@@ -63,7 +63,7 @@ let crc32 s =
   let table = Lazy.force crc_table in
   let c = ref 0xFFFFFFFF in
   String.iter s ~f:(fun ch ->
-    c := table.((!c lxor Char.to_int ch) land 0xFF) lxor (!c lsr 8));
+    c := table.(!c lxor Char.to_int ch land 0xFF) lxor (!c lsr 8));
   !c lxor 0xFFFFFFFF
 ;;
 
@@ -115,11 +115,14 @@ let png_with ~width ~height ~pixel =
   ^ chunk "IEND" ""
 ;;
 
-let png ~width ~height = png_with ~width ~height ~pixel:(fun ~x:_ ~y:_ -> '\x80')
+let png ~width ~height =
+  png_with ~width ~height ~pixel:(fun ~x:_ ~y:_ -> '\x80')
+;;
 
 let to_scaled t (x, y) =
   let map v ~real ~scaled =
-    Float.iround_nearest_exn (Float.of_int v *. Float.of_int scaled /. Float.of_int real)
+    Float.iround_nearest_exn
+      (Float.of_int v *. Float.of_int scaled /. Float.of_int real)
   in
   ( map x ~real:t.info.width ~scaled:t.info.scaled_width
   , map y ~real:t.info.height ~scaled:t.info.scaled_height )
@@ -147,7 +150,9 @@ let point (x, y) =
 
 let act t (action : Computer_action.t) =
   let record fmt = ksprintf (fun s -> Queue.enqueue t.log s) fmt in
-  let real (p : Computer_action.Point.t) = Computer_info.to_real t.info ~x:p.x ~y:p.y in
+  let real (p : Computer_action.Point.t) =
+    Computer_info.to_real t.info ~x:p.x ~y:p.y
+  in
   let move_to p =
     let x, y = real p in
     record "move %d,%d" x y;
@@ -221,7 +226,8 @@ let act t (action : Computer_action.t) =
        [ Some ("ok", `True)
        ; Some ("text", `String text)
        ; Some ("cursor", point (to_scaled t t.cursor))
-       ; Option.map (Computer_action.point action) ~f:(fun p -> "real", point (real p))
+       ; Option.map (Computer_action.point action) ~f:(fun p ->
+           "real", point (real p))
        ; Option.map shot ~f:(fun s -> "screenshot", s)
        ])
 ;;

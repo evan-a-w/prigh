@@ -473,7 +473,8 @@ let serve_connection
                      "home", `String home)
                  ; Some ("tools", `True)
                  ; Option.map computer ~f:(fun helper ->
-                     "computer", Computer_info.to_json (Computer_helper.info helper))
+                     ( "computer"
+                     , Computer_info.to_json (Computer_helper.info helper) ))
                  ; Some ("host_id", `String host_id)
                  ; Some
                      ( "features"
@@ -481,10 +482,11 @@ let serve_connection
                          (List.map
                             (features
                              @ [ "heartbeat" ]
-                             @ Option.value_map computer ~default:[] ~f:(fun _ ->
-                               [ Computer_info.feature ]))
-                            ~f:(fun f ->
-                            `String f)) )
+                             @ Option.value_map
+                                 computer
+                                 ~default:[]
+                                 ~f:(fun _ -> [ Computer_info.feature ]))
+                            ~f:(fun f -> `String f)) )
                  ; Some
                      ( "running_execs"
                      , `Array

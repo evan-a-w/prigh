@@ -615,7 +615,8 @@ let%expect_test "stdio worker: the computer tool, off and on" =
   Worker.close on;
   ignore (Worker.read_line on : string option);
   List.iter (Computer_fake.log fake) ~f:print_endline;
-  [%expect {|
+  [%expect
+    {|
     {"type":"result","exec_id":"e1","text":"computer use is off on this tool host: start it with -computer (prigh tool-host -computer, prigh desktop -computer, or programs.prigh.desktop .computerUse in Home Manager)","is_error":true}
     (worker finished)
     {"type":"result","exec_id":"e1","text":"click (10, 20) → (20, 40) on the screen\ncursor at (10, 20)\nscreenshot 1280×800","is_error":false,"images":[{"mime_type":"image/png","data":"…"}]}
@@ -636,7 +637,8 @@ let%expect_test "network tool host: hello says it runs the computer tool" =
     Test_rpc.make_server t ~sw ~provider:(Faux_provider.create [])
   in
   call t h "hello" {|{}|};
-  [%expect {| {"type":"response","id":"r","ok":true,"result":{"client_id":"client-1","host_id":"client-1","namespace":null,"user":null,"superuser":false,"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"supports_images":false,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","active_host_name":"<host>","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"plan":null,"session_rules":[]}}} |}];
+  [%expect
+    {| {"type":"response","id":"r","ok":true,"result":{"client_id":"client-1","host_id":"client-1","namespace":null,"user":null,"superuser":false,"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"supports_images":false,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","active_host_name":"<host>","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"plan":null,"session_rules":[]}}} |}];
   let listener = Listener.start t ~sw h.server in
   let fake = Computer_fake.create () in
   let computer =
@@ -656,7 +658,8 @@ let%expect_test "network tool host: hello says it runs the computer tool" =
   Host.wait_logs t host 1;
   show_hosts t agent;
   call t h "get_state" {|{}|};
-  [%expect {|
+  [%expect
+    {|
     connected to 127.0.0.1:PORT as client-2
     active=backend hosts=(((id backend)(name <host>)(cwd $DIR)(session_id())(session_name())(home $HOME)(git_location))((id host-box)(name box)(cwd $DIR/host)(session_id(<id>))(session_name())(home $HOME)(exec_input)(git_location)(computer((backend fake)(detail())(platform linux)(output(FAKE-1))(width 2560)(height 1600)(scale 1)(scaled_width 1280)(scaled_height 800)))))
     {"type":"response","id":"r","ok":true,"result":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"supports_images":false,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","active_host_name":"<host>","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"},{"id":"host-box","name":"box","cwd":"$DIR/host","session_id":"<id>","session_name":null,"home":"$HOME","computer":{"backend":"fake","platform":"linux","output":"FAKE-1","width":2560,"height":1600,"scale":1,"scaled_width":1280,"scaled_height":800}}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"plan":null,"session_rules":[]}}

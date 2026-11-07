@@ -82,7 +82,8 @@ let to_real t ~x ~y =
     in
     Int.clamp_exn r ~min:0 ~max:(real - 1)
   in
-  map x ~real:t.width ~scaled:t.scaled_width, map y ~real:t.height ~scaled:t.scaled_height
+  ( map x ~real:t.width ~scaled:t.scaled_width
+  , map y ~real:t.height ~scaled:t.scaled_height )
 ;;
 
 let scaled_size ~max_long_side ~max_pixels ~width ~height =
@@ -109,4 +110,5 @@ let to_string_hum t =
     t.scaled_width
     t.scaled_height
 ;;
+
 let feature = "computer"

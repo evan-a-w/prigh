@@ -31,7 +31,10 @@ module Point = struct
   [@@deriving sexp_of, equal]
 
   let to_string { x; y } = sprintf "(%d, %d)" x y
-  let to_json { x; y } = `Array [ `Number (Int.to_string x); `Number (Int.to_string y) ]
+
+  let to_json { x; y } =
+    `Array [ `Number (Int.to_string x); `Number (Int.to_string y) ]
+  ;;
 end
 
 module Region = struct
@@ -110,7 +113,8 @@ let of_json json =
   let%bind fields =
     match json with
     | `Object fields -> Ok fields
-    | _ -> Or_error.error_string "the arguments must be an object with \"action\""
+    | _ ->
+      Or_error.error_string "the arguments must be an object with \"action\""
   in
   let find name = List.Assoc.find fields ~equal:String.equal name in
   let%bind action =
@@ -137,7 +141,8 @@ let of_json json =
       let%bind x = coordinate "x" x in
       let%bind y = coordinate "y" y in
       Ok (Some { Point.x; y })
-    | _ -> fail "give both \"x\" and \"y\" (or neither, for where the pointer is)"
+    | _ ->
+      fail "give both \"x\" and \"y\" (or neither, for where the pointer is)"
   in
   let point () =
     match%bind point_opt () with
@@ -180,7 +185,11 @@ let of_json json =
   let seconds name ~limit =
     match Option.bind (find name) ~f:number_of with
     | Some s when Float.(s > 0. && s <= Float.of_int limit) -> Ok s
-    | _ -> fail "%S must be a number of seconds, more than 0 and at most %d" name limit
+    | _ ->
+      fail
+        "%S must be a number of seconds, more than 0 and at most %d"
+        name
+        limit
   in
   match action with
   | "screenshot" -> Ok Screenshot
@@ -229,7 +238,8 @@ let of_json json =
     let%bind dy = int_field "dy" ~default:0 in
     let%bind () =
       if dx = 0 && dy = 0
-      then fail "give \"dy\" (notches, positive down) or \"dx\" (positive right)"
+      then
+        fail "give \"dy\" (notches, positive down) or \"dx\" (positive right)"
       else Ok ()
     in
     let%bind keys = string_opt "keys" in
@@ -238,7 +248,9 @@ let of_json json =
     let%bind text = string "text" ~what:"the text to type" in
     Ok (Type text)
   | "key" ->
-    let%bind combo = string "combo" ~what:"the keys, e.g. \"ctrl+shift+t\" or \"Return\"" in
+    let%bind combo =
+      string "combo" ~what:"the keys, e.g. \"ctrl+shift+t\" or \"Return\""
+    in
     Ok (Key combo)
   | "hold_key" ->
     let%bind combo = string "combo" ~what:"the keys to hold, e.g. \"shift\"" in
@@ -257,7 +269,8 @@ let of_json json =
        if x1 > x0 && y1 > y0
        then Ok (Zoom { x0; y0; x1; y1 })
        else fail "\"region\" is [x0, y0, x1, y1] with x1 > x0 and y1 > y0"
-     | _ -> fail "needs \"region\": [x0, y0, x1, y1] in the screenshot's coordinates")
+     | _ ->
+       fail "needs \"region\": [x0, y0, x1, y1] in the screenshot's coordinates")
   | other ->
     Or_error.errorf
       "unknown action %S: use one of %s"
@@ -282,24 +295,39 @@ let to_json t =
     | Screenshot -> [ "action", `String "screenshot" ]
     | Cursor_position -> [ "action", `String "cursor_position" ]
     | Click { at = p; button = b; count; keys = k } ->
-      [ "action", `String "click" ] @ at p @ button b @ [ "count", int count ] @ keys k
+      [ "action", `String "click" ]
+      @ at p
+      @ button b
+      @ [ "count", int count ]
+      @ keys k
     | Move p -> [ "action", `String "move" ] @ at (Some p)
     | Drag { path; button = b; keys = k } ->
-      [ "action", `String "drag"; "path", `Array (List.map path ~f:Point.to_json) ]
+      [ "action", `String "drag"
+      ; "path", `Array (List.map path ~f:Point.to_json)
+      ]
       @ button b
       @ keys k
     | Mouse_down { at = p; button = b } ->
       [ "action", `String "mouse_down" ] @ at p @ button b
-    | Mouse_up { at = p; button = b } -> [ "action", `String "mouse_up" ] @ at p @ button b
+    | Mouse_up { at = p; button = b } ->
+      [ "action", `String "mouse_up" ] @ at p @ button b
     | Scroll { at = p; dx; dy; keys = k } ->
-      [ "action", `String "scroll" ] @ at p @ [ "dx", int dx; "dy", int dy ] @ keys k
+      [ "action", `String "scroll" ]
+      @ at p
+      @ [ "dx", int dx; "dy", int dy ]
+      @ keys k
     | Type text -> [ "action", `String "type"; "text", `String text ]
     | Key combo -> [ "action", `String "key"; "combo", `String combo ]
     | Hold_key { combo; duration } ->
-      [ "action", `String "hold_key"; "combo", `String combo; "duration", float duration ]
+      [ "action", `String "hold_key"
+      ; "combo", `String combo
+      ; "duration", float duration
+      ]
     | Wait s -> [ "action", `String "wait"; "seconds", float s ]
     | Zoom { x0; y0; x1; y1 } ->
-      [ "action", `String "zoom"; "region", `Array [ int x0; int y0; int x1; int y1 ] ]
+      [ "action", `String "zoom"
+      ; "region", `Array [ int x0; int y0; int x1; int y1 ]
+      ]
   in
   `Object fields
 ;;
@@ -343,23 +371,39 @@ let describe t =
   | Mouse_up { at = p; button } -> button_prefix button ^ "mouse up" ^ at p
   | Scroll { at = p; dx; dy; keys } ->
     let part n ~pos ~neg =
-      if n = 0 then [] else [ sprintf "%s%d" (if n > 0 then pos else neg) (abs n) ]
+      if n = 0
+      then []
+      else [ sprintf "%s%d" (if n > 0 then pos else neg) (abs n) ]
     in
-    let amount = String.concat ~sep:" " (part dy ~pos:"↓" ~neg:"↑" @ part dx ~pos:"→" ~neg:"←") in
-    with_keys keys "scroll " ^ amount ^ Option.value_map p ~default:"" ~f:(fun p -> " at " ^ Point.to_string p)
+    let amount =
+      String.concat
+        ~sep:" "
+        (part dy ~pos:"↓" ~neg:"↑" @ part dx ~pos:"→" ~neg:"←")
+    in
+    with_keys keys "scroll "
+    ^ amount
+    ^ Option.value_map p ~default:"" ~f:(fun p -> " at " ^ Point.to_string p)
   | Type text -> "type " ^ quoted text
   | Key combo -> "key " ^ combo
   | Hold_key { combo; duration } ->
-    sprintf "hold %s for %ss" combo (Float.to_string_hum ~strip_zero:true ~decimals:2 duration)
-  | Wait s -> sprintf "wait %ss" (Float.to_string_hum ~strip_zero:true ~decimals:2 s)
+    sprintf
+      "hold %s for %ss"
+      combo
+      (Float.to_string_hum ~strip_zero:true ~decimals:2 duration)
+  | Wait s ->
+    sprintf "wait %ss" (Float.to_string_hum ~strip_zero:true ~decimals:2 s)
   | Zoom { x0; y0; x1; y1 } -> sprintf "zoom [%d, %d, %d, %d]" x0 y0 x1 y1
 ;;
 
 let point = function
-  | Click { at; _ } | Mouse_down { at; _ } | Mouse_up { at; _ } | Scroll { at; _ } -> at
+  | Click { at; _ }
+  | Mouse_down { at; _ }
+  | Mouse_up { at; _ }
+  | Scroll { at; _ } -> at
   | Move p -> Some p
   | Drag { path; _ } -> List.last path
-  | Screenshot | Cursor_position | Type _ | Key _ | Hold_key _ | Wait _ | Zoom _ -> None
+  | Screenshot | Cursor_position | Type _ | Key _ | Hold_key _ | Wait _ | Zoom _
+    -> None
 ;;
 
 let takes_screenshot = function
@@ -374,7 +418,12 @@ let parameters =
        @ Option.value_map enum ~default:[] ~f:(fun values ->
          [ "enum", `Array (List.map values ~f:(fun v -> `String v)) ]))
   in
-  let point = `Object [ "type", `String "array"; "items", `Object [ "type", `String "integer" ] ] in
+  let point =
+    `Object
+      [ "type", `String "array"
+      ; "items", `Object [ "type", `String "integer" ]
+      ]
+  in
   `Object
     [ "type", `String "object"
     ; ( "properties"
@@ -383,29 +432,46 @@ let parameters =
             , prop
                 "string"
                 ~enum:names
-                "What to do. Every action but wait returns a screenshot afterwards." )
-          ; "x", prop "integer" "Horizontal coordinate in the screenshot (click, move, mouse_down/up, scroll; default: where the pointer is)"
+                "What to do. Every action but wait returns a screenshot \
+                 afterwards." )
+          ; ( "x"
+            , prop
+                "integer"
+                "Horizontal coordinate in the screenshot (click, move, \
+                 mouse_down/up, scroll; default: where the pointer is)" )
           ; "y", prop "integer" "Vertical coordinate in the screenshot"
           ; ( "button"
             , prop
                 "string"
                 ~enum:(List.map Button.all ~f:Button.to_string)
                 "Mouse button (default left)" )
-          ; "count", prop "integer" "click: 1, 2 (double-click) or 3 (triple-click)"
-          ; "keys", prop "string" "Modifier keys held during a click, drag or scroll, e.g. \"ctrl+shift\""
+          ; ( "count"
+            , prop "integer" "click: 1, 2 (double-click) or 3 (triple-click)" )
+          ; ( "keys"
+            , prop
+                "string"
+                "Modifier keys held during a click, drag or scroll, e.g. \
+                 \"ctrl+shift\"" )
           ; ( "path"
             , `Object
                 [ "type", `String "array"
                 ; "items", point
-                ; "description", `String "drag: the points [[x, y], ...] the pointer goes through, at least two"
+                ; ( "description"
+                  , `String
+                      "drag: the points [[x, y], ...] the pointer goes \
+                       through, at least two" )
                 ] )
-          ; "dx", prop "integer" "scroll: wheel notches to the right (negative: left)"
+          ; ( "dx"
+            , prop
+                "integer"
+                "scroll: wheel notches to the right (negative: left)" )
           ; "dy", prop "integer" "scroll: wheel notches down (negative: up)"
           ; "text", prop "string" "type: the text to type (any Unicode)"
           ; ( "combo"
             , prop
                 "string"
-                "key, hold_key: keys like \"ctrl+shift+t\", \"Return\", \"alt+Tab\"; several separated by spaces are pressed in turn" )
+                "key, hold_key: keys like \"ctrl+shift+t\", \"Return\", \
+                 \"alt+Tab\"; several separated by spaces are pressed in turn" )
           ; "duration", prop "number" "hold_key: seconds to hold (at most 10)"
           ; "seconds", prop "number" "wait: seconds (at most 30)"
           ; ( "region"
@@ -414,7 +480,8 @@ let parameters =
                 ; "items", `Object [ "type", `String "integer" ]
                 ; ( "description"
                   , `String
-                      "zoom: [x0, y0, x1, y1] in the screenshot; returns that area at the screen's full resolution" )
+                      "zoom: [x0, y0, x1, y1] in the screenshot; returns that \
+                       area at the screen's full resolution" )
                 ] )
           ] )
     ; "required", `Array [ `String "action" ]
