@@ -117,7 +117,8 @@ module Doc = struct
     ; mtime : float
     ; name : string option
     ; texts : (int * string) array (** weight, text; the name first, if any *)
-    ; words : int String.Table.t (** each word's best weight *)
+    ; mutable words : string array
+      (** its distinct words, the postings' strings (set by [add]) *)
     }
 
   let texts ~name session =
@@ -149,23 +150,25 @@ module Doc = struct
        @ messages)
   ;;
 
+  (* The document and each of its words' best weight. *)
   let create ~num ~(summary : Session.Summary.t) ~size ~mtime session =
     let texts = texts ~name:summary.name session in
-    let table = String.Table.create () in
+    let weights = String.Table.create () in
     Array.iter texts ~f:(fun (weight, text) ->
       List.iter (words text) ~f:(fun w ->
-        Hashtbl.update table w ~f:(function
+        Hashtbl.update weights w ~f:(function
           | Some best -> Int.max best weight
           | None -> weight)));
-    { num
-    ; id = summary.id
-    ; path = summary.path
-    ; size
-    ; mtime
-    ; name = summary.name
-    ; texts
-    ; words = table
-    }
+    ( { num
+      ; id = summary.id
+      ; path = summary.path
+      ; size
+      ; mtime
+      ; name = summary.name
+      ; texts
+      ; words = [||]
+      }
+    , weights )
   ;;
 end
 
@@ -181,11 +184,48 @@ let letters w =
     acc lor (1 lsl bit))
 ;;
 
+(* A word's sessions, packed: a few bytes each, as there are millions. *)
 module Posting = struct
   type t =
-    { letters : int
-    ; docs : int Int.Table.t (** by [Doc.num], the word's best weight there *)
+    { word : string
+    ; letters : int
+    ; mutable docs : int array
+      (** [Doc.num lsl 3 lor weight], the word's best weight there; the first
+        [len] are used *)
+    ; mutable len : int
     }
+
+  let create word = { word; letters = letters word; docs = [||]; len = 0 }
+
+  let add t ~num ~weight =
+    if t.len = Array.length t.docs
+    then (
+      let docs = Array.create ~len:(Int.max 2 (t.len * 2)) 0 in
+      Array.blit ~src:t.docs ~src_pos:0 ~dst:docs ~dst_pos:0 ~len:t.len;
+      t.docs <- docs);
+    t.docs.(t.len) <- (num lsl 3) lor weight;
+    t.len <- t.len + 1
+  ;;
+
+  let remove t ~num =
+    match Array.findi t.docs ~f:(fun i e -> i < t.len && e lsr 3 = num) with
+    | None -> ()
+    | Some (i, _) ->
+      t.len <- t.len - 1;
+      t.docs.(i) <- t.docs.(t.len)
+  ;;
+
+  let trim t =
+    if Array.length t.docs > t.len
+    then t.docs <- Array.sub t.docs ~pos:0 ~len:t.len
+  ;;
+
+  let iter t ~f =
+    for i = 0 to t.len - 1 do
+      let e = t.docs.(i) in
+      f ~num:(e lsr 3) ~weight:(e land 7)
+    done
+  ;;
 end
 
 type t =
@@ -209,23 +249,25 @@ let create () =
 let remove t (doc : Doc.t) =
   Hashtbl.remove t.docs doc.path;
   t.free <- doc.num :: t.free;
-  Hashtbl.iter_keys doc.words ~f:(fun w ->
+  Array.iter doc.words ~f:(fun w ->
     match Hashtbl.find t.postings w with
     | None -> ()
-    | Some { docs; _ } ->
-      Hashtbl.remove docs doc.num;
-      if Hashtbl.is_empty docs then Hashtbl.remove t.postings w)
+    | Some posting ->
+      Posting.remove posting ~num:doc.num;
+      if posting.len = 0 then Hashtbl.remove t.postings w)
 ;;
 
-let add t (doc : Doc.t) =
+let add t ((doc : Doc.t), weights) =
   Hashtbl.set t.docs ~key:doc.path ~data:doc;
-  Hashtbl.iteri doc.words ~f:(fun ~key:w ~data:weight ->
-    Hashtbl.set
-      (Hashtbl.find_or_add t.postings w ~default:(fun () ->
-         { Posting.letters = letters w; docs = Int.Table.create () }))
-        .docs
-      ~key:doc.num
-      ~data:weight)
+  doc.words
+  <- Array.of_list
+       (Hashtbl.fold weights ~init:[] ~f:(fun ~key:w ~data:weight words ->
+          let posting =
+            Hashtbl.find_or_add t.postings w ~default:(fun () ->
+              Posting.create w)
+          in
+          Posting.add posting ~num:doc.num ~weight;
+          posting.word :: words))
 ;;
 
 let refresh ?(yield = ignore) t ~sessions ~load =
@@ -276,7 +318,10 @@ let index t ~sessions ~load ~yield =
     let indexing, resolve = Promise.create () in
     t.indexing <- Some indexing;
     Exn.protect
-      ~f:(fun () -> refresh t ~sessions:(sessions ()) ~load ~yield)
+      ~f:(fun () ->
+        refresh t ~sessions:(sessions ()) ~load ~yield;
+        (* Growing them left up to half of each unused. *)
+        Hashtbl.iter t.postings ~f:Posting.trim)
       ~finally:(fun () ->
         t.indexing <- None;
         Promise.resolve resolve ())
@@ -288,15 +333,15 @@ let indexed t = Hashtbl.length t.docs
 let scores t ~w =
   let best = Array.create ~len:(t.next + 1) 0 in
   let wanted = letters w in
-  Hashtbl.iteri t.postings ~f:(fun ~key:v ~data:{ letters; docs } ->
+  Hashtbl.iteri t.postings ~f:(fun ~key:v ~data:(posting : Posting.t) ->
     (* Every match but a typo has all of [w]'s letters; a typo all but one. *)
-    let missing = wanted land lnot letters in
+    let missing = wanted land lnot posting.letters in
     if missing land (missing - 1) = 0
     then (
       match kind ~w v with
       | None -> ()
       | Some (k, _) ->
-        Hashtbl.iteri docs ~f:(fun ~key:num ~data:weight ->
+        Posting.iter posting ~f:(fun ~num ~weight ->
           best.(num) <- Int.max best.(num) (k * weight))));
   best
 ;;
