@@ -247,8 +247,11 @@ The layers below cut across those groups.
 
 - `Import` — `Json = Jsonaf`, Eio aliases, `Env.t`.
 - `Cancellation`, `Process` (streamed subprocess with timeout/kill; the
-  child leads its own process group and the whole group is killed, so a
-  cancelled `bash` cannot leave grandchildren holding the output pipes),
+  child leads its own process group, and a cancel or timeout stops then
+  SIGKILLs that group and every descendant (`Process_tree`, from `/proc` or
+  `ps`: what left the group, like `timeout` or `setsid`, dies too), then
+  waits at most a second more for the output pipes, which a daemon that
+  escaped to init may hold, so a cancelled `bash` always returns at once),
   `Http_client` (cohttp-eio + ocaml-tls; `post` and streaming
   `post_stream`, whose `idle_timeout` gives up a response or body that
   sends nothing for that long: `Stalled`; a connection broken mid-body is
@@ -900,7 +903,7 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   fiber while the turn goes on, its streamed `tool_exec_output` chunks
   feeding the job's buffer (`Agent.executor` runs the spawning call itself in
   the backend, never on the host). Killing a job cancels that call, which
-  kills the process group (locally, or on the host via `tool_exec_cancel`); a
+  kills its process tree (locally, or on the host via `tool_exec_cancel`); a
   host disconnecting fails it. The outcome's status is read from the
   foreground result's trailer (`[exit code N]`, `[cancelled]`, `[killed by
   ...]`, `[timed out ...]`), its body is the last 40 lines of output.
