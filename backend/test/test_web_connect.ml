@@ -667,8 +667,17 @@ module Desktop = struct
     ; ended : Desktop_sidecar.Ended.t Eio.Promise.or_exn
     ; close_stdin : unit -> unit
     ; saved : Saved_connection.t Queue.t
-    ; pages : Desktop_sidecar.Page.t Queue.t (** said after the first *)
+    ; pages : Desktop_sidecar.Page.t Eio.Stream.t (** said after the first *)
     }
+
+  (* A page line as the shell reads it, the page here's port and key
+     masked. *)
+  let page_line page =
+    Re.replace
+      (Re.compile (Re.Perl.re "127\\.0\\.0\\.1:[0-9]+/#desktop=[0-9a-f]+"))
+      ~f:(fun _ -> "127.0.0.1:SITE/#desktop=<key>")
+      (Desktop_sidecar.Page.to_json_line page)
+  ;;
 
   let start
         ?(ui = Desktop_sidecar.Ui.Local)
@@ -693,12 +702,20 @@ module Desktop = struct
           Option.value save ~default:(fun c ->
             Queue.enqueue saved c;
             Ok ())
+      ; remember_signin =
+          (fun remote grant ->
+            printf
+              "remember_signin: %s with %s (cookie %s)\n"
+              (Backend_address.to_string remote)
+              (Sexp.to_string_hum [%sexp (grant : Browser_signin.Grant.t)])
+              (Option.value remote.proxy_cookie ~default:"none");
+            Ok ())
       }
     in
     Core_unix.mkdir_p config.cwd;
     let stdin, stdin_writer = Eio_unix.pipe sw in
     let first, set_first = Eio.Promise.create () in
-    let pages = Queue.create () in
+    let pages = Eio.Stream.create Int.max_value in
     let ended =
       Eio.Fiber.fork_promise ~sw (fun () ->
         Desktop_sidecar.run
@@ -708,34 +725,31 @@ module Desktop = struct
           ~log:(Queue.enqueue logs)
           ~on_page:(fun page ->
             if not (Eio.Promise.try_resolve set_first page)
-            then Queue.enqueue pages page)
+            then Eio.Stream.add pages page)
           ~stdin
           config)
     in
     let (first : Desktop_sidecar.Page.t) = Eio.Promise.await first in
-    let url = first.url in
-    if first.remote
-    then (
-      printf "first page: %s\n" (Desktop_sidecar.Page.to_json_line first);
-      { url
-      ; key = ""
-      ; port = 0
-      ; ended
-      ; close_stdin = (fun () -> Eio.Flow.close stdin_writer)
-      ; saved
-      ; pages
-      })
-    else (
-      let port =
-        String.lsplit2_exn url ~on:':'
-        |> snd
-        |> String.lsplit2_exn ~on:':'
-        |> snd
-        |> String.lsplit2_exn ~on:'/'
-        |> fst
-        |> Int.of_string
-      in
-      let key = String.lsplit2_exn url ~on:'=' |> snd in
+    let url =
+      if first.remote then Option.value_exn first.signin else first.url
+    in
+    if first.remote then printf "first page: %s\n" (page_line first);
+    let port =
+      String.lsplit2_exn url ~on:':'
+      |> snd
+      |> String.lsplit2_exn ~on:':'
+      |> snd
+      |> String.lsplit2_exn ~on:'/'
+      |> fst
+      |> Int.of_string
+    in
+    let key =
+      String.lsplit2_exn url ~on:'='
+      |> snd
+      |> String.chop_suffix_if_exists ~suffix:"&signin=1"
+    in
+    if not first.remote
+    then
       printf
         "url: %s\n"
         (url
@@ -743,21 +757,26 @@ module Desktop = struct
               ~pattern:(sprintf ":%d/" port)
               ~with_:":PORT/"
          |> String.substr_replace_all ~pattern:key ~with_:"<key>");
-      { url
-      ; key
-      ; port
-      ; ended
-      ; close_stdin = (fun () -> Eio.Flow.close stdin_writer)
-      ; saved
-      ; pages
-      })
+    { url
+    ; key
+    ; port
+    ; ended
+    ; close_stdin = (fun () -> Eio.Flow.close stdin_writer)
+    ; saved
+    ; pages
+    }
   ;;
 
   (* The pages said since, as the shell reads them. *)
   let show_pages d =
-    Queue.iter d.pages ~f:(fun page ->
-      printf "page: %s\n" (Desktop_sidecar.Page.to_json_line page));
-    Queue.clear d.pages
+    let rec loop () =
+      match Eio.Stream.take_nonblocking d.pages with
+      | Some page ->
+        printf "page: %s\n" (page_line page);
+        loop ()
+      | None -> ()
+    in
+    loop ()
   ;;
 
   (* A [POST] of [fields] (and the key, unless [key] says otherwise) to
@@ -1092,7 +1111,7 @@ let%expect_test
     url: http://127.0.0.1:PORT/#desktop=<key>
     status HTTP/1.1 200 OK: {"state":"connect","address":null,"user":null,"error":null}
     connect HTTP/1.1 200 OK: {"ok":true,"remote":"http://127.0.0.1:PORT/#app=desktop&host=host-laptop"}
-    page: {"url":"http://127.0.0.1:PORT/#app=desktop&host=host-laptop","remote":true}
+    page: {"url":"http://127.0.0.1:PORT/#app=desktop&host=host-laptop","remote":true,"signin":"http://127.0.0.1:SITE/#desktop=<key>&signin=1"}
     status HTTP/1.1 200 OK: {"state":"remote","url":"http://127.0.0.1:PORT/#app=desktop&host=host-laptop"}
     HTTP/1.1 405 Method Not Allowed
       Cache-Control: no-cache
@@ -1147,9 +1166,9 @@ let%expect_test
   print_string (unport backend_port [%expect.output]);
   [%expect
     {|
-    first page: {"url":"http://127.0.0.1:PORT/#app=desktop&host=host-laptop","remote":true}
+    first page: {"url":"http://127.0.0.1:PORT/#app=desktop&host=host-laptop","remote":true,"signin":"http://127.0.0.1:SITE/#desktop=<key>&signin=1"}
     Stdin_closed
-    first page: {"url":"http://127.0.0.1:PORT/#app=desktop","remote":true}
+    first page: {"url":"http://127.0.0.1:PORT/#app=desktop","remote":true,"signin":"http://127.0.0.1:SITE/#desktop=<key>&signin=1"}
     Stdin_closed
     tool host: connected to 127.0.0.1:PORT as client-N
     tools run on this machine, in $DIR/here
@@ -1498,5 +1517,407 @@ let%expect_test
     connect HTTP/1.1 200 OK: {"ok":false,"error":"connected to 127.0.0.1:PORT, but starting failed: (Failure \"disk on fire\")"}
     status HTTP/1.1 200 OK: {"state":"connect","address":"127.0.0.1:PORT","user":null,"error":"connected to 127.0.0.1:PORT, but starting failed: (Failure \"disk on fire\")"}
     Stdin_closed
+    |}]
+;;
+
+(* [prigh desktop -ui remote] in front of a sign-in proxy (authentik's
+   forward auth): the page here offers signing in through the default
+   browser or in the window instead of the window looping through the
+   login. *)
+module Proxied = struct
+  type p =
+    { proxy : int
+    ; remote : Backend_address.t
+    }
+
+  let start t ~sw ~backend_port ~ws_exempt =
+    let proxy =
+      Fake_signin_proxy.start
+        ~env:t.env
+        ~sw
+        ~ws_exempt
+        ~fresh_state:true
+        ~upstream:backend_port
+        ()
+    in
+    { proxy; remote = address (sprintf "ws://127.0.0.1:%d/ws" proxy) }
+  ;;
+
+  let cli_signin = Re.compile (Re.Perl.re "cli-signin=[0-9]+\\.[^&\"]+")
+
+  (* Ports and the sign-in's one-time state masked. *)
+  let clean t ~backend_port p s =
+    Re.replace_string cli_signin ~by:"cli-signin=LISTENER.STATE" s
+    |> mask t
+    |> String.substr_replace_all
+         ~pattern:(sprintf ":%d" p.proxy)
+         ~with_:":PROXY"
+    |> unport backend_port
+  ;;
+
+  (* The listener's port and state from the URL the shell is to open. *)
+  let listener (page : Desktop_sidecar.Page.t) =
+    let _, value = String.lsplit2_exn page.url ~on:'#' in
+    let value = String.chop_prefix_exn value ~prefix:"cli-signin=" in
+    let value, _ = String.lsplit2_exn value ~on:'&' in
+    let port, state = String.lsplit2_exn value ~on:'.' in
+    Int.of_string port, state
+  ;;
+
+  (* What the browser does once prigh-web's page there is allowed: posts
+     the proxy's cookie with the state to the listener. *)
+  let allow t ?(fields = []) page =
+    let port, state = listener page in
+    let response =
+      Fake_signin_proxy.request
+        ~env:t.env
+        ~port
+        ~meth:"POST"
+        ~headers:[ "Content-Type", "application/x-www-form-urlencoded" ]
+        ~body:
+          (Uri.encoded_of_query
+             (List.map
+                ([ "state", state; "cookie", Fake_signin_proxy.cookie ] @ fields)
+                ~f:(fun (k, v) -> k, [ v ])))
+        "/callback"
+    in
+    List.hd_exn (String.split_lines response)
+  ;;
+end
+
+let%expect_test "the site probe: a sign-in proxy's login, or not" =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let _h, backend_port = backend t ~sw in
+  let p = Proxied.start t ~sw ~backend_port ~ws_exempt:true in
+  let probe remote =
+    print_endline
+      (Proxied.clean
+         t
+         ~backend_port
+         p
+         (Sexp.to_string_hum
+            [%sexp (Site_probe.run ~env:t.env remote : Site_probe.Result.t)]))
+  in
+  probe p.remote;
+  probe
+    (Backend_address.with_proxy_cookie p.remote (Some Fake_signin_proxy.cookie));
+  probe (address (sprintf "ws://127.0.0.1:%d/ws" backend_port));
+  probe (address (sprintf "127.0.0.1:%d" p.proxy));
+  probe (address "ws://127.0.0.1:1/ws");
+  [%expect
+    {|
+    (Signin_required
+     (why
+      "127.0.0.1:PROXY answered with a login page (HTTP/1.1 302 Found to https://login.example.com/outpost.goauthentik.io/start)")
+     (login (login.example.com)))
+    Open
+    Open
+    Open
+    (Unreachable "connection refused")
+    |}]
+;;
+
+let%expect_test
+    "prigh desktop -ui remote behind a sign-in proxy (/ws exempt): signing in \
+     through the browser, then it expires"
+  =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let _h, backend_port = backend t ~sw in
+  let p = Proxied.start t ~sw ~backend_port ~ws_exempt:true in
+  Eio.Switch.run
+  @@ fun sw ->
+  let logs = Queue.create () in
+  let d =
+    Desktop.start
+      ~ui:Remote
+      t
+      ~sw
+      ~logs
+      (Check
+         { remote = p.remote
+         ; credentials = { token = Some "sekrit"; user = None }
+         ; source = Saved "~/.prigh/tui-connection.sexp"
+         ; save = None
+         })
+  in
+  let post ?(fields = []) what =
+    ignore (Desktop.post t ~sw d what fields : string option)
+  in
+  let signin how = post "signin" ~fields:[ "how", `String how ] in
+  post "status";
+  (* Nothing is under way to open again or cancel. *)
+  signin "again";
+  signin "nonsense";
+  post "connect" ~fields:[ "address", `String "127.0.0.1:1" ];
+  (* Through the browser: the shell is told to open it there; the page
+     shows it is waiting, and can open it again. *)
+  let grant = ref "" in
+  Eio.Fiber.both
+    (fun () -> signin "browser")
+    (fun () ->
+       let page = Eio.Stream.take d.pages in
+       printf "page: %s\n" (Desktop.page_line page);
+       post "status";
+       signin "again";
+       Desktop.show_pages d;
+       grant := Proxied.allow t page);
+  print_endline !grant;
+  Desktop.show_pages d;
+  post "status";
+  signin "browser";
+  print_string (Proxied.clean t ~backend_port p [%expect.output]);
+  [%expect
+    {|
+    url: http://127.0.0.1:PORT/#desktop=<key>
+    status HTTP/1.1 200 OK: {"state":"signin","site":"127.0.0.1:PROXY","login":"login.example.com","waiting":null,"error":null,"expired":false}
+    signin HTTP/1.1 200 OK: {"ok":false,"error":"No sign-in through the browser is under way: start one."}
+    signin HTTP/1.1 200 OK: {"ok":false,"error":"\"how\": \"browser\", \"again\", \"cancel\" or \"here\" expected"}
+    connect HTTP/1.1 200 OK: {"ok":false,"error":"Signing in to 127.0.0.1:PROXY: reload the page."}
+    page: {"url":"http://127.0.0.1:PROXY/#cli-signin=LISTENER.STATE&program=desktop","external":true}
+    status HTTP/1.1 200 OK: {"state":"signin","site":"127.0.0.1:PROXY","login":"login.example.com","waiting":"http://127.0.0.1:PROXY/#cli-signin=LISTENER.STATE&program=desktop","error":null,"expired":false}
+    signin HTTP/1.1 200 OK: {"ok":true}
+    page: {"url":"http://127.0.0.1:PROXY/#cli-signin=LISTENER.STATE&program=desktop","external":true}
+    remember_signin: ws://127.0.0.1:PROXY/ws with ((proxy_cookie <opaque>) (token ()) (user ())) (cookie proxy_session=s3cret-session)
+    signin HTTP/1.1 200 OK: {"ok":true,"remote":"http://127.0.0.1:PROXY/#app=desktop&host=host-laptop"}
+    HTTP/1.1 200 OK
+    page: {"url":"http://127.0.0.1:PROXY/#app=desktop&host=host-laptop","remote":true,"cookie":"proxy_session=s3cret-session","signin":"http://127.0.0.1:SITE/#desktop=<key>&signin=1"}
+    status HTTP/1.1 200 OK: {"state":"remote","url":"http://127.0.0.1:PROXY/#app=desktop&host=host-laptop"}
+    signin HTTP/1.1 200 OK: {"ok":false,"error":"Not signing in now: reload the page."}
+    |}];
+  (* The site sends the window to its login again: the shell brings it
+     back here, and the page says so. Signing in in the window this time. *)
+  post "status" ~fields:[ "signin", `True ];
+  post "status";
+  signin "here";
+  Desktop.show_pages d;
+  post "status";
+  d.close_stdin ();
+  print_s [%sexp (Eio.Promise.await_exn d.ended : Desktop_sidecar.Ended.t)];
+  List.iter (Queue.to_list logs) ~f:(show_log t ~port:backend_port);
+  print_s [%sexp (Queue.to_list d.saved : Saved_connection.t list)];
+  print_string (Proxied.clean t ~backend_port p [%expect.output]);
+  [%expect
+    {|
+    status HTTP/1.1 200 OK: {"state":"signin","site":"127.0.0.1:PROXY","login":null,"waiting":null,"error":null,"expired":true}
+    status HTTP/1.1 200 OK: {"state":"signin","site":"127.0.0.1:PROXY","login":null,"waiting":null,"error":null,"expired":true}
+    signin HTTP/1.1 200 OK: {"ok":true,"remote":"http://127.0.0.1:PROXY/#app=desktop&host=host-laptop"}
+    page: {"url":"http://127.0.0.1:PROXY/#app=desktop&host=host-laptop","remote":true,"signin":"http://127.0.0.1:SITE/#desktop=<key>&signin=1","here":true}
+    status HTTP/1.1 200 OK: {"state":"remote","url":"http://127.0.0.1:PROXY/#app=desktop&host=host-laptop"}
+    Stdin_closed
+    tool host: connected to ws://127.0.0.1:PROXY/ws as client-N
+    tools run on this machine, in $DIR/here
+    connected to ws://127.0.0.1:PROXY/ws
+    127.0.0.1:PROXY is behind a sign-in (login.example.com)
+    prigh-web on http://127.0.0.1:SITE/
+    signing in through the browser
+    signed in through the browser
+    the sign-in to 127.0.0.1:PROXY expired: signing in again
+    signing in in the window
+    ()
+    |}]
+;;
+
+let%expect_test
+    "prigh desktop -ui remote behind a sign-in proxy: cancelling, a failed \
+     sign-in, then in the window"
+  =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let _h, backend_port = backend t ~sw in
+  let p = Proxied.start t ~sw ~backend_port ~ws_exempt:true in
+  Eio.Switch.run
+  @@ fun sw ->
+  let logs = Queue.create () in
+  let d =
+    Desktop.start
+      ~ui:Remote
+      ~tools:Remote
+      t
+      ~sw
+      ~logs
+      (Check
+         { remote = p.remote
+         ; credentials = { token = Some "sekrit"; user = None }
+         ; source = Flag
+         ; save = None
+         })
+  in
+  let post ?(fields = []) what =
+    ignore (Desktop.post t ~sw d what fields : string option)
+  in
+  let signin how = post "signin" ~fields:[ "how", `String how ] in
+  (* Cancelled here; a second click while one is under way joins it
+     without opening the browser again. *)
+  Eio.Fiber.all
+    [ (fun () -> signin "browser")
+    ; (fun () ->
+        let (_ : Desktop_sidecar.Page.t) = Eio.Stream.take d.pages in
+        print_endline "the browser is to open";
+        Eio.Fiber.both
+          (fun () -> signin "browser")
+          (fun () ->
+             post "status";
+             signin "cancel"))
+    ];
+  Desktop.show_pages d;
+  post "status";
+  (* Cancelled in the browser. *)
+  let grant = ref "" in
+  Eio.Fiber.both
+    (fun () -> signin "browser")
+    (fun () ->
+       grant
+       := Proxied.allow t ~fields:[ "cancel", "1" ] (Eio.Stream.take d.pages));
+  print_endline !grant;
+  post "status";
+  signin "here";
+  Desktop.show_pages d;
+  d.close_stdin ();
+  print_s [%sexp (Eio.Promise.await_exn d.ended : Desktop_sidecar.Ended.t)];
+  List.iter (Queue.to_list logs) ~f:(show_log t ~port:backend_port);
+  print_string (Proxied.clean t ~backend_port p [%expect.output]);
+  [%expect
+    {|
+    url: http://127.0.0.1:PORT/#desktop=<key>
+    the browser is to open
+    status HTTP/1.1 200 OK: {"state":"signin","site":"127.0.0.1:PROXY","login":"login.example.com","waiting":"http://127.0.0.1:PROXY/#cli-signin=LISTENER.STATE&program=desktop","error":null,"expired":false}
+    signin HTTP/1.1 200 OK: {"ok":true}
+    signin HTTP/1.1 200 OK: {"ok":false,"cancelled":true}
+    signin HTTP/1.1 200 OK: {"ok":false,"cancelled":true}
+    status HTTP/1.1 200 OK: {"state":"signin","site":"127.0.0.1:PROXY","login":"login.example.com","waiting":null,"error":null,"expired":false}
+    signin HTTP/1.1 200 OK: {"ok":false,"error":"Signing in through the browser did not work: the sign-in was cancelled in the browser. Try again, or sign in here."}
+    HTTP/1.1 200 OK
+    status HTTP/1.1 200 OK: {"state":"signin","site":"127.0.0.1:PROXY","login":"login.example.com","waiting":null,"error":"Signing in through the browser did not work: the sign-in was cancelled in the browser. Try again, or sign in here.","expired":false}
+    signin HTTP/1.1 200 OK: {"ok":true,"remote":"http://127.0.0.1:PROXY/#app=desktop"}
+    page: {"url":"http://127.0.0.1:PROXY/#app=desktop","remote":true,"signin":"http://127.0.0.1:SITE/#desktop=<key>&signin=1","here":true}
+    Stdin_closed
+    tools run on the backend (-tools remote)
+    connected to ws://127.0.0.1:PROXY/ws
+    127.0.0.1:PROXY is behind a sign-in (login.example.com)
+    prigh-web on http://127.0.0.1:SITE/
+    signing in through the browser
+    the sign-in through the browser was cancelled
+    signing in through the browser
+    Signing in through the browser did not work: the sign-in was cancelled in the browser. Try again, or sign in here.
+    signing in in the window
+    |}]
+;;
+
+let%expect_test
+    "prigh desktop -ui remote with /ws behind the sign-in proxy too: the form, \
+     signing in, then saved and the tool host started with the cookie"
+  =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let _h, backend_port = backend t ~sw in
+  let p = Proxied.start t ~sw ~backend_port ~ws_exempt:false in
+  Eio.Switch.run
+  @@ fun sw ->
+  let logs = Queue.create () in
+  let d =
+    Desktop.start
+      ~ui:Remote
+      t
+      ~sw
+      ~logs
+      (Form { address = None; user = None; error = None })
+  in
+  let post ?(fields = []) what =
+    ignore (Desktop.post t ~sw d what fields : string option)
+  in
+  post
+    "connect"
+    ~fields:
+      [ "address", `String (Backend_address.to_string p.remote)
+      ; "token", `String "sekrit"
+      ];
+  post "status";
+  print_s [%sexp (Queue.to_list d.saved : Saved_connection.t list)];
+  let grant = ref "" in
+  Eio.Fiber.both
+    (fun () -> post "signin" ~fields:[ "how", `String "browser" ])
+    (fun () -> grant := Proxied.allow t (Eio.Stream.take d.pages));
+  print_endline !grant;
+  print_s [%sexp (Queue.to_list d.saved : Saved_connection.t list)];
+  Desktop.show_pages d;
+  post "status";
+  d.close_stdin ();
+  print_s [%sexp (Eio.Promise.await_exn d.ended : Desktop_sidecar.Ended.t)];
+  List.iter (Queue.to_list logs) ~f:(show_log t ~port:backend_port);
+  print_string (Proxied.clean t ~backend_port p [%expect.output]);
+  [%expect
+    {|
+    url: http://127.0.0.1:PORT/#desktop=<key>
+    connect HTTP/1.1 200 OK: {"ok":true,"signin":true}
+    status HTTP/1.1 200 OK: {"state":"signin","site":"127.0.0.1:PROXY","login":"login.example.com","waiting":null,"error":null,"expired":false}
+    ()
+    remember_signin: ws://127.0.0.1:PROXY/ws with ((proxy_cookie <opaque>) (token ()) (user ())) (cookie proxy_session=s3cret-session)
+    signin HTTP/1.1 200 OK: {"ok":true,"remote":"http://127.0.0.1:PROXY/#app=desktop&host=host-laptop"}
+    HTTP/1.1 200 OK
+    (((connect ws://127.0.0.1:PROXY/ws) (token sekrit)))
+    page: {"url":"http://127.0.0.1:PROXY/#app=desktop&host=host-laptop","remote":true,"cookie":"proxy_session=s3cret-session","signin":"http://127.0.0.1:SITE/#desktop=<key>&signin=1"}
+    status HTTP/1.1 200 OK: {"state":"remote","url":"http://127.0.0.1:PROXY/#app=desktop&host=host-laptop"}
+    Stdin_closed
+    prigh-web on http://127.0.0.1:SITE/
+    127.0.0.1:PROXY is behind a sign-in (login.example.com)
+    signing in through the browser
+    signed in through the browser
+    tool host: connected to ws://127.0.0.1:PROXY/ws as client-N
+    tools run on this machine, in $DIR/here
+    connected to ws://127.0.0.1:PROXY/ws
+    |}]
+;;
+
+let%expect_test
+    "prigh desktop -ui remote with a saved sign-in cookie: straight to the \
+     site, with it"
+  =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let _h, backend_port = backend t ~sw in
+  let p = Proxied.start t ~sw ~backend_port ~ws_exempt:false in
+  Eio.Switch.run
+  @@ fun sw ->
+  let logs = Queue.create () in
+  let d =
+    Desktop.start
+      ~ui:Remote
+      ~tools:Remote
+      t
+      ~sw
+      ~logs
+      (Check
+         { remote =
+             Backend_address.with_proxy_cookie
+               p.remote
+               (Some Fake_signin_proxy.cookie)
+         ; credentials = { token = Some "sekrit"; user = None }
+         ; source = Saved "~/.prigh/tui-connection.sexp"
+         ; save = None
+         })
+  in
+  d.close_stdin ();
+  print_s [%sexp (Eio.Promise.await_exn d.ended : Desktop_sidecar.Ended.t)];
+  List.iter (Queue.to_list logs) ~f:(show_log t ~port:backend_port);
+  print_string (Proxied.clean t ~backend_port p [%expect.output]);
+  [%expect
+    {|
+    first page: {"url":"http://127.0.0.1:PROXY/#app=desktop","remote":true,"cookie":"proxy_session=s3cret-session","signin":"http://127.0.0.1:SITE/#desktop=<key>&signin=1"}
+    Stdin_closed
+    tools run on the backend (-tools remote)
+    connected to ws://127.0.0.1:PROXY/ws
+    prigh-web on http://127.0.0.1:SITE/
     |}]
 ;;

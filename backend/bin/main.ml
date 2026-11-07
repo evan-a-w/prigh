@@ -1557,6 +1557,7 @@ let desktop_command =
              ; listen
              ; root
              ; save = Saved_connection.save ~home
+             ; remember_signin = Backend_choice.remember_signin ~home
              })
        in
        log

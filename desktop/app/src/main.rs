@@ -5,18 +5,19 @@
 // ARCHITECTURE.md.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Read};
 use std::path::PathBuf;
 use std::process::{ChildStdin, Command, Stdio};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use prigh_desktop_core::browser::{self, Choice, Found, Mode, Platform};
 use prigh_desktop_core::failure::{self, Failure};
 use prigh_desktop_core::launch::{self, Os};
-use prigh_desktop_core::navigation::{self, Decision};
+use prigh_desktop_core::navigation::{self, Decision, Remote};
 use prigh_desktop_core::profile;
 use prigh_desktop_core::tail::Tail;
 use prigh_desktop_core::zoom::{self, Step};
@@ -70,6 +71,10 @@ struct Sidecar {
     exited: AtomicBool,
     /// The page is in a browser's app window, not the app's own.
     browser: Mutex<Option<Arc<BrowserWindow>>>,
+    /// The backend's site, as its last page line said.
+    remote: Mutex<Option<Remote>>,
+    /// The app's own windows' navigations, by label.
+    windows: Mutex<HashMap<String, navigation::Window>>,
 }
 
 impl Sidecar {
@@ -79,6 +84,23 @@ impl Sidecar {
 
     fn origins(&self) -> Vec<String> {
         self.origins.lock().unwrap().clone()
+    }
+
+    fn loaded(&self, label: &str, url: &str) -> Option<String> {
+        let (origins, remote) = (self.origins(), self.remote());
+        let mut windows = self.windows.lock().unwrap();
+        windows.entry(label.to_string()).or_default().on_loaded(url, &origins, remote.as_ref(), Instant::now())
+    }
+
+    fn remote(&self) -> Option<Remote> {
+        self.remote.lock().unwrap().clone()
+    }
+
+    /// What the app's window `label` does about a navigation.
+    fn step(&self, label: &str, url: &str) -> navigation::Step {
+        let (origins, remote) = (self.origins(), self.remote());
+        let mut windows = self.windows.lock().unwrap();
+        windows.entry(label.to_string()).or_default().on_navigation(url, &origins, remote.as_ref(), Instant::now())
     }
 
     fn is_ours(&self, url: &str) -> bool {
@@ -130,6 +152,9 @@ struct BrowserWindow {
     /// The instance already on the profile that our launch handed the
     /// window to.
     handed_to: Mutex<Option<i32>>,
+    /// Its DevTools, once it runs.
+    #[cfg(target_os = "linux")]
+    devtools: Mutex<Option<Arc<devtools_pipe::Watcher>>>,
 }
 
 /// How long the browser has to exit after SIGTERM before it is killed.
@@ -187,7 +212,7 @@ impl BrowserWindow {
         *self.child.lock().unwrap() = Some(child.clone());
         #[cfg(target_os = "linux")]
         if let Some(pipe) = devtools {
-            pipe.watch(app.clone(), sidecar.clone(), self.clone());
+            *self.devtools.lock().unwrap() = Some(pipe.watch(app.clone(), sidecar.clone(), self.clone()));
         }
         // Browsers say a lot on stderr: only kept, for when it fails.
         let tail = Arc::new(Mutex::new(Tail::new(20)));
@@ -320,6 +345,20 @@ impl BrowserWindow {
         }
     }
 
+    /// The backend's site, as the sidecar now says to show it (see
+    /// [prigh_desktop_core::devtools::Links::set_remote]).
+    fn set_remote(&self, remote: Remote, here: bool) {
+        #[cfg(target_os = "linux")]
+        if let Some(watcher) = self.devtools.lock().unwrap().clone() {
+            watcher.set_remote(remote, here);
+            return;
+        }
+        let _ = here;
+        if !remote.cookies.is_empty() {
+            log("no DevTools pipe to give the browser window the sign-in: it signs in to the site itself");
+        }
+    }
+
     /// A second launch of the app: another window on the page.
     fn another_window(&self) {
         if let Some(url) = self.url.lock().unwrap().clone() {
@@ -396,13 +435,15 @@ impl BrowserWindow {
 mod devtools_pipe {
     use super::{downloads_dir, env_flag, log, open_external, BrowserWindow, Sidecar};
     use prigh_desktop_core::devtools::{Effect, Links};
+    use prigh_desktop_core::navigation::Remote;
     use std::fs::File;
     use std::io::{BufRead, BufReader, Write};
     use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
     use std::os::unix::process::CommandExt;
     use std::process::Command;
-    use std::sync::Arc;
+    use std::sync::{Arc, Mutex};
     use std::thread;
+    use std::time::Instant;
     use tauri::AppHandle;
 
     pub struct Pipe {
@@ -445,20 +486,57 @@ mod devtools_pipe {
         })
     }
 
+    /// The browser's DevTools: [Links], and the pipe to the browser.
+    pub struct Watcher {
+        state: Mutex<(Links, File)>,
+        app: AppHandle,
+        window: Arc<BrowserWindow>,
+    }
+
+    impl Watcher {
+        fn apply(&self, to_browser: &mut File, effects: Vec<Effect>) {
+            for effect in effects {
+                match effect {
+                    Effect::Send(command) => {
+                        let _ = to_browser.write_all(command.as_bytes()).and_then(|()| to_browser.write_all(b"\0"));
+                    }
+                    Effect::OpenExternally(url) => open_external(&self.app, &url),
+                    Effect::OpenWindow(url) => {
+                        log("a popup on prigh's site: opening it in another app window");
+                        self.window.window_on(&url)
+                    }
+                    Effect::Log(text) => log(text),
+                }
+            }
+        }
+
+        pub fn set_remote(&self, remote: Remote, here: bool) {
+            let mut state = self.state.lock().unwrap();
+            let (links, to_browser) = &mut *state;
+            let effects = links.set_remote(remote, here);
+            self.apply(to_browser, effects);
+        }
+    }
+
     impl Pipe {
         /// The browser started: follows its pages until it exits.
-        pub fn watch(self, app: AppHandle, sidecar: Arc<Sidecar>, window: Arc<BrowserWindow>) {
-            let Pipe { mut to_browser, from_browser, theirs } = self;
+        pub fn watch(self, app: AppHandle, sidecar: Arc<Sidecar>, window: Arc<BrowserWindow>) -> Arc<Watcher> {
+            let Pipe { to_browser, from_browser, theirs } = self;
             drop(theirs);
-            thread::spawn(move || {
-                let mut send = |msg: &str| {
-                    let _ = to_browser.write_all(msg.as_bytes()).and_then(|()| to_browser.write_all(b"\0"));
-                };
-                let downloads = downloads_dir();
-                let mut links = Links::new(env_flag("PRIGH_DESKTOP_DEVTOOLS"));
-                for command in links.start(&downloads) {
-                    send(&command);
+            let mut links = Links::new(env_flag("PRIGH_DESKTOP_DEVTOOLS"));
+            let start = links.start(&downloads_dir());
+            let watcher = Arc::new(Watcher { state: Mutex::new((links, to_browser)), app, window });
+            {
+                let mut state = watcher.state.lock().unwrap();
+                let (links, to_browser) = &mut *state;
+                watcher.apply(to_browser, start.into_iter().map(Effect::Send).collect());
+                if let Some(remote) = sidecar.remote() {
+                    let effects = links.set_remote(remote, false);
+                    watcher.apply(to_browser, effects);
                 }
+            }
+            let me = watcher.clone();
+            thread::spawn(move || {
                 let mut reader = BufReader::new(from_browser);
                 let mut msg = Vec::new();
                 while reader.read_until(0, &mut msg).is_ok_and(|n| n > 0) {
@@ -466,20 +544,15 @@ mod devtools_pipe {
                         msg.pop();
                     }
                     let text = String::from_utf8_lossy(&msg);
-                    for effect in links.on_message(&text, &sidecar.origins()) {
-                        match effect {
-                            Effect::Send(command) => send(&command),
-                            Effect::OpenExternally(url) => open_external(&app, &url),
-                            Effect::OpenWindow(url) => {
-                                log("a popup on prigh's site: opening it in another app window");
-                                window.window_on(&url)
-                            }
-                            Effect::Log(text) => log(text),
-                        }
-                    }
+                    let mut state = me.state.lock().unwrap();
+                    let (links, to_browser) = &mut *state;
+                    let effects = links.on_message(&text, &sidecar.origins(), Instant::now());
+                    me.apply(to_browser, effects);
+                    drop(state);
                     msg.clear();
                 }
             });
+            watcher
         }
     }
 }
@@ -530,6 +603,8 @@ fn window_choice(app: &AppHandle) -> Result<Option<Arc<BrowserWindow>>, Failure>
                 url: Mutex::new(None),
                 closing: AtomicBool::new(false),
                 handed_to: Mutex::new(None),
+                #[cfg(target_os = "linux")]
+                devtools: Mutex::new(None),
             })))
         }
     }
@@ -708,6 +783,14 @@ fn start_sidecar(app: AppHandle, sidecar: Arc<Sidecar>) {
 
 fn on_page(app: &AppHandle, sidecar: &Arc<Sidecar>, page: &ready::Page) {
     let url = page.url.as_str();
+    if page.external {
+        // Its fragment has the sign-in's one-time state: not for the log.
+        log(format!("opening {} in the system browser to sign in", redact(url)));
+        if let Err(e) = app.opener().open_url(url, None::<&str>) {
+            log(format!("could not open {}: {e}", redact(url)));
+        }
+        return;
+    }
     let (Ok(parsed), Some(origin)) = (Url::parse(url), navigation::origin(url)) else {
         log(format!("prigh desktop's url does not parse: {url}"));
         return;
@@ -722,6 +805,27 @@ fn on_page(app: &AppHandle, sidecar: &Arc<Sidecar>, page: &ready::Page) {
     };
     if page.remote {
         log(format!("showing the backend's prigh-web at {}", redact(url)));
+        let remote = Remote {
+            url: url.to_string(),
+            cookies: page.cookie.as_deref().map(navigation::cookie_pairs).unwrap_or_default(),
+            signin_page: page.signin.clone(),
+        };
+        *sidecar.remote.lock().unwrap() = Some(remote.clone());
+        if page.here {
+            log("signing in to the backend's site in the window");
+        }
+        if let Some(b) = sidecar.browser() {
+            b.set_remote(remote, page.here);
+        } else if let Some(w) = app.get_webview_window(WINDOW) {
+            let mut windows = sidecar.windows.lock().unwrap();
+            let window = windows.entry(WINDOW.to_string()).or_default();
+            if page.here {
+                window.sign_in_here();
+            } else if !remote.cookies.is_empty() {
+                set_cookies(&w, &remote);
+                window.cookies_given(&remote.cookies);
+            }
+        }
     } else {
         log(format!("prigh desktop is ready at {}", redact(url)));
     }
@@ -740,8 +844,50 @@ fn on_page(app: &AppHandle, sidecar: &Arc<Sidecar>, page: &ready::Page) {
     } else {
         parsed
     };
+    sidecar.windows.lock().unwrap().entry(WINDOW.to_string()).or_default().loading(target.as_str());
     if let Err(e) = w.navigate(target) {
         log(format!("navigating to prigh-web: {e}"));
+    }
+}
+
+/// After a refused navigation of the app's window `label`: gives it the
+/// backend's site's cookies (`cookies`), then loads `url`.
+fn later_in_window(app: &AppHandle, sidecar: &Arc<Sidecar>, label: &str, url: String, cookies: bool) {
+    let (app, sidecar, label) = (app.clone(), sidecar.clone(), label.to_string());
+    thread::spawn(move || {
+        let Some(w) = app.get_webview_window(&label) else { return };
+        if cookies {
+            if let Some(remote) = sidecar.remote() {
+                set_cookies(&w, &remote);
+            }
+        }
+        match Url::parse(&url) {
+            Ok(parsed) => {
+                sidecar.windows.lock().unwrap().entry(label.clone()).or_default().loading(&url);
+                if let Err(e) = w.navigate(parsed) {
+                    log(format!("navigating to {}: {e}", redact(&url)));
+                }
+            }
+            Err(e) => log(format!("{}: {e}", redact(&url))),
+        }
+    });
+}
+
+/// Gives the app's window the backend's site's cookies (from signing in to
+/// its proxy through the default browser).
+fn set_cookies(w: &tauri::WebviewWindow, remote: &Remote) {
+    let Some(domain) = Url::parse(&remote.url).ok().and_then(|u| u.host_str().map(str::to_string)) else { return };
+    for (name, value) in &remote.cookies {
+        let cookie = tauri::webview::Cookie::build((name.clone(), value.clone()))
+            .domain(domain.clone())
+            .path("/")
+            .secure(remote.url.starts_with("https://"))
+            .http_only(true)
+            .build();
+        match w.set_cookie(cookie) {
+            Ok(()) => log(format!("gave the window the cookie {name} for {domain}")),
+            Err(e) => log(format!("could not give the window the cookie {name} for {domain}: {e}")),
+        }
     }
 }
 
@@ -848,27 +994,47 @@ fn build_window(
         .disable_drag_drop_handler()
         // WebView2's own Ctrl+=/-/0, Ctrl+wheel and pinch (Windows).
         .zoom_hotkeys_enabled(true)
-        .on_navigation(move |url| match navigation::decide(url.as_str(), &nav_sidecar.origins()) {
-            _ if test_close && url.as_str() == TEST_CLOSE_URL => {
+        .on_navigation(move |url| {
+            if test_close && url.as_str() == TEST_CLOSE_URL {
                 if let Some(w) = nav_app.get_webview_window(&nav_label) {
                     let _ = w.close();
                 }
-                false
+                return false;
             }
-            _ if gpu_info && url.as_str() == GPU_INFO_URL => true,
-            Decision::Quit => {
-                log("the page's Quit: stopping prigh desktop");
-                nav_sidecar.stop();
-                false
+            if gpu_info && url.as_str() == GPU_INFO_URL {
+                return true;
             }
-            Decision::Allow => true,
-            Decision::External => {
-                open_external(&nav_app, url.as_str());
-                false
-            }
-            Decision::Block => {
-                log(format!("refused to navigate to {url}"));
-                false
+            match nav_sidecar.step(&nav_label, url.as_str()) {
+                navigation::Step::Quit => {
+                    log("the page's Quit: stopping prigh desktop");
+                    nav_sidecar.stop();
+                    false
+                }
+                navigation::Step::Allow => true,
+                navigation::Step::Away(text) => {
+                    log(text);
+                    true
+                }
+                navigation::Step::Open(url) => {
+                    open_external(&nav_app, &url);
+                    false
+                }
+                navigation::Step::Refuse(text) => {
+                    if let Some(text) = text {
+                        log(text);
+                    }
+                    false
+                }
+                navigation::Step::Cookies { url } => {
+                    log("the backend's site wants a sign-in: giving the window the one from the browser");
+                    later_in_window(&nav_app, &nav_sidecar, &nav_label, url, true);
+                    false
+                }
+                navigation::Step::SignIn { url } => {
+                    log("the backend's site wants a sign-in: showing prigh's sign-in page");
+                    later_in_window(&nav_app, &nav_sidecar, &nav_label, url, false);
+                    false
+                }
             }
         })
         .on_new_window(move |url, _| match navigation::decide(url.as_str(), &new_sidecar.origins()) {
@@ -921,6 +1087,9 @@ fn build_window(
                 return;
             }
             let url = payload.url().as_str();
+            if let Some(text) = load_sidecar.loaded(window.label(), url) {
+                log(text);
+            }
             if load_sidecar.is_ours(url) {
                 log(format!("loaded {}", redact(url)));
                 if close_on_load {
