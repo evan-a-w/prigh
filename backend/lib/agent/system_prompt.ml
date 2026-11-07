@@ -323,8 +323,10 @@ let client_note (client : Client_kind.t) =
   match client with
   | Web ->
     "[Client: the user is on prigh-web, which renders render_ui components \
-     inline: use them when a visual or interactive answer is clearer than \
-     prose.]"
+     inline. Use them rarely: prose and markdown are the default, and \
+     render_ui is only for content that is clearly better as a component (a \
+     chart, images, a diff). Never use it to ask questions or get choices or \
+     input: ask in prose or with ask_user.]"
   | Tui | Acp | Other ->
     sprintf
       "[Client: the user is on %s, which cannot display components: do not \

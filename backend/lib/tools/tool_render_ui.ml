@@ -4,9 +4,11 @@ open! Import
 let name = "render_ui"
 
 let description =
-  {|Shows rich components inline in the user's chat in prigh-web: charts, tables, stats, forms and more. Frontends render them from these arguments; you get a short acknowledgement. Only prigh-web displays them: on other clients the call fails, so follow the client notes and answer in text there.
+  {|Shows rich components inline in the user's chat in prigh-web: charts, tables, stats, images and more. Frontends render them from these arguments; you get a short acknowledgement. Only prigh-web displays them: on other clients the call fails, so follow the client notes and answer in text there.
 
-Use components when a visual or interactive answer is clearer than prose: comparisons, trends, structured data, choices or input from the user, multi-step plans, showing image files. Prose and markdown stay the default: don't use components for short answers or code edits, and don't repeat a component's content in prose afterwards.
+Use this tool rarely. Prose and markdown are the default, and markdown tables are fine for tabular data. Only call it when the content is clearly a better experience as a component than as text: a chart of numeric data, an image or gallery of files, a diff, a large table worth sorting, a calculator. Usually call it at most once in a turn.
+
+Never use it to ask the user anything: questions, choices, confirmations and collecting input go in prose, or through ask_user where it exists. Never use it for short answers, status updates, summaries, plans, code edits or lists that markdown handles, and never repeat a component's content in prose.
 
 Arguments: {"components": [Component, ...]} (1-20 top level, 100 in all). Every component has "type" and may have "id" (unique in the call; required by form, choices and a checklist with submit). (md) strings take inline markdown. tone: neutral|info|success|warning|danger.
 
@@ -48,13 +50,13 @@ Interactive, in the browser only:
 - flashcards {title?, cards:[{front(md), back(md)}]} (1-50)
 - quiz {title?, questions:[{question(md), options:[string] (2-6), answer (0-based index), explanation?(md)}]} (1-50)
 
-Interactive, replying to you (the user's answer arrives as their next message, naming the component):
+Interactive, replying to you, only when the user explicitly asks for a form or an interactive input UI (the user's answer arrives as their next message, naming the component):
 - form {id, title?, description?(md), fields:[{name, label, kind: text|textarea|number|select|radio|checkbox|toggle|slider|date, options? (select, radio, checkbox; 1-50), default?, min?, max?, step? (number and slider: numbers, a slider needs min and max; date: "YYYY-MM-DD" min and max, step in days), required?, placeholder?, help?}] (1-30), submit? (button label)}
 - choices {id, prompt?(md), options:[{label, value?, description?, tone?}] (1-12), multiple?} (buttons)
 - checklist {id?, title?, items:[{text(md), checked?}] (1-50), submit?} (with submit and id, sends the checked items)
 
 Example:
-{"components": [{"type": "chart", "kind": "line", "title": "Build time", "unit": "s", "labels": ["Mon", "Tue", "Wed"], "series": [{"name": "main", "values": [61, 58, 49]}]}, {"type": "table", "title": "Slowest tests", "columns": [{"key": "test"}, {"key": "secs", "label": "Seconds", "format": "number", "decimals": 1}], "rows": [{"test": "e2e", "secs": 31.4}]}, {"type": "choices", "id": "next", "prompt": "Which should I speed up first?", "options": [{"label": "e2e"}, {"label": "unit"}]}]}|}
+{"components": [{"type": "chart", "kind": "line", "title": "Build time", "unit": "s", "labels": ["Mon", "Tue", "Wed"], "series": [{"name": "main", "values": [61, 58, 49]}]}, {"type": "table", "title": "Slowest tests", "columns": [{"key": "test"}, {"key": "secs", "label": "Seconds", "format": "number", "decimals": 1}], "rows": [{"test": "e2e", "secs": 31.4}]}]}|}
 ;;
 
 let spec =
