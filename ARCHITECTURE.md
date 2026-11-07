@@ -2890,7 +2890,9 @@ terminal frontend and `web/` prigh-web, the browser one.
       with `Line_diff`/`Diff_view`, apply_patch file by file,
       ls/grep/find, subagents (marked with `data-call` and `data-agent`
       for the agents panel), jobs and `job_input`, `web_fetch` with its URL
-      as a link and the page folded, and `server_tool`, the card a
+      as a link and the page folded, `computer` (`Computer_action`, shared with
+      the TUI, says what it did; the screenshot with the point marked as a
+      percentage of its size, in the image viewer), and `server_tool`, the card a
       `web_search` block gets among the message's text, from the streamed
       partial message: the work lamp while it runs, then a folded list of
       result links),
@@ -3120,7 +3122,10 @@ terminal frontend and `web/` prigh-web, the browser one.
       box, below the chip only when there is no room above, within the box
       sideways, its height capped by the room (`--popover-lift`,
       `--popover-room`, `--popover-shift`); on a phone it is as wide as the
-      box. With it, `Queue_view` (the queued steers and follow-ups from `Queued`:
+      box. Above it, `Computer_banner` while the run has called `computer`
+      (`Chat.uses_computer`: since the last user message): whose screen,
+      and Stop (`Abort`).
+      With it, `Queue_view` (the queued steers and follow-ups from `Queued`:
       the backend's `queue_update` lists, taken out at once by Edit and
       remove via `remove_queued`, re-fetched with `get_pending` if that
       fails; what left the queue otherwise is acknowledged when its user
