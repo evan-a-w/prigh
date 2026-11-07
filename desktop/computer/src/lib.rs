@@ -15,9 +15,9 @@ pub mod macos;
 pub mod quartz;
 pub mod scale;
 pub mod win_input;
+#[cfg(windows)]
+pub mod windows;
 #[cfg(target_os = "linux")]
 pub mod wlroots;
 #[cfg(target_os = "linux")]
 pub mod x11;
-#[cfg(windows)]
-pub mod windows;
