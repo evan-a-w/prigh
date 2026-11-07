@@ -84,9 +84,122 @@ let freeform_input arguments =
   | Ok _ | Error _ -> arguments
 ;;
 
-let input_items ~provider ~freeform (messages : Message.t list) =
+(* The model's built-in computer tool answers a [computer_call] (a batch of
+   actions, stored as one call each: [call_id], [call_id__1] (ids Anthropic accepts too), ...) with one
+   [computer_call_output]: the screenshot after the batch, acknowledging the
+   call's safety checks. Errors follow it as text; a screenshot left out of
+   the request ({!Computer_screenshots}) is sent as a blank image. *)
+let is_computer name = String.equal name Tool_computer.name
+
+let computer_group id =
+  match String.substr_index id ~pattern:"__" with
+  | Some i -> String.prefix id i
+  | None -> id
+;;
+
+let blank_png =
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII="
+;;
+
+let computer_call (a : Message.Assistant.t) (call : Content.Tool_call.t) =
+  if not (String.equal (computer_group call.id) call.id)
+  then None
+  else (
+    let members =
+      List.filter_map a.content ~f:(function
+        | Tool_call c
+          when is_computer c.name && String.equal (computer_group c.id) call.id
+          -> Some c
+        | _ -> None)
+    in
+    let _, checks, item_id = Computer_native.to_openai call.arguments in
+    Some
+      (`Object
+          ([ "type", `String "computer_call" ]
+           @ Option.value_map item_id ~default:[] ~f:(fun id ->
+             [ "id", `String id ])
+           @ [ "call_id", `String call.id
+             ; ( "actions"
+               , `Array
+                   (List.map members ~f:(fun c ->
+                      let action, _, _ =
+                        Computer_native.to_openai c.arguments
+                      in
+                      action)) )
+             ; "pending_safety_checks", `Array checks
+             ; "status", `String "completed"
+             ])))
+;;
+
+let computer_outputs (messages : Message.t list) (r : Message.Tool_result.t) =
+  let group = computer_group r.tool_call_id in
+  let results =
+    List.filter_map messages ~f:(function
+      | Tool_result r'
+        when is_computer r'.tool_name
+             && String.equal (computer_group r'.tool_call_id) group -> Some r'
+      | _ -> None)
+  in
+  match List.last results with
+  | Some last when not (String.equal last.tool_call_id r.tool_call_id) -> []
+  | Some _ | None ->
+    let checks =
+      List.find_map messages ~f:(function
+        | Assistant a ->
+          List.find_map a.content ~f:(function
+            | Tool_call c when String.equal c.id group ->
+              let _, checks, _ = Computer_native.to_openai c.arguments in
+              Some checks
+            | _ -> None)
+        | User _ | Tool_result _ -> None)
+      |> Option.value ~default:[]
+    in
+    let image_url =
+      match
+        List.find_map (List.rev results) ~f:(fun r -> List.last r.images)
+      with
+      | Some image -> sprintf "data:%s;base64,%s" image.mime_type image.data
+      | None -> "data:image/png;base64," ^ blank_png
+    in
+    let errors = List.filter results ~f:(fun r -> r.is_error) in
+    [ `Object
+        ([ "type", `String "computer_call_output"
+         ; "call_id", `String group
+         ; ( "output"
+           , `Object
+               [ "type", `String "computer_screenshot"
+               ; "image_url", `String image_url
+               ; "detail", `String "original"
+               ] )
+         ]
+         @
+         if List.is_empty checks
+         then []
+         else [ "acknowledged_safety_checks", `Array checks ])
+    ]
+    @
+    if List.is_empty errors
+    then []
+    else
+      [ `Object
+          [ "type", `String "message"
+          ; "role", `String "user"
+          ; ( "content"
+            , `Array
+                [ input_text
+                    (String.concat
+                       ~sep:"\n"
+                       (List.map errors ~f:(fun r -> "computer: " ^ r.text)))
+                ] )
+          ]
+      ]
+;;
+
+let input_items ~provider ~freeform ~computer (messages : Message.t list) =
   List.concat_mapi messages ~f:(fun message_index m ->
     match m with
+    | Tool_result r when computer && is_computer r.tool_name ->
+      computer_outputs messages r
     | User { text; images; origin = _ } ->
       [ `Object
           [ "type", `String "message"
@@ -166,6 +279,16 @@ let input_items ~provider ~freeform (messages : Message.t list) =
                           ]
                       ] )
                 ])
+        | Tool_call call when computer && is_computer call.name ->
+          computer_call a call
+        | Tool_call call when is_computer call.name ->
+          Some
+            (`Object
+                [ "type", `String "function_call"
+                ; "call_id", `String call.id
+                ; "name", `String call.name
+                ; "arguments", `String (Computer_native.generic call.arguments)
+                ])
         | Tool_call call when freeform call.name ->
           Some
             (`Object
@@ -184,9 +307,11 @@ let input_items ~provider ~freeform (messages : Message.t list) =
                 ])))
 ;;
 
-let wire_tool (t : Tool_spec.t) =
+let wire_tool ~computer (t : Tool_spec.t) =
   if Tool_web_search.is_spec t
   then `Object [ "type", `String "web_search" ]
+  else if computer && Option.is_some t.native
+  then `Object [ "type", `String "computer" ]
   else (
     match t.freeform with
     | Some grammar ->
@@ -216,8 +341,17 @@ let wire_tool (t : Tool_spec.t) =
         ])
 ;;
 
+(* Whether [computer] is offered as the model's built-in computer tool. *)
+let native_computer ~(endpoint : Endpoint.t) (r : Provider.Request.t) =
+  match endpoint, r.model.native_computer with
+  | Openai _, Some Openai ->
+    List.exists r.tools ~f:(fun t -> Option.is_some t.native)
+  | (Openai _ | Codex _ | Custom _), _ -> false
+;;
+
 let request_body ~(endpoint : Endpoint.t) (r : Provider.Request.t) : Json.t =
   let r = Provider.Request.prepare r in
+  let computer = native_computer ~endpoint r in
   let provider = Endpoint.provider_id endpoint in
   let freeform name =
     List.exists r.tools ~f:(fun (t : Tool_spec.t) ->
@@ -243,7 +377,8 @@ let request_body ~(endpoint : Endpoint.t) (r : Provider.Request.t) : Json.t =
          ; ( "instructions"
            , `String
                (Option.value r.system ~default:"You are a helpful assistant.") )
-         ; "input", `Array (input_items ~provider ~freeform r.messages)
+         ; ( "input"
+           , `Array (input_items ~provider ~freeform ~computer r.messages) )
          ; ( "include"
            , `Array
                (`String "reasoning.encrypted_content"
@@ -256,7 +391,7 @@ let request_body ~(endpoint : Endpoint.t) (r : Provider.Request.t) : Json.t =
          ]
        ; (if List.is_empty r.tools
           then []
-          else [ "tools", `Array (List.map r.tools ~f:wire_tool) ])
+          else [ "tools", `Array (List.map r.tools ~f:(wire_tool ~computer)) ])
        ; reasoning
        ; (* Custom servers may reject fields they do not know. *)
          (match endpoint, r.cache_key with
@@ -467,6 +602,39 @@ let parse_event (state : Stream_state.t) (event : Sse.Event.t)
                 [ Tool_call_delta { index; arguments } ]
               | _ -> [])
            | _ -> [])
+        | Some "computer_call", Some item ->
+          state.saw_tool_call <- true;
+          let call_id = Option.value (member "call_id" item) ~default:"" in
+          let actions =
+            match Json.member "actions" item, Json.member "action" item with
+            | Some (`Array actions), _ -> actions
+            | _, Some action -> [ action ]
+            | _ -> [ `Object [ "type", `String "screenshot" ] ]
+          in
+          let safety_checks =
+            match Json.member "pending_safety_checks" item with
+            | Some (`Array checks) -> checks
+            | _ -> []
+          in
+          List.concat_mapi actions ~f:(fun k action ->
+            let index = state.tool_count in
+            state.tool_count <- index + 1;
+            let arguments =
+              if k = 0
+              then
+                Computer_native.of_openai
+                  ?item_id:(member "id" item)
+                  ~safety_checks
+                  action
+              else Computer_native.of_openai action
+            in
+            [ Assistant_event.Tool_call_start
+                { index
+                ; id = (if k = 0 then call_id else sprintf "%s__%d" call_id k)
+                ; name = Tool_computer.name
+                }
+            ; Tool_call_delta { index; arguments }
+            ])
         | Some "custom_tool_call", Some item ->
           (match
              List.Assoc.find state.tools ~equal:Int.equal (output_index ())
