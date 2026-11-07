@@ -543,7 +543,10 @@
         # desktop/: Rust, cargo-tauri and the webview's libraries, apart from
         # the OxCaml shell so that one stays lean.
         devShells.desktop = pkgs.mkShell {
-          inputsFrom = [ prighDesktopUnwrapped ];
+          inputsFrom = [
+            prighDesktopUnwrapped
+            prighComputer
+          ];
           packages = [
             pkgs.cargo-tauri
             pkgs.clippy

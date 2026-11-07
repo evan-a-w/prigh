@@ -12,8 +12,12 @@ pub mod keymap;
 pub mod keysym;
 #[cfg(target_os = "macos")]
 pub mod macos;
+#[cfg(target_os = "linux")]
+pub mod portal;
 pub mod quartz;
 pub mod scale;
+#[cfg(target_os = "linux")]
+pub mod screencast;
 pub mod win_input;
 #[cfg(windows)]
 pub mod windows;
