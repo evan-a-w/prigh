@@ -105,6 +105,112 @@ let%expect_test "a search keeps the groups, best match first in each" =
     |}]
 ;;
 
+let%expect_test
+    "a search's title and content hits each show in their group, pinned ones \
+     under Pinned with their pin, marks and passage"
+  =
+  let sessions =
+    sprintf
+      "[%s]"
+      (String.concat
+         ~sep:","
+         [ H.session_json
+             ~name:"Deploy the docs"
+             ~updated_at:"2026-10-05 09:00:00Z"
+             "s1"
+         ; H.session_json
+             ~name:"Weekly notes"
+             ~pinned:true
+             ~updated_at:"2026-10-05 08:00:00Z"
+             "s2"
+         ; H.session_json
+             ~name:"Deploy checklist"
+             ~pinned:true
+             ~updated_at:"2026-10-04 08:00:00Z"
+             "s3"
+         ; H.session_json
+             ~name:"Lexer"
+             ~updated_at:"2026-10-03 08:00:00Z"
+             "s4"
+         ; H.session_json
+             ~name:"Old deploy"
+             ~archived:true
+             ~updated_at:"2026-10-02 08:00:00Z"
+             "s5"
+         ])
+  in
+  let h = H.create ~sessions () in
+  H.act h (Set_session_query "deploy");
+  H.act h (Search_sessions 1);
+  sidebar h;
+  [%expect
+    {|
+    (Search_sessions_later (search 1) (after_ms 150))
+    (Rpc (method_ search_sessions) (params ((query deploy) (limit 50)))
+     (tag (Session_hits 1)))
+    Pinned 1
+    (Deploy checklist 1d ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
+    Recent 1
+    (Deploy the docs 1h ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (Archived 1)
+    (Old deploy 3d ago /work) (More (right-click, Shift+F10)) (Unarchive) (Delete)
+    (Delete archived)
+    |}];
+  (* The messages of a pinned and an unpinned session mention it too. *)
+  H.reply
+    h
+    "search_sessions"
+    {|{"query":"deploy","hits":[
+      {"id":"s2","path":"/sessions/s2.jsonl","score":20,
+       "snippet":{"text":"…before we deploy on Friday","ranges":[[13,6]]}},
+      {"id":"s4","path":"/sessions/s4.jsonl","score":20,
+       "snippet":{"text":"…deploy the lexer","ranges":[[3,6]]}},
+      {"id":"s3","path":"/sessions/s3.jsonl","score":40,"snippet":null}]}|};
+  sidebar h;
+  [%expect
+    {|
+    Pinned 2
+    (Deploy checklist 1d ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (Weekly notes …before we deploy on Friday 2h ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
+    Recent 2
+    (Deploy the docs 1h ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (Lexer … deploy the lexer 2d ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (Archived 1)
+    (Old deploy 3d ago /work) (More (right-click, Shift+F10)) (Unarchive) (Delete)
+    (Delete archived)
+    |}];
+  H.show h ~selector:"[data-session=s2] .session-main";
+  H.show h ~selector:"[data-session=s3] .session-title";
+  [%expect {|
+    <div class="session-main">
+      <span dir="auto" class="session-title">
+        <span role="img" aria-label="Pinned" title="Pinned to the top (P unpins)" class="session-pin">
+          <icon class="pin"> </icon>
+        </span>
+        Weekly notes
+      </span>
+      <span dir="auto" class="session-snippet">
+        …before we
+        <mark> deploy </mark>
+         on Friday
+      </span>
+      <div class="session-meta">
+        <span class="session-age"> 2h ago </span>
+        <span title="/work" class="session-cwd"> /work </span>
+        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+      </div>
+    </div>
+    <span dir="auto" class="session-title">
+      <span role="img" aria-label="Pinned" title="Pinned to the top (P unpins)" class="session-pin">
+        <icon class="pin"> </icon>
+      </span>
+      <mark> Deploy </mark>
+       checklist
+    </span>
+    |}]
+;;
+
 let%expect_test "pinning and unpinning: at once, and back if refused" =
   let h = H.create ~sessions () in
   menu h "/sessions/s2.jsonl";
