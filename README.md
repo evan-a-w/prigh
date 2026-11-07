@@ -1460,6 +1460,15 @@ github:evan-a-w/prigh#prigh-computer`). The helper's tests are `cargo test
 `computer-use` check, which drives a headless sway and Xvfb and compares
 the input an app received (`desktop/computer/test/expected.txt`).
 
+In prigh-web each `computer` call is a card: what it did ("click (640,
+312)", "type “hello”", "key ctrl+t", "scroll ↓3 at (x, y)", ...) and the
+screen after it, with the point it acted on marked; tap the screenshot for
+the image viewer. While a run is driving the screen (it called `computer`
+since your last message), a strip over the composer says "prigh is
+controlling <host>" with Stop, which aborts the run as Esc does. The TUI
+shows a line per action (`computer click 640,312  → screenshot
+1280×800`).
+
 ## Editors (ACP)
 
 `prigh acp` speaks the [Agent Client Protocol](https://agentclientprotocol.com)
