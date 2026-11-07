@@ -1442,9 +1442,23 @@ PATH, with extra arguments from `$PRIGH_COMPUTER_ARGS`.
   first.
 - **X11**: XTEST and the root window, cropped to the primary monitor;
   characters the keyboard map lacks go through spare keycodes.
-- **GNOME and KDE on Wayland, macOS and Windows** are not supported yet:
+- **Windows** (`prigh-computer.exe`): the primary monitor, captured with
+  DXGI Desktop Duplication, or GDI's BitBlt where that is unavailable (RDP
+  sessions, some virtual GPUs, a rotated screen; `--probe`'s `detail`
+  says which and why); input with `SendInput` (absolute over the virtual
+  desktop, the wheel both ways, text as Unicode, combos as virtual keys:
+  `win`, `ctrl`, `alt`, `shift`, F1..F24, ...); the pointer with
+  `GetCursorPos`. It is per-monitor DPI aware, so coordinates are physical
+  pixels at any display scale. What Windows does not allow it says: the
+  secure desktop (UAC prompts, the lock screen, Ctrl+Alt+Del) can be
+  neither seen nor driven, and windows of programs run as administrator
+  get no input from a helper that is not elevated (UIPI; it refuses
+  rather than let Windows drop the input silently: run the desktop app as
+  administrator to drive those too). It has been tested on Wine and the
+  CI's Windows runner (Notepad), not yet by hand on a real desktop.
+- **GNOME and KDE on Wayland, and macOS** are not supported yet:
   it says so (on GNOME or KDE, log in to an X11 session meanwhile).
-  `--backend auto|wlroots|x11|fake` (or `$PRIGH_COMPUTER_BACKEND`)
+  `--backend auto|wlroots|x11|windows|fake` (or `$PRIGH_COMPUTER_BACKEND`)
   overrides the detection; `prigh-computer --probe` prints what it
   found, or what is missing.
 - **Kill switch**: when the mouse is not where the helper left it, the
@@ -1455,7 +1469,20 @@ In the desktop app, pass `-computer` to `prigh desktop`: with Home Manager,
 `programs.prigh.desktop.computerUse = true` (it adds `-computer` and points
 `PRIGH_COMPUTER` at the packaged helper); otherwise `PRIGH_DESKTOP_ARGS=-computer`
 with `prigh-computer` on the PATH (`nix profile install
-github:evan-a-w/prigh#prigh-computer`). The helper's tests are `cargo test
+github:evan-a-w/prigh#prigh-computer`).
+
+On Windows the tool host runs in WSL, where there is no Windows desktop
+to see, so the Windows installers carry the Windows build,
+`prigh-computer.exe`, next to the app, and the app hands it to WSL:
+`$PRIGH_COMPUTER` set to its path and shared through `$WSLENV` (as
+`PRIGH_COMPUTER/p`, so WSL sees `/mnt/c/.../prigh-computer.exe`). The
+tool host in WSL runs it like any program (WSL's interop starts Windows
+executables, with the pipes connected), and it drives the Windows
+desktop of the user who opened the app. So `PRIGH_DESKTOP_ARGS=-computer`
+is all it takes; a `$PRIGH_COMPUTER` of your own wins (share it through
+`$WSLENV` yourself). Cancelling an action ends the WSL side at once and
+the helper when its pipe closes (an action in progress finishes first).
+The helper's tests are `cargo test
 -p prigh-computer` in `desktop/` (in `./test`) and the flake's
 `computer-use` check, which drives a headless sway and Xvfb and compares
 the input an app received (`desktop/computer/test/expected.txt`).
@@ -1492,8 +1519,8 @@ The backend's own host never offers it.
 - Each action's result carries a screenshot, but requests send only the
   latest `computer_screenshots` (config, default 3) as images; older ones
   are sent as `[screenshot omitted]`. The session keeps them all.
-- Platforms: Linux on wlroots compositors and X11 (above); the rest say
-  they are not supported yet.
+- Platforms: Linux on wlroots compositors and X11, and Windows (above);
+  the rest say they are not supported yet.
 
 ## Editors (ACP)
 
