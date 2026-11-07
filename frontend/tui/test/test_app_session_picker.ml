@@ -596,3 +596,94 @@ let%expect_test "/delete-archived with the current session archived" =
       (tag Sessions_deleted))
     |}]
 ;;
+
+let pinned_sessions_json =
+  {|[
+  {"id":"1","path":"/s/1.jsonl","name":"build fix","cwd":"/work","created_at":"2025-06-05T10:00:00Z","updated_at":"2025-06-06T10:00:00Z","first_prompt":"fix the build","message_count":12,"pinned":false,"archived":true,"bytes":2048},
+  {"id":"2","path":"/s/2.jsonl","name":"deploy","cwd":"/work","created_at":"2025-06-03T10:00:00Z","updated_at":"2025-06-04T10:00:00Z","first_prompt":"deploy it","message_count":6,"pinned":false,"bytes":4096},
+  {"id":"3","path":"/s/3.jsonl","name":"notes","cwd":"/work","created_at":"2025-05-03T10:00:00Z","updated_at":"2025-06-03T10:00:00Z","first_prompt":"keep notes","message_count":6,"pinned":true,"bytes":4096},
+  {"id":"4","path":"/s/4.jsonl","name":"scratch","cwd":"/tmp","created_at":"2025-06-02T10:00:00Z","updated_at":"2025-06-02T10:00:00Z","first_prompt":"scratch","message_count":2,"pinned":false,"bytes":100},
+  {"id":"5","path":"/s/5.jsonl","name":"todo","cwd":"/work","created_at":"2025-04-01T10:00:00Z","updated_at":"2025-06-01T10:00:00Z","first_prompt":"the list","message_count":3,"pinned":true,"bytes":300}
+  ]|}
+;;
+
+let%expect_test
+    "pinned sessions first under their own divider, in the list's order; \
+     Alt+T pins and unpins, pinning unarchives"
+  =
+  let h = Test_app.connected ~width:100 ~height:18 () in
+  H.keys h "/sessions";
+  H.enter h;
+  H.reply h Sessions_picker pinned_sessions_json;
+  rows h;
+  [%expect
+    {|
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions_picker))
+    |}];
+  (* Unpinning the highlighted one moves it among the others. *)
+  H.key h (Key.alt (Char "t"));
+  rows h;
+  [%expect {| |}];
+  H.reply h (Pin_done { name = "session \"notes\""; pinned = false }) "{}";
+  (* Pinning an archived one brings it to the top. *)
+  H.key h (Key.plain End);
+  H.key h (Key.alt (Char "t"));
+  rows h;
+  [%expect {| |}];
+  H.reply_error
+    h
+    (Pin_done { name = "session \"build fix\""; pinned = true })
+    "no such session \"/s/1.jsonl\"";
+  [%expect {| |}]
+;;
+
+let%expect_test "Alt+T on a backend that cannot pin says so" =
+  let h = Test_app.connected ~width:100 ~height:14 () in
+  H.keys h "/sessions";
+  H.enter h;
+  H.reply h Sessions_picker (list [ session "a" "alpha"; session "b" "beta" ]);
+  H.key h (Key.alt (Char "t"));
+  H.show h;
+  [%expect {| |}]
+;;
+
+let%expect_test "/pin and /unpin: the current session, or one by name or id" =
+  let h = in_here () in
+  H.keys h "/pin";
+  H.enter h;
+  H.keys h "/unpin";
+  H.enter h;
+  H.keys h "/pin deploy";
+  H.enter h;
+  H.reply h (Session_to_pin { arg = "deploy"; pinned = true }) pinned_sessions_json;
+  H.keys h "/unpin 5";
+  H.enter h;
+  H.reply h (Session_to_pin { arg = "5"; pinned = false }) pinned_sessions_json;
+  H.keys h "/pin nothing-like-it";
+  H.enter h;
+  H.reply
+    h
+    (Session_to_pin { arg = "nothing-like-it"; pinned = true })
+    pinned_sessions_json;
+  H.show h;
+  [%expect {| |}];
+  (* A backend that cannot pin. *)
+  H.key h (Key.ctrl 'u');
+  H.keys h "/pin alpha";
+  H.enter h;
+  H.reply
+    h
+    (Session_to_pin { arg = "alpha"; pinned = true })
+    (list [ session "a" "alpha" ]);
+  H.show h;
+  [%expect {| |}];
+  (* Completions: /pin offers the unpinned (and archived), /unpin the pinned. *)
+  H.key h (Key.ctrl 'u');
+  H.keys h "/pin ";
+  H.reply h Sessions_cache pinned_sessions_json;
+  rows h;
+  H.key h (Key.ctrl 'u');
+  H.keys h "/unpin ";
+  rows h;
+  [%expect {| |}]
+;;
