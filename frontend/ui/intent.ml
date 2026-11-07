@@ -52,6 +52,7 @@ type t =
   | Next_user_message
   | Jump_to_bottom
   | Toggle_archived
+  | Toggle_pinned
   | Review_highlighted
   | Toggle_sidebar
 [@@deriving sexp_of, equal, compare]

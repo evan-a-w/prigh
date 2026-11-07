@@ -130,12 +130,21 @@ end
 
 (* One line per session: the name (else the first prompt) and how it is
    listed. *)
-let print_sessions (c : Client.t) =
+let print_sessions ?(by_name = false) (c : Client.t) =
   match Client.result (Client.request c "list_sessions" []) with
   | Error e -> print_endline e
   | Ok sessions ->
+    let name s =
+      match Json.member "name" s with
+      | Some (`String n) -> n
+      | _ -> ""
+    in
     List.iter
-      (Option.value (Json.list sessions) ~default:[])
+      (Option.value (Json.list sessions) ~default:[]
+       |>
+       if by_name
+       then List.sort ~compare:(Comparable.lift String.compare ~f:name)
+       else Fn.id)
       ~f:(fun s ->
         let field name = Json.member name s in
         let str name =
@@ -160,7 +169,8 @@ let print_sessions (c : Client.t) =
            | _ -> str "first_prompt")
           (String.concat
              ~sep:" "
-             (List.filter_opt [ flag "archived"; flag "running"; flag "live" ]))
+             (List.filter_opt
+                [ flag "pinned"; flag "archived"; flag "running"; flag "live" ]))
           (number "background")
           (number "clients"))
 ;;
@@ -279,6 +289,80 @@ let%expect_test
     recent     live background=0 clients=1
     old         background=0 clients=-
     ancient     background=0 clients=-
+    |}]
+;;
+
+let%expect_test "pinning: over RPC, never archived by age, archiving unpins" =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let ancient = saved t "ancient" ~days_ago:30. in
+  let old = saved t "old" ~days_ago:10. in
+  let (_ : Session.t) = saved t "recent" ~days_ago:0.1 in
+  let provider = Routed_provider.create ~main:[] [] in
+  let server = Server.create t ~sw ~provider in
+  let a = Client.connect server "a" in
+  let b = Client.connect server "b" ~session:(Session.id old) in
+  Client.call t a "set_pinned" (path ancient @ [ "pinned", `True ]);
+  Client.call
+    t
+    a
+    "set_pinned"
+    [ "path", `String (Session.id old); "pinned", `True ];
+  Client.call t a "set_pinned" (path old);
+  Client.call t a "set_pinned" [ "path", `String "nope"; "pinned", `True ];
+  Client.call t a "set_pinned" (path old @ [ "pinned", `String "yes" ]);
+  print_sessions ~by_name:true a;
+  Client.sessions_changed a;
+  Client.sessions_changed b;
+  [%expect
+    {|
+    {"type":"response","id":"r","ok":true,"result":{}}
+    {"type":"response","id":"r","ok":true,"result":{}}
+    {"type":"response","id":"r","ok":false,"error":"missing param \"pinned\""}
+    {"type":"response","id":"r","ok":false,"error":"no such session \"nope\""}
+    {"type":"response","id":"r","ok":false,"error":"param \"pinned\" must be a boolean"}
+    ancient    pinned background=0 clients=-
+    old        pinned live background=0 clients=1
+    recent      background=0 clients=-
+    a: 2 sessions_changed
+    b: 2 sessions_changed
+    |}];
+  (* Archiving a pinned session unpins it; pinning it again unarchives it. *)
+  Client.call t a "set_archived" (path ancient @ [ "archived", `True ]);
+  print_sessions a;
+  Client.call t a "set_pinned" (path ancient @ [ "pinned", `True ]);
+  print_sessions ~by_name:true a;
+  [%expect
+    {|
+    {"type":"response","id":"r","ok":true,"result":{}}
+    ancient    archived background=0 clients=-
+    old        pinned live background=0 clients=1
+    recent      background=0 clients=-
+    {"type":"response","id":"r","ok":true,"result":{}}
+    ancient    pinned background=0 clients=-
+    old        pinned live background=0 clients=1
+    recent      background=0 clients=-
+    |}];
+  (* Unpinning counts as activity, so it is not archived at once. *)
+  Client.call t a "set_pinned" (path old @ [ "pinned", `False ]);
+  print_sessions ~by_name:true a;
+  [%expect
+    {|
+    {"type":"response","id":"r","ok":true,"result":{}}
+    ancient    pinned background=0 clients=-
+    old        live background=0 clients=1
+    recent      background=0 clients=-
+    |}];
+  (* A fresh server over the same files agrees. *)
+  let server2 = Server.create t ~sw ~provider in
+  print_sessions ~by_name:true (Client.connect server2 "c");
+  [%expect
+    {|
+    ancient    pinned background=0 clients=-
+    old         background=0 clients=-
+    recent      background=0 clients=-
     |}]
 ;;
 

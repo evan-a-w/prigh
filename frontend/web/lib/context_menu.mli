@@ -61,6 +61,8 @@ module Item : sig
     | Copy_id
     | Archive
     | Unarchive
+    | Pin
+    | Unpin
     | Delete
     | Remove (** the worktree *)
     | Copy_message (** its text (a reply's markdown) *)

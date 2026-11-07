@@ -266,6 +266,7 @@ let handle t (intent : Intent.t) ~page : Outcome.t =
   | Prev_user_message
   | Next_user_message
   | Toggle_archived
+  | Toggle_pinned
   | Review_highlighted
   | Toggle_sidebar
   | Jump_to_bottom

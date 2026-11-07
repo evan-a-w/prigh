@@ -780,7 +780,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider, …
-      ↕ 1–8 of 72
+      ↕ 1–8 of 74
     ────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  think:off  Tab/Enter accept · Alt+S as typed
@@ -797,7 +797,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider, …
-      ↕ 1–8 of 72
+      ↕ 1–8 of 74
     ────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  think:off  Tab/Enter accept · Alt+S as typed
@@ -814,7 +814,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider, …
-      ↕ 1–8 of 72
+      ↕ 1–8 of 74
     ────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  think:off  Tab/Enter accept · Alt+S as typed
@@ -1561,7 +1561,7 @@ let%expect_test
 
     ▌ earlier question
       earlier answer
-    Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
+    Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named · Alt+T (un)pins
     / ▏
     ▸* ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
        ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
@@ -1628,7 +1628,7 @@ let%expect_test
 
     ▌ earlier question
       earlier answer
-    Sessions  (2)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
+    Sessions  (2)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named · Alt+T (un)pins
     / spike▏
       ── archived ──
     ▸  old spike ∣ 2025-04-02T10:00 ∣ 2 msgs ∣ another spike  /old
@@ -1655,7 +1655,7 @@ let%expect_test
 
     ▌ earlier question
       earlier answer
-    Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
+    Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named · Alt+T (un)pins
     / ▏
      ✓ ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
      ✓ ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
@@ -1680,7 +1680,7 @@ let%expect_test
 
     ▌ earlier question
       earlier answer
-    Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
+    Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named · Alt+T (un)pins
     / ▏
      ✓ ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
        ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
@@ -1739,7 +1739,7 @@ let%expect_test
 
     ▌ earlier question
       earlier answer
-    Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
+    Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named · Alt+T (un)pins
     / ▏
      * ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
      ✓ ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
@@ -1767,7 +1767,7 @@ let%expect_test
 
     ▌ earlier question
       earlier answer
-    Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
+    Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named · Alt+T (un)pins
     / ▏
      * ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
      ✓ ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
@@ -1792,7 +1792,7 @@ let%expect_test
     │ Deleted 1 session (1.0 MB)                                                                       │
     │ Not deleted: session "deploy" is running: wait for it, or switch to it and /abort                │
     └────────────────────────────────────────────────────────────────────────────────── Esc dismisses ─┘
-    Sessions  (4)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
+    Sessions  (4)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named · Alt+T (un)pins
     / ▏
      * ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
      ✓ ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
@@ -1854,7 +1854,7 @@ let%expect_test
 
     ▌ earlier question
       earlier answer
-    Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
+    Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named · Alt+T (un)pins
     / ▏
      * ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
        ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
@@ -1880,7 +1880,7 @@ let%expect_test
 
     ▌ earlier question
       earlier answer
-    Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
+    Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named · Alt+T (un)pins
     / ▏
      * ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
        ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
@@ -1916,7 +1916,7 @@ let%expect_test
 
     ▌ earlier question
       earlier answer
-    Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
+    Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named · Alt+T (un)pins
     / ▏
      * ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
        ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
@@ -1925,6 +1925,34 @@ let%expect_test
       ── archived ──
     ▸  (unnamed) ∣ 2025-06-04T10:00 ∣ 4 msgs ∣ try a spike  /old
     ───────────────────────────────────────────────────────────────── unarchived session "old spike" ───
+    >
+    deepseek-flash  think:off  ctx:0.1%/1.0M  Enter switches · Tab marks · Ctrl+D deletes · Esc closes
+    |}]
+;;
+
+(* Pinning is in test_app_session_picker.ml; a backend from before it
+   cannot. *)
+let%expect_test "Alt+T on a backend that cannot pin says so" =
+  let h = sessions_open () in
+  H.key h (Key.alt (Char "t"));
+  H.show h;
+  [%expect
+    {|
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions_picker))
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named · Alt+T (un)pins
+    / ▏
+    ▸* ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
+       ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
+       (unnamed) ∣ 2025-06-01T10:00 ∣ 0 msgs ∣ (empty)     /tmp
+      ── archived ──
+       (unnamed) ∣ 2025-06-04T10:00 ∣ 4 msgs ∣ try a spike  /old
+       old spike ∣ 2025-04-02T10:00 ∣ 2 msgs ∣ another spike  /old
+    ───────────────────────────────────────────── this backend cannot pin sessions: update it to pin ───
     >
     deepseek-flash  think:off  ctx:0.1%/1.0M  Enter switches · Tab marks · Ctrl+D deletes · Esc closes
     |}]
@@ -2324,7 +2352,7 @@ let%expect_test
 
     ▌ earlier question
       earlier answer
-    Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
+    Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named · Alt+T (un)pins
     / 2025▏
      ✓ ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
     ▸  ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it  /work
@@ -2358,7 +2386,7 @@ let%expect_test
 
     ▌ earlier question
       earlier answer
-    Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
+    Sessions  (5)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named · Alt+T (un)pins
     / 2025▏
        dev ∣ 2025-06-06T10:00 ∣ 1 msgs ∣ something new     /work
      ✓ ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
@@ -2978,7 +3006,7 @@ let%expect_test "/auth, /help, /state, /clear, unknown method errors" =
     │ Ctrl+P cycles through                                    │
     │ /change_default                    save the current      │
     │ model and thinking level as the default for new sessions │
-    └───────── 1–11 of 316 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
+    └───────── 1–11 of 325 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
     ────────────────────────────────────────────────────────────
     > ▏
     deepseek-flash  ctx:0.1%/1.0M  ↑↓ scroll · Esc closes
@@ -6163,7 +6191,7 @@ let%expect_test "/hotkeys prints the keys half of /help" =
     │ the current turn (a focused subagent's: before it        │
     │ reports)                                                 │
     │ Alt+S                   send exactly what is typed,      │
-    └────────── 1–7 of 104 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
+    └────────── 1–7 of 108 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
     ────────────────────────────────────────────────────────────
     > ▏
     deepseek-flash  ctx:0.1%/1.0M  ↑↓ scroll · Esc closes
@@ -6679,7 +6707,7 @@ let%expect_test "resize keeps the confirm dialog and picker within the width" =
 
     ▌ earlier question
       earlier answer
-    Sessions  (2)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
+    Sessions  (2)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named · Alt+T (un)pins
     / ▏
     ▸* build fix ∣ 2025-06-01T10:00 ∣ 12 msgs ∣ fix the build please  /work
        (unnamed) ∣ 2025-06-02T11:30 ∣ 0 msgs ∣ (empty)               /other
@@ -7493,6 +7521,7 @@ let%expect_test "keymap: every binding is covered by a scenario" =
     Alt+M            Cycle_mode               covered
     Ctrl+N           Picker_toggle_filter     covered
     Alt+A            Toggle_archived          covered
+    Alt+T            Toggle_pinned            covered
     Alt+R            Review_highlighted       covered
     Ctrl+X           Copy_last                covered
     Ctrl+Z           Suspend                  covered
@@ -8562,7 +8591,7 @@ let%expect_test
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider, …
-      ↕ 1–8 of 72
+      ↕ 1–8 of 74
     ────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  think:off  Tab/Enter accept · Alt+S as typed
@@ -8579,7 +8608,7 @@ let%expect_test
       /fallback [off|model...]        show or set the models th…
       /default-dir [off|path]         show or set the directory…
       /login [provider] [api_key|oauth]  log in to a provider, …
-      ↕ 1–8 of 72
+      ↕ 1–8 of 74
     ────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  think:off  Tab/Enter accept · Alt+S as typed
@@ -8864,7 +8893,7 @@ let%expect_test
                                 │   /fallback [off|model...]           show or set the models that take over, in order, when a model'…
                                 │   /default-dir [off|path]            show or set the directory new sessions start in
                                 │   /login [provider] [api_key|oauth]  log in to a provider, or a git host: github [HOST] [token], fo…
-     Alt+L hides · ⇧Tab focuses │   ↕ 1–8 of 72
+     Alt+L hides · ⇧Tab focuses │   ↕ 1–8 of 74
     ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
     > /▏
     /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01  Tab/Enter accept · Alt+S as typed

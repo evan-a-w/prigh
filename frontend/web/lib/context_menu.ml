@@ -47,6 +47,8 @@ module Item = struct
     | Copy_id
     | Archive
     | Unarchive
+    | Pin
+    | Unpin
     | Delete
     | Remove
     | Copy_message
@@ -84,6 +86,8 @@ module Item = struct
     | Copy_id
     | Archive
     | Unarchive
+    | Pin
+    | Unpin
     | Copy_message
     | Select_text
     | Trim_before
@@ -120,6 +124,10 @@ let session_items ?host_home (s : Session_summary.t) ~current
     ; Some (Terminal, "Open terminal there", "/terminal")
     ; Some (Copy_path, "Copy path", "")
     ; Some (Copy_id, "Copy session id", "")
+    ; Option.map s.pinned ~f:(fun pinned ->
+        if pinned && not s.archived
+        then Item.Unpin, "Unpin", "P"
+        else Pin, "Pin to top", "P")
     ; (if s.archived
        then Some (Unarchive, "Unarchive", "A")
        else Some (Archive, "Archive", "A"))

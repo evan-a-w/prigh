@@ -30,6 +30,7 @@ let session
   ; waiting = 0
   ; failed = false
   ; archived = false
+  ; pinned = None
   ; bytes = 0
   ; host = None
   ; repo =

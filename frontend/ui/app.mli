@@ -57,6 +57,14 @@ module Reply_tag : sig
         { arg : string (** [/archive]'s argument *)
         ; archived : bool
         }
+    | Pin_done of
+        { name : string
+        ; pinned : bool
+        }
+    | Session_to_pin of
+        { arg : string (** [/pin]'s argument *)
+        ; pinned : bool
+        }
     | Paths_for_autocomplete of string
     | Dirs_for_autocomplete of string
     | Set_model_done of string

@@ -409,11 +409,14 @@ try {
       const r = e.getBoundingClientRect();
       if (r.width < 1) continue;
       const name = (e.getAttribute("aria-label") || e.innerText).trim().split("\n")[0];
-      // Past the edge of a scroller is scrolled to, not lost.
+      // Past the edge of a scroller (or into the padding a sheet scrolls
+      // under, over the home indicator) is scrolled to, not lost.
       let scroller = e.parentElement;
       while (scroller && !/(auto|scroll)/.test(getComputedStyle(scroller).overflowY)) scroller = scroller.parentElement;
       const box = scroller?.getBoundingClientRect();
-      if (box && (r.top < box.top - 0.5 || r.bottom > box.bottom + 0.5)) continue;
+      const padding = scroller && scroller.scrollHeight > scroller.clientHeight
+        ? parseFloat(getComputedStyle(scroller).paddingBottom) : 0;
+      if (box && (r.top < box.top - 0.5 || r.bottom > box.bottom - padding + 0.5)) continue;
       if (r.left < -0.5 || r.right > innerWidth + 0.5 || r.top < inset.top - 0.5 || r.bottom > innerHeight - inset.bottom + 0.5)
         out.push(`${name}: out of the safe area`);
       const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);

@@ -80,6 +80,9 @@ let help =
        remove it" )
   ; ( "A (on a session)"
     , "archive or unarchive it (archived sessions are listed last, muted)" )
+  ; ( "P (on a session)"
+    , "pin it to the top of the sidebar, or unpin it (pinned sessions are \
+       never archived for being idle)" )
   ; ( "Shift+F10 / ContextMenu (on a session or worktree)"
     , "its menu: open, rename, fork, new worktree, review, files, terminal, \
        pull request, copy, delete or remove (also right-click, a long press or \
@@ -460,6 +463,10 @@ let session_key (m : App.Model.t) t id : App.Action.t option =
   | ("a" | "A") when not (t.ctrl || t.alt || t.meta) ->
     session (fun s ->
       App.Action.Set_archived { path = s.path; archived = not s.archived })
+  | ("p" | "P") when not (t.ctrl || t.alt || t.meta) ->
+    session (fun s ->
+      App.Action.Set_pinned
+        { path = s.path; pinned = not (Session_list.is_pinned s) })
   | "Escape" when m.marks.selecting -> Some (Select_sessions false)
   | "Escape" -> Some Leave_sidebar
   | _ -> None
