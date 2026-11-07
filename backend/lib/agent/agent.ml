@@ -353,9 +353,10 @@ let active_computer t =
 
 (* The built-in tools, with [computer] while the active host runs it. *)
 let own_tools t =
-  if Option.is_some (active_computer t)
-  then t.tools @ [ Tool_computer.tool ]
-  else t.tools
+  match active_computer t with
+  | Some info ->
+    t.tools @ [ Tool_computer.for_screen ~native:t.config.computer_native info ]
+  | None -> t.tools
 ;;
 
 let find_branch t ~cwd =
@@ -1973,6 +1974,7 @@ let compaction_settings t =
         Result.ok (Model_registry.resolve t.models name))
   ; mask_observations = t.config.mask_observations
   ; computer_screenshots = t.config.computer_screenshots
+  ; computer_screenshots_max = t.config.computer_screenshots_max
   }
 ;;
 

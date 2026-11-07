@@ -8,6 +8,7 @@ let spec =
   ; parallel_safe = true
   ; on_host = true
   ; freeform = None
+  ; native = None
   ; destructive = Never
   ; description =
       "Find files by glob pattern (e.g. *.ml, src/**/*.ts). Respects \

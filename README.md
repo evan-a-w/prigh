@@ -543,7 +543,8 @@ chooses, Esc closes it and changes nothing. Below
 the list a faint "Archived 14" rule unfolds the archived sessions, muted,
 with their directory. A search (Ctrl+K) finds sessions by title, prompt,
 directory, repository, branch or their worktrees' branches, the archived
-ones too. Where a session is in git is found on its
+ones too, and by what was said in them: see "Searching sessions" under Keys.
+Esc clears it, then goes back to the editor. Where a session is in git is found on its
 tool host whenever its directory changes, by reading the repository's
 files (no git command), and kept in the session; a tool host running an
 older prigh cannot tell, and its sessions show their directory. On a focused session A archives or unarchives it and Delete
@@ -1520,9 +1521,30 @@ The backend's own host never offers it.
 - Moving the mouse stops the run at once ("computer use stopped: you
   moved the mouse ..."); the next message goes on. Esc or Stop abort as
   for any run.
-- Each action's result carries a screenshot, but requests send only the
-  latest `computer_screenshots` (config, default 3) as images; older ones
-  are sent as `[screenshot omitted]`. The session keeps them all.
+- Each action's result carries a screenshot. Requests send them as images
+  until there are `computer_screenshots_max` (config, default 8), then the
+  oldest are cut, all at once, down to the latest `computer_screenshots`
+  (default 3), and sent as `[screenshot omitted]`: between two cuts each
+  request only adds to the one before, so the provider's prompt cache
+  keeps working (prigh puts an Anthropic cache breakpoint before the first
+  screenshot, which a cut never changes). The session keeps them all.
+  On models that check what came before each thinking block they get
+  back (Claude 5.1 and later), a cut also leaves out the thinking written
+  while a now omitted screenshot was still sent.
+- Models with a built-in computer-use tool get it instead of prigh's
+  JSON schema (`computer_native`, config, default `true`): Claude 5.5
+  models the `computer_toolset_20260801` toolset, Claude Opus 4.5 to 5
+  and Sonnet 4.6 and 5 `computer_20251124` (with zoom), Sonnet and Haiku
+  4.5 `computer_20250124` (with their beta headers), and the OpenAI API's
+  models with computer use (GPT-5.4 and later) the Responses API's
+  `computer` tool. prigh translates their calls to its own actions (the
+  session, the host and the frontends see those) and replays them to the
+  same kind of model as written. An OpenAI `computer_call` is a batch:
+  each action runs in order, and a batch (from either provider) stops at
+  the first action that fails, the rest answered "Not executed". A call
+  with OpenAI `pending_safety_checks` needs approval in Ask mode and its
+  result says the checks were acknowledged. Other models, Codex and
+  custom providers use the schema.
 - Platforms: Linux on wlroots compositors and X11, and Windows (above);
   the rest say they are not supported yet.
 
@@ -1898,6 +1920,24 @@ and `/scoped-models` toggles with Space (Ctrl+A all, Ctrl+X none). `/help`
 lists the commands, the prompt prefixes (`!cmd`, `!!cmd`, `!&cmd`, `@path`, `#name`)
 and these keys.
 
+**Searching sessions.** prigh-web's sidebar search and the TUI's `/sessions` filter work the
+same way. The query is split into words, and a session matches when every
+word matches, in any order and in any of its fields: its name, its first
+prompt, its description, its directory, repository and branches, and
+(searched by the backend, `search_sessions`) the text of all its messages,
+yours and the agent's (not tool output). A word matches a word of the
+session exactly, as its start, inside it (3+ letters), with one typo (4+
+letters: `reconect`, `sesion`) or as its letters in order from its first
+(`cfg` for `configure`), best first; never across words, so short queries
+match little rather than everything. A match in the name counts more than
+one in the first prompt, then the other text, then where it works; ties go
+to the most recently updated. Titles match as you type; the messages
+follow once typing pauses, each session found there with the passage that
+matched under its title, the matched words marked (in titles too). The
+backend keeps an index of every session's words in memory, updated as
+sessions change, so a search of thousands of sessions takes tens of
+milliseconds (the first one reads them all).
+
 `/sessions` lists the active sessions first, most recent first, each with
 its repository and branch (`prigh ⎇ main`) and, beside its directory, the
 worktrees that matter to it (`⎇ feat/x · ⎇ agent/fix (subagent)`; the
@@ -2270,8 +2310,11 @@ prigh-web's settings page; free with Groq, see "Free dictation with
 Groq" under custom providers),
 `mask_observations` (default `true`: replace old tool outputs with
 placeholders before summarising, see "Long runs" below),
-`computer_screenshots` (default 3: how many of the latest `computer`
-screenshots requests carry as images, see "Turning computer use on"),
+`computer_screenshots` and `computer_screenshots_max` (default 3 and 8:
+how many of the latest `computer` screenshots requests carry as images
+after a cut, and how many they may carry before the next, see "Turning
+computer use on"), `computer_native` (default `true`: offer models their
+built-in computer-use tool),
 `compact_at_tokens` (default 200000, `0` = off: compact once the context
 exceeds this many tokens, if that comes before 80% of the window) and
 `compaction_model` (the model that writes compaction summaries; default:

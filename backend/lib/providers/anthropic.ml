@@ -63,8 +63,42 @@ let text_block ?(cached = false) text =
 ;;
 
 let redacted_prefix = "redacted:"
+let is_computer name = String.equal name Tool_computer.name
 
-let assistant_block ~oauth ~replay_thinking (block : Content.t) =
+let computer_tool_use
+      ~(computer : Native_computer.t option)
+      (call : Content.Tool_call.t)
+  =
+  let tool_use ?toolset name input =
+    `Object
+      ([ "type", `String "tool_use"
+       ; "id", `String call.id
+       ; "name", `String name
+       ]
+       @ Option.value_map toolset ~default:[] ~f:(fun t ->
+         [ "toolset_name", `String t ])
+       @ [ "input", input ])
+  in
+  match computer with
+  | Some Anthropic_toolset ->
+    let name, input =
+      Computer_native.to_anthropic ~toolset:true call.arguments
+    in
+    tool_use ~toolset:Tool_computer.name name input
+  | Some (Anthropic_tool _) ->
+    let name, input =
+      Computer_native.to_anthropic ~toolset:false call.arguments
+    in
+    tool_use name input
+  | Some Openai | None ->
+    tool_use
+      call.name
+      (match Json.parse (Computer_native.generic call.arguments) with
+       | Ok (`Object _ as json) -> json
+       | Ok _ | Error _ -> `Object [])
+;;
+
+let assistant_block ~oauth ~replay_thinking ~computer (block : Content.t) =
   match block with
   | Content.Text "" | Server_tool _ -> None
   | Text text -> Some (`Object [ "type", `String "text"; "text", `String text ])
@@ -88,6 +122,8 @@ let assistant_block ~oauth ~replay_thinking (block : Content.t) =
             ; "thinking", `String text
             ; "signature", `String signature
             ])
+  | Tool_call call when is_computer call.name ->
+    Some (computer_tool_use ~computer call)
   | Tool_call call ->
     let input =
       match Content.Tool_call.parse_arguments call with
@@ -136,6 +172,7 @@ let server_tool_blocks ~same_provider ~continuing (tool : Content.Server_tool.t)
 let assistant_blocks
       ~oauth
       ~replay_thinking
+      ~computer
       ?(continuing = false)
       (a : Message.Assistant.t)
   =
@@ -144,7 +181,7 @@ let assistant_blocks
     | Content.Server_tool tool ->
       server_tool_blocks ~same_provider:replay_thinking ~continuing tool
     | Text _ | Thinking _ | Tool_call _ ->
-      Option.to_list (assistant_block ~oauth ~replay_thinking block))
+      Option.to_list (assistant_block ~oauth ~replay_thinking ~computer block))
 ;;
 
 let image_block (image : Image.t) =
@@ -167,18 +204,26 @@ let user_blocks ({ text; images; origin = _ } : Message.User.t) =
   @ List.map images ~f:image_block
 ;;
 
-let tool_result_block (r : Message.Tool_result.t) =
+let tool_result_block
+      ~(computer : Native_computer.t option)
+      (r : Message.Tool_result.t)
+  =
   let text = if String.is_empty r.text then "(no output)" else r.text in
   `Object
-    [ "type", `String "tool_result"
-    ; "tool_use_id", `String r.tool_call_id
-    ; ( "content"
-      , match r.images with
-        | [] -> `String text
-        | images -> `Array (text_block text :: List.map images ~f:image_block)
-      )
-    ; ("is_error", if r.is_error then `True else `False)
-    ]
+    ([ "type", `String "tool_result"
+     ; "tool_use_id", `String r.tool_call_id
+     ; ( "content"
+       , match r.images with
+         | [] -> `String text
+         | images -> `Array (text_block text :: List.map images ~f:image_block)
+       )
+     ; ("is_error", if r.is_error then `True else `False)
+     ]
+     @
+     match computer with
+     | Some Anthropic_toolset when is_computer r.tool_name ->
+       [ "toolset_name", `String Tool_computer.name ]
+     | _ -> [])
 ;;
 
 let same_provider ~provider (a : Message.Assistant.t) =
@@ -207,8 +252,15 @@ let add_cache_control = function
    cached prefix, so with the end alone a turn that adds more blocks (many
    parallel tool calls and their results) would miss the cache and process
    the whole context again. *)
-let wire_messages ~oauth ~provider (messages : Message.t list) =
+let wire_messages ~oauth ~provider ~computer (messages : Message.t list) =
   let last = List.length messages - 1 in
+  let first_screenshot =
+    List.findi messages ~f:(fun _ m ->
+      match m with
+      | Tool_result r -> is_computer r.tool_name && not (List.is_empty r.images)
+      | User _ | Assistant _ -> false)
+    |> Option.map ~f:fst
+  in
   let previous_end =
     List.foldi messages ~init:(-1) ~f:(fun i acc m ->
       match m with
@@ -220,11 +272,12 @@ let wire_messages ~oauth ~provider (messages : Message.t list) =
       let role, blocks =
         match m with
         | User u -> "user", user_blocks u
-        | Tool_result r -> "user", [ tool_result_block r ]
+        | Tool_result r -> "user", [ tool_result_block ~computer r ]
         | Assistant a ->
           ( "assistant"
           , assistant_blocks
               ~oauth
+              ~computer
               ~replay_thinking:(same_provider ~provider a)
               ~continuing:(i = last)
               a )
@@ -237,7 +290,11 @@ let wire_messages ~oauth ~provider (messages : Message.t list) =
   in
   let breakpoints =
     List.filter_opt
-      [ last_cacheable ~upto:previous_end; last_cacheable ~upto:last ]
+      [ Option.bind first_screenshot ~f:(fun i -> last_cacheable ~upto:(i - 1))
+      ; last_cacheable ~upto:previous_end
+      ; last_cacheable ~upto:last
+      ]
+    |> List.dedup_and_sort ~compare:Int.compare
   in
   let merged =
     List.foldi blocks ~init:[] ~f:(fun pos acc (_, role, block) ->
@@ -257,20 +314,33 @@ let wire_messages ~oauth ~provider (messages : Message.t list) =
 
 let web_search_max_uses = 5
 
-let wire_tool ~oauth (t : Tool_spec.t) =
-  if Tool_web_search.is_spec t
-  then
+let wire_tool ~oauth ~computer (t : Tool_spec.t) =
+  match computer, t.native with
+  | Some Native_computer.Anthropic_toolset, Some (Tool_spec.Native.Computer _)
+    -> `Object [ "type", `String "computer_toolset_20260801" ]
+  | ( Some (Anthropic_tool { version; beta = _; zoom })
+    , Some (Computer { width; height }) ) ->
     `Object
-      [ "type", `String "web_search_20250305"
-      ; "name", `String Tool_web_search.name
-      ; "max_uses", `Number (Int.to_string web_search_max_uses)
-      ]
-  else
-    `Object
-      [ "name", `String (if oauth then to_claude_code_name t.name else t.name)
-      ; "description", `String t.description
-      ; "input_schema", t.parameters
-      ]
+      ([ "type", `String version
+       ; "name", `String t.name
+       ; "display_width_px", `Number (Int.to_string width)
+       ; "display_height_px", `Number (Int.to_string height)
+       ]
+       @ if zoom then [ "enable_zoom", `True ] else [])
+  | _ ->
+    if Tool_web_search.is_spec t
+    then
+      `Object
+        [ "type", `String "web_search_20250305"
+        ; "name", `String Tool_web_search.name
+        ; "max_uses", `Number (Int.to_string web_search_max_uses)
+        ]
+    else
+      `Object
+        [ "name", `String (if oauth then to_claude_code_name t.name else t.name)
+        ; "description", `String t.description
+        ; "input_schema", t.parameters
+        ]
 ;;
 
 let thinking_budget ~max_tokens (thinking : Thinking.t) =
@@ -329,8 +399,18 @@ let thinking_on (model : Model.t) (thinking : Thinking.t) =
   | Adaptive _ -> false
 ;;
 
+(* The model's built-in computer tool, when it has one and the request offers
+   [computer] in that form. *)
+let native_computer (r : Provider.Request.t) =
+  match r.model.native_computer with
+  | Some (Anthropic_toolset | Anthropic_tool _) as native
+    when List.exists r.tools ~f:(fun t -> Option.is_some t.native) -> native
+  | Some (Anthropic_toolset | Anthropic_tool _ | Openai) | None -> None
+;;
+
 let request_body ~oauth (r : Provider.Request.t) : Json.t =
   let r = Provider.Request.prepare r in
+  let computer = native_computer r in
   let max_tokens = Option.value r.max_tokens ~default:r.model.max_output in
   (* One breakpoint at the end of the system prompt (tools come before
      it); the identity alone would gain nothing from another. *)
@@ -351,22 +431,29 @@ let request_body ~oauth (r : Provider.Request.t) : Json.t =
          ]
        ; (if List.is_empty system then [] else [ "system", `Array system ])
        ; [ ( "messages"
-           , `Array (wire_messages ~oauth ~provider:r.model.provider r.messages)
-           )
+           , `Array
+               (wire_messages
+                  ~oauth
+                  ~provider:r.model.provider
+                  ~computer
+                  r.messages) )
          ]
        ; (if List.is_empty r.tools
           then []
-          else [ "tools", `Array (List.map r.tools ~f:(wire_tool ~oauth)) ])
+          else
+            [ "tools", `Array (List.map r.tools ~f:(wire_tool ~oauth ~computer))
+            ])
        ; thinking
        ])
 ;;
 
-let headers ~(auth : Auth.t) ~thinking_on =
+let headers ?(betas = []) ~(auth : Auth.t) ~thinking_on () =
   let betas =
     (match auth with
      | Oauth _ -> oauth_betas
      | Api_key _ | Gateway _ -> [])
-    @ if thinking_on then [ interleaved_thinking_beta ] else []
+    @ (if thinking_on then [ interleaved_thinking_beta ] else [])
+    @ betas
   in
   List.concat
     [ [ "anthropic-version", api_version ]
@@ -397,6 +484,8 @@ module Stream_state = struct
     ; mutable input : int
     ; mutable cache_read : int
     ; mutable output : int
+    ; mutable computer_calls : (int * (int * string option * Buffer.t)) list
+      (* content index -> tool index, toolset member, input so far *)
     ; mutable error : string option
     }
 
@@ -409,6 +498,7 @@ module Stream_state = struct
     ; input = 0
     ; cache_read = 0
     ; output = 0
+    ; computer_calls = []
     ; error = None
     }
   ;;
@@ -449,9 +539,19 @@ let search_result (content : Json.t option) =
   | None -> "search failed: no results in the reply", true
 ;;
 
+(* A [tool_use] block of the model's built-in computer tool: [Some member]
+   for a toolset member, [Some None] for the [computer] tool's. *)
+let native_computer_call ~(computer : Native_computer.t option) block =
+  match computer, member "toolset_name" block, member "name" block with
+  | Some Anthropic_toolset, Some toolset, Some name
+    when String.equal toolset Tool_computer.name -> Some (Some name)
+  | Some (Anthropic_tool _), None, Some name when is_computer name -> Some None
+  | _ -> None
+;;
+
 (* Returns the assistant events for one SSE event and records usage/stop
    reason in [state]. *)
-let parse_event ~tools (state : Stream_state.t) (event : Sse.Event.t)
+let parse_event ~tools ~computer (state : Stream_state.t) (event : Sse.Event.t)
   : Assistant_event.t list
   =
   match Json.parse event.data with
@@ -510,6 +610,22 @@ let parse_event ~tools (state : Stream_state.t) (event : Sse.Event.t)
                  ; raw = Some (Json.to_string block)
                  }
              ]
+           | "tool_use"
+             when Option.is_some (native_computer_call ~computer block) ->
+             let tool_index = state.tool_index in
+             state.tool_index <- tool_index + 1;
+             state.computer_calls
+             <- ( index
+                , ( tool_index
+                  , Option.value_exn (native_computer_call ~computer block)
+                  , Buffer.create 64 ) )
+                :: state.computer_calls;
+             [ Tool_call_start
+                 { index = tool_index
+                 ; id = Option.value (member "id" block) ~default:""
+                 ; name = Tool_computer.name
+                 }
+             ]
            | "tool_use" ->
              let tool_index = state.tool_index in
              state.tool_index <- tool_index + 1;
@@ -543,6 +659,15 @@ let parse_event ~tools (state : Stream_state.t) (event : Sse.Event.t)
                ~default:[]
                ~f:(fun s -> [ Assistant_event.Thinking_signature s ])
            | "input_json_delta"
+             when List.Assoc.mem state.computer_calls ~equal:Int.equal index ->
+             let _, _, input =
+               List.Assoc.find_exn state.computer_calls ~equal:Int.equal index
+             in
+             Option.iter
+               (member "partial_json" delta)
+               ~f:(Buffer.add_string input);
+             []
+           | "input_json_delta"
              when List.Assoc.mem state.server_tools ~equal:Int.equal index ->
              let _, _, input =
                List.Assoc.find_exn state.server_tools ~equal:Int.equal index
@@ -561,6 +686,26 @@ let parse_event ~tools (state : Stream_state.t) (event : Sse.Event.t)
                 [ Tool_call_delta { index = tool_index; arguments } ]
               | _ -> [])
            | _ -> []))
+     | "content_block_stop"
+       when List.Assoc.mem state.computer_calls ~equal:Int.equal (index ()) ->
+       let tool_index, member, input =
+         List.Assoc.find_exn state.computer_calls ~equal:Int.equal (index ())
+       in
+       let input =
+         match Json.parse (Buffer.contents input) with
+         | Ok json -> json
+         | Error _ -> `Object []
+       in
+       let arguments =
+         match member with
+         | Some name -> Computer_native.of_anthropic ~toolset:true ~name input
+         | None ->
+           Computer_native.of_anthropic
+             ~toolset:false
+             ~name:Tool_computer.name
+             input
+       in
+       [ Tool_call_delta { index = tool_index; arguments } ]
      | "content_block_stop" ->
        (match
           List.Assoc.find state.server_tools ~equal:Int.equal (index ())
@@ -642,14 +787,29 @@ let stream
         ?timeout
         ~cancel
         ~url
-        ~headers:(headers ~auth ~thinking_on @ extra_headers)
+        ~headers:
+          (headers
+             ~betas:
+               (match native_computer request with
+                | Some (Anthropic_tool { beta; _ }) -> [ beta ]
+                | Some (Anthropic_toolset | Openai) | None -> [])
+             ~auth
+             ~thinking_on
+             ()
+           @ extra_headers)
         ~body:
           (Trace.span ~detailed:true "request_build" (fun () ->
              Json.to_string (request_body ~oauth request)))
         ~on_event:(fun event ->
-          List.iter (parse_event ~tools:request.tools state event) ~f:(fun e ->
-            Assistant_builder.apply builder e;
-            on_event e))
+          List.iter
+            (parse_event
+               ~tools:request.tools
+               ~computer:(native_computer request)
+               state
+               event)
+            ~f:(fun e ->
+              Assistant_builder.apply builder e;
+              on_event e))
         ()
     in
     tool_index := state.tool_index;
@@ -709,12 +869,17 @@ module For_testing = struct
   let thinking_on = thinking_on
   let request_body = request_body
   let headers = headers
+  let native_computer = native_computer
 
-  let parse_events ~tools events =
+  let parse_events ?computer ~tools events =
     let state = Stream_state.create () in
     let events =
       List.concat_map events ~f:(fun data ->
-        parse_event ~tools state { Sse.Event.event = None; data; id = None })
+        parse_event
+          ~tools
+          ~computer
+          state
+          { Sse.Event.event = None; data; id = None })
     in
     ( events
     , `Stop_reason state.stop_reason
