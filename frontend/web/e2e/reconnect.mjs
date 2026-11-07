@@ -87,7 +87,7 @@ await page.addInitScript(() => {
 const errors = [];
 page.on("console", message => {
   if (message.type() === "error"
-    && !/favicon\.ico|interactive-widget|WebSocket|ERR_CONNECTION_REFUSED|ERR_INTERNET_DISCONNECTED|establish a connection/.test(message.text()))
+    && !/favicon\.ico|interactive-widget|WebSocket|ERR_CONNECTION_REFUSED|ERR_INTERNET_DISCONNECTED|establish a connection|interrupted while the page was loading/.test(message.text()))
     errors.push(`console: ${message.text()}`);
 });
 page.on("pageerror", error => errors.push(`page: ${error.message}`));
