@@ -1287,6 +1287,7 @@ programs.prigh.desktop.enable = true;  # "prigh" in the application menu / ~/App
 # programs.prigh.desktop.extraArgs = [ "-cwd" "/home/me/src" ];  # for `prigh desktop`
 # programs.prigh.desktop.useSystemNixpkgs = true;                # slow window on NixOS? see below
 # programs.prigh.desktop.disableDmabuf = true;                   # blank window? see below
+# programs.prigh.desktop.computerUse = true;                     # the agent may drive this desktop (below)
 ```
 
 Without Home Manager, `nix profile install github:evan-a-w/prigh#prigh-desktop`
@@ -1420,6 +1421,44 @@ PRIGH_TOKEN=... prigh desktop -connect wss://server/ws -cwd ~/proj
   another host name (DNS rebinding) or from another page (`Origin`, which
   matters most for WebSockets, which browsers open to any address) is
   refused.
+
+### The desktop's screen, mouse and keyboard: `prigh-computer`
+
+`prigh-computer` (`desktop/computer`, flake package `prigh-computer`) is
+the helper behind the `computer` tool: the tool host (`prigh tool-host
+-computer`, `prigh desktop -computer`) runs it and talks JSON lines with
+it on stdio. It takes screenshots of the screen (scaled so that the long
+side is at most `--max-long-side` (1280) and the pixels at most
+`--max-pixels` (1150000), the aspect kept; the model's coordinates are in
+that scaled space and mapped back to real pixels, HiDPI included), and
+moves and clicks the mouse, scrolls, drags and types any Unicode text.
+The tool host finds it as `$PRIGH_COMPUTER`, else `prigh-computer` on the
+PATH, with extra arguments from `$PRIGH_COMPUTER_ARGS`.
+
+- **Wayland, wlroots compositors** (Hyprland, sway, river, ...):
+  wlr-screencopy, the virtual pointer and the virtual keyboard (with a
+  keymap made for the characters typed, as `wtype` does). It controls
+  one output: the focused one (Hyprland and sway say which), else the
+  first.
+- **X11**: XTEST and the root window, cropped to the primary monitor;
+  characters the keyboard map lacks go through spare keycodes.
+- **GNOME and KDE on Wayland, macOS and Windows** are not supported yet:
+  it says so (on GNOME or KDE, log in to an X11 session meanwhile).
+  `--backend auto|wlroots|x11|fake` (or `$PRIGH_COMPUTER_BACKEND`)
+  overrides the detection; `prigh-computer --probe` prints what it
+  found, or what is missing.
+- **Kill switch**: when the mouse is not where the helper left it, the
+  user has moved it: the action stops and computer use pauses until the
+  next prompt.
+
+In the desktop app, pass `-computer` to `prigh desktop`: with Home Manager,
+`programs.prigh.desktop.computerUse = true` (it adds `-computer` and points
+`PRIGH_COMPUTER` at the packaged helper); otherwise `PRIGH_DESKTOP_ARGS=-computer`
+with `prigh-computer` on the PATH (`nix profile install
+github:evan-a-w/prigh#prigh-computer`). The helper's tests are `cargo test
+-p prigh-computer` in `desktop/` (in `./test`) and the flake's
+`computer-use` check, which drives a headless sway and Xvfb and compares
+the input an app received (`desktop/computer/test/expected.txt`).
 
 ## Editors (ACP)
 
