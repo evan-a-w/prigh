@@ -6,6 +6,7 @@ prints the captured panes.
   === normal
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
+  • Using another client
   ▌ go
     let me look
   ✓ bash $ printf 'one\ntwo\nthree\n'
@@ -31,8 +32,9 @@ prints the captured panes.
   >
   deepseek-flash  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00  agents:[main] 1✓ 2✓
   === verbose
-    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
-  
+  • Using another client
+    [Client: the user is on another client, which cannot display components: do not call render_ui;
+    answer in text (markdown is fine).]
   ▌ go
     let me look
   ✓ bash $ printf 'one\ntwo\nthree\n'
@@ -63,6 +65,7 @@ prints the captured panes.
   === quiet
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
+  • Using another client
   ▌ go
     let me look
   ✓ bash $ printf 'one\ntwo\nthree\n'  3 lines
@@ -141,6 +144,7 @@ prints the captured panes.
   === main again
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
+  • Using another client
   ▌ go
     let me look
   ✓ bash $ printf 'one\ntwo\nthree\n'  3 lines
@@ -158,6 +162,7 @@ prints the captured panes.
   === moved to the background
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
+  • Using another client
   ▌ build it
     building
   ✓ bash $ echo compiling; while [ ! -f gate ]; do sleep 0.0…  job j1 moved to the background after 1s
@@ -169,6 +174,7 @@ prints the captured panes.
   === its report
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
+  • Using another client
   ▌ build it
     building
   ✓ bash $ echo compiling; while [ ! -f gate ]; do sleep 0.0…  job j1 moved to the background after 1s

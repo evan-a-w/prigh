@@ -54,8 +54,9 @@ val tool_summary : name:string -> Json.t -> string
     [Compacted] (at the summariser's prices). [halt] is polled before each
     turn (also passed to tools, for subagents): [Some _] ends the run there.
     [approve] checks every tool call before it runs (default: all run);
-    [ask_user] is how the [ask_user] tool reaches the user. Both are passed
-    on to the tools' contexts, so [subagent] can hand [approve] down.
+    [ask_user] is how the [ask_user] tool reaches the user, [ui] what
+    [render_ui] needs. They are passed on to the tools' contexts, so
+    [subagent] can hand [approve] down.
 
     Each tool call's context carries the {!Conversation.t} up to the
     assistant message that made it. [on_context] gets the context the run
@@ -88,6 +89,7 @@ val run
         -> timeout_seconds:int option
         -> User_question.t list
         -> User_question.Reply.t)
+  -> ?ui:Ui_host.t
   -> ?execute:Tool.executor
   -> ?background:Background_tasks.t
   -> ?sleep:(float -> unit)

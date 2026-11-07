@@ -264,7 +264,9 @@ let%expect_test "prompt content: links, embedded files, selections, images" =
     > result 0 {"content":"one\ntwo (unsaved)\nthree\n"}
     < update agent_message_chunk {"content":{"type":"text","text":"one"}}
     < result 2 {"stopReason":"end_turn"}
-    model got: look at @$DIR/a.txt and [docs](https://example.com/docs)
+    model got: [Client: the user is on an editor (ACP), which cannot display components: do not call render_ui; answer in text (markdown is fine).]
+
+    look at @$DIR/a.txt and [docs](https://example.com/docs)
 
     <file path="$DIR/a.txt">
     one
@@ -421,7 +423,9 @@ let%expect_test "slash commands run prigh's commands" =
     model got: <btw>The user asks a side question (/btw) while you may be in the middle of a task. Answer it briefly from the conversation so far. You cannot use tools in this reply, and neither the question nor your answer will be added to the conversation.</btw>
 
     what is 2+2?
-    model got: go
+    model got: [Client: the user is on an editor (ACP), which cannot display components: do not call render_ui; answer in text (markdown is fine).]
+
+    go
     model got: [prigh reminder: r1, as you ended your turn (1 of 1)] check the tests
     model got: [Plan mode is on: you are planning, not implementing. Investigate with read-only tools (bash only for read-only commands; the user confirms each one) and ask the user about anything unclear with ask_user. Keep the steps in update_plan. When the plan is ready, present it as your reply (concise: the steps and the files they touch), then stop and wait. Do not implement any of it: do not change files, worktrees or pull requests (they are refused) and do not run commands that change anything. Only the user turns plan mode off, when they want the plan implemented: do not try to leave plan mode or ask them to.]
 

@@ -684,32 +684,32 @@ let%expect_test
   printf "after: %s\n" (shapes (Session.messages session));
   [%expect
     {|
-    request: 1 messages, ~2 tokens, masked []
-    request: 3 messages, ~2006 tokens, masked []
-    request: 5 messages, ~4011 tokens, masked []
-    request: 7 messages, ~6016 tokens, masked []
-    request: 9 messages, ~8021 tokens, masked []
-    request: 11 messages, ~10025 tokens, masked []
-    request: 13 messages, ~12030 tokens, masked []
-    request: 15 messages, ~14035 tokens, masked []
-    request: 17 messages, ~16040 tokens, masked []
-    request: 19 messages, ~18044 tokens, masked []
-    request: 21 messages, ~20049 tokens, masked []
-    request: 23 messages, ~22054 tokens, masked []
-    request: 25 messages, ~24059 tokens, masked []
+    request: 1 messages, ~35 tokens, masked []
+    request: 3 messages, ~2040 tokens, masked []
+    request: 5 messages, ~4044 tokens, masked []
+    request: 7 messages, ~6049 tokens, masked []
+    request: 9 messages, ~8054 tokens, masked []
+    request: 11 messages, ~10059 tokens, masked []
+    request: 13 messages, ~12063 tokens, masked []
+    request: 15 messages, ~14068 tokens, masked []
+    request: 17 messages, ~16073 tokens, masked []
+    request: 19 messages, ~18078 tokens, masked []
+    request: 21 messages, ~20082 tokens, masked []
+    request: 23 messages, ~22087 tokens, masked []
+    request: 25 messages, ~24092 tokens, masked []
     masked 3 messages, saving ~5934 tokens
-    request: 27 messages, ~20130 tokens, masked [c1 c2 c3]
-    request: 29 messages, ~22135 tokens, masked [c1 c2 c3]
-    request: 31 messages, ~24140 tokens, masked [c1 c2 c3]
+    request: 27 messages, ~20163 tokens, masked [c1 c2 c3]
+    request: 29 messages, ~22168 tokens, masked [c1 c2 c3]
+    request: 31 messages, ~24173 tokens, masked [c1 c2 c3]
     masked 3 messages, saving ~5934 tokens
-    last request: U(the task) A[c1] M(c1) A[c2] M(c2) A[c3] M(c3) A[c4] T(c4,8000) A[c5] T(c5,8000) A[c6] T(c6,8000) A[c7] T(c7,8000) A[c8] T(c8,8000) A[c9] T(c9,8000) A[c10] T(c10,8000) A[c11] T(c11,8000) A[c12] T(c12,8000) A[c13] T(c13,8000) A[c14] T(c14,8000) A[c15] T(c15,8000)
-    session now:  U(the task) A[c1] M(c1) A[c2] M(c2) A[c3] M(c3) A[c4] M(c4) A[c5] M(c5) A[c6] M(c6) A[c7] T(c7,8000) A[c8] T(c8,8000) A[c9] T(c9,8000) A[c10] T(c10,8000) A[c11] T(c11,8000) A[c12] T(c12,8000) A[c13] T(c13,8000) A[c14] T(c14,8000) A[c15] T(c15,8000) A(done)
+    last request: U([Client: the user is) A[c1] M(c1) A[c2] M(c2) A[c3] M(c3) A[c4] T(c4,8000) A[c5] T(c5,8000) A[c6] T(c6,8000) A[c7] T(c7,8000) A[c8] T(c8,8000) A[c9] T(c9,8000) A[c10] T(c10,8000) A[c11] T(c11,8000) A[c12] T(c12,8000) A[c13] T(c13,8000) A[c14] T(c14,8000) A[c15] T(c15,8000)
+    session now:  U([Client: the user is) A[c1] M(c1) A[c2] M(c2) A[c3] M(c3) A[c4] M(c4) A[c5] M(c5) A[c6] M(c6) A[c7] T(c7,8000) A[c8] T(c8,8000) A[c9] T(c9,8000) A[c10] T(c10,8000) A[c11] T(c11,8000) A[c12] T(c12,8000) A[c13] T(c13,8000) A[c14] T(c14,8000) A[c15] T(c15,8000) A(done)
     resumed the same: true
     masks: 2
     summarise: 25 messages + ask, masked [c1 c2 c3 c4 c5 c6]
     compacted: SUMMARY
     the summary request is the start of the agent's: true
-    after: U(the task) S(SUMMARY) A[c13] T(c13,8000) A[c14] T(c14,8000) A[c15] T(c15,8000) A(done)
+    after: U([Client: the user is) S(SUMMARY) A[c13] T(c13,8000) A[c14] T(c14,8000) A[c15] T(c15,8000) A(done)
     |}]
 ;;
 

@@ -28,7 +28,7 @@ let%expect_test "a background subagent whose loop raises still ends" =
     {|
     state: running=true subagents=[]
     agent_start
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  subagent{"task":"explode"}
     subagent_start a1: explode
     state: running=true subagents=[a1 running]
@@ -60,7 +60,7 @@ let%expect_test "a nested synchronous subagent whose loop raises still ends" =
     {|
     state: running=true subagents=[]
     agent_start
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  subagent{"task":"outer"}
     subagent_start a1: outer
     state: running=true subagents=[a1 running]
@@ -111,7 +111,7 @@ let%expect_test "cancelling a background subagent ends its nested one" =
     {|
     state: running=true subagents=[]
     agent_start
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  subagent{"task":"outer"}
     subagent_start a1: outer
     state: running=true subagents=[a1 running]
@@ -229,7 +229,7 @@ let%expect_test "the sweep ends subagents whose run or parent is gone" =
     {|
     state: running=true subagents=[]
     agent_start
-    user: go
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  orphan{}
     subagent_start o1: o1
     tool_result orphan: started one
