@@ -1973,6 +1973,7 @@ let compaction_settings t =
         Result.ok (Model_registry.resolve t.models name))
   ; mask_observations = t.config.mask_observations
   ; computer_screenshots = t.config.computer_screenshots
+  ; computer_screenshots_max = t.config.computer_screenshots_max
   }
 ;;
 
