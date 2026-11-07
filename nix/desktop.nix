@@ -39,16 +39,24 @@ let
   };
   # The computer-use helper (desktop/computer): `prigh tool-host -computer`
   # and `prigh desktop -computer` run it (PRIGH_COMPUTER) for the computer
-  # tool. Pure Rust (its Wayland and X11 clients speak the protocols
-  # themselves): no libraries to link.
+  # tool. Its Wayland and X11 clients speak the protocols themselves; the
+  # xdg-desktop-portal backend (GNOME, KDE) links libpipewire for the
+  # screen cast (D-Bus is zbus, pure Rust).
   prighComputer = pkgs.rustPlatform.buildRustPackage {
     pname = "prigh-computer";
     version = desktopVersion;
     inherit src;
     cargoLock.lockFile = ../desktop/Cargo.lock;
     buildAndTestSubdir = "computer";
+    nativeBuildInputs = [
+      pkgs.pkg-config
+      pkgs.rustPlatform.bindgenHook
+    ];
+    buildInputs = [ pkgs.pipewire ];
+    # the fake portal test runs a private bus
+    nativeCheckInputs = [ pkgs.dbus ];
     meta = {
-      description = "prigh's computer-use helper: screenshots and input on the desktop (wlroots Wayland, X11)";
+      description = "prigh's computer-use helper: screenshots and input on the desktop (wlroots Wayland, xdg-desktop-portal, X11)";
       mainProgram = "prigh-computer";
       platforms = lib.platforms.linux;
     };
