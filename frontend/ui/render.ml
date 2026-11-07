@@ -1201,6 +1201,12 @@ let notice_box (m : App.Model.t) ~width : Overlay.t option =
 
 let picker_block ?keys (p : Picker.t) ~width ~rows : Overlay.t =
   let visible = Picker.visible p in
+  (* Rows with a snippet take two lines. *)
+  let rows =
+    if List.exists visible ~f:(fun (i : Picker.Item.t) -> Option.is_some i.snippet)
+    then Int.max 1 (rows / 2)
+    else rows
+  in
   let selected = Picker.selected p in
   let start =
     Int.max 0 (Int.min (selected - (rows / 2)) (List.length visible - rows))
@@ -1257,12 +1263,29 @@ let picker_block ?keys (p : Picker.t) ~width ~rows : Overlay.t =
         let s = if item.dimmed then dim else Style.plain in
         if is_selected then Style.invert (Style.bold s) else s
       in
+      let matched_style = Style.underline (Style.bold label_style) in
       let line =
-        [ span ~style:label_style (mark ^ label)
-        ; span
+        (match item.matched with
+         | [] -> [ span ~style:label_style (mark ^ label) ]
+         | matched ->
+           span ~style:label_style mark
+           :: List.map (Session_search.pieces label matched) ~f:(function
+             | `Plain, s -> span ~style:label_style s
+             | `Match, s -> span ~style:matched_style s))
+        @ [ span
             ~style:(if is_selected then Style.invert dim else dim)
             (if String.is_empty item.detail then "" else "  " ^ item.detail)
         ]
+      in
+      let snippet =
+        Option.to_list item.snippet
+        |> List.map ~f:(fun (s : P.Session_hits.Snippet.t) ->
+          Content.Line.truncate
+            (span ~style:dim "      "
+             :: List.map (Session_search.pieces s.text s.ranges) ~f:(function
+               | `Plain, s -> span ~style:dim s
+               | `Match, s -> span ~style:(Style.bold (Style.fg Yellow)) s))
+            ~width)
       in
       let divider =
         let previous =
@@ -1276,7 +1299,7 @@ let picker_block ?keys (p : Picker.t) ~width ~rows : Overlay.t =
           when String.equal previous.section item.section -> []
         | _ -> [ [ span ~style:dim ("  ── " ^ item.section ^ " ──") ] ]
       in
-      divider @ [ Content.Line.truncate line ~width ])
+      divider @ [ Content.Line.truncate line ~width ] @ snippet)
     |> List.concat
   in
   let lines =
