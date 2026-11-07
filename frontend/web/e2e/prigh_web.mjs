@@ -1197,6 +1197,36 @@ try {
   await idle();
   await page.waitForFunction(() => document.querySelectorAll(".sidebar .session").length === 3);
   const hello = page.locator(".sidebar .session", { hasText: "hello again" });
+  // Pinning one (its ⋯ menu) moves it into a Pinned group at the top, with a
+  // pin; P on it unpins it.
+  const counting = page.locator(".sidebar .session", { hasText: "count some lines" });
+  await counting.hover();
+  await counting.locator(".more").click();
+  await page.locator(".context-menu.placed [data-item=pin]").click();
+  await page.locator(".sessions-group", { hasText: "Pinned" }).waitFor();
+  section("pinned");
+  console.log(sizes(await page.locator(".sidebar .sessions").innerText()));
+  console.log(`pin: ${await counting.locator(".session-pin").getAttribute("aria-label")}`);
+  await page.mouse.move(700, 400);
+  await screenshot("pinned");
+  for (const [width, height] of [[390, 844], [320, 640]]) {
+    await page.setViewportSize({ width, height });
+    await page.waitForFunction(() => document.querySelector(".app.narrow"));
+    if (!(await page.locator(".app.sidebar-open").count())) {
+      await page.locator(".chat-chrome .toggle-sidebar").click();
+      await page.waitForFunction(() => document.querySelector(".app.narrow.sidebar-open"));
+    }
+    await page.locator(".sidebar").evaluate(el => Promise.all(el.getAnimations().map(a => a.finished)));
+    await screenshot(`phone ${width}: pinned`);
+  }
+  await page.keyboard.press("Escape");
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.waitForFunction(() => document.querySelector(".app:not(.narrow)"));
+  await counting.locator(".session-open").focus();
+  await page.keyboard.press("p");
+  await page.waitForSelector(".sessions-group", { state: "detached" });
+  section("unpinned");
+  console.log(sizes(await page.locator(".sidebar .sessions").innerText()));
   await hello.hover();
   await hello.locator(".more").click();
   await page.locator(".context-menu.placed [data-item=archive]").click();
