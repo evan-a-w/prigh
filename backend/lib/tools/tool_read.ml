@@ -6,6 +6,7 @@ let spec =
   ; parallel_safe = true
   ; on_host = true
   ; freeform = None
+  ; native = None
   ; destructive = Never
   ; description =
       "Read a text or image file. Returns the content; large text files are \

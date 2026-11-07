@@ -12,6 +12,7 @@ let tools =
     ; parallel_safe = false
     ; on_host = true
     ; freeform = None
+    ; native = None
     ; destructive = Always
     ; description = "Run a command"
     ; parameters =
@@ -25,6 +26,7 @@ let tools =
     ; parallel_safe = true
     ; on_host = true
     ; freeform = None
+    ; native = None
     ; destructive = Never
     ; description = "Delegate"
     ; parameters = `Object [ "type", `String "object" ]
@@ -290,7 +292,7 @@ let%expect_test
 
 let%expect_test "headers: api key vs oauth token, betas" =
   let show ~auth ~thinking_on =
-    List.iter (T.headers ~auth ~thinking_on) ~f:(fun (k, v) ->
+    List.iter (T.headers ~auth ~thinking_on ()) ~f:(fun (k, v) ->
       printf "%s: %s\n" k v)
   in
   show ~auth:(Api_key "sk-ant-api03-x") ~thinking_on:false;

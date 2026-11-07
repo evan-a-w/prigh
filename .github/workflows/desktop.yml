@@ -1,8 +1,9 @@
 # The desktop app's installers (desktop/), as artifacts of the run: .deb and
 # .AppImage on Linux, .dmg (and .app) on macOS, .msi and the NSIS .exe on
-# Windows. They contain only the shell (and, on macOS, the computer-use
-# helper prigh-computer): prigh itself is installed apart (on
-# Windows inside WSL), see README.md, "Desktop app". Nix users get the app
+# Windows. They contain only the shell and prigh-computer, the computer-use
+# helper (desktop/computer): prigh itself is installed apart (on Windows
+# inside WSL), see README.md, "Desktop app". On Windows the tool host in WSL
+# runs prigh-computer.exe through WSL's interop. Nix users get the app
 # from the flake (packages.prigh-desktop, programs.prigh.desktop).
 name: desktop
 
@@ -59,13 +60,26 @@ jobs:
           node-version: 22
 
       - name: Tests
-        run: cargo test --locked -p prigh-desktop-core
+        run: cargo test --locked -p prigh-desktop-core -p prigh-computer
 
-      # The computer-use helper: its Linux backends are checked by the
-      # flake (computer-use), its macOS one only builds and unit-tests here.
-      - name: Computer-use helper tests
-        if: runner.os != 'Windows'
-        run: cargo test --locked -p prigh-computer
+      # The Windows backend on the runner's own desktop: Notepad must get
+      # what the helper types.
+      - name: Computer use on Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          cargo build --release --locked -p prigh-computer
+          ./computer/test/windows.ps1 target/release/prigh-computer.exe
+
+      # Tauri's externalBin (app/tauri.windows.conf.json) wants it named for
+      # the target, and installs it next to prigh-desktop.exe.
+      - name: Bundle prigh-computer
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          triple=$(rustc -vV | sed -n 's/^host: //p')
+          mkdir -p app/binaries
+          cp target/release/prigh-computer.exe "app/binaries/prigh-computer-$triple.exe"
 
       # Bundled beside prigh-desktop (Contents/MacOS/prigh-computer), which
       # points $PRIGH_COMPUTER at it for `prigh desktop -computer`.

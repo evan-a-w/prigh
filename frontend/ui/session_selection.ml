@@ -37,6 +37,7 @@ let item ~current (s : P.Session_summary.t) =
   let worktrees = Session_worktrees.summary (Session_worktrees.of_session s) in
   Picker.Item.create
     ~id:s.path
+    ~fields:(Session_search.fields s @ [ Place, date ])
     ~detail:
       (String.concat
          ~sep:" · "

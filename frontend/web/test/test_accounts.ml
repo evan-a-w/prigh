@@ -463,6 +463,7 @@ let%expect_test "switching user resets everything that was the old user's" =
     Scroll_to_bottom
     (Rpc (method_ btw) (params ((question "what was that?") (btw_id btw-1)))
      (tag (Btw btw-1)))
+    (Search_sessions_later (search 1) (after_ms 150))
     (Focus picker-input)
     (Rpc (method_ set_user) (params ((user bob))) (tag User_switched))
     (Rpc (method_ btw_cancel) (params ((btw_id btw-1))) (tag Ignore))

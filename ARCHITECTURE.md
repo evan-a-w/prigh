@@ -678,10 +678,27 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   with the tool host", says when it comes and goes, with the guidance
   the system prompt also gets: the screen is untrusted data), and stops
   the run (as `halt` does for a budget, with a notice) after an
-  interrupted result. `Computer_screenshots.keep_last` makes
-  `Agent_loop`'s requests carry only the latest `computer_screenshots`
-  (config, default 3, in `Compaction_settings`) screenshots as images,
-  older ones as `[screenshot omitted]`; the session keeps them.
+  interrupted result, and a batch of `computer` calls in one reply stops
+  at the first that fails. `Computer_screenshots.prune` makes
+  `Agent_loop`'s requests carry screenshots as images up to
+  `computer_screenshots_max` and then cut back to the latest
+  `computer_screenshots` (config, default 8 and 3, in
+  `Compaction_settings`), older ones as `[screenshot omitted]`: a
+  function of the message list alone, so requests between cuts only
+  append (and the prompt cache holds); with
+  `Model.binds_thinking_to_prefix` it also leaves out thinking written
+  against a now changed prefix. The session keeps everything.
+- Native computer-use tools. `Native_computer` (`providers/`) is a
+  model's built-in tool (`Model.native_computer`: Anthropic's toolset or
+  `computer_2025*` tool, OpenAI's `computer`); `Tool_computer.for_screen`
+  marks the spec `Tool_spec.Native.Computer` (the screenshot size) when
+  `computer_native` is on, and `Anthropic`/`Openai_responses` then offer
+  the native tool and translate with `Computer_native`: a native call is
+  stored as `Computer_action` JSON plus `native` (the original, replayed
+  unchanged to the same form) and OpenAI's `safety_checks`. OpenAI's
+  batches are one stored call per action (`call_id`, `call_id__1`, ...)
+  and are replayed as one `computer_call` and one `computer_call_output`
+  (the batch's last screenshot).
 - The file browser, in layers. `Host_files` is the host's side: the
   pseudo-tools `$fs_list` (one directory's entries with kind, size, mtime,
   a symlink's target kind; at most 5000, dot files on request; a file lists
@@ -1857,7 +1874,11 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   `get_subagent`, `get_pending`, `kill_job`, `job_output`, `list_jobs`,
   `shell`, `get_state`, `get_messages`, `get_messages_page`,
   `get_outline`, `get_tool_output`, `get_entries`, `set_model`, `set_thinking`, `list_models`, `compact`,
-  `new_session`, `switch_session`, `list_sessions`, `set_session_name`,
+  `new_session`, `switch_session`, `list_sessions`, `search_sessions`
+  (`{query, limit}`: the listed sessions by name and what the user and
+  assistant wrote, best first, each with a snippet and its match ranges;
+  `Session_search` keeps an inverted index in memory, re-reading only the
+  files that changed), `set_session_name`,
   `delete_session`, `delete_sessions`, `delete_archived`, `set_archived`,
   `export`, `import`, `fork`, `clone`, `rewind`, `trim`, `untrim`,
   `get_trim_points`, `get_trimmed`, `trim_after`, `delete`, `undelete`,
@@ -3641,10 +3662,15 @@ The sidecar contract (the shell's only coupling to the backend):
   `$PRIGH_DESKTOP_BACKEND`, else `prigh` on the PATH, else on the login
   shell's PATH, since an app started from a desktop menu has a short one;
   on Windows `wsl.exe … bash -lc 'exec "$0" desktop "$@"' prigh …`) from the
-  home directory, with stdin a pipe it holds open, and `$PRIGH_COMPUTER`
-  set to the `prigh-computer` beside the app's executable when there is
-  one and it is unset (`launch::bundled_computer`: the macOS bundle has
-  it, for `-computer`);
+  home directory, with stdin a pipe it holds open, and the computer-use
+  helper bundled with the app as `$PRIGH_COMPUTER` when the user set none:
+  on macOS and Linux the `prigh-computer` beside the app's executable when
+  there is one (`launch::bundled_computer`: the macOS bundle has it, for
+  `-computer`); on Windows, when `prigh-computer.exe` is next to the app
+  (the installers bundle it, as Tauri's `externalBin` in
+  `app/tauri.windows.conf.json`), its path, with `WSLENV` sharing it as
+  `PRIGH_COMPUTER/p`, so the tool host in WSL runs the Windows helper
+  (`desktop/computer/src/windows.rs`) through WSL's interop;
 - the sidecar prints one line, `{"url":"http://127.0.0.1:PORT/#desktop=KEY"}`
   (`Desktop_sidecar`), on stdout when it is ready (`core/ready.rs`; the
   first must be http(s) on a loopback host, anything else ends the app with
