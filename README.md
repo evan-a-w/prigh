@@ -1489,9 +1489,30 @@ The backend's own host never offers it.
 - Moving the mouse stops the run at once ("computer use stopped: you
   moved the mouse ..."); the next message goes on. Esc or Stop abort as
   for any run.
-- Each action's result carries a screenshot, but requests send only the
-  latest `computer_screenshots` (config, default 3) as images; older ones
-  are sent as `[screenshot omitted]`. The session keeps them all.
+- Each action's result carries a screenshot. Requests send them as images
+  until there are `computer_screenshots_max` (config, default 8), then the
+  oldest are cut, all at once, down to the latest `computer_screenshots`
+  (default 3), and sent as `[screenshot omitted]`: between two cuts each
+  request only adds to the one before, so the provider's prompt cache
+  keeps working (prigh puts an Anthropic cache breakpoint before the first
+  screenshot, which a cut never changes). The session keeps them all.
+  On models that check what came before each thinking block they get
+  back (Claude 5.1 and later), a cut also leaves out the thinking written
+  while a now omitted screenshot was still sent.
+- Models with a built-in computer-use tool get it instead of prigh's
+  JSON schema (`computer_native`, config, default `true`): Claude 5.5
+  models the `computer_toolset_20260801` toolset, Claude Opus 4.5 to 5
+  and Sonnet 4.6 and 5 `computer_20251124` (with zoom), Sonnet and Haiku
+  4.5 `computer_20250124` (with their beta headers), and the OpenAI API's
+  models with computer use (GPT-5.4 and later) the Responses API's
+  `computer` tool. prigh translates their calls to its own actions (the
+  session, the host and the frontends see those) and replays them to the
+  same kind of model as written. An OpenAI `computer_call` is a batch:
+  each action runs in order, and a batch (from either provider) stops at
+  the first action that fails, the rest answered "Not executed". A call
+  with OpenAI `pending_safety_checks` needs approval in Ask mode and its
+  result says the checks were acknowledged. Other models, Codex and
+  custom providers use the schema.
 - Platforms: Linux on wlroots compositors and X11 (above); the rest say
   they are not supported yet.
 
@@ -2239,8 +2260,11 @@ prigh-web's settings page; free with Groq, see "Free dictation with
 Groq" under custom providers),
 `mask_observations` (default `true`: replace old tool outputs with
 placeholders before summarising, see "Long runs" below),
-`computer_screenshots` (default 3: how many of the latest `computer`
-screenshots requests carry as images, see "Turning computer use on"),
+`computer_screenshots` and `computer_screenshots_max` (default 3 and 8:
+how many of the latest `computer` screenshots requests carry as images
+after a cut, and how many they may carry before the next, see "Turning
+computer use on"), `computer_native` (default `true`: offer models their
+built-in computer-use tool),
 `compact_at_tokens` (default 200000, `0` = off: compact once the context
 exceeds this many tokens, if that comes before 80% of the window) and
 `compaction_model` (the model that writes compaction summaries; default:
