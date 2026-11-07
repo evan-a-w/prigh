@@ -19,6 +19,10 @@ module Method = struct
         { path : string
         ; archived : bool
         }
+    | Set_pinned of
+        { path : string
+        ; pinned : bool
+        }
     | Delete_sessions of
         { paths : string list
         ; switch_to : Switch_to.t option
@@ -170,6 +174,7 @@ module Method = struct
     | List_mcp _ -> "list_mcp"
     | Mcp_approve _ -> "mcp_approve"
     | Set_archived _ -> "set_archived"
+    | Set_pinned _ -> "set_pinned"
     | Delete_sessions _ -> "delete_sessions"
     | Delete_archived _ -> "delete_archived"
     | Get_messages_page _ -> "get_messages_page"
@@ -299,6 +304,8 @@ module Method = struct
       [ "source", Json.str source; "server", Json.str server ]
     | Set_archived { path; archived } ->
       [ "path", Json.str path; "archived", Json.bool archived ]
+    | Set_pinned { path; pinned } ->
+      [ "path", Json.str path; "pinned", Json.bool pinned ]
     | Delete_sessions { paths; switch_to } ->
       ("paths", `Array (List.map paths ~f:Json.str))
       :: Switch_to.params switch_to
