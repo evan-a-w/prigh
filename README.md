@@ -1315,6 +1315,10 @@ it), so install prigh as well.
   github:evan-a-w/prigh`). The app starts `wsl.exe --cd ~ -e bash -lc 'exec
   prigh desktop'` (the login shell's PATH, so Nix's profile counts) and
   opens the page through WSL's localhost forwarding (on by default).
+  The installers also carry `prigh-computer.exe`, the Windows computer-use
+  helper, which the app hands to WSL as `$PRIGH_COMPUTER` (see [the
+  helper](#the-desktops-screen-mouse-and-keyboard-prigh-computer)): with `PRIGH_DESKTOP_ARGS=-computer` the agent can
+  drive the Windows desktop.
 - **Settings** (environment variables; Home Manager sets all but the WSL
   one):
   `PRIGH_DESKTOP_BACKEND` the prigh to run (a path or a command name; on
