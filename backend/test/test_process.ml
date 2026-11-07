@@ -69,6 +69,32 @@ let%expect_test "streaming callbacks see chunks in order" =
   [%expect {| ((Exited 0) ("a\n" "b\n" "c\n")) |}]
 ;;
 
+let%expect_test "merge_stderr: one stream, in the order written" =
+  Eio_main.run
+  @@ fun env ->
+  let out = Buffer.create 16 in
+  let err = Buffer.create 16 in
+  let exit =
+    Process.run
+      ~env
+      ~prog:"sh"
+      ~args:[ "-c"; "for i in 1 2 3 4 5; do echo out$i; echo err$i >&2; done" ]
+      ~merge_stderr:true
+      ~on_stdout:(Buffer.add_string out)
+      ~on_stderr:(Buffer.add_string err)
+      ()
+  in
+  print_s
+    [%sexp
+      (exit : Process.Exit.t)
+    , (String.split_lines (Buffer.contents out) : string list)
+    , (Buffer.contents err : string)];
+  [%expect
+    {|
+    ((Exited 0) (out1 err1 out2 err2 out3 err3 out4 err4 out5 err5) "")
+    |}]
+;;
+
 let%expect_test "timeout kills the process and keeps partial output" =
   Eio_main.run
   @@ fun env ->
