@@ -3141,7 +3141,8 @@ terminal frontend and `web/` prigh-web, the browser one.
       `Ask_remove_worktree` (the listing's entry, else the session's record
       with its repository, which `remove_worktree` gets as `cwd`). The
       pinned sessions come first under a "Pinned" heading, the others under
-      "Recent" (`Session_list.sections`; no headings when none is pinned;
+      "Recent" (`Session_list.sections`, also while searching, best match first
+      within each group, content hits included; no headings when none is pinned;
       Pin/Unpin in the menu, P, `/pin`, `/unpin` send `set_pinned`, at once,
       a refusal refetching the list; hidden when the summaries have no
       `pinned`). Then a
