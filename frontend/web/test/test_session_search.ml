@@ -33,8 +33,8 @@ let hits ~query =
 ;;
 
 let%expect_test
-    "titles match at once; the messages once the typing pauses, merged in \
-     with their passage"
+    "titles match at once; the messages once the typing pauses, merged in with \
+     their passage"
   =
   let h = H.create ~sessions () in
   H.act h (Set_session_query "port");
@@ -58,7 +58,8 @@ let%expect_test
   H.reply h "search_sessions" (hits ~query:"port config");
   H.text h ~selector:".session-main";
   H.show h ~selector:".session-snippet";
-  [%expect {|
+  [%expect
+    {|
     Make the port config urable
     1h ago /work
     fix the parser bug …then make the port config urable via the config file
@@ -75,15 +76,15 @@ let%expect_test
     |}]
 ;;
 
-let%expect_test "a reply to an older search is ignored; Esc clears the search"
-  =
+let%expect_test "a reply to an older search is ignored; Esc clears the search" =
   let h = H.create ~sessions () in
   H.act h (Set_session_query "port");
   H.act h (Search_sessions 1);
   H.act h (Set_session_query "port config");
   H.reply h "search_sessions" (hits ~query:"port");
   H.text h ~selector:".session-main";
-  [%expect {|
+  [%expect
+    {|
     (Search_sessions_later (search 1) (after_ms 150))
     (Rpc (method_ search_sessions) (params ((query port) (limit 50)))
      (tag (Session_hits 1)))
@@ -94,7 +95,8 @@ let%expect_test "a reply to an older search is ignored; Esc clears the search"
   H.key h "Escape" ~target:Session_search;
   H.text h ~selector:".session-title";
   H.key h "Escape" ~target:Session_search;
-  [%expect {|
+  [%expect
+    {|
     (Set_session_query "")
     Make the port configurable
     fix the parser bug
@@ -105,15 +107,16 @@ let%expect_test "a reply to an older search is ignored; Esc clears the search"
 ;;
 
 let%expect_test
-    "nothing found says where search looks; a backend without content \
-     search still finds titles"
+    "nothing found says where search looks; a backend without content search \
+     still finds titles"
   =
   let h = H.create ~sessions () in
   H.act h (Set_session_query "zzz");
   H.act h (Search_sessions 1);
   H.fail h "search_sessions" "unknown method search_sessions";
   H.text h ~selector:".sessions";
-  [%expect {|
+  [%expect
+    {|
     (Search_sessions_later (search 1) (after_ms 150))
     (Rpc (method_ search_sessions) (params ((query zzz) (limit 50)))
      (tag (Session_hits 1)))

@@ -11,7 +11,8 @@ module Snippet = struct
     | `Array [ start; length ] ->
       let int j = Json.int_field (Json.obj [ "n", j ]) "n" in
       Or_error.both (int start) (int length)
-    | other -> Or_error.errorf "expected [start, length], got %s" (Json.to_string other)
+    | other ->
+      Or_error.errorf "expected [start, length], got %s" (Json.to_string other)
   ;;
 
   let of_json j =

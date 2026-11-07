@@ -154,7 +154,9 @@ module Reply_tag : sig
         ; draft : string (** what was sent, as typed *)
         } (** [steer_agent]: back to the editor if it fails *)
     | Sessions
-    | Session_hits of int (** [search_sessions], this search of the sidebar's; stale ones are ignored *)
+    | Session_hits of int
+    (** [search_sessions] for this search of the sidebar's; stale ones are
+        ignored *)
     | Models
     | Reload_state (** the client's session changed: fetch its state *)
     | Subagent of string

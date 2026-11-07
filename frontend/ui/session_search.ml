@@ -112,10 +112,12 @@ let within_one_edit a b =
 
 let typo ~w v =
   let n = String.length w in
-  List.find_map [ n; n - 1; n + 1 ] ~f:(fun len ->
-    if len <= String.length v && within_one_edit w (String.prefix v len)
-    then Some len
-    else None)
+  List.find_map
+    [ n; n - 1; n + 1 ]
+    ~f:(fun len ->
+      if len <= String.length v && within_one_edit w (String.prefix v len)
+      then Some len
+      else None)
 ;;
 
 (* The positions of [w]'s letters in [v], from its first letter on. *)
@@ -152,9 +154,7 @@ let match_word ~w v =
   else if String.is_prefix v ~prefix:w
   then Some (Prefix, [ 0, n ])
   else (
-    match
-      if n >= 3 then String.substr_index v ~pattern:w else None
-    with
+    match if n >= 3 then String.substr_index v ~pattern:w else None with
     | Some i -> Some (Substring, [ i, n ])
     | None ->
       (match if n >= 4 then typo ~w v else None with
@@ -179,11 +179,11 @@ let merge_ranges ranges =
 
 let score ~query fields =
   match words query with
-  | [] -> Some { Match.score = 0; ranges = List.map fields ~f:(fun _ -> []); why = [] }
+  | [] ->
+    Some
+      { Match.score = 0; ranges = List.map fields ~f:(fun _ -> []); why = [] }
   | query_words ->
-    let fields =
-      List.map fields ~f:(fun (field, text) -> field, tokens text)
-    in
+    let fields = List.map fields ~f:(fun (field, text) -> field, tokens text) in
     (* Per field, per token: the matches of any query word, with ranges. *)
     let best =
       List.map query_words ~f:(fun w ->
