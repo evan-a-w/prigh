@@ -302,21 +302,50 @@ let%expect_test "pinning: over RPC, never archived by age, archiving unpins" =
   print_sessions a;
   Client.sessions_changed a;
   Client.sessions_changed b;
-  [%expect {||}];
+  [%expect {|
+    {"type":"response","id":"r","ok":true,"result":{}}
+    {"type":"response","id":"r","ok":true,"result":{}}
+    {"type":"response","id":"r","ok":false,"error":"missing param \"pinned\""}
+    {"type":"response","id":"r","ok":false,"error":"no such session \"nope\""}
+    {"type":"response","id":"r","ok":false,"error":"param \"pinned\" must be a boolean"}
+    old        pinned live background=0 clients=1
+    ancient    pinned background=0 clients=-
+    recent      background=0 clients=-
+    a: 2 sessions_changed
+    b: 2 sessions_changed
+    |}];
   (* Archiving a pinned session unpins it; pinning it again unarchives it. *)
   Client.call t a "set_archived" (path ancient @ [ "archived", `True ]);
   print_sessions a;
   Client.call t a "set_pinned" (path ancient @ [ "pinned", `True ]);
   print_sessions a;
-  [%expect {||}];
+  [%expect {|
+    {"type":"response","id":"r","ok":true,"result":{}}
+    ancient    archived background=0 clients=-
+    old        pinned live background=0 clients=1
+    recent      background=0 clients=-
+    {"type":"response","id":"r","ok":true,"result":{}}
+    ancient    pinned background=0 clients=-
+    old        pinned live background=0 clients=1
+    recent      background=0 clients=-
+    |}];
   (* Unpinning counts as activity, so it is not archived at once. *)
   Client.call t a "set_pinned" (path old @ [ "pinned", `False ]);
   print_sessions a;
-  [%expect {||}];
+  [%expect {|
+    {"type":"response","id":"r","ok":true,"result":{}}
+    old        live background=0 clients=1
+    ancient    pinned background=0 clients=-
+    recent      background=0 clients=-
+    |}];
   (* A fresh server over the same files agrees. *)
   let server2 = Server.create t ~sw ~provider in
   print_sessions (Client.connect server2 "c");
-  [%expect {||}]
+  [%expect {|
+    old         background=0 clients=-
+    ancient    pinned background=0 clients=-
+    recent      background=0 clients=-
+    |}]
 ;;
 
 let%expect_test
