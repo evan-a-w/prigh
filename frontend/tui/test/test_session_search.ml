@@ -62,7 +62,8 @@ let sessions =
       "s02"
       ~updated:"2026-11-07T09:00:00Z"
       ~name:"Make the port configurable"
-      ~first_prompt:"prigh serve should take the listen port from the config file"
+      ~first_prompt:
+        "prigh serve should take the listen port from the config file"
       ~branch:"feat/port-config"
       ~worktrees:[ "feat/port-config" ]
   ; session
@@ -171,10 +172,10 @@ let%expect_test "before: one subsequence over everything" =
   List.iter queries ~f:(fun query ->
     let ranked = before ~query in
     printf "%S (%d)\n" query (List.length ranked);
-    List.iteri ranked ~f:(fun i s ->
-      if i < 4 then printf "  %s\n" (title s));
+    List.iteri ranked ~f:(fun i s -> if i < 4 then printf "  %s\n" (title s));
     if List.length ranked > 4 then printf "  ...\n");
-  [%expect {|
+  [%expect
+    {|
     "port" (10)
       port the tmux tests to the private socket
       configure the reverse proxy for the web server port
@@ -293,7 +294,8 @@ let%expect_test "after: every word, in any field, best field and match first" =
           (render_ranges (Session_search.title r.session) r.title)
           (String.concat ~sep:" " (List.map r.why ~f:why)));
     if List.length ranked > 4 then printf "  ...\n");
-  [%expect {|
+  [%expect
+    {|
     "port" (3)
       s02  40 Make the [port] configurable  (port:Name/Exact)
       s06  30 [port] the tmux tests to the private socket  (port:Prompt/Exact)
@@ -381,7 +383,8 @@ let%expect_test "content hits merge in; a reply to another query is ignored" =
           printf "      %s\n" (render_ranges s.text s.ranges)))
   in
   show ~query:"port config" (Some (content "config  PORT"));
-  [%expect {|
+  [%expect
+    {|
     s02  72 Make the [port] [config]urable
     s09  60 [config]ure the reverse proxy for the web server [port]
     s12  36 hello
@@ -389,7 +392,8 @@ let%expect_test "content hits merge in; a reply to another query is ignored" =
     |}];
   print_endline "-- stale:";
   show ~query:"port config" (Some (content "port"));
-  [%expect {|
+  [%expect
+    {|
     -- stale:
     s02  72 Make the [port] [config]urable
     s09  54 [config]ure the reverse proxy for the web server [port]

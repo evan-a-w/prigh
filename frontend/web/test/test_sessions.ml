@@ -166,19 +166,22 @@ let%expect_test "fuzzy search over titles, prompts and directories" =
     |}];
   H.act h (Set_session_query "lexr");
   H.text h ~selector:".session-title";
-  [%expect {|
+  [%expect
+    {|
     (Search_sessions_later (search 1) (after_ms 150))
     Refactor the lexe r
     |}];
   H.act h (Set_session_query "docs");
   H.text h ~selector:".session-title";
-  [%expect {|
+  [%expect
+    {|
     (Search_sessions_later (search 2) (after_ms 150))
     Release notes
     |}];
   H.act h (Set_session_query "zzz");
   H.text h ~selector:".sessions";
-  [%expect {|
+  [%expect
+    {|
     (Search_sessions_later (search 3) (after_ms 150))
     No sessions match “zzz”. Search looks in titles and messages.
     |}];

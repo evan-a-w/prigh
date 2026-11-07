@@ -868,8 +868,7 @@ let subagent_header (m : App.Model.t) (a : Agent_view.t) : Content.Line.t =
       sprintf "✓ done %d turns $%.2f" turns cost_usd
     | Agent_view.Status.Failed _ -> "✗ failed"
   in
-  let task = Text_width.truncate (Agent_view.title a) ~width:40
-  in
+  let task = Text_width.truncate (Agent_view.title a) ~width:40 in
   [ span
       ~style:(Style.bold (Style.fg Cyan))
       (sprintf "◆ subagent %d/%d" index total)
@@ -1167,9 +1166,7 @@ let queued_block (m : App.Model.t) ~width : Overlay.t option =
     in
     Some
       (Overlay.create
-         (List.map
-            ((header :: rows) @ more)
-            ~f:(Content.Line.truncate ~width))))
+         (List.map ((header :: rows) @ more) ~f:(Content.Line.truncate ~width))))
 ;;
 
 let notice_box (m : App.Model.t) ~width : Overlay.t option =
@@ -1203,7 +1200,9 @@ let picker_block ?keys (p : Picker.t) ~width ~rows : Overlay.t =
   let visible = Picker.visible p in
   (* Rows with a snippet take two lines. *)
   let rows =
-    if List.exists visible ~f:(fun (i : Picker.Item.t) -> Option.is_some i.snippet)
+    if
+      List.exists visible ~f:(fun (i : Picker.Item.t) ->
+        Option.is_some i.snippet)
     then Int.max 1 (rows / 2)
     else rows
   in
@@ -1273,9 +1272,9 @@ let picker_block ?keys (p : Picker.t) ~width ~rows : Overlay.t =
              | `Plain, s -> span ~style:label_style s
              | `Match, s -> span ~style:matched_style s))
         @ [ span
-            ~style:(if is_selected then Style.invert dim else dim)
-            (if String.is_empty item.detail then "" else "  " ^ item.detail)
-        ]
+              ~style:(if is_selected then Style.invert dim else dim)
+              (if String.is_empty item.detail then "" else "  " ^ item.detail)
+          ]
       in
       let snippet =
         Option.to_list item.snippet
@@ -1364,9 +1363,7 @@ let autocomplete_block (ac : Autocomplete.t) ~width ~rows : Overlay.t =
             ~width:(usage_width - Text_width.string name)
         in
         Content.Line.truncate
-          [ span
-              ~style:(style Style.plain)
-              (if is_selected then "▸ " else "  ")
+          [ span ~style:(style Style.plain) (if is_selected then "▸ " else "  ")
           ; span ~style:(style (Style.bold Style.plain)) name
           ; span ~style:(style dim) args
           ; span ~style:(style dim) ("  " ^ help)
@@ -1382,9 +1379,7 @@ let autocomplete_block (ac : Autocomplete.t) ~width ~rows : Overlay.t =
         let is_selected = start + i = selected in
         let style s = if is_selected then Style.invert s else s in
         Content.Line.truncate
-          [ span
-              ~style:(style Style.plain)
-              (if is_selected then "▸ " else "  ")
+          [ span ~style:(style Style.plain) (if is_selected then "▸ " else "  ")
           ; span
               ~style:(style (Style.bold Style.plain))
               (Text_width.pad_right item.label ~width:label_width)

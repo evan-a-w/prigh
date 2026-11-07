@@ -698,15 +698,15 @@ let styled_rows (h : H.t) =
 
 let%expect_test
     "the filter: words matched in the labels; the backend's finds in the \
-     messages join, each with its passage; replies for other words are \
-     dropped"
+     messages join, each with its passage; replies for other words are dropped"
   =
   let h = Test_app.connected ~width:100 ~height:20 () in
   H.keys h "/sessions";
   H.enter h;
   H.reply ~quiet:true h Sessions_picker sessions_json;
   H.keys h "it dep";
-  [%expect {|
+  [%expect
+    {|
     (Rpc (method_ list_sessions) (params ()) (tag Sessions_picker))
     (Rpc
       (method_ search_sessions)
@@ -740,7 +740,8 @@ let%expect_test
       (tag Session_hits))
     |}];
   styled_rows h;
-  [%expect {|
+  [%expect
+    {|
       [gray]prigh in /work · /help · Esc aborts · Ctrl+C twice quits[/]
       earlier [bold]answer[/]
     [yellow][bold]/ [/]it dep
@@ -757,7 +758,8 @@ let%expect_test
   (* The reply for "it de", typed before "p". *)
   H.reply h Session_hits (hits "it de");
   styled_rows h;
-  [%expect {|
+  [%expect
+    {|
       [gray]prigh in /work · /help · Esc aborts · Ctrl+C twice quits[/]
       earlier [bold]answer[/]
     [yellow][bold]/ [/]it dep
@@ -765,7 +767,8 @@ let%expect_test
     |}];
   H.reply h Session_hits (hits "dep  IT");
   styled_rows h;
-  [%expect {|
+  [%expect
+    {|
       [gray]prigh in /work · /help · Esc aborts · Ctrl+C twice quits[/]
       earlier [bold]answer[/]
     [yellow][bold]/ [/]it dep
@@ -776,7 +779,8 @@ let%expect_test
   (* Less typed: the words differ, the finds go. *)
   H.key h (Key.plain Backspace);
   rows h;
-  [%expect {|
+  [%expect
+    {|
     (Rpc
       (method_ search_sessions)
       (params (

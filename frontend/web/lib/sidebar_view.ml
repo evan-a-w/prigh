@@ -401,35 +401,35 @@ let row ~inject (s : Session_summary.t) (row : Row.t) =
             ; div ~cls:"session-mark" [ mark ]
             ; div
                 ~cls:"session-main"
-                (marked_text ~cls:"session-title" title matched
-                 :: Option.to_list
-                      (Option.map snippet ~f:(fun s ->
-                         marked_text ~cls:"session-snippet" s.text s.ranges))
+                ((marked_text ~cls:"session-title" title matched
+                  :: Option.to_list
+                       (Option.map snippet ~f:(fun s ->
+                          marked_text ~cls:"session-snippet" s.text s.ranges)))
                  @ [ div
-                    ~cls:"session-meta"
-                    [ span ~cls:"session-age" age
-                    ; place ?host_home s ~cwd
-                    ; Option.value_map home ~default:Node.none ~f:(fun h ->
-                        span
-                          ~cls:"session-home"
-                          ~attrs:
-                            [ Attr.title
-                                (sprintf
-                                   "Switched into worktrees from %s: Switch \
-                                    back (/worktree back) returns"
-                                   (home_relative ?host_home h.cwd))
-                            ]
-                          (Option.value_exn
-                             (Session_worktrees.home
-                                ~tilde:(home_relative ?host_home)
-                                (Some h))))
-                    ; (if selecting
-                       then
-                         span
-                           ~cls:"session-size"
-                           (Session_summary.size_string s.bytes)
-                       else Node.none)
-                    ]
+                       ~cls:"session-meta"
+                       [ span ~cls:"session-age" age
+                       ; place ?host_home s ~cwd
+                       ; Option.value_map home ~default:Node.none ~f:(fun h ->
+                           span
+                             ~cls:"session-home"
+                             ~attrs:
+                               [ Attr.title
+                                   (sprintf
+                                      "Switched into worktrees from %s: Switch \
+                                       back (/worktree back) returns"
+                                      (home_relative ?host_home h.cwd))
+                               ]
+                             (Option.value_exn
+                                (Session_worktrees.home
+                                   ~tilde:(home_relative ?host_home)
+                                   (Some h))))
+                       ; (if selecting
+                          then
+                            span
+                              ~cls:"session-size"
+                              (Session_summary.size_string s.bytes)
+                          else Node.none)
+                       ]
                    ])
             ]
         ; (if selecting then Node.none else fold)
@@ -629,7 +629,9 @@ let user_footer (m : App.Model.t) ~inject =
 let view (m : App.Model.t) ~inject =
   let current = Option.map m.state ~f:(fun s -> s.session_id) in
   let content = m.session_hits in
-  let sessions = Session_list.filter ?content m.sessions ~query:m.session_query in
+  let sessions =
+    Session_list.filter ?content m.sessions ~query:m.session_query
+  in
   Node.aside
     ~attrs:[ Attr.class_ "sidebar"; Attr.id "sidebar" ]
     [ div

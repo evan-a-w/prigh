@@ -34,7 +34,8 @@ val sections
   :  ?content:Session_hits.t
   -> Session_summary.t list
   -> query:string
-  -> Prigh_ui.Session_search.Result.t list * Prigh_ui.Session_search.Result.t list
+  -> Prigh_ui.Session_search.Result.t list
+     * Prigh_ui.Session_search.Result.t list
 
 (** Whether the archived sessions show: when the user unfolded them, or while
     searching. *)

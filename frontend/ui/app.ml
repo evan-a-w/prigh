@@ -5009,7 +5009,10 @@ let worktree_in_picker m (listing : P.Worktree.Listing.t) picker ~f =
 let search_sessions_messages (kind : Mode.Picker_kind.t) ~before ~after =
   match kind with
   | Sessions _
-    when not (Session_search.same_words (Picker.query before) (Picker.query after))
+    when (not
+            (Session_search.same_words
+               (Picker.query before)
+               (Picker.query after)))
          && not (List.is_empty (Session_search.words (Picker.query after))) ->
     [ rpc
         "search_sessions"
@@ -6654,7 +6657,11 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
          match m.mode with
          | Picker { kind = Sessions _ as kind; picker }
            when Session_search.same_words hits.query (Picker.query picker) ->
-           { m with mode = Picker { kind; picker = Picker.set_content picker (Some hits) } }, []
+           ( { m with
+               mode =
+                 Picker { kind; picker = Picker.set_content picker (Some hits) }
+             }
+           , [] )
          | _ -> m, [])
      | Sessions_cache ->
        decode

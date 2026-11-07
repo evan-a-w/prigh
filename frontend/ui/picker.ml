@@ -11,21 +11,21 @@ module Item = struct
     ; dimmed : bool
     ; section : string [@default ""] [@sexp_drop_default.equal]
     ; fields : (Session_search.Field.t * string) list
-         [@default []] [@sexp_drop_default.equal]
+          [@default []] [@sexp_drop_default.equal]
     ; matched : (int * int) list [@default []] [@sexp_drop_default.equal]
     ; snippet : P.Session_hits.Snippet.t option [@sexp.option]
     }
   [@@deriving sexp_of, equal]
 
   let create
-    ?(detail = "")
-    ?(fields = [])
-    ?search
-    ?(marked = false)
-    ?(dimmed = false)
-    ?(section = "")
-    ~id
-    label
+        ?(detail = "")
+        ?(fields = [])
+        ?search
+        ?(marked = false)
+        ?(dimmed = false)
+        ?(section = "")
+        ~id
+        label
     =
     { id
     ; label
@@ -81,9 +81,13 @@ let refilter t =
         ~fields:(fun i -> i.Item.fields)
         ~path:(fun i -> i.Item.id)
       |> List.map ~f:(fun ((i : Item.t), _, snippet) ->
-        { i with matched = Session_search.ranges ~query:t.query i.label; snippet })
-    else Fuzzy.rank ~query:t.query t.items ~key:(fun i -> i.Item.search)
-    |> by_section t.items
+        { i with
+          matched = Session_search.ranges ~query:t.query i.label
+        ; snippet
+        })
+    else
+      Fuzzy.rank ~query:t.query t.items ~key:(fun i -> i.Item.search)
+      |> by_section t.items
   in
   let selected =
     if String.is_empty t.query
@@ -97,14 +101,22 @@ let refilter t =
 ;;
 
 let create
-  ?(query = "")
-  ?(multi = false)
-  ?(checked = String.Set.empty)
-  ~title
-  items
+      ?(query = "")
+      ?(multi = false)
+      ?(checked = String.Set.empty)
+      ~title
+      items
   =
   refilter
-    { title; items; query; visible = []; selected = 0; multi; checked; content = None }
+    { title
+    ; items
+    ; query
+    ; visible = []
+    ; selected = 0
+    ; multi
+    ; checked
+    ; content = None
+    }
 ;;
 
 let title t = t.title
