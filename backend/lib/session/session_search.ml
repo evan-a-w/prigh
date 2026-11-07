@@ -194,6 +194,7 @@ type t =
     (** each word's sessions (by [Doc.num]) with its best weight in them *)
   ; mutable next : int (** the highest [Doc.num] given *)
   ; mutable free : int list (** [Doc.num]s given back by [remove] *)
+  ; mutable indexing : unit Promise.t option (** [index] under way *)
   }
 
 let create () =
@@ -201,6 +202,7 @@ let create () =
   ; postings = String.Table.create ()
   ; next = 0
   ; free = []
+  ; indexing = None
   }
 ;;
 
@@ -226,7 +228,7 @@ let add t (doc : Doc.t) =
       ~data:weight)
 ;;
 
-let refresh t ~sessions ~load =
+let refresh ?(yield = ignore) t ~sessions ~load =
   let listed =
     String.Set.of_list
       (List.map sessions ~f:(fun (s : Session.Summary.t) -> s.path))
@@ -237,34 +239,50 @@ let refresh t ~sessions ~load =
     let drop () =
       Option.iter (Hashtbl.find t.docs summary.path) ~f:(remove t)
     in
-    match Core_unix.stat summary.path with
-    | exception _ -> drop ()
-    | { st_size = size; st_mtime = mtime; _ } ->
-      let fresh =
-        match Hashtbl.find t.docs summary.path with
-        | Some doc ->
-          Int64.equal doc.size size
-          && Float.equal doc.mtime mtime
-          && Option.equal String.equal doc.name summary.name
-        | None -> false
-      in
-      if not fresh
-      then (
-        let loaded = load summary in
-        (* [load] may let another search index it meanwhile. *)
-        drop ();
-        Option.iter loaded ~f:(fun session ->
-          let num =
-            match t.free with
-            | num :: rest ->
-              t.free <- rest;
-              num
-            | [] ->
-              t.next <- t.next + 1;
-              t.next
-          in
-          add t (Doc.create ~num ~summary ~size ~mtime session))))
+    (match Core_unix.stat summary.path with
+     | exception _ -> drop ()
+     | { st_size = size; st_mtime = mtime; _ } ->
+       let fresh =
+         match Hashtbl.find t.docs summary.path with
+         | Some doc ->
+           Int64.equal doc.size size
+           && Float.equal doc.mtime mtime
+           && Option.equal String.equal doc.name summary.name
+         | None -> false
+       in
+       if not fresh
+       then (
+         let loaded = load summary in
+         (* [load] may let another search index it meanwhile. *)
+         drop ();
+         Option.iter loaded ~f:(fun session ->
+           let num =
+             match t.free with
+             | num :: rest ->
+               t.free <- rest;
+               num
+             | [] ->
+               t.next <- t.next + 1;
+               t.next
+           in
+           add t (Doc.create ~num ~summary ~size ~mtime session))));
+    yield ())
 ;;
+
+let index t ~sessions ~load ~yield =
+  match t.indexing with
+  | Some indexing -> Promise.await indexing
+  | None ->
+    let indexing, resolve = Promise.create () in
+    t.indexing <- Some indexing;
+    Exn.protect
+      ~f:(fun () -> refresh t ~sessions:(sessions ()) ~load ~yield)
+      ~finally:(fun () ->
+        t.indexing <- None;
+        Promise.resolve resolve ())
+;;
+
+let indexed t = Hashtbl.length t.docs
 
 (* Each session's best score for [w]: one look at every distinct word. *)
 let scores t ~w =
@@ -437,6 +455,7 @@ let search t ~sessions ~load ~query ~limit =
   match query_words query with
   | [] -> []
   | ws ->
+    Option.iter t.indexing ~f:Promise.await;
     refresh t ~sessions ~load;
     let tables = List.map ws ~f:(fun w -> scores t ~w) in
     let totals =

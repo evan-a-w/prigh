@@ -1797,25 +1797,53 @@ let list_sessions t client =
        | other -> other))
 ;;
 
+(* A session for [search_sessions]' index: the live one's from memory. *)
+let load_for_search t (s : Session.Summary.t) =
+  let live =
+    Hashtbl.data t.agents
+    |> List.find_map ~f:(fun agent ->
+      let session = Agent.session agent in
+      Option.some_if (String.equal (Session.path session) s.path) session)
+  in
+  match live with
+  | Some session -> Some session
+  | None -> Result.ok (load_session t s.path)
+;;
+
+let index_sessions t =
+  Session_search.index
+    t.search
+    ~sessions:(fun () -> saved_sessions t)
+    ~load:(load_for_search t)
+    ~yield:Fiber.yield
+;;
+
+let indexed_sessions t = Session_search.indexed t.search
+
+let start_indexing t =
+  Fiber.fork_daemon ~sw:t.sw (fun () ->
+    (match index_sessions t with
+     | () -> ()
+     | exception (Eio.Cancel.Cancelled _ as exn) -> raise exn
+     | exception exn ->
+       eprintf
+         "prigh: indexing the sessions for search failed (searches read them \
+          instead): %s\n\
+          %!"
+         (Exn.to_string exn));
+    `Stop_daemon)
+;;
+
 (* The sessions [list_sessions] lists, by what was said in them. *)
 let search_sessions t params =
   let open Or_error.Let_syntax in
   let%bind query = string_param params "query" in
   let%map limit = int_param params "limit" ~default:50 in
-  let live path =
-    Hashtbl.data t.agents
-    |> List.find_map ~f:(fun agent ->
-      let session = Agent.session agent in
-      Option.some_if (String.equal (Session.path session) path) session)
-  in
   let hits =
     Session_search.search
       t.search
       ~sessions:(saved_sessions t)
-      ~load:(fun (s : Session.Summary.t) ->
-        match live s.path with
-        | Some session -> Some session
-        | None -> Result.ok (load_session t s.path))
+      ~load:(load_for_search t)
       ~query
       ~limit
   in
