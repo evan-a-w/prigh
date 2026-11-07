@@ -400,7 +400,7 @@
                 cp -r ${./desktop/computer/test} test
                 chmod -R u+w test
                 patchShebangs test
-                bash test/run.sh ${prighComputer}/bin/prigh-computer > actual.txt 2> stderr.txt || { cat stderr.txt actual.txt; exit 1; }
+                bash test/run.sh ${prighComputer}/bin/prigh-computer ${prigh}/bin/prigh > actual.txt 2> stderr.txt || { cat stderr.txt actual.txt; exit 1; }
                 diff -u test/expected.txt actual.txt
                 touch "$out"
               ''

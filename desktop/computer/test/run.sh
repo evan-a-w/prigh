@@ -105,7 +105,14 @@ awk -f "$here/xev.awk" "$work/xev.log"
 
 if [ -n "$prigh" ]; then
 	echo "== prigh tool-host -computer (X11)"
-	printf '%s\n' '{"type":"exec","exec_id":"e1","name":"computer","arguments":{"action":"click","x":10,"y":10},"cwd":"/"}' \
-		| PRIGH_COMPUTER=$helper PRIGH_COMPUTER_ARGS="--max-long-side 640" timeout 30 "$prigh" tool-host -computer \
-		| sed -E 's/"data":"[^"]*"/"data":"…"/g'
+	# stdin stays open until the result is in: at its end the worker cancels
+	# what still runs.
+	coproc TH { PRIGH_COMPUTER=$helper PRIGH_COMPUTER_ARGS="--max-long-side 640" timeout 30 "$prigh" tool-host -computer 2>/dev/null; }
+	printf '%s\n' '{"type":"exec","exec_id":"e1","name":"computer","arguments":{"action":"click","x":10,"y":10},"cwd":"/"}' >&"${TH[1]}"
+	while IFS= read -r line <&"${TH[0]}"; do
+		case $line in *'"type":"result"'*) break ;; esac
+	done
+	exec {TH[1]}>&-
+	wait "$TH_PID" || true
+	printf '%s\n' "$line" | sed -E 's/"data":"[^"]*"/"data":"…"/g'
 fi
