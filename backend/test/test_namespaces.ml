@@ -226,7 +226,7 @@ let%expect_test "namespaces: worlds, sessions, logins, tool hosts, config" =
     | _ -> -1
   in
   print_s [%message (search a ca : int) (search b cb : int)];
-  [%expect {| |}];
+  [%expect {| (("search a ca" 1) ("search b cb" 0)) |}];
   (* Logins: a stored key in a's store only. *)
   let world name = List.Assoc.find_exn worlds ~equal:String.equal name in
   Or_error.ok_exn (Auth_store.set (world "a").store Deepseek (Api_key "sk-a"));

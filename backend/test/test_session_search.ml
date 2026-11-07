@@ -179,6 +179,12 @@ let%expect_test "search: ranking, snippets, typos, updates" =
     "xylophone" (read 0)
     "8080" (read 0)
       port      20  …The default stays [8080].
+    "verbatim" (read 0)
+      compact   20  …I'll keep the plan [verbatim] in the compaction instead of summarising it, which…
+    "hundred verbatim" (read 0)
+      compact   40  …I'll keep the plan [verbatim] in the compaction instead of summarising it, which…
+    "looking" (read 0)
+      compact   20  [Looking] at it, there are three places where the context gets cut down before the…
     "zzz port" (read 0)
     "  " (read 0)
     |}];
