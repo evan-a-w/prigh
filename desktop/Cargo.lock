@@ -2657,6 +2657,7 @@ dependencies = [
  "wayland-client",
  "wayland-protocols-misc",
  "wayland-protocols-wlr",
+ "windows",
  "x11rb",
 ]
 
