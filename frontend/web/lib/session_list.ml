@@ -18,9 +18,24 @@ let filter sessions ~query =
 
 let dom_id id = "session-" ^ id
 
+module Sections = struct
+  type t =
+    { pinned : Session_summary.t list
+    ; active : Session_summary.t list
+    ; archived : Session_summary.t list
+    }
+end
+
+let is_pinned (s : Session_summary.t) =
+  (not s.archived) && Option.value s.pinned ~default:false
+;;
+
 let sections sessions ~query =
-  List.partition_tf (filter sessions ~query) ~f:(fun (s : Session_summary.t) ->
-    not s.archived)
+  let pinned, rest = List.partition_tf (filter sessions ~query) ~f:is_pinned in
+  let active, archived =
+    List.partition_tf rest ~f:(fun (s : Session_summary.t) -> not s.archived)
+  in
+  { Sections.pinned; active; archived }
 ;;
 
 let archived_shown ~query ~archived_open =
@@ -28,6 +43,6 @@ let archived_shown ~query ~archived_open =
 ;;
 
 let shown sessions ~query ~archived_open =
-  let active, archived = sections sessions ~query in
-  if archived_shown ~query ~archived_open then active @ archived else active
+  let { Sections.pinned; active; archived } = sections sessions ~query in
+  pinned @ active @ if archived_shown ~query ~archived_open then archived else []
 ;;
