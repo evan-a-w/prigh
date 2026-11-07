@@ -154,6 +154,10 @@ module Reply_tag = struct
         { title : string
         ; archived : bool
         }
+    | Pinned_set of
+        { title : string
+        ; pinned : bool
+        }
     | Refresh_sessions
     | Login_started
     | Notice of string
@@ -432,6 +436,10 @@ module Action = struct
     | Set_archived of
         { path : string
         ; archived : bool
+        }
+    | Set_pinned of
+        { path : string
+        ; pinned : bool
         }
     | Set_session_query of string
     | Toggle_archived
@@ -2242,11 +2250,44 @@ let set_archived (m : Model.t) (s : Session_summary.t) ~archived =
     ( { m with
         sessions =
           List.map m.sessions ~f:(fun (x : Session_summary.t) ->
-            if String.equal x.path s.path then { x with archived } else x)
+            if String.equal x.path s.path
+            then
+              { x with
+                archived
+              ; pinned =
+                  (if archived
+                   then Option.map x.pinned ~f:(fun _ -> false)
+                   else x.pinned)
+              }
+            else x)
       }
     , [ call
           (Set_archived { path = s.path; archived })
           ~tag:(Archived_set { title = Session_list.title s; archived })
+      ] )
+;;
+
+let cannot_pin = "This backend can't pin sessions: update it to pin."
+
+(* Pinning unarchives; archiving unpins (as the backend does). *)
+let set_pinned (m : Model.t) (s : Session_summary.t) ~pinned =
+  match s.pinned with
+  | None -> error m cannot_pin
+  | Some _ ->
+    ( { m with
+        sessions =
+          List.map m.sessions ~f:(fun (x : Session_summary.t) ->
+            if String.equal x.path s.path
+            then
+              { x with
+                pinned = Some pinned
+              ; archived = x.archived && not pinned
+              }
+            else x)
+      }
+    , [ call
+          (Set_pinned { path = s.path; pinned })
+          ~tag:(Pinned_set { title = Session_list.title s; pinned })
       ] )
 ;;
 
@@ -5919,8 +5960,7 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
     loading m "Session" [ rpc "session_stats" [] ~tag:Session_stats ]
   | "trace", _ -> loading m "Trace" [ rpc "trace" [] ~tag:Trace ]
   | "sessions", _ | "switch", "" -> open_sessions m
-  | (("archive" | "unarchive") as name), key ->
-    let archived = String.equal name "archive" in
+  | (("archive" | "unarchive" | "pin" | "unpin") as name), key ->
     let session =
       if String.is_empty key
       then (
@@ -5932,9 +5972,11 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
         | None -> Error "This session isn't saved yet: send a message first.")
       else find_session m key
     in
-    (match session with
-     | Ok s -> set_archived m s ~archived
-     | Error e -> prompt_failed m e)
+    (match session, name with
+     | Ok s, "pin" -> set_pinned m s ~pinned:true
+     | Ok s, "unpin" -> set_pinned m s ~pinned:false
+     | Ok s, _ -> set_archived m s ~archived:(String.equal name "archive")
+     | Error e, _ -> prompt_failed m e)
   | "delete", "" ->
     if Model.running m
     then error m (running_error `Delete)
@@ -7477,6 +7519,17 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
   | Sessions_deleted, Error e -> error m (sprintf "Couldn't delete: %s" e)
   | Moved_and_deleted switch_to, Error e ->
     error (not_moving m switch_to) (sprintf "Couldn't delete: %s" e)
+  | Pinned_set { title; pinned }, Error e ->
+    let m, cmds =
+      error
+        m
+        (sprintf
+           "Couldn't %s “%s”: %s"
+           (if pinned then "pin" else "unpin")
+           title
+           e)
+    in
+    m, cmds @ [ rpc "list_sessions" [] ~tag:Sessions ]
   | Archived_set { title; archived }, Error e ->
     let m, cmds =
       error
@@ -8005,6 +8058,12 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
           (Delete_result.summary result)
       in
       m, cmds @ [ rpc "list_sessions" [] ~tag:Sessions ])
+  | Pinned_set { title; pinned }, Ok _ ->
+    toast
+      m
+      (if pinned
+       then sprintf "Pinned “%s” to the top" title
+       else sprintf "Unpinned “%s”" title)
   | Archived_set { title; archived }, Ok _ ->
     toast
       m
@@ -8767,6 +8826,8 @@ let message_chosen (m : Model.t) n (item : Context_menu.Item.t) =
       | Copy_id
       | Archive
       | Unarchive
+      | Pin
+      | Unpin
       | Remove
       | Approve_files
       | Unapprove_files
@@ -8821,6 +8882,8 @@ let review_files_chosen (m : Model.t) paths (item : Context_menu.Item.t) =
     | Copy_id
     | Archive
     | Unarchive
+    | Pin
+    | Unpin
     | Delete
     | Remove
     | Copy_message
@@ -8891,6 +8954,8 @@ let menu_chosen (m : Model.t) (menu : Context_menu.t) id =
      | Copy_id -> copy "the session id" s.id
      | Archive -> set_archived m s ~archived:true
      | Unarchive -> set_archived m s ~archived:false
+     | Pin -> set_pinned m s ~pinned:true
+     | Unpin -> set_pinned m s ~pinned:false
      | Delete -> ask_delete m [ s.path ]
      | Remove -> ask_remove_session_worktree m dir
      | Copy_message
@@ -9490,6 +9555,10 @@ let update_connected (m : Model.t) (action : Action.t) =
   | Set_archived { path; archived } ->
     (match find_session_by_path m path with
      | Some s -> set_archived m s ~archived
+     | None -> m, [])
+  | Set_pinned { path; pinned } ->
+    (match find_session_by_path m path with
+     | Some s -> set_pinned m s ~pinned
      | None -> m, [])
   | Set_session_query session_query -> set_session_query m session_query
   | Search_sessions search ->

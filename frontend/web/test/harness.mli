@@ -125,6 +125,7 @@ val session_json
   -> ?waiting:int (** confirmations and questions waiting for the user *)
   -> ?failed:bool (** its last reply ended in an error *)
   -> ?archived:bool
+  -> ?pinned:bool
   -> ?bytes:int
   -> ?repo:string * string * string option
        (** where its cwd is in git: the repository's root, the worktree and

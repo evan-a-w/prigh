@@ -53,6 +53,14 @@ module Reply_tag = struct
         { arg : string
         ; archived : bool
         }
+    | Pin_done of
+        { name : string
+        ; pinned : bool
+        }
+    | Session_to_pin of
+        { arg : string
+        ; pinned : bool
+        }
     | Paths_for_autocomplete of string
     | Dirs_for_autocomplete of string
     | Set_model_done of string (** the key requested *)
@@ -1317,6 +1325,47 @@ let archive_resolved m ~arg ~archived sessions =
       in
       call
         (Set_archived { path = s.path; archived })
+        ~tag:(Notice_on_success notice)
+    in
+    m, List.map found ~f:set
+;;
+
+let pin_verb ~pinned = if pinned then "pinned" else "unpinned"
+let cannot_pin = "this backend cannot pin sessions: update it to pin"
+
+(* No argument: the current session; otherwise it is looked up in the list
+   ([Session_to_pin]). *)
+let pin_command m ~pinned arg =
+  match arg, m.state with
+  | "", None -> error m "not connected", []
+  | "", Some state ->
+    ( m
+    , [ call
+          (Set_pinned { path = state.session_path; pinned })
+          ~tag:
+            (Notice_on_success
+               (if pinned
+                then "pinned this session to the top of /sessions"
+                else "unpinned this session"))
+      ] )
+  | arg, _ -> m, [ rpc "list_sessions" ~tag:(Session_to_pin { arg; pinned }) ]
+;;
+
+let pin_resolved m ~arg ~pinned sessions =
+  match Session_selection.resolve sessions [ arg ] with
+  | Error e ->
+    let command = sprintf "/%s %s" (if pinned then "pin" else "unpin") arg in
+    error (restore_command m command) e, []
+  | Ok found
+    when List.exists found ~f:(fun (s : P.Session_summary.t) ->
+           Option.is_none s.pinned) -> error m cannot_pin, []
+  | Ok found ->
+    let set (s : P.Session_summary.t) =
+      let notice =
+        sprintf "%s %s" (pin_verb ~pinned) (Session_selection.describe s)
+      in
+      call
+        (Set_pinned { path = s.path; pinned })
         ~tag:(Notice_on_success notice)
     in
     m, List.map found ~f:set
@@ -3864,6 +3913,8 @@ let run_command m (cmd : Commands.Parsed.t) =
   | "delete-archived", _ -> m, [ rpc "list_sessions" ~tag:Archived_to_delete ]
   | (("archive" | "unarchive") as verb), _ ->
     archive_command m ~archived:(String.equal verb "archive") cmd.rest
+  | (("pin" | "unpin") as verb), _ ->
+    pin_command m ~pinned:(String.equal verb "pin") cmd.rest
   | "switch", _ ->
     ( m
     , [ rpc
@@ -4576,8 +4627,11 @@ let editing_intent m (intent : Intent.t) =
   | Search -> open_search m, []
   | Prev_user_message -> jump_user_message m ~direction:`Prev
   | Next_user_message -> jump_user_message m ~direction:`Next
-  | Toggle_archived | Toggle_sidebar | Review_highlighted | Jump_to_bottom ->
-    m, []
+  | Toggle_archived
+  | Toggle_pinned
+  | Toggle_sidebar
+  | Review_highlighted
+  | Jump_to_bottom -> m, []
 ;;
 
 (* Autocomplete is a sub-state of editing: while it is open it owns a few keys,
@@ -4659,6 +4713,7 @@ let editing m (intent : Intent.t) =
         | Prev_user_message
         | Next_user_message
         | Toggle_archived
+        | Toggle_pinned
         | Review_highlighted
         | Toggle_sidebar
         | Jump_to_bottom
@@ -4953,6 +5008,32 @@ let toggle_archived m selection picker =
       ] )
 ;;
 
+let toggle_pinned m selection picker =
+  match
+    Option.bind (Picker.selected_item picker) ~f:(fun item ->
+      Session_selection.find selection item.id)
+  with
+  | None -> m, []
+  | Some { pinned = None; _ } -> error m cannot_pin, []
+  | Some ({ pinned = Some was; _ } as session) ->
+    let pinned = not (was && not session.archived) in
+    let selection =
+      Session_selection.set_pinned selection ~path:session.path ~pinned
+    in
+    let picker =
+      Session_selection.picker
+        ~previous:picker
+        ~select:session.path
+        selection
+        ~current:(current_session m)
+    in
+    ( { m with mode = Picker { kind = Sessions selection; picker } }
+    , [ call
+          (Set_pinned { path = session.path; pinned })
+          ~tag:(Pin_done { name = Session_selection.describe session; pinned })
+      ] )
+;;
+
 (* Applies [f] to the sessions picker, open or waiting behind a confirmation. *)
 let map_sessions_picker m ~f =
   let current = current_session m in
@@ -5025,7 +5106,7 @@ let search_sessions_messages (kind : Mode.Picker_kind.t) ~before ~after =
 let picker m (kind : Mode.Picker_kind.t) picker (intent : Intent.t) =
   let back = Some { Mode.Open_picker.kind; picker } in
   match intent with
-  | (Complete | Toggle_archived | Delete_word_forward)
+  | (Complete | Toggle_archived | Toggle_pinned | Delete_word_forward)
     when match kind with
          | Sessions _ -> true
          | _ -> false ->
@@ -5034,6 +5115,7 @@ let picker m (kind : Mode.Picker_kind.t) picker (intent : Intent.t) =
        ( { m with mode = Picker { kind; picker = Picker.toggle_check picker } }
        , [] )
      | Sessions selection, Toggle_archived -> toggle_archived m selection picker
+     | Sessions selection, Toggle_pinned -> toggle_pinned m selection picker
      | Sessions selection, _ -> confirm_delete_archived m ~back selection
      | _ -> m, [])
   | Review_highlighted ->
@@ -5181,6 +5263,7 @@ let login_prompt m ~id ~(prompt : P.Auth_event.Prompt.t) (intent : Intent.t) =
   | Prev_user_message
   | Next_user_message
   | Toggle_archived
+  | Toggle_pinned
   | Review_highlighted
   | Toggle_sidebar
   | Jump_to_bottom
@@ -5377,6 +5460,7 @@ let text_prompt m ~(action : Mode.Text_prompt_action.t) (intent : Intent.t) =
   | Prev_user_message
   | Next_user_message
   | Toggle_archived
+  | Toggle_pinned
   | Review_highlighted
   | Toggle_sidebar
   | Jump_to_bottom -> m, []
@@ -6039,7 +6123,7 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
          { m with refs = Location_cache.set m.refs ~key P.Git_diff.Refs.empty }
      | Worktree_removed { target; force } ->
        worktree_remove_failed m ~target ~force e
-     | Archive_done _ ->
+     | Archive_done _ | Pin_done _ ->
        (* Undo the picker's optimistic change. *)
        error m e, [ rpc "list_sessions" ~tag:Sessions_refresh ]
      | Pr_created ->
@@ -6484,6 +6568,13 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
          json
          ~f:(decode_list ~f:P.Session_summary.of_json)
          (archive_resolved m ~arg ~archived)
+     | Pin_done { name; pinned } ->
+       notice m (sprintf "%s %s" (pin_verb ~pinned) name), []
+     | Session_to_pin { arg; pinned } ->
+       decode
+         json
+         ~f:(decode_list ~f:P.Session_summary.of_json)
+         (pin_resolved m ~arg ~pinned)
      | Sessions_refresh ->
        decode
          json

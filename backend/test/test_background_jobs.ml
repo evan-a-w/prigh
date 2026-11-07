@@ -56,6 +56,7 @@ let hold_tool promise ~started =
       ; destructive = Never
       ; on_host = false
       ; freeform = None
+      ; native = None
       }
   ; run =
       (fun context _ ->

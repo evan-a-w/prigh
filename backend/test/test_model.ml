@@ -18,7 +18,7 @@ let%expect_test "GPT-6.1 Sol on the OpenAI API and Codex" =
      ((id gpt-6.1-sol) (provider Openai) (name "GPT-6.1 Sol")
       (context_window 272000) (max_output 128000) (supports_thinking true)
       (thinking_style Budget) (cost ((input 2) (output 10) (cache_read 0.1)))
-      (supports_images true)))
+      (supports_images true) (native_computer Openai)))
     (openai-codex/gpt-6.1-sol
      ((id gpt-6.1-sol) (provider Openai_codex) (name "GPT-6.1 Sol")
       (context_window 272000) (max_output 128000) (supports_thinking true)

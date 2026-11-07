@@ -83,7 +83,7 @@ prints the captured panes.
   ✓ bash $ sleep 2
     now
   … bash $ rm -rf build
-  Sessions  (2)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named
+  Sessions  (2)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named · Alt+T (un)pins
   /
    * ▶ (unnamed) ∣ <time> ∣ 4 msgs ∣ go   $TMP/cwd
   ▸  (unnamed) ∣ <time> ∣ 2 msgs ∣ hello  $TMP/cwd

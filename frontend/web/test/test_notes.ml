@@ -405,9 +405,11 @@ let%expect_test "/diff, /review and /init are in the completions and /help" =
     Commands ↑↓ Tab Enter Esc   Ctrl+Enter as typed
     /init write or improve the project's AGENTS.md
     /import [path] import a session from a JSONL file on the backend
+    /pin [session] pin a session to the top of the sidebar (this one without an argument): pinned sessions are never archived for being idle
     /diff [path] show the uncommitted changes where the tools run, untracked files too
     /trim [after|undo] drop everything before a message from the model's context (the transcript keeps it folded); after: everything after a message instead (what you send later stays); undo brings back the last trim
     /quit leave: quit the desktop app (Ctrl+Q); in a browser, close the tab (/signout signs out)
+    /unpin [session] unpin a session (this one without an argument)
     /mkdir [path] create a directory (and its parents) and change to it
     /files [path] browse, preview, upload and download files where the tools run (Ctrl+Shift+F)
     /login [provider|github [HOST]|forgejo HOST|HOST] [token] log in to a model provider (or /login custom), or sign in to GitHub or a Forgejo or Gitea host (token: paste one instead of OAuth)

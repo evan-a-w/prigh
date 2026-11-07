@@ -678,10 +678,27 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   with the tool host", says when it comes and goes, with the guidance
   the system prompt also gets: the screen is untrusted data), and stops
   the run (as `halt` does for a budget, with a notice) after an
-  interrupted result. `Computer_screenshots.keep_last` makes
-  `Agent_loop`'s requests carry only the latest `computer_screenshots`
-  (config, default 3, in `Compaction_settings`) screenshots as images,
-  older ones as `[screenshot omitted]`; the session keeps them.
+  interrupted result, and a batch of `computer` calls in one reply stops
+  at the first that fails. `Computer_screenshots.prune` makes
+  `Agent_loop`'s requests carry screenshots as images up to
+  `computer_screenshots_max` and then cut back to the latest
+  `computer_screenshots` (config, default 8 and 3, in
+  `Compaction_settings`), older ones as `[screenshot omitted]`: a
+  function of the message list alone, so requests between cuts only
+  append (and the prompt cache holds); with
+  `Model.binds_thinking_to_prefix` it also leaves out thinking written
+  against a now changed prefix. The session keeps everything.
+- Native computer-use tools. `Native_computer` (`providers/`) is a
+  model's built-in tool (`Model.native_computer`: Anthropic's toolset or
+  `computer_2025*` tool, OpenAI's `computer`); `Tool_computer.for_screen`
+  marks the spec `Tool_spec.Native.Computer` (the screenshot size) when
+  `computer_native` is on, and `Anthropic`/`Openai_responses` then offer
+  the native tool and translate with `Computer_native`: a native call is
+  stored as `Computer_action` JSON plus `native` (the original, replayed
+  unchanged to the same form) and OpenAI's `safety_checks`. OpenAI's
+  batches are one stored call per action (`call_id`, `call_id__1`, ...)
+  and are replayed as one `computer_call` and one `computer_call_output`
+  (the batch's last screenshot).
 - The file browser, in layers. `Host_files` is the host's side: the
   pseudo-tools `$fs_list` (one directory's entries with kind, size, mtime,
   a symlink's target kind; at most 5000, dot files on request; a file lists
@@ -1391,7 +1408,9 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   where the session runs), the system prompt, the goal, the reminders
   (`Reminders`, the whole list), the approval mode with plan
   mode (`approval`), rules the user allowed for the session (`allow_rule`),
-  `Archived {archived}` (archived or unarchived by hand), `Spend {usage,
+  `Archived {archived}` (archived or unarchived by hand; archiving appends
+  `Pinned {pinned = false}` too), `Pinned {pinned}` (pinned to the top,
+  never archived for being idle; pinning unarchives), `Spend {usage,
   cost_usd}` (what the messages do not record: subagents' responses,
   compactions, `btw`; `spend` totals them on all branches) and `Resume_at
   {at}` (a scheduled resume after a usage limit, `None` once it ran or was
@@ -1811,8 +1830,12 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   reply ended in an error), `live` (with `clients` and `waiting`, its
   confirmations and questions waiting for the user, when live), `running` (a
   turn or background work), `background` (running background subagents +
-  jobs, 0 when not loaded) and `archived` (computed with the namespace's
-  current `config.json`, reread per call). `set_archived {path, archived}`
+  jobs, 0 when not loaded), `pinned` and `archived` (computed with the
+  namespace's current `config.json`, reread per call; never for a pinned
+  session). `set_pinned {path, pinned}` appends a `Pinned` entry as
+  `set_archived` does its own (an unpin counts as activity for
+  `archive_after_days`); frontends treat a summary without `pinned` as a
+  backend that cannot pin. `set_archived {path, archived}`
   (`path`: a session file or id) appends an `Archived` entry, through the
   live agent's session if loaded; archiving an active session is refused.
   `delete_sessions {paths}` and `delete_archived {}` answer `{deleted:
@@ -1864,6 +1887,7 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   files that changed; each server builds it as it starts, in a fiber that
   yields after each session, and a search meanwhile waits for it), `set_session_name`,
   `delete_session`, `delete_sessions`, `delete_archived`, `set_archived`,
+  `set_pinned`,
   `export`, `import`, `fork`, `clone`, `rewind`, `trim`, `untrim`,
   `get_trim_points`, `get_trimmed`, `trim_after`, `delete`, `undelete`,
   `get_message_points`,
@@ -2336,7 +2360,7 @@ terminal frontend and `web/` prigh-web, the browser one.
   `File_listing` and `File_preview`, the review's `Review` and
   `Review_comment`) and the `Request` encoder (`Request.Method` has typed
   constructors for `list_skills`, `list_mcp`, `mcp_approve`,
-  `set_archived`, `delete_sessions`, `delete_archived`, the review's
+  `set_archived`, `set_pinned`, `delete_sessions`, `delete_archived`, the review's
   methods, `fs_preview` and `fs_write`).
 - `client/` (`prigh_client`, `Async_kernel` only so it links under
   js_of_ocaml) — `Transport.t` (a line channel; an in-memory pair for
@@ -2482,7 +2506,9 @@ terminal frontend and `web/` prigh-web, the browser one.
     it out. The `delete_sessions` reply (`Delete_result`) is the notice,
     refusals included; with `moved_to` it closes the picker and resets the
     session as a `switch_session` reply does (`reset_session`). Alt+A flips `archived` in the picker at once
-    and sends `set_archived` (a refusal refetches the list). `/archive`,
+    and sends `set_archived` (a refusal refetches the list); Alt+T does the
+    same with `pinned` and `set_pinned`, and the picker's sections are
+    pinned, the rest, archived. `/pin`, `/unpin`, `/archive`,
     `/unarchive` and `/delete` look their arguments up in a fresh list
     (`Session_selection.resolve`: path, id, unique id prefix or name).
     `sessions_changed` refetches `list_sessions` (`Sessions_refresh`) while
@@ -3114,7 +3140,13 @@ terminal frontend and `web/` prigh-web, the browser one.
       PATH`, `/terminal PATH`, `/pr new`), or a notice; "New session here"
       is `New_session_in` (`new_session` then `set_cwd`), Remove
       `Ask_remove_worktree` (the listing's entry, else the session's record
-      with its repository, which `remove_worktree` gets as `cwd`). Then a
+      with its repository, which `remove_worktree` gets as `cwd`). The
+      pinned sessions come first under a "Pinned" heading, the others under
+      "Recent" (`Session_list.sections`, also while searching, best match first
+      within each group, content hits included; no headings when none is pinned;
+      Pin/Unpin in the menu, P, `/pin`, `/unpin` send `set_pinned`, at once,
+      a refusal refetching the list; hidden when the summaries have no
+      `pinned`). Then a
       divider with the archived ones'
       count that folds them (`Model.archived_open`, `Session_list.shown`,
       the list's order, which keyboard navigation and selection ranges
@@ -3646,7 +3678,15 @@ The sidecar contract (the shell's only coupling to the backend):
   `$PRIGH_DESKTOP_BACKEND`, else `prigh` on the PATH, else on the login
   shell's PATH, since an app started from a desktop menu has a short one;
   on Windows `wsl.exe … bash -lc 'exec "$0" desktop "$@"' prigh …`) from the
-  home directory, with stdin a pipe it holds open;
+  home directory, with stdin a pipe it holds open, and the computer-use
+  helper bundled with the app as `$PRIGH_COMPUTER` when the user set none:
+  on macOS and Linux the `prigh-computer` beside the app's executable when
+  there is one (`launch::bundled_computer`: the macOS bundle has it, for
+  `-computer`); on Windows, when `prigh-computer.exe` is next to the app
+  (the installers bundle it, as Tauri's `externalBin` in
+  `app/tauri.windows.conf.json`), its path, with `WSLENV` sharing it as
+  `PRIGH_COMPUTER/p`, so the tool host in WSL runs the Windows helper
+  (`desktop/computer/src/windows.rs`) through WSL's interop;
 - the sidecar prints one line, `{"url":"http://127.0.0.1:PORT/#desktop=KEY"}`
   (`Desktop_sidecar`), on stdout when it is ready (`core/ready.rs`; the
   first must be http(s) on a loopback host, anything else ends the app with

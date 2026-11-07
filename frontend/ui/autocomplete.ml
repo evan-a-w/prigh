@@ -176,7 +176,11 @@ let session_items (sessions : P.Session_summary.t list) =
     let detail =
       String.concat
         ~sep:" · "
-        ((if s.archived then [ "archived" ] else [])
+        ((if s.archived
+          then [ "archived" ]
+          else if Option.value s.pinned ~default:false
+          then [ "pinned" ]
+          else [])
          @ Option.value_map s.name ~default:[] ~f:(fun _ -> [ first ])
          @ [ s.cwd ])
     in
@@ -190,12 +194,15 @@ let session_items (sessions : P.Session_summary.t list) =
 ;;
 
 (* The sessions a command can act on: [/archive] the active ones,
-   [/unarchive] the archived ones, [/delete] all. *)
+   [/unarchive] the archived ones, [/pin] the unpinned ones, [/unpin] the
+   pinned ones, [/delete] all. *)
 let sessions_for (spec : Commands.Spec.t) sessions =
   List.filter sessions ~f:(fun (s : P.Session_summary.t) ->
     match spec.name with
     | "archive" -> not s.archived
     | "unarchive" -> s.archived
+    | "pin" -> (not (Option.value s.pinned ~default:false)) || s.archived
+    | "unpin" -> Option.value s.pinned ~default:false && not s.archived
     | _ -> true)
 ;;
 

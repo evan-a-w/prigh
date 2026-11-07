@@ -2,6 +2,14 @@
 //! from `$PRIGH_DESKTOP_BACKEND` or the PATH; on Windows, where prigh does
 //! not run natively, inside WSL through a login shell (for the PATH the
 //! user's profile sets up, e.g. Nix's).
+//!
+//! In WSL the tool host cannot see or drive the Windows desktop, so for
+//! computer use the app hands it the Windows helper bundled next to it
+//! (`prigh-computer.exe`): `$PRIGH_COMPUTER`, shared into WSL through
+//! `$WSLENV` with `/p` (its path translated, `/mnt/c/...`). The tool host
+//! runs it there as any program, through WSL's interop, talking to it
+//! over the same pipes. Elsewhere (the macOS bundle) the helper next to
+//! the app is `$PRIGH_COMPUTER` for the sidecar ([bundled_computer]).
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Os {
@@ -19,12 +27,21 @@ pub struct Env {
     /// `$PRIGH_DESKTOP_WSL_DISTRO`: the WSL distribution (default: WSL's
     /// default one).
     pub wsl_distro: Option<String>,
+    /// The Windows `prigh-computer.exe` bundled with the app, when it is
+    /// there.
+    pub bundled_computer: Option<String>,
+    /// `$PRIGH_COMPUTER`: the user's choice wins over the bundled helper.
+    pub computer: Option<String>,
+    /// `$WSLENV`, which the shared variables join.
+    pub wslenv: Option<String>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Launch {
     pub program: String,
     pub args: Vec<String>,
+    /// Variables to set for it.
+    pub env: Vec<(String, String)>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -49,7 +66,7 @@ pub fn plan(os: Os, env: &Env, find: impl Fn(&str) -> Option<String>) -> Result<
             };
             let mut args = vec!["desktop".to_string()];
             args.extend(extra);
-            Ok(Launch { program, args })
+            Ok(Launch { program, args, env: Vec::new() })
         }
         Os::Windows => {
             let mut args = Vec::new();
@@ -61,8 +78,42 @@ pub fn plan(os: Os, env: &Env, find: impl Fn(&str) -> Option<String>) -> Result<
                     .map(String::from),
             );
             args.extend(extra);
-            Ok(Launch { program: "wsl.exe".to_string(), args })
+            Ok(Launch { program: "wsl.exe".to_string(), args, env: wsl_env(env) })
         }
+    }
+}
+
+/// The computer-use helper bundled next to the app (`prigh-computer` beside
+/// its executable, as the macOS bundle has it), for `$PRIGH_COMPUTER` when
+/// it is not set: `prigh desktop -computer` then finds it without it being
+/// on the PATH. Not on Windows, where prigh runs in WSL.
+pub fn bundled_computer(
+    os: Os,
+    exe: Option<&std::path::Path>,
+    env_computer: Option<&str>,
+    is_executable: impl Fn(&std::path::Path) -> bool,
+) -> Option<std::path::PathBuf> {
+    if os == Os::Windows || env_computer.is_some_and(|c| !c.is_empty()) {
+        return None;
+    }
+    let helper = exe?.parent()?.join("prigh-computer");
+    is_executable(&helper).then_some(helper)
+}
+
+/// The bundled helper as `$PRIGH_COMPUTER` in WSL, unless the user set
+/// their own.
+fn wsl_env(env: &Env) -> Vec<(String, String)> {
+    let set = |v: &Option<String>| v.as_deref().filter(|v| !v.is_empty()).map(str::to_string);
+    match (set(&env.computer), set(&env.bundled_computer)) {
+        (None, Some(helper)) => {
+            let shared = match set(&env.wslenv) {
+                Some(w) if w.split(':').any(|v| v.split('/').next() == Some("PRIGH_COMPUTER")) => w,
+                Some(w) => format!("{w}:PRIGH_COMPUTER/p"),
+                None => "PRIGH_COMPUTER/p".to_string(),
+            };
+            vec![("PRIGH_COMPUTER".into(), helper), ("WSLENV".into(), shared)]
+        }
+        _ => Vec::new(),
     }
 }
 
@@ -78,7 +129,7 @@ mod tests {
     fn unix() {
         assert_eq!(
             plan(Os::Unix, &Env::default(), find),
-            Ok(Launch { program: "/nix/profile/bin/prigh".into(), args: vec!["desktop".into()] })
+            Ok(Launch { program: "/nix/profile/bin/prigh".into(), args: vec!["desktop".into()], env: Vec::new() })
         );
         let env = Env {
             backend: Some("/store/prigh/bin/prigh".into()),
@@ -89,7 +140,8 @@ mod tests {
             plan(Os::Unix, &env, find),
             Ok(Launch {
                 program: "/store/prigh/bin/prigh".into(),
-                args: ["desktop", "-cwd", "/my proj", "-tools", "remote"].map(String::from).to_vec()
+                args: ["desktop", "-cwd", "/my proj", "-tools", "remote"].map(String::from).to_vec(),
+                env: Vec::new(),
             })
         );
         let env = Env { backend: Some("prigh-dev".into()), ..Env::default() };
@@ -103,6 +155,27 @@ mod tests {
     }
 
     #[test]
+    fn computer() {
+        use std::path::Path;
+        let exe = Path::new("/Applications/prigh.app/Contents/MacOS/prigh-desktop");
+        let bundled = |p: &Path| p == Path::new("/Applications/prigh.app/Contents/MacOS/prigh-computer");
+        assert_eq!(
+            bundled_computer(Os::Unix, Some(exe), None, bundled),
+            Some("/Applications/prigh.app/Contents/MacOS/prigh-computer".into())
+        );
+        assert_eq!(
+            bundled_computer(Os::Unix, Some(exe), Some(""), bundled),
+            Some("/Applications/prigh.app/Contents/MacOS/prigh-computer".into())
+        );
+        // $PRIGH_COMPUTER wins
+        assert_eq!(bundled_computer(Os::Unix, Some(exe), Some("/nix/bin/prigh-computer"), bundled), None);
+        // none bundled (Linux packages, Nix)
+        assert_eq!(bundled_computer(Os::Unix, Some(exe), None, |_| false), None);
+        assert_eq!(bundled_computer(Os::Unix, None, None, bundled), None);
+        assert_eq!(bundled_computer(Os::Windows, Some(exe), None, |_| true), None);
+    }
+
+    #[test]
     fn windows() {
         assert_eq!(
             plan(Os::Windows, &Env::default(), |_| None),
@@ -110,13 +183,15 @@ mod tests {
                 program: "wsl.exe".into(),
                 args: ["--cd", "~", "-e", "bash", "-lc", "exec \"$0\" desktop \"$@\"", "prigh"]
                     .map(String::from)
-                    .to_vec()
+                    .to_vec(),
+                env: Vec::new()
             })
         );
         let env = Env {
             backend: Some("/home/me/.nix-profile/bin/prigh".into()),
             args: Some("-name laptop".into()),
             wsl_distro: Some("NixOS".into()),
+            ..Env::default()
         };
         assert_eq!(
             plan(Os::Windows, &env, |_| None).unwrap().args,
@@ -134,5 +209,42 @@ mod tests {
                 "laptop"
             ]
         );
+    }
+
+    #[test]
+    fn windows_computer_helper() {
+        let helper = r"C:\Program Files\prigh\prigh-computer.exe";
+        let plan = |env: Env| plan(Os::Windows, &env, |_| None).unwrap().env;
+        let shared = |wslenv: &str| {
+            vec![("PRIGH_COMPUTER".to_string(), helper.to_string()), ("WSLENV".to_string(), wslenv.to_string())]
+        };
+        // not bundled: nothing
+        assert_eq!(plan(Env::default()), vec![]);
+        assert_eq!(plan(Env { bundled_computer: Some(helper.into()), ..Env::default() }), shared("PRIGH_COMPUTER/p"));
+        assert_eq!(
+            plan(Env { bundled_computer: Some(helper.into()), wslenv: Some("USERPROFILE/p".into()), ..Env::default() }),
+            shared("USERPROFILE/p:PRIGH_COMPUTER/p")
+        );
+        // already shared by the user: as it is
+        assert_eq!(
+            plan(Env {
+                bundled_computer: Some(helper.into()),
+                wslenv: Some("PRIGH_COMPUTER/u".into()),
+                ..Env::default()
+            }),
+            shared("PRIGH_COMPUTER/u")
+        );
+        // the user's own helper wins (they share it themselves)
+        assert_eq!(
+            plan(Env {
+                bundled_computer: Some(helper.into()),
+                computer: Some("/usr/bin/prigh-computer".into()),
+                ..Env::default()
+            }),
+            vec![]
+        );
+        // Unix: never
+        let unix = Env { bundled_computer: Some(helper.into()), ..Env::default() };
+        assert_eq!(super::plan(Os::Unix, &unix, find).unwrap().env, vec![]);
     }
 }
