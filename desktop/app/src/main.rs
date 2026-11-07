@@ -694,6 +694,13 @@ fn start_sidecar(app: AppHandle, sidecar: Arc<Sidecar>) {
         if let Ok(home) = std::env::var("HOME") {
             cmd.current_dir(home);
         }
+        let exe = std::env::current_exe().ok();
+        let computer = std::env::var("PRIGH_COMPUTER").ok();
+        if let Some(helper) =
+            launch::bundled_computer(OS, exe.as_deref(), computer.as_deref(), |p| p.to_str().is_some_and(is_executable))
+        {
+            cmd.env("PRIGH_COMPUTER", helper);
+        }
         #[cfg(windows)]
         {
             use std::os::windows::process::CommandExt;
