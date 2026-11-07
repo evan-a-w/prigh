@@ -1035,3 +1035,88 @@ let%expect_test
     >
     |}]
 ;;
+
+let%expect_test
+    "a search keeps the pinned section first: a pinned session found by its \
+     title and one found in its messages, each with its passage"
+  =
+  let h = Test_app.connected ~width:100 ~height:20 () in
+  H.keys h "/sessions";
+  H.enter h;
+  H.reply ~quiet:true h Sessions_picker pinned_sessions_json;
+  H.keys h "notes";
+  rows h;
+  [%expect
+    {|
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions_picker))
+    (Rpc
+      (method_ search_sessions)
+      (params (
+        (query n)
+        (limit 50)))
+      (tag Session_hits))
+    (Rpc
+      (method_ search_sessions)
+      (params (
+        (query no)
+        (limit 50)))
+      (tag Session_hits))
+    (Rpc
+      (method_ search_sessions)
+      (params (
+        (query not)
+        (limit 50)))
+      (tag Session_hits))
+    (Rpc
+      (method_ search_sessions)
+      (params (
+        (query note)
+        (limit 50)))
+      (tag Session_hits))
+    (Rpc
+      (method_ search_sessions)
+      (params (
+        (query notes)
+        (limit 50)))
+      (tag Session_hits))
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      earlier answer
+      ── pinned ──
+    ▸  notes ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ keep notes  /work
+    >
+    |}];
+  H.reply
+    h
+    Session_hits
+    {|{"query":"notes","hits":[
+      {"id":"5","path":"/s/5.jsonl","score":20,
+       "snippet":{"text":"add it to the release notes","ranges":[[22,5]]}},
+      {"id":"4","path":"/s/4.jsonl","score":20,
+       "snippet":{"text":"notes for the next try","ranges":[[0,5]]}},
+      {"id":"3","path":"/s/3.jsonl","score":40,"snippet":null}]}|};
+  rows h;
+  styled_rows h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      earlier answer
+      ── pinned ──
+    ▸  notes ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ keep notes  /work
+       todo ∣ 2025-06-01T10:00 ∣ 3 msgs ∣ the list     /work
+          add it to the release notes
+      ── sessions ──
+       scratch ∣ 2025-06-02T10:00 ∣ 2 msgs ∣ scratch   /tmp
+          notes for the next try
+    >
+      [gray]prigh in /work · /help · Esc aborts · Ctrl+C twice quits[/]
+      earlier [bold]answer[/]
+    [yellow][bold]/ [/]notes
+    [dim]  ── pinned ──[/]
+    [bold][invert]▸  [/][bold][underline][invert]notes[/][bold][invert] ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ keep [/][bold][underline][invert]notes[/][dim][invert]  /work[/]
+       todo ∣ 2025-06-01T10:00 ∣ 3 msgs ∣ the list   [dim]  /work[/]
+    [dim]      [/][dim]add it to the release [/][yellow][bold]notes[/]
+    [dim]  ── sessions ──[/]
+       scratch ∣ 2025-06-02T10:00 ∣ 2 msgs ∣ scratch [dim]  /tmp[/]
+    [dim]      [/][yellow][bold]notes[/][dim] for the next try[/]
+    |}]
+;;

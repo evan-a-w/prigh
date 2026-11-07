@@ -128,10 +128,7 @@ let%expect_test
              ~pinned:true
              ~updated_at:"2026-10-04 08:00:00Z"
              "s3"
-         ; H.session_json
-             ~name:"Lexer"
-             ~updated_at:"2026-10-03 08:00:00Z"
-             "s4"
+         ; H.session_json ~name:"Lexer" ~updated_at:"2026-10-03 08:00:00Z" "s4"
          ; H.session_json
              ~name:"Old deploy"
              ~archived:true
@@ -181,7 +178,8 @@ let%expect_test
     |}];
   H.show h ~selector:"[data-session=s2] .session-main";
   H.show h ~selector:"[data-session=s3] .session-title";
-  [%expect {|
+  [%expect
+    {|
     <div class="session-main">
       <span dir="auto" class="session-title">
         <span role="img" aria-label="Pinned" title="Pinned to the top (P unpins)" class="session-pin">

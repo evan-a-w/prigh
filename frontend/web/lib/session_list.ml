@@ -44,8 +44,12 @@ let archived_shown ~query ~archived_open =
 ;;
 
 let shown ?content sessions ~query ~archived_open =
-  let { Sections.pinned; active; archived } = sections ?content sessions ~query in
+  let { Sections.pinned; active; archived } =
+    sections ?content sessions ~query
+  in
   List.map
-    (pinned @ active @ if archived_shown ~query ~archived_open then archived else [])
+    (pinned
+     @ active
+     @ if archived_shown ~query ~archived_open then archived else [])
     ~f:(fun (r : Session_search.Result.t) -> r.session)
 ;;
