@@ -618,6 +618,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     Alt+M            Cycle_mode
     Ctrl+N           Picker_toggle_filter
     Alt+A            Toggle_archived
+    Alt+T            Toggle_pinned
     Alt+R            Review_highlighted
     Ctrl+X           Copy_last
     Ctrl+Z           Suspend
@@ -679,6 +680,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     Alt+M                   cycle the mode: ask → auto-edit → auto → plan (read-only)
     Ctrl+N                  picker: toggle the named-only / logged-in-only filter; /worktree: open in a new session
     Alt+A                   /sessions: archive or unarchive the highlighted session
+    Alt+T                   /sessions: pin the highlighted session to the top, or unpin it
     Alt+R                   /worktree: review the highlighted worktree's changes
     Ctrl+X                  copy the last assistant message
     Ctrl+Z                  suspend to the shell
@@ -727,9 +729,11 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /name [text]                       set the session name
     /session                           show session statistics
     /trace                             where the session's time went: model, tools, waiting on you, the slowest steps (prigh trace SESSION -perfetto FILE exports a timeline)
-    /sessions                          pick a saved session (Tab marks, Ctrl+D deletes, Alt+A archives, Alt+D deletes all archived, Ctrl+N named)
+    /sessions                          pick a saved session (Tab marks, Ctrl+D deletes, Alt+A archives, Alt+T pins, Alt+D deletes all archived, Ctrl+N named)
     /archive [session]                 archive a session (the current one without an argument)
     /unarchive [session]               unarchive a session (the current one without an argument)
+    /pin [session]                     pin a session to the top of /sessions, where it is never archived for being idle (the current one without an argument)
+    /unpin [session]                   unpin a session (the current one without an argument)
     /delete-archived                   delete every archived session, after a confirmation
     /agents [steer|cancel ...]         focus a subagent (Ctrl+D cancels one); steer N TEXT: tell subagent N (its number or id) at its next step, follow-up N TEXT: before it reports; cancel N
     /jobs [id|kill <id>]               list background jobs (Enter shows output, Ctrl+D kills), or show/kill one
@@ -770,6 +774,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     Ctrl+D                   /sessions: delete the marked or highlighted sessions · /agents: cancel · /jobs: kill · /queue, /remind, /worktree: remove
     Tab                      /sessions: mark or unmark the highlighted session
     Alt+A                    /sessions: archive or unarchive the highlighted session
+    Alt+T                    /sessions: pin or unpin the highlighted session
     Alt+R                    /worktree: review the highlighted worktree's changes
     Alt+D                    /sessions: delete every archived session
     Ctrl+N                   /sessions: named only · /model: logged-in only · /worktree: open in a new session
