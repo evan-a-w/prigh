@@ -68,13 +68,14 @@ let subagent_control =
   [ "subagent_status"; "subagent_cancel"; "subagent_message" ]
 ;;
 
-(* The session's plan, goal, plan mode and the user belong to the main
-   agent. *)
+(* The session's plan, goal, plan mode, the user and their memory belong to
+   the main agent. *)
 let main_agent_only =
   [ Plan.tool_name
   ; Tool_ask_user.name
   ; Tool_render_ui.name
   ; Goal.tool_name
+  ; Tool_memory.name
   ; Tool_review_reply.name
   ]
 ;;
@@ -95,9 +96,9 @@ let unavailable ~depth name =
   else if depth >= 1 && mem main_agent_only name
   then
     Some
-      "it is the main agent's (the user's plan, questions, components and \
-       goal), and you are a subagent: put what you need from the user in your \
-       report"
+      "it is the main agent's (the user's plan, questions, components, goal \
+       and memory), and you are a subagent: put what you need from the user in \
+       your report"
   else None
 ;;
 

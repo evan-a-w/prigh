@@ -2284,6 +2284,20 @@ custom endpoints) and OpenAI's models without it (`gpt-4`, `gpt-4.1-nano`,
 search page. Neither tool is destructive, so neither asks for confirmation
 in the `ask` approval mode.
 
+Memory: tell prigh to remember something ("remember that I deploy with
+`./ship`") and the `memory` tool saves it as a short note, which later
+sessions can recall ("how do I deploy?", "use my usual setup"). It keeps
+notes in `~/.prigh/memory.json` on the backend, one memory per user (per
+namespace with `-tokens`). `memory {action: save, text, title?}` adds a
+note (`m1`, `m2`, ...; saving with an existing title replaces that note),
+`recall {query?}` finds notes by their words (substrings, one typo
+allowed) or lists them all (the newest 50, each cut to a line), and
+`forget {id}` removes one by id or title: ask prigh to forget a wrong note.
+The model is told to use it very rarely: it saves only when you ask it to
+remember (not routine details or what the repository says) and recalls only
+when you refer to something you told it before, never by default. Only the
+main agent has it; `save` and `forget` ask in the `ask` approval mode.
+
 Models see images. The `read` tool returns PNG, JPEG, GIF and WebP files
 (recognised by content, not by name) as images the model can look at, and an
 `@shot.png` attachment adds the image to the prompt; prigh-web also sends
@@ -2969,8 +2983,9 @@ beside the model, along the composer's bottom edge) and switched with
   `job_input`, which writes to a running job that may run what it reads,
   `worktree`'s `create` and `remove` (not `list`), whatever changes the
   git host (`pull_request` other than `list`/`view`/`checks`/`diff`/
-  `comments`, `issue` other than `list`/`view`, `repo rerun`), and MCP
-  tools that are not read-only) wait for your answer.
+  `comments`, `issue` other than `list`/`view`, `repo rerun`), `memory`
+  `save` and `forget`, and MCP tools that are not read-only) wait for your
+  answer.
 - `auto-edit`: file edits run without asking; `bash`, `job_input`,
   `worktree create`/`remove`, the git-host changes and MCP tools still
   ask.

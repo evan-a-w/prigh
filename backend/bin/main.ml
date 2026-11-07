@@ -205,6 +205,7 @@ let common_params =
         ~store
         ()
     in
+    let memory = Memory.create ~path:(Memory.path ~home) in
     (* One agent per session; the subagent tool follows its own agent's
        model and thinking level. *)
     let new_agent ?session ~cwd () =
@@ -257,6 +258,7 @@ let common_params =
                  ; Tool_pull_request.create ~forges ~worktrees_dir ()
                  ; Tool_issue.create ~forges ()
                  ; Tool_repo.create ~forges ()
+                 ; Tool_memory.create ~memory ()
                  ]
                @ Tool_jobs.tools
                @ Tools.interaction)

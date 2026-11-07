@@ -803,6 +803,20 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   a change for the user to accept, `resolve` closing the thread. Not on
   the host; offered only while the session has comments, never to
   subagents (`Tools.main_agent_only`).
+- `Memory` / `Tool_memory` — the user's notes across sessions,
+  `~/.prigh/memory.json` under the world's home (per namespace with
+  `-tokens`): `{next, notes: [{id, title?, text, saved}]}`, ids `m<n>` never
+  reused. Changes re-read the file and replace it atomically under its
+  `Lock_dir` and the store's mutex (`bin/main.ml` makes one per world, like
+  `Forges`, and hands it to that world's agents). `memory {action: save |
+  recall | forget, text?, title?, query?, id?}`: a save with an existing
+  title (no case) replaces that note; `search` ranks notes by the query's
+  words found as substrings or within one edit of a note's word (4+
+  letters); a recall without a query lists the newest 50, each on a line.
+  Not on the host, main agent only (`Tools.main_agent_only`), `save` and
+  `forget` destructive. Its description tells the model to use it very
+  rarely (save when asked to remember, recall when the user refers to what
+  they said before, never by default).
 - `Tool_web_search` — `web_search` is a provider-side tool: `Tools.for_model`
   keeps it only for Anthropic, OpenAI and OpenAI Codex models, whose
   providers send their native tool for it; its `run` only answers a model
@@ -1038,7 +1052,7 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   the session's `render_ui` calls, becoming a user message of an
   `Injected` `Ui_action` note). `Tools.interaction` holds the three; they are
   not tool-host tools, and `Tools.for_context` drops them for subagents,
-  which cannot ask the user (nor `goal_complete`, `job_input` and the other
+  which cannot ask the user (nor `goal_complete`, `memory`, `job_input` and the other
   background controls).
 - `Tools.all` is the fixed built-in set; `Tools.builtin` adds the variants
   (`apply_patch`) that a tool host can also run. `Tools.for_model` gives a
@@ -3864,6 +3878,7 @@ for Linux, macOS and Windows.
   string per line, last 500).
 - `~/.prigh/prefs.json` — the user's preferences and data kept for the
   frontends (`User_prefs`): prigh-web's `web.*` and the shared `history`.
+- `~/.prigh/memory.json` — the `memory` tool's notes (`Memory`).
 - `~/.prigh/config.json` — `scoped_models`, `approval_mode`, `permissions`, `notify`, `snippets`, `providers`
   (custom endpoints; their keys are in `auth.json` under their names),
   `forges` (git hosts' kind, OAuth client id and URL, by host).
