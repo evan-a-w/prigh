@@ -34,6 +34,7 @@ let
       ../desktop/core
       ../desktop/computer/Cargo.toml
       ../desktop/computer/src
+      ../desktop/computer/tests
       (lib.fileset.difference ../desktop/app (lib.fileset.maybeMissing ../desktop/app/gen))
     ];
   };
