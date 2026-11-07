@@ -349,3 +349,49 @@ let%expect_test "after: every word, in any field, best field and match first" =
     "xyz" (0)
     |}]
 ;;
+
+let%expect_test "content hits merge in; a reply to another query is ignored" =
+  let content query =
+    { P.Session_hits.query
+    ; hits =
+        [ { id = "s12"
+          ; path = "/s/s12.jsonl"
+          ; score = 36
+          ; snippet =
+              Some
+                { text = "…so we make the port configurable via the config file"
+                ; ranges = [ 18, 4; 23, 6; 44, 6 ]
+                }
+          }
+        ; { id = "s09"; path = "/s/s09.jsonl"; score = 60; snippet = None }
+        ; { id = "gone"; path = "/s/gone.jsonl"; score = 80; snippet = None }
+        ]
+    }
+  in
+  let show ~query content =
+    List.iter
+      (Session_search.sessions ?content ~query sessions)
+      ~f:(fun (r : Session_search.Result.t) ->
+        printf
+          "%s %3d %s\n"
+          r.session.id
+          r.score
+          (render_ranges (Session_search.title r.session) r.title);
+        Option.iter r.snippet ~f:(fun s ->
+          printf "      %s\n" (render_ranges s.text s.ranges)))
+  in
+  show ~query:"port config" (Some (content "config  PORT"));
+  [%expect {|
+    s02  72 Make the [port] [config]urable
+    s09  60 [config]ure the reverse proxy for the web server [port]
+    s12  36 hello
+          …so we make the [port] [config]urable via the [config] file
+    |}];
+  print_endline "-- stale:";
+  show ~query:"port config" (Some (content "port"));
+  [%expect {|
+    -- stale:
+    s02  72 Make the [port] [config]urable
+    s09  54 [config]ure the reverse proxy for the web server [port]
+    |}]
+;;

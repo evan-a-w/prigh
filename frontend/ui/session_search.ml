@@ -306,7 +306,9 @@ let sessions ?content ~query sessions =
     let hits =
       match content with
       | Some (c : P.Session_hits.t)
-        when [%equal: string list] (words c.query) (words query) ->
+        when [%equal: string list]
+               (List.sort (words c.query) ~compare:String.compare)
+               (List.sort (words query) ~compare:String.compare) ->
         String.Map.of_alist_reduce
           (List.map c.hits ~f:(fun (h : P.Session_hits.Hit.t) -> h.path, h))
           ~f:(fun a _ -> a)
