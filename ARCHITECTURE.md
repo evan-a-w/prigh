@@ -3662,11 +3662,14 @@ The sidecar contract (the shell's only coupling to the backend):
   `$PRIGH_DESKTOP_BACKEND`, else `prigh` on the PATH, else on the login
   shell's PATH, since an app started from a desktop menu has a short one;
   on Windows `wsl.exe … bash -lc 'exec "$0" desktop "$@"' prigh …`) from the
-  home directory, with stdin a pipe it holds open; on Windows, when
-  `prigh-computer.exe` is next to the app (the installers bundle it, as
-  Tauri's `externalBin` in `app/tauri.windows.conf.json`) and the user set
-  no `$PRIGH_COMPUTER`, with `PRIGH_COMPUTER` its path and `WSLENV` sharing
-  it as `PRIGH_COMPUTER/p`, so the tool host in WSL runs the Windows helper
+  home directory, with stdin a pipe it holds open, and the computer-use
+  helper bundled with the app as `$PRIGH_COMPUTER` when the user set none:
+  on macOS and Linux the `prigh-computer` beside the app's executable when
+  there is one (`launch::bundled_computer`: the macOS bundle has it, for
+  `-computer`); on Windows, when `prigh-computer.exe` is next to the app
+  (the installers bundle it, as Tauri's `externalBin` in
+  `app/tauri.windows.conf.json`), its path, with `WSLENV` sharing it as
+  `PRIGH_COMPUTER/p`, so the tool host in WSL runs the Windows helper
   (`desktop/computer/src/windows.rs`) through WSL's interop;
 - the sidecar prints one line, `{"url":"http://127.0.0.1:PORT/#desktop=KEY"}`
   (`Desktop_sidecar`), on stdout when it is ready (`core/ready.rs`; the

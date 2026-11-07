@@ -1447,6 +1447,20 @@ PATH, with extra arguments from `$PRIGH_COMPUTER_ARGS`.
   first.
 - **X11**: XTEST and the root window, cropped to the primary monitor;
   characters the keyboard map lacks go through spare keycodes.
+- **macOS** (never yet run on a real Mac: only built and unit-tested on
+  CI): ScreenCaptureKit screenshots (CGDisplayCreateImage before macOS
+  14) of the main display, in its pixels (twice its points on Retina), and
+  Quartz events for the mouse, scrolling and keys (`cmd`, `option`,
+  `ctrl`, `shift` in combos; any text as Unicode). macOS asks to allow
+  **Screen Recording** and **Accessibility** the first time; they belong
+  to the app that started the helper (the tool host's *responsible app*):
+  the prigh app, or the terminal you ran `prigh tool-host -computer` in.
+  Until they are given, actions fail saying where to give them (System
+  Settings > Privacy & Security > Screen Recording / Accessibility);
+  after allowing Screen Recording, quit and reopen that app. The macOS
+  app bundle carries `prigh-computer` (`prigh.app/Contents/MacOS`) and
+  points `$PRIGH_COMPUTER` at it; its CI builds are not signed, so macOS
+  may ask again after an update.
 - **Windows** (`prigh-computer.exe`): the primary monitor, captured with
   DXGI Desktop Duplication, or GDI's BitBlt where that is unavailable (RDP
   sessions, some virtual GPUs, a rotated screen; `--probe`'s `detail`
@@ -1461,9 +1475,9 @@ PATH, with extra arguments from `$PRIGH_COMPUTER_ARGS`.
   rather than let Windows drop the input silently: run the desktop app as
   administrator to drive those too). It has been tested only on the CI's
   Windows runner (Notepad), never on a real Windows desktop.
-- **GNOME and KDE on Wayland, and macOS** are not supported yet:
-  it says so (on GNOME or KDE, log in to an X11 session meanwhile).
-  `--backend auto|wlroots|x11|windows|fake` (or `$PRIGH_COMPUTER_BACKEND`)
+- **GNOME and KDE on Wayland** are not supported yet: it says so (log
+  in to an X11 session meanwhile).
+  `--backend auto|wlroots|x11|macos|windows|fake` (or `$PRIGH_COMPUTER_BACKEND`)
   overrides the detection; `prigh-computer --probe` prints what it
   found, or what is missing.
 - **Kill switch**: when the mouse is not where the helper left it, the
@@ -1474,7 +1488,7 @@ In the desktop app, pass `-computer` to `prigh desktop`: with Home Manager,
 `programs.prigh.desktop.computerUse = true` (it adds `-computer` and points
 `PRIGH_COMPUTER` at the packaged helper); otherwise `PRIGH_DESKTOP_ARGS=-computer`
 with `prigh-computer` on the PATH (`nix profile install
-github:evan-a-w/prigh#prigh-computer`).
+github:evan-a-w/prigh#prigh-computer`; the macOS app has it already).
 
 On Windows the tool host runs in WSL, where there is no Windows desktop
 to see, so the Windows installers carry the Windows build,
@@ -1545,8 +1559,8 @@ The backend's own host never offers it.
   with OpenAI `pending_safety_checks` needs approval in Ask mode and its
   result says the checks were acknowledged. Other models, Codex and
   custom providers use the schema.
-- Platforms: Linux on wlroots compositors and X11, and Windows (above);
-  the rest say they are not supported yet.
+- Platforms: Linux on wlroots compositors and X11, macOS and Windows
+  (above); the rest say they are not supported yet.
 
 ## Editors (ACP)
 
