@@ -522,13 +522,49 @@ mark.review-mark.quiet.hot { background: color-mix(in srgb, var(--sage) 14%, tra
 .comment-reply { font: 13px/1.5 var(--sans); }
 
 /* Phones: a full-screen sheet; Esc or the close button goes back to the
-   chat. */
+   chat. The code has the screen: two short rows of controls over it, the
+   file's row (the way to the list, which takes the code's place with what
+   is reviewed and git), Approve under it. */
 .app.narrow .review-page { position: fixed; inset: 0; z-index: var(--z-sheet); }
 .app.narrow .review-body { flex-direction: column; }
-.app.narrow .review-files { width: auto; max-height: 30vh; border-right: 0; border-bottom: 1px solid var(--rule); }
-.app.narrow .review-controls { margin-left: 0; }
-.app.narrow .review-head { padding: 8px 10px; }
-.app.narrow .review-progress { flex: 1 1 120px; }
+.app.narrow .review-files { width: auto; flex: 1; border-right: 0; }
+.app.narrow .review-head { padding: 6px 8px; gap: 6px 8px; min-height: 0; }
+.app.narrow .review-title, .app.narrow .review-progress-word { display: none; }
+.app.narrow .review-progress { flex: 1 1 80px; min-width: 80px; }
+.app.narrow .review-strip { min-width: 40px; }
+/* The controls' box gone, the first row is the progress, Send and close;
+   the second the two switches. */
+.app.narrow .review-controls { display: contents; }
+.app.narrow .review-head > *, .app.narrow .review-send, .app.narrow .review-close { order: 1; }
+.app.narrow .review-controls > .segmented { order: 2; }
+.app.narrow .review-controls > .segmented + .segmented { margin-left: auto; }
+.app.narrow .review-scroll { padding: 6px 4px 24px; }
+.app.narrow .review-dock { padding: 6px 8px; }
+.review-files-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 40px;
+  padding: 4px 12px;
+  border: 0;
+  border-bottom: 1px solid var(--rule);
+  background: var(--slate);
+  color: var(--chalk);
+  text-align: left;
+  cursor: pointer;
+  font: 500 13px var(--mono);
+}
+.review-files-toggle .chip { font: 11px var(--sans); color: var(--muted); background: var(--well); border: 1px solid var(--rule-2); border-radius: var(--r-chip); padding: 0 5px; }
+.review-files-toggle .review-file-path { flex: 1; min-width: 0; }
+.review-files-toggle .mark { --mark-size: 13px; }
+.review-files-toggle .review-file-path .dir { color: var(--faint); }
+.review-files-where { font: 11.5px var(--mono); color: var(--faint); font-variant-numeric: tabular-nums; }
+.review-files-toggle .chevron { width: 14px; height: 14px; color: var(--muted); transition: transform 0.12s ease-out; }
+.review-files-toggle.open { background: var(--sodium-wash); }
+.review-files-toggle.open .chevron { transform: rotate(180deg); color: var(--chalk); }
+.review-files-toggle:focus-visible { outline: 2px solid var(--sodium); outline-offset: -2px; }
+@media (prefers-reduced-motion: reduce) { .review-files-toggle .chevron { transition: none; } }
 
 /* ---- what is reviewed: the worktree and its base, each a picker */
 

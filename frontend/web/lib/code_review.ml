@@ -117,6 +117,7 @@ type t =
   ; unfolded : String.Set.t
   ; marked : String.Set.t
   ; mark_from : string option
+  ; files_open : bool
   }
 [@@deriving sexp_of]
 
@@ -153,6 +154,7 @@ let empty =
   ; unfolded = String.Set.empty
   ; marked = String.Set.empty
   ; mark_from = None
+  ; files_open = false
   }
 ;;
 
@@ -256,6 +258,7 @@ module Action = struct
         ; range : bool
         }
     | Unmark_all
+    | Toggle_files
     | Submit
     | Edit_input of string
     | Save
@@ -803,7 +806,7 @@ let rec update t (action : Action.t) =
       in
       t, diff @ more @ [ Out.Focus "review-page" ])
   | Go path ->
-    let t, outs = show t path in
+    let t, outs = show { t with files_open = false } path in
     let t, diff = get_diff t in
     t, outs @ diff
   | Step by -> step t by
@@ -1009,6 +1012,7 @@ let rec update t (action : Action.t) =
       ( { t with marked; mark_from = (if range then t.mark_from else Some path) }
       , [] ))
   | Unmark_all -> { t with marked = String.Set.empty; mark_from = None }, []
+  | Toggle_files -> { t with files_open = not t.files_open }, []
   | Submit ->
     if unsent t = 0
     then
@@ -1382,6 +1386,8 @@ let key t ~key ~shift ~ctrl ~alt : Action.t option =
       then Some Clear_selection
       else if not (List.is_empty (marked t))
       then Some Unmark_all
+      else if t.files_open
+      then Some Toggle_files
       else Some Close
     | _ -> None)
 ;;
