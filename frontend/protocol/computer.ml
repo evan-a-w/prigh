@@ -40,7 +40,8 @@ let of_json j =
       ; scaled_height = int "scaled_height"
       ; scale =
           (match Json.field j "scale" with
-           | Some (`Number n) -> Option.value (Float.of_string_opt n) ~default:1.
+           | Some (`Number n) ->
+             Option.value (Float.of_string_opt n) ~default:1.
            | _ -> 1.)
       }
   | _ -> Or_error.error_string "computer must be an object"

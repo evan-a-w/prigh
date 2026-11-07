@@ -93,7 +93,8 @@ let%expect_test "every action, described for prigh-web and the terminal" =
     |}]
 ;;
 
-let%expect_test "one line per action: running, done with its screenshot, failed" =
+let%expect_test "one line per action: running, done with its screenshot, failed"
+  =
   let h = Test_app.connected ~height:14 () in
   H.event h (State (state ~running:true ()));
   H.event h (Message_start (user "open a new tab"));
@@ -127,7 +128,8 @@ let%expect_test "one line per action: running, done with its screenshot, failed"
              ~name:"computer"
              ~id:"c1"
              ~images:[ shot ]
-             (result_text ~action:"click (640, 312) → (1280, 624) on the screen")
+             (result_text
+                ~action:"click (640, 312) → (1280, 624) on the screen")
        });
   let keys =
     tool_call
@@ -178,7 +180,8 @@ let%expect_test "protocol: a host offering computer use says what it controls" =
     {|{"id":"host-1","name":"laptop","cwd":"/w","session_id":null,"session_name":null,"computer":{"backend":"wlroots","detail":"Hyprland","platform":"linux","output":"DP-1","width":2560,"height":1440,"scale":2.0,"scaled_width":1280,"scaled_height":720}}|};
   (* Without it, and from a newer host with fields missing. *)
   host {|{"id":"host-1","name":"laptop","cwd":"/w"}|};
-  host {|{"id":"host-1","name":"laptop","cwd":"/w","computer":{"backend":"x11"}}|};
+  host
+    {|{"id":"host-1","name":"laptop","cwd":"/w","computer":{"backend":"x11"}}|};
   host {|{"id":"host-1","name":"laptop","cwd":"/w","computer":true}|};
   [%expect
     {|
