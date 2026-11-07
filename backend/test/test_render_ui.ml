@@ -149,7 +149,7 @@ let%expect_test
     hello: ok
     prompt: ok
     user: "how fast?"
-      note Using prigh-web: [Client: the user is on prigh-web, which renders render_ui components inline: use them when a visual or interactive answer is clearer than prose.]
+      note Using prigh-web: [Client: the user is on prigh-web, which renders render_ui components inline. Use them rarely: prose and markdown are the default, and render_ui is only for content that is clearly better as a component (a chart, images, a diff). Never use it to ask questions or get choices or input: ask in prose or with ask_user.]
     render_ui ok: Shown: chart "Build times".
     |}];
   S.call_as s tui ~params:{|{"text": "and now?"}|} "prompt";
@@ -169,7 +169,7 @@ let%expect_test
     {|
     follow_up: ok
     user: "back"
-      note Using prigh-web: [Client: the user is on prigh-web, which renders render_ui components inline: use them when a visual or interactive answer is clearer than prose.]
+      note Using prigh-web: [Client: the user is on prigh-web, which renders render_ui components inline. Use them rarely: prose and markdown are the default, and render_ui is only for content that is clearly better as a component (a chart, images, a diff). Never use it to ask questions or get choices or input: ask in prose or with ask_user.]
     render_ui ok: Shown: chart "Build times".
     prompt: ok
     user: "more"
@@ -222,7 +222,7 @@ let%expect_test
     hello: ok
     prompt: ok
     user: "one"
-      note Using prigh-web: [Client: the user is on prigh-web, which renders render_ui components inline: use them when a visual or interactive answer is clearer than prose.]
+      note Using prigh-web: [Client: the user is on prigh-web, which renders render_ui components inline. Use them rarely: prose and markdown are the default, and render_ui is only for content that is clearly better as a component (a chart, images, a diff). Never use it to ask questions or get choices or input: ask in prose or with ask_user.]
     new_session: ok
     switch_session: ok
     prompt: ok
@@ -253,7 +253,7 @@ let%expect_test "invalid components: every problem by path, nothing shown" =
     hello: ok
     prompt: ok
     user: "go"
-      note Using prigh-web: [Client: the user is on prigh-web, which renders render_ui components inline: use them when a visual or interactive answer is clearer than prose.]
+      note Using prigh-web: [Client: the user is on prigh-web, which renders render_ui components inline. Use them rarely: prose and markdown are the default, and render_ui is only for content that is clearly better as a component (a chart, images, a diff). Never use it to ask questions or get choices or input: ask in prose or with ask_user.]
     render_ui error: Nothing was shown. Fix these and call render_ui again:
     - components[0].series[0].values: 2 values for 3 labels; give one per label (null for a gap).
     - components[1].type: unknown type "tabel"; did you mean "table"?
@@ -304,7 +304,7 @@ let%expect_test "images are checked on the tool host" =
     hello: ok
     prompt: ok
     user: "show"
-      note Using prigh-web: [Client: the user is on prigh-web, which renders render_ui components inline: use them when a visual or interactive answer is clearer than prose.]
+      note Using prigh-web: [Client: the user is on prigh-web, which renders render_ui components inline. Use them rarely: prose and markdown are the default, and render_ui is only for content that is clearly better as a component (a chart, images, a diff). Never use it to ask questions or get choices or input: ask in prose or with ask_user.]
     render_ui ok: Shown: image $DIR/shot.png.
     render_ui error: Nothing was shown. Fix this and call render_ui again:
     - components[0].path: "shot.png" is relative; give the absolute path: use $DIR/shot.png.
@@ -348,7 +348,7 @@ let%expect_test
     hello: ok
     prompt: ok
     user: "deploy"
-      note Using prigh-web: [Client: the user is on prigh-web, which renders render_ui components inline: use them when a visual or interactive answer is clearer than prose.]
+      note Using prigh-web: [Client: the user is on prigh-web, which renders render_ui components inline. Use them rarely: prose and markdown are the default, and render_ui is only for content that is clearly better as a component (a chart, images, a diff). Never use it to ask questions or get choices or input: ask in prose or with ask_user.]
     render_ui ok: Shown: form "Deploy options", card. The user can answer through form "Deploy options", choices "next"; an answer arrives as their next message.
     |}];
   let action ?(text = {|""|}) ?(meth = "prompt") fields =
@@ -439,7 +439,7 @@ let%expect_test
   [%expect
     {|
     prompt: ok
-    {"role":"user","text":"The user responded through \"next\" (render_ui call c1, component next):\n[\"a\",\"b \\\"quoted\\\"\",\"ünïcode\"]\n[Client: the user is on prigh-web, which renders render_ui components inline: use them when a visual or interactive answer is clearer than prose.]","origin":{"body":"","notes":[{"kind":"ui_action","title":"Sent \"next\": a, b \"quoted\", ünïcode","text":"The user responded through \"next\" (render_ui call c1, component next):\n[\"a\",\"b \\\"quoted\\\"\",\"ünïcode\"]"},{"kind":"client","title":"Using prigh-web","text":"[Client: the user is on prigh-web, which renders render_ui components inline: use them when a visual or interactive answer is clearer than prose.]"}]}}
+    {"role":"user","text":"The user responded through \"next\" (render_ui call c1, component next):\n[\"a\",\"b \\\"quoted\\\"\",\"ünïcode\"]\n[Client: the user is on prigh-web, which renders render_ui components inline. Use them rarely: prose and markdown are the default, and render_ui is only for content that is clearly better as a component (a chart, images, a diff). Never use it to ask questions or get choices or input: ask in prose or with ask_user.]","origin":{"body":"","notes":[{"kind":"ui_action","title":"Sent \"next\": a, b \"quoted\", ünïcode","text":"The user responded through \"next\" (render_ui call c1, component next):\n[\"a\",\"b \\\"quoted\\\"\",\"ünïcode\"]"},{"kind":"client","title":"Using prigh-web","text":"[Client: the user is on prigh-web, which renders render_ui components inline. Use them rarely: prose and markdown are the default, and render_ui is only for content that is clearly better as a component (a chart, images, a diff). Never use it to ask questions or get choices or input: ask in prose or with ask_user.]"}]}}
     |}]
 ;;
 
@@ -488,7 +488,7 @@ let%expect_test "images on a tool host that is too old, then away" =
     the host is asked for $fs_stat
     tool_exec_result: ok
     user: "show"
-      note Using prigh-web: [Client: the user is on prigh-web, which renders render_ui components inline: use them when a visual or interactive answer is clearer than prose.]
+      note Using prigh-web: [Client: the user is on prigh-web, which renders render_ui components inline. Use them rarely: prose and markdown are the default, and render_ui is only for content that is clearly better as a component (a chart, images, a diff). Never use it to ask questions or get choices or input: ask in prose or with ask_user.]
     render_ui error: Nothing was shown: cannot check the images (tool host laptop runs a prigh too old to show its files: update prigh there). Tell the user, or answer without images.
     |}];
   (* Gone: no waiting for it to come back. *)
@@ -678,7 +678,7 @@ let%expect_test
     prompt: ok
     steer: ok
     user: "show me"
-      note Using prigh-web: [Client: the user is on prigh-web, which renders render_ui components inline: use them when a visual or interactive answer is clearer than prose.]
+      note Using prigh-web: [Client: the user is on prigh-web, which renders render_ui components inline. Use them rarely: prose and markdown are the default, and render_ui is only for content that is clearly better as a component (a chart, images, a diff). Never use it to ask questions or get choices or input: ask in prose or with ask_user.]
     render_ui ok: Shown: chart.
     user: "from the terminal"
       note Using prigh-tui: [Client: the user is on prigh-tui, which cannot display components: do not call render_ui; answer in text (markdown is fine).]
@@ -690,7 +690,7 @@ let%expect_test
     prompt: ok
     follow_up: ok
     user: "show me"
-      note Using prigh-web: [Client: the user is on prigh-web, which renders render_ui components inline: use them when a visual or interactive answer is clearer than prose.]
+      note Using prigh-web: [Client: the user is on prigh-web, which renders render_ui components inline. Use them rarely: prose and markdown are the default, and render_ui is only for content that is clearly better as a component (a chart, images, a diff). Never use it to ask questions or get choices or input: ask in prose or with ask_user.]
     render_ui ok: Shown: chart.
     user: "from the terminal"
       note Using prigh-tui: [Client: the user is on prigh-tui, which cannot display components: do not call render_ui; answer in text (markdown is fine).]
@@ -714,7 +714,7 @@ let%expect_test
     hello: ok
     prompt: ok
     user: "hi"
-      note Using prigh-web: [Client: the user is on prigh-web, which renders render_ui components inline: use them when a visual or interactive answer is clearer than prose.]
+      note Using prigh-web: [Client: the user is on prigh-web, which renders render_ui components inline. Use them rarely: prose and markdown are the default, and render_ui is only for content that is clearly better as a component (a chart, images, a diff). Never use it to ask questions or get choices or input: ask in prose or with ask_user.]
     |}];
   let tui = Rpc_server.connect s.h.server ~send:ignore in
   S.call_as
