@@ -924,3 +924,25 @@ let%expect_test
     }
     |}]
 ;;
+
+let%expect_test "a call with OpenAI safety checks needs approval in Ask mode" =
+  let needs_approval args =
+    match computer_spec.destructive with
+    | Depends f -> f (Or_error.ok_exn (Json.parse args))
+    | Always -> true
+    | Never -> false
+  in
+  let action = Or_error.ok_exn (Json.parse {|{"type":"click","x":1,"y":2}|}) in
+  print_s
+    [%sexp
+      (needs_approval (Computer_native.of_openai action) : bool)
+    , (needs_approval
+         (Computer_native.of_openai
+            ~safety_checks:
+              [ Or_error.ok_exn
+                  (Json.parse {|{"id":"sc","code":"irrelevant_domain"}|})
+              ]
+            action)
+       : bool)];
+  [%expect {| (false true) |}]
+;;
