@@ -245,7 +245,7 @@ it: compaction, approvals, plans, goals, reminders, the system prompt,
 skills), `session/` (the session log and the message types it records),
 `providers/` (the model providers and their routing, models, SSE, HTTP),
 `auth/` (credentials, OAuth flows, logins), `tools/` (the built-in tools
-and their helpers), `host/` (tool hosts and their operations), `mcp/`,
+and their helpers), `host/` (tool hosts and their operations), `mcp/`, `computer/` (computer use),
 `rpc/` (the RPC server and router, namespaces, the web server and
 WebSocket, file transfers), `terminal/` (the browser's terminals) and
 `util/` (`Import`, `Config`, cancellation and other small shared pieces).
