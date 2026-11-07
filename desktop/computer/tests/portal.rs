@@ -1,3 +1,5 @@
+#![cfg(target_os = "linux")]
+
 //! The portal backend against a fake xdg-desktop-portal on a private
 //! dbus-daemon: the fake answers as the real one does (Request objects and
 //! their Response signals, the session's streams, a restore token) and

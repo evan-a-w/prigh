@@ -56,6 +56,7 @@ let
     buildInputs = [ pkgs.pipewire ];
     # the fake portal test runs a private bus
     nativeCheckInputs = [ pkgs.dbus ];
+    env.PRIGH_REQUIRE_DBUS = "1";
     meta = {
       description = "prigh's computer-use helper: screenshots and input on the desktop (wlroots Wayland, xdg-desktop-portal, X11)";
       mainProgram = "prigh-computer";
