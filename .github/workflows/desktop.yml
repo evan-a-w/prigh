@@ -25,6 +25,28 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # prigh-computer on Linux: its portal backend's PipeWire bindings need
+  # PipeWire 1.0's headers, newer than the bundle's ubuntu-22.04 has. Its
+  # portal and screen-cast tests skip without dbus-daemon or PipeWire here;
+  # the flake's prigh-computer build runs them.
+  computer-linux:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: desktop
+    steps:
+      - uses: actions/checkout@v4
+      - name: Linux libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libpipewire-0.3-dev libclang-dev
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop
+      - name: Tests
+        run: cargo test --locked -p prigh-computer
+
   bundle:
     strategy:
       fail-fast: false
@@ -48,8 +70,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libsoup-3.0-dev \
-            libgtk-3-dev librsvg2-dev libayatana-appindicator3-dev patchelf \
-            libpipewire-0.3-dev libclang-dev
+            libgtk-3-dev librsvg2-dev libayatana-appindicator3-dev patchelf
 
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
@@ -60,8 +81,9 @@ jobs:
         with:
           node-version: 22
 
+      # prigh-computer on Linux: the computer-linux job
       - name: Tests
-        run: cargo test --locked -p prigh-desktop-core -p prigh-computer
+        run: cargo test --locked -p prigh-desktop-core ${{ runner.os != 'Linux' && '-p prigh-computer' || '' }}
 
       # The Windows backend on the runner's own desktop: Notepad must get
       # what the helper types.
