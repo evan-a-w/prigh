@@ -31,6 +31,8 @@ type t =
   ; cost : Cost.t
   ; supports_images : bool
     (** otherwise each image is replaced by a note saying it was left out *)
+  ; native_computer : Native_computer.t option
+    (** its built-in computer-use tool, if it has one *)
   }
 [@@deriving sexp_of]
 

@@ -27,6 +27,7 @@ type t =
   ; thinking_style : Thinking_style.t
   ; cost : Cost.t
   ; supports_images : bool
+  ; native_computer : Native_computer.t option
   }
 [@@deriving sexp_of]
 
@@ -54,6 +55,7 @@ let m
   ; thinking_style = style
   ; cost = { input; output; cache_read }
   ; supports_images = images
+  ; native_computer = Native_computer.of_model provider id
   }
 ;;
 

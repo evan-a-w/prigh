@@ -19,12 +19,17 @@ let off_error =
    .computerUse in Home Manager)"
 ;;
 
-let spec =
+let has_safety_checks args =
+  not (List.is_empty (Computer_native.safety_checks args))
+;;
+
+let spec ?native () =
   { Tool_spec.name
   ; parallel_safe = false
   ; on_host = true
   ; freeform = None
-  ; destructive = Never
+  ; native
+  ; destructive = Depends has_safety_checks
   ; description =
       "See and control the user's desktop: take a screenshot, click, move the \
        pointer, drag, scroll, type text and press keys. Coordinates are pixels \
@@ -39,15 +44,36 @@ let spec =
 ;;
 
 let execute helper ~cancel arguments =
-  match helper with
-  | None -> Tool_result.error off_error
-  | Some helper -> Computer_helper.run helper ~cancel arguments
+  let result : Tool_result.t =
+    match helper with
+    | None -> Tool_result.error off_error
+    | Some helper -> Computer_helper.run helper ~cancel arguments
+  in
+  match Computer_native.safety_checks arguments with
+  | [] -> result
+  | checks ->
+    { result with
+      text = Computer_native.safety_note checks ^ "\n" ^ result.text
+    }
 ;;
 
 (* Reached only when the session's tools run in the backend's own process,
    which never offers computer use. *)
 let tool =
-  { Tool.spec
+  { Tool.spec = spec ()
   ; run = (fun context args -> execute None ~cancel:context.cancel args)
+  }
+;;
+
+let for_screen ~native (info : Computer_info.t) =
+  { tool with
+    spec =
+      spec
+        ?native:
+          (Option.some_if
+             native
+             (Tool_spec.Native.Computer
+                { width = info.scaled_width; height = info.scaled_height }))
+        ()
   }
 ;;

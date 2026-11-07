@@ -597,9 +597,12 @@ let%expect_test "screenshots are pruned in batches, keeping the prefix" =
     messages := !messages @ step i;
     let sent = Computer_screenshots.prune ~min ~max !messages in
     let images =
-      List.sum (module Int) sent ~f:(function
-        | Tool_result r -> List.length r.images
-        | _ -> 0)
+      List.sum
+        (module Int)
+        sent
+        ~f:(function
+          | Tool_result r -> List.length r.images
+          | _ -> 0)
     in
     let first_changed =
       List.findi !previous ~f:(fun i m ->
@@ -613,7 +616,8 @@ let%expect_test "screenshots are pruned in batches, keeping the prefix" =
       (Option.value_map first_changed ~default:"-" ~f:Int.to_string);
     previous := sent
   done;
-  [%expect {|
+  [%expect
+    {|
     step  sent images  first changed message (-: only appended)
     1     1            -
     2     2            -
