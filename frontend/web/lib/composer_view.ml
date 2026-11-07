@@ -464,7 +464,8 @@ let view (m : App.Model.t) ~inject =
           ; "busy", Status_view.busy m
           ]
       ]
-    [ rest (Queue_view.view m ~inject)
+    [ Computer_banner.view m ~inject
+    ; rest (Queue_view.view m ~inject)
     ; Node.div
         ~attrs:
           [ classes

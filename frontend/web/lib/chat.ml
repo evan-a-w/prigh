@@ -539,3 +539,16 @@ let reconcile ~old fresh =
       ; detached = old.detached
       }
 ;;
+
+let uses_computer t =
+  let rec go = function
+    | [] | User _ :: _ -> false
+    | Assistant { message; _ } :: rest ->
+      List.exists message.content ~f:(function
+        | Content.Tool_call { name = "computer"; _ } -> true
+        | _ -> false)
+      || go rest
+    | (Shell _ | Compaction _) :: rest -> go rest
+  in
+  go t.rev_entries
+;;

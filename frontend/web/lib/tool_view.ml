@@ -33,6 +33,12 @@ let summary (call : Tool_call.t) =
   then Option.value (Tool_summary.issue args) ~default:""
   else if String.equal call.name "repo"
   then Option.value (Tool_summary.repo args) ~default:""
+  else if String.equal call.name "computer"
+  then
+    Option.value_map
+      (Computer_action.of_call call)
+      ~default:""
+      ~f:Computer_action.describe
   else
     List.find_map
       [ "command"; "path"; "pattern"; "task"; "id"; "url"; "query" ]
@@ -341,6 +347,87 @@ let present
              | None -> running_output ()
              | Some r -> output ~fold ~error:r.is_error ?elided:r.elided text))
         ]
+    }
+  | "computer" ->
+    let action = Computer_action.of_call call in
+    let body =
+      match result with
+      | None -> []
+      | Some { is_error = true; _ } -> [ error_body ]
+      | Some { images = []; text; _ } ->
+        [ span "caption" (String.strip text) ]
+      | Some { images = shot :: _; text; _ } ->
+        let size =
+          match Computer_action.screenshot_size text with
+          | Some size -> Some size
+          | None -> Image_size.dimensions shot
+        in
+        let mark =
+          match Option.bind action ~f:Computer_action.point, size with
+          | Some { x; y }, Some (w, h) when x >= 0 && y >= 0 && x <= w && y <= h
+            ->
+            let percent n d = Float.of_int n *. 100. /. Float.of_int d in
+            [ Node.span
+                ~attrs:
+                  [ Attr.class_ "screen-mark"
+                  ; Attr.create "aria-hidden" "true"
+                  ; Attr.style
+                      (Css_gen.create
+                         ~field:"left"
+                         ~value:(sprintf "%.3f%%" (percent x w))
+                       |> Css_gen.combine
+                            (Css_gen.create
+                               ~field:"top"
+                               ~value:(sprintf "%.3f%%" (percent y h))))
+                  ]
+                []
+            ]
+          | _ -> []
+        in
+        let label = Image.to_string_hum shot in
+        let lines = String.split_lines (String.rstrip text) in
+        (* The last line ("screenshot W×H") is the image itself. *)
+        let caption =
+          match List.rev lines with
+          | last :: rest when String.is_prefix last ~prefix:"screenshot " ->
+            List.rev rest
+          | _ -> lines
+        in
+        [ Node.div
+            ~attrs:[ Attr.class_ "screen"; Attr.create Image_view.group_attribute "" ]
+            [ Node.button
+                ~attrs:
+                  [ Attr.type_ "button"
+                  ; Attr.class_ "image screen-shot"
+                  ; Attr.title label
+                  ; Attr.create "aria-label" ("View the screenshot, " ^ label)
+                  ; Attr.create Image_view.viewer_attribute ""
+                  ]
+                ([ Node.img
+                    ~attrs:
+                      [ Attr.class_ "thumb"
+                      ; Attr.src (Image_view.src shot)
+                      ; Attr.alt "the screen after the action"
+                      ]
+                    ()
+                ]
+                @ mark)
+            ]
+        ; span "caption" (String.concat ~sep:"\n" caption)
+        ]
+    in
+    { arg =
+        Option.map action ~f:(fun a -> span "arg" (Computer_action.describe a))
+    ; chips =
+        (match result with
+         | Some { is_error = false; text; _ } ->
+           Option.value_map
+             (Computer_action.screenshot_size text)
+             ~default:[]
+             ~f:(fun (w, h) -> [ chip (sprintf "%d×%d" w h) ])
+         | _ -> [])
+    ; details = []
+    ; body
     }
   | "read" ->
     let range =
