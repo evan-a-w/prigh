@@ -27,6 +27,7 @@
 // optionally SHOTS.
 import { spawn } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
+import { hostname } from "node:os";
 import { join } from "node:path";
 import { end } from "./end.mjs";
 import { png } from "./png.mjs";
@@ -278,7 +279,7 @@ const phone = async (w, h, { pwa = false } = {}) => {
 
   section(`${tag}: the composer's row`);
   say(await rowFits());
-  say(`it shows: ${await page.locator(".composer-row button:visible").evaluateAll(bs => bs.map(b => (b.getAttribute("aria-label") || b.innerText).trim().split("\n")[0]).join(", "))}`);
+  say(`it shows: ${(await page.locator(".composer-row button:visible").evaluateAll(bs => bs.map(b => (b.getAttribute("aria-label") || b.innerText).trim().split("\n")[0]).join(", "))).replaceAll(hostname(), "<HOSTNAME>")}`);
   await shoot(`${tag}-composer`);
 
   section(`${tag}: the ⋯ sheet's choices act`);

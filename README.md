@@ -153,8 +153,9 @@ to a login page, a 401, an HTML page instead of the WebSocket upgrade) is
 reported as such, and prigh-tui offers to sign in through the browser: it
 opens prigh-web on that site, which asks you to allow it and hands it the
 proxy's cookie (saved with the connection, sent with every connection;
-`prigh web` and `prigh tool-host` do the same without asking, and `prigh
-browser-signin -connect URL` by hand; DOCKER.md, "Behind a reverse proxy",
+`prigh web` and `prigh tool-host` do the same without asking (once: a
+sign-in cancelled or failed is not started again on every reconnect),
+and `prigh browser-signin -connect URL` by hand; DOCKER.md, "Behind a reverse proxy",
 has the details). Or exempt `/ws` and `/terminal` from it (prigh checks its
 own token there; DOCKER.md shows how for authentik, Caddy, nginx and
 Traefik), send its credentials with `-header 'NAME: VALUE'` (repeatable;
@@ -1383,6 +1384,21 @@ PRIGH_TOKEN=... prigh desktop -connect wss://server/ws -cwd ~/proj
   user name and the token as the password), prefilled and saying what went
   wrong and what to do. What the backend accepts is saved for next time,
   and the page goes on signed in.
+- When the backend's site is behind a sign-in proxy (authentik's forward
+  auth, Cloudflare Access), the window does not go to the proxy's login,
+  which would only loop back: the page asks how to sign in to it. **Sign
+  in with your browser** (first, Enter) opens the site in the default
+  browser, where you are usually signed in already; allow prigh desktop
+  there (as for `prigh browser-signin`), and the window goes to the site
+  with the proxy's cookie, which is kept in the saved connection for next
+  time. Open it again reopens that tab; Cancel (Esc) goes back. **Sign in
+  here** goes to the site in the window, to sign in to the proxy there.
+  When the sign-in expires later, the window comes back to the same
+  choice, saying so. The app's window tells the proxy's redirects (which
+  it follows, through the identity provider and back) from links to other
+  sites (which open in the default browser, at most twice a site within
+  5 s); a sign-in that goes round and round (a cookie the site does not
+  take) ends on the same choice.
 - An address without TLS on another machine (`server:7790`, `ws://`)
   would send the token and everything else in the clear, and whoever is on
   the way could run commands on this computer: the form says so and asks

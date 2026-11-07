@@ -33,7 +33,12 @@ open! Import
       prefill, each a string or null),
       [{"state": "connected", "address", "code"}] ([code] the
       {!Signin_handoff}'s, null once traded) or, under {!Ui.Remote},
-      [{"state": "remote", "url"}] (the window is on its way there);
+      [{"state": "remote", "url"}] (the window is on its way there) or
+      [{"state": "signin", "site", "login", "waiting", "error",
+      "expired"}] (see below). With ["signin": true] (the window was sent
+      back to [#desktop=KEY&signin=1] by the site's sign-in proxy: the
+      sign-in expired), a connection under {!Ui.Remote} goes back to the
+      sign-in choice first;
     - [/desktop/connect] with ["address"], ["user"] and ["token"]: checks
       them ({!Web_connect.Check}), and if the backend accepts them saves
       them and answers [{"ok": true, "code"}] ([{"ok": true, "remote":
@@ -42,7 +47,31 @@ open! Import
       without TLS to another machine is refused with
       [{"ok": false, "error", "plaintext": true}] (the risk, and the
       alternatives) unless the request has ["plaintext": true];
-    - [/desktop/quit]: answers [{"ok": true}] and ends {!run}. *)
+    - [/desktop/quit]: answers [{"ok": true}] and ends {!run};
+    - [/desktop/signin] with ["how"], while signing in (below):
+      ["browser"] signs in through the default browser
+      ({!Browser_signin}, [program=desktop]): the shell is told to open its
+      URL there ([{"url", "external": true}] on stdout; a request while
+      one is under way joins it without opening it again), and the answer
+      comes once it ends: [{"ok": true, "remote": url}] (signed in: the
+      cookie is remembered with [remember_signin] and the window goes to
+      the site with it), [{"ok": false, "error"}] or [{"ok": false,
+      "cancelled": true}]; ["again"] opens the one under way again;
+      ["cancel"] cancels it; ["here"] goes to the site without a cookie
+      ([{"ok": true, "remote": url}], the page line says ["here": true]):
+      the window signs in to the proxy itself.
+
+    Under {!Ui.Remote}, once the backend's [/ws] accepted the connection
+    ({!Web_connect.Check}), the site's page is probed ({!Site_probe}):
+    when a sign-in proxy guards it (or [/ws] itself: the check's
+    [Signin_required]), the page here shows the sign-in choice ([{"state":
+    "signin"}]: ["site"] its host, ["login"] the login site's if known,
+    ["waiting"] the URL of the sign-in through the browser under way,
+    ["error"] what went wrong last) instead of the window going to the
+    site. When [/ws] needed no cookie the connection is saved and the tool
+    host started before the sign-in (it does not need it); when it did,
+    after the sign-in through the browser, with the cookie (signing in
+    "here" then runs no tool host: it could not get past the proxy). *)
 
 module Initial : sig
   type t =
@@ -73,10 +102,25 @@ module Page : sig
     ; remote : bool
       (** the backend's site, which the window is to trust as it trusts
           the page here *)
+    ; cookie : string option
+      (** on the backend's site: the [Cookie] its sign-in proxy wants (from
+          a sign-in through the browser), for the window to send there;
+          not printed by [sexp_of_t] *)
+    ; signin : string option
+      (** on the backend's site: the page here, at the sign-in choice
+          ([#desktop=KEY&signin=1]), for when the site's sign-in proxy
+          sends the window to its login again *)
+    ; here : bool
+      (** the user chose to sign in to the site's proxy in the window *)
+    ; external_ : bool
+      (** not for the window: [url] (a sign-in) is to open in the default
+          browser *)
     }
   [@@deriving sexp_of]
 
-  (** [{"url": ...}], with ["remote": true] when it is. *)
+  (** [{"url": ...}], with ["remote": true], ["cookie": ...], ["signin":
+      ...], ["here": true] and ["external": true] when they are (a contract
+      with the shell: [desktop/core/src/ready.rs]). *)
   val to_json_line : t -> string
 end
 
@@ -91,6 +135,11 @@ module Config : sig
     ; listen : Web_connect.Listen.t
     ; root : string (** the built site *)
     ; save : Saved_connection.t -> unit Or_error.t
+    ; remember_signin :
+        Backend_address.t -> Browser_signin.Grant.t -> unit Or_error.t
+      (** after a sign-in through the browser, with the address with its
+          cookie ([Backend_choice.remember_signin]); after [save] for a new
+          connection *)
     }
 end
 
