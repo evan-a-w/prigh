@@ -44,5 +44,7 @@ let archived_shown ~query ~archived_open =
 
 let shown sessions ~query ~archived_open =
   let { Sections.pinned; active; archived } = sections sessions ~query in
-  pinned @ active @ if archived_shown ~query ~archived_open then archived else []
+  pinned
+  @ active
+  @ if archived_shown ~query ~archived_open then archived else []
 ;;

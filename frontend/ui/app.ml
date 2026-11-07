@@ -1330,7 +1330,6 @@ let archive_resolved m ~arg ~archived sessions =
 ;;
 
 let pin_verb ~pinned = if pinned then "pinned" else "unpinned"
-
 let cannot_pin = "this backend cannot pin sessions: update it to pin"
 
 (* No argument: the current session; otherwise it is looked up in the list
@@ -1364,7 +1363,9 @@ let pin_resolved m ~arg ~pinned sessions =
       let notice =
         sprintf "%s %s" (pin_verb ~pinned) (Session_selection.describe s)
       in
-      call (Set_pinned { path = s.path; pinned }) ~tag:(Notice_on_success notice)
+      call
+        (Set_pinned { path = s.path; pinned })
+        ~tag:(Notice_on_success notice)
     in
     m, List.map found ~f:set
 ;;

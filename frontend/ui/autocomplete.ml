@@ -201,7 +201,7 @@ let sessions_for (spec : Commands.Spec.t) sessions =
     match spec.name with
     | "archive" -> not s.archived
     | "unarchive" -> s.archived
-    | "pin" -> not (Option.value s.pinned ~default:false) || s.archived
+    | "pin" -> (not (Option.value s.pinned ~default:false)) || s.archived
     | "unpin" -> Option.value s.pinned ~default:false && not s.archived
     | _ -> true)
 ;;

@@ -200,8 +200,8 @@ let every =
       ~argument:Session
       ~args:"[session]"
       "pin"
-      "pin a session to the top of the sidebar (this one without an \
-       argument): pinned sessions are never archived for being idle"
+      "pin a session to the top of the sidebar (this one without an argument): \
+       pinned sessions are never archived for being idle"
   ; c
       ~argument:Session
       ~args:"[session]"

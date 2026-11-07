@@ -23,8 +23,7 @@ module Method : sig
     | Set_pinned of
         { path : string (** a session's path or id *)
         ; pinned : bool
-        }
-    (** pinning unarchives, archiving unpins *)
+        } (** pinning unarchives, archiving unpins *)
     | Delete_sessions of
         { paths : string list
         ; switch_to : Switch_to.t option
