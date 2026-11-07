@@ -1683,16 +1683,19 @@ let rec remove path =
 let delete_files path = List.iter (files path) ~f:remove
 
 (* An [Archived] entry after the last message is a manual (un)archive; an
-   unarchive also counts as activity. *)
+   unarchive also counts as activity, as does an unpin (so that unpinning an
+   idle session does not archive it at once). *)
 let archived_and_activity t ~mtime =
-  let last_message_at, marker =
+  let (last_message_at, marker), unpinned_at =
     List.fold
       (List.rev t.entries)
-      ~init:(None, None)
-      ~f:(fun (last_message, marker) (e : Entry.t) ->
+      ~init:((None, None), None)
+      ~f:(fun ((last_message, marker), unpinned_at) (e : Entry.t) ->
         match e.payload with
-        | Message _ -> Some e.at, None
-        | Archived { archived } -> last_message, Some (archived, e.at)
+        | Pinned { pinned = false } -> (last_message, marker), Some e.at
+        | Message _ -> (Some e.at, None), unpinned_at
+        | Archived { archived } ->
+          (last_message, Some (archived, e.at)), unpinned_at
         | Model _
         | Compaction _
         | Masked _
@@ -1705,7 +1708,7 @@ let archived_and_activity t ~mtime =
         | Budget _
         | Approval _
         | Allow_rule _
-        | Pinned _
+        | Pinned { pinned = true }
         | Spend _
         | Resume_at _
         | Told_environment _
@@ -1720,9 +1723,12 @@ let archived_and_activity t ~mtime =
         | Trim_after _
         | Delete _
         | Restore _
-        | Review _ -> last_message, marker)
+        | Review _ -> (last_message, marker), unpinned_at)
   in
   let activity = Option.value (Option.join last_message_at) ~default:mtime in
+  let activity =
+    Option.fold (Option.join unpinned_at) ~init:activity ~f:Float.max
+  in
   let activity =
     match marker with
     | Some (false, Some at) -> Float.max activity at
