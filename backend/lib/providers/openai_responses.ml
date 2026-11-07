@@ -85,15 +85,15 @@ let freeform_input arguments =
 ;;
 
 (* The model's built-in computer tool answers a [computer_call] (a batch of
-   actions, stored as one call each: [call_id], [call_id#1], ...) with one
+   actions, stored as one call each: [call_id], [call_id__1] (ids Anthropic accepts too), ...) with one
    [computer_call_output]: the screenshot after the batch, acknowledging the
    call's safety checks. Errors follow it as text; a screenshot left out of
    the request ({!Computer_screenshots}) is sent as a blank image. *)
 let is_computer name = String.equal name Tool_computer.name
 
 let computer_group id =
-  match String.lsplit2 id ~on:'#' with
-  | Some (group, _) -> group
+  match String.substr_index id ~pattern:"__" with
+  | Some i -> String.prefix id i
   | None -> id
 ;;
 
@@ -630,7 +630,7 @@ let parse_event (state : Stream_state.t) (event : Sse.Event.t)
             in
             [ Assistant_event.Tool_call_start
                 { index
-                ; id = (if k = 0 then call_id else sprintf "%s#%d" call_id k)
+                ; id = (if k = 0 then call_id else sprintf "%s__%d" call_id k)
                 ; name = Tool_computer.name
                 }
             ; Tool_call_delta { index; arguments }

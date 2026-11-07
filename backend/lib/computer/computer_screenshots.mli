@@ -25,10 +25,14 @@ val placeholder : string
 val omitted : min:int -> max:int -> int -> int
 
 (** [messages] with the oldest {!omitted} images of [computer] results
-    replaced by {!placeholder} (a line after the result's text), and the
-    thinking left out of the replies written while an image now omitted was
-    still sent: a provider may check that what came before a thinking block
-    is what it was (Anthropic's preserved thinking), and refuse the request
-    otherwise. Leaving those out keeps the thinking sent an unbroken run of
-    what the model wrote against the request as it is now. *)
-val prune : min:int -> max:int -> Message.t list -> Message.t list
+    replaced by {!placeholder} (a line after the result's text). With
+    [drop_stale_thinking] (a model that checks what came before each thinking
+    block, {!Model.binds_thinking_to_prefix}), also without the thinking of
+    the replies written while an image now omitted was still sent, which the
+    provider would refuse. *)
+val prune
+  :  drop_stale_thinking:bool
+  -> min:int
+  -> max:int
+  -> Message.t list
+  -> Message.t list

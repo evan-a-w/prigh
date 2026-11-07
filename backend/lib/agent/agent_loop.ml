@@ -385,6 +385,7 @@ let run
       let fit_images () =
         let messages =
           Computer_screenshots.prune
+            ~drop_stale_thinking:(Model.binds_thinking_to_prefix config.model)
             ~min:config.compaction.computer_screenshots
             ~max:config.compaction.computer_screenshots_max
             !messages

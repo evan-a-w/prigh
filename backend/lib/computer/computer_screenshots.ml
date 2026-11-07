@@ -15,7 +15,7 @@ let screenshots : Message.t -> int = function
   | Tool_result _ | User _ | Assistant _ -> 0
 ;;
 
-let prune ~min ~max messages =
+let prune ~drop_stale_thinking ~min ~max messages =
   let total = List.sum (module Int) messages ~f:screenshots in
   let omitted_now = omitted ~min ~max total in
   let left = ref omitted_now in
@@ -35,7 +35,8 @@ let prune ~min ~max messages =
                 (r.text :: List.init n ~f:(fun _ -> placeholder))
           }
       | Assistant a
-        when Int.min omitted_now !before <> omitted ~min ~max !before ->
+        when drop_stale_thinking
+             && Int.min omitted_now !before <> omitted ~min ~max !before ->
         Assistant
           { a with
             content =

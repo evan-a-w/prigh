@@ -558,28 +558,40 @@ let%expect_test "screenshots are pruned in batches, keeping the prefix" =
     17 12       5
     18 12       6
     19 12       7
-    |}];
-  (* A computer-use loop: each step adds the model's call and its result
-     (every fourth a wait, without a screenshot). The request differs from
-     the one before only from where it was cut. *)
+    |}]
+;;
+
+(* A computer-use loop: each step adds the model's reply (signed thinking
+   and a native toolset call, every fourth a wait, without a screenshot) and
+   its result. Each request, as prigh's messages, as Anthropic's and as
+   OpenAI's wire messages (cache breakpoints aside, which move with the
+   end), differs from the one before only from where it was cut, and only
+   on the steps that cut. *)
+let%expect_test "pruning keeps every request's prefix until the next cut" =
+  let min = 3
+  and max = 8 in
   let image = { Image.mime_type = "image/png"; data = "AAAA" } in
   let step i =
     let id = sprintf "c%d" i in
     let wait = i % 4 = 3 in
     [ Message.Assistant
         { content =
-            [ Tool_call
+            [ Content.thinking ~signature:(sprintf "sig%d" i) "look"
+            ; Tool_call
                 { id
                 ; name = "computer"
                 ; arguments =
-                    (if wait
-                     then {|{"action":"wait","seconds":1}|}
-                     else {|{"action":"screenshot"}|})
+                    Computer_native.of_anthropic
+                      ~toolset:true
+                      ~name:(if wait then "wait" else "screenshot")
+                      (if wait
+                       then `Object [ "duration", `Number "1" ]
+                       else `Object [])
                 }
             ]
         ; stop_reason = Tool_use
         ; usage = Usage.zero
-        ; model = "anthropic/claude-sonnet-4-6"
+        ; model = "anthropic/claude-opus-5-5"
         }
     ; Tool_result
         { tool_call_id = id
@@ -590,54 +602,120 @@ let%expect_test "screenshots are pruned in batches, keeping the prefix" =
         }
     ]
   in
+  let rec without_cache_control : Json.t -> Json.t = function
+    | `Object fields ->
+      `Object
+        (List.filter_map fields ~f:(fun (k, v) ->
+           Option.some_if
+             (not (String.equal k "cache_control"))
+             (k, without_cache_control v)))
+    | `Array l -> `Array (List.map l ~f:without_cache_control)
+    | j -> j
+  in
+  let wire_messages ~field body =
+    match body with
+    | `Object fields ->
+      (match List.Assoc.find fields field ~equal:String.equal with
+       | Some (`Array l) -> List.map l ~f:without_cache_control
+       | _ -> [])
+    | _ -> []
+  in
+  let first_changed previous current ~equal =
+    List.findi previous ~f:(fun i m ->
+      match List.nth current i with
+      | Some m' -> not (equal m m')
+      | None -> true)
+    |> Option.value_map ~default:"-" ~f:(fun (i, _) -> Int.to_string i)
+  in
+  let request model messages =
+    { Provider.Request.model = Or_error.ok_exn (Model.resolve model)
+    ; system = Some "sys"
+    ; messages
+    ; tools = [ Tool_bash.tool.spec ]
+    ; thinking = Thinking.On (Some High)
+    ; max_tokens = None
+    ; cache_key = None
+    }
+  in
   let messages = ref [ Message.user "go" ] in
-  let previous = ref [] in
-  print_endline "step  sent images  first changed message (-: only appended)";
+  let previous = ref ([], [], []) in
+  print_endline
+    "first changed (-: only appended): prigh's messages, Anthropic's, OpenAI's";
+  print_endline
+    "step  images  thinking (dropped or kept)  prigh  anthropic  openai";
   for i = 1 to 20 do
     messages := !messages @ step i;
-    let sent = Computer_screenshots.prune ~min ~max !messages in
+    let sent =
+      Computer_screenshots.prune ~drop_stale_thinking:true ~min ~max !messages
+    in
+    let kept =
+      Computer_screenshots.prune ~drop_stale_thinking:false ~min ~max !messages
+    in
+    let count ?(sent = sent) f = List.sum (module Int) sent ~f in
     let images =
-      List.sum
-        (module Int)
-        sent
-        ~f:(function
-          | Tool_result r -> List.length r.images
-          | _ -> 0)
+      count (function
+        | Tool_result r -> List.length r.images
+        | _ -> 0)
     in
-    let first_changed =
-      List.findi !previous ~f:(fun i m ->
-        not (Message.equal m (List.nth_exn sent i)))
-      |> Option.map ~f:fst
+    let thinking_in sent =
+      count ~sent (function
+        | Assistant a ->
+          List.count a.content ~f:(function
+            | Thinking _ -> true
+            | _ -> false)
+        | _ -> 0)
     in
+    let thinking = thinking_in sent
+    and thinking_kept = thinking_in kept in
+    let anthropic =
+      wire_messages
+        ~field:"messages"
+        (Anthropic.For_testing.request_body
+           ~oauth:false
+           (request "anthropic/claude-opus-5-5" sent))
+    in
+    let openai =
+      wire_messages
+        ~field:"input"
+        (Openai_responses.For_testing.request_body
+           ~endpoint:(Openai { api_key = "k" })
+           (request "openai/gpt-6.1-sol" sent))
+    in
+    let prev_sent, prev_anthropic, prev_openai = !previous in
     printf
-      "%-5d %-12d %s\n"
+      "%-5d %-7d %-2d %-20d %-6s %-10s %s\n"
       i
       images
-      (Option.value_map first_changed ~default:"-" ~f:Int.to_string);
-    previous := sent
+      thinking
+      thinking_kept
+      (first_changed prev_sent sent ~equal:Message.equal)
+      (first_changed prev_anthropic anthropic ~equal:Json.exactly_equal)
+      (first_changed prev_openai openai ~equal:Json.exactly_equal);
+    previous := sent, anthropic, openai
   done;
   [%expect
     {|
-    step  sent images  first changed message (-: only appended)
-    1     1            -
-    2     2            -
-    3     2            -
-    4     3            -
-    5     4            -
-    6     5            -
-    7     5            -
-    8     6            -
-    9     7            -
-    10    8            -
-    11    8            -
-    12    3            2
-    13    4            -
-    14    5            -
-    15    5            -
-    16    6            -
-    17    7            -
-    18    8            -
-    19    8            -
-    20    3            18
+    first changed (-: only appended): prigh's messages, Anthropic's, OpenAI's
+    step  images  thinking (dropped or kept)  prigh  anthropic  openai
+    1     1       1  1                    -      -          -
+    2     2       2  2                    -      -          -
+    3     2       3  3                    -      -          -
+    4     3       4  4                    -      -          -
+    5     4       5  5                    -      -          -
+    6     5       6  6                    -      -          -
+    7     5       7  7                    -      -          -
+    8     6       8  8                    -      -          -
+    9     7       9  9                    -      -          -
+    10    8       10 10                   -      -          -
+    11    8       11 11                   -      -          -
+    12    3       1  12                   2      2          2
+    13    4       2  13                   -      -          -
+    14    5       3  14                   -      -          -
+    15    5       4  15                   -      -          -
+    16    6       5  16                   -      -          -
+    17    7       6  17                   -      -          -
+    18    8       7  18                   -      -          -
+    19    8       8  19                   -      -          -
+    20    3       1  20                   18     18         18
     |}]
 ;;
