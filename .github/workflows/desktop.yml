@@ -1,7 +1,9 @@
 # The desktop app's installers (desktop/), as artifacts of the run: .deb and
 # .AppImage on Linux, .dmg (and .app) on macOS, .msi and the NSIS .exe on
-# Windows. They contain only the shell: prigh itself is installed apart (on
-# Windows inside WSL), see README.md, "Desktop app". Nix users get the app
+# Windows. They contain only the shell and prigh-computer, the computer-use
+# helper (desktop/computer): prigh itself is installed apart (on Windows
+# inside WSL), see README.md, "Desktop app". On Windows the tool host in WSL
+# runs prigh-computer.exe through WSL's interop. Nix users get the app
 # from the flake (packages.prigh-desktop, programs.prigh.desktop).
 name: desktop
 
@@ -58,11 +60,56 @@ jobs:
           node-version: 22
 
       - name: Tests
-        run: cargo test --locked -p prigh-desktop-core
+        run: cargo test --locked -p prigh-desktop-core -p prigh-computer
+
+      # The Windows backend on the runner's own desktop: Notepad must get
+      # what the helper types.
+      - name: Computer use on Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          cargo build --release --locked -p prigh-computer
+          ./computer/test/windows.ps1 target/release/prigh-computer.exe
+
+      # Tauri's externalBin (app/tauri.windows.conf.json) wants it named for
+      # the target, and installs it next to prigh-desktop.exe.
+      - name: Bundle prigh-computer
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          triple=$(rustc -vV | sed -n 's/^host: //p')
+          mkdir -p app/binaries
+          cp target/release/prigh-computer.exe "app/binaries/prigh-computer-$triple.exe"
+
+      # Bundled beside prigh-desktop (Contents/MacOS/prigh-computer), which
+      # points $PRIGH_COMPUTER at it for `prigh desktop -computer`.
+      - name: Computer-use helper for the bundle
+        if: runner.os == 'macOS'
+        run: |
+          cargo build --locked --release -p prigh-computer
+          triple=$(rustc -vV | sed -n 's/^host: //p')
+          mkdir -p app/binaries
+          cp target/release/prigh-computer "app/binaries/prigh-computer-$triple"
+
+      # The only run of the macOS backend in CI: on the runner's display,
+      # without Screen Recording or Accessibility granted, so the
+      # probe must work and report what is missing; the screenshot is shown
+      # but may be refused.
+      - name: Computer-use helper smoke test
+        if: runner.os == 'macOS'
+        run: |
+          perl -e 'alarm 60; exec @ARGV' target/release/prigh-computer --probe
+          printf '%s\n' '{"id":1,"op":"act","action":{"action":"screenshot"}}' \
+            | perl -e 'alarm 60; exec @ARGV' target/release/prigh-computer \
+            | sed -E 's/"data":"[^"]*"/"data":"…"/' || true
 
       - name: Bundle
         working-directory: desktop/app
-        run: npx --yes @tauri-apps/cli@^2 build --bundles ${{ matrix.bundles }} -- --locked
+        run: npx --yes @tauri-apps/cli@^2 build --bundles ${{ matrix.bundles }} ${{ runner.os == 'macOS' && '--config tauri.computer.conf.json' || '' }} -- --locked
+
+      - name: The bundle has the computer-use helper
+        if: runner.os == 'macOS'
+        run: test -x target/release/bundle/macos/prigh.app/Contents/MacOS/prigh-computer
 
       - uses: actions/upload-artifact@v4
         with:

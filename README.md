@@ -543,7 +543,8 @@ chooses, Esc closes it and changes nothing. Below
 the list a faint "Archived 14" rule unfolds the archived sessions, muted,
 with their directory. A search (Ctrl+K) finds sessions by title, prompt,
 directory, repository, branch or their worktrees' branches, the archived
-ones too. Where a session is in git is found on its
+ones too, and by what was said in them: see "Searching sessions" under Keys.
+Esc clears it, then goes back to the editor. Where a session is in git is found on its
 tool host whenever its directory changes, by reading the repository's
 files (no git command), and kept in the session; a tool host running an
 older prigh cannot tell, and its sessions show their directory. On a focused session A archives or unarchives it and Delete
@@ -1315,6 +1316,10 @@ it), so install prigh as well.
   github:evan-a-w/prigh`). The app starts `wsl.exe --cd ~ -e bash -lc 'exec
   prigh desktop'` (the login shell's PATH, so Nix's profile counts) and
   opens the page through WSL's localhost forwarding (on by default).
+  The installers also carry `prigh-computer.exe`, the Windows computer-use
+  helper, which the app hands to WSL as `$PRIGH_COMPUTER` (see [the
+  helper](#the-desktops-screen-mouse-and-keyboard-prigh-computer)): with `PRIGH_DESKTOP_ARGS=-computer` the agent can
+  drive the Windows desktop.
 - **Settings** (environment variables; Home Manager sets all but the WSL
   one):
   `PRIGH_DESKTOP_BACKEND` the prigh to run (a path or a command name; on
@@ -1455,10 +1460,38 @@ PATH, with extra arguments from `$PRIGH_COMPUTER_ARGS`.
   on KDE Plasma), and says so when they are missing. Never yet run on a
   real GNOME or KDE: its tests use a fake portal on a private D-Bus and a
   private PipeWire with a test screen.
-- **macOS and Windows** are not supported yet: it says so.
-  `--backend auto|wlroots|portal|x11|fake` (or `$PRIGH_COMPUTER_BACKEND`)
-  overrides the detection (auto: wlroots' protocols if the compositor has
-  them, else the portal on Wayland, else X11); `prigh-computer --probe`
+- **macOS** (never yet run on a real Mac: only built and unit-tested on
+  CI): ScreenCaptureKit screenshots (CGDisplayCreateImage before macOS
+  14) of the main display, in its pixels (twice its points on Retina), and
+  Quartz events for the mouse, scrolling and keys (`cmd`, `option`,
+  `ctrl`, `shift` in combos; any text as Unicode). macOS asks to allow
+  **Screen Recording** and **Accessibility** the first time; they belong
+  to the app that started the helper (the tool host's *responsible app*):
+  the prigh app, or the terminal you ran `prigh tool-host -computer` in.
+  Until they are given, actions fail saying where to give them (System
+  Settings > Privacy & Security > Screen Recording / Accessibility);
+  after allowing Screen Recording, quit and reopen that app. The macOS
+  app bundle carries `prigh-computer` (`prigh.app/Contents/MacOS`) and
+  points `$PRIGH_COMPUTER` at it; its CI builds are not signed, so macOS
+  may ask again after an update.
+- **Windows** (`prigh-computer.exe`): the primary monitor, captured with
+  DXGI Desktop Duplication, or GDI's BitBlt where that is unavailable (RDP
+  sessions, some virtual GPUs, a rotated screen; `--probe`'s `detail`
+  says which and why); input with `SendInput` (absolute over the virtual
+  desktop, the wheel both ways, text as Unicode, combos as virtual keys:
+  `win`, `ctrl`, `alt`, `shift`, F1..F24, ...); the pointer with
+  `GetCursorPos`. It is per-monitor DPI aware, so coordinates are physical
+  pixels at any display scale. What Windows does not allow it says: the
+  secure desktop (UAC prompts, the lock screen, Ctrl+Alt+Del) can be
+  neither seen nor driven, and windows of programs run as administrator
+  get no input from a helper that is not elevated (UIPI; it refuses
+  rather than let Windows drop the input silently: run the desktop app as
+  administrator to drive those too). It has been tested only on the CI's
+  Windows runner (Notepad), never on a real Windows desktop.
+- **Choosing**: `--backend auto|wlroots|portal|x11|macos|windows|fake`
+  (or `$PRIGH_COMPUTER_BACKEND`) overrides the detection (auto: the
+  system's own on macOS and Windows; on Linux wlroots' protocols if the
+  compositor has them, else the portal on Wayland, else X11); `prigh-computer --probe`
   prints what it found, or what is missing.
 - **Kill switch**: when the mouse is not where the helper left it, the
   user has moved it: the action stops and computer use pauses until the
@@ -1471,7 +1504,20 @@ In the desktop app, pass `-computer` to `prigh desktop`: with Home Manager,
 `programs.prigh.desktop.computerUse = true` (it adds `-computer` and points
 `PRIGH_COMPUTER` at the packaged helper); otherwise `PRIGH_DESKTOP_ARGS=-computer`
 with `prigh-computer` on the PATH (`nix profile install
-github:evan-a-w/prigh#prigh-computer`). The helper's tests are `cargo test
+github:evan-a-w/prigh#prigh-computer`; the macOS app has it already).
+
+On Windows the tool host runs in WSL, where there is no Windows desktop
+to see, so the Windows installers carry the Windows build,
+`prigh-computer.exe`, next to the app, and the app hands it to WSL:
+`$PRIGH_COMPUTER` set to its path and shared through `$WSLENV` (as
+`PRIGH_COMPUTER/p`, so WSL sees `/mnt/c/.../prigh-computer.exe`). The
+tool host in WSL runs it like any program (WSL's interop starts Windows
+executables, with the pipes connected), and it drives the Windows
+desktop of the user who opened the app. So `PRIGH_DESKTOP_ARGS=-computer`
+is all it takes; a `$PRIGH_COMPUTER` of your own wins (share it through
+`$WSLENV` yourself). Cancelling an action ends the WSL side at once and
+the helper when its pipe closes (an action in progress finishes first).
+The helper's tests are `cargo test
 -p prigh-computer` in `desktop/` (in `./test`) and the flake's
 `computer-use` check, which drives a headless sway and Xvfb and compares
 the input an app received (`desktop/computer/test/expected.txt`); the
@@ -1508,12 +1554,33 @@ The backend's own host never offers it.
 - Moving the mouse stops the run at once ("computer use stopped: you
   moved the mouse ..."); the next message goes on. Esc or Stop abort as
   for any run.
-- Each action's result carries a screenshot, but requests send only the
-  latest `computer_screenshots` (config, default 3) as images; older ones
-  are sent as `[screenshot omitted]`. The session keeps them all.
+- Each action's result carries a screenshot. Requests send them as images
+  until there are `computer_screenshots_max` (config, default 8), then the
+  oldest are cut, all at once, down to the latest `computer_screenshots`
+  (default 3), and sent as `[screenshot omitted]`: between two cuts each
+  request only adds to the one before, so the provider's prompt cache
+  keeps working (prigh puts an Anthropic cache breakpoint before the first
+  screenshot, which a cut never changes). The session keeps them all.
+  On models that check what came before each thinking block they get
+  back (Claude 5.1 and later), a cut also leaves out the thinking written
+  while a now omitted screenshot was still sent.
+- Models with a built-in computer-use tool get it instead of prigh's
+  JSON schema (`computer_native`, config, default `true`): Claude 5.5
+  models the `computer_toolset_20260801` toolset, Claude Opus 4.5 to 5
+  and Sonnet 4.6 and 5 `computer_20251124` (with zoom), Sonnet and Haiku
+  4.5 `computer_20250124` (with their beta headers), and the OpenAI API's
+  models with computer use (GPT-5.4 and later) the Responses API's
+  `computer` tool. prigh translates their calls to its own actions (the
+  session, the host and the frontends see those) and replays them to the
+  same kind of model as written. An OpenAI `computer_call` is a batch:
+  each action runs in order, and a batch (from either provider) stops at
+  the first action that fails, the rest answered "Not executed". A call
+  with OpenAI `pending_safety_checks` needs approval in Ask mode and its
+  result says the checks were acknowledged. Other models, Codex and
+  custom providers use the schema.
 - Platforms: Linux on wlroots compositors, other Wayland desktops through
-  xdg-desktop-portal, and X11 (above); macOS and Windows say they are not
-  supported yet.
+  xdg-desktop-portal, and X11; macOS and Windows (above). The rest say
+  they are not supported.
 
 ## Editors (ACP)
 
@@ -1887,6 +1954,24 @@ and `/scoped-models` toggles with Space (Ctrl+A all, Ctrl+X none). `/help`
 lists the commands, the prompt prefixes (`!cmd`, `!!cmd`, `!&cmd`, `@path`, `#name`)
 and these keys.
 
+**Searching sessions.** prigh-web's sidebar search and the TUI's `/sessions` filter work the
+same way. The query is split into words, and a session matches when every
+word matches, in any order and in any of its fields: its name, its first
+prompt, its description, its directory, repository and branches, and
+(searched by the backend, `search_sessions`) the text of all its messages,
+yours and the agent's (not tool output). A word matches a word of the
+session exactly, as its start, inside it (3+ letters), with one typo (4+
+letters: `reconect`, `sesion`) or as its letters in order from its first
+(`cfg` for `configure`), best first; never across words, so short queries
+match little rather than everything. A match in the name counts more than
+one in the first prompt, then the other text, then where it works; ties go
+to the most recently updated. Titles match as you type; the messages
+follow once typing pauses, each session found there with the passage that
+matched under its title, the matched words marked (in titles too). The
+backend keeps an index of every session's words in memory, updated as
+sessions change, so a search of thousands of sessions takes tens of
+milliseconds (the first one reads them all).
+
 `/sessions` lists the active sessions first, most recent first, each with
 its repository and branch (`prigh ⎇ main`) and, beside its directory, the
 worktrees that matter to it (`⎇ feat/x · ⎇ agent/fix (subagent)`; the
@@ -2259,8 +2344,11 @@ prigh-web's settings page; free with Groq, see "Free dictation with
 Groq" under custom providers),
 `mask_observations` (default `true`: replace old tool outputs with
 placeholders before summarising, see "Long runs" below),
-`computer_screenshots` (default 3: how many of the latest `computer`
-screenshots requests carry as images, see "Turning computer use on"),
+`computer_screenshots` and `computer_screenshots_max` (default 3 and 8:
+how many of the latest `computer` screenshots requests carry as images
+after a cut, and how many they may carry before the next, see "Turning
+computer use on"), `computer_native` (default `true`: offer models their
+built-in computer-use tool),
 `compact_at_tokens` (default 200000, `0` = off: compact once the context
 exceeds this many tokens, if that comes before 80% of the window) and
 `compaction_model` (the model that writes compaction summaries; default:
