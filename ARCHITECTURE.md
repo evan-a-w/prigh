@@ -1884,7 +1884,8 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   (`{query, limit}`: the listed sessions by name and what the user and
   assistant wrote, best first, each with a snippet and its match ranges;
   `Session_search` keeps an inverted index in memory, re-reading only the
-  files that changed), `set_session_name`,
+  files that changed; each server builds it as it starts, in a fiber that
+  yields after each session, and a search meanwhile waits for it), `set_session_name`,
   `delete_session`, `delete_sessions`, `delete_archived`, `set_archived`,
   `set_pinned`,
   `export`, `import`, `fork`, `clone`, `rewind`, `trim`, `untrim`,

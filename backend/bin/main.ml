@@ -741,6 +741,7 @@ let serve_command =
          in
          Rpc_server.restore_resumes server;
          Rpc_server.clean_leftovers server;
+         Rpc_server.start_indexing server;
          server
        in
        let router =
