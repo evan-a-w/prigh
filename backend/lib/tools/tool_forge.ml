@@ -10,6 +10,7 @@ let host_op op ~run =
       ; destructive = Never
       ; on_host = true
       ; freeform = None
+      ; native = None
       }
   ; run
   }

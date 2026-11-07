@@ -4,7 +4,7 @@ use crate::detect::Kind;
 use crate::driver::{Config, Format};
 use std::time::Duration;
 
-pub const USAGE: &str = "usage: prigh-computer [--backend auto|wlroots|x11|fake] [--max-long-side N] [--max-pixels N] \
+pub const USAGE: &str = "usage: prigh-computer [--backend auto|wlroots|portal|x11|macos|windows|fake] [--max-long-side N] [--max-pixels N] \
 [--format png|jpeg] [--settle-ms N] [--watch-seconds N] [--fake-size WxH] [--probe]
 JSON lines on stdin and stdout: {\"id\":1,\"op\":\"info\"}, {\"id\":2,\"op\":\"act\",\"action\":{\"action\":\"screenshot\"}}";
 

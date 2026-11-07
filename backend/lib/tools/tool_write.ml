@@ -6,6 +6,7 @@ let spec =
   ; parallel_safe = false
   ; on_host = true
   ; freeform = None
+  ; native = None
   ; destructive = Always
   ; description =
       "Write a file, creating it (and parent directories) or overwriting it \

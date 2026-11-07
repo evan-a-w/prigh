@@ -177,6 +177,10 @@ module Reply_tag : sig
         { title : string
         ; archived : bool
         }
+    | Pinned_set of
+        { title : string
+        ; pinned : bool
+        }
     | Refresh_sessions (** on success, list the sessions again *)
     | Login_started
     | Notice of string (** shown on success *)
@@ -534,6 +538,10 @@ module Action : sig
     | Set_archived of
         { path : string
         ; archived : bool
+        }
+    | Set_pinned of
+        { path : string
+        ; pinned : bool
         }
     | Set_session_query of string
     | Toggle_archived (** fold or unfold the sidebar's archived sessions *)

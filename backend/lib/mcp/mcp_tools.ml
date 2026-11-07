@@ -212,6 +212,7 @@ let tools (listing : Listing.t) ~call =
             ; destructive = Tool_spec.Destructive.of_bool (not tool.read_only)
             ; on_host = false
             ; freeform = None
+            ; native = None
             }
         ; run =
             (fun context args ->

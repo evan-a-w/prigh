@@ -68,6 +68,7 @@ let spec =
   ; parallel_safe = false
   ; on_host = false
   ; freeform = None
+  ; native = None
   ; destructive = Never
   ; description =
       sprintf

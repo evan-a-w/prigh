@@ -124,7 +124,9 @@ let fit_keys text ~width =
 let picker_keys (kind : Mode.Picker_kind.t) =
   match kind with
   | Sessions _ ->
-    Some "Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named"
+    Some
+      "Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named · Alt+T \
+       (un)pins"
   | _ -> None
 ;;
 

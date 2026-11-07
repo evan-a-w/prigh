@@ -257,10 +257,11 @@ let swipe_actions ~inject (s : Session_summary.t) =
 ;;
 
 (* What the search matched, marked. *)
-let marked_text ~cls text ranges =
+let marked_text ?(before = []) ~cls text ranges =
   Node.span
     ~attrs:[ Attr.class_ cls; Attr.create "dir" "auto" ]
-    (List.map (Prigh_ui.Session_search.pieces text ranges) ~f:(function
+    (before
+     @ List.map (Prigh_ui.Session_search.pieces text ranges) ~f:(function
        | `Plain, s -> Node.text s
        | `Match, s -> Node.create "mark" [ Node.text s ]))
 ;;
@@ -401,7 +402,23 @@ let row ~inject (s : Session_summary.t) (row : Row.t) =
             ; div ~cls:"session-mark" [ mark ]
             ; div
                 ~cls:"session-main"
-                ((marked_text ~cls:"session-title" title matched
+                ((marked_text
+                    ~cls:"session-title"
+                    ~before:
+                      (if Session_list.is_pinned s
+                       then
+                         [ Node.span
+                             ~attrs:
+                               [ Attr.class_ "session-pin"
+                               ; Attr.role "img"
+                               ; Attr.create "aria-label" "Pinned"
+                               ; Attr.title "Pinned to the top (P unpins)"
+                               ]
+                             [ icon Pin ]
+                         ]
+                       else [])
+                    title
+                    matched
                   :: Option.to_list
                        (Option.map snippet ~f:(fun s ->
                           marked_text ~cls:"session-snippet" s.text s.ranges)))
@@ -558,6 +575,20 @@ let selection_bar (m : App.Model.t) ~inject =
     ]
 ;;
 
+(* A faint rule naming a group of sessions, with its count. *)
+let group_heading label sessions =
+  Node.div
+    ~attrs:
+      [ Attr.class_ "sessions-divider sessions-group"
+      ; Attr.role "heading"
+      ; Attr.create "aria-level" "3"
+      ]
+    [ span ~cls:"divider-label" label
+    ; span ~cls:"divider-count" (Int.to_string (List.length sessions))
+    ; Node.span ~attrs:[ Attr.class_ "divider-rule" ] []
+    ]
+;;
+
 (* A faint rule with the count, folding the archived sessions away. *)
 let archived_divider ~inject ~shown archived =
   Node.button
@@ -700,7 +731,7 @@ let view (m : App.Model.t) ~inject =
                ]
            ]
          | _, _ ->
-           let active, archived =
+           let { Session_list.Sections.pinned; active; archived } =
              Session_list.sections ?content m.sessions ~query:m.session_query
            in
            let shown =
@@ -708,7 +739,17 @@ let view (m : App.Model.t) ~inject =
                ~query:m.session_query
                ~archived_open:m.archived_open
            in
-           List.map active ~f:(session m ~inject ~current)
+           (match pinned with
+            | [] -> List.map active ~f:(session m ~inject ~current)
+            | pinned ->
+              (group_heading "Pinned" pinned
+               :: List.map pinned ~f:(session m ~inject ~current))
+              @
+                (match active with
+                | [] -> []
+                | active ->
+                  group_heading "Recent" active
+                  :: List.map active ~f:(session m ~inject ~current)))
            @
              (match archived with
              | [] -> []

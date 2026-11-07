@@ -911,6 +911,8 @@ let%expect_test
       "generate_model": null,
       "mask_observations": true,
       "computer_screenshots": 3,
+      "computer_screenshots_max": 8,
+      "computer_native": true,
       "compact_at_tokens": 200000,
       "compaction_model": null,
       "naming_model": null,

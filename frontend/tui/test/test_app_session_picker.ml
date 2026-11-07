@@ -686,6 +686,248 @@ let%expect_test "/delete-archived with the current session archived" =
     |}]
 ;;
 
+let pinned_sessions_json =
+  {|[
+  {"id":"1","path":"/s/1.jsonl","name":"build fix","cwd":"/work","created_at":"2025-06-05T10:00:00Z","updated_at":"2025-06-06T10:00:00Z","first_prompt":"fix the build","message_count":12,"pinned":false,"archived":true,"bytes":2048},
+  {"id":"2","path":"/s/2.jsonl","name":"deploy","cwd":"/work","created_at":"2025-06-03T10:00:00Z","updated_at":"2025-06-04T10:00:00Z","first_prompt":"deploy it","message_count":6,"pinned":false,"bytes":4096},
+  {"id":"3","path":"/s/3.jsonl","name":"notes","cwd":"/work","created_at":"2025-05-03T10:00:00Z","updated_at":"2025-06-03T10:00:00Z","first_prompt":"keep notes","message_count":6,"pinned":true,"bytes":4096},
+  {"id":"4","path":"/s/4.jsonl","name":"scratch","cwd":"/tmp","created_at":"2025-06-02T10:00:00Z","updated_at":"2025-06-02T10:00:00Z","first_prompt":"scratch","message_count":2,"pinned":false,"bytes":100},
+  {"id":"5","path":"/s/5.jsonl","name":"todo","cwd":"/work","created_at":"2025-04-01T10:00:00Z","updated_at":"2025-06-01T10:00:00Z","first_prompt":"the list","message_count":3,"pinned":true,"bytes":300}
+  ]|}
+;;
+
+let%expect_test
+    "pinned sessions first under their own divider, in the list's order; Alt+T \
+     pins and unpins, pinning unarchives"
+  =
+  let h = Test_app.connected ~width:100 ~height:18 () in
+  H.keys h "/sessions";
+  H.enter h;
+  H.reply h Sessions_picker pinned_sessions_json;
+  rows h;
+  [%expect
+    {|
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions_picker))
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      earlier answer
+      ── pinned ──
+    ▸  notes ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ keep notes      /work
+       todo ∣ 2025-06-01T10:00 ∣ 3 msgs ∣ the list         /work
+      ── sessions ──
+       deploy ∣ 2025-06-04T10:00 ∣ 6 msgs ∣ deploy it      /work
+       scratch ∣ 2025-06-02T10:00 ∣ 2 msgs ∣ scratch       /tmp
+      ── archived ──
+       build fix ∣ 2025-06-06T10:00 ∣ 12 msgs ∣ fix the build  /work
+    >
+    |}];
+  (* Unpinning the highlighted one moves it among the others. *)
+  H.key h (Key.alt (Char "t"));
+  rows h;
+  [%expect
+    {|
+    (Rpc
+      (method_ set_pinned)
+      (params (
+        (path   /s/3.jsonl)
+        (pinned false)))
+      (tag (
+        Pin_done
+        (name   "session \"notes\"")
+        (pinned false))))
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      earlier answer
+      ── pinned ──
+       todo ∣ 2025-06-01T10:00 ∣ 3 msgs ∣ the list         /work
+      ── sessions ──
+       deploy ∣ 2025-06-04T10:00 ∣ 6 msgs ∣ deploy it      /work
+    ▸  notes ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ keep notes      /work
+       scratch ∣ 2025-06-02T10:00 ∣ 2 msgs ∣ scratch       /tmp
+      ── archived ──
+       build fix ∣ 2025-06-06T10:00 ∣ 12 msgs ∣ fix the build  /work
+    >
+    |}];
+  H.reply h (Pin_done { name = "session \"notes\""; pinned = false }) "{}";
+  (* Pinning an archived one brings it to the top. *)
+  H.key h (Key.plain End);
+  H.key h (Key.alt (Char "t"));
+  rows h;
+  [%expect
+    {|
+    (Rpc
+      (method_ set_pinned)
+      (params (
+        (path   /s/1.jsonl)
+        (pinned true)))
+      (tag (
+        Pin_done
+        (name   "session \"build fix\"")
+        (pinned true))))
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      earlier answer
+      ── pinned ──
+    ▸  build fix ∣ 2025-06-06T10:00 ∣ 12 msgs ∣ fix the build  /work
+       todo ∣ 2025-06-01T10:00 ∣ 3 msgs ∣ the list         /work
+      ── sessions ──
+       deploy ∣ 2025-06-04T10:00 ∣ 6 msgs ∣ deploy it      /work
+       notes ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ keep notes      /work
+       scratch ∣ 2025-06-02T10:00 ∣ 2 msgs ∣ scratch       /tmp
+    >
+    |}];
+  H.reply_error
+    h
+    (Pin_done { name = "session \"build fix\""; pinned = true })
+    "no such session \"/s/1.jsonl\"";
+  [%expect
+    {| (Rpc (method_ list_sessions) (params ()) (tag Sessions_refresh)) |}]
+;;
+
+let%expect_test "/pin and /unpin: the current session, or one by name or id" =
+  let h = in_here () in
+  let run command = Test_app.run h command in
+  run "/pin";
+  run "/unpin";
+  [%expect
+    {|
+    (Rpc
+      (method_ set_pinned)
+      (params (
+        (path   /s/here.jsonl)
+        (pinned true)))
+      (tag (Notice_on_success "pinned this session to the top of /sessions")))
+    (Rpc
+      (method_ set_pinned)
+      (params (
+        (path   /s/here.jsonl)
+        (pinned false)))
+      (tag (Notice_on_success "unpinned this session")))
+    |}];
+  run "/pin deploy";
+  H.reply
+    h
+    (Session_to_pin { arg = "deploy"; pinned = true })
+    pinned_sessions_json;
+  run "/unpin 5";
+  H.reply h (Session_to_pin { arg = "5"; pinned = false }) pinned_sessions_json;
+  [%expect
+    {|
+    (Rpc
+      (method_ list_sessions)
+      (params ())
+      (tag (
+        Session_to_pin
+        (arg    deploy)
+        (pinned true))))
+    (Rpc
+      (method_ set_pinned)
+      (params (
+        (path   /s/2.jsonl)
+        (pinned true)))
+      (tag (Notice_on_success "pinned session \"deploy\"")))
+    (Rpc
+      (method_ list_sessions)
+      (params ())
+      (tag (
+        Session_to_pin
+        (arg    5)
+        (pinned false))))
+    (Rpc
+      (method_ set_pinned)
+      (params (
+        (path   /s/5.jsonl)
+        (pinned false)))
+      (tag (Notice_on_success "unpinned session \"todo\"")))
+    |}];
+  run "/pin nothing-like-it";
+  H.reply
+    h
+    (Session_to_pin { arg = "nothing-like-it"; pinned = true })
+    pinned_sessions_json;
+  H.show h;
+  [%expect
+    {|
+    (Rpc
+      (method_ list_sessions)
+      (params ())
+      (tag (
+        Session_to_pin
+        (arg    nothing-like-it)
+        (pinned true))))
+
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    ┌─ Error ──────────────────────────────────────────────────────────────────────┐
+    │ no session matches "nothing-like-it": /sessions lists them, or Tab after the │
+    │ command completes them                                                       │
+    └────────────────────────────────────────────────────────────── Esc dismisses ─┘
+    ────────────────────────────────────────────────────────────────────────────────
+    > /pin nothing-like-it▏
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
+    |}];
+  (* A backend that cannot pin. *)
+  H.key h (Key.plain Escape);
+  H.key h (Key.ctrl 'u');
+  run "/pin alpha";
+  H.reply
+    h
+    (Session_to_pin { arg = "alpha"; pinned = true })
+    (list [ session "a" "alpha" ]);
+  H.show h;
+  [%expect
+    {|
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions_cache))
+    (Rpc
+      (method_ list_sessions)
+      (params ())
+      (tag (
+        Session_to_pin
+        (arg    alpha)
+        (pinned true))))
+
+
+
+
+
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    ───────────────────────── this backend cannot pin sessions: update it to pin ───
+    > ▏
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
+    |}];
+  (* Completions: /pin offers the unpinned (and archived), /unpin the pinned. *)
+  H.key h (Key.ctrl 'u');
+  H.keys h "/pin ";
+  H.reply h Sessions_cache pinned_sessions_json;
+  rows h;
+  H.key h (Key.ctrl 'u');
+  H.keys h "/unpin ";
+  rows h;
+  [%expect
+    {|
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions_cache))
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      earlier answer
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    ▸ deploy     deploy it · /work
+      scratch    scratch · /tmp
+      build fix  archived · fix the build · /work
+    > /pin
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      earlier answer
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    ▸ notes  pinned · keep notes · /work
+      todo   pinned · the list · /work
+    > /unpin
+    |}]
+;;
+
 let styled_rows (h : H.t) =
   List.iter (Render.screen h.model).lines ~f:(fun line ->
     let plain = Content.Line.to_plain line in
@@ -791,5 +1033,90 @@ let%expect_test
       earlier answer
     ▸  deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ deploy it  /work
     >
+    |}]
+;;
+
+let%expect_test
+    "a search keeps the pinned section first: a pinned session found by its \
+     title and one found in its messages, each with its passage"
+  =
+  let h = Test_app.connected ~width:100 ~height:20 () in
+  H.keys h "/sessions";
+  H.enter h;
+  H.reply ~quiet:true h Sessions_picker pinned_sessions_json;
+  H.keys h "notes";
+  rows h;
+  [%expect
+    {|
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions_picker))
+    (Rpc
+      (method_ search_sessions)
+      (params (
+        (query n)
+        (limit 50)))
+      (tag Session_hits))
+    (Rpc
+      (method_ search_sessions)
+      (params (
+        (query no)
+        (limit 50)))
+      (tag Session_hits))
+    (Rpc
+      (method_ search_sessions)
+      (params (
+        (query not)
+        (limit 50)))
+      (tag Session_hits))
+    (Rpc
+      (method_ search_sessions)
+      (params (
+        (query note)
+        (limit 50)))
+      (tag Session_hits))
+    (Rpc
+      (method_ search_sessions)
+      (params (
+        (query notes)
+        (limit 50)))
+      (tag Session_hits))
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      earlier answer
+      ── pinned ──
+    ▸  notes ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ keep notes  /work
+    >
+    |}];
+  H.reply
+    h
+    Session_hits
+    {|{"query":"notes","hits":[
+      {"id":"5","path":"/s/5.jsonl","score":20,
+       "snippet":{"text":"add it to the release notes","ranges":[[22,5]]}},
+      {"id":"4","path":"/s/4.jsonl","score":20,
+       "snippet":{"text":"notes for the next try","ranges":[[0,5]]}},
+      {"id":"3","path":"/s/3.jsonl","score":40,"snippet":null}]}|};
+  rows h;
+  styled_rows h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      earlier answer
+      ── pinned ──
+    ▸  notes ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ keep notes  /work
+       todo ∣ 2025-06-01T10:00 ∣ 3 msgs ∣ the list     /work
+          add it to the release notes
+      ── sessions ──
+       scratch ∣ 2025-06-02T10:00 ∣ 2 msgs ∣ scratch   /tmp
+          notes for the next try
+    >
+      [gray]prigh in /work · /help · Esc aborts · Ctrl+C twice quits[/]
+      earlier [bold]answer[/]
+    [yellow][bold]/ [/]notes
+    [dim]  ── pinned ──[/]
+    [bold][invert]▸  [/][bold][underline][invert]notes[/][bold][invert] ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ keep [/][bold][underline][invert]notes[/][dim][invert]  /work[/]
+       todo ∣ 2025-06-01T10:00 ∣ 3 msgs ∣ the list   [dim]  /work[/]
+    [dim]      [/][dim]add it to the release [/][yellow][bold]notes[/]
+    [dim]  ── sessions ──[/]
+       scratch ∣ 2025-06-02T10:00 ∣ 2 msgs ∣ scratch [dim]  /tmp[/]
+    [dim]      [/][yellow][bold]notes[/][dim] for the next try[/]
     |}]
 ;;

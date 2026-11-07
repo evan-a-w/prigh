@@ -18,6 +18,8 @@ type t =
   ; waiting : int (** confirmations and questions waiting for the user *)
   ; failed : bool (** its last reply ended in an error *)
   ; archived : bool
+  ; pinned : bool option
+    (** [None]: the backend cannot pin sessions (it predates [set_pinned]) *)
   ; bytes : int (** on disk *)
   ; host : string option (** the tool host its cwd is on, when recorded *)
   ; repo : Repo.t option

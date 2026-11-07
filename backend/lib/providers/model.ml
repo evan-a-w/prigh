@@ -27,6 +27,7 @@ type t =
   ; thinking_style : Thinking_style.t
   ; cost : Cost.t
   ; supports_images : bool
+  ; native_computer : Native_computer.t option [@sexp.option]
   }
 [@@deriving sexp_of]
 
@@ -54,6 +55,7 @@ let m
   ; thinking_style = style
   ; cost = { input; output; cache_read }
   ; supports_images = images
+  ; native_computer = Native_computer.of_model provider id
   }
 ;;
 
@@ -859,4 +861,20 @@ let cost_usd t (usage : Usage.t) =
   per_m (usage.input - usage.cache_read) t.cost.input
   +. per_m usage.cache_read t.cost.cache_read
   +. per_m usage.output t.cost.output
+;;
+
+(* As of the preserved thinking docs (November 2026). *)
+let binds_thinking_to_prefix t =
+  match t.provider with
+  | Anthropic ->
+    List.exists
+      [ "claude-fable-5-1"
+      ; "claude-mythos-5-1"
+      ; "claude-opus-5-5"
+      ; "claude-sonnet-5-5"
+      ; "claude-haiku-5-5"
+      ]
+      ~f:(fun family ->
+        String.equal t.id family || String.is_prefix t.id ~prefix:(family ^ "-"))
+  | Openai | Openai_codex | Deepseek | Custom _ -> false
 ;;

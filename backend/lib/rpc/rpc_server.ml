@@ -73,6 +73,7 @@ let methods =
   ; "delete_sessions"
   ; "delete_archived"
   ; "set_archived"
+  ; "set_pinned"
   ; "export"
   ; "import"
   ; "fork"
@@ -1392,6 +1393,12 @@ let bool_param params name ~default =
   | Some _ -> Or_error.errorf "param %S must be a boolean" name
 ;;
 
+let required_bool_param params name =
+  match param params name with
+  | Some _ -> bool_param params name ~default:false
+  | None -> Or_error.errorf "missing param %S" name
+;;
+
 let unauthorised = User_access.unauthorised
 
 let credentials_ok t ?user given =
@@ -2047,6 +2054,18 @@ let set_archived t ~key ~archived =
         sessions_changed t)))
 ;;
 
+let set_pinned t ~key ~pinned =
+  Or_error.bind (find_saved t key) ~f:(fun summary ->
+    let session =
+      match Hashtbl.find t.agents summary.id with
+      | Some agent -> Ok (Agent.session agent)
+      | None -> Session.load summary.path
+    in
+    Or_error.map session ~f:(fun session ->
+      ignore (Session.set_pinned session ~pinned : Session.Entry.t);
+      sessions_changed t))
+;;
+
 let exec_param t params =
   Or_error.bind (string_param params "exec_id") ~f:(fun exec_id ->
     match Hashtbl.find t.execs exec_id with
@@ -2646,16 +2665,14 @@ let dispatch_server t (client : Client.t) ~meth ~params
   | "set_archived" ->
     Some
       (Or_error.bind (string_param params "path") ~f:(fun key ->
-         let archived =
-           match param params "archived" with
-           | Some `True -> Ok true
-           | Some `False -> Ok false
-           | Some _ ->
-             Or_error.error_string "param \"archived\" must be a boolean"
-           | None -> Or_error.error_string "missing param \"archived\""
-         in
-         Or_error.bind archived ~f:(fun archived ->
-           unit_result (set_archived t ~key ~archived))))
+         Or_error.bind
+           (required_bool_param params "archived")
+           ~f:(fun archived -> unit_result (set_archived t ~key ~archived))))
+  | "set_pinned" ->
+    Some
+      (Or_error.bind (string_param params "path") ~f:(fun key ->
+         Or_error.bind (required_bool_param params "pinned") ~f:(fun pinned ->
+           unit_result (set_pinned t ~key ~pinned))))
   | "import" ->
     Some
       (Or_error.bind (string_param params "path") ~f:(fun path ->
