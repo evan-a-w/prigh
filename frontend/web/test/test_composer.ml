@@ -431,6 +431,8 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /switch [path] switch to a saved session
     /archive [session] archive a session (this one without an argument): it moves under Archived in the sidebar
     /unarchive [session] unarchive a session (this one without an argument)
+    /pin [session] pin a session to the top of the sidebar (this one without an argument): pinned sessions are never archived for being idle
+    /unpin [session] unpin a session (this one without an argument)
     /delete [undo|session...] delete a message from the transcript and the model's context (a reply with its tool calls' results): pick it, newest first; undo brings the latest deletion back; with sessions, deletes them after a confirmation
     /delete-archived delete every archived session, after a confirmation
     /clone copy this session into a new one
@@ -445,8 +447,6 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /host [name|backend] pick where tools run, and the directory there
     /export [path] export the transcript on the backend (markdown, or .jsonl)
     /import [path] import a session from a JSONL file on the backend
-    /snippet [NAME|add|rm] insert a saved text at the caret (none: pick one, Alt+N); add NAME [TEXT] saves one (no TEXT: your last prompt), rm NAME deletes it
-    /skills pick a skill to invoke (/skill:name)
     |}];
   H.type_ h "/mod";
   H.key h "Tab";

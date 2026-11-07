@@ -104,6 +104,8 @@ let%expect_test "every command does something (none is unknown)" =
     /switch                    sidebar
     /archive                   toast: This session isn't saved yet: send a message first.
     /unarchive                 toast: This session isn't saved yet: send a message first.
+    /pin                       toast: This session isn't saved yet: send a message first.
+    /unpin                     toast: This session isn't saved yet: send a message first.
     /delete                    loading Delete a message: rpc push_pref, rpc get_message_points
     /delete-archived           toast: There are no archived sessions.
     /clone                     rpc clone
@@ -202,6 +204,7 @@ let%expect_test "/help <command> and /hotkeys" =
     Ctrl+K search sessions (↓ ↑ through them, Enter opens, Delete deletes)
     Alt+Enter / Alt+R / Delete (/worktree) start a new session in the highlighted worktree / review its changes / remove it
     A (on a session) archive or unarchive it (archived sessions are listed last, muted)
+    P (on a session) pin it to the top of the sidebar, or unpin it (pinned sessions are never archived for being idle)
     Shift+F10 / ContextMenu (on a session or worktree) its menu: open, rename, fork, new worktree, review, files, terminal, pull request, copy, delete or remove (also right-click, a long press or its ⋯)
     Shift+F10 / ContextMenu (on a message) its menu: copy, trim everything before or after it, delete it (also right-click or a long press, at the pointer; with text selected, right-click is the browser's, to copy it; on a phone, its Select text selects its words)
     Shift+F10 / ContextMenu (in a text field, the desktop app's browser window) its menu: cut, copy, paste, select all (also right-click; ↑ ↓ move, Enter chooses, Esc closes); the browser's own menus are hidden there

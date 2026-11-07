@@ -165,6 +165,7 @@ let%expect_test "help lists every key and command" =
     Ctrl+K search sessions (↓ ↑ through them, Enter opens, Delete deletes)
     Alt+Enter / Alt+R / Delete (/worktree) start a new session in the highlighted worktree / review its changes / remove it
     A (on a session) archive or unarchive it (archived sessions are listed last, muted)
+    P (on a session) pin it to the top of the sidebar, or unpin it (pinned sessions are never archived for being idle)
     Shift+F10 / ContextMenu (on a session or worktree) its menu: open, rename, fork, new worktree, review, files, terminal, pull request, copy, delete or remove (also right-click, a long press or its ⋯)
     Shift+F10 / ContextMenu (on a message) its menu: copy, trim everything before or after it, delete it (also right-click or a long press, at the pointer; with text selected, right-click is the browser's, to copy it; on a phone, its Select text selects its words)
     Shift+F10 / ContextMenu (in a text field, the desktop app's browser window) its menu: cut, copy, paste, select all (also right-click; ↑ ↓ move, Enter chooses, Esc closes); the browser's own menus are hidden there
@@ -237,6 +238,8 @@ let%expect_test "help lists every key and command" =
     /switch [path] switch to a saved session
     /archive [session] archive a session (this one without an argument): it moves under Archived in the sidebar
     /unarchive [session] unarchive a session (this one without an argument)
+    /pin [session] pin a session to the top of the sidebar (this one without an argument): pinned sessions are never archived for being idle
+    /unpin [session] unpin a session (this one without an argument)
     /delete [undo|session...] delete a message from the transcript and the model's context (a reply with its tool calls' results): pick it, newest first; undo brings the latest deletion back; with sessions, deletes them after a confirmation
     /delete-archived delete every archived session, after a confirmation
     /clone copy this session into a new one
