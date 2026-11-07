@@ -339,7 +339,7 @@ let notches = function
        if px < 0 then -n else n)
 ;;
 
-let of_openai ?(safety_checks = []) action =
+let of_openai ?item_id ?(safety_checks = []) action =
   let get = find (fields action) in
   let at =
     [ "x"; "y" ]
@@ -405,7 +405,12 @@ let of_openai ?(safety_checks = []) action =
   in
   stored
     ~fallback:generic
-    ~native:(`Object [ "form", `String "openai"; "action", action ])
+    ~native:
+      (`Object
+          ([ "form", `String "openai" ]
+           @ Option.value_map item_id ~default:[] ~f:(fun id ->
+             [ "id", `String id ])
+           @ [ "action", action ]))
     ~extra:
       (if List.is_empty safety_checks
        then []
@@ -475,8 +480,14 @@ let to_openai arguments =
     | Some (`Array checks) -> checks
     | _ -> []
   in
+  let native = native_of stored ~form:"openai" in
+  let item_id =
+    match Option.bind native ~f:(fun n -> find n "id") with
+    | Some (`String id) -> Some id
+    | _ -> None
+  in
   let action =
-    match native_of stored ~form:"openai" with
+    match native with
     | Some native ->
       Option.value
         (find native "action")
@@ -486,5 +497,5 @@ let to_openai arguments =
        | Ok action -> openai_of_action action
        | Error _ -> `Object [ "type", `String "screenshot" ])
   in
-  action, checks
+  action, checks, item_id
 ;;
