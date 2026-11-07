@@ -174,5 +174,92 @@ let%expect_test "before: one subsequence over everything" =
     List.iteri ranked ~f:(fun i s ->
       if i < 4 then printf "  %s\n" (title s));
     if List.length ranked > 4 then printf "  ...\n");
-  [%expect {| |}]
+  [%expect {|
+    "port" (10)
+      port the tmux tests to the private socket
+      configure the reverse proxy for the web server port
+      Make the port configurable
+      Configure nix cache
+      ...
+    "port config" (7)
+      configure the reverse proxy for the web server port
+      Make the port configurable
+      Configure nix cache
+      Anthropic retry on overload
+      ...
+    "config port" (7)
+      Configure nix cache
+      configure the reverse proxy for the web server port
+      Make the port configurable
+      Anthropic retry on overload
+      ...
+    "configurable port" (1)
+      Make the port configurable
+    "websocket" (1)
+      Fix flaky websocket reconnect
+    "web socket" (1)
+      Fix flaky websocket reconnect
+    "reconect" (4)
+      Fix flaky websocket reconnect
+      Configure nix cache
+      Session search
+      Make the port configurable
+    "compaction plan" (1)
+      why does the compaction summary lose the plan?
+    "plan compaction" (1)
+      why does the compaction summary lose the plan?
+    "sesion search" (8)
+      Session search
+      Session search
+      Phone layout of the sidebar
+      why does the compaction summary lose the plan?
+      ...
+    "search" (8)
+      Session search
+      Session search
+      Compaction keeps pinned messages
+      Phone layout of the sidebar
+      ...
+    "cfg" (7)
+      Configure nix cache
+      Anthropic retry on overload
+      Compaction keeps pinned messages
+      Session search
+      ...
+    "ws" (5)
+      Fix flaky websocket reconnect
+      Phone layout of the sidebar
+      Anthropic retry on overload
+      configure the reverse proxy for the web server port
+      ...
+    "e" (12)
+      hello
+      Configure nix cache
+      Session search
+      Anthropic retry on overload
+      ...
+    "pr" (11)
+      Configure nix cache
+      Session search
+      Anthropic retry on overload
+      Compaction keeps pinned messages
+      ...
+    "nix" (4)
+      Configure nix cache
+      configure the reverse proxy for the web server port
+      Phone layout of the sidebar
+      Fix flaky websocket reconnect
+    "dotfiles cache" (2)
+      Configure nix cache
+      Make the port configurable
+    "phone overflow" (2)
+      Phone layout of the sidebar
+      Fix flaky websocket reconnect
+    "retry anthropic" (1)
+      Anthropic retry on overload
+    "pinned" (2)
+      Compaction keeps pinned messages
+      Phone layout of the sidebar
+    "xyz" (0)
+    |}]
 ;;
