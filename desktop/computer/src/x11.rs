@@ -131,7 +131,7 @@ impl X11 {
         self.sync()?;
         // Clients apply the new mapping when they read MappingNotify: give
         // them the time before the key arrives.
-        std::thread::sleep(std::time::Duration::from_millis(20));
+        std::thread::sleep(std::time::Duration::from_millis(50));
         Ok(code)
     }
 }
