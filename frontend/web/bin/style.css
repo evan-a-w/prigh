@@ -2142,3 +2142,27 @@ kbd {
 .annotate-zoom-pct { min-width: 50px; font-variant-numeric: tabular-nums; }
 .annotate-frame { transform-origin: 50% 50%; will-change: transform; }
 @media (prefers-reduced-motion: reduce) { .annotate-frame { transition: none !important; } }
+
+/* Computer use: while the agent drives the user's screen, a strip over the
+   composer says whose, with Stop in reach (Computer_banner). In the
+   composer's flow, like the queue: it never covers the transcript. */
+.computer-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 4px 4px 12px;
+  background: var(--sodium-wash);
+  border-left: 2px solid var(--sodium);
+  border-radius: var(--r-control);
+  font-size: 13.5px;
+  animation: rise 0.12s ease-out;
+}
+.computer-banner-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.computer-banner-text strong { color: var(--sodium); font-weight: 600; }
+.computer-banner .btn.computer-banner-stop {
+  height: 28px;
+  color: var(--brick);
+  border-color: var(--brick-line);
+  background: var(--brick-wash);
+}
+.computer-banner .btn.computer-banner-stop:hover { background: var(--brick); color: var(--graphite); }
