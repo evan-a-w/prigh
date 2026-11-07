@@ -66,6 +66,7 @@ let methods =
   ; "keep_session"
   ; "switch_session"
   ; "list_sessions"
+  ; "search_sessions"
   ; "set_session_name"
   ; "set_transcript_filter"
   ; "delete_session"
@@ -408,6 +409,7 @@ type t =
         for [get_messages_page] without opening them *)
   ; loading : Session.t Or_error.t Promise.t String.Table.t
     (** session files being parsed, by path *)
+  ; search : Session_search.t (** [search_sessions]' index *)
   ; repos : Git_location.t option String.Table.t
     (** where the cwds of saved sessions that recorded none are in git, read
         from the backend's files once (see [with_repo]) *)
@@ -828,6 +830,7 @@ let create
     ; listed = String.Table.create ()
     ; on_session_deleted = []
     ; loading = String.Table.create ()
+    ; search = Session_search.create ()
     ; repos = String.Table.create ()
     ; nix_store
     ; temporaries = String.Table.create ()
@@ -1794,6 +1797,34 @@ let list_sessions t client =
        | other -> other))
 ;;
 
+(* The sessions [list_sessions] lists, by what was said in them. *)
+let search_sessions t params =
+  let open Or_error.Let_syntax in
+  let%bind query = string_param params "query" in
+  let%map limit = int_param params "limit" ~default:50 in
+  let live path =
+    Hashtbl.data t.agents
+    |> List.find_map ~f:(fun agent ->
+      let session = Agent.session agent in
+      Option.some_if (String.equal (Session.path session) path) session)
+  in
+  let hits =
+    Session_search.search
+      t.search
+      ~sessions:(saved_sessions t)
+      ~load:(fun (s : Session.Summary.t) ->
+        match live s.path with
+        | Some session -> Some session
+        | None -> Result.ok (load_session t s.path))
+      ~query
+      ~limit
+  in
+  `Object
+    [ "query", `String query
+    ; "hits", `Array (List.map hits ~f:Session_search.Hit.to_json)
+    ]
+;;
+
 (* A saved session by its file (as the summaries give it) or its id. *)
 let find_saved t key =
   Or_error.bind
@@ -2546,6 +2577,7 @@ let dispatch_server t (client : Client.t) ~meth ~params
            attach t client target;
            attached_state client)))
   | "list_sessions" -> Some (ok (list_sessions t client))
+  | "search_sessions" -> Some (search_sessions t params)
   | "list_worktrees" -> Some (list_worktrees t client params)
   | "create_worktree" -> Some (create_worktree t client params)
   | "remove_worktree" -> Some (remove_worktree t client params)
