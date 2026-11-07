@@ -160,7 +160,7 @@ let print_sessions (c : Client.t) =
            | _ -> str "first_prompt")
           (String.concat
              ~sep:" "
-             (List.filter_opt [ flag "archived"; flag "running"; flag "live" ]))
+             (List.filter_opt [ flag "pinned"; flag "archived"; flag "running"; flag "live" ]))
           (number "background")
           (number "clients"))
 ;;
@@ -280,6 +280,43 @@ let%expect_test
     old         background=0 clients=-
     ancient     background=0 clients=-
     |}]
+;;
+
+let%expect_test "pinning: over RPC, never archived by age, archiving unpins" =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let ancient = saved t "ancient" ~days_ago:30. in
+  let old = saved t "old" ~days_ago:10. in
+  let (_ : Session.t) = saved t "recent" ~days_ago:0.1 in
+  let provider = Routed_provider.create ~main:[] [] in
+  let server = Server.create t ~sw ~provider in
+  let a = Client.connect server "a" in
+  let b = Client.connect server "b" ~session:(Session.id old) in
+  Client.call t a "set_pinned" (path ancient @ [ "pinned", `True ]);
+  Client.call t a "set_pinned" [ "path", `String (Session.id old); "pinned", `True ];
+  Client.call t a "set_pinned" (path old);
+  Client.call t a "set_pinned" [ "path", `String "nope"; "pinned", `True ];
+  Client.call t a "set_pinned" (path old @ [ "pinned", `String "yes" ]);
+  print_sessions a;
+  Client.sessions_changed a;
+  Client.sessions_changed b;
+  [%expect {||}];
+  (* Archiving a pinned session unpins it; pinning it again unarchives it. *)
+  Client.call t a "set_archived" (path ancient @ [ "archived", `True ]);
+  print_sessions a;
+  Client.call t a "set_pinned" (path ancient @ [ "pinned", `True ]);
+  print_sessions a;
+  [%expect {||}];
+  (* Unpinning counts as activity, so it is not archived at once. *)
+  Client.call t a "set_pinned" (path old @ [ "pinned", `False ]);
+  print_sessions a;
+  [%expect {||}];
+  (* A fresh server over the same files agrees. *)
+  let server2 = Server.create t ~sw ~provider in
+  print_sessions (Client.connect server2 "c");
+  [%expect {||}]
 ;;
 
 let%expect_test
