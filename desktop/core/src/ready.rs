@@ -1,7 +1,13 @@
 //! The sidecar's page lines: JSON objects on its stdout, one per page the
 //! window is to show: `{"url":"http://127.0.0.1:PORT/..."}` (its own site),
 //! or `{"url":"https://backend/...","remote":true}` (the backend's own
-//! prigh-web, `prigh desktop -ui remote`). The first is its ready line. Only
+//! prigh-web, `prigh desktop -ui remote`), which may have `"cookie"` (a
+//! sign-in proxy's `Cookie` header for that site, from signing in through
+//! the default browser), `"signin"` (the sidecar's page offering to sign in,
+//! for when the site wants it again) and `"here":true` (the user chose to
+//! sign in to the proxy in the window), or `{"url":...,"external":true}`, a
+//! page for the default browser instead (signing in there). The first is its
+//! ready line. Only
 //! flat objects of strings and other scalars are accepted: enough for the
 //! contract, with no JSON dependency.
 
@@ -13,6 +19,11 @@ pub struct Page {
     pub url: String,
     /// The backend's site, not the sidecar's.
     pub remote: bool,
+    pub cookie: Option<String>,
+    pub signin: Option<String>,
+    pub here: bool,
+    /// For the default browser, not the window.
+    pub external: bool,
 }
 
 pub fn parse(line: &str) -> Result<Page, Error> {
@@ -25,9 +36,22 @@ pub fn parse(line: &str) -> Result<Page, Error> {
             _ => None,
         })
         .ok_or_else(|| Error(format!("prigh desktop's ready line has no \"url\": {:?}", truncate(line))))?;
-    let remote = fields.iter().any(|(k, v)| k == "remote" && matches!(v, Value::Scalar(s) if s == "true"));
+    let flag = |name: &str| fields.iter().any(|(k, v)| k == name && matches!(v, Value::Scalar(s) if s == "true"));
+    let string = |name: &str| {
+        fields.iter().find_map(|(k, v)| match v {
+            Value::Str(s) if k == name && !s.is_empty() => Some(s.clone()),
+            _ => None,
+        })
+    };
     if url.starts_with("http://") || url.starts_with("https://") {
-        Ok(Page { url, remote })
+        Ok(Page {
+            remote: flag("remote"),
+            cookie: string("cookie"),
+            signin: string("signin"),
+            here: flag("here"),
+            external: flag("external"),
+            url,
+        })
     } else {
         Err(Error(format!("prigh desktop's ready line has a url that is not http(s): {url:?}")))
     }
@@ -173,7 +197,9 @@ mod tests {
 
     #[test]
     fn ready_lines() {
-        let page = |url: &str, remote| Ok(Page { url: url.to_string(), remote });
+        let page = |url: &str, remote| {
+            Ok(Page { url: url.to_string(), remote, cookie: None, signin: None, here: false, external: false })
+        };
         assert_eq!(
             parse(r#"{"url":"http://127.0.0.1:41234/#signin=abc"}"#),
             page("http://127.0.0.1:41234/#signin=abc", false)
@@ -190,6 +216,25 @@ mod tests {
         );
         assert_eq!(parse(r#"{"url":"http://x/","remote":false}"#), page("http://x/", false));
         assert_eq!(parse(r#"{"url":"http://x/","remote":"true"}"#), page("http://x/", false));
+        // signed in to a proxy in front of it
+        assert_eq!(
+            parse(
+                r#"{"url":"https://ai.example.com/","remote":true,"cookie":"a=b; c=d","signin":"http://127.0.0.1:1/#desktop=k&signin=1","here":true}"#
+            ),
+            Ok(Page {
+                url: "https://ai.example.com/".to_string(),
+                remote: true,
+                cookie: Some("a=b; c=d".to_string()),
+                signin: Some("http://127.0.0.1:1/#desktop=k&signin=1".to_string()),
+                here: true,
+                external: false
+            })
+        );
+        assert!(
+            parse(r#"{"url":"https://ai.example.com/#cli-signin=1.2&program=desktop","external":true}"#)
+                .unwrap()
+                .external
+        );
     }
 
     #[test]

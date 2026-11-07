@@ -28,10 +28,27 @@ val take_hint : unit -> unit
 (** Whether the page runs under the desktop app. *)
 val active : unit -> bool
 
-(** Asks the sidecar where it stands (it waits for a check under way). *)
+(** Whether the window was sent to the sidecar's sign-in page
+    ({!Prigh_web.Desktop_link.signin_of_hash}). Before {!key}, which clears
+    the fragment. *)
+val signin_requested : unit -> bool
+
+(** Asks the sidecar where it stands (it waits for a check under way);
+    [signin]: as {!signin_requested} said. *)
 val status
-  :  key:string
+  :  ?signin:bool
+  -> key:string
   -> f:(Prigh_web.Desktop_link.Status.t option -> unit)
+  -> unit
+  -> unit
+
+(** Signs in to the sign-in proxy in front of the backend's site (see
+    [/desktop/signin]); the answer to [Browser] comes once that sign-in
+    ends. *)
+val signin
+  :  key:string
+  -> how:Prigh_web.Desktop_link.How.t
+  -> f:(Prigh_web.Desktop_link.Signin_reply.t option -> unit)
   -> unit
 
 val connect

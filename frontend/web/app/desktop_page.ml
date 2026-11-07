@@ -56,13 +56,22 @@ let on_backend_site () =
 ;;
 
 let active () = Option.is_some (stored ()) || on_backend_site ()
+let signin_requested () = Desktop_link.signin_of_hash (Browser.hash ())
 
-let status ~key ~f =
+let status ?(signin = false) ~key ~f () =
   Browser.post
     ~content_type:"application/json"
     ~url:Desktop_link.status_path
-    ~body:(Desktop_link.status_body ~key)
+    ~body:(Desktop_link.status_body ~key ~signin)
     ~f:(fun reply -> f (Option.bind reply ~f:Desktop_link.Status.of_json))
+;;
+
+let signin ~key ~how ~f =
+  Browser.post
+    ~content_type:"application/json"
+    ~url:Desktop_link.signin_path
+    ~body:(Desktop_link.signin_body ~key ~how)
+    ~f:(fun reply -> f (Option.bind reply ~f:Desktop_link.Signin_reply.of_json))
 ;;
 
 let connect ~key ~address ~user ~token ~plaintext ~f =
