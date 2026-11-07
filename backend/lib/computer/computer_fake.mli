@@ -27,6 +27,10 @@ val transport : t -> Computer_helper.Transport.t
     left×2"], ["type hello"]. *)
 val log : t -> string list
 
+(** The helper dies: the latest transport's [send] fails and [receive]
+    says it exited. *)
+val crash : t -> unit
+
 (** The user moves the pointer: the next action is refused as interrupted
     (the kill switch). *)
 val user_move : t -> x:int -> y:int -> unit

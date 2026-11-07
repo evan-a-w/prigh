@@ -9,6 +9,7 @@ type t =
   ; mutable left_at : int * int (** where this helper last put the pointer *)
   ; log : string Queue.t
   ; replies : string Queue.t
+  ; mutable crash : unit -> unit (** kills the latest transport *)
   }
 
 let create
@@ -39,6 +40,7 @@ let create
   ; left_at = center
   ; log = Queue.create ()
   ; replies = Queue.create ()
+  ; crash = ignore
   }
 ;;
 
@@ -265,8 +267,11 @@ let handle t json =
   Queue.enqueue t.replies (Json.to_string reply)
 ;;
 
+let crash t = t.crash ()
+
 let transport t =
   let dead = ref false in
+  t.crash <- (fun () -> dead := true);
   { Computer_helper.Transport.send =
       (fun line ->
         if !dead then failwith "prigh-computer is gone";
