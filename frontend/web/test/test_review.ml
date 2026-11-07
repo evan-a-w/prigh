@@ -414,6 +414,108 @@ let%expect_test "on a phone the review is a sheet, the sidebar its drawer" =
 ;;
 
 let%expect_test
+    "on a phone the code has the screen: the file's row opens the list in its \
+     place, picking a file closes it"
+  =
+  let h = opened () in
+  H.quiet h (fun () -> H.act h (Set_narrow true));
+  let page () =
+    H.elements h ~selector:".review-page > *";
+    H.elements h ~selector:".review-body > *";
+    H.show h ~selector:"#review-files-toggle"
+  in
+  page ();
+  [%expect
+    {|
+    (Complete_accept (run true))
+    <header class="review-head">
+    <button class="review-files-toggle">
+    <div class="review-body">
+    <div class="review-current">
+    <button type="button"
+            id="review-files-toggle"
+            data-review-keys=""
+            aria-expanded="false"
+            title="All the changed files"
+            class="review-files-toggle"
+            @on_click>
+      <span title="Not approved yet" role="img" aria-label="Not approved yet" class="mark todo">
+        <icon class="ring"> </icon>
+      </span>
+      <span class="review-file-path">
+        <span class="dir"> src/ </span>
+        <span class="name"> main.ml </span>
+      </span>
+      <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+      <span class="review-files-where"> 1/2 </span>
+      <icon class="chevron"> </icon>
+    </button>
+    |}];
+  H.click h ~selector:"#review-files-toggle";
+  page ();
+  [%expect
+    {|
+    (Review Toggle_files)
+    <header class="review-head">
+    <button class="open review-files-toggle">
+    <div class="review-target">
+    <div class="review-body">
+    <Vdom.Node.none-widget class="">
+    <nav class="review-files">
+    <button type="button"
+            id="review-files-toggle"
+            data-review-keys=""
+            aria-expanded="true"
+            title="Back to the file's changes"
+            class="open review-files-toggle"
+            @on_click>
+      <span title="Not approved yet" role="img" aria-label="Not approved yet" class="mark todo">
+        <icon class="ring"> </icon>
+      </span>
+      <span class="review-file-path">
+        <span class="dir"> src/ </span>
+        <span class="name"> main.ml </span>
+      </span>
+      <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+      <span class="review-files-where"> 1/2 </span>
+      <icon class="chevron"> </icon>
+    </button>
+    |}];
+  H.click h ~nth:1 ~selector:".review-file";
+  page ();
+  [%expect
+    {|
+    (Review (Go src/util.ml))
+    (Rpc (method_ fs_preview) (params ((path /home/me/proj/src/util.ml)))
+     (tag (Review (Content src/util.ml))))
+    (Rpc (method_ git_diff) (params ()) (tag (Review Diff)))
+    (Rpc (method_ git_status) (params ()) (tag (Git Status)))
+    <header class="review-head">
+    <button class="review-files-toggle">
+    <div class="review-body">
+    <div class="review-current">
+    <button type="button"
+            id="review-files-toggle"
+            data-review-keys=""
+            aria-expanded="false"
+            title="All the changed files"
+            class="review-files-toggle"
+            @on_click>
+      <span title="Not approved yet" role="img" aria-label="Not approved yet" class="mark todo">
+        <icon class="ring"> </icon>
+      </span>
+      <span class="review-file-path">
+        <span class="dir"> src/ </span>
+        <span class="name"> util.ml </span>
+      </span>
+      <span class="chip"> new </span>
+      <span class="review-files-where"> 2/2 </span>
+      <icon class="chevron"> </icon>
+    </button>
+    |}]
+;;
+
+let%expect_test
     "keys: next and previous file, approving, the layout; Esc closes"
   =
   let h = opened () in

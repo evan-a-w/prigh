@@ -2115,6 +2115,9 @@ the page behind is inert: true
 Esc closed the drawer, the review open: true
 === firefox: review: phone ===
 sheet: fixed
+code: most of the screen
+files open: 3 files, code hidden
+picking a file shows its code
 Alt+R closed it
 === firefox: review: errors ===
 none
