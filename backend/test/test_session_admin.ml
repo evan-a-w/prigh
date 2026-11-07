@@ -313,7 +313,7 @@ let%expect_test "pinning: over RPC, never archived by age, archiving unpins" =
   Client.call t a "set_pinned" (path old);
   Client.call t a "set_pinned" [ "path", `String "nope"; "pinned", `True ];
   Client.call t a "set_pinned" (path old @ [ "pinned", `String "yes" ]);
-  print_sessions a;
+  print_sessions ~by_name:true a;
   Client.sessions_changed a;
   Client.sessions_changed b;
   [%expect
@@ -323,8 +323,8 @@ let%expect_test "pinning: over RPC, never archived by age, archiving unpins" =
     {"type":"response","id":"r","ok":false,"error":"missing param \"pinned\""}
     {"type":"response","id":"r","ok":false,"error":"no such session \"nope\""}
     {"type":"response","id":"r","ok":false,"error":"param \"pinned\" must be a boolean"}
-    old        pinned live background=0 clients=1
     ancient    pinned background=0 clients=-
+    old        pinned live background=0 clients=1
     recent      background=0 clients=-
     a: 2 sessions_changed
     b: 2 sessions_changed
