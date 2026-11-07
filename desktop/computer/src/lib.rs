@@ -10,6 +10,9 @@ pub mod driver;
 pub mod fake;
 pub mod keymap;
 pub mod keysym;
+#[cfg(target_os = "macos")]
+pub mod macos;
+pub mod quartz;
 pub mod scale;
 #[cfg(target_os = "linux")]
 pub mod wlroots;
