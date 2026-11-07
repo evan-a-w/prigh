@@ -530,7 +530,8 @@ Fork… (`/fork`), New worktree… (`/worktree new`: a branch, and a base that
 defaults to the session's branch; Enter creates it under `worktrees_dir`
 and the session moves there), Review changes (`/review`), Open in file
 browser (`/files`), Open terminal there (`/terminal`), Copy path, Copy
-session id, Archive or Unarchive (A) and Delete… (Delete). A worktree's:
+session id, Pin to top or Unpin (P), Archive or Unarchive (A) and Delete…
+(Delete). A worktree's:
 Switch session here (`/worktree open`), New session here (`/worktree open
 -n`), Review changes (`/review <worktree>`), Open in file browser (`/files
 <path>`), Open terminal there (`/terminal <path>`, a shell of its own in
@@ -539,15 +540,19 @@ new`), Copy path and Remove worktree… (`/worktree rm`; "Discard changes
 and remove" when it has changes; not the one the open session works in;
 Delete on a focused worktree does the same). An item on a session other
 than the open one switches to it first. ↑↓ move through the menu, Enter
-chooses, Esc closes it and changes nothing. Below
+chooses, Esc closes it and changes nothing. Pinned sessions are listed
+first under a "Pinned" heading, marked with a pin, then the others under
+"Recent" (no headings when nothing is pinned), each group most recent
+first; a pinned session is never archived for being idle. Archiving a
+pinned session unpins it, and pinning an archived one unarchives it. Below
 the list a faint "Archived 14" rule unfolds the archived sessions, muted,
 with their directory. A search (Ctrl+K) finds sessions by title, prompt,
 directory, repository, branch or their worktrees' branches, the archived
-ones too. Where a session is in git is found on its
+ones too, each in its group. Where a session is in git is found on its
 tool host whenever its directory changes, by reading the repository's
 files (no git command), and kept in the session; a tool host running an
-older prigh cannot tell, and its sessions show their directory. On a focused session A archives or unarchives it and Delete
-deletes it. "Select" turns the list into
+older prigh cannot tell, and its sessions show their directory. On a focused session P pins or unpins it, A archives or unarchives it
+and Delete deletes it. "Select" turns the list into
 checkboxes: click or Space marks a session, Shift+click or Shift+Space the
 range from the last one (across the divider), and Delete (or the bar at
 the foot of the list, "Delete 3 sessions (12.4 MB)") asks to delete the
@@ -559,7 +564,8 @@ delete the dialog only says why (Close). Deleting the session you are in
 moves you first to the next session down the list that is not being
 deleted (else the nearest above, else a new session), and the confirmation
 says where ("You'll move to “Y”."); the backend makes the move and the
-deletion one request. `/archive`, `/unarchive` and `/delete` also take
+deletion one request. `/pin`, `/unpin`, `/archive`, `/unarchive` and
+`/delete` also take
 sessions by name, id or path. The list follows the backend as it changes; the worktrees of the
 repositories the sessions' worktrees belong to are listed (for their
 changes and to drop removed ones) when the session, its directory or its
@@ -1756,7 +1762,7 @@ Then:
 frontend/_build/default/tui/bin/main.exe       # interactive TUI (PRIGH_BACKEND or the dune build)
 backend/_build/default/bin/main.exe run "explain this repo"    # headless
 backend/_build/default/bin/main.exe run -session ID "go on"     # continue a saved session (id, unique prefix or file)
-backend/_build/default/bin/main.exe sessions list          # saved sessions, the archived ones last under "archived:"
+backend/_build/default/bin/main.exe sessions list          # saved sessions, pinned first, archived last
 backend/_build/default/bin/main.exe sessions delete ID...  # ids may be unique prefixes; nothing is deleted if one matches none or several
 backend/_build/default/bin/main.exe sessions prune -dry-run                        # empty sessions
 backend/_build/default/bin/main.exe sessions prune -max-messages 2 -cwd /tmp       # filters: -older-than DAYS, -prompt TEXT
@@ -1842,7 +1848,7 @@ that no longer exists.
 | Alt+M | cycle the mode: ask → auto-edit → auto → plan (read-only) |
 | Alt+N | pick a snippet to insert at the cursor (`/snippet`) |
 | Ctrl+N | picker: toggle the named-only / logged-in-only filter |
-| Tab / Alt+A / Alt+D | `/sessions`: mark a session / archive or unarchive it / delete every archived one |
+| Tab / Alt+A / Alt+T / Alt+D | `/sessions`: mark a session / archive or unarchive it / pin or unpin it / delete every archived one |
 | Ctrl+X | copy the last assistant message |
 | Ctrl+Z | suspend to the shell |
 | Shift+Tab | cycle subagent focus: main → agent 1 → … → main |
@@ -1867,7 +1873,8 @@ and `/scoped-models` toggles with Space (Ctrl+A all, Ctrl+X none). `/help`
 lists the commands, the prompt prefixes (`!cmd`, `!!cmd`, `!&cmd`, `@path`, `#name`)
 and these keys.
 
-`/sessions` lists the active sessions first, most recent first, each with
+`/sessions` lists the pinned sessions first (under `── pinned ──`, with
+`── sessions ──` before the rest), then the active ones, most recent first, each with
 its repository and branch (`prigh ⎇ main`) and, beside its directory, the
 worktrees that matter to it (`⎇ feat/x · ⎇ agent/fix (subagent)`; the
 filter matches these too), and then, after an
@@ -1877,7 +1884,8 @@ in the backend and `*` the one you are in; the list follows changes made
 anywhere (other frontends, other sessions). In it Tab marks or unmarks a
 session (`✓`; the status line shows how many and their size), Ctrl+D
 deletes the marked sessions (or the highlighted one), Alt+A archives or
-unarchives the highlighted one, Alt+D deletes every archived session, and
+unarchives the highlighted one, Alt+T pins or unpins it (pinning
+unarchives, archiving unpins), Alt+D deletes every archived session, and
 Ctrl+N shows only named ones (marks on the hidden ones stay). Deleting the
 session you are in (Ctrl+D, `/delete`, or Alt+D when it is archived) moves
 you first to the next session down the list not being deleted, else the
@@ -1885,7 +1893,7 @@ nearest above, else a new one, and the confirmation says where (`Delete
 session "x" (1.2 KB)? You'll move to session "y". Enter deletes, Esc keeps
 it`); the list closes, as when switching from it. While it is running or
 open in another frontend, Ctrl+D and `/delete` say so at once and Alt+D
-leaves it out. Tab after `/switch`, `/archive`, `/unarchive` or
+leaves it out. Tab after `/switch`, `/pin`, `/unpin`, `/archive`, `/unarchive` or
 `/delete` completes sessions by name (or first prompt), the active ones
 first, and inserts the id. Deleting always asks first, with the count and
 the disk space (`Delete 3 sessions (1.2 MB)? Enter deletes, Esc keeps
@@ -2268,7 +2276,9 @@ lists show it as archived (frontends put archived ones apart). Archiving
 or unarchiving by hand is recorded in the session file; a new message
 unarchives it, an unarchived one stays active for another
 `archive_after_days`, and a session is never archived while a run or a
-background subagent or job of it is going on. Deleting a session (one, a
+background subagent or job of it is going on, nor while it is pinned
+(pinning is recorded in the session file too; archiving by hand unpins,
+pinning unarchives, and unpinning counts as activity, like unarchiving). Deleting a session (one, a
 selection, or every archived one) removes its file and its directory
 (`~/.prigh/sessions/<stamp>_<id>/`, where per-session data is kept) and
 kills its terminal; it is refused for a session that is running, open in
@@ -2519,8 +2529,9 @@ it.
 | `/name [text]` | set the session name |
 | `/session` | show session statistics |
 | `/trace` | where the session's time went (see [Tracing](#tracing-where-the-time-went)) |
-| `/sessions` | pick a saved session (Tab marks, Ctrl+D deletes, Alt+A archives/unarchives, Alt+D deletes all archived, Ctrl+N named-only) |
+| `/sessions` | pick a saved session (Tab marks, Ctrl+D deletes, Alt+A archives/unarchives, Alt+T pins/unpins, Alt+D deletes all archived, Ctrl+N named-only) |
 | `/archive [session]`, `/unarchive [session]` | archive or unarchive a session (id, unique id prefix, name or path; the current one without an argument) |
+| `/pin [session]`, `/unpin [session]` | pin a session to the top of the session lists (never archived for being idle), or unpin it (as `/archive` takes its argument) |
 | `/delete session...` | delete sessions after a confirmation (or pick them in `/sessions`) |
 | `/delete-archived` | delete every archived session after a confirmation |
 | `/switch [path]` | switch to a saved session |
