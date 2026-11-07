@@ -391,8 +391,8 @@
                 nativeBuildInputs = [
                   pkgs.sway-unwrapped
                   pkgs.wev
-                  pkgs.xorg.xvfb
-                  pkgs.xorg.xev
+                  pkgs.xvfb
+                  pkgs.xev
                   pkgs.procps
                 ];
               }
