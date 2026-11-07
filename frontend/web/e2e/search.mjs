@@ -176,6 +176,8 @@ try {
     if (engineName !== "firefox") options.isMobile = true;
     await open(options);
     await signIn();
+    // The session rejoined, its state in: it resets the search.
+    await page.waitForFunction(() => document.querySelector("#chat")?.innerText.includes("through the config file"));
     await page.getByRole("button", { name: "Sessions" }).first().tap();
     await page.locator("#session-search").waitFor();
     await page.locator(".session", { hasText: "Release notes" }).waitFor();
