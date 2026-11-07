@@ -194,6 +194,11 @@ let unrecoverable_overflow message ~reason =
        reason)
 ;;
 
+(* Anthropic's computer toolset asks for exactly this. *)
+let computer_halted =
+  "Not executed: an earlier computer action in this turn failed."
+;;
+
 let image_attempts = 2
 
 (* An image the provider refused as too large that cannot be made smaller. *)
@@ -379,8 +384,10 @@ let run
       (* Images over the model's limit are sent downscaled. *)
       let fit_images () =
         let messages =
-          Computer_screenshots.keep_last
-            config.compaction.computer_screenshots
+          Computer_screenshots.prune
+            ~drop_stale_thinking:(Model.binds_thinking_to_prefix config.model)
+            ~min:config.compaction.computer_screenshots
+            ~max:config.compaction.computer_screenshots_max
             !messages
         in
         let limit =
@@ -599,11 +606,26 @@ let run
             List.map results ~f:(fun result ->
               append (Tool_result result);
               result))
-          else
+          else (
+            (* A batch of computer actions stops at the first that fails:
+               the later ones assumed it worked. *)
+            let computer_failed = ref false in
             List.map calls ~f:(fun call ->
-              let result = execute call in
+              let is_computer = String.equal call.name Tool_computer.name in
+              let result =
+                if is_computer && !computer_failed
+                then
+                  { Message.Tool_result.tool_call_id = call.id
+                  ; tool_name = call.name
+                  ; text = computer_halted
+                  ; is_error = true
+                  ; images = []
+                  }
+                else execute call
+              in
+              if is_computer && result.is_error then computer_failed := true;
               append (Tool_result result);
-              result)
+              result))
       in
       emit (Turn_end { assistant; tool_results });
       Trace.finish

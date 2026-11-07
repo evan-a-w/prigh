@@ -8,6 +8,7 @@ let spec =
   ; parallel_safe = true
   ; on_host = true
   ; freeform = None
+  ; native = None
   ; destructive = Never
   ; description =
       "Search file contents with a regular expression (ripgrep syntax). \

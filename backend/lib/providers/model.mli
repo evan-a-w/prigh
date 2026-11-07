@@ -31,6 +31,8 @@ type t =
   ; cost : Cost.t
   ; supports_images : bool
     (** otherwise each image is replaced by a note saying it was left out *)
+  ; native_computer : Native_computer.t option [@sexp.option]
+    (** its built-in computer-use tool, if it has one *)
   }
 [@@deriving sexp_of]
 
@@ -74,3 +76,9 @@ val resolve : string -> t Or_error.t
 val written_by : string -> Provider_id.t -> bool
 
 val cost_usd : t -> Usage.t -> float
+
+(** Whether the provider checks that what came before each thinking block
+    sent back is what it was when the block was written, and refuses the
+    request (or drops the block) otherwise (Anthropic's preserved thinking,
+    Claude 5.1 and later). *)
+val binds_thinking_to_prefix : t -> bool
