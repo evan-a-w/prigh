@@ -2847,7 +2847,11 @@ the chat (`render_ui`): charts, tables, stats, timelines, diffs, file
 trees, images and galleries of files on the tool host, calculators,
 flashcards and quizzes, and forms, choices and checklists you answer
 through (your answer is sent as your next message, and the component shows
-what you sent). The model is told which frontend you prompt from, and in
+what you sent). The model is told to use components rarely, only when
+one is clearly better than prose (a chart, images, a diff), and never to
+ask you questions through them (it asks in prose or with `ask_user`;
+forms and choices are for when you ask for one). The model is told which
+frontend you prompt from, and in
 prigh-tui or an editor it answers in text instead (a component it showed
 earlier is a one-line placeholder there).
 
