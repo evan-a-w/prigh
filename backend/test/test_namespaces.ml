@@ -214,6 +214,19 @@ let%expect_test "namespaces: worlds, sessions, logins, tool hosts, config" =
   in
   print_s [%message (sessions a ca : string list) (sessions b cb : string list)];
   [%expect {| (("sessions a ca" ("\"in a\"")) ("sessions b cb" ())) |}];
+  (* Searching finds a's session in a only. *)
+  let search server client =
+    match
+      Json.member
+        "hits"
+        (result
+           (call server client ~params:{|{"query": "in"}|} "search_sessions"))
+    with
+    | Some (`Array hits) -> List.length hits
+    | _ -> -1
+  in
+  print_s [%message (search a ca : int) (search b cb : int)];
+  [%expect {| (("search a ca" 1) ("search b cb" 0)) |}];
   (* Logins: a stored key in a's store only. *)
   let world name = List.Assoc.find_exn worlds ~equal:String.equal name in
   Or_error.ok_exn (Auth_store.set (world "a").store Deepseek (Api_key "sk-a"));

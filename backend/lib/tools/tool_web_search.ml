@@ -8,6 +8,7 @@ let spec =
   ; parallel_safe = true
   ; on_host = false
   ; freeform = None
+  ; native = None
   ; destructive = Never
   ; description =
       "Search the web for current information (documentation, error messages, \

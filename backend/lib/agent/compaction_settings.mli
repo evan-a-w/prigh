@@ -14,13 +14,15 @@ type t =
   ; model : Model.t option (** the summariser; [None]: the conversation's *)
   ; mask_observations : bool
   ; computer_screenshots : int
-    (** the latest [computer] screenshots requests carry as images
-        ({!Computer_screenshots}) *)
+  ; computer_screenshots_max : int
+    (** how many of the latest [computer] screenshots requests carry as
+        images: they pile up to [computer_screenshots_max], then are cut
+        back to [computer_screenshots] ({!Computer_screenshots}) *)
   }
 [@@deriving sexp_of]
 
 (** 80% of the window, summarised by the conversation's model; masking on;
-    the latest 3 computer screenshots. *)
+    3 to 8 computer screenshots. *)
 val window_only : t
 
 (** The input tokens above which a conversation held by [model] is
