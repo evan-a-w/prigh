@@ -25,5 +25,10 @@ val placeholder : string
 val omitted : min:int -> max:int -> int -> int
 
 (** [messages] with the oldest {!omitted} images of [computer] results
-    replaced by {!placeholder} (a line after the result's text). *)
+    replaced by {!placeholder} (a line after the result's text), and the
+    thinking left out of the replies written while an image now omitted was
+    still sent: a provider may check that what came before a thinking block
+    is what it was (Anthropic's preserved thinking), and refuse the request
+    otherwise. Leaving those out keeps the thinking sent an unbroken run of
+    what the model wrote against the request as it is now. *)
 val prune : min:int -> max:int -> Message.t list -> Message.t list
