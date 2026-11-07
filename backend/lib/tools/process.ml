@@ -26,6 +26,8 @@ let pump source ~on_data =
   | End_of_file -> ()
 ;;
 
+let drain_after_kill = 1.
+
 let run
       ~(env : Env.t)
       ?cwd
@@ -132,9 +134,14 @@ let run
     | Some (Ok status) -> `Done status
   in
   Option.iter input ~f:Stdin_feed.finish;
+  (* What escaped even the tree (a daemon reparented to init) may hold the
+     pipes: the output stops being waited for after [drain_after_kill]. *)
   let kill_and_reap () =
-    Signal_unix.send_i Signal.kill group;
-    drain ();
+    Process_tree.kill ~env ~root:(Pid.of_int (Eio.Process.pid child));
+    ignore
+      (Eio.Time.with_timeout (Eio.Stdenv.clock env) drain_after_kill (fun () ->
+         Ok (drain ()))
+       : (unit, [ `Timeout ]) Result.t);
     ignore (Eio.Process.await child : Eio.Process.exit_status)
   in
   let exit =
