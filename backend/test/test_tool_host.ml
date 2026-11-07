@@ -82,7 +82,7 @@ module Host = struct
 
   (* Runs [Tool_host.connect] until [sw] ends or it gives up; logs (and why
      it gave up) are kept, with the port masked. *)
-  let start ?terminals ?user ?host_id t ~sw ~port ~token ~cwd =
+  let start ?terminals ?computer ?user ?host_id t ~sw ~port ~token ~cwd =
     let logs = Queue.create () in
     let log line =
       Queue.enqueue
@@ -97,6 +97,7 @@ module Host = struct
         ~env:t.env
         ?terminals
         ~log
+        ?computer
         ~initial_backoff:(Time_ns.Span.of_sec 0.05)
         ~max_backoff:(Time_ns.Span.of_sec 0.2)
         ~backend:
@@ -401,20 +402,21 @@ module Worker = struct
     ; output : Eio.Buf_read.t
     }
 
-  let start ?terminals (sandbox : Tool_test_helpers.t) ~sw =
+  let start ?terminals ?computer (sandbox : Tool_test_helpers.t) ~sw =
     let input_r, input_w = Eio_unix.pipe sw in
     let output_r, output_w = Eio_unix.pipe sw in
     Eio.Fiber.fork ~sw (fun () ->
       Tool_host.run
         ~env:sandbox.env
         ?terminals
+        ?computer
         ~input:input_r
         ~output:output_w
         ();
       Eio.Resource.close output_w;
       print_endline "(worker finished)");
     { input = (input_w :> Eio_unix.sink_ty Eio.Resource.t)
-    ; output = Eio.Buf_read.of_flow output_r ~max_size:(1024 * 1024)
+    ; output = Eio.Buf_read.of_flow output_r ~max_size:(64 * 1024 * 1024)
     }
   ;;
 
@@ -579,5 +581,84 @@ let%expect_test
     retrying in 10ms
     cannot connect to ws://127.0.0.1:PORT/ws: 127.0.0.1:PORT answered with a login page (HTTP 302 Found to https://login.example.com/outpost.goauthentik.io/start?state=login-state-2)
     retrying in 10ms
+    |}]
+;;
+
+let%expect_test "stdio worker: the computer tool, off and on" =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let screenshot_once w =
+    Worker.send
+      w
+      {|{"type":"exec","exec_id":"e1","name":"computer","arguments":{"action":"click","x":10,"y":20}}|};
+    Option.iter (Worker.read_line w) ~f:(fun line ->
+      (* The screenshot's data is long and says nothing. *)
+      print_endline
+        (Re.replace_string
+           (Re.compile (Re.Perl.re {|"data":"[^"]*"|}))
+           ~by:{|"data":"…"|}
+           line))
+  in
+  let off = Worker.start t ~sw in
+  screenshot_once off;
+  Worker.close off;
+  ignore (Worker.read_line off : string option);
+  let fake = Computer_fake.create () in
+  let computer =
+    Computer_helper.create (Computer_fake.info fake) ~start:(fun () ->
+      Computer_fake.transport fake)
+  in
+  let on = Worker.start t ~sw ~computer in
+  screenshot_once on;
+  Worker.close on;
+  ignore (Worker.read_line on : string option);
+  List.iter (Computer_fake.log fake) ~f:print_endline;
+  [%expect {|
+    {"type":"result","exec_id":"e1","text":"computer use is off on this tool host: start it with -computer (prigh tool-host -computer, prigh desktop -computer, or programs.prigh.desktop .computerUse in Home Manager)","is_error":true}
+    (worker finished)
+    {"type":"result","exec_id":"e1","text":"click (10, 20) → (20, 40) on the screen\ncursor at (10, 20)\nscreenshot 1280×800","is_error":false,"images":[{"mime_type":"image/png","data":"…"}]}
+    (worker finished)
+    move 20,40
+    click left×1
+    |}]
+;;
+
+let%expect_test "network tool host: hello says it runs the computer tool" =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let host_dir = Filename.concat t.dir "host" in
+  Core_unix.mkdir_p host_dir;
+  let agent, h =
+    Test_rpc.make_server t ~sw ~provider:(Faux_provider.create [])
+  in
+  call t h "hello" {|{}|};
+  [%expect {| {"type":"response","id":"r","ok":true,"result":{"client_id":"client-1","host_id":"client-1","namespace":null,"user":null,"superuser":false,"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"supports_images":false,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","active_host_name":"<host>","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"plan":null,"session_rules":[]}}} |}];
+  let listener = Listener.start t ~sw h.server in
+  let fake = Computer_fake.create () in
+  let computer =
+    Computer_helper.create (Computer_fake.info fake) ~start:(fun () ->
+      Computer_fake.transport fake)
+  in
+  let host =
+    Host.start
+      t
+      ~sw
+      ~computer
+      ~port:listener.port
+      ~host_id:"host-box"
+      ~token:None
+      ~cwd:host_dir
+  in
+  Host.wait_logs t host 1;
+  show_hosts t agent;
+  call t h "get_state" {|{}|};
+  [%expect {|
+    connected to 127.0.0.1:PORT as client-2
+    active=backend hosts=(((id backend)(name <host>)(cwd $DIR)(session_id())(session_name())(home $HOME)(git_location))((id host-box)(name box)(cwd $DIR/host)(session_id(<id>))(session_name())(home $HOME)(exec_input)(git_location)(computer((backend fake)(detail())(platform linux)(output(FAKE-1))(width 2560)(height 1600)(scale 1)(scaled_width 1280)(scaled_height 800)))))
+    {"type":"response","id":"r","ok":true,"result":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"supports_images":false,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","active_host_name":"<host>","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"},{"id":"host-box","name":"box","cwd":"$DIR/host","session_id":"<id>","session_name":null,"home":"$HOME","computer":{"backend":"fake","platform":"linux","output":"FAKE-1","width":2560,"height":1600,"scale":1,"scaled_width":1280,"scaled_height":800}}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"plan":null,"session_rules":[]}}
     |}]
 ;;
