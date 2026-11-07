@@ -61,7 +61,17 @@ type t =
         conversation ({!Observation_mask}; default true) *)
   ; computer_screenshots : int
     (** how many of the latest [computer] screenshots requests carry as
-        images; older ones are sent as ["[screenshot omitted]"] (default 3) *)
+        images after a prune; older ones are sent as ["[screenshot
+        omitted]"] (default 3) *)
+  ; computer_screenshots_max : int
+    (** screenshots pile up to this many before older ones are omitted, all
+        at once down to [computer_screenshots], so that requests between
+        prunes share their prefix (the provider's prompt cache); at least
+        [computer_screenshots] (default 8) *)
+  ; computer_native : bool
+    (** offer the [computer] tool in the model's native form when it has one
+        (Anthropic's computer tool, OpenAI's computer tool); false: always
+        prigh's own schema (default true) *)
   ; compact_at_tokens : int
     (** compact a conversation once its context exceeds this many tokens,
         or 80% of the model's window if that comes first (default 200000; 0:

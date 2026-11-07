@@ -121,11 +121,100 @@ let%expect_test
        backend ∣ 2025-06-06T10:00 ∣ 2 msgs ∣ prigh ⎇ main ∣ go  /src/prigh/backend
        notes ∣ 2025-06-05T10:00 ∣ 2 msgs ∣ go              /home/u/notes
     >
+    (Rpc
+      (method_ search_sessions)
+      (params (
+        (query s)
+        (limit 50)))
+      (tag Session_hits))
+    (Rpc
+      (method_ search_sessions)
+      (params (
+        (query si)
+        (limit 50)))
+      (tag Session_hits))
+    (Rpc
+      (method_ search_sessions)
+      (params (
+        (query sit)
+        (limit 50)))
+      (tag Session_hits))
+    (Rpc
+      (method_ search_sessions)
+      (params (
+        (query site)
+        (limit 50)))
+      (tag Session_hits))
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
       earlier answer
     ▸  landing ∣ 2025-06-07T10:00 ∣ 2 msgs ∣ site ⎇ trunk ∣ go  /src/site
-       main work ∣ 2025-06-08T10:00 ∣ 2 msgs ∣ prigh ⎇ main ∣ go  /src/prigh · ⎇ feat/login · ⎇ agent/f…
     >
+    (Rpc
+      (method_ search_sessions)
+      (params (
+        (query sit)
+        (limit 50)))
+      (tag Session_hits))
+    (Rpc
+      (method_ search_sessions)
+      (params (
+        (query si)
+        (limit 50)))
+      (tag Session_hits))
+    (Rpc
+      (method_ search_sessions)
+      (params (
+        (query s)
+        (limit 50)))
+      (tag Session_hits))
+    (Rpc
+      (method_ search_sessions)
+      (params (
+        (query a)
+        (limit 50)))
+      (tag Session_hits))
+    (Rpc
+      (method_ search_sessions)
+      (params (
+        (query ag)
+        (limit 50)))
+      (tag Session_hits))
+    (Rpc
+      (method_ search_sessions)
+      (params (
+        (query age)
+        (limit 50)))
+      (tag Session_hits))
+    (Rpc
+      (method_ search_sessions)
+      (params (
+        (query agen)
+        (limit 50)))
+      (tag Session_hits))
+    (Rpc
+      (method_ search_sessions)
+      (params (
+        (query agent)
+        (limit 50)))
+      (tag Session_hits))
+    (Rpc
+      (method_ search_sessions)
+      (params (
+        (query agent/f)
+        (limit 50)))
+      (tag Session_hits))
+    (Rpc
+      (method_ search_sessions)
+      (params (
+        (query agent/fi)
+        (limit 50)))
+      (tag Session_hits))
+    (Rpc
+      (method_ search_sessions)
+      (params (
+        (query agent/fix)
+        (limit 50)))
+      (tag Session_hits))
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
       earlier answer
     ▸  main work ∣ 2025-06-08T10:00 ∣ 2 msgs ∣ prigh ⎇ main ∣ go  /src/prigh · ⎇ feat/login · ⎇ agent/f…
@@ -836,5 +925,113 @@ let%expect_test "/pin and /unpin: the current session, or one by name or id" =
     ▸ notes  pinned · keep notes · /work
       todo   pinned · the list · /work
     > /unpin
+    |}]
+;;
+
+let styled_rows (h : H.t) =
+  List.iter (Render.screen h.model).lines ~f:(fun line ->
+    let plain = Content.Line.to_plain line in
+    if
+      String.is_prefix plain ~prefix:" "
+      || String.is_prefix plain ~prefix:"▸"
+      || String.is_prefix plain ~prefix:"/"
+    then print_endline (String.rstrip (Content.to_styled [ line ])))
+;;
+
+let%expect_test
+    "the filter: words matched in the labels; the backend's finds in the \
+     messages join, each with its passage; replies for other words are dropped"
+  =
+  let h = Test_app.connected ~width:100 ~height:20 () in
+  H.keys h "/sessions";
+  H.enter h;
+  H.reply ~quiet:true h Sessions_picker sessions_json;
+  H.keys h "it dep";
+  [%expect
+    {|
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions_picker))
+    (Rpc
+      (method_ search_sessions)
+      (params (
+        (query i)
+        (limit 50)))
+      (tag Session_hits))
+    (Rpc
+      (method_ search_sessions)
+      (params (
+        (query it)
+        (limit 50)))
+      (tag Session_hits))
+    (Rpc
+      (method_ search_sessions)
+      (params (
+        (query "it d")
+        (limit 50)))
+      (tag Session_hits))
+    (Rpc
+      (method_ search_sessions)
+      (params (
+        (query "it de")
+        (limit 50)))
+      (tag Session_hits))
+    (Rpc
+      (method_ search_sessions)
+      (params (
+        (query "it dep")
+        (limit 50)))
+      (tag Session_hits))
+    |}];
+  styled_rows h;
+  [%expect
+    {|
+      [gray]prigh in /work · /help · Esc aborts · Ctrl+C twice quits[/]
+      earlier [bold]answer[/]
+    [yellow][bold]/ [/]it dep
+    [bold][invert]▸  [/][bold][underline][invert]dep[/][bold][invert]loy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ [/][bold][underline][invert]dep[/][bold][invert]loy [/][bold][underline][invert]it[/][dim][invert]  /work[/]
+    |}];
+  let hits query =
+    sprintf
+      {|{"query":%S,"hits":[
+        {"id":"5","path":"/s/5.jsonl","score":30,
+         "snippet":{"text":"we can dep it once the tag is cut","ranges":[[7,3],[11,2]]}},
+        {"id":"2","path":"/s/2.jsonl","score":20,"snippet":null}]}|}
+      query
+  in
+  (* The reply for "it de", typed before "p". *)
+  H.reply h Session_hits (hits "it de");
+  styled_rows h;
+  [%expect
+    {|
+      [gray]prigh in /work · /help · Esc aborts · Ctrl+C twice quits[/]
+      earlier [bold]answer[/]
+    [yellow][bold]/ [/]it dep
+    [bold][invert]▸  [/][bold][underline][invert]dep[/][bold][invert]loy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ [/][bold][underline][invert]dep[/][bold][invert]loy [/][bold][underline][invert]it[/][dim][invert]  /work[/]
+    |}];
+  H.reply h Session_hits (hits "dep  IT");
+  styled_rows h;
+  [%expect
+    {|
+      [gray]prigh in /work · /help · Esc aborts · Ctrl+C twice quits[/]
+      earlier [bold]answer[/]
+    [yellow][bold]/ [/]it dep
+    [bold][invert]▸  [/][bold][underline][invert]dep[/][bold][invert]loy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ [/][bold][underline][invert]dep[/][bold][invert]loy [/][bold][underline][invert]it[/][dim][invert]  /work[/]
+       release ∣ 2025-06-01T10:00 ∣ 3 msgs ∣ cut [bold][underline]it[/]  [dim]  /work[/]
+    [dim]      [/][dim]we can [/][yellow][bold]dep[/][dim] [/][yellow][bold]it[/][dim] once the tag is cut[/]
+    |}];
+  (* Less typed: the words differ, the finds go. *)
+  H.key h (Key.plain Backspace);
+  rows h;
+  [%expect
+    {|
+    (Rpc
+      (method_ search_sessions)
+      (params (
+        (query "it de")
+        (limit 50)))
+      (tag Session_hits))
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+      earlier answer
+    ▸  deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ deploy it  /work
+    >
     |}]
 ;;

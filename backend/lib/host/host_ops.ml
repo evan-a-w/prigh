@@ -153,6 +153,7 @@ let instructions_tool =
       ; destructive = Never
       ; on_host = true
       ; freeform = None
+      ; native = None
       }
   ; run =
       (fun context args ->

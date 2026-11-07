@@ -34,21 +34,45 @@ let
       ../desktop/core
       ../desktop/computer/Cargo.toml
       ../desktop/computer/src
+      ../desktop/computer/tests
       (lib.fileset.difference ../desktop/app (lib.fileset.maybeMissing ../desktop/app/gen))
     ];
   };
   # The computer-use helper (desktop/computer): `prigh tool-host -computer`
   # and `prigh desktop -computer` run it (PRIGH_COMPUTER) for the computer
-  # tool. Pure Rust (its Wayland and X11 clients speak the protocols
-  # themselves): no libraries to link.
+  # tool. Its Wayland and X11 clients speak the protocols themselves; the
+  # xdg-desktop-portal backend (GNOME, KDE) links libpipewire for the
+  # screen cast (D-Bus is zbus, pure Rust).
   prighComputer = pkgs.rustPlatform.buildRustPackage {
     pname = "prigh-computer";
     version = desktopVersion;
     inherit src;
     cargoLock.lockFile = ../desktop/Cargo.lock;
     buildAndTestSubdir = "computer";
+    nativeBuildInputs = [
+      pkgs.pkg-config
+      pkgs.rustPlatform.bindgenHook
+    ];
+    buildInputs = [ pkgs.pipewire ];
+    # tests/portal.rs runs a fake portal on a private bus; tests/screencast.rs
+    # a private PipeWire (with wireplumber) and a GStreamer test screen
+    nativeCheckInputs = [
+      pkgs.dbus
+      pkgs.pipewire
+      pkgs.wireplumber
+      pkgs.gst_all_1.gstreamer
+    ];
+    env = {
+      PRIGH_REQUIRE_DBUS = "1";
+      PRIGH_REQUIRE_PIPEWIRE = "1";
+      GST_PLUGIN_SYSTEM_PATH_1_0 = lib.makeSearchPath "lib/gstreamer-1.0" [
+        pkgs.pipewire
+        pkgs.gst_all_1.gstreamer.out
+        pkgs.gst_all_1.gst-plugins-base
+      ];
+    };
     meta = {
-      description = "prigh's computer-use helper: screenshots and input on the desktop (wlroots Wayland, X11)";
+      description = "prigh's computer-use helper: screenshots and input on the desktop (wlroots Wayland, xdg-desktop-portal, X11)";
       mainProgram = "prigh-computer";
       platforms = lib.platforms.linux;
     };
@@ -65,6 +89,15 @@ let
     ]
     ++ lib.optionals isLinux [ pkgs.wrapGAppsHook3 ];
     buildInputs = lib.optionals isLinux desktopLinuxDeps;
+    # The deb's icons are Tauri's few (256px under a nonstandard
+    # 256x256@2): the hicolor theme gets every size and the SVG instead.
+    postInstall = lib.optionalString isLinux ''
+      rm -rf "$out/share/icons/hicolor"
+      for s in 16 24 32 48 64 96 128 256 512; do
+        install -Dm644 app/icons/''${s}x''${s}.png "$out/share/icons/hicolor/''${s}x''${s}/apps/prigh-desktop.png"
+      done
+      install -Dm644 app/icons/icon.svg "$out/share/icons/hicolor/scalable/apps/prigh-desktop.svg"
+    '';
     # The logic is in prigh-desktop-core; the app's own crate has no
     # tests.
     checkPhase = ''

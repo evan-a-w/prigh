@@ -6,6 +6,7 @@ let spec =
   ; parallel_safe = false
   ; on_host = true
   ; freeform = None
+  ; native = None
   ; destructive = Always
   ; description =
       "Edit a file by exact text replacement. Each old_text must occur exactly \

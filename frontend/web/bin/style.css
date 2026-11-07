@@ -305,6 +305,9 @@ kbd {
 .session-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .session-title { min-width: 0; line-height: 21px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .session.selected .session-title { font-weight: 600; }
+/* Under the title while searching: the passage of its messages that matched. */
+.session-snippet { font-size: 12.5px; line-height: 17px; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; margin: 1px 0 2px; }
+.session-title mark, .session-snippet mark { background: var(--sodium-glow); color: var(--chalk); border-radius: 2px; }
 /* On the lighter row the faint meta would fall under 4.5:1. */
 .session.selected .session-meta { color: var(--muted); }
 .session-meta { display: flex; gap: 10px; min-width: 0; font: 11.5px/18px var(--mono); color: var(--faint); font-variant-numeric: tabular-nums; }

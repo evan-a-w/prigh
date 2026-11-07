@@ -1,4 +1,5 @@
 open! Core
+open! Import
 
 (** A modal list with a fuzzy filter. Pure; rendering lives in [Render]. *)
 
@@ -13,11 +14,19 @@ module Item : sig
     ; section : string
       (** items are listed by section, in the order sections first appear, with
         a divider naming each non-empty one; [""] by default *)
+    ; fields : (Session_search.Field.t * string) list
+      (** when an item has them, the filter is {!Session_search}'s over these,
+          not a fuzzy match of [search] *)
+    ; matched : (int * int) list
+      (** what the filter matched in [label] (with [fields]) *)
+    ; snippet : P.Session_hits.Snippet.t option
+      (** what the backend found in the session's messages ([set_content]) *)
     }
   [@@deriving sexp_of, equal]
 
   val create
     :  ?detail:string
+    -> ?fields:(Session_search.Field.t * string) list
     -> ?search:string
     -> ?marked:bool
     -> ?dimmed:bool
@@ -60,6 +69,10 @@ val set_items
   -> t
   -> Item.t list
   -> t
+
+(** The backend's search of the sessions' messages, merged into the
+    matches of items with [fields] while it is for the query's words. *)
+val set_content : t -> P.Session_hits.t option -> t
 
 (** Checks or unchecks the highlighted item and moves to the next one. *)
 val toggle_check : t -> t
