@@ -49,7 +49,8 @@ val host_changed_note : host:string -> string
 val cwd_changed_note : cwd:string -> string
 
 (** After a model change adds or removes tools (e.g. swaps the file editor,
-    or drops the provider's [web_search]). *)
+    or drops the provider's [web_search]), or a tool host change adds or
+    removes [computer] (then with its guidance). *)
 val tools_changed_note : added:string list -> removed:string list -> string
 
 (** When plan mode is switched on or off (before the next message, or
