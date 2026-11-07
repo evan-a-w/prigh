@@ -8,7 +8,7 @@
 #   bash run.sh PRIGH_COMPUTER [PRIGH]
 #
 # With PRIGH, an exec also goes through `prigh tool-host -computer` (the
-# stdio worker), as a backend sends it. Needs sway, swaymsg, wev, Xvfb and
+# stdio worker), as a backend sends it. Needs sway, wev, Xvfb and
 # xev on PATH. KEEP=1 keeps the logs.
 set -euo pipefail
 helper=$1
@@ -16,10 +16,16 @@ prigh=${2:-}
 here=$(cd "$(dirname "$0")" && pwd)
 work=$(mktemp -d)
 pids=()
+# kill_tree PID: it and its descendants (sway's apps).
+kill_tree() {
+	local c
+	for c in $(pgrep -P "$1"); do kill_tree "$c"; done
+	kill -9 "$1" 2>/dev/null || true
+}
 cleanup() {
-	for p in "${pids[@]}"; do kill "$p" 2>/dev/null || true; done
+	for p in "${pids[@]}"; do kill_tree "$p"; done
 	wait 2>/dev/null || true
-	if [ -n "${KEEP:-}" ]; then echo "kept $work" >&2; else rm -rf "$work"; fi
+	if [ -n "${KEEP:-}" ]; then chmod -R a+rX "$work"; echo "kept $work" >&2; else rm -rf "$work"; fi
 }
 trap cleanup EXIT
 
@@ -86,6 +92,12 @@ export DISPLAY
 stdbuf -oL xev -geometry 1280x720+0+0 -event keyboard -event button -event structure >"$work/xev.log" 2>&1 &
 pids+=($!)
 wait_for 10 has "$work/xev.log" "^MapNotify"
+# Xlib loads the keymap and asks for its changes at the first key: until
+# that has reached the server, xev misses a remapping (é read NoSymbol).
+# Apps (GTK, Qt) do that when they start.
+printf '%s\n' '{"id":0,"op":"act","action":{"action":"key","combo":"shift"}}' \
+	| "$helper" --settle-ms 0 >/dev/null
+wait_for 10 has "$work/xev.log" "Shift_L"
 drive
 wait_for 10 has "$work/xev.log" "keysym 0x61, a"
 echo "-- xev received:"
