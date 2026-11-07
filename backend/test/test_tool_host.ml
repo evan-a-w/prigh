@@ -530,3 +530,54 @@ let%expect_test "stdio worker: instructions come from the host's own home" =
     (worker finished)
     |}]
 ;;
+
+let%expect_test
+    "network tool host: a failed browser sign-in is not started again on every \
+     retry"
+  =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let proxy =
+    Fake_signin_proxy.start ~env:t.env ~sw ~fresh_state:true ~upstream:1 ()
+  in
+  let signins = ref 0 in
+  let logs = Queue.create () in
+  Eio.Fiber.fork_daemon ~sw (fun () ->
+    ignore
+      (Tool_host.connect
+         ~env:t.env
+         ~log:(fun line ->
+           Queue.enqueue
+             logs
+             (String.substr_replace_all
+                line
+                ~pattern:(sprintf ":%d" proxy)
+                ~with_:":PORT"))
+         ~initial_backoff:(Time_ns.Span.of_sec 0.01)
+         ~max_backoff:(Time_ns.Span.of_sec 0.01)
+         ~signin:(fun ~why:_ _ ->
+           incr signins;
+           Error "the sign-in was cancelled in the browser")
+         ~backend:
+           (Or_error.ok_exn
+              (Backend_address.parse (sprintf "http://127.0.0.1:%d" proxy)))
+         ~token:(Some "sekrit")
+         ~name:"box"
+         ~cwd:t.dir
+         ()
+       : Error.t);
+    `Stop_daemon);
+  ignore (eventually t (fun () -> Queue.length logs >= 8) : bool);
+  printf "sign-ins: %d\n" !signins;
+  List.iter (List.take (Queue.to_list logs) 4) ~f:print_endline;
+  [%expect
+    {|
+    sign-ins: 1
+    not signed in: the sign-in was cancelled in the browser (not asking again: sign in with `prigh browser-signin -connect http://127.0.0.1:PORT/`, then restart the tool host)
+    retrying in 10ms
+    cannot connect to ws://127.0.0.1:PORT/ws: 127.0.0.1:PORT answered with a login page (HTTP 302 Found to https://login.example.com/outpost.goauthentik.io/start?state=login-state-2)
+    retrying in 10ms
+    |}]
+;;
