@@ -100,7 +100,9 @@ pub fn open(kind: Option<Kind>, options: &Options) -> Result<Box<dyn Backend>, S
         #[cfg(not(target_os = "linux"))]
         Kind::Wlroots | Kind::X11 => Err(format!("the {kind:?} backend is only on Linux")),
         #[cfg(not(windows))]
-        Kind::Windows => Err("the Windows backend is only on Windows (from WSL, run the Windows build, prigh-computer.exe)".into()),
+        Kind::Windows => {
+            Err("the Windows backend is only on Windows (from WSL, run the Windows build, prigh-computer.exe)".into())
+        }
     }
 }
 
