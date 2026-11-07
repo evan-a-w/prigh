@@ -2680,6 +2680,7 @@ No sessions match “zebra quokka”. Search looks in titles and messages.
 === webkit: search: Esc clears the search ===
 query: ""; rows: 4
 === webkit: search: 390x844 ===
+once the session is in, the search box: "configurable port"
 -- Pinned 1 --
 📌 Deploy checklist
     That the [port] stays [configurable], and the certificates are fresh.
@@ -2690,6 +2691,7 @@ page overflows sideways: false
 sidebar overflows sideways: false
 snippets inside the screen: true
 === webkit: search: 320x640 ===
+once the session is in, the search box: "configurable port"
 -- Pinned 1 --
 📌 Deploy checklist
     That the [port] stays [configurable], and the certificates are fresh.
