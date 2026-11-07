@@ -1,0 +1,17 @@
+//! prigh-computer: lets prigh's agent see and drive this machine's desktop.
+//! The tool host runs it and talks JSON lines over stdio ([driver]); each
+//! desktop is a [backend::Backend], chosen by [detect].
+
+pub mod action;
+pub mod args;
+pub mod backend;
+pub mod detect;
+pub mod driver;
+pub mod fake;
+pub mod keymap;
+pub mod keysym;
+pub mod scale;
+#[cfg(target_os = "linux")]
+pub mod wlroots;
+#[cfg(target_os = "linux")]
+pub mod x11;
