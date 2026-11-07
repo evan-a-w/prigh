@@ -3641,7 +3641,10 @@ The sidecar contract (the shell's only coupling to the backend):
   `$PRIGH_DESKTOP_BACKEND`, else `prigh` on the PATH, else on the login
   shell's PATH, since an app started from a desktop menu has a short one;
   on Windows `wsl.exe … bash -lc 'exec "$0" desktop "$@"' prigh …`) from the
-  home directory, with stdin a pipe it holds open;
+  home directory, with stdin a pipe it holds open, and `$PRIGH_COMPUTER`
+  set to the `prigh-computer` beside the app's executable when there is
+  one and it is unset (`launch::bundled_computer`: the macOS bundle has
+  it, for `-computer`);
 - the sidecar prints one line, `{"url":"http://127.0.0.1:PORT/#desktop=KEY"}`
   (`Desktop_sidecar`), on stdout when it is ready (`core/ready.rs`; the
   first must be http(s) on a loopback host, anything else ends the app with

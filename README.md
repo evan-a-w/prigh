@@ -1442,9 +1442,23 @@ PATH, with extra arguments from `$PRIGH_COMPUTER_ARGS`.
   first.
 - **X11**: XTEST and the root window, cropped to the primary monitor;
   characters the keyboard map lacks go through spare keycodes.
-- **GNOME and KDE on Wayland, macOS and Windows** are not supported yet:
+- **macOS** (never yet run on a real Mac: only built and unit-tested on
+  CI): ScreenCaptureKit screenshots (CGDisplayCreateImage before macOS
+  14) of the main display, in its pixels (twice its points on Retina), and
+  Quartz events for the mouse, scrolling and keys (`cmd`, `option`,
+  `ctrl`, `shift` in combos; any text as Unicode). macOS asks to allow
+  **Screen Recording** and **Accessibility** the first time; they belong
+  to the app that started the helper (the tool host's *responsible app*):
+  the prigh app, or the terminal you ran `prigh tool-host -computer` in.
+  Until they are given, actions fail saying where to give them (System
+  Settings > Privacy & Security > Screen Recording / Accessibility);
+  after allowing Screen Recording, quit and reopen that app. The macOS
+  app bundle carries `prigh-computer` (`prigh.app/Contents/MacOS`) and
+  points `$PRIGH_COMPUTER` at it; its CI builds are not signed, so macOS
+  may ask again after an update.
+- **GNOME and KDE on Wayland, and Windows** are not supported yet:
   it says so (on GNOME or KDE, log in to an X11 session meanwhile).
-  `--backend auto|wlroots|x11|fake` (or `$PRIGH_COMPUTER_BACKEND`)
+  `--backend auto|wlroots|x11|macos|fake` (or `$PRIGH_COMPUTER_BACKEND`)
   overrides the detection; `prigh-computer --probe` prints what it
   found, or what is missing.
 - **Kill switch**: when the mouse is not where the helper left it, the
@@ -1455,7 +1469,7 @@ In the desktop app, pass `-computer` to `prigh desktop`: with Home Manager,
 `programs.prigh.desktop.computerUse = true` (it adds `-computer` and points
 `PRIGH_COMPUTER` at the packaged helper); otherwise `PRIGH_DESKTOP_ARGS=-computer`
 with `prigh-computer` on the PATH (`nix profile install
-github:evan-a-w/prigh#prigh-computer`). The helper's tests are `cargo test
+github:evan-a-w/prigh#prigh-computer`; the macOS app has it already). The helper's tests are `cargo test
 -p prigh-computer` in `desktop/` (in `./test`) and the flake's
 `computer-use` check, which drives a headless sway and Xvfb and compares
 the input an app received (`desktop/computer/test/expected.txt`).
@@ -1492,8 +1506,8 @@ The backend's own host never offers it.
 - Each action's result carries a screenshot, but requests send only the
   latest `computer_screenshots` (config, default 3) as images; older ones
   are sent as `[screenshot omitted]`. The session keeps them all.
-- Platforms: Linux on wlroots compositors and X11 (above); the rest say
-  they are not supported yet.
+- Platforms: Linux on wlroots compositors and X11, and macOS (above); the
+  rest say they are not supported yet.
 
 ## Editors (ACP)
 
