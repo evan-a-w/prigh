@@ -551,8 +551,10 @@ let set_reminders t reminders = append t (Reminders { reminders })
 let set_budget t ~usd = append t (Budget { usd })
 let set_approval t ~mode ~plan = append t (Approval { mode; plan })
 let add_allow_rule t ~rule = append t (Allow_rule { rule })
+
 let set_archived t ~archived =
-  if archived && t.pinned then ignore (append t (Pinned { pinned = false }) : Entry.t);
+  if archived && t.pinned
+  then ignore (append t (Pinned { pinned = false }) : Entry.t);
   append t (Archived { archived })
 ;;
 
@@ -1738,11 +1740,11 @@ let archived_and_activity t ~mtime =
 ;;
 
 let set_pinned t ~pinned =
-  (if pinned
-   then
-     match fst (archived_and_activity t ~mtime:0.) with
-     | Some true -> ignore (append t (Archived { archived = false }) : Entry.t)
-     | Some false | None -> ());
+  if pinned
+  then (
+    match fst (archived_and_activity t ~mtime:0.) with
+    | Some true -> ignore (append t (Archived { archived = false }) : Entry.t)
+    | Some false | None -> ());
   append t (Pinned { pinned })
 ;;
 

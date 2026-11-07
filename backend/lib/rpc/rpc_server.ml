@@ -2605,8 +2605,9 @@ let dispatch_server t (client : Client.t) ~meth ~params
   | "set_archived" ->
     Some
       (Or_error.bind (string_param params "path") ~f:(fun key ->
-         Or_error.bind (required_bool_param params "archived") ~f:(fun archived ->
-           unit_result (set_archived t ~key ~archived))))
+         Or_error.bind
+           (required_bool_param params "archived")
+           ~f:(fun archived -> unit_result (set_archived t ~key ~archived))))
   | "set_pinned" ->
     Some
       (Or_error.bind (string_param params "path") ~f:(fun key ->

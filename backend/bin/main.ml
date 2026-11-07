@@ -1992,7 +1992,8 @@ let print_summary (s : Session.Summary.t) =
 ;;
 
 (* Pinned sessions come first and archived ones last, under their own
-   headings, as in the frontends' pickers. Without a server, no session counts as active. *)
+   headings, as in the frontends' pickers. Without a server, no session
+   counts as active. *)
 let sessions_list_command =
   Command.basic
     ~summary:
