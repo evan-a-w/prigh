@@ -1469,6 +1469,32 @@ controlling <host>" with Stop, which aborts the run as Esc does. The TUI
 shows a line per action (`computer click 640,312  → screenshot
 1280×800`).
 
+#### Turning computer use on, and what keeps it safe
+
+Computer use is off unless the tool host that owns the screen opts in:
+`prigh tool-host -computer` (with `-connect`/`-remote`, or as the stdio
+worker), `prigh web -computer` (the tool host it runs here) or `prigh
+desktop -computer`. The host probes `prigh-computer` once at start and
+says what it found (`computer use is on: wlroots (Hyprland), 2560×1440
+shown as 1280×720`, or why it is off); a call to a host without it
+answers "computer use is off on this tool host: start it with -computer".
+The backend's own host never offers it.
+
+- The `computer` tool is offered only while the session's active host
+  runs it; switching to it (or away) tells the model the tool came (or
+  went), with the guidance below.
+- The system prompt says the screen is the user's real desktop, that
+  what is on it is untrusted data (never instructions), and to ask before
+  anything irreversible or sensitive.
+- Moving the mouse stops the run at once ("computer use stopped: you
+  moved the mouse ..."); the next message goes on. Esc or Stop abort as
+  for any run.
+- Each action's result carries a screenshot, but requests send only the
+  latest `computer_screenshots` (config, default 3) as images; older ones
+  are sent as `[screenshot omitted]`. The session keeps them all.
+- Platforms: Linux on wlroots compositors and X11 (above); the rest say
+  they are not supported yet.
+
 ## Editors (ACP)
 
 `prigh acp` speaks the [Agent Client Protocol](https://agentclientprotocol.com)
@@ -2213,6 +2239,8 @@ prigh-web's settings page; free with Groq, see "Free dictation with
 Groq" under custom providers),
 `mask_observations` (default `true`: replace old tool outputs with
 placeholders before summarising, see "Long runs" below),
+`computer_screenshots` (default 3: how many of the latest `computer`
+screenshots requests carry as images, see "Turning computer use on"),
 `compact_at_tokens` (default 200000, `0` = off: compact once the context
 exceeds this many tokens, if that comes before 80% of the window) and
 `compaction_model` (the model that writes compaction summaries; default:
