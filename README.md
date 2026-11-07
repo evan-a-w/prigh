@@ -1442,14 +1442,30 @@ PATH, with extra arguments from `$PRIGH_COMPUTER_ARGS`.
   first.
 - **X11**: XTEST and the root window, cropped to the primary monitor;
   characters the keyboard map lacks go through spare keycodes.
-- **GNOME and KDE on Wayland, macOS and Windows** are not supported yet:
-  it says so (on GNOME or KDE, log in to an X11 session meanwhile).
-  `--backend auto|wlroots|x11|fake` (or `$PRIGH_COMPUTER_BACKEND`)
-  overrides the detection; `prigh-computer --probe` prints what it
-  found, or what is missing.
+- **Other Wayland compositors** (GNOME's Mutter, KDE's KWin, ...):
+  xdg-desktop-portal's RemoteDesktop for the pointer and keyboard (keysyms,
+  so any Unicode text types without a keymap), with a ScreenCast stream of
+  one monitor in the same session for the screen (frames over PipeWire)
+  and for absolute pointer motion. The first time, the desktop asks once
+  ("share the screen and allow remote control"): the portal's restore
+  token (`persist_mode` 2) is kept in `~/.prigh/computer-portal-token`
+  (mode 0600; delete it to be asked again), so later sessions start
+  without a dialog. It needs `xdg-desktop-portal` and the desktop's
+  backend (`xdg-desktop-portal-gnome` on GNOME, `xdg-desktop-portal-kde`
+  on KDE Plasma), and says so when they are missing. Never yet run on a
+  real GNOME or KDE: its tests use a fake portal on a private D-Bus and a
+  private PipeWire with a test screen.
+- **macOS and Windows** are not supported yet: it says so.
+  `--backend auto|wlroots|portal|x11|fake` (or `$PRIGH_COMPUTER_BACKEND`)
+  overrides the detection (auto: wlroots' protocols if the compositor has
+  them, else the portal on Wayland, else X11); `prigh-computer --probe`
+  prints what it found, or what is missing.
 - **Kill switch**: when the mouse is not where the helper left it, the
   user has moved it: the action stops and computer use pauses until the
-  next prompt.
+  next prompt. With the portal the pointer's position comes from the
+  screen cast's cursor metadata (GNOME and KDE send it); where a portal
+  offers no metadata the kill switch is unavailable (the pointer is then
+  drawn into the screenshots by the compositor).
 
 In the desktop app, pass `-computer` to `prigh desktop`: with Home Manager,
 `programs.prigh.desktop.computerUse = true` (it adds `-computer` and points
@@ -1458,7 +1474,10 @@ with `prigh-computer` on the PATH (`nix profile install
 github:evan-a-w/prigh#prigh-computer`). The helper's tests are `cargo test
 -p prigh-computer` in `desktop/` (in `./test`) and the flake's
 `computer-use` check, which drives a headless sway and Xvfb and compares
-the input an app received (`desktop/computer/test/expected.txt`).
+the input an app received (`desktop/computer/test/expected.txt`); the
+package's build runs the portal backend against a fake portal on a private
+D-Bus (`tests/portal.rs`) and its PipeWire capture against a private
+PipeWire (`tests/screencast.rs`).
 
 In prigh-web each `computer` call is a card: what it did ("click (640,
 312)", "type “hello”", "key ctrl+t", "scroll ↓3 at (x, y)", ...) and the
@@ -1492,8 +1511,9 @@ The backend's own host never offers it.
 - Each action's result carries a screenshot, but requests send only the
   latest `computer_screenshots` (config, default 3) as images; older ones
   are sent as `[screenshot omitted]`. The session keeps them all.
-- Platforms: Linux on wlroots compositors and X11 (above); the rest say
-  they are not supported yet.
+- Platforms: Linux on wlroots compositors, other Wayland desktops through
+  xdg-desktop-portal, and X11 (above); macOS and Windows say they are not
+  supported yet.
 
 ## Editors (ACP)
 
