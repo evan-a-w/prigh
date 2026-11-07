@@ -17,7 +17,7 @@ prints the captured panes.
   === after reply
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
-  • Using another client
+  ▢ Using prigh-tui
   ▌ hello there
     faux reply
   ────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -35,7 +35,7 @@ prints the captured panes.
     /help · Esc aborts · Ctrl+C twice
     quits
   
-  • Using another client
+  ▢ Using prigh-tui
   ▌ first
     faux reply
   ────────────────────────────────────────
@@ -44,7 +44,7 @@ prints the captured panes.
   === 100x30
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
-  • Using another client
+  ▢ Using prigh-tui
   ▌ first
     faux reply
   ────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -54,7 +54,7 @@ prints the captured panes.
   === scrolled back
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
-  • Using another client
+  ▢ Using prigh-tui
   ▌ prompt 1
     faux reply
   

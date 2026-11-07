@@ -320,6 +320,7 @@ let command =
            [ ( "name"
              , `String (Option.value name ~default:(Core_unix.gethostname ())) )
            ; "cwd", `String (Option.value cwd ~default:(Core_unix.getcwd ()))
+           ; "client", `String "tui"
            ]
          in
          let spawn_args =

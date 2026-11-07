@@ -104,7 +104,7 @@ let arg (call : P.Tool_call.t) =
     | "ls" -> Some (Option.value (str "path") ~default:".")
     | "grep" | "find" -> str "pattern"
     | "subagent" -> str "task"
-    | "ask_user" | "update_plan" -> None
+    | "ask_user" | "update_plan" | "render_ui" -> None
     | "job_kill" | "subagent_cancel" -> ids ()
     | _ ->
       (match
@@ -553,6 +553,22 @@ let render_step
              List.concat_map files ~f:(fun file ->
                let lines = diff ~max_lines (Patch.File.lines file) in
                if single then lines else label file :: lines) ))
+    | "render_ui", Some ({ is_error = true; _ } as r) -> [], error r.text
+    | "render_ui", _ ->
+      (* The terminal shows what the components are, never the components. *)
+      (match P.Ui_spec.of_arguments call.arguments with
+       | None -> [], []
+       | Some spec ->
+         let summary = P.Ui_spec.summary spec in
+         ( [ chip (plural (List.length summary) "component") ]
+         , List.map summary ~f:(fun line ->
+             Log_line.indent
+               ~depth:2
+               [ { text = "[" ^ line ^ "]"; style = dim } ])
+           @ [ Log_line.indent
+                 ~depth:2
+                 [ { text = "open in prigh-web to view"; style = dim } ]
+             ] ))
     | "update_plan", _ ->
       (match plan_of_call call with
        | None -> generic result
@@ -654,7 +670,8 @@ let render_step
   in
   let arguments =
     match verbosity with
-    | Verbose when not applied -> arguments call
+    | Verbose when not (applied || String.equal call.name "render_ui") ->
+      arguments call
     | Verbose | Quiet | Normal -> []
   in
   let arg_style =

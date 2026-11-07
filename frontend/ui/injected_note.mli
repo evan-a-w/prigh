@@ -9,7 +9,8 @@ open! Import
 (** One character standing for the kind of note: [⇄] tools moved, [⌂] the
     directory, [✎] the editor, [◇] plan mode, [↩] reports, [↪] a hand-over,
     [◎] a goal, [◷] a goal's continuation, [↻] a resume, [$] shell output,
-    [≡] the summary, [⚑] a review, [▤] [/init], [→] a message sent to a
+    [≡] the summary, [⚑] a review, [▤] [/init], [▢] another client, [↵] an answer
+    given through a [render_ui] component, [→] a message sent to a
     running subagent. *)
 val glyph : P.Origin.Kind.t -> string
 
