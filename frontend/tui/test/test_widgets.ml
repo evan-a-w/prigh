@@ -374,7 +374,7 @@ let%expect_test "fuzzy ranking: command names" =
       (String.concat ~sep:" " (Fuzzy.rank ~query names ~key:Fn.id)));
   [%expect
     {|
-    "mo" -> mode model scoped-models import compaction permissions
+    "mo" -> mode model scoped-models memory import compaction permissions
     "lo" -> login logout clone
     "s"  -> state switch skills skill: signin setusr session snippet signout sessions scoped-models push jobs host todos resume agents hotkeys verbosity permissions downsize-images
     "sw" -> switch
@@ -711,6 +711,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /budget [dollars|off]              show or set the session's cost budget: no turn starts once it is spent
     /goal [text|off|resume]            set a goal the agent keeps working toward until it is met; show, clear or resume it
     /remind [stop|every|rm|off ...]    stop [N] TEXT: remind the agent when it ends its turn (at most N times in a row, default 3); every N TEXT: every N turns; rm NAME, off: remove one or all; none: list the session's (Ctrl+D removes one)
+    /memory [on|off]                   the notes the model saved when you asked it to remember something (Ctrl+D forgets one); on or off gives the model the memory tool or takes it away
     /resume [now|cancel]               show, run now or cancel the automatic resume after a usage limit
     /downsize-images                   send the conversation's images smaller (after the model refused one as too large) and retry a failed reply
     /compact [instructions]            summarise older messages to free context
@@ -771,7 +772,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     #name      insert a snippet: Tab or Enter on its completion (/snippet)
     type                     filter the list (fuzzy)
     Enter / Esc              accept the highlighted item / close without changes
-    Ctrl+D                   /sessions: delete the marked or highlighted sessions · /agents: cancel · /jobs: kill · /queue, /remind, /worktree: remove
+    Ctrl+D                   /sessions: delete the marked or highlighted sessions · /agents: cancel · /jobs: kill · /queue, /remind, /worktree: remove · /memory: forget
     Tab                      /sessions: mark or unmark the highlighted session
     Alt+A                    /sessions: archive or unarchive the highlighted session
     Alt+T                    /sessions: pin or unpin the highlighted session
@@ -2253,7 +2254,7 @@ let%expect_test
   show "host prompt" (Autocomplete.directory ~host:"client-1" ~text:"~/de");
   [%expect
     {|
-    /mo          command    prefix="mo" navigated=false enter_accepts=true items=6
+    /mo          command    prefix="mo" navigated=false enter_accepts=true items=7
     /model       arg:model  prefix="" navigated=false enter_accepts=false items=4
     /model down  arg:model  prefix="" navigated=true enter_accepts=true items=4
     /model gp    arg:model  prefix="gp" navigated=false enter_accepts=true items=1

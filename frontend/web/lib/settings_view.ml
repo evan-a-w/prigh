@@ -665,9 +665,9 @@ let memory_switch (m : App.Model.t) ~inject =
     ~cls:"memory-enabled"
     ~name:"Use memory"
     ~about:
-      "The model saves a note only when you ask it to remember something, \
-       and looks one up when you refer back to it. Off, it is not given the \
-       memory tool, and your notes stay here."
+      "The model saves a note only when you ask it to remember something, and \
+       looks one up when you refer back to it. Off, it is not given the memory \
+       tool, and your notes stay here."
     ?note:
       (match n.status with
        | Unknown | Loading -> Some ("muted", "Reading your memory…")
@@ -680,7 +680,8 @@ let memory_switch (m : App.Model.t) ~inject =
            then "Stop giving the model your memory (/memory off)"
            else "Give the model your memory (/memory on)")
         ~on
-        ~on_click:(inject (Action.Run (if on then "/memory off" else "/memory on")))
+        ~on_click:
+          (inject (Action.Run (if on then "/memory off" else "/memory on")))
         ()
     ]
 ;;
@@ -745,7 +746,10 @@ let memory_note (n : Memory_notes.t) (note : Memory.Note.t) ~inject =
     let forgetting = Option.equal String.equal n.forgetting (Some note.id) in
     let name = Option.value note.title ~default:"Untitled note" in
     div
-      ~cls:(if forgetting then "setting memory-note forgetting" else "setting memory-note")
+      ~cls:
+        (if forgetting
+         then "setting memory-note forgetting"
+         else "setting memory-note")
       ~attrs:[ Attr.create "data-note" note.id ]
       [ div
           ~cls:"setting-text"
@@ -754,7 +758,10 @@ let memory_note (n : Memory_notes.t) (note : Memory.Note.t) ~inject =
              | None -> Node.none)
           ; span ~cls:"memory-note-text" note.text
           ; span
-              ~cls:(if forgetting then "setting-note warm" else "setting-note muted")
+              ~cls:
+                (if forgetting
+                 then "setting-note warm"
+                 else "setting-note muted")
               (if forgetting
                then "Delete this note? The model can no longer recall it."
                else "Saved " ^ Memory.Note.date note)
@@ -859,8 +866,8 @@ let memory_notes (m : App.Model.t) ~inject =
           ~name:"No notes yet"
           ~about:
             "Tell the model “remember that…” and it saves a note here. In a \
-             later session, ask about it (“what did I say about deploys?”) \
-             and it looks it up. It saves nothing you did not ask it to."
+             later session, ask about it (“what did I say about deploys?”) and \
+             it looks it up. It saves nothing you did not ask it to."
           (if List.is_empty draft then [ add ] else [])
       ]
   | Loaded, _ ->
@@ -881,6 +888,7 @@ let memory_notes (m : App.Model.t) ~inject =
           ]
         | visible -> List.map visible ~f:(memory_note n ~inject))
 ;;
+
 module Section = Settings_section
 
 (* A section's settings, in groups: a new setting is a row in its list.

@@ -22,7 +22,8 @@ module Fixed = struct
     let editor =
       Option.value_map
         (List.findi rows ~f:(fun _ row ->
-           String.is_prefix row ~prefix:"> " || String.is_prefix row ~prefix:"? "))
+           String.is_prefix row ~prefix:"> "
+           || String.is_prefix row ~prefix:"? "))
         ~default:(-1)
         ~f:fst
     in
@@ -83,7 +84,7 @@ let%expect_test "no shift: opening the command autocomplete" =
       /fallback [off|model...]           show or set the models that take…
       /default-dir [off|path]            show or set the directory new se…
       /login [provider] [api_key|oauth]  log in to a provider, or a git h…
-      ↕ 1–8 of 74
+      ↕ 1–8 of 75
     ──────────────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  ctx:0.1%/1.0M  Tab/Enter accept · Alt+S as typed
@@ -457,11 +458,11 @@ let%expect_test "/help is a scrollable box; typing closes it into the editor" =
       /mode [ask|auto-edit|auto|plan]  pick or set the mode: what asks fi…
       /model [name|id|provider/id]     pick or switch the model
       /mkdir [path]                    create a directory (and its parent…
+      /memory [on|off]                 the notes the model saved when you…
       /scoped-models                   pick the models Ctrl+P cycles thro…
       /trim [after|undo|show|hide]     drop everything before a message f…
       /name [text]                     set the session name
-      /remind [stop|every|rm|off ...]  stop [N] TEXT: remind the agent wh…
-      ↕ 1–8 of 17
+      ↕ 1–8 of 18
     ──────────────────────────────────────────────────────────────────────
     > /m▏
     deepseek-flash  ctx:0.1%/1.0M  Tab/Enter accept · Alt+S as typed
@@ -589,7 +590,6 @@ let%expect_test "screen: 100x30 and 160x40" =
 
 
 
-
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
@@ -603,6 +603,7 @@ let%expect_test "screen: 100x30 and 160x40" =
     ▸ /mode [ask|auto-edit|auto|plan]  pick or set the mode: what asks first, or read-only planning (Al…
       /model [name|id|provider/id]     pick or switch the model
       /scoped-models                   pick the models Ctrl+P cycles through
+      /memory [on|off]                 the notes the model saved when you asked it to remember somethin…
       /import [path]                   import a session from a JSONL file
       /compaction [at|model|mask ...]  show when conversations are compacted and what summarises them; …
       /permissions                     show the mode and the allow/ask/deny rules (config and this sess…
@@ -671,7 +672,6 @@ let%expect_test "screen: 100x30 and 160x40" =
 
 
 
-
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
@@ -685,6 +685,7 @@ let%expect_test "screen: 100x30 and 160x40" =
     ▸ /mode [ask|auto-edit|auto|plan]  pick or set the mode: what asks first, or read-only planning (Alt+M cycles)
       /model [name|id|provider/id]     pick or switch the model
       /scoped-models                   pick the models Ctrl+P cycles through
+      /memory [on|off]                 the notes the model saved when you asked it to remember something (Ctrl+D forgets one); on or off gives the model the memory…
       /import [path]                   import a session from a JSONL file
       /compaction [at|model|mask ...]  show when conversations are compacted and what summarises them; at TOKENS|off: also once the context exceeds TOKENS, not onl…
       /permissions                     show the mode and the allow/ask/deny rules (config and this session)

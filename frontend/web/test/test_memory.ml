@@ -30,7 +30,8 @@ let%expect_test "opening reads the memory; empty, it says what memory is" =
   H.reply h "get_memory" {|{"enabled":true,"notes":[]}|};
   section h;
   H.text h ~selector:".settings-nav";
-  [%expect {|
+  [%expect
+    {|
     (Focus dialog)
     (Rpc (method_ get_memory) (params ()) (tag Memory_loaded))
     Memory
@@ -58,7 +59,8 @@ let%expect_test "the notes, newest first; the filter narrows them" =
   H.text h ~selector:".memory-note";
   H.input h ~selector:"#memory-filter" "zzz";
   section h;
-  [%expect {|
+  [%expect
+    {|
     Memory
     What you asked the model to remember, for later sessions. Kept on the backend, for your account.
     Use memory
@@ -101,7 +103,8 @@ let%expect_test "edit a note: Enter in the title saves, the reply replaces it" =
     {|{"note":{"id":"m1","title":"editor","text":"neovim",
        "saved":"2025-10-04 10:00:00.000000Z"}}|};
   H.text h ~selector:"[data-note=m1]";
-  [%expect {|
+  [%expect
+    {|
     (Memory_edit (m1))
     (Focus memory-text)
     <div class="memory-draft setting">
@@ -156,7 +159,8 @@ let%expect_test "add a note; Esc cancels one, leaving Settings open" =
   H.key h ~ctrl:true ~target:Multiline "Enter";
   H.fail h "save_memory" "memory is full (200 notes): forget some first";
   H.text h ~selector:".memory-draft";
-  [%expect {|
+  [%expect
+    {|
     (Memory_edit ())
     (Focus memory-text)
     (Memory_text "half written")
@@ -188,7 +192,8 @@ let%expect_test "delete asks first; Keep and Esc keep it" =
     {|{"note":{"id":"m3","title":"shell","text":"fish",
        "saved":"2025-10-03 08:00:00.000000Z"}}|};
   H.names h ~selector:".memory-note .setting-name";
-  [%expect {|
+  [%expect
+    {|
     (Memory_forget m3)
     (Focus memory-forget-yes)
     shell fish Delete this note? The model can no longer recall it.
@@ -218,7 +223,8 @@ let%expect_test "the switch, /memory on|off, and memory_changed from elsewhere" 
   section h;
   H.act h (Run "/memory bogus");
   H.act h (Run "/memory off");
-  [%expect {|
+  [%expect
+    {|
     (Run "/memory off")
     (Expire_toast (id 0) (after_ms 3380))
     (Rpc (method_ set_memory_enabled) (params ((enabled false)))
@@ -247,7 +253,8 @@ let%expect_test "a failed read says so, with a retry" =
   H.fail h "get_memory" "memory.json is not valid JSON: fix or remove it";
   section h;
   H.click h ~selector:".memory-failed button";
-  [%expect {|
+  [%expect
+    {|
     Memory
     What you asked the model to remember, for later sessions. Kept on the backend, for your account.
     Use memory

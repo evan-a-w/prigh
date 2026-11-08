@@ -1677,7 +1677,7 @@ sections ${getComputedStyle(nav).flexDirection === "row" ? "across the top" : "d
   // sections, and another (mobile.mjs has the rest).
   await page.setViewportSize({ width: 390, height: 844 });
   await page.locator(".settings-dialog .modal-back").click();
-  await page.locator(".settings-home-row", { hasText: "Sessions" }).click();
+  await page.locator(".settings-home-row[data-settings-tab=\"sessions\"]").click();
   await page.locator(".settings-panel-sessions").waitFor();
   console.log(`phone: ${await page.evaluate(() => {
     const d = document.querySelector(".settings-dialog").getBoundingClientRect();

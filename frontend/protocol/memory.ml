@@ -35,7 +35,9 @@ let of_json j =
 ;;
 
 let save_params ?id ?title text =
-  let opt key = Option.value_map ~default:[] ~f:(fun v -> [ key, Json.str v ]) in
+  let opt key =
+    Option.value_map ~default:[] ~f:(fun v -> [ key, Json.str v ])
+  in
   opt "id" id @ opt "title" title @ [ "text", Json.str text ]
 ;;
 
