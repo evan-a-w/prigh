@@ -1467,9 +1467,10 @@ PATH, with extra arguments from `$PRIGH_COMPUTER_ARGS`.
   another keymap sees nothing there (Xwayland apps cannot get such keys:
   those characters do not type in X apps). Keys still down are released
   when an action fails or is interrupted and when the helper exits (end of
-  input, SIGTERM, SIGINT, SIGHUP); a SIGKILLed helper's keys may stay
-  down (Hyprland keeps them unless
-  `input:virtualkeyboard:release_pressed_on_close`).
+  input, SIGTERM, SIGINT, SIGHUP; the tool host stops it with SIGTERM when an
+  action is cancelled or it shuts down, and SIGKILLs it only when it has not
+  exited a second later); a SIGKILLed helper's keys may stay down
+  (Hyprland keeps them unless `input:virtualkeyboard:release_pressed_on_close`).
 - **Hyprland**: binds are matched through Hyprland's configured layout,
   whatever keymap a virtual keyboard uploads, so a tool with a keymap of
   its own (wtype; this helper before) fires other binds: wtype's first key
