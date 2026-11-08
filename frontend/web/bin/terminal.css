@@ -42,6 +42,7 @@
   flex-direction: column;
   padding: 6px 0 0 10px;
 }
+.terminal-frame { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .terminal-host { position: relative; flex: 1; min-height: 0; overflow: hidden; }
 .terminal-host .xterm { height: 100%; }
 .terminal-host .xterm-viewport, .terminal-host .xterm-rows, .terminal-host .xterm-screen {
@@ -79,11 +80,54 @@
 
 .terminal-toggle.open { color: var(--sodium); background: var(--sodium-wash); }
 
+/* The extra keys a phone's keyboard lacks (terminal_keys_widget.ml): on a
+   touch screen, while the shell has the focus (the keyboard is up), one row
+   along the panel's foot, which is the visual viewport's on a phone (a
+   swipe scrolls it). None on a desktop: its keyboard has them. */
+.terminal-keys { display: none; }
+@media (hover: none), (pointer: coarse) {
+  .terminal-panel:focus-within .terminal-keys { display: flex; }
+}
+.terminal-keys {
+  flex: none;
+  gap: 5px;
+  margin-left: -10px;
+  padding: 5px 6px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  touch-action: pan-x;
+  scrollbar-width: none;
+  background: var(--slate);
+  border-top: 1px solid var(--rule);
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+.terminal-keys::-webkit-scrollbar { display: none; }
+.terminal-key {
+  flex: none;
+  min-width: 42px;
+  height: 44px;
+  padding: 0 10px;
+  font: 600 15px/1 var(--mono);
+  color: var(--chalk);
+  background: var(--well);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-control, 8px);
+  -webkit-tap-highlight-color: transparent;
+  touch-action: pan-x;
+}
+.terminal-key.modifier { font-family: inherit; font-size: 14px; }
+.terminal-key.arrow { font-size: 19px; }
+.terminal-key.pressed { background: var(--sodium-wash); border-color: var(--sodium); color: var(--sodium); }
+.terminal-key.latched { color: var(--sodium); border-color: var(--sodium); box-shadow: inset 0 -3px 0 var(--sodium); }
+.terminal-key.locked { color: var(--well); background: var(--sodium); border-color: var(--sodium); }
+
 /* Phones: a full-screen sheet, under dialogs and the other sheets. */
 .app.narrow .terminal-panel {
   position: fixed;
-  inset: 0;
-  height: auto;
+  inset: 0 0 auto;
+  height: var(--vvh, 100dvh);
   max-height: none;
   z-index: calc(var(--z-sheet) - 5);
   border-top: 0;
@@ -91,6 +135,12 @@
 }
 .app.narrow .terminal-head { min-height: 50px; padding-left: 14px; }
 .app.narrow .terminal-body { padding: 4px 0 0 6px; }
+.app.narrow .terminal-keys { margin-left: -6px; }
+/* Over the home indicator, the bar's ground under it. */
+@media (hover: none), (pointer: coarse) {
+  .app.narrow .terminal-panel:focus-within { padding-bottom: 0; }
+  .app.narrow .terminal-panel:focus-within .terminal-keys { padding-bottom: max(5px, var(--safe-b)); }
+}
 @keyframes terminal-up { from { opacity: 0; transform: translateY(24px); } }
 
 @media (prefers-reduced-motion: reduce) {
