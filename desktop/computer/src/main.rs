@@ -1,4 +1,5 @@
-use prigh_computer::{args, detect, driver::Driver};
+use prigh_computer::driver::{self, Driver};
+use prigh_computer::{args, detect};
 use std::io::{BufRead, Write};
 use std::sync::mpsc;
 
@@ -7,8 +8,9 @@ enum Input {
     Quit,
 }
 
-/// SIGTERM, SIGINT and SIGHUP end the helper as end of input does, after
-/// the request in hand, so the driver lets go of any key it holds: blocked
+/// SIGTERM, SIGINT and SIGHUP end the helper as end of input does, the
+/// action in hand stopping at its next step, so the driver lets go of any
+/// key it holds (a compositor may keep a killed client's keys down): blocked
 /// here (before any thread starts, so every thread inherits it) and waited
 /// for by one thread.
 #[cfg(unix)]
@@ -23,6 +25,7 @@ fn quit_on_signals(tx: mpsc::Sender<Input>) {
         std::thread::spawn(move || {
             let mut sig = 0;
             libc::sigwait(&set, &mut sig);
+            driver::STOPPING.store(true, std::sync::atomic::Ordering::Relaxed);
             let _ = tx.send(Input::Quit);
         });
     }
