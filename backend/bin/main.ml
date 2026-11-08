@@ -66,6 +66,7 @@ module Setup = struct
     ; world : Namespace.World.t
     ; models : Model_registry.t
     ; forges : Forges.t (** the world's git-host sign-ins *)
+    ; memory : Memory.t (** the world's *)
     }
 end
 
@@ -205,7 +206,7 @@ let common_params =
         ~store
         ()
     in
-    let memory = Memory.create ~path:(Memory.path ~home) in
+    let memory = Memory.create ~home in
     (* One agent per session; the subagent tool follows its own agent's
        model and thinking level. *)
     let new_agent ?session ~cwd () =
@@ -274,13 +275,16 @@ let common_params =
           ?mcp
           ~use_default_cwd:(not cwd_given)
           ?max_budget_usd
+          ~offered:(fun tool ->
+            (not (String.equal (Tool.name tool) Tool_memory.name))
+            || Memory.enabled memory)
           ~cwd
           ()
       in
       agent_ref := Some agent;
       agent
     in
-    { Setup.session; cwd; new_agent; world; models; forges }
+    { Setup.session; cwd; new_agent; world; models; forges; memory }
 ;;
 
 (* Errors from the agent name the slash command; on the command line the
@@ -704,7 +708,7 @@ let serve_command =
             | None -> Nix_store_ops.local ~env)
        in
        let create_server ?token ?namespace ?world () =
-         let { Setup.session; cwd; new_agent; world; models; forges } =
+         let { Setup.session; cwd; new_agent; world; models; forges; memory } =
            make_agent ~env ~sw ~backend_host ?world ()
          in
          let login =
@@ -735,6 +739,7 @@ let serve_command =
              ~nix_store
              ~login
              ~forges
+             ~memory
              ~sessions_dir:world.sessions_dir
              ~cwd
              ~new_agent
@@ -1736,7 +1741,7 @@ let acp_command =
          | Some (host, port) ->
            None, Rpc_client.Connector.tcp ~env ~sw ~host ~port
          | None ->
-           let { Setup.session; cwd; new_agent; world; models; forges } =
+           let { Setup.session; cwd; new_agent; world; models; forges; memory } =
              make_agent ~env ~sw ~backend_host:false ()
            in
            if Option.is_some session
@@ -1761,6 +1766,7 @@ let acp_command =
                ~home:world.home
                ~login
                ~forges
+               ~memory
                ~sessions_dir:world.sessions_dir
                ~cwd
                ~new_agent
@@ -2191,15 +2197,21 @@ let trace_command =
 ;;
 
 (* What the built-in tools' specifications add to each request, as
-   [Compaction_eval] counts tokens. *)
+   [Compaction_eval] counts tokens: [memory]'s while the user has it on. *)
 let tools_overhead_tokens () =
+  let memory =
+    Option.some_if
+      (Memory.enabled (Memory.create ~home:(home ())))
+      Tool_memory.spec
+  in
   List.sum
     (module Int)
-    (Tools.all @ Tools.interaction)
-    ~f:(fun (t : Tool.t) ->
-      (String.length t.spec.name
-       + String.length t.spec.description
-       + String.length (Jsonaf.to_string t.spec.parameters))
+    (List.map (Tools.all @ Tools.interaction) ~f:(fun (t : Tool.t) -> t.spec)
+     @ Option.to_list memory)
+    ~f:(fun (spec : Tool_spec.t) ->
+      (String.length spec.name
+       + String.length spec.description
+       + String.length (Jsonaf.to_string spec.parameters))
       / 4)
 ;;
 

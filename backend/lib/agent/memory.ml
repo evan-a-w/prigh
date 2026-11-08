@@ -3,11 +3,39 @@ open! Import
 
 type t =
   { path : string
+  ; prefs : User_prefs.t
   ; mutex : Eio.Mutex.t
+  ; mutable subscribers : (unit -> unit) list
   }
 
 let path ~home = Filename.concat home ".prigh/memory.json"
-let create ~path = { path; mutex = Eio.Mutex.create () }
+
+let create ~home =
+  { path = path ~home
+  ; prefs = User_prefs.create ~path:(User_prefs.path ~home)
+  ; mutex = Eio.Mutex.create ()
+  ; subscribers = []
+  }
+;;
+
+let subscribe t ~f = t.subscribers <- f :: t.subscribers
+let changed t = List.iter (List.rev t.subscribers) ~f:(fun f -> f ())
+let enabled_key = "memory.enabled"
+
+let enabled t =
+  match User_prefs.get t.prefs ~keys:[ enabled_key ] with
+  | Ok [ (_, `False) ] -> false
+  | Ok _ | Error _ -> true
+;;
+
+let set_enabled t enabled =
+  let%map.Or_error changes =
+    User_prefs.set
+      t.prefs
+      [ (enabled_key, if enabled then None else Some `False) ]
+  in
+  if not (List.is_empty changes) then changed t
+;;
 
 module Note = struct
   module Utc = struct
@@ -121,20 +149,24 @@ let write t (file : File.t) =
 (* Fibers of one process are serialised with the mutex, processes with the
    lock directory. *)
 let update t ~f =
-  Eio.Mutex.use_rw ~protect:false t.mutex
-  @@ fun () ->
-  Or_error.join
-    (Or_error.try_with (fun () ->
-       Core_unix.mkdir_p (Filename.dirname t.path);
-       Lock_dir.with_lock
-         ~file:t.path
-         ~f:(fun () ->
-           let open Or_error.Let_syntax in
-           let%bind file = read t in
-           let%map file, result = f file in
-           write t file;
-           result)
-         ()))
+  let result =
+    Eio.Mutex.use_rw ~protect:false t.mutex
+    @@ fun () ->
+    Or_error.join
+      (Or_error.try_with (fun () ->
+         Core_unix.mkdir_p (Filename.dirname t.path);
+         Lock_dir.with_lock
+           ~file:t.path
+           ~f:(fun () ->
+             let open Or_error.Let_syntax in
+             let%bind file = read t in
+             let%map file, result = f file in
+             write t file;
+             result)
+           ()))
+  in
+  if Or_error.is_ok result then changed t;
+  result
 ;;
 
 let notes t =
@@ -142,7 +174,7 @@ let notes t =
     Or_error.map (read t) ~f:(fun (file : File.t) -> file.notes))
 ;;
 
-let save t ?title ~now text =
+let checked ?title text =
   let text = String.strip text in
   let title =
     Option.bind title ~f:(fun title ->
@@ -161,36 +193,37 @@ let save t ?title ~now text =
   else if Option.exists title ~f:(fun title -> String.length title > max_title)
   then
     Or_error.errorf "a title is limited to %d bytes: use a few words" max_title
-  else
-    update t ~f:(fun file ->
-      match title with
-      | Some title
-        when List.exists file.notes ~f:(fun note -> Note.has_title note title)
-        ->
-        let replaced = ref None in
-        let notes =
-          List.map file.notes ~f:(fun note ->
-            if Note.has_title note title
-            then (
-              let note = { note with title = Some title; text; saved = now } in
-              replaced := Some note;
-              note)
-            else note)
+  else Ok (title, text)
+;;
+
+let save t ?title ~now text =
+  let%bind.Or_error title, text = checked ?title text in
+  update t ~f:(fun file ->
+    match title with
+    | Some title
+      when List.exists file.notes ~f:(fun note -> Note.has_title note title) ->
+      let replaced = ref None in
+      let notes =
+        List.map file.notes ~f:(fun note ->
+          if Note.has_title note title
+          then (
+            let note = { note with title = Some title; text; saved = now } in
+            replaced := Some note;
+            note)
+          else note)
+      in
+      Ok ({ file with notes }, Saved.Replaced (Option.value_exn !replaced))
+    | _ ->
+      if List.length file.notes >= max_notes
+      then
+        Or_error.errorf "memory is full (%d notes): forget some first" max_notes
+      else (
+        let note =
+          { Note.id = sprintf "m%d" file.next; title; text; saved = now }
         in
-        Ok ({ file with notes }, Saved.Replaced (Option.value_exn !replaced))
-      | _ ->
-        if List.length file.notes >= max_notes
-        then
-          Or_error.errorf
-            "memory is full (%d notes): forget some first"
-            max_notes
-        else (
-          let note =
-            { Note.id = sprintf "m%d" file.next; title; text; saved = now }
-          in
-          Ok
-            ( { File.next = file.next + 1; notes = file.notes @ [ note ] }
-            , Saved.Added note )))
+        Ok
+          ( { File.next = file.next + 1; notes = file.notes @ [ note ] }
+          , Saved.Added note )))
 ;;
 
 let words s =
@@ -284,4 +317,33 @@ let forget t key =
                    | Some title -> sprintf "%s (%s)" n.id title
                    | None -> n.id))
               ^ if List.length notes > 20 then ", ..." else "")))
+;;
+
+let edit t ~id ?title ~now text =
+  let%bind.Or_error title, text = checked ?title text in
+  update t ~f:(fun file ->
+    match
+      List.find file.notes ~f:(fun (note : Note.t) -> String.equal note.id id)
+    with
+    | None -> Or_error.errorf "no note %S: it was forgotten" id
+    | Some _ ->
+      (match
+         Option.bind title ~f:(fun title ->
+           List.find file.notes ~f:(fun (note : Note.t) ->
+             (not (String.equal note.id id)) && Note.has_title note title))
+       with
+       | Some other ->
+         Or_error.errorf
+           "note %s is titled %S already: choose another title"
+           other.id
+           (Option.value other.title ~default:"")
+       | None ->
+         let edited = { Note.id; title; text; saved = now } in
+         Ok
+           ( { file with
+               notes =
+                 List.map file.notes ~f:(fun (note : Note.t) ->
+                   if String.equal note.id id then edited else note)
+             }
+           , edited )))
 ;;

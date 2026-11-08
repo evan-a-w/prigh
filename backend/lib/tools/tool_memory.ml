@@ -12,6 +12,7 @@ let spec =
   ; parallel_safe = false
   ; on_host = false
   ; freeform = None
+  ; native = None
   ; destructive =
       Depends
         (fun args ->
@@ -108,6 +109,11 @@ let recall memory query =
           else []))
 ;;
 
+let off =
+  "memory is off: the user turned it off (Settings, Memory in prigh-web; \
+   /memory on in the terminal). Do not use it."
+;;
+
 let create ?now ~memory () =
   let run (context : Tool.Context.t) args =
     let str key =
@@ -136,6 +142,7 @@ let create ?now ~memory () =
     in
     let result =
       match Tool_args.string args "action" with
+      | _ when not (Memory.enabled memory) -> Or_error.error_string off
       | "save" ->
         let text = required "text" ~why:"the note" in
         Or_error.map

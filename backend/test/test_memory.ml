@@ -2,12 +2,13 @@ open! Core
 open! Prigh
 open Tool_test_helpers
 module Reply = Faux_provider.Reply
+module Json = Jsonaf
 
 let day n =
   Time_float.add Time_float.epoch (Time_float.Span.of_day (20_000. +. n))
 ;;
 
-let memory t = Memory.create ~path:(Memory.path ~home:t.dir)
+let memory t = Memory.create ~home:t.dir
 
 let print_file t =
   match In_channel.read_all (Memory.path ~home:t.dir) with
@@ -214,9 +215,7 @@ let%expect_test "each namespace has its own memory" =
   let alice = world "alice"
   and bob = world "bob"
   and default = world "default" in
-  let m (w : Namespace.World.t) =
-    Memory.create ~path:(Memory.path ~home:w.home)
-  in
+  let m (w : Namespace.World.t) = Memory.create ~home:w.home in
   List.iter [ alice; bob; default ] ~f:(fun w ->
     print_endline (mask t (Memory.path ~home:w.home)));
   save (m alice) "alice's note";
@@ -488,5 +487,243 @@ let%expect_test "an agent saves in one run and recalls in the next" =
     result: m1 · deploys · 2024-10-05
     Deploy with ./ship, never by hand.
     assistant: You said to deploy with ./ship.
+    |}]
+;;
+
+let%expect_test "edit keeps the id; subscribers hear every change" =
+  with_sandbox
+  @@ fun t ->
+  let m = memory t in
+  Memory.subscribe m ~f:(fun () -> print_endline "(changed)");
+  save m ~title:"editor" "helix";
+  save m ~title:"shell" "fish";
+  [%expect
+    {|
+    (changed)
+    (Added
+     ((id m1) (title (editor)) (text helix)
+      (saved "2024-10-04 00:00:00.000000Z")))
+    (changed)
+    (Added
+     ((id m2) (title (shell)) (text fish) (saved "2024-10-04 00:00:00.000000Z")))
+    |}];
+  let edit ?title id text =
+    match Memory.edit m ~id ?title ~now:(day 3.) text with
+    | Ok note -> print_s [%sexp (note : Memory.Note.t)]
+    | Error e -> print_endline ("error: " ^ Error.to_string_hum e)
+  in
+  edit "m1" ~title:"Editor" "neovim";
+  edit "m2" ~title:"editor" "taken";
+  edit "m1" "untitled now";
+  edit "m9" "gone";
+  edit "m2" "  ";
+  show_notes m;
+  [%expect
+    {|
+    (changed)
+    ((id m1) (title (Editor)) (text neovim)
+     (saved "2024-10-07 00:00:00.000000Z"))
+    error: note m1 is titled "Editor" already: choose another title
+    (changed)
+    ((id m1) (title ()) (text "untitled now")
+     (saved "2024-10-07 00:00:00.000000Z"))
+    error: no note "m9": it was forgotten
+    error: the note's text is empty
+    m1 -: untitled now
+    m2 [shell]: fish
+    |}]
+;;
+
+let%expect_test "off: not offered to the model, refused, back on the next turn" =
+  with_sandbox
+  @@ fun t ->
+  let m = memory t in
+  Memory.subscribe m ~f:(fun () ->
+    printf "(changed: enabled=%b)\n" (Memory.enabled m));
+  print_s [%sexp (Memory.enabled m : bool)];
+  [%expect {| true |}];
+  Or_error.ok_exn (Memory.set_enabled m false);
+  Or_error.ok_exn (Memory.set_enabled m false);
+  print_endline
+    (String.substr_replace_all
+       (In_channel.read_all (User_prefs.path ~home:t.dir))
+       ~pattern:"\n"
+       ~with_:" ");
+  [%expect
+    {|
+    (changed: enabled=false)
+    {   "memory.enabled": false }
+    |}];
+  let tool = tool t in
+  let result =
+    Tool.execute
+      tool
+      (Tool.Context.create ~env:t.env ~cwd:t.dir ())
+      (Jsonaf.of_string {|{"action":"recall"}|})
+  in
+  printf "error=%b %s\n" result.is_error result.text;
+  [%expect
+    {| error=true memory is off: the user turned it off (Settings, Memory in prigh-web; /memory on in the terminal). Do not use it. |}];
+  Eio.Switch.run
+  @@ fun sw ->
+  let provider =
+    Faux_provider.create
+      ~on_request:(fun request ->
+        print_s
+          [%sexp
+            (List.map request.tools ~f:(fun (s : Tool_spec.t) -> s.name)
+             : string list)])
+      ~loop:true
+      [ Reply.text "ok" ]
+  in
+  let agent =
+    Agent.create
+      ~env:t.env
+      ~sw
+      ~provider
+      ~tools:[ tool; Tool_read.tool ]
+      ~sessions_dir:(Filename.concat t.dir "sessions")
+      ~home:t.dir
+      ~offered:(fun tool ->
+        (not (String.equal (Tool.name tool) Tool_memory.name))
+        || Memory.enabled m)
+      ~cwd:t.dir
+      ()
+  in
+  let prompt text =
+    Or_error.ok_exn (Agent.prompt agent text);
+    Agent.wait_idle agent
+  in
+  prompt "one";
+  [%expect {| (read) |}];
+  Or_error.ok_exn (Memory.set_enabled m true);
+  prompt "two";
+  [%expect
+    {|
+    (changed: enabled=true)
+    (memory read)
+    |}]
+;;
+
+let rec undated : Jsonaf.t -> Jsonaf.t = function
+  | `Object fields ->
+    `Object
+      (List.map fields ~f:(fun (key, value) ->
+         ( key
+         , if String.equal key "saved" then `String "$SAVED" else undated value
+         )))
+  | `Array items -> `Array (List.map items ~f:undated)
+  | json -> json
+;;
+
+let%expect_test "RPC: get, save, edit, forget, on and off; every client hears" =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let login =
+    Login_manager.create
+      ~env:t.env
+      ~sw
+      ~getenv:(fun _ -> None)
+      ~store:(Auth_store.create ~path:(Filename.concat t.dir "auth.json"))
+      ()
+  in
+  let sessions_dir = Filename.concat t.dir "sessions" in
+  let new_agent ?session ~cwd () =
+    Agent.create
+      ~env:t.env
+      ~sw
+      ~provider:(Faux_provider.create [])
+      ~tools:[]
+      ~sessions_dir
+      ~home:t.dir
+      ?session
+      ~cwd
+      ()
+  in
+  let memory = memory t in
+  let server =
+    Rpc_server.create
+      ~env:t.env
+      ~sw
+      ~home:t.dir
+      ~memory
+      ~login
+      ~sessions_dir
+      ~cwd:t.dir
+      ~new_agent
+      ()
+  in
+  let client name =
+    Rpc_server.connect server ~send:(fun json ->
+      match Json.member "event" json with
+      | Some (`String "memory_changed") ->
+        printf "%s hears %s\n" name (Json.to_string (undated json))
+      | _ -> ())
+  in
+  let a = client "a" in
+  let b = client "b" in
+  let call client meth params =
+    let response =
+      Rpc_server.handle
+        server
+        client
+        (`Object [ "id", `Number "1"; "method", `String meth; "params", params ])
+    in
+    match Json.member "ok" response, Json.member "result" response with
+    | Some `True, Some result -> print_endline (Json.to_string (undated result))
+    | _ ->
+      print_endline
+        (Json.to_string (Option.value_exn (Json.member "error" response)))
+  in
+  call a "hello" (`Object []);
+  call b "hello" (`Object []);
+  ignore ([%expect.output] : string);
+  call a "get_memory" (`Object []);
+  [%expect {| {"enabled":true,"notes":[]} |}];
+  call
+    a
+    "save_memory"
+    (`Object [ "title", `String "editor"; "text", `String "helix" ]);
+  [%expect
+    {|
+    a hears {"type":"event","event":"memory_changed","enabled":true,"notes":[{"id":"m1","title":"editor","text":"helix","saved":"$SAVED"}]}
+    b hears {"type":"event","event":"memory_changed","enabled":true,"notes":[{"id":"m1","title":"editor","text":"helix","saved":"$SAVED"}]}
+    {"note":{"id":"m1","title":"editor","text":"helix","saved":"$SAVED"}}
+    |}];
+  call
+    a
+    "save_memory"
+    (`Object [ "id", `String "m1"; "text", `String "neovim" ]);
+  call a "save_memory" (`Object [ "id", `String "m7"; "text", `String "x" ]);
+  call a "save_memory" (`Object [ "text", `Number "1" ]);
+  [%expect
+    {|
+    a hears {"type":"event","event":"memory_changed","enabled":true,"notes":[{"id":"m1","text":"neovim","saved":"$SAVED"}]}
+    b hears {"type":"event","event":"memory_changed","enabled":true,"notes":[{"id":"m1","text":"neovim","saved":"$SAVED"}]}
+    {"note":{"id":"m1","text":"neovim","saved":"$SAVED"}}
+    "no note \"m7\": it was forgotten"
+    "param \"text\" must be a string"
+    |}];
+  call b "set_memory_enabled" (`Object [ "enabled", `False ]);
+  call b "set_memory_enabled" (`Object [ "enabled", `String "no" ]);
+  call a "get_memory" (`Object []);
+  [%expect
+    {|
+    a hears {"type":"event","event":"memory_changed","enabled":false,"notes":[{"id":"m1","text":"neovim","saved":"$SAVED"}]}
+    b hears {"type":"event","event":"memory_changed","enabled":false,"notes":[{"id":"m1","text":"neovim","saved":"$SAVED"}]}
+    {"enabled":false}
+    "param \"enabled\" must be a boolean"
+    {"enabled":false,"notes":[{"id":"m1","text":"neovim","saved":"$SAVED"}]}
+    |}];
+  call a "forget_memory" (`Object [ "id", `String "m1" ]);
+  call a "forget_memory" (`Object [ "id", `String "m1" ]);
+  [%expect
+    {|
+    a hears {"type":"event","event":"memory_changed","enabled":false,"notes":[]}
+    b hears {"type":"event","event":"memory_changed","enabled":false,"notes":[]}
+    {"note":{"id":"m1","text":"neovim","saved":"$SAVED"}}
+    "no note \"m1\": memory is empty"
     |}]
 ;;

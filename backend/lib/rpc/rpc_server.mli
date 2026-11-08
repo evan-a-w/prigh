@@ -71,6 +71,11 @@ val create
   -> ?forges:Forges.t
        (** git hosts (default: real HTTP, sign-ins in [login]'s store,
            settings in [home]'s config) *)
+  -> ?memory:Memory.t
+       (** the user's memory, for [get_memory], [save_memory], [forget_memory]
+           and [set_memory_enabled] (default: the one under [home]; without
+           either they fail). Every client hears [memory_changed] after any
+           change, the model's included. *)
   -> ?transcription_http:Transcription.Http.t
        (** where [transcribe] posts the audio (default: real HTTP) *)
   -> ?nix_store:Nix_store.t

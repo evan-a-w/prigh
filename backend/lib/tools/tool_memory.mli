@@ -9,9 +9,11 @@ open! Import
     asks to remember or refers to what they said before. *)
 
 val name : string
+val spec : Tool_spec.t
 
 (** Whether [action] changes the memory (approvals). *)
 val changes : string -> bool
 
-(** [now] (default: the clock) dates saved notes. *)
+(** [now] (default: the clock) dates saved notes. While memory is off
+    ({!Memory.enabled}) every call is refused. *)
 val create : ?now:(unit -> Time_float.t) -> memory:Memory.t -> unit -> Tool.t

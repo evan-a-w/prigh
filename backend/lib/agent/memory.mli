@@ -10,14 +10,26 @@ open! Import
     Every change re-reads the file and replaces it atomically (a temporary
     file renamed over it) under the file's {!Lock_dir} and this value's
     mutex, so sessions and backends sharing a home do not lose each other's
-    notes. Make one per world. *)
+    notes. Make one per world.
+
+    The user can turn memory off: [memory.enabled] set to [false] in their
+    {!User_prefs} (absent: on). *)
 
 type t
 
 (** [~/.prigh/memory.json] under [home]. *)
 val path : home:string -> string
 
-val create : path:string -> t
+(** The memory and the preferences under [home]. *)
+val create : home:string -> t
+
+(** [f] runs after every change made through this value: a note saved,
+    edited or forgotten, memory turned on or off. *)
+val subscribe : t -> f:(unit -> unit) -> unit
+
+val enabled_key : string
+val enabled : t -> bool
+val set_enabled : t -> bool -> unit Or_error.t
 
 module Note : sig
   type t =
@@ -27,6 +39,10 @@ module Note : sig
     ; saved : Time_float.t (** shown in UTC *)
     }
   [@@deriving sexp_of]
+
+  (** [{"id", "title"?, "text", "saved"}], [saved] in UTC as
+      [YYYY-MM-DD HH:MM:SS.ffffffZ]. *)
+  val to_json : t -> Json.t
 end
 
 module Saved : sig
@@ -49,6 +65,17 @@ val save
   -> now:Time_float.t
   -> string
   -> Saved.t Or_error.t
+
+(** Replaces the title and text of the note [id], keeping its id and
+    dating it [now]; refused as {!save} is, or when another note has this
+    title. *)
+val edit
+  :  t
+  -> id:string
+  -> ?title:string
+  -> now:Time_float.t
+  -> string
+  -> Note.t Or_error.t
 
 (** Every note, oldest first. *)
 val notes : t -> Note.t list Or_error.t
