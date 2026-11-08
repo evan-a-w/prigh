@@ -77,19 +77,32 @@ hl.bind("SUPER + 1", hl.dsp.exec_cmd("touch $work/1"))
 hl.bind("ALT + D", hl.dsp.exec_cmd("touch $work/alt-d"))
 CONF
 # A seat that cannot open: Hyprland then leaves the machine's input devices
-# and DRM alone and runs on the Wayland backend only.
-WAYLAND_DISPLAY=kwin-0 LIBSEAT_BACKEND=seatd SEATD_SOCK=$work/no-seatd HYPRLAND_NO_CRASHREPORTER=1 \
-	Hyprland --config "$work/hyprland.lua" >"$work/hyprland.log" 2>&1 &
-pids+=($!)
-wait_for 30 bash -c "ls $XDG_RUNTIME_DIR/hypr/*/.socket.sock" || {
+# and DRM alone and runs on the Wayland backend only. Now and then it starts
+# with no monitor (the nested output never comes up): then it starts again.
+started=
+for attempt in 1 2 3; do
+	rm -rf "$XDG_RUNTIME_DIR/hypr"
+	WAYLAND_DISPLAY=kwin-0 LIBSEAT_BACKEND=seatd SEATD_SOCK=$work/no-seatd HYPRLAND_NO_CRASHREPORTER=1 \
+		Hyprland --config "$work/hyprland.lua" >"$work/hyprland.log" 2>&1 &
+	hypr=$!
+	pids+=($hypr)
+	if wait_for 30 bash -c "ls $XDG_RUNTIME_DIR/hypr/*/.socket.sock"; then
+		HYPRLAND_INSTANCE_SIGNATURE=$(basename "$(dirname "$(ls "$XDG_RUNTIME_DIR"/hypr/*/.socket.sock)")")
+		export HYPRLAND_INSTANCE_SIGNATURE
+		if wait_for 15 bash -c 'hyprctl -j monitors | grep -q "\"width\": 1920"' 2>/dev/null; then
+			started=1
+			break
+		fi
+	fi
+	echo "Hyprland attempt $attempt came up without a monitor" >"$work/attempt-$attempt"
+	kill_tree "$hypr"
+done
+[ -n "$started" ] || {
 	tail -20 "$work/hyprland.log" >&2
 	exit 1
 }
-HYPRLAND_INSTANCE_SIGNATURE=$(basename "$(dirname "$(ls "$XDG_RUNTIME_DIR"/hypr/*/.socket.sock)")")
-export HYPRLAND_INSTANCE_SIGNATURE
 WAYLAND_DISPLAY=$(hyprctl -j instances | sed -nE 's/.*"wl_socket": "([^"]*)".*/\1/p' | head -1)
 export WAYLAND_DISPLAY
-wait_for 20 bash -c 'hyprctl -j monitors | grep -q "\"width\": 1920"'
 stdbuf -oL wev >"$work/wev.log" 2>&1 &
 pids+=($!)
 wait_for 20 bash -c 'hyprctl -j activewindow | grep -q wev'
@@ -114,7 +127,7 @@ mkfifo "$work/in"
 "$helper" --settle-ms 0 <"$work/in" >"$work/held.out" &
 held=$!
 exec 4>"$work/in"
-echo '{"id":4,"op":"act","action":{"action":"hold_key","combo":"alt","duration":30}}' >&4
+echo '{"id":4,"op":"act","action":{"action":"hold_key","combo":"alt","duration":10}}' >&4
 wait_for 10 has "$work/wev.log" "depressed: 00000008"
 kill -TERM "$held"
 wait "$held" || true

@@ -7,6 +7,10 @@ binds fired: none
 == d alone (no Super left down)
 {"cursor":{"x":320,"y":180},"id":3,"ok":true,"screenshot":{"data":"…","height":360,"mime_type":"image/png","width":640},"text":"pressed d"}
 binds fired: none
+== SIGTERM while holding alt, then d alone
+{"error":"the helper was stopped","id":4,"interrupted":false,"ok":false}
+{"cursor":{"x":320,"y":180},"id":5,"ok":true,"screenshot":{"data":"…","height":360,"mime_type":"image/png","width":640},"text":"pressed d"}
+binds fired: none
 -- wev received:
 key Super_L
 key h
@@ -16,4 +20,6 @@ key l
 key o
 key space
 key eacute
+key d
+key Alt_L
 key d
