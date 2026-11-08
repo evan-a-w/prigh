@@ -40,7 +40,8 @@ let
   };
   # The computer-use helper (desktop/computer): `prigh tool-host -computer`
   # and `prigh desktop -computer` run it (PRIGH_COMPUTER) for the computer
-  # tool. Its Wayland and X11 clients speak the protocols themselves; the
+  # tool. Its Wayland and X11 clients speak the protocols themselves (the
+  # Wayland keyboard compiles layouts with libxkbcommon); the
   # xdg-desktop-portal backend (GNOME, KDE) links libpipewire for the
   # screen cast (D-Bus is zbus, pure Rust).
   prighComputer = pkgs.rustPlatform.buildRustPackage {
@@ -53,7 +54,10 @@ let
       pkgs.pkg-config
       pkgs.rustPlatform.bindgenHook
     ];
-    buildInputs = [ pkgs.pipewire ];
+    buildInputs = [
+      pkgs.pipewire
+      pkgs.libxkbcommon
+    ];
     # tests/portal.rs runs a fake portal on a private bus; tests/screencast.rs
     # a private PipeWire (with wireplumber) and a GStreamer test screen
     nativeCheckInputs = [

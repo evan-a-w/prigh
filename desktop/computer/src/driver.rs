@@ -45,6 +45,10 @@ impl Default for Config {
 
 pub const INTERRUPTED: &str = "you moved the mouse: stopped (computer use paused until the next prompt)";
 
+/// Set when the helper is told to stop (a signal): the action in hand stops
+/// at its next step, letting go of what it holds.
+pub static STOPPING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
 enum Failure {
     Error(String),
     Interrupted,
@@ -133,8 +137,11 @@ impl Driver {
     }
 
     /// Fails with [Failure::Interrupted] when the pointer is not where the
-    /// helper left it (recently).
+    /// helper left it (recently), and when the helper is [STOPPING].
     fn check(&mut self) -> R<()> {
+        if STOPPING.load(std::sync::atomic::Ordering::Relaxed) {
+            return Err(Failure::Error("the helper was stopped".into()));
+        }
         let Some((left, at)) = self.left_at else { return Ok(()) };
         if at.elapsed() > self.config.watch {
             self.left_at = None;
@@ -389,6 +396,7 @@ impl Driver {
         match result {
             Ok(()) => out,
             Err(f) => {
+                let _ = self.backend.release_all().and_then(|()| self.backend.sync());
                 let (error, interrupted) = match f {
                     Failure::Error(e) => (e, false),
                     Failure::Interrupted => (INTERRUPTED.to_string(), true),
@@ -443,6 +451,12 @@ impl Driver {
         };
         body.insert("id".into(), id);
         Value::Object(body)
+    }
+}
+
+impl Drop for Driver {
+    fn drop(&mut self) {
+        let _ = self.backend.release_all().and_then(|()| self.backend.sync());
     }
 }
 
@@ -550,6 +564,25 @@ mod tests {
         std::thread::sleep(Duration::from_millis(5));
         ask(&mut d, r#"{"id":2,"op":"fake_user_move","x":5,"y":5}"#);
         assert!(ask(&mut d, r#"{"id":3,"op":"act","action":{"action":"type","text":"x"}}"#).contains(r#""ok":true"#));
+    }
+
+    #[test]
+    fn a_failure_releases_every_key() {
+        let mut d = driver();
+        d.backend.as_fake().unwrap().refuse = crate::keysym::of_name("t");
+        assert_eq!(
+            ask(&mut d, r#"{"id":1,"op":"act","action":{"action":"key","combo":"ctrl+shift+t"}}"#),
+            r#"{"error":"the fake refuses t","id":1,"interrupted":false,"ok":false}"#
+        );
+        assert_eq!(
+            ask(&mut d, r#"{"id":2,"op":"fake_log"}"#),
+            r#"{"id":2,"log":["key Control_L+Shift_L+t down","released Shift_L+Control_L"],"ok":true}"#
+        );
+        // keys held during a click that fails
+        d.backend.as_fake().unwrap().refuse = crate::keysym::of_name("shift");
+        ask(&mut d, r#"{"id":3,"op":"act","action":{"action":"click","x":1,"y":1,"keys":"super+shift"}}"#);
+        let fake = d.backend.as_fake().unwrap();
+        assert_eq!(fake.log[2..], ["move 2,2", "key Super_L+Shift_L down", "released Super_L"]);
     }
 
     #[test]
