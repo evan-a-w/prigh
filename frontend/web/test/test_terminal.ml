@@ -505,3 +505,160 @@ let%expect_test "/terminal DIR: a shell of its own there, for that session" =
     ((session s1)(host backend)(online true)(as_user())(generation 0)(dir()))
     |}]
 ;;
+
+(* The extra keys over a phone's keyboard (Terminal_keys): what each sends,
+   with ESC for \x1b and ^X for the other control characters. *)
+
+let readable bytes =
+  String.concat_map bytes ~f:(fun c ->
+    match c with
+    | '\x1b' -> "ESC"
+    | '\x7f' -> "^?"
+    | c when Char.to_int c < 0x20 -> "^" ^ String.of_char (Char.of_int_exn (Char.to_int c + 64))
+    | c -> String.of_char c)
+;;
+
+let%expect_test "the extra keys: the bar and what each key sends" =
+  List.iter Terminal_keys.Key.all ~f:(fun key ->
+    let send ~app_cursor =
+      readable (snd (Terminal_keys.press Terminal_keys.empty key ~app_cursor ~now:0.))
+    in
+    printf
+      "%-52s repeats:%-5b normal:%-7s app:%-7s shows %s\n"
+      (Terminal_keys.Key.name key)
+      (Terminal_keys.Key.repeats key)
+      (send ~app_cursor:false)
+      (send ~app_cursor:true)
+      (Terminal_keys.Key.label key));
+  [%expect {|
+    Escape                                               repeats:false normal:ESC     app:ESC     shows Esc
+    Tab                                                  repeats:false normal:^I      app:^I      shows Tab
+    Control: tap for the next key, double-tap to lock    repeats:false normal:        app:        shows Ctrl
+    Alt: tap for the next key, double-tap to lock        repeats:false normal:        app:        shows Alt
+    Left arrow                                           repeats:true  normal:ESC[D   app:ESCOD   shows ←
+    Up arrow                                             repeats:true  normal:ESC[A   app:ESCOA   shows ↑
+    Down arrow                                           repeats:true  normal:ESC[B   app:ESCOB   shows ↓
+    Right arrow                                          repeats:true  normal:ESC[C   app:ESCOC   shows →
+    Vertical bar                                         repeats:false normal:|       app:|       shows |
+    Tilde                                                repeats:false normal:~       app:~       shows ~
+    Slash                                                repeats:false normal:/       app:/       shows /
+    Hyphen                                               repeats:false normal:-       app:-       shows -
+    Home                                                 repeats:false normal:ESC[H   app:ESCOH   shows Home
+    End                                                  repeats:false normal:ESC[F   app:ESCOF   shows End
+    Page up                                              repeats:false normal:ESC[5~  app:ESC[5~  shows PgUp
+    Page down                                            repeats:false normal:ESC[6~  app:ESC[6~  shows PgDn
+    |}]
+;;
+
+let%expect_test "Ctrl and Alt: tap for the next key, double-tap to lock" =
+  let t = ref Terminal_keys.empty in
+  let latches () =
+    sprintf
+      "ctrl:%s alt:%s"
+      (Sexp.to_string [%sexp (Terminal_keys.latch !t Ctrl : Terminal_keys.Latch.t)])
+      (Sexp.to_string [%sexp (Terminal_keys.latch !t Alt : Terminal_keys.Latch.t)])
+  in
+  let press ?(app_cursor = false) ?(at = 0.) key =
+    let t', bytes = Terminal_keys.press !t key ~app_cursor ~now:at in
+    t := t';
+    printf
+      "%-22s -> %-12s %s\n"
+      (Sexp.to_string [%sexp (key : Terminal_keys.Key.t)])
+      (readable bytes)
+      (latches ())
+  in
+  let type_ data =
+    let t', bytes = Terminal_keys.type_ !t data in
+    t := t';
+    printf "%-22s -> %-12s %s\n" ("typed " ^ readable data) (readable bytes) (latches ())
+  in
+  (* Nothing latched: typing is untouched. *)
+  type_ "c";
+  (* A tap: the next key only. *)
+  press (Modifier Ctrl);
+  type_ "c";
+  type_ "c";
+  press (Modifier Alt);
+  type_ "x";
+  press (Modifier Ctrl) ~at:0.;
+  press (Modifier Alt) ~at:10.;
+  type_ "b";
+  (* Ctrl with the bar's own keys, the arrows in either cursor mode. *)
+  press (Modifier Ctrl);
+  press (Char '/');
+  press (Modifier Ctrl);
+  press Left ~app_cursor:true;
+  press Up ~app_cursor:true;
+  press (Modifier Alt);
+  press Esc;
+  press (Modifier Alt);
+  press Page_up;
+  (* Tapped again later: off again. *)
+  press (Modifier Ctrl) ~at:1000.;
+  press (Modifier Ctrl) ~at:2000.;
+  (* Twice quickly: locked, for every key until tapped again. *)
+  press (Modifier Ctrl) ~at:3000.;
+  press (Modifier Ctrl) ~at:3300.;
+  type_ "c";
+  type_ "d";
+  press Right;
+  press (Modifier Alt) ~at:3400.;
+  type_ "f";
+  press (Modifier Ctrl) ~at:3500.;
+  type_ "c";
+  (* A double tap of one is not one of each. *)
+  press (Modifier Ctrl) ~at:4000.;
+  press (Modifier Alt) ~at:4100.;
+  press (Modifier Ctrl) ~at:4200.;
+  press (Modifier Alt) ~at:4300.;
+  (* Ctrl on what has no control character, and on a word. *)
+  press (Modifier Ctrl);
+  type_ "é";
+  press (Modifier Ctrl);
+  type_ "ls";
+  press (Modifier Ctrl);
+  type_ "";
+  type_ "[";
+  [%expect {|
+    typed c                -> c            ctrl:Off alt:Off
+    (Modifier Ctrl)        ->              ctrl:Once alt:Off
+    typed c                -> ^C           ctrl:Off alt:Off
+    typed c                -> c            ctrl:Off alt:Off
+    (Modifier Alt)         ->              ctrl:Off alt:Once
+    typed x                -> ESCx         ctrl:Off alt:Off
+    (Modifier Ctrl)        ->              ctrl:Once alt:Off
+    (Modifier Alt)         ->              ctrl:Once alt:Once
+    typed b                -> ESC^B        ctrl:Off alt:Off
+    (Modifier Ctrl)        ->              ctrl:Once alt:Off
+    (Char /)               -> ^_           ctrl:Off alt:Off
+    (Modifier Ctrl)        ->              ctrl:Once alt:Off
+    Left                   -> ESC[1;5D     ctrl:Off alt:Off
+    Up                     -> ESCOA        ctrl:Off alt:Off
+    (Modifier Alt)         ->              ctrl:Off alt:Once
+    Esc                    -> ESCESC       ctrl:Off alt:Off
+    (Modifier Alt)         ->              ctrl:Off alt:Once
+    Page_up                -> ESC[5;3~     ctrl:Off alt:Off
+    (Modifier Ctrl)        ->              ctrl:Once alt:Off
+    (Modifier Ctrl)        ->              ctrl:Off alt:Off
+    (Modifier Ctrl)        ->              ctrl:Once alt:Off
+    (Modifier Ctrl)        ->              ctrl:Locked alt:Off
+    typed c                -> ^C           ctrl:Locked alt:Off
+    typed d                -> ^D           ctrl:Locked alt:Off
+    Right                  -> ESC[1;5C     ctrl:Locked alt:Off
+    (Modifier Alt)         ->              ctrl:Locked alt:Once
+    typed f                -> ESC^F        ctrl:Locked alt:Off
+    (Modifier Ctrl)        ->              ctrl:Off alt:Off
+    typed c                -> c            ctrl:Off alt:Off
+    (Modifier Ctrl)        ->              ctrl:Once alt:Off
+    (Modifier Alt)         ->              ctrl:Once alt:Once
+    (Modifier Ctrl)        ->              ctrl:Off alt:Once
+    (Modifier Alt)         ->              ctrl:Off alt:Off
+    (Modifier Ctrl)        ->              ctrl:Once alt:Off
+    typed é               -> é           ctrl:Off alt:Off
+    (Modifier Ctrl)        ->              ctrl:Once alt:Off
+    typed ls               -> ^Ls          ctrl:Off alt:Off
+    (Modifier Ctrl)        ->              ctrl:Once alt:Off
+    typed                  ->              ctrl:Once alt:Off
+    typed [                -> ESC          ctrl:Off alt:Off
+    |}]
+;;
