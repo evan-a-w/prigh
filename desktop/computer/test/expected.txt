@@ -16,6 +16,7 @@ key o
 key space
 key eacute
 key U2192
+key Control_L
 key Control+a
 wheel (axis, value120) (0, 240)
 == x11 (Xvfb)

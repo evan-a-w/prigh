@@ -37,6 +37,10 @@ pub trait Backend {
     fn keys(&mut self, keys: &[Keysym], down: bool) -> Result<(), String>;
     /// Types text, whatever its characters, independent of the user's layout.
     fn type_text(&mut self, text: &str) -> Result<(), String>;
+    /// Releases every key still held: after a failure, and at exit.
+    fn release_all(&mut self) -> Result<(), String> {
+        Ok(())
+    }
 
     /// Where the pointer is now, if this desktop can tell: the kill switch
     /// compares it with where the helper left it.

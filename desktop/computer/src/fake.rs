@@ -15,11 +15,22 @@ pub struct Fake {
     /// Where buttons went down, drawn as dots.
     marks: Vec<(i32, i32)>,
     pub log: Vec<String>,
+    held: Vec<Keysym>,
+    /// A key the fake fails to press, to test what a failure leaves held.
+    pub refuse: Option<Keysym>,
 }
 
 impl Fake {
     pub fn new(width: u32, height: u32) -> Fake {
-        Fake { width, height, pointer: (width as i32 / 2, height as i32 / 2), marks: Vec::new(), log: Vec::new() }
+        Fake {
+            width,
+            height,
+            pointer: (width as i32 / 2, height as i32 / 2),
+            marks: Vec::new(),
+            log: Vec::new(),
+            held: Vec::new(),
+            refuse: None,
+        }
     }
 
     pub fn user_move(&mut self, x: i32, y: i32) {
@@ -85,6 +96,26 @@ impl Backend for Fake {
     fn keys(&mut self, keys: &[Keysym], down: bool) -> Result<(), String> {
         let names: Vec<String> = keys.iter().map(|k| xkb_name(*k)).collect();
         self.log.push(format!("key {} {}", names.join("+"), if down { "down" } else { "up" }));
+        for &k in keys {
+            if !down {
+                if let Some(i) = self.held.iter().rposition(|h| *h == k) {
+                    self.held.remove(i);
+                }
+            } else if self.refuse == Some(k) {
+                return Err(format!("the fake refuses {}", xkb_name(k)));
+            } else {
+                self.held.push(k);
+            }
+        }
+        Ok(())
+    }
+
+    fn release_all(&mut self) -> Result<(), String> {
+        if !self.held.is_empty() {
+            let names: Vec<String> = self.held.iter().rev().map(|k| xkb_name(*k)).collect();
+            self.log.push(format!("released {}", names.join("+")));
+            self.held.clear();
+        }
         Ok(())
     }
 
