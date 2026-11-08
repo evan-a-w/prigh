@@ -3156,6 +3156,62 @@ compact_at_tokens=0 compaction_model=null mask_observations=false
 fits: true
 === firefox: compaction: errors ===
 (none)
+=== firefox: memory: notes ===
+Memory
+What you asked the model to remember, for later sessions. Kept on the backend, for your account.
+Use memory
+The model saves a note only when you ask it to remember something, and looks one up when you refer back to it. Off, it is not given the memory tool, and your notes stay here.
+NOTES
+3 notes
+Add note
+shell
+fish
+Saved 2025-10-03
+Deploys go through the staging cluster first, then production on Tuesdays
+Saved 2025-10-02
+editor
+helix, with the default keymap
+Saved 2025-10-01
+switch: true
+=== firefox: memory: filtered ===
+Deploys go through the staging cluster first, then production on Tuesdays | Saved 2025-10-02
+settings still open: 1
+=== firefox: memory: edited and added ===
+m1 editor: neovim, with lazy.nvim; m2 -: Deploys go through the staging cluster first, then production on Tuesdays; m3 shell: fish; m4 pager: less -R
+=== firefox: memory: deleting ===
+shell | fish | Delete this note? The model can no longer recall it. | Keep | Delete
+m1 editor: neovim, with lazy.nvim; m2 -: Deploys go through the staging cluster first, then production on Tuesdays; m4 pager: less -R
+=== firefox: memory: off ===
+Memory
+What you asked the model to remember, for later sessions. Kept on the backend, for your account.
+Use memory
+The model saves a note only when you ask it to remember something, and looks one up when you refer back to it. Off, it is not given the memory tool, and your notes stay here.
+NOTES
+3 notes
+Add note
+pager
+less -R
+Saved (today)
+editor
+neovim, with lazy.nvim
+Saved (today)
+Deploys go through the staging cluster first, then production on Tuesdays
+Saved 2025-10-02
+switch: false
+prefs: memory.enabled=false
+after /memory on: prefs memory.enabled=null
+=== firefox: memory: phone 390x844 ===
+fits: yes; targets: all ok
+deleting fits: yes; targets: all ok
+editing fits: yes; targets: all ok
+back: Memory | What you asked the model to remember, for later sessions. Kept on the backend, for your account.
+=== firefox: memory: phone 320x640 ===
+fits: yes; targets: all ok
+deleting fits: yes; targets: all ok
+editing fits: yes; targets: all ok
+back: Memory | What you asked the model to remember, for later sessions. Kept on the backend, for your account.
+=== firefox: memory: errors ===
+(none)
 === firefox: images (desktop): refused as too large: the error card ===
 The model returned an error
 HTTP 400: invalid_request_error: messages.0.content.0: image exceeds 5 MB maximum (Claude Opus 4.6 still refused the images downsized to 0.8 MB, 1500 px: /downsize-images makes them smaller and tries again)
