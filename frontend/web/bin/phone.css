@@ -286,6 +286,8 @@
 .app.narrow .setting :is(.btn, select, .chip-button) { min-height: 40px; }
 .app.narrow .setting input[type="text"], .app.narrow .setting input:not([type]) { width: 100%; }
 .app.narrow .switch { width: 46px; height: 28px; border-radius: 14px; }
+/* Its hit area a thumb's, past the 28px it shows. */
+.app.narrow .switch::after { content: ""; position: absolute; inset: -9px -2px; }
 .app.narrow .settings-group h4 { font-size: 12px; }
 /* A wide row is the words, then the control: neither grows into a gap. */
 .app.narrow .setting-wide { flex-wrap: nowrap; }
@@ -506,6 +508,6 @@
 .app.narrow .memory-note.forgetting .setting-control { width: 100%; }
 .app.narrow .memory-note.forgetting .setting-control .btn { flex: 1; min-height: var(--tap); }
 .app.narrow :is(.memory-toolbar, .memory-draft-buttons) .btn { min-height: var(--tap); }
-.app.narrow .memory-filter { min-height: var(--tap); }
+.app.narrow :is(.memory-filter, .memory-title-input) { min-height: var(--tap); }
 .app.narrow .memory-draft-keys { display: none; }
 .app.narrow .memory-draft-buttons .btn { flex: 1; }
