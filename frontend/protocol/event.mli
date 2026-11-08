@@ -154,6 +154,8 @@ type t =
       } (** the temporary session this client left is deleted *)
   | Prefs_changed of Prefs.Change.t list
   (** another frontend of the user changed their preferences *)
+  | Memory_changed of Memory.t
+  (** a note was saved, edited or forgotten, or memory turned on or off *)
   | Nix_gc_progress of Nix_gc_progress.t
   (** how far the [nix_store_gc] we asked for got *)
 [@@deriving sexp_of, equal]
