@@ -1,0 +1,19 @@
+== super+d
+{"cursor":{"x":320,"y":180},"id":1,"ok":true,"screenshot":{"data":"…","height":360,"mime_type":"image/png","width":640},"text":"pressed super+d"}
+binds fired: super+d
+== type
+{"cursor":{"x":320,"y":180},"id":2,"ok":true,"screenshot":{"data":"…","height":360,"mime_type":"image/png","width":640},"text":"typed 7 characters"}
+binds fired: none
+== d alone (no Super left down)
+{"cursor":{"x":320,"y":180},"id":3,"ok":true,"screenshot":{"data":"…","height":360,"mime_type":"image/png","width":640},"text":"pressed d"}
+binds fired: none
+-- wev received:
+key Super_L
+key h
+key e
+key l
+key l
+key o
+key space
+key eacute
+key d

@@ -225,7 +225,10 @@
                   export __EGL_VENDOR_LIBRARY_FILENAMES=${pkgs.mesa}/share/glvnd/egl_vendor.d/50_mesa.json
                   export LIBGL_DRIVERS_PATH=${pkgs.mesa}/lib/dri GBM_BACKENDS_PATH=${pkgs.mesa}/lib/gbm
                   export LD_LIBRARY_PATH=${pkgs.mesa}/lib
-                  exec bash ${./desktop/computer/test}/hyprland.sh "''${1:-${prighComputer}/bin/prigh-computer}"
+                  actual=$(mktemp)
+                  trap 'rm -f "$actual"' EXIT
+                  bash ${./desktop/computer/test}/hyprland.sh "''${1:-${prighComputer}/bin/prigh-computer}" | tee "$actual"
+                  diff -u ${./desktop/computer/test/hyprland.expected} "$actual" && echo "as expected"
                 '';
               }
             );

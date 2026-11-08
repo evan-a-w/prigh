@@ -49,8 +49,9 @@ fired() {
 	hyprctl dispatch "hl.dsp.exec_cmd(\"touch $work/sync\")" >/dev/null
 	wait_for 10 test -e "$work/sync"
 	for f in d escape 1; do [ -e "$work/$f" ] && out="$out super+$f"; done
+	[ -e "$work/alt-d" ] && out="$out alt+d"
 	echo "binds fired:${out:- none}"
-	rm -f "$work/d" "$work/escape" "$work/1"
+	rm -f "$work/d" "$work/escape" "$work/1" "$work/alt-d"
 }
 
 ls /dev/dri/renderD* >/dev/null 2>&1 || {
@@ -73,6 +74,7 @@ hl.config({ misc = { disable_hyprland_logo = true, disable_splash_rendering = tr
 hl.bind("SUPER + D", hl.dsp.exec_cmd("touch $work/d"))
 hl.bind("SUPER + Escape", hl.dsp.exec_cmd("touch $work/escape"))
 hl.bind("SUPER + 1", hl.dsp.exec_cmd("touch $work/1"))
+hl.bind("ALT + D", hl.dsp.exec_cmd("touch $work/alt-d"))
 CONF
 # A seat that cannot open: Hyprland then leaves the machine's input devices
 # and DRM alone and runs on the Wayland backend only.
@@ -104,7 +106,21 @@ ask '{"id":2,"op":"act","action":{"action":"type","text":"hello é"}}'
 fired
 echo "== d alone (no Super left down)"
 ask '{"id":3,"op":"act","action":{"action":"key","combo":"d"}}'
-wait_for 10 bash -c "awk -f $here/wev.awk $work/wev.log /dev/null | grep -qx 'key d'"
+fired
+# A compositor may keep a stopped client's keys down (Hyprland does unless
+# release_pressed_on_close): on SIGTERM the helper lets go first.
+echo "== SIGTERM while holding alt, then d alone"
+mkfifo "$work/in"
+"$helper" --settle-ms 0 <"$work/in" >"$work/held.out" &
+held=$!
+exec 4>"$work/in"
+echo '{"id":4,"op":"act","action":{"action":"hold_key","combo":"alt","duration":30}}' >&4
+wait_for 10 has "$work/wev.log" "depressed: 00000008"
+kill -TERM "$held"
+wait "$held" || true
+exec 4>&-
+sed -E 's/"data":"[^"]*"/"data":"…"/' "$work/held.out"
+ask '{"id":5,"op":"act","action":{"action":"key","combo":"d"}}'
 fired
 echo "-- wev received:"
 awk -f "$here/wev.awk" "$work/wev.log" /dev/null

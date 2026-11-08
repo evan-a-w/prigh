@@ -45,6 +45,10 @@ impl Default for Config {
 
 pub const INTERRUPTED: &str = "you moved the mouse: stopped (computer use paused until the next prompt)";
 
+/// Set when the helper is told to stop (a signal): the action in hand stops
+/// at its next step, letting go of what it holds.
+pub static STOPPING: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
 enum Failure {
     Error(String),
     Interrupted,
@@ -133,8 +137,11 @@ impl Driver {
     }
 
     /// Fails with [Failure::Interrupted] when the pointer is not where the
-    /// helper left it (recently).
+    /// helper left it (recently), and when the helper is [STOPPING].
     fn check(&mut self) -> R<()> {
+        if STOPPING.load(std::sync::atomic::Ordering::Relaxed) {
+            return Err(Failure::Error("the helper was stopped".into()));
+        }
         let Some((left, at)) = self.left_at else { return Ok(()) };
         if at.elapsed() > self.config.watch {
             self.left_at = None;
