@@ -42,7 +42,9 @@ module Handle = struct
   type t =
     < focus : unit Js.meth
     ; dispose : unit Js.meth
-    ; setTheme : Js.Unsafe.any -> unit Js.meth >
+    ; setTheme : Js.Unsafe.any -> unit Js.meth
+    ; press : Js.js_string Js.t -> unit Js.meth
+    ; appCursor : bool Js.t Js.meth >
       Js.t
 end
 
@@ -113,6 +115,7 @@ module Mounted = struct
   type t =
     { mutable handle : Handle.t option
     ; mutable disposed : bool
+    ; keys : Terminal_keys_widget.t
     }
 end
 
@@ -159,6 +162,13 @@ let mount (input : Input.t) (mounted : Mounted.t) host =
           [| "onStatus", Js.Unsafe.inject on_status
            ; "focus", Js.Unsafe.inject (Js.bool !focus_owed)
            ; "theme", Js.Unsafe.inject (theme_js ())
+           ; ( "transform"
+             , Js.Unsafe.inject
+                 (Js.wrap_callback (fun data ->
+                    Js.string
+                      (Terminal_keys_widget.transform
+                         mounted.keys
+                         (Js.to_string data)))) )
           |]
       in
       focus_owed := false;
@@ -175,7 +185,7 @@ let mount (input : Input.t) (mounted : Mounted.t) host =
 ;;
 
 module Widget = struct
-  type dom = Dom_html.divElement
+  type dom = Dom_html.element
 
   module Input = Input
 
@@ -188,12 +198,35 @@ module Widget = struct
   let name = "prigh-web-terminal"
 
   let create input =
+    let frame = Dom_html.createDiv Dom_html.document in
+    frame##.className := Js.string "terminal-frame";
     let host = Dom_html.createDiv Dom_html.document in
     host##.className := Js.string "terminal-host";
-    let mounted = { Mounted.handle = None; disposed = false } in
+    let self = ref None in
+    let handle () = Option.bind !self ~f:(fun (m : Mounted.t) -> m.handle) in
+    let keys =
+      Terminal_keys_widget.create
+        ~press:(fun data ->
+          Option.iter (handle ()) ~f:(fun h -> h##press (Js.string data)))
+        ~app_cursor:(fun () ->
+          Option.value_map (handle ()) ~default:false ~f:(fun h ->
+            Js.to_bool h##appCursor))
+        ~refocus:(fun () ->
+          let inside =
+            Js.Opt.case
+              Dom_html.document##.activeElement
+              (fun () -> false)
+              (fun active -> Js.to_bool (host##contains (active :> Dom.node Js.t)))
+          in
+          if not inside then Option.iter (handle ()) ~f:(fun h -> h##focus))
+    in
+    let mounted = { Mounted.handle = None; disposed = false; keys } in
+    self := Some mounted;
+    Dom.appendChild frame host;
+    Dom.appendChild frame (Terminal_keys_widget.element keys);
     current := Some mounted;
     mount input mounted host;
-    mounted, host
+    mounted, (frame :> Dom_html.element Js.t)
   ;;
 
   let destroy ~prev_input:_ ~(state : State.t) ~element:_ =
