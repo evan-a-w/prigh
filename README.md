@@ -1448,10 +1448,32 @@ The tool host finds it as `$PRIGH_COMPUTER`, else `prigh-computer` on the
 PATH, with extra arguments from `$PRIGH_COMPUTER_ARGS`.
 
 - **Wayland, wlroots compositors** (Hyprland, sway, river, ...):
-  wlr-screencopy, the virtual pointer and the virtual keyboard (with a
-  keymap made for the characters typed, as `wtype` does). It controls
+  wlr-screencopy, the virtual pointer and the virtual keyboard. It controls
   one output: the focused one (Hyprland and sway say which), else the
-  first.
+  first. The keyboard is a physical one in the user's layout (Hyprland's
+  `input:kb_*` / `kb_file`, else xkbcommon's default: `$XKB_DEFAULT_LAYOUT`,
+  ..., else us): real evdev codes (`super+d` is KEY_LEFTMETA, then KEY_D),
+  modifier keys pressed and released, the modifier state xkb derives from
+  them. Characters the layout lacks get keys of their own past every evdev
+  code (from 768, `KEY_MAX` + 1), so a compositor that reads them through
+  another keymap sees nothing there (Xwayland apps cannot get such keys:
+  those characters do not type in X apps). Keys still down are released
+  when an action fails or is interrupted and when the helper exits (end of
+  input, SIGTERM, SIGINT, SIGHUP); a SIGKILLed helper's keys may stay
+  down (Hyprland keeps them unless
+  `input:virtualkeyboard:release_pressed_on_close`).
+- **Hyprland**: binds are matched through Hyprland's configured layout,
+  whatever keymap a virtual keyboard uploads, so a tool with a keymap of
+  its own (wtype; this helper before) fires other binds: wtype's first key
+  is evdev 1, Escape, so `wtype -M logo -k d` is Super+Escape. There are
+  no prompts by default: any local client may capture the screen and send
+  input. With `ecosystem:enforce_permissions` on, screen capture asks
+  (virtual keyboards stay allowed unless a rule says otherwise); allow the
+  helper in the config (rules are read when Hyprland starts):
+  `hl.permission(".*/prigh-computer", "screencopy", "allow")` (Lua), or
+  `permission = .*/prigh-computer, screencopy, allow` (hyprlang). The
+  first argument is a regex on the binary's path; a `keyboard` rule
+  matches the device name, `hl-virtual-keyboard-prigh-computer`.
 - **X11**: XTEST and the root window, cropped to the primary monitor;
   characters the keyboard map lacks go through spare keycodes.
 - **Other Wayland compositors** (GNOME's Mutter, KDE's KWin, ...):
@@ -1527,7 +1549,12 @@ the helper when its pipe closes (an action in progress finishes first).
 The helper's tests are `cargo test
 -p prigh-computer` in `desktop/` (in `./test`) and the flake's
 `computer-use` check, which drives a headless sway and Xvfb and compares
-the input an app received (`desktop/computer/test/expected.txt`); the
+the input an app received (`desktop/computer/test/expected.txt`);
+`nix run .#computer-use-hyprland` does the same on Hyprland nested in a
+virtual KWin (binds that must fire or not, typing, a SIGTERM while a key
+is held; `hyprland.expected`): it needs a GPU render node, which the Nix
+sandbox lacks (aquamarine allocates buffers only with GBM on a DRM node),
+so it is not a check; the
 package's build runs the portal backend against a fake portal on a private
 D-Bus (`tests/portal.rs`) and its PipeWire capture against a private
 PipeWire (`tests/screencast.rs`).
