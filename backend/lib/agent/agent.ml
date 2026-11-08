@@ -194,6 +194,7 @@ type t =
   ; sw : Switch.t
   ; provider : Provider.t
   ; tools : Tool.t list
+  ; offered : Tool.t -> bool
   ; sessions_dir : string
   ; home : string
   ; models : Model_registry.t
@@ -353,10 +354,11 @@ let active_computer t =
 
 (* The built-in tools, with [computer] while the active host runs it. *)
 let own_tools t =
+  let tools = List.filter t.tools ~f:t.offered in
   match active_computer t with
   | Some info ->
-    t.tools @ [ Tool_computer.for_screen ~native:t.config.computer_native info ]
-  | None -> t.tools
+    tools @ [ Tool_computer.for_screen ~native:t.config.computer_native info ]
+  | None -> tools
 ;;
 
 let find_branch t ~cwd =
@@ -2943,6 +2945,7 @@ let create
       ?max_budget_usd
       ?sleep_until
       ?trace_clock
+      ?(offered = fun (_ : Tool.t) -> true)
       ~cwd
       ()
   =
@@ -2990,6 +2993,7 @@ let create
     ; sw
     ; provider
     ; tools
+    ; offered
     ; sessions_dir
     ; home
     ; models

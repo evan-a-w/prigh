@@ -137,6 +137,7 @@ module Reply_tag = struct
     | Skills_for_autocomplete of string (** the [Location_cache] key *)
     | Skill_prompt of string (** the [/skill:] text sent *)
     | Mcp_picker
+    | Memory_picker
     | Mcp_reconnected
     | Mcp_approved of string (** server *)
     | Pending
@@ -3109,6 +3110,132 @@ let reminder_picker m (reminders : P.Reminder.t list) =
   open_picker m Reminders (Picker.create ~title:"Reminders" items)
 ;;
 
+(* ---- memory ------------------------------------------------------------ *)
+
+let memory_title (memory : P.Memory.t) =
+  let n = List.length memory.notes in
+  sprintf
+    "Memory · %s · %d note%s"
+    (if memory.enabled then "on" else "off: the model is not given it")
+    n
+    (if n = 1 then "" else "s")
+;;
+
+let one_line text = String.concat ~sep:" " (String.split_lines text)
+
+let memory_label (note : P.Memory.Note.t) =
+  Option.value note.title ~default:(one_line note.text)
+;;
+
+(* Newest first. *)
+let memory_items (memory : P.Memory.t) =
+  List.rev_map memory.notes ~f:(fun (note : P.Memory.Note.t) ->
+    Picker.Item.create
+      ~id:note.id
+      ~detail:
+        (match note.title with
+         | Some _ ->
+           sprintf "%s · %s" (P.Memory.Note.date note) (one_line note.text)
+         | None -> P.Memory.Note.date note)
+      ~search:(Option.value note.title ~default:"" ^ " " ^ note.text)
+      (memory_label note))
+;;
+
+let memory_picker m (memory : P.Memory.t) =
+  if List.is_empty memory.notes
+  then
+    notice
+      m
+      (sprintf
+         "memory is empty (%s): the model saves a note when you ask it to \
+          remember something, and recalls it when you refer back"
+         (if memory.enabled
+          then "on; /memory off takes it away"
+          else "off; /memory on gives the model the memory tool"))
+  else
+    open_picker
+      m
+      (Memory memory)
+      (Picker.create ~title:(memory_title memory) (memory_items memory))
+;;
+
+let refresh_memory_picker (memory : P.Memory.t) picker =
+  Picker.set_items ~title:(memory_title memory) picker (memory_items memory)
+;;
+
+(* [memory_changed]: an open picker (or the one a confirmation returns to)
+   follows. *)
+let memory_changed m (memory : P.Memory.t) =
+  match m.mode with
+  | Picker { kind = Memory _; picker } ->
+    { m with
+      mode =
+        Picker
+          { kind = Memory memory; picker = refresh_memory_picker memory picker }
+    }
+  | Confirm
+      { question
+      ; action = Forget_memory { note; back = Some { kind = Memory _; picker } }
+      } ->
+    { m with
+      mode =
+        Confirm
+          { question
+          ; action =
+              Forget_memory
+                { note
+                ; back =
+                    Some
+                      { kind = Memory memory
+                      ; picker = refresh_memory_picker memory picker
+                      }
+                }
+          }
+    }
+  | _ -> m
+;;
+
+let confirm_forget_memory m (note : P.Memory.Note.t) ~back =
+  ( { m with
+      mode =
+        Confirm
+          { question =
+              sprintf
+                "forget %S? The model can no longer recall it (y/n)"
+                (memory_label note)
+          ; action = Forget_memory { note; back }
+          }
+    }
+  , [] )
+;;
+
+let memory_command m args =
+  match args with
+  | [] -> m, [ rpc "get_memory" ~tag:Memory_picker ]
+  | [ (("on" | "off") as word) ] ->
+    let enabled = String.equal word "on" in
+    ( m
+    , [ rpc
+          "set_memory_enabled"
+          ~params:(P.Memory.set_enabled_params enabled)
+          ~tag:
+            (Notice_on_success
+               (if enabled
+                then
+                  "memory on: the model can save and recall notes when you ask"
+                else
+                  "memory off: the model is not given the memory tool; your \
+                   notes are kept (/memory lists them)"))
+      ] )
+  | _ ->
+    ( error
+        (restore_command m ("/memory " ^ String.concat ~sep:" " args))
+        (sprintf
+           "unknown argument %S; use on or off, or nothing to list the notes"
+           (String.concat ~sep:" " args))
+    , [] )
+;;
+
 let nix_gc_still_running m =
   ( warn
       m
@@ -3999,6 +4126,7 @@ let run_command m (cmd : Commands.Parsed.t) =
          ~last_prompt:(last_prompt m)
          cmd.rest)
   | "worktree", _ -> worktree_command m cmd.rest
+  | "memory", args -> memory_command m args
   | "remind", _ ->
     remind_action
       m
@@ -4891,6 +5019,21 @@ let picker_selected m (kind : Mode.Picker_kind.t) (item : Picker.Item.t) =
      with
      | Some w -> open_worktree m w ~new_session:false
      | None -> m, [])
+  | Memory memory ->
+    (match
+       List.find memory.notes ~f:(fun (n : P.Memory.Note.t) ->
+         String.equal n.id item.id)
+     with
+     | Some note ->
+       ( notice
+           m
+           (sprintf
+              "%s (saved %s): %s · Ctrl+D in /memory forgets it"
+              (Option.value note.title ~default:note.id)
+              (P.Memory.Note.date note)
+              note.text)
+       , [] )
+     | None -> error m "that note is gone; /memory lists the others", [])
   | Mcp list -> mcp_selected m list item.id
   | Auth_select id ->
     m, [ rpc "auth_respond" ~params:[ "id", str id; "value", str item.id ] ]
@@ -5189,6 +5332,14 @@ let picker m (kind : Mode.Picker_kind.t) picker (intent : Intent.t) =
      | Worktrees listing ->
        worktree_in_picker m listing picker ~f:(fun w ->
          confirm_remove_worktree m w ~force:false ~back)
+     | Memory memory ->
+       (match
+          Option.bind (Picker.selected_item picker) ~f:(fun item ->
+            List.find memory.notes ~f:(fun (n : P.Memory.Note.t) ->
+              String.equal n.id item.id))
+        with
+        | None -> m, []
+        | Some note -> confirm_forget_memory m note ~back)
      | _ -> { m with quitting = true }, [ Command.Quit ])
   | _ ->
     (match
@@ -5501,6 +5652,13 @@ let confirm m ~(action : Mode.Confirm_action.t) (intent : Intent.t) =
         ~doing:"signing in through the browser: follow the link it opens…"
     | Create_dir { target; path } ->
       m, [ change_dir ~if_missing:Create ~target path ]
+    | Forget_memory { note; back } ->
+      ( back_to m back
+      , [ rpc
+            "forget_memory"
+            ~params:(P.Memory.forget_params ~id:note.id)
+            ~tag:(Notice_on_success (sprintf "forgot %S" (memory_label note)))
+        ] )
     | Remove_worktree { worktree; force; back = _ } ->
       ( notice m (sprintf "removing the worktree at %s…" worktree.path)
       , [ call
@@ -5515,6 +5673,7 @@ let confirm m ~(action : Mode.Confirm_action.t) (intent : Intent.t) =
     | Tool_confirm c -> answer_confirm m c Deny
     | Delete_sessions { back = Some _ as back; _ } -> back_to m back, []
     | Remove_worktree { back = Some _ as back; _ } -> back_to m back, []
+    | Forget_memory { back; _ } -> back_to m back, []
     | Create_dir { path; _ } -> notice m (sprintf "not created: %s" path), []
     | Cd_to_checkout path ->
       notice m (sprintf "staying here; /cd %s goes there" path), []
@@ -5941,6 +6100,7 @@ let event m (e : P.Event.t) =
   | Terminal_frame _
   | Terminal_close _
   | Terminal_kill _ -> m, []
+  | Memory_changed memory -> memory_changed m memory, []
   | Prefs_changed changes ->
     let m = filter_of_prefs m changes in
     (match
@@ -6156,6 +6316,9 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
            { m with skills = Location_cache.set m.skills ~key skills })
      | Mcp_picker ->
        decode json ~f:P.Mcp_list.of_json (fun list -> mcp_picker m list, [])
+     | Memory_picker ->
+       decode json ~f:P.Memory.of_json (fun memory ->
+         memory_picker m memory, [])
      | Nix_store_shown ->
        decode json ~f:P.Nix_store_status.of_json (fun status ->
          ( output

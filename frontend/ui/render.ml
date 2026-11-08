@@ -237,6 +237,12 @@ let mode_hint (m : App.Model.t) : Content.Line.t option =
                 ~style:attention
                 "Enter shows it · Esc closes · Ctrl+D removes"
             ]
+        | Picker { kind = Memory _; _ } ->
+          Some
+            [ span
+                ~style:attention
+                "Enter shows it · Ctrl+D forgets it · Esc closes"
+            ]
         | Picker { kind = Worktrees _; _ } ->
           Some
             [ span

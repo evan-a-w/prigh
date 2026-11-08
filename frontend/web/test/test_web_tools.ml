@@ -553,9 +553,43 @@ let%expect_test "issue and repo: the action and what it acts on" =
            ~arguments:{|{"action":"logs","job":200}|}
            "line 1"
        ]);
-  [%expect {|
+  [%expect
+    {|
     ✓ issue list open "crash"
     ✓ issue close #12
     ✓ repo logs job 200
+    |}]
+;;
+
+let%expect_test "memory: the action and its title, query or id" =
+  Chat_harness.text
+    ~selector:".tool-head"
+    (Chat_harness.chat
+       [ tool_end
+           ~name:"memory"
+           ~arguments:{|{"action":"save","title":"editor","text":"helix"}|}
+           "Saved m1 · editor · 2026-11-07"
+       ; tool_end
+           ~id:"c2"
+           ~name:"memory"
+           ~arguments:{|{"action":"recall","query":"deploy"}|}
+           "No note matches"
+       ; tool_end
+           ~id:"c3"
+           ~name:"memory"
+           ~arguments:{|{"action":"forget","id":"m3"}|}
+           "Forgot m3"
+       ; tool_end
+           ~id:"c4"
+           ~name:"memory"
+           ~arguments:{|{"action":"recall"}|}
+           "Memory is empty."
+       ]);
+  [%expect
+    {|
+    ✓ memory save editor
+    ✓ memory recall "deploy"
+    ✓ memory forget m3
+    ✓ memory recall
     |}]
 ;;

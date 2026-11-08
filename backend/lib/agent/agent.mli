@@ -247,6 +247,9 @@ val create
            default: the clock *)
   -> ?trace_clock:Trace.Clock.t
        (** times the session's trace ({!Trace_file}); default: the clocks *)
+  -> ?offered:(Tool.t -> bool)
+       (** which of [tools] the model is given, asked again for every turn
+           (the user's memory is offered while it is on); default: all *)
   -> cwd:string
   -> unit
   -> t

@@ -299,6 +299,10 @@ module Reply_tag : sig
     | Nix_status of { open_settings : bool }
     (** [nix_store_status]; [/nix-gc] opens Settings once it is in *)
     | Nix_collected (** [nix_store_gc] *)
+    | Memory_loaded (** [get_memory] *)
+    | Memory_saved (** [save_memory]: the draft closes, or says why not *)
+    | Memory_forgot
+    | Memory_enabled (** [set_memory_enabled] *)
     | Trim_points of Trim_purpose.t
     | Trimmed (** [trim]: the confirmation closes, or says why not *)
     | Untrimmed
@@ -575,6 +579,16 @@ module Action : sig
         section and focuses its tab *)
     | Compact_at_input of string (** the settings page's "Compact at" *)
     | Compact_at_commit (** applies it (leaving the field; Enter accepts) *)
+    | Memory_filter of string (** the settings page's Memory: its filter *)
+    | Memory_edit of string option
+    (** edits this note, or writes a new one ([None]) *)
+    | Memory_title of string
+    | Memory_text of string
+    | Memory_save (** Enter in the title, Ctrl+Enter in the text *)
+    | Memory_cancel (** Esc *)
+    | Memory_forget of string (** asks first *)
+    | Memory_forget_confirm
+    | Memory_forget_cancel
     | Open_rename
     | Open_subagents of string option
     (** the agents panel: its list, or the agent or job with this number
@@ -930,6 +944,7 @@ module Model : sig
         goes down to its place *)
     ; forges : Forges.t (** the user's git hosts *)
     ; nix_gc : Nix_gc.t (** superusers': the Nix store *)
+    ; memory : Memory_notes.t (** the settings page's Memory *)
     ; compact_at : Compact_at.t (** the settings page's "Compact at" *)
     ; settings_section : Settings_section.t
     (* A phone's settings show the list of sections, not one of them. *)

@@ -25,6 +25,10 @@ val issue : Tool_args.t -> string option
 (** [repo]'s argument: the action and its run or job, e.g. [logs job 7]. *)
 val repo : Tool_args.t -> string option
 
+(** [memory]'s argument: the action and its title (or quoted text), query or
+    id, e.g. [save editor], [recall "deploy"], [forget m3]. *)
+val memory : Tool_args.t -> string option
+
 (** Whether a [job_input] call ends the job's stdin. *)
 val closes_stdin : Tool_args.t -> bool
 

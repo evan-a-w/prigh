@@ -152,6 +152,7 @@ module Reply_tag : sig
     | Skill_prompt of string
     (** a [/skill:] prompt, steer or follow-up; failing puts it back *)
     | Mcp_picker
+    | Memory_picker
     | Mcp_reconnected
     | Mcp_approved of string (** server *)
     | Pending (** [get_pending]: confirmations and questions to show *)

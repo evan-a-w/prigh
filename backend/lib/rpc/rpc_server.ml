@@ -117,6 +117,10 @@ let methods =
   ; "get_prefs"
   ; "set_prefs"
   ; "push_pref"
+  ; "get_memory"
+  ; "save_memory"
+  ; "forget_memory"
+  ; "set_memory_enabled"
   ]
   @ Files_rpc.methods
   @ Review_rpc.methods
@@ -401,6 +405,7 @@ type t =
   ; terminals : Terminal_relay.t
   ; home : string option (** for the current [config.json] *)
   ; prefs : User_prefs.t option (** under [home] *)
+  ; memory : Memory.t option (** under [home] *)
   ; now : unit -> float
   ; listed : Listed.t String.Table.t
     (** what [list_sessions] last showed of each live session *)
@@ -755,6 +760,26 @@ let register t agent =
   agent
 ;;
 
+let memory_json memory =
+  let%map.Or_error notes = Memory.notes memory in
+  [ ("enabled", if Memory.enabled memory then `True else `False)
+  ; "notes", `Array (List.map notes ~f:Memory.Note.to_json)
+  ]
+;;
+
+(* Every client hears of every change, the model's saves included, so that
+   open settings follow. *)
+let memory_changed (t : t) memory =
+  match memory_json memory with
+  | Error _ -> ()
+  | Ok fields ->
+    let json =
+      `Object
+        ([ "type", `String "event"; "event", `String "memory_changed" ] @ fields)
+    in
+    Hashtbl.iter t.clients ~f:(fun (c : Client.t) -> c.send json)
+;;
+
 let create
       ~env
       ~sw
@@ -768,6 +793,7 @@ let create
       ?(backend_host = true)
       ?home
       ?forges
+      ?memory
       ?transcription_http
       ?nix_store
       ~login
@@ -827,6 +853,10 @@ let create
     ; prefs =
         Option.map home ~f:(fun home ->
           User_prefs.create ~path:(User_prefs.path ~home))
+    ; memory =
+        (match memory with
+         | Some _ -> memory
+         | None -> Option.map home ~f:(fun home -> Memory.create ~home))
     ; now = (fun () -> Eio.Time.now (Eio.Stdenv.clock env))
     ; listed = String.Table.create ()
     ; on_session_deleted = []
@@ -844,6 +874,8 @@ let create
   (* The flow itself (URL, prompts) belongs to the client that started it:
      other frontends, possibly on other machines, must not open a browser or
      pop up a dialog. Everyone hears the outcome, to refresh their status. *)
+  Option.iter t.memory ~f:(fun memory ->
+    Memory.subscribe memory ~f:(fun () -> memory_changed t memory));
   Login_manager.subscribe login ~f:(fun event ->
     let json = Rpc_json.login_event event in
     match event with
@@ -2519,6 +2551,46 @@ let prefs t client ~meth ~params =
        `Object [ "value", list ])
 ;;
 
+let memory t ~meth ~params =
+  match t.memory with
+  | None -> Or_error.error_string "this backend keeps no memory"
+  | Some memory ->
+    let open Or_error.Let_syntax in
+    let now () =
+      Time_float.of_span_since_epoch (Time_float.Span.of_sec (t.now ()))
+    in
+    (match meth with
+     | "get_memory" ->
+       let%map fields = memory_json memory in
+       `Object fields
+     | "save_memory" ->
+       let%bind id = string_param_opt params "id" in
+       let%bind title = string_param_opt params "title" in
+       let%bind text = string_param params "text" in
+       let%map note =
+         match id with
+         | Some id -> Memory.edit memory ~id ?title ~now:(now ()) text
+         | None ->
+           Or_error.map
+             (Memory.save memory ?title ~now:(now ()) text)
+             ~f:(function Added note | Replaced note -> note)
+       in
+       `Object [ "note", Memory.Note.to_json note ]
+     | "forget_memory" ->
+       let%bind id = string_param params "id" in
+       let%map note = Memory.forget memory id in
+       `Object [ "note", Memory.Note.to_json note ]
+     | _ ->
+       let%bind enabled =
+         match param params "enabled" with
+         | Some `True -> Ok true
+         | Some `False -> Ok false
+         | _ -> Or_error.error_string "param \"enabled\" must be a boolean"
+       in
+       let%map () = Memory.set_enabled memory enabled in
+       `Object [ ("enabled", if enabled then `True else `False) ])
+;;
+
 let keep_session t (client : Client.t) =
   let agent = client.agent in
   if not (Agent.temporary agent)
@@ -2579,6 +2651,8 @@ let dispatch_server t (client : Client.t) ~meth ~params
               { Tool_result.text; is_error; images })))
   | "get_prefs" | "set_prefs" | "push_pref" ->
     Some (prefs t client ~meth ~params)
+  | "get_memory" | "save_memory" | "forget_memory" | "set_memory_enabled" ->
+    Some (memory t ~meth ~params)
   | "nix_store_status" | "nix_store_gc" ->
     Nix_store_rpc.dispatch
       t.nix_store
