@@ -198,9 +198,38 @@
           prigh-computer = prighComputer;
         };
 
-        apps.default = {
-          type = "app";
-          program = "${prigh}/bin/prigh";
+        apps = {
+          default = {
+            type = "app";
+            program = "${prigh}/bin/prigh";
+          };
+        }
+        // lib.optionalAttrs isLinux {
+          # desktop/computer/test/hyprland.sh: needs a GPU, so not a check
+          computer-use-hyprland = {
+            type = "app";
+            program = lib.getExe (
+              pkgs.writeShellApplication {
+                name = "computer-use-hyprland";
+                runtimeInputs = [
+                  pkgs.kdePackages.kwin
+                  pkgs.hyprland
+                  pkgs.wev
+                  pkgs.procps
+                  pkgs.coreutils
+                  pkgs.gawk
+                ];
+                text = ''
+                  # Mesa for the nested compositors, also where it is not
+                  # the system's (outside NixOS)
+                  export __EGL_VENDOR_LIBRARY_FILENAMES=${pkgs.mesa}/share/glvnd/egl_vendor.d/50_mesa.json
+                  export LIBGL_DRIVERS_PATH=${pkgs.mesa}/lib/dri GBM_BACKENDS_PATH=${pkgs.mesa}/lib/gbm
+                  export LD_LIBRARY_PATH=${pkgs.mesa}/lib
+                  exec bash ${./desktop/computer/test}/hyprland.sh "''${1:-${prighComputer}/bin/prigh-computer}"
+                '';
+              }
+            );
+          };
         };
 
         checks.web-wrapper = pkgs.runCommand "prigh-web-wrapper-test" { } ''
