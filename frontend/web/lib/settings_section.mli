@@ -6,6 +6,7 @@ type t =
   | Appearance
   | Sessions
   | Models
+  | Memory
   | Git_hosting
   | Nix_store (** superusers only *)
   | Account

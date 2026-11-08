@@ -17,7 +17,7 @@ let%expect_test "the gear, /settings and Ctrl+, open it; Esc closes it" =
     (Focus dialog)
     Settings
     (Close (Esc))
-    (Appearance) (Sessions) (Models) (Git hosting) (Account)
+    (Appearance) (Sessions) (Models) (Memory) (Git hosting) (Account)
     Appearance
     How this page looks. Saved for your account, so it follows you to every browser you sign in on.
     Look
@@ -317,6 +317,9 @@ let%expect_test "the names of the settings' controls" =
     [switch] button "Mask old tool outputs" -- Keep old tool outputs (/compaction mask off)
     [group] div "Compact at"
     [switch] button "Mask old tool outputs" -- Keep old tool outputs (/compaction mask off)
+    -- Memory
+    [switch] button "Use memory" -- Stop giving the model your memory (/memory off)
+    [switch] button "Use memory" -- Stop giving the model your memory (/memory off)
     -- Git hosting
     button "Connect GitHub (github.com) with a token" -- /login github token
     button "Connect GitHub (github.com)" -- /login github
@@ -330,6 +333,7 @@ let%expect_test "the names of the settings' controls" =
     [tab] button "Appearance" -- /settings appearance
     [tab] button "Sessions" -- /settings sessions
     [tab] button "Models" -- /settings models
+    [tab] button "Memory" -- /settings memory
     [tab] button "Git hosting" -- /settings git
     [tab] button "Account" -- /settings account
     button "Keyboard shortcuts" -- /hotkeys
@@ -472,9 +476,9 @@ let%expect_test "sections: clicks, arrows, Home and End, /settings SECTION" =
     Close_dialog
     (Focus editor)
     Send
-    Nix store is only for superusers: try /settings appearance, /settings sessions, /settings models, /settings git, /settings account. (Dismiss)
+    Nix store is only for superusers: try /settings appearance, /settings sessions, /settings models, /settings memory, /settings git, /settings account. (Dismiss)
     Send
-    No settings section "colours": try /settings appearance, /settings sessions, /settings models, /settings git, /settings account. (Dismiss)
+    No settings section "colours": try /settings appearance, /settings sessions, /settings models, /settings memory, /settings git, /settings account. (Dismiss)
     |}]
 ;;
 
@@ -491,7 +495,7 @@ let%expect_test "superusers have the Nix store's section" =
   H.quiet h (fun () -> H.act h Open_settings);
   H.text h ~selector:".settings-nav";
   [%expect
-    {| (Appearance) (Sessions) (Models) (Git hosting) (Nix store) (R root) |}]
+    {| (Appearance) (Sessions) (Models) (Memory) (Git hosting) (Nix store) (R root) |}]
 ;;
 
 let%expect_test "/settings completes the sections" =
@@ -504,6 +508,7 @@ let%expect_test "/settings completes the sections" =
     appearance How this page looks. Saved for your account, so it follows you to every browser you sign in on.
     sessions How new sessions start, and how this browser tells you that something happened. Kept on the backend.
     models The providers whose models you use, the models prigh uses for its own work, and when long conversations are summarised. Kept on the backend.
+    memory What you asked the model to remember, for later sessions. Kept on the backend, for your account.
     git The hosts agents push branches to and open pull requests on.
     account Who you are on this backend.
     |}]
@@ -532,7 +537,7 @@ let%expect_test
     (Focus dialog)
     Settings
     (Close (Esc))
-    (Appearance How this page looks. Saved for your account, so it follows you to every browser you sign in on.) (Sessions How new sessions start, and how this browser tells you that something happened. Kept on the backend.) (Models The providers whose models you use, the models prigh uses for its own work, and when long conversations are summarised. Kept on the backend.) (Git hosting The hosts agents push branches to and open pull requests on.) (Account Who you are on this backend.)
+    (Appearance How this page looks. Saved for your account, so it follows you to every browser you sign in on.) (Sessions How new sessions start, and how this browser tells you that something happened. Kept on the backend.) (Models The providers whose models you use, the models prigh uses for its own work, and when long conversations are summarised. Kept on the backend.) (Memory What you asked the model to remember, for later sessions. Kept on the backend, for your account.) (Git hosting The hosts agents push branches to and open pull requests on.) (Account Who you are on this backend.)
     (Settings_section Models)
     <button class="btn ghost modal-back">
     <h2 class="">

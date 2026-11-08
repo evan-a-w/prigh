@@ -417,7 +417,8 @@ let rec apply t (event : Event.t) =
   | Agent_queues _
   | Nix_gc_progress _
   | Masked _
-  | Prefs_changed _ -> t
+  | Prefs_changed _
+  | Memory_changed _ -> t
 ;;
 
 let rec received (event : Event.t) ~at : Event.t =

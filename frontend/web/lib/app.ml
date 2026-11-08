@@ -256,6 +256,10 @@ module Reply_tag = struct
     | Git of Git_bar.Reply.t
     | Nix_status of { open_settings : bool }
     | Nix_collected
+    | Memory_loaded
+    | Memory_saved
+    | Memory_forgot
+    | Memory_enabled
     | Trim_points of Trim_purpose.t
     | Trimmed
     | Untrimmed
@@ -466,6 +470,15 @@ module Action = struct
     | Settings_move of Settings_section.Move.t
     | Compact_at_input of string
     | Compact_at_commit
+    | Memory_filter of string
+    | Memory_edit of string option
+    | Memory_title of string
+    | Memory_text of string
+    | Memory_save
+    | Memory_cancel
+    | Memory_forget of string
+    | Memory_forget_confirm
+    | Memory_forget_cancel
     | Open_rename
     | Open_subagents of string option
     (** the agents panel; with a number, an agent's or a job's id *)
@@ -728,6 +741,7 @@ module Model = struct
     ; landing : bool
     ; forges : Forges.t
     ; nix_gc : Nix_gc.t
+    ; memory : Memory_notes.t
     ; compact_at : Compact_at.t
     ; settings_section : Settings_section.t
       (* A phone's settings show the list of sections, not one of them. *)
@@ -1042,6 +1056,7 @@ let init =
   ; landing = false
   ; forges = Forges.empty
   ; nix_gc = Nix_gc.empty
+  ; memory = Memory_notes.empty
   ; compact_at = Compact_at.empty
   ; settings_section = Appearance
   ; settings_home = true
@@ -1799,7 +1814,11 @@ let fetch_nix_status (m : Model.t) ~open_settings =
   , [ call Nix_store_status ~tag:(Nix_status { open_settings }) ] )
 ;;
 
-(* Superusers see the Nix store there, as it is now. *)
+let fetch_memory (m : Model.t) =
+  { m with memory = Memory_notes.loading m.memory }, [ call Get_memory ~tag:Memory_loaded ]
+;;
+
+(* Superusers see the Nix store there, as it is now; everyone their memory. *)
 let open_settings ?(fetch = true) ?section (m : Model.t) =
   let settings_section = Option.value section ~default:m.settings_section in
   let m, cmds =
@@ -1811,11 +1830,36 @@ let open_settings ?(fetch = true) ?section (m : Model.t) =
       }
       Settings
   in
+  let m, cmds =
+    if fetch && Settings_section.equal settings_section Memory
+    then (
+      let m, more = fetch_memory m in
+      m, cmds @ more)
+    else m, cmds
+  in
   if fetch && superuser m
   then (
     let m, fetch = fetch_nix_status m ~open_settings:false in
     m, cmds @ fetch)
   else m, cmds
+;;
+
+(* The model is given the memory tool, or not, from its next turn. *)
+let set_memory_enabled (m : Model.t) enabled =
+  let memory = m.memory in
+  let m =
+    { m with
+      memory = { memory with memory = { memory.memory with enabled } }
+    }
+  in
+  let m, cmds =
+    toast
+      m
+      (if enabled
+       then "Memory on: the model can save and recall notes"
+       else "Memory off: the model no longer sees your notes")
+  in
+  m, cmds @ [ call (Set_memory_enabled { enabled }) ~tag:Memory_enabled ]
 ;;
 
 (* [/settings SECTION]. *)
@@ -3753,6 +3797,12 @@ let dictation_command (m : Model.t) rest =
   | Set_model _ as action -> set_dictation m action
 ;;
 
+let save_memory (m : Model.t) =
+  match Memory_notes.save m.memory with
+  | memory, Some request -> { m with memory }, [ call request ~tag:Memory_saved ]
+  | memory, None -> { m with memory }, []
+;;
+
 let commit_compact_at (m : Model.t) =
   match Compact_at.commit m.compact_at with
   | compact_at, Some n -> set_compaction { m with compact_at } (Set_at n)
@@ -4175,6 +4225,7 @@ let user_switched (m : Model.t) (hello : Hello_reply.t) =
     ; agents = { Agents.empty with open_ = m.agents.open_ }
     ; forges = Forges.empty
     ; nix_gc = { Nix_gc.empty with collecting = m.nix_gc.collecting }
+    ; memory = Memory_notes.empty
     ; config = None
     ; compact_at = Compact_at.empty
     }
@@ -5776,6 +5827,15 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
   | "settings", "" -> open_settings m
   | "settings", arg -> settings_command m arg
   | "nix-gc", rest when superuser m -> nix_gc_command m rest
+  | "memory", "" -> open_settings ~section:Memory m
+  | "memory", ("on" | "off") -> set_memory_enabled m (String.equal rest "on")
+  | "memory", other ->
+    error
+      m
+      (sprintf
+         "/memory takes on or off, not %S; /memory alone shows the notes in \
+          Settings."
+         other)
   | "new", _ -> starting m, [ rpc "new_session" [] ~tag:Reload_state ]
   | "temporary", _ when temporary m -> open_dialog m Temporary_menu
   | "temporary", _ -> new_temporary_session m ~temporary:true
@@ -7770,6 +7830,28 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
      | Nix_status { open_settings = true }, Error e ->
        error m (String.capitalize e)
      | _ -> m, [])
+  | Memory_loaded, result ->
+    let result =
+      Result.bind result ~f:(fun json ->
+        Result.map_error (Memory.of_json json) ~f:Error.to_string_hum)
+    in
+    { m with memory = Memory_notes.loaded m.memory result }, []
+  | Memory_saved, result ->
+    let result =
+      Result.bind result ~f:(fun json ->
+        Result.map_error (Memory.note_of_reply json) ~f:Error.to_string_hum)
+    in
+    { m with memory = Memory_notes.saved m.memory result }, []
+  | Memory_forgot, result ->
+    ( { m with
+        memory = Memory_notes.forgotten m.memory (Result.map result ~f:ignore)
+      }
+    , [] )
+  | Memory_enabled, Ok _ -> m, []
+  | Memory_enabled, Error e ->
+    let m, cmds = fetch_memory m in
+    let m, more = error m ("Memory could not be switched: " ^ e) in
+    m, cmds @ more
   | Nix_collected, result ->
     let result =
       Result.bind result ~f:(fun json ->
@@ -8502,6 +8584,9 @@ let main_event (m : Model.t) (event : Event.t) =
     in
     m, (Command.Remember_temporary None :: deleted) @ kept
   | Nix_gc_progress p -> { m with nix_gc = Nix_gc.progress m.nix_gc p }, []
+  (* Saved, edited or forgotten here, elsewhere or by the model. *)
+  | Memory_changed memory ->
+    { m with memory = Memory_notes.changed m.memory memory }, []
   (* Another of the user's frontends changed their preferences. *)
   | Prefs_changed changes ->
     apply_prefs m ~startup:false changes, [ Command.Cache_prefs changes ]
@@ -9248,6 +9333,7 @@ let dialog_accept (m : Model.t) =
      | None, Some _ -> respond_login m flow
      | Some _, _ -> close_dialog m
      | None, None -> m, [])
+  | Some Settings when Option.is_some m.memory.draft -> save_memory m
   | Some Settings when Option.is_some (Compact_at.draft m.compact_at) ->
     commit_compact_at m
   | Some
@@ -9597,18 +9683,47 @@ let update_connected (m : Model.t) (action : Action.t) =
   | Settings_section section ->
     (match m.dialog with
      | Some Settings ->
-       { m with settings_section = section; settings_home = false }, []
+       let m = { m with settings_section = section; settings_home = false } in
+       (match section with
+        | Memory -> fetch_memory m
+        | _ -> m, [])
      | _ -> open_settings ~section m)
   | Settings_home -> { m with settings_home = true }, []
   | Settings_move move ->
     let section =
       Settings_section.move m.settings_section move ~superuser:(superuser m)
     in
-    ( { m with settings_section = section }
-    , [ Command.Focus (Settings_section.tab_id section) ] )
+    let m, cmds =
+      match section with
+      | Memory when not (Settings_section.equal m.settings_section Memory) ->
+        fetch_memory { m with settings_section = section }
+      | _ -> { m with settings_section = section }, []
+    in
+    m, Command.Focus (Settings_section.tab_id section) :: cmds
   | Compact_at_input text ->
     { m with compact_at = Compact_at.input m.compact_at text }, []
   | Compact_at_commit -> commit_compact_at m
+  | Memory_filter text ->
+    { m with memory = Memory_notes.set_filter m.memory text }, []
+  | Memory_edit id ->
+    ( { m with memory = Memory_notes.edit m.memory id }
+    , [ Command.Focus "memory-text" ] )
+  | Memory_title text ->
+    { m with memory = Memory_notes.set_title m.memory text }, []
+  | Memory_text text ->
+    { m with memory = Memory_notes.set_text m.memory text }, []
+  | Memory_save -> save_memory m
+  | Memory_cancel -> { m with memory = Memory_notes.cancel m.memory }, []
+  | Memory_forget id ->
+    ( { m with memory = Memory_notes.ask_forget m.memory id }
+    , [ Command.Focus "memory-forget-yes" ] )
+  | Memory_forget_confirm ->
+    (match Memory_notes.forget m.memory with
+     | memory, Some request ->
+       { m with memory }, [ call request ~tag:Memory_forgot ]
+     | memory, None -> { m with memory }, [])
+  | Memory_forget_cancel ->
+    { m with memory = Memory_notes.cancel_forget m.memory }, []
   | Open_rename -> open_rename m
   | Open_subagents arg -> open_agents m arg
   | Toggle_subagents ->
@@ -9686,6 +9801,12 @@ let update_connected (m : Model.t) (action : Action.t) =
      | Some (Pr_create _), Some { target = Pr; _ }
      | Some (New_worktree _), Some { target = Worktree_branch; _ }
      | Some (Rename _), Some { target = Session_title; _ } -> stop_generate m
+     (* Esc leaves the note being written, or the deletion asked about,
+        before the page. *)
+     | Some Settings, _ when Option.is_some m.memory.draft ->
+       { m with memory = Memory_notes.cancel m.memory }, []
+     | Some Settings, _ when Option.is_some m.memory.forgetting ->
+       { m with memory = Memory_notes.cancel_forget m.memory }, []
      | _ ->
        (match m.dialog with
         | Some (Login { failed = None; provider; _ }) ->
