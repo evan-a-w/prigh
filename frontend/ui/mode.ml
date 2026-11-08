@@ -25,6 +25,7 @@ module Picker_kind = struct
     | Skills
     | Snippets
     | Reminders
+    | Memory of Memory.t
     | Worktrees of Worktree.Listing.t
     | Mcp of Mcp_list.t
     | Pull_requests (** [/pr]: Enter shows one *)
@@ -83,6 +84,10 @@ module Confirm_action = struct
         { worktree : Worktree.t
         ; force : bool
         ; back : Open_picker.t option (** where Esc returns *)
+        }
+    | Forget_memory of
+        { note : Memory.Note.t
+        ; back : Open_picker.t option
         }
     | Nix_gc of Nix_generations.t
     (** [/nix-gc run DAYS|all]: deleting profile generations *)

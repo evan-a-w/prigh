@@ -88,6 +88,7 @@ module Icon : sig
     | Scissors
     | Palette
     | Package
+    | Book
     | Mic
     | Image
     | Paperclip

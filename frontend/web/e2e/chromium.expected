@@ -761,6 +761,7 @@ Settings
 Appearance
 Sessions
 Models
+Memory
 Git hosting
 T
 token
@@ -980,6 +981,7 @@ I am bob
 Appearance
 Sessions
 Models
+Memory
 Git hosting
 B
 bob
@@ -2983,7 +2985,7 @@ Jump to a message, Filter the transcript, Files, Terminal, Settings
 === chromium: mobile: 390x844: the settings' list ===
 ok
 === chromium: mobile: 390x844: the settings ===
-Appearance, Sessions, Models, Git hosting, Account
+Appearance, Sessions, Models, Memory, Git hosting, Account
 === chromium: mobile: 390x844: settings: appearance ===
 ok
 title: Appearance; back: Settings
@@ -3017,7 +3019,7 @@ Jump to a message, Filter the transcript, Files, Terminal, Settings
 === chromium: mobile: 320x640: the settings' list ===
 ok
 === chromium: mobile: 320x640: the settings ===
-Appearance, Sessions, Models, Git hosting, Account
+Appearance, Sessions, Models, Memory, Git hosting, Account
 === chromium: mobile: 320x640: settings: appearance ===
 ok
 title: Appearance; back: Settings
@@ -3051,7 +3053,7 @@ Jump to a message, Filter the transcript, Files, Terminal, Settings
 === chromium: mobile: 390x844-pwa: the settings' list ===
 ok
 === chromium: mobile: 390x844-pwa: the settings ===
-Appearance, Sessions, Models, Git hosting, Account
+Appearance, Sessions, Models, Memory, Git hosting, Account
 === chromium: mobile: 390x844-pwa: settings: appearance ===
 ok
 title: Appearance; back: Settings
@@ -3214,6 +3216,67 @@ compact_at_tokens=0 compaction_model=null mask_observations=false
 === chromium: compaction: phone ===
 fits: true
 === chromium: compaction: errors ===
+(none)
+=== chromium: memory: notes ===
+Memory
+What you asked the model to remember, for later sessions. Kept on the backend, for your account.
+Use memory
+The model saves a note only when you ask it to remember something, and looks one up when you refer back to it. Off, it is not given the memory tool, and your notes stay here.
+NOTES
+3 notes
+Add note
+shell
+fish
+Saved 2025-10-03
+Deploys go through the staging cluster first, then production on Tuesdays
+Saved 2025-10-02
+editor
+helix, with the default keymap
+Saved 2025-10-01
+switch: true
+=== chromium: memory: filtered ===
+Deploys go through the staging cluster first, then production on Tuesdays | Saved 2025-10-02
+settings still open: 1
+=== chromium: memory: edited and added ===
+m1 editor: neovim, with lazy.nvim; m2 -: Deploys go through the staging cluster first, then production on Tuesdays; m3 shell: fish; m4 pager: less -R
+=== chromium: memory: deleting ===
+shell | fish | Delete this note? The model can no longer recall it. | Keep | Delete
+m1 editor: neovim, with lazy.nvim; m2 -: Deploys go through the staging cluster first, then production on Tuesdays; m4 pager: less -R
+=== chromium: memory: off ===
+Memory
+What you asked the model to remember, for later sessions. Kept on the backend, for your account.
+Use memory
+The model saves a note only when you ask it to remember something, and looks one up when you refer back to it. Off, it is not given the memory tool, and your notes stay here.
+NOTES
+3 notes
+Add note
+pager
+less -R
+Saved (today)
+editor
+neovim, with lazy.nvim
+Saved (today)
+Deploys go through the staging cluster first, then production on Tuesdays
+Saved 2025-10-02
+switch: false
+prefs: memory.enabled=false
+after /memory on: prefs memory.enabled=null
+=== chromium: memory: phone 390x844 ===
+fits: yes; targets: all ok
+deleting fits: yes; targets: all ok
+editing fits: yes; targets: all ok
+back: Memory | What you asked the model to remember, for later sessions. Kept on the backend, for your account.
+=== chromium: memory: phone 320x640 ===
+fits: yes; targets: all ok
+deleting fits: yes; targets: all ok
+editing fits: yes; targets: all ok
+back: Memory | What you asked the model to remember, for later sessions. Kept on the backend, for your account.
+=== chromium: memory: phone 390x844-pwa ===
+fits: yes; targets: all ok
+deleting fits: yes; targets: all ok
+editing fits: yes; targets: all ok
+back: Memory | What you asked the model to remember, for later sessions. Kept on the backend, for your account.
+=== chromium: memory: errors ===
 (none)
 === chromium: images (desktop): refused as too large: the error card ===
 The model returned an error

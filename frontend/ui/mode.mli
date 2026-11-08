@@ -28,6 +28,7 @@ module Picker_kind : sig
     | Skills
     | Snippets (** [/snippet]: Enter inserts the text *)
     | Reminders (** [/remind]: the session's; Ctrl+D removes one *)
+    | Memory of Memory.t (** [/memory]: the user's notes; Ctrl+D forgets one *)
     | Worktrees of Worktree.Listing.t
     (** [/worktree]: Ctrl+N opens one in a new session, Ctrl+D removes one *)
     | Mcp of Mcp_list.t
@@ -89,6 +90,10 @@ module Confirm_action : sig
         { worktree : Worktree.t
         ; force : bool
         ; back : Open_picker.t option (** where Esc returns *)
+        }
+    | Forget_memory of
+        { note : Memory.Note.t
+        ; back : Open_picker.t option (** where Esc and Enter return *)
         }
     | Nix_gc of Nix_generations.t
     (** [/nix-gc run DAYS|all]: deleting profile generations *)

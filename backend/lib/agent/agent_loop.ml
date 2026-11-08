@@ -90,6 +90,21 @@ let tool_summary ~name (args : Json.t) =
        String.concat
          ~sep:" "
          (text "action" @ text "state" @ number @ text "title")
+     | _ when String.equal name Tool_memory.name ->
+       let text key =
+         match find key with
+         | Some (`String s) ->
+           [ String.concat ~sep:" " (String.split_lines (String.strip s)) ]
+         | _ -> []
+       in
+       String.concat
+         ~sep:" "
+         (text "action"
+          @ (match text "title", text "text" with
+             | [ title ], [ body ] -> [ title ^ ":"; body ]
+             | title, body -> title @ body)
+          @ text "query"
+          @ text "id")
      | Some (`String s), _, _ -> s
      | _, Some (`String s), _ -> s
      | _, _, Some (`String patch) when String.equal name "apply_patch" ->

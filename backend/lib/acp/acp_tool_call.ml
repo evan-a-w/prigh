@@ -81,6 +81,21 @@ let title ~name ~args ~cwd =
       (Option.map (string_arg args "task") ~f:(first_line ~max:70))
   | "ask_user" -> "Question for you"
   | "update_plan" -> "Update the plan"
+  | "memory" ->
+    let colon verb = function
+      | Some x -> verb ^ ": " ^ x
+      | None -> verb
+    in
+    (match string_arg args "action" with
+     | Some "save" ->
+       colon
+         "Remember"
+         (Option.first_some
+            (string_arg args "title")
+            (Option.map (string_arg args "text") ~f:first_line))
+     | Some "recall" -> colon "Recall from memory" (string_arg args "query")
+     | Some "forget" -> colon "Forget from memory" (string_arg args "id")
+     | Some _ | None -> "memory")
   | name -> name
 ;;
 

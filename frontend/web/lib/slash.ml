@@ -17,6 +17,7 @@ module Argument = struct
     | Mode
     | Plan
     | Notify
+    | Memory
     | Settings
     | Session
     | Path
@@ -137,6 +138,12 @@ let every =
       "notify"
       "tell you when a turn ends or something waits for you while the tab is \
        hidden"
+  ; c
+      ~argument:Memory
+      ~args:"[on|off]"
+      "memory"
+      "your notes the model saves when you ask it to remember something, in \
+       Settings; on or off gives the model the memory tool or takes it away"
   ; c
       ~args:"[instructions]"
       "compact"
