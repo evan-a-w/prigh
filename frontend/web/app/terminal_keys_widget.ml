@@ -73,6 +73,7 @@ let button t key =
   := Js.string
        (match (key : Keys.Key.t) with
         | Modifier _ -> "terminal-key modifier"
+        | Left | Up | Down | Right -> "terminal-key arrow"
         | _ -> "terminal-key");
   button##setAttribute (Js.string "type") (Js.string "button");
   button##setAttribute (Js.string "tabindex") (Js.string "-1");

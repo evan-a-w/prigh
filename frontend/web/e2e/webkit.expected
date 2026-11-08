@@ -3019,6 +3019,52 @@ ok
 ok
 === webkit: mobile: 320x640: the keyboard ===
 the composer in view: true
+=== webkit: terminal keys: a desktop ===
+the shell has the focus: true; the bar: hidden
+=== webkit: terminal keys: 390x844: the keyboard up ===
+the bar: full width: true; at the visual viewport's foot: true; scrolls sideways: true
+keys: Esc Tab Ctrl Alt ← ↑ ↓ → | ~ / - Home End PgUp PgDn
+=== webkit: terminal keys: 390x844: ↑ recalls the last command ===
+the line: $ echo first-command; the shell kept the focus: true
+=== webkit: terminal keys: 390x844: Tab completes ===
+the line: $ cat uniquely-named-notes.txt
+=== webkit: terminal keys: 390x844: Ctrl then c interrupts sleep ===
+Ctrl after a tap: aria-pressed=true latched
+interrupted: the prompt is back; Ctrl after the key: aria-pressed=false off
+a plain c again: true
+=== webkit: terminal keys: 390x844: a double tap locks Ctrl ===
+Ctrl: aria-pressed=true locked
+tapped again: aria-pressed=false off
+=== webkit: terminal keys: 390x844: the cursor keys' mode, an arrow held ===
+application mode: ↑ sends ^[OA, ← held repeats: true
+normal mode: ↑ Home PgUp send ^[[A ^[[H ^[[5~
+=== webkit: terminal keys: 390x844: the bar scrolled to its end ===
+the bar: full width: true; at the visual viewport's foot: true; scrolls sideways: true
+the shell has the focus: true
+=== webkit: terminal keys: 390x844: the shell without the focus ===
+the bar: hidden
+=== webkit: terminal keys: 320x640: the keyboard up ===
+the bar: full width: true; at the visual viewport's foot: true; scrolls sideways: true
+keys: Esc Tab Ctrl Alt ← ↑ ↓ → | ~ / - Home End PgUp PgDn
+=== webkit: terminal keys: 320x640: ↑ recalls the last command ===
+the line: $ echo first-command; the shell kept the focus: true
+=== webkit: terminal keys: 320x640: Tab completes ===
+the line: $ cat uniquely-named-notes.txt
+=== webkit: terminal keys: 320x640: Ctrl then c interrupts sleep ===
+Ctrl after a tap: aria-pressed=true latched
+interrupted: the prompt is back; Ctrl after the key: aria-pressed=false off
+a plain c again: true
+=== webkit: terminal keys: 320x640: a double tap locks Ctrl ===
+Ctrl: aria-pressed=true locked
+tapped again: aria-pressed=false off
+=== webkit: terminal keys: 320x640: the cursor keys' mode, an arrow held ===
+application mode: ↑ sends ^[OA, ← held repeats: true
+normal mode: ↑ Home PgUp send ^[[A ^[[H ^[[5~
+=== webkit: terminal keys: 320x640: the bar scrolled to its end ===
+the bar: full width: true; at the visual viewport's foot: true; scrolls sideways: true
+the shell has the focus: true
+=== webkit: terminal keys: 320x640: the shell without the focus ===
+the bar: hidden
 === webkit: long press: held on your message ===
 menu: copy_message, select_text, trim_before, trim_after, delete; a sheet at the bottom: true
 the release clicked nothing: true
