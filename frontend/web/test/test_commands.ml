@@ -232,7 +232,7 @@ let%expect_test "/help <command> and /hotkeys" =
     l / Shift+L (reviewing) what changed since your latest action on the file (or the hunks again); choose the action it compares with: Latest follows your newest
     Esc (reviewing) drop the comment, the selected code, the selected files, then close the review
     Enter / Ctrl+S (reviewing) add the comment or reply (Shift+Enter: a new line); save the file being edited
-    Ctrl+` open or close the terminal (/terminal); in it, every other key goes to the shell
+    Ctrl+` open or close the terminal (/terminal); in it, every other key goes to the shell. On a touch screen a bar over the keyboard has Esc, Tab, Ctrl and Alt (tap: the next key; double-tap: locked), the arrows (held: repeat), | ~ / - and Home, End, PgUp, PgDn
     Esc (in a pull request) back to the list it was opened from (/pr); Enter closes it
     Alt+G (a pull request, commit message, branch or session name) ✦ Generate: the model drafts it from the changes, the commits and the session (Esc stops, keeping what came; Undo puts the text back)
     Ctrl+Enter / Esc (the review's commit message) commit the files listed above it; close the commit, keeping the message
