@@ -167,6 +167,14 @@ module Method = struct
         }
     | Nix_store_status
     | Nix_store_gc of { delete_generations : Nix_generations.t option }
+    | Get_memory
+    | Save_memory of
+        { id : string option
+        ; title : string option
+        ; text : string
+        }
+    | Forget_memory of { id : string }
+    | Set_memory_enabled of { enabled : bool }
   [@@deriving sexp_of, equal]
 
   let name = function
@@ -228,6 +236,10 @@ module Method = struct
     | Transcribe _ -> "transcribe"
     | Nix_store_status -> "nix_store_status"
     | Nix_store_gc _ -> "nix_store_gc"
+    | Get_memory -> "get_memory"
+    | Save_memory _ -> "save_memory"
+    | Forget_memory _ -> "forget_memory"
+    | Set_memory_enabled _ -> "set_memory_enabled"
   ;;
 
   let dir_param = function
@@ -253,12 +265,16 @@ module Method = struct
     | Forge_status
     | Get_review
     | Nix_store_status
+    | Get_memory
     | Get_trim_points
     | Get_trimmed
     | Untrim
     | Get_message_points
     | Undelete -> []
     | Nix_store_gc { delete_generations = None } -> []
+    | Save_memory { id; title; text } -> Memory.save_params ?id ?title text
+    | Forget_memory { id } -> Memory.forget_params ~id
+    | Set_memory_enabled { enabled } -> Memory.set_enabled_params enabled
     | Nix_store_gc { delete_generations = Some _ as generations } ->
       [ "delete_generations", Nix_generations.to_json generations ]
     | Review_submit { root = None } -> []

@@ -5940,7 +5940,8 @@ let event m (e : P.Event.t) =
   | Terminal_open _
   | Terminal_frame _
   | Terminal_close _
-  | Terminal_kill _ -> m, []
+  | Terminal_kill _
+  | Memory_changed _ -> m, []
   | Prefs_changed changes ->
     let m = filter_of_prefs m changes in
     (match

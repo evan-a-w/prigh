@@ -1822,6 +1822,23 @@ kbd {
 .account-setting { flex-wrap: nowrap; }
 .account-setting .setting-text { flex-basis: 0; }
 .account-setting .avatar { align-self: flex-start; }
+/* Memory: a filter over the notes, each its text and when it was saved. */
+.memory-toolbar { flex-wrap: nowrap; gap: 8px; }
+.memory-filter { flex: 1; min-width: 0; }
+.memory-note { align-items: flex-start; flex-wrap: nowrap; }
+.memory-note .setting-text { flex-basis: 0; }
+.memory-note-text { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.5; }
+.memory-note .setting-control { gap: 2px; }
+.memory-note.forgetting { background: color-mix(in srgb, var(--brick) 8%, transparent); }
+.memory-note.forgetting .setting-control { gap: 8px; align-self: center; }
+.memory-delete:hover { color: var(--brick); }
+.memory-draft { flex-direction: column; align-items: stretch; gap: 8px; }
+.memory-text-input { resize: vertical; min-height: 4.5em; font: inherit; line-height: 1.5; }
+.memory-draft-buttons { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.memory-draft-keys { margin-right: auto; color: var(--faint); font-size: 12px; }
+.memory-add { white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; }
+.memory-add .icon { width: 14px; height: 14px; }
+.memory-error { padding: 8px 0; }
 @media (max-width: 760px) {
   /* A phone: the page fills the screen, the sections a strip across its top. */
   .modal-backdrop:has(> .settings-dialog) { padding: 8px; }

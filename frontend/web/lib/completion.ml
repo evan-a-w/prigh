@@ -187,6 +187,11 @@ let argument_items
       [ "on", "notify when the tab is hidden"
       ; "off", "no browser notifications"
       ]
+  | Memory ->
+    simple
+      [ "on", "the model can save and recall your notes"
+      ; "off", "the model is not given the memory tool"
+      ]
   | Settings ->
     List.map (Settings_section.available ~superuser) ~f:(fun section ->
       let arg = Settings_section.arg section in
