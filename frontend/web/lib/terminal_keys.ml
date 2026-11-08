@@ -113,7 +113,8 @@ let double_tap_ms = 400.
 let tap t (modifier : Modifier.t) ~now =
   let double =
     match t.last_tap with
-    | Some (m, at) -> Modifier.equal m modifier && Float.(now - at <= double_tap_ms)
+    | Some (m, at) ->
+      Modifier.equal m modifier && Float.(now - at <= double_tap_ms)
     | None -> false
   in
   let next : Latch.t =
@@ -175,7 +176,9 @@ let type_ t data =
 
 let press t (key : Key.t) ~app_cursor ~now =
   (* xterm's modifier parameter: 1, +1 Shift, +2 Alt, +4 Ctrl. *)
-  let modifiers = 1 + (if on t.alt then 2 else 0) + if on t.ctrl then 4 else 0 in
+  let modifiers =
+    1 + (if on t.alt then 2 else 0) + if on t.ctrl then 4 else 0
+  in
   let cursor letter =
     if modifiers > 1
     then sprintf "\x1b[1;%d%c" modifiers letter

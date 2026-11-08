@@ -216,7 +216,8 @@ module Widget = struct
             Js.Opt.case
               Dom_html.document##.activeElement
               (fun () -> false)
-              (fun active -> Js.to_bool (host##contains (active :> Dom.node Js.t)))
+              (fun active ->
+                 Js.to_bool (host##contains (active :> Dom.node Js.t)))
           in
           if not inside then Option.iter (handle ()) ~f:(fun h -> h##focus))
     in
@@ -250,6 +251,7 @@ end
 
 let widget = Staged.unstage (Vdom.Node.widget_of_module (module Widget))
 let view ~url ~key ~on_status = widget { Input.url; key; on_status }
+
 let set_theme theme =
   if not (Prigh_web.Theme.equal theme !look)
   then (
