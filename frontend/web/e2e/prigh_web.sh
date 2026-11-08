@@ -25,7 +25,8 @@
 # field_menu.mjs, text fields' menu in the desktop app's browser window, then card.mjs, the
 # session's card in the sidebar in each state, then status.mjs, the six
 # status styles and the floating chrome, then mobile.mjs, phones by touch
-# and as an installed PWA, then pwa.mjs, then
+# and as an installed PWA, then terminal_keys.mjs, the terminal's extra keys on
+# phones, then pwa.mjs, then
 # compaction.mjs, the settings page's Compaction section, then memory.mjs,
 # its Memory section, on a desktop and phones, then images.mjs,
 # images too large for the model and image files, on a desktop and two
@@ -66,7 +67,7 @@ test -x "$PRIGH_BACKEND" || { echo "no backend at $PRIGH_BACKEND: build it (cd b
 test -f "$SITE/main.bc.js" || { echo "no site at $SITE: build it (cd frontend && dune build ./web/bin/site)" >&2; exit 1; }
 if [ -n "${SHOTS:-}" ]; then mkdir -p "$SHOTS"; fi
 
-scripts="prigh_web temporary accounts reconnect paging resilience:slow resilience:drops stability themes worktrees review review_git remote cli_signin desktop desktop_signin steer subagent_paged trim filter search viewer math clipboard field_menu card status mobile long_press pwa compaction memory images:desktop images:phone images:small computer:desktop computer:phone computer:small ui"
+scripts="prigh_web temporary accounts reconnect paging resilience:slow resilience:drops stability themes worktrees review review_git remote cli_signin desktop desktop_signin steer subagent_paged trim filter search viewer math clipboard field_menu card status mobile terminal_keys long_press pwa compaction memory images:desktop images:phone images:small computer:desktop computer:phone computer:small ui"
 engines="${ENGINES:-chromium firefox webkit}"
 jobs="${JOBS:-$(nproc)}"
 # Measured peaks (PSS of the script, its backend and browser): 1.2 to 1.7 GiB,

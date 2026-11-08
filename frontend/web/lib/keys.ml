@@ -153,7 +153,9 @@ let help =
        edited" )
   ; ( "Ctrl+`"
     , "open or close the terminal (/terminal); in it, every other key goes to \
-       the shell" )
+       the shell. On a touch screen a bar over the keyboard has Esc, Tab, Ctrl \
+       and Alt (tap: the next key; double-tap: locked), the arrows (held: \
+       repeat), | ~ / - and Home, End, PgUp, PgDn" )
   ; ( "Esc (in a pull request)"
     , "back to the list it was opened from (/pr); Enter closes it" )
   ; ( "Alt+G (a pull request, commit message, branch or session name)"
