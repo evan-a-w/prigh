@@ -3608,7 +3608,16 @@ terminal frontend and `web/` prigh-web, the browser one.
     the shell exits starts a new one; it reports its state through
     `onStatus`, which becomes `Action.Terminal_status`, focuses the shell for
     `Focus_terminal` and takes the theme's colours (`setTheme`, read from
-    the computed CSS variables, with ANSI colours per theme). The document listeners leave keys (a capture
+    the computed CSS variables, with ANSI colours per theme). Under the
+    shell, `Terminal_keys_widget` is the extra keys' bar (shown by
+    `terminal.css` on a touch screen while the shell has the focus): the
+    keys, the sticky Ctrl and Alt and the bytes each sends are the pure
+    `Terminal_keys` (cursor keys per xterm.js's `modes.applicationCursorKeysMode`);
+    a key's bytes go through xterm.js's `input` (`press`) and text typed
+    while a modifier is latched through `terminal.js`'s `transform`. A key
+    acts on `pointerup` (a swipe cancels it and scrolls the bar), an arrow
+    held repeats, and `pointerdown` is prevented so the shell keeps the
+    focus and the phone its keyboard. The document listeners leave keys (a capture
     listener takes only Ctrl+`, before xterm.js), pastes and drops inside
     the panel to it, and the chat's and agents panel's mutation observers
     ignore xterm.js redrawing. `Files_widget` keeps the browser's `File`s

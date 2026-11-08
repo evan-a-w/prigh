@@ -514,14 +514,16 @@ let readable bytes =
     match c with
     | '\x1b' -> "ESC"
     | '\x7f' -> "^?"
-    | c when Char.to_int c < 0x20 -> "^" ^ String.of_char (Char.of_int_exn (Char.to_int c + 64))
+    | c when Char.to_int c < 0x20 ->
+      "^" ^ String.of_char (Char.of_int_exn (Char.to_int c + 64))
     | c -> String.of_char c)
 ;;
 
 let%expect_test "the extra keys: the bar and what each key sends" =
   List.iter Terminal_keys.Key.all ~f:(fun key ->
     let send ~app_cursor =
-      readable (snd (Terminal_keys.press Terminal_keys.empty key ~app_cursor ~now:0.))
+      readable
+        (snd (Terminal_keys.press Terminal_keys.empty key ~app_cursor ~now:0.))
     in
     printf
       "%-52s repeats:%-5b normal:%-7s app:%-7s shows %s\n"
@@ -530,7 +532,8 @@ let%expect_test "the extra keys: the bar and what each key sends" =
       (send ~app_cursor:false)
       (send ~app_cursor:true)
       (Terminal_keys.Key.label key));
-  [%expect {|
+  [%expect
+    {|
     Escape                                               repeats:false normal:ESC     app:ESC     shows Esc
     Tab                                                  repeats:false normal:^I      app:^I      shows Tab
     Control: tap for the next key, double-tap to lock    repeats:false normal:        app:        shows Ctrl
@@ -555,8 +558,10 @@ let%expect_test "Ctrl and Alt: tap for the next key, double-tap to lock" =
   let latches () =
     sprintf
       "ctrl:%s alt:%s"
-      (Sexp.to_string [%sexp (Terminal_keys.latch !t Ctrl : Terminal_keys.Latch.t)])
-      (Sexp.to_string [%sexp (Terminal_keys.latch !t Alt : Terminal_keys.Latch.t)])
+      (Sexp.to_string
+         [%sexp (Terminal_keys.latch !t Ctrl : Terminal_keys.Latch.t)])
+      (Sexp.to_string
+         [%sexp (Terminal_keys.latch !t Alt : Terminal_keys.Latch.t)])
   in
   let press ?(app_cursor = false) ?(at = 0.) key =
     let t', bytes = Terminal_keys.press !t key ~app_cursor ~now:at in
@@ -570,7 +575,11 @@ let%expect_test "Ctrl and Alt: tap for the next key, double-tap to lock" =
   let type_ data =
     let t', bytes = Terminal_keys.type_ !t data in
     t := t';
-    printf "%-22s -> %-12s %s\n" ("typed " ^ readable data) (readable bytes) (latches ())
+    printf
+      "%-22s -> %-12s %s\n"
+      ("typed " ^ readable data)
+      (readable bytes)
+      (latches ())
   in
   (* Nothing latched: typing is untouched. *)
   type_ "c";
@@ -619,7 +628,8 @@ let%expect_test "Ctrl and Alt: tap for the next key, double-tap to lock" =
   press (Modifier Ctrl);
   type_ "";
   type_ "[";
-  [%expect {|
+  [%expect
+    {|
     typed c                -> c            ctrl:Off alt:Off
     (Modifier Ctrl)        ->              ctrl:Once alt:Off
     typed c                -> ^C           ctrl:Off alt:Off

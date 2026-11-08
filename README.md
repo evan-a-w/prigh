@@ -636,7 +636,14 @@ directory; `/terminal DIR`, or a worktree's "Open terminal there", a shell
 of its own in DIR) in a panel under the chat: drag its top edge to resize it (the
 height is remembered), a full-screen sheet on a phone. Keys typed in it
 are the shell's, Esc included; Ctrl+` closes it (so does its ×) and
-gives the keyboard back to the editor. It is a tmux session (on the
+gives the keyboard back to the editor. On a touch screen (a phone, a
+tablet), while the shell has the focus, a row of the keys a phone's keyboard
+lacks sits over the keyboard: Esc, Tab, Ctrl and Alt (a tap applies to the
+next key, typed or tapped, so Ctrl then c is Ctrl+C; a double-tap locks it
+until the next tap), the arrows (held, they repeat), `| ~ / -`, Home, End,
+PgUp and PgDn; swipe it for the rest. The arrows, Home and End follow the
+shell's cursor key mode, as vim and less expect. A desktop's keyboard has
+those keys, so there is no bar there. It is a tmux session (on the
 backend's host it needs `tmux`; the nix package brings its own), so closing
 the panel, reloading the page (which reopens it) or losing the connection
 keeps the shell; it is killed after 10 minutes with no page attached, when

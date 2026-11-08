@@ -76,9 +76,7 @@ let button t key =
         | _ -> "terminal-key");
   button##setAttribute (Js.string "type") (Js.string "button");
   button##setAttribute (Js.string "tabindex") (Js.string "-1");
-  button##setAttribute
-    (Js.string "aria-label")
-    (Js.string (Keys.Key.name key));
+  button##setAttribute (Js.string "aria-label") (Js.string (Keys.Key.name key));
   button##.textContent := Js.some (Js.string (Keys.Key.label key));
   let timer = ref None in
   let held = ref false in
@@ -136,7 +134,7 @@ let create ~press ~app_cursor ~refocus =
   element##setAttribute (Js.string "role") (Js.string "toolbar");
   element##setAttribute (Js.string "aria-label") (Js.string "Terminal keys");
   let t =
-    { element = (element :> Dom_html.element Js.t)
+    { element :> Dom_html.element Js.t
     ; keys = Keys.empty
     ; modifiers = []
     ; press
