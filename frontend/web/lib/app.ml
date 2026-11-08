@@ -1815,7 +1815,8 @@ let fetch_nix_status (m : Model.t) ~open_settings =
 ;;
 
 let fetch_memory (m : Model.t) =
-  { m with memory = Memory_notes.loading m.memory }, [ call Get_memory ~tag:Memory_loaded ]
+  ( { m with memory = Memory_notes.loading m.memory }
+  , [ call Get_memory ~tag:Memory_loaded ] )
 ;;
 
 (* Superusers see the Nix store there, as it is now; everyone their memory. *)
@@ -1848,9 +1849,7 @@ let open_settings ?(fetch = true) ?section (m : Model.t) =
 let set_memory_enabled (m : Model.t) enabled =
   let memory = m.memory in
   let m =
-    { m with
-      memory = { memory with memory = { memory.memory with enabled } }
-    }
+    { m with memory = { memory with memory = { memory.memory with enabled } } }
   in
   let m, cmds =
     toast
@@ -3799,7 +3798,8 @@ let dictation_command (m : Model.t) rest =
 
 let save_memory (m : Model.t) =
   match Memory_notes.save m.memory with
-  | memory, Some request -> { m with memory }, [ call request ~tag:Memory_saved ]
+  | memory, Some request ->
+    { m with memory }, [ call request ~tag:Memory_saved ]
   | memory, None -> { m with memory }, []
 ;;
 

@@ -894,7 +894,8 @@ phone): **Appearance** (the theme and accent, transcript detail
 (`/verbosity`)), **Behaviour** (tool confirmation (`/confirm`);
 notifications, on or off, and what to do when the browser has
 not been asked, blocks them or cannot show them), **Models** (the providers
-(`/auth`) and compaction), **Git hosting**, **Nix store** (superusers) and
+(`/auth`) and compaction), **Memory** (the model's notes and the switch
+that turns memory off), **Git hosting**, **Nix store** (superusers) and
 **Account** (who you are signed in, and acting, as, with Switch account and
 Sign out). `/settings SECTION` (e.g. `/settings git`, completed as you type)
 opens it at a section; on the list, the arrows, Home and End move between
@@ -2297,6 +2298,12 @@ The model is told to use it very rarely: it saves only when you ask it to
 remember (not routine details or what the repository says) and recalls only
 when you refer to something you told it before, never by default. Only the
 main agent has it; `save` and `forget` ask in the `ask` approval mode.
+You can turn memory off (`/memory off`, or the switch in prigh-web's
+Settings → Memory; on by default, kept in your prefs as `memory.enabled`):
+from the next turn the model is not given the tool and a call is refused;
+your notes are kept. Settings → Memory also lists the notes to filter, edit
+and delete, and the TUI's `/memory` picks among them (Enter shows one,
+Ctrl+D forgets it after a confirmation).
 
 Models see images. The `read` tool returns PNG, JPEG, GIF and WebP files
 (recognised by content, not by name) as images the model can look at, and an
@@ -2647,6 +2654,7 @@ it.
 | `/notify [off\|bell\|desktop]` (TUI), `/notify [on\|off]` (prigh-web) | how to tell you that a turn ended, a tool waits for confirmation or background work finished while you look elsewhere |
 | `/budget [dollars\|off]` | show or set the session's cost budget: no turn starts once it is spent |
 | `/goal [text\|off\|resume]` | set a goal the agent keeps working toward until it is met; show, clear or resume it |
+| `/memory [on\|off]` | pick among the notes the model saved (Ctrl+D forgets one; prigh-web opens Settings → Memory); `on`/`off` gives the model the memory tool or takes it away |
 | `/remind [stop [N] TEXT\|every N TEXT\|rm NAME\|off]` | remind the agent when it ends its turn (at most N times in a row, default 3) or every N turns; without arguments, pick among the session's (Ctrl+D / Delete removes one); `rm` removes one, `off` all |
 | `/resume [now\|cancel]` | show, run now or cancel the automatic resume after a usage limit |
 | `/new`, `/clear`, `/quit` | new session / clear transcript / exit |

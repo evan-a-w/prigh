@@ -186,7 +186,8 @@ let list_help =
     ; "Enter / Esc", "accept the highlighted item / close without changes"
     ; ( "Ctrl+D"
       , "/sessions: delete the marked or highlighted sessions · /agents: \
-         cancel · /jobs: kill · /queue, /remind, /worktree: remove" )
+         cancel · /jobs: kill · /queue, /remind, /worktree: remove · /memory: \
+         forget" )
     ; "Tab", "/sessions: mark or unmark the highlighted session"
     ; "Alt+A", "/sessions: archive or unarchive the highlighted session"
     ; "Alt+T", "/sessions: pin or unpin the highlighted session"

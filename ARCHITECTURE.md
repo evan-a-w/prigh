@@ -816,7 +816,13 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   Not on the host, main agent only (`Tools.main_agent_only`), `save` and
   `forget` destructive. Its description tells the model to use it very
   rarely (save when asked to remember, recall when the user refers to what
-  they said before, never by default).
+  they said before, never by default). Off (`memory.enabled` false in
+  `User_prefs`) drops it from the tools offered each turn and refuses a
+  call. RPC: `get_memory` (`{enabled, notes}`), `save_memory` (with `id`:
+  edit that note), `forget_memory`, `set_memory_enabled`; every change is
+  broadcast to that world's clients as `memory_changed`
+  (`Prigh_protocol.Memory`). prigh-web's Settings → Memory
+  (`Memory_notes`, `Settings_view`) and the TUI's `/memory` picker use them.
 - `Tool_web_search` — `web_search` is a provider-side tool: `Tools.for_model`
   keeps it only for Anthropic, OpenAI and OpenAI Codex models, whose
   providers send their native tool for it; its `run` only answers a model

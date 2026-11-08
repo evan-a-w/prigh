@@ -95,9 +95,7 @@ let edit t id =
         Some
           { id
           ; title =
-              Option.value
-                (Option.bind note ~f:(fun n -> n.title))
-                ~default:""
+              Option.value (Option.bind note ~f:(fun n -> n.title)) ~default:""
           ; text = Option.value_map note ~default:"" ~f:(fun n -> n.text)
           ; saving = false
           ; error = None
@@ -146,7 +144,8 @@ let cancel_forget t = { t with forgetting = None }
 let forget t =
   match t.forgetting with
   | None -> t, None
-  | Some id -> { t with forgetting = None }, Some (Request.Method.Forget_memory { id })
+  | Some id ->
+    { t with forgetting = None }, Some (Request.Method.Forget_memory { id })
 ;;
 
 let forgotten t = function

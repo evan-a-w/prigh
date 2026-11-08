@@ -761,6 +761,7 @@ Settings
 Appearance
 Sessions
 Models
+Memory
 Git hosting
 T
 token
@@ -980,6 +981,7 @@ I am bob
 Appearance
 Sessions
 Models
+Memory
 Git hosting
 B
 bob
@@ -2962,7 +2964,7 @@ Jump to a message, Filter the transcript, Files, Terminal, Settings
 === webkit: mobile: 390x844: the settings' list ===
 ok
 === webkit: mobile: 390x844: the settings ===
-Appearance, Sessions, Models, Git hosting, Account
+Appearance, Sessions, Models, Memory, Git hosting, Account
 === webkit: mobile: 390x844: settings: appearance ===
 ok
 title: Appearance; back: Settings
@@ -2996,7 +2998,7 @@ Jump to a message, Filter the transcript, Files, Terminal, Settings
 === webkit: mobile: 320x640: the settings' list ===
 ok
 === webkit: mobile: 320x640: the settings ===
-Appearance, Sessions, Models, Git hosting, Account
+Appearance, Sessions, Models, Memory, Git hosting, Account
 === webkit: mobile: 320x640: settings: appearance ===
 ok
 title: Appearance; back: Settings
