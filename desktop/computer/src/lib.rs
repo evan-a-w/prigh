@@ -8,6 +8,7 @@ pub mod backend;
 pub mod detect;
 pub mod driver;
 pub mod fake;
+#[cfg(target_os = "linux")]
 pub mod keymap;
 pub mod keysym;
 #[cfg(target_os = "macos")]
@@ -25,3 +26,5 @@ pub mod windows;
 pub mod wlroots;
 #[cfg(target_os = "linux")]
 pub mod x11;
+#[cfg(target_os = "linux")]
+pub mod xkb;
