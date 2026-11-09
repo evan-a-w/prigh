@@ -23,9 +23,12 @@
   cohttp-eio
   tls-eio
   ca-certs
+  mirage-crypto
+  mirage-crypto-ec
   mirage-crypto-rng
   mirage-crypto-rng.unix
   digestif
+  kdf.hkdf
   patience_diff
   base64
   ohex
