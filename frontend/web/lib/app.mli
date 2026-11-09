@@ -264,6 +264,7 @@ module Reply_tag : sig
     | Resync of
         { session : string (** its id *)
         ; from : string option
+        ; events : int (** [transcript_events] when it was asked for *)
         }
     (** the session's messages after reconnecting, from the first one on show
         ([from], when older ones are not loaded): merged into the transcript
@@ -924,6 +925,9 @@ module Model : sig
           preference) *)
     ; layout : Resize.t (** the panels' sizes *)
     ; paging : Paging.t (** how much of the transcript is loaded *)
+    ; transcript_events : int
+      (** events that changed the transcript: a page asked for before one
+          of them may not have it *)
     ; chat_cache : Chat_cache.t
     ; jump : Jump.t
     ; trimmed : Trimmed.t

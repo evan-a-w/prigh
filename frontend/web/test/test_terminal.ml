@@ -219,7 +219,7 @@ let%expect_test "the panel follows the session, the host and the user" =
      (tag Prefs))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s2.jsonl) (limit 1000000)))
-     (tag (Resync (session s2) (from ()))))
+     (tag (Resync (session s2) (from ()) (events 0))))
     (Rpc (method_ get_pending) (params ()) (tag Resync_pending))
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))

@@ -329,7 +329,7 @@ let%expect_test "switching back shows the transcript at once, then refreshes it"
     {|
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s2.jsonl) (limit 1000000)))
-     (tag (Resync (session s2) (from ()))))
+     (tag (Resync (session s2) (from ()) (events 1))))
     question 1
     answer 1
     question 3
@@ -502,7 +502,7 @@ let%expect_test "reconnecting with older pages loaded" =
      (tag Prefs))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s2.jsonl) (from e3) (limit 60)))
-     (tag (Resync (session s2) (from (e3)))))
+     (tag (Resync (session s2) (from (e3)) (events 0))))
     (Rpc (method_ get_pending) (params ()) (tag Resync_pending))
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
@@ -578,7 +578,7 @@ let%expect_test "reconnecting when what was on show has gone from the session" =
      (tag Prefs))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s2.jsonl) (from e5) (limit 60)))
-     (tag (Resync (session s2) (from (e5)))))
+     (tag (Resync (session s2) (from (e5)) (events 0))))
     (Rpc (method_ get_pending) (params ()) (tag Resync_pending))
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
