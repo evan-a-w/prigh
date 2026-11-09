@@ -905,7 +905,8 @@ let browser_signin_command =
          no_arg
          ~doc:
            " also take the code the page shows after Allow, pasted on stdin \
-            (the default over SSH; PRIGH_SIGNIN_PASTE=0 or 1 overrides)"
+            (the default over SSH, but not with -json; PRIGH_SIGNIN_PASTE=0 or 1 \
+            overrides)"
      in
      fun () ->
        let home = home () in
@@ -962,9 +963,7 @@ let browser_signin_command =
          if json
          then (
            let paste =
-             Option.some_if
-               (Browser_signin.Paste.wanted ~flag:paste ~getenv:Sys.getenv)
-               (Browser_signin.Paste.stdin ~env)
+             Option.some_if paste (Browser_signin.Paste.stdin ~env)
            in
            Browser_signin.run
              ~env

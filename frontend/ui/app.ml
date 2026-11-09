@@ -196,6 +196,7 @@ module Command = struct
         { generation : int
         ; change : Server_link.Change.t
         }
+    | Signin_code of string option
     | Sign_out
     | Notify of
         { mode : Notify.Mode.t
@@ -266,6 +267,7 @@ module Action = struct
         }
     | Rejected of string
     | Signin_required of string
+    | Signin_code_prompt of Server_link.Code_prompt.t
     | Resize of
         { width : int
         ; height : int
@@ -2518,11 +2520,39 @@ let ask_browser_signin m ~why =
   }
 ;;
 
+let signin_code_question = "Paste the code the page shows after Allow"
+
+(* The browser sign-in under way also takes the page's code: ask for it in
+   place of the dialog (none is open while it waits). *)
+let signin_code_prompt m (prompt : Server_link.Code_prompt.t) =
+  match m.connection with
+  | Switching _ ->
+    let m =
+      match prompt with
+      | Wanted -> m
+      | Refused why -> warn m why
+    in
+    ( { m with
+        mode =
+          Text_prompt { question = signin_code_question; action = Signin_code }
+      ; editor = Editor.clear m.editor
+      ; autocomplete = None
+      }
+    , [] )
+  | Connected | Reconnecting _ | Disconnected _ -> m, []
+;;
+
 let relinked m ~generation (outcome : Server_link.Outcome.t) =
   match m.connection with
   | Switching { generation = current; previous; notices }
     when generation = current ->
     let m = { m with server = Some outcome.link } in
+    let m =
+      match m.mode with
+      | Text_prompt { action = Signin_code; _ } ->
+        { m with mode = Editing; editor = Editor.clear m.editor }
+      | _ -> m
+    in
     (match outcome.result with
      | Unreachable e ->
        let m = { m with connection = previous } in
@@ -5486,6 +5516,16 @@ let text_prompt m ~(action : Mode.Text_prompt_action.t) (intent : Intent.t) =
       if String.is_empty text
       then m, []
       else forge_login m (Host { host = text; kind = Some kind; method_ })
+    | Signin_code ->
+      if String.is_empty text
+      then
+        ( { m with
+            mode =
+              Text_prompt
+                { question = signin_code_question; action = Signin_code }
+          }
+        , [] )
+      else notice m "checking the code…", [ Signin_code (Some text) ]
     | Deny_reason { confirm; draft } ->
       answer_confirm
         { m with editor = Editor.set_text m.editor draft }
@@ -5504,8 +5544,13 @@ let text_prompt m ~(action : Mode.Text_prompt_action.t) (intent : Intent.t) =
       Some
         (Option.value_map m.state ~default:"backend" ~f:(fun s -> s.active_host))
     | Host_cwd host -> Some host
-    | Name | Export_path | Import_path | Deny_reason _ | Connect | Forge_host _
-      -> None
+    | Name
+    | Export_path
+    | Import_path
+    | Deny_reason _
+    | Connect
+    | Forge_host _
+    | Signin_code -> None
   in
   let edit m =
     let m', cmds = editing_intent m intent in
@@ -5552,6 +5597,15 @@ let text_prompt m ~(action : Mode.Text_prompt_action.t) (intent : Intent.t) =
            editor = Editor.set_text m.editor draft
          }
        , [] )
+     | Signin_code ->
+       ( notice
+           { m with
+             editor = Editor.clear m.editor
+           ; mode = Editing
+           ; autocomplete = None
+           }
+           "cancelling the sign-in…"
+       , [ Signin_code None ] )
      | Name
      | Cd
      | Mkdir
@@ -7098,6 +7152,7 @@ let update m (action : Action.t) =
       | Relinked { generation; outcome } -> relinked m ~generation outcome
       | Rejected reason -> signed_out m ~reason, []
       | Signin_required why -> ask_browser_signin m ~why, []
+      | Signin_code_prompt prompt -> signin_code_prompt m prompt
       | Resize { width; height } -> { m with width; height }, []
     in
     let m, cmds = block_backend_rpc m cmds in

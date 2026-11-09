@@ -623,11 +623,12 @@ let%expect_test
   let servers = servers () in
   let address = "https://ai.example.com/" in
   let answer = ref (Error "the sign-in was cancelled in the browser") in
-  let browser_signin ~connect ~on_url =
+  let browser_signin ~connect ~on_url ~on_paste_refused:_ =
     printf "prigh browser-signin -connect %s\n" connect;
     on_url
       ~url:"https://ai.example.com/#cli-signin=4242.s&program=tui"
-      ~port:4242;
+      ~port:4242
+      ~paste:None;
     return !answer
   in
   let link =
@@ -732,5 +733,89 @@ let%expect_test
       (user         alice)
       (proxy_cookie proxy_session=ok)))
     |}];
+  return ()
+;;
+
+let%expect_test
+    "a sign-in proxy over SSH: the code pasted, refused, then accepted"
+  =
+  with_home
+  @@ fun home ->
+  let servers = servers () in
+  let address = "https://ai.example.com/" in
+  let pasted = Pipe.create () |> fun (r, w) -> r, w in
+  let browser_signin ~connect ~on_url ~on_paste_refused =
+    printf "prigh browser-signin -paste -connect %s\n" connect;
+    let reader, writer = pasted in
+    on_url
+      ~url:"https://ai.example.com/#cli-signin=4242.s&program=tui&paste=K"
+      ~port:4242
+      ~paste:
+        (Some
+           (Prigh_client_unix.Browser_signin.Code_input.create
+              ~send:(fun code ->
+                printf "stdin: %s\n" code;
+                Pipe.write_without_pushback writer code)
+              ~cancel:(fun () ->
+                print_endline "cancel";
+                Pipe.close writer)));
+    let rec read () =
+      match%bind Pipe.read reader with
+      | `Eof -> return (Error "cancelled")
+      | `Ok "prigh1:good" ->
+        return
+          (Ok
+             { Prigh_client_unix.Browser_signin.Grant.proxy_cookie =
+                 "proxy_session=ok"
+             ; token = Some "page-token"
+             ; user = Some "alice"
+             })
+      | `Ok _ ->
+        on_paste_refused "that code is not for this sign-in";
+        read ()
+    in
+    read ()
+  in
+  let link =
+    make ~home ~servers ~browser_signin ~target:(Remote address) ~saved:None ()
+  in
+  Link.set_notice link (printf "notice: %s\n");
+  Link.set_code_prompt link (fun prompt ->
+    print_s [%sexp "code prompt", (prompt : Prigh_ui.Server_link.Code_prompt.t)];
+    (* The user pastes into the dialog the prompt opens. *)
+    match prompt with
+    | Wanted -> Link.signin_code link (Some "prigh1:stale")
+    | Refused _ -> Link.signin_code link (Some "prigh1:good"));
+  let%bind (_ : Prigh_ui.Server_link.Outcome.result) = Link.start link in
+  [%expect
+    {|
+    open (Websocket (url https://ai.example.com/)
+     (address
+      ((tls true) (host ai.example.com) (port 443) (prefix "") (lines false)))
+     (headers ()))
+    |}];
+  let%bind o = Link.relink link Browser_signin in
+  outcome o;
+  [%expect {|
+    prigh browser-signin -paste -connect https://ai.example.com/
+    notice: sign in through the browser at https://ai.example.com/#cli-signin=4242.s&program=tui&paste=K, then paste the code it shows after Allow (or forward the port: ssh -L 4242:127.0.0.1:4242 …)
+    open the browser at https://ai.example.com/#cli-signin=4242.s&program=tui&paste=K
+    ("code prompt" Wanted)
+    stdin: prigh1:stale
+    ("code prompt" (Refused "that code is not for this sign-in"))
+    stdin: prigh1:good
+    open (Websocket (url https://ai.example.com/)
+     (address
+      ((tls true) (host ai.example.com) (port 443) (prefix "") (lines false)))
+     (headers ((Cookie proxy_session=ok))))
+    https://ai.example.com/ hello {"name":"laptop","token":"page-token","user":"alice","home":"<home>","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location"]}
+    (connected "")
+    ((address (https://ai.example.com/))
+     (user    (alice))
+     (saved   (https://ai.example.com/)))
+    |}];
+  (* Nothing under way: a late code goes nowhere. *)
+  Link.signin_code link (Some "prigh1:late");
+  [%expect {| |}];
   return ()
 ;;

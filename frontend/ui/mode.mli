@@ -54,6 +54,9 @@ module Text_prompt_action : sig
         { kind : string
         ; method_ : string option
         } (** the git host to sign in to *)
+    | Signin_code
+    (** the code the page shows after a browser sign-in's Allow: over SSH
+        the browser cannot reach our listener *)
   [@@deriving sexp_of, equal]
 end
 

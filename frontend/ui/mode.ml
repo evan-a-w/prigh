@@ -50,6 +50,7 @@ module Text_prompt_action = struct
         { kind : string
         ; method_ : string option
         } (** the git host to sign in to *)
+    | Signin_code
   [@@deriving sexp_of, equal]
 end
 
