@@ -33,8 +33,10 @@ setTimeout(() => { console.error("terminal_keys.mjs: timed out"); process.exit(2
 const server = spawn(
   backend,
   ["serve", "-web", "127.0.0.1:0", "-web-root", site, "-token", token, "-cwd", cwd],
-  // The terminal's tmux server is ours, so its shell is $SHELL.
-  { env: { ...process.env, HOME: home, TMUX_TMPDIR: dir, SHELL: "/bin/sh" }, stdio: ["ignore", "ignore", "pipe"] },
+  // The terminal's tmux server is ours, so its shell is $SHELL: an
+  // interactive bash (readline: ↑ recalls, Tab completes), which the flake's
+  // check names in $PRIGH_E2E_SHELL (the sandbox's /bin/sh has no readline).
+  { env: { ...process.env, HOME: home, TMUX_TMPDIR: dir, SHELL: process.env.PRIGH_E2E_SHELL || "/bin/sh" }, stdio: ["ignore", "ignore", "pipe"] },
 );
 const url = await new Promise((resolve, reject) => {
   let err = "";
