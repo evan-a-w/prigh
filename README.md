@@ -155,8 +155,10 @@ opens prigh-web on that site, which asks you to allow it and hands it the
 proxy's cookie (saved with the connection, sent with every connection;
 `prigh web` and `prigh tool-host` do the same without asking (once: a
 sign-in cancelled or failed is not started again on every reconnect),
-and `prigh browser-signin -connect URL` by hand; DOCKER.md, "Behind a reverse proxy",
-has the details). Or exempt `/ws` and `/terminal` from it (prigh checks its
+and `prigh browser-signin -connect URL` by hand; over SSH, where the
+browser cannot reach the program, paste the code the page shows after
+Allow into the program's terminal, or forward its port with `ssh -L`;
+DOCKER.md, "Behind a reverse proxy", has the details). Or exempt `/ws` and `/terminal` from it (prigh checks its
 own token there; DOCKER.md shows how for authentik, Caddy, nginx and
 Traefik), send its credentials with `-header 'NAME: VALUE'` (repeatable;
 `$PRIGH_CONNECT_HEADERS`, one per line; never saved), or use an SSH tunnel
