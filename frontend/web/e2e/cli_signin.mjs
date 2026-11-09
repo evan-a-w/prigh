@@ -12,7 +12,9 @@ import { mkdirSync, readFileSync } from "node:fs";
 import http from "node:http";
 import net from "node:net";
 import { join } from "node:path";
+import { hostname } from "node:os";
 import { end } from "./end.mjs";
+import { inputs, sealSource, vector } from "./paste_vector.mjs";
 
 const { chromium, firefox, webkit } = await import(process.env.PLAYWRIGHT_MODULE);
 
@@ -90,20 +92,23 @@ await new Promise(resolve => proxy.listen(0, "127.0.0.1", resolve));
 const site_url = `http://127.0.0.1:${proxy.address().port}/`;
 
 const laptopEnv = { ...process.env, HOME: dirs["laptop-home"] };
-for (const name of ["PRIGH_CONNECT", "PRIGH_TOKEN", "PRIGH_USER"]) delete laptopEnv[name];
-const signin = (program) => {
+for (const name of ["PRIGH_CONNECT", "PRIGH_TOKEN", "PRIGH_USER", "SSH_CONNECTION", "SSH_TTY", "PRIGH_SIGNIN_PASTE"])
+  delete laptopEnv[name];
+const signin = (program, { paste = false } = {}) => {
   const proc = spawn(
     backend,
-    ["browser-signin", "-connect", site_url, "-no-browser", "-program", program],
-    { env: laptopEnv, stdio: ["ignore", "ignore", "pipe"] },
+    ["browser-signin", "-connect", site_url, "-no-browser", "-program", program, ...(paste ? ["-paste"] : [])],
+    { env: laptopEnv, stdio: [paste ? "pipe" : "ignore", "ignore", "pipe"] },
   );
+  let err = "";
+  proc.stderr.on("data", data => { err += data; });
   const url = waitFor(proc.stderr, proc, /^(http:\/\/\S+#cli-signin=\S+)$/m, "prigh browser-signin");
-  const done = new Promise(resolve => {
-    let err = "";
-    proc.stderr.on("data", data => { err += data; });
-    proc.on("exit", code => resolve({ code, err }));
-  });
-  return { proc, url, done };
+  const prompt = paste && waitFor(proc.stderr, proc, /^(Or paste the code .*)$/m, "prigh browser-signin");
+  const refused = paste && waitFor(proc.stderr, proc, /(Paste the code:)$/m, "prigh browser-signin");
+  // Not awaited when the program ends otherwise.
+  for (const p of [url, prompt, refused]) if (p) p.catch(() => {});
+  const done = new Promise(resolve => proc.on("exit", code => resolve({ code, err })));
+  return { proc, url, prompt, refused, done, err: () => err };
 };
 
 const browser = await engine.launch({
@@ -120,9 +125,13 @@ const watch = p => {
 };
 const clean = text => text
   .replaceAll(dir, "$DIR")
+  .replaceAll(hostname(), "<HOST>")
   .replace(/127\.0\.0\.1:\d+/g, "127.0.0.1:<PORT>")
   .replace(/-L \d+:/g, "-L <PORT>:")
   .replace(/cli-signin=\d+\.[0-9a-f]+/g, "cli-signin=<PORT>.<STATE>")
+  .replace(/paste=[\w-]+/g, "paste=<KEY>")
+  .replace(/from=[\w.-]+/g, "from=<HOST>")
+  .replace(/prigh1:[\w-]+/g, "prigh1:<CODE>")
   .split("\n")
   .map(line => line.trim())
   .filter(line => line !== "")
@@ -216,9 +225,64 @@ try {
     await page.locator("#cli-signin-cancel").waitFor();
     await page.keyboard.press("Escape");
     const cancelled = await second.done;
+    // The listener's page, before the next navigation.
+    await page.getByText("Not signed in").first().waitFor();
     section(`${label}: cancelled with Esc`);
     console.log(`exit ${cancelled.code}`);
     console.log(clean(cancelled.err.split("\n").filter(l => !l.includes("#cli-signin=")).join("\n")));
+
+    // Over SSH the browser cannot reach the program's listener: it takes
+    // the code the page shows after Allow, pasted into its terminal.
+    const third = signin("tui", { paste: true });
+    children.push(third.proc);
+    const pasteUrl = await third.url;
+    await third.prompt;
+    section(`${label}: paste mode: the program`);
+    console.log(clean(third.err().split("\n").filter(l => !l.includes("#cli-signin=")).join("\n")));
+    console.log(clean(pasteUrl));
+    await page.goto("about:blank");
+    await page.goto(pasteUrl);
+    await page.locator("#cli-signin-allow").waitFor();
+    await page.waitForFunction(() => !document.querySelector("#cli-signin-allow").disabled);
+    section(`${label}: paste mode: asked`);
+    console.log(clean(await page.locator(".cli-signin").innerText()));
+    await screenshot(page, `${label} paste asked`);
+    await page.locator("#cli-signin-allow").click();
+    await page.locator("#cli-signin-code").waitFor();
+    section(`${label}: paste mode: the code`);
+    console.log(clean(await page.locator(".cli-signin").innerText()));
+    console.log(await layout(page));
+    await screenshot(page, `${label} paste code`);
+    if (label === "phone") {
+      await page.setViewportSize({ width: 320, height: 640 });
+      section("small phone: paste mode: the code");
+      console.log(await layout(page));
+      await screenshot(page, "small phone paste code");
+      await page.setViewportSize(options.viewport);
+    }
+    await page.locator("#cli-signin-copy").click();
+    await page.waitForFunction(() => /Copied|Could not copy/.test(document.querySelector(".cli-signin").innerText));
+    section(`${label}: paste mode: copied`);
+    console.log(clean(await page.locator(".signin-error").innerText()));
+    await screenshot(page, `${label} paste copied`);
+    const pasteCode = await page.locator("#cli-signin-code").textContent();
+    // A mistyped code first: the program says so and waits for another.
+    third.proc.stdin.write(`${pasteCode.slice(0, -6)}AAAAAA\n`);
+    await third.refused;
+    third.proc.stdin.write(`${pasteCode}\n`);
+    const pasted = await third.done;
+    section(`${label}: paste mode: the program signed in`);
+    console.log(`exit ${pasted.code}`);
+    console.log(clean(pasted.err.split("\n").filter(l => !l.includes("#cli-signin=")).join("\n")));
+    if (label === "desktop") {
+      // The browser seals as Node does: the backend's test opens this vector.
+      const { programPublic, state, plaintext, fixed } = inputs;
+      const sealed = await page.evaluate(
+        `(() => {\n${sealSource}\nreturn prigh_paste_seal(${JSON.stringify(programPublic)}, ${JSON.stringify(state)}, ${JSON.stringify(plaintext)}, ${JSON.stringify(fixed)});\n})()`,
+      );
+      section("paste mode: this browser seals the recorded vector");
+      console.log(sealed === vector ? "same" : `DIFFERENT: ${sealed}`);
+    }
     await context.close();
   }
 

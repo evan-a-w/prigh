@@ -853,12 +853,13 @@ let serve_command =
          Eio.Fiber.await_cancel ())
 ;;
 
-(* A pasted sign-in code, when the program runs over SSH (or [-paste]) and
-   someone is at its terminal to paste it. *)
+(* A pasted sign-in code: with [-paste], or when the program runs over SSH
+   and someone is at its terminal to paste it. *)
 let terminal_paste ~env ~flag =
   Option.some_if
-    (Browser_signin.Paste.wanted ~flag ~getenv:Sys.getenv
-     && Core_unix.isatty Core_unix.stdin)
+    (flag
+     || (Browser_signin.Paste.wanted ~flag ~getenv:Sys.getenv
+         && Core_unix.isatty Core_unix.stdin))
     (Browser_signin.Paste.stdin ~env)
 ;;
 

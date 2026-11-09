@@ -360,6 +360,9 @@
                 mkdir -p "$HOME"
                 cp -r ${./frontend/web/e2e} e2e
                 chmod -R u+w e2e
+                # paste_vector.mjs seals with the page's own paste_seal.js.
+                mkdir app
+                cp ${./frontend/web/app/paste_seal.js} app/paste_seal.js
                 ${pkgs.runtimeShell} e2e/prigh_web.sh
                 mkdir "$out"
               ''
