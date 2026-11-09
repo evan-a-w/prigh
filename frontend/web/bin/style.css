@@ -1328,6 +1328,19 @@ kbd {
 .cli-signin .signin-sub { margin: 0; }
 .cli-signin h1 { margin-bottom: 4px; }
 .signin .btn.primary, .cli-signin .btn.ghost { min-height: 44px; }
+.cli-signin-code {
+  width: 100%;
+  resize: none;
+  background: var(--well);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-control);
+  padding: 8px 10px;
+  font: 13px/1.45 var(--mono);
+  color: var(--chalk);
+  word-break: break-all;
+  outline: none;
+}
+.cli-signin-code:focus { border-color: var(--sodium); }
 
 /* Phones: the sidebar is a drawer over the page */
 
@@ -1580,6 +1593,7 @@ kbd {
 .signin .btn.primary:disabled { opacity: 0.7; cursor: progress; }
 @media (pointer: coarse) {
   .signin input { font-size: 16px; }
+  .cli-signin-code { font-size: 16px; }
   .signin .btn { min-height: 44px; }
 }
 
