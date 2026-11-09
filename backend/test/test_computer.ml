@@ -290,6 +290,139 @@ let%expect_test "a host without computer use says how to turn it on" =
     {| error: computer use is off on this tool host: start it with -computer (prigh tool-host -computer, prigh desktop -computer, or programs.prigh.desktop .computerUse in Home Manager) |}]
 ;;
 
+(* A real helper process ($PRIGH_COMPUTER): a script that says it is ready,
+   then never replies (it hangs), running [on_term] on SIGTERM and logging
+   it. [f] gets [spawn] (it prints the ready line) and [ended], which prints
+   how the helper ended, once it has, and the log when [log_shown] (one
+   that ignores SIGTERM may be killed before it writes it). *)
+let with_script_helper ~on_term f =
+  with_sandbox
+  @@ fun t ->
+  let script = Filename.concat t.dir "helper" in
+  let log = Filename.concat t.dir "log" in
+  Out_channel.write_all
+    script
+    ~data:
+      (sprintf
+         "#!/bin/sh\n\
+          trap 'echo SIGTERM >>%s; %s' TERM\n\
+          mkfifo %s/hold\n\
+          exec 3<>%s/hold\n\
+          echo '{\"ready\":true}'\n\
+          while :; do read -r line <&3; done\n"
+         log
+         on_term
+         t.dir
+         t.dir);
+  Core_unix.chmod script ~perm:0o755;
+  Core_unix.putenv ~key:"PRIGH_COMPUTER" ~data:script;
+  Exn.protect
+    ~finally:(fun () -> Core_unix.unsetenv "PRIGH_COMPUTER")
+    ~f:(fun () ->
+      let exited, set_exited = Eio.Promise.create () in
+      let spawn ~grace ~sw =
+        let transport =
+          Computer_helper.spawn
+            ~grace
+            ~on_exit:(Eio.Promise.resolve set_exited)
+            ~env:t.env
+            ~sw
+            ()
+        in
+        printf "helper: %s\n" (Option.value_exn (transport.receive ()));
+        transport
+      in
+      let ended ~log_shown =
+        (match Eio.Promise.await exited with
+         | `Exited n -> printf "helper exited %d\n" n
+         | `Signaled n ->
+           printf
+             "helper killed by %s\n"
+             (Signal.to_string (Signal.of_caml_int n)));
+        if log_shown then printf "log: %s" (In_channel.read_all log)
+      in
+      f ~spawn ~exited:(fun () -> Eio.Promise.is_resolved exited) ~ended)
+;;
+
+(* A call whose helper hangs, cancelled once its request is sent. *)
+let cancel_hung_call ~on_term ~grace =
+  with_script_helper ~on_term
+  @@ fun ~spawn ~exited ~ended ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let cancel = Cancellation.create () in
+  let helper =
+    Computer_helper.create
+      (Computer_fake.info (Computer_fake.create ()))
+      ~start:(fun () ->
+        let transport = spawn ~grace ~sw in
+        { transport with
+          send =
+            (fun line ->
+              transport.send line;
+              Cancellation.cancel cancel)
+        })
+  in
+  show_result
+    (Computer_helper.run
+       helper
+       ~cancel
+       (Json.of_string {|{"action":"hold_key","combo":"shift","duration":5}|}));
+  printf "helper exited before the call returned: %b\n" (exited ());
+  ended ~log_shown:(String.equal on_term "exit 0")
+;;
+
+let%expect_test "cancelling: the call ends at once, the helper gets SIGTERM" =
+  cancel_hung_call ~on_term:"exit 0" ~grace:(Time_ns.Span.of_min 1.);
+  [%expect
+    {|
+    helper: {"ready":true}
+    error: [cancelled]
+    helper exited before the call returned: false
+    helper exited 0
+    log: SIGTERM
+    |}]
+;;
+
+let%expect_test
+    "cancelling: a helper that ignores SIGTERM is killed after the grace"
+  =
+  cancel_hung_call ~on_term:":" ~grace:(Time_ns.Span.of_ms 50.);
+  [%expect
+    {|
+    helper: {"ready":true}
+    error: [cancelled]
+    helper exited before the call returned: false
+    helper killed by sigkill
+    |}]
+;;
+
+let%expect_test "the tool host ending stops the helper as cancelling does" =
+  let shut_down ~on_term ~grace =
+    with_script_helper ~on_term
+    @@ fun ~spawn ~exited ~ended ->
+    Eio.Switch.run (fun sw ->
+      ignore (spawn ~grace ~sw : Computer_helper.Transport.t));
+    printf "helper exited when the switch ended: %b\n" (exited ());
+    ended ~log_shown:(String.equal on_term "exit 0")
+  in
+  shut_down ~on_term:"exit 0" ~grace:(Time_ns.Span.of_min 1.);
+  [%expect
+    {|
+    helper: {"ready":true}
+    helper exited when the switch ended: true
+    helper exited 0
+    log: SIGTERM
+    |}];
+  shut_down ~on_term:":" ~grace:(Time_ns.Span.of_ms 50.);
+  [%expect
+    {|
+    helper: {"ready":true}
+    helper exited when the switch ended: true
+    helper killed by sigkill
+    |}]
+;;
+
 (* An agent whose tools run on a tool host ([Host_ops.execute], as the
    host's worker does) whose screen is [fake] when [computer]. Prints each
    request (the tools offered when [show_tools]; the computer results the

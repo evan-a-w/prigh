@@ -665,7 +665,12 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   "text","cursor","real","screenshot"}` or `{"ok":false,"error",
   "interrupted"}` out), spawned on the first action and again when it died
   (an action whose send failed goes to the new one; one with no reply
-  fails), killed on cancel, one action at a time. The result's text is
+  fails), stopped on cancel, one action at a time. Stopping returns at once
+  (the cancelled turn ends then) and, in the background, SIGTERMs the
+  helper, so that it releases the keys and buttons it holds, and SIGKILLs
+  it if it has not exited a second later. The helper runs on a switch of
+  its own (`Switch.run_protected`), so the tool host shutting down stops it
+  the same way and waits for it, rather than Eio SIGKILLing it. The result's text is
   the description with the real point (`→ (1280, 624) on the screen`), the
   cursor and `screenshot W×H`; the screenshot is its image. An interrupted
   reply (the user moved the mouse: the kill switch) is an error starting

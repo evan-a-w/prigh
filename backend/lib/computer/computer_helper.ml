@@ -104,47 +104,76 @@ let create info ~start =
   { info; start; running = None; mutex = Eio.Mutex.create (); next_id = 0 }
 ;;
 
-let spawn ~env ~sw () =
-  let prog = program () in
-  let stdin_r, stdin_w = Eio_unix.pipe sw in
-  let stdout_r, stdout_w = Eio_unix.pipe sw in
+let default_grace = Time_ns.Span.of_sec 1.
+
+(* SIGTERM lets the helper release the keys and buttons it holds; SIGKILL
+   only if it has not exited after [grace]. *)
+let terminate ~clock ~grace child =
+  let signal s =
+    try Eio.Process.signal child s with
+    | _ -> ()
+  in
+  signal Stdlib.Sys.sigterm;
   match
-    Eio.Process.spawn
-      ~sw
-      (Eio.Stdenv.process_mgr env)
-      ~stdin:stdin_r
-      ~stdout:stdout_w
-      (prog :: extra_args ())
+    Eio.Time.with_timeout_exn clock (Time_ns.Span.to_sec grace) (fun () ->
+      Eio.Process.await child)
   with
-  | exception Eio.Io (Eio.Process.E (Executable_not_found _), _) ->
-    Eio.Flow.close stdin_w;
-    Eio.Flow.close stdout_r;
-    failwith (not_found prog)
-  | child ->
-    Eio.Flow.close stdin_r;
-    Eio.Flow.close stdout_w;
-    let reader = Eio.Buf_read.of_flow stdout_r ~max_size:(256 * 1024 * 1024) in
-    let killed = ref false in
-    let kill () =
-      if not !killed
-      then (
-        killed := true;
-        (try Eio.Process.signal child Stdlib.Sys.sigkill with
-         | _ -> ());
+  | status -> status
+  | exception Eio.Time.Timeout ->
+    signal Stdlib.Sys.sigkill;
+    Eio.Process.await child
+;;
+
+let spawn ?(grace = default_grace) ?(on_exit = ignore) ~env ~sw () =
+  let prog = program () in
+  let started, set_started = Promise.create () in
+  let stop_requested, request_stop = Promise.create () in
+  let stop () = ignore (Promise.try_resolve request_stop () : bool) in
+  (* The helper lives on a switch of its own, which [sw] ending does not
+     cancel (that would SIGKILL it): [sw] ending stops it as [kill] does,
+     and [sw] waits for it. *)
+  Fiber.fork_daemon ~sw (fun () ->
+    Switch.run_protected (fun sw ->
+      let stdin_r, stdin_w = Eio_unix.pipe sw in
+      let stdout_r, stdout_w = Eio_unix.pipe sw in
+      match
+        Eio.Process.spawn
+          ~sw
+          (Eio.Stdenv.process_mgr env)
+          ~stdin:stdin_r
+          ~stdout:stdout_w
+          (prog :: extra_args ())
+      with
+      | exception exn -> Promise.resolve set_started (Error exn)
+      | child ->
+        Eio.Flow.close stdin_r;
+        Eio.Flow.close stdout_w;
+        Promise.resolve set_started (Ok (stdin_w, stdout_r));
+        Promise.await stop_requested;
         (try Eio.Flow.close stdin_w with
          | _ -> ());
-        Fiber.fork ~sw (fun () ->
-          ignore (Eio.Process.await child : Eio.Process.exit_status);
-          try Eio.Flow.close stdout_r with
-          | _ -> ()))
-    in
+        on_exit (terminate ~clock:(Eio.Stdenv.clock env) ~grace child));
+    `Stop_daemon);
+  Fiber.fork_daemon ~sw (fun () ->
+    (try Promise.await stop_requested with
+     | Eio.Cancel.Cancelled _ -> stop ());
+    `Stop_daemon);
+  match Promise.await started with
+  | Error (Eio.Io (Eio.Process.E (Executable_not_found _), _)) ->
+    stop ();
+    failwith (not_found prog)
+  | Error exn ->
+    stop ();
+    raise exn
+  | Ok (stdin_w, stdout_r) ->
+    let reader = Eio.Buf_read.of_flow stdout_r ~max_size:(256 * 1024 * 1024) in
     { Transport.send = (fun line -> Eio.Flow.copy_string (line ^ "\n") stdin_w)
     ; receive =
         (fun () ->
           match Eio.Buf_read.line reader with
           | line -> Some line
           | exception (End_of_file | Eio.Io _) -> None)
-    ; kill
+    ; kill = stop
     }
 ;;
 
