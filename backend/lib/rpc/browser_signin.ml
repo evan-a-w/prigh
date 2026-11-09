@@ -26,14 +26,7 @@ module Program = struct
   ;;
 end
 
-module Grant = struct
-  type t =
-    { proxy_cookie : (string[@sexp.opaque])
-    ; token : (string[@sexp.opaque]) option
-    ; user : string option
-    }
-  [@@deriving sexp_of]
-end
+module Grant = Browser_signin_grant
 
 let url remote ~program ~port ~state =
   sprintf

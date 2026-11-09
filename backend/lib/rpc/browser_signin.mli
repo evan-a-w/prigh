@@ -38,16 +38,7 @@ module Program : sig
   val name : t -> string
 end
 
-module Grant : sig
-  (** What the page sent: the proxy's cookie and the prigh credentials the
-      page is signed in with. Printed without the secrets. *)
-  type t =
-    { proxy_cookie : string
-    ; token : string option
-    ; user : string option
-    }
-  [@@deriving sexp_of]
-end
+module Grant = Browser_signin_grant
 
 (** The page's URL for a listener on [port] with [state]. *)
 val url
