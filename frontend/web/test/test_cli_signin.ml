@@ -208,7 +208,7 @@ let show_page html =
       (if String.is_substring (Re.Group.get g 2) ~substring:"disabled"
        then " (disabled)"
        else ""))
-  |> replace {|<textarea[^>]*>([^<]*)</textarea>|} ~f:(fun g ->
+  |> replace {|<code[^>]*>([^<]*)</code>|} ~f:(fun g ->
     sprintf "{%s}\n" (Re.Group.get g 1))
   |> replace {|<p class="([^"]*)"[^>]*>([^<]*)</p>|} ~f:(fun g ->
     match Re.Group.get g 2 with

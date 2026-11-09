@@ -1329,8 +1329,9 @@ kbd {
 .cli-signin h1 { margin-bottom: 4px; }
 .signin .btn.primary, .cli-signin .btn.ghost { min-height: 44px; }
 .cli-signin-code {
-  width: 100%;
-  resize: none;
+  display: block;
+  user-select: all;
+  -webkit-user-select: all;
   background: var(--well);
   border: 1px solid var(--rule);
   border-radius: var(--r-control);
@@ -1340,7 +1341,7 @@ kbd {
   word-break: break-all;
   outline: none;
 }
-.cli-signin-code:focus { border-color: var(--sodium); }
+.cli-signin-code:focus-visible { border-color: var(--sodium); }
 
 /* Phones: the sidebar is a drawer over the page */
 
@@ -1593,7 +1594,6 @@ kbd {
 .signin .btn.primary:disabled { opacity: 0.7; cursor: progress; }
 @media (pointer: coarse) {
   .signin input { font-size: 16px; }
-  .cli-signin-code { font-size: 16px; }
   .signin .btn { min-height: 44px; }
 }
 

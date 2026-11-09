@@ -286,7 +286,7 @@ let html (t : Request.t) ~host ~user (view : View.t) =
              "%s asked for it. The code works once, only for this sign-in."
              (Program.name t.program))
         ^ sprintf
-            {|<textarea class="cli-signin-code" id="cli-signin-code" readonly rows="4" spellcheck="false" aria-label="The sign-in code">%s</textarea>|}
+            {|<code class="cli-signin-code" id="cli-signin-code" tabindex="0" aria-label="The sign-in code">%s</code>|}
             (escape code)
         ^ para
             ~cls:
