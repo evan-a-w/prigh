@@ -218,6 +218,9 @@ module Command : sig
         }
     (** [/connect], [/signin]: switch server or credentials and answer
         [Relinked]. *)
+    | Signin_code of string option
+    (** The code pasted for the browser sign-in under way; [None] cancels
+        it. *)
     | Sign_out
     (** Forget the stored credentials (the token) and drop the connection. *)
     | Notify of
@@ -286,6 +289,8 @@ module Action : sig
     | Signin_required of string
     (** the first connection met a sign-in proxy's login (why): start
         disconnected, offering to sign in through the browser *)
+    | Signin_code_prompt of Server_link.Code_prompt.t
+    (** the browser sign-in under way also takes a pasted code *)
     | Resize of
         { width : int
         ; height : int

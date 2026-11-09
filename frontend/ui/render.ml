@@ -274,6 +274,12 @@ let mode_hint (m : App.Model.t) : Content.Line.t option =
           Some [ span ~style:attention "login: Enter answers · Esc cancels" ]
         | Text_prompt { action = Deny_reason _; _ } ->
           Some [ span ~style:attention "Enter denies · Esc goes back" ]
+        | Text_prompt { action = Signin_code; _ } ->
+          Some
+            [ span
+                ~style:attention
+                "Enter sends the code · Esc cancels the sign-in"
+            ]
         | Text_prompt _ ->
           (match m.autocomplete with
            | Some ac when Autocomplete.accepts_on_enter ac ->

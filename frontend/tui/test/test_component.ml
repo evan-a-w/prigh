@@ -79,6 +79,11 @@ let make_platform ~replies : Component.Platform.t =
             ; result = Connected (`Object [ "client_id", `String "client-3" ])
             })
           ())
+  ; signin_code =
+      (fun code ->
+        Bonsai.Effect.of_sync_fun
+          (fun () -> print_s [%sexp "signin_code", (code : string option)])
+          ())
   ; sign_out =
       Bonsai.Effect.of_sync_fun
         (fun () ->

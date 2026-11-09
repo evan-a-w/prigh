@@ -139,8 +139,13 @@ type t =
   ; open_transport : Endpoint.t -> Transport.t Deferred.Or_error.t
   ; browser_signin :
       connect:string
-      -> on_url:(url:string -> port:int -> unit)
+      -> on_url:
+           (url:string -> port:int -> paste:Browser_signin.Code_input.t option -> unit)
+      -> on_paste_refused:(string -> unit)
       -> (Browser_signin.Grant.t, string) Result.t Deferred.t
+  ; mutable code_input : Browser_signin.Code_input.t option
+    (** where a code pasted for the browser sign-in under way goes *)
+  ; mutable code_prompt : Server_link.Code_prompt.t -> unit
   ; open_url : string -> unit
   ; mutable proxy_cookie : (string * string) option
     (** the address, and the [Cookie] its sign-in proxy wants *)
@@ -181,6 +186,15 @@ let set_notice t f =
   t.notice <- f;
   Queue.iter t.held_notices ~f;
   Queue.clear t.held_notices
+;;
+
+let set_code_prompt t f = t.code_prompt <- f
+
+let signin_code t code =
+  Option.iter t.code_input ~f:(fun input ->
+    match code with
+    | Some code -> Browser_signin.Code_input.send input code
+    | None -> Browser_signin.Code_input.cancel input)
 ;;
 
 let endpoint t ~session : Target.t -> Endpoint.t Or_error.t = function
@@ -314,8 +328,17 @@ let create
     ; hello
     ; open_transport
     ; browser_signin =
-        Option.value browser_signin ~default:(fun ~connect ~on_url ->
-          Browser_signin.run ~backend ~connect ~on_url)
+        Option.value
+          browser_signin
+          ~default:(fun ~connect ~on_url ~on_paste_refused ->
+            Browser_signin.run
+              ~backend
+              ~connect
+              ~paste:(Browser_signin.paste_wanted ~getenv:Sys.getenv)
+              ~on_url
+              ~on_paste_refused)
+    ; code_input = None
+    ; code_prompt = ignore
     ; open_url
     ; proxy_cookie =
         (match (target : Target.t) with
@@ -445,17 +468,34 @@ let drop_connection t =
    have none. *)
 let sign_in_through_browser t address =
   let%map result =
-    t.browser_signin ~connect:address ~on_url:(fun ~url ~port ->
-      notify
-        t
-        (sprintf
-           "sign in through the browser at %s (opening it; over SSH, forward \
-            the port first: ssh -L %d:127.0.0.1:%d …)"
-           url
-           port
-           port);
-      t.open_url url)
+    t.browser_signin
+      ~connect:address
+      ~on_url:(fun ~url ~port ~paste ->
+        notify
+          t
+          (match paste with
+           | None ->
+             sprintf
+               "sign in through the browser at %s (opening it; over SSH, \
+                forward the port first: ssh -L %d:127.0.0.1:%d …)"
+               url
+               port
+               port
+           | Some _ ->
+             sprintf
+               "sign in through the browser at %s, then paste the code it \
+                shows after Allow (or forward the port: ssh -L \
+                %d:127.0.0.1:%d …)"
+               url
+               port
+               port);
+        t.open_url url;
+        Option.iter paste ~f:(fun input ->
+          t.code_input <- Some input;
+          t.code_prompt Wanted))
+      ~on_paste_refused:(fun why -> t.code_prompt (Refused why))
   in
+  t.code_input <- None;
   Result.map result ~f:(fun (grant : Browser_signin.Grant.t) ->
     t.proxy_cookie <- Some (address, grant.proxy_cookie);
     let token, user =

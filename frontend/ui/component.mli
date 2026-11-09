@@ -32,6 +32,9 @@ module Platform : sig
     ; relink : Server_link.Change.t -> Server_link.Outcome.t Bonsai.Effect.t
     (** [/connect] and [/signin]: asked only of platforms that report an
         [App.Action.Server_link]. *)
+    ; signin_code : string option -> unit Bonsai.Effect.t
+    (** The code pasted for the browser sign-in under way; [None] cancels
+        it. *)
     }
 end
 
