@@ -5,6 +5,8 @@
  (name prigh_web_app)
  (preprocess
   (pps ppx_jane js_of_ocaml-ppx bonsai.ppx_bonsai))
+ (js_of_ocaml
+  (javascript_files paste_seal.js))
  (libraries
   core
   async_kernel
