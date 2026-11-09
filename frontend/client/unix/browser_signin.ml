@@ -52,7 +52,10 @@ module Line = struct
         | _ -> None
       in
       (match
-         string "url", string "proxy_cookie", string "error", string "paste_error"
+         ( string "url"
+         , string "proxy_cookie"
+         , string "error"
+         , string "paste_error" )
        with
        | Some url, _, _, _ ->
          Option.map

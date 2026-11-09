@@ -161,9 +161,13 @@ let focused_agent_hint ~main (a : Agent_view.t) =
   ]
 ;;
 
+let signin_code_keys = "Enter sends the code · Esc cancels the sign-in"
+
 let mode_hint (m : App.Model.t) : Content.Line.t option =
   match m.connection with
   | Disconnected _ -> Some [ span ~style:attention (disconnected_hint m) ]
+  | Switching _ when Mode.is_signin_code m.mode ->
+    Some [ span ~style:attention signin_code_keys ]
   | Switching _ -> Some [ span ~style:attention "connecting…" ]
   | Reconnecting { attempt; delay_ms; _ } ->
     Some
@@ -274,12 +278,6 @@ let mode_hint (m : App.Model.t) : Content.Line.t option =
           Some [ span ~style:attention "login: Enter answers · Esc cancels" ]
         | Text_prompt { action = Deny_reason _; _ } ->
           Some [ span ~style:attention "Enter denies · Esc goes back" ]
-        | Text_prompt { action = Signin_code; _ } ->
-          Some
-            [ span
-                ~style:attention
-                "Enter sends the code · Esc cancels the sign-in"
-            ]
         | Text_prompt _ ->
           (match m.autocomplete with
            | Some ac when Autocomplete.accepts_on_enter ac ->
@@ -936,6 +934,8 @@ let server_part (m : App.Model.t) =
 let status (m : App.Model.t) : Content.Line.t =
   match m.state, m.connection with
   | _, Disconnected _ -> [ span ~style:attention (disconnected_hint m) ]
+  | _, Switching _ when Mode.is_signin_code m.mode ->
+    [ span ~style:attention signin_code_keys ]
   | None, Switching _ -> [ span ~style:gray "connecting…" ]
   | None, _ ->
     (match m.mode with

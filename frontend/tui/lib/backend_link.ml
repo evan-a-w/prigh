@@ -140,7 +140,10 @@ type t =
   ; browser_signin :
       connect:string
       -> on_url:
-           (url:string -> port:int -> paste:Browser_signin.Code_input.t option -> unit)
+           (url:string
+            -> port:int
+            -> paste:Browser_signin.Code_input.t option
+            -> unit)
       -> on_paste_refused:(string -> unit)
       -> (Browser_signin.Grant.t, string) Result.t Deferred.t
   ; mutable code_input : Browser_signin.Code_input.t option
@@ -484,8 +487,8 @@ let sign_in_through_browser t address =
            | Some _ ->
              sprintf
                "sign in through the browser at %s, then paste the code it \
-                shows after Allow (or forward the port: ssh -L \
-                %d:127.0.0.1:%d …)"
+                shows after Allow (or forward the port: ssh -L %d:127.0.0.1:%d \
+                …)"
                url
                port
                port);

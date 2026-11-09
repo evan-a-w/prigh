@@ -142,3 +142,6 @@ type t =
 
 val is_dialog : t -> bool
 val name : t -> string
+
+(** The browser sign-in's dialog for the page's code. *)
+val is_signin_code : t -> bool
