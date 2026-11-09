@@ -2,22 +2,11 @@ open! Core
 open! Prigh
 
 (* The paste-back code of a browser sign-in, against the vector the page's
-   own paste_seal.js made (frontend/web/e2e/paste_vector.mjs prints it and
-   cli_signin.mjs checks every browser makes the same). *)
+   own paste_seal.js made ({!Paste_vector}). *)
 
-let program_secret =
-  Base64.decode_exn
-    ~pad:false
-    ~alphabet:Base64.uri_safe_alphabet
-    "AQIDBAUGBwgJCgsMDQ4PEBESExQVFhcYGRobHB0eHyA"
-;;
-
-let state = "0123456789abcdef0123456789abcdef"
-
-let vector =
-  "prigh1:WGmv9FBUlzLLqu1eXfmzCm2jHLDldCutWtShp2jxpnugoaKjpKWmp6ipqqsX8VRaKw-Xbo3_3ST_iBU4rzNOgjGkmVsO3vPMlN6CcJgIOXlZCLis7BV1Z4g11IagVBAlcqXyYNFdJTxsEEiSbI8nHMyx90rt-3nTY04i3nY"
-;;
-
+let program_secret = Paste_vector.program_secret
+let state = Paste_vector.state
+let vector = Paste_vector.code
 let start = Time_ns.of_string_with_utc_offset "2026-11-09 12:00:00Z"
 let expires = Time_ns.add start (Time_ns.Span.of_min 30.)
 
