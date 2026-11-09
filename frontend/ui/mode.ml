@@ -153,3 +153,8 @@ let name = function
   | Search _ -> "search"
   | Output _ -> "output"
 ;;
+
+let is_signin_code = function
+  | Text_prompt { action = Signin_code; _ } -> true
+  | _ -> false
+;;

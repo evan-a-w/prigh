@@ -16,7 +16,8 @@ let%expect_test "the lines it prints" =
     ; "not json"
     ]
     ~f:(fun line ->
-      print_s [%sexp (Browser_signin.Line.parse line : Browser_signin.Line.t option)]);
+      print_s
+        [%sexp (Browser_signin.Line.parse line : Browser_signin.Line.t option)]);
   [%expect
     {|
     ((

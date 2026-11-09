@@ -11,14 +11,14 @@ let make_platform ~replies : Component.Platform.t =
       (fun method_ params ->
         Bonsai.Effect.of_sync_fun
           (fun () ->
-            printf
-              "rpc %s %s\n"
-              method_
-              (Sexp.to_string [%sexp (params : (string * P.Json.t) list)]);
-            match List.Assoc.find replies ~equal:String.equal method_ with
-            | Some (Ok json) -> Ok (Or_error.ok_exn (P.Json.parse json))
-            | Some (Error e) -> Error e
-            | None -> Ok (`Object []))
+             printf
+               "rpc %s %s\n"
+               method_
+               (Sexp.to_string [%sexp (params : (string * P.Json.t) list)]);
+             match List.Assoc.find replies ~equal:String.equal method_ with
+             | Some (Ok json) -> Ok (Or_error.ok_exn (P.Json.parse json))
+             | Some (Error e) -> Error e
+             | None -> Ok (`Object []))
           ())
   ; open_browser =
       (fun url ->
@@ -27,8 +27,8 @@ let make_platform ~replies : Component.Platform.t =
       (fun () ->
         Bonsai.Effect.of_sync_fun
           (fun () ->
-            print_endline "load history";
-            Ok (`Array []))
+             print_endline "load history";
+             Ok (`Array []))
           ())
   ; append_history =
       (fun text ->
@@ -42,42 +42,44 @@ let make_platform ~replies : Component.Platform.t =
       (fun mode n ->
         Bonsai.Effect.of_sync_fun
           (fun () ->
-            print_s
-              [%sexp
-                "notify", (mode : Prigh_ui.Notify.Mode.t), (n : Prigh_ui.Notify.t)])
+             print_s
+               [%sexp
+                 "notify"
+               , (mode : Prigh_ui.Notify.Mode.t)
+               , (n : Prigh_ui.Notify.t)])
           ())
   ; suspend = Bonsai.Effect.of_sync_fun (fun () -> print_endline "suspend") ()
   ; edit_externally =
       (fun text ->
         Bonsai.Effect.of_sync_fun
           (fun () ->
-            printf "edit %s\n" text;
-            Ok text)
+             printf "edit %s\n" text;
+             Ok text)
           ())
   ; reconnect =
       (fun ~delay_ms ~session ~as_user ->
         Bonsai.Effect.of_sync_fun
           (fun () ->
-            printf
-              "reconnect after %dms session=%s%s\n"
-              delay_ms
-              (Option.value session ~default:"-")
-              (Option.value_map as_user ~default:"" ~f:(fun u ->
-                 " as_user=" ^ u));
-            Ok (`Object [ "client_id", `String "client-2" ]))
+             printf
+               "reconnect after %dms session=%s%s\n"
+               delay_ms
+               (Option.value session ~default:"-")
+               (Option.value_map as_user ~default:"" ~f:(fun u ->
+                  " as_user=" ^ u));
+             Ok (`Object [ "client_id", `String "client-2" ]))
           ())
   ; relink =
       (fun change ->
         Bonsai.Effect.of_sync_fun
           (fun () ->
-            print_s [%sexp "relink", (change : Prigh_ui.Server_link.Change.t)];
-            { Prigh_ui.Server_link.Outcome.link =
-                { address = Some "srv:7777"
-                ; user = Some "lloyd"
-                ; saved = None
-                }
-            ; result = Connected (`Object [ "client_id", `String "client-3" ])
-            })
+             print_s [%sexp "relink", (change : Prigh_ui.Server_link.Change.t)];
+             { Prigh_ui.Server_link.Outcome.link =
+                 { address = Some "srv:7777"
+                 ; user = Some "lloyd"
+                 ; saved = None
+                 }
+             ; result = Connected (`Object [ "client_id", `String "client-3" ])
+             })
           ())
   ; signin_code =
       (fun code ->
@@ -87,8 +89,8 @@ let make_platform ~replies : Component.Platform.t =
   ; sign_out =
       Bonsai.Effect.of_sync_fun
         (fun () ->
-          print_endline "sign out";
-          Error "not here")
+           print_endline "sign out";
+           Error "not here")
         ()
   ; quit = Bonsai.Effect.of_sync_fun (fun () -> print_endline "quit") ()
   }
@@ -128,14 +130,16 @@ let%expect_test "component: a driver can schedule startup explicitly" =
     ]
   in
   let handle =
-    Bonsai_test.Handle.create (module Result_spec) (fun graph ->
-      let model, inject =
-        Component.create
-          ~start_on_activate:false
-          (Bonsai.return (make_platform ~replies))
-          graph
-      in
-      Bonsai.both model inject)
+    Bonsai_test.Handle.create
+      (module Result_spec)
+      (fun graph ->
+         let model, inject =
+           Component.create
+             ~start_on_activate:false
+             (Bonsai.return (make_platform ~replies))
+             graph
+         in
+         Bonsai.both model inject)
   in
   Bonsai_test.Handle.recompute_view_until_stable handle;
   [%expect {| |}];
@@ -155,8 +159,8 @@ let%expect_test "component: a driver can schedule startup explicitly" =
     |}]
 ;;
 
-let%expect_test "component: startup requests, key handling, rpc round trip, \
-                 quit"
+let%expect_test
+    "component: startup requests, key handling, rpc round trip, quit"
   =
   let replies =
     [ "get_state", Ok (state_json false)
@@ -169,11 +173,13 @@ let%expect_test "component: startup requests, key handling, rpc round trip, \
     ]
   in
   let handle =
-    Bonsai_test.Handle.create (module Result_spec) (fun graph ->
-      let model, inject =
-        Component.create (Bonsai.return (make_platform ~replies)) graph
-      in
-      Bonsai.both model inject)
+    Bonsai_test.Handle.create
+      (module Result_spec)
+      (fun graph ->
+         let model, inject =
+           Component.create (Bonsai.return (make_platform ~replies)) graph
+         in
+         Bonsai.both model inject)
   in
   Bonsai_test.Handle.recompute_view_until_stable handle;
   Bonsai_test.Handle.show handle;
@@ -271,8 +277,8 @@ let%expect_test "component: startup requests, key handling, rpc round trip, \
     |}]
 ;;
 
-let%expect_test "component: /signout runs the platform's sign-out and shows \
-                 its error"
+let%expect_test
+    "component: /signout runs the platform's sign-out and shows its error"
   =
   let replies =
     [ "get_state", Ok (state_json false)
@@ -284,11 +290,13 @@ let%expect_test "component: /signout runs the platform's sign-out and shows \
     ]
   in
   let handle =
-    Bonsai_test.Handle.create (module Result_spec) (fun graph ->
-      let model, inject =
-        Component.create (Bonsai.return (make_platform ~replies)) graph
-      in
-      Bonsai.both model inject)
+    Bonsai_test.Handle.create
+      (module Result_spec)
+      (fun graph ->
+         let model, inject =
+           Component.create (Bonsai.return (make_platform ~replies)) graph
+         in
+         Bonsai.both model inject)
   in
   Bonsai_test.Handle.recompute_view_until_stable handle;
   Bonsai_test.Handle.do_actions

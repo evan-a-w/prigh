@@ -13,13 +13,13 @@ module Platform : sig
     ; open_browser : string -> unit Bonsai.Effect.t
     ; quit : unit Bonsai.Effect.t
     ; sign_out : (unit, string) Result.t Bonsai.Effect.t
-    (** Forgets the saved credentials and disconnects (the app opens its
+      (** Forgets the saved credentials and disconnects (the app opens its
         sign-in dialog). The error is shown. *)
     ; load_history : unit -> (P.Json.t, string) Result.t Bonsai.Effect.t
     ; append_history : string -> unit Bonsai.Effect.t
     ; copy_to_clipboard : string -> unit Bonsai.Effect.t
     ; notify : Notify.Mode.t -> Notify.t -> unit Bonsai.Effect.t
-    (** The bell or a desktop notification; a no-op where there is none. *)
+      (** The bell or a desktop notification; a no-op where there is none. *)
     ; suspend : unit Bonsai.Effect.t
     ; edit_externally : string -> (string, string) Result.t Bonsai.Effect.t
     ; reconnect :
@@ -27,13 +27,13 @@ module Platform : sig
         -> session:string option
         -> as_user:string option
         -> (P.Json.t, string) Result.t Bonsai.Effect.t
-    (** Waits, connects again and sends [hello] (with [session] and [as_user]
+      (** Waits, connects again and sends [hello] (with [session] and [as_user]
         when given); the result is the hello reply. *)
     ; relink : Server_link.Change.t -> Server_link.Outcome.t Bonsai.Effect.t
-    (** [/connect] and [/signin]: asked only of platforms that report an
+      (** [/connect] and [/signin]: asked only of platforms that report an
         [App.Action.Server_link]. *)
     ; signin_code : string option -> unit Bonsai.Effect.t
-    (** The code pasted for the browser sign-in under way; [None] cancels
+      (** The code pasted for the browser sign-in under way; [None] cancels
         it. *)
     }
 end

@@ -1167,12 +1167,13 @@ let%expect_test "over SSH: the code the page shows, pasted into the dialog" =
   H.step h (Signin_code_prompt Wanted);
   H.show h;
   H.mode h;
-  [%expect {|
+  [%expect
+    {|
     ┌─ Paste the code the page shows after Allow ──────────────────────────────────┐
     └──────────────────────────────────────────────────────────────────────────────┘
     ────────────────── signing in through the browser: follow the link it opens… ───
     ? ▏
-    connecting…
+    Enter sends the code · Esc cancels the sign-in
     text_prompt
     |}];
   (* Enter with nothing pasted keeps asking. *)
@@ -1181,16 +1182,18 @@ let%expect_test "over SSH: the code the page shows, pasted into the dialog" =
   [%expect {| text_prompt |}];
   H.step h (Intent (Paste "prigh1:stale"));
   H.show h;
-  [%expect {|
+  [%expect
+    {|
     ┌─ Paste the code the page shows after Allow ──────────────────────────────────┐
     └──────────────────────────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────────────────────────
     ? prigh1:stale▏
-    connecting…
+    Enter sends the code · Esc cancels the sign-in
     |}];
   H.enter h;
   H.show h;
-  [%expect {|
+  [%expect
+    {|
     (Signin_code (prigh1:stale))
 
 
@@ -1212,7 +1215,8 @@ let%expect_test "over SSH: the code the page shows, pasted into the dialog" =
            on the way): paste the code the page shows for this link, or open \
            the link again"));
   H.show h;
-  [%expect {|
+  [%expect
+    {|
     ┌─ Warning ────────────────────────────────────────────────────────────────────┐
     │ that code is not for this sign-in (from an earlier one, or changed on the    │
     │ way): paste the code the page shows for this link, or open the link again    │
@@ -1221,7 +1225,7 @@ let%expect_test "over SSH: the code the page shows, pasted into the dialog" =
     └──────────────────────────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────────────────────────
     ? ▏
-    connecting…
+    Enter sends the code · Esc cancels the sign-in
     |}];
   H.step h (Intent (Paste "prigh1:good"));
   H.enter h;
@@ -1231,7 +1235,8 @@ let%expect_test "over SSH: the code the page shows, pasted into the dialog" =
     (Connected (hello {|{"client_id":"c2"}|}));
   H.mode h;
   connection h;
-  [%expect {|
+  [%expect
+    {|
     (Signin_code (prigh1:good))
     (Rpc (method_ get_state) (params ()) (tag Initial_state))
     (Rpc (method_ get_messages) (params ()) (tag Initial_messages))
@@ -1245,8 +1250,8 @@ let%expect_test "over SSH: the code the page shows, pasted into the dialog" =
     |}]
 ;;
 
-let%expect_test "over SSH: Esc cancels the sign-in; a forwarded port closes \
-                 the dialog"
+let%expect_test
+    "over SSH: Esc cancels the sign-in; a forwarded port closes the dialog"
   =
   let h = H.create ~width:80 ~height:10 () in
   H.step h (Server_link (remote ~user:None "https://ai.example.com/"));
@@ -1257,7 +1262,8 @@ let%expect_test "over SSH: Esc cancels the sign-in; a forwarded port closes \
   H.keys h "prigh1:half";
   H.esc h;
   H.show h;
-  [%expect {|
+  [%expect
+    {|
     Load_history
     (Relink
       (generation 1)
@@ -1290,7 +1296,8 @@ let%expect_test "over SSH: Esc cancels the sign-in; a forwarded port closes \
     (Connected (hello {|{"client_id":"c2"}|}));
   H.mode h;
   H.show h;
-  [%expect {|
+  [%expect
+    {|
     (Relink
       (generation 2)
       (change     Browser_signin))

@@ -796,7 +796,8 @@ let%expect_test
     |}];
   let%bind o = Link.relink link Browser_signin in
   outcome o;
-  [%expect {|
+  [%expect
+    {|
     prigh browser-signin -paste -connect https://ai.example.com/
     notice: sign in through the browser at https://ai.example.com/#cli-signin=4242.s&program=tui&paste=K, then paste the code it shows after Allow (or forward the port: ssh -L 4242:127.0.0.1:4242 …)
     open the browser at https://ai.example.com/#cli-signin=4242.s&program=tui&paste=K
