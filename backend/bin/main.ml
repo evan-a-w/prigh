@@ -853,6 +853,15 @@ let serve_command =
          Eio.Fiber.await_cancel ())
 ;;
 
+(* A pasted sign-in code, when the program runs over SSH (or [-paste]) and
+   someone is at its terminal to paste it. *)
+let terminal_paste ~env ~flag =
+  Option.some_if
+    (Browser_signin.Paste.wanted ~flag ~getenv:Sys.getenv
+     && Core_unix.isatty Core_unix.stdin)
+    (Browser_signin.Paste.stdin ~env)
+;;
+
 let browser_signin_command =
   Command.basic
     ~summary:
@@ -883,10 +892,19 @@ let browser_signin_command =
          "-json"
          no_arg
          ~doc:
-           " print JSON lines on stdout ({\"url\", \"port\"} then the sign-in \
-            or {\"error\"}) and save nothing: for prigh-tui"
+           " print JSON lines on stdout ({\"url\", \"port\", \"paste\"}, then \
+            the sign-in or {\"error\"}; {\"paste_error\"} for a pasted code \
+            that does not open) and save nothing: for prigh-tui, which writes \
+            a pasted code to stdin as a line"
      and no_browser =
        flag "-no-browser" no_arg ~doc:" print the URL without opening it"
+     and paste =
+       flag
+         "-paste"
+         no_arg
+         ~doc:
+           " also take the code the page shows after Allow, pasted on stdin \
+            (the default over SSH; PRIGH_SIGNIN_PASTE=0 or 1 overrides)"
      in
      fun () ->
        let home = home () in
@@ -941,21 +959,37 @@ let browser_signin_command =
          Eio_main.run
          @@ fun env ->
          if json
-         then
-           Browser_signin.run ~env ~program remote ~on_url:(fun ~url ~port ->
-             print_endline
-               (Jsonaf.to_string
-                  (`Object
-                      [ "url", `String url
-                      ; "port", `Number (Int.to_string port)
-                      ]));
-             Option.iter open_url ~f:(fun open_url -> open_url url))
+         then (
+           let paste =
+             Option.some_if
+               (Browser_signin.Paste.wanted ~flag:paste ~getenv:Sys.getenv)
+               (Browser_signin.Paste.stdin ~env)
+           in
+           Browser_signin.run
+             ~env
+             ~program
+             ?paste
+             ~on_refused:(fun error ->
+               print_endline
+                 (Jsonaf.to_string (`Object [ "paste_error", `String error ])))
+             remote
+             ~on_url:(fun ~url ~port ->
+               print_endline
+                 (Jsonaf.to_string
+                    (`Object
+                        [ "url", `String url
+                        ; "port", `Number (Int.to_string port)
+                        ; ( "paste"
+                          , if Option.is_some paste then `True else `False )
+                        ]));
+               Option.iter open_url ~f:(fun open_url -> open_url url)))
          else
            Browser_signin.run_on_terminal
              ~env
              ~program
              ~say:(eprintf "prigh browser-signin: %s\n%!")
              ?open_url
+             ?paste:(terminal_paste ~env ~flag:paste)
              ~why:"signing in"
              remote
        in
@@ -1160,6 +1194,7 @@ let tool_host_command =
                    ~env
                    ~program:Tool_host
                    ~say:(eprintf "prigh tool-host: %s\n%!")
+                   ?paste:(terminal_paste ~env ~flag:false)
                    ~why
                    remote
                in
@@ -1370,6 +1405,7 @@ let web_command =
                 ~program:Web
                 ~say:(eprintf "prigh web: %s\n%!")
                 ~open_url:open_in_browser
+                ?paste:(terminal_paste ~env ~flag:false)
                 ~why
                 remote
             with

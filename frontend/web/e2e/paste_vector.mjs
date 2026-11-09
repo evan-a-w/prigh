@@ -1,7 +1,7 @@
 // The cross-implementation vector for a browser sign-in's paste-back code:
 // fixed keys and nonce, sealed by the page's own paste_seal.js (in Node here,
-// in each browser in cli_signin.mjs). The backend's test_paste_code.ml opens
-// the code this prints; keep them in step.
+// in each browser in cli_signin.mjs). The backend's tests open
+// the code this prints (backend/test/paste_vector.ml); keep them in step.
 //
 //   node frontend/web/e2e/paste_vector.mjs        prints the vector as JSON
 //   import { vector, sealSource } from "./paste_vector.mjs"
@@ -46,7 +46,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const code = await seal(programPublic, state, plaintext, fixed);
   console.log(JSON.stringify({ ...inputs, code }, null, 2));
   if (code !== vector) {
-    console.error(`the recorded vector differs: update it here and in backend/test/test_paste_code.ml`);
+    console.error(`the recorded vector differs: update it here and in backend/test/paste_vector.ml`);
     process.exitCode = 1;
   }
 }
