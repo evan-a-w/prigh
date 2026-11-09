@@ -354,6 +354,7 @@
                 export PRIGH_BACKEND=${prighBackend}/bin/prigh
                 export PRIGH_WEB_ROOT=${prighWebRoot}
                 export PRIGH_TMUX=${pkgs.tmux}/bin/tmux
+                export PRIGH_E2E_SHELL=${pkgs.bashInteractive}/bin/bash
                 # WebKit (WPE) renders through EGL: Mesa's, in software.
                 export __EGL_VENDOR_LIBRARY_DIRS=${pkgs.mesa}/share/glvnd/egl_vendor.d
                 export HOME="$PWD/home"
