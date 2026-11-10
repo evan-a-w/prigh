@@ -57,15 +57,26 @@ jobs:
       # built from (inputDerivation: the OxCaml toolchains and packages, the
       # Rust crates) and the dev shells. Paths are pushed as they are built,
       # so a failed or cancelled run still caches what it finished; paths on
-      # cache.nixos.org are skipped.
+      # cache.nixos.org are skipped. Attic only uploads what it lacks (and of
+      # that, only the chunks it lacks); targets the cache already has are not
+      # built at all, so unchanged dependencies are not even downloaded.
       - name: Build and push
         run: |
+          targets=()
+          for t in default prigh-desktop prigh-computer backend frontend \
+            backend.inputDerivation frontend.inputDerivation \
+            prigh-desktop-unwrapped.inputDerivation prigh-computer.inputDerivation \
+            devShells.x86_64-linux.default devShells.x86_64-linux.desktop; do
+            out=$(nix eval --raw ".#$t.outPath")
+            if nix path-info --store https://attic.caduc.co/prigh "$out" >/dev/null 2>&1; then
+              echo "cached: $t"
+            else
+              targets+=(".#$t")
+            fi
+          done
+          [ ${#targets[@]} -gt 0 ] || exit 0
           attic watch-store ci:prigh &
           watcher=$!
-          nix build --print-build-logs \
-            .#default .#prigh-desktop .#prigh-computer .#backend .#frontend \
-            .#backend.inputDerivation .#frontend.inputDerivation \
-            .#prigh-desktop-unwrapped.inputDerivation .#prigh-computer.inputDerivation \
-            .#devShells.x86_64-linux.default .#devShells.x86_64-linux.desktop
+          nix build --print-build-logs "${targets[@]}"
           attic push ci:prigh ./result*
           kill "$watcher"
