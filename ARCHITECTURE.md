@@ -941,15 +941,17 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   `bin/main.ml` with the world's `sessions_dir` (so within the namespace)
   and the agent's session id. It reads session files in the backend and
   changes nothing. A session is named by id or unique prefix (`find`), never
-  by path. `search` matches every word of the query, case-insensitively:
-  first against each `Session.Summary` (name, description, first prompt,
-  cwd, repository), which costs nothing; then, most recent first and until
-  `limit` sessions are found, against the transcripts, where a file is only
-  parsed (`Session.load`) when its raw bytes hold the words (words JSON
-  would escape skip that filter), within a budget of bytes read
-  (`max_scan_bytes`). Results are one line per session and at most two
-  snippets with their message indices; with `session`, the matching
-  messages of that one. `outline` prints its `Outline` (the last 40 points,
+  by path. `search` is `Session_search`, through the `search` closure
+  `create` takes: the server's index (`Rpc_server.search_hits`, which
+  `search_sessions` answers from too), which `bin/main.ml` points the
+  world's tools at once the server exists, and until then or without a
+  server (`prigh run`) an index of the tool's own (`local_search`). So it
+  finds what the user and the assistant said and the sessions' names, not
+  directories or tool output. Results are one line per session (from its
+  `Session.Summary`) and the hit's snippet, without message indices: with
+  `session`, the tool itself lists the messages of that one that have any
+  of the query's words (`Session_search.words`), tool calls and results
+  included, with their indices. `outline` prints its `Outline` (the last 40 points,
   `before` for earlier ones) and `read` up to 30 messages from `from` as
   plain text: user and assistant text cut to 1500 bytes, no thinking, tool
   calls as one line, results cut to 300 bytes, 12k in all, ending with the

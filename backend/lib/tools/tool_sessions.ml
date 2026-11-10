@@ -4,7 +4,7 @@ open! Import
 let name = "sessions"
 let default_search_limit = 8
 let max_search_limit = 20
-let snippets_per_session = 2
+let snippet_cut = 160
 let matches_in_session = 10
 let outline_points = 40
 let default_read_limit = 10
@@ -23,10 +23,10 @@ let spec =
   ; description =
       "Search and read other saved sessions, only when the user refers to one \
        or asks, or the task plainly depends on work done in another session: \
-       not routinely, and never to start a task. search finds sessions whose \
-       title, directory or transcript has all the words of query, with their \
-       ids and snippets; with session, the matching messages of that one. \
-       outline lists a session's prompts with their message indices. read \
+       not routinely, and never to start a task. search finds sessions by what \
+       was said in them and their names (every word of query must match), with \
+       their ids and a snippet; with session, the matching messages of that \
+       one. outline lists a session's prompts with their message indices. read \
        shows messages from an index, cut short. Read only what you need. It \
        only reads: the other sessions are not told or changed."
   ; parameters =
@@ -132,21 +132,7 @@ let session_line ~current (s : Session.Summary.t) =
 ;;
 
 let words query =
-  String.lowercase query
-  |> String.split_on_chars ~on:[ ' '; '\n'; '\t'; '\r' ]
-  |> List.filter ~f:(fun w -> not (String.is_empty w))
-  |> List.dedup_and_sort ~compare:String.compare
-;;
-
-let meta (s : Session.Summary.t) =
-  let repo =
-    match s.repo with
-    | Some (Some repo) -> [ Some repo.root; repo.branch ]
-    | Some None | None -> []
-  in
-  List.filter_opt ([ s.name; s.description; s.first_prompt; Some s.cwd ] @ repo)
-  |> String.concat ~sep:"\n"
-  |> String.lowercase
+  List.dedup_and_sort (Session_search.words query) ~compare:String.compare
 ;;
 
 let has text word = String.is_substring text ~substring:word
@@ -223,13 +209,6 @@ let hits session ~words =
 
 let load (s : Session.Summary.t) = Session.load ~yield:Fiber.yield s.path
 
-(* Words that appear in a session's file as they are in its text: JSON
-   escapes nothing of them. *)
-let plain word =
-  String.for_all word ~f:(fun c ->
-    Char.is_alphanum c || String.mem "-_./:@#=+~" c)
-;;
-
 let search_in ~current (summary : Session.Summary.t) ~words =
   let%map.Or_error session = load summary in
   let header = session_line ~current summary in
@@ -250,67 +229,51 @@ let search_in ~current (summary : Session.Summary.t) ~words =
        else [])
 ;;
 
-let search_all ~max_scan_bytes ~dir ~current ~words ~limit =
+module Search = struct
+  type t = query:string -> limit:int -> Session_search.Hit.t list
+end
+
+let search_all ~search ~dir ~current ~query ~limit =
   let summaries = Session.list ~dir in
-  let by_meta, rest =
-    List.partition_tf summaries ~f:(fun s ->
-      let meta = meta s in
-      List.for_all words ~f:(has meta))
+  let lines =
+    List.concat_map
+      (search ~query ~limit:(limit + 1))
+      ~f:(fun (hit : Session_search.Hit.t) ->
+        match List.find summaries ~f:(fun s -> String.equal s.id hit.id) with
+        | None -> []
+        | Some summary ->
+          [ String.concat
+              ~sep:"\n"
+              (session_line ~current summary
+               :: (Option.map hit.snippet ~f:(fun snippet ->
+                     "  " ^ short ~max:snippet_cut snippet.text)
+                   |> Option.to_list))
+          ])
   in
-  let found = Queue.create () in
-  List.iter (List.take by_meta limit) ~f:(fun s ->
-    Queue.enqueue found (session_line ~current s));
-  let patterns =
-    List.filter words ~f:plain
-    |> List.map ~f:(String.Search_pattern.create ~case_sensitive:false)
-  in
-  let more = "(more sessions may match: add words or raise limit)" in
-  let scanned = ref 0 in
-  let rec scan = function
-    | [] -> None
-    | _ :: _ when Queue.length found >= limit -> Some more
-    | _ when !scanned >= max_scan_bytes ->
-      Some
-        (sprintf
-           "(stopped after reading %d MiB of sessions: older ones were not \
-            searched)"
-           (!scanned / (1024 * 1024)))
-    | (s : Session.Summary.t) :: rest ->
-      Fiber.yield ();
-      (match In_channel.read_all s.path with
-       | exception Sys_error _ -> ()
-       | raw ->
-         scanned := !scanned + String.length raw;
-         if
-           List.for_all patterns ~f:(fun pattern ->
-             Option.is_some (String.Search_pattern.index pattern ~in_:raw))
-         then (
-           match load s with
-           | Error _ -> ()
-           | Ok session ->
-             let hits = hits session ~words in
-             let meta = meta s in
-             if
-               List.for_all words ~f:(fun word ->
-                 has meta word
-                 || List.exists hits ~f:(fun (hit : Hit.t) ->
-                   List.mem hit.matched word ~equal:String.equal))
-             then
-               Queue.enqueue
-                 found
-                 (String.concat
-                    ~sep:"\n"
-                    (session_line ~current s
-                     :: (List.sort hits ~compare:Hit.compare
-                         |> Fn.flip List.take snippets_per_session
-                         |> List.map ~f:Hit.line)))));
-      scan rest
-  in
-  let stopped = if List.length by_meta > limit then Some more else scan rest in
-  match Queue.to_list found, stopped with
-  | [], None ->
-    "No session matches: all the words must match, so try fewer or other words."
-  | found, stopped -> String.concat ~sep:"\n" (found @ Option.to_list stopped)
+  match lines with
+  | [] ->
+    "No session matches: every word must match what was said in a session or \
+     its name, so try fewer or other words."
+  | lines ->
+    String.concat
+      ~sep:"\n"
+      (List.take lines limit
+       @ (if List.length lines > limit
+          then [ "(more sessions match: add words or raise limit)" ]
+          else [])
+       @ [ "(for message indices to read from: search with session, or outline)"
+         ])
+;;
+
+let local_search ~dir =
+  let index = Session_search.create () in
+  fun ~query ~limit ->
+    Session_search.search
+      index
+      ~sessions:(Session.list ~dir:(dir ()))
+      ~load:(fun summary -> Result.ok (load summary))
+      ~query
+      ~limit
 ;;
 
 let time at =
@@ -466,7 +429,7 @@ let clamp ~default ~max limit =
   Int.clamp_exn (Option.value limit ~default) ~min:1 ~max
 ;;
 
-let create ?(max_scan_bytes = 512 * 1024 * 1024) ~sessions_dir ~current () =
+let create ~search ~sessions_dir ~current () =
   let run (_ : Tool.Context.t) args =
     let dir = sessions_dir () in
     let session () =
@@ -480,9 +443,10 @@ let create ?(max_scan_bytes = 512 * 1024 * 1024) ~sessions_dir ~current () =
     let result =
       match Tool_args.string args "action" with
       | "search" ->
-        (match
-           words (Option.value (Tool_args.string_opt args "query") ~default:"")
-         with
+        let query =
+          Option.value (Tool_args.string_opt args "query") ~default:""
+        in
+        (match words query with
          | [] ->
            Or_error.error_string "query is required: the words to look for"
          | words ->
@@ -493,10 +457,10 @@ let create ?(max_scan_bytes = 512 * 1024 * 1024) ~sessions_dir ~current () =
             | None ->
               Ok
                 (search_all
-                   ~max_scan_bytes
+                   ~search
                    ~dir
                    ~current
-                   ~words
+                   ~query
                    ~limit:
                      (clamp
                         ~default:default_search_limit

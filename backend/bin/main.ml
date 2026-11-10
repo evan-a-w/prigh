@@ -64,6 +64,8 @@ module Setup = struct
     ; cwd : string
     ; new_agent : ?session:Session.t -> cwd:string -> unit -> Agent.t
     ; questions : Session_questions.t
+    ; search : Tool_sessions.Search.t ref
+      (** the [sessions] tool's: the server's index, once there is one *)
     ; world : Namespace.World.t
     ; models : Model_registry.t
     ; forges : Forges.t (** the world's git-host sign-ins *)
@@ -209,6 +211,9 @@ let common_params =
     in
     let memory = Memory.create ~home in
     let questions = Session_questions.create () in
+    let search =
+      ref (Tool_sessions.local_search ~dir:(fun () -> sessions_dir))
+    in
     (* One agent per session; the subagent tool follows its own agent's
        model and thinking level. *)
     let new_agent ?session ~cwd () =
@@ -272,6 +277,7 @@ let common_params =
                  ; Tool_issue.create ~forges ()
                  ; Tool_repo.create ~forges ()
                  ; Tool_sessions.create
+                     ~search:(fun ~query ~limit -> !search ~query ~limit)
                      ~sessions_dir:(fun () -> sessions_dir)
                      ~current:current_session
                      ()
@@ -310,7 +316,16 @@ let common_params =
       agent_ref := Some agent;
       agent
     in
-    { Setup.session; cwd; new_agent; world; models; forges; memory; questions }
+    { Setup.session
+    ; cwd
+    ; new_agent
+    ; world
+    ; models
+    ; forges
+    ; memory
+    ; questions
+    ; search
+    }
 ;;
 
 (* Errors from the agent name the slash command; on the command line the
@@ -742,6 +757,7 @@ let serve_command =
              ; forges
              ; memory
              ; questions
+             ; search
              }
            =
            make_agent ~env ~sw ~backend_host ?world ()
@@ -782,6 +798,7 @@ let serve_command =
              ()
          in
          Rpc_server.serve_questions server questions;
+         search := Rpc_server.search_hits server;
          Rpc_server.restore_resumes server;
          Rpc_server.clean_leftovers server;
          Rpc_server.start_indexing server;
@@ -1819,6 +1836,7 @@ let acp_command =
                ; forges
                ; memory
                ; questions
+               ; search
                }
              =
              make_agent ~env ~sw ~backend_host:false ()
@@ -1852,6 +1870,7 @@ let acp_command =
                ()
            in
            Rpc_server.serve_questions server questions;
+           search := Rpc_server.search_hits server;
            Some server, Rpc_client.Connector.in_process server
        in
        let stdin =

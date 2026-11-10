@@ -2999,9 +2999,9 @@ The model can reach your other sessions with two tools, which it is told
 to use only when you refer to an earlier or another session ("like we did in
 the parser session", "ask session 3f2a… how it deployed"), ask for it, or
 the task plainly depends on work done in one; never by default. `sessions`
-searches the saved sessions (`search`: all the words must match, in the
-title, description, first prompt, directory or repository, else anywhere in
-the transcript; it answers with ids and short snippets), lists one's prompts
+searches the saved sessions (`search`: the search of the session list,
+what you and the assistant said and the sessions' names, every word
+matching; it answers with ids and a short snippet each), lists one's prompts
 (`outline`) and reads a few of its messages from an index, cut short
 (`read`); it changes nothing. `ask_session` asks another session a question
 and that session itself answers: the question arrives in it as a message

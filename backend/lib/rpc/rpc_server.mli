@@ -113,6 +113,10 @@ val start_indexing : t -> unit
     way, when it finishes). *)
 val index_sessions : t -> unit
 
+(** [search_sessions]' hits: the best [limit] saved sessions for [query],
+    from the index. *)
+val search_hits : t -> query:string -> limit:int -> Session_search.Hit.t list
+
 (** How many sessions [search_sessions]' index has. *)
 val indexed_sessions : t -> int
 

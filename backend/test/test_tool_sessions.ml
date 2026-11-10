@@ -78,9 +78,9 @@ let three t =
   parser, deploy, notes
 ;;
 
-let tool ?max_scan_bytes ?current t =
+let tool ?current t =
   Tool_sessions.create
-    ?max_scan_bytes
+    ~search:(Tool_sessions.local_search ~dir:(fun () -> sessions_dir t))
     ~sessions_dir:(fun () -> sessions_dir t)
     ~current:(fun () -> current)
     ()
@@ -92,10 +92,10 @@ let args fields =
         (List.map fields ~f:(fun (key, value) -> key, Jsonaf.of_string value)))
 ;;
 
-let search ?max_scan_bytes ?current ?limit ?session t query =
+let search ?current ?limit ?session t query =
   run
     t
-    (tool ?max_scan_bytes ?current t)
+    (tool ?current t)
     (args
        ([ "action", {|"search"|}; "query", sprintf "%S" query ]
         @ Option.value_map limit ~default:[] ~f:(fun n ->
@@ -104,49 +104,56 @@ let search ?max_scan_bytes ?current ?limit ?session t query =
           [ "session", sprintf "%S" (Session.id s) ])))
 ;;
 
-let%expect_test "search: titles and directories first, then transcripts" =
+let%expect_test "search: names and what was said, the best first" =
   with_sandbox
   @@ fun t ->
   let parser, _, _ = three t in
   search t "PARSER";
-  [%expect {| <id>  2026-01-02  "Fix the parser"  /work/app  4 messages |}];
+  [%expect
+    {|
+    <id>  2026-01-02  "Fix the parser"  /work/app  4 messages
+    (for message indices to read from: search with session, or outline)
+    |}];
+  (* Directories are not searched. *)
   search t "infra";
   [%expect
-    {| <id>  2026-01-03  "deploy the staging cluster"  /work/infra  2 messages |}];
-  (* In two transcripts: the most recent first, each with its messages. *)
+    {| No session matches: every word must match what was said in a session or its name, so try fewer or other words. |}];
+  (* Said in two sessions: the most recent first, each with a snippet. *)
   search t "lexer";
   [%expect
     {|
     <id>  2026-01-03  "deploy the staging cluster"  /work/infra  2 messages
-      [1] assistant: Deployed with the Zebra rollout strategy; the lexer is fine.
+      …strategy; the lexer is fine.
     <id>  2026-01-02  "Fix the parser"  /work/app  4 messages
-      [1] assistant: Looking at the Lexer module. bash {"command": "dune build @runtest"}
-      [3] assistant: Fixed: the lexer now flushes at end of input.
+      Looking at the Lexer module.
+    (for message indices to read from: search with session, or outline)
     |}];
-  (* A title's match comes before a more recent transcript's. *)
+  (* A name's match; every word must match. *)
   search t "notes";
   search t "release lexer";
   [%expect
     {|
     <id>  2026-01-04  "Release notes"  /work/app  2 messages
-    No session matches: all the words must match, so try fewer or other words.
+      write release notes
+    (for message indices to read from: search with session, or outline)
+    No session matches: every word must match what was said in a session or its name, so try fewer or other words.
     |}];
-  (* Every word must match, in the title or anywhere in the transcript. *)
+  (* Tool results are not searched ("unterminated"); a typo still finds. *)
   search t "parser unterminated flushes";
   [%expect
-    {|
-    <id>  2026-01-02  "Fix the parser"  /work/app  4 messages
-      [2] result bash: 1 test failed: unterminated string
-      [3] assistant: Fixed: the lexer now flushes at end of input.
-    |}];
-  search ~current:(Session.id parser) t "tokenizer";
+    {| No session matches: every word must match what was said in a session or its name, so try fewer or other words. |}];
+  search ~current:(Session.id parser) t "tokenizr";
   [%expect
-    {| <id>  2026-01-02  "Fix the parser"  /work/app  4 messages  (this session) |}];
+    {|
+    <id>  2026-01-02  "Fix the parser"  /work/app  4 messages  (this session)
+      the tokenizer drops the last token
+    (for message indices to read from: search with session, or outline)
+    |}];
   search t "   ";
   [%expect {| ERROR: query is required: the words to look for |}]
 ;;
 
-let%expect_test "search: limit, and words JSON escapes" =
+let%expect_test "search: limit" =
   with_sandbox
   @@ fun t ->
   ignore (three t : Session.t * Session.t * Session.t);
@@ -157,30 +164,30 @@ let%expect_test "search: limit, and words JSON escapes" =
   [%expect
     {|
     <id>  2026-01-05  "say \"quoted\" things about the lexer"  /work/app  1 messages
-    (more sessions may match: add words or raise limit)
+      …things about the lexer
+    (more sessions match: add words or raise limit)
+    (for message indices to read from: search with session, or outline)
     |}];
   search t ~limit:2 "the";
   [%expect
     {|
+    <id>  2026-01-02  "Fix the parser"  /work/app  4 messages
+      the tokenizer drops the last token
     <id>  2026-01-05  "say \"quoted\" things about the lexer"  /work/app  1 messages
-    <id>  2026-01-03  "deploy the staging cluster"  /work/infra  2 messages
-    (more sessions may match: add words or raise limit)
+      …things about the lexer
+    (more sessions match: add words or raise limit)
+    (for message indices to read from: search with session, or outline)
     |}];
   search t {|"quoted" zebra|};
   [%expect
-    {| No session matches: all the words must match, so try fewer or other words. |}];
+    {| No session matches: every word must match what was said in a session or its name, so try fewer or other words. |}];
   search t {|"quoted" things|};
   [%expect
-    {| <id>  2026-01-05  "say \"quoted\" things about the lexer"  /work/app  1 messages |}]
-;;
-
-let%expect_test "search: stops reading files at its budget" =
-  with_sandbox
-  @@ fun t ->
-  ignore (three t : Session.t * Session.t * Session.t);
-  search ~max_scan_bytes:1 t "flushes";
-  [%expect
-    {| (stopped after reading 0 MiB of sessions: older ones were not searched) |}]
+    {|
+    <id>  2026-01-05  "say \"quoted\" things about the lexer"  /work/app  1 messages
+      say "quoted" things about the lexer
+    (for message indices to read from: search with session, or outline)
+    |}]
 ;;
 
 let%expect_test "search inside one session" =
