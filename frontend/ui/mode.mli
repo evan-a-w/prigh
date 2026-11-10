@@ -98,6 +98,7 @@ module Confirm_action : sig
         { note : Memory.Note.t
         ; back : Open_picker.t option (** where Esc and Enter return *)
         }
+    | Clear_user_info (** [/user-info clear] *)
     | Nix_gc of Nix_generations.t
     (** [/nix-gc run DAYS|all]: deleting profile generations *)
     | Browser_signin
