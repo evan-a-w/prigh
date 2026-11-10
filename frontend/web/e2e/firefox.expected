@@ -2268,6 +2268,41 @@ exit 2
 prigh browser-signin: signing in: sign in through the browser: open
 (Over SSH, forward the port to the browser's computer first: ssh -L <PORT>:127.0.0.1:<PORT> ...) Waiting for the sign-in...
 prigh browser-signin: the sign-in was cancelled in the browser
+=== firefox: cli_signin: desktop: paste mode: the program ===
+prigh browser-signin: signing in: sign in through the browser: open
+(Over SSH, forward the port to the browser's computer first: ssh -L <PORT>:127.0.0.1:<PORT> ...)
+Or paste the code the page shows after Allow:
+http://127.0.0.1:<PORT>/#cli-signin=<PORT>.<STATE>&program=tui&paste=<KEY>&from=<HOST>
+=== firefox: cli_signin: desktop: paste mode: asked ===
+prigh
+sign-in
+Allow prigh-tui to connect?
+prigh-tui on <HOST> wants to connect to 127.0.0.1:<PORT> with this page's sign-in.
+It gets this browser's sign-in to the site and your prigh sign-in. Allow it only if you just started it.
+Allow
+Cancel
+=== firefox: cli_signin: desktop: paste mode: the code ===
+prigh
+sign-in
+Paste this into the terminal on <HOST>
+prigh-tui asked for it. The code works once, only for this sign-in.
+prigh1:<CODE>
+Copy
+Send to the forwarded port
+Copy: 44px+, on screen
+Send to the forwarded port: 44px+, on screen
+overflows sideways: false
+=== firefox: cli_signin: desktop: paste mode: copied ===
+Copied: paste it into the terminal and press Enter.
+=== firefox: cli_signin: desktop: paste mode: the program signed in ===
+exit 0
+prigh browser-signin: signing in: sign in through the browser: open
+(Over SSH, forward the port to the browser's computer first: ssh -L <PORT>:127.0.0.1:<PORT> ...)
+Or paste the code the page shows after Allow:
+prigh browser-signin: that code is not for this sign-in (from an earlier one, or changed on the way): paste the code the page shows for this link, or open the link again. Paste the code:
+prigh browser-signin: signed in; saved for ws://127.0.0.1:<PORT>/ws in $DIR/laptop-home/.prigh/tui-connection.sexp
+=== firefox: cli_signin: paste mode: this browser seals the recorded vector ===
+same
 === firefox: cli_signin: phone: the program ===
 http://127.0.0.1:<PORT>/#cli-signin=<PORT>.<STATE>&program=tool-host
 === firefox: cli_signin: phone: asked ===
@@ -2307,6 +2342,43 @@ exit 2
 prigh browser-signin: signing in: sign in through the browser: open
 (Over SSH, forward the port to the browser's computer first: ssh -L <PORT>:127.0.0.1:<PORT> ...) Waiting for the sign-in...
 prigh browser-signin: the sign-in was cancelled in the browser
+=== firefox: cli_signin: phone: paste mode: the program ===
+prigh browser-signin: signing in: sign in through the browser: open
+(Over SSH, forward the port to the browser's computer first: ssh -L <PORT>:127.0.0.1:<PORT> ...)
+Or paste the code the page shows after Allow:
+http://127.0.0.1:<PORT>/#cli-signin=<PORT>.<STATE>&program=tui&paste=<KEY>&from=<HOST>
+=== firefox: cli_signin: phone: paste mode: asked ===
+prigh
+sign-in
+Allow prigh-tui to connect?
+prigh-tui on <HOST> wants to connect to 127.0.0.1:<PORT> with this page's sign-in.
+It gets this browser's sign-in to the site and your prigh sign-in. Allow it only if you just started it.
+Allow
+Cancel
+=== firefox: cli_signin: phone: paste mode: the code ===
+prigh
+sign-in
+Paste this into the terminal on <HOST>
+prigh-tui asked for it. The code works once, only for this sign-in.
+prigh1:<CODE>
+Copy
+Send to the forwarded port
+Copy: 44px+, on screen
+Send to the forwarded port: 44px+, on screen
+overflows sideways: false
+=== firefox: cli_signin: small phone: paste mode: the code ===
+Copy: 44px+, on screen
+Send to the forwarded port: 44px+, on screen
+overflows sideways: false
+=== firefox: cli_signin: phone: paste mode: copied ===
+Copied: paste it into the terminal and press Enter.
+=== firefox: cli_signin: phone: paste mode: the program signed in ===
+exit 0
+prigh browser-signin: signing in: sign in through the browser: open
+(Over SSH, forward the port to the browser's computer first: ssh -L <PORT>:127.0.0.1:<PORT> ...)
+Or paste the code the page shows after Allow:
+prigh browser-signin: that code is not for this sign-in (from an earlier one, or changed on the way): paste the code the page shows for this link, or open the link again. Paste the code:
+prigh browser-signin: signed in; saved for ws://127.0.0.1:<PORT>/ws in $DIR/laptop-home/.prigh/tui-connection.sexp
 === firefox: cli_signin: through the proxy ===
 upgrade /ws
 POST /cli-signin/grant

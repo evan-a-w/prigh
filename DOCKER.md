@@ -443,8 +443,19 @@ which holds the proxy's session (HttpOnly: the page itself cannot read it),
 and hands it to the program, which sends it with each connection and saves
 it in `~/.prigh/tui-connection.sexp` (mode 0600) for next time. The proxy's
 session lasts as long as the proxy says; when it ends, the program asks
-again. Over SSH the browser is on another computer: forward the port it
-prints first (`ssh -L PORT:127.0.0.1:PORT host`). `prigh browser-signin
+again. Over SSH the browser is on another computer and cannot reach that
+port. Either paste: the link then carries a one-time public key
+(`&paste=KEY&from=HOST`), and after *Allow* the page shows a code instead
+(`prigh1:…`, the grant sealed to that key: X25519, HKDF-SHA256,
+AES-256-GCM, bound to the sign-in's state, 30 minutes) with a Copy button;
+paste it into the program's terminal (prigh-tui asks for it in a dialog;
+`prigh tool-host`, `prigh web` and `prigh browser-signin` read it from the
+terminal). Programs offer this when `SSH_CONNECTION` or `SSH_TTY` is set
+and someone is at a terminal; `PRIGH_SIGNIN_PASTE=1` or `0` overrides,
+`prigh browser-signin -paste` forces it. Or forward the port it prints
+first (`ssh -L PORT:127.0.0.1:PORT host`): the page's *Send to the
+forwarded port* still posts to it. Without a terminal (`prigh desktop`, a
+tool host as a service) only the forwarded port works. `prigh browser-signin
 -connect URL` does it by hand (it saves the cookie for the saved address).
 The server only answers the page's own requests (`Content-Type:
 application/json`, an `Origin` matching `Host` or `X-Forwarded-Host`), so

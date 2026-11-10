@@ -50,6 +50,7 @@ module Text_prompt_action = struct
         { kind : string
         ; method_ : string option
         } (** the git host to sign in to *)
+    | Signin_code
   [@@deriving sexp_of, equal]
 end
 
@@ -151,4 +152,9 @@ let name = function
   | Pr_form _ -> "pr_form"
   | Search _ -> "search"
   | Output _ -> "output"
+;;
+
+let is_signin_code = function
+  | Text_prompt { action = Signin_code; _ } -> true
+  | _ -> false
 ;;
