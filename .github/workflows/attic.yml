@@ -1,8 +1,9 @@
-# Builds prigh, prigh-desktop and the Docker image's backend and frontend on
-# every push to main and pushes them to the Attic cache `prigh`. Its API is
-# only reachable over NetBird, so the runner joins the network first as an
-# ephemeral peer. Pulls are public, from https://attic.caduc.co/prigh (the
-# Docker build's backend and frontend have the same store paths as these).
+# Builds prigh, everything it is built from and the dev shells on every push
+# to main and pushes them to the Attic cache `prigh`, the flake's and the
+# Docker build's substituter. Its API is only reachable over NetBird, so the
+# runner joins the network first as an ephemeral peer. Pulls are public, from
+# https://attic.caduc.co/prigh (the Docker build's backend and frontend have
+# the same store paths as these).
 #
 # Secrets: NETBIRD_SETUP_KEY (reusable, ephemeral, auto-assigned to a group
 # allowed TCP to the Attic API), ATTIC_ENDPOINT (the API endpoint, e.g.
@@ -23,7 +24,14 @@ jobs:
   push:
     runs-on: ubuntu-24.04
     if: github.repository == 'evan-a-w/prigh'
+    # Compiling the OxCaml toolchains from scratch (after a dependency change)
+    # takes hours on a runner.
+    timeout-minutes: 360
     steps:
+      - uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be # v1.3.1
+        with:
+          tool-cache: true
+
       - uses: actions/checkout@v4
 
       - uses: cachix/install-nix-action@d9186cbdca7adedf113a159fa91f725a27866771 # v31
@@ -45,12 +53,19 @@ jobs:
           nix profile install nixpkgs#attic-client
           attic login ci "$ATTIC_ENDPOINT" "$ATTIC_TOKEN"
 
-      # Paths are pushed as they are built, so a failed or cancelled build
-      # still caches what it finished.
+      # Everything a build or a dev shell needs: the packages, what they are
+      # built from (inputDerivation: the OxCaml toolchains and packages, the
+      # Rust crates) and the dev shells. Paths are pushed as they are built,
+      # so a failed or cancelled run still caches what it finished; paths on
+      # cache.nixos.org are skipped.
       - name: Build and push
         run: |
           attic watch-store ci:prigh &
           watcher=$!
-          nix build --print-build-logs .#default .#prigh-desktop .#backend .#frontend
+          nix build --print-build-logs \
+            .#default .#prigh-desktop .#prigh-computer .#backend .#frontend \
+            .#backend.inputDerivation .#frontend.inputDerivation \
+            .#prigh-desktop-unwrapped.inputDerivation .#prigh-computer.inputDerivation \
+            .#devShells.x86_64-linux.default .#devShells.x86_64-linux.desktop
           attic push ci:prigh ./result*
           kill "$watcher"

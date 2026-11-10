@@ -10,12 +10,12 @@ ARG NIX_IMAGE=nixos/nix:2.35.2
 ARG RUNTIME_IMAGE=debian:bookworm-slim
 
 FROM ${NIX_IMAGE} AS nix-build
-# Binary caches, space-separated (the keys too): Attic has prigh itself as
-# built from main, Cachix the OxCaml toolchain and packages, so they are
-# downloaded instead of compiled (see DOCKER.md). Empty NIX_SUBSTITUTER to
-# build everything from source.
-ARG NIX_SUBSTITUTER="https://attic.caduc.co/prigh https://prigh.cachix.org"
-ARG NIX_SUBSTITUTER_KEY="prigh:n6wPXDyh+4CS5uoNgXQ3QvKjOSLE7ED87qIiTSvih1A= prigh.cachix.org-1:1kHKoGOetNmpzJg8lJ1nvQzwzTL0XiOs5GInELMgSoI="
+# Binary caches, space-separated (the keys too), holding prigh as built from
+# main and the OxCaml toolchain and packages, so they are downloaded instead
+# of compiled (see DOCKER.md). Empty NIX_SUBSTITUTER to build everything from
+# source.
+ARG NIX_SUBSTITUTER=https://attic.caduc.co/prigh
+ARG NIX_SUBSTITUTER_KEY=prigh:n6wPXDyh+4CS5uoNgXQ3QvKjOSLE7ED87qIiTSvih1A=
 # Builds must keep running as the image's nixbld users: as root, an impure
 # build can create /homeless-shelter, which fails every later build.
 RUN printf '%s\n' 'experimental-features = nix-command flakes' 'sandbox = false' \

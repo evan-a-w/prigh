@@ -108,19 +108,17 @@ pinned package set through import-from-derivation) and the first build compiles
 both OCaml toolchains plus their package sets (about an hour on a small
 machine); both are cached afterwards.
 
-The flakes name the binary cache `prigh.cachix.org`, which has the OxCaml
-toolchain and packages prebuilt, so that most of that is downloaded instead.
+The flake names the binary cache `https://attic.caduc.co/prigh`, so that
+all of that is downloaded instead. CI fills it from every push to `main`
+(`.github/workflows/attic.yml`): prigh, prigh-desktop, everything they are
+built from (the OxCaml toolchain and packages) and the dev shells.
 Nix asks before using a flake's settings: answer `y` (and save it), or pass
 `--accept-flake-config`. With a multi-user Nix install it is only used if you
-are in `trusted-users`, or if `https://prigh.cachix.org` and its key are in
-the system's `trusted-substituters`/`trusted-public-keys`; otherwise add them
-to `/etc/nix/nix.conf` (NixOS: `nix.settings`) as `extra-substituters` and
-`extra-trusted-public-keys`. The key is in `flake.nix`.
-
-Every push to `main` also builds `prigh` and `prigh-desktop` and pushes them
-to the Attic cache `https://attic.caduc.co/prigh` (`.github/workflows/attic.yml`),
-key `prigh:n6wPXDyh+4CS5uoNgXQ3QvKjOSLE7ED87qIiTSvih1A=`: add it the same way
-to download prigh itself prebuilt.
+are in `trusted-users`, or if `https://attic.caduc.co/prigh` and its key are
+in the system's `trusted-substituters`/`trusted-public-keys`; otherwise add
+them to `/etc/nix/nix.conf` (NixOS: `nix.settings`) as `extra-substituters`
+and `extra-trusted-public-keys`. The key is
+`prigh:n6wPXDyh+4CS5uoNgXQ3QvKjOSLE7ED87qIiTSvih1A=` (also in `flake.nix`).
 
 ## Remote backend, several frontends
 
