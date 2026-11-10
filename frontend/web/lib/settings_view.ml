@@ -782,7 +782,7 @@ let about_you (m : App.Model.t) ~inject =
     ~cls:"setting about-you"
     [ div
         ~cls:"setting-text"
-        [ span ~cls:"setting-name" "What the model should know about you"
+        [ span ~cls:"setting-name" "Describe yourself"
         ; span
             ~cls:"setting-about"
             "Who you are, what you work on, how you like answers. This text is \

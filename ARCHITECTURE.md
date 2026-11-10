@@ -828,6 +828,27 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   broadcast to that world's clients as `memory_changed`
   (`Prigh_protocol.Memory`). prigh-web's Settings → Memory
   (`Memory_notes`, `Settings_view`) and the TUI's `/memory` picker use them.
+- `User_info` — what the user wrote about themselves for the model, plain
+  text in `~/.prigh/user_info.md` under the world's home (one per world,
+  made in `bin/main.ml` like `Memory`; at most `User_info.max_bytes`, read
+  from the file whenever it is asked for, so an edit by hand counts, and
+  replaced atomically (a longer file edited by hand is cut to the limit). Unlike memory it is always in
+  context, and no tool changes it. `Agent.create ?user_info` is asked for
+  the text: `System_prompt.build ?user_info` puts it after the
+  instructions when a session's prompt is first built (and in
+  non-forked subagents' prompts, `Tool_subagent.create ?user_info`; shared
+  forks inherit the parent's), and `Told_environment.user_info` records
+  what the session was told, so the usual diff
+  (`Told_environment.notes`) prefixes a `User_info` note
+  (`System_prompt.user_info_note`) to the next user message when the text
+  differs: a session from before the text or the feature, an edit, a
+  removal. The stored system prompt is never rewritten (it stays cached);
+  a session never told anything gets no note for an empty text. RPC:
+  `get_user_info` and `set_user_info {text}` (`{text, max}`), and every
+  change made through them is broadcast to that world's
+  clients as `user_info_changed` (`Prigh_protocol.User_info`). prigh-web's
+  Settings → About you (`About_you`, `Settings_view`) and the TUI's
+  `/user-info` use them.
 - `Tool_web_search` — `web_search` is a provider-side tool: `Tools.for_model`
   keeps it only for Anthropic, OpenAI and OpenAI Codex models, whose
   providers send their native tool for it; its `run` only answers a model
@@ -3960,6 +3981,8 @@ for Linux, macOS and Windows.
 - `~/.prigh/prefs.json` — the user's preferences and data kept for the
   frontends (`User_prefs`): prigh-web's `web.*` and the shared `history`.
 - `~/.prigh/memory.json` — the `memory` tool's notes (`Memory`).
+- `~/.prigh/user_info.md` — what the user wrote about themselves, in every
+  session's context (`User_info`).
 - `~/.prigh/config.json` — `scoped_models`, `approval_mode`, `permissions`, `notify`, `snippets`, `providers`
   (custom endpoints; their keys are in `auth.json` under their names),
   `forges` (git hosts' kind, OAuth client id and URL, by host).

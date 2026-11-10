@@ -39,12 +39,12 @@ let%expect_test "opening reads it; the section says what it is for" =
     (Rpc (method_ get_user_info) (params ()) (tag About_you_loaded))
     About you
     What the model should know about you, given to it in every session. Kept on the backend, for your account.
-    What the model should know about you Who you are, what you work on, how you like answers. This text is given to the model in every session: new ones start with it, and open ones get it with your next message. Memory is for notes the model looks up only when it needs them.
+    Describe yourself Who you are, what you work on, how you like answers. This text is given to the model in every session: new ones start with it, and open ones get it with your next message. Memory is for notes the model looks up only when it needs them.
     [] Reading what you wrote…
     Ctrl+Enter saves (Save)
     About you
     What the model should know about you, given to it in every session. Kept on the backend, for your account.
-    What the model should know about you Who you are, what you work on, how you like answers. This text is given to the model in every session: new ones start with it, and open ones get it with your next message. Memory is for notes the model looks up only when it needs them.
+    Describe yourself Who you are, what you work on, how you like answers. This text is given to the model in every session: new ones start with it, and open ones get it with your next message. Memory is for notes the model looks up only when it needs them.
     []
     0 of 4000 bytes Ctrl+Enter saves (Save)
     <textarea id="about-you-text"
@@ -96,7 +96,7 @@ let%expect_test "typing makes it dirty: Save and Revert; Ctrl+Enter saves" =
               @on_input> </textarea>
     About you
     What the model should know about you, given to it in every session. Kept on the backend, for your account.
-    What the model should know about you Who you are, what you work on, how you like answers. This text is given to the model in every session: new ones start with it, and open ones get it with your next message. Memory is for notes the model looks up only when it needs them.
+    Describe yourself Who you are, what you work on, how you like answers. This text is given to the model in every session: new ones start with it, and open ones get it with your next message. Memory is for notes the model looks up only when it needs them.
     [I'm Lloyd. I work on prigh, in OCaml.] Saved. New sessions start with it; open ones get it with your next message in them.
     37 of 4000 bytes Ctrl+Enter saves (Save)
     |}];
@@ -151,7 +151,7 @@ let%expect_test "refused: the reason stays under the text, which is kept" =
     About_you_save
     (Rpc (method_ set_user_info) (params ((text "new text")))
      (tag About_you_saved))
-    What the model should know about you Who you are, what you work on, how you like answers. This text is given to the model in every session: new ones start with it, and open ones get it with your next message. Memory is for notes the model looks up only when it needs them.
+    Describe yourself Who you are, what you work on, how you like answers. This text is given to the model in every session: new ones start with it, and open ones get it with your next message. Memory is for notes the model looks up only when it needs them.
     [new text] cannot write /home/me/.prigh/user_info.md: Permission denied
     8 of 4000 bytes Ctrl+Enter saves (Revert) (Save)
     |}];
@@ -191,13 +191,13 @@ let%expect_test "changed elsewhere: shown at once, unless something is typed" =
               #value="Written in another browser."
               @on_input> </textarea>
     (About_you_text "Typed here.")
-    What the model should know about you Who you are, what you work on, how you like answers. This text is given to the model in every session: new ones start with it, and open ones get it with your next message. Memory is for notes the model looks up only when it needs them.
+    Describe yourself Who you are, what you work on, how you like answers. This text is given to the model in every session: new ones start with it, and open ones get it with your next message. Memory is for notes the model looks up only when it needs them.
     [Typed here.]
     It was changed somewhere else while you were typing. Saving replaces that with this. (Load that one)
     11 of 4000 bytes Ctrl+Enter saves (Revert) (Save)
     About_you_revert
     (Focus about-you-text)
-    What the model should know about you Who you are, what you work on, how you like answers. This text is given to the model in every session: new ones start with it, and open ones get it with your next message. Memory is for notes the model looks up only when it needs them.
+    Describe yourself Who you are, what you work on, how you like answers. This text is given to the model in every session: new ones start with it, and open ones get it with your next message. Memory is for notes the model looks up only when it needs them.
     [Written in a third browser.]
     27 of 4000 bytes Ctrl+Enter saves (Save)
     |}]
@@ -210,7 +210,7 @@ let%expect_test "a failed read says so" =
   H.text h ~selector:".about-you";
   [%expect
     {|
-    What the model should know about you Who you are, what you work on, how you like answers. This text is given to the model in every session: new ones start with it, and open ones get it with your next message. Memory is for notes the model looks up only when it needs them.
+    Describe yourself Who you are, what you work on, how you like answers. This text is given to the model in every session: new ones start with it, and open ones get it with your next message. Memory is for notes the model looks up only when it needs them.
     [] Could not read it: cannot read /home/me/.prigh/user_info.md. Open the section again to retry.
     Ctrl+Enter saves (Save)
     |}]
