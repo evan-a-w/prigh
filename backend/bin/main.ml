@@ -67,6 +67,7 @@ module Setup = struct
     ; world : Namespace.World.t
     ; models : Model_registry.t
     ; forges : Forges.t (** the world's git-host sign-ins *)
+    ; memory : Memory.t (** the world's *)
     }
 end
 
@@ -206,9 +207,10 @@ let common_params =
         ~store
         ()
     in
+    let memory = Memory.create ~home in
+    let questions = Session_questions.create () in
     (* One agent per session; the subagent tool follows its own agent's
        model and thinking level. *)
-    let questions = Session_questions.create () in
     let new_agent ?session ~cwd () =
       let agent_ref = ref None in
       let current f default () =
@@ -282,6 +284,7 @@ let common_params =
                      ~current:current_party
                      ~questions
                      ()
+                 ; Tool_memory.create ~memory ()
                  ]
                @ Tool_jobs.tools
                @ Tools.interaction)
@@ -298,13 +301,16 @@ let common_params =
           ~use_default_cwd:(not cwd_given)
           ?max_budget_usd
           ~questions
+          ~offered:(fun tool ->
+            (not (String.equal (Tool.name tool) Tool_memory.name))
+            || Memory.enabled memory)
           ~cwd
           ()
       in
       agent_ref := Some agent;
       agent
     in
-    { Setup.session; cwd; new_agent; world; models; forges; questions }
+    { Setup.session; cwd; new_agent; world; models; forges; memory; questions }
 ;;
 
 (* Errors from the agent name the slash command; on the command line the
@@ -728,7 +734,15 @@ let serve_command =
             | None -> Nix_store_ops.local ~env)
        in
        let create_server ?token ?namespace ?world () =
-         let { Setup.session; cwd; new_agent; world; models; forges; questions }
+         let { Setup.session
+             ; cwd
+             ; new_agent
+             ; world
+             ; models
+             ; forges
+             ; memory
+             ; questions
+             }
            =
            make_agent ~env ~sw ~backend_host ?world ()
          in
@@ -760,6 +774,7 @@ let serve_command =
              ~nix_store
              ~login
              ~forges
+             ~memory
              ~sessions_dir:world.sessions_dir
              ~cwd
              ~new_agent
@@ -769,6 +784,7 @@ let serve_command =
          Rpc_server.serve_questions server questions;
          Rpc_server.restore_resumes server;
          Rpc_server.clean_leftovers server;
+         Rpc_server.start_indexing server;
          server
        in
        let router =
@@ -873,6 +889,16 @@ let serve_command =
          Eio.Fiber.await_cancel ())
 ;;
 
+(* A pasted sign-in code: with [-paste], or when the program runs over SSH
+   and someone is at its terminal to paste it. *)
+let terminal_paste ~env ~flag =
+  Option.some_if
+    (flag
+     || (Browser_signin.Paste.wanted ~flag ~getenv:Sys.getenv
+         && Core_unix.isatty Core_unix.stdin))
+    (Browser_signin.Paste.stdin ~env)
+;;
+
 let browser_signin_command =
   Command.basic
     ~summary:
@@ -903,10 +929,20 @@ let browser_signin_command =
          "-json"
          no_arg
          ~doc:
-           " print JSON lines on stdout ({\"url\", \"port\"} then the sign-in \
-            or {\"error\"}) and save nothing: for prigh-tui"
+           " print JSON lines on stdout ({\"url\", \"port\", \"paste\"}, then \
+            the sign-in or {\"error\"}; {\"paste_error\"} for a pasted code \
+            that does not open) and save nothing: for prigh-tui, which writes \
+            a pasted code to stdin as a line"
      and no_browser =
        flag "-no-browser" no_arg ~doc:" print the URL without opening it"
+     and paste =
+       flag
+         "-paste"
+         no_arg
+         ~doc:
+           " also take the code the page shows after Allow, pasted on stdin \
+            (the default over SSH, but not with -json; PRIGH_SIGNIN_PASTE=0 or \
+            1 overrides)"
      in
      fun () ->
        let home = home () in
@@ -961,21 +997,33 @@ let browser_signin_command =
          Eio_main.run
          @@ fun env ->
          if json
-         then
-           Browser_signin.run ~env ~program remote ~on_url:(fun ~url ~port ->
-             print_endline
-               (Jsonaf.to_string
-                  (`Object
-                      [ "url", `String url
-                      ; "port", `Number (Int.to_string port)
-                      ]));
-             Option.iter open_url ~f:(fun open_url -> open_url url))
+         then (
+           let paste = Option.some_if paste (Browser_signin.Paste.stdin ~env) in
+           Browser_signin.run
+             ~env
+             ~program
+             ?paste
+             ~on_refused:(fun error ->
+               print_endline
+                 (Jsonaf.to_string (`Object [ "paste_error", `String error ])))
+             remote
+             ~on_url:(fun ~url ~port ->
+               print_endline
+                 (Jsonaf.to_string
+                    (`Object
+                        [ "url", `String url
+                        ; "port", `Number (Int.to_string port)
+                        ; ( "paste"
+                          , if Option.is_some paste then `True else `False )
+                        ]));
+               Option.iter open_url ~f:(fun open_url -> open_url url)))
          else
            Browser_signin.run_on_terminal
              ~env
              ~program
              ~say:(eprintf "prigh browser-signin: %s\n%!")
              ?open_url
+             ?paste:(terminal_paste ~env ~flag:paste)
              ~why:"signing in"
              remote
        in
@@ -1180,6 +1228,7 @@ let tool_host_command =
                    ~env
                    ~program:Tool_host
                    ~say:(eprintf "prigh tool-host: %s\n%!")
+                   ?paste:(terminal_paste ~env ~flag:false)
                    ~why
                    remote
                in
@@ -1390,6 +1439,7 @@ let web_command =
                 ~program:Web
                 ~say:(eprintf "prigh web: %s\n%!")
                 ~open_url:open_in_browser
+                ?paste:(terminal_paste ~env ~flag:false)
                 ~why
                 remote
             with
@@ -1767,6 +1817,7 @@ let acp_command =
                ; world
                ; models
                ; forges
+               ; memory
                ; questions
                }
              =
@@ -1794,6 +1845,7 @@ let acp_command =
                ~home:world.home
                ~login
                ~forges
+               ~memory
                ~sessions_dir:world.sessions_dir
                ~cwd
                ~new_agent
@@ -2028,13 +2080,14 @@ let print_summary (s : Session.Summary.t) =
        String.prefix (String.strip p) 60))
 ;;
 
-(* Archived sessions come last under their own heading, as in the
-   frontends' pickers. Without a server, no session counts as active. *)
+(* Pinned sessions come first and archived ones last, under their own
+   headings, as in the frontends' pickers. Without a server, no session
+   counts as active. *)
 let sessions_list_command =
   Command.basic
     ~summary:
-      "List saved sessions, the archived ones (by hand, or idle for the \
-       config's archive_after_days) last"
+      "List saved sessions, the pinned ones first and the archived ones (by \
+       hand, or idle for the config's archive_after_days) last"
     (Command.Param.return (fun () ->
        let archive_after_days =
          match Config.load ~home:(home ()) with
@@ -2056,6 +2109,14 @@ let sessions_list_command =
                ~archive_after_days
                ~active:false)
        in
+       let pinned, current =
+         List.partition_tf current ~f:(fun (s : Session.Summary.t) -> s.pinned)
+       in
+       if not (List.is_empty pinned)
+       then (
+         printf "pinned:\n";
+         List.iter pinned ~f:print_summary;
+         if not (List.is_empty current) then printf "sessions:\n");
        List.iter current ~f:print_summary;
        if not (List.is_empty archived)
        then (
@@ -2216,15 +2277,21 @@ let trace_command =
 ;;
 
 (* What the built-in tools' specifications add to each request, as
-   [Compaction_eval] counts tokens. *)
+   [Compaction_eval] counts tokens: [memory]'s while the user has it on. *)
 let tools_overhead_tokens () =
+  let memory =
+    Option.some_if
+      (Memory.enabled (Memory.create ~home:(home ())))
+      Tool_memory.spec
+  in
   List.sum
     (module Int)
-    (Tools.all @ Tools.interaction)
-    ~f:(fun (t : Tool.t) ->
-      (String.length t.spec.name
-       + String.length t.spec.description
-       + String.length (Jsonaf.to_string t.spec.parameters))
+    (List.map (Tools.all @ Tools.interaction) ~f:(fun (t : Tool.t) -> t.spec)
+     @ Option.to_list memory)
+    ~f:(fun (spec : Tool_spec.t) ->
+      (String.length spec.name
+       + String.length spec.description
+       + String.length (Jsonaf.to_string spec.parameters))
       / 4)
 ;;
 

@@ -38,6 +38,7 @@ module Reply_tag : sig
     | Models_after_login of string (** provider *)
     | Sessions_picker
     | Sessions_cache
+    | Session_hits (** [search_sessions], for the [/sessions] picker *)
     | Session_stats
     | Trace
     | Entries_for_fork
@@ -55,6 +56,14 @@ module Reply_tag : sig
     | Session_to_archive of
         { arg : string (** [/archive]'s argument *)
         ; archived : bool
+        }
+    | Pin_done of
+        { name : string
+        ; pinned : bool
+        }
+    | Session_to_pin of
+        { arg : string (** [/pin]'s argument *)
+        ; pinned : bool
         }
     | Paths_for_autocomplete of string
     | Dirs_for_autocomplete of string
@@ -143,6 +152,7 @@ module Reply_tag : sig
     | Skill_prompt of string
     (** a [/skill:] prompt, steer or follow-up; failing puts it back *)
     | Mcp_picker
+    | Memory_picker
     | Mcp_reconnected
     | Mcp_approved of string (** server *)
     | Pending (** [get_pending]: confirmations and questions to show *)
@@ -208,6 +218,9 @@ module Command : sig
         }
     (** [/connect], [/signin]: switch server or credentials and answer
         [Relinked]. *)
+    | Signin_code of string option
+    (** The code pasted for the browser sign-in under way; [None] cancels
+        it. *)
     | Sign_out
     (** Forget the stored credentials (the token) and drop the connection. *)
     | Notify of
@@ -276,6 +289,8 @@ module Action : sig
     | Signin_required of string
     (** the first connection met a sign-in proxy's login (why): start
         disconnected, offering to sign in through the browser *)
+    | Signin_code_prompt of Server_link.Code_prompt.t
+    (** the browser sign-in under way also takes a pasted code *)
     | Resize of
         { width : int
         ; height : int

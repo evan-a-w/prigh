@@ -1,11 +1,12 @@
 {
   description = "prigh — OCaml backend, Bonsai_term and Bonsai_web frontends on OxCaml";
 
-  # The OxCaml toolchain and packages, prebuilt (see README.md).
+  # prigh, its OxCaml toolchain and packages and the dev shells, prebuilt by
+  # CI from main (see README.md).
   nixConfig = {
-    extra-substituters = [ "https://prigh.cachix.org" ];
+    extra-substituters = [ "https://attic.caduc.co/prigh" ];
     extra-trusted-public-keys = [
-      "prigh.cachix.org-1:1kHKoGOetNmpzJg8lJ1nvQzwzTL0XiOs5GInELMgSoI="
+      "prigh:n6wPXDyh+4CS5uoNgXQ3QvKjOSLE7ED87qIiTSvih1A="
     ];
   };
 
@@ -198,9 +199,41 @@
           prigh-computer = prighComputer;
         };
 
-        apps.default = {
-          type = "app";
-          program = "${prigh}/bin/prigh";
+        apps = {
+          default = {
+            type = "app";
+            program = "${prigh}/bin/prigh";
+          };
+        }
+        // lib.optionalAttrs isLinux {
+          # desktop/computer/test/hyprland.sh: needs a GPU, so not a check
+          computer-use-hyprland = {
+            type = "app";
+            program = lib.getExe (
+              pkgs.writeShellApplication {
+                name = "computer-use-hyprland";
+                runtimeInputs = [
+                  pkgs.kdePackages.kwin
+                  pkgs.hyprland
+                  pkgs.wev
+                  pkgs.procps
+                  pkgs.coreutils
+                  pkgs.gawk
+                ];
+                text = ''
+                  # Mesa for the nested compositors, also where it is not
+                  # the system's (outside NixOS)
+                  export __EGL_VENDOR_LIBRARY_FILENAMES=${pkgs.mesa}/share/glvnd/egl_vendor.d/50_mesa.json
+                  export LIBGL_DRIVERS_PATH=${pkgs.mesa}/lib/dri GBM_BACKENDS_PATH=${pkgs.mesa}/lib/gbm
+                  export LD_LIBRARY_PATH=${pkgs.mesa}/lib
+                  actual=$(mktemp)
+                  trap 'rm -f "$actual"' EXIT
+                  bash ${./desktop/computer/test}/hyprland.sh "''${1:-${prighComputer}/bin/prigh-computer}" | tee "$actual"
+                  diff -u ${./desktop/computer/test/hyprland.expected} "$actual" && echo "as expected"
+                '';
+              }
+            );
+          };
         };
 
         checks.web-wrapper = pkgs.runCommand "prigh-web-wrapper-test" { } ''
@@ -322,12 +355,16 @@
                 export PRIGH_BACKEND=${prighBackend}/bin/prigh
                 export PRIGH_WEB_ROOT=${prighWebRoot}
                 export PRIGH_TMUX=${pkgs.tmux}/bin/tmux
+                export PRIGH_E2E_SHELL=${pkgs.bashInteractive}/bin/bash
                 # WebKit (WPE) renders through EGL: Mesa's, in software.
                 export __EGL_VENDOR_LIBRARY_DIRS=${pkgs.mesa}/share/glvnd/egl_vendor.d
                 export HOME="$PWD/home"
                 mkdir -p "$HOME"
                 cp -r ${./frontend/web/e2e} e2e
                 chmod -R u+w e2e
+                # paste_vector.mjs seals with the page's own paste_seal.js.
+                mkdir app
+                cp ${./frontend/web/app/paste_seal.js} app/paste_seal.js
                 ${pkgs.runtimeShell} e2e/prigh_web.sh
                 mkdir "$out"
               ''
@@ -543,7 +580,10 @@
         # desktop/: Rust, cargo-tauri and the webview's libraries, apart from
         # the OxCaml shell so that one stays lean.
         devShells.desktop = pkgs.mkShell {
-          inputsFrom = [ prighDesktopUnwrapped ];
+          inputsFrom = [
+            prighDesktopUnwrapped
+            prighComputer
+          ];
           packages = [
             pkgs.cargo-tauri
             pkgs.clippy

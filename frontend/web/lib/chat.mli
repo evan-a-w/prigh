@@ -103,6 +103,9 @@ val set_running : t -> bool -> t
 
 val apply : t -> Event.t -> t
 
+(** Whether [apply] left the entries and tool calls as they were. *)
+val same_transcript : t -> t -> bool
+
 (** Gives the messages of [message_start] and [message_end] events (also a
     subagent's) without a time, from a backend that does not send them, the
     time the page received them. *)

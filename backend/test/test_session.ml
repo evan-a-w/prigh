@@ -1012,6 +1012,7 @@ let%expect_test "find_summary: exact id, unique prefix, ambiguous, missing" =
     ; failed = false
     ; parent = None
     ; archived = None
+    ; pinned = false
     ; last_activity = 0.
     ; resume_at = None
     ; bytes = 0

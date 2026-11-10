@@ -8,6 +8,7 @@ let spec =
   ; parallel_safe = true
   ; on_host = false
   ; freeform = None
+  ; native = None
   ; destructive = Never
   ; description =
       "Ask another session a question, interrupting its work and costing it a \

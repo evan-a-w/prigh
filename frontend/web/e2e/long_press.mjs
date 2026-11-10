@@ -285,6 +285,8 @@ try {
   section("a file of the review");
   await editor.fill("/review");
   await editor.press("Enter");
+  // On a phone the list is behind the file's row, in the code's place.
+  await page.locator("#review-files-toggle").click();
   const file = page.locator(".review-file-row").first();
   await file.waitFor();
   await page.waitForTimeout(300);

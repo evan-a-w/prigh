@@ -135,6 +135,7 @@ module Reply_tag = struct
         ; draft : string
         }
     | Sessions
+    | Session_hits of int
     | Models
     | Reload_state
     | Subagent of string (** the [subagent] call or agent id *)
@@ -152,6 +153,10 @@ module Reply_tag = struct
     | Archived_set of
         { title : string
         ; archived : bool
+        }
+    | Pinned_set of
+        { title : string
+        ; pinned : bool
         }
     | Refresh_sessions
     | Login_started
@@ -225,6 +230,7 @@ module Reply_tag = struct
     | Resync of
         { session : string (** its id *)
         ; from : string option
+        ; events : int (** [transcript_events] when it was asked for *)
         }
     (** the session's messages after reconnecting, [from] the first one on
         show *)
@@ -251,6 +257,10 @@ module Reply_tag = struct
     | Git of Git_bar.Reply.t
     | Nix_status of { open_settings : bool }
     | Nix_collected
+    | Memory_loaded
+    | Memory_saved
+    | Memory_forgot
+    | Memory_enabled
     | Trim_points of Trim_purpose.t
     | Trimmed
     | Untrimmed
@@ -281,6 +291,10 @@ module Command = struct
     | Set_url_session of string
     | Expire_toast of
         { id : int
+        ; after_ms : int
+        }
+    | Search_sessions_later of
+        { search : int
         ; after_ms : int
         }
     | Focus of string
@@ -428,6 +442,10 @@ module Action = struct
         { path : string
         ; archived : bool
         }
+    | Set_pinned of
+        { path : string
+        ; pinned : bool
+        }
     | Set_session_query of string
     | Toggle_archived
     | Open_sessions
@@ -453,6 +471,15 @@ module Action = struct
     | Settings_move of Settings_section.Move.t
     | Compact_at_input of string
     | Compact_at_commit
+    | Memory_filter of string
+    | Memory_edit of string option
+    | Memory_title of string
+    | Memory_text of string
+    | Memory_save
+    | Memory_cancel
+    | Memory_forget of string
+    | Memory_forget_confirm
+    | Memory_forget_cancel
     | Open_rename
     | Open_subagents of string option
     (** the agents panel; with a number, an agent's or a job's id *)
@@ -555,6 +582,7 @@ module Action = struct
         ; error : bool
         }
     | Dismiss_toast of int
+    | Search_sessions of int
     | Update_ready
     | Apply_update
     | Dismiss_update
@@ -674,6 +702,8 @@ module Model = struct
     ; status_tray : bool
     ; scrolled_up : bool
     ; session_query : string
+    ; session_hits : Session_hits.t option
+    ; session_search : int
     ; archived_open : bool
     ; agents : Agents.t
     ; verbosity : Prigh_ui.Verbosity.t
@@ -699,6 +729,9 @@ module Model = struct
     ; review_memory : Review_memory.t
     ; layout : Resize.t
     ; paging : Paging.t
+    ; transcript_events : int
+      (** events that changed the transcript: a page asked for before one
+          of them may not have it *)
     ; chat_cache : Chat_cache.t
     ; jump : Jump.t
     ; trimmed : Trimmed.t
@@ -712,6 +745,7 @@ module Model = struct
     ; landing : bool
     ; forges : Forges.t
     ; nix_gc : Nix_gc.t
+    ; memory : Memory_notes.t
     ; compact_at : Compact_at.t
     ; settings_section : Settings_section.t
       (* A phone's settings show the list of sections, not one of them. *)
@@ -917,6 +951,7 @@ module Model = struct
       let order =
         let shown =
           Session_list.shown
+            ?content:t.session_hits
             t.sessions
             ~query:t.session_query
             ~archived_open:t.archived_open
@@ -987,6 +1022,8 @@ let init =
   ; review_drawer = false
   ; scrolled_up = false
   ; session_query = ""
+  ; session_hits = None
+  ; session_search = 0
   ; archived_open = false
   ; agents = Agents.empty
   ; verbosity = Normal
@@ -1012,6 +1049,7 @@ let init =
   ; review_memory = Review_memory.empty
   ; layout = Resize.empty
   ; paging = Paging.all
+  ; transcript_events = 0
   ; chat_cache = Chat_cache.empty
   ; jump = Jump.empty
   ; trimmed = Trimmed.empty
@@ -1023,6 +1061,7 @@ let init =
   ; landing = false
   ; forges = Forges.empty
   ; nix_gc = Nix_gc.empty
+  ; memory = Memory_notes.empty
   ; compact_at = Compact_at.empty
   ; settings_section = Appearance
   ; settings_home = true
@@ -1307,7 +1346,8 @@ let resync_rpc (m : Model.t) (state : State.t) =
   call
     (Get_messages_page
        { session = state.session_path; before = None; from; limit })
-    ~tag:(Resync { session = state.session_id; from })
+    ~tag:
+      (Resync { session = state.session_id; from; events = m.transcript_events })
 ;;
 
 let session_path (m : Model.t) = Option.map m.state ~f:(fun s -> s.session_path)
@@ -1780,7 +1820,12 @@ let fetch_nix_status (m : Model.t) ~open_settings =
   , [ call Nix_store_status ~tag:(Nix_status { open_settings }) ] )
 ;;
 
-(* Superusers see the Nix store there, as it is now. *)
+let fetch_memory (m : Model.t) =
+  ( { m with memory = Memory_notes.loading m.memory }
+  , [ call Get_memory ~tag:Memory_loaded ] )
+;;
+
+(* Superusers see the Nix store there, as it is now; everyone their memory. *)
 let open_settings ?(fetch = true) ?section (m : Model.t) =
   let settings_section = Option.value section ~default:m.settings_section in
   let m, cmds =
@@ -1792,11 +1837,34 @@ let open_settings ?(fetch = true) ?section (m : Model.t) =
       }
       Settings
   in
+  let m, cmds =
+    if fetch && Settings_section.equal settings_section Memory
+    then (
+      let m, more = fetch_memory m in
+      m, cmds @ more)
+    else m, cmds
+  in
   if fetch && superuser m
   then (
     let m, fetch = fetch_nix_status m ~open_settings:false in
     m, cmds @ fetch)
   else m, cmds
+;;
+
+(* The model is given the memory tool, or not, from its next turn. *)
+let set_memory_enabled (m : Model.t) enabled =
+  let memory = m.memory in
+  let m =
+    { m with memory = { memory with memory = { memory.memory with enabled } } }
+  in
+  let m, cmds =
+    toast
+      m
+      (if enabled
+       then "Memory on: the model can save and recall notes"
+       else "Memory off: the model no longer sees your notes")
+  in
+  m, cmds @ [ call (Set_memory_enabled { enabled }) ~tag:Memory_enabled ]
 ;;
 
 (* [/settings SECTION]. *)
@@ -2150,9 +2218,20 @@ let not_moving (m : Model.t) (switch_to : Switch_to.t) =
   if ours then { m with pending = { m.pending with session = None } } else m
 ;;
 
+(* Titles match at once; the messages, searched by the backend, once the
+   typing pauses. *)
+let set_session_query (m : Model.t) session_query =
+  let search = m.session_search + 1 in
+  let m = { m with session_query; session_search = search } in
+  if List.is_empty (Prigh_ui.Session_search.words session_query)
+  then { m with session_hits = None }, []
+  else m, [ Command.Search_sessions_later { search; after_ms = 150 } ]
+;;
+
 (* The sidebar's sessions in the order it shows them. *)
 let shown_sessions (m : Model.t) =
   Session_list.shown
+    ?content:m.session_hits
     m.sessions
     ~query:m.session_query
     ~archived_open:m.archived_open
@@ -2220,11 +2299,44 @@ let set_archived (m : Model.t) (s : Session_summary.t) ~archived =
     ( { m with
         sessions =
           List.map m.sessions ~f:(fun (x : Session_summary.t) ->
-            if String.equal x.path s.path then { x with archived } else x)
+            if String.equal x.path s.path
+            then
+              { x with
+                archived
+              ; pinned =
+                  (if archived
+                   then Option.map x.pinned ~f:(fun _ -> false)
+                   else x.pinned)
+              }
+            else x)
       }
     , [ call
           (Set_archived { path = s.path; archived })
           ~tag:(Archived_set { title = Session_list.title s; archived })
+      ] )
+;;
+
+let cannot_pin = "This backend can't pin sessions: update it to pin."
+
+(* Pinning unarchives; archiving unpins (as the backend does). *)
+let set_pinned (m : Model.t) (s : Session_summary.t) ~pinned =
+  match s.pinned with
+  | None -> error m cannot_pin
+  | Some _ ->
+    ( { m with
+        sessions =
+          List.map m.sessions ~f:(fun (x : Session_summary.t) ->
+            if String.equal x.path s.path
+            then
+              { x with
+                pinned = Some pinned
+              ; archived = x.archived && not pinned
+              }
+            else x)
+      }
+    , [ call
+          (Set_pinned { path = s.path; pinned })
+          ~tag:(Pinned_set { title = Session_list.title s; pinned })
       ] )
 ;;
 
@@ -3690,6 +3802,13 @@ let dictation_command (m : Model.t) rest =
   | Set_model _ as action -> set_dictation m action
 ;;
 
+let save_memory (m : Model.t) =
+  match Memory_notes.save m.memory with
+  | memory, Some request ->
+    { m with memory }, [ call request ~tag:Memory_saved ]
+  | memory, None -> { m with memory }, []
+;;
+
 let commit_compact_at (m : Model.t) =
   match Compact_at.commit m.compact_at with
   | compact_at, Some n -> set_compaction { m with compact_at } (Set_at n)
@@ -4085,6 +4204,7 @@ let user_switched (m : Model.t) (hello : Hello_reply.t) =
     ; sessions = []
     ; marks = Session_marks.empty
     ; session_query = ""
+    ; session_hits = None
     ; confirms = []
     ; confirm_reason = None
     ; questions = []
@@ -4111,6 +4231,7 @@ let user_switched (m : Model.t) (hello : Hello_reply.t) =
     ; agents = { Agents.empty with open_ = m.agents.open_ }
     ; forges = Forges.empty
     ; nix_gc = { Nix_gc.empty with collecting = m.nix_gc.collecting }
+    ; memory = Memory_notes.empty
     ; config = None
     ; compact_at = Compact_at.empty
     }
@@ -5712,6 +5833,15 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
   | "settings", "" -> open_settings m
   | "settings", arg -> settings_command m arg
   | "nix-gc", rest when superuser m -> nix_gc_command m rest
+  | "memory", "" -> open_settings ~section:Memory m
+  | "memory", ("on" | "off") -> set_memory_enabled m (String.equal rest "on")
+  | "memory", other ->
+    error
+      m
+      (sprintf
+         "/memory takes on or off, not %S; /memory alone shows the notes in \
+          Settings."
+         other)
   | "new", _ -> starting m, [ rpc "new_session" [] ~tag:Reload_state ]
   | "temporary", _ when temporary m -> open_dialog m Temporary_menu
   | "temporary", _ -> new_temporary_session m ~temporary:true
@@ -5896,8 +6026,7 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
     loading m "Session" [ rpc "session_stats" [] ~tag:Session_stats ]
   | "trace", _ -> loading m "Trace" [ rpc "trace" [] ~tag:Trace ]
   | "sessions", _ | "switch", "" -> open_sessions m
-  | (("archive" | "unarchive") as name), key ->
-    let archived = String.equal name "archive" in
+  | (("archive" | "unarchive" | "pin" | "unpin") as name), key ->
     let session =
       if String.is_empty key
       then (
@@ -5909,9 +6038,11 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
         | None -> Error "This session isn't saved yet: send a message first.")
       else find_session m key
     in
-    (match session with
-     | Ok s -> set_archived m s ~archived
-     | Error e -> prompt_failed m e)
+    (match session, name with
+     | Ok s, "pin" -> set_pinned m s ~pinned:true
+     | Ok s, "unpin" -> set_pinned m s ~pinned:false
+     | Ok s, _ -> set_archived m s ~archived:(String.equal name "archive")
+     | Error e, _ -> prompt_failed m e)
   | "delete", "" ->
     if Model.running m
     then error m (running_error `Delete)
@@ -7283,6 +7414,14 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
   | Session_gone { session; _ }, Ok json -> Rejoin.gone m json ~session
   | Resync { session; _ }, _ when not (String.equal session (session_id m)) ->
     m, []
+  (* Events came since it was asked for: they may be newer than the page,
+     which would wipe them (its answer comes after them). Again once the
+     turn ends. *)
+  | Resync { events; _ }, Ok _ when events <> m.transcript_events ->
+    (match m.state with
+     | Some state when not (Chat.running m.chat) -> m, [ resync_rpc m state ]
+     | Some _ | None ->
+       { m with pending = { m.pending with resync_at_end = true } }, [])
   | Resync _, Ok json ->
     decode m json Message_page.of_json ~f:(fun page ->
       let chat =
@@ -7454,6 +7593,17 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
   | Sessions_deleted, Error e -> error m (sprintf "Couldn't delete: %s" e)
   | Moved_and_deleted switch_to, Error e ->
     error (not_moving m switch_to) (sprintf "Couldn't delete: %s" e)
+  | Pinned_set { title; pinned }, Error e ->
+    let m, cmds =
+      error
+        m
+        (sprintf
+           "Couldn't %s “%s”: %s"
+           (if pinned then "pin" else "unpin")
+           title
+           e)
+    in
+    m, cmds @ [ rpc "list_sessions" [] ~tag:Sessions ]
   | Archived_set { title; archived }, Error e ->
     let m, cmds =
       error
@@ -7694,6 +7844,28 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
      | Nix_status { open_settings = true }, Error e ->
        error m (String.capitalize e)
      | _ -> m, [])
+  | Memory_loaded, result ->
+    let result =
+      Result.bind result ~f:(fun json ->
+        Result.map_error (Memory.of_json json) ~f:Error.to_string_hum)
+    in
+    { m with memory = Memory_notes.loaded m.memory result }, []
+  | Memory_saved, result ->
+    let result =
+      Result.bind result ~f:(fun json ->
+        Result.map_error (Memory.note_of_reply json) ~f:Error.to_string_hum)
+    in
+    { m with memory = Memory_notes.saved m.memory result }, []
+  | Memory_forgot, result ->
+    ( { m with
+        memory = Memory_notes.forgotten m.memory (Result.map result ~f:ignore)
+      }
+    , [] )
+  | Memory_enabled, Ok _ -> m, []
+  | Memory_enabled, Error e ->
+    let m, cmds = fetch_memory m in
+    let m, more = error m ("Memory could not be switched: " ^ e) in
+    m, cmds @ more
   | Nix_collected, result ->
     let result =
       Result.bind result ~f:(fun json ->
@@ -7728,6 +7900,8 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
   | Hidden_messages { path; entry }, result ->
     hidden_messages m ~path ~entry result
   | _, Error "backend closed" -> m, []
+  (* A backend without content search: the titles still are. *)
+  | Session_hits _, Error _ -> m, []
   | _, Error e -> error m (String.capitalize e)
   | Sent _, Ok _ ->
     { m with pending = In_flight.answered m.pending ~failed:None }, []
@@ -7875,6 +8049,12 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
             Chat_cache.retain m.chat_cache ~paths:(String.Set.of_list paths)
         }
       , [] ))
+  | Session_hits search, Ok json ->
+    if search = m.session_search
+    then
+      decode m json Session_hits.of_json ~f:(fun hits ->
+        { m with session_hits = Some hits }, [])
+    else m, []
   | Refresh_sessions, Ok _ -> m, [ rpc "list_sessions" [] ~tag:Sessions ]
   | Models, Ok json ->
     decode m json (decode_list Llm.of_json) ~f:(fun models ->
@@ -7974,6 +8154,12 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
           (Delete_result.summary result)
       in
       m, cmds @ [ rpc "list_sessions" [] ~tag:Sessions ])
+  | Pinned_set { title; pinned }, Ok _ ->
+    toast
+      m
+      (if pinned
+       then sprintf "Pinned “%s” to the top" title
+       else sprintf "Unpinned “%s”" title)
   | Archived_set { title; archived }, Ok _ ->
     toast
       m
@@ -8412,6 +8598,9 @@ let main_event (m : Model.t) (event : Event.t) =
     in
     m, (Command.Remember_temporary None :: deleted) @ kept
   | Nix_gc_progress p -> { m with nix_gc = Nix_gc.progress m.nix_gc p }, []
+  (* Saved, edited or forgotten here, elsewhere or by the model. *)
+  | Memory_changed memory ->
+    { m with memory = Memory_notes.changed m.memory memory }, []
   (* Another of the user's frontends changed their preferences. *)
   | Prefs_changed changes ->
     apply_prefs m ~startup:false changes, [ Command.Cache_prefs changes ]
@@ -8437,9 +8626,14 @@ let event (m : Model.t) (e : Event.t) =
     | Agent_end _ -> { m.pending with prompts = [] }
     | _ -> m.pending
   in
+  let chat = Chat.apply m.chat e in
   let m =
     { m with
-      chat = Chat.apply m.chat e
+      chat
+    ; transcript_events =
+        (if Chat.same_transcript m.chat chat
+         then m.transcript_events
+         else m.transcript_events + 1)
     ; agents = Agents.record m.agents ~now:(now_of m) e
     ; pending
     ; paging =
@@ -8453,13 +8647,24 @@ let event (m : Model.t) (e : Event.t) =
          | _ -> m.jump)
     }
   in
+  let m, resync =
+    match e, m.state with
+    | Agent_end _, Some state when m.pending.resync_at_end ->
+      ( { m with pending = { m.pending with resync_at_end = false } }
+      , [ resync_rpc m state ] )
+    | _ -> m, []
+  in
   let m, cmds = main_event m e in
   let m, review =
     if touches_files e
     then with_review m (Code_review.changed m.review ~watching:m.files.open_)
     else m, []
   in
-  m, cmds @ review @ if Agents.starts_or_ends e then [ list_subagents ] else []
+  ( m
+  , resync
+    @ cmds
+    @ review
+    @ if Agents.starts_or_ends e then [ list_subagents ] else [] )
 ;;
 
 let image_json (image : Image.t) =
@@ -8736,6 +8941,8 @@ let message_chosen (m : Model.t) n (item : Context_menu.Item.t) =
       | Copy_id
       | Archive
       | Unarchive
+      | Pin
+      | Unpin
       | Remove
       | Approve_files
       | Unapprove_files
@@ -8790,6 +8997,8 @@ let review_files_chosen (m : Model.t) paths (item : Context_menu.Item.t) =
     | Copy_id
     | Archive
     | Unarchive
+    | Pin
+    | Unpin
     | Delete
     | Remove
     | Copy_message
@@ -8860,6 +9069,8 @@ let menu_chosen (m : Model.t) (menu : Context_menu.t) id =
      | Copy_id -> copy "the session id" s.id
      | Archive -> set_archived m s ~archived:true
      | Unarchive -> set_archived m s ~archived:false
+     | Pin -> set_pinned m s ~pinned:true
+     | Unpin -> set_pinned m s ~pinned:false
      | Delete -> ask_delete m [ s.path ]
      | Remove -> ask_remove_session_worktree m dir
      | Copy_message
@@ -9152,6 +9363,7 @@ let dialog_accept (m : Model.t) =
      | None, Some _ -> respond_login m flow
      | Some _, _ -> close_dialog m
      | None, None -> m, [])
+  | Some Settings when Option.is_some m.memory.draft -> save_memory m
   | Some Settings when Option.is_some (Compact_at.draft m.compact_at) ->
     commit_compact_at m
   | Some
@@ -9460,7 +9672,21 @@ let update_connected (m : Model.t) (action : Action.t) =
     (match find_session_by_path m path with
      | Some s -> set_archived m s ~archived
      | None -> m, [])
-  | Set_session_query session_query -> { m with session_query }, []
+  | Set_pinned { path; pinned } ->
+    (match find_session_by_path m path with
+     | Some s -> set_pinned m s ~pinned
+     | None -> m, [])
+  | Set_session_query session_query -> set_session_query m session_query
+  | Search_sessions search ->
+    if search = m.session_search
+    then
+      ( m
+      , [ rpc
+            "search_sessions"
+            (Session_hits.params ~query:m.session_query ~limit:50)
+            ~tag:(Session_hits search)
+        ] )
+    else m, []
   | Toggle_archived -> { m with archived_open = not m.archived_open }, []
   | Open_sessions -> open_sessions m
   | Session_nav { from; by } -> session_nav m ~from ~by
@@ -9487,18 +9713,47 @@ let update_connected (m : Model.t) (action : Action.t) =
   | Settings_section section ->
     (match m.dialog with
      | Some Settings ->
-       { m with settings_section = section; settings_home = false }, []
+       let m = { m with settings_section = section; settings_home = false } in
+       (match section with
+        | Memory -> fetch_memory m
+        | _ -> m, [])
      | _ -> open_settings ~section m)
   | Settings_home -> { m with settings_home = true }, []
   | Settings_move move ->
     let section =
       Settings_section.move m.settings_section move ~superuser:(superuser m)
     in
-    ( { m with settings_section = section }
-    , [ Command.Focus (Settings_section.tab_id section) ] )
+    let m, cmds =
+      match section with
+      | Memory when not (Settings_section.equal m.settings_section Memory) ->
+        fetch_memory { m with settings_section = section }
+      | _ -> { m with settings_section = section }, []
+    in
+    m, Command.Focus (Settings_section.tab_id section) :: cmds
   | Compact_at_input text ->
     { m with compact_at = Compact_at.input m.compact_at text }, []
   | Compact_at_commit -> commit_compact_at m
+  | Memory_filter text ->
+    { m with memory = Memory_notes.set_filter m.memory text }, []
+  | Memory_edit id ->
+    ( { m with memory = Memory_notes.edit m.memory id }
+    , [ Command.Focus "memory-text" ] )
+  | Memory_title text ->
+    { m with memory = Memory_notes.set_title m.memory text }, []
+  | Memory_text text ->
+    { m with memory = Memory_notes.set_text m.memory text }, []
+  | Memory_save -> save_memory m
+  | Memory_cancel -> { m with memory = Memory_notes.cancel m.memory }, []
+  | Memory_forget id ->
+    ( { m with memory = Memory_notes.ask_forget m.memory id }
+    , [ Command.Focus "memory-forget-yes" ] )
+  | Memory_forget_confirm ->
+    (match Memory_notes.forget m.memory with
+     | memory, Some request ->
+       { m with memory }, [ call request ~tag:Memory_forgot ]
+     | memory, None -> { m with memory }, [])
+  | Memory_forget_cancel ->
+    { m with memory = Memory_notes.cancel_forget m.memory }, []
   | Open_rename -> open_rename m
   | Open_subagents arg -> open_agents m arg
   | Toggle_subagents ->
@@ -9576,6 +9831,12 @@ let update_connected (m : Model.t) (action : Action.t) =
      | Some (Pr_create _), Some { target = Pr; _ }
      | Some (New_worktree _), Some { target = Worktree_branch; _ }
      | Some (Rename _), Some { target = Session_title; _ } -> stop_generate m
+     (* Esc leaves the note being written, or the deletion asked about,
+        before the page. *)
+     | Some Settings, _ when Option.is_some m.memory.draft ->
+       { m with memory = Memory_notes.cancel m.memory }, []
+     | Some Settings, _ when Option.is_some m.memory.forgetting ->
+       { m with memory = Memory_notes.cancel_forget m.memory }, []
      | _ ->
        (match m.dialog with
         | Some (Login { failed = None; provider; _ }) ->

@@ -515,6 +515,35 @@ model: under .sidebar, .scrim
 host: under .sidebar, .scrim
 === chromium: phone: a chip's menu ===
 attach's menu: a sheet across the bottom; focus in it: true
+=== chromium: pinned ===
+Pinned
+1
+one more
+<AGE>
+cwd
+main
+Recent
+2
+count some lines
+<AGE>
+cwd
+main
+hello again
+<AGE>
+<CWD>
+pin: Pinned
+=== chromium: unpinned ===
+one more
+<AGE>
+cwd
+main
+count some lines
+<AGE>
+cwd
+main
+hello again
+<AGE>
+<CWD>
 === chromium: archived, folded ===
 one more
 <AGE>
@@ -732,6 +761,7 @@ Settings
 Appearance
 Sessions
 Models
+Memory
 Git hosting
 T
 token
@@ -951,6 +981,7 @@ I am bob
 Appearance
 Sessions
 Models
+Memory
 Git hosting
 B
 bob
@@ -1224,6 +1255,7 @@ Open in file browser  /files
 Open terminal there  /terminal
 Copy path
 Copy session id
+Pin to top  P
 Archive  A
 Delete…  Delete
 === chromium: worktrees: the new worktree dialog ===
@@ -1269,6 +1301,7 @@ Open in file browser  /files
 Open terminal there  /terminal
 Copy path
 Copy session id
+Pin to top  P
 Archive  A
 Delete…  Delete
 === chromium: worktrees: Esc changed nothing ===
@@ -1295,6 +1328,7 @@ Open in file browser  /files
 Open terminal there  /terminal
 Copy path
 Copy session id
+Pin to top  P
 Archive  A
 Delete…  Delete
 === chromium: worktrees: switched back ===
@@ -2101,6 +2135,9 @@ the page behind is inert: true
 Esc closed the drawer, the review open: true
 === chromium: review: phone ===
 sheet: fixed
+code: most of the screen
+files open: 3 files, code hidden
+picking a file shows its code
 Alt+R closed it
 === chromium: review: errors ===
 none
@@ -2249,6 +2286,41 @@ exit 2
 prigh browser-signin: signing in: sign in through the browser: open
 (Over SSH, forward the port to the browser's computer first: ssh -L <PORT>:127.0.0.1:<PORT> ...) Waiting for the sign-in...
 prigh browser-signin: the sign-in was cancelled in the browser
+=== chromium: cli_signin: desktop: paste mode: the program ===
+prigh browser-signin: signing in: sign in through the browser: open
+(Over SSH, forward the port to the browser's computer first: ssh -L <PORT>:127.0.0.1:<PORT> ...)
+Or paste the code the page shows after Allow:
+http://127.0.0.1:<PORT>/#cli-signin=<PORT>.<STATE>&program=tui&paste=<KEY>&from=<HOST>
+=== chromium: cli_signin: desktop: paste mode: asked ===
+prigh
+sign-in
+Allow prigh-tui to connect?
+prigh-tui on <HOST> wants to connect to 127.0.0.1:<PORT> with this page's sign-in.
+It gets this browser's sign-in to the site and your prigh sign-in. Allow it only if you just started it.
+Allow
+Cancel
+=== chromium: cli_signin: desktop: paste mode: the code ===
+prigh
+sign-in
+Paste this into the terminal on <HOST>
+prigh-tui asked for it. The code works once, only for this sign-in.
+prigh1:<CODE>
+Copy
+Send to the forwarded port
+Copy: 44px+, on screen
+Send to the forwarded port: 44px+, on screen
+overflows sideways: false
+=== chromium: cli_signin: desktop: paste mode: copied ===
+Copied: paste it into the terminal and press Enter.
+=== chromium: cli_signin: desktop: paste mode: the program signed in ===
+exit 0
+prigh browser-signin: signing in: sign in through the browser: open
+(Over SSH, forward the port to the browser's computer first: ssh -L <PORT>:127.0.0.1:<PORT> ...)
+Or paste the code the page shows after Allow:
+prigh browser-signin: that code is not for this sign-in (from an earlier one, or changed on the way): paste the code the page shows for this link, or open the link again. Paste the code:
+prigh browser-signin: signed in; saved for ws://127.0.0.1:<PORT>/ws in $DIR/laptop-home/.prigh/tui-connection.sexp
+=== chromium: cli_signin: paste mode: this browser seals the recorded vector ===
+same
 === chromium: cli_signin: phone: the program ===
 http://127.0.0.1:<PORT>/#cli-signin=<PORT>.<STATE>&program=tool-host
 === chromium: cli_signin: phone: asked ===
@@ -2288,6 +2360,43 @@ exit 2
 prigh browser-signin: signing in: sign in through the browser: open
 (Over SSH, forward the port to the browser's computer first: ssh -L <PORT>:127.0.0.1:<PORT> ...) Waiting for the sign-in...
 prigh browser-signin: the sign-in was cancelled in the browser
+=== chromium: cli_signin: phone: paste mode: the program ===
+prigh browser-signin: signing in: sign in through the browser: open
+(Over SSH, forward the port to the browser's computer first: ssh -L <PORT>:127.0.0.1:<PORT> ...)
+Or paste the code the page shows after Allow:
+http://127.0.0.1:<PORT>/#cli-signin=<PORT>.<STATE>&program=tui&paste=<KEY>&from=<HOST>
+=== chromium: cli_signin: phone: paste mode: asked ===
+prigh
+sign-in
+Allow prigh-tui to connect?
+prigh-tui on <HOST> wants to connect to 127.0.0.1:<PORT> with this page's sign-in.
+It gets this browser's sign-in to the site and your prigh sign-in. Allow it only if you just started it.
+Allow
+Cancel
+=== chromium: cli_signin: phone: paste mode: the code ===
+prigh
+sign-in
+Paste this into the terminal on <HOST>
+prigh-tui asked for it. The code works once, only for this sign-in.
+prigh1:<CODE>
+Copy
+Send to the forwarded port
+Copy: 44px+, on screen
+Send to the forwarded port: 44px+, on screen
+overflows sideways: false
+=== chromium: cli_signin: small phone: paste mode: the code ===
+Copy: 44px+, on screen
+Send to the forwarded port: 44px+, on screen
+overflows sideways: false
+=== chromium: cli_signin: phone: paste mode: copied ===
+Copied: paste it into the terminal and press Enter.
+=== chromium: cli_signin: phone: paste mode: the program signed in ===
+exit 0
+prigh browser-signin: signing in: sign in through the browser: open
+(Over SSH, forward the port to the browser's computer first: ssh -L <PORT>:127.0.0.1:<PORT> ...)
+Or paste the code the page shows after Allow:
+prigh browser-signin: that code is not for this sign-in (from an earlier one, or changed on the way): paste the code the page shows for this link, or open the link again. Paste the code:
+prigh browser-signin: signed in; saved for ws://127.0.0.1:<PORT>/ws in $DIR/laptop-home/.prigh/tui-connection.sexp
 === chromium: cli_signin: through the proxy ===
 upgrade /ws
 POST /cli-signin/grant
@@ -2646,6 +2755,49 @@ note inside the screen: true; Show all clickable; button inside: true
 after Show all: user 2, replies 3, thinking 1, tools 1, subagents 1, stopped 1
 === chromium: filter: errors ===
 none
+=== chromium: search: a title and a reply ===
+-- Pinned 2 --
+📌 [Port] the tmux tests
+📌 Deploy checklist
+    That the [port] stays configurable, and the certificates are fresh.
+-- Recent 1 --
+where does the server listen?
+    …can make the listen [port] configurable through the config file: add a `[port]` key.
+=== chromium: search: the messages, once typing pauses ===
+-- Pinned 1 --
+📌 Deploy checklist
+    That the [port] stays [configurable], and the certificates are fresh.
+-- Recent 1 --
+where does the server listen?
+    …can make the listen [port] [configurable] through the config file: add a `[port]` key.
+=== chromium: search: nothing matches ===
+No sessions match “zebra quokka”. Search looks in titles and messages.
+=== chromium: search: Esc clears the search ===
+query: ""; rows: 4
+=== chromium: search: 390x844 ===
+once the session is in, the search box: "configurable port"
+-- Pinned 1 --
+📌 Deploy checklist
+    That the [port] stays [configurable], and the certificates are fresh.
+-- Recent 1 --
+where does the server listen?
+    …can make the listen [port] [configurable] through the config file: add a `[port]` key.
+page overflows sideways: false
+sidebar overflows sideways: false
+snippets inside the screen: true
+=== chromium: search: 320x640 ===
+once the session is in, the search box: "configurable port"
+-- Pinned 1 --
+📌 Deploy checklist
+    That the [port] stays [configurable], and the certificates are fresh.
+-- Recent 1 --
+where does the server listen?
+    …can make the listen [port] [configurable] through the config file: add a `[port]` key.
+page overflows sideways: false
+sidebar overflows sideways: false
+snippets inside the screen: true
+=== chromium: search: errors ===
+none
 === chromium: viewer: desktop: fit ===
 thumbnails: 3, named: View [image: image/png, 4.1 KB]
 focused: Close
@@ -2905,7 +3057,7 @@ Jump to a message, Filter the transcript, Files, Terminal, Settings
 === chromium: mobile: 390x844: the settings' list ===
 ok
 === chromium: mobile: 390x844: the settings ===
-Appearance, Sessions, Models, Git hosting, Account
+Appearance, Sessions, Models, Memory, Git hosting, Account
 === chromium: mobile: 390x844: settings: appearance ===
 ok
 title: Appearance; back: Settings
@@ -2939,7 +3091,7 @@ Jump to a message, Filter the transcript, Files, Terminal, Settings
 === chromium: mobile: 320x640: the settings' list ===
 ok
 === chromium: mobile: 320x640: the settings ===
-Appearance, Sessions, Models, Git hosting, Account
+Appearance, Sessions, Models, Memory, Git hosting, Account
 === chromium: mobile: 320x640: settings: appearance ===
 ok
 title: Appearance; back: Settings
@@ -2973,7 +3125,7 @@ Jump to a message, Filter the transcript, Files, Terminal, Settings
 === chromium: mobile: 390x844-pwa: the settings' list ===
 ok
 === chromium: mobile: 390x844-pwa: the settings ===
-Appearance, Sessions, Models, Git hosting, Account
+Appearance, Sessions, Models, Memory, Git hosting, Account
 === chromium: mobile: 390x844-pwa: settings: appearance ===
 ok
 title: Appearance; back: Settings
@@ -2994,6 +3146,74 @@ ok
 ok
 === chromium: mobile: 390x844-pwa: the keyboard ===
 the composer in view: true
+=== chromium: terminal keys: a desktop ===
+the shell has the focus: true; the bar: hidden
+=== chromium: terminal keys: 390x844: the keyboard up ===
+the bar: full width: true; at the visual viewport's foot: true; scrolls sideways: true
+keys: Esc Tab Ctrl Alt ← ↑ ↓ → | ~ / - Home End PgUp PgDn
+=== chromium: terminal keys: 390x844: ↑ recalls the last command ===
+the line: $ echo first-command; the shell kept the focus: true
+=== chromium: terminal keys: 390x844: Tab completes ===
+the line: $ cat uniquely-named-notes.txt
+=== chromium: terminal keys: 390x844: Ctrl then c interrupts sleep ===
+Ctrl after a tap: aria-pressed=true latched
+interrupted: the prompt is back; Ctrl after the key: aria-pressed=false off
+a plain c again: true
+=== chromium: terminal keys: 390x844: a double tap locks Ctrl ===
+Ctrl: aria-pressed=true locked
+tapped again: aria-pressed=false off
+=== chromium: terminal keys: 390x844: the cursor keys' mode, an arrow held ===
+application mode: ↑ sends ^[OA, ← held repeats: true
+normal mode: ↑ Home PgUp send ^[[A ^[[H ^[[5~
+=== chromium: terminal keys: 390x844: the bar scrolled to its end ===
+the bar: full width: true; at the visual viewport's foot: true; scrolls sideways: true
+the shell has the focus: true
+=== chromium: terminal keys: 390x844: the shell without the focus ===
+the bar: hidden
+=== chromium: terminal keys: 320x640: the keyboard up ===
+the bar: full width: true; at the visual viewport's foot: true; scrolls sideways: true
+keys: Esc Tab Ctrl Alt ← ↑ ↓ → | ~ / - Home End PgUp PgDn
+=== chromium: terminal keys: 320x640: ↑ recalls the last command ===
+the line: $ echo first-command; the shell kept the focus: true
+=== chromium: terminal keys: 320x640: Tab completes ===
+the line: $ cat uniquely-named-notes.txt
+=== chromium: terminal keys: 320x640: Ctrl then c interrupts sleep ===
+Ctrl after a tap: aria-pressed=true latched
+interrupted: the prompt is back; Ctrl after the key: aria-pressed=false off
+a plain c again: true
+=== chromium: terminal keys: 320x640: a double tap locks Ctrl ===
+Ctrl: aria-pressed=true locked
+tapped again: aria-pressed=false off
+=== chromium: terminal keys: 320x640: the cursor keys' mode, an arrow held ===
+application mode: ↑ sends ^[OA, ← held repeats: true
+normal mode: ↑ Home PgUp send ^[[A ^[[H ^[[5~
+=== chromium: terminal keys: 320x640: the bar scrolled to its end ===
+the bar: full width: true; at the visual viewport's foot: true; scrolls sideways: true
+the shell has the focus: true
+=== chromium: terminal keys: 320x640: the shell without the focus ===
+the bar: hidden
+=== chromium: terminal keys: 390x844-pwa: the keyboard up ===
+the bar: full width: true; at the visual viewport's foot: true; scrolls sideways: true
+keys: Esc Tab Ctrl Alt ← ↑ ↓ → | ~ / - Home End PgUp PgDn
+=== chromium: terminal keys: 390x844-pwa: ↑ recalls the last command ===
+the line: $ echo first-command; the shell kept the focus: true
+=== chromium: terminal keys: 390x844-pwa: Tab completes ===
+the line: $ cat uniquely-named-notes.txt
+=== chromium: terminal keys: 390x844-pwa: Ctrl then c interrupts sleep ===
+Ctrl after a tap: aria-pressed=true latched
+interrupted: the prompt is back; Ctrl after the key: aria-pressed=false off
+a plain c again: true
+=== chromium: terminal keys: 390x844-pwa: a double tap locks Ctrl ===
+Ctrl: aria-pressed=true locked
+tapped again: aria-pressed=false off
+=== chromium: terminal keys: 390x844-pwa: the cursor keys' mode, an arrow held ===
+application mode: ↑ sends ^[OA, ← held repeats: true
+normal mode: ↑ Home PgUp send ^[[A ^[[H ^[[5~
+=== chromium: terminal keys: 390x844-pwa: the bar scrolled to its end ===
+the bar: full width: true; at the visual viewport's foot: true; scrolls sideways: true
+the shell has the focus: true
+=== chromium: terminal keys: 390x844-pwa: the shell without the focus ===
+the bar: hidden
 === chromium: long press: held on your message ===
 menu: copy_message, select_text, trim_before, trim_after, delete; a sheet at the bottom: true
 the release clicked nothing: true
@@ -3022,7 +3242,7 @@ no menu
 === chromium: long press: Delete ===
 your messages: make the port configurable
 === chromium: long press: a session in the drawer ===
-menu: open_window, rename, fork, new_worktree, review, files, terminal, copy_path, copy_id, archive, delete; a sheet at the bottom: true
+menu: open_window, rename, fork, new_worktree, review, files, terminal, copy_path, copy_id, pin, archive, delete; a sheet at the bottom: true
 === chromium: long press: a worktree in the drawer ===
 menu: switch_here, new_session_here, review, files, terminal, create_pr, copy_path, remove; a sheet at the bottom: true
 === chromium: long press: a file of the review ===
@@ -3136,6 +3356,67 @@ compact_at_tokens=0 compaction_model=null mask_observations=false
 === chromium: compaction: phone ===
 fits: true
 === chromium: compaction: errors ===
+(none)
+=== chromium: memory: notes ===
+Memory
+What you asked the model to remember, for later sessions. Kept on the backend, for your account.
+Use memory
+The model saves a note only when you ask it to remember something, and looks one up when you refer back to it. Off, it is not given the memory tool, and your notes stay here.
+NOTES
+3 notes
+Add note
+shell
+fish
+Saved 2025-10-03
+Deploys go through the staging cluster first, then production on Tuesdays
+Saved 2025-10-02
+editor
+helix, with the default keymap
+Saved 2025-10-01
+switch: true
+=== chromium: memory: filtered ===
+Deploys go through the staging cluster first, then production on Tuesdays | Saved 2025-10-02
+settings still open: 1
+=== chromium: memory: edited and added ===
+m1 editor: neovim, with lazy.nvim; m2 -: Deploys go through the staging cluster first, then production on Tuesdays; m3 shell: fish; m4 pager: less -R
+=== chromium: memory: deleting ===
+shell | fish | Delete this note? The model can no longer recall it. | Keep | Delete
+m1 editor: neovim, with lazy.nvim; m2 -: Deploys go through the staging cluster first, then production on Tuesdays; m4 pager: less -R
+=== chromium: memory: off ===
+Memory
+What you asked the model to remember, for later sessions. Kept on the backend, for your account.
+Use memory
+The model saves a note only when you ask it to remember something, and looks one up when you refer back to it. Off, it is not given the memory tool, and your notes stay here.
+NOTES
+3 notes
+Add note
+pager
+less -R
+Saved (today)
+editor
+neovim, with lazy.nvim
+Saved (today)
+Deploys go through the staging cluster first, then production on Tuesdays
+Saved 2025-10-02
+switch: false
+prefs: memory.enabled=false
+after /memory on: prefs memory.enabled=null
+=== chromium: memory: phone 390x844 ===
+fits: yes; targets: all ok
+deleting fits: yes; targets: all ok
+editing fits: yes; targets: all ok
+back: Memory | What you asked the model to remember, for later sessions. Kept on the backend, for your account.
+=== chromium: memory: phone 320x640 ===
+fits: yes; targets: all ok
+deleting fits: yes; targets: all ok
+editing fits: yes; targets: all ok
+back: Memory | What you asked the model to remember, for later sessions. Kept on the backend, for your account.
+=== chromium: memory: phone 390x844-pwa ===
+fits: yes; targets: all ok
+deleting fits: yes; targets: all ok
+editing fits: yes; targets: all ok
+back: Memory | What you asked the model to remember, for later sessions. Kept on the backend, for your account.
+=== chromium: memory: errors ===
 (none)
 === chromium: images (desktop): refused as too large: the error card ===
 The model returned an error

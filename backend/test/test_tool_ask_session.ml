@@ -29,6 +29,7 @@ module World = struct
         ; destructive = Never
         ; on_host = false
         ; freeform = None
+        ; native = None
         }
     ; run =
         (fun context _ ->

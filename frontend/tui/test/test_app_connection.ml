@@ -1150,6 +1150,182 @@ let%expect_test "the browser sign-in declined, or failing" =
     |}]
 ;;
 
+let%expect_test "over SSH: the code the page shows, pasted into the dialog" =
+  let h = H.create ~width:80 ~height:10 () in
+  H.step h (Server_link (remote ~user:None "https://ai.example.com/"));
+  H.step h (Signin_required proxy_login);
+  H.step h Start;
+  H.keys h "y";
+  [%expect
+    {|
+    Load_history
+    (Relink
+      (generation 1)
+      (change     Browser_signin))
+    |}];
+  (* The platform's sign-in takes a pasted code: the dialog asks for it. *)
+  H.step h (Signin_code_prompt Wanted);
+  H.show h;
+  H.mode h;
+  [%expect
+    {|
+    ┌─ Paste the code the page shows after Allow ──────────────────────────────────┐
+    └──────────────────────────────────────────────────────────────────────────────┘
+    ────────────────── signing in through the browser: follow the link it opens… ───
+    ? ▏
+    Enter sends the code · Esc cancels the sign-in
+    text_prompt
+    |}];
+  (* Enter with nothing pasted keeps asking. *)
+  H.enter h;
+  H.mode h;
+  [%expect {| text_prompt |}];
+  H.step h (Intent (Paste "prigh1:stale"));
+  H.show h;
+  [%expect
+    {|
+    ┌─ Paste the code the page shows after Allow ──────────────────────────────────┐
+    └──────────────────────────────────────────────────────────────────────────────┘
+    ────────────────────────────────────────────────────────────────────────────────
+    ? prigh1:stale▏
+    Enter sends the code · Esc cancels the sign-in
+    |}];
+  H.enter h;
+  H.show h;
+  [%expect
+    {|
+    (Signin_code (prigh1:stale))
+
+
+
+
+
+
+
+    ───────────────────────────────────────────────────────── checking the code… ───
+    > ▏
+    connecting…
+    |}];
+  (* It does not open: why, and the dialog again. *)
+  H.step
+    h
+    (Signin_code_prompt
+       (Refused
+          "that code is not for this sign-in (from an earlier one, or changed \
+           on the way): paste the code the page shows for this link, or open \
+           the link again"));
+  H.show h;
+  [%expect
+    {|
+    ┌─ Warning ────────────────────────────────────────────────────────────────────┐
+    │ that code is not for this sign-in (from an earlier one, or changed on the    │
+    │ way): paste the code the page shows for this link, or open the link again    │
+    └────────────────────────────────────────────────────────────── Esc dismisses ─┘
+    ┌─ Paste the code the page shows after Allow ──────────────────────────────────┐
+    └──────────────────────────────────────────────────────────────────────────────┘
+    ────────────────────────────────────────────────────────────────────────────────
+    ? ▏
+    Enter sends the code · Esc cancels the sign-in
+    |}];
+  H.step h (Intent (Paste "prigh1:good"));
+  H.enter h;
+  relinked
+    h
+    ~link:(remote ~user:None "https://ai.example.com/")
+    (Connected (hello {|{"client_id":"c2"}|}));
+  H.mode h;
+  connection h;
+  [%expect
+    {|
+    (Signin_code (prigh1:good))
+    (Rpc (method_ get_state) (params ()) (tag Initial_state))
+    (Rpc (method_ get_messages) (params ()) (tag Initial_messages))
+    (Rpc (method_ auth_status) (params ()) (tag Auth_refresh))
+    (Rpc (method_ forge_status) (params ()) (tag Forge_refresh))
+    (Rpc (method_ get_config) (params ()) (tag Config))
+    (Rpc (method_ list_models) (params ()) (tag Models_catalog))
+    (Rpc (method_ get_pending) (params ()) (tag Pending))
+    editing
+    Connected
+    |}]
+;;
+
+let%expect_test
+    "over SSH: Esc cancels the sign-in; a forwarded port closes the dialog"
+  =
+  let h = H.create ~width:80 ~height:10 () in
+  H.step h (Server_link (remote ~user:None "https://ai.example.com/"));
+  H.step h (Signin_required proxy_login);
+  H.step h Start;
+  H.keys h "y";
+  H.step h (Signin_code_prompt Wanted);
+  H.keys h "prigh1:half";
+  H.esc h;
+  H.show h;
+  [%expect
+    {|
+    Load_history
+    (Relink
+      (generation 1)
+      (change     Browser_signin))
+    (Signin_code ())
+
+
+
+
+
+
+
+    ──────────────────────────────────────────────────── cancelling the sign-in… ───
+    > ▏
+    connecting…
+    |}];
+  relinked
+    h
+    ~link:(remote ~user:None "https://ai.example.com/")
+    (Signin_required "not signed in through the browser: cancelled");
+  H.mode h;
+  [%expect {| confirm |}];
+  (* Signed in through the forwarded port instead: the dialog goes. *)
+  H.keys h "y";
+  H.step h (Signin_code_prompt Wanted);
+  relinked
+    h
+    ~generation:2
+    ~link:(remote ~user:None "https://ai.example.com/")
+    (Connected (hello {|{"client_id":"c2"}|}));
+  H.mode h;
+  H.show h;
+  [%expect
+    {|
+    (Relink
+      (generation 2)
+      (change     Browser_signin))
+    (Rpc (method_ get_state) (params ()) (tag Initial_state))
+    (Rpc (method_ get_messages) (params ()) (tag Initial_messages))
+    (Rpc (method_ auth_status) (params ()) (tag Auth_refresh))
+    (Rpc (method_ forge_status) (params ()) (tag Forge_refresh))
+    (Rpc (method_ get_config) (params ()) (tag Config))
+    (Rpc (method_ list_models) (params ()) (tag Models_catalog))
+    (Rpc (method_ get_pending) (params ()) (tag Pending))
+    editing
+
+
+
+
+
+
+
+    ────────────────────────────────────────── connected to wss://ai.example.com ───
+    > ▏
+    connecting…
+    |}];
+  (* A late prompt, with nothing under way, opens nothing. *)
+  H.step h (Signin_code_prompt Wanted);
+  H.mode h;
+  [%expect {| editing |}]
+;;
+
 let%expect_test "the proxy's cookie expires: a reconnect asks, no more retries" =
   let h = on (remote "https://ai.example.com/") in
   H.step ~quiet:true h Backend_closed;

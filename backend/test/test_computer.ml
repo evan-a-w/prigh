@@ -290,6 +290,139 @@ let%expect_test "a host without computer use says how to turn it on" =
     {| error: computer use is off on this tool host: start it with -computer (prigh tool-host -computer, prigh desktop -computer, or programs.prigh.desktop .computerUse in Home Manager) |}]
 ;;
 
+(* A real helper process ($PRIGH_COMPUTER): a script that says it is ready,
+   then never replies (it hangs), running [on_term] on SIGTERM and logging
+   it. [f] gets [spawn] (it prints the ready line) and [ended], which prints
+   how the helper ended, once it has, and the log when [log_shown] (one
+   that ignores SIGTERM may be killed before it writes it). *)
+let with_script_helper ~on_term f =
+  with_sandbox
+  @@ fun t ->
+  let script = Filename.concat t.dir "helper" in
+  let log = Filename.concat t.dir "log" in
+  Out_channel.write_all
+    script
+    ~data:
+      (sprintf
+         "#!/bin/sh\n\
+          trap 'echo SIGTERM >>%s; %s' TERM\n\
+          mkfifo %s/hold\n\
+          exec 3<>%s/hold\n\
+          echo '{\"ready\":true}'\n\
+          while :; do read -r line <&3; done\n"
+         log
+         on_term
+         t.dir
+         t.dir);
+  Core_unix.chmod script ~perm:0o755;
+  Core_unix.putenv ~key:"PRIGH_COMPUTER" ~data:script;
+  Exn.protect
+    ~finally:(fun () -> Core_unix.unsetenv "PRIGH_COMPUTER")
+    ~f:(fun () ->
+      let exited, set_exited = Eio.Promise.create () in
+      let spawn ~grace ~sw =
+        let transport =
+          Computer_helper.spawn
+            ~grace
+            ~on_exit:(Eio.Promise.resolve set_exited)
+            ~env:t.env
+            ~sw
+            ()
+        in
+        printf "helper: %s\n" (Option.value_exn (transport.receive ()));
+        transport
+      in
+      let ended ~log_shown =
+        (match Eio.Promise.await exited with
+         | `Exited n -> printf "helper exited %d\n" n
+         | `Signaled n ->
+           printf
+             "helper killed by %s\n"
+             (Signal.to_string (Signal.of_caml_int n)));
+        if log_shown then printf "log: %s" (In_channel.read_all log)
+      in
+      f ~spawn ~exited:(fun () -> Eio.Promise.is_resolved exited) ~ended)
+;;
+
+(* A call whose helper hangs, cancelled once its request is sent. *)
+let cancel_hung_call ~on_term ~grace =
+  with_script_helper ~on_term
+  @@ fun ~spawn ~exited ~ended ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let cancel = Cancellation.create () in
+  let helper =
+    Computer_helper.create
+      (Computer_fake.info (Computer_fake.create ()))
+      ~start:(fun () ->
+        let transport = spawn ~grace ~sw in
+        { transport with
+          send =
+            (fun line ->
+              transport.send line;
+              Cancellation.cancel cancel)
+        })
+  in
+  show_result
+    (Computer_helper.run
+       helper
+       ~cancel
+       (Json.of_string {|{"action":"hold_key","combo":"shift","duration":5}|}));
+  printf "helper exited before the call returned: %b\n" (exited ());
+  ended ~log_shown:(String.equal on_term "exit 0")
+;;
+
+let%expect_test "cancelling: the call ends at once, the helper gets SIGTERM" =
+  cancel_hung_call ~on_term:"exit 0" ~grace:(Time_ns.Span.of_min 1.);
+  [%expect
+    {|
+    helper: {"ready":true}
+    error: [cancelled]
+    helper exited before the call returned: false
+    helper exited 0
+    log: SIGTERM
+    |}]
+;;
+
+let%expect_test
+    "cancelling: a helper that ignores SIGTERM is killed after the grace"
+  =
+  cancel_hung_call ~on_term:":" ~grace:(Time_ns.Span.of_ms 50.);
+  [%expect
+    {|
+    helper: {"ready":true}
+    error: [cancelled]
+    helper exited before the call returned: false
+    helper killed by sigkill
+    |}]
+;;
+
+let%expect_test "the tool host ending stops the helper as cancelling does" =
+  let shut_down ~on_term ~grace =
+    with_script_helper ~on_term
+    @@ fun ~spawn ~exited ~ended ->
+    Eio.Switch.run (fun sw ->
+      ignore (spawn ~grace ~sw : Computer_helper.Transport.t));
+    printf "helper exited when the switch ended: %b\n" (exited ());
+    ended ~log_shown:(String.equal on_term "exit 0")
+  in
+  shut_down ~on_term:"exit 0" ~grace:(Time_ns.Span.of_min 1.);
+  [%expect
+    {|
+    helper: {"ready":true}
+    helper exited when the switch ended: true
+    helper exited 0
+    log: SIGTERM
+    |}];
+  shut_down ~on_term:":" ~grace:(Time_ns.Span.of_ms 50.);
+  [%expect
+    {|
+    helper: {"ready":true}
+    helper exited when the switch ended: true
+    helper killed by sigkill
+    |}]
+;;
+
 (* An agent whose tools run on a tool host ([Host_ops.execute], as the
    host's worker does) whose screen is [fake] when [computer]. Prints each
    request (the tools offered when [show_tools]; the computer results the
@@ -429,7 +562,7 @@ let%expect_test "the tool is offered only while the host runs it" =
 ;;
 
 let%expect_test
-    "a sequence of actions: real coordinates, older screenshots omitted"
+    "a sequence of actions: real coordinates, every screenshot under the cap"
   =
   let call id args = Reply.tool_call ~id ~name:"computer" ~arguments:args () in
   with_agent
@@ -470,15 +603,15 @@ let%expect_test
       sees w4: wait 0.01s | waited | cursor at (640, 312)
     assistant:
     --- request
-      sees s1: screenshot | cursor at (640, 400) | screenshot 1280×800 | [screenshot omitted]
+      sees s1: screenshot | cursor at (640, 400) | screenshot 1280×800 <screenshot>
       sees c2: click (640, 312) → (1280, 624) on the screen | cursor at (640, 312) | screenshot 1280×800 <screenshot>
       sees t3: type “hello” | cursor at (640, 312) | screenshot 1280×800 <screenshot>
       sees w4: wait 0.01s | waited | cursor at (640, 312)
       sees k5: key Return | cursor at (640, 312) | screenshot 1280×800 <screenshot>
     assistant:
     --- request
-      sees s1: screenshot | cursor at (640, 400) | screenshot 1280×800 | [screenshot omitted]
-      sees c2: click (640, 312) → (1280, 624) on the screen | cursor at (640, 312) | screenshot 1280×800 | [screenshot omitted]
+      sees s1: screenshot | cursor at (640, 400) | screenshot 1280×800 <screenshot>
+      sees c2: click (640, 312) → (1280, 624) on the screen | cursor at (640, 312) | screenshot 1280×800 <screenshot>
       sees t3: type “hello” | cursor at (640, 312) | screenshot 1280×800 <screenshot>
       sees w4: wait 0.01s | waited | cursor at (640, 312)
       sees k5: key Return | cursor at (640, 312) | screenshot 1280×800 <screenshot>
@@ -525,5 +658,255 @@ let%expect_test "the user taking over stops the run" =
       sees s1: screenshot | cursor at (640, 400) | screenshot 1280×800 <screenshot>
       sees c2: [interrupted] you moved the mouse: stopped (computer use paused until the next prompt)
     assistant: never asked
+    |}]
+;;
+
+let%expect_test "screenshots are pruned in batches, keeping the prefix" =
+  let min = 3
+  and max = 8 in
+  print_endline "n  omitted  kept";
+  List.iter (List.range 0 20) ~f:(fun n ->
+    let omitted = Computer_screenshots.omitted ~min ~max n in
+    printf "%-2d %-8d %d\n" n omitted (n - omitted));
+  [%expect
+    {|
+    n  omitted  kept
+    0  0        0
+    1  0        1
+    2  0        2
+    3  0        3
+    4  0        4
+    5  0        5
+    6  0        6
+    7  0        7
+    8  0        8
+    9  6        3
+    10 6        4
+    11 6        5
+    12 6        6
+    13 6        7
+    14 6        8
+    15 12       3
+    16 12       4
+    17 12       5
+    18 12       6
+    19 12       7
+    |}]
+;;
+
+(* A computer-use loop: each step adds the model's reply (signed thinking
+   and a native toolset call, every fourth a wait, without a screenshot) and
+   its result. Each request, as prigh's messages, as Anthropic's and as
+   OpenAI's wire messages (cache breakpoints aside, which move with the
+   end), differs from the one before only from where it was cut, and only
+   on the steps that cut. *)
+let%expect_test "pruning keeps every request's prefix until the next cut" =
+  let min = 3
+  and max = 8 in
+  let image = { Image.mime_type = "image/png"; data = "AAAA" } in
+  let step i =
+    let id = sprintf "c%d" i in
+    let wait = i % 4 = 3 in
+    [ Message.Assistant
+        { content =
+            [ Content.thinking ~signature:(sprintf "sig%d" i) "look"
+            ; Tool_call
+                { id
+                ; name = "computer"
+                ; arguments =
+                    Computer_native.of_anthropic
+                      ~toolset:true
+                      ~name:(if wait then "wait" else "screenshot")
+                      (if wait
+                       then `Object [ "duration", `Number "1" ]
+                       else `Object [])
+                }
+            ]
+        ; stop_reason = Tool_use
+        ; usage = Usage.zero
+        ; model = "anthropic/claude-opus-5-5"
+        }
+    ; Tool_result
+        { tool_call_id = id
+        ; tool_name = "computer"
+        ; text = (if wait then "wait 1s" else "screenshot")
+        ; is_error = false
+        ; images = (if wait then [] else [ image ])
+        }
+    ]
+  in
+  let rec without_cache_control : Json.t -> Json.t = function
+    | `Object fields ->
+      `Object
+        (List.filter_map fields ~f:(fun (k, v) ->
+           Option.some_if
+             (not (String.equal k "cache_control"))
+             (k, without_cache_control v)))
+    | `Array l -> `Array (List.map l ~f:without_cache_control)
+    | j -> j
+  in
+  let wire_messages ~field body =
+    match body with
+    | `Object fields ->
+      (match List.Assoc.find fields field ~equal:String.equal with
+       | Some (`Array l) -> List.map l ~f:without_cache_control
+       | _ -> [])
+    | _ -> []
+  in
+  let first_changed previous current ~equal =
+    List.findi previous ~f:(fun i m ->
+      match List.nth current i with
+      | Some m' -> not (equal m m')
+      | None -> true)
+    |> Option.value_map ~default:"-" ~f:(fun (i, _) -> Int.to_string i)
+  in
+  let request model messages =
+    { Provider.Request.model = Or_error.ok_exn (Model.resolve model)
+    ; system = Some "sys"
+    ; messages
+    ; tools = [ Tool_bash.tool.spec ]
+    ; thinking = Thinking.On (Some High)
+    ; max_tokens = None
+    ; cache_key = None
+    }
+  in
+  let messages = ref [ Message.user "go" ] in
+  let previous = ref ([], [], []) in
+  print_endline
+    "first changed (-: only appended): prigh's messages, Anthropic's, OpenAI's";
+  print_endline
+    "step  images  thinking (dropped or kept)  prigh  anthropic  openai";
+  for i = 1 to 20 do
+    messages := !messages @ step i;
+    let sent =
+      Computer_screenshots.prune ~drop_stale_thinking:true ~min ~max !messages
+    in
+    let kept =
+      Computer_screenshots.prune ~drop_stale_thinking:false ~min ~max !messages
+    in
+    let count ?(sent = sent) f = List.sum (module Int) sent ~f in
+    let images =
+      count (function
+        | Tool_result r -> List.length r.images
+        | _ -> 0)
+    in
+    let thinking_in sent =
+      count ~sent (function
+        | Assistant a ->
+          List.count a.content ~f:(function
+            | Thinking _ -> true
+            | _ -> false)
+        | _ -> 0)
+    in
+    let thinking = thinking_in sent
+    and thinking_kept = thinking_in kept in
+    let anthropic =
+      wire_messages
+        ~field:"messages"
+        (Anthropic.For_testing.request_body
+           ~oauth:false
+           (request "anthropic/claude-opus-5-5" sent))
+    in
+    let openai =
+      wire_messages
+        ~field:"input"
+        (Openai_responses.For_testing.request_body
+           ~endpoint:(Openai { api_key = "k" })
+           (request "openai/gpt-6.1-sol" sent))
+    in
+    let prev_sent, prev_anthropic, prev_openai = !previous in
+    printf
+      "%-5d %-7d %-2d %-20d %-6s %-10s %s\n"
+      i
+      images
+      thinking
+      thinking_kept
+      (first_changed prev_sent sent ~equal:Message.equal)
+      (first_changed prev_anthropic anthropic ~equal:Json.exactly_equal)
+      (first_changed prev_openai openai ~equal:Json.exactly_equal);
+    previous := sent, anthropic, openai
+  done;
+  [%expect
+    {|
+    first changed (-: only appended): prigh's messages, Anthropic's, OpenAI's
+    step  images  thinking (dropped or kept)  prigh  anthropic  openai
+    1     1       1  1                    -      -          -
+    2     2       2  2                    -      -          -
+    3     2       3  3                    -      -          -
+    4     3       4  4                    -      -          -
+    5     4       5  5                    -      -          -
+    6     5       6  6                    -      -          -
+    7     5       7  7                    -      -          -
+    8     6       8  8                    -      -          -
+    9     7       9  9                    -      -          -
+    10    8       10 10                   -      -          -
+    11    8       11 11                   -      -          -
+    12    3       1  12                   2      2          2
+    13    4       2  13                   -      -          -
+    14    5       3  14                   -      -          -
+    15    5       4  15                   -      -          -
+    16    6       5  16                   -      -          -
+    17    7       6  17                   -      -          -
+    18    8       7  18                   -      -          -
+    19    8       8  19                   -      -          -
+    20    3       1  20                   18     18         18
+    |}]
+;;
+
+let%expect_test
+    "native calls run on the host; a batch stops at the first failed action"
+  =
+  let toolset name input =
+    Computer_native.of_anthropic
+      ~toolset:true
+      ~name
+      (Or_error.ok_exn (Json.parse input))
+  in
+  with_agent
+    [ Reply.tool_calls
+        [ "a1", "computer", toolset "left_click" {|{"coordinate":[640,312]}|}
+        ; "a2", "computer", {|{"action":"bogus"}|}
+        ; "a3", "computer", toolset "type" {|{"text":"never"}|}
+        ]
+    ; Reply.tool_call
+        ~id:"o1"
+        ~name:"computer"
+        ~arguments:
+          (Computer_native.of_openai
+             ~item_id:"cu_1"
+             ~safety_checks:
+               [ Or_error.ok_exn
+                   (Json.parse
+                      {|{"id":"sc_1","code":"malicious_instructions","message":"Careful"}|})
+               ]
+             (Or_error.ok_exn (Json.parse {|{"type":"type","text":"ok"}|})))
+        ()
+    ; Reply.text "done"
+    ]
+  @@ fun ~set_computer:_ fake agent ->
+  Or_error.ok_exn (Agent.prompt agent "do it");
+  Agent.wait_idle agent;
+  print_endline "--- input on the screen";
+  List.iter (Computer_fake.log fake) ~f:print_endline;
+  [%expect
+    {|
+    notice: tools now run on desk in $DIR
+    --- request
+    assistant:
+    --- request
+      sees a1: click (640, 312) → (1280, 624) on the screen | cursor at (640, 312) | screenshot 1280×800 <screenshot>
+      sees a2: unknown action "bogus": use one of screenshot, click, move, drag, mouse_down, mouse_up, scroll, type, key, hold_key, wait, zoom, cursor_position
+      sees a3: Not executed: an earlier computer action in this turn failed.
+    assistant:
+    --- request
+      sees a1: click (640, 312) → (1280, 624) on the screen | cursor at (640, 312) | screenshot 1280×800 <screenshot>
+      sees a2: unknown action "bogus": use one of screenshot, click, move, drag, mouse_down, mouse_up, scroll, type, key, hold_key, wait, zoom, cursor_position
+      sees a3: Not executed: an earlier computer action in this turn failed.
+      sees o1: OpenAI safety checks acknowledged: malicious_instructions: Careful | type “ok” | cursor at (640, 312) | screenshot 1280×800 <screenshot>
+    assistant: done
+    --- input on the screen
+    move 1280,624
+    click left×1
+    type ok
     |}]
 ;;

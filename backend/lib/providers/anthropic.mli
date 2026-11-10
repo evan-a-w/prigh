@@ -34,11 +34,20 @@ val create
 
 module For_testing : sig
   val request_body : oauth:bool -> Provider.Request.t -> Json.t
-  val headers : auth:Auth.t -> thinking_on:bool -> (string * string) list
+
+  val headers
+    :  ?betas:string list
+    -> auth:Auth.t
+    -> thinking_on:bool
+    -> unit
+    -> (string * string) list
+
+  val native_computer : Provider.Request.t -> Native_computer.t option
   val thinking_on : Model.t -> Thinking.t -> bool
 
   val parse_events
-    :  tools:Tool_spec.t list
+    :  ?computer:Native_computer.t
+    -> tools:Tool_spec.t list
     -> string list
     -> Assistant_event.t list
        * [ `Stop_reason of string option ]

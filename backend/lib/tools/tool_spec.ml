@@ -25,6 +25,18 @@ module Destructive = struct
   ;;
 end
 
+module Native = struct
+  type t =
+    | Computer of
+        { width : int
+        ; height : int
+        }
+    (** the [computer] tool, whose screenshots are [width] x [height]:
+        providers whose model has a built-in computer-use tool
+        ([Model.native_computer]) offer that instead of the schema *)
+  [@@deriving sexp_of, equal]
+end
+
 type t =
   { name : string
   ; description : string
@@ -40,5 +52,7 @@ type t =
         the model write the input as free text matching it rather than JSON.
         Such tools take one string parameter, [input], which is how the
         text reaches [run] and how other providers send it. *)
+  ; native : Native.t option [@sexp.option]
+    (** a provider-defined form the tool may be offered in instead *)
   }
 [@@deriving sexp_of]

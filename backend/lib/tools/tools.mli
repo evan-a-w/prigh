@@ -38,7 +38,7 @@ val unavailable : depth:int -> string -> string option
 (** The tools available to an agent at [depth]: the parent's [parent] tools,
     restricted to [only] if given. The [subagent] tool (and
     [subagent_continue]) is dropped at depth 2 and beyond so that delegation
-    cannot recurse further, and the subagent controls ([subagent_status], ...), {!interaction} and [goal_complete] at
+    cannot recurse further, and the subagent controls ([subagent_status], ...), {!interaction}, [goal_complete] and [memory] at
     depth 1 and beyond, where subagents run synchronously and nobody can be
     asked. There [bash] is {!Tool_bash.subagent_tool}: never moved to the
     background by itself. *)

@@ -194,6 +194,7 @@ type t =
   ; sw : Switch.t
   ; provider : Provider.t
   ; tools : Tool.t list
+  ; offered : Tool.t -> bool
   ; sessions_dir : string
   ; home : string
   ; models : Model_registry.t
@@ -354,9 +355,11 @@ let active_computer t =
 
 (* The built-in tools, with [computer] while the active host runs it. *)
 let own_tools t =
-  if Option.is_some (active_computer t)
-  then t.tools @ [ Tool_computer.tool ]
-  else t.tools
+  let tools = List.filter t.tools ~f:t.offered in
+  match active_computer t with
+  | Some info ->
+    tools @ [ Tool_computer.for_screen ~native:t.config.computer_native info ]
+  | None -> tools
 ;;
 
 let find_branch t ~cwd =
@@ -1974,6 +1977,7 @@ let compaction_settings t =
         Result.ok (Model_registry.resolve t.models name))
   ; mask_observations = t.config.mask_observations
   ; computer_screenshots = t.config.computer_screenshots
+  ; computer_screenshots_max = t.config.computer_screenshots_max
   }
 ;;
 
@@ -2986,6 +2990,7 @@ let create
       ?sleep_until
       ?questions
       ?trace_clock
+      ?(offered = fun (_ : Tool.t) -> true)
       ~cwd
       ()
   =
@@ -3033,6 +3038,7 @@ let create
     ; sw
     ; provider
     ; tools
+    ; offered
     ; sessions_dir
     ; home
     ; models

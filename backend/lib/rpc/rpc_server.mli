@@ -71,6 +71,11 @@ val create
   -> ?forges:Forges.t
        (** git hosts (default: real HTTP, sign-ins in [login]'s store,
            settings in [home]'s config) *)
+  -> ?memory:Memory.t
+       (** the user's memory, for [get_memory], [save_memory], [forget_memory]
+           and [set_memory_enabled] (default: the one under [home]; without
+           either they fail). Every client hears [memory_changed] after any
+           change, the model's included. *)
   -> ?transcription_http:Transcription.Http.t
        (** where [transcribe] posts the audio (default: real HTTP) *)
   -> ?nix_store:Nix_store.t
@@ -98,6 +103,18 @@ val restore_resumes : t -> unit
     deleting ([Temporary_ledger]), on the hosts connected now (the others'
     when they connect). *)
 val clean_leftovers : t -> unit
+
+(** Builds [search_sessions]' index of the saved sessions in a fiber of its
+    own that yields after each session, so that the backend serves its
+    clients meanwhile; a search meanwhile waits for it. *)
+val start_indexing : t -> unit
+
+(** [start_indexing]'s work, returning when it is done (or, if it is under
+    way, when it finishes). *)
+val index_sessions : t -> unit
+
+(** How many sessions [search_sessions]' index has. *)
+val indexed_sessions : t -> int
 
 (** Registers a client whose outgoing lines go through [send]; it starts
     in a new session in [cwd] (or the default one). With [signed_in] (the

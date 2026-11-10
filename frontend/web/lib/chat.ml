@@ -417,7 +417,8 @@ let rec apply t (event : Event.t) =
   | Agent_queues _
   | Nix_gc_progress _
   | Masked _
-  | Prefs_changed _ -> t
+  | Prefs_changed _
+  | Memory_changed _ -> t
 ;;
 
 let rec received (event : Event.t) ~at : Event.t =
@@ -538,6 +539,10 @@ let reconcile ~old fresh =
       ; first = old.first
       ; detached = old.detached
       }
+;;
+
+let same_transcript a b =
+  phys_equal a.rev_entries b.rev_entries && phys_equal a.tools b.tools
 ;;
 
 let uses_computer t =

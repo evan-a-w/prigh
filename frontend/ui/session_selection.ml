@@ -10,13 +10,18 @@ type t =
 let create ?(named_only = false) sessions = { named_only; sessions }
 let title t = if t.named_only then "Sessions (named)" else "Sessions"
 
-(* Active first: [Picker] orders sections as they first appear. *)
+let is_pinned (s : P.Session_summary.t) =
+  (not s.archived) && Option.value s.pinned ~default:false
+;;
+
+(* Pinned first, archived last: [Picker] orders sections as they first
+   appear. *)
 let active_first sessions =
+  let pinned, rest = List.partition_tf sessions ~f:is_pinned in
   let active, archived =
-    List.partition_tf sessions ~f:(fun (s : P.Session_summary.t) ->
-      not s.archived)
+    List.partition_tf rest ~f:(fun (s : P.Session_summary.t) -> not s.archived)
   in
-  active @ archived
+  pinned @ active @ archived
 ;;
 
 let shown t =
@@ -26,7 +31,7 @@ let shown t =
      else t.sessions)
 ;;
 
-let item ~current (s : P.Session_summary.t) =
+let item ~current ~any_pinned (s : P.Session_summary.t) =
   let name = Option.value s.name ~default:"(unnamed)" in
   let date = String.prefix (Option.value s.updated_at ~default:"") 16 in
   let first = Text_width.truncate (P.Session_summary.blurb s) ~width:60 in
@@ -37,6 +42,7 @@ let item ~current (s : P.Session_summary.t) =
   let worktrees = Session_worktrees.summary (Session_worktrees.of_session s) in
   Picker.Item.create
     ~id:s.path
+    ~fields:(Session_search.fields s @ [ Place, date ])
     ~detail:
       (String.concat
          ~sep:" · "
@@ -50,7 +56,14 @@ let item ~current (s : P.Session_summary.t) =
          ([ name; first; s.cwd; date; worktrees ] @ Option.to_list place))
     ~marked:(Option.value_map current ~default:false ~f:(String.equal s.path))
     ~dimmed:s.archived
-    ~section:(if s.archived then "archived" else "")
+    ~section:
+      (if s.archived
+       then "archived"
+       else if is_pinned s
+       then "pinned"
+       else if any_pinned
+       then "sessions"
+       else "")
     (sprintf
        "%s%s ∣ %s ∣ %d msgs%s%s ∣ %s"
        (if s.running then "▶ " else if s.live then "● " else "")
@@ -83,7 +96,9 @@ let nearest_shown t id =
 ;;
 
 let picker ?previous ?select t ~current =
-  let items = List.map (shown t) ~f:(item ~current) in
+  let shown = shown t in
+  let any_pinned = List.exists shown ~f:is_pinned in
+  let items = List.map shown ~f:(item ~current ~any_pinned) in
   match previous with
   | None -> Picker.create ~title:(title t) items
   | Some previous ->
@@ -121,7 +136,27 @@ let set_archived t ~path ~archived =
   { t with
     sessions =
       List.map t.sessions ~f:(fun s ->
-        if String.equal s.path path then { s with archived } else s)
+        if String.equal s.path path
+        then
+          { s with
+            archived
+          ; pinned =
+              (if archived
+               then Option.map s.pinned ~f:(fun _ -> false)
+               else s.pinned)
+          }
+        else s)
+  }
+;;
+
+let set_pinned t ~path ~pinned =
+  { t with
+    sessions =
+      List.map t.sessions ~f:(fun s ->
+        if String.equal s.path path
+        then
+          { s with pinned = Some pinned; archived = s.archived && not pinned }
+        else s)
   }
 ;;
 

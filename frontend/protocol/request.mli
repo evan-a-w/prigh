@@ -20,6 +20,10 @@ module Method : sig
         { path : string (** a session's path or id *)
         ; archived : bool
         }
+    | Set_pinned of
+        { path : string (** a session's path or id *)
+        ; pinned : bool
+        } (** pinning unarchives, archiving unpins *)
     | Delete_sessions of
         { paths : string list
         ; switch_to : Switch_to.t option
@@ -207,6 +211,14 @@ module Method : sig
     | Nix_store_gc of { delete_generations : Nix_generations.t option }
     (** superusers: {!Nix_gc_progress} events, then a {!Nix_gc_report}; can
         take minutes *)
+    | Get_memory (** {!Memory} *)
+    | Save_memory of
+        { id : string option (** edit this note; [None]: add one *)
+        ; title : string option
+        ; text : string
+        } (** [{note}]: {!Memory.note_of_reply} *)
+    | Forget_memory of { id : string }
+    | Set_memory_enabled of { enabled : bool }
   [@@deriving sexp_of, equal]
 
   val name : t -> string

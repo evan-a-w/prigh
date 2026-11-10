@@ -28,6 +28,7 @@ module Picker_kind : sig
     | Skills
     | Snippets (** [/snippet]: Enter inserts the text *)
     | Reminders (** [/remind]: the session's; Ctrl+D removes one *)
+    | Memory of Memory.t (** [/memory]: the user's notes; Ctrl+D forgets one *)
     | Worktrees of Worktree.Listing.t
     (** [/worktree]: Ctrl+N opens one in a new session, Ctrl+D removes one *)
     | Mcp of Mcp_list.t
@@ -53,6 +54,9 @@ module Text_prompt_action : sig
         { kind : string
         ; method_ : string option
         } (** the git host to sign in to *)
+    | Signin_code
+    (** the code the page shows after a browser sign-in's Allow: over SSH
+        the browser cannot reach our listener *)
   [@@deriving sexp_of, equal]
 end
 
@@ -89,6 +93,10 @@ module Confirm_action : sig
         { worktree : Worktree.t
         ; force : bool
         ; back : Open_picker.t option (** where Esc returns *)
+        }
+    | Forget_memory of
+        { note : Memory.Note.t
+        ; back : Open_picker.t option (** where Esc and Enter return *)
         }
     | Nix_gc of Nix_generations.t
     (** [/nix-gc run DAYS|all]: deleting profile generations *)
@@ -134,3 +142,6 @@ type t =
 
 val is_dialog : t -> bool
 val name : t -> string
+
+(** The browser sign-in's dialog for the page's code. *)
+val is_signin_code : t -> bool

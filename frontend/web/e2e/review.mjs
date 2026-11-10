@@ -777,6 +777,19 @@ try {
   await screenshot("phone");
   section("phone");
   console.log(`sheet: ${await page.evaluate(() => getComputedStyle(document.querySelector(".review-page")).position)}`);
+  // The code has the screen; the file's row opens the list in its place.
+  const codeShare = async () => page.evaluate(() => {
+    const scroll = document.querySelector("#review-scroll");
+    return scroll ? Math.round(scroll.getBoundingClientRect().height / innerHeight * 10) / 10 : 0;
+  });
+  console.log(`code: ${(await codeShare()) >= 0.7 ? "most of the screen" : `only ${await codeShare()} of it`}`);
+  await page.locator("#review-files-toggle").click();
+  await page.waitForSelector(".review-files");
+  await screenshot("phone files");
+  console.log(`files open: ${await page.locator(".review-file-row").count()} files, code ${(await page.locator("#review-scroll").count()) ? "shown" : "hidden"}`);
+  await page.locator(".review-file").first().click();
+  await page.waitForSelector(".review-files", { state: "detached" });
+  console.log("picking a file shows its code");
   await page.keyboard.press("Alt+r");
   await page.waitForSelector(".review-page", { state: "detached" });
   console.log("Alt+R closed it");

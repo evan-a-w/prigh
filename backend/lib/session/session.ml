@@ -53,6 +53,7 @@ module Entry = struct
           }
       | Allow_rule of { rule : string }
       | Archived of { archived : bool }
+      | Pinned of { pinned : bool }
       | Spend of
           { usage : Usage.t
           ; cost_usd : float
@@ -113,6 +114,7 @@ type t =
   ; mutable worktrees : Session_worktree.t list (** newest first *)
   ; mutable home : Home.t option
   ; mutable transcript_filter : string option
+  ; mutable pinned : bool
   ; created_at : Time_float.t
   ; parent : string option
   ; mutable entries : Entry.t list (* reversed *)
@@ -195,6 +197,7 @@ let worth_saving (line : Line.t) =
           | Approval _
           | Allow_rule _
           | Archived _
+          | Pinned _
           | Spend _
           | Resume_at _
           | Told_environment _
@@ -316,6 +319,7 @@ let create ~dir ~cwd ?parent ?(temporary = false) () =
     ; worktrees = []
     ; home = None
     ; transcript_filter = None
+    ; pinned = false
     ; created_at
     ; parent
     ; entries = []
@@ -388,6 +392,7 @@ let add_entry t (entry : Entry.t) =
   | Worktree w -> track_worktree t w
   | Home { home } -> t.home <- home
   | Transcript_filter { filter } -> t.transcript_filter <- filter
+  | Pinned { pinned } -> t.pinned <- pinned
   | Worktree_removed { path } ->
     t.worktrees
     <- List.filter t.worktrees ~f:(fun (o : Session_worktree.t) ->
@@ -464,6 +469,7 @@ let load ?(yield = fun () -> ()) path =
            ; worktrees = []
            ; home = None
            ; transcript_filter = None
+           ; pinned = false
            ; created_at
            ; parent
            ; entries = []
@@ -545,7 +551,14 @@ let set_reminders t reminders = append t (Reminders { reminders })
 let set_budget t ~usd = append t (Budget { usd })
 let set_approval t ~mode ~plan = append t (Approval { mode; plan })
 let add_allow_rule t ~rule = append t (Allow_rule { rule })
-let set_archived t ~archived = append t (Archived { archived })
+
+let set_archived t ~archived =
+  if archived && t.pinned
+  then ignore (append t (Pinned { pinned = false }) : Entry.t);
+  append t (Archived { archived })
+;;
+
+let pinned t = t.pinned
 let add_spend t ~usage ~cost_usd = append t (Spend { usage; cost_usd })
 let set_told_environment t told = append t (Told_environment told)
 let repo t = Hashtbl.find t.repos t.cwd
@@ -607,6 +620,7 @@ let name t =
     | Approval _
     | Allow_rule _
     | Archived _
+    | Pinned _
     | Spend _
     | Resume_at _
     | Told_environment _
@@ -641,6 +655,7 @@ let description t =
     | Approval _
     | Allow_rule _
     | Archived _
+    | Pinned _
     | Spend _
     | Resume_at _
     | Told_environment _
@@ -951,6 +966,7 @@ let fold t path : Folded.t =
       | Approval _
       | Allow_rule _
       | Archived _
+      | Pinned _
       | Spend _
       | Resume_at _
       | Told_environment _
@@ -1221,6 +1237,7 @@ let context_cwds t =
       | Approval _
       | Allow_rule _
       | Archived _
+      | Pinned _
       | Spend _
       | Resume_at _
       | Told_environment _
@@ -1293,6 +1310,7 @@ let system_prompt t =
     | Approval _
     | Allow_rule _
     | Archived _
+    | Pinned _
     | Spend _
     | Resume_at _
     | Told_environment _
@@ -1327,6 +1345,7 @@ let goal t =
     | Approval _
     | Allow_rule _
     | Archived _
+    | Pinned _
     | Spend _
     | Resume_at _
     | Told_environment _
@@ -1376,6 +1395,7 @@ let budget t =
     | Approval _
     | Allow_rule _
     | Archived _
+    | Pinned _
     | Spend _
     | Resume_at _
     | Told_environment _
@@ -1410,6 +1430,7 @@ let model t =
     | Approval _
     | Allow_rule _
     | Archived _
+    | Pinned _
     | Spend _
     | Resume_at _
     | Told_environment _
@@ -1555,6 +1576,7 @@ let fork ?at t ~dir =
               if Option.is_some text then Hash_set.add texts md5;
               Some (Review (Snapshot { snapshot = s; text }))
             | Archived _
+            | Pinned _
             | Spend _
             | Resume_at _
             | Agent_worktree _
@@ -1600,6 +1622,7 @@ module Summary = struct
     ; failed : bool
     ; parent : string option
     ; archived : bool option
+    ; pinned : bool
     ; last_activity : float
     ; resume_at : float option
     ; bytes : int
@@ -1613,6 +1636,7 @@ module Summary = struct
 
   let is_archived t ~now ~archive_after_days ~active =
     (not active)
+    && (not t.pinned)
     &&
     match t.archived with
     | Some true -> true
@@ -1661,16 +1685,19 @@ let rec remove path =
 let delete_files path = List.iter (files path) ~f:remove
 
 (* An [Archived] entry after the last message is a manual (un)archive; an
-   unarchive also counts as activity. *)
+   unarchive also counts as activity, as does an unpin (so that unpinning an
+   idle session does not archive it at once). *)
 let archived_and_activity t ~mtime =
-  let last_message_at, marker =
+  let (last_message_at, marker), unpinned_at =
     List.fold
       (List.rev t.entries)
-      ~init:(None, None)
-      ~f:(fun (last_message, marker) (e : Entry.t) ->
+      ~init:((None, None), None)
+      ~f:(fun ((last_message, marker), unpinned_at) (e : Entry.t) ->
         match e.payload with
-        | Message _ -> Some e.at, None
-        | Archived { archived } -> last_message, Some (archived, e.at)
+        | Pinned { pinned = false } -> (last_message, marker), Some e.at
+        | Message _ -> (Some e.at, None), unpinned_at
+        | Archived { archived } ->
+          (last_message, Some (archived, e.at)), unpinned_at
         | Model _
         | Compaction _
         | Masked _
@@ -1683,6 +1710,7 @@ let archived_and_activity t ~mtime =
         | Budget _
         | Approval _
         | Allow_rule _
+        | Pinned { pinned = true }
         | Spend _
         | Resume_at _
         | Told_environment _
@@ -1697,15 +1725,27 @@ let archived_and_activity t ~mtime =
         | Trim_after _
         | Delete _
         | Restore _
-        | Review _ -> last_message, marker)
+        | Review _ -> (last_message, marker), unpinned_at)
   in
   let activity = Option.value (Option.join last_message_at) ~default:mtime in
+  let activity =
+    Option.fold (Option.join unpinned_at) ~init:activity ~f:Float.max
+  in
   let activity =
     match marker with
     | Some (false, Some at) -> Float.max activity at
     | Some _ | None -> activity
   in
   Option.map marker ~f:fst, activity
+;;
+
+let set_pinned t ~pinned =
+  if pinned
+  then (
+    match fst (archived_and_activity t ~mtime:0.) with
+    | Some true -> ignore (append t (Archived { archived = false }) : Entry.t)
+    | Some false | None -> ());
+  append t (Pinned { pinned })
 ;;
 
 let summarise t ~path ~mtime =
@@ -1744,6 +1784,7 @@ let summarise t ~path ~mtime =
       |> Option.value ~default:false
   ; parent = t.parent
   ; archived
+  ; pinned = t.pinned
   ; last_activity
   ; resume_at = resume_at t
   ; bytes = 0
@@ -1988,6 +2029,7 @@ let to_markdown t =
     | Approval _
     | Allow_rule _
     | Archived _
+    | Pinned _
     | Spend _
     | Resume_at _
     | Told_environment _

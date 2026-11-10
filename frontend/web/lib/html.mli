@@ -65,6 +65,8 @@ module Icon : sig
     | Clock
     | Archive
     | Unarchive
+    | Pin
+    | Pin_off
     | Bell
     | Bell_off
     | Shield
@@ -86,6 +88,7 @@ module Icon : sig
     | Scissors
     | Palette
     | Package
+    | Book
     | Mic
     | Image
     | Paperclip

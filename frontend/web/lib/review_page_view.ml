@@ -260,17 +260,21 @@ let selection_bar (m : App.Model.t) ~inject =
       ]
 ;;
 
+(* The file's place in the list, from 1, and the list's length. *)
+let position (t : Code_review.t) path =
+  let index =
+    List.findi t.files ~f:(fun _ (f : Diff_files.File.t) ->
+      String.equal f.path path)
+    |> Option.value_map ~default:0 ~f:(fun (i, _) -> i + 1)
+  in
+  index, List.length t.files
+;;
+
 (* Under the file, always in the same place: the previous file, approve
    (and go on), the next; the keys say so. *)
 let dock (m : App.Model.t) path ~inject =
   let t = m.review in
-  let files = t.files in
-  let total = List.length files in
-  let index =
-    List.findi files ~f:(fun _ (f : Diff_files.File.t) ->
-      String.equal f.path path)
-    |> Option.value_map ~default:0 ~f:(fun (i, _) -> i + 1)
-  in
+  let index, total = position t path in
   let status =
     Option.map (Code_review.file t path) ~f:(Code_review.approval t)
   in
@@ -421,27 +425,64 @@ let editor (m : App.Model.t) (e : Code_review.Editor.t) ~inject =
     ]
 ;;
 
-let current_file (m : App.Model.t) path ~inject =
+let file_chip (file : Diff_files.File.t option) =
+  match file with
+  | Some { status = Added; _ } -> span ~cls:"chip" "new"
+  | Some { status = Deleted; _ } -> span ~cls:"chip" "deleted"
+  | Some { status = Binary; _ } -> span ~cls:"chip" "binary"
+  | Some { status = Modified; _ } | None -> Node.none
+;;
+
+(* On a phone, the file's head is the way to the list: the file, where it is
+   in the list, and a chevron; the list (with what is reviewed and git)
+   takes the code's place while it is open. *)
+let files_toggle (m : App.Model.t) path ~open_ ~inject =
+  let t = m.review in
+  let file = Code_review.file t path in
+  let status = Option.map file ~f:(Code_review.approval t) in
+  let index, total = position t path in
+  let dir, name = split_path path in
+  Node.button
+    ~attrs:
+      [ classes [ "review-files-toggle" ] [ "open", open_ ]
+      ; Attr.type_ "button"
+      ; Attr.id "review-files-toggle"
+      ; review_keys
+      ; Attr.create "aria-expanded" (Bool.to_string open_)
+      ; Attr.title
+          (if open_
+           then "Back to the file's changes"
+           else "All the changed files")
+      ; Attr.on_click (fun _ -> inject (review Toggle_files))
+      ]
+    [ Option.value_map status ~default:Node.none ~f:approval_mark
+    ; Node.span
+        ~attrs:[ Attr.class_ "review-file-path" ]
+        [ span ~cls:"dir" dir; span ~cls:"name" name ]
+    ; file_chip file
+    ; span ~cls:"review-files-where" (sprintf "%d/%d" index total)
+    ; icon ~cls:"chevron" Chevron
+    ]
+;;
+
+let current_file ?(head = true) (m : App.Model.t) path ~inject =
   let t = m.review in
   let file = Code_review.file t path in
   let status = Option.map file ~f:(Code_review.approval t) in
   let head =
-    div
-      ~cls:"review-file-head"
-      [ Node.h2
-          ~attrs:[ Attr.class_ "review-file-title" ]
-          [ Node.text path
-          ; (match file with
-             | Some { status = Added; _ } -> span ~cls:"chip" "new"
-             | Some { status = Deleted; _ } -> span ~cls:"chip" "deleted"
-             | Some { status = Binary; _ } -> span ~cls:"chip" "binary"
-             | Some { status = Modified; _ } | None -> Node.none)
-          ]
-      ; (match status with
-         | Some Changed ->
-           span ~cls:"review-stale" "Changed since you approved it"
-         | Some (Approved | Unapproved) | None -> Node.none)
-      ]
+    if not head
+    then Node.none
+    else
+      div
+        ~cls:"review-file-head"
+        [ Node.h2
+            ~attrs:[ Attr.class_ "review-file-title" ]
+            [ Node.text path; file_chip file ]
+        ; (match status with
+           | Some Changed ->
+             span ~cls:"review-stale" "Changed since you approved it"
+           | Some (Approved | Unapproved) | None -> Node.none)
+        ]
   in
   let body =
     match t.mode, t.editor with
@@ -714,9 +755,11 @@ let view (m : App.Model.t) ~inject =
                        ; Attr.title f.path
                        ]
                      []))
-            ; span
-                ~cls:"review-progress-text"
-                (sprintf "%d/%d approved" approved total)
+            ; Node.span
+                ~attrs:[ Attr.class_ "review-progress-text" ]
+                [ Node.text (sprintf "%d/%d" approved total)
+                ; span ~cls:"review-progress-word" " approved"
+                ]
             ]
         ; (if t.loading
            then lamp ~title:"Reading the changes" ()
@@ -768,7 +811,10 @@ let view (m : App.Model.t) ~inject =
                    , inject (review (Set_layout Full)) )
                  ])
             ; button
-                ~cls:(if unsent > 0 then "small primary" else "small")
+                ~cls:
+                  (if unsent > 0
+                   then "small primary review-send"
+                   else "small review-send")
                 ~disabled:(unsent = 0 || t.submitting)
                 ~title:"Send the new comments and replies to prigh (s)"
                 ~on_click:(inject (review Submit))
@@ -780,7 +826,7 @@ let view (m : App.Model.t) ~inject =
                      | n -> sprintf "Send %d comments" n)
                 ]
             ; button
-                ~cls:"icon ghost"
+                ~cls:"icon ghost review-close"
                 ~title:"Close the review (Esc, Alt+R)"
                 ~label:"Close the review"
                 ~on_click:(inject (review Close))
@@ -788,27 +834,57 @@ let view (m : App.Model.t) ~inject =
             ]
         ]
     in
-    let body =
-      match t.files, t.current with
-      | [], _ | _, None -> empty_state t
-      | files, Some path ->
-        div
-          ~cls:"review-body"
-          [ Node.nav
-              ~attrs:
-                [ Attr.class_ "review-files"
-                ; Attr.create "aria-label" "Changed files"
-                ]
-              [ selection_bar m ~inject
-              ; Node.ul (List.map files ~f:(file_row m ~inject))
-              ; div
-                  ~cls:"review-files-foot"
-                  [ Node.text (Diff_files.summary files) ]
-              ; Git_bar_view.commit_box m ~inject
-              ]
-          ; Resize_view.handle m ~inject Review_files
-          ; current_file m path ~inject
+    let files_nav files =
+      Node.nav
+        ~attrs:
+          [ Attr.class_ "review-files"
+          ; Attr.create "aria-label" "Changed files"
           ]
+        [ selection_bar m ~inject
+        ; Node.ul (List.map files ~f:(file_row m ~inject))
+        ; div ~cls:"review-files-foot" [ Node.text (Diff_files.summary files) ]
+        ; Git_bar_view.commit_box m ~inject
+        ]
+    in
+    (* On a phone the list is shown in the code's place on demand (or while
+       something in it is open: a picker, the commit message), so the code
+       has the screen. *)
+    let files_shown =
+      (not m.narrow)
+      || t.files_open
+      || Option.is_some m.git_bar.commit
+      ||
+      match m.dialog with
+      | Some (Review_pick p) ->
+        (match Review_picker.which p with
+         | Target | Base -> true
+         | Since _ -> false)
+      | _ -> false
+    in
+    (* On a phone the toggle stays under the head, what is reviewed under
+       it while the list is open. *)
+    let toggle, body =
+      match t.files, t.current with
+      | [], _ | _, None -> [], empty_state t
+      | files, Some path when m.narrow ->
+        ( [ files_toggle m path ~open_:files_shown ~inject ]
+        , div
+            ~cls:"review-body"
+            [ (if files_shown
+               then files_nav files
+               else current_file ~head:false m path ~inject)
+            ] )
+      | files, Some path ->
+        ( []
+        , div
+            ~cls:"review-body"
+            [ files_nav files
+            ; Resize_view.handle m ~inject Review_files
+            ; current_file m path ~inject
+            ] )
+    in
+    let files_shown =
+      files_shown || List.is_empty t.files || Option.is_none t.current
     in
     Node.create
       "section"
@@ -820,12 +896,24 @@ let view (m : App.Model.t) ~inject =
         ]
       (* While a picker is open the rest of the page is out of reach. The
          git actions are at the foot, away from Send comments. *)
-      (let target = target_bar m ~inject in
-       let foot = Git_bar_view.strip m ~inject in
+      (let if_shown f = if files_shown then [ f m ~inject ] else [] in
+       let target = if_shown target_bar
+       and foot = if_shown Git_bar_view.strip
+       and inerts = List.map ~f:inert in
        match m.dialog with
        | Some (Review_pick p) ->
          (match Review_picker.which p with
-          | Since _ -> [ head; inert target; inert body; inert foot ]
-          | Target | Base -> [ inert head; target; inert body; inert foot ])
-       | _ -> [ head; target; body; foot ]))
+          | Since _ ->
+            [ head ]
+            @ inerts toggle
+            @ inerts target
+            @ [ inert body ]
+            @ inerts foot
+          | Target | Base ->
+            [ inert head ]
+            @ inerts toggle
+            @ target
+            @ [ inert body ]
+            @ inerts foot)
+       | _ -> [ head ] @ toggle @ target @ [ body ] @ foot))
 ;;

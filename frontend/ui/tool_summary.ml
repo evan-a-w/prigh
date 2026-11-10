@@ -146,6 +146,23 @@ let repo args =
     String.concat ~sep:" " (action :: target))
 ;;
 
+let memory args =
+  let str = Tool_args.string args in
+  Option.map (str "action") ~f:(fun action ->
+    let target =
+      match action with
+      | "save" ->
+        (match str "title", str "text" with
+         | Some title, _ -> [ title ]
+         | None, Some text -> [ quoted text ]
+         | None, None -> [])
+      | "recall" -> Option.to_list (Option.map (str "query") ~f:quoted)
+      | "forget" -> Option.to_list (str "id")
+      | _ -> []
+    in
+    String.concat ~sep:" " (action :: target))
+;;
+
 let as_call (s : P.Content.Server_tool.t) =
   let call = { P.Tool_call.id = s.id; name = s.name; arguments = s.input } in
   ( call

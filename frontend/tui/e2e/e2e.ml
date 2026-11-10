@@ -149,7 +149,7 @@ let rec summarise (e : Event.t) : string option =
   | Temporary_ended { session; _ } ->
     Some (sprintf "temporary_ended %s" session)
   | Nix_gc_progress p -> Some (sprintf "nix_gc_progress %d" p.paths_deleted)
-  | Prefs_changed _ -> None
+  | Prefs_changed _ | Memory_changed _ -> None
   | Generate_delta { gen_id; delta } ->
     Some (sprintf "generate_delta %s %S" gen_id delta)
   | Agent_queues _ -> None

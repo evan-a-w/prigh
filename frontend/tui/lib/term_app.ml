@@ -210,6 +210,8 @@ let platform link ~exit ~quit_requested : Prigh_ui.Component.Platform.t =
   ; relink =
       (fun change ->
         Effect.of_deferred_fun (fun () -> Backend_link.relink link change) ())
+  ; signin_code =
+      (fun code -> Effect.of_sync_fun (Backend_link.signin_code link) code)
   ; sign_out =
       Effect.of_deferred_fun (fun () -> Backend_link.sign_out link) ()
   ; quit =
@@ -503,6 +505,8 @@ let run link =
        send App.Action.Start;
        Backend_link.set_notice link (fun text ->
          send (App.Action.Event (Notice text)));
+       Backend_link.set_code_prompt link (fun prompt ->
+         send (App.Action.Signin_code_prompt prompt));
        forward_incoming link driver;
        let%bind.Deferred () =
          Deferred.any_unit

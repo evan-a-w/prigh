@@ -124,7 +124,9 @@ let fit_keys text ~width =
 let picker_keys (kind : Mode.Picker_kind.t) =
   match kind with
   | Sessions _ ->
-    Some "Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named"
+    Some
+      "Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named · Alt+T \
+       (un)pins"
   | _ -> None
 ;;
 
@@ -159,9 +161,13 @@ let focused_agent_hint ~main (a : Agent_view.t) =
   ]
 ;;
 
+let signin_code_keys = "Enter sends the code · Esc cancels the sign-in"
+
 let mode_hint (m : App.Model.t) : Content.Line.t option =
   match m.connection with
   | Disconnected _ -> Some [ span ~style:attention (disconnected_hint m) ]
+  | Switching _ when Mode.is_signin_code m.mode ->
+    Some [ span ~style:attention signin_code_keys ]
   | Switching _ -> Some [ span ~style:attention "connecting…" ]
   | Reconnecting { attempt; delay_ms; _ } ->
     Some
@@ -234,6 +240,12 @@ let mode_hint (m : App.Model.t) : Content.Line.t option =
             [ span
                 ~style:attention
                 "Enter shows it · Esc closes · Ctrl+D removes"
+            ]
+        | Picker { kind = Memory _; _ } ->
+          Some
+            [ span
+                ~style:attention
+                "Enter shows it · Ctrl+D forgets it · Esc closes"
             ]
         | Picker { kind = Worktrees _; _ } ->
           Some
@@ -868,8 +880,7 @@ let subagent_header (m : App.Model.t) (a : Agent_view.t) : Content.Line.t =
       sprintf "✓ done %d turns $%.2f" turns cost_usd
     | Agent_view.Status.Failed _ -> "✗ failed"
   in
-  let task = Text_width.truncate (Agent_view.title a) ~width:40
-  in
+  let task = Text_width.truncate (Agent_view.title a) ~width:40 in
   [ span
       ~style:(Style.bold (Style.fg Cyan))
       (sprintf "◆ subagent %d/%d" index total)
@@ -923,6 +934,8 @@ let server_part (m : App.Model.t) =
 let status (m : App.Model.t) : Content.Line.t =
   match m.state, m.connection with
   | _, Disconnected _ -> [ span ~style:attention (disconnected_hint m) ]
+  | _, Switching _ when Mode.is_signin_code m.mode ->
+    [ span ~style:attention signin_code_keys ]
   | None, Switching _ -> [ span ~style:gray "connecting…" ]
   | None, _ ->
     (match m.mode with
@@ -1167,9 +1180,7 @@ let queued_block (m : App.Model.t) ~width : Overlay.t option =
     in
     Some
       (Overlay.create
-         (List.map
-            ((header :: rows) @ more)
-            ~f:(Content.Line.truncate ~width))))
+         (List.map ((header :: rows) @ more) ~f:(Content.Line.truncate ~width))))
 ;;
 
 let notice_box (m : App.Model.t) ~width : Overlay.t option =
@@ -1201,6 +1212,14 @@ let notice_box (m : App.Model.t) ~width : Overlay.t option =
 
 let picker_block ?keys (p : Picker.t) ~width ~rows : Overlay.t =
   let visible = Picker.visible p in
+  (* Rows with a snippet take two lines. *)
+  let rows =
+    if
+      List.exists visible ~f:(fun (i : Picker.Item.t) ->
+        Option.is_some i.snippet)
+    then Int.max 1 (rows / 2)
+    else rows
+  in
   let selected = Picker.selected p in
   let start =
     Int.max 0 (Int.min (selected - (rows / 2)) (List.length visible - rows))
@@ -1257,12 +1276,29 @@ let picker_block ?keys (p : Picker.t) ~width ~rows : Overlay.t =
         let s = if item.dimmed then dim else Style.plain in
         if is_selected then Style.invert (Style.bold s) else s
       in
+      let matched_style = Style.underline (Style.bold label_style) in
       let line =
-        [ span ~style:label_style (mark ^ label)
-        ; span
-            ~style:(if is_selected then Style.invert dim else dim)
-            (if String.is_empty item.detail then "" else "  " ^ item.detail)
-        ]
+        (match item.matched with
+         | [] -> [ span ~style:label_style (mark ^ label) ]
+         | matched ->
+           span ~style:label_style mark
+           :: List.map (Session_search.pieces label matched) ~f:(function
+             | `Plain, s -> span ~style:label_style s
+             | `Match, s -> span ~style:matched_style s))
+        @ [ span
+              ~style:(if is_selected then Style.invert dim else dim)
+              (if String.is_empty item.detail then "" else "  " ^ item.detail)
+          ]
+      in
+      let snippet =
+        Option.to_list item.snippet
+        |> List.map ~f:(fun (s : P.Session_hits.Snippet.t) ->
+          Content.Line.truncate
+            (span ~style:dim "      "
+             :: List.map (Session_search.pieces s.text s.ranges) ~f:(function
+               | `Plain, s -> span ~style:dim s
+               | `Match, s -> span ~style:(Style.bold (Style.fg Yellow)) s))
+            ~width)
       in
       let divider =
         let previous =
@@ -1276,7 +1312,7 @@ let picker_block ?keys (p : Picker.t) ~width ~rows : Overlay.t =
           when String.equal previous.section item.section -> []
         | _ -> [ [ span ~style:dim ("  ── " ^ item.section ^ " ──") ] ]
       in
-      divider @ [ Content.Line.truncate line ~width ])
+      divider @ [ Content.Line.truncate line ~width ] @ snippet)
     |> List.concat
   in
   let lines =
@@ -1341,9 +1377,7 @@ let autocomplete_block (ac : Autocomplete.t) ~width ~rows : Overlay.t =
             ~width:(usage_width - Text_width.string name)
         in
         Content.Line.truncate
-          [ span
-              ~style:(style Style.plain)
-              (if is_selected then "▸ " else "  ")
+          [ span ~style:(style Style.plain) (if is_selected then "▸ " else "  ")
           ; span ~style:(style (Style.bold Style.plain)) name
           ; span ~style:(style dim) args
           ; span ~style:(style dim) ("  " ^ help)
@@ -1359,9 +1393,7 @@ let autocomplete_block (ac : Autocomplete.t) ~width ~rows : Overlay.t =
         let is_selected = start + i = selected in
         let style s = if is_selected then Style.invert s else s in
         Content.Line.truncate
-          [ span
-              ~style:(style Style.plain)
-              (if is_selected then "▸ " else "  ")
+          [ span ~style:(style Style.plain) (if is_selected then "▸ " else "  ")
           ; span
               ~style:(style (Style.bold Style.plain))
               (Text_width.pad_right item.label ~width:label_width)

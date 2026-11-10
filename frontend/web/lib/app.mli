@@ -154,6 +154,9 @@ module Reply_tag : sig
         ; draft : string (** what was sent, as typed *)
         } (** [steer_agent]: back to the editor if it fails *)
     | Sessions
+    | Session_hits of int
+    (** [search_sessions] for this search of the sidebar's; stale ones are
+        ignored *)
     | Models
     | Reload_state (** the client's session changed: fetch its state *)
     | Subagent of string
@@ -173,6 +176,10 @@ module Reply_tag : sig
     | Archived_set of
         { title : string
         ; archived : bool
+        }
+    | Pinned_set of
+        { title : string
+        ; pinned : bool
         }
     | Refresh_sessions (** on success, list the sessions again *)
     | Login_started
@@ -257,6 +264,7 @@ module Reply_tag : sig
     | Resync of
         { session : string (** its id *)
         ; from : string option
+        ; events : int (** [transcript_events] when it was asked for *)
         }
     (** the session's messages after reconnecting, from the first one on show
         ([from], when older ones are not loaded): merged into the transcript
@@ -292,6 +300,10 @@ module Reply_tag : sig
     | Nix_status of { open_settings : bool }
     (** [nix_store_status]; [/nix-gc] opens Settings once it is in *)
     | Nix_collected (** [nix_store_gc] *)
+    | Memory_loaded (** [get_memory] *)
+    | Memory_saved (** [save_memory]: the draft closes, or says why not *)
+    | Memory_forgot
+    | Memory_enabled (** [set_memory_enabled] *)
     | Trim_points of Trim_purpose.t
     | Trimmed (** [trim]: the confirmation closes, or says why not *)
     | Untrimmed
@@ -330,6 +342,10 @@ module Command : sig
         { id : int
         ; after_ms : int
         } (** [Dismiss_toast id] after [after_ms] *)
+    | Search_sessions_later of
+        { search : int
+        ; after_ms : int
+        } (** [Search_sessions search] after [after_ms]: typing debounced *)
     | Focus of string (** the element with this id, once rendered *)
     | Clear_text_selection (** the page's selected text, unselected *)
     | Place_popover
@@ -528,6 +544,10 @@ module Action : sig
         { path : string
         ; archived : bool
         }
+    | Set_pinned of
+        { path : string
+        ; pinned : bool
+        }
     | Set_session_query of string
     | Toggle_archived (** fold or unfold the sidebar's archived sessions *)
     | Open_sessions (** the sidebar, with its search focused *)
@@ -560,6 +580,16 @@ module Action : sig
         section and focuses its tab *)
     | Compact_at_input of string (** the settings page's "Compact at" *)
     | Compact_at_commit (** applies it (leaving the field; Enter accepts) *)
+    | Memory_filter of string (** the settings page's Memory: its filter *)
+    | Memory_edit of string option
+    (** edits this note, or writes a new one ([None]) *)
+    | Memory_title of string
+    | Memory_text of string
+    | Memory_save (** Enter in the title, Ctrl+Enter in the text *)
+    | Memory_cancel (** Esc *)
+    | Memory_forget of string (** asks first *)
+    | Memory_forget_confirm
+    | Memory_forget_cancel
     | Open_rename
     | Open_subagents of string option
     (** the agents panel: its list, or the agent or job with this number
@@ -677,6 +707,9 @@ module Action : sig
         ; error : bool
         }
     | Dismiss_toast of int
+    | Search_sessions of int
+    (** the sidebar's search [Search_sessions_later] scheduled: the backend
+        searches the messages unless the query changed since *)
     | Update_ready
     (** from the page: a new build's service worker is installed, waiting for
         the page to reload into it *)
@@ -856,6 +889,9 @@ module Model : sig
           and the settings: {!Action.Toggle_status_tray}) *)
     ; scrolled_up : bool (** the chat is not following new output *)
     ; session_query : string
+    ; session_hits : Session_hits.t option
+      (** the backend's search of the messages for [session_query] *)
+    ; session_search : int (** counts the searches typed *)
     ; archived_open : bool (** the sidebar shows the archived sessions *)
     ; agents : Agents.t (** the agents panel, per session *)
     ; verbosity : Prigh_ui.Verbosity.t
@@ -889,6 +925,9 @@ module Model : sig
           preference) *)
     ; layout : Resize.t (** the panels' sizes *)
     ; paging : Paging.t (** how much of the transcript is loaded *)
+    ; transcript_events : int
+      (** events that changed the transcript: a page asked for before one
+          of them may not have it *)
     ; chat_cache : Chat_cache.t
     ; jump : Jump.t
     ; trimmed : Trimmed.t
@@ -909,6 +948,7 @@ module Model : sig
         goes down to its place *)
     ; forges : Forges.t (** the user's git hosts *)
     ; nix_gc : Nix_gc.t (** superusers': the Nix store *)
+    ; memory : Memory_notes.t (** the settings page's Memory *)
     ; compact_at : Compact_at.t (** the settings page's "Compact at" *)
     ; settings_section : Settings_section.t
     (* A phone's settings show the list of sections, not one of them. *)

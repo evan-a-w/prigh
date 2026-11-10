@@ -96,6 +96,7 @@ let arg (call : P.Tool_call.t) =
     | "sessions" -> Tool_summary.sessions args
     | "ask_session" -> Tool_summary.ask_session args
     | "answer_session" -> Tool_summary.answer_session args
+    | "memory" -> Tool_summary.memory args
     | "computer" ->
       Option.map (Computer_action.of_call call) ~f:Computer_action.compact
     | "apply_patch" ->

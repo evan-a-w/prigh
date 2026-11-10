@@ -167,6 +167,9 @@ type t =
     (** the files selected in the list, which its menu acts on (approve,
         stage, commit) *)
   ; mark_from : string option (** the file marked last: Shift extends from it *)
+  ; files_open : bool
+    (** on a phone, the files (what is reviewed, and git) shown in the
+        code's place *)
   }
 [@@deriving sexp_of]
 
@@ -279,6 +282,7 @@ module Action : sig
         ; range : bool (** every file from the one marked last, or the page's *)
         } (** select the file in the list, or unselect it *)
     | Unmark_all
+    | Toggle_files (** on a phone, the files in the code's place, or not *)
     | Submit (** send the new comments and replies to the agent *)
     | Edit_input of string
     | Save

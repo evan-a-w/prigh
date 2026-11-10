@@ -61,7 +61,12 @@ val create
        (** default: {!Endpoint.open_} *)
   -> ?browser_signin:
        (connect:string
-        -> on_url:(url:string -> port:int -> unit)
+        -> on_url:
+             (url:string
+              -> port:int
+              -> paste:Prigh_client_unix.Browser_signin.Code_input.t option
+              -> unit)
+        -> on_paste_refused:(string -> unit)
         -> (Prigh_client_unix.Browser_signin.Grant.t, string) Result.t
              Deferred.t)
        (** signs in to the sign-in proxy in front of a prigh-web URL; default:
@@ -93,6 +98,15 @@ val tool_host : t -> Prigh_client_unix.Tool_host.t option
 (** Notices for the user (a tool host that died, a host id that cannot be
     kept); those sent before this is called are delivered by it. *)
 val set_notice : t -> (string -> unit) -> unit
+
+(** Asks the user for the code the page shows, when the browser sign-in
+    under way takes one (over SSH: {!Prigh_client_unix.Browser_signin.paste_wanted}),
+    and says when a pasted one does not open. *)
+val set_code_prompt : t -> (Prigh_ui.Server_link.Code_prompt.t -> unit) -> unit
+
+(** The code pasted for the browser sign-in under way ([None] cancels it);
+    nothing when none is under way. *)
+val signin_code : t -> string option -> unit
 
 (** Connects and sends [hello]. A sign-in proxy's login is
     [Signin_required]: [relink] with [Browser_signin] gets past it; the

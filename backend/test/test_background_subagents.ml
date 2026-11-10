@@ -117,6 +117,7 @@ let hold_tool promise =
       ; destructive = Never
       ; on_host = false
       ; freeform = None
+      ; native = None
       }
   ; run =
       (fun _ _ ->
@@ -736,6 +737,7 @@ let noop_tool =
       ; destructive = Never
       ; on_host = false
       ; freeform = None
+      ; native = None
       }
   ; run = (fun _ _ -> Tool.Result.ok "stepped")
   }
