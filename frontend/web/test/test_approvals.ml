@@ -973,7 +973,7 @@ let%expect_test
      (tag Prefs))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s1.jsonl) (limit 1000000)))
-     (tag (Resync (session s1) (from ()))))
+     (tag (Resync (session s1) (from ()) (events 0))))
     (Rpc (method_ get_pending) (params ()) (tag Resync_pending))
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
