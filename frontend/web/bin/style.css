@@ -305,6 +305,9 @@ kbd {
 .session-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .session-title { min-width: 0; line-height: 21px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .session.selected .session-title { font-weight: 600; }
+/* Under the title while searching: the passage of its messages that matched. */
+.session-snippet { font-size: 12.5px; line-height: 17px; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; margin: 1px 0 2px; }
+.session-title mark, .session-snippet mark { background: var(--sodium-glow); color: var(--chalk); border-radius: 2px; }
 /* On the lighter row the faint meta would fall under 4.5:1. */
 .session.selected .session-meta { color: var(--muted); }
 .session-meta { display: flex; gap: 10px; min-width: 0; font: 11.5px/18px var(--mono); color: var(--faint); font-variant-numeric: tabular-nums; }
@@ -373,6 +376,13 @@ kbd {
 .sessions-divider:hover { color: var(--muted); }
 .sessions-divider:hover .divider-rule { background: var(--rule-2); }
 .sessions-divider:focus-visible { outline: 2px solid var(--sodium); outline-offset: -2px; }
+/* Pinned and Recent: the same rule, as headings, not buttons. */
+.sessions-group { cursor: default; padding-right: 9px; }
+.sessions-group:first-child { margin-top: 2px; }
+.sessions-group:hover { color: var(--faint); }
+.sessions-group:hover .divider-rule { background: var(--rule); }
+.session-pin { display: inline-flex; vertical-align: -1px; margin-right: 5px; color: var(--sodium); }
+.session-pin .icon { width: 12px; height: 12px; }
 .delete-archived {
   align-self: flex-start;
   margin: 2px 0 0 14px;
@@ -565,6 +575,7 @@ kbd {
 .delete-row.kept { opacity: 0.6; }
 .delete-title { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .delete-size, .delete-more { color: var(--faint); font-size: 12px; font-variant-numeric: tabular-nums; }
+.delete-pinned { color: var(--sodium); font-size: 12px; }
 .delete-more { padding: 3px 8px; }
 .delete-warnings { margin: 10px 0 0; padding: 8px 10px 8px 26px; border: 1px solid var(--brick-line); background: var(--brick-wash); border-radius: var(--r-control); color: var(--chalk); font-size: 13px; }
 
@@ -1317,6 +1328,20 @@ kbd {
 .cli-signin .signin-sub { margin: 0; }
 .cli-signin h1 { margin-bottom: 4px; }
 .signin .btn.primary, .cli-signin .btn.ghost { min-height: 44px; }
+.cli-signin-code {
+  display: block;
+  user-select: all;
+  -webkit-user-select: all;
+  background: var(--well);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-control);
+  padding: 8px 10px;
+  font: 13px/1.45 var(--mono);
+  color: var(--chalk);
+  word-break: break-all;
+  outline: none;
+}
+.cli-signin-code:focus-visible { border-color: var(--sodium); }
 
 /* Phones: the sidebar is a drawer over the page */
 
@@ -1811,6 +1836,23 @@ kbd {
 .account-setting { flex-wrap: nowrap; }
 .account-setting .setting-text { flex-basis: 0; }
 .account-setting .avatar { align-self: flex-start; }
+/* Memory: a filter over the notes, each its text and when it was saved. */
+.memory-toolbar { flex-wrap: nowrap; gap: 8px; }
+.memory-filter { flex: 1; min-width: 0; }
+.memory-note { align-items: flex-start; flex-wrap: nowrap; }
+.memory-note .setting-text { flex-basis: 0; }
+.memory-note-text { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.5; }
+.memory-note .setting-control { gap: 2px; }
+.memory-note.forgetting { background: color-mix(in srgb, var(--brick) 8%, transparent); }
+.memory-note.forgetting .setting-control { gap: 8px; align-self: center; }
+.memory-delete:hover { color: var(--brick); }
+.memory-draft { flex-direction: column; align-items: stretch; gap: 8px; }
+.memory-text-input { resize: vertical; min-height: 4.5em; font: inherit; line-height: 1.5; }
+.memory-draft-buttons { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.memory-draft-keys { margin-right: auto; color: var(--faint); font-size: 12px; }
+.memory-add { white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; }
+.memory-add .icon { width: 14px; height: 14px; }
+.memory-error { padding: 8px 0; }
 @media (max-width: 760px) {
   /* A phone: the page fills the screen, the sections a strip across its top. */
   .modal-backdrop:has(> .settings-dialog) { padding: 8px; }

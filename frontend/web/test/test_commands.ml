@@ -90,6 +90,7 @@ let%expect_test "every command does something (none is unknown)" =
     /todos                     toast: No plan: the model has not made one (it makes one with update_plan).
     /permissions               text: Permissions
     /notify                    toast: Notifications are on, but the browser has not been asked yet: /notify on asks it
+    /memory                    Settings
     /compact                   toast: Compacting the conversation…
     /naming                    toast: Sessions and subagents are named by the generate model, else the session's model (/naming model MODEL|off)
     /dictation                 toast: Dictation is transcribed by openai/gpt-4o-mini-transcribe, the default (/dictation model MODEL|off)
@@ -104,6 +105,8 @@ let%expect_test "every command does something (none is unknown)" =
     /switch                    sidebar
     /archive                   toast: This session isn't saved yet: send a message first.
     /unarchive                 toast: This session isn't saved yet: send a message first.
+    /pin                       toast: This session isn't saved yet: send a message first.
+    /unpin                     toast: This session isn't saved yet: send a message first.
     /delete                    loading Delete a message: rpc push_pref, rpc get_message_points
     /delete-archived           toast: There are no archived sessions.
     /clone                     rpc clone
@@ -199,9 +202,10 @@ let%expect_test "/help <command> and /hotkeys" =
     Ctrl+J jump to one of your messages: a list to filter (or the marks at the transcript's right edge)
     Delete (in the jump list) trim the model's context before the highlighted message (confirmed first; /trim undo brings it back)
     PageUp / PageDown scroll the transcript
-    Ctrl+K search sessions (↓ ↑ through them, Enter opens, Delete deletes)
+    Ctrl+K search sessions by words of their titles and messages (↓ ↑ through them, Enter opens, Delete deletes, Esc clears)
     Alt+Enter / Alt+R / Delete (/worktree) start a new session in the highlighted worktree / review its changes / remove it
     A (on a session) archive or unarchive it (archived sessions are listed last, muted)
+    P (on a session) pin it to the top of the sidebar, or unpin it (pinned sessions are never archived for being idle)
     Shift+F10 / ContextMenu (on a session or worktree) its menu: open, rename, fork, new worktree, review, files, terminal, pull request, copy, delete or remove (also right-click, a long press or its ⋯)
     Shift+F10 / ContextMenu (on a message) its menu: copy, trim everything before or after it, delete it (also right-click or a long press, at the pointer; with text selected, right-click is the browser's, to copy it; on a phone, its Select text selects its words)
     Shift+F10 / ContextMenu (in a text field, the desktop app's browser window) its menu: cut, copy, paste, select all (also right-click; ↑ ↓ move, Enter chooses, Esc closes); the browser's own menus are hidden there
@@ -228,7 +232,7 @@ let%expect_test "/help <command> and /hotkeys" =
     l / Shift+L (reviewing) what changed since your latest action on the file (or the hunks again); choose the action it compares with: Latest follows your newest
     Esc (reviewing) drop the comment, the selected code, the selected files, then close the review
     Enter / Ctrl+S (reviewing) add the comment or reply (Shift+Enter: a new line); save the file being edited
-    Ctrl+` open or close the terminal (/terminal); in it, every other key goes to the shell
+    Ctrl+` open or close the terminal (/terminal); in it, every other key goes to the shell. On a touch screen a bar over the keyboard has Esc, Tab, Ctrl and Alt (tap: the next key; double-tap: locked), the arrows (held: repeat), | ~ / - and Home, End, PgUp, PgDn
     Esc (in a pull request) back to the list it was opened from (/pr); Enter closes it
     Alt+G (a pull request, commit message, branch or session name) ✦ Generate: the model drafts it from the changes, the commits and the session (Esc stops, keeping what came; Undo puts the text back)
     Ctrl+Enter / Esc (the review's commit message) commit the files listed above it; close the commit, keeping the message
@@ -1836,7 +1840,7 @@ let%expect_test "/retry-backend-connection, /state, /clear, /quit" =
      (tag Prefs))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s1.jsonl) (limit 1000000)))
-     (tag (Resync (session s1) (from ()))))
+     (tag (Resync (session s1) (from ()) (events 0))))
     (Rpc (method_ get_pending) (params ()) (tag Resync_pending))
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))

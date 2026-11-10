@@ -64,3 +64,13 @@ module Outcome : sig
     }
   [@@deriving sexp_of]
 end
+
+module Code_prompt : sig
+  (** A browser sign-in that also takes the code the page shows (the
+      browser is on another computer, e.g. over SSH): the platform asks for
+      it, and says when a pasted one does not open. *)
+  type t =
+    | Wanted
+    | Refused of string (** why, and what to do *)
+  [@@deriving sexp_of, equal]
+end

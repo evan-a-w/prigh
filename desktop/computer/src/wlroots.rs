@@ -1,8 +1,9 @@
 //! wlroots compositors (Hyprland, sway, river, ...): screenshots through
 //! `wlr-screencopy-unstable-v1`, the pointer through
 //! `zwlr_virtual_pointer_v1` bound to the controlled output, and keys
-//! through `zwp_virtual_keyboard_v1` with a keymap of its own
-//! ([crate::keymap]), so any character types whatever the user's layout.
+//! through `zwp_virtual_keyboard_v1` as a physical keyboard with the
+//! user's layout and real evdev codes, plus keys of its own for characters
+//! the layout lacks ([crate::keymap]).
 //! No permission prompts: these protocols are open to any client.
 //!
 //! The output is the focused one (Hyprland and sway say which), else the
@@ -11,8 +12,9 @@
 
 use crate::action::Button;
 use crate::backend::{Backend, Screen};
-use crate::keymap::{modifier_mask, Keymap};
-use crate::keysym::{is_modifier, of_char, of_name, Keysym};
+use crate::keymap::{Event, Keyboard};
+use crate::keysym::{of_char, Keysym};
+use crate::xkb;
 use image::RgbaImage;
 use serde_json::Value;
 use std::io::{Read, Write};
@@ -194,6 +196,40 @@ fn sway(kind: u32) -> Result<Value, String> {
     serde_json::from_slice(&body).map_err(|e| format!("sway IPC: {e}"))
 }
 
+/// The layout keys are sent in: Hyprland's configured one (what it matches
+/// binds through), else xkbcommon's default (`$XKB_DEFAULT_LAYOUT`, ...,
+/// else us).
+fn layout(hyprland: Option<&PathBuf>) -> xkb::Keymap {
+    let option = |name: &str| -> String {
+        let Some(socket) = hyprland else { return String::new() };
+        match hyprland_ipc(socket, &format!("j/getoption input:{name}")) {
+            Ok(v) => v["str"].as_str().filter(|s| *s != "[[EMPTY]]").unwrap_or_default().to_string(),
+            Err(_) => String::new(),
+        }
+    };
+    let file = option("kb_file");
+    if !file.is_empty() {
+        let path = match file.strip_prefix("~/") {
+            Some(rest) => PathBuf::from(std::env::var("HOME").unwrap_or_default()).join(rest),
+            None => PathBuf::from(&file),
+        };
+        if let Some(k) = std::fs::read_to_string(path).ok().and_then(|t| xkb::Keymap::from_text(&t).ok()) {
+            return k;
+        }
+    }
+    let names = xkb::Names {
+        rules: option("kb_rules"),
+        model: option("kb_model"),
+        layout: option("kb_layout"),
+        variant: option("kb_variant"),
+        options: option("kb_options"),
+    };
+    xkb::Keymap::from_names(&names)
+        .or_else(|_| xkb::Keymap::from_names(&xkb::Names::default()))
+        .or_else(|_| xkb::Keymap::from_names(&xkb::Names { layout: "us".into(), ..Default::default() }))
+        .expect("xkbcommon compiles the us layout")
+}
+
 fn focused_name(outputs: &Value) -> Option<String> {
     outputs.as_array()?.iter().find(|o| o["focused"].as_bool() == Some(true))?["name"].as_str().map(str::to_string)
 }
@@ -208,8 +244,7 @@ pub struct Wlroots {
     keyboard: zwp_virtual_keyboard_v1::ZwpVirtualKeyboardV1,
     output: wl_output::WlOutput,
     screen: Screen,
-    keymap: Keymap,
-    mods: u32,
+    keyboard_state: Keyboard,
     start: Instant,
     hyprland: Option<PathBuf>,
 }
@@ -278,13 +313,11 @@ impl Wlroots {
                 height: info.height.max(1) as u32,
                 scale: info.scale.max(1) as f64,
             },
-            keymap: Keymap::default(),
-            mods: 0,
+            keyboard_state: Keyboard::new(&layout(hyprland.as_ref()))?,
             start: Instant::now(),
             hyprland,
         };
-        me.keymap.keycode(of_name("Return").unwrap());
-        me.upload_keymap()?;
+        me.send_keys()?;
         // The real size is what screencopy gives (a rotated output's too).
         let first = me.capture()?;
         me.screen.width = first.width();
@@ -300,19 +333,26 @@ impl Wlroots {
         self.queue.flush().map_err(|e| format!("Wayland: {e}"))
     }
 
-    fn upload_keymap(&mut self) -> Result<(), String> {
-        let mut text = self.keymap.text().into_bytes();
-        text.push(0);
-        let fd = memfd(text.len())?;
-        let mut file = std::fs::File::from(fd.try_clone().map_err(|e| e.to_string())?);
-        file.write_all(&text).map_err(|e| format!("writing the keymap: {e}"))?;
-        self.keyboard.keymap(1, fd.as_fd(), text.len() as u32);
+    /// Sends what the keyboard did since the last call.
+    fn send_keys(&mut self) -> Result<(), String> {
+        for e in self.keyboard_state.take_events() {
+            match e {
+                Event::Keymap(text) => {
+                    let mut text = text.into_bytes();
+                    text.push(0);
+                    let fd = memfd(text.len())?;
+                    let mut file = std::fs::File::from(fd.try_clone().map_err(|e| e.to_string())?);
+                    file.write_all(&text).map_err(|e| format!("writing the keymap: {e}"))?;
+                    self.keyboard.keymap(1, fd.as_fd(), text.len() as u32);
+                }
+                Event::Key { evdev, down } => {
+                    let t = self.time();
+                    self.keyboard.key(t, evdev, down as u32);
+                }
+                Event::Mods(m) => self.keyboard.modifiers(m.depressed, m.latched, m.locked, m.group),
+            }
+        }
         self.flush()
-    }
-
-    fn key(&mut self, keycode: u32, down: bool) {
-        let t = self.time();
-        self.keyboard.key(t, Keymap::evdev(keycode), down as u32);
     }
 
     fn pointer_frame(&mut self) -> Result<(), String> {
@@ -399,59 +439,33 @@ impl Backend for Wlroots {
     }
 
     fn keys(&mut self, keys: &[Keysym], down: bool) -> Result<(), String> {
-        let mut added = false;
-        let codes: Vec<Option<u32>> = keys
-            .iter()
-            .map(|k| {
-                if is_modifier(*k) {
-                    None
-                } else {
-                    let (c, a) = self.keymap.keycode(*k);
-                    added |= a;
-                    Some(c)
-                }
-            })
-            .collect();
-        if added {
-            self.upload_keymap()?;
-        }
-        for (k, code) in keys.iter().zip(codes) {
-            match code {
-                None => {
-                    let m = modifier_mask(*k);
-                    self.mods = if down { self.mods | m } else { self.mods & !m };
-                    self.keyboard.modifiers(self.mods, 0, 0, 0);
-                }
-                Some(c) => self.key(c, down),
+        if down {
+            self.keyboard_state.prepare(keys)?;
+            for &k in keys {
+                self.keyboard_state.press(k)?;
+            }
+        } else {
+            for &k in keys {
+                self.keyboard_state.release(k);
             }
         }
-        self.flush()
+        self.send_keys()
     }
 
     fn type_text(&mut self, text: &str) -> Result<(), String> {
         let syms: Vec<Keysym> = text.chars().map(of_char).collect();
-        if self.keymap.len() + syms.len() > 240 {
-            self.keymap = Keymap::default();
-        }
-        let mut added = false;
-        let codes: Vec<u32> = syms
-            .iter()
-            .map(|k| {
-                let (c, a) = self.keymap.keycode(*k);
-                added |= a;
-                c
-            })
-            .collect();
-        if added {
-            self.upload_keymap()?;
-        }
-        for c in codes {
-            self.key(c, true);
-            self.key(c, false);
-            self.flush()?;
+        self.keyboard_state.prepare(&syms)?;
+        for k in syms {
+            self.keyboard_state.tap(k)?;
+            self.send_keys()?;
             std::thread::sleep(std::time::Duration::from_millis(2));
         }
         Ok(())
+    }
+
+    fn release_all(&mut self) -> Result<(), String> {
+        self.keyboard_state.release_all();
+        self.send_keys()
     }
 
     fn cursor(&mut self) -> Result<Option<(i32, i32)>, String> {

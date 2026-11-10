@@ -19,4 +19,5 @@
   prigh_web
   prigh_web_app
   virtual_dom
-  virtual_dom.vdom_test_helpers))
+  virtual_dom.vdom_test_helpers
+  re))

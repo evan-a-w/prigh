@@ -656,6 +656,239 @@ let account (m : App.Model.t) ~inject =
     ]
 ;;
 
+(* The model's memory: whether it has it, and the notes, each to edit or
+   delete. *)
+let memory_switch (m : App.Model.t) ~inject =
+  let n = m.memory in
+  let on = n.memory.enabled in
+  row
+    ~cls:"memory-enabled"
+    ~name:"Use memory"
+    ~about:
+      "The model saves a note only when you ask it to remember something, and \
+       looks one up when you refer back to it. Off, it is not given the memory \
+       tool, and your notes stay here."
+    ?note:
+      (match n.status with
+       | Unknown | Loading -> Some ("muted", "Reading your memory…")
+       | Loaded | Failed _ -> None)
+    [ switch
+        ~disabled:(not (Memory_notes.Status.equal n.status Loaded))
+        ~label:"Use memory"
+        ~title:
+          (if on
+           then "Stop giving the model your memory (/memory off)"
+           else "Give the model your memory (/memory on)")
+        ~on
+        ~on_click:
+          (inject (Action.Run (if on then "/memory off" else "/memory on")))
+        ()
+    ]
+;;
+
+let memory_draft (d : Memory_notes.Draft.t) ~inject =
+  div
+    ~cls:"setting memory-draft"
+    [ Node.input
+        ~attrs:
+          [ Attr.id "memory-title"
+          ; Attr.class_ "text-input memory-title-input"
+          ; Attr.type_ "text"
+          ; Attr.create "aria-label" "Title"
+          ; Attr.placeholder "Title (optional): a few words"
+          ; Attr.value d.title
+          ; Attr.create "maxlength" "80"
+          ; Attr.create "autocomplete" "off"
+          ; (if d.saving then Attr.disabled else Attr.empty)
+          ; Attr.on_input (fun _ text -> inject (Action.Memory_title text))
+          ]
+        ()
+    ; Node.textarea
+        ~attrs:
+          [ Attr.id "memory-text"
+          ; Attr.class_ "text-input memory-text-input"
+          ; Attr.create "aria-label" "Note"
+          ; Attr.placeholder "What the model should remember"
+          ; Attr.value d.text
+          ; Attr.rows 3
+          ; Attr.create "maxlength" "2000"
+          ; (if d.saving then Attr.disabled else Attr.empty)
+          ; Attr.on_input (fun _ text -> inject (Action.Memory_text text))
+          ]
+        []
+    ; (match d.error with
+       | Some e -> span ~cls:"setting-note warm" e
+       | None -> Node.none)
+    ; div
+        ~cls:"memory-draft-buttons"
+        [ span ~cls:"memory-draft-keys" "Ctrl+Enter saves, Esc cancels"
+        ; button
+            ~cls:"small ghost"
+            ~title:"Esc"
+            ~on_click:(inject Action.Memory_cancel)
+            [ Node.text "Cancel" ]
+        ; button
+            ~cls:"small primary"
+            ~title:"Ctrl+Enter (Enter in the title)"
+            ~disabled:d.saving
+            ~attrs:(if d.saving then [ Attr.create "aria-busy" "true" ] else [])
+            ~on_click:(inject Action.Memory_save)
+            [ Node.text (if d.saving then "Saving…" else "Save") ]
+        ]
+    ]
+;;
+
+let memory_note (n : Memory_notes.t) (note : Memory.Note.t) ~inject =
+  match n.draft with
+  | Some ({ id = Some id; _ } as d) when String.equal id note.id ->
+    memory_draft d ~inject
+  | _ ->
+    let forgetting = Option.equal String.equal n.forgetting (Some note.id) in
+    let name = Option.value note.title ~default:"Untitled note" in
+    div
+      ~cls:
+        (if forgetting
+         then "setting memory-note forgetting"
+         else "setting memory-note")
+      ~attrs:[ Attr.create "data-note" note.id ]
+      [ div
+          ~cls:"setting-text"
+          [ (match note.title with
+             | Some title -> span ~cls:"setting-name" title
+             | None -> Node.none)
+          ; span ~cls:"memory-note-text" note.text
+          ; span
+              ~cls:
+                (if forgetting
+                 then "setting-note warm"
+                 else "setting-note muted")
+              (if forgetting
+               then "Delete this note? The model can no longer recall it."
+               else "Saved " ^ Memory.Note.date note)
+          ]
+      ; div
+          ~cls:"setting-control"
+          (if forgetting
+           then
+             [ button
+                 ~cls:"small ghost"
+                 ~title:"Keep it (Esc)"
+                 ~on_click:(inject Action.Memory_forget_cancel)
+                 [ Node.text "Keep" ]
+             ; button
+                 ~cls:"small danger"
+                 ~attrs:[ Attr.id "memory-forget-yes" ]
+                 ~on_click:(inject Action.Memory_forget_confirm)
+                 [ Node.text "Delete" ]
+             ]
+           else
+             [ button
+                 ~cls:"icon ghost"
+                 ~label:("Edit " ^ name)
+                 ~title:"Edit"
+                 ~on_click:(inject (Action.Memory_edit (Some note.id)))
+                 [ icon Pencil ]
+             ; button
+                 ~cls:"icon ghost memory-delete"
+                 ~label:("Delete " ^ name)
+                 ~title:"Delete"
+                 ~on_click:(inject (Action.Memory_forget note.id))
+                 [ icon Trash ]
+             ])
+      ]
+;;
+
+let memory_notes (m : App.Model.t) ~inject =
+  let n = m.memory in
+  let notes = n.memory.notes in
+  let add =
+    button
+      ~cls:"small memory-add"
+      ~title:"Write a note for the model yourself"
+      ~disabled:(Option.is_some n.draft)
+      ~on_click:(inject (Action.Memory_edit None))
+      [ icon Plus; Node.text "Add note" ]
+  in
+  let toolbar =
+    div
+      ~cls:"setting memory-toolbar"
+      [ Node.input
+          ~attrs:
+            [ Attr.id "memory-filter"
+            ; Attr.class_ "text-input memory-filter"
+            ; Attr.type_ "search"
+            ; Attr.create "aria-label" "Filter notes"
+            ; Attr.placeholder "Filter notes"
+            ; Attr.value n.filter
+            ; Attr.create "autocomplete" "off"
+            ; Attr.create "spellcheck" "false"
+            ; Attr.on_input (fun _ text -> inject (Action.Memory_filter text))
+            ]
+          ()
+      ; add
+      ]
+  in
+  let error =
+    match n.error with
+    | Some e ->
+      [ div
+          ~cls:"setting memory-error"
+          ~attrs:[ Attr.role "alert" ]
+          [ span ~cls:"setting-note warm" e ]
+      ]
+    | None -> []
+  in
+  let draft =
+    match n.draft with
+    | Some ({ id = None; _ } as d) -> [ memory_draft d ~inject ]
+    | _ -> []
+  in
+  match n.status, notes with
+  | (Unknown | Loading), _ -> []
+  | Failed e, _ ->
+    [ row
+        ~cls:"memory-failed"
+        ~name:"Your notes"
+        ~about:"The backend could not read them."
+        ~note:("warm", e)
+        [ button
+            ~cls:"small ghost"
+            ~title:"Read them again (/memory)"
+            ~on_click:(inject (Action.Run "/memory"))
+            [ Node.text "Retry" ]
+        ]
+    ]
+  | Loaded, [] ->
+    error
+    @ draft
+    @ [ row
+          ~cls:"memory-empty"
+          ~name:"No notes yet"
+          ~about:
+            "Tell the model “remember that…” and it saves a note here. In a \
+             later session, ask about it (“what did I say about deploys?”) and \
+             it looks it up. It saves nothing you did not ask it to."
+          (if List.is_empty draft then [ add ] else [])
+      ]
+  | Loaded, _ ->
+    toolbar
+    :: (error
+        @ draft
+        @
+        match Memory_notes.visible n with
+        | [] ->
+          [ row
+              ~cls:"memory-none"
+              ~name:"No match"
+              ~about:
+                (sprintf
+                   "No note matches “%s”: change or clear the filter."
+                   (String.strip n.filter))
+              []
+          ]
+        | visible -> List.map visible ~f:(memory_note n ~inject))
+;;
+
 module Section = Settings_section
 
 (* A section's settings, in groups: a new setting is a row in its list.
@@ -688,6 +921,21 @@ let content (m : App.Model.t) (section : Section.t) ~inject =
         ]
     ; group ~title:"Compaction" (compaction m ~inject)
     ]
+  | Memory ->
+    group [ memory_switch m ~inject ]
+    ::
+    (match memory_notes m ~inject with
+     | [] -> []
+     | rows ->
+       [ group
+           ~title:"Notes"
+           ?note:
+             (match m.memory.memory.notes with
+              | [] -> None
+              | [ _ ] -> Some "1 note"
+              | notes -> Some (sprintf "%d notes" (List.length notes)))
+           rows
+       ])
   | Git_hosting -> [ group ~title:"Hosts" (git_hosts m ~inject) ]
   | Nix_store -> [ group (nix_store m ~inject) ]
   | Account -> [ group (account m ~inject) ]
@@ -697,6 +945,7 @@ let section_icon : Section.t -> Icon.t = function
   | Appearance -> Palette
   | Sessions -> Bot
   | Models -> Brain
+  | Memory -> Book
   | Git_hosting -> Repo
   | Nix_store -> Package
   | Account -> User

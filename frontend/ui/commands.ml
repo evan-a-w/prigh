@@ -26,6 +26,7 @@ module Argument = struct
     | Delete
     | Snippet
     | Remind
+    | Memory
     | Worktree
     | Review
     | Server
@@ -154,6 +155,13 @@ let every =
        in a row, default 3); every N TEXT: every N turns; rm NAME, off: remove \
        one or all; none: list the session's (Ctrl+D removes one)"
   ; c
+      ~argument:Argument.Memory
+      "memory"
+      "[on|off]"
+      "the notes the model saved when you asked it to remember something \
+       (Ctrl+D forgets one); on or off gives the model the memory tool or \
+       takes it away"
+  ; c
       ~argument:Argument.Resume
       "resume"
       "[now|cancel]"
@@ -163,10 +171,7 @@ let every =
       ""
       "send the conversation's images smaller (after the model refused one as \
        too large) and retry a failed reply"
-  ; c
-      "compact"
-      "[instructions]"
-      "summarise older messages to free context"
+  ; c "compact" "[instructions]" "summarise older messages to free context"
   ; c
       ~argument:Argument.Compaction
       "compaction"
@@ -255,8 +260,8 @@ let every =
   ; c
       "sessions"
       ""
-      "pick a saved session (Tab marks, Ctrl+D deletes, Alt+A archives, Alt+D \
-       deletes all archived, Ctrl+N named)"
+      "pick a saved session (Tab marks, Ctrl+D deletes, Alt+A archives, Alt+T \
+       pins, Alt+D deletes all archived, Ctrl+N named)"
   ; c
       ~argument:Argument.Sessions
       "archive"
@@ -267,6 +272,17 @@ let every =
       "unarchive"
       "[session]"
       "unarchive a session (the current one without an argument)"
+  ; c
+      ~argument:Argument.Sessions
+      "pin"
+      "[session]"
+      "pin a session to the top of /sessions, where it is never archived for \
+       being idle (the current one without an argument)"
+  ; c
+      ~argument:Argument.Sessions
+      "unpin"
+      "[session]"
+      "unpin a session (the current one without an argument)"
   ; c "delete-archived" "" "delete every archived session, after a confirmation"
   ; c
       ~argument:Argument.Agents

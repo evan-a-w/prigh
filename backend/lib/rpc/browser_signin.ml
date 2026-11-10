@@ -26,22 +26,58 @@ module Program = struct
   ;;
 end
 
-module Grant = struct
+module Grant = Browser_signin_grant
+
+module Paste = struct
   type t =
-    { proxy_cookie : (string[@sexp.opaque])
-    ; token : (string[@sexp.opaque]) option
-    ; user : string option
+    { secret : string option
+    ; from : string
+    ; read_line : unit -> string option
     }
-  [@@deriving sexp_of]
+
+  let create ?secret ~from ~read_line () = { secret; from; read_line }
+
+  let stdin ~env =
+    let reader =
+      Eio.Buf_read.of_flow ~max_size:(64 * 1024) (Eio.Stdenv.stdin env)
+    in
+    { secret = None
+    ; from = Core_unix.gethostname ()
+    ; read_line =
+        (fun () ->
+          match Eio.Buf_read.line reader with
+          | line -> Some line
+          | exception (End_of_file | Eio.Buf_read.Buffer_limit_exceeded) -> None)
+    }
+  ;;
+
+  let wanted ~flag ~getenv =
+    let set name = Option.exists (getenv name) ~f:(Fn.non String.is_empty) in
+    flag
+    ||
+    match Option.map (getenv "PRIGH_SIGNIN_PASTE") ~f:String.strip with
+    | Some "1" -> true
+    | Some "0" -> false
+    | Some _ | None -> set "SSH_CONNECTION" || set "SSH_TTY"
+  ;;
+
+  let lifetime = Time_ns.Span.of_min 30.
 end
 
-let url remote ~program ~port ~state =
+let url ?paste remote ~program ~port ~state =
   sprintf
-    "%s#cli-signin=%d.%s&program=%s"
+    "%s#cli-signin=%d.%s&program=%s%s"
     (Backend_address.web_url remote)
     port
     state
     (Program.to_string program)
+    (match paste with
+     | None -> ""
+     | Some (key, from) ->
+       sprintf
+         "&paste=%s&from=%s"
+         (Paste_code.public_key key)
+         (Uri.pct_encode ~component:`Query_value from))
 ;;
 
 let digest s = Digestif.SHA256.(to_raw_string (digest_string s))
@@ -181,7 +217,25 @@ let random_state () =
   Ohex.encode (Mirage_crypto_rng.generate 16)
 ;;
 
-let run ~env ?state ~program ~on_url remote =
+(* Pasted codes, one a line, until one opens or the sign-in expires; once
+   the input ends, only the listener can finish. *)
+let read_pastes (paste : Paste.t) key ~on_refused =
+  let rec loop () =
+    match paste.read_line () with
+    | None -> Fiber.await_cancel ()
+    | Some line when String.is_empty (String.strip line) -> loop ()
+    | Some line ->
+      (match Paste_code.open_ key ~now:(Time_ns.now ()) line with
+       | Ok grant -> Ok grant
+       | Error (Expired as e) -> Error (Paste_code.Error.to_string_hum e)
+       | Error e ->
+         on_refused (Paste_code.Error.to_string_hum e);
+         loop ())
+  in
+  loop ()
+;;
+
+let run ~env ?state ?paste ?(on_refused = ignore) ~program ~on_url remote =
   let state = Option.value_or_thunk state ~default:random_state in
   let host = Backend_address.authority remote in
   Switch.run
@@ -220,7 +274,24 @@ let run ~env ?state ~program ~on_url remote =
     Web_server.respond flow response;
     Option.iter result ~f:(Promise.resolve finish)
   in
-  on_url ~url:(url remote ~program ~port ~state) ~port;
+  let paste =
+    Option.map paste ~f:(fun (paste : Paste.t) ->
+      ( paste
+      , Paste_code.create
+          ?secret:paste.secret
+          ~state
+          ~expires:(Time_ns.add (Time_ns.now ()) Paste.lifetime)
+          () ))
+  in
+  on_url
+    ~url:
+      (url
+         ?paste:(Option.map paste ~f:(fun (paste, key) -> key, paste.from))
+         remote
+         ~program
+         ~port
+         ~state)
+    ~port;
   (* Browsers open spare connections that may never send anything: each is
      served on its own, and whatever is left is dropped once it is done. *)
   Fiber.fork_daemon ~sw (fun () ->
@@ -242,23 +313,38 @@ let run ~env ?state ~program ~on_url remote =
       accept ()
     in
     accept ());
-  Promise.await finished
+  match paste with
+  | None -> Promise.await finished
+  | Some (paste, key) ->
+    Fiber.first
+      (fun () -> Promise.await finished)
+      (fun () -> read_pastes paste key ~on_refused)
 ;;
 
-let run_on_terminal ~env ~program ~say ?open_url ~why remote =
-  run ~env ~program remote ~on_url:(fun ~url ~port ->
-    say
-      (sprintf
-         "%s: sign in through the browser: %s\n\
-          %s\n\
-          (Over SSH, forward the port to the browser's computer first: ssh -L \
-          %d:127.0.0.1:%d ...) Waiting for the sign-in..."
-         why
-         (match open_url with
-          | Some _ -> "opening (if it does not open, open it yourself)"
-          | None -> "open")
-         url
-         port
-         port);
-    Option.iter open_url ~f:(fun open_url -> open_url url))
+let run_on_terminal ~env ?state ~program ~say ?open_url ?paste ~why remote =
+  run
+    ~env
+    ?state
+    ~program
+    ?paste
+    ~on_refused:(fun error -> say (sprintf "%s. Paste the code:" error))
+    remote
+    ~on_url:(fun ~url ~port ->
+      say
+        (sprintf
+           "%s: sign in through the browser: %s\n\
+            %s\n\
+            (Over SSH, forward the port to the browser's computer first: ssh \
+            -L %d:127.0.0.1:%d ...)%s"
+           why
+           (match open_url with
+            | Some _ -> "opening (if it does not open, open it yourself)"
+            | None -> "open")
+           url
+           port
+           port
+           (match paste with
+            | None -> " Waiting for the sign-in..."
+            | Some _ -> "\nOr paste the code the page shows after Allow:"));
+      Option.iter open_url ~f:(fun open_url -> open_url url))
 ;;

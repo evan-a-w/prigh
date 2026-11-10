@@ -103,6 +103,7 @@
   border-width: 1px 0 0;
   padding-bottom: max(8px, var(--safe-b));
   padding-left: max(8px, var(--safe-l));
+  scroll-padding-bottom: max(8px, var(--safe-b));
   padding-right: max(8px, var(--safe-r));
   overflow-y: auto;
   overscroll-behavior: contain;
@@ -285,6 +286,10 @@
 .app.narrow .setting :is(.btn, select, .chip-button) { min-height: 40px; }
 .app.narrow .setting input[type="text"], .app.narrow .setting input:not([type]) { width: 100%; }
 .app.narrow .switch { width: 46px; height: 28px; border-radius: 14px; }
+.app.narrow .switch-knob { top: 3px; left: 3px; width: 20px; height: 20px; }
+.app.narrow .switch.on .switch-knob { transform: translateX(18px); }
+/* Its hit area a thumb's, past the 28px it shows. */
+.app.narrow .switch::after { content: ""; position: absolute; inset: -9px -2px; }
 .app.narrow .settings-group h4 { font-size: 12px; }
 /* A wide row is the words, then the control: neither grows into a gap. */
 .app.narrow .setting-wide { flex-wrap: nowrap; }
@@ -497,3 +502,14 @@
   .composer-controls .model-chip > .chevron { display: none; }
 }
 .app.narrow .computer-banner .btn.computer-banner-stop { height: var(--tap); min-width: var(--tap); }
+/* Memory: notes over their buttons' column; the editor's buttons a thumb's. */
+.app.narrow .memory-note .setting-text { flex-basis: 0; }
+.app.narrow .memory-note .btn.icon { width: var(--tap); height: var(--tap); }
+.app.narrow .memory-note.forgetting { flex-wrap: wrap; }
+.app.narrow .memory-note.forgetting .setting-text { flex-basis: 100%; }
+.app.narrow .memory-note.forgetting .setting-control { width: 100%; }
+.app.narrow .memory-note.forgetting .setting-control .btn { flex: 1; min-height: var(--tap); }
+.app.narrow :is(.memory-toolbar, .memory-draft-buttons) .btn { min-height: var(--tap); }
+.app.narrow :is(.memory-filter, .memory-title-input) { min-height: var(--tap); }
+.app.narrow .memory-draft-keys { display: none; }
+.app.narrow .memory-draft-buttons .btn { flex: 1; }

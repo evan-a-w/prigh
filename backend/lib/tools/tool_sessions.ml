@@ -18,6 +18,7 @@ let spec =
   ; parallel_safe = true
   ; on_host = false
   ; freeform = None
+  ; native = None
   ; destructive = Never
   ; description =
       "Search and read other saved sessions, only when the user refers to one \

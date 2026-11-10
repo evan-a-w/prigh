@@ -554,6 +554,13 @@ let perform client settings ctx (model : App.Model.t) (command : App.Command.t) 
           ()
       in
       inject (App.Action.Dismiss_toast id)
+    | Search_sessions_later { search; after_ms } ->
+      let%bind.Effect () =
+        Effect.of_deferred_fun
+          (fun () -> Clock_ns.after (Time_ns.Span.of_int_ms after_ms))
+          ()
+      in
+      inject (App.Action.Search_sessions search)
     | Focus id -> Effect.of_sync_fun focus id
     | Clear_text_selection -> Effect.of_sync_fun Selection_listeners.clear ()
     | Place_popover -> Effect.of_sync_fun place_popover ()
@@ -695,11 +702,11 @@ let terminal
       inject (App.Action.Terminal_status { key; status }))
 ;;
 
-let component client settings ~current (local_ graph) =
+let component client settings ~init ~current (local_ graph) =
   let model, inject =
     Bonsai.state_machine
       ~sexp_of_action:App.Action.sexp_of_t
-      ~default_model:App.init
+      ~default_model:init
       ~apply_action:(fun ctx model action ->
         let model', commands = App.update model action in
         current := model';
@@ -1431,7 +1438,10 @@ let run_app (settings : Settings.t) =
        sign_in_form settings ~error
      | result ->
        let handle_ref = ref None in
-       let current = ref App.init in
+       (* Laid out for a phone from the first frame: the drawer would show,
+          then slide away. *)
+       let init = fst (App.update App.init (Set_narrow (narrow ()))) in
+       let current = ref init in
        let schedule action =
          Option.iter !handle_ref ~f:(fun handle ->
            Start.Handle.schedule handle action)
@@ -1440,7 +1450,7 @@ let run_app (settings : Settings.t) =
          Start.start_and_get_handle
            (module Result_)
            ~bind_to_element_with_id:"app"
-           (component client settings ~current)
+           (component client settings ~init ~current)
        in
        handle_ref := Some handle;
        Option.iter (Result.ok result) ~f:(fun (reply, _) ->

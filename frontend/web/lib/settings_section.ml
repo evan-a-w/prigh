@@ -4,6 +4,7 @@ type t =
   | Appearance
   | Sessions
   | Models
+  | Memory
   | Git_hosting
   | Nix_store
   | Account
@@ -12,7 +13,7 @@ type t =
 let available ~superuser =
   List.filter all ~f:(function
     | Nix_store -> superuser
-    | Appearance | Sessions | Models | Git_hosting | Account -> true)
+    | Appearance | Sessions | Models | Memory | Git_hosting | Account -> true)
 ;;
 
 let visible t ~superuser =
@@ -23,6 +24,7 @@ let name = function
   | Appearance -> "Appearance"
   | Sessions -> "Sessions"
   | Models -> "Models"
+  | Memory -> "Memory"
   | Git_hosting -> "Git hosting"
   | Nix_store -> "Nix store"
   | Account -> "Account"
@@ -38,6 +40,9 @@ let about = function
   | Models ->
     "The providers whose models you use, the models prigh uses for its own \
      work, and when long conversations are summarised. Kept on the backend."
+  | Memory ->
+    "What you asked the model to remember, for later sessions. Kept on the \
+     backend, for your account."
   | Git_hosting ->
     "The hosts agents push branches to and open pull requests on."
   | Nix_store ->
@@ -49,6 +54,7 @@ let arg = function
   | Appearance -> "appearance"
   | Sessions -> "sessions"
   | Models -> "models"
+  | Memory -> "memory"
   | Git_hosting -> "git"
   | Nix_store -> "nix"
   | Account -> "account"

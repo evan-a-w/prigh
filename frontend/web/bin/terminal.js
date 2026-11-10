@@ -24,9 +24,14 @@
    *     | "failed", message?: string) => void,
    *   focus?: boolean,
    *   theme?: object,
+   *   transform?: (data: string) => string,
    * }} options [onStatus] reports the connection's state; [focus] (default
-   *   true) focuses the terminal once it is open; [theme] is xterm.js's.
-   * @returns {{ focus(): void, dispose(): void, setTheme(theme: object): void }}
+   *   true) focuses the terminal once it is open; [theme] is xterm.js's;
+   *   [transform] rewrites what is typed (the extra keys' latched Ctrl and Alt).
+   * @returns {{ focus(): void, dispose(): void, setTheme(theme: object): void,
+   *   press(data: string): void, appCursor(): boolean }} [press] sends
+   *   [data] as typed, untransformed; [appCursor] is the cursor keys' mode
+   *   (DECCKM).
    */
   const mount = (host, url, options) => {
     const report = (state, message) => options.onStatus(state, message);
@@ -44,6 +49,8 @@
     let observer;
     // "open" | "exited" (a key starts a new shell) | "failed" | "disposed"
     let state = "open";
+    // While [press] feeds xterm.js its bytes, which are not to be transformed.
+    let pressing = false;
 
     const send = data => {
       if (ws?.readyState === WebSocket.OPEN) ws.send(data);
@@ -124,6 +131,7 @@
       term.open(host);
       fit.fit();
       term.onData(data => {
+        if (options.transform && !pressing) data = options.transform(data);
         if (state === "exited") {
           state = "open";
           connect();
@@ -151,6 +159,17 @@
         if (term) term.focus();
         else focusWhenOpen = true;
       },
+      // Through xterm.js, as a key typed: it scrolls to the prompt.
+      press: data => {
+        if (!term) return;
+        pressing = true;
+        try {
+          term.input(data, true);
+        } finally {
+          pressing = false;
+        }
+      },
+      appCursor: () => term?.modes.applicationCursorKeysMode ?? false,
       setTheme: theme => {
         options.theme = theme;
         if (term) term.options.theme = theme;

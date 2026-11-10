@@ -55,3 +55,10 @@ module Outcome = struct
     }
   [@@deriving sexp_of]
 end
+
+module Code_prompt = struct
+  type t =
+    | Wanted
+    | Refused of string
+  [@@deriving sexp_of, equal]
+end

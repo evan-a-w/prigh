@@ -495,6 +495,7 @@ let session_summary (s : Session.Summary.t) =
   ; "first_prompt", Option.value_map s.first_prompt ~default:`Null ~f:str
   ; "message_count", int s.message_count
   ; ("failed", if s.failed then `True else `False)
+  ; ("pinned", if s.pinned then `True else `False)
   ; "parent", Option.value_map s.parent ~default:`Null ~f:str
   ; "host", Option.value_map s.host ~default:`Null ~f:str
   ]
@@ -570,6 +571,8 @@ let entry (e : Session.Entry.t) =
       [ "kind", str "archived"
       ; ("archived", if archived then `True else `False)
       ]
+    | Pinned { pinned } ->
+      [ "kind", str "pinned"; ("pinned", if pinned then `True else `False) ]
     | Spend { usage = u; cost_usd } ->
       [ "kind", str "spend"; "usage", usage u; "cost_usd", float cost_usd ]
     | Resume_at { at } ->

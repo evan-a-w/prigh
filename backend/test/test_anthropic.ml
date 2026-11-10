@@ -12,6 +12,7 @@ let tools =
     ; parallel_safe = false
     ; on_host = true
     ; freeform = None
+    ; native = None
     ; destructive = Always
     ; description = "Run a command"
     ; parameters =
@@ -25,6 +26,7 @@ let tools =
     ; parallel_safe = true
     ; on_host = true
     ; freeform = None
+    ; native = None
     ; destructive = Never
     ; description = "Delegate"
     ; parameters = `Object [ "type", `String "object" ]
@@ -290,7 +292,7 @@ let%expect_test
 
 let%expect_test "headers: api key vs oauth token, betas" =
   let show ~auth ~thinking_on =
-    List.iter (T.headers ~auth ~thinking_on) ~f:(fun (k, v) ->
+    List.iter (T.headers ~auth ~thinking_on ()) ~f:(fun (k, v) ->
       printf "%s: %s\n" k v)
   in
   show ~auth:(Api_key "sk-ant-api03-x") ~thinking_on:false;
@@ -321,7 +323,7 @@ let%expect_test "headers: api key vs oauth token, betas" =
     --
     anthropic-version: 2023-06-01
     Authorization: Bearer sk-ant-oat01-x
-    user-agent: claude-cli/2.1.280
+    user-agent: claude-cli/2.1.322
     x-app: cli
     anthropic-beta: claude-code-20250219,oauth-2025-04-20,interleaved-thinking-2025-05-14
     --
@@ -460,7 +462,7 @@ let%expect_test "stream end to end: request shape, headers, assembled message" =
     authorization: Bearer sk-ant-oat01-t
     anthropic-beta: claude-code-20250219,oauth-2025-04-20
     x-app: cli
-    user-agent: claude-cli/2.1.280
+    user-agent: claude-cli/2.1.322
     accept: text/event-stream
     [{"type":"text","text":"You are Claude Code, Anthropic's official CLI for Claude.","cache_control":{"type":"ephemeral"}}]
     {"type":"adaptive","display":"summarized"}

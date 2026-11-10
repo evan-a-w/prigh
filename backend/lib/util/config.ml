@@ -44,6 +44,8 @@ type t =
   ; generate_model : string option
   ; mask_observations : bool
   ; computer_screenshots : int
+  ; computer_screenshots_max : int
+  ; computer_native : bool
   ; compact_at_tokens : int
   ; compaction_model : string option
   ; naming_model : string option
@@ -74,6 +76,8 @@ let default =
   ; generate_model = None
   ; mask_observations = true
   ; computer_screenshots = 3
+  ; computer_screenshots_max = 8
+  ; computer_native = true
   ; compact_at_tokens = 200_000
   ; compaction_model = None
   ; naming_model = None
@@ -140,6 +144,9 @@ let to_json t =
     ; "generate_model", option (fun s -> `String s) t.generate_model
     ; ("mask_observations", if t.mask_observations then `True else `False)
     ; "computer_screenshots", `Number (Int.to_string t.computer_screenshots)
+    ; ( "computer_screenshots_max"
+      , `Number (Int.to_string t.computer_screenshots_max) )
+    ; ("computer_native", if t.computer_native then `True else `False)
     ; "compact_at_tokens", `Number (Int.to_string t.compact_at_tokens)
     ; "compaction_model", option (fun s -> `String s) t.compaction_model
     ; "naming_model", option (fun s -> `String s) t.naming_model
@@ -354,6 +361,33 @@ let of_json json =
          | Some _ | None -> error ())
       | Some _ -> error ()
     in
+    let%bind computer_screenshots_max =
+      let error () =
+        Or_error.errorf
+          "config.computer_screenshots_max must be a whole number, at least \
+           computer_screenshots (%d): screenshots pile up to it, then all but \
+           the latest computer_screenshots are omitted at once"
+          computer_screenshots
+      in
+      match find "computer_screenshots_max" with
+      | None | Some `Null ->
+        Ok (Int.max computer_screenshots default.computer_screenshots_max)
+      | Some (`Number n) ->
+        (match Int.of_string_opt n with
+         | Some n when n >= computer_screenshots -> Ok n
+         | Some _ | None -> error ())
+      | Some _ -> error ()
+    in
+    let%bind computer_native =
+      match find "computer_native" with
+      | None | Some `Null -> Ok default.computer_native
+      | Some `True -> Ok true
+      | Some `False -> Ok false
+      | Some _ ->
+        Or_error.error_string
+          "config.computer_native must be a boolean (false: always use prigh's \
+           own computer tool, not the model's built-in one)"
+    in
     let%bind snippets =
       Snippet.list_of_json (Option.value (find "snippets") ~default:`Null)
     in
@@ -402,6 +436,8 @@ let of_json json =
     ; generate_model
     ; mask_observations
     ; computer_screenshots
+    ; computer_screenshots_max
+    ; computer_native
     ; compact_at_tokens
     ; compaction_model
     ; naming_model

@@ -117,9 +117,10 @@ let%expect_test "active sessions first, then the archived ones under a divider" 
   H.text h ~selector:".sessions";
   [%expect
     {|
+    (Search_sessions_later (search 1) (after_ms 150))
     (Archived 2)
     (Old lexer 2m ago /work) (More (right-click, Shift+F10)) (Unarchive) (Delete)
-    (Older docs 2m ago /work) (More (right-click, Shift+F10)) (Unarchive) (Delete)
+    (Old er docs 2m ago /work) (More (right-click, Shift+F10)) (Unarchive) (Delete)
     (Delete archived)
     |}]
 ;;

@@ -1,4 +1,5 @@
 open! Core
+open! Import
 
 module Item = struct
   type t =
@@ -9,17 +10,22 @@ module Item = struct
     ; marked : bool
     ; dimmed : bool
     ; section : string [@default ""] [@sexp_drop_default.equal]
+    ; fields : (Session_search.Field.t * string) list
+          [@default []] [@sexp_drop_default.equal]
+    ; matched : (int * int) list [@default []] [@sexp_drop_default.equal]
+    ; snippet : P.Session_hits.Snippet.t option [@sexp.option]
     }
   [@@deriving sexp_of, equal]
 
   let create
-    ?(detail = "")
-    ?search
-    ?(marked = false)
-    ?(dimmed = false)
-    ?(section = "")
-    ~id
-    label
+        ?(detail = "")
+        ?(fields = [])
+        ?search
+        ?(marked = false)
+        ?(dimmed = false)
+        ?(section = "")
+        ~id
+        label
     =
     { id
     ; label
@@ -28,6 +34,9 @@ module Item = struct
     ; marked
     ; dimmed
     ; section
+    ; fields
+    ; matched = []
+    ; snippet = None
     }
   ;;
 end
@@ -40,6 +49,7 @@ type t =
   ; selected : int
   ; multi : bool
   ; checked : String.Set.t
+  ; content : P.Session_hits.t option [@sexp.option]
   }
 [@@deriving sexp_of, equal]
 
@@ -62,8 +72,22 @@ let by_section items visible =
 
 let refilter t =
   let visible =
-    Fuzzy.rank ~query:t.query t.items ~key:(fun i -> i.Item.search)
-    |> by_section t.items
+    if List.exists t.items ~f:(fun i -> not (List.is_empty i.Item.fields))
+    then
+      Session_search.rank
+        ?content:t.content
+        ~query:t.query
+        t.items
+        ~fields:(fun i -> i.Item.fields)
+        ~path:(fun i -> i.Item.id)
+      |> List.map ~f:(fun ((i : Item.t), _, snippet) ->
+        { i with
+          matched = Session_search.ranges ~query:t.query i.label
+        ; snippet
+        })
+    else
+      Fuzzy.rank ~query:t.query t.items ~key:(fun i -> i.Item.search)
+      |> by_section t.items
   in
   let selected =
     if String.is_empty t.query
@@ -77,13 +101,22 @@ let refilter t =
 ;;
 
 let create
-  ?(query = "")
-  ?(multi = false)
-  ?(checked = String.Set.empty)
-  ~title
-  items
+      ?(query = "")
+      ?(multi = false)
+      ?(checked = String.Set.empty)
+      ~title
+      items
   =
-  refilter { title; items; query; visible = []; selected = 0; multi; checked }
+  refilter
+    { title
+    ; items
+    ; query
+    ; visible = []
+    ; selected = 0
+    ; multi
+    ; checked
+    ; content = None
+    }
 ;;
 
 let title t = t.title
@@ -120,6 +153,14 @@ let set_items ?title ?select ?checked t items =
   | Some id when Set.mem ids id -> select_id t id
   | Some _ | None ->
     { t with selected = Int.max 0 (Int.min before (List.length t.visible - 1)) }
+;;
+
+let set_content t content =
+  let select = Option.map (selected_item t) ~f:(fun i -> i.Item.id) in
+  let t = refilter { t with content } in
+  match select with
+  | Some id -> select_id t id
+  | None -> t
 ;;
 
 let toggle_check t =
@@ -225,6 +266,7 @@ let handle t (intent : Intent.t) ~page : Outcome.t =
   | Prev_user_message
   | Next_user_message
   | Toggle_archived
+  | Toggle_pinned
   | Review_highlighted
   | Toggle_sidebar
   | Jump_to_bottom

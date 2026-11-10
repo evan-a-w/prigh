@@ -203,3 +203,91 @@ let%expect_test "list reuses summaries of unchanged files" =
     ((HO))
     |}]
 ;;
+
+let show_pinned ?(active = false) t ~dir =
+  let s = summary t ~dir in
+  printf
+    "pinned=%b marker=%s activity=%d days ago archived=%b\n"
+    s.pinned
+    (Option.value_map s.archived ~default:"none" ~f:Bool.to_string)
+    (Float.iround_nearest_exn ((now -. s.last_activity) /. day))
+    (Session.Summary.is_archived s ~now ~archive_after_days:7. ~active)
+;;
+
+let%expect_test
+    "pinned: never archived by age; archiving unpins, pinning unarchives"
+  =
+  with_dir
+  @@ fun dir ->
+  let t = Session.create ~dir ~cwd:"/proj" () in
+  ignore
+    (Session.append_message t ~at:(now -. (30. *. day)) (Message.user "old")
+     : Session.Entry.t);
+  show_pinned t ~dir;
+  ignore (Session.set_pinned t ~pinned:true : Session.Entry.t);
+  show_pinned t ~dir;
+  [%expect
+    {|
+    pinned=false marker=none activity=30 days ago archived=true
+    pinned=true marker=none activity=30 days ago archived=false
+    |}];
+  (* In the file: a reload is pinned too, and new messages keep the pin. *)
+  let reload () = Or_error.ok_exn (Session.load (Session.path t)) in
+  print_s [%sexp (Session.pinned (reload ()) : bool)];
+  ignore
+    (Session.append_message
+       t
+       ~at:(now -. (20. *. day))
+       (Message.user "less old")
+     : Session.Entry.t);
+  show_pinned t ~dir;
+  [%expect
+    {|
+    true
+    pinned=true marker=none activity=20 days ago archived=false
+    |}];
+  (* Archiving by hand unpins it. *)
+  ignore (Session.set_archived t ~archived:true : Session.Entry.t);
+  show_pinned t ~dir;
+  print_s [%sexp (Session.pinned t : bool), (Session.pinned (reload ()) : bool)];
+  [%expect
+    {|
+    pinned=false marker=true activity=0 days ago archived=true
+    (false false)
+    |}];
+  (* Pinning an archived session unarchives it. *)
+  ignore (Session.set_pinned t ~pinned:true : Session.Entry.t);
+  show_pinned t ~dir;
+  [%expect {| pinned=true marker=false activity=0 days ago archived=false |}]
+;;
+
+let%expect_test "unpinning an idle session counts as activity" =
+  with_dir
+  @@ fun dir ->
+  let t = Session.create ~dir ~cwd:"/proj" () in
+  ignore
+    (Session.append_message t ~at:(now -. (30. *. day)) (Message.user "old")
+     : Session.Entry.t);
+  ignore (Session.set_pinned t ~pinned:true : Session.Entry.t);
+  show_pinned t ~dir;
+  ignore (Session.set_pinned t ~pinned:false : Session.Entry.t);
+  show_pinned t ~dir;
+  [%expect
+    {|
+    pinned=true marker=none activity=30 days ago archived=false
+    pinned=false marker=none activity=0 days ago archived=false
+    |}]
+;;
+
+let%expect_test "pins are not copied by fork" =
+  with_dir
+  @@ fun dir ->
+  let t = Session.create ~dir ~cwd:"/proj" () in
+  ignore (Session.append_message t (Message.user "hi") : Session.Entry.t);
+  ignore (Session.set_pinned t ~pinned:true : Session.Entry.t);
+  let forked = Or_error.ok_exn (Session.fork t ~dir) in
+  print_s
+    [%sexp
+      ((summary t ~dir).pinned : bool), ((summary forked ~dir).pinned : bool)];
+  [%expect {| (true false) |}]
+;;

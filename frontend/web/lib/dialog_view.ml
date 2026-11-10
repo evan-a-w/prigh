@@ -327,6 +327,9 @@ let delete (m : App.Model.t) (target : Dialog.Delete_target.t) ~inject =
     Node.li
       ~attrs:[ classes [ "delete-row" ] [ "kept", Option.is_some (kept m s) ] ]
       [ span ~cls:"delete-title" (Session_list.title s)
+      ; (if Session_list.is_pinned s
+         then span ~cls:"delete-pinned" "pinned"
+         else Node.none)
       ; span ~cls:"delete-size" (Session_summary.size_string s.bytes)
       ]
   in

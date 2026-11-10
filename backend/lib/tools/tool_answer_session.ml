@@ -8,6 +8,7 @@ let spec =
   ; parallel_safe = true
   ; on_host = false
   ; freeform = None
+  ; native = None
   ; destructive = Never
   ; description =
       "Answer a question another session asked this one, only after a message \

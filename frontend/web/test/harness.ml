@@ -35,6 +35,7 @@ let rec act t action =
      | Set_url_session _
      | Clear_text_selection
      | Expire_toast _
+     | Search_sessions_later _
      | Focus _
      | Set_caret _
      | Cache_prefs _
@@ -228,6 +229,7 @@ let session_json
       ?(waiting = 0)
       ?(failed = false)
       ?(archived = false)
+      ?(pinned = false)
       ?(bytes = 0)
       ?repo
       ?(worktrees = [])
@@ -272,7 +274,7 @@ let session_json
            source))
   in
   sprintf
-    {|{"id":"%s","path":"/sessions/%s.jsonl","name":%s,"description":%s,"cwd":"%s","created_at":"2026-10-01 08:00:00Z","updated_at":"%s","first_prompt":%s,"message_count":%d,"parent":null,%s%s"worktrees":[%s],"live":%b,"running":%b,"background":%d,"clients":%d,"waiting":%d,"failed":%b,"archived":%b,"bytes":%d}|}
+    {|{"id":"%s","path":"/sessions/%s.jsonl","name":%s,"description":%s,"cwd":"%s","created_at":"2026-10-01 08:00:00Z","updated_at":"%s","first_prompt":%s,"message_count":%d,"parent":null,%s%s"worktrees":[%s],"live":%b,"running":%b,"background":%d,"clients":%d,"waiting":%d,"failed":%b,"archived":%b,"pinned":%b,"bytes":%d}|}
     id
     id
     (opt name)
@@ -291,6 +293,7 @@ let session_json
     waiting
     failed
     archived
+    pinned
     bytes
 ;;
 

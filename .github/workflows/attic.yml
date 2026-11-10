@@ -1,0 +1,87 @@
+# Builds prigh, everything it is built from and the dev shells on every push
+# to main and pushes them to the Attic cache `prigh`, the flake's and the
+# Docker build's substituter. Its API is only reachable over NetBird, so the
+# runner joins the network first as an ephemeral peer. Pulls are public, from
+# https://attic.caduc.co/prigh (the Docker build's backend and frontend have
+# the same store paths as these).
+#
+# Secrets: NETBIRD_SETUP_KEY (reusable, ephemeral, auto-assigned to a group
+# allowed TCP to the Attic API), ATTIC_ENDPOINT (the API endpoint, e.g.
+# http://100.x.y.z:8765/), ATTIC_TOKEN (atticadm make-token --push prigh
+# --pull prigh). Variable: NETBIRD_MANAGEMENT_URL when NetBird is self-hosted.
+name: attic
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: attic
+  cancel-in-progress: true
+
+jobs:
+  push:
+    runs-on: ubuntu-24.04
+    if: github.repository == 'evan-a-w/prigh'
+    # Compiling the OxCaml toolchains from scratch (after a dependency change)
+    # takes hours on a runner.
+    timeout-minutes: 360
+    steps:
+      - uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be # v1.3.1
+        with:
+          tool-cache: true
+
+      - uses: actions/checkout@v4
+
+      - uses: cachix/install-nix-action@d9186cbdca7adedf113a159fa91f725a27866771 # v31
+        with:
+          extra_nix_config: |
+            accept-flake-config = true
+
+      - name: Join NetBird
+        uses: ankurk91/netbird-action@a2bfe6fd69eed50daa9387dfb3d86e5092f25557 # v2
+        with:
+          setup-key: ${{ secrets.NETBIRD_SETUP_KEY }}
+          management-url: ${{ vars.NETBIRD_MANAGEMENT_URL || 'https://api.netbird.io:443' }}
+
+      - name: Log in to Attic
+        env:
+          ATTIC_ENDPOINT: ${{ secrets.ATTIC_ENDPOINT }}
+          ATTIC_TOKEN: ${{ secrets.ATTIC_TOKEN }}
+        run: |
+          nix profile install nixpkgs#attic-client
+          attic login ci "$ATTIC_ENDPOINT" "$ATTIC_TOKEN"
+
+      # Everything a build or a dev shell needs: the packages, what they are
+      # built from (inputDerivation: the OxCaml toolchains and packages, the
+      # Rust crates) and the dev shells' inputs (a shell's own output is a stub
+      # that references none of them). The watcher starts before evaluation,
+      # which builds opam-nix's import-from-derivation results. Paths are
+      # pushed as they are built, so a failed or cancelled run still caches
+      # what it finished; paths on cache.nixos.org are skipped. Attic only
+      # uploads what it lacks (and of that, only the chunks it lacks); targets
+      # the cache already has are not built at all, so unchanged dependencies
+      # are not even downloaded.
+      - name: Build and push
+        run: |
+          attic watch-store ci:prigh &
+          watcher=$!
+          targets=()
+          for t in default prigh-desktop prigh-computer backend frontend \
+            backend.inputDerivation frontend.inputDerivation \
+            prigh-desktop-unwrapped.inputDerivation prigh-computer.inputDerivation \
+            devShells.x86_64-linux.default.inputDerivation \
+            devShells.x86_64-linux.desktop.inputDerivation; do
+            out=$(nix eval --raw ".#$t.outPath")
+            if nix path-info --store https://attic.caduc.co/prigh "$out" >/dev/null 2>&1; then
+              echo "cached: $t"
+            else
+              targets+=(".#$t")
+            fi
+          done
+          if [ ${#targets[@]} -gt 0 ]; then
+            nix build --print-build-logs "${targets[@]}"
+            attic push ci:prigh ./result*
+          fi
+          kill "$watcher"

@@ -108,14 +108,17 @@ pinned package set through import-from-derivation) and the first build compiles
 both OCaml toolchains plus their package sets (about an hour on a small
 machine); both are cached afterwards.
 
-The flakes name the binary cache `prigh.cachix.org`, which has the OxCaml
-toolchain and packages prebuilt, so that most of that is downloaded instead.
+The flake names the binary cache `https://attic.caduc.co/prigh`, so that
+all of that is downloaded instead. CI fills it from every push to `main`
+(`.github/workflows/attic.yml`): prigh, prigh-desktop, everything they are
+built from (the OxCaml toolchain and packages) and the dev shells.
 Nix asks before using a flake's settings: answer `y` (and save it), or pass
 `--accept-flake-config`. With a multi-user Nix install it is only used if you
-are in `trusted-users`, or if `https://prigh.cachix.org` and its key are in
-the system's `trusted-substituters`/`trusted-public-keys`; otherwise add them
-to `/etc/nix/nix.conf` (NixOS: `nix.settings`) as `extra-substituters` and
-`extra-trusted-public-keys`. The key is in `flake.nix`.
+are in `trusted-users`, or if `https://attic.caduc.co/prigh` and its key are
+in the system's `trusted-substituters`/`trusted-public-keys`; otherwise add
+them to `/etc/nix/nix.conf` (NixOS: `nix.settings`) as `extra-substituters`
+and `extra-trusted-public-keys`. The key is
+`prigh:n6wPXDyh+4CS5uoNgXQ3QvKjOSLE7ED87qIiTSvih1A=` (also in `flake.nix`).
 
 ## Remote backend, several frontends
 
@@ -155,8 +158,10 @@ opens prigh-web on that site, which asks you to allow it and hands it the
 proxy's cookie (saved with the connection, sent with every connection;
 `prigh web` and `prigh tool-host` do the same without asking (once: a
 sign-in cancelled or failed is not started again on every reconnect),
-and `prigh browser-signin -connect URL` by hand; DOCKER.md, "Behind a reverse proxy",
-has the details). Or exempt `/ws` and `/terminal` from it (prigh checks its
+and `prigh browser-signin -connect URL` by hand; over SSH, where the
+browser cannot reach the program, paste the code the page shows after
+Allow into the program's terminal, or forward its port with `ssh -L`;
+DOCKER.md, "Behind a reverse proxy", has the details). Or exempt `/ws` and `/terminal` from it (prigh checks its
 own token there; DOCKER.md shows how for authentik, Caddy, nginx and
 Traefik), send its credentials with `-header 'NAME: VALUE'` (repeatable;
 `$PRIGH_CONNECT_HEADERS`, one per line; never saved), or use an SSH tunnel
@@ -530,7 +535,8 @@ Fork… (`/fork`), New worktree… (`/worktree new`: a branch, and a base that
 defaults to the session's branch; Enter creates it under `worktrees_dir`
 and the session moves there), Review changes (`/review`), Open in file
 browser (`/files`), Open terminal there (`/terminal`), Copy path, Copy
-session id, Archive or Unarchive (A) and Delete… (Delete). A worktree's:
+session id, Pin to top or Unpin (P), Archive or Unarchive (A) and Delete…
+(Delete). A worktree's:
 Switch session here (`/worktree open`), New session here (`/worktree open
 -n`), Review changes (`/review <worktree>`), Open in file browser (`/files
 <path>`), Open terminal there (`/terminal <path>`, a shell of its own in
@@ -539,15 +545,21 @@ new`), Copy path and Remove worktree… (`/worktree rm`; "Discard changes
 and remove" when it has changes; not the one the open session works in;
 Delete on a focused worktree does the same). An item on a session other
 than the open one switches to it first. ↑↓ move through the menu, Enter
-chooses, Esc closes it and changes nothing. Below
+chooses, Esc closes it and changes nothing. Pinned sessions are listed
+first under a "Pinned" heading, marked with a pin, then the others under
+"Recent" (no headings when nothing is pinned), each group most recent
+first; a pinned session is never archived for being idle. Archiving a
+pinned session unpins it, and pinning an archived one unarchives it. Below
 the list a faint "Archived 14" rule unfolds the archived sessions, muted,
 with their directory. A search (Ctrl+K) finds sessions by title, prompt,
 directory, repository, branch or their worktrees' branches, the archived
-ones too. Where a session is in git is found on its
+ones too, each in its group (best match first within it), and by what was said
+in them: see "Searching sessions" under Keys. Esc clears it, then goes back to
+the editor. Where a session is in git is found on its
 tool host whenever its directory changes, by reading the repository's
 files (no git command), and kept in the session; a tool host running an
-older prigh cannot tell, and its sessions show their directory. On a focused session A archives or unarchives it and Delete
-deletes it. "Select" turns the list into
+older prigh cannot tell, and its sessions show their directory. On a focused session P pins or unpins it, A archives or unarchives it
+and Delete deletes it. "Select" turns the list into
 checkboxes: click or Space marks a session, Shift+click or Shift+Space the
 range from the last one (across the divider), and Delete (or the bar at
 the foot of the list, "Delete 3 sessions (12.4 MB)") asks to delete the
@@ -559,7 +571,8 @@ delete the dialog only says why (Close). Deleting the session you are in
 moves you first to the next session down the list that is not being
 deleted (else the nearest above, else a new session), and the confirmation
 says where ("You'll move to “Y”."); the backend makes the move and the
-deletion one request. `/archive`, `/unarchive` and `/delete` also take
+deletion one request. `/pin`, `/unpin`, `/archive`, `/unarchive` and
+`/delete` also take
 sessions by name, id or path. The list follows the backend as it changes; the worktrees of the
 repositories the sessions' worktrees belong to are listed (for their
 changes and to drop removed ones) when the session, its directory or its
@@ -628,7 +641,14 @@ directory; `/terminal DIR`, or a worktree's "Open terminal there", a shell
 of its own in DIR) in a panel under the chat: drag its top edge to resize it (the
 height is remembered), a full-screen sheet on a phone. Keys typed in it
 are the shell's, Esc included; Ctrl+` closes it (so does its ×) and
-gives the keyboard back to the editor. It is a tmux session (on the
+gives the keyboard back to the editor. On a touch screen (a phone, a
+tablet), while the shell has the focus, a row of the keys a phone's keyboard
+lacks sits over the keyboard: Esc, Tab, Ctrl and Alt (a tap applies to the
+next key, typed or tapped, so Ctrl then c is Ctrl+C; a double-tap locks it
+until the next tap), the arrows (held, they repeat), `| ~ / -`, Home, End,
+PgUp and PgDn; swipe it for the rest. The arrows, Home and End follow the
+shell's cursor key mode, as vim and less expect. A desktop's keyboard has
+those keys, so there is no bar there. It is a tmux session (on the
 backend's host it needs `tmux`; the nix package brings its own), so closing
 the panel, reloading the page (which reopens it) or losing the connection
 keeps the shell; it is killed after 10 minutes with no page attached, when
@@ -886,7 +906,8 @@ phone): **Appearance** (the theme and accent, transcript detail
 (`/verbosity`)), **Behaviour** (tool confirmation (`/confirm`);
 notifications, on or off, and what to do when the browser has
 not been asked, blocks them or cannot show them), **Models** (the providers
-(`/auth`) and compaction), **Git hosting**, **Nix store** (superusers) and
+(`/auth`) and compaction), **Memory** (the model's notes and the switch
+that turns memory off), **Git hosting**, **Nix store** (superusers) and
 **Account** (who you are signed in, and acting, as, with Switch account and
 Sign out). `/settings SECTION` (e.g. `/settings git`, completed as you type)
 opens it at a section; on the list, the arrows, Home and End move between
@@ -1315,6 +1336,10 @@ it), so install prigh as well.
   github:evan-a-w/prigh`). The app starts `wsl.exe --cd ~ -e bash -lc 'exec
   prigh desktop'` (the login shell's PATH, so Nix's profile counts) and
   opens the page through WSL's localhost forwarding (on by default).
+  The installers also carry `prigh-computer.exe`, the Windows computer-use
+  helper, which the app hands to WSL as `$PRIGH_COMPUTER` (see [the
+  helper](#the-desktops-screen-mouse-and-keyboard-prigh-computer)): with `PRIGH_DESKTOP_ARGS=-computer` the agent can
+  drive the Windows desktop.
 - **Settings** (environment variables; Home Manager sets all but the WSL
   one):
   `PRIGH_DESKTOP_BACKEND` the prigh to run (a path or a command name; on
@@ -1436,29 +1461,117 @@ The tool host finds it as `$PRIGH_COMPUTER`, else `prigh-computer` on the
 PATH, with extra arguments from `$PRIGH_COMPUTER_ARGS`.
 
 - **Wayland, wlroots compositors** (Hyprland, sway, river, ...):
-  wlr-screencopy, the virtual pointer and the virtual keyboard (with a
-  keymap made for the characters typed, as `wtype` does). It controls
+  wlr-screencopy, the virtual pointer and the virtual keyboard. It controls
   one output: the focused one (Hyprland and sway say which), else the
-  first.
+  first. The keyboard is a physical one in the user's layout (Hyprland's
+  `input:kb_*` / `kb_file`, else xkbcommon's default: `$XKB_DEFAULT_LAYOUT`,
+  ..., else us): real evdev codes (`super+d` is KEY_LEFTMETA, then KEY_D),
+  modifier keys pressed and released, the modifier state xkb derives from
+  them. Characters the layout lacks get keys of their own past every evdev
+  code (from 768, `KEY_MAX` + 1), so a compositor that reads them through
+  another keymap sees nothing there (Xwayland apps cannot get such keys:
+  those characters do not type in X apps). Keys still down are released
+  when an action fails or is interrupted and when the helper exits (end of
+  input, SIGTERM, SIGINT, SIGHUP; the tool host stops it with SIGTERM when an
+  action is cancelled or it shuts down, and SIGKILLs it only when it has not
+  exited a second later); a SIGKILLed helper's keys may stay down
+  (Hyprland keeps them unless `input:virtualkeyboard:release_pressed_on_close`).
+- **Hyprland**: binds are matched through Hyprland's configured layout,
+  whatever keymap a virtual keyboard uploads, so a tool with a keymap of
+  its own (wtype; this helper before) fires other binds: wtype's first key
+  is evdev 1, Escape, so `wtype -M logo -k d` is Super+Escape. There are
+  no prompts by default: any local client may capture the screen and send
+  input. With `ecosystem:enforce_permissions` on, screen capture asks
+  (virtual keyboards stay allowed unless a rule says otherwise); allow the
+  helper in the config (rules are read when Hyprland starts):
+  `hl.permission(".*/prigh-computer", "screencopy", "allow")` (Lua), or
+  `permission = .*/prigh-computer, screencopy, allow` (hyprlang). The
+  first argument is a regex on the binary's path; a `keyboard` rule
+  matches the device name, `hl-virtual-keyboard-prigh-computer`.
 - **X11**: XTEST and the root window, cropped to the primary monitor;
   characters the keyboard map lacks go through spare keycodes.
-- **GNOME and KDE on Wayland, macOS and Windows** are not supported yet:
-  it says so (on GNOME or KDE, log in to an X11 session meanwhile).
-  `--backend auto|wlroots|x11|fake` (or `$PRIGH_COMPUTER_BACKEND`)
-  overrides the detection; `prigh-computer --probe` prints what it
-  found, or what is missing.
+- **Other Wayland compositors** (GNOME's Mutter, KDE's KWin, ...):
+  xdg-desktop-portal's RemoteDesktop for the pointer and keyboard (keysyms,
+  so any Unicode text types without a keymap), with a ScreenCast stream of
+  one monitor in the same session for the screen (frames over PipeWire)
+  and for absolute pointer motion. The first time, the desktop asks once
+  ("share the screen and allow remote control"): the portal's restore
+  token (`persist_mode` 2) is kept in `~/.prigh/computer-portal-token`
+  (mode 0600; delete it to be asked again), so later sessions start
+  without a dialog. It needs `xdg-desktop-portal` and the desktop's
+  backend (`xdg-desktop-portal-gnome` on GNOME, `xdg-desktop-portal-kde`
+  on KDE Plasma), and says so when they are missing. Never yet run on a
+  real GNOME or KDE: its tests use a fake portal on a private D-Bus and a
+  private PipeWire with a test screen.
+- **macOS** (never yet run on a real Mac: only built and unit-tested on
+  CI): ScreenCaptureKit screenshots (CGDisplayCreateImage before macOS
+  14) of the main display, in its pixels (twice its points on Retina), and
+  Quartz events for the mouse, scrolling and keys (`cmd`, `option`,
+  `ctrl`, `shift` in combos; any text as Unicode). macOS asks to allow
+  **Screen Recording** and **Accessibility** the first time; they belong
+  to the app that started the helper (the tool host's *responsible app*):
+  the prigh app, or the terminal you ran `prigh tool-host -computer` in.
+  Until they are given, actions fail saying where to give them (System
+  Settings > Privacy & Security > Screen Recording / Accessibility);
+  after allowing Screen Recording, quit and reopen that app. The macOS
+  app bundle carries `prigh-computer` (`prigh.app/Contents/MacOS`) and
+  points `$PRIGH_COMPUTER` at it; its CI builds are not signed, so macOS
+  may ask again after an update.
+- **Windows** (`prigh-computer.exe`): the primary monitor, captured with
+  DXGI Desktop Duplication, or GDI's BitBlt where that is unavailable (RDP
+  sessions, some virtual GPUs, a rotated screen; `--probe`'s `detail`
+  says which and why); input with `SendInput` (absolute over the virtual
+  desktop, the wheel both ways, text as Unicode, combos as virtual keys:
+  `win`, `ctrl`, `alt`, `shift`, F1..F24, ...); the pointer with
+  `GetCursorPos`. It is per-monitor DPI aware, so coordinates are physical
+  pixels at any display scale. What Windows does not allow it says: the
+  secure desktop (UAC prompts, the lock screen, Ctrl+Alt+Del) can be
+  neither seen nor driven, and windows of programs run as administrator
+  get no input from a helper that is not elevated (UIPI; it refuses
+  rather than let Windows drop the input silently: run the desktop app as
+  administrator to drive those too). It has been tested only on the CI's
+  Windows runner (Notepad), never on a real Windows desktop.
+- **Choosing**: `--backend auto|wlroots|portal|x11|macos|windows|fake`
+  (or `$PRIGH_COMPUTER_BACKEND`) overrides the detection (auto: the
+  system's own on macOS and Windows; on Linux wlroots' protocols if the
+  compositor has them, else the portal on Wayland, else X11); `prigh-computer --probe`
+  prints what it found, or what is missing.
 - **Kill switch**: when the mouse is not where the helper left it, the
   user has moved it: the action stops and computer use pauses until the
-  next prompt.
+  next prompt. With the portal the pointer's position comes from the
+  screen cast's cursor metadata (GNOME and KDE send it); where a portal
+  offers no metadata the kill switch is unavailable (the pointer is then
+  drawn into the screenshots by the compositor).
 
 In the desktop app, pass `-computer` to `prigh desktop`: with Home Manager,
 `programs.prigh.desktop.computerUse = true` (it adds `-computer` and points
 `PRIGH_COMPUTER` at the packaged helper); otherwise `PRIGH_DESKTOP_ARGS=-computer`
 with `prigh-computer` on the PATH (`nix profile install
-github:evan-a-w/prigh#prigh-computer`). The helper's tests are `cargo test
+github:evan-a-w/prigh#prigh-computer`; the macOS app has it already).
+
+On Windows the tool host runs in WSL, where there is no Windows desktop
+to see, so the Windows installers carry the Windows build,
+`prigh-computer.exe`, next to the app, and the app hands it to WSL:
+`$PRIGH_COMPUTER` set to its path and shared through `$WSLENV` (as
+`PRIGH_COMPUTER/p`, so WSL sees `/mnt/c/.../prigh-computer.exe`). The
+tool host in WSL runs it like any program (WSL's interop starts Windows
+executables, with the pipes connected), and it drives the Windows
+desktop of the user who opened the app. So `PRIGH_DESKTOP_ARGS=-computer`
+is all it takes; a `$PRIGH_COMPUTER` of your own wins (share it through
+`$WSLENV` yourself). Cancelling an action ends the WSL side at once and
+the helper when its pipe closes (an action in progress finishes first).
+The helper's tests are `cargo test
 -p prigh-computer` in `desktop/` (in `./test`) and the flake's
 `computer-use` check, which drives a headless sway and Xvfb and compares
-the input an app received (`desktop/computer/test/expected.txt`).
+the input an app received (`desktop/computer/test/expected.txt`);
+`nix run .#computer-use-hyprland` does the same on Hyprland nested in a
+virtual KWin (binds that must fire or not, typing, a SIGTERM while a key
+is held; `hyprland.expected`): it needs a GPU render node, which the Nix
+sandbox lacks (aquamarine allocates buffers only with GBM on a DRM node),
+so it is not a check; the
+package's build runs the portal backend against a fake portal on a private
+D-Bus (`tests/portal.rs`) and its PipeWire capture against a private
+PipeWire (`tests/screencast.rs`).
 
 In prigh-web each `computer` call is a card: what it did ("click (640,
 312)", "type “hello”", "key ctrl+t", "scroll ↓3 at (x, y)", ...) and the
@@ -1489,11 +1602,34 @@ The backend's own host never offers it.
 - Moving the mouse stops the run at once ("computer use stopped: you
   moved the mouse ..."); the next message goes on. Esc or Stop abort as
   for any run.
-- Each action's result carries a screenshot, but requests send only the
-  latest `computer_screenshots` (config, default 3) as images; older ones
-  are sent as `[screenshot omitted]`. The session keeps them all.
-- Platforms: Linux on wlroots compositors and X11 (above); the rest say
-  they are not supported yet.
+- Each action's result carries a screenshot. Requests send them as images
+  until there are `computer_screenshots_max` (config, default 8), then the
+  oldest are cut, all at once, down to the latest `computer_screenshots`
+  (default 3), and sent as `[screenshot omitted]`: between two cuts each
+  request only adds to the one before, so the provider's prompt cache
+  keeps working (prigh puts an Anthropic cache breakpoint before the first
+  screenshot, which a cut never changes). The session keeps them all.
+  On models that check what came before each thinking block they get
+  back (Claude 5.1 and later), a cut also leaves out the thinking written
+  while a now omitted screenshot was still sent.
+- Models with a built-in computer-use tool get it instead of prigh's
+  JSON schema (`computer_native`, config, default `true`): Claude 5.5
+  models and Fable and Mythos 5.2 the `computer_toolset_20260801`
+  toolset, Claude Opus 4.5 to 5, Sonnet 4.6 and 5 and Fable and Mythos 5
+  and 5.1 `computer_20251124` (with zoom), Sonnet and Haiku
+  4.5 `computer_20250124` (with their beta headers), and the OpenAI API's
+  models with computer use (GPT-5.4 and later) the Responses API's
+  `computer` tool. prigh translates their calls to its own actions (the
+  session, the host and the frontends see those) and replays them to the
+  same kind of model as written. An OpenAI `computer_call` is a batch:
+  each action runs in order, and a batch (from either provider) stops at
+  the first action that fails, the rest answered "Not executed". A call
+  with OpenAI `pending_safety_checks` needs approval in Ask mode and its
+  result says the checks were acknowledged. Other models, Codex and
+  custom providers use the schema.
+- Platforms: Linux on wlroots compositors, other Wayland desktops through
+  xdg-desktop-portal, and X11; macOS and Windows (above). The rest say
+  they are not supported.
 
 ## Editors (ACP)
 
@@ -1756,7 +1892,7 @@ Then:
 frontend/_build/default/tui/bin/main.exe       # interactive TUI (PRIGH_BACKEND or the dune build)
 backend/_build/default/bin/main.exe run "explain this repo"    # headless
 backend/_build/default/bin/main.exe run -session ID "go on"     # continue a saved session (id, unique prefix or file)
-backend/_build/default/bin/main.exe sessions list          # saved sessions, the archived ones last under "archived:"
+backend/_build/default/bin/main.exe sessions list          # saved sessions, pinned first, archived last
 backend/_build/default/bin/main.exe sessions delete ID...  # ids may be unique prefixes; nothing is deleted if one matches none or several
 backend/_build/default/bin/main.exe sessions prune -dry-run                        # empty sessions
 backend/_build/default/bin/main.exe sessions prune -max-messages 2 -cwd /tmp       # filters: -older-than DAYS, -prompt TEXT
@@ -1842,7 +1978,7 @@ that no longer exists.
 | Alt+M | cycle the mode: ask → auto-edit → auto → plan (read-only) |
 | Alt+N | pick a snippet to insert at the cursor (`/snippet`) |
 | Ctrl+N | picker: toggle the named-only / logged-in-only filter |
-| Tab / Alt+A / Alt+D | `/sessions`: mark a session / archive or unarchive it / delete every archived one |
+| Tab / Alt+A / Alt+T / Alt+D | `/sessions`: mark a session / archive or unarchive it / pin or unpin it / delete every archived one |
 | Ctrl+X | copy the last assistant message |
 | Ctrl+Z | suspend to the shell |
 | Shift+Tab | cycle subagent focus: main → agent 1 → … → main |
@@ -1867,7 +2003,28 @@ and `/scoped-models` toggles with Space (Ctrl+A all, Ctrl+X none). `/help`
 lists the commands, the prompt prefixes (`!cmd`, `!!cmd`, `!&cmd`, `@path`, `#name`)
 and these keys.
 
-`/sessions` lists the active sessions first, most recent first, each with
+**Searching sessions.** prigh-web's sidebar search and the TUI's `/sessions` filter work the
+same way. The query is split into words, and a session matches when every
+word matches, in any order and in any of its fields: its name, its first
+prompt, its description, its directory, repository and branches, and
+(searched by the backend, `search_sessions`) the text of all its messages,
+yours and the agent's (not tool output). A word matches a word of the
+session exactly, as its start, inside it (3+ letters), with one typo (4+
+letters: `reconect`, `sesion`) or as its letters in order from its first
+(`cfg` for `configure`), best first; never across words, so short queries
+match little rather than everything. A match in the name counts more than
+one in the first prompt, then the other text, then where it works; ties go
+to the most recently updated. Titles match as you type; the messages
+follow once typing pauses, each session found there with the passage that
+matched under its title, the matched words marked (in titles too). The
+backend keeps an index of every session's words in memory, updated as
+sessions change, so a search of thousands of sessions takes tens of
+milliseconds (the first one reads them all).
+ Pinned sessions stay in their group
+above the others while searching, ranked the same way within it.
+
+`/sessions` lists the pinned sessions first (under `── pinned ──`, with
+`── sessions ──` before the rest), then the active ones, most recent first, each with
 its repository and branch (`prigh ⎇ main`) and, beside its directory, the
 worktrees that matter to it (`⎇ feat/x · ⎇ agent/fix (subagent)`; the
 filter matches these too), and then, after an
@@ -1877,7 +2034,8 @@ in the backend and `*` the one you are in; the list follows changes made
 anywhere (other frontends, other sessions). In it Tab marks or unmarks a
 session (`✓`; the status line shows how many and their size), Ctrl+D
 deletes the marked sessions (or the highlighted one), Alt+A archives or
-unarchives the highlighted one, Alt+D deletes every archived session, and
+unarchives the highlighted one, Alt+T pins or unpins it (pinning
+unarchives, archiving unpins), Alt+D deletes every archived session, and
 Ctrl+N shows only named ones (marks on the hidden ones stay). Deleting the
 session you are in (Ctrl+D, `/delete`, or Alt+D when it is archived) moves
 you first to the next session down the list not being deleted, else the
@@ -1885,7 +2043,7 @@ nearest above, else a new one, and the confirmation says where (`Delete
 session "x" (1.2 KB)? You'll move to session "y". Enter deletes, Esc keeps
 it`); the list closes, as when switching from it. While it is running or
 open in another frontend, Ctrl+D and `/delete` say so at once and Alt+D
-leaves it out. Tab after `/switch`, `/archive`, `/unarchive` or
+leaves it out. Tab after `/switch`, `/pin`, `/unpin`, `/archive`, `/unarchive` or
 `/delete` completes sessions by name (or first prompt), the active ones
 first, and inserts the id. Deleting always asks first, with the count and
 the disk space (`Delete 3 sessions (1.2 MB)? Enter deletes, Esc keeps
@@ -2168,6 +2326,26 @@ custom endpoints) and OpenAI's models without it (`gpt-4`, `gpt-4.1-nano`,
 search page. Neither tool is destructive, so neither asks for confirmation
 in the `ask` approval mode.
 
+Memory: tell prigh to remember something ("remember that I deploy with
+`./ship`") and the `memory` tool saves it as a short note, which later
+sessions can recall ("how do I deploy?", "use my usual setup"). It keeps
+notes in `~/.prigh/memory.json` on the backend, one memory per user (per
+namespace with `-tokens`). `memory {action: save, text, title?}` adds a
+note (`m1`, `m2`, ...; saving with an existing title replaces that note),
+`recall {query?}` finds notes by their words (substrings, one typo
+allowed) or lists them all (the newest 50, each cut to a line), and
+`forget {id}` removes one by id or title: ask prigh to forget a wrong note.
+The model is told to use it very rarely: it saves only when you ask it to
+remember (not routine details or what the repository says) and recalls only
+when you refer to something you told it before, never by default. Only the
+main agent has it; `save` and `forget` ask in the `ask` approval mode.
+You can turn memory off (`/memory off`, or the switch in prigh-web's
+Settings → Memory; on by default, kept in your prefs as `memory.enabled`):
+from the next turn the model is not given the tool and a call is refused;
+your notes are kept. Settings → Memory also lists the notes to filter, edit
+and delete, and the TUI's `/memory` picks among them (Enter shows one,
+Ctrl+D forgets it after a confirmation).
+
 Models see images. The `read` tool returns PNG, JPEG, GIF and WebP files
 (recognised by content, not by name) as images the model can look at, and an
 `@shot.png` attachment adds the image to the prompt; prigh-web also sends
@@ -2239,8 +2417,11 @@ prigh-web's settings page; free with Groq, see "Free dictation with
 Groq" under custom providers),
 `mask_observations` (default `true`: replace old tool outputs with
 placeholders before summarising, see "Long runs" below),
-`computer_screenshots` (default 3: how many of the latest `computer`
-screenshots requests carry as images, see "Turning computer use on"),
+`computer_screenshots` and `computer_screenshots_max` (default 3 and 8:
+how many of the latest `computer` screenshots requests carry as images
+after a cut, and how many they may carry before the next, see "Turning
+computer use on"), `computer_native` (default `true`: offer models their
+built-in computer-use tool),
 `compact_at_tokens` (default 200000, `0` = off: compact once the context
 exceeds this many tokens, if that comes before 80% of the window) and
 `compaction_model` (the model that writes compaction summaries; default:
@@ -2268,7 +2449,9 @@ lists show it as archived (frontends put archived ones apart). Archiving
 or unarchiving by hand is recorded in the session file; a new message
 unarchives it, an unarchived one stays active for another
 `archive_after_days`, and a session is never archived while a run or a
-background subagent or job of it is going on. Deleting a session (one, a
+background subagent or job of it is going on, nor while it is pinned
+(pinning is recorded in the session file too; archiving by hand unpins,
+pinning unarchives, and unpinning counts as activity, like unarchiving). Deleting a session (one, a
 selection, or every archived one) removes its file and its directory
 (`~/.prigh/sessions/<stamp>_<id>/`, where per-session data is kept) and
 kills its terminal; it is refused for a session that is running, open in
@@ -2512,6 +2695,7 @@ it.
 | `/notify [off\|bell\|desktop]` (TUI), `/notify [on\|off]` (prigh-web) | how to tell you that a turn ended, a tool waits for confirmation or background work finished while you look elsewhere |
 | `/budget [dollars\|off]` | show or set the session's cost budget: no turn starts once it is spent |
 | `/goal [text\|off\|resume]` | set a goal the agent keeps working toward until it is met; show, clear or resume it |
+| `/memory [on\|off]` | pick among the notes the model saved (Ctrl+D forgets one; prigh-web opens Settings → Memory); `on`/`off` gives the model the memory tool or takes it away |
 | `/remind [stop [N] TEXT\|every N TEXT\|rm NAME\|off]` | remind the agent when it ends its turn (at most N times in a row, default 3) or every N turns; without arguments, pick among the session's (Ctrl+D / Delete removes one); `rm` removes one, `off` all |
 | `/resume [now\|cancel]` | show, run now or cancel the automatic resume after a usage limit |
 | `/new`, `/clear`, `/quit` | new session / clear transcript / exit |
@@ -2519,8 +2703,9 @@ it.
 | `/name [text]` | set the session name |
 | `/session` | show session statistics |
 | `/trace` | where the session's time went (see [Tracing](#tracing-where-the-time-went)) |
-| `/sessions` | pick a saved session (Tab marks, Ctrl+D deletes, Alt+A archives/unarchives, Alt+D deletes all archived, Ctrl+N named-only) |
+| `/sessions` | pick a saved session (Tab marks, Ctrl+D deletes, Alt+A archives/unarchives, Alt+T pins/unpins, Alt+D deletes all archived, Ctrl+N named-only) |
 | `/archive [session]`, `/unarchive [session]` | archive or unarchive a session (id, unique id prefix, name or path; the current one without an argument) |
+| `/pin [session]`, `/unpin [session]` | pin a session to the top of the session lists (never archived for being idle), or unpin it (as `/archive` takes its argument) |
 | `/delete session...` | delete sessions after a confirmation (or pick them in `/sessions`) |
 | `/delete-archived` | delete every archived session after a confirmation |
 | `/switch [path]` | switch to a saved session |
@@ -2871,8 +3056,9 @@ beside the model, along the composer's bottom edge) and switched with
   `job_input`, which writes to a running job that may run what it reads,
   `worktree`'s `create` and `remove` (not `list`), whatever changes the
   git host (`pull_request` other than `list`/`view`/`checks`/`diff`/
-  `comments`, `issue` other than `list`/`view`, `repo rerun`), and MCP
-  tools that are not read-only) wait for your answer.
+  `comments`, `issue` other than `list`/`view`, `repo rerun`), `memory`
+  `save` and `forget`, and MCP tools that are not read-only) wait for your
+  answer.
 - `auto-edit`: file edits run without asking; `bash`, `job_input`,
   `worktree create`/`remove`, the git-host changes and MCP tools still
   ask.

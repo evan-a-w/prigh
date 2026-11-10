@@ -72,12 +72,17 @@ let help =
     , "trim the model's context before the highlighted message (confirmed \
        first; /trim undo brings it back)" )
   ; "PageUp / PageDown", "scroll the transcript"
-  ; "Ctrl+K", "search sessions (↓ ↑ through them, Enter opens, Delete deletes)"
+  ; ( "Ctrl+K"
+    , "search sessions by words of their titles and messages (↓ ↑ through \
+       them, Enter opens, Delete deletes, Esc clears)" )
   ; ( "Alt+Enter / Alt+R / Delete (/worktree)"
     , "start a new session in the highlighted worktree / review its changes / \
        remove it" )
   ; ( "A (on a session)"
     , "archive or unarchive it (archived sessions are listed last, muted)" )
+  ; ( "P (on a session)"
+    , "pin it to the top of the sidebar, or unpin it (pinned sessions are \
+       never archived for being idle)" )
   ; ( "Shift+F10 / ContextMenu (on a session or worktree)"
     , "its menu: open, rename, fork, new worktree, review, files, terminal, \
        pull request, copy, delete or remove (also right-click, a long press or \
@@ -148,7 +153,9 @@ let help =
        edited" )
   ; ( "Ctrl+`"
     , "open or close the terminal (/terminal); in it, every other key goes to \
-       the shell" )
+       the shell. On a touch screen a bar over the keyboard has Esc, Tab, Ctrl \
+       and Alt (tap: the next key; double-tap: locked), the arrows (held: \
+       repeat), | ~ / - and Home, End, PgUp, PgDn" )
   ; ( "Esc (in a pull request)"
     , "back to the list it was opened from (/pr); Enter closes it" )
   ; ( "Alt+G (a pull request, commit message, branch or session name)"
@@ -425,10 +432,12 @@ let resize_key h t : Resize.Action.t option =
 ;;
 
 (* The sidebar is a picker: ↓ ↑ move from the search through the sessions,
-   Enter opens one (from the search, the best match), Esc goes back to the
-   editor. *)
-let session_search_key t : App.Action.t option =
+   Enter opens one (from the search, the best match), Esc clears the
+   search, then goes back to the editor. *)
+let session_search_key (m : App.Model.t) t : App.Action.t option =
   match t.key with
+  | "Escape" when not (String.is_empty m.session_query) ->
+    Some (Set_session_query "")
   | "ArrowDown" when plain t -> Some (Session_nav { from = None; by = 1 })
   | "Enter" when plain t -> Some Open_first_session
   | "Escape" -> Some Leave_sidebar
@@ -456,6 +465,10 @@ let session_key (m : App.Model.t) t id : App.Action.t option =
   | ("a" | "A") when not (t.ctrl || t.alt || t.meta) ->
     session (fun s ->
       App.Action.Set_archived { path = s.path; archived = not s.archived })
+  | ("p" | "P") when not (t.ctrl || t.alt || t.meta) ->
+    session (fun s ->
+      App.Action.Set_pinned
+        { path = s.path; pinned = not (Session_list.is_pinned s) })
   | "Escape" when m.marks.selecting -> Some (Select_sessions false)
   | "Escape" -> Some Leave_sidebar
   | _ -> None
@@ -643,7 +656,7 @@ let handle (m : App.Model.t) t : App.Action.t option =
        (match agents_key m t, t.target with
         | Some action, _ -> Some action
         | None, Editor { cursor } -> editor_key m t ~cursor
-        | None, Session_search -> session_search_key t
+        | None, Session_search -> session_search_key m t
         | None, Session id -> session_key m t id
         | None, Worktree { session; path } -> worktree_key m t ~session ~path
         | None, Files ->

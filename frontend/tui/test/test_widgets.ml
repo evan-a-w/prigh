@@ -374,7 +374,7 @@ let%expect_test "fuzzy ranking: command names" =
       (String.concat ~sep:" " (Fuzzy.rank ~query names ~key:Fn.id)));
   [%expect
     {|
-    "mo" -> mode model scoped-models import compaction permissions
+    "mo" -> mode model scoped-models memory import compaction permissions
     "lo" -> login logout clone
     "s"  -> state switch skills skill: signin setusr session snippet signout sessions scoped-models push jobs host todos resume agents hotkeys verbosity permissions downsize-images
     "sw" -> switch
@@ -618,6 +618,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     Alt+M            Cycle_mode
     Ctrl+N           Picker_toggle_filter
     Alt+A            Toggle_archived
+    Alt+T            Toggle_pinned
     Alt+R            Review_highlighted
     Ctrl+X           Copy_last
     Ctrl+Z           Suspend
@@ -679,6 +680,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     Alt+M                   cycle the mode: ask → auto-edit → auto → plan (read-only)
     Ctrl+N                  picker: toggle the named-only / logged-in-only filter; /worktree: open in a new session
     Alt+A                   /sessions: archive or unarchive the highlighted session
+    Alt+T                   /sessions: pin the highlighted session to the top, or unpin it
     Alt+R                   /worktree: review the highlighted worktree's changes
     Ctrl+X                  copy the last assistant message
     Ctrl+Z                  suspend to the shell
@@ -709,6 +711,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /budget [dollars|off]              show or set the session's cost budget: no turn starts once it is spent
     /goal [text|off|resume]            set a goal the agent keeps working toward until it is met; show, clear or resume it
     /remind [stop|every|rm|off ...]    stop [N] TEXT: remind the agent when it ends its turn (at most N times in a row, default 3); every N TEXT: every N turns; rm NAME, off: remove one or all; none: list the session's (Ctrl+D removes one)
+    /memory [on|off]                   the notes the model saved when you asked it to remember something (Ctrl+D forgets one); on or off gives the model the memory tool or takes it away
     /resume [now|cancel]               show, run now or cancel the automatic resume after a usage limit
     /downsize-images                   send the conversation's images smaller (after the model refused one as too large) and retry a failed reply
     /compact [instructions]            summarise older messages to free context
@@ -727,9 +730,11 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /name [text]                       set the session name
     /session                           show session statistics
     /trace                             where the session's time went: model, tools, waiting on you, the slowest steps (prigh trace SESSION -perfetto FILE exports a timeline)
-    /sessions                          pick a saved session (Tab marks, Ctrl+D deletes, Alt+A archives, Alt+D deletes all archived, Ctrl+N named)
+    /sessions                          pick a saved session (Tab marks, Ctrl+D deletes, Alt+A archives, Alt+T pins, Alt+D deletes all archived, Ctrl+N named)
     /archive [session]                 archive a session (the current one without an argument)
     /unarchive [session]               unarchive a session (the current one without an argument)
+    /pin [session]                     pin a session to the top of /sessions, where it is never archived for being idle (the current one without an argument)
+    /unpin [session]                   unpin a session (the current one without an argument)
     /delete-archived                   delete every archived session, after a confirmation
     /agents [steer|cancel ...]         focus a subagent (Ctrl+D cancels one); steer N TEXT: tell subagent N (its number or id) at its next step, follow-up N TEXT: before it reports; cancel N
     /jobs [id|kill <id>]               list background jobs (Enter shows output, Ctrl+D kills), or show/kill one
@@ -767,9 +772,10 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     #name      insert a snippet: Tab or Enter on its completion (/snippet)
     type                     filter the list (fuzzy)
     Enter / Esc              accept the highlighted item / close without changes
-    Ctrl+D                   /sessions: delete the marked or highlighted sessions · /agents: cancel · /jobs: kill · /queue, /remind, /worktree: remove
+    Ctrl+D                   /sessions: delete the marked or highlighted sessions · /agents: cancel · /jobs: kill · /queue, /remind, /worktree: remove · /memory: forget
     Tab                      /sessions: mark or unmark the highlighted session
     Alt+A                    /sessions: archive or unarchive the highlighted session
+    Alt+T                    /sessions: pin or unpin the highlighted session
     Alt+R                    /worktree: review the highlighted worktree's changes
     Alt+D                    /sessions: delete every archived session
     Ctrl+N                   /sessions: named only · /model: logged-in only · /worktree: open in a new session
@@ -2248,7 +2254,7 @@ let%expect_test
   show "host prompt" (Autocomplete.directory ~host:"client-1" ~text:"~/de");
   [%expect
     {|
-    /mo          command    prefix="mo" navigated=false enter_accepts=true items=6
+    /mo          command    prefix="mo" navigated=false enter_accepts=true items=7
     /model       arg:model  prefix="" navigated=false enter_accepts=false items=4
     /model down  arg:model  prefix="" navigated=true enter_accepts=true items=4
     /model gp    arg:model  prefix="gp" navigated=false enter_accepts=true items=1

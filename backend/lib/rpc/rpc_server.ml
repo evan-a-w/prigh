@@ -66,12 +66,14 @@ let methods =
   ; "keep_session"
   ; "switch_session"
   ; "list_sessions"
+  ; "search_sessions"
   ; "set_session_name"
   ; "set_transcript_filter"
   ; "delete_session"
   ; "delete_sessions"
   ; "delete_archived"
   ; "set_archived"
+  ; "set_pinned"
   ; "export"
   ; "import"
   ; "fork"
@@ -115,6 +117,10 @@ let methods =
   ; "get_prefs"
   ; "set_prefs"
   ; "push_pref"
+  ; "get_memory"
+  ; "save_memory"
+  ; "forget_memory"
+  ; "set_memory_enabled"
   ]
   @ Files_rpc.methods
   @ Review_rpc.methods
@@ -399,6 +405,7 @@ type t =
   ; terminals : Terminal_relay.t
   ; home : string option (** for the current [config.json] *)
   ; prefs : User_prefs.t option (** under [home] *)
+  ; memory : Memory.t option (** under [home] *)
   ; now : unit -> float
   ; listed : Listed.t String.Table.t
     (** what [list_sessions] last showed of each live session *)
@@ -408,6 +415,7 @@ type t =
         for [get_messages_page] without opening them *)
   ; loading : Session.t Or_error.t Promise.t String.Table.t
     (** session files being parsed, by path *)
+  ; search : Session_search.t (** [search_sessions]' index *)
   ; repos : Git_location.t option String.Table.t
     (** where the cwds of saved sessions that recorded none are in git, read
         from the backend's files once (see [with_repo]) *)
@@ -752,6 +760,26 @@ let register t agent =
   agent
 ;;
 
+let memory_json memory =
+  let%map.Or_error notes = Memory.notes memory in
+  [ ("enabled", if Memory.enabled memory then `True else `False)
+  ; "notes", `Array (List.map notes ~f:Memory.Note.to_json)
+  ]
+;;
+
+(* Every client hears of every change, the model's saves included, so that
+   open settings follow. *)
+let memory_changed (t : t) memory =
+  match memory_json memory with
+  | Error _ -> ()
+  | Ok fields ->
+    let json =
+      `Object
+        ([ "type", `String "event"; "event", `String "memory_changed" ] @ fields)
+    in
+    Hashtbl.iter t.clients ~f:(fun (c : Client.t) -> c.send json)
+;;
+
 let create
       ~env
       ~sw
@@ -765,6 +793,7 @@ let create
       ?(backend_host = true)
       ?home
       ?forges
+      ?memory
       ?transcription_http
       ?nix_store
       ~login
@@ -824,10 +853,15 @@ let create
     ; prefs =
         Option.map home ~f:(fun home ->
           User_prefs.create ~path:(User_prefs.path ~home))
+    ; memory =
+        (match memory with
+         | Some _ -> memory
+         | None -> Option.map home ~f:(fun home -> Memory.create ~home))
     ; now = (fun () -> Eio.Time.now (Eio.Stdenv.clock env))
     ; listed = String.Table.create ()
     ; on_session_deleted = []
     ; loading = String.Table.create ()
+    ; search = Session_search.create ()
     ; repos = String.Table.create ()
     ; nix_store
     ; temporaries = String.Table.create ()
@@ -840,6 +874,8 @@ let create
   (* The flow itself (URL, prompts) belongs to the client that started it:
      other frontends, possibly on other machines, must not open a browser or
      pop up a dialog. Everyone hears the outcome, to refresh their status. *)
+  Option.iter t.memory ~f:(fun memory ->
+    Memory.subscribe memory ~f:(fun () -> memory_changed t memory));
   Login_manager.subscribe login ~f:(fun event ->
     let json = Rpc_json.login_event event in
     match event with
@@ -1418,6 +1454,12 @@ let bool_param params name ~default =
   | Some _ -> Or_error.errorf "param %S must be a boolean" name
 ;;
 
+let required_bool_param params name =
+  match param params name with
+  | Some _ -> bool_param params name ~default:false
+  | None -> Or_error.errorf "missing param %S" name
+;;
+
 let unauthorised = User_access.unauthorised
 
 let credentials_ok t ?user given =
@@ -1823,6 +1865,62 @@ let list_sessions t client =
        | other -> other))
 ;;
 
+(* A session for [search_sessions]' index: the live one's from memory. *)
+let load_for_search t (s : Session.Summary.t) =
+  let live =
+    Hashtbl.data t.agents
+    |> List.find_map ~f:(fun agent ->
+      let session = Agent.session agent in
+      Option.some_if (String.equal (Session.path session) s.path) session)
+  in
+  match live with
+  | Some session -> Some session
+  | None -> Result.ok (load_session t s.path)
+;;
+
+let index_sessions t =
+  Session_search.index
+    t.search
+    ~sessions:(fun () -> saved_sessions t)
+    ~load:(load_for_search t)
+    ~yield:Fiber.yield
+;;
+
+let indexed_sessions t = Session_search.indexed t.search
+
+let start_indexing t =
+  Fiber.fork_daemon ~sw:t.sw (fun () ->
+    (match index_sessions t with
+     | () -> ()
+     | exception (Eio.Cancel.Cancelled _ as exn) -> raise exn
+     | exception exn ->
+       eprintf
+         "prigh: indexing the sessions for search failed (searches read them \
+          instead): %s\n\
+          %!"
+         (Exn.to_string exn));
+    `Stop_daemon)
+;;
+
+(* The sessions [list_sessions] lists, by what was said in them. *)
+let search_sessions t params =
+  let open Or_error.Let_syntax in
+  let%bind query = string_param params "query" in
+  let%map limit = int_param params "limit" ~default:50 in
+  let hits =
+    Session_search.search
+      t.search
+      ~sessions:(saved_sessions t)
+      ~load:(load_for_search t)
+      ~query
+      ~limit
+  in
+  `Object
+    [ "query", `String query
+    ; "hits", `Array (List.map hits ~f:Session_search.Hit.to_json)
+    ]
+;;
+
 (* A saved session by its file (as the summaries give it) or its id. *)
 let find_saved t key =
   Or_error.bind
@@ -2015,6 +2113,18 @@ let set_archived t ~key ~archived =
       Or_error.map session ~f:(fun session ->
         ignore (Session.set_archived session ~archived : Session.Entry.t);
         sessions_changed t)))
+;;
+
+let set_pinned t ~key ~pinned =
+  Or_error.bind (find_saved t key) ~f:(fun summary ->
+    let session =
+      match Hashtbl.find t.agents summary.id with
+      | Some agent -> Ok (Agent.session agent)
+      | None -> Session.load summary.path
+    in
+    Or_error.map session ~f:(fun session ->
+      ignore (Session.set_pinned session ~pinned : Session.Entry.t);
+      sessions_changed t))
 ;;
 
 let exec_param t params =
@@ -2470,6 +2580,46 @@ let prefs t client ~meth ~params =
        `Object [ "value", list ])
 ;;
 
+let memory t ~meth ~params =
+  match t.memory with
+  | None -> Or_error.error_string "this backend keeps no memory"
+  | Some memory ->
+    let open Or_error.Let_syntax in
+    let now () =
+      Time_float.of_span_since_epoch (Time_float.Span.of_sec (t.now ()))
+    in
+    (match meth with
+     | "get_memory" ->
+       let%map fields = memory_json memory in
+       `Object fields
+     | "save_memory" ->
+       let%bind id = string_param_opt params "id" in
+       let%bind title = string_param_opt params "title" in
+       let%bind text = string_param params "text" in
+       let%map note =
+         match id with
+         | Some id -> Memory.edit memory ~id ?title ~now:(now ()) text
+         | None ->
+           Or_error.map
+             (Memory.save memory ?title ~now:(now ()) text)
+             ~f:(function Added note | Replaced note -> note)
+       in
+       `Object [ "note", Memory.Note.to_json note ]
+     | "forget_memory" ->
+       let%bind id = string_param params "id" in
+       let%map note = Memory.forget memory id in
+       `Object [ "note", Memory.Note.to_json note ]
+     | _ ->
+       let%bind enabled =
+         match param params "enabled" with
+         | Some `True -> Ok true
+         | Some `False -> Ok false
+         | _ -> Or_error.error_string "param \"enabled\" must be a boolean"
+       in
+       let%map () = Memory.set_enabled memory enabled in
+       `Object [ ("enabled", if enabled then `True else `False) ])
+;;
+
 let keep_session t (client : Client.t) =
   let agent = client.agent in
   if not (Agent.temporary agent)
@@ -2530,6 +2680,8 @@ let dispatch_server t (client : Client.t) ~meth ~params
               { Tool_result.text; is_error; images })))
   | "get_prefs" | "set_prefs" | "push_pref" ->
     Some (prefs t client ~meth ~params)
+  | "get_memory" | "save_memory" | "forget_memory" | "set_memory_enabled" ->
+    Some (memory t ~meth ~params)
   | "nix_store_status" | "nix_store_gc" ->
     Nix_store_rpc.dispatch
       t.nix_store
@@ -2575,6 +2727,7 @@ let dispatch_server t (client : Client.t) ~meth ~params
            attach t client target;
            attached_state client)))
   | "list_sessions" -> Some (ok (list_sessions t client))
+  | "search_sessions" -> Some (search_sessions t params)
   | "list_worktrees" -> Some (list_worktrees t client params)
   | "create_worktree" -> Some (create_worktree t client params)
   | "remove_worktree" -> Some (remove_worktree t client params)
@@ -2615,16 +2768,14 @@ let dispatch_server t (client : Client.t) ~meth ~params
   | "set_archived" ->
     Some
       (Or_error.bind (string_param params "path") ~f:(fun key ->
-         let archived =
-           match param params "archived" with
-           | Some `True -> Ok true
-           | Some `False -> Ok false
-           | Some _ ->
-             Or_error.error_string "param \"archived\" must be a boolean"
-           | None -> Or_error.error_string "missing param \"archived\""
-         in
-         Or_error.bind archived ~f:(fun archived ->
-           unit_result (set_archived t ~key ~archived))))
+         Or_error.bind
+           (required_bool_param params "archived")
+           ~f:(fun archived -> unit_result (set_archived t ~key ~archived))))
+  | "set_pinned" ->
+    Some
+      (Or_error.bind (string_param params "path") ~f:(fun key ->
+         Or_error.bind (required_bool_param params "pinned") ~f:(fun pinned ->
+           unit_result (set_pinned t ~key ~pinned))))
   | "import" ->
     Some
       (Or_error.bind (string_param params "path") ~f:(fun path ->

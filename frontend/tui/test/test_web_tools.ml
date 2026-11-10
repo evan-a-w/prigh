@@ -809,3 +809,60 @@ let%expect_test "pull_request: the action and what it acts on" =
         }
     |}]
 ;;
+
+let%expect_test "memory: the action and its title, query or id" =
+  show_item
+    (tool
+       "memory"
+       {|{"action":"save","title":"editor","text":"The user's editor is helix."}|}
+       ~result:(false, "Saved m1 · editor · 2026-11-07"));
+  show_item (tool "memory" {|{"action":"save","text":"Uses fish."}|});
+  show_item (tool "memory" {|{"action":"recall","query":"deploy"}|});
+  show_item (tool "memory" {|{"action":"forget","id":"m3"}|});
+  [%expect
+    {|
+    == quiet ==
+    ✓ memory save editor  1 line
+    == normal ==
+    ✓ memory save editor
+        Saved m1 · editor · 2026-11-07
+    == verbose ==
+    ✓ memory save editor
+        {
+          action: "save"
+          title: "editor"
+          text: "The user's editor is helix."
+        }
+        Saved m1 · editor · 2026-11-07
+    == quiet ==
+    … memory save "Uses fish."
+    == normal ==
+    … memory save "Uses fish."
+    == verbose ==
+    … memory save "Uses fish."
+        {
+          action: "save"
+          text: "Uses fish."
+        }
+    == quiet ==
+    … memory recall "deploy"
+    == normal ==
+    … memory recall "deploy"
+    == verbose ==
+    … memory recall "deploy"
+        {
+          action: "recall"
+          query: "deploy"
+        }
+    == quiet ==
+    … memory forget m3
+    == normal ==
+    … memory forget m3
+    == verbose ==
+    … memory forget m3
+        {
+          action: "forget"
+          id: "m3"
+        }
+    |}]
+;;

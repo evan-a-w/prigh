@@ -11,6 +11,7 @@ let spec =
   ; parallel_safe = true
   ; on_host = true
   ; freeform = None
+  ; native = None
   ; destructive = Never
   ; description =
       "Fetch a URL (http or https) and return its content as readable text: \

@@ -34,6 +34,7 @@ module Reply_tag = struct
     | Models_after_login of string
     | Sessions_picker
     | Sessions_cache
+    | Session_hits
     | Session_stats
     | Trace
     | Entries_for_fork
@@ -51,6 +52,14 @@ module Reply_tag = struct
     | Session_to_archive of
         { arg : string
         ; archived : bool
+        }
+    | Pin_done of
+        { name : string
+        ; pinned : bool
+        }
+    | Session_to_pin of
+        { arg : string
+        ; pinned : bool
         }
     | Paths_for_autocomplete of string
     | Dirs_for_autocomplete of string
@@ -128,6 +137,7 @@ module Reply_tag = struct
     | Skills_for_autocomplete of string (** the [Location_cache] key *)
     | Skill_prompt of string (** the [/skill:] text sent *)
     | Mcp_picker
+    | Memory_picker
     | Mcp_reconnected
     | Mcp_approved of string (** server *)
     | Pending
@@ -186,6 +196,7 @@ module Command = struct
         { generation : int
         ; change : Server_link.Change.t
         }
+    | Signin_code of string option
     | Sign_out
     | Notify of
         { mode : Notify.Mode.t
@@ -256,6 +267,7 @@ module Action = struct
         }
     | Rejected of string
     | Signin_required of string
+    | Signin_code_prompt of Server_link.Code_prompt.t
     | Resize of
         { width : int
         ; height : int
@@ -1316,6 +1328,47 @@ let archive_resolved m ~arg ~archived sessions =
       in
       call
         (Set_archived { path = s.path; archived })
+        ~tag:(Notice_on_success notice)
+    in
+    m, List.map found ~f:set
+;;
+
+let pin_verb ~pinned = if pinned then "pinned" else "unpinned"
+let cannot_pin = "this backend cannot pin sessions: update it to pin"
+
+(* No argument: the current session; otherwise it is looked up in the list
+   ([Session_to_pin]). *)
+let pin_command m ~pinned arg =
+  match arg, m.state with
+  | "", None -> error m "not connected", []
+  | "", Some state ->
+    ( m
+    , [ call
+          (Set_pinned { path = state.session_path; pinned })
+          ~tag:
+            (Notice_on_success
+               (if pinned
+                then "pinned this session to the top of /sessions"
+                else "unpinned this session"))
+      ] )
+  | arg, _ -> m, [ rpc "list_sessions" ~tag:(Session_to_pin { arg; pinned }) ]
+;;
+
+let pin_resolved m ~arg ~pinned sessions =
+  match Session_selection.resolve sessions [ arg ] with
+  | Error e ->
+    let command = sprintf "/%s %s" (if pinned then "pin" else "unpin") arg in
+    error (restore_command m command) e, []
+  | Ok found
+    when List.exists found ~f:(fun (s : P.Session_summary.t) ->
+           Option.is_none s.pinned) -> error m cannot_pin, []
+  | Ok found ->
+    let set (s : P.Session_summary.t) =
+      let notice =
+        sprintf "%s %s" (pin_verb ~pinned) (Session_selection.describe s)
+      in
+      call
+        (Set_pinned { path = s.path; pinned })
         ~tag:(Notice_on_success notice)
     in
     m, List.map found ~f:set
@@ -2467,11 +2520,39 @@ let ask_browser_signin m ~why =
   }
 ;;
 
+let signin_code_question = "Paste the code the page shows after Allow"
+
+(* The browser sign-in under way also takes the page's code: ask for it in
+   place of the dialog (none is open while it waits). *)
+let signin_code_prompt m (prompt : Server_link.Code_prompt.t) =
+  match m.connection with
+  | Switching _ ->
+    let m =
+      match prompt with
+      | Wanted -> m
+      | Refused why -> warn m why
+    in
+    ( { m with
+        mode =
+          Text_prompt { question = signin_code_question; action = Signin_code }
+      ; editor = Editor.clear m.editor
+      ; autocomplete = None
+      }
+    , [] )
+  | Connected | Reconnecting _ | Disconnected _ -> m, []
+;;
+
 let relinked m ~generation (outcome : Server_link.Outcome.t) =
   match m.connection with
   | Switching { generation = current; previous; notices }
     when generation = current ->
     let m = { m with server = Some outcome.link } in
+    let m =
+      match m.mode with
+      | Text_prompt { action = Signin_code; _ } ->
+        { m with mode = Editing; editor = Editor.clear m.editor }
+      | _ -> m
+    in
     (match outcome.result with
      | Unreachable e ->
        let m = { m with connection = previous } in
@@ -3057,6 +3138,132 @@ let reminder_picker m (reminders : P.Reminder.t list) =
         r.name)
   in
   open_picker m Reminders (Picker.create ~title:"Reminders" items)
+;;
+
+(* ---- memory ------------------------------------------------------------ *)
+
+let memory_title (memory : P.Memory.t) =
+  let n = List.length memory.notes in
+  sprintf
+    "Memory · %s · %d note%s"
+    (if memory.enabled then "on" else "off: the model is not given it")
+    n
+    (if n = 1 then "" else "s")
+;;
+
+let one_line text = String.concat ~sep:" " (String.split_lines text)
+
+let memory_label (note : P.Memory.Note.t) =
+  Option.value note.title ~default:(one_line note.text)
+;;
+
+(* Newest first. *)
+let memory_items (memory : P.Memory.t) =
+  List.rev_map memory.notes ~f:(fun (note : P.Memory.Note.t) ->
+    Picker.Item.create
+      ~id:note.id
+      ~detail:
+        (match note.title with
+         | Some _ ->
+           sprintf "%s · %s" (P.Memory.Note.date note) (one_line note.text)
+         | None -> P.Memory.Note.date note)
+      ~search:(Option.value note.title ~default:"" ^ " " ^ note.text)
+      (memory_label note))
+;;
+
+let memory_picker m (memory : P.Memory.t) =
+  if List.is_empty memory.notes
+  then
+    notice
+      m
+      (sprintf
+         "memory is empty (%s): the model saves a note when you ask it to \
+          remember something, and recalls it when you refer back"
+         (if memory.enabled
+          then "on; /memory off takes it away"
+          else "off; /memory on gives the model the memory tool"))
+  else
+    open_picker
+      m
+      (Memory memory)
+      (Picker.create ~title:(memory_title memory) (memory_items memory))
+;;
+
+let refresh_memory_picker (memory : P.Memory.t) picker =
+  Picker.set_items ~title:(memory_title memory) picker (memory_items memory)
+;;
+
+(* [memory_changed]: an open picker (or the one a confirmation returns to)
+   follows. *)
+let memory_changed m (memory : P.Memory.t) =
+  match m.mode with
+  | Picker { kind = Memory _; picker } ->
+    { m with
+      mode =
+        Picker
+          { kind = Memory memory; picker = refresh_memory_picker memory picker }
+    }
+  | Confirm
+      { question
+      ; action = Forget_memory { note; back = Some { kind = Memory _; picker } }
+      } ->
+    { m with
+      mode =
+        Confirm
+          { question
+          ; action =
+              Forget_memory
+                { note
+                ; back =
+                    Some
+                      { kind = Memory memory
+                      ; picker = refresh_memory_picker memory picker
+                      }
+                }
+          }
+    }
+  | _ -> m
+;;
+
+let confirm_forget_memory m (note : P.Memory.Note.t) ~back =
+  ( { m with
+      mode =
+        Confirm
+          { question =
+              sprintf
+                "forget %S? The model can no longer recall it (y/n)"
+                (memory_label note)
+          ; action = Forget_memory { note; back }
+          }
+    }
+  , [] )
+;;
+
+let memory_command m args =
+  match args with
+  | [] -> m, [ rpc "get_memory" ~tag:Memory_picker ]
+  | [ (("on" | "off") as word) ] ->
+    let enabled = String.equal word "on" in
+    ( m
+    , [ rpc
+          "set_memory_enabled"
+          ~params:(P.Memory.set_enabled_params enabled)
+          ~tag:
+            (Notice_on_success
+               (if enabled
+                then
+                  "memory on: the model can save and recall notes when you ask"
+                else
+                  "memory off: the model is not given the memory tool; your \
+                   notes are kept (/memory lists them)"))
+      ] )
+  | _ ->
+    ( error
+        (restore_command m ("/memory " ^ String.concat ~sep:" " args))
+        (sprintf
+           "unknown argument %S; use on or off, or nothing to list the notes"
+           (String.concat ~sep:" " args))
+    , [] )
 ;;
 
 let nix_gc_still_running m =
@@ -3863,6 +4070,8 @@ let run_command m (cmd : Commands.Parsed.t) =
   | "delete-archived", _ -> m, [ rpc "list_sessions" ~tag:Archived_to_delete ]
   | (("archive" | "unarchive") as verb), _ ->
     archive_command m ~archived:(String.equal verb "archive") cmd.rest
+  | (("pin" | "unpin") as verb), _ ->
+    pin_command m ~pinned:(String.equal verb "pin") cmd.rest
   | "switch", _ ->
     ( m
     , [ rpc
@@ -3947,6 +4156,7 @@ let run_command m (cmd : Commands.Parsed.t) =
          ~last_prompt:(last_prompt m)
          cmd.rest)
   | "worktree", _ -> worktree_command m cmd.rest
+  | "memory", args -> memory_command m args
   | "remind", _ ->
     remind_action
       m
@@ -4575,8 +4785,11 @@ let editing_intent m (intent : Intent.t) =
   | Search -> open_search m, []
   | Prev_user_message -> jump_user_message m ~direction:`Prev
   | Next_user_message -> jump_user_message m ~direction:`Next
-  | Toggle_archived | Toggle_sidebar | Review_highlighted | Jump_to_bottom ->
-    m, []
+  | Toggle_archived
+  | Toggle_pinned
+  | Toggle_sidebar
+  | Review_highlighted
+  | Jump_to_bottom -> m, []
 ;;
 
 (* Autocomplete is a sub-state of editing: while it is open it owns a few keys,
@@ -4658,6 +4871,7 @@ let editing m (intent : Intent.t) =
         | Prev_user_message
         | Next_user_message
         | Toggle_archived
+        | Toggle_pinned
         | Review_highlighted
         | Toggle_sidebar
         | Jump_to_bottom
@@ -4835,6 +5049,21 @@ let picker_selected m (kind : Mode.Picker_kind.t) (item : Picker.Item.t) =
      with
      | Some w -> open_worktree m w ~new_session:false
      | None -> m, [])
+  | Memory memory ->
+    (match
+       List.find memory.notes ~f:(fun (n : P.Memory.Note.t) ->
+         String.equal n.id item.id)
+     with
+     | Some note ->
+       ( notice
+           m
+           (sprintf
+              "%s (saved %s): %s · Ctrl+D in /memory forgets it"
+              (Option.value note.title ~default:note.id)
+              (P.Memory.Note.date note)
+              note.text)
+       , [] )
+     | None -> error m "that note is gone; /memory lists the others", [])
   | Mcp list -> mcp_selected m list item.id
   | Auth_select id ->
     m, [ rpc "auth_respond" ~params:[ "id", str id; "value", str item.id ] ]
@@ -4952,6 +5181,32 @@ let toggle_archived m selection picker =
       ] )
 ;;
 
+let toggle_pinned m selection picker =
+  match
+    Option.bind (Picker.selected_item picker) ~f:(fun item ->
+      Session_selection.find selection item.id)
+  with
+  | None -> m, []
+  | Some { pinned = None; _ } -> error m cannot_pin, []
+  | Some ({ pinned = Some was; _ } as session) ->
+    let pinned = not (was && not session.archived) in
+    let selection =
+      Session_selection.set_pinned selection ~path:session.path ~pinned
+    in
+    let picker =
+      Session_selection.picker
+        ~previous:picker
+        ~select:session.path
+        selection
+        ~current:(current_session m)
+    in
+    ( { m with mode = Picker { kind = Sessions selection; picker } }
+    , [ call
+          (Set_pinned { path = session.path; pinned })
+          ~tag:(Pin_done { name = Session_selection.describe session; pinned })
+      ] )
+;;
+
 (* Applies [f] to the sessions picker, open or waiting behind a confirmation. *)
 let map_sessions_picker m ~f =
   let current = current_session m in
@@ -5002,10 +5257,29 @@ let worktree_in_picker m (listing : P.Worktree.Listing.t) picker ~f =
   | None -> m, []
 ;;
 
+(* The /sessions picker's filter also asks the backend to search the
+   messages, at each change of its words; replies for other words are
+   dropped. *)
+let search_sessions_messages (kind : Mode.Picker_kind.t) ~before ~after =
+  match kind with
+  | Sessions _
+    when (not
+            (Session_search.same_words
+               (Picker.query before)
+               (Picker.query after)))
+         && not (List.is_empty (Session_search.words (Picker.query after))) ->
+    [ rpc
+        "search_sessions"
+        ~params:(P.Session_hits.params ~query:(Picker.query after) ~limit:50)
+        ~tag:Session_hits
+    ]
+  | _ -> []
+;;
+
 let picker m (kind : Mode.Picker_kind.t) picker (intent : Intent.t) =
   let back = Some { Mode.Open_picker.kind; picker } in
   match intent with
-  | (Complete | Toggle_archived | Delete_word_forward)
+  | (Complete | Toggle_archived | Toggle_pinned | Delete_word_forward)
     when match kind with
          | Sessions _ -> true
          | _ -> false ->
@@ -5014,6 +5288,7 @@ let picker m (kind : Mode.Picker_kind.t) picker (intent : Intent.t) =
        ( { m with mode = Picker { kind; picker = Picker.toggle_check picker } }
        , [] )
      | Sessions selection, Toggle_archived -> toggle_archived m selection picker
+     | Sessions selection, Toggle_pinned -> toggle_pinned m selection picker
      | Sessions selection, _ -> confirm_delete_archived m ~back selection
      | _ -> m, [])
   | Review_highlighted ->
@@ -5087,6 +5362,14 @@ let picker m (kind : Mode.Picker_kind.t) picker (intent : Intent.t) =
      | Worktrees listing ->
        worktree_in_picker m listing picker ~f:(fun w ->
          confirm_remove_worktree m w ~force:false ~back)
+     | Memory memory ->
+       (match
+          Option.bind (Picker.selected_item picker) ~f:(fun item ->
+            List.find memory.notes ~f:(fun (n : P.Memory.Note.t) ->
+              String.equal n.id item.id))
+        with
+        | None -> m, []
+        | Some note -> confirm_forget_memory m note ~back)
      | _ -> { m with quitting = true }, [ Command.Quit ])
   | _ ->
     (match
@@ -5095,7 +5378,9 @@ let picker m (kind : Mode.Picker_kind.t) picker (intent : Intent.t) =
          (if Intent.equal intent Interrupt then Cancel else intent)
          ~page:(picker_rows m)
      with
-     | Continue picker -> { m with mode = Picker { kind; picker } }, []
+     | Continue next ->
+       ( { m with mode = Picker { kind; picker = next } }
+       , search_sessions_messages kind ~before:picker ~after:next )
      | Selected item -> picker_selected m kind item
      | Cancelled ->
        let m = { m with mode = Editing; login_lines = [] } in
@@ -5159,6 +5444,7 @@ let login_prompt m ~id ~(prompt : P.Auth_event.Prompt.t) (intent : Intent.t) =
   | Prev_user_message
   | Next_user_message
   | Toggle_archived
+  | Toggle_pinned
   | Review_highlighted
   | Toggle_sidebar
   | Jump_to_bottom
@@ -5230,6 +5516,16 @@ let text_prompt m ~(action : Mode.Text_prompt_action.t) (intent : Intent.t) =
       if String.is_empty text
       then m, []
       else forge_login m (Host { host = text; kind = Some kind; method_ })
+    | Signin_code ->
+      if String.is_empty text
+      then
+        ( { m with
+            mode =
+              Text_prompt
+                { question = signin_code_question; action = Signin_code }
+          }
+        , [] )
+      else notice m "checking the code…", [ Signin_code (Some text) ]
     | Deny_reason { confirm; draft } ->
       answer_confirm
         { m with editor = Editor.set_text m.editor draft }
@@ -5248,8 +5544,13 @@ let text_prompt m ~(action : Mode.Text_prompt_action.t) (intent : Intent.t) =
       Some
         (Option.value_map m.state ~default:"backend" ~f:(fun s -> s.active_host))
     | Host_cwd host -> Some host
-    | Name | Export_path | Import_path | Deny_reason _ | Connect | Forge_host _
-      -> None
+    | Name
+    | Export_path
+    | Import_path
+    | Deny_reason _
+    | Connect
+    | Forge_host _
+    | Signin_code -> None
   in
   let edit m =
     let m', cmds = editing_intent m intent in
@@ -5296,6 +5597,15 @@ let text_prompt m ~(action : Mode.Text_prompt_action.t) (intent : Intent.t) =
            editor = Editor.set_text m.editor draft
          }
        , [] )
+     | Signin_code ->
+       ( notice
+           { m with
+             editor = Editor.clear m.editor
+           ; mode = Editing
+           ; autocomplete = None
+           }
+           "cancelling the sign-in…"
+       , [ Signin_code None ] )
      | Name
      | Cd
      | Mkdir
@@ -5355,6 +5665,7 @@ let text_prompt m ~(action : Mode.Text_prompt_action.t) (intent : Intent.t) =
   | Prev_user_message
   | Next_user_message
   | Toggle_archived
+  | Toggle_pinned
   | Review_highlighted
   | Toggle_sidebar
   | Jump_to_bottom -> m, []
@@ -5395,6 +5706,13 @@ let confirm m ~(action : Mode.Confirm_action.t) (intent : Intent.t) =
         ~doing:"signing in through the browser: follow the link it opens…"
     | Create_dir { target; path } ->
       m, [ change_dir ~if_missing:Create ~target path ]
+    | Forget_memory { note; back } ->
+      ( back_to m back
+      , [ rpc
+            "forget_memory"
+            ~params:(P.Memory.forget_params ~id:note.id)
+            ~tag:(Notice_on_success (sprintf "forgot %S" (memory_label note)))
+        ] )
     | Remove_worktree { worktree; force; back = _ } ->
       ( notice m (sprintf "removing the worktree at %s…" worktree.path)
       , [ call
@@ -5409,6 +5727,7 @@ let confirm m ~(action : Mode.Confirm_action.t) (intent : Intent.t) =
     | Tool_confirm c -> answer_confirm m c Deny
     | Delete_sessions { back = Some _ as back; _ } -> back_to m back, []
     | Remove_worktree { back = Some _ as back; _ } -> back_to m back, []
+    | Forget_memory { back; _ } -> back_to m back, []
     | Create_dir { path; _ } -> notice m (sprintf "not created: %s" path), []
     | Cd_to_checkout path ->
       notice m (sprintf "staying here; /cd %s goes there" path), []
@@ -5835,6 +6154,7 @@ let event m (e : P.Event.t) =
   | Terminal_frame _
   | Terminal_close _
   | Terminal_kill _ -> m, []
+  | Memory_changed memory -> memory_changed m memory, []
   | Prefs_changed changes ->
     let m = filter_of_prefs m changes in
     (match
@@ -5966,7 +6286,7 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
            { m with editor }
            (if String.is_empty hint then e else sprintf "%s; %s" e hint)
        , [] )
-     | Ignore | Prefs_history -> m, []
+     | Ignore | Prefs_history | Session_hits -> m, []
      | Review_named { command; model = Some args; _ } ->
        (* Not a repository: no worktree by that name, the model reviews. *)
        review_action m ~command (Model args)
@@ -6017,7 +6337,7 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
          { m with refs = Location_cache.set m.refs ~key P.Git_diff.Refs.empty }
      | Worktree_removed { target; force } ->
        worktree_remove_failed m ~target ~force e
-     | Archive_done _ ->
+     | Archive_done _ | Pin_done _ ->
        (* Undo the picker's optimistic change. *)
        error m e, [ rpc "list_sessions" ~tag:Sessions_refresh ]
      | Pr_created ->
@@ -6050,6 +6370,9 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
            { m with skills = Location_cache.set m.skills ~key skills })
      | Mcp_picker ->
        decode json ~f:P.Mcp_list.of_json (fun list -> mcp_picker m list, [])
+     | Memory_picker ->
+       decode json ~f:P.Memory.of_json (fun memory ->
+         memory_picker m memory, [])
      | Nix_store_shown ->
        decode json ~f:P.Nix_store_status.of_json (fun status ->
          ( output
@@ -6462,6 +6785,13 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
          json
          ~f:(decode_list ~f:P.Session_summary.of_json)
          (archive_resolved m ~arg ~archived)
+     | Pin_done { name; pinned } ->
+       notice m (sprintf "%s %s" (pin_verb ~pinned) name), []
+     | Session_to_pin { arg; pinned } ->
+       decode
+         json
+         ~f:(decode_list ~f:P.Session_summary.of_json)
+         (pin_resolved m ~arg ~pinned)
      | Sessions_refresh ->
        decode
          json
@@ -6630,6 +6960,17 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
          json
          ~f:(decode_list ~f:P.Session_summary.of_json)
          (fun sessions -> sessions_picker m sessions, [])
+     | Session_hits ->
+       decode json ~f:P.Session_hits.of_json (fun hits ->
+         match m.mode with
+         | Picker { kind = Sessions _ as kind; picker }
+           when Session_search.same_words hits.query (Picker.query picker) ->
+           ( { m with
+               mode =
+                 Picker { kind; picker = Picker.set_content picker (Some hits) }
+             }
+           , [] )
+         | _ -> m, [])
      | Sessions_cache ->
        decode
          json
@@ -6811,6 +7152,7 @@ let update m (action : Action.t) =
       | Relinked { generation; outcome } -> relinked m ~generation outcome
       | Rejected reason -> signed_out m ~reason, []
       | Signin_required why -> ask_browser_signin m ~why, []
+      | Signin_code_prompt prompt -> signin_code_prompt m prompt
       | Resize { width; height } -> { m with width; height }, []
     in
     let m, cmds = block_backend_rpc m cmds in

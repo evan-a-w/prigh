@@ -665,7 +665,12 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   "text","cursor","real","screenshot"}` or `{"ok":false,"error",
   "interrupted"}` out), spawned on the first action and again when it died
   (an action whose send failed goes to the new one; one with no reply
-  fails), killed on cancel, one action at a time. The result's text is
+  fails), stopped on cancel, one action at a time. Stopping returns at once
+  (the cancelled turn ends then) and, in the background, SIGTERMs the
+  helper, so that it releases the keys and buttons it holds, and SIGKILLs
+  it if it has not exited a second later. The helper runs on a switch of
+  its own (`Switch.run_protected`), so the tool host shutting down stops it
+  the same way and waits for it, rather than Eio SIGKILLing it. The result's text is
   the description with the real point (`→ (1280, 624) on the screen`), the
   cursor and `screenshot W×H`; the screenshot is its image. An interrupted
   reply (the user moved the mouse: the kill switch) is an error starting
@@ -678,10 +683,27 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   with the tool host", says when it comes and goes, with the guidance
   the system prompt also gets: the screen is untrusted data), and stops
   the run (as `halt` does for a budget, with a notice) after an
-  interrupted result. `Computer_screenshots.keep_last` makes
-  `Agent_loop`'s requests carry only the latest `computer_screenshots`
-  (config, default 3, in `Compaction_settings`) screenshots as images,
-  older ones as `[screenshot omitted]`; the session keeps them.
+  interrupted result, and a batch of `computer` calls in one reply stops
+  at the first that fails. `Computer_screenshots.prune` makes
+  `Agent_loop`'s requests carry screenshots as images up to
+  `computer_screenshots_max` and then cut back to the latest
+  `computer_screenshots` (config, default 8 and 3, in
+  `Compaction_settings`), older ones as `[screenshot omitted]`: a
+  function of the message list alone, so requests between cuts only
+  append (and the prompt cache holds); with
+  `Model.binds_thinking_to_prefix` it also leaves out thinking written
+  against a now changed prefix. The session keeps everything.
+- Native computer-use tools. `Native_computer` (`providers/`) is a
+  model's built-in tool (`Model.native_computer`: Anthropic's toolset or
+  `computer_2025*` tool, OpenAI's `computer`); `Tool_computer.for_screen`
+  marks the spec `Tool_spec.Native.Computer` (the screenshot size) when
+  `computer_native` is on, and `Anthropic`/`Openai_responses` then offer
+  the native tool and translate with `Computer_native`: a native call is
+  stored as `Computer_action` JSON plus `native` (the original, replayed
+  unchanged to the same form) and OpenAI's `safety_checks`. OpenAI's
+  batches are one stored call per action (`call_id`, `call_id__1`, ...)
+  and are replayed as one `computer_call` and one `computer_call_output`
+  (the batch's last screenshot).
 - The file browser, in layers. `Host_files` is the host's side: the
   pseudo-tools `$fs_list` (one directory's entries with kind, size, mtime,
   a symlink's target kind; at most 5000, dot files on request; a file lists
@@ -786,6 +808,26 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   a change for the user to accept, `resolve` closing the thread. Not on
   the host; offered only while the session has comments, never to
   subagents (`Tools.main_agent_only`).
+- `Memory` / `Tool_memory` — the user's notes across sessions,
+  `~/.prigh/memory.json` under the world's home (per namespace with
+  `-tokens`): `{next, notes: [{id, title?, text, saved}]}`, ids `m<n>` never
+  reused. Changes re-read the file and replace it atomically under its
+  `Lock_dir` and the store's mutex (`bin/main.ml` makes one per world, like
+  `Forges`, and hands it to that world's agents). `memory {action: save |
+  recall | forget, text?, title?, query?, id?}`: a save with an existing
+  title (no case) replaces that note; `search` ranks notes by the query's
+  words found as substrings or within one edit of a note's word (4+
+  letters); a recall without a query lists the newest 50, each on a line.
+  Not on the host, main agent only (`Tools.main_agent_only`), `save` and
+  `forget` destructive. Its description tells the model to use it very
+  rarely (save when asked to remember, recall when the user refers to what
+  they said before, never by default). Off (`memory.enabled` false in
+  `User_prefs`) drops it from the tools offered each turn and refuses a
+  call. RPC: `get_memory` (`{enabled, notes}`), `save_memory` (with `id`:
+  edit that note), `forget_memory`, `set_memory_enabled`; every change is
+  broadcast to that world's clients as `memory_changed`
+  (`Prigh_protocol.Memory`). prigh-web's Settings → Memory
+  (`Memory_notes`, `Settings_view`) and the TUI's `/memory` picker use them.
 - `Tool_web_search` — `web_search` is a provider-side tool: `Tools.for_model`
   keeps it only for Anthropic, OpenAI and OpenAI Codex models, whose
   providers send their native tool for it; its `run` only answers a model
@@ -1069,7 +1111,7 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   the session's `render_ui` calls, becoming a user message of an
   `Injected` `Ui_action` note). `Tools.interaction` holds the three; they are
   not tool-host tools, and `Tools.for_context` drops them for subagents,
-  which cannot ask the user (nor `goal_complete`, `job_input` and the other
+  which cannot ask the user (nor `goal_complete`, `memory`, `job_input` and the other
   background controls).
 - `Tools.all` is the fixed built-in set; `Tools.builtin` adds the variants
   (`apply_patch`) that a tool host can also run. `Tools.for_model` gives a
@@ -1439,7 +1481,9 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   where the session runs), the system prompt, the goal, the reminders
   (`Reminders`, the whole list), the approval mode with plan
   mode (`approval`), rules the user allowed for the session (`allow_rule`),
-  `Archived {archived}` (archived or unarchived by hand), `Spend {usage,
+  `Archived {archived}` (archived or unarchived by hand; archiving appends
+  `Pinned {pinned = false}` too), `Pinned {pinned}` (pinned to the top,
+  never archived for being idle; pinning unarchives), `Spend {usage,
   cost_usd}` (what the messages do not record: subagents' responses,
   compactions, `btw`; `spend` totals them on all branches) and `Resume_at
   {at}` (a scheduled resume after a usage limit, `None` once it ran or was
@@ -1859,8 +1903,12 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   reply ended in an error), `live` (with `clients` and `waiting`, its
   confirmations and questions waiting for the user, when live), `running` (a
   turn or background work), `background` (running background subagents +
-  jobs, 0 when not loaded) and `archived` (computed with the namespace's
-  current `config.json`, reread per call). `set_archived {path, archived}`
+  jobs, 0 when not loaded), `pinned` and `archived` (computed with the
+  namespace's current `config.json`, reread per call; never for a pinned
+  session). `set_pinned {path, pinned}` appends a `Pinned` entry as
+  `set_archived` does its own (an unpin counts as activity for
+  `archive_after_days`); frontends treat a summary without `pinned` as a
+  backend that cannot pin. `set_archived {path, archived}`
   (`path`: a session file or id) appends an `Archived` entry, through the
   live agent's session if loaded; archiving an active session is refused.
   `delete_sessions {paths}` and `delete_archived {}` answer `{deleted:
@@ -1905,8 +1953,14 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   `get_subagent`, `get_pending`, `kill_job`, `job_output`, `list_jobs`,
   `shell`, `get_state`, `get_messages`, `get_messages_page`,
   `get_outline`, `get_tool_output`, `get_entries`, `set_model`, `set_thinking`, `list_models`, `compact`,
-  `new_session`, `switch_session`, `list_sessions`, `set_session_name`,
+  `new_session`, `switch_session`, `list_sessions`, `search_sessions`
+  (`{query, limit}`: the listed sessions by name and what the user and
+  assistant wrote, best first, each with a snippet and its match ranges;
+  `Session_search` keeps an inverted index in memory, re-reading only the
+  files that changed; each server builds it as it starts, in a fiber that
+  yields after each session, and a search meanwhile waits for it), `set_session_name`,
   `delete_session`, `delete_sessions`, `delete_archived`, `set_archived`,
+  `set_pinned`,
   `export`, `import`, `fork`, `clone`, `rewind`, `trim`, `untrim`,
   `get_trim_points`, `get_trimmed`, `trim_after`, `delete`, `undelete`,
   `get_message_points`,
@@ -2160,6 +2214,17 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   cookies) and saved in `Saved_connection`'s `proxy_cookie` for the saved
   address. `Tool_host.connect ~signin`, `prigh web` and `prigh
   browser-signin` (`-json` for prigh-tui) use it.
+  Over SSH (`Browser_signin.Paste`) the link also carries a one-time
+  X25519 public key; the page seals the grant to it (`paste_seal.js` in
+  `frontend/web/app`, WebCrypto: HKDF-SHA256 and AES-256-GCM, the
+  state as associated data) and shows `prigh1:` + base64url(ephemeral
+  public key, nonce, ciphertext) to paste; `Paste_code` opens it, and
+  `Browser_signin.run` takes whichever comes first, a pasted code (one a
+  line, on stdin) or the listener's callback. prigh-tui passes `-paste`
+  and writes the code from its dialog to `browser-signin -json`'s stdin
+  (`{"paste_error"}` lines say why one did not open). The vector in
+  `backend/test/paste_vector.ml` is what `frontend/web/e2e/paste_vector.mjs`
+  and each browser seal.
 - `Saved_connection` — `~/.prigh/tui-connection.sexp`, shared with the TUI
   (which has the same module in `client/unix/`): `prigh web` resolves and
   saves `-connect`/`-token`/`-user` by the TUI's rules, once the check
@@ -2379,7 +2444,7 @@ terminal frontend and `web/` prigh-web, the browser one.
   `File_listing` and `File_preview`, the review's `Review` and
   `Review_comment`) and the `Request` encoder (`Request.Method` has typed
   constructors for `list_skills`, `list_mcp`, `mcp_approve`,
-  `set_archived`, `delete_sessions`, `delete_archived`, the review's
+  `set_archived`, `set_pinned`, `delete_sessions`, `delete_archived`, the review's
   methods, `fs_preview` and `fs_write`).
 - `client/` (`prigh_client`, `Async_kernel` only so it links under
   js_of_ocaml) — `Transport.t` (a line channel; an in-memory pair for
@@ -2525,7 +2590,9 @@ terminal frontend and `web/` prigh-web, the browser one.
     it out. The `delete_sessions` reply (`Delete_result`) is the notice,
     refusals included; with `moved_to` it closes the picker and resets the
     session as a `switch_session` reply does (`reset_session`). Alt+A flips `archived` in the picker at once
-    and sends `set_archived` (a refusal refetches the list). `/archive`,
+    and sends `set_archived` (a refusal refetches the list); Alt+T does the
+    same with `pinned` and `set_pinned`, and the picker's sections are
+    pinned, the rest, archived. `/pin`, `/unpin`, `/archive`,
     `/unarchive` and `/delete` look their arguments up in a fresh list
     (`Session_selection.resolve`: path, id, unique id prefix or name).
     `sessions_changed` refetches `list_sessions` (`Sessions_refresh`) while
@@ -3157,7 +3224,13 @@ terminal frontend and `web/` prigh-web, the browser one.
       PATH`, `/terminal PATH`, `/pr new`), or a notice; "New session here"
       is `New_session_in` (`new_session` then `set_cwd`), Remove
       `Ask_remove_worktree` (the listing's entry, else the session's record
-      with its repository, which `remove_worktree` gets as `cwd`). Then a
+      with its repository, which `remove_worktree` gets as `cwd`). The
+      pinned sessions come first under a "Pinned" heading, the others under
+      "Recent" (`Session_list.sections`, also while searching, best match first
+      within each group, content hits included; no headings when none is pinned;
+      Pin/Unpin in the menu, P, `/pin`, `/unpin` send `set_pinned`, at once,
+      a refusal refetching the list; hidden when the summaries have no
+      `pinned`). Then a
       divider with the archived ones'
       count that folds them (`Model.archived_open`, `Session_list.shown`,
       the list's order, which keyboard navigation and selection ranges
@@ -3599,7 +3672,16 @@ terminal frontend and `web/` prigh-web, the browser one.
     the shell exits starts a new one; it reports its state through
     `onStatus`, which becomes `Action.Terminal_status`, focuses the shell for
     `Focus_terminal` and takes the theme's colours (`setTheme`, read from
-    the computed CSS variables, with ANSI colours per theme). The document listeners leave keys (a capture
+    the computed CSS variables, with ANSI colours per theme). Under the
+    shell, `Terminal_keys_widget` is the extra keys' bar (shown by
+    `terminal.css` on a touch screen while the shell has the focus): the
+    keys, the sticky Ctrl and Alt and the bytes each sends are the pure
+    `Terminal_keys` (cursor keys per xterm.js's `modes.applicationCursorKeysMode`);
+    a key's bytes go through xterm.js's `input` (`press`) and text typed
+    while a modifier is latched through `terminal.js`'s `transform`. A key
+    acts on `pointerup` (a swipe cancels it and scrolls the bar), an arrow
+    held repeats, and `pointerdown` is prevented so the shell keeps the
+    focus and the phone its keyboard. The document listeners leave keys (a capture
     listener takes only Ctrl+`, before xterm.js), pastes and drops inside
     the panel to it, and the chat's and agents panel's mutation observers
     ignore xterm.js redrawing. `Files_widget` keeps the browser's `File`s
@@ -3689,7 +3771,15 @@ The sidecar contract (the shell's only coupling to the backend):
   `$PRIGH_DESKTOP_BACKEND`, else `prigh` on the PATH, else on the login
   shell's PATH, since an app started from a desktop menu has a short one;
   on Windows `wsl.exe … bash -lc 'exec "$0" desktop "$@"' prigh …`) from the
-  home directory, with stdin a pipe it holds open;
+  home directory, with stdin a pipe it holds open, and the computer-use
+  helper bundled with the app as `$PRIGH_COMPUTER` when the user set none:
+  on macOS and Linux the `prigh-computer` beside the app's executable when
+  there is one (`launch::bundled_computer`: the macOS bundle has it, for
+  `-computer`); on Windows, when `prigh-computer.exe` is next to the app
+  (the installers bundle it, as Tauri's `externalBin` in
+  `app/tauri.windows.conf.json`), its path, with `WSLENV` sharing it as
+  `PRIGH_COMPUTER/p`, so the tool host in WSL runs the Windows helper
+  (`desktop/computer/src/windows.rs`) through WSL's interop;
 - the sidecar prints one line, `{"url":"http://127.0.0.1:PORT/#desktop=KEY"}`
   (`Desktop_sidecar`), on stdout when it is ready (`core/ready.rs`; the
   first must be http(s) on a loopback host, anything else ends the app with
@@ -3867,6 +3957,7 @@ for Linux, macOS and Windows.
   string per line, last 500).
 - `~/.prigh/prefs.json` — the user's preferences and data kept for the
   frontends (`User_prefs`): prigh-web's `web.*` and the shared `history`.
+- `~/.prigh/memory.json` — the `memory` tool's notes (`Memory`).
 - `~/.prigh/config.json` — `scoped_models`, `approval_mode`, `permissions`, `notify`, `snippets`, `providers`
   (custom endpoints; their keys are in `auth.json` under their names),
   `forges` (git hosts' kind, OAuth client id and URL, by host).

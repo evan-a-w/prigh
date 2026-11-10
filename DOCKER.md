@@ -27,11 +27,12 @@ and [Isolation](#isolation).
    is `default` and the token is the password), and `/login` to a provider
    (see [Logging in](#logging-in)).
 
-**The first build downloads a few GB.** The OxCaml toolchain and packages
-come from the binary cache `prigh.cachix.org` instead of being compiled.
-Without the cache, compiling them takes an hour or more and over 8 GB of
-RAM. The cache must be re-pushed when the dependencies change (see
-[Binary cache](#binary-cache)). Later builds reuse the cached dependency layer whenever
+**The first build downloads a few GB.** The OxCaml toolchain and packages,
+and prigh itself as built from `main`, come from the binary cache
+`attic.caduc.co/prigh` instead of being compiled: CI pushes them on every
+push to `main` (see [Binary cache](#binary-cache)), so building a commit of
+`main` compiles nothing. Without the cache, compiling them takes an hour or
+more and over 8 GB of RAM. Later builds reuse the cached dependency layer whenever
 `flake.nix`, `flake.lock`, `nix/` and the `*.opam`/`dune-project` files
 are unchanged. In that case only prigh itself is rebuilt, which takes a
 few minutes. Redeploying with "Re-pull image and redeploy" (or the
@@ -180,7 +181,7 @@ user, `default`.
 | `PRIGH_GITHUB_CLIENT_ID` | – | client id of your GitHub OAuth app (with Device Flow enabled), for `/login github` and prigh-web's Git hosting settings (README: Git hosting) |
 | `PRIGH_GIT_NAME`, `PRIGH_GIT_EMAIL` | – | commit author written to a user's `~/.gitconfig` at start if it has none yet |
 | `PRIGH_UID`, `PRIGH_GID` | 1000 | (build) uid/gid of the `prigh` service user. `/home/prigh` is chowned to it at start if it differs |
-| `PRIGH_NIX_SUBSTITUTER`, `PRIGH_NIX_SUBSTITUTER_KEY` | `https://prigh.cachix.org` and its key | (build) the Nix binary cache. Set the substituter to an empty value to compile everything |
+| `PRIGH_NIX_SUBSTITUTER`, `PRIGH_NIX_SUBSTITUTER_KEY` | `https://attic.caduc.co/prigh` and its key | (build) the Nix binary caches, space-separated (the keys too). Set the substituter to an empty value to compile everything |
 | `PRIGH_EXTRA_APT_PACKAGES` | – | (build) extra Debian packages baked into the image, e.g. `python3 build-essential` |
 
 ## Installing tools
@@ -443,8 +444,19 @@ which holds the proxy's session (HttpOnly: the page itself cannot read it),
 and hands it to the program, which sends it with each connection and saves
 it in `~/.prigh/tui-connection.sexp` (mode 0600) for next time. The proxy's
 session lasts as long as the proxy says; when it ends, the program asks
-again. Over SSH the browser is on another computer: forward the port it
-prints first (`ssh -L PORT:127.0.0.1:PORT host`). `prigh browser-signin
+again. Over SSH the browser is on another computer and cannot reach that
+port. Either paste: the link then carries a one-time public key
+(`&paste=KEY&from=HOST`), and after *Allow* the page shows a code instead
+(`prigh1:…`, the grant sealed to that key: X25519, HKDF-SHA256,
+AES-256-GCM, bound to the sign-in's state, 30 minutes) with a Copy button;
+paste it into the program's terminal (prigh-tui asks for it in a dialog;
+`prigh tool-host`, `prigh web` and `prigh browser-signin` read it from the
+terminal). Programs offer this when `SSH_CONNECTION` or `SSH_TTY` is set
+and someone is at a terminal; `PRIGH_SIGNIN_PASTE=1` or `0` overrides,
+`prigh browser-signin -paste` forces it. Or forward the port it prints
+first (`ssh -L PORT:127.0.0.1:PORT host`): the page's *Send to the
+forwarded port* still posts to it. Without a terminal (`prigh desktop`, a
+tool host as a service) only the forwarded port works. `prigh browser-signin
 -connect URL` does it by hand (it saves the cookie for the saved address).
 The server only answers the page's own requests (`Content-Type:
 application/json`, an `Origin` matching `Host` or `X-Forwarded-Host`), so
@@ -634,13 +646,15 @@ proxy that keeps dead sockets open does not keep their work alive.
 
 ## Binary cache
 
-When `flake.lock`, `nix/` or the `*.opam`/`dune-project` files change, the
-dependencies get new hashes. Rebuild and push them from a machine that has
-Nix (and enough RAM):
+Every push to `main` builds prigh and everything it is built from and
+pushes them to the Attic cache `prigh` (`.github/workflows/attic.yml`), so
+when `flake.lock`, `nix/` or the `*.opam`/`dune-project` files change, the
+new dependencies are cached once that run finishes. To push them by hand,
+from a machine with Nix, enough RAM and a push token (`attic login`):
 
 ```
 nix build --no-link --print-out-paths path:.#frontend.inputDerivation path:.#backend.inputDerivation \
-  | nix run nixpkgs#cachix -- push prigh
+  | xargs nix run nixpkgs#attic-client -- push prigh
 ```
 
 Anything missing from the cache is compiled, so a stale cache makes the
