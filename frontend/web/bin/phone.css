@@ -512,4 +512,9 @@
 .app.narrow :is(.memory-toolbar, .memory-draft-buttons) .btn { min-height: var(--tap); }
 .app.narrow :is(.memory-filter, .memory-title-input) { min-height: var(--tap); }
 .app.narrow .memory-draft-keys { display: none; }
+/* About you: the box at 16px (no zoom on focus), its buttons a thumb's. */
+.app.narrow .about-you-input { font-size: 16px; min-height: 8em; }
+.app.narrow .about-you-keys { display: none; }
+.app.narrow .about-you-buttons .btn, .app.narrow .about-you-elsewhere .btn { min-height: var(--tap); min-width: 88px; }
+.app.narrow .about-you-elsewhere { flex-wrap: wrap; }
 .app.narrow .memory-draft-buttons .btn { flex: 1; }
