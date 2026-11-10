@@ -225,6 +225,7 @@ let%expect_test "help lists every key and command" =
     /permissions show the mode and the allow/ask/deny rules (config and this session)
     /notify [on|off] tell you when a turn ends or something waits for you while the tab is hidden
     /memory [on|off] your notes the model saves when you ask it to remember something, in Settings; on or off gives the model the memory tool or takes it away
+    /user-info what you wrote about yourself for the model, given to it in every session (unlike memory, which it looks up), in Settings
     /compact [instructions] summarise older messages to free context
     /naming [model MODEL|off] show which model names sessions and subagents; model MODEL|off: name them with MODEL (off: the generate model, else the session's)
     /dictation [model MODEL|off] show which model transcribes dictation (speech to text); model MODEL|off: transcribe with MODEL, an OpenAI or OpenAI-compatible provider's (off: openai/gpt-4o-mini-transcribe)

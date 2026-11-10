@@ -145,6 +145,10 @@ let every =
       "your notes the model saves when you ask it to remember something, in \
        Settings; on or off gives the model the memory tool or takes it away"
   ; c
+      "user-info"
+      "what you wrote about yourself for the model, given to it in every \
+       session (unlike memory, which it looks up), in Settings"
+  ; c
       ~args:"[instructions]"
       "compact"
       "summarise older messages to free context"
