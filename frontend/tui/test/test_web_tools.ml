@@ -677,7 +677,8 @@ let%expect_test "a subagent's card names its searches as its steps" =
 ;;
 
 let%expect_test
-    "sessions and ask_session: the action, the session, the question"
+    "sessions, ask_session and answer_session: the action, the session, the \
+     question, the answer"
   =
   let quiet item =
     print_endline
@@ -698,13 +699,19 @@ let%expect_test
     (tool
        "ask_session"
        {|{"session":"3f2a9c1e5d6b7a80","question":"Where does the cache live?"}|}
-       ~result:(false, "In lib/cache."));
+       ~result:(false, "asked 3f2a9c1e5d6b7a80 as q3; its answer arrives later"));
+  quiet
+    (tool
+       "answer_session"
+       {|{"id":"q3","answer":"In lib/cache, since the move."}|}
+       ~result:(false, "sent"));
   [%expect {|
     … sessions search "parser bug"
     … sessions search "lexer" in 3f2a9c1e
     … sessions outline 3f2a9c1e
     … sessions read 3f2a9c1e from 40
     ✓ ask_session 3f2a9c1e "Where does the cache live?"  1 line
+    ✓ answer_session q3 "In lib/cache, since the move."  1 line
     |}]
 ;;
 

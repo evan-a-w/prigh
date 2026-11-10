@@ -353,10 +353,7 @@ let%expect_test "agents with the session tools are told when to use them" =
     Tool_ask_session.create
       ~sessions_dir:(fun () -> "/sessions")
       ~current:(fun () -> None)
-      ~provider:(Faux_provider.create [])
-      ~resolve_model:Model.resolve
-      ~current_model:(fun () -> Model.default)
-      ~record_spend:(fun ~usage:_ ~cost_usd:_ -> ())
+      ~questions:(Session_questions.create ())
       ()
   in
   let show tools =
@@ -379,10 +376,10 @@ let%expect_test "agents with the session tools are told when to use them" =
   show Tools.all;
   [%expect
     {|
-    - Other sessions (sessions, ask_session): only when the user refers to an earlier or another session or asks for it, or the task plainly depends on work done in one; never by default or to start a task. For one specific question use ask_session; otherwise search, then outline, and read only what you need.
+    - Other sessions: only when the user refers to an earlier or another session or asks for it, or the task plainly depends on work done in one; never by default or to start a task. To look something up, use sessions (read-only): search, then outline, and read only what you need. ask_session interrupts that session's own work and costs it a run: use it only for what that session alone can tell or do, or when the user asks you to ask it.
     - sessions: Search and read other saved sessions, only when the user refers to one or asks,
-    - ask_session: Ask another saved session a question, only when the user refers to it or asks, o
-    - Other sessions (sessions): only when the user refers to an earlier or another session or asks for it, or the task plainly depends on work done in one; never by default or to start a task.
+    - ask_session: Ask another session a question, interrupting its work and costing it a run: only
+    - Other sessions: only when the user refers to an earlier or another session or asks for it, or the task plainly depends on work done in one; never by default or to start a task. To look something up, use sessions (read-only): search, then outline, and read only what you need.
     - sessions: Search and read other saved sessions, only when the user refers to one or asks,
     (nothing about sessions)
     |}]

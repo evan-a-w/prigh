@@ -79,6 +79,10 @@ let main_agent_only =
   ]
 ;;
 
+(* Their answers and questions arrive in the session, as messages to the
+   main agent. *)
+let between_sessions = [ Tool_ask_session.name; Tool_answer_session.name ]
+
 (* Why a tool is not available at [depth], if it is not. *)
 let unavailable ~depth name =
   let mem = List.mem ~equal:String.equal in
@@ -98,6 +102,12 @@ let unavailable ~depth name =
       "it is the main agent's (the user's plan, questions, components and \
        goal), and you are a subagent: put what you need from the user in your \
        report"
+  else if depth >= 1 && mem between_sessions name
+  then
+    Some
+      "sessions ask and answer each other through the main agent, and you are \
+       a subagent: read the other session with the sessions tool, or put the \
+       question in your report"
   else None
 ;;
 

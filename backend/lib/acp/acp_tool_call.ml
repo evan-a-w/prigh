@@ -89,6 +89,10 @@ let title ~name ~args ~cwd =
     with_
       "Ask another session:"
       (Option.map (string_arg args "question") ~f:(first_line ~max:70))
+  | "answer_session" ->
+    with_
+      "Answer another session:"
+      (Option.map (string_arg args "answer") ~f:(first_line ~max:70))
   | "ask_user" -> "Question for you"
   | "update_plan" -> "Update the plan"
   | name -> name

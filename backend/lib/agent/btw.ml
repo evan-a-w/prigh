@@ -35,35 +35,19 @@ let sanitize messages =
   go [] messages
 ;;
 
-module Asker = struct
-  type t =
-    | User
-    | Session
-end
-
-let question_message ?(asker = Asker.User) question =
-  let note =
-    match asker with
-    | User ->
-      "<btw>The user asks a side question (/btw) while you may be in the \
-       middle of a task. Answer it briefly from the conversation so far. You \
-       cannot use tools in this reply, and neither the question nor your \
-       answer will be added to the conversation.</btw>"
-    | Session ->
-      "<ask_session>Another prigh session asks a question about this \
-       conversation. Answer it concisely from the conversation so far alone, \
-       with the specifics it needs (paths, names, decisions, state of the \
-       work); say so when the conversation does not tell. You cannot use tools \
-       in this reply, and neither the question nor your answer will be added \
-       to the conversation.</ask_session>"
-  in
-  Message.user (note ^ "\n\n" ^ question)
+let question_message question =
+  Message.user
+    ("<btw>The user asks a side question (/btw) while you may be in the middle \
+      of a task. Answer it briefly from the conversation so far. You cannot \
+      use tools in this reply, and neither the question nor your answer will \
+      be added to the conversation.</btw>\n\n"
+     ^ question)
 ;;
 
-let request ?asker ?cache_key ~model ~system ~messages ~question () =
+let request ?cache_key ~model ~system ~messages ~question () =
   { Provider.Request.model
   ; system = Some system
-  ; messages = sanitize messages @ [ question_message ?asker question ]
+  ; messages = sanitize messages @ [ question_message question ]
   ; tools = []
   ; thinking = Off
   ; max_tokens = None

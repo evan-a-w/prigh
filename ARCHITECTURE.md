@@ -913,17 +913,35 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   calls as one line, results cut to 300 bytes, 12k in all, ending with the
   index to continue from. Indices are positions in
   `Session.identified_messages` everywhere.
-- `Tool_ask_session` — the model's `ask_session` tool (`session`,
-  `question`): `Btw.request ~asker:Session` (its own framing of the
-  question, no tools, thinking off) over the other session's
-  `Session.messages` and recorded system prompt, loaded from its file, sent
-  with that session's model when `Model_registry.resolve` knows it (else the
-  caller's) and its id as the cache key. Only the answer is returned, cut at
-  6000 bytes. The other session is never written; the spend goes to the
-  asking session (`Agent.record_spend`). It refuses the calling session.
-  `System_prompt` tells agents with either tool to use them only when the
-  user refers to another session or asks, or the task plainly depends on
-  one.
+- `Session_questions` — what a server's sessions ask each other, one per
+  world (made in `bin/main.ml`, given to its agents and tools), in memory
+  only. `ask` records a `Question` (id `qN`, asker and target as `Party`:
+  session id and name), puts it in the target's mail and wakes it with the
+  function `Rpc_server.serve_questions` sets (`set_wake`): the live agent,
+  else the saved session loaded and its agent started with no client (where
+  it last was), then `Agent.check_mail`; it is evicted like any idle agent
+  without clients once its run ends. Without a server (print mode) `ask`
+  fails. `answer` and `run_ended` (`Outcome`: the run's last message,
+  nothing, aborted, failed) put the answer in the asker's mail the same
+  way; one that cannot be delivered is dropped with a line on stderr.
+  `Agent` takes its mail (`take_mail`: user messages with `Injected` kinds
+  `session_question`, `session_answer`) like a background task's report:
+  at the next step of a run, or in a run `check_mail` starts when idle; a
+  run that ends (not one handing over to another model or waiting for
+  background work) calls `run_ended`, which closes the questions it saw.
+  At most `max_open` (4) questions of one asker are open.
+- `Tool_ask_session`, `Tool_answer_session` — `ask_session` (`session`,
+  `question`) and `answer_session` (`id`, `answer`), both refused to
+  subagents (`Tools.between_sessions`). `ask_session` resolves the id like
+  `Tool_sessions.find`, refuses the calling session, and returns at once
+  with the question's id. `answer_session` is always in the tool list (a
+  question arrives in the middle of a run, whose tools and cached prompt
+  prefix are fixed) and refuses when nothing is open; an unknown id lists
+  the open ones. `Plan_mode` counts `ask_session` as changing work: the
+  asked session runs with its own tools. `System_prompt` tells agents to
+  use `sessions` to look things up, and `ask_session` only for what that
+  session alone can tell or do, since it interrupts that session and costs
+  it a run.
 - `Tool_issue`, `Tool_repo` — the `issue` tool (list, view, create, comment,
   edit, close, reopen, label, unlabel, assign, unassign) and the `repo` tool
   (view, runs, run, logs, rerun), on `Forges.with_repo`; `Tool_forge` has

@@ -194,6 +194,17 @@ module Source = struct
     | Review of { target : string }
     | Init
     | Review_comments of { count : int }
+    | Session_question of
+        { session : string
+        ; name : string option [@sexp.option] [@jsonaf.option]
+        ; id : string
+        }
+    | Session_answer of
+        { session : string
+        ; name : string option [@sexp.option] [@jsonaf.option]
+        ; id : string
+        ; answered : bool
+        }
   [@@deriving sexp, jsonaf, equal]
 
   let kind = function
@@ -208,6 +219,8 @@ module Source = struct
     | Review _ -> "review"
     | Init -> "init"
     | Review_comments _ -> "review_comments"
+    | Session_question _ -> "session_question"
+    | Session_answer _ -> "session_answer"
   ;;
 
   let title = function
@@ -229,6 +242,14 @@ module Source = struct
     | Init -> "Write or improve AGENTS.md"
     | Review_comments { count = 1 } -> "1 review comment"
     | Review_comments { count } -> sprintf "%d review comments" count
+    | Session_question { session; name; id } ->
+      sprintf "Session %s asks (%s)" (Option.value name ~default:session) id
+    | Session_answer { session; name; id; answered } ->
+      sprintf
+        "Session %s %s (%s)"
+        (Option.value name ~default:session)
+        (if answered then "answered" else "did not answer")
+        id
   ;;
 
   (* [\[subagent a1 finished\] task] or [\[job j1 exited 0\] command]. *)

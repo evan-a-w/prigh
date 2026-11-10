@@ -1,22 +1,20 @@
 open! Core
 open! Import
 
-(** The [ask_session] tool: the model asks another saved session of its
-    namespace a question. One tool-less model call ({!Btw.request}, asked
-    as a session) over that session's context answers it, and only the
-    answer comes back. The other session's file is read and never written:
-    the call's spend goes to [record_spend], the asking session's. *)
+(** [ask_session {session, question}]: the model asks another saved session
+    of its namespace a question ({!Session_questions.ask}). The call returns
+    at once; that session's own agent gets the question (in a run started
+    for it, or at the next step of the run it is in), works with its tools
+    and answers with [answer_session] ({!Tool_answer_session}), and the
+    answer arrives later as a message. Only the main agent has it: that is
+    where answers arrive. *)
 
 val name : string
 
 val create
   :  sessions_dir:(unit -> string)
-  -> current:(unit -> string option) (** the calling session's id *)
-  -> provider:Provider.t
-  -> resolve_model:(string -> Model.t Or_error.t)
-       (** the asked session's model, by the key it recorded *)
-  -> current_model:(unit -> Model.t)
-       (** the caller's, when the asked session's does not resolve *)
-  -> record_spend:(usage:Usage.t -> cost_usd:float -> unit)
+  -> current:(unit -> Session_questions.Party.t option)
+       (** the calling session *)
+  -> questions:Session_questions.t
   -> unit
   -> Tool.t

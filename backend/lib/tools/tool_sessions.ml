@@ -26,8 +26,8 @@ let spec =
        title, directory or transcript has all the words of query, with their \
        ids and snippets; with session, the matching messages of that one. \
        outline lists a session's prompts with their message indices. read \
-       shows messages from an index, cut short. Read only what you need; for \
-       one specific question about a session, ask_session costs less."
+       shows messages from an index, cut short. Read only what you need. It \
+       only reads: the other sessions are not told or changed."
   ; parameters =
       Tool_args.schema
         ~required:[ "action" ]

@@ -23,6 +23,9 @@ val sessions : Tool_args.t -> string option
     question, quoted. *)
 val ask_session : Tool_args.t -> string option
 
+(** [answer_session]'s argument: the question's id and the answer, quoted. *)
+val answer_session : Tool_args.t -> string option
+
 (** [pull_request]'s argument: the action and what it acts on, e.g. [list closed],
     [view #12], [create "Add x" (draft)]. *)
 val pull_request : Tool_args.t -> string option
