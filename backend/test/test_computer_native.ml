@@ -57,6 +57,9 @@ let%expect_test "which models have a built-in computer tool" =
   List.iter
     [ "anthropic/claude-opus-5-5"
     ; "anthropic/claude-sonnet-5-5"
+    ; "anthropic/claude-fable-5"
+    ; "anthropic/claude-fable-5-1"
+    ; "anthropic/claude-fable-5-2"
     ; "anthropic/claude-opus-4-6"
     ; "anthropic/claude-sonnet-4-5"
     ; "anthropic/claude-haiku-4-5"
@@ -73,6 +76,13 @@ let%expect_test "which models have a built-in computer tool" =
     {|
     (anthropic/claude-opus-5-5 (Anthropic_toolset))
     (anthropic/claude-sonnet-5-5 (Anthropic_toolset))
+    (anthropic/claude-fable-5
+     ((Anthropic_tool (version computer_20251124) (beta computer-use-2025-11-24)
+       (zoom true))))
+    (anthropic/claude-fable-5-1
+     ((Anthropic_tool (version computer_20251124) (beta computer-use-2025-11-24)
+       (zoom true))))
+    (anthropic/claude-fable-5-2 (Anthropic_toolset))
     (anthropic/claude-opus-4-6
      ((Anthropic_tool (version computer_20251124) (beta computer-use-2025-11-24)
        (zoom true))))
@@ -86,6 +96,23 @@ let%expect_test "which models have a built-in computer tool" =
     (openai/gpt-4.1 ())
     (openai-codex/gpt-6.1-sol ())
     (deepseek/deepseek-flash ())
+    |}];
+  List.iter
+    [ "claude-mythos-5"; "claude-mythos-5-1"; "claude-mythos-5-2" ]
+    ~f:(fun id ->
+      print_s
+        [%sexp
+          (id : string)
+        , (Native_computer.of_model Anthropic id : Native_computer.t option)]);
+  [%expect
+    {|
+    (claude-mythos-5
+     ((Anthropic_tool (version computer_20251124) (beta computer-use-2025-11-24)
+       (zoom true))))
+    (claude-mythos-5-1
+     ((Anthropic_tool (version computer_20251124) (beta computer-use-2025-11-24)
+       (zoom true))))
+    (claude-mythos-5-2 (Anthropic_toolset))
     |}]
 ;;
 
