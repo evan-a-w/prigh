@@ -342,6 +342,52 @@ let%expect_test "agents with the worktree tool are told to use it" =
     |}]
 ;;
 
+let%expect_test "agents with the session tools are told when to use them" =
+  let sessions =
+    Tool_sessions.create
+      ~sessions_dir:(fun () -> "/sessions")
+      ~current:(fun () -> None)
+      ()
+  in
+  let ask =
+    Tool_ask_session.create
+      ~sessions_dir:(fun () -> "/sessions")
+      ~current:(fun () -> None)
+      ~provider:(Faux_provider.create [])
+      ~resolve_model:Model.resolve
+      ~current_model:(fun () -> Model.default)
+      ~record_spend:(fun ~usage:_ ~cost_usd:_ -> ())
+      ()
+  in
+  let show tools =
+    System_prompt.build
+      ~date:"2026-01-02"
+      ~instructions:[]
+      ~role:Main
+      ~cwd:"/proj"
+      ~home:"/home"
+      ~tools:(Tools.specs tools)
+      ()
+    |> String.split_lines
+    |> List.filter ~f:(String.is_substring ~substring:"session")
+    |> function
+    | [] -> print_endline "(nothing about sessions)"
+    | lines -> List.iter lines ~f:print_endline
+  in
+  show (Tools.all @ [ sessions; ask ]);
+  show (Tools.all @ [ sessions ]);
+  show Tools.all;
+  [%expect
+    {|
+    - Other sessions (sessions, ask_session): only when the user refers to an earlier or another session or asks for it, or the task plainly depends on work done in one; never by default or to start a task. For one specific question use ask_session; otherwise search, then outline, and read only what you need.
+    - sessions: Search and read other saved sessions, only when the user refers to one or asks,
+    - ask_session: Ask another saved session a question, only when the user refers to it or asks, o
+    - Other sessions (sessions): only when the user refers to an earlier or another session or asks for it, or the task plainly depends on work done in one; never by default or to start a task.
+    - sessions: Search and read other saved sessions, only when the user refers to one or asks,
+    (nothing about sessions)
+    |}]
+;;
+
 let%expect_test "agents with the pull_request tool are told to use it, not gh" =
   let pull_request =
     Tool_pull_request.create

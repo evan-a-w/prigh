@@ -2810,6 +2810,20 @@ from the session's current context, streaming into a box above the composer
 that Esc dismisses (without aborting the run). The question and answer are
 never added to the conversation; their cost counts towards the session's.
 
+The model can look into your other sessions with two tools, which it is told
+to use only when you refer to an earlier or another session ("like we did in
+the parser session", "ask session 3f2a… how it deployed"), ask for it, or
+the task plainly depends on work done in one; never by default. `sessions`
+searches the saved sessions (`search`: all the words must match, in the
+title, description, first prompt, directory or repository, else anywhere in
+the transcript; it answers with ids and short snippets), lists one's prompts
+(`outline`) and reads a few of its messages from an index, cut short
+(`read`). `ask_session` asks another session a question, like `/btw` from
+outside: one model call without tools, with that session's model, answers
+from its context, and only the answer comes back. Neither changes the other
+session; the call's cost counts towards the asking one. Both see only the
+sessions of your own user, and name them by id, never by path.
+
 `-faux-script FILE` (a backend flag, passed through the TUI after `--`) plays
 a JSON array of scripted provider replies, so demos and tests run without API
 calls; it implies `-faux`.

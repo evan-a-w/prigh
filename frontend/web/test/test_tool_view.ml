@@ -1442,3 +1442,42 @@ let%expect_test "apply_patch: the files streamed so far" =
     </div>
     |}]
 ;;
+
+let%expect_test "sessions and ask_session: what they look into" =
+  let call name arguments =
+    sprintf
+      {|{"event":"message_end","message":{"role":"assistant","content":[{"type":"tool_call","id":"c1","name":%S,"arguments":%S}],"stop_reason":{"type":"tool_use"},"usage":{"input":0,"output":0,"cache_read":0},"model":"m"}}|}
+      name
+      arguments
+  in
+  show
+    ~running:true
+    [ call
+        "sessions"
+        {|{"action":"read","session":"3f2a9c1e5d6b7a80","from":40}|}
+    ];
+  [%expect {|
+    <div class="running tool tool-sessions">
+      <div class="tool-head">
+        <span aria-hidden="true" class="lamp"> </span>
+        <span class="name"> sessions </span>
+        <span class="arg"> read 3f2a9c1e from 40 </span>
+      </div>
+    </div>
+    |}];
+  show
+    ~running:true
+    [ call
+        "ask_session"
+        {|{"session":"3f2a9c1e5d6b7a80","question":"Where does the cache live?"}|}
+    ];
+  [%expect {|
+    <div class="running tool tool-ask_session">
+      <div class="tool-head">
+        <span aria-hidden="true" class="lamp"> </span>
+        <span class="name"> ask_session </span>
+        <span class="arg"> 3f2a9c1e "Where does the cache live?" </span>
+      </div>
+    </div>
+    |}]
+;;

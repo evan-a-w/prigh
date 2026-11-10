@@ -93,6 +93,8 @@ let arg (call : P.Tool_call.t) =
     | "pull_request" -> Tool_summary.pull_request args
     | "issue" -> Tool_summary.issue args
     | "repo" -> Tool_summary.repo args
+    | "sessions" -> Tool_summary.sessions args
+    | "ask_session" -> Tool_summary.ask_session args
     | "computer" ->
       Option.map (Computer_action.of_call call) ~f:Computer_action.compact
     | "apply_patch" ->

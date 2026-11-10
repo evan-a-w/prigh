@@ -719,6 +719,10 @@ val resume_now : t -> unit Or_error.t
     whether it did. Fails for a model that cannot see images. *)
 val downsize_images : t -> (Image.Limit.t * bool) Or_error.t
 
+(** Spend of this session that its messages do not record (a tool's own
+    model call): counts towards [State.usage]/[cost_usd]. *)
+val record_spend : t -> usage:Usage.t -> cost_usd:float -> unit
+
 (** Answers a side question with one tool-less model call over a snapshot of
     the conversation (see {!Btw}), concurrently with any run and without
     touching the session; [on_delta] receives the streamed text. The usage

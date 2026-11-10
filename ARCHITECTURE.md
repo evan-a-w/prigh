@@ -894,6 +894,36 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   review, reply, request_reviewers; `closes` on create and edit) are
   `Pr_actions`; only list, view, checks, diff and comments are not
   `destructive`.
+- `Tool_sessions` — the model's `sessions` tool (`action` search, outline
+  or read; `query`, `session`, `from`, `before`, `limit`), made in
+  `bin/main.ml` with the world's `sessions_dir` (so within the namespace)
+  and the agent's session id. It reads session files in the backend and
+  changes nothing. A session is named by id or unique prefix (`find`), never
+  by path. `search` matches every word of the query, case-insensitively:
+  first against each `Session.Summary` (name, description, first prompt,
+  cwd, repository), which costs nothing; then, most recent first and until
+  `limit` sessions are found, against the transcripts, where a file is only
+  parsed (`Session.load`) when its raw bytes hold the words (words JSON
+  would escape skip that filter), within a budget of bytes read
+  (`max_scan_bytes`). Results are one line per session and at most two
+  snippets with their message indices; with `session`, the matching
+  messages of that one. `outline` prints its `Outline` (the last 40 points,
+  `before` for earlier ones) and `read` up to 30 messages from `from` as
+  plain text: user and assistant text cut to 1500 bytes, no thinking, tool
+  calls as one line, results cut to 300 bytes, 12k in all, ending with the
+  index to continue from. Indices are positions in
+  `Session.identified_messages` everywhere.
+- `Tool_ask_session` — the model's `ask_session` tool (`session`,
+  `question`): `Btw.request ~asker:Session` (its own framing of the
+  question, no tools, thinking off) over the other session's
+  `Session.messages` and recorded system prompt, loaded from its file, sent
+  with that session's model when `Model_registry.resolve` knows it (else the
+  caller's) and its id as the cache key. Only the answer is returned, cut at
+  6000 bytes. The other session is never written; the spend goes to the
+  asking session (`Agent.record_spend`). It refuses the calling session.
+  `System_prompt` tells agents with either tool to use them only when the
+  user refers to another session or asks, or the task plainly depends on
+  one.
 - `Tool_issue`, `Tool_repo` — the `issue` tool (list, view, create, comment,
   edit, close, reopen, label, unlabel, assign, unassign) and the `repo` tool
   (view, runs, run, logs, rerun), on `Forges.with_repo`; `Tool_forge` has
