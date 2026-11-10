@@ -59,7 +59,8 @@ while iterating.
   time (`waitForFunction`, `waitFor`): a fixed wait is either slow or flaky
   on a busy machine, and a wait that is meant to time out costs its whole
   timeout.
-- The flake uses the binary cache `prigh.cachix.org`; pass
+- The flake uses the binary cache `attic.caduc.co/prigh`, which CI fills
+  from every push to `main` (`.github/workflows/attic.yml`); pass
   `--accept-flake-config` to Nix in non-interactive use.
 - Only have one dune process running at a time, otherwise it hangs. E.g. if
   you are running tests, don't also `dune exec`.
