@@ -90,6 +90,17 @@ let all =
       ~output:50.
       ~cache_read:0.25
   ; m
+      ~style:adaptive_always_on
+      Anthropic
+      "claude-fable-5-2"
+      "Claude Fable 5.2"
+      ~ctx:1000000
+      ~max:128000
+      ~thinking:true
+      ~input:8.
+      ~output:40.
+      ~cache_read:0.2
+  ; m
       Anthropic
       "claude-haiku-4-5"
       "Claude Haiku 4.5 (latest)"
@@ -870,6 +881,8 @@ let binds_thinking_to_prefix t =
     List.exists
       [ "claude-fable-5-1"
       ; "claude-mythos-5-1"
+      ; "claude-fable-5-2"
+      ; "claude-mythos-5-2"
       ; "claude-opus-5-5"
       ; "claude-sonnet-5-5"
       ; "claude-haiku-5-5"

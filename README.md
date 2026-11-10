@@ -1611,8 +1611,9 @@ The backend's own host never offers it.
   while a now omitted screenshot was still sent.
 - Models with a built-in computer-use tool get it instead of prigh's
   JSON schema (`computer_native`, config, default `true`): Claude 5.5
-  models the `computer_toolset_20260801` toolset, Claude Opus 4.5 to 5
-  and Sonnet 4.6 and 5 `computer_20251124` (with zoom), Sonnet and Haiku
+  models and Fable and Mythos 5.2 the `computer_toolset_20260801`
+  toolset, Claude Opus 4.5 to 5, Sonnet 4.6 and 5 and Fable and Mythos 5
+  and 5.1 `computer_20251124` (with zoom), Sonnet and Haiku
   4.5 `computer_20250124` (with their beta headers), and the OpenAI API's
   models with computer use (GPT-5.4 and later) the Responses API's
   `computer` tool. prigh translates their calls to its own actions (the
