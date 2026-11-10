@@ -762,6 +762,7 @@ Appearance
 Sessions
 Models
 Memory
+About you
 Git hosting
 T
 token
@@ -982,6 +983,7 @@ Appearance
 Sessions
 Models
 Memory
+About you
 Git hosting
 B
 bob
@@ -3057,7 +3059,7 @@ Jump to a message, Filter the transcript, Files, Terminal, Settings
 === chromium: mobile: 390x844: the settings' list ===
 ok
 === chromium: mobile: 390x844: the settings ===
-Appearance, Sessions, Models, Memory, Git hosting, Account
+Appearance, Sessions, Models, Memory, About you, Git hosting, Account
 === chromium: mobile: 390x844: settings: appearance ===
 ok
 title: Appearance; back: Settings
@@ -3091,7 +3093,7 @@ Jump to a message, Filter the transcript, Files, Terminal, Settings
 === chromium: mobile: 320x640: the settings' list ===
 ok
 === chromium: mobile: 320x640: the settings ===
-Appearance, Sessions, Models, Memory, Git hosting, Account
+Appearance, Sessions, Models, Memory, About you, Git hosting, Account
 === chromium: mobile: 320x640: settings: appearance ===
 ok
 title: Appearance; back: Settings
@@ -3125,7 +3127,7 @@ Jump to a message, Filter the transcript, Files, Terminal, Settings
 === chromium: mobile: 390x844-pwa: the settings' list ===
 ok
 === chromium: mobile: 390x844-pwa: the settings ===
-Appearance, Sessions, Models, Memory, Git hosting, Account
+Appearance, Sessions, Models, Memory, About you, Git hosting, Account
 === chromium: mobile: 390x844-pwa: settings: appearance ===
 ok
 title: Appearance; back: Settings
@@ -3417,6 +3419,61 @@ deleting fits: yes; targets: all ok
 editing fits: yes; targets: all ok
 back: Memory | What you asked the model to remember, for later sessions. Kept on the backend, for your account.
 === chromium: memory: errors ===
+(none)
+=== chromium: user info: empty ===
+About you
+What the model should know about you, given to it in every session. Kept on the backend, for your account.
+Describe yourself
+Who you are, what you work on, how you like answers. This text is given to the model in every session: new ones start with it, and open ones get it with your next message. Memory is for notes the model looks up only when it needs them.
+0 of 4000 bytes
+Ctrl+Enter saves
+Save
+text: ""
+=== chromium: user info: saved ===
+About you
+What the model should know about you, given to it in every session. Kept on the backend, for your account.
+Describe yourself
+Who you are, what you work on, how you like answers. This text is given to the model in every session: new ones start with it, and open ones get it with your next message. Memory is for notes the model looks up only when it needs them.
+Saved. New sessions start with it; open ones get it with your next message in them.
+57 of 4000 bytes
+Ctrl+Enter saves
+Save
+text: "I'm Lloyd. I work on prigh, in OCaml.\nKeep answers short."
+file: "I'm Lloyd. I work on prigh, in OCaml.\nKeep answers short.\n"
+reverted: "I'm Lloyd. I work on prigh, in OCaml.\nKeep answers short."
+=== chromium: user info: followed on another page ===
+text: "I'm Lloyd. Keep answers short."
+=== chromium: user info: changed under a draft ===
+About you
+What the model should know about you, given to it in every session. Kept on the backend, for your account.
+Describe yourself
+Who you are, what you work on, how you like answers. This text is given to the model in every session: new ones start with it, and open ones get it with your next message. Memory is for notes the model looks up only when it needs them.
+It was changed somewhere else while you were typing. Saving replaces that with this.
+Load that one
+23 of 4000 bytes
+Ctrl+Enter saves
+Revert
+Save
+text: "typed on the other page"
+loaded: "I'm Lloyd. Keep answers short, in British English."
+=== chromium: user info: the session is told ===
+☺ About you: the model was given what you wrote
+[User info: what the user wrote about themselves in prigh's settings, for every session, is now:
+I'm Lloyd. Keep answers short, in British English.
+It replaces any earlier text about the user.]
+=== chromium: user info: phone 390x844 ===
+fits: yes; targets: all ok; Save on screen: yes
+typing fits: yes; targets: all ok; Save on screen: yes
+back: About you | What the model should know about you, given to it in every session. Kept on the backend, for your account.
+=== chromium: user info: phone 320x640 ===
+fits: yes; targets: all ok; Save on screen: yes
+typing fits: yes; targets: all ok; Save on screen: yes
+back: About you | What the model should know about you, given to it in every session. Kept on the backend, for your account.
+=== chromium: user info: phone 390x844-pwa ===
+fits: yes; targets: all ok; Save on screen: yes
+typing fits: yes; targets: all ok; Save on screen: yes
+back: About you | What the model should know about you, given to it in every session. Kept on the backend, for your account.
+=== chromium: user info: errors ===
 (none)
 === chromium: images (desktop): refused as too large: the error card ===
 The model returned an error
