@@ -29,6 +29,9 @@ val create
   -> ?compaction:(unit -> Compaction_settings.t)
        (** the session's, when the tool runs (default:
            {!Compaction_settings.window_only}) *)
+  -> ?user_info:(unit -> string option)
+       (** {!User_info}'s text when the tool runs, for the system prompt of
+           a subagent that has its own (default: none) *)
   -> provider:Provider.t
   -> current_model:(unit -> Model.t)
   -> current_thinking:(unit -> Thinking.t)

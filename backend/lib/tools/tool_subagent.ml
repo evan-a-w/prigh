@@ -622,6 +622,7 @@ let execute
       ~provider
       ~compaction
       ~home
+      ~user_info
       ~resumable
       (context : Tool.Context.t)
       (p : Prepared.t)
@@ -657,6 +658,7 @@ let execute
            ~nix
            ~skills
            ~role:Subagent
+           ?user_info:(user_info ())
            ~cwd:p.cwd
            ~home
            ~tools:(Tools.specs p.tools)
@@ -827,6 +829,7 @@ let create
       ?(models = Model_registry.builtin ())
       ?(worktrees_dir = fun () -> "~/.prigh/worktrees")
       ?(compaction = fun () -> Compaction_settings.window_only)
+      ?(user_info = fun () -> None)
       ~provider
       ~current_model
       ~current_thinking
@@ -881,6 +884,7 @@ let create
                     ~provider
                     ~compaction
                     ~home
+                    ~user_info
                     ~resumable:Background
                     { context with cancel; emit; on_output = ignore }
                     prepared
@@ -904,6 +908,7 @@ let create
              ~provider
              ~compaction
              ~home
+             ~user_info
              ~resumable
              context
              prepared

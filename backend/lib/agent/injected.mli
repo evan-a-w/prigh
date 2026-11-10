@@ -43,6 +43,9 @@ module Note : sig
       (** the user answered through an interactive [render_ui] component
           ({!Ui_action}); [summary] is the title, e.g. [Sent "Deploy
           options": env = prod] *)
+      | User_info of { cleared : bool }
+      (** what the user wrote about themselves changed, or was removed
+          ([System_prompt.user_info_note]) *)
     [@@deriving sexp, jsonaf, equal]
   end
 
