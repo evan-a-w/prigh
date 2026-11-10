@@ -1,11 +1,12 @@
 {
   description = "prigh — OCaml backend, Bonsai_term and Bonsai_web frontends on OxCaml";
 
-  # The OxCaml toolchain and packages, prebuilt (see README.md).
+  # prigh, its OxCaml toolchain and packages and the dev shells, prebuilt by
+  # CI from main (see README.md).
   nixConfig = {
-    extra-substituters = [ "https://prigh.cachix.org" ];
+    extra-substituters = [ "https://attic.caduc.co/prigh" ];
     extra-trusted-public-keys = [
-      "prigh.cachix.org-1:1kHKoGOetNmpzJg8lJ1nvQzwzTL0XiOs5GInELMgSoI="
+      "prigh:n6wPXDyh+4CS5uoNgXQ3QvKjOSLE7ED87qIiTSvih1A="
     ];
   };
 
