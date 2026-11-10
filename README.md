@@ -117,6 +117,11 @@ the system's `trusted-substituters`/`trusted-public-keys`; otherwise add them
 to `/etc/nix/nix.conf` (NixOS: `nix.settings`) as `extra-substituters` and
 `extra-trusted-public-keys`. The key is in `flake.nix`.
 
+Every push to `main` also builds `prigh` and `prigh-desktop` and pushes them
+to the Attic cache `https://attic.caduc.co/prigh` (`.github/workflows/attic.yml`),
+key `prigh:n6wPXDyh+4CS5uoNgXQ3QvKjOSLE7ED87qIiTSvih1A=`: add it the same way
+to download prigh itself prebuilt.
+
 ## Remote backend, several frontends
 
 The backend can run on another machine and serve many sessions and
