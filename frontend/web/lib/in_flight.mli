@@ -46,6 +46,9 @@ type t =
   ; filters : int
     (** [set_transcript_filter]s not yet answered: until then, states
         echo older filters *)
+  ; resync_at_end : bool
+    (** a resync that the turn's events overtook: asked for again when the
+        turn ends *)
   }
 [@@deriving sexp_of]
 

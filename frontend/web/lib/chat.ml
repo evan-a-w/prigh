@@ -541,6 +541,10 @@ let reconcile ~old fresh =
       }
 ;;
 
+let same_transcript a b =
+  phys_equal a.rev_entries b.rev_entries && phys_equal a.tools b.tools
+;;
+
 let uses_computer t =
   let rec go = function
     | [] | User _ :: _ -> false

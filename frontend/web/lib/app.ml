@@ -230,6 +230,7 @@ module Reply_tag = struct
     | Resync of
         { session : string (** its id *)
         ; from : string option
+        ; events : int (** [transcript_events] when it was asked for *)
         }
     (** the session's messages after reconnecting, [from] the first one on
         show *)
@@ -728,6 +729,9 @@ module Model = struct
     ; review_memory : Review_memory.t
     ; layout : Resize.t
     ; paging : Paging.t
+    ; transcript_events : int
+      (** events that changed the transcript: a page asked for before one
+          of them may not have it *)
     ; chat_cache : Chat_cache.t
     ; jump : Jump.t
     ; trimmed : Trimmed.t
@@ -1045,6 +1049,7 @@ let init =
   ; review_memory = Review_memory.empty
   ; layout = Resize.empty
   ; paging = Paging.all
+  ; transcript_events = 0
   ; chat_cache = Chat_cache.empty
   ; jump = Jump.empty
   ; trimmed = Trimmed.empty
@@ -1341,7 +1346,8 @@ let resync_rpc (m : Model.t) (state : State.t) =
   call
     (Get_messages_page
        { session = state.session_path; before = None; from; limit })
-    ~tag:(Resync { session = state.session_id; from })
+    ~tag:
+      (Resync { session = state.session_id; from; events = m.transcript_events })
 ;;
 
 let session_path (m : Model.t) = Option.map m.state ~f:(fun s -> s.session_path)
@@ -7408,6 +7414,14 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
   | Session_gone { session; _ }, Ok json -> Rejoin.gone m json ~session
   | Resync { session; _ }, _ when not (String.equal session (session_id m)) ->
     m, []
+  (* Events came since it was asked for: they may be newer than the page,
+     which would wipe them (its answer comes after them). Again once the
+     turn ends. *)
+  | Resync { events; _ }, Ok _ when events <> m.transcript_events ->
+    (match m.state with
+     | Some state when not (Chat.running m.chat) -> m, [ resync_rpc m state ]
+     | Some _ | None ->
+       { m with pending = { m.pending with resync_at_end = true } }, [])
   | Resync _, Ok json ->
     decode m json Message_page.of_json ~f:(fun page ->
       let chat =
@@ -8612,9 +8626,14 @@ let event (m : Model.t) (e : Event.t) =
     | Agent_end _ -> { m.pending with prompts = [] }
     | _ -> m.pending
   in
+  let chat = Chat.apply m.chat e in
   let m =
     { m with
-      chat = Chat.apply m.chat e
+      chat
+    ; transcript_events =
+        (if Chat.same_transcript m.chat chat
+         then m.transcript_events
+         else m.transcript_events + 1)
     ; agents = Agents.record m.agents ~now:(now_of m) e
     ; pending
     ; paging =
@@ -8628,13 +8647,24 @@ let event (m : Model.t) (e : Event.t) =
          | _ -> m.jump)
     }
   in
+  let m, resync =
+    match e, m.state with
+    | Agent_end _, Some state when m.pending.resync_at_end ->
+      ( { m with pending = { m.pending with resync_at_end = false } }
+      , [ resync_rpc m state ] )
+    | _ -> m, []
+  in
   let m, cmds = main_event m e in
   let m, review =
     if touches_files e
     then with_review m (Code_review.changed m.review ~watching:m.files.open_)
     else m, []
   in
-  m, cmds @ review @ if Agents.starts_or_ends e then [ list_subagents ] else []
+  ( m
+  , resync
+    @ cmds
+    @ review
+    @ if Agents.starts_or_ends e then [ list_subagents ] else [] )
 ;;
 
 let image_json (image : Image.t) =

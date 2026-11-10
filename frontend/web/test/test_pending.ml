@@ -267,7 +267,7 @@ let%expect_test "a turn's events before the first page: asked for again" =
     {|
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s1.jsonl) (limit 60)))
-     (tag (Resync (session s1) (from ()))))
+     (tag (Resync (session s1) (from ()) (events 1))))
     |}];
   (* The stale page does not wipe what streamed meanwhile. *)
   H.text h ~selector:".chat .entries";
@@ -320,7 +320,7 @@ let%expect_test
     {|
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s1.jsonl) (limit 60)))
-     (tag (Resync (session s1) (from ()))))
+     (tag (Resync (session s1) (from ()) (events 1))))
     Loading the session…
     |}];
   H.reply
@@ -342,5 +342,87 @@ let%expect_test
     00:00
     Reply 0.
     Reply 1.
+    |}]
+;;
+
+(* The page asked for again is answered from the middle of the turn, and its
+   answer comes after the rest of the turn's events (replies and events reach
+   the page by different ways). *)
+let%expect_test "a page from before the turn's last events: asked for again" =
+  let h = H.connecting () in
+  H.quiet h (fun () -> H.reply h "get_state" (H.state_json ()));
+  let user = {|{"role":"user","text":"hello","at":0}|} in
+  let reply text =
+    sprintf
+      {|{"role":"assistant","content":[{"type":"text","text":"%s"}],"stop_reason":{"type":"end_turn"},"usage":{"input":0,"output":0,"cache_read":0},"model":"faux"}|}
+      text
+  in
+  let page messages = H.page ("[" ^ String.concat ~sep:"," messages ^ "]") in
+  H.event h {|{"event":"agent_start"}|};
+  H.event h (sprintf {|{"event":"message_end","message":%s}|} user);
+  H.event h (Agent_events.text_reply "Reply 0.");
+  H.reply h "get_messages_page" (H.page "[]");
+  [%expect
+    {|
+    (Rpc (method_ get_messages_page)
+     (params ((session /sessions/s1.jsonl) (limit 60)))
+     (tag (Resync (session s1) (from ()) (events 1))))
+    |}];
+  (* Still running: asked for again once the turn ends, not at every event. *)
+  H.event h (Agent_events.text_reply "Reply 1.");
+  H.reply h "get_messages_page" (page [ user; reply "Reply 0." ]);
+  H.text h ~selector:".chat .entries";
+  [%expect
+    {|
+    Reply 0.
+    Reply 1.
+    |}];
+  H.event h (Agent_events.text_reply "Reply 2.");
+  H.event h {|{"event":"agent_end","messages":[]}|};
+  [%expect
+    {|
+    (Rpc (method_ get_messages_page)
+     (params ((session /sessions/s1.jsonl) (limit 60)))
+     (tag (Resync (session s1) (from ()) (events 3))))
+    |}];
+  (* Over: asked for again at once. *)
+  H.event h {|{"event":"agent_start"}|};
+  H.event h (Agent_events.text_reply "Reply 3.");
+  H.event h {|{"event":"agent_end","messages":[]}|};
+  H.reply
+    h
+    "get_messages_page"
+    (page [ user; reply "Reply 0."; reply "Reply 1."; reply "Reply 2." ]);
+  H.text h ~selector:".chat .entries";
+  [%expect
+    {|
+    (Rpc (method_ get_messages_page)
+     (params ((session /sessions/s1.jsonl) (limit 60)))
+     (tag (Resync (session s1) (from ()) (events 4))))
+    Reply 0.
+    Reply 1.
+    Reply 2.
+    Reply 3.
+    |}];
+  H.reply
+    h
+    "get_messages_page"
+    (page
+       [ user
+       ; reply "Reply 0."
+       ; reply "Reply 1."
+       ; reply "Reply 2."
+       ; reply "Reply 3."
+       ]);
+  H.text h ~selector:".chat .entries";
+  [%expect
+    {|
+    Scroll_to_bottom
+    hello
+    00:00
+    Reply 0.
+    Reply 1.
+    Reply 2.
+    Reply 3.
     |}]
 ;;

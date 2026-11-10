@@ -35,6 +35,7 @@ type t =
   ; thinking : string option
   ; mode : Session_mode.t option
   ; filters : int
+  ; resync_at_end : bool
   }
 [@@deriving sexp_of]
 
@@ -49,6 +50,7 @@ let none =
   ; thinking = None
   ; mode = None
   ; filters = 0
+  ; resync_at_end = false
   }
 ;;
 
