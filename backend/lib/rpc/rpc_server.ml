@@ -1902,19 +1902,21 @@ let start_indexing t =
     `Stop_daemon)
 ;;
 
+let search_hits t ~query ~limit =
+  Session_search.search
+    t.search
+    ~sessions:(saved_sessions t)
+    ~load:(load_for_search t)
+    ~query
+    ~limit
+;;
+
 (* The sessions [list_sessions] lists, by what was said in them. *)
 let search_sessions t params =
   let open Or_error.Let_syntax in
   let%bind query = string_param params "query" in
   let%map limit = int_param params "limit" ~default:50 in
-  let hits =
-    Session_search.search
-      t.search
-      ~sessions:(saved_sessions t)
-      ~load:(load_for_search t)
-      ~query
-      ~limit
-  in
+  let hits = search_hits t ~query ~limit in
   `Object
     [ "query", `String query
     ; "hits", `Array (List.map hits ~f:Session_search.Hit.to_json)

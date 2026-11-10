@@ -345,6 +345,7 @@ let%expect_test "agents with the worktree tool are told to use it" =
 let%expect_test "agents with the session tools are told when to use them" =
   let sessions =
     Tool_sessions.create
+      ~search:(fun ~query:_ ~limit:_ -> [])
       ~sessions_dir:(fun () -> "/sessions")
       ~current:(fun () -> None)
       ()
