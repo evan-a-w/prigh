@@ -1471,12 +1471,22 @@ let%expect_test "sessions and ask_session: what they look into" =
         "ask_session"
         {|{"session":"3f2a9c1e5d6b7a80","question":"Where does the cache live?"}|}
     ];
+  show
+    ~running:true
+    [ call "answer_session" {|{"id":"q3","answer":"In lib/cache."}|} ];
   [%expect {|
     <div class="running tool tool-ask_session">
       <div class="tool-head">
         <span aria-hidden="true" class="lamp"> </span>
         <span class="name"> ask_session </span>
         <span class="arg"> 3f2a9c1e "Where does the cache live?" </span>
+      </div>
+    </div>
+    <div class="running tool tool-answer_session">
+      <div class="tool-head">
+        <span aria-hidden="true" class="lamp"> </span>
+        <span class="name"> answer_session </span>
+        <span class="arg"> q3 "In lib/cache." </span>
       </div>
     </div>
     |}]

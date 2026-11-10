@@ -63,6 +63,7 @@ module Setup = struct
     { session : Session.t option (** [-session], if given *)
     ; cwd : string
     ; new_agent : ?session:Session.t -> cwd:string -> unit -> Agent.t
+    ; questions : Session_questions.t
     ; world : Namespace.World.t
     ; models : Model_registry.t
     ; forges : Forges.t (** the world's git-host sign-ins *)
@@ -207,6 +208,7 @@ let common_params =
     in
     (* One agent per session; the subagent tool follows its own agent's
        model and thinking level. *)
+    let questions = Session_questions.create () in
     let new_agent ?session ~cwd () =
       let agent_ref = ref None in
       let current f default () =
@@ -222,8 +224,15 @@ let common_params =
         | Some agent -> Agent.compaction_settings agent
         | None -> Compaction_settings.window_only
       in
+      let current_party () =
+        Option.map !agent_ref ~f:(fun agent ->
+          let session = Agent.session agent in
+          { Session_questions.Party.id = Session.id session
+          ; name = Session.name session
+          })
+      in
       let current_session () =
-        Option.map !agent_ref ~f:(fun agent -> Session.id (Agent.session agent))
+        Option.map (current_party ()) ~f:(fun party -> party.id)
       in
       let auto_describe = Option.is_none faux_script && not faux in
       let name_task ~task ~siblings ~cancel =
@@ -266,13 +275,12 @@ let common_params =
                      ()
                  ; Tool_ask_session.create
                      ~sessions_dir:(fun () -> sessions_dir)
-                     ~current:current_session
-                     ~provider
-                     ~resolve_model:(Model_registry.resolve models)
-                     ~current_model:(current (fun s -> s.model) Model.default)
-                     ~record_spend:(fun ~usage ~cost_usd ->
-                       Option.iter !agent_ref ~f:(fun agent ->
-                         Agent.record_spend agent ~usage ~cost_usd))
+                     ~current:current_party
+                     ~questions
+                     ()
+                 ; Tool_answer_session.create
+                     ~current:current_party
+                     ~questions
                      ()
                  ]
                @ Tool_jobs.tools
@@ -289,13 +297,14 @@ let common_params =
           ?mcp
           ~use_default_cwd:(not cwd_given)
           ?max_budget_usd
+          ~questions
           ~cwd
           ()
       in
       agent_ref := Some agent;
       agent
     in
-    { Setup.session; cwd; new_agent; world; models; forges }
+    { Setup.session; cwd; new_agent; world; models; forges; questions }
 ;;
 
 (* Errors from the agent name the slash command; on the command line the
@@ -719,7 +728,8 @@ let serve_command =
             | None -> Nix_store_ops.local ~env)
        in
        let create_server ?token ?namespace ?world () =
-         let { Setup.session; cwd; new_agent; world; models; forges } =
+         let { Setup.session; cwd; new_agent; world; models; forges; questions }
+           =
            make_agent ~env ~sw ~backend_host ?world ()
          in
          let login =
@@ -756,6 +766,7 @@ let serve_command =
              ?default_agent
              ()
          in
+         Rpc_server.serve_questions server questions;
          Rpc_server.restore_resumes server;
          Rpc_server.clean_leftovers server;
          server
@@ -1750,7 +1761,15 @@ let acp_command =
          | Some (host, port) ->
            None, Rpc_client.Connector.tcp ~env ~sw ~host ~port
          | None ->
-           let { Setup.session; cwd; new_agent; world; models; forges } =
+           let { Setup.session
+               ; cwd
+               ; new_agent
+               ; world
+               ; models
+               ; forges
+               ; questions
+               }
+             =
              make_agent ~env ~sw ~backend_host:false ()
            in
            if Option.is_some session
@@ -1780,6 +1799,7 @@ let acp_command =
                ~new_agent
                ()
            in
+           Rpc_server.serve_questions server questions;
            Some server, Rpc_client.Connector.in_process server
        in
        let stdin =

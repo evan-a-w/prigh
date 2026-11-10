@@ -107,20 +107,25 @@ let base ~nix ~auto_background ~(role : Role.t) ~tools =
             )
           ]
         else [])
-     @ (match List.filter [ "sessions"; "ask_session" ] ~f:has with
-        | [] -> []
-        | names ->
-          [ sprintf
-              "- Other sessions (%s): only when the user refers to an earlier \
-               or another session or asks for it, or the task plainly depends \
-               on work done in one; never by default or to start a task.%s"
-              (String.concat ~sep:", " names)
-              (if List.length names = 2
-               then
-                 " For one specific question use ask_session; otherwise \
-                  search, then outline, and read only what you need."
-               else "")
-          ])
+     @ (if has "sessions" || has "ask_session"
+        then
+          [ ("- Other sessions: only when the user refers to an earlier or \
+              another session or asks for it, or the task plainly depends on \
+              work done in one; never by default or to start a task."
+             ^ (if has "sessions"
+                then
+                  " To look something up, use sessions (read-only): search, \
+                   then outline, and read only what you need."
+                else "")
+             ^
+             if has "ask_session"
+             then
+               " ask_session interrupts that session's own work and costs it a \
+                run: use it only for what that session alone can tell or do, \
+                or when the user asks you to ask it."
+             else "")
+          ]
+        else [])
      @ (let uses =
           List.filter_map
             [ ( "pull_request"

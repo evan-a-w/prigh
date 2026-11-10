@@ -99,11 +99,24 @@ module Source : sig
     | Init (** [/init] *)
     | Review_comments of { count : int }
     (** the user's review comments, sent with [review_submit] *)
+    | Session_question of
+        { session : string
+        ; name : string option
+        ; id : string
+        }
+    (** the session with this id and name asks question [id]
+        ({!Session_questions}) *)
+    | Session_answer of
+        { session : string
+        ; name : string option
+        ; id : string
+        ; answered : bool (** else its run ended without an answer *)
+        }
   [@@deriving sexp, jsonaf, equal]
 
   (** The wire name: [delivery], [handover], [goal], [goal_continuation],
       [reminder], [resume], [shell], [summary], [review], [init],
-      [review_comments]. *)
+      [review_comments], [session_question], [session_answer]. *)
   val kind : t -> string
 
   val title : t -> string

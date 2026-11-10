@@ -85,6 +85,15 @@ let ask_session args =
     Some (String.concat ~sep:" " (List.filter_opt [ session; question ]))
 ;;
 
+let answer_session args =
+  match
+    ( Tool_args.string args "id"
+    , Option.map (Tool_args.string args "answer") ~f:(quoted ~width:60) )
+  with
+  | None, None -> None
+  | id, answer -> Some (String.concat ~sep:" " (List.filter_opt [ id; answer ]))
+;;
+
 let pull_request args =
   let str = Tool_args.string args in
   Option.map (str "action") ~f:(fun action ->
