@@ -245,6 +245,10 @@ val create
        (** waits until a time (seconds since the epoch): for {!resume_now}'s
            automatic counterpart and for an [ask_user] question's timeout;
            default: the clock *)
+  -> ?questions:Session_questions.t
+       (** what the server's sessions ask each other: the session gets the
+           questions asked of it and the answers to its own, and a run that
+           ends without answering one answers it by how it ended *)
   -> ?trace_clock:Trace.Clock.t
        (** times the session's trace ({!Trace_file}); default: the clocks *)
   -> ?offered:(Tool.t -> bool)
@@ -372,6 +376,10 @@ val wait_idle : t -> unit
     injects it at the next turn boundary (with steering), unless
     [subagent_cancel]/[job_kill] already returned it. [abort] leaves them
     running; after an abort, reports that are ready wait for the next run. *)
+
+(** Starts a run when the session has mail ({!Session_questions}) and is
+    idle; a running one takes it at its next step. *)
+val check_mail : t -> unit
 
 val has_running_subagents : t -> bool
 

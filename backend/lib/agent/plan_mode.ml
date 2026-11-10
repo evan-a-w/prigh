@@ -15,5 +15,7 @@ let changes_work ~tool args =
   then Option.value_map action ~default:true ~f:Tool_repo.changes
   else if String.equal tool Tool_subagent.name
   then Tool_subagent.wants_worktree args
-  else false
+  else
+    (* The asked session works with its own tools, in its own mode. *)
+    String.equal tool Tool_ask_session.name
 ;;
