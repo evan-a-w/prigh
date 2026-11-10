@@ -149,14 +149,13 @@ let rec summarise (e : Event.t) : string option =
   | Temporary_ended { session; _ } ->
     Some (sprintf "temporary_ended %s" session)
   | Nix_gc_progress p -> Some (sprintf "nix_gc_progress %d" p.paths_deleted)
-  | Prefs_changed _ | Memory_changed _ -> None
+  | Prefs_changed _ | Memory_changed _ | User_info_changed _ -> None
   | Generate_delta { gen_id; delta } ->
     Some (sprintf "generate_delta %s %S" gen_id delta)
   | Agent_queues _ -> None
   | Masked { masked; tokens_saved } ->
     Some (sprintf "masked %d (%d tokens)" masked tokens_saved)
-  | Review r ->
-    Some (sprintf "review %d comments" (List.length r.comments))
+  | Review r -> Some (sprintf "review %d comments" (List.length r.comments))
 ;;
 
 let rec drain client ~stop =
@@ -469,7 +468,7 @@ let main () =
     let client = Client.create ~connect:(spawn btw_args) in
     let%bind () =
       match%bind Client.connect client with
-     | Error e ->
+      | Error e ->
         print_s [%message "cannot start btw backend" (e : Error.t)];
         return ()
       | Ok () ->
@@ -500,7 +499,7 @@ let main () =
         in
         let%bind () = Client.close client in
         print_endline "btw backend exited";
-       return ()
+        return ()
     in
     (* A transient error: the retry event, then the reply. *)
     let retry_script = Filename.concat tmp "retry.json" in
@@ -772,49 +771,49 @@ let main () =
              ; "deepseek/deepseek-flash"
              ])
     in
-    match%bind Client.connect client with
-    | Error e ->
-      print_s [%message "cannot start images backend" (e : Error.t)];
-      return ()
-    | Ok () ->
-      let%bind () =
-        call
-          client
-          "prompt"
-          [ "text", Json.str "what is in @shot.png?"
-          ; "attachments", `Array [ Json.str "shot.png" ]
-          ; ( "images"
-            , `Array
-                [ `Object
-                    [ "mime_type", Json.str "image/gif"
-                    ; ( "data"
-                      , Json.str
-                          "R0lGODlhBQAEAPAAAAAA/wAAACH5BAAAAAAALAAAAAAFAAQAAAIEhI+ZBQA7"
-                      )
-                    ]
-                ] )
-          ]
-      in
-      let%bind () =
-        drain client ~stop:(function
-          | State { running = false; _ } -> true
-          | _ -> false)
-      in
-      let%bind () =
-        match%map Client.call client "get_messages" [] with
-        | Ok (`Array messages) ->
-          List.iter messages ~f:(fun json ->
-            match Message.of_json json with
-            | Ok (User u) -> show "<- user" [%sexp (u : Message.User.t)]
-            | Ok (Tool_result r) ->
-              show "<- tool_result" [%sexp (r : Message.Tool_result.t)]
-            | Ok (Assistant _) -> ()
-            | Error e -> show "<- message ERROR" [%sexp (e : Error.t)])
-        | Ok _ | Error _ -> print_endline "<- get_messages: unexpected"
-      in
-      let%bind () = Client.close client in
-      print_endline "images backend exited";
-      return ()
+    (match%bind Client.connect client with
+     | Error e ->
+       print_s [%message "cannot start images backend" (e : Error.t)];
+       return ()
+     | Ok () ->
+       let%bind () =
+         call
+           client
+           "prompt"
+           [ "text", Json.str "what is in @shot.png?"
+           ; "attachments", `Array [ Json.str "shot.png" ]
+           ; ( "images"
+             , `Array
+                 [ `Object
+                     [ "mime_type", Json.str "image/gif"
+                     ; ( "data"
+                       , Json.str
+                           "R0lGODlhBQAEAPAAAAAA/wAAACH5BAAAAAAALAAAAAAFAAQAAAIEhI+ZBQA7"
+                       )
+                     ]
+                 ] )
+           ]
+       in
+       let%bind () =
+         drain client ~stop:(function
+           | State { running = false; _ } -> true
+           | _ -> false)
+       in
+       let%bind () =
+         match%map Client.call client "get_messages" [] with
+         | Ok (`Array messages) ->
+           List.iter messages ~f:(fun json ->
+             match Message.of_json json with
+             | Ok (User u) -> show "<- user" [%sexp (u : Message.User.t)]
+             | Ok (Tool_result r) ->
+               show "<- tool_result" [%sexp (r : Message.Tool_result.t)]
+             | Ok (Assistant _) -> ()
+             | Error e -> show "<- message ERROR" [%sexp (e : Error.t)])
+         | Ok _ | Error _ -> print_endline "<- get_messages: unexpected"
+       in
+       let%bind () = Client.close client in
+       print_endline "images backend exited";
+       return ())
 ;;
 
 let () =
