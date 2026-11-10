@@ -76,6 +76,11 @@ val create
            and [set_memory_enabled] (default: the one under [home]; without
            either they fail). Every client hears [memory_changed] after any
            change, the model's included. *)
+  -> ?user_info:User_info.t
+       (** what the user wrote about themselves, for [get_user_info] and
+           [set_user_info] (default: the one under [home]; without either
+           they fail). Every client hears [user_info_changed] after a
+           change. *)
   -> ?transcription_http:Transcription.Http.t
        (** where [transcribe] posts the audio (default: real HTTP) *)
   -> ?nix_store:Nix_store.t

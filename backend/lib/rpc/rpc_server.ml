@@ -121,6 +121,8 @@ let methods =
   ; "save_memory"
   ; "forget_memory"
   ; "set_memory_enabled"
+  ; "get_user_info"
+  ; "set_user_info"
   ]
   @ Files_rpc.methods
   @ Review_rpc.methods
@@ -406,6 +408,7 @@ type t =
   ; home : string option (** for the current [config.json] *)
   ; prefs : User_prefs.t option (** under [home] *)
   ; memory : Memory.t option (** under [home] *)
+  ; user_info : User_info.t option (** under [home] *)
   ; now : unit -> float
   ; listed : Listed.t String.Table.t
     (** what [list_sessions] last showed of each live session *)
@@ -780,6 +783,21 @@ let memory_changed (t : t) memory =
     Hashtbl.iter t.clients ~f:(fun (c : Client.t) -> c.send json)
 ;;
 
+let user_info_json user_info =
+  [ "text", `String (User_info.get user_info)
+  ; "max", `Number (Int.to_string User_info.max_bytes)
+  ]
+;;
+
+let user_info_changed (t : t) user_info =
+  let json =
+    `Object
+      ([ "type", `String "event"; "event", `String "user_info_changed" ]
+       @ user_info_json user_info)
+  in
+  Hashtbl.iter t.clients ~f:(fun (c : Client.t) -> c.send json)
+;;
+
 let create
       ~env
       ~sw
@@ -794,6 +812,7 @@ let create
       ?home
       ?forges
       ?memory
+      ?user_info
       ?transcription_http
       ?nix_store
       ~login
@@ -857,6 +876,10 @@ let create
         (match memory with
          | Some _ -> memory
          | None -> Option.map home ~f:(fun home -> Memory.create ~home))
+    ; user_info =
+        (match user_info with
+         | Some _ -> user_info
+         | None -> Option.map home ~f:(fun home -> User_info.create ~home))
     ; now = (fun () -> Eio.Time.now (Eio.Stdenv.clock env))
     ; listed = String.Table.create ()
     ; on_session_deleted = []
@@ -876,6 +899,8 @@ let create
      pop up a dialog. Everyone hears the outcome, to refresh their status. *)
   Option.iter t.memory ~f:(fun memory ->
     Memory.subscribe memory ~f:(fun () -> memory_changed t memory));
+  Option.iter t.user_info ~f:(fun user_info ->
+    User_info.subscribe user_info ~f:(fun () -> user_info_changed t user_info));
   Login_manager.subscribe login ~f:(fun event ->
     let json = Rpc_json.login_event event in
     match event with
@@ -2622,6 +2647,21 @@ let memory t ~meth ~params =
        `Object [ ("enabled", if enabled then `True else `False) ])
 ;;
 
+let user_info t ~meth ~params =
+  match t.user_info with
+  | None -> Or_error.error_string "this backend keeps no user info"
+  | Some user_info ->
+    let open Or_error.Let_syntax in
+    let%map () =
+      match meth with
+      | "set_user_info" ->
+        let%bind text = string_param params "text" in
+        User_info.set user_info text
+      | _ -> Ok ()
+    in
+    `Object (user_info_json user_info)
+;;
+
 let keep_session t (client : Client.t) =
   let agent = client.agent in
   if not (Agent.temporary agent)
@@ -2684,6 +2724,7 @@ let dispatch_server t (client : Client.t) ~meth ~params
     Some (prefs t client ~meth ~params)
   | "get_memory" | "save_memory" | "forget_memory" | "set_memory_enabled" ->
     Some (memory t ~meth ~params)
+  | "get_user_info" | "set_user_info" -> Some (user_info t ~meth ~params)
   | "nix_store_status" | "nix_store_gc" ->
     Nix_store_rpc.dispatch
       t.nix_store

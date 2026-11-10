@@ -230,6 +230,25 @@ let base ~nix ~auto_background ~(role : Role.t) ~tools =
        ])
 ;;
 
+let user_info_section text =
+  "About the user (written by them in prigh's settings; applies to every \
+   session):\n"
+  ^ text
+;;
+
+let user_info_note = function
+  | Some text ->
+    sprintf
+      "[User info: what the user wrote about themselves in prigh's settings, \
+       for every session, is now:\n\
+       %s\n\
+       It replaces any earlier text about the user.]"
+      text
+  | None ->
+    "[User info: the user removed what they wrote about themselves in prigh's \
+     settings: any earlier text about the user no longer applies.]"
+;;
+
 let read_instructions ~cwd ~home =
   List.map (instruction_files ~cwd ~home) ~f:(fun path ->
     path, String.strip (In_channel.read_all path))
@@ -242,6 +261,7 @@ let build
       ?(skills = [])
       ?auto_background
       ?(role = Role.Main)
+      ?user_info
       ~cwd
       ~home
       ~tools
@@ -279,7 +299,8 @@ let build
     ([ base ~nix ~auto_background ~role ~tools ]
      @ skills
      @ [ environment ]
-     @ instructions)
+     @ instructions
+     @ Option.to_list (Option.map user_info ~f:user_info_section))
 ;;
 
 let discretion =
