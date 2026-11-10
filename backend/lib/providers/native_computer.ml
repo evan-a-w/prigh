@@ -32,14 +32,22 @@ let family id ~prefixes =
     String.equal id prefix || String.is_prefix id ~prefix:(prefix ^ "-"))
 ;;
 
-(* As of the computer use tool's docs (November 2026). *)
+(* As of the computer use tool's docs (November 2026). Fable and Mythos 5.2
+   reject [computer_20251124], which the older [claude-fable-5] and
+   [claude-mythos-5] families below would match. *)
 let of_model (provider : Provider_id.t) id =
   match provider with
   | Anthropic ->
     if
       family
         id
-        ~prefixes:[ "claude-opus-5-5"; "claude-sonnet-5-5"; "claude-haiku-5-5" ]
+        ~prefixes:
+          [ "claude-opus-5-5"
+          ; "claude-sonnet-5-5"
+          ; "claude-haiku-5-5"
+          ; "claude-fable-5-2"
+          ; "claude-mythos-5-2"
+          ]
     then Some Anthropic_toolset
     else if
       family
