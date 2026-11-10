@@ -2166,6 +2166,17 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   cookies) and saved in `Saved_connection`'s `proxy_cookie` for the saved
   address. `Tool_host.connect ~signin`, `prigh web` and `prigh
   browser-signin` (`-json` for prigh-tui) use it.
+  Over SSH (`Browser_signin.Paste`) the link also carries a one-time
+  X25519 public key; the page seals the grant to it (`paste_seal.js` in
+  `frontend/web/app`, WebCrypto: HKDF-SHA256 and AES-256-GCM, the
+  state as associated data) and shows `prigh1:` + base64url(ephemeral
+  public key, nonce, ciphertext) to paste; `Paste_code` opens it, and
+  `Browser_signin.run` takes whichever comes first, a pasted code (one a
+  line, on stdin) or the listener's callback. prigh-tui passes `-paste`
+  and writes the code from its dialog to `browser-signin -json`'s stdin
+  (`{"paste_error"}` lines say why one did not open). The vector in
+  `backend/test/paste_vector.ml` is what `frontend/web/e2e/paste_vector.mjs`
+  and each browser seal.
 - `Saved_connection` — `~/.prigh/tui-connection.sexp`, shared with the TUI
   (which has the same module in `client/unix/`): `prigh web` resolves and
   saves `-connect`/`-token`/`-user` by the TUI's rules, once the check
