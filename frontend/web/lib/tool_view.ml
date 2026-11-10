@@ -33,6 +33,10 @@ let summary (call : Tool_call.t) =
   then Option.value (Tool_summary.issue args) ~default:""
   else if String.equal call.name "repo"
   then Option.value (Tool_summary.repo args) ~default:""
+  else if String.equal call.name "sessions"
+  then Option.value (Tool_summary.sessions args) ~default:""
+  else if String.equal call.name "ask_session"
+  then Option.value (Tool_summary.ask_session args) ~default:""
   else if String.equal call.name "computer"
   then
     Option.value_map

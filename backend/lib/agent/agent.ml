@@ -3822,6 +3822,11 @@ let downsize_images t =
     Ok (limit, retried))
 ;;
 
+let record_spend t ~usage ~cost_usd =
+  ignore (Session.add_spend t.session ~usage ~cost_usd : Session.Entry.t);
+  state_changed t
+;;
+
 let btw t ~question ~cancel ~on_delta =
   let session = t.session in
   let model = t.model in

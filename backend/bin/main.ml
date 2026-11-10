@@ -222,6 +222,9 @@ let common_params =
         | Some agent -> Agent.compaction_settings agent
         | None -> Compaction_settings.window_only
       in
+      let current_session () =
+        Option.map !agent_ref ~f:(fun agent -> Session.id (Agent.session agent))
+      in
       let auto_describe = Option.is_none faux_script && not faux in
       let name_task ~task ~siblings ~cancel =
         Option.bind !agent_ref ~f:(fun agent ->
@@ -257,6 +260,20 @@ let common_params =
                  ; Tool_pull_request.create ~forges ~worktrees_dir ()
                  ; Tool_issue.create ~forges ()
                  ; Tool_repo.create ~forges ()
+                 ; Tool_sessions.create
+                     ~sessions_dir:(fun () -> sessions_dir)
+                     ~current:current_session
+                     ()
+                 ; Tool_ask_session.create
+                     ~sessions_dir:(fun () -> sessions_dir)
+                     ~current:current_session
+                     ~provider
+                     ~resolve_model:(Model_registry.resolve models)
+                     ~current_model:(current (fun s -> s.model) Model.default)
+                     ~record_spend:(fun ~usage ~cost_usd ->
+                       Option.iter !agent_ref ~f:(fun agent ->
+                         Agent.record_spend agent ~usage ~cost_usd))
+                     ()
                  ]
                @ Tool_jobs.tools
                @ Tools.interaction)

@@ -79,6 +79,16 @@ let title ~name ~args ~cwd =
     with_
       "Subagent:"
       (Option.map (string_arg args "task") ~f:(first_line ~max:70))
+  | "sessions" ->
+    (match string_arg args "action", string_arg args "query" with
+     | Some "search", Some query -> sprintf "Search sessions for %S" query
+     | Some action, _ ->
+       with_ (String.capitalize action ^ " session") (string_arg args "session")
+     | None, _ -> "sessions")
+  | "ask_session" ->
+    with_
+      "Ask another session:"
+      (Option.map (string_arg args "question") ~f:(first_line ~max:70))
   | "ask_user" -> "Question for you"
   | "update_plan" -> "Update the plan"
   | name -> name
