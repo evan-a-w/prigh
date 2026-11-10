@@ -342,6 +342,50 @@ let%expect_test "agents with the worktree tool are told to use it" =
     |}]
 ;;
 
+let%expect_test "agents with the session tools are told when to use them" =
+  let sessions =
+    Tool_sessions.create
+      ~search:(fun ~query:_ ~limit:_ -> [])
+      ~sessions_dir:(fun () -> "/sessions")
+      ~current:(fun () -> None)
+      ()
+  in
+  let ask =
+    Tool_ask_session.create
+      ~sessions_dir:(fun () -> "/sessions")
+      ~current:(fun () -> None)
+      ~questions:(Session_questions.create ())
+      ()
+  in
+  let show tools =
+    System_prompt.build
+      ~date:"2026-01-02"
+      ~instructions:[]
+      ~role:Main
+      ~cwd:"/proj"
+      ~home:"/home"
+      ~tools:(Tools.specs tools)
+      ()
+    |> String.split_lines
+    |> List.filter ~f:(String.is_substring ~substring:"session")
+    |> function
+    | [] -> print_endline "(nothing about sessions)"
+    | lines -> List.iter lines ~f:print_endline
+  in
+  show (Tools.all @ [ sessions; ask ]);
+  show (Tools.all @ [ sessions ]);
+  show Tools.all;
+  [%expect
+    {|
+    - Other sessions: only when the user refers to an earlier or another session or asks for it, or the task plainly depends on work done in one; never by default or to start a task. To look something up, use sessions (read-only): search, then outline, and read only what you need. ask_session interrupts that session's own work and costs it a run: use it only for what that session alone can tell or do, or when the user asks you to ask it.
+    - sessions: Search and read other saved sessions, only when the user refers to one or asks,
+    - ask_session: Ask another session a question, interrupting its work and costing it a run: only
+    - Other sessions: only when the user refers to an earlier or another session or asks for it, or the task plainly depends on work done in one; never by default or to start a task. To look something up, use sessions (read-only): search, then outline, and read only what you need.
+    - sessions: Search and read other saved sessions, only when the user refers to one or asks,
+    (nothing about sessions)
+    |}]
+;;
+
 let%expect_test "agents with the pull_request tool are told to use it, not gh" =
   let pull_request =
     Tool_pull_request.create

@@ -89,6 +89,11 @@ val create
   -> unit
   -> t
 
+(** Lets the sessions of [new_agent] ask each other: a session with mail
+    ({!Session_questions}) is woken here, loaded from disk when it is not
+    live (with no client, as {!restore_resumes} does). *)
+val serve_questions : t -> Session_questions.t -> unit
+
 (** Loads the sessions that recorded a resume after a usage limit still to
     come ([Session.resume_at]), so that they resume on time with nobody
     attached; one that cannot be loaded is skipped with a line on stderr. *)
@@ -107,6 +112,10 @@ val start_indexing : t -> unit
 (** [start_indexing]'s work, returning when it is done (or, if it is under
     way, when it finishes). *)
 val index_sessions : t -> unit
+
+(** [search_sessions]' hits: the best [limit] saved sessions for [query],
+    from the index. *)
+val search_hits : t -> query:string -> limit:int -> Session_search.Hit.t list
 
 (** How many sessions [search_sessions]' index has. *)
 val indexed_sessions : t -> int

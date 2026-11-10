@@ -1252,6 +1252,35 @@ let find_agent t (client : Client.t) key =
           start_agent t session (loaded_start t client session)))
 ;;
 
+(* The live session with this id, a temporary one too, else the saved one,
+   loaded with no client: it starts where it last was. *)
+let wake_session t ~session =
+  let agent =
+    match Hashtbl.find t.agents session with
+    | Some agent -> Ok agent
+    | None ->
+      (match
+         List.find (saved_sessions t) ~f:(fun s -> String.equal s.id session)
+       with
+       | None -> Or_error.errorf "no session %S" session
+       | Some summary ->
+         let loaded =
+           File_cache.find_or_read t.loaded summary.path ~read:(load_session t)
+         in
+         (* A client may have opened it while it was being read. *)
+         (match Hashtbl.find t.agents session with
+          | Some agent -> Ok agent
+          | None ->
+            File_cache.remove t.loaded summary.path;
+            Or_error.map loaded ~f:(fun session -> start_agent t session None)))
+  in
+  Or_error.map agent ~f:Agent.check_mail
+;;
+
+let serve_questions t questions =
+  Session_questions.set_wake questions (wake_session t)
+;;
+
 (* A session's messages to read: the live session's, else from disk without
    opening it (kept in [t.loaded] for when it is opened). *)
 let session_to_read ?(client : Client.t option) t key =
@@ -1873,19 +1902,21 @@ let start_indexing t =
     `Stop_daemon)
 ;;
 
+let search_hits t ~query ~limit =
+  Session_search.search
+    t.search
+    ~sessions:(saved_sessions t)
+    ~load:(load_for_search t)
+    ~query
+    ~limit
+;;
+
 (* The sessions [list_sessions] lists, by what was said in them. *)
 let search_sessions t params =
   let open Or_error.Let_syntax in
   let%bind query = string_param params "query" in
   let%map limit = int_param params "limit" ~default:50 in
-  let hits =
-    Session_search.search
-      t.search
-      ~sessions:(saved_sessions t)
-      ~load:(load_for_search t)
-      ~query
-      ~limit
-  in
+  let hits = search_hits t ~query ~limit in
   `Object
     [ "query", `String query
     ; "hits", `Array (List.map hits ~f:Session_search.Hit.to_json)
