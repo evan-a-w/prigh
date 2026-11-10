@@ -28,7 +28,10 @@ and [Isolation](#isolation).
    (see [Logging in](#logging-in)).
 
 **The first build downloads a few GB.** The OxCaml toolchain and packages
-come from the binary cache `prigh.cachix.org` instead of being compiled.
+come from the binary cache `prigh.cachix.org` instead of being compiled,
+and prigh itself, as built from `main`, comes from `attic.caduc.co/prigh`
+(CI pushes it on every push to `main`), so building a commit of `main`
+compiles nothing.
 Without the cache, compiling them takes an hour or more and over 8 GB of
 RAM. The cache must be re-pushed when the dependencies change (see
 [Binary cache](#binary-cache)). Later builds reuse the cached dependency layer whenever
@@ -180,7 +183,7 @@ user, `default`.
 | `PRIGH_GITHUB_CLIENT_ID` | – | client id of your GitHub OAuth app (with Device Flow enabled), for `/login github` and prigh-web's Git hosting settings (README: Git hosting) |
 | `PRIGH_GIT_NAME`, `PRIGH_GIT_EMAIL` | – | commit author written to a user's `~/.gitconfig` at start if it has none yet |
 | `PRIGH_UID`, `PRIGH_GID` | 1000 | (build) uid/gid of the `prigh` service user. `/home/prigh` is chowned to it at start if it differs |
-| `PRIGH_NIX_SUBSTITUTER`, `PRIGH_NIX_SUBSTITUTER_KEY` | `https://prigh.cachix.org` and its key | (build) the Nix binary cache. Set the substituter to an empty value to compile everything |
+| `PRIGH_NIX_SUBSTITUTER`, `PRIGH_NIX_SUBSTITUTER_KEY` | `https://attic.caduc.co/prigh https://prigh.cachix.org` and their keys | (build) the Nix binary caches, space-separated (the keys too). Set the substituter to an empty value to compile everything |
 | `PRIGH_EXTRA_APT_PACKAGES` | – | (build) extra Debian packages baked into the image, e.g. `python3 build-essential` |
 
 ## Installing tools

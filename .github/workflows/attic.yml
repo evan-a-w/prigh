@@ -1,7 +1,8 @@
-# Builds prigh and prigh-desktop on every push to main and pushes them to the
-# Attic cache `prigh`. Its API is only reachable over NetBird, so the runner
-# joins the network first as an ephemeral peer. Pulls are public, from
-# https://attic.caduc.co/prigh.
+# Builds prigh, prigh-desktop and the Docker image's backend and frontend on
+# every push to main and pushes them to the Attic cache `prigh`. Its API is
+# only reachable over NetBird, so the runner joins the network first as an
+# ephemeral peer. Pulls are public, from https://attic.caduc.co/prigh (the
+# Docker build's backend and frontend have the same store paths as these).
 #
 # Secrets: NETBIRD_SETUP_KEY (reusable, ephemeral, auto-assigned to a group
 # allowed TCP to the Attic API), ATTIC_ENDPOINT (the API endpoint, e.g.
@@ -50,6 +51,6 @@ jobs:
         run: |
           attic watch-store ci:prigh &
           watcher=$!
-          nix build --print-build-logs .#default .#prigh-desktop
+          nix build --print-build-logs .#default .#prigh-desktop .#backend .#frontend
           attic push ci:prigh ./result*
           kill "$watcher"
