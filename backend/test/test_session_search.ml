@@ -307,6 +307,27 @@ let%expect_test "search_sessions: the RPC, live sessions" =
     {"type":"response","id":"r","ok":false,"error":"param \"query\" must be a string"}
     {"type":"response","id":"r","ok":false,"error":"param \"limit\" must be an integer"}
     {"query":"listen","hits":[{"id":"<id>","path":"$DIR/sessions/<stamp>_<id>.jsonl","score":40,"snippet":null}]}
+    |}];
+  (* The [sessions] tool searches the same index. *)
+  run
+    t
+    (Tool_sessions.create
+       ~search:(Rpc_server.search_hits server)
+       ~sessions_dir:(fun () -> sessions_dir t)
+       ~current:(fun () -> None)
+       ())
+    {|{"action": "search", "query": "listen"}|};
+  (* Without the day it was renamed on. *)
+  [%expect.output]
+  |> String.split_lines
+  |> List.iter ~f:(fun line ->
+    match String.split line ~on:' ' with
+    | id :: "" :: _day :: rest ->
+      print_endline (String.concat ~sep:" " (id :: rest))
+    | _ -> print_endline line);
+  [%expect {|
+    <id>  "Listen address"  $DIR  2 messages
+    (for message indices to read from: search with session, or outline)
     |}]
 ;;
 

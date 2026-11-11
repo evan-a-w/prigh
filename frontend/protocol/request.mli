@@ -219,6 +219,8 @@ module Method : sig
         } (** [{note}]: {!Memory.note_of_reply} *)
     | Forget_memory of { id : string }
     | Set_memory_enabled of { enabled : bool }
+    | Get_user_info (** {!User_info} *)
+    | Set_user_info of { text : string } (** {!User_info}, as saved *)
   [@@deriving sexp_of, equal]
 
   val name : t -> string

@@ -304,6 +304,8 @@ module Reply_tag : sig
     | Memory_saved (** [save_memory]: the draft closes, or says why not *)
     | Memory_forgot
     | Memory_enabled (** [set_memory_enabled] *)
+    | About_you_loaded (** [get_user_info] *)
+    | About_you_saved (** [set_user_info]: saved, or says why not *)
     | Trim_points of Trim_purpose.t
     | Trimmed (** [trim]: the confirmation closes, or says why not *)
     | Untrimmed
@@ -590,6 +592,9 @@ module Action : sig
     | Memory_forget of string (** asks first *)
     | Memory_forget_confirm
     | Memory_forget_cancel
+    | About_you_text of string (** the settings page's About you: its text *)
+    | About_you_save (** Ctrl+Enter *)
+    | About_you_revert (** back to what the backend has *)
     | Open_rename
     | Open_subagents of string option
     (** the agents panel: its list, or the agent or job with this number
@@ -949,6 +954,7 @@ module Model : sig
     ; forges : Forges.t (** the user's git hosts *)
     ; nix_gc : Nix_gc.t (** superusers': the Nix store *)
     ; memory : Memory_notes.t (** the settings page's Memory *)
+    ; about_you : About_you.t (** the settings page's About you *)
     ; compact_at : Compact_at.t (** the settings page's "Compact at" *)
     ; settings_section : Settings_section.t
     (* A phone's settings show the list of sections, not one of them. *)

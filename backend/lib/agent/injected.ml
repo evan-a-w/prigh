@@ -32,6 +32,7 @@ module Note = struct
           ; component : string
           ; summary : string
           }
+      | User_info of { cleared : bool }
     [@@deriving sexp, jsonaf, equal]
 
     let wire = function
@@ -42,6 +43,7 @@ module Note = struct
       | Steer _ -> "steer"
       | Client _ -> "client"
       | Ui_action _ -> "ui_action"
+      | User_info _ -> "user_info"
     ;;
   end
 
@@ -77,6 +79,10 @@ module Note = struct
         (if follow_up then "follow-up" else "steer")
     | Client { client } -> "Using " ^ Client_kind.describe client
     | Ui_action { summary; _ } -> summary
+    | User_info { cleared = false } ->
+      "About you: the model was given what you wrote"
+    | User_info { cleared = true } ->
+      "About you: the model was told you removed it"
   ;;
 
   let steer ~from_user ~follow_up =
@@ -194,6 +200,17 @@ module Source = struct
     | Review of { target : string }
     | Init
     | Review_comments of { count : int }
+    | Session_question of
+        { session : string
+        ; name : string option [@sexp.option] [@jsonaf.option]
+        ; id : string
+        }
+    | Session_answer of
+        { session : string
+        ; name : string option [@sexp.option] [@jsonaf.option]
+        ; id : string
+        ; answered : bool
+        }
   [@@deriving sexp, jsonaf, equal]
 
   let kind = function
@@ -208,6 +225,8 @@ module Source = struct
     | Review _ -> "review"
     | Init -> "init"
     | Review_comments _ -> "review_comments"
+    | Session_question _ -> "session_question"
+    | Session_answer _ -> "session_answer"
   ;;
 
   let title = function
@@ -229,6 +248,14 @@ module Source = struct
     | Init -> "Write or improve AGENTS.md"
     | Review_comments { count = 1 } -> "1 review comment"
     | Review_comments { count } -> sprintf "%d review comments" count
+    | Session_question { session; name; id } ->
+      sprintf "Session %s asks (%s)" (Option.value name ~default:session) id
+    | Session_answer { session; name; id; answered } ->
+      sprintf
+        "Session %s %s (%s)"
+        (Option.value name ~default:session)
+        (if answered then "answered" else "did not answer")
+        id
   ;;
 
   (* [\[subagent a1 finished\] task] or [\[job j1 exited 0\] command]. *)

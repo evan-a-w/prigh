@@ -63,10 +63,14 @@ module Setup = struct
     { session : Session.t option (** [-session], if given *)
     ; cwd : string
     ; new_agent : ?session:Session.t -> cwd:string -> unit -> Agent.t
+    ; questions : Session_questions.t
+    ; search : Tool_sessions.Search.t ref
+      (** the [sessions] tool's: the server's index, once there is one *)
     ; world : Namespace.World.t
     ; models : Model_registry.t
     ; forges : Forges.t (** the world's git-host sign-ins *)
     ; memory : Memory.t (** the world's *)
+    ; user_info : User_info.t (** the world's *)
     }
 end
 
@@ -207,6 +211,11 @@ let common_params =
         ()
     in
     let memory = Memory.create ~home in
+    let user_info = User_info.create ~home in
+    let questions = Session_questions.create () in
+    let search =
+      ref (Tool_sessions.local_search ~dir:(fun () -> sessions_dir))
+    in
     (* One agent per session; the subagent tool follows its own agent's
        model and thinking level. *)
     let new_agent ?session ~cwd () =
@@ -224,6 +233,16 @@ let common_params =
         | Some agent -> Agent.compaction_settings agent
         | None -> Compaction_settings.window_only
       in
+      let current_party () =
+        Option.map !agent_ref ~f:(fun agent ->
+          let session = Agent.session agent in
+          { Session_questions.Party.id = Session.id session
+          ; name = Session.name session
+          })
+      in
+      let current_session () =
+        Option.map (current_party ()) ~f:(fun party -> party.id)
+      in
       let auto_describe = Option.is_none faux_script && not faux in
       let name_task ~task ~siblings ~cancel =
         Option.bind !agent_ref ~f:(fun agent ->
@@ -235,6 +254,7 @@ let common_params =
           ~models
           ~worktrees_dir
           ~compaction
+          ~user_info:(fun () -> User_info.text user_info)
           ~provider
           ~current_model:(current (fun s -> s.model) Model.default)
           ~current_thinking:(current (fun s -> s.thinking) Thinking.default)
@@ -259,6 +279,20 @@ let common_params =
                  ; Tool_pull_request.create ~forges ~worktrees_dir ()
                  ; Tool_issue.create ~forges ()
                  ; Tool_repo.create ~forges ()
+                 ; Tool_sessions.create
+                     ~search:(fun ~query ~limit -> !search ~query ~limit)
+                     ~sessions_dir:(fun () -> sessions_dir)
+                     ~current:current_session
+                     ()
+                 ; Tool_ask_session.create
+                     ~sessions_dir:(fun () -> sessions_dir)
+                     ~current:current_party
+                     ~questions
+                     ()
+                 ; Tool_answer_session.create
+                     ~current:current_party
+                     ~questions
+                     ()
                  ; Tool_memory.create ~memory ()
                  ]
                @ Tool_jobs.tools
@@ -275,16 +309,28 @@ let common_params =
           ?mcp
           ~use_default_cwd:(not cwd_given)
           ?max_budget_usd
+          ~questions
           ~offered:(fun tool ->
             (not (String.equal (Tool.name tool) Tool_memory.name))
             || Memory.enabled memory)
+          ~user_info
           ~cwd
           ()
       in
       agent_ref := Some agent;
       agent
     in
-    { Setup.session; cwd; new_agent; world; models; forges; memory }
+    { Setup.session
+    ; cwd
+    ; new_agent
+    ; world
+    ; models
+    ; forges
+    ; memory
+    ; user_info
+    ; questions
+    ; search
+    }
 ;;
 
 (* Errors from the agent name the slash command; on the command line the
@@ -709,7 +755,18 @@ let serve_command =
             | None -> Nix_store_ops.local ~env)
        in
        let create_server ?token ?namespace ?world () =
-         let { Setup.session; cwd; new_agent; world; models; forges; memory } =
+         let { Setup.session
+             ; cwd
+             ; new_agent
+             ; world
+             ; models
+             ; forges
+             ; memory
+             ; user_info
+             ; questions
+             ; search
+             }
+           =
            make_agent ~env ~sw ~backend_host ?world ()
          in
          let login =
@@ -741,12 +798,15 @@ let serve_command =
              ~login
              ~forges
              ~memory
+             ~user_info
              ~sessions_dir:world.sessions_dir
              ~cwd
              ~new_agent
              ?default_agent
              ()
          in
+         Rpc_server.serve_questions server questions;
+         search := Rpc_server.search_hits server;
          Rpc_server.restore_resumes server;
          Rpc_server.clean_leftovers server;
          Rpc_server.start_indexing server;
@@ -1776,7 +1836,18 @@ let acp_command =
          | Some (host, port) ->
            None, Rpc_client.Connector.tcp ~env ~sw ~host ~port
          | None ->
-           let { Setup.session; cwd; new_agent; world; models; forges; memory } =
+           let { Setup.session
+               ; cwd
+               ; new_agent
+               ; world
+               ; models
+               ; forges
+               ; memory
+               ; user_info
+               ; questions
+               ; search
+               }
+             =
              make_agent ~env ~sw ~backend_host:false ()
            in
            if Option.is_some session
@@ -1802,11 +1873,14 @@ let acp_command =
                ~login
                ~forges
                ~memory
+               ~user_info
                ~sessions_dir:world.sessions_dir
                ~cwd
                ~new_agent
                ()
            in
+           Rpc_server.serve_questions server questions;
+           search := Rpc_server.search_hits server;
            Some server, Rpc_client.Connector.in_process server
        in
        let stdin =

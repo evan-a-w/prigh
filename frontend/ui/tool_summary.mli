@@ -1,7 +1,7 @@
 open! Core
 open! Import
 
-(** How the web, job-input, worktree and pull-request tools and the provider's own tools (web search)
+(** How the web, job-input, worktree, pull-request and session tools and the provider's own tools (web search)
     read in a transcript; shared by [Tool_render] and prigh-web's [Tool_view]. *)
 
 (** [text] on one line in double quotes, escaped like a JSON string ([\n], [\t], [\x07]),
@@ -14,6 +14,17 @@ val job_input : Tool_args.t -> string option
 (** [worktree]'s argument: the action and its branch (and base) or path,
     e.g. [create feat/x from main], [remove ../wt (force)], [list]. *)
 val worktree : Tool_args.t -> string option
+
+(** [sessions]'s argument: the action, its query and the session (the
+    start of its id), e.g. [search "parser bug"], [read 3f2a9c1e from 40]. *)
+val sessions : Tool_args.t -> string option
+
+(** [ask_session]'s argument: the session (the start of its id) and the
+    question, quoted. *)
+val ask_session : Tool_args.t -> string option
+
+(** [answer_session]'s argument: the question's id and the answer, quoted. *)
+val answer_session : Tool_args.t -> string option
 
 (** [pull_request]'s argument: the action and what it acts on, e.g. [list closed],
     [view #12], [create "Add x" (draft)]. *)

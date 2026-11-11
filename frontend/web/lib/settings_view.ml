@@ -738,6 +738,108 @@ let memory_draft (d : Memory_notes.Draft.t) ~inject =
     ]
 ;;
 
+(* What the user wrote about themselves: one text, saved as a whole. *)
+let about_you (m : App.Model.t) ~inject =
+  let a = m.about_you in
+  let text = About_you.text a in
+  let size = String.length (String.strip text) in
+  let max = a.info.max in
+  let dirty = About_you.dirty a in
+  let ready = About_you.Status.equal a.status Loaded in
+  let note cls text = span ~cls:("setting-note " ^ cls) text in
+  let status =
+    match a.status, a.error with
+    | _, Some e -> note "warm about-you-error" e
+    | Failed e, None ->
+      note
+        "warm about-you-error"
+        (sprintf "Could not read it: %s. Open the section again to retry." e)
+    | (Unknown | Loading), None -> note "muted" "Reading what you wrote…"
+    | Loaded, None when a.elsewhere ->
+      div
+        ~cls:"about-you-elsewhere"
+        [ note
+            "warm"
+            "It was changed somewhere else while you were typing. Saving \
+             replaces that with this."
+        ; button
+            ~cls:"small"
+            ~title:"Drop what is typed here for the text as it is saved now"
+            ~on_click:(inject Action.About_you_revert)
+            [ Node.text "Load that one" ]
+        ]
+    | Loaded, None when a.saved ->
+      note
+        "good about-you-saved"
+        (if String.is_empty a.info.text
+         then "Removed. Open sessions are told with your next message in them."
+         else
+           "Saved. New sessions start with it; open ones get it with your next \
+            message in them.")
+    | Loaded, None -> Node.none
+  in
+  div
+    ~cls:"setting about-you"
+    [ div
+        ~cls:"setting-text"
+        [ span ~cls:"setting-name" "Describe yourself"
+        ; span
+            ~cls:"setting-about"
+            "Who you are, what you work on, how you like answers. This text is \
+             given to the model in every session: new ones start with it, and \
+             open ones get it with your next message. Memory is for notes the \
+             model looks up only when it needs them."
+        ]
+    ; Node.textarea
+        ~attrs:
+          [ Attr.id "about-you-text"
+          ; Attr.class_ "text-input about-you-input"
+          ; Attr.create "aria-label" "About you"
+          ; Attr.placeholder
+              "I'm a backend engineer working mostly in OCaml. Keep answers \
+               short, and ask before adding a dependency."
+          ; Attr.value text
+          ; Attr.rows 8
+          ; (if max > 0
+             then Attr.create "maxlength" (Int.to_string max)
+             else Attr.empty)
+          ; (if a.saving || not ready then Attr.disabled else Attr.empty)
+          ; Attr.on_input (fun _ text -> inject (Action.About_you_text text))
+          ]
+        []
+    ; status
+    ; div
+        ~cls:"about-you-buttons"
+        [ (if max > 0
+           then
+             span
+               ~cls:
+                 (if size * 10 >= max * 9
+                  then "about-you-count near"
+                  else "about-you-count")
+               (sprintf "%d of %d bytes" size max)
+           else Node.none)
+        ; span ~cls:"about-you-keys" "Ctrl+Enter saves"
+        ; (if dirty
+           then
+             button
+               ~cls:"small ghost"
+               ~title:"Back to the text as it is saved"
+               ~disabled:a.saving
+               ~on_click:(inject Action.About_you_revert)
+               [ Node.text "Revert" ]
+           else Node.none)
+        ; button
+            ~cls:"small primary"
+            ~title:"Ctrl+Enter"
+            ~disabled:(a.saving || not dirty)
+            ~attrs:(if a.saving then [ Attr.create "aria-busy" "true" ] else [])
+            ~on_click:(inject Action.About_you_save)
+            [ Node.text (if a.saving then "Saving…" else "Save") ]
+        ]
+    ]
+;;
+
 let memory_note (n : Memory_notes.t) (note : Memory.Note.t) ~inject =
   match n.draft with
   | Some ({ id = Some id; _ } as d) when String.equal id note.id ->
@@ -936,6 +1038,7 @@ let content (m : App.Model.t) (section : Section.t) ~inject =
               | notes -> Some (sprintf "%d notes" (List.length notes)))
            rows
        ])
+  | About_you -> [ group [ about_you m ~inject ] ]
   | Git_hosting -> [ group ~title:"Hosts" (git_hosts m ~inject) ]
   | Nix_store -> [ group (nix_store m ~inject) ]
   | Account -> [ group (account m ~inject) ]
@@ -946,6 +1049,7 @@ let section_icon : Section.t -> Icon.t = function
   | Sessions -> Bot
   | Models -> Brain
   | Memory -> Book
+  | About_you -> User
   | Git_hosting -> Repo
   | Nix_store -> Package
   | Account -> User

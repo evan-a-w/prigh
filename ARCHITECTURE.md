@@ -843,6 +843,27 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   broadcast to that world's clients as `memory_changed`
   (`Prigh_protocol.Memory`). prigh-web's Settings → Memory
   (`Memory_notes`, `Settings_view`) and the TUI's `/memory` picker use them.
+- `User_info` — what the user wrote about themselves for the model, plain
+  text in `~/.prigh/user_info.md` under the world's home (one per world,
+  made in `bin/main.ml` like `Memory`; at most `User_info.max_bytes`, read
+  from the file whenever it is asked for, so an edit by hand counts, and
+  replaced atomically (a longer file edited by hand is cut to the limit). Unlike memory it is always in
+  context, and no tool changes it. `Agent.create ?user_info` is asked for
+  the text: `System_prompt.build ?user_info` puts it after the
+  instructions when a session's prompt is first built (and in
+  non-forked subagents' prompts, `Tool_subagent.create ?user_info`; shared
+  forks inherit the parent's), and `Told_environment.user_info` records
+  what the session was told, so the usual diff
+  (`Told_environment.notes`) prefixes a `User_info` note
+  (`System_prompt.user_info_note`) to the next user message when the text
+  differs: a session from before the text or the feature, an edit, a
+  removal. The stored system prompt is never rewritten (it stays cached);
+  a session never told anything gets no note for an empty text. RPC:
+  `get_user_info` and `set_user_info {text}` (`{text, max}`), and every
+  change made through them is broadcast to that world's
+  clients as `user_info_changed` (`Prigh_protocol.User_info`). prigh-web's
+  Settings → About you (`About_you`, `Settings_view`) and the TUI's
+  `/user-info` use them.
 - `Tool_web_search` — `web_search` is a provider-side tool: `Tools.for_model`
   keeps it only for Anthropic, OpenAI and OpenAI Codex models, whose
   providers send their native tool for it; its `run` only answers a model
@@ -951,6 +972,56 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   review, reply, request_reviewers; `closes` on create and edit) are
   `Pr_actions`; only list, view, checks, diff and comments are not
   `destructive`.
+- `Tool_sessions` — the model's `sessions` tool (`action` search, outline
+  or read; `query`, `session`, `from`, `before`, `limit`), made in
+  `bin/main.ml` with the world's `sessions_dir` (so within the namespace)
+  and the agent's session id. It reads session files in the backend and
+  changes nothing. A session is named by id or unique prefix (`find`), never
+  by path. `search` is `Session_search`, through the `search` closure
+  `create` takes: the server's index (`Rpc_server.search_hits`, which
+  `search_sessions` answers from too), which `bin/main.ml` points the
+  world's tools at once the server exists, and until then or without a
+  server (`prigh run`) an index of the tool's own (`local_search`). So it
+  finds what the user and the assistant said and the sessions' names, not
+  directories or tool output. Results are one line per session (from its
+  `Session.Summary`) and the hit's snippet, without message indices: with
+  `session`, the tool itself lists the messages of that one that have any
+  of the query's words (`Session_search.words`), tool calls and results
+  included, with their indices. `outline` prints its `Outline` (the last 40 points,
+  `before` for earlier ones) and `read` up to 30 messages from `from` as
+  plain text: user and assistant text cut to 1500 bytes, no thinking, tool
+  calls as one line, results cut to 300 bytes, 12k in all, ending with the
+  index to continue from. Indices are positions in
+  `Session.identified_messages` everywhere.
+- `Session_questions` — what a server's sessions ask each other, one per
+  world (made in `bin/main.ml`, given to its agents and tools), in memory
+  only. `ask` records a `Question` (id `qN`, asker and target as `Party`:
+  session id and name), puts it in the target's mail and wakes it with the
+  function `Rpc_server.serve_questions` sets (`set_wake`): the live agent,
+  else the saved session loaded and its agent started with no client (where
+  it last was), then `Agent.check_mail`; it is evicted like any idle agent
+  without clients once its run ends. Without a server (print mode) `ask`
+  fails. `answer` and `run_ended` (`Outcome`: the run's last message,
+  nothing, aborted, failed) put the answer in the asker's mail the same
+  way; one that cannot be delivered is dropped with a line on stderr.
+  `Agent` takes its mail (`take_mail`: user messages with `Injected` kinds
+  `session_question`, `session_answer`) like a background task's report:
+  at the next step of a run, or in a run `check_mail` starts when idle; a
+  run that ends (not one handing over to another model or waiting for
+  background work) calls `run_ended`, which closes the questions it saw.
+  At most `max_open` (4) questions of one asker are open.
+- `Tool_ask_session`, `Tool_answer_session` — `ask_session` (`session`,
+  `question`) and `answer_session` (`id`, `answer`), both refused to
+  subagents (`Tools.between_sessions`). `ask_session` resolves the id like
+  `Tool_sessions.find`, refuses the calling session, and returns at once
+  with the question's id. `answer_session` is always in the tool list (a
+  question arrives in the middle of a run, whose tools and cached prompt
+  prefix are fixed) and refuses when nothing is open; an unknown id lists
+  the open ones. `Plan_mode` counts `ask_session` as changing work: the
+  asked session runs with its own tools. `System_prompt` tells agents to
+  use `sessions` to look things up, and `ask_session` only for what that
+  session alone can tell or do, since it interrupts that session and costs
+  it a run.
 - `Tool_issue`, `Tool_repo` — the `issue` tool (list, view, create, comment,
   edit, close, reopen, label, unlabel, assign, unassign) and the `repo` tool
   (view, runs, run, logs, rerun), on `Forges.with_repo`; `Tool_forge` has
@@ -3927,6 +3998,8 @@ for Linux, macOS and Windows.
 - `~/.prigh/prefs.json` — the user's preferences and data kept for the
   frontends (`User_prefs`): prigh-web's `web.*` and the shared `history`.
 - `~/.prigh/memory.json` — the `memory` tool's notes (`Memory`).
+- `~/.prigh/user_info.md` — what the user wrote about themselves, in every
+  session's context (`User_info`).
 - `~/.prigh/config.json` — `scoped_models`, `approval_mode`, `permissions`, `notify`, `snippets`, `providers`
   (custom endpoints; their keys are in `auth.json` under their names),
   `forges` (git hosts' kind, OAuth client id and URL, by host).

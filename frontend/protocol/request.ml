@@ -175,6 +175,8 @@ module Method = struct
         }
     | Forget_memory of { id : string }
     | Set_memory_enabled of { enabled : bool }
+    | Get_user_info
+    | Set_user_info of { text : string }
   [@@deriving sexp_of, equal]
 
   let name = function
@@ -240,6 +242,8 @@ module Method = struct
     | Save_memory _ -> "save_memory"
     | Forget_memory _ -> "forget_memory"
     | Set_memory_enabled _ -> "set_memory_enabled"
+    | Get_user_info -> "get_user_info"
+    | Set_user_info _ -> "set_user_info"
   ;;
 
   let dir_param = function
@@ -266,6 +270,7 @@ module Method = struct
     | Get_review
     | Nix_store_status
     | Get_memory
+    | Get_user_info
     | Get_trim_points
     | Get_trimmed
     | Untrim
@@ -275,6 +280,7 @@ module Method = struct
     | Save_memory { id; title; text } -> Memory.save_params ?id ?title text
     | Forget_memory { id } -> Memory.forget_params ~id
     | Set_memory_enabled { enabled } -> Memory.set_enabled_params enabled
+    | Set_user_info { text } -> User_info.set_params text
     | Nix_store_gc { delete_generations = Some _ as generations } ->
       [ "delete_generations", Nix_generations.to_json generations ]
     | Review_submit { root = None } -> []
