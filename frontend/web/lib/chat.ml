@@ -544,16 +544,3 @@ let reconcile ~old fresh =
 let same_transcript a b =
   phys_equal a.rev_entries b.rev_entries && phys_equal a.tools b.tools
 ;;
-
-let uses_computer t =
-  let rec go = function
-    | [] | User _ :: _ -> false
-    | Assistant { message; _ } :: rest ->
-      List.exists message.content ~f:(function
-        | Content.Tool_call { name = "computer"; _ } -> true
-        | _ -> false)
-      || go rest
-    | (Shell _ | Compaction _) :: rest -> go rest
-  in
-  go t.rev_entries
-;;

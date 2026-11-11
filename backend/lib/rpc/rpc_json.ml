@@ -359,6 +359,8 @@ let state (s : Agent.State.t) =
       , Option.value_map s.resume_at ~default:`Null ~f:(fun at -> ms at) )
     ; "approval_mode", str (Approval_mode.to_string s.approval_mode)
     ; "plan_mode", bool s.plan_mode
+    ; ( "computer_control"
+      , Option.value_map s.computer_control ~default:`Null ~f:str )
     ; "plan", Option.value_map s.plan ~default:`Null ~f:Plan.to_json
     ; "session_rules", `Array (List.map s.session_rules ~f:str)
     ]
@@ -746,7 +748,7 @@ let rec event ?now (e : Agent.Event.t) =
       [ "event", str "tool_start"; "call", tool_call call ]
     | Loop (Tool_output { call_id; chunk }) ->
       [ "event", str "tool_output"; "call_id", str call_id; "chunk", str chunk ]
-    | Loop (Tool_confirm { call_id; agent_id; name; summary; rules }) ->
+    | Loop (Tool_confirm { call_id; agent_id; name; summary; rules; kind }) ->
       [ "event", str "tool_confirm"
       ; "call_id", str call_id
       ; "agent_id", Option.value_map agent_id ~default:`Null ~f:str
@@ -754,6 +756,7 @@ let rec event ?now (e : Agent.Event.t) =
       ; "summary", str summary
       ; "rules", `Array (List.map rules ~f:str)
       ]
+      @ Confirm_kind.to_json_fields kind
     | Loop (Tool_confirm_done { call_id; agent_id }) ->
       [ "event", str "tool_confirm_done"
       ; "call_id", str call_id
@@ -913,12 +916,13 @@ let pending ~steer ~follow_up ~agents ~confirms ~questions =
       , `Array
           (List.map confirms ~f:(fun (c : Agent.Pending_confirm.t) ->
              `Object
-               [ "call_id", str c.call_id
-               ; "agent_id", Option.value_map c.agent_id ~default:`Null ~f:str
-               ; "name", str c.name
-               ; "summary", str c.summary
-               ; "rules", `Array (List.map c.rules ~f:str)
-               ])) )
+               ([ "call_id", str c.call_id
+                ; "agent_id", Option.value_map c.agent_id ~default:`Null ~f:str
+                ; "name", str c.name
+                ; "summary", str c.summary
+                ; "rules", `Array (List.map c.rules ~f:str)
+                ]
+                @ Confirm_kind.to_json_fields c.kind))) )
     ; ( "questions"
       , `Array
           (List.map questions ~f:(fun (q : Agent.Pending_question.t) ->

@@ -756,6 +756,13 @@ let register t agent =
   Hashtbl.set t.listed ~key:(session_id agent) ~data:(Listed.of_agent agent);
   Agent.subscribe agent ~f:(route t agent);
   Agent.on_noted agent ~f:(fun () -> write_ledger t agent);
+  Agent.set_unattended agent (fun () ->
+    if List.exists (clients_of t agent) ~f:(fun c -> not c.tools)
+    then None
+    else
+      Some
+        "no prigh frontend (prigh-web, the TUI, an editor) is connected \
+         to          this session");
   Agent.report_interrupted_subagents agent;
   agent
 ;;

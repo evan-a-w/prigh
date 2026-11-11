@@ -827,25 +827,49 @@ let confirm t (s : Session.t) json =
   let name = string_field "name" json in
   let summary = string_field "summary" json in
   let rules = List.filter_map (list_field "rules" json) ~f:Json.string in
+  (* Computer use asks once for a whole period of control. *)
+  let computer_use =
+    match opt_string "kind" json with
+    | Some "computer_use" ->
+      Some (Option.value (opt_string "host" json) ~default:"this computer")
+    | Some _ | None -> None
+  in
   let view = Hashtbl.find s.tools call_id in
   let tool_call =
-    match view with
-    | Some view ->
-      tool_fields s view ~call_id
-      @ [ "status", str "pending"; "rawInput", view.args ]
-      @ change_preview t s view
-    | None ->
-      [ "toolCallId", str call_id
-      ; "title", str summary
-      ; "kind", str (Acp_tool_call.kind name)
-      ; "status", str "pending"
-      ]
+    let fields =
+      match view with
+      | Some view ->
+        tool_fields s view ~call_id
+        @ [ "status", str "pending"; "rawInput", view.args ]
+        @ change_preview t s view
+      | None ->
+        [ "toolCallId", str call_id
+        ; "title", str summary
+        ; "kind", str (Acp_tool_call.kind name)
+        ; "status", str "pending"
+        ]
+    in
+    match computer_use with
+    | None -> fields
+    | Some host ->
+      List.map fields ~f:(function
+        | "title", _ ->
+          ( "title"
+          , str
+              (sprintf
+                 "Let prigh control %s's screen, mouse and keyboard?"
+                 host) )
+        | field -> field)
   in
   let options =
     [ Some
         (`Object
             [ "optionId", str "allow"
-            ; "name", str "Allow"
+            ; ( "name"
+              , str
+                  (if Option.is_some computer_use
+                   then "Allow until control ends"
+                   else "Allow") )
             ; "kind", str "allow_once"
             ])
     ; (if List.is_empty rules

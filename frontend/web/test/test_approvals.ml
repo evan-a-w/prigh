@@ -400,6 +400,76 @@ let confirm ?agent ?(rules = []) ?(name = "bash") id summary =
     (String.concat ~sep:"," (List.map rules ~f:(sprintf "%S")))
 ;;
 
+let computer_consent ?agent id =
+  sprintf
+    {|{"event":"tool_confirm","call_id":"%s","agent_id":%s,"name":"computer","summary":"first: click (10, 20)","rules":[],"kind":"computer_use","host":"laptop"}|}
+    id
+    (Option.value_map agent ~default:"null" ~f:(sprintf "%S"))
+;;
+
+let%expect_test
+    "computer use: its own dialog, no always; Enter allows, Esc denies"
+  =
+  let h = H.create () in
+  H.event h (computer_consent "c1");
+  modal h;
+  [%expect
+    {|
+    (Focus confirm)
+    Computer use
+    (Close (Esc))
+    Let prigh control laptop's screen, mouse and keyboard?
+    first: click (10, 20). Until you move the mouse or press a key there, press Stop, or the agent finishes: then it asks again.
+    (y Allow) (n Deny) (r Deny, saying why)
+    |}];
+  H.names h ~selector:".computer-consent button";
+  [%expect
+    {|
+    button "Close" -- Close (Esc)
+    button "Allow" -- y or Enter
+    button "Deny" -- n or Esc
+    button "Deny, saying why" -- r
+    |}];
+  H.key h "Enter";
+  toasts h;
+  [%expect
+    {|
+    (Answer_confirm (call_id c1) (agent_id ()) (answer Allow))
+    (Rpc (method_ tool_confirm_respond) (params ((call_id c1) (allow true)))
+     (tag Answer))
+    (Focus editor)
+    (Expire_toast (id 0) (after_ms 2700))
+    Allowed computer use on laptop
+    |}];
+  H.event h {|{"event":"tool_confirm_done","call_id":"c1","agent_id":null}|};
+  H.event h (computer_consent ~agent:"a1" "s1");
+  modal h;
+  [%expect
+    {|
+    (Focus confirm)
+    Computer use
+    (Close (Esc))
+    [a1] Let prigh control laptop's screen, mouse and keyboard?
+    first: click (10, 20). Until you move the mouse or press a key there, press Stop, or the agent finishes: then it asks again.
+    (y Allow) (n Deny) (r Deny, saying why)
+    |}];
+  H.key h "Escape";
+  toasts h;
+  [%expect
+    {|
+    (Answer_confirm (call_id s1) (agent_id (a1)) (answer Deny))
+    (Rpc (method_ tool_confirm_respond)
+     (params ((call_id s1) (allow false) (agent_id a1))) (tag Answer))
+    (Focus editor)
+    (Expire_toast (id 1) (after_ms 2660))
+    Allowed computer use on laptop
+    Denied computer use on laptop
+    |}];
+  H.event h {|{"event":"tool_confirm_done","call_id":"s1","agent_id":"a1"}|};
+  modal h;
+  [%expect {| |}]
+;;
+
 let%expect_test "a confirmation: allow once, always, deny, deny with a reason" =
   let h = H.create () in
   H.event h (confirm ~rules:[ "bash(make:*)" ] "c1" "make test");

@@ -4,9 +4,13 @@
 // 1. A session where it clicked and typed: each card says what it did and
 //    shows the screen after it, the point it clicked marked where it is on
 //    the screenshot; tapping the screenshot opens the viewer.
-// 2. A run that calls computer: while it runs, a strip over the composer
-//    says prigh is controlling the computer, with Stop, which aborts the run
-//    (and the strip goes).
+// 2. A run that calls computer: it asks first (a dialog, a sheet from the
+//    bottom on a phone); allowed, a strip over the composer says prigh is
+//    controlling the computer, with Stop, which aborts the run (and the
+//    strip goes).
+// 3. The next run asks again (on Chromium's phone, as an installed app on
+//    a notched phone: the safe area's insets emulated); denied with Esc or
+//    Deny, the model is told and no strip shows.
 //
 // Run by prigh_web.sh; prints normalised snapshots (the expected output is
 // in ENGINE.expected) and, with SHOTS, screenshots.
@@ -93,7 +97,12 @@ writeFileSync(
         { id: "w1", name: "bash", arguments: { command: waitFor("gate") } },
       ],
     },
-    { text: "Stopped." },
+    // The aborted run asks for nothing more: the next prompt's.
+    {
+      text: "Looking again.",
+      tool_calls: [{ id: "k4", name: "computer", arguments: { action: "screenshot" } }],
+    },
+    { text: "Understood: no computer use." },
   ]),
 );
 
@@ -205,9 +214,34 @@ try {
   await page.waitForSelector("dialog.viewer[open]", { state: "detached" });
   console.log("closed");
 
-  // 2. A run that drives the screen.
+  // 2. A run that drives the screen: it asks first.
   await composer.fill("open a tab");
   await tap(page.locator(".btn.send"));
+  const consent = page.locator(".modal.computer-consent");
+  await consent.waitFor();
+  section("asks first");
+  const consentHost = await page.evaluate(() =>
+    document.querySelector(".computer-consent .confirm-question").innerText.match(/control (.*)'s screen/)[1]);
+  const consentText = async () =>
+    (await consent.innerText()).replaceAll(consentHost, "<HOST>").replace(/\s+/g, " ").trim();
+  // Each answer: whole on the screen, uncovered, and how tall.
+  const answers = async () => {
+    for (const cls of ["allow", "deny", "reason"]) {
+      const sel = `.computer-consent .confirm-answer.${cls}`;
+      console.log(`${cls}: ${await inView(sel)}, ${Math.round((await page.locator(sel).boundingBox()).height) >= (touch ? 44 : 28) ? "tall enough" : "too small"}`);
+    }
+    // On a phone a sheet from the bottom: its foot at the screen's.
+    const box = await consent.boundingBox();
+    console.log(`at the bottom: ${Math.abs(box.y + box.height - viewport.height) < 1}`);
+  };
+  console.log(await consentText());
+  console.log(`the host is the composer's: ${(await page.locator(".composer").innerText()).includes(consentHost)}`);
+  console.log(`banner while asking: ${await page.locator(".computer-banner").count()}`);
+  await answers();
+  console.log(await overflow());
+  await screenshot("asks first");
+  await tap(page.locator(".computer-consent .confirm-answer.allow"));
+  await consent.waitFor({ state: "detached" });
   await page.locator(".computer-banner").waitFor();
   await page.waitForFunction(() => document.getElementById("chat").innerText.includes("Opening a tab."));
   section("controlling");
@@ -229,6 +263,36 @@ try {
   section("stopped");
   console.log(`banner: ${await page.locator(".computer-banner").count()}`);
   await screenshot("stopped");
+
+  // 3. The next run asks again; denied.
+  if (part === "phone" && engineName === "chromium") {
+    const cdp = await context.newCDPSession(page);
+    await cdp.send("Emulation.setSafeAreaInsetsOverride", { insets: { top: 47, bottom: 34, left: 0, right: 0 } });
+  }
+  await composer.fill("look again");
+  await tap(page.locator(".btn.send"));
+  await consent.waitFor();
+  section("asks again");
+  console.log(await consentText());
+  await answers();
+  if (part === "phone" && engineName === "chromium") {
+    // Over the home indicator: the answers end above the inset.
+    const bottom = await page.locator(".computer-consent .confirm-answer.reason").evaluate(el => el.getBoundingClientRect().bottom);
+    console.log(`clear of the home indicator: ${bottom <= viewport.height - 34}`);
+    await screenshot("asks again pwa");
+  } else {
+    console.log("clear of the home indicator: true");
+    await screenshot("asks again");
+  }
+  if (touch) await tap(page.locator(".computer-consent .confirm-answer.deny"));
+  else await page.keyboard.press("Escape");
+  await consent.waitFor({ state: "detached" });
+  await page.waitForFunction(() => document.getElementById("chat").innerText.includes("Understood: no computer use."));
+  section("denied");
+  const denied = await page.locator(".tool-computer").last().innerText();
+  console.log(`the model was told: ${/declined/.test(denied) || /did not allow/.test(denied)}`);
+  console.log(`banner: ${await page.locator(".computer-banner").count()}`);
+  await screenshot("denied");
 
   section("errors");
   console.log(errors.length ? errors.join("\n") : "none");

@@ -494,6 +494,10 @@ let with_agent ?(computer = true) ?(show_tools = false) replies f =
     | Notice n -> printf "notice: %s\n" (mask t n)
     | Loop (Message_end (Assistant a)) ->
       printf "assistant: %s\n" (Message.Assistant.text a)
+    | Loop (Tool_confirm { call_id; kind = Computer_use { host }; _ }) ->
+      (* The user lets it: [Test_computer_consent] covers asking. *)
+      printf "allowed control of %s\n" host;
+      Or_error.ok_exn (Agent.respond_confirm agent ~call_id Allow)
     | _ -> ());
   let host computer : Agent.Host.t =
     { id = "h"
@@ -584,6 +588,7 @@ let%expect_test
     notice: tools now run on desk in $DIR
     --- request
     assistant:
+    allowed control of desk
     --- request
       sees s1: screenshot | cursor at (640, 400) | screenshot 1280×800 <screenshot>
     assistant:
@@ -649,6 +654,7 @@ let%expect_test "the user taking over stops the run" =
     notice: tools now run on desk in $DIR
     --- request
     assistant:
+    allowed control of desk
     --- request
       sees s1: screenshot | cursor at (640, 400) | screenshot 1280×800 <screenshot>
     assistant:
@@ -893,6 +899,7 @@ let%expect_test
     notice: tools now run on desk in $DIR
     --- request
     assistant:
+    allowed control of desk
     --- request
       sees a1: click (640, 312) → (1280, 624) on the screen | cursor at (640, 312) | screenshot 1280×800 <screenshot>
       sees a2: unknown action "bogus": use one of screenshot, click, move, drag, mouse_down, mouse_up, scroll, type, key, hold_key, wait, zoom, cursor_position

@@ -678,6 +678,21 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   tests. `Tool_computer` is the tool (`on_host`, not `parallel_safe`):
   `Host_ops.execute ?computer` runs it with the host's helper, or answers
   "computer use is off on this tool host: start it with -computer".
+  Consent: `Agent.approve` asks before a `computer` action unless the
+  session's `Computer_consent` is granted for the active host, in every
+  approval mode (the consent stands in for the mode's own question; deny
+  rules and plan mode still refuse): a `Tool_confirm` with `kind`
+  `Confirm_kind.Computer_use { host }` (no rules, so no "always"; JSON
+  `kind: "computer_use"`, `host`), timing out after
+  `ask_user_timeout_seconds`, or refused at once when
+  `Agent.set_unattended` says nobody can answer (`Rpc_server`: no
+  frontend client attached; `prigh run`: always). Allowing grants it (the
+  state's `computer_control`, the host's name) and lets other agents'
+  waiting consents go; subagents ask through the same dialog. It is
+  revoked when a run starts or ends (also failed or aborted), when a
+  `computer` result is `[interrupted]` (the executor), and when the
+  active host changes. The texts the model gets are
+  `Computer_consent.declined`/`timed_out`/`unavailable`.
   `Agent` adds it to the tools while the active host has a
   `Computer_info` (so `Told_environment`'s tools note, "the tools changed
   with the tool host", says when it comes and goes, with the guidance
@@ -2336,7 +2351,9 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   `current_mode_update`, `config_option_update`, `plan`, `usage_update`,
   `session_info_update` and `_prigh/state`. `tool_confirm` becomes
   `session/request_permission` (`tool_confirm_respond`, `always` for
-  allow_always, deny when cancelled); `ask_user` an `elicitation/create`
+  allow_always, deny when cancelled; a computer-use consent is titled
+  "Let prigh control <host>'s screen, mouse and keyboard?", with
+  "Allow until control ends" and no allow_always); `ask_user` an `elicitation/create`
   form, a permission request for a single choice, or `ask_user_respond`
   with `unavailable` (`Acp_question`); `*_done` events withdraw the request
   with `$/cancel_request`. `session/prompt` (content via `Acp_prompt`) sends
@@ -3232,9 +3249,9 @@ terminal frontend and `web/` prigh-web, the browser one.
       box, below the chip only when there is no room above, within the box
       sideways, its height capped by the room (`--popover-lift`,
       `--popover-room`, `--popover-shift`); on a phone it is as wide as the
-      box. Above it, `Computer_banner` while the run has called `computer`
-      (`Chat.uses_computer`: since the last user message): whose screen,
-      and Stop (`Abort`).
+      box. Above it, `Computer_banner` while the run controls a screen
+      (the state's `computer_control`, set once the user allowed it):
+      whose screen, and Stop (`Abort`).
       With it, `Queue_view` (the queued steers and follow-ups from `Queued`:
       the backend's `queue_update` lists, taken out at once by Edit and
       remove via `remove_queued`, re-fetched with `get_pending` if that

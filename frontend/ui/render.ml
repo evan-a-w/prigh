@@ -370,7 +370,15 @@ let mode_hint (m : App.Model.t) : Content.Line.t option =
                  [ span
                      ~style:attention
                      (spinner_frames.(m.spinner % Array.length spinner_frames)
-                      ^ sprintf " %s · Esc aborts · Enter steers" (doing m))
+                      ^
+                      match s.computer_control with
+                      | Some host ->
+                        (* The user allowed it: Esc takes the screen back. *)
+                        sprintf
+                          " controlling %s · Esc stops · Enter steers"
+                          host
+                      | None ->
+                        sprintf " %s · Esc aborts · Enter steers" (doing m))
                  ]
              else None)
         | Output _ ->
@@ -421,6 +429,10 @@ let confirm_dialog ~width (c : P.Pending.Confirm.t) =
   let question =
     span ~style:(Style.bold (Style.fg Yellow)) (Confirm_prompt.title c)
   in
+  let detail =
+    Option.value_map (Confirm_prompt.detail c) ~default:[] ~f:(fun text ->
+      [ [ span ~style:gray text ] ])
+  in
   let answers =
     List.map (Confirm_prompt.answers c) ~f:(fun (_, key, label) ->
       [ span ~style:(Style.bold Style.plain) key
@@ -428,9 +440,12 @@ let confirm_dialog ~width (c : P.Pending.Confirm.t) =
       ])
   in
   Boxed.render
-    ~title:"Confirm"
+    ~title:
+      (match c.kind with
+       | Tool -> "Confirm"
+       | Computer_use _ -> "Computer use")
     ~width
-    (Content.wrap [ [ question ] ] ~width:inner @ answers)
+    (Content.wrap ([ question ] :: detail) ~width:inner @ answers)
 ;;
 
 (* The keys of a question, most important first, wrapped in the box. *)

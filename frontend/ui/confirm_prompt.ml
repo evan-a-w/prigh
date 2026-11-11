@@ -18,20 +18,40 @@ let who (c : P.Pending.Confirm.t) =
 
 let title (c : P.Pending.Confirm.t) =
   let what =
-    match c.name with
-    | "bash" -> sprintf "Run bash: %s?" c.summary
-    | "write" -> sprintf "Write %s?" c.summary
-    | "edit" -> sprintf "Edit %s?" c.summary
-    | "apply_patch" -> sprintf "Apply patch to %s?" c.summary
-    | "job_input" -> sprintf "Send to job %s?" c.summary
-    | name when String.is_empty c.summary -> sprintf "Run %s?" name
-    | name -> sprintf "Run %s: %s?" name c.summary
+    match c.kind, c.name with
+    | Computer_use { host }, _ ->
+      sprintf "Let prigh control %s's screen, mouse and keyboard?" host
+    | Tool, name ->
+      (match name with
+       | "bash" -> sprintf "Run bash: %s?" c.summary
+       | "write" -> sprintf "Write %s?" c.summary
+       | "edit" -> sprintf "Edit %s?" c.summary
+       | "apply_patch" -> sprintf "Apply patch to %s?" c.summary
+       | "job_input" -> sprintf "Send to job %s?" c.summary
+       | name when String.is_empty c.summary -> sprintf "Run %s?" name
+       | name -> sprintf "Run %s: %s?" name c.summary)
   in
   who c ^ what
 ;;
 
+let detail (c : P.Pending.Confirm.t) =
+  match c.kind with
+  | Tool -> None
+  | Computer_use _ ->
+    let until =
+      "Until you move the mouse or press a key there, press Stop, or the agent \
+       finishes: then it asks again."
+    in
+    Some (if String.is_empty c.summary then until else c.summary ^ ". " ^ until)
+;;
+
 let answers (c : P.Pending.Confirm.t) =
-  [ Answer.Allow, "y", "allow once" ]
+  [ ( Answer.Allow
+    , "y"
+    , match c.kind with
+      | Tool -> "allow once"
+      | Computer_use _ -> "allow" )
+  ]
   @ (match c.rules with
      | [] -> []
      | rules ->
@@ -65,9 +85,15 @@ let params (c : P.Pending.Confirm.t) (answer : Answer.t) ~reason =
 ;;
 
 let acknowledgement (c : P.Pending.Confirm.t) (answer : Answer.t) =
-  match answer with
-  | Allow -> sprintf "allowed %s" c.name
-  | Always ->
-    sprintf "allowed %s; always: %s" c.name (String.concat ~sep:", " c.rules)
-  | Deny | Deny_with_reason -> sprintf "denied %s" c.name
+  match c.kind, answer with
+  | Computer_use { host }, (Allow | Always) ->
+    sprintf "allowed computer use on %s" host
+  | Computer_use { host }, (Deny | Deny_with_reason) ->
+    sprintf "denied computer use on %s" host
+  | Tool, answer ->
+    (match answer with
+     | Allow -> sprintf "allowed %s" c.name
+     | Always ->
+       sprintf "allowed %s; always: %s" c.name (String.concat ~sep:", " c.rules)
+     | Deny | Deny_with_reason -> sprintf "denied %s" c.name)
 ;;
