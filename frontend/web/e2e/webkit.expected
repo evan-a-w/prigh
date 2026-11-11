@@ -3431,6 +3431,14 @@ fits the width
 === webkit: computer (desktop): the screenshot in the viewer ===
 opened: 1280x800
 closed
+=== webkit: computer (desktop): asks first ===
+Computer use Let prigh control <HOST>'s screen, mouse and keyboard? first: key ctrl+t. Until you move the mouse or press a key there, press Stop, or the agent finishes: then it asks again. y Allow n Deny r Deny, saying why
+banner while asking: 0
+allow: in view, tall enough
+deny: in view, tall enough
+reason: in view, tall enough
+at the bottom: false
+fits the width
 === webkit: computer (desktop): controlling ===
 prigh is controlling <HOST> Stop
 the host is the composer's: true
@@ -3438,6 +3446,16 @@ Stop: in view, 28px tall
 fits the width
 Stop: abort sent
 === webkit: computer (desktop): stopped ===
+banner: 0
+=== webkit: computer (desktop): asks again ===
+Computer use Let prigh control <HOST>'s screen, mouse and keyboard? first: screenshot. Until you move the mouse or press a key there, press Stop, or the agent finishes: then it asks again. y Allow n Deny r Deny, saying why
+allow: in view, tall enough
+deny: in view, tall enough
+reason: in view, tall enough
+at the bottom: false
+clear of the home indicator: true
+=== webkit: computer (desktop): denied ===
+the model was told: true
 banner: 0
 === webkit: computer (desktop): errors ===
 none
@@ -3448,6 +3466,14 @@ fits the width
 === webkit: computer (phone): the screenshot in the viewer ===
 opened: 1280x800
 closed
+=== webkit: computer (phone): asks first ===
+Computer use Let prigh control <HOST>'s screen, mouse and keyboard? first: key ctrl+t. Until you move the mouse or press a key there, press Stop, or the agent finishes: then it asks again. y Allow n Deny r Deny, saying why
+banner while asking: 0
+allow: in view, tall enough
+deny: in view, tall enough
+reason: in view, tall enough
+at the bottom: true
+fits the width
 === webkit: computer (phone): controlling ===
 prigh is controlling <HOST> Stop
 the host is the composer's: true
@@ -3455,6 +3481,16 @@ Stop: in view, 44px tall
 fits the width
 Stop: abort sent
 === webkit: computer (phone): stopped ===
+banner: 0
+=== webkit: computer (phone): asks again ===
+Computer use Let prigh control <HOST>'s screen, mouse and keyboard? first: screenshot. Until you move the mouse or press a key there, press Stop, or the agent finishes: then it asks again. y Allow n Deny r Deny, saying why
+allow: in view, tall enough
+deny: in view, tall enough
+reason: in view, tall enough
+at the bottom: true
+clear of the home indicator: true
+=== webkit: computer (phone): denied ===
+the model was told: true
 banner: 0
 === webkit: computer (phone): errors ===
 none
@@ -3465,6 +3501,14 @@ fits the width
 === webkit: computer (small): the screenshot in the viewer ===
 opened: 1280x800
 closed
+=== webkit: computer (small): asks first ===
+Computer use Let prigh control <HOST>'s screen, mouse and keyboard? first: key ctrl+t. Until you move the mouse or press a key there, press Stop, or the agent finishes: then it asks again. y Allow n Deny r Deny, saying why
+banner while asking: 0
+allow: in view, tall enough
+deny: in view, tall enough
+reason: in view, tall enough
+at the bottom: true
+fits the width
 === webkit: computer (small): controlling ===
 prigh is controlling <HOST> Stop
 the host is the composer's: true
@@ -3472,6 +3516,16 @@ Stop: in view, 44px tall
 fits the width
 Stop: abort sent
 === webkit: computer (small): stopped ===
+banner: 0
+=== webkit: computer (small): asks again ===
+Computer use Let prigh control <HOST>'s screen, mouse and keyboard? first: screenshot. Until you move the mouse or press a key there, press Stop, or the agent finishes: then it asks again. y Allow n Deny r Deny, saying why
+allow: in view, tall enough
+deny: in view, tall enough
+reason: in view, tall enough
+at the bottom: true
+clear of the home indicator: true
+=== webkit: computer (small): denied ===
+the model was told: true
 banner: 0
 === webkit: computer (small): errors ===
 none

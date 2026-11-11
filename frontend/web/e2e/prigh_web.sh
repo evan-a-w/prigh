@@ -31,7 +31,8 @@
 # its Memory section, on a desktop and phones, then images.mjs,
 # images too large for the model and image files, on a desktop and two
 # phones, then computer.mjs, the computer tool's cards and the strip while
-# the agent drives the screen, on a desktop and two phones) in each browser and diffs the output with ENGINE.expected (chromium.expected,
+# the agent drives the screen, its consent dialog (allow, Stop, ask again,
+# deny), on a desktop and two phones) in each browser and diffs the output with ENGINE.expected (chromium.expected,
 # firefox.expected, webkit.expected). The scripts all run at once (JOBS at a
 # time, default: the number of CPUs, fewer if the memory available would not
 # hold them; and on Linux none starts while less than MEM_PER_JOB is
