@@ -32,8 +32,10 @@ pub fn app_id(program: &str, url: &str) -> Option<String> {
     Some(format!("{prefix}-{host}__{}-Default", path.replace('/', "_")))
 }
 
-/// The desktop entry for `app_id`: prigh's name and icon, out of the menus
-/// (the app's own entry is the one there), launching the app again.
+/// The desktop entry for `app_id`: prigh's name and icon, launching the app
+/// again. Not `NoDisplay`: some taskbars (Noctalia's) skip hidden entries
+/// when they match a window to an app, then take a Chromium window for the
+/// browser itself.
 pub fn desktop_entry(app_id: &str, exec: &str) -> String {
     let exec = if exec.contains([' ', '"', '\\', '\'']) {
         format!("\"{}\"", exec.replace('\\', "\\\\").replace('"', "\\\""))
@@ -42,7 +44,7 @@ pub fn desktop_entry(app_id: &str, exec: &str) -> String {
     };
     format!(
         "[Desktop Entry]\nType=Application\nName=prigh\nComment=prigh's window in the browser\nExec={exec}\n\
-         Icon=prigh-desktop\nTerminal=false\nNoDisplay=true\nStartupWMClass={app_id}\n"
+         Icon=prigh-desktop\nTerminal=false\nStartupWMClass={app_id}\n"
     )
 }
 
@@ -74,7 +76,7 @@ mod tests {
         assert_eq!(
             desktop_entry("chrome-127.0.0.1__-Default", "/nix/store/x-prigh-desktop/bin/prigh-desktop"),
             "[Desktop Entry]\nType=Application\nName=prigh\nComment=prigh's window in the browser\n\
-             Exec=/nix/store/x-prigh-desktop/bin/prigh-desktop\nIcon=prigh-desktop\nTerminal=false\nNoDisplay=true\n\
+             Exec=/nix/store/x-prigh-desktop/bin/prigh-desktop\nIcon=prigh-desktop\nTerminal=false\n\
              StartupWMClass=chrome-127.0.0.1__-Default\n"
         );
         assert!(desktop_entry("a", "/opt/my apps/prigh-desktop").contains("\nExec=\"/opt/my apps/prigh-desktop\"\n"));
