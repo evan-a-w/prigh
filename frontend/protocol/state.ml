@@ -65,6 +65,7 @@ type t =
   ; resume_at : Time_ns.t option
   ; approval_mode : Approval_mode.t
   ; plan_mode : bool
+  ; computer_control : string option [@sexp.option]
   ; plan : Plan.t option
   ; session_rules : string list
   ; trim : Trim.t option [@sexp.option]
@@ -138,6 +139,7 @@ let of_json j =
     | None -> Ok false
     | Some _ -> Json.bool_field j "plan_mode"
   in
+  let%bind computer_control = Json.string_opt_field j "computer_control" in
   let%bind plan =
     match Json.field j "plan" with
     | None -> Ok None
@@ -175,6 +177,7 @@ let of_json j =
   ; resume_at
   ; approval_mode
   ; plan_mode
+  ; computer_control
   ; plan
   ; session_rules
   ; trim

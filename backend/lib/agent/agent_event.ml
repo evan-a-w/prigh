@@ -35,6 +35,7 @@ type t =
       ; summary : string
       ; rules : string list
         (** what "don't ask again" adds; none when it is not offered *)
+      ; kind : Confirm_kind.t
       }
   | Tool_confirm_done of
       { call_id : string

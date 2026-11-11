@@ -77,6 +77,9 @@ module State : sig
           epoch) *)
     ; approval_mode : Approval_mode.t
     ; plan_mode : bool
+    ; computer_control : string option
+      (** the host (its name) whose screen the user allowed prigh to
+          control, while that lasts ({!Computer_consent}) *)
     ; plan : Plan.t option (** the model's [update_plan] *)
     ; session_rules : string list
       (** rules the user allowed for this session ("don't ask again") *)
@@ -179,6 +182,7 @@ module Pending_confirm : sig
     ; rules : string list
       (** what [Always] adds ({!Approval_rule.suggest}); empty when it is
           not offered *)
+    ; kind : Confirm_kind.t
     }
   [@@deriving sexp_of]
 end
@@ -504,6 +508,22 @@ val save_as_default : t -> unit Or_error.t
     ({!System_prompt.plan_mode_note}: with the next user message, or between
     turns of a running loop). Only the user leaves plan mode
     ({!set_mode}): the model presents its plan and waits. *)
+
+(** Computer use asks the user first in every approval mode (a
+    [Tool_confirm] of kind {!Confirm_kind.Computer_use}, timing out after
+    the config's [ask_user_timeout_seconds]), once per control period: the
+    consent ({!Computer_consent}) lasts until the user takes over the screen
+    (the kill switch), the run ends or is aborted, or the session moves to
+    another host; a run starts without it. Subagents' actions ask through
+    the same dialog and share the consent. Refused, timed out or with nobody
+    to ask ({!set_unattended}), the call fails telling the model not to try
+    again unless the user asks. *)
+
+(** [f ()] says why nobody can answer a computer-use consent now (no
+    frontend is connected, the run is headless), or [None] when someone
+    can: then it is denied at once rather than waiting. Default: someone
+    can. *)
+val set_unattended : t -> (unit -> string option) -> unit
 
 (** Answers a pending [Tool_confirm] request. Fails if no confirmation is
     outstanding for [call_id] (of the subagent [agent_id]): it was answered

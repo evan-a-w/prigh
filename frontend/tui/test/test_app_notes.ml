@@ -720,6 +720,7 @@ let%expect_test
        ; name = "bash"
        ; summary = "rm -rf build"
        ; rules = []
+       ; kind = Tool
        });
   H.step ~quiet:true h (Key (Key.char 'n'));
   H.event h (Message_start (delivery "[job j1 exited 0] make test\nok"));
