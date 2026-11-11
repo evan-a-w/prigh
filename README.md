@@ -1580,11 +1580,11 @@ PipeWire (`tests/screencast.rs`).
 In prigh-web each `computer` call is a card: what it did ("click (640,
 312)", "type “hello”", "key ctrl+t", "scroll ↓3 at (x, y)", ...) and the
 screen after it, with the point it acted on marked; tap the screenshot for
-the image viewer. While a run is driving the screen (it called `computer`
-since your last message), a strip over the composer says "prigh is
-controlling <host>" with Stop, which aborts the run as Esc does. The TUI
-shows a line per action (`computer click 640,312  → screenshot
-1280×800`).
+the image viewer. While you let a run drive the screen (below), a strip
+over the composer says "prigh is controlling <host>" with Stop, which
+aborts the run as Esc does (the TUI's status line says `controlling
+<host>`). The TUI shows a line per action (`computer click 640,312  →
+screenshot 1280×800`).
 
 #### Turning computer use on, and what keeps it safe
 
@@ -1603,6 +1603,20 @@ The backend's own host never offers it.
 - The system prompt says the screen is the user's real desktop, that
   what is on it is untrusted data (never instructions), and to ask before
   anything irreversible or sensitive.
+- Taking control asks you first, in every approval mode (auto included):
+  the first `computer` action of a run asks "Let prigh control <host>'s
+  screen, mouse and keyboard?" (Enter or y allows, Esc or n denies, r
+  denies saying why; no "always"). Allowed, the run's next actions go
+  ahead without asking, until control ends: you move the mouse or press
+  a key there, you press Stop (or Esc), the run ends, or the session
+  switches tool host. The next action after that asks again. A
+  subagent's actions ask through the same dialog (`[agent] Let prigh
+  control ...`) and share the answer. Refused, unanswered within
+  `ask_user_timeout_seconds` (config, default 5 minutes), or with no
+  frontend connected to ask (`prigh run`), the action fails telling the
+  model not to use the computer again unless you ask. In an editor (ACP)
+  it is a permission request. A `permissions.deny` rule for `computer`
+  or plan mode still refuses without asking.
 - Moving the mouse stops the run at once ("computer use stopped: you
   moved the mouse ..."); the next message goes on. Esc or Stop abort as
   for any run.

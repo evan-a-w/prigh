@@ -1,12 +1,29 @@
 open! Core
 
 module Confirm = struct
+  module Kind = struct
+    type t =
+      | Tool
+      | Computer_use of { host : string }
+    [@@deriving sexp_of, equal]
+
+    let of_json j =
+      let open Or_error.Let_syntax in
+      match%bind Json.string_opt_field j "kind" with
+      | Some "computer_use" ->
+        let%map host = Json.string_opt_field j "host" in
+        Computer_use { host = Option.value host ~default:"this computer" }
+      | Some _ | None -> Ok Tool
+    ;;
+  end
+
   type t =
     { call_id : string
     ; agent_id : string option
     ; name : string
     ; summary : string
     ; rules : string list
+    ; kind : Kind.t [@default Kind.Tool] [@sexp_drop_default.equal]
     }
   [@@deriving sexp_of, equal]
 
@@ -16,10 +33,11 @@ module Confirm = struct
     let%bind agent_id = Json.string_opt_field j "agent_id" in
     let%bind name = Json.string_field j "name" in
     let%bind summary = Json.string_field j "summary" in
-    let%map rules =
+    let%bind rules =
       Json.optional_list_field j "rules" ~f:Json.to_string_or_error
     in
-    { call_id; agent_id; name; summary; rules }
+    let%map kind = Kind.of_json j in
+    { call_id; agent_id; name; summary; rules; kind }
   ;;
 end
 
@@ -57,7 +75,9 @@ let of_json j =
   in
   let%bind steer_texts = strings "steer_texts" in
   let%bind follow_up_texts = strings "follow_up_texts" in
-  let%bind agents = Json.optional_list_field j "agents" ~f:Agent_queue.of_json in
+  let%bind agents =
+    Json.optional_list_field j "agents" ~f:Agent_queue.of_json
+  in
   let%bind confirms =
     Json.optional_list_field j "confirms" ~f:Confirm.of_json
   in

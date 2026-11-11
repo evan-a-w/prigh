@@ -22,6 +22,7 @@ module Pending_confirm = struct
     ; name : string
     ; summary : string
     ; rules : string list
+    ; kind : Confirm_kind.t
     }
   [@@deriving sexp_of]
 
@@ -104,6 +105,7 @@ module State = struct
     ; resume_at : float option
     ; approval_mode : Approval_mode.t
     ; plan_mode : bool
+    ; computer_control : string option
     ; plan : Plan.t option
     ; session_rules : string list
     ; home : Session.Home.t option
@@ -214,6 +216,9 @@ type t =
   ; mutable subscribers : (Event.t -> unit) list
   ; mutable config : Config.t
   ; pending_confirms : Waiting_confirm.t String.Table.t
+  ; computer_consent : Computer_consent.t
+  ; mutable unattended : unit -> string option
+    (** why nobody can answer a computer-use consent now, if so *)
   ; pending_questions :
       (Pending_question.t * User_question.Reply.t Promise.u) String.Table.t
   ; mutable approval_mode : Approval_mode.t
@@ -525,6 +530,11 @@ let state t =
   ; resume_at = Option.map t.resume ~f:(fun r -> r.at)
   ; approval_mode = t.approval_mode
   ; plan_mode = t.plan_mode
+  ; computer_control =
+      Option.map (Computer_consent.granted t.computer_consent) ~f:(fun id ->
+        match List.find (hosts t) ~f:(fun h -> String.equal h.id id) with
+        | Some host -> host.name
+        | None -> t.active_host_name)
   ; plan = t.plan
   ; session_rules = List.map t.session_rules ~f:Approval_rule.to_string
   ; home = Session.home t.session
@@ -648,7 +658,18 @@ let plan_mode_note t =
       })
 ;;
 
-let confirm t (context : Tool.Context.t) ~name ~summary ~rules ~recheck =
+(* [None]: the run was cancelled; [Some (Error after)]: unanswered within
+   [timeout] (seconds). *)
+let confirm
+      ?(kind = Confirm_kind.Tool)
+      ?timeout
+      t
+      (context : Tool.Context.t)
+      ~name
+      ~summary
+      ~rules
+      ~recheck
+  =
   let call_id = context.call_id in
   let agent_id = context.agent_id in
   let key = Pending_confirm.key ~call_id ~agent_id in
@@ -659,14 +680,30 @@ let confirm t (context : Tool.Context.t) ~name ~summary ~rules ~recheck =
     ~key
     ~data:
       { Waiting_confirm.pending =
-          { Pending_confirm.call_id; agent_id; name; summary; rules }
+          { Pending_confirm.call_id; agent_id; name; summary; rules; kind }
       ; resolver
       ; recheck
       };
-  broadcast t (Loop (Tool_confirm { call_id; agent_id; name; summary; rules }));
+  broadcast
+    t
+    (Loop (Tool_confirm { call_id; agent_id; name; summary; rules; kind }));
+  let answered () = Ok (Promise.await promise) in
+  let wait =
+    match timeout with
+    | None -> answered
+    | Some after ->
+      let at = Eio.Time.now (Eio.Stdenv.clock t.env) +. after in
+      fun () ->
+        Fiber.first answered (fun () ->
+          t.sleep_until at;
+          (* An answer that came in meanwhile still counts. *)
+          match Hashtbl.find t.pending_confirms key with
+          | Some w when phys_equal w.resolver resolver -> Error after
+          | Some _ | None -> answered ())
+  in
   let answer =
     Trace.span "approval_wait" (fun () ->
-      Cancellation.protect context.cancel ~f:(fun () -> Promise.await promise))
+      Cancellation.protect context.cancel ~f:wait)
   in
   Hashtbl.remove t.pending_confirms key;
   broadcast t (Loop (Tool_confirm_done { call_id; agent_id }));
@@ -1146,7 +1183,8 @@ let activate_host t (host : Host.t) ~cwd ~pinned =
   if not (String.equal t.active_host host.id)
   then (
     environment_changed t;
-    hosts_changed t);
+    hosts_changed t;
+    ignore (Computer_consent.revoke t.computer_consent : bool));
   t.active_host <- host.id;
   t.active_host_name <- host.name;
   t.host_pinned <- pinned;
@@ -1362,6 +1400,58 @@ let active_host_home t =
   Option.bind (find_host t t.active_host) ~f:(host_home t)
 ;;
 
+(* Computer use always asks first, whatever the approval mode: once per
+   control period ({!Computer_consent}). *)
+let rec computer_consent t (context : Tool.Context.t) ~name ~summary =
+  let consent = t.computer_consent in
+  let host = t.active_host in
+  let host_name = t.active_host_name in
+  let refuse text = Some (Tool.Result.error text) in
+  if Computer_consent.is_granted consent ~host
+  then None
+  else (
+    match t.unattended () with
+    | Some why -> refuse (Computer_consent.unavailable ~host:host_name why)
+    | None ->
+      (match
+         confirm
+           t
+           context
+           ~kind:(Computer_use { host = host_name })
+           ?timeout:(Config.ask_user_timeout t.config)
+           ~name
+           ~summary
+           ~rules:[]
+           ~recheck:(fun () -> Computer_consent.is_granted consent ~host)
+       with
+       | None -> refuse "[cancelled]"
+       | Some (Error after) ->
+         broadcast
+           t
+           (Notice (Computer_consent.timed_out_notice ~host:host_name ~after));
+         refuse (Computer_consent.timed_out ~host:host_name ~after)
+       | Some (Ok (Deny reason)) ->
+         refuse (Computer_consent.declined ~host:host_name ~reason)
+       | Some (Ok (Allow | Always)) ->
+         if not (String.equal host t.active_host)
+         then (* it moved to another host meanwhile: ask about that one *)
+           computer_consent t context ~name ~summary
+         else (
+           if not (Computer_consent.is_granted consent ~host)
+           then (
+             Computer_consent.grant consent ~host;
+             state_changed t);
+           (* Other agents' actions waiting for the same consent go on. *)
+           recheck_confirms t;
+           None)))
+;;
+
+let end_computer_control t =
+  if Computer_consent.revoke t.computer_consent then state_changed t
+;;
+
+let set_unattended t f = t.unattended <- f
+
 let approve t : Tool.approver =
   fun context tool args ->
   let name = Tool.name tool in
@@ -1387,31 +1477,49 @@ let approve t : Tool.approver =
       ~changes_work:(Plan_mode.changes_work ~tool:name args)
       call
   in
-  match decide () with
-  | Allow -> None
-  | Deny text -> Some (Tool.Result.error text)
-  | Ask { rules } ->
-    let recheck () =
-      match decide () with
-      | Allow -> true
-      | Ask _ | Deny _ -> false
-    in
-    (match
-       confirm
-         t
-         context
-         ~name
-         ~summary:(Agent_loop.tool_summary ~name args)
-         ~rules
-         ~recheck
-     with
-     | None -> Some (Tool.Result.error "[cancelled]")
-     | Some (Deny reason) -> Some (Tool.Result.error (denied_text reason))
-     | Some (Allow | Always) ->
-       (* Plan mode may have started while the user was deciding. *)
-       (match decide () with
-        | Deny text -> Some (Tool.Result.error text)
-        | Allow | Ask _ -> None))
+  let summary =
+    if String.equal name Tool_computer.name
+    then (
+      match Computer_action.of_json args with
+      | Ok action -> "first: " ^ Computer_action.describe action
+      | Error _ -> "")
+    else Agent_loop.tool_summary ~name args
+  in
+  let approved () =
+    match decide () with
+    | Allow -> None
+    | Deny text -> Some (Tool.Result.error text)
+    | Ask { rules } ->
+      let recheck () =
+        match decide () with
+        | Allow -> true
+        | Ask _ | Deny _ -> false
+      in
+      (match confirm t context ~name ~summary ~rules ~recheck with
+       | None -> Some (Tool.Result.error "[cancelled]")
+       | Some (Error _) -> assert false (* no timeout *)
+       | Some (Ok (Deny reason)) ->
+         Some (Tool.Result.error (denied_text reason))
+       | Some (Ok (Allow | Always)) ->
+         (* Plan mode may have started while the user was deciding. *)
+         (match decide () with
+          | Deny text -> Some (Tool.Result.error text)
+          | Allow | Ask _ -> None))
+  in
+  if String.equal name Tool_computer.name
+  then (
+    (* The consent stands for the approval mode's question too: a deny rule
+       or plan mode still refuses. *)
+    match decide () with
+    | Deny text -> Some (Tool.Result.error text)
+    | Allow | Ask _ ->
+      (match computer_consent t context ~name ~summary with
+       | Some _ as refused -> refused
+       | None ->
+         (match decide () with
+          | Deny text -> Some (Tool.Result.error text)
+          | Allow | Ask _ -> None)))
+  else approved ()
 ;;
 
 (* Where [path] would take the session on [host], creating it or asking
@@ -1642,7 +1750,14 @@ let executor t : Tool.executor =
     if bash
     then
       Worktree_watch.around context ~dir:t.config.worktrees_dir ~arguments run
-    else run ())
+    else (
+      let result = run () in
+      (* The user took over the screen: control ends with it. *)
+      if
+        String.equal (Tool.name tool) Tool_computer.name
+        && Computer_helper.interrupted result
+      then end_computer_control t;
+      result))
 ;;
 
 (* AGENTS.md/CLAUDE.md come from the active host's filesystem. *)
@@ -2345,6 +2460,7 @@ let run_failed t ~resolve exn =
   if Promise.try_resolve resolve ()
   then (
     t.run <- None;
+    ignore (Computer_consent.revoke t.computer_consent : bool);
     broadcast t (Notice ("run failed: " ^ Exn.to_string exn));
     state_changed t)
 ;;
@@ -2415,6 +2531,9 @@ let rec start_run
   refresh_location t;
   cancel_resume_timer t;
   close_interrupted t;
+  (* A run starts without control of the screen, even when a background
+     subagent was allowed it since the last one. *)
+  ignore (Computer_consent.revoke t.computer_consent : bool);
   let cancel = Cancellation.create () in
   let finished, resolve = Promise.create () in
   t.run <- Some { cancel; finished };
@@ -2442,6 +2561,7 @@ let rec start_run
        let session = t.session in
        let finish ~idle =
          t.run <- None;
+         ignore (Computer_consent.revoke t.computer_consent : bool);
          Promise.resolve resolve ();
          if idle then state_changed t
        in
@@ -3060,6 +3180,8 @@ let create
     ; subscribers = []
     ; config
     ; pending_confirms = String.Table.create ()
+    ; computer_consent = Computer_consent.create ()
+    ; unattended = (fun () -> None)
     ; pending_questions = String.Table.create ()
     ; approval_mode = config.approval_mode
     ; plan_mode = false

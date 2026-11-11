@@ -104,6 +104,7 @@ let%expect_test "no shift: a confirmation dialog arrives" =
          ; name = "bash"
          ; summary = "rm -rf _build"
          ; rules = [ "bash(rm:*)" ]
+         ; kind = Tool
          }));
   [%expect
     {|
