@@ -16,6 +16,8 @@ val string_list_opt : Json.t -> string -> string list option
 (** Builds a JSON schema for an object with the given properties. *)
 val schema
   :  ?required:string list
-  -> (string * [ `String | `Integer | `Boolean | `Array of Json.t ] * string)
+  -> (string
+     * [ `String | `Integer | `Boolean | `Object | `Array of Json.t ]
+     * string)
        list
   -> Json.t

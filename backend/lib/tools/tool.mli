@@ -53,10 +53,13 @@ and context =
     (** asks the user (the [ask_user] tool, which passes its
         [timeout_seconds]); only the main agent can *)
   ; ui : Ui_host.t (** for [render_ui]: the user's client, the host's files *)
+  ; host : string option
+    (** the tool host (by id) this call's [on_host] tool runs on, when it is
+        not the session's active one ([on_host]'s inner call) *)
   }
 
 (** Runs a tool call. [Agent] installs one that forwards [on_host] tools to
-    the session's active tool host. *)
+    the session's active tool host (or the context's [host]). *)
 and executor = context -> t -> Json.t -> Tool_result.t
 
 (** [Some result] refuses the call with that result (denied, cancelled);
@@ -87,6 +90,7 @@ module Context : sig
           -> User_question.t list
           -> User_question.Reply.t)
     -> ?ui:Ui_host.t
+    -> ?host:string
     -> env:Env.t
     -> cwd:string
     -> unit

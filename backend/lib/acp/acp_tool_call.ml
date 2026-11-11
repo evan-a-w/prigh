@@ -46,13 +46,25 @@ let patch_paths args =
 
 let shown ~cwd path = Tool_edit.relative_path ~cwd (Tool.resolve ~cwd path)
 
-let title ~name ~args ~cwd =
+let rec title ~name ~args ~cwd =
   let path key = Option.map (string_arg args key) ~f:(shown ~cwd) in
   let with_ verb = function
     | Some x -> verb ^ " " ^ x
     | None -> verb
   in
   match name with
+  | "on_host" ->
+    (match Tool_on_host.inner args with
+     | Some (host, name, inner) ->
+       (* Paths are the host's: relative to the call's cwd there, if given,
+          else as written. *)
+       let cwd = Option.value (string_arg args "cwd") ~default:"." in
+       sprintf "On %s: %s" host (title ~name ~args:inner ~cwd)
+     | None ->
+       Option.value_map
+         (string_arg args "host")
+         ~default:"List tool hosts"
+         ~f:(fun h -> "On " ^ h))
   | "bash" ->
     Option.value_map (string_arg args "command") ~default:"bash" ~f:first_line
   | "read" -> with_ "Read" (path "path")

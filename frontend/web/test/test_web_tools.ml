@@ -593,3 +593,103 @@ let%expect_test "memory: the action and its title, query or id" =
     ✓ memory recall
     |}]
 ;;
+
+let%expect_test "on_host: the call it ran, on its host" =
+  let chat =
+    Chat_harness.chat
+      [ tool_end
+          ~name:"on_host"
+          ~arguments:
+            {|{"host":"laptop","tool":"bash","args":{"command":"uname -a"}}|}
+          "Linux laptop"
+      ; tool_end
+          ~id:"c2"
+          ~name:"on_host"
+          ~arguments:
+            {|{"host":"laptop","tool":"read","args":{"path":"notes.txt"},"cwd":"/srv"}|}
+          "hello"
+      ; tool_end ~id:"c3" ~name:"on_host" ~arguments:"{}" "tool hosts: ..."
+      ; tool_end
+          ~id:"c4"
+          ~name:"on_host"
+          ~arguments:{|{"host":"lapto","tool":"bash","args":{"command":"pwd"}}|}
+          ~is_error:true
+          "no connected tool host"
+      ]
+  in
+  Chat_harness.text ~selector:".tool-head" chat;
+  Chat_harness.show ~selector:".tool-on_host .tool-head" chat;
+  [%expect
+    {|
+    ✓ on laptop: bash uname -a
+    ✓ on laptop: read notes.txt
+    ✓ on_host list hosts
+    ✕ on lapto: bash pwd
+    <button type="button" data-fold="c1#open" aria-expanded="true" class="tool-head">
+      <span title="Done" role="img" aria-label="Done" class="done mark">
+        <icon class="check"> </icon>
+      </span>
+      <span class="host"> on laptop: </span>
+      <span class="name"> bash </span>
+      <span class="arg command"> uname -a </span>
+      <span class="chev">  </span>
+    </button>
+    <button type="button" data-fold="c2#open" aria-expanded="true" class="tool-head">
+      <span title="Done" role="img" aria-label="Done" class="done mark">
+        <icon class="check"> </icon>
+      </span>
+      <span class="host"> on laptop: </span>
+      <span class="name"> read </span>
+      <span class="arg path"> notes.txt </span>
+      <span class="chev">  </span>
+    </button>
+    <button type="button" data-fold="c3#open" aria-expanded="true" class="tool-head">
+      <span title="Done" role="img" aria-label="Done" class="done mark">
+        <icon class="check"> </icon>
+      </span>
+      <span class="name"> on_host </span>
+      <span class="arg"> list hosts </span>
+      <span class="chev">  </span>
+    </button>
+    <button type="button" data-fold="c4#open" aria-expanded="true" class="tool-head">
+      <span title="Failed" role="img" aria-label="Failed" class="failed mark">
+        <icon class="cross"> </icon>
+      </span>
+      <span class="host"> on lapto: </span>
+      <span class="name"> bash </span>
+      <span class="arg command"> pwd </span>
+      <span class="chev">  </span>
+    </button>
+    |}]
+;;
+
+let%expect_test "on_host while its arguments stream" =
+  Chat_harness.text
+    ~selector:".tool-head"
+    (Chat_harness.chat
+       [ tool_start
+           ~name:"on_host"
+           ~arguments:
+             {|{"host":"laptop","tool":"bash","args":{"command":"make te|}
+       ]);
+  [%expect {| ■ on laptop: bash make te no result |}]
+;;
+
+let%expect_test "on_host as a subagent's latest step" =
+  print_s
+    [%sexp
+      (Tool_view.last_activity
+         (loaded
+            [ Json.obj
+                [ "type", Json.str "tool_call"
+                ; "id", Json.str "c1"
+                ; "name", Json.str "on_host"
+                ; ( "arguments"
+                  , Json.str
+                      {|{"host":"laptop","tool":"bash","args":{"command":"make test"}}|}
+                  )
+                ]
+            ])
+       : string option)];
+  [%expect {| ("on laptop: bash make test") |}]
+;;

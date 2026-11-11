@@ -94,6 +94,13 @@ let base ~nix ~auto_background ~(role : Role.t) ~tools =
      ; "- Ask before destructive or irreversible actions."
      ]
      @ (if has Tool_computer.name then [ "- " ^ Tool_computer.guidance ] else [])
+     @ (if has Tool_on_host.name
+        then
+          [ "- Other machines: use on_host only when the user names another \
+             machine or asks to run something there; the session's own host is \
+             for normal work."
+          ]
+        else [])
      @ (if has "worktree"
         then
           [ ("- To work on a separate branch, use the worktree tool"

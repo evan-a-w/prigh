@@ -163,6 +163,37 @@ let memory args =
     String.concat ~sep:" " (action :: target))
 ;;
 
+(* While the model still writes the arguments, the inner ones are the text
+   after ["args":], an unfinished object [Tool_args] reads leniently. *)
+let on_host (call : P.Tool_call.t) =
+  if not (String.equal call.name "on_host")
+  then None
+  else (
+    let args = Tool_args.of_call call in
+    match Tool_args.string args "host", Tool_args.string args "tool" with
+    | Some host, Some tool ->
+      let inner =
+        match P.Json.parse call.arguments with
+        | Ok json ->
+          Option.value_map
+            (P.Json.field json "args")
+            ~default:"{}"
+            ~f:P.Json.to_string
+        | Error _ ->
+          (match String.substr_index call.arguments ~pattern:{|"args"|} with
+           | None -> "{}"
+           | Some i ->
+             let rest = String.drop_prefix call.arguments (i + 6) in
+             (match String.index rest '{' with
+              | Some j -> String.drop_prefix rest j
+              | None -> "{}"))
+      in
+      Some (host, { call with name = tool; arguments = inner })
+    | _ -> None)
+;;
+
+let on_host_line ~host line = sprintf "on %s: %s" host line
+
 let as_call (s : P.Content.Server_tool.t) =
   let call = { P.Tool_call.id = s.id; name = s.name; arguments = s.input } in
   ( call

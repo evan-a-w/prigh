@@ -24,6 +24,7 @@ let title (c : P.Pending.Confirm.t) =
     | "edit" -> sprintf "Edit %s?" c.summary
     | "apply_patch" -> sprintf "Apply patch to %s?" c.summary
     | "job_input" -> sprintf "Send to job %s?" c.summary
+    | "on_host" -> sprintf "Run %s?" c.summary
     | name when String.is_empty c.summary -> sprintf "Run %s?" name
     | name -> sprintf "Run %s: %s?" name c.summary
   in
