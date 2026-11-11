@@ -966,6 +966,11 @@ let older_host_note (host : Host.t) ~name (result : Tool.Result.t) =
   else result
 ;;
 
+(* What the agent has seen of files ([Seen_files]) is kept per session and
+   host, so that reading a file on one host does not let it be overwritten
+   on another, even when both are served by one process. *)
+let seen_scope t ~host = Session.id t.session ^ "@" ^ host
+
 (* Runs [name] on [host]: in-process when that is the backend, otherwise
    through a [Tool_exec] round trip with the client. *)
 let host_exec_with_stdin
@@ -1282,15 +1287,29 @@ let host_exec_on t host ~cancel ~on_output ~call_id ~cwd ~name ~arguments =
     ()
 ;;
 
-(* The active host; with [wait], one that went away is waited for until it
-   comes back, its [host_returns] time passes, the session moves to another
-   host or [cancel]. *)
-let await_active_host t ~wait ~cancel =
-  let id = t.active_host in
-  let unavailable = host_unavailable_message t in
+(* The host [id] (by default the active one); with [wait], one that went
+   away is waited for until it comes back, its [host_returns] time passes,
+   the session moves off it (the active host) or [cancel]. *)
+let await_host ?id t ~wait ~cancel =
+  let id = Option.value id ~default:t.active_host in
+  let active = String.equal id t.active_host in
+  let unavailable () =
+    if active
+    then host_unavailable_message t
+    else (
+      let known =
+        List.find_map t.hosts ~f:(fun (h : Host.t) ->
+          Option.some_if (String.equal h.id id) h.name)
+      in
+      sprintf
+        "tool host %S is not connected; on_host without host lists those that \
+         are"
+        (Option.value known ~default:id))
+  in
+  let moved = host_unavailable_message t in
   let rec loop () =
-    if not (String.equal t.active_host id)
-    then Error unavailable
+    if active && not (String.equal t.active_host id)
+    then Error moved
     else (
       match find_host t id, Map.find t.host_returns id with
       | Some host, _ -> Ok host
@@ -1306,13 +1325,16 @@ let await_active_host t ~wait ~cancel =
          with
          | Some () -> loop ()
          | None -> Error "[cancelled]")
-      | None, _ -> Error (host_unavailable_message t))
+      | None, _ -> Error (unavailable ()))
   in
   loop ()
 ;;
 
-let active_host_exec
+(* Runs [name] on the host [host] (default: the active one), see
+   [await_host]. *)
+let host_exec_by_id
       ?(wait = false)
+      ?host:id
       t
       ?stdin
       ~cancel
@@ -1323,7 +1345,7 @@ let active_host_exec
       ~arguments
       ()
   =
-  match await_active_host t ~wait ~cancel with
+  match await_host ?id t ~wait ~cancel with
   | Error message -> Tool.Result.error message
   | Ok host ->
     host_exec_with_stdin
@@ -1338,6 +1360,8 @@ let active_host_exec
       ~arguments
       ()
 ;;
+
+let active_host_exec = host_exec_by_id ?host:None
 
 let host_exec t ~cancel ~on_output ~call_id ~cwd ~name ~arguments =
   active_host_exec t ~cancel ~on_output ~call_id ~cwd ~name ~arguments ()
@@ -1452,38 +1476,74 @@ let end_computer_control t =
 
 let set_unattended t f = t.unattended <- f
 
+let tool_hosts t =
+  List.map (hosts t) ~f:(fun (h : Host.t) ->
+    { Tool_on_host.Host.id = h.id
+    ; name = h.name
+    ; home = known_home t h
+    ; active = String.equal h.id t.active_host
+    ; computer = Option.is_some h.computer
+    })
+;;
+
+(* A call [on_host] runs on another host ([context.host]) follows the mode,
+   but no allow rule: rules are written for the session's own host (its
+   paths, its commands), so none lets a call elsewhere through and the user
+   is not offered one to add; deny and ask rules still apply. *)
 let approve t : Tool.approver =
   fun context tool args ->
   let name = Tool.name tool in
+  let elsewhere =
+    Option.filter context.host ~f:(fun id ->
+      not (String.equal id t.active_host))
+  in
+  let host_id = Option.value elsewhere ~default:t.active_host in
+  let host = find_host t host_id in
   (* Asking an older host for its home is only worth it for a [~] in the
      call; rules with [~] use what is known (else the backend's home). *)
   let home =
-    Option.bind (find_host t t.active_host) ~f:(fun host ->
+    Option.bind host ~f:(fun host ->
       if String.is_substring (Json.to_string args) ~substring:"~"
       then host_home t host
       else known_home t host)
     |> Option.value_or_thunk ~default:(fun () -> Tool.expand_home "~")
   in
   let call = Approval_rule.Call.create ~home ~cwd:context.cwd ~tool:name args in
+  let rules, session, cwd =
+    match elsewhere with
+    | None -> t.config.permissions, t.session_rules, t.cwd
+    | Some _ -> { t.config.permissions with allow = [] }, [], context.cwd
+  in
   let decide () =
     Approval.decide
       ~mode:t.approval_mode
       ~plan:t.plan_mode
-      ~rules:t.config.permissions
-      ~session:t.session_rules
-      ~cwd:t.cwd
+      ~rules
+      ~session
+      ~cwd
       ~home
       ~destructive:(Tool_spec.Destructive.call tool.spec.destructive args)
       ~changes_work:(Plan_mode.changes_work ~tool:name args)
       call
   in
-  let summary =
-    if String.equal name Tool_computer.name
-    then (
-      match Computer_action.of_json args with
-      | Ok action -> "first: " ^ Computer_action.describe action
-      | Error _ -> "")
-    else Agent_loop.tool_summary ~name args
+  let name, summary =
+    match elsewhere with
+    | Some id ->
+      let host_name =
+        Option.value_map host ~default:id ~f:(fun (h : Host.t) -> h.name)
+      in
+      ( Tool_on_host.name
+      , Agent_loop.tool_summary
+          ~name:Tool_on_host.name
+          (`Object
+              [ "host", `String host_name; "tool", `String name; "args", args ])
+      )
+    | None when String.equal name Tool_computer.name ->
+      ( name
+      , (match Computer_action.of_json args with
+         | Ok action -> "first: " ^ Computer_action.describe action
+         | Error _ -> "") )
+    | None -> name, Agent_loop.tool_summary ~name args
   in
   let approved () =
     match decide () with
@@ -1495,6 +1555,7 @@ let approve t : Tool.approver =
         | Allow -> true
         | Ask _ | Deny _ -> false
       in
+      let rules = if Option.is_some elsewhere then [] else rules in
       (match confirm t context ~name ~summary ~rules ~recheck with
        | None -> Some (Tool.Result.error "[cancelled]")
        | Some (Error _) -> assert false (* no timeout *)
@@ -1643,7 +1704,7 @@ let set_active_host ?(if_missing = Dir_change.If_missing.Fail) t id ~cwd =
    that is away. *)
 let ui_host t ~cancel =
   let read_head path ~length : (int * string, Ui_host.Problem.t) Result.t =
-    match await_active_host t ~wait:false ~cancel with
+    match await_host t ~wait:false ~cancel with
     | Error message -> Error (Host message)
     | Ok host ->
       let call name arguments : (Json.t, Ui_host.Problem.t) Result.t =
@@ -1711,16 +1772,20 @@ let ui_host t ~cancel =
 
 let executor t : Tool.executor =
   fun context tool arguments ->
+  let host = Option.value context.host ~default:t.active_host in
+  let elsewhere = not (String.equal host t.active_host) in
   let arguments =
     if Seen_files.applies_to (Tool.name tool)
-    then Seen_files.with_scope arguments ~scope:(Session.id t.session)
+    then Seen_files.with_scope arguments ~scope:(seen_scope t ~host)
     else arguments
   in
   let bash = String.equal (Tool.name tool) (Tool.name Tool_bash.tool) in
   let execute () =
     Tool.execute
       tool
-      { context with home = (fun () -> active_host_home t) }
+      { context with
+        home = (fun () -> Option.bind (find_host t host) ~f:(host_home t))
+      }
       arguments
   in
   if bash && Tool_bash.runs_in_backend context arguments
@@ -1729,14 +1794,15 @@ let executor t : Tool.executor =
     let run () =
       if
         (not tool.spec.on_host)
-        || (String.equal t.active_host Host.backend_id && t.backend_host_enabled)
+        || (String.equal host Host.backend_id && t.backend_host_enabled)
       then execute ()
       else (
         Trace.add_attrs ~under:"tool" [ "where", String "tool_host" ];
-        Trace.span "host_roundtrip" ~attrs:[ "host", String t.active_host ]
+        Trace.span "host_roundtrip" ~attrs:[ "host", String host ]
         @@ fun () ->
-        active_host_exec
+        host_exec_by_id
           ~wait:true
+          ~host
           t
           ?stdin:context.stdin
           ~cancel:context.cancel
@@ -1747,7 +1813,8 @@ let executor t : Tool.executor =
           ~arguments
           ())
     in
-    if bash
+    (* The session's worktrees are those of its active host. *)
+    if bash && not elsewhere
     then
       Worktree_watch.around context ~dir:t.config.worktrees_dir ~arguments run
     else (
@@ -2130,7 +2197,7 @@ let with_attachments t ~cancel text attachments =
           ~arguments:
             (Seen_files.with_scope
                (`Object [ "path", `String path ])
-               ~scope:(Session.id t.session))
+               ~scope:(seen_scope t ~host:t.active_host))
       in
       match result with
       | { is_error = true; text; images = _ } ->

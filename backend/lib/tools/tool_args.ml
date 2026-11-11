@@ -69,6 +69,7 @@ let schema ?(required = []) properties =
       | `String -> [ "type", `String "string" ]
       | `Integer -> [ "type", `String "integer" ]
       | `Boolean -> [ "type", `String "boolean" ]
+      | `Object -> [ "type", `String "object" ]
       | `Array items -> [ "type", `String "array"; "items", items ]
     in
     name, `Object (typed @ [ "description", `String description ])

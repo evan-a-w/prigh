@@ -239,7 +239,14 @@ its TUIs and `prigh tool-host`: with two TUIs open, the newer one runs the
 machine's tools (the older one finishes the calls it was running) and the
 older one takes over again if the newer one quits. A call the host lost
 (it restarted, or did not come back within the minute) fails telling the
-model to run it again if it still needs it. Several frontends can attach
+model to run it again if it still needs it. When you ask for something on
+another connected machine ("check the disk on laptop"), the model can run
+one call there with the `on_host` tool (bash in the foreground, the file
+tools, ls, grep, find) without moving the session: it lists the hosts,
+refuses the session's own, and calls follow the approval mode, a
+confirmation reading `on HOST: ...`; approval rules you saved apply only on the session's own host (deny
+rules everywhere), and a file read on one host does not count as read on
+another. Several frontends can attach
 to one session (`/sessions` marks live ones) and all see the same stream; a
 session keeps running when its frontends disconnect. `prigh serve` itself
 speaks plain TCP and HTTP with a shared token (it warns when `-listen` or
