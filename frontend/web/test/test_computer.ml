@@ -163,10 +163,11 @@ let%expect_test "while streaming: the action so far, running" =
 
 let running = sprintf {|{"event":"state","state":%s}|}
 
-let state ~running =
+let state ?(control = true) ~running () =
   H.state_json
     ~fields:
       [ ("running", if running then `True else `False)
+      ; ("computer_control", if control then `String "laptop" else `Null)
       ; "active_host", `String "host-1"
       ; ( "hosts"
         , Jsonaf.of_string
@@ -176,27 +177,22 @@ let state ~running =
     ()
 ;;
 
-let%expect_test "the banner: while a run drives the screen; Stop aborts it" =
+let%expect_test
+    "the banner: while the user allows prigh to control the screen; Stop \
+     aborts the run"
+  =
   let h = H.create () in
   let banner () = H.text h ~selector:".computer-banner" in
+  (* Running, still asking (or never asked): no banner. *)
   H.quiet h (fun () ->
-    H.event h (running (state ~running:true));
-    H.event
-      h
-      {|{"event":"message_start","message":{"role":"user","text":"open a new tab"}}|};
-    H.event
-      h
-      {|{"event":"message_end","message":{"role":"user","text":"open a new tab"}}|};
-    H.event
-      h
-      {|{"event":"message_end","message":{"role":"assistant","content":[{"type":"text","text":"Reading the files first."},{"type":"tool_call","id":"b1","name":"bash","arguments":"{\"command\":\"ls\"}"}],"stop_reason":{"type":"tool_use"},"usage":{"input":0,"output":0,"cache_read":0},"model":"m"}}|});
-  (* Not yet: no computer call in this run. *)
-  banner ();
-  [%expect {| |}];
-  H.quiet h (fun () ->
+    H.event h (running (state ~control:false ~running:true ()));
     H.event
       h
       {|{"event":"message_end","message":{"role":"assistant","content":[{"type":"tool_call","id":"c1","name":"computer","arguments":"{\"action\":\"key\",\"combo\":\"ctrl+t\"}"}],"stop_reason":{"type":"tool_use"},"usage":{"input":0,"output":0,"cache_read":0},"model":"m"}}|});
+  banner ();
+  [%expect {| |}];
+  (* Allowed. *)
+  H.quiet h (fun () -> H.event h (running (state ~running:true ())));
   banner ();
   [%expect {| prigh is controlling laptop (Stop) |}];
   H.names h ~selector:".computer-banner button";
@@ -207,16 +203,13 @@ let%expect_test "the banner: while a run drives the screen; Stop aborts it" =
     Abort
     (Rpc (method_ abort) (params ()) (tag Restored))
     |}];
-  (* The run ended: gone. *)
-  H.quiet h (fun () -> H.event h (running (state ~running:false)));
+  (* The run ended, and with it control. *)
+  H.quiet h (fun () ->
+    H.event h (running (state ~control:false ~running:false ())));
   banner ();
   [%expect {| |}];
-  (* A new prompt: only its own run's calls count. *)
-  H.quiet h (fun () ->
-    H.event h (running (state ~running:true));
-    H.event
-      h
-      {|{"event":"message_start","message":{"role":"user","text":"thanks"}}|});
+  (* A stale grant on an idle session shows nothing either. *)
+  H.quiet h (fun () -> H.event h (running (state ~running:false ())));
   banner ();
   [%expect {| |}]
 ;;

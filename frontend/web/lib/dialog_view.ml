@@ -699,6 +699,10 @@ let confirm (m : App.Model.t) ~inject =
         ( [ Node.p
               ~attrs:[ Attr.class_ "confirm-question" ]
               [ Node.text (Confirm_prompt.title c) ]
+          ; (match Confirm_prompt.detail c with
+             | None -> Node.none
+             | Some text ->
+               Node.p ~attrs:[ Attr.class_ "confirm-detail" ] [ Node.text text ])
           ; div
               ~cls:"confirm-answers"
               (List.map (Confirm_prompt.answers c) ~f:(fun (a, key, label) ->
@@ -760,8 +764,14 @@ let confirm (m : App.Model.t) ~inject =
     in
     Modal.view
       ~id:"confirm"
-      ~cls:"confirm-dialog"
-      ~title:"Confirm"
+      ~cls:
+        (match c.kind with
+         | Tool -> "confirm-dialog"
+         | Computer_use _ -> "confirm-dialog computer-consent")
+      ~title:
+        (match c.kind with
+         | Tool -> "Confirm"
+         | Computer_use _ -> "Computer use")
       ~on_close
       ~footer
       body

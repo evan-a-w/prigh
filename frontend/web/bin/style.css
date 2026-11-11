@@ -738,6 +738,9 @@ kbd {
 .btn.confirm-answer kbd { flex-shrink: 0; }
 .btn.confirm-answer.primary kbd { background: var(--sodium-ink); color: var(--sodium); border-color: transparent; }
 .btn.confirm-answer.always { border-color: var(--sodium-line); }
+/* Computer use asks in prose, saying how long the answer holds. */
+.computer-consent .confirm-question { font: 600 14px/1.4 var(--sans); background: none; padding: 0; margin-bottom: 6px; }
+.confirm-detail { color: var(--muted); font-size: 12.5px; margin: 0 0 12px; }
 .confirm-reason-label { display: block; color: var(--muted); font-size: 12.5px; margin-bottom: 6px; }
 #confirm-reason { width: 100%; }
 

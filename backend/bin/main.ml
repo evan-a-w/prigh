@@ -404,6 +404,7 @@ let run_command =
          | _ -> ()
        in
        Agent.subscribe agent ~f:(handle ~in_subagent:false);
+       Agent.set_unattended agent (fun () -> Some "prigh run is headless");
        Or_error.ok_exn (Agent.prompt agent prompt);
        Agent.wait_idle agent;
        (* A run stopped by a usage limit resumes when it resets. *)
