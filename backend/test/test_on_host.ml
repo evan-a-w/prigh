@@ -82,6 +82,7 @@ let with_agent
   agent_ref := Some agent;
   Agent.set_mode agent ~approval:mode;
   let running = String.Table.create () in
+  let output = Buffer.create 64 in
   Agent.subscribe agent ~f:(fun e ->
     match e with
     | Tool_exec { exec_id; name; arguments; cwd; host; _ } ->
@@ -108,7 +109,7 @@ let with_agent
     | Tool_exec_cancel { host; exec_id } ->
       printf "%s cancels its call\n" host;
       Option.iter (Hashtbl.find running exec_id) ~f:Cancellation.cancel
-    | Loop (Tool_output { chunk; _ }) -> printf "  output: %S\n" (show t chunk)
+    | Loop (Tool_output { chunk; _ }) -> Buffer.add_string output chunk
     | Loop (Tool_confirm { call_id; agent_id; name; summary; rules; kind = _ })
       ->
       printf
@@ -119,6 +120,11 @@ let with_agent
       Or_error.ok_exn
         (Agent.respond_confirm ?agent_id agent ~call_id (answer summary))
     | Loop (Tool_end { call; result }) ->
+      (* Streamed output, in one piece: how it is split depends on timing. *)
+      if Buffer.length output > 0
+      then (
+        printf "  output: %S\n" (show t (Buffer.contents output));
+        Buffer.clear output);
       printf
         "%s -> %s%s\n"
         call.name
@@ -206,8 +212,8 @@ let%expect_test "a cancelled call is cancelled on the other host" =
   [%expect
     {|
     host-laptop runs bash in $DIR/laptop
-      output: "started\n"
     host-laptop cancels its call
+      output: "started\n"
     on_host -> ERROR [cancelled]
     |}]
 ;;
@@ -431,7 +437,8 @@ let%expect_test "summaries, ACP titles and what the model is told" =
     (String.prefix
        (Tool_on_host.create ~hosts:(fun () -> []) ()).spec.description
        80);
-  [%expect {|
+  [%expect
+    {|
     hosts                               | List tool hosts
     on laptop: bash make test           | On laptop: make test
     on laptop: read /srv/notes.txt      | On laptop: Read notes.txt
