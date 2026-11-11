@@ -13,8 +13,12 @@ module Answer : sig
   [@@deriving sexp_of, equal]
 end
 
-(** e.g. [Run bash: make test?], [Run on laptop: bash make test?] *)
+(** e.g. [Run bash: make test?], [Run on laptop: bash make test?], or [Let
+    prigh control desk's screen, mouse and keyboard?] for computer use. *)
 val title : P.Pending.Confirm.t -> string
+
+(** A line under the title: for computer use, how long the consent lasts. *)
+val detail : P.Pending.Confirm.t -> string option
 
 (** The answers offered, with their keys ([y], [a], [n], [r]) and labels;
     [Always] only when the confirmation has rules, its label naming them. *)

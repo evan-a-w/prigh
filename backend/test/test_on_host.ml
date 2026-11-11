@@ -109,7 +109,8 @@ let with_agent
       printf "%s cancels its call\n" host;
       Option.iter (Hashtbl.find running exec_id) ~f:Cancellation.cancel
     | Loop (Tool_output { chunk; _ }) -> printf "  output: %S\n" (show t chunk)
-    | Loop (Tool_confirm { call_id; agent_id; name; summary; rules }) ->
+    | Loop (Tool_confirm { call_id; agent_id; name; summary; rules; kind = _ })
+      ->
       printf
         "confirm %s: %s [%s]\n"
         name
@@ -430,5 +431,12 @@ let%expect_test "summaries, ACP titles and what the model is told" =
     (String.prefix
        (Tool_on_host.create ~hosts:(fun () -> []) ()).spec.description
        80);
-  [%expect {| |}]
+  [%expect {|
+    hosts                               | List tool hosts
+    on laptop: bash make test           | On laptop: make test
+    on laptop: read /srv/notes.txt      | On laptop: Read notes.txt
+    on laptop: ls                       | On laptop: List .
+    on laptop                           | On laptop
+    Run one tool call on another tool host; only when the user names that machine or
+    |}]
 ;;

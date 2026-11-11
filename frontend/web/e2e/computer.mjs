@@ -4,9 +4,13 @@
 // 1. A session where it clicked and typed: each card says what it did and
 //    shows the screen after it, the point it clicked marked where it is on
 //    the screenshot; tapping the screenshot opens the viewer.
-// 2. A run that calls computer: while it runs, a strip over the composer
-//    says prigh is controlling the computer, with Stop, which aborts the run
-//    (and the strip goes).
+// 2. A run that calls computer: it asks first (a dialog, a sheet from the
+//    bottom on a phone); allowed, a strip over the composer says prigh is
+//    controlling the computer, with Stop, which aborts the run (and the
+//    strip goes).
+// 3. The next run asks again (on Chromium's phone, as an installed app on
+//    a notched phone: the safe area's insets emulated); denied with Esc or
+//    Deny, the model is told and no strip shows.
 //
 // Run by prigh_web.sh; prints normalised snapshots (the expected output is
 // in ENGINE.expected) and, with SHOTS, screenshots.
@@ -93,25 +97,59 @@ writeFileSync(
         { id: "w1", name: "bash", arguments: { command: waitFor("gate") } },
       ],
     },
-    { text: "Stopped." },
+    // The aborted run asks for nothing more: the next prompt's.
+    {
+      text: "Looking again.",
+      tool_calls: [{ id: "k4", name: "computer", arguments: { action: "screenshot" } }],
+    },
+    { text: "Understood: no computer use." },
   ]),
 );
 
+// The screen prigh controls: a stand-in for prigh-computer
+// ($PRIGH_COMPUTER) speaking its protocol, showing the same screen.
+const helper = join(dir, "computer-helper.mjs");
+writeFileSync(helper, `
+import { createInterface } from "node:readline";
+const info = { backend: "fake", platform: "linux", width: 1280, height: 800, scale: 1, scaled_width: 1280, scaled_height: 800 };
+if (process.argv.includes("--probe")) { console.log(JSON.stringify(info)); process.exit(0); }
+const shot = ${JSON.stringify(b64(screen()))};
+createInterface({ input: process.stdin }).on("line", line => {
+  const { id, op } = JSON.parse(line);
+  console.log(JSON.stringify(op === "info"
+    ? { id, ok: true, info }
+    : { id, ok: true, text: "", cursor: { x: 640, y: 400 }, screenshot: { ...shot, width: 1280, height: 800 } }));
+});
+`);
+
+const waitForLine = (proc, pattern, what) => new Promise((resolve, reject) => {
+  let err = "";
+  proc.stderr.on("data", data => {
+    err += data;
+    const m = err.match(pattern);
+    if (m) resolve(m[1]);
+  });
+  proc.on("exit", code => reject(new Error(`${what} exited (${code}):\n${err}`)));
+});
 const server = spawn(
   backend,
   ["serve", "-web", "127.0.0.1:0", "-web-root", site, "-faux-script", join(dir, "script.json"),
     "-token", token, "-cwd", cwd],
   { env: { ...process.env, HOME: home, TMUX_TMPDIR: dir, SHELL: "/bin/sh" }, stdio: ["ignore", "ignore", "pipe"] },
 );
-const url = await new Promise((resolve, reject) => {
-  let err = "";
-  server.stderr.on("data", data => {
-    err += data;
-    const m = err.match(/^prigh: prigh-web on (\S+)$/m);
-    if (m) resolve(m[1]);
-  });
-  server.on("exit", code => reject(new Error(`backend exited (${code}):\n${err}`)));
-});
+const serverAddress = await waitForLine(server, /^prigh: prigh-web on http:\/\/(\S+)\/$/m, "the backend");
+// The machine whose screen it is: prigh web with -computer, its tool host.
+const deskEnv = { ...process.env, HOME: join(dir, "desk-home"), TMUX_TMPDIR: dir, SHELL: "/bin/sh",
+  PRIGH_COMPUTER: process.execPath, PRIGH_COMPUTER_ARGS: helper };
+for (const name of ["PRIGH_CONNECT", "PRIGH_TOKEN", "PRIGH_USER", "PRIGH_WEB_LISTEN"]) delete deskEnv[name];
+mkdirSync(deskEnv.HOME, { recursive: true });
+const desk = spawn(
+  backend,
+  ["web", "-connect", serverAddress, "-token", token, "-listen", "127.0.0.1:0", "-web-root", site,
+    "-cwd", cwd, "-name", "desk", "-host-id", "host-desk", "-computer"],
+  { env: deskEnv, stdio: ["ignore", "ignore", "pipe"] },
+);
+const url = await waitForLine(desk, /^prigh web: prigh-web for \S+ on (\S+)$/m, "prigh web");
 
 const browser = await engine.launch({
   headless: true,
@@ -163,9 +201,10 @@ const inView = selector => page.evaluate(sel => {
 }, selector);
 
 try {
-  await page.goto(`${url.replace(/\/$/, "")}/?session=${id}`);
-  await page.locator("form input[type=password]").fill(token);
-  await tap(page.locator("form button[type=submit]"));
+  // prigh web's link signs in; then the session.
+  await page.goto(url);
+  await composer.waitFor();
+  await page.goto(`${new URL(url).origin}/?session=${id}`);
   await composer.waitFor();
   await page.waitForFunction(() => document.getElementById("chat")?.innerText.includes("typed hello"));
 
@@ -205,9 +244,35 @@ try {
   await page.waitForSelector("dialog.viewer[open]", { state: "detached" });
   console.log("closed");
 
-  // 2. A run that drives the screen.
+  // 2. A run that drives the screen: it asks first.
   await composer.fill("open a tab");
   await tap(page.locator(".btn.send"));
+  const consent = page.locator(".modal.computer-consent");
+  await consent.waitFor();
+  section("asks first");
+  const consentHost = await page.evaluate(() =>
+    document.querySelector(".computer-consent .confirm-question").innerText.match(/control (.*)'s screen/)[1]);
+  const consentText = async () =>
+    (await consent.innerText()).replaceAll(consentHost, "<HOST>").replace(/\s+/g, " ").trim();
+  // Each answer: whole on the screen, uncovered, and how tall.
+  const answers = async () => {
+    // The sheet's entrance done.
+    await page.waitForFunction(() => document.querySelector(".computer-consent").getAnimations().every(a => a.playState !== "running"));
+    for (const cls of ["allow", "deny", "reason"]) {
+      const sel = `.computer-consent .confirm-answer.${cls}`;
+      console.log(`${cls}: ${await inView(sel)}, ${Math.round((await page.locator(sel).boundingBox()).height) >= (touch ? 44 : 28) ? "tall enough" : "too small"}`);
+    }
+    // On a phone a sheet from the bottom: its foot at the screen's.
+    const box = await consent.boundingBox();
+    console.log(`at the bottom: ${Math.abs(box.y + box.height - viewport.height) < 2}`);
+  };
+  console.log(await consentText());
+  console.log(`banner while asking: ${await page.locator(".computer-banner").count()}`);
+  await answers();
+  console.log(await overflow());
+  await screenshot("asks first");
+  await tap(page.locator(".computer-consent .confirm-answer.allow"));
+  await consent.waitFor({ state: "detached" });
   await page.locator(".computer-banner").waitFor();
   await page.waitForFunction(() => document.getElementById("chat").innerText.includes("Opening a tab."));
   section("controlling");
@@ -230,6 +295,36 @@ try {
   console.log(`banner: ${await page.locator(".computer-banner").count()}`);
   await screenshot("stopped");
 
+  // 3. The next run asks again; denied.
+  if (part === "phone" && engineName === "chromium") {
+    const cdp = await context.newCDPSession(page);
+    await cdp.send("Emulation.setSafeAreaInsetsOverride", { insets: { top: 47, bottom: 34, left: 0, right: 0 } });
+  }
+  await composer.fill("look again");
+  await tap(page.locator(".btn.send"));
+  await consent.waitFor();
+  section("asks again");
+  console.log(await consentText());
+  await answers();
+  if (part === "phone" && engineName === "chromium") {
+    // Over the home indicator: the answers end above the inset.
+    const bottom = await page.locator(".computer-consent .confirm-answer.reason").evaluate(el => el.getBoundingClientRect().bottom);
+    console.log(`clear of the home indicator: ${bottom <= viewport.height - 34}`);
+    await screenshot("asks again pwa");
+  } else {
+    console.log("clear of the home indicator: true");
+    await screenshot("asks again");
+  }
+  if (touch) await tap(page.locator(".computer-consent .confirm-answer.deny"));
+  else await page.keyboard.press("Escape");
+  await consent.waitFor({ state: "detached" });
+  await page.waitForFunction(() => document.getElementById("chat").innerText.includes("Understood: no computer use."));
+  section("denied");
+  const denied = await page.locator(".tool-computer").last().innerText();
+  console.log(`the model was told: ${/declined/.test(denied) || /did not allow/.test(denied)}`);
+  console.log(`banner: ${await page.locator(".computer-banner").count()}`);
+  await screenshot("denied");
+
   section("errors");
   console.log(errors.length ? errors.join("\n") : "none");
 } catch (error) {
@@ -239,5 +334,5 @@ try {
   throw error;
 } finally {
   writeFileSync(join(cwd, "gate"), "");
-  await end(() => server.kill(), () => browser.close());
+  await end(() => { desk.kill(); server.kill(); }, () => browser.close());
 }

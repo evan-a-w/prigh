@@ -56,6 +56,9 @@ type t =
     (** when a run stopped by a usage limit resumes by itself *)
   ; approval_mode : Approval_mode.t
   ; plan_mode : bool (** read-only planning, until the user turns it off *)
+  ; computer_control : string option
+    (** the host (its name) whose screen the user allowed prigh to control,
+        while that lasts *)
   ; plan : Plan.t option (** the model's [update_plan] *)
   ; session_rules : string list
     (** rules the user allowed for the session ("don't ask again") *)

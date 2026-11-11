@@ -61,6 +61,7 @@ module H = struct
              ; name
              ; summary
              ; rules = []
+             ; kind = Tool
              })
        }
   ;;
@@ -6249,6 +6250,7 @@ let%expect_test "tool confirm: allow, deny, queue and Esc-abort" =
        { call_id = "c1"
        ; agent_id = None
        ; rules = []
+       ; kind = Tool
        ; name = "bash"
        ; summary = "rm -rf build"
        });
@@ -6287,6 +6289,7 @@ let%expect_test "tool confirm: allow, deny, queue and Esc-abort" =
        { call_id = "c1"
        ; agent_id = None
        ; rules = []
+       ; kind = Tool
        ; name = "bash"
        ; summary = "rm -rf build"
        });
@@ -6321,6 +6324,7 @@ let%expect_test "tool confirm: allow, deny, queue and Esc-abort" =
        { call_id = "c1"
        ; agent_id = None
        ; rules = []
+       ; kind = Tool
        ; name = "bash"
        ; summary = "rm -rf build"
        });
@@ -6330,6 +6334,7 @@ let%expect_test "tool confirm: allow, deny, queue and Esc-abort" =
        { call_id = "c2"
        ; agent_id = None
        ; rules = []
+       ; kind = Tool
        ; name = "write"
        ; summary = "/work/a.txt"
        });
@@ -6339,6 +6344,7 @@ let%expect_test "tool confirm: allow, deny, queue and Esc-abort" =
        { call_id = "c3"
        ; agent_id = None
        ; rules = []
+       ; kind = Tool
        ; name = "edit"
        ; summary = "/work/b.txt"
        });
@@ -6348,6 +6354,7 @@ let%expect_test "tool confirm: allow, deny, queue and Esc-abort" =
        { call_id = "c4"
        ; agent_id = None
        ; rules = []
+       ; kind = Tool
        ; name = "apply_patch"
        ; summary = "src/a.ml, src/b.ml"
        });
@@ -6652,6 +6659,7 @@ let%expect_test "resize keeps the confirm dialog and picker within the width" =
        { call_id = "c1"
        ; agent_id = None
        ; rules = []
+       ; kind = Tool
        ; name = "bash"
        ; summary = "rm -rf build"
        });
@@ -6894,6 +6902,7 @@ let%expect_test "Ctrl+C closes every dialog and search" =
        { call_id = "c1"
        ; agent_id = None
        ; rules = []
+       ; kind = Tool
        ; name = "bash"
        ; summary = "rm -rf build"
        });

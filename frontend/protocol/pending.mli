@@ -5,12 +5,24 @@ open! Core
     [ask_user] questions. *)
 
 module Confirm : sig
+  (** What is asked. *)
+  module Kind : sig
+    type t =
+      | Tool (** whether the call may run *)
+      | Computer_use of { host : string }
+      (** whether prigh may control [host]'s (its name) screen, mouse and
+          keyboard until control ends; then the call runs (or asks again as
+          a [Tool]) *)
+    [@@deriving sexp_of, equal]
+  end
+
   type t =
     { call_id : string
     ; agent_id : string option (** a subagent's call *)
     ; name : string
     ; summary : string
     ; rules : string list (** what "don't ask again" allows *)
+    ; kind : Kind.t
     }
   [@@deriving sexp_of, equal]
 

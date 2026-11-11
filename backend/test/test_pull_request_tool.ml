@@ -347,7 +347,7 @@ let with_agent ~answer replies ~sub_replies f =
       ()
   in
   Agent.subscribe agent ~f:(function
-    | Loop (Tool_confirm { call_id; agent_id; name; summary; rules }) ->
+    | Loop (Tool_confirm { call_id; agent_id; name; summary; rules; kind }) ->
       printf
         "confirm %s%s %s: %s\n"
         (Option.value_map agent_id ~default:"" ~f:(fun a -> a ^ "/"))
@@ -360,7 +360,13 @@ let with_agent ~answer replies ~sub_replies f =
            agent
            ~call_id
            (answer
-              { Agent.Pending_confirm.call_id; agent_id; name; summary; rules }))
+              { Agent.Pending_confirm.call_id
+              ; agent_id
+              ; name
+              ; summary
+              ; rules
+              ; kind
+              }))
     | Loop (Tool_end { call; result }) ->
       printf
         "%s %s -> %s%s\n"
