@@ -917,6 +917,9 @@ val host_unavailable_message : t -> string
 (** The backend first (unless disabled), then the client hosts. *)
 val hosts : t -> Host.t list
 
+(** [hosts] as [on_host] lists them. *)
+val tool_hosts : t -> Tool_on_host.Host.t list
+
 val active_host : t -> string
 
 (** Where the session runs, as it records it ({!Session.Host}): the active

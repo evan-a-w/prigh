@@ -110,6 +110,10 @@ let arg (call : P.Tool_call.t) =
     | "ls" -> Some (Option.value (str "path") ~default:".")
     | "grep" | "find" -> str "pattern"
     | "subagent" -> str "task"
+    | "on_host" ->
+      Some
+        (Option.value_map (str "host") ~default:"list hosts" ~f:(fun host ->
+           "on " ^ host))
     | "ask_user" | "update_plan" | "render_ui" -> None
     | "job_kill" | "subagent_cancel" -> ids ()
     | _ ->
@@ -141,10 +145,13 @@ let questions_of_call call =
     |> Option.value ~default:[])
 ;;
 
-let summary call =
-  match arg call with
-  | Some arg -> call.name ^ " " ^ arg
-  | None -> call.name
+let rec summary call =
+  match Tool_summary.on_host call with
+  | Some (host, inner) -> Tool_summary.on_host_line ~host (summary inner)
+  | None ->
+    (match arg call with
+     | Some arg -> call.name ^ " " ^ arg
+     | None -> call.name)
 ;;
 
 let output ?(style = gray) ~head ?(tail = 0) text =
@@ -325,6 +332,7 @@ let search_results ~max (results : Tool_summary.Search_result.t list) =
 
 let render_step
       ?(arg = arg)
+      ?name
       ?(ended = false)
       ~(verbosity : Verbosity.t)
       ~width
@@ -693,13 +701,29 @@ let render_step
     | "web_fetch", Some url -> Some (Style.link Style.plain url)
     | _ -> None
   in
-  (header ~width ~mark ~name:call.name ?arg:(arg call) ?arg_style chips
+  (header
+     ~width
+     ~mark
+     ~name:(Option.value name ~default:call.name)
+     ?arg:(arg call)
+     ?arg_style
+     chips
    :: arguments)
   @ body
 ;;
 
+(* An [on_host] call reads as the call it ran, on its host. *)
 let render ~verbosity ~width call result ~live_tail =
-  render_step ~verbosity ~width call result ~live_tail
+  match Tool_summary.on_host call with
+  | Some (host, inner) ->
+    render_step
+      ~name:(Tool_summary.on_host_line ~host inner.name)
+      ~verbosity
+      ~width
+      inner
+      result
+      ~live_tail
+  | None -> render_step ~verbosity ~width call result ~live_tail
 ;;
 
 let server_tool ~verbosity ~width ~ended (s : P.Content.Server_tool.t) =

@@ -13,7 +13,7 @@ module Answer : sig
   [@@deriving sexp_of, equal]
 end
 
-(** e.g. [Run bash: make test?] *)
+(** e.g. [Run bash: make test?], [Run on laptop: bash make test?] *)
 val title : P.Pending.Confirm.t -> string
 
 (** The answers offered, with their keys ([y], [a], [n], [r]) and labels;

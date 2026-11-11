@@ -625,6 +625,17 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
   font-weight: 600;
   flex-shrink: 0;
 }
+/* on_host's: the machine the call ran on */
+.tool-head .host {
+  font-size: 12px;
+  color: var(--muted);
+  flex-shrink: 1;
+  min-width: 0;
+  max-width: 40%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .tool-head .arg {
   font-family: var(--mono);
   font-size: 13px;
