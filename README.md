@@ -907,7 +907,8 @@ phone): **Appearance** (the theme and accent, transcript detail
 notifications, on or off, and what to do when the browser has
 not been asked, blocks them or cannot show them), **Models** (the providers
 (`/auth`) and compaction), **Memory** (the model's notes and the switch
-that turns memory off), **Git hosting**, **Nix store** (superusers) and
+that turns memory off), **About you** (what you wrote about yourself for
+the model, `/user-info`), **Git hosting**, **Nix store** (superusers) and
 **Account** (who you are signed in, and acting, as, with Switch account and
 Sign out). `/settings SECTION` (e.g. `/settings git`, completed as you type)
 opens it at a section; on the list, the arrows, Home and End move between
@@ -1286,10 +1287,13 @@ Where it shows it (`PRIGH_DESKTOP_WINDOW`, `programs.prigh.desktop.window`):
   `--class` for an app window and names its app_id after the site and the
   profile (e.g. `chrome-127.0.0.1__-Default`, or `chrome-ai.example.com__-Default`
   on a backend's site; `brave-`, `msedge-`, `vivaldi-` for those). The app
-  writes a hidden desktop entry by that name
+  writes a desktop entry by that name
   (`~/.local/share/applications/chrome-127.0.0.1__-Default.desktop`) so
   docks and taskbars show prigh's name and icon; match the app_id in
-  Hyprland or sway rules (`hyprctl clients` shows it).
+  Hyprland or sway rules (`hyprctl clients` shows it). The entry is not
+  hidden (`NoDisplay`), since some taskbars (Noctalia's) ignore hidden
+  entries and would show the window as the browser or not at all, so app
+  launchers may list prigh twice; both start the app.
   The browser's own right-click menu never shows there (it would give away
   that the window is Chrome): a text field's right-click (or Shift+F10)
   opens prigh's Cut, Copy, Paste and Select all instead (↑↓, Enter, Esc),
@@ -2360,6 +2364,21 @@ your notes are kept. Settings → Memory also lists the notes to filter, edit
 and delete, and the TUI's `/memory` picks among them (Enter shows one,
 Ctrl+D forgets it after a confirmation).
 
+About you: where memory is notes the model looks up only when it needs
+them, what you write about yourself (who you are, what you work on, how you
+like answers) is in the model's context in every session. Write it in
+prigh-web's Settings → About you (`/user-info` opens it; Ctrl+Enter saves,
+Revert drops what is typed, and a change made in another browser is shown
+at once, or offered if you were typing), or in the TUI with `/user-info
+TEXT` (`/user-info` shows it, `/user-info clear` removes it after a
+confirmation). It is kept as plain text in `~/.prigh/user_info.md` on the
+backend, one per user (per namespace with `-tokens`), at most 4000 bytes;
+editing the file by hand works too. A new session starts with it in its
+system prompt (and so do its subagents); a session that is already open is
+told the text with your next message in it, once, and again whenever you
+change or remove it (a "☺ About you" note over your message shows what it
+was told). Only you write it: the model has no tool to change it.
+
 Models see images. The `read` tool returns PNG, JPEG, GIF and WebP files
 (recognised by content, not by name) as images the model can look at, and an
 `@shot.png` attachment adds the image to the prompt; prigh-web also sends
@@ -2710,6 +2729,7 @@ it.
 | `/budget [dollars\|off]` | show or set the session's cost budget: no turn starts once it is spent |
 | `/goal [text\|off\|resume]` | set a goal the agent keeps working toward until it is met; show, clear or resume it |
 | `/memory [on\|off]` | pick among the notes the model saved (Ctrl+D forgets one; prigh-web opens Settings → Memory); `on`/`off` gives the model the memory tool or takes it away |
+| `/user-info [TEXT\|clear]` | what you wrote about yourself for the model, in the context of every session: show it, replace it with TEXT or clear it (prigh-web opens Settings → About you) |
 | `/remind [stop [N] TEXT\|every N TEXT\|rm NAME\|off]` | remind the agent when it ends its turn (at most N times in a row, default 3) or every N turns; without arguments, pick among the session's (Ctrl+D / Delete removes one); `rm` removes one, `off` all |
 | `/resume [now\|cancel]` | show, run now or cancel the automatic resume after a usage limit |
 | `/new`, `/clear`, `/quit` | new session / clear transcript / exit |
@@ -3008,6 +3028,30 @@ shown the same way.
 from the session's current context, streaming into a box above the composer
 that Esc dismisses (without aborting the run). The question and answer are
 never added to the conversation; their cost counts towards the session's.
+
+The model can reach your other sessions with two tools, which it is told
+to use only when you refer to an earlier or another session ("like we did in
+the parser session", "ask session 3f2a… how it deployed"), ask for it, or
+the task plainly depends on work done in one; never by default. `sessions`
+searches the saved sessions (`search`: the search of the session list,
+what you and the assistant said and the sessions' names, every word
+matching; it answers with ids and a short snippet each), lists one's prompts
+(`outline`) and reads a few of its messages from an index, cut short
+(`read`); it changes nothing. `ask_session` asks another session a question
+and that session itself answers: the question arrives in it as a message
+(you see it there), at its next step if it is in the middle of a run,
+starting a run if it is idle, and opening it first if it is not open. It
+can use its tools, answers with `answer_session` and carries on with its
+work; a run that ends without
+answering sends its last message instead. The asking session does not wait:
+the answer arrives later as a message, as a background subagent's report
+does, and wakes it if it is idle. That work is the asked session's and
+counts towards its cost, so the model is told to ask only for what that
+session alone can tell or do, and to read with `sessions` otherwise. A
+session can have four questions open; they are forgotten when the backend
+restarts. Plan mode does not ask (the asked session may change things),
+and subagents neither ask nor answer. Both tools see only the
+sessions of your own user, and name them by id, never by path.
 
 `-faux-script FILE` (a backend flag, passed through the TUI after `--`) plays
 a JSON array of scripted provider replies, so demos and tests run without API

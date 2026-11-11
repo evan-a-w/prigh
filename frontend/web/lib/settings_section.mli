@@ -7,6 +7,7 @@ type t =
   | Sessions
   | Models
   | Memory
+  | About_you
   | Git_hosting
   | Nix_store (** superusers only *)
   | Account

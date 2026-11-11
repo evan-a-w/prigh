@@ -197,6 +197,7 @@ type t =
   ; provider : Provider.t
   ; tools : Tool.t list
   ; offered : Tool.t -> bool
+  ; user_info : User_info.t option
   ; sessions_dir : string
   ; home : string
   ; models : Model_registry.t
@@ -249,6 +250,7 @@ type t =
     (** what the model was last told, as [Session.told_environment] records
         it; the difference to now is told with the next user message *)
   ; background : Background_tasks.t
+  ; questions : Session_questions.t option
   ; subagent_log : Subagent_log.t
   ; mcp : Mcp_hub.t option
     (** the backend's own servers; [None] turns MCP off on every host *)
@@ -586,6 +588,7 @@ let environment t =
       |> List.dedup_and_sort ~compare:String.compare
   ; plan_mode = t.plan_mode
   ; client = Some (Option.value t.client ~default:Other)
+  ; user_info = Option.bind t.user_info ~f:User_info.text
   }
 ;;
 
@@ -605,7 +608,7 @@ let restore_told t =
   t.told
   <- (match Session.told_environment t.session with
       | Some told -> told
-      | None -> { (environment t) with client = None });
+      | None -> { (environment t) with client = None; user_info = None });
   t.client <- t.told.client
 ;;
 
@@ -1775,7 +1778,7 @@ let instructions t ~cancel ~cwd =
    the next user message instead. *)
 let tools t = Tools.for_model t.model (own_tools t @ t.mcp_tools)
 
-let build_system_prompt ?(cancel = Cancellation.never) t =
+let build_system_prompt ?(cancel = Cancellation.never) ?user_info t =
   let { Host_ops.Instructions.files; nix; skills } =
     instructions t ~cancel ~cwd:t.cwd
   in
@@ -1784,6 +1787,7 @@ let build_system_prompt ?(cancel = Cancellation.never) t =
     ~nix
     ~skills
     ?auto_background:(Config.auto_background t.config)
+    ?user_info
     ~cwd:t.cwd
     ~home:t.home
     ~tools:(Tools.specs (tools t))
@@ -1904,17 +1908,13 @@ let system_prompt ?(cancel = Cancellation.never) t =
   match Session.system_prompt t.session with
   | Some text -> text
   | None ->
-    let text = build_system_prompt ~cancel t in
+    let now = environment t in
+    let text = build_system_prompt ~cancel ?user_info:now.user_info t in
     (* Without its instructions: the next run builds it again. *)
     if not (Cancellation.is_cancelled cancel)
     then (
       ignore (Session.set_system_prompt t.session ~text : Session.Entry.t);
-      tell
-        t
-        { (environment t) with
-          plan_mode = t.told.plan_mode
-        ; client = t.told.client
-        });
+      tell t { now with plan_mode = t.told.plan_mode; client = t.told.client });
     text
 ;;
 
@@ -2359,6 +2359,36 @@ let compacted t ~model (outcome : Compaction.Outcome.t) =
   broadcast t (Compacted { summary = outcome.summary })
 ;;
 
+let mail t =
+  match t.questions with
+  | None -> []
+  | Some questions ->
+    Session_questions.take_mail questions ~session:(Session.id t.session)
+;;
+
+let has_mail t =
+  Option.exists t.questions ~f:(fun questions ->
+    Session_questions.has_mail questions ~session:(Session.id t.session))
+;;
+
+let run_outcome ~cancelled added : Session_questions.Outcome.t =
+  if cancelled
+  then Aborted
+  else (
+    match
+      List.find_map (List.rev added) ~f:(function
+        | Message.Assistant a -> Some a
+        | User _ | Tool_result _ -> None)
+    with
+    | Some { stop_reason = Error error; _ } -> Failed error
+    | Some { stop_reason = Aborted; _ } -> Aborted
+    | Some a ->
+      (match String.strip (Message.Assistant.text a) with
+       | "" -> Silent
+       | text -> Said text)
+    | None -> Silent)
+;;
+
 let last_stop added =
   List.find_map (List.rev added) ~f:(function
     | Message.Assistant a -> Some a.stop_reason
@@ -2507,7 +2537,7 @@ let rec start_run
   let cancel = Cancellation.create () in
   let finished, resolve = Promise.create () in
   t.run <- Some { cancel; finished };
-  let prompts = deliveries t @ prompts in
+  let prompts = deliveries t @ mail t @ prompts in
   state_changed t;
   Guarded.fork
     ~sw:t.sw
@@ -2576,7 +2606,7 @@ let rec start_run
                           note.text))
                  else []
                in
-               deliveries t @ note @ queued @ due_reminders t)
+               deliveries t @ mail t @ note @ queued @ due_reminders t)
              ~compact:
                (fun
                  ~model ~keep_recent_tokens ~overflowed ~cancel _messages ->
@@ -2690,6 +2720,18 @@ let rec start_run
            false
          | Some _, Some _ -> false
        in
+       (* A question another session asked is answered by how the run ended,
+          unless it carries on: with another model, or once the background
+          work it waits for is done. *)
+       if
+         Option.is_none handover
+         && (cancelled || not (Background_tasks.has_running t.background))
+       then
+         Option.iter t.questions ~f:(fun questions ->
+           Session_questions.run_ended
+             questions
+             ~session:(Session.id session)
+             (run_outcome ~cancelled added));
        (* Steering messages that arrived after the last turn boundary go
        first: they were sent before any follow-up still queued. *)
        if Steer_queue.steers_first t.queue then queue_update t;
@@ -2745,8 +2787,9 @@ let rec start_run
               Some (`Prompts [ user_message t queued ])
             | None ->
               if
-                Background_tasks.has_undelivered t.background
-                && not (Cancellation.is_cancelled cancel)
+                (Background_tasks.has_undelivered t.background
+                 && not (Cancellation.is_cancelled cancel))
+                || has_mail t
               then Some (`Prompts [])
               else if goal_continues
               then (
@@ -3064,8 +3107,10 @@ let create
       ?(use_default_cwd = true)
       ?max_budget_usd
       ?sleep_until
+      ?questions
       ?trace_clock
       ?(offered = fun (_ : Tool.t) -> true)
+      ?user_info
       ~cwd
       ()
   =
@@ -3114,6 +3159,7 @@ let create
     ; provider
     ; tools
     ; offered
+    ; user_info
     ; sessions_dir
     ; home
     ; models
@@ -3154,7 +3200,14 @@ let create
     ; pending_execs = String.Table.create ()
     ; exec_seq = 0
     ; client = None
-    ; told = { host = ""; cwd; tools = []; plan_mode = false; client = None }
+    ; told =
+        { host = ""
+        ; cwd
+        ; tools = []
+        ; plan_mode = false
+        ; client = None
+        ; user_info = None
+        }
     ; background =
         Background_tasks.create
           ~env
@@ -3174,6 +3227,7 @@ let create
     ; resume = None
     ; past_resets = 0
     ; sleep_until
+    ; questions
     ; trace_clock
     ; tracer = tracer_for ~clock:trace_clock ~config session
     ; noted = []
@@ -3304,6 +3358,8 @@ let rec wait_idle t =
       Background_tasks.wait_all t.background;
       wait_idle t)
 ;;
+
+let check_mail t = if (not (is_running t)) && has_mail t then start_run t []
 
 let has_running_subagents t =
   Background_tasks.has_running ~kind:Subagent t.background
@@ -3956,7 +4012,7 @@ let btw t ~question ~cancel ~on_delta =
   let system =
     match Session.system_prompt session with
     | Some text -> text
-    | None -> build_system_prompt ~cancel t
+    | None -> build_system_prompt ~cancel ?user_info:(environment t).user_info t
   in
   let request =
     Btw.request

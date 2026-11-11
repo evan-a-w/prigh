@@ -261,6 +261,8 @@ module Reply_tag = struct
     | Memory_saved
     | Memory_forgot
     | Memory_enabled
+    | About_you_loaded
+    | About_you_saved
     | Trim_points of Trim_purpose.t
     | Trimmed
     | Untrimmed
@@ -480,6 +482,9 @@ module Action = struct
     | Memory_forget of string
     | Memory_forget_confirm
     | Memory_forget_cancel
+    | About_you_text of string
+    | About_you_save
+    | About_you_revert
     | Open_rename
     | Open_subagents of string option
     (** the agents panel; with a number, an agent's or a job's id *)
@@ -746,6 +751,7 @@ module Model = struct
     ; forges : Forges.t
     ; nix_gc : Nix_gc.t
     ; memory : Memory_notes.t
+    ; about_you : About_you.t
     ; compact_at : Compact_at.t
     ; settings_section : Settings_section.t
       (* A phone's settings show the list of sections, not one of them. *)
@@ -1062,6 +1068,7 @@ let init =
   ; forges = Forges.empty
   ; nix_gc = Nix_gc.empty
   ; memory = Memory_notes.empty
+  ; about_you = About_you.empty
   ; compact_at = Compact_at.empty
   ; settings_section = Appearance
   ; settings_home = true
@@ -1825,6 +1832,18 @@ let fetch_memory (m : Model.t) =
   , [ call Get_memory ~tag:Memory_loaded ] )
 ;;
 
+let fetch_about_you (m : Model.t) =
+  ( { m with about_you = About_you.loading m.about_you }
+  , [ call Get_user_info ~tag:About_you_loaded ] )
+;;
+
+(* What a section shows is asked for as it opens. *)
+let fetch_section (m : Model.t) : Settings_section.t -> _ = function
+  | Memory -> fetch_memory m
+  | About_you -> fetch_about_you m
+  | Appearance | Sessions | Models | Git_hosting | Nix_store | Account -> m, []
+;;
+
 (* Superusers see the Nix store there, as it is now; everyone their memory. *)
 let open_settings ?(fetch = true) ?section (m : Model.t) =
   let settings_section = Option.value section ~default:m.settings_section in
@@ -1838,9 +1857,9 @@ let open_settings ?(fetch = true) ?section (m : Model.t) =
       Settings
   in
   let m, cmds =
-    if fetch && Settings_section.equal settings_section Memory
+    if fetch
     then (
-      let m, more = fetch_memory m in
+      let m, more = fetch_section m settings_section in
       m, cmds @ more)
     else m, cmds
   in
@@ -3802,6 +3821,13 @@ let dictation_command (m : Model.t) rest =
   | Set_model _ as action -> set_dictation m action
 ;;
 
+let save_about_you (m : Model.t) =
+  match About_you.save m.about_you with
+  | about_you, Some request ->
+    { m with about_you }, [ call request ~tag:About_you_saved ]
+  | about_you, None -> { m with about_you }, []
+;;
+
 let save_memory (m : Model.t) =
   match Memory_notes.save m.memory with
   | memory, Some request ->
@@ -4232,6 +4258,7 @@ let user_switched (m : Model.t) (hello : Hello_reply.t) =
     ; forges = Forges.empty
     ; nix_gc = { Nix_gc.empty with collecting = m.nix_gc.collecting }
     ; memory = Memory_notes.empty
+    ; about_you = About_you.empty
     ; config = None
     ; compact_at = Compact_at.empty
     }
@@ -5833,6 +5860,12 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
   | "settings", "" -> open_settings m
   | "settings", arg -> settings_command m arg
   | "nix-gc", rest when superuser m -> nix_gc_command m rest
+  | "user-info", "" -> open_settings ~section:About_you m
+  | "user-info", _ ->
+    error
+      m
+      "/user-info takes no argument here: it opens Settings, About you, where \
+       you write the text."
   | "memory", "" -> open_settings ~section:Memory m
   | "memory", ("on" | "off") -> set_memory_enabled m (String.equal rest "on")
   | "memory", other ->
@@ -7861,6 +7894,18 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
         memory = Memory_notes.forgotten m.memory (Result.map result ~f:ignore)
       }
     , [] )
+  | About_you_loaded, result ->
+    let result =
+      Result.bind result ~f:(fun json ->
+        Result.map_error (User_info.of_json json) ~f:Error.to_string_hum)
+    in
+    { m with about_you = About_you.loaded m.about_you result }, []
+  | About_you_saved, result ->
+    let result =
+      Result.bind result ~f:(fun json ->
+        Result.map_error (User_info.of_json json) ~f:Error.to_string_hum)
+    in
+    { m with about_you = About_you.was_saved m.about_you result }, []
   | Memory_enabled, Ok _ -> m, []
   | Memory_enabled, Error e ->
     let m, cmds = fetch_memory m in
@@ -8601,6 +8646,8 @@ let main_event (m : Model.t) (event : Event.t) =
   (* Saved, edited or forgotten here, elsewhere or by the model. *)
   | Memory_changed memory ->
     { m with memory = Memory_notes.changed m.memory memory }, []
+  | User_info_changed info ->
+    { m with about_you = About_you.changed m.about_you info }, []
   (* Another of the user's frontends changed their preferences. *)
   | Prefs_changed changes ->
     apply_prefs m ~startup:false changes, [ Command.Cache_prefs changes ]
@@ -9364,6 +9411,9 @@ let dialog_accept (m : Model.t) =
      | Some _, _ -> close_dialog m
      | None, None -> m, [])
   | Some Settings when Option.is_some m.memory.draft -> save_memory m
+  | Some Settings
+    when Settings_section.equal m.settings_section About_you
+         && About_you.dirty m.about_you -> save_about_you m
   | Some Settings when Option.is_some (Compact_at.draft m.compact_at) ->
     commit_compact_at m
   | Some
@@ -9714,9 +9764,7 @@ let update_connected (m : Model.t) (action : Action.t) =
     (match m.dialog with
      | Some Settings ->
        let m = { m with settings_section = section; settings_home = false } in
-       (match section with
-        | Memory -> fetch_memory m
-        | _ -> m, [])
+       fetch_section m section
      | _ -> open_settings ~section m)
   | Settings_home -> { m with settings_home = true }, []
   | Settings_move move ->
@@ -9724,10 +9772,9 @@ let update_connected (m : Model.t) (action : Action.t) =
       Settings_section.move m.settings_section move ~superuser:(superuser m)
     in
     let m, cmds =
-      match section with
-      | Memory when not (Settings_section.equal m.settings_section Memory) ->
-        fetch_memory { m with settings_section = section }
-      | _ -> { m with settings_section = section }, []
+      if Settings_section.equal m.settings_section section
+      then m, []
+      else fetch_section { m with settings_section = section } section
     in
     m, Command.Focus (Settings_section.tab_id section) :: cmds
   | Compact_at_input text ->
@@ -9754,6 +9801,12 @@ let update_connected (m : Model.t) (action : Action.t) =
      | memory, None -> { m with memory }, [])
   | Memory_forget_cancel ->
     { m with memory = Memory_notes.cancel_forget m.memory }, []
+  | About_you_text text ->
+    { m with about_you = About_you.set_text m.about_you text }, []
+  | About_you_save -> save_about_you m
+  | About_you_revert ->
+    ( { m with about_you = About_you.revert m.about_you }
+    , [ Command.Focus "about-you-text" ] )
   | Open_rename -> open_rename m
   | Open_subagents arg -> open_agents m arg
   | Toggle_subagents ->

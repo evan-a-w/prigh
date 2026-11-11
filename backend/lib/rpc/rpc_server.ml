@@ -121,6 +121,8 @@ let methods =
   ; "save_memory"
   ; "forget_memory"
   ; "set_memory_enabled"
+  ; "get_user_info"
+  ; "set_user_info"
   ]
   @ Files_rpc.methods
   @ Review_rpc.methods
@@ -406,6 +408,7 @@ type t =
   ; home : string option (** for the current [config.json] *)
   ; prefs : User_prefs.t option (** under [home] *)
   ; memory : Memory.t option (** under [home] *)
+  ; user_info : User_info.t option (** under [home] *)
   ; now : unit -> float
   ; listed : Listed.t String.Table.t
     (** what [list_sessions] last showed of each live session *)
@@ -787,6 +790,21 @@ let memory_changed (t : t) memory =
     Hashtbl.iter t.clients ~f:(fun (c : Client.t) -> c.send json)
 ;;
 
+let user_info_json user_info =
+  [ "text", `String (User_info.get user_info)
+  ; "max", `Number (Int.to_string User_info.max_bytes)
+  ]
+;;
+
+let user_info_changed (t : t) user_info =
+  let json =
+    `Object
+      ([ "type", `String "event"; "event", `String "user_info_changed" ]
+       @ user_info_json user_info)
+  in
+  Hashtbl.iter t.clients ~f:(fun (c : Client.t) -> c.send json)
+;;
+
 let create
       ~env
       ~sw
@@ -801,6 +819,7 @@ let create
       ?home
       ?forges
       ?memory
+      ?user_info
       ?transcription_http
       ?nix_store
       ~login
@@ -864,6 +883,10 @@ let create
         (match memory with
          | Some _ -> memory
          | None -> Option.map home ~f:(fun home -> Memory.create ~home))
+    ; user_info =
+        (match user_info with
+         | Some _ -> user_info
+         | None -> Option.map home ~f:(fun home -> User_info.create ~home))
     ; now = (fun () -> Eio.Time.now (Eio.Stdenv.clock env))
     ; listed = String.Table.create ()
     ; on_session_deleted = []
@@ -883,6 +906,8 @@ let create
      pop up a dialog. Everyone hears the outcome, to refresh their status. *)
   Option.iter t.memory ~f:(fun memory ->
     Memory.subscribe memory ~f:(fun () -> memory_changed t memory));
+  Option.iter t.user_info ~f:(fun user_info ->
+    User_info.subscribe user_info ~f:(fun () -> user_info_changed t user_info));
   Login_manager.subscribe login ~f:(fun event ->
     let json = Rpc_json.login_event event in
     match event with
@@ -1257,6 +1282,35 @@ let find_agent t (client : Client.t) key =
         File_cache.remove t.loaded path;
         Or_error.map session ~f:(fun session ->
           start_agent t session (loaded_start t client session)))
+;;
+
+(* The live session with this id, a temporary one too, else the saved one,
+   loaded with no client: it starts where it last was. *)
+let wake_session t ~session =
+  let agent =
+    match Hashtbl.find t.agents session with
+    | Some agent -> Ok agent
+    | None ->
+      (match
+         List.find (saved_sessions t) ~f:(fun s -> String.equal s.id session)
+       with
+       | None -> Or_error.errorf "no session %S" session
+       | Some summary ->
+         let loaded =
+           File_cache.find_or_read t.loaded summary.path ~read:(load_session t)
+         in
+         (* A client may have opened it while it was being read. *)
+         (match Hashtbl.find t.agents session with
+          | Some agent -> Ok agent
+          | None ->
+            File_cache.remove t.loaded summary.path;
+            Or_error.map loaded ~f:(fun session -> start_agent t session None)))
+  in
+  Or_error.map agent ~f:Agent.check_mail
+;;
+
+let serve_questions t questions =
+  Session_questions.set_wake questions (wake_session t)
 ;;
 
 (* A session's messages to read: the live session's, else from disk without
@@ -1880,19 +1934,21 @@ let start_indexing t =
     `Stop_daemon)
 ;;
 
+let search_hits t ~query ~limit =
+  Session_search.search
+    t.search
+    ~sessions:(saved_sessions t)
+    ~load:(load_for_search t)
+    ~query
+    ~limit
+;;
+
 (* The sessions [list_sessions] lists, by what was said in them. *)
 let search_sessions t params =
   let open Or_error.Let_syntax in
   let%bind query = string_param params "query" in
   let%map limit = int_param params "limit" ~default:50 in
-  let hits =
-    Session_search.search
-      t.search
-      ~sessions:(saved_sessions t)
-      ~load:(load_for_search t)
-      ~query
-      ~limit
-  in
+  let hits = search_hits t ~query ~limit in
   `Object
     [ "query", `String query
     ; "hits", `Array (List.map hits ~f:Session_search.Hit.to_json)
@@ -2598,6 +2654,21 @@ let memory t ~meth ~params =
        `Object [ ("enabled", if enabled then `True else `False) ])
 ;;
 
+let user_info t ~meth ~params =
+  match t.user_info with
+  | None -> Or_error.error_string "this backend keeps no user info"
+  | Some user_info ->
+    let open Or_error.Let_syntax in
+    let%map () =
+      match meth with
+      | "set_user_info" ->
+        let%bind text = string_param params "text" in
+        User_info.set user_info text
+      | _ -> Ok ()
+    in
+    `Object (user_info_json user_info)
+;;
+
 let keep_session t (client : Client.t) =
   let agent = client.agent in
   if not (Agent.temporary agent)
@@ -2660,6 +2731,7 @@ let dispatch_server t (client : Client.t) ~meth ~params
     Some (prefs t client ~meth ~params)
   | "get_memory" | "save_memory" | "forget_memory" | "set_memory_enabled" ->
     Some (memory t ~meth ~params)
+  | "get_user_info" | "set_user_info" -> Some (user_info t ~meth ~params)
   | "nix_store_status" | "nix_store_gc" ->
     Nix_store_rpc.dispatch
       t.nix_store

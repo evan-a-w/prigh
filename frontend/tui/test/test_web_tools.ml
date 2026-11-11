@@ -676,6 +676,45 @@ let%expect_test "a subagent's card names its searches as its steps" =
     |}]
 ;;
 
+let%expect_test
+    "sessions, ask_session and answer_session: the action, the session, the \
+     question, the answer"
+  =
+  let quiet item =
+    print_endline
+      (Content.to_plain
+         (Transcript.render_item ~width:70 item ~verbosity:Quiet))
+  in
+  quiet (tool "sessions" {|{"action":"search","query":"parser bug"}|});
+  quiet
+    (tool
+       "sessions"
+       {|{"action":"search","query":"lexer","session":"3f2a9c1e5d6b7a80"}|});
+  quiet (tool "sessions" {|{"action":"outline","session":"3f2a9c1e5d6b7a80"}|});
+  quiet
+    (tool
+       "sessions"
+       {|{"action":"read","session":"3f2a9c1e5d6b7a80","from":40,"limit":5}|});
+  quiet
+    (tool
+       "ask_session"
+       {|{"session":"3f2a9c1e5d6b7a80","question":"Where does the cache live?"}|}
+       ~result:(false, "asked 3f2a9c1e5d6b7a80 as q3; its answer arrives later"));
+  quiet
+    (tool
+       "answer_session"
+       {|{"id":"q3","answer":"In lib/cache, since the move."}|}
+       ~result:(false, "sent"));
+  [%expect {|
+    … sessions search "parser bug"
+    … sessions search "lexer" in 3f2a9c1e
+    … sessions outline 3f2a9c1e
+    … sessions read 3f2a9c1e from 40
+    ✓ ask_session 3f2a9c1e "Where does the cache live?"  1 line
+    ✓ answer_session q3 "In lib/cache, since the move."  1 line
+    |}]
+;;
+
 let%expect_test "worktree: the action and its branch or path" =
   show_item
     (tool

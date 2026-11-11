@@ -43,6 +43,9 @@ module Note : sig
       (** the user answered through an interactive [render_ui] component
           ({!Ui_action}); [summary] is the title, e.g. [Sent "Deploy
           options": env = prod] *)
+      | User_info of { cleared : bool }
+      (** what the user wrote about themselves changed, or was removed
+          ([System_prompt.user_info_note]) *)
     [@@deriving sexp, jsonaf, equal]
   end
 
@@ -99,11 +102,24 @@ module Source : sig
     | Init (** [/init] *)
     | Review_comments of { count : int }
     (** the user's review comments, sent with [review_submit] *)
+    | Session_question of
+        { session : string
+        ; name : string option
+        ; id : string
+        }
+    (** the session with this id and name asks question [id]
+        ({!Session_questions}) *)
+    | Session_answer of
+        { session : string
+        ; name : string option
+        ; id : string
+        ; answered : bool (** else its run ended without an answer *)
+        }
   [@@deriving sexp, jsonaf, equal]
 
   (** The wire name: [delivery], [handover], [goal], [goal_continuation],
       [reminder], [resume], [shell], [summary], [review], [init],
-      [review_comments]. *)
+      [review_comments], [session_question], [session_answer]. *)
   val kind : t -> string
 
   val title : t -> string

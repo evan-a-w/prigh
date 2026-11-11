@@ -376,7 +376,7 @@ let%expect_test "fuzzy ranking: command names" =
     {|
     "mo" -> mode model scoped-models memory import compaction permissions
     "lo" -> login logout clone
-    "s"  -> state switch skills skill: signin setusr session snippet signout sessions scoped-models push jobs host todos resume agents hotkeys verbosity permissions downsize-images
+    "s"  -> state switch skills skill: signin setusr session snippet signout sessions scoped-models push jobs host todos resume agents hotkeys verbosity user-info permissions downsize-images
     "sw" -> switch
     "xyz" ->
     |}]
@@ -712,6 +712,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /goal [text|off|resume]            set a goal the agent keeps working toward until it is met; show, clear or resume it
     /remind [stop|every|rm|off ...]    stop [N] TEXT: remind the agent when it ends its turn (at most N times in a row, default 3); every N TEXT: every N turns; rm NAME, off: remove one or all; none: list the session's (Ctrl+D removes one)
     /memory [on|off]                   the notes the model saved when you asked it to remember something (Ctrl+D forgets one); on or off gives the model the memory tool or takes it away
+    /user-info [TEXT|clear]            what you wrote about yourself for the model, in the context of every session (unlike memory, which it looks up): show it, replace it with TEXT, or clear it
     /resume [now|cancel]               show, run now or cancel the automatic resume after a usage limit
     /downsize-images                   send the conversation's images smaller (after the model refused one as too large) and retry a failed reply
     /compact [instructions]            summarise older messages to free context

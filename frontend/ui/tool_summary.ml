@@ -58,6 +58,42 @@ let worktree args =
     Some (String.concat ~sep:" " (action :: Option.to_list target))
 ;;
 
+let short_id id = String.prefix id 8
+
+let sessions args =
+  let str = Tool_args.string args in
+  Option.map (str "action") ~f:(fun action ->
+    String.concat
+      ~sep:" "
+      ((action :: Option.to_list (Option.map (str "query") ~f:quoted))
+       @ Option.to_list
+           (Option.map (str "session") ~f:(fun id ->
+              if String.equal action "search"
+              then "in " ^ short_id id
+              else short_id id))
+       @ List.filter_map [ "from"; "before" ] ~f:(fun key ->
+         Option.map (Tool_args.int args key) ~f:(sprintf "%s %d" key))))
+;;
+
+let ask_session args =
+  match
+    ( Option.map (Tool_args.string args "session") ~f:short_id
+    , Option.map (Tool_args.string args "question") ~f:(quoted ~width:60) )
+  with
+  | None, None -> None
+  | session, question ->
+    Some (String.concat ~sep:" " (List.filter_opt [ session; question ]))
+;;
+
+let answer_session args =
+  match
+    ( Tool_args.string args "id"
+    , Option.map (Tool_args.string args "answer") ~f:(quoted ~width:60) )
+  with
+  | None, None -> None
+  | id, answer -> Some (String.concat ~sep:" " (List.filter_opt [ id; answer ]))
+;;
+
 let pull_request args =
   let str = Tool_args.string args in
   Option.map (str "action") ~f:(fun action ->

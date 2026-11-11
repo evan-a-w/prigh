@@ -90,6 +90,7 @@ module Confirm_action = struct
         { note : Memory.Note.t
         ; back : Open_picker.t option
         }
+    | Clear_user_info
     | Nix_gc of Nix_generations.t
     (** [/nix-gc run DAYS|all]: deleting profile generations *)
     | Browser_signin

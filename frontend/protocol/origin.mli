@@ -26,6 +26,8 @@ module Kind : sig
     | Client (** the user changed client (prigh-web, the TUI, ...) *)
     | Ui_action
     (** the user answered through a [render_ui] component ({!Ui_action}) *)
+    | User_info
+    (** what the user wrote about themselves changed ({!User_info}) *)
     | Other of string
   [@@deriving sexp_of, equal]
 

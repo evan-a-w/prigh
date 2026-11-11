@@ -405,6 +405,7 @@ let%expect_test "/diff, /review and /init are in the completions and /help" =
     Commands ↑↓ Tab Enter Esc   Ctrl+Enter as typed
     /init write or improve the project's AGENTS.md
     /import [path] import a session from a JSONL file on the backend
+    /user-info what you wrote about yourself for the model, given to it in every session (unlike memory, which it looks up), in Settings
     /pin [session] pin a session to the top of the sidebar (this one without an argument): pinned sessions are never archived for being idle
     /diff [path] show the uncommitted changes where the tools run, untracked files too
     /trim [after|undo] drop everything before a message from the model's context (the transcript keeps it folded); after: everything after a message instead (what you send later stays); undo brings back the last trim
