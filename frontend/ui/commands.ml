@@ -162,6 +162,12 @@ let every =
        (Ctrl+D forgets one); on or off gives the model the memory tool or \
        takes it away"
   ; c
+      "user-info"
+      "[TEXT|clear]"
+      "what you wrote about yourself for the model, in the context of every \
+       session (unlike memory, which it looks up): show it, replace it with \
+       TEXT, or clear it"
+  ; c
       ~argument:Argument.Resume
       "resume"
       "[now|cancel]"

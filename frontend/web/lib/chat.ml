@@ -418,7 +418,8 @@ let rec apply t (event : Event.t) =
   | Nix_gc_progress _
   | Masked _
   | Prefs_changed _
-  | Memory_changed _ -> t
+  | Memory_changed _
+  | User_info_changed _ -> t
 ;;
 
 let rec received (event : Event.t) ~at : Event.t =

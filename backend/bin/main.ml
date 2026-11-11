@@ -70,6 +70,7 @@ module Setup = struct
     ; models : Model_registry.t
     ; forges : Forges.t (** the world's git-host sign-ins *)
     ; memory : Memory.t (** the world's *)
+    ; user_info : User_info.t (** the world's *)
     }
 end
 
@@ -210,6 +211,7 @@ let common_params =
         ()
     in
     let memory = Memory.create ~home in
+    let user_info = User_info.create ~home in
     let questions = Session_questions.create () in
     let search =
       ref (Tool_sessions.local_search ~dir:(fun () -> sessions_dir))
@@ -252,6 +254,7 @@ let common_params =
           ~models
           ~worktrees_dir
           ~compaction
+          ~user_info:(fun () -> User_info.text user_info)
           ~provider
           ~current_model:(current (fun s -> s.model) Model.default)
           ~current_thinking:(current (fun s -> s.thinking) Thinking.default)
@@ -310,6 +313,7 @@ let common_params =
           ~offered:(fun tool ->
             (not (String.equal (Tool.name tool) Tool_memory.name))
             || Memory.enabled memory)
+          ~user_info
           ~cwd
           ()
       in
@@ -323,6 +327,7 @@ let common_params =
     ; models
     ; forges
     ; memory
+    ; user_info
     ; questions
     ; search
     }
@@ -756,6 +761,7 @@ let serve_command =
              ; models
              ; forges
              ; memory
+             ; user_info
              ; questions
              ; search
              }
@@ -791,6 +797,7 @@ let serve_command =
              ~login
              ~forges
              ~memory
+             ~user_info
              ~sessions_dir:world.sessions_dir
              ~cwd
              ~new_agent
@@ -1835,6 +1842,7 @@ let acp_command =
                ; models
                ; forges
                ; memory
+               ; user_info
                ; questions
                ; search
                }
@@ -1864,6 +1872,7 @@ let acp_command =
                ~login
                ~forges
                ~memory
+               ~user_info
                ~sessions_dir:world.sessions_dir
                ~cwd
                ~new_agent

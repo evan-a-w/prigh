@@ -254,6 +254,10 @@ val create
   -> ?offered:(Tool.t -> bool)
        (** which of [tools] the model is given, asked again for every turn
            (the user's memory is offered while it is on); default: all *)
+  -> ?user_info:User_info.t
+       (** what the user wrote about themselves: in the system prompt of a
+           new session, and told with the next message to a session that
+           knows another text ({!Told_environment}); default: none *)
   -> cwd:string
   -> unit
   -> t

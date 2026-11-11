@@ -32,6 +32,7 @@ module Note = struct
           ; component : string
           ; summary : string
           }
+      | User_info of { cleared : bool }
     [@@deriving sexp, jsonaf, equal]
 
     let wire = function
@@ -42,6 +43,7 @@ module Note = struct
       | Steer _ -> "steer"
       | Client _ -> "client"
       | Ui_action _ -> "ui_action"
+      | User_info _ -> "user_info"
     ;;
   end
 
@@ -77,6 +79,10 @@ module Note = struct
         (if follow_up then "follow-up" else "steer")
     | Client { client } -> "Using " ^ Client_kind.describe client
     | Ui_action { summary; _ } -> summary
+    | User_info { cleared = false } ->
+      "About you: the model was given what you wrote"
+    | User_info { cleared = true } ->
+      "About you: the model was told you removed it"
   ;;
 
   let steer ~from_user ~follow_up =

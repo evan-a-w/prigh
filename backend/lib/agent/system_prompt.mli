@@ -28,7 +28,8 @@ end
     subagent's tells it to block on commands rather than sleep, and that it
     finishes only once its jobs have exited. Either role, given the
     [worktree] tool, is told to make worktrees with it rather than with
-    [git worktree add]. *)
+    [git worktree add]. [user_info] is what the user wrote about themselves
+    ({!User_info}), the last block. *)
 val build
   :  ?date:string
   -> ?instructions:(string * string) list
@@ -36,6 +37,7 @@ val build
   -> ?skills:Skill.t list
   -> ?auto_background:float
   -> ?role:Role.t
+  -> ?user_info:string
   -> cwd:string
   -> home:string
   -> tools:Tool_spec.t list
@@ -60,3 +62,7 @@ val plan_mode_note : on:bool -> string
 (** When the user's kind of client changes (and with the first prompt from
     one): whether [render_ui]'s components can be shown. *)
 val client_note : Client_kind.t -> string
+
+(** The user's info about themselves ({!User_info}) changed, or was removed
+    ([None]), since the model was told it. *)
+val user_info_note : string option -> string
