@@ -7,6 +7,7 @@ type t =
   ; tools : string list
   ; plan_mode : bool
   ; client : Client_kind.t option [@sexp.option] [@jsonaf.option]
+  ; user_info : string option [@sexp.option] [@jsonaf.option]
   }
 [@@deriving sexp, jsonaf, equal]
 
@@ -55,5 +56,13 @@ let notes ~told now ~host_name =
       note (Client { client }) (System_prompt.client_note client)
     | Some _ | None -> None
   in
-  List.filter_opt [ host; cwd; tools; plan_mode; client ]
+  let user_info =
+    if Option.equal String.equal told.user_info now.user_info
+    then None
+    else
+      note
+        (User_info { cleared = Option.is_none now.user_info })
+        (System_prompt.user_info_note now.user_info)
+  in
+  List.filter_opt [ host; cwd; tools; plan_mode; client; user_info ]
 ;;

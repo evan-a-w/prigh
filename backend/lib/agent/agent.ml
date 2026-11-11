@@ -195,6 +195,7 @@ type t =
   ; provider : Provider.t
   ; tools : Tool.t list
   ; offered : Tool.t -> bool
+  ; user_info : User_info.t option
   ; sessions_dir : string
   ; home : string
   ; models : Model_registry.t
@@ -577,6 +578,7 @@ let environment t =
       |> List.dedup_and_sort ~compare:String.compare
   ; plan_mode = t.plan_mode
   ; client = Some (Option.value t.client ~default:Other)
+  ; user_info = Option.bind t.user_info ~f:User_info.text
   }
 ;;
 
@@ -596,7 +598,7 @@ let restore_told t =
   t.told
   <- (match Session.told_environment t.session with
       | Some told -> told
-      | None -> { (environment t) with client = None });
+      | None -> { (environment t) with client = None; user_info = None });
   t.client <- t.told.client
 ;;
 
@@ -1661,7 +1663,7 @@ let instructions t ~cancel ~cwd =
    the next user message instead. *)
 let tools t = Tools.for_model t.model (own_tools t @ t.mcp_tools)
 
-let build_system_prompt ?(cancel = Cancellation.never) t =
+let build_system_prompt ?(cancel = Cancellation.never) ?user_info t =
   let { Host_ops.Instructions.files; nix; skills } =
     instructions t ~cancel ~cwd:t.cwd
   in
@@ -1670,6 +1672,7 @@ let build_system_prompt ?(cancel = Cancellation.never) t =
     ~nix
     ~skills
     ?auto_background:(Config.auto_background t.config)
+    ?user_info
     ~cwd:t.cwd
     ~home:t.home
     ~tools:(Tools.specs (tools t))
@@ -1790,17 +1793,13 @@ let system_prompt ?(cancel = Cancellation.never) t =
   match Session.system_prompt t.session with
   | Some text -> text
   | None ->
-    let text = build_system_prompt ~cancel t in
+    let now = environment t in
+    let text = build_system_prompt ~cancel ?user_info:now.user_info t in
     (* Without its instructions: the next run builds it again. *)
     if not (Cancellation.is_cancelled cancel)
     then (
       ignore (Session.set_system_prompt t.session ~text : Session.Entry.t);
-      tell
-        t
-        { (environment t) with
-          plan_mode = t.told.plan_mode
-        ; client = t.told.client
-        });
+      tell t { now with plan_mode = t.told.plan_mode; client = t.told.client });
     text
 ;;
 
@@ -2991,6 +2990,7 @@ let create
       ?questions
       ?trace_clock
       ?(offered = fun (_ : Tool.t) -> true)
+      ?user_info
       ~cwd
       ()
   =
@@ -3039,6 +3039,7 @@ let create
     ; provider
     ; tools
     ; offered
+    ; user_info
     ; sessions_dir
     ; home
     ; models
@@ -3077,7 +3078,14 @@ let create
     ; pending_execs = String.Table.create ()
     ; exec_seq = 0
     ; client = None
-    ; told = { host = ""; cwd; tools = []; plan_mode = false; client = None }
+    ; told =
+        { host = ""
+        ; cwd
+        ; tools = []
+        ; plan_mode = false
+        ; client = None
+        ; user_info = None
+        }
     ; background =
         Background_tasks.create
           ~env
@@ -3882,7 +3890,7 @@ let btw t ~question ~cancel ~on_delta =
   let system =
     match Session.system_prompt session with
     | Some text -> text
-    | None -> build_system_prompt ~cancel t
+    | None -> build_system_prompt ~cancel ?user_info:(environment t).user_info t
   in
   let request =
     Btw.request

@@ -1853,6 +1853,16 @@ kbd {
 .memory-add { white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; }
 .memory-add .icon { width: 14px; height: 14px; }
 .memory-error { padding: 8px 0; }
+/* About you: one text the model is given, its size and Save under it. */
+.about-you { flex-direction: column; align-items: stretch; gap: 10px; }
+.about-you .setting-text { flex-basis: auto; }
+.about-you-input { width: 100%; resize: vertical; min-height: 9em; font: inherit; line-height: 1.5; }
+.about-you-buttons { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.about-you-count { margin-right: auto; color: var(--faint); font-size: 12px; font-variant-numeric: tabular-nums; }
+.about-you-count.near { color: var(--brick); }
+.about-you-keys { color: var(--faint); font-size: 12px; }
+.about-you-elsewhere { display: flex; align-items: center; gap: 8px; }
+.about-you-elsewhere .setting-note { flex: 1; min-width: 0; }
 @media (max-width: 760px) {
   /* A phone: the page fills the screen, the sections a strip across its top. */
   .modal-backdrop:has(> .settings-dialog) { padding: 8px; }

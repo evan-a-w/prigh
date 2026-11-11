@@ -907,7 +907,8 @@ phone): **Appearance** (the theme and accent, transcript detail
 notifications, on or off, and what to do when the browser has
 not been asked, blocks them or cannot show them), **Models** (the providers
 (`/auth`) and compaction), **Memory** (the model's notes and the switch
-that turns memory off), **Git hosting**, **Nix store** (superusers) and
+that turns memory off), **About you** (what you wrote about yourself for
+the model, `/user-info`), **Git hosting**, **Nix store** (superusers) and
 **Account** (who you are signed in, and acting, as, with Switch account and
 Sign out). `/settings SECTION` (e.g. `/settings git`, completed as you type)
 opens it at a section; on the list, the arrows, Home and End move between
@@ -2346,6 +2347,21 @@ your notes are kept. Settings → Memory also lists the notes to filter, edit
 and delete, and the TUI's `/memory` picks among them (Enter shows one,
 Ctrl+D forgets it after a confirmation).
 
+About you: where memory is notes the model looks up only when it needs
+them, what you write about yourself (who you are, what you work on, how you
+like answers) is in the model's context in every session. Write it in
+prigh-web's Settings → About you (`/user-info` opens it; Ctrl+Enter saves,
+Revert drops what is typed, and a change made in another browser is shown
+at once, or offered if you were typing), or in the TUI with `/user-info
+TEXT` (`/user-info` shows it, `/user-info clear` removes it after a
+confirmation). It is kept as plain text in `~/.prigh/user_info.md` on the
+backend, one per user (per namespace with `-tokens`), at most 4000 bytes;
+editing the file by hand works too. A new session starts with it in its
+system prompt (and so do its subagents); a session that is already open is
+told the text with your next message in it, once, and again whenever you
+change or remove it (a "☺ About you" note over your message shows what it
+was told). Only you write it: the model has no tool to change it.
+
 Models see images. The `read` tool returns PNG, JPEG, GIF and WebP files
 (recognised by content, not by name) as images the model can look at, and an
 `@shot.png` attachment adds the image to the prompt; prigh-web also sends
@@ -2696,6 +2712,7 @@ it.
 | `/budget [dollars\|off]` | show or set the session's cost budget: no turn starts once it is spent |
 | `/goal [text\|off\|resume]` | set a goal the agent keeps working toward until it is met; show, clear or resume it |
 | `/memory [on\|off]` | pick among the notes the model saved (Ctrl+D forgets one; prigh-web opens Settings → Memory); `on`/`off` gives the model the memory tool or takes it away |
+| `/user-info [TEXT\|clear]` | what you wrote about yourself for the model, in the context of every session: show it, replace it with TEXT or clear it (prigh-web opens Settings → About you) |
 | `/remind [stop [N] TEXT\|every N TEXT\|rm NAME\|off]` | remind the agent when it ends its turn (at most N times in a row, default 3) or every N turns; without arguments, pick among the session's (Ctrl+D / Delete removes one); `rm` removes one, `off` all |
 | `/resume [now\|cancel]` | show, run now or cancel the automatic resume after a usage limit |
 | `/new`, `/clear`, `/quit` | new session / clear transcript / exit |

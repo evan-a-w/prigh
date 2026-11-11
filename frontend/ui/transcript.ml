@@ -587,6 +587,7 @@ let apply t (event : P.Event.t) =
   | P.Event.Nix_gc_progress _
   | P.Event.Prefs_changed _
   | P.Event.Memory_changed _
+  | P.Event.User_info_changed _
   | P.Event.Config_changed _
   | P.Event.Review _
   | P.Event.Generate_delta _
