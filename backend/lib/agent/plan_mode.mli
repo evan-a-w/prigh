@@ -6,6 +6,6 @@ open! Import
     worktrees, creating or checking out pull requests,
     anything else that changes the git host (issues, comments, merges, CI
     re-runs), and subagents in a
-    worktree of their own. Other destructive calls ask
-    ({!Approval.decide}). *)
+    worktree of their own; [on_host] as the call it runs. Other destructive
+    calls ask ({!Approval.decide}). *)
 val changes_work : tool:string -> Json.t -> bool

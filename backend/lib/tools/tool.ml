@@ -31,6 +31,7 @@ and context =
       -> User_question.t list
       -> User_question.Reply.t
   ; ui : Ui_host.t
+  ; host : string option
   }
 
 and executor = context -> t -> Json.t -> Tool_result.t
@@ -76,6 +77,7 @@ module Context = struct
           fun ~call_id:_ ~timeout_seconds:_ _ ->
             User_question.Reply.Unavailable "no user to ask")
         ?(ui = Ui_host.none)
+        ?host
         ~env
         ~cwd
         ()
@@ -100,6 +102,7 @@ module Context = struct
     ; approve
     ; ask_user
     ; ui
+    ; host
     }
   ;;
 end

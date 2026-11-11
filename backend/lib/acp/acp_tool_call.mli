@@ -10,7 +10,8 @@ open! Import
     (update_plan), else [other]. *)
 val kind : string -> string
 
-(** A one-line title: the command, the path, the pattern, the URL... *)
+(** A one-line title: the command, the path, the pattern, the URL...;
+    [On HOST: TITLE] for [on_host]. *)
 val title : name:string -> args:Json.t -> cwd:string -> string
 
 (** [{path, line?}] of the files the call reads or changes. *)

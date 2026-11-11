@@ -1,9 +1,14 @@
 open! Core
 open! Import
 
-let changes_work ~tool args =
+let rec changes_work ~tool args =
   let action = Tool_args.string_opt args "action" in
-  if Approval.is_edit tool
+  if String.equal tool Tool_on_host.name
+  then (
+    match Tool_on_host.inner args with
+    | Some (_, tool, args) -> changes_work ~tool args
+    | None -> false)
+  else if Approval.is_edit tool
   then true
   else if String.equal tool Tool_worktree.name
   then not ([%equal: string option] action (Some "list"))

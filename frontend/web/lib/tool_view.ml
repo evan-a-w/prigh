@@ -41,6 +41,12 @@ let summary (call : Tool_call.t) =
   then Option.value (Tool_summary.answer_session args) ~default:""
   else if String.equal call.name "memory"
   then Option.value (Tool_summary.memory args) ~default:""
+  else if String.equal call.name "on_host"
+  then
+    Option.value_map
+      (Tool_args.string args "host")
+      ~default:"list hosts"
+      ~f:(fun h -> "on " ^ h)
   else if String.equal call.name "computer"
   then
     Option.value_map
@@ -133,7 +139,15 @@ let last_activity chat =
       List.rev message.content
       |> List.find_map ~f:(fun (content : Content.t) ->
         match content with
-        | Tool_call call -> Some (call.name ^ " " ^ first_line (summary call))
+        | Tool_call call ->
+          let line (call : Tool_call.t) =
+            call.name ^ " " ^ first_line (summary call)
+          in
+          Some
+            (match Tool_summary.on_host call with
+             | Some (host, inner) ->
+               Tool_summary.on_host_line ~host (line inner)
+             | None -> line call)
         | Server_tool s -> Some (Tool_summary.server_tool_line s)
         | Text t when not (String.is_empty (String.strip t)) ->
           List.last (String.split_lines (String.strip t))
@@ -835,6 +849,12 @@ let card
       (call : Tool_call.t)
       (tool : Chat.Tool.t option)
   =
+  (* An [on_host] call reads as the call it ran, on its host. *)
+  let host, call =
+    match Tool_summary.on_host call with
+    | Some (host, inner) -> Some host, inner
+    | None -> None, call
+  in
   let result = Option.bind tool ~f:(fun t -> t.result) in
   let cancelled = Option.exists result ~f:cancelled in
   (* What a cancelled call managed to do is not an error. *)
@@ -889,7 +909,11 @@ let card
     | details -> Some (String.concat ~sep:" · " details)
   in
   let cls =
-    String.concat ~sep:" " [ "tool"; "tool-" ^ call.name; Status.cls status ]
+    String.concat
+      ~sep:" "
+      ([ "tool"; "tool-" ^ call.name ]
+       @ Option.to_list (Option.map host ~f:(fun _ -> "tool-on_host"))
+       @ [ Status.cls status ])
   in
   if String.equal call.name "subagent"
   then (
@@ -939,7 +963,11 @@ let card
     let key = open_key call.id in
     let opened = Fold.opened ~by_default fold key in
     let line =
-      [ Status.icon status; span "name" call.name ] @ Option.to_list arg
+      [ Status.icon status ]
+      @ Option.to_list
+          (Option.map host ~f:(fun host -> span "host" ("on " ^ host ^ ":")))
+      @ [ span "name" call.name ]
+      @ Option.to_list arg
     in
     match body with
     | [] -> div cls [ div "tool-head" (line @ chips) ]

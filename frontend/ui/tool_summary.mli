@@ -1,7 +1,7 @@
 open! Core
 open! Import
 
-(** How the web, job-input, worktree, pull-request and session tools and the provider's own tools (web search)
+(** How the web, job-input, worktree, pull-request, session and [on_host] tools and the provider's own tools (web search)
     read in a transcript; shared by [Tool_render] and prigh-web's [Tool_view]. *)
 
 (** [text] on one line in double quotes, escaped like a JSON string ([\n], [\t], [\x07]),
@@ -39,6 +39,13 @@ val repo : Tool_args.t -> string option
 (** [memory]'s argument: the action and its title (or quoted text), query or
     id, e.g. [save editor], [recall "deploy"], [forget m3]. *)
 val memory : Tool_args.t -> string option
+
+(** An [on_host] call's host and the call it runs there (with the same id),
+    once its arguments name them; also while they are still streaming. *)
+val on_host : P.Tool_call.t -> (string * P.Tool_call.t) option
+
+(** [on HOST: LINE]: how an [on_host] call reads, [line] the inner call's. *)
+val on_host_line : host:string -> string -> string
 
 (** Whether a [job_input] call ends the job's stdin. *)
 val closes_stdin : Tool_args.t -> bool

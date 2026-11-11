@@ -705,7 +705,8 @@ let%expect_test
        "answer_session"
        {|{"id":"q3","answer":"In lib/cache, since the move."}|}
        ~result:(false, "sent"));
-  [%expect {|
+  [%expect
+    {|
     … sessions search "parser bug"
     … sessions search "lexer" in 3f2a9c1e
     … sessions outline 3f2a9c1e
@@ -864,5 +865,82 @@ let%expect_test "memory: the action and its title, query or id" =
           action: "forget"
           id: "m3"
         }
+    |}]
+;;
+
+let%expect_test "on_host: the call it ran, on its host" =
+  show_item
+    ~styled:true
+    (tool
+       "on_host"
+       {|{"host":"laptop","tool":"bash","args":{"command":"uname -a"}}|}
+       ~result:(false, "Linux laptop 6.1"));
+  show_item
+    (tool
+       "on_host"
+       {|{"host":"laptop","tool":"read","args":{"path":"notes.txt"}}|}
+       ~result:(false, "hello"));
+  show_item (tool "on_host" "{}" ~result:(false, "tool hosts:\n- laptop"));
+  show_item
+    (tool "on_host" {|{"host":"laptop","tool":"bash","args":{"command":"mak|});
+  print_endline
+    (Tool_render.summary
+       { id = "c1"
+       ; name = "on_host"
+       ; arguments =
+           {|{"host":"laptop","tool":"bash","args":{"command":"make"}}|}
+       });
+  print_endline
+    (Confirm_prompt.title
+       { call_id = "c1"
+       ; agent_id = None
+       ; name = "on_host"
+       ; summary = "on laptop: bash make"
+       ; rules = []
+       ; kind = Tool
+       });
+  [%expect
+    {|
+    == quiet ==
+    [green]✓ [/][bold]on laptop: bash[/] $ uname -a  [dim]1 line[/]
+    == normal ==
+    [green]✓ [/][bold]on laptop: bash[/] $ uname -a
+        [gray]Linux laptop 6.1[/]
+    == verbose ==
+    [green]✓ [/][bold]on laptop: bash[/] $ uname -a
+        [dim]{[/]
+        [dim]  command: "uname -a"[/]
+        [dim]}[/]
+        [gray]Linux laptop 6.1[/]
+    == quiet ==
+    ✓ on laptop: read notes.txt  1 line
+    == normal ==
+    ✓ on laptop: read notes.txt  1 line
+    == verbose ==
+    ✓ on laptop: read notes.txt  1 line
+        {
+          path: "notes.txt"
+        }
+        hello
+    == quiet ==
+    ✓ on_host list hosts  2 lines
+    == normal ==
+    ✓ on_host list hosts
+        tool hosts:
+        - laptop
+    == verbose ==
+    ✓ on_host list hosts
+        {}
+        tool hosts:
+        - laptop
+    == quiet ==
+    … on laptop: bash $ mak
+    == normal ==
+    … on laptop: bash $ mak
+    == verbose ==
+    … on laptop: bash $ mak
+        {"command":"mak
+    on laptop: bash $ make
+    Run on laptop: bash make?
     |}]
 ;;

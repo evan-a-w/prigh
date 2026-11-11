@@ -294,6 +294,13 @@ let common_params =
                      ~questions
                      ()
                  ; Tool_memory.create ~memory ()
+                 ; Tool_on_host.create
+                     ~hosts:(fun () ->
+                       Option.value_map
+                         !agent_ref
+                         ~default:[]
+                         ~f:Agent.tool_hosts)
+                     ()
                  ]
                @ Tool_jobs.tools
                @ Tools.interaction)
@@ -2315,7 +2322,11 @@ let tools_overhead_tokens () =
   in
   List.sum
     (module Int)
-    (List.map (Tools.all @ Tools.interaction) ~f:(fun (t : Tool.t) -> t.spec)
+    (List.map
+       (Tools.all
+        @ Tools.interaction
+        @ [ Tool_on_host.create ~hosts:(fun () -> []) () ])
+       ~f:(fun (t : Tool.t) -> t.spec)
      @ Option.to_list memory)
     ~f:(fun (spec : Tool_spec.t) ->
       (String.length spec.name

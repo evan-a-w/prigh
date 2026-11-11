@@ -116,6 +116,13 @@ adoption is only for sessions that never had a host, or whose recorded host
 is the disabled backend). A single-agent `new_session` or `fork` carries on
 on the current host; files without recorded hosts load as before.
 
+The `on_host` tool (`Tool_on_host`, below) runs one call on another
+connected host without moving the session: the executor takes the host from
+`Tool.Context.host` (default: the active one) and dispatches through the
+same `host_exec_by_id` as normal calls (in-process for the backend host,
+else `Tool_exec` to that client), so streaming, cancellation and the
+host's older-version notes are unchanged.
+
 A brand-new session made by or for a client (`new_session`, `fork`,
 `clone`, `import`, the session a client starts in, and, without the backend
 host, a saved session that never had a host when switched to) starts on a
@@ -797,12 +804,36 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   changed N seconds ago and must be read again). `edit` and patch updates
   are not blocked but note a change. The record lives where the files are:
   a process-wide table on the tool host (the backend's for its own host),
-  keyed by the session id that `Agent.executor` adds to `read`/`write`/
-  `edit`/`apply_patch` calls (and `$read_file` attachments) as the hidden
-  argument `$seen_scope`, so subagents share it; it is bounded (2000 files
+  keyed by `SESSION@HOST` (session and host id) that `Agent.executor` adds
+  to `read`/`write`/`edit`/`apply_patch` calls (and `$read_file`
+  attachments) as the hidden argument `$seen_scope`, so subagents share it
+  and a read on one host (through `on_host`, say) never vouches for a write
+  on another, even when one process serves both; it is bounded (2000 files
   per scope, 200 scopes, least recently used dropped). A restarted host, a
   host switch or an evicted entry leave the file unseen: the agent is asked
   to read it again. Calls without a scope (older backends) are unchecked.
+- `Tool_on_host` — `on_host {host?, tool?, args?, cwd?}`: without `host`,
+  the session's hosts (`Agent.tool_hosts`: name, id, home, active,
+  computer), one line each, and how to call; with one, runs `tool` (`bash`,
+  `read`, `write`, `edit`/`apply_patch`, `ls`, `grep`, `find`, whichever
+  the agent has) with `args` on that host (by id, or by name when unique),
+  in `cwd` resolved there (default: its home), for that one call. The
+  inner call goes through the context's approver and executor like a
+  normal one, with `Tool.Context.host` set, so it is validated, truncated,
+  streamed and cancelled as usual. Refused, saying what to do: an unknown
+  or disconnected host (the connected ones listed, closest first), the
+  session's active host (call the tool directly), any other tool
+  (subagents, jobs, `computer`, itself), missing `tool`/`args`, and `bash`
+  with `background` (jobs belong to the active host). Approval: the outer
+  call is never destructive by itself; plan mode judges it as its inner
+  call (`Plan_mode.changes_work`); the inner call follows the approval
+  mode and the deny and ask rules, but no allow rule (configured or
+  session) applies off the active host, since rules are paths and
+  commands on the session's machine, and its confirmation (`on_host`, `on
+  HOST: TOOL SUMMARY`) offers none to add. In every agent's tool list
+  (subagents' too: they share the hosts), for a stable prompt; the
+  description and a system prompt line say to use it only when the user
+  names another machine.
 - `Tool_web_fetch` / `Html_text` — `web_fetch` runs on the active host
   (`on_host`, so `localhost` is the host's; a host predating it answers
   `unknown host tool`), through `Http_client.get_stream`: up to 10

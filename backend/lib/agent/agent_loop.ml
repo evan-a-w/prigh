@@ -54,11 +54,20 @@ let cancelled_result (call : Content.Tool_call.t) =
   }
 ;;
 
-let tool_summary ~name (args : Json.t) =
+let rec tool_summary ~name (args : Json.t) =
   match args with
   | `Object fields ->
     let find name = List.Assoc.find fields ~equal:String.equal name in
     (match find "command", find "path", find "input" with
+     | _ when String.equal name Tool_on_host.name ->
+       (match Tool_on_host.inner args with
+        | Some (host, tool, args) ->
+          String.strip
+            (sprintf "on %s: %s %s" host tool (tool_summary ~name:tool args))
+        | None ->
+          (match find "host" with
+           | Some (`String host) -> "on " ^ host
+           | _ -> "hosts"))
      | _ when String.equal name "worktree" ->
        let text key =
          match find key with

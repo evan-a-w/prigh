@@ -12,8 +12,10 @@ open! Import
 
     The record lives on the tool host, where the files are (this process's
     table, in the backend for its own host and in each [prigh tool-host]),
-    keyed by a scope the backend passes with the call: the session id, so a
-    session's subagents share it. A host that restarts, a host switch to a
+    keyed by a scope the backend passes with the call: the session id and
+    the host's, so a session's subagents share it and a file read on one host
+    (with [on_host], say) is not taken as seen on another, even when one
+    process serves both. A host that restarts, a host switch to a
     machine with no record, or an evicted entry all mean "not seen", so the
     agent is asked to read the file again: losing the record fails safe.
     Calls without a scope (an older backend, direct use) are not checked. *)
