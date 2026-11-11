@@ -29,10 +29,16 @@ let plan : P.Plan.t =
   }
 ;;
 
-let confirm ?(rules = []) ?agent_id ?(name = "bash") call_id summary
+let confirm
+      ?(rules = [])
+      ?agent_id
+      ?(name = "bash")
+      ?(kind = P.Pending.Confirm.Kind.Tool)
+      call_id
+      summary
   : P.Pending.Confirm.t
   =
-  { call_id; agent_id; name; summary; rules }
+  { call_id; agent_id; name; summary; rules; kind }
 ;;
 
 let%expect_test "Alt+M cycles the mode; the status line shows it at once" =
@@ -411,6 +417,118 @@ let%expect_test
     ──────────────────────── confirmation answered elsewhere ───
     > ▏
     deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    |}]
+;;
+
+let%expect_test
+    "computer use: its own dialog, no always; Enter allows, Esc denies; the \
+     status line says while prigh controls the screen"
+  =
+  let h = Test_app.connected () in
+  let consent call_id =
+    confirm
+      ~name:"computer"
+      ~kind:(Computer_use { host = "laptop" })
+      call_id
+      "click (10, 20)"
+  in
+  H.event h (Tool_confirm (consent "c1"));
+  H.show h;
+  [%expect
+    {|
+    ┌─ Computer use ───────────────────────────────────────────┐
+    │ Let prigh control laptop's screen, mouse and keyboard?   │
+    │ click (10, 20). Until you move the mouse or press a key  │
+    │ there, press Stop, or the agent finishes: then it asks   │
+    │ again.                                                   │
+    │ y  allow                                                 │
+    │ n  deny                                                  │
+    │ r  deny, saying why                                      │
+    └──────────────────────────────────────────────────────────┘
+    ────────────────────────────────────────────────────────────
+    ? ▏
+    deepseek-flash  think:off  ctx:0.1%/1.0M  confirm: y/n/r
+    |}];
+  H.enter h;
+  [%expect
+    {|
+    (Rpc
+      (method_ tool_confirm_respond)
+      (params (
+        (call_id c1)
+        (allow   true)))
+      (tag Show_error))
+    |}];
+  H.event h (Tool_confirm_done { call_id = "c1"; agent_id = None });
+  H.event
+    h
+    (State
+       { (with_mode Auto) with
+         running = true
+       ; computer_control = Some "laptop"
+       });
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      allowed computer use on laptop
+    ────────────────────────────────────────────────────────────
+    > ▏
+    deepseek-flash  ctx:0.1%/1.0M  ⠋ controlling laptop
+    |}];
+  H.event h (State (with_mode Auto));
+  H.event h (Tool_confirm (consent "c2"));
+  H.esc h;
+  H.show h;
+  [%expect
+    {|
+    (Rpc
+      (method_ tool_confirm_respond)
+      (params (
+        (call_id c2)
+        (allow   false)))
+      (tag Show_error))
+
+
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      allowed computer use on laptop
+      denied computer use on laptop
+    ────────────────────────────────────────────────────────────
+    > ▏
+    deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    |}];
+  (* A subagent's asks the same, saying whose. *)
+  H.event
+    h
+    (Tool_confirm
+       (confirm
+          ~agent_id:"a1"
+          ~name:"computer"
+          ~kind:(Computer_use { host = "laptop" })
+          "s1"
+          "screenshot"));
+  H.show h;
+  [%expect
+    {|
+    ┌─ Computer use ───────────────────────────────────────────┐
+    │ [a1] Let prigh control laptop's screen, mouse and        │
+    │ keyboard?                                                │
+    │ screenshot. Until you move the mouse or press a key      │
+    │ there, press Stop, or the agent finishes: then it asks   │
+    │ again.                                                   │
+    │ y  allow                                                 │
+    │ n  deny                                                  │
+    │ r  deny, saying why                                      │
+    ────────────────────────────────────────────────────────────
+    ? ▏
+    deepseek-flash  think:off  ctx:0.1%/1.0M  confirm: y/n/r
     |}]
 ;;
 

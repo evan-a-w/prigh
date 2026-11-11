@@ -897,6 +897,7 @@ let%expect_test "on_host: the call it ran, on its host" =
        ; name = "on_host"
        ; summary = "on laptop: bash make"
        ; rules = []
+       ; kind = Tool
        });
   [%expect
     {|

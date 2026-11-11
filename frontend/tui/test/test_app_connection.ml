@@ -219,6 +219,7 @@ let%expect_test
        ; name = "bash"
        ; summary = "make"
        ; rules = []
+       ; kind = Tool
        });
   (* Typing meanwhile is not sent anywhere. *)
   H.keys h "hello";

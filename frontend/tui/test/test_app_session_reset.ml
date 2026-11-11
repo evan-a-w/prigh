@@ -23,7 +23,14 @@ let session_state (h : H.t) =
 ;;
 
 let confirm call_id summary : P.Event.t =
-  Tool_confirm { call_id; agent_id = None; name = "bash"; summary; rules = [] }
+  Tool_confirm
+    { call_id
+    ; agent_id = None
+    ; name = "bash"
+    ; summary
+    ; rules = []
+    ; kind = Tool
+    }
 ;;
 
 let question call_id : P.Event.t =

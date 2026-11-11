@@ -66,7 +66,7 @@ let with_agent
   let mode = ref "" in
   Agent.subscribe agent ~f:(fun e ->
     match e with
-    | Loop (Tool_confirm { call_id; agent_id; name; summary; rules }) ->
+    | Loop (Tool_confirm { call_id; agent_id; name; summary; rules; kind }) ->
       printf
         "confirm %s%s %s: %s [%s]\n"
         (Option.value_map agent_id ~default:"" ~f:(fun a -> a ^ "/"))
@@ -75,7 +75,14 @@ let with_agent
         (mask t summary)
         (String.concat ~sep:" " rules);
       let answer =
-        answer { Agent.Pending_confirm.call_id; agent_id; name; summary; rules }
+        answer
+          { Agent.Pending_confirm.call_id
+          ; agent_id
+          ; name
+          ; summary
+          ; rules
+          ; kind
+          }
       in
       printf
         "  -> %s\n"
