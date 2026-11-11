@@ -1287,10 +1287,13 @@ Where it shows it (`PRIGH_DESKTOP_WINDOW`, `programs.prigh.desktop.window`):
   `--class` for an app window and names its app_id after the site and the
   profile (e.g. `chrome-127.0.0.1__-Default`, or `chrome-ai.example.com__-Default`
   on a backend's site; `brave-`, `msedge-`, `vivaldi-` for those). The app
-  writes a hidden desktop entry by that name
+  writes a desktop entry by that name
   (`~/.local/share/applications/chrome-127.0.0.1__-Default.desktop`) so
   docks and taskbars show prigh's name and icon; match the app_id in
-  Hyprland or sway rules (`hyprctl clients` shows it).
+  Hyprland or sway rules (`hyprctl clients` shows it). The entry is not
+  hidden (`NoDisplay`), since some taskbars (Noctalia's) ignore hidden
+  entries and would show the window as the browser or not at all, so app
+  launchers may list prigh twice; both start the app.
   The browser's own right-click menu never shows there (it would give away
   that the window is Chrome): a text field's right-click (or Shift+F10)
   opens prigh's Cut, Copy, Paste and Select all instead (↑↓, Enter, Esc),
