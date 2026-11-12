@@ -302,6 +302,11 @@ module Reply_tag : sig
     (** [nix_store_status]; [/nix-gc] opens Settings once it is in *)
     | Nix_collected (** [nix_store_gc] *)
     | Memory_loaded (** [get_memory] *)
+    | Instructions_loaded (** [get_custom_instructions] *)
+    | Instruction_saved
+    (** [save_custom_instruction]: the draft closes, or says why not *)
+    | Instruction_removed
+    | Instructions_enabled (** [set_custom_instructions_enabled] *)
     | Memory_saved (** [save_memory]: the draft closes, or says why not *)
     | Memory_forgot
     | Memory_enabled (** [set_memory_enabled] *)
@@ -479,6 +484,8 @@ module Action : sig
     | Tick of Time_ns.t (** the clock, for ages; also refreshes the sessions *)
     | Set_utc_offset of Time_ns.Span.t
     (** the browser's time zone, for messages' times *)
+    | Set_browser_time_zone of string
+    (** the browser's IANA time zone, offered in About you *)
     | Set_narrow of bool (** a phone-sized window: the sidebar is a drawer *)
     | Set_desktop of bool (** the page runs under [prigh desktop] *)
     | Set_browser_shell of bool
@@ -588,6 +595,9 @@ module Action : sig
         days *)
     | Sessions_field_commit of Sessions_fields.Which.t
     (** applies one (leaving the field; Enter accepts) *)
+    | Switch_number of Switched_off.Key.t * bool
+    (** a settings number's On/Off switch: on restores what it was before
+        it was switched off, else its default *)
     | Memory_filter of string (** the settings page's Memory: its filter *)
     | Memory_edit of string option
     (** edits this note, or writes a new one ([None]) *)
@@ -598,7 +608,18 @@ module Action : sig
     | Memory_forget of string (** asks first *)
     | Memory_forget_confirm
     | Memory_forget_cancel
-    | About_you_text of string (** the settings page's About you: its text *)
+    | Instruction_edit of string option
+    (** the settings page's Custom instructions: edit one, or write a new
+        one ([None]) *)
+    | Instruction_title of string
+    | Instruction_text of string
+    | Instruction_save (** Enter in the title, Ctrl+Enter in the text *)
+    | Instruction_cancel (** Esc *)
+    | Instruction_remove of string (** asks first *)
+    | Instruction_remove_confirm
+    | Instruction_remove_cancel
+    | About_you_field of About_you.Field.t * string
+    (** the settings page's About you: a field typed in or chosen *)
     | About_you_save (** Ctrl+Enter *)
     | About_you_revert (** back to what the backend has *)
     | Open_rename
@@ -853,6 +874,7 @@ module Model : sig
     ; auth : Auth_status.t list
     ; now : Time_ns.t option
     ; utc_offset : Time_ns.Span.t (** local time minus UTC *)
+    ; browser_time_zone : string option (** IANA, once the page said *)
     ; narrow : bool
     ; desktop : bool
     (** under [prigh desktop], the desktop app: Quit prigh is offered *)
@@ -960,10 +982,14 @@ module Model : sig
     ; forges : Forges.t (** the user's git hosts *)
     ; nix_gc : Nix_gc.t (** superusers': the Nix store *)
     ; memory : Memory_notes.t (** the settings page's Memory *)
+    ; instructions : Instruction_notes.t
+    (** the settings page's Custom instructions *)
     ; about_you : About_you.t (** the settings page's About you *)
     ; compact_at : Compact_at.t (** the settings page's "Compact at" *)
     ; sessions_fields : Sessions_fields.t
       (** the settings page's session list fields *)
+    ; switched_off : Switched_off.t
+      (** what the settings' numbers were when switched off *)
     ; settings_section : Settings_section.t
     (* A phone's settings show the list of sections, not one of them. *)
     ; settings_home : bool

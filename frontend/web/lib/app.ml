@@ -259,6 +259,10 @@ module Reply_tag = struct
     | Nix_status of { open_settings : bool }
     | Nix_collected
     | Memory_loaded
+    | Instructions_loaded
+    | Instruction_saved
+    | Instruction_removed
+    | Instructions_enabled
     | Memory_saved
     | Memory_forgot
     | Memory_enabled
@@ -394,6 +398,7 @@ module Action = struct
     | Reply of Reply_tag.t * (Json.t, string) Result.t
     | Tick of Time_ns.t
     | Set_utc_offset of Time_ns.Span.t
+    | Set_browser_time_zone of string
     | Set_narrow of bool
     | Set_desktop of bool
     | Set_browser_shell of bool
@@ -476,6 +481,7 @@ module Action = struct
     | Compact_at_commit
     | Sessions_field_input of Sessions_fields.Which.t * string
     | Sessions_field_commit of Sessions_fields.Which.t
+    | Switch_number of Switched_off.Key.t * bool
     | Memory_filter of string
     | Memory_edit of string option
     | Memory_title of string
@@ -485,7 +491,15 @@ module Action = struct
     | Memory_forget of string
     | Memory_forget_confirm
     | Memory_forget_cancel
-    | About_you_text of string
+    | Instruction_edit of string option
+    | Instruction_title of string
+    | Instruction_text of string
+    | Instruction_save
+    | Instruction_cancel
+    | Instruction_remove of string
+    | Instruction_remove_confirm
+    | Instruction_remove_cancel
+    | About_you_field of About_you.Field.t * string
     | About_you_save
     | About_you_revert
     | Open_rename
@@ -681,6 +695,7 @@ module Model = struct
     ; auth : Auth_status.t list
     ; now : Time_ns.t option
     ; utc_offset : Time_ns.Span.t
+    ; browser_time_zone : string option
     ; narrow : bool
     ; desktop : bool
     ; browser_shell : bool
@@ -754,9 +769,11 @@ module Model = struct
     ; forges : Forges.t
     ; nix_gc : Nix_gc.t
     ; memory : Memory_notes.t
+    ; instructions : Instruction_notes.t
     ; about_you : About_you.t
     ; compact_at : Compact_at.t
     ; sessions_fields : Sessions_fields.t
+    ; switched_off : Switched_off.t
     ; settings_section : Settings_section.t
       (* A phone's settings show the list of sections, not one of them. *)
     ; settings_home : bool
@@ -1003,6 +1020,7 @@ let init =
   ; auth = []
   ; now = None
   ; utc_offset = Time_ns.Span.zero
+  ; browser_time_zone = None
   ; narrow = false
   ; desktop = false
   ; browser_shell = false
@@ -1072,9 +1090,11 @@ let init =
   ; forges = Forges.empty
   ; nix_gc = Nix_gc.empty
   ; memory = Memory_notes.empty
+  ; instructions = Instruction_notes.empty
   ; about_you = About_you.empty
   ; compact_at = Compact_at.empty
   ; sessions_fields = Sessions_fields.empty
+  ; switched_off = Switched_off.empty
   ; settings_section = Appearance
   ; settings_home = true
   ; return_to_settings = false
@@ -1299,7 +1319,20 @@ let review_out (m : Model.t) (outs : Code_review.Out.t list) =
     | Clear_text_selection -> m, cmds @ [ Command.Clear_text_selection ])
 ;;
 
-let with_review (m : Model.t) (review, outs) = review_out { m with review } outs
+(* On a phone the review page is a sheet: the sheets it was opened from
+   close, or they would stay over it. *)
+let with_review (m : Model.t) ((review : Code_review.t), outs) =
+  let m =
+    if m.narrow && review.open_ && not m.review.open_
+    then
+      { m with
+        files = fst (Files.update m.files Close)
+      ; agents = { m.agents with open_ = false }
+      }
+    else m
+  in
+  review_out { m with review } outs
+;;
 
 (* What the agent may have changed in the working tree: an edit, a write, a
    command, its own or a subagent's; and a run's end. *)
@@ -1837,6 +1870,11 @@ let fetch_memory (m : Model.t) =
   , [ call Get_memory ~tag:Memory_loaded ] )
 ;;
 
+let fetch_instructions (m : Model.t) =
+  ( { m with instructions = Instruction_notes.loading m.instructions }
+  , [ call Get_custom_instructions ~tag:Instructions_loaded ] )
+;;
+
 let fetch_about_you (m : Model.t) =
   ( { m with about_you = About_you.loading m.about_you }
   , [ call Get_user_info ~tag:About_you_loaded ] )
@@ -1846,6 +1884,7 @@ let fetch_about_you (m : Model.t) =
 let fetch_section (m : Model.t) : Settings_section.t -> _ = function
   | Memory -> fetch_memory m
   | About_you -> fetch_about_you m
+  | Custom_instructions -> fetch_instructions m
   | Appearance | Sessions | Models | Git_hosting | Nix_store | Account -> m, []
 ;;
 
@@ -1890,6 +1929,30 @@ let set_memory_enabled (m : Model.t) enabled =
        else "Memory off: the model no longer sees your notes")
   in
   m, cmds @ [ call (Set_memory_enabled { enabled }) ~tag:Memory_enabled ]
+;;
+
+(* The model is given the custom_instructions tool, or not, from its next
+   turn; the instructions stay in context either way. *)
+let set_instructions_enabled (m : Model.t) enabled =
+  let n = m.instructions in
+  let m =
+    { m with
+      instructions = { n with instructions = { n.instructions with enabled } }
+    }
+  in
+  let m, cmds =
+    toast
+      m
+      (if enabled
+       then "The model may now add, edit and remove your custom instructions"
+       else "The model may no longer change your custom instructions")
+  in
+  ( m
+  , cmds
+    @ [ call
+          (Set_custom_instructions_enabled { enabled })
+          ~tag:Instructions_enabled
+      ] )
 ;;
 
 (* [/settings SECTION]. *)
@@ -3645,9 +3708,23 @@ let compaction_summary config =
 
 (* The backend resolves the model as /model does, and says which models
    come closest to one it doesn't know. *)
+(* Off: what it was, for its switch to turn back on to. *)
+let remember_on (m : Model.t) key ~was ~now =
+  if Float.(now <= 0.)
+  then { m with switched_off = Switched_off.remember m.switched_off key was }
+  else m
+;;
+
 let set_compaction (m : Model.t) action =
-  with_config m ~f:(fun config ->
-    let config = Prigh_ui.Compaction_command.apply action config in
+  with_config m ~f:(fun was ->
+    let config = Prigh_ui.Compaction_command.apply action was in
+    let m =
+      remember_on
+        m
+        Compact_at
+        ~was:(Float.of_int was.compact_at_tokens)
+        ~now:(Float.of_int config.compact_at_tokens)
+    in
     let compact_at =
       match action with
       | Set_at _ -> Compact_at.empty
@@ -3746,8 +3823,15 @@ let auto_archive_summary config =
 
 (* The backend tells every client to list the sessions again. *)
 let set_auto_archive (m : Model.t) action =
-  with_config m ~f:(fun config ->
-    let config = Prigh_ui.Auto_archive_command.apply action config in
+  with_config m ~f:(fun was ->
+    let config = Prigh_ui.Auto_archive_command.apply action was in
+    let m =
+      remember_on
+        m
+        Archive_days
+        ~was:was.archive_after_days
+        ~now:config.archive_after_days
+    in
     ( { m with config = Some config }
     , [ set_config
           config
@@ -3856,6 +3940,13 @@ let save_about_you (m : Model.t) =
   | about_you, None -> { m with about_you }, []
 ;;
 
+let save_instruction (m : Model.t) =
+  match Instruction_notes.save m.instructions with
+  | instructions, Some request ->
+    { m with instructions }, [ call request ~tag:Instruction_saved ]
+  | instructions, None -> { m with instructions }, []
+;;
+
 let save_memory (m : Model.t) =
   match Memory_notes.save m.memory with
   | memory, Some request ->
@@ -3863,25 +3954,91 @@ let save_memory (m : Model.t) =
   | memory, None -> { m with memory }, []
 ;;
 
+(* The settings page's numbers behind a switch, as they are ([None]: the
+   backend's settings not loaded yet). *)
+let number (m : Model.t) (key : Switched_off.Key.t) =
+  match key with
+  | Worktree_hours ->
+    Some (Float.of_int (Worktree_folds.hours m.worktree_folds))
+  | Archive_days -> Option.map m.config ~f:(fun c -> c.archive_after_days)
+  | Compact_at ->
+    Option.map m.config ~f:(fun c -> Float.of_int c.compact_at_tokens)
+;;
+
+(* Sets one ([0]: off). *)
+let set_number (m : Model.t) (key : Switched_off.Key.t) value =
+  match key with
+  | Worktree_hours ->
+    let m =
+      remember_on
+        m
+        Worktree_hours
+        ~was:(Float.of_int (Worktree_folds.hours m.worktree_folds))
+        ~now:value
+    in
+    let worktree_folds =
+      Worktree_folds.set_hours m.worktree_folds (Float.iround_nearest_exn value)
+    in
+    ( { m with worktree_folds }
+    , save_pref
+        m
+        Key.worktree_hours
+        (Worktree_folds.hours_pref worktree_folds) )
+  | Archive_days ->
+    set_auto_archive m (Prigh_ui.Auto_archive_command.Action.Set value)
+  | Compact_at -> set_compaction m (Set_at (Float.iround_nearest_exn value))
+;;
+
 let commit_compact_at (m : Model.t) =
   match Compact_at.commit m.compact_at with
-  | compact_at, Some n -> set_compaction { m with compact_at } (Set_at n)
+  | compact_at, Some n ->
+    set_number { m with compact_at } Compact_at (Float.of_int n)
   | compact_at, None -> { m with compact_at }, []
+;;
+
+let sessions_key : Sessions_fields.Which.t -> Switched_off.Key.t = function
+  | Worktree_hours -> Worktree_hours
+  | Archive_days -> Archive_days
 ;;
 
 let commit_sessions_field (m : Model.t) (which : Sessions_fields.Which.t) =
   let sessions_fields, value = Sessions_fields.commit m.sessions_fields which in
   let m = { m with sessions_fields } in
-  match which, value with
-  | _, None -> m, []
-  | Worktree_hours, Some hours ->
-    let worktree_folds =
-      Worktree_folds.set_hours m.worktree_folds (Float.iround_nearest_exn hours)
+  match value with
+  | None -> m, []
+  | Some value -> set_number m (sessions_key which) value
+;;
+
+(* On: what it was before it was switched off, else its default. Whatever
+   was typed in its field goes. *)
+let switch_number (m : Model.t) (key : Switched_off.Key.t) on =
+  match number m key with
+  | None -> m, []
+  | Some current when Bool.equal on Float.(current > 0.) -> m, []
+  | Some _ ->
+    let m =
+      match key with
+      | Worktree_hours ->
+        { m with
+          sessions_fields =
+            Sessions_fields.clear m.sessions_fields Worktree_hours
+        }
+      | Archive_days ->
+        { m with
+          sessions_fields = Sessions_fields.clear m.sessions_fields Archive_days
+        }
+      | Compact_at -> { m with compact_at = Compact_at.empty }
     in
-    ( { m with worktree_folds }
-    , save_pref m Key.worktree_hours (Worktree_folds.hours_pref worktree_folds) )
-  | Archive_days, Some days ->
-    set_auto_archive m (Prigh_ui.Auto_archive_command.Action.Set days)
+    let default =
+      match key with
+      | Worktree_hours -> Float.of_int Worktree_folds.default_hours
+      | Archive_days -> Config.default.archive_after_days
+      | Compact_at -> Float.of_int Config.default.compact_at_tokens
+    in
+    set_number
+      m
+      key
+      (if on then Switched_off.value m.switched_off key ~default else 0.)
 ;;
 
 (* What the click changes is kept, against the session's age. *)
@@ -4317,10 +4474,12 @@ let user_switched (m : Model.t) (hello : Hello_reply.t) =
     ; forges = Forges.empty
     ; nix_gc = { Nix_gc.empty with collecting = m.nix_gc.collecting }
     ; memory = Memory_notes.empty
+    ; instructions = Instruction_notes.empty
     ; about_you = About_you.empty
     ; config = None
     ; compact_at = Compact_at.empty
     ; sessions_fields = Sessions_fields.empty
+    ; switched_off = Switched_off.empty
     }
   in
   let m, cmds =
@@ -5925,8 +6084,18 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
     error
       m
       "/user-info takes no argument here: it opens Settings, About you, where \
-       you write the text."
+       you fill in the form."
   | "memory", "" -> open_settings ~section:Memory m
+  | "instructions", "" -> open_settings ~section:Custom_instructions m
+  | "instructions", ("on" | "off") ->
+    set_instructions_enabled m (String.equal rest "on")
+  | "instructions", other ->
+    error
+      m
+      (sprintf
+         "/instructions takes on or off, not %S; /instructions alone opens \
+          them in Settings, where you add, edit and remove them."
+         other)
   | "memory", ("on" | "off") -> set_memory_enabled m (String.equal rest "on")
   | "memory", other ->
     error
@@ -7970,6 +8139,33 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
         Result.map_error (User_info.of_json json) ~f:Error.to_string_hum)
     in
     { m with about_you = About_you.was_saved m.about_you result }, []
+  | Instructions_loaded, result ->
+    let result =
+      Result.bind result ~f:(fun json ->
+        Result.map_error
+          (Custom_instructions.of_json json)
+          ~f:Error.to_string_hum)
+    in
+    { m with instructions = Instruction_notes.loaded m.instructions result }, []
+  | Instruction_saved, result ->
+    let result =
+      Result.bind result ~f:(fun json ->
+        Result.map_error
+          (Custom_instructions.note_of_reply json)
+          ~f:Error.to_string_hum)
+    in
+    { m with instructions = Instruction_notes.saved m.instructions result }, []
+  | Instruction_removed, result ->
+    ( { m with
+        instructions =
+          Instruction_notes.removed m.instructions (Result.map result ~f:ignore)
+      }
+    , [] )
+  | Instructions_enabled, Ok _ -> m, []
+  | Instructions_enabled, Error e ->
+    let m, cmds = fetch_instructions m in
+    let m, more = error m ("Custom instructions could not be switched: " ^ e) in
+    m, cmds @ more
   | Memory_enabled, Ok _ -> m, []
   | Memory_enabled, Error e ->
     let m, cmds = fetch_memory m in
@@ -8711,6 +8907,8 @@ let main_event (m : Model.t) (event : Event.t) =
     m, (Command.Remember_temporary None :: deleted) @ kept
   | Nix_gc_progress p -> { m with nix_gc = Nix_gc.progress m.nix_gc p }, []
   (* Saved, edited or forgotten here, elsewhere or by the model. *)
+  | Custom_instructions_changed ci ->
+    { m with instructions = Instruction_notes.changed m.instructions ci }, []
   | Memory_changed memory ->
     { m with memory = Memory_notes.changed m.memory memory }, []
   | User_info_changed info ->
@@ -9478,6 +9676,7 @@ let dialog_accept (m : Model.t) =
      | Some _, _ -> close_dialog m
      | None, None -> m, [])
   | Some Settings when Option.is_some m.memory.draft -> save_memory m
+  | Some Settings when Option.is_some m.instructions.draft -> save_instruction m
   | Some Settings
     when Settings_section.equal m.settings_section About_you
          && About_you.dirty m.about_you -> save_about_you m
@@ -9695,6 +9894,7 @@ let update_connected (m : Model.t) (action : Action.t) =
   (* The ages in the sidebar; the list itself follows [sessions_changed]. *)
   | Tick now -> { m with now = Some now }, []
   | Set_utc_offset utc_offset -> { m with utc_offset }, []
+  | Set_browser_time_zone zone -> { m with browser_time_zone = Some zone }, []
   | Set_desktop desktop -> { m with desktop }, []
   | Set_browser_shell browser_shell -> { m with browser_shell }, []
   | Open_field_menu { field; anchor } ->
@@ -9861,6 +10061,7 @@ let update_connected (m : Model.t) (action : Action.t) =
     }
     , []
   | Sessions_field_commit which -> commit_sessions_field m which
+  | Switch_number (key, on) -> switch_number m key on
   | Memory_filter text ->
     { m with memory = Memory_notes.set_filter m.memory text }, []
   | Memory_edit id ->
@@ -9880,14 +10081,35 @@ let update_connected (m : Model.t) (action : Action.t) =
      | memory, Some request ->
        { m with memory }, [ call request ~tag:Memory_forgot ]
      | memory, None -> { m with memory }, [])
+  | Instruction_edit id ->
+    ( { m with instructions = Instruction_notes.edit m.instructions id }
+    , [ Command.Focus "instruction-text" ] )
+  | Instruction_title text ->
+    ( { m with instructions = Instruction_notes.set_title m.instructions text }
+    , [] )
+  | Instruction_text text ->
+    { m with instructions = Instruction_notes.set_text m.instructions text }, []
+  | Instruction_save -> save_instruction m
+  | Instruction_cancel ->
+    { m with instructions = Instruction_notes.cancel m.instructions }, []
+  | Instruction_remove id ->
+    ( { m with instructions = Instruction_notes.ask_remove m.instructions id }
+    , [ Command.Focus "instruction-remove-yes" ] )
+  | Instruction_remove_confirm ->
+    (match Instruction_notes.remove m.instructions with
+     | instructions, Some request ->
+       { m with instructions }, [ call request ~tag:Instruction_removed ]
+     | instructions, None -> { m with instructions }, [])
+  | Instruction_remove_cancel ->
+    { m with instructions = Instruction_notes.cancel_remove m.instructions }, []
   | Memory_forget_cancel ->
     { m with memory = Memory_notes.cancel_forget m.memory }, []
-  | About_you_text text ->
-    { m with about_you = About_you.set_text m.about_you text }, []
+  | About_you_field (field, value) ->
+    { m with about_you = About_you.set m.about_you field value }, []
   | About_you_save -> save_about_you m
   | About_you_revert ->
     ( { m with about_you = About_you.revert m.about_you }
-    , [ Command.Focus "about-you-text" ] )
+    , [ Command.Focus "about-you-name" ] )
   | Open_rename -> open_rename m
   | Open_subagents arg -> open_agents m arg
   | Toggle_subagents ->
@@ -9971,6 +10193,11 @@ let update_connected (m : Model.t) (action : Action.t) =
        { m with memory = Memory_notes.cancel m.memory }, []
      | Some Settings, _ when Option.is_some m.memory.forgetting ->
        { m with memory = Memory_notes.cancel_forget m.memory }, []
+     | Some Settings, _ when Option.is_some m.instructions.draft ->
+       { m with instructions = Instruction_notes.cancel m.instructions }, []
+     | Some Settings, _ when Option.is_some m.instructions.removing ->
+       ( { m with instructions = Instruction_notes.cancel_remove m.instructions }
+       , [] )
      | _ ->
        (match m.dialog with
         | Some (Login { failed = None; provider; _ }) ->

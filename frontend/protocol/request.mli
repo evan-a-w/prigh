@@ -219,8 +219,21 @@ module Method : sig
         } (** [{note}]: {!Memory.note_of_reply} *)
     | Forget_memory of { id : string }
     | Set_memory_enabled of { enabled : bool }
+    | Get_custom_instructions (** {!Custom_instructions} *)
+    | Save_custom_instruction of
+        { id : string option (** edits it; without, adds one *)
+        ; title : string option
+        ; text : string
+        } (** [{note}]: {!Custom_instructions.note_of_reply} *)
+    | Remove_custom_instruction of { id : string }
+    | Set_custom_instructions_enabled of { enabled : bool }
     | Get_user_info (** {!User_info} *)
-    | Set_user_info of { text : string } (** {!User_info}, as saved *)
+    | Set_user_info of { form : User_info.Form.t }
+    (** replaces the form: {!User_info}, as saved *)
+    | Set_user_info_field of
+        { field : string (** {!User_info.Form.fields} *)
+        ; value : string (** empty: clears it *)
+        } (** {!User_info}, as saved *)
   [@@deriving sexp_of, equal]
 
   val name : t -> string

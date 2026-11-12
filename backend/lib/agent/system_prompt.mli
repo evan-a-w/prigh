@@ -28,8 +28,10 @@ end
     subagent's tells it to block on commands rather than sleep, and that it
     finishes only once its jobs have exited. Either role, given the
     [worktree] tool, is told to make worktrees with it rather than with
-    [git worktree add]. [user_info] is what the user wrote about themselves
-    ({!User_info}), the last block. *)
+    [git worktree add]. [user_info] is what the user set about themselves
+    ({!User_info}), then the user's [custom_instructions], the last blocks;
+    given the [custom_instructions] tool, the model is told when to change
+    them. *)
 val build
   :  ?date:string
   -> ?instructions:(string * string) list
@@ -38,6 +40,7 @@ val build
   -> ?auto_background:float
   -> ?role:Role.t
   -> ?user_info:string
+  -> ?custom_instructions:Custom_instruction.t list
   -> cwd:string
   -> home:string
   -> tools:Tool_spec.t list

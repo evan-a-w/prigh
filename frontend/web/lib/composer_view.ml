@@ -37,6 +37,7 @@ let popup (m : App.Model.t) ~inject =
       | Argument Resume -> "Automatic resume"
       | Argument Notify -> "Notifications"
       | Argument Memory -> "Memory"
+      | Argument Instructions -> "Custom instructions"
       | Argument Settings -> "Settings sections"
       | Argument Pr -> "Pull requests"
       | Argument Theme -> "Themes"
@@ -182,14 +183,20 @@ let images (m : App.Model.t) ~inject =
 let pending_chip = Session_chips_view.pending_chip
 let menu_attrs = Session_chips_view.menu_attrs
 
-(* On a phone, a model's name without its first word (the family:
-   "DeepSeek", "Claude"), rather than cut short: "V4.1 Flash", "Opus 4.5".
-   Only in names of three words or more, so that what is left still says
-   which; the tooltip and the menu have it whole. *)
-let model_label (m : App.Model.t) name =
+(* Short of room (a phone, a narrow composer), a model's name goes
+   without its first word (the family: "DeepSeek", "Claude"), rather than
+   cut short: "V4.1 Flash", "Opus 4.5". Only in names of three words or
+   more, so that what is left still says which; the tooltip and the menu
+   have it whole. The style sheet hides the family. *)
+let model_label name =
+  let label = Node.span ~attrs:[ Attr.class_ "chip-label" ] in
   match String.split name ~on:' ' with
-  | _ :: (_ :: _ :: _ as rest) when m.narrow -> String.concat ~sep:" " rest
-  | _ -> name
+  | family :: (_ :: _ :: _ as rest) ->
+    label
+      [ span ~cls:"model-family" (family ^ " ")
+      ; Node.text (String.concat ~sep:" " rest)
+      ]
+  | _ -> label [ Node.text name ]
 ;;
 
 let model_chip (m : App.Model.t) (state : State.t) ~inject =
@@ -206,9 +213,7 @@ let model_chip (m : App.Model.t) (state : State.t) ~inject =
       ~title:(sprintf "%s: switch model (Ctrl+L)" state.model.name)
       ~attrs:(menu_attrs m Model)
       ~on_click:(inject (Action.Open_chip Model))
-      [ span ~cls:"chip-label" (model_label m state.model.name)
-      ; icon ~cls:"chevron" Chevron
-      ]
+      [ model_label state.model.name; icon ~cls:"chevron" Chevron ]
 ;;
 
 (* Where tools run, always named, also while that host is disconnected (its

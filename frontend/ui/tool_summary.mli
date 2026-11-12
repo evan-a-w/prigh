@@ -40,6 +40,10 @@ val repo : Tool_args.t -> string option
     id, e.g. [save editor], [recall "deploy"], [forget m3]. *)
 val memory : Tool_args.t -> string option
 
+(** [custom_instructions]' argument: the action, the id it changes and its
+    title (or quoted text). *)
+val custom_instructions : Tool_args.t -> string option
+
 (** An [on_host] call's host and the call it runs there (with the same id),
     once its arguments name them; also while they are still streaming. *)
 val on_host : P.Tool_call.t -> (string * P.Tool_call.t) option

@@ -8,6 +8,8 @@ type t =
   ; plan_mode : bool
   ; client : Client_kind.t option [@sexp.option] [@jsonaf.option]
   ; user_info : string option [@sexp.option] [@jsonaf.option]
+  ; custom_instructions : Custom_instruction.t list
+        [@sexp.list] [@jsonaf.default []] [@jsonaf_drop_default.equal]
   }
 [@@deriving sexp, jsonaf, equal]
 
@@ -64,5 +66,30 @@ let notes ~told now ~host_name =
         (User_info { cleared = Option.is_none now.user_info })
         (System_prompt.user_info_note now.user_info)
   in
-  List.filter_opt [ host; cwd; tools; plan_mode; client; user_info ]
+  let custom_instructions =
+    let told = told.custom_instructions
+    and now = now.custom_instructions in
+    Option.map (Custom_instruction.note ~told now) ~f:(fun text ->
+      let changes = Custom_instruction.changes ~told now in
+      let count f = List.count changes ~f in
+      { Injected.Note.kind =
+          Custom_instructions
+            { added =
+                count (function
+                  | Added _ -> true
+                  | _ -> false)
+            ; edited =
+                count (function
+                  | Edited _ -> true
+                  | _ -> false)
+            ; removed =
+                count (function
+                  | Removed _ -> true
+                  | _ -> false)
+            }
+      ; text
+      })
+  in
+  List.filter_opt
+    [ host; cwd; tools; plan_mode; client; user_info; custom_instructions ]
 ;;

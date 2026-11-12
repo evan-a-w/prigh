@@ -528,10 +528,10 @@ mark.review-mark.quiet.hot { background: color-mix(in srgb, var(--sage) 14%, tra
 .app.narrow .review-page { position: fixed; inset: 0; z-index: var(--z-sheet); }
 .app.narrow .review-body { flex-direction: column; }
 .app.narrow .review-files { width: auto; flex: 1; border-right: 0; }
-.app.narrow .review-head { padding: 6px 8px; gap: 6px 8px; min-height: 0; }
+.app.narrow .review-head { padding: 6px; gap: 6px 4px; min-height: 0; }
 .app.narrow .review-title, .app.narrow .review-progress-word { display: none; }
-.app.narrow .review-progress { flex: 1 1 80px; min-width: 80px; }
-.app.narrow .review-strip { min-width: 40px; }
+.app.narrow .review-progress { flex: 1 1 48px; min-width: 48px; gap: 6px; }
+.app.narrow .review-strip { min-width: 0; }
 /* The controls' box gone, the first row is the progress, Send and close;
    the second the two switches. */
 .app.narrow .review-controls { display: contents; }
@@ -540,6 +540,20 @@ mark.review-mark.quiet.hot { background: color-mix(in srgb, var(--sage) 14%, tra
 .app.narrow .review-controls > .segmented + .segmented { margin-left: auto; }
 .app.narrow .review-scroll { padding: 6px 4px 24px; }
 .app.narrow .review-dock { padding: 6px 8px; }
+/* Over the whole screen: the notch over the head, the home indicator under
+   the dock, and targets a thumb can hit, as in the panels. */
+.app.narrow .review-page { padding: var(--safe-t) var(--safe-r) var(--safe-b) var(--safe-l); }
+.app.narrow .review-head .btn.icon { min-width: var(--tap); min-height: var(--tap); }
+.app.narrow .review-head :is(.segment, .review-send) { min-height: var(--tap); }
+.app.narrow .review-files-toggle { min-height: var(--tap); }
+.app.narrow .review-pick-button { min-height: var(--tap); align-items: center; }
+.app.narrow .review-file { min-height: var(--tap); }
+.app.narrow .review-file-more.btn.icon { width: var(--tap); height: var(--tap); right: 0; }
+.app.narrow .review-files li > .review-file { padding-right: var(--tap); }
+.app.narrow .git-actions .btn { min-height: var(--tap); }
+.app.narrow .review-dock-step.btn { min-width: var(--tap); min-height: var(--tap); }
+.app.narrow .review-approve.btn { min-height: var(--tap); }
+@media (pointer: coarse) { .review-approve kbd { display: none; } }
 .review-files-toggle {
   display: flex;
   align-items: center;

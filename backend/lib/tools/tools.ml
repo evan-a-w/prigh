@@ -76,6 +76,7 @@ let main_agent_only =
   ; Tool_render_ui.name
   ; Goal.tool_name
   ; Tool_memory.name
+  ; Tool_custom_instructions.name
   ; Tool_review_reply.name
   ]
 ;;
@@ -100,9 +101,9 @@ let unavailable ~depth name =
   else if depth >= 1 && mem main_agent_only name
   then
     Some
-      "it is the main agent's (the user's plan, questions, components, goal \
-       and memory), and you are a subagent: put what you need from the user in \
-       your report"
+      "it is the main agent's (the user's plan, questions, components, goal, \
+       memory and custom instructions), and you are a subagent: put what you \
+       need from the user in your report"
   else if depth >= 1 && mem between_sessions name
   then
     Some

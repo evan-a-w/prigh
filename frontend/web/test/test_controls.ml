@@ -1227,7 +1227,10 @@ let%expect_test "narrow: the chips' short names, the shorter placeholder" =
             aria-expanded="false"
             class="btn chip-button model-chip"
             @on_click>
-      <span class="chip-label"> Opus 5.5 </span>
+      <span class="chip-label">
+        <span class="model-family"> Claude  </span>
+        Opus 5.5
+      </span>
       <icon class="chevron"> </icon>
     </button>
     <textarea id="editor"

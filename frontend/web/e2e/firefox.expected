@@ -742,7 +742,7 @@ on a phone: 0 handles
 hl-kw:let hl-kw:rec hl-kw:if hl-num:2 hl-kw:then hl-kw:else hl-num:1 hl-num:2 hl-com:(* slow *)
 hl-prop:"name" hl-str:"prigh" hl-prop:"ok" hl-con:true hl-prop:"n" hl-num:3
 === firefox: the session: a 700px chat column ===
-chat 700; chips: DeepSeek V4.1 Flash, <HOSTNAME>, on, auto, normal; status: 0%, $<COST>; .chat-chrome 44px high
+chat 700; chips: DeepSeek V4.1 Flash, <HOSTNAME>, icon, icon, icon; status: 0%, $<COST>; .chat-chrome 44px high
 .chat-chrome: fits
 .composer: fits
 the panels' toggles: 3 buttons 10px from the top, 14px from the right, clear of the jump list: true, open: Files
@@ -752,7 +752,7 @@ chat 520; chips: DeepSeek V4.1 Flash, icon, icon, icon, icon; status: 0%; .chat-
 .composer: fits
 the panels' toggles: 3 buttons 10px from the top, 14px from the right, clear of the jump list: true, open: Files
 === firefox: the session: a 400px chat column ===
-chat 400; chips: DeepSeek V4.1 Flash, icon, icon, icon, icon; status: 0%; .chat-chrome 44px high
+chat 400; chips: V4.1 Flash, icon, icon, icon, icon; status: 0%; .chat-chrome 44px high
 .chat-chrome: fits
 .composer: fits
 the panels' toggles: 3 buttons 10px from the top, 14px from the right, clear of the jump list: true, open: Files
@@ -763,6 +763,7 @@ Sessions
 Models
 Memory
 About you
+Custom instructions
 Git hosting
 T
 token
@@ -809,7 +810,7 @@ chat 600; chips: DeepSeek V4.1 Flash, icon, icon, icon, icon; status: 0%; .chat-
 .composer: fits
 the panels' toggles: 4 buttons 10px from the top, 14px from the right, clear of the jump list: true, open: Files
 === firefox: the session's bar: a 400px chat column without the sidebar ===
-chat 400; chips: DeepSeek V4.1 Flash, icon, icon, icon, icon; status: 0%; .chat-chrome 44px high
+chat 400; chips: V4.1 Flash, icon, icon, icon, icon; status: 0%; .chat-chrome 44px high
 .chat-chrome: fits
 .composer: fits
 the panels' toggles: 4 buttons 10px from the top, 14px from the right, clear of the jump list: true, open: Files
@@ -984,6 +985,7 @@ Sessions
 Models
 Memory
 About you
+Custom instructions
 Git hosting
 B
 bob
@@ -3054,7 +3056,7 @@ Jump to a message, Filter the transcript, Files, Terminal, Settings
 === firefox: mobile: 390x844: the settings' list ===
 ok
 === firefox: mobile: 390x844: the settings ===
-Appearance, Sessions, Models, Memory, About you, Git hosting, Account
+Appearance, Sessions, Models, Memory, About you, Custom instructions, Git hosting, Account
 === firefox: mobile: 390x844: settings: appearance ===
 ok
 title: Appearance; back: Settings
@@ -3073,6 +3075,10 @@ full width: true; at the bottom: true
 ok
 === firefox: mobile: 390x844: the files ===
 ok
+=== firefox: mobile: 390x844: the review page ===
+ok
+=== firefox: mobile: 390x844: the review's files ===
+ok
 === firefox: mobile: 320x640: the chat ===
 ok
 === firefox: mobile: 320x640: the chrome ===
@@ -3086,7 +3092,7 @@ Jump to a message, Filter the transcript, Files, Terminal, Settings
 === firefox: mobile: 320x640: the settings' list ===
 ok
 === firefox: mobile: 320x640: the settings ===
-Appearance, Sessions, Models, Memory, About you, Git hosting, Account
+Appearance, Sessions, Models, Memory, About you, Custom instructions, Git hosting, Account
 === firefox: mobile: 320x640: settings: appearance ===
 ok
 title: Appearance; back: Settings
@@ -3104,6 +3110,10 @@ full width: true; at the bottom: true
 === firefox: mobile: 320x640: / completion ===
 ok
 === firefox: mobile: 320x640: the files ===
+ok
+=== firefox: mobile: 320x640: the review page ===
+ok
+=== firefox: mobile: 320x640: the review's files ===
 ok
 === firefox: terminal keys: a desktop ===
 the shell has the focus: true; the bar: hidden
@@ -3248,10 +3258,9 @@ COMPACTION
 Compact at
 Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window.
 tokens
-Off
 Mask old tool outputs
 Replace tool outputs older than the last 10 turns with placeholders first, which often saves summarising.
-field: "200k" (placeholder 200k); Off pressed: false; mask: true
+field: "200k" (placeholder 200k); on: true; mask: true
 === firefox: compaction: refused ===
 “lots” isn't a number of tokens: type one like 150k or 200000, or off to compact only at 80% of the window.
 still open: 1
@@ -3260,10 +3269,9 @@ COMPACTION
 Compact at
 Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window.
 tokens
-Off
 Mask old tool outputs
 Replace tool outputs older than the last 10 turns with placeholders first, which often saves summarising.
-field: "150k" (placeholder 200k); Off pressed: false; mask: false
+field: "150k" (placeholder 200k); on: true; mask: false
 compact_at_tokens=150000 compaction_model=null mask_observations=false
 === firefox: compaction: picker ===
 Summary model; first: The conversation's model whichever model the conversation uses
@@ -3273,23 +3281,29 @@ COMPACTION
 Compact at
 Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window.
 tokens
-Off
 Mask old tool outputs
 Replace tool outputs older than the last 10 turns with placeholders first, which often saves summarising.
-field: "150k" (placeholder 200k); Off pressed: false; mask: false
+field: "150k" (placeholder 200k); on: true; mask: false
 === firefox: compaction: /compaction ===
 Compaction: at 150k tokens, or 80% of the model's window if that is less; summaries by the session's model; observation masking off (/compaction at TOKENS|off, /compaction model MODEL|off, /compaction mask on|off)
 === firefox: compaction: off by /compaction ===
 COMPACTION
 Compact at
 Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window.
-Off: only at 80% of the window. Type a number to set one.
-tokens
-Off
+Off: only at 80% of the window.
 Mask old tool outputs
 Replace tool outputs older than the last 10 turns with placeholders first, which often saves summarising.
-field: "" (placeholder 150k); Off pressed: true; mask: false
+field: hidden; on: false; mask: false
 compact_at_tokens=0 compaction_model=null mask_observations=false
+=== firefox: compaction: switched on ===
+COMPACTION
+Compact at
+Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window.
+tokens
+Mask old tool outputs
+Replace tool outputs older than the last 10 turns with placeholders first, which often saves summarising.
+field: "150k" (placeholder 200k); on: true; mask: false
+compact_at_tokens=150000 compaction_model=null mask_observations=false
 === firefox: compaction: phone ===
 fits: true
 === firefox: compaction: errors ===
@@ -3298,8 +3312,8 @@ fits: true
 + Fresh work: fix/fresh
 - Old work
 === firefox: sessions settings: the settings ===
-Show worktrees | Your account | Show worktrees for sessions used in the last 12 hours; older ones fold them behind their count. Your own fold or unfold of a session wins. | hours | Off
-Archive after | Sessions without activity for 7 days move to Archived (pinned and running ones never do). | days | Off
+Show worktrees | Your account | Show worktrees for sessions used in the last 12 hours; older ones fold them behind their count. Your own fold or unfold of a session wins. | hours
+Archive after | Sessions without activity for 7 days move to Archived (pinned and running ones never do). | days
 fields: "12" hours, "7" days
 === firefox: sessions settings: 100 hours ===
 + Fresh work: fix/fresh
@@ -3313,12 +3327,16 @@ fields: "12" hours, "7" days
 === firefox: sessions settings: refused ===
 “a fortnight” isn't a number of days from 0 to 365: type one like 7, or off to archive only by hand.
 === firefox: sessions settings: archive after 2 days ===
-Show worktrees | Your account | Show worktrees for sessions used in the last N hours (0 or Off: none); older ones fold them behind their count. Your own fold or unfold of a session wins. | Off: every session's worktrees start folded. | hours | Off
-Archive after | Sessions without activity for 2 days move to Archived (pinned and running ones never do). | days | Off
-fields: "" hours, "2" days
+Show worktrees | Your account | Show worktrees for sessions used recently; older ones fold them behind their count. Your own fold or unfold of a session wins. | Off: every session's worktrees start folded.
+Archive after | Sessions without activity for 2 days move to Archived (pinned and running ones never do). | days
+fields: hidden hours, "2" days
 archive_after_days=2
 - Fresh work
 archived: Archived 1
+=== firefox: sessions settings: switched on again ===
+Show worktrees | Your account | Show worktrees for sessions used in the last 100 hours; older ones fold them behind their count. Your own fold or unfold of a session wins. | hours
+Archive after | Sessions without activity for 2 days move to Archived (pinned and running ones never do). | days
+fields: "100" hours, "2" days
 === firefox: sessions settings: phone 390x844: sidebar ===
 + Fresh work: fix/fresh
 + Old work: feat/old-a, feat/old-b
@@ -3387,47 +3405,91 @@ editing fits: yes; targets: all ok
 back: Memory | What you asked the model to remember, for later sessions. Kept on the backend, for your account.
 === firefox: memory: errors ===
 (none)
-=== firefox: user info: empty ===
+=== firefox: user info: moved from user_info.md ===
 About you
 What the model should know about you, given to it in every session. Kept on the backend, for your account.
-Describe yourself
-Who you are, what you work on, how you like answers. This text is given to the model in every session: new ones start with it, and open ones get it with your next message. Memory is for notes the model looks up only when it needs them.
-0 of 4000 bytes
+Tell the model about you
+Every field is optional. What you fill in is given to the model in every session: new ones start with it, and open ones get it with your next message. Memory is for notes the model looks up only when it needs them.
+Name
+Country or region
+Time zone
+Use Australia/Sydney
+Language and spelling
+Units
+Not set
+Metric
+Imperial
+US
+Date format
+Not set
+D/M/Y
+M/D/Y
+ISO
+Occupation or role
+Background and expertise
+Anything else
+21 of 5000 bytes
 Ctrl+Enter saves
 Save
-text: ""
+values: name="" country="" time-zone="" language="" units="Not set" date-format="Not set" occupation="" background="" anything-else="I like short answers."
+files: user_info.md: no, user_info.md.migrated: yes
 === firefox: user info: saved ===
 About you
 What the model should know about you, given to it in every session. Kept on the backend, for your account.
-Describe yourself
-Who you are, what you work on, how you like answers. This text is given to the model in every session: new ones start with it, and open ones get it with your next message. Memory is for notes the model looks up only when it needs them.
+Tell the model about you
+Every field is optional. What you fill in is given to the model in every session: new ones start with it, and open ones get it with your next message. Memory is for notes the model looks up only when it needs them.
+Name
+Country or region
+Time zone
+Language and spelling
+Units
+Not set
+Metric
+Imperial
+US
+Date format
+Not set
+D/M/Y
+M/D/Y
+ISO
+Occupation or role
+Background and expertise
+Anything else
 Saved. New sessions start with it; open ones get it with your next message in them.
-57 of 4000 bytes
+79 of 5000 bytes
 Ctrl+Enter saves
 Save
-text: "I'm Lloyd. I work on prigh, in OCaml.\nKeep answers short."
-file: "I'm Lloyd. I work on prigh, in OCaml.\nKeep answers short.\n"
-reverted: "I'm Lloyd. I work on prigh, in OCaml.\nKeep answers short."
+values: name="Lloyd" country="Australia" time-zone="Australia/Sydney" language="" units="Metric" date-format="D/M/Y" occupation="" background="Undergrad pure maths and CS." anything-else="I like short answers."
+file: {
+  "version": 1,
+  "name": "Lloyd",
+  "country": "Australia",
+  "time_zone": "Australia/Sydney",
+  "units": "metric",
+  "date_format": "dmy",
+  "background": "Undergrad pure maths and CS.",
+  "anything_else": "I like short answers."
+}
+reverted: "Lloyd"
 === firefox: user info: followed on another page ===
-text: "I'm Lloyd. Keep answers short."
+values: name="Lloyd" country="Australia" time-zone="Australia/Sydney" language="" units="Metric" date-format="D/M/Y" occupation="Student" background="Undergrad pure maths and CS." anything-else="I like short answers."
 === firefox: user info: changed under a draft ===
-About you
-What the model should know about you, given to it in every session. Kept on the backend, for your account.
-Describe yourself
-Who you are, what you work on, how you like answers. This text is given to the model in every session: new ones start with it, and open ones get it with your next message. Memory is for notes the model looks up only when it needs them.
 It was changed somewhere else while you were typing. Saving replaces that with this.
 Load that one
-23 of 4000 bytes
-Ctrl+Enter saves
-Revert
-Save
-text: "typed on the other page"
-loaded: "I'm Lloyd. Keep answers short, in British English."
+loaded: name="Lloyd" country="Australia" time-zone="Australia/Sydney" language="English, Australian spelling" units="Metric" date-format="D/M/Y" occupation="Student" background="Undergrad pure maths and CS." anything-else="I like short answers."
 === firefox: user info: the session is told ===
-☺ About you: the model was given what you wrote
-[User info: what the user wrote about themselves in prigh's settings, for every session, is now:
-I'm Lloyd. Keep answers short, in British English.
-It replaces any earlier text about the user.]
+☺ About you: the model was given your details
+[User info: what the user set about themselves in prigh's settings, for every session, is now:
+- Name: Lloyd
+- Country/region: Australia
+- Time zone: Australia/Sydney
+- Language and spelling: English, Australian spelling
+- Units: metric (°C, km, kg, L)
+- Date format: day/month/year (25/12/2026)
+- Occupation/role: Student
+- Background and expertise: Undergrad pure maths and CS.
+- Anything else: I like short answers.
+It replaces anything earlier about the user from their settings.]
 === firefox: user info: phone 390x844 ===
 fits: yes; targets: all ok; Save on screen: yes
 typing fits: yes; targets: all ok; Save on screen: yes
@@ -3437,6 +3499,64 @@ fits: yes; targets: all ok; Save on screen: yes
 typing fits: yes; targets: all ok; Save on screen: yes
 back: About you | What the model should know about you, given to it in every session. Kept on the backend, for your account.
 === firefox: user info: errors ===
+(none)
+=== firefox: custom instructions: list ===
+Custom instructions
+Standing instructions for the model, given to it in every session; it may also add or edit them when you state a lasting preference. Kept on the backend, for your account.
+Let the model change them
+When you state a lasting preference or standing instruction, the model adds it here or edits the one that covers it, and tells you. Off, only you change them; they stay in every session either way.
+INSTRUCTIONS
+2 instructions
+2 of 50 · about 43 tokens in every session
+Use Australian spelling.
+ci1 · saved 2026-11-01
+Maths
+Keep a single memory note on my maths ability up to date.
+ci2 · saved 2026-11-02
+Add instruction
+switch: true
+settings still open: 1
+=== firefox: custom instructions: edited and added ===
+ci1 -: Use Australian spelling and metric units.; ci2 Maths: Keep a single memory note on my maths ability up to date.; ci3 Code: Prefer OCaml examples.
+=== firefox: custom instructions: deleting ===
+Maths | Keep a single memory note on my maths ability up to date. | Delete this instruction? No session gets it any more. | Keep | Delete
+ci1 -: Use Australian spelling and metric units.; ci3 Code: Prefer OCaml examples.
+=== firefox: custom instructions: off, followed on another page ===
+Custom instructions
+Standing instructions for the model, given to it in every session; it may also add or edit them when you state a lasting preference. Kept on the backend, for your account.
+Let the model change them
+When you state a lasting preference or standing instruction, the model adds it here or edits the one that covers it, and tells you. Off, only you change them; they stay in every session either way.
+INSTRUCTIONS
+2 instructions
+2 of 50 · about 38 tokens in every session
+Use Australian spelling and metric units.
+ci1 · saved (today)
+Code
+Prefer OCaml examples.
+ci3 · saved (today)
+Add instruction
+switch: false
+prefs: custom_instructions.enabled=false
+=== firefox: custom instructions: the session is told ===
+§ Custom instructions: the model was told 1 added, 1 edited, 1 removed
+[Custom instructions (the user's standing instructions; follow them) are now:
+[ci1] Use Australian spelling and metric units.
+[ci3] (Code) Prefer OCaml examples.
+These replace any earlier custom instructions.]
+after /instructions on: prefs custom_instructions.enabled=null
+=== firefox: custom instructions: warning ===
+About 1,757 tokens in every session | They are added to the context of every session, before you say anything: that is cost on every message and room the work no longer has. Trim them: merge near-duplicates, drop what no longer applies, and keep what is only sometimes needed in memory.
+=== firefox: custom instructions: phone 390x844 ===
+warning fits: yes; targets: all ok
+deleting fits: yes; targets: all ok
+editing fits: yes; targets: all ok
+back: Custom instructions | Standing instructions for the model, given to it in every session; it may also add or edit them when you state a lasting preference. Kept on the backend, for your account.
+=== firefox: custom instructions: phone 320x640 ===
+warning fits: yes; targets: all ok
+deleting fits: yes; targets: all ok
+editing fits: yes; targets: all ok
+back: Custom instructions | Standing instructions for the model, given to it in every session; it may also add or edit them when you state a lasting preference. Kept on the backend, for your account.
+=== firefox: custom instructions: errors ===
 (none)
 === firefox: images (desktop): refused as too large: the error card ===
 The model returned an error

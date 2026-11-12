@@ -101,4 +101,11 @@ type t =
   (** A tool made or removed git worktrees ([worktree], or [bash] running
       [git worktree]): {!Agent} records them on the session, a subagent's as
       that subagent's; frontends do not see this event. *)
+  | Custom_instruction_set of
+      { id : string
+      ; instruction : Custom_instruction.t option (** [None]: removed *)
+      }
+  (** The [custom_instructions] tool changed one: {!Agent} records that the
+      model knows, so it is not told back to it; frontends do not see this
+      event (they hear [custom_instructions_changed]). *)
 [@@deriving sexp_of]
