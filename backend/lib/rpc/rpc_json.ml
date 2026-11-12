@@ -822,6 +822,9 @@ let rec event ?now (e : Agent.Event.t) =
     | Loop (Worktrees_changed _) ->
       (* [Agent] records it rather than broadcasting it. *)
       [ "event", str "worktrees_changed" ]
+    | Loop (Custom_instruction_set _) ->
+      (* Likewise. *)
+      [ "event", str "custom_instruction_set" ]
     | Loop (Compacted { summary; usage = u; cost_usd }) ->
       [ "event", str "compacted"
       ; "summary", str summary

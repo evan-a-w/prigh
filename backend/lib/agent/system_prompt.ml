@@ -98,7 +98,8 @@ let base ~nix ~auto_background ~(role : Role.t) ~tools =
         then
           [ "- Other machines: use on_host only when the user names another \
              machine or asks to run something there; the session's own host is \
-             for normal work. This is very important! Do not use on_host EVER unless the user has given permission."
+             for normal work. This is very important! Do not use on_host EVER \
+             unless the user has given permission."
           ]
         else [])
      @ (if has "worktree"
@@ -112,6 +113,16 @@ let base ~nix ~auto_background ~(role : Role.t) ~tools =
                 its path: cd there in bash, use paths under it in file tools"
              ^ if has "subagent" then ", pass it as a subagent's cwd." else "."
             )
+          ]
+        else [])
+     @ (if has "custom_instructions"
+        then
+          [ "- Custom instructions: when the user states a lasting preference, \
+             fact about themselves or standing instruction for every session \
+             that they do not cover yet, add it with custom_instructions (or \
+             edit the one that covers it) and say so briefly; never for task \
+             details or one-off requests. Memory is for what is looked up only \
+             when needed."
           ]
         else [])
      @ (if has "sessions" || has "ask_session"
@@ -238,22 +249,22 @@ let base ~nix ~auto_background ~(role : Role.t) ~tools =
 ;;
 
 let user_info_section text =
-  "About the user (written by them in prigh's settings; applies to every \
-   session):\n"
+  "About the user (from their settings in prigh; applies to every session):\n"
   ^ text
 ;;
 
 let user_info_note = function
   | Some text ->
     sprintf
-      "[User info: what the user wrote about themselves in prigh's settings, \
-       for every session, is now:\n\
+      "[User info: what the user set about themselves in prigh's settings, for \
+       every session, is now:\n\
        %s\n\
-       It replaces any earlier text about the user.]"
+       It replaces anything earlier about the user from their settings.]"
       text
   | None ->
-    "[User info: the user removed what they wrote about themselves in prigh's \
-     settings: any earlier text about the user no longer applies.]"
+    "[User info: the user cleared what they set about themselves in prigh's \
+     settings: anything earlier about the user from their settings no longer \
+     applies.]"
 ;;
 
 let read_instructions ~cwd ~home =
@@ -269,6 +280,7 @@ let build
       ?auto_background
       ?(role = Role.Main)
       ?user_info
+      ?(custom_instructions = [])
       ~cwd
       ~home
       ~tools
@@ -307,7 +319,8 @@ let build
      @ skills
      @ [ environment ]
      @ instructions
-     @ Option.to_list (Option.map user_info ~f:user_info_section))
+     @ Option.to_list (Option.map user_info ~f:user_info_section)
+     @ Option.to_list (Custom_instruction.section custom_instructions))
 ;;
 
 let discretion =

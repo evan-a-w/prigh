@@ -99,7 +99,9 @@ let rec tool_summary ~name (args : Json.t) =
        String.concat
          ~sep:" "
          (text "action" @ text "state" @ number @ text "title")
-     | _ when String.equal name Tool_memory.name ->
+     | _
+       when String.equal name Tool_memory.name
+            || String.equal name Tool_custom_instructions.name ->
        let text key =
          match find key with
          | Some (`String s) ->

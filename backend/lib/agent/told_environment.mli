@@ -20,12 +20,16 @@ type t =
   ; user_info : string option
     (** {!User_info}'s text; [None]: none (also in sessions from before it,
         which are so told the text with their next message) *)
+  ; custom_instructions : Custom_instruction.t list
+    (** as the model was told them (also by its own changes); [[]] in
+        sessions from before them *)
   }
 [@@deriving sexp, jsonaf, equal]
 
 (** What a model that knows [told] is to be told about [now] ([host_name]
     names [now.host]), in this order: host, cwd, tools (added and removed),
     plan mode, client (whenever [now]'s differs, so the first prompt tells
-    it), the user's info (its new text, or that it was removed). Only net changes:
+    it), the user's info (its new text, or that it was removed), the
+    custom instructions ({!Custom_instruction.note}). Only net changes:
     changes that cancel out give no note. *)
 val notes : told:t -> t -> host_name:string -> Injected.Note.t list

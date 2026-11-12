@@ -924,8 +924,8 @@ without activity that archive it (`/auto-archive`); notifications, on or
 off, and what to do when the browser has not been asked, blocks them or
 cannot show them), **Models** (the providers
 (`/auth`) and compaction), **Memory** (the model's notes and the switch
-that turns memory off), **About you** (what you wrote about yourself for
-the model, `/user-info`), **Git hosting**, **Nix store** (superusers) and
+that turns memory off), **About you** (a form about yourself for the
+model, `/user-info`), **Git hosting**, **Nix store** (superusers) and
 **Account** (who you are signed in, and acting, as, with Switch account and
 Sign out). `/settings SECTION` (e.g. `/settings git`, completed as you type)
 opens it at a section; on the list, the arrows, Home and End move between
@@ -2386,19 +2386,53 @@ and delete, and the TUI's `/memory` picks among them (Enter shows one,
 Ctrl+D forgets it after a confirmation).
 
 About you: where memory is notes the model looks up only when it needs
-them, what you write about yourself (who you are, what you work on, how you
-like answers) is in the model's context in every session. Write it in
-prigh-web's Settings → About you (`/user-info` opens it; Ctrl+Enter saves,
-Revert drops what is typed, and a change made in another browser is shown
-at once, or offered if you were typing), or in the TUI with `/user-info
-TEXT` (`/user-info` shows it, `/user-info clear` removes it after a
-confirmation). It is kept as plain text in `~/.prigh/user_info.md` on the
-backend, one per user (per namespace with `-tokens`), at most 4000 bytes;
-editing the file by hand works too. A new session starts with it in its
-system prompt (and so do its subagents); a session that is already open is
-told the text with your next message in it, once, and again whenever you
-change or remove it (a "☺ About you" note over your message shows what it
-was told). Only you write it: the model has no tool to change it.
+them, what you set about yourself is in the model's context in every
+session. It is a form of optional fields: name, country or region, time zone
+(prigh-web offers the browser's with one tap), language and spelling, units
+(metric, imperial or US customary), date format (D/M/Y, M/D/Y or ISO),
+occupation or role, background and expertise, and anything else. Only the
+filled fields are given to the model, as a short list ("- Name: Lloyd",
+"- Units: metric (°C, km, kg, L)"). Fill it in in prigh-web's Settings →
+About you (`/user-info` opens it; Ctrl+Enter saves, Revert drops what is
+typed, and a change made in another browser is shown at once, or offered if
+you were typing), or in the TUI: `/user-info` shows what the model is given
+and the fields, `/user-info FIELD VALUE` sets one (`/user-info timezone
+Australia/Sydney`; no VALUE clears it) and `/user-info clear` clears them
+all after a confirmation. It is kept in `~/.prigh/about_you.json` on the
+backend, one per user (per namespace with `-tokens`): 100 bytes for each
+short field, 1000 for background, 4000 for anything else and 5000 in all.
+The free text of earlier versions (`~/.prigh/user_info.md`) is moved into
+"Anything else" the first time it is read (the old file is renamed
+`user_info.md.migrated`). A new session starts with it in its system prompt
+(and so do its subagents); a session that is already open is told it with
+your next message in it, once, and again whenever you change it (a "☺ About
+you" note over your message shows what it was told). Only you write it: the
+model has no tool to change it.
+
+Custom instructions: standing instructions given to the model in every
+session, after About you ("Use Australian spelling", "keep one memory note
+on my maths ability up to date"). Each has an id (`ci1`, `ci2`, ...) and
+shows in the context with it. Manage them in prigh-web's Settings → Custom
+instructions (`/instructions` opens it: add, edit, delete after a
+confirmation; it shows their size, about bytes/4 tokens, and warns past
+about 1,500 tokens that they cost every session) or in the TUI:
+`/instructions` lists them (Enter shows one, Ctrl+D removes it after a
+confirmation) and `/instructions add TEXT` adds one; editing is left to
+prigh-web. The model can change them too with the `custom_instructions`
+tool (`add`, `edit`, `remove`, `list`): it is told to do so when you state
+a lasting preference, fact about yourself or standing instruction that is
+not covered yet (editing the one that covers it rather than adding a
+near-duplicate), never for task details, and to tell you when it does.
+Only the main agent has it; changes ask in the `ask` approval mode, like
+memory's. `/instructions off` (or the switch in Settings; kept in your
+prefs as `custom_instructions.enabled`) stops the model changing them; they
+stay in context either way. They are kept in
+`~/.prigh/custom_instructions.json` on the backend, one list per user (per
+namespace with `-tokens`), at most 50, 1000 bytes each. New sessions (and
+their subagents) get them in the system prompt; an open session is told
+what changed with your next message (a "§ Custom instructions" note: what
+was added, edited and removed, or the whole list when most of it changed),
+but not the changes it made itself.
 
 Models see images. The `read` tool returns PNG, JPEG, GIF and WebP files
 (recognised by content, not by name) as images the model can look at, and an
@@ -2754,7 +2788,7 @@ it.
 | `/budget [dollars\|off]` | show or set the session's cost budget: no turn starts once it is spent |
 | `/goal [text\|off\|resume]` | set a goal the agent keeps working toward until it is met; show, clear or resume it |
 | `/memory [on\|off]` | pick among the notes the model saved (Ctrl+D forgets one; prigh-web opens Settings → Memory); `on`/`off` gives the model the memory tool or takes it away |
-| `/user-info [TEXT\|clear]` | what you wrote about yourself for the model, in the context of every session: show it, replace it with TEXT or clear it (prigh-web opens Settings → About you) |
+| `/user-info [FIELD VALUE\|clear]` | what you set about yourself for the model (name, country, time zone, units…), in the context of every session: show it, set one field (no VALUE clears it) or clear them all (prigh-web opens Settings → About you) |
 | `/remind [stop [N] TEXT\|every N TEXT\|rm NAME\|off]` | remind the agent when it ends its turn (at most N times in a row, default 3) or every N turns; without arguments, pick among the session's (Ctrl+D / Delete removes one); `rm` removes one, `off` all |
 | `/resume [now\|cancel]` | show, run now or cancel the automatic resume after a usage limit |
 | `/new`, `/clear`, `/quit` | new session / clear transcript / exit |
