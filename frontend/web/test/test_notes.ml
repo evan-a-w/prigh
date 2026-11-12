@@ -438,6 +438,7 @@ let%expect_test "/diff, /review and /init are in the completions and /help" =
     /compaction [at|model|mask ...] show when conversations are compacted and what summarises them; at TOKENS|off: also once the context exceeds TOKENS, not only at 80% of the window; model MODEL|off: the model that writes the summaries (off: the session's); mask on|off: replace old tool outputs with placeholders first
     /permissions show the mode and the allow/ask/deny rules (config and this session)
     /default-dir [path|off] show or set the directory new sessions start in
+    /auto-archive [DAYS|off] show how long a session goes without activity before it is archived; DAYS|off: archive after DAYS days (off: never, only by hand), in Settings
     /delete-archived delete every archived session, after a confirmation
     /downsize-images send the conversation's images smaller (after the model refused one as too large) and retry a failed reply
     /retry-backend-connection reconnect to the backend now

@@ -375,6 +375,161 @@ let dictation_model (m : App.Model.t) ~inject =
     ]
 ;;
 
+(* A number typed in, with its unit, and Off: like "Compact at". *)
+let number_field
+      (m : App.Model.t)
+      (which : Sessions_fields.Which.t)
+      ~id
+      ~label
+      ~unit
+      ~placeholder
+      ~title
+      ~off_title
+      ~disabled
+      ~current
+      ~inject
+  =
+  let off = Option.exists current ~f:(fun n -> Float.(n <= 0.)) in
+  let error = Sessions_fields.error m.sessions_fields which in
+  let value =
+    match Sessions_fields.draft m.sessions_fields which, current with
+    | Some draft, _ -> draft
+    | None, Some n when Float.(n > 0.) -> sprintf "%g" n
+    | None, _ -> ""
+  in
+  Node.div
+    ~attrs:
+      [ Attr.class_ "segmented"
+      ; Attr.role "group"
+      ; Attr.create "aria-label" label
+      ]
+    [ Node.label
+        ~attrs:[ classes [ "segment"; "number-field" ] [ "on", not off ] ]
+        [ Node.input
+            ~attrs:
+              [ Attr.id id
+              ; Attr.class_ "number-field-input"
+              ; Attr.type_ "text"
+              ; Attr.create "inputmode" "decimal"
+              ; Attr.value value
+              ; Attr.placeholder placeholder
+              ; Attr.title title
+              ; Attr.create "aria-label" (label ^ ", in " ^ unit)
+              ; Attr.create
+                  "aria-invalid"
+                  (Bool.to_string (Option.is_some error))
+              ; Attr.create "autocomplete" "off"
+              ; Attr.create "spellcheck" "false"
+              ; (if disabled then Attr.disabled else Attr.empty)
+              ; Attr.on_input (fun _ text ->
+                  inject (App.Action.Sessions_field_input (which, text)))
+              ; Attr.on_change (fun _ _ ->
+                  inject (App.Action.Sessions_field_commit which))
+              ]
+            ()
+        ; span ~cls:"number-field-unit" unit
+        ]
+    ; Node.button
+        ~attrs:
+          [ classes [ "segment" ] [ "on", off ]
+          ; Attr.type_ "button"
+          ; Attr.create "aria-pressed" (Bool.to_string off)
+          ; Attr.title off_title
+          ; (if disabled
+             then Attr.disabled
+             else
+               Attr.on_click (fun _ ->
+                 Effect.Many
+                   [ inject (App.Action.Sessions_field_input (which, "off"))
+                   ; inject (App.Action.Sessions_field_commit which)
+                   ]))
+          ]
+        [ Node.text "Off" ]
+    ]
+;;
+
+(* A display preference, the user's on every browser: the TUI's list has no
+   folds. *)
+let worktree_hours (m : App.Model.t) ~inject =
+  let hours = Worktree_folds.hours m.worktree_folds in
+  let which = Sessions_fields.Which.Worktree_hours in
+  row
+    ~cls:"worktree-hours"
+    ~scope:Account
+    ~name:"Show worktrees"
+    ~about:
+      (sprintf
+         "Show worktrees for sessions used in the last %s; older ones fold \
+          them behind their count. Your own fold or unfold of a session wins."
+         (if hours = 0
+          then "N hours (0 or Off: none)"
+          else Worktree_folds.hours_string hours))
+    ?note:
+      (match Sessions_fields.error m.sessions_fields which with
+       | Some e -> Some ("warm", e)
+       | None when hours = 0 ->
+         Some ("muted", "Off: every session's worktrees start folded.")
+       | None -> None)
+    [ number_field
+        m
+        which
+        ~id:"worktree-hours"
+        ~label:"Show worktrees for sessions used in the last"
+        ~unit:"hours"
+        ~placeholder:(Int.to_string Worktree_folds.default_hours)
+        ~title:
+          (sprintf
+             "Hours, 0 to %d (default %d)"
+             Worktree_folds.max_hours
+             Worktree_folds.default_hours)
+        ~off_title:"Fold every session's worktrees until opened"
+        ~disabled:false
+        ~current:(Some (Float.of_int hours))
+        ~inject
+    ]
+;;
+
+let auto_archive (m : App.Model.t) ~inject =
+  let which = Sessions_fields.Which.Archive_days in
+  let days = Option.map m.config ~f:(fun c -> c.archive_after_days) in
+  row
+    ~cls:"auto-archive"
+    ~name:"Archive after"
+    ~about:
+      (match days with
+       | Some d when Float.(d > 0.) ->
+         sprintf
+           "Sessions without activity for %s move to Archived (pinned and \
+            running ones never do)."
+           (Prigh_ui.Auto_archive_command.days d)
+       | _ ->
+         "Sessions without activity this many days move to Archived (pinned \
+          and running ones never do).")
+    ?note:
+      (match Sessions_fields.error m.sessions_fields which, days with
+       | Some e, _ -> Some ("warm", e)
+       | None, None -> Some waiting
+       | None, Some d when Float.(d <= 0.) ->
+         Some ("muted", "Off: sessions are archived only by hand.")
+       | None, Some _ -> None)
+    [ number_field
+        m
+        which
+        ~id:"auto-archive"
+        ~label:"Archive sessions after"
+        ~unit:"days"
+        ~placeholder:"7"
+        ~title:
+          (sprintf
+             "/auto-archive DAYS: 0 to %g days"
+             Prigh_ui.Auto_archive_command.max_days)
+        ~off_title:"Archive only by hand (/auto-archive off)"
+        ~disabled:(Option.is_none m.config)
+        ~current:days
+        ~inject
+    ]
+;;
+
 let compaction (m : App.Model.t) ~inject =
   [ compact_at m m.config ~inject; mask m.config ~inject ]
 ;;
@@ -1010,6 +1165,9 @@ let content (m : App.Model.t) (section : Section.t) ~inject =
         ; default_dir m ~inject
         ; fallback m ~inject
         ]
+    ; group
+        ~title:"Session list"
+        [ worktree_hours m ~inject; auto_archive m ~inject ]
     ; group ~title:"Notifications" [ notifications m ~inject ]
     ]
   | Models ->

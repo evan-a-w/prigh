@@ -8,6 +8,8 @@ module Key = struct
   let verbosity = "web.verbosity"
   let terminal_open = "web.terminal-open"
   let folded = "web.sidebar-folded"
+  let unfolded = "web.sidebar-unfolded"
+  let worktree_hours = "web.sidebar-worktree-hours"
   let review = "web.review"
   let history = "history"
   let migrated = "web.migrated"
@@ -19,6 +21,8 @@ module Key = struct
     ; verbosity
     ; terminal_open
     ; folded
+    ; unfolded
+    ; worktree_hours
     ; review
     ; history
     ; migrated

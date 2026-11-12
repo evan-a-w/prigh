@@ -246,28 +246,45 @@ let%expect_test
      the config's, reread on every listing. *)
   let server2 = Server.create t ~sw ~provider in
   let c = Client.connect server2 "c" in
+  (* Another session's client: told to list the sessions again. *)
+  let d = Client.connect server2 "d" ~session:(Session.id old) in
   print_sessions c;
   Client.call
     t
     c
     "set_config"
     [ "config", `Object [ "archive_after_days", `Number "0" ] ];
-  print_sessions c;
+  Client.sessions_changed c;
+  Client.sessions_changed d;
+  print_sessions d;
   Client.call
     t
     c
     "set_config"
     [ "config", `Object [ "archive_after_days", `String "7" ] ];
+  (* Refused, or the same age: nothing to list again. *)
+  Client.call
+    t
+    c
+    "set_config"
+    [ "config", `Object [ "archive_after_days", `Number "0" ] ];
+  Client.sessions_changed c;
+  Client.sessions_changed d;
   [%expect
     {|
-    old         background=0 clients=-
+    old        live background=0 clients=1
     recent     archived background=0 clients=-
     ancient    archived background=0 clients=-
     {"type":"response","id":"r","ok":true,"result":{"scoped_models":[],"approval_mode":"auto","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":null,"default_thinking":null,"fallback_models":[],"default_cwd":null,"worktrees_dir":"~/.prigh/worktrees","max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true,"ask_user_timeout_seconds":300,"archive_after_days":0,"notify":"bell","snippets":[],"auto_background_seconds":30,"generate_model":null,"mask_observations":true,"computer_screenshots":3,"computer_screenshots_max":8,"computer_native":true,"compact_at_tokens":200000,"compaction_model":null,"naming_model":null,"dictation_model":null,"trace":"default"}}
-    old         background=0 clients=-
+    c: 1 sessions_changed
+    d: 1 sessions_changed
+    old        live background=0 clients=1
     recent     archived background=0 clients=-
     ancient     background=0 clients=-
     {"type":"response","id":"r","ok":false,"error":"config.archive_after_days must be a number of days (0: never)"}
+    {"type":"response","id":"r","ok":true,"result":{"scoped_models":[],"approval_mode":"auto","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":null,"default_thinking":null,"fallback_models":[],"default_cwd":null,"worktrees_dir":"~/.prigh/worktrees","max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true,"ask_user_timeout_seconds":300,"archive_after_days":0,"notify":"bell","snippets":[],"auto_background_seconds":30,"generate_model":null,"mask_observations":true,"computer_screenshots":3,"computer_screenshots_max":8,"computer_native":true,"compact_at_tokens":200000,"compaction_model":null,"naming_model":null,"dictation_model":null,"trace":"default"}}
+    c: 0 sessions_changed
+    d: 0 sessions_changed
     |}];
   (* A new message unarchives; a running session cannot be archived. *)
   Client.call t c "switch_session" (path recent);
@@ -284,10 +301,10 @@ let%expect_test
     {"type":"response","id":"r","ok":true,"result":{}}
     {"type":"response","id":"r","ok":false,"error":"session \"recent\" is running: wait for it or /abort it before archiving"}
     recent     running live background=0 clients=1
-    old         background=0 clients=-
+    old        live background=0 clients=1
     ancient     background=0 clients=-
     recent     live background=0 clients=1
-    old         background=0 clients=-
+    old        live background=0 clients=1
     ancient     background=0 clients=-
     |}]
 ;;
