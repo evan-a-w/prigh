@@ -760,6 +760,7 @@ the panels' toggles: 3 buttons 10px from the top, 14px from the right, clear of 
 Settings
 Appearance
 Sessions
+New sessions
 Models
 Memory
 About you
@@ -793,7 +794,7 @@ host: under .modal-backdrop
 a choice keeps it open: true
 === chromium: settings: the sections ===
 clicked Sessions: tab Sessions, focus Sessions, showing Sessions (labelled by settings-tab-sessions)
-ArrowDown: tab Models, focus Models, showing Models (labelled by settings-tab-models)
+ArrowDown: tab New sessions, focus New sessions, showing New sessions (labelled by settings-tab-new-sessions)
 End: tab T token, focus T token, showing Account (labelled by settings-tab-account)
 ArrowDown wraps: tab Appearance, focus Appearance, showing Appearance (labelled by settings-tab-appearance)
 desktop: dialog 940x704, in the window: true; sections down the side; panel fits: true
@@ -982,6 +983,7 @@ I am bob
 === chromium: accounts: bob's settings ===
 Appearance
 Sessions
+New sessions
 Models
 Memory
 About you
@@ -3061,7 +3063,7 @@ Jump to a message, Filter the transcript, Files, Terminal, Settings
 === chromium: mobile: 390x844: the settings' list ===
 ok
 === chromium: mobile: 390x844: the settings ===
-Appearance, Sessions, Models, Memory, About you, Custom instructions, Git hosting, Account
+Appearance, Sessions, New sessions, Models, Memory, About you, Custom instructions, Git hosting, Account
 === chromium: mobile: 390x844: settings: appearance ===
 ok
 title: Appearance; back: Settings
@@ -3095,7 +3097,7 @@ Jump to a message, Filter the transcript, Files, Terminal, Settings
 === chromium: mobile: 320x640: the settings' list ===
 ok
 === chromium: mobile: 320x640: the settings ===
-Appearance, Sessions, Models, Memory, About you, Custom instructions, Git hosting, Account
+Appearance, Sessions, New sessions, Models, Memory, About you, Custom instructions, Git hosting, Account
 === chromium: mobile: 320x640: settings: appearance ===
 ok
 title: Appearance; back: Settings
@@ -3129,7 +3131,7 @@ Jump to a message, Filter the transcript, Files, Terminal, Settings
 === chromium: mobile: 390x844-pwa: the settings' list ===
 ok
 === chromium: mobile: 390x844-pwa: the settings ===
-Appearance, Sessions, Models, Memory, About you, Custom instructions, Git hosting, Account
+Appearance, Sessions, New sessions, Models, Memory, About you, Custom instructions, Git hosting, Account
 === chromium: mobile: 390x844-pwa: settings: appearance ===
 ok
 title: Appearance; back: Settings
