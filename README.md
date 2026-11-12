@@ -1269,11 +1269,14 @@ Where it shows it (`PRIGH_DESKTOP_WINDOW`, `programs.prigh.desktop.window`):
   closes the window, which does the same. A browser left running on prigh's
   profile (by an app that was killed) is closed when the app starts. Links
   to other sites open in your default browser (`xdg-open` on Linux), with
-  your own profile, as in the app's own window: the app watches the
-  browser's windows (its DevTools, on a pipe only the app holds, no port)
-  and closes a new tab or window on another site, or sends prigh's window
-  back, opening the link in your browser instead (Linux only: elsewhere
-  they open in the browser on prigh's profile).
+  your own profile, as in the app's own window, at once: prigh's page hands
+  a click on such a link (Ctrl+click and a middle click too) to the app,
+  which opens it in your browser before Chrome opens anything. The app
+  also watches the browser's windows (its DevTools, on a pipe only the app
+  holds, no port) and closes a new tab or window on another site that
+  opens anyway, or sends prigh's window back, opening the link in your
+  browser instead (Linux only: elsewhere they open in the browser on
+  prigh's profile).
   The window is an app's, not a browser's (also Linux only, through the
   same DevTools pipe): the browser's own pages are closed as soon as they
   open and the focus goes back to prigh's window, so Ctrl+T, Ctrl+N

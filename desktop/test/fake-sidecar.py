@@ -28,6 +28,10 @@ $FAKE_MODE picks a behaviour:
 With $FAKE_PAGE_LINKS set, the page, once, opens a window on another site
 (http://localhost:PORT/new-window: another origin, the same server) and
 then goes to another site itself (/away), as links in prigh-web would.
+With $FAKE_PAGE_HANDOVER set, the page, once the shell has given it its
+binding (window.prighOpenExternal), clicks a link to another site
+(/handed-over), which it hands to the binding as prigh-web does, and then
+opens a window on another site itself (/fallback), which the shell closes.
 With $FAKE_PAGE_POPUP set, the page, once, opens a popup on its own site
 (/?popup=1), as prigh-web's Open in new window does in a browser's app
 window.
@@ -74,6 +78,27 @@ addEventListener("load", () => {
   const elsewhere = "http://localhost:" + location.port;
   window.open(elsewhere + "/new-window", "_blank");
   setTimeout(() => { location.href = elsewhere + "/away"; }, 1000);
+});
+</script></body>""")
+if os.environ.get("FAKE_PAGE_HANDOVER"):
+    PAGE = PAGE.replace(b"</body>", b"""<script>
+addEventListener("click", ev => {
+  const a = ev.target.closest("a[href]");
+  if (!a || typeof window.prighOpenExternal !== "function") return;
+  ev.preventDefault();
+  window.prighOpenExternal(JSON.stringify({ url: a.href, newWindow: a.target === "_blank" }));
+});
+addEventListener("load", async () => {
+  if (location.hostname === "localhost" || sessionStorage.getItem("went")) return;
+  sessionStorage.setItem("went", "1");
+  const elsewhere = "http://localhost:" + location.port;
+  while (typeof window.prighOpenExternal !== "function") await new Promise(r => setTimeout(r, 50));
+  const a = document.createElement("a");
+  a.href = elsewhere + "/handed-over";
+  a.target = "_blank";
+  document.body.append(a);
+  a.click();
+  setTimeout(() => window.open(elsewhere + "/fallback", "_blank"), 500);
 });
 </script></body>""")
 if os.environ.get("FAKE_PAGE_POPUP"):

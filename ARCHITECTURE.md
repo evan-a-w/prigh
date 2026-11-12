@@ -3933,7 +3933,28 @@ profile. `devtools::Links` turns its target events into effects:
 browser (the opener plugin: `xdg-open`) and either `Target.closeTarget` (a
 new tab or window: a `target=_blank` link, `window.open`) or, for a target
 last seen on prigh's sites (its window, a popup on its site),
-`Target.attachToTarget` and `Page.navigate` back to that page. The
+`Target.attachToTarget` and `Page.navigate` back to that page. That
+fallback shows a window for a moment, so prigh's pages hand links over
+first: on each session on one of prigh's windows (attached when it reaches
+prigh's site, again after a detach; bindings outlive the target's reloads
+and navigations) `Links` sends `Runtime.addBinding` for
+`devtools::BINDING` (`window.prighOpenExternal`). prigh-web's
+`External_link_listeners` (installed at start; acting only with
+`Desktop_page.in_browser` and the binding present) listens for `click` and
+`auxclick` on the window in the bubbling phase, so a click prigh's own
+handlers took (`defaultPrevented`: the image viewer, the end of a drag) is
+theirs; `External_link.decide` hands over an HTML link's absolute `href`
+when it is `mailto:` or http(s) on another origin than the page's (not a
+`download` link; the main or middle button), as `{"url", "newWindow"}`
+(`newWindow`: a target that is a new window, Ctrl/⌘/Shift, the middle
+button), and cancels the browser's default. `Runtime.bindingCalled`
+(`Links::on_link`) is honoured only from a session on one of prigh's
+windows whose page is on prigh's site (not away signing in, so a sign-in
+site cannot use it): `External` goes to the default browser through the
+same `OpenGuard` as the window's links, a URL on another of prigh's
+origins where the click would have gone (`OpenWindow` or `Page.navigate`),
+anything else is refused and logged. The fallback logs "a window opened on
+SITE: closing it", so a link that still flashes shows in the log. The
 browser's own pages (`devtools::browser_page`: `chrome:`, `chrome-search:`,
 `chrome-untrusted:`, `devtools:`, `view-source:`, `chrome-extension:` and
 the other browsers' schemes; a new tab or tabbed window is one, on its new
