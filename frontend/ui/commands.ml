@@ -36,6 +36,7 @@ module Argument = struct
     | Commit
     | Agents
     | Compaction
+    | Generate_model
     | Naming
     | Dictation
   [@@deriving sexp_of, equal]
@@ -208,11 +209,17 @@ let every =
        the session's); mask on|off: replace old tool outputs with placeholders \
        first"
   ; c
+      ~argument:Argument.Generate_model
+      "generate-model"
+      "[MODEL|off]"
+      "show which model drafts commit messages, pull requests and branch names \
+       (✦ Generate); MODEL|off: draft them with MODEL (off: the session's)"
+  ; c
       ~argument:Argument.Naming
       "naming"
       "[model MODEL|off]"
       "show which model names sessions and subagents; model MODEL|off: name \
-       them with MODEL (off: the generate model, else the session's)"
+       them with MODEL (off: the drafting model, else the session's)"
   ; c
       ~argument:Argument.Dictation
       "dictation"

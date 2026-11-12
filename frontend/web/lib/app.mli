@@ -197,6 +197,7 @@ module Reply_tag : sig
     | Default_set of New_default.t
     (** the new config: the settings' New sessions changed a default *)
     | Compaction_saved (** the new config; its settings are shown *)
+    | Generate_model_saved (** the new config; the drafting model is shown *)
     | Naming_saved (** the new config; the naming model is shown *)
     | Auto_archive_saved (** the new config; the age is shown *)
     | Dictation_saved (** the new config; the dictation model is shown *)

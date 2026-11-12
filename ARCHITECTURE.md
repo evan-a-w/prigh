@@ -1519,7 +1519,8 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   `Worktree` puts new worktrees on the tool host; default
   `~/.prigh/worktrees`), `max_budget_usd`,
   `goal_max_continuations`, `resume_on_limit_reset`, `ask_user_timeout_seconds` (default
-  300, 0 = never), `generate_model`, `naming_model`, `dictation_model`, `mask_observations` (default true),
+  300, 0 = never), `generate_model` (the drafting model, `/generate-model`),
+  `naming_model`, `dictation_model`, `mask_observations` (default true),
   `compact_at_tokens` (default 200000,
   0 = 80% of the window only), `compaction_model` and `snippets`, the
   frontends' `/snippet` texts, validated by `Snippet`), loaded at agent

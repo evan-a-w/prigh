@@ -227,6 +227,7 @@ let%expect_test
       (compact_at_tokens 200000)
       (compaction_model ())
       (mask_observations true)
+      (generate_model  ())
       (naming_model    ())
       (dictation_model ())))
     |}]

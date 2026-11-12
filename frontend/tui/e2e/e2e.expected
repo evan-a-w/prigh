@@ -215,7 +215,8 @@ retry backend exited
   (default_cwd ($TMP)) (default_host ()) (max_budget_usd ())
   (worktrees_dir (~/.prigh/worktrees)) (archive_after_days 7) (notify bell)
   (snippets ()) (compact_at_tokens 200000) (compaction_model ())
-  (mask_observations true) (naming_model ()) (dictation_model ())))
+  (mask_observations true) (generate_model ()) (naming_model ())
+  (dictation_model ())))
 <- set_config ERROR: "fallback_models: unknown model \"gpt-9\"; did you mean: openai/gpt-4 (GPT-4), openai/gpt-5 (GPT-5), openai/gpt-4o (GPT-4o)"
 <- set_config: (Ok
  ((scoped_models ()) (approval_mode Auto)
@@ -225,7 +226,8 @@ retry backend exited
   (default_cwd ()) (default_host ()) (max_budget_usd ())
   (worktrees_dir (~/.prigh/worktrees)) (archive_after_days 7) (notify bell)
   (snippets ()) (compact_at_tokens 200000) (compaction_model ())
-  (mask_observations true) (naming_model ()) (dictation_model ())))
+  (mask_observations true) (generate_model ()) (naming_model ())
+  (dictation_model ())))
 <- set_config: (Ok
  ((scoped_models ()) (approval_mode Auto)
   (permissions ((allow ()) (ask ()) (deny ()))) (default_model ())
@@ -236,7 +238,7 @@ retry backend exited
   (snippets (((name review) (text  "Review the diff.\
                                   \nBe brief."))))
   (compact_at_tokens 200000) (compaction_model ()) (mask_observations true)
-  (naming_model ()) (dictation_model ())))
+  (generate_model ()) (naming_model ()) (dictation_model ())))
 <- set_config ERROR: "config.snippets[0].name \"two words\" must be one word: non-empty, without spaces"
 <- set_config: (Ok
  ((scoped_models ()) (approval_mode Auto)
@@ -246,7 +248,8 @@ retry backend exited
   (default_cwd ()) (default_host ()) (max_budget_usd ())
   (worktrees_dir (~/.prigh/worktrees)) (archive_after_days 7) (notify bell)
   (snippets ()) (compact_at_tokens 200000) (compaction_model ())
-  (mask_observations true) (naming_model ()) (dictation_model ())))
+  (mask_observations true) (generate_model ()) (naming_model ())
+  (dictation_model ())))
 <- prompt: ()
   event state running=true model=deepseek/deepseek-flash
   event user "[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\nfix the bug"

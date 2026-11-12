@@ -73,6 +73,8 @@ module Reply_tag = struct
     | Default_dir_saved of string
     | Compaction_shown
     | Compaction_saved of string
+    | Generate_model_shown
+    | Generate_model_saved of string
     | Naming_shown
     | Naming_saved of string
     | Auto_archive_shown
@@ -3058,6 +3060,24 @@ let compaction_command m (cmd : Commands.Parsed.t) =
       ] )
 ;;
 
+let generate_model_command m (cmd : Commands.Parsed.t) =
+  match Generate_model_command.parse cmd.rest with
+  | Show ->
+    show_config
+      m
+      ~tag:Generate_model_shown
+      ~summary:Generate_model_command.summary
+  | Error e ->
+    ( error (restore_command m (String.strip ("/generate-model " ^ cmd.rest))) e
+    , [] )
+  | Set_model _ as action ->
+    ( m
+    , [ set_config
+          ~tag:(Generate_model_saved ("/generate-model " ^ cmd.rest))
+          (Generate_model_command.fields action)
+      ] )
+;;
+
 let naming_command m (cmd : Commands.Parsed.t) =
   match Naming_command.parse cmd.rest with
   | Show -> show_config m ~tag:Naming_shown ~summary:Naming_command.summary
@@ -4217,6 +4237,7 @@ let run_command m (cmd : Commands.Parsed.t) =
   | "default-budget", _ -> default_budget_command m cmd
   | "compaction", _ -> compaction_command m cmd
   | "dictation", _ -> dictation_command m cmd
+  | "generate-model", _ -> generate_model_command m cmd
   | "naming", _ -> naming_command m cmd
   | "auto-archive", _ -> auto_archive_command m cmd
   | "auth", _ ->
@@ -6638,6 +6659,7 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
      | Fallback_saved text
      | Default_dir_saved text
      | Compaction_saved text
+     | Generate_model_saved text
      | Naming_saved text
      | Default_host_saved text
      | Default_budget_saved text
@@ -7254,6 +7276,12 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
          ( notice
              { m with config = Some config }
              (Compaction_command.summary config)
+         , [] ))
+     | Generate_model_shown | Generate_model_saved _ ->
+       decode json ~f:P.Config.of_json (fun config ->
+         ( notice
+             { m with config = Some config }
+             (Generate_model_command.summary config)
          , [] ))
      | Naming_shown | Naming_saved _ ->
        decode json ~f:P.Config.of_json (fun config ->
