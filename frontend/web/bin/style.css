@@ -2138,6 +2138,8 @@ kbd {
    Archive after): a short field, its unit after it as plain text. */
 .number-switch { display: inline-flex; align-items: center; gap: 14px; }
 .number-field { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: 12.5px; cursor: text; }
+/* The same width for every unit, so a section's fields line up. */
+.number-field-unit { min-width: 6ch; }
 .text-input.number-field-input {
   width: calc(6ch + 18px); padding: 4px 8px;
   font: 12.5px var(--mono); font-variant-numeric: tabular-nums; text-align: center;
