@@ -83,9 +83,11 @@ const signIn = async p => {
   await p.locator("form button[type=submit]").click();
   await composer(p).waitFor();
 };
+// As typed: a plain Enter may accept the completion popup instead (a /cd
+// path's trailing slash) when it opens first.
 const send = async (p, text) => {
   await composer(p).fill(text);
-  await composer(p).press("Enter");
+  await composer(p).press("Control+Enter");
 };
 const session = (p, title) =>
   p.locator(".session-item", { has: p.locator(".session-title", { hasText: title }) });
@@ -107,14 +109,14 @@ const openSettings = async p => {
   await p.keyboard.press("Control+,");
   await p.locator(".settings-dialog").waitFor();
   await p.locator(".settings-tab-sessions").click();
-  await p.locator("#auto-archive:not([disabled])").waitFor();
+  await p.locator(".setting.auto-archive .switch:not([disabled])").waitFor();
   await sessions(p).scrollIntoViewIfNeeded();
 };
 const showSettings = async p => {
   console.log((await sessions(p).locator(".setting.worktree-hours, .setting.auto-archive").allInnerTexts())
     .map(t => t.replace(/\n+/g, " | ")).join("\n"));
-  console.log(`fields: ${JSON.stringify(await p.locator("#worktree-hours").inputValue())} hours, \
-${JSON.stringify(await p.locator("#auto-archive").inputValue())} days`);
+  const field = async id => (await p.locator(id).count() ? JSON.stringify(await p.locator(id).inputValue()) : "hidden");
+  console.log(`fields: ${await field("#worktree-hours")} hours, ${await field("#auto-archive")} days`);
 };
 const config = () => {
   const c = JSON.parse(readFileSync(join(home, ".prigh/config.json"), "utf8"));
@@ -151,9 +153,12 @@ try {
   await send(page, "/worktree new feat/old-b");
   await page.locator(".worktree-branch", { hasText: "feat/old-b" }).waitFor();
   await page.locator(".new-session").click();
-  await page.waitForFunction(() => !document.querySelector(".new-session.opening"));
+  // In the new session, then in the repo, before its first message, or it
+  // starts in Old work's worktree.
+  await page.waitForFunction(() =>
+    !document.querySelector(".new-session.opening, .session-item.selected") && document.querySelector(".hero"));
   await send(page, `/cd ${repo}`);
-  await page.locator(".toast", { hasText: "repo" }).first().waitFor().catch(() => {});
+  await page.locator(".toast", { hasText: /^Working directory: .*\/repo$/ }).first().waitFor();
   await send(page, "Fresh work");
   await session(page, "Fresh work").waitFor();
   await send(page, "/worktree new fix/fresh");
@@ -175,7 +180,8 @@ try {
   await showSettings(page);
   await screenshot(page, "settings");
 
-  // A wider window shows the old session's too; Off folds them all.
+  // A wider window shows the old session's too; its switch off folds them
+  // all.
   await page.locator("#worktree-hours").fill("100");
   await page.locator("#worktree-hours").press("Enter");
   await page.locator(".setting.worktree-hours .setting-note, .setting.worktree-hours", { hasText: "100 hours" }).first().waitFor();
@@ -185,7 +191,8 @@ try {
   section("100 hours");
   await sidebar(page);
   await openSettings(page);
-  await sessions(page).locator(".setting.worktree-hours button", { hasText: "Off" }).click();
+  await sessions(page).locator(".setting.worktree-hours .switch").click();
+  await page.locator("#worktree-hours").waitFor({ state: "detached" });
   await page.keyboard.press("Escape");
   await page.locator(".settings-dialog").waitFor({ state: "detached" });
   await session(page, "Fresh work").locator(".session-fold.folded").waitFor();
@@ -220,9 +227,12 @@ try {
   await screenshot(page, "archived");
 
   // Phones: the sidebar, then the settings section, at 390x844 and 320x640.
+  // The worktrees' switch on again: the 100 hours they were.
   await openSettings(page);
-  await page.locator("#worktree-hours").fill("100");
-  await page.locator("#worktree-hours").press("Enter");
+  await sessions(page).locator(".setting.worktree-hours .switch").click();
+  await page.locator(".setting.worktree-hours", { hasText: "100 hours" }).waitFor();
+  section("switched on again");
+  await showSettings(page);
   await page.locator("#auto-archive").fill("7");
   await page.locator("#auto-archive").press("Enter");
   await toast(page, "after 7 days");

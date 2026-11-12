@@ -333,14 +333,14 @@ let%expect_test "the hours: a setting, synced; 0 never shows them; bounds" =
     Show worktrees Your account
     Show worktrees for sessions used in the last 72 hours; older ones fold them behind their count. Your own fold or unfold of a session wins.
     [72] hours
-    (Off)
+    (Fold every session's worktrees until opened)
     |}];
-  H.click h ~selector:".setting.worktree-hours button.segment";
+  H.click h ~selector:".setting.worktree-hours .switch";
   folds h;
+  H.text h ~selector:".setting.worktree-hours .setting-control";
   [%expect
     {|
-    (Sessions_field_input Worktree_hours off)
-    (Sessions_field_commit Worktree_hours)
+    (Switch_number Worktree_hours false)
     (Cache_prefs (((key web.sidebar-worktree-hours) (value (0)))))
     (Rpc (method_ set_prefs) (params ((prefs ((web.sidebar-worktree-hours 0)))))
      (tag Show_error))
@@ -348,6 +348,22 @@ let%expect_test "the hours: a setting, synced; 0 never shows them; bounds" =
     - Login form
     - Landing page
     - Shopping list
+    - New hero
+    (Show recent sessions' worktrees)
+    |}];
+  (* On again: the 72 hours it was. *)
+  H.click h ~selector:".setting.worktree-hours .switch";
+  folds h;
+  [%expect
+    {|
+    (Switch_number Worktree_hours true)
+    (Cache_prefs (((key web.sidebar-worktree-hours) (value (72)))))
+    (Rpc (method_ set_prefs) (params ((prefs ((web.sidebar-worktree-hours 72)))))
+     (tag Show_error))
+    + Main work
+    + Login form
+    + Landing page
+    + Shopping list
     - New hero
     |}];
   field "721";
@@ -358,9 +374,9 @@ let%expect_test "the hours: a setting, synced; 0 never shows them; bounds" =
     (Sessions_field_input Worktree_hours 721)
     (Sessions_field_commit Worktree_hours)
     Show worktrees Your account
-    Show worktrees for sessions used in the last N hours (0 or Off: none); older ones fold them behind their count. Your own fold or unfold of a session wins. “721” isn't a number of hours from 0 to 720: type one like 12, or off to fold every session's worktrees.
+    Show worktrees for sessions used in the last 72 hours; older ones fold them behind their count. Your own fold or unfold of a session wins. “721” isn't a number of hours from 0 to 720: type one like 12, or off to fold every session's worktrees.
     [721] hours
-    (Off)
+    (Fold every session's worktrees until opened)
     (Sessions_field_input Worktree_hours 12)
     (Sessions_field_commit Worktree_hours)
     (Cache_prefs (((key web.sidebar-worktree-hours) (value ()))))

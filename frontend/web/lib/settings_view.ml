@@ -196,7 +196,7 @@ let fallback (m : App.Model.t) ~inject =
 module Compaction_command = Prigh_ui.Compaction_command
 
 let compact_at (m : App.Model.t) (config : Config.t option) ~inject =
-  let off = Option.exists config ~f:(fun c -> c.compact_at_tokens <= 0) in
+  let on = Option.exists config ~f:(fun c -> c.compact_at_tokens > 0) in
   let error = Compact_at.error m.compact_at in
   let value =
     match Compact_at.draft m.compact_at, config with
@@ -205,7 +205,6 @@ let compact_at (m : App.Model.t) (config : Config.t option) ~inject =
       Compaction_command.tokens c.compact_at_tokens
     | None, _ -> ""
   in
-  let disabled = Option.is_none config in
   row
     ~cls:"compact-at"
     ~name:"Compact at"
@@ -215,57 +214,28 @@ let compact_at (m : App.Model.t) (config : Config.t option) ~inject =
     ?note:
       (match error, config with
        | Some e, _ -> Some ("warm", e)
-       | None, None -> Some ("muted", "Waiting for the backend's settings…")
-       | None, Some _ when off ->
-         Some
-           ("muted", "Off: only at 80% of the window. Type a number to set one.")
+       | None, None -> Some waiting
+       | None, Some _ when not on ->
+         Some ("muted", "Off: only at 80% of the window.")
        | None, Some _ -> None)
-    [ Node.div
-        ~attrs:
-          [ Attr.class_ "segmented"
-          ; Attr.role "group"
-          ; Attr.create "aria-label" "Compact at"
-          ]
-        [ Node.label
-            ~attrs:
-              [ classes [ "segment"; "compact-at-field" ] [ "on", not off ] ]
-            [ Node.input
-                ~attrs:
-                  [ Attr.id "compact-at"
-                  ; Attr.class_ "compact-at-input"
-                  ; Attr.type_ "text"
-                  ; Attr.value value
-                  ; Attr.placeholder (if off then "150k" else "200k")
-                  ; Attr.title "/compaction at TOKENS, e.g. 150k or 200000"
-                  ; Attr.create "aria-label" "Compact at, in tokens"
-                  ; Attr.create
-                      "aria-invalid"
-                      (Bool.to_string (Option.is_some error))
-                  ; Attr.create "autocomplete" "off"
-                  ; Attr.create "spellcheck" "false"
-                  ; (if disabled then Attr.disabled else Attr.empty)
-                  ; Attr.on_input (fun _ text ->
-                      inject (Action.Compact_at_input text))
-                  ; Attr.on_change (fun _ _ -> inject Action.Compact_at_commit)
-                  ]
-                ()
-            ; span ~cls:"compact-at-unit" "tokens"
-            ]
-        ; Node.button
-            ~attrs:
-              [ classes [ "segment" ] [ "on", off ]
-              ; Attr.type_ "button"
-              ; Attr.create "aria-pressed" (Bool.to_string off)
-              ; Attr.title
-                  "Only at 80% of the model's window (/compaction at off)"
-              ; (if disabled
-                 then Attr.disabled
-                 else
-                   Attr.on_click (fun _ ->
-                     inject (Action.Run "/compaction at off")))
-              ]
-            [ Node.text "Off" ]
-        ]
+    [ number_switch
+        ~disabled:(Option.is_none config)
+        ~id:"compact-at"
+        ~label:"Compact at"
+        ~unit:"tokens"
+        ~value
+        ~placeholder:"200k"
+        ~title:"/compaction at TOKENS, e.g. 150k or 200000"
+        ~switch_title:
+          (if on
+           then "Only at 80% of the model's window (/compaction at off)"
+           else "Also at a number of tokens (/compaction at TOKENS)")
+        ~invalid:(Option.is_some error)
+        ~on
+        ~on_input:(fun text -> inject (Action.Compact_at_input text))
+        ~on_commit:(inject Action.Compact_at_commit)
+        ~on_switch:(fun on -> inject (Action.Switch_number (Compact_at, on)))
+        ()
     ]
 ;;
 
@@ -375,8 +345,8 @@ let dictation_model (m : App.Model.t) ~inject =
     ]
 ;;
 
-(* A number typed in, with its unit, and Off: like "Compact at". *)
-let number_field
+(* One of the session list's numbers, behind its switch. *)
+let sessions_number
       (m : App.Model.t)
       (which : Sessions_fields.Which.t)
       ~id
@@ -384,68 +354,38 @@ let number_field
       ~unit
       ~placeholder
       ~title
-      ~off_title
-      ~disabled
+      ~switch_title
       ~current
       ~inject
   =
-  let off = Option.exists current ~f:(fun n -> Float.(n <= 0.)) in
-  let error = Sessions_fields.error m.sessions_fields which in
+  let on = Option.exists current ~f:(fun n -> Float.(n > 0.)) in
   let value =
     match Sessions_fields.draft m.sessions_fields which, current with
     | Some draft, _ -> draft
     | None, Some n when Float.(n > 0.) -> sprintf "%g" n
     | None, _ -> ""
   in
-  Node.div
-    ~attrs:
-      [ Attr.class_ "segmented"
-      ; Attr.role "group"
-      ; Attr.create "aria-label" label
-      ]
-    [ Node.label
-        ~attrs:[ classes [ "segment"; "number-field" ] [ "on", not off ] ]
-        [ Node.input
-            ~attrs:
-              [ Attr.id id
-              ; Attr.class_ "number-field-input"
-              ; Attr.type_ "text"
-              ; Attr.create "inputmode" "decimal"
-              ; Attr.value value
-              ; Attr.placeholder placeholder
-              ; Attr.title title
-              ; Attr.create "aria-label" (label ^ ", in " ^ unit)
-              ; Attr.create
-                  "aria-invalid"
-                  (Bool.to_string (Option.is_some error))
-              ; Attr.create "autocomplete" "off"
-              ; Attr.create "spellcheck" "false"
-              ; (if disabled then Attr.disabled else Attr.empty)
-              ; Attr.on_input (fun _ text ->
-                  inject (App.Action.Sessions_field_input (which, text)))
-              ; Attr.on_change (fun _ _ ->
-                  inject (App.Action.Sessions_field_commit which))
-              ]
-            ()
-        ; span ~cls:"number-field-unit" unit
-        ]
-    ; Node.button
-        ~attrs:
-          [ classes [ "segment" ] [ "on", off ]
-          ; Attr.type_ "button"
-          ; Attr.create "aria-pressed" (Bool.to_string off)
-          ; Attr.title off_title
-          ; (if disabled
-             then Attr.disabled
-             else
-               Attr.on_click (fun _ ->
-                 Effect.Many
-                   [ inject (App.Action.Sessions_field_input (which, "off"))
-                   ; inject (App.Action.Sessions_field_commit which)
-                   ]))
-          ]
-        [ Node.text "Off" ]
-    ]
+  let key : Switched_off.Key.t =
+    match which with
+    | Worktree_hours -> Worktree_hours
+    | Archive_days -> Archive_days
+  in
+  number_switch
+    ~disabled:(Option.is_none current)
+    ~id
+    ~label
+    ~unit
+    ~value
+    ~placeholder
+    ~title
+    ~switch_title:(switch_title on)
+    ~invalid:(Option.is_some (Sessions_fields.error m.sessions_fields which))
+    ~on
+    ~on_input:(fun text ->
+      inject (App.Action.Sessions_field_input (which, text)))
+    ~on_commit:(inject (App.Action.Sessions_field_commit which))
+    ~on_switch:(fun on -> inject (App.Action.Switch_number (key, on)))
+    ()
 ;;
 
 (* A display preference, the user's on every browser: the TUI's list has no
@@ -459,18 +399,18 @@ let worktree_hours (m : App.Model.t) ~inject =
     ~name:"Show worktrees"
     ~about:
       (sprintf
-         "Show worktrees for sessions used in the last %s; older ones fold \
-          them behind their count. Your own fold or unfold of a session wins."
+         "Show worktrees for sessions used %s; older ones fold them behind \
+          their count. Your own fold or unfold of a session wins."
          (if hours = 0
-          then "N hours (0 or Off: none)"
-          else Worktree_folds.hours_string hours))
+          then "recently"
+          else "in the last " ^ Worktree_folds.hours_string hours))
     ?note:
       (match Sessions_fields.error m.sessions_fields which with
        | Some e -> Some ("warm", e)
        | None when hours = 0 ->
          Some ("muted", "Off: every session's worktrees start folded.")
        | None -> None)
-    [ number_field
+    [ sessions_number
         m
         which
         ~id:"worktree-hours"
@@ -479,11 +419,13 @@ let worktree_hours (m : App.Model.t) ~inject =
         ~placeholder:(Int.to_string Worktree_folds.default_hours)
         ~title:
           (sprintf
-             "Hours, 0 to %d (default %d)"
+             "Hours, 1 to %d (default %d)"
              Worktree_folds.max_hours
              Worktree_folds.default_hours)
-        ~off_title:"Fold every session's worktrees until opened"
-        ~disabled:false
+        ~switch_title:(fun on ->
+          if on
+          then "Fold every session's worktrees until opened"
+          else "Show recent sessions' worktrees")
         ~current:(Some (Float.of_int hours))
         ~inject
     ]
@@ -512,7 +454,7 @@ let auto_archive (m : App.Model.t) ~inject =
        | None, Some d when Float.(d <= 0.) ->
          Some ("muted", "Off: sessions are archived only by hand.")
        | None, Some _ -> None)
-    [ number_field
+    [ sessions_number
         m
         which
         ~id:"auto-archive"
@@ -521,10 +463,12 @@ let auto_archive (m : App.Model.t) ~inject =
         ~placeholder:"7"
         ~title:
           (sprintf
-             "/auto-archive DAYS: 0 to %g days"
+             "/auto-archive DAYS: up to %g days"
              Prigh_ui.Auto_archive_command.max_days)
-        ~off_title:"Archive only by hand (/auto-archive off)"
-        ~disabled:(Option.is_none m.config)
+        ~switch_title:(fun on ->
+          if on
+          then "Archive only by hand (/auto-archive off)"
+          else "Archive sessions without activity (/auto-archive DAYS)")
         ~current:days
         ~inject
     ]
