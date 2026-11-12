@@ -335,6 +335,12 @@ default browser: http://localhost:PORT/away
 default browser: http://localhost:PORT/new-window
 prigh's page loaded: 2 times; Chromium's windows: http://127.0.0.1:PORT/
 exit 0; left running: 0
+== real Chromium: a link handed over opens in the default browser, no window
+default browser: http://localhost:PORT/handed-over
+default browser: http://localhost:PORT/fallback
+prigh-desktop: a window opened on http://localhost:PORT: closing it
+Chromium's windows: http://127.0.0.1:PORT/
+exit 0; left running: 0
 == real Chromium: a sign-in proxy: the window signs in there, and is back on the site: exit 0
 prigh-desktop: starting WORK/bin/fake-prigh desktop
 prigh-desktop: prigh desktop is ready at http://127.0.0.1:PORT/
