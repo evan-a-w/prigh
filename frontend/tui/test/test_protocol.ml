@@ -891,6 +891,28 @@ let%expect_test "config round trip and config_changed event" =
   show
     (fun j -> Or_error.map (Config.of_json j) ~f:Config.sexp_of_t)
     {|{"dictation_model":"aiproxy/whisper"}|};
+  show
+    (fun j -> Or_error.map (Config.of_json j) ~f:Config.sexp_of_t)
+    {|{"generate_model":"deepseek/deepseek-flash","naming_model":null}|};
+  show
+    (fun j -> Or_error.map (Config.of_json j) ~f:Config.sexp_of_t)
+    {|{"generate_model":3}|};
+  let config =
+    { Config.default with
+      generate_model = Some "deepseek/deepseek-flash"
+    ; naming_model = Some "anthropic/claude-haiku-4-5"
+    }
+  in
+  print_s
+    [%message
+      "round trip"
+        ~generate_model:
+          (Json.field (Config.to_json config) "generate_model" : Json.t option)
+        ~equal:
+          (Or_error.map
+             (Config.of_json (Config.to_json config))
+             ~f:(fun c -> Config.equal c config)
+           : bool Or_error.t)];
   print_s
     [%sexp
       (Config.to_json
@@ -912,6 +934,7 @@ let%expect_test "config round trip and config_changed event" =
          ; compact_at_tokens = 150_000
          ; compaction_model = Some "anthropic/claude-haiku-4-5"
          ; mask_observations = false
+         ; generate_model = None
          ; naming_model = None
          ; dictation_model = Some "openai/whisper-1"
          }
@@ -939,6 +962,7 @@ let%expect_test "config round trip and config_changed event" =
      (compact_at_tokens 200000)
      (compaction_model ())
      (mask_observations true)
+     (generate_model  ())
      (naming_model    ())
      (dictation_model ()))
     ((scoped_models ())
@@ -960,6 +984,7 @@ let%expect_test "config round trip and config_changed event" =
      (compact_at_tokens 200000)
      (compaction_model ())
      (mask_observations true)
+     (generate_model  ())
      (naming_model    ())
      (dictation_model ()))
     ((scoped_models ())
@@ -981,6 +1006,7 @@ let%expect_test "config round trip and config_changed event" =
      (compact_at_tokens 200000)
      (compaction_model ())
      (mask_observations true)
+     (generate_model  ())
      (naming_model    ())
      (dictation_model ()))
     (decode (e "default_model must be a string"))
@@ -1003,6 +1029,7 @@ let%expect_test "config round trip and config_changed event" =
      (compact_at_tokens 200000)
      (compaction_model ())
      (mask_observations true)
+     (generate_model  ())
      (naming_model    ())
      (dictation_model ()))
     (decode (e "fallback_models must be an array of strings"))
@@ -1028,6 +1055,7 @@ let%expect_test "config round trip and config_changed event" =
      (compact_at_tokens 200000)
      (compaction_model ())
      (mask_observations true)
+     (generate_model  ())
      (naming_model    ())
      (dictation_model ()))
     (decode (e (in snippets[0] "missing field \"text\"")))
@@ -1050,6 +1078,7 @@ let%expect_test "config round trip and config_changed event" =
      (compact_at_tokens 0)
      (compaction_model (claude-haiku-4-5))
      (mask_observations true)
+     (generate_model  ())
      (naming_model    ())
      (dictation_model ()))
     (decode (e "compact_at_tokens must be a whole number"))
@@ -1072,6 +1101,7 @@ let%expect_test "config round trip and config_changed event" =
      (compact_at_tokens 200000)
      (compaction_model ())
      (mask_observations false)
+     (generate_model  ())
      (naming_model    ())
      (dictation_model ()))
     (decode (e "mask_observations must be a boolean"))
@@ -1094,8 +1124,33 @@ let%expect_test "config round trip and config_changed event" =
      (compact_at_tokens 200000)
      (compaction_model ())
      (mask_observations true)
-     (naming_model ())
+     (generate_model ())
+     (naming_model   ())
      (dictation_model (aiproxy/whisper)))
+    ((scoped_models ())
+     (approval_mode Auto)
+     (permissions (
+       (allow ())
+       (ask   ())
+       (deny  ())))
+     (default_model    ())
+     (default_thinking ())
+     (fallback_models  ())
+     (default_cwd      ())
+     (default_host     ())
+     (max_budget_usd   ())
+     (worktrees_dir    ())
+     (archive_after_days 7)
+     (notify             bell)
+     (snippets ())
+     (compact_at_tokens 200000)
+     (compaction_model ())
+     (mask_observations true)
+     (generate_model (deepseek/deepseek-flash))
+     (naming_model    ())
+     (dictation_model ()))
+    (decode (e "generate_model must be a string"))
+    ("round trip" (generate_model (deepseek/deepseek-flash)) (equal (Ok true)))
     ((scoped_models (a b))
      (approval_mode ask)
      (permissions (
@@ -1117,6 +1172,7 @@ let%expect_test "config round trip and config_changed event" =
      (compact_at_tokens 150000)
      (compaction_model  anthropic/claude-haiku-4-5)
      (mask_observations false)
+     (generate_model    null)
      (naming_model      null)
      (dictation_model   openai/whisper-1))
     (Event (
@@ -1140,6 +1196,7 @@ let%expect_test "config round trip and config_changed event" =
         (compact_at_tokens 200000)
         (compaction_model ())
         (mask_observations true)
+        (generate_model  ())
         (naming_model    ())
         (dictation_model ()))))
     |}]

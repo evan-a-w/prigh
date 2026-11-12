@@ -171,6 +171,29 @@ let mask (config : Config.t option) ~inject =
     ]
 ;;
 
+let generate_model (m : App.Model.t) ~inject =
+  let current =
+    match Option.bind m.config ~f:(fun c -> c.generate_model) with
+    | None -> "Default"
+    | Some key -> model_name m key
+  in
+  row
+    ~cls:"generate-model"
+    ~name:"Drafting"
+    ~about:
+      (* A no-break space keeps "✦ Generate" on one line. *)
+      "Drafts commit messages, pull request descriptions and branch names \
+       (✦\xC2\xA0Generate). Default: the session's model."
+    [ select
+        ~cls:"generate-model-choice"
+        ~title:"Choose the model (/generate-model)"
+        ~label:("Drafting model: " ^ current)
+        ~disabled:(Option.is_none m.config)
+        ~on_click:(inject (Action.Run "/generate-model"))
+        current
+    ]
+;;
+
 let naming_model (m : App.Model.t) ~inject =
   let current =
     match Option.bind m.config ~f:(fun c -> c.naming_model) with
@@ -182,7 +205,7 @@ let naming_model (m : App.Model.t) ~inject =
     ~name:"Naming"
     ~about:
       "Titles sessions and names subagents: a small, fast model is plenty. \
-       Default: the generate model, else the session's."
+       Default: the drafting model, else the session's."
     [ select
         ~cls:"naming-model-choice"
         ~title:"Choose the model (/naming model)"
@@ -1343,7 +1366,8 @@ let content (m : App.Model.t) (section : Section.t) ~inject =
     ; group
         ~title:"Models prigh uses"
         ~note:"Besides the conversation's"
-        [ naming_model m ~inject
+        [ generate_model m ~inject
+        ; naming_model m ~inject
         ; summary_model m m.config ~inject
         ; dictation_model m ~inject
         ]

@@ -61,7 +61,7 @@ let%expect_test "/fallback shows the chain, sets only it, and clears it" =
       (default_host ()) (max_budget_usd ()) (worktrees_dir ())
       (archive_after_days 7) (notify bell) (snippets ())
       (compact_at_tokens 200000) (compaction_model ()) (mask_observations true)
-      (naming_model ()) (dictation_model ())))
+      (generate_model ()) (naming_model ()) (dictation_model ())))
     (Rpc (method_ push_pref) (params ((key history) (value /fallback) (max 500)))
      (tag Ignore))
     (Expire_toast (id 0) (after_ms 5780))
@@ -93,7 +93,7 @@ let%expect_test "/fallback shows the chain, sets only it, and clears it" =
       (default_host ()) (max_budget_usd ()) (worktrees_dir ())
       (archive_after_days 7) (notify bell) (snippets ())
       (compact_at_tokens 200000) (compaction_model ()) (mask_observations true)
-      (naming_model ()) (dictation_model ())))
+      (generate_model ()) (naming_model ()) (dictation_model ())))
     |}];
   (* After a hand-over the status line's model moves on, and so does
      /fallback's "now on". *)
@@ -140,7 +140,7 @@ let%expect_test "/fallback shows the chain, sets only it, and clears it" =
       (default_host ()) (max_budget_usd ()) (worktrees_dir ())
       (archive_after_days 7) (notify bell) (snippets ())
       (compact_at_tokens 200000) (compaction_model ()) (mask_observations true)
-      (naming_model ()) (dictation_model ())))
+      (generate_model ()) (naming_model ()) (dictation_model ())))
     |}]
 ;;
 
@@ -169,7 +169,7 @@ let%expect_test
       (default_host ()) (max_budget_usd ()) (worktrees_dir ())
       (archive_after_days 7) (notify bell) (snippets ())
       (compact_at_tokens 200000) (compaction_model ()) (mask_observations true)
-      (naming_model ()) (dictation_model ())))
+      (generate_model ()) (naming_model ()) (dictation_model ())))
     |}];
   (* Before the config has arrived there is nothing to show or keep. *)
   let m, cmds = App.update { App.init with draft = "/fallback gpt-6" } Send in
@@ -299,7 +299,7 @@ let%expect_test "/default-dir shows, sets and clears where new sessions start" =
       (default_host ()) (max_budget_usd ()) (worktrees_dir ())
       (archive_after_days 7) (notify bell) (snippets ())
       (compact_at_tokens 200000) (compaction_model ()) (mask_observations true)
-      (naming_model ()) (dictation_model ())))
+      (generate_model ()) (naming_model ()) (dictation_model ())))
     |}];
   run h "/default-dir";
   H.text h ~selector:".toast:last-child";

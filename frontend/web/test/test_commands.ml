@@ -94,7 +94,8 @@ let%expect_test "every command does something (none is unknown)" =
     /instructions              Settings
     /user-info                 Settings
     /compact                   toast: Compacting the conversation…
-    /naming                    toast: Sessions and subagents are named by the generate model, else the session's model (/naming model MODEL|off)
+    /generate-model            picker: Drafting model
+    /naming                    toast: Sessions and subagents are named by the drafting model, else the session's model (/naming model MODEL|off)
     /dictation                 toast: Dictation is transcribed by openai/gpt-4o-mini-transcribe, the default (/dictation model MODEL|off)
     /compaction                toast: Compaction: at 200k tokens, or 80% of the model's window if that is less; summaries by the session's model; observation masking on (/compaction at TOKENS|off, /compaction model MODEL|off, /compaction mask on|off)
     /diff                      toast: Reading the changes…
@@ -369,7 +370,7 @@ let%expect_test "/scoped-models, Ctrl+P and Alt+P" =
       (default_cwd ()) (default_host ()) (max_budget_usd ()) (worktrees_dir ())
       (archive_after_days 7) (notify bell) (snippets ())
       (compact_at_tokens 200000) (compaction_model ()) (mask_observations true)
-      (naming_model ()) (dictation_model ())))
+      (generate_model ()) (naming_model ()) (dictation_model ())))
     |}]
 ;;
 

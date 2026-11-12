@@ -422,7 +422,8 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /instructions [on|off] your custom instructions, in the context of every session, in Settings; on or off lets the model add, edit and remove them or not
     /user-info what you set about yourself for the model (name, country, units...), given to it in every session, in Settings
     /compact [instructions] summarise older messages to free context
-    /naming [model MODEL|off] show which model names sessions and subagents; model MODEL|off: name them with MODEL (off: the generate model, else the session's)
+    /generate-model [MODEL|off] pick the model that drafts commit messages, pull requests and branch names (✦ Generate); MODEL|off: draft them with MODEL (off: the session's)
+    /naming [model MODEL|off] show which model names sessions and subagents; model MODEL|off: name them with MODEL (off: the drafting model, else the session's)
     /dictation [model MODEL|off] show which model transcribes dictation (speech to text); model MODEL|off: transcribe with MODEL, an OpenAI or OpenAI-compatible provider's (off: openai/gpt-4o-mini-transcribe)
     /compaction [at|model|mask ...] show when conversations are compacted and what summarises them; at TOKENS|off: also once the context exceeds TOKENS, not only at 80% of the window; model MODEL|off: the model that writes the summaries (off: the session's); mask on|off: replace old tool outputs with placeholders first
     /diff [path] show the uncommitted changes where the tools run, untracked files too
@@ -447,7 +448,6 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /tree show the session tree and move to any message in it
     /cd [path] change the working directory (asks to create a missing one)
     /mkdir [path] create a directory (and its parents) and change to it
-    /worktree [list|new|open|back|rm] pick a git worktree of the repository to work in (Alt+Enter: in a new session, Alt+R: review its changes, Delete removes it); new BRANCH [BASE] creates one and works there; open [-n] TARGET (-n: in a new session); back [main]: back where the session switched into worktrees from; rm [-f] TARGET (-f: with uncommitted changes)
     |}];
   H.type_ h "/mod";
   H.key h "Tab";

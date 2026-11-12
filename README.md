@@ -2507,10 +2507,12 @@ from the model waits for you, above), `snippets` (texts to insert into the
 editor, `/snippet` below) and
 `auto_background_seconds` (default 30, `0` = never: when a foreground
 command moves to the background and how long a wait lasts, above),
-`generate_model` (the model ✦ Generate drafts commit messages, pull
-requests and branch names with; default: the session's),
+`generate_model` (the drafting model: the one ✦ Generate drafts commit
+messages, pull requests and branch names with; default: the session's;
+`/generate-model` picks it, also on prigh-web's settings page, Models →
+Drafting),
 `naming_model` (the model that names sessions and subagents; default:
-`generate_model`, else the session's; `/naming model` picks it, also on
+the drafting model, else the session's; `/naming model` picks it, also on
 prigh-web's settings page),
 `dictation_model` (the speech-to-text model of the `transcribe` method,
 `provider/id` on OpenAI or an OpenAI-compatible custom provider; default
@@ -2801,7 +2803,8 @@ it.
 | `/trim [after\|undo\|show\|hide]` | drop everything before a message from the model's context (a picker, then a confirmation); `after`: everything after a message instead; `undo` brings the latest trim back, `show`/`hide` (TUI) unfold or fold the trimmed messages; see [Trimming the context](#trimming-the-context) |
 | `/delete [undo]` | drop a message from the transcript and the model's context (a picker, newest first; a reply goes with its tool results); `undo` brings the latest deletion back; see [Trimming the context](#trimming-the-context) |
 | `/compaction`, `/compaction at TOKENS\|off`, `/compaction model MODEL\|off`, `/compaction mask on\|off` | show or set when conversations are compacted (`compact_at_tokens`: also once the context exceeds TOKENS, e.g. `150k`), which model writes the summaries (`compaction_model`; `off`: the session's) and whether old tool outputs are masked first (`mask_observations`); also on prigh-web's settings page |
-| `/naming`, `/naming model MODEL\|off` | show or set the model that names sessions and subagents (`naming_model`; `off`: `generate_model`, else the session's); in the TUI `/naming model ` completes the models, in prigh-web `/naming model` alone opens a picker; also on prigh-web's settings page |
+| `/generate-model`, `/generate-model MODEL\|off` | show or set the drafting model, the one ✦ Generate drafts commit messages, pull requests and branch names with (`generate_model`; `off`: the session's); in the TUI `/generate-model ` completes `off` and the models, in prigh-web `/generate-model` alone opens a picker; also on prigh-web's settings page (Models → Drafting) |
+| `/naming`, `/naming model MODEL\|off` | show or set the model that names sessions and subagents (`naming_model`; `off`: the drafting model, else the session's); in the TUI `/naming model ` completes the models, in prigh-web `/naming model` alone opens a picker; also on prigh-web's settings page |
 | `/dictation`, `/dictation model MODEL\|off` | show or set the model that transcribes dictation (`dictation_model`: OpenAI's `gpt-4o-mini-transcribe`, `gpt-4o-transcribe`, `whisper-1`, or a custom OpenAI-compatible provider's model; `off`: `openai/gpt-4o-mini-transcribe`); the TUI completes them, prigh-web opens a picker that also takes a typed key; also on prigh-web's settings page |
 | `/commit [-a] [--amend] [-m MESSAGE \| --generate]` | commit what is staged in the session's worktree (`-a`: every change to tracked files first); `--generate` drafts the message with the model into the editor, see [Git hosting](#git-hosting) |
 | `/push` | push the worktree's branch to its upstream (set when it has none), with the tool host's git credentials |
@@ -3003,8 +3006,9 @@ back; it stays editable before use. In the TUI, `/pr new --generate [title]`
 drafts the form's title (unless one is given) and body, Ctrl+G in the form
 drafts on demand (Esc stops, Ctrl+_ swaps back to the text from before), and
 `/commit --generate` drafts a commit message. One tool-less request per
-draft, without thinking, on `generate_model` from `config.json` (a model name,
-id or prefix, e.g. a cheap fast one like `claude-haiku-4-5`), else the
+draft, without thinking, on the drafting model (`generate_model` in
+`config.json`, set with `/generate-model` or in prigh-web's settings: a model
+name, id or prefix, e.g. a cheap fast one like `claude-haiku-4-5`), else the
 session's model; its cost counts towards the session's. Large diffs are cut
 down to fit (every file keeps a share of its hunks, the rest listed with
 their line counts).

@@ -4,7 +4,7 @@ open! Import
 (** [/naming], shared by the terminal and browser frontends: [/naming] shows
     which model names sessions and subagents, [/naming model MODEL|off] sets
     the config's [naming_model] (the backend resolves the name as [/model]
-    does; [off]: [generate_model], else the session's model). *)
+    does; [off]: the drafting model ([generate_model]), else the session's). *)
 
 module Action : sig
   type t =
