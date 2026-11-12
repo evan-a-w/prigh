@@ -163,6 +163,25 @@ let memory args =
     String.concat ~sep:" " (action :: target))
 ;;
 
+let custom_instructions args =
+  let str = Tool_args.string args in
+  Option.map (str "action") ~f:(fun action ->
+    let about =
+      match str "title", str "text" with
+      | Some title, _ -> [ title ]
+      | None, Some text -> [ quoted text ]
+      | None, None -> []
+    in
+    let target =
+      match action with
+      | "add" -> about
+      | "edit" -> Option.to_list (str "id") @ about
+      | "remove" -> Option.to_list (str "id")
+      | _ -> []
+    in
+    String.concat ~sep:" " (action :: target))
+;;
+
 (* While the model still writes the arguments, the inner ones are the text
    after ["args":], an unfinished object [Tool_args] reads leniently. *)
 let on_host (call : P.Tool_call.t) =

@@ -9,6 +9,7 @@ type t =
   | Models
   | Memory
   | About_you
+  | Custom_instructions
   | Git_hosting
   | Nix_store (** superusers only *)
   | Account

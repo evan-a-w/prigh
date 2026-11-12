@@ -198,6 +198,7 @@ type t =
   ; tools : Tool.t list
   ; offered : Tool.t -> bool
   ; user_info : User_info.t option
+  ; custom_instructions : Custom_instructions.t option
   ; sessions_dir : string
   ; home : string
   ; models : Model_registry.t
@@ -420,11 +421,29 @@ let record_worktrees t ~agent ~added ~removed =
     then ignore (Session.worktree_removed t.session ~path : Session.Entry.t))
 ;;
 
+let record_told t =
+  if
+    not
+      (Option.equal
+         Told_environment.equal
+         (Session.told_environment t.session)
+         (Some t.told))
+  then ignore (Session.set_told_environment t.session t.told : Session.Entry.t)
+;;
+
 let broadcast t (event : Event.t) =
   match event with
   | Loop e when Option.is_some (worktrees_changed e) ->
     Option.iter (worktrees_changed e) ~f:(fun (agent, added, removed) ->
       record_worktrees t ~agent ~added ~removed)
+  | Loop (Custom_instruction_set { id; instruction }) ->
+    (* The model made this change: it is not told it back. *)
+    t.told
+    <- { t.told with
+         custom_instructions =
+           Custom_instruction.apply t.told.custom_instructions ~id instruction
+       };
+    record_told t
   | _ ->
     (match event with
      | Loop e ->
@@ -589,17 +608,12 @@ let environment t =
   ; plan_mode = t.plan_mode
   ; client = Some (Option.value t.client ~default:Other)
   ; user_info = Option.bind t.user_info ~f:User_info.text
+  ; custom_instructions =
+      Option.value_map
+        t.custom_instructions
+        ~default:[]
+        ~f:Custom_instructions.for_model
   }
-;;
-
-let record_told t =
-  if
-    not
-      (Option.equal
-         Told_environment.equal
-         (Session.told_environment t.session)
-         (Some t.told))
-  then ignore (Session.set_told_environment t.session t.told : Session.Entry.t)
 ;;
 
 (* A session from before [told] was recorded starts from its environment as
@@ -608,7 +622,12 @@ let restore_told t =
   t.told
   <- (match Session.told_environment t.session with
       | Some told -> told
-      | None -> { (environment t) with client = None; user_info = None });
+      | None ->
+        { (environment t) with
+          client = None
+        ; user_info = None
+        ; custom_instructions = []
+        });
   t.client <- t.told.client
 ;;
 
@@ -1891,7 +1910,11 @@ let instructions t ~cancel ~cwd =
    the next user message instead. *)
 let tools t = Tools.for_model t.model (own_tools t @ t.mcp_tools)
 
-let build_system_prompt ?(cancel = Cancellation.never) ?user_info t =
+let build_system_prompt
+      ?(cancel = Cancellation.never)
+      (now : Told_environment.t)
+      t
+  =
   let { Host_ops.Instructions.files; nix; skills } =
     instructions t ~cancel ~cwd:t.cwd
   in
@@ -1900,7 +1923,8 @@ let build_system_prompt ?(cancel = Cancellation.never) ?user_info t =
     ~nix
     ~skills
     ?auto_background:(Config.auto_background t.config)
-    ?user_info
+    ?user_info:now.user_info
+    ~custom_instructions:now.custom_instructions
     ~cwd:t.cwd
     ~home:t.home
     ~tools:(Tools.specs (tools t))
@@ -2022,7 +2046,7 @@ let system_prompt ?(cancel = Cancellation.never) t =
   | Some text -> text
   | None ->
     let now = environment t in
-    let text = build_system_prompt ~cancel ?user_info:now.user_info t in
+    let text = build_system_prompt ~cancel now t in
     (* Without its instructions: the next run builds it again. *)
     if not (Cancellation.is_cancelled cancel)
     then (
@@ -3224,6 +3248,7 @@ let create
       ?trace_clock
       ?(offered = fun (_ : Tool.t) -> true)
       ?user_info
+      ?custom_instructions
       ~cwd
       ()
   =
@@ -3273,6 +3298,7 @@ let create
     ; tools
     ; offered
     ; user_info
+    ; custom_instructions
     ; sessions_dir
     ; home
     ; models
@@ -3320,6 +3346,7 @@ let create
         ; plan_mode = false
         ; client = None
         ; user_info = None
+        ; custom_instructions = []
         }
     ; background =
         Background_tasks.create
@@ -4125,7 +4152,7 @@ let btw t ~question ~cancel ~on_delta =
   let system =
     match Session.system_prompt session with
     | Some text -> text
-    | None -> build_system_prompt ~cancel ?user_info:(environment t).user_info t
+    | None -> build_system_prompt ~cancel (environment t) t
   in
   let request =
     Btw.request

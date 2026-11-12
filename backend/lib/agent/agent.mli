@@ -262,6 +262,10 @@ val create
        (** what the user wrote about themselves: in the system prompt of a
            new session, and told with the next message to a session that
            knows another text ({!Told_environment}); default: none *)
+  -> ?custom_instructions:Custom_instructions.t
+       (** the user's custom instructions: in the system prompt of a new
+           session, and the changes told with the next message to a session
+           that knows others ({!Told_environment}); default: none *)
   -> cwd:string
   -> unit
   -> t

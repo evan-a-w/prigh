@@ -7,10 +7,7 @@ open! Import
     per namespace with [-tokens]: [{"next": n, "notes": [...]}], oldest
     first.
 
-    Every change re-reads the file and replaces it atomically (a temporary
-    file renamed over it) under the file's {!Lock_dir} and this value's
-    mutex, so sessions and backends sharing a home do not lose each other's
-    notes. Make one per world.
+    Kept by {!Note_store}. Make one per world.
 
     The user can turn memory off: [memory.enabled] set to [false] in their
     {!User_prefs} (absent: on). *)
@@ -31,19 +28,8 @@ val enabled_key : string
 val enabled : t -> bool
 val set_enabled : t -> bool -> unit Or_error.t
 
-module Note : sig
-  type t =
-    { id : string (** [m1], [m2], ...: never reused *)
-    ; title : string option
-    ; text : string
-    ; saved : Time_float.t (** shown in UTC *)
-    }
-  [@@deriving sexp_of]
-
-  (** [{"id", "title"?, "text", "saved"}], [saved] in UTC as
-      [YYYY-MM-DD HH:MM:SS.ffffffZ]. *)
-  val to_json : t -> Json.t
-end
+(** Ids are [m1], [m2], ...: never reused. *)
+module Note = Note_store.Note
 
 module Saved : sig
   type t =

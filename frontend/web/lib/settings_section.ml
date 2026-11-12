@@ -7,6 +7,7 @@ type t =
   | Models
   | Memory
   | About_you
+  | Custom_instructions
   | Git_hosting
   | Nix_store
   | Account
@@ -21,6 +22,7 @@ let available ~superuser =
     | Models
     | Memory
     | About_you
+    | Custom_instructions
     | Git_hosting
     | Account -> true)
 ;;
@@ -36,6 +38,7 @@ let name = function
   | Models -> "Models"
   | Memory -> "Memory"
   | About_you -> "About you"
+  | Custom_instructions -> "Custom instructions"
   | Git_hosting -> "Git hosting"
   | Nix_store -> "Nix store"
   | Account -> "Account"
@@ -60,6 +63,10 @@ let about = function
   | About_you ->
     "What the model should know about you, given to it in every session. Kept \
      on the backend, for your account."
+  | Custom_instructions ->
+    "Standing instructions for the model, given to it in every session; it may \
+     also add or edit them when you state a lasting preference. Kept on the \
+     backend, for your account."
   | Git_hosting ->
     "The hosts agents push branches to and open pull requests on."
   | Nix_store ->
@@ -74,6 +81,7 @@ let arg = function
   | Models -> "models"
   | Memory -> "memory"
   | About_you -> "user-info"
+  | Custom_instructions -> "instructions"
   | Git_hosting -> "git"
   | Nix_store -> "nix"
   | Account -> "account"
