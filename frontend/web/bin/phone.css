@@ -320,6 +320,16 @@
 /* A segmented control takes the row's width, its choices an even grid. */
 .app.narrow .setting .setting-control:has(> .segmented) { flex: 1 1 100%; margin-left: 0; }
 .app.narrow .setting .segmented > .segment { min-height: 44px; padding: 6px 8px; }
+/* New sessions: the choosers and the directory take the row, its reset at
+   the end; thinking's five levels in one row. */
+.app.narrow .setting:is(.default-model, .default-host, .default-dir, .default-fallback) .setting-control { flex: 1 1 100%; margin-left: 0; flex-wrap: wrap; justify-content: flex-start; }
+.app.narrow :is(.default-model-choice, .default-host-choice) { flex: 1 1 auto; max-width: none; min-height: var(--tap); justify-content: space-between; }
+.app.narrow .default-dir-input { flex: 1 1 0; width: auto; min-height: var(--tap); font-size: 16px; }
+.app.narrow .default-reset, .app.narrow .fallback-remove { min-width: var(--tap); min-height: var(--tap); justify-content: center; }
+.app.narrow .default-model-this, .app.narrow .fallback-add { min-height: var(--tap); }
+.app.narrow .fallback-list { flex: 1 1 100%; }
+.app.narrow .default-thinking .segmented { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.app.narrow .default-thinking .segmented > .segment { padding: 6px 2px; white-space: nowrap; }
 /* Many or long choices (the status styles): a list of rows, each its name
    over a line about it, a radio's ring before them. */
 .choice-list .segment-about { display: none; }

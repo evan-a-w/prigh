@@ -916,14 +916,22 @@ The settings page (the gear beside your account at the foot of the
 sidebar, Settings in the account menu, `/settings` or Ctrl+,) holds what is not
 about the session, in sections listed down its side (across its top on a
 phone): **Appearance** (the theme and accent, transcript detail
-(`/verbosity`)), **Sessions** (how new sessions start: the model, tool
-confirmation (`/confirm`), the starting directory and fallback models;
-the session list: Show worktrees, the hours a session's worktrees stay
+(`/verbosity`)), **Sessions** (the session list: Show worktrees, the hours a session's worktrees stay
 unfolded in the sidebar after it was used, and Archive after, the days
 without activity that archive it (`/auto-archive`), each a number with
 a switch that turns it off and back on to what it was; notifications, on or
 off, and what to do when the browser has not been asked, blocks them or
-cannot show them), **Models** (the providers
+cannot show them), **New sessions** (what a new session starts with, each
+with its control and a ↶ back to the built-in: the model (a picker, or This
+session's: `/change_default`), thinking, mode (Ask, Auto-edit, Auto), the
+tool host (a picker of the connected ones, `/default-host`) and the starting
+directory (typed, applied on Enter or leaving the field, `/default-dir`);
+and the limits every session without its own follows: the fallback models
+(added from a picker, removed one by one, `/fallback`) and the budget
+(`/default-budget`). They are the backend's `config.json`: a change applies
+from the next new session, open sessions keep their own (the fallback chain
+and the budget, which open sessions follow too, aside), and every client's
+settings follow it at once), **Models** (the providers
 (`/auth`) and compaction), **Memory** (the model's notes and the switch
 that turns memory off), **About you** (a form about yourself for the
 model, `/user-info`), **Git hosting**, **Nix store** (superusers) and
@@ -2531,10 +2539,17 @@ it), the transcript shows `↪ Handed over from A to B`, and B carries on with
 the task. At the end of the chain the run stops with a note saying so
 (`/model` picks another). Without a `default_model`, new sessions start on
 the chain's first model. `/fallback` shows the chain and `/fallback off`
-clears it. `default_cwd` (`/default-dir PATH`, `/default-dir off`) is the
-directory, on the backend's host (`~` allowed), that a session starts in
-when the backend starts one for a frontend, instead of the backend's
-working directory; it is ignored if it is not a directory there.
+clears it. `default_host` (`/default-host NAME`, `/default-host off`, or
+Settings → New sessions → Tool host) is the tool host, by id, that sessions
+a frontend starts (`new_session`) run their tools on, while it is connected
+(a tool host's own new sessions stay on it; without one, or while it is
+away, a session starts where the client's session is). `default_cwd`
+(`/default-dir PATH`, `/default-dir off`) is the directory on that host
+(`~` is its home; the backend's host without a `default_host`) that such a
+session starts in, instead of the host's working directory; on the backend's
+host it must be a directory when set, and it is ignored if it is not one
+when a session starts. Both are per namespace (each user's or project's
+`config.json`).
 `archive_after_days` (default 7, `0` = never) archives a session
 automatically once its last message is that many days old: the session
 lists show it as archived (frontends put archived ones apart). Set it
@@ -2693,7 +2708,8 @@ compactions included, counted as they happen — no further turn starts, the
 run stops between turns with a note saying how to raise it, and prompts are
 refused until you do. `max_budget_usd` in `config.json` (or `prigh run|serve
 -max-budget-usd DOLLARS`, which wins) is the budget of sessions that set
-none; `/budget` is recorded in the session.
+none (`/default-budget DOLLARS|off`, or prigh-web's Settings → New
+sessions → Budget); `/budget` is recorded in the session.
 
 `/goal TEXT` sets a goal and starts working on it: the agent keeps going
 across turns until it judges the goal met and calls `goal_complete` with a
@@ -2764,7 +2780,9 @@ it.
 | `/scoped-models` | pick the models Ctrl+P cycles through |
 | `/change_default` | save the current model and thinking level as the default for new sessions |
 | `/fallback [off\|model...]` | show or set the models that take over, in order, when a model's usage runs out (each word completes a model) |
-| `/default-dir [off\|path]` | show or set the directory new sessions start in |
+| `/default-dir [off\|path]` | show or set the directory new sessions start in (on the default host) |
+| `/default-host [off\|name]` | show or set the tool host new sessions start on (`default_host`; `off`: where you are); in prigh-web, bare: a picker |
+| `/default-budget [off\|dollars]` | show or set the budget sessions without their own `/budget` follow (`max_budget_usd`) |
 | `/login [provider\|custom] [api_key\|oauth]`, `/logout [provider]`, `/auth` | credentials; `/login custom` adds an OpenAI-compatible endpoint |
 | `/login github [HOST] [token]`, `/login forgejo HOST [token]`, `/login HOST [token]`, `/logout HOST` | sign in to or out of a git host (see [Git hosting](#git-hosting)) |
 | `/pr [list [open\|closed\|all]\|view N\|new [--generate] [title]\|checkout N]` | pull requests of the session's repository: pick one (Enter shows it), show one (also `/pr N`), create one from the current branch (`--generate`: the model drafts its title and body), or check one out in a git worktree |

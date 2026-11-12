@@ -866,9 +866,41 @@ let track_plan t (event : Agent_event.t) =
 
 let config t = t.config
 
+let adopt_config t config =
+  t.config <- config;
+  Trace.set_level t.tracer (Trace.Level.effective ~configured:config.trace);
+  broadcast t (Config_changed config)
+;;
+
 (* Fallback models are stored as keys, so a name or prefix that resolves
    now keeps meaning the same model. *)
-let set_config t (config : Config.t) =
+(* A host is named as [/host] names it (its id, else its name), and stored
+   by id, which stays the same across its reconnects. *)
+let resolve_default_host t name =
+  let hosts = hosts t in
+  match
+    Option.first_some
+      (List.find hosts ~f:(fun h -> String.equal h.id name))
+      (List.find hosts ~f:(fun h -> String.Caseless.equal h.name name))
+  with
+  | Some h -> Ok h.id
+  | None ->
+    Or_error.errorf
+      "default_host: no connected tool host is called %S; %s"
+      name
+      (match hosts with
+       | [] -> "none is connected (start prigh or prigh tool-host there)"
+       | hosts ->
+         "connected: "
+         ^ String.concat
+             ~sep:", "
+             (List.map hosts ~f:(fun h ->
+                if String.equal h.id Host.backend_id
+                then sprintf "%s (the backend)" h.name
+                else h.name)))
+;;
+
+let set_config ?(session_mode = true) t (config : Config.t) =
   let open Or_error.Let_syntax in
   let%bind fallback_models =
     List.map config.fallback_models ~f:(fun name ->
@@ -915,6 +947,13 @@ let set_config t (config : Config.t) =
       |> Result.map_error ~f:(fun e ->
         Error.createf "dictation_model: %s" (Error.to_string_hum e))
   in
+  let%bind default_host =
+    match config.default_host with
+    | None -> Ok None
+    | Some name when Option.equal String.equal t.config.default_host (Some name)
+      -> Ok (Some name)
+    | Some name -> Or_error.map (resolve_default_host t name) ~f:Option.some
+  in
   let config =
     { config with
       fallback_models =
@@ -922,14 +961,23 @@ let set_config t (config : Config.t) =
     ; generate_model
     ; compaction_model
     ; naming_model
+    ; default_host
     }
+  in
+  let on_backend =
+    Option.value_map
+      config.default_host
+      ~default:true
+      ~f:(String.equal Host.backend_id)
   in
   let%bind () =
     match config.default_cwd with
     | Some dir when not (Filename.is_absolute (Tool.expand_home dir)) ->
       Or_error.errorf "default_cwd: %s must be absolute (or start with ~/)" dir
     | Some dir
-      when t.backend_host_enabled
+      when on_backend
+           && t.backend_host_enabled
+           && (not (Option.equal String.equal t.config.default_cwd (Some dir)))
            && not (Sys_unix.is_directory_exn (Tool.expand_home dir)) ->
       Or_error.errorf
         "default_cwd: %s is not a directory on the backend (%s)"
@@ -941,11 +989,9 @@ let set_config t (config : Config.t) =
   let mode_changed =
     not (Approval_mode.equal config.approval_mode t.config.approval_mode)
   in
-  t.config <- config;
-  Trace.set_level t.tracer (Trace.Level.effective ~configured:config.trace);
-  broadcast t (Config_changed config);
+  adopt_config t config;
   (* [/confirm on|off] changes the default and the session at once. *)
-  if mode_changed then set_approval_mode t config.approval_mode
+  if session_mode && mode_changed then set_approval_mode t config.approval_mode
 ;;
 
 let save_as_default t =

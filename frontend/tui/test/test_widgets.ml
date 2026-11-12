@@ -375,8 +375,8 @@ let%expect_test "fuzzy ranking: command names" =
   [%expect
     {|
     "mo" -> mode model scoped-models memory import compaction permissions
-    "lo" -> login logout clone
-    "s"  -> state switch skills skill: signin setusr session snippet signout sessions scoped-models push jobs host todos resume agents hotkeys verbosity user-info permissions instructions downsize-images
+    "lo" -> login logout clone default-host
+    "s"  -> state switch skills skill: signin setusr session snippet signout sessions scoped-models push jobs host todos resume agents hotkeys verbosity user-info permissions default-host instructions downsize-images
     "sw" -> switch
     "xyz" ->
     |}]
@@ -695,7 +695,9 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /scoped-models                     pick the models Ctrl+P cycles through
     /change_default                    save the current model and thinking level as the default for new sessions
     /fallback [off|model...]           show or set the models that take over, in order, when a model's usage runs out
-    /default-dir [off|path]            show or set the directory new sessions start in
+    /default-dir [off|path]            show or set the directory new sessions start in (on the default host)
+    /default-host [off|name]           show or set the tool host prigh-web's new sessions start on (a terminal's start on its machine)
+    /default-budget [off|dollars]      show or set the cost budget of sessions that set none with /budget
     /login [provider] [api_key|oauth]  log in to a provider, or a git host: github [HOST] [token], forgejo HOST [token], HOST [token]
     /logout [provider|HOST]            remove a provider's or a git host's stored credential
     /thinking [off|low|on|high|max]    pick or set the thinking level

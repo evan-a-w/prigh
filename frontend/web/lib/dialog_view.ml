@@ -30,6 +30,8 @@ let picker_title : Dialog.Picker_kind.t -> string = function
   | Accents -> "Colours"
   | Attach -> "Attach"
   | Compaction_models | Naming_models | Dictation_models -> "Models"
+  | Defaults (Model | Fallback) -> "Models"
+  | Defaults Host -> "Hosts"
 ;;
 
 (* What is wrong with the MCP configuration, under its servers. *)

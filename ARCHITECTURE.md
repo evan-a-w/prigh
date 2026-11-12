@@ -1514,7 +1514,8 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   `approval_mode` (new sessions' mode; read from `confirm_tools` when
   absent, which saving replaces), `permissions` (allow/ask/deny rules;
   saving keeps the file's as written), `default_model`/`default_thinking`,
-  `fallback_models` (model keys), `default_cwd`, `worktrees_dir` (where
+  `fallback_models` (model keys), `default_cwd`, `default_host` (a tool
+  host's id), `worktrees_dir` (where
   `Worktree` puts new worktrees on the tool host; default
   `~/.prigh/worktrees`), `max_budget_usd`,
   `goal_max_continuations`, `resume_on_limit_reset`, `ask_user_timeout_seconds` (default
@@ -1538,9 +1539,23 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   `naming_model`
   like `set_model` (stored as keys; an unknown name is refused with the
   closest matches). `dictation_model` is kept as written, refused
-  only when its provider cannot transcribe (`Transcription.check_model`). A new
-  session starts in `default_cwd` (on the backend host) and on
-  `default_model`, else the first of `fallback_models`.
+  only when its provider cannot transcribe (`Transcription.check_model`).
+  `default_host` is resolved like `/host` (an id, else a name, among the
+  connected hosts) and stored as the id; one kept as it was is not checked
+  again (it may be away). `default_cwd` must be absolute or start with
+  `~`; on the backend's host it must be a directory there when it changes.
+  `set_config {config, defaults_only?}`: with `defaults_only` an
+  `approval_mode` change is the default only, the caller's session keeps
+  its mode (prigh-web's Settings → New sessions); without it `/confirm`
+  changes both. After a save every other agent of the server adopts the
+  config (`Agent.adopt_config`) and tells its clients (`config_changed`),
+  so every client's settings follow and a later `set_config` merges over
+  the file as it is (`Rpc_server.current_config` rereads it). A new
+  session starts on `default_model`, else the first of `fallback_models`;
+  `Rpc_server.new_session_start` puts one a non-tool-host client starts on
+  `default_host` while it is connected (else where the client's session
+  is), in `default_cwd` there (`~` is that host's home; on the backend's
+  host only if it is a directory).
 - `User_prefs` — a user's preferences and data that frontends keep on the
   backend, `~/.prigh/prefs.json` under the user's home (per namespace with
   `-tokens`): a JSON object of keys the backend gives no meaning
@@ -2724,9 +2739,12 @@ terminal frontend and `web/` prigh-web, the browser one.
     at a word start (a letter or digit first, only when a snippet matches),
     and `Autocomplete.insert_snippet` swaps `#name` for the text with
     `Editor.replace` (one undo step, the cursor after it).
-  - Model hand-over and default directory: `/fallback` and `/default-dir`
-    show `Config`'s `fallback_models`/`default_cwd`, or send `set_config`
-    with only that field. The backend keeps the fields a `set_config`
+  - Model hand-over and defaults: `/fallback`, `/default-dir`,
+    `/default-host` and `/default-budget` show `Config`'s
+    `fallback_models`/`default_cwd`/`default_host`/`max_budget_usd`, or
+    send `set_config` with only that field (`Default_host_command` and
+    `Default_budget_command` parse and summarise, shared with prigh-web;
+    a host is named by id or name among the state's `hosts`). The backend keeps the fields a `set_config`
     leaves out, so every one the app sends (`/confirm`, `/scoped-models`
     too) carries only its own field and a stale or missing `Config` cannot
     undo another change. A refusal (an unknown model, with the backend's
@@ -3485,6 +3503,18 @@ terminal frontend and `web/` prigh-web, the browser one.
       `Slash.parse` lets `/snippet add` span lines. Saving sends
       `set_config` with only `snippets`, shown at once; a refused
       `Config_saved` refetches the config so the page shows the backend's.
+    - New sessions: `New_sessions_view` is Settings → New sessions, every
+      default with its control (`Settings_row`'s select, segmented and
+      fields) and a reset to the built-in. `New_default.t` is one change
+      (`Model`, `Thinking`, `Mode`, `Host`, `Dir`, `Fallback`, `Budget`);
+      `App.set_default` shows it at once and sends `set_config` with that
+      field and `defaults_only`, tagged `Default_set`, whose reply or
+      refusal (refetching the config) says what new sessions get.
+      `Default_fields` holds the directory and budget drafts until Enter or
+      leaving the field. The model, host and fallback rows open a
+      `Picker` of kind `Defaults` (`New_default.Picker`), the first item
+      going back to the built-in; closing it returns to the settings.
+      `/default-host` alone opens that picker.
     - Model hand-over: `/fallback` and `/default-dir` send `set_config`
       with only the field they change (as `/confirm` and `/scoped-models`
       do), and show the config the backend replies with (`/fallback`'s

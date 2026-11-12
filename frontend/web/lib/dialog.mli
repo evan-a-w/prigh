@@ -43,6 +43,9 @@ module Picker_kind : sig
     | Dictation_models
     (** [/dictation model]: transcription model keys, or [off] (the
         default); other keys are typed in the filter *)
+    | Defaults of New_default.Picker.t
+    (** the settings' New sessions: model keys, or host ids; the first item
+        ([builtin]) goes back to the built-in *)
     | Attach (** the composer's +: item ids are [files] and [image] *)
     | Menu of Context_menu.t
     (** a session's or worktree's context menu; item ids are

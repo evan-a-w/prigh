@@ -121,6 +121,8 @@ let%expect_test "every command does something (none is unknown)" =
     /mkdir                     path prompt
     /worktree                  loading Worktrees: rpc push_pref, rpc list_worktrees
     /default-dir               toast: No default directory: new sessions start in the backend's working directory; /default-dir PATH sets one
+    /default-host              picker: New sessions' host
+    /default-budget            toast: No default budget: /default-budget DOLLARS sets one for sessions without their own /budget
     /host                      picker: Where tools run
     /export                    path prompt
     /import                    path prompt
@@ -364,9 +366,10 @@ let%expect_test "/scoped-models, Ctrl+P and Alt+P" =
         deepseek/deepseek-chat))
       (approval_mode Auto) (permissions ((allow ()) (ask ()) (deny ())))
       (default_model ()) (default_thinking ()) (fallback_models ())
-      (default_cwd ()) (worktrees_dir ()) (archive_after_days 7) (notify bell)
-      (snippets ()) (compact_at_tokens 200000) (compaction_model ())
-      (mask_observations true) (naming_model ()) (dictation_model ())))
+      (default_cwd ()) (default_host ()) (max_budget_usd ()) (worktrees_dir ())
+      (archive_after_days 7) (notify bell) (snippets ())
+      (compact_at_tokens 200000) (compaction_model ()) (mask_observations true)
+      (naming_model ()) (dictation_model ())))
     |}]
 ;;
 

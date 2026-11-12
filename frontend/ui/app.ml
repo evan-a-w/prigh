@@ -79,6 +79,10 @@ module Reply_tag = struct
     | Auto_archive_saved of string
     | Dictation_shown
     | Dictation_saved of string
+    | Default_host_shown
+    | Default_host_saved of string
+    | Default_budget_shown
+    | Default_budget_saved of string
     | Models_catalog
     | Models_for_scoped
     | Compact_done
@@ -3070,10 +3074,7 @@ let naming_command m (cmd : Commands.Parsed.t) =
 let auto_archive_command m (cmd : Commands.Parsed.t) =
   match Auto_archive_command.parse cmd.rest with
   | Show ->
-    show_config
-      m
-      ~tag:Auto_archive_shown
-      ~summary:Auto_archive_command.summary
+    show_config m ~tag:Auto_archive_shown ~summary:Auto_archive_command.summary
   | Error e ->
     error (restore_command m (String.strip ("/auto-archive " ^ cmd.rest))) e, []
   | Set _ as action ->
@@ -3081,6 +3082,43 @@ let auto_archive_command m (cmd : Commands.Parsed.t) =
     , [ set_config
           ~tag:(Auto_archive_saved ("/auto-archive " ^ cmd.rest))
           (Auto_archive_command.fields action)
+      ] )
+;;
+
+let state_hosts m = Option.value_map m.state ~default:[] ~f:(fun s -> s.hosts)
+
+let default_host_command m (cmd : Commands.Parsed.t) =
+  match Default_host_command.parse cmd.rest with
+  | Show ->
+    show_config
+      m
+      ~tag:Default_host_shown
+      ~summary:(Default_host_command.summary ~hosts:(state_hosts m))
+  | Error e ->
+    error (restore_command m (String.strip ("/default-host " ^ cmd.rest))) e, []
+  | Set _ as action ->
+    ( m
+    , [ set_config
+          ~tag:(Default_host_saved ("/default-host " ^ cmd.rest))
+          (Default_host_command.fields action)
+      ] )
+;;
+
+let default_budget_command m (cmd : Commands.Parsed.t) =
+  match Default_budget_command.parse cmd.rest with
+  | Show ->
+    show_config
+      m
+      ~tag:Default_budget_shown
+      ~summary:Default_budget_command.summary
+  | Error e ->
+    ( error (restore_command m (String.strip ("/default-budget " ^ cmd.rest))) e
+    , [] )
+  | Set _ as action ->
+    ( m
+    , [ set_config
+          ~tag:(Default_budget_saved ("/default-budget " ^ cmd.rest))
+          (Default_budget_command.fields action)
       ] )
 ;;
 
@@ -4175,6 +4213,8 @@ let run_command m (cmd : Commands.Parsed.t) =
   | "default-dir", [] ->
     show_config m ~tag:Default_dir_shown ~summary:default_dir_summary
   | "default-dir", _ -> set_default_dir m cmd
+  | "default-host", _ -> default_host_command m cmd
+  | "default-budget", _ -> default_budget_command m cmd
   | "compaction", _ -> compaction_command m cmd
   | "dictation", _ -> dictation_command m cmd
   | "naming", _ -> naming_command m cmd
@@ -6599,6 +6639,8 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
      | Default_dir_saved text
      | Compaction_saved text
      | Naming_saved text
+     | Default_host_saved text
+     | Default_budget_saved text
      | Auto_archive_saved text ->
        (* Back in the editor, to correct rather than retype. *)
        let editor =
@@ -7216,6 +7258,18 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
      | Naming_shown | Naming_saved _ ->
        decode json ~f:P.Config.of_json (fun config ->
          ( notice { m with config = Some config } (Naming_command.summary config)
+         , [] ))
+     | Default_host_shown | Default_host_saved _ ->
+       decode json ~f:P.Config.of_json (fun config ->
+         ( notice
+             { m with config = Some config }
+             (Default_host_command.summary ~hosts:(state_hosts m) config)
+         , [] ))
+     | Default_budget_shown | Default_budget_saved _ ->
+       decode json ~f:P.Config.of_json (fun config ->
+         ( notice
+             { m with config = Some config }
+             (Default_budget_command.summary config)
          , [] ))
      | Auto_archive_shown | Auto_archive_saved _ ->
        decode json ~f:P.Config.of_json (fun config ->

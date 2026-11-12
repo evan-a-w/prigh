@@ -29,7 +29,12 @@ type t =
     (** model keys, in order: when a model's usage runs out (or it has no
         credentials), a run hands over to the next one after it *)
   ; default_cwd : string option
-    (** where new sessions start on the backend host *)
+    (** where new sessions start on [default_host] (the backend's host when
+        there is none) *)
+  ; default_host : string option
+    (** the id of the tool host a frontend without tools (prigh-web) starts
+        new sessions on while it is connected; [None]: where the frontend's
+        session is (see [Rpc_server.new_session]) *)
   ; worktrees_dir : string
     (** where prigh creates git worktrees on the tool host (default
         [~/.prigh/worktrees], see {!Worktree}) *)

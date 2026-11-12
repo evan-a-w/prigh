@@ -17,7 +17,7 @@ let%expect_test "the gear, /settings and Ctrl+, open it; Esc closes it" =
     (Focus dialog)
     Settings
     (Close (Esc))
-    (Appearance) (Sessions) (Models) (Memory) (About you) (Custom instructions) (Git hosting) (Account)
+    (Appearance) (Sessions) (New sessions) (Models) (Memory) (About you) (Custom instructions) (Git hosting) (Account)
     Appearance
     How this page looks. Saved for your account, so it follows you to every browser you sign in on.
     Look
@@ -193,8 +193,8 @@ let%expect_test "transcript detail, default mode, providers, shortcuts" =
     Quiet
     |}];
   (* The default mode is the config's: auto by default. Ask, auto-edit or
-     auto, for new sessions and this one. *)
-  H.click h ~selector:".settings-tab-sessions";
+     auto, for new sessions only: this one keeps its mode. *)
+  H.click h ~selector:".settings-tab-new-sessions";
   H.text h ~selector:".setting.default-mode";
   H.elements h ~selector:".setting.default-mode .segment";
   H.click h ~selector:".setting.default-mode .segment:nth-child(2)";
@@ -202,18 +202,17 @@ let%expect_test "transcript detail, default mode, providers, shortcuts" =
   H.elements h ~selector:".settings-dialog";
   [%expect
     {|
-    (Settings_section Sessions)
+    (Settings_section New_sessions)
     Mode
-    What asks before it runs: everything (Ask), all but file edits (Auto-edit) or nothing (Auto). This session changes too.
+    What asks before it runs: everything (Ask), all but file edits (Auto-edit) or nothing (Auto).
     (Ask) (Auto-edit) (Auto)
     <button class="segment">
     <button class="segment">
     <button class="on segment">
-    (Run "/confirm auto-edit")
-    (Rpc (method_ set_config) (params ((config ((approval_mode auto-edit)))))
-     (tag
-      (Config_saved
-       "Mode auto-edit, also for new sessions: file edits run; bash, job_input and MCP tools ask first")))
+    (Set_default (Mode Auto_edit))
+    (Rpc (method_ set_config)
+     (params ((config ((approval_mode auto-edit))) (defaults_only true)))
+     (tag (Default_set (Mode Auto_edit))))
     <button class="segment">
     <button class="on segment">
     <button class="segment">
@@ -300,20 +299,33 @@ let%expect_test "the names of the settings' controls" =
     [radio] button "Yellow" -- Yellow (/accent yellow)
     [group] div "Transcript detail"
     -- Sessions
-    button "Use this session\226\128\153s" -- Start new sessions with Claude Opus 5.5 · thinking on (/change_default)
-    button "Ask" -- /confirm ask
-    button "Auto-edit" -- /confirm auto-edit
-    button "Auto" -- /confirm auto
     [switch] button "Show worktrees for sessions used in the last" -- Fold every session's worktrees until opened
     [switch] button "Archive sessions after" -- Archive only by hand (/auto-archive off)
     button "Allow" -- Ask the browser to allow notifications (/notify on)
     [switch] button "Notifications" -- Turn notifications off (/notify off)
-    [group] div "Default mode"
     [group] div "Show worktrees for sessions used in the last"
     [switch] button "Show worktrees for sessions used in the last" -- Fold every session's worktrees until opened
     [group] div "Archive sessions after"
     [switch] button "Archive sessions after" -- Archive only by hand (/auto-archive off)
     [switch] button "Notifications" -- Turn notifications off (/notify off)
+    -- New sessions
+    button "New sessions' model: The backend's choice" -- Choose the model new sessions start with
+    button "This session\226\128\153s" -- Start new sessions with Claude Opus 5.5 · thinking on, its thinking level too (/change_default)
+    button "Off" -- New sessions think at off
+    button "Low" -- New sessions think at low
+    button "On" -- New sessions think at on
+    button "High" -- New sessions think at high
+    button "Max" -- New sessions think at max
+    button "Ask" -- New sessions start in Ask mode
+    button "Auto-edit" -- New sessions start in Auto-edit mode
+    button "Auto" -- New sessions start in Auto mode
+    button "New sessions' tool host: Where you are" -- Choose the tool host new sessions start on (/default-host)
+    button "Add" -- Add a model to the end of the chain (/fallback MODEL…)
+    [switch] button "Budget" -- Stop sessions starting turns past a cost (/default-budget)
+    [group] div "New sessions' thinking"
+    [group] div "New sessions' mode"
+    [group] div "Budget"
+    [switch] button "Budget" -- Stop sessions starting turns past a cost (/default-budget)
     -- Models
     button "Manage providers" -- /auth (/login, /logout)
     button "Naming model: Default" -- Choose the model (/naming model)
@@ -354,6 +366,7 @@ let%expect_test "the names of the settings' controls" =
     [tablist] div "Settings sections"
     [tab] button "Appearance" -- /settings appearance
     [tab] button "Sessions" -- /settings sessions
+    [tab] button "New sessions" -- /settings new-sessions
     [tab] button "Models" -- /settings models
     [tab] button "Memory" -- /settings memory
     [tab] button "About you" -- /settings user-info
@@ -500,9 +513,9 @@ let%expect_test "sections: clicks, arrows, Home and End, /settings SECTION" =
     Close_dialog
     (Focus editor)
     Send
-    Nix store is only for superusers: try /settings appearance, /settings sessions, /settings models, /settings memory, /settings user-info, /settings instructions, /settings git, /settings account. (Dismiss)
+    Nix store is only for superusers: try /settings appearance, /settings sessions, /settings new-sessions, /settings models, /settings memory, /settings user-info, /settings instructions, /settings git, /settings account. (Dismiss)
     Send
-    No settings section "colours": try /settings appearance, /settings sessions, /settings models, /settings memory, /settings user-info, /settings instructions, /settings git, /settings account. (Dismiss)
+    No settings section "colours": try /settings appearance, /settings sessions, /settings new-sessions, /settings models, /settings memory, /settings user-info, /settings instructions, /settings git, /settings account. (Dismiss)
     |}]
 ;;
 
@@ -519,7 +532,7 @@ let%expect_test "superusers have the Nix store's section" =
   H.quiet h (fun () -> H.act h Open_settings);
   H.text h ~selector:".settings-nav";
   [%expect
-    {| (Appearance) (Sessions) (Models) (Memory) (About you) (Custom instructions) (Git hosting) (Nix store) (R root) |}]
+    {| (Appearance) (Sessions) (New sessions) (Models) (Memory) (About you) (Custom instructions) (Git hosting) (Nix store) (R root) |}]
 ;;
 
 let%expect_test "/settings completes the sections" =
@@ -530,7 +543,8 @@ let%expect_test "/settings completes the sections" =
     {|
     Settings sections ↑↓ Tab Enter Esc   Ctrl+Enter as typed
     appearance How this page looks. Saved for your account, so it follows you to every browser you sign in on.
-    sessions How new sessions start, how the session list shows them, and how this browser tells you that something happened. Kept on the backend.
+    sessions How the session list shows sessions, and how this browser tells you that something happened. Kept on the backend.
+    new-sessions What a new session starts with. A change applies from the next new session: open ones keep theirs. Kept on the backend.
     models The providers whose models you use, the models prigh uses for its own work, and when long conversations are summarised. Kept on the backend.
     memory What you asked the model to remember, for later sessions. Kept on the backend, for your account.
     user-info What the model should know about you, given to it in every session. Kept on the backend, for your account.
@@ -563,7 +577,7 @@ let%expect_test
     (Focus dialog)
     Settings
     (Close (Esc))
-    (Appearance How this page looks. Saved for your account, so it follows you to every browser you sign in on.) (Sessions How new sessions start, how the session list shows them, and how this browser tells you that something happened. Kept on the backend.) (Models The providers whose models you use, the models prigh uses for its own work, and when long conversations are summarised. Kept on the backend.) (Memory What you asked the model to remember, for later sessions. Kept on the backend, for your account.) (About you What the model should know about you, given to it in every session. Kept on the backend, for your account.) (Custom instructions Standing instructions for the model, given to it in every session; it may also add or edit them when you state a lasting preference. Kept on the backend, for your account.) (Git hosting The hosts agents push branches to and open pull requests on.) (Account Who you are on this backend.)
+    (Appearance How this page looks. Saved for your account, so it follows you to every browser you sign in on.) (Sessions How the session list shows sessions, and how this browser tells you that something happened. Kept on the backend.) (New sessions What a new session starts with. A change applies from the next new session: open ones keep theirs. Kept on the backend.) (Models The providers whose models you use, the models prigh uses for its own work, and when long conversations are summarised. Kept on the backend.) (Memory What you asked the model to remember, for later sessions. Kept on the backend, for your account.) (About you What the model should know about you, given to it in every session. Kept on the backend, for your account.) (Custom instructions Standing instructions for the model, given to it in every session; it may also add or edit them when you state a lasting preference. Kept on the backend, for your account.) (Git hosting The hosts agents push branches to and open pull requests on.) (Account Who you are on this backend.)
     (Settings_section Models)
     <button class="btn ghost modal-back">
     <h2 class="">

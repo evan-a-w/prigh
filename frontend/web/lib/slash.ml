@@ -66,8 +66,8 @@ let every =
       ~argument:Settings
       ~args:"[section]"
       "settings"
-      "appearance, sessions, models, git hosting and your account; a section \
-       opens at it (Ctrl+,)"
+      "appearance, sessions, new sessions' defaults, models, git hosting and \
+       your account; a section opens at it (Ctrl+,)"
   ; c "new" "start a new session"
   ; c
       "temporary"
@@ -273,7 +273,19 @@ let every =
       ~argument:Backend_directory
       ~args:"[path|off]"
       "default-dir"
-      "show or set the directory new sessions start in"
+      "show or set the directory new sessions start in (on the default host), \
+       in Settings"
+  ; c
+      ~argument:Host
+      ~args:"[off|name]"
+      "default-host"
+      "pick or set the tool host new sessions start on (off: where you are), \
+       in Settings"
+  ; c
+      ~args:"[off|dollars]"
+      "default-budget"
+      "show or set the cost budget of sessions that set none with /budget, in \
+       Settings"
   ; c
       ~argument:Host
       ~args:"[name|backend]"
