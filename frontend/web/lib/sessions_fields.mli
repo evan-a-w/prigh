@@ -24,6 +24,9 @@ val error : t -> Which.t -> string option
 
 val input : t -> Which.t -> string -> t
 
+(** Forgets its draft and error. *)
+val clear : t -> Which.t -> t
+
 (** Applies the draft: the number to set ([0]: off), if it is one; an empty
     or untouched field sets nothing. *)
 val commit : t -> Which.t -> t * float option

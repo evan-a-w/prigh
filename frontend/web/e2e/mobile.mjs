@@ -3,18 +3,19 @@
 // touch), and as an installed PWA on a notched phone (Chromium: the safe
 // area's insets emulated). On each screen (the chat, the ⋯ sheet, the
 // drawer, the composer's menus, the settings' list and a section of it, the
-// files, a picker) it prints whether the page overflows sideways, any
-// control that is off screen, covered by another or smaller than a thumb
-// (44px, 36px in the composer's and the transcript's rows; a word only by its height), and inputs that
-// iOS would zoom into (under 16px). Then: the one strip of chrome is under
-// the notch and the composer over the home indicator, the settings go a
-// level down and back by tap, and the keyboard (a shorter visual viewport)
-// keeps the composer in view. Run by prigh_web.sh; prints normalised results
-// (the expected output is in ENGINE.expected) and, with SHOTS, screenshots.
+// files, a picker, the review page and its files) it prints whether the
+// page overflows sideways, any control that is off screen, covered by
+// another or smaller than a thumb (44px on its shorter side, 40px in the
+// rows in [dense]), and inputs that iOS would zoom into (under 16px). Then:
+// the one strip of chrome is under the notch and the composer over the home
+// indicator, the settings go a level down and back by tap, and the keyboard
+// (a shorter visual viewport) keeps the composer in view. Run by
+// prigh_web.sh; prints normalised results (the expected output is in
+// ENGINE.expected) and, with SHOTS, screenshots.
 //
 // Environment: PLAYWRIGHT_MODULE, PRIGH_BACKEND, SITE, TEST_DIR, TOKEN, and
 // optionally SHOTS.
-import { spawn } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { end } from "./end.mjs";
@@ -32,6 +33,18 @@ mkdirSync(home, { recursive: true });
 mkdirSync(join(cwd, "src"), { recursive: true });
 writeFileSync(join(cwd, "server.ml"), "let port = 8080\n");
 writeFileSync(join(cwd, "README.md"), "# demo\n");
+// A repository with a change, for the review page.
+const git = (...args) => execFileSync("git", args, {
+  cwd,
+  env: {
+    ...process.env, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_NOSYSTEM: "1",
+    GIT_AUTHOR_NAME: "t", GIT_AUTHOR_EMAIL: "t@t", GIT_COMMITTER_NAME: "t", GIT_COMMITTER_EMAIL: "t@t",
+  },
+});
+git("init", "-q", "-b", "main");
+git("add", "-A");
+git("commit", "-qm", "start");
+writeFileSync(join(cwd, "README.md"), "# demo\n\nA change to review.\n");
 setTimeout(() => { console.error("mobile.mjs: timed out"); process.exit(2); }, 280000).unref();
 
 const long = "/home/someone/projects/a-very-long-directory-name/with/many/levels/of/nesting/and-a-file-name-without-breaks.ml";
@@ -92,7 +105,11 @@ const choicesFit = page => page.evaluate(() => {
   const one = list && new Set([...list.querySelectorAll(".segment")].map(b => Math.round(b.getBoundingClientRect().left))).size === 1;
   return `choice controls fit: ${bad.length ? bad.join("; ") : "true"}` + (list ? `; the status styles a list: ${one}` : "");
 });
-const audit = page => page.evaluate(() => {
+// Rows a phone keeps on screen with more in them than 44px targets leave
+// room for, whose targets are 40px: the composer's (+, the model, the host,
+// the status, the microphone, send).
+const dense = ".composer";
+const audit = page => page.evaluate(dense => {
   const out = [];
   const W = innerWidth, H = innerHeight;
   const sw = document.scrollingElement.scrollWidth;
@@ -112,7 +129,7 @@ const audit = page => page.evaluate(() => {
     }
     return !e.closest("[inert], .sr-only");
   };
-  const top = [...document.querySelectorAll(".modal, .chrome-menu, .chip-popover, .popup, .sidebar, .files-panel")]
+  const top = [...document.querySelectorAll(".modal, .chrome-menu, .chip-popover, .popup, .sidebar, .files-panel, .review-page")]
     .filter(visible).pop();
   const scope = top ?? document;
   const controls = [...scope.querySelectorAll("button, a[href], input:not([type=hidden]), textarea, select, [role=tab]")].filter(visible);
@@ -130,12 +147,9 @@ const audit = page => page.evaluate(() => {
     const cx = Math.min(Math.max(r.left + r.width / 2, 0), W - 1), cy = Math.min(Math.max(r.top + r.height / 2, 0), H - 1);
     const hit = document.elementFromPoint(cx, cy);
     if (hit && !e.contains(hit) && !hit.contains(e) && !e.closest("label")?.contains(hit)) covered.push(`${name(e)} under ${name(hit)}`);
-    const row = e.closest(".composer, .chat-chrome, .tool, .code, .popup, .segmented, .settings-card, .picker-items, .files-crumbs, .files-columns, .files-list, .accent-choices");
-    // A word to tap is as wide as it is: only its height counts.
-    const iconOnly = !e.innerText.trim();
-    const min = row ? 36 : 44;
     const isText = e.matches("textarea, input:not([type=checkbox]):not([type=radio]):not([type=color]):not([type=range]), select");
-    if (!isText && !e.matches("a") && (r.height < min - 0.5 || (iconOnly && r.width < min - 0.5)) && !e.closest(".message, .md, .tool-body, .status-details"))
+    const min = e.closest(dense) ? 40 : 44;
+    if (!isText && !e.matches("a") && Math.min(r.width, r.height) < min - 0.5 && !e.closest(".message, .md, .tool-body, .status-details"))
       small.push(`${name(e)} ${Math.round(r.width)}x${Math.round(r.height)}`);
     if (isText && parseFloat(getComputedStyle(e).fontSize) < 16) zoom.push(`${name(e)} ${getComputedStyle(e).fontSize}`);
   }
@@ -144,7 +158,7 @@ const audit = page => page.evaluate(() => {
   if (small.length) out.push(`small: ${small.join(" | ")}`);
   if (zoom.length) out.push(`zooms (under 16px): ${zoom.join(" | ")}`);
   return out.length ? out.join("\n") : "ok";
-});
+}, dense);
 
 // The chrome's pieces don't overlap each other or the transcript.
 const chrome = page => page.evaluate(() => {
@@ -259,7 +273,18 @@ const visit = async (w, h, { safe = false } = {}) => {
     await page.locator(".chrome-menu .files-sheet-row").tap();
     await page.locator(".files-panel").waitFor();
   });
-  await page.getByRole("button", { name: "Close files" }).tap();
+  await step("the review page", async () => {
+    await page.locator(".files-panel .files-head .review-open").tap();
+    await page.locator(".review-page").waitFor();
+  });
+  await step("the review's files", async () => {
+    await page.locator("#review-files-toggle").tap();
+    await page.locator(".review-files").waitFor();
+  });
+  await page.keyboard.press("Alt+r");
+  await page.locator(".review-page").waitFor({ state: "detached" });
+  if (await page.locator(".files-panel").count())
+    await page.getByRole("button", { name: "Close files" }).tap();
 
   // The keyboard: the visual viewport shrinks (as a phone's keyboard does);
   // the composer stays in it.

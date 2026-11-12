@@ -752,7 +752,7 @@ chat 520; chips: DeepSeek V4.1 Flash, icon, icon, icon, icon; status: 0%; .chat-
 .composer: fits
 the panels' toggles: 3 buttons 10px from the top, 14px from the right, clear of the jump list: true, open: Files
 === webkit: the session: a 400px chat column ===
-chat 400; chips: DeepSeek V4.1 Flash, icon, icon, icon, icon; status: 0%; .chat-chrome 44px high
+chat 400; chips: V4.1 Flash, icon, icon, icon, icon; status: 0%; .chat-chrome 44px high
 .chat-chrome: fits
 .composer: fits
 the panels' toggles: 3 buttons 10px from the top, 14px from the right, clear of the jump list: true, open: Files
@@ -811,7 +811,7 @@ chat 600; chips: DeepSeek V4.1 Flash, icon, icon, icon, icon; status: 0%; .chat-
 .composer: fits
 the panels' toggles: 4 buttons 10px from the top, 14px from the right, clear of the jump list: true, open: Files
 === webkit: the session's bar: a 400px chat column without the sidebar ===
-chat 400; chips: DeepSeek V4.1 Flash, icon, icon, icon, icon; status: 0%; .chat-chrome 44px high
+chat 400; chips: V4.1 Flash, icon, icon, icon, icon; status: 0%; .chat-chrome 44px high
 .chat-chrome: fits
 .composer: fits
 the panels' toggles: 4 buttons 10px from the top, 14px from the right, clear of the jump list: true, open: Files
@@ -3061,6 +3061,10 @@ full width: true; at the bottom: true
 ok
 === webkit: mobile: 390x844: the files ===
 ok
+=== webkit: mobile: 390x844: the review page ===
+ok
+=== webkit: mobile: 390x844: the review's files ===
+ok
 === webkit: mobile: 390x844: the keyboard ===
 the composer in view: true
 === webkit: mobile: 320x640: the chat ===
@@ -3094,6 +3098,10 @@ full width: true; at the bottom: true
 === webkit: mobile: 320x640: / completion ===
 ok
 === webkit: mobile: 320x640: the files ===
+ok
+=== webkit: mobile: 320x640: the review page ===
+ok
+=== webkit: mobile: 320x640: the review's files ===
 ok
 === webkit: mobile: 320x640: the keyboard ===
 the composer in view: true
@@ -3240,10 +3248,9 @@ COMPACTION
 Compact at
 Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window.
 tokens
-Off
 Mask old tool outputs
 Replace tool outputs older than the last 10 turns with placeholders first, which often saves summarising.
-field: "200k" (placeholder 200k); Off pressed: false; mask: true
+field: "200k" (placeholder 200k); on: true; mask: true
 === webkit: compaction: refused ===
 “lots” isn't a number of tokens: type one like 150k or 200000, or off to compact only at 80% of the window.
 still open: 1
@@ -3252,10 +3259,9 @@ COMPACTION
 Compact at
 Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window.
 tokens
-Off
 Mask old tool outputs
 Replace tool outputs older than the last 10 turns with placeholders first, which often saves summarising.
-field: "150k" (placeholder 200k); Off pressed: false; mask: false
+field: "150k" (placeholder 200k); on: true; mask: false
 compact_at_tokens=150000 compaction_model=null mask_observations=false
 === webkit: compaction: picker ===
 Summary model; first: The conversation's model whichever model the conversation uses
@@ -3265,23 +3271,29 @@ COMPACTION
 Compact at
 Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window.
 tokens
-Off
 Mask old tool outputs
 Replace tool outputs older than the last 10 turns with placeholders first, which often saves summarising.
-field: "150k" (placeholder 200k); Off pressed: false; mask: false
+field: "150k" (placeholder 200k); on: true; mask: false
 === webkit: compaction: /compaction ===
 Compaction: at 150k tokens, or 80% of the model's window if that is less; summaries by the session's model; observation masking off (/compaction at TOKENS|off, /compaction model MODEL|off, /compaction mask on|off)
 === webkit: compaction: off by /compaction ===
 COMPACTION
 Compact at
 Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window.
-Off: only at 80% of the window. Type a number to set one.
-tokens
-Off
+Off: only at 80% of the window.
 Mask old tool outputs
 Replace tool outputs older than the last 10 turns with placeholders first, which often saves summarising.
-field: "" (placeholder 150k); Off pressed: true; mask: false
+field: hidden; on: false; mask: false
 compact_at_tokens=0 compaction_model=null mask_observations=false
+=== webkit: compaction: switched on ===
+COMPACTION
+Compact at
+Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window.
+tokens
+Mask old tool outputs
+Replace tool outputs older than the last 10 turns with placeholders first, which often saves summarising.
+field: "150k" (placeholder 200k); on: true; mask: false
+compact_at_tokens=150000 compaction_model=null mask_observations=false
 === webkit: compaction: phone ===
 fits: true
 === webkit: compaction: errors ===
@@ -3290,8 +3302,8 @@ fits: true
 + Fresh work: fix/fresh
 - Old work
 === webkit: sessions settings: the settings ===
-Show worktrees | Your account | Show worktrees for sessions used in the last 12 hours; older ones fold them behind their count. Your own fold or unfold of a session wins. | hours | Off
-Archive after | Sessions without activity for 7 days move to Archived (pinned and running ones never do). | days | Off
+Show worktrees | Your account | Show worktrees for sessions used in the last 12 hours; older ones fold them behind their count. Your own fold or unfold of a session wins. | hours
+Archive after | Sessions without activity for 7 days move to Archived (pinned and running ones never do). | days
 fields: "12" hours, "7" days
 === webkit: sessions settings: 100 hours ===
 + Fresh work: fix/fresh
@@ -3305,12 +3317,16 @@ fields: "12" hours, "7" days
 === webkit: sessions settings: refused ===
 “a fortnight” isn't a number of days from 0 to 365: type one like 7, or off to archive only by hand.
 === webkit: sessions settings: archive after 2 days ===
-Show worktrees | Your account | Show worktrees for sessions used in the last N hours (0 or Off: none); older ones fold them behind their count. Your own fold or unfold of a session wins. | Off: every session's worktrees start folded. | hours | Off
-Archive after | Sessions without activity for 2 days move to Archived (pinned and running ones never do). | days | Off
-fields: "" hours, "2" days
+Show worktrees | Your account | Show worktrees for sessions used recently; older ones fold them behind their count. Your own fold or unfold of a session wins. | Off: every session's worktrees start folded.
+Archive after | Sessions without activity for 2 days move to Archived (pinned and running ones never do). | days
+fields: hidden hours, "2" days
 archive_after_days=2
 - Fresh work
 archived: Archived 1
+=== webkit: sessions settings: switched on again ===
+Show worktrees | Your account | Show worktrees for sessions used in the last 100 hours; older ones fold them behind their count. Your own fold or unfold of a session wins. | hours
+Archive after | Sessions without activity for 2 days move to Archived (pinned and running ones never do). | days
+fields: "100" hours, "2" days
 === webkit: sessions settings: phone 390x844: sidebar ===
 + Fresh work: fix/fresh
 + Old work: feat/old-a, feat/old-b
