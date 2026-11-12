@@ -600,6 +600,7 @@ let%expect_test "losing the connection while a session loads" =
                             \n/work") (purpose (Sidebar 2)))))
     (Reconnect (generation 1) (delay_ms 0) (session (s2)))
     What are we building?
+    / for commands, @ for files
     |}];
   Harness.act h (Reply (Reconnect 1, Ok (Jsonaf.of_string "{}")));
   Harness.quiet h (fun () ->

@@ -48,7 +48,7 @@ let%expect_test "the names of the controls" =
     button "Branch: main. Change it" -- Work in another worktree (/worktree)
     [switch] button "Temporary" -- Make it temporary: not saved or listed (Ctrl+Shift+O)
     input "Search sessions"
-    textarea "Message"
+    textarea "Message" -- Working in /work on main. Ask prigh anything…
     [separator] div "Resize the sessions sidebar" -- Drag to resize, double-click for the default size
     [region] div "Transcript"
     [group] div "Model and host"
@@ -158,7 +158,7 @@ let%expect_test "the names in dialogs, pickers and the transcript" =
     button "Context 0% full: the session's details"
     button "Dictate" -- Dictate (speak, then click again to stop)
     button "Send" -- Send (Enter)
-    textarea "Message"
+    textarea "Message" -- Working in /work on main. Ask prigh anything…
     [group] div "Model and host"
     [group] div "Thinking, mode and transcript"
     [group] div "Session status"

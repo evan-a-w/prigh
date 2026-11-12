@@ -1891,6 +1891,7 @@ let%expect_test "/retry-backend-connection, /state, /clear, /quit" =
      (tag Ignore))
     (Expire_toast (id 2) (after_ms 4780))
     What are we building?
+    / for commands, @ for files
     (Rpc (method_ push_pref) (params ((key history) (value /quit) (max 500)))
      (tag Ignore))
     (Expire_toast (id 3) (after_ms 4620))
