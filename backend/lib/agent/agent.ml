@@ -958,6 +958,7 @@ let set_config ?(session_mode = true) t (config : Config.t) =
     | Some dir
       when on_backend
            && t.backend_host_enabled
+           && (not (Option.equal String.equal t.config.default_cwd (Some dir)))
            && not (Sys_unix.is_directory_exn (Tool.expand_home dir)) ->
       Or_error.errorf
         "default_cwd: %s is not a directory on the backend (%s)"
