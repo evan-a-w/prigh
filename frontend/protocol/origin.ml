@@ -20,6 +20,7 @@ module Kind = struct
     | Client
     | Ui_action
     | User_info
+    | Custom_instructions
     | Other of string
   [@@deriving sexp_of, equal]
 
@@ -42,6 +43,7 @@ module Kind = struct
     | "client" -> Client
     | "ui_action" -> Ui_action
     | "user_info" -> User_info
+    | "custom_instructions" -> Custom_instructions
     | other -> Other other
   ;;
 end

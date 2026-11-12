@@ -594,6 +594,39 @@ let%expect_test "memory: the action and its title, query or id" =
     |}]
 ;;
 
+let%expect_test "custom_instructions: the action, id and title or text" =
+  Chat_harness.text
+    ~selector:".tool-head"
+    (Chat_harness.chat
+       [ tool_end
+           ~name:"custom_instructions"
+           ~arguments:{|{"action":"add","text":"Use Australian spelling."}|}
+           "Added ci1"
+       ; tool_end
+           ~id:"c2"
+           ~name:"custom_instructions"
+           ~arguments:{|{"action":"edit","id":"ci2","title":"Maths"}|}
+           "Edited ci2"
+       ; tool_end
+           ~id:"c3"
+           ~name:"custom_instructions"
+           ~arguments:{|{"action":"remove","id":"ci3"}|}
+           "Removed ci3"
+       ; tool_end
+           ~id:"c4"
+           ~name:"custom_instructions"
+           ~arguments:{|{"action":"list"}|}
+           "[ci1] Use Australian spelling."
+       ]);
+  [%expect
+    {|
+    ✓ custom_instructions add "Use Australian spelling."
+    ✓ custom_instructions edit ci2 Maths
+    ✓ custom_instructions remove ci3
+    ✓ custom_instructions list
+    |}]
+;;
+
 let%expect_test "on_host: the call it ran, on its host" =
   let chat =
     Chat_harness.chat
