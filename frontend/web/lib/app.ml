@@ -172,6 +172,7 @@ module Reply_tag = struct
     | Default_dir_saved
     | Default_set of New_default.t
     | Compaction_saved
+    | Generate_model_saved
     | Naming_saved
     | Auto_archive_saved
     | Dictation_saved
@@ -1227,6 +1228,7 @@ let close_dialog (m : Model.t) =
         | Picker
             { kind =
                 ( Compaction_models
+                | Generate_models
                 | Naming_models
                 | Dictation_models
                 | Defaults _ )
@@ -4008,6 +4010,51 @@ let compaction_command (m : Model.t) rest =
     | (Set_at _ | Set_model _ | Set_mask _) as action -> set_compaction m action)
 ;;
 
+let generate_model_summary config =
+  String.capitalize (Prigh_ui.Generate_model_command.summary config)
+;;
+
+let set_generate_model (m : Model.t) action =
+  with_config m ~f:(fun config ->
+    let config = Prigh_ui.Generate_model_command.apply action config in
+    ( { m with config = Some config }
+    , [ set_config
+          config
+          ~fields:
+            (List.map (Prigh_ui.Generate_model_command.fields action) ~f:fst)
+          ~tag:Generate_model_saved
+      ] ))
+;;
+
+let generate_models_picker (m : Model.t) =
+  with_config m ~f:(fun config ->
+    open_picker
+      m
+      (Picker
+         { kind = Generate_models
+         ; picker =
+             models_picker
+               m
+               ~title:"Drafting model"
+               ~current:config.generate_model
+               ~leading:
+                 [ Picker.Item.create
+                     ~id:"off"
+                     ~detail:"the session's model"
+                     ~search:"off default session"
+                     ~marked:(Option.is_none config.generate_model)
+                     "Default"
+                 ]
+         }))
+;;
+
+let generate_model_command (m : Model.t) rest =
+  match Prigh_ui.Generate_model_command.parse rest with
+  | Show -> generate_models_picker m
+  | Error e -> error m (String.capitalize e)
+  | Set_model _ as action -> set_generate_model m action
+;;
+
 let naming_summary config =
   String.capitalize (Prigh_ui.Naming_command.summary config)
 ;;
@@ -4038,8 +4085,8 @@ let naming_models_picker (m : Model.t) =
                ~leading:
                  [ Picker.Item.create
                      ~id:"off"
-                     ~detail:"the generate model, else the session's"
-                     ~search:"off default generate session"
+                     ~detail:"the drafting model, else the session's"
+                     ~search:"off default drafting generate session"
                      ~marked:(Option.is_none config.naming_model)
                      "Default"
                  ]
@@ -6630,6 +6677,7 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
      | Ok dir -> set_default_dir m (Some dir)
      | Error message -> error m message)
   | "compaction", rest -> compaction_command m rest
+  | "generate-model", rest -> generate_model_command m rest
   | "naming", rest -> naming_command m rest
   | "auto-archive", rest -> auto_archive_command m rest
   | "dictation", rest -> dictation_command m rest
@@ -8092,6 +8140,15 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
       error m (sprintf "Couldn't set %s: %s" (default_set_failed change) e)
     in
     m, cmds @ [ rpc "get_config" [] ~tag:Config ]
+  | Generate_model_saved, Error e ->
+    let m, cmds =
+      error
+        m
+        (sprintf
+           "Couldn't set the drafting model: %s. Pick one with /generate-model"
+           e)
+    in
+    m, cmds @ [ rpc "get_config" [] ~tag:Config ]
   | Naming_saved, Error e ->
     let m, cmds =
       error
@@ -8752,6 +8809,9 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
          | None ->
            "Default directory cleared: new sessions start in the backend's \
             working directory"))
+  | Generate_model_saved, Ok json ->
+    decode m json Config.of_json ~f:(fun config ->
+      toast { m with config = Some config } (generate_model_summary config))
   | Naming_saved, Ok json ->
     decode m json Config.of_json ~f:(fun config ->
       toast { m with config = Some config } (naming_summary config))
@@ -9709,6 +9769,17 @@ let picker_accepted (m : Model.t) ~kind (item : Picker.Item.t) =
     | Dictation_models ->
       let m, cmds =
         set_dictation
+          m
+          (Set_model (Option.some_if (not (String.equal item.id "off")) item.id))
+      in
+      if m.return_to_settings
+      then
+        ( { m with dialog = Some Settings; return_to_settings = false }
+        , Command.Focus "dialog" :: cmds )
+      else m, cmds
+    | Generate_models ->
+      let m, cmds =
+        set_generate_model
           m
           (Set_model (Option.some_if (not (String.equal item.id "off")) item.id))
       in
@@ -10773,6 +10844,7 @@ let update_connected (m : Model.t) (action : Action.t) =
               | Picker
                   { kind =
                       ( Compaction_models
+                      | Generate_models
                       | Naming_models
                       | Dictation_models
                       | Defaults _ )

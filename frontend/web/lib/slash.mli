@@ -34,6 +34,7 @@ module Argument : sig
     | Snippet (** a snippet's name, [add] or [rm] *)
     | Remind (** a [/remind] subcommand, or a reminder's name after [rm] *)
     | Compaction (** [at] or [model], then [off] or a model *)
+    | Generate_model (** [off] or a model *)
     | Naming (** [model], then [off] or a model *)
     | Dictation (** [model], then [off] or a transcription model *)
     | Pr (** [/pr]'s subcommands *)

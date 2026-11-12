@@ -49,8 +49,11 @@ type t =
   ; mask_observations : bool
     (** replace old tool outputs with placeholders before summarising
         (default true) *)
+  ; generate_model : string option
+    (** the model that drafts commit messages, pull requests and branch names
+        (✦ Generate); [None]: the session's *)
   ; naming_model : string option
-    (** the model that names sessions and subagents; [None]: the backend's
+    (** the model that names sessions and subagents; [None]:
         [generate_model], else the session's *)
   ; dictation_model : string option
     (** the speech-to-text model of [transcribe] ([provider/id]); [None]:

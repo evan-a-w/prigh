@@ -498,7 +498,7 @@ let%expect_test "styled frame: markdown link, diff and autocomplete" =
         [bold]/fallback[/][gray] [off|model...]      show or set the models that take over, in order…[/]
         [bold]/default-dir[/][gray] [off|path]       show or set the directory new sessions start in…[/]
         [bold]/default-host[/][gray] [off|name]      show or set the tool host prigh-web's new sessi…[/]
-      [gray]  ↕ 1–8 of 80[/]
+      [gray]  ↕ 1–8 of 81[/]
       [gray]────────────────────────────────────────────────────────────────────────────────[/]
       [yellow][bold]> [/]/
       [gray]deepseek-flash[/]  [gray]think:off[/]  [gray]ctx:0.1%/1.0M[/]  [yellow]Tab/Enter accept · Alt+S as typed[/]
