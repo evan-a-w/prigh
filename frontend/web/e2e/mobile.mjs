@@ -9,7 +9,9 @@
 // rows in [dense]), and inputs that iOS would zoom into (under 16px). Then:
 // the one strip of chrome is under the notch and the composer over the home
 // indicator, the settings go a level down and back by tap, and the keyboard
-// (a shorter visual viewport) keeps the composer in view. Run by
+// (a shorter visual viewport) keeps the composer in view. The empty
+// composer's "Working in ~/projects/demo on main." fits its one line there,
+// and on a desktop (whole, and in a narrower window). Run by
 // prigh_web.sh; prints normalised results (the expected output is in
 // ENGINE.expected) and, with SHOTS, screenshots.
 //
@@ -28,7 +30,8 @@ if (!engine) throw new Error("usage: mobile.mjs chromium|firefox|webkit");
 const { PRIGH_BACKEND: backend, SITE: site, TOKEN: token } = process.env;
 const dir = join(process.env.TEST_DIR, "mobile");
 const home = join(dir, "home");
-const cwd = join(dir, "cwd");
+// Under the home directory, for the composer's "Working in ~/projects/demo".
+const cwd = join(home, "projects", "demo");
 mkdirSync(home, { recursive: true });
 mkdirSync(join(cwd, "src"), { recursive: true });
 writeFileSync(join(cwd, "server.ml"), "let port = 8080\n");
@@ -180,6 +183,34 @@ const chrome = page => page.evaluate(() => {
   ].join("\n");
 });
 
+// The empty composer's line saying where the session works: the layer
+// shown (the longest that fits on its line, else the last, cut), whether it
+// is one line, and whether the editor (its caret, its taps) is over it.
+const where = page => page.evaluate(() => {
+  const editor = document.querySelector("#editor");
+  const hint = document.querySelector(".cwd-hint");
+  if (!hint || getComputedStyle(hint).display === "none")
+    return editor.value ? "no placeholder: the editor has text" : `placeholder: ${editor.placeholder} (the editor's own)`;
+  const text = e => e.innerText.replace(/\s+/g, " ").trim();
+  const fits = [...hint.querySelectorAll(".cwd-hint-fit")].filter(f =>
+    f.querySelector(".cwd-hint-line").getBoundingClientRect().top - f.getBoundingClientRect().top < 1);
+  const last = hint.querySelector(".cwd-hint-cut");
+  const shown = fits.length ? text(fits[fits.length - 1]) : `${text(last)}${last.scrollWidth > last.clientWidth + 1 ? " (cut)" : ""}`;
+  const h = hint.getBoundingClientRect(), e = editor.getBoundingClientRect();
+  const top = document.elementFromPoint(h.left + 8, h.top + h.height / 2);
+  const mono = getComputedStyle(hint.querySelector(".cwd-path")).fontFamily.includes("Mono");
+  const room = hint.clientWidth - 12, stack = hint.querySelector(".cwd-hint-stack").getBoundingClientRect().width;
+  const share = Math.abs(stack - room * 0.58) < 1.5 ? "58% of the editor"
+    : stack > room * 0.58 && stack < room - 1 ? "more than 58%: what the shortest line needs"
+    : stack >= room - 1 ? "all of the editor" : `${Math.round(100 * stack / room)}% of the editor`;
+  return [
+    `placeholder: ${shown}`,
+    `its width: ${share}`,
+    `one line: ${h.height <= e.height + 1 && hint.scrollWidth <= hint.clientWidth + 1}; the path in mono: ${mono}; the editor on top: ${top === editor}`,
+    `for screen readers: ${editor.placeholder}`,
+  ].join("\n");
+});
+
 const shoot = async (page, tag) => {
   if (!process.env.SHOTS) return;
   await page.waitForTimeout(250);
@@ -229,6 +260,8 @@ const visit = async (w, h, { safe = false } = {}) => {
   };
 
   await step("the chat");
+  section(`${tag}: where the session works`);
+  console.log(await where(page));
   section(`${tag}: the chrome`);
   console.log(await chrome(page));
 
@@ -302,8 +335,33 @@ const visit = async (w, h, { safe = false } = {}) => {
       const vh = window.visualViewport?.height ?? innerHeight;
       return `the composer in view: ${c.bottom <= vh + 1 && c.top >= 0}`;
     }));
+    console.log(await where(page));
     await shoot(page, `${tag}-keyboard`);
   }
+  await context.close();
+};
+
+// A desktop: the line whole, then in a narrower window cut.
+const desktop = async () => {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  const page = await context.newPage();
+  page.on("pageerror", e => errors.push(`page: ${e.message}`));
+  await page.goto(sessionUrl, { timeout: 60000 });
+  await page.locator("form input[type=password]").fill(token);
+  await page.locator("form button[type=submit]").click();
+  await page.waitForFunction(() => document.querySelector("#chat")?.innerText.includes("Done."));
+  for (const width of [1280, 760]) {
+    await page.setViewportSize({ width, height: 800 });
+    await page.waitForTimeout(150);
+    section(`desktop ${width}: where the session works`);
+    console.log(await where(page));
+    console.log(`tooltip: ${await page.locator("#editor").getAttribute("title")}`);
+    if (process.env.SHOTS)
+      await page.locator(".composer").screenshot({ path: join(process.env.SHOTS, `mobile-${engineName}-desktop-${width}-composer.png`) });
+  }
+  await page.locator("#editor").fill("typing");
+  section("desktop: typing");
+  console.log(await where(page));
   await context.close();
 };
 
@@ -311,6 +369,7 @@ try {
   await visit(390, 844);
   await visit(320, 640);
   if (engineName === "chromium") await visit(390, 844, { safe: true });
+  await desktop();
   if (errors.length) {
     section("errors");
     console.log(errors.join("\n"));

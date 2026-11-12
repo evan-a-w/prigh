@@ -317,7 +317,9 @@ const layoutProblems = selector => page.evaluate(selector => {
   };
   const name = e => `${e.tagName.toLowerCase()}.${[...e.classList].join(".")}`;
   const problems = [];
-  const all = [root, ...root.querySelectorAll("*")].filter(e => (e instanceof HTMLElement || e.tagName === "svg") && shown(e) && !e.closest(":popover-open"));
+  // The empty composer's line of where the session works lies under the
+  // editor in layers, each cut by design (mobile.mjs checks what it shows).
+  const all = [root, ...root.querySelectorAll("*")].filter(e => (e instanceof HTMLElement || e.tagName === "svg") && shown(e) && !e.closest(":popover-open, .cwd-hint"));
   // A box without one of its own (display: contents) lays its children out
   // in its parent's.
   const contents = e => getComputedStyle(e).display === "contents";

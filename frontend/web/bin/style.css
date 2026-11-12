@@ -819,6 +819,43 @@ kbd {
 .editor::placeholder { color: var(--faint); }
 /* The placeholder is one line, cut rather than wrapped. */
 .editor:placeholder-shown { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* Where the session works (Cwd_placeholder), under the empty editor's text:
+   the editor keeps the caret and the clicks, its own placeholder (the same
+   sentence) is for screen readers. The line takes 58% of the editor, or what
+   its last layer (the path cut, no question) needs if more, up to all of
+   it: the first column's automatic minimum is that layer's width (the
+   others are width 0 to sizing), capped by its max-width; a percentage
+   track, or a last layer that clips itself, would lose that minimum. Each
+   .cwd-hint-fit shows its line only when it fits after the empty ::before
+   (else the line wraps out of sight) and covers the shorter ones under it;
+   .cwd-hint-last is cut. */
+.editor-wrap { display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; container-type: inline-size; }
+.editor-wrap > * { grid-area: 1 / 1; min-width: 0; }
+.editor-wrap > .editor { z-index: 1; }
+.editor.cwd-placeholder::placeholder { color: transparent; }
+.editor:not(:placeholder-shown) ~ .cwd-hint { display: none; }
+.cwd-hint {
+  display: grid;
+  grid-template-columns: minmax(auto, 58fr) minmax(0, 42fr);
+  align-self: start;
+  padding: 4px 6px 0;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--faint);
+  white-space: nowrap;
+  overflow: hidden;
+  pointer-events: none;
+  user-select: none;
+}
+.cwd-hint-stack { display: grid; max-width: calc(100cqw - 12px); }
+.cwd-hint-stack > * { grid-area: 1 / 1; }
+.cwd-hint-last { max-width: calc(100cqw - 12px); }
+.cwd-hint-cut { display: block; overflow: hidden; text-overflow: ellipsis; }
+.cwd-hint-fit { width: 0; min-width: 100%; display: flex; flex-wrap: wrap; height: 1.5em; overflow: hidden; }
+.cwd-hint-fit::before { content: ""; height: 1.5em; }
+.cwd-hint-line { flex: none; background: var(--slate); }
+.cwd-path, .cwd-branch { font-family: var(--mono); font-size: 0.9em; color: var(--muted); }
+.cwd-host { color: var(--muted); }
 .composer-row { display: flex; align-items: center; gap: 4px; min-height: 32px; min-width: 0; }
 .composer-plus { position: relative; display: flex; flex-shrink: 0; }
 .composer-plus.menu-open { z-index: var(--z-menu-anchor); }

@@ -609,6 +609,7 @@ let%expect_test "new session and switching session reload the state" =
                             \n/work") (purpose (Sidebar 2)))))
     (New session)
     What are we building?
+    / for commands, @ for files
     |}];
   Harness.reply h "get_messages_page" (Harness.page "[]");
   Harness.text h ~selector:".chat";
@@ -616,6 +617,7 @@ let%expect_test "new session and switching session reload the state" =
     {|
     Scroll_to_bottom
     What are we building?
+    / for commands, @ for files
     |}];
   (* The session clicked is marked until it has loaded. *)
   Harness.act h (Switch_session "/sessions/s3.jsonl");
@@ -660,6 +662,7 @@ let%expect_test "new session and switching session reload the state" =
                             \nbackend\
                             \n/work") (purpose (Sidebar 3)))))
     What are we building?
+    / for commands, @ for files
     |}];
   Harness.reply
     h

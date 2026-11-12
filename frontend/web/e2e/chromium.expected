@@ -16,6 +16,7 @@ T
 token
 === chromium: signed in: chat ===
 What are we building?
+/ for commands, @ for files
 === chromium: signed in: the session's card ===
 on
 auto
@@ -30,7 +31,7 @@ Shift+Tab: dialog: Keys
 Shift+Tab: dialog: Close (Esc)
 Shift+Tab: dialog: Done
 Shift+Tab: dialog: Keys
-after Esc: editor
+after Esc: editor cwd-placeholder
 === chromium: a mistyped command ===
 Unknown command /modle. Did you mean /mode? (/help lists them)
 editor: /modle
@@ -180,6 +181,7 @@ T
 token
 === chromium: new session ===
 What are we building?
+/ for commands, @ for files
 === chromium: sending ===
 hello again
 Sending…
@@ -818,7 +820,7 @@ the panels' toggles: 4 buttons 10px from the top, 14px from the right, clear of 
 === chromium: errors ===
 none
 === chromium: temporary: desktop: the new-session screen ===
-heading: What are we building?
+heading: What are we building? | / for commands, @ for files
 tray: <cwd> | Temporary
 chip: false
 composer under the heading: true
@@ -859,7 +861,7 @@ stayed: true
 its command stopped: true
 saved: 0
 === chromium: temporary: 390x844: the new-session screen ===
-heading: What are we building?
+heading: What are we building? | / for commands, @ for files
 tray: cwd | Temporary
 chip: false
 composer under the heading: true
@@ -900,7 +902,7 @@ stayed: true
 its command stopped: true
 saved: 0
 === chromium: temporary: 320x640: the new-session screen ===
-heading: What are we building?
+heading: What are we building? | / for commands, @ for files
 tray: cwd | Temporary
 chip: false
 composer under the heading: true
@@ -3068,6 +3070,11 @@ the strip under the notch: true; the composer over the home indicator: true
 the row fits: true
 === chromium: mobile: 390x844: the chat ===
 ok
+=== chromium: mobile: 390x844: where the session works ===
+placeholder: Working in …/demo on main.
+its width: more than 58%: what the shortest line needs
+one line: true; the path in mono: true; the editor on top: true
+for screen readers: Working in ~/projects/demo on main. Ask prigh anything…
 === chromium: mobile: 390x844: the chrome ===
 strip: 0 to 48; its pieces overlap: false
 the transcript starts under it: true
@@ -3104,8 +3111,17 @@ ok
 ok
 === chromium: mobile: 390x844: the keyboard ===
 the composer in view: true
+placeholder: Working in …/demo on main.
+its width: more than 58%: what the shortest line needs
+one line: true; the path in mono: true; the editor on top: true
+for screen readers: Working in ~/projects/demo on main. Ask prigh anything…
 === chromium: mobile: 320x640: the chat ===
 ok
+=== chromium: mobile: 320x640: where the session works ===
+placeholder: Working in …/demo on main.
+its width: more than 58%: what the shortest line needs
+one line: true; the path in mono: true; the editor on top: true
+for screen readers: Working in ~/projects/demo on main. Ask prigh anything…
 === chromium: mobile: 320x640: the chrome ===
 strip: 0 to 48; its pieces overlap: false
 the transcript starts under it: true
@@ -3142,8 +3158,17 @@ ok
 ok
 === chromium: mobile: 320x640: the keyboard ===
 the composer in view: true
+placeholder: Working in …/demo on main.
+its width: more than 58%: what the shortest line needs
+one line: true; the path in mono: true; the editor on top: true
+for screen readers: Working in ~/projects/demo on main. Ask prigh anything…
 === chromium: mobile: 390x844-pwa: the chat ===
 ok
+=== chromium: mobile: 390x844-pwa: where the session works ===
+placeholder: Working in …/demo on main.
+its width: more than 58%: what the shortest line needs
+one line: true; the path in mono: true; the editor on top: true
+for screen readers: Working in ~/projects/demo on main. Ask prigh anything…
 === chromium: mobile: 390x844-pwa: the chrome ===
 strip: 0 to 95; its pieces overlap: false
 the transcript starts under it: true
@@ -3180,6 +3205,24 @@ ok
 ok
 === chromium: mobile: 390x844-pwa: the keyboard ===
 the composer in view: true
+placeholder: Working in …/demo on main.
+its width: more than 58%: what the shortest line needs
+one line: true; the path in mono: true; the editor on top: true
+for screen readers: Working in ~/projects/demo on main. Ask prigh anything…
+=== chromium: mobile: desktop 1280: where the session works ===
+placeholder: Working in ~/projects/demo on main. Ask prigh anything…
+its width: 58% of the editor
+one line: true; the path in mono: true; the editor on top: true
+for screen readers: Working in ~/projects/demo on main. Ask prigh anything…
+tooltip: Working in ~/projects/demo on main. Ask prigh anything…
+=== chromium: mobile: desktop 760: where the session works ===
+placeholder: Working in …/demo on main.
+its width: 58% of the editor
+one line: true; the path in mono: true; the editor on top: true
+for screen readers: Working in ~/projects/demo on main. Ask prigh anything…
+tooltip: Working in ~/projects/demo on main. Ask prigh anything…
+=== chromium: mobile: desktop: typing ===
+no placeholder: the editor has text
 === chromium: terminal keys: a desktop ===
 the shell has the focus: true; the bar: hidden
 === chromium: terminal keys: 390x844: the keyboard up ===
