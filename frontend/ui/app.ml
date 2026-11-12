@@ -75,6 +75,8 @@ module Reply_tag = struct
     | Compaction_saved of string
     | Naming_shown
     | Naming_saved of string
+    | Auto_archive_shown
+    | Auto_archive_saved of string
     | Dictation_shown
     | Dictation_saved of string
     | Models_catalog
@@ -3063,6 +3065,23 @@ let naming_command m (cmd : Commands.Parsed.t) =
       ] )
 ;;
 
+let auto_archive_command m (cmd : Commands.Parsed.t) =
+  match Auto_archive_command.parse cmd.rest with
+  | Show ->
+    show_config
+      m
+      ~tag:Auto_archive_shown
+      ~summary:Auto_archive_command.summary
+  | Error e ->
+    error (restore_command m (String.strip ("/auto-archive " ^ cmd.rest))) e, []
+  | Set _ as action ->
+    ( m
+    , [ set_config
+          ~tag:(Auto_archive_saved ("/auto-archive " ^ cmd.rest))
+          (Auto_archive_command.fields action)
+      ] )
+;;
+
 let dictation_command m (cmd : Commands.Parsed.t) =
   match Dictation_command.parse cmd.rest with
   | Show ->
@@ -4000,6 +4019,7 @@ let run_command m (cmd : Commands.Parsed.t) =
   | "compaction", _ -> compaction_command m cmd
   | "dictation", _ -> dictation_command m cmd
   | "naming", _ -> naming_command m cmd
+  | "auto-archive", _ -> auto_archive_command m cmd
   | "auth", _ ->
     ( m
     , [ rpc "auth_status" ~tag:Auth_show; call Forge_status ~tag:Forge_refresh ]
@@ -6382,7 +6402,8 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
      | Fallback_saved text
      | Default_dir_saved text
      | Compaction_saved text
-     | Naming_saved text ->
+     | Naming_saved text
+     | Auto_archive_saved text ->
        (* Back in the editor, to correct rather than retype. *)
        let editor =
          if Editor.is_empty m.editor
@@ -6987,6 +7008,12 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
      | Naming_shown | Naming_saved _ ->
        decode json ~f:P.Config.of_json (fun config ->
          ( notice { m with config = Some config } (Naming_command.summary config)
+         , [] ))
+     | Auto_archive_shown | Auto_archive_saved _ ->
+       decode json ~f:P.Config.of_json (fun config ->
+         ( notice
+             { m with config = Some config }
+             (Auto_archive_command.summary config)
          , [] ))
      | Dictation_shown | Dictation_saved _ ->
        decode json ~f:P.Config.of_json (fun config ->

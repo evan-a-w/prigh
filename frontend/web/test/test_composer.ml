@@ -437,6 +437,7 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /unpin [session] unpin a session (this one without an argument)
     /delete [undo|session...] delete a message from the transcript and the model's context (a reply with its tool calls' results): pick it, newest first; undo brings the latest deletion back; with sessions, deletes them after a confirmation
     /delete-archived delete every archived session, after a confirmation
+    /auto-archive [DAYS|off] show how long a session goes without activity before it is archived; DAYS|off: archive after DAYS days (off: never, only by hand), in Settings
     /clone copy this session into a new one
     /fork start a new session from an earlier message
     /rewind go back to an earlier message in this session
@@ -446,7 +447,6 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /mkdir [path] create a directory (and its parents) and change to it
     /worktree [list|new|open|back|rm] pick a git worktree of the repository to work in (Alt+Enter: in a new session, Alt+R: review its changes, Delete removes it); new BRANCH [BASE] creates one and works there; open [-n] TARGET (-n: in a new session); back [main]: back where the session switched into worktrees from; rm [-f] TARGET (-f: with uncommitted changes)
     /default-dir [path|off] show or set the directory new sessions start in
-    /host [name|backend] pick where tools run, and the directory there
     |}];
   H.type_ h "/mod";
   H.key h "Tab";

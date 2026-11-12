@@ -244,6 +244,7 @@ let%expect_test "help lists every key and command" =
     /unpin [session] unpin a session (this one without an argument)
     /delete [undo|session...] delete a message from the transcript and the model's context (a reply with its tool calls' results): pick it, newest first; undo brings the latest deletion back; with sessions, deletes them after a confirmation
     /delete-archived delete every archived session, after a confirmation
+    /auto-archive [DAYS|off] show how long a session goes without activity before it is archived; DAYS|off: archive after DAYS days (off: never, only by hand), in Settings
     /clone copy this session into a new one
     /fork start a new session from an earlier message
     /rewind go back to an earlier message in this session
@@ -605,10 +606,10 @@ let%expect_test
      (params
       ((keys
         (web.theme web.accent web.notify web.verbosity web.terminal-open
-         web.sidebar-folded web.review history web.migrated web.sidebar-width
-         web.files-width web.files-preview-width web.agents-width
-         web.terminal-height web.review-chat-width web.review-files-width
-         web.review-margin-width))))
+         web.sidebar-folded web.sidebar-unfolded web.sidebar-worktree-hours
+         web.review history web.migrated web.sidebar-width web.files-width
+         web.files-preview-width web.agents-width web.terminal-height
+         web.review-chat-width web.review-files-width web.review-margin-width))))
      (tag Prefs))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s1.jsonl) (limit 1000000)))
