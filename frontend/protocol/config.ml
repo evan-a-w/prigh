@@ -45,6 +45,7 @@ type t =
   ; compact_at_tokens : int
   ; compaction_model : string option
   ; mask_observations : bool
+  ; generate_model : string option
   ; naming_model : string option
   ; dictation_model : string option
   }
@@ -67,6 +68,7 @@ let default =
   ; compact_at_tokens = 200_000
   ; compaction_model = None
   ; mask_observations = true
+  ; generate_model = None
   ; naming_model = None
   ; dictation_model = None
   }
@@ -142,6 +144,7 @@ let of_json j =
     | Some `False -> Ok false
     | Some _ -> Or_error.error_string "mask_observations must be a boolean"
   in
+  let%bind generate_model = optional_string "generate_model" in
   let%bind naming_model = optional_string "naming_model" in
   let%bind dictation_model = optional_string "dictation_model" in
   let%map snippets = Json.optional_list_field j "snippets" ~f:Snippet.of_json in
@@ -161,6 +164,7 @@ let of_json j =
   ; compact_at_tokens
   ; compaction_model
   ; mask_observations
+  ; generate_model
   ; naming_model
   ; dictation_model
   }
@@ -190,6 +194,7 @@ let to_json t =
        ; "compact_at_tokens", `Number (Int.to_string t.compact_at_tokens)
        ; "compaction_model", optional t.compaction_model
        ; ("mask_observations", if t.mask_observations then `True else `False)
+       ; "generate_model", optional t.generate_model
        ; "naming_model", optional t.naming_model
        ; "dictation_model", optional t.dictation_model
        ])

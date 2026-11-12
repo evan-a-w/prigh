@@ -264,6 +264,7 @@ let argument_items
   | Path
   | Remind
   | Compaction
+  | Generate_model
   | Naming
   | Dictation
   | Worktree
@@ -391,13 +392,20 @@ let compute
                 with
                 | [] -> None
                 | items -> Some (make (Argument kind) ~prefix:word ~start items))
-             | (Remind | Compaction | Naming | Dictation | Worktree | Review) as
-               kind ->
+             | ( Remind
+               | Compaction
+               | Generate_model
+               | Naming
+               | Dictation
+               | Worktree
+               | Review ) as kind ->
                let rest = String.lstrip rest in
                Option.bind
                  (match kind with
                   | Compaction ->
                     Prigh_ui.Compaction_command.complete ~models rest
+                  | Generate_model ->
+                    Prigh_ui.Generate_model_command.complete ~models rest
                   | Naming -> Prigh_ui.Naming_command.complete ~models rest
                   | Dictation -> Prigh_ui.Dictation_command.complete rest
                   | Worktree ->

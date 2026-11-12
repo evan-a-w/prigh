@@ -30,7 +30,7 @@ let%expect_test "naming model: shown, picked, back to the default" =
   [%expect
     {|
     Naming
-    Titles sessions and names subagents: a small, fast model is plenty. Default: the generate model, else the session's.
+    Titles sessions and names subagents: a small, fast model is plenty. Default: the drafting model, else the session's.
     (Default)
     button "Naming model: Default" -- Choose the model (/naming model)
     (Run "/naming model")
@@ -38,7 +38,7 @@ let%expect_test "naming model: shown, picked, back to the default" =
     Naming model
     (Close (Esc))
     []
-    Default the generate model, else the session's ✓
+    Default the drafting model, else the session's ✓
     Claude Opus 5.5 anthropic, 200k ctx
     Claude Sonnet 5 anthropic, 200k ctx
     GPT-6 openai, 200k ctx, not logged in
@@ -59,7 +59,7 @@ let%expect_test "naming model: shown, picked, back to the default" =
      (tag Naming_saved))
     (Expire_toast (id 0) (after_ms 4980))
     Naming
-    Titles sessions and names subagents: a small, fast model is plenty. Default: the generate model, else the session's.
+    Titles sessions and names subagents: a small, fast model is plenty. Default: the drafting model, else the session's.
     (Claude Sonnet 5)
     Sessions and subagents are named by anthropic/claude-sonnet-5 (/naming model MODEL|off)
     |}];
@@ -85,7 +85,7 @@ let%expect_test "/naming from the composer, and a model the backend refuses" =
     H.act h Send);
   H.text h ~selector:".toast:last-child";
   [%expect
-    {| Sessions and subagents are named by the generate model, else the session's model (/naming model MODEL|off) |}];
+    {| Sessions and subagents are named by the drafting model, else the session's model (/naming model MODEL|off) |}];
   H.quiet h (fun () ->
     H.type_ h "/naming model nosuch";
     H.act h Send);

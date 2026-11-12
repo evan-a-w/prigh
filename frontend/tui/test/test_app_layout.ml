@@ -84,7 +84,7 @@ let%expect_test "no shift: opening the command autocomplete" =
       /fallback [off|model...]      show or set the models that take over…
       /default-dir [off|path]       show or set the directory new session…
       /default-host [off|name]      show or set the tool host prigh-web's…
-      ↕ 1–8 of 80
+      ↕ 1–8 of 81
     ──────────────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  ctx:0.1%/1.0M  Tab/Enter accept · Alt+S as typed
@@ -461,9 +461,9 @@ let%expect_test "/help is a scrollable box; typing closes it into the editor" =
       /mkdir [path]                    create a directory (and its parent…
       /memory [on|off]                 the notes the model saved when you…
       /scoped-models                   pick the models Ctrl+P cycles thro…
+      /generate-model [MODEL|off]      show which model drafts commit mes…
       /trim [after|undo|show|hide]     drop everything before a message f…
-      /name [text]                     set the session name
-      ↕ 1–8 of 18
+      ↕ 1–8 of 19
     ──────────────────────────────────────────────────────────────────────
     > /m▏
     deepseek-flash  ctx:0.1%/1.0M  Tab/Enter accept · Alt+S as typed
@@ -590,7 +590,6 @@ let%expect_test "screen: 100x30 and 160x40" =
 
 
 
-
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
@@ -604,6 +603,7 @@ let%expect_test "screen: 100x30 and 160x40" =
     ▸ /mode [ask|auto-edit|auto|plan]  pick or set the mode: what asks first, or read-only planning (Al…
       /model [name|id|provider/id]     pick or switch the model
       /scoped-models                   pick the models Ctrl+P cycles through
+      /generate-model [MODEL|off]      show which model drafts commit messages, pull requests and branc…
       /memory [on|off]                 the notes the model saved when you asked it to remember somethin…
       /import [path]                   import a session from a JSONL file
       /compaction [at|model|mask ...]  show when conversations are compacted and what summarises them; …
@@ -672,7 +672,6 @@ let%expect_test "screen: 100x30 and 160x40" =
 
 
 
-
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
@@ -686,6 +685,7 @@ let%expect_test "screen: 100x30 and 160x40" =
     ▸ /mode [ask|auto-edit|auto|plan]  pick or set the mode: what asks first, or read-only planning (Alt+M cycles)
       /model [name|id|provider/id]     pick or switch the model
       /scoped-models                   pick the models Ctrl+P cycles through
+      /generate-model [MODEL|off]      show which model drafts commit messages, pull requests and branch names (✦ Generate); MODEL|off: draft them with MODEL (off:…
       /memory [on|off]                 the notes the model saved when you asked it to remember something (Ctrl+D forgets one); on or off gives the model the memory…
       /import [path]                   import a session from a JSONL file
       /compaction [at|model|mask ...]  show when conversations are compacted and what summarises them; at TOKENS|off: also once the context exceeds TOKENS, not onl…

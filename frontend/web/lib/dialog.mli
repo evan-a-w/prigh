@@ -38,8 +38,10 @@ module Picker_kind : sig
     | Accents (** item ids are [Theme.Accent.to_string]s *)
     | Compaction_models
     (** [/compaction model]: model keys, or [off] (the conversation's) *)
+    | Generate_models
+    (** [/generate-model]: model keys, or [off] (the session's) *)
     | Naming_models
-    (** [/naming model]: model keys, or [off] (the generate model's) *)
+    (** [/naming model]: model keys, or [off] (the drafting model's) *)
     | Dictation_models
     (** [/dictation model]: transcription model keys, or [off] (the
         default); other keys are typed in the filter *)

@@ -31,6 +31,7 @@ module Argument = struct
     | Snippet
     | Remind
     | Compaction
+    | Generate_model
     | Naming
     | Dictation
     | Pr
@@ -160,11 +161,18 @@ let every =
       "compact"
       "summarise older messages to free context"
   ; c
+      ~argument:Generate_model
+      ~args:"[MODEL|off]"
+      "generate-model"
+      "pick the model that drafts commit messages, pull requests and branch \
+       names (✦ Generate); MODEL|off: draft them with MODEL (off: the \
+       session's)"
+  ; c
       ~argument:Naming
       ~args:"[model MODEL|off]"
       "naming"
       "show which model names sessions and subagents; model MODEL|off: name \
-       them with MODEL (off: the generate model, else the session's)"
+       them with MODEL (off: the drafting model, else the session's)"
   ; c
       ~argument:Dictation
       ~args:"[model MODEL|off]"

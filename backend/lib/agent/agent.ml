@@ -2611,7 +2611,7 @@ let generate_model t =
     Model_registry.resolve t.models name
     |> Result.map_error ~f:(fun e ->
       Error.createf
-        "generate_model: %s (fix it with /settings or in config.json)"
+        "generate_model: %s (fix it with /generate-model or in config.json)"
         (Error.to_string_hum e))
 ;;
 
