@@ -520,8 +520,8 @@ prigh) goes. On disk worktrees still go by repository
 repository's. A session used in the last 12 hours (its age on the card)
 shows its worktrees; an older one folds them behind the count at the
 right of its second line (`⑂ 3`). Settings → Sessions → Show worktrees
-sets the window in hours (0 to 720; Off or 0: every session's start
-folded). Clicking the count folds or unfolds a session's worktrees
+sets the window in hours (up to 720; its switch off, or 0: every
+session's start folded; on again: the hours it had). Clicking the count folds or unfolds a session's worktrees
 whatever its age, and that choice wins over the window until you click
 again; the window and the choices are kept with your preferences
 (`web.sidebar-worktree-hours`, `web.sidebar-folded`,
@@ -920,7 +920,8 @@ phone): **Appearance** (the theme and accent, transcript detail
 confirmation (`/confirm`), the starting directory and fallback models;
 the session list: Show worktrees, the hours a session's worktrees stay
 unfolded in the sidebar after it was used, and Archive after, the days
-without activity that archive it (`/auto-archive`); notifications, on or
+without activity that archive it (`/auto-archive`), each a number with
+a switch that turns it off and back on to what it was; notifications, on or
 off, and what to do when the browser has not been asked, blocks them or
 cannot show them), **Models** (the providers
 (`/auth`) and compaction), **Memory** (the model's notes and the switch

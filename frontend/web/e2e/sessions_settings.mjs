@@ -109,14 +109,14 @@ const openSettings = async p => {
   await p.keyboard.press("Control+,");
   await p.locator(".settings-dialog").waitFor();
   await p.locator(".settings-tab-sessions").click();
-  await p.locator("#auto-archive:not([disabled])").waitFor();
+  await p.locator(".setting.auto-archive .switch:not([disabled])").waitFor();
   await sessions(p).scrollIntoViewIfNeeded();
 };
 const showSettings = async p => {
   console.log((await sessions(p).locator(".setting.worktree-hours, .setting.auto-archive").allInnerTexts())
     .map(t => t.replace(/\n+/g, " | ")).join("\n"));
-  console.log(`fields: ${JSON.stringify(await p.locator("#worktree-hours").inputValue())} hours, \
-${JSON.stringify(await p.locator("#auto-archive").inputValue())} days`);
+  const field = async id => (await p.locator(id).count() ? JSON.stringify(await p.locator(id).inputValue()) : "hidden");
+  console.log(`fields: ${await field("#worktree-hours")} hours, ${await field("#auto-archive")} days`);
 };
 const config = () => {
   const c = JSON.parse(readFileSync(join(home, ".prigh/config.json"), "utf8"));
@@ -180,7 +180,8 @@ try {
   await showSettings(page);
   await screenshot(page, "settings");
 
-  // A wider window shows the old session's too; Off folds them all.
+  // A wider window shows the old session's too; its switch off folds them
+  // all.
   await page.locator("#worktree-hours").fill("100");
   await page.locator("#worktree-hours").press("Enter");
   await page.locator(".setting.worktree-hours .setting-note, .setting.worktree-hours", { hasText: "100 hours" }).first().waitFor();
@@ -190,7 +191,8 @@ try {
   section("100 hours");
   await sidebar(page);
   await openSettings(page);
-  await sessions(page).locator(".setting.worktree-hours button", { hasText: "Off" }).click();
+  await sessions(page).locator(".setting.worktree-hours .switch").click();
+  await page.locator("#worktree-hours").waitFor({ state: "detached" });
   await page.keyboard.press("Escape");
   await page.locator(".settings-dialog").waitFor({ state: "detached" });
   await session(page, "Fresh work").locator(".session-fold.folded").waitFor();
@@ -225,9 +227,12 @@ try {
   await screenshot(page, "archived");
 
   // Phones: the sidebar, then the settings section, at 390x844 and 320x640.
+  // The worktrees' switch on again: the 100 hours they were.
   await openSettings(page);
-  await page.locator("#worktree-hours").fill("100");
-  await page.locator("#worktree-hours").press("Enter");
+  await sessions(page).locator(".setting.worktree-hours .switch").click();
+  await page.locator(".setting.worktree-hours", { hasText: "100 hours" }).waitFor();
+  section("switched on again");
+  await showSettings(page);
   await page.locator("#auto-archive").fill("7");
   await page.locator("#auto-archive").press("Enter");
   await toast(page, "after 7 days");

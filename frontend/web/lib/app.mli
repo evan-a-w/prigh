@@ -595,6 +595,9 @@ module Action : sig
         days *)
     | Sessions_field_commit of Sessions_fields.Which.t
     (** applies one (leaving the field; Enter accepts) *)
+    | Switch_number of Switched_off.Key.t * bool
+    (** a settings number's On/Off switch: on restores what it was before
+        it was switched off, else its default *)
     | Memory_filter of string (** the settings page's Memory: its filter *)
     | Memory_edit of string option
     (** edits this note, or writes a new one ([None]) *)
@@ -985,6 +988,8 @@ module Model : sig
     ; compact_at : Compact_at.t (** the settings page's "Compact at" *)
     ; sessions_fields : Sessions_fields.t
       (** the settings page's session list fields *)
+    ; switched_off : Switched_off.t
+      (** what the settings' numbers were when switched off *)
     ; settings_section : Settings_section.t
     (* A phone's settings show the list of sections, not one of them. *)
     ; settings_home : bool

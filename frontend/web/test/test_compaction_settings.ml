@@ -18,7 +18,7 @@ let config ?(at = 200_000) ?model ?(mask = true) () =
 let section h = H.text h ~selector:".settings-group:has(.compact-at)"
 
 let field h =
-  H.show h ~selector:".compact-at-input";
+  H.show h ~selector:"#compact-at";
   H.text h ~selector:".setting.compact-at .setting-note"
 ;;
 
@@ -39,12 +39,12 @@ let%expect_test "the section: defaults, then each control" =
     Compact at
     Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window.
     [200k] tokens
-    (Off)
+    (Only at 80% of the model's window (/compaction at off))
     Mask old tool outputs
     Replace tool outputs older than the last 10 turns with placeholders first, which often saves summarising.
     (Keep old tool outputs (/compaction mask off))
     input "Compact at, in tokens" -- /compaction at TOKENS, e.g. 150k or 200000
-    button "Off" -- Only at 80% of the model's window (/compaction at off)
+    [switch] button "Compact at" -- Only at 80% of the model's window (/compaction at off)
     [switch] button "Mask old tool outputs" -- Keep old tool outputs (/compaction mask off)
     |}];
   (* A threshold: typed, applied with Enter, shown at once and saved. *)
@@ -60,13 +60,14 @@ let%expect_test "the section: defaults, then each control" =
      (tag Compaction_saved))
     <input id="compact-at"
            type="text"
+           inputmode="decimal"
            placeholder="200k"
            title="/compaction at TOKENS, e.g. 150k or 200000"
            aria-label="Compact at, in tokens"
            aria-invalid="false"
            autocomplete="off"
            spellcheck="false"
-           class="compact-at-input"
+           class="number-field-input text-input"
            #value="150k"
            @on_change
            @on_input/>
@@ -74,7 +75,7 @@ let%expect_test "the section: defaults, then each control" =
     Compaction: at 150k tokens, or 80% of the model's window if that is less; summaries by the session's model; observation masking on (/compaction at TOKENS|off, /compaction model MODEL|off, /compaction mask on|off)
     |}];
   (* Leaving the field ([change]) applies it too; the settings stay open. *)
-  H.input h ~selector:".compact-at-input" " 120000 ";
+  H.input h ~selector:"#compact-at" " 120000 ";
   H.text h ~selector:".setting.compact-at .setting-control";
   print_s [%sexp (Option.is_some (H.model h).dialog : bool)];
   [%expect
@@ -84,7 +85,7 @@ let%expect_test "the section: defaults, then each control" =
     (Rpc (method_ set_config) (params ((config ((compact_at_tokens 120000)))))
      (tag Compaction_saved))
     [120k] tokens
-    (Off)
+    (Only at 80% of the model's window (/compaction at off))
     true
     |}];
   H.quiet h (fun () -> H.reply h "set_config" (config ~at:120_000 ()));
@@ -97,13 +98,14 @@ let%expect_test "the section: defaults, then each control" =
     Dialog_accept
     <input id="compact-at"
            type="text"
+           inputmode="decimal"
            placeholder="200k"
            title="/compaction at TOKENS, e.g. 150k or 200000"
            aria-label="Compact at, in tokens"
            aria-invalid="true"
            autocomplete="off"
            spellcheck="false"
-           class="compact-at-input"
+           class="number-field-input text-input"
            #value="lots"
            @on_change
            @on_input/>
@@ -112,32 +114,31 @@ let%expect_test "the section: defaults, then each control" =
   (* Typing again clears the error; Off (or typing off) turns it off. *)
   H.act h (Compact_at_input "15");
   field h;
-  H.click h ~selector:".setting.compact-at .segment:not(.compact-at-field)";
+  H.click h ~selector:".setting.compact-at .switch";
   H.text h ~selector:".setting.compact-at";
-  H.elements h ~selector:".setting.compact-at .segment";
+  H.elements h ~selector:".setting.compact-at .switch";
   [%expect
     {|
     <input id="compact-at"
            type="text"
+           inputmode="decimal"
            placeholder="200k"
            title="/compaction at TOKENS, e.g. 150k or 200000"
            aria-label="Compact at, in tokens"
            aria-invalid="false"
            autocomplete="off"
            spellcheck="false"
-           class="compact-at-input"
+           class="number-field-input text-input"
            #value="15"
            @on_change
            @on_input/>
-    (Run "/compaction at off")
+    (Switch_number Compact_at false)
     (Rpc (method_ set_config) (params ((config ((compact_at_tokens 0)))))
      (tag Compaction_saved))
     Compact at
-    Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window. Off: only at 80% of the window. Type a number to set one.
-    [] tokens
-    (Off)
-    <label class="compact-at-field segment">
-    <button class="on segment">
+    Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window. Off: only at 80% of the window.
+    (Also at a number of tokens (/compaction at TOKENS))
+    <button class="switch">
     |}];
   H.quiet h (fun () -> H.reply h "set_config" (config ~at:0 ()));
   H.act h (Compact_at_input "off");
@@ -147,6 +148,18 @@ let%expect_test "the section: defaults, then each control" =
     Dialog_accept
     (Rpc (method_ set_config) (params ((config ((compact_at_tokens 0)))))
      (tag Compaction_saved))
+    |}];
+  H.quiet h (fun () -> H.reply h "set_config" (config ~at:0 ()));
+  (* On again: the 120k it was before Off. *)
+  H.click h ~selector:".setting.compact-at .switch";
+  H.text h ~selector:".setting.compact-at .setting-control";
+  [%expect
+    {|
+    (Switch_number Compact_at true)
+    (Rpc (method_ set_config) (params ((config ((compact_at_tokens 120000)))))
+     (tag Compaction_saved))
+    [120k] tokens
+    (Only at 80% of the model's window (/compaction at off))
     |}];
   H.quiet h (fun () -> H.reply h "set_config" (config ~at:0 ()));
   (* With nothing typed, Enter accepts the page: it closes. *)
@@ -263,7 +276,7 @@ let%expect_test
     Compact at
     Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window.
     [90k] tokens
-    (Off)
+    (Only at 80% of the model's window (/compaction at off))
     Mask old tool outputs
     Replace tool outputs older than the last 10 turns with placeholders first, which often saves summarising.
     (Mask old tool outputs (/compaction mask on))
@@ -276,7 +289,7 @@ let%expect_test
   [%expect
     {|
     [250k] tokens
-    (Off)
+    (Only at 80% of the model's window (/compaction at off))
     |}];
   (* A half-typed threshold is the page's: Esc drops it. *)
   H.act h (Compact_at_input "33");
@@ -288,7 +301,7 @@ let%expect_test
     Close_dialog
     (Focus editor)
     [250k] tokens
-    (Off)
+    (Only at 80% of the model's window (/compaction at off))
     |}];
   (* Another account: its own settings, once the backend sends them. *)
   H.act h (Compact_at_input "lots");
@@ -311,8 +324,7 @@ let%expect_test
     Compaction
     Compact at
     Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window. Waiting for the backend's settings…
-    [] tokens
-    (Off)
+    (Also at a number of tokens (/compaction at TOKENS))
     Mask old tool outputs
     Replace tool outputs older than the last 10 turns with placeholders first, which often saves summarising.
     (Mask old tool outputs (/compaction mask on))
@@ -320,7 +332,7 @@ let%expect_test
     Compact at
     Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window.
     [200k] tokens
-    (Off)
+    (Only at 80% of the model's window (/compaction at off))
     Mask old tool outputs
     Replace tool outputs older than the last 10 turns with placeholders first, which often saves summarising.
     (Keep old tool outputs (/compaction mask off))
