@@ -299,12 +299,14 @@ let%expect_test "the names of the settings' controls" =
     [radio] button "Yellow" -- Yellow (/accent yellow)
     [group] div "Transcript detail"
     -- Sessions
-    button "Off" -- Fold every session's worktrees until opened
-    button "Off" -- Archive only by hand (/auto-archive off)
+    [switch] button "Show worktrees for sessions used in the last" -- Fold every session's worktrees until opened
+    [switch] button "Archive sessions after" -- Archive only by hand (/auto-archive off)
     button "Allow" -- Ask the browser to allow notifications (/notify on)
     [switch] button "Notifications" -- Turn notifications off (/notify off)
     [group] div "Show worktrees for sessions used in the last"
+    [switch] button "Show worktrees for sessions used in the last" -- Fold every session's worktrees until opened
     [group] div "Archive sessions after"
+    [switch] button "Archive sessions after" -- Archive only by hand (/auto-archive off)
     [switch] button "Notifications" -- Turn notifications off (/notify off)
     -- New sessions
     button "New sessions' model: The backend's choice" -- Choose the model new sessions start with
@@ -328,9 +330,10 @@ let%expect_test "the names of the settings' controls" =
     button "Naming model: Default" -- Choose the model (/naming model)
     button "Summary model: The conversation's model" -- Choose the model (/compaction model)
     button "Dictation model: openai/gpt-4o-mini-transcribe" -- Choose the model (/dictation model)
-    button "Off" -- Only at 80% of the model's window (/compaction at off)
+    [switch] button "Compact at" -- Only at 80% of the model's window (/compaction at off)
     [switch] button "Mask old tool outputs" -- Keep old tool outputs (/compaction mask off)
     [group] div "Compact at"
+    [switch] button "Compact at" -- Only at 80% of the model's window (/compaction at off)
     [switch] button "Mask old tool outputs" -- Keep old tool outputs (/compaction mask off)
     -- Memory
     [switch] button "Use memory" -- Stop giving the model your memory (/memory off)

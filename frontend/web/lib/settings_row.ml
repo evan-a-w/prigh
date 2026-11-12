@@ -104,6 +104,63 @@ let switch ?(disabled = false) ~label ~title ~on ~on_click () =
     [ Node.span ~attrs:[ Attr.class_ "switch-knob" ] [] ]
 ;;
 
+let number_switch
+      ?(disabled = false)
+      ~id
+      ~label
+      ~unit
+      ~value
+      ~placeholder
+      ~title
+      ~switch_title
+      ~invalid
+      ~on
+      ~on_input
+      ~on_commit
+      ~on_switch
+      ()
+  =
+  Node.div
+    ~attrs:
+      [ Attr.class_ "number-switch"
+      ; Attr.role "group"
+      ; Attr.create "aria-label" label
+      ]
+    [ (if on
+       then
+         Node.label
+           ~attrs:[ Attr.class_ "number-field" ]
+           [ Node.input
+               ~attrs:
+                 [ Attr.id id
+                 ; Attr.class_ "text-input number-field-input"
+                 ; Attr.type_ "text"
+                 ; Attr.create "inputmode" "decimal"
+                 ; Attr.value value
+                 ; Attr.placeholder placeholder
+                 ; Attr.title title
+                 ; Attr.create "aria-label" (label ^ ", in " ^ unit)
+                 ; Attr.create "aria-invalid" (Bool.to_string invalid)
+                 ; Attr.create "autocomplete" "off"
+                 ; Attr.create "spellcheck" "false"
+                 ; (if disabled then Attr.disabled else Attr.empty)
+                 ; Attr.on_input (fun _ text -> on_input text)
+                 ; Attr.on_change (fun _ _ -> on_commit)
+                 ]
+               ()
+           ; span ~cls:"number-field-unit" unit
+           ]
+       else Node.none)
+    ; switch
+        ~disabled
+        ~label
+        ~title:switch_title
+        ~on
+        ~on_click:(on_switch (not on))
+        ()
+    ]
+;;
+
 let select ?(disabled = false) ~cls ~title ~label ~on_click value =
   button
     ~cls:("small setting-select " ^ cls)
