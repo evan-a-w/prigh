@@ -763,6 +763,7 @@ Sessions
 Models
 Memory
 About you
+Custom instructions
 Git hosting
 T
 token
@@ -984,6 +985,7 @@ Sessions
 Models
 Memory
 About you
+Custom instructions
 Git hosting
 B
 bob
@@ -3038,7 +3040,7 @@ Jump to a message, Filter the transcript, Files, Terminal, Settings
 === webkit: mobile: 390x844: the settings' list ===
 ok
 === webkit: mobile: 390x844: the settings ===
-Appearance, Sessions, Models, Memory, About you, Git hosting, Account
+Appearance, Sessions, Models, Memory, About you, Custom instructions, Git hosting, Account
 === webkit: mobile: 390x844: settings: appearance ===
 ok
 title: Appearance; back: Settings
@@ -3072,7 +3074,7 @@ Jump to a message, Filter the transcript, Files, Terminal, Settings
 === webkit: mobile: 320x640: the settings' list ===
 ok
 === webkit: mobile: 320x640: the settings ===
-Appearance, Sessions, Models, Memory, About you, Git hosting, Account
+Appearance, Sessions, Models, Memory, About you, Custom instructions, Git hosting, Account
 === webkit: mobile: 320x640: settings: appearance ===
 ok
 title: Appearance; back: Settings
@@ -3375,47 +3377,91 @@ editing fits: yes; targets: all ok
 back: Memory | What you asked the model to remember, for later sessions. Kept on the backend, for your account.
 === webkit: memory: errors ===
 (none)
-=== webkit: user info: empty ===
+=== webkit: user info: moved from user_info.md ===
 About you
 What the model should know about you, given to it in every session. Kept on the backend, for your account.
-Describe yourself
-Who you are, what you work on, how you like answers. This text is given to the model in every session: new ones start with it, and open ones get it with your next message. Memory is for notes the model looks up only when it needs them.
-0 of 4000 bytes
+Tell the model about you
+Every field is optional. What you fill in is given to the model in every session: new ones start with it, and open ones get it with your next message. Memory is for notes the model looks up only when it needs them.
+Name
+Country or region
+Time zone
+Use Australia/Sydney
+Language and spelling
+Units
+Not set
+Metric
+Imperial
+US
+Date format
+Not set
+D/M/Y
+M/D/Y
+ISO
+Occupation or role
+Background and expertise
+Anything else
+21 of 5000 bytes
 Ctrl+Enter saves
 Save
-text: ""
+values: name="" country="" time-zone="" language="" units="Not set" date-format="Not set" occupation="" background="" anything-else="I like short answers."
+files: user_info.md: no, user_info.md.migrated: yes
 === webkit: user info: saved ===
 About you
 What the model should know about you, given to it in every session. Kept on the backend, for your account.
-Describe yourself
-Who you are, what you work on, how you like answers. This text is given to the model in every session: new ones start with it, and open ones get it with your next message. Memory is for notes the model looks up only when it needs them.
+Tell the model about you
+Every field is optional. What you fill in is given to the model in every session: new ones start with it, and open ones get it with your next message. Memory is for notes the model looks up only when it needs them.
+Name
+Country or region
+Time zone
+Language and spelling
+Units
+Not set
+Metric
+Imperial
+US
+Date format
+Not set
+D/M/Y
+M/D/Y
+ISO
+Occupation or role
+Background and expertise
+Anything else
 Saved. New sessions start with it; open ones get it with your next message in them.
-57 of 4000 bytes
+79 of 5000 bytes
 Ctrl+Enter saves
 Save
-text: "I'm Lloyd. I work on prigh, in OCaml.\nKeep answers short."
-file: "I'm Lloyd. I work on prigh, in OCaml.\nKeep answers short.\n"
-reverted: "I'm Lloyd. I work on prigh, in OCaml.\nKeep answers short."
+values: name="Lloyd" country="Australia" time-zone="Australia/Sydney" language="" units="Metric" date-format="D/M/Y" occupation="" background="Undergrad pure maths and CS." anything-else="I like short answers."
+file: {
+  "version": 1,
+  "name": "Lloyd",
+  "country": "Australia",
+  "time_zone": "Australia/Sydney",
+  "units": "metric",
+  "date_format": "dmy",
+  "background": "Undergrad pure maths and CS.",
+  "anything_else": "I like short answers."
+}
+reverted: "Lloyd"
 === webkit: user info: followed on another page ===
-text: "I'm Lloyd. Keep answers short."
+values: name="Lloyd" country="Australia" time-zone="Australia/Sydney" language="" units="Metric" date-format="D/M/Y" occupation="Student" background="Undergrad pure maths and CS." anything-else="I like short answers."
 === webkit: user info: changed under a draft ===
-About you
-What the model should know about you, given to it in every session. Kept on the backend, for your account.
-Describe yourself
-Who you are, what you work on, how you like answers. This text is given to the model in every session: new ones start with it, and open ones get it with your next message. Memory is for notes the model looks up only when it needs them.
 It was changed somewhere else while you were typing. Saving replaces that with this.
 Load that one
-23 of 4000 bytes
-Ctrl+Enter saves
-Revert
-Save
-text: "typed on the other page"
-loaded: "I'm Lloyd. Keep answers short, in British English."
+loaded: name="Lloyd" country="Australia" time-zone="Australia/Sydney" language="English, Australian spelling" units="Metric" date-format="D/M/Y" occupation="Student" background="Undergrad pure maths and CS." anything-else="I like short answers."
 === webkit: user info: the session is told ===
-☺ About you: the model was given what you wrote
-[User info: what the user wrote about themselves in prigh's settings, for every session, is now:
-I'm Lloyd. Keep answers short, in British English.
-It replaces any earlier text about the user.]
+☺ About you: the model was given your details
+[User info: what the user set about themselves in prigh's settings, for every session, is now:
+- Name: Lloyd
+- Country/region: Australia
+- Time zone: Australia/Sydney
+- Language and spelling: English, Australian spelling
+- Units: metric (°C, km, kg, L)
+- Date format: day/month/year (25/12/2026)
+- Occupation/role: Student
+- Background and expertise: Undergrad pure maths and CS.
+- Anything else: I like short answers.
+It replaces anything earlier about the user from their settings.]
 === webkit: user info: phone 390x844 ===
 fits: yes; targets: all ok; Save on screen: yes
 typing fits: yes; targets: all ok; Save on screen: yes
@@ -3425,6 +3471,64 @@ fits: yes; targets: all ok; Save on screen: yes
 typing fits: yes; targets: all ok; Save on screen: yes
 back: About you | What the model should know about you, given to it in every session. Kept on the backend, for your account.
 === webkit: user info: errors ===
+(none)
+=== webkit: custom instructions: list ===
+Custom instructions
+Standing instructions for the model, given to it in every session; it may also add or edit them when you state a lasting preference. Kept on the backend, for your account.
+Let the model change them
+When you state a lasting preference or standing instruction, the model adds it here or edits the one that covers it, and tells you. Off, only you change them; they stay in every session either way.
+INSTRUCTIONS
+2 instructions
+2 of 50 · about 43 tokens in every session
+Use Australian spelling.
+ci1 · saved 2026-11-01
+Maths
+Keep a single memory note on my maths ability up to date.
+ci2 · saved 2026-11-02
+Add instruction
+switch: true
+settings still open: 1
+=== webkit: custom instructions: edited and added ===
+ci1 -: Use Australian spelling and metric units.; ci2 Maths: Keep a single memory note on my maths ability up to date.; ci3 Code: Prefer OCaml examples.
+=== webkit: custom instructions: deleting ===
+Maths | Keep a single memory note on my maths ability up to date. | Delete this instruction? No session gets it any more. | Keep | Delete
+ci1 -: Use Australian spelling and metric units.; ci3 Code: Prefer OCaml examples.
+=== webkit: custom instructions: off, followed on another page ===
+Custom instructions
+Standing instructions for the model, given to it in every session; it may also add or edit them when you state a lasting preference. Kept on the backend, for your account.
+Let the model change them
+When you state a lasting preference or standing instruction, the model adds it here or edits the one that covers it, and tells you. Off, only you change them; they stay in every session either way.
+INSTRUCTIONS
+2 instructions
+2 of 50 · about 38 tokens in every session
+Use Australian spelling and metric units.
+ci1 · saved (today)
+Code
+Prefer OCaml examples.
+ci3 · saved (today)
+Add instruction
+switch: false
+prefs: custom_instructions.enabled=false
+=== webkit: custom instructions: the session is told ===
+§ Custom instructions: the model was told 1 added, 1 edited, 1 removed
+[Custom instructions (the user's standing instructions; follow them) are now:
+[ci1] Use Australian spelling and metric units.
+[ci3] (Code) Prefer OCaml examples.
+These replace any earlier custom instructions.]
+after /instructions on: prefs custom_instructions.enabled=null
+=== webkit: custom instructions: warning ===
+About 1,757 tokens in every session | They are added to the context of every session, before you say anything: that is cost on every message and room the work no longer has. Trim them: merge near-duplicates, drop what no longer applies, and keep what is only sometimes needed in memory.
+=== webkit: custom instructions: phone 390x844 ===
+warning fits: yes; targets: all ok
+deleting fits: yes; targets: all ok
+editing fits: yes; targets: all ok
+back: Custom instructions | Standing instructions for the model, given to it in every session; it may also add or edit them when you state a lasting preference. Kept on the backend, for your account.
+=== webkit: custom instructions: phone 320x640 ===
+warning fits: yes; targets: all ok
+deleting fits: yes; targets: all ok
+editing fits: yes; targets: all ok
+back: Custom instructions | Standing instructions for the model, given to it in every session; it may also add or edit them when you state a lasting preference. Kept on the backend, for your account.
+=== webkit: custom instructions: errors ===
 (none)
 === webkit: images (desktop): refused as too large: the error card ===
 The model returned an error

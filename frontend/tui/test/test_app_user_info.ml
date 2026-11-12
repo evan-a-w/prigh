@@ -4,7 +4,7 @@ open Prigh_ui
 module H = Test_app.H
 module P = Prigh_protocol
 
-(* /user-info: what the user wrote about themselves for every session. *)
+(* /user-info: what the user set about themselves for every session. *)
 
 (* As typed, closing the completion first so that Enter runs it. *)
 let run h text =
@@ -13,70 +13,83 @@ let run h text =
   H.enter h
 ;;
 
-let%expect_test "/user-info shows it, or says how to write it" =
-  let h = Test_app.connected ~width:80 ~height:14 () in
+let limits =
+  {|"limits":{"name":100,"background":1000,"anything_else":4000,"total":5000}|}
+;;
+
+let empty = sprintf {|{"form":{},"text":"",%s}|} limits
+
+let lloyd =
+  sprintf
+    {|{"form":{"name":"Lloyd","country":"Australia","units":"metric"},"text":"- Name: Lloyd\n- Country/region: Australia\n- Units: metric (°C, km, kg, L)",%s}|}
+    limits
+;;
+
+let%expect_test "/user-info shows the block the model is given" =
+  let h = Test_app.connected ~width:80 ~height:16 () in
   run h "/user-info";
-  H.reply h User_info_shown {|{"text":"","max":4000}|};
+  H.reply h User_info_shown empty;
   H.show h;
   [%expect
     {|
     (Rpc (method_ get_user_info) (params ()) (tag User_info_shown))
-
-
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
-
-    ▌ earlier question
-      earlier answer
-    ┌─ Notice ─────────────────────────────────────────────────────────────────────┐
-    │ nothing about you yet: /user-info TEXT tells the model who you are and how   │
-    │ you like to work, in every session (~/.prigh/user_info.md on the backend;    │
-    │ prigh-web: Settings, About you)                                              │
-    └────────────────────────────────────────────────────────────── Esc dismisses ─┘
+    ┌─ About you · nothing yet ────────────────────────────────────────────────────┐
+    │ Nothing about you yet: tell the model who you are, in every session.         │
+    │                                                                              │
+    │ /user-info FIELD VALUE sets a field (an empty VALUE clears it), /user-info   │
+    │ clear clears them all (~/.prigh/about_you.json on the backend; prigh-web:    │
+    │ Settings, About you). The fields:                                            │
+    │   name           what to call you                                            │
+    │   country        country or region                                           │
+    │   time_zone      IANA time zone, e.g. Australia/Sydney                       │
+    │   language       language and spelling, e.g. English, Australian spelling    │
+    │   units          metric, imperial or us_customary                            │
+    │   date_format    dmy, mdy or iso                                             │
+    └────────────────────────────── 1–11 of 14 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
     ────────────────────────────────────────────────────────────────────────────────
     > ▏
-    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
+    deepseek-flash  think:off  ↑↓ scroll · Esc closes · typing goes to the editor
     |}];
   run h "/user-info";
-  H.reply
-    ~quiet:true
-    h
-    User_info_shown
-    {|{"text":"I'm Lloyd.\nI prefer short answers.","max":4000}|};
+  H.reply ~quiet:true h User_info_shown lloyd;
   H.show h;
   [%expect
     {|
     (Rpc (method_ get_user_info) (params ()) (tag User_info_shown))
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
-
-    ▌ earlier question
-      earlier answer
-    ┌─ About you · given to the model in every session · 34 of 4000 bytes ─────────┐
-    │ I'm Lloyd.                                                                   │
-    │ I prefer short answers.                                                      │
+    ┌─ About you · given to the model in every session · 74 bytes ─────────────────┐
+    │ - Name: Lloyd                                                                │
+    │ - Country/region: Australia                                                  │
+    │ - Units: metric (°C, km, kg, L)                                              │
     │                                                                              │
-    │ /user-info TEXT replaces it, /user-info clear removes it                     │
-    │ (~/.prigh/user_info.md on the backend; prigh-web: Settings, About you)       │
-    └───────────────────────────────────────────────────────────────── Esc closes ─┘
+    │ /user-info FIELD VALUE sets a field (an empty VALUE clears it), /user-info   │
+    │ clear clears them all (~/.prigh/about_you.json on the backend; prigh-web:    │
+    │ Settings, About you). The fields:                                            │
+    │   name           what to call you                                            │
+    │   country        country or region                                           │
+    │   time_zone      IANA time zone, e.g. Australia/Sydney                       │
+    │   language       language and spelling, e.g. English, Australian spelling    │
+    └────────────────────────────── 1–11 of 16 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
     ────────────────────────────────────────────────────────────────────────────────
     > ▏
     deepseek-flash  think:off  ↑↓ scroll · Esc closes · typing goes to the editor
     |}]
 ;;
 
-let%expect_test "/user-info TEXT saves it; a refusal puts the command back" =
+let%expect_test
+    "/user-info FIELD VALUE sets one; a refusal puts the command back"
+  =
   let h = Test_app.connected ~width:80 ~height:14 () in
-  run h "/user-info I'm Lloyd. I prefer short answers.";
-  H.reply
-    h
-    (User_info_saved "/user-info I'm Lloyd. I prefer short answers.")
-    {|{"text":"I'm Lloyd. I prefer short answers.","max":4000}|};
+  run h "/user-info timezone Australia/Sydney";
+  H.reply h (User_info_saved "/user-info timezone Australia/Sydney") lloyd;
   H.show h;
   [%expect
     {|
     (Rpc
       (method_ set_user_info)
-      (params ((text "I'm Lloyd. I prefer short answers.")))
-      (tag (User_info_saved "/user-info I'm Lloyd. I prefer short answers.")))
+      (params (
+        (field time_zone)
+        (value Australia/Sydney)))
+      (tag (User_info_saved "/user-info timezone Australia/Sydney")))
 
 
 
@@ -85,26 +98,39 @@ let%expect_test "/user-info TEXT saves it; a refusal puts the command back" =
     ▌ earlier question
       earlier answer
     ┌─ Notice ─────────────────────────────────────────────────────────────────────┐
-    │ saved (34 of 4000 bytes): the model has it in new sessions, and in open ones │
-    │ from your next message                                                       │
+    │ saved (74 bytes): the model has it in new sessions, and in open ones from    │
+    │ your next message                                                            │
     └────────────────────────────────────────────────────────────── Esc dismisses ─┘
     ────────────────────────────────────────────────────────────────────────────────
     > ▏
     /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
     |}];
-  run h "/user-info far too long";
+  run h "/user-info units";
+  H.reply h (User_info_saved "/user-info units") lloyd;
+  [%expect
+    {|
+    (Rpc
+      (method_ set_user_info)
+      (params (
+        (field units)
+        (value "")))
+      (tag (User_info_saved "/user-info units")))
+    |}];
+  run h "/user-info units furlongs";
   H.reply_error
     h
-    (User_info_saved "/user-info far too long")
-    "the text about you is limited to 4000 bytes (this one has 4001): shorten \
-     it, and keep what is only sometimes needed in memory notes";
+    (User_info_saved "/user-info units furlongs")
+    "units is one of metric, imperial, us_customary (or empty, to clear it), \
+     not \"furlongs\"";
   H.show h;
   [%expect
     {|
     (Rpc
       (method_ set_user_info)
-      (params ((text "far too long")))
-      (tag (User_info_saved "/user-info far too long")))
+      (params (
+        (field units)
+        (value furlongs)))
+      (tag (User_info_saved "/user-info units furlongs")))
 
 
 
@@ -113,12 +139,56 @@ let%expect_test "/user-info TEXT saves it; a refusal puts the command back" =
     ▌ earlier question
       earlier answer
     ┌─ Error ──────────────────────────────────────────────────────────────────────┐
-    │ the text about you is limited to 4000 bytes (this one has 4001): shorten it, │
-    │ and keep what is only sometimes needed in memory notes                       │
+    │ units is one of metric, imperial, us_customary (or empty, to clear it), not  │
+    │ "furlongs"                                                                   │
     └────────────────────────────────────────────────────────────── Esc dismisses ─┘
     ────────────────────────────────────────────────────────────────────────────────
-    > /user-info far too long▏
+    > /user-info units furlongs▏
     /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
+    |}];
+  let h = Test_app.connected ~width:80 ~height:14 () in
+  run h "/user-info shoe-size 9";
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ┌─ Error ──────────────────────────────────────────────────────────────────────┐
+    │ no field "shoe_size": /user-info FIELD VALUE, where FIELD is one of name,    │
+    │ country, time_zone, language, units, date_format, occupation, background,    │
+    │ anything_else                                                                │
+    └────────────────────────────────────────────────────────────── Esc dismisses ─┘
+    ────────────────────────────────────────────────────────────────────────────────
+    > /user-info shoe-size 9▏
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
+    |}]
+;;
+
+let%expect_test "/user-info completes the fields" =
+  let h = Test_app.connected ~width:80 ~height:24 () in
+  String.iter "/user-info " ~f:(fun c ->
+    H.step ~quiet:true h (Key (Key.char c)));
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ▸ name         what to call you
+      country      country or region
+      time_zone    IANA time zone, e.g. Australia/Sydney
+      language     language and spelling, e.g. English, Australian spelling
+      units        metric, imperial or us_customary
+      date_format  dmy, mdy or iso
+      occupation   occupation or role
+      background   background and expertise
+      ↕ 1–8 of 10
+    ────────────────────────────────────────────────────────────────────────────────
+    > /user-info ▏
+    deepseek-flash  ctx:0.1%/1.0M  $0.01  Tab accepts · Enter as typed · Esc hides
     |}]
 ;;
 
@@ -133,7 +203,8 @@ let%expect_test "/user-info clear asks first" =
     ▌ earlier question
       earlier answer
     ┌─ Confirm ────────────────────────────────────────────────────────────────────┐
-    │ remove what you wrote about yourself? The model is no longer given it (y/n)  │
+    │ clear everything you set about yourself? The model is no longer given it     │
+    │ (y/n)                                                                        │
     └──────────────────────────────────────────────────────────────────────────────┘
     ────────────────────────────────────────────────────────────────────────────────
     ? ▏
@@ -147,17 +218,17 @@ let%expect_test "/user-info clear asks first" =
 
     ▌ earlier question
       earlier answer
-    ───────────────────────────────────────── kept what you wrote about yourself ───
+    ─────────────────────────────────────────── kept what you set about yourself ───
     > ▏
     /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
     |}];
   run h "/user-info clear";
   H.key h (Key.char 'y');
-  H.reply h (User_info_saved "") {|{"text":"","max":4000}|};
+  H.reply h (User_info_saved "") empty;
   H.show h;
   [%expect
     {|
-    (Rpc (method_ set_user_info) (params ((text ""))) (tag (User_info_saved "")))
+    (Rpc (method_ set_user_info) (params ((form ()))) (tag (User_info_saved "")))
 
 
 
@@ -166,7 +237,7 @@ let%expect_test "/user-info clear asks first" =
     ▌ earlier question
       earlier answer
     ┌─ Notice ─────────────────────────────────────────────────────────────────────┐
-    │ removed what you wrote about yourself: open sessions are told with your next │
+    │ cleared what you set about yourself: open sessions are told with your next   │
     │ message                                                                      │
     └────────────────────────────────────────────────────────────── Esc dismisses ─┘
     ────────────────────────────────────────────────────────────────────────────────
@@ -180,7 +251,7 @@ let%expect_test "the note a session is told with is a chip in the transcript" =
     Or_error.ok_exn
       (Or_error.bind
          (P.Json.parse
-            {|{"body":"hello","notes":[{"kind":"user_info","title":"About you: the model was given what you wrote","text":"[User info: ...]"}]}|})
+            {|{"body":"hello","notes":[{"kind":"user_info","title":"About you: the model was given your details","text":"[User info: ...]"}]}|})
          ~f:P.Origin.of_json)
   in
   print_s [%sexp (origin : P.Origin.t)];
@@ -190,9 +261,9 @@ let%expect_test "the note a session is told with is a chip in the transcript" =
     {|
     ((body hello)
      (notes ((
-       (kind User_info)
-       (title "About you: the model was given what you wrote")
-       (text "[User info: ...]")))))
-    ☺ About you: the model was given what you wrote
+       (kind  User_info)
+       (title "About you: the model was given your details")
+       (text  "[User info: ...]")))))
+    ☺ About you: the model was given your details
     |}]
 ;;

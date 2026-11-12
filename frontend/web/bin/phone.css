@@ -513,8 +513,16 @@
 .app.narrow :is(.memory-toolbar, .memory-draft-buttons) .btn { min-height: var(--tap); }
 .app.narrow :is(.memory-filter, .memory-title-input) { min-height: var(--tap); }
 .app.narrow .memory-draft-keys { display: none; }
+.app.narrow .instructions-warning .setting-text { flex-basis: 0; }
+.app.narrow .instruction-add { min-height: var(--tap); }
 /* About you: the box at 16px (no zoom on focus), its buttons a thumb's. */
-.app.narrow .about-you-input { font-size: 16px; min-height: 8em; }
+.app.narrow .about-you-input { font-size: 16px; min-height: 6em; }
+.app.narrow .about-you-field { flex-basis: 100%; }
+.app.narrow .about-you-buttons { padding-bottom: max(8px, var(--safe-b)); }
+.app.narrow .about-you-line { font-size: 16px; min-height: var(--tap); }
+.app.narrow .about-you-choice .segmented { display: flex; width: 100%; }
+.app.narrow .about-you-choice .segment { flex: 1 1 auto; min-height: var(--tap); padding: 3px 6px; white-space: nowrap; justify-content: center; }
+.app.narrow .about-you-detect { min-height: var(--tap); }
 .app.narrow .about-you-keys { display: none; }
 .app.narrow .about-you-buttons .btn, .app.narrow .about-you-elsewhere .btn { min-height: var(--tap); min-width: 88px; }
 .app.narrow .about-you-elsewhere { flex-wrap: wrap; }
