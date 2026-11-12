@@ -3949,8 +3949,16 @@ directory, `profile::downloads_dir`) and `Browser.grantPermissions` for
 prigh's origins as it learns them. Before each launch
 `BrowserWindow::write_settings` merges `profile::preferences` and
 `profile::local_state` into the profile (each setting set at its dotted path,
-the user's other settings kept), and on Linux `taskbar::app_id` names the
-desktop entry the app writes for the window's Wayland app_id. A second
+the user's other settings kept), and on Linux `taskbar::sync` writes the
+user's `prigh.desktop`: the installed entry (found in `$XDG_DATA_DIRS`,
+skipping the app's own package; `taskbar::packaged_entry`, from the same
+template and `tauri.conf.json`, if none) with `StartupWMClass` the window's
+class (`taskbar::window_class`: `taskbar::app_id` on Wayland), `Exec` and
+`TryExec` through the profile (`taskbar::profile_program`) and
+`X-Prigh-Generated=true`, shadowing the installed one so launchers list prigh
+once; with the app's own window it removes its own (never an unmarked
+one), and every launch removes the `<app_id>.desktop` entries earlier
+versions wrote. A second
 launch's browser, which only hands its window over, gets no pipe.
 `shell=browser` tells prigh-web (`Desktop_link.browser_shell_of_hash`, kept
 in sessionStorage) that on the backend's site Quit prigh is `window.close()`
