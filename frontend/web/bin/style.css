@@ -771,8 +771,8 @@ kbd {
 .composer {
   container: composer / inline-size;
   position: relative;
-  padding: 8px 16px 12px;
-  max-width: 892px;
+  padding: 8px var(--edge) 12px;
+  max-width: calc(var(--column) + 2 * var(--edge));
   width: 100%;
   margin: 0 auto;
   display: flex;
@@ -1209,12 +1209,12 @@ kbd {
 /* Toasts: over the bottom of the chat column, above the composer, the
    newest nearest to it. */
 
-.toast-anchor { position: relative; height: 0; max-width: 852px; width: 100%; margin: 0 auto; }
+.toast-anchor { position: relative; height: 0; max-width: calc(var(--column) + 2 * var(--edge)); width: 100%; margin: 0 auto; }
 .toasts {
   position: absolute;
   bottom: 10px;
-  left: 16px;
-  right: 16px;
+  left: var(--edge);
+  right: var(--edge);
   display: flex;
   flex-direction: column;
   align-items: flex-end;
@@ -1363,8 +1363,8 @@ kbd {
 .app.narrow .scrim { display: block; position: fixed; inset: 0; background: var(--scrim); z-index: var(--z-scrim); }
 
 @media (max-width: 760px) {
-  .composer { padding: 6px 8px 8px; --composer-inset: 12px; }
-  .toasts { left: 8px; right: 8px; align-items: stretch; }
+  .composer { padding-top: 6px; padding-bottom: 8px; --composer-inset: 12px; }
+  .toasts { align-items: stretch; }
   .main:has(.jump-to-bottom) .toasts { bottom: 56px; }
   .main:has(.jump-to-bottom) .toast { max-width: none; }
   .modal-backdrop { padding-top: 8vh; }
@@ -1436,7 +1436,7 @@ kbd {
 
 .btw-panel {
   margin: 0 auto 8px;
-  width: min(860px, calc(100% - 32px));
+  width: min(var(--column), calc(100% - 2 * var(--edge)));
   background: var(--slate);
   border: 1px solid var(--rule);
   border-left: 2px solid var(--sodium);
@@ -1611,11 +1611,10 @@ kbd {
   .help-table kbd { white-space: normal; }
   .account-menu { left: 8px; right: 8px; bottom: 8px; width: auto; }
   .stats-grid { grid-template-columns: repeat(2, 1fr); }
-  .btw-panel { width: calc(100% - 16px); }
 }
 
 /* Jump back to the end of the chat while it is scrolled up */
-.jump-anchor { position: sticky; bottom: 0; height: 0; z-index: var(--z-float); }
+.jump-anchor { position: sticky; bottom: 0; height: 0; max-width: var(--column); z-index: var(--z-float); }
 .jump-to-bottom {
   position: absolute;
   bottom: 12px;
