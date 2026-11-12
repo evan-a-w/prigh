@@ -128,7 +128,8 @@ idle machine is broken).
   (standalone, so the safe-area insets for the notch and the home indicator
   apply). Consider the on-screen keyboard (the visual viewport shrinks) and
   touch (no hover: whatever a hover shows has a tap). `e2e/mobile.mjs` checks
-  no page overflows sideways and no control is off screen or covered.
+  no page overflows sideways and no control is off screen, covered or
+  under 44px (40px in the few dense rows it lists).
 
 ## UI principles
 

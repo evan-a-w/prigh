@@ -133,6 +133,28 @@
 .sheet-grip { display: none; }
 .app.narrow .sheet-grip { display: block; width: 36px; height: 4px; margin: 0 auto 6px; border-radius: 2px; background: var(--rule-2); flex: none; }
 .app.narrow .chrome-menu.sheet { gap: 0; padding-top: 8px; min-width: 0; }
+/* Taller than a menu's sheet, short of the top strip's ⋯ (a 640px phone
+   has all but a row or two of it), and while more is below its foot fades
+   out (where the browser drives an animation by scrolling). */
+.app.narrow .chrome-menu.sheet { max-height: min(90dvh, calc(var(--vvh, 100dvh) - var(--safe-t) - 12px)) !important; }
+@keyframes sheet-more { from, 90% { opacity: 1; } to { opacity: 0; } }
+@supports (animation-timeline: scroll()) {
+  .app.narrow .chrome-menu.sheet::after {
+    content: "";
+    position: sticky;
+    /* Over the padding too (the home indicator's room): to the sheet's foot. */
+    bottom: calc(-1 * max(8px, var(--safe-b)));
+    flex: none;
+    height: 64px;
+    margin-top: -64px;
+    background: linear-gradient(transparent, var(--slate) 75%);
+    pointer-events: none;
+    /* Seen only while the sheet scrolls: a sheet that fits has no timeline. */
+    opacity: 0;
+    animation: sheet-more linear both;
+    animation-timeline: scroll();
+  }
+}
 .app.narrow .chrome-menu.sheet > .status-notes { flex-direction: column; align-items: stretch; gap: 0; padding: 0 0 6px; margin-bottom: 6px; font-size: 14px; border-bottom: 1px solid var(--rule); }
 .app.narrow .chrome-menu.sheet > .status-notes > * { min-height: var(--tap); display: flex; align-items: center; padding: 0 12px; max-width: none; }
 .sheet-row {
@@ -161,7 +183,7 @@
 
 /* {1 The composer} */
 
-.app.narrow .composer { padding-bottom: max(8px, var(--safe-b)); padding-left: max(8px, var(--safe-l)); padding-right: max(8px, var(--safe-r)); }
+.app.narrow .composer { padding-bottom: max(8px, var(--safe-b)); }
 /* 16px: iOS zooms the page into a field under that, and stays zoomed. */
 .app.narrow :is(textarea, input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]), select) { font-size: 16px; }
 .app.narrow .composer :is(.chip-button, .btn.icon) { min-height: 40px; }
@@ -283,8 +305,8 @@
 .app.narrow .setting:not(.setting-wide) .setting-text { flex-basis: 100%; }
 .app.narrow .setting .segmented { display: grid; grid-auto-flow: row; grid-template-columns: repeat(auto-fit, minmax(76px, 1fr)); width: 100%; min-width: 0; }
 .app.narrow .setting .setting-control { min-width: 0; max-width: 100%; }
-.app.narrow .setting .segmented > * { min-height: 40px; font-size: 14px; justify-content: center; text-align: center; white-space: normal; line-height: 1.2; }
-.app.narrow .setting :is(.btn, select, .chip-button) { min-height: 40px; }
+.app.narrow .setting .segmented > * { min-height: var(--tap); font-size: 14px; justify-content: center; text-align: center; white-space: normal; line-height: 1.2; }
+.app.narrow .setting :is(.btn, select, .chip-button) { min-height: var(--tap); }
 .app.narrow .setting input[type="text"], .app.narrow .setting input:not([type]) { width: 100%; }
 .app.narrow .switch { width: 46px; height: 28px; border-radius: 14px; }
 .app.narrow .switch-knob { top: 3px; left: 3px; width: 20px; height: 20px; }
@@ -327,10 +349,9 @@
 .app.narrow .choice-list .segment-about { display: block; grid-column: 2; font-size: 13px; line-height: 1.35; color: var(--muted); }
 .app.narrow .choice-list .segment:not(.on) .segment-name { font-weight: 500; }
 /* Compaction's threshold field: one line, the number and its unit centred. */
-.app.narrow .segmented:has(.compact-at-field), .app.narrow .segmented:has(.number-field) { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
-.app.narrow .compact-at-field, .app.narrow .number-field { justify-content: center; white-space: nowrap; padding: 0 8px; }
-.app.narrow .compact-at-input, .app.narrow .number-field-input { width: 6ch; font-size: 16px; }
-.app.narrow .compact-at-unit, .app.narrow .number-field-unit { white-space: nowrap; }
+.app.narrow .number-switch { gap: 16px; }
+.app.narrow .number-field { font-size: 15px; white-space: nowrap; }
+.app.narrow .setting input.number-field-input { width: calc(6ch + 22px); min-height: 44px; font-size: 16px; }
 /* Tabs never show on a phone: their switch is for the desktop. */
 
 /* Hints that only make sense with a keyboard (Ctrl+K, Enter accepts…). */
@@ -357,7 +378,7 @@
 /* {1 Panels: full screen, under the safe area} */
 
 .app.narrow :is(.files-panel, .agents-panel, .terminal-panel) { padding-top: var(--safe-t); padding-bottom: var(--safe-b); padding-left: var(--safe-l); padding-right: var(--safe-r); }
-.app.narrow :is(.files-head, .agents-head, .terminal-head, .files-preview-head) .btn.icon { min-width: 40px; min-height: 40px; }
+.app.narrow :is(.files-head, .agents-head, .terminal-head, .files-preview-head) .btn.icon { min-width: var(--tap); min-height: var(--tap); }
 
 /* {1 The image viewer and drawing} */
 
@@ -380,25 +401,36 @@
 .app.narrow .composer-status .status-item.cost,
 .app.narrow .composer-status:is(.busy, *) .status-item.activity > .label { display: none; }
 .app.narrow .composer-status > .status-gauge { height: 40px; padding: 0 2px 0 10px; font-size: 12px; }
-.app.narrow .composer-status .status-item.link { height: 40px; padding: 0 8px 0 4px; }
+.app.narrow .composer-status .status-item.link { height: 40px; min-width: 40px; justify-content: center; padding: 0 8px 0 4px; }
 .app.narrow .composer-status .ring.mini { width: 15px; height: 15px; }
 /* A tool's line is the toggle for its output: a thumb's height. */
-.app.narrow .tool-head { min-height: 36px; }
+.app.narrow .tool-head { min-height: var(--tap); }
 
 /* {1 Thumb-sized, the rest of the way} */
 .app.narrow .composer-buttons .send { width: 40px; height: 40px; }
 .app.narrow .chip-anchor.host > .host-chip { min-width: 40px; }
-.app.narrow button.copy { min-height: 36px; padding: 0 12px; }
-.app.narrow .accent-choice { min-width: 40px; min-height: 40px; justify-content: center; }
+.app.narrow .code-head { padding-top: 0; }
+.app.narrow button.copy { min-height: var(--tap); padding: 0 12px; }
+.app.narrow .accent-choice { min-width: var(--tap); min-height: var(--tap); justify-content: center; }
 .app.narrow .modal-back { min-width: 44px; justify-content: center; }
 /* A group's title and its note, one over the other on a narrow page. */
 .app.narrow .settings-group-head { flex-wrap: wrap; row-gap: 2px; }
 .app.narrow .settings-group-note { flex-basis: 100%; }
-/* The files: the head's buttons and the path's parts a thumb's height. */
-.app.narrow .files-head .btn.icon { width: 44px; height: 44px; }
-.app.narrow .files-crumb { min-height: 36px; display: inline-flex; align-items: center; padding: 0 6px; }
+/* The files: the head's buttons and the path's parts a thumb's size. The
+   tools have a row of their own under the host's name and the close. */
+.app.narrow .files-head .btn.icon { width: var(--tap); height: var(--tap); }
+.app.narrow .files-head { flex-wrap: wrap; gap: 0 4px; padding-top: 2px; padding-bottom: 2px; }
+.app.narrow .files-machine { flex: 1; }
+.app.narrow .files-tools { display: contents; }
+.app.narrow .files-close { order: 1; }
+.app.narrow .files-head::after { content: ""; order: 2; flex-basis: 100%; }
+.app.narrow .files-tool { order: 3; }
+.app.narrow .files-head .review-open { order: 1; min-height: var(--tap); }
+.app.narrow .files-crumbs { padding-top: 0; padding-bottom: 0; gap: 0; }
+.app.narrow .files-crumb { min-width: var(--tap); min-height: var(--tap); display: inline-flex; align-items: center; justify-content: center; padding: 0 4px; }
+.app.narrow .files-edit-path { width: var(--tap); height: var(--tap); }
 .app.narrow .account-button { margin-left: 0; min-height: 44px; }
-.app.narrow .files-sort { min-height: 36px; }
+.app.narrow .files-sort { min-height: var(--tap); }
 
 /* Help: the keys over what they do, not a 1%-wide column broken a letter a line. */
 .app.narrow :is(.help-table, .help-table tbody, .help-table tr) { display: block; width: auto; }
@@ -465,8 +497,11 @@
    name gets the room. */
 @media (max-width: 359px) {
   .app.narrow .composer-status .ring.mini { display: none; }
-  .app.narrow .composer-status > .status-gauge { padding-left: 4px; }
+  .app.narrow .composer-status > .status-gauge { padding: 0 4px; }
   .app.narrow .composer-status .status-item.link { padding: 0 4px; }
+  .app.narrow .composer-box { padding-left: 4px; padding-right: 4px; }
+  .app.narrow :is(.composer-row, .composer-buttons) { gap: 2px; }
+  .app.narrow .composer .model-chip { padding-left: 6px; padding-right: 6px; }
   /* "auto-edit" whole: a longer word gets the room it needs. */
   .session-choice { flex: 1 1 auto; padding: 0 2px; font-size: 13px; }
 }
@@ -513,8 +548,16 @@
 .app.narrow :is(.memory-toolbar, .memory-draft-buttons) .btn { min-height: var(--tap); }
 .app.narrow :is(.memory-filter, .memory-title-input) { min-height: var(--tap); }
 .app.narrow .memory-draft-keys { display: none; }
+.app.narrow .instructions-warning .setting-text { flex-basis: 0; }
+.app.narrow .instruction-add { min-height: var(--tap); }
 /* About you: the box at 16px (no zoom on focus), its buttons a thumb's. */
-.app.narrow .about-you-input { font-size: 16px; min-height: 8em; }
+.app.narrow .about-you-input { font-size: 16px; min-height: 6em; }
+.app.narrow .about-you-field { flex-basis: 100%; }
+.app.narrow .about-you-buttons { padding-bottom: max(8px, var(--safe-b)); }
+.app.narrow .about-you-line { font-size: 16px; min-height: var(--tap); }
+.app.narrow .about-you-choice .segmented { display: flex; width: 100%; }
+.app.narrow .about-you-choice .segment { flex: 1 1 auto; min-height: var(--tap); padding: 3px 6px; white-space: nowrap; justify-content: center; }
+.app.narrow .about-you-detect { min-height: var(--tap); }
 .app.narrow .about-you-keys { display: none; }
 .app.narrow .about-you-buttons .btn, .app.narrow .about-you-elsewhere .btn { min-height: var(--tap); min-width: 88px; }
 .app.narrow .about-you-elsewhere { flex-wrap: wrap; }

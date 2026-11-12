@@ -392,7 +392,7 @@ let%expect_test "spec: backend-side, main agent only, only changes ask" =
     recall destructive=false
     forget destructive=true
     (()
-     ("it is the main agent's (the user's plan, questions, components, goal and memory), and you are a subagent: put what you need from the user in your report"))
+     ("it is the main agent's (the user's plan, questions, components, goal, memory and custom instructions), and you are a subagent: put what you need from the user in your report"))
     The user's persistent memory, kept across sessions. Use it VERY RARELY. save (text, optional title) only when the user explicitly asks you to remember something, or states a lasting preference and asks that it be kept; saving with an existing title replaces that note. Never save routine task details, facts you can find in the code or the repository, or anything inferred or speculative. recall (optional query; without one it lists the notes) only when the user refers to something they told you before or the request obviously depends on it ("use my usual X", "what did I say about Y"); never recall by default or at the start of a task. forget (id or title) removes a wrong or unwanted note.
     |}];
   List.iter

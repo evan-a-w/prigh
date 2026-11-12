@@ -86,6 +86,11 @@ let rec show_event (e : Agent_event.t) =
          ~sep:","
          (List.map added ~f:(fun (w : Session_worktree.t) -> w.path)))
       (String.concat ~sep:"," removed)
+  | Custom_instruction_set { id; instruction } ->
+    sprintf
+      "custom_instruction_set %s %s"
+      id
+      (Option.value_map instruction ~default:"removed" ~f:(fun i -> i.text))
 ;;
 
 let run ?cancel ?steer ?max_turns ?tools ?(context = []) t provider prompt =
