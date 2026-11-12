@@ -204,8 +204,21 @@ let%expect_test
   ignore (call b other_page "new_session" : Json.t);
   show_session t b other_page;
   [%expect {| on backend in $DIR (mode auto) |}];
-  (* On the backend, the directory must be there; [off] the host, it is the
-     backend's again. *)
+  (* No default host, keeping a directory that is only the laptop's:
+     accepted (it is not the directory that changed). New sessions start
+     where the page's session is, as without a default. *)
+  show_config
+    t
+    (call a page ~params:{|{"config": {"default_host": null}}|} "set_config");
+  ignore (call a page "new_session" : Json.t);
+  show_session t a page;
+  [%expect
+    {|
+    default_host=- default_cwd=~/notes approval_mode=auto
+    on host-laptop in /home/me/notes (mode auto)
+    |}];
+  (* On the backend, a new directory must be there; [off] the host, it is
+     the backend's again. *)
   Core_unix.mkdir_p (t.dir ^/ "work");
   show_config
     t
