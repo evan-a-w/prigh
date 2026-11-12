@@ -78,7 +78,16 @@ let every =
       ~argument:Argument.Default_directory
       "default-dir"
       "[off|path]"
-      "show or set the directory new sessions start in"
+      "show or set the directory new sessions start in (on the default host)"
+  ; c
+      "default-host"
+      "[off|name]"
+      "show or set the tool host prigh-web's new sessions start on (a \
+       terminal's start on its machine)"
+  ; c
+      "default-budget"
+      "[off|dollars]"
+      "show or set the cost budget of sessions that set none with /budget"
   ; c
       ~argument:Argument.Login
       "login"
