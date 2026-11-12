@@ -27,6 +27,7 @@ module Argument = struct
     | Snippet
     | Remind
     | Memory
+    | Instructions
     | User_info
     | Worktree
     | Review
@@ -162,6 +163,13 @@ let every =
       "the notes the model saved when you asked it to remember something \
        (Ctrl+D forgets one); on or off gives the model the memory tool or \
        takes it away"
+  ; c
+      ~argument:Argument.Instructions
+      "instructions"
+      "[add TEXT|on|off]"
+      "your custom instructions, in the context of every session (Enter shows \
+       one, Ctrl+D removes it): add TEXT adds one; on or off lets the model \
+       add, edit and remove them or not; prigh-web's Settings edits them"
   ; c
       ~argument:Argument.User_info
       "user-info"

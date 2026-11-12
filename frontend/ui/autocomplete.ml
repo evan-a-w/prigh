@@ -292,6 +292,13 @@ let argument_items
       (pairs
          (P.User_info.Form.fields
           @ [ "clear", "clear every field (asks first)" ]))
+  | Instructions ->
+    Some
+      (pairs
+         [ "add", "add a custom instruction: the text follows"
+         ; "on", "the model may add, edit and remove them"
+         ; "off", "the model may not change them (they stay in context)"
+         ])
   | Pr -> Some (pairs Pr_command.subcommands)
   | Sessions | Delete ->
     Some (Option.value_map sessions ~default:[] ~f:session_items)

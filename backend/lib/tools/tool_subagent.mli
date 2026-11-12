@@ -32,6 +32,9 @@ val create
   -> ?user_info:(unit -> string option)
        (** {!User_info}'s text when the tool runs, for the system prompt of
            a subagent that has its own (default: none) *)
+  -> ?custom_instructions:(unit -> Custom_instruction.t list)
+       (** the user's custom instructions when the tool runs, likewise
+           (default: none) *)
   -> provider:Provider.t
   -> current_model:(unit -> Model.t)
   -> current_thinking:(unit -> Thinking.t)

@@ -192,6 +192,11 @@ let argument_items
       [ "on", "the model can save and recall your notes"
       ; "off", "the model is not given the memory tool"
       ]
+  | Instructions ->
+    simple
+      [ "on", "the model may add, edit and remove your custom instructions"
+      ; "off", "the model may not change them (they stay in context)"
+      ]
   | Settings ->
     List.map (Settings_section.available ~superuser) ~f:(fun section ->
       let arg = Settings_section.arg section in

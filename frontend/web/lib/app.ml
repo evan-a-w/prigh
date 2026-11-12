@@ -258,6 +258,10 @@ module Reply_tag = struct
     | Nix_status of { open_settings : bool }
     | Nix_collected
     | Memory_loaded
+    | Instructions_loaded
+    | Instruction_saved
+    | Instruction_removed
+    | Instructions_enabled
     | Memory_saved
     | Memory_forgot
     | Memory_enabled
@@ -483,6 +487,14 @@ module Action = struct
     | Memory_forget of string
     | Memory_forget_confirm
     | Memory_forget_cancel
+    | Instruction_edit of string option
+    | Instruction_title of string
+    | Instruction_text of string
+    | Instruction_save
+    | Instruction_cancel
+    | Instruction_remove of string
+    | Instruction_remove_confirm
+    | Instruction_remove_cancel
     | About_you_field of About_you.Field.t * string
     | About_you_save
     | About_you_revert
@@ -753,6 +765,7 @@ module Model = struct
     ; forges : Forges.t
     ; nix_gc : Nix_gc.t
     ; memory : Memory_notes.t
+    ; instructions : Instruction_notes.t
     ; about_you : About_you.t
     ; compact_at : Compact_at.t
     ; settings_section : Settings_section.t
@@ -1071,6 +1084,7 @@ let init =
   ; forges = Forges.empty
   ; nix_gc = Nix_gc.empty
   ; memory = Memory_notes.empty
+  ; instructions = Instruction_notes.empty
   ; about_you = About_you.empty
   ; compact_at = Compact_at.empty
   ; settings_section = Appearance
@@ -1835,6 +1849,11 @@ let fetch_memory (m : Model.t) =
   , [ call Get_memory ~tag:Memory_loaded ] )
 ;;
 
+let fetch_instructions (m : Model.t) =
+  ( { m with instructions = Instruction_notes.loading m.instructions }
+  , [ call Get_custom_instructions ~tag:Instructions_loaded ] )
+;;
+
 let fetch_about_you (m : Model.t) =
   ( { m with about_you = About_you.loading m.about_you }
   , [ call Get_user_info ~tag:About_you_loaded ] )
@@ -1844,6 +1863,7 @@ let fetch_about_you (m : Model.t) =
 let fetch_section (m : Model.t) : Settings_section.t -> _ = function
   | Memory -> fetch_memory m
   | About_you -> fetch_about_you m
+  | Custom_instructions -> fetch_instructions m
   | Appearance | Sessions | Models | Git_hosting | Nix_store | Account -> m, []
 ;;
 
@@ -1887,6 +1907,30 @@ let set_memory_enabled (m : Model.t) enabled =
        else "Memory off: the model no longer sees your notes")
   in
   m, cmds @ [ call (Set_memory_enabled { enabled }) ~tag:Memory_enabled ]
+;;
+
+(* The model is given the custom_instructions tool, or not, from its next
+   turn; the instructions stay in context either way. *)
+let set_instructions_enabled (m : Model.t) enabled =
+  let n = m.instructions in
+  let m =
+    { m with
+      instructions = { n with instructions = { n.instructions with enabled } }
+    }
+  in
+  let m, cmds =
+    toast
+      m
+      (if enabled
+       then "The model may now add, edit and remove your custom instructions"
+       else "The model may no longer change your custom instructions")
+  in
+  ( m
+  , cmds
+    @ [ call
+          (Set_custom_instructions_enabled { enabled })
+          ~tag:Instructions_enabled
+      ] )
 ;;
 
 (* [/settings SECTION]. *)
@@ -3831,6 +3875,13 @@ let save_about_you (m : Model.t) =
   | about_you, None -> { m with about_you }, []
 ;;
 
+let save_instruction (m : Model.t) =
+  match Instruction_notes.save m.instructions with
+  | instructions, Some request ->
+    { m with instructions }, [ call request ~tag:Instruction_saved ]
+  | instructions, None -> { m with instructions }, []
+;;
+
 let save_memory (m : Model.t) =
   match Memory_notes.save m.memory with
   | memory, Some request ->
@@ -4261,6 +4312,7 @@ let user_switched (m : Model.t) (hello : Hello_reply.t) =
     ; forges = Forges.empty
     ; nix_gc = { Nix_gc.empty with collecting = m.nix_gc.collecting }
     ; memory = Memory_notes.empty
+    ; instructions = Instruction_notes.empty
     ; about_you = About_you.empty
     ; config = None
     ; compact_at = Compact_at.empty
@@ -5870,6 +5922,16 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
       "/user-info takes no argument here: it opens Settings, About you, where \
        you fill in the form."
   | "memory", "" -> open_settings ~section:Memory m
+  | "instructions", "" -> open_settings ~section:Custom_instructions m
+  | "instructions", ("on" | "off") ->
+    set_instructions_enabled m (String.equal rest "on")
+  | "instructions", other ->
+    error
+      m
+      (sprintf
+         "/instructions takes on or off, not %S; /instructions alone opens \
+          them in Settings, where you add, edit and remove them."
+         other)
   | "memory", ("on" | "off") -> set_memory_enabled m (String.equal rest "on")
   | "memory", other ->
     error
@@ -7909,6 +7971,33 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
         Result.map_error (User_info.of_json json) ~f:Error.to_string_hum)
     in
     { m with about_you = About_you.was_saved m.about_you result }, []
+  | Instructions_loaded, result ->
+    let result =
+      Result.bind result ~f:(fun json ->
+        Result.map_error
+          (Custom_instructions.of_json json)
+          ~f:Error.to_string_hum)
+    in
+    { m with instructions = Instruction_notes.loaded m.instructions result }, []
+  | Instruction_saved, result ->
+    let result =
+      Result.bind result ~f:(fun json ->
+        Result.map_error
+          (Custom_instructions.note_of_reply json)
+          ~f:Error.to_string_hum)
+    in
+    { m with instructions = Instruction_notes.saved m.instructions result }, []
+  | Instruction_removed, result ->
+    ( { m with
+        instructions =
+          Instruction_notes.removed m.instructions (Result.map result ~f:ignore)
+      }
+    , [] )
+  | Instructions_enabled, Ok _ -> m, []
+  | Instructions_enabled, Error e ->
+    let m, cmds = fetch_instructions m in
+    let m, more = error m ("Custom instructions could not be switched: " ^ e) in
+    m, cmds @ more
   | Memory_enabled, Ok _ -> m, []
   | Memory_enabled, Error e ->
     let m, cmds = fetch_memory m in
@@ -8647,6 +8736,8 @@ let main_event (m : Model.t) (event : Event.t) =
     m, (Command.Remember_temporary None :: deleted) @ kept
   | Nix_gc_progress p -> { m with nix_gc = Nix_gc.progress m.nix_gc p }, []
   (* Saved, edited or forgotten here, elsewhere or by the model. *)
+  | Custom_instructions_changed ci ->
+    { m with instructions = Instruction_notes.changed m.instructions ci }, []
   | Memory_changed memory ->
     { m with memory = Memory_notes.changed m.memory memory }, []
   | User_info_changed info ->
@@ -9414,6 +9505,7 @@ let dialog_accept (m : Model.t) =
      | Some _, _ -> close_dialog m
      | None, None -> m, [])
   | Some Settings when Option.is_some m.memory.draft -> save_memory m
+  | Some Settings when Option.is_some m.instructions.draft -> save_instruction m
   | Some Settings
     when Settings_section.equal m.settings_section About_you
          && About_you.dirty m.about_you -> save_about_you m
@@ -9803,6 +9895,27 @@ let update_connected (m : Model.t) (action : Action.t) =
      | memory, Some request ->
        { m with memory }, [ call request ~tag:Memory_forgot ]
      | memory, None -> { m with memory }, [])
+  | Instruction_edit id ->
+    ( { m with instructions = Instruction_notes.edit m.instructions id }
+    , [ Command.Focus "instruction-text" ] )
+  | Instruction_title text ->
+    ( { m with instructions = Instruction_notes.set_title m.instructions text }
+    , [] )
+  | Instruction_text text ->
+    { m with instructions = Instruction_notes.set_text m.instructions text }, []
+  | Instruction_save -> save_instruction m
+  | Instruction_cancel ->
+    { m with instructions = Instruction_notes.cancel m.instructions }, []
+  | Instruction_remove id ->
+    ( { m with instructions = Instruction_notes.ask_remove m.instructions id }
+    , [ Command.Focus "instruction-remove-yes" ] )
+  | Instruction_remove_confirm ->
+    (match Instruction_notes.remove m.instructions with
+     | instructions, Some request ->
+       { m with instructions }, [ call request ~tag:Instruction_removed ]
+     | instructions, None -> { m with instructions }, [])
+  | Instruction_remove_cancel ->
+    { m with instructions = Instruction_notes.cancel_remove m.instructions }, []
   | Memory_forget_cancel ->
     { m with memory = Memory_notes.cancel_forget m.memory }, []
   | About_you_field (field, value) ->
@@ -9894,6 +10007,11 @@ let update_connected (m : Model.t) (action : Action.t) =
        { m with memory = Memory_notes.cancel m.memory }, []
      | Some Settings, _ when Option.is_some m.memory.forgetting ->
        { m with memory = Memory_notes.cancel_forget m.memory }, []
+     | Some Settings, _ when Option.is_some m.instructions.draft ->
+       { m with instructions = Instruction_notes.cancel m.instructions }, []
+     | Some Settings, _ when Option.is_some m.instructions.removing ->
+       ( { m with instructions = Instruction_notes.cancel_remove m.instructions }
+       , [] )
      | _ ->
        (match m.dialog with
         | Some (Login { failed = None; provider; _ }) ->

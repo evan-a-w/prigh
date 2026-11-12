@@ -115,6 +115,16 @@ let base ~nix ~auto_background ~(role : Role.t) ~tools =
             )
           ]
         else [])
+     @ (if has "custom_instructions"
+        then
+          [ "- Custom instructions: when the user states a lasting preference, \
+             fact about themselves or standing instruction for every session \
+             that they do not cover yet, add it with custom_instructions (or \
+             edit the one that covers it) and say so briefly; never for task \
+             details or one-off requests. Memory is for what is looked up only \
+             when needed."
+          ]
+        else [])
      @ (if has "sessions" || has "ask_session"
         then
           [ ("- Other sessions: only when the user refers to an earlier or \
@@ -270,6 +280,7 @@ let build
       ?auto_background
       ?(role = Role.Main)
       ?user_info
+      ?(custom_instructions = [])
       ~cwd
       ~home
       ~tools
@@ -308,7 +319,8 @@ let build
      @ skills
      @ [ environment ]
      @ instructions
-     @ Option.to_list (Option.map user_info ~f:user_info_section))
+     @ Option.to_list (Option.map user_info ~f:user_info_section)
+     @ Option.to_list (Custom_instruction.section custom_instructions))
 ;;
 
 let discretion =

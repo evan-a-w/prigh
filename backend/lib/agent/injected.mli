@@ -46,6 +46,13 @@ module Note : sig
       | User_info of { cleared : bool }
       (** what the user wrote about themselves changed, or was removed
           ([System_prompt.user_info_note]) *)
+      | Custom_instructions of
+          { added : int
+          ; edited : int
+          ; removed : int
+          }
+      (** the user's custom instructions changed since the model was told
+          them ([Custom_instruction.note]) *)
     [@@deriving sexp, jsonaf, equal]
   end
 

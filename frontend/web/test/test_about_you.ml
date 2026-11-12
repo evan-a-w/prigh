@@ -233,7 +233,7 @@ let%expect_test "opening reads it; the form's fields; what it is for" =
                   @on_input> </textarea>
       </div>
     </div>
-    (Appearance) (Sessions) (Models) (Memory) (About you) (Git hosting) (Account)
+    (Appearance) (Sessions) (Models) (Memory) (About you) (Custom instructions) (Git hosting) (Account)
     |}]
 ;;
 

@@ -138,6 +138,8 @@ module Reply_tag = struct
     | Skill_prompt of string (** the [/skill:] text sent *)
     | Mcp_picker
     | Memory_picker
+    | Instructions_picker
+    | Instruction_saved of string (** the command, put back on failure *)
     | User_info_shown
     | User_info_saved of string
     | Mcp_reconnected
@@ -3241,6 +3243,134 @@ let confirm_forget_memory m (note : P.Memory.Note.t) ~back =
   , [] )
 ;;
 
+(* ---- custom instructions ----------------------------------------------- *)
+
+let instructions_title (ci : P.Custom_instructions.t) =
+  let n = List.length ci.notes in
+  sprintf
+    "Custom instructions · %d · ~%d tokens per session · model edits %s"
+    n
+    (P.Custom_instructions.tokens ci.notes)
+    (if ci.enabled then "on" else "off")
+;;
+
+(* In order, as the model sees them. *)
+let instructions_items (ci : P.Custom_instructions.t) =
+  List.map ci.notes ~f:(fun (note : P.Custom_instructions.Note.t) ->
+    Picker.Item.create
+      ~id:note.id
+      ~detail:
+        (match note.title with
+         | Some _ -> sprintf "%s · %s" note.id (one_line note.text)
+         | None -> note.id)
+      ~search:
+        (note.id ^ " " ^ Option.value note.title ~default:"" ^ " " ^ note.text)
+      (memory_label note))
+;;
+
+let instructions_picker m (ci : P.Custom_instructions.t) =
+  if List.is_empty ci.notes
+  then
+    notice
+      m
+      "no custom instructions: /instructions add TEXT adds one (in the context \
+       of every session), or tell the model a lasting preference"
+  else
+    open_picker
+      m
+      (Custom_instructions ci)
+      (Picker.create ~title:(instructions_title ci) (instructions_items ci))
+;;
+
+let refresh_instructions_picker (ci : P.Custom_instructions.t) picker =
+  Picker.set_items ~title:(instructions_title ci) picker (instructions_items ci)
+;;
+
+let instructions_changed m (ci : P.Custom_instructions.t) =
+  match m.mode with
+  | Picker { kind = Custom_instructions _; picker } ->
+    { m with
+      mode =
+        Picker
+          { kind = Custom_instructions ci
+          ; picker = refresh_instructions_picker ci picker
+          }
+    }
+  | Confirm
+      { question
+      ; action =
+          Remove_custom_instruction
+            { note; back = Some { kind = Custom_instructions _; picker } }
+      } ->
+    { m with
+      mode =
+        Confirm
+          { question
+          ; action =
+              Remove_custom_instruction
+                { note
+                ; back =
+                    Some
+                      { kind = Custom_instructions ci
+                      ; picker = refresh_instructions_picker ci picker
+                      }
+                }
+          }
+    }
+  | _ -> m
+;;
+
+let confirm_remove_instruction m (note : P.Custom_instructions.Note.t) ~back =
+  ( { m with
+      mode =
+        Confirm
+          { question =
+              sprintf
+                "remove %s %S? It leaves every session's context (y/n)"
+                note.id
+                (memory_label note)
+          ; action = Remove_custom_instruction { note; back }
+          }
+    }
+  , [] )
+;;
+
+let instructions_command m args =
+  let rest = String.concat ~sep:" " args in
+  match args with
+  | [] -> m, [ call Get_custom_instructions ~tag:Instructions_picker ]
+  | [ (("on" | "off") as word) ] ->
+    let enabled = String.equal word "on" in
+    ( m
+    , [ call
+          (Set_custom_instructions_enabled { enabled })
+          ~tag:
+            (Notice_on_success
+               (if enabled
+                then
+                  "custom instructions: the model may add, edit and remove them"
+                else
+                  "custom instructions: the model may not change them; they \
+                   stay in every session's context"))
+      ] )
+  | "add" :: (_ :: _ as words) ->
+    let text = String.concat ~sep:" " words in
+    ( m
+    , [ call
+          (Save_custom_instruction { id = None; title = None; text })
+          ~tag:(Instruction_saved ("/instructions " ^ rest))
+      ] )
+  | _ ->
+    ( error
+        (restore_command m ("/instructions " ^ rest))
+        (sprintf
+           "unknown argument %S: /instructions lists them (Ctrl+D removes \
+            one), add TEXT adds one, on or off lets the model change them or \
+            not; prigh-web's Settings edits them"
+           rest)
+    , [] )
+;;
+
 (* ---- user info --------------------------------------------------------- *)
 
 let user_info_where =
@@ -4255,6 +4385,7 @@ let run_command m (cmd : Commands.Parsed.t) =
          cmd.rest)
   | "worktree", _ -> worktree_command m cmd.rest
   | "memory", args -> memory_command m args
+  | "instructions", args -> instructions_command m args
   | "user-info", _ -> user_info_command m cmd
   | "remind", _ ->
     remind_action
@@ -5163,6 +5294,21 @@ let picker_selected m (kind : Mode.Picker_kind.t) (item : Picker.Item.t) =
               note.text)
        , [] )
      | None -> error m "that note is gone; /memory lists the others", [])
+  | Custom_instructions ci ->
+    (match
+       List.find ci.notes ~f:(fun (n : P.Custom_instructions.Note.t) ->
+         String.equal n.id item.id)
+     with
+     | Some note ->
+       ( notice
+           m
+           (sprintf
+              "%s%s: %s · Ctrl+D in /instructions removes it"
+              note.id
+              (Option.value_map note.title ~default:"" ~f:(sprintf " (%s)"))
+              note.text)
+       , [] )
+     | None -> error m "that one is gone; /instructions lists the others", [])
   | Mcp list -> mcp_selected m list item.id
   | Auth_select id ->
     m, [ rpc "auth_respond" ~params:[ "id", str id; "value", str item.id ] ]
@@ -5469,6 +5615,14 @@ let picker m (kind : Mode.Picker_kind.t) picker (intent : Intent.t) =
         with
         | None -> m, []
         | Some note -> confirm_forget_memory m note ~back)
+     | Custom_instructions ci ->
+       (match
+          Option.bind (Picker.selected_item picker) ~f:(fun item ->
+            List.find ci.notes ~f:(fun (n : P.Custom_instructions.Note.t) ->
+              String.equal n.id item.id))
+        with
+        | None -> m, []
+        | Some note -> confirm_remove_instruction m note ~back)
      | _ -> { m with quitting = true }, [ Command.Quit ])
   | _ ->
     (match
@@ -5812,6 +5966,12 @@ let confirm m ~(action : Mode.Confirm_action.t) (intent : Intent.t) =
             ~params:(P.Memory.forget_params ~id:note.id)
             ~tag:(Notice_on_success (sprintf "forgot %S" (memory_label note)))
         ] )
+    | Remove_custom_instruction { note; back } ->
+      ( back_to m back
+      , [ call
+            (Remove_custom_instruction { id = note.id })
+            ~tag:(Notice_on_success (sprintf "removed %s" note.id))
+        ] )
     | Clear_user_info ->
       ( m
       , [ call
@@ -5833,6 +5993,7 @@ let confirm m ~(action : Mode.Confirm_action.t) (intent : Intent.t) =
     | Delete_sessions { back = Some _ as back; _ } -> back_to m back, []
     | Remove_worktree { back = Some _ as back; _ } -> back_to m back, []
     | Forget_memory { back; _ } -> back_to m back, []
+    | Remove_custom_instruction { back; _ } -> back_to m back, []
     | Clear_user_info -> notice m "kept what you set about yourself", []
     | Create_dir { path; _ } -> notice m (sprintf "not created: %s" path), []
     | Cd_to_checkout path ->
@@ -6261,6 +6422,7 @@ let event m (e : P.Event.t) =
   | Terminal_close _
   | Terminal_kill _ -> m, []
   | Memory_changed memory -> memory_changed m memory, []
+  | Custom_instructions_changed ci -> instructions_changed m ci, []
   | User_info_changed _ -> m, []
   | Prefs_changed changes ->
     let m = filter_of_prefs m changes in
@@ -6412,6 +6574,7 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
      | Agent_message { agent_id; kind; text; retry } ->
        agent_message_failed m ~agent_id ~kind ~text ~retry e, []
      | User_info_saved text
+     | Instruction_saved text
      | Fallback_saved text
      | Default_dir_saved text
      | Compaction_saved text
@@ -6481,12 +6644,24 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
      | Memory_picker ->
        decode json ~f:P.Memory.of_json (fun memory ->
          memory_picker m memory, [])
+     | Instructions_picker ->
+       decode json ~f:P.Custom_instructions.of_json (fun ci ->
+         instructions_picker m ci, [])
      | User_info_shown ->
        decode json ~f:P.User_info.of_json (fun info ->
          user_info_shown m info, [])
      | User_info_saved _ ->
        decode json ~f:P.User_info.of_json (fun info ->
          user_info_saved m info, [])
+     | Instruction_saved _ ->
+       decode json ~f:P.Custom_instructions.note_of_reply (fun note ->
+         ( notice
+             m
+             (sprintf
+                "added %s, in the context of every session: /instructions \
+                 lists them"
+                note.id)
+         , [] ))
      | Nix_store_shown ->
        decode json ~f:P.Nix_store_status.of_json (fun status ->
          ( output
