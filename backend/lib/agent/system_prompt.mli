@@ -28,7 +28,7 @@ end
     subagent's tells it to block on commands rather than sleep, and that it
     finishes only once its jobs have exited. Either role, given the
     [worktree] tool, is told to make worktrees with it rather than with
-    [git worktree add]. [user_info] is what the user wrote about themselves
+    [git worktree add]. [user_info] is what the user set about themselves
     ({!User_info}), the last block. *)
 val build
   :  ?date:string

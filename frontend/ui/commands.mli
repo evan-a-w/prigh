@@ -31,6 +31,7 @@ module Argument : sig
     | Snippet (** a snippet name, [add] or [rm] *)
     | Remind (** a [/remind] subcommand, or a reminder name after [rm] *)
     | Memory (** on or off *)
+    | User_info (** a field of the form, or clear *)
     | Worktree
     (** a [/worktree] subcommand, then a worktree, flag or base branch *)
     | Review (** [/review]: a worktree or [--base], then a base branch *)

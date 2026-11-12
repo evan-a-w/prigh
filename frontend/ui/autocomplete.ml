@@ -287,6 +287,11 @@ let argument_items
        @ pairs (Forge_accounts.login_completions forge))
   | Logout ->
     Some (provider_items auth @ pairs (Forge_accounts.logout_completions forge))
+  | User_info ->
+    Some
+      (pairs
+         (P.User_info.Form.fields
+          @ [ "clear", "clear every field (asks first)" ]))
   | Pr -> Some (pairs Pr_command.subcommands)
   | Sessions | Delete ->
     Some (Option.value_map sessions ~default:[] ~f:session_items)

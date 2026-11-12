@@ -321,7 +321,17 @@ let%expect_test "the names of the settings' controls" =
     [switch] button "Use memory" -- Stop giving the model your memory (/memory off)
     [switch] button "Use memory" -- Stop giving the model your memory (/memory off)
     -- About you
+    button "Not set" -- Leave it out
+    button "Metric" -- Metric (°C, km, kg)
+    button "Imperial" -- Imperial (miles, stone; °C)
+    button "US" -- US customary (°F, miles, lb)
+    button "Not set" -- Leave it out
+    button "D/M/Y" -- D/M/Y (25/12/2026)
+    button "M/D/Y" -- M/D/Y (12/25/2026)
+    button "ISO" -- ISO (2026-12-25)
     button "Save" -- Ctrl+Enter
+    [group] div "Units"
+    [group] div "Date format"
     -- Git hosting
     button "Connect GitHub (github.com) with a token" -- /login github token
     button "Connect GitHub (github.com)" -- /login github

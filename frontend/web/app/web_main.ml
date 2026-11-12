@@ -1405,6 +1405,21 @@ let utc_offset () =
   Time_ns.Span.of_min (Float.of_int (-minutes))
 ;;
 
+(* The IANA name, when the browser knows it. *)
+let time_zone () =
+  match
+    let intl = Js.Unsafe.get Js.Unsafe.global "Intl" in
+    let format = Js.Unsafe.fun_call (Js.Unsafe.get intl "DateTimeFormat") [||] in
+    let options = Js.Unsafe.meth_call format "resolvedOptions" [||] in
+    Js.Optdef.to_option (Js.Unsafe.get options "timeZone")
+  with
+  | Some (zone : Js.js_string Js.t) ->
+    let zone = String.strip (Js.to_string zone) in
+    Option.some_if (not (String.is_empty zone)) zone
+  | None -> None
+  | exception _ -> None
+;;
+
 let run_app (settings : Settings.t) =
   let client =
     Client.create ~connect:(fun () ->
@@ -1521,6 +1536,8 @@ let run_app (settings : Settings.t) =
          then schedule (App.Action.Set_utc_offset utc_offset)
        in
        tick ();
+       Option.iter (time_zone ()) ~f:(fun zone ->
+         schedule (App.Action.Set_browser_time_zone zone));
        Clock_ns.every (Time_ns.Span.of_sec 30.) tick;
        Clock_ns.every (Time_ns.Span.of_sec 1.) (fun () ->
          if App.Model.ticking !current
