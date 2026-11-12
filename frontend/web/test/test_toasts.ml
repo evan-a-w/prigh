@@ -168,7 +168,7 @@ let%expect_test "toasts are not under a dialog's inert page" =
     Place_popover
     <aside class="sidebar">
     <div class="chat-frame">
-    <textarea class="editor">
+    <div class="editor-wrap">
     <div class="composer-buttons">
     <div class="tray">
     <div class="toast">

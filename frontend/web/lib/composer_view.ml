@@ -412,34 +412,44 @@ let planning (m : App.Model.t) =
   Option.value_map m.state ~default:false ~f:(fun (s : State.t) -> s.plan_mode)
 ;;
 
+(* The text, and where the session works when that is what it shows. *)
 let placeholder (m : App.Model.t) =
   (* A phone, or the chat beside a side panel. *)
   let cramped = m.narrow || m.agents.open_ || m.files.open_ in
+  let text s = s, None in
   if Option.is_some m.session_gone
-  then "Session gone: /new starts one"
+  then text "Session gone: /new starts one"
   else if not (connected m)
   then
-    if cramped
-    then "Offline: send once back"
-    else "Offline: write now, send once it is back"
+    text
+      (if cramped
+       then "Offline: send once back"
+       else "Offline: write now, send once it is back")
   else (
     match steered m with
-    | Some id when cramped -> sprintf "Steer %s (Alt+Enter: after its turn)…" id
+    | Some id when cramped ->
+      text (sprintf "Steer %s (Alt+Enter: after its turn)…" id)
     | Some id ->
-      sprintf
-        "Steer %s (Enter) or queue a follow-up for when it ends its turn \
-         (Alt+Enter)…"
-        id
-    | None when App.Model.running m && cramped -> "Steer the agent…"
+      text
+        (sprintf
+           "Steer %s (Enter) or queue a follow-up for when it ends its turn \
+            (Alt+Enter)…"
+           id)
+    | None when App.Model.running m && cramped -> text "Steer the agent…"
     | None when App.Model.running m ->
-      "Steer (Enter) or queue a follow-up (Alt+Enter)…"
-    | None when planning m && cramped -> "Plan mode: /plan off to implement"
+      text "Steer (Enter) or queue a follow-up (Alt+Enter)…"
+    | None when planning m && cramped ->
+      text "Plan mode: /plan off to implement"
     | None when planning m ->
-      sprintf
-        "Plan mode: discuss the plan, or leave it to implement (%s)…"
-        Session_mode.leave
-    | None when cramped -> "Ask prigh…  / commands"
-    | None -> "Ask prigh anything…  / commands, @ files")
+      text
+        (sprintf
+           "Plan mode: discuss the plan, or leave it to implement (%s)…"
+           Session_mode.leave)
+    | None ->
+      (match Cwd_placeholder.of_model m with
+       | Some where -> Cwd_placeholder.sentence where, Some where
+       | None when cramped -> text "Ask prigh…  / commands"
+       | None -> text "Ask prigh anything…  / commands, @ files"))
 ;;
 
 let view (m : App.Model.t) ~inject =
@@ -455,6 +465,7 @@ let view (m : App.Model.t) ~inject =
      subagent being steered keeps its steer). *)
   let stops = running && (not has_input) && Option.is_none (steered m) in
   let connected = connected m in
+  let placeholder, where = placeholder m in
   (* A chip's menu leaves only the chips live. *)
   let rest =
     match m.dialog with
@@ -488,38 +499,53 @@ let view (m : App.Model.t) ~inject =
             ; rest (images m ~inject)
             ; rest (Files_view.chips m ~inject)
             ; rest
-              @@ Node.textarea
-                   ~attrs:
-                     [ Attr.class_ "editor"
-                     ; Attr.id "editor"
-                     ; Attr.placeholder (placeholder m)
-                     ; Attr.create "aria-label" "Message"
-                     ; Attr.create "dir" "auto"
-                     ; (match App.Model.popup m with
-                        | None -> Attr.empty
-                        | Some c ->
-                          Attr.many
-                            [ Attr.role "combobox"
-                            ; Attr.create "aria-controls" "completion-list"
-                            ; Attr.create "aria-expanded" "true"
-                            ; Attr.create "aria-autocomplete" "list"
-                            ; Attr.create
-                                "aria-activedescendant"
-                                (sprintf
-                                   "completion-option-%d"
-                                   (Completion.selected c))
-                            ])
-                     ; Attr.value m.draft
-                     ; Attr.rows 1
-                     ; Attr.create "autocomplete" "off"
-                     ; Attr.create "enterkeyhint" "send"
-                     ; Attr.on_input (fun ev text ->
-                         let cursor =
-                           Option.value (caret ev) ~default:(String.length text)
-                         in
-                         inject (Action.Edit { text; cursor }))
-                     ]
-                   []
+              @@ div
+                   ~cls:"editor-wrap"
+                   [ Node.textarea
+                       ~attrs:
+                         [ classes
+                             [ "editor" ]
+                             [ "cwd-placeholder", Option.is_some where ]
+                         ; Attr.id "editor"
+                         ; Attr.placeholder placeholder
+                         ; (match where with
+                            | Some _ when String.is_empty m.draft && not m.narrow ->
+                              Attr.title placeholder
+                            | Some _ | None -> Attr.empty)
+                         ; Attr.create "aria-label" "Message"
+                         ; Attr.create "dir" "auto"
+                         ; (match App.Model.popup m with
+                            | None -> Attr.empty
+                            | Some c ->
+                              Attr.many
+                                [ Attr.role "combobox"
+                                ; Attr.create "aria-controls" "completion-list"
+                                ; Attr.create "aria-expanded" "true"
+                                ; Attr.create "aria-autocomplete" "list"
+                                ; Attr.create
+                                    "aria-activedescendant"
+                                    (sprintf
+                                       "completion-option-%d"
+                                       (Completion.selected c))
+                                ])
+                         ; Attr.value m.draft
+                         ; Attr.rows 1
+                         ; Attr.create "autocomplete" "off"
+                         ; Attr.create "enterkeyhint" "send"
+                         ; Attr.on_input (fun ev text ->
+                             let cursor =
+                               Option.value
+                                 (caret ev)
+                                 ~default:(String.length text)
+                             in
+                             inject (Action.Edit { text; cursor }))
+                         ]
+                       []
+                   ; (match where with
+                      | Some where when String.is_empty m.draft ->
+                        Cwd_placeholder.view where
+                      | Some _ | None -> Node.none)
+                   ]
             ; div
                 ~cls:"composer-row"
                 [ plus m ~inject

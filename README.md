@@ -329,7 +329,9 @@ but built for the browser rather than mounting the terminal UI: a real DOM
 (Bonsai_web, js_of_ocaml) with a session sidebar, a chat transcript with
 markdown, collapsible tool calls and their images, model and thinking
 selectors, and a composer that takes pasted or dropped images, `/`
-commands, `@` paths, `#` snippets and `!cmd` like the TUI. Messages show when they were
+commands, `@` paths, `#` snippets and `!cmd` like the TUI. Empty, the
+composer says where the session works ("Working in `~/projects/prigh` on
+`main`.", with the tool host when it is not the backend's default). Messages show when they were
 sent, in the browser's time zone (`14:32`, `Yesterday 14:32`, `3 Oct
 14:32`; the full date on hover): under your messages and in a reply's
 footer, with a separator where the day changes. The backend serves it and
