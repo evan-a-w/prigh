@@ -512,7 +512,7 @@ let session
              @ Repo_listings.listings m.repo_worktrees)
           ~cwd
           s
-    ; folded = Set.mem m.folded s.id
+    ; folded = not (Worktree_folds.shown m.worktree_folds ~now:m.now s)
     ; entering = Worktrees.entering m.worktrees
     ; matched = found.title
     ; snippet = found.snippet

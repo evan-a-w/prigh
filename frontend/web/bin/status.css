@@ -245,13 +245,24 @@
 
 /* {1 A narrow composer} (a small window, or the sidebar and a panel beside
    it): the session's chips keep their icons, the status its ring and
-   percent. */
+   percent, before the model's and the host's names are cut. */
 
-@container composer (max-width: 640px) {
+@container composer (max-width: 760px) {
   .row-chips .chip-label { display: none; }
   .row-chips .chip-button { padding: 0 6px; }
+}
+@container composer (max-width: 640px) {
   .composer-status .status-item.cost { display: none; }
   .composer-status.busy .status-item.activity > .label { display: none; }
+}
+/* Narrower still (the review page beside the chat): no room for one row,
+   so the + and where the message goes are the first, the chips and the
+   buttons a second, rather than drawn over the model's name. A phone has
+   the chips in its ⋯ sheet instead. */
+@container composer (width < 420px) {
+  .app:not(.narrow) .composer-row { flex-wrap: wrap; row-gap: 2px; }
+  .app:not(.narrow) .composer-controls:has(+ .row-chips) { flex: 1 1 calc(100% - 36px); }
+  .app:not(.narrow) .row-chips { padding-left: 3px; margin-left: 0; border-left: 0; }
 }
 
 /* {1 Still} */

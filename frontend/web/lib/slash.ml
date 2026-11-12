@@ -233,6 +233,12 @@ let every =
        with its tool calls' results): pick it, newest first; undo brings the \
        latest deletion back; with sessions, deletes them after a confirmation"
   ; c "delete-archived" "delete every archived session, after a confirmation"
+  ; c
+      ~args:"[DAYS|off]"
+      "auto-archive"
+      "show how long a session goes without activity before it is archived; \
+       DAYS|off: archive after DAYS days (off: never, only by hand), in \
+       Settings"
   ; c "clone" "copy this session into a new one"
   ; c "fork" "start a new session from an earlier message"
   ; c "rewind" "go back to an earlier message in this session"

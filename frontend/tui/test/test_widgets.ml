@@ -738,6 +738,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /pin [session]                     pin a session to the top of /sessions, where it is never archived for being idle (the current one without an argument)
     /unpin [session]                   unpin a session (the current one without an argument)
     /delete-archived                   delete every archived session, after a confirmation
+    /auto-archive [DAYS|off]           show how long a session goes without activity before it is archived; DAYS|off: archive after DAYS days (off: never, only by hand)
     /agents [steer|cancel ...]         focus a subagent (Ctrl+D cancels one); steer N TEXT: tell subagent N (its number or id) at its next step, follow-up N TEXT: before it reports; cancel N
     /jobs [id|kill <id>]               list background jobs (Enter shows output, Ctrl+D kills), or show/kill one
     /queue                             the queued steers and follow-ups (Enter edits one, Ctrl+D removes it)
