@@ -155,6 +155,8 @@ module Reply_tag : sig
     (** a [/skill:] prompt, steer or follow-up; failing puts it back *)
     | Mcp_picker
     | Memory_picker
+    | Instructions_picker
+    | Instruction_saved of string
     | User_info_shown (** [/user-info] *)
     | User_info_saved of string
     (** [/user-info TEXT] or [clear]; failing puts the command back *)

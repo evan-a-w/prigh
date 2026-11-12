@@ -623,6 +623,7 @@ let execute
       ~compaction
       ~home
       ~user_info
+      ~custom_instructions
       ~resumable
       (context : Tool.Context.t)
       (p : Prepared.t)
@@ -659,6 +660,7 @@ let execute
            ~skills
            ~role:Subagent
            ?user_info:(user_info ())
+           ~custom_instructions:(custom_instructions ())
            ~cwd:p.cwd
            ~home
            ~tools:(Tools.specs p.tools)
@@ -830,6 +832,7 @@ let create
       ?(worktrees_dir = fun () -> "~/.prigh/worktrees")
       ?(compaction = fun () -> Compaction_settings.window_only)
       ?(user_info = fun () -> None)
+      ?(custom_instructions = fun () -> [])
       ~provider
       ~current_model
       ~current_thinking
@@ -885,6 +888,7 @@ let create
                     ~compaction
                     ~home
                     ~user_info
+                    ~custom_instructions
                     ~resumable:Background
                     { context with cancel; emit; on_output = ignore }
                     prepared
@@ -909,6 +913,7 @@ let create
              ~compaction
              ~home
              ~user_info
+             ~custom_instructions
              ~resumable
              context
              prepared

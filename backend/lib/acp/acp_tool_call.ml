@@ -122,6 +122,26 @@ let rec title ~name ~args ~cwd =
      | Some "recall" -> colon "Recall from memory" (string_arg args "query")
      | Some "forget" -> colon "Forget from memory" (string_arg args "id")
      | Some _ | None -> "memory")
+  | "custom_instructions" ->
+    let colon verb = function
+      | Some x -> verb ^ ": " ^ x
+      | None -> verb
+    in
+    let about =
+      Option.first_some
+        (string_arg args "title")
+        (Option.map (string_arg args "text") ~f:first_line)
+    in
+    (match string_arg args "action" with
+     | Some "add" -> colon "Add a custom instruction" about
+     | Some "edit" ->
+       colon
+         ("Edit custom instruction"
+          ^ Option.value_map (string_arg args "id") ~default:"" ~f:(( ^ ) " "))
+         about
+     | Some "remove" -> colon "Remove custom instruction" (string_arg args "id")
+     | Some "list" -> "List custom instructions"
+     | Some _ | None -> "custom_instructions")
   | name -> name
 ;;
 

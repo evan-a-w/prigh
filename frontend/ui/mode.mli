@@ -29,6 +29,8 @@ module Picker_kind : sig
     | Snippets (** [/snippet]: Enter inserts the text *)
     | Reminders (** [/remind]: the session's; Ctrl+D removes one *)
     | Memory of Memory.t (** [/memory]: the user's notes; Ctrl+D forgets one *)
+    | Custom_instructions of Custom_instructions.t
+    (** [/instructions]: the user's custom instructions; Ctrl+D removes one *)
     | Worktrees of Worktree.Listing.t
     (** [/worktree]: Ctrl+N opens one in a new session, Ctrl+D removes one *)
     | Mcp of Mcp_list.t
@@ -96,6 +98,10 @@ module Confirm_action : sig
         }
     | Forget_memory of
         { note : Memory.Note.t
+        ; back : Open_picker.t option (** where Esc and Enter return *)
+        }
+    | Remove_custom_instruction of
+        { note : Custom_instructions.Note.t
         ; back : Open_picker.t option (** where Esc and Enter return *)
         }
     | Clear_user_info (** [/user-info clear] *)
