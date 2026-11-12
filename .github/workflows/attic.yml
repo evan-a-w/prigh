@@ -53,6 +53,18 @@ jobs:
           nix profile install nixpkgs#attic-client
           attic login ci "$ATTIC_ENDPOINT" "$ATTIC_TOKEN"
 
+      # Fails in a minute or two, not after the build, when the API cannot be
+      # reached (the server or its NetBird peer down, its storage hung).
+      - name: Check the Attic API
+        run: |
+          for attempt in 1 2 3; do
+            if timeout 30 attic cache info ci:prigh; then exit 0; fi
+            echo "Attic API not answering (attempt $attempt of 3)" >&2
+            sleep 15
+          done
+          echo "::error::The Attic API at ATTIC_ENDPOINT does not answer: check atticd and its NetBird peer"
+          exit 1
+
       # Everything a build or a dev shell needs: the packages, what they are
       # built from (inputDerivation: the OxCaml toolchains and packages, the
       # Rust crates) and the dev shells' inputs (a shell's own output is a stub
@@ -62,11 +74,15 @@ jobs:
       # what it finished; paths on cache.nixos.org are skipped. Attic only
       # uploads what it lacks (and of that, only the chunks it lacks); targets
       # the cache already has are not built at all, so unchanged dependencies
-      # are not even downloaded.
+      # are not even downloaded. The final push (the targets' closures) is
+      # retried, since Attic skips what it already has. A watcher that died
+      # fails the job afterwards: until then, nothing was pushed as it was
+      # built, so a failed run would have cached nothing.
       - name: Build and push
         run: |
           attic watch-store ci:prigh &
           watcher=$!
+          trap 'kill "$watcher" 2>/dev/null || true' EXIT
           targets=()
           for t in default prigh-desktop prigh-computer backend frontend \
             backend.inputDerivation frontend.inputDerivation \
@@ -82,6 +98,19 @@ jobs:
           done
           if [ ${#targets[@]} -gt 0 ]; then
             nix build --print-build-logs "${targets[@]}"
-            attic push ci:prigh ./result*
+            for attempt in 1 2 3 4; do
+              if attic push ci:prigh ./result*; then break; fi
+              if [ "$attempt" = 4 ]; then
+                echo "::error::attic push failed 4 times: check atticd and its storage"
+                exit 1
+              fi
+              echo "attic push failed (attempt $attempt of 4), retrying in 60s" >&2
+              sleep 60
+            done
           fi
-          kill "$watcher"
+          if ! kill -0 "$watcher" 2>/dev/null; then
+            status=0
+            wait "$watcher" || status=$?
+            echo "::error::attic watch-store exited early (status $status): paths were not pushed as they were built"
+            exit 1
+          fi
