@@ -413,6 +413,30 @@ let%expect_test "on a phone the review is a sheet, the sidebar its drawer" =
   [%expect {| <div class="app narrow reviewing sidebar-drawer sidebar-open"> |}]
 ;;
 
+let%expect_test "on a phone the review opened from the files closes them" =
+  let h = H.create ~state:(state ()) () in
+  H.quiet h (fun () ->
+    H.act h (Set_narrow true);
+    H.act h (Files (Open None)));
+  H.elements h ~selector:".app";
+  [%expect {| <div class="app files-open narrow"> |}];
+  H.quiet h (fun () -> H.act h (Review (Open None)));
+  H.elements h ~selector:".app";
+  H.elements h ~selector:".review-page";
+  [%expect
+    {|
+    <div class="app narrow reviewing">
+    <section class="review-page">
+    |}];
+  (* Beside the chat, the files stay open. *)
+  let h = H.create ~state:(state ()) () in
+  H.quiet h (fun () ->
+    H.act h (Files (Open None));
+    H.act h (Review (Open None)));
+  H.elements h ~selector:".app";
+  [%expect {| <div class="app files-open reviewing"> |}]
+;;
+
 let%expect_test
     "on a phone the code has the screen: the file's row opens the list in its \
      place, picking a file closes it"

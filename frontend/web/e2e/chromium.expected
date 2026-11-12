@@ -752,7 +752,7 @@ chat 520; chips: DeepSeek V4.1 Flash, icon, icon, icon, icon; status: 0%; .chat-
 .composer: fits
 the panels' toggles: 3 buttons 10px from the top, 14px from the right, clear of the jump list: true, open: Files
 === chromium: the session: a 400px chat column ===
-chat 400; chips: DeepSeek V4.1 Flash, icon, icon, icon, icon; status: 0%; .chat-chrome 44px high
+chat 400; chips: V4.1 Flash, icon, icon, icon, icon; status: 0%; .chat-chrome 44px high
 .chat-chrome: fits
 .composer: fits
 the panels' toggles: 3 buttons 10px from the top, 14px from the right, clear of the jump list: true, open: Files
@@ -810,7 +810,7 @@ chat 600; chips: DeepSeek V4.1 Flash, icon, icon, icon, icon; status: 0%; .chat-
 .composer: fits
 the panels' toggles: 4 buttons 10px from the top, 14px from the right, clear of the jump list: true, open: Files
 === chromium: the session's bar: a 400px chat column without the sidebar ===
-chat 400; chips: DeepSeek V4.1 Flash, icon, icon, icon, icon; status: 0%; .chat-chrome 44px high
+chat 400; chips: V4.1 Flash, icon, icon, icon, icon; status: 0%; .chat-chrome 44px high
 .chat-chrome: fits
 .composer: fits
 the panels' toggles: 4 buttons 10px from the top, 14px from the right, clear of the jump list: true, open: Files
@@ -3080,6 +3080,10 @@ full width: true; at the bottom: true
 ok
 === chromium: mobile: 390x844: the files ===
 ok
+=== chromium: mobile: 390x844: the review page ===
+ok
+=== chromium: mobile: 390x844: the review's files ===
+ok
 === chromium: mobile: 390x844: the keyboard ===
 the composer in view: true
 === chromium: mobile: 320x640: the chat ===
@@ -3114,6 +3118,10 @@ full width: true; at the bottom: true
 ok
 === chromium: mobile: 320x640: the files ===
 ok
+=== chromium: mobile: 320x640: the review page ===
+ok
+=== chromium: mobile: 320x640: the review's files ===
+ok
 === chromium: mobile: 320x640: the keyboard ===
 the composer in view: true
 === chromium: mobile: 390x844-pwa: the chat ===
@@ -3147,6 +3155,10 @@ full width: true; at the bottom: true
 === chromium: mobile: 390x844-pwa: / completion ===
 ok
 === chromium: mobile: 390x844-pwa: the files ===
+ok
+=== chromium: mobile: 390x844-pwa: the review page ===
+ok
+=== chromium: mobile: 390x844-pwa: the review's files ===
 ok
 === chromium: mobile: 390x844-pwa: the keyboard ===
 the composer in view: true
