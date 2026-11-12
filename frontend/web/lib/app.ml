@@ -172,6 +172,7 @@ module Reply_tag = struct
     | Default_dir_saved
     | Compaction_saved
     | Naming_saved
+    | Auto_archive_saved
     | Dictation_saved
     | Transcribed
     | Default_saved
@@ -478,6 +479,8 @@ module Action = struct
     | Settings_move of Settings_section.Move.t
     | Compact_at_input of string
     | Compact_at_commit
+    | Sessions_field_input of Sessions_fields.Which.t * string
+    | Sessions_field_commit of Sessions_fields.Which.t
     | Memory_filter of string
     | Memory_edit of string option
     | Memory_title of string
@@ -739,7 +742,7 @@ module Model = struct
     ; skills : Skills.t
     ; worktrees : Worktrees.t
     ; repo_worktrees : Repo_listings.t
-    ; folded : String.Set.t
+    ; worktree_folds : Worktree_folds.t
     ; pending : In_flight.t
     ; marks : Session_marks.t
     ; notifications : Page_notify.t
@@ -768,6 +771,7 @@ module Model = struct
     ; instructions : Instruction_notes.t
     ; about_you : About_you.t
     ; compact_at : Compact_at.t
+    ; sessions_fields : Sessions_fields.t
     ; settings_section : Settings_section.t
       (* A phone's settings show the list of sections, not one of them. *)
     ; settings_home : bool
@@ -1062,7 +1066,7 @@ let init =
   ; skills = Skills.empty
   ; worktrees = Worktrees.empty
   ; repo_worktrees = Repo_listings.empty
-  ; folded = String.Set.empty
+  ; worktree_folds = Worktree_folds.empty
   ; pending = In_flight.none
   ; marks = Session_marks.empty
   ; notifications = Page_notify.init
@@ -1087,6 +1091,7 @@ let init =
   ; instructions = Instruction_notes.empty
   ; about_you = About_you.empty
   ; compact_at = Compact_at.empty
+  ; sessions_fields = Sessions_fields.empty
   ; settings_section = Appearance
   ; settings_home = true
   ; return_to_settings = false
@@ -1874,6 +1879,7 @@ let open_settings ?(fetch = true) ?section (m : Model.t) =
     open_dialog
       { m with
         compact_at = Compact_at.empty
+      ; sessions_fields = Sessions_fields.empty
       ; settings_section
       ; settings_home = Option.is_none section
       }
@@ -2550,17 +2556,15 @@ let apply_pref (m : Model.t) ~startup ({ key; value } : Prefs.Change.t) =
       in
       { m with history = History.of_list entries })
   else if String.equal key Key.folded
-  then (
-    let folded =
-      match value with
-      | Some (`Array items) ->
-        String.Set.of_list
-          (List.filter_map items ~f:(function
-             | `String s -> Some s
-             | _ -> None))
-      | _ -> String.Set.empty
-    in
-    { m with folded })
+  then { m with worktree_folds = Worktree_folds.set_folded m.worktree_folds value }
+  else if String.equal key Key.unfolded
+  then
+    { m with worktree_folds = Worktree_folds.set_unfolded m.worktree_folds value }
+  else if String.equal key Key.worktree_hours
+  then
+    { m with
+      worktree_folds = Worktree_folds.set_hours_pref m.worktree_folds value
+    }
   else if String.equal key Key.review
   then { m with review_memory = Review_memory.of_json value }
   else if String.equal key Key.terminal_open
@@ -3783,6 +3787,30 @@ let naming_command (m : Model.t) rest =
   | Set_model _ as action -> set_naming m action
 ;;
 
+let auto_archive_summary config =
+  String.capitalize (Prigh_ui.Auto_archive_command.summary config)
+;;
+
+(* The backend tells every client to list the sessions again. *)
+let set_auto_archive (m : Model.t) action =
+  with_config m ~f:(fun config ->
+    let config = Prigh_ui.Auto_archive_command.apply action config in
+    ( { m with config = Some config }
+    , [ set_config
+          config
+          ~fields:
+            (List.map (Prigh_ui.Auto_archive_command.fields action) ~f:fst)
+          ~tag:Auto_archive_saved
+      ] ))
+;;
+
+let auto_archive_command (m : Model.t) rest =
+  match Prigh_ui.Auto_archive_command.parse rest with
+  | Show -> with_config m ~f:(fun c -> toast m (auto_archive_summary c))
+  | Error e -> error m (String.capitalize e)
+  | Set _ as action -> set_auto_archive m action
+;;
+
 let dictation_summary config =
   String.capitalize (Prigh_ui.Dictation_command.summary config)
 ;;
@@ -3893,6 +3921,37 @@ let commit_compact_at (m : Model.t) =
   match Compact_at.commit m.compact_at with
   | compact_at, Some n -> set_compaction { m with compact_at } (Set_at n)
   | compact_at, None -> { m with compact_at }, []
+;;
+
+let commit_sessions_field (m : Model.t) (which : Sessions_fields.Which.t) =
+  let sessions_fields, value = Sessions_fields.commit m.sessions_fields which in
+  let m = { m with sessions_fields } in
+  match which, value with
+  | _, None -> m, []
+  | Worktree_hours, Some hours ->
+    let worktree_folds =
+      Worktree_folds.set_hours m.worktree_folds (Float.iround_nearest_exn hours)
+    in
+    ( { m with worktree_folds }
+    , save_pref m Key.worktree_hours (Worktree_folds.hours_pref worktree_folds) )
+  | Archive_days, Some days ->
+    set_auto_archive m (Prigh_ui.Auto_archive_command.Action.Set days)
+;;
+
+(* What the click changes is kept, against the session's age. *)
+let toggle_folded (m : Model.t) id =
+  match List.find m.sessions ~f:(fun s -> String.equal s.id id) with
+  | None -> m, []
+  | Some s ->
+    let worktree_folds = Worktree_folds.toggle m.worktree_folds ~now:m.now s in
+    ( { m with worktree_folds }
+    , save_prefs
+        m
+        [ { key = Key.folded; value = Worktree_folds.folded_pref worktree_folds }
+        ; { key = Key.unfolded
+          ; value = Worktree_folds.unfolded_pref worktree_folds
+          }
+        ] )
 ;;
 
 let last_reply (m : Model.t) =
@@ -4316,6 +4375,7 @@ let user_switched (m : Model.t) (hello : Hello_reply.t) =
     ; about_you = About_you.empty
     ; config = None
     ; compact_at = Compact_at.empty
+    ; sessions_fields = Sessions_fields.empty
     }
   in
   let m, cmds =
@@ -6218,6 +6278,7 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
      | Error message -> error m message)
   | "compaction", rest -> compaction_command m rest
   | "naming", rest -> naming_command m rest
+  | "auto-archive", rest -> auto_archive_command m rest
   | "dictation", rest -> dictation_command m rest
   | "host", "" -> hosts_picker m
   | "host", arg -> switch_host m arg
@@ -7684,6 +7745,9 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
   | Dictation_saved, Error e ->
     let m, cmds = error m (sprintf "Couldn't set the dictation model: %s" e) in
     m, cmds @ [ rpc "get_config" [] ~tag:Config ]
+  | Auto_archive_saved, Error e ->
+    let m, cmds = error m (sprintf "Couldn't set when sessions are archived: %s" e) in
+    m, cmds @ [ rpc "get_config" [] ~tag:Config ]
   | Compaction_saved, Error e ->
     (* The change shown at once did not happen: show the backend's. *)
     let m, cmds = error m (sprintf "Couldn't set compaction: %s" e) in
@@ -8324,6 +8388,9 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
   | Naming_saved, Ok json ->
     decode m json Config.of_json ~f:(fun config ->
       toast { m with config = Some config } (naming_summary config))
+  | Auto_archive_saved, Ok json ->
+    decode m json Config.of_json ~f:(fun config ->
+      toast { m with config = Some config } (auto_archive_summary config))
   | Dictation_saved, Ok json ->
     decode m json Config.of_json ~f:(fun config ->
       (* The backend may transcribe now: it is asked again. *)
@@ -9511,6 +9578,14 @@ let dialog_accept (m : Model.t) =
          && About_you.dirty m.about_you -> save_about_you m
   | Some Settings when Option.is_some (Compact_at.draft m.compact_at) ->
     commit_compact_at m
+  | Some Settings
+    when not (List.is_empty (Sessions_fields.drafted m.sessions_fields)) ->
+    List.fold
+      (Sessions_fields.drafted m.sessions_fields)
+      ~init:(m, [])
+      ~f:(fun (m, cmds) which ->
+        let m, more = commit_sessions_field m which in
+        m, cmds @ more)
   | Some
       ( Help
       | Hotkeys
@@ -9876,6 +9951,12 @@ let update_connected (m : Model.t) (action : Action.t) =
   | Compact_at_input text ->
     { m with compact_at = Compact_at.input m.compact_at text }, []
   | Compact_at_commit -> commit_compact_at m
+  | Sessions_field_input (which, text) ->
+    { m with
+      sessions_fields = Sessions_fields.input m.sessions_fields which text
+    }
+    , []
+  | Sessions_field_commit which -> commit_sessions_field m which
   | Memory_filter text ->
     { m with memory = Memory_notes.set_filter m.memory text }, []
   | Memory_edit id ->
@@ -10049,21 +10130,7 @@ let update_connected (m : Model.t) (action : Action.t) =
       m
       ~command:("/remind rm " ^ name)
       (Prigh_ui.Remind_command.Action.Remove name)
-  | Toggle_folded dir ->
-    let folded =
-      if Set.mem m.folded dir
-      then Set.remove m.folded dir
-      else Set.add m.folded dir
-    in
-    ( { m with folded }
-    , save_pref
-        m
-        Key.folded
-        (if Set.is_empty folded
-         then None
-         else
-           Some (`Array (List.map (Set.to_list folded) ~f:(fun d -> `String d))))
-    )
+  | Toggle_folded id -> toggle_folded m id
   | New_session_in path -> new_session_in m path
   | Generate Commit_message -> git_action m Draft
   | Generate target -> start_generate m target

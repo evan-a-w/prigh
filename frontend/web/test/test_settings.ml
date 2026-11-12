@@ -304,9 +304,13 @@ let%expect_test "the names of the settings' controls" =
     button "Ask" -- /confirm ask
     button "Auto-edit" -- /confirm auto-edit
     button "Auto" -- /confirm auto
+    button "Off" -- Fold every session's worktrees until opened
+    button "Off" -- Archive only by hand (/auto-archive off)
     button "Allow" -- Ask the browser to allow notifications (/notify on)
     [switch] button "Notifications" -- Turn notifications off (/notify off)
     [group] div "Default mode"
+    [group] div "Show worktrees for sessions used in the last"
+    [group] div "Archive sessions after"
     [switch] button "Notifications" -- Turn notifications off (/notify off)
     -- Models
     button "Manage providers" -- /auth (/login, /logout)
@@ -523,7 +527,7 @@ let%expect_test "/settings completes the sections" =
     {|
     Settings sections ↑↓ Tab Enter Esc   Ctrl+Enter as typed
     appearance How this page looks. Saved for your account, so it follows you to every browser you sign in on.
-    sessions How new sessions start, and how this browser tells you that something happened. Kept on the backend.
+    sessions How new sessions start, how the session list shows them, and how this browser tells you that something happened. Kept on the backend.
     models The providers whose models you use, the models prigh uses for its own work, and when long conversations are summarised. Kept on the backend.
     memory What you asked the model to remember, for later sessions. Kept on the backend, for your account.
     user-info What the model should know about you, given to it in every session. Kept on the backend, for your account.
@@ -556,7 +560,7 @@ let%expect_test
     (Focus dialog)
     Settings
     (Close (Esc))
-    (Appearance How this page looks. Saved for your account, so it follows you to every browser you sign in on.) (Sessions How new sessions start, and how this browser tells you that something happened. Kept on the backend.) (Models The providers whose models you use, the models prigh uses for its own work, and when long conversations are summarised. Kept on the backend.) (Memory What you asked the model to remember, for later sessions. Kept on the backend, for your account.) (About you What the model should know about you, given to it in every session. Kept on the backend, for your account.) (Custom instructions Standing instructions for the model, given to it in every session; it may also add or edit them when you state a lasting preference. Kept on the backend, for your account.) (Git hosting The hosts agents push branches to and open pull requests on.) (Account Who you are on this backend.)
+    (Appearance How this page looks. Saved for your account, so it follows you to every browser you sign in on.) (Sessions How new sessions start, how the session list shows them, and how this browser tells you that something happened. Kept on the backend.) (Models The providers whose models you use, the models prigh uses for its own work, and when long conversations are summarised. Kept on the backend.) (Memory What you asked the model to remember, for later sessions. Kept on the backend, for your account.) (About you What the model should know about you, given to it in every session. Kept on the backend, for your account.) (Custom instructions Standing instructions for the model, given to it in every session; it may also add or edit them when you state a lasting preference. Kept on the backend, for your account.) (Git hosting The hosts agents push branches to and open pull requests on.) (Account Who you are on this backend.)
     (Settings_section Models)
     <button class="btn ghost modal-back">
     <h2 class="">

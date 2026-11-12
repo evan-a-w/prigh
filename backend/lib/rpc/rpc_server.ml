@@ -3535,8 +3535,15 @@ let handle t client (request : Json.t) : Json.t =
     match param request "method" with
     | Some (`String meth) ->
       let params = request_params request in
-      (match
-         if (not client.Client.authed) && not (String.equal meth "hello")
+      (* Every client's list shows the sessions archived by the new age. *)
+      let archive_before =
+        Option.some_if
+          (client.Client.authed && String.equal meth "set_config")
+          (archive_after_days t client)
+      in
+      let result =
+        match
+          if (not client.Client.authed) && not (String.equal meth "hello")
          then
            Or_error.error_string "unauthorised: send hello with the token first"
          else (
@@ -3562,10 +3569,17 @@ let handle t client (request : Json.t) : Json.t =
               with
               | Some result -> result
               | None -> dispatch agent t.login ~client ~meth ~params))
-       with
-       | result -> result
-       | exception exn ->
-         Or_error.error_s [%message "internal error" (exn : exn)])
+        with
+        | result -> result
+        | exception exn ->
+          Or_error.error_s [%message "internal error" (exn : exn)]
+      in
+      (match archive_before, result with
+       | Some before, Ok _
+         when not (Float.equal before (archive_after_days t client)) ->
+         sessions_changed t
+       | _ -> ());
+      result
     | _ -> Or_error.error_string "request must have a string \"method\""
   in
   match response with

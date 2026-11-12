@@ -1529,6 +1529,10 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   `default_model`. Each namespace has its own file, so each has its own
   defaults; `archive_after_days` (default 7, 0 = never) is when an
   inactive session counts as archived (`Session.Summary.is_archived`).
+  `Rpc_server.handle` compares the client's `archive_after_days` before
+  and after a successful `set_config` and broadcasts `sessions_changed`
+  when it moved, so every client lists the sessions again
+  (`list_sessions` reads the config each time: no restart).
   `set_config` merges the given fields over the current ones and
   resolves `fallback_models`, `generate_model`, `compaction_model` and
   `naming_model`
@@ -3312,9 +3316,14 @@ terminal frontend and `web/` prigh-web, the browser one.
       `Repo_listings`, the other repositories the sessions' worktrees
       belong to, each `list_worktrees {cwd: root}` asked once
       (`Repo_worktrees`) and again once stale: a turn's end, a session's
-      worktrees changing, a worktree made or removed); `Model.folded`
-      (session ids, kept in the `web.sidebar-folded` preference) folds a
-      session's worktrees. Context menus (`Context_menu`, also messages', drawn by
+      worktrees changing, a worktree made or removed);
+      `Model.worktree_folds` (`Worktree_folds`) decides whether a
+      session's worktrees show: an explicit fold or unfold (session ids in
+      the `web.sidebar-folded` and `web.sidebar-unfolded` preferences)
+      wins, else they show when the session's `updated_at` is within the
+      window (`web.sidebar-worktree-hours`, default 12, 0 = never) of
+      `Model.now`. A per-user preference rather than config.json: it is
+      a display choice of the person, not of the backend's namespace. Context menus (`Context_menu`, also messages', drawn by
       `Context_menu_view` as a `Dialog.Picker` of kind `Menu`, so it owns
       the keyboard like any picker; `Command.Place_menu` has
       `Menu_listeners` put it at the pointer or under the row and keep it

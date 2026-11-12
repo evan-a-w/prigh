@@ -517,9 +517,15 @@ against its upstream; the one it works in says `here`. A worktree two
 sessions use is under both; one removed (from any session, or outside
 prigh) goes. On disk worktrees still go by repository
 (`<worktrees_dir>/<project>/<branch>`), and `/worktree` lists all of the
-repository's. The fold at the right of a session's second line (`⑂ 3`)
-hides its worktrees; the folds are kept with your preferences, so they
-follow you to other browsers.
+repository's. A session used in the last 12 hours (its age on the card)
+shows its worktrees; an older one folds them behind the count at the
+right of its second line (`⑂ 3`). Settings → Sessions → Show worktrees
+sets the window in hours (0 to 720; Off or 0: every session's start
+folded). Clicking the count folds or unfolds a session's worktrees
+whatever its age, and that choice wins over the window until you click
+again; the window and the choices are kept with your preferences
+(`web.sidebar-worktree-hours`, `web.sidebar-folded`,
+`web.sidebar-unfolded`), so they follow you to other browsers.
 
 A session that switched into a worktree (`/worktree open`, `/worktree
 new`, `/pr checkout`, Switch session here) remembers where it came from,
@@ -910,9 +916,13 @@ The settings page (the gear beside your account at the foot of the
 sidebar, Settings in the account menu, `/settings` or Ctrl+,) holds what is not
 about the session, in sections listed down its side (across its top on a
 phone): **Appearance** (the theme and accent, transcript detail
-(`/verbosity`)), **Behaviour** (tool confirmation (`/confirm`);
-notifications, on or off, and what to do when the browser has
-not been asked, blocks them or cannot show them), **Models** (the providers
+(`/verbosity`)), **Sessions** (how new sessions start: the model, tool
+confirmation (`/confirm`), the starting directory and fallback models;
+the session list: Show worktrees, the hours a session's worktrees stay
+unfolded in the sidebar after it was used, and Archive after, the days
+without activity that archive it (`/auto-archive`); notifications, on or
+off, and what to do when the browser has not been asked, blocks them or
+cannot show them), **Models** (the providers
 (`/auth`) and compaction), **Memory** (the model's notes and the switch
 that turns memory off), **About you** (a form about yourself for the
 model, `/user-info`), **Git hosting**, **Nix store** (superusers) and
@@ -2523,7 +2533,11 @@ when the backend starts one for a frontend, instead of the backend's
 working directory; it is ignored if it is not a directory there.
 `archive_after_days` (default 7, `0` = never) archives a session
 automatically once its last message is that many days old: the session
-lists show it as archived (frontends put archived ones apart). Archiving
+lists show it as archived (frontends put archived ones apart). Set it
+with `/auto-archive DAYS|off` (fractions allowed, at most 365) or
+prigh-web's Settings → Sessions → Archive after; the change applies to
+the next `list_sessions` without a restart, and every connected client
+is told to list the sessions again. Archiving
 or unarchiving by hand is recorded in the session file; a new message
 unarchives it, an unarchived one stays active for another
 `archive_after_days`, and a session is never archived while a run or a
@@ -2787,6 +2801,7 @@ it.
 | `/pin [session]`, `/unpin [session]` | pin a session to the top of the session lists (never archived for being idle), or unpin it (as `/archive` takes its argument) |
 | `/delete session...` | delete sessions after a confirmation (or pick them in `/sessions`) |
 | `/delete-archived` | delete every archived session after a confirmation |
+| `/auto-archive`, `/auto-archive DAYS\|off` | show or set how many days without activity archive a session (`archive_after_days`; `off` or `0`: never, only by hand; at most 365); also on prigh-web's settings page (Sessions → Archive after) |
 | `/switch [path]` | switch to a saved session |
 | `/cd [path]` | change the working directory (on the active tool host: `~` is that host's home, a relative path is under the current directory); a missing one is created once you confirm (`Create /x? (y/n)`; in prigh-web a "Create folder?" dialog); `/host`'s directory asks the same |
 | `/mkdir [path]` | create a directory (with its parents) on the tool host and change to it |
