@@ -245,11 +245,13 @@
 
 /* {1 A narrow composer} (a small window, or the sidebar and a panel beside
    it): the session's chips keep their icons, the status its ring and
-   percent. */
+   percent, before the model's and the host's names are cut. */
 
-@container composer (max-width: 640px) {
+@container composer (max-width: 760px) {
   .row-chips .chip-label { display: none; }
   .row-chips .chip-button { padding: 0 6px; }
+}
+@container composer (max-width: 640px) {
   .composer-status .status-item.cost { display: none; }
   .composer-status.busy .status-item.activity > .label { display: none; }
 }
