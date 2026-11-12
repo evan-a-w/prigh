@@ -43,8 +43,8 @@ let about = function
     "How this page looks. Saved for your account, so it follows you to every \
      browser you sign in on."
   | Sessions ->
-    "How new sessions start, and how this browser tells you that something \
-     happened. Kept on the backend."
+    "How new sessions start, how the session list shows them, and how this \
+     browser tells you that something happened. Kept on the backend."
   | Models ->
     "The providers whose models you use, the models prigh uses for its own \
      work, and when long conversations are summarised. Kept on the backend."

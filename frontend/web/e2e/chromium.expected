@@ -3359,6 +3359,43 @@ compact_at_tokens=0 compaction_model=null mask_observations=false
 fits: true
 === chromium: compaction: errors ===
 (none)
+=== chromium: sessions settings: used days ago: folded, used now: shown ===
++ Fresh work: fix/fresh
+- Old work
+=== chromium: sessions settings: the settings ===
+Show worktrees | Your account | Show worktrees for sessions used in the last 12 hours; older ones fold them behind their count. Your own fold or unfold of a session wins. | hours | Off
+Archive after | Sessions without activity for 7 days move to Archived (pinned and running ones never do). | days | Off
+fields: "12" hours, "7" days
+=== chromium: sessions settings: 100 hours ===
++ Fresh work: fix/fresh
++ Old work: feat/old-a, feat/old-b
+=== chromium: sessions settings: off ===
+- Fresh work
+- Old work
+=== chromium: sessions settings: off, Old work unfolded by hand ===
+- Fresh work
++ Old work: feat/old-a, feat/old-b
+=== chromium: sessions settings: refused ===
+“a fortnight” isn't a number of days from 0 to 365: type one like 7, or off to archive only by hand.
+=== chromium: sessions settings: archive after 2 days ===
+Show worktrees | Your account | Show worktrees for sessions used in the last N hours (0 or Off: none); older ones fold them behind their count. Your own fold or unfold of a session wins. | Off: every session's worktrees start folded. | hours | Off
+Archive after | Sessions without activity for 2 days move to Archived (pinned and running ones never do). | days | Off
+fields: "" hours, "2" days
+archive_after_days=2
+- Fresh work
+archived: Archived 1
+=== chromium: sessions settings: phone 390x844: sidebar ===
++ Fresh work: fix/fresh
++ Old work: feat/old-a, feat/old-b
+=== chromium: sessions settings: phone 390x844: settings ===
+fits: true
+=== chromium: sessions settings: phone 320x640: sidebar ===
++ Fresh work: fix/fresh
++ Old work: feat/old-a, feat/old-b
+=== chromium: sessions settings: phone 320x640: settings ===
+fits: true
+=== chromium: sessions settings: errors ===
+(none)
 === chromium: memory: notes ===
 Memory
 What you asked the model to remember, for later sessions. Kept on the backend, for your account.
