@@ -36,6 +36,8 @@ type t =
   ; default_thinking : string option
   ; fallback_models : string list
   ; default_cwd : string option
+  ; default_host : string option
+  ; max_budget_usd : float option
   ; worktrees_dir : string option
   ; archive_after_days : float
   ; notify : string
@@ -56,6 +58,8 @@ let default =
   ; default_thinking = None
   ; fallback_models = []
   ; default_cwd = None
+  ; default_host = None
+  ; max_budget_usd = None
   ; worktrees_dir = None
   ; archive_after_days = 7.
   ; notify = "bell"
@@ -103,6 +107,15 @@ let of_json j =
   let%bind default_thinking = optional_string "default_thinking" in
   let%bind fallback_models = strings "fallback_models" in
   let%bind default_cwd = optional_string "default_cwd" in
+  let%bind default_host = optional_string "default_host" in
+  let%bind max_budget_usd =
+    match Json.field j "max_budget_usd" with
+    | None | Some `Null -> Ok None
+    | Some (`Number n) ->
+      Or_error.try_with (fun () -> Some (Float.of_string n))
+      |> Or_error.tag ~tag:"max_budget_usd must be a number"
+    | Some _ -> Or_error.error_string "max_budget_usd must be a number"
+  in
   let%bind worktrees_dir = optional_string "worktrees_dir" in
   let%bind archive_after_days =
     match Json.field j "archive_after_days" with
@@ -139,6 +152,8 @@ let of_json j =
   ; default_thinking
   ; fallback_models
   ; default_cwd
+  ; default_host
+  ; max_budget_usd
   ; worktrees_dir
   ; archive_after_days
   ; notify = Option.value notify ~default:"bell"
@@ -162,6 +177,10 @@ let to_json t =
      ; "default_thinking", optional t.default_thinking
      ; "fallback_models", strings t.fallback_models
      ; "default_cwd", optional t.default_cwd
+     ; "default_host", optional t.default_host
+     ; ( "max_budget_usd"
+       , Option.value_map t.max_budget_usd ~default:`Null ~f:(fun usd ->
+           `Number (sprintf "%g" usd)) )
      ]
      @ Option.value_map t.worktrees_dir ~default:[] ~f:(fun dir ->
        [ "worktrees_dir", `String dir ])

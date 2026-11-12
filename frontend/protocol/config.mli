@@ -23,7 +23,14 @@ type t =
   ; default_thinking : string option
   ; fallback_models : string list
     (** model keys that take over, in order, when a model's usage runs out *)
-  ; default_cwd : string option (** where new sessions start *)
+  ; default_cwd : string option
+    (** where new sessions start on [default_host] (the backend's when there
+        is none) *)
+  ; default_host : string option
+    (** the id of the tool host prigh-web's new sessions start on while it is
+        connected; [None]: where the session you are on is *)
+  ; max_budget_usd : float option
+    (** the cost budget of sessions that set none with [/budget] *)
   ; worktrees_dir : string option
     (** where worktrees are created on the tool host; [None] from backends
         before worktrees *)

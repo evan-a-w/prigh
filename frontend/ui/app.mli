@@ -84,6 +84,10 @@ module Reply_tag : sig
     | Auto_archive_saved of string (** like [Fallback_saved] *)
     | Dictation_shown (** [get_config] for [/dictation] *)
     | Dictation_saved of string (** like [Fallback_saved] *)
+    | Default_host_shown (** [get_config] for [/default-host] *)
+    | Default_host_saved of string (** like [Fallback_saved] *)
+    | Default_budget_shown (** [get_config] for [/default-budget] *)
+    | Default_budget_saved of string (** like [Fallback_saved] *)
     | Models_catalog
     | Models_for_scoped
     | Compact_done
