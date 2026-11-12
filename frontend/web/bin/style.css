@@ -244,6 +244,7 @@ kbd {
   gap: 8px;
   padding: 12px 10px 0;
   min-height: 0;
+  container-type: inline-size;
 }
 .app:not(.sidebar-open) .sidebar { display: none; }
 
@@ -261,18 +262,14 @@ kbd {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  /* The gutter sits in the sidebar's padding: rows end where the search
-     field does. */
+  /* The gutter sits in the sidebar's padding. */
   margin: 0 -10px 0 -4px;
   padding: 0 0 8px 4px;
 }
-@supports not selector(::-webkit-scrollbar) {
-  .sessions { margin-right: -4px; scrollbar-gutter: auto; }
-}
-/* A touch screen's overlay scrollbar takes no room. */
-@media (hover: none) {
-  .sessions { margin-right: 0; scrollbar-gutter: auto; }
-}
+/* The rows end where the search field does (the sidebar's content box,
+   100cqw) whatever room the scrollbar takes: none when it is an overlay
+   (Firefox, WebKit on Linux, a touch screen), up to the padding's 10px. */
+.sessions > * { width: min(100%, 100cqw); }
 .sessions-empty { color: var(--muted); font-size: 12.5px; padding: 12px 10px; }
 .session {
   position: relative;
