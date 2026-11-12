@@ -83,9 +83,11 @@ const signIn = async p => {
   await p.locator("form button[type=submit]").click();
   await composer(p).waitFor();
 };
+// As typed: a plain Enter may accept the completion popup instead (a /cd
+// path's trailing slash) when it opens first.
 const send = async (p, text) => {
   await composer(p).fill(text);
-  await composer(p).press("Enter");
+  await composer(p).press("Control+Enter");
 };
 const session = (p, title) =>
   p.locator(".session-item", { has: p.locator(".session-title", { hasText: title }) });
@@ -151,9 +153,12 @@ try {
   await send(page, "/worktree new feat/old-b");
   await page.locator(".worktree-branch", { hasText: "feat/old-b" }).waitFor();
   await page.locator(".new-session").click();
-  await page.waitForFunction(() => !document.querySelector(".new-session.opening"));
+  // In the new session, then in the repo, before its first message, or it
+  // starts in Old work's worktree.
+  await page.waitForFunction(() =>
+    !document.querySelector(".new-session.opening, .session-item.selected") && document.querySelector(".hero"));
   await send(page, `/cd ${repo}`);
-  await page.locator(".toast", { hasText: "repo" }).first().waitFor().catch(() => {});
+  await page.locator(".toast", { hasText: /^Working directory: .*\/repo$/ }).first().waitFor();
   await send(page, "Fresh work");
   await session(page, "Fresh work").waitFor();
   await send(page, "/worktree new fix/fresh");
