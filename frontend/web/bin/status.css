@@ -253,6 +253,15 @@
   .composer-status .status-item.cost { display: none; }
   .composer-status.busy .status-item.activity > .label { display: none; }
 }
+/* Narrower still (the review page beside the chat): no room for one row,
+   so the + and where the message goes are the first, the chips and the
+   buttons a second, rather than drawn over the model's name. A phone has
+   the chips in its ⋯ sheet instead. */
+@container composer (width < 420px) {
+  .app:not(.narrow) .composer-row { flex-wrap: wrap; row-gap: 2px; }
+  .app:not(.narrow) .composer-controls:has(+ .row-chips) { flex: 1 1 calc(100% - 36px); }
+  .app:not(.narrow) .row-chips { padding-left: 3px; margin-left: 0; border-left: 0; }
+}
 
 /* {1 Still} */
 
