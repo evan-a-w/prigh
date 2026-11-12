@@ -98,7 +98,7 @@ let base ~nix ~auto_background ~(role : Role.t) ~tools =
         then
           [ "- Other machines: use on_host only when the user names another \
              machine or asks to run something there; the session's own host is \
-             for normal work."
+             for normal work. This is very important! Do not use on_host EVER unless the user has given permission."
           ]
         else [])
      @ (if has "worktree"
