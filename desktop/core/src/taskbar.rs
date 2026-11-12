@@ -91,7 +91,9 @@ pub fn packaged_entry(exec: &str) -> String {
         Some("DeveloperTool") => "Development;",
         _ => "",
     };
+    // A Windows checkout may have CRLF line ends.
     include_str!("../../app/prigh.desktop")
+        .replace("\r\n", "\n")
         .replace("{{comment}}", bundle["shortDescription"].as_str().unwrap_or("prigh"))
         .replace("{{icon}}", conf["mainBinaryName"].as_str().unwrap_or("prigh-desktop"))
         .replace("{{categories}}", categories)
