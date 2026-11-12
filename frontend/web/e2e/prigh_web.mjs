@@ -1651,11 +1651,11 @@ try {
     console.log(`${label}: tab ${at.tab}, focus ${at.focus}, showing ${at.panel} (labelled by ${at.labelled})`);
   };
   section("settings: the sections");
-  await page.locator(".settings-tab", { hasText: "Sessions" }).click();
+  await page.locator("#settings-tab-sessions").click();
   await page.locator(".settings-panel-sessions").waitFor();
   await settingsAt("clicked Sessions");
   await page.keyboard.press("ArrowDown");
-  await page.locator(".settings-panel-models").waitFor();
+  await page.locator(".settings-panel-new-sessions").waitFor();
   await settingsAt("ArrowDown");
   await page.keyboard.press("End");
   await page.locator(".settings-panel-account").waitFor();
