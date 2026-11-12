@@ -931,6 +931,8 @@ kbd {
 .chip-anchor { position: relative; display: flex; min-width: 0; flex-shrink: 0; }
 .chip-anchor.model, .chip-anchor.model > .model-chip { flex-shrink: 1; }
 .chip-anchor.model .chip-label { min-width: 4ch; }
+/* Short of room, the model without its family (Composer_view.model_label). */
+.app.narrow .model-family { display: none; }
 /* Where tools run: its server icon always, the name cut before the model's. */
 .composer-controls .host-chip > .icon:first-child { display: inline-block; }
 .chip-anchor.host, .chip-anchor.host > .host-chip { flex-shrink: 6; min-width: 52px; }

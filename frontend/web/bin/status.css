@@ -260,6 +260,7 @@
    buttons a second, rather than drawn over the model's name. A phone has
    the chips in its ⋯ sheet instead. */
 @container composer (width < 420px) {
+  .composer-controls .model-family { display: none; }
   .app:not(.narrow) .composer-row { flex-wrap: wrap; row-gap: 2px; }
   .app:not(.narrow) .composer-controls:has(+ .row-chips) { flex: 1 1 calc(100% - 36px); }
   .app:not(.narrow) .row-chips { padding-left: 3px; margin-left: 0; border-left: 0; }
