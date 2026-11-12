@@ -142,7 +142,9 @@ prigh-desktop: Fix PRIGH_DESKTOP_ARGS (words as a shell splits them) and start p
 == browser: auto takes one on the PATH; closing its window stops the sidecar: exit 0
 prigh-desktop: starting WORK/bin/fake-prigh desktop
 prigh-desktop: prigh desktop is ready at http://127.0.0.1:PORT/
-prigh-desktop: the window's taskbar entry: WORK/data/applications/chrome-127.0.0.1__-Default.desktop
+prigh-desktop: removed the old taskbar entry WORK/data/applications/brave-ai.example.com__-Default.desktop
+prigh-desktop: removed the old taskbar entry WORK/data/applications/chrome-127.0.0.1__-Default.desktop
+prigh-desktop: the launcher entry for the browser window (chrome-127.0.0.1__-Default): WORK/data/applications/prigh.desktop
 prigh-desktop: opening the page in Google Chrome's app window (WORK/browsers/google-chrome-stable)
 prigh-desktop: the browser window closed: stopping prigh desktop
 prigh-desktop: prigh desktop exited (exit status: 0)
@@ -155,10 +157,38 @@ browser: args --app=http://127.0.0.1:PORT/#desktop=0123abcd&shell=browser --user
 browser: fragment desktop=0123abcd&shell=browser
 browser: loaded the page
 browser: window closed
-taskbar entry: Name=prigh Icon=prigh-desktop StartupWMClass=chrome-127.0.0.1__-Default
+applications: chrome-mail.example.com__-Default.desktop prigh.desktop
+prigh.desktop: [Desktop Entry]
+prigh.desktop: Type=Application
+prigh.desktop: Name=prigh
+prigh.desktop: GenericName=Coding agent
+prigh.desktop: Comment=prigh, the coding agent
+prigh.desktop: Exec=WORK/profile/bin/prigh-desktop
+prigh.desktop: Icon=prigh-desktop
+prigh.desktop: Terminal=false
+prigh.desktop: Categories=Development;
+prigh.desktop: StartupWMClass=chrome-127.0.0.1__-Default
+prigh.desktop: StartupNotify=true
+prigh.desktop: Keywords=agent;ai;coding;llm;
+prigh.desktop: TryExec=WORK/profile/bin/prigh-desktop
+prigh.desktop: X-Prigh-Generated=true
+== the app's own window: the installed entry shows again: exit 0
+prigh-desktop: removed prigh's launcher entry for the browser window WORK/data/applications/prigh.desktop
+prigh-desktop: starting WORK/bin/fake-prigh desktop
+prigh-desktop: prigh desktop is ready at http://127.0.0.1:PORT/
+prigh-desktop: loaded http://127.0.0.1:PORT/
+prigh-desktop: the window closed: stopping prigh desktop
+prigh-desktop: prigh desktop exited (exit status: 0)
+fake: args desktop
+fake: cwd WORK/home
+fake: GET / webkit=True
+fake: GET /pixel.gif webkit=True
+fake: eof
+applications: chrome-mail.example.com__-Default.desktop
 == browser: the page's Quit (the sidecar exits) closes the browser: exit 0
 prigh-desktop: starting WORK/bin/fake-prigh desktop
 prigh-desktop: prigh desktop is ready at http://127.0.0.1:PORT/
+prigh-desktop: the launcher entry for the browser window (prigh): WORK/data/applications/prigh.desktop
 prigh-desktop: opening the page in google-chrome-stable's app window (WORK/browsers/google-chrome-stable)
 prigh-desktop: prigh desktop exited: closing the browser window
 prigh-desktop: prigh desktop exited (exit status: 0)
@@ -383,6 +413,7 @@ prigh-desktop: closed the browser's own page devtools://devtools/bundled/devtool
 prigh-desktop: the browser window closed: stopping prigh desktop
 prigh-desktop: prigh desktop exited (exit status: 0)
 == the real sidecar: the connect form; closing the window stops it: exit 0
+prigh-desktop: removed prigh's launcher entry for the browser window WORK/data/applications/prigh.desktop
 prigh-desktop: starting PRIGH desktop -ui local -cwd WORK/laptop-cwd -name laptop -host-id test-desktop-laptop -listen 127.0.0.1:PORT
 prigh-desktop: prigh desktop is ready at http://127.0.0.1:PORT/
 prigh-desktop: the window closed: stopping prigh desktop
