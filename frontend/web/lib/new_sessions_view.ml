@@ -306,14 +306,13 @@ let budget (m : App.Model.t) (config : Config.t option) ~inject =
   let which = Default_fields.Which.Budget in
   let set = Option.bind config ~f:(fun c -> c.max_budget_usd) in
   let error = Default_fields.error m.default_fields which in
+  let on = Option.is_some set in
   let value =
     match Default_fields.draft m.default_fields which, set with
     | Some draft, _ -> draft
     | None, Some usd -> sprintf "%.2f" usd
     | None, None -> ""
   in
-  let off = Option.is_some config && Option.is_none set in
-  let disabled = Option.is_none config in
   row
     ~cls:"default-budget"
     ~name:"Budget"
@@ -324,53 +323,27 @@ let budget (m : App.Model.t) (config : Config.t option) ~inject =
       (match error, config with
        | Some e, _ -> Some ("warm", e)
        | None, None -> Some waiting
-       | None, Some _ when off ->
-         Some ("muted", "Off: no limit. Type an amount to set one.")
+       | None, Some _ when not on -> Some ("muted", "Off: no limit.")
        | None, Some _ -> None)
-    [ Node.div
-        ~attrs:
-          [ Attr.class_ "segmented"
-          ; Attr.role "group"
-          ; Attr.create "aria-label" "Budget"
-          ]
-        [ Node.label
-            ~attrs:[ classes [ "segment"; "number-field" ] [ "on", not off ] ]
-            [ span ~cls:"number-field-unit" "$"
-            ; Node.input
-                ~attrs:
-                  [ Attr.id "default-budget"
-                  ; Attr.class_ "number-field-input"
-                  ; Attr.type_ "text"
-                  ; Attr.create "inputmode" "decimal"
-                  ; Attr.value value
-                  ; Attr.placeholder "5.00"
-                  ; Attr.title "Dollars, e.g. 5 or 2.50 (/default-budget)"
-                  ; Attr.create "aria-label" "Budget, in dollars"
-                  ; Attr.create
-                      "aria-invalid"
-                      (Bool.to_string (Option.is_some error))
-                  ; Attr.create "autocomplete" "off"
-                  ; Attr.create "spellcheck" "false"
-                  ; (if disabled then Attr.disabled else Attr.empty)
-                  ; Attr.on_input (fun _ text ->
-                      inject (Action.Default_field_input (which, text)))
-                  ; Attr.on_change (fun _ _ ->
-                      inject (Action.Default_field_commit which))
-                  ]
-                ()
-            ]
-        ; Node.button
-            ~attrs:
-              [ classes [ "segment" ] [ "on", off ]
-              ; Attr.type_ "button"
-              ; Attr.create "aria-pressed" (Bool.to_string off)
-              ; Attr.title "No budget, the built-in (/default-budget off)"
-              ; (if disabled
-                 then Attr.disabled
-                 else Attr.on_click (fun _ -> set_default ~inject (Budget None)))
-              ]
-            [ Node.text "Off" ]
-        ]
+    [ number_switch
+        ~disabled:(Option.is_none config)
+        ~id:"default-budget"
+        ~label:"Budget"
+        ~unit:"USD"
+        ~value
+        ~placeholder:"5.00"
+        ~title:"Dollars, e.g. 5 or 2.50 (/default-budget)"
+        ~switch_title:
+          (if on
+           then "No budget, the built-in (/default-budget off)"
+           else "Stop sessions starting turns past a cost (/default-budget)")
+        ~invalid:(Option.is_some error)
+        ~on
+        ~on_input:(fun text ->
+          inject (Action.Default_field_input (which, text)))
+        ~on_commit:(inject (Action.Default_field_commit which))
+        ~on_switch:(fun on -> inject (Action.Switch_number (Budget, on)))
+        ()
     ]
 ;;
 

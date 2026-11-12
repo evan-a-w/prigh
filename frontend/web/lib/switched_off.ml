@@ -6,6 +6,7 @@ module Key = struct
     | Worktree_hours
     | Archive_days
     | Compact_at
+    | Budget
   [@@deriving sexp_of, equal, compare]
 end
 

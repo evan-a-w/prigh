@@ -41,6 +41,7 @@ let draft t which = (get t which).draft
 let error t which = (get t which).error
 let input t which text = set t which { draft = Some text; error = None }
 let refuse t which ~draft e = set t which { draft = Some draft; error = Some e }
+let clear t which = set t which Field.empty
 
 let commit t which =
   match (get t which).draft with

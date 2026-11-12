@@ -13,6 +13,7 @@ type t =
 
 let builtin_mode = Config.default.approval_mode
 let builtin_thinking = "on"
+let budget_usd = 5.
 
 let apply t (config : Config.t) =
   match t with

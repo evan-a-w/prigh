@@ -156,7 +156,10 @@ const targets = p =>
     for (const el of document.querySelectorAll(".settings-panel :is(button, input:not(.number-field-input), .number-field)")) {
       const r = el.getBoundingClientRect();
       if (r.width === 0) continue;
-      if (r.height < 40) bad.push(`${el.getAttribute("aria-label") ?? el.innerText.trim()} ${Math.round(r.height)}px high`);
+      // A switch's target reaches past it: its ::after.
+      const after = getComputedStyle(el, "::after");
+      const reach = el.matches(".switch") && after.position === "absolute" ? -parseFloat(after.top) - parseFloat(after.bottom) : 0;
+      if (r.height + reach < 40) bad.push(`${el.getAttribute("aria-label") ?? el.innerText.trim()} ${Math.round(r.height)}px high`);
       const input = el.matches("input") ? el : el.querySelector("input");
       if (input && parseFloat(getComputedStyle(input).fontSize) < 16) bad.push(`${input.id} font ${getComputedStyle(input).fontSize}`);
     }
@@ -194,6 +197,9 @@ try {
   await toast(page, "~/proj");
   await pick(page, ".fallback-add", "flash", "Flash");
   await page.locator(".fallback-list li").first().waitFor();
+  // The budget is off: its switch sets $5, typed over.
+  await page.locator(".setting.default-budget .switch").click();
+  await toast(page, "$5.00");
   await page.locator("#default-budget").fill("2.50");
   await page.locator("#default-budget").press("Enter");
   await toast(page, "$2.50");
@@ -268,8 +274,8 @@ try {
     await page.locator(`.setting.${row} .default-reset`).click();
     await page.locator(`.setting.${row} .default-reset`).waitFor({ state: "detached" });
   }
-  await page.locator(".setting.default-budget .segment", { hasText: "Off" }).click();
-  await page.waitForFunction(() => document.querySelector("#default-budget")?.value === "");
+  await page.locator(".setting.default-budget .switch").click();
+  await page.locator("#default-budget").waitFor({ state: "detached" });
   section("reset");
   await show(page);
   console.log(configFile());
