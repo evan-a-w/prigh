@@ -3459,9 +3459,7 @@ None: a model whose usage runs out stops.
 Add
 Budget
 Sessions without their own /budget start no turn once they have cost this much, open ones too.
-Off: no limit. Type an amount to set one.
-$
-Off
+Off: no limit.
 === chromium: new sessions: all set ===
 New sessions
 What a new session starts with. A change applies from the next new session: open ones keep theirs. Kept on the backend.
@@ -3497,8 +3495,7 @@ DeepSeek V4.1 Flash
 Add
 Budget
 Sessions without their own /budget start no turn once they have cost this much, open ones too.
-$
-Off
+USD
 default_model="anthropic/claude-fable-5" default_thinking="high" approval_mode="ask" default_host="host-laptop" default_cwd="~/proj" fallback_models=["deepseek/deepseek-flash"] max_budget_usd=2.5
 === chromium: new sessions: the other browser ===
 New sessions
@@ -3535,14 +3532,12 @@ DeepSeek V4.1 Flash
 Add
 Budget
 Sessions without their own /budget start no turn once they have cost this much, open ones too.
-$
-Off
+USD
 === chromium: new sessions: refused ===
 Budget
 Sessions without their own /budget start no turn once they have cost this much, open ones too.
 “lots” isn't an amount of dollars: type one like 5 or 2.50, or clear the field for no budget.
-$
-Off
+USD
 === chromium: new sessions: the session open keeps its own ===
 model: DeepSeek V4.1 Flash: switch model (Ctrl+L)
 thinking: Thinking on: how much the model reasons before it answers (Alt+T cycles, /thinking)
@@ -3601,9 +3596,7 @@ None: a model whose usage runs out stops.
 Add
 Budget
 Sessions without their own /budget start no turn once they have cost this much, open ones too.
-Off: no limit. Type an amount to set one.
-$
-Off
+Off: no limit.
 default_model=null default_thinking=null approval_mode="auto" default_host=null default_cwd=null fallback_models=[] max_budget_usd=null
 === chromium: new sessions: errors ===
 (none)

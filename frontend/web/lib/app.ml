@@ -3789,11 +3789,24 @@ let default_set_failed (change : New_default.t) =
   | Budget _ -> "the default budget"
 ;;
 
+let remember_on (m : Model.t) key ~was ~now =
+  if Float.(now <= 0.)
+  then { m with switched_off = Switched_off.remember m.switched_off key was }
+  else m
+;;
+
 (* Shown at once; [set_config]'s [defaults_only] leaves this session's mode
    as it is. *)
-let set_default (m : Model.t) change =
-  with_config m ~f:(fun config ->
-    let config, field = New_default.apply change config in
+let set_default (m : Model.t) (change : New_default.t) =
+  with_config m ~f:(fun was ->
+    let m =
+      match change with
+      | Budget now ->
+        let usd = Option.value ~default:0. in
+        remember_on m Budget ~was:(usd was.max_budget_usd) ~now:(usd now)
+      | Model _ | Thinking _ | Mode _ | Host _ | Dir _ | Fallback _ -> m
+    in
+    let config, field = New_default.apply change was in
     ( { m with config = Some config }
     , [ set_config
           ~defaults_only:true
@@ -3940,12 +3953,6 @@ let compaction_summary config =
 (* The backend resolves the model as /model does, and says which models
    come closest to one it doesn't know. *)
 (* Off: what it was, for its switch to turn back on to. *)
-let remember_on (m : Model.t) key ~was ~now =
-  if Float.(now <= 0.)
-  then { m with switched_off = Switched_off.remember m.switched_off key was }
-  else m
-;;
-
 let set_compaction (m : Model.t) action =
   with_config m ~f:(fun was ->
     let config = Prigh_ui.Compaction_command.apply action was in
@@ -4194,6 +4201,8 @@ let number (m : Model.t) (key : Switched_off.Key.t) =
   | Archive_days -> Option.map m.config ~f:(fun c -> c.archive_after_days)
   | Compact_at ->
     Option.map m.config ~f:(fun c -> Float.of_int c.compact_at_tokens)
+  | Budget ->
+    Option.map m.config ~f:(fun c -> Option.value c.max_budget_usd ~default:0.)
 ;;
 
 (* Sets one ([0]: off). *)
@@ -4218,6 +4227,7 @@ let set_number (m : Model.t) (key : Switched_off.Key.t) value =
   | Archive_days ->
     set_auto_archive m (Prigh_ui.Auto_archive_command.Action.Set value)
   | Compact_at -> set_compaction m (Set_at (Float.iround_nearest_exn value))
+  | Budget -> set_default m (Budget (Option.some_if Float.(value > 0.) value))
 ;;
 
 let commit_compact_at (m : Model.t) =
@@ -4259,12 +4269,15 @@ let switch_number (m : Model.t) (key : Switched_off.Key.t) on =
           sessions_fields = Sessions_fields.clear m.sessions_fields Archive_days
         }
       | Compact_at -> { m with compact_at = Compact_at.empty }
+      | Budget ->
+        { m with default_fields = Default_fields.clear m.default_fields Budget }
     in
     let default =
       match key with
       | Worktree_hours -> Float.of_int Worktree_folds.default_hours
       | Archive_days -> Config.default.archive_after_days
       | Compact_at -> Float.of_int Config.default.compact_at_tokens
+      | Budget -> New_default.budget_usd
     in
     set_number
       m

@@ -26,6 +26,9 @@ val input : t -> Which.t -> string -> t
 (** Refuses [draft] (back in the field), saying why under it. *)
 val refuse : t -> Which.t -> draft:string -> string -> t
 
+(** Drops what was typed, and the error. *)
+val clear : t -> Which.t -> t
+
 (** Applies the draft: the text to set, stripped ([""]: back to the
     built-in), if there is a draft. *)
 val commit : t -> Which.t -> t * string option

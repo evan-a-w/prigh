@@ -66,9 +66,8 @@ let%expect_test "the section: the built-ins, every control" =
     When a model's usage runs out, the next in this list takes over the conversation. Every session follows it, open ones too. None: a model whose usage runs out stops.
     (Add)
     Budget
-    Sessions without their own /budget start no turn once they have cost this much, open ones too. Off: no limit. Type an amount to set one.
-    $ []
-    (Off)
+    Sessions without their own /budget start no turn once they have cost this much, open ones too. Off: no limit.
+    (Stop sessions starting turns past a cost (/default-budget))
     button "New sessions' model: The backend's choice" -- Choose the model new sessions start with
     button "This session\226\128\153s" -- Start new sessions with Claude Opus 5.5 · thinking on, its thinking level too (/change_default)
     button "Off" -- New sessions think at off
@@ -81,9 +80,8 @@ let%expect_test "the section: the built-ins, every control" =
     button "Auto" -- New sessions start in Auto mode
     button "New sessions' tool host: Where you are" -- Choose the tool host new sessions start on (/default-host)
     button "Add" -- Add a model to the end of the chain (/fallback MODEL…)
-    button "Off" -- No budget, the built-in (/default-budget off)
+    [switch] button "Budget" -- Stop sessions starting turns past a cost (/default-budget)
     input "New sessions' starting directory" -- An absolute path, or ~/… under the host's home
-    input "Budget, in dollars" -- Dollars, e.g. 5 or 2.50 (/default-budget)
     |}]
 ;;
 
@@ -366,44 +364,95 @@ let%expect_test "fallback: added from the picker, removed, cleared" =
     |}]
 ;;
 
-let%expect_test "budget: dollars, refused, off" =
+let%expect_test "budget: switched on, dollars, refused, off and on again" =
   let h = section () in
-  H.act h (Default_field_input (Budget, "$5"));
-  H.key h "Enter" ~target:Field;
+  let budget () = H.text h ~selector:".setting.default-budget" in
+  let switch () = H.click h ~selector:".setting.default-budget .switch" in
+  (* Off, the built-in: no field until switched on, which sets $5. *)
+  budget ();
+  switch ();
   H.reply h "set_config" (config [ "max_budget_usd", `Number "5" ]);
-  H.text h ~selector:".setting.default-budget";
-  H.text h ~selector:".toast:last-child";
+  budget ();
   [%expect
     {|
-    Dialog_accept
+    Budget
+    Sessions without their own /budget start no turn once they have cost this much, open ones too. Off: no limit.
+    (Stop sessions starting turns past a cost (/default-budget))
+    (Switch_number Budget true)
     (Rpc (method_ set_config)
      (params ((config ((max_budget_usd 5))) (defaults_only true)))
      (tag (Default_set (Budget (5)))))
     (Expire_toast (id 0) (after_ms 5220))
     Budget
     Sessions without their own /budget start no turn once they have cost this much, open ones too.
-    $ [5.00]
-    (Off)
-    Sessions without their own /budget stop once they cost $5.00 (/default-budget off removes it)
+    [5.00] USD
+    (No budget, the built-in (/default-budget off))
+    |}];
+  H.act h (Default_field_input (Budget, "$2.50"));
+  H.key h "Enter" ~target:Field;
+  H.reply h "set_config" (config [ "max_budget_usd", `Number "2.5" ]);
+  budget ();
+  H.text h ~selector:".toast:last-child";
+  [%expect
+    {|
+    Dialog_accept
+    (Rpc (method_ set_config)
+     (params ((config ((max_budget_usd 2.5))) (defaults_only true)))
+     (tag (Default_set (Budget (2.5)))))
+    (Expire_toast (id 1) (after_ms 5220))
+    Budget
+    Sessions without their own /budget start no turn once they have cost this much, open ones too.
+    [2.50] USD
+    (No budget, the built-in (/default-budget off))
+    Sessions without their own /budget stop once they cost $2.50 (/default-budget off removes it)
     |}];
   H.act h (Default_field_input (Budget, "lots"));
   H.key h "Enter" ~target:Field;
-  H.text h ~selector:".setting.default-budget";
+  budget ();
   [%expect
     {|
     Dialog_accept
     Budget
     Sessions without their own /budget start no turn once they have cost this much, open ones too. “lots” isn't an amount of dollars: type one like 5 or 2.50, or clear the field for no budget.
-    $ [lots]
-    (Off)
+    [lots] USD
+    (No budget, the built-in (/default-budget off))
     |}];
-  H.click h ~selector:".setting.default-budget .segment:nth-child(2)";
+  (* Off drops what was typed; on again restores $2.50, not $5. *)
+  switch ();
+  H.reply h "set_config" (config [ "max_budget_usd", `Null ]);
+  budget ();
+  switch ();
   [%expect
     {|
-    (Set_default (Budget ()))
+    (Switch_number Budget false)
     (Rpc (method_ set_config)
      (params ((config ((max_budget_usd null))) (defaults_only true)))
      (tag (Default_set (Budget ()))))
+    (Expire_toast (id 2) (after_ms 5100))
+    Budget
+    Sessions without their own /budget start no turn once they have cost this much, open ones too. Off: no limit.
+    (Stop sessions starting turns past a cost (/default-budget))
+    (Switch_number Budget true)
+    (Rpc (method_ set_config)
+     (params ((config ((max_budget_usd 2.5))) (defaults_only true)))
+     (tag (Default_set (Budget (2.5)))))
+    |}];
+  (* /default-budget off is remembered the same way. *)
+  H.reply h "set_config" (config [ "max_budget_usd", `Number "2.5" ]);
+  H.quiet h (fun () -> H.act h (Run "/default-budget 7"));
+  H.reply h "set_config" (config [ "max_budget_usd", `Number "7" ]);
+  H.quiet h (fun () -> H.act h (Run "/default-budget off"));
+  H.reply h "set_config" (config [ "max_budget_usd", `Null ]);
+  switch ();
+  [%expect
+    {|
+    (Expire_toast (id 3) (after_ms 5220))
+    (Expire_toast (id 4) (after_ms 5220))
+    (Expire_toast (id 5) (after_ms 5100))
+    (Switch_number Budget true)
+    (Rpc (method_ set_config)
+     (params ((config ((max_budget_usd 7))) (defaults_only true)))
+     (tag (Default_set (Budget (7)))))
     |}]
 ;;
 

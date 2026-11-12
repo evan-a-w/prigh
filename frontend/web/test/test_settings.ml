@@ -321,10 +321,11 @@ let%expect_test "the names of the settings' controls" =
     button "Auto" -- New sessions start in Auto mode
     button "New sessions' tool host: Where you are" -- Choose the tool host new sessions start on (/default-host)
     button "Add" -- Add a model to the end of the chain (/fallback MODEL…)
-    button "Off" -- No budget, the built-in (/default-budget off)
+    [switch] button "Budget" -- Stop sessions starting turns past a cost (/default-budget)
     [group] div "New sessions' thinking"
     [group] div "New sessions' mode"
     [group] div "Budget"
+    [switch] button "Budget" -- Stop sessions starting turns past a cost (/default-budget)
     -- Models
     button "Manage providers" -- /auth (/login, /logout)
     button "Naming model: Default" -- Choose the model (/naming model)

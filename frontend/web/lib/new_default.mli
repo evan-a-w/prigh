@@ -21,6 +21,9 @@ val builtin_mode : Approval_mode.t
 (** The built-in thinking level. *)
 val builtin_thinking : string
 
+(** The budget, in dollars, switching it on sets when none was set before. *)
+val budget_usd : float
+
 (** [config] with [t] applied, and the field [set_config] sends. *)
 val apply : t -> Config.t -> Config.t * string
 
