@@ -17,6 +17,10 @@ work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 export HOME="$work/home" XDG_CONFIG_HOME="$work/config" XDG_DATA_HOME="$work/data"
 mkdir -p "$HOME"
+# The package's desktop entry, installed in a profile (a link to it, as
+# Nix's are).
+ln -s "$(cd "$(dirname "$app")/.." && pwd)" "$work/profile"
+export XDG_DATA_DIRS="$work/profile/share"
 fake="$work/bin/fake-prigh"
 mkdir -p "$work/bin"
 cp "$here/fake-sidecar.py" "$fake"
@@ -95,10 +99,32 @@ scenario "bad PRIGH_DESKTOP_ARGS" PRIGH_DESKTOP_ARGS="-cwd 'x"
 # The page in a browser's app window (fake-browser.py, standing in for
 # Chromium), not the app's own.
 browser="$work/browsers/google-chrome-stable"
+# Entries earlier versions named after the window's app_id (they go), and
+# the user's own for a site (it stays).
+mkdir -p "$XDG_DATA_HOME/applications"
+old='[Desktop Entry]
+Type=Application
+Name=prigh
+Comment=prigh'\''s window in the browser
+Exec=/nix/store/x-prigh-desktop-unwrapped/bin/prigh-desktop
+Icon=prigh-desktop
+StartupWMClass=chrome-127.0.0.1__-Default
+'
+printf "$old" >"$XDG_DATA_HOME/applications/chrome-127.0.0.1__-Default.desktop"
+printf "$old" >"$XDG_DATA_HOME/applications/brave-ai.example.com__-Default.desktop"
+printf '[Desktop Entry]\nName=Mail\nExec=chromium --app=https://mail.example.com\n' \
+	>"$XDG_DATA_HOME/applications/chrome-mail.example.com__-Default.desktop"
+entries() {
+	echo "applications: $(ls "$XDG_DATA_HOME/applications" | paste -sd ' ' -)"
+}
 scenario "browser: auto takes one on the PATH; closing its window stops the sidecar" \
-	PRIGH_DESKTOP_WINDOW= PATH="$work/browsers:$PATH"
-# The desktop entry named after its Wayland app_id: prigh's name and icon.
-echo "taskbar entry: $(grep -E '^(Name|Icon|NoDisplay|StartupWMClass)=' "$XDG_DATA_HOME"/applications/*.desktop | paste -sd ' ' -)"
+	PRIGH_DESKTOP_WINDOW= PATH="$work/browsers:$PATH" XDG_SESSION_TYPE=wayland
+# One entry for prigh: the installed one, shadowed by the user's with the
+# window's Wayland app_id, run through the profile.
+entries
+normalize <"$XDG_DATA_HOME/applications/prigh.desktop" | sed 's/^/prigh.desktop: /'
+scenario "the app's own window: the installed entry shows again" PRIGH_DESKTOP_TEST_CLOSE_ON_LOAD=1
+entries
 scenario "browser: the page's Quit (the sidecar exits) closes the browser" \
 	PRIGH_DESKTOP_WINDOW=browser PRIGH_DESKTOP_BROWSER="$browser" FAKE_MODE=quit FAKE_BROWSER_MODE=stay
 scenario "browser: the sidecar fails: the browser closes, the failure is told" \

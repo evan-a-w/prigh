@@ -1293,14 +1293,18 @@ Where it shows it (`PRIGH_DESKTOP_WINDOW`, `programs.prigh.desktop.window`):
   Window managers see the class `prigh` on X11; on Wayland Chromium ignores
   `--class` for an app window and names its app_id after the site and the
   profile (e.g. `chrome-127.0.0.1__-Default`, or `chrome-ai.example.com__-Default`
-  on a backend's site; `brave-`, `msedge-`, `vivaldi-` for those). The app
-  writes a desktop entry by that name
-  (`~/.local/share/applications/chrome-127.0.0.1__-Default.desktop`) so
-  docks and taskbars show prigh's name and icon; match the app_id in
-  Hyprland or sway rules (`hyprctl clients` shows it). The entry is not
-  hidden (`NoDisplay`), since some taskbars (Noctalia's) ignore hidden
-  entries and would show the window as the browser or not at all, so app
-  launchers may list prigh twice; both start the app.
+  on a backend's site; `brave-`, `msedge-`, `vivaldi-` for those); match it
+  in Hyprland or sway rules (`hyprctl clients` shows it). So that docks and
+  taskbars show prigh's name and icon for that window, the app writes
+  `~/.local/share/applications/prigh.desktop` (`$XDG_DATA_HOME`) at each
+  launch: the installed `prigh.desktop`, which it shadows, with the
+  window's class as `StartupWMClass` and `Exec` through your profile
+  (`~/.nix-profile/bin/prigh-desktop` rather than a store path, so an
+  update or a garbage collection does not break it). App launchers list
+  prigh once. The app's own window (webview) removes that file again. It
+  only ever changes a `prigh.desktop` it wrote (marked
+  `X-Prigh-Generated=true`): one of your own there is left alone. Earlier
+  versions wrote `chrome-…-Default.desktop` entries; the app removes those.
   The browser's own right-click menu never shows there (it would give away
   that the window is Chrome): a text field's right-click (or Shift+F10)
   opens prigh's Cut, Copy, Paste and Select all instead (↑↓, Enter, Esc),

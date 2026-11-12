@@ -20,6 +20,8 @@ use prigh_desktop_core::launch::{self, Os};
 use prigh_desktop_core::navigation::{self, Decision, Remote};
 use prigh_desktop_core::profile;
 use prigh_desktop_core::tail::Tail;
+#[cfg(target_os = "linux")]
+use prigh_desktop_core::taskbar;
 use prigh_desktop_core::zoom::{self, Step};
 use prigh_desktop_core::{ready, search_path};
 use shared_child::SharedChild;
@@ -190,7 +192,11 @@ impl BrowserWindow {
         }
         self.write_settings();
         #[cfg(target_os = "linux")]
-        self.write_taskbar_entry(&url);
+        {
+            let var = |name: &str| std::env::var(name).ok();
+            let wayland = taskbar::is_wayland(var("WAYLAND_DISPLAY").as_deref(), var("XDG_SESSION_TYPE").as_deref());
+            sync_launcher_entry(taskbar::window_class(&self.found.program, &url, wayland).as_deref());
+        }
         log(format!("opening the page in {}'s app window ({})", self.found.name, self.found.program));
         let mut cmd = self.command(&url);
         // Its own process group: closing it reaches its helpers too.
@@ -273,33 +279,6 @@ impl BrowserWindow {
         let downloads = downloads_dir();
         write(self.profile.join("Default").join("Preferences"), &|e| profile::preferences(e, &downloads));
         write(self.profile.join("Local State"), &profile::local_state);
-    }
-
-    /// The desktop entry named after the window's app_id on Wayland (see
-    /// [prigh_desktop_core::taskbar]), in the user's applications.
-    #[cfg(target_os = "linux")]
-    fn write_taskbar_entry(&self, url: &str) {
-        let Some(app_id) = prigh_desktop_core::taskbar::app_id(&self.found.program, url) else { return };
-        let var = |name: &str| std::env::var(name).ok().filter(|v| !v.is_empty());
-        let Some(data) = var("XDG_DATA_HOME").or_else(|| var("HOME").map(|h| format!("{h}/.local/share"))) else {
-            return;
-        };
-        // How the app was started: makeWrapper's wrapper passes its own path.
-        let exec = std::env::args()
-            .next()
-            .filter(|a| !a.contains('/') || a.starts_with('/'))
-            .or_else(|| std::env::current_exe().ok().map(|p| p.display().to_string()))
-            .unwrap_or_else(|| "prigh-desktop".into());
-        let path = PathBuf::from(data).join("applications").join(format!("{app_id}.desktop"));
-        let entry = prigh_desktop_core::taskbar::desktop_entry(&app_id, &exec);
-        if std::fs::read_to_string(&path).ok().as_deref() == Some(&entry) {
-            return;
-        }
-        let written = path.parent().map_or(Ok(()), std::fs::create_dir_all).and_then(|()| std::fs::write(&path, entry));
-        match written {
-            Ok(()) => log(format!("the window's taskbar entry: {}", path.display())),
-            Err(e) => log(format!("writing the window's taskbar entry {}: {e}", path.display())),
-        }
     }
 
     /// The browser instance running on prigh's profile: the pid in its
@@ -568,6 +547,23 @@ fn downloads_dir() -> String {
 #[cfg(unix)]
 fn alive(pid: i32) -> bool {
     unsafe { libc::kill(pid, 0) == 0 }
+}
+
+/// The user's launcher entry for the window (see [taskbar]): `class` is
+/// the browser window's, `None` for the app's own.
+#[cfg(target_os = "linux")]
+fn sync_launcher_entry(class: Option<&str>) {
+    let var = |name: &str| std::env::var(name).ok();
+    let Some(dirs) =
+        taskbar::Dirs::new(var("XDG_DATA_HOME").as_deref(), var("HOME").as_deref(), var("XDG_DATA_DIRS").as_deref())
+    else {
+        return;
+    };
+    // The app's own path, for when no entry is installed.
+    let program = std::env::current_exe().map_or_else(|_| "prigh-desktop".into(), |p| p.display().to_string());
+    for line in taskbar::sync(&dirs, class, &program) {
+        log(line);
+    }
 }
 
 /// Where the page is shown: `None` for the app's own window.
@@ -1402,13 +1398,17 @@ fn main() {
                     return Ok(());
                 }
                 Ok(Some(b)) => *setup_sidecar.browser.lock().unwrap() = Some(b),
-                Ok(None) => build_window(
-                    app.handle(),
-                    setup_sidecar.clone(),
-                    zoom,
-                    WINDOW,
-                    WebviewUrl::App("index.html".into()),
-                )?,
+                Ok(None) => {
+                    #[cfg(target_os = "linux")]
+                    sync_launcher_entry(None);
+                    build_window(
+                        app.handle(),
+                        setup_sidecar.clone(),
+                        zoom,
+                        WINDOW,
+                        WebviewUrl::App("index.html".into()),
+                    )?
+                }
             }
             start_sidecar(app.handle().clone(), setup_sidecar.clone());
             Ok(())
