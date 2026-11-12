@@ -28,6 +28,8 @@ module Kind : sig
     (** the user answered through a [render_ui] component ({!Ui_action}) *)
     | User_info
     (** what the user wrote about themselves changed ({!User_info}) *)
+    | Custom_instructions
+    (** the user's custom instructions changed ({!Custom_instructions}) *)
     | Other of string
   [@@deriving sexp_of, equal]
 

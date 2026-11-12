@@ -33,6 +33,11 @@ module Note = struct
           ; summary : string
           }
       | User_info of { cleared : bool }
+      | Custom_instructions of
+          { added : int
+          ; edited : int
+          ; removed : int
+          }
     [@@deriving sexp, jsonaf, equal]
 
     let wire = function
@@ -44,6 +49,7 @@ module Note = struct
       | Client _ -> "client"
       | Ui_action _ -> "ui_action"
       | User_info _ -> "user_info"
+      | Custom_instructions _ -> "custom_instructions"
     ;;
   end
 
@@ -83,6 +89,16 @@ module Note = struct
       "About you: the model was given your details"
     | User_info { cleared = true } ->
       "About you: the model was told you cleared them"
+    | Custom_instructions { added; edited; removed } ->
+      let part n verb = Option.some_if (n > 0) (sprintf "%d %s" n verb) in
+      "Custom instructions: the model was told "
+      ^ String.concat
+          ~sep:", "
+          (List.filter_opt
+             [ part added "added"
+             ; part edited "edited"
+             ; part removed "removed"
+             ])
   ;;
 
   let steer ~from_user ~follow_up =

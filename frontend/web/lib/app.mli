@@ -301,6 +301,11 @@ module Reply_tag : sig
     (** [nix_store_status]; [/nix-gc] opens Settings once it is in *)
     | Nix_collected (** [nix_store_gc] *)
     | Memory_loaded (** [get_memory] *)
+    | Instructions_loaded (** [get_custom_instructions] *)
+    | Instruction_saved
+    (** [save_custom_instruction]: the draft closes, or says why not *)
+    | Instruction_removed
+    | Instructions_enabled (** [set_custom_instructions_enabled] *)
     | Memory_saved (** [save_memory]: the draft closes, or says why not *)
     | Memory_forgot
     | Memory_enabled (** [set_memory_enabled] *)
@@ -594,6 +599,16 @@ module Action : sig
     | Memory_forget of string (** asks first *)
     | Memory_forget_confirm
     | Memory_forget_cancel
+    | Instruction_edit of string option
+    (** the settings page's Custom instructions: edit one, or write a new
+        one ([None]) *)
+    | Instruction_title of string
+    | Instruction_text of string
+    | Instruction_save (** Enter in the title, Ctrl+Enter in the text *)
+    | Instruction_cancel (** Esc *)
+    | Instruction_remove of string (** asks first *)
+    | Instruction_remove_confirm
+    | Instruction_remove_cancel
     | About_you_field of About_you.Field.t * string
     (** the settings page's About you: a field typed in or chosen *)
     | About_you_save (** Ctrl+Enter *)
@@ -958,6 +973,8 @@ module Model : sig
     ; forges : Forges.t (** the user's git hosts *)
     ; nix_gc : Nix_gc.t (** superusers': the Nix store *)
     ; memory : Memory_notes.t (** the settings page's Memory *)
+    ; instructions : Instruction_notes.t
+    (** the settings page's Custom instructions *)
     ; about_you : About_you.t (** the settings page's About you *)
     ; compact_at : Compact_at.t (** the settings page's "Compact at" *)
     ; settings_section : Settings_section.t

@@ -1082,6 +1082,259 @@ let memory_notes (m : App.Model.t) ~inject =
         | visible -> List.map visible ~f:(memory_note n ~inject))
 ;;
 
+(* The user's custom instructions: whether the model may change them, and
+   the list, each to edit or delete, with what they cost every session. *)
+let instructions_switch (m : App.Model.t) ~inject =
+  let n = m.instructions in
+  let on = n.instructions.enabled in
+  row
+    ~cls:"instructions-enabled"
+    ~name:"Let the model change them"
+    ~about:
+      "When you state a lasting preference or standing instruction, the model \
+       adds it here or edits the one that covers it, and tells you. Off, only \
+       you change them; they stay in every session either way."
+    ?note:
+      (match n.status with
+       | Unknown | Loading -> Some ("muted", "Reading your instructions…")
+       | Loaded | Failed _ -> None)
+    [ switch
+        ~disabled:(not (Instruction_notes.Status.equal n.status Loaded))
+        ~label:"Let the model change them"
+        ~title:
+          (if on
+           then "Only you change them (/instructions off)"
+           else "Let the model add and edit them (/instructions on)")
+        ~on
+        ~on_click:
+          (inject
+             (Action.Run
+                (if on then "/instructions off" else "/instructions on")))
+        ()
+    ]
+;;
+
+let instruction_draft
+      (n : Instruction_notes.t)
+      (d : Instruction_notes.Draft.t)
+      ~inject
+  =
+  let limits = n.instructions.limits in
+  div
+    ~cls:"setting memory-draft instruction-draft"
+    [ Node.input
+        ~attrs:
+          [ Attr.id "instruction-title"
+          ; Attr.class_ "text-input memory-title-input"
+          ; Attr.type_ "text"
+          ; Attr.create "aria-label" "Title"
+          ; Attr.placeholder "Title (optional): a few words"
+          ; Attr.value d.title
+          ; Attr.create "maxlength" (Int.to_string limits.title)
+          ; Attr.create "autocomplete" "off"
+          ; (if d.saving then Attr.disabled else Attr.empty)
+          ; Attr.on_input (fun _ text -> inject (Action.Instruction_title text))
+          ]
+        ()
+    ; Node.textarea
+        ~attrs:
+          [ Attr.id "instruction-text"
+          ; Attr.class_ "text-input memory-text-input"
+          ; Attr.create "aria-label" "Instruction"
+          ; Attr.placeholder
+              "What the model should always do, e.g. “Use Australian spelling.”"
+          ; Attr.value d.text
+          ; Attr.rows 3
+          ; Attr.create "maxlength" (Int.to_string limits.text)
+          ; (if d.saving then Attr.disabled else Attr.empty)
+          ; Attr.on_input (fun _ text -> inject (Action.Instruction_text text))
+          ]
+        []
+    ; (match d.error with
+       | Some e -> span ~cls:"setting-note warm" e
+       | None -> Node.none)
+    ; div
+        ~cls:"memory-draft-buttons"
+        [ span ~cls:"memory-draft-keys" "Ctrl+Enter saves, Esc cancels"
+        ; button
+            ~cls:"small ghost"
+            ~title:"Esc"
+            ~on_click:(inject Action.Instruction_cancel)
+            [ Node.text "Cancel" ]
+        ; button
+            ~cls:"small primary"
+            ~title:"Ctrl+Enter (Enter in the title)"
+            ~disabled:d.saving
+            ~attrs:(if d.saving then [ Attr.create "aria-busy" "true" ] else [])
+            ~on_click:(inject Action.Instruction_save)
+            [ Node.text (if d.saving then "Saving…" else "Save") ]
+        ]
+    ]
+;;
+
+let instruction_note
+      (n : Instruction_notes.t)
+      (note : Custom_instructions.Note.t)
+      ~inject
+  =
+  match n.draft with
+  | Some ({ id = Some id; _ } as d) when String.equal id note.id ->
+    instruction_draft n d ~inject
+  | _ ->
+    let removing = Option.equal String.equal n.removing (Some note.id) in
+    let name = Option.value note.title ~default:note.id in
+    div
+      ~cls:
+        (if removing
+         then "setting memory-note instruction forgetting"
+         else "setting memory-note instruction")
+      ~attrs:[ Attr.create "data-note" note.id ]
+      [ div
+          ~cls:"setting-text"
+          [ (match note.title with
+             | Some title -> span ~cls:"setting-name" title
+             | None -> Node.none)
+          ; span ~cls:"memory-note-text" note.text
+          ; span
+              ~cls:
+                (if removing then "setting-note warm" else "setting-note muted")
+              (if removing
+               then "Delete this instruction? No session gets it any more."
+               else sprintf "%s · saved %s" note.id (Memory.Note.date note))
+          ]
+      ; div
+          ~cls:"setting-control"
+          (if removing
+           then
+             [ button
+                 ~cls:"small ghost"
+                 ~title:"Keep it (Esc)"
+                 ~on_click:(inject Action.Instruction_remove_cancel)
+                 [ Node.text "Keep" ]
+             ; button
+                 ~cls:"small danger"
+                 ~attrs:[ Attr.id "instruction-remove-yes" ]
+                 ~on_click:(inject Action.Instruction_remove_confirm)
+                 [ Node.text "Delete" ]
+             ]
+           else
+             [ button
+                 ~cls:"icon ghost"
+                 ~label:("Edit " ^ name)
+                 ~title:"Edit"
+                 ~on_click:(inject (Action.Instruction_edit (Some note.id)))
+                 [ icon Pencil ]
+             ; button
+                 ~cls:"icon ghost memory-delete"
+                 ~label:("Delete " ^ name)
+                 ~title:"Delete"
+                 ~on_click:(inject (Action.Instruction_remove note.id))
+                 [ icon Trash ]
+             ])
+      ]
+;;
+
+let instructions_size (n : Instruction_notes.t) =
+  let tokens = Instruction_notes.tokens n in
+  let count = List.length n.instructions.notes in
+  if tokens > Instruction_notes.warn_tokens
+  then
+    div
+      ~cls:"setting instructions-warning"
+      ~attrs:[ Attr.role "status" ]
+      [ icon Warning
+      ; div
+          ~cls:"setting-text"
+          [ span
+              ~cls:"setting-name"
+              (sprintf
+                 "About %s tokens in every session"
+                 (Int.to_string_hum ~delimiter:',' tokens))
+          ; span
+              ~cls:"setting-about"
+              "They are added to the context of every session, before you say \
+               anything: that is cost on every message and room the work no \
+               longer has. Trim them: merge near-duplicates, drop what no \
+               longer applies, and keep what is only sometimes needed in \
+               memory."
+          ]
+      ]
+  else
+    div
+      ~cls:"setting instructions-size"
+      [ span
+          ~cls:"setting-note muted"
+          (sprintf
+             "%d of %d · about %s tokens in every session"
+             count
+             n.instructions.limits.count
+             (Int.to_string_hum ~delimiter:',' tokens))
+      ]
+;;
+
+let instruction_rows (m : App.Model.t) ~inject =
+  let n = m.instructions in
+  let notes = n.instructions.notes in
+  let add =
+    button
+      ~cls:"small memory-add instruction-add"
+      ~title:"Write an instruction for the model yourself"
+      ~disabled:(Option.is_some n.draft)
+      ~on_click:(inject (Action.Instruction_edit None))
+      [ icon Plus; Node.text "Add instruction" ]
+  in
+  let error =
+    match n.error with
+    | Some e ->
+      [ div
+          ~cls:"setting memory-error"
+          ~attrs:[ Attr.role "alert" ]
+          [ span ~cls:"setting-note warm" e ]
+      ]
+    | None -> []
+  in
+  let draft =
+    match n.draft with
+    | Some ({ id = None; _ } as d) -> [ instruction_draft n d ~inject ]
+    | _ -> []
+  in
+  match n.status, notes with
+  | (Unknown | Loading), _ -> []
+  | Failed e, _ ->
+    [ row
+        ~cls:"memory-failed"
+        ~name:"Your instructions"
+        ~about:"The backend could not read them."
+        ~note:("warm", e)
+        [ button
+            ~cls:"small ghost"
+            ~title:"Read them again (/instructions)"
+            ~on_click:(inject (Action.Run "/instructions"))
+            [ Node.text "Retry" ]
+        ]
+    ]
+  | Loaded, [] ->
+    error
+    @ draft
+    @ [ row
+          ~cls:"instructions-empty"
+          ~name:"No instructions yet"
+          ~about:
+            "Write what the model should always do (“Use Australian spelling”, \
+             “Prefer OCaml examples”), or tell it a lasting preference and it \
+             adds one here. Every session gets them."
+          (if List.is_empty draft then [ add ] else [])
+      ]
+  | Loaded, _ ->
+    (instructions_size n :: error)
+    @ List.map notes ~f:(instruction_note n ~inject)
+    @ draft
+    @
+    if List.is_empty draft
+    then [ div ~cls:"setting instructions-toolbar" [ add ] ]
+    else []
+;;
+
 module Section = Settings_section
 
 (* A section's settings, in groups: a new setting is a row in its list.
@@ -1130,6 +1383,21 @@ let content (m : App.Model.t) (section : Section.t) ~inject =
            rows
        ])
   | About_you -> [ group [ about_you m ~inject ] ]
+  | Custom_instructions ->
+    group [ instructions_switch m ~inject ]
+    ::
+    (match instruction_rows m ~inject with
+     | [] -> []
+     | rows ->
+       [ group
+           ~title:"Instructions"
+           ?note:
+             (match m.instructions.instructions.notes with
+              | [] -> None
+              | [ _ ] -> Some "1 instruction"
+              | notes -> Some (sprintf "%d instructions" (List.length notes)))
+           rows
+       ])
   | Git_hosting -> [ group ~title:"Hosts" (git_hosts m ~inject) ]
   | Nix_store -> [ group (nix_store m ~inject) ]
   | Account -> [ group (account m ~inject) ]
@@ -1141,6 +1409,7 @@ let section_icon : Section.t -> Icon.t = function
   | Models -> Brain
   | Memory -> Book
   | About_you -> User
+  | Custom_instructions -> Toc
   | Git_hosting -> Repo
   | Nix_store -> Package
   | Account -> User

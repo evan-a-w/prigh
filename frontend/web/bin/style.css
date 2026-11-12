@@ -1856,6 +1856,12 @@ kbd {
 .memory-add { white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; }
 .memory-add .icon { width: 14px; height: 14px; }
 .memory-error { padding: 8px 0; }
+.instructions-size { padding: 8px 0; }
+.instructions-toolbar { justify-content: flex-end; padding: 10px 0; }
+/* Past the threshold: they cost every session context. */
+.instructions-warning { flex-wrap: nowrap; align-items: flex-start; gap: 10px; margin: 10px 0; padding: 10px 12px; border: 1px solid var(--brick-line); border-radius: var(--r-control); background: var(--brick-wash); }
+.instructions-warning > .icon { flex: none; width: 16px; height: 16px; margin-top: 2px; color: var(--brick); }
+.instructions-warning + .setting { border-top: 0; }
 /* About you: one text the model is given, its size and Save under it. */
 .about-you { flex-direction: column; align-items: stretch; gap: 10px; }
 .about-you .setting-text { flex-basis: auto; }

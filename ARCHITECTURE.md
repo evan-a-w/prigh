@@ -874,6 +874,32 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   broadcast to that world's clients as `memory_changed`
   (`Prigh_protocol.Memory`). prigh-web's Settings → Memory
   (`Memory_notes`, `Settings_view`) and the TUI's `/memory` picker use them.
+- `Note_store` — the store `Memory` and `Custom_instructions` share: a
+  JSON file of `{next, notes: [{id, title?, text, saved}]}` under the
+  world's home, ids `<prefix><n>` never reused, caps per note and on the
+  count, an enabled switch in `User_prefs`, changes re-read and replace the
+  file atomically under its `Lock_dir` and a mutex, and subscribers told
+  of every change.
+- `Custom_instructions` / `Custom_instruction` /
+  `Tool_custom_instructions` — the user's standing instructions,
+  `~/.prigh/custom_instructions.json` (a `Note_store`, ids `ci<n>`, 50
+  notes of 1000 bytes; enabled key `custom_instructions.enabled`). Always
+  in context: `Custom_instruction.section` is the block after About you in
+  `System_prompt.build ?custom_instructions` (new sessions and non-forked
+  subagents), and `Told_environment.custom_instructions` records the list
+  a session was told, so `Custom_instruction.note` tells the next user
+  message what changed (added/edited/removed with ids and texts; the
+  whole list when most of it changed; an `Injected` `Custom_instructions`
+  note). The tool (`add | edit | remove | list`; main agent only,
+  destructive but `list`, offered only while enabled) emits
+  `Agent_event.Custom_instruction_set`, which `Agent` folds into the
+  session's told list (`Custom_instruction.apply`) so its own change is not
+  told back. RPC: `get_custom_instructions` (`{enabled, notes, limits}`),
+  `save_custom_instruction` (with `id`: edit), `remove_custom_instruction`,
+  `set_custom_instructions_enabled`, and the `custom_instructions_changed`
+  event (`Prigh_protocol.Custom_instructions`). prigh-web's Settings →
+  Custom instructions (`Instruction_notes`, `Settings_view`; the size and a
+  warning past `warn_tokens`) and the TUI's `/instructions` use them.
 - `User_info` — what the user set about themselves for the model: a
   `User_info.Form` of optional fields (name, country, time zone, language,
   `Units`, `Date_format`, occupation, background, anything else) in
@@ -4045,6 +4071,8 @@ for Linux, macOS and Windows.
 - `~/.prigh/prefs.json` — the user's preferences and data kept for the
   frontends (`User_prefs`): prigh-web's `web.*` and the shared `history`.
 - `~/.prigh/memory.json` — the `memory` tool's notes (`Memory`).
+- `~/.prigh/custom_instructions.json` — the user's standing instructions,
+  in every session's context (`Custom_instructions`).
 - `~/.prigh/about_you.json` — what the user set about themselves, in every
   session's context (`User_info`; `user_info.md.migrated` is an earlier
   version's text, moved into it).

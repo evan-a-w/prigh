@@ -82,6 +82,13 @@ val create
            [value]) (default: the one under [home]; without either they
            fail). Every client hears [user_info_changed] after a
            change. *)
+  -> ?custom_instructions:Custom_instructions.t
+       (** the user's custom instructions, for [get_custom_instructions],
+           [save_custom_instruction] (adds one, or edits [id]),
+           [remove_custom_instruction] and [set_custom_instructions_enabled]
+           (default: the one under [home]; without either they fail). Every
+           client hears [custom_instructions_changed] after any change, the
+           model's included. *)
   -> ?transcription_http:Transcription.Http.t
        (** where [transcribe] posts the audio (default: real HTTP) *)
   -> ?nix_store:Nix_store.t

@@ -2399,6 +2399,31 @@ your next message in it, once, and again whenever you change it (a "☺ About
 you" note over your message shows what it was told). Only you write it: the
 model has no tool to change it.
 
+Custom instructions: standing instructions given to the model in every
+session, after About you ("Use Australian spelling", "keep one memory note
+on my maths ability up to date"). Each has an id (`ci1`, `ci2`, ...) and
+shows in the context with it. Manage them in prigh-web's Settings → Custom
+instructions (`/instructions` opens it: add, edit, delete after a
+confirmation; it shows their size, about bytes/4 tokens, and warns past
+about 1,500 tokens that they cost every session) or in the TUI:
+`/instructions` lists them (Enter shows one, Ctrl+D removes it after a
+confirmation) and `/instructions add TEXT` adds one; editing is left to
+prigh-web. The model can change them too with the `custom_instructions`
+tool (`add`, `edit`, `remove`, `list`): it is told to do so when you state
+a lasting preference, fact about yourself or standing instruction that is
+not covered yet (editing the one that covers it rather than adding a
+near-duplicate), never for task details, and to tell you when it does.
+Only the main agent has it; changes ask in the `ask` approval mode, like
+memory's. `/instructions off` (or the switch in Settings; kept in your
+prefs as `custom_instructions.enabled`) stops the model changing them; they
+stay in context either way. They are kept in
+`~/.prigh/custom_instructions.json` on the backend, one list per user (per
+namespace with `-tokens`), at most 50, 1000 bytes each. New sessions (and
+their subagents) get them in the system prompt; an open session is told
+what changed with your next message (a "§ Custom instructions" note: what
+was added, edited and removed, or the whole list when most of it changed),
+but not the changes it made itself.
+
 Models see images. The `read` tool returns PNG, JPEG, GIF and WebP files
 (recognised by content, not by name) as images the model can look at, and an
 `@shot.png` attachment adds the image to the prompt; prigh-web also sends

@@ -48,7 +48,7 @@ let%expect_test "opening reads the memory; empty, it says what memory is" =
     No notes yet
     Tell the model “remember that…” and it saves a note here. In a later session, ask about it (“what did I say about deploys?”) and it looks it up. It saves nothing you did not ask it to.
     (Add note)
-    (Appearance) (Sessions) (Models) (Memory) (About you) (Git hosting) (Account)
+    (Appearance) (Sessions) (Models) (Memory) (About you) (Custom instructions) (Git hosting) (Account)
     |}]
 ;;
 

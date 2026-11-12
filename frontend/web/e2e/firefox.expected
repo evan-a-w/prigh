@@ -763,6 +763,7 @@ Sessions
 Models
 Memory
 About you
+Custom instructions
 Git hosting
 T
 token
@@ -984,6 +985,7 @@ Sessions
 Models
 Memory
 About you
+Custom instructions
 Git hosting
 B
 bob
@@ -3038,7 +3040,7 @@ Jump to a message, Filter the transcript, Files, Terminal, Settings
 === firefox: mobile: 390x844: the settings' list ===
 ok
 === firefox: mobile: 390x844: the settings ===
-Appearance, Sessions, Models, Memory, About you, Git hosting, Account
+Appearance, Sessions, Models, Memory, About you, Custom instructions, Git hosting, Account
 === firefox: mobile: 390x844: settings: appearance ===
 ok
 title: Appearance; back: Settings
@@ -3070,7 +3072,7 @@ Jump to a message, Filter the transcript, Files, Terminal, Settings
 === firefox: mobile: 320x640: the settings' list ===
 ok
 === firefox: mobile: 320x640: the settings ===
-Appearance, Sessions, Models, Memory, About you, Git hosting, Account
+Appearance, Sessions, Models, Memory, About you, Custom instructions, Git hosting, Account
 === firefox: mobile: 320x640: settings: appearance ===
 ok
 title: Appearance; back: Settings
@@ -3428,6 +3430,64 @@ fits: yes; targets: all ok; Save on screen: yes
 typing fits: yes; targets: all ok; Save on screen: yes
 back: About you | What the model should know about you, given to it in every session. Kept on the backend, for your account.
 === firefox: user info: errors ===
+(none)
+=== firefox: custom instructions: list ===
+Custom instructions
+Standing instructions for the model, given to it in every session; it may also add or edit them when you state a lasting preference. Kept on the backend, for your account.
+Let the model change them
+When you state a lasting preference or standing instruction, the model adds it here or edits the one that covers it, and tells you. Off, only you change them; they stay in every session either way.
+INSTRUCTIONS
+2 instructions
+2 of 50 · about 43 tokens in every session
+Use Australian spelling.
+ci1 · saved 2026-11-01
+Maths
+Keep a single memory note on my maths ability up to date.
+ci2 · saved 2026-11-02
+Add instruction
+switch: true
+settings still open: 1
+=== firefox: custom instructions: edited and added ===
+ci1 -: Use Australian spelling and metric units.; ci2 Maths: Keep a single memory note on my maths ability up to date.; ci3 Code: Prefer OCaml examples.
+=== firefox: custom instructions: deleting ===
+Maths | Keep a single memory note on my maths ability up to date. | Delete this instruction? No session gets it any more. | Keep | Delete
+ci1 -: Use Australian spelling and metric units.; ci3 Code: Prefer OCaml examples.
+=== firefox: custom instructions: off, followed on another page ===
+Custom instructions
+Standing instructions for the model, given to it in every session; it may also add or edit them when you state a lasting preference. Kept on the backend, for your account.
+Let the model change them
+When you state a lasting preference or standing instruction, the model adds it here or edits the one that covers it, and tells you. Off, only you change them; they stay in every session either way.
+INSTRUCTIONS
+2 instructions
+2 of 50 · about 38 tokens in every session
+Use Australian spelling and metric units.
+ci1 · saved (today)
+Code
+Prefer OCaml examples.
+ci3 · saved (today)
+Add instruction
+switch: false
+prefs: custom_instructions.enabled=false
+=== firefox: custom instructions: the session is told ===
+§ Custom instructions: the model was told 1 added, 1 edited, 1 removed
+[Custom instructions (the user's standing instructions; follow them) are now:
+[ci1] Use Australian spelling and metric units.
+[ci3] (Code) Prefer OCaml examples.
+These replace any earlier custom instructions.]
+after /instructions on: prefs custom_instructions.enabled=null
+=== firefox: custom instructions: warning ===
+About 1,757 tokens in every session | They are added to the context of every session, before you say anything: that is cost on every message and room the work no longer has. Trim them: merge near-duplicates, drop what no longer applies, and keep what is only sometimes needed in memory.
+=== firefox: custom instructions: phone 390x844 ===
+warning fits: yes; targets: all ok
+deleting fits: yes; targets: all ok
+editing fits: yes; targets: all ok
+back: Custom instructions | Standing instructions for the model, given to it in every session; it may also add or edit them when you state a lasting preference. Kept on the backend, for your account.
+=== firefox: custom instructions: phone 320x640 ===
+warning fits: yes; targets: all ok
+deleting fits: yes; targets: all ok
+editing fits: yes; targets: all ok
+back: Custom instructions | Standing instructions for the model, given to it in every session; it may also add or edit them when you state a lasting preference. Kept on the backend, for your account.
+=== firefox: custom instructions: errors ===
 (none)
 === firefox: images (desktop): refused as too large: the error card ===
 The model returned an error
