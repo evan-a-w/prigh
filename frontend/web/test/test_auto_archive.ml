@@ -29,9 +29,9 @@ let%expect_test "archive after: shown, typed, off, refused" =
     Archive after
     Sessions without activity for 7 days move to Archived (pinned and running ones never do).
     [7] days
-    (Off)
-    input "Archive sessions after, in days" -- /auto-archive DAYS: 0 to 365 days
-    button "Off" -- Archive only by hand (/auto-archive off)
+    (Archive only by hand (/auto-archive off))
+    input "Archive sessions after, in days" -- /auto-archive DAYS: up to 365 days
+    [switch] button "Archive sessions after" -- Archive only by hand (/auto-archive off)
     |}];
   H.input h ~selector:"#auto-archive" "14";
   H.reply h "set_config" (config "14");
@@ -46,22 +46,35 @@ let%expect_test "archive after: shown, typed, off, refused" =
     Archive after
     Sessions without activity for 14 days move to Archived (pinned and running ones never do).
     [14] days
-    (Off)
+    (Archive only by hand (/auto-archive off))
     |}];
-  H.click h ~selector:".setting.auto-archive button.segment";
+  H.click h ~selector:".setting.auto-archive .switch";
   H.reply h "set_config" (config "0");
   row h;
   [%expect
     {|
-    (Sessions_field_input Archive_days off)
-    (Sessions_field_commit Archive_days)
+    (Switch_number Archive_days false)
     (Rpc (method_ set_config) (params ((config ((archive_after_days 0)))))
      (tag Auto_archive_saved))
     (Expire_toast (id 1) (after_ms 5620))
     Archive after
     Sessions without activity this many days move to Archived (pinned and running ones never do). Off: sessions are archived only by hand.
-    [] days
-    (Off)
+    (Archive sessions without activity (/auto-archive DAYS))
+    |}];
+  (* On again: the 14 days it was. *)
+  H.click h ~selector:".setting.auto-archive .switch";
+  H.reply h "set_config" (config "14");
+  row h;
+  [%expect
+    {|
+    (Switch_number Archive_days true)
+    (Rpc (method_ set_config) (params ((config ((archive_after_days 14)))))
+     (tag Auto_archive_saved))
+    (Expire_toast (id 2) (after_ms 4580))
+    Archive after
+    Sessions without activity for 14 days move to Archived (pinned and running ones never do).
+    [14] days
+    (Archive only by hand (/auto-archive off))
     |}];
   H.input h ~selector:"#auto-archive" "a fortnight";
   row h;
@@ -73,16 +86,16 @@ let%expect_test "archive after: shown, typed, off, refused" =
     (Sessions_field_input Archive_days "a fortnight")
     (Sessions_field_commit Archive_days)
     Archive after
-    Sessions without activity this many days move to Archived (pinned and running ones never do). “a fortnight” isn't a number of days from 0 to 365: type one like 7, or off to archive only by hand.
+    Sessions without activity for 14 days move to Archived (pinned and running ones never do). “a fortnight” isn't a number of days from 0 to 365: type one like 7, or off to archive only by hand.
     [a fortnight] days
-    (Off)
+    (Archive only by hand (/auto-archive off))
     (Sessions_field_input Archive_days 400)
     (Sessions_field_commit Archive_days)
     Dialog_accept
     Archive after
-    Sessions without activity this many days move to Archived (pinned and running ones never do). “400” isn't a number of days from 0 to 365: type one like 7, or off to archive only by hand.
+    Sessions without activity for 14 days move to Archived (pinned and running ones never do). “400” isn't a number of days from 0 to 365: type one like 7, or off to archive only by hand.
     [400] days
-    (Off)
+    (Archive only by hand (/auto-archive off))
     |}]
 ;;
 
@@ -128,4 +141,25 @@ let%expect_test "/auto-archive: shows, sets, refuses; the list follows" =
   (* The backend tells every client after a change. *)
   H.event h {|{"event":"sessions_changed"}|};
   [%expect {| (Rpc (method_ list_sessions) (params ()) (tag Sessions)) |}]
+;;
+
+let%expect_test "switched on with nothing to restore: the default, 7 days" =
+  let h = settings () in
+  H.quiet h (fun () ->
+    H.event
+      h
+      (sprintf
+         {|{"type":"event","event":"config_changed","config":%s}|}
+         (config "0")));
+  row h;
+  H.click h ~selector:".setting.auto-archive .switch";
+  [%expect
+    {|
+    Archive after
+    Sessions without activity this many days move to Archived (pinned and running ones never do). Off: sessions are archived only by hand.
+    (Archive sessions without activity (/auto-archive DAYS))
+    (Switch_number Archive_days true)
+    (Rpc (method_ set_config) (params ((config ((archive_after_days 7)))))
+     (tag Auto_archive_saved))
+    |}]
 ;;

@@ -349,10 +349,9 @@
 .app.narrow .choice-list .segment-about { display: block; grid-column: 2; font-size: 13px; line-height: 1.35; color: var(--muted); }
 .app.narrow .choice-list .segment:not(.on) .segment-name { font-weight: 500; }
 /* Compaction's threshold field: one line, the number and its unit centred. */
-.app.narrow .segmented:has(.compact-at-field), .app.narrow .segmented:has(.number-field) { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
-.app.narrow .compact-at-field, .app.narrow .number-field { justify-content: center; white-space: nowrap; padding: 0 8px; }
-.app.narrow .compact-at-input, .app.narrow .number-field-input { width: 6ch; font-size: 16px; }
-.app.narrow .compact-at-unit, .app.narrow .number-field-unit { white-space: nowrap; }
+.app.narrow .number-switch { gap: 16px; }
+.app.narrow .number-field { font-size: 15px; white-space: nowrap; }
+.app.narrow .setting input.number-field-input { width: calc(6ch + 22px); min-height: 44px; font-size: 16px; }
 /* Tabs never show on a phone: their switch is for the desktop. */
 
 /* Hints that only make sense with a keyboard (Ctrl+K, Enter accepts…). */
