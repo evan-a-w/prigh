@@ -7,9 +7,15 @@
 //! (`--remote-debugging-pipe`: JSON messages ended by a NUL byte, commands
 //! on the browser's fd 3, replies and events on its fd 4):
 //!
-//! - a new tab or window on another site (a link with `target=_blank`,
-//!   `window.open`) is closed, and the link opened in the system's default
-//!   browser, as the built-in window does (see [crate::navigation]);
+//! - prigh's own pages hand a link to another site to the shell before the
+//!   browser opens anything: each of prigh's windows has a function
+//!   [BINDING] (`Runtime.addBinding`, kept across its reloads), which
+//!   prigh-web calls with the link a click on it would open; the shell
+//!   opens it in the system's default browser (see [crate::navigation]), so
+//!   no window opens and closes again;
+//! - a new tab or window on another site that opens anyway (a link prigh-web
+//!   did not hand over, `window.open`) is closed, and the link opened in the
+//!   default browser, as the built-in window does;
 //! - prigh's own window (the app's, or one opened on prigh's site) following
 //!   a link or its page's script to another site (an `anchorClick` or
 //!   `scriptInitiated` navigation to that site, seen on a DevTools session
@@ -47,6 +53,12 @@ use std::time::{Duration, Instant};
 pub const ROUND_HOPS: usize = 12;
 pub const ROUND_WINDOW: Duration = Duration::from_secs(10);
 
+/// The function each of prigh's windows has (`window.prighOpenExternal`),
+/// which prigh-web calls with `{"url": URL, "newWindow": BOOL}` for a link to
+/// open elsewhere: `newWindow` when the click would open a new window (a
+/// `target=_blank` link, Ctrl+click, a middle click).
+pub const BINDING: &str = "prighOpenExternal";
+
 /// What prigh's sites may do without the browser asking.
 pub const PERMISSIONS: &[&str] = &["clipboardReadWrite", "clipboardSanitizedWrite", "notifications", "audioCapture"];
 
@@ -67,6 +79,8 @@ pub enum Effect {
 struct Page {
     /// Where it last was on prigh's sites: it is one of prigh's windows.
     ours: Option<String>,
+    /// Where it is now.
+    url: String,
     /// Opened by another page (a link with `target=_blank`, `window.open`),
     /// not one of the app's launches.
     popup: bool,
@@ -213,6 +227,16 @@ impl Links {
                     }
                 }
             }
+            Some("Runtime.bindingCalled") if params["name"] == BINDING => {
+                let target = msg["sessionId"].as_str().and_then(|s| self.sessions.get(s)).cloned();
+                let link = params["payload"].as_str().and_then(|p| serde_json::from_str::<Value>(p).ok());
+                if let (Some(target), Some(link)) = (target, link) {
+                    if let Some(url) = link["url"].as_str() {
+                        let new_window = link["newWindow"].as_bool().unwrap_or(false);
+                        out.extend(self.on_link(&target, url, new_window, ours, now));
+                    }
+                }
+            }
             Some("Browser.downloadProgress") if params["state"] == "completed" => {
                 if let Some(path) = params["filePath"].as_str() {
                     out.push(Effect::Log(format!("downloaded {path}")));
@@ -252,6 +276,7 @@ impl Links {
         if new {
             page.popup = opener.is_some();
         }
+        page.url = url.to_string();
         if browser_page(url, self.keep_devtools) {
             return match page.ours.clone() {
                 // One of prigh's windows: back to prigh's page.
@@ -295,7 +320,9 @@ impl Links {
                 if page.popup && page.ours.is_none() {
                     page.closing = true;
                     let (_, close) = self.command("Target.closeTarget", json!({ "targetId": id }), None);
-                    let mut out = self.open_externally(opener.unwrap_or(id), url, now);
+                    let site = origin(url).unwrap_or_else(|| url.split([':', '?']).next().unwrap_or(url).to_string());
+                    let mut out = vec![Effect::Log(format!("a window opened on {site}: closing it"))];
+                    out.extend(self.open_externally(opener.unwrap_or(id), url, now));
                     out.push(Effect::Send(close));
                     return out;
                 }
@@ -381,6 +408,32 @@ impl Links {
             // A popup before it loads (about:blank, or no address yet), and
             // what the window would refuse.
             _ => vec![],
+        }
+    }
+
+    /// A link prigh's page in `target` handed over ([BINDING]): to another
+    /// site, the default browser; to prigh's, where the click would have
+    /// gone. Only from a page on prigh's site: one away signing in, or a
+    /// page that is no longer prigh's, has no say.
+    fn on_link(&mut self, target: &str, url: &str, new_window: bool, ours: &[String], now: Instant) -> Vec<Effect> {
+        let Some(page) = self.pages.get(target).filter(|p| !p.closing) else { return vec![] };
+        if !origin(&page.url).is_some_and(|o| ours.contains(&o)) {
+            let site = origin(&page.url).unwrap_or_else(|| page.url.clone());
+            return vec![Effect::Log(format!("ignored a link to open from {site}, which is not prigh's"))];
+        }
+        match decide(url, ours) {
+            Decision::External => self.open_externally(target, url, now),
+            Decision::Allow if origin(url).is_some_and(|o| ours.contains(&o)) => {
+                if new_window {
+                    vec![Effect::OpenWindow(url.to_string())]
+                } else {
+                    self.send_back(target, url.to_string())
+                }
+            }
+            _ => vec![Effect::Log(format!(
+                "refused to open {} from prigh's page",
+                url.split(['?', '#']).next().unwrap_or(url)
+            ))],
         }
     }
 
@@ -498,7 +551,8 @@ impl Links {
         page.session = Some(session.to_string());
         self.sessions.insert(session.to_string(), target);
         let (_, enable) = self.command("Page.enable", json!({}), Some(session));
-        let mut out = vec![Effect::Send(enable)];
+        let (_, bind) = self.command("Runtime.addBinding", json!({ "name": BINDING }), Some(session));
+        let mut out = vec![Effect::Send(enable), Effect::Send(bind)];
         if let Some(back) = back {
             let (_, navigate) = self.command("Page.navigate", json!({ "url": back }), Some(session));
             out.push(Effect::Send(navigate));
@@ -585,8 +639,8 @@ mod tests {
     }
 
     /// [run_raw], with each window's session attached as asked (session
-    /// `S-TARGET`) and the commands' ids left out: those that attach and
-    /// enable its events are not shown.
+    /// `S-TARGET`) and the commands' ids left out: those that attach,
+    /// enable its events and add its [BINDING] are not shown.
     fn run_at(links: &mut Links, msgs: &[String], secs: u64) -> Vec<Value> {
         let mut out = vec![];
         let mut queue: Vec<String> = msgs.to_vec();
@@ -599,7 +653,7 @@ mod tests {
                     replies.push(json!({ "id": effect["id"], "result": { "sessionId": session } }).to_string());
                     continue;
                 }
-                if effect["method"] == "Page.enable" {
+                if effect["method"] == "Page.enable" || effect["method"] == "Runtime.addBinding" {
                     continue;
                 }
                 if let Some(o) = effect.as_object_mut() {
@@ -692,7 +746,170 @@ mod tests {
         let gone = popup("Target.targetInfoChanged", "B", "https://github.com/evan-a-w/prigh");
         assert_eq!(
             run(&mut links, &[app, blank, gone.clone(), gone]),
-            [json!({ "open": "https://github.com/evan-a-w/prigh" }), close("B")]
+            [
+                json!({ "log": "a window opened on https://github.com: closing it" }),
+                json!({ "open": "https://github.com/evan-a-w/prigh" }),
+                close("B")
+            ]
+        );
+    }
+
+    /// prigh's page in window `target` calls [BINDING] with `payload`.
+    fn bound(target: &str, payload: &str) -> String {
+        json!({ "method": "Runtime.bindingCalled", "sessionId": format!("S-{target}"),
+                "params": { "name": BINDING, "payload": payload, "executionContextId": 1 } })
+        .to_string()
+    }
+
+    fn link(url: &str, new_window: bool) -> String {
+        json!({ "url": url, "newWindow": new_window }).to_string()
+    }
+
+    #[test]
+    fn prighs_page_hands_a_link_to_another_site_over_and_no_window_opens() {
+        let mut links = links();
+        let out = run(
+            &mut links,
+            &[
+                created("A", "http://127.0.0.1:7780/#desktop=k&shell=browser"),
+                bound("A", &link("https://github.com/evan-a-w/prigh/pull/1", true)),
+                // A link in the window itself (no target), mail, Ctrl+click.
+                bound("A", &link("https://example.com/docs", false)),
+                bound("A", &link("mailto:me@example.com", false)),
+            ],
+        );
+        assert_eq!(
+            out,
+            [
+                json!({ "open": "https://github.com/evan-a-w/prigh/pull/1" }),
+                json!({ "open": "https://example.com/docs" }),
+                json!({ "open": "mailto:me@example.com" }),
+            ]
+        );
+        // The backend's site, another window of prigh's (Open in new
+        // window) and the window after a reload: each has it, on its own
+        // session.
+        let out = run(
+            &mut links,
+            &[
+                created("B", "https://ai.example.com/?session=s2#app=desktop"),
+                bound("B", &link("https://docs.example.org/", true)),
+                changed("A", "http://127.0.0.1:7780/?session=s1"),
+                bound("A", &link("https://other.example/", false)),
+            ],
+        );
+        assert_eq!(out, [json!({ "open": "https://docs.example.org/" }), json!({ "open": "https://other.example/" })]);
+    }
+
+    #[test]
+    fn a_link_handed_over_to_prighs_own_site_goes_where_the_click_would_have() {
+        let mut links = links();
+        let out = run(
+            &mut links,
+            &[
+                created("A", "http://127.0.0.1:7780/?session=s1"),
+                // The backend's site from the sidecar's: in the window, or
+                // in another app window.
+                bound("A", &link("https://ai.example.com/?session=s2", false)),
+                bound("A", &link("https://ai.example.com/?session=s3", true)),
+            ],
+        );
+        assert_eq!(
+            out,
+            [
+                navigate("A", "https://ai.example.com/?session=s2"),
+                json!({ "window": "https://ai.example.com/?session=s3" })
+            ]
+        );
+    }
+
+    #[test]
+    fn links_handed_over_that_the_window_would_refuse_are_refused() {
+        let mut links = links();
+        let out = run(
+            &mut links,
+            &[
+                created("A", "http://127.0.0.1:7780/"),
+                bound("A", &link("file:///etc/passwd", true)),
+                bound("A", &link("javascript:alert(1)", false)),
+                bound("A", &link("vscode://file/x?y", false)),
+                bound("A", &link("about:blank#prigh-desktop-quit", false)),
+                bound("A", &link("data:text/html,<p>hi", true)),
+                // Not a link at all, or another binding: nothing.
+                bound("A", "https://example.com/"),
+                bound("A", r#"{"newWindow": true}"#),
+                json!({ "method": "Runtime.bindingCalled", "sessionId": "S-A",
+                        "params": { "name": "other", "payload": link("https://example.com/", false) } })
+                .to_string(),
+            ],
+        );
+        assert_eq!(
+            out,
+            [
+                json!({ "log": "refused to open file:///etc/passwd from prigh's page" }),
+                json!({ "log": "refused to open javascript:alert(1) from prigh's page" }),
+                json!({ "log": "refused to open vscode://file/x from prigh's page" }),
+                json!({ "log": "refused to open about:blank from prigh's page" }),
+                json!({ "log": "refused to open data:text/html,<p>hi from prigh's page" }),
+            ]
+        );
+    }
+
+    #[test]
+    fn only_prighs_pages_on_prighs_site_may_hand_links_over() {
+        let mut links = links();
+        let mut out = run(
+            &mut links,
+            &[
+                created("A", "https://ai.example.com/"),
+                // Away signing in: the sign-in's pages have it too (it is the
+                // window's), but no say.
+                changed("A", "https://login.example.com/flow"),
+                bound("A", &link("https://evil.example/", false)),
+                // A session that is not one of prigh's windows', or none.
+                bound("Z", &link("https://example.com/", false)),
+                json!({ "method": "Runtime.bindingCalled",
+                        "params": { "name": BINDING, "payload": link("https://example.com/", false) } })
+                .to_string(),
+            ],
+        );
+        // Back: it may again; once closed, not.
+        out.extend(run(
+            &mut links,
+            &[
+                changed("A", "https://ai.example.com/"),
+                bound("A", &link("https://example.com/", false)),
+                json!({ "method": "Target.targetDestroyed", "params": { "targetId": "A" } }).to_string(),
+                bound("A", &link("https://example.com/", false)),
+            ],
+        ));
+        assert_eq!(
+            out,
+            [
+                json!({ "log": "prigh's window went to https://login.example.com on its own (a sign-in?): it stays there until it is back" }),
+                json!({ "log": "ignored a link to open from https://login.example.com, which is not prigh's" }),
+                json!({ "log": "prigh's window is back from https://login.example.com" }),
+                json!({ "open": "https://example.com/" }),
+            ]
+        );
+    }
+
+    #[test]
+    fn links_handed_over_are_limited_as_the_windows_links_are() {
+        let mut links = links();
+        let mut out = run(&mut links, &[created("A", "http://127.0.0.1:7780/")]);
+        for i in 0..4 {
+            out.extend(run(&mut links, &[bound("A", &link(&format!("https://spam.example/{i}"), true))]));
+        }
+        out.extend(run_at(&mut links, &[bound("A", &link("https://spam.example/later", true))], 6));
+        assert_eq!(
+            out,
+            [
+                json!({ "open": "https://spam.example/0" }),
+                json!({ "open": "https://spam.example/1" }),
+                json!({ "log": "https://spam.example again within 5s: not opening it in the default browser again" }),
+                json!({ "open": "https://spam.example/later" }),
+            ]
         );
     }
 
@@ -884,7 +1101,13 @@ mod tests {
             [json!({ "id": 3, "method": "Target.attachToTarget", "params": { "targetId": "A", "flatten": true } })]
         );
         let out = run_raw(&mut links, &[json!({ "id": 3, "result": { "sessionId": "S" } }).to_string()], 0);
-        assert_eq!(out, [json!({ "id": 4, "method": "Page.enable", "sessionId": "S", "params": {} })]);
+        assert_eq!(
+            out,
+            [
+                json!({ "id": 4, "method": "Page.enable", "sessionId": "S", "params": {} }),
+                json!({ "id": 5, "method": "Runtime.addBinding", "sessionId": "S", "params": { "name": "prighOpenExternal" } }),
+            ]
+        );
         // Detached (DevTools' own window took it?): attached again when next
         // on prigh's site.
         let detached =
@@ -892,8 +1115,12 @@ mod tests {
         let out = run_raw(&mut links, &[detached.to_string(), changed("A", "http://127.0.0.1:7780/?session=s")], 0);
         assert_eq!(
             out,
-            [json!({ "id": 5, "method": "Target.attachToTarget", "params": { "targetId": "A", "flatten": true } })]
+            [json!({ "id": 6, "method": "Target.attachToTarget", "params": { "targetId": "A", "flatten": true } })]
         );
+        // The new session has the binding again.
+        let out = run_raw(&mut links, &[json!({ "id": 6, "result": { "sessionId": "S2" } }).to_string()], 0);
+        assert_eq!(out[1]["method"], "Runtime.addBinding");
+        assert_eq!(out[1]["sessionId"], "S2");
     }
 
     #[test]
@@ -915,7 +1142,8 @@ mod tests {
             [
                 json!({ "id": 3, "method": "Target.attachToTarget", "params": { "targetId": "A", "flatten": true } }),
                 json!({ "id": 4, "method": "Page.enable", "sessionId": "S", "params": {} }),
-                json!({ "id": 5, "method": "Page.navigate", "sessionId": "S",
+                json!({ "id": 5, "method": "Runtime.addBinding", "sessionId": "S", "params": { "name": "prighOpenExternal" } }),
+                json!({ "id": 6, "method": "Page.navigate", "sessionId": "S",
                         "params": { "url": "http://127.0.0.1:7780/?session=s1" } }),
             ]
         );
@@ -1219,7 +1447,7 @@ mod tests {
         assert_eq!(
             out,
             [
-                json!({ "id": 5, "method": "Page.navigate", "sessionId": "S-A", "params": { "url": "https://ai.example.com/#app=desktop&host=h" } }),
+                json!({ "id": 6, "method": "Page.navigate", "sessionId": "S-A", "params": { "url": "https://ai.example.com/#app=desktop&host=h" } }),
                 json!({ "log": "prigh's window went to https://login.example.com on its own (a sign-in?): it stays there until it is back" }),
                 json!({ "log": "prigh's window is back from https://login.example.com" }),
             ]
@@ -1234,7 +1462,11 @@ mod tests {
                 &mut links,
                 &[created("A", "http://127.0.0.1:7780/"), popup("Target.targetCreated", "B", "mailto:me@example.com")]
             ),
-            [json!({ "open": "mailto:me@example.com" }), close("B")]
+            [
+                json!({ "log": "a window opened on mailto: closing it" }),
+                json!({ "open": "mailto:me@example.com" }),
+                close("B")
+            ]
         );
     }
 
@@ -1250,6 +1482,6 @@ mod tests {
         ];
         assert_eq!(run(&mut links, &msgs), Vec::<Value>::new());
         // Forgotten: a page with that id now is a new one (here a popup).
-        assert_eq!(run(&mut links, &[popup("Target.targetCreated", "A", "https://example.com/")]).len(), 2);
+        assert_eq!(run(&mut links, &[popup("Target.targetCreated", "A", "https://example.com/")]).len(), 3);
     }
 }

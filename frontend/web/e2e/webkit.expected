@@ -2902,6 +2902,22 @@ session: cancelled; field menus: 0
 dialog: 1; focus: dialog's field; "renamed" selected 0-7
 === webkit: field_menu: errors ===
 none
+=== webkit: desktop_links: the browser shell, with the app's binding ===
+a click: handed over {"url":"https://example.com/docs","newWindow":true}
+Ctrl+click: handed over {"url":"https://example.com/docs","newWindow":true}
+a middle click: handed over {"url":"https://example.com/docs","newWindow":true}
+a mail link: handed over {"url":"mailto:me@example.com","newWindow":true}
+Enter on it: handed over {"url":"https://example.com/docs","newWindow":true}
+the browser's windows: none; still on prigh/
+prigh's own link: the browser opened ORIGIN/?own=1; handed over: 0
+=== webkit: desktop_links: the browser shell, without the binding (a browser tab, an older app) ===
+a click: the browser opened https://example.com/docs
+=== webkit: desktop_links: not in the browser shell, with a binding ===
+a click: the browser opened https://example.com/docs; handed over: 0
+=== webkit: desktop_links: a tap ===
+a tap: handed over {"url":"https://example.com/docs","newWindow":true}; the browser's windows: none
+=== webkit: desktop_links: errors ===
+none
 === webkit: card: idle ===
 row 1: 0% | $<COST>
 lamps: 0; accented: nothing; 28px high
