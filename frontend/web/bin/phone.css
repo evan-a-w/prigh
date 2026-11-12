@@ -133,6 +133,28 @@
 .sheet-grip { display: none; }
 .app.narrow .sheet-grip { display: block; width: 36px; height: 4px; margin: 0 auto 6px; border-radius: 2px; background: var(--rule-2); flex: none; }
 .app.narrow .chrome-menu.sheet { gap: 0; padding-top: 8px; min-width: 0; }
+/* Taller than a menu's sheet, short of the top strip's ⋯ (a 640px phone
+   has all but a row or two of it), and while more is below its foot fades
+   out (where the browser drives an animation by scrolling). */
+.app.narrow .chrome-menu.sheet { max-height: min(90dvh, calc(var(--vvh, 100dvh) - var(--safe-t) - 12px)) !important; }
+@keyframes sheet-more { from, 90% { opacity: 1; } to { opacity: 0; } }
+@supports (animation-timeline: scroll()) {
+  .app.narrow .chrome-menu.sheet::after {
+    content: "";
+    position: sticky;
+    /* Over the padding too (the home indicator's room): to the sheet's foot. */
+    bottom: calc(-1 * max(8px, var(--safe-b)));
+    flex: none;
+    height: 64px;
+    margin-top: -64px;
+    background: linear-gradient(transparent, var(--slate) 75%);
+    pointer-events: none;
+    /* Seen only while the sheet scrolls: a sheet that fits has no timeline. */
+    opacity: 0;
+    animation: sheet-more linear both;
+    animation-timeline: scroll();
+  }
+}
 .app.narrow .chrome-menu.sheet > .status-notes { flex-direction: column; align-items: stretch; gap: 0; padding: 0 0 6px; margin-bottom: 6px; font-size: 14px; border-bottom: 1px solid var(--rule); }
 .app.narrow .chrome-menu.sheet > .status-notes > * { min-height: var(--tap); display: flex; align-items: center; padding: 0 12px; max-width: none; }
 .sheet-row {
