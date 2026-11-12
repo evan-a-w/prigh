@@ -79,120 +79,6 @@ let model_name (m : App.Model.t) key =
   | None -> key
 ;;
 
-(* What new sessions ask before they act; the backend applies it to this
-   session too. Plan is a session's, not a default: the composer's chip. *)
-let default_mode (m : App.Model.t) ~inject =
-  let current = Option.map m.config ~f:(fun c -> c.approval_mode) in
-  row
-    ~cls:"default-mode"
-    ~name:"Mode"
-    ~about:
-      "What asks before it runs: everything (Ask), all but file edits \
-       (Auto-edit) or nothing (Auto). This session changes too."
-    ?note:(Option.value_map current ~default:(Some waiting) ~f:(fun _ -> None))
-    [ segmented
-        ~disabled:(Option.is_none current)
-        ~label:"Default mode"
-        (List.map Approval_mode.all ~f:(fun mode ->
-           let arg = Approval_mode.to_string mode in
-           ( (match mode with
-              | Ask -> "Ask"
-              | Auto_edit -> "Auto-edit"
-              | Auto -> "Auto")
-           , "/confirm " ^ arg
-           , Option.equal Approval_mode.equal current (Some mode)
-           , inject (Action.Run ("/confirm " ^ arg)) )))
-    ]
-;;
-
-let default_model (m : App.Model.t) ~inject =
-  let current =
-    match m.config with
-    | None -> None
-    | Some { default_model = None; _ } -> Some "the backend's default"
-    | Some { default_model = Some key; default_thinking; _ } ->
-      Some
-        (match default_thinking with
-         | Some level when not (String.equal level "off") ->
-           sprintf "%s · thinking %s" (model_name m key) level
-         | _ -> model_name m key)
-  in
-  let this =
-    Option.map m.state ~f:(fun s ->
-      if s.model.supports_thinking && not (String.equal s.thinking "off")
-      then sprintf "%s · thinking %s" s.model.name s.thinking
-      else s.model.name)
-  in
-  row
-    ~cls:"default-model"
-    ~name:"Model"
-    ~about:
-      (match current with
-       | Some current -> "New sessions start with " ^ current ^ "."
-       | None -> "The model and thinking level new sessions start with.")
-    ?note:(Option.value_map current ~default:(Some waiting) ~f:(fun _ -> None))
-    [ button
-        ~cls:"small"
-        ~title:
-          (match this with
-           | Some this ->
-             sprintf "Start new sessions with %s (/change_default)" this
-           | None -> "/change_default")
-        ~disabled:(Option.is_none m.config || Option.is_none m.state)
-        ~on_click:(inject (Action.Run "/change_default"))
-        [ Node.text "Use this session’s" ]
-    ]
-;;
-
-let default_dir (m : App.Model.t) ~inject =
-  let current = Option.bind m.config ~f:(fun c -> c.default_cwd) in
-  row
-    ~cls:"default-dir"
-    ~name:"Starting directory"
-    ~about:
-      (match current with
-       | Some dir -> "New sessions start in " ^ dir ^ "."
-       | None ->
-         "New sessions start in the tool host's home. /default-dir PATH sets \
-          one.")
-    (match current with
-     | Some _ ->
-       [ button
-           ~cls:"small"
-           ~title:"Start in the home directory again (/default-dir off)"
-           ~on_click:(inject (Action.Run "/default-dir off"))
-           [ Node.text "Reset" ]
-       ]
-     | None -> [])
-;;
-
-let fallback (m : App.Model.t) ~inject =
-  let models =
-    Option.value_map m.config ~default:[] ~f:(fun c -> c.fallback_models)
-  in
-  row
-    ~cls:"fallback"
-    ~name:"Fallback models"
-    ~about:
-      (match models with
-       | [] ->
-         "When a model's usage runs out, the session stops. /fallback MODEL… \
-          names models to take over, in order."
-       | models ->
-         "When a model's usage runs out: "
-         ^ String.concat ~sep:", then " (List.map models ~f:(model_name m))
-         ^ ".")
-    (match models with
-     | [] -> []
-     | _ ->
-       [ button
-           ~cls:"small"
-           ~title:"No fallback (/fallback off)"
-           ~on_click:(inject (Action.Run "/fallback off"))
-           [ Node.text "Clear" ]
-       ])
-;;
-
 module Compaction_command = Prigh_ui.Compaction_command
 
 let compact_at (m : App.Model.t) (config : Config.t option) ~inject =
@@ -1447,17 +1333,11 @@ let content (m : App.Model.t) (section : Section.t) ~inject =
     ]
   | Sessions ->
     [ group
-        ~title:"New sessions"
-        [ default_model m ~inject
-        ; default_mode m ~inject
-        ; default_dir m ~inject
-        ; fallback m ~inject
-        ]
-    ; group
         ~title:"Session list"
         [ worktree_hours m ~inject; auto_archive m ~inject ]
     ; group ~title:"Notifications" [ notifications m ~inject ]
     ]
+  | New_sessions -> New_sessions_view.groups m ~inject
   | Models ->
     [ group ~title:"Providers" [ providers m ~inject ]
     ; group
@@ -1508,6 +1388,7 @@ let content (m : App.Model.t) (section : Section.t) ~inject =
 let section_icon : Section.t -> Icon.t = function
   | Appearance -> Palette
   | Sessions -> Bot
+  | New_sessions -> Plus
   | Models -> Brain
   | Memory -> Book
   | About_you -> User

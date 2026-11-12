@@ -1833,6 +1833,13 @@ kbd {
 .setting-select-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .setting-select > .chevron { width: 13px; height: 13px; color: var(--faint); flex-shrink: 0; }
 .setting-select:hover > .chevron { color: var(--chalk); }
+/* Settings → New sessions: the directory field, the fallback chain. */
+.default-dir-input { width: 240px; max-width: 100%; }
+.fallback-list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.fallback-model { display: inline-flex; align-items: center; gap: 6px; padding: 2px 2px 2px 8px; border: 1px solid var(--rule); border-radius: 6px; }
+.fallback-index { color: var(--faint); font-size: 12px; font-variant-numeric: tabular-nums; }
+.fallback-actions { display: flex; align-items: center; gap: 8px; }
+.default-fallback .setting-control { flex-wrap: wrap; justify-content: flex-end; }
 .setting-control { display: flex; align-items: center; gap: 8px; flex-shrink: 0; margin-left: auto; }
 .account-setting { flex-wrap: nowrap; }
 .account-setting .setting-text { flex-basis: 0; }

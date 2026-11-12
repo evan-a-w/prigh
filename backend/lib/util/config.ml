@@ -32,6 +32,7 @@ type t =
   ; default_thinking : Thinking.t option
   ; fallback_models : string list
   ; default_cwd : string option
+  ; default_host : string option
   ; worktrees_dir : string
   ; max_budget_usd : float option
   ; goal_max_continuations : int
@@ -64,6 +65,7 @@ let default =
   ; default_thinking = None
   ; fallback_models = []
   ; default_cwd = None
+  ; default_host = None
   ; worktrees_dir = default_worktrees_dir
   ; max_budget_usd = None
   ; goal_max_continuations = Goal.default_max_continuations
@@ -126,6 +128,7 @@ let to_json t =
     ; ( "fallback_models"
       , `Array (List.map t.fallback_models ~f:(fun s -> `String s)) )
     ; "default_cwd", option (fun s -> `String s) t.default_cwd
+    ; "default_host", option (fun s -> `String s) t.default_host
     ; "worktrees_dir", `String t.worktrees_dir
     ; ( "max_budget_usd"
       , option
@@ -181,6 +184,15 @@ let of_json json =
       | Some (`String "") -> Ok None
       | Some (`String s) -> Ok (Some s)
       | Some _ -> Or_error.error_string "config.default_cwd must be a string"
+    in
+    let%bind default_host =
+      match find "default_host" with
+      | None | Some `Null | Some (`String "") -> Ok None
+      | Some (`String s) -> Ok (Some s)
+      | Some _ ->
+        Or_error.error_string
+          "config.default_host must be a tool host's id (or null: where you \
+           are)"
     in
     let%bind worktrees_dir =
       match find "worktrees_dir" with
@@ -424,6 +436,7 @@ let of_json json =
     ; default_thinking
     ; fallback_models
     ; default_cwd
+    ; default_host
     ; worktrees_dir
     ; max_budget_usd
     ; goal_max_continuations

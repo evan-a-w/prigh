@@ -3,6 +3,7 @@ open! Core
 type t =
   | Appearance
   | Sessions
+  | New_sessions
   | Models
   | Memory
   | About_you
@@ -17,6 +18,7 @@ let available ~superuser =
     | Nix_store -> superuser
     | Appearance
     | Sessions
+    | New_sessions
     | Models
     | Memory
     | About_you
@@ -32,6 +34,7 @@ let visible t ~superuser =
 let name = function
   | Appearance -> "Appearance"
   | Sessions -> "Sessions"
+  | New_sessions -> "New sessions"
   | Models -> "Models"
   | Memory -> "Memory"
   | About_you -> "About you"
@@ -46,8 +49,11 @@ let about = function
     "How this page looks. Saved for your account, so it follows you to every \
      browser you sign in on."
   | Sessions ->
-    "How new sessions start, how the session list shows them, and how this \
-     browser tells you that something happened. Kept on the backend."
+    "How the session list shows sessions, and how this browser tells you that \
+     something happened. Kept on the backend."
+  | New_sessions ->
+    "What a new session starts with. A change applies from the next new \
+     session: open ones keep theirs. Kept on the backend."
   | Models ->
     "The providers whose models you use, the models prigh uses for its own \
      work, and when long conversations are summarised. Kept on the backend."
@@ -71,6 +77,7 @@ let about = function
 let arg = function
   | Appearance -> "appearance"
   | Sessions -> "sessions"
+  | New_sessions -> "new-sessions"
   | Models -> "models"
   | Memory -> "memory"
   | About_you -> "user-info"
@@ -93,6 +100,7 @@ let of_arg s =
     match List.find all ~f:(fun t -> String.equal (arg t) s) with
     | Some t -> Some t
     | None when String.is_prefix "behaviour" ~prefix:s -> Some Sessions
+    | None when String.is_prefix "defaults" ~prefix:s -> Some New_sessions
     | None -> List.find all ~f:matches)
 ;;
 

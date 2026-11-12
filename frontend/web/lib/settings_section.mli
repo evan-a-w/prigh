@@ -5,6 +5,7 @@ open! Core
 type t =
   | Appearance
   | Sessions
+  | New_sessions (** what new sessions start with *)
   | Models
   | Memory
   | About_you

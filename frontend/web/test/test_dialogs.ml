@@ -206,7 +206,7 @@ let%expect_test "help lists every key and command" =
     Commands
     /help [command] show commands and keys, or a command's usage
     /hotkeys show the keyboard shortcuts
-    /settings [section] appearance, sessions, models, git hosting and your account; a section opens at it (Ctrl+,)
+    /settings [section] appearance, sessions, new sessions' defaults, models, git hosting and your account; a section opens at it (Ctrl+,)
     /new start a new session
     /temporary a temporary session: not saved or listed, deleted when you leave it (Ctrl+Shift+O); in one, keep it or delete it
     /model [name] pick or switch the model
@@ -254,7 +254,9 @@ let%expect_test "help lists every key and command" =
     /cd [path] change the working directory (asks to create a missing one)
     /mkdir [path] create a directory (and its parents) and change to it
     /worktree [list|new|open|back|rm] pick a git worktree of the repository to work in (Alt+Enter: in a new session, Alt+R: review its changes, Delete removes it); new BRANCH [BASE] creates one and works there; open [-n] TARGET (-n: in a new session); back [main]: back where the session switched into worktrees from; rm [-f] TARGET (-f: with uncommitted changes)
-    /default-dir [path|off] show or set the directory new sessions start in
+    /default-dir [path|off] show or set the directory new sessions start in (on the default host), in Settings
+    /default-host [off|name] pick or set the tool host new sessions start on (off: where you are), in Settings
+    /default-budget [off|dollars] show or set the cost budget of sessions that set none with /budget, in Settings
     /host [name|backend] pick where tools run, and the directory there
     /export [path] export the transcript on the backend (markdown, or .jsonl)
     /import [path] import a session from a JSONL file on the backend
