@@ -1294,7 +1294,20 @@ let review_out (m : Model.t) (outs : Code_review.Out.t list) =
     | Clear_text_selection -> m, cmds @ [ Command.Clear_text_selection ])
 ;;
 
-let with_review (m : Model.t) (review, outs) = review_out { m with review } outs
+(* On a phone the review page is a sheet: the sheets it was opened from
+   close, or they would stay over it. *)
+let with_review (m : Model.t) ((review : Code_review.t), outs) =
+  let m =
+    if m.narrow && review.open_ && not m.review.open_
+    then
+      { m with
+        files = fst (Files.update m.files Close)
+      ; agents = { m.agents with open_ = false }
+      }
+    else m
+  in
+  review_out { m with review } outs
+;;
 
 (* What the agent may have changed in the working tree: an edit, a write, a
    command, its own or a subagent's; and a run's end. *)
