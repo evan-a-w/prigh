@@ -40,6 +40,7 @@ let set t (which : Which.t) field =
 let draft t which = (get t which).draft
 let error t which = (get t which).error
 let input t which text = set t which { draft = Some text; error = None }
+let clear t which = set t which Field.empty
 
 let parse (which : Which.t) text =
   match which with
