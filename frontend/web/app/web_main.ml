@@ -1827,6 +1827,7 @@ let run () =
   Async_js.init ();
   Service_worker.register ();
   Desktop_page.take_shell ();
+  External_link_listeners.install ();
   Desktop_page.take_hint ();
   let signin = Desktop_page.signin_requested () in
   match Desktop_page.key () with
