@@ -3078,6 +3078,10 @@ full width: true; at the bottom: true
 ok
 === chromium: mobile: 390x844: the files ===
 ok
+=== chromium: mobile: 390x844: the review page ===
+ok
+=== chromium: mobile: 390x844: the review's files ===
+ok
 === chromium: mobile: 390x844: the keyboard ===
 the composer in view: true
 === chromium: mobile: 320x640: the chat ===
@@ -3112,6 +3116,10 @@ full width: true; at the bottom: true
 ok
 === chromium: mobile: 320x640: the files ===
 ok
+=== chromium: mobile: 320x640: the review page ===
+ok
+=== chromium: mobile: 320x640: the review's files ===
+ok
 === chromium: mobile: 320x640: the keyboard ===
 the composer in view: true
 === chromium: mobile: 390x844-pwa: the chat ===
@@ -3145,6 +3153,10 @@ full width: true; at the bottom: true
 === chromium: mobile: 390x844-pwa: / completion ===
 ok
 === chromium: mobile: 390x844-pwa: the files ===
+ok
+=== chromium: mobile: 390x844-pwa: the review page ===
+ok
+=== chromium: mobile: 390x844-pwa: the review's files ===
 ok
 === chromium: mobile: 390x844-pwa: the keyboard ===
 the composer in view: true

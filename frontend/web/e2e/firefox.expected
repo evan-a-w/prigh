@@ -3057,6 +3057,10 @@ full width: true; at the bottom: true
 ok
 === firefox: mobile: 390x844: the files ===
 ok
+=== firefox: mobile: 390x844: the review page ===
+ok
+=== firefox: mobile: 390x844: the review's files ===
+ok
 === firefox: mobile: 320x640: the chat ===
 ok
 === firefox: mobile: 320x640: the chrome ===
@@ -3088,6 +3092,10 @@ full width: true; at the bottom: true
 === firefox: mobile: 320x640: / completion ===
 ok
 === firefox: mobile: 320x640: the files ===
+ok
+=== firefox: mobile: 320x640: the review page ===
+ok
+=== firefox: mobile: 320x640: the review's files ===
 ok
 === firefox: terminal keys: a desktop ===
 the shell has the focus: true; the bar: hidden
