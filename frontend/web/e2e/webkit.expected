@@ -3319,6 +3319,189 @@ fits: true
 fits: true
 === webkit: sessions settings: errors ===
 (none)
+=== webkit: new sessions: the session open, before ===
+model: DeepSeek V4.1 Flash: switch model (Ctrl+L)
+thinking: Thinking on: how much the model reasons before it answers (Alt+T cycles, /thinking)
+mode: Tools run without asking (Alt+M cycles, /mode picks)
+host: Tools run on <host>, in <cwd> (/host switches)
+=== webkit: new sessions: the built-ins ===
+New sessions
+What a new session starts with. A change applies from the next new session: open ones keep theirs. Kept on the backend.
+START WITH
+From the next new session
+Model
+New sessions start with the backend's choice: a model of a provider you are logged in to.
+The backend's choice
+This session’s
+Thinking
+How hard new sessions think, on models that can: Off, Low, On (the model's own), High or Max.
+Off
+Low
+On
+High
+Max
+Mode
+What asks before it runs: everything (Ask), all but file edits (Auto-edit) or nothing (Auto).
+Ask
+Auto-edit
+Auto
+Tool host
+New sessions you start here run their tools where the session you are on does.
+Where you are
+Starting directory
+New sessions start in their tool host's working directory. ~/ is its home.
+LIMITS
+Every session without its own
+Fallback models
+When a model's usage runs out, the next in this list takes over the conversation. Every session follows it, open ones too.
+None: a model whose usage runs out stops.
+Add
+Budget
+Sessions without their own /budget start no turn once they have cost this much, open ones too.
+Off: no limit. Type an amount to set one.
+$
+Off
+=== webkit: new sessions: all set ===
+New sessions
+What a new session starts with. A change applies from the next new session: open ones keep theirs. Kept on the backend.
+START WITH
+From the next new session
+Model
+New sessions start with Claude Fable 5.
+Claude Fable 5
+This session’s
+Thinking
+How hard new sessions think, on models that can: Off, Low, On (the model's own), High or Max.
+Off
+Low
+On
+High
+Max
+Mode
+What asks before it runs: everything (Ask), all but file edits (Auto-edit) or nothing (Auto).
+Ask
+Auto-edit
+Auto
+Tool host
+New sessions you start here run their tools on laptop, while it is connected.
+laptop
+Starting directory
+New sessions start in ~/proj, on their tool host.
+LIMITS
+Every session without its own
+Fallback models
+When a model's usage runs out, the next in this list takes over the conversation. Every session follows it, open ones too.
+1
+DeepSeek V4.1 Flash
+Add
+Budget
+Sessions without their own /budget start no turn once they have cost this much, open ones too.
+$
+Off
+default_model="anthropic/claude-fable-5" default_thinking="high" approval_mode="ask" default_host="host-laptop" default_cwd="~/proj" fallback_models=["deepseek/deepseek-flash"] max_budget_usd=2.5
+=== webkit: new sessions: the other browser ===
+New sessions
+What a new session starts with. A change applies from the next new session: open ones keep theirs. Kept on the backend.
+START WITH
+From the next new session
+Model
+New sessions start with Claude Fable 5.
+Claude Fable 5
+This session’s
+Thinking
+How hard new sessions think, on models that can: Off, Low, On (the model's own), High or Max.
+Off
+Low
+On
+High
+Max
+Mode
+What asks before it runs: everything (Ask), all but file edits (Auto-edit) or nothing (Auto).
+Ask
+Auto-edit
+Auto
+Tool host
+New sessions you start here run their tools on laptop, while it is connected.
+laptop
+Starting directory
+New sessions start in ~/proj, on their tool host.
+LIMITS
+Every session without its own
+Fallback models
+When a model's usage runs out, the next in this list takes over the conversation. Every session follows it, open ones too.
+1
+DeepSeek V4.1 Flash
+Add
+Budget
+Sessions without their own /budget start no turn once they have cost this much, open ones too.
+$
+Off
+=== webkit: new sessions: refused ===
+Budget
+Sessions without their own /budget start no turn once they have cost this much, open ones too.
+“lots” isn't an amount of dollars: type one like 5 or 2.50, or clear the field for no budget.
+$
+Off
+=== webkit: new sessions: the session open keeps its own ===
+model: DeepSeek V4.1 Flash: switch model (Ctrl+L)
+thinking: Thinking on: how much the model reasons before it answers (Alt+T cycles, /thinking)
+mode: Tools run without asking (Alt+M cycles, /mode picks)
+host: Tools run on <host>, in <cwd> (/host switches)
+=== webkit: new sessions: a new session ===
+model: Claude Fable 5: switch model (Ctrl+L)
+thinking: Thinking high: how much the model reasons before it answers (Alt+T cycles, /thinking)
+mode: Bash, job_input, edits and MCP tools ask first (Alt+M cycles, /mode picks)
+host: Tools run on laptop, in <dir>/laptop-home/proj (/host switches)
+Budget $2.50, $0.00 spent: /budget DOLLARS changes it, /budget off removes it
+Fallback: deepseek/deepseek-flash (now on anthropic/claude-fable-5)
+=== webkit: new sessions: phone 390x844 ===
+fits: yes; targets: all ok
+after the picker: back on the settings
+back: New sessions | What a new session starts with. A change applies from the next new session: open ones keep theirs. Kept on the backend.
+=== webkit: new sessions: phone 320x640 ===
+fits: yes; targets: all ok
+after the picker: back on the settings
+back: New sessions | What a new session starts with. A change applies from the next new session: open ones keep theirs. Kept on the backend.
+=== webkit: new sessions: reset ===
+New sessions
+What a new session starts with. A change applies from the next new session: open ones keep theirs. Kept on the backend.
+START WITH
+From the next new session
+Model
+New sessions start with the backend's choice: a model of a provider you are logged in to.
+The backend's choice
+This session’s
+Thinking
+How hard new sessions think, on models that can: Off, Low, On (the model's own), High or Max.
+Off
+Low
+On
+High
+Max
+Mode
+What asks before it runs: everything (Ask), all but file edits (Auto-edit) or nothing (Auto).
+Ask
+Auto-edit
+Auto
+Tool host
+New sessions you start here run their tools where the session you are on does.
+Where you are
+Starting directory
+New sessions start in their tool host's working directory. ~/ is its home.
+LIMITS
+Every session without its own
+Fallback models
+When a model's usage runs out, the next in this list takes over the conversation. Every session follows it, open ones too.
+None: a model whose usage runs out stops.
+Add
+Budget
+Sessions without their own /budget start no turn once they have cost this much, open ones too.
+Off: no limit. Type an amount to set one.
+$
+Off
+default_model=null default_thinking=null approval_mode="auto" default_host=null default_cwd=null fallback_models=[] max_budget_usd=null
+=== webkit: new sessions: errors ===
+(none)
 === webkit: memory: notes ===
 Memory
 What you asked the model to remember, for later sessions. Kept on the backend, for your account.
