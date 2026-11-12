@@ -491,8 +491,9 @@ let%expect_test "save_as_default applies to new agents, not saved sessions" =
     ((scoped_models (a)) (approval_mode Auto)
      (permissions ((allow ()) (ask ()) (deny ())))
      (default_model (deepseek/deepseek-flash)) (default_thinking ((On (High))))
-     (fallback_models ()) (default_cwd ()) (worktrees_dir ~/.prigh/worktrees)
-     (max_budget_usd ()) (goal_max_continuations 20) (resume_on_limit_reset true)
+     (fallback_models ()) (default_cwd ()) (default_host ())
+     (worktrees_dir ~/.prigh/worktrees) (max_budget_usd ())
+     (goal_max_continuations 20) (resume_on_limit_reset true)
      (ask_user_timeout_seconds 300) (archive_after_days 7) (notify Bell)
      (snippets ()) (auto_background_seconds 30) (generate_model ())
      (mask_observations true) (computer_screenshots 3)
@@ -508,6 +509,7 @@ let%expect_test "save_as_default applies to new agents, not saved sessions" =
       "default_thinking": "high",
       "fallback_models": [],
       "default_cwd": null,
+      "default_host": null,
       "worktrees_dir": "~/.prigh/worktrees",
       "max_budget_usd": null,
       "goal_max_continuations": 20,

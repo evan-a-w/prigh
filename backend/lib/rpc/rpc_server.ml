@@ -1772,6 +1772,23 @@ let hello t (client : Client.t) params =
             ]))))
 ;;
 
+(* The namespace's file as it is now, which another session may have
+   changed. *)
+let current_config t agent =
+  match Option.map t.home ~f:(fun home -> Config.load ~home) with
+  | Some (Ok config) -> config
+  | Some (Error _) | None -> Agent.config agent
+;;
+
+(* Every session hears of a change one of them saved, and tells its clients:
+   open settings follow, and a later [set_config] from any of them starts
+   from it. *)
+let config_saved t agent =
+  let config = Agent.config agent in
+  Hashtbl.iter t.agents ~f:(fun other ->
+    if not (phys_equal other agent) then Agent.adopt_config other config)
+;;
+
 (* The file is reread so that a change made from another session counts. *)
 let archive_after_days t (client : Client.t) =
   let config =
@@ -1819,8 +1836,50 @@ let attached_state (client : Client.t) =
 (* A temporary session is not saved or listed, and ends when its client
    leaves it ([attach]), or [temporary_grace] after the last one went. Its
    ledger exists from the start, so that a restart knows to clean up. *)
-let new_session t (client : Client.t) ~temporary =
+(* Where [new_session] starts a session. A tool host's sessions start on
+   it, where it is; another client's on the config's [default_host] while
+   that is connected, else as [start_location] says. On the default host
+   (the backend's without one), in [default_cwd] when there is one. *)
+let new_session_start t (client : Client.t) =
   let start = start_location t client ~cwd:(own_cwd client) in
+  if client.tools
+  then start
+  else (
+    let config = current_config t client.agent in
+    let hosts = Agent.hosts client.agent in
+    let find id =
+      List.find hosts ~f:(fun (h : Agent.Host.t) -> String.equal h.id id)
+    in
+    let start =
+      match Option.bind config.default_host ~f:find with
+      | Some h ->
+        Some ({ Session.Host.id = h.id; name = h.name; pinned = false }, h.cwd)
+      | None -> start
+    in
+    let on = Option.value config.default_host ~default:Agent.Host.backend_id in
+    let default_dir (h : Agent.Host.t) dir =
+      if String.equal h.id Agent.Host.backend_id
+      then (
+        let dir = Tool.expand_home dir in
+        match Sys_unix.is_directory dir with
+        | `Yes -> Some dir
+        | `No | `Unknown -> None)
+      else if String.is_prefix dir ~prefix:"~"
+      then Option.map h.home ~f:(fun home -> Tool.expand_home ~home dir)
+      else Some dir
+    in
+    match start, config.default_cwd with
+    | Some (host, cwd), Some dir when String.equal host.id on ->
+      let cwd =
+        Option.bind (find on) ~f:(fun h -> default_dir h dir)
+        |> Option.value ~default:cwd
+      in
+      Some (host, cwd)
+    | _ -> start)
+;;
+
+let new_session t (client : Client.t) ~temporary =
+  let start = new_session_start t client in
   let cwd =
     match start with
     | Some (_, cwd) -> cwd
@@ -2684,6 +2743,40 @@ let keep_session t (client : Client.t) =
     Ok (attached_state client))
 ;;
 
+let set_config t agent params =
+  match param params "config" with
+  | None -> Or_error.error_string "missing param \"config\""
+  | Some json ->
+    (* Fields left out keep their values, so a frontend that does not know a
+       field cannot reset it. *)
+    let json =
+      match Config.to_json (current_config t agent), json with
+      | `Object current, `Object given ->
+        (* [confirm_tools] from an older frontend stands for
+           [approval_mode]. *)
+        let given_names =
+          List.map given ~f:fst
+          @
+          if List.Assoc.mem given ~equal:String.equal "confirm_tools"
+          then [ "approval_mode" ]
+          else []
+        in
+        `Object
+          (List.filter current ~f:(fun (k, _) ->
+             not (List.mem given_names k ~equal:String.equal))
+           @ given)
+      | _, json -> json
+    in
+    let open Or_error.Let_syntax in
+    let%bind config = Config.of_json json in
+    let%bind defaults_only = bool_param params "defaults_only" ~default:false in
+    let%map () =
+      Agent.set_config ~session_mode:(not defaults_only) agent config
+    in
+    config_saved t agent;
+    Config.to_json (Agent.config agent)
+;;
+
 let dispatch_server t (client : Client.t) ~meth ~params
   : Json.t Or_error.t option
   =
@@ -2764,6 +2857,12 @@ let dispatch_server t (client : Client.t) ~meth ~params
     Some
       (unit_result
          (Terminal_relay.closed t.terminals ~host:client.host_id params))
+  | "set_config" -> Some (set_config t client.agent params)
+  | "change_default" ->
+    Some
+      (Or_error.map (Agent.save_as_default client.agent) ~f:(fun () ->
+         config_saved t client.agent;
+         Config.to_json (Agent.config client.agent)))
   | "new_session" ->
     Some
       (Or_error.map
@@ -3299,36 +3398,6 @@ let dispatch agent login ~(client : Client.t) ~meth ~params : Json.t Or_error.t 
     Or_error.bind (string_param_opt params "host") ~f:(fun host ->
       Agent.list_dirs ?host agent ~prefix)
   | "get_config" -> ok (Config.to_json (Agent.config agent))
-  | "set_config" ->
-    (match param params "config" with
-     | None -> Or_error.error_string "missing param \"config\""
-     | Some json ->
-       (* Fields left out keep their values, so a frontend that does not know
-          a field cannot reset it. *)
-       let json =
-         match Config.to_json (Agent.config agent), json with
-         | `Object current, `Object given ->
-           (* [confirm_tools] from an older frontend stands for
-              [approval_mode]. *)
-           let given_names =
-             List.map given ~f:fst
-             @
-             if List.Assoc.mem given ~equal:String.equal "confirm_tools"
-             then [ "approval_mode" ]
-             else []
-           in
-           `Object
-             (List.filter current ~f:(fun (k, _) ->
-                not (List.mem given_names k ~equal:String.equal))
-              @ given)
-         | _, json -> json
-       in
-       Or_error.bind (Config.of_json json) ~f:(fun config ->
-         Or_error.map (Agent.set_config agent config) ~f:(fun () ->
-           Config.to_json (Agent.config agent))))
-  | "change_default" ->
-    Or_error.map (Agent.save_as_default agent) ~f:(fun () ->
-      Config.to_json (Agent.config agent))
   | "tool_confirm_respond" ->
     let open Or_error.Let_syntax in
     let%bind call_id = string_param params "call_id" in
