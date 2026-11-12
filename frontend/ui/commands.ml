@@ -291,6 +291,11 @@ let every =
       "unpin a session (the current one without an argument)"
   ; c "delete-archived" "" "delete every archived session, after a confirmation"
   ; c
+      "auto-archive"
+      "[DAYS|off]"
+      "show how long a session goes without activity before it is archived; \
+       DAYS|off: archive after DAYS days (off: never, only by hand)"
+  ; c
       ~argument:Argument.Agents
       "agents"
       "[steer|cancel ...]"
