@@ -3338,47 +3338,91 @@ editing fits: yes; targets: all ok
 back: Memory | What you asked the model to remember, for later sessions. Kept on the backend, for your account.
 === webkit: memory: errors ===
 (none)
-=== webkit: user info: empty ===
+=== webkit: user info: moved from user_info.md ===
 About you
 What the model should know about you, given to it in every session. Kept on the backend, for your account.
-Describe yourself
-Who you are, what you work on, how you like answers. This text is given to the model in every session: new ones start with it, and open ones get it with your next message. Memory is for notes the model looks up only when it needs them.
-0 of 4000 bytes
+Tell the model about you
+Every field is optional. What you fill in is given to the model in every session: new ones start with it, and open ones get it with your next message. Memory is for notes the model looks up only when it needs them.
+Name
+Country or region
+Time zone
+Use Australia/Sydney
+Language and spelling
+Units
+Not set
+Metric
+Imperial
+US
+Date format
+Not set
+D/M/Y
+M/D/Y
+ISO
+Occupation or role
+Background and expertise
+Anything else
+21 of 5000 bytes
 Ctrl+Enter saves
 Save
-text: ""
+values: name="" country="" time-zone="" language="" units="Not set" date-format="Not set" occupation="" background="" anything-else="I like short answers."
+files: user_info.md: no, user_info.md.migrated: yes
 === webkit: user info: saved ===
 About you
 What the model should know about you, given to it in every session. Kept on the backend, for your account.
-Describe yourself
-Who you are, what you work on, how you like answers. This text is given to the model in every session: new ones start with it, and open ones get it with your next message. Memory is for notes the model looks up only when it needs them.
+Tell the model about you
+Every field is optional. What you fill in is given to the model in every session: new ones start with it, and open ones get it with your next message. Memory is for notes the model looks up only when it needs them.
+Name
+Country or region
+Time zone
+Language and spelling
+Units
+Not set
+Metric
+Imperial
+US
+Date format
+Not set
+D/M/Y
+M/D/Y
+ISO
+Occupation or role
+Background and expertise
+Anything else
 Saved. New sessions start with it; open ones get it with your next message in them.
-57 of 4000 bytes
+79 of 5000 bytes
 Ctrl+Enter saves
 Save
-text: "I'm Lloyd. I work on prigh, in OCaml.\nKeep answers short."
-file: "I'm Lloyd. I work on prigh, in OCaml.\nKeep answers short.\n"
-reverted: "I'm Lloyd. I work on prigh, in OCaml.\nKeep answers short."
+values: name="Lloyd" country="Australia" time-zone="Australia/Sydney" language="" units="Metric" date-format="D/M/Y" occupation="" background="Undergrad pure maths and CS." anything-else="I like short answers."
+file: {
+  "version": 1,
+  "name": "Lloyd",
+  "country": "Australia",
+  "time_zone": "Australia/Sydney",
+  "units": "metric",
+  "date_format": "dmy",
+  "background": "Undergrad pure maths and CS.",
+  "anything_else": "I like short answers."
+}
+reverted: "Lloyd"
 === webkit: user info: followed on another page ===
-text: "I'm Lloyd. Keep answers short."
+values: name="Lloyd" country="Australia" time-zone="Australia/Sydney" language="" units="Metric" date-format="D/M/Y" occupation="Student" background="Undergrad pure maths and CS." anything-else="I like short answers."
 === webkit: user info: changed under a draft ===
-About you
-What the model should know about you, given to it in every session. Kept on the backend, for your account.
-Describe yourself
-Who you are, what you work on, how you like answers. This text is given to the model in every session: new ones start with it, and open ones get it with your next message. Memory is for notes the model looks up only when it needs them.
 It was changed somewhere else while you were typing. Saving replaces that with this.
 Load that one
-23 of 4000 bytes
-Ctrl+Enter saves
-Revert
-Save
-text: "typed on the other page"
-loaded: "I'm Lloyd. Keep answers short, in British English."
+loaded: name="Lloyd" country="Australia" time-zone="Australia/Sydney" language="English, Australian spelling" units="Metric" date-format="D/M/Y" occupation="Student" background="Undergrad pure maths and CS." anything-else="I like short answers."
 === webkit: user info: the session is told ===
-☺ About you: the model was given what you wrote
-[User info: what the user wrote about themselves in prigh's settings, for every session, is now:
-I'm Lloyd. Keep answers short, in British English.
-It replaces any earlier text about the user.]
+☺ About you: the model was given your details
+[User info: what the user set about themselves in prigh's settings, for every session, is now:
+- Name: Lloyd
+- Country/region: Australia
+- Time zone: Australia/Sydney
+- Language and spelling: English, Australian spelling
+- Units: metric (°C, km, kg, L)
+- Date format: day/month/year (25/12/2026)
+- Occupation/role: Student
+- Background and expertise: Undergrad pure maths and CS.
+- Anything else: I like short answers.
+It replaces anything earlier about the user from their settings.]
 === webkit: user info: phone 390x844 ===
 fits: yes; targets: all ok; Save on screen: yes
 typing fits: yes; targets: all ok; Save on screen: yes

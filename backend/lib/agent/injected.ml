@@ -80,9 +80,9 @@ module Note = struct
     | Client { client } -> "Using " ^ Client_kind.describe client
     | Ui_action { summary; _ } -> summary
     | User_info { cleared = false } ->
-      "About you: the model was given what you wrote"
+      "About you: the model was given your details"
     | User_info { cleared = true } ->
-      "About you: the model was told you removed it"
+      "About you: the model was told you cleared them"
   ;;
 
   let steer ~from_user ~follow_up =

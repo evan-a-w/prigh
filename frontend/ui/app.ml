@@ -3244,31 +3244,38 @@ let confirm_forget_memory m (note : P.Memory.Note.t) ~back =
 (* ---- user info --------------------------------------------------------- *)
 
 let user_info_where =
-  "~/.prigh/user_info.md on the backend; prigh-web: Settings, About you"
+  "~/.prigh/about_you.json on the backend; prigh-web: Settings, About you"
+;;
+
+let user_info_fields =
+  String.concat
+    ~sep:"\n"
+    (List.map P.User_info.Form.fields ~f:(fun (field, what) ->
+       sprintf "  %-14s %s" field what))
 ;;
 
 let user_info_shown m (info : P.User_info.t) =
-  if String.is_empty info.text
-  then
-    notice
-      m
-      (sprintf
-         "nothing about you yet: /user-info TEXT tells the model who you are \
-          and how you like to work, in every session (%s)"
-         user_info_where)
-  else
-    output
-      m
-      ~title:
-        (sprintf
-           "About you · given to the model in every session · %d of %d bytes"
-           (String.length info.text)
-           info.max)
-      (Content.lines
-         (info.text
-          ^ "\n\n/user-info TEXT replaces it, /user-info clear removes it ("
-          ^ user_info_where
-          ^ ")"))
+  output
+    m
+    ~title:
+      (if String.is_empty info.text
+       then "About you · nothing yet"
+       else
+         sprintf
+           "About you · given to the model in every session · %d bytes"
+           (String.length info.text))
+    (Content.lines
+       ((if String.is_empty info.text
+         then
+           "Nothing about you yet: tell the model who you are, in every \
+            session."
+         else info.text)
+        ^ "\n\n\
+           /user-info FIELD VALUE sets a field (an empty VALUE clears it), \
+           /user-info clear clears them all ("
+        ^ user_info_where
+        ^ "). The fields:\n"
+        ^ user_info_fields))
 ;;
 
 let user_info_saved m (info : P.User_info.t) =
@@ -3276,14 +3283,13 @@ let user_info_saved m (info : P.User_info.t) =
     m
     (if String.is_empty info.text
      then
-       "removed what you wrote about yourself: open sessions are told with \
-        your next message"
+       "cleared what you set about yourself: open sessions are told with your \
+        next message"
      else
        sprintf
-         "saved (%d of %d bytes): the model has it in new sessions, and in \
-          open ones from your next message"
-         (String.length info.text)
-         info.max)
+         "saved (%d bytes): the model has it in new sessions, and in open ones \
+          from your next message"
+         (String.length info.text))
 ;;
 
 let user_info_command m (cmd : Commands.Parsed.t) =
@@ -3294,18 +3300,41 @@ let user_info_command m (cmd : Commands.Parsed.t) =
         mode =
           Confirm
             { question =
-                "remove what you wrote about yourself? The model is no longer \
-                 given it (y/n)"
+                "clear everything you set about yourself? The model is no \
+                 longer given it (y/n)"
             ; action = Clear_user_info
             }
       }
     , [] )
-  | _ ->
-    ( m
-    , [ call
-          (Set_user_info { text = cmd.rest })
-          ~tag:(User_info_saved ("/user-info " ^ cmd.rest))
-      ] )
+  | field :: _ ->
+    let field = String.lowercase field in
+    let field =
+      match field with
+      | "timezone" | "tz" -> "time_zone"
+      | "date" | "dates" -> "date_format"
+      | "else" | "other" -> "anything_else"
+      | field -> String.tr field ~target:'-' ~replacement:'_'
+    in
+    if not (List.Assoc.mem P.User_info.Form.fields field ~equal:String.equal)
+    then
+      ( error
+          (restore_command m ("/user-info " ^ cmd.rest))
+          (sprintf
+             "no field %S: /user-info FIELD VALUE, where FIELD is one of %s"
+             field
+             (String.concat ~sep:", " (List.map P.User_info.Form.fields ~f:fst)))
+      , [] )
+    else (
+      let value =
+        match String.lsplit2 (String.strip cmd.rest) ~on:' ' with
+        | Some (_, value) -> String.strip value
+        | None -> ""
+      in
+      ( m
+      , [ call
+            (Set_user_info_field { field; value })
+            ~tag:(User_info_saved ("/user-info " ^ cmd.rest))
+        ] ))
 ;;
 
 let memory_command m args =
@@ -5784,7 +5813,11 @@ let confirm m ~(action : Mode.Confirm_action.t) (intent : Intent.t) =
             ~tag:(Notice_on_success (sprintf "forgot %S" (memory_label note)))
         ] )
     | Clear_user_info ->
-      m, [ call (Set_user_info { text = "" }) ~tag:(User_info_saved "") ]
+      ( m
+      , [ call
+            (Set_user_info { form = P.User_info.Form.empty })
+            ~tag:(User_info_saved "")
+        ] )
     | Remove_worktree { worktree; force; back = _ } ->
       ( notice m (sprintf "removing the worktree at %s…" worktree.path)
       , [ call
@@ -5800,7 +5833,7 @@ let confirm m ~(action : Mode.Confirm_action.t) (intent : Intent.t) =
     | Delete_sessions { back = Some _ as back; _ } -> back_to m back, []
     | Remove_worktree { back = Some _ as back; _ } -> back_to m back, []
     | Forget_memory { back; _ } -> back_to m back, []
-    | Clear_user_info -> notice m "kept what you wrote about yourself", []
+    | Clear_user_info -> notice m "kept what you set about yourself", []
     | Create_dir { path; _ } -> notice m (sprintf "not created: %s" path), []
     | Cd_to_checkout path ->
       notice m (sprintf "staying here; /cd %s goes there" path), []

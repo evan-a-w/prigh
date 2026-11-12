@@ -220,7 +220,12 @@ module Method : sig
     | Forget_memory of { id : string }
     | Set_memory_enabled of { enabled : bool }
     | Get_user_info (** {!User_info} *)
-    | Set_user_info of { text : string } (** {!User_info}, as saved *)
+    | Set_user_info of { form : User_info.Form.t }
+    (** replaces the form: {!User_info}, as saved *)
+    | Set_user_info_field of
+        { field : string (** {!User_info.Form.fields} *)
+        ; value : string (** empty: clears it *)
+        } (** {!User_info}, as saved *)
   [@@deriving sexp_of, equal]
 
   val name : t -> string

@@ -478,6 +478,8 @@ module Action : sig
     | Tick of Time_ns.t (** the clock, for ages; also refreshes the sessions *)
     | Set_utc_offset of Time_ns.Span.t
     (** the browser's time zone, for messages' times *)
+    | Set_browser_time_zone of string
+    (** the browser's IANA time zone, offered in About you *)
     | Set_narrow of bool (** a phone-sized window: the sidebar is a drawer *)
     | Set_desktop of bool (** the page runs under [prigh desktop] *)
     | Set_browser_shell of bool
@@ -592,7 +594,8 @@ module Action : sig
     | Memory_forget of string (** asks first *)
     | Memory_forget_confirm
     | Memory_forget_cancel
-    | About_you_text of string (** the settings page's About you: its text *)
+    | About_you_field of About_you.Field.t * string
+    (** the settings page's About you: a field typed in or chosen *)
     | About_you_save (** Ctrl+Enter *)
     | About_you_revert (** back to what the backend has *)
     | Open_rename
@@ -847,6 +850,7 @@ module Model : sig
     ; auth : Auth_status.t list
     ; now : Time_ns.t option
     ; utc_offset : Time_ns.Span.t (** local time minus UTC *)
+    ; browser_time_zone : string option (** IANA, once the page said *)
     ; narrow : bool
     ; desktop : bool
     (** under [prigh desktop], the desktop app: Quit prigh is offered *)

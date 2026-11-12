@@ -739,11 +739,114 @@ let memory_draft (d : Memory_notes.Draft.t) ~inject =
 ;;
 
 (* What the user wrote about themselves: one text, saved as a whole. *)
+let about_you_field
+      (m : App.Model.t)
+      (field : About_you.Field.t)
+      ~inject
+      ~disabled
+  =
+  let a = m.about_you in
+  let id =
+    "about-you-"
+    ^ String.tr (About_you.Field.wire field) ~target:'_' ~replacement:'-'
+  in
+  let value = About_you.value a field in
+  let on_input =
+    Attr.on_input (fun _ v -> inject (Action.About_you_field (field, v)))
+  in
+  let common =
+    [ Attr.id id
+    ; (if disabled then Attr.disabled else Attr.empty)
+    ; (match About_you.max a field with
+       | 0 -> Attr.empty
+       | max -> Attr.create "maxlength" (Int.to_string max))
+    ]
+  in
+  let control =
+    match About_you.Field.choices field with
+    | Some choices ->
+      div ~cls:"about-you-choice" ~attrs:[ Attr.id id ]
+      @@ [ segmented
+             ~disabled
+             ~label:(About_you.Field.label field)
+             (List.map
+                (("", "Not set", "Leave it out") :: choices)
+                ~f:(fun (wire, short, label) ->
+                  ( short
+                  , label
+                  , String.equal wire value
+                  , inject (Action.About_you_field (field, wire)) )))
+         ]
+    | None when About_you.Field.multiline field ->
+      Node.textarea
+        ~attrs:
+          (common
+           @ [ Attr.class_ "text-input about-you-input"
+             ; Attr.placeholder (About_you.Field.placeholder field)
+             ; Attr.value value
+             ; Attr.rows
+                 (match field with
+                  | Anything_else -> 5
+                  | _ -> 3)
+             ; on_input
+             ])
+        []
+    | None ->
+      Node.input
+        ~attrs:
+          (common
+           @ [ Attr.class_ "text-input about-you-line"
+             ; Attr.type_ "text"
+             ; Attr.placeholder (About_you.Field.placeholder field)
+             ; Attr.value value
+             ; Attr.create "autocomplete" "off"
+             ; on_input
+             ])
+        ()
+  in
+  let detected =
+    match field, m.browser_time_zone with
+    | Time_zone, Some zone when not (String.equal (String.strip value) zone) ->
+      Some
+        (button
+           ~cls:"small about-you-detect"
+           ~title:("Fill in this browser's time zone, " ^ zone)
+           ~disabled
+           ~on_click:(inject (Action.About_you_field (Time_zone, zone)))
+           [ Node.text ("Use " ^ zone) ])
+    | _ -> None
+  in
+  div
+    ~cls:
+      ("about-you-field"
+       ^ if About_you.Field.multiline field then " wide" else "")
+    ~attrs:[ Attr.id (id ^ "-field") ]
+    [ Node.label
+        ~attrs:
+          [ (match About_you.Field.choices field with
+             | Some _ -> Attr.empty
+             | None -> Attr.for_ id)
+          ; Attr.class_ "about-you-label"
+          ]
+        [ Node.text (About_you.Field.label field) ]
+    ; (match detected with
+       | None -> control
+       | Some detected -> div ~cls:"about-you-with" [ control; detected ])
+    ]
+;;
+
 let about_you (m : App.Model.t) ~inject =
   let a = m.about_you in
-  let text = About_you.text a in
-  let size = String.length (String.strip text) in
-  let max = a.info.max in
+  let size =
+    List.sum
+      (module Int)
+      About_you.Field.all
+      ~f:(fun field ->
+        match About_you.Field.choices field with
+        | Some _ -> 0
+        | None -> String.length (String.strip (About_you.value a field)))
+  in
+  let max = a.info.max_total in
   let dirty = About_you.dirty a in
   let ready = About_you.Status.equal a.status Loaded in
   let note cls text = span ~cls:("setting-note " ^ cls) text in
@@ -754,7 +857,7 @@ let about_you (m : App.Model.t) ~inject =
       note
         "warm about-you-error"
         (sprintf "Could not read it: %s. Open the section again to retry." e)
-    | (Unknown | Loading), None -> note "muted" "Reading what you wrote…"
+    | (Unknown | Loading), None -> note "muted" "Reading what you set…"
     | Loaded, None when a.elsewhere ->
       div
         ~cls:"about-you-elsewhere"
@@ -764,7 +867,7 @@ let about_you (m : App.Model.t) ~inject =
              replaces that with this."
         ; button
             ~cls:"small"
-            ~title:"Drop what is typed here for the text as it is saved now"
+            ~title:"Drop what is typed here for the form as it is saved now"
             ~on_click:(inject Action.About_you_revert)
             [ Node.text "Load that one" ]
         ]
@@ -772,41 +875,29 @@ let about_you (m : App.Model.t) ~inject =
       note
         "good about-you-saved"
         (if String.is_empty a.info.text
-         then "Removed. Open sessions are told with your next message in them."
+         then "Cleared. Open sessions are told with your next message in them."
          else
            "Saved. New sessions start with it; open ones get it with your next \
             message in them.")
     | Loaded, None -> Node.none
   in
+  let disabled = a.saving || not ready in
   div
     ~cls:"setting about-you"
     [ div
         ~cls:"setting-text"
-        [ span ~cls:"setting-name" "Describe yourself"
+        [ span ~cls:"setting-name" "Tell the model about you"
         ; span
             ~cls:"setting-about"
-            "Who you are, what you work on, how you like answers. This text is \
-             given to the model in every session: new ones start with it, and \
-             open ones get it with your next message. Memory is for notes the \
-             model looks up only when it needs them."
+            "Every field is optional. What you fill in is given to the model \
+             in every session: new ones start with it, and open ones get it \
+             with your next message. Memory is for notes the model looks up \
+             only when it needs them."
         ]
-    ; Node.textarea
-        ~attrs:
-          [ Attr.id "about-you-text"
-          ; Attr.class_ "text-input about-you-input"
-          ; Attr.create "aria-label" "About you"
-          ; Attr.placeholder
-              "I'm a backend engineer working mostly in OCaml. Keep answers \
-               short, and ask before adding a dependency."
-          ; Attr.value text
-          ; Attr.rows 8
-          ; (if max > 0
-             then Attr.create "maxlength" (Int.to_string max)
-             else Attr.empty)
-          ; (if a.saving || not ready then Attr.disabled else Attr.empty)
-          ; Attr.on_input (fun _ text -> inject (Action.About_you_text text))
-          ]
-        []
+    ; div
+        ~cls:"about-you-form"
+        (List.map About_you.Field.all ~f:(fun field ->
+           about_you_field m field ~inject ~disabled))
     ; status
     ; div
         ~cls:"about-you-buttons"
@@ -824,7 +915,7 @@ let about_you (m : App.Model.t) ~inject =
            then
              button
                ~cls:"small ghost"
-               ~title:"Back to the text as it is saved"
+               ~title:"Back to the form as it is saved"
                ~disabled:a.saving
                ~on_click:(inject Action.About_you_revert)
                [ Node.text "Revert" ]

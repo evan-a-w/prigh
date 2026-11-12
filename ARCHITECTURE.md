@@ -874,26 +874,34 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   broadcast to that world's clients as `memory_changed`
   (`Prigh_protocol.Memory`). prigh-web's Settings → Memory
   (`Memory_notes`, `Settings_view`) and the TUI's `/memory` picker use them.
-- `User_info` — what the user wrote about themselves for the model, plain
-  text in `~/.prigh/user_info.md` under the world's home (one per world,
-  made in `bin/main.ml` like `Memory`; at most `User_info.max_bytes`, read
-  from the file whenever it is asked for, so an edit by hand counts, and
-  replaced atomically (a longer file edited by hand is cut to the limit). Unlike memory it is always in
-  context, and no tool changes it. `Agent.create ?user_info` is asked for
-  the text: `System_prompt.build ?user_info` puts it after the
-  instructions when a session's prompt is first built (and in
-  non-forked subagents' prompts, `Tool_subagent.create ?user_info`; shared
-  forks inherit the parent's), and `Told_environment.user_info` records
-  what the session was told, so the usual diff
-  (`Told_environment.notes`) prefixes a `User_info` note
+- `User_info` — what the user set about themselves for the model: a
+  `User_info.Form` of optional fields (name, country, time zone, language,
+  `Units`, `Date_format`, occupation, background, anything else) in
+  `~/.prigh/about_you.json` under the world's home (`{"version": 1, ...}`
+  with only the filled fields; one per world, made in `bin/main.ml` like
+  `Memory`; `max_field` per field and `max_total` in all; read from the
+  file whenever it is asked for, so an edit by hand counts, and replaced
+  atomically). The free text of earlier versions (`~/.prigh/user_info.md`)
+  becomes `anything_else` on the first read (cut to its limit) and the old
+  file is renamed `user_info.md.migrated`. `Form.render` makes the block
+  the model sees: a `- Label: value` line per filled field, in a fixed
+  order. Unlike memory it is always in context, and no tool changes it.
+  `Agent.create ?user_info` is asked for the rendered text:
+  `System_prompt.build ?user_info` puts it after the instructions when a
+  session's prompt is first built (and in non-forked subagents' prompts,
+  `Tool_subagent.create ?user_info`; shared forks inherit the parent's),
+  and `Told_environment.user_info` records what the session was told, so
+  the usual diff (`Told_environment.notes`) prefixes a `User_info` note
   (`System_prompt.user_info_note`) to the next user message when the text
-  differs: a session from before the text or the feature, an edit, a
-  removal. The stored system prompt is never rewritten (it stays cached);
-  a session never told anything gets no note for an empty text. RPC:
-  `get_user_info` and `set_user_info {text}` (`{text, max}`), and every
-  change made through them is broadcast to that world's
-  clients as `user_info_changed` (`Prigh_protocol.User_info`). prigh-web's
-  Settings → About you (`About_you`, `Settings_view`) and the TUI's
+  differs: a session from before the form or the feature, an edit, a
+  clear. The stored system prompt is never rewritten (it stays cached); a
+  session never told anything gets no note for an empty form. RPC:
+  `get_user_info` and `set_user_info` with a whole `{form}` or one
+  `{field, value}` (both reply `{form, text, limits}`), and every change
+  made through them is broadcast to that world's clients as
+  `user_info_changed` (`Prigh_protocol.User_info`). prigh-web's Settings →
+  About you (`About_you`, `Settings_view`; the browser's time zone,
+  `App.Action.Set_browser_time_zone`, is offered as a fill) and the TUI's
   `/user-info` use them.
 - `Tool_web_search` — `web_search` is a provider-side tool: `Tools.for_model`
   keeps it only for Anthropic, OpenAI and OpenAI Codex models, whose
@@ -4037,8 +4045,9 @@ for Linux, macOS and Windows.
 - `~/.prigh/prefs.json` — the user's preferences and data kept for the
   frontends (`User_prefs`): prigh-web's `web.*` and the shared `history`.
 - `~/.prigh/memory.json` — the `memory` tool's notes (`Memory`).
-- `~/.prigh/user_info.md` — what the user wrote about themselves, in every
-  session's context (`User_info`).
+- `~/.prigh/about_you.json` — what the user set about themselves, in every
+  session's context (`User_info`; `user_info.md.migrated` is an earlier
+  version's text, moved into it).
 - `~/.prigh/config.json` — `scoped_models`, `approval_mode`, `permissions`, `notify`, `snippets`, `providers`
   (custom endpoints; their keys are in `auth.json` under their names),
   `forges` (git hosts' kind, OAuth client id and URL, by host).

@@ -791,18 +791,30 @@ let memory_changed (t : t) memory =
 ;;
 
 let user_info_json user_info =
-  [ "text", `String (User_info.get user_info)
-  ; "max", `Number (Int.to_string User_info.max_bytes)
+  let%map.Or_error form = User_info.get user_info in
+  let max key = key, `Number (Int.to_string (User_info.max_field key)) in
+  [ "form", User_info.Form.to_json form
+  ; "text", `String (Option.value (User_info.Form.render form) ~default:"")
+  ; ( "limits"
+    , `Object
+        [ max "name"
+        ; max "background"
+        ; max "anything_else"
+        ; "total", `Number (Int.to_string User_info.max_total)
+        ] )
   ]
 ;;
 
 let user_info_changed (t : t) user_info =
-  let json =
-    `Object
-      ([ "type", `String "event"; "event", `String "user_info_changed" ]
-       @ user_info_json user_info)
-  in
-  Hashtbl.iter t.clients ~f:(fun (c : Client.t) -> c.send json)
+  match user_info_json user_info with
+  | Error _ -> ()
+  | Ok fields ->
+    let json =
+      `Object
+        ([ "type", `String "event"; "event", `String "user_info_changed" ]
+         @ fields)
+    in
+    Hashtbl.iter t.clients ~f:(fun (c : Client.t) -> c.send json)
 ;;
 
 let create
@@ -2659,14 +2671,26 @@ let user_info t ~meth ~params =
   | None -> Or_error.error_string "this backend keeps no user info"
   | Some user_info ->
     let open Or_error.Let_syntax in
-    let%map () =
+    let%bind () =
       match meth with
       | "set_user_info" ->
-        let%bind text = string_param params "text" in
-        User_info.set user_info text
+        (match param params "form", string_param_opt params "field" with
+         | Some form, _ ->
+           let%bind form = User_info.Form.of_json form in
+           User_info.set user_info form
+         | None, Ok (Some field) ->
+           let%bind value = string_param params "value" in
+           let%bind form = User_info.get user_info in
+           let%bind form = User_info.Form.set_field form field value in
+           User_info.set user_info form
+         | None, Error e -> Error e
+         | None, Ok None ->
+           Or_error.error_string
+             "set_user_info needs a form, or a field and its value")
       | _ -> Ok ()
     in
-    `Object (user_info_json user_info)
+    let%map fields = user_info_json user_info in
+    `Object fields
 ;;
 
 let keep_session t (client : Client.t) =

@@ -393,6 +393,7 @@ module Action = struct
     | Reply of Reply_tag.t * (Json.t, string) Result.t
     | Tick of Time_ns.t
     | Set_utc_offset of Time_ns.Span.t
+    | Set_browser_time_zone of string
     | Set_narrow of bool
     | Set_desktop of bool
     | Set_browser_shell of bool
@@ -482,7 +483,7 @@ module Action = struct
     | Memory_forget of string
     | Memory_forget_confirm
     | Memory_forget_cancel
-    | About_you_text of string
+    | About_you_field of About_you.Field.t * string
     | About_you_save
     | About_you_revert
     | Open_rename
@@ -678,6 +679,7 @@ module Model = struct
     ; auth : Auth_status.t list
     ; now : Time_ns.t option
     ; utc_offset : Time_ns.Span.t
+    ; browser_time_zone : string option
     ; narrow : bool
     ; desktop : bool
     ; browser_shell : bool
@@ -999,6 +1001,7 @@ let init =
   ; auth = []
   ; now = None
   ; utc_offset = Time_ns.Span.zero
+  ; browser_time_zone = None
   ; narrow = false
   ; desktop = false
   ; browser_shell = false
@@ -5865,7 +5868,7 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
     error
       m
       "/user-info takes no argument here: it opens Settings, About you, where \
-       you write the text."
+       you fill in the form."
   | "memory", "" -> open_settings ~section:Memory m
   | "memory", ("on" | "off") -> set_memory_enabled m (String.equal rest "on")
   | "memory", other ->
@@ -9620,6 +9623,7 @@ let update_connected (m : Model.t) (action : Action.t) =
   (* The ages in the sidebar; the list itself follows [sessions_changed]. *)
   | Tick now -> { m with now = Some now }, []
   | Set_utc_offset utc_offset -> { m with utc_offset }, []
+  | Set_browser_time_zone zone -> { m with browser_time_zone = Some zone }, []
   | Set_desktop desktop -> { m with desktop }, []
   | Set_browser_shell browser_shell -> { m with browser_shell }, []
   | Open_field_menu { field; anchor } ->
@@ -9801,12 +9805,12 @@ let update_connected (m : Model.t) (action : Action.t) =
      | memory, None -> { m with memory }, [])
   | Memory_forget_cancel ->
     { m with memory = Memory_notes.cancel_forget m.memory }, []
-  | About_you_text text ->
-    { m with about_you = About_you.set_text m.about_you text }, []
+  | About_you_field (field, value) ->
+    { m with about_you = About_you.set m.about_you field value }, []
   | About_you_save -> save_about_you m
   | About_you_revert ->
     ( { m with about_you = About_you.revert m.about_you }
-    , [ Command.Focus "about-you-text" ] )
+    , [ Command.Focus "about-you-name" ] )
   | Open_rename -> open_rename m
   | Open_subagents arg -> open_agents m arg
   | Toggle_subagents ->
