@@ -753,6 +753,6 @@ let%expect_test "only the main agent has render_ui" =
   [%expect
     {|
     ((render_ui) ())
-    ("it is the main agent's (the user's plan, questions, components, goal and memory), and you are a subagent: put what you need from the user in your report")
+    ("it is the main agent's (the user's plan, questions, components, goal, memory and custom instructions), and you are a subagent: put what you need from the user in your report")
     |}]
 ;;

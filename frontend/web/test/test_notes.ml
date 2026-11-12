@@ -405,7 +405,8 @@ let%expect_test "/diff, /review and /init are in the completions and /help" =
     Commands ↑↓ Tab Enter Esc   Ctrl+Enter as typed
     /init write or improve the project's AGENTS.md
     /import [path] import a session from a JSONL file on the backend
-    /user-info what you wrote about yourself for the model, given to it in every session (unlike memory, which it looks up), in Settings
+    /instructions [on|off] your custom instructions, in the context of every session, in Settings; on or off lets the model add, edit and remove them or not
+    /user-info what you set about yourself for the model (name, country, units...), given to it in every session, in Settings
     /pin [session] pin a session to the top of the sidebar (this one without an argument): pinned sessions are never archived for being idle
     /diff [path] show the uncommitted changes where the tools run, untracked files too
     /trim [after|undo] drop everything before a message from the model's context (the transcript keeps it folded); after: everything after a message instead (what you send later stays); undo brings back the last trim
@@ -438,6 +439,7 @@ let%expect_test "/diff, /review and /init are in the completions and /help" =
     /compaction [at|model|mask ...] show when conversations are compacted and what summarises them; at TOKENS|off: also once the context exceeds TOKENS, not only at 80% of the window; model MODEL|off: the model that writes the summaries (off: the session's); mask on|off: replace old tool outputs with placeholders first
     /permissions show the mode and the allow/ask/deny rules (config and this session)
     /default-dir [path|off] show or set the directory new sessions start in
+    /auto-archive [DAYS|off] show how long a session goes without activity before it is archived; DAYS|off: archive after DAYS days (off: never, only by hand), in Settings
     /delete-archived delete every archived session, after a confirmation
     /downsize-images send the conversation's images smaller (after the model refused one as too large) and retry a failed reply
     /retry-backend-connection reconnect to the backend now

@@ -175,8 +175,20 @@ module Method = struct
         }
     | Forget_memory of { id : string }
     | Set_memory_enabled of { enabled : bool }
+    | Get_custom_instructions
+    | Save_custom_instruction of
+        { id : string option
+        ; title : string option
+        ; text : string
+        }
+    | Remove_custom_instruction of { id : string }
+    | Set_custom_instructions_enabled of { enabled : bool }
     | Get_user_info
-    | Set_user_info of { text : string }
+    | Set_user_info of { form : User_info.Form.t }
+    | Set_user_info_field of
+        { field : string
+        ; value : string
+        }
   [@@deriving sexp_of, equal]
 
   let name = function
@@ -242,8 +254,12 @@ module Method = struct
     | Save_memory _ -> "save_memory"
     | Forget_memory _ -> "forget_memory"
     | Set_memory_enabled _ -> "set_memory_enabled"
+    | Get_custom_instructions -> "get_custom_instructions"
+    | Save_custom_instruction _ -> "save_custom_instruction"
+    | Remove_custom_instruction _ -> "remove_custom_instruction"
+    | Set_custom_instructions_enabled _ -> "set_custom_instructions_enabled"
     | Get_user_info -> "get_user_info"
-    | Set_user_info _ -> "set_user_info"
+    | Set_user_info _ | Set_user_info_field _ -> "set_user_info"
   ;;
 
   let dir_param = function
@@ -270,6 +286,7 @@ module Method = struct
     | Get_review
     | Nix_store_status
     | Get_memory
+    | Get_custom_instructions
     | Get_user_info
     | Get_trim_points
     | Get_trimmed
@@ -280,7 +297,14 @@ module Method = struct
     | Save_memory { id; title; text } -> Memory.save_params ?id ?title text
     | Forget_memory { id } -> Memory.forget_params ~id
     | Set_memory_enabled { enabled } -> Memory.set_enabled_params enabled
-    | Set_user_info { text } -> User_info.set_params text
+    | Save_custom_instruction { id; title; text } ->
+      Custom_instructions.save_params ?id ?title text
+    | Remove_custom_instruction { id } -> Custom_instructions.remove_params ~id
+    | Set_custom_instructions_enabled { enabled } ->
+      Custom_instructions.set_enabled_params enabled
+    | Set_user_info { form } -> User_info.set_params form
+    | Set_user_info_field { field; value } ->
+      User_info.set_field_params ~field value
     | Nix_store_gc { delete_generations = Some _ as generations } ->
       [ "delete_generations", Nix_generations.to_json generations ]
     | Review_submit { root = None } -> []

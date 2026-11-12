@@ -811,6 +811,41 @@ let%expect_test "pull_request: the action and what it acts on" =
     |}]
 ;;
 
+let%expect_test "custom_instructions: the action, id and title or text" =
+  show_item
+    (tool
+       "custom_instructions"
+       {|{"action":"edit","id":"ci2","text":"Use British spelling."}|}
+       ~result:(false, "Edited ci2"));
+  show_item (tool "custom_instructions" {|{"action":"remove","id":"ci3"}|});
+  [%expect
+    {|
+    == quiet ==
+    ✓ custom_instructions edit ci2 "Use British spelling."  1 line
+    == normal ==
+    ✓ custom_instructions edit ci2 "Use British spelling."
+        Edited ci2
+    == verbose ==
+    ✓ custom_instructions edit ci2 "Use British spelling."
+        {
+          action: "edit"
+          id: "ci2"
+          text: "Use British spelling."
+        }
+        Edited ci2
+    == quiet ==
+    … custom_instructions remove ci3
+    == normal ==
+    … custom_instructions remove ci3
+    == verbose ==
+    … custom_instructions remove ci3
+        {
+          action: "remove"
+          id: "ci3"
+        }
+    |}]
+;;
+
 let%expect_test "memory: the action and its title, query or id" =
   show_item
     (tool
