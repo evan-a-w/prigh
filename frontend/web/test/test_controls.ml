@@ -706,7 +706,7 @@ let%expect_test
     <Vdom.Node.none-widget class="">
     <Vdom.Node.none-widget class="">
     <Vdom.Node.none-widget class="">
-    <textarea class="editor">
+    <div class="editor-wrap">
     <div class="composer-row">
     button "Add files or images" -- Add files or images (or paste, or drop them here)
     button "Claude Opus 5.5" -- Claude Opus 5.5: switch model (Ctrl+L)
@@ -1048,7 +1048,7 @@ let%expect_test
   [%expect
     {|
     button "Claude Opus 5.5" -- Claude Opus 5.5: switch model (Ctrl+L)
-    <textarea class="editor">
+    <div class="editor-wrap">
     <div class="composer-buttons">
     <div class="tray">
     <div class="composer-controls menu-open">
@@ -1212,7 +1212,7 @@ let%expect_test "the status at the composer: idle, running, and what applies" =
 
 (* A phone: the same chips, with the short names CSS shows (style.css's
    container queries), and the status beside the title. *)
-let%expect_test "narrow: the chips' short names, the shorter placeholder" =
+let%expect_test "narrow: the chips' short names, the placeholder without a tooltip" =
   let h = H.create () in
   H.quiet h (fun () -> H.act h (Set_narrow true));
   H.elements h ~selector:".app";
@@ -1234,13 +1234,13 @@ let%expect_test "narrow: the chips' short names, the shorter placeholder" =
       <icon class="chevron"> </icon>
     </button>
     <textarea id="editor"
-              placeholder="Ask prigh…  / commands"
+              placeholder="Working in /work on main. Ask prigh anything…"
               aria-label="Message"
               dir="auto"
               rows="1"
               autocomplete="off"
               enterkeyhint="send"
-              class="editor"
+              class="cwd-placeholder editor"
               #value=""
               @on_input> </textarea>
     |}]

@@ -11,6 +11,7 @@ let%expect_test
   [%expect
     {|
     []
+    Working in /work on main . Working in /work on main . Ask prigh anything…
     (Add files or images (or paste, or drop them here))
     (Claude Opus 5.5)
     (backend)

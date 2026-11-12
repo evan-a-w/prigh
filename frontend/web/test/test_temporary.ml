@@ -47,6 +47,7 @@ let%expect_test
     {|
     <main class="fresh main">
     What are we building?
+    / for commands, @ for files
     button "Folder: /work. Change it" -- Start in another folder (/cd)
     button "Branch: main. Change it" -- Work in another worktree (/worktree)
     [switch] button "Temporary" -- Make it temporary: not saved or listed (Ctrl+Shift+O)
