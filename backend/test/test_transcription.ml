@@ -465,7 +465,7 @@ let%expect_test "rpc: transcribe and set_config's dictation_model" =
   config ();
   [%expect
     {|
-    {"scoped_models":[],"approval_mode":"auto","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":null,"default_thinking":null,"fallback_models":[],"default_cwd":null,"worktrees_dir":"~/.prigh/worktrees","max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true,"ask_user_timeout_seconds":300,"archive_after_days":7,"notify":"bell","snippets":[],"auto_background_seconds":30,"generate_model":null,"mask_observations":true,"computer_screenshots":3,"computer_screenshots_max":8,"computer_native":true,"compact_at_tokens":200000,"compaction_model":null,"naming_model":null,"dictation_model":"openai/whisper-1","trace":"default"}
+    {"scoped_models":[],"approval_mode":"auto","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":null,"default_thinking":null,"fallback_models":[],"default_cwd":null,"default_host":null,"worktrees_dir":"~/.prigh/worktrees","max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true,"ask_user_timeout_seconds":300,"archive_after_days":7,"notify":"bell","snippets":[],"auto_background_seconds":30,"generate_model":null,"mask_observations":true,"computer_screenshots":3,"computer_screenshots_max":8,"computer_native":true,"compact_at_tokens":200000,"compaction_model":null,"naming_model":null,"dictation_model":"openai/whisper-1","trace":"default"}
     error: dictation_model: Anthropic cannot transcribe: pick an OpenAI or OpenAI-compatible model with /dictation model (e.g. openai/gpt-4o-mini-transcribe)
     error: config.dictation_model must be a model's provider/id (or null: openai/gpt-4o-mini-transcribe)
     "openai/whisper-1"
@@ -480,7 +480,7 @@ let%expect_test "rpc: transcribe and set_config's dictation_model" =
   config ();
   [%expect
     {|
-    {"scoped_models":[],"approval_mode":"auto","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":null,"default_thinking":null,"fallback_models":[],"default_cwd":null,"worktrees_dir":"~/.prigh/worktrees","max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true,"ask_user_timeout_seconds":300,"archive_after_days":7,"notify":"bell","snippets":[],"auto_background_seconds":30,"generate_model":null,"mask_observations":true,"computer_screenshots":3,"computer_screenshots_max":8,"computer_native":true,"compact_at_tokens":200000,"compaction_model":null,"naming_model":null,"dictation_model":null,"trace":"default"}
+    {"scoped_models":[],"approval_mode":"auto","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":null,"default_thinking":null,"fallback_models":[],"default_cwd":null,"default_host":null,"worktrees_dir":"~/.prigh/worktrees","max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true,"ask_user_timeout_seconds":300,"archive_after_days":7,"notify":"bell","snippets":[],"auto_background_seconds":30,"generate_model":null,"mask_observations":true,"computer_screenshots":3,"computer_screenshots_max":8,"computer_native":true,"compact_at_tokens":200000,"compaction_model":null,"naming_model":null,"dictation_model":null,"trace":"default"}
     null
     |}];
   call "transcribe" {|{"mime_type": "audio/ogg", "data": "not base64!"}|};
