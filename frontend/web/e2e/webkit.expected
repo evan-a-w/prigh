@@ -3057,6 +3057,10 @@ full width: true; at the bottom: true
 ok
 === webkit: mobile: 390x844: the files ===
 ok
+=== webkit: mobile: 390x844: the review page ===
+ok
+=== webkit: mobile: 390x844: the review's files ===
+ok
 === webkit: mobile: 390x844: the keyboard ===
 the composer in view: true
 === webkit: mobile: 320x640: the chat ===
@@ -3090,6 +3094,10 @@ full width: true; at the bottom: true
 === webkit: mobile: 320x640: / completion ===
 ok
 === webkit: mobile: 320x640: the files ===
+ok
+=== webkit: mobile: 320x640: the review page ===
+ok
+=== webkit: mobile: 320x640: the review's files ===
 ok
 === webkit: mobile: 320x640: the keyboard ===
 the composer in view: true
