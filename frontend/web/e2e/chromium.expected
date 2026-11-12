@@ -742,7 +742,7 @@ on a phone: 0 handles
 hl-kw:let hl-kw:rec hl-kw:if hl-num:2 hl-kw:then hl-kw:else hl-num:1 hl-num:2 hl-com:(* slow *)
 hl-prop:"name" hl-str:"prigh" hl-prop:"ok" hl-con:true hl-prop:"n" hl-num:3
 === chromium: the session: a 700px chat column ===
-chat 700; chips: DeepSeek V4.1 Flash, <HOSTNAME>, on, auto, normal; status: 0%, $<COST>; .chat-chrome 44px high
+chat 700; chips: DeepSeek V4.1 Flash, <HOSTNAME>, icon, icon, icon; status: 0%, $<COST>; .chat-chrome 44px high
 .chat-chrome: fits
 .composer: fits
 the panels' toggles: 3 buttons 10px from the top, 14px from the right, clear of the jump list: true, open: Files
