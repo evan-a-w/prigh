@@ -75,6 +75,8 @@ module Reply_tag = struct
     | Compaction_saved of string
     | Naming_shown
     | Naming_saved of string
+    | Auto_archive_shown
+    | Auto_archive_saved of string
     | Dictation_shown
     | Dictation_saved of string
     | Models_catalog
@@ -138,6 +140,8 @@ module Reply_tag = struct
     | Skill_prompt of string (** the [/skill:] text sent *)
     | Mcp_picker
     | Memory_picker
+    | Instructions_picker
+    | Instruction_saved of string (** the command, put back on failure *)
     | User_info_shown
     | User_info_saved of string
     | Mcp_reconnected
@@ -3063,6 +3067,23 @@ let naming_command m (cmd : Commands.Parsed.t) =
       ] )
 ;;
 
+let auto_archive_command m (cmd : Commands.Parsed.t) =
+  match Auto_archive_command.parse cmd.rest with
+  | Show ->
+    show_config
+      m
+      ~tag:Auto_archive_shown
+      ~summary:Auto_archive_command.summary
+  | Error e ->
+    error (restore_command m (String.strip ("/auto-archive " ^ cmd.rest))) e, []
+  | Set _ as action ->
+    ( m
+    , [ set_config
+          ~tag:(Auto_archive_saved ("/auto-archive " ^ cmd.rest))
+          (Auto_archive_command.fields action)
+      ] )
+;;
+
 let dictation_command m (cmd : Commands.Parsed.t) =
   match Dictation_command.parse cmd.rest with
   | Show ->
@@ -3241,34 +3262,169 @@ let confirm_forget_memory m (note : P.Memory.Note.t) ~back =
   , [] )
 ;;
 
-(* ---- user info --------------------------------------------------------- *)
+(* ---- custom instructions ----------------------------------------------- *)
 
-let user_info_where =
-  "~/.prigh/user_info.md on the backend; prigh-web: Settings, About you"
+let instructions_title (ci : P.Custom_instructions.t) =
+  let n = List.length ci.notes in
+  sprintf
+    "Custom instructions · %d · ~%d tokens per session · model edits %s"
+    n
+    (P.Custom_instructions.tokens ci.notes)
+    (if ci.enabled then "on" else "off")
 ;;
 
-let user_info_shown m (info : P.User_info.t) =
-  if String.is_empty info.text
+(* In order, as the model sees them. *)
+let instructions_items (ci : P.Custom_instructions.t) =
+  List.map ci.notes ~f:(fun (note : P.Custom_instructions.Note.t) ->
+    Picker.Item.create
+      ~id:note.id
+      ~detail:
+        (match note.title with
+         | Some _ -> sprintf "%s · %s" note.id (one_line note.text)
+         | None -> note.id)
+      ~search:
+        (note.id ^ " " ^ Option.value note.title ~default:"" ^ " " ^ note.text)
+      (memory_label note))
+;;
+
+let instructions_picker m (ci : P.Custom_instructions.t) =
+  if List.is_empty ci.notes
   then
     notice
       m
-      (sprintf
-         "nothing about you yet: /user-info TEXT tells the model who you are \
-          and how you like to work, in every session (%s)"
-         user_info_where)
+      "no custom instructions: /instructions add TEXT adds one (in the context \
+       of every session), or tell the model a lasting preference"
   else
-    output
+    open_picker
       m
-      ~title:
+      (Custom_instructions ci)
+      (Picker.create ~title:(instructions_title ci) (instructions_items ci))
+;;
+
+let refresh_instructions_picker (ci : P.Custom_instructions.t) picker =
+  Picker.set_items ~title:(instructions_title ci) picker (instructions_items ci)
+;;
+
+let instructions_changed m (ci : P.Custom_instructions.t) =
+  match m.mode with
+  | Picker { kind = Custom_instructions _; picker } ->
+    { m with
+      mode =
+        Picker
+          { kind = Custom_instructions ci
+          ; picker = refresh_instructions_picker ci picker
+          }
+    }
+  | Confirm
+      { question
+      ; action =
+          Remove_custom_instruction
+            { note; back = Some { kind = Custom_instructions _; picker } }
+      } ->
+    { m with
+      mode =
+        Confirm
+          { question
+          ; action =
+              Remove_custom_instruction
+                { note
+                ; back =
+                    Some
+                      { kind = Custom_instructions ci
+                      ; picker = refresh_instructions_picker ci picker
+                      }
+                }
+          }
+    }
+  | _ -> m
+;;
+
+let confirm_remove_instruction m (note : P.Custom_instructions.Note.t) ~back =
+  ( { m with
+      mode =
+        Confirm
+          { question =
+              sprintf
+                "remove %s %S? It leaves every session's context (y/n)"
+                note.id
+                (memory_label note)
+          ; action = Remove_custom_instruction { note; back }
+          }
+    }
+  , [] )
+;;
+
+let instructions_command m args =
+  let rest = String.concat ~sep:" " args in
+  match args with
+  | [] -> m, [ call Get_custom_instructions ~tag:Instructions_picker ]
+  | [ (("on" | "off") as word) ] ->
+    let enabled = String.equal word "on" in
+    ( m
+    , [ call
+          (Set_custom_instructions_enabled { enabled })
+          ~tag:
+            (Notice_on_success
+               (if enabled
+                then
+                  "custom instructions: the model may add, edit and remove them"
+                else
+                  "custom instructions: the model may not change them; they \
+                   stay in every session's context"))
+      ] )
+  | "add" :: (_ :: _ as words) ->
+    let text = String.concat ~sep:" " words in
+    ( m
+    , [ call
+          (Save_custom_instruction { id = None; title = None; text })
+          ~tag:(Instruction_saved ("/instructions " ^ rest))
+      ] )
+  | _ ->
+    ( error
+        (restore_command m ("/instructions " ^ rest))
         (sprintf
-           "About you · given to the model in every session · %d of %d bytes"
-           (String.length info.text)
-           info.max)
-      (Content.lines
-         (info.text
-          ^ "\n\n/user-info TEXT replaces it, /user-info clear removes it ("
-          ^ user_info_where
-          ^ ")"))
+           "unknown argument %S: /instructions lists them (Ctrl+D removes \
+            one), add TEXT adds one, on or off lets the model change them or \
+            not; prigh-web's Settings edits them"
+           rest)
+    , [] )
+;;
+
+(* ---- user info --------------------------------------------------------- *)
+
+let user_info_where =
+  "~/.prigh/about_you.json on the backend; prigh-web: Settings, About you"
+;;
+
+let user_info_fields =
+  String.concat
+    ~sep:"\n"
+    (List.map P.User_info.Form.fields ~f:(fun (field, what) ->
+       sprintf "  %-14s %s" field what))
+;;
+
+let user_info_shown m (info : P.User_info.t) =
+  output
+    m
+    ~title:
+      (if String.is_empty info.text
+       then "About you · nothing yet"
+       else
+         sprintf
+           "About you · given to the model in every session · %d bytes"
+           (String.length info.text))
+    (Content.lines
+       ((if String.is_empty info.text
+         then
+           "Nothing about you yet: tell the model who you are, in every \
+            session."
+         else info.text)
+        ^ "\n\n\
+           /user-info FIELD VALUE sets a field (an empty VALUE clears it), \
+           /user-info clear clears them all ("
+        ^ user_info_where
+        ^ "). The fields:\n"
+        ^ user_info_fields))
 ;;
 
 let user_info_saved m (info : P.User_info.t) =
@@ -3276,14 +3432,13 @@ let user_info_saved m (info : P.User_info.t) =
     m
     (if String.is_empty info.text
      then
-       "removed what you wrote about yourself: open sessions are told with \
-        your next message"
+       "cleared what you set about yourself: open sessions are told with your \
+        next message"
      else
        sprintf
-         "saved (%d of %d bytes): the model has it in new sessions, and in \
-          open ones from your next message"
-         (String.length info.text)
-         info.max)
+         "saved (%d bytes): the model has it in new sessions, and in open ones \
+          from your next message"
+         (String.length info.text))
 ;;
 
 let user_info_command m (cmd : Commands.Parsed.t) =
@@ -3294,18 +3449,41 @@ let user_info_command m (cmd : Commands.Parsed.t) =
         mode =
           Confirm
             { question =
-                "remove what you wrote about yourself? The model is no longer \
-                 given it (y/n)"
+                "clear everything you set about yourself? The model is no \
+                 longer given it (y/n)"
             ; action = Clear_user_info
             }
       }
     , [] )
-  | _ ->
-    ( m
-    , [ call
-          (Set_user_info { text = cmd.rest })
-          ~tag:(User_info_saved ("/user-info " ^ cmd.rest))
-      ] )
+  | field :: _ ->
+    let field = String.lowercase field in
+    let field =
+      match field with
+      | "timezone" | "tz" -> "time_zone"
+      | "date" | "dates" -> "date_format"
+      | "else" | "other" -> "anything_else"
+      | field -> String.tr field ~target:'-' ~replacement:'_'
+    in
+    if not (List.Assoc.mem P.User_info.Form.fields field ~equal:String.equal)
+    then
+      ( error
+          (restore_command m ("/user-info " ^ cmd.rest))
+          (sprintf
+             "no field %S: /user-info FIELD VALUE, where FIELD is one of %s"
+             field
+             (String.concat ~sep:", " (List.map P.User_info.Form.fields ~f:fst)))
+      , [] )
+    else (
+      let value =
+        match String.lsplit2 (String.strip cmd.rest) ~on:' ' with
+        | Some (_, value) -> String.strip value
+        | None -> ""
+      in
+      ( m
+      , [ call
+            (Set_user_info_field { field; value })
+            ~tag:(User_info_saved ("/user-info " ^ cmd.rest))
+        ] ))
 ;;
 
 let memory_command m args =
@@ -4000,6 +4178,7 @@ let run_command m (cmd : Commands.Parsed.t) =
   | "compaction", _ -> compaction_command m cmd
   | "dictation", _ -> dictation_command m cmd
   | "naming", _ -> naming_command m cmd
+  | "auto-archive", _ -> auto_archive_command m cmd
   | "auth", _ ->
     ( m
     , [ rpc "auth_status" ~tag:Auth_show; call Forge_status ~tag:Forge_refresh ]
@@ -4226,6 +4405,7 @@ let run_command m (cmd : Commands.Parsed.t) =
          cmd.rest)
   | "worktree", _ -> worktree_command m cmd.rest
   | "memory", args -> memory_command m args
+  | "instructions", args -> instructions_command m args
   | "user-info", _ -> user_info_command m cmd
   | "remind", _ ->
     remind_action
@@ -5134,6 +5314,21 @@ let picker_selected m (kind : Mode.Picker_kind.t) (item : Picker.Item.t) =
               note.text)
        , [] )
      | None -> error m "that note is gone; /memory lists the others", [])
+  | Custom_instructions ci ->
+    (match
+       List.find ci.notes ~f:(fun (n : P.Custom_instructions.Note.t) ->
+         String.equal n.id item.id)
+     with
+     | Some note ->
+       ( notice
+           m
+           (sprintf
+              "%s%s: %s · Ctrl+D in /instructions removes it"
+              note.id
+              (Option.value_map note.title ~default:"" ~f:(sprintf " (%s)"))
+              note.text)
+       , [] )
+     | None -> error m "that one is gone; /instructions lists the others", [])
   | Mcp list -> mcp_selected m list item.id
   | Auth_select id ->
     m, [ rpc "auth_respond" ~params:[ "id", str id; "value", str item.id ] ]
@@ -5440,6 +5635,14 @@ let picker m (kind : Mode.Picker_kind.t) picker (intent : Intent.t) =
         with
         | None -> m, []
         | Some note -> confirm_forget_memory m note ~back)
+     | Custom_instructions ci ->
+       (match
+          Option.bind (Picker.selected_item picker) ~f:(fun item ->
+            List.find ci.notes ~f:(fun (n : P.Custom_instructions.Note.t) ->
+              String.equal n.id item.id))
+        with
+        | None -> m, []
+        | Some note -> confirm_remove_instruction m note ~back)
      | _ -> { m with quitting = true }, [ Command.Quit ])
   | _ ->
     (match
@@ -5783,8 +5986,18 @@ let confirm m ~(action : Mode.Confirm_action.t) (intent : Intent.t) =
             ~params:(P.Memory.forget_params ~id:note.id)
             ~tag:(Notice_on_success (sprintf "forgot %S" (memory_label note)))
         ] )
+    | Remove_custom_instruction { note; back } ->
+      ( back_to m back
+      , [ call
+            (Remove_custom_instruction { id = note.id })
+            ~tag:(Notice_on_success (sprintf "removed %s" note.id))
+        ] )
     | Clear_user_info ->
-      m, [ call (Set_user_info { text = "" }) ~tag:(User_info_saved "") ]
+      ( m
+      , [ call
+            (Set_user_info { form = P.User_info.Form.empty })
+            ~tag:(User_info_saved "")
+        ] )
     | Remove_worktree { worktree; force; back = _ } ->
       ( notice m (sprintf "removing the worktree at %s…" worktree.path)
       , [ call
@@ -5800,7 +6013,8 @@ let confirm m ~(action : Mode.Confirm_action.t) (intent : Intent.t) =
     | Delete_sessions { back = Some _ as back; _ } -> back_to m back, []
     | Remove_worktree { back = Some _ as back; _ } -> back_to m back, []
     | Forget_memory { back; _ } -> back_to m back, []
-    | Clear_user_info -> notice m "kept what you wrote about yourself", []
+    | Remove_custom_instruction { back; _ } -> back_to m back, []
+    | Clear_user_info -> notice m "kept what you set about yourself", []
     | Create_dir { path; _ } -> notice m (sprintf "not created: %s" path), []
     | Cd_to_checkout path ->
       notice m (sprintf "staying here; /cd %s goes there" path), []
@@ -6228,6 +6442,7 @@ let event m (e : P.Event.t) =
   | Terminal_close _
   | Terminal_kill _ -> m, []
   | Memory_changed memory -> memory_changed m memory, []
+  | Custom_instructions_changed ci -> instructions_changed m ci, []
   | User_info_changed _ -> m, []
   | Prefs_changed changes ->
     let m = filter_of_prefs m changes in
@@ -6379,10 +6594,12 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
      | Agent_message { agent_id; kind; text; retry } ->
        agent_message_failed m ~agent_id ~kind ~text ~retry e, []
      | User_info_saved text
+     | Instruction_saved text
      | Fallback_saved text
      | Default_dir_saved text
      | Compaction_saved text
-     | Naming_saved text ->
+     | Naming_saved text
+     | Auto_archive_saved text ->
        (* Back in the editor, to correct rather than retype. *)
        let editor =
          if Editor.is_empty m.editor
@@ -6448,12 +6665,24 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
      | Memory_picker ->
        decode json ~f:P.Memory.of_json (fun memory ->
          memory_picker m memory, [])
+     | Instructions_picker ->
+       decode json ~f:P.Custom_instructions.of_json (fun ci ->
+         instructions_picker m ci, [])
      | User_info_shown ->
        decode json ~f:P.User_info.of_json (fun info ->
          user_info_shown m info, [])
      | User_info_saved _ ->
        decode json ~f:P.User_info.of_json (fun info ->
          user_info_saved m info, [])
+     | Instruction_saved _ ->
+       decode json ~f:P.Custom_instructions.note_of_reply (fun note ->
+         ( notice
+             m
+             (sprintf
+                "added %s, in the context of every session: /instructions \
+                 lists them"
+                note.id)
+         , [] ))
      | Nix_store_shown ->
        decode json ~f:P.Nix_store_status.of_json (fun status ->
          ( output
@@ -6987,6 +7216,12 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
      | Naming_shown | Naming_saved _ ->
        decode json ~f:P.Config.of_json (fun config ->
          ( notice { m with config = Some config } (Naming_command.summary config)
+         , [] ))
+     | Auto_archive_shown | Auto_archive_saved _ ->
+       decode json ~f:P.Config.of_json (fun config ->
+         ( notice
+             { m with config = Some config }
+             (Auto_archive_command.summary config)
          , [] ))
      | Dictation_shown | Dictation_saved _ ->
        decode json ~f:P.Config.of_json (fun config ->

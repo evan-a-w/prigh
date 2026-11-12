@@ -71,6 +71,7 @@ module Setup = struct
     ; forges : Forges.t (** the world's git-host sign-ins *)
     ; memory : Memory.t (** the world's *)
     ; user_info : User_info.t (** the world's *)
+    ; custom_instructions : Custom_instructions.t (** the world's *)
     }
 end
 
@@ -212,6 +213,7 @@ let common_params =
     in
     let memory = Memory.create ~home in
     let user_info = User_info.create ~home in
+    let custom_instructions = Custom_instructions.create ~home in
     let questions = Session_questions.create () in
     let search =
       ref (Tool_sessions.local_search ~dir:(fun () -> sessions_dir))
@@ -255,6 +257,8 @@ let common_params =
           ~worktrees_dir
           ~compaction
           ~user_info:(fun () -> User_info.text user_info)
+          ~custom_instructions:(fun () ->
+            Custom_instructions.for_model custom_instructions)
           ~provider
           ~current_model:(current (fun s -> s.model) Model.default)
           ~current_thinking:(current (fun s -> s.thinking) Thinking.default)
@@ -294,6 +298,7 @@ let common_params =
                      ~questions
                      ()
                  ; Tool_memory.create ~memory ()
+                 ; Tool_custom_instructions.create ~custom_instructions ()
                  ; Tool_on_host.create
                      ~hosts:(fun () ->
                        Option.value_map
@@ -318,9 +323,14 @@ let common_params =
           ?max_budget_usd
           ~questions
           ~offered:(fun tool ->
-            (not (String.equal (Tool.name tool) Tool_memory.name))
-            || Memory.enabled memory)
+            match Tool.name tool with
+            | name when String.equal name Tool_memory.name ->
+              Memory.enabled memory
+            | name when String.equal name Tool_custom_instructions.name ->
+              Custom_instructions.enabled custom_instructions
+            | _ -> true)
           ~user_info
+          ~custom_instructions
           ~cwd
           ()
       in
@@ -335,6 +345,7 @@ let common_params =
     ; forges
     ; memory
     ; user_info
+    ; custom_instructions
     ; questions
     ; search
     }
@@ -770,6 +781,7 @@ let serve_command =
              ; forges
              ; memory
              ; user_info
+             ; custom_instructions
              ; questions
              ; search
              }
@@ -806,6 +818,7 @@ let serve_command =
              ~forges
              ~memory
              ~user_info
+             ~custom_instructions
              ~sessions_dir:world.sessions_dir
              ~cwd
              ~new_agent
@@ -1851,6 +1864,7 @@ let acp_command =
                ; forges
                ; memory
                ; user_info
+               ; custom_instructions
                ; questions
                ; search
                }
@@ -1881,6 +1895,7 @@ let acp_command =
                ~forges
                ~memory
                ~user_info
+               ~custom_instructions
                ~sessions_dir:world.sessions_dir
                ~cwd
                ~new_agent
@@ -2313,12 +2328,17 @@ let trace_command =
 ;;
 
 (* What the built-in tools' specifications add to each request, as
-   [Compaction_eval] counts tokens: [memory]'s while the user has it on. *)
+   [Compaction_eval] counts tokens: [memory]'s and [custom_instructions]'
+   while the user has them on. *)
 let tools_overhead_tokens () =
+  let home = home () in
   let memory =
-    Option.some_if
-      (Memory.enabled (Memory.create ~home:(home ())))
-      Tool_memory.spec
+    List.filter_opt
+      [ Option.some_if (Memory.enabled (Memory.create ~home)) Tool_memory.spec
+      ; Option.some_if
+          (Custom_instructions.enabled (Custom_instructions.create ~home))
+          Tool_custom_instructions.spec
+      ]
   in
   List.sum
     (module Int)
@@ -2327,7 +2347,7 @@ let tools_overhead_tokens () =
         @ Tools.interaction
         @ [ Tool_on_host.create ~hosts:(fun () -> []) () ])
        ~f:(fun (t : Tool.t) -> t.spec)
-     @ Option.to_list memory)
+     @ memory)
     ~f:(fun (spec : Tool_spec.t) ->
       (String.length spec.name
        + String.length spec.description

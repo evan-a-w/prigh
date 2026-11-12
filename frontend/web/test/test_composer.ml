@@ -418,7 +418,8 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /permissions show the mode and the allow/ask/deny rules (config and this session)
     /notify [on|off] tell you when a turn ends or something waits for you while the tab is hidden
     /memory [on|off] your notes the model saves when you ask it to remember something, in Settings; on or off gives the model the memory tool or takes it away
-    /user-info what you wrote about yourself for the model, given to it in every session (unlike memory, which it looks up), in Settings
+    /instructions [on|off] your custom instructions, in the context of every session, in Settings; on or off lets the model add, edit and remove them or not
+    /user-info what you set about yourself for the model (name, country, units...), given to it in every session, in Settings
     /compact [instructions] summarise older messages to free context
     /naming [model MODEL|off] show which model names sessions and subagents; model MODEL|off: name them with MODEL (off: the generate model, else the session's)
     /dictation [model MODEL|off] show which model transcribes dictation (speech to text); model MODEL|off: transcribe with MODEL, an OpenAI or OpenAI-compatible provider's (off: openai/gpt-4o-mini-transcribe)
@@ -437,6 +438,7 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /unpin [session] unpin a session (this one without an argument)
     /delete [undo|session...] delete a message from the transcript and the model's context (a reply with its tool calls' results): pick it, newest first; undo brings the latest deletion back; with sessions, deletes them after a confirmation
     /delete-archived delete every archived session, after a confirmation
+    /auto-archive [DAYS|off] show how long a session goes without activity before it is archived; DAYS|off: archive after DAYS days (off: never, only by hand), in Settings
     /clone copy this session into a new one
     /fork start a new session from an earlier message
     /rewind go back to an earlier message in this session
@@ -445,8 +447,6 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /cd [path] change the working directory (asks to create a missing one)
     /mkdir [path] create a directory (and its parents) and change to it
     /worktree [list|new|open|back|rm] pick a git worktree of the repository to work in (Alt+Enter: in a new session, Alt+R: review its changes, Delete removes it); new BRANCH [BASE] creates one and works there; open [-n] TARGET (-n: in a new session); back [main]: back where the session switched into worktrees from; rm [-f] TARGET (-f: with uncommitted changes)
-    /default-dir [path|off] show or set the directory new sessions start in
-    /host [name|backend] pick where tools run, and the directory there
     |}];
   H.type_ h "/mod";
   H.key h "Tab";

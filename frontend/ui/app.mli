@@ -80,6 +80,8 @@ module Reply_tag : sig
     | Compaction_saved of string (** like [Fallback_saved] *)
     | Naming_shown (** [get_config] for [/naming] *)
     | Naming_saved of string (** like [Fallback_saved] *)
+    | Auto_archive_shown (** [get_config] for [/auto-archive] *)
+    | Auto_archive_saved of string (** like [Fallback_saved] *)
     | Dictation_shown (** [get_config] for [/dictation] *)
     | Dictation_saved of string (** like [Fallback_saved] *)
     | Models_catalog
@@ -153,6 +155,8 @@ module Reply_tag : sig
     (** a [/skill:] prompt, steer or follow-up; failing puts it back *)
     | Mcp_picker
     | Memory_picker
+    | Instructions_picker
+    | Instruction_saved of string
     | User_info_shown (** [/user-info] *)
     | User_info_saved of string
     (** [/user-info TEXT] or [clear]; failing puts the command back *)

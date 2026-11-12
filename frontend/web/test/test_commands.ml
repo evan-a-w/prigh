@@ -91,6 +91,7 @@ let%expect_test "every command does something (none is unknown)" =
     /permissions               text: Permissions
     /notify                    toast: Notifications are on, but the browser has not been asked yet: /notify on asks it
     /memory                    Settings
+    /instructions              Settings
     /user-info                 Settings
     /compact                   toast: Compacting the conversation…
     /naming                    toast: Sessions and subagents are named by the generate model, else the session's model (/naming model MODEL|off)
@@ -110,6 +111,7 @@ let%expect_test "every command does something (none is unknown)" =
     /unpin                     toast: This session isn't saved yet: send a message first.
     /delete                    loading Delete a message: rpc push_pref, rpc get_message_points
     /delete-archived           toast: There are no archived sessions.
+    /auto-archive              toast: Sessions are archived after 7 days without activity (/auto-archive DAYS|off)
     /clone                     rpc clone
     /fork                      loading Fork from: rpc push_pref, rpc get_entries
     /rewind                    loading Rewind to: rpc push_pref, rpc get_entries
@@ -1779,10 +1781,10 @@ let%expect_test "/setusr: a superuser acts as another user, and back" =
      (params
       ((keys
         (web.theme web.accent web.notify web.verbosity web.terminal-open
-         web.sidebar-folded web.review history web.migrated web.sidebar-width
-         web.files-width web.files-preview-width web.agents-width
-         web.terminal-height web.review-chat-width web.review-files-width
-         web.review-margin-width))))
+         web.sidebar-folded web.sidebar-unfolded web.sidebar-worktree-hours
+         web.review history web.migrated web.sidebar-width web.files-width
+         web.files-preview-width web.agents-width web.terminal-height
+         web.review-chat-width web.review-files-width web.review-margin-width))))
      (tag Prefs))
     Acting as bob
     Back to alice
@@ -1834,10 +1836,10 @@ let%expect_test "/retry-backend-connection, /state, /clear, /quit" =
      (params
       ((keys
         (web.theme web.accent web.notify web.verbosity web.terminal-open
-         web.sidebar-folded web.review history web.migrated web.sidebar-width
-         web.files-width web.files-preview-width web.agents-width
-         web.terminal-height web.review-chat-width web.review-files-width
-         web.review-margin-width))))
+         web.sidebar-folded web.sidebar-unfolded web.sidebar-worktree-hours
+         web.review history web.migrated web.sidebar-width web.files-width
+         web.files-preview-width web.agents-width web.terminal-height
+         web.review-chat-width web.review-files-width web.review-margin-width))))
      (tag Prefs))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s1.jsonl) (limit 1000000)))

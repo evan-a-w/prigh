@@ -874,26 +874,60 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   broadcast to that world's clients as `memory_changed`
   (`Prigh_protocol.Memory`). prigh-web's Settings → Memory
   (`Memory_notes`, `Settings_view`) and the TUI's `/memory` picker use them.
-- `User_info` — what the user wrote about themselves for the model, plain
-  text in `~/.prigh/user_info.md` under the world's home (one per world,
-  made in `bin/main.ml` like `Memory`; at most `User_info.max_bytes`, read
-  from the file whenever it is asked for, so an edit by hand counts, and
-  replaced atomically (a longer file edited by hand is cut to the limit). Unlike memory it is always in
-  context, and no tool changes it. `Agent.create ?user_info` is asked for
-  the text: `System_prompt.build ?user_info` puts it after the
-  instructions when a session's prompt is first built (and in
-  non-forked subagents' prompts, `Tool_subagent.create ?user_info`; shared
-  forks inherit the parent's), and `Told_environment.user_info` records
-  what the session was told, so the usual diff
-  (`Told_environment.notes`) prefixes a `User_info` note
+- `Note_store` — the store `Memory` and `Custom_instructions` share: a
+  JSON file of `{next, notes: [{id, title?, text, saved}]}` under the
+  world's home, ids `<prefix><n>` never reused, caps per note and on the
+  count, an enabled switch in `User_prefs`, changes re-read and replace the
+  file atomically under its `Lock_dir` and a mutex, and subscribers told
+  of every change.
+- `Custom_instructions` / `Custom_instruction` /
+  `Tool_custom_instructions` — the user's standing instructions,
+  `~/.prigh/custom_instructions.json` (a `Note_store`, ids `ci<n>`, 50
+  notes of 1000 bytes; enabled key `custom_instructions.enabled`). Always
+  in context: `Custom_instruction.section` is the block after About you in
+  `System_prompt.build ?custom_instructions` (new sessions and non-forked
+  subagents), and `Told_environment.custom_instructions` records the list
+  a session was told, so `Custom_instruction.note` tells the next user
+  message what changed (added/edited/removed with ids and texts; the
+  whole list when most of it changed; an `Injected` `Custom_instructions`
+  note). The tool (`add | edit | remove | list`; main agent only,
+  destructive but `list`, offered only while enabled) emits
+  `Agent_event.Custom_instruction_set`, which `Agent` folds into the
+  session's told list (`Custom_instruction.apply`) so its own change is not
+  told back. RPC: `get_custom_instructions` (`{enabled, notes, limits}`),
+  `save_custom_instruction` (with `id`: edit), `remove_custom_instruction`,
+  `set_custom_instructions_enabled`, and the `custom_instructions_changed`
+  event (`Prigh_protocol.Custom_instructions`). prigh-web's Settings →
+  Custom instructions (`Instruction_notes`, `Settings_view`; the size and a
+  warning past `warn_tokens`) and the TUI's `/instructions` use them.
+- `User_info` — what the user set about themselves for the model: a
+  `User_info.Form` of optional fields (name, country, time zone, language,
+  `Units`, `Date_format`, occupation, background, anything else) in
+  `~/.prigh/about_you.json` under the world's home (`{"version": 1, ...}`
+  with only the filled fields; one per world, made in `bin/main.ml` like
+  `Memory`; `max_field` per field and `max_total` in all; read from the
+  file whenever it is asked for, so an edit by hand counts, and replaced
+  atomically). The free text of earlier versions (`~/.prigh/user_info.md`)
+  becomes `anything_else` on the first read (cut to its limit) and the old
+  file is renamed `user_info.md.migrated`. `Form.render` makes the block
+  the model sees: a `- Label: value` line per filled field, in a fixed
+  order. Unlike memory it is always in context, and no tool changes it.
+  `Agent.create ?user_info` is asked for the rendered text:
+  `System_prompt.build ?user_info` puts it after the instructions when a
+  session's prompt is first built (and in non-forked subagents' prompts,
+  `Tool_subagent.create ?user_info`; shared forks inherit the parent's),
+  and `Told_environment.user_info` records what the session was told, so
+  the usual diff (`Told_environment.notes`) prefixes a `User_info` note
   (`System_prompt.user_info_note`) to the next user message when the text
-  differs: a session from before the text or the feature, an edit, a
-  removal. The stored system prompt is never rewritten (it stays cached);
-  a session never told anything gets no note for an empty text. RPC:
-  `get_user_info` and `set_user_info {text}` (`{text, max}`), and every
-  change made through them is broadcast to that world's
-  clients as `user_info_changed` (`Prigh_protocol.User_info`). prigh-web's
-  Settings → About you (`About_you`, `Settings_view`) and the TUI's
+  differs: a session from before the form or the feature, an edit, a
+  clear. The stored system prompt is never rewritten (it stays cached); a
+  session never told anything gets no note for an empty form. RPC:
+  `get_user_info` and `set_user_info` with a whole `{form}` or one
+  `{field, value}` (both reply `{form, text, limits}`), and every change
+  made through them is broadcast to that world's clients as
+  `user_info_changed` (`Prigh_protocol.User_info`). prigh-web's Settings →
+  About you (`About_you`, `Settings_view`; the browser's time zone,
+  `App.Action.Set_browser_time_zone`, is offered as a fill) and the TUI's
   `/user-info` use them.
 - `Tool_web_search` — `web_search` is a provider-side tool: `Tools.for_model`
   keeps it only for Anthropic, OpenAI and OpenAI Codex models, whose
@@ -1495,6 +1529,10 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   `default_model`. Each namespace has its own file, so each has its own
   defaults; `archive_after_days` (default 7, 0 = never) is when an
   inactive session counts as archived (`Session.Summary.is_archived`).
+  `Rpc_server.handle` compares the client's `archive_after_days` before
+  and after a successful `set_config` and broadcasts `sessions_changed`
+  when it moved, so every client lists the sessions again
+  (`list_sessions` reads the config each time: no restart).
   `set_config` merges the given fields over the current ones and
   resolves `fallback_models`, `generate_model`, `compaction_model` and
   `naming_model`
@@ -3278,9 +3316,14 @@ terminal frontend and `web/` prigh-web, the browser one.
       `Repo_listings`, the other repositories the sessions' worktrees
       belong to, each `list_worktrees {cwd: root}` asked once
       (`Repo_worktrees`) and again once stale: a turn's end, a session's
-      worktrees changing, a worktree made or removed); `Model.folded`
-      (session ids, kept in the `web.sidebar-folded` preference) folds a
-      session's worktrees. Context menus (`Context_menu`, also messages', drawn by
+      worktrees changing, a worktree made or removed);
+      `Model.worktree_folds` (`Worktree_folds`) decides whether a
+      session's worktrees show: an explicit fold or unfold (session ids in
+      the `web.sidebar-folded` and `web.sidebar-unfolded` preferences)
+      wins, else they show when the session's `updated_at` is within the
+      window (`web.sidebar-worktree-hours`, default 12, 0 = never) of
+      `Model.now`. A per-user preference rather than config.json: it is
+      a display choice of the person, not of the backend's namespace. Context menus (`Context_menu`, also messages', drawn by
       `Context_menu_view` as a `Dialog.Picker` of kind `Menu`, so it owns
       the keyboard like any picker; `Command.Place_menu` has
       `Menu_listeners` put it at the pointer or under the row and keep it
@@ -4037,8 +4080,11 @@ for Linux, macOS and Windows.
 - `~/.prigh/prefs.json` — the user's preferences and data kept for the
   frontends (`User_prefs`): prigh-web's `web.*` and the shared `history`.
 - `~/.prigh/memory.json` — the `memory` tool's notes (`Memory`).
-- `~/.prigh/user_info.md` — what the user wrote about themselves, in every
-  session's context (`User_info`).
+- `~/.prigh/custom_instructions.json` — the user's standing instructions,
+  in every session's context (`Custom_instructions`).
+- `~/.prigh/about_you.json` — what the user set about themselves, in every
+  session's context (`User_info`; `user_info.md.migrated` is an earlier
+  version's text, moved into it).
 - `~/.prigh/config.json` — `scoped_models`, `approval_mode`, `permissions`, `notify`, `snippets`, `providers`
   (custom endpoints; their keys are in `auth.json` under their names),
   `forges` (git hosts' kind, OAuth client id and URL, by host).
