@@ -194,6 +194,8 @@ module Reply_tag : sig
     | Config_saved of string (** the new config; the notice is shown *)
     | Fallback_saved (** the new config; its chain is shown *)
     | Default_dir_saved
+    | Default_set of New_default.t
+    (** the new config: the settings' New sessions changed a default *)
     | Compaction_saved (** the new config; its settings are shown *)
     | Naming_saved (** the new config; the naming model is shown *)
     | Auto_archive_saved (** the new config; the age is shown *)
@@ -588,6 +590,15 @@ module Action : sig
         days *)
     | Sessions_field_commit of Sessions_fields.Which.t
     (** applies one (leaving the field; Enter accepts) *)
+    | Set_default of New_default.t
+    (** the settings' New sessions: saves a default, for new sessions only *)
+    | Pick_default of New_default.Picker.t
+    (** the settings' New sessions: opens a picker, back to the settings
+        after it *)
+    | Default_field_input of Default_fields.Which.t * string
+    (** the settings' New sessions: its directory and budget fields *)
+    | Default_field_commit of Default_fields.Which.t
+    (** applies one (leaving the field; Enter accepts) *)
     | Memory_filter of string (** the settings page's Memory: its filter *)
     | Memory_edit of string option
     (** edits this note, or writes a new one ([None]) *)
@@ -964,6 +975,8 @@ module Model : sig
     ; compact_at : Compact_at.t (** the settings page's "Compact at" *)
     ; sessions_fields : Sessions_fields.t
       (** the settings page's session list fields *)
+    ; default_fields : Default_fields.t
+      (** the settings page's New sessions fields *)
     ; settings_section : Settings_section.t
     (* A phone's settings show the list of sections, not one of them. *)
     ; settings_home : bool

@@ -30,6 +30,7 @@ module Picker_kind = struct
     | Compaction_models
     | Naming_models
     | Dictation_models
+    | Defaults of New_default.Picker.t
     | Attach
     | Menu of Context_menu.t
   [@@deriving sexp_of, equal]
@@ -155,9 +156,7 @@ let per_session = function
           | Trim_after _ )
       ; _
       }
-  | Annotate _
-  | Temporary_menu
-  | Leave_temporary
+  | Annotate _ | Temporary_menu | Leave_temporary
   | Picker { kind = Snippets | Reminders | Worktrees _ | Menu _; _ } -> true
   | Picker
       { kind =
@@ -174,6 +173,7 @@ let per_session = function
           | Compaction_models
           | Naming_models
           | Dictation_models
+          | Defaults _
           | Attach )
       ; _
       }

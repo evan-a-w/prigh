@@ -397,7 +397,7 @@ let%expect_test "/diff, /review and /init are in the completions and /help" =
     Commands ↑↓ Tab Enter Esc   Ctrl+Enter as typed
     /diff [path] show the uncommitted changes where the tools run, untracked files too
     /dictation [model MODEL|off] show which model transcribes dictation (speech to text); model MODEL|off: transcribe with MODEL, an OpenAI or OpenAI-compatible provider's (off: openai/gpt-4o-mini-transcribe)
-    /default-dir [path|off] show or set the directory new sessions start in
+    /default-dir [path|off] show or set the directory new sessions start in (on the default host), in Settings
     /mkdir [path] create a directory (and its parents) and change to it
     /downsize-images send the conversation's images smaller (after the model refused one as too large) and retry a failed reply
     /delete-archived delete every archived session, after a confirmation
@@ -437,7 +437,7 @@ let%expect_test "/diff, /review and /init are in the completions and /help" =
     /unarchive [session] unarchive a session (this one without an argument)
     /compaction [at|model|mask ...] show when conversations are compacted and what summarises them; at TOKENS|off: also once the context exceeds TOKENS, not only at 80% of the window; model MODEL|off: the model that writes the summaries (off: the session's); mask on|off: replace old tool outputs with placeholders first
     /permissions show the mode and the allow/ask/deny rules (config and this session)
-    /default-dir [path|off] show or set the directory new sessions start in
+    /default-dir [path|off] show or set the directory new sessions start in (on the default host), in Settings
     /auto-archive [DAYS|off] show how long a session goes without activity before it is archived; DAYS|off: archive after DAYS days (off: never, only by hand), in Settings
     /delete-archived delete every archived session, after a confirmation
     /downsize-images send the conversation's images smaller (after the model refused one as too large) and retry a failed reply

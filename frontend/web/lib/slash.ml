@@ -266,7 +266,19 @@ let every =
       ~argument:Backend_directory
       ~args:"[path|off]"
       "default-dir"
-      "show or set the directory new sessions start in"
+      "show or set the directory new sessions start in (on the default host), \
+       in Settings"
+  ; c
+      ~argument:Host
+      ~args:"[off|name]"
+      "default-host"
+      "pick or set the tool host new sessions start on (off: where you are), \
+       in Settings"
+  ; c
+      ~args:"[off|dollars]"
+      "default-budget"
+      "show or set the cost budget of sessions that set none with /budget, in \
+       Settings"
   ; c
       ~argument:Host
       ~args:"[name|backend]"

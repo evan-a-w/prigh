@@ -55,7 +55,7 @@ let%expect_test "opening reads it; the section says what it is for" =
               class="about-you-input text-input"
               #value=""
               @on_input> </textarea>
-    (Appearance) (Sessions) (Models) (Memory) (About you) (Git hosting) (Account)
+    (Appearance) (Sessions) (New sessions) (Models) (Memory) (About you) (Git hosting) (Account)
     |}]
 ;;
 
