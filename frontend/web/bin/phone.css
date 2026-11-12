@@ -161,7 +161,7 @@
 
 /* {1 The composer} */
 
-.app.narrow .composer { padding-bottom: max(8px, var(--safe-b)); padding-left: max(8px, var(--safe-l)); padding-right: max(8px, var(--safe-r)); }
+.app.narrow .composer { padding-bottom: max(8px, var(--safe-b)); }
 /* 16px: iOS zooms the page into a field under that, and stays zoomed. */
 .app.narrow :is(textarea, input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]), select) { font-size: 16px; }
 .app.narrow .composer :is(.chip-button, .btn.icon) { min-height: 40px; }
