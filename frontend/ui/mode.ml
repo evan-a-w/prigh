@@ -26,6 +26,7 @@ module Picker_kind = struct
     | Snippets
     | Reminders
     | Memory of Memory.t
+    | Custom_instructions of Custom_instructions.t
     | Worktrees of Worktree.Listing.t
     | Mcp of Mcp_list.t
     | Pull_requests (** [/pr]: Enter shows one *)
@@ -88,6 +89,10 @@ module Confirm_action = struct
         }
     | Forget_memory of
         { note : Memory.Note.t
+        ; back : Open_picker.t option
+        }
+    | Remove_custom_instruction of
+        { note : Custom_instructions.Note.t
         ; back : Open_picker.t option
         }
     | Clear_user_info

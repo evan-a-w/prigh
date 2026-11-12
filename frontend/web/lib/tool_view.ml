@@ -41,6 +41,8 @@ let summary (call : Tool_call.t) =
   then Option.value (Tool_summary.answer_session args) ~default:""
   else if String.equal call.name "memory"
   then Option.value (Tool_summary.memory args) ~default:""
+  else if String.equal call.name "custom_instructions"
+  then Option.value (Tool_summary.custom_instructions args) ~default:""
   else if String.equal call.name "on_host"
   then
     Option.value_map

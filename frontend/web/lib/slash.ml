@@ -18,6 +18,7 @@ module Argument = struct
     | Plan
     | Notify
     | Memory
+    | Instructions
     | Settings
     | Session
     | Path
@@ -145,9 +146,15 @@ let every =
       "your notes the model saves when you ask it to remember something, in \
        Settings; on or off gives the model the memory tool or takes it away"
   ; c
+      ~argument:Instructions
+      ~args:"[on|off]"
+      "instructions"
+      "your custom instructions, in the context of every session, in Settings; \
+       on or off lets the model add, edit and remove them or not"
+  ; c
       "user-info"
-      "what you wrote about yourself for the model, given to it in every \
-       session (unlike memory, which it looks up), in Settings"
+      "what you set about yourself for the model (name, country, units...), \
+       given to it in every session, in Settings"
   ; c
       ~args:"[instructions]"
       "compact"

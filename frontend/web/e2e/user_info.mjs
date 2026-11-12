@@ -1,5 +1,7 @@
-// The settings page's About you section: the text in the account's
-// user_info.md, written, saved (Ctrl+Enter) and reverted; a change on another
+// The settings page's About you section: the form in the account's
+// about_you.json (an earlier user_info.md's text moved into Anything else),
+// filled in (the browser's time zone with a tap), saved (Ctrl+Enter) and
+// reverted; a change on another
 // page followed, or offered when something is typed there; the open session
 // told with the next message; and the section on phones (390x844, 320x640;
 // touch, and Chromium as an installed PWA with the notch's insets). Run by prigh_web.sh; prints normalised
@@ -9,7 +11,7 @@
 // Environment: PLAYWRIGHT_MODULE, PRIGH_BACKEND, SITE, TEST_DIR, TOKEN and
 // optionally SHOTS.
 import { spawn } from "node:child_process";
-import { mkdirSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { end } from "./end.mjs";
 
@@ -24,14 +26,18 @@ const home = join(dir, "home");
 const cwd = join(dir, "cwd");
 mkdirSync(join(home, ".prigh"), { recursive: true });
 mkdirSync(cwd, { recursive: true });
-const infoFile = join(home, ".prigh/user_info.md");
+// What an earlier prigh kept: moved into the form on first read.
+writeFileSync(join(home, ".prigh/user_info.md"), "I like short answers.\n");
+const infoFile = join(home, ".prigh/about_you.json");
 const file = () => {
   try {
-    return JSON.stringify(readFileSync(infoFile, "utf8"));
+    return readFileSync(infoFile, "utf8").trim();
   } catch {
-    return "(no user_info.md)";
+    return "(no about_you.json)";
   }
 };
+const oldFile = () =>
+  ["user_info.md", "user_info.md.migrated"].map(f => `${f}: ${existsSync(join(home, ".prigh", f)) ? "yes" : "no"}`).join(", ");
 
 const server = spawn(
   backend,
@@ -59,6 +65,8 @@ const open = async (viewport, { phone = false, safe = false } = {}) => {
     options.hasTouch = true;
     if (engineName !== "firefox") options.isMobile = true;
   }
+  // The time zone the browser detects, offered as a one-tap fill.
+  options.timezoneId = "Australia/Sydney";
   const context = await browser.newContext(options);
   context.setDefaultTimeout(20000);
   const page = await context.newPage();
@@ -94,16 +102,23 @@ const run = async (p, command) => {
   await composer(p).press("Control+Enter");
 };
 const panel = p => p.locator(".settings-panel");
-const text = p => p.locator("#about-you-text");
-// /user-info: Settings, at About you, once the text is in.
+const field = (p, name) => p.locator(`#about-you-${name}`);
+const text = p => field(p, "name");
+// /user-info: Settings, at About you, once the form is in.
 const openInfo = async p => {
   await run(p, "/user-info");
   await p.locator(".settings-dialog").waitFor();
-  await p.locator("#about-you-text:not([disabled])").waitFor();
+  await p.locator("#about-you-name:not([disabled])").waitFor();
 };
+const values = p =>
+  p.evaluate(() =>
+    [...document.querySelectorAll(".about-you-form :is(input, textarea, .about-you-choice)")]
+      .map(el => `${el.id.replace("about-you-", "")}=${JSON.stringify(el.matches(".about-you-choice") ? el.querySelector(".segment.on").innerText : el.value)}`)
+      .join(" "),
+  );
 const show = async p => {
   console.log((await panel(p).innerText()).replace(/\n+/g, "\n"));
-  console.log(`text: ${JSON.stringify(await text(p).inputValue())}`);
+  console.log(`values: ${await values(p)}`);
 };
 // Whether Save is on the screen, clear of the edges (the home indicator).
 const saveVisible = p =>
@@ -148,15 +163,21 @@ try {
   await run(page, "hello");
   await page.getByText("faux reply").first().waitFor();
   await openInfo(page);
-  section("empty");
+  section("moved from user_info.md");
   await show(page);
-  await screenshot(page, "empty");
+  console.log(`files: ${oldFile()}`);
+  await screenshot(page, "migrated");
 
-  // Written and saved with Ctrl+Enter: the file, and the acknowledgement.
-  await text(page).fill("I'm Lloyd. I work on prigh, in OCaml.\nKeep answers short.");
+  // Filled in, the time zone with a tap, and saved with Ctrl+Enter.
+  await field(page, "name").fill("Lloyd");
+  await field(page, "country").fill("Australia");
+  await page.locator(".about-you-detect").click();
+  await page.locator("#about-you-units .segment", { hasText: "Metric" }).click();
+  await page.locator("#about-you-date-format .segment", { hasText: "D/M/Y" }).click();
+  await field(page, "background").fill("Undergrad pure maths and CS.");
   await page.locator(".about-you-buttons button", { hasText: "Revert" }).waitFor();
   await screenshot(page, "typed");
-  await text(page).press("Control+Enter");
+  await field(page, "background").press("Control+Enter");
   await page.locator(".about-you-saved").waitFor();
   section("saved");
   await show(page);
@@ -173,21 +194,21 @@ try {
   const other = await open({ width: 1280, height: 800 });
   await signIn(other);
   await openInfo(other);
-  await text(page).fill("I'm Lloyd. Keep answers short.");
-  await text(page).press("Control+Enter");
-  await other.waitForFunction(() => document.querySelector("#about-you-text").value === "I'm Lloyd. Keep answers short.");
+  await field(page, "occupation").fill("Student");
+  await field(page, "occupation").press("Control+Enter");
+  await other.waitForFunction(() => document.querySelector("#about-you-occupation").value === "Student");
   section("followed on another page");
-  console.log(`text: ${JSON.stringify(await text(other).inputValue())}`);
+  console.log(`values: ${await values(other)}`);
   await text(other).fill("typed on the other page");
-  await text(page).fill("I'm Lloyd. Keep answers short, in British English.");
-  await text(page).press("Control+Enter");
+  await field(page, "language").fill("English, Australian spelling");
+  await field(page, "language").press("Control+Enter");
   await other.locator(".about-you-elsewhere").waitFor();
   section("changed under a draft");
-  await show(other);
+  console.log((await other.locator(".about-you-elsewhere").innerText()).trim());
   await screenshot(other, "elsewhere");
   await other.locator(".about-you-elsewhere button").click();
   await other.locator(".about-you-elsewhere").waitFor({ state: "detached" });
-  console.log(`loaded: ${JSON.stringify(await text(other).inputValue())}`);
+  console.log(`loaded: ${await values(other)}`);
   await other.close();
 
   // The open session, started before any of it, is told with the next message.
@@ -209,10 +230,12 @@ try {
     section(`phone ${tag}`);
     console.log(`fits: ${await fits(phone)}; targets: ${await targets(phone)}; Save on screen: ${await saveVisible(phone)}`);
     await screenshot(phone, `phone-${tag}`);
-    await text(phone).fill("I'm Lloyd. Keep answers short, in British English. On a phone.");
+    await field(phone, "anything-else").fill("I like short answers. On a phone.");
     await phone.locator(".about-you-buttons button", { hasText: "Revert" }).waitFor();
     console.log(`typing fits: ${await fits(phone)}; targets: ${await targets(phone)}; Save on screen: ${await saveVisible(phone)}`);
     await screenshot(phone, `phone-${tag}-typed`);
+    await field(phone, "units").scrollIntoViewIfNeeded();
+    await screenshot(phone, `phone-${tag}-selects`);
     await phone.locator(".about-you-buttons button", { hasText: "Revert" }).tap();
     await phone.locator(".about-you-buttons button", { hasText: "Revert" }).waitFor({ state: "detached" });
     // The way back: the list of sections.

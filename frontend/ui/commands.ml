@@ -27,6 +27,8 @@ module Argument = struct
     | Snippet
     | Remind
     | Memory
+    | Instructions
+    | User_info
     | Worktree
     | Review
     | Server
@@ -171,11 +173,20 @@ let every =
        (Ctrl+D forgets one); on or off gives the model the memory tool or \
        takes it away"
   ; c
+      ~argument:Argument.Instructions
+      "instructions"
+      "[add TEXT|on|off]"
+      "your custom instructions, in the context of every session (Enter shows \
+       one, Ctrl+D removes it): add TEXT adds one; on or off lets the model \
+       add, edit and remove them or not; prigh-web's Settings edits them"
+  ; c
+      ~argument:Argument.User_info
       "user-info"
-      "[TEXT|clear]"
-      "what you wrote about yourself for the model, in the context of every \
-       session (unlike memory, which it looks up): show it, replace it with \
-       TEXT, or clear it"
+      "[FIELD VALUE|clear]"
+      "what you set about yourself for the model (name, country, time zone, \
+       units...), in the context of every session (unlike memory, which it \
+       looks up): show it, set a field (an empty VALUE clears it), or clear \
+       them all"
   ; c
       ~argument:Argument.Resume
       "resume"
