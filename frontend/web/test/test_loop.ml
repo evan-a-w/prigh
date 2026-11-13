@@ -51,7 +51,10 @@ let%expect_test
   H.text h ~selector:".composer-status";
   H.text h ~selector:".status-notes";
   List.iter
-    [ ".composer-status .budget"; ".status-notes .goal"; ".status-notes .resume" ]
+    [ ".composer-status .budget"
+    ; ".status-notes .goal"
+    ; ".status-notes .resume"
+    ]
     ~f:(fun selector -> H.elements h ~selector);
   (* In the page's time zone. *)
   H.act h (Set_utc_offset (Time_ns.Span.of_hr 2.));
@@ -63,7 +66,7 @@ let%expect_test
     Context 0 / 200k · 0%
     Tokens 0 in · 0 out · 0 cached
     Cost $0.0000
-    Thinking on
+    Thinking provider's default
     Mode Auto: never asks
     Model Claude Opus 5.5
     Branch main
@@ -73,7 +76,7 @@ let%expect_test
     Context 0 / 200k · 0%
     Tokens 0 in · 0 out · 0 cached
     Cost $4.2000 · $4.20/$5.00
-    Thinking on
+    Thinking provider's default
     Mode Auto: never asks
     Model Claude Opus 5.5
     Branch main
@@ -84,7 +87,7 @@ let%expect_test
     Context 0 / 200k · 0%
     Tokens 0 in · 0 out · 0 cached
     Cost $5.5000 · $5.50/$5.00
-    Thinking on
+    Thinking provider's default
     Mode Auto: never asks
     Model Claude Opus 5.5
     Branch main

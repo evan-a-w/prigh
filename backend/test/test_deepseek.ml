@@ -164,6 +164,37 @@ let%expect_test "request body: thinking off, max_tokens" =
     |}]
 ;;
 
+let%expect_test "thinking per setting: clamped to low, high or max" =
+  let settings : Thinking.t list =
+    Off
+    :: On None
+    :: List.map Thinking.Level.all ~f:(fun l -> Thinking.On (Some l))
+  in
+  List.iter settings ~f:(fun thinking ->
+    let body =
+      T.request_body { (request [ Message.user "hi" ]) with thinking }
+    in
+    let field name =
+      Option.value_map (Json.member name body) ~default:"-" ~f:Json.to_string
+    in
+    printf
+      "%-8s thinking=%s reasoning_effort=%s\n"
+      (Thinking.to_string thinking)
+      (field "thinking")
+      (field "reasoning_effort"));
+  [%expect
+    {|
+    off      thinking={"type":"disabled"} reasoning_effort=-
+    default  thinking={"type":"enabled"} reasoning_effort=-
+    minimal  thinking={"type":"enabled"} reasoning_effort="low"
+    low      thinking={"type":"enabled"} reasoning_effort="low"
+    medium   thinking={"type":"enabled"} reasoning_effort="low"
+    high     thinking={"type":"enabled"} reasoning_effort="high"
+    xhigh    thinking={"type":"enabled"} reasoning_effort="high"
+    max      thinking={"type":"enabled"} reasoning_effort="max"
+    |}]
+;;
+
 let parse s =
   print_s [%sexp (T.parse_chunk (Json.of_string s) : T.Chunk.t Or_error.t)]
 ;;

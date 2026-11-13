@@ -50,8 +50,8 @@ let%expect_test "the section: the built-ins, every control" =
     New sessions start with the backend's choice: a model of a provider you are logged in to.
     (The backend's choice) (This session’s)
     Thinking
-    How hard new sessions think, on models that can: Off, Low, On (the model's own), High or Max.
-    (Off) (Low) (On) (High) (Max)
+    How hard new sessions think, on models that can. A model without the level takes its nearest one.
+    (Off answer straight away) (Provider's default the provider picks the effort) (Minimal barely) (Low a little) (Medium some) (High more) (Xhigh a lot, for long agentic work) (Max as much as the model allows)
     Mode
     What asks before it runs: everything (Ask), all but file edits (Auto-edit) or nothing (Auto).
     (Ask) (Auto-edit) (Auto)
@@ -69,11 +69,14 @@ let%expect_test "the section: the built-ins, every control" =
     Sessions without their own /budget start no turn once they have cost this much, open ones too. Off: no limit.
     (Stop sessions starting turns past a cost (/default-budget))
     button "New sessions' model: The backend's choice" -- Choose the model new sessions start with
-    button "This session\226\128\153s" -- Start new sessions with Claude Opus 5.5 · thinking on, its thinking level too (/change_default)
+    button "This session\226\128\153s" -- Start new sessions with Claude Opus 5.5 · thinking provider's default, its thinking level too (/change_default)
     button "Off" -- New sessions think at off
+    button "Provider's default" -- New sessions think at provider's default
+    button "Minimal" -- New sessions think at minimal
     button "Low" -- New sessions think at low
-    button "On" -- New sessions think at on
+    button "Medium" -- New sessions think at medium
     button "High" -- New sessions think at high
+    button "Xhigh" -- New sessions think at xhigh
     button "Max" -- New sessions think at max
     button "Ask" -- New sessions start in Ask mode
     button "Auto-edit" -- New sessions start in Auto-edit mode
@@ -152,21 +155,21 @@ let%expect_test "thinking and mode: segmented, for new sessions only" =
   H.elements h ~selector:".setting.default-thinking .default-reset";
   [%expect
     {|
-    (Set_default (Thinking (high)))
+    (Set_default (Thinking (low)))
     (Rpc (method_ set_config)
-     (params ((config ((default_thinking high))) (defaults_only true)))
-     (tag (Default_set (Thinking (high)))))
-    (Expire_toast (id 0) (after_ms 3660))
+     (params ((config ((default_thinking low))) (defaults_only true)))
+     (tag (Default_set (Thinking (low)))))
+    (Expire_toast (id 0) (after_ms 3620))
     <button class="on segment">
     Thinking
-    How hard new sessions think, on models that can: Off, Low, On (the model's own), High or Max.
-    (Off) (Low) (On) (High) (Max)
-    (Back to the built-in: on)
+    How hard new sessions think, on models that can. A model without the level takes its nearest one.
+    (Off answer straight away) (Provider's default the provider picks the effort) (Minimal barely) (Low a little) (Medium some) (High more) (Xhigh a lot, for long agentic work) (Max as much as the model allows)
+    (Back to the built-in: provider's default)
     (Set_default (Thinking ()))
     (Rpc (method_ set_config)
      (params ((config ((default_thinking null))) (defaults_only true)))
      (tag (Default_set (Thinking ()))))
-    (Expire_toast (id 1) (after_ms 4380))
+    (Expire_toast (id 1) (after_ms 5020))
     |}];
   H.click h ~selector:".setting.default-mode .segment:nth-child(1)";
   H.reply h "set_config" (config [ "approval_mode", `String "ask" ]);
@@ -463,10 +466,10 @@ let%expect_test "a refused change shows the backend's again" =
   H.text h ~selector:".toast:last-child";
   [%expect
     {|
-    (Set_default (Thinking (max)))
+    (Set_default (Thinking (medium)))
     (Rpc (method_ set_config)
-     (params ((config ((default_thinking max))) (defaults_only true)))
-     (tag (Default_set (Thinking (max)))))
+     (params ((config ((default_thinking medium))) (defaults_only true)))
+     (tag (Default_set (Thinking (medium)))))
     (Rpc (method_ get_config) (params ()) (tag Config))
     Couldn't set the default thinking level: the disk is full (Dismiss)
     |}]

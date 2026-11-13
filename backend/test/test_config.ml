@@ -175,7 +175,8 @@ let%expect_test "malformed JSON and wrong types are errors" =
     (Error "config.confirm_tools must be a boolean")
     (Error "config.default_model must be a string")
     (Error
-     (config.default_thinking "thinking must be one of: off, on, low, high, max"))
+     (config.default_thinking
+      "thinking must be one of: off, default, minimal, low, medium, high, xhigh, max"))
     (Error "config.default_thinking must be a string")
     (Error
      "config.dictation_model must be a model's provider/id (or null: openai/gpt-4o-mini-transcribe)")

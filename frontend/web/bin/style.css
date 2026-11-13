@@ -2144,10 +2144,6 @@ kbd {
 /* Thinking's effort, as rising bars: lit up to the level. */
 .thinking-meter { display: inline-flex; align-items: flex-end; gap: 2px; height: 12px; flex-shrink: 0; }
 .thinking-meter > .bar { width: 3px; border-radius: 1px; background: var(--rule-2); }
-.thinking-meter > .bar:nth-child(1) { height: 4px; }
-.thinking-meter > .bar:nth-child(2) { height: 6.5px; }
-.thinking-meter > .bar:nth-child(3) { height: 9px; }
-.thinking-meter > .bar:nth-child(4) { height: 12px; }
 .thinking-meter > .bar.on { background: var(--muted); }
 .popover-item.marked .thinking-meter > .bar.on { background: var(--sodium); }
 @media (prefers-reduced-motion: reduce) {

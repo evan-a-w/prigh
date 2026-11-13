@@ -498,6 +498,8 @@ let%expect_test "model matching" =
     ; context_window = 1000
     ; max_output = 100
     ; supports_thinking = true
+    ; thinking_options = []
+    ; thinking_default = None
     ; cost = { input = 1.; output = 2.; cache_read = 0.1 }
     ; image_limit = None
     }
@@ -700,7 +702,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /default-budget [off|dollars]      show or set the cost budget of sessions that set none with /budget
     /login [provider] [api_key|oauth]  log in to a provider, or a git host: github [HOST] [token], forgejo HOST [token], HOST [token]
     /logout [provider|HOST]            remove a provider's or a git host's stored credential
-    /thinking [off|low|on|high|max]    pick or set the thinking level
+    /thinking [off|default|LEVEL]      pick or set the thinking level (the model's; default: the provider's)
     /verbosity [quiet|normal|verbose]  set the transcript verbosity
     /filter [all|KIND...|-KIND|+KIND]  show only some kinds of the transcript (user, assistant, thinking, tools, subagents, notes); the model's context is unchanged
     /confirm [on|off|mode]             ask before destructive tools: the approval mode new sessions (and this one) start in; on: ask, off: auto, or ask, auto-edit, auto
@@ -2230,6 +2232,7 @@ let%expect_test
       ~logged_in:(fun _ -> true)
       ~default_dir_host:None
       ~server:None
+      ~model:None
   in
   let show name ac =
     printf
@@ -2312,6 +2315,7 @@ let%expect_test "autocomplete: /skill: completes skill names" =
       ~logged_in:(fun _ -> true)
       ~default_dir_host:None
       ~server:None
+      ~model:None
   in
   let show line ?skills () =
     match compute ?skills line with
@@ -2466,6 +2470,7 @@ let%expect_test
         ~logged_in:(fun _ -> true)
         ~default_dir_host
         ~server:None
+        ~model:None
     with
     | None -> printf "%S none\n" line
     | Some ac ->

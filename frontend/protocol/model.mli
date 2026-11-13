@@ -26,6 +26,12 @@ type t =
   ; context_window : int
   ; max_output : int
   ; supports_thinking : bool
+  ; thinking_options : string list
+    (** what [set_thinking] takes for it, in cycling order (["off"],
+        ["default"], then its effort levels); [\[\]] from a backend from
+        before it sent them: see {!Thinking.options} *)
+  ; thinking_default : string option
+    (** the level the provider picks when sent none, when known *)
   ; cost : Cost.t
   ; image_limit : Image_limit.t option
     (** [None] from a backend from before it sent one *)

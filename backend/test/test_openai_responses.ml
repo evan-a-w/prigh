@@ -218,7 +218,7 @@ let%expect_test
   in
   print_endline (Json.to_string body);
   [%expect
-    {| {"model":"gpt-5.5","stream":true,"store":false,"instructions":"You are a helpful assistant.","input":[{"type":"message","role":"user","content":[{"type":"input_text","text":"hi"}]}],"include":["reasoning.encrypted_content"],"tool_choice":"auto","parallel_tool_calls":true,"max_output_tokens":500} |}]
+    {| {"model":"gpt-5.5","stream":true,"store":false,"instructions":"You are a helpful assistant.","input":[{"type":"message","role":"user","content":[{"type":"input_text","text":"hi"}]}],"include":["reasoning.encrypted_content"],"tool_choice":"auto","parallel_tool_calls":true,"reasoning":{"effort":"none"},"max_output_tokens":500} |}]
 ;;
 
 let%expect_test
@@ -433,7 +433,7 @@ let%expect_test "stream end to end against the codex endpoint" =
     chatgpt-account-id: acct-1
     openai-beta: responses=experimental
     originator: prigh
-    {"effort":"medium","summary":"auto"}
+    {"summary":"auto"}
     |}]
 ;;
 
@@ -611,5 +611,87 @@ let%expect_test
          \n+caf\195\169 \\ tab\t\
          \n*** End Patch")))))
     (Ok (Object ((input (String "whole \"input\"")))))
+    |}]
+;;
+
+let%expect_test
+    "reasoning per model and setting (clamped to the model's options first)"
+  =
+  let settings : Thinking.t list =
+    Off
+    :: On None
+    :: List.map Thinking.Level.all ~f:(fun l -> Thinking.On (Some l))
+  in
+  let show ~endpoint key =
+    let model = ok_exn (Model.resolve key) in
+    printf "%s:\n" key;
+    List.iter settings ~f:(fun thinking ->
+      let body =
+        T.request_body
+          ~endpoint
+          { (request ~model [ Message.user "hi" ]) with thinking }
+      in
+      printf
+        "  %-8s reasoning=%s\n"
+        (Thinking.to_string thinking)
+        (Option.value_map
+           (Json.member "reasoning" body)
+           ~default:"-"
+           ~f:Json.to_string))
+  in
+  show ~endpoint:(Openai { api_key = "k" }) "openai/gpt-5";
+  show ~endpoint:(Openai { api_key = "k" }) "openai/gpt-5.5";
+  show ~endpoint:(Openai { api_key = "k" }) "openai/gpt-5-pro";
+  show ~endpoint:(Openai { api_key = "k" }) "openai/gpt-4.1";
+  show
+    ~endpoint:(Codex { access_token = "t"; account_id = "acct" })
+    "openai-codex/gpt-6.1-sol";
+  [%expect
+    {|
+    openai/gpt-5:
+      off      reasoning={"summary":"auto"}
+      default  reasoning={"summary":"auto"}
+      minimal  reasoning={"effort":"minimal","summary":"auto"}
+      low      reasoning={"effort":"low","summary":"auto"}
+      medium   reasoning={"effort":"medium","summary":"auto"}
+      high     reasoning={"effort":"high","summary":"auto"}
+      xhigh    reasoning={"effort":"high","summary":"auto"}
+      max      reasoning={"effort":"high","summary":"auto"}
+    openai/gpt-5.5:
+      off      reasoning={"effort":"none"}
+      default  reasoning={"summary":"auto"}
+      minimal  reasoning={"effort":"low","summary":"auto"}
+      low      reasoning={"effort":"low","summary":"auto"}
+      medium   reasoning={"effort":"medium","summary":"auto"}
+      high     reasoning={"effort":"high","summary":"auto"}
+      xhigh    reasoning={"effort":"xhigh","summary":"auto"}
+      max      reasoning={"effort":"xhigh","summary":"auto"}
+    openai/gpt-5-pro:
+      off      reasoning={"summary":"auto"}
+      default  reasoning={"summary":"auto"}
+      minimal  reasoning={"effort":"high","summary":"auto"}
+      low      reasoning={"effort":"high","summary":"auto"}
+      medium   reasoning={"effort":"high","summary":"auto"}
+      high     reasoning={"effort":"high","summary":"auto"}
+      xhigh    reasoning={"effort":"high","summary":"auto"}
+      max      reasoning={"effort":"high","summary":"auto"}
+    openai/gpt-4.1:
+      off      reasoning=-
+      default  reasoning=-
+      minimal  reasoning=-
+      low      reasoning=-
+      medium   reasoning=-
+      high     reasoning=-
+      xhigh    reasoning=-
+      max      reasoning=-
+    openai-codex/gpt-6.1-sol:
+      off      reasoning={"summary":"auto"}
+      default  reasoning={"summary":"auto"}
+      minimal  reasoning={"effort":"low","summary":"auto"}
+      low      reasoning={"effort":"low","summary":"auto"}
+      medium   reasoning={"effort":"medium","summary":"auto"}
+      high     reasoning={"effort":"high","summary":"auto"}
+      xhigh    reasoning={"effort":"xhigh","summary":"auto"}
+      max      reasoning={"effort":"max","summary":"auto"}
     |}]
 ;;
