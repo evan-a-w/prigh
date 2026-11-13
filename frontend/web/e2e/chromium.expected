@@ -18,7 +18,7 @@ token
 What are we building?
 / for commands, @ for files
 === chromium: signed in: the session's card ===
-on
+provider's default
 auto
 normal
 0%
@@ -104,7 +104,7 @@ printf 'one\ntwo\nthree\n'
 three lines
 <TIME>
 === chromium: the session's card after a run ===
-on
+provider's default
 auto
 normal
 0%
@@ -381,10 +381,10 @@ Thinking
 Alt+T cycles
 Off
 answer straight away
+Provider's Default
+the provider picks: high
 Low
 a little
-On
-the provider's default budget
 High
 more
 Max
@@ -803,7 +803,7 @@ desktop: dialog 940x704, in the window: true; sections down the side; panel fits
 phone: dialog 390x844, the screen: true; back: Settings; panel fits: true
 Esc closes it, the editor has the focus: true
 === chromium: the session's bar: a 900px chat column without the sidebar ===
-chat 900; chips: DeepSeek V4.1 Flash, <HOSTNAME>, on, auto, normal; status: 0%, $<COST>; .chat-chrome 44px high
+chat 900; chips: DeepSeek V4.1 Flash, <HOSTNAME>, provider's default, auto, normal; status: 0%, $<COST>; .chat-chrome 44px high
 .chat-chrome: fits
 .composer: fits
 the panels' toggles: 4 buttons 10px from the top, 14px from the right, clear of the jump list: true, open: Files
@@ -2963,8 +2963,8 @@ row 1: 0% | $<COST>
 lamps: 0; accented: nothing; 28px high
 fits
 === chromium: card: the composer's chips ===
-chips 1: DeepSeek V4.1 Flash | <HOSTNAME> | on | auto | verbose
-chip problems: none
+chips 1: DeepSeek V4.1 Flash | <HOSTNAME> | provider's default | auto | verbose
+chip problems: none (host name truncated)
 === chromium: card: another host to choose ===
 ✓ <HOSTNAME>
 build-runner-eu-west-a-long-hostname (in <SESSION>)
@@ -2972,7 +2972,7 @@ build-runner-eu-west-a-long-hostname (in <SESSION>)
 row 1: 0% | $<COST>
 lamps: 0; accented: nothing; 28px high
 fits
-chips 1: DeepSeek V4.1 Flash | build-runner-eu-west-a-long-hostname | on | auto | verbose
+chips 1: DeepSeek V4.1 Flash | build-runner-eu-west-a-long-hostname | provider's default | auto | verbose
 chip problems: none (host name truncated)
 === chromium: card: the context opens the session's details ===
 Session
@@ -3481,7 +3481,7 @@ fits: true
 (none)
 === chromium: new sessions: the session open, before ===
 model: DeepSeek V4.1 Flash: switch model (Ctrl+L)
-thinking: Thinking on: how much the model reasons before it answers (Alt+T cycles, /thinking)
+thinking: Thinking: provider's default: how much the model reasons before it answers (Alt+T cycles, /thinking)
 mode: Tools run without asking (Alt+M cycles, /mode picks)
 host: Tools run on <host>, in <cwd> (/host switches)
 === chromium: new sessions: the built-ins ===
@@ -3494,11 +3494,14 @@ New sessions start with the backend's choice: a model of a provider you are logg
 The backend's choice
 This session’s
 Thinking
-How hard new sessions think, on models that can: Off, Low, On (the model's own), High or Max.
+How hard new sessions think, on models that can. A model without the level takes its nearest one.
 Off
+Provider's default
+Minimal
 Low
-On
+Medium
 High
+Xhigh
 Max
 Mode
 What asks before it runs: everything (Ask), all but file edits (Auto-edit) or nothing (Auto).
@@ -3529,11 +3532,14 @@ New sessions start with Claude Fable 5.
 Claude Fable 5
 This session’s
 Thinking
-How hard new sessions think, on models that can: Off, Low, On (the model's own), High or Max.
+How hard new sessions think, on models that can. A model without the level takes its nearest one.
 Off
+Provider's default
+Minimal
 Low
-On
+Medium
 High
+Xhigh
 Max
 Mode
 What asks before it runs: everything (Ask), all but file edits (Auto-edit) or nothing (Auto).
@@ -3566,11 +3572,14 @@ New sessions start with Claude Fable 5.
 Claude Fable 5
 This session’s
 Thinking
-How hard new sessions think, on models that can: Off, Low, On (the model's own), High or Max.
+How hard new sessions think, on models that can. A model without the level takes its nearest one.
 Off
+Provider's default
+Minimal
 Low
-On
+Medium
 High
+Xhigh
 Max
 Mode
 What asks before it runs: everything (Ask), all but file edits (Auto-edit) or nothing (Auto).
@@ -3599,12 +3608,12 @@ Sessions without their own /budget start no turn once they have cost this much, 
 USD
 === chromium: new sessions: the session open keeps its own ===
 model: DeepSeek V4.1 Flash: switch model (Ctrl+L)
-thinking: Thinking on: how much the model reasons before it answers (Alt+T cycles, /thinking)
+thinking: Thinking: provider's default: how much the model reasons before it answers (Alt+T cycles, /thinking)
 mode: Tools run without asking (Alt+M cycles, /mode picks)
 host: Tools run on <host>, in <cwd> (/host switches)
 === chromium: new sessions: a new session ===
 model: Claude Fable 5: switch model (Ctrl+L)
-thinking: Thinking high: how much the model reasons before it answers (Alt+T cycles, /thinking)
+thinking: Thinking: high: how much the model reasons before it answers (Alt+T cycles, /thinking)
 mode: Bash, job_input, edits and MCP tools ask first (Alt+M cycles, /mode picks)
 host: Tools run on laptop, in <dir>/laptop-home/proj (/host switches)
 Budget $2.50, $0.00 spent: /budget DOLLARS changes it, /budget off removes it
@@ -3631,11 +3640,14 @@ New sessions start with the backend's choice: a model of a provider you are logg
 The backend's choice
 This session’s
 Thinking
-How hard new sessions think, on models that can: Off, Low, On (the model's own), High or Max.
+How hard new sessions think, on models that can. A model without the level takes its nearest one.
 Off
+Provider's default
+Minimal
 Low
-On
+Medium
 High
+Xhigh
 Max
 Mode
 What asks before it runs: everything (Ask), all but file edits (Auto-edit) or nothing (Auto).

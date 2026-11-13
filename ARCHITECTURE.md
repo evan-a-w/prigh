@@ -401,6 +401,9 @@ becomes a list):
   index or id; thinking arrives as `reasoning_content` or `reasoning`.
   Images are `image_url` data-URL parts; a tool message is text only, so a
   tool result's images follow the run of tool messages in a user message.
+  `Model.thinking_options` lists the settings each model takes and
+  `Provider.Request.prepare` clamps the request's to them, so providers only
+  map a supported level to its wire value.
   Per-server differences are `Quirks`: how the thinking level is sent
   (DeepSeek's `thinking: {type}` plus `reasoning_effort`, or OpenAI's
   `reasoning_effort`) and whether earlier thinking is replayed as
