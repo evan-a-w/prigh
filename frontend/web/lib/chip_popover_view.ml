@@ -23,17 +23,42 @@ let shortcut : Chip.t -> string = function
 
 let option_id i = sprintf "popover-option-%d" i
 
-(* How hard the model thinks at each level: one bar per step above off. *)
-let meter level =
-  let steps = List.length App.thinking_levels - 1 in
-  let on =
-    List.findi App.thinking_levels ~f:(fun _ l -> String.equal l level)
-    |> Option.value_map ~default:0 ~f:fst
+(* How hard the model thinks at each setting: a bar per effort level it
+   takes, as many lit as the setting's (the provider's default lights its
+   level when the model says which, else none). *)
+let meter (m : App.Model.t) level =
+  let llm = Option.map m.state ~f:(fun s -> s.model) in
+  let levels =
+    List.filter (App.thinking_options m) ~f:(fun l ->
+      not (List.mem [ "off"; "default" ] l ~equal:String.equal))
   in
+  let level =
+    match
+      Thinking.normalize level, Option.bind llm ~f:(fun l -> l.thinking_default)
+    with
+    | "default", Some known -> Thinking.normalize known
+    | level, _ -> level
+  in
+  let on =
+    List.findi levels ~f:(fun _ l -> String.equal l level)
+    |> Option.value_map ~default:0 ~f:(fun (i, _) -> i + 1)
+  in
+  let steps = List.length levels in
   Node.span
     ~attrs:[ Attr.class_ "thinking-meter"; Attr.create "aria-hidden" "true" ]
     (List.init steps ~f:(fun i ->
-       Node.span ~attrs:[ classes [ "bar" ] [ "on", i < on ] ] []))
+       Node.span
+         ~attrs:
+           [ classes [ "bar" ] [ "on", i < on ]
+           ; Attr.style
+               (Css_gen.height
+                  (`Px_float
+                      (4.
+                       +. (8.
+                           *. Float.of_int i
+                           /. Float.of_int (max 1 (steps - 1))))))
+           ]
+         []))
 ;;
 
 let provider_name (m : App.Model.t) id =
@@ -104,7 +129,7 @@ let row
            ~cls:"popover-aside"
            ~attrs:[ Attr.title "Context window, in tokens" ]
            (App.compact_tokens l.context_window)
-       | Thinking, _ -> meter item.id
+       | Thinking, _ -> meter m item.id
        | (Model | Mode | Verbosity | Host | Attach), _ -> Node.none)
     ]
 ;;
@@ -209,18 +234,22 @@ let session_sections (m : App.Model.t) ~inject =
       if not state.model.supports_thinking
       then Node.none
       else (
-        let level = Option.value m.pending.thinking ~default:state.thinking in
+        let level =
+          Thinking.normalize
+            (Option.value m.pending.thinking ~default:state.thinking)
+        in
         section
           "Thinking"
           ~glyph:Brain
-          ~note:level
+          ~note:(Thinking.label level)
           (div
-             ~cls:"session-choices"
-             (List.map App.thinking_levels ~f:(fun l ->
+             ~cls:"session-choices thinking-choices"
+             (List.map (App.thinking_options m) ~f:(fun l ->
                 choice
                   ~current:(String.equal l level)
                   ~label:l
-                  ~title:(sprintf "Thinking: %s (/thinking %s)" l l)
+                  ~title:
+                    (sprintf "Thinking: %s (/thinking %s)" (Thinking.label l) l)
                   ~on_click:(inject (Action.Set_thinking l))))))
     in
     let mode =
@@ -310,7 +339,8 @@ let view (m : App.Model.t) ~(chip : Chip.t) (p : Picker.t) ~inject =
            @
            match chip with
            | Model | Host -> []
-           | Thinking | Mode | Verbosity | Attach -> [ Attr.tabindex 0; active ])
+           | Thinking | Mode | Verbosity | Attach -> [ Attr.tabindex 0; active ]
+          )
         (rows m ~chip p ~inject)
   in
   Node.div

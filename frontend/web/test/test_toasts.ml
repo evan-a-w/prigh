@@ -186,6 +186,6 @@ let%expect_test "toasts quote non-ASCII text as it is" =
   [%expect
     {|
     No model matches “日本語 é 😀”. Ctrl+L lists them all. (Dismiss)
-    Unknown thinking level “שלום”: use off, low, on, high, max. (Dismiss)
+    Claude Opus 5.5 has no thinking “שלום”: use default, low, medium, high, xhigh, max. (Dismiss)
     |}]
 ;;

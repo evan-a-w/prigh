@@ -2,14 +2,15 @@ open! Core
 module P = Prigh_protocol
 
 let model_json
-  ?(provider = "anthropic")
-  ?(supports_thinking = true)
-  ?(context_window = 1000000)
-  id
-  name
+      ?(provider = "anthropic")
+      ?(supports_thinking = true)
+      ?thinking_options
+      ?(context_window = 1000000)
+      id
+      name
   =
   sprintf
-    {|{"id":"%s","provider":"%s","key":"%s/%s","name":"%s","context_window":%d,"max_output":128000,"supports_thinking":%b,"cost":{"input":10,"output":50,"cache_read":1}}|}
+    {|{"id":"%s","provider":"%s","key":"%s/%s","name":"%s","context_window":%d,"max_output":128000,"supports_thinking":%b,%s"cost":{"input":10,"output":50,"cache_read":1}}|}
     id
     provider
     provider
@@ -17,7 +18,16 @@ let model_json
     name
     context_window
     supports_thinking
+    (Option.value_map thinking_options ~default:"" ~f:(fun options ->
+       sprintf
+         {|"thinking_options":[%s],|}
+         (String.concat
+            ~sep:","
+            (List.map options ~f:(fun o -> sprintf "%S" o)))))
 ;;
+
+(* What the backend lists for DeepSeek's models. *)
+let deepseek_thinking = [ "off"; "default"; "low"; "high"; "max" ]
 
 let models_json =
   sprintf
@@ -27,25 +37,33 @@ let models_json =
        [ model_json "claude-fable-5" "Claude Fable 5"
        ; model_json "claude-fable-5-1" "Claude Fable 5.1"
        ; model_json ~provider:"openai" "gpt-5.5" "GPT-5.5"
-       ; model_json ~provider:"deepseek" "deepseek-flash" "DeepSeek V4.1 Flash"
+       ; model_json
+           ~provider:"deepseek"
+           ~thinking_options:deepseek_thinking
+           "deepseek-flash"
+           "DeepSeek V4.1 Flash"
        ])
 ;;
 
 let state_json
-  ?(model =
-    model_json ~provider:"deepseek" "deepseek-flash" "DeepSeek V4.1 Flash")
-  ?(running = false)
-  ?(cwd = "/work")
-  ?git_branch
-  ?(thinking = "off")
-  ?(context_tokens = 1500)
-  ?(cost_usd = 0.0123)
-  ?session_name
-  ?(session = "abc123", "/home/u/.prigh/sessions/1.jsonl")
-  ?(subagents = [])
-  ?(jobs = [])
-  ?(extra = [])
-  ()
+      ?(model =
+        model_json
+          ~provider:"deepseek"
+          ~thinking_options:deepseek_thinking
+          "deepseek-flash"
+          "DeepSeek V4.1 Flash")
+      ?(running = false)
+      ?(cwd = "/work")
+      ?git_branch
+      ?(thinking = "off")
+      ?(context_tokens = 1500)
+      ?(cost_usd = 0.0123)
+      ?session_name
+      ?(session = "abc123", "/home/u/.prigh/sessions/1.jsonl")
+      ?(subagents = [])
+      ?(jobs = [])
+      ?(extra = [])
+      ()
   =
   let session_id, session_path = session in
   sprintf
@@ -89,18 +107,18 @@ let state_json
 ;;
 
 let state
-  ?model
-  ?running
-  ?cwd
-  ?git_branch
-  ?thinking
-  ?context_tokens
-  ?cost_usd
-  ?session_name
-  ?subagents
-  ?jobs
-  ?extra
-  ()
+      ?model
+      ?running
+      ?cwd
+      ?git_branch
+      ?thinking
+      ?context_tokens
+      ?cost_usd
+      ?session_name
+      ?subagents
+      ?jobs
+      ?extra
+      ()
   =
   Or_error.ok_exn
     (P.State.of_json

@@ -66,9 +66,6 @@ val find : superuser:bool -> string -> Spec.t option
 (** [/name args], as [/help] shows it. *)
 val usage : Spec.t -> string
 
-(** [/thinking] levels in Ctrl+T cycling order. *)
-val thinking_levels : string list
-
 module Parsed : sig
   type t =
     { name : string

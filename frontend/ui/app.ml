@@ -925,17 +925,27 @@ let scoped_models_picker m =
 ;;
 
 let thinking_picker m =
-  let current = Option.map m.state ~f:(fun s -> s.thinking) in
+  let current =
+    Option.map m.state ~f:(fun s -> P.Thinking.normalize s.thinking)
+  in
+  let options =
+    Option.value_map m.state ~default:P.Thinking.all ~f:(fun s ->
+      P.Thinking.options s.model)
+  in
+  let title =
+    Option.value_map m.state ~default:"Thinking level" ~f:(fun s ->
+      "Thinking level for " ^ s.model.name)
+  in
   let items =
-    List.map Commands.thinking_levels ~f:(fun level ->
+    List.map options ~f:(fun level ->
       Picker.Item.create
         ~id:level
-        ~detail:(if String.equal level "on" then "provider default" else "")
+        ~detail:(P.Thinking.description level)
         ~marked:
           (Option.value_map current ~default:false ~f:(String.equal level))
-        level)
+        (P.Thinking.label level))
   in
-  open_picker m Thinking (Picker.create ~title:"Thinking level" items)
+  open_picker m Thinking (Picker.create ~title items)
 ;;
 
 let verbosity_picker m =
@@ -2782,26 +2792,15 @@ let cycle_model m ~step =
     m, [ set_model_command next.key ]
 ;;
 
-let thinking_cycle = Commands.thinking_levels
-
 let cycle_thinking m =
   match m.state with
   | None -> notice m "not connected", []
   | Some s when not s.model.supports_thinking ->
     notice m "thinking: n/a for this model", []
   | Some s ->
-    let index =
-      Option.value_map
-        (List.findi thinking_cycle ~f:(fun _ level ->
-           String.equal level s.thinking))
-        ~default:0
-        ~f:fst
-    in
-    let next =
-      List.nth_exn thinking_cycle ((index + 1) mod List.length thinking_cycle)
-    in
+    let next = P.Thinking.next s.model ~current:s.thinking in
     let m = { m with state = Some { s with thinking = next } } in
-    ( notice m (sprintf "thinking: %s" next)
+    ( notice m (sprintf "thinking: %s" (P.Thinking.label next))
     , [ rpc "set_thinking" ~params:[ "thinking", str next ] ] )
 ;;
 
@@ -4150,7 +4149,20 @@ let run_command m (cmd : Commands.Parsed.t) =
     else scoped_models_picker m, []
   | "thinking", [] -> thinking_picker m, []
   | "thinking", level :: _ ->
-    m, [ rpc "set_thinking" ~params:[ "thinking", str level ] ]
+    (match m.state with
+     | Some s
+       when not
+              (List.mem
+                 (P.Thinking.options s.model)
+                 (P.Thinking.normalize level)
+                 ~equal:String.equal) ->
+       error m (P.Thinking.unsupported s.model level), []
+     | _ ->
+       ( m
+       , [ rpc
+             "set_thinking"
+             ~params:[ "thinking", str (P.Thinking.normalize level) ]
+         ] ))
   | "filter", [] -> filter_picker m, []
   | "filter", _ ->
     (match Transcript_filter.parse m.transcript_filter cmd.rest with
@@ -4781,6 +4793,7 @@ let refresh_command_autocomplete m =
       ~logged_in:(logged_in m)
       ~default_dir_host:(default_dir_host m)
       ~server:m.server
+      ~model:(Option.map m.state ~f:(fun s -> s.model))
   with
   | None -> { m with autocomplete = None }, []
   | Some ac -> fetch_autocomplete m ac

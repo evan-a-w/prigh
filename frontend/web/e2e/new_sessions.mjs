@@ -186,7 +186,7 @@ try {
 
   await pick(page, ".default-model-choice", "fable", "Fable");
   await toast(page, "New sessions start with");
-  await page.locator(".setting.default-thinking .segment", { hasText: "High" }).click();
+  await page.locator(".setting.default-thinking").getByRole("button", { name: "High", exact: true }).click();
   await toast(page, "think at high");
   await page.locator(".setting.default-mode .segment", { hasText: "Ask" }).click();
   await toast(page, "Ask mode");

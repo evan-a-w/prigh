@@ -3354,9 +3354,9 @@ let dispatch agent login ~(client : Client.t) ~meth ~params : Json.t Or_error.t 
           `Object []))
   | "set_thinking" ->
     Or_error.bind (string_param params "thinking") ~f:(fun s ->
-      Or_error.map (Rpc_json.thinking_of_string s) ~f:(fun thinking ->
-        Agent.set_thinking agent thinking;
-        `Object []))
+      Or_error.bind (Rpc_json.thinking_of_string s) ~f:(fun thinking ->
+        Or_error.map (Agent.set_thinking agent thinking) ~f:(fun () ->
+          `Object [])))
   | "compact" ->
     Or_error.bind
       (string_param_opt params "instructions")
@@ -3613,31 +3613,32 @@ let handle t client (request : Json.t) : Json.t =
       let result =
         match
           if (not client.Client.authed) && not (String.equal meth "hello")
-         then
-           Or_error.error_string "unauthorised: send hello with the token first"
-         else (
-           match dispatch_server t client ~meth ~params with
-           | Some result -> result
-           | None ->
-             let agent = agent_of_client t client in
-             let by =
-               Option.map client.signed_in ~f:(fun s ->
-                 s.User_access.Signed_in.user)
-             in
-             (match
-                Option.first_some
-                  (Files_rpc.dispatch ?by agent ~meth ~params)
-                  (Option.first_some
-                     (Review_rpc.dispatch
-                        ?by
-                        ~client:client.kind
-                        agent
-                        ~meth
-                        ~params)
-                     (Git_rpc.dispatch agent ~meth ~params))
-              with
-              | Some result -> result
-              | None -> dispatch agent t.login ~client ~meth ~params))
+          then
+            Or_error.error_string
+              "unauthorised: send hello with the token first"
+          else (
+            match dispatch_server t client ~meth ~params with
+            | Some result -> result
+            | None ->
+              let agent = agent_of_client t client in
+              let by =
+                Option.map client.signed_in ~f:(fun s ->
+                  s.User_access.Signed_in.user)
+              in
+              (match
+                 Option.first_some
+                   (Files_rpc.dispatch ?by agent ~meth ~params)
+                   (Option.first_some
+                      (Review_rpc.dispatch
+                         ?by
+                         ~client:client.kind
+                         agent
+                         ~meth
+                         ~params)
+                      (Git_rpc.dispatch agent ~meth ~params))
+               with
+               | Some result -> result
+               | None -> dispatch agent t.login ~client ~meth ~params))
         with
         | result -> result
         | exception exn ->

@@ -40,6 +40,8 @@ type t =
   ; context_window : int
   ; max_output : int
   ; supports_thinking : bool
+  ; thinking_options : string list
+  ; thinking_default : string option
   ; cost : Cost.t
   ; image_limit : Image_limit.t option [@sexp.option]
   }
@@ -54,6 +56,12 @@ let of_json j =
   let%bind context_window = Json.int_field j "context_window" in
   let%bind max_output = Json.int_field j "max_output" in
   let%bind supports_thinking = Json.bool_field j "supports_thinking" in
+  let%bind thinking_options =
+    Json.optional_list_field j "thinking_options" ~f:(function
+      | `String s -> Ok s
+      | _ -> Or_error.error_string "thinking_options: expected strings")
+  in
+  let%bind thinking_default = Json.string_opt_field j "thinking_default" in
   let%bind cost = Json.object_field j "cost" >>= Cost.of_json in
   let%map image_limit =
     match Json.field j "image_limit" with
@@ -67,6 +75,8 @@ let of_json j =
   ; context_window
   ; max_output
   ; supports_thinking
+  ; thinking_options
+  ; thinking_default
   ; cost
   ; image_limit
   }

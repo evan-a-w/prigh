@@ -28,7 +28,7 @@ prints the captured panes.
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   ─────────────────────────────────────────────────────────────────── connected to 127.0.0.1:<port> ───
   >
-  deepseek-flash  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00  server:127.0.0.1:<port>
+  deepseek-flash  think:default  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00  server:127.0.0.1:<port>
   === saved (600)
   ((connect 127.0.0.1:<port>) (token s3cret))
   === signed out
@@ -51,7 +51,7 @@ prints the captured panes.
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   ─────────────────────────────────────────────────────────────────── connected to a local backend ───
   >
-  $TMP/cwd  deepseek-flash  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00
+  $TMP/cwd  deepseek-flash  think:default  mode:auto  ctx:0.0%/1.0M  $0.00
   $ bash ./harness.sh startup_signin
   === refused at startup
   ┌─ Sign in to 127.0.0.1:<port> ─────────────────────────────────────────────────────────────────────┐
@@ -68,7 +68,7 @@ prints the captured panes.
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   ─────────────────────────────────────────────────────────────────── connected to 127.0.0.1:<port> ───
   >
-  deepseek-flash  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00  server:127.0.0.1:<port>
+  deepseek-flash  think:default  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00  server:127.0.0.1:<port>
   === saved (600)
   ((connect 127.0.0.1:<port>) (token s3cret))
   $ bash ./harness.sh connect_websocket
@@ -87,7 +87,7 @@ prints the captured panes.
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   ────────────────────────────────────────────────────────────── connected to ws://127.0.0.1:<port> ───
   >
-  deepseek-flash  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00  server:ws://127.0.0.1:<port>
+  deepseek-flash  think:default  mode:auto  ctx:0.0%/1.0M  $0.00  server:ws://127.0.0.1:<port>
   === saved (600)
   ((connect ws://127.0.0.1:<port>/ws) (token s3cret))
   === a turn over the WebSocket
@@ -99,7 +99,7 @@ prints the captured panes.
     faux reply
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
-  deepseek-flash  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00  server:ws://127.0.0.1:<port>
+  deepseek-flash  think:default  mode:auto  ctx:0.0%/1.0M  $0.00  server:ws://127.0.0.1:<port>
   === /connect completes the URL
     tools now run on <host> in $TMP/cwd
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
@@ -111,7 +111,7 @@ prints the captured panes.
     local                    a backend started here, like prigh-tui -local
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   > /connect
-  deepseek-flash  think:on  mode:auto  ctx:0.0%/1.0M  $0.00  Tab accepts · Enter as typed · Esc hides
+  deepseek-flash  think:default  mode:auto  ctx:0.0%/1.0M  Tab accepts · Enter as typed · Esc hides
   $ bash ./harness.sh detached
   === from inside tmux, relative DIR and -auth-file, odd values
   prigh is running in tmux session prigh-cwd: $TMP/tmux.sh switch-client -t prigh-cwd
@@ -121,7 +121,7 @@ prints the captured panes.
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
-  $TMP/cwd  deepseek-flash  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00
+  $TMP/cwd  deepseek-flash  think:default  mode:auto  ctx:0.0%/1.0M  $0.00
   === the pane: in $TMP/cwd
   HOME=$TMP/home
   PRIGH_BACKEND=$BACKEND
@@ -140,7 +140,7 @@ prints the captured panes.
     faux reply
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
-  $TMP/cwd  deepseek-flash  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00
+  $TMP/cwd  deepseek-flash  think:default  mode:auto  ctx:0.0%/1.0M  $0.00
   === quit: the session closed
   === sessions: other prigh-cwd
   === a TUI that fails keeps its pane until Enter

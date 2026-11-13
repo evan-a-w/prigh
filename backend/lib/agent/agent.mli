@@ -474,8 +474,12 @@ val job_output : t -> job_id:string -> lines:int -> string Or_error.t
     returns its id. *)
 val start_job : t -> command:string -> string
 
+(** Switches model; a thinking setting the new model does not take becomes
+    the closest one it does ({!Model.clamp_thinking}), with a notice. *)
 val set_model : t -> Model.t -> unit
-val set_thinking : t -> Thinking.t -> unit
+
+(** Fails, listing the model's options, when the model does not take it. *)
+val set_thinking : t -> Thinking.t -> unit Or_error.t
 
 (** The agent's persistent configuration (loaded from [~/.prigh/config.json] at
     creation). *)

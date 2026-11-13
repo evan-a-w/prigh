@@ -157,7 +157,7 @@ let%expect_test "the mode chip, Alt+M, and set_mode's reply or failure" =
     Context 0 / 200k · 0%
     Tokens 0 in · 0 out · 0 cached
     Cost $0.0000
-    Thinking on
+    Thinking provider's default
     Mode Asks: commands
     Model Claude Opus 5.5
     Branch main
@@ -282,7 +282,7 @@ let%expect_test "the plan: its chip in the chrome, /todos" =
     Context 0 / 200k · 0%
     Tokens 0 in · 0 out · 0 cached
     Cost $0.0000
-    Thinking on
+    Thinking provider's default
     Mode Auto: never asks
     Model Claude Opus 5.5
     Branch main
@@ -324,7 +324,7 @@ let%expect_test "the plan: its chip in the chrome, /todos" =
     Context 0 / 200k · 0%
     Tokens 0 in · 0 out · 0 cached
     Cost $0.0000
-    Thinking on
+    Thinking provider's default
     Mode Auto: never asks
     Model Claude Opus 5.5
     Branch main
@@ -1058,7 +1058,7 @@ let%expect_test
     Context 0 / 200k · 0%
     Tokens 0 in · 0 out · 0 cached
     Cost $0.0000
-    Thinking on
+    Thinking provider's default
     Mode Auto: never asks
     Model Claude Opus 5.5
     Branch main

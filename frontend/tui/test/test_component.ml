@@ -213,12 +213,11 @@ let%expect_test
   Bonsai_test.Handle.show handle;
   [%expect
     {|
-    rpc set_thinking ((thinking zzz))
     spinner=1 running=false
       quits
     ┌─ Error ────────────────────────────────────────┐
-    │ thinking must be one of: off, on, low, high,   │
-    │ max                                            │
+    │ M does not think: /model switches to one that  │
+    │ does.                                          │
     └──────────────────────────────── Esc dismisses ─┘
     ──────────────────────────────────────────────────
     > ▏
@@ -242,8 +241,8 @@ let%expect_test
     spinner=2 running=true
       quits
     ┌─ Error ────────────────────────────────────────┐
-    │ thinking must be one of: off, on, low, high,   │
-    │ max                                            │
+    │ M does not think: /model switches to one that  │
+    │ does.                                          │
     └──────────────────────────────── Esc dismisses ─┘
     ──────────────────────────────────────────────────
     > ▏

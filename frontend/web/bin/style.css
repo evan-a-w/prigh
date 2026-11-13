@@ -2133,7 +2133,8 @@ kbd {
 .popover-item.dimmed .menu-text { opacity: 0.55; }
 .popover-item .menu-text { flex: 1; }
 .popover-item .menu-label { font-size: 13.5px; }
-.chip-popover[data-chip="thinking"] .menu-label { text-transform: capitalize; }
+.chip-popover[data-chip="thinking"] .menu-label { display: inline-block; }
+.chip-popover[data-chip="thinking"] .menu-label::first-letter { text-transform: uppercase; }
 .chip-popover[data-chip="mode"] .menu-detail { white-space: normal; }
 .popover-check { --mark-size: 14px; width: 16px; }
 .popover-aside { color: var(--faint); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -2144,10 +2145,6 @@ kbd {
 /* Thinking's effort, as rising bars: lit up to the level. */
 .thinking-meter { display: inline-flex; align-items: flex-end; gap: 2px; height: 12px; flex-shrink: 0; }
 .thinking-meter > .bar { width: 3px; border-radius: 1px; background: var(--rule-2); }
-.thinking-meter > .bar:nth-child(1) { height: 4px; }
-.thinking-meter > .bar:nth-child(2) { height: 6.5px; }
-.thinking-meter > .bar:nth-child(3) { height: 9px; }
-.thinking-meter > .bar:nth-child(4) { height: 12px; }
 .thinking-meter > .bar.on { background: var(--muted); }
 .popover-item.marked .thinking-meter > .bar.on { background: var(--sodium); }
 @media (prefers-reduced-motion: reduce) {

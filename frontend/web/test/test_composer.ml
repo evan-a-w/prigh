@@ -15,7 +15,7 @@ let%expect_test
     (Add files or images (or paste, or drop them here))
     (Claude Opus 5.5)
     (backend)
-    (on)
+    (provider's default)
     (auto)
     (normal)
     Ready (0%) $0.00
@@ -23,7 +23,7 @@ let%expect_test
     Context 0 / 200k · 0%
     Tokens 0 in · 0 out · 0 cached
     Cost $0.0000
-    Thinking on
+    Thinking provider's default
     Mode Auto: never asks
     Model Claude Opus 5.5
     Branch main

@@ -348,26 +348,35 @@ let thinking_budget ~max_tokens (thinking : Thinking.t) =
     Int.max 1_024 (Int.min b (max_tokens - 1_024)))
 ;;
 
-let effort_of_thinking : Thinking.t -> string option = function
-  | Off -> None
-  | On None -> Some "medium"
-  | On (Some Low) -> Some "low"
-  | On (Some High) -> Some "high"
-  | On (Some Max) -> Some "max"
-;;
-
 (* The thinking-related fields of the request. Budget models get
-   [thinking.enabled] with a token budget (pi's older Claude path); adaptive
-   models get [thinking.adaptive] and the effort in [output_config], or
-   [thinking.disabled] when off (omitted for models that are always on).
-   Adaptive thinking asks for the summarized text: newer models omit it by
-   default, which leaves minutes of thought with nothing to show. *)
+   [thinking.enabled] with a token budget (pi's older Claude path), and Claude
+   Opus 4.5 the effort in [output_config] as well; adaptive
+   models get [thinking.adaptive] and the effort in [output_config] (none for
+   the provider's default), or [thinking.disabled] ([between_tools] on Claude
+   Sonnet 5.5) when off. Adaptive thinking asks for the summarized text: newer
+   models omit it by default, which leaves minutes of thought with nothing to
+   show. [r.thinking] is already clamped to what the model takes. *)
 let thinking_fields ~max_tokens (model : Model.t) (thinking : Thinking.t) =
-  if not model.supports_thinking
+  if not (Model.supports_thinking model)
   then []
   else (
+    let adaptive ~off =
+      match thinking with
+      | Off ->
+        if model.can_disable_thinking
+        then [ "thinking", `Object [ "type", `String off ] ]
+        else []
+      | On level ->
+        ( "thinking"
+        , `Object
+            [ "type", `String "adaptive"; "display", `String "summarized" ] )
+        :: Option.value_map level ~default:[] ~f:(fun level ->
+          [ ( "output_config"
+            , `Object [ "effort", `String (Thinking.Level.to_string level) ] )
+          ])
+    in
     match model.thinking_style with
-    | Budget ->
+    | (Budget _ | Effort _) as style ->
       (match thinking_budget ~max_tokens thinking with
        | None -> []
        | Some budget_tokens ->
@@ -376,27 +385,26 @@ let thinking_fields ~max_tokens (model : Model.t) (thinking : Thinking.t) =
                [ "type", `String "enabled"
                ; "budget_tokens", `Number (Int.to_string budget_tokens)
                ] )
-         ])
-    | Adaptive { can_disable } ->
-      (match effort_of_thinking thinking with
-       | None ->
-         if can_disable
-         then [ "thinking", `Object [ "type", `String "disabled" ] ]
-         else []
-       | Some effort ->
-         [ ( "thinking"
-           , `Object
-               [ "type", `String "adaptive"; "display", `String "summarized" ] )
-         ; "output_config", `Object [ "effort", `String effort ]
-         ]))
+         ]
+         @
+           (match style, thinking with
+           | Budget { effort = true }, On (Some level) ->
+             [ ( "output_config"
+               , `Object [ "effort", `String (Thinking.Level.to_string level) ]
+               )
+             ]
+           | _ -> []))
+    | Adaptive -> adaptive ~off:"disabled"
+    | Adaptive_between_tools -> adaptive ~off:"between_tools")
 ;;
 
 (* Only budget models need the beta; adaptive thinking is interleaved
    already. *)
 let thinking_on (model : Model.t) (thinking : Thinking.t) =
   match model.thinking_style with
-  | Budget -> model.supports_thinking && not (Thinking.equal thinking Off)
-  | Adaptive _ -> false
+  | Budget _ | Effort _ ->
+    not (Thinking.equal (Model.clamp_thinking model thinking) Off)
+  | Adaptive | Adaptive_between_tools -> false
 ;;
 
 (* The model's built-in computer tool, when it has one and the request offers

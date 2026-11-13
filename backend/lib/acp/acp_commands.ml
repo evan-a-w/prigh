@@ -38,7 +38,10 @@ let builtin =
       ~hint:"[dollars|off]"
       "show or set the session's cost budget: no turn starts once it is spent"
   ; c "model" ~hint:"[model]" "show or set the model (id, name or prefix)"
-  ; c "thinking" ~hint:"[off|on|low|high|max]" "show or set the thinking level"
+  ; c
+      "thinking"
+      ~hint:"[off|default|low|medium|high|xhigh|max]"
+      "show or set the thinking level (the model's: default is the provider's)"
   ; c
       "plan"
       ~hint:"[on|off]"

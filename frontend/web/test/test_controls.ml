@@ -19,14 +19,14 @@ let%expect_test "the thinking chip names the level and opens its menu over it" =
     (Claude Opus 5.5)
     (backend)
     <button type="button"
-            title="Thinking on: how much the model reasons before it answers (Alt+T cycles, /thinking)"
-            aria-label="Thinking on"
+            title="Thinking: provider's default: how much the model reasons before it answers (Alt+T cycles, /thinking)"
+            aria-label="Thinking: provider's default"
             aria-haspopup="dialog"
             aria-expanded="false"
             class="btn chip-button thinking-chip"
             @on_click>
       <icon class="brain"> </icon>
-      <span class="chip-label"> on </span>
+      <span class="chip-label"> provider's default </span>
     </button>
     |}];
   (* Its menu: the levels, the current one checked, the keyboard's on the
@@ -48,14 +48,15 @@ let%expect_test "the thinking chip names the level and opens its menu over it" =
     <div class="popover-items">
     <div class="menu-keys">
     Thinking Alt+T cycles
-    off answer straight away
+    ✓ provider's default the provider picks: medium
     low a little
-    ✓ on the provider's default budget
+    medium some
     high more
+    xhigh a lot, for long agentic work
     max as much as the model allows
     Enter chooses, ← → the next setting, Esc closes
     <div role="option"
-         id="popover-option-2"
+         id="popover-option-0"
          aria-selected="true"
          aria-checked="true"
          class="marked menu-item popover-item selected"
@@ -64,26 +65,27 @@ let%expect_test "the thinking chip names the level and opens its menu over it" =
         <icon class="check"> </icon>
       </span>
       <span class="menu-text">
-        <span class="menu-label"> on </span>
-        <span class="menu-detail"> the provider's default budget </span>
+        <span class="menu-label"> provider's default </span>
+        <span class="menu-detail"> the provider picks: medium </span>
       </span>
       <span aria-hidden="true" class="thinking-meter">
-        <span class="bar on"> </span>
-        <span class="bar on"> </span>
-        <span class="bar"> </span>
-        <span class="bar"> </span>
+        <span class="bar on" style={ height: 4.00px; }> </span>
+        <span class="bar on" style={ height: 6.00px; }> </span>
+        <span class="bar" style={ height: 8.00px; }> </span>
+        <span class="bar" style={ height: 10.00px; }> </span>
+        <span class="bar" style={ height: 12.00px; }> </span>
       </span>
     </div>
     <button type="button"
-            title="Thinking on: how much the model reasons before it answers (Alt+T cycles, /thinking)"
-            aria-label="Thinking on"
+            title="Thinking: provider's default: how much the model reasons before it answers (Alt+T cycles, /thinking)"
+            aria-label="Thinking: provider's default"
             aria-haspopup="dialog"
             aria-expanded="true"
             aria-controls="chip-popover"
             class="btn chip-button thinking-chip"
             @on_click>
       <icon class="brain"> </icon>
-      <span class="chip-label"> on </span>
+      <span class="chip-label"> provider's default </span>
     </button>
     |}];
   (* Esc closes it without a change. *)
@@ -104,13 +106,13 @@ let%expect_test "the thinking chip names the level and opens its menu over it" =
     {|
     Cycle_thinking
     (Expire_toast (id 0) (after_ms 2500))
-    (Rpc (method_ set_thinking) (params ((thinking high))) (tag Thinking_set))
+    (Rpc (method_ set_thinking) (params ((thinking low))) (tag Thinking_set))
     (Claude Opus 5.5)
     (backend)
     <button class="awaiting btn chip-button thinking-chip">
     |}];
   H.text h ~selector:".thinking-chip .chip-label";
-  [%expect {| high |}];
+  [%expect {| low |}];
   H.reply h "set_thinking" "{}";
   H.event
     h
@@ -711,7 +713,7 @@ let%expect_test
     button "Add files or images" -- Add files or images (or paste, or drop them here)
     button "Claude Opus 5.5" -- Claude Opus 5.5: switch model (Ctrl+L)
     button "backend" -- Tools run on the backend (/host switches)
-    button "Thinking on" -- Thinking on: how much the model reasons before it answers (Alt+T cycles, /thinking)
+    button "Thinking: provider's default" -- Thinking: provider's default: how much the model reasons before it answers (Alt+T cycles, /thinking)
     button "Auto: never asks" -- Tools run without asking (Alt+M cycles, /mode picks)
     button "Transcript normal" -- Transcript: normal (Ctrl+O cycles, /verbosity)
     button "Dictate" -- Dictate (speak, then click again to stop)
@@ -775,7 +777,7 @@ let%expect_test
     button "Add files or images" -- Add files or images (or paste, or drop them here)
     button "Claude Opus 5.5" -- Claude Opus 5.5: switch model (Ctrl+L)
     button "backend" -- Tools run on the backend (/host switches)
-    button "Thinking on" -- Thinking on: how much the model reasons before it answers (Alt+T cycles, /thinking)
+    button "Thinking: provider's default" -- Thinking: provider's default: how much the model reasons before it answers (Alt+T cycles, /thinking)
     button "Auto: never asks" -- Tools run without asking (Alt+M cycles, /mode picks)
     button "Transcript normal" -- Transcript: normal (Ctrl+O cycles, /verbosity)
     button "Dictate" -- Dictate (speak, then click again to stop)
@@ -1136,7 +1138,7 @@ let%expect_test "the status at the composer: idle, running, and what applies" =
     Context 130k / 200k · 65%
     Tokens 120k in · 9.0k out · 0 cached
     Cost $0.4200
-    Thinking on
+    Thinking provider's default
     Mode Auto: never asks
     Model Claude Opus 5.5
     Branch main
@@ -1174,7 +1176,7 @@ let%expect_test "the status at the composer: idle, running, and what applies" =
     Context 180k / 200k · 90%
     Tokens 0 in · 0 out · 0 cached
     Cost $0.0000
-    Thinking on
+    Thinking provider's default
     Mode Auto: never asks
     Model Claude Opus 5.5
     Branch main
@@ -1212,7 +1214,9 @@ let%expect_test "the status at the composer: idle, running, and what applies" =
 
 (* A phone: the same chips, with the short names CSS shows (style.css's
    container queries), and the status beside the title. *)
-let%expect_test "narrow: the chips' short names, the placeholder without a tooltip" =
+let%expect_test
+    "narrow: the chips' short names, the placeholder without a tooltip"
+  =
   let h = H.create () in
   H.quiet h (fun () -> H.act h (Set_narrow true));
   H.elements h ~selector:".app";

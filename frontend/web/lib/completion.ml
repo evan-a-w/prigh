@@ -88,8 +88,18 @@ let argument_items
   match kind with
   | Model -> model_items models ~auth ~current_model
   | Thinking ->
-    List.map Prigh_ui.Commands.thinking_levels ~f:(fun level ->
-      Picker.Item.create ~id:level level)
+    let llm =
+      Option.bind current_model ~f:(fun key ->
+        List.find models ~f:(fun (l : Llm.t) -> String.equal l.key key))
+    in
+    List.map
+      (Option.value_map llm ~default:Thinking.all ~f:Thinking.options)
+      ~f:(fun level ->
+        Picker.Item.create
+          ~id:level
+          ~search:level
+          ~detail:(Thinking.description level)
+          (Thinking.label level))
   | Login ->
     List.map auth ~f:(fun s ->
       Picker.Item.create

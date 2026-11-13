@@ -10,13 +10,22 @@ module Cost : sig
   [@@deriving sexp_of]
 end
 
-(** How a model takes a thinking setting (Anthropic): a token budget, or
-    adaptive thinking with an effort level. [can_disable] is false for models
-    that cannot turn thinking off. *)
+(** How a provider is told the thinking setting. *)
 module Thinking_style : sig
   type t =
-    | Budget
-    | Adaptive of { can_disable : bool }
+    | Budget of { effort : bool }
+    (** Anthropic's extended thinking: [thinking.enabled] with a token
+        budget per level, and with [effort] (Claude Opus 4.5) the level in
+        [output_config.effort] too *)
+    | Adaptive
+    (** Anthropic's adaptive thinking with [output_config.effort]; off is
+        [thinking.disabled] *)
+    | Adaptive_between_tools
+    (** adaptive, but off is [thinking.between_tools] (Claude Sonnet 5.5) *)
+    | Effort of { off_is_none : bool }
+    (** an OpenAI-style reasoning effort (DeepSeek's provider has its own
+        parameter); off is the effort ["none"] when [off_is_none], else no
+        effort is sent *)
   [@@deriving sexp_of, equal]
 end
 
@@ -26,7 +35,12 @@ type t =
   ; name : string
   ; context_window : int
   ; max_output : int
-  ; supports_thinking : bool
+  ; thinking_levels : Thinking.Level.t list
+    (** the effort levels it takes, lowest first; none: it does not think *)
+  ; can_disable_thinking : bool
+  ; thinking_default : Thinking.t option
+    (** what the provider does when it is sent no effort (the provider's
+        default), when known *)
   ; thinking_style : Thinking_style.t
   ; cost : Cost.t
   ; supports_images : bool
@@ -82,3 +96,17 @@ val cost_usd : t -> Usage.t -> float
     request (or drops the block) otherwise (Anthropic's preserved thinking,
     Claude 5.1 and later). *)
 val binds_thinking_to_prefix : t -> bool
+
+val supports_thinking : t -> bool
+
+(** The thinking settings it takes, in cycling order: off (when it can be
+    disabled), the provider's default, then its levels. Just [Off] for a
+    model that does not think. *)
+val thinking_options : t -> Thinking.t list
+
+(** {!Thinking.clamp} to its options: what a request to it sends, and what a
+    session's setting becomes when it switches to it. *)
+val clamp_thinking : t -> Thinking.t -> Thinking.t
+
+(** The setting when it is one of its options, else an error listing them. *)
+val check_thinking : t -> Thinking.t -> Thinking.t Or_error.t

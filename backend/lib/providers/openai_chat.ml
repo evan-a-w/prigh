@@ -151,24 +151,23 @@ let wire_tool (t : Tool_spec.t) : Json.t =
 ;;
 
 let thinking_fields ~(quirks : Quirks.t) (r : Provider.Request.t) =
-  if not r.model.supports_thinking
+  if not (Model.supports_thinking r.model)
   then []
   else (
+    let effort level =
+      Option.value_map level ~default:[] ~f:(fun level ->
+        [ "reasoning_effort", `String (Thinking.Level.to_string level) ])
+    in
     match quirks.thinking_param, r.thinking with
     | Deepseek, Off -> [ "thinking", `Object [ "type", `String "disabled" ] ]
     | Deepseek, On level ->
-      [ "thinking", `Object [ "type", `String "enabled" ] ]
-      @ Option.value_map level ~default:[] ~f:(fun level ->
-        [ "reasoning_effort", `String (Thinking.Level.to_string level) ])
-    | Reasoning_effort, Off -> []
-    | Reasoning_effort, On level ->
-      let effort =
-        match level with
-        | None -> "medium"
-        | Some Low -> "low"
-        | Some (High | Max) -> "high"
-      in
-      [ "reasoning_effort", `String effort ])
+      [ "thinking", `Object [ "type", `String "enabled" ] ] @ effort level
+    | Reasoning_effort, Off ->
+      (match r.model.thinking_style with
+       | Effort { off_is_none = true } -> [ "reasoning_effort", `String "none" ]
+       | Effort { off_is_none = false }
+       | Budget _ | Adaptive | Adaptive_between_tools -> [])
+    | Reasoning_effort, On level -> effort level)
 ;;
 
 let request_body ~quirks (r : Provider.Request.t) : Json.t =
