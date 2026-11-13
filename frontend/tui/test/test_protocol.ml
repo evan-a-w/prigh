@@ -59,6 +59,8 @@ let%expect_test "state event and messages" =
           (context_window    1000000)
           (max_output        128000)
           (supports_thinking true)
+          (thinking_options ())
+          (thinking_default ())
           (cost (
             (input      10)
             (output     50)
@@ -402,6 +404,8 @@ let%expect_test "tool host events and state hosts" =
           (context_window    1000000)
           (max_output        128000)
           (supports_thinking true)
+          (thinking_options (off default low high max))
+          (thinking_default ())
           (cost (
             (input      10)
             (output     50)

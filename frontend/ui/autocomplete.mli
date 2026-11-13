@@ -59,6 +59,7 @@ val compute
   -> default_dir_host:string option
        (** where [/default-dir] lists directories ([None]: the active host) *)
   -> server:Server_link.t option (** what [/connect] offers *)
+  -> model:P.Model.t option (** the session's: its thinking levels *)
   -> t option
 
 (** Directory completion for a whole prompt line (the [/host] directory

@@ -196,7 +196,9 @@ let details (m : App.Model.t) (state : State.t) =
            (sprintf "$%.4f · %s" state.cost_usd text))
     ; line
         "Thinking"
-        (if state.model.supports_thinking then state.thinking else "none")
+        (if state.model.supports_thinking
+         then Thinking.label state.thinking
+         else "none")
     ; line "Mode" (Session_mode.title mode)
     ; line "Model" state.model.name
     ; (match state.git_branch with
@@ -390,7 +392,9 @@ let composer_status (m : App.Model.t) ~inject =
                context_button
                  state
                  ~inject
-                 [ ring ~cls:"mini" p []; span ~cls:"percent" (sprintf "%.0f%%" p) ]
+                 [ ring ~cls:"mini" p []
+                 ; span ~cls:"percent" (sprintf "%.0f%%" p)
+                 ]
              | None -> context_button state ~inject [ ring ~cls:"mini" 0. [] ])
           ; cost state ~inject
           ]

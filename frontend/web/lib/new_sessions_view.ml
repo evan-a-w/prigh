@@ -43,7 +43,7 @@ let model (m : App.Model.t) (config : Config.t option) ~inject =
   let this =
     Option.map m.state ~f:(fun s ->
       if s.model.supports_thinking && not (String.equal s.thinking "off")
-      then sprintf "%s · thinking %s" s.model.name s.thinking
+      then sprintf "%s · thinking %s" s.model.name (Thinking.label s.thinking)
       else s.model.name)
   in
   row
@@ -86,25 +86,28 @@ let model (m : App.Model.t) (config : Config.t option) ~inject =
 
 let thinking (config : Config.t option) ~inject =
   let set = Option.bind config ~f:(fun c -> c.default_thinking) in
-  let current = Option.value set ~default:New_default.builtin_thinking in
+  let current =
+    Thinking.normalize (Option.value set ~default:New_default.builtin_thinking)
+  in
   row
     ~cls:"default-thinking"
     ~name:"Thinking"
     ~about:
-      "How hard new sessions think, on models that can: Off, Low, On (the \
-       model's own), High or Max."
+      "How hard new sessions think, on models that can. A model without the \
+       level takes its nearest one."
     ?note:(Option.value_map config ~default:(Some waiting) ~f:(fun _ -> None))
-    [ segmented
+    [ choice_list
         ~disabled:(Option.is_none config)
         ~label:"New sessions' thinking"
-        (List.map Prigh_ui.Commands.thinking_levels ~f:(fun level ->
-           ( String.capitalize level
-           , sprintf "New sessions think at %s" level
+        (List.map Thinking.all ~f:(fun level ->
+           ( String.capitalize (Thinking.label level)
+           , Thinking.description level
+           , sprintf "New sessions think at %s" (Thinking.label level)
            , Option.is_some config && String.equal level current
            , set_default ~inject (Thinking (Some level)) )))
     ; reset
         ~name:"Thinking"
-        ~builtin:New_default.builtin_thinking
+        ~builtin:(Thinking.label New_default.builtin_thinking)
         ~set:(Option.is_some set)
         ~on_click:(set_default ~inject (Thinking None))
     ]

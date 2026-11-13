@@ -78,7 +78,7 @@ let%expect_test "every command does something (none is unknown)" =
     /model                     picker: Switch model
     /scoped-models             scoped models dialog
     /fallback                  toast: No fallback models: /fallback MODEL [MODEL...] sets the chain that takes over when a model's usage runs out
-    /thinking                  picker: Thinking level
+    /thinking                  picker: Thinking level for Claude Opus 5.5
     /change_default            rpc change_default
     /verbosity                 picker: Transcript verbosity (Ctrl+O cycles)
     /filter                    transcript filter menu
@@ -382,14 +382,14 @@ let%expect_test "/thinking and Alt+T" =
     {|
     Cycle_thinking
     (Expire_toast (id 0) (after_ms 2500))
-    (Rpc (method_ set_thinking) (params ((thinking high))) (tag Thinking_set))
+    (Rpc (method_ set_thinking) (params ((thinking low))) (tag Thinking_set))
     Cycle_thinking
     (Expire_toast (id 1) (after_ms 2500))
-    (Rpc (method_ set_thinking) (params ((thinking max))) (tag Thinking_set))
+    (Rpc (method_ set_thinking) (params ((thinking medium))) (tag Thinking_set))
     |}];
   let state = (H.model h).state |> Option.value_exn in
   print_endline state.thinking;
-  [%expect {| max |}];
+  [%expect {| medium |}];
   H.act h (Set_model "deepseek/deepseek-chat");
   H.event
     h
@@ -493,7 +493,7 @@ let%expect_test "/verbosity and Ctrl+O" =
     Context 0 / 200k · 0%
     Tokens 0 in · 0 out · 0 cached
     Cost $0.0000
-    Thinking on
+    Thinking provider's default
     Mode Auto: never asks
     Model Claude Opus 5.5
     Branch main
@@ -529,7 +529,7 @@ let%expect_test "/verbosity and Ctrl+O" =
     Context 0 / 200k · 0%
     Tokens 0 in · 0 out · 0 cached
     Cost $0.0000
-    Thinking on
+    Thinking provider's default
     Mode Auto: never asks
     Model Claude Opus 5.5
     Branch main
@@ -621,7 +621,7 @@ let%expect_test "/session" =
     (Focus dialog)
     Session
     (Close (Esc))
-    Name (unnamed) Id s1 File /sessions/s1.jsonl Directory /work Model Claude Opus 5.5 (anthropic/claude-opus-5-5) Thinking on
+    Name (unnamed) Id s1 File /sessions/s1.jsonl Directory /work Model Claude Opus 5.5 (anthropic/claude-opus-5-5) Thinking default
     12 Messages
     4 Turns
     $0.4321 Cost
@@ -1868,8 +1868,11 @@ let%expect_test "/retry-backend-connection, /state, /clear, /quit" =
      (model
       ((id claude-opus-5-5) (provider anthropic) (key anthropic/claude-opus-5-5)
        (name "Claude Opus 5.5") (context_window 200000) (max_output 64000)
-       (supports_thinking true) (cost ((input 5) (output 25) (cache_read 0.5)))))
-     (thinking on) (running false) (message_count 0)
+       (supports_thinking true)
+       (thinking_options (default low medium high xhigh max))
+       (thinking_default (medium))
+       (cost ((input 5) (output 25) (cache_read 0.5)))))
+     (thinking default) (running false) (message_count 0)
      (usage ((input 0) (output 0) (cache_read 0))) (cost_usd 0)
      (context_tokens 0) (active_host backend) (active_host_name ()) (hosts ())
      (subagents ()) (jobs ()) (budget_usd ()) (goal ()) (reminders ())

@@ -1097,7 +1097,13 @@ module Model : sig
   val moving_to : t -> Dialog.Delete_target.t -> Switch_to.t option
 end
 
-val thinking_levels : string list
+(** The session model's thinking settings ([Thinking.all] before the state
+    comes). *)
+val thinking_options : Model.t -> string list
+
+(** A picker's detail for a setting: for the provider's default, the level
+    the provider picks when the model says. *)
+val thinking_detail : Llm.t option -> string -> string
 
 (** A token count in a few characters: [200k], [1.2M]. *)
 val compact_tokens : int -> string

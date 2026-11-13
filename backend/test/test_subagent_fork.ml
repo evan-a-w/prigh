@@ -176,7 +176,7 @@ let%expect_test
     system: the caller's
     tools: the caller's (bash read write edit ls grep find web_fetch subagent subagent_status subagent_cancel subagent_message subagent_continue)
     cache_key: the caller's
-    model: deepseek-flash, thinking: on
+    model: deepseek-flash, thinking: default
     starts with the caller's last request's messages: true
     user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  r1 read{"path":"notes.txt"}
@@ -298,7 +298,7 @@ let%expect_test
     system: its own (You are a subagent...)
     tools: its own (read subagent)
     cache_key: its own
-    model: deepseek-flash, thinking: on
+    model: deepseek-flash, thinking: default
     starts with the caller's last request's messages: true
     user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  c1 subagent{"task":"other model","fork":true,"model":"openai/gpt-5","thinking":"high"} c2 subagent{"task":"subset","fork":true,"tools":["read","subagent"],"context":"the plan is X"}

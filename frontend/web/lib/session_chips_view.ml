@@ -65,20 +65,20 @@ let thinking_chip (m : App.Model.t) (state : State.t) ~inject =
   | Some level ->
     pending_chip
       ~cls:"thinking-chip"
-      ~title:(sprintf "Switching to thinking %s…" level)
-      level
+      ~title:(sprintf "Switching to thinking %s…" (Thinking.label level))
+      (Thinking.label level)
   | None when state.model.supports_thinking ->
     button
       ~cls:"chip-button thinking-chip"
       ~title:
         (sprintf
-           "Thinking %s: how much the model reasons before it answers (Alt+T \
+           "Thinking: %s: how much the model reasons before it answers (Alt+T \
             cycles, /thinking)"
-           state.thinking)
-      ~label:(sprintf "Thinking %s" state.thinking)
+           (Thinking.label state.thinking))
+      ~label:(sprintf "Thinking: %s" (Thinking.label state.thinking))
       ~attrs:(menu_attrs m Thinking)
       ~on_click:(inject (Action.Open_chip Thinking))
-      [ icon Brain; span ~cls:"chip-label" state.thinking ]
+      [ icon Brain; span ~cls:"chip-label" (Thinking.label state.thinking) ]
   | None ->
     button
       ~cls:"chip-button thinking-chip unsupported"

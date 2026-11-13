@@ -30,6 +30,7 @@ module Model_override = struct
     ; context_window : int option
     ; max_output : int option
     ; thinking : bool option
+    ; thinking_levels : Thinking.Level.t list option
     ; images : bool option
     ; cost : Model.Cost.t option
     }
@@ -181,8 +182,20 @@ let model t ?listed id =
       Option.value
         (get (fun o -> o.max_output))
         ~default:(Int.min default_max_output context_window)
-  ; supports_thinking = Option.value (get (fun o -> o.thinking)) ~default:false
-  ; thinking_style = Budget
+  ; thinking_levels =
+      (match get (fun o -> o.thinking), get (fun o -> o.thinking_levels) with
+       | Some false, _ | None, None -> []
+       | (Some true | None), Some levels -> levels
+       | Some true, None ->
+         (match t.api with
+          | Anthropic -> [ Low; Medium; High; Xhigh; Max ]
+          | Chat | Responses -> [ Low; Medium; High ]))
+  ; can_disable_thinking = true
+  ; thinking_default = None
+  ; thinking_style =
+      (match t.api with
+       | Anthropic -> Budget { effort = false }
+       | Chat | Responses -> Effort { off_is_none = false })
   ; cost =
       Option.value
         (get (fun o -> o.cost))
@@ -255,7 +268,15 @@ let cost_of_json ~what json =
 ;;
 
 let override_known =
-  [ "id"; "name"; "context_window"; "max_output"; "thinking"; "images"; "cost" ]
+  [ "id"
+  ; "name"
+  ; "context_window"
+  ; "max_output"
+  ; "thinking"
+  ; "thinking_levels"
+  ; "images"
+  ; "cost"
+  ]
 ;;
 
 let override_of_json ~what json =
@@ -284,6 +305,21 @@ let override_of_json ~what json =
     opt "max_output" ~f:positive_int ~expected:"a positive integer (tokens)"
   in
   let%bind thinking = opt "thinking" ~f:Json.bool ~expected:"true or false" in
+  let%bind thinking_levels =
+    opt
+      "thinking_levels"
+      ~f:(fun json ->
+        match json with
+        | `Array (_ :: _ as items) ->
+          Option.all
+            (List.map items ~f:(fun item ->
+               Option.bind (Json.string item) ~f:Thinking.Level.of_string))
+          |> Option.map ~f:(List.dedup_and_sort ~compare:Thinking.Level.compare)
+        | _ -> None)
+      ~expected:
+        "a non-empty list of effort levels (\"minimal\", \"low\", \"medium\", \
+         \"high\", \"xhigh\", \"max\")"
+  in
   let%bind images = opt "images" ~f:Json.bool ~expected:"true or false" in
   let%map cost =
     match find "cost" with
@@ -296,6 +332,7 @@ let override_of_json ~what json =
     ; context_window
     ; max_output
     ; thinking
+    ; thinking_levels
     ; images
     ; cost
     }
@@ -384,6 +421,13 @@ let override_to_json (o : Model_override.t) =
        ; opt "context_window" int o.context_window
        ; opt "max_output" int o.max_output
        ; opt "thinking" bool o.thinking
+       ; opt
+           "thinking_levels"
+           (fun levels ->
+              `Array
+                (List.map levels ~f:(fun l ->
+                   `String (Thinking.Level.to_string l))))
+           o.thinking_levels
        ; opt "images" bool o.images
        ; opt
            "cost"

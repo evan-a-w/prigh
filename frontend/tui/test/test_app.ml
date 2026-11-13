@@ -453,11 +453,11 @@ let%expect_test
 
     ▌ earlier question
       earlier answer
-    ▸ off
-      low
-      on
-      high
-      max
+    ▸ off                 answer straight away
+      provider's default  the provider picks the effort
+      low                 a little
+      high                more
+      max                 as much as the model allows
     ────────────────────────────────────────────────────────────
     > /thinking ▏
     deepseek-flash  Tab accepts · Enter as typed · Esc hides
@@ -5680,18 +5680,28 @@ let%expect_test "Ctrl+P with one scoped model notices instead of switching" =
     |}]
 ;;
 
-let%expect_test "Ctrl+T cycles off/low/on/high/max and is n/a when unsupported" =
+let%expect_test
+    "Ctrl+T cycles the model's thinking options and is n/a when unsupported"
+  =
   let h =
-    connected ~model:(model_json "claude-fable-5-1" "Claude Fable 5.1") ()
+    connected
+      ~model:
+        (model_json
+           ~thinking_options:
+             [ "off"; "default"; "low"; "medium"; "high"; "max" ]
+           "claude-opus-4-6"
+           "Claude Opus 4.6")
+      ()
   in
-  for _ = 1 to 5 do
+  for _ = 1 to 6 do
     H.key h (Key.ctrl 't')
   done;
   H.show h;
   [%expect
     {|
+    (Rpc (method_ set_thinking) (params ((thinking default))) (tag Show_error))
     (Rpc (method_ set_thinking) (params ((thinking low))) (tag Show_error))
-    (Rpc (method_ set_thinking) (params ((thinking on))) (tag Show_error))
+    (Rpc (method_ set_thinking) (params ((thinking medium))) (tag Show_error))
     (Rpc (method_ set_thinking) (params ((thinking high))) (tag Show_error))
     (Rpc (method_ set_thinking) (params ((thinking max))) (tag Show_error))
     (Rpc (method_ set_thinking) (params ((thinking off))) (tag Show_error))
@@ -5706,7 +5716,7 @@ let%expect_test "Ctrl+T cycles off/low/on/high/max and is n/a when unsupported" 
       earlier answer
     ────────────────────────────────────────── thinking: off ───
     > ▏
-    claude-fable-5-1  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    claude-opus-4-6  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}];
   H.reply
     ~quiet:true
@@ -8930,6 +8940,67 @@ let%expect_test
 ;;
 
 let%expect_test
+    "/thinking LEVEL: the model's levels only; on is default; completion and \
+     an older backend's state"
+  =
+  let h = connected () in
+  H.keys h "/thinking xhigh";
+  H.enter h;
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ┌─ Error ──────────────────────────────────────────────────┐
+    │ DeepSeek V4.1 Flash has no thinking “xhigh”: use off,    │
+    │ default, low, high, max.                                 │
+    └────────────────────────────────────────── Esc dismisses ─┘
+    ────────────────────────────────────────────────────────────
+    > ▏
+    deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    |}];
+  H.esc h;
+  H.keys h "/thinking on";
+  H.enter h;
+  [%expect
+    {| (Rpc (method_ set_thinking) (params ((thinking default))) (tag Show_error)) |}];
+  H.keys h "/thinking ";
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ▸ off                 answer straight away
+      provider's default  the provider picks the effort
+      low                 a little
+      high                more
+      max                 as much as the model allows
+    ────────────────────────────────────────────────────────────
+    > /thinking ▏
+    deepseek-flash  Tab accepts · Enter as typed · Esc hides
+    |}];
+  H.esc h;
+  H.key h (Key.ctrl 'u');
+  H.reply ~quiet:true h Initial_state (state_json ~thinking:"on" ());
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    ────────────────────────────────────────────────────────────
+    > ▏
+    deepseek-flash  think:default  mode:auto  ctx:0.1%/1.0M
+    |}]
+;;
+
+let%expect_test
     "/thinking lists levels in cycling order with the default marked"
   =
   let h = connected () in
@@ -8941,13 +9012,13 @@ let%expect_test
     {|
     ▌ earlier question
       earlier answer
-    Thinking level  (5)
+    Thinking level for DeepSeek V4.1 Flash  (5)
     / ▏
-    ▸* off
-       low
-       on    provider default
-       high
-       max
+    ▸* off                 answer straight away
+       provider's default  the provider picks the effort
+       low                 a little
+       high                more
+       max                 as much as the model allows
     ────────────────────────────────────────────────────────────
     >
     deepseek-flash  ctx:0.1%/1.0M  Enter selects · Esc closes
@@ -9726,11 +9797,11 @@ let%expect_test
     [gray]/work[/]  [gray]m[/]  [gray]think:off[/]  [gray]mode:auto[/]  [gray]view:normal[/]  [yellow]ctx:60%/200k[/]  [gray]$0.01[/]
     [gray]/work[/]  [gray]m[/]  [gray]think:off[/]  [gray]mode:auto[/]  [gray]view:normal[/]  [red]ctx:85%/200k[/]  [gray]$0.01[/]
     [gray]/work[/]  [gray]m[/]  [gray]think:off[/]  [gray]mode:auto[/]  [gray]ctx:0.0%/200k[/]  [gray]$0.01[/]  [yellow]⠋ working · Esc aborts · Enter steers[/]
-    (Rpc (method_ set_thinking) (params ((thinking low))) (tag Show_error))
+    (Rpc (method_ set_thinking) (params ((thinking default))) (tag Show_error))
     (Rpc (method_ list_models) (params ()) (tag (Models_for_picker "")))
-    [gray]/work[/]  [gray]m[/]  [gray]think:low[/]  [gray]mode:auto[/]  [gray]ctx:0.0%/200k[/]  [gray]$0.01[/]  [yellow]⠋ working · Esc aborts · Enter steers[/]
+    [gray]/work[/]  [gray]m[/]  [gray]think:default[/]  [gray]mode:auto[/]  [gray]ctx:0.0%/200k[/]  [gray]$0.01[/]  [yellow]⠋ working · Esc aborts · Enter steers[/]
     (Rpc (method_ abort) (params ()) (tag Abort_done))
-    [gray]/work[/]  [gray]m[/]  [gray]think:low[/]  [gray]mode:auto[/]  [gray]view:normal[/]  [gray]ctx:0.0%/200k[/]  [gray]$0.01[/]  [red]backend gone · retry 1 in 0s[/]
+    [gray]/work[/]  [gray]m[/]  [gray]think:default[/]  [gray]mode:auto[/]  [gray]view:normal[/]  [gray]ctx:0.0%/200k[/]  [gray]$0.01[/]  [red]backend gone · retry 1 in 0s[/]
     |}];
   (* Without a known window, the tokens are shown instead. *)
   let model = model_json ~context_window:0 "m" "M" in

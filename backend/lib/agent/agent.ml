@@ -317,6 +317,15 @@ let restore_approvals t =
   t.plan <- Plan.latest (path_messages t.session)
 ;;
 
+(* The setting kept when [model] becomes the session's: the closest one it
+   takes. A model that does not think keeps the setting for the next one
+   (its requests send none). *)
+let settle_thinking model thinking =
+  if Model.supports_thinking model
+  then Model.clamp_thinking model thinking
+  else thinking
+;;
+
 let restore_settings t =
   t.goal <- Session.goal t.session;
   t.review <- Session.review t.session;
@@ -325,7 +334,7 @@ let restore_settings t =
    | Some (model_id, thinking) ->
      Option.iter (Model_registry.find t.models model_id) ~f:(fun m ->
        t.model <- m);
-     t.thinking <- thinking
+     t.thinking <- settle_thinking t.model thinking
    | None -> ());
   restore_approvals t
 ;;
@@ -2423,6 +2432,23 @@ let deliveries t =
 (* The system prompt names the tools of the model it was built for. *)
 let set_model t model =
   t.model <- model;
+  let thinking = settle_thinking model t.thinking in
+  if not (Thinking.equal thinking t.thinking)
+  then (
+    broadcast
+      t
+      (Notice
+         (sprintf
+            "%s: thinking is now %s"
+            (match t.thinking with
+             | Off -> model.name ^ " always thinks"
+             | On _ ->
+               sprintf
+                 "%s has no %s thinking"
+                 model.name
+                 (Thinking.label t.thinking))
+            (Thinking.label thinking)));
+    t.thinking <- thinking);
   environment_changed t;
   ignore
     (Session.set_model t.session ~model:(Model.key model) ~thinking:t.thinking
@@ -3276,6 +3302,7 @@ let create
   let thinking =
     Option.first_some thinking config.default_thinking
     |> Option.value ~default:Thinking.default
+    |> settle_thinking model
   in
   let session =
     match session with
@@ -3675,11 +3702,12 @@ let shell t ~command ~add_to_context =
 ;;
 
 let set_thinking t thinking =
-  t.thinking <- thinking;
-  ignore
-    (Session.set_model t.session ~model:(Model.key t.model) ~thinking
-     : Session.Entry.t);
-  state_changed t
+  Or_error.map (Model.check_thinking t.model thinking) ~f:(fun thinking ->
+    t.thinking <- thinking;
+    ignore
+      (Session.set_model t.session ~model:(Model.key t.model) ~thinking
+       : Session.Entry.t);
+    state_changed t)
 ;;
 
 let compact ?instructions t =

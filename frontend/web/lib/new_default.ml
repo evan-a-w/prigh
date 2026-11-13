@@ -12,7 +12,7 @@ type t =
 [@@deriving sexp_of, equal]
 
 let builtin_mode = Config.default.approval_mode
-let builtin_thinking = "on"
+let builtin_thinking = "default"
 let budget_usd = 5.
 
 let apply t (config : Config.t) =

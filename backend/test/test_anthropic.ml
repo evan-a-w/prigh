@@ -546,57 +546,121 @@ let%expect_test
     |}]
 ;;
 
-let%expect_test "thinking: budget models vs adaptive models (effort)" =
+let%expect_test
+    "thinking per model and setting (clamped to the model's options first)"
+  =
+  let settings : Thinking.t list =
+    Off
+    :: On None
+    :: List.map Thinking.Level.all ~f:(fun l -> Thinking.On (Some l))
+  in
   let show id =
     let model = Option.value_exn (Model.find id) in
     printf
       "%s: %s\n"
       id
       (Sexp.to_string [%sexp (model.thinking_style : Model.Thinking_style.t)]);
-    List.iter
-      [ Thinking.Off; On None; On (Some Low); On (Some High); On (Some Max) ]
-      ~f:(fun thinking ->
-        let body =
-          T.request_body
-            ~oauth:false
-            { (request [ Message.user "hi" ]) with model; thinking }
-        in
-        let field name =
-          Option.value_map
-            (Json.member name body)
-            ~default:"-"
-            ~f:Json.to_string
-        in
-        printf
-          "  %-12s thinking=%s output_config=%s interleaved-beta=%b\n"
-          (Sexp.to_string [%sexp (thinking : Thinking.t)])
-          (field "thinking")
-          (field "output_config")
-          (T.thinking_on model thinking))
+    List.iter settings ~f:(fun thinking ->
+      let body =
+        T.request_body
+          ~oauth:false
+          { (request [ Message.user "hi" ]) with model; thinking }
+      in
+      let field name =
+        Option.value_map (Json.member name body) ~default:"-" ~f:Json.to_string
+      in
+      printf
+        "  %-8s thinking=%s output_config=%s beta=%b\n"
+        (Thinking.to_string thinking)
+        (field "thinking")
+        (field "output_config")
+        (T.thinking_on model thinking))
   in
-  show "claude-sonnet-4-5";
-  show "claude-opus-5-5";
-  show "claude-opus-5";
+  List.iter
+    [ "claude-sonnet-4-5"
+    ; "claude-opus-4-5"
+    ; "claude-opus-4-6"
+    ; "claude-opus-4-7"
+    ; "claude-opus-5"
+    ; "claude-opus-5-5"
+    ; "claude-sonnet-5-5"
+    ; "claude-fable-5-2"
+    ]
+    ~f:show;
   [%expect
     {|
-    claude-sonnet-4-5: Budget
-      Off          thinking=- output_config=- interleaved-beta=false
-      (On())       thinking={"type":"enabled","budget_tokens":8192} output_config=- interleaved-beta=true
-      (On(Low))    thinking={"type":"enabled","budget_tokens":2048} output_config=- interleaved-beta=true
-      (On(High))   thinking={"type":"enabled","budget_tokens":16384} output_config=- interleaved-beta=true
-      (On(Max))    thinking={"type":"enabled","budget_tokens":32000} output_config=- interleaved-beta=true
-    claude-opus-5-5: (Adaptive(can_disable false))
-      Off          thinking=- output_config=- interleaved-beta=false
-      (On())       thinking={"type":"adaptive","display":"summarized"} output_config={"effort":"medium"} interleaved-beta=false
-      (On(Low))    thinking={"type":"adaptive","display":"summarized"} output_config={"effort":"low"} interleaved-beta=false
-      (On(High))   thinking={"type":"adaptive","display":"summarized"} output_config={"effort":"high"} interleaved-beta=false
-      (On(Max))    thinking={"type":"adaptive","display":"summarized"} output_config={"effort":"max"} interleaved-beta=false
-    claude-opus-5: (Adaptive(can_disable false))
-      Off          thinking=- output_config=- interleaved-beta=false
-      (On())       thinking={"type":"adaptive","display":"summarized"} output_config={"effort":"medium"} interleaved-beta=false
-      (On(Low))    thinking={"type":"adaptive","display":"summarized"} output_config={"effort":"low"} interleaved-beta=false
-      (On(High))   thinking={"type":"adaptive","display":"summarized"} output_config={"effort":"high"} interleaved-beta=false
-      (On(Max))    thinking={"type":"adaptive","display":"summarized"} output_config={"effort":"max"} interleaved-beta=false
+    claude-sonnet-4-5: (Budget(effort false))
+      off      thinking=- output_config=- beta=false
+      default  thinking={"type":"enabled","budget_tokens":8192} output_config=- beta=true
+      minimal  thinking={"type":"enabled","budget_tokens":2048} output_config=- beta=true
+      low      thinking={"type":"enabled","budget_tokens":2048} output_config=- beta=true
+      medium   thinking={"type":"enabled","budget_tokens":8192} output_config=- beta=true
+      high     thinking={"type":"enabled","budget_tokens":16384} output_config=- beta=true
+      xhigh    thinking={"type":"enabled","budget_tokens":32000} output_config=- beta=true
+      max      thinking={"type":"enabled","budget_tokens":62976} output_config=- beta=true
+    claude-opus-4-5: (Budget(effort true))
+      off      thinking=- output_config=- beta=false
+      default  thinking={"type":"enabled","budget_tokens":8192} output_config=- beta=true
+      minimal  thinking={"type":"enabled","budget_tokens":2048} output_config={"effort":"low"} beta=true
+      low      thinking={"type":"enabled","budget_tokens":2048} output_config={"effort":"low"} beta=true
+      medium   thinking={"type":"enabled","budget_tokens":8192} output_config={"effort":"medium"} beta=true
+      high     thinking={"type":"enabled","budget_tokens":16384} output_config={"effort":"high"} beta=true
+      xhigh    thinking={"type":"enabled","budget_tokens":16384} output_config={"effort":"high"} beta=true
+      max      thinking={"type":"enabled","budget_tokens":16384} output_config={"effort":"high"} beta=true
+    claude-opus-4-6: Adaptive
+      off      thinking={"type":"disabled"} output_config=- beta=false
+      default  thinking={"type":"adaptive","display":"summarized"} output_config=- beta=false
+      minimal  thinking={"type":"adaptive","display":"summarized"} output_config={"effort":"low"} beta=false
+      low      thinking={"type":"adaptive","display":"summarized"} output_config={"effort":"low"} beta=false
+      medium   thinking={"type":"adaptive","display":"summarized"} output_config={"effort":"medium"} beta=false
+      high     thinking={"type":"adaptive","display":"summarized"} output_config={"effort":"high"} beta=false
+      xhigh    thinking={"type":"adaptive","display":"summarized"} output_config={"effort":"high"} beta=false
+      max      thinking={"type":"adaptive","display":"summarized"} output_config={"effort":"max"} beta=false
+    claude-opus-4-7: Adaptive
+      off      thinking={"type":"disabled"} output_config=- beta=false
+      default  thinking={"type":"adaptive","display":"summarized"} output_config=- beta=false
+      minimal  thinking={"type":"adaptive","display":"summarized"} output_config={"effort":"low"} beta=false
+      low      thinking={"type":"adaptive","display":"summarized"} output_config={"effort":"low"} beta=false
+      medium   thinking={"type":"adaptive","display":"summarized"} output_config={"effort":"medium"} beta=false
+      high     thinking={"type":"adaptive","display":"summarized"} output_config={"effort":"high"} beta=false
+      xhigh    thinking={"type":"adaptive","display":"summarized"} output_config={"effort":"xhigh"} beta=false
+      max      thinking={"type":"adaptive","display":"summarized"} output_config={"effort":"max"} beta=false
+    claude-opus-5: Adaptive
+      off      thinking={"type":"disabled"} output_config=- beta=false
+      default  thinking={"type":"adaptive","display":"summarized"} output_config=- beta=false
+      minimal  thinking={"type":"adaptive","display":"summarized"} output_config={"effort":"low"} beta=false
+      low      thinking={"type":"adaptive","display":"summarized"} output_config={"effort":"low"} beta=false
+      medium   thinking={"type":"adaptive","display":"summarized"} output_config={"effort":"medium"} beta=false
+      high     thinking={"type":"adaptive","display":"summarized"} output_config={"effort":"high"} beta=false
+      xhigh    thinking={"type":"adaptive","display":"summarized"} output_config={"effort":"xhigh"} beta=false
+      max      thinking={"type":"adaptive","display":"summarized"} output_config={"effort":"max"} beta=false
+    claude-opus-5-5: Adaptive
+      off      thinking={"type":"adaptive","display":"summarized"} output_config=- beta=false
+      default  thinking={"type":"adaptive","display":"summarized"} output_config=- beta=false
+      minimal  thinking={"type":"adaptive","display":"summarized"} output_config={"effort":"low"} beta=false
+      low      thinking={"type":"adaptive","display":"summarized"} output_config={"effort":"low"} beta=false
+      medium   thinking={"type":"adaptive","display":"summarized"} output_config={"effort":"medium"} beta=false
+      high     thinking={"type":"adaptive","display":"summarized"} output_config={"effort":"high"} beta=false
+      xhigh    thinking={"type":"adaptive","display":"summarized"} output_config={"effort":"xhigh"} beta=false
+      max      thinking={"type":"adaptive","display":"summarized"} output_config={"effort":"max"} beta=false
+    claude-sonnet-5-5: Adaptive_between_tools
+      off      thinking={"type":"between_tools"} output_config=- beta=false
+      default  thinking={"type":"adaptive","display":"summarized"} output_config=- beta=false
+      minimal  thinking={"type":"adaptive","display":"summarized"} output_config={"effort":"low"} beta=false
+      low      thinking={"type":"adaptive","display":"summarized"} output_config={"effort":"low"} beta=false
+      medium   thinking={"type":"adaptive","display":"summarized"} output_config={"effort":"medium"} beta=false
+      high     thinking={"type":"adaptive","display":"summarized"} output_config={"effort":"high"} beta=false
+      xhigh    thinking={"type":"adaptive","display":"summarized"} output_config={"effort":"xhigh"} beta=false
+      max      thinking={"type":"adaptive","display":"summarized"} output_config={"effort":"max"} beta=false
+    claude-fable-5-2: Adaptive
+      off      thinking={"type":"adaptive","display":"summarized"} output_config=- beta=false
+      default  thinking={"type":"adaptive","display":"summarized"} output_config=- beta=false
+      minimal  thinking={"type":"adaptive","display":"summarized"} output_config={"effort":"low"} beta=false
+      low      thinking={"type":"adaptive","display":"summarized"} output_config={"effort":"low"} beta=false
+      medium   thinking={"type":"adaptive","display":"summarized"} output_config={"effort":"medium"} beta=false
+      high     thinking={"type":"adaptive","display":"summarized"} output_config={"effort":"high"} beta=false
+      xhigh    thinking={"type":"adaptive","display":"summarized"} output_config={"effort":"xhigh"} beta=false
+      max      thinking={"type":"adaptive","display":"summarized"} output_config={"effort":"max"} beta=false
     |}]
 ;;
 

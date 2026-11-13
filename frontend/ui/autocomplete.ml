@@ -115,9 +115,15 @@ let compute_skill ~line ~line_index ~skills =
   | _ -> None
 ;;
 
-let thinking_items () =
-  List.map Commands.thinking_levels ~f:(fun level ->
-    Picker.Item.create ~id:level level)
+let thinking_items model =
+  List.map
+    (Option.value_map model ~default:P.Thinking.all ~f:P.Thinking.options)
+    ~f:(fun level ->
+      Picker.Item.create
+        ~id:level
+        ~search:level
+        ~detail:(P.Thinking.description level)
+        (P.Thinking.label level))
 ;;
 
 let verbosity_items () =
@@ -258,10 +264,11 @@ let argument_items
       ~snippets
       ~logged_in
       ~server
+      ~model
   =
   match (kind : Commands.Argument.t) with
   | Model | Models -> Some (model_items ~logged_in models)
-  | Thinking -> Some (thinking_items ())
+  | Thinking -> Some (thinking_items model)
   | Verbosity -> Some (verbosity_items ())
   | Filter ->
     Some
@@ -432,6 +439,7 @@ let compute_argument
       ~logged_in
       ~default_dir_host
       ~server
+      ~model
   =
   match String.chop_prefix line ~prefix:"/" with
   | None -> None
@@ -585,7 +593,8 @@ let compute_argument
                        ~sessions
                        ~snippets
                        ~logged_in
-                       ~server)
+                       ~server
+                       ~model)
                     ~default:[]
                 in
                 let items =
@@ -707,6 +716,7 @@ let compute
       ~logged_in
       ~default_dir_host
       ~server
+      ~model
   =
   match
     Option.first_some
@@ -733,6 +743,7 @@ let compute
          ~logged_in
          ~default_dir_host
          ~server
+         ~model
      with
      | Some _ as t -> t
      | None ->

@@ -33,7 +33,10 @@ module Request = struct
 
   let prepare t =
     omit_unsupported_images
-      { t with messages = lead_with_user (Tool_pairing.repair t.messages) }
+      { t with
+        messages = lead_with_user (Tool_pairing.repair t.messages)
+      ; thinking = Model.clamp_thinking t.model t.thinking
+      }
   ;;
 end
 

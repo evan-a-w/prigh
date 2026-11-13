@@ -55,7 +55,6 @@ end
 let c ?argument name args help = { Spec.name; args; help; argument }
 
 (* In cycling order: "on" is the provider's default budget. *)
-let thinking_levels = [ "off"; "low"; "on"; "high"; "max" ]
 
 let every =
   [ c "help" "" "show commands and keys"
@@ -105,8 +104,8 @@ let every =
   ; c
       ~argument:Argument.Thinking
       "thinking"
-      "[off|low|on|high|max]"
-      "pick or set the thinking level"
+      "[off|default|LEVEL]"
+      "pick or set the thinking level (the model's; default: the provider's)"
   ; c
       ~argument:Argument.Verbosity
       "verbosity"

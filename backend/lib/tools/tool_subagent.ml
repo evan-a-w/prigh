@@ -80,7 +80,9 @@ let spec =
              model)" )
         ; ( "thinking"
           , `String
-          , "Thinking level: off|on|low|high|max (default: this agent's)" )
+          , "Thinking: off, default (the provider's) or an effort level the \
+             model takes (minimal|low|medium|high|xhigh|max) (default: this \
+             agent's)" )
         ; "cwd", `String, "Working directory (default: this agent's)"
         ; ( "worktree"
           , `String
@@ -192,10 +194,13 @@ let prepare
   in
   let thinking =
     match Tool_args.string_opt args "thinking", conversation with
-    | None, Some conversation -> conversation.thinking
-    | None, None -> current_thinking ()
+    | None, Some conversation ->
+      Model.clamp_thinking model conversation.thinking
+    | None, None -> Model.clamp_thinking model (current_thinking ())
     | Some name, _ ->
-      (match Thinking.of_string name with
+      (match
+         Or_error.bind (Thinking.of_string name) ~f:(Model.check_thinking model)
+       with
        | Ok thinking -> thinking
        | Error e -> raise (Tool_args.Invalid (Error.to_string_hum e)))
   in

@@ -7,10 +7,15 @@ module P = Prigh_protocol
 val model_json
   :  ?provider:string
   -> ?supports_thinking:bool
+  -> ?thinking_options:string list
+       (** what the backend lists; left out, as an older backend does *)
   -> ?context_window:int
   -> string
   -> string
   -> string
+
+(** The thinking options the backend lists for DeepSeek's models. *)
+val deepseek_thinking : string list
 
 val models_json : string
 

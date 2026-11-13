@@ -981,7 +981,9 @@ let status (m : App.Model.t) : Content.Line.t =
               ~style:base
               (sprintf
                  "think:%s"
-                 (if s.model.supports_thinking then s.thinking else "n/a"))
+                 (if s.model.supports_thinking
+                  then P.Thinking.normalize s.thinking
+                  else "n/a"))
           ] )
       ]
       @ mode_part s

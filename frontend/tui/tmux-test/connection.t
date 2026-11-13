@@ -11,7 +11,7 @@ prints the captured panes.
     faux reply
   ───────────────────────────────────────────────────────────────────── reconnected to the backend ───
   >
-  $TMP/cwd  deepseek-flash  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00
+  $TMP/cwd  deepseek-flash  think:default  mode:auto  ctx:0.0%/1.0M  $0.00
   === prompt works again
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
@@ -23,7 +23,7 @@ prints the captured panes.
     faux reply
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
-  $TMP/cwd  deepseek-flash  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00
+  $TMP/cwd  deepseek-flash  think:default  mode:auto  ctx:0.0%/1.0M  $0.00
   $ bash ./harness.sh fallback
   === chain and default directory set
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
@@ -33,7 +33,7 @@ prints the captured panes.
   └────────────────────────────────────────────────────────────────────────────────── Esc dismisses ─┘
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
-  $TMP/cwd  deepseek-flash  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00
+  $TMP/cwd  deepseek-flash  think:default  mode:auto  ctx:0.0%/1.0M  $0.00
   === handed over
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
@@ -47,7 +47,7 @@ prints the captured panes.
     carried on
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
-  $TMP/cwd  claude-fable-5-1  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00
+  $TMP/cwd  claude-fable-5-1  think:default  mode:auto  ctx:0.0%/1.0M  $0.00
   $ bash ./harness.sh reconnect_dialog
   === typing the reason
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
@@ -62,7 +62,7 @@ prints the captured panes.
   └──────────────────────────────────────────────────────────────────────────────────────────────────┘
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
-  deepseek-flash  think:on  mode:ask  view:normal  ctx:0.0%/1.0M  $0.00  Enter denies · Esc goes back
+  deepseek-flash  think:default  mode:ask  ctx:0.0%/1.0M  $0.00  Enter denies · Esc goes back
   === reconnected: the dialog closed
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
@@ -72,7 +72,7 @@ prints the captured panes.
   … bash $ make deploy
   ───────────────────────────────────────────────────────────────────── reconnected to the backend ───
   >
-  $TMP/cwd  deepseek-flash  think:on  mode:ask  view:normal  ctx:0.0%/1.0M  $0.00
+  $TMP/cwd  deepseek-flash  think:default  mode:ask  ctx:0.0%/1.0M  $0.00
   $ bash ./harness.sh switch_pending
   === the picker, a confirmation waiting behind it
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
@@ -98,7 +98,7 @@ prints the captured panes.
     in the first session
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
-  $TMP/cwd  deepseek-flash  think:on  mode:ask  view:normal  ctx:0.0%/1.0M  $0.00
+  $TMP/cwd  deepseek-flash  think:default  mode:ask  ctx:0.0%/1.0M  $0.00
   === back: its confirmation again
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
@@ -117,7 +117,7 @@ prints the captured panes.
   └──────────────────────────────────────────────────────────────────────────────────────────────────┘
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   ?
-  deepseek-flash  think:on  mode:ask  view:normal  ctx:0.0%/1.0M  $0.00  confirm: y/a/n/r
+  deepseek-flash  think:default  mode:ask  view:normal  ctx:0.0%/1.0M  $0.00  confirm: y/a/n/r
   === answered
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
@@ -131,4 +131,4 @@ prints the captured panes.
     all done
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
-  $TMP/cwd  deepseek-flash  think:on  mode:ask  view:normal  ctx:0.0%/1.0M  $0.00
+  $TMP/cwd  deepseek-flash  think:default  mode:ask  ctx:0.0%/1.0M  $0.00

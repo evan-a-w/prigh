@@ -49,12 +49,24 @@ module Endpoint = struct
   ;;
 end
 
-let effort_of_thinking : Thinking.t -> string option = function
-  | Off -> None
-  | On None -> Some "medium"
-  | On (Some Low) -> Some "low"
-  | On (Some High) -> Some "high"
-  | On (Some Max) -> Some "xhigh"
+(* The [reasoning] object: the effort (none for the provider's default),
+   and a summary of the reasoning to show. Off is effort "none" for models
+   that take it, else no [reasoning] at all. *)
+let reasoning_fields (model : Model.t) : Thinking.t -> (string * Json.t) list
+  = function
+  | Off ->
+    (match model.thinking_style with
+     | Effort { off_is_none = true } ->
+       [ "reasoning", `Object [ "effort", `String "none" ] ]
+     | Effort { off_is_none = false }
+     | Budget _ | Adaptive | Adaptive_between_tools -> [])
+  | On level ->
+    [ ( "reasoning"
+      , `Object
+          (Option.value_map level ~default:[] ~f:(fun level ->
+             [ "effort", `String (Thinking.Level.to_string level) ])
+           @ [ "summary", `String "auto" ]) )
+    ]
 ;;
 
 let same_provider ~provider (a : Message.Assistant.t) =
@@ -358,16 +370,9 @@ let request_body ~(endpoint : Endpoint.t) (r : Provider.Request.t) : Json.t =
       String.equal t.name name && Option.is_some t.freeform)
   in
   let reasoning =
-    if not r.model.supports_thinking
-    then []
-    else
-      Option.value_map
-        (effort_of_thinking r.thinking)
-        ~default:[]
-        ~f:(fun effort ->
-          [ ( "reasoning"
-            , `Object [ "effort", `String effort; "summary", `String "auto" ] )
-          ])
+    if Model.supports_thinking r.model
+    then reasoning_fields r.model r.thinking
+    else []
   in
   `Object
     (List.concat
