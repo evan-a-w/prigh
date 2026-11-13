@@ -14,7 +14,7 @@ prints the captured panes.
     faux reply
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
-  $TMP/cwd  deepseek-flash  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00
+  $TMP/cwd  deepseek-flash  think:default  mode:auto  ctx:0.0%/1.0M  $0.00
   === editor works
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
@@ -23,20 +23,20 @@ prints the captured panes.
     faux reply
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   > still typing
-  $TMP/cwd  deepseek-flash  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00
+  $TMP/cwd  deepseek-flash  think:default  mode:auto  ctx:0.0%/1.0M  $0.00
   $ bash ./harness.sh editor
   === after Ctrl+G round trip
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   > draftedited by editor
   
-  $TMP/cwd  deepseek-flash  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00
+  $TMP/cwd  deepseek-flash  think:default  mode:auto  ctx:0.0%/1.0M  $0.00
   $ bash ./harness.sh paste
   === chip after a 5-line paste
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   > [5 lines pasted]
-  $TMP/cwd  deepseek-flash  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00
+  $TMP/cwd  deepseek-flash  think:default  mode:auto  ctx:0.0%/1.0M  $0.00
   === cursor inside expands the chip
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   ────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -45,7 +45,7 @@ prints the captured panes.
     line three
     line four
     line five
-  $TMP/cwd  deepseek-flash  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00
+  $TMP/cwd  deepseek-flash  think:default  mode:auto  ctx:0.0%/1.0M  $0.00
   === submitted as one message
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
@@ -58,4 +58,4 @@ prints the captured panes.
     faux reply
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
-  $TMP/cwd  deepseek-flash  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00
+  $TMP/cwd  deepseek-flash  think:default  mode:auto  ctx:0.0%/1.0M  $0.00

@@ -30,7 +30,7 @@ prints the captured panes.
     all done
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
-  deepseek-flash  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00  agents:[main] 1✓ 2✓
+  deepseek-flash  think:default  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00  agents:[main] 1✓ 2✓
   === verbose
   ▢ Using prigh-tui
     [Client: the user is on prigh-tui, which cannot display components: do not call render_ui; answer
@@ -61,7 +61,7 @@ prints the captured panes.
     all done
   ──────────────────────────────────────────────────────────── view: verbose — everything is shown ───
   >
-  deepseek-flash  think:on  mode:auto  view:verbose  ctx:0.0%/1.0M  $0.00  agents:[main] 1✓ 2✓
+  deepseek-flash  think:default  mode:auto  view:verbose  ctx:0.0%/1.0M  $0.00  agents:[main] 1✓ 2✓
   === quiet
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
@@ -78,7 +78,7 @@ prints the captured panes.
     all done
   ────────────────────────────────────── view: quiet — intermediate output and thinking are hidden ───
   >
-  deepseek-flash  think:on  mode:auto  view:quiet  ctx:0.0%/1.0M  $0.00  agents:[main] 1✓ 2✓
+  deepseek-flash  think:default  mode:auto  view:quiet  ctx:0.0%/1.0M  $0.00  agents:[main] 1✓ 2✓
   === agent 1
   ◆ subagent 1/2  deepseek-flash  ✓ done 1 turns $0.00  "Count files"
   
@@ -109,7 +109,7 @@ prints the captured panes.
     child reporting: done
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >  a1 has finished · Esc goes back to the main agent
-  deepseek-flash  think:on  ctx:0.0%/1.0M  agents:main [1✓] 2✓  → a1 (finished) · Esc: main agent
+  deepseek-flash  think:default  ctx:0.0%/1.0M  agents:main [1✓] 2✓  → a1 (finished) · Esc: main agent
   === agent 2
   ◆ subagent 2/2  deepseek-flash  ✓ done 1 turns $0.00  "Say hello"
   
@@ -140,7 +140,7 @@ prints the captured panes.
     child reporting: done
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >  a2 has finished · Esc goes back to the main agent
-  deepseek-flash  think:on  ctx:0.0%/1.0M  agents:main 1✓ [2✓]  → a2 (finished) · Esc: main agent
+  deepseek-flash  think:default  ctx:0.0%/1.0M  agents:main 1✓ [2✓]  → a2 (finished) · Esc: main agent
   === main again
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
@@ -157,7 +157,7 @@ prints the captured panes.
     all done
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
-  deepseek-flash  think:on  mode:auto  view:quiet  ctx:0.0%/1.0M  $0.00  agents:[main] 1✓ 2✓
+  deepseek-flash  think:default  mode:auto  view:quiet  ctx:0.0%/1.0M  $0.00  agents:[main] 1✓ 2✓
   $ bash ./harness.sh auto_background
   === moved to the background
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
@@ -170,7 +170,7 @@ prints the captured panes.
     carrying on meanwhile
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
-  $TMP/cwd  deepseek-flash  think:on  mode:auto  ctx:0.0%/1.0M  $0.00  jobs:1 <spin>
+  $TMP/cwd  deepseek-flash  think:default  mode:auto  ctx:0.0%/1.0M  $0.00  jobs:1 <spin>
   === its report
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
@@ -186,16 +186,16 @@ prints the captured panes.
     the build finished
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
-  $TMP/cwd  deepseek-flash  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00
+  $TMP/cwd  deepseek-flash  think:default  mode:auto  ctx:0.0%/1.0M  $0.00
   $ bash ./harness.sh send_raw
   === the popup highlights a directory
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   ▸ $TMP/cwd/sub/deeper/
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   > /cd $TMP/cwd/sub/
-  deepseek-flash  think:on  mode:auto  ctx:0.0%/1.0M  $0.00  Tab/Enter accept · Alt+S as typed
+  deepseek-flash  think:default  mode:auto  ctx:0.0%/1.0M  $0.00  Tab/Enter accept · Alt+S as typed
   === Alt+S: /cd to what was typed
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   ──────────────────────────────────────────────────────────────────────────────────── cwd changed ───
   >
-  $TMP/cwd/sub  deepseek-flash  think:on  mode:auto  ctx:0.0%/1.0M  $0.00
+  $TMP/cwd/sub  deepseek-flash  think:default  mode:auto  ctx:0.0%/1.0M  $0.00

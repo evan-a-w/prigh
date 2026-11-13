@@ -310,11 +310,14 @@ let%expect_test "the names of the settings' controls" =
     [switch] button "Notifications" -- Turn notifications off (/notify off)
     -- New sessions
     button "New sessions' model: The backend's choice" -- Choose the model new sessions start with
-    button "This session\226\128\153s" -- Start new sessions with Claude Opus 5.5 · thinking on, its thinking level too (/change_default)
+    button "This session\226\128\153s" -- Start new sessions with Claude Opus 5.5 · thinking provider's default, its thinking level too (/change_default)
     button "Off" -- New sessions think at off
+    button "Provider's default" -- New sessions think at provider's default
+    button "Minimal" -- New sessions think at minimal
     button "Low" -- New sessions think at low
-    button "On" -- New sessions think at on
+    button "Medium" -- New sessions think at medium
     button "High" -- New sessions think at high
+    button "Xhigh" -- New sessions think at xhigh
     button "Max" -- New sessions think at max
     button "Ask" -- New sessions start in Ask mode
     button "Auto-edit" -- New sessions start in Auto-edit mode

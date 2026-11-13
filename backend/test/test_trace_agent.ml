@@ -748,7 +748,7 @@ let%expect_test "the summary and the Perfetto export of a session" =
       {"name":"thread_sort_index","ph":"M","pid":1,"tid":4,"args":{"sort_index":4}}
       {"name":"prompt","cat":"prompt","ph":"X","ts":0,"dur":21800000,"pid":1,"tid":1,"args":{"status":"ok","model":"deepseek/deepseek-flash"}}
       {"name":"turn 1","cat":"turn","ph":"X","ts":0,"dur":4100000,"pid":1,"tid":1,"args":{"status":"ok","turn":1,"tool_calls":3}}
-      {"name":"model_request deepseek/deepseek-flash","cat":"model_request","ph":"X","ts":0,"dur":1100000,"pid":1,"tid":1,"args":{"status":"ok","model":"deepseek/deepseek-flash","thinking":"on","input_tokens":20,"output_tokens":8,"cache_read_tokens":5,"cost_usd":1.413e-05,"deltas":6,"stop":"tool_use"}}
+      {"name":"model_request deepseek/deepseek-flash","cat":"model_request","ph":"X","ts":0,"dur":1100000,"pid":1,"tid":1,"args":{"status":"ok","model":"deepseek/deepseek-flash","thinking":"default","input_tokens":20,"output_tokens":8,"cache_read_tokens":5,"cost_usd":1.413e-05,"deltas":6,"stop":"tool_use"}}
       {"name":"connect","cat":"connect","ph":"X","ts":0,"dur":500000,"pid":1,"tid":1,"args":{"status":"ok"}}
       {"name":"first_token","cat":"first_token","ph":"X","ts":500000,"dur":100000,"pid":1,"tid":1,"args":{"status":"ok"}}
       {"name":"stream","cat":"stream","ph":"X","ts":600000,"dur":500000,"pid":1,"tid":1,"args":{"status":"ok"}}
@@ -768,35 +768,35 @@ let%expect_test "the summary and the Perfetto export of a session" =
       {"name":"first_token","cat":"first_token","ph":"X","ts":3300000,"dur":100000,"pid":1,"tid":2,"args":{"status":"ok"}}
       {"name":"stream","cat":"stream","ph":"X","ts":3400000,"dur":0,"pid":1,"tid":2,"args":{"status":"ok"}}
       {"name":"turn 2","cat":"turn","ph":"X","ts":4100000,"dur":4700000,"pid":1,"tid":1,"args":{"status":"ok","turn":2,"tool_calls":1}}
-      {"name":"model_request deepseek/deepseek-flash","cat":"model_request","ph":"X","ts":4100000,"dur":700000,"pid":1,"tid":1,"args":{"status":"ok","model":"deepseek/deepseek-flash","thinking":"on","input_tokens":20,"output_tokens":8,"cache_read_tokens":5,"cost_usd":1.413e-05,"deltas":2,"stop":"tool_use"}}
+      {"name":"model_request deepseek/deepseek-flash","cat":"model_request","ph":"X","ts":4100000,"dur":700000,"pid":1,"tid":1,"args":{"status":"ok","model":"deepseek/deepseek-flash","thinking":"default","input_tokens":20,"output_tokens":8,"cache_read_tokens":5,"cost_usd":1.413e-05,"deltas":2,"stop":"tool_use"}}
       {"name":"connect","cat":"connect","ph":"X","ts":4100000,"dur":500000,"pid":1,"tid":1,"args":{"status":"ok"}}
       {"name":"first_token","cat":"first_token","ph":"X","ts":4600000,"dur":100000,"pid":1,"tid":1,"args":{"status":"ok"}}
       {"name":"stream","cat":"stream","ph":"X","ts":4700000,"dur":100000,"pid":1,"tid":1,"args":{"status":"ok"}}
       {"name":"tool danger","cat":"tool","ph":"X","ts":4800000,"dur":4000000,"pid":1,"tid":1,"args":{"status":"ok","tool":"danger","call_id":"d1","where":"local","result_bytes":7,"is_error":false}}
       {"name":"approval_wait","cat":"approval_wait","ph":"X","ts":4800000,"dur":4000000,"pid":1,"tid":1,"args":{"status":"ok"}}
       {"name":"turn 3","cat":"turn","ph":"X","ts":8800000,"dur":7700000,"pid":1,"tid":1,"args":{"status":"ok","turn":3,"tool_calls":1}}
-      {"name":"model_request deepseek/deepseek-flash","cat":"model_request","ph":"X","ts":8800000,"dur":700000,"pid":1,"tid":1,"args":{"status":"ok","model":"deepseek/deepseek-flash","thinking":"on","input_tokens":20,"output_tokens":8,"cache_read_tokens":5,"cost_usd":1.413e-05,"deltas":2,"stop":"tool_use"}}
+      {"name":"model_request deepseek/deepseek-flash","cat":"model_request","ph":"X","ts":8800000,"dur":700000,"pid":1,"tid":1,"args":{"status":"ok","model":"deepseek/deepseek-flash","thinking":"default","input_tokens":20,"output_tokens":8,"cache_read_tokens":5,"cost_usd":1.413e-05,"deltas":2,"stop":"tool_use"}}
       {"name":"connect","cat":"connect","ph":"X","ts":8800000,"dur":500000,"pid":1,"tid":1,"args":{"status":"ok"}}
       {"name":"first_token","cat":"first_token","ph":"X","ts":9300000,"dur":100000,"pid":1,"tid":1,"args":{"status":"ok"}}
       {"name":"stream","cat":"stream","ph":"X","ts":9400000,"dur":100000,"pid":1,"tid":1,"args":{"status":"ok"}}
       {"name":"tool ask_user","cat":"tool","ph":"X","ts":9500000,"dur":7000000,"pid":1,"tid":1,"args":{"status":"ok","tool":"ask_user","call_id":"q1","where":"local","result_bytes":34,"is_error":false}}
       {"name":"ask_user_wait","cat":"ask_user_wait","ph":"X","ts":9500000,"dur":7000000,"pid":1,"tid":1,"args":{"status":"ok","questions":1}}
       {"name":"turn 4","cat":"turn","ph":"X","ts":16500000,"dur":4700000,"pid":1,"tid":1,"args":{"status":"ok","turn":4,"tool_calls":1}}
-      {"name":"model_request deepseek/deepseek-flash","cat":"model_request","ph":"X","ts":16500000,"dur":700000,"pid":1,"tid":1,"args":{"status":"ok","model":"deepseek/deepseek-flash","thinking":"on","input_tokens":20,"output_tokens":8,"cache_read_tokens":5,"cost_usd":1.413e-05,"deltas":2,"stop":"tool_use"}}
+      {"name":"model_request deepseek/deepseek-flash","cat":"model_request","ph":"X","ts":16500000,"dur":700000,"pid":1,"tid":1,"args":{"status":"ok","model":"deepseek/deepseek-flash","thinking":"default","input_tokens":20,"output_tokens":8,"cache_read_tokens":5,"cost_usd":1.413e-05,"deltas":2,"stop":"tool_use"}}
       {"name":"connect","cat":"connect","ph":"X","ts":16500000,"dur":500000,"pid":1,"tid":1,"args":{"status":"ok"}}
       {"name":"first_token","cat":"first_token","ph":"X","ts":17000000,"dur":100000,"pid":1,"tid":1,"args":{"status":"ok"}}
       {"name":"stream","cat":"stream","ph":"X","ts":17100000,"dur":100000,"pid":1,"tid":1,"args":{"status":"ok"}}
       {"name":"tool bash (while [ ! -e go ]; do sleep 0.01; done)","cat":"tool","ph":"X","ts":17200000,"dur":4000000,"pid":1,"tid":1,"args":{"status":"ok","tool":"bash","call_id":"b1","summary":"while [ ! -e go ]; do sleep 0.01; done","where":"local","result_bytes":166,"is_error":false}}
       {"name":"approval_wait","cat":"approval_wait","ph":"X","ts":17200000,"dur":4000000,"pid":1,"tid":1,"args":{"status":"ok"}}
       {"name":"turn 5","cat":"turn","ph":"X","ts":21200000,"dur":600000,"pid":1,"tid":1,"args":{"status":"ok","turn":5,"tool_calls":0}}
-      {"name":"model_request deepseek/deepseek-flash","cat":"model_request","ph":"X","ts":21200000,"dur":600000,"pid":1,"tid":1,"args":{"status":"ok","model":"deepseek/deepseek-flash","thinking":"on","input_tokens":10,"output_tokens":5,"cache_read_tokens":0,"cost_usd":9e-06,"deltas":1,"stop":"end_turn"}}
+      {"name":"model_request deepseek/deepseek-flash","cat":"model_request","ph":"X","ts":21200000,"dur":600000,"pid":1,"tid":1,"args":{"status":"ok","model":"deepseek/deepseek-flash","thinking":"default","input_tokens":10,"output_tokens":5,"cache_read_tokens":0,"cost_usd":9e-06,"deltas":1,"stop":"end_turn"}}
       {"name":"job j1","cat":"job","ph":"X","ts":21200000,"dur":600000,"pid":1,"tid":4,"args":{"status":"ok","job_id":"j1","label":"while [ ! -e go ]; do sleep 0.01; done","outcome":"exited 0"}}
       {"name":"connect","cat":"connect","ph":"X","ts":21200000,"dur":500000,"pid":1,"tid":1,"args":{"status":"ok"}}
       {"name":"first_token","cat":"first_token","ph":"X","ts":21700000,"dur":100000,"pid":1,"tid":1,"args":{"status":"ok"}}
       {"name":"stream","cat":"stream","ph":"X","ts":21800000,"dur":0,"pid":1,"tid":1,"args":{"status":"ok"}}
       {"name":"prompt","cat":"prompt","ph":"X","ts":21800000,"dur":600000,"pid":1,"tid":1,"args":{"status":"ok","model":"deepseek/deepseek-flash"}}
       {"name":"turn 1","cat":"turn","ph":"X","ts":21800000,"dur":600000,"pid":1,"tid":1,"args":{"status":"ok","turn":1,"tool_calls":0}}
-      {"name":"model_request deepseek/deepseek-flash","cat":"model_request","ph":"X","ts":21800000,"dur":600000,"pid":1,"tid":1,"args":{"status":"ok","model":"deepseek/deepseek-flash","thinking":"on","input_tokens":10,"output_tokens":5,"cache_read_tokens":0,"cost_usd":9e-06,"deltas":1,"stop":"end_turn"}}
+      {"name":"model_request deepseek/deepseek-flash","cat":"model_request","ph":"X","ts":21800000,"dur":600000,"pid":1,"tid":1,"args":{"status":"ok","model":"deepseek/deepseek-flash","thinking":"default","input_tokens":10,"output_tokens":5,"cache_read_tokens":0,"cost_usd":9e-06,"deltas":1,"stop":"end_turn"}}
       {"name":"connect","cat":"connect","ph":"X","ts":21800000,"dur":500000,"pid":1,"tid":1,"args":{"status":"ok"}}
       {"name":"first_token","cat":"first_token","ph":"X","ts":22300000,"dur":100000,"pid":1,"tid":1,"args":{"status":"ok"}}
       {"name":"stream","cat":"stream","ph":"X","ts":22400000,"dur":0,"pid":1,"tid":1,"args":{"status":"ok"}}

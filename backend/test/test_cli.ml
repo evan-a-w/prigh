@@ -42,7 +42,7 @@ let%expect_test "flags: bad values name the flag and the fix" =
   with_sandbox
   @@ fun t ->
   prigh t [ "run"; "-model"; "anthropic/nope"; "hi" ];
-  prigh t [ "run"; "-thinking"; "medium"; "hi" ];
+  prigh t [ "run"; "-thinking"; "lots"; "hi" ];
   prigh t [ "run"; "-cwd"; "/nonexistent"; "-faux"; "hi" ];
   prigh t [ "models"; "-provider"; "anthropc" ];
   prigh t [ "serve"; "-listen"; "7777" ];
@@ -55,8 +55,8 @@ let%expect_test "flags: bad values name the flag and the fix" =
     -model: unknown model "anthropic/nope"; did you mean: anthropic/claude-opus-5 (Claude Opus 5), anthropic/claude-fable-5 (Claude Fable 5), anthropic/claude-opus-4-5 (Claude Opus 4.5 (latest))
     prigh models lists them all
     [exit 2]
-    $ prigh run -thinking medium hi
-    -thinking medium: thinking must be one of: off, on, low, high, max
+    $ prigh run -thinking lots hi
+    -thinking lots: thinking must be one of: off, default, minimal, low, medium, high, xhigh, max
     [exit 2]
     $ prigh run -cwd /nonexistent -faux hi
     -cwd /nonexistent: no such directory (mkdir -p it first)

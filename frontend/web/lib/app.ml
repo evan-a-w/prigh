@@ -1012,8 +1012,6 @@ module Model = struct
   ;;
 end
 
-let thinking_levels = Prigh_ui.Commands.thinking_levels
-
 let init =
   { Model.connection = Connected
   ; drops = Drops.initial
@@ -1755,24 +1753,38 @@ let model_picker ?query m =
   Dialog.Picker { kind = Models; picker = models_picker ?query m }
 ;;
 
+(* The session model's settings ([Thinking.all] before the state comes). *)
+let thinking_options (m : Model.t) =
+  Option.value_map m.state ~default:Thinking.all ~f:(fun s ->
+    Thinking.options s.model)
+;;
+
+(* "provider's default", and the level the provider picks when we know it. *)
+let thinking_detail (llm : Llm.t option) level =
+  match
+    Thinking.normalize level, Option.bind llm ~f:(fun l -> l.thinking_default)
+  with
+  | "default", Some known ->
+    sprintf "the provider picks: %s" (Thinking.label known)
+  | level, _ -> Thinking.description level
+;;
+
 let thinking_levels_picker (m : Model.t) =
-  let current = Option.value_map m.state ~default:"" ~f:(fun s -> s.thinking) in
-  let detail = function
-    | "off" -> "answer straight away"
-    | "low" -> "a little"
-    | "on" -> "the provider's default budget"
-    | "high" -> "more"
-    | "max" -> "as much as the model allows"
-    | _ -> ""
+  let current =
+    Option.value_map m.state ~default:"" ~f:(fun s ->
+      Thinking.normalize s.thinking)
   in
+  let llm = Option.map m.state ~f:(fun s -> s.model) in
   Picker.create
-    ~title:"Thinking level"
-    (List.map thinking_levels ~f:(fun level ->
+    ~title:
+      (Option.value_map llm ~default:"Thinking level" ~f:(fun l ->
+         "Thinking level for " ^ l.name))
+    (List.map (thinking_options m) ~f:(fun level ->
        Picker.Item.create
          ~id:level
-         ~detail:(detail level)
+         ~detail:(thinking_detail llm level)
          ~marked:(String.equal level current)
-         level))
+         (Thinking.label level)))
 ;;
 
 let custom_detail (c : Auth_status.Custom.t) =
@@ -2165,11 +2177,16 @@ let open_thinking_picker (m : Model.t) =
 ;;
 
 let set_thinking (m : Model.t) level =
+  let level = Thinking.normalize level in
   match m.state with
   | Some state when not state.model.supports_thinking -> no_thinking m state
+  | Some state
+    when not (List.mem (Thinking.options state.model) level ~equal:String.equal)
+    -> error m (Thinking.unsupported state.model level)
   | state ->
     let unchanged =
-      Option.exists state ~f:(fun s -> String.equal s.thinking level)
+      Option.exists state ~f:(fun s ->
+        String.equal (Thinking.normalize s.thinking) level)
     in
     ( (if unchanged
        then m
@@ -3135,16 +3152,13 @@ let cycle_thinking (m : Model.t) =
             /model"
            state.model.name)
     else (
-      let index =
-        List.findi thinking_levels ~f:(fun _ l -> String.equal l state.thinking)
-        |> Option.value_map ~default:0 ~f:fst
-      in
-      let next =
-        List.nth_exn thinking_levels ((index + 1) % List.length thinking_levels)
-      in
+      let next = Thinking.next state.model ~current:state.thinking in
       let m = { m with state = Some { state with thinking = next } } in
       let m, cmds =
-        toast m ~replaces:[ "Thinking: " ] (sprintf "Thinking: %s" next)
+        toast
+          m
+          ~replaces:[ "Thinking: " ]
+          (sprintf "Thinking: %s" (Thinking.label next))
       in
       ( { m with pending = { m.pending with thinking = Some next } }
       , cmds @ [ rpc "set_thinking" [ "thinking", str next ] ~tag:Thinking_set ]
@@ -3763,9 +3777,10 @@ let default_set_notice
   | Thinking None ->
     sprintf
       "New sessions think at the built-in level, %s%s"
-      New_default.builtin_thinking
+      (Thinking.label New_default.builtin_thinking)
       next
-  | Thinking (Some level) -> sprintf "New sessions think at %s%s" level next
+  | Thinking (Some level) ->
+    sprintf "New sessions think at %s%s" (Thinking.label level) next
   | Mode mode -> sprintf "New sessions start in %s mode%s" (mode_name mode) next
   | Host None -> "New sessions start where your session is" ^ next
   | Host (Some id) ->
@@ -4267,10 +4282,8 @@ let set_number (m : Model.t) (key : Switched_off.Key.t) value =
       Worktree_folds.set_hours m.worktree_folds (Float.iround_nearest_exn value)
     in
     ( { m with worktree_folds }
-    , save_pref
-        m
-        Key.worktree_hours
-        (Worktree_folds.hours_pref worktree_folds) )
+    , save_pref m Key.worktree_hours (Worktree_folds.hours_pref worktree_folds)
+    )
   | Archive_days ->
     set_auto_archive m (Prigh_ui.Auto_archive_command.Action.Set value)
   | Compact_at -> set_compaction m (Set_at (Float.iround_nearest_exn value))
@@ -6428,16 +6441,7 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
   | "fallback", "off" -> set_fallback m []
   | "fallback", _ -> set_fallback m words
   | "thinking", "" -> open_thinking_picker m
-  | "thinking", level ->
-    if List.mem thinking_levels level ~equal:String.equal
-    then set_thinking m level
-    else
-      error
-        m
-        (sprintf
-           "Unknown thinking level “%s”: use %s."
-           level
-           (String.concat ~sep:", " thinking_levels))
+  | "thinking", level -> set_thinking m level
   | "change_default", _ -> m, [ rpc "change_default" [] ~tag:Default_saved ]
   | "theme", "" -> open_picker m (theme_picker m)
   | "theme", name -> theme_named m name

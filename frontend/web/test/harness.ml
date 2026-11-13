@@ -121,9 +121,9 @@ let state_json ?(fields = []) () =
     ; "git_branch", `String "main"
     ; ( "model"
       , Jsonaf.of_string
-          {|{"id":"claude-opus-5-5","provider":"anthropic","key":"anthropic/claude-opus-5-5","name":"Claude Opus 5.5","context_window":200000,"max_output":64000,"supports_thinking":true,"cost":{"input":5,"output":25,"cache_read":0.5}}|}
+          {|{"id":"claude-opus-5-5","provider":"anthropic","key":"anthropic/claude-opus-5-5","name":"Claude Opus 5.5","context_window":200000,"max_output":64000,"supports_thinking":true,"thinking_options":["default","low","medium","high","xhigh","max"],"thinking_default":"medium","cost":{"input":5,"output":25,"cache_read":0.5}}|}
       )
-    ; "thinking", `String "on"
+    ; "thinking", `String "default"
     ; "running", `False
     ; "message_count", `Number "0"
     ; "usage", Jsonaf.of_string {|{"input":0,"output":0,"cache_read":0}|}

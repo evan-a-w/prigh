@@ -151,7 +151,11 @@ let model (m : Model.t) =
     ; "name", str m.name
     ; "context_window", int m.context_window
     ; "max_output", int m.max_output
-    ; "supports_thinking", bool m.supports_thinking
+    ; "supports_thinking", bool (Model.supports_thinking m)
+    ; ( "thinking_options"
+      , `Array (List.map (Model.thinking_options m) ~f:thinking) )
+    ; ( "thinking_default"
+      , Option.value_map m.thinking_default ~default:`Null ~f:thinking )
     ; "supports_images", bool m.supports_images
     ; ( "image_limit"
       , let limit = Image_limit.for_model m in

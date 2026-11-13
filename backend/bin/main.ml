@@ -84,7 +84,10 @@ let common_params =
         "ID model id or provider/id (default: the session's, else the one \
          saved by /change_default, else the first logged-in provider's)"
   and thinking =
-    flag "-thinking" (optional string) ~doc:"LEVEL off|on|low|high|max"
+    flag
+      "-thinking"
+      (optional string)
+      ~doc:"LEVEL off|default|minimal|low|medium|high|xhigh|max (the model's)"
   and session =
     flag
       "-session"

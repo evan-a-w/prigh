@@ -95,12 +95,14 @@ let show_models t registry =
     if Provider_id.is_custom m.provider
     then
       printf
-        "%s  name=%s ctx=%d max=%d thinking=%b images=%b cost=%g/%g/%g\n"
+        "%s  name=%s ctx=%d max=%d thinking=%s images=%b cost=%g/%g/%g\n"
         (Model.key m)
         m.name
         m.context_window
         m.max_output
-        m.supports_thinking
+        (String.concat
+           ~sep:"|"
+           (List.map (Model.thinking_options m) ~f:Thinking.to_string))
         m.supports_images
         m.cost.input
         m.cost.output
@@ -222,17 +224,17 @@ let%expect_test "config: valid entries load, bad ones are reported and skipped" 
       (headers ((X-Team infra)))
       (models
        (((id gpt-4o) (name ()) (context_window (128000)) (max_output (4096))
-         (thinking (true)) (images (false))
+         (thinking (true)) (thinking_levels ()) (images (false))
          (cost (((input 2.5) (output 10) (cache_read 0)))))
         ((id typo) (name ()) (context_window ()) (max_output ()) (thinking ())
-         (images ()) (cost ())))))
+         (thinking_levels ()) (images ()) (cost ())))))
      ((name ollama) (base_url http://localhost:11434/v1) (api Chat) (headers ())
       (models ()))
      ((name gateway) (base_url https://gw.example.com/v1) (api Anthropic)
       (headers ()) (models ())))
     providers.aiproxy.models[1].context_window must be a positive integer (tokens); that entry is ignored (in $DIR/.prigh/config.json)
     providers.aiproxy.models[2] needs an "id" (the model id the server uses); that entry is ignored (in $DIR/.prigh/config.json)
-    providers.aiproxy.models[3]: unknown field "context" ignored (known: id, name, context_window, max_output, thinking, images, cost) (in $DIR/.prigh/config.json)
+    providers.aiproxy.models[3]: unknown field "context" ignored (known: id, name, context_window, max_output, thinking, thinking_levels, images, cost) (in $DIR/.prigh/config.json)
     providers.ollama: unknown field "extra" ignored (known: base_url, api, headers, models) (in $DIR/.prigh/config.json)
     providers.nourl needs a "base_url" such as "http://localhost:3000/v1" (in $DIR/.prigh/config.json); that provider is skipped
     providers.badapi.api must be one of: chat, responses, anthropic (in $DIR/.prigh/config.json); that provider is skipped
@@ -393,12 +395,12 @@ let%expect_test
   [%expect
     {|
     before fetching:
-    aiproxy/local-only  name=Local only ctx=128000 max=16384 thinking=true images=true cost=0/0/0
-    aiproxy/gpt-4o  name=gpt-4o ctx=64000 max=16384 thinking=false images=false cost=2.5/10/1.25
+    aiproxy/local-only  name=Local only ctx=128000 max=16384 thinking=off|default|low|medium|high images=true cost=0/0/0
+    aiproxy/gpt-4o  name=gpt-4o ctx=64000 max=16384 thinking=off images=false cost=2.5/10/1.25
     after:
-    aiproxy/local-only  name=Local only ctx=128000 max=16384 thinking=true images=true cost=0/0/0
-    aiproxy/gpt-4o  name=gpt-4o ctx=64000 max=16384 thinking=false images=false cost=2.5/10/1.25
-    aiproxy/meta-llama/llama-3.1-8b  name=meta-llama/llama-3.1-8b ctx=131072 max=16384 thinking=false images=true cost=0/0/0
+    aiproxy/local-only  name=Local only ctx=128000 max=16384 thinking=off|default|low|medium|high images=true cost=0/0/0
+    aiproxy/gpt-4o  name=gpt-4o ctx=64000 max=16384 thinking=off images=false cost=2.5/10/1.25
+    aiproxy/meta-llama/llama-3.1-8b  name=meta-llama/llama-3.1-8b ctx=131072 max=16384 thinking=off images=true cost=0/0/0
     problem: down: no model list: GET http://127.0.0.1:PORT/v1/models: HTTP 404: Not Found (the base URL usually ends in /v1). Check that the server is running and the base URL and key are right (/login down to change them); models named in config.json still work.
     |}];
   let show_find s =
@@ -706,8 +708,8 @@ let%expect_test
       }
     }
 
-    aiproxy/gpt-4o  name=gpt-4o ctx=128000 max=16384 thinking=false images=true cost=0/0/0
-    aiproxy/qwen3  name=qwen3 ctx=128000 max=16384 thinking=false images=true cost=0/0/0
+    aiproxy/gpt-4o  name=gpt-4o ctx=128000 max=16384 thinking=off images=true cost=0/0/0
+    aiproxy/qwen3  name=qwen3 ctx=128000 max=16384 thinking=off images=true cost=0/0/0
     |}]
 ;;
 
@@ -926,7 +928,7 @@ let%expect_test
         }
       }
     }
-    ollama/llama3  name=llama3 ctx=8192 max=8192 thinking=false images=true cost=0/0/0
+    ollama/llama3  name=llama3 ctx=8192 max=8192 thinking=off images=true cost=0/0/0
     |}];
   (* The server saw the extra header. *)
   print_s
@@ -1010,6 +1012,7 @@ let custom_model ?(thinking = true) ?(images = true) () : Model.t =
           ; context_window = None
           ; max_output = None
           ; thinking = Some thinking
+          ; thinking_levels = None
           ; images = Some images
           ; cost = None
           }
@@ -1208,7 +1211,7 @@ let%expect_test
     {"role":"tool","tool_call_id":"call_1","content":"[2 images attached in the next message]"}
     {"role":"tool","tool_call_id":"call_2","content":"[interrupted: prigh stopped before this tool call returned (e.g. the backend restarted), so whether it ran, and what it did, is unknown: check before relying on it]"}
     {"role":"user","content":[{"type":"text","text":"[2 images from the read result call_1]"},{"type":"image_url","image_url":{"url":"data:image/png;base64,SHOT"}},{"type":"image_url","image_url":{"url":"data:image/png;base64,SHOT"}}]}
-    ("\"medium\"")
+    ()
     |}]
 ;;
 
@@ -1565,10 +1568,10 @@ let%expect_test
     {|
     (aiproxy/gpt-4o aiproxy/openai/gpt-4o-mini)
     {"type":"event","event":"notice","text":"providers.broken needs a \"base_url\" such as \"http://localhost:3000/v1\" (in $DIR/.prigh/config.json); that provider is skipped"}
-    {"id":"gpt-4o","provider":"aiproxy","key":"aiproxy/gpt-4o","name":"gpt-4o","context_window":128000,"max_output":16384,"supports_thinking":false,"supports_images":true,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0,"output":0,"cache_read":0}}
-    {"id":"openai/gpt-4o-mini","provider":"aiproxy","key":"aiproxy/openai/gpt-4o-mini","name":"openai/gpt-4o-mini","context_window":128000,"max_output":16384,"supports_thinking":false,"supports_images":true,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0,"output":0,"cache_read":0}}
-    {"id":"gpt-4o","provider":"aiproxy","key":"aiproxy/gpt-4o","name":"gpt-4o","context_window":128000,"max_output":16384,"supports_thinking":false,"supports_images":true,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0,"output":0,"cache_read":0}}
-    {"id":"openai/gpt-4o-mini","provider":"aiproxy","key":"aiproxy/openai/gpt-4o-mini","name":"openai/gpt-4o-mini","context_window":128000,"max_output":16384,"supports_thinking":false,"supports_images":true,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0,"output":0,"cache_read":0}}
+    {"id":"gpt-4o","provider":"aiproxy","key":"aiproxy/gpt-4o","name":"gpt-4o","context_window":128000,"max_output":16384,"supports_thinking":false,"thinking_options":["off"],"thinking_default":null,"supports_images":true,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0,"output":0,"cache_read":0}}
+    {"id":"openai/gpt-4o-mini","provider":"aiproxy","key":"aiproxy/openai/gpt-4o-mini","name":"openai/gpt-4o-mini","context_window":128000,"max_output":16384,"supports_thinking":false,"thinking_options":["off"],"thinking_default":null,"supports_images":true,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0,"output":0,"cache_read":0}}
+    {"id":"gpt-4o","provider":"aiproxy","key":"aiproxy/gpt-4o","name":"gpt-4o","context_window":128000,"max_output":16384,"supports_thinking":false,"thinking_options":["off"],"thinking_default":null,"supports_images":true,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0,"output":0,"cache_read":0}}
+    {"id":"openai/gpt-4o-mini","provider":"aiproxy","key":"aiproxy/openai/gpt-4o-mini","name":"openai/gpt-4o-mini","context_window":128000,"max_output":16384,"supports_thinking":false,"thinking_options":["off"],"thinking_default":null,"supports_images":true,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0,"output":0,"cache_read":0}}
     |}];
   call ~params:{|{"model": "aiproxy/openai/gpt-4o-mini"}|} "set_model";
   call ~params:{|{"model": "aiproxy/gpt-5"}|} "set_model";
@@ -1582,7 +1585,7 @@ let%expect_test
   custom_entries (call_quiet "auth_status") ~f:Fn.id;
   [%expect
     {|
-    {"type":"event","event":"state","state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"openai/gpt-4o-mini","provider":"aiproxy","key":"aiproxy/openai/gpt-4o-mini","name":"openai/gpt-4o-mini","context_window":128000,"max_output":16384,"supports_thinking":false,"supports_images":true,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0,"output":0,"cache_read":0}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","active_host_name":"<host>","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"computer_control":null,"plan":null,"session_rules":[]}}
+    {"type":"event","event":"state","state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"openai/gpt-4o-mini","provider":"aiproxy","key":"aiproxy/openai/gpt-4o-mini","name":"openai/gpt-4o-mini","context_window":128000,"max_output":16384,"supports_thinking":false,"thinking_options":["off"],"thinking_default":null,"supports_images":true,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0,"output":0,"cache_read":0}},"thinking":"default","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","active_host_name":"<host>","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"computer_control":null,"plan":null,"session_rules":[]}}
     {"type":"response","id":"r1","ok":true,"result":{}}
     {"type":"response","id":"r1","ok":false,"error":"unknown model \"aiproxy/gpt-5\"; did you mean: aiproxy/gpt-4o (gpt-4o)"}
     ("\"aiproxy/openai/gpt-4o-mini\"")
