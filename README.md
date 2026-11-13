@@ -2530,8 +2530,23 @@ built-in computer-use tool),
 exceeds this many tokens, if that comes before 80% of the window) and
 `compaction_model` (the model that writes compaction summaries; default:
 the conversation's), all three set with `/compaction` (below).
-Without a `default_thinking`, sessions start with thinking `on`; models that
-cannot think ignore it. A fallback model keeps the session's thinking level.
+Thinking is `off`, `default` (the provider's default: thinking on, no effort
+sent, the provider decides; `on` is an alias, as older sessions and configs
+say) or an effort level: `minimal`, `low`, `medium`, `high`, `xhigh` or
+`max`. Each model takes only some of these (`prigh models`, the `/thinking`
+picker, the RPC's `thinking_options`): Anthropic's adaptive models their
+`output_config.effort` levels (xhigh on Opus 4.7 and later, max on the 4.6
+generation and later; Claude 5 models cannot turn thinking off), older
+Claude models a `budget_tokens` per level, OpenAI's models their
+`reasoning.effort` values (`none` is `off`), DeepSeek low, high and max. An
+explicit `/thinking` level the model lacks is refused with its options;
+switching to a model without the session's level moves to its nearest one
+(the lower on a tie) and says so. A custom provider's model declares its
+levels with `"thinking_levels": ["low", "medium", "high"]` (with `"thinking":
+true` and none listed: low to high, low to max for an Anthropic API).
+Without a `default_thinking`, sessions start with the provider's default;
+models that cannot think ignore it. A fallback model keeps the session's
+thinking level, clamped to its own.
 
 `fallback_models` is a chain of models that take over from each other
 (`/fallback MODEL...` sets it; names, ids and prefixes work as for
@@ -2790,7 +2805,7 @@ it.
 | `/login [provider\|custom] [api_key\|oauth]`, `/logout [provider]`, `/auth` | credentials; `/login custom` adds an OpenAI-compatible endpoint |
 | `/login github [HOST] [token]`, `/login forgejo HOST [token]`, `/login HOST [token]`, `/logout HOST` | sign in to or out of a git host (see [Git hosting](#git-hosting)) |
 | `/pr [list [open\|closed\|all]\|view N\|new [--generate] [title]\|checkout N]` | pull requests of the session's repository: pick one (Enter shows it), show one (also `/pr N`), create one from the current branch (`--generate`: the model drafts its title and body), or check one out in a git worktree |
-| `/thinking [off\|on\|low\|high\|max]` | set the thinking level |
+| `/thinking [off\|default\|LEVEL]` | pick or set the thinking level among the model's (`default`, alias `on`: the provider's default) |
 | `/verbosity [quiet\|normal\|verbose]` | set the transcript verbosity |
 | `/filter [all\|KIND...\|-KIND\|+KIND]` | show only some kinds in the transcript (`user`, `assistant`, `thinking`, `tools`, `subagents`, `notes`); bare: a checklist |
 | `/theme [original\|dark\|light]`, `/accent [name\|#rrggbb]` (prigh-web) | pick or set the theme and the accent colour, for you in every browser |

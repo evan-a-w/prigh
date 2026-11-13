@@ -165,6 +165,7 @@ const pick = async (chip, option, how) => {
   if (how === "mouse") {
     await button.click();
     await page.locator("#chip-popover").waitFor();
+    if (chip === "thinking") await shoot("desktop-thinking-menu");
     await page.locator("#chip-popover .popover-item").filter({ hasText: new RegExp(`^\\s*${option}`, "i") }).first().click();
   } else {
     await button.focus();
@@ -294,7 +295,7 @@ const phone = async (w, h, { pwa = false } = {}) => {
     await more();
     const again = await sec.locator(".session-choice.on").innerText().catch(() => "none");
     say(`${name}: ${now}; reopened: ${again}`);
-    if (name === "Mode") await shoot(`${tag}-sheet`);
+    if (name === "Thinking" || name === "Mode") await shoot(`${tag}-sheet-${name.toLowerCase()}`);
     await closeSheet();
   }
 
