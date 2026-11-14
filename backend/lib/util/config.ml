@@ -50,6 +50,7 @@ type t =
   ; compact_at_tokens : int
   ; compaction_model : string option
   ; naming_model : string option
+  ; approval_model : string option
   ; dictation_model : string option
   ; trace : Trace.Level.t
   }
@@ -83,6 +84,7 @@ let default =
   ; compact_at_tokens = 200_000
   ; compaction_model = None
   ; naming_model = None
+  ; approval_model = None
   ; dictation_model = None
   ; trace = Default
   }
@@ -153,6 +155,7 @@ let to_json t =
     ; "compact_at_tokens", `Number (Int.to_string t.compact_at_tokens)
     ; "compaction_model", option (fun s -> `String s) t.compaction_model
     ; "naming_model", option (fun s -> `String s) t.naming_model
+    ; "approval_model", option (fun s -> `String s) t.approval_model
     ; "dictation_model", option (fun s -> `String s) t.dictation_model
     ; "trace", `String (Trace.Level.to_string t.trace)
     ]
@@ -292,6 +295,15 @@ let of_json json =
         Or_error.error_string
           "config.naming_model must be a model's name (or null: \
            generate_model, else the session's model)"
+    in
+    let%bind approval_model =
+      match find "approval_model" with
+      | None | Some `Null | Some (`String "") -> Ok None
+      | Some (`String s) -> Ok (Some s)
+      | Some _ ->
+        Or_error.error_string
+          "config.approval_model must be a model's name (or null: the \
+           session's model)"
     in
     let%bind dictation_model =
       match find "dictation_model" with
@@ -454,6 +466,7 @@ let of_json json =
     ; compact_at_tokens
     ; compaction_model
     ; naming_model
+    ; approval_model
     ; dictation_model
     ; trace
     }

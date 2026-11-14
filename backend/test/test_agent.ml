@@ -558,7 +558,7 @@ let%expect_test "save_as_default applies to new agents, not saved sessions" =
      (mask_observations true) (computer_screenshots 3)
      (computer_screenshots_max 8) (computer_native true)
      (compact_at_tokens 200000) (compaction_model ()) (naming_model ())
-     (dictation_model ()) (trace Default))
+     (approval_model ()) (dictation_model ()) (trace Default))
     {
       "scoped_models": [
         "a"
@@ -586,6 +586,7 @@ let%expect_test "save_as_default applies to new agents, not saved sessions" =
       "compact_at_tokens": 200000,
       "compaction_model": null,
       "naming_model": null,
+      "approval_model": null,
       "dictation_model": null,
       "trace": "default"
     }

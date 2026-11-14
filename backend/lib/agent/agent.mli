@@ -115,6 +115,10 @@ module Session_stats : sig
     ; compactions : int
     ; masks : int (** observation maskings ({!Observation_mask}) *)
     ; duration_seconds : float
+    ; approvals_judged : int
+      (** tool calls the approval model judged ([smart] mode, {!Approval_judge}) *)
+    ; approvals_cost_usd : float
+      (** what judging them cost; in [cost_usd] too *)
     }
   [@@deriving sexp_of]
 end
@@ -829,6 +833,10 @@ val generate_model : t -> Model.t Or_error.t
 (** The model that names the session and its subagents: the config's
     [naming_model], else {!generate_model}. *)
 val naming_model : t -> Model.t Or_error.t
+
+(** The model that judges tool calls in the [smart] approval mode
+    ({!Approval_judge}): the config's [approval_model], else the session's. *)
+val approval_model : t -> Model.t Or_error.t
 
 (** A name for a subagent the model gave none ({!Subagent_name.ask}), by
     {!naming_model} (the session's model when it is unknown or fails, with a

@@ -3548,9 +3548,10 @@ High
 Xhigh
 Max
 Mode
-What asks before it runs: everything (Ask), all but file edits (Auto-edit) or nothing (Auto).
+What asks before it runs: everything (Ask), all but file edits (Auto-edit), what the approval model leaves to you (Smart) or nothing (Auto).
 Ask
 Auto-edit
+Smart
 Auto
 Tool host
 New sessions you start here run their tools where the session you are on does.
@@ -3586,9 +3587,10 @@ High
 Xhigh
 Max
 Mode
-What asks before it runs: everything (Ask), all but file edits (Auto-edit) or nothing (Auto).
+What asks before it runs: everything (Ask), all but file edits (Auto-edit), what the approval model leaves to you (Smart) or nothing (Auto).
 Ask
 Auto-edit
+Smart
 Auto
 Tool host
 New sessions you start here run their tools on laptop, while it is connected.
@@ -3626,9 +3628,10 @@ High
 Xhigh
 Max
 Mode
-What asks before it runs: everything (Ask), all but file edits (Auto-edit) or nothing (Auto).
+What asks before it runs: everything (Ask), all but file edits (Auto-edit), what the approval model leaves to you (Smart) or nothing (Auto).
 Ask
 Auto-edit
+Smart
 Auto
 Tool host
 New sessions you start here run their tools on laptop, while it is connected.
@@ -3694,9 +3697,10 @@ High
 Xhigh
 Max
 Mode
-What asks before it runs: everything (Ask), all but file edits (Auto-edit) or nothing (Auto).
+What asks before it runs: everything (Ask), all but file edits (Auto-edit), what the approval model leaves to you (Smart) or nothing (Auto).
 Ask
 Auto-edit
+Smart
 Auto
 Tool host
 New sessions you start here run their tools where the session you are on does.
@@ -4348,6 +4352,78 @@ the model was told: true
 banner: 0
 === chromium: computer (small): errors ===
 none
+=== chromium: smart (desktop): the mode chip's menu ===
+Asks: edits & commands bash, job_input, edits and MCP tools ask first
+Asks: commands file edits run; bash, job_input and MCP tools ask first
+Smart: a model decides edits in the project run; the approval model lets other calls run or asks you, saying why (/approval-model)
+Auto: never asks tools run without asking
+Plan mode read-only planning, until you leave it (/plan off or Alt+M): no file edits; bash, job_input and MCP tools ask first
+Chat: no tool host a chat without the tool host: no files, commands or project, only the web and other host-free tools, until you leave it (/chat off or Alt+M)
+=== chromium: smart (desktop): the mode chip ===
+smart: Edits in the project run; the approval model lets other calls run or asks you, saying why (/approval-model) (Alt+M cycles, /mode picks)
+=== chromium: smart (desktop): left to the user ===
+Confirm (smart) Run bash: rm -rf ~/.cache/demo? deepseek/deepseek-flash left this to you: deletes files outside the project y Allow once a Always allow bash(rm:*) this session n Deny r Deny, saying why
+allow: in view, tall enough
+deny: in view, tall enough
+fits the width
+=== chromium: smart (desktop): allowed by the approval model ===
+judged cards: 1
+head: bash echo tests passed judged
+chip's title: allowed by deepseek/deepseek-flash: runs the project's tests, which the user asked for
+note: allowed by deepseek/deepseek-flash: runs the project's tests, which the user asked for
+fits the width
+=== chromium: smart (desktop): Settings → Models → Approvals ===
+Approvals In smart mode, lets a tool call run or asks you, saying why. Default: the session's model. Default
+choice: in view, tall enough
+fits the width
+Approval model; first: Default the session's model
+chosen: Claude Haiku
+=== chromium: smart (desktop): errors ===
+none
+=== chromium: smart (phone): the ⋯ sheet ===
+shows smart: true
+fits the width
+=== chromium: smart (phone): left to the user ===
+Confirm (smart) Run bash: rm -rf ~/.cache/demo? deepseek/deepseek-flash left this to you: deletes files outside the project y Allow once a Always allow bash(rm:*) this session n Deny r Deny, saying why
+allow: in view, tall enough
+deny: in view, tall enough
+fits the width
+=== chromium: smart (phone): allowed by the approval model ===
+judged cards: 1
+head: bash echo tests passed judged
+chip's title: allowed by deepseek/deepseek-flash: runs the project's tests, which the user asked for
+note: allowed by deepseek/deepseek-flash: runs the project's tests, which the user asked for
+fits the width
+=== chromium: smart (phone): Settings → Models → Approvals ===
+Approvals In smart mode, lets a tool call run or asks you, saying why. Default: the session's model. Default
+choice: in view, tall enough
+fits the width
+Approval model; first: Default the session's model
+chosen: Claude Haiku
+=== chromium: smart (phone): errors ===
+none
+=== chromium: smart (small): the ⋯ sheet ===
+shows smart: true
+fits the width
+=== chromium: smart (small): left to the user ===
+Confirm (smart) Run bash: rm -rf ~/.cache/demo? deepseek/deepseek-flash left this to you: deletes files outside the project y Allow once a Always allow bash(rm:*) this session n Deny r Deny, saying why
+allow: in view, tall enough
+deny: in view, tall enough
+fits the width
+=== chromium: smart (small): allowed by the approval model ===
+judged cards: 1
+head: bash echo tests passed judged
+chip's title: allowed by deepseek/deepseek-flash: runs the project's tests, which the user asked for
+note: allowed by deepseek/deepseek-flash: runs the project's tests, which the user asked for
+fits the width
+=== chromium: smart (small): Settings → Models → Approvals ===
+Approvals In smart mode, lets a tool call run or asks you, saying why. Default: the session's model. Default
+choice: in view, tall enough
+fits the width
+Approval model; first: Default the session's model
+chosen: Claude Haiku
+=== chromium: smart (small): errors ===
+none
 === chromium: ui: drawn ===
 charts 8: line 1, area 1, bar 1, stacked 1, horizontal 1, pie 1, donut 1, scatter 1
 stats 3, tables 1, progress 1, callouts 1
@@ -4409,6 +4485,8 @@ Asks: edits & commands
 bash, job_input, edits and MCP tools ask first
 Asks: commands
 file edits run; bash, job_input and MCP tools ask first
+Smart: a model decides
+edits in the project run; the approval model lets other calls run or asks you, saying why (/approval-model)
 Auto: never asks
 tools run without asking
 Plan mode
@@ -4439,7 +4517,7 @@ placeholder: Chat: no files or commands…
 strip: (none)
 audit: ok
 === chromium: chat: phone 390x844: the ⋯ sheet's mode ===
-Mode ask auto-edit auto plan [chat]
+Mode ask auto-edit smart auto plan [chat]
 audit: ok
 === chromium: chat: phone 390x844: mode ask, no tool host ===
 mode chip: (in the ⋯ sheet)
@@ -4455,7 +4533,7 @@ placeholder: Chat: no files or commands…
 strip: (none)
 audit: ok
 === chromium: chat: phone 320x640: the ⋯ sheet's mode ===
-Mode ask auto-edit auto plan [chat]
+Mode ask auto-edit smart auto plan [chat]
 audit: ok
 === chromium: chat: phone 320x640: mode ask, no tool host ===
 mode chip: (in the ⋯ sheet)
@@ -4471,7 +4549,7 @@ placeholder: Chat: no files or commands…
 strip: (none)
 audit: ok
 === chromium: chat: phone 390x844-pwa: the ⋯ sheet's mode ===
-Mode ask auto-edit auto plan [chat]
+Mode ask auto-edit smart auto plan [chat]
 audit: ok
 === chromium: chat: phone 390x844-pwa: mode ask, no tool host ===
 mode chip: (in the ⋯ sheet)

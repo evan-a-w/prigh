@@ -35,7 +35,7 @@ let%expect_test
   [%expect
     {|
     > request 1 session/new {"cwd":"$DIR","mcpServers":[]}
-    < result 1 {"sessionId":"<id>","modes":{"currentModeId":"auto","availableModes":[{"id":"ask","name":"Ask","description":"ask before every tool that changes something"},{"id":"auto-edit","name":"Auto-edit","description":"edit files without asking; ask before commands"},{"id":"auto","name":"Auto","description":"run every tool without asking"},{"id":"plan","name":"Plan","description":"investigate and plan, changing no files, until you switch to another mode"},{"id":"chat","name":"Chat","description":"talk without the tool host: no files, commands or project, only the web and other host-free tools"}]},"configOptions":[{"id":"mode","name":"Mode","category":"mode","type":"select","currentValue":"auto","options":[{"value":"ask","name":"Ask","description":"ask before every tool that changes something"},{"value":"auto-edit","name":"Auto-edit","description":"edit files without asking; ask before commands"},{"value":"auto","name":"Auto","description":"run every tool without asking"},{"value":"plan","name":"Plan","description":"investigate and plan, changing no files, until you switch to another mode"},{"value":"chat","name":"Chat","description":"talk without the tool host: no files, commands or project, only the web and other host-free tools"}]},{"id":"model","name":"Model","category":"model","type":"select","currentValue":"deepseek/deepseek-flash","options":[{"value":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","description":"deepseek/deepseek-flash"}]},{"id":"thinking","name":"Thinking","category":"thought_level","type":"select","currentValue":"default","options":[{"value":"off","name":"off"},{"value":"default","name":"provider's default"},{"value":"low","name":"low"},{"value":"high","name":"high"},{"value":"max","name":"max"}]}]}
+    < result 1 {"sessionId":"<id>","modes":{"currentModeId":"auto","availableModes":[{"id":"ask","name":"Ask","description":"ask before every tool that changes something"},{"id":"auto-edit","name":"Auto-edit","description":"edit files without asking; ask before commands"},{"id":"auto","name":"Auto","description":"run every tool without asking"},{"id":"smart","name":"Smart","description":"a model runs what is safe and routine, and asks you about the rest"},{"id":"plan","name":"Plan","description":"investigate and plan, changing no files, until you switch to another mode"},{"id":"chat","name":"Chat","description":"talk without the tool host: no files, commands or project, only the web and other host-free tools"}]},"configOptions":[{"id":"mode","name":"Mode","category":"mode","type":"select","currentValue":"auto","options":[{"value":"ask","name":"Ask","description":"ask before every tool that changes something"},{"value":"auto-edit","name":"Auto-edit","description":"edit files without asking; ask before commands"},{"value":"auto","name":"Auto","description":"run every tool without asking"},{"value":"smart","name":"Smart","description":"a model runs what is safe and routine, and asks you about the rest"},{"value":"plan","name":"Plan","description":"investigate and plan, changing no files, until you switch to another mode"},{"value":"chat","name":"Chat","description":"talk without the tool host: no files, commands or project, only the web and other host-free tools"}]},{"id":"model","name":"Model","category":"model","type":"select","currentValue":"deepseek/deepseek-flash","options":[{"value":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","description":"deepseek/deepseek-flash"}]},{"id":"thinking","name":"Thinking","category":"thought_level","type":"select","currentValue":"default","options":[{"value":"off","name":"off"},{"value":"default","name":"provider's default"},{"value":"low","name":"low"},{"value":"high","name":"high"},{"value":"max","name":"max"}]}]}
     < update available_commands_update {"availableCommands":[{"name":"compact","description":"summarise older messages to free context","input":{"hint":"[instructions]"}},{"name":"goal","description":"set a goal the agent keeps working toward until it is met; show, clear or resume it","input":{"hint":"[text|off|resume]"}},{"name":"remind","description":"remind the agent when it ends its turn (stop) or every N turns; list or remove reminders","input":{"hint":"[stop [N] TEXT | every N TEXT | rm NAME | off]"}},{"name":"budget","description":"show or set the session's cost budget: no turn starts once it is spent","input":{"hint":"[dollars|off]"}},{"name":"model","description":"show or set the model (id, name or prefix)","input":{"hint":"[model]"}},{"name":"thinking","description":"show or set the thinking level (the model's: default is the provider's)","input":{"hint":"[off|default|low|medium|high|xhigh|max]"}},{"name":"plan","description":"toggle plan mode: the model investigates and plans, changing no files","input":{"hint":"[on|off]"}},{"name":"chat","description":"toggle chat mode: talk without the tool host (no files or commands)","input":{"hint":"[on|off]"}},{"name":"review","description":"review the uncommitted changes, or those against a base branch","input":{"hint":"[base] [instructions]"}},{"name":"init","description":"write or improve the project's AGENTS.md"},{"name":"btw","description":"ask a side question without adding it to the session","input":{"hint":"question"}},{"name":"name","description":"set the session name","input":{"hint":"text"}},{"name":"diff","description":"show the uncommitted changes (git diff)","input":{"hint":"[path]"}}]}
     < _prigh/state {"sessionId":"<id>","model":"deepseek/deepseek-flash","thinking":"default","running":false,"context_tokens":0,"context_window":1000000,"cost_usd":0,"budget_usd":null,"approval_mode":"auto","plan_mode":false,"chat_mode":false,"queued":{"steer":0,"follow_up":0},"subagents":[],"jobs":0,"goal":null,"reminders":0,"active_host":"testhost"}
     |}]
@@ -52,7 +52,7 @@ let%expect_test "without _meta.prigh.state there is no _prigh/state" =
     > request 0 initialize {"protocolVersion":1,"clientCapabilities":{},"clientInfo":{"name":"test-editor","version":"1"}}
     < result 0 {"protocolVersion":1,"agentCapabilities":{"loadSession":true,"promptCapabilities":{"image":true,"audio":false,"embeddedContext":true},"mcpCapabilities":{"http":false,"sse":false},"sessionCapabilities":{"list":{},"resume":{},"close":{}},"_meta":{"prigh":{"version":1,"extensions":["_prigh/state","_prigh/notice"]}}},"authMethods":[{"id":"prigh-login","name":"prigh login","description":"Log in to a model provider: run `prigh login` in a terminal (or /login in the prigh TUI), then try again"}],"agentInfo":{"name":"prigh","title":"prigh","version":"<version>"},"_meta":{"prigh":{"version":1,"extensions":["_prigh/state","_prigh/notice"]}}}
     > request 1 session/new {"cwd":"$DIR","mcpServers":[]}
-    < result 1 {"sessionId":"<id>","modes":"auto[ask|auto-edit|auto|plan|chat]","configOptions":"mode=auto[ask|auto-edit|auto|plan|chat] model=deepseek/deepseek-flash[deepseek/deepseek-flash] thinking=default[off|default|low|high|max]"}
+    < result 1 {"sessionId":"<id>","modes":"auto[ask|auto-edit|auto|smart|plan|chat]","configOptions":"mode=auto[ask|auto-edit|auto|smart|plan|chat] model=deepseek/deepseek-flash[deepseek/deepseek-flash] thinking=default[off|default|low|high|max]"}
     < update available_commands_update {"availableCommands":"compact goal remind budget model thinking plan chat review init btw name diff"}
     |}]
 ;;
@@ -130,7 +130,7 @@ let%expect_test "permissions: allow, always, reject, and cancelled denies" =
     > request 2 session/set_mode {"sessionId":"<id>","modeId":"ask"}
     < result 2 {}
     < update current_mode_update {"currentModeId":"ask"}
-    < update config_option_update {"configOptions":"mode=ask[ask|auto-edit|auto|plan|chat] model=deepseek/deepseek-flash[deepseek/deepseek-flash] thinking=default[off|default|low|high|max]"}
+    < update config_option_update {"configOptions":"mode=ask[ask|auto-edit|auto|smart|plan|chat] model=deepseek/deepseek-flash[deepseek/deepseek-flash] thinking=default[off|default|low|high|max]"}
     < _prigh/state {"sessionId":"<id>","model":"deepseek/deepseek-flash","thinking":"default","running":false,"context_tokens":0,"context_window":1000000,"cost_usd":0,"budget_usd":null,"approval_mode":"ask","plan_mode":false,"chat_mode":false,"queued":{"steer":0,"follow_up":0},"subagents":[],"jobs":0,"goal":null,"reminders":0,"active_host":"testhost"}
     |}];
   let pick option_id ~method_ ~params:_ =
@@ -260,7 +260,7 @@ let%expect_test "session/cancel mid-turn: the pending permission is withdrawn" =
     > request 2 session/set_mode {"sessionId":"<id>","modeId":"ask"}
     < result 2 {}
     < update current_mode_update {"currentModeId":"ask"}
-    < update config_option_update {"configOptions":"mode=ask[ask|auto-edit|auto|plan|chat] model=deepseek/deepseek-flash[deepseek/deepseek-flash] thinking=default[off|default|low|high|max]"}
+    < update config_option_update {"configOptions":"mode=ask[ask|auto-edit|auto|smart|plan|chat] model=deepseek/deepseek-flash[deepseek/deepseek-flash] thinking=default[off|default|low|high|max]"}
     < _prigh/state {"sessionId":"<id>","model":"deepseek/deepseek-flash","thinking":"default","running":false,"context_tokens":0,"context_window":1000000,"cost_usd":0,"budget_usd":null,"approval_mode":"ask","plan_mode":false,"chat_mode":false,"queued":{"steer":0,"follow_up":0},"subagents":[],"jobs":0,"goal":null,"reminders":0,"active_host":"testhost"}
     |}];
   ignore (H.prompt ~wait:false h "write it" : Jsonaf.t);
@@ -374,7 +374,7 @@ let%expect_test "session/load replays the history; session/list lists it" =
     < update tool_call {"toolCallId":"c1","title":"Write b.txt","kind":"edit","status":"in_progress","rawInput":{"path":"b.txt","content":"new\n"},"locations":[{"path":"$DIR/b.txt"}]}
     < update tool_call_update {"toolCallId":"c1","status":"completed","content":[{"type":"diff","path":"$DIR/b.txt","oldText":null,"newText":"new\n"}]}
     < update agent_message_chunk {"content":{"type":"text","text":"Wrote b.txt."}}
-    < result 6 {"modes":"auto[ask|auto-edit|auto|plan|chat]","configOptions":"mode=auto[ask|auto-edit|auto|plan|chat] model=deepseek/deepseek-flash[deepseek/deepseek-flash] thinking=default[off|default|low|high|max]"}
+    < result 6 {"modes":"auto[ask|auto-edit|auto|smart|plan|chat]","configOptions":"mode=auto[ask|auto-edit|auto|smart|plan|chat] model=deepseek/deepseek-flash[deepseek/deepseek-flash] thinking=default[off|default|low|high|max]"}
     < update available_commands_update {"availableCommands":"compact goal remind budget model thinking plan chat review init btw name diff"}
     < _prigh/state {"sessionId":"<id>","model":"deepseek/deepseek-flash","thinking":"default","running":false,"context_tokens":0,"context_window":1000000,"cost_usd":0,"budget_usd":null,"approval_mode":"auto","plan_mode":false,"chat_mode":false,"queued":{"steer":0,"follow_up":0},"subagents":[],"jobs":0,"goal":null,"reminders":0,"active_host":"testhost"}
     |}];
@@ -388,7 +388,7 @@ let%expect_test "session/load replays the history; session/list lists it" =
   [%expect
     {|
     > request 7 session/resume {"sessionId":"<id>","cwd":"$DIR"}
-    < result 7 {"modes":"auto[ask|auto-edit|auto|plan|chat]","configOptions":"mode=auto[ask|auto-edit|auto|plan|chat] model=deepseek/deepseek-flash[deepseek/deepseek-flash] thinking=default[off|default|low|high|max]"}
+    < result 7 {"modes":"auto[ask|auto-edit|auto|smart|plan|chat]","configOptions":"mode=auto[ask|auto-edit|auto|smart|plan|chat] model=deepseek/deepseek-flash[deepseek/deepseek-flash] thinking=default[off|default|low|high|max]"}
     < update available_commands_update {"availableCommands":"compact goal remind budget model thinking plan chat review init btw name diff"}
     < _prigh/state {"sessionId":"<id>","model":"deepseek/deepseek-flash","thinking":"default","running":false,"context_tokens":0,"context_window":1000000,"cost_usd":0,"budget_usd":null,"approval_mode":"auto","plan_mode":false,"chat_mode":false,"queued":{"steer":0,"follow_up":0},"subagents":[],"jobs":0,"goal":null,"reminders":0,"active_host":"testhost"}
     |}]
@@ -426,7 +426,7 @@ let%expect_test "modes and config options" =
     > request 2 session/set_mode {"sessionId":"<id>","modeId":"auto-edit"}
     < result 2 {}
     < update current_mode_update {"currentModeId":"auto-edit"}
-    < update config_option_update {"configOptions":"mode=auto-edit[ask|auto-edit|auto|plan|chat] model=deepseek/deepseek-flash[deepseek/deepseek-flash] thinking=default[off|default|low|high|max]"}
+    < update config_option_update {"configOptions":"mode=auto-edit[ask|auto-edit|auto|smart|plan|chat] model=deepseek/deepseek-flash[deepseek/deepseek-flash] thinking=default[off|default|low|high|max]"}
     < _prigh/state {"sessionId":"<id>","model":"deepseek/deepseek-flash","thinking":"default","running":false,"context_tokens":0,"context_window":1000000,"cost_usd":0,"budget_usd":null,"approval_mode":"auto-edit","plan_mode":false,"chat_mode":false,"queued":{"steer":0,"follow_up":0},"subagents":[],"jobs":0,"goal":null,"reminders":0,"active_host":"testhost"}
     |}];
   set_mode "plan";
@@ -435,7 +435,7 @@ let%expect_test "modes and config options" =
     > request 3 session/set_mode {"sessionId":"<id>","modeId":"plan"}
     < result 3 {}
     < update current_mode_update {"currentModeId":"plan"}
-    < update config_option_update {"configOptions":"mode=plan[ask|auto-edit|auto|plan|chat] model=deepseek/deepseek-flash[deepseek/deepseek-flash] thinking=default[off|default|low|high|max]"}
+    < update config_option_update {"configOptions":"mode=plan[ask|auto-edit|auto|smart|plan|chat] model=deepseek/deepseek-flash[deepseek/deepseek-flash] thinking=default[off|default|low|high|max]"}
     < _prigh/state {"sessionId":"<id>","model":"deepseek/deepseek-flash","thinking":"default","running":false,"context_tokens":0,"context_window":1000000,"cost_usd":0,"budget_usd":null,"approval_mode":"auto-edit","plan_mode":true,"chat_mode":false,"queued":{"steer":0,"follow_up":0},"subagents":[],"jobs":0,"goal":null,"reminders":0,"active_host":"testhost"}
     |}];
   set_mode "chat";
@@ -444,7 +444,7 @@ let%expect_test "modes and config options" =
     > request 4 session/set_mode {"sessionId":"<id>","modeId":"chat"}
     < result 4 {}
     < update current_mode_update {"currentModeId":"chat"}
-    < update config_option_update {"configOptions":"mode=chat[ask|auto-edit|auto|plan|chat] model=deepseek/deepseek-flash[deepseek/deepseek-flash] thinking=default[off|default|low|high|max]"}
+    < update config_option_update {"configOptions":"mode=chat[ask|auto-edit|auto|smart|plan|chat] model=deepseek/deepseek-flash[deepseek/deepseek-flash] thinking=default[off|default|low|high|max]"}
     < _prigh/state {"sessionId":"<id>","model":"deepseek/deepseek-flash","thinking":"default","running":false,"context_tokens":0,"context_window":1000000,"cost_usd":0,"budget_usd":null,"approval_mode":"auto-edit","plan_mode":true,"chat_mode":true,"queued":{"steer":0,"follow_up":0},"subagents":[],"jobs":0,"goal":null,"reminders":0,"active_host":"testhost"}
     |}];
   set_mode "plan";
@@ -453,34 +453,34 @@ let%expect_test "modes and config options" =
     > request 5 session/set_mode {"sessionId":"<id>","modeId":"plan"}
     < result 5 {}
     < update current_mode_update {"currentModeId":"plan"}
-    < update config_option_update {"configOptions":"mode=plan[ask|auto-edit|auto|plan|chat] model=deepseek/deepseek-flash[deepseek/deepseek-flash] thinking=default[off|default|low|high|max]"}
+    < update config_option_update {"configOptions":"mode=plan[ask|auto-edit|auto|smart|plan|chat] model=deepseek/deepseek-flash[deepseek/deepseek-flash] thinking=default[off|default|low|high|max]"}
     < _prigh/state {"sessionId":"<id>","model":"deepseek/deepseek-flash","thinking":"default","running":false,"context_tokens":0,"context_window":1000000,"cost_usd":0,"budget_usd":null,"approval_mode":"auto-edit","plan_mode":true,"chat_mode":false,"queued":{"steer":0,"follow_up":0},"subagents":[],"jobs":0,"goal":null,"reminders":0,"active_host":"testhost"}
     |}];
   set_mode "yolo";
   [%expect
     {|
     > request 6 session/set_mode {"sessionId":"<id>","modeId":"yolo"}
-    < error 6 {"code":-32602,"message":"unknown mode \"yolo\": the modes are ask, auto-edit, auto, plan, chat"}
+    < error 6 {"code":-32602,"message":"unknown mode \"yolo\": the modes are ask, auto-edit, auto, smart, plan, chat"}
     |}];
   set_option "thinking" "high";
   [%expect
     {|
     > request 7 session/set_config_option {"sessionId":"<id>","configId":"thinking","value":"high"}
-    < result 7 {"configOptions":"mode=plan[ask|auto-edit|auto|plan|chat] model=deepseek/deepseek-flash[deepseek/deepseek-flash] thinking=high[off|default|low|high|max]"}
+    < result 7 {"configOptions":"mode=plan[ask|auto-edit|auto|smart|plan|chat] model=deepseek/deepseek-flash[deepseek/deepseek-flash] thinking=high[off|default|low|high|max]"}
     < _prigh/state {"sessionId":"<id>","model":"deepseek/deepseek-flash","thinking":"high","running":false,"context_tokens":0,"context_window":1000000,"cost_usd":0,"budget_usd":null,"approval_mode":"auto-edit","plan_mode":true,"chat_mode":false,"queued":{"steer":0,"follow_up":0},"subagents":[],"jobs":0,"goal":null,"reminders":0,"active_host":"testhost"}
     |}];
   set_option "model" "claude-sonnet-4-5";
   [%expect
     {|
     > request 8 session/set_config_option {"sessionId":"<id>","configId":"model","value":"claude-sonnet-4-5"}
-    < result 8 {"configOptions":"mode=plan[ask|auto-edit|auto|plan|chat] model=anthropic/claude-sonnet-4-5[anthropic/claude-sonnet-4-5] thinking=high[off|default|low|medium|high|xhigh|max]"}
+    < result 8 {"configOptions":"mode=plan[ask|auto-edit|auto|smart|plan|chat] model=anthropic/claude-sonnet-4-5[anthropic/claude-sonnet-4-5] thinking=high[off|default|low|medium|high|xhigh|max]"}
     < _prigh/state {"sessionId":"<id>","model":"anthropic/claude-sonnet-4-5","thinking":"high","running":false,"context_tokens":0,"context_window":1000000,"cost_usd":0,"budget_usd":null,"approval_mode":"auto-edit","plan_mode":true,"chat_mode":false,"queued":{"steer":0,"follow_up":0},"subagents":[],"jobs":0,"goal":null,"reminders":0,"active_host":"testhost"}
     |}];
   set_option "mode" "ask";
   [%expect
     {|
     > request 9 session/set_config_option {"sessionId":"<id>","configId":"mode","value":"ask"}
-    < result 9 {"configOptions":"mode=ask[ask|auto-edit|auto|plan|chat] model=anthropic/claude-sonnet-4-5[anthropic/claude-sonnet-4-5] thinking=high[off|default|low|medium|high|xhigh|max]"}
+    < result 9 {"configOptions":"mode=ask[ask|auto-edit|auto|smart|plan|chat] model=anthropic/claude-sonnet-4-5[anthropic/claude-sonnet-4-5] thinking=high[off|default|low|medium|high|xhigh|max]"}
     < update current_mode_update {"currentModeId":"ask"}
     < _prigh/state {"sessionId":"<id>","model":"anthropic/claude-sonnet-4-5","thinking":"high","running":false,"context_tokens":0,"context_window":1000000,"cost_usd":0,"budget_usd":null,"approval_mode":"ask","plan_mode":false,"chat_mode":false,"queued":{"steer":0,"follow_up":0},"subagents":[],"jobs":0,"goal":null,"reminders":0,"active_host":"testhost"}
     |}];

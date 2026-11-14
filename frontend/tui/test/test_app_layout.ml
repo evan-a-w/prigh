@@ -84,7 +84,7 @@ let%expect_test "no shift: opening the command autocomplete" =
       /fallback [off|model...]      show or set the models that take over…
       /default-dir [off|path]       show or set the directory new session…
       /default-host [off|name]      show or set the tool host prigh-web's…
-      ↕ 1–8 of 82
+      ↕ 1–8 of 83
     ──────────────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  ctx:0.1%/1.0M  Tab/Enter accept · Alt+S as typed
@@ -462,8 +462,8 @@ let%expect_test "/help is a scrollable box; typing closes it into the editor" =
       /memory [on|off]                     the notes the model saved when…
       /scoped-models                       pick the models Ctrl+P cycles …
       /generate-model [MODEL|off]          show which model drafts commit…
-      /trim [after|undo|show|hide]         drop everything before a messa…
-      ↕ 1–8 of 19
+      /approval-model [MODEL|off]          show which model judges tool c…
+      ↕ 1–8 of 20
     ──────────────────────────────────────────────────────────────────────
     > /m▏
     deepseek-flash  ctx:0.1%/1.0M  Tab/Enter accept · Alt+S as typed
@@ -589,7 +589,6 @@ let%expect_test "screen: 100x30 and 160x40" =
 
 
 
-
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
@@ -604,10 +603,11 @@ let%expect_test "screen: 100x30 and 160x40" =
       /model [name|id|provider/id]          pick or switch the model
       /scoped-models                        pick the models Ctrl+P cycles through
       /generate-model [MODEL|off]           show which model drafts commit messages, pull requests and …
+      /approval-model [MODEL|off]           show which model judges tool calls in smart mode (Alt+M, /m…
       /memory [on|off]                      the notes the model saved when you asked it to remember som…
       /import [path]                        import a session from a JSONL file
       /compaction [at|model|mask ...]       show when conversations are compacted and what summarises t…
-      /permissions                          show the mode and the allow/ask/deny rules (config and this…
+      ↕ 1–8 of 9
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > /mo▏
     /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  Tab/Enter accept · Alt+S as typed
@@ -671,7 +671,6 @@ let%expect_test "screen: 100x30 and 160x40" =
 
 
 
-
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
@@ -686,10 +685,11 @@ let%expect_test "screen: 100x30 and 160x40" =
       /model [name|id|provider/id]          pick or switch the model
       /scoped-models                        pick the models Ctrl+P cycles through
       /generate-model [MODEL|off]           show which model drafts commit messages, pull requests and branch names (✦ Generate); MODEL|off: draft them with MODEL …
+      /approval-model [MODEL|off]           show which model judges tool calls in smart mode (Alt+M, /mode smart); MODEL|off: judge them with MODEL (off: the sessi…
       /memory [on|off]                      the notes the model saved when you asked it to remember something (Ctrl+D forgets one); on or off gives the model the m…
       /import [path]                        import a session from a JSONL file
       /compaction [at|model|mask ...]       show when conversations are compacted and what summarises them; at TOKENS|off: also once the context exceeds TOKENS, no…
-      /permissions                          show the mode and the allow/ask/deny rules (config and this session)
+      ↕ 1–8 of 9
     ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
     > /mo▏
     /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01  Tab/Enter accept · Alt+S as typed

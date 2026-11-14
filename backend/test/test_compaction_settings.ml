@@ -340,7 +340,7 @@ let spends agent =
     (Session.active_path (Agent.session agent))
     ~f:(fun e ->
       match e.payload with
-      | Spend { usage; cost_usd } ->
+      | Spend { usage; cost_usd; purpose = _ } ->
         printf "spend: in=%d out=%d $%.4f\n" usage.input usage.output cost_usd
       | _ -> ())
 ;;

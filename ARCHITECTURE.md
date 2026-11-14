@@ -1199,7 +1199,7 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   processes still get an empty stdin. `job_input` writes (and optionally closes) and
   returns the output that follows (`Output_tail.since`): until it is quiet
   for 300 ms after something arrived, the job exits or `wait_ms` pass.
-- Approvals — `Approval_mode` (`Ask | Auto_edit | Auto`), `Approval_rule`
+- Approvals — `Approval_mode` (`Ask | Auto_edit | Smart | Auto`), `Approval_rule`
   (Claude Code's `TOOL(PATTERN)` rules: parsing, `Call.create` (a call's
   command or the paths it touches, `..` resolved lexically), `covers` (all
   of a call's parts, a command's segments or paths, matched by some rule;
@@ -1209,7 +1209,23 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   `Approval` (`Rules`, config's `permissions` with its problems, and
   `decide`: deny rule → plan mode refuses edits → ask rule (no
   suggestions) → allow rules, the config's and the session's → plan mode
-  asks for other destructive tools → the mode).
+  asks for other destructive tools → the mode; `Smart` lets edits under
+  the cwd run (no `.git` or `..` in the path) and returns `Judge` for the
+  rest). `Approval_judge` is the judge: the request (the user's last ten
+  typed messages, a subagent's task, the goal and plan, host, cwd and the
+  call with its full arguments, never tool output), its `verdict` tool
+  (`{decision: allow|ask, reason}`) and parsing the reply (anything else is
+  `Ask` with why), thinking off or the lowest level. `Agent.approve` turns
+  `Judge` into a judgement on the approval model (`approval_model`, else
+  the session's): shared promises keyed by the model and the judge's
+  prompt (at most 256, cleared when full and on a session switch; failures
+  are dropped), so a turn's calls are
+  judged at once (`judge_turn`) and identical ones once; 60s timeout; a
+  mode change while judging decides again. `Allow` emits `tool_allowed
+  {call_id, agent_id, model, reason}` and runs the call; `Ask` is a
+  `Tool_confirm` with `Confirm_kind.Judged {model; reason}` (JSON `kind:
+  "judged"`, `model`, `reason`). Its spend is a `Spend {purpose =
+  "approval"}`.
 - `Plan` — `update_plan` (Codex's): steps with statuses, validated (several
   may be in progress, for parallel work), and `latest`, the plan as of the last successful call
   in a list of messages, which is how `Agent` keeps it as session state
@@ -1564,7 +1580,8 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   `~/.prigh/worktrees`), `max_budget_usd`,
   `goal_max_continuations`, `resume_on_limit_reset`, `ask_user_timeout_seconds` (default
   300, 0 = never), `generate_model` (the drafting model, `/generate-model`),
-  `naming_model`, `dictation_model`, `mask_observations` (default true),
+  `approval_model` (smart mode's judge, `/approval-model`; an unknown
+  one is a startup warning), `naming_model`, `dictation_model`, `mask_observations` (default true),
   `compact_at_tokens` (default 200000,
   0 = 80% of the window only), `compaction_model` and `snippets`, the
   frontends' `/snippet` texts, validated by `Snippet`), loaded at agent
@@ -1774,7 +1791,8 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   `export` writes markdown or copies the JSONL,
   `import` copies a file in (the markdown has each message's time, in UTC,
   in its heading), and `session_stats` counts turns, tool calls by
-  name, tokens, cost, model changes, compactions and maskings (`masks`).
+  name, tokens, cost, model changes, compactions, maskings (`masks`) and the approvals judged
+  (`approvals_judged`, `approvals_cost_usd`).
   Under the RPC,
   `get_entries` returns `{head, entries}` (`all: true` includes abandoned
   branches for the tree view; entries carry `at` in milliseconds when
@@ -2925,7 +2943,11 @@ terminal frontend and `web/` prigh-web, the browser one.
   - Approvals, shared with prigh-web: `Session_mode` (the approval mode, or
     plan mode, as the status line shows it and as prigh-web's chip names it,
     `title`; Alt+M's cycle; `set_mode`'s parameters), `Confirm_prompt` (a confirmation's title and answers with
-    their keys, y/a/n/r, and `tool_confirm_respond`'s parameters),
+    their keys, y/a/n/r, and `tool_confirm_respond`'s parameters), `Approval_model_command`
+    (`/approval-model`, like `Generate_model_command`: parse, the
+    `set_config` fields, completion, summary; the judge's notes come from
+    `Confirm_prompt.allowed` and `judged`, `Transcript` keeps the allowed
+    note on its tool item),
     `Question_form` (answering an `ask_user` call with keys), `Plan_view`
     (`plan 2/5: step`, the checklist); the backend's plan mode notes are
     harness notes (`◇ Plan mode on: ...`). Confirmations and questions queue in the

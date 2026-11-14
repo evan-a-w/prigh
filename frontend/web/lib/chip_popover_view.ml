@@ -261,7 +261,7 @@ let session_sections (m : App.Model.t) ~inject =
         ~glyph:(if current.chat then Message else Shield)
         ~note:(Session_mode.describe current)
         (div
-           ~cls:"session-choices"
+           ~cls:"session-choices mode-choices"
            (List.map (Session_mode.choices ~current) ~f:(fun mode ->
               choice
                 ~current:(Session_mode.equal mode current)

@@ -53,8 +53,8 @@ let%expect_test "the section: the built-ins, every control" =
     How hard new sessions think, on models that can. A model without the level takes its nearest one.
     (Off answer straight away) (Provider's default the provider picks the effort) (Minimal barely) (Low a little) (Medium some) (High more) (Xhigh a lot, for long agentic work) (Max as much as the model allows)
     Mode
-    What asks before it runs: everything (Ask), all but file edits (Auto-edit) or nothing (Auto).
-    (Ask) (Auto-edit) (Auto)
+    What asks before it runs: everything (Ask), all but file edits (Auto-edit), what the approval model leaves to you (Smart) or nothing (Auto).
+    (Ask) (Auto-edit) (Smart) (Auto)
     Tool host
     New sessions you start here run their tools where the session you are on does.
     (Where you are)
@@ -80,6 +80,7 @@ let%expect_test "the section: the built-ins, every control" =
     button "Max" -- New sessions think at max
     button "Ask" -- New sessions start in Ask mode
     button "Auto-edit" -- New sessions start in Auto-edit mode
+    button "Smart" -- New sessions start in Smart mode
     button "Auto" -- New sessions start in Auto mode
     button "New sessions' tool host: Where you are" -- Choose the tool host new sessions start on (/default-host)
     button "Add" -- Add a model to the end of the chain (/fallback MODEL…)
@@ -187,8 +188,8 @@ let%expect_test "thinking and mode: segmented, for new sessions only" =
      (tag (Default_set (Mode Ask))))
     (Expire_toast (id 2) (after_ms 3820))
     Mode
-    What asks before it runs: everything (Ask), all but file edits (Auto-edit) or nothing (Auto).
-    (Ask) (Auto-edit) (Auto)
+    What asks before it runs: everything (Ask), all but file edits (Auto-edit), what the approval model leaves to you (Smart) or nothing (Auto).
+    (Ask) (Auto-edit) (Smart) (Auto)
     (Back to the built-in: Auto)
     New sessions start in Ask mode (open sessions keep theirs)
     auto

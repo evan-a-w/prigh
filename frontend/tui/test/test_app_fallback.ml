@@ -230,6 +230,7 @@ let%expect_test
       (mask_observations true)
       (generate_model  ())
       (naming_model    ())
+      (approval_model  ())
       (dictation_model ())))
     |}]
 ;;

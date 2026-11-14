@@ -4,6 +4,10 @@ module Confirm = struct
   module Kind = struct
     type t =
       | Tool
+      | Judged of
+          { model : string
+          ; reason : string
+          }
       | Computer_use of { host : string }
     [@@deriving sexp_of, equal]
 
@@ -13,6 +17,10 @@ module Confirm = struct
       | Some "computer_use" ->
         let%map host = Json.string_opt_field j "host" in
         Computer_use { host = Option.value host ~default:"this computer" }
+      | Some "judged" ->
+        let%bind model = Json.string_field j "model" in
+        let%map reason = Json.string_field j "reason" in
+        Judged { model; reason }
       | Some _ | None -> Ok Tool
     ;;
   end

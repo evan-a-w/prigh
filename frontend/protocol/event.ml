@@ -58,6 +58,12 @@ type t =
       ; result : Message.Tool_result.t
       }
   | Tool_confirm of Pending.Confirm.t
+  | Tool_allowed of
+      { call_id : string
+      ; agent_id : string option
+      ; model : string
+      ; reason : string
+      }
   | Tool_confirm_done of
       { call_id : string
       ; agent_id : string option
@@ -206,6 +212,12 @@ let rec of_json j =
     in
     Tool_end { call; result }
   | "tool_confirm" -> Pending.Confirm.of_json j >>| fun c -> Tool_confirm c
+  | "tool_allowed" ->
+    let%bind call_id = Json.string_field j "call_id" in
+    let%bind agent_id = Json.string_opt_field j "agent_id" in
+    let%bind model = Json.string_field j "model" in
+    let%map reason = Json.string_field j "reason" in
+    Tool_allowed { call_id; agent_id; model; reason }
   | "tool_confirm_done" ->
     let%bind call_id = Json.string_field j "call_id" in
     let%map agent_id = Json.string_opt_field j "agent_id" in

@@ -782,7 +782,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /fallback [off|model...]      show or set the models that…
       /default-dir [off|path]       show or set the directory n…
       /default-host [off|name]      show or set the tool host p…
-      ↕ 1–8 of 82
+      ↕ 1–8 of 83
     ────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  think:off  Tab/Enter accept · Alt+S as typed
@@ -799,7 +799,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /fallback [off|model...]      show or set the models that…
       /default-dir [off|path]       show or set the directory n…
       /default-host [off|name]      show or set the tool host p…
-      ↕ 1–8 of 82
+      ↕ 1–8 of 83
     ────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  think:off  Tab/Enter accept · Alt+S as typed
@@ -816,7 +816,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /fallback [off|model...]      show or set the models that…
       /default-dir [off|path]       show or set the directory n…
       /default-host [off|name]      show or set the tool host p…
-      ↕ 1–8 of 82
+      ↕ 1–8 of 83
     ────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  think:off  Tab/Enter accept · Alt+S as typed
@@ -847,12 +847,11 @@ let%expect_test
   H.show h;
   [%expect
     {|
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
-
     ▌ earlier question
       earlier answer
     ▸ ask
       auto-edit
+      smart
       auto
       plan
       chat
@@ -883,15 +882,15 @@ let%expect_test "Esc closes autocomplete without abort while running" =
   H.show h;
   [%expect
     {|
-      earlier answer
     ▸ /mode [ask|auto-edit|auto|plan|chat]  pick or set the mod…
       /model [name|id|provider/id]    pick or switch the model
       /scoped-models                  pick the models Ctrl+P cy…
       /generate-model [MODEL|off]     show which model drafts c…
+      /approval-model [MODEL|off]     show which model judges t…
       /memory [on|off]                the notes the model saved…
       /import [path]                  import a session from a J…
       /compaction [at|model|mask ...]  show when conversations …
-      /permissions                    show the mode and the all…
+      ↕ 1–8 of 9
     ────────────────────────────────────────────────────────────
     > /mo▏
     deepseek-flash  think:off  Tab/Enter accept · Alt+S as typed
@@ -1401,7 +1400,7 @@ let%expect_test "/session prints the stats table" =
     │ cost           $0.0001                                   │
     │ context        1.5%                                      │
     │ model changes  1                                         │
-    └─────────── 1–7 of 10 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
+    └─────────── 1–7 of 11 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
     ────────────────────────────────────────────────────────────
     > ▏
     deepseek-flash  ctx:0.1%/1.0M  ↑↓ scroll · Esc closes
@@ -3010,7 +3009,7 @@ let%expect_test "/auth, /help, /state, /clear, unknown method errors" =
     │ Ctrl+P cycles through                                    │
     │ /change_default                       save the current   │
     │ model and thinking level as the default for new sessions │
-    └───────── 1–11 of 366 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
+    └───────── 1–11 of 369 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
     ────────────────────────────────────────────────────────────
     > ▏
     deepseek-flash  ctx:0.1%/1.0M  ↑↓ scroll · Esc closes
@@ -5477,6 +5476,7 @@ let%expect_test
       (mask_observations true)
       (generate_model  ())
       (naming_model    ())
+      (approval_model  ())
       (dictation_model ())))
     ((
       (scoped_models (deepseek/deepseek-flash))
@@ -5500,6 +5500,7 @@ let%expect_test
       (mask_observations true)
       (generate_model  ())
       (naming_model    ())
+      (approval_model  ())
       (dictation_model ())))
     |}]
 ;;
@@ -6539,6 +6540,7 @@ let%expect_test "/change_default saves the model and thinking level" =
       (mask_observations true)
       (generate_model  ())
       (naming_model    ())
+      (approval_model  ())
       (dictation_model ())))
 
 
@@ -8630,7 +8632,7 @@ let%expect_test
       /fallback [off|model...]      show or set the models that…
       /default-dir [off|path]       show or set the directory n…
       /default-host [off|name]      show or set the tool host p…
-      ↕ 1–8 of 82
+      ↕ 1–8 of 83
     ────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  think:off  Tab/Enter accept · Alt+S as typed
@@ -8647,7 +8649,7 @@ let%expect_test
       /fallback [off|model...]      show or set the models that…
       /default-dir [off|path]       show or set the directory n…
       /default-host [off|name]      show or set the tool host p…
-      ↕ 1–8 of 82
+      ↕ 1–8 of 83
     ────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  think:off  Tab/Enter accept · Alt+S as typed
@@ -8932,7 +8934,7 @@ let%expect_test
                                 │   /fallback [off|model...]      show or set the models that take over, in order, when a model's usa…
                                 │   /default-dir [off|path]       show or set the directory new sessions start in (on the default hos…
                                 │   /default-host [off|name]      show or set the tool host prigh-web's new sessions start on (a term…
-     Alt+L hides · ⇧Tab focuses │   ↕ 1–8 of 82
+     Alt+L hides · ⇧Tab focuses │   ↕ 1–8 of 83
     ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
     > /▏
     /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01  Tab/Enter accept · Alt+S as typed

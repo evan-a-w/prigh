@@ -515,6 +515,7 @@
   .app.narrow .composer .model-chip { padding-left: 6px; padding-right: 6px; }
   /* "auto-edit" whole: a longer word gets the room it needs. */
   .session-choice { flex: 1 1 auto; min-width: var(--tap); padding: 0 2px; font-size: 13px; }
+  .mode-choices > .session-choice { padding: 0 2px; }
   /* The model keeps a target's width beside a long host chip. */
   .composer-controls .chip-anchor.model { min-width: 40px; }
 }

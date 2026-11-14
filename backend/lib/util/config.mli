@@ -87,6 +87,9 @@ type t =
   ; naming_model : string option
     (** the model that names sessions and subagents ({!Session_description},
         {!Subagent_name}); [None]: [generate_model], else the session's *)
+  ; approval_model : string option
+    (** the model that judges tool calls in the [smart] approval mode
+        ({!Approval_judge}); [None]: the session's *)
   ; dictation_model : string option
     (** the speech-to-text model of the [transcribe] method
         ({!Transcription}), [provider/id]; [None]:

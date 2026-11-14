@@ -61,6 +61,7 @@ module Entry = struct
       | Spend of
           { usage : Usage.t
           ; cost_usd : float
+          ; purpose : string option [@jsonaf.option] [@sexp.option]
           }
       | Resume_at of { at : float option }
       | Told_environment of Told_environment.t
@@ -573,7 +574,11 @@ let set_archived t ~archived =
 ;;
 
 let pinned t = t.pinned
-let add_spend t ~usage ~cost_usd = append t (Spend { usage; cost_usd })
+
+let add_spend ?purpose t ~usage ~cost_usd =
+  append t (Spend { usage; cost_usd; purpose })
+;;
+
 let set_told_environment t told = append t (Told_environment told)
 let repo t = Hashtbl.find t.repos t.cwd
 let set_repo t ~cwd repo = append t (Repo { cwd; repo })
@@ -602,6 +607,14 @@ let spend t =
       match e.payload with
       | Spend s -> Usage.add usage s.usage, cost +. s.cost_usd
       | _ -> usage, cost)
+;;
+
+let spend_for t ~purpose =
+  List.fold t.entries ~init:(0, 0.) ~f:(fun (n, cost) (e : Entry.t) ->
+    match e.payload with
+    | Spend { cost_usd; purpose = Some p; usage = _ }
+      when String.equal p purpose -> n + 1, cost +. cost_usd
+    | _ -> n, cost)
 ;;
 
 let resume_at t =

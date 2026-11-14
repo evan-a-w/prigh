@@ -75,6 +75,7 @@ let%expect_test "in chat mode: the chip, the host chip and the placeholder" =
     When tools ask first Alt+M cycles
     Asks: edits & commands bash, job_input, edits and MCP tools ask first
     Asks: commands file edits run; bash, job_input and MCP tools ask first
+    Smart: a model decides edits in the project run; the approval model lets other calls run or asks you, saying why (/approval-model)
     Auto: never asks tools run without asking
     Plan mode read-only planning, until you leave it (/plan off or Alt+M): no file edits; bash, job_input and MCP tools ask first
     ✓ Chat: no tool host a chat without the tool host: no files, commands or project, only the web and other host-free tools, until you leave it (/chat off or Alt+M)

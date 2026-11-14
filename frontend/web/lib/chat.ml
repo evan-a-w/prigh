@@ -26,6 +26,7 @@ and tool =
   ; missed : bool
   ; result : Message.Tool_result.t option
   ; subagent : subagent option
+  ; allowed : string option [@sexp.option]
   }
 
 and subagent =
@@ -68,6 +69,7 @@ module Tool = struct
     ; missed : bool
     ; result : Message.Tool_result.t option
     ; subagent : Subagent.t option
+    ; allowed : string option [@sexp.option]
     }
   [@@deriving sexp_of]
 end
@@ -117,6 +119,7 @@ let add_call t (call : Tool_call.t) =
         ; missed = false
         ; result = None
         ; subagent = None
+        ; allowed = None
         })
   in
   { t with tools }
@@ -357,6 +360,17 @@ let rec apply t (event : Event.t) =
   | Tool_output { call_id; chunk } ->
     update_tool t call_id ~f:(fun tool -> append_output tool chunk)
   | Tool_end { call = _; result } -> set_result t result
+  | Tool_allowed { call_id; agent_id; model; reason } ->
+    let allow chat =
+      update_tool chat call_id ~f:(fun tool ->
+        { tool with
+          allowed = Some (Prigh_ui.Confirm_prompt.allowed ~model ~reason)
+        })
+    in
+    (match agent_id with
+     | None -> allow t
+     | Some agent_id ->
+       map_subagent t agent_id ~f:(fun s -> { s with chat = allow s.chat }))
   | Subagent_start { call_id; agent_id; task; model; forked; continued; _ } ->
     update_tool t call_id ~f:(fun tool ->
       { tool with

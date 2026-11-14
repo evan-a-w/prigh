@@ -108,6 +108,8 @@ let rec summarise (e : Event.t) : string option =
   | Tool_output _ -> None
   | Tool_end { result; _ } -> Some (sprintf "tool_end %s" result.tool_name)
   | Tool_confirm c -> Some (sprintf "tool_confirm %s %s" c.name c.summary)
+  | Tool_allowed { model; reason; _ } ->
+    Some (sprintf "tool_allowed by %s: %s" model reason)
   | Tool_confirm_done { call_id; _ } -> Some ("tool_confirm_done " ^ call_id)
   | Ask_user { call_id; questions; deadline = _ } ->
     Some (sprintf "ask_user %s (%d questions)" call_id (List.length questions))

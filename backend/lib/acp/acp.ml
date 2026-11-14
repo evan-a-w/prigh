@@ -394,6 +394,9 @@ let modes =
   [ "ask", "Ask", "ask before every tool that changes something"
   ; "auto-edit", "Auto-edit", "edit files without asking; ask before commands"
   ; "auto", "Auto", "run every tool without asking"
+  ; ( "smart"
+    , "Smart"
+    , "a model runs what is safe and routine, and asks you about the rest" )
   ; ( "plan"
     , "Plan"
     , "investigate and plan, changing no files, until you switch to another \
@@ -852,6 +855,13 @@ let confirm t (s : Session.t) json =
       Some (Option.value (opt_string "host" json) ~default:"this computer")
     | Some _ | None -> None
   in
+  (* The approval model's reason for asking ([smart] mode). *)
+  let judged =
+    match opt_string "kind" json, opt_string "reason" json with
+    | Some "judged", Some reason ->
+      Some (Option.value (opt_string "model" json) ~default:"the model", reason)
+    | _ -> None
+  in
   let view = Hashtbl.find s.tools call_id in
   let tool_call =
     let fields =
@@ -866,6 +876,15 @@ let confirm t (s : Session.t) json =
         ; "kind", str (Acp_tool_call.kind name)
         ; "status", str "pending"
         ]
+    in
+    let fields =
+      match judged with
+      | None -> fields
+      | Some (model, reason) ->
+        List.map fields ~f:(function
+          | "title", `String title ->
+            "title", str (sprintf "%s (%s asks: %s)" title model reason)
+          | field -> field)
     in
     match computer_use with
     | None -> fields

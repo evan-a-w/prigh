@@ -374,8 +374,8 @@ let%expect_test "fuzzy ranking: command names" =
       (String.concat ~sep:" " (Fuzzy.rank ~query names ~key:Fn.id)));
   [%expect
     {|
-    "mo" -> mode model scoped-models generate-model memory import compaction permissions
-    "lo" -> login logout clone default-host
+    "mo" -> mode model scoped-models generate-model approval-model memory import compaction permissions
+    "lo" -> login logout clone default-host approval-model
     "s"  -> state switch skills skill: signin setusr session snippet signout sessions scoped-models push jobs host todos resume agents hotkeys verbosity user-info permissions default-host instructions downsize-images
     "sw" -> switch
     "xyz" ->
@@ -679,7 +679,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     Ctrl+P                  cycle to the next scoped model (Shift+Ctrl+P is unavailable; Alt+P goes back)
     Alt+P                   cycle to the previous scoped model
     Ctrl+T                  cycle the thinking level
-    Alt+M                   cycle the mode: ask → auto-edit → auto → plan (read-only) → chat (no tool host)
+    Alt+M                   cycle the mode: ask → auto-edit → smart → auto → plan (read-only) → chat (no tool host)
     Ctrl+N                  picker: toggle the named-only / logged-in-only filter; /worktree: open in a new session
     Alt+A                   /sessions: archive or unarchive the highlighted session
     Alt+T                   /sessions: pin the highlighted session to the top, or unpin it
@@ -705,7 +705,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /thinking [off|default|LEVEL]         pick or set the thinking level (the model's; default: the provider's)
     /verbosity [quiet|normal|verbose]     set the transcript verbosity
     /filter [all|KIND...|-KIND|+KIND]     show only some kinds of the transcript (user, assistant, thinking, tools, subagents, notes); the model's context is unchanged
-    /confirm [on|off|mode]                ask before destructive tools: the approval mode new sessions (and this one) start in; on: ask, off: auto, or ask, auto-edit, auto
+    /confirm [on|off|mode]                ask before destructive tools: the approval mode new sessions (and this one) start in; on: ask, off: auto, or ask, auto-edit, smart, auto
     /mode [ask|auto-edit|auto|plan|chat]  pick or set the mode: what asks first, read-only planning, or a chat without the tool host (Alt+M cycles)
     /plan [on|off]                        toggle plan mode: the model investigates and plans, changing no files, until you turn it off
     /chat [on|off]                        toggle chat mode: talk without the tool host (no files, commands or project; the web and other host-free tools), until you turn it off
@@ -724,6 +724,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /compact [instructions]               summarise older messages to free context
     /compaction [at|model|mask ...]       show when conversations are compacted and what summarises them; at TOKENS|off: also once the context exceeds TOKENS, not only at 80% of the window; model MODEL|off: the model that writes the summaries (off: the session's); mask on|off: replace old tool outputs with placeholders first
     /generate-model [MODEL|off]           show which model drafts commit messages, pull requests and branch names (✦ Generate); MODEL|off: draft them with MODEL (off: the session's)
+    /approval-model [MODEL|off]           show which model judges tool calls in smart mode (Alt+M, /mode smart); MODEL|off: judge them with MODEL (off: the session's)
     /naming [model MODEL|off]             show which model names sessions and subagents; model MODEL|off: name them with MODEL (off: the drafting model, else the session's)
     /dictation [model MODEL|off]          show which model transcribes dictation (speech to text); model MODEL|off: transcribe with MODEL, an OpenAI or OpenAI-compatible provider's (off: openai/gpt-4o-mini-transcribe)
     /trim [after|undo|show|hide]          drop everything before a message from the model's context: pick the message (newest first, with what it frees), confirm; after: everything after a message instead (what you send later stays); undo brings the latest trim back, show/hide unfolds the trimmed messages
@@ -913,7 +914,12 @@ let%expect_test "bash timeout is merged into the tool line at each verbosity" =
   in
   let item =
     Transcript.Item.Tool
-      { call; result = Some result; live_tail = None; subagent = None }
+      { call
+      ; result = Some result
+      ; live_tail = None
+      ; subagent = None
+      ; allowed = None
+      }
   in
   List.iter [ Verbosity.Quiet; Normal; Verbose ] ~f:(fun verbosity ->
     printf "== %s ==\n" (Verbosity.name verbosity);
@@ -1124,6 +1130,7 @@ let%expect_test "diff colouring at Normal and Verbose through to_styled" =
       ; result = Some (edit_result text)
       ; live_tail = None
       ; subagent = None
+      ; allowed = None
       }
   in
   List.iter [ Verbosity.Normal; Verbosity.Verbose ] ~f:(fun verbosity ->
@@ -1166,6 +1173,7 @@ let tool ?result ?live_tail name arguments =
     ; result
     ; live_tail
     ; subagent = None
+    ; allowed = None
     }
 ;;
 
@@ -2264,7 +2272,7 @@ let%expect_test
   show "host prompt" (Autocomplete.directory ~host:"client-1" ~text:"~/de");
   [%expect
     {|
-    /mo          command    prefix="mo" navigated=false enter_accepts=true items=8
+    /mo          command    prefix="mo" navigated=false enter_accepts=true items=9
     /model       arg:model  prefix="" navigated=false enter_accepts=false items=4
     /model down  arg:model  prefix="" navigated=true enter_accepts=true items=4
     /model gp    arg:model  prefix="gp" navigated=false enter_accepts=true items=1

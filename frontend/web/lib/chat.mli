@@ -35,6 +35,9 @@ module Tool : sig
           session on show, the connection lost, opened as it ran) *)
     ; result : Message.Tool_result.t option
     ; subagent : Subagent.t option
+    ; allowed : string option
+      (** the approval model let it run ([smart] mode): its note,
+          {!Prigh_ui.Confirm_prompt.allowed} *)
     }
   [@@deriving sexp_of]
 end

@@ -896,7 +896,25 @@ let card
       chips @ [ chip "cancelled" ]
     | Preparing | Running | Done | Failed | Interrupted -> chips
   in
-  let body = Chat_html.present body in
+  (* The approval model let it run ([smart] mode): a chip on the line, its
+     note (the model and its reason) first in the body. *)
+  let allowed = Option.bind tool ~f:(fun t -> t.allowed) in
+  let chips =
+    match allowed with
+    | None -> chips
+    | Some note ->
+      chips
+      @ [ Node.span
+            ~attrs:[ Attr.class_ "chip judged"; Attr.title note ]
+            [ Node.text "judged" ]
+        ]
+  in
+  let body =
+    Chat_html.present
+      (match allowed with
+       | None -> body
+       | Some note -> span "tool-allowed" note :: body)
+  in
   (* A subagent's card opens it in the agents panel (the page listens for
      clicks on [data-agent]); [data-call] finds the card from the panel. *)
   let agent =
@@ -1061,5 +1079,12 @@ let server_tool ~fold ~running (s : Content.Server_tool.t) =
     ~running
     call
     (Some
-       { call; output = ""; lines = 0; missed = false; result; subagent = None })
+       { call
+       ; output = ""
+       ; lines = 0
+       ; missed = false
+       ; result
+       ; subagent = None
+       ; allowed = None
+       })
 ;;

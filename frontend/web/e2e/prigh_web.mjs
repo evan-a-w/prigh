@@ -1105,6 +1105,7 @@ try {
   await page.keyboard.press("Alt+M");
   await page.keyboard.press("Alt+M");
   await page.keyboard.press("Alt+M");
+  await page.keyboard.press("Alt+M");
   // Each step is shown at once; the backend's replies settle on the last.
   await page.locator(".toast", { hasText: "Mode: plan" }).waitFor();
   await page.waitForSelector(".mode-chip.plan-mode:not(.awaiting)");

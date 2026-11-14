@@ -11,6 +11,8 @@ type t =
   ; compactions : int
   ; masks : int
   ; duration_seconds : float
+  ; approvals_judged : int
+  ; approvals_cost_usd : float
   }
 [@@deriving sexp_of, equal]
 
@@ -44,7 +46,17 @@ let of_json j =
     | None -> Ok 0
     | Some _ -> Json.int_field j "masks"
   in
-  let%map duration_seconds = Json.float_field j "duration_seconds" in
+  let%bind duration_seconds = Json.float_field j "duration_seconds" in
+  let%bind approvals_judged =
+    match Json.field j "approvals_judged" with
+    | None -> Ok 0
+    | Some _ -> Json.int_field j "approvals_judged"
+  in
+  let%map approvals_cost_usd =
+    match Json.field j "approvals_cost_usd" with
+    | None -> Ok 0.
+    | Some _ -> Json.float_field j "approvals_cost_usd"
+  in
   { message_count
   ; turns
   ; tool_calls
@@ -55,5 +67,7 @@ let of_json j =
   ; compactions
   ; masks
   ; duration_seconds
+  ; approvals_judged
+  ; approvals_cost_usd
   }
 ;;

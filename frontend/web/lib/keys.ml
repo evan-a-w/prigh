@@ -54,7 +54,8 @@ let help =
     , "the next chip's menu (model, thinking, mode, host)" )
   ; "Ctrl+P / Alt+P", "next / previous scoped model (/scoped-models)"
   ; "Alt+T", "cycle the thinking level"
-  ; "Alt+M", "cycle the mode: ask → auto-edit → auto → plan (/mode, /plan)"
+  ; ( "Alt+M"
+    , "cycle the mode: ask → auto-edit → smart → auto → plan (/mode, /plan)" )
   ; "Alt+N", "insert a snippet at the caret: a list to filter (/snippet)"
   ; "Ctrl+O", "cycle the transcript verbosity"
   ; ( "↑ ↓ / Space / Enter / Esc (transcript filter)"

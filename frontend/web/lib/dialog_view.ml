@@ -29,8 +29,11 @@ let picker_title : Dialog.Picker_kind.t -> string = function
   | Themes -> "Themes"
   | Accents -> "Colours"
   | Attach -> "Attach"
-  | Compaction_models | Generate_models | Naming_models | Dictation_models ->
-    "Models"
+  | Compaction_models
+  | Generate_models
+  | Approval_models
+  | Naming_models
+  | Dictation_models -> "Models"
   | Defaults (Model | Fallback) -> "Models"
   | Defaults Host -> "Hosts"
 ;;
@@ -770,10 +773,12 @@ let confirm (m : App.Model.t) ~inject =
       ~cls:
         (match c.kind with
          | Tool -> "confirm-dialog"
+         | Judged _ -> "confirm-dialog judged"
          | Computer_use _ -> "confirm-dialog computer-consent")
       ~title:
         (match c.kind with
          | Tool -> "Confirm"
+         | Judged _ -> "Confirm (smart)"
          | Computer_use _ -> "Computer use")
       ~on_close
       ~footer

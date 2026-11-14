@@ -838,12 +838,14 @@ let%expect_test "entries and session stats" =
        (input      30)
        (output     13)
        (cache_read 5)))
-     (cost_usd         0.0001)
-     (context_percent  1.5)
-     (model_changes    1)
-     (compactions      0)
-     (masks            0)
-     (duration_seconds 12.5))
+     (cost_usd           0.0001)
+     (context_percent    1.5)
+     (model_changes      1)
+     (compactions        0)
+     (masks              0)
+     (duration_seconds   12.5)
+     (approvals_judged   0)
+     (approvals_cost_usd 0))
     |}]
 ;;
 
@@ -975,6 +977,7 @@ let%expect_test "config round trip and config_changed event" =
          ; mask_observations = false
          ; generate_model = None
          ; naming_model = None
+         ; approval_model = Some "anthropic/claude-haiku-4-5"
          ; dictation_model = Some "openai/whisper-1"
          }
        : Json.t)];
@@ -1003,6 +1006,7 @@ let%expect_test "config round trip and config_changed event" =
      (mask_observations true)
      (generate_model  ())
      (naming_model    ())
+     (approval_model  ())
      (dictation_model ()))
     ((scoped_models ())
      (approval_mode Auto)
@@ -1025,6 +1029,7 @@ let%expect_test "config round trip and config_changed event" =
      (mask_observations true)
      (generate_model  ())
      (naming_model    ())
+     (approval_model  ())
      (dictation_model ()))
     ((scoped_models ())
      (approval_mode Auto)
@@ -1047,6 +1052,7 @@ let%expect_test "config round trip and config_changed event" =
      (mask_observations true)
      (generate_model  ())
      (naming_model    ())
+     (approval_model  ())
      (dictation_model ()))
     (decode (e "default_model must be a string"))
     ((scoped_models ())
@@ -1070,6 +1076,7 @@ let%expect_test "config round trip and config_changed event" =
      (mask_observations true)
      (generate_model  ())
      (naming_model    ())
+     (approval_model  ())
      (dictation_model ()))
     (decode (e "fallback_models must be an array of strings"))
     (decode (e "default_cwd must be a string"))
@@ -1096,6 +1103,7 @@ let%expect_test "config round trip and config_changed event" =
      (mask_observations true)
      (generate_model  ())
      (naming_model    ())
+     (approval_model  ())
      (dictation_model ()))
     (decode (e (in snippets[0] "missing field \"text\"")))
     ((scoped_models ())
@@ -1119,6 +1127,7 @@ let%expect_test "config round trip and config_changed event" =
      (mask_observations true)
      (generate_model  ())
      (naming_model    ())
+     (approval_model  ())
      (dictation_model ()))
     (decode (e "compact_at_tokens must be a whole number"))
     ((scoped_models ())
@@ -1142,6 +1151,7 @@ let%expect_test "config round trip and config_changed event" =
      (mask_observations false)
      (generate_model  ())
      (naming_model    ())
+     (approval_model  ())
      (dictation_model ()))
     (decode (e "mask_observations must be a boolean"))
     ((scoped_models ())
@@ -1165,6 +1175,7 @@ let%expect_test "config round trip and config_changed event" =
      (mask_observations true)
      (generate_model ())
      (naming_model   ())
+     (approval_model ())
      (dictation_model (aiproxy/whisper)))
     ((scoped_models ())
      (approval_mode Auto)
@@ -1187,6 +1198,7 @@ let%expect_test "config round trip and config_changed event" =
      (mask_observations true)
      (generate_model (deepseek/deepseek-flash))
      (naming_model    ())
+     (approval_model  ())
      (dictation_model ()))
     (decode (e "generate_model must be a string"))
     ("round trip" (generate_model (deepseek/deepseek-flash)) (equal (Ok true)))
@@ -1213,6 +1225,7 @@ let%expect_test "config round trip and config_changed event" =
      (mask_observations false)
      (generate_model    null)
      (naming_model      null)
+     (approval_model    anthropic/claude-haiku-4-5)
      (dictation_model   openai/whisper-1))
     (Event (
       Config_changed (
@@ -1237,6 +1250,7 @@ let%expect_test "config round trip and config_changed event" =
         (mask_observations true)
         (generate_model  ())
         (naming_model    ())
+        (approval_model  ())
         (dictation_model ()))))
     |}]
 ;;
@@ -1987,6 +2001,107 @@ let%expect_test "hidden ranges, message points and the requests about them" =
     {"id":1,"method":"trim_after","params":{"after":"a3"}}
     {"id":1,"method":"untrim","params":{}}
     {"id":1,"method":"get_trimmed","params":{"entry":"t1"}}
+    |}]
+;;
+
+let%expect_test "smart approval mode: the judge's events, confirms and spend" =
+  let show f json =
+    match Json.parse json with
+    | Error e -> print_s [%message "parse" (e : Error.t)]
+    | Ok j ->
+      (match f j with
+       | Ok s -> print_s s
+       | Error e -> print_s [%message "decode" (e : Error.t)])
+  in
+  List.iter Approval_mode.all ~f:(fun mode ->
+    let wire = Approval_mode.to_string mode in
+    print_s
+      [%message
+        wire
+          ~decoded:
+            (Approval_mode.of_json (Json.str wire) : Approval_mode.t Or_error.t)]);
+  decode
+    {|{"type":"event","event":"tool_allowed","call_id":"c1","agent_id":null,"model":"anthropic/claude-haiku-4-5","reason":"runs the project's tests"}|};
+  decode
+    {|{"type":"event","event":"tool_allowed","call_id":"c2","agent_id":"a1","model":"m","reason":"reads a file"}|};
+  decode
+    {|{"type":"event","event":"tool_confirm","call_id":"c3","agent_id":null,"name":"bash","summary":"rm -rf ~/x","rules":["bash(rm *)"],"kind":"judged","model":"m","reason":"deletes outside the project"}|};
+  decode
+    {|{"type":"event","event":"tool_confirm","call_id":"c4","name":"bash","summary":"ls","kind":"judged","model":"m"}|};
+  show
+    (fun j -> Or_error.map (Session_stats.of_json j) ~f:Session_stats.sexp_of_t)
+    {|{"message_count":4,"turns":2,"tool_calls":{},"usage":{"input":30,"output":13,"cache_read":5},"cost_usd":0.0003,"context_percent":1.5,"model_changes":0,"compactions":0,"duration_seconds":1,"approvals_judged":3,"approvals_cost_usd":0.0002}|};
+  let config =
+    { Config.default with approval_model = Some "deepseek/deepseek-flash" }
+  in
+  print_s
+    [%message
+      "config round trip"
+        ~approval_model:
+          (Json.field (Config.to_json config) "approval_model" : Json.t option)
+        ~equal:
+          (Or_error.map
+             (Config.of_json (Config.to_json config))
+             ~f:(fun c -> Config.equal c config)
+           : bool Or_error.t)];
+  show
+    (fun j ->
+       Or_error.map (Config.of_json j) ~f:(fun c ->
+         [%sexp (c.approval_model : string option)]))
+    {|{"approval_model":null}|};
+  [%expect
+    {|
+    (ask (decoded (Ok Ask)))
+    (auto-edit (decoded (Ok Auto_edit)))
+    (smart (decoded (Ok Smart)))
+    (auto (decoded (Ok Auto)))
+    (Event (
+      Tool_allowed
+      (call_id c1)
+      (agent_id ())
+      (model  anthropic/claude-haiku-4-5)
+      (reason "runs the project's tests")))
+    (Event (
+      Tool_allowed
+      (call_id c2)
+      (agent_id (a1))
+      (model  m)
+      (reason "reads a file")))
+    (Event (
+      Tool_confirm (
+        (call_id c3)
+        (agent_id ())
+        (name    bash)
+        (summary "rm -rf ~/x")
+        (rules ("bash(rm *)"))
+        (kind (
+          Judged
+          (model  m)
+          (reason "deletes outside the project"))))))
+    (error (
+      e (
+        "while decoding"
+        "{\"type\":\"event\",\"event\":\"tool_confirm\",\"call_id\":\"c4\",\"name\":\"bash\",\"summary\":\"ls\",\"kind\":\"judged\",\"model\":\"m\"}"
+        "missing field \"reason\"")))
+    ((message_count 4)
+     (turns         2)
+     (tool_calls ())
+     (usage (
+       (input      30)
+       (output     13)
+       (cache_read 5)))
+     (cost_usd           0.0003)
+     (context_percent    1.5)
+     (model_changes      0)
+     (compactions        0)
+     (masks              0)
+     (duration_seconds   1)
+     (approvals_judged   3)
+     (approvals_cost_usd 0.0002))
+    ("config round trip"
+      (approval_model (deepseek/deepseek-flash))
+      (equal (Ok true)))
+    ()
     |}]
 ;;
 

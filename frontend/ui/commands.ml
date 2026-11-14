@@ -38,6 +38,7 @@ module Argument = struct
     | Agents
     | Compaction
     | Generate_model
+    | Approval_model
     | Naming
     | Dictation
   [@@deriving sexp_of, equal]
@@ -123,7 +124,7 @@ let every =
       "confirm"
       "[on|off|mode]"
       "ask before destructive tools: the approval mode new sessions (and this \
-       one) start in; on: ask, off: auto, or ask, auto-edit, auto"
+       one) start in; on: ask, off: auto, or ask, auto-edit, smart, auto"
   ; c
       ~argument:Argument.Mode
       "mode"
@@ -220,6 +221,12 @@ let every =
       "[MODEL|off]"
       "show which model drafts commit messages, pull requests and branch names \
        (✦ Generate); MODEL|off: draft them with MODEL (off: the session's)"
+  ; c
+      ~argument:Argument.Approval_model
+      "approval-model"
+      "[MODEL|off]"
+      "show which model judges tool calls in smart mode (Alt+M, /mode smart); \
+       MODEL|off: judge them with MODEL (off: the session's)"
   ; c
       ~argument:Argument.Naming
       "naming"

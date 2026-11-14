@@ -11,6 +11,9 @@ type t =
   ; compactions : int
   ; masks : int
   ; duration_seconds : float
+  ; approvals_judged : int
+    (** tool calls the approval model judged ([smart] mode) *)
+  ; approvals_cost_usd : float (** what judging them cost; in [cost_usd] too *)
   }
 [@@deriving sexp_of, equal]
 

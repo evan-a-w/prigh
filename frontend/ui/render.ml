@@ -454,6 +454,7 @@ let confirm_dialog ~width (c : P.Pending.Confirm.t) =
     ~title:
       (match c.kind with
        | Tool -> "Confirm"
+       | Judged _ -> "Confirm (smart)"
        | Computer_use _ -> "Computer use")
     ~width
     (Content.wrap ([ question ] :: detail) ~width:inner @ answers)

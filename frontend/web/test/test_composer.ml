@@ -424,6 +424,7 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /user-info what you set about yourself for the model (name, country, units...), given to it in every session, in Settings
     /compact [instructions] summarise older messages to free context
     /generate-model [MODEL|off] pick the model that drafts commit messages, pull requests and branch names (✦ Generate); MODEL|off: draft them with MODEL (off: the session's)
+    /approval-model [MODEL|off] pick the model that judges tool calls in smart mode; MODEL|off: judge them with MODEL (off: the session's)
     /naming [model MODEL|off] show which model names sessions and subagents; model MODEL|off: name them with MODEL (off: the drafting model, else the session's)
     /dictation [model MODEL|off] show which model transcribes dictation (speech to text); model MODEL|off: transcribe with MODEL, an OpenAI or OpenAI-compatible provider's (off: openai/gpt-4o-mini-transcribe)
     /compaction [at|model|mask ...] show when conversations are compacted and what summarises them; at TOKENS|off: also once the context exceeds TOKENS, not only at 80% of the window; model MODEL|off: the model that writes the summaries (off: the session's); mask on|off: replace old tool outputs with placeholders first
@@ -447,7 +448,6 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /rewind go back to an earlier message in this session
     /trim [after|undo] drop everything before a message from the model's context (the transcript keeps it folded); after: everything after a message instead (what you send later stays); undo brings back the last trim
     /tree show the session tree and move to any message in it
-    /cd [path] change the working directory (asks to create a missing one)
     |}];
   H.type_ h "/mod";
   H.key h "Tab";
@@ -461,6 +461,7 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     Modes ↑↓ Tab Enter Esc   Ctrl+Enter as typed
     ask bash, job_input, edits and MCP tools ask first
     auto-edit file edits run; bash, job_input and MCP tools ask first
+    smart edits in the project run; the approval model lets other calls run or asks you, saying why (/approval-model)
     auto tools run without asking
     plan read-only planning, until you leave it (/plan off or Alt+M): no file edits; bash, job_input and MCP tools ask first
     chat a chat without the tool host: no files, commands or project, only the web and other host-free tools, until you leave it (/chat off or Alt+M)

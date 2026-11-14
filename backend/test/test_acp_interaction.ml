@@ -352,7 +352,7 @@ let%expect_test "slash commands run prigh's commands" =
   [%expect
     {|
     > request 6 session/prompt {"sessionId":"<id>","prompt":[{"type":"text","text":"/thinking high"}]}
-    < update config_option_update {"configOptions":"mode=auto[ask|auto-edit|auto|plan|chat] model=deepseek/deepseek-flash[deepseek/deepseek-flash] thinking=high[off|default|low|high|max]"}
+    < update config_option_update {"configOptions":"mode=auto[ask|auto-edit|auto|smart|plan|chat] model=deepseek/deepseek-flash[deepseek/deepseek-flash] thinking=high[off|default|low|high|max]"}
     < _prigh/state {"sessionId":"<id>","model":"deepseek/deepseek-flash","thinking":"high","running":false,"context_tokens":0,"context_window":1000000,"cost_usd":0,"budget_usd":5,"approval_mode":"auto","plan_mode":false,"chat_mode":false,"queued":{"steer":0,"follow_up":0},"subagents":[],"jobs":0,"goal":null,"reminders":0,"active_host":"testhost"}
     < update agent_message_chunk {"content":{"type":"text","text":"thinking set to high"}}
     < result 6 {"stopReason":"end_turn"}
@@ -403,7 +403,7 @@ let%expect_test "slash commands run prigh's commands" =
     {|
     > request 12 session/prompt {"sessionId":"<id>","prompt":[{"type":"text","text":"/plan"}]}
     < update current_mode_update {"currentModeId":"plan"}
-    < update config_option_update {"configOptions":"mode=plan[ask|auto-edit|auto|plan|chat] model=deepseek/deepseek-flash[deepseek/deepseek-flash] thinking=high[off|default|low|high|max]"}
+    < update config_option_update {"configOptions":"mode=plan[ask|auto-edit|auto|smart|plan|chat] model=deepseek/deepseek-flash[deepseek/deepseek-flash] thinking=high[off|default|low|high|max]"}
     < _prigh/state {"sessionId":"<id>","model":"deepseek/deepseek-flash","thinking":"high","running":false,"context_tokens":0,"context_window":1000000,"cost_usd":0,"budget_usd":5,"approval_mode":"auto","plan_mode":true,"chat_mode":false,"queued":{"steer":0,"follow_up":0},"subagents":[],"jobs":0,"goal":null,"reminders":1,"active_host":"testhost"}
     < update agent_message_chunk {"content":{"type":"text","text":"plan mode on"}}
     < result 12 {"stopReason":"end_turn"}
@@ -413,7 +413,7 @@ let%expect_test "slash commands run prigh's commands" =
     {|
     > request 13 session/prompt {"sessionId":"<id>","prompt":[{"type":"text","text":"/chat"}]}
     < update current_mode_update {"currentModeId":"chat"}
-    < update config_option_update {"configOptions":"mode=chat[ask|auto-edit|auto|plan|chat] model=deepseek/deepseek-flash[deepseek/deepseek-flash] thinking=high[off|default|low|high|max]"}
+    < update config_option_update {"configOptions":"mode=chat[ask|auto-edit|auto|smart|plan|chat] model=deepseek/deepseek-flash[deepseek/deepseek-flash] thinking=high[off|default|low|high|max]"}
     < _prigh/state {"sessionId":"<id>","model":"deepseek/deepseek-flash","thinking":"high","running":false,"context_tokens":0,"context_window":1000000,"cost_usd":0,"budget_usd":5,"approval_mode":"auto","plan_mode":true,"chat_mode":true,"queued":{"steer":0,"follow_up":0},"subagents":[],"jobs":0,"goal":null,"reminders":1,"active_host":"testhost"}
     < update agent_message_chunk {"content":{"type":"text","text":"chat mode on"}}
     < result 13 {"stopReason":"end_turn"}
@@ -423,7 +423,7 @@ let%expect_test "slash commands run prigh's commands" =
     {|
     > request 14 session/prompt {"sessionId":"<id>","prompt":[{"type":"text","text":"/chat off"}]}
     < update current_mode_update {"currentModeId":"plan"}
-    < update config_option_update {"configOptions":"mode=plan[ask|auto-edit|auto|plan|chat] model=deepseek/deepseek-flash[deepseek/deepseek-flash] thinking=high[off|default|low|high|max]"}
+    < update config_option_update {"configOptions":"mode=plan[ask|auto-edit|auto|smart|plan|chat] model=deepseek/deepseek-flash[deepseek/deepseek-flash] thinking=high[off|default|low|high|max]"}
     < _prigh/state {"sessionId":"<id>","model":"deepseek/deepseek-flash","thinking":"high","running":false,"context_tokens":0,"context_window":1000000,"cost_usd":0,"budget_usd":5,"approval_mode":"auto","plan_mode":true,"chat_mode":false,"queued":{"steer":0,"follow_up":0},"subagents":[],"jobs":0,"goal":null,"reminders":1,"active_host":"testhost"}
     < update agent_message_chunk {"content":{"type":"text","text":"chat mode off"}}
     < result 14 {"stopReason":"end_turn"}

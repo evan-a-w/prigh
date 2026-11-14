@@ -183,6 +183,7 @@ module Reply_tag = struct
     | Default_set of New_default.t
     | Compaction_saved
     | Generate_model_saved
+    | Approval_model_saved
     | Naming_saved
     | Auto_archive_saved
     | Dictation_saved
@@ -1295,6 +1296,7 @@ let close_dialog (m : Model.t) =
             { kind =
                 ( Compaction_models
                 | Generate_models
+                | Approval_models
                 | Naming_models
                 | Dictation_models
                 | Defaults _ )
@@ -3969,6 +3971,7 @@ let model_display (m : Model.t) key =
 let mode_name : Approval_mode.t -> string = function
   | Ask -> "Ask"
   | Auto_edit -> "Auto-edit"
+  | Smart -> "Smart"
   | Auto -> "Auto"
 ;;
 
@@ -4276,6 +4279,51 @@ let generate_model_command (m : Model.t) rest =
   | Show -> generate_models_picker m
   | Error e -> error m (String.capitalize e)
   | Set_model _ as action -> set_generate_model m action
+;;
+
+let approval_model_summary config =
+  String.capitalize (Prigh_ui.Approval_model_command.summary config)
+;;
+
+let set_approval_model (m : Model.t) action =
+  with_config m ~f:(fun config ->
+    let config = Prigh_ui.Approval_model_command.apply action config in
+    ( { m with config = Some config }
+    , [ set_config
+          config
+          ~fields:
+            (List.map (Prigh_ui.Approval_model_command.fields action) ~f:fst)
+          ~tag:Approval_model_saved
+      ] ))
+;;
+
+let approval_models_picker (m : Model.t) =
+  with_config m ~f:(fun config ->
+    open_picker
+      m
+      (Picker
+         { kind = Approval_models
+         ; picker =
+             models_picker
+               m
+               ~title:"Approval model"
+               ~current:config.approval_model
+               ~leading:
+                 [ Picker.Item.create
+                     ~id:"off"
+                     ~detail:"the session's model"
+                     ~search:"off default session"
+                     ~marked:(Option.is_none config.approval_model)
+                     "Default"
+                 ]
+         }))
+;;
+
+let approval_model_command (m : Model.t) rest =
+  match Prigh_ui.Approval_model_command.parse rest with
+  | Show -> approval_models_picker m
+  | Error e -> error m (String.capitalize e)
+  | Set_model _ as action -> set_approval_model m action
 ;;
 
 let naming_summary config =
@@ -6697,7 +6745,7 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
        error
          m
          (sprintf
-            "Unknown setting “%s”: use on, off, ask, auto-edit or auto."
+            "Unknown setting “%s”: use on, off, ask, auto-edit, smart or auto."
             other))
   | "budget", "" ->
     current_state m ~f:(fun s ->
@@ -6901,6 +6949,7 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
      | Error message -> error m message)
   | "compaction", rest -> compaction_command m rest
   | "generate-model", rest -> generate_model_command m rest
+  | "approval-model", rest -> approval_model_command m rest
   | "naming", rest -> naming_command m rest
   | "auto-archive", rest -> auto_archive_command m rest
   | "dictation", rest -> dictation_command m rest
@@ -8384,6 +8433,15 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
            e)
     in
     m, cmds @ [ rpc "get_config" [] ~tag:Config ]
+  | Approval_model_saved, Error e ->
+    let m, cmds =
+      error
+        m
+        (sprintf
+           "Couldn't set the approval model: %s. Pick one with /approval-model"
+           e)
+    in
+    m, cmds @ [ rpc "get_config" [] ~tag:Config ]
   | Naming_saved, Error e ->
     let m, cmds =
       error
@@ -9103,6 +9161,9 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
   | Generate_model_saved, Ok json ->
     decode m json Config.of_json ~f:(fun config ->
       toast { m with config = Some config } (generate_model_summary config))
+  | Approval_model_saved, Ok json ->
+    decode m json Config.of_json ~f:(fun config ->
+      toast { m with config = Some config } (approval_model_summary config))
   | Naming_saved, Ok json ->
     decode m json Config.of_json ~f:(fun config ->
       toast { m with config = Some config } (naming_summary config))
@@ -10155,6 +10216,17 @@ let picker_accepted (m : Model.t) ~kind (item : Picker.Item.t) =
     | Generate_models ->
       let m, cmds =
         set_generate_model
+          m
+          (Set_model (Option.some_if (not (String.equal item.id "off")) item.id))
+      in
+      if m.return_to_settings
+      then
+        ( { m with dialog = Some Settings; return_to_settings = false }
+        , Command.Focus "dialog" :: cmds )
+      else m, cmds
+    | Approval_models ->
+      let m, cmds =
+        set_approval_model
           m
           (Set_model (Option.some_if (not (String.equal item.id "off")) item.id))
       in
@@ -11277,6 +11349,7 @@ let update_connected (m : Model.t) (action : Action.t) =
                   { kind =
                       ( Compaction_models
                       | Generate_models
+                      | Approval_models
                       | Naming_models
                       | Dictation_models
                       | Defaults _ )

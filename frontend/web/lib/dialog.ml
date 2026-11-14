@@ -29,6 +29,7 @@ module Picker_kind = struct
     | Accents
     | Compaction_models
     | Generate_models
+    | Approval_models
     | Naming_models
     | Dictation_models
     | Defaults of New_default.Picker.t
@@ -175,6 +176,7 @@ let per_session = function
           | Accents
           | Compaction_models
           | Generate_models
+          | Approval_models
           | Naming_models
           | Dictation_models
           | Defaults _

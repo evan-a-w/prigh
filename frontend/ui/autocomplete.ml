@@ -338,6 +338,7 @@ let argument_items
   | Agents
   | Compaction
   | Generate_model
+  | Approval_model
   | Naming
   | Dictation -> None
   | Server -> Some (server_items server)
@@ -532,6 +533,7 @@ let compute_argument
                 | Agents
                 | Compaction
                 | Generate_model
+                | Approval_model
                 | Naming
                 | Dictation ) as kind ->
                 let rest = String.drop_prefix line start in
@@ -542,6 +544,8 @@ let compute_argument
                    | Compaction -> Compaction_command.complete ~models rest
                    | Generate_model ->
                      Generate_model_command.complete ~models rest
+                   | Approval_model ->
+                     Approval_model_command.complete ~models rest
                    | Naming -> Naming_command.complete ~models rest
                    | Dictation -> Dictation_command.complete rest
                    | _ -> Remind_command.complete ~reminders rest)

@@ -541,6 +541,8 @@ let session_stats (s : Agent.Session_stats.t) =
     ; "compactions", int s.compactions
     ; "masks", int s.masks
     ; "duration_seconds", float s.duration_seconds
+    ; "approvals_judged", int s.approvals_judged
+    ; "approvals_cost_usd", float s.approvals_cost_usd
     ]
 ;;
 
@@ -585,7 +587,7 @@ let entry (e : Session.Entry.t) =
       ]
     | Pinned { pinned } ->
       [ "kind", str "pinned"; ("pinned", if pinned then `True else `False) ]
-    | Spend { usage = u; cost_usd } ->
+    | Spend { usage = u; cost_usd; purpose = _ } ->
       [ "kind", str "spend"; "usage", usage u; "cost_usd", float cost_usd ]
     | Resume_at { at } ->
       [ "kind", str "resume_at"
@@ -767,6 +769,13 @@ let rec event ?now (e : Agent.Event.t) =
       ; "rules", `Array (List.map rules ~f:str)
       ]
       @ Confirm_kind.to_json_fields kind
+    | Loop (Tool_allowed { call_id; agent_id; model; reason }) ->
+      [ "event", str "tool_allowed"
+      ; "call_id", str call_id
+      ; "agent_id", Option.value_map agent_id ~default:`Null ~f:str
+      ; "model", str model
+      ; "reason", str reason
+      ]
     | Loop (Tool_confirm_done { call_id; agent_id }) ->
       [ "event", str "tool_confirm_done"
       ; "call_id", str call_id

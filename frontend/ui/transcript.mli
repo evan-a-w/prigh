@@ -42,6 +42,9 @@ module Item : sig
         ; result : P.Message.Tool_result.t option
         ; live_tail : string option
         ; subagent : Subagent.t option
+        ; allowed : string option
+          (** the approval model let it run ([smart] mode): its note,
+              {!Confirm_prompt.allowed} *)
         }
     | Server_tool of
         { tool : P.Content.Server_tool.t

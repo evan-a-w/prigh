@@ -75,6 +75,8 @@ module Reply_tag = struct
     | Compaction_saved of string
     | Generate_model_shown
     | Generate_model_saved of string
+    | Approval_model_shown
+    | Approval_model_saved of string
     | Naming_shown
     | Naming_saved of string
     | Auto_archive_shown
@@ -1468,6 +1470,8 @@ let format_stats (s : P.Session_stats.t) : Content.t =
     ; "model changes", Int.to_string s.model_changes
     ; "compactions", Int.to_string s.compactions
     ; "maskings", Int.to_string s.masks
+    ; ( "approvals"
+      , sprintf "%d judged, $%.4f" s.approvals_judged s.approvals_cost_usd )
     ; "duration", sprintf "%.1fs" s.duration_seconds
     ]
   in
@@ -3231,6 +3235,24 @@ let generate_model_command m (cmd : Commands.Parsed.t) =
       ] )
 ;;
 
+let approval_model_command m (cmd : Commands.Parsed.t) =
+  match Approval_model_command.parse cmd.rest with
+  | Show ->
+    show_config
+      m
+      ~tag:Approval_model_shown
+      ~summary:Approval_model_command.summary
+  | Error e ->
+    ( error (restore_command m (String.strip ("/approval-model " ^ cmd.rest))) e
+    , [] )
+  | Set_model _ as action ->
+    ( m
+    , [ set_config
+          ~tag:(Approval_model_saved ("/approval-model " ^ cmd.rest))
+          (Approval_model_command.fields action)
+      ] )
+;;
+
 let naming_command m (cmd : Commands.Parsed.t) =
   match Naming_command.parse cmd.rest with
   | Show -> show_config m ~tag:Naming_shown ~summary:Naming_command.summary
@@ -4389,7 +4411,7 @@ let run_command m (cmd : Commands.Parsed.t) =
        ( error
            m
            (sprintf
-              "unknown argument %S; use on, off, ask, auto-edit or auto"
+              "unknown argument %S; use on, off, ask, auto-edit, smart or auto"
               other)
        , [] ))
   | "notify", [] -> notice m (notify_summary m), []
@@ -4417,6 +4439,7 @@ let run_command m (cmd : Commands.Parsed.t) =
   | "compaction", _ -> compaction_command m cmd
   | "dictation", _ -> dictation_command m cmd
   | "generate-model", _ -> generate_model_command m cmd
+  | "approval-model", _ -> approval_model_command m cmd
   | "naming", _ -> naming_command m cmd
   | "auto-archive", _ -> auto_archive_command m cmd
   | "auth", _ ->
@@ -6733,6 +6756,7 @@ let event m (e : P.Event.t) =
   | Tool_start _
   | Tool_output _
   | Tool_end _
+  | Tool_allowed _
   | Compacted _
   | Masked _
   | Notice _
@@ -6904,6 +6928,7 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
      | Default_dir_saved text
      | Compaction_saved text
      | Generate_model_saved text
+     | Approval_model_saved text
      | Naming_saved text
      | Default_host_saved text
      | Default_budget_saved text
@@ -7543,6 +7568,12 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
          ( notice
              { m with config = Some config }
              (Generate_model_command.summary config)
+         , [] ))
+     | Approval_model_shown | Approval_model_saved _ ->
+       decode json ~f:P.Config.of_json (fun config ->
+         ( notice
+             { m with config = Some config }
+             (Approval_model_command.summary config)
          , [] ))
      | Naming_shown | Naming_saved _ ->
        decode json ~f:P.Config.of_json (fun config ->

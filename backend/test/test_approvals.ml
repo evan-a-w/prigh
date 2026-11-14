@@ -884,9 +884,9 @@ let%expect_test
     (Ok (Auto_edit "{\"allow\":[],\"ask\":[],\"deny\":[]}"))
     (Error
      (config.approval_mode
-      "unknown approval mode \"careful\"; the modes are ask, auto-edit, auto"))
+      "unknown approval mode \"careful\"; the modes are ask, auto-edit, auto, smart"))
     (config.approval_mode
-     "unknown approval mode \"careful\"; the modes are ask, auto-edit, auto") (in $DIR/.prigh/config.json); prigh ignores the file's settings until it is fixed
+     "unknown approval mode \"careful\"; the modes are ask, auto-edit, auto, smart") (in $DIR/.prigh/config.json); prigh ignores the file's settings until it is fixed
     (Ok (Auto "{\"allow\":[\"bash(ls:*)\"],\"ask\":[],\"deny\":[]}"))
     permissions.allow: rule "bash(ls": the pattern must end with ")" (left out) in $DIR/.prigh/config.json
     permissions.maybe is not a list prigh knows (allow, ask, deny) in $DIR/.prigh/config.json
@@ -925,6 +925,7 @@ let%expect_test
       "compact_at_tokens": 200000,
       "compaction_model": null,
       "naming_model": null,
+      "approval_model": null,
       "dictation_model": null,
       "trace": "default"
     }

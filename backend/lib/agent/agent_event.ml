@@ -41,6 +41,15 @@ type t =
       { call_id : string
       ; agent_id : string option
       } (** answered (by any frontend), let through or withdrawn *)
+  | Tool_allowed of
+      { call_id : string
+      ; agent_id : string option
+      ; model : string (** the approval model's key *)
+      ; reason : string
+      }
+  (** The approval model ([smart] mode, {!Approval_judge}) let the call run
+      without asking the user, for [reason]; frontends note it on the
+      call. *)
   | Ask_user of
       { call_id : string
       ; questions : User_question.t list

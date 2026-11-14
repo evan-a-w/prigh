@@ -208,6 +208,7 @@ module Reply_tag : sig
     (** the new config: the settings' New sessions changed a default *)
     | Compaction_saved (** the new config; its settings are shown *)
     | Generate_model_saved (** the new config; the drafting model is shown *)
+    | Approval_model_saved (** the new config; the approval model is shown *)
     | Naming_saved (** the new config; the naming model is shown *)
     | Auto_archive_saved (** the new config; the age is shown *)
     | Dictation_saved (** the new config; the dictation model is shown *)
@@ -753,7 +754,7 @@ module Action : sig
     | Send_confirm_reason (** deny with the reason typed *)
     | Cancel_confirm_reason (** back to the answers, nothing sent *)
     | Question of Question_dialog.Action.t (** the oldest [ask_user] dialog *)
-    | Cycle_mode (** Alt+M: ask → auto-edit → auto → plan *)
+    | Cycle_mode (** Alt+M: ask → auto-edit → smart → auto → plan *)
     | Add_image of Image.t
     | Remove_image of int
     | Paste_text of string
