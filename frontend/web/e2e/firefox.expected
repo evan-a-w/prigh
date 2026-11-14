@@ -2906,6 +2906,26 @@ session: cancelled; field menus: 0
   Paste  Ctrl+V
   Select all  Ctrl+A
 dialog: 1; focus: dialog's field; "renamed" selected 0-7
+=== firefox: field_menu: the terminal ===
+selected: "copy-me-please"
+terminal: cancelled; menu at the pointer
+> Copy  Ctrl+Shift+C
+  Paste  Ctrl+Shift+V
+  Select all
+still selected: "copy-me-please"
+clipboard: "copy-me-please"
+the shell has the focus: true
+Shift+F10: menu under the cursor
+=== firefox: field_menu: the terminal: paste ===
+> Copy  Ctrl+Shift+C
+  Paste  Ctrl+Shift+V
+  Select all
+=== firefox: field_menu: the terminal: select all ===
+selected: the whole screen
+=== firefox: field_menu: the terminal: Ctrl+Shift+C and Ctrl+Shift+V ===
+clipboard: "pasted-from-the-menu"
+Ctrl+C: interrupted
+the shell saw: ["$ echo copy-me-please","$ echo pasted-from-the-menu","pasted-from-the-menu","$ echo pasted-by-keys","pasted-by-keys"]
 === firefox: field_menu: errors ===
 none
 === firefox: desktop_links: the browser shell, with the app's binding ===

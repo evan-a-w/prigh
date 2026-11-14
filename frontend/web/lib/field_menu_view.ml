@@ -47,9 +47,10 @@ let view (m : App.Model.t) ~inject =
           ]
         [ icon (item_icon item)
         ; span ~cls:"menu-label" (Field_menu.Item.label item)
-        ; Node.kbd
-            ~attrs:[ Attr.class_ "menu-command" ]
-            [ Node.text (Field_menu.Item.key item) ]
+        ; (match Field_menu.Item.key (Field_menu.field menu).kind item with
+           | None -> Node.none
+           | Some key ->
+             Node.kbd ~attrs:[ Attr.class_ "menu-command" ] [ Node.text key ])
         ]
     in
     let section items = div ~cls:"menu-section" (List.map items ~f:row) in
@@ -74,6 +75,6 @@ let view (m : App.Model.t) ~inject =
             ; Attr.create "aria-label" "Edit"
             ; Attr.tabindex (-1)
             ]
-          [ section [ Cut; Copy; Paste ]; section [ Select_all ] ]
+          (List.map (Field_menu.sections menu) ~f:section)
       ]
 ;;

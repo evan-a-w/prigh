@@ -2,27 +2,47 @@ open! Core
 open Js_of_ocaml
 module Field_menu = Prigh_web.Field_menu
 
-let field : Dom_html.element Js.t option ref = ref None
+(* What the menu was opened on: a text field, or xterm.js's element with the
+   handle bin/terminal.js puts on it. *)
+module Target = struct
+  type t =
+    | Field of Dom_html.element Js.t
+    | Terminal of Dom_html.element Js.t
+
+  let element = function
+    | Field el | Terminal el -> el
+  ;;
+end
+
+let target : Target.t option ref = ref None
 let text_types = [ "text"; "search"; "url"; "tel"; "email"; "password" ]
 
-let closest (el : Dom_html.element Js.t) selector =
-  Js.Opt.test
+let closest (el : Dom_html.element Js.t) selector : Dom_html.element Js.t option
+  =
+  Js.Opt.to_option
     (Js.Unsafe.meth_call
        el
        "closest"
-       [| Js.Unsafe.inject (Js.string selector) |]
-     : Dom_html.element Js.t Js.opt)
+       [| Js.Unsafe.inject (Js.string selector) |])
 ;;
+
+let terminal_handle el = Js.Unsafe.get el (Js.string "prighTerminal")
 
 let text_field (el : Dom_html.element Js.t) =
   let type_ () =
     String.lowercase (Js.to_string (Js.Unsafe.get el (Js.string "type")))
   in
   match String.lowercase (Js.to_string el##.tagName) with
-  (* xterm's own textarea: the terminal does its own pasting. *)
-  | "textarea" -> not (closest el ".xterm")
+  | "textarea" -> true
   | "input" -> List.mem text_types (type_ ()) ~equal:String.equal
   | _ -> false
+;;
+
+let find (el : Dom_html.element Js.t) : Target.t option =
+  match closest el ".xterm" with
+  | Some term when Js.Optdef.test (terminal_handle term) -> Some (Terminal term)
+  | Some _ -> None
+  | None -> Option.some_if (text_field el) (Target.Field el)
 ;;
 
 let int_field el name =
@@ -34,14 +54,25 @@ let int_field el name =
 
 let bool_field el name = Js.to_bool (Js.Unsafe.get el (Js.string name))
 
-let describe (el : Dom_html.element Js.t) : Field_menu.Field.t =
-  { selection = int_field el "selectionStart" < int_field el "selectionEnd"
-  ; editable = not (bool_field el "readOnly" || bool_field el "disabled")
-  ; secret =
-      String.equal
-        (String.lowercase (Js.to_string (Js.Unsafe.get el (Js.string "type"))))
-        "password"
-  }
+let describe : Target.t -> Field_menu.Field.t = function
+  | Field el ->
+    { kind = Text_field
+    ; selection = int_field el "selectionStart" < int_field el "selectionEnd"
+    ; editable = not (bool_field el "readOnly" || bool_field el "disabled")
+    ; secret =
+        String.equal
+          (String.lowercase
+             (Js.to_string (Js.Unsafe.get el (Js.string "type"))))
+          "password"
+    }
+  | Terminal el ->
+    { kind = Terminal
+    ; selection =
+        Js.to_bool
+          (Js.Unsafe.meth_call (terminal_handle el) "hasSelection" [||])
+    ; editable = true
+    ; secret = false
+    }
 ;;
 
 let install ~schedule =
@@ -52,13 +83,12 @@ let install ~schedule =
        Dom_html.window
        (Dom.Event.make "contextmenu")
        (Dom.handler (fun (ev : Dom_html.mouseEvent Js.t) ->
-          let target =
-            Option.filter (Js.Opt.to_option ev##.target) ~f:text_field
-          in
+          let clicked = Js.Opt.to_option ev##.target in
+          let found = Option.bind clicked ~f:find in
           match
             Field_menu.decide
               ~browser_shell:(Desktop_page.in_browser ())
-              (Option.map target ~f:describe)
+              (Option.map found ~f:describe)
           with
           | Native -> Js._true
           | Suppress ->
@@ -68,13 +98,14 @@ let install ~schedule =
             Dom.preventDefault ev;
             (* The field's own: not also a menu of what it is in. *)
             Dom_html.stopPropagation ev;
-            field := target;
+            target := found;
             let x = Float.to_int (Js.to_float ev##.clientX)
             and y = Float.to_int (Js.to_float ev##.clientY) in
             let anchor : Prigh_web.Context_menu.Anchor.t =
-              match target with
+              match clicked with
               | Some el when x = 0 && y = 0 ->
-                (* From the keyboard: under the field's top left corner. *)
+                (* From the keyboard: under the field's top left corner (the
+                   terminal's input follows its cursor). *)
                 let r = el##getBoundingClientRect in
                 Point
                   { x = Float.to_int (Js.to_float r##.left)
@@ -167,41 +198,77 @@ let read_clipboard () : string option Async_kernel.Deferred.t =
   else Async_kernel.Deferred.return None
 ;;
 
-let edit (item : Field_menu.Item.t option) =
+let copy_selection text ~key =
+  let%map.Async_kernel.Deferred copied = Browser.copy_to_clipboard text in
+  Option.some_if
+    (not copied)
+    (sprintf "Could not copy to the clipboard: press %s instead." key)
+;;
+
+let edit_field el (item : Field_menu.Item.t option) =
   let open Async_kernel in
-  match !field with
+  el##focus;
+  match item with
   | None -> return None
-  | Some el when not (Js.to_bool (Js.Unsafe.get el (Js.string "isConnected")))
-    ->
-    field := None;
+  | Some Select_all ->
+    ignore (Js.Unsafe.meth_call el "select" [||] : Js.Unsafe.any);
     return None
-  | Some el ->
-    el##focus;
-    (match item with
-     | None -> return None
-     | Some Select_all ->
-       ignore (Js.Unsafe.meth_call el "select" [||] : Js.Unsafe.any);
-       return None
-     | Some ((Cut | Copy) as item) ->
-       let text = selected_text el in
-       let%map.Deferred copied = Browser.copy_to_clipboard text in
-       if not copied
-       then Some "Could not copy to the clipboard: press Ctrl+C instead."
-       else (
-         (match item with
-          | Cut ->
-            el##focus;
-            replace el ""
-          | Copy | Paste | Select_all -> ());
-         None)
-     | Some Paste ->
-       (match%map.Deferred read_clipboard () with
-        | None ->
-          Some
-            "The browser would not let prigh read the clipboard: press Ctrl+V \
-             to paste."
-        | Some text ->
-          el##focus;
-          replace el text;
-          None))
+  | Some ((Cut | Copy) as item) ->
+    let%map failed = copy_selection (selected_text el) ~key:"Ctrl+C" in
+    (match item, failed with
+     | Cut, None ->
+       el##focus;
+       replace el ""
+     | (Cut | Copy | Paste | Select_all), _ -> ());
+    failed
+  | Some Paste ->
+    (match%map.Deferred read_clipboard () with
+     | None ->
+       Some
+         "The browser would not let prigh read the clipboard: press Ctrl+V to \
+          paste."
+     | Some text ->
+       el##focus;
+       replace el text;
+       None)
+;;
+
+let edit_terminal el (item : Field_menu.Item.t option) =
+  let open Async_kernel in
+  let term = terminal_handle el in
+  let call name args =
+    ignore (Js.Unsafe.meth_call term name args : Js.Unsafe.any)
+  in
+  call "focus" [||];
+  match item with
+  | None | Some Cut -> return None
+  | Some Select_all ->
+    call "selectAll" [||];
+    return None
+  | Some Copy ->
+    copy_selection
+      (Js.to_string (Js.Unsafe.meth_call term "selection" [||]))
+      ~key:"Ctrl+Shift+C"
+  | Some Paste ->
+    (match%map.Deferred read_clipboard () with
+     | None ->
+       Some
+         "The browser would not let prigh read the clipboard: press \
+          Ctrl+Shift+V to paste."
+     | Some text ->
+       call "paste" [| Js.Unsafe.inject (Js.string text) |];
+       None)
+;;
+
+let edit (item : Field_menu.Item.t option) =
+  match !target with
+  | None -> Async_kernel.return None
+  | Some t
+    when not
+           (Js.to_bool
+              (Js.Unsafe.get (Target.element t) (Js.string "isConnected"))) ->
+    target := None;
+    Async_kernel.return None
+  | Some (Field el) -> edit_field el item
+  | Some (Terminal el) -> edit_terminal el item
 ;;
