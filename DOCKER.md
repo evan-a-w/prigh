@@ -217,7 +217,11 @@ How it fits together:
   entrypoint starts as root (and restarts if it exits; if it keeps failing,
   prigh runs on without it and the startup line says `nix: NOT RUNNING`).
   Every user's environment (tool hosts, `prigh-docker as`) has
-  `NIX_REMOTE=daemon` and `~/.nix-profile/bin` on PATH.
+  `NIX_REMOTE=daemon` and `~/.nix-profile/bin` on PATH. Shells keep the
+  profile on PATH too: `/etc/profile.d/nix-path.sh` (also sourced by
+  `/etc/bash.bashrc`) adds `~/.local/state/nix/profiles/profile/bin`, which
+  login shells (the terminal panel's, `bash -l`) and `docker exec` would
+  otherwise lose.
 - **Users are not trusted** by Nix (`/etc/nix/nix.conf`): they cannot add
   substituters or keys or change the sandbox settings, so everything they
   substitute is signed by `cache.nixos.org`. Packages not in the cache are
