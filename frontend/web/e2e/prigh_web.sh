@@ -18,7 +18,9 @@
 # context before a message and undoing it, then filter.mjs, the transcript
 # filter's button, menu and note, on a desktop and a phone, then
 # search.mjs, the sidebar's search of titles and messages, on a desktop
-# and two phones, then
+# and two phones, then session_links.mjs, links to sessions in a reply
+# followed in place, in a new window, or to a toast, on a desktop and two
+# phones, then
 # viewer.mjs, the image viewer's fit, zoom and pan, then math.mjs,
 # TeX math drawn by KaTeX in the themes and on a phone, then clipboard.mjs,
 # copying without the Clipboard API (a plain http address), then
@@ -76,7 +78,7 @@ test -x "$PRIGH_BACKEND" || { echo "no backend at $PRIGH_BACKEND: build it (cd b
 test -f "$SITE/main.bc.js" || { echo "no site at $SITE: build it (cd frontend && dune build ./web/bin/site)" >&2; exit 1; }
 if [ -n "${SHOTS:-}" ]; then mkdir -p "$SHOTS"; fi
 
-scripts="prigh_web temporary accounts reconnect paging resilience:slow resilience:drops stability themes worktrees review review_git remote cli_signin desktop desktop_signin steer subagent_paged trim filter search viewer math clipboard field_menu desktop_links card status mobile terminal_keys long_press pwa compaction sessions_settings new_sessions memory user_info custom_instructions images:desktop images:phone images:small computer:desktop computer:phone computer:small ui"
+scripts="prigh_web temporary accounts reconnect paging resilience:slow resilience:drops stability themes worktrees review review_git remote cli_signin desktop desktop_signin steer subagent_paged trim filter search session_links viewer math clipboard field_menu desktop_links card status mobile terminal_keys long_press pwa compaction sessions_settings new_sessions memory user_info custom_instructions images:desktop images:phone images:small computer:desktop computer:phone computer:small ui"
 engines="${ENGINES:-chromium firefox webkit}"
 jobs="${JOBS:-$(nproc)}"
 # Measured peaks (PSS of the script, its backend and browser): 1.2 to 1.7 GiB,
