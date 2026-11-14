@@ -70,6 +70,7 @@ module Icon : sig
     | Bell
     | Bell_off
     | Shield
+    | Message
     | Gear
     | Cross
     | Dash

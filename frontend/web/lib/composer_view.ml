@@ -219,10 +219,18 @@ let model_chip (m : App.Model.t) (state : State.t) ~inject =
 ;;
 
 (* Where tools run, always named, also while that host is disconnected (its
-   server struck through, "offline" beside it); no host at all is lit. *)
+   server struck through, "offline" beside it); no host at all is lit. A
+   chat uses none. *)
 let host_chip (m : App.Model.t) (state : State.t) ~inject =
   let cls, title, aria, content =
     match Active_host.of_state state with
+    | _ when state.chat_mode ->
+      ( " chat"
+      , sprintf
+          "Chat mode uses no tool host (%s to work on one)"
+          Session_mode.leave_chat
+      , Some "No tool host (chat mode)"
+      , [ icon Server_off; span ~cls:"chip-label" "no host" ] )
     | Connected h ->
       ( ""
       , sprintf "Tools run on %s, in %s (/host switches)" h.name h.cwd
@@ -411,7 +419,12 @@ let connected (m : App.Model.t) =
 
 (* One line at any width (CSS cuts it with an ellipsis, never wraps it). *)
 let planning (m : App.Model.t) =
-  Option.value_map m.state ~default:false ~f:(fun (s : State.t) -> s.plan_mode)
+  Option.value_map m.state ~default:false ~f:(fun (s : State.t) ->
+    s.plan_mode && not s.chat_mode)
+;;
+
+let chatting (m : App.Model.t) =
+  Option.value_map m.state ~default:false ~f:(fun (s : State.t) -> s.chat_mode)
 ;;
 
 (* The text, and where the session works when that is what it shows. *)
@@ -440,6 +453,9 @@ let placeholder (m : App.Model.t) =
     | None when App.Model.running m && cramped -> text "Steer the agent…"
     | None when App.Model.running m ->
       text "Steer (Enter) or queue a follow-up (Alt+Enter)…"
+    | None when chatting m && cramped -> text "Chat: no files or commands…"
+    | None when chatting m ->
+      text "Chat, without a tool host: no files or commands. Ask anything…"
     | None when planning m && cramped ->
       text "Plan mode: /plan off to implement"
     | None when planning m ->
@@ -484,6 +500,7 @@ let view (m : App.Model.t) ~inject =
           ]
       ]
     [ Computer_banner.view m ~inject
+    ; No_host_banner.view m ~inject
     ; rest (Queue_view.view m ~inject)
     ; Node.div
         ~attrs:
