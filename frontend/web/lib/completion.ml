@@ -174,8 +174,7 @@ let argument_items
     simple
       [ ( "on"
         , Session_mode.describe { approval = Ask; plan = false; chat = false }
-          ^ " (mode ask)"
-        )
+          ^ " (mode ask)" )
       ; "off", "run tools without asking (mode auto)"
       ]
   | Mode ->

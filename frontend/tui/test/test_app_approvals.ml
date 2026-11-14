@@ -1029,7 +1029,8 @@ let%expect_test "chat mode: the status line says so, without the cwd or host" =
   in
   show 100;
   show 60;
-  [%expect {|
+  [%expect
+    {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
@@ -1052,12 +1053,15 @@ let%expect_test "/chat toggles chat mode; leaving returns to the mode before" =
   let h = Test_app.connected () in
   H.event h (State (with_mode ~plan_mode:true Auto_edit));
   command h "/chat";
-  H.event h (State { (with_mode ~plan_mode:true Auto_edit) with chat_mode = true });
+  H.event
+    h
+    (State { (with_mode ~plan_mode:true Auto_edit) with chat_mode = true });
   command h "/chat off";
   command h "/mode chat";
   command h "/chat maybe";
   H.show h;
-  [%expect {|
+  [%expect
+    {|
     (Rpc
       (method_ set_mode)
       (params (
@@ -1118,7 +1122,8 @@ let%expect_test "no tool host: Enter offers to send the message as a chat" =
   H.enter h;
   H.keys h "y";
   H.show h;
-  [%expect {|
+  [%expect
+    {|
     ▌ earlier question
       earlier answer
     ┌─ Confirm ────────────────────────────────────────────────┐

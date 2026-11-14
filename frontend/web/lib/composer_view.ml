@@ -528,7 +528,8 @@ let view (m : App.Model.t) ~inject =
                          ; Attr.id "editor"
                          ; Attr.placeholder placeholder
                          ; (match where with
-                            | Some _ when String.is_empty m.draft && not m.narrow ->
+                            | Some _
+                              when String.is_empty m.draft && not m.narrow ->
                               Attr.title placeholder
                             | Some _ | None -> Attr.empty)
                          ; Attr.create "aria-label" "Message"

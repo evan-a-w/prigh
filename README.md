@@ -2030,7 +2030,7 @@ that no longer exists.
 | Ctrl+L | pick a model |
 | Ctrl+P / Alt+P | cycle to the next / previous scoped model |
 | Ctrl+T | cycle the thinking level |
-| Alt+M | cycle the mode: ask → auto-edit → auto → plan (read-only) |
+| Alt+M | cycle the mode: ask → auto-edit → auto → plan (read-only) → chat (no tool host) |
 | Alt+N | pick a snippet to insert at the cursor (`/snippet`) |
 | Ctrl+N | picker: toggle the named-only / logged-in-only filter |
 | Tab / Alt+A / Alt+T / Alt+D | `/sessions`: mark a session / archive or unarchive it / pin or unpin it / delete every archived one |
@@ -3188,9 +3188,9 @@ things back.
 ### Approvals, plan mode, chat mode and questions
 
 Each session has an approval mode, always shown in the status line
-(`mode:ask`, `mode:auto-edit`, `mode:auto`, `mode:plan`; in prigh-web
-beside the model, along the composer's bottom edge) and switched with
-`/mode` or Alt+M (ask → auto-edit → auto → plan → ask):
+(`mode:ask`, `mode:auto-edit`, `mode:auto`, `mode:plan`, `mode:chat`; in
+prigh-web beside the model, along the composer's bottom edge) and switched
+with `/mode` or Alt+M (ask → auto-edit → auto → plan → chat → ask):
 
 - `ask`: destructive tools (`bash`, `write`, `edit`, `apply_patch`,
   `job_input`, which writes to a running job that may run what it reads,

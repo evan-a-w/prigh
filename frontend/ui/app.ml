@@ -2903,12 +2903,18 @@ let set_mode m (mode : Session_mode.t) =
 (* Plan mode leaves chat mode: planning needs the project. *)
 let set_plan m (s : P.State.t) ~on =
   let mode = Session_mode.of_state s in
-  set_mode m (if on then { mode with plan = true; chat = false } else { mode with plan = false })
+  set_mode
+    m
+    (if on
+     then { mode with plan = true; chat = false }
+     else { mode with plan = false })
 ;;
 
 let set_chat m (s : P.State.t) ~on =
   let mode = Session_mode.of_state s in
-  set_mode m (if on then { mode with chat = true } else Session_mode.leaving_chat mode)
+  set_mode
+    m
+    (if on then { mode with chat = true } else Session_mode.leaving_chat mode)
 ;;
 
 let cycle_mode m =
@@ -4213,8 +4219,7 @@ let run_command m (cmd : Commands.Parsed.t) =
   | "plan", [] ->
     (match m.state with
      | None -> notice m "not connected", []
-     | Some s ->
-       set_plan m s ~on:(s.chat_mode || not s.plan_mode))
+     | Some s -> set_plan m s ~on:(s.chat_mode || not s.plan_mode))
   | "plan", (("on" | "off") as on) :: _ ->
     (match m.state with
      | None -> notice m "not connected", []
@@ -6156,7 +6161,10 @@ let confirm m ~(action : Mode.Confirm_action.t) (intent : Intent.t) =
     | Remove_custom_instruction { back; _ } -> back_to m back, []
     | Clear_user_info -> notice m "kept what you set about yourself", []
     | Chat_without_host _ ->
-      notice m "not sent: the message stays in the editor (/chat, or a tool host)", []
+      ( notice
+          m
+          "not sent: the message stays in the editor (/chat, or a tool host)"
+      , [] )
     | Create_dir { path; _ } -> notice m (sprintf "not created: %s" path), []
     | Cd_to_checkout path ->
       notice m (sprintf "staying here; /cd %s goes there" path), []

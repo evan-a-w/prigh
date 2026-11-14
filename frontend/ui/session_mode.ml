@@ -72,8 +72,8 @@ let title t =
 let describe t =
   if t.chat
   then
-    "a chat without the tool host: no files, commands or project, only the \
-     web and other host-free tools, until you leave it ("
+    "a chat without the tool host: no files, commands or project, only the web \
+     and other host-free tools, until you leave it ("
     ^ leave_chat
     ^ ")"
   else if t.plan

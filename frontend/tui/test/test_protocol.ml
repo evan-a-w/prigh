@@ -491,7 +491,8 @@ let%expect_test "state: chat mode and why no tool host can run a message" =
        {|{%s,"plan_mode":true,"chat_mode":true,"no_host":"no tool host connected"}|}
        base);
   modes (sprintf {|{%s,"chat_mode":"yes"}|} base);
-  [%expect {|
+  [%expect
+    {|
     ((chat_mode false)
      (plan_mode false)
      (no_host ()))
