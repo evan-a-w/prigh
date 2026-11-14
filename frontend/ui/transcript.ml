@@ -112,6 +112,7 @@ let user_items (user : P.Message.User.t) : Item.t list =
     when (not (List.is_empty notes))
          && String.is_empty (String.strip (P.Message.User.body user))
          && List.is_empty user.images
+         && List.is_empty origin.pasted
          && List.is_empty origin.attachments -> notes
   | None -> [ user_item user ]
 ;;
@@ -589,6 +590,7 @@ let apply t (event : P.Event.t) =
   | P.Event.Memory_changed _
   | P.Event.User_info_changed _
   | P.Event.Custom_instructions_changed _
+  | P.Event.Mcp_settings_changed _
   | P.Event.Config_changed _
   | P.Event.Review _
   | P.Event.Generate_delta _
@@ -697,9 +699,21 @@ let user_notes (user : P.Message.User.t) ~verbosity =
       note_lines ~kind:n.kind ~title:n.title ~text:n.text ~verbosity))
 ;;
 
+(* Pasted texts are named, not shown: they are long. *)
 let attachment_lines (user : P.Message.User.t) =
   Option.value_map user.origin ~default:[] ~f:(fun origin ->
-    List.map origin.attachments ~f:(fun path ->
+    List.map origin.pasted ~f:(fun (p : P.Origin.Pasted.t) ->
+      Log_line.bar
+        turn_bar
+        [ { text = p.name; style = cyan }
+        ; { text =
+              "  "
+              ^ Pasted_text.summary ~lines:p.lines ~bytes:(String.length p.text)
+              ^ "  pasted"
+          ; style = dim
+          }
+        ])
+    @ List.map origin.attachments ~f:(fun path ->
       Log_line.bar
         turn_bar
         [ { text = "@" ^ path; style = cyan }

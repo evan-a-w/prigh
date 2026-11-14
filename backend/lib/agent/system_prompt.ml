@@ -66,7 +66,22 @@ let subagent_waiting ~has =
     @ [ "" ]
 ;;
 
-let base ~nix ~auto_background ~(role : Role.t) ~tools =
+let chat_intro =
+  [ "You are prigh, an assistant chatting with the user."
+  ; ""
+  ; "This is a chat (chat mode): you have no access to any machine. There is \
+     no project, working directory, shell or file system, so do not offer to \
+     run commands, read or change files or look at code you have not been \
+     shown. Answer from what you know, what the user tells you and the tools \
+     below. If something needs a machine, say so briefly: only the user can \
+     leave chat mode."
+  ; ""
+  ; "Guidelines:"
+  ; "- Be concise. Explain non-trivial points briefly. No filler."
+  ]
+;;
+
+let base ?(chat = false) ~nix ~auto_background ~(role : Role.t) ~tools () =
   let tool_list =
     String.concat
       ~sep:"\n"
@@ -78,21 +93,24 @@ let base ~nix ~auto_background ~(role : Role.t) ~tools =
   in
   String.concat
     ~sep:"\n"
-    ([ "You are prigh, a coding agent working in the user's project from the \
-        command line."
-     ; ""
-     ; "Guidelines:"
-     ; "- Use the tools to inspect and change the project; do not guess file \
-        contents."
-     ; sprintf
-         "- Prefer %s over write for existing files. Keep changes minimal and \
-          focused."
-         (if has "apply_patch" then "apply_patch" else "edit")
-     ; "- After making changes, verify them (build, tests) when a way to do so \
-        exists."
-     ; "- Be concise. Explain non-trivial decisions briefly. No filler."
-     ; "- Ask before destructive or irreversible actions."
-     ]
+    ((if chat
+      then chat_intro
+      else
+        [ "You are prigh, a coding agent working in the user's project from \
+           the command line."
+        ; ""
+        ; "Guidelines:"
+        ; "- Use the tools to inspect and change the project; do not guess \
+           file contents."
+        ; sprintf
+            "- Prefer %s over write for existing files. Keep changes minimal \
+             and focused."
+            (if has "apply_patch" then "apply_patch" else "edit")
+        ; "- After making changes, verify them (build, tests) when a way to do \
+           so exists."
+        ; "- Be concise. Explain non-trivial decisions briefly. No filler."
+        ; "- Ask before destructive or irreversible actions."
+        ])
      @ (if has Tool_computer.name then [ "- " ^ Tool_computer.guidance ] else [])
      @ (if has Tool_on_host.name
         then
@@ -167,7 +185,7 @@ let base ~nix ~auto_background ~(role : Role.t) ~tools =
                | [] -> "")
               (if List.length uses = 1 then "it signs in" else "they sign in")
           ])
-     @ (if Role.equal role Main && has "subagent"
+     @ (if Role.equal role Main && has "subagent" && not chat
         then
           [ "- You are the orchestrator: for substantial work (implementing a \
              feature, a multi-file change, a long investigation), spawn \
@@ -282,6 +300,7 @@ let build
       ?user_info
       ?session
       ?(custom_instructions = [])
+      ?(chat = false)
       ~cwd
       ~home
       ~tools
@@ -293,25 +312,33 @@ let build
     | None -> Date.to_string (Date.today ~zone:Time_float.Zone.utc)
   in
   let environment =
-    sprintf
-      "Environment:\n- Working directory: %s\n- Date: %s\n- OS: %s%s"
-      cwd
-      date
-      (Core_unix.Utsname.sysname (Core_unix.uname ()))
-      (match session with
-       | None -> ""
-       | Some id ->
-         sprintf
-           "\n\
-            - This session's link: %s. To refer to a session (this one or \
-            another) in a reply, link it: [its title](?session=ID)."
-           (Session_link.href id))
+    let link =
+      match session with
+      | None -> ""
+      | Some id ->
+        sprintf
+          "\n\
+           - This session's link: %s. To refer to a session (this one or \
+           another) in a reply, link it: [its title](?session=ID)."
+          (Session_link.href id)
+    in
+    if chat
+    then sprintf "Environment:\n- Date: %s%s" date link
+    else
+      sprintf
+        "Environment:\n- Working directory: %s\n- Date: %s\n- OS: %s%s"
+        cwd
+        date
+        (Core_unix.Utsname.sysname (Core_unix.uname ()))
+        link
   in
   let instructions =
     match instructions with
+    | _ when chat -> []
     | Some files -> files
     | None -> read_instructions ~cwd ~home
   in
+  let nix = nix && not chat in
   let instructions =
     List.map instructions ~f:(fun (path, text) ->
       sprintf "Instructions from %s:\n%s" path text)
@@ -324,7 +351,7 @@ let build
   in
   String.concat
     ~sep:"\n\n"
-    ([ base ~nix ~auto_background ~role ~tools ]
+    ([ base ~chat ~nix ~auto_background ~role ~tools () ]
      @ skills
      @ [ environment ]
      @ instructions
@@ -386,6 +413,27 @@ let plan_mode_note ~on =
   else
     "[Plan mode is off: you can change files and run commands again, as the \
      user's approval mode allows.]"
+;;
+
+let chat_mode_note ~on ~host ~cwd =
+  if on
+  then
+    "[Chat mode is on: this is now a chat, with no access to any machine. The \
+     tool host, the working directory, the shell, the file and project tools \
+     and the project instructions are gone: only the tools you are now offered \
+     remain, and calls to others are refused. Do not offer to run commands or \
+     touch files. Only the user leaves chat mode.]"
+  else
+    sprintf
+      "[Chat mode is off: you work on a machine again. %s Your tools are back. \
+       Project instructions (AGENTS.md/CLAUDE.md) may apply there: read them \
+       if the task involves the project.]"
+      (match host with
+       | Some host ->
+         sprintf "The tool host is %s and the working directory %s." host cwd
+       | None ->
+         "No tool host is connected yet: tools fail until one is (the user \
+          connects one).")
 ;;
 
 let client_note (client : Client_kind.t) =

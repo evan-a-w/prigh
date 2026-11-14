@@ -318,3 +318,21 @@ body.dropping-chat .composer-box::after { content: "Drop to attach to your messa
   .files-panel, .app.narrow .files-panel, .files-preview, .attach-chip { animation: none; }
   .files-bar::after, .attach-chip.uploading::after { transition: none; }
 }
+
+/* A long paste: its chip opens it (read, insert as text, remove). */
+.pasted-chip { padding-left: 0; max-width: 100%; }
+.pasted-chip .attach-chip-name { flex-shrink: 0; }
+.pasted-chip .attach-chip-detail { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.pasted-chip-open.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 0 2px 0 8px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+}
+.pasted-chip-open.btn:hover .attach-chip-name { text-decoration: underline; text-decoration-color: var(--faint); }
+.pasted-chip .attach-chip-name::before { content: "¶ "; color: var(--faint); }

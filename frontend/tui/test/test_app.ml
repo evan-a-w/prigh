@@ -782,7 +782,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /fallback [off|model...]      show or set the models that…
       /default-dir [off|path]       show or set the directory n…
       /default-host [off|name]      show or set the tool host p…
-      ↕ 1–8 of 81
+      ↕ 1–8 of 82
     ────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  think:off  Tab/Enter accept · Alt+S as typed
@@ -799,7 +799,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /fallback [off|model...]      show or set the models that…
       /default-dir [off|path]       show or set the directory n…
       /default-host [off|name]      show or set the tool host p…
-      ↕ 1–8 of 81
+      ↕ 1–8 of 82
     ────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  think:off  Tab/Enter accept · Alt+S as typed
@@ -816,7 +816,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /fallback [off|model...]      show or set the models that…
       /default-dir [off|path]       show or set the directory n…
       /default-host [off|name]      show or set the tool host p…
-      ↕ 1–8 of 81
+      ↕ 1–8 of 82
     ────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  think:off  Tab/Enter accept · Alt+S as typed
@@ -855,6 +855,7 @@ let%expect_test
       auto-edit
       auto
       plan
+      chat
     ────────────────────────────────────────────────────────────
     > /mode ▏
     deepseek-flash  Tab accepts · Enter as typed · Esc hides
@@ -883,7 +884,7 @@ let%expect_test "Esc closes autocomplete without abort while running" =
   [%expect
     {|
       earlier answer
-    ▸ /mode [ask|auto-edit|auto|plan]  pick or set the mode: wh…
+    ▸ /mode [ask|auto-edit|auto|plan|chat]  pick or set the mod…
       /model [name|id|provider/id]    pick or switch the model
       /scoped-models                  pick the models Ctrl+P cy…
       /generate-model [MODEL|off]     show which model drafts c…
@@ -2999,17 +3000,17 @@ let%expect_test "/auth, /help, /state, /clear, unknown method errors" =
     {|
     ┌─ Help ───────────────────────────────────────────────────┐
     │ Commands                                                 │
-    │ /help                              show commands and     │
+    │ /help                                 show commands and  │
     │ keys                                                     │
-    │ /hotkeys                           show keyboard         │
+    │ /hotkeys                              show keyboard      │
     │ shortcuts                                                │
-    │ /model [name|id|provider/id]       pick or switch the    │
+    │ /model [name|id|provider/id]          pick or switch the │
     │ model                                                    │
-    │ /scoped-models                     pick the models       │
+    │ /scoped-models                        pick the models    │
     │ Ctrl+P cycles through                                    │
-    │ /change_default                    save the current      │
+    │ /change_default                       save the current   │
     │ model and thinking level as the default for new sessions │
-    └───────── 1–11 of 352 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
+    └───────── 1–11 of 366 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
     ────────────────────────────────────────────────────────────
     > ▏
     deepseek-flash  ctx:0.1%/1.0M  ↑↓ scroll · Esc closes
@@ -7179,7 +7180,8 @@ let%expect_test "Alt+M cycles the mode; the status line shows it at once" =
       (method_ set_mode)
       (params (
         (approval_mode auto-edit)
-        (plan_mode     false)))
+        (plan_mode     false)
+        (chat_mode     false)))
       (tag (
         Mode_set
         "mode: auto-edit \226\128\148 file edits run; bash, job_input and MCP tools ask first")))
@@ -7197,26 +7199,29 @@ let%expect_test "Alt+M cycles the mode; the status line shows it at once" =
       (method_ set_mode)
       (params (
         (approval_mode auto)
-        (plan_mode     true)))
+        (plan_mode     true)
+        (chat_mode     false)))
       (tag (
         Mode_set
         "mode: plan \226\128\148 read-only planning, until you leave it (/plan off or Alt+M): no file edits; bash, job_input and MCP tools ask first")))
     (Rpc
       (method_ set_mode)
       (params (
-        (approval_mode ask)
-        (plan_mode     false)))
+        (approval_mode auto)
+        (plan_mode     true)
+        (chat_mode     true)))
       (tag (
         Mode_set
-        "mode: ask \226\128\148 bash, job_input, edits and MCP tools ask first")))
+        "mode: chat \226\128\148 a chat without the tool host: no files, commands or project, only the web and other host-free tools, until you leave it (/chat off or Alt+M)")))
     (Rpc
       (method_ set_mode)
       (params (
-        (approval_mode auto-edit)
-        (plan_mode     false)))
+        (approval_mode ask)
+        (plan_mode     false)
+        (chat_mode     false)))
       (tag (
         Mode_set
-        "mode: auto-edit \226\128\148 file edits run; bash, job_input and MCP tools ask first")))
+        "mode: ask \226\128\148 bash, job_input, edits and MCP tools ask first")))
     |}];
   (* A refusal puts the backend's mode back. *)
   H.reply_error h (Mode_set "x") "unknown approval mode";
@@ -7940,6 +7945,7 @@ let%expect_test "~ in the cwd shown is the active tool host's home, not ours" =
        ; namespace = None
        ; user = None
        ; superuser = false
+       ; features = []
        });
   show_where ~active:"client-2" ~cwd:"/home/me/d";
   [%expect
@@ -7984,6 +7990,7 @@ let%expect_test
        ; namespace = None
        ; user = None
        ; superuser = false
+       ; features = []
        });
   H.keys h "/host laptop";
   H.enter h;
@@ -8294,6 +8301,7 @@ let%expect_test "the host picker shows which session other frontends are in" =
        ; namespace = None
        ; user = None
        ; superuser = false
+       ; features = []
        });
   H.keys h "/host";
   H.enter h;
@@ -8622,7 +8630,7 @@ let%expect_test
       /fallback [off|model...]      show or set the models that…
       /default-dir [off|path]       show or set the directory n…
       /default-host [off|name]      show or set the tool host p…
-      ↕ 1–8 of 81
+      ↕ 1–8 of 82
     ────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  think:off  Tab/Enter accept · Alt+S as typed
@@ -8639,7 +8647,7 @@ let%expect_test
       /fallback [off|model...]      show or set the models that…
       /default-dir [off|path]       show or set the directory n…
       /default-host [off|name]      show or set the tool host p…
-      ↕ 1–8 of 81
+      ↕ 1–8 of 82
     ────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  think:off  Tab/Enter accept · Alt+S as typed
@@ -8924,7 +8932,7 @@ let%expect_test
                                 │   /fallback [off|model...]      show or set the models that take over, in order, when a model's usa…
                                 │   /default-dir [off|path]       show or set the directory new sessions start in (on the default hos…
                                 │   /default-host [off|name]      show or set the tool host prigh-web's new sessions start on (a term…
-     Alt+L hides · ⇧Tab focuses │   ↕ 1–8 of 81
+     Alt+L hides · ⇧Tab focuses │   ↕ 1–8 of 82
     ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
     > /▏
     /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01  Tab/Enter accept · Alt+S as typed
@@ -9091,6 +9099,7 @@ let%expect_test
        ; namespace = Some "lloyd"
        ; user = Some "lloyd"
        ; superuser = false
+       ; features = []
        });
   H.show h;
   [%expect
@@ -9365,6 +9374,7 @@ let%expect_test "/setusr: lists users, acts as one, reconnects as them" =
        ; namespace = Some "s"
        ; user = Some "s"
        ; superuser = false
+       ; features = []
        });
   H.keys h "/setusr";
   H.enter h;

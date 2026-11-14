@@ -5,6 +5,7 @@ type t =
   ; namespace : string option
   ; user : string option
   ; superuser : bool
+  ; features : string list [@sexp.list]
   }
 [@@deriving sexp_of, equal]
 
@@ -15,8 +16,13 @@ let of_json j =
   let client_id = Option.value host_id ~default:client_id in
   let%bind namespace = Json.string_opt_field j "namespace" in
   let%bind user = Json.string_opt_field j "user" in
-  let%map superuser = Json.bool_default_field j "superuser" ~default:false in
-  { client_id; namespace; user; superuser }
+  let%bind superuser = Json.bool_default_field j "superuser" ~default:false in
+  let%map features =
+    Json.optional_list_field j "features" ~f:(function
+      | `String s -> Ok s
+      | _ -> Or_error.error_string "features: a list of strings")
+  in
+  { client_id; namespace; user; superuser; features }
 ;;
 
 let acting_as t =
@@ -25,3 +31,5 @@ let acting_as t =
     Some namespace
   | _ -> None
 ;;
+
+let pasted_text t = List.mem t.features "pasted_text" ~equal:String.equal

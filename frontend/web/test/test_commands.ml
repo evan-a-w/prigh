@@ -30,6 +30,7 @@ let%expect_test "every command does something (none is unknown)" =
       ; namespace = Some "alice"
       ; user = Some "alice"
       ; superuser = true
+      ; features = []
       }
     in
     let m', commands =
@@ -87,6 +88,7 @@ let%expect_test "every command does something (none is unknown)" =
     /confirm                   picker: Tool confirmation
     /mode                      picker: When tools ask first (Alt+M cycles)
     /plan                      rpc set_mode
+    /chat                      rpc set_mode
     /todos                     toast: No plan: the model has not made one (it makes one with update_plan).
     /permissions               text: Permissions
     /notify                    toast: Notifications are on, but the browser has not been asked yet: /notify on asks it
@@ -227,6 +229,7 @@ let%expect_test "/help <command> and /hotkeys" =
     Enter / Alt+Enter (steering a subagent) send it a message: at its next step / when it ends its turn (its Steer button in the agents panel; /agents steer N TEXT sends one)
     Alt+↑ (steering a subagent) take its last queued message back
     Esc (steering a subagent) write to the main agent again
+    Ctrl+Shift+V / ⌘+Shift+V (in the message box) paste a long text into the box as text; a plain paste of over 2,000 characters or 40 lines becomes a Pasted text chip, sent whole with the message (its dialog: Insert as text, Remove)
     Ctrl+Shift+O a new temporary session (/temporary): not saved or listed, deleted when you leave it; on the new-session screen, its Temporary chip
     Ctrl+Shift+F open or close the file browser (/files): ↑↓ select, Enter opens, Backspace goes up, F2 renames, Delete deletes, Esc closes
     Alt+R open or close the review page (/review): the changes file by file, beside the chat
@@ -1064,7 +1067,12 @@ let%expect_test "/host: pick a host, then the directory there" =
   H.act
     h
     (Hello
-       { client_id = "c7"; namespace = None; user = None; superuser = false });
+       { client_id = "c7"
+       ; namespace = None
+       ; user = None
+       ; superuser = false
+       ; features = []
+       });
   run h "/host";
   H.text h ~selector:".picker-items";
   [%expect
@@ -1141,7 +1149,12 @@ let%expect_test "/cd and /host to a missing directory ask to create it" =
   H.act
     h
     (Hello
-       { client_id = "c7"; namespace = None; user = None; superuser = false });
+       { client_id = "c7"
+       ; namespace = None
+       ; user = None
+       ; superuser = false
+       ; features = []
+       });
   run h "/cd /work/new";
   H.reply h "set_cwd" {|{"missing":"/work/new"}|};
   H.text h ~selector:".modal";
@@ -1716,6 +1729,7 @@ let%expect_test "/setusr: a superuser acts as another user, and back" =
        ; namespace = Some "alice"
        ; user = Some "alice"
        ; superuser = false
+       ; features = []
        });
   run h "/setusr";
   H.reply h "list_users" {|["alice","bob","carol"]|};
@@ -1786,10 +1800,11 @@ let%expect_test "/setusr: a superuser acts as another user, and back" =
      (params
       ((keys
         (web.theme web.accent web.notify web.verbosity web.terminal-open
-         web.sidebar-folded web.sidebar-unfolded web.sidebar-worktree-hours
-         web.review history web.migrated web.sidebar-width web.files-width
-         web.files-preview-width web.agents-width web.terminal-height
-         web.review-chat-width web.review-files-width web.review-margin-width))))
+         web.sidebar-folded web.sidebar-unfolded web.sidebar-opened
+         web.sidebar-worktree-hours web.review history web.migrated
+         web.sidebar-width web.files-width web.files-preview-width
+         web.agents-width web.terminal-height web.review-chat-width
+         web.review-files-width web.review-margin-width))))
      (tag Prefs))
     Acting as bob
     Back to alice
@@ -1841,10 +1856,11 @@ let%expect_test "/retry-backend-connection, /state, /clear, /quit" =
      (params
       ((keys
         (web.theme web.accent web.notify web.verbosity web.terminal-open
-         web.sidebar-folded web.sidebar-unfolded web.sidebar-worktree-hours
-         web.review history web.migrated web.sidebar-width web.files-width
-         web.files-preview-width web.agents-width web.terminal-height
-         web.review-chat-width web.review-files-width web.review-margin-width))))
+         web.sidebar-folded web.sidebar-unfolded web.sidebar-opened
+         web.sidebar-worktree-hours web.review history web.migrated
+         web.sidebar-width web.files-width web.files-preview-width
+         web.agents-width web.terminal-height web.review-chat-width
+         web.review-files-width web.review-margin-width))))
      (tag Prefs))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s1.jsonl) (limit 1000000)))
@@ -1877,8 +1893,8 @@ let%expect_test "/retry-backend-connection, /state, /clear, /quit" =
      (usage ((input 0) (output 0) (cache_read 0))) (cost_usd 0)
      (context_tokens 0) (active_host backend) (active_host_name ()) (hosts ())
      (subagents ()) (jobs ()) (budget_usd ()) (goal ()) (reminders ())
-     (resume_at ()) (approval_mode Auto) (plan_mode false) (plan ())
-     (session_rules ()))
+     (resume_at ()) (approval_mode Auto) (plan_mode false) (chat_mode false)
+     (plan ()) (session_rules ()))
     (Done)
     |}];
   H.key h "Escape" ~target:Page;

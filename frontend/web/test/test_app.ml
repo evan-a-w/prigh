@@ -14,10 +14,11 @@ let%expect_test "startup, a prompt and its streamed reply" =
      (params
       ((keys
         (web.theme web.accent web.notify web.verbosity web.terminal-open
-         web.sidebar-folded web.sidebar-unfolded web.sidebar-worktree-hours
-         web.review history web.migrated web.sidebar-width web.files-width
-         web.files-preview-width web.agents-width web.terminal-height
-         web.review-chat-width web.review-files-width web.review-margin-width))))
+         web.sidebar-folded web.sidebar-unfolded web.sidebar-opened
+         web.sidebar-worktree-hours web.review history web.migrated
+         web.sidebar-width web.files-width web.files-preview-width
+         web.agents-width web.terminal-height web.review-chat-width
+         web.review-files-width web.review-margin-width))))
      (tag Prefs))
     (Set_url_session s1)
     (Rpc (method_ get_messages_page)
@@ -39,6 +40,7 @@ let%expect_test "startup, a prompt and its streamed reply" =
       ((key web.notify) (value ())) ((key web.verbosity) (value ()))
       ((key web.terminal-open) (value ())) ((key web.sidebar-folded) (value ()))
       ((key web.sidebar-unfolded) (value ()))
+      ((key web.sidebar-opened) (value ()))
       ((key web.sidebar-worktree-hours) (value ())) ((key web.review) (value ()))
       ((key history) (value ())) ((key web.migrated) (value (true)))
       ((key web.sidebar-width) (value ())) ((key web.files-width) (value ()))
@@ -47,6 +49,11 @@ let%expect_test "startup, a prompt and its streamed reply" =
       ((key web.review-chat-width) (value ()))
       ((key web.review-files-width) (value ()))
       ((key web.review-margin-width) (value ()))))
+    (Cache_prefs
+     (((key web.sidebar-opened) (value (((s1 "2026-10-05 10:00:00Z")))))))
+    (Rpc (method_ set_prefs)
+     (params ((prefs ((web.sidebar-opened ((s1 "2026-10-05 10:00:00Z")))))))
+     (tag Show_error))
     |}];
   Harness.act h (Set_draft "hello");
   Harness.act h Send;

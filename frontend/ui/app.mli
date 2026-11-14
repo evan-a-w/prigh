@@ -159,7 +159,8 @@ module Reply_tag : sig
     | Skills_for_autocomplete of string (** the [Location_cache] key *)
     | Skill_prompt of string
     (** a [/skill:] prompt, steer or follow-up; failing puts it back *)
-    | Mcp_picker
+    | Mcp_settings_for_picker
+    | Mcp_picker of P.Mcp_settings.t (** with the disabled ones listed *)
     | Memory_picker
     | Instructions_picker
     | Instruction_saved of string
@@ -352,6 +353,9 @@ module Model : sig
     ; superuser : bool
       (** [user] is a superuser (even when acting as another): has the
           commands only superusers have ([/nix-gc]) *)
+    ; pasted_text : bool
+      (** the backend takes prompts' [pasted] texts ([hello]'s [features]);
+          else they go inline *)
     ; stderr_tail : string list
     ; pending_confirms : P.Pending.Confirm.t list
     ; pending_questions : P.Pending.Ask.t list

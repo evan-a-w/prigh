@@ -10,6 +10,7 @@ open! Import
 
 val max_turns : int
 val name : string
+val continue_name : string
 
 (** Whether a call's arguments ask for a worktree of its own. *)
 val wants_worktree : Json.t -> bool

@@ -77,6 +77,12 @@ module State : sig
           epoch) *)
     ; approval_mode : Approval_mode.t
     ; plan_mode : bool
+    ; chat_mode : bool
+      (** a chat with no tool host ({!Chat_mode}); overrides [plan_mode] *)
+    ; no_host : string option
+      (** why a message outside chat mode cannot run now (no tool host is
+          connected, or the session's is gone for good), naming what to do,
+          chat mode included *)
     ; computer_control : string option
       (** the host (its name) whose screen the user allowed prigh to
           control, while that lasts ({!Computer_consent}) *)
@@ -160,6 +166,7 @@ module Queued : sig
         command's prompt *)
     ; source : Injected.Source.t option
     ; attachments : string list
+    ; pasted : string list
     ; images : Image.t list
     ; client : Client_kind.t option
       (** the kind of client that sent it; when it is sent to the model it
@@ -258,6 +265,9 @@ val create
   -> ?offered:(Tool.t -> bool)
        (** which of [tools] the model is given, asked again for every turn
            (the user's memory is offered while it is on); default: all *)
+  -> ?mcp_settings:Mcp_settings.t
+       (** the MCP servers from the user's settings: sent to every host the
+           session uses with its own; default: none *)
   -> ?user_info:User_info.t
        (** what the user wrote about themselves: in the system prompt of a
            new session, and told with the next message to a session that
@@ -280,6 +290,10 @@ val messages : t -> Message.t list
     contents are appended to the user message as [<file>] blocks, read with
     [Tool_read] limits (image files are attached as images, like [images]).
 
+    [pasted] are texts the user pasted, sent in full as [<pasted_text>]
+    blocks before them ({!Injected.Pasted}); one over
+    [Injected.Pasted.max_bytes] is refused, saying to attach it as a file.
+
     A text [/skill:NAME ARGS] invokes the skill [NAME] from the tool host
     ({!Skill.expand}); an unknown name is an error. *)
 
@@ -292,6 +306,7 @@ val messages : t -> Message.t list
 (** Starts a run. Fails if one is already running. *)
 val prompt
   :  ?attachments:string list
+  -> ?pasted:string list
   -> ?images:Image.t list
   -> ?client:Client_kind.t
   -> ?ui_action:Ui_action.t
@@ -303,6 +318,7 @@ val prompt
     run when idle. *)
 val steer
   :  ?attachments:string list
+  -> ?pasted:string list
   -> ?images:Image.t list
   -> ?client:Client_kind.t
   -> t
@@ -312,6 +328,7 @@ val steer
 (** Queued to run after the current run finishes, or starts a run when idle. *)
 val follow_up
   :  ?attachments:string list
+  -> ?pasted:string list
   -> ?images:Image.t list
   -> ?client:Client_kind.t
   -> ?ui_action:Ui_action.t
@@ -328,6 +345,11 @@ val skills : t -> Skill.t list Or_error.t
     host again), and problems are reported once each as [Notice]s. *)
 val mcp_servers : ?reconnect:bool -> t -> Mcp_tools.Listing.t Or_error.t
 
+(** The settings' MCP servers changed: the host starts and stops what
+    changed, and the session's tools follow (in the background; in chat
+    mode, which uses no host, at the first turn after it). *)
+val mcp_settings_changed : t -> unit
+
 (** Approves a project's MCP server on the host and starts it. *)
 val approve_mcp
   :  t
@@ -339,6 +361,10 @@ val approve_mcp
     that were queued and are therefore restored to the caller: steer messages
     in order, then follow-ups (not answers through components). Emits [Queue_update]. *)
 val abort : t -> string list
+
+(** [abort], with the messages restored as they were queued (their pasted
+    texts too). *)
+val abort_queued : t -> Queued.t list
 
 (** Pops the most recently queued message: follow-ups take priority over steer
     messages. Emits [Queue_update] when a message was removed. An answer
@@ -521,7 +547,14 @@ val save_as_default : t -> unit Or_error.t
     asks (unless a rule allows it). The model is told when plan mode changes
     ({!System_prompt.plan_mode_note}: with the next user message, or between
     turns of a running loop). Only the user leaves plan mode
-    ({!set_mode}): the model presents its plan and waits. *)
+    ({!set_mode}): the model presents its plan and waits.
+
+    Chat mode ({!Chat_mode}) ignores the tool host: the model is offered only
+    the tools that need none ([web_fetch] then runs in the backend), the
+    system prompt has no working directory or project instructions, any
+    other call is refused, and nothing waits for a host. Switching it is told
+    like plan mode ({!System_prompt.chat_mode_note}). Outside chat mode a
+    message is refused while no host can run it ([no_host]). *)
 
 (** Computer use asks the user first in every approval mode (a
     [Tool_confirm] of kind {!Confirm_kind.Computer_use}, timing out after
@@ -554,7 +587,17 @@ val respond_confirm
     session. Pending confirmations the new mode lets through are allowed;
     leaving plan mode, when idle, carries on an active goal (see
     {!set_goal}). *)
-val set_mode : ?approval:Approval_mode.t -> ?plan:bool -> t -> unit
+val set_mode
+  :  ?approval:Approval_mode.t
+  -> ?plan:bool
+  -> ?chat:bool
+  -> t
+  -> unit
+
+(** Puts a brand-new session (no messages, no mode chosen) in chat mode when
+    no tool host is connected, so that it can be used at once; leaving chat
+    mode, also once a host connects, is the user's choice. *)
+val chat_without_host : t -> unit
 
 (** Answers a pending [ask_user] call ([Answered], one list per question, or
     [Declined]). Unanswered, it times out at its deadline: the model gets

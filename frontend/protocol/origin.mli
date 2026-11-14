@@ -12,6 +12,7 @@ module Kind : sig
     | Tools
     (** a model change added or removed tools ([editor] from older backends) *)
     | Plan_mode (** plan mode turned on or off *)
+    | Chat_mode (** chat mode turned on or off *)
     | Delivery (** reports of finished subagents and jobs *)
     | Handover (** another model takes over *)
     | Goal (** [/goal] starts *)
@@ -53,13 +54,27 @@ module Source : sig
   [@@deriving sexp_of, equal]
 end
 
+module Pasted : sig
+  (** A long text the user pasted, sent apart from what they typed: the
+      model sees it whole, frontends show a chip. *)
+  type t =
+    { name : string (** [Pasted text #N] *)
+    ; lines : int
+    ; text : string
+    }
+  [@@deriving sexp_of, equal]
+end
+
 type t =
   { body : string option (** what the user wrote; [None] with a [source] *)
   ; notes : Note.t list
+  ; pasted : Pasted.t list
   ; attachments : string list (** paths *)
   ; source : Source.t option (** the whole message is the harness's *)
   }
 [@@deriving sexp_of, equal]
 
 val empty : t
-val of_json : Json.t -> t Or_error.t
+
+(** [text] is the message's, where the pasted texts are. *)
+val of_json : text:string -> Json.t -> t Or_error.t

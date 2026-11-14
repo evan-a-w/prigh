@@ -173,8 +173,8 @@ let argument_items
   | Confirm ->
     simple
       [ ( "on"
-        , Session_mode.describe { approval = Ask; plan = false } ^ " (mode ask)"
-        )
+        , Session_mode.describe { approval = Ask; plan = false; chat = false }
+          ^ " (mode ask)" )
       ; "off", "run tools without asking (mode auto)"
       ]
   | Mode ->
@@ -183,7 +183,7 @@ let argument_items
          ( name
          , Option.value_map
              (Session_mode.of_name
-                ~current:{ approval = Ask; plan = false }
+                ~current:{ approval = Ask; plan = false; chat = false }
                 name)
              ~default:""
              ~f:Session_mode.describe )))
@@ -191,6 +191,11 @@ let argument_items
     simple
       [ "on", "read-only planning until you turn it off"
       ; "off", "leave plan mode"
+      ]
+  | Chat ->
+    simple
+      [ "on", "a chat without the tool host until you turn it off"
+      ; "off", "leave chat mode, back to the mode before it"
       ]
   | Notify ->
     simple

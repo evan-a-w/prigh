@@ -144,7 +144,8 @@ module Reply_tag = struct
     | Reminder_added
     | Skills_for_autocomplete of string (** the [Location_cache] key *)
     | Skill_prompt of string (** the [/skill:] text sent *)
-    | Mcp_picker
+    | Mcp_settings_for_picker
+    | Mcp_picker of P.Mcp_settings.t (** with the disabled ones listed *)
     | Memory_picker
     | Instructions_picker
     | Instruction_saved of string (** the command, put back on failure *)
@@ -321,6 +322,7 @@ module Model = struct
     ; namespace : string option
     ; user : string option
     ; superuser : bool
+    ; pasted_text : bool
     ; stderr_tail : string list
     ; pending_confirms : P.Pending.Confirm.t list
     ; pending_questions : P.Pending.Ask.t list
@@ -372,6 +374,7 @@ module Model = struct
       ; namespace = t.namespace
       ; user = t.user
       ; superuser = t.superuser
+      ; features = []
       }
   ;;
 end
@@ -694,6 +697,7 @@ let init =
   ; namespace = None
   ; user = None
   ; superuser = false
+  ; pasted_text = false
   ; stderr_tail = []
   ; pending_confirms = []
   ; pending_questions = []
@@ -816,13 +820,45 @@ let decode_list json ~f =
   | other -> Or_error.errorf "expected array, got %s" (P.Json.to_string other)
 ;;
 
+let strings json = decode_list json ~f:P.Json.to_string_or_error
+
+(* The texts given back, each with its pasted texts ([pasted] is there when
+   any has some). *)
 let decode_restored json =
-  match P.Json.field json "restored" with
-  | None -> Ok []
-  | Some (`Array items) ->
-    Or_error.all (List.map items ~f:P.Json.to_string_or_error)
-  | Some other ->
-    Or_error.errorf "restored: expected array, got %s" (P.Json.to_string other)
+  let open Or_error.Let_syntax in
+  let%bind restored =
+    match P.Json.field json "restored" with
+    | None -> Ok []
+    | Some (`Array _ as items) -> strings items
+    | Some other ->
+      Or_error.errorf
+        "restored: expected array, got %s"
+        (P.Json.to_string other)
+  in
+  let%bind pasted = P.Json.optional_list_field json "pasted" ~f:strings in
+  match List.zip restored pasted with
+  | Ok pairs -> Ok pairs
+  | Unequal_lengths -> Ok (List.map restored ~f:(fun text -> text, []))
+;;
+
+(* A message given back to the editor: its pasted texts are tokens again,
+   where the text names them or else after it. *)
+let restore_pasted editor (text, pasted) =
+  let editor, pairs =
+    List.fold_mapi pasted ~init:editor ~f:(fun i editor p ->
+      let editor, token = Editor.paste_token editor p in
+      editor, (sprintf "[%s]" (Pasted_text.name (i + 1)), token))
+  in
+  let missing =
+    List.filter_map pairs ~f:(fun (name, token) ->
+      Option.some_if (not (String.is_substring text ~substring:name)) token)
+  in
+  ( editor
+  , String.concat
+      ~sep:" "
+      (List.filter
+         (Pasted_text.replace_tokens text pairs :: missing)
+         ~f:(Fn.non String.is_empty)) )
 ;;
 
 let logged_in m provider =
@@ -1785,8 +1821,8 @@ let skills_picker m (skills : P.Skill.t list) =
 let open_skills m = m, [ call List_skills ~tag:Skills_picker ]
 
 let mcp_config_hint =
-  "configure servers under \"mcpServers\" in ~/.prigh/mcp.json or a project's \
-   .mcp.json"
+  "add one with /mcp add NAME URL|COMMAND, in Settings → MCP servers, or under \
+   \"mcpServers\" in ~/.prigh/mcp.json or a project's .mcp.json"
 ;;
 
 let plural n word = sprintf "%d %s%s" n word (if n = 1 then "" else "s")
@@ -1803,28 +1839,60 @@ let mcp_problems m (list : P.Mcp_list.t) =
     warn m ("MCP config: " ^ problem))
 ;;
 
-let mcp_picker ?(problems = true) m (list : P.Mcp_list.t) =
+let mcp_disabled_prefix = "disabled:"
+let mcp_overridden_prefix = "overridden:"
+
+let mcp_picker ?(problems = true) ?(settings = []) m (list : P.Mcp_list.t) =
   let m = if problems then mcp_problems m list else m in
-  if List.is_empty list.servers
+  let source s = Mcp_command.source_label ~home:m.home s in
+  let disabled =
+    List.filter settings ~f:(fun (s : P.Mcp_settings.Server.t) -> not s.enabled)
+  in
+  (* Enabled settings servers a host or project file defines too. *)
+  let overridden =
+    List.filter_map settings ~f:(fun (s : P.Mcp_settings.Server.t) ->
+      if not s.enabled
+      then None
+      else
+        List.find list.servers ~f:(fun (l : P.Mcp_server.t) ->
+          String.equal l.name s.name
+          && not (String.equal l.source P.Mcp_settings.source))
+        |> Option.map ~f:(fun (l : P.Mcp_server.t) -> s.name, source l.source))
+  in
+  if List.is_empty list.servers && List.is_empty disabled
   then notice m ("no MCP servers; " ^ mcp_config_hint)
   else (
     let items =
       List.mapi list.servers ~f:(fun i (s : P.Mcp_server.t) ->
         Picker.Item.create
           ~id:(Int.to_string i)
-          ~detail:(mcp_status s ^ "  " ^ s.source)
-          ~search:(s.name ^ " " ^ s.source)
+          ~detail:(mcp_status s ^ "  " ^ source s.source)
+          ~search:(s.name ^ " " ^ source s.source)
           ~dimmed:(P.Mcp_server.Status.equal s.status Failed)
           s.name)
+      @ List.map disabled ~f:(fun (s : P.Mcp_settings.Server.t) ->
+        Picker.Item.create
+          ~id:(mcp_disabled_prefix ^ s.name)
+          ~detail:"disabled  Settings"
+          ~search:(s.name ^ " Settings")
+          ~dimmed:true
+          s.name)
+      @ List.map overridden ~f:(fun (name, by) ->
+        Picker.Item.create
+          ~id:(mcp_overridden_prefix ^ name)
+          ~detail:("overridden by " ^ by ^ "  Settings")
+          ~search:(name ^ " Settings")
+          ~dimmed:true
+          name)
     in
     open_picker m (Mcp list) (Picker.create ~title:"MCP servers" items))
 ;;
 
-let mcp_tools (s : P.Mcp_server.t) : Content.t =
+let mcp_tools ~source (s : P.Mcp_server.t) : Content.t =
   let header : Content.Line.t =
     [ { Content.Span.text = s.name; style = Style.bold (Style.fg Cyan) }
     ; { text = "  " ^ plural (List.length s.tools) "tool"; style = Style.plain }
-    ; { text = "  " ^ s.source; style = Style.dim Style.plain }
+    ; { text = "  " ^ source; style = Style.dim Style.plain }
     ]
   in
   let width =
@@ -1842,18 +1910,48 @@ let mcp_tools (s : P.Mcp_server.t) : Content.t =
 
 let mcp_selected m (list : P.Mcp_list.t) id =
   match Option.bind (Int.of_string_opt id) ~f:(List.nth list.servers) with
-  | None -> m, []
+  | None ->
+    (match String.chop_prefix id ~prefix:mcp_disabled_prefix with
+     | Some name ->
+       ( notice m (sprintf "%s is disabled; /mcp enable %s starts it" name name)
+       , [] )
+     | None ->
+       (match String.chop_prefix id ~prefix:mcp_overridden_prefix with
+        | Some name ->
+          let by =
+            List.find list.servers ~f:(fun (l : P.Mcp_server.t) ->
+              String.equal l.name name)
+            |> Option.value_map ~default:"a file on the host" ~f:(fun l ->
+              Mcp_command.source_label ~home:m.home l.source)
+          in
+          ( notice
+              m
+              (sprintf
+                 "the %s in your settings is not used: %s defines %s too, and \
+                  the closest definition wins; rename one of them to use both"
+                 name
+                 by
+                 name)
+          , [] )
+        | None -> m, []))
   | Some s ->
     (match s.status with
-     | Ready -> output m ~title:("MCP: " ^ s.name) (mcp_tools s), []
+     | Ready ->
+       ( output
+           m
+           ~title:("MCP: " ^ s.name)
+           (mcp_tools
+              ~source:(Mcp_command.source_label ~home:m.home s.source)
+              s)
+       , [] )
      | Failed ->
        ( error
            m
            (sprintf
-              "%s %s; check its entry in %s, then /mcp reconnect"
+              "%s %s; %s, then /mcp reconnect"
               s.name
               (mcp_status s)
-              s.source)
+              (Mcp_command.edit_hint s.source))
        , [] )
      | Needs_approval ->
        ( notice m (sprintf "approving %s from %s…" s.name s.source)
@@ -1864,7 +1962,7 @@ let mcp_selected m (list : P.Mcp_list.t) id =
 ;;
 
 (* One line per server, for [/mcp reconnect]. *)
-let mcp_summary (list : P.Mcp_list.t) : Content.t =
+let mcp_summary m (list : P.Mcp_list.t) : Content.t =
   let width =
     List.fold list.servers ~init:0 ~f:(fun acc (s : P.Mcp_server.t) ->
       Int.max acc (Text_width.string s.name))
@@ -1880,7 +1978,9 @@ let mcp_summary (list : P.Mcp_list.t) : Content.t =
       ; style = Style.bold Style.plain
       }
     ; { text = "  " ^ mcp_status s; style }
-    ; { text = "  " ^ s.source; style = Style.dim Style.plain }
+    ; { text = "  " ^ Mcp_command.source_label ~home:m.home s.source
+      ; style = Style.dim Style.plain
+      }
     ])
 ;;
 
@@ -2127,7 +2227,12 @@ let message_agent
           "steer_agent"
           ~params:
             [ "agent_id", str a.id
-            ; "text", str text
+            ; ( "text"
+              , str
+                  (let text, pasted =
+                     Pasted_text.resolve text (Editor.pasted m.editor)
+                   in
+                   Pasted_text.inline ~text pasted) )
             ; "mode", str (Queued_message.Kind.wire kind)
             ]
           ~tag:(Agent_message { agent_id = a.id; kind; text; retry })
@@ -2383,6 +2488,7 @@ let reset_connection m =
   ; namespace = None
   ; user = None
   ; superuser = false
+  ; pasted_text = false
   ; stderr_tail = []
   ; known_paths = String.Set.empty
   ; login_lines = []
@@ -2636,8 +2742,15 @@ let relinked m ~generation (outcome : Server_link.Outcome.t) =
        let m = reset_connection m in
        let m =
          match P.Hello_reply.of_json json with
-         | Ok { client_id; namespace; user; superuser } ->
-           { m with client_id = Some client_id; namespace; user; superuser }
+         | Ok ({ client_id; namespace; user; superuser; features = _ } as hello)
+           ->
+           { m with
+             client_id = Some client_id
+           ; namespace
+           ; user
+           ; superuser
+           ; pasted_text = P.Hello_reply.pasted_text hello
+           }
          | Error _ -> m
        in
        let m = { m with connection = Connected } in
@@ -2705,11 +2818,17 @@ let reconnect_reply m ~generation result =
          ~delay_ms
          ~session
      | Ok json ->
-       let client_id, namespace, user, superuser =
+       let client_id, namespace, user, superuser, pasted_text =
          match P.Hello_reply.of_json json with
-         | Ok { client_id; namespace; user; superuser } ->
-           Some client_id, namespace, user, superuser
-         | Error _ -> m.client_id, m.namespace, m.user, m.superuser
+         | Ok ({ client_id; namespace; user; superuser; features = _ } as hello)
+           ->
+           ( Some client_id
+           , namespace
+           , user
+           , superuser
+           , P.Hello_reply.pasted_text hello )
+         | Error _ ->
+           m.client_id, m.namespace, m.user, m.superuser, m.pasted_text
        in
        let m, session_commands =
          reset_session
@@ -2719,6 +2838,7 @@ let reconnect_reply m ~generation result =
            ; namespace
            ; user
            ; superuser
+           ; pasted_text
            }
        in
        let m =
@@ -2891,7 +3011,12 @@ let set_mode m (mode : Session_mode.t) =
     let m =
       { m with
         state =
-          Some { s with approval_mode = mode.approval; plan_mode = mode.plan }
+          Some
+            { s with
+              approval_mode = mode.approval
+            ; plan_mode = mode.plan
+            ; chat_mode = mode.chat
+            }
       }
     in
     ( m
@@ -2905,6 +3030,23 @@ let set_mode m (mode : Session_mode.t) =
                   (Session_mode.label mode)
                   (Session_mode.describe mode)))
       ] )
+;;
+
+(* Plan mode leaves chat mode: planning needs the project. *)
+let set_plan m (s : P.State.t) ~on =
+  let mode = Session_mode.of_state s in
+  set_mode
+    m
+    (if on
+     then { mode with plan = true; chat = false }
+     else { mode with plan = false })
+;;
+
+let set_chat m (s : P.State.t) ~on =
+  let mode = Session_mode.of_state s in
+  set_mode
+    m
+    (if on then { mode with chat = true } else Session_mode.leaving_chat mode)
 ;;
 
 let cycle_mode m =
@@ -4209,14 +4351,27 @@ let run_command m (cmd : Commands.Parsed.t) =
   | "plan", [] ->
     (match m.state with
      | None -> notice m "not connected", []
-     | Some s ->
-       set_mode m { (Session_mode.of_state s) with plan = not s.plan_mode })
+     | Some s -> set_plan m s ~on:(s.chat_mode || not s.plan_mode))
   | "plan", (("on" | "off") as on) :: _ ->
     (match m.state with
      | None -> notice m "not connected", []
-     | Some s ->
-       set_mode m { (Session_mode.of_state s) with plan = String.equal on "on" })
+     | Some s -> set_plan m s ~on:(String.equal on "on"))
   | "plan", other :: _ ->
+    ( error
+        m
+        (sprintf
+           "unknown argument %S; use on or off (or nothing to toggle)"
+           other)
+    , [] )
+  | "chat", [] ->
+    (match m.state with
+     | None -> notice m "not connected", []
+     | Some s -> set_chat m s ~on:(not s.chat_mode))
+  | "chat", (("on" | "off") as on) :: _ ->
+    (match m.state with
+     | None -> notice m "not connected", []
+     | Some s -> set_chat m s ~on:(String.equal on "on"))
+  | "chat", other :: _ ->
     ( error
         m
         (sprintf
@@ -4497,11 +4652,24 @@ let run_command m (cmd : Commands.Parsed.t) =
       m
       ~command:(String.strip ("/remind " ^ cmd.rest))
       (Remind_command.run ~reminders:(reminders m) cmd.rest)
-  | "mcp", [] -> m, [ call (List_mcp { reconnect = false }) ~tag:Mcp_picker ]
-  | "mcp", [ "reconnect" ] ->
-    ( notice m "reconnecting MCP servers…"
-    , [ call (List_mcp { reconnect = true }) ~tag:Mcp_reconnected ] )
-  | "mcp", _ -> error m "usage: /mcp [reconnect]", []
+  | "mcp", _ ->
+    (match Mcp_command.parse cmd.rest with
+     | List -> m, [ call Get_mcp_settings ~tag:Mcp_settings_for_picker ]
+     | Reconnect ->
+       ( notice m "reconnecting MCP servers…"
+       , [ call (List_mcp { reconnect = true }) ~tag:Mcp_reconnected ] )
+     | Change { request; done_ } ->
+       ( { m with mode = Editing }
+       , [ call
+             request
+             ~tag:
+               (Retry_in_editor
+                  { command = "/mcp " ^ cmd.rest
+                  ; hint = ""
+                  ; then_ = Notice_on_success done_
+                  })
+         ] )
+     | Error e -> error (restore_command m ("/mcp " ^ cmd.rest)) e, [])
   | "btw", [] -> error m "usage: /btw <question>", []
   | "btw", _ -> start_btw m cmd.rest
   | "retry-backend-connection", _ -> retry_backend_connection m
@@ -4542,13 +4710,14 @@ let attachments m text =
 ;;
 
 let user_params m text =
+  let text, pasted = Pasted_text.resolve text (Editor.pasted m.editor) in
   let attachments = attachments m text in
-  ("text", str text)
-  ::
-  (if List.is_empty attachments
-   then []
-   else
-     [ "attachments", `Array (List.map attachments ~f:(fun p -> P.Json.str p)) ])
+  Pasted_text.params ~backend_takes:m.pasted_text ~text pasted
+  @
+  if List.is_empty attachments
+  then []
+  else
+    [ "attachments", `Array (List.map attachments ~f:(fun p -> P.Json.str p)) ]
 ;;
 
 let shell_command m text =
@@ -4613,6 +4782,17 @@ let shown_queued m (kind : Queued_message.Kind.t) text =
   m.queued_messages @ [ { Queued_message.kind; index; text } ]
 ;;
 
+let no_host_question reason =
+  reason ^ ". Send it as a chat (chat mode: no tool host)? (y/n: keep it)"
+;;
+
+(* Why a message cannot run now, outside chat mode: no tool host. *)
+let needs_host m =
+  match m.state with
+  | Some (s : P.State.t) when not s.chat_mode -> s.no_host
+  | Some _ | None -> None
+;;
+
 let send_prompt m text =
   let m, cmds =
     if String.is_prefix text ~prefix:"!"
@@ -4635,6 +4815,20 @@ let submit ?(kind = Queued_message.Kind.Steer) m =
   then m, []
   else (
     match Commands.parse text, focused_agent m with
+    | None, None
+      when (not (String.is_prefix text ~prefix:"!"))
+           && (not (Model.running m))
+           && Option.is_some (needs_host m) ->
+      (* Kept in the editor: Esc leaves it there. *)
+      ( { m with
+          editor = Editor.set_text m.editor text
+        ; mode =
+            Confirm
+              { question = no_host_question (Option.value_exn (needs_host m))
+              ; action = Chat_without_host text
+              }
+        }
+      , [] )
     | Some { name = "skill:"; _ }, _ -> open_skills m
     | Some { name; _ }, _ when String.is_prefix name ~prefix:"skill:" ->
       send_prompt m (String.strip text)
@@ -5040,7 +5234,14 @@ let editing_intent m (intent : Intent.t) =
   let ed f = { m with editor = f m.editor }, [] in
   match intent with
   | Insert s -> ed (fun e -> Editor.insert e s)
-  | Paste s -> ed (fun e -> Editor.insert_paste e s)
+  | Paste s ->
+    (match
+       Option.bind
+         (Option.some_if (Pasted_text.is_long s) s)
+         ~f:Pasted_text.too_large
+     with
+     | Some error -> notice m error, []
+     | None -> ed (fun e -> Editor.insert_paste e s))
   | Submit -> submit m
   | Submit_as_typed -> submit { m with autocomplete = None }
   | Newline -> ed Editor.newline
@@ -6086,6 +6287,17 @@ let confirm m ~(action : Mode.Confirm_action.t) (intent : Intent.t) =
             (Set_user_info { form = P.User_info.Form.empty })
             ~tag:(User_info_saved "")
         ] )
+    | Chat_without_host text ->
+      (match m.state with
+       | None -> notice m "not connected", []
+       | Some s ->
+         let m, mode_cmds =
+           set_mode m { (Session_mode.of_state s) with chat = true }
+         in
+         let m, send_cmds =
+           send_prompt { m with editor = Editor.clear m.editor } text
+         in
+         m, mode_cmds @ send_cmds)
     | Remove_worktree { worktree; force; back = _ } ->
       ( notice m (sprintf "removing the worktree at %s…" worktree.path)
       , [ call
@@ -6103,6 +6315,11 @@ let confirm m ~(action : Mode.Confirm_action.t) (intent : Intent.t) =
     | Forget_memory { back; _ } -> back_to m back, []
     | Remove_custom_instruction { back; _ } -> back_to m back, []
     | Clear_user_info -> notice m "kept what you set about yourself", []
+    | Chat_without_host _ ->
+      ( notice
+          m
+          "not sent: the message stays in the editor (/chat, or a tool host)"
+      , [] )
     | Create_dir { path; _ } -> notice m (sprintf "not created: %s" path), []
     | Cd_to_checkout path ->
       notice m (sprintf "staying here; /cd %s goes there" path), []
@@ -6531,7 +6748,7 @@ let event m (e : P.Event.t) =
   | Terminal_kill _ -> m, []
   | Memory_changed memory -> memory_changed m memory, []
   | Custom_instructions_changed ci -> instructions_changed m ci, []
-  | User_info_changed _ -> m, []
+  | User_info_changed _ | Mcp_settings_changed _ -> m, []
   | Prefs_changed changes ->
     let m = filter_of_prefs m changes in
     (match
@@ -6594,10 +6811,10 @@ let mcp_approved m server (list : P.Mcp_list.t) =
       error
         m
         (sprintf
-           "approved %s, but it %s; check its entry in %s, then /mcp reconnect"
+           "approved %s, but it %s; %s, then /mcp reconnect"
            server
            (mcp_status s)
-           s.source)
+           (Mcp_command.edit_hint s.source))
     | Some s -> notice m (sprintf "approved %s: %s" server (mcp_status s))
     | None -> notice m (sprintf "approved %s" server)
   in
@@ -6703,6 +6920,9 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
          { m with skills = Location_cache.set m.skills ~key [] }
      | Mcp_approved server ->
        error m (sprintf "approving MCP server %s failed: %s" server e), []
+     | Mcp_settings_for_picker ->
+       (* An older backend, without servers in the settings. *)
+       m, [ call (List_mcp { reconnect = false }) ~tag:(Mcp_picker []) ]
      | Mode_set _ ->
        (* The mode shown at once was not taken. *)
        error m e, [ rpc "get_state" ~tag:Refresh_state ]
@@ -6751,8 +6971,12 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
        decode json ~f:decode_skills (fun skills ->
          skills_for_autocomplete
            { m with skills = Location_cache.set m.skills ~key skills })
-     | Mcp_picker ->
-       decode json ~f:P.Mcp_list.of_json (fun list -> mcp_picker m list, [])
+     | Mcp_settings_for_picker ->
+       decode json ~f:P.Mcp_settings.of_json (fun settings ->
+         m, [ call (List_mcp { reconnect = false }) ~tag:(Mcp_picker settings) ])
+     | Mcp_picker settings ->
+       decode json ~f:P.Mcp_list.of_json (fun list ->
+         mcp_picker ~settings m list, [])
      | Memory_picker ->
        decode json ~f:P.Memory.of_json (fun memory ->
          memory_picker m memory, [])
@@ -6795,7 +7019,7 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
          let m = mcp_problems m list in
          if List.is_empty list.servers
          then notice m ("no MCP servers; " ^ mcp_config_hint), []
-         else output m ~title:"MCP servers" (mcp_summary list), [])
+         else output m ~title:"MCP servers" (mcp_summary m list), [])
      | Mcp_approved server ->
        decode json ~f:P.Mcp_list.of_json (mcp_approved m server)
      | Pending ->
@@ -6960,7 +7184,10 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
          match restored with
          | [] -> m, []
          | restored ->
-           let joined = String.concat ~sep:"\n\n" restored in
+           let editor, texts =
+             List.fold_map restored ~init:m.editor ~f:restore_pasted
+           in
+           let joined = String.concat ~sep:"\n\n" texts in
            let text =
              if Editor.is_empty m.editor
              then joined
@@ -6970,7 +7197,7 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
            let noun = if count = 1 then "message" else "messages" in
            let m =
              { m with
-               editor = Editor.set_text m.editor text
+               editor = Editor.set_text editor text
              ; queued_messages = []
              }
            in
@@ -7065,7 +7292,10 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
        decode
          json
          ~f:P.Hello_reply.of_json
-         (fun { client_id; namespace; user; superuser = _ } ->
+         (fun
+             ({ client_id; namespace; user; superuser = _; features = _ } as
+              hello)
+            ->
             let m, session_commands =
               reset_session
                 { m with
@@ -7074,6 +7304,7 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
                 ; user
                 ; sessions = None
                 ; known_sessions = Session_link.Known.empty
+                ; pasted_text = P.Hello_reply.pasted_text hello
                 }
             in
             let m =
@@ -7446,15 +7677,22 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
         | _ ->
           decode
             json
-            ~f:(fun j -> P.Json.string_field j "text")
-            (fun text ->
+            ~f:(fun j ->
+              let%bind.Or_error text = P.Json.string_field j "text" in
+              let%map.Or_error pasted =
+                P.Json.optional_list_field
+                  j
+                  "pasted"
+                  ~f:P.Json.to_string_or_error
+              in
+              text, pasted)
+            (fun queued ->
+               let editor, text = restore_pasted m.editor queued in
                let editor =
                  if Editor.is_empty m.editor
-                 then Editor.set_text m.editor text
+                 then Editor.set_text editor text
                  else
-                   Editor.set_text
-                     m.editor
-                     (text ^ "\n\n" ^ Editor.text m.editor)
+                   Editor.set_text editor (text ^ "\n\n" ^ Editor.text m.editor)
                in
                { m with editor }, []))
      | Paths_for_autocomplete prefix ->
@@ -7573,8 +7811,16 @@ let update m (action : Action.t) =
       | Set_utc_offset utc_offset -> { m with utc_offset }, []
       | Focus focused ->
         { m with terminal_focus = (if focused then Focused else Unfocused) }, []
-      | Hello { client_id; namespace; user; superuser } ->
-        { m with client_id = Some client_id; namespace; user; superuser }, []
+      | Hello ({ client_id; namespace; user; superuser; features = _ } as hello)
+        ->
+        ( { m with
+            client_id = Some client_id
+          ; namespace
+          ; user
+          ; superuser
+          ; pasted_text = P.Hello_reply.pasted_text hello
+          }
+        , [] )
       | Server_link link -> { m with server = Some link }, []
       | Relinked { generation; outcome } -> relinked m ~generation outcome
       | Rejected reason -> signed_out m ~reason, []

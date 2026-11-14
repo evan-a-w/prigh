@@ -208,6 +208,7 @@ let delivery text =
     ~origin:
       { body = None
       ; notes = []
+      ; pasted = []
       ; attachments = []
       ; source = Some { kind = Delivery; title = "Reports" }
       }

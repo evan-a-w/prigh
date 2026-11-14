@@ -8,6 +8,7 @@ module Queued = struct
       (** what the model gets instead: a skill's or a command's prompt *)
     ; source : Injected.Source.t option
     ; attachments : string list
+    ; pasted : string list
     ; images : Image.t list
     ; client : Client_kind.t option
     ; ui_action : Ui_action.t option
@@ -105,6 +106,8 @@ module State = struct
     ; resume_at : float option
     ; approval_mode : Approval_mode.t
     ; plan_mode : bool
+    ; chat_mode : bool
+    ; no_host : string option
     ; computer_control : string option
     ; plan : Plan.t option
     ; session_rules : string list
@@ -224,6 +227,7 @@ type t =
       (Pending_question.t * User_question.Reply.t Promise.u) String.Table.t
   ; mutable approval_mode : Approval_mode.t
   ; mutable plan_mode : bool
+  ; mutable chat_mode : bool
   ; mutable session_rules : Approval_rule.t list
   ; mutable plan : Plan.t option
   ; mutable shell_seq : int
@@ -254,6 +258,7 @@ type t =
   ; questions : Session_questions.t option
   ; subagent_log : Subagent_log.t
   ; mcp : Mcp_hub.t option
+  ; mcp_settings : Mcp_settings.t option
     (** the backend's own servers; [None] turns MCP off on every host *)
   ; mutable mcp_tools : Tool.t list (** as of the latest run's start *)
   ; mutable mcp_noticed : String.Set.t
@@ -303,14 +308,16 @@ let path_messages session =
    config's mode. *)
 let restore_approvals t =
   (match Session.approval t.session with
-   | Some (mode, plan) ->
+   | Some { approval; plan; chat } ->
      t.approval_mode
-     <- Result.ok (Approval_mode.of_string mode)
+     <- Result.ok (Approval_mode.of_string approval)
         |> Option.value ~default:t.config.approval_mode;
-     t.plan_mode <- plan
+     t.plan_mode <- plan;
+     t.chat_mode <- chat
    | None ->
      t.approval_mode <- t.config.approval_mode;
-     t.plan_mode <- false);
+     t.plan_mode <- false;
+     t.chat_mode <- false);
   t.session_rules
   <- List.filter_map (Session.allow_rules t.session) ~f:(fun rule ->
        Result.ok (Approval_rule.of_string rule));
@@ -369,13 +376,17 @@ let active_computer t =
     if String.equal h.id t.active_host then h.computer else None)
 ;;
 
-(* The built-in tools, with [computer] while the active host runs it. *)
+(* The built-in tools, with [computer] while the active host runs it; in
+   chat mode only those that need no host. *)
 let own_tools t =
   let tools = List.filter t.tools ~f:t.offered in
-  match active_computer t with
-  | Some info ->
-    tools @ [ Tool_computer.for_screen ~native:t.config.computer_native info ]
-  | None -> tools
+  if t.chat_mode
+  then Chat_mode.tools ~allow_local:t.backend_host_enabled tools
+  else (
+    match active_computer t with
+    | Some info ->
+      tools @ [ Tool_computer.for_screen ~native:t.config.computer_native info ]
+    | None -> tools)
 ;;
 
 let find_branch t ~cwd =
@@ -519,6 +530,39 @@ let budget_exhausted t =
   | None -> None
 ;;
 
+let chat_hint = "or talk without one in chat mode (/mode chat)"
+
+let no_host_message =
+  "no tool host connected: connect one with `prigh tool-host -connect ...` or \
+   a TUI, then pick it with /host, "
+  ^ chat_hint
+;;
+
+(* Why a message cannot run on a tool host now, if so: none is connected,
+   or the session's went away and is not expected back. *)
+let no_host t =
+  let connected =
+    List.exists (hosts t) ~f:(fun h -> String.equal h.id t.active_host)
+  in
+  let returning =
+    match Map.find t.host_returns t.active_host with
+    | Some until -> Float.( < ) (Eio.Time.now (Eio.Stdenv.clock t.env)) until
+    | None -> false
+  in
+  if connected || returning
+  then None
+  else if String.is_empty t.active_host
+  then Some no_host_message
+  else
+    Some
+      (sprintf
+         "tool host %S is not connected: /host picks another, %s"
+         (if String.is_empty t.active_host_name
+          then t.active_host
+          else t.active_host_name)
+         chat_hint)
+;;
+
 let state t =
   let messages = messages t in
   let assistant_usage, assistant_cost = session_spend t in
@@ -558,6 +602,8 @@ let state t =
   ; resume_at = Option.map t.resume ~f:(fun r -> r.at)
   ; approval_mode = t.approval_mode
   ; plan_mode = t.plan_mode
+  ; chat_mode = t.chat_mode
+  ; no_host = no_host t
   ; computer_control =
       Option.map (Computer_consent.granted t.computer_consent) ~f:(fun id ->
         match List.find (hosts t) ~f:(fun h -> String.equal h.id id) with
@@ -595,6 +641,7 @@ let record_approval t =
        t.session
        ~mode:(Approval_mode.to_string t.approval_mode)
        ~plan:t.plan_mode
+       ~chat:t.chat_mode
      : Session.Entry.t)
 ;;
 
@@ -609,12 +656,13 @@ let recheck_confirms t =
 ;;
 
 let environment t =
-  { Told_environment.host = t.active_host
-  ; cwd = t.cwd
+  { Told_environment.host = (if t.chat_mode then "" else t.active_host)
+  ; cwd = (if t.chat_mode then "" else t.cwd)
   ; tools =
       List.map (Tools.for_model t.model (own_tools t)) ~f:Tool.name
       |> List.dedup_and_sort ~compare:String.compare
-  ; plan_mode = t.plan_mode
+  ; plan_mode = t.plan_mode && not t.chat_mode
+  ; chat_mode = t.chat_mode
   ; client = Some (Option.value t.client ~default:Other)
   ; user_info = Option.bind t.user_info ~f:User_info.text
   ; custom_instructions =
@@ -656,16 +704,28 @@ let tell t told =
   record_told t
 ;;
 
-let switch_mode ?approval ?plan t =
+(* Entering chat mode wakes the calls waiting for a host that went away
+   (they are refused now: see [await_host]) and ends control of a screen. *)
+let switch_mode ?approval ?plan ?chat t =
   let approval = Option.value approval ~default:t.approval_mode in
   let plan = Option.value plan ~default:t.plan_mode in
+  let chat = Option.value chat ~default:t.chat_mode in
   if
     not
       (Approval_mode.equal approval t.approval_mode
-       && Bool.equal plan t.plan_mode)
+       && Bool.equal plan t.plan_mode
+       && Bool.equal chat t.chat_mode)
   then (
+    let entering_chat = chat && not t.chat_mode in
     t.approval_mode <- approval;
     t.plan_mode <- plan;
+    t.chat_mode <- chat;
+    if entering_chat
+    then (
+      ignore (Computer_consent.revoke t.computer_consent : bool);
+      let _, resolver = t.hosts_changed in
+      t.hosts_changed <- Promise.create ();
+      Promise.resolve resolver ());
     environment_changed t;
     record_approval t;
     recheck_confirms t;
@@ -674,16 +734,17 @@ let switch_mode ?approval ?plan t =
 
 let set_approval_mode t mode = switch_mode t ~approval:mode
 
-(* The note for the model when plan mode changed since it was last told. *)
-let plan_mode_note t =
-  if Bool.equal t.plan_mode t.told.plan_mode
-  then None
-  else (
-    tell t { t.told with plan_mode = t.plan_mode };
-    Some
-      { Injected.Note.kind = Plan_mode { on = t.plan_mode }
-      ; text = System_prompt.plan_mode_note ~on:t.plan_mode
-      })
+(* The notes for the model when chat or plan mode changed since it was last
+   told. *)
+let mode_notes t =
+  let now = environment t in
+  match
+    Told_environment.mode_notes ~told:t.told now ~host_name:t.active_host_name
+  with
+  | [] -> []
+  | notes ->
+    tell t (Told_environment.told_modes ~told:t.told now);
+    notes
 ;;
 
 (* [None]: the run was cancelled; [Some (Error after)]: unanswered within
@@ -1272,11 +1333,6 @@ let activate_host t (host : Host.t) ~cwd ~pinned =
   state_changed t
 ;;
 
-let no_host_message =
-  "no tool host connected: connect one with `prigh tool-host -connect ...` or \
-   a TUI, then pick it with /host"
-;;
-
 let host_unavailable_message t =
   if String.is_empty t.active_host
   then no_host_message
@@ -1286,6 +1342,15 @@ let host_unavailable_message t =
       t.active_host_name
 ;;
 
+let chat_without_host t =
+  if
+    (not t.chat_mode)
+    && List.is_empty (hosts t)
+    && Option.is_none (Session.approval t.session)
+    && List.is_empty (Session.messages t.session)
+  then switch_mode t ~chat:true
+;;
+
 (* A session stays on its host when the host goes away, and resumes there,
    in the same cwd, when it comes back: only [set_active_host] moves it.
    Without the backend host, a session that never had a host adopts the
@@ -1293,6 +1358,8 @@ let host_unavailable_message t =
 let set_hosts ?(returning = String.Map.empty) t clients =
   t.host_returns <- returning;
   hosts_changed t;
+  (* Chat mode does not use the host: its comings and goings are not news. *)
+  let notice text = if not t.chat_mode then broadcast t (Notice text) in
   if not (List.equal Host.equal t.hosts clients)
   then (
     let was_connected = active_host_connected t in
@@ -1303,15 +1370,13 @@ let set_hosts ?(returning = String.Map.empty) t clients =
     | Some host, _ when not was_connected ->
       t.active_host_name <- host.name;
       set_host_cwd t host ~cwd:host.cwd;
-      broadcast
-        t
-        (Notice (sprintf "tools run on %s again in %s" host.name t.cwd));
+      notice (sprintf "tools run on %s again in %s" host.name t.cwd);
       state_changed t
     | Some host, _ ->
       t.active_host_name <- host.name;
       state_changed t
     | None, _ ->
-      if was_connected then broadcast t (Notice (host_unavailable_message t));
+      if was_connected then notice (host_unavailable_message t);
       state_changed t)
 ;;
 
@@ -1382,7 +1447,9 @@ let await_host ?id t ~wait ~cancel =
   in
   let moved = host_unavailable_message t in
   let rec loop () =
-    if active && not (String.equal t.active_host id)
+    if wait && t.chat_mode
+    then Error (Chat_mode.refusal "the tool host")
+    else if active && not (String.equal t.active_host id)
     then Error moved
     else (
       match find_host t id, Map.find t.host_returns id with
@@ -1564,7 +1631,25 @@ let tool_hosts t =
    but no allow rule: rules are written for the session's own host (its
    paths, its commands), so none lets a call elsewhere through and the user
    is not offered one to add; deny and ask rules still apply. *)
-let approve t : Tool.approver =
+let rec approve t : Tool.approver =
+  fun context tool args ->
+  let name = Tool.name tool in
+  if
+    t.chat_mode
+    && ((not (Chat_mode.allowed name))
+        || (String.equal name Tool_subagent.name
+            && Tool_subagent.wants_worktree args))
+  then
+    Some
+      (Tool.Result.error
+         (if Chat_mode.allowed name
+          then
+            "a subagent cannot have a worktree in chat mode, which has no \
+             machine: start it without one"
+          else Chat_mode.refusal name))
+  else approve_on_host t context tool args
+
+and approve_on_host t : Tool.approver =
   fun context tool args ->
   let name = Tool.name tool in
   let elsewhere =
@@ -1779,6 +1864,10 @@ let set_active_host ?(if_missing = Dir_change.If_missing.Fail) t id ~cwd =
 let ui_host t ~cancel =
   let read_head path ~length : (int * string, Ui_host.Problem.t) Result.t =
     match await_host t ~wait:false ~cancel with
+    | _ when t.chat_mode ->
+      Error
+        (Host
+           "this is a chat (chat mode): there is no tool host to read files on")
     | Error message -> Error (Host message)
     | Ok host ->
       let call name arguments : (Json.t, Ui_host.Problem.t) Result.t =
@@ -1844,7 +1933,22 @@ let ui_host t ~cancel =
   }
 ;;
 
-let executor t : Tool.executor =
+let rec executor t : Tool.executor =
+  fun context tool arguments ->
+  let name = Tool.name tool in
+  if t.chat_mode && tool.spec.on_host
+  then
+    if String.equal name Tool_web_fetch.name
+    then
+      executor
+        t
+        context
+        (Tool_web_fetch.in_backend ~allow_local:t.backend_host_enabled)
+        arguments
+    else Tool.Result.error (Chat_mode.refusal name)
+  else host_executor t context tool arguments
+
+and host_executor t : Tool.executor =
   fun context tool arguments ->
   let host = Option.value context.host ~default:t.active_host in
   let elsewhere = not (String.equal host t.active_host) in
@@ -1917,7 +2021,9 @@ let instructions t ~cancel ~cwd =
 (* Built once per conversation and recorded in the session, so the prompt
    prefix stays cacheable; later cwd/host changes reach the model as notes on
    the next user message instead. *)
-let tools t = Tools.for_model t.model (own_tools t @ t.mcp_tools)
+let tools t =
+  Tools.for_model t.model (own_tools t @ if t.chat_mode then [] else t.mcp_tools)
+;;
 
 let build_system_prompt
       ?(cancel = Cancellation.never)
@@ -1925,9 +2031,12 @@ let build_system_prompt
       t
   =
   let { Host_ops.Instructions.files; nix; skills } =
-    instructions t ~cancel ~cwd:t.cwd
+    if t.chat_mode
+    then { Host_ops.Instructions.files = []; nix = false; skills = [] }
+    else instructions t ~cancel ~cwd:t.cwd
   in
   System_prompt.build
+    ~chat:t.chat_mode
     ~instructions:files
     ~nix
     ~skills
@@ -1979,6 +2088,10 @@ let expand_skill t text =
       Some (Skill.expand skill ~body ~args))
 ;;
 
+let mcp_settings t =
+  Option.value_map t.mcp_settings ~default:(`Object []) ~f:Mcp_settings.enabled
+;;
+
 let mcp_exec t ?(cancel = Cancellation.never) ~call_id name arguments =
   Host_ops.listing_of_result
     (host_exec t ~cancel ~on_output:ignore ~call_id ~cwd:t.cwd ~name ~arguments)
@@ -1993,7 +2106,13 @@ let mcp_call t (context : Tool.Context.t) ~source ~server ~tool arguments =
     ~cwd:context.cwd
     ~name:Host_ops.mcp_call_op
     ~arguments:
-      (Host_ops.mcp_call_args ~home:t.home ~source ~server ~tool arguments)
+      (Host_ops.mcp_call_args
+         ~home:t.home
+         ~settings:(mcp_settings t)
+         ~source
+         ~server
+         ~tool
+         arguments)
 ;;
 
 let use_listing t (listing : Mcp_tools.Listing.t) =
@@ -2016,7 +2135,10 @@ let refresh_mcp t ~cancel =
         ~cancel
         ~call_id:"mcp"
         Host_ops.mcp_servers_op
-        (Host_ops.mcp_servers_args ~home:t.home ~reconnect:false)
+        (Host_ops.mcp_servers_args
+           ~home:t.home
+           ~settings:(mcp_settings t)
+           ~reconnect:false)
     with
     | Ok listing -> use_listing t listing
     | Error _ -> t.mcp_tools <- [])
@@ -2033,10 +2155,18 @@ let mcp_servers ?(reconnect = false) t =
          t
          ~call_id:"mcp"
          Host_ops.mcp_servers_op
-         (Host_ops.mcp_servers_args ~home:t.home ~reconnect))
+         (Host_ops.mcp_servers_args
+            ~home:t.home
+            ~settings:(mcp_settings t)
+            ~reconnect))
       ~f:(fun listing ->
         use_listing t listing;
         listing)
+;;
+
+let mcp_settings_changed t =
+  if Option.is_some t.mcp && not t.chat_mode
+  then Fiber.fork ~sw:t.sw (fun () -> refresh_mcp t ~cancel:Cancellation.never)
 ;;
 
 let approve_mcp t ~source ~server =
@@ -2048,7 +2178,11 @@ let approve_mcp t ~source ~server =
          t
          ~call_id:"mcp"
          Host_ops.mcp_approve_op
-         (Host_ops.mcp_approve_args ~home:t.home ~source ~server))
+         (Host_ops.mcp_approve_args
+            ~home:t.home
+            ~settings:(mcp_settings t)
+            ~source
+            ~server))
       ~f:(fun listing ->
         use_listing t listing;
         listing)
@@ -2075,9 +2209,9 @@ let set_goal_state t goal =
   ignore (Session.set_goal t.session goal : Session.Entry.t)
 ;;
 
-(* Goal messages are not user messages, but carry the plan mode note too. *)
+(* Goal messages are not user messages, but carry the mode notes too. *)
 let goal_message t ~source text =
-  let notes = Option.to_list (plan_mode_note t) in
+  let notes = mode_notes t in
   Message.user
     ~origin:{ Injected.empty with notes; source = Some source }
     (Injected.prefix_notes notes text)
@@ -2207,7 +2341,7 @@ let update_review_file ?by ?text t ~root ~path ~action ~f =
 ;;
 
 let reply_tools t =
-  if List.is_empty t.review.comments
+  if List.is_empty t.review.comments || t.chat_mode
   then []
   else
     [ Tool_review_reply.create ~reply:(fun ~id ~text ~edits ~resolve ->
@@ -2300,6 +2434,15 @@ let with_attachments t ~cancel text attachments =
     , List.concat images )
 ;;
 
+(* The text with the pasted texts' [<pasted_text>] blocks, and what they are. *)
+let with_pasted text pasted =
+  let pasted, blocks =
+    List.unzip
+      (List.mapi pasted ~f:(fun i p -> Injected.Pasted.make ~n:(i + 1) p))
+  in
+  String.concat (text :: List.map blocks ~f:(fun b -> "\n\n" ^ b)), pasted
+;;
+
 (* Without a system prompt yet, it is to be built from the current
    environment: only plan mode, which it does not describe, is told. *)
 let take_notes t =
@@ -2327,11 +2470,12 @@ let user_message ?(cancel = Cancellation.never) t (q : Queued.t) =
       (String.concat ~sep:"\n" (List.map notes ~f:(fun n -> n.text)))
   | None ->
     let text = Option.value q.expanded ~default:q.text in
+    let text, pasted = with_pasted text q.pasted in
     let text, attachments, attached =
       with_attachments t ~cancel text q.attachments
     in
     let notes = take_notes t in
-    let origin = { Injected.notes; attachments; source = q.source } in
+    let origin = { Injected.notes; pasted; attachments; source = q.source } in
     Message.user
       ~images:(q.images @ attached)
       ?origin:(Option.some_if (not (Injected.is_empty origin)) origin)
@@ -2695,7 +2839,7 @@ let rec start_run
           t
           prompts
   =
-  refresh_location t;
+  if not t.chat_mode then refresh_location t;
   cancel_resume_timer t;
   close_interrupted t;
   (* A run starts without control of the screen, even when a background
@@ -2732,7 +2876,7 @@ let rec start_run
          Promise.resolve resolve ();
          if idle then state_changed t
        in
-       refresh_mcp t ~cancel;
+       if not t.chat_mode then refresh_mcp t ~cancel;
        let halted = ref None in
        (* The prompts are in the session (and its file made) before the
           system prompt is built: that asks the tool host, which may take
@@ -2756,21 +2900,27 @@ let rec start_run
              ~approve:(approve t)
              ~ask_user:(ask_user t ~cancel)
              ~ui:(ui_host t ~cancel)
+             ~chat:t.chat_mode
              ~execute:(executor t)
              ~background:t.background
              ~steer:(fun () ->
                let l = Steer_queue.take_steers t.queue in
                if not (List.is_empty l) then queue_update t;
                let queued = List.map l ~f:(user_message t) in
-               (* A plan mode switched during the run is told between turns. *)
+               (* A chat or plan mode switched during the run is told
+                  between turns. *)
                let note =
                  if List.is_empty queued
-                 then
-                   Option.to_list
-                     (Option.map (plan_mode_note t) ~f:(fun note ->
-                        Message.user
-                          ~origin:{ Injected.empty with notes = [ note ] }
-                          note.text))
+                 then (
+                   match mode_notes t with
+                   | [] -> []
+                   | notes ->
+                     [ Message.user
+                         ~origin:{ Injected.empty with notes }
+                         (String.concat
+                            ~sep:"\n"
+                            (List.map notes ~f:(fun n -> n.text)))
+                     ])
                  else []
                in
                deliveries t @ mail t @ note @ queued @ due_reminders t)
@@ -3277,6 +3427,7 @@ let create
       ?questions
       ?trace_clock
       ?(offered = fun (_ : Tool.t) -> true)
+      ?mcp_settings
       ?user_info
       ?custom_instructions
       ~cwd
@@ -3355,6 +3506,7 @@ let create
     ; pending_questions = String.Table.create ()
     ; approval_mode = config.approval_mode
     ; plan_mode = false
+    ; chat_mode = false
     ; session_rules = []
     ; plan = None
     ; shell_seq = 0
@@ -3375,6 +3527,7 @@ let create
         ; cwd
         ; tools = []
         ; plan_mode = false
+        ; chat_mode = false
         ; client = None
         ; user_info = None
         ; custom_instructions = []
@@ -3389,6 +3542,7 @@ let create
     ; subagent_log = Subagent_log.create ()
     ; mcp
     ; mcp_tools = []
+    ; mcp_settings
     ; mcp_noticed = String.Set.empty
     ; max_budget_usd
     ; goal = None
@@ -3421,14 +3575,45 @@ let create
   t
 ;;
 
+let megabytes bytes = sprintf "%.1f MB" (Float.of_int bytes /. 1_048_576.)
+
+let check_pasted pasted =
+  match
+    List.findi pasted ~f:(fun _ p ->
+      String.length p > Injected.Pasted.max_bytes)
+  with
+  | None -> Ok ()
+  | Some (i, p) ->
+    Or_error.errorf
+      "pasted text #%d is %s, over the %s a pasted text may be: attach it as a \
+       file instead (prigh-web: its + or drop it on the page; the TUI: save it \
+       and @mention its path)"
+      (i + 1)
+      (megabytes (String.length p))
+      (megabytes Injected.Pasted.max_bytes)
+;;
+
 (* What [prompt], [steer] and [follow_up] queue: the text with its skill
    expanded, or the answer through a component. *)
-let to_queue t ~attachments ~images ~client ~ui_action text =
+let to_queue t ~attachments ~pasted ~images ~client ~ui_action text =
   match ui_action with
-  | Some _ when not (List.is_empty attachments && List.is_empty images) ->
+  | None when t.chat_mode && not (List.is_empty attachments) ->
     Or_error.error_string
-      "a prompt with ui_action takes no attachments or images: send them in a \
-       message of their own"
+      "attached files are read on the tool host, and chat mode has none: paste \
+       what matters into the message, or leave chat mode (/mode) to attach \
+       them"
+  | None when t.chat_mode && Option.is_some (Skill.invocation text) ->
+    Or_error.error_string
+      "skills are read on the tool host, and chat mode has none: leave chat \
+       mode (/mode) to use one"
+  | Some _
+    when not
+           (List.is_empty attachments
+            && List.is_empty pasted
+            && List.is_empty images) ->
+    Or_error.error_string
+      "a prompt with ui_action takes no attachments, pasted texts or images: \
+       send them in a message of their own"
   | Some action ->
     Or_error.map
       (Ui_action.check action (path_messages t.session))
@@ -3437,33 +3622,52 @@ let to_queue t ~attachments ~images ~client ~ui_action text =
         ; expanded = None
         ; source = None
         ; attachments = []
+        ; pasted = []
         ; images = []
         ; client
         ; ui_action = Some action
         })
   | None ->
+    let%bind.Or_error () = check_pasted pasted in
     Or_error.map (expand_skill t text) ~f:(fun expanded ->
       { Queued.text
       ; expanded
       ; source = None
       ; attachments
+      ; pasted
       ; images
       ; client
       ; ui_action = None
       })
 ;;
 
-let prompt ?(attachments = []) ?(images = []) ?client ?ui_action t text =
+(* Why a message cannot start a run now: outside chat mode, it needs a
+   tool host. *)
+let cannot_start t =
+  match budget_exhausted t with
+  | Some _ as exhausted -> exhausted
+  | None -> if t.chat_mode then None else no_host t
+;;
+
+let prompt
+      ?(attachments = [])
+      ?(pasted = [])
+      ?(images = [])
+      ?client
+      ?ui_action
+      t
+      text
+  =
   let running () =
     Or_error.error_string "a run is already in progress; use steer or follow_up"
   in
   if is_running t
   then running ()
-  else if Option.is_some (budget_exhausted t)
-  then Or_error.error_string (Option.value_exn (budget_exhausted t))
+  else if Option.is_some (cannot_start t)
+  then Or_error.error_string (Option.value_exn (cannot_start t))
   else
     Or_error.bind
-      (to_queue t ~attachments ~images ~client ~ui_action text)
+      (to_queue t ~attachments ~pasted ~images ~client ~ui_action text)
       ~f:(fun queued ->
         if is_running t
         then running ()
@@ -3481,29 +3685,38 @@ let enqueue_queued t kind queued =
   else start_run t [] ~then_:(fun ~cancel -> [ user_message ~cancel t queued ])
 ;;
 
-let enqueue t kind ?(attachments = []) ?(images = []) ?client ?ui_action text =
-  match budget_exhausted t with
+let enqueue
+      t
+      kind
+      ?(attachments = [])
+      ?(pasted = [])
+      ?(images = [])
+      ?client
+      ?ui_action
+      text
+  =
+  match if is_running t then budget_exhausted t else cannot_start t with
   | Some reason -> Or_error.error_string reason
   | None ->
     Or_error.map
-      (to_queue t ~attachments ~images ~client ~ui_action text)
+      (to_queue t ~attachments ~pasted ~images ~client ~ui_action text)
       ~f:(enqueue_queued t kind)
 ;;
 
-let steer ?attachments ?images ?client t text =
-  enqueue t Steer ?attachments ?images ?client text
+let steer ?attachments ?pasted ?images ?client t text =
+  enqueue t Steer ?attachments ?pasted ?images ?client text
 ;;
 
-let follow_up ?attachments ?images ?client ?ui_action t text =
-  enqueue t Follow_up ?attachments ?images ?client ?ui_action text
+let follow_up ?attachments ?pasted ?images ?client ?ui_action t text =
+  enqueue t Follow_up ?attachments ?pasted ?images ?client ?ui_action text
 ;;
 
 (* Queued text is restored verbatim: attachments are only inlined when the
    message is actually sent. *)
-let abort t =
+let abort_queued t =
   let restored =
-    List.filter_map (Steer_queue.take_all t.queue) ~f:(fun (q : Queued.t) ->
-      Option.some_if (Option.is_none q.ui_action) q.text)
+    List.filter (Steer_queue.take_all t.queue) ~f:(fun (q : Queued.t) ->
+      Option.is_none q.ui_action)
   in
   queue_update t;
   Option.iter t.run ~f:(fun run -> Cancellation.cancel run.cancel);
@@ -3514,6 +3727,8 @@ let abort t =
     state_changed t);
   restored
 ;;
+
+let abort t = List.map (abort_queued t) ~f:(fun (q : Queued.t) -> q.text)
 
 let rec wait_idle t =
   match t.run, t.describing with
@@ -3847,6 +4062,7 @@ let command_prompt ?client t ~text ~expanded ~source =
       ; expanded = Some expanded
       ; source = Some source
       ; attachments = []
+      ; pasted = []
       ; images = []
       ; client
       ; ui_action = None
@@ -3917,6 +4133,7 @@ let submit_review ?client ?root t =
           ; expanded = Some text
           ; source = Some (Review_comments { count })
           ; attachments = []
+          ; pasted = []
           ; images = []
           ; client
           ; ui_action = None
@@ -4096,9 +4313,9 @@ let clear_reminders t =
 
 (* Leaving plan mode while idle carries on an active goal, which waited for
    the user to leave it. *)
-let set_mode ?approval ?plan t =
+let set_mode ?approval ?plan ?chat t =
   let was_planning = t.plan_mode in
-  switch_mode ?approval ?plan t;
+  switch_mode ?approval ?plan ?chat t;
   match t.goal with
   | Some goal
     when was_planning

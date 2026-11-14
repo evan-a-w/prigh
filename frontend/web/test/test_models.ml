@@ -236,6 +236,7 @@ let%expect_test
        ; namespace = Some "bob"
        ; user = Some "ann"
        ; superuser = false
+       ; features = []
        });
   H.event h (sprintf {|{"event":"state","state":%s}|} busy_state);
   H.event

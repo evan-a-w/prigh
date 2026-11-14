@@ -218,6 +218,26 @@ let mcp_items () =
       ~search:"reconnect"
       ~detail:"restart failed or stopped servers"
       "reconnect"
+  ; Picker.Item.create
+      ~id:"add"
+      ~search:"add"
+      ~detail:"NAME URL|COMMAND [ARGS...]: add a server to your settings"
+      "add"
+  ; Picker.Item.create
+      ~id:"remove"
+      ~search:"remove"
+      ~detail:"NAME: remove a server from your settings"
+      "remove"
+  ; Picker.Item.create
+      ~id:"enable"
+      ~search:"enable"
+      ~detail:"NAME: start a server from your settings again"
+      "enable"
+  ; Picker.Item.create
+      ~id:"disable"
+      ~search:"disable"
+      ~detail:"NAME: stop a server from your settings, keeping it"
+      "disable"
   ]
 ;;
 
@@ -280,7 +300,7 @@ let argument_items
               | Some kind -> Transcript_filter.Kind.label kind
               | None -> "show everything")
            word))
-  | Confirm | Plan | Memory -> Some (confirm_items ())
+  | Confirm | Plan | Chat | Memory -> Some (confirm_items ())
   | Mode -> Some (mode_items ())
   | Notify -> Some (notify_items ())
   | Login ->
