@@ -217,7 +217,8 @@ let%expect_test
       -> Always
     mode=auto-edit plan=none rules=[bash(echo:*) bash(true:*) bash(printf:*)]
     bash {"command":"printf three"} -> three
-    (((auto-edit false)) ("bash(echo:*)" "bash(true:*)" "bash(printf:*)"))
+    ((((approval auto-edit) (plan false) (chat false)))
+     ("bash(echo:*)" "bash(true:*)" "bash(printf:*)"))
     (reloaded (mode auto-edit)
      (rules ("bash(echo:*)" "bash(true:*)" "bash(printf:*)")))
     |}]

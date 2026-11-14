@@ -147,12 +147,6 @@ let%expect_test "backend host disabled" =
       ~sw
       ~backend_host:false
       [ Reply.tool_call
-          ~id:"c1"
-          ~name:"bash"
-          ~arguments:{|{"command":"pwd"}|}
-          ()
-      ; Reply.text "no host"
-      ; Reply.tool_call
           ~id:"c2"
           ~name:"bash"
           ~arguments:{|{"command":"pwd"}|}
@@ -202,16 +196,15 @@ let%expect_test "backend host disabled" =
     ((active_host "") (cwd $DIR) (git_branch ()) (hosts ()))
     {"type":"response","id":"r","ok":false,"error":"the backend tool host is disabled"}
     {"type":"response","id":"r","ok":false,"error":"unknown tool host \"nobody\""}
-    {"type":"response","id":"r","ok":false,"error":"no tool host connected: connect one with `prigh tool-host -connect ...` or a TUI, then pick it with /host"}
-    {"type":"response","id":"r","ok":false,"error":"no tool host connected: connect one with `prigh tool-host -connect ...` or a TUI, then pick it with /host"}
-    {"type":"response","id":"r","ok":false,"error":"no tool host connected: connect one with `prigh tool-host -connect ...` or a TUI, then pick it with /host"}
-    {"type":"response","id":"r","ok":true,"result":{"text":"no tool host connected: connect one with `prigh tool-host -connect ...` or a TUI, then pick it with /host","is_error":true}}
+    {"type":"response","id":"r","ok":false,"error":"no tool host connected: connect one with `prigh tool-host -connect ...` or a TUI, then pick it with /host, or talk without one in chat mode (/mode chat)"}
+    {"type":"response","id":"r","ok":false,"error":"no tool host connected: connect one with `prigh tool-host -connect ...` or a TUI, then pick it with /host, or talk without one in chat mode (/mode chat)"}
+    {"type":"response","id":"r","ok":false,"error":"no tool host connected: connect one with `prigh tool-host -connect ...` or a TUI, then pick it with /host, or talk without one in chat mode (/mode chat)"}
+    {"type":"response","id":"r","ok":true,"result":{"text":"no tool host connected: connect one with `prigh tool-host -connect ...` or a TUI, then pick it with /host, or talk without one in chat mode (/mode chat)","is_error":true}}
     (Unavailable "no live session and the backend tool host is disabled")
     (Unavailable
-     "no tool host connected: connect one with `prigh tool-host -connect ...` or a TUI, then pick it with /host")
-    {"type":"response","id":"r","ok":true,"result":{}}
-    tool_result bash: "no tool host connected: connect one with `prigh tool-host -connect ...` or a TUI, then pick it with /host"
-    true
+     "no tool host connected: connect one with `prigh tool-host -connect ...` or a TUI, then pick it with /host, or talk without one in chat mode (/mode chat)")
+    {"type":"response","id":"r","ok":false,"error":"no tool host connected: connect one with `prigh tool-host -connect ...` or a TUI, then pick it with /host, or talk without one in chat mode (/mode chat)"}
+    false
     |}];
   (* A tool host connecting (attached to a session of its own) is adopted. *)
   let sent = Queue.create () in
@@ -231,12 +224,13 @@ let%expect_test "backend host disabled" =
   new_tool_results agent ~seen;
   [%expect
     {|
-    {"type":"response","id":"r","ok":true,"result":{"client_id":"client-2","host_id":"client-2","namespace":null,"user":null,"superuser":false,"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"/home/me/proj","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"thinking_options":["off","default","low","high","max"],"thinking_default":"high","supports_images":false,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"default","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"client-2","active_host_name":"laptop","hosts":[{"id":"client-2","name":"laptop","cwd":"/home/me/proj","session_id":"<id>","session_name":null}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"computer_control":null,"plan":null,"session_rules":[]}}}
+    {"type":"response","id":"r","ok":true,"result":{"client_id":"client-2","host_id":"client-2","namespace":null,"user":null,"superuser":false,"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"/home/me/proj","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"thinking_options":["off","default","low","high","max"],"thinking_default":"high","supports_images":false,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"default","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"client-2","active_host_name":"laptop","hosts":[{"id":"client-2","name":"laptop","cwd":"/home/me/proj","session_id":"<id>","session_name":null}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"chat_mode":false,"no_host":null,"computer_control":null,"plan":null,"session_rules":[]}}}
     ((active_host client-2) (cwd /home/me/proj) (git_branch ())
      (hosts (client-2)))
     (Host client-2 /home/me/proj)
     {"type":"response","id":"r","ok":true,"result":{}}
-    exec: {"type":"event","event":"tool_exec","host":"client-2","session_id":"<id>","exec_id":"<id>/c2-0","call_id":"c2","name":"bash","arguments":{"command":"pwd","timeout":2592000},"cwd":"/home/me/proj"}
+    exec: {"type":"event","event":"tool_exec","host":"client-2","session_id":"<id>","exec_id":"<id>/instructions-0","call_id":"instructions","name":"$instructions","arguments":{"home":"$DIR","with_nix":true},"cwd":"/home/me/proj"}
+    exec: {"type":"event","event":"tool_exec","host":"client-2","session_id":"<id>","exec_id":"<id>/c2-1","call_id":"c2","name":"bash","arguments":{"command":"pwd","timeout":2592000},"cwd":"/home/me/proj"}
     tool_result bash: "bash ran on laptop"
     |}];
   (* The subagent's tools (and its instructions lookup) also go to the host,
@@ -252,8 +246,8 @@ let%expect_test "backend host disabled" =
   [%expect
     {|
     {"type":"response","id":"r","ok":true,"result":{}}
-    exec: {"type":"event","event":"tool_exec","host":"client-2","session_id":"<id>","exec_id":"<id>/c3-1","call_id":"c3","name":"$instructions","arguments":{"home":"$DIR","with_nix":true},"cwd":"/home/me/proj"}
-    exec: {"type":"event","event":"tool_exec","host":"client-2","session_id":"<id>","exec_id":"<id>/s1-2","call_id":"s1","name":"ls","arguments":{},"cwd":"/home/me/proj"}
+    exec: {"type":"event","event":"tool_exec","host":"client-2","session_id":"<id>","exec_id":"<id>/c3-2","call_id":"c3","name":"$instructions","arguments":{"home":"$DIR","with_nix":true},"cwd":"/home/me/proj"}
+    exec: {"type":"event","event":"tool_exec","host":"client-2","session_id":"<id>","exec_id":"<id>/s1-3","call_id":"s1","name":"ls","arguments":{},"cwd":"/home/me/proj"}
     tool_result subagent: "started agent a1 (look around); its result will be delivered to you when it finishes: keep working or end your turn meanwhile"
     delivered: "[subagent a1 finished] look around\nsub done\n[subagent: 2 turns, 30 in / 13 out tokens, $0.0000]"
     |}];
@@ -279,8 +273,7 @@ let%expect_test "backend host disabled" =
     ((active_host client-2) (cwd /home/me/proj) (git_branch ()) (hosts ()))
     ((active_host client-2) (cwd /home/me/proj) (git_branch ())
      (hosts (host-desk)))
-    {"type":"response","id":"r","ok":true,"result":{}}
-    tool_result bash: "waiting for tool host \"laptop\" to reconnect; /host picks another"
+    {"type":"response","id":"r","ok":false,"error":"tool host \"laptop\" is not connected: /host picks another, or talk without one in chat mode (/mode chat)"}
     (Unavailable
      "waiting for tool host \"laptop\" to reconnect; /host picks another")
     |}]
@@ -415,7 +408,7 @@ let%expect_test "subagents outlive their turn and a session switch; cancel RPC" 
   [%expect
     {|
     {"type":"response","id":"r","ok":true,"result":{}}
-    {"type":"response","id":"r","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"thinking_options":["off","default","low","high","max"],"thinking_default":"high","supports_images":false,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"default","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","active_host_name":"<host>","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"computer_control":null,"plan":null,"session_rules":[]}}}
+    {"type":"response","id":"r","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"thinking_options":["off","default","low","high","max"],"thinking_default":"high","supports_images":false,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"default","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","active_host_name":"<host>","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"chat_mode":false,"no_host":null,"computer_control":null,"plan":null,"session_rules":[]}}}
     session "go" live=true
     delivered: "[subagent a1 failed] stuck\n[cancelled]\n[subagent: 1 turns, 10 in / 5 out tokens, $0.0000]"
     delivered: "[subagent a2 finished] slow\nslow report\n[subagent: 1 turns, 10 in / 5 out tokens, $0.0000]"
@@ -519,7 +512,7 @@ let%expect_test "backend host disabled: no access to the backend's other files" 
        answer ());
   [%expect
     {|
-    {"type":"response","id":"r","ok":true,"result":{"client_id":"client-2","host_id":"client-2","namespace":null,"user":null,"superuser":false,"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"/home/me/proj","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"thinking_options":["off","default","low","high","max"],"thinking_default":"high","supports_images":false,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"default","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"client-2","active_host_name":"laptop","hosts":[{"id":"client-2","name":"laptop","cwd":"/home/me/proj","session_id":"<id>","session_name":null}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"computer_control":null,"plan":null,"session_rules":[]}}}
+    {"type":"response","id":"r","ok":true,"result":{"client_id":"client-2","host_id":"client-2","namespace":null,"user":null,"superuser":false,"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"/home/me/proj","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"thinking_options":["off","default","low","high","max"],"thinking_default":"high","supports_images":false,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"default","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"client-2","active_host_name":"laptop","hosts":[{"id":"client-2","name":"laptop","cwd":"/home/me/proj","session_id":"<id>","session_name":null}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"chat_mode":false,"no_host":null,"computer_control":null,"plan":null,"session_rules":[]}}}
     exec write out.md
     {"type":"response","id":"r","ok":true,"result":{"path":"/home/me/proj/out.md"}}
     |}]

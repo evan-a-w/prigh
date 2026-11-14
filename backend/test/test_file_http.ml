@@ -440,8 +440,8 @@ let%expect_test "file browser on a network tool host, and without any" =
   ignore (call t h "fs_download" {|{"path": "backend-secret.txt"}|} : Json.t);
   [%expect
     {|
-    {"type":"response","id":"r","ok":false,"error":"no tool host connected: connect one with `prigh tool-host -connect ...` or a TUI, then pick it with /host"}
-    {"type":"response","id":"r","ok":false,"error":"no tool host connected: connect one with `prigh tool-host -connect ...` or a TUI, then pick it with /host"}
+    {"type":"response","id":"r","ok":false,"error":"no tool host connected: connect one with `prigh tool-host -connect ...` or a TUI, then pick it with /host, or talk without one in chat mode (/mode chat)"}
+    {"type":"response","id":"r","ok":false,"error":"no tool host connected: connect one with `prigh tool-host -connect ...` or a TUI, then pick it with /host, or talk without one in chat mode (/mode chat)"}
     |}];
   let host_dir = Filename.concat t.dir "host" in
   write t "host/readme.md" "# hi\n";
