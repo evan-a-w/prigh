@@ -735,7 +735,7 @@ let%expect_test "/mcp reconnect reports; no servers says where to add them" =
     MCP servers: 1 ready (1 tool)
     No MCP servers: configure them under "mcpServers" in ~/.prigh/mcp.json, or in a project's .mcp.json.
     No MCP servers: configure them under "mcpServers" in ~/.prigh/mcp.json, or in a project's .mcp.json.
-    Unknown /mcp argument “restart”: /mcp lists the servers, /mcp reconnect restarts the failed ones.
+    Usage: /mcp [reconnect], /mcp add NAME URL|COMMAND [ARGS...], /mcp add {"NAME": {...}} (mcpServers JSON), /mcp remove|enable|disable NAME
     Couldn't list the MCP servers: unknown method list_mcp
     |}]
 ;;

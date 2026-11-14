@@ -1947,3 +1947,93 @@ let%expect_test "hidden ranges, message points and the requests about them" =
     {"id":1,"method":"get_trimmed","params":{"entry":"t1"}}
     |}]
 ;;
+
+let%expect_test "MCP servers in the settings: requests, the event, round trips" =
+  List.iter
+    [ Request.Method.Get_mcp_settings
+    ; Add_mcp_servers
+        [ ( "fs"
+          , Stdio
+              { command = "npx"
+              ; args = [ "-y"; "server fs" ]
+              ; env = [ "TOKEN", "s3cret" ]
+              } )
+        ; "web", Http { url = "https://example.com/mcp"; headers = [] }
+        ]
+    ; Add_mcp_servers_text { text = {|{"a":{"command":"a"}}|} }
+    ; Update_mcp_server
+        { name = "web"
+        ; rename = Some "docs"
+        ; transport =
+            Http
+              { url = "https://example.com/mcp"
+              ; headers = [ "Authorization", "Bearer t" ]
+              }
+        }
+    ; Update_mcp_server
+        { name = "fs"
+        ; rename = None
+        ; transport = Stdio { command = "fs"; args = []; env = [] }
+        }
+    ; Remove_mcp_server { name = "fs" }
+    ; Set_mcp_server_enabled { name = "web"; enabled = false }
+    ]
+    ~f:(fun m -> print_endline (Request.to_line (Request.create ~id:1 m)));
+  [%expect
+    {|
+    {"id":1,"method":"get_mcp_settings","params":{}}
+    {"id":1,"method":"add_mcp_servers","params":{"servers":{"fs":{"command":"npx","args":["-y","server fs"],"env":{"TOKEN":"s3cret"}},"web":{"type":"http","url":"https://example.com/mcp"}}}}
+    {"id":1,"method":"add_mcp_servers","params":{"text":"{\"a\":{\"command\":\"a\"}}"}}
+    {"id":1,"method":"update_mcp_server","params":{"name":"web","rename":"docs","config":{"type":"http","url":"https://example.com/mcp","headers":{"Authorization":"Bearer t"}}}}
+    {"id":1,"method":"update_mcp_server","params":{"name":"fs","config":{"command":"fs"}}}
+    {"id":1,"method":"remove_mcp_server","params":{"name":"fs"}}
+    {"id":1,"method":"set_mcp_server_enabled","params":{"name":"web","enabled":false}}
+    |}];
+  let event =
+    {|{"type":"event","event":"mcp_settings_changed","servers":[{"name":"web","enabled":false,"config":{"type":"http","url":"https://example.com/mcp","headers":{"Authorization":"Bearer t"}}},{"name":"fs","enabled":true,"config":{"command":"npx","args":["-y","server fs"],"env":{"TOKEN":"s3cret"}}}]}|}
+  in
+  decode event;
+  [%expect
+    {|
+    (Event (
+      Mcp_settings_changed (
+        ((name    web)
+         (enabled false)
+         (transport (
+           Http
+           (url https://example.com/mcp)
+           (headers ((Authorization <hidden>))))))
+        ((name    fs)
+         (enabled true)
+         (transport (
+           Stdio (command npx) (args (-y "server fs")) (env ((TOKEN <hidden>)))))))))
+    |}];
+  (* What the backend sends decodes to what encodes to it again. *)
+  (match Server_message.of_line event with
+   | Ok (Event (Mcp_settings_changed servers)) ->
+     List.iter servers ~f:(fun (s : Mcp_settings.Server.t) ->
+       let json = Mcp_settings.Transport.to_json s.transport in
+       let back = Or_error.ok_exn (Mcp_settings.Transport.of_json json) in
+       printf
+         "%s %b %s  %s\n"
+         s.name
+         (Mcp_settings.Transport.equal back s.transport)
+         (Mcp_settings.Transport.summary s.transport)
+         (Json.to_string json))
+   | _ -> print_endline "not decoded");
+  [%expect
+    {|
+    web true https://example.com/mcp  {"type":"http","url":"https://example.com/mcp","headers":{"Authorization":"Bearer t"}}
+    fs true npx -y 'server fs'  {"command":"npx","args":["-y","server fs"],"env":{"TOKEN":"s3cret"}}
+    |}];
+  decode
+    {|{"type":"event","event":"mcp_settings_changed","servers":[{"name":"x","enabled":true,"config":{"args":["a"]}}]}|};
+  [%expect
+    {|
+    (error (
+      e (
+        "while decoding"
+        "{\"type\":\"event\",\"event\":\"mcp_settings_changed\",\"servers\":[{\"name\":\"x\",\"enabled\":true,\"config\":{\"args\":[\"a\"]}}]}"
+        (in servers[0] ("server \"x\"" "missing field \"command\"")))))
+    |}]
+;;

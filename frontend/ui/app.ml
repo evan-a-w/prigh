@@ -144,7 +144,8 @@ module Reply_tag = struct
     | Reminder_added
     | Skills_for_autocomplete of string (** the [Location_cache] key *)
     | Skill_prompt of string (** the [/skill:] text sent *)
-    | Mcp_picker
+    | Mcp_settings_for_picker
+    | Mcp_picker of P.Mcp_settings.t (** with the disabled ones listed *)
     | Memory_picker
     | Instructions_picker
     | Instruction_saved of string (** the command, put back on failure *)
@@ -1774,8 +1775,8 @@ let skills_picker m (skills : P.Skill.t list) =
 let open_skills m = m, [ call List_skills ~tag:Skills_picker ]
 
 let mcp_config_hint =
-  "configure servers under \"mcpServers\" in ~/.prigh/mcp.json or a project's \
-   .mcp.json"
+  "add one with /mcp add NAME URL|COMMAND, in Settings → MCP servers, or under \
+   \"mcpServers\" in ~/.prigh/mcp.json or a project's .mcp.json"
 ;;
 
 let plural n word = sprintf "%d %s%s" n word (if n = 1 then "" else "s")
@@ -1792,28 +1793,60 @@ let mcp_problems m (list : P.Mcp_list.t) =
     warn m ("MCP config: " ^ problem))
 ;;
 
-let mcp_picker ?(problems = true) m (list : P.Mcp_list.t) =
+let mcp_disabled_prefix = "disabled:"
+let mcp_overridden_prefix = "overridden:"
+
+let mcp_picker ?(problems = true) ?(settings = []) m (list : P.Mcp_list.t) =
   let m = if problems then mcp_problems m list else m in
-  if List.is_empty list.servers
+  let source s = Mcp_command.source_label ~home:m.home s in
+  let disabled =
+    List.filter settings ~f:(fun (s : P.Mcp_settings.Server.t) -> not s.enabled)
+  in
+  (* Enabled settings servers a host or project file defines too. *)
+  let overridden =
+    List.filter_map settings ~f:(fun (s : P.Mcp_settings.Server.t) ->
+      if not s.enabled
+      then None
+      else
+        List.find list.servers ~f:(fun (l : P.Mcp_server.t) ->
+          String.equal l.name s.name
+          && not (String.equal l.source P.Mcp_settings.source))
+        |> Option.map ~f:(fun (l : P.Mcp_server.t) -> s.name, source l.source))
+  in
+  if List.is_empty list.servers && List.is_empty disabled
   then notice m ("no MCP servers; " ^ mcp_config_hint)
   else (
     let items =
       List.mapi list.servers ~f:(fun i (s : P.Mcp_server.t) ->
         Picker.Item.create
           ~id:(Int.to_string i)
-          ~detail:(mcp_status s ^ "  " ^ s.source)
-          ~search:(s.name ^ " " ^ s.source)
+          ~detail:(mcp_status s ^ "  " ^ source s.source)
+          ~search:(s.name ^ " " ^ source s.source)
           ~dimmed:(P.Mcp_server.Status.equal s.status Failed)
           s.name)
+      @ List.map disabled ~f:(fun (s : P.Mcp_settings.Server.t) ->
+        Picker.Item.create
+          ~id:(mcp_disabled_prefix ^ s.name)
+          ~detail:"disabled  Settings"
+          ~search:(s.name ^ " Settings")
+          ~dimmed:true
+          s.name)
+      @ List.map overridden ~f:(fun (name, by) ->
+        Picker.Item.create
+          ~id:(mcp_overridden_prefix ^ name)
+          ~detail:("overridden by " ^ by ^ "  Settings")
+          ~search:(name ^ " Settings")
+          ~dimmed:true
+          name)
     in
     open_picker m (Mcp list) (Picker.create ~title:"MCP servers" items))
 ;;
 
-let mcp_tools (s : P.Mcp_server.t) : Content.t =
+let mcp_tools ~source (s : P.Mcp_server.t) : Content.t =
   let header : Content.Line.t =
     [ { Content.Span.text = s.name; style = Style.bold (Style.fg Cyan) }
     ; { text = "  " ^ plural (List.length s.tools) "tool"; style = Style.plain }
-    ; { text = "  " ^ s.source; style = Style.dim Style.plain }
+    ; { text = "  " ^ source; style = Style.dim Style.plain }
     ]
   in
   let width =
@@ -1831,18 +1864,48 @@ let mcp_tools (s : P.Mcp_server.t) : Content.t =
 
 let mcp_selected m (list : P.Mcp_list.t) id =
   match Option.bind (Int.of_string_opt id) ~f:(List.nth list.servers) with
-  | None -> m, []
+  | None ->
+    (match String.chop_prefix id ~prefix:mcp_disabled_prefix with
+     | Some name ->
+       ( notice m (sprintf "%s is disabled; /mcp enable %s starts it" name name)
+       , [] )
+     | None ->
+       (match String.chop_prefix id ~prefix:mcp_overridden_prefix with
+        | Some name ->
+          let by =
+            List.find list.servers ~f:(fun (l : P.Mcp_server.t) ->
+              String.equal l.name name)
+            |> Option.value_map ~default:"a file on the host" ~f:(fun l ->
+              Mcp_command.source_label ~home:m.home l.source)
+          in
+          ( notice
+              m
+              (sprintf
+                 "the %s in your settings is not used: %s defines %s too, and \
+                  the closest definition wins; rename one of them to use both"
+                 name
+                 by
+                 name)
+          , [] )
+        | None -> m, []))
   | Some s ->
     (match s.status with
-     | Ready -> output m ~title:("MCP: " ^ s.name) (mcp_tools s), []
+     | Ready ->
+       ( output
+           m
+           ~title:("MCP: " ^ s.name)
+           (mcp_tools
+              ~source:(Mcp_command.source_label ~home:m.home s.source)
+              s)
+       , [] )
      | Failed ->
        ( error
            m
            (sprintf
-              "%s %s; check its entry in %s, then /mcp reconnect"
+              "%s %s; %s, then /mcp reconnect"
               s.name
               (mcp_status s)
-              s.source)
+              (Mcp_command.edit_hint s.source))
        , [] )
      | Needs_approval ->
        ( notice m (sprintf "approving %s from %s…" s.name s.source)
@@ -1853,7 +1916,7 @@ let mcp_selected m (list : P.Mcp_list.t) id =
 ;;
 
 (* One line per server, for [/mcp reconnect]. *)
-let mcp_summary (list : P.Mcp_list.t) : Content.t =
+let mcp_summary m (list : P.Mcp_list.t) : Content.t =
   let width =
     List.fold list.servers ~init:0 ~f:(fun acc (s : P.Mcp_server.t) ->
       Int.max acc (Text_width.string s.name))
@@ -1869,7 +1932,9 @@ let mcp_summary (list : P.Mcp_list.t) : Content.t =
       ; style = Style.bold Style.plain
       }
     ; { text = "  " ^ mcp_status s; style }
-    ; { text = "  " ^ s.source; style = Style.dim Style.plain }
+    ; { text = "  " ^ Mcp_command.source_label ~home:m.home s.source
+      ; style = Style.dim Style.plain
+      }
     ])
 ;;
 
@@ -4485,11 +4550,24 @@ let run_command m (cmd : Commands.Parsed.t) =
       m
       ~command:(String.strip ("/remind " ^ cmd.rest))
       (Remind_command.run ~reminders:(reminders m) cmd.rest)
-  | "mcp", [] -> m, [ call (List_mcp { reconnect = false }) ~tag:Mcp_picker ]
-  | "mcp", [ "reconnect" ] ->
-    ( notice m "reconnecting MCP servers…"
-    , [ call (List_mcp { reconnect = true }) ~tag:Mcp_reconnected ] )
-  | "mcp", _ -> error m "usage: /mcp [reconnect]", []
+  | "mcp", _ ->
+    (match Mcp_command.parse cmd.rest with
+     | List -> m, [ call Get_mcp_settings ~tag:Mcp_settings_for_picker ]
+     | Reconnect ->
+       ( notice m "reconnecting MCP servers…"
+       , [ call (List_mcp { reconnect = true }) ~tag:Mcp_reconnected ] )
+     | Change { request; done_ } ->
+       ( { m with mode = Editing }
+       , [ call
+             request
+             ~tag:
+               (Retry_in_editor
+                  { command = "/mcp " ^ cmd.rest
+                  ; hint = ""
+                  ; then_ = Notice_on_success done_
+                  })
+         ] )
+     | Error e -> error (restore_command m ("/mcp " ^ cmd.rest)) e, [])
   | "btw", [] -> error m "usage: /btw <question>", []
   | "btw", _ -> start_btw m cmd.rest
   | "retry-backend-connection", _ -> retry_backend_connection m
@@ -6517,7 +6595,7 @@ let event m (e : P.Event.t) =
   | Terminal_kill _ -> m, []
   | Memory_changed memory -> memory_changed m memory, []
   | Custom_instructions_changed ci -> instructions_changed m ci, []
-  | User_info_changed _ -> m, []
+  | User_info_changed _ | Mcp_settings_changed _ -> m, []
   | Prefs_changed changes ->
     let m = filter_of_prefs m changes in
     (match
@@ -6580,10 +6658,10 @@ let mcp_approved m server (list : P.Mcp_list.t) =
       error
         m
         (sprintf
-           "approved %s, but it %s; check its entry in %s, then /mcp reconnect"
+           "approved %s, but it %s; %s, then /mcp reconnect"
            server
            (mcp_status s)
-           s.source)
+           (Mcp_command.edit_hint s.source))
     | Some s -> notice m (sprintf "approved %s: %s" server (mcp_status s))
     | None -> notice m (sprintf "approved %s" server)
   in
@@ -6689,6 +6767,9 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
          { m with skills = Location_cache.set m.skills ~key [] }
      | Mcp_approved server ->
        error m (sprintf "approving MCP server %s failed: %s" server e), []
+     | Mcp_settings_for_picker ->
+       (* An older backend, without servers in the settings. *)
+       m, [ call (List_mcp { reconnect = false }) ~tag:(Mcp_picker []) ]
      | Mode_set _ ->
        (* The mode shown at once was not taken. *)
        error m e, [ rpc "get_state" ~tag:Refresh_state ]
@@ -6737,8 +6818,12 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
        decode json ~f:decode_skills (fun skills ->
          skills_for_autocomplete
            { m with skills = Location_cache.set m.skills ~key skills })
-     | Mcp_picker ->
-       decode json ~f:P.Mcp_list.of_json (fun list -> mcp_picker m list, [])
+     | Mcp_settings_for_picker ->
+       decode json ~f:P.Mcp_settings.of_json (fun settings ->
+         m, [ call (List_mcp { reconnect = false }) ~tag:(Mcp_picker settings) ])
+     | Mcp_picker settings ->
+       decode json ~f:P.Mcp_list.of_json (fun list ->
+         mcp_picker ~settings m list, [])
      | Memory_picker ->
        decode json ~f:P.Memory.of_json (fun memory ->
          memory_picker m memory, [])
@@ -6781,7 +6866,7 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
          let m = mcp_problems m list in
          if List.is_empty list.servers
          then notice m ("no MCP servers; " ^ mcp_config_hint), []
-         else output m ~title:"MCP servers" (mcp_summary list), [])
+         else output m ~title:"MCP servers" (mcp_summary m list), [])
      | Mcp_approved server ->
        decode json ~f:P.Mcp_list.of_json (mcp_approved m server)
      | Pending ->

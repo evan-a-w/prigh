@@ -304,11 +304,18 @@ module Stdio = struct
       | Some failure -> Error failure
       | None ->
         Eio.Mutex.use_rw ~protect:true write_lock (fun () ->
-          match Eio.Flow.copy_string (Json.to_string json ^ "\n") stdin_w with
-          | () -> Ok ()
-          | exception (Eio.Io _ as exn) ->
+          if not !stdin_open
+          then
             Error
-              (sprintf "could not write to the server: %s" (Exn.to_string exn)))
+              (Option.value state.failure ~default:"the connection was closed")
+          else (
+            match Eio.Flow.copy_string (Json.to_string json ^ "\n") stdin_w with
+            | () -> Ok ()
+            | exception (Eio.Io _ as exn) ->
+              Error
+                (sprintf
+                   "could not write to the server: %s"
+                   (Exn.to_string exn))))
     in
     let dispatch line =
       match Json.parse line with
@@ -383,7 +390,20 @@ module Stdio = struct
       if !stdin_open
       then (
         stdin_open := false;
-        Eio.Resource.close stdin_w;
+        (* Not under a send that is writing: it waits for the lock; one stuck
+           on a full pipe ends when the server dies. *)
+        let close_stdin () =
+          Eio.Mutex.use_rw ~protect:true write_lock (fun () ->
+            Eio.Resource.close stdin_w)
+        in
+        (match
+           Eio.Time.with_timeout (Eio.Stdenv.clock env) 1. (fun () ->
+             Ok (close_stdin ()))
+         with
+         | Ok () -> ()
+         | Error `Timeout ->
+           kill_group ();
+           close_stdin ());
         (match
            Eio.Time.with_timeout (Eio.Stdenv.clock env) 1. (fun () ->
              Ok (Eio.Process.await child))

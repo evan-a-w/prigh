@@ -397,9 +397,11 @@ let every =
   ; c
       ~argument:Argument.Mcp
       "mcp"
-      "[reconnect]"
+      "[reconnect|add|remove ...]"
       "list MCP servers (Enter approves one or lists its tools); reconnect \
-       restarts failed ones"
+       restarts failed ones; add NAME URL|COMMAND [ARGS...] (or add \
+       {mcpServers JSON}), remove, enable or disable NAME change the servers \
+       in your settings, which run on every host"
   ; c
       "retry-backend-connection"
       ""

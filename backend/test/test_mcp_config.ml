@@ -93,19 +93,30 @@ let%expect_test "variables are expanded; unset ones are problems" =
                   "env": {"KEY": "${TOKEN}-${TOKEN}"}},
         "missing": {"command": "x", "env": {"KEY": "${NOT_SET}"}}}}|};
   discover ~dir ~home ~cwd:dir;
+  (* Sexps hide the values of env and headers: they hold secrets. *)
   [%expect
     {|
     ((name remote) (source $DIR/home/.prigh/mcp.json) (project false)
      (dir $DIR/home)
      (transport
-      (Http (url https://example.com/mcp)
-       (headers ((Authorization "Bearer s3cret"))))))
+      (Http (url https://example.com/mcp) (headers ((Authorization <hidden>))))))
     ((name local) (source $DIR/home/.prigh/mcp.json) (project false)
      (dir $DIR/home)
      (transport
-      (Stdio (command npx) (args (-y s3cret "" $TOKEN))
-       (env ((KEY s3cret-s3cret))))))
+      (Stdio (command npx) (args (-y s3cret "" $TOKEN)) (env ((KEY <hidden>))))))
     problem: $DIR/home/.prigh/mcp.json: server "missing": ${NOT_SET} is not set; set it or write ${NOT_SET:-default}
+    |}];
+  List.iter
+    (Mcp_config.discover ~getenv ~cwd:dir ~home ()).servers
+    ~f:(fun server ->
+      match server.transport with
+      | Http { headers; _ } ->
+        print_s [%sexp (headers : (string * string) list)]
+      | Stdio { env; _ } -> print_s [%sexp (env : (string * string) list)]);
+  [%expect
+    {|
+    ((Authorization "Bearer s3cret"))
+    ((KEY s3cret-s3cret))
     |}];
   print_s_masked
     ~dir
@@ -229,4 +240,123 @@ let%expect_test
          List.length (Jsonaf.list_exn json))
        : int Or_error.t)];
   [%expect {| (Ok 1) |}]
+;;
+
+let settings json = Jsonaf.parse json |> ok_exn
+
+let%expect_test "settings rank below the host's file and the project's" =
+  in_dir
+  @@ fun ~dir ~home ->
+  let cwd = Filename.concat dir "p" in
+  write
+    (Filename.concat cwd ".mcp.json")
+    {|{"mcpServers": {"both": {"command": "from-project"}}}|};
+  write
+    (Mcp_config.user_file ~home)
+    {|{"mcpServers": {"host": {"command": "from-host-file"},
+                      "both": {"command": "from-host-file"}}}|};
+  let settings =
+    settings
+      {|{"host": {"command": "from-settings"},
+         "both": {"command": "from-settings"},
+         "mine": {"type": "http", "url": "https://${HOST:-example.com}/mcp",
+                  "headers": {"Authorization": "Bearer ${TOKEN}"}},
+         "unset": {"command": "x", "env": {"K": "${NOT_SET}"}}}|}
+  in
+  print_discovered ~dir (Mcp_config.discover ~getenv ~settings ~cwd ~home ());
+  [%expect
+    {|
+    ((name both) (source $DIR/p/.mcp.json) (project true) (dir $DIR/p)
+     (transport (Stdio (command from-project) (args ()) (env ()))))
+    ((name host) (source $DIR/home/.prigh/mcp.json) (project false)
+     (dir $DIR/home)
+     (transport (Stdio (command from-host-file) (args ()) (env ()))))
+    ((name mine) (source settings) (project false) (dir $DIR/home)
+     (transport
+      (Http (url https://example.com/mcp) (headers ((Authorization <hidden>))))))
+    problem: Settings → MCP servers: server "unset": ${NOT_SET} is not set; set it or write ${NOT_SET:-default}
+    |}];
+  (* The settings' own servers, approved as the user's. *)
+  let find name =
+    Mcp_config.find
+      ~getenv
+      ~settings
+      ~home
+      ~source:Mcp_config.settings_source
+      name
+  in
+  (match find "mine" with
+   | Ok server ->
+     printf "approved: %b\n" (Mcp_config.is_approved ~home server);
+     (match server.transport with
+      | Http { headers; _ } ->
+        print_s [%sexp (headers : (string * string) list)]
+      | Stdio _ -> ())
+   | Error e -> print_s [%sexp (e : Error.t)]);
+  print_s [%sexp (Or_error.map (find "gone") ~f:ignore : unit Or_error.t)];
+  [%expect
+    {|
+    approved: true
+    ((Authorization "Bearer s3cret"))
+    (Error
+     "Settings \226\134\146 MCP servers no longer defines the MCP server \"gone\"")
+    |}]
+;;
+
+let%expect_test "names and definitions are checked, saying what to fix" =
+  List.iter
+    [ "github"
+    ; "my-server_2"
+    ; ""
+    ; "has space"
+    ; "a.b"
+    ; "two__parts"
+    ; String.make 33 'x'
+    ]
+    ~f:(fun name ->
+      print_s
+        [%sexp (name : string), (Mcp_config.check_name name : unit Or_error.t)]);
+  [%expect
+    {|
+    (github (Ok ()))
+    (my-server_2 (Ok ()))
+    ("" (Error "give the server a name"))
+    ("has space"
+     (Error
+      "the name \"has space\" may only have letters, digits, - and _ (its tools are named mcp__NAME__TOOL)"))
+    (a.b
+     (Error
+      "the name \"a.b\" may only have letters, digits, - and _ (its tools are named mcp__NAME__TOOL)"))
+    (two__parts
+     (Error
+      "the name \"two__parts\" has \"__\", which separates the server from the tool in mcp__NAME__TOOL; use a single _"))
+    (xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+     (Error
+      "the name \"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\" is longer than 32 characters; shorten it (its tools are named mcp__NAME__TOOL, at most 64 characters)"))
+    |}];
+  List.iter
+    [ {|{"command": "npx", "args": ["-y", "${PKG}"], "env": {"T": "${TOKEN}"}}|}
+    ; {|{"type": "http", "url": "${URL}"}|}
+    ; {|{"command": "  "}|}
+    ; {|{"type": "http", "url": ""}|}
+    ; {|{"type": "http", "url": "example.com/mcp"}|}
+    ; {|{"type": "sse", "url": "https://example.com/sse"}|}
+    ; {|{"args": ["x"]}|}
+    ; {|["npx"]|}
+    ]
+    ~f:(fun spec ->
+      print_s [%sexp (Mcp_config.check (settings spec) : unit Or_error.t)]);
+  [%expect
+    {|
+    (Ok ())
+    (Ok ())
+    (Error "the \"command\" is empty: give the program to run")
+    (Error "the \"url\" is empty: give the server's address")
+    (Error "the url \"example.com/mcp\" must start with https:// (or http://)")
+    (Error
+     "the legacy SSE transport is not supported; use the server's streamable HTTP endpoint (\"type\": \"http\")")
+    (Error "give a \"command\" (stdio) or a \"url\" (http)")
+    (Error
+     "a server is an object with a \"command\" (stdio) or a \"url\" (http)")
+    |}]
 ;;

@@ -105,8 +105,8 @@ let%expect_test "/skills: a fuzzy picker; Enter puts /skill:NAME in the editor" 
     |}]
 ;;
 
-let%expect_test "/skills: Esc closes without side effects; none says where to \
-                 add them"
+let%expect_test
+    "/skills: Esc closes without side effects; none says where to add them"
   =
   let h = connected () in
   H.keys h "/skills";
@@ -374,8 +374,8 @@ let%expect_test "/skill: completes skill names, fetched once per session" =
     |}]
 ;;
 
-let%expect_test "/skill: cache is reset by switching sessions, users and \
-                 reconnecting"
+let%expect_test
+    "/skill: cache is reset by switching sessions, users and reconnecting"
   =
   let h = connected () in
   let fetch () =
@@ -461,8 +461,8 @@ let%expect_test "/skill: cache is reset by switching sessions, users and \
     |}]
 ;;
 
-let%expect_test "an unknown skill: the backend's error, and the text is back \
-                 in the editor"
+let%expect_test
+    "an unknown skill: the backend's error, and the text is back in the editor"
   =
   let h = connected () in
   H.keys h "/skill:fronted make it bold";
@@ -750,12 +750,15 @@ let%expect_test "/fork lists and restores a skill message as /skill:NAME ARGS" =
     |}]
 ;;
 
+let no_settings = {|{"servers":[]}|}
+
 let mcp_json =
   {|{"servers":[{"name":"fs","source":"/home/u/.prigh/mcp.json","project":false,"status":"ready","tools":[{"name":"mcp__fs__read_file","description":"Read a file"},{"name":"mcp__fs__list","description":"List a directory\nwith details"}]},{"name":"gh","source":"/work/.mcp.json","project":true,"status":"failed","error":"exited with 1: gh-mcp: command not found","tools":[]},{"name":"db","source":"/work/.mcp.json","project":true,"status":"needs_approval","tools":[]}],"problems":["/work/.mcp.json: server \"x\": give a \"command\" (stdio) or a \"url\" (http)"]}|}
 ;;
 
-let%expect_test "/mcp: servers with their status; Enter lists tools, explains \
-                 failures, approves"
+let%expect_test
+    "/mcp: servers with their status; Enter lists tools, explains failures, \
+     approves"
   =
   let h = connected ~width:80 () in
   H.keys h "/mcp";
@@ -763,8 +766,10 @@ let%expect_test "/mcp: servers with their status; Enter lists tools, explains \
   [%expect {| |}];
   (* The first Enter completes [/mcp] and offers its argument, as for [/model]. *)
   H.enter h;
-  [%expect {| (Rpc (method_ list_mcp) (params ()) (tag Mcp_picker)) |}];
-  H.reply h Mcp_picker mcp_json;
+  [%expect
+    {| (Rpc (method_ get_mcp_settings) (params ()) (tag Mcp_settings_for_picker)) |}];
+  H.reply ~quiet:true h Mcp_settings_for_picker no_settings;
+  H.reply h (Mcp_picker []) mcp_json;
   H.show h;
   [%expect
     {|
@@ -778,7 +783,7 @@ let%expect_test "/mcp: servers with their status; Enter lists tools, explains \
     └────────────────────────────────────────────────────────────── Esc dismisses ─┘
     MCP servers  (3)
     / ▏
-    ▸  fs  ready, 2 tools  /home/u/.prigh/mcp.json
+    ▸  fs  ready, 2 tools  ~/.prigh/mcp.json
        gh  failed: exited with 1: gh-mcp: command not found  /work/.mcp.json
        db  needs approval  /work/.mcp.json
     ────────────────────────────────────────────────────────────────────────────────
@@ -794,7 +799,7 @@ let%expect_test "/mcp: servers with their status; Enter lists tools, explains \
     ▌ earlier question
       earlier answer
     ┌─ MCP: fs ────────────────────────────────────────────────────────────────────┐
-    │ fs  2 tools  /home/u/.prigh/mcp.json                                         │
+    │ fs  2 tools  ~/.prigh/mcp.json                                               │
     │   mcp__fs__read_file  Read a file                                            │
     │   mcp__fs__list       List a directory                                       │
     └───────────────────────────────────────────────────────────────── Esc closes ─┘
@@ -805,13 +810,14 @@ let%expect_test "/mcp: servers with their status; Enter lists tools, explains \
   H.keys h "/mcp";
   H.enter h;
   H.enter h;
-  H.reply ~quiet:true h Mcp_picker mcp_json;
+  H.reply ~quiet:true h Mcp_settings_for_picker no_settings;
+  H.reply ~quiet:true h (Mcp_picker []) mcp_json;
   H.keys h "gh";
   H.enter h;
   H.show h;
   [%expect
     {|
-    (Rpc (method_ list_mcp) (params ()) (tag Mcp_picker))
+    (Rpc (method_ get_mcp_settings) (params ()) (tag Mcp_settings_for_picker))
 
 
 
@@ -832,13 +838,14 @@ let%expect_test "/mcp: servers with their status; Enter lists tools, explains \
   H.keys h "/mcp";
   H.enter h;
   H.enter h;
-  H.reply ~quiet:true h Mcp_picker mcp_json;
+  H.reply ~quiet:true h Mcp_settings_for_picker no_settings;
+  H.reply ~quiet:true h (Mcp_picker []) mcp_json;
   H.keys h "db";
   H.enter h;
   H.show h;
   [%expect
     {|
-    (Rpc (method_ list_mcp) (params ()) (tag Mcp_picker))
+    (Rpc (method_ get_mcp_settings) (params ()) (tag Mcp_settings_for_picker))
     (Rpc
       (method_ mcp_approve)
       (params (
@@ -880,7 +887,7 @@ let%expect_test "/mcp: servers with their status; Enter lists tools, explains \
       earlier answer
     MCP servers  (3)
     / ▏
-    ▸  fs  ready, 2 tools  /home/u/.prigh/mcp.json
+    ▸  fs  ready, 2 tools  ~/.prigh/mcp.json
        gh  failed: exited with 1: gh-mcp: command not found  /work/.mcp.json
        db  ready, 1 tool  /work/.mcp.json
     ───────────────────────────────────────────────── approved db: ready, 1 tool ───
@@ -918,8 +925,9 @@ let%expect_test "/mcp: servers with their status; Enter lists tools, explains \
     |}]
 ;;
 
-let%expect_test "/mcp reconnect reports every server; no servers says where to \
-                 configure them"
+let%expect_test
+    "/mcp reconnect reports every server; no servers says where to configure \
+     them"
   =
   let h = connected () in
   H.keys h "/mcp reconnect";
@@ -937,7 +945,7 @@ let%expect_test "/mcp reconnect reports every server; no servers says where to \
     │ "command" (stdio) or a "url" (http)                      │
     └────────────────────────────────────────── Esc dismisses ─┘
     ┌─ MCP servers ────────────────────────────────────────────┐
-    │ fs  ready, 2 tools  /home/u/.prigh/mcp.json              │
+    │ fs  ready, 2 tools  ~/.prigh/mcp.json                    │
     │ gh  failed: exited with 1: gh-mcp: command not found     │
     │ /work/.mcp.json                                          │
     │ db  needs approval  /work/.mcp.json                      │
@@ -949,18 +957,14 @@ let%expect_test "/mcp reconnect reports every server; no servers says where to \
   H.keys h "/mcp";
   H.enter h;
   H.enter h;
-  H.reply h Mcp_picker {|{"servers":[],"problems":[]}|};
+  H.reply ~quiet:true h Mcp_settings_for_picker no_settings;
+  H.reply h (Mcp_picker []) {|{"servers":[],"problems":[]}|};
   H.keys h "/mcp restart";
   H.enter h;
   H.show h;
   [%expect
     {|
-    (Rpc (method_ list_mcp) (params ()) (tag Mcp_picker))
-
-
-
-
-
+    (Rpc (method_ get_mcp_settings) (params ()) (tag Mcp_settings_for_picker))
 
 
 
@@ -969,8 +973,13 @@ let%expect_test "/mcp reconnect reports every server; no servers says where to \
 
     ▌ earlier question
       earlier answer
-    ──────────────────────────────── usage: /mcp [reconnect] ───
-    > ▏
+    ┌─ Error ──────────────────────────────────────────────────┐
+    │ usage: /mcp [reconnect], /mcp add NAME URL|COMMAND       │
+    │ [ARGS...], /mcp add {"NAME": {...}} (mcpServers JSON),   │
+    │ /mcp remove|enable|disable NAME                          │
+    └────────────────────────────────────────── Esc dismisses ─┘
+    ────────────────────────────────────────────────────────────
+    > /mcp restart▏
     deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
@@ -989,8 +998,12 @@ let%expect_test "/help lists the skill and MCP commands" =
     ▌ earlier question
       earlier answer
     ┌─ /mcp ───────────────────────────────────────────────────┐
-    │ /mcp [reconnect]  list MCP servers (Enter approves one   │
-    │ or lists its tools); reconnect restarts failed ones      │
+    │ /mcp [reconnect|add|remove ...]  list MCP servers (Enter │
+    │ approves one or lists its tools); reconnect restarts     │
+    │ failed ones; add NAME URL|COMMAND [ARGS...] (or add      │
+    │ {mcpServers JSON}), remove, enable or disable NAME       │
+    │ change the servers in your settings, which run on every  │
+    │ host                                                     │
     └───────────────────────────────────────────── Esc closes ─┘
     ────────────────────────────────────────────────────────────
     > ▏

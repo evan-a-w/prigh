@@ -102,6 +102,7 @@ module Icon : sig
     | Ghost (** a dashed circle: a temporary session *)
     | Keep (** a ticked circle: keeping a temporary session *)
     | Clipboard (** Paste *)
+    | Plug (** MCP servers *)
 
   (** An inline SVG; tests show [<icon name>]. *)
   val view : ?cls:string -> t -> Node.t

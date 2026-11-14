@@ -218,6 +218,26 @@ let mcp_items () =
       ~search:"reconnect"
       ~detail:"restart failed or stopped servers"
       "reconnect"
+  ; Picker.Item.create
+      ~id:"add"
+      ~search:"add"
+      ~detail:"NAME URL|COMMAND [ARGS...]: add a server to your settings"
+      "add"
+  ; Picker.Item.create
+      ~id:"remove"
+      ~search:"remove"
+      ~detail:"NAME: remove a server from your settings"
+      "remove"
+  ; Picker.Item.create
+      ~id:"enable"
+      ~search:"enable"
+      ~detail:"NAME: start a server from your settings again"
+      "enable"
+  ; Picker.Item.create
+      ~id:"disable"
+      ~search:"disable"
+      ~detail:"NAME: stop a server from your settings, keeping it"
+      "disable"
   ]
 ;;
 

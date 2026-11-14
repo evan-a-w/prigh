@@ -152,7 +152,8 @@ let rec summarise (e : Event.t) : string option =
   | Prefs_changed _
   | Memory_changed _
   | Custom_instructions_changed _
-  | User_info_changed _ -> None
+  | User_info_changed _
+  | Mcp_settings_changed _ -> None
   | Generate_delta { gen_id; delta } ->
     Some (sprintf "generate_delta %s %S" gen_id delta)
   | Agent_queues _ -> None

@@ -10,6 +10,7 @@ type t =
   | Memory
   | About_you
   | Custom_instructions
+  | Mcp
   | Git_hosting
   | Nix_store (** superusers only *)
   | Account

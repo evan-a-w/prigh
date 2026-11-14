@@ -13,6 +13,17 @@ module Transport = struct
         ; headers : (string * string) list
         }
   [@@deriving sexp_of, compare]
+
+  (* Identifies the definition, secrets included: never shown. *)
+  let fingerprint = sexp_of_t
+
+  let sexp_of_t t =
+    let hide = List.map ~f:(fun (k, _) -> k, "<hidden>") in
+    sexp_of_t
+      (match t with
+       | Stdio s -> Stdio { s with env = hide s.env }
+       | Http h -> Http { h with headers = hide h.headers })
+  ;;
 end
 
 module Server = struct
@@ -31,8 +42,8 @@ module Server = struct
       (Md5.digest_string
          (Sexp.to_string
             [%sexp
-              ((t.name, t.source, t.dir, t.transport)
-               : string * string * string * Transport.t)]))
+              ((t.name, t.source, t.dir, Transport.fingerprint t.transport)
+               : string * string * string * Sexp.t)]))
   ;;
 end
 
@@ -122,6 +133,12 @@ let transport ~getenv json =
     | _ -> None
   in
   match type_, field json "command", field json "url" with
+  | (None | Some "stdio"), Some (`String command), _
+    when String.is_empty (String.strip command) ->
+    Or_error.error_string "the \"command\" is empty: give the program to run"
+  | (None | Some ("http" | "streamable-http")), _, Some (`String url)
+    when String.is_empty (String.strip url) ->
+    Or_error.error_string "the \"url\" is empty: give the server's address"
   | (None | Some "stdio"), Some (`String command), _ ->
     let%bind args = opt "args" ~default:[] ~f:strings in
     let%bind env = opt "env" ~default:[] ~f:string_map in
@@ -154,6 +171,39 @@ let read_file path =
   | text -> Some text
 ;;
 
+let settings_source = "settings"
+let settings_label = "Settings → MCP servers"
+
+let label source =
+  if String.equal source settings_source then settings_label else source
+;;
+
+let approval_of ~source ~name spec =
+  Md5.to_hex
+    (Md5.digest_string (source ^ "\000" ^ name ^ "\000" ^ Json.to_string spec))
+;;
+
+let servers_of ~getenv ~source ~project ~dir entries =
+  List.partition_map entries ~f:(fun (name, spec) ->
+    match transport ~getenv spec with
+    | Ok transport ->
+      First
+        { Server.name
+        ; source
+        ; project
+        ; dir
+        ; transport
+        ; approval = approval_of ~source ~name spec
+        }
+    | Error e ->
+      Second
+        (sprintf
+           "%s: server %S: %s"
+           (label source)
+           name
+           (Error.to_string_hum e)))
+;;
+
 let servers_in ~getenv ~source ~project ~dir =
   match read_file source with
   | None -> [], []
@@ -165,31 +215,28 @@ let servers_in ~getenv ~source ~project ~dir =
        (match field json "mcpServers" with
         | None -> [], []
         | Some (`Object entries) ->
-          List.partition_map entries ~f:(fun (name, spec) ->
-            match transport ~getenv spec with
-            | Ok transport ->
-              First
-                { Server.name
-                ; source
-                ; project
-                ; dir
-                ; transport
-                ; approval =
-                    Md5.to_hex
-                      (Md5.digest_string
-                         (source ^ "\000" ^ name ^ "\000" ^ Json.to_string spec))
-                }
-            | Error e ->
-              Second
-                (sprintf
-                   "%s: server %S: %s"
-                   source
-                   name
-                   (Error.to_string_hum e)))
+          servers_of ~getenv ~source ~project ~dir entries
         | Some _ -> [], [ sprintf "%s: mcpServers must be an object" source ]))
 ;;
 
-let discover ?(getenv = Sys.getenv) ~cwd ~home () =
+let settings_entries = function
+  | `Object entries -> entries
+  | _ -> []
+;;
+
+let settings_servers ?(getenv = Sys.getenv) ~home settings =
+  let servers, problems =
+    servers_of
+      ~getenv
+      ~source:settings_source
+      ~project:false
+      ~dir:home
+      (settings_entries settings)
+  in
+  { Discovered.servers; problems }
+;;
+
+let discover ?(getenv = Sys.getenv) ?(settings = `Object []) ~cwd ~home () =
   let project =
     List.map (ancestors cwd) ~f:(fun dir ->
       servers_in
@@ -201,7 +248,15 @@ let discover ?(getenv = Sys.getenv) ~cwd ~home () =
   let user =
     servers_in ~getenv ~source:(user_file ~home) ~project:false ~dir:home
   in
-  let found = project @ [ user ] in
+  let settings =
+    servers_of
+      ~getenv
+      ~source:settings_source
+      ~project:false
+      ~dir:home
+      (settings_entries settings)
+  in
+  let found = project @ [ user; settings ] in
   { Discovered.servers =
       List.concat_map found ~f:fst
       |> List.stable_dedup ~compare:(fun (a : Server.t) b ->
@@ -210,10 +265,21 @@ let discover ?(getenv = Sys.getenv) ~cwd ~home () =
   }
 ;;
 
-let find ?(getenv = Sys.getenv) ~home ~source name =
-  let project = not (String.equal source (user_file ~home)) in
-  let dir = if project then Filename.dirname source else home in
-  let servers, problems = servers_in ~getenv ~source ~project ~dir in
+let find ?(getenv = Sys.getenv) ?(settings = `Object []) ~home ~source name =
+  let servers, problems =
+    if String.equal source settings_source
+    then
+      servers_of
+        ~getenv
+        ~source
+        ~project:false
+        ~dir:home
+        (settings_entries settings)
+    else (
+      let project = not (String.equal source (user_file ~home)) in
+      let dir = if project then Filename.dirname source else home in
+      servers_in ~getenv ~source ~project ~dir)
+  in
   match List.find servers ~f:(fun s -> String.equal s.name name) with
   | Some server -> Ok server
   | None ->
@@ -223,7 +289,61 @@ let find ?(getenv = Sys.getenv) ~home ~source name =
      with
      | Some problem -> Error (Error.of_string problem)
      | None ->
-       Or_error.errorf "%s no longer defines the MCP server %S" source name)
+       Or_error.errorf
+         "%s no longer defines the MCP server %S"
+         (label source)
+         name)
+;;
+
+let check_name name =
+  if String.is_empty name
+  then Or_error.error_string "give the server a name"
+  else if String.length name > 32
+  then
+    Or_error.errorf
+      "the name %S is longer than 32 characters; shorten it (its tools are \
+       named mcp__NAME__TOOL, at most 64 characters)"
+      name
+  else if
+    not
+      (String.for_all name ~f:(fun c ->
+         Char.is_alphanum c || Char.equal c '_' || Char.equal c '-'))
+  then
+    Or_error.errorf
+      "the name %S may only have letters, digits, - and _ (its tools are named \
+       mcp__NAME__TOOL)"
+      name
+  else if String.is_substring name ~substring:"__"
+  then
+    Or_error.errorf
+      "the name %S has \"__\", which separates the server from the tool in \
+       mcp__NAME__TOOL; use a single _"
+      name
+  else Ok ()
+;;
+
+let check spec =
+  match spec with
+  | `Object _ ->
+    Or_error.bind
+      (transport ~getenv:(fun _ -> Some "x") spec)
+      ~f:(function
+        | Stdio _ -> Ok ()
+        | Http _ ->
+          (match field spec "url" with
+           | Some (`String url)
+             when not
+                    (List.exists
+                       [ "https://"; "http://"; "${" ]
+                       ~f:(fun prefix ->
+                         String.is_prefix (String.strip url) ~prefix)) ->
+             Or_error.errorf
+               "the url %S must start with https:// (or http://)"
+               url
+           | _ -> Ok ()))
+  | _ ->
+    Or_error.error_string
+      "a server is an object with a \"command\" (stdio) or a \"url\" (http)"
 ;;
 
 let approvals ~home =

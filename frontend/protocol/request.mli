@@ -234,6 +234,21 @@ module Method : sig
         { field : string (** {!User_info.Form.fields} *)
         ; value : string (** empty: clears it *)
         } (** {!User_info}, as saved *)
+    | Get_mcp_settings (** {!Mcp_settings} *)
+    | Add_mcp_servers of (string * Mcp_settings.Transport.t) list
+    (** added enabled, all or none; {!Mcp_settings} *)
+    | Add_mcp_servers_text of { text : string }
+    (** pasted Claude Code [mcpServers] JSON, the backend parses it *)
+    | Update_mcp_server of
+        { name : string
+        ; rename : string option
+        ; transport : Mcp_settings.Transport.t
+        }
+    | Remove_mcp_server of { name : string }
+    | Set_mcp_server_enabled of
+        { name : string
+        ; enabled : bool
+        }
   [@@deriving sexp_of, equal]
 
   val name : t -> string

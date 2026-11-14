@@ -263,14 +263,20 @@ let is_mcp_op name =
     ~equal:String.equal
 ;;
 
-let mcp_servers_args ~home ~reconnect =
-  `Object
-    [ "home", `String home; ("reconnect", if reconnect then `True else `False) ]
-;;
-
-let mcp_call_args ~home ~source ~server ~tool arguments =
+(* The servers from the user's settings go with every request: the host
+   keeps none of them. *)
+let mcp_servers_args ~home ~settings ~reconnect =
   `Object
     [ "home", `String home
+    ; ("reconnect", if reconnect then `True else `False)
+    ; "settings", settings
+    ]
+;;
+
+let mcp_call_args ~home ~settings ~source ~server ~tool arguments =
+  `Object
+    [ "home", `String home
+    ; "settings", settings
     ; "source", `String source
     ; "server", `String server
     ; "tool", `String tool
@@ -278,9 +284,13 @@ let mcp_call_args ~home ~source ~server ~tool arguments =
     ]
 ;;
 
-let mcp_approve_args ~home ~source ~server =
+let mcp_approve_args ~home ~settings ~source ~server =
   `Object
-    [ "home", `String home; "source", `String source; "server", `String server ]
+    [ "home", `String home
+    ; "settings", settings
+    ; "source", `String source
+    ; "server", `String server
+    ]
 ;;
 
 let listing_of_result (result : Tool.Result.t) =
@@ -291,12 +301,15 @@ let listing_of_result (result : Tool.Result.t) =
 
 let mcp ~mcp ~cancel ~cwd ~name ~(arguments : Json.t) =
   let home = home_arg arguments in
+  let settings =
+    Option.value (Json.member "settings" arguments) ~default:(`Object [])
+  in
   let listing ~reconnect =
     Tool.Result.ok
       (Json.to_string
          (Mcp_tools.Listing.to_json
             (Mcp_tools.Listing.of_hub
-               (Mcp_hub.servers mcp ~reconnect ~cwd ~home ()))))
+               (Mcp_hub.servers mcp ~reconnect ~settings ~cwd ~home ()))))
   in
   let string key = Tool_args.string arguments key in
   if String.equal name mcp_servers_op
@@ -309,6 +322,7 @@ let mcp ~mcp ~cancel ~cwd ~name ~(arguments : Json.t) =
     Mcp_hub.call
       mcp
       ~cancel
+      ~settings
       ~source:(string "source")
       ~server:(string "server")
       ~home
@@ -318,7 +332,11 @@ let mcp ~mcp ~cancel ~cwd ~name ~(arguments : Json.t) =
   else (
     match
       Or_error.bind
-        (Mcp_config.find ~home ~source:(string "source") (string "server"))
+        (Mcp_config.find
+           ~settings
+           ~home
+           ~source:(string "source")
+           (string "server"))
         ~f:(Mcp_config.approve ~home)
     with
     | Error e -> Tool.Result.error (Error.to_string_hum e)
