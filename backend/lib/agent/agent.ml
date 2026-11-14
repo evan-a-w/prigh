@@ -1933,6 +1933,10 @@ let build_system_prompt
     ~skills
     ?auto_background:(Config.auto_background t.config)
     ?user_info:now.user_info
+    ?session:
+      (Option.some_if
+         (not (Session.temporary t.session))
+         (Session.id t.session))
     ~custom_instructions:now.custom_instructions
     ~cwd:t.cwd
     ~home:t.home

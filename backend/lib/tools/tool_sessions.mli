@@ -16,6 +16,10 @@ val name : string
     with it; never a path. Errors say what to do next. *)
 val find : dir:string -> string -> Session.Summary.t Or_error.t
 
+(** [\[title\](?session=ID)] ({!Session_link}): its name, else its first
+    prompt, cut short. *)
+val link : Session.Summary.t -> string
+
 module Search : sig
   (** The best [limit] sessions for [query], best first. *)
   type t = query:string -> limit:int -> Session_search.Hit.t list

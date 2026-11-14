@@ -440,6 +440,44 @@ let%expect_test "sessions: list, new, switch, fork, rewind" =
 ;;
 
 let%expect_test
+    "switch_session takes a unique prefix of an id (a session link's)"
+  =
+  with_agent [ Reply.text "one" ]
+  @@ fun t agent h ->
+  call t h ~params:{|{"text": "first"}|} "prompt";
+  Agent.wait_idle agent;
+  let first = (Agent.state agent).session_id in
+  call t h "new_session";
+  [%expect.output] |> (ignore : string -> unit);
+  let switch key =
+    let request =
+      Json.of_string
+        (sprintf
+           {|{"id": "r1", "method": "switch_session", "params": {"path": %S}}|}
+           key)
+    in
+    match Rpc_server.handle h.server h.client request with
+    | `Object fields
+      when Option.is_some (List.Assoc.find fields "error" ~equal:String.equal)
+      -> print_endline (mask t (Json.to_string (`Object fields)))
+    | (_ : Json.t) ->
+      print_s
+        [%sexp
+          { switched_to_first =
+              (String.equal (Session.id (Agent.session (current h))) first
+               : bool)
+          }]
+  in
+  switch (String.prefix first 8);
+  switch "ffffffffzz";
+  [%expect
+    {|
+    ((switched_to_first true))
+    {"type":"response","id":"r1","ok":false,"error":"no session \"ffffffffzz\""}
+    |}]
+;;
+
+let%expect_test
     "end to end over pipes: request/response framing, invalid JSON, EOF aborts"
   =
   with_sandbox

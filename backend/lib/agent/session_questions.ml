@@ -199,11 +199,14 @@ let message : Mail.t -> Message.t = function
                  { session = target.id; name = target.name; id; answered })
         }
       (sprintf
-         "[session %s %s %s]\n\n%s"
+         "[session %s %s %s]\n\n%s\n\n[link to it: %s]"
          (Party.to_string target)
          (if answered then "answered" else "did not answer")
          id
-         text)
+         text
+         (Session_link.markdown
+            ~id:target.id
+            ~title:(Option.value target.name ~default:target.id)))
 ;;
 
 let take_mail t ~session =

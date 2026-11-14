@@ -280,6 +280,7 @@ let build
       ?auto_background
       ?(role = Role.Main)
       ?user_info
+      ?session
       ?(custom_instructions = [])
       ~cwd
       ~home
@@ -293,10 +294,18 @@ let build
   in
   let environment =
     sprintf
-      "Environment:\n- Working directory: %s\n- Date: %s\n- OS: %s"
+      "Environment:\n- Working directory: %s\n- Date: %s\n- OS: %s%s"
       cwd
       date
       (Core_unix.Utsname.sysname (Core_unix.uname ()))
+      (match session with
+       | None -> ""
+       | Some id ->
+         sprintf
+           "\n\
+            - This session's link: %s. To refer to a session (this one or \
+            another) in a reply, link it: [its title](?session=ID)."
+           (Session_link.href id))
   in
   let instructions =
     match instructions with

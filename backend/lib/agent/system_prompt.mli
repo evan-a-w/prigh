@@ -31,7 +31,8 @@ end
     [git worktree add]. [user_info] is what the user set about themselves
     ({!User_info}), then the user's [custom_instructions], the last blocks;
     given the [custom_instructions] tool, the model is told when to change
-    them. *)
+    them. [session] (the session's id) is linked in the environment, with
+    how to link sessions ({!Session_link}). *)
 val build
   :  ?date:string
   -> ?instructions:(string * string) list
@@ -40,6 +41,7 @@ val build
   -> ?auto_background:float
   -> ?role:Role.t
   -> ?user_info:string
+  -> ?session:string
   -> ?custom_instructions:Custom_instruction.t list
   -> cwd:string
   -> home:string

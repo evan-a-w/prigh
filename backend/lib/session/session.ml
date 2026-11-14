@@ -1557,6 +1557,16 @@ let fork ?at t ~dir =
                        List.map pinned ~f:(fun pin ->
                          { pin with id = renamed pin.id })
                    })
+            | System_prompt { text } ->
+              (* It names the session it is in (to link it). *)
+              Some
+                (System_prompt
+                   { text =
+                       String.substr_replace_all
+                         text
+                         ~pattern:(Session_link.href t.id)
+                         ~with_:(Session_link.href forked.id)
+                   })
             | Trim { before } -> Some (Trim { before = renamed before })
             | Trim_after { after; through } ->
               Some

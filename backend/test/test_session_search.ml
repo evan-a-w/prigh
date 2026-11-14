@@ -325,8 +325,9 @@ let%expect_test "search_sessions: the RPC, live sessions" =
     | id :: "" :: _day :: rest ->
       print_endline (String.concat ~sep:" " (id :: rest))
     | _ -> print_endline line);
-  [%expect {|
-    <id>  "Listen address"  $DIR  2 messages
+  [%expect
+    {|
+    <id>  [Listen address](?session=<id>)  $DIR  2 messages
     (for message indices to read from: search with session, or outline)
     |}]
 ;;

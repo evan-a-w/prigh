@@ -25,10 +25,12 @@ let spec =
        or asks, or the task plainly depends on work done in another session: \
        not routinely, and never to start a task. search finds sessions by what \
        was said in them and their names (every word of query must match), with \
-       their ids and a snippet; with session, the matching messages of that \
-       one. outline lists a session's prompts with their message indices. read \
-       shows messages from an index, cut short. Read only what you need. It \
-       only reads: the other sessions are not told or changed."
+       their ids, links and a snippet; with session, the matching messages of \
+       that one. outline lists a session's prompts with their message indices. \
+       read shows messages from an index, cut short. Read only what you need. \
+       It only reads: the other sessions are not told or changed. When you \
+       mention a session to the user, link it as its lines do: \
+       [title](?session=ID)."
   ; parameters =
       Tool_args.schema
         ~required:[ "action" ]
@@ -109,8 +111,12 @@ let short ~max text =
 let title (s : Session.Summary.t) =
   match Option.first_some s.name s.first_prompt with
   | Some title when not (String.is_empty (String.strip title)) ->
-    sprintf "%S" (short ~max:80 title)
-  | Some _ | None -> "(untitled)"
+    short ~max:80 title
+  | Some _ | None -> "untitled"
+;;
+
+let link (s : Session.Summary.t) =
+  Session_link.markdown ~id:s.id ~title:(title s)
 ;;
 
 let session_line ~current (s : Session.Summary.t) =
@@ -118,7 +124,7 @@ let session_line ~current (s : Session.Summary.t) =
     ~sep:"  "
     ([ s.id
      ; String.prefix s.updated_at 10
-     ; title s
+     ; link s
      ; s.cwd
      ; sprintf "%d messages" s.message_count
      ]

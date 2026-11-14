@@ -357,11 +357,12 @@ let%expect_test "agents with the session tools are told when to use them" =
       ~questions:(Session_questions.create ())
       ()
   in
-  let show tools =
+  let show ?session tools =
     System_prompt.build
       ~date:"2026-01-02"
       ~instructions:[]
       ~role:Main
+      ?session
       ~cwd:"/proj"
       ~home:"/home"
       ~tools:(Tools.specs tools)
@@ -383,6 +384,17 @@ let%expect_test "agents with the session tools are told when to use them" =
     - Other sessions: only when the user refers to an earlier or another session or asks for it, or the task plainly depends on work done in one; never by default or to start a task. To look something up, use sessions (read-only): search, then outline, and read only what you need.
     - sessions: Search and read other saved sessions, only when the user refers to one or asks,
     (nothing about sessions)
+    |}];
+  (* The session's own link, and how to link one, with or without the
+     tools. *)
+  show ~session:"6cad9f6e0123abcd" (Tools.all @ [ sessions ]);
+  show ~session:"6cad9f6e0123abcd" Tools.all;
+  [%expect
+    {|
+    - Other sessions: only when the user refers to an earlier or another session or asks for it, or the task plainly depends on work done in one; never by default or to start a task. To look something up, use sessions (read-only): search, then outline, and read only what you need.
+    - sessions: Search and read other saved sessions, only when the user refers to one or asks,
+    - This session's link: ?session=6cad9f6e0123abcd. To refer to a session (this one or another) in a reply, link it: [its title](?session=ID).
+    - This session's link: ?session=6cad9f6e0123abcd. To refer to a session (this one or another) in a reply, link it: [its title](?session=ID).
     |}]
 ;;
 
