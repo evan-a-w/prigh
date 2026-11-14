@@ -480,6 +480,36 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
   text-underline-offset: 3px;
 }
 .markdown a:hover { text-decoration-color: var(--sodium); }
+/* A link to one of the user's sessions (followed in place): washed, with a
+   solid underline, apart from links that leave prigh. */
+.session-link {
+  position: relative;
+  color: var(--chalk);
+  background: var(--sodium-wash);
+  border-radius: 3px;
+  padding: 0 2px;
+  text-decoration: underline;
+  text-decoration-color: var(--sodium);
+  text-underline-offset: 3px;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+.session-link:hover { background: var(--sodium-glow); }
+.session-link:focus-visible { outline: 2px solid var(--sodium); outline-offset: 1px; }
+.markdown .session-link > code { background: none; padding: 0; }
+/* A thumb's target (44px tall) around the line's text, without spacing the
+   lines apart. */
+@media (pointer: coarse) {
+  .session-link::after {
+    content: "";
+    position: absolute;
+    left: -4px;
+    right: -4px;
+    top: 50%;
+    height: 44px;
+    transform: translateY(-50%);
+  }
+}
 .markdown strong { font-weight: 650; }
 .markdown del { color: var(--muted); }
 .markdown :not(pre) > code {
@@ -837,6 +867,7 @@ button.tool-head:is(:hover, :focus-visible) > .chev, .tool.open > button.tool-he
 }
 .output :is(.earlier, .missed) + pre { padding-top: 0; }
 .output pre:has(+ .fold) { padding-bottom: 2px; }
+.output pre a.session-link { padding: 0; text-underline-offset: 2px; }
 .output.error { background: var(--err-bg); box-shadow: inset 2px 0 0 var(--brick); border-radius: 0 var(--r-control) var(--r-control) 0; }
 .output.error pre { color: var(--del-fg); }
 /* Unfolding grows the well once, from the lines it showed. */
