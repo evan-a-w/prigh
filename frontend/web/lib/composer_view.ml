@@ -31,6 +31,7 @@ let popup (m : App.Model.t) ~inject =
       | Argument Remind -> "Reminders"
       | Argument Compaction -> "Compaction"
       | Argument Generate_model -> "Drafting model"
+      | Argument Approval_model -> "Approval model"
       | Argument Naming -> "Naming"
       | Argument Dictation -> "Dictation"
       | Argument Worktree -> "Worktrees"

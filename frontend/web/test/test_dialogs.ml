@@ -153,7 +153,7 @@ let%expect_test "help lists every key and command" =
     ← → / Tab (a chip's menu) the next chip's menu (model, thinking, mode, host)
     Ctrl+P / Alt+P next / previous scoped model (/scoped-models)
     Alt+T cycle the thinking level
-    Alt+M cycle the mode: ask → auto-edit → auto → plan (/mode, /plan)
+    Alt+M cycle the mode: ask → auto-edit → smart → auto → plan (/mode, /plan)
     Alt+N insert a snippet at the caret: a list to filter (/snippet)
     Ctrl+O cycle the transcript verbosity
     ↑ ↓ / Space / Enter / Esc (transcript filter) the filter's menu (/filter, its button left of the files'): choose a kind, show or hide it, keep the filter, or put back the one it opened with
@@ -230,6 +230,7 @@ let%expect_test "help lists every key and command" =
     /user-info what you set about yourself for the model (name, country, units...), given to it in every session, in Settings
     /compact [instructions] summarise older messages to free context
     /generate-model [MODEL|off] pick the model that drafts commit messages, pull requests and branch names (✦ Generate); MODEL|off: draft them with MODEL (off: the session's)
+    /approval-model [MODEL|off] pick the model that judges tool calls in smart mode; MODEL|off: judge them with MODEL (off: the session's)
     /naming [model MODEL|off] show which model names sessions and subagents; model MODEL|off: name them with MODEL (off: the drafting model, else the session's)
     /dictation [model MODEL|off] show which model transcribes dictation (speech to text); model MODEL|off: transcribe with MODEL, an OpenAI or OpenAI-compatible provider's (off: openai/gpt-4o-mini-transcribe)
     /compaction [at|model|mask ...] show when conversations are compacted and what summarises them; at TOKENS|off: also once the context exceeds TOKENS, not only at 80% of the window; model MODEL|off: the model that writes the summaries (off: the session's); mask on|off: replace old tool outputs with placeholders first

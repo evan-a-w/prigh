@@ -335,6 +335,7 @@ let%expect_test "the names of the settings' controls" =
     -- Models
     button "Manage providers" -- /auth (/login, /logout)
     button "Drafting model: Default" -- Choose the model (/generate-model)
+    button "Approval model: Default" -- Choose the model (/approval-model)
     button "Naming model: Default" -- Choose the model (/naming model)
     button "Summary model: The conversation's model" -- Choose the model (/compaction model)
     button "Dictation model: openai/gpt-4o-mini-transcribe" -- Choose the model (/dictation model)

@@ -119,7 +119,7 @@ let bindings =
   ; b
       [ Key.alt (Char "m") ]
       Cycle_mode
-      "cycle the mode: ask → auto-edit → auto → plan (read-only)"
+      "cycle the mode: ask → auto-edit → smart → auto → plan (read-only)"
   ; b
       [ Key.ctrl 'n' ]
       Picker_toggle_filter

@@ -194,6 +194,28 @@ let generate_model (m : App.Model.t) ~inject =
     ]
 ;;
 
+let approval_model (m : App.Model.t) ~inject =
+  let current =
+    match Option.bind m.config ~f:(fun c -> c.approval_model) with
+    | None -> "Default"
+    | Some key -> model_name m key
+  in
+  row
+    ~cls:"approval-model"
+    ~name:"Approvals"
+    ~about:
+      "In smart mode, lets a tool call run or asks you, saying why. Default: \
+       the session's model."
+    [ select
+        ~cls:"approval-model-choice"
+        ~title:"Choose the model (/approval-model)"
+        ~label:("Approval model: " ^ current)
+        ~disabled:(Option.is_none m.config)
+        ~on_click:(inject (Action.Run "/approval-model"))
+        current
+    ]
+;;
+
 let naming_model (m : App.Model.t) ~inject =
   let current =
     match Option.bind m.config ~f:(fun c -> c.naming_model) with
@@ -1367,6 +1389,7 @@ let content (m : App.Model.t) (section : Section.t) ~inject =
         ~title:"Models prigh uses"
         ~note:"Besides the conversation's"
         [ generate_model m ~inject
+        ; approval_model m ~inject
         ; naming_model m ~inject
         ; summary_model m m.config ~inject
         ; dictation_model m ~inject

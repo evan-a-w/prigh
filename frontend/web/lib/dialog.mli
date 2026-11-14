@@ -40,6 +40,8 @@ module Picker_kind : sig
     (** [/compaction model]: model keys, or [off] (the conversation's) *)
     | Generate_models
     (** [/generate-model]: model keys, or [off] (the session's) *)
+    | Approval_models
+    (** [/approval-model]: model keys, or [off] (the session's) *)
     | Naming_models
     (** [/naming model]: model keys, or [off] (the drafting model's) *)
     | Dictation_models

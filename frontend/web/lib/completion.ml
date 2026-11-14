@@ -275,6 +275,7 @@ let argument_items
   | Remind
   | Compaction
   | Generate_model
+  | Approval_model
   | Naming
   | Dictation
   | Worktree
@@ -405,6 +406,7 @@ let compute
              | ( Remind
                | Compaction
                | Generate_model
+               | Approval_model
                | Naming
                | Dictation
                | Worktree
@@ -416,6 +418,8 @@ let compute
                     Prigh_ui.Compaction_command.complete ~models rest
                   | Generate_model ->
                     Prigh_ui.Generate_model_command.complete ~models rest
+                  | Approval_model ->
+                    Prigh_ui.Approval_model_command.complete ~models rest
                   | Naming -> Prigh_ui.Naming_command.complete ~models rest
                   | Dictation -> Prigh_ui.Dictation_command.complete rest
                   | Worktree ->

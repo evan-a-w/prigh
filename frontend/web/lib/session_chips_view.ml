@@ -88,7 +88,7 @@ let thinking_chip (m : App.Model.t) (state : State.t) ~inject =
       [ icon Brain; span ~cls:"chip-label" "none" ]
 ;;
 
-(* What asks first, by its short name (ask, auto-edit, auto, plan); the
+(* What asks first, by its short name (ask, auto-edit, smart, auto, plan); the
    shield lit where nothing asks. *)
 let mode_chip (m : App.Model.t) (state : State.t) ~inject =
   match m.pending.mode with

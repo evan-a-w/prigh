@@ -95,6 +95,7 @@ let%expect_test "every command does something (none is unknown)" =
     /user-info                 Settings
     /compact                   toast: Compacting the conversation…
     /generate-model            picker: Drafting model
+    /approval-model            picker: Approval model
     /naming                    toast: Sessions and subagents are named by the drafting model, else the session's model (/naming model MODEL|off)
     /dictation                 toast: Dictation is transcribed by openai/gpt-4o-mini-transcribe, the default (/dictation model MODEL|off)
     /compaction                toast: Compaction: at 200k tokens, or 80% of the model's window if that is less; summaries by the session's model; observation masking on (/compaction at TOKENS|off, /compaction model MODEL|off, /compaction mask on|off)
@@ -199,7 +200,7 @@ let%expect_test "/help <command> and /hotkeys" =
     ← → / Tab (a chip's menu) the next chip's menu (model, thinking, mode, host)
     Ctrl+P / Alt+P next / previous scoped model (/scoped-models)
     Alt+T cycle the thinking level
-    Alt+M cycle the mode: ask → auto-edit → auto → plan (/mode, /plan)
+    Alt+M cycle the mode: ask → auto-edit → smart → auto → plan (/mode, /plan)
     Alt+N insert a snippet at the caret: a list to filter (/snippet)
     Ctrl+O cycle the transcript verbosity
     ↑ ↓ / Space / Enter / Esc (transcript filter) the filter's menu (/filter, its button left of the files'): choose a kind, show or hide it, keep the filter, or put back the one it opened with
@@ -577,7 +578,7 @@ let%expect_test "/confirm" =
     (Rpc (method_ push_pref)
      (params ((key history) (value "/confirm maybe") (max 500))) (tag Ignore))
     Mode ask, also for new sessions: bash, job_input, edits and MCP tools ask first
-    Unknown setting “maybe”: use on, off, ask, auto-edit or auto. (Dismiss)
+    Unknown setting “maybe”: use on, off, ask, auto-edit, smart or auto. (Dismiss)
     |}]
 ;;
 
@@ -632,7 +633,7 @@ let%expect_test "/session" =
     3.2k Output
     30.0k Cache read
     12m 34s Duration
-    Tools bash 3, read 5 Model changes 1 Compactions 0 Maskings 2
+    Tools bash 3, read 5 Model changes 1 Compactions 0 Maskings 2 Approvals 0 judged · $0.0000
     (Rename) (Export) (Tree) (Done)
     |}];
   H.act h (Run "/name");

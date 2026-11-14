@@ -714,6 +714,7 @@ ol.results .url { margin-left: 8px; font: 11.5px var(--mono); color: var(--faint
 .chip.ok, .chip.add { color: var(--sage); }
 .chip.job { color: var(--muted); }
 .chip.waiting { color: var(--sodium); }
+.chip.judged { color: var(--sage); }
 
 /* A call at rest is one line, and the line opens it: a button, reset to
    look like the line it was, with a chevron that shows on hover, focus and
@@ -747,6 +748,7 @@ button.tool-head:is(:hover, :focus-visible) > .chev, .tool.open > button.tool-he
 .tool.open > button.tool-head > .chev { transform: translateY(-1px) rotate(45deg); }
 .msg.assistant > .tool:not(.open) + .tool:not(.open) { margin-top: -8px; }
 .tool-body > .details { font: 11.5px var(--mono); color: var(--faint); }
+.tool-body > .tool-allowed { display: block; font-size: 12.5px; color: var(--muted); overflow-wrap: anywhere; }
 .tool-body > .url-link { font: 12px var(--mono); color: var(--muted); overflow-wrap: anywhere; text-underline-offset: 3px; text-decoration-color: var(--sodium-line); }
 .tool-head .arg.step { font-family: var(--sans); font-size: 13.5px; color: var(--fg); }
 /* A subagent: its lamp or outcome, its name and the way in. */

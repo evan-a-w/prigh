@@ -42,6 +42,7 @@ module Argument : sig
     | Agents (** [/agents]' subcommands, then a subagent *)
     | Compaction (** [at] or [model], then [off] or a model *)
     | Generate_model (** [off] or a model *)
+    | Approval_model (** [off] or a model *)
     | Naming (** [model], then [off] or a model *)
     | Dictation (** [model], then [off] or a transcription model *)
   [@@deriving sexp_of, equal]

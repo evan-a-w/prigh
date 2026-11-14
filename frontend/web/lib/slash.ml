@@ -32,6 +32,7 @@ module Argument = struct
     | Remind
     | Compaction
     | Generate_model
+    | Approval_model
     | Naming
     | Dictation
     | Pr
@@ -167,6 +168,12 @@ let every =
       "pick the model that drafts commit messages, pull requests and branch \
        names (✦ Generate); MODEL|off: draft them with MODEL (off: the \
        session's)"
+  ; c
+      ~argument:Approval_model
+      ~args:"[MODEL|off]"
+      "approval-model"
+      "pick the model that judges tool calls in smart mode; MODEL|off: judge \
+       them with MODEL (off: the session's)"
   ; c
       ~argument:Naming
       ~args:"[model MODEL|off]"
