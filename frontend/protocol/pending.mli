@@ -9,6 +9,13 @@ module Confirm : sig
   module Kind : sig
     type t =
       | Tool (** whether the call may run *)
+      | Judged of
+          { model : string
+          ; reason : string
+          }
+      (** whether the call may run, which the approval model [model]
+          ([smart] mode) left to the user, saying why: its reason, or why it
+          gave no verdict *)
       | Computer_use of { host : string }
       (** whether prigh may control [host]'s (its name) screen, mouse and
           keyboard until control ends; then the call runs (or asks again as

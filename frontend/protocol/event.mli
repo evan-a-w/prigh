@@ -45,6 +45,14 @@ type t =
       ; result : Message.Tool_result.t
       }
   | Tool_confirm of Pending.Confirm.t
+  | Tool_allowed of
+      { call_id : string
+      ; agent_id : string option
+      ; model : string (** the approval model *)
+      ; reason : string
+      }
+  (** the approval model ([smart] mode) let the call run without asking,
+      for [reason]: a note on the call *)
   | Tool_confirm_done of
       { call_id : string
       ; agent_id : string option

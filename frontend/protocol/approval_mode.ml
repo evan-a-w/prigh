@@ -4,12 +4,14 @@ type t =
   | Ask
   | Auto_edit
   | Auto
+  | Smart
 [@@deriving sexp_of, equal, enumerate]
 
 let to_string = function
   | Ask -> "ask"
   | Auto_edit -> "auto-edit"
   | Auto -> "auto"
+  | Smart -> "smart"
 ;;
 
 let of_string s =
@@ -17,6 +19,7 @@ let of_string s =
   | "ask" -> Some Ask
   | "auto-edit" | "auto_edit" -> Some Auto_edit
   | "auto" -> Some Auto
+  | "smart" -> Some Smart
   | _ -> None
 ;;
 
