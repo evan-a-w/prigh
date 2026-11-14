@@ -300,6 +300,7 @@ module Model = struct
     ; mode : Mode.t
     ; autocomplete : Autocomplete.t option
     ; sessions : P.Session_summary.t list option
+    ; known_sessions : (Session_link.Known.t[@sexp.opaque])
     ; skills : P.Skill.t list Location_cache.t
     ; worktrees : P.Worktree.Listing.t Location_cache.t
     ; refs : P.Git_diff.Refs.t Location_cache.t
@@ -440,8 +441,16 @@ let focused_transcript m =
   Transcript.filter (unfiltered_transcript m) m.transcript_filter
 ;;
 
+let with_sessions m sessions =
+  { m with
+    sessions = Some sessions
+  ; known_sessions = Session_link.Known.create sessions
+  }
+;;
+
 let transcript_line_count m =
   Transcript.line_count
+    ~sessions:m.known_sessions
     (focused_transcript m)
     ~width:(transcript_width m)
     ~verbosity:m.verbosity
@@ -665,6 +674,7 @@ let init =
   ; mode = Editing
   ; autocomplete = None
   ; sessions = None
+  ; known_sessions = Session_link.Known.empty
   ; skills = Location_cache.empty
   ; worktrees = Location_cache.empty
   ; refs = Location_cache.empty
@@ -714,6 +724,7 @@ let refill_commands =
   ; rpc "get_config" ~tag:Config
   ; rpc "list_models" ~tag:Models_catalog
   ; rpc "get_pending" ~tag:Pending
+  ; rpc "list_sessions" ~tag:Sessions_cache
   ]
 ;;
 
@@ -2366,6 +2377,7 @@ let reset_connection m =
   ; auth = []
   ; forge = []
   ; sessions = None
+  ; known_sessions = Session_link.Known.empty
   ; config = None
   ; client_id = None
   ; namespace = None
@@ -4935,6 +4947,7 @@ let scroll_down m ~lines =
 
 let focused_lines m =
   Transcript.render_all
+    ~sessions:m.known_sessions
     (focused_transcript m)
     ~width:(transcript_width m)
     ~verbosity:m.verbosity
@@ -5006,6 +5019,7 @@ let jump_user_message m ~direction =
   let lines =
     Transcript.user_message_lines
       ~filter:m.transcript_filter
+      ~sessions:m.known_sessions
       (unfiltered_transcript m)
       ~width:(transcript_width m)
       ~verbosity:m.verbosity
@@ -7059,6 +7073,7 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
                 ; namespace
                 ; user
                 ; sessions = None
+                ; known_sessions = Session_link.Known.empty
                 }
             in
             let m =
@@ -7074,6 +7089,7 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
               @ [ rpc "auth_status" ~tag:Auth_refresh
                 ; call Forge_status ~tag:Forge_refresh
                 ; rpc "get_config" ~tag:Config
+                ; rpc "list_sessions" ~tag:Sessions_cache
                 ] ))
      | Session_stats ->
        decode json ~f:P.Session_stats.of_json (fun stats ->
@@ -7109,14 +7125,15 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
          in
          let m = map_sessions_picker m ~f:(Session_selection.remove ~paths) in
          let m =
-           { m with
-             sessions =
-               Option.map m.sessions ~f:(fun sessions ->
-                 (Session_selection.remove
-                    (Session_selection.create sessions)
-                    ~paths)
-                   .sessions)
-           }
+           match m.sessions with
+           | None -> m
+           | Some sessions ->
+             with_sessions
+               m
+               (Session_selection.remove
+                  (Session_selection.create sessions)
+                  ~paths)
+                 .sessions
          in
          (* Moved out of a deleted session: as a switch from the picker,
             which closes it. *)
@@ -7188,7 +7205,7 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
               map_sessions_picker m ~f:(fun selection ->
                 { selection with sessions })
             in
-            let m = { m with sessions = Some sessions } in
+            let m = with_sessions m sessions in
             match m.mode, m.autocomplete with
             | Editing, Some _ -> refresh_autocomplete m
             | _ -> m, [])
@@ -7387,7 +7404,7 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
          json
          ~f:(decode_list ~f:P.Session_summary.of_json)
          (fun sessions ->
-            refresh_autocomplete { m with sessions = Some sessions })
+            refresh_autocomplete (with_sessions m sessions))
      | Prefs_history ->
        (* Not worth a word when it is not what we expect. *)
        (match P.Prefs.of_reply json with

@@ -127,6 +127,7 @@ let%expect_test "component: a driver can schedule startup explicitly" =
     ; "forge_status", Ok {|{"accounts":[]}|}
     ; "get_config", Ok {|{"scoped_models":[],"confirm_tools":false}|}
     ; "list_models", Ok "[]"
+    ; "list_sessions", Ok "[]"
     ]
   in
   let handle =
@@ -154,6 +155,7 @@ let%expect_test "component: a driver can schedule startup explicitly" =
     rpc get_config ()
     rpc list_models ()
     rpc get_pending ()
+    rpc list_sessions ()
     load history
     rpc get_prefs ((keys(history tui.transcript-filter)))
     |}]
@@ -169,6 +171,7 @@ let%expect_test
     ; "forge_status", Ok {|{"accounts":[]}|}
     ; "get_config", Ok {|{"scoped_models":[],"confirm_tools":false}|}
     ; "list_models", Ok "[]"
+    ; "list_sessions", Ok "[]"
     ; "set_thinking", Error "thinking must be one of: off, on, low, high, max"
     ]
   in
@@ -192,6 +195,7 @@ let%expect_test
     rpc get_config ()
     rpc list_models ()
     rpc get_pending ()
+    rpc list_sessions ()
     load history
     rpc get_prefs ((keys(history tui.transcript-filter)))
     spinner=0 running=false
@@ -286,6 +290,7 @@ let%expect_test
     ; "forge_status", Ok {|{"accounts":[]}|}
     ; "get_config", Ok {|{"scoped_models":[],"confirm_tools":false}|}
     ; "list_models", Ok "[]"
+    ; "list_sessions", Ok "[]"
     ]
   in
   let handle =
@@ -314,6 +319,7 @@ let%expect_test
     rpc get_config ()
     rpc list_models ()
     rpc get_pending ()
+    rpc list_sessions ()
     load history
     rpc get_prefs ((keys(history tui.transcript-filter)))
     sign out

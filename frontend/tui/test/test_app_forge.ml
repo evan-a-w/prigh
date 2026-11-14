@@ -204,6 +204,7 @@ let%expect_test "the git hosts: fetched at start, listed by /auth" =
     (Rpc (method_ get_config) (params ()) (tag Config))
     (Rpc (method_ list_models) (params ()) (tag Models_catalog))
     (Rpc (method_ get_pending) (params ()) (tag Pending))
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions_cache))
     Load_history
     (Rpc
       (method_ get_prefs)
