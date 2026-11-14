@@ -67,7 +67,10 @@ module Entry : sig
       | Approval of
           { mode : string (** an [Approval_mode] *)
           ; plan : bool
-          } (** the session's approval mode and whether it is in plan mode *)
+          ; chat : bool
+          }
+      (** the session's approval mode and whether it is in plan mode and in
+          chat mode (which overrides both) *)
       | Allow_rule of { rule : string }
       (** an [Approval_rule] the user allowed for the session *)
       | Archived of { archived : bool }
@@ -362,10 +365,19 @@ val budget : t -> float option option
 
 val set_budget : t -> usd:float option -> Entry.t
 
-(** The last [approval] entry on the active path. *)
-val approval : t -> (string * bool) option
+module Mode : sig
+  type t =
+    { approval : string (** an [Approval_mode] *)
+    ; plan : bool
+    ; chat : bool
+    }
+  [@@deriving sexp_of, equal]
+end
 
-val set_approval : t -> mode:string -> plan:bool -> Entry.t
+(** The last [approval] entry on the active path. *)
+val approval : t -> Mode.t option
+
+val set_approval : t -> mode:string -> plan:bool -> chat:bool -> Entry.t
 
 (** The last [told_environment] entry on the active path: what the model
     was last told about its environment. [None] in sessions from before it

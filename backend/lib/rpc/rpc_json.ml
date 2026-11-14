@@ -363,6 +363,8 @@ let state (s : Agent.State.t) =
       , Option.value_map s.resume_at ~default:`Null ~f:(fun at -> ms at) )
     ; "approval_mode", str (Approval_mode.to_string s.approval_mode)
     ; "plan_mode", bool s.plan_mode
+    ; "chat_mode", bool s.chat_mode
+    ; "no_host", Option.value_map s.no_host ~default:`Null ~f:str
     ; ( "computer_control"
       , Option.value_map s.computer_control ~default:`Null ~f:str )
     ; "plan", Option.value_map s.plan ~default:`Null ~f:Plan.to_json
@@ -570,8 +572,12 @@ let entry (e : Session.Entry.t) =
     | Goal _ -> [ "kind", str "goal" ]
     | Reminders _ -> [ "kind", str "reminders" ]
     | Budget _ -> [ "kind", str "budget" ]
-    | Approval { mode; plan } ->
-      [ "kind", str "approval"; "mode", str mode; "plan", bool plan ]
+    | Approval { mode; plan; chat } ->
+      [ "kind", str "approval"
+      ; "mode", str mode
+      ; "plan", bool plan
+      ; "chat", bool chat
+      ]
     | Allow_rule { rule } -> [ "kind", str "allow_rule"; "rule", str rule ]
     | Archived { archived } ->
       [ "kind", str "archived"

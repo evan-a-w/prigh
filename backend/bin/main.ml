@@ -72,6 +72,7 @@ module Setup = struct
     ; memory : Memory.t (** the world's *)
     ; user_info : User_info.t (** the world's *)
     ; custom_instructions : Custom_instructions.t (** the world's *)
+    ; mcp_settings : Mcp_settings.t (** the world's *)
     }
 end
 
@@ -217,6 +218,7 @@ let common_params =
     let memory = Memory.create ~home in
     let user_info = User_info.create ~home in
     let custom_instructions = Custom_instructions.create ~home in
+    let mcp_settings = Mcp_settings.create ~home in
     let questions = Session_questions.create () in
     let search =
       ref (Tool_sessions.local_search ~dir:(fun () -> sessions_dir))
@@ -332,6 +334,7 @@ let common_params =
             | name when String.equal name Tool_custom_instructions.name ->
               Custom_instructions.enabled custom_instructions
             | _ -> true)
+          ~mcp_settings
           ~user_info
           ~custom_instructions
           ~cwd
@@ -349,6 +352,7 @@ let common_params =
     ; memory
     ; user_info
     ; custom_instructions
+    ; mcp_settings
     ; questions
     ; search
     }
@@ -785,6 +789,7 @@ let serve_command =
              ; memory
              ; user_info
              ; custom_instructions
+             ; mcp_settings
              ; questions
              ; search
              }
@@ -822,6 +827,7 @@ let serve_command =
              ~memory
              ~user_info
              ~custom_instructions
+             ~mcp_settings
              ~sessions_dir:world.sessions_dir
              ~cwd
              ~new_agent
@@ -1868,6 +1874,7 @@ let acp_command =
                ; memory
                ; user_info
                ; custom_instructions
+               ; mcp_settings
                ; questions
                ; search
                }
@@ -1899,6 +1906,7 @@ let acp_command =
                ~memory
                ~user_info
                ~custom_instructions
+               ~mcp_settings
                ~sessions_dir:world.sessions_dir
                ~cwd
                ~new_agent

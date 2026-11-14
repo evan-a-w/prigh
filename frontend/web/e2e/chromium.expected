@@ -767,6 +767,7 @@ Models
 Memory
 About you
 Custom instructions
+MCP servers
 Git hosting
 T
 token
@@ -990,6 +991,7 @@ Models
 Memory
 About you
 Custom instructions
+MCP servers
 Git hosting
 B
 bob
@@ -3106,7 +3108,7 @@ Jump to a message, Filter the transcript, Files, Terminal, Settings
 === chromium: mobile: 390x844: the settings' list ===
 ok
 === chromium: mobile: 390x844: the settings ===
-Appearance, Sessions, New sessions, Models, Memory, About you, Custom instructions, Git hosting, Account
+Appearance, Sessions, New sessions, Models, Memory, About you, Custom instructions, MCP servers, Git hosting, Account
 === chromium: mobile: 390x844: settings: appearance ===
 ok
 title: Appearance; back: Settings
@@ -3153,7 +3155,7 @@ Jump to a message, Filter the transcript, Files, Terminal, Settings
 === chromium: mobile: 320x640: the settings' list ===
 ok
 === chromium: mobile: 320x640: the settings ===
-Appearance, Sessions, New sessions, Models, Memory, About you, Custom instructions, Git hosting, Account
+Appearance, Sessions, New sessions, Models, Memory, About you, Custom instructions, MCP servers, Git hosting, Account
 === chromium: mobile: 320x640: settings: appearance ===
 ok
 title: Appearance; back: Settings
@@ -3200,7 +3202,7 @@ Jump to a message, Filter the transcript, Files, Terminal, Settings
 === chromium: mobile: 390x844-pwa: the settings' list ===
 ok
 === chromium: mobile: 390x844-pwa: the settings ===
-Appearance, Sessions, New sessions, Models, Memory, About you, Custom instructions, Git hosting, Account
+Appearance, Sessions, New sessions, Models, Memory, About you, Custom instructions, MCP servers, Git hosting, Account
 === chromium: mobile: 390x844-pwa: settings: appearance ===
 ok
 title: Appearance; back: Settings
@@ -3462,7 +3464,7 @@ fits: true
 + Fresh work: fix/fresh
 - Old work
 === chromium: sessions settings: the settings ===
-Show worktrees | Your account | Show worktrees for sessions used in the last 12 hours; older ones fold them behind their count. Your own fold or unfold of a session wins. | hours
+Show worktrees | Your account | Show worktrees for pinned sessions and those used in the last 12 hours (changed, running, opened or worked in); others fold them behind their count. Your own fold or unfold of a session holds until you next open it. | hours
 Archive after | Sessions without activity for 7 days move to Archived (pinned and running ones never do). | days
 fields: "12" hours, "7" days
 === chromium: sessions settings: 100 hours ===
@@ -3477,14 +3479,14 @@ fields: "12" hours, "7" days
 === chromium: sessions settings: refused ===
 “a fortnight” isn't a number of days from 0 to 365: type one like 7, or off to archive only by hand.
 === chromium: sessions settings: archive after 2 days ===
-Show worktrees | Your account | Show worktrees for sessions used recently; older ones fold them behind their count. Your own fold or unfold of a session wins. | Off: every session's worktrees start folded.
+Show worktrees | Your account | Show worktrees for pinned sessions and those used recently (changed, running, opened or worked in); others fold them behind their count. Your own fold or unfold of a session holds until you next open it. | Off: every session's worktrees fold, pinned ones too.
 Archive after | Sessions without activity for 2 days move to Archived (pinned and running ones never do). | days
 fields: hidden hours, "2" days
 archive_after_days=2
 - Fresh work
 archived: Archived 1
 === chromium: sessions settings: switched on again ===
-Show worktrees | Your account | Show worktrees for sessions used in the last 100 hours; older ones fold them behind their count. Your own fold or unfold of a session wins. | hours
+Show worktrees | Your account | Show worktrees for pinned sessions and those used in the last 100 hours (changed, running, opened or worked in); others fold them behind their count. Your own fold or unfold of a session holds until you next open it. | hours
 Archive after | Sessions without activity for 2 days move to Archived (pinned and running ones never do). | days
 fields: "100" hours, "2" days
 === chromium: sessions settings: phone 390x844: sidebar ===
@@ -3914,6 +3916,105 @@ editing fits: yes; targets: all ok
 back: Custom instructions | Standing instructions for the model, given to it in every session; it may also add or edit them when you state a lasting preference. Kept on the backend, for your account.
 === chromium: custom instructions: errors ===
 (none)
+=== chromium: mcp settings: empty, the host's own ===
+MCP servers
+Tools the model can use from MCP servers. The servers here are kept on the backend for your account and run on every host your sessions use; a host's ~/.prigh/mcp.json and a project's .mcp.json add their own.
+YOUR SERVERS
+No servers yet
+Add one by the command that starts it or by its URL, or paste the mcpServers JSON from another tool's settings. It runs on every host your sessions use.
+Add server
+Paste JSON
+ON HOST
+From its files: change them there
+local
+~/.prigh/mcp.json
+Ready ·
+1 tool
+=== chromium: mcp settings: adding ===
+value while typing: text
+hidden: password
+shown again: text
+=== chromium: mcp settings: added: started with the env ===
+echo
+NODE FAKE echo
+Ready on HOST ·
+1 tool
+file (mode 600): echo: {"command":"NODE","args":["FAKE","echo"],"env":{"TOKEN":"s3cret"}}
+editing, the value: password
+settings still open: 1
+=== chromium: mcp settings: a wrong secret ===
+echo
+NODE FAKE echo
+Failed on HOST: The server exited (code 1): echo: wrong TOKEN
+=== chromium: mcp settings: pasted, one broken ===
+Paste JSON
+An mcpServers object, as in Claude Code's or Cursor's settings, with or without the mcpServers around it. Every server in it is added, or none is.
+Server "broken": give a "command" (stdio) or a "url" (http)
+Ctrl+Enter adds, Esc cancels
+Cancel
+Add servers
+=== chromium: mcp settings: pasted ===
+MCP servers
+Tools the model can use from MCP servers. The servers here are kept on the backend for your account and run on every host your sessions use; a host's ~/.prigh/mcp.json and a project's .mcp.json add their own.
+YOUR SERVERS
+3 servers
+echo
+NODE FAKE echo
+Ready on HOST ·
+1 tool
+pasted
+NODE FAKE pasted
+Ready on HOST ·
+1 tool
+local
+https://example.com/mcp
+Overridden by ~/.prigh/mcp.json on HOST: that one runs instead. Rename one of them to use both.
+Add server
+Paste JSON
+ON HOST
+From its files: change them there
+local
+~/.prigh/mcp.json
+Ready ·
+1 tool
+file (mode 600): echo: {"command":"NODE","args":["FAKE","echo"],"env":{"TOKEN":"s3cret"}}; pasted: {"command":"NODE","args":["FAKE","pasted"]}; local: {"url":"https://example.com/mcp","headers":{"Authorization":"Bearer t"}}
+=== chromium: mcp settings: off, followed on another page ===
+pasted
+NODE FAKE pasted
+Off: not started on any host
+file (mode 600): echo: {"command":"NODE","args":["FAKE","echo"],"env":{"TOKEN":"s3cret"}}; pasted (off): {"command":"NODE","args":["FAKE","pasted"]}; local: {"url":"https://example.com/mcp","headers":{"Authorization":"Bearer t"}}
+=== chromium: mcp settings: removing ===
+local
+https://example.com/mcp
+Remove it from your settings? Its tools go from every session.
+Keep
+Remove
+file (mode 600): echo: {"command":"NODE","args":["FAKE","echo"],"env":{"TOKEN":"s3cret"}}; pasted: {"command":"NODE","args":["FAKE","pasted"]}
+=== chromium: mcp settings: /mcp disable ===
+Disabled MCP server pasted
+file (mode 600): echo: {"command":"NODE","args":["FAKE","echo"],"env":{"TOKEN":"s3cret"}}; pasted (off): {"command":"NODE","args":["FAKE","pasted"]}
+There is already an MCP server "echo" in the settings: choose another name, or edit that one. /mcp add echo https://example.com/mcp is back in the editor.
+composer: /mcp add echo https://example.com/mcp
+=== chromium: mcp settings: phone 390x844 ===
+list fits: yes; targets: all ok
+editing fits: yes; targets: all ok
+pasting fits: yes; targets: all ok
+removing fits: yes; targets: all ok
+back: MCP servers | Tools the model can use from MCP servers. The servers here are kept on the backend for your account and run on every host your sessions use; a host's ~/.prigh/mcp.json and a project's .mcp.json add their own.
+=== chromium: mcp settings: phone 320x640 ===
+list fits: yes; targets: all ok
+editing fits: yes; targets: all ok
+pasting fits: yes; targets: all ok
+removing fits: yes; targets: all ok
+back: MCP servers | Tools the model can use from MCP servers. The servers here are kept on the backend for your account and run on every host your sessions use; a host's ~/.prigh/mcp.json and a project's .mcp.json add their own.
+=== chromium: mcp settings: phone 390x844-pwa ===
+list fits: yes; targets: all ok
+editing fits: yes; targets: all ok
+pasting fits: yes; targets: all ok
+removing fits: yes; targets: all ok
+back: MCP servers | Tools the model can use from MCP servers. The servers here are kept on the backend for your account and run on every host your sessions use; a host's ~/.prigh/mcp.json and a project's .mcp.json add their own.
+=== chromium: mcp settings: errors ===
+(none)
 === chromium: images (desktop): refused as too large: the error card ===
 The model returned an error
 HTTP 400: invalid_request_error: messages.0.content.0: image exceeds 5 MB maximum (Claude Opus 4.6 still refused the images downsized to 0.8 MB, 1500 px: /downsize-images makes them smaller and tries again)
@@ -4271,3 +4372,91 @@ tap shows a tooltip: true
 page fits: true; overflowing: 0
 === chromium: ui: errors ===
 none
+=== chromium: chat: a new session with no tool host ===
+mode chip: chat
+host chip: no host
+placeholder: Chat, without a tool host: no files or commands. Ask anything…
+strip: (none)
+=== chromium: chat: a reply, with no tool host ===
+you: what is a monad? (time)
+prigh: faux reply deepseek-flash 10 in 5 out (time)
+=== chromium: chat: the mode menu ===
+When tools ask first
+Alt+M cycles
+Asks: edits & commands
+bash, job_input, edits and MCP tools ask first
+Asks: commands
+file edits run; bash, job_input and MCP tools ask first
+Auto: never asks
+tools run without asking
+Plan mode
+read-only planning, until you leave it (/plan off or Alt+M): no file edits; bash, job_input and MCP tools ask first
+Chat: no tool host
+a chat without the tool host: no files, commands or project, only the web and other host-free tools, until you leave it (/chat off or Alt+M)
+Enter chooses, ← → the next setting, Esc closes
+=== chromium: chat: mode ask, no tool host ===
+mode chip: ask
+host chip: No host
+placeholder: Working in $CWD. Ask prigh anything…
+strip: No tool host connected Chat without a host
+toast: No tool host connected: your message stays here. Chat without a host (over it) sends it as a chat, or connect a tool host and pick it (/host).
+draft: and a functor?
+messages: 1
+=== chromium: chat: chat without a host: sent ===
+mode chip: chat
+host chip: no host
+placeholder: Chat, without a tool host: no files or commands. Ask anything…
+strip: (none)
+draft: ""
+you: what is a monad? (time) | and a functor? (time)
+replies: 2
+=== chromium: chat: phone 390x844: chat ===
+mode chip: (in the ⋯ sheet)
+host chip: no host
+placeholder: Chat: no files or commands…
+strip: (none)
+audit: ok
+=== chromium: chat: phone 390x844: the ⋯ sheet's mode ===
+Mode ask auto-edit auto plan [chat]
+audit: ok
+=== chromium: chat: phone 390x844: mode ask, no tool host ===
+mode chip: (in the ⋯ sheet)
+host chip: No host
+placeholder: Working in $CWD. Ask prigh anything…
+strip: No tool host connected Chat without a host
+audit: ok
+after Chat without a host: strip (none)
+=== chromium: chat: phone 320x640: chat ===
+mode chip: (in the ⋯ sheet)
+host chip: no host
+placeholder: Chat: no files or commands…
+strip: (none)
+audit: ok
+=== chromium: chat: phone 320x640: the ⋯ sheet's mode ===
+Mode ask auto-edit auto plan [chat]
+audit: ok
+=== chromium: chat: phone 320x640: mode ask, no tool host ===
+mode chip: (in the ⋯ sheet)
+host chip: No host
+placeholder: Working in $CWD. Ask prigh anything…
+strip: No tool host connected Chat anyway
+audit: ok
+after Chat without a host: strip (none)
+=== chromium: chat: phone 390x844-pwa: chat ===
+mode chip: (in the ⋯ sheet)
+host chip: no host
+placeholder: Chat: no files or commands…
+strip: (none)
+audit: ok
+=== chromium: chat: phone 390x844-pwa: the ⋯ sheet's mode ===
+Mode ask auto-edit auto plan [chat]
+audit: ok
+=== chromium: chat: phone 390x844-pwa: mode ask, no tool host ===
+mode chip: (in the ⋯ sheet)
+host chip: No host
+placeholder: Working in $CWD. Ask prigh anything…
+strip: No tool host connected Chat without a host
+audit: ok
+after Chat without a host: strip (none)
+=== chromium: chat: errors ===
+(none)

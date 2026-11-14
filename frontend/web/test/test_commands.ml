@@ -88,6 +88,7 @@ let%expect_test "every command does something (none is unknown)" =
     /confirm                   picker: Tool confirmation
     /mode                      picker: When tools ask first (Alt+M cycles)
     /plan                      rpc set_mode
+    /chat                      rpc set_mode
     /todos                     toast: No plan: the model has not made one (it makes one with update_plan).
     /permissions               text: Permissions
     /notify                    toast: Notifications are on, but the browser has not been asked yet: /notify on asks it
@@ -1799,10 +1800,11 @@ let%expect_test "/setusr: a superuser acts as another user, and back" =
      (params
       ((keys
         (web.theme web.accent web.notify web.verbosity web.terminal-open
-         web.sidebar-folded web.sidebar-unfolded web.sidebar-worktree-hours
-         web.review history web.migrated web.sidebar-width web.files-width
-         web.files-preview-width web.agents-width web.terminal-height
-         web.review-chat-width web.review-files-width web.review-margin-width))))
+         web.sidebar-folded web.sidebar-unfolded web.sidebar-opened
+         web.sidebar-worktree-hours web.review history web.migrated
+         web.sidebar-width web.files-width web.files-preview-width
+         web.agents-width web.terminal-height web.review-chat-width
+         web.review-files-width web.review-margin-width))))
      (tag Prefs))
     Acting as bob
     Back to alice
@@ -1854,10 +1856,11 @@ let%expect_test "/retry-backend-connection, /state, /clear, /quit" =
      (params
       ((keys
         (web.theme web.accent web.notify web.verbosity web.terminal-open
-         web.sidebar-folded web.sidebar-unfolded web.sidebar-worktree-hours
-         web.review history web.migrated web.sidebar-width web.files-width
-         web.files-preview-width web.agents-width web.terminal-height
-         web.review-chat-width web.review-files-width web.review-margin-width))))
+         web.sidebar-folded web.sidebar-unfolded web.sidebar-opened
+         web.sidebar-worktree-hours web.review history web.migrated
+         web.sidebar-width web.files-width web.files-preview-width
+         web.agents-width web.terminal-height web.review-chat-width
+         web.review-files-width web.review-margin-width))))
      (tag Prefs))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s1.jsonl) (limit 1000000)))
@@ -1890,8 +1893,8 @@ let%expect_test "/retry-backend-connection, /state, /clear, /quit" =
      (usage ((input 0) (output 0) (cache_read 0))) (cost_usd 0)
      (context_tokens 0) (active_host backend) (active_host_name ()) (hosts ())
      (subagents ()) (jobs ()) (budget_usd ()) (goal ()) (reminders ())
-     (resume_at ()) (approval_mode Auto) (plan_mode false) (plan ())
-     (session_rules ()))
+     (resume_at ()) (approval_mode Auto) (plan_mode false) (chat_mode false)
+     (plan ()) (session_rules ()))
     (Done)
     |}];
   H.key h "Escape" ~target:Page;

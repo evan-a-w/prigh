@@ -32,6 +32,7 @@ and context =
       -> User_question.Reply.t
   ; ui : Ui_host.t
   ; host : string option
+  ; chat : bool
   }
 
 and executor = context -> t -> Json.t -> Tool_result.t
@@ -78,6 +79,7 @@ module Context = struct
             User_question.Reply.Unavailable "no user to ask")
         ?(ui = Ui_host.none)
         ?host
+        ?(chat = false)
         ~env
         ~cwd
         ()
@@ -103,6 +105,7 @@ module Context = struct
     ; ask_user
     ; ui
     ; host
+    ; chat
     }
   ;;
 end

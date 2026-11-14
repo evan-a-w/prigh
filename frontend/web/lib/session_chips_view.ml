@@ -89,7 +89,7 @@ let thinking_chip (m : App.Model.t) (state : State.t) ~inject =
 ;;
 
 (* What asks first, by its short name (ask, auto-edit, auto, plan); the
-   shield lit where nothing asks. *)
+   shield lit where nothing asks. Chat mode is a speech bubble, lit. *)
 let mode_chip (m : App.Model.t) (state : State.t) ~inject =
   match m.pending.mode with
   | Some mode ->
@@ -100,14 +100,18 @@ let mode_chip (m : App.Model.t) (state : State.t) ~inject =
   | None ->
     let mode = Session_mode.of_state state in
     let never_asks =
-      (not mode.plan) && Approval_mode.equal mode.approval Auto
+      (not (mode.plan || mode.chat)) && Approval_mode.equal mode.approval Auto
     in
     button
       ~cls:
         (String.concat
            ~sep:" "
            ([ "chip-button"; "mode-chip" ]
-            @ (if mode.plan then [ "plan-mode" ] else [])
+            @ (if mode.chat
+               then [ "chat-mode" ]
+               else if mode.plan
+               then [ "plan-mode" ]
+               else [])
             @ if never_asks then [ "never-asks" ] else []))
       ~title:
         (sprintf
@@ -116,7 +120,9 @@ let mode_chip (m : App.Model.t) (state : State.t) ~inject =
       ~label:(Session_mode.title mode)
       ~attrs:(menu_attrs m Mode)
       ~on_click:(inject (Action.Open_chip Mode))
-      [ icon Shield; span ~cls:"chip-label" (Session_mode.label mode) ]
+      [ icon (if mode.chat then Message else Shield)
+      ; span ~cls:"chip-label" (Session_mode.label mode)
+      ]
 ;;
 
 (* How much of the transcript shows (Ctrl+O cycles): lines and the level;

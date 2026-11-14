@@ -62,7 +62,8 @@ let%expect_test "Alt+M cycles the mode; the status line shows it at once" =
       (method_ set_mode)
       (params (
         (approval_mode auto-edit)
-        (plan_mode     false)))
+        (plan_mode     false)
+        (chat_mode     false)))
       (tag (
         Mode_set
         "mode: auto-edit \226\128\148 file edits run; bash, job_input and MCP tools ask first")))
@@ -80,26 +81,29 @@ let%expect_test "Alt+M cycles the mode; the status line shows it at once" =
       (method_ set_mode)
       (params (
         (approval_mode auto)
-        (plan_mode     true)))
+        (plan_mode     true)
+        (chat_mode     false)))
       (tag (
         Mode_set
         "mode: plan \226\128\148 read-only planning, until you leave it (/plan off or Alt+M): no file edits; bash, job_input and MCP tools ask first")))
     (Rpc
       (method_ set_mode)
       (params (
-        (approval_mode ask)
-        (plan_mode     false)))
+        (approval_mode auto)
+        (plan_mode     true)
+        (chat_mode     true)))
       (tag (
         Mode_set
-        "mode: ask \226\128\148 bash, job_input, edits and MCP tools ask first")))
+        "mode: chat \226\128\148 a chat without the tool host: no files, commands or project, only the web and other host-free tools, until you leave it (/chat off or Alt+M)")))
     (Rpc
       (method_ set_mode)
       (params (
-        (approval_mode auto-edit)
-        (plan_mode     false)))
+        (approval_mode ask)
+        (plan_mode     false)
+        (chat_mode     false)))
       (tag (
         Mode_set
-        "mode: auto-edit \226\128\148 file edits run; bash, job_input and MCP tools ask first")))
+        "mode: ask \226\128\148 bash, job_input, edits and MCP tools ask first")))
     |}];
   (* A refusal puts the backend's mode back. *)
   H.reply_error h (Mode_set "x") "unknown approval mode";
@@ -129,12 +133,13 @@ let%expect_test "/mode picks or sets the mode; /plan toggles plan mode" =
 
     ▌ earlier question
       earlier answer
-    Mode (Alt+M cycles)  (4)
+    Mode (Alt+M cycles)  (5)
     / ▏
        ask        bash, job_input, edits and MCP tools ask first
     ▸* auto-edit  file edits run; bash, job_input and MCP tools…
        auto       tools run without asking
        plan       read-only planning, until you leave it (/plan…
+       chat       a chat without the tool host: no files, comma…
     ────────────────────────────────────────────────────────────
     >
     deepseek-flash  ctx:0.1%/1.0M  Enter selects · Esc closes
@@ -147,7 +152,8 @@ let%expect_test "/mode picks or sets the mode; /plan toggles plan mode" =
       (method_ set_mode)
       (params (
         (approval_mode auto-edit)
-        (plan_mode     true)))
+        (plan_mode     true)
+        (chat_mode     false)))
       (tag (
         Mode_set
         "mode: plan \226\128\148 read-only planning, until you leave it (/plan off or Alt+M): no file edits; bash, job_input and MCP tools ask first")))
@@ -175,7 +181,8 @@ let%expect_test "/mode picks or sets the mode; /plan toggles plan mode" =
       (method_ set_mode)
       (params (
         (approval_mode auto-edit)
-        (plan_mode     false)))
+        (plan_mode     false)
+        (chat_mode     false)))
       (tag (
         Mode_set
         "mode: auto-edit \226\128\148 file edits run; bash, job_input and MCP tools ask first")))
@@ -183,7 +190,8 @@ let%expect_test "/mode picks or sets the mode; /plan toggles plan mode" =
       (method_ set_mode)
       (params (
         (approval_mode auto-edit)
-        (plan_mode     true)))
+        (plan_mode     true)
+        (chat_mode     false)))
       (tag (
         Mode_set
         "mode: plan \226\128\148 read-only planning, until you leave it (/plan off or Alt+M): no file edits; bash, job_input and MCP tools ask first")))
@@ -191,7 +199,8 @@ let%expect_test "/mode picks or sets the mode; /plan toggles plan mode" =
       (method_ set_mode)
       (params (
         (approval_mode ask)
-        (plan_mode     false)))
+        (plan_mode     false)
+        (chat_mode     false)))
       (tag (
         Mode_set
         "mode: ask \226\128\148 bash, job_input, edits and MCP tools ask first")))
@@ -1005,5 +1014,169 @@ let%expect_test "long choice descriptions and answers wrap in the question box" 
     ──────────────────────────────────────────────────
     >
     deepseek-flash  Enter accepts · Esc declines
+    |}]
+;;
+
+let chat_state ?(plan_mode = false) () =
+  { (with_mode ~plan_mode Auto) with chat_mode = true }
+;;
+
+let%expect_test "chat mode: the status line says so, without the cwd or host" =
+  let show width =
+    let h = Test_app.connected ~width ~height:8 () in
+    H.event h (State (chat_state ()));
+    H.show h
+  in
+  show 100;
+  show 60;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    deepseek-flash  think:off  mode:chat  (/chat off or Alt+M leaves)  ctx:0.1%/1.0M  $0.01
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ────────────────────────────────────────────────────────────
+    > ▏
+    deepseek-flash  think:off  mode:chat  ctx:0.1%/1.0M  $0.01
+    |}]
+;;
+
+let%expect_test "/chat toggles chat mode; leaving returns to the mode before" =
+  let h = Test_app.connected () in
+  H.event h (State (with_mode ~plan_mode:true Auto_edit));
+  command h "/chat";
+  H.event
+    h
+    (State { (with_mode ~plan_mode:true Auto_edit) with chat_mode = true });
+  command h "/chat off";
+  command h "/mode chat";
+  command h "/chat maybe";
+  H.show h;
+  [%expect
+    {|
+    (Rpc
+      (method_ set_mode)
+      (params (
+        (approval_mode auto-edit)
+        (plan_mode     true)
+        (chat_mode     true)))
+      (tag (
+        Mode_set
+        "mode: chat \226\128\148 a chat without the tool host: no files, commands or project, only the web and other host-free tools, until you leave it (/chat off or Alt+M)")))
+    (Rpc
+      (method_ set_mode)
+      (params (
+        (approval_mode auto-edit)
+        (plan_mode     true)
+        (chat_mode     false)))
+      (tag (
+        Mode_set
+        "mode: plan \226\128\148 read-only planning, until you leave it (/plan off or Alt+M): no file edits; bash, job_input and MCP tools ask first")))
+    (Rpc
+      (method_ set_mode)
+      (params (
+        (approval_mode auto-edit)
+        (plan_mode     true)
+        (chat_mode     true)))
+      (tag (
+        Mode_set
+        "mode: chat \226\128\148 a chat without the tool host: no files, commands or project, only the web and other host-free tools, until you leave it (/chat off or Alt+M)")))
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ┌─ Error ──────────────────────────────────────────────────┐
+    │ unknown argument "maybe"; use on or off (or nothing to   │
+    │ toggle)                                                  │
+    └────────────────────────────────────────── Esc dismisses ─┘
+    ────────────────────────────────────────────────────────────
+    > ▏
+    deepseek-flash  think:off  mode:chat  ctx:0.1%/1.0M  $0.01
+    |}]
+;;
+
+let%expect_test "no tool host: Enter offers to send the message as a chat" =
+  let h = Test_app.connected () in
+  let no_host =
+    "no tool host connected: connect one with `prigh tool-host -connect ...` \
+     or a TUI, then pick it with /host, or talk without one in chat mode \
+     (/mode chat)"
+  in
+  H.event h (State { (with_mode Auto) with no_host = Some no_host });
+  H.keys h "hello";
+  H.enter h;
+  H.show h;
+  (* Esc keeps the message, unsent. *)
+  H.key h (Key.plain Escape);
+  H.show h;
+  (* Enter, then y: chat mode, then the message. *)
+  H.enter h;
+  H.keys h "y";
+  H.show h;
+  [%expect
+    {|
+    ▌ earlier question
+      earlier answer
+    ┌─ Confirm ────────────────────────────────────────────────┐
+    │ no tool host connected: connect one with `prigh          │
+    │ tool-host -connect ...` or a TUI, then pick it with      │
+    │ /host, or talk without one in chat mode (/mode chat).    │
+    │ Send it as a chat (chat mode: no tool host)? (y/n: keep  │
+    │ it)                                                      │
+    └──────────────────────────────────────────────────────────┘
+    ────────────────────────────────────────────────────────────
+    ? hello▏
+    deepseek-flash  think:off  ctx:0.1%/1.0M  confirm: y / n
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ┌─ Notice ─────────────────────────────────────────────────┐
+    │ not sent: the message stays in the editor (/chat, or a   │
+    │ tool host)                                               │
+    └────────────────────────────────────────── Esc dismisses ─┘
+    ────────────────────────────────────────────────────────────
+    > hello▏
+    deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    (Rpc
+      (method_ set_mode)
+      (params (
+        (approval_mode auto)
+        (plan_mode     false)
+        (chat_mode     true)))
+      (tag (
+        Mode_set
+        "mode: chat \226\128\148 a chat without the tool host: no files, commands or project, only the web and other host-free tools, until you leave it (/chat off or Alt+M)")))
+    (Rpc (method_ prompt) (params ((text hello))) (tag Show_error))
+    (Append_history hello)
+    (Rpc
+      (method_ push_pref)
+      (params (
+        (key   history)
+        (value hello)
+        (max   500)))
+      (tag Ignore))
+
+
+
+
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ────────────────────────────────────────────────────────────
+    > ▏
+    deepseek-flash  think:off  mode:chat  ctx:0.1%/1.0M  $0.01
     |}]
 ;;

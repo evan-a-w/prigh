@@ -56,6 +56,12 @@ type t =
     (** when a run stopped by a usage limit resumes by itself *)
   ; approval_mode : Approval_mode.t
   ; plan_mode : bool (** read-only planning, until the user turns it off *)
+  ; chat_mode : bool
+    (** a chat without the tool host, until the user turns it off; overrides
+        [plan_mode], kept to return to *)
+  ; no_host : string option
+    (** why a message outside chat mode cannot run now (no tool host), and
+        what to do *)
   ; computer_control : string option
     (** the host (its name) whose screen the user allowed prigh to control,
         while that lasts *)

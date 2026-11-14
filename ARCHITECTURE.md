@@ -790,7 +790,17 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
 - MCP — `Mcp_config` reads `mcpServers` from the host's `~/.prigh/mcp.json`
   and `.mcp.json` in the cwd and its ancestors (closest wins; `${VAR}` and
   `${VAR:-default}`), and keeps approvals of project servers (by a digest of
-  the definition as written) in `~/.prigh/mcp-approvals.json`. `Mcp_client`
+  the definition as written) in `~/.prigh/mcp-approvals.json`.
+  `Mcp_settings` is the user's own servers, kept by the backend in
+  `~/.prigh/mcp-servers.json` under the world's home (mode 600, written
+  atomically under a mutex; `mcpServers` plus the names of the disabled
+  ones). The agent sends the enabled ones as `settings` with every `$mcp_*`
+  op, so they reach only that user's hosts; `Mcp_hub` merges them under the
+  host's files (source `"settings"`, no approval; a file's server of the
+  same name wins), expands `${VAR}` on the host, and on a change stops only
+  the servers whose definition changed or went (a request without
+  `settings`, from an older backend, stops only the settings' ones). Their
+  `Transport` sexps hide `env` and `header` values. `Mcp_client`
   is one connection (stdio child in its own process group, or streamable
   HTTP; `initialize`, `tools/list`, `tools/call`, cancellation, ping).
   `Mcp_hub` holds a host's running servers, shared by all its sessions: one
@@ -844,7 +854,9 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   names another machine.
 - `Tool_web_fetch` / `Html_text` — `web_fetch` runs on the active host
   (`on_host`, so `localhost` is the host's; a host predating it answers
-  `unknown host tool`), through `Http_client.get_stream`: up to 10
+  `unknown host tool`), or in the backend in chat mode (`in_backend`: no
+  saved full text, and without the backend host it refuses loopback,
+  private and link-local addresses, also after a redirect), through `Http_client.get_stream`: up to 10
   redirects, a 5 MB body limit, a 30 s default timeout (at most 120). HTML
   goes through `Html_text` (a hand-written tokenizer and renderer: headings,
   lists, links resolved against the final URL, `pre` fences, tables,
@@ -1271,8 +1283,8 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   changed and leave re-reading the instructions to the model's discretion,
   since they are often unchanged.
 - `Told_environment` — what the model was last told about its environment
-  (host id, cwd, the tool names `Tools.for_model` gives it, plan mode, the
-  kind of client, once one prompted):
+  (host id, cwd, the tool names `Tools.for_model` gives it, plan mode, chat
+  mode, the kind of client, once one prompted):
   set from the current environment when the system prompt is built (plan
   mode excepted: the prompt does not describe it) and whenever notes are
   delivered, and recorded as a `Told_environment` session entry on the
@@ -1451,7 +1463,24 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   model is told about plan mode by `System_prompt.plan_mode_note`, on the
   next user message (or goal message) or, while a loop runs, as a message
   of its own at the next turn boundary, recorded as an `Injected` note of
-  kind `Plan_mode`. `ask_user` emits `Ask_user` and waits for
+  kind `Plan_mode`. Chat mode (`Chat_mode`; `set_mode`'s `chat_mode`, kept in
+  the session's `approval` entry with `chat`) overrides both, keeping them
+  to return to: `own_tools` offers only `Chat_mode.allowed` (no MCP or
+  review tools), with `web_fetch` swapped for `Tool_web_fetch.in_backend`;
+  `approve` refuses anything else (a cached tool list, an `ls` from before
+  the switch) and the executor refuses `on_host` tools other than
+  `web_fetch`, which it runs in the backend; `System_prompt.build ~chat`
+  drops the environment, project instructions, skills, Nix and the
+  orchestration guidance; `Tool.Context.chat` makes a subagent a chat too
+  (its prompt and tools); `refresh_location`, MCP and `await_host` do not
+  touch the host. `Told_environment` records `chat_mode` with an empty host
+  and cwd, and its chat note (`System_prompt.chat_mode_note`, kind
+  `Chat_mode`) stands for the host, cwd and tool changes; `mode_notes`
+  delivers it between turns like plan mode's. `State.no_host` says why a
+  message outside chat mode cannot run (no host connected, or the
+  session's gone for good) and `prompt` and the queue refuse with it;
+  `Agent.chat_without_host`, called when a non-host client attaches,
+  puts a brand-new session with no host in reach in chat mode. `ask_user` emits `Ask_user` and waits for
   `answer_question` (the first answer wins; abort withdraws it;
   `Ask_user_done` follows). Its timeout (`User_question.timeout`: the
   config's `ask_user_timeout_seconds`, or the call's `timeout_seconds`,
@@ -2114,7 +2143,13 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   `list_mcp {reconnect?}` and `mcp_approve {source, server}` (both
   `{servers: [{name, source, project, status: ready|failed|needs_approval,
   error?, tools: [{name, description}]}], problems}`, tools under their
-  prigh names),
+  prigh names), `get_mcp_settings`, `add_mcp_servers {servers | text}`
+  (an `mcpServers` object, or pasted text; all or none),
+  `update_mcp_server {name, rename?, config}`, `remove_mcp_server {name}`
+  and `set_mcp_server_enabled {name, enabled}` (all `{servers: [{name,
+  enabled, config}]}`, the user's servers with their secrets: only that
+  user's clients see them; every one of them also gets the
+  `mcp_settings_changed` event with the list, and running agents re-list),
   `tool_exec_result`, `auth_status`, `login`, `auth_respond`, `auth_cancel`,
   `logout`, `forge_status`, `forge_login {host?, kind?, method?}`,
   `forge_logout {host}`, `pr_list {state?}`, `pr_view {number}`,
@@ -2696,7 +2731,11 @@ terminal frontend and `web/` prigh-web, the browser one.
     transcript).
   - Skills and MCP: `/skills` and `/mcp` are pickers over `list_skills` and
     `list_mcp` (Enter on a server needing approval sends `mcp_approve`,
-    whose reply is the new list). `/skill:NAME ARGS` is sent as a prompt
+    whose reply is the new list); `/mcp` asks `get_mcp_settings` first, so
+    a disabled or overridden server of the user's shows too (an older
+    backend's error falls back to the host's list). `Prigh_ui.Mcp_command`
+    parses `/mcp add|remove|enable|disable` for both frontends; a refusal
+    puts the command back in the editor. `/skill:NAME ARGS` is sent as a prompt
     tagged `Skill_prompt`, so a failure (an unknown name) puts the text back
     in the editor and takes it off the queue. `Autocomplete`'s `Skill`
     source completes names from `Location_cache` (shared with the
@@ -3351,11 +3390,18 @@ terminal frontend and `web/` prigh-web, the browser one.
       (`Repo_worktrees`) and again once stale: a turn's end, a session's
       worktrees changing, a worktree made or removed);
       `Model.worktree_folds` (`Worktree_folds`) decides whether a
-      session's worktrees show: an explicit fold or unfold (session ids in
-      the `web.sidebar-folded` and `web.sidebar-unfolded` preferences)
-      wins, else they show when the session's `updated_at` is within the
-      window (`web.sidebar-worktree-hours`, default 12, 0 = never) of
-      `Model.now`. A per-user preference rather than config.json: it is
+      session's worktrees show (`Model.worktrees_shown`): a fold or
+      unfold by hand (session id → when, in the `web.sidebar-folded` and
+      `web.sidebar-unfolded` preferences) made since the session was last
+      opened wins; else pinned sessions show, and the rest when last used
+      within the window (`web.sidebar-worktree-hours`, default 12, 0 =
+      fold all) of `Model.now`. Used is the latest of `updated_at`, the
+      last time the user went into it (`web.sidebar-opened`, written by
+      `note_opened` on a session change and the first `Tick`, merged
+      across browsers by the later time, and uploaded when this browser's
+      cache is ahead once the preferences load), and now while it runs or
+      is open; a session whose cwd is inside another's worktree lends that
+      one its use and openings. A per-user preference rather than config.json: it is
       a display choice of the person, not of the backend's namespace. Context menus (`Context_menu`, also messages', drawn by
       `Context_menu_view` as a `Dialog.Picker` of kind `Menu`, so it owns
       the keyboard like any picker; `Command.Place_menu` has
@@ -3507,7 +3553,15 @@ terminal frontend and `web/` prigh-web, the browser one.
       `list_mcp`/`mcp_approve` replies (`Mcp_list`) into `/mcp`'s picker
       (servers to act on first; the problems under it, in `Dialog_view`),
       `/mcp reconnect`'s report and what became of an approved or restarted
-      server; a ready one's tools are the `Mcp_tools` dialog.
+      server; a ready one's tools are the `Mcp_tools` dialog. Settings →
+      MCP servers is `Mcp_page` (its state: the user's servers from
+      `get_mcp_settings` and `mcp_settings_changed`, the session's host's
+      list, the form's draft with masked `env`/header pairs, the pasted
+      JSON, the one being removed, each server's health on that host) and
+      `Mcp_settings_view`; opening it fetches both lists, a change keeps
+      what is shown until the new lists come, and the event re-asks the
+      host. `/mcp add|remove|enable|disable` go through
+      `Prigh_ui.Mcp_command`, as in the TUI.
     - Snippets: `/snippet` runs `Prigh_ui.Snippet_command`; the picker
       (Alt+N, which passes the editor's caret) inserts at the caret, as do
       `/snippet NAME` and `#name` completion (`Completion.insert_snippet`).
@@ -4157,6 +4211,8 @@ for Linux, macOS and Windows.
 - `~/.prigh/memory.json` — the `memory` tool's notes (`Memory`).
 - `~/.prigh/custom_instructions.json` — the user's standing instructions,
   in every session's context (`Custom_instructions`).
+- `~/.prigh/mcp-servers.json` — the MCP servers in the user's settings,
+  sent to their tool hosts (`Mcp_settings`; mode 600).
 - `~/.prigh/about_you.json` — what the user set about themselves, in every
   session's context (`User_info`; `user_info.md.migrated` is an earlier
   version's text, moved into it).

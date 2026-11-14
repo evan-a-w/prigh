@@ -22,6 +22,7 @@ module Note = struct
           ; after : string
           }
       | Plan_mode of { on : bool }
+      | Chat_mode of { on : bool }
       | Steer of
           { from_user : bool
           ; follow_up : bool
@@ -45,6 +46,7 @@ module Note = struct
       | Cwd _ -> "cwd"
       | Tools _ | Editor _ -> "tools"
       | Plan_mode _ -> "plan_mode"
+      | Chat_mode _ -> "chat_mode"
       | Steer _ -> "steer"
       | Client _ -> "client"
       | Ui_action _ -> "ui_action"
@@ -78,6 +80,10 @@ module Note = struct
       "Plan mode on: the model was told to plan, not change files"
     | Plan_mode { on = false } ->
       "Plan mode off: the model was told it can change files"
+    | Chat_mode { on = true } ->
+      "Chat mode on: the model was told it has no machine, only chat tools"
+    | Chat_mode { on = false } ->
+      "Chat mode off: the model was told it works on a tool host again"
     | Steer { from_user; follow_up } ->
       sprintf
         "%s (%s)"
@@ -139,6 +145,10 @@ module Note = struct
           Some (Plan_mode { on = true })
         | None when String.is_prefix line ~prefix:"[Plan mode is off: " ->
           Some (Plan_mode { on = false })
+        | None when String.is_prefix line ~prefix:"[Chat mode is on: " ->
+          Some (Chat_mode { on = true })
+        | None when String.is_prefix line ~prefix:"[Chat mode is off: " ->
+          Some (Chat_mode { on = false })
         | None ->
           (match
              between

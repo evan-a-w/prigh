@@ -1,6 +1,6 @@
 // The sidebar's worktrees by how recently their sessions were used, and the
 // settings page's Sessions rows for it and for archiving: a session used
-// three days ago has its worktrees folded behind ⑂, one used now shows
+// (and opened) three days ago has its worktrees folded behind ⑂, one used now shows
 // them; "Show worktrees" widens the window, "Archive after" moves the old
 // session to Archived at once (no restart); both on a desktop and on
 // phones (390x844, 320x640). Run by prigh_web.sh; prints normalised
@@ -142,6 +142,32 @@ const age = title => {
   utimesSync(file, then, then);
 };
 
+// The user's visits to sessions ("web.sidebar-opened": when they last went
+// into each), three days earlier too, on the backend and in the page's
+// cache, so the old session was not opened since either.
+const shiftVisits = visits => Object.fromEntries(Object.entries(visits).map(([id, at]) => {
+  const then = new Date(new Date(at.replace(" ", "T")).getTime() - 3 * 86400e3);
+  return [id, then.toISOString().replace("T", " ").replace(/\.\d+Z$/, "Z")];
+}));
+const ageVisits = async p => {
+  const file = join(home, ".prigh/prefs.json");
+  const sorted = visits => JSON.stringify(Object.entries(visits ?? {}).sort());
+  const cached = () => p.evaluate(() => JSON.parse(localStorage.getItem("prigh-web.prefs")).prefs["web.sidebar-opened"]);
+  const kept = () => JSON.parse(readFileSync(file, "utf8"))["web.sidebar-opened"];
+  // The page's last visit has reached the backend.
+  for (let i = 0; sorted(await cached()) !== sorted(kept()); i++) {
+    if (i > 200) throw new Error(`visits: the backend has ${sorted(kept())}, the page ${sorted(await cached())}`);
+    await new Promise(resolve => setTimeout(resolve, 50));
+  }
+  const visits = shiftVisits(kept());
+  writeFileSync(file, JSON.stringify({ ...JSON.parse(readFileSync(file, "utf8")), "web.sidebar-opened": visits }));
+  await p.evaluate(visits => {
+    const stored = JSON.parse(localStorage.getItem("prigh-web.prefs"));
+    stored.prefs["web.sidebar-opened"] = visits;
+    localStorage.setItem("prigh-web.prefs", JSON.stringify(stored));
+  }, visits);
+};
+
 const page = await open({ width: 1280, height: 800 });
 try {
   await signIn(page);
@@ -167,6 +193,7 @@ try {
   await page.reload();
   await composer(page).waitFor();
   age("Old work");
+  await ageVisits(page);
   await page.reload();
   await composer(page).waitFor();
   await session(page, "Old work").locator(".session-fold.folded").waitFor();

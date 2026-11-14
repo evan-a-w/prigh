@@ -10,6 +10,7 @@ module Argument = struct
     | Confirm
     | Mode
     | Plan
+    | Chat
     | Notify
     | Login
     | Logout
@@ -126,15 +127,21 @@ let every =
   ; c
       ~argument:Argument.Mode
       "mode"
-      "[ask|auto-edit|auto|plan]"
-      "pick or set the mode: what asks first, or read-only planning (Alt+M \
-       cycles)"
+      "[ask|auto-edit|auto|plan|chat]"
+      "pick or set the mode: what asks first, read-only planning, or a chat \
+       without the tool host (Alt+M cycles)"
   ; c
       ~argument:Argument.Plan
       "plan"
       "[on|off]"
       "toggle plan mode: the model investigates and plans, changing no files, \
        until you turn it off"
+  ; c
+      ~argument:Argument.Chat
+      "chat"
+      "[on|off]"
+      "toggle chat mode: talk without the tool host (no files, commands or \
+       project; the web and other host-free tools), until you turn it off"
   ; c "todos" "" "show the model's plan (its update_plan steps)"
   ; c
       "permissions"
@@ -397,9 +404,11 @@ let every =
   ; c
       ~argument:Argument.Mcp
       "mcp"
-      "[reconnect]"
+      "[reconnect|add|remove ...]"
       "list MCP servers (Enter approves one or lists its tools); reconnect \
-       restarts failed ones"
+       restarts failed ones; add NAME URL|COMMAND [ARGS...] (or add \
+       {mcpServers JSON}), remove, enable or disable NAME change the servers \
+       in your settings, which run on every host"
   ; c
       "retry-backend-connection"
       ""

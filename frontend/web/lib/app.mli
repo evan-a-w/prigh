@@ -189,6 +189,16 @@ module Reply_tag : sig
         ; notice : string option
           (** shown on success; [None]: the reminder added, by its name *)
         }
+    | Mcp_command of
+        { command : string (** back into the editor if refused *)
+        ; notice : string (** shown on success *)
+        }
+    | Mcp_settings_loaded (** [get_mcp_settings] *)
+    | Mcp_host_listed (** [list_mcp] or [mcp_approve], for the settings *)
+    | Mcp_draft_saved
+    | Mcp_pasted
+    | Mcp_removed of string
+    | Mcp_toggled of string
     | Reconnect of int (** generation; stale replies are ignored *)
     | Config (** [get_config] *)
     | Config_saved of string (** the new config; the notice is shown *)
@@ -252,6 +262,9 @@ module Reply_tag : sig
         follow *)
     | Plan_entered of Context_menu.Plan.t (** [set_cwd], likewise *)
     | Mode_set of string (** [set_mode]: the new state; the notice is shown *)
+    | Chat_then_send of string
+    (** [set_mode] to chat mode ([Action.Chat_without_host]): as [Mode_set],
+        then the draft is sent *)
     | Model_set (** [set_model]: the choice is no longer pending *)
     | Filter_saved of string
     (** [set_transcript_filter] in this session: one fewer pending *)
@@ -575,6 +588,9 @@ module Action : sig
     | Set_model of string (** [provider/id] *)
     | Set_thinking of string
     | Set_mode of Session_mode.t
+    | Chat_without_host
+    (** chat mode, then the draft sent (when there is one) once the backend
+        has taken it: no tool host can run the message ({!No_host_banner}) *)
     | Open_chip of Chip.t
     | Open_filter (** the transcript filter's menu; again: closes it *)
     | Filter_press of Filter_menu.Row.t option
@@ -636,6 +652,24 @@ module Action : sig
     (** the settings page's About you: a field typed in or chosen *)
     | About_you_save (** Ctrl+Enter *)
     | About_you_revert (** back to what the backend has *)
+    | Mcp_edit of string option
+    (** the settings' MCP servers: add one ([None]) or edit one *)
+    | Mcp_field of Mcp_page.Field.t
+    | Mcp_save
+    | Mcp_cancel
+    | Mcp_paste (** add servers from pasted [mcpServers] JSON *)
+    | Mcp_paste_text of string
+    | Mcp_paste_save
+    | Mcp_remove of string (** asks first *)
+    | Mcp_remove_confirm
+    | Mcp_remove_cancel
+    | Mcp_toggle of string (** enables or disables it *)
+    | Mcp_show_tools of string (** shows or hides its tools *)
+    | Mcp_reconnect (** restarts the failed servers on the session's host *)
+    | Mcp_approve of
+        { source : string
+        ; server : string
+        } (** a project's server *)
     | Open_rename
     | Open_subagents of string option
     (** the agents panel: its list, or the agent or job with this number
@@ -1008,6 +1042,7 @@ module Model : sig
     ; instructions : Instruction_notes.t
     (** the settings page's Custom instructions *)
     ; about_you : About_you.t (** the settings page's About you *)
+    ; mcp : Mcp_page.t (** the settings page's MCP servers *)
     ; compact_at : Compact_at.t (** the settings page's "Compact at" *)
     ; sessions_fields : Sessions_fields.t
       (** the settings page's session list fields *)
@@ -1054,6 +1089,9 @@ module Model : sig
   val waiting : t -> bool
   (** The turn or background subagents or jobs run: the session is busy. *)
   val active : t -> bool
+
+  (** The sessions whose worktrees the sidebar shows ({!Worktree_folds}). *)
+  val worktrees_shown : t -> String.Set.t
 
   (** The agents panel is open with something running: the page sends
       [Clock] every second. *)
@@ -1134,3 +1172,7 @@ val temporary_shown : Model.t -> bool
 
 val init : Model.t
 val update : Model.t -> Action.t -> Model.t * Command.t list
+
+(** The first clause of the state's [no_host], capitalised: "No tool host
+    connected". *)
+val no_host_headline : string -> string

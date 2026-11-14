@@ -221,8 +221,9 @@ let%expect_test "help lists every key and command" =
     /theme [original|dark|light] pick or set the theme, for you in every browser
     /accent [name|#rrggbb] pick or set the accent colour: orange, blue, green, purple, pink, teal, yellow or any #rrggbb
     /confirm [on|off] ask before bash, job_input, edits and MCP tools run (mode ask or auto, also for new sessions)
-    /mode [ask|auto-edit|auto|plan] pick or set the mode: what asks first, or read-only planning (Alt+M cycles)
+    /mode [ask|auto-edit|auto|plan|chat] pick or set the mode: what asks first, read-only planning, or a chat without the tool host (Alt+M cycles)
     /plan [on|off] toggle plan mode: the model investigates and plans, changing no files, until you turn it off
+    /chat [on|off] toggle chat mode: talk without the tool host (no files, commands or project; the web and other host-free tools), until you turn it off
     /todos show the model's plan (its update_plan steps)
     /permissions show the mode and the allow/ask/deny rules (config and this session)
     /notify [on|off] tell you when a turn ends or something waits for you while the tab is hidden
@@ -612,10 +613,11 @@ let%expect_test
      (params
       ((keys
         (web.theme web.accent web.notify web.verbosity web.terminal-open
-         web.sidebar-folded web.sidebar-unfolded web.sidebar-worktree-hours
-         web.review history web.migrated web.sidebar-width web.files-width
-         web.files-preview-width web.agents-width web.terminal-height
-         web.review-chat-width web.review-files-width web.review-margin-width))))
+         web.sidebar-folded web.sidebar-unfolded web.sidebar-opened
+         web.sidebar-worktree-hours web.review history web.migrated
+         web.sidebar-width web.files-width web.files-preview-width
+         web.agents-width web.terminal-height web.review-chat-width
+         web.review-files-width web.review-margin-width))))
      (tag Prefs))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s1.jsonl) (limit 1000000)))

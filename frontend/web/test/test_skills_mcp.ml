@@ -304,6 +304,15 @@ let%expect_test
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
+    (Cache_prefs
+     (((key web.sidebar-opened)
+       (value (((s1 "2026-10-05 10:00:00Z") (s2 "2026-10-05 10:00:00Z")))))))
+    (Rpc (method_ set_prefs)
+     (params
+      ((prefs
+        ((web.sidebar-opened
+          ((s1 "2026-10-05 10:00:00Z") (s2 "2026-10-05 10:00:00Z")))))))
+     (tag Show_error))
     (Rpc (method_ get_review) (params ()) (tag (Review Review)))
     (Rpc (method_ list_worktrees) (params ())
      (tag (Worktrees (place  "s2\
@@ -735,7 +744,7 @@ let%expect_test "/mcp reconnect reports; no servers says where to add them" =
     MCP servers: 1 ready (1 tool)
     No MCP servers: configure them under "mcpServers" in ~/.prigh/mcp.json, or in a project's .mcp.json.
     No MCP servers: configure them under "mcpServers" in ~/.prigh/mcp.json, or in a project's .mcp.json.
-    Unknown /mcp argument “restart”: /mcp lists the servers, /mcp reconnect restarts the failed ones.
+    Usage: /mcp [reconnect], /mcp add NAME URL|COMMAND [ARGS...], /mcp add {"NAME": {...}} (mcpServers JSON), /mcp remove|enable|disable NAME
     Couldn't list the MCP servers: unknown method list_mcp
     |}]
 ;;
@@ -775,6 +784,15 @@ let%expect_test "/mcp with only problems; the dialog closes with the session" =
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
+    (Cache_prefs
+     (((key web.sidebar-opened)
+       (value (((s1 "2026-10-05 10:00:00Z") (s2 "2026-10-05 10:00:00Z")))))))
+    (Rpc (method_ set_prefs)
+     (params
+      ((prefs
+        ((web.sidebar-opened
+          ((s1 "2026-10-05 10:00:00Z") (s2 "2026-10-05 10:00:00Z")))))))
+     (tag Show_error))
     (Rpc (method_ get_review) (params ()) (tag (Review Review)))
     (Rpc (method_ list_worktrees) (params ())
      (tag (Worktrees (place  "s2\

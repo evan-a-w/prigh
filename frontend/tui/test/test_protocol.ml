@@ -85,6 +85,7 @@ let%expect_test "state event and messages" =
         (resume_at        ())
         (approval_mode Auto)
         (plan_mode     false)
+        (chat_mode     false)
         (plan          ())
         (session_rules ()))))
     (Event (Message_start (User ((text hi)))))
@@ -437,6 +438,7 @@ let%expect_test "tool host events and state hosts" =
         (resume_at  ())
         (approval_mode Auto)
         (plan_mode     false)
+        (chat_mode     false)
         (plan          ())
         (session_rules ()))))
     |}]
@@ -465,6 +467,39 @@ let%expect_test "state lists background subagents (absent means none)" =
       (name ())
       (running false)))
     ()
+    |}]
+;;
+
+let%expect_test "state: chat mode and why no tool host can run a message" =
+  let modes json =
+    match Json.parse json |> Or_error.bind ~f:State.of_json with
+    | Ok state ->
+      print_s
+        [%sexp
+          { chat_mode : bool = state.chat_mode
+          ; plan_mode : bool = state.plan_mode
+          ; no_host : string option = state.no_host
+          }]
+    | Error e -> print_s [%message "error" (e : Error.t)]
+  in
+  let base =
+    {|"session_id":"s1","session_path":"/tmp/s1.jsonl","cwd":"/work","model":{"id":"m","provider":"p","key":"p/m","name":"M","context_window":1,"max_output":1,"supports_thinking":false,"cost":{"input":0,"output":0,"cache_read":0}},"thinking":"off","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0|}
+  in
+  modes (sprintf "{%s}" base);
+  modes
+    (sprintf
+       {|{%s,"plan_mode":true,"chat_mode":true,"no_host":"no tool host connected"}|}
+       base);
+  modes (sprintf {|{%s,"chat_mode":"yes"}|} base);
+  [%expect
+    {|
+    ((chat_mode false)
+     (plan_mode false)
+     (no_host ()))
+    ((chat_mode true)
+     (plan_mode true)
+     (no_host ("no tool host connected")))
+    (error (e "field \"chat_mode\": expected bool, got \"yes\""))
     |}]
 ;;
 
@@ -2006,5 +2041,95 @@ let%expect_test "origin: pasted texts are taken out of the message's text" =
         (text  "a\nb"))))))
     (Error (in pasted[0] "pasted text \"Pasted text #1\" is not in the message"))
     (Ok ((body x)))
+    |}]
+;;
+
+let%expect_test "MCP servers in the settings: requests, the event, round trips" =
+  List.iter
+    [ Request.Method.Get_mcp_settings
+    ; Add_mcp_servers
+        [ ( "fs"
+          , Stdio
+              { command = "npx"
+              ; args = [ "-y"; "server fs" ]
+              ; env = [ "TOKEN", "s3cret" ]
+              } )
+        ; "web", Http { url = "https://example.com/mcp"; headers = [] }
+        ]
+    ; Add_mcp_servers_text { text = {|{"a":{"command":"a"}}|} }
+    ; Update_mcp_server
+        { name = "web"
+        ; rename = Some "docs"
+        ; transport =
+            Http
+              { url = "https://example.com/mcp"
+              ; headers = [ "Authorization", "Bearer t" ]
+              }
+        }
+    ; Update_mcp_server
+        { name = "fs"
+        ; rename = None
+        ; transport = Stdio { command = "fs"; args = []; env = [] }
+        }
+    ; Remove_mcp_server { name = "fs" }
+    ; Set_mcp_server_enabled { name = "web"; enabled = false }
+    ]
+    ~f:(fun m -> print_endline (Request.to_line (Request.create ~id:1 m)));
+  [%expect
+    {|
+    {"id":1,"method":"get_mcp_settings","params":{}}
+    {"id":1,"method":"add_mcp_servers","params":{"servers":{"fs":{"command":"npx","args":["-y","server fs"],"env":{"TOKEN":"s3cret"}},"web":{"type":"http","url":"https://example.com/mcp"}}}}
+    {"id":1,"method":"add_mcp_servers","params":{"text":"{\"a\":{\"command\":\"a\"}}"}}
+    {"id":1,"method":"update_mcp_server","params":{"name":"web","rename":"docs","config":{"type":"http","url":"https://example.com/mcp","headers":{"Authorization":"Bearer t"}}}}
+    {"id":1,"method":"update_mcp_server","params":{"name":"fs","config":{"command":"fs"}}}
+    {"id":1,"method":"remove_mcp_server","params":{"name":"fs"}}
+    {"id":1,"method":"set_mcp_server_enabled","params":{"name":"web","enabled":false}}
+    |}];
+  let event =
+    {|{"type":"event","event":"mcp_settings_changed","servers":[{"name":"web","enabled":false,"config":{"type":"http","url":"https://example.com/mcp","headers":{"Authorization":"Bearer t"}}},{"name":"fs","enabled":true,"config":{"command":"npx","args":["-y","server fs"],"env":{"TOKEN":"s3cret"}}}]}|}
+  in
+  decode event;
+  [%expect
+    {|
+    (Event (
+      Mcp_settings_changed (
+        ((name    web)
+         (enabled false)
+         (transport (
+           Http
+           (url https://example.com/mcp)
+           (headers ((Authorization <hidden>))))))
+        ((name    fs)
+         (enabled true)
+         (transport (
+           Stdio (command npx) (args (-y "server fs")) (env ((TOKEN <hidden>)))))))))
+    |}];
+  (* What the backend sends decodes to what encodes to it again. *)
+  (match Server_message.of_line event with
+   | Ok (Event (Mcp_settings_changed servers)) ->
+     List.iter servers ~f:(fun (s : Mcp_settings.Server.t) ->
+       let json = Mcp_settings.Transport.to_json s.transport in
+       let back = Or_error.ok_exn (Mcp_settings.Transport.of_json json) in
+       printf
+         "%s %b %s  %s\n"
+         s.name
+         (Mcp_settings.Transport.equal back s.transport)
+         (Mcp_settings.Transport.summary s.transport)
+         (Json.to_string json))
+   | _ -> print_endline "not decoded");
+  [%expect
+    {|
+    web true https://example.com/mcp  {"type":"http","url":"https://example.com/mcp","headers":{"Authorization":"Bearer t"}}
+    fs true npx -y 'server fs'  {"command":"npx","args":["-y","server fs"],"env":{"TOKEN":"s3cret"}}
+    |}];
+  decode
+    {|{"type":"event","event":"mcp_settings_changed","servers":[{"name":"x","enabled":true,"config":{"args":["a"]}}]}|};
+  [%expect
+    {|
+    (error (
+      e (
+        "while decoding"
+        "{\"type\":\"event\",\"event\":\"mcp_settings_changed\",\"servers\":[{\"name\":\"x\",\"enabled\":true,\"config\":{\"args\":[\"a\"]}}]}"
+        (in servers[0] ("server \"x\"" "missing field \"command\"")))))
     |}]
 ;;

@@ -16,6 +16,7 @@ module Argument = struct
     | Confirm
     | Mode
     | Plan
+    | Chat
     | Notify
     | Memory
     | Instructions
@@ -120,16 +121,22 @@ let every =
        also for new sessions)"
   ; c
       ~argument:Mode
-      ~args:"[ask|auto-edit|auto|plan]"
+      ~args:"[ask|auto-edit|auto|plan|chat]"
       "mode"
-      "pick or set the mode: what asks first, or read-only planning (Alt+M \
-       cycles)"
+      "pick or set the mode: what asks first, read-only planning, or a chat \
+       without the tool host (Alt+M cycles)"
   ; c
       ~argument:Plan
       ~args:"[on|off]"
       "plan"
       "toggle plan mode: the model investigates and plans, changing no files, \
        until you turn it off"
+  ; c
+      ~argument:Chat
+      ~args:"[on|off]"
+      "chat"
+      "toggle chat mode: talk without the tool host (no files, commands or \
+       project; the web and other host-free tools), until you turn it off"
   ; c "todos" "show the model's plan (its update_plan steps)"
   ; c
       "permissions"
