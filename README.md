@@ -519,15 +519,20 @@ against its upstream; the one it works in says `here`. A worktree two
 sessions use is under both; one removed (from any session, or outside
 prigh) goes. On disk worktrees still go by repository
 (`<worktrees_dir>/<project>/<branch>`), and `/worktree` lists all of the
-repository's. A session used in the last 12 hours (its age on the card)
-shows its worktrees; an older one folds them behind the count at the
-right of its second line (`⑂ 3`). Settings → Sessions → Show worktrees
-sets the window in hours (up to 720; its switch off, or 0: every
-session's start folded; on again: the hours it had). Clicking the count folds or unfolds a session's worktrees
-whatever its age, and that choice wins over the window until you click
-again; the window and the choices are kept with your preferences
-(`web.sidebar-worktree-hours`, `web.sidebar-folded`,
-`web.sidebar-unfolded`), so they follow you to other browsers.
+repository's. A session used in the last 12 hours shows its worktrees,
+and so does a pinned one; others fold them behind the count at the right
+of its second line (`⑂ 3`). Used means changed (its age on the card),
+running, open in front of you, or gone into (in any of your browsers);
+a session working in one of another's worktrees uses that one too.
+Settings → Sessions → Show worktrees sets the window in hours (up to
+720; its switch off, or 0: every session's worktrees fold, pinned and open ones
+too; on again: the hours it had). Clicking the count folds or unfolds a
+session's worktrees whatever its age, and that choice holds until you
+next go into the session (or into one working in its worktrees); the
+window, the choices and when you last went into each session are kept
+with your preferences (`web.sidebar-worktree-hours`,
+`web.sidebar-folded`, `web.sidebar-unfolded`, `web.sidebar-opened`), so
+they follow you to other browsers.
 
 A session that switched into a worktree (`/worktree open`, `/worktree
 new`, `/pr checkout`, Switch session here) remembers where it came from,
@@ -2862,7 +2867,7 @@ it.
 | `/downsize-images` | send the conversation's images smaller (the model refused one as too large) and retry a failed reply |
 | `/snippet [NAME\|add NAME [TEXT]\|rm NAME]` | insert a snippet at the cursor without sending it (alone: a picker, also Alt+N); `add` saves one (TEXT is the rest of the prompt, new lines included; without it, your last prompt), `rm` deletes one |
 | `/skills`, `/skill:NAME [args]` | pick a skill (Enter puts `/skill:NAME ` in the editor for its arguments) / run one |
-| `/mcp [reconnect]` | MCP servers and their state: Enter approves a project's server or lists a ready one's tools; `reconnect` restarts failed ones |
+| `/mcp [reconnect\|add ...\|remove\|enable\|disable NAME]` | MCP servers and their state: Enter approves a project's server or lists a ready one's tools; `reconnect` restarts failed ones; `add NAME URL\|COMMAND [ARGS...]` or `add {"NAME": {...}}` adds to your settings, `remove`, `enable` and `disable` change them (see [MCP servers](#mcp-servers)) |
 | `/retry-backend-connection` | reconnect to the backend now |
 | `/connect [HOST:PORT\|URL\|local]` | (TUI) switch to another backend (`HOST:PORT` or a prigh-web URL such as `wss://host/ws`), saved for next time, or to a spawned one; alone: pick or type the address |
 | `/signin [user]` | (TUI) sign in to the server: a dialog for the user and the token or password |
@@ -3338,9 +3343,10 @@ refused with the closest ones. `/skills` lists them.
 
 ### MCP servers
 
-MCP servers are configured in Claude Code's `mcpServers` format, in the
-tool host's `~/.prigh/mcp.json` and in a project's `.mcp.json` (in the
-working directory or an ancestor; the closest definition of a name wins):
+MCP servers are configured in Claude Code's `mcpServers` format, in
+**Settings → MCP servers** (or `/mcp add`), in the tool host's
+`~/.prigh/mcp.json` and in a project's `.mcp.json` (in the working directory
+or an ancestor; the closest definition of a name wins):
 
 ```json
 {
@@ -3366,6 +3372,26 @@ came with the project, so they only start once you approve them in `/mcp`
 approval are reported once each; `/mcp` shows every server with its status
 and tools, and `/mcp reconnect` restarts failed ones. `-no-tools` turns MCP
 off.
+
+The servers in **Settings → MCP servers** are yours: the backend keeps them
+for your account (`~/.prigh/mcp-servers.json` in its home, readable by its
+owner only: where the backend runs as another user than the tool hosts, as
+in the Docker image, the agent cannot read or change them) and sends the
+enabled ones to every tool host your sessions use, which starts them as it starts its own; they need no approval. A
+host's `~/.prigh/mcp.json` or a project's `.mcp.json` that defines the same
+name wins, and Settings says which file overrides it. The section lists
+your servers with their state on the session's host (ready with their
+tools, failed with the error, off, overridden), and below them the host's
+own; add one with the form (a command and its arguments one per line, or a
+URL; environment variables and headers are masked until you show them) or
+paste an `mcpServers` object from another tool's settings (all of it is
+added, or none); switch one off, edit, rename or remove it (asked first);
+Approve a project's server and Retry a failed one there. A change reaches
+running sessions at once: only the servers whose definition changed
+restart. In the composer, `/mcp add NAME URL`, `/mcp add NAME COMMAND
+[ARGS...]` (split like a shell's), `/mcp add {"NAME": {...}}` and `/mcp
+remove|enable|disable NAME` do the same; a refusal puts the command back in
+the editor.
 
 ### Testing
 

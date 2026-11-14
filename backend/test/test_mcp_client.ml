@@ -178,6 +178,33 @@ let%expect_test "stdio: cancelling a call tells the server" =
   Mcp_client.close client
 ;;
 
+(* Closing while calls queue for the pipe (as the hub does when the settings
+   change a server in use): each ends answered or refused, none writes to the
+   closed pipe. *)
+let%expect_test "stdio: closing while calls are being sent" =
+  run
+  @@ fun ~env ~sw ~dir ->
+  let client = connect ~env ~sw (stdio_server ~dir ()) in
+  let outcomes = String.Hash_set.create () in
+  Eio.Fiber.both
+    (fun () ->
+       Eio.Fiber.List.iter
+         (fun i ->
+            let { Tool_result.text; is_error; _ } =
+              Mcp_client.call
+                client
+                ~cancel:Cancellation.never
+                ~tool:"echo"
+                ~arguments:(`Object [ "text", `String (Int.to_string i) ])
+            in
+            Hash_set.add outcomes (if is_error then text else "answered"))
+         (List.init 50 ~f:Fn.id))
+    (fun () -> Mcp_client.close client);
+  Hash_set.remove outcomes "answered";
+  print_s [%sexp (Hash_set.to_list outcomes : string list)];
+  [%expect {| ("the connection was closed") |}]
+;;
+
 let%expect_test "stdio: a server that dies fails its calls and the client" =
   run
   @@ fun ~env ~sw ~dir ->

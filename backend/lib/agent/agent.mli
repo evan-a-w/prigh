@@ -264,6 +264,9 @@ val create
   -> ?offered:(Tool.t -> bool)
        (** which of [tools] the model is given, asked again for every turn
            (the user's memory is offered while it is on); default: all *)
+  -> ?mcp_settings:Mcp_settings.t
+       (** the MCP servers from the user's settings: sent to every host the
+           session uses with its own; default: none *)
   -> ?user_info:User_info.t
        (** what the user wrote about themselves: in the system prompt of a
            new session, and told with the next message to a session that
@@ -333,6 +336,11 @@ val skills : t -> Skill.t list Or_error.t
     offered to the model from the next run on (each run starts by asking the
     host again), and problems are reported once each as [Notice]s. *)
 val mcp_servers : ?reconnect:bool -> t -> Mcp_tools.Listing.t Or_error.t
+
+(** The settings' MCP servers changed: the host starts and stops what
+    changed, and the session's tools follow (in the background; in chat
+    mode, which uses no host, at the first turn after it). *)
+val mcp_settings_changed : t -> unit
 
 (** Approves a project's MCP server on the host and starts it. *)
 val approve_mcp

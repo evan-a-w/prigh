@@ -165,6 +165,16 @@ module Reply_tag = struct
         { command : string
         ; notice : string option
         }
+    | Mcp_command of
+        { command : string
+        ; notice : string
+        }
+    | Mcp_settings_loaded
+    | Mcp_host_listed
+    | Mcp_draft_saved
+    | Mcp_pasted
+    | Mcp_removed of string
+    | Mcp_toggled of string
     | Reconnect of int
     | Config
     | Config_saved of string
@@ -511,6 +521,23 @@ module Action = struct
     | About_you_field of About_you.Field.t * string
     | About_you_save
     | About_you_revert
+    | Mcp_edit of string option
+    | Mcp_field of Mcp_page.Field.t
+    | Mcp_save
+    | Mcp_cancel
+    | Mcp_paste
+    | Mcp_paste_text of string
+    | Mcp_paste_save
+    | Mcp_remove of string
+    | Mcp_remove_confirm
+    | Mcp_remove_cancel
+    | Mcp_toggle of string
+    | Mcp_show_tools of string
+    | Mcp_reconnect
+    | Mcp_approve of
+        { source : string
+        ; server : string
+        }
     | Open_rename
     | Open_subagents of string option
     (** the agents panel; with a number, an agent's or a job's id *)
@@ -780,6 +807,7 @@ module Model = struct
     ; memory : Memory_notes.t
     ; instructions : Instruction_notes.t
     ; about_you : About_you.t
+    ; mcp : Mcp_page.t
     ; compact_at : Compact_at.t
     ; sessions_fields : Sessions_fields.t
     ; default_fields : Default_fields.t
@@ -855,6 +883,16 @@ module Model = struct
       || List.exists s.subagents ~f:(fun a -> a.running)
       || List.exists s.jobs ~f:(fun j -> j.running)
     | None -> false
+  ;;
+
+  let worktrees_shown t =
+    Worktree_folds.shown
+      t.worktree_folds
+      ~now:t.now
+      ~current:
+        (Option.map t.state ~f:(fun (s : State.t) ->
+           { Worktree_folds.Current.id = s.session_id; cwd = s.cwd }))
+      t.sessions
   ;;
 
   let image_limit t =
@@ -1100,6 +1138,7 @@ let init =
   ; memory = Memory_notes.empty
   ; instructions = Instruction_notes.empty
   ; about_you = About_you.empty
+  ; mcp = Mcp_page.empty
   ; compact_at = Compact_at.empty
   ; sessions_fields = Sessions_fields.empty
   ; default_fields = Default_fields.empty
@@ -1483,6 +1522,54 @@ let filter_changed (m : Model.t) filter =
   | _ -> { m with transcript_filter = filter }
 ;;
 
+(* ---- the user's preferences (Pref_sync) *)
+
+module Key = Pref_sync.Key
+
+(* Acting as another user, theirs are not ours: ours stay, in this browser
+   only, until we are back. *)
+let acting_as (m : Model.t) = Option.bind m.hello ~f:Hello_reply.acting_as
+
+let saves_prefs (m : Model.t) =
+  Pref_sync.saving m.prefs && Option.is_none (acting_as m)
+;;
+
+(* Kept in the browser, and on the backend unless it keeps none for us. *)
+let save_prefs (m : Model.t) (changes : Prefs.Change.t list) =
+  if List.is_empty changes
+  then []
+  else
+    Command.Cache_prefs changes
+    ::
+    (if saves_prefs m
+     then [ rpc "set_prefs" (Prefs.set_params changes) ]
+     else [])
+;;
+
+let save_pref m key value = save_prefs m [ { Prefs.Change.key; value } ]
+
+let listed_ids (m : Model.t) =
+  String.Set.of_list (List.map m.sessions ~f:(fun s -> s.id))
+;;
+
+(* The user is in the session now: it was used, and its worktrees' hand
+   folds have had their day. Not another user's sessions, when acting as
+   them. *)
+let note_opened (m : Model.t) =
+  match m.now, m.state with
+  | Some now, Some state when Option.is_none (acting_as m) ->
+    let worktree_folds =
+      Worktree_folds.open_
+        m.worktree_folds
+        ~now
+        ~listed:(listed_ids m)
+        state.session_id
+    in
+    ( { m with worktree_folds }
+    , save_pref m Key.opened (Worktree_folds.opened_pref worktree_folds) )
+  | _ -> m, []
+;;
+
 let set_state_without_files (m : Model.t) (state : State.t) =
   let chat_cache = keep_chat m in
   let changed =
@@ -1678,7 +1765,13 @@ let set_state (m : Model.t) (state : State.t) =
         ([%equal: Host.t list] old.hosts state.hosts
          && String.equal old.active_host state.active_host))
   in
+  let entered =
+    Option.for_all m.state ~f:(fun (old : State.t) ->
+      not (String.equal old.session_id state.session_id))
+  in
   let m, cmds = set_state_without_files m state in
+  let m, opened = if entered then note_opened m else m, [] in
+  let cmds = cmds @ opened in
   let m = if hosts_changed then refresh_hosts m else m in
   let m, more = with_files m (Files.set_where m.files (files_where m)) in
   let m, review =
@@ -1909,10 +2002,47 @@ let fetch_about_you (m : Model.t) =
   , [ call Get_user_info ~tag:About_you_loaded ] )
 ;;
 
+(* The servers in the settings, and how the session's host is doing with
+   them and its own. *)
+let mcp_lists =
+  [ call Get_mcp_settings ~tag:Mcp_settings_loaded
+  ; call (List_mcp { reconnect = false }) ~tag:Mcp_host_listed
+  ]
+;;
+
+let fetch_mcp (m : Model.t) = { m with mcp = Mcp_page.loading m.mcp }, mcp_lists
+
+(* After a change: what is shown stays until the new lists replace it. *)
+let refresh_mcp (m : Model.t) = m, mcp_lists
+
+let mcp_save (m : Model.t) =
+  let mcp, request = Mcp_page.save m.mcp in
+  ( { m with mcp }
+  , Option.to_list
+      (Option.map request ~f:(fun r -> call r ~tag:Mcp_draft_saved)) )
+;;
+
+let mcp_paste_save (m : Model.t) =
+  let mcp, request = Mcp_page.save_paste m.mcp in
+  ( { m with mcp }
+  , Option.to_list (Option.map request ~f:(fun r -> call r ~tag:Mcp_pasted)) )
+;;
+
+let mcp_remove (m : Model.t) =
+  match m.mcp.removing with
+  | None -> m, []
+  | Some name ->
+    let mcp, request = Mcp_page.remove m.mcp in
+    ( { m with mcp }
+    , Option.to_list
+        (Option.map request ~f:(fun r -> call r ~tag:(Mcp_removed name))) )
+;;
+
 (* What a section shows is asked for as it opens. *)
 let fetch_section (m : Model.t) : Settings_section.t -> _ = function
   | Memory -> fetch_memory m
   | About_you -> fetch_about_you m
+  | Mcp -> fetch_mcp m
   | Custom_instructions -> fetch_instructions m
   | Appearance
   | Sessions
@@ -2516,32 +2646,6 @@ let open_rename (m : Model.t) =
   open_dialog m ~focus:"dialog-input" (Rename name)
 ;;
 
-(* ---- the user's preferences (Pref_sync) *)
-
-module Key = Pref_sync.Key
-
-(* Acting as another user, theirs are not ours: ours stay, in this browser
-   only, until we are back. *)
-let acting_as (m : Model.t) = Option.bind m.hello ~f:Hello_reply.acting_as
-
-let saves_prefs (m : Model.t) =
-  Pref_sync.saving m.prefs && Option.is_none (acting_as m)
-;;
-
-(* Kept in the browser, and on the backend unless it keeps none for us. *)
-let save_prefs (m : Model.t) (changes : Prefs.Change.t list) =
-  if List.is_empty changes
-  then []
-  else
-    Command.Cache_prefs changes
-    ::
-    (if saves_prefs m
-     then [ rpc "set_prefs" (Prefs.set_params changes) ]
-     else [])
-;;
-
-let save_pref m key value = save_prefs m [ { Prefs.Change.key; value } ]
-
 let fetch_prefs (m : Model.t) =
   match acting_as m with
   | Some _ -> []
@@ -2620,6 +2724,11 @@ let apply_pref (m : Model.t) ~startup ({ key; value } : Prefs.Change.t) =
     { m with
       worktree_folds = Worktree_folds.set_unfolded m.worktree_folds value
     }
+  else if String.equal key Key.opened
+  then
+    { m with
+      worktree_folds = Worktree_folds.merge_opened m.worktree_folds value
+    }
   else if String.equal key Key.worktree_hours
   then
     { m with
@@ -2660,14 +2769,26 @@ let prefs_loaded (m : Model.t) changes =
   let startup = Pref_sync.Remote.equal m.prefs.remote Unknown in
   let prefs, applied, upload = Pref_sync.loaded m.prefs changes in
   let m = apply_prefs { m with prefs } ~startup applied in
+  (* Going into a session before they came. *)
+  let opened =
+    let theirs =
+      List.find_map applied ~f:(fun (c : Prefs.Change.t) ->
+        Option.some_if (String.equal c.key Key.opened) c.value)
+      |> Option.join
+    in
+    if Worktree_folds.opened_ahead m.worktree_folds theirs
+    then save_pref m Key.opened (Worktree_folds.opened_pref m.worktree_folds)
+    else []
+  in
   (* The page may show another account's, from the browser's cache. *)
   ( m
-  , Command.Apply_theme (Model.look m)
-    :: Command.Cache_prefs applied
-    ::
-    (if List.is_empty upload
-     then []
-     else [ rpc "set_prefs" (Prefs.set_params upload) ]) )
+  , (Command.Apply_theme (Model.look m)
+     :: Command.Cache_prefs applied
+     ::
+     (if List.is_empty upload
+      then []
+      else [ rpc "set_prefs" (Prefs.set_params upload) ]))
+    @ opened )
 ;;
 
 let theme_changes (theme : Theme.t) =
@@ -4376,12 +4497,20 @@ let switch_number (m : Model.t) (key : Switched_off.Key.t) on =
       (if on then Switched_off.value m.switched_off key ~default else 0.)
 ;;
 
-(* What the click changes is kept, against the session's age. *)
+(* What the click changes is kept, against the session's age, until the
+   session is next opened. *)
 let toggle_folded (m : Model.t) id =
-  match List.find m.sessions ~f:(fun s -> String.equal s.id id) with
-  | None -> m, []
-  | Some s ->
-    let worktree_folds = Worktree_folds.toggle m.worktree_folds ~now:m.now s in
+  if not (List.exists m.sessions ~f:(fun s -> String.equal s.id id))
+  then m, []
+  else (
+    let worktree_folds =
+      Worktree_folds.toggle
+        m.worktree_folds
+        ~now:m.now
+        ~listed:(listed_ids m)
+        ~shown:(Set.mem (Model.worktrees_shown m) id)
+        id
+    in
     ( { m with worktree_folds }
     , save_prefs
         m
@@ -4391,7 +4520,7 @@ let toggle_folded (m : Model.t) id =
         ; { key = Key.unfolded
           ; value = Worktree_folds.unfolded_pref worktree_folds
           }
-        ] )
+        ] ))
 ;;
 
 let last_reply (m : Model.t) =
@@ -4813,6 +4942,7 @@ let user_switched (m : Model.t) (hello : Hello_reply.t) =
     ; memory = Memory_notes.empty
     ; instructions = Instruction_notes.empty
     ; about_you = About_you.empty
+    ; mcp = Mcp_page.empty
     ; config = None
     ; compact_at = Compact_at.empty
     ; sessions_fields = Sessions_fields.empty
@@ -6736,21 +6866,28 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
          ~snippets:(snippets m)
          ~last_prompt:(last_prompt m)
          rest)
-  | "mcp", "" ->
-    loading
-      m
-      "MCP servers"
-      [ call (List_mcp { reconnect = false }) ~tag:(Mcp Picker) ]
-  | "mcp", "reconnect" ->
-    let m, cmds = toast m "Restarting the failed MCP servers…" in
-    m, cmds @ [ call (List_mcp { reconnect = true }) ~tag:(Mcp Reconnect) ]
-  | "mcp", other ->
-    error
-      m
-      (sprintf
-         "Unknown /mcp argument “%s”: /mcp lists the servers, /mcp reconnect \
-          restarts the failed ones."
-         other)
+  | "mcp", rest ->
+    (match Prigh_ui.Mcp_command.parse rest with
+     | List ->
+       loading
+         m
+         "MCP servers"
+         [ call (List_mcp { reconnect = false }) ~tag:(Mcp Picker) ]
+     | Reconnect ->
+       let m, cmds = toast m "Restarting the failed MCP servers…" in
+       m, cmds @ [ call (List_mcp { reconnect = true }) ~tag:(Mcp Reconnect) ]
+     | Change { request; done_ } ->
+       ( m
+       , [ call
+             request
+             ~tag:
+               (Mcp_command
+                  { command = String.strip ("/mcp " ^ rest); notice = done_ })
+         ] )
+     | Error e ->
+       error
+         (back_in_editor m (String.strip ("/mcp " ^ rest)))
+         (String.capitalize e))
   | "copy", _ -> copy_last m
   | "btw", "" -> error m "Usage: /btw <question> (asked aside; the run goes on)"
   | "btw", question -> start_btw m question
@@ -8259,6 +8396,55 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
         (set_draft m command)
         (sprintf "%s. %s is back in the editor." (String.capitalize e) command)
     else error m (String.capitalize e)
+  | Mcp_command { command; _ }, Error e ->
+    if String.is_empty m.draft && List.is_empty m.images
+    then
+      error
+        (set_draft m command)
+        (sprintf "%s. %s is back in the editor." (String.capitalize e) command)
+    else error m (String.capitalize e)
+  | Mcp_command { notice; _ }, Ok _ -> toast m (String.capitalize notice)
+  | Mcp_settings_loaded, result ->
+    let result =
+      Result.bind result ~f:(fun json ->
+        Result.map_error (Mcp_settings.of_json json) ~f:Error.to_string_hum)
+    in
+    { m with mcp = Mcp_page.loaded m.mcp result }, []
+  | Mcp_host_listed, result ->
+    let result =
+      Result.bind result ~f:(fun json ->
+        Result.map_error (Mcp_list.of_json json) ~f:Error.to_string_hum)
+    in
+    { m with mcp = Mcp_page.host_listed m.mcp result }, []
+  | Mcp_draft_saved, result ->
+    let mcp = Mcp_page.saved m.mcp (Result.map result ~f:ignore) in
+    (match result with
+     | Ok _ -> refresh_mcp { m with mcp }
+     | Error _ -> { m with mcp }, [])
+  | Mcp_pasted, result ->
+    let mcp = Mcp_page.pasted m.mcp (Result.map result ~f:ignore) in
+    (match result with
+     | Ok _ -> refresh_mcp { m with mcp }
+     | Error _ -> { m with mcp }, [])
+  | Mcp_removed name, Ok _ ->
+    let m, cmds = refresh_mcp m in
+    let m, more = toast m (sprintf "Removed %s from your settings" name) in
+    m, cmds @ more
+  | Mcp_removed name, Error e ->
+    ( { m with
+        mcp = Mcp_page.failed m.mcp (sprintf "Couldn't remove %s: %s" name e)
+      }
+    , [] )
+  | Mcp_toggled name, Ok _ ->
+    refresh_mcp { m with mcp = Mcp_page.set_busy m.mcp name false }
+  | Mcp_toggled name, Error e ->
+    ( { m with
+        mcp =
+          Mcp_page.failed
+            (Mcp_page.set_busy m.mcp name false)
+            (sprintf "Couldn't switch %s: %s" name e)
+      }
+    , [] )
   | Reminder { notice; _ }, Ok json ->
     toast
       m
@@ -9277,6 +9463,15 @@ let main_event (m : Model.t) (event : Event.t) =
     { m with memory = Memory_notes.changed m.memory memory }, []
   | User_info_changed info ->
     { m with about_you = About_you.changed m.about_you info }, []
+  | Mcp_settings_changed servers ->
+    let m = { m with mcp = Mcp_page.changed m.mcp servers } in
+    (* The host starts or stops them as it hears: ask it again, so a new
+       server reads "checking", then its state, rather than "not running". *)
+    (match m.dialog, m.settings_section with
+     | Some Settings, Mcp ->
+       ( { m with mcp = { m.mcp with host = None; host_error = None } }
+       , [ call (List_mcp { reconnect = false }) ~tag:Mcp_host_listed ] )
+     | _ -> m, [])
   (* Another of the user's frontends changed their preferences. *)
   | Prefs_changed changes ->
     apply_prefs m ~startup:false changes, [ Command.Cache_prefs changes ]
@@ -10081,6 +10276,15 @@ let dialog_accept (m : Model.t) =
   | Some Settings when Option.is_some m.memory.draft -> save_memory m
   | Some Settings when Option.is_some m.instructions.draft -> save_instruction m
   | Some Settings
+    when Settings_section.equal m.settings_section Mcp
+         && Option.is_some m.mcp.removing -> mcp_remove m
+  | Some Settings
+    when Settings_section.equal m.settings_section Mcp
+         && Option.is_some m.mcp.paste -> mcp_paste_save m
+  | Some Settings
+    when Settings_section.equal m.settings_section Mcp
+         && Option.is_some m.mcp.draft -> mcp_save m
+  | Some Settings
     when Settings_section.equal m.settings_section About_you
          && About_you.dirty m.about_you -> save_about_you m
   | Some Settings when Option.is_some (Compact_at.draft m.compact_at) ->
@@ -10308,7 +10512,10 @@ let update_connected (m : Model.t) (action : Action.t) =
     m, cmds @ sent
   | Reply (tag, result) -> reply m tag result
   (* The ages in the sidebar; the list itself follows [sessions_changed]. *)
-  | Tick now -> { m with now = Some now }, []
+  | Tick now ->
+    let first = Option.is_none m.now in
+    let m = { m with now = Some now } in
+    if first then note_opened m else m, []
   | Set_utc_offset utc_offset -> { m with utc_offset }, []
   | Set_browser_time_zone zone -> { m with browser_time_zone = Some zone }, []
   | Set_desktop desktop -> { m with desktop }, []
@@ -10531,6 +10738,33 @@ let update_connected (m : Model.t) (action : Action.t) =
     { m with instructions = Instruction_notes.cancel_remove m.instructions }, []
   | Memory_forget_cancel ->
     { m with memory = Memory_notes.cancel_forget m.memory }, []
+  | Mcp_edit name ->
+    { m with mcp = Mcp_page.edit m.mcp name }, [ Command.Focus "mcp-name" ]
+  | Mcp_field field -> { m with mcp = Mcp_page.set m.mcp field }, []
+  | Mcp_save -> mcp_save m
+  | Mcp_cancel -> { m with mcp = Mcp_page.cancel m.mcp }, []
+  | Mcp_paste ->
+    ( { m with mcp = Mcp_page.open_paste m.mcp }
+    , [ Command.Focus "mcp-paste-text" ] )
+  | Mcp_remove name ->
+    ( { m with mcp = Mcp_page.ask_remove m.mcp name }
+    , [ Command.Focus "mcp-remove-yes" ] )
+  | Mcp_paste_text text -> { m with mcp = Mcp_page.set_paste m.mcp text }, []
+  | Mcp_paste_save -> mcp_paste_save m
+  | Mcp_remove_confirm -> mcp_remove m
+  | Mcp_remove_cancel -> { m with mcp = Mcp_page.cancel_remove m.mcp }, []
+  | Mcp_toggle name ->
+    let mcp, request = Mcp_page.toggle_enabled m.mcp name in
+    ( { m with mcp }
+    , Option.to_list
+        (Option.map request ~f:(fun r -> call r ~tag:(Mcp_toggled name))) )
+  | Mcp_show_tools name -> { m with mcp = Mcp_page.toggle_tools m.mcp name }, []
+  | Mcp_reconnect ->
+    ( { m with mcp = { m.mcp with host = None } }
+    , [ call (List_mcp { reconnect = true }) ~tag:Mcp_host_listed ] )
+  | Mcp_approve { source; server } ->
+    ( { m with mcp = Mcp_page.set_busy m.mcp server true }
+    , [ call (Mcp_approve { source; server }) ~tag:Mcp_host_listed ] )
   | About_you_field (field, value) ->
     { m with about_you = About_you.set m.about_you field value }, []
   | About_you_save -> save_about_you m
@@ -10625,6 +10859,8 @@ let update_connected (m : Model.t) (action : Action.t) =
      | Some Settings, _ when Option.is_some m.instructions.removing ->
        ( { m with instructions = Instruction_notes.cancel_remove m.instructions }
        , [] )
+     | Some Settings, _ when Option.is_some (Mcp_page.escape m.mcp) ->
+       { m with mcp = Option.value_exn (Mcp_page.escape m.mcp) }, []
      | _ ->
        (match m.dialog with
         | Some (Login { failed = None; provider; _ }) ->
