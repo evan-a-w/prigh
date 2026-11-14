@@ -17,3 +17,13 @@ val max_bytes : int
 
 val default_timeout_seconds : int
 val max_timeout_seconds : int
+
+val name : string
+
+(** [web_fetch] run in the backend itself ([on_host = false]), for a
+    conversation without a tool host (chat mode): pages are truncated but not
+    saved (there is no file tool to read them with), and unless
+    [allow_local] (the backend is also the session's own machine) URLs on
+    the server's own network (loopback, private and link-local addresses,
+    also after a redirect) are refused. *)
+val in_backend : allow_local:bool -> Tool.t

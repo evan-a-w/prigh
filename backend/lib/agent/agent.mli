@@ -77,6 +77,12 @@ module State : sig
           epoch) *)
     ; approval_mode : Approval_mode.t
     ; plan_mode : bool
+    ; chat_mode : bool
+      (** a chat with no tool host ({!Chat_mode}); overrides [plan_mode] *)
+    ; no_host : string option
+      (** why a message outside chat mode cannot run now (no tool host is
+          connected, or the session's is gone for good), naming what to do,
+          chat mode included *)
     ; computer_control : string option
       (** the host (its name) whose screen the user allowed prigh to
           control, while that lasts ({!Computer_consent}) *)
@@ -521,7 +527,14 @@ val save_as_default : t -> unit Or_error.t
     asks (unless a rule allows it). The model is told when plan mode changes
     ({!System_prompt.plan_mode_note}: with the next user message, or between
     turns of a running loop). Only the user leaves plan mode
-    ({!set_mode}): the model presents its plan and waits. *)
+    ({!set_mode}): the model presents its plan and waits.
+
+    Chat mode ({!Chat_mode}) ignores the tool host: the model is offered only
+    the tools that need none ([web_fetch] then runs in the backend), the
+    system prompt has no working directory or project instructions, any
+    other call is refused, and nothing waits for a host. Switching it is told
+    like plan mode ({!System_prompt.chat_mode_note}). Outside chat mode a
+    message is refused while no host can run it ([no_host]). *)
 
 (** Computer use asks the user first in every approval mode (a
     [Tool_confirm] of kind {!Confirm_kind.Computer_use}, timing out after
@@ -554,7 +567,17 @@ val respond_confirm
     session. Pending confirmations the new mode lets through are allowed;
     leaving plan mode, when idle, carries on an active goal (see
     {!set_goal}). *)
-val set_mode : ?approval:Approval_mode.t -> ?plan:bool -> t -> unit
+val set_mode
+  :  ?approval:Approval_mode.t
+  -> ?plan:bool
+  -> ?chat:bool
+  -> t
+  -> unit
+
+(** Puts a brand-new session (no messages, no mode chosen) in chat mode when
+    no tool host is connected, so that it can be used at once; leaving chat
+    mode, also once a host connects, is the user's choice. *)
+val chat_without_host : t -> unit
 
 (** Answers a pending [ask_user] call ([Answered], one list per question, or
     [Declined]). Unanswered, it times out at its deadline: the model gets

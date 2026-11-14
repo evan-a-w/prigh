@@ -6,19 +6,20 @@ let default_timeout_seconds = 30
 let max_timeout_seconds = 120
 let max_redirects = 10
 
-let spec =
-  { Tool_spec.name = "web_fetch"
+let name = "web_fetch"
+
+let make_spec ~on_host ~where =
+  { Tool_spec.name
   ; parallel_safe = true
-  ; on_host = true
+  ; on_host
   ; freeform = None
   ; native = None
   ; destructive = Never
   ; description =
       "Fetch a URL (http or https) and return its content as readable text: \
        HTML is converted to markdown with links kept, other text is returned \
-       as is, images are attached. Follows redirects. Runs on the machine the \
-       tools run on, so localhost is that machine. Long pages are truncated \
-       and saved in full to a file you can read."
+       as is, images are attached. Follows redirects. "
+      ^ where
   ; parameters =
       Tool_args.schema
         ~required:[ "url" ]
@@ -31,6 +32,22 @@ let spec =
               max_timeout_seconds )
         ]
   }
+;;
+
+let spec =
+  make_spec
+    ~on_host:true
+    ~where:
+      "Runs on the machine the tools run on, so localhost is that machine. \
+       Long pages are truncated and saved in full to a file you can read."
+;;
+
+let backend_spec =
+  make_spec
+    ~on_host:false
+    ~where:
+      "Runs on prigh's server: this conversation has no machine of its own. \
+       Long pages are truncated."
 ;;
 
 let user_agent = sprintf "Mozilla/5.0 (compatible; prigh/%s)" Version.to_string
@@ -90,8 +107,11 @@ let resolve ~base location =
 ;;
 
 (* Follows redirects; returns the final URL and its body. *)
-let fetch ~env ~cancel ~timeout url =
+let fetch ~env ~cancel ~timeout ~check url =
   let rec go url ~hops =
+    match check url with
+    | Error host -> Error (`Local host)
+    | Ok () ->
     match fetch_once ~env ~cancel ~timeout url with
     | Error e -> Error (`Http e)
     | Ok (body : Body.t) ->
@@ -208,7 +228,7 @@ let header ~url (body : Body.t) ~mime =
 
 (* The page's text under the header, cut like other tools' output; the full
    text goes to a file. *)
-let text_result (context : Tool.Context.t) ~header ?title text =
+let text_result (context : Tool.Context.t) ~save ~header ?title text =
   let title =
     Option.value_map title ~default:"" ~f:(fun t -> "Title: " ^ t ^ "\n")
   in
@@ -216,6 +236,16 @@ let text_result (context : Tool.Context.t) ~header ?title text =
   let note =
     if not shown.truncated
     then ""
+    else if not save
+    then
+      sprintf
+        "\n\n\
+         [truncated: showing %d of %d lines (%s of %s); fetch a more specific \
+         page for the rest]"
+        (Truncate.count_lines shown.text)
+        shown.total_lines
+        (size_text (String.length shown.text))
+        (size_text shown.total_bytes)
     else (
       let saved =
         match Tool_bash.save_output context text with
@@ -237,7 +267,11 @@ let text_result (context : Tool.Context.t) ~header ?title text =
   Tool.Result.ok (sprintf "%s\n%s\n%s%s" header title shown.text note)
 ;;
 
-let content (context : Tool.Context.t) ~url (body : Body.t) =
+let download_hint ~save how =
+  if save then how else "web_fetch cannot show it in this conversation"
+;;
+
+let content (context : Tool.Context.t) ~save ~url (body : Body.t) =
   let media =
     Media.of_header (Http_client.Response.header body.response "content-type")
   in
@@ -248,16 +282,17 @@ let content (context : Tool.Context.t) ~url (body : Body.t) =
     let page =
       Html_text.convert ~base:(Uri.of_string url) (decode media data)
     in
-    text_result context ~header ?title:page.title page.text)
+    text_result context ~save ~header ?title:page.title page.text)
   else if Option.is_some (Image.sniff data)
   then
     if body.cut
     then
       Tool.Result.error
         (sprintf
-           "%s\nthe image is larger than %s; download it with curl in bash"
+           "%s\nthe image is larger than %s; %s"
            header
-           (size_text max_bytes))
+           (size_text max_bytes)
+           (download_hint ~save "download it with curl in bash"))
     else (
       match Image.load ~env:context.env ~cancel:context.cancel data with
       | Error e ->
@@ -272,19 +307,77 @@ let content (context : Tool.Context.t) ~url (body : Body.t) =
   else if
     Media.is_text media
     || (String.is_empty media.mime && not (looks_binary data))
-  then text_result context ~header (decode media data)
+  then text_result context ~save ~header (decode media data)
   else
     Tool.Result.error
       (sprintf
-         "%s\n\
-          web_fetch only shows text, HTML and images; download it with curl in \
-          bash (e.g. curl -sL -o FILE '%s') and use a tool that reads %s"
+         "%s\nweb_fetch only shows text, HTML and images; %s"
          header
-         url
-         (if String.is_empty media.mime then "this format" else media.mime))
+         (download_hint
+            ~save
+            (sprintf
+               "download it with curl in bash (e.g. curl -sL -o FILE '%s') and \
+                use a tool that reads %s"
+               url
+               (if String.is_empty media.mime then "this format" else media.mime))))
 ;;
 
-let run (context : Tool.Context.t) args =
+(* Loopback, private, link-local and unspecified addresses, also as IPv6
+   mapped IPv4. *)
+let is_local_address ip =
+  let v4 ip =
+    Ipaddr.V4.is_private ip
+    || Ipaddr.V4.Prefix.mem ip Ipaddr.V4.Prefix.relative
+    || Ipaddr.V4.compare ip Ipaddr.V4.any = 0
+  in
+  match (ip : Ipaddr.t) with
+  | V4 ip -> v4 ip
+  | V6 ip ->
+    Ipaddr.V6.is_private ip
+    || Ipaddr.V6.compare ip Ipaddr.V6.unspecified = 0
+    || Ipaddr.V6.compare ip Ipaddr.V6.localhost = 0
+    || Option.value_map (Ipaddr.to_v4 (V6 ip)) ~default:false ~f:v4
+;;
+
+(* The addresses [host] (a name or a literal address) stands for. *)
+let addresses ~env host =
+  match Ipaddr.of_string host with
+  | Ok ip -> [ ip ]
+  | Error _ ->
+    (match Eio.Net.getaddrinfo_stream (Eio.Stdenv.net env) host with
+     | addrs ->
+       List.filter_map addrs ~f:(function
+         | `Tcp (ip, _) ->
+           Result.ok
+             (Ipaddr.of_string (Format.asprintf "%a" Eio.Net.Ipaddr.pp ip))
+         | `Unix _ -> None)
+     | exception _ -> [])
+;;
+
+(* Run in the backend for a conversation without a machine, a fetch must
+   not reach the server's own network (its other services, the cloud's
+   metadata): local addresses are refused unless [allow_local]. *)
+let check_local ~env ~allow_local url =
+  if allow_local
+  then Ok ()
+  else (
+    match Uri.host (Uri.of_string url) with
+    | None -> Ok ()
+    | Some host ->
+      let host =
+        String.chop_prefix_if_exists host ~prefix:"["
+        |> String.chop_suffix_if_exists ~suffix:"]"
+      in
+      let named_local =
+        String.Caseless.equal host "localhost"
+        || String.Caseless.is_suffix host ~suffix:".localhost"
+      in
+      if named_local || List.exists (addresses ~env host) ~f:is_local_address
+      then Error host
+      else Ok ())
+;;
+
+let run_with ~save ~allow_local (context : Tool.Context.t) args =
   let url = String.strip (Tool_args.string args "url") in
   let timeout =
     Option.value
@@ -315,8 +408,16 @@ let run (context : Tool.Context.t) args =
          ~env:context.env
          ~cancel:context.cancel
          ~timeout:(Time_ns.Span.of_int_sec timeout)
+         ~check:(check_local ~env:context.env ~allow_local)
          url
      with
+     | Error (`Local host) ->
+       Tool.Result.error
+         (sprintf
+            "%s is on prigh's server's own network (%s), which this \
+             conversation cannot reach: fetch a public URL"
+            url
+            host)
      | Error (`Http Cancelled) -> Tool.Result.error "[cancelled]"
      | Error (`Http (Timed_out | Stalled _)) ->
        Tool.Result.error
@@ -330,9 +431,10 @@ let run (context : Tool.Context.t) args =
        Tool.Result.error
          (sprintf
             "cannot fetch %s: %s; check the URL, and that its host is \
-             reachable from the machine the tools run on"
+             reachable from %s"
             url
-            message)
+            message
+            (if save then "the machine the tools run on" else "prigh's server"))
      | Error (`Too_many_redirects last) ->
        Tool.Result.error
          (sprintf
@@ -343,7 +445,7 @@ let run (context : Tool.Context.t) args =
             last)
      | Ok (final, body) ->
        if body.response.status >= 200 && body.response.status < 300
-       then content context ~url:final body
+       then content context ~save ~url:final body
        else (
          let media =
            Media.of_header
@@ -378,4 +480,8 @@ let run (context : Tool.Context.t) args =
          (Option.value (Uri.scheme uri) ~default:""))
 ;;
 
-let tool = { Tool.spec; run }
+let tool = { Tool.spec; run = run_with ~save:true ~allow_local:true }
+
+let in_backend ~allow_local =
+  { Tool.spec = backend_spec; run = run_with ~save:false ~allow_local }
+;;

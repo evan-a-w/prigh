@@ -91,6 +91,7 @@ val run
         -> User_question.t list
         -> User_question.Reply.t)
   -> ?ui:Ui_host.t
+  -> ?chat:bool
   -> ?execute:Tool.executor
   -> ?background:Background_tasks.t
   -> ?sleep:(float -> unit)

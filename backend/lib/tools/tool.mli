@@ -56,6 +56,9 @@ and context =
   ; host : string option
     (** the tool host (by id) this call's [on_host] tool runs on, when it is
         not the session's active one ([on_host]'s inner call) *)
+  ; chat : bool
+    (** the run is in chat mode: it has no tool host (a subagent it starts
+        is a chat too) *)
   }
 
 (** Runs a tool call. [Agent] installs one that forwards [on_host] tools to
@@ -91,6 +94,7 @@ module Context : sig
           -> User_question.Reply.t)
     -> ?ui:Ui_host.t
     -> ?host:string
+    -> ?chat:bool
     -> env:Env.t
     -> cwd:string
     -> unit

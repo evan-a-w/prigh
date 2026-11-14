@@ -50,6 +50,7 @@ module Entry = struct
       | Approval of
           { mode : string
           ; plan : bool
+          ; chat : bool [@sexp.bool] [@jsonaf.default false] [@jsonaf_drop_default.equal]
           }
       | Allow_rule of { rule : string }
       | Archived of { archived : bool }
@@ -549,7 +550,16 @@ let set_system_prompt t ~text = append t (System_prompt { text })
 let set_goal t goal = append t (Goal { goal })
 let set_reminders t reminders = append t (Reminders { reminders })
 let set_budget t ~usd = append t (Budget { usd })
-let set_approval t ~mode ~plan = append t (Approval { mode; plan })
+module Mode = struct
+  type t =
+    { approval : string
+    ; plan : bool
+    ; chat : bool
+    }
+  [@@deriving sexp_of, equal]
+end
+
+let set_approval t ~mode ~plan ~chat = append t (Approval { mode; plan; chat })
 let add_allow_rule t ~rule = append t (Allow_rule { rule })
 
 let set_archived t ~archived =
@@ -697,7 +707,7 @@ let active_path t =
 let approval t =
   List.fold (active_path t) ~init:None ~f:(fun acc (e : Entry.t) ->
     match e.payload with
-    | Approval { mode; plan } -> Some (mode, plan)
+    | Approval { mode; plan; chat } -> Some { Mode.approval = mode; plan; chat }
     | _ -> acc)
 ;;
 

@@ -151,6 +151,7 @@ let execute_tool
       ?approve
       ?ask_user
       ?ui
+      ?chat
       ?execute
       ?background
       ~conversation
@@ -173,6 +174,7 @@ let execute_tool
              ?approve
              ?ask_user
              ?ui
+             ?chat
              ~on_output:(fun chunk ->
                emit (Agent_event.Tool_output { call_id = call.id; chunk }))
              ~emit
@@ -263,6 +265,7 @@ let run
       ?approve
       ?ask_user
       ?ui
+      ?chat
       ?execute
       ?background
       ?sleep
@@ -587,6 +590,7 @@ let run
                 ?approve
                 ?ask_user
                 ?ui
+                ?chat
                 ?execute
                 ?background
                 ~conversation

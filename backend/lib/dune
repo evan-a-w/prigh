@@ -33,4 +33,5 @@
   base64
   ohex
   uri
-  domain-name))
+  domain-name
+  ipaddr))

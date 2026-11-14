@@ -998,9 +998,10 @@ let attach t (client : Client.t) agent =
   publish_hosts t;
   if client.tools
   then Agent.prefer_host agent client.host_id
-  else
+  else (
     Option.iter (preferred_host t client) ~f:(fun host ->
-      Agent.prefer_host agent host.host_id)
+      Agent.prefer_host agent host.host_id);
+    Agent.chat_without_host agent)
 ;;
 
 (* A brand-new session made or opened for [client] starts on a host chosen
@@ -3544,14 +3545,16 @@ let dispatch agent login ~(client : Client.t) ~meth ~params : Json.t Or_error.t 
       | None -> Ok None
       | Some s -> Or_error.map (Approval_mode.of_string s) ~f:Option.some
     in
-    let%bind plan =
-      match param params "plan_mode" with
+    let flag name =
+      match param params name with
       | None | Some `Null -> Ok None
       | Some `True -> Ok (Some true)
       | Some `False -> Ok (Some false)
-      | Some _ -> Or_error.error_string "param \"plan_mode\" must be a boolean"
+      | Some _ -> Or_error.errorf "param %S must be a boolean" name
     in
-    Agent.set_mode ?approval ?plan agent;
+    let%bind plan = flag "plan_mode" in
+    let%bind chat = flag "chat_mode" in
+    Agent.set_mode ?approval ?plan ?chat agent;
     ok (Rpc_json.state (Agent.state agent))
   | "ask_user_respond" ->
     let open Or_error.Let_syntax in

@@ -512,6 +512,7 @@ let run_once
         ~config:{ state.config with max_turns = Some turn_limit }
         ~cwd:p.cwd
         ~cancel:context.cancel
+        ~chat:context.chat
         ~execute:context.execute
         ~approve:context.approve
         ~depth:p.depth
@@ -650,16 +651,20 @@ let execute
       | Some _ | None -> instructions
     in
     let { Host_ops.Instructions.files; nix; skills } =
-      Host_ops.instructions_of_result
-        (Tool.execute_via
-           { context with cwd = p.cwd; on_output = ignore }
-           Host_ops.instructions_tool
-           (Host_ops.instructions_args ~home))
+      if context.chat
+      then { Host_ops.Instructions.files = []; nix = false; skills = [] }
+      else
+        Host_ops.instructions_of_result
+          (Tool.execute_via
+             { context with cwd = p.cwd; on_output = ignore }
+             Host_ops.instructions_tool
+             (Host_ops.instructions_args ~home))
     in
     Some
       (base
        ^ "\n\n"
        ^ System_prompt.build
+           ~chat:context.chat
            ~instructions:files
            ~nix
            ~skills

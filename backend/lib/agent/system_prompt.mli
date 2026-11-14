@@ -31,7 +31,9 @@ end
     [git worktree add]. [user_info] is what the user set about themselves
     ({!User_info}), then the user's [custom_instructions], the last blocks;
     given the [custom_instructions] tool, the model is told when to change
-    them. *)
+    them. [chat] (default false) builds a chat's prompt (chat mode, see
+    {!Chat_mode}): it says there is no machine, and has no working directory,
+    OS, project instructions, skills or Nix. *)
 val build
   :  ?date:string
   -> ?instructions:(string * string) list
@@ -41,6 +43,7 @@ val build
   -> ?role:Role.t
   -> ?user_info:string
   -> ?custom_instructions:Custom_instruction.t list
+  -> ?chat:bool
   -> cwd:string
   -> home:string
   -> tools:Tool_spec.t list
@@ -61,6 +64,10 @@ val tools_changed_note : added:string list -> removed:string list -> string
 (** When plan mode is switched on or off (before the next message, or
     between turns of a run). *)
 val plan_mode_note : on:bool -> string
+
+(** When chat mode is switched on or off; leaving it names the tool host
+    and the working directory ([host] [None]: none is connected). *)
+val chat_mode_note : on:bool -> host:string option -> cwd:string -> string
 
 (** When the user's kind of client changes (and with the first prompt from
     one): whether [render_ui]'s components can be shown. *)

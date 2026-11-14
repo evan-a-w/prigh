@@ -183,7 +183,7 @@ let%expect_test
   print_s
     [%sexp
       (Session.approval (Or_error.ok_exn (Session.load path))
-       : (string * bool) option)
+       : Session.Mode.t option)
     , (Session.allow_rules (Or_error.ok_exn (Session.load path)) : string list)];
   Eio.Switch.run (fun sw ->
     let reloaded =
