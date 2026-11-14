@@ -839,7 +839,9 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   names another machine.
 - `Tool_web_fetch` / `Html_text` — `web_fetch` runs on the active host
   (`on_host`, so `localhost` is the host's; a host predating it answers
-  `unknown host tool`), through `Http_client.get_stream`: up to 10
+  `unknown host tool`), or in the backend in chat mode (`in_backend`: no
+  saved full text, and without the backend host it refuses loopback,
+  private and link-local addresses, also after a redirect), through `Http_client.get_stream`: up to 10
   redirects, a 5 MB body limit, a 30 s default timeout (at most 120). HTML
   goes through `Html_text` (a hand-written tokenizer and renderer: headings,
   lists, links resolved against the final URL, `pre` fences, tables,
@@ -1266,8 +1268,8 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   changed and leave re-reading the instructions to the model's discretion,
   since they are often unchanged.
 - `Told_environment` — what the model was last told about its environment
-  (host id, cwd, the tool names `Tools.for_model` gives it, plan mode, the
-  kind of client, once one prompted):
+  (host id, cwd, the tool names `Tools.for_model` gives it, plan mode, chat
+  mode, the kind of client, once one prompted):
   set from the current environment when the system prompt is built (plan
   mode excepted: the prompt does not describe it) and whenever notes are
   delivered, and recorded as a `Told_environment` session entry on the
@@ -1440,7 +1442,24 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   model is told about plan mode by `System_prompt.plan_mode_note`, on the
   next user message (or goal message) or, while a loop runs, as a message
   of its own at the next turn boundary, recorded as an `Injected` note of
-  kind `Plan_mode`. `ask_user` emits `Ask_user` and waits for
+  kind `Plan_mode`. Chat mode (`Chat_mode`; `set_mode`'s `chat_mode`, kept in
+  the session's `approval` entry with `chat`) overrides both, keeping them
+  to return to: `own_tools` offers only `Chat_mode.allowed` (no MCP or
+  review tools), with `web_fetch` swapped for `Tool_web_fetch.in_backend`;
+  `approve` refuses anything else (a cached tool list, an `ls` from before
+  the switch) and the executor refuses `on_host` tools other than
+  `web_fetch`, which it runs in the backend; `System_prompt.build ~chat`
+  drops the environment, project instructions, skills, Nix and the
+  orchestration guidance; `Tool.Context.chat` makes a subagent a chat too
+  (its prompt and tools); `refresh_location`, MCP and `await_host` do not
+  touch the host. `Told_environment` records `chat_mode` with an empty host
+  and cwd, and its chat note (`System_prompt.chat_mode_note`, kind
+  `Chat_mode`) stands for the host, cwd and tool changes; `mode_notes`
+  delivers it between turns like plan mode's. `State.no_host` says why a
+  message outside chat mode cannot run (no host connected, or the
+  session's gone for good) and `prompt` and the queue refuse with it;
+  `Agent.chat_without_host`, called when a non-host client attaches,
+  puts a brand-new session with no host in reach in chat mode. `ask_user` emits `Ask_user` and waits for
   `answer_question` (the first answer wins; abort withdraws it;
   `Ask_user_done` follows). Its timeout (`User_question.timeout`: the
   config's `ask_user_timeout_seconds`, or the call's `timeout_seconds`,
