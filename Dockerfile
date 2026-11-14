@@ -91,7 +91,9 @@ COPY docker/gitconfig /etc/gitconfig
 COPY docker/ssh_known_hosts /etc/ssh/ssh_known_hosts
 COPY docker/ssh_config /etc/ssh/ssh_config.d/prigh.conf
 COPY docker/nix.conf /etc/nix/nix.conf
+COPY docker/nix-path.sh /etc/profile.d/nix-path.sh
 RUN mv /opt/nix-seed/flake-registry.json /etc/nix/ \
+ && printf '\n. /etc/profile.d/nix-path.sh\n' >>/etc/bash.bashrc \
  && ln -s /opt/prigh/bin/prigh /opt/prigh/bin/prigh-tui /usr/local/bin/ \
  && nix_pkg=$(cat /opt/nix-seed/nix) \
  && for b in /opt/nix-seed/store/"${nix_pkg##*/}"/bin/*; do ln -s "$nix_pkg/bin/${b##*/}" /usr/local/bin/; done \
