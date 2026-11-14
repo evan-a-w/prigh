@@ -716,6 +716,18 @@ uploads; one that failed says to remove it or attach it again. While
 files upload (or a download is being prepared), the status says so
 with the work lamp: "Uploading 2 files 40%".
 
+A long paste (over 2,000 characters or 40 lines: a log, a stack trace)
+does not fill the composer: it becomes a **Pasted text #1** chip with its
+lines and size (× removes it; clicking it shows the text, with Remove and
+Insert as text). Ctrl+Shift+V (⌘+Shift+V) pastes it into the box as text
+instead. It goes to the model whole with the message, after what you
+typed, as a `<pasted_text name="Pasted text #1" lines="420">` block (no
+tool or host needed; up to 2 MiB each: attach a larger one as a file), and
+the transcript shows it as one folded line that opens to the text. Stop
+or a failed send puts the chips back. The TUI does the same with a
+bracketed paste: a `[Pasted text #1 +420 lines]` token in the editor,
+which Backspace or Delete removes whole.
+
 Transfers go through the backend, so they work on any tool host: the page
 asks over its signed-in connection for a one-time link (a random ticket,
 valid 5 minutes, for that session's host only), then `GET
@@ -2017,8 +2029,8 @@ that no longer exists.
 | PageUp / PageDown | scroll the transcript / list a page |
 | mouse wheel | scroll the transcript (selecting text needs Shift) |
 | Ctrl+Up / Ctrl+Down | jump to the previous/next user message (or the trimmed divider) |
-| Backspace / Ctrl+H | delete the character before the cursor |
-| Delete | delete the character under the cursor |
+| Backspace / Ctrl+H | delete the character before the cursor (a `[Pasted text #N +L lines]` token whole) |
+| Delete | delete the character under the cursor (a pasted text's token whole) |
 | Ctrl+K / Ctrl+U | delete to the end / start of the line |
 | Ctrl+W / Alt+Backspace | delete the word before the cursor |
 | Ctrl+Y / Alt+Y | paste the most recent kill / replace it with an older kill |

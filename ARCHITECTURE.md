@@ -332,7 +332,9 @@ the turn that launched them), `Background_tasks` (`job`, on track
   plan mode note
   sent between turns is a message of notes only, with an empty body), `@`
   files behind
-  (`Attachment`: path and length), or a whole message written in the
+  (`Attachment`: path and length), long pastes between the user's text and
+  the files (`Pasted`: name, lines and length; each a `<pasted_text
+  name="Pasted text #N" lines="L">` block), or a whole message written in the
   user's place (`Source`: delivery, hand-over, goal start/continuation,
   reminder, resume, `!cmd` output, compaction summary, `/review`, `/init`; a goal's
   or a reminder's message may carry a plan mode note too). The
@@ -341,7 +343,10 @@ the turn that launched them), `Background_tasks` (`job`, on track
   `Injected.infer` recognises the same things by their wording in sessions
   written before `origin` existed, and `Rpc_json`
   sends `origin` (recorded, else inferred) as `{body, notes: [{kind,
-  title, text}], attachments: [{path}]}` or `{source: {kind, title}}`.
+  title, text}], pasted: [{name, lines, start, length}], attachments:
+  [{path}]}` or `{source: {kind, title}}`; a pasted text's `start` and
+  `length` are its contents' byte range in the message's text, so it is
+  not sent twice.
 - `Image` — what models accept: PNG/JPEG/GIF/WebP sniffed from the bytes,
   dimensions from the header, and `load`, which downscales anything over
   2000 px or 4.5 MB of base64 by running ImageMagick or `sips` (PNG, then
@@ -1401,8 +1406,14 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   forget the finished tasks (`list_jobs` starts empty).
   `prompt`/`steer`/`follow_up` accept optional `attachments`
   (paths whose contents are appended to the user message as `<file>` blocks;
-  image files are read like `read` does and attached as images) and
-  `images`; `prompt`/`follow_up` accept `ui_action` (`{call_id, component,
+  image files are read like `read` does and attached as images),
+  `pasted` (texts appended whole as `<pasted_text>` blocks, before the
+  files and needing no host; over 2 MiB is refused, saying to attach it as
+  a file; `abort`'s and `dequeue`'s restored messages give them back as
+  `pasted`) and `images`. `hello`'s reply lists what the backend takes
+  beyond the basics in `features` (`pasted_text`): the frontends
+  (`Pasted_text.params`) send `pasted` only to a backend that says so, and
+  to an older one the blocks inline in the text; `prompt`/`follow_up` accept `ui_action` (`{call_id, component,
   title, values}`, with `text: ""`): the user's answer through a
   `render_ui` component, whose text for the model is `The user responded
   through "<title>" (render_ui call <call_id>, component <component>):`
