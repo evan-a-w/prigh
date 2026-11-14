@@ -1044,6 +1044,9 @@ module Model : sig
   (** The turn or background subagents or jobs run: the session is busy. *)
   val active : t -> bool
 
+  (** The sessions whose worktrees the sidebar shows ({!Worktree_folds}). *)
+  val worktrees_shown : t -> String.Set.t
+
   (** The agents panel is open with something running: the page sends
       [Clock] every second. *)
   val ticking : t -> bool

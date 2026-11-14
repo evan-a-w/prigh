@@ -199,7 +199,7 @@ let folds h =
     then
       printf
         "%s %s\n"
-        (if Worktree_folds.shown m.worktree_folds ~now:m.now s then "+" else "-")
+        (if Set.mem (App.Model.worktrees_shown m) s.id then "+" else "-")
         (Option.value s.name ~default:s.id))
 ;;
 

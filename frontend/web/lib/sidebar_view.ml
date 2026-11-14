@@ -476,6 +476,7 @@ let session
       (m : App.Model.t)
       ~inject
       ~current
+      ~worktrees_shown
       (found : Prigh_ui.Session_search.Result.t)
   =
   let s = found.session in
@@ -512,7 +513,7 @@ let session
              @ Repo_listings.listings m.repo_worktrees)
           ~cwd
           s
-    ; folded = not (Worktree_folds.shown m.worktree_folds ~now:m.now s)
+    ; folded = not (Set.mem worktrees_shown s.id)
     ; entering = Worktrees.entering m.worktrees
     ; matched = found.title
     ; snippet = found.snippet
@@ -734,22 +735,23 @@ let view (m : App.Model.t) ~inject =
            let { Session_list.Sections.pinned; active; archived } =
              Session_list.sections ?content m.sessions ~query:m.session_query
            in
+           let worktrees_shown = App.Model.worktrees_shown m in
            let shown =
              Session_list.archived_shown
                ~query:m.session_query
                ~archived_open:m.archived_open
            in
            (match pinned with
-            | [] -> List.map active ~f:(session m ~inject ~current)
+            | [] -> List.map active ~f:(session m ~inject ~current ~worktrees_shown)
             | pinned ->
               (group_heading "Pinned" pinned
-               :: List.map pinned ~f:(session m ~inject ~current))
+               :: List.map pinned ~f:(session m ~inject ~current ~worktrees_shown))
               @
                 (match active with
                 | [] -> []
                 | active ->
                   group_heading "Recent" active
-                  :: List.map active ~f:(session m ~inject ~current)))
+                  :: List.map active ~f:(session m ~inject ~current ~worktrees_shown)))
            @
              (match archived with
              | [] -> []
@@ -758,7 +760,7 @@ let view (m : App.Model.t) ~inject =
                ::
                (if shown
                 then
-                  List.map archived ~f:(session m ~inject ~current)
+                  List.map archived ~f:(session m ~inject ~current ~worktrees_shown)
                   @
                   if m.marks.selecting
                   then []

@@ -9,6 +9,7 @@ module Key = struct
   let terminal_open = "web.terminal-open"
   let folded = "web.sidebar-folded"
   let unfolded = "web.sidebar-unfolded"
+  let opened = "web.sidebar-opened"
   let worktree_hours = "web.sidebar-worktree-hours"
   let review = "web.review"
   let history = "history"
@@ -22,6 +23,7 @@ module Key = struct
     ; terminal_open
     ; folded
     ; unfolded
+    ; opened
     ; worktree_hours
     ; review
     ; history

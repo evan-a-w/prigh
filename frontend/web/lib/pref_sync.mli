@@ -23,11 +23,14 @@ module Key : sig
   val terminal_open : string
 
   (** The sidebar's sessions whose worktrees the user folded away: their
-      ids ({!Worktree_folds}). *)
+      ids, each with when ({!Worktree_folds}). *)
   val folded : string
 
   (** Those whose worktrees the user unfolded, however old. *)
   val unfolded : string
+
+  (** When the user last went into each session. *)
+  val opened : string
 
   (** How many hours after its last use a session's worktrees show unless
       folded ([0]: never; unset: 12). *)
