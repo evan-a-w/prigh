@@ -17,8 +17,7 @@ let no_host =
    chat)"
 ;;
 
-let state ?(mode = "auto") ?(plan_mode = false) ?(chat_mode = false) ?no_host
-      ()
+let state ?(mode = "auto") ?(plan_mode = false) ?(chat_mode = false) ?no_host ()
   =
   H.state_json
     ~fields:
@@ -42,7 +41,8 @@ let chrome h =
 let%expect_test "in chat mode: the chip, the host chip and the placeholder" =
   let h = H.create ~state:(state ~chat_mode:true ()) () in
   chrome h;
-  [%expect {|
+  [%expect
+    {|
     <button type="button"
             title="A chat without the tool host: no files, commands or project, only the web and other host-free tools, until you leave it (/chat off or Alt+M) (Alt+M cycles, /mode picks)"
             aria-label="Chat: no tool host"
@@ -67,7 +67,8 @@ let%expect_test "in chat mode: the chip, the host chip and the placeholder" =
     |}];
   H.click h ~selector:".mode-chip";
   H.text h ~selector:"#chip-popover";
-  [%expect {|
+  [%expect
+    {|
     (Open_chip Mode)
     (Focus popover-list)
     Place_popover
@@ -82,7 +83,8 @@ let%expect_test "in chat mode: the chip, the host chip and the placeholder" =
   H.key h "Escape" ~target:Field;
   H.quiet h (fun () -> H.act h (Set_narrow true));
   placeholder h;
-  [%expect {|
+  [%expect
+    {|
     Close_dialog
     (Focus editor)
     <textarea id="editor"
@@ -108,7 +110,8 @@ let%expect_test "/chat toggles; leaving returns to the mode before; Alt+M" =
   H.reply h "set_mode" (state ~mode:"auto-edit" ());
   run h "/chat maybe";
   toasts h;
-  [%expect {|
+  [%expect
+    {|
     (Rpc (method_ push_pref) (params ((key history) (value /chat) (max 500)))
      (tag Ignore))
     (Rpc (method_ set_mode)
@@ -138,7 +141,8 @@ let%expect_test "/chat toggles; leaving returns to the mode before; Alt+M" =
   H.reply h "set_mode" (state ~mode:"auto" ~plan_mode:true ());
   H.key h "m" ~alt:true;
   H.text h ~selector:".mode-chip";
-  [%expect {|
+  [%expect
+    {|
     Cycle_mode
     (Rpc (method_ set_mode)
      (params ((approval_mode auto) (plan_mode true) (chat_mode false)))
@@ -159,7 +163,8 @@ let%expect_test "/chat toggles; leaving returns to the mode before; Alt+M" =
 let%expect_test "no tool host: the banner, the message kept, one click to chat" =
   let h = H.create ~state:(state ~no_host ()) () in
   H.show h ~selector:".no-host-banner";
-  [%expect {|
+  [%expect
+    {|
     <div role="status"
          aria-live="polite"
          title="No tool host connected: connect one with `prigh tool-host -connect ...` or a TUI, then pick it with /host, or talk without one in chat mode (/mode chat)"
@@ -180,13 +185,15 @@ let%expect_test "no tool host: the banner, the message kept, one click to chat" 
   run h "what is a monad?";
   toasts h;
   print_s [%sexp ((H.model h).draft : string)];
-  [%expect {|
+  [%expect
+    {|
     No tool host connected: your message stays here. Chat without a host (over it) sends it as a chat, or connect a tool host and pick it (/host). (Dismiss)
     "what is a monad?"
     |}];
   (* The button: chat mode first, then the message once it is taken. *)
   H.click h ~selector:".no-host-banner-chat";
-  [%expect {|
+  [%expect
+    {|
     Chat_without_host
     (Rpc (method_ set_mode)
      (params ((approval_mode auto) (plan_mode false) (chat_mode true)))
@@ -197,7 +204,8 @@ let%expect_test "no tool host: the banner, the message kept, one click to chat" 
   H.reply h "set_mode" (state ~chat_mode:true ~no_host ());
   print_s [%sexp ((H.model h).draft : string)];
   H.text h ~selector:".no-host-banner";
-  [%expect {|
+  [%expect
+    {|
     (Expire_toast (id 1) (after_ms 6000))
     (Rpc (method_ push_pref)
      (params ((key history) (value "what is a monad?") (max 500))) (tag Ignore))
@@ -214,7 +222,8 @@ let%expect_test "no tool host: the backend refusing the prompt keeps the draft" 
   H.fail h "prompt" no_host;
   toasts h;
   print_s [%sexp ((H.model h).draft : string)];
-  [%expect {|
+  [%expect
+    {|
     (Rpc (method_ push_pref) (params ((key history) (value hello) (max 500)))
      (tag Ignore))
     Scroll_to_bottom
@@ -232,7 +241,8 @@ let%expect_test "the chat button failing leaves the message and says why" =
   H.fail h "set_mode" "no session";
   toasts h;
   print_s [%sexp ((H.model h).draft : string)];
-  [%expect {|
+  [%expect
+    {|
     Chat_without_host
     (Rpc (method_ set_mode)
      (params ((approval_mode auto) (plan_mode false) (chat_mode true)))

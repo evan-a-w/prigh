@@ -100,8 +100,7 @@ let mode_chip (m : App.Model.t) (state : State.t) ~inject =
   | None ->
     let mode = Session_mode.of_state state in
     let never_asks =
-      (not (mode.plan || mode.chat))
-      && Approval_mode.equal mode.approval Auto
+      (not (mode.plan || mode.chat)) && Approval_mode.equal mode.approval Auto
     in
     button
       ~cls:
