@@ -243,7 +243,7 @@
 /* The modes keep their words ("auto-edit" whole): each as wide as its
    name, wrapping to a second row rather than cutting one short. */
 .mode-choices { flex-wrap: wrap; }
-.mode-choices > .session-choice { flex: 1 0 auto; padding: 0 6px; }
+.mode-choices > .session-choice { flex: 1 0 auto; min-width: 44px; padding: 0 6px; }
 .session-usage { display: flex; align-items: center; gap: 12px; padding: 0 2px; font-size: 13px; color: var(--muted); }
 .session-context { flex: 1; display: flex; align-items: center; gap: 8px; min-width: 0; }
 .session-context .meter { flex: 1; height: 5px; }

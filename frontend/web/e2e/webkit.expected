@@ -3434,9 +3434,10 @@ High
 Xhigh
 Max
 Mode
-What asks before it runs: everything (Ask), all but file edits (Auto-edit) or nothing (Auto).
+What asks before it runs: everything (Ask), all but file edits (Auto-edit), what the approval model leaves to you (Smart) or nothing (Auto).
 Ask
 Auto-edit
+Smart
 Auto
 Tool host
 New sessions you start here run their tools where the session you are on does.
@@ -3472,9 +3473,10 @@ High
 Xhigh
 Max
 Mode
-What asks before it runs: everything (Ask), all but file edits (Auto-edit) or nothing (Auto).
+What asks before it runs: everything (Ask), all but file edits (Auto-edit), what the approval model leaves to you (Smart) or nothing (Auto).
 Ask
 Auto-edit
+Smart
 Auto
 Tool host
 New sessions you start here run their tools on laptop, while it is connected.
@@ -3512,9 +3514,10 @@ High
 Xhigh
 Max
 Mode
-What asks before it runs: everything (Ask), all but file edits (Auto-edit) or nothing (Auto).
+What asks before it runs: everything (Ask), all but file edits (Auto-edit), what the approval model leaves to you (Smart) or nothing (Auto).
 Ask
 Auto-edit
+Smart
 Auto
 Tool host
 New sessions you start here run their tools on laptop, while it is connected.
@@ -3576,9 +3579,10 @@ High
 Xhigh
 Max
 Mode
-What asks before it runs: everything (Ask), all but file edits (Auto-edit) or nothing (Auto).
+What asks before it runs: everything (Ask), all but file edits (Auto-edit), what the approval model leaves to you (Smart) or nothing (Auto).
 Ask
 Auto-edit
+Smart
 Auto
 Tool host
 New sessions you start here run their tools where the session you are on does.
