@@ -96,6 +96,9 @@ let help =
        window)"
     , "its menu: cut, copy, paste, select all (also right-click; ↑ ↓ move, \
        Enter chooses, Esc closes); the browser's own menus are hidden there" )
+  ; ( "Shift+F10 / ContextMenu (in the terminal, the desktop app's browser \
+       window)"
+    , "its menu: copy the selection, paste, select all (also right-click)" )
   ; ( "Space (selecting)"
     , "mark a session (Shift: the range from the last one); Delete deletes the \
        marked ones, Esc stops selecting" )
@@ -153,7 +156,8 @@ let help =
        edited" )
   ; ( "Ctrl+`"
     , "open or close the terminal (/terminal); in it, every other key goes to \
-       the shell. On a touch screen a bar over the keyboard has Esc, Tab, Ctrl \
+       the shell but Ctrl+Shift+C (copy the selection) and Ctrl+Shift+V \
+       (paste). On a touch screen a bar over the keyboard has Esc, Tab, Ctrl \
        and Alt (tap: the next key; double-tap: locked), the arrows (held: \
        repeat), | ~ / - and Home, End, PgUp, PgDn" )
   ; ( "Esc (in a pull request)"
@@ -581,11 +585,11 @@ let commenting (m : App.Model.t) t =
 
 let handle (m : App.Model.t) t : App.Action.t option =
   match t.target, m.confirms, m.questions, m.dialog with
+  | _ when Option.is_some m.field_menu -> field_menu_key t
   (* Inside the terminal every key but Ctrl+` is the shell's, Esc and Enter
      included, even with a dialog or a confirmation showing. *)
   | Terminal, _, _, _ ->
     Option.some_if (terminal_toggle t) App.Action.Toggle_terminal
-  | _ when Option.is_some m.field_menu -> field_menu_key t
   | _, c :: _, _, _ -> confirm_key m c t
   | _, [], _ :: _, _ ->
     Option.map (question_key t) ~f:(fun a -> App.Action.Question a)

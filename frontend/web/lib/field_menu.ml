@@ -1,9 +1,17 @@
 open! Core
 open! Import
 
+module Kind = struct
+  type t =
+    | Text_field
+    | Terminal
+  [@@deriving sexp_of, equal]
+end
+
 module Field = struct
   type t =
-    { selection : bool
+    { kind : Kind.t
+    ; selection : bool
     ; editable : bool
     ; secret : bool
     }
@@ -25,11 +33,15 @@ module Item = struct
     | Select_all -> "Select all"
   ;;
 
-  let key = function
-    | Cut -> "Ctrl+X"
-    | Copy -> "Ctrl+C"
-    | Paste -> "Ctrl+V"
-    | Select_all -> "Ctrl+A"
+  let key (kind : Kind.t) t =
+    match kind, t with
+    | Text_field, Cut -> Some "Ctrl+X"
+    | Text_field, Copy -> Some "Ctrl+C"
+    | Text_field, Paste -> Some "Ctrl+V"
+    | Text_field, Select_all -> Some "Ctrl+A"
+    | Terminal, Copy -> Some "Ctrl+Shift+C"
+    | Terminal, Paste -> Some "Ctrl+Shift+V"
+    | Terminal, (Cut | Select_all) -> None
   ;;
 end
 
@@ -44,7 +56,19 @@ let field t = t.field
 let anchor t = t.anchor
 let selected t = t.selected
 
-let enabled_in (field : Field.t) : Item.t -> bool = function
+let sections_of (field : Field.t) : Item.t list list =
+  match field.kind with
+  | Text_field -> [ [ Cut; Copy; Paste ]; [ Select_all ] ]
+  | Terminal -> [ [ Copy; Paste ]; [ Select_all ] ]
+;;
+
+let sections t = sections_of t.field
+
+let enabled_in (field : Field.t) (item : Item.t) =
+  List.exists (sections_of field) ~f:(fun items ->
+    List.mem items item ~equal:Item.equal)
+  &&
+  match item with
   | Cut -> field.selection && field.editable && not field.secret
   | Copy -> field.selection && not field.secret
   | Paste -> field.editable
@@ -57,13 +81,14 @@ let create field ~anchor =
   { field
   ; anchor
   ; selected =
-      List.find Item.all ~f:(enabled_in field)
+      List.concat (sections_of field)
+      |> List.find ~f:(enabled_in field)
       |> Option.value ~default:Item.Select_all
   }
 ;;
 
 let move t delta =
-  let items = List.filter Item.all ~f:(enabled t) in
+  let items = List.filter (List.concat (sections t)) ~f:(enabled t) in
   match List.findi items ~f:(fun _ item -> Item.equal item t.selected) with
   | None -> t
   | Some (i, _) ->
