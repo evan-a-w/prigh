@@ -1,6 +1,6 @@
 == ws://
 <- ping ERROR: unauthorised: send hello with the token first
-<- hello: ok (client_id,host_id,namespace,user,superuser,state)
+<- hello: ok (client_id,host_id,namespace,user,superuser,features,state)
 <- ping: ok
 <- prompt: ok
   event text_delta "faux reply"
@@ -8,7 +8,7 @@
 <- ping ERROR: unauthorised: send hello with the token first
 == http:// (its /ws)
 <- ping ERROR: unauthorised: send hello with the token first
-<- hello: ok (client_id,host_id,namespace,user,superuser,state)
+<- hello: ok (client_id,host_id,namespace,user,superuser,features,state)
 <- ping: ok
 <- prompt: ok
   event text_delta "faux reply"
@@ -16,7 +16,7 @@
 <- ping ERROR: unauthorised: send hello with the token first
 == wss:// through a TLS proxy
 <- ping ERROR: unauthorised: send hello with the token first
-<- hello: ok (client_id,host_id,namespace,user,superuser,state)
+<- hello: ok (client_id,host_id,namespace,user,superuser,features,state)
 <- ping: ok
 <- prompt: ok
   event text_delta "faux reply"

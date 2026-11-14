@@ -1091,13 +1091,17 @@ let install_listeners ~schedule ~current =
     schedule (Resize_widget.viewport ()));
   (* Ctrl+Shift+V (Cmd+Shift+V), "paste as plain text": a long paste goes in
      the box as text rather than as a chip. The keydown comes just before
-     its paste. *)
+     its paste, and the keyup after it (the terminal's Ctrl+Shift+V reads the
+     clipboard instead: no paste). *)
   let plain_paste = ref false in
   listen ~capture:true Dom_html.Event.keydown (fun ev ->
     plain_paste
     := Js.to_bool ev##.shiftKey
        && (Js.to_bool ev##.ctrlKey || Js.to_bool ev##.metaKey)
-       && (ev##.keyCode = 86);
+       && ev##.keyCode = 86;
+    Js._true);
+  listen ~capture:true Dom_html.Event.keyup (fun _ ->
+    plain_paste := false;
     Js._true);
   let in_editor (ev : #Dom_html.event Js.t) =
     Js.Opt.case ev##.target (fun () -> false) (fun t ->

@@ -92,12 +92,20 @@ const overflow = () => page.evaluate(() => document.documentElement.scrollWidth 
 const paste = (text, plain = false) => page.evaluate(([text, plain]) => {
   const box = document.querySelector(".composer textarea");
   box.focus();
-  if (plain)
-    box.dispatchEvent(new KeyboardEvent("keydown", { key: "V", code: "KeyV", keyCode: 86, ctrlKey: true, shiftKey: true, bubbles: true }));
+  const key = type => {
+    const event = new KeyboardEvent(type, { key: "V", code: "KeyV", ctrlKey: true, shiftKey: true, bubbles: true });
+    // Only Chromium takes [keyCode] from the init.
+    Object.defineProperty(event, "keyCode", { value: 86 });
+    box.dispatchEvent(event);
+  };
+  if (plain) key("keydown");
   const data = new DataTransfer();
   data.setData("text/plain", text);
-  const event = new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true });
+  const event = new ClipboardEvent("paste", { bubbles: true, cancelable: true });
+  // Firefox ignores [clipboardData] in a script's ClipboardEvent.
+  Object.defineProperty(event, "clipboardData", { value: data });
   box.dispatchEvent(event);
+  if (plain) key("keyup");
   // What the browser does with a paste no one prevented.
   if (!event.defaultPrevented) box.setRangeText(text, box.selectionStart, box.selectionEnd, "end");
   box.dispatchEvent(new Event("input", { bubbles: true }));
@@ -145,6 +153,20 @@ try {
   console.log(await paste("\n" + log.split("\n").slice(0, 50).join("\n"), true));
   await page.waitForFunction(() => document.querySelector(".composer textarea").value.includes("frame 49"));
   console.log(`chips: ${before} → ${await page.locator(".pasted-chip").count()}; box lines: ${(await composer.inputValue()).split("\n").length}`);
+  // Its keyup ends it, also when no paste came (the terminal reads the
+  // clipboard itself): the next paste (from a menu, no keys) is a chip.
+  await page.evaluate(() => {
+    for (const type of ["keydown", "keyup"]) {
+      const event = new KeyboardEvent(type, { key: "V", code: "KeyV", ctrlKey: true, shiftKey: true, bubbles: true });
+      Object.defineProperty(event, "keyCode", { value: 86 });
+      document.body.dispatchEvent(event);
+    }
+  });
+  console.log(`Ctrl+Shift+V without a paste, then a paste from a menu: ${await paste(log)}`);
+  await page.locator(".pasted-chip").nth(1).waitFor();
+  console.log(clean(await page.locator(".pasted-chips").innerText()));
+  await tap(page.locator(".pasted-chip").nth(1).locator(".attach-chip-remove"));
+  await page.waitForFunction(() => document.querySelectorAll(".pasted-chip").length === 1);
   await composer.fill("why does this fail?");
 
   // 3. Sent: the question and a folded chip.

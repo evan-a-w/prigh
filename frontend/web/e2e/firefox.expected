@@ -3882,6 +3882,124 @@ composer cleared: true
 48x48
 === firefox: images (small): errors ===
 none
+=== firefox: pasted (desktop): a long paste ===
+kept from the box
+box: "why does this fail?"
+Pasted text #1
+420 lines · 12.5 KB
+chip: on screen; remove: on screen; fits the width
+=== firefox: pasted (desktop): its dialog ===
+Pasted text #1 · 420 lines · 12.5 KB
+Sent whole with the message, not in the box
+Remove
+Insert as text
+Done
+lines shown: 420
+=== firefox: pasted (desktop): Ctrl+Shift+V ===
+into the box
+chips: 1 → 1; box lines: 51
+Ctrl+Shift+V without a paste, then a paste from a menu: kept from the box
+Pasted text #1
+420 lines · 12.5 KB
+Pasted text #2
+420 lines · 12.5 KB
+=== firefox: pasted (desktop): sent ===
+chips left: 0
+why does this fail?
+Pasted text #1
+420 lines · 12.5 KB
+at frame 0 (worker.py:10)
+<TIME>
+text in the page: false; fits the width
+head: on screen
+=== firefox: pasted (desktop): opened ===
+the whole text: true; fits the width
+=== firefox: pasted (desktop): reloaded ===
+why does this fail?
+Pasted text #1
+420 lines · 12.5 KB
+at frame 0 (worker.py:10)
+<TIME>
+=== firefox: pasted (desktop): errors ===
+none
+=== firefox: pasted (phone): a long paste ===
+kept from the box
+box: "why does this fail?"
+Pasted text #1
+420 lines · 12.5 KB
+chip: on screen, tappable; remove: on screen, tappable; fits the width
+=== firefox: pasted (phone): its dialog ===
+Pasted text #1 · 420 lines · 12.5 KB
+Remove
+Insert as text
+Done
+lines shown: 420
+=== firefox: pasted (phone): Ctrl+Shift+V ===
+into the box
+chips: 1 → 1; box lines: 51
+Ctrl+Shift+V without a paste, then a paste from a menu: kept from the box
+Pasted text #1
+420 lines · 12.5 KB
+Pasted text #2
+420 lines · 12.5 KB
+=== firefox: pasted (phone): sent ===
+chips left: 0
+why does this fail?
+Pasted text #1
+420 lines · 12.5 KB
+at frame 0 (worker.py:10)
+<TIME>
+text in the page: false; fits the width
+head: on screen, tappable
+=== firefox: pasted (phone): opened ===
+the whole text: true; fits the width
+=== firefox: pasted (phone): reloaded ===
+why does this fail?
+Pasted text #1
+420 lines · 12.5 KB
+at frame 0 (worker.py:10)
+<TIME>
+=== firefox: pasted (phone): errors ===
+none
+=== firefox: pasted (small): a long paste ===
+kept from the box
+box: "why does this fail?"
+Pasted text #1
+420 lines · 12.5 KB
+chip: on screen, tappable; remove: on screen, tappable; fits the width
+=== firefox: pasted (small): its dialog ===
+Pasted text #1 · 420 lines · 12.5 KB
+Remove
+Insert as text
+Done
+lines shown: 420
+=== firefox: pasted (small): Ctrl+Shift+V ===
+into the box
+chips: 1 → 1; box lines: 51
+Ctrl+Shift+V without a paste, then a paste from a menu: kept from the box
+Pasted text #1
+420 lines · 12.5 KB
+Pasted text #2
+420 lines · 12.5 KB
+=== firefox: pasted (small): sent ===
+chips left: 0
+why does this fail?
+Pasted text #1
+420 lines · 12.5 KB
+at frame 0 (worker.py:10)
+<TIME>
+text in the page: false; fits the width
+head: on screen, tappable
+=== firefox: pasted (small): opened ===
+the whole text: true; fits the width
+=== firefox: pasted (small): reloaded ===
+why does this fail?
+Pasted text #1
+420 lines · 12.5 KB
+at frame 0 (worker.py:10)
+<TIME>
+=== firefox: pasted (small): errors ===
+none
 === firefox: computer (desktop): cards ===
 computer click (640, 312) 1280×800 | 1280x800, fits | mark at 640,312 | click (640, 312) → (1280, 624) on the screen
 computer type “hello” 1280×800 | 1280x800, fits | no mark | typed 5 characters

@@ -320,7 +320,9 @@ body.dropping-chat .composer-box::after { content: "Drop to attach to your messa
 }
 
 /* A long paste: its chip opens it (read, insert as text, remove). */
-.pasted-chip { padding-left: 0; }
+.pasted-chip { padding-left: 0; max-width: 100%; }
+.pasted-chip .attach-chip-name { flex-shrink: 0; }
+.pasted-chip .attach-chip-detail { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .pasted-chip-open.btn {
   display: inline-flex;
   align-items: center;

@@ -4002,6 +4002,124 @@ composer cleared: true
 48x48
 === chromium: images (small): errors ===
 none
+=== chromium: pasted (desktop): a long paste ===
+kept from the box
+box: "why does this fail?"
+Pasted text #1
+420 lines · 12.5 KB
+chip: on screen; remove: on screen; fits the width
+=== chromium: pasted (desktop): its dialog ===
+Pasted text #1 · 420 lines · 12.5 KB
+Sent whole with the message, not in the box
+Remove
+Insert as text
+Done
+lines shown: 420
+=== chromium: pasted (desktop): Ctrl+Shift+V ===
+into the box
+chips: 1 → 1; box lines: 51
+Ctrl+Shift+V without a paste, then a paste from a menu: kept from the box
+Pasted text #1
+420 lines · 12.5 KB
+Pasted text #2
+420 lines · 12.5 KB
+=== chromium: pasted (desktop): sent ===
+chips left: 0
+why does this fail?
+Pasted text #1
+420 lines · 12.5 KB
+at frame 0 (worker.py:10)
+<TIME>
+text in the page: false; fits the width
+head: on screen
+=== chromium: pasted (desktop): opened ===
+the whole text: true; fits the width
+=== chromium: pasted (desktop): reloaded ===
+why does this fail?
+Pasted text #1
+420 lines · 12.5 KB
+at frame 0 (worker.py:10)
+<TIME>
+=== chromium: pasted (desktop): errors ===
+none
+=== chromium: pasted (phone): a long paste ===
+kept from the box
+box: "why does this fail?"
+Pasted text #1
+420 lines · 12.5 KB
+chip: on screen, tappable; remove: on screen, tappable; fits the width
+=== chromium: pasted (phone): its dialog ===
+Pasted text #1 · 420 lines · 12.5 KB
+Remove
+Insert as text
+Done
+lines shown: 420
+=== chromium: pasted (phone): Ctrl+Shift+V ===
+into the box
+chips: 1 → 1; box lines: 51
+Ctrl+Shift+V without a paste, then a paste from a menu: kept from the box
+Pasted text #1
+420 lines · 12.5 KB
+Pasted text #2
+420 lines · 12.5 KB
+=== chromium: pasted (phone): sent ===
+chips left: 0
+why does this fail?
+Pasted text #1
+420 lines · 12.5 KB
+at frame 0 (worker.py:10)
+<TIME>
+text in the page: false; fits the width
+head: on screen, tappable
+=== chromium: pasted (phone): opened ===
+the whole text: true; fits the width
+=== chromium: pasted (phone): reloaded ===
+why does this fail?
+Pasted text #1
+420 lines · 12.5 KB
+at frame 0 (worker.py:10)
+<TIME>
+=== chromium: pasted (phone): errors ===
+none
+=== chromium: pasted (small): a long paste ===
+kept from the box
+box: "why does this fail?"
+Pasted text #1
+420 lines · 12.5 KB
+chip: on screen, tappable; remove: on screen, tappable; fits the width
+=== chromium: pasted (small): its dialog ===
+Pasted text #1 · 420 lines · 12.5 KB
+Remove
+Insert as text
+Done
+lines shown: 420
+=== chromium: pasted (small): Ctrl+Shift+V ===
+into the box
+chips: 1 → 1; box lines: 51
+Ctrl+Shift+V without a paste, then a paste from a menu: kept from the box
+Pasted text #1
+420 lines · 12.5 KB
+Pasted text #2
+420 lines · 12.5 KB
+=== chromium: pasted (small): sent ===
+chips left: 0
+why does this fail?
+Pasted text #1
+420 lines · 12.5 KB
+at frame 0 (worker.py:10)
+<TIME>
+text in the page: false; fits the width
+head: on screen, tappable
+=== chromium: pasted (small): opened ===
+the whole text: true; fits the width
+=== chromium: pasted (small): reloaded ===
+why does this fail?
+Pasted text #1
+420 lines · 12.5 KB
+at frame 0 (worker.py:10)
+<TIME>
+=== chromium: pasted (small): errors ===
+none
 === chromium: computer (desktop): cards ===
 computer click (640, 312) 1280×800 | 1280x800, fits | mark at 640,312 | click (640, 312) → (1280, 624) on the screen
 computer type “hello” 1280×800 | 1280x800, fits | no mark | typed 5 characters

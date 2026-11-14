@@ -1261,9 +1261,9 @@ dialog.viewer::backdrop { background: transparent; }
   transition: transform 0.15s;
 }
 .pasted.open > .pasted-head > .chev { transform: translateY(-1px) rotate(45deg); }
-.pasted-name { color: var(--fg); white-space: nowrap; }
-.pasted-detail { color: var(--faint); font-size: 11.5px; white-space: nowrap; }
-.pasted-preview { color: var(--muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pasted-name { color: var(--fg); white-space: nowrap; flex-shrink: 0; }
+.pasted-detail { color: var(--faint); font-size: 11.5px; white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.pasted-preview { color: var(--muted); flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pasted-body { position: relative; border-top: 1px solid var(--rule); }
 .pasted-body > .copy { position: absolute; top: 4px; right: 6px; background: var(--well); }
 .pasted-text { margin: 0; padding: 10px 12px; max-height: 50vh; overflow: auto; font: 12px/1.5 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
