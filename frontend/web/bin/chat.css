@@ -496,7 +496,7 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
 }
 .session-link:hover { background: var(--sodium-glow); }
 .session-link:focus-visible { outline: 2px solid var(--sodium); outline-offset: 1px; }
-.markdown .session-link > code { background: none; padding: 0; }
+.markdown .session-link > code { background: none; padding: 0; font-family: inherit; font-size: inherit; color: inherit; }
 /* A thumb's target (44px tall) around the line's text, without spacing the
    lines apart. */
 @media (pointer: coarse) {
