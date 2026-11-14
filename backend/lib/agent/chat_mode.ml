@@ -34,7 +34,6 @@ let tools ~allow_local tools =
     else Option.some_if (allowed name) tool)
 ;;
 
-
 let refusal name =
   sprintf
     "%s is not available: this is a chat (chat mode), with no access to any \

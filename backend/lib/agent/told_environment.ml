@@ -6,7 +6,8 @@ type t =
   ; cwd : string
   ; tools : string list
   ; plan_mode : bool
-  ; chat_mode : bool [@sexp.bool] [@jsonaf.default false] [@jsonaf_drop_default.equal]
+  ; chat_mode : bool
+        [@sexp.bool] [@jsonaf.default false] [@jsonaf_drop_default.equal]
   ; client : Client_kind.t option [@sexp.option] [@jsonaf.option]
   ; user_info : string option [@sexp.option] [@jsonaf.option]
   ; custom_instructions : Custom_instruction.t list
@@ -15,7 +16,6 @@ type t =
 [@@deriving sexp, jsonaf, equal]
 
 let note (kind : Injected.Note.Kind.t) text = Some { Injected.Note.kind; text }
-
 let chat_changed ~told now = not (Bool.equal told.chat_mode now.chat_mode)
 
 let mode_notes ~told now ~host_name =
@@ -27,7 +27,10 @@ let mode_notes ~told now ~host_name =
         (Chat_mode { on = now.chat_mode })
         (System_prompt.chat_mode_note
            ~on:now.chat_mode
-           ~host:(Option.some_if (not (String.is_empty now.host)) host_name)
+           ~host:
+             (Option.some_if
+                (not (String.is_empty now.host))
+                (if String.is_empty host_name then now.host else host_name))
            ~cwd:now.cwd)
   in
   let plan_mode =

@@ -17,7 +17,6 @@ val max_bytes : int
 
 val default_timeout_seconds : int
 val max_timeout_seconds : int
-
 val name : string
 
 (** [web_fetch] run in the backend itself ([on_host = false]), for a

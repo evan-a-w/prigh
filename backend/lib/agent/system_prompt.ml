@@ -100,15 +100,15 @@ let base ?(chat = false) ~nix ~auto_background ~(role : Role.t) ~tools () =
            the command line."
         ; ""
         ; "Guidelines:"
-     ; "- Use the tools to inspect and change the project; do not guess file \
-        contents."
-     ; sprintf
-         "- Prefer %s over write for existing files. Keep changes minimal and \
-          focused."
-         (if has "apply_patch" then "apply_patch" else "edit")
-     ; "- After making changes, verify them (build, tests) when a way to do so \
-        exists."
-     ; "- Be concise. Explain non-trivial decisions briefly. No filler."
+        ; "- Use the tools to inspect and change the project; do not guess \
+           file contents."
+        ; sprintf
+            "- Prefer %s over write for existing files. Keep changes minimal \
+             and focused."
+            (if has "apply_patch" then "apply_patch" else "edit")
+        ; "- After making changes, verify them (build, tests) when a way to do \
+           so exists."
+        ; "- Be concise. Explain non-trivial decisions briefly. No filler."
         ; "- Ask before destructive or irreversible actions."
         ])
      @ (if has Tool_computer.name then [ "- " ^ Tool_computer.guidance ] else [])
@@ -185,7 +185,7 @@ let base ?(chat = false) ~nix ~auto_background ~(role : Role.t) ~tools () =
                | [] -> "")
               (if List.length uses = 1 then "it signs in" else "they sign in")
           ])
-     @ (if Role.equal role Main && has "subagent"
+     @ (if Role.equal role Main && has "subagent" && not chat
         then
           [ "- You are the orchestrator: for substantial work (implementing a \
              feature, a multi-file change, a long investigation), spawn \

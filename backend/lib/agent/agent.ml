@@ -737,10 +737,7 @@ let set_approval_mode t mode = switch_mode t ~approval:mode
 let mode_notes t =
   let now = environment t in
   match
-    Told_environment.mode_notes
-      ~told:t.told
-      now
-      ~host_name:t.active_host_name
+    Told_environment.mode_notes ~told:t.told now ~host_name:t.active_host_name
   with
   | [] -> []
   | notes ->
@@ -2023,9 +2020,7 @@ let instructions t ~cancel ~cwd =
    prefix stays cacheable; later cwd/host changes reach the model as notes on
    the next user message instead. *)
 let tools t =
-  Tools.for_model
-    t.model
-    (own_tools t @ if t.chat_mode then [] else t.mcp_tools)
+  Tools.for_model t.model (own_tools t @ if t.chat_mode then [] else t.mcp_tools)
 ;;
 
 let build_system_prompt
@@ -3543,9 +3538,9 @@ let to_queue t ~attachments ~images ~client ~ui_action text =
   match ui_action with
   | None when t.chat_mode && not (List.is_empty attachments) ->
     Or_error.error_string
-      "attached files are read on the tool host, and chat mode has none: \
-       paste what matters into the message, or leave chat mode (/mode) to \
-       attach them"
+      "attached files are read on the tool host, and chat mode has none: paste \
+       what matters into the message, or leave chat mode (/mode) to attach \
+       them"
   | None when t.chat_mode && Option.is_some (Skill.invocation text) ->
     Or_error.error_string
       "skills are read on the tool host, and chat mode has none: leave chat \
@@ -3615,9 +3610,7 @@ let enqueue_queued t kind queued =
 ;;
 
 let enqueue t kind ?(attachments = []) ?(images = []) ?client ?ui_action text =
-  match
-    if is_running t then budget_exhausted t else cannot_start t
-  with
+  match if is_running t then budget_exhausted t else cannot_start t with
   | Some reason -> Or_error.error_string reason
   | None ->
     Or_error.map

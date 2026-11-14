@@ -5,7 +5,6 @@ let max_bytes = 5 * 1024 * 1024
 let default_timeout_seconds = 30
 let max_timeout_seconds = 120
 let max_redirects = 10
-
 let name = "web_fetch"
 
 let make_spec ~on_host ~where =
@@ -112,18 +111,18 @@ let fetch ~env ~cancel ~timeout ~check url =
     match check url with
     | Error host -> Error (`Local host)
     | Ok () ->
-    match fetch_once ~env ~cancel ~timeout url with
-    | Error e -> Error (`Http e)
-    | Ok (body : Body.t) ->
-      (match
-         ( is_redirect body.response.status
-         , Http_client.Response.header body.response "location" )
-       with
-       | true, Some location ->
-         if hops >= max_redirects
-         then Error (`Too_many_redirects (resolve ~base:url location))
-         else go (resolve ~base:url location) ~hops:(hops + 1)
-       | _ -> Ok (url, body))
+      (match fetch_once ~env ~cancel ~timeout url with
+       | Error e -> Error (`Http e)
+       | Ok (body : Body.t) ->
+         (match
+            ( is_redirect body.response.status
+            , Http_client.Response.header body.response "location" )
+          with
+          | true, Some location ->
+            if hops >= max_redirects
+            then Error (`Too_many_redirects (resolve ~base:url location))
+            else go (resolve ~base:url location) ~hops:(hops + 1)
+          | _ -> Ok (url, body)))
   in
   go url ~hops:0
 ;;
