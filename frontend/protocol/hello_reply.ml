@@ -5,7 +5,7 @@ type t =
   ; namespace : string option
   ; user : string option
   ; superuser : bool
-  ; features : string list
+  ; features : string list [@sexp.list]
   }
 [@@deriving sexp_of, equal]
 
