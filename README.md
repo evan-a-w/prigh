@@ -1717,7 +1717,7 @@ What the editor gets:
   rule prigh offers, reject); `ask_user` questions as forms when the editor
   supports elicitation, as a permission request for a single choice, else
   the model is told the user cannot be asked;
-- modes `ask`, `auto-edit`, `auto` (the approval modes) and `plan` (plan
+- modes `ask`, `auto-edit`, `smart`, `auto` (the approval modes) and `plan` (plan
   mode), and config options for the mode, the model (of the providers you
   are logged in to) and the thinking level;
 - the slash commands `/compact`, `/goal`, `/remind`, `/budget`, `/model`,
@@ -2494,8 +2494,8 @@ machine's once it answers (a backend that has none gets this machine's),
 and prompts sent from another frontend arrive as you type. Secrets from
 login prompts are never recorded.
 `~/.prigh/config.json` holds `scoped_models` (the models Ctrl+P cycles
-through; `/scoped-models` edits it), `approval_mode` (`ask`, `auto-edit`
-or `auto`: the mode new sessions start in, see below; `/confirm on|off`
+through; `/scoped-models` edits it), `approval_mode` (`ask`, `auto-edit`,
+`smart` or `auto`: the mode new sessions start in, see below; `/confirm on|off`
 sets `ask` or `auto`; files with the older `confirm_tools` still work, and
 it is replaced by `approval_mode` when prigh saves the file),
 `permissions` (allow/ask/deny rules, below; edited by hand) and
@@ -2513,6 +2513,9 @@ command moves to the background and how long a wait lasts, above),
 messages, pull requests and branch names with; default: the session's;
 `/generate-model` picks it, also on prigh-web's settings page, Models →
 Drafting),
+`approval_model` (the model that judges tool calls in `smart` mode,
+below; default: the session's; `/approval-model` picks it, also on
+prigh-web's settings page, Models → Approvals),
 `naming_model` (the model that names sessions and subagents; default:
 the drafting model, else the session's; `/naming model` picks it, also on
 prigh-web's settings page),
@@ -2812,7 +2815,7 @@ it.
 | `/filter [all\|KIND...\|-KIND\|+KIND]` | show only some kinds in the transcript (`user`, `assistant`, `thinking`, `tools`, `subagents`, `notes`); bare: a checklist |
 | `/theme [original\|dark\|light]`, `/accent [name\|#rrggbb]` (prigh-web) | pick or set the theme and the accent colour, for you in every browser |
 | `/confirm [on\|off]` | ask before destructive tools: sets the approval mode `ask` or `auto`, here and for new sessions |
-| `/mode [ask\|auto-edit\|auto\|plan]` | pick or set this session's mode (Alt+M cycles) |
+| `/mode [ask\|auto-edit\|smart\|auto\|plan]` | pick or set this session's mode (Alt+M cycles) |
 | `/plan [on\|off]` | toggle plan mode (read-only planning until you turn it off) |
 | `/todos` | show the model's plan (its `update_plan` steps) |
 | `/permissions` | show the mode and the allow/ask/deny rules (config and this session) |
@@ -2821,6 +2824,7 @@ it.
 | `/delete [undo]` | drop a message from the transcript and the model's context (a picker, newest first; a reply goes with its tool results); `undo` brings the latest deletion back; see [Trimming the context](#trimming-the-context) |
 | `/compaction`, `/compaction at TOKENS\|off`, `/compaction model MODEL\|off`, `/compaction mask on\|off` | show or set when conversations are compacted (`compact_at_tokens`: also once the context exceeds TOKENS, e.g. `150k`), which model writes the summaries (`compaction_model`; `off`: the session's) and whether old tool outputs are masked first (`mask_observations`); also on prigh-web's settings page |
 | `/generate-model`, `/generate-model MODEL\|off` | show or set the drafting model, the one ✦ Generate drafts commit messages, pull requests and branch names with (`generate_model`; `off`: the session's); in the TUI `/generate-model ` completes `off` and the models, in prigh-web `/generate-model` alone opens a picker; also on prigh-web's settings page (Models → Drafting) |
+| `/approval-model`, `/approval-model MODEL\|off` | show or set the approval model, the one that judges tool calls in `smart` mode (`approval_model`; `off`: the session's); in the TUI `/approval-model ` completes `off` and the models, in prigh-web `/approval-model` alone opens a picker; also on prigh-web's settings page (Models → Approvals) |
 | `/naming`, `/naming model MODEL\|off` | show or set the model that names sessions and subagents (`naming_model`; `off`: the drafting model, else the session's); in the TUI `/naming model ` completes the models, in prigh-web `/naming model` alone opens a picker; also on prigh-web's settings page |
 | `/dictation`, `/dictation model MODEL\|off` | show or set the model that transcribes dictation (`dictation_model`: OpenAI's `gpt-4o-mini-transcribe`, `gpt-4o-transcribe`, `whisper-1`, or a custom OpenAI-compatible provider's model; `off`: `openai/gpt-4o-mini-transcribe`); the TUI completes them, prigh-web opens a picker that also takes a typed key; also on prigh-web's settings page |
 | `/commit [-a] [--amend] [-m MESSAGE \| --generate]` | commit what is staged in the session's worktree (`-a`: every change to tracked files first); `--generate` drafts the message with the model into the editor, see [Git hosting](#git-hosting) |
@@ -2838,7 +2842,7 @@ it.
 | `/new`, `/clear`, `/quit` | new session / clear transcript / exit |
 | `/temporary` (prigh-web) | a temporary session (Ctrl+Shift+O): not saved or listed, deleted when you leave it; in one, its menu (keep it, delete it) |
 | `/name [text]` | set the session name |
-| `/session` | show session statistics |
+| `/session` | show session statistics (with the approvals the approval model judged and their cost) |
 | `/trace` | where the session's time went (see [Tracing](#tracing-where-the-time-went)) |
 | `/sessions` | pick a saved session (Tab marks, Ctrl+D deletes, Alt+A archives/unarchives, Alt+T pins/unpins, Alt+D deletes all archived, Ctrl+N named-only) |
 | `/archive [session]`, `/unarchive [session]` | archive or unarchive a session (id, unique id prefix, name or path; the current one without an argument) |
@@ -3187,7 +3191,7 @@ things back.
 ### Approvals, plan mode and questions
 
 Each session has an approval mode, always shown in the status line
-(`mode:ask`, `mode:auto-edit`, `mode:auto`, `mode:plan`; in prigh-web
+(`mode:ask`, `mode:auto-edit`, `mode:smart`, `mode:auto`, `mode:plan`; in prigh-web
 beside the model, along the composer's bottom edge) and switched with
 `/mode` or Alt+M (ask → auto-edit → smart → auto → plan → ask):
 
@@ -3201,12 +3205,29 @@ beside the model, along the composer's bottom edge) and switched with
 - `auto-edit`: file edits run without asking; `bash`, `job_input`,
   `worktree create`/`remove`, the git-host changes and MCP tools still
   ask.
+- `smart`: like Claude Code's auto mode. What `ask` would hold is judged
+  by the approval model instead (below); file edits under the session's
+  directory run unjudged unless the path has `.git` or `..`.
 - `auto`: nothing asks (the default, as before).
 
 A new session starts in the config's `approval_mode`; a session keeps its
 mode (and the rules below) in its file, so it survives a reload or a backend
 restart, and forks take it along. Subagents' tool calls are checked like the
 main agent's (their confirmations name the subagent).
+
+In `smart` mode, rules still come first (deny, ask, then allow rules), and
+read-only tools run. Any other call that `ask` would hold goes to the
+approval model (`approval_model` in `config.json`, `/approval-model MODEL|off`
+or prigh-web's Settings → Models → Approvals; default: the session's
+model, `off` goes back to it). It sees the user's own last ten messages, a
+subagent's task, the goal and plan, the host and directory and the call
+with its full arguments, never tool output, and answers with a `verdict`
+tool: `allow` (the call runs; its card carries "allowed by MODEL: reason")
+or `ask` (the confirmation shows "MODEL left this to you: reason"). It never
+denies on its own; an error, a timeout (60s) or a malformed reply asks you,
+saying why. A turn's calls are judged at once, and an identical call is
+judged once until you say more. What the judge spends counts in the
+session's cost (`/session` shows approvals judged and their cost).
 
 A confirmation offers: `y` allow once; `a` always allow, for the rest of the
 session, the rule shown (for `bash`, the program, with its subcommand for
