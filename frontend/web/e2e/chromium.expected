@@ -2808,6 +2808,28 @@ sidebar overflows sideways: false
 snippets inside the screen: true
 === chromium: search: errors ===
 none
+=== chromium: session_links: drawn ===
+Fix the taskbar entry -> ?session=6cad9f6e0123abcd (6cad9f6e0123abcd; "Session 6cad9f6e: Fix the taskbar entry")
+6cad9f6e -> ?session=6cad9f6e0123abcd (6cad9f6e0123abcd; "Session 6cad9f6e: Fix the taskbar entry")
+this one -> ?session=0badc0de (0badc0de; "Session 0badc0de")
+=== chromium: session_links: a click on the link switches in place ===
+session=6cad9f6e0123abcd; showing "The taskbar entry is blank."; reloaded: false
+=== chromium: session_links: a click on the bare id too ===
+session=6cad9f6e0123abcd; showing "The taskbar entry is blank."; reloaded: false
+=== chromium: session_links: Ctrl/⌘+click opens a new window; this one stays ===
+new window: session=6cad9f6e0123abcd
+session=3b5c0d1e2f3a4b5c; showing "Hello."; reloaded: false
+=== chromium: session_links: a session the user does not have: a toast ===
+No session 0badc0de: it was deleted, or it is not yours. The sidebar lists your sessions.
+session=3b5c0d1e2f3a4b5c; showing "Hello."; reloaded: false
+=== chromium: session_links: 390x844 ===
+tap target: at least 44px tall; page overflows sideways: false
+session=6cad9f6e0123abcd; showing "The taskbar entry is blank."; reloaded: false
+=== chromium: session_links: 320x640 ===
+tap target: at least 44px tall; page overflows sideways: false
+session=6cad9f6e0123abcd; showing "The taskbar entry is blank."; reloaded: false
+=== chromium: session_links: errors ===
+none
 === chromium: viewer: desktop: fit ===
 thumbnails: 3, named: View [image: image/png, 4.1 KB]
 focused: Close

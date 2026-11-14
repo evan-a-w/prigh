@@ -1824,6 +1824,7 @@ let frame (m : App.Model.t) =
     | Viewport.Follow ->
       Transcript.render_tail
         source
+        ~sessions:m.known_sessions
         ~width:area
         ~rows:body_rows
         ~skip:0
@@ -1831,6 +1832,7 @@ let frame (m : App.Model.t) =
     | Viewport.Anchored { top; _ } ->
       Transcript.render_window
         source
+        ~sessions:m.known_sessions
         ~width:area
         ~rows:body_rows
         ~top

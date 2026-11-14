@@ -5,6 +5,45 @@ let code_style = Style.fg Cyan
 let dim = Style.dim Style.plain
 let strike_style base = Style.strike (Style.dim base)
 
+(* No OSC 8: [?session=ID] is relative, a page's, which means nothing to a
+   terminal. *)
+let session_style (base : Style.t) = Style.underline { base with fg = Magenta }
+
+(* [text] in [style], with the ids of known sessions in it highlighted. *)
+let with_ids ~sessions text style : Content.Span.t list =
+  match Session_link.ids sessions text with
+  | [] -> [ { text; style } ]
+  | ids ->
+    let piece pos stop : Content.Span.t list =
+      if stop > pos
+      then [ { text = String.sub text ~pos ~len:(stop - pos); style } ]
+      else []
+    in
+    let pos, rev =
+      List.fold ids ~init:(0, []) ~f:(fun (pos, rev) (at, len, _) ->
+        ( at + len
+        , ({ Content.Span.text = String.sub text ~pos:at ~len
+           ; style = session_style style
+           }
+           :: List.rev (piece pos at))
+          @ rev ))
+    in
+    List.rev_append rev (piece pos (String.length text))
+;;
+
+(* A link to a session: its text, then its id (the short form the session
+   lists show), dim. *)
+let session_link ~sessions base text id : Content.Span.t list =
+  let id =
+    match Session_link.Known.find sessions id with
+    | Found s -> s.id
+    | Ambiguous _ | Missing _ -> id
+  in
+  [ { text; style = session_style base }
+  ; { text = " " ^ String.prefix id 8; style = Style.dim base }
+  ]
+;;
+
 let parse_link (s : string) (i : int) : (string * string * int) option =
   match String.index_from s (i + 1) ']' with
   | None -> None
@@ -21,7 +60,7 @@ let parse_link (s : string) (i : int) : (string * string * int) option =
     else None
 ;;
 
-let inline (line : string) : Content.Line.t =
+let inline ~sessions (line : string) : Content.Line.t =
   let rec parse (s : string) (base : Style.t) : Content.Span.t list =
     let n = String.length s in
     let spans = ref [] in
@@ -30,7 +69,9 @@ let inline (line : string) : Content.Line.t =
       if Buffer.length buf > 0
       then (
         spans
-        := { Content.Span.text = Buffer.contents buf; style = base } :: !spans;
+        := List.rev_append
+             (with_ids ~sessions (Buffer.contents buf) base)
+             !spans;
         Buffer.clear buf)
     in
     let emit_text text style =
@@ -49,7 +90,11 @@ let inline (line : string) : Content.Line.t =
         | '`' ->
           (match String.index_from s (i + 1) '`' with
            | Some j when j > i + 1 ->
-             emit_text (String.sub s ~pos:(i + 1) ~len:(j - i - 1)) code_style;
+             emit_spans
+               (with_ids
+                  ~sessions
+                  (String.sub s ~pos:(i + 1) ~len:(j - i - 1))
+                  code_style);
              loop (j + 1)
            | _ ->
              Buffer.add_char buf '`';
@@ -90,7 +135,9 @@ let inline (line : string) : Content.Line.t =
         | '[' ->
           (match parse_link s i with
            | Some (text, url, next) ->
-             emit_text text (Style.link base url);
+             (match Session_link.of_href url with
+              | Some id -> emit_spans (session_link ~sessions base text id)
+              | None -> emit_text text (Style.link base url));
              loop next
            | None ->
              Buffer.add_char buf '[';
@@ -232,7 +279,10 @@ let ordered_marker s =
   else None
 ;;
 
-let render ?(width = 80) (text : string) : Content.t =
+let render ?(sessions = Session_link.Known.empty) ?(width = 80) (text : string)
+  : Content.t
+  =
+  let inline = inline ~sessions in
   let lines = String.split_lines text in
   let n = List.length lines in
   let lines = Array.of_list lines in

@@ -453,6 +453,10 @@ module Action = struct
     | Leave_delete
     | Switch_session of string
     | Open_session_window of string
+    | Follow_session_link of
+        { id : string
+        ; new_window : bool
+        }
     | Ask_delete of string
     | Select_sessions of bool
     | Mark_session of
@@ -2466,6 +2470,36 @@ let switch_session (m : Model.t) path =
     , [ rpc "switch_session" [ "path", str path ] ~tag:Reload_state ]
       @ fetch
       @ [ focus_editor ] ))
+;;
+
+(* A session link: the session it names, as a click on it in the sidebar
+   would, against the sessions the user has. *)
+let follow_session_link (m : Model.t) ~id ~new_window =
+  let short (s : Session_summary.t) =
+    sprintf "%s (%s)" (String.prefix s.id 8) (Session_link.title s)
+  in
+  match Session_link.Known.find (Session_link.Known.create m.sessions) id with
+  | Found s when new_window -> m, [ Command.Open_window s.id ]
+  | Found s -> switch_session m s.path
+  | Ambiguous many ->
+    error
+      m
+      (sprintf
+         "Session %s is ambiguous: %s. Pick it in the sidebar."
+         id
+         (String.concat
+            ~sep:", "
+            (List.map many ~f:(fun (s : Session_summary.t) ->
+               sprintf "%s (%s)" s.id (Session_link.title s)))))
+  | Missing { closest } ->
+    error
+      m
+      (sprintf
+         "No session %s: it was deleted, or it is not yours. %s"
+         id
+         (match closest with
+          | Some s -> sprintf "Did you mean %s?" (short s)
+          | None -> "The sidebar lists your sessions."))
 ;;
 
 (* Deleting the session we are in moves us first: the backend does both in
@@ -10678,6 +10712,8 @@ let update_connected (m : Model.t) (action : Action.t) =
   | Leave_keep | Leave_delete -> m, []
   | Switch_session path -> switch_session m path
   | Open_session_window id -> m, [ Command.Open_window id ]
+  | Follow_session_link { id; new_window } ->
+    follow_session_link m ~id ~new_window
   | Ask_delete path ->
     if Set.mem m.marks.marked path
     then

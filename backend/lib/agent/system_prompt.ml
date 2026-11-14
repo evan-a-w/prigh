@@ -298,6 +298,7 @@ let build
       ?auto_background
       ?(role = Role.Main)
       ?user_info
+      ?session
       ?(custom_instructions = [])
       ?(chat = false)
       ~cwd
@@ -311,14 +312,25 @@ let build
     | None -> Date.to_string (Date.today ~zone:Time_float.Zone.utc)
   in
   let environment =
+    let link =
+      match session with
+      | None -> ""
+      | Some id ->
+        sprintf
+          "\n\
+           - This session's link: %s. To refer to a session (this one or \
+           another) in a reply, link it: [its title](?session=ID)."
+          (Session_link.href id)
+    in
     if chat
-    then sprintf "Environment:\n- Date: %s" date
+    then sprintf "Environment:\n- Date: %s%s" date link
     else
       sprintf
-        "Environment:\n- Working directory: %s\n- Date: %s\n- OS: %s"
+        "Environment:\n- Working directory: %s\n- Date: %s\n- OS: %s%s"
         cwd
         date
         (Core_unix.Utsname.sysname (Core_unix.uname ()))
+        link
   in
   let instructions =
     match instructions with

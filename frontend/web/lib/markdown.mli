@@ -24,7 +24,9 @@ module Inline : sig
     | Emph of t list
     | Strike of t list
     | Link of
-        { href : string (** http, https or mailto only *)
+        { href : string
+          (** http, https or mailto only, or a session's
+              ([?session=ID], {!Prigh_ui.Session_link}) *)
         ; children : t list
         }
     | Math of

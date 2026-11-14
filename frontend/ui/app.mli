@@ -325,6 +325,8 @@ module Model : sig
     ; mode : Mode.t
     ; autocomplete : Autocomplete.t option
     ; sessions : P.Session_summary.t list option
+    ; known_sessions : (Session_link.Known.t[@sexp.opaque])
+      (** [sessions], whose ids the transcript highlights *)
     ; skills : P.Skill.t list Location_cache.t
     ; worktrees : P.Worktree.Listing.t Location_cache.t
     ; refs : P.Git_diff.Refs.t Location_cache.t

@@ -1058,7 +1058,8 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   `Pr_actions`; only list, view, checks, diff and comments are not
   `destructive`.
 - `Tool_sessions` — the model's `sessions` tool (`action` search, outline
-  or read; `query`, `session`, `from`, `before`, `limit`), made in
+  or read; `query`, `session`, `from`, `before`, `limit`), whose lines
+  are `ID DATE [title](?session=ID) cwd N messages` (`Session_link`), made in
   `bin/main.ml` with the world's `sessions_dir` (so within the namespace)
   and the agent's session id. It reads session files in the backend and
   changes nothing. A session is named by id or unique prefix (`find`), never
@@ -1634,6 +1635,12 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   `/change_default`) rereads the file and records the agent's current model
   and thinking level there; agents created without an explicit `-model`/
   `-thinking` start from them (a loaded session's own settings still win).
+- `Session_link` — a session's link, `?session=ID` (relative, so it works
+  at any address prigh-web is reached at), and `[title](?session=ID)`. The
+  `sessions` tool, `ask_session`'s answers and the system prompt's
+  Environment block (the session's own link, not for temporary sessions; a
+  fork's is the fork's) write them; the frontends follow them
+  (`Prigh_ui.Session_link` parses and resolves them).
 - `Session` — an append-only JSONL log forming a tree: every entry has a
   `parent` and `at`, when it was appended (seconds; optional, so files
   written before it load, without times; a fork keeps the copied entries'
@@ -2055,7 +2062,8 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   provider's `logout` is a flow owned by its caller like a login;
   `list_models` rereads the registry; `auth_status` entries of custom
   providers carry `custom: {base_url, api, api_label}`. The session methods
-  (`new_session`, `switch_session` by id or path, `fork`, `clone`, `import`)
+  (`new_session`, `switch_session` by id, a unique prefix of one, or path,
+  `fork`, `clone`, `import`)
   create or load an agent and move only the calling client (`new_session`,
   `switch_session`, `fork` and `clone` answer `{state}`, the new session's
   state, so a frontend needs no `get_state` round trip); `list_sessions`
@@ -2719,7 +2727,15 @@ terminal frontend and `web/` prigh-web, the browser one.
     shown queue and puts the text back, and `App.shown_queue` lists the
     focused agent's queue; `Agents_command` parses and completes `/agents
     steer|follow-up|cancel N`), `Commands` (slash table, parse, complete,
-    closest), `Model_match` (display-name/prefix/did-you-mean), `Markdown`,
+    closest), `Model_match` (display-name/prefix/did-you-mean), `Markdown`
+    (a session link is its title underlined in magenta and its short id,
+    dim, without OSC 8, which a relative link means nothing to; the ids of
+    `known_sessions`, the session list fetched at startup and on
+    `sessions_changed`, are underlined too), `Session_link` (shared with
+    prigh-web: parses `?session=`, `/?session=` and `prigh://session/ID`,
+    resolves an id or prefix against the session list to found, ambiguous
+    or missing with the closest, and finds the bare ids of known sessions
+    in text),
     `Btw_box` (the `/btw` panel above the composer: a newer question cancels
     and replaces it; Esc dismisses it before Esc's other meanings, so it
     never aborts the run), `Boxed` (the framed dialogs, with an optional
@@ -3796,6 +3812,18 @@ terminal frontend and `web/` prigh-web, the browser one.
       as Android and iOS require), `visibilitychange` and the favicon with
       a sodium dot while something is unseen; whether they are on is a
       preference (`web.notify`).
+    - Session links: `Session_link_view` draws links to `?session=` (and
+      the bare ids of the session list's sessions in text, inline code
+      that is all an id, and tool output; not code blocks or other links)
+      as `a.session-link` with `data-session-link`; the session list is in
+      the transcript's cache keys (`Known.stamp`). `app/`'s
+      `Session_link_listeners` (a capturing click and auxclick listener,
+      before the desktop app's external-link handler) asks
+      `Session_link_click.decide` which clicks are ours and sends
+      `Follow_session_link`: in place as a sidebar click
+      (`switch_session`), with Ctrl/⌘/Shift or the middle button
+      `Open_window`; an unknown id or an ambiguous prefix is a toast naming
+      the closest or the candidates.
     - Open in new window: `Command.Open_window` (the session menu's item,
       `Action.Open_session_window` from a Ctrl/⌘- or middle click in the
       sidebar) opens the page on `?session=ID` in another window

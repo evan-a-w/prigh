@@ -36,25 +36,33 @@ let code_block ?title ~lang ~text ~closed () =
     ]
 ;;
 
-let rec inline (i : Inline.t) =
+(* Inside a link, text is not linked again. *)
+let rec inline ?(linked = false) (i : Inline.t) =
   match i with
-  | Text s -> Node.text s
-  | Code s -> Node.code [ Node.text s ]
-  | Strong l -> Node.strong (inlines l)
-  | Emph l -> Node.em (inlines l)
-  | Strike l -> Node.del (inlines l)
+  | Text s when linked -> Node.text s
+  | Text s -> Node.fragment (Session_link_view.linkify s)
+  | Code s when linked -> Node.code [ Node.text s ]
+  | Code s ->
+    Option.value_or_thunk (Session_link_view.whole s) ~default:(fun () ->
+      Node.code [ Node.text s ])
+  | Strong l -> Node.strong (inlines ~linked l)
+  | Emph l -> Node.em (inlines ~linked l)
+  | Strike l -> Node.del (inlines ~linked l)
   | Break -> Node.br ()
   | Math { tex; display } -> Math_view.render ~display tex
   | Link { href; children } ->
-    Node.a
-      ~attrs:
-        [ Attr.href href
-        ; Attr.target "_blank"
-        ; Attr.create "rel" "noopener noreferrer"
-        ]
-      (inlines children)
+    (match Session_link.of_href href with
+     | Some id -> Session_link_view.anchor id (inlines ~linked:true children)
+     | None ->
+       Node.a
+         ~attrs:
+           [ Attr.href href
+           ; Attr.target "_blank"
+           ; Attr.create "rel" "noopener noreferrer"
+           ]
+         (inlines ~linked:true children))
 
-and inlines l = List.map l ~f:inline
+and inlines ?linked l = List.map l ~f:(inline ?linked)
 
 let align_attr (align : Markdown.Align.t) =
   match align with
@@ -143,9 +151,14 @@ let parts = String.Table.create ()
 
 let part text =
   if Hashtbl.length parts > 10_000 then Hashtbl.clear parts;
-  Hashtbl.find_or_add parts text ~default:(fun () ->
+  (* Drawn with the session list: its ids are links. *)
+  let known = Session_link_view.known () in
+  let key = sprintf "%d:%s" (Session_link.Known.stamp known) text in
+  Hashtbl.find_or_add parts key ~default:(fun () ->
     Node.lazy_
-      (lazy (Node.div ~attrs:(cls "md-part") (blocks ~streaming:false text))))
+      (lazy
+        (Session_link_view.within known (fun () ->
+           Node.div ~attrs:(cls "md-part") (blocks ~streaming:false text)))))
 ;;
 
 let render ?(streaming = false) text =

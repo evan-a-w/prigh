@@ -1156,6 +1156,7 @@ let install_listeners ~schedule ~current =
                    (App.update !current (Picker_choose (Js.to_string id)))))));
     Js._true);
   Chat_listeners.install ~schedule;
+  Session_link_listeners.install ~schedule;
   Gesture_listeners.install ~schedule;
   Dictation_widget.install ~schedule;
   Annotate_widget.install ~schedule;

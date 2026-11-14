@@ -139,7 +139,8 @@ let%expect_test "the tools and the system prompt of a chat" =
           List.filter (String.split_lines system) ~f:(fun l ->
             String.is_prefix l ~prefix:"- Date"
             || String.is_prefix l ~prefix:"- Working"
-            || String.is_prefix l ~prefix:"- OS")
+            || String.is_prefix l ~prefix:"- OS"
+            || String.is_prefix l ~prefix:"- This session")
           |> List.map ~f:(fun l -> String.prefix l 6)
       }];
   [%expect
@@ -163,7 +164,8 @@ let%expect_test "the tools and the system prompt of a chat" =
     - Each finished job or subagent reports automatically, in a message starting with "[job <id> exited <code>]" (or killed, failed) or "[subagent <id> finished]" (or failed, or out of turns: subagent_continue gives it more turns), sent by prigh, not typed by the user. You are woken by it even after you end your turn.
     - So while they run, keep working on whatever does not depend on them, or end your turn. Never sleep or poll to pass the time.
 
-    ((mentions_cwd false) (mentions_agents_md false) (environment ("- Date")))
+    ((mentions_cwd false) (mentions_agents_md false)
+     (environment ("- Date" "- This")))
     |}]
 ;;
 

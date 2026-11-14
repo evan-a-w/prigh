@@ -172,6 +172,32 @@ let%expect_test "fork copies the active path up to a point" =
   [%expect {| true |}]
 ;;
 
+let%expect_test "a fork's system prompt links the fork, not its parent" =
+  with_dir
+  @@ fun dir ->
+  let t = Session.create ~dir ~cwd:"/proj" () in
+  let (_ : Session.Entry.t) =
+    Session.set_system_prompt
+      t
+      ~text:("This session's link: " ^ Session_link.href (Session.id t))
+  in
+  let (_ : Session.Entry.t) = Session.append_message t (Message.user "q1") in
+  let forked = Or_error.ok_exn (Session.fork t ~dir) in
+  let show s =
+    Option.value_exn (Session.system_prompt s)
+    |> String.substr_replace_all ~pattern:(Session.id t) ~with_:"<parent>"
+    |> String.substr_replace_all ~pattern:(Session.id forked) ~with_:"<fork>"
+    |> print_endline
+  in
+  show t;
+  show forked;
+  [%expect
+    {|
+    This session's link: ?session=<parent>
+    This session's link: ?session=<fork>
+    |}]
+;;
+
 let%expect_test
     "the transcript filter: the last one counts, on any branch; kept by reload \
      and fork"

@@ -59,10 +59,10 @@ let create ~sessions_dir ~current ~questions () =
          | Ok asked ->
            Tool.Result.ok
              (sprintf
-                "asked %s%s as %s; its answer arrives later as a message: keep \
-                 working on what does not depend on it, or end your turn"
+                "asked %s %s as %s; its answer arrives later as a message: \
+                 keep working on what does not depend on it, or end your turn"
                 summary.id
-                (Option.value_map summary.name ~default:"" ~f:(sprintf " (%s)"))
+                (Tool_sessions.link summary)
                 asked.id)))
   in
   { Tool.spec; run }

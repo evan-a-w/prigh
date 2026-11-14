@@ -35,6 +35,7 @@ let serve backend =
            | "get_config" -> config_json
            | "forge_status" -> {|{"accounts":[]}|}
            | "list_models" -> models_json
+           | "list_sessions" -> "[]"
            | _ -> "null"
          in
          Transport.In_memory.Backend.send

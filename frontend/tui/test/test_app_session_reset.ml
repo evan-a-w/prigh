@@ -171,6 +171,7 @@ let%expect_test
     (Rpc (method_ auth_status) (params ()) (tag Auth_refresh))
     (Rpc (method_ forge_status) (params ()) (tag Forge_refresh))
     (Rpc (method_ get_config) (params ()) (tag Config))
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions_cache))
     ((mode   editing)
      (editor "my draft")
      (pending_confirms  ())

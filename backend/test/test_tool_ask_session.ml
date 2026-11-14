@@ -277,11 +277,13 @@ let%expect_test
     --- A ---
     user: ask B where the cache is
     assistant:  [ask_session {"session":"<B>","question":"Where is the cache?"}]
-    result: asked <B> (B) as q1; its answer arrives later as a message: keep working on what does not depend on it, or end your turn
+    result: asked <B> [B](?session=<B>) as q1; its answer arrives later as a message: keep working on what does not depend on it, or end your turn
     assistant: Asked B; waiting.
     user {Session B answered (q1)}: [session <B> (B) answered q1]
       |
       | The cache is in sessions/.
+      |
+      | [link to it: [B](?session=<B>)]
     assistant: B says the cache is in sessions/.
     --- B ---
     user {Session A asks (q1)}: [session <A> (A) asks q1]
@@ -344,16 +346,18 @@ let%expect_test
     --- A, before B's step ends ---
     user: ask B how far it is
     assistant:  [ask_session {"session":"<B>","question":"How far is the refactor?"}]
-    result: asked <B> (B) as q1; its answer arrives later as a message: keep working on what does not depend on it, or end your turn
+    result: asked <B> [B](?session=<B>) as q1; its answer arrives later as a message: keep working on what does not depend on it, or end your turn
     assistant: Asked.
     --- A ---
     user: ask B how far it is
     assistant:  [ask_session {"session":"<B>","question":"How far is the refactor?"}]
-    result: asked <B> (B) as q1; its answer arrives later as a message: keep working on what does not depend on it, or end your turn
+    result: asked <B> [B](?session=<B>) as q1; its answer arrives later as a message: keep working on what does not depend on it, or end your turn
     assistant: Asked.
     user {Session B answered (q1)}: [session <B> (B) answered q1]
       |
       | Half way: the parser is done.
+      |
+      | [link to it: [B](?session=<B>)]
     assistant: B is half way.
     --- B ---
     user: refactor the parser
@@ -420,11 +424,13 @@ let%expect_test
     --- A ---
     user: ask B for the number
     assistant:  [ask_session {"session":"<B>","question":"What is the number?"}]
-    result: asked <B> (B) as q1; its answer arrives later as a message: keep working on what does not depend on it, or end your turn
+    result: asked <B> [B](?session=<B>) as q1; its answer arrives later as a message: keep working on what does not depend on it, or end your turn
     assistant: Asked.
     user {Session B answered (q1)}: [session <B> (B) answered q1]
       |
       | 42.
+      |
+      | [link to it: [B](?session=<B>)]
     assistant: It is 42.
     --- B ---
     user {Session A asks (q1)}: [session <A> (A) asks q1]
@@ -483,24 +489,30 @@ let%expect_test
     --- A ---
     user: ask B
     assistant:  [ask_session {"session":"<B>","question":"Where does it live?"}]
-    result: asked <B> (B) as q1; its answer arrives later as a message: keep working on what does not depend on it, or end your turn
+    result: asked <B> [B](?session=<B>) as q1; its answer arrives later as a message: keep working on what does not depend on it, or end your turn
     assistant: Asked.
     user {Session B did not answer (q1)}: [session <B> (B) did not answer q1]
       |
       | Its run ended without answer_session; its last message:
       |
       | It lives in lib/cache.
+      |
+      | [link to it: [B](?session=<B>)]
     assistant:  [ask_session {"session":"<B>","question":"And the tests?"}]
-    result: asked <B> (B) as q2; its answer arrives later as a message: keep working on what does not depend on it, or end your turn
+    result: asked <B> [B](?session=<B>) as q2; its answer arrives later as a message: keep working on what does not depend on it, or end your turn
     user {Session B did not answer (q2)}: [session <B> (B) did not answer q2]
       |
       | Its run failed before it answered: provider down
+      |
+      | [link to it: [B](?session=<B>)]
     assistant:  [ask_session {"session":"<B>","question":"And the docs?"}]
-    result: asked <B> (B) as q3; its answer arrives later as a message: keep working on what does not depend on it, or end your turn
+    result: asked <B> [B](?session=<B>) as q3; its answer arrives later as a message: keep working on what does not depend on it, or end your turn
     assistant: Asked once more.
     user {Session B did not answer (q3)}: [session <B> (B) did not answer q3]
       |
       | Its run was aborted before it answered.
+      |
+      | [link to it: [B](?session=<B>)]
     assistant: Enough.
     --- B ---
     user {Session A asks (q1)}: [session <A> (A) asks q1]
@@ -584,10 +596,10 @@ let%expect_test
     assistant: None of that worked.
     user: ask B a lot
     assistant:  [ask_session {"session":"<B>","question":"Question 0?"}] [ask_session {"session":"<B>","question":"Question 1?"}] [ask_session {"session":"<B>","question":"Question 2?"}] [ask_session {"session":"<B>","question":"Question 3?"}] [ask_session {"session":"<B>","question":"Question 4?"}]
-    result: asked <B> (B) as q1; its answer arrives later as a message: keep working on what does not depend on it, or end your turn
-    result: asked <B> (B) as q2; its answer arrives later as a message: keep working on what does not depend on it, or end your turn
-    result: asked <B> (B) as q3; its answer arrives later as a message: keep working on what does not depend on it, or end your turn
-    result: asked <B> (B) as q4; its answer arrives later as a message: keep working on what does not depend on it, or end your turn
+    result: asked <B> [B](?session=<B>) as q1; its answer arrives later as a message: keep working on what does not depend on it, or end your turn
+    result: asked <B> [B](?session=<B>) as q2; its answer arrives later as a message: keep working on what does not depend on it, or end your turn
+    result: asked <B> [B](?session=<B>) as q3; its answer arrives later as a message: keep working on what does not depend on it, or end your turn
+    result: asked <B> [B](?session=<B>) as q4; its answer arrives later as a message: keep working on what does not depend on it, or end your turn
     result (error): <B> was not asked: 4 questions of this session are still open (q1, q2, q3, q4): wait for their answers, which arrive as messages
     assistant: Asked.
     |}];

@@ -1351,14 +1351,15 @@ let find_temporary t ~session ~key =
       session
 ;;
 
-(* The file of a saved session, by path or id. *)
+(* The file of a saved session, by path, id or a unique prefix of its id
+   (what the frontends show, and session links may hold). *)
 let saved_path t key =
   if Sys_unix.file_exists_exn key
   then session_file t key
-  else (
-    match List.find (saved_sessions t) ~f:(fun s -> String.equal s.id key) with
-    | Some summary -> Ok summary.path
-    | None -> Or_error.errorf "no session %S" key)
+  else
+    Or_error.map
+      (Session.find_summary (saved_sessions t) key)
+      ~f:(fun s -> s.path)
 ;;
 
 (* Finds a live session by id or path, or loads it from disk for [client]

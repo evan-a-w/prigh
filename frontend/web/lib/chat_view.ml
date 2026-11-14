@@ -394,10 +394,12 @@ module Deps = struct
     ; filter : Transcript_filter.t
     ; ui : Ui_context.Page.t option
       (** with a [render_ui] call: what its components show *)
+    ; sessions : int (** {!Session_link_view.stamp} *)
     }
 
   let equal a b =
     a.n = b.n
+    && a.sessions = b.sessions
     && Transcript_filter.equal a.filter b.filter
     && Option.equal More.equal a.more b.more
     && Bool.equal a.running b.running
@@ -426,10 +428,12 @@ module Chat_deps = struct
     ; deleting : Int.Set.t
     ; dividers : Divider.t list
     ; ui : Ui_context.Page.t
+    ; sessions : int
     }
 
   let equal a b =
-    Message_time.equal a.times b.times
+    a.sessions = b.sessions
+    && Message_time.equal a.times b.times
     && Fold.equal a.fold b.fold
     && Option.equal Menu.equal a.menu b.menu
     && Option.equal phys_equal a.index b.index
@@ -649,6 +653,7 @@ and entry ?menu ?index ~ui ~fold times chat ~n (entry : Chat.Entry.t) =
                Option.exists tool ~f:(fun t ->
                  String.equal t.call.name "render_ui")))
             ui
+      ; sessions = Session_link_view.stamp ()
       }
     ~equal:Deps.equal
     ~f:(fun () ->
@@ -706,7 +711,16 @@ and view
   View_cache.find
     chats
     chat
-    ~deps:{ Chat_deps.times; fold; menu; index; deleting; dividers; ui }
+    ~deps:
+      { Chat_deps.times
+      ; fold
+      ; menu
+      ; index
+      ; deleting
+      ; dividers
+      ; ui
+      ; sessions = Session_link_view.stamp ()
+      }
     ~equal:Chat_deps.equal
     ~f:(fun () ->
       entries_view ?menu ?index ~ui ~deleting ~dividers ~fold times chat)
