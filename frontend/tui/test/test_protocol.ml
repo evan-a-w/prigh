@@ -85,6 +85,7 @@ let%expect_test "state event and messages" =
         (resume_at        ())
         (approval_mode Auto)
         (plan_mode     false)
+        (chat_mode     false)
         (plan          ())
         (session_rules ()))))
     (Event (Message_start (User ((text hi)))))
@@ -437,6 +438,7 @@ let%expect_test "tool host events and state hosts" =
         (resume_at  ())
         (approval_mode Auto)
         (plan_mode     false)
+        (chat_mode     false)
         (plan          ())
         (session_rules ()))))
     |}]

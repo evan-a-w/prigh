@@ -3277,10 +3277,12 @@ let set_default_mode (m : Model.t) (approval_mode : Approval_mode.t) =
     { m with
       state =
         Option.map m.state ~f:(fun s ->
-          { s with approval_mode; plan_mode = false })
+          { s with approval_mode; plan_mode = false; chat_mode = false })
     }
   in
-  let mode : Session_mode.t = { approval = approval_mode; plan = false } in
+  let mode : Session_mode.t =
+    { approval = approval_mode; plan = false; chat = false }
+  in
   save_config
     m
     { (config m) with approval_mode }
@@ -3306,7 +3308,12 @@ let set_mode (m : Model.t) (mode : Session_mode.t) =
     let m =
       { m with
         state =
-          Some { s with approval_mode = mode.approval; plan_mode = mode.plan }
+          Some
+            { s with
+              approval_mode = mode.approval
+            ; plan_mode = mode.plan
+            ; chat_mode = mode.chat
+            }
       ; pending = { m.pending with mode = Some mode }
       }
     in
@@ -3522,14 +3529,31 @@ let plan_mode (m : Model.t) arg =
   current_state m ~f:(fun s ->
     let mode = Session_mode.of_state s in
     match arg with
-    | "" -> set_mode m { mode with plan = not s.plan_mode }
-    | "on" -> set_mode m { mode with plan = true }
+    | "" ->
+      let on = s.chat_mode || not s.plan_mode in
+      set_mode m { mode with plan = on; chat = mode.chat && not on }
+    | "on" -> set_mode m { mode with plan = true; chat = false }
     | "off" -> set_mode m { mode with plan = false }
     | other ->
       error
         m
         (sprintf
            "Unknown argument “%s”: use /plan on, /plan off, or /plan to toggle."
+           other))
+;;
+
+let chat_mode (m : Model.t) arg =
+  current_state m ~f:(fun s ->
+    let mode = Session_mode.of_state s in
+    match arg with
+    | "" when s.chat_mode -> set_mode m (Session_mode.leaving_chat mode)
+    | "" | "on" -> set_mode m { mode with chat = true }
+    | "off" -> set_mode m (Session_mode.leaving_chat mode)
+    | other ->
+      error
+        m
+        (sprintf
+           "Unknown argument “%s”: use /chat on, /chat off, or /chat to toggle."
            other))
 ;;
 
@@ -6467,6 +6491,7 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
   | "mode", "" -> mode_picker m
   | "mode", name -> mode_by_name m name
   | "plan", arg -> plan_mode m arg
+  | "chat", arg -> chat_mode m arg
   | "todos", _ -> show_plan m
   | "permissions", _ -> show_permissions m
   | "confirm", ("on" | "true") -> set_confirm m true

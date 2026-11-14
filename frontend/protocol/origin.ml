@@ -6,6 +6,7 @@ module Kind = struct
     | Cwd
     | Tools
     | Plan_mode
+    | Chat_mode
     | Delivery
     | Handover
     | Goal
@@ -29,6 +30,7 @@ module Kind = struct
     | "cwd" -> Cwd
     | "tools" | "editor" -> Tools
     | "plan_mode" -> Plan_mode
+    | "chat_mode" -> Chat_mode
     | "delivery" -> Delivery
     | "handover" -> Handover
     | "goal" -> Goal

@@ -21,6 +21,7 @@ let popup (m : App.Model.t) ~inject =
       | Argument Confirm -> "Tool confirmation"
       | Argument Mode -> "Modes"
       | Argument Plan -> "Plan mode"
+      | Argument Chat -> "Chat mode"
       | Argument Session -> "Sessions"
       | Argument Host -> "Hosts"
       | Argument User -> "Users"

@@ -62,7 +62,8 @@ let%expect_test "Alt+M cycles the mode; the status line shows it at once" =
       (method_ set_mode)
       (params (
         (approval_mode auto-edit)
-        (plan_mode     false)))
+        (plan_mode     false)
+        (chat_mode     false)))
       (tag (
         Mode_set
         "mode: auto-edit \226\128\148 file edits run; bash, job_input and MCP tools ask first")))
@@ -80,26 +81,29 @@ let%expect_test "Alt+M cycles the mode; the status line shows it at once" =
       (method_ set_mode)
       (params (
         (approval_mode auto)
-        (plan_mode     true)))
+        (plan_mode     true)
+        (chat_mode     false)))
       (tag (
         Mode_set
         "mode: plan \226\128\148 read-only planning, until you leave it (/plan off or Alt+M): no file edits; bash, job_input and MCP tools ask first")))
     (Rpc
       (method_ set_mode)
       (params (
-        (approval_mode ask)
-        (plan_mode     false)))
+        (approval_mode auto)
+        (plan_mode     true)
+        (chat_mode     true)))
       (tag (
         Mode_set
-        "mode: ask \226\128\148 bash, job_input, edits and MCP tools ask first")))
+        "mode: chat \226\128\148 a chat without the tool host: no files, commands or project, only the web and other host-free tools, until you leave it (/chat off or Alt+M)")))
     (Rpc
       (method_ set_mode)
       (params (
-        (approval_mode auto-edit)
-        (plan_mode     false)))
+        (approval_mode ask)
+        (plan_mode     false)
+        (chat_mode     false)))
       (tag (
         Mode_set
-        "mode: auto-edit \226\128\148 file edits run; bash, job_input and MCP tools ask first")))
+        "mode: ask \226\128\148 bash, job_input, edits and MCP tools ask first")))
     |}];
   (* A refusal puts the backend's mode back. *)
   H.reply_error h (Mode_set "x") "unknown approval mode";
@@ -129,12 +133,13 @@ let%expect_test "/mode picks or sets the mode; /plan toggles plan mode" =
 
     ▌ earlier question
       earlier answer
-    Mode (Alt+M cycles)  (4)
+    Mode (Alt+M cycles)  (5)
     / ▏
        ask        bash, job_input, edits and MCP tools ask first
     ▸* auto-edit  file edits run; bash, job_input and MCP tools…
        auto       tools run without asking
        plan       read-only planning, until you leave it (/plan…
+       chat       a chat without the tool host: no files, comma…
     ────────────────────────────────────────────────────────────
     >
     deepseek-flash  ctx:0.1%/1.0M  Enter selects · Esc closes
@@ -147,7 +152,8 @@ let%expect_test "/mode picks or sets the mode; /plan toggles plan mode" =
       (method_ set_mode)
       (params (
         (approval_mode auto-edit)
-        (plan_mode     true)))
+        (plan_mode     true)
+        (chat_mode     false)))
       (tag (
         Mode_set
         "mode: plan \226\128\148 read-only planning, until you leave it (/plan off or Alt+M): no file edits; bash, job_input and MCP tools ask first")))
@@ -175,7 +181,8 @@ let%expect_test "/mode picks or sets the mode; /plan toggles plan mode" =
       (method_ set_mode)
       (params (
         (approval_mode auto-edit)
-        (plan_mode     false)))
+        (plan_mode     false)
+        (chat_mode     false)))
       (tag (
         Mode_set
         "mode: auto-edit \226\128\148 file edits run; bash, job_input and MCP tools ask first")))
@@ -183,7 +190,8 @@ let%expect_test "/mode picks or sets the mode; /plan toggles plan mode" =
       (method_ set_mode)
       (params (
         (approval_mode auto-edit)
-        (plan_mode     true)))
+        (plan_mode     true)
+        (chat_mode     false)))
       (tag (
         Mode_set
         "mode: plan \226\128\148 read-only planning, until you leave it (/plan off or Alt+M): no file edits; bash, job_input and MCP tools ask first")))
@@ -191,7 +199,8 @@ let%expect_test "/mode picks or sets the mode; /plan toggles plan mode" =
       (method_ set_mode)
       (params (
         (approval_mode ask)
-        (plan_mode     false)))
+        (plan_mode     false)
+        (chat_mode     false)))
       (tag (
         Mode_set
         "mode: ask \226\128\148 bash, job_input, edits and MCP tools ask first")))

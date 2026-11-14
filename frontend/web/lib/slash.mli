@@ -19,6 +19,7 @@ module Argument : sig
     | Confirm
     | Mode
     | Plan
+    | Chat
     | Notify (** [on] or [off] *)
     | Memory (** [on] or [off] *)
     | Instructions (** [on] or [off] *)
