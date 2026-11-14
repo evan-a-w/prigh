@@ -423,12 +423,7 @@ let mode_part (s : P.State.t) =
   @
   if mode.chat
   then
-    [ ( 5
-      , [ span
-            ~style:gray
-            (sprintf "(no tool host; %s leaves)" Session_mode.leave_chat)
-        ] )
-    ]
+    [ 5, [ span ~style:gray (sprintf "(%s leaves)" Session_mode.leave_chat) ] ]
   else if mode.plan
   then [ 5, [ span ~style:gray (sprintf "(%s leaves)" Session_mode.leave) ] ]
   else []
