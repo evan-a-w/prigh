@@ -43,7 +43,9 @@ let tail_lines text n =
 ;;
 
 let pre text =
-  if String.is_empty text then Node.none else Node.pre [ Node.text text ]
+  if String.is_empty text
+  then Node.none
+  else Node.pre (Session_link_view.linkify text)
 ;;
 
 let note cls text = Node.div ~attrs:[ Attr.class_ cls ] [ Node.text text ]

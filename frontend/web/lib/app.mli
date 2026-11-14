@@ -544,6 +544,13 @@ module Action : sig
     | Open_session_window of string
     (** a session (its id) in a new window ({!Command.Open_window}): a
         Ctrl or Cmd click or a middle click on it in the sidebar *)
+    | Follow_session_link of
+        { id : string (** or a prefix of it *)
+        ; new_window : bool
+        }
+    (** a click on a session link ({!Session_link_view}): the session it
+        names, in place or (a modifier or middle click) in a new window;
+        a toast says when the user has no such session *)
     | Ask_delete of string
     (** path; the marked sessions instead when it is one of them *)
     | Select_sessions of bool (** the sidebar's selection mode, on or off *)

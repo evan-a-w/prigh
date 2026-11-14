@@ -333,6 +333,9 @@ mod tests {
         assert_eq!(decide("https://ai.example.com/#app=desktop&host=laptop", site), External);
         assert_eq!(decide("https://ai.example.com/#app=desktop&host=laptop", both), Allow);
         assert_eq!(decide("https://ai.example.com:443/files/x", both), Allow);
+        // a session link ("Open in new window"'s, or one the model wrote in full)
+        assert_eq!(decide("https://ai.example.com/?session=6cad9f6e#app=desktop", both), Allow);
+        assert_eq!(decide("http://127.0.0.1:7790/?session=6cad9f6e", both), Allow);
         assert_eq!(decide("http://ai.example.com/", both), External);
         assert_eq!(decide("https://evil.example/", both), External);
         // quitting, from any of them
