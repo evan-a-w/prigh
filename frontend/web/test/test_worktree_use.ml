@@ -63,7 +63,8 @@ let switch ?cwd h id =
 let%expect_test "a pinned session's worktrees show, however old" =
   let h = create () in
   sidebar h;
-  [%expect {|
+  [%expect
+    {|
     Pinned 1
     (Pinned 3d ago prigh main) (1) (More (right-click, Shift+F10)) (Archive) (Delete)
     (feat/pinned)
@@ -79,7 +80,8 @@ let%expect_test "opening a session is using it" =
   switch h "old";
   switch h "here";
   sidebar h;
-  [%expect {|
+  [%expect
+    {|
     Pinned 1
     (Pinned 3d ago prigh main) (1) (More (right-click, Shift+F10)) (Archive) (Delete)
     (feat/pinned)
@@ -94,7 +96,8 @@ let%expect_test "opening a session is using it" =
 let%expect_test "the session the user is in shows its worktrees" =
   let h = create ~current:"old" () in
   sidebar h;
-  [%expect {|
+  [%expect
+    {|
     Pinned 1
     (Pinned 3d ago prigh main) (1) (More (right-click, Shift+F10)) (Archive) (Delete)
     (feat/pinned)
@@ -121,7 +124,8 @@ let%expect_test "a session working in another's worktree uses it" =
       ()
   in
   sidebar h;
-  [%expect {|
+  [%expect
+    {|
     Pinned 1
     (Pinned 3d ago prigh main) (1) (More (right-click, Shift+F10)) (Archive) (Delete)
     (feat/pinned)
@@ -151,7 +155,8 @@ let%expect_test "a running session stays used while the page is open" =
   H.quiet h (fun () ->
     H.act h (Tick (Time_ns.add H.now (Time_ns.Span.of_hr 13.))));
   sidebar h;
-  [%expect {|
+  [%expect
+    {|
     Pinned 1
     (Pinned 3d ago prigh main) (1) (More (right-click, Shift+F10)) (Archive) (Delete)
     (feat/pinned)
@@ -166,9 +171,12 @@ let%expect_test "a running session stays used while the page is open" =
 
 let%expect_test "a fold from before (the old preference) does not stick" =
   let h = create () in
-  H.event h {|{"event":"prefs_changed","prefs":{"web.sidebar-folded":["here"]}}|};
+  H.event
+    h
+    {|{"event":"prefs_changed","prefs":{"web.sidebar-folded":["here"]}}|};
   sidebar h;
-  [%expect {|
+  [%expect
+    {|
     (Cache_prefs (((key web.sidebar-folded) (value ((here))))))
     Pinned 1
     (Pinned 3d ago prigh main) (1) (More (right-click, Shift+F10)) (Archive) (Delete)
@@ -179,7 +187,6 @@ let%expect_test "a fold from before (the old preference) does not stick" =
     (Old 3d ago prigh main) (1) (More (right-click, Shift+F10)) (Archive) (Delete)
     |}]
 ;;
-
 
 (* Each session, [+] its worktrees shown or [-] folded. *)
 let folds h =
@@ -193,8 +200,7 @@ let folds h =
 ;;
 
 let at h time =
-  H.quiet h (fun () ->
-    H.act h (Tick (Time_ns.of_string_with_utc_offset time)))
+  H.quiet h (fun () -> H.act h (Tick (Time_ns.of_string_with_utc_offset time)))
 ;;
 
 let toggle h id = H.quiet h (fun () -> H.act h (Toggle_folded id))
@@ -213,7 +219,8 @@ let%expect_test "a hand fold holds until the session is next opened" =
   toggle h "here";
   at h "2026-10-05 12:00:00Z";
   folds h;
-  [%expect {|
+  [%expect
+    {|
     - Here
     - Old
     + Pinned
@@ -221,7 +228,8 @@ let%expect_test "a hand fold holds until the session is next opened" =
   (* Going elsewhere keeps it. *)
   switch h "old";
   folds h;
-  [%expect {|
+  [%expect
+    {|
     - Here
     + Old
     + Pinned
@@ -229,7 +237,8 @@ let%expect_test "a hand fold holds until the session is next opened" =
   (* Going back in: the fold has had its day. *)
   switch h "here";
   folds h;
-  [%expect {|
+  [%expect
+    {|
     + Here
     + Old
     + Pinned
@@ -256,13 +265,16 @@ let%expect_test "a fold made in the session holds, there and after" =
     |}]
 ;;
 
-let%expect_test "an old session unfolded by hand folds again after its next visit" =
+let%expect_test
+    "an old session unfolded by hand folds again after its next visit"
+  =
   let h = create () in
   at h "2026-10-05 10:01:00Z";
   toggle h "old";
   at h "2026-10-07 10:00:00Z";
   folds h;
-  [%expect {|
+  [%expect
+    {|
     + Here
     + Old
     + Pinned
@@ -325,7 +337,8 @@ let%expect_test "visits in another browser count; the later of each wins" =
   at h "2026-10-05 10:01:00Z";
   toggle h "pinned";
   folds h;
-  [%expect {|
+  [%expect
+    {|
     + Here
     - Old
     - Pinned
@@ -397,7 +410,8 @@ let%expect_test "visits before the preferences came are uploaded, if newer" =
   start
     ~cached:{|{"old":"2026-10-05 08:00:00Z"}|}
     ~backend:{|{"old":"2026-10-05 09:00:00Z"}|};
-  [%expect {|
+  [%expect
+    {|
     set_prefs prefs {"web.sidebar-opened":{"here":"2026-10-05 10:00:00Z","old":"2026-10-05 09:00:00Z"}}
     {"here":"2026-10-05 10:00:00Z","old":"2026-10-05 09:00:00Z"}
     |}];
@@ -405,14 +419,14 @@ let%expect_test "visits before the preferences came are uploaded, if newer" =
   start
     ~cached:{|{"old":"2026-10-05 08:00:00Z"}|}
     ~backend:{|{"old":"2026-10-05 09:00:00Z","here":"2026-10-05 10:00:00Z"}|};
-  [%expect {| {"here":"2026-10-05 10:00:00Z","old":"2026-10-05 09:00:00Z"} |}]
-;
+  [%expect {| {"here":"2026-10-05 10:00:00Z","old":"2026-10-05 09:00:00Z"} |}];
   (* A visit cached from an earlier page, later than the backend's, goes up
      too. *)
   start
     ~cached:{|{"old":"2026-10-05 09:30:00Z"}|}
     ~backend:{|{"old":"2026-10-05 09:00:00Z","here":"2026-10-05 10:00:00Z"}|};
-  [%expect {|
+  [%expect
+    {|
     set_prefs prefs {"web.sidebar-opened":{"here":"2026-10-05 10:00:00Z","old":"2026-10-05 09:30:00Z"}}
     {"here":"2026-10-05 10:00:00Z","old":"2026-10-05 09:30:00Z"}
     |}]
@@ -425,7 +439,8 @@ let%expect_test "0 hours folds them all, pinned and the open session too" =
       h
       {|{"event":"prefs_changed","prefs":{"web.sidebar-worktree-hours":0}}|});
   folds h;
-  [%expect {|
+  [%expect
+    {|
     - Here
     - Old
     - Pinned

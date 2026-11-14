@@ -309,9 +309,8 @@ let worktree_hours (m : App.Model.t) ~inject =
     ~about:
       (sprintf
          "Show worktrees for pinned sessions and those used %s (changed, \
-          running, opened or worked in); others fold them behind their \
-          count. Your own fold or unfold of a session holds until you next \
-          open it."
+          running, opened or worked in); others fold them behind their count. \
+          Your own fold or unfold of a session holds until you next open it."
          (if hours = 0
           then "recently"
           else "in the last " ^ Worktree_folds.hours_string hours))

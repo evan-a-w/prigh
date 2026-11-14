@@ -3372,7 +3372,7 @@ fits: true
 + Fresh work: fix/fresh
 - Old work
 === webkit: sessions settings: the settings ===
-Show worktrees | Your account | Show worktrees for sessions used in the last 12 hours; older ones fold them behind their count. Your own fold or unfold of a session wins. | hours
+Show worktrees | Your account | Show worktrees for pinned sessions and those used in the last 12 hours (changed, running, opened or worked in); others fold them behind their count. Your own fold or unfold of a session holds until you next open it. | hours
 Archive after | Sessions without activity for 7 days move to Archived (pinned and running ones never do). | days
 fields: "12" hours, "7" days
 === webkit: sessions settings: 100 hours ===
@@ -3387,14 +3387,14 @@ fields: "12" hours, "7" days
 === webkit: sessions settings: refused ===
 “a fortnight” isn't a number of days from 0 to 365: type one like 7, or off to archive only by hand.
 === webkit: sessions settings: archive after 2 days ===
-Show worktrees | Your account | Show worktrees for sessions used recently; older ones fold them behind their count. Your own fold or unfold of a session wins. | Off: every session's worktrees start folded.
+Show worktrees | Your account | Show worktrees for pinned sessions and those used recently (changed, running, opened or worked in); others fold them behind their count. Your own fold or unfold of a session holds until you next open it. | Off: every session's worktrees fold, pinned ones too.
 Archive after | Sessions without activity for 2 days move to Archived (pinned and running ones never do). | days
 fields: hidden hours, "2" days
 archive_after_days=2
 - Fresh work
 archived: Archived 1
 === webkit: sessions settings: switched on again ===
-Show worktrees | Your account | Show worktrees for sessions used in the last 100 hours; older ones fold them behind their count. Your own fold or unfold of a session wins. | hours
+Show worktrees | Your account | Show worktrees for pinned sessions and those used in the last 100 hours (changed, running, opened or worked in); others fold them behind their count. Your own fold or unfold of a session holds until you next open it. | hours
 Archive after | Sessions without activity for 2 days move to Archived (pinned and running ones never do). | days
 fields: "100" hours, "2" days
 === webkit: sessions settings: phone 390x844: sidebar ===

@@ -742,16 +742,21 @@ let view (m : App.Model.t) ~inject =
                ~archived_open:m.archived_open
            in
            (match pinned with
-            | [] -> List.map active ~f:(session m ~inject ~current ~worktrees_shown)
+            | [] ->
+              List.map active ~f:(session m ~inject ~current ~worktrees_shown)
             | pinned ->
               (group_heading "Pinned" pinned
-               :: List.map pinned ~f:(session m ~inject ~current ~worktrees_shown))
+               :: List.map
+                    pinned
+                    ~f:(session m ~inject ~current ~worktrees_shown))
               @
                 (match active with
                 | [] -> []
                 | active ->
                   group_heading "Recent" active
-                  :: List.map active ~f:(session m ~inject ~current ~worktrees_shown)))
+                  :: List.map
+                       active
+                       ~f:(session m ~inject ~current ~worktrees_shown)))
            @
              (match archived with
              | [] -> []
@@ -760,7 +765,9 @@ let view (m : App.Model.t) ~inject =
                ::
                (if shown
                 then
-                  List.map archived ~f:(session m ~inject ~current ~worktrees_shown)
+                  List.map
+                    archived
+                    ~f:(session m ~inject ~current ~worktrees_shown)
                   @
                   if m.marks.selecting
                   then []

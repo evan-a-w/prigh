@@ -10,7 +10,8 @@ module Times = struct
     let at =
       Time_ns.of_span_since_epoch
         (Time_ns.Span.of_sec
-           (Float.round_down (Time_ns.Span.to_sec (Time_ns.to_span_since_epoch at))))
+           (Float.round_down
+              (Time_ns.Span.to_sec (Time_ns.to_span_since_epoch at))))
     in
     String.substr_replace_first
       (Time_ns.to_string_utc at)
@@ -116,7 +117,10 @@ module Use = struct
     }
 
   let none = { used = None; opened = None }
-  let merge a b = { used = later a.used b.used; opened = later a.opened b.opened }
+
+  let merge a b =
+    { used = later a.used b.used; opened = later a.opened b.opened }
+  ;;
 end
 
 (* The sessions whose worktrees hold [dir]: [owners] by worktree path, up
@@ -141,20 +145,29 @@ let uses t ~now ~(current : Current.t option) sessions =
     { Use.used = later (later changed opened) busy; opened }
   in
   let owners =
-    List.fold sessions ~init:String.Map.empty ~f:(fun owners (s : Session_summary.t) ->
-      List.fold s.worktrees ~init:owners ~f:(fun owners (w : Session_worktree.t) ->
-        Map.add_multi owners ~key:w.path ~data:s.id))
+    List.fold
+      sessions
+      ~init:String.Map.empty
+      ~f:(fun owners (s : Session_summary.t) ->
+        List.fold
+          s.worktrees
+          ~init:owners
+          ~f:(fun owners (w : Session_worktree.t) ->
+            Map.add_multi owners ~key:w.path ~data:s.id))
   in
-  List.fold sessions ~init:String.Map.empty ~f:(fun uses (s : Session_summary.t) ->
-    let use = own s in
-    let cwd =
-      match current with
-      | Some c when is_current s -> c.cwd
-      | _ -> s.cwd
-    in
-    List.fold (s.id :: owners_of owners cwd) ~init:uses ~f:(fun uses id ->
-      Map.update uses id ~f:(fun before ->
-        Use.merge use (Option.value before ~default:Use.none))))
+  List.fold
+    sessions
+    ~init:String.Map.empty
+    ~f:(fun uses (s : Session_summary.t) ->
+      let use = own s in
+      let cwd =
+        match current with
+        | Some c when is_current s -> c.cwd
+        | _ -> s.cwd
+      in
+      List.fold (s.id :: owners_of owners cwd) ~init:uses ~f:(fun uses id ->
+        Map.update uses id ~f:(fun before ->
+          Use.merge use (Option.value before ~default:Use.none))))
 ;;
 
 let shown t ~now ~current sessions =
@@ -212,7 +225,10 @@ let set_unfolded t value = { t with unfolded = Times.of_pref value }
 let merge_opened t value =
   { t with
     opened =
-      Map.merge_skewed t.opened (Times.of_pref value) ~combine:(fun ~key:_ a b -> Time_ns.max a b)
+      Map.merge_skewed
+        t.opened
+        (Times.of_pref value)
+        ~combine:(fun ~key:_ a b -> Time_ns.max a b)
   }
 ;;
 

@@ -2708,18 +2708,17 @@ let prefs_loaded (m : Model.t) changes =
       |> Option.join
     in
     if Worktree_folds.opened_ahead m.worktree_folds theirs
-    then
-      save_pref m Key.opened (Worktree_folds.opened_pref m.worktree_folds)
+    then save_pref m Key.opened (Worktree_folds.opened_pref m.worktree_folds)
     else []
   in
   (* The page may show another account's, from the browser's cache. *)
   ( m
-  , Command.Apply_theme (Model.look m)
-    :: Command.Cache_prefs applied
-    ::
-    (if List.is_empty upload
-     then []
-     else [ rpc "set_prefs" (Prefs.set_params upload) ])
+  , (Command.Apply_theme (Model.look m)
+     :: Command.Cache_prefs applied
+     ::
+     (if List.is_empty upload
+      then []
+      else [ rpc "set_prefs" (Prefs.set_params upload) ]))
     @ opened )
 ;;
 
