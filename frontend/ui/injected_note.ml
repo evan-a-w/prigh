@@ -6,6 +6,7 @@ let glyph : P.Origin.Kind.t -> string = function
   | Cwd -> "⌂"
   | Tools -> "±"
   | Plan_mode -> "◇"
+  | Chat_mode -> "◌"
   | Delivery -> "↩"
   | Handover -> "↪"
   | Goal -> "◎"

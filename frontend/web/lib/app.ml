@@ -228,6 +228,8 @@ module Reply_tag = struct
     | Plan_switched of Context_menu.Plan.t
     | Plan_entered of Context_menu.Plan.t
     | Mode_set of string
+    | Chat_then_send of string
+    (** [set_mode] to chat mode, the draft then sent (with the toast) *)
     | Model_set
     | Filter_saved of string
     | Thinking_set
@@ -478,6 +480,7 @@ module Action = struct
     | Set_model of string
     | Set_thinking of string
     | Set_mode of Session_mode.t
+    | Chat_without_host
     | Open_chip of Chip.t
     | Open_filter (** the transcript filter's menu; again: closes it *)
     | Filter_press of Filter_menu.Row.t option
@@ -3398,10 +3401,12 @@ let set_default_mode (m : Model.t) (approval_mode : Approval_mode.t) =
     { m with
       state =
         Option.map m.state ~f:(fun s ->
-          { s with approval_mode; plan_mode = false })
+          { s with approval_mode; plan_mode = false; chat_mode = false })
     }
   in
-  let mode : Session_mode.t = { approval = approval_mode; plan = false } in
+  let mode : Session_mode.t =
+    { approval = approval_mode; plan = false; chat = false }
+  in
   save_config
     m
     { (config m) with approval_mode }
@@ -3421,13 +3426,19 @@ let mode_text (mode : Session_mode.t) =
   sprintf "Mode: %s (%s)" (Session_mode.label mode) (Session_mode.describe mode)
 ;;
 
-(* Shown at once; [set_mode]'s reply is the backend's state. *)
-let set_mode (m : Model.t) (mode : Session_mode.t) =
+(* Shown at once; [set_mode]'s reply is the backend's state ([then_send]:
+   the draft is sent then). *)
+let set_mode ?(then_send = false) (m : Model.t) (mode : Session_mode.t) =
   current_state m ~f:(fun s ->
     let m =
       { m with
         state =
-          Some { s with approval_mode = mode.approval; plan_mode = mode.plan }
+          Some
+            { s with
+              approval_mode = mode.approval
+            ; plan_mode = mode.plan
+            ; chat_mode = mode.chat
+            }
       ; pending = { m.pending with mode = Some mode }
       }
     in
@@ -3435,7 +3446,10 @@ let set_mode (m : Model.t) (mode : Session_mode.t) =
     , [ rpc
           "set_mode"
           (Session_mode.params mode)
-          ~tag:(Mode_set (mode_text mode))
+          ~tag:
+            (if then_send
+             then Chat_then_send (mode_text mode)
+             else Mode_set (mode_text mode))
       ] ))
 ;;
 
@@ -3643,14 +3657,31 @@ let plan_mode (m : Model.t) arg =
   current_state m ~f:(fun s ->
     let mode = Session_mode.of_state s in
     match arg with
-    | "" -> set_mode m { mode with plan = not s.plan_mode }
-    | "on" -> set_mode m { mode with plan = true }
+    | "" ->
+      let on = s.chat_mode || not s.plan_mode in
+      set_mode m { mode with plan = on; chat = mode.chat && not on }
+    | "on" -> set_mode m { mode with plan = true; chat = false }
     | "off" -> set_mode m { mode with plan = false }
     | other ->
       error
         m
         (sprintf
            "Unknown argument “%s”: use /plan on, /plan off, or /plan to toggle."
+           other))
+;;
+
+let chat_mode (m : Model.t) arg =
+  current_state m ~f:(fun s ->
+    let mode = Session_mode.of_state s in
+    match arg with
+    | "" when s.chat_mode -> set_mode m (Session_mode.leaving_chat mode)
+    | "" | "on" -> set_mode m { mode with chat = true }
+    | "off" -> set_mode m (Session_mode.leaving_chat mode)
+    | other ->
+      error
+        m
+        (sprintf
+           "Unknown argument “%s”: use /chat on, /chat off, or /chat to toggle."
            other))
 ;;
 
@@ -6597,6 +6628,7 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
   | "mode", "" -> mode_picker m
   | "mode", name -> mode_by_name m name
   | "plan", arg -> plan_mode m arg
+  | "chat", arg -> chat_mode m arg
   | "todos", _ -> show_plan m
   | "permissions", _ -> show_permissions m
   | "confirm", ("on" | "true") -> set_confirm m true
@@ -8349,8 +8381,8 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
     (* Shown removed at once: the backend's queue is the truth. *)
     let m, cmds = error m (String.capitalize e) in
     m, cmds @ [ rpc "get_pending" [] ~tag:Pending ]
-  | Mode_set _, Error e ->
-    (* The mode shown at once was not taken. *)
+  | (Mode_set _ | Chat_then_send _), Error e ->
+    (* The mode shown at once was not taken (the draft stays). *)
     let m, cmds =
       error
         { m with pending = { m.pending with mode = None } }
@@ -8795,6 +8827,11 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
         ~confirms:pending.confirms
         ~questions:pending.questions)
   | Mode_set notice, Ok json ->
+    decode m json State.of_json ~f:(fun state ->
+      let m, cmds = set_state m state in
+      let m, toast_cmds = toast m ~replaces:[ "Mode: " ] notice in
+      m, cmds @ toast_cmds)
+  | Chat_then_send notice, Ok json ->
     decode m json State.of_json ~f:(fun state ->
       let m, cmds = set_state m state in
       let m, toast_cmds = toast m ~replaces:[ "Mode: " ] notice in
@@ -9549,6 +9586,20 @@ let invokes_skill ({ name; _ } : Slash.Parsed.t) =
   | None -> false
 ;;
 
+(* "No tool host connected", from the backend's reason. *)
+let no_host_headline reason =
+  String.capitalize
+    (String.strip
+       (Option.value_map (String.lsplit2 reason ~on:':') ~default:reason ~f:fst))
+;;
+
+(* Why a message cannot start a run: no tool host, outside chat mode. *)
+let no_host (m : Model.t) =
+  match m.state with
+  | Some s when not s.chat_mode -> s.no_host
+  | Some _ | None -> None
+;;
+
 let send (m : Model.t) ~follow_up =
   let text = String.strip m.draft in
   (* The errors were about what was sent before. *)
@@ -9637,6 +9688,13 @@ let send (m : Model.t) ~follow_up =
        let m, save = sent m in
        let m, cmds = message_agent m ~agent ~text ~follow_up ~draft:text in
        m, save @ cmds)
+  | _ when Option.is_some (no_host m) && not (Model.running m) ->
+    error
+      m
+      (sprintf
+         "%s: your message stays here. Chat without a host (over it) sends it \
+          as a chat, or connect a tool host and pick it (/host)."
+         (no_host_headline (Option.value_exn (no_host m))))
   | _ when attached && Or_error.is_error (Files.prompt_attachments m.files) ->
     (match Files.prompt_attachments m.files with
      | Error e -> error m (Error.to_string_hum e)
@@ -10447,6 +10505,11 @@ let update_connected (m : Model.t) (action : Action.t) =
            ] ))
   | Reply ((Resync _ as tag), result) ->
     reply { m with drops = Drops.resynced m.drops } tag result
+  (* Chat mode taken: the message that waited for it goes. *)
+  | Reply ((Chat_then_send _ as tag), (Ok _ as result)) ->
+    let m, cmds = reply m tag result in
+    let m, sent = sent_to_bottom (send m ~follow_up:false) in
+    m, cmds @ sent
   | Reply (tag, result) -> reply m tag result
   (* The ages in the sidebar; the list itself follows [sessions_changed]. *)
   | Tick now ->
@@ -10588,6 +10651,9 @@ let update_connected (m : Model.t) (action : Action.t) =
   | Set_model key -> set_model m key
   | Set_thinking level -> hub_keeps_focus m (set_thinking m level)
   | Set_mode mode -> hub_keeps_focus m (set_mode m mode)
+  | Chat_without_host ->
+    current_state m ~f:(fun s ->
+      set_mode m ~then_send:true { (Session_mode.of_state s) with chat = true })
   | Open_chip chip -> open_chip m chip
   | Open_filter -> open_filter m
   | Filter_press row -> filter_press m row

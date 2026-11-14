@@ -300,7 +300,7 @@ let argument_items
               | Some kind -> Transcript_filter.Kind.label kind
               | None -> "show everything")
            word))
-  | Confirm | Plan | Memory -> Some (confirm_items ())
+  | Confirm | Plan | Chat | Memory -> Some (confirm_items ())
   | Mode -> Some (mode_items ())
   | Notify -> Some (notify_items ())
   | Login ->

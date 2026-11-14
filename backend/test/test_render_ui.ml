@@ -448,11 +448,7 @@ let%expect_test "images on a tool host that is too old, then away" =
     let image =
       sprintf {|{"type": "image", "path": %S}|} (sandbox.dir ^/ "a.png")
     in
-    [ render ~id:"c1" image
-    ; Reply.text "old"
-    ; render ~id:"c2" image
-    ; Reply.text "away"
-    ])
+    [ render ~id:"c1" image; Reply.text "old" ])
   @@ fun s ->
   let sent = Queue.create () in
   let laptop = Rpc_server.connect s.h.server ~send:(Queue.enqueue sent) in
@@ -491,15 +487,12 @@ let%expect_test "images on a tool host that is too old, then away" =
       note Using prigh-web: [Client: the user is on prigh-web, which renders render_ui components inline. Use them rarely: prose and markdown are the default, and render_ui is only for content that is clearly better as a component (a chart, images, a diff). Never use it to ask questions or get choices or input: ask in prose or with ask_user.]
     render_ui error: Nothing was shown: cannot check the images (tool host laptop runs a prigh too old to show its files: update prigh there). Tell the user, or answer without images.
     |}];
-  (* Gone: no waiting for it to come back. *)
+  (* Gone: a message waits for no host, and says what to do instead. *)
   Rpc_server.disconnect s.h.server laptop;
   S.call_as s s.h.client ~params:{|{"text": "again"}|} "prompt";
-  S.print_last_turn s;
   [%expect
     {|
-    prompt: ok
-    user: "again"
-    render_ui error: Nothing was shown: cannot check the images (waiting for tool host "laptop" to reconnect; /host picks another). Tell the user, or answer without images.
+    prompt: error "tool host \"laptop\" is not connected: /host picks another, or talk without one in chat mode (/mode chat)"
     |}]
 ;;
 

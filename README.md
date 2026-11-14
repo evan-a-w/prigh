@@ -1722,11 +1722,11 @@ What the editor gets:
   rule prigh offers, reject); `ask_user` questions as forms when the editor
   supports elicitation, as a permission request for a single choice, else
   the model is told the user cannot be asked;
-- modes `ask`, `auto-edit`, `auto` (the approval modes) and `plan` (plan
-  mode), and config options for the mode, the model (of the providers you
+- modes `ask`, `auto-edit`, `auto` (the approval modes), `plan` (plan
+  mode) and `chat` (chat mode), and config options for the mode, the model (of the providers you
   are logged in to) and the thinking level;
 - the slash commands `/compact`, `/goal`, `/remind`, `/budget`, `/model`,
-  `/thinking`, `/plan`, `/review`, `/init`, `/btw`, `/name`, `/diff`, and
+  `/thinking`, `/plan`, `/chat`, `/review`, `/init`, `/btw`, `/name`, `/diff`, and
   your skills (any other `/text` goes to the model).
 
 When the editor offers `fs/read_text_file` and `fs/write_text_file`, the
@@ -2035,7 +2035,7 @@ that no longer exists.
 | Ctrl+L | pick a model |
 | Ctrl+P / Alt+P | cycle to the next / previous scoped model |
 | Ctrl+T | cycle the thinking level |
-| Alt+M | cycle the mode: ask → auto-edit → auto → plan (read-only) |
+| Alt+M | cycle the mode: ask → auto-edit → auto → plan (read-only) → chat (no tool host) |
 | Alt+N | pick a snippet to insert at the cursor (`/snippet`) |
 | Ctrl+N | picker: toggle the named-only / logged-in-only filter |
 | Tab / Alt+A / Alt+T / Alt+D | `/sessions`: mark a session / archive or unarchive it / pin or unpin it / delete every archived one |
@@ -2817,8 +2817,9 @@ it.
 | `/filter [all\|KIND...\|-KIND\|+KIND]` | show only some kinds in the transcript (`user`, `assistant`, `thinking`, `tools`, `subagents`, `notes`); bare: a checklist |
 | `/theme [original\|dark\|light]`, `/accent [name\|#rrggbb]` (prigh-web) | pick or set the theme and the accent colour, for you in every browser |
 | `/confirm [on\|off]` | ask before destructive tools: sets the approval mode `ask` or `auto`, here and for new sessions |
-| `/mode [ask\|auto-edit\|auto\|plan]` | pick or set this session's mode (Alt+M cycles) |
+| `/mode [ask\|auto-edit\|auto\|plan\|chat]` | pick or set this session's mode (Alt+M cycles) |
 | `/plan [on\|off]` | toggle plan mode (read-only planning until you turn it off) |
+| `/chat [on\|off]` | toggle chat mode (a chat without the tool host until you turn it off) |
 | `/todos` | show the model's plan (its `update_plan` steps) |
 | `/permissions` | show the mode and the allow/ask/deny rules (config and this session) |
 | `/compact [instructions]` | summarise older messages to free context, focusing on the instructions |
@@ -3189,12 +3190,12 @@ was last told, so the note still comes if you switch to another session,
 reconnect or restart the backend first, and none comes when you changed
 things back.
 
-### Approvals, plan mode and questions
+### Approvals, plan mode, chat mode and questions
 
 Each session has an approval mode, always shown in the status line
-(`mode:ask`, `mode:auto-edit`, `mode:auto`, `mode:plan`; in prigh-web
-beside the model, along the composer's bottom edge) and switched with
-`/mode` or Alt+M (ask → auto-edit → auto → plan → ask):
+(`mode:ask`, `mode:auto-edit`, `mode:auto`, `mode:plan`, `mode:chat`; in
+prigh-web beside the model, along the composer's bottom edge) and switched
+with `/mode` or Alt+M (ask → auto-edit → auto → plan → chat → ask):
 
 - `ask`: destructive tools (`bash`, `write`, `edit`, `apply_patch`,
   `job_input`, which writes to a running job that may run what it reads,
@@ -3266,6 +3267,27 @@ plan mode off (back to the approval mode you had) and asking it to go
 ahead has it implement the plan. An active `/goal` gets no automatic
 continuations while plan mode is on (the model cannot make progress on it,
 only plan); leaving plan mode carries on with it.
+
+Chat mode (`/chat`, `/mode chat` or Alt+M after plan) is a conversation
+that ignores the tool host: the model is offered only tools that need no
+machine (`web_search`, `web_fetch`, `ask_user`, `render_ui`,
+`update_plan`, `memory`, `custom_instructions`, the sessions tools and
+subagents, which are chats too and get no worktree); no shell, files,
+terminals, worktrees, computer use, `on_host`, MCP servers or git-host
+tools. Its system prompt has no working directory, OS, project
+instructions or skills, and says plainly that there is no machine;
+switching in or out mid-session tells the model (like plan mode), and a
+host tool call that slips through is refused. `web_fetch` runs in the
+backend itself in chat mode (on a backend whose own host is disabled,
+`-no-backend-host`, it refuses addresses on the server's own network).
+Nothing waits for a tool host, so a session needs none: when no host is
+connected, a brand-new session starts in chat mode (switching to another
+mode stays your choice, also once a host connects), and a message in
+another mode is refused with what to do, chat mode included: the TUI asks
+whether to send it as a chat (y/n, the text stays in the editor), and
+prigh-web shows a "Chat without a host" button over the composer. Leaving
+chat mode (`/chat off`) returns to the mode you had; the status line and
+prigh-web's mode chip show `chat`.
 
 The model's plan (`update_plan`: steps pending, in progress or done, as in
 Codex) is session state: the status line shows `plan 2/5: current step`

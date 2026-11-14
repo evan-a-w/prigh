@@ -258,7 +258,7 @@ let session_sections (m : App.Model.t) ~inject =
       in
       section
         "Mode"
-        ~glyph:Shield
+        ~glyph:(if current.chat then Message else Shield)
         ~note:(Session_mode.describe current)
         (div
            ~cls:"session-choices"

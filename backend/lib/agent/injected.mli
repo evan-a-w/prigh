@@ -26,6 +26,9 @@ module Note : sig
       | Plan_mode of { on : bool }
       (** plan mode turned on or off ([System_prompt.plan_mode_note]), also
           as a message of its own between turns *)
+      | Chat_mode of { on : bool }
+      (** chat mode turned on or off ([System_prompt.chat_mode_note]), like
+          [Plan_mode] *)
       | Steer of
           { from_user : bool (** else the main agent ([subagent_message]) *)
           ; follow_up : bool

@@ -85,6 +85,7 @@ let%expect_test "state event and messages" =
         (resume_at        ())
         (approval_mode Auto)
         (plan_mode     false)
+        (chat_mode     false)
         (plan          ())
         (session_rules ()))))
     (Event (Message_start (User ((text hi)))))
@@ -437,6 +438,7 @@ let%expect_test "tool host events and state hosts" =
         (resume_at  ())
         (approval_mode Auto)
         (plan_mode     false)
+        (chat_mode     false)
         (plan          ())
         (session_rules ()))))
     |}]
@@ -465,6 +467,39 @@ let%expect_test "state lists background subagents (absent means none)" =
       (name ())
       (running false)))
     ()
+    |}]
+;;
+
+let%expect_test "state: chat mode and why no tool host can run a message" =
+  let modes json =
+    match Json.parse json |> Or_error.bind ~f:State.of_json with
+    | Ok state ->
+      print_s
+        [%sexp
+          { chat_mode : bool = state.chat_mode
+          ; plan_mode : bool = state.plan_mode
+          ; no_host : string option = state.no_host
+          }]
+    | Error e -> print_s [%message "error" (e : Error.t)]
+  in
+  let base =
+    {|"session_id":"s1","session_path":"/tmp/s1.jsonl","cwd":"/work","model":{"id":"m","provider":"p","key":"p/m","name":"M","context_window":1,"max_output":1,"supports_thinking":false,"cost":{"input":0,"output":0,"cache_read":0}},"thinking":"off","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0|}
+  in
+  modes (sprintf "{%s}" base);
+  modes
+    (sprintf
+       {|{%s,"plan_mode":true,"chat_mode":true,"no_host":"no tool host connected"}|}
+       base);
+  modes (sprintf {|{%s,"chat_mode":"yes"}|} base);
+  [%expect
+    {|
+    ((chat_mode false)
+     (plan_mode false)
+     (no_host ()))
+    ((chat_mode true)
+     (plan_mode true)
+     (no_host ("no tool host connected")))
+    (error (e "field \"chat_mode\": expected bool, got \"yes\""))
     |}]
 ;;
 

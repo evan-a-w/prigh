@@ -47,6 +47,10 @@ let builtin =
       ~hint:"[on|off]"
       "toggle plan mode: the model investigates and plans, changing no files"
   ; c
+      "chat"
+      ~hint:"[on|off]"
+      "toggle chat mode: talk without the tool host (no files or commands)"
+  ; c
       "review"
       ~hint:"[base] [instructions]"
       "review the uncommitted changes, or those against a base branch"
@@ -236,6 +240,18 @@ let parse ~state text =
          ~params:[ ("plan_mode", if on then `True else `False) ]
          (const (if on then "plan mode on" else "plan mode off"))
      | "plan", _ -> Reply "usage: /plan [on|off]"
+     | "chat", ("" | "on" | "off") ->
+       let on =
+         match rest with
+         | "on" -> true
+         | "off" -> false
+         | _ -> not (Json.exactly_equal (field "chat_mode" state) `True)
+       in
+       call
+         "set_mode"
+         ~params:[ ("chat_mode", if on then `True else `False) ]
+         (const (if on then "chat mode on" else "chat mode off"))
+     | "chat", _ -> Reply "usage: /chat [on|off]"
      | "review", _ ->
        call "review" ~params:(opt_param "args") ~turn:true (const "")
      | "init", "" -> call "init" ~turn:true (const "")

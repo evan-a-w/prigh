@@ -621,7 +621,7 @@ kbd {
 .session-chips .chip-anchor.open > .chip-button { background: var(--slate-2); color: var(--chalk); }
 .session-chips .chip-button .icon { width: 12px; height: 12px; }
 .session-chips .thinking-chip.unsupported { color: var(--faint); }
-.session-chips .mode-chip.never-asks, .session-chips .mode-chip.plan-mode { color: var(--sodium); }
+.session-chips .mode-chip.never-asks, .session-chips .mode-chip.plan-mode, .session-chips .mode-chip.chat-mode { color: var(--sodium); }
 
 /* The context's gauge and its details, over it on hover (to the keyboard
    they are its description): what the
@@ -975,6 +975,7 @@ kbd {
 .chip-anchor.host, .chip-anchor.host > .host-chip { flex-shrink: 6; min-width: 52px; }
 .chip-anchor.host .chip-label { max-width: 180px; }
 .composer-controls .host-chip.warm { color: var(--sodium); }
+.composer-controls .host-chip.chatting { color: var(--sodium); }
 /* A disconnected host keeps its name; its server is struck through in
    brick and "offline" follows, which the name gives way to first. */
 .host-chip.offline > .icon:first-child { color: var(--brick); }
@@ -1706,7 +1707,7 @@ kbd {
    each opening its picker. Plan mode holds the agent back, so it is lit. */
 .chip-key { opacity: 0.75; }
 .thinking-chip.unsupported { color: var(--faint); }
-.mode-chip.plan-mode, .composer-box:focus-within .mode-chip.plan-mode:not(:hover) { color: var(--sodium); background: var(--sodium-wash); }
+.mode-chip.plan-mode, .composer-box:focus-within .mode-chip.plan-mode:not(:hover), .mode-chip.chat-mode, .composer-box:focus-within .mode-chip.chat-mode:not(:hover) { color: var(--sodium); background: var(--sodium-wash); }
 
 /* Queued steers and follow-ups, above the composer while they wait. */
 .queue {
@@ -1796,7 +1797,7 @@ kbd {
   .composer-controls .chip-button { padding: 0 7px; gap: 5px; }
   /* The host is its server alone (its name in the tooltip and its menu),
      so the model keeps its name. */
-  .composer-controls .host-chip:not(.warm) .chip-label,
+  .composer-controls .host-chip:not(.warm, .chatting) .chip-label,
   .composer-controls .host-chip .chip-state { display: none; }
   .chip-anchor.host, .chip-anchor.host > .host-chip { min-width: 0; flex-shrink: 0; }
   .composer-controls .host-chip { padding: 0 8px; }
@@ -2315,3 +2316,29 @@ kbd {
   background: var(--brick-wash);
 }
 .computer-banner .btn.computer-banner-stop:hover { background: var(--brick); color: var(--graphite); }
+
+/* No tool host can run a message (outside chat mode): said above the
+   composer, with the way to talk anyway (No_host_banner). */
+.no-host-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 4px 4px 10px;
+  background: var(--sodium-wash);
+  border-left: 2px solid var(--sodium);
+  border-radius: var(--r-control);
+  font-size: 13.5px;
+  animation: rise 0.12s ease-out;
+}
+.no-host-banner > .icon { color: var(--sodium); flex: none; }
+.no-host-banner-text { flex: 1; min-width: 0; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-height: 1.25; }
+.no-host-banner .btn.no-host-banner-chat { height: 28px; flex: none; gap: 6px; color: var(--sodium); border-color: var(--sodium-line); }
+.no-host-banner-chat .short { display: none; }
+@media (max-width: 359px) {
+  .no-host-banner-chat .long { display: none; }
+  .no-host-banner-chat .short { display: inline; }
+}
+/* "No host" whole beside the model: it says the session is a chat, or that
+   nothing runs its tools. */
+.chip-anchor.host:has(> .host-chip:is(.chatting, .warm)),
+.composer-controls .host-chip:is(.chatting, .warm) { flex-shrink: 0; }

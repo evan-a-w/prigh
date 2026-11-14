@@ -105,6 +105,9 @@ module Confirm_action : sig
         ; back : Open_picker.t option (** where Esc and Enter return *)
         }
     | Clear_user_info (** [/user-info clear] *)
+    | Chat_without_host of string
+    (** a message that needs a tool host while none is connected (the text,
+        kept in the editor): send it as a chat (chat mode) instead *)
     | Nix_gc of Nix_generations.t
     (** [/nix-gc run DAYS|all]: deleting profile generations *)
     | Browser_signin

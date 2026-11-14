@@ -12,6 +12,7 @@ module Argument : sig
     | Confirm
     | Mode
     | Plan
+    | Chat
     | Notify (** [off], [bell] or [desktop] *)
     | Login
     | Logout

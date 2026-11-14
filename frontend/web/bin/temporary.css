@@ -92,6 +92,10 @@
 .tray-where .icon.chevron { width: 13px; height: 13px; margin-left: -2px; }
 .tray-where > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tray-where:first-child { flex: 0 1 auto; }
+/* Chat mode: no folder or branch to name. */
+.tray-chat { display: flex; align-items: center; gap: 6px; min-width: 0; height: 30px; padding: 0 8px; color: var(--sodium); font: 12.5px var(--mono); }
+.tray-chat .icon { width: 15px; height: 15px; flex: none; }
+.tray-chat > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .temporary-chip {
   margin-left: auto;

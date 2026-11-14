@@ -2944,7 +2944,12 @@ let set_mode m (mode : Session_mode.t) =
     let m =
       { m with
         state =
-          Some { s with approval_mode = mode.approval; plan_mode = mode.plan }
+          Some
+            { s with
+              approval_mode = mode.approval
+            ; plan_mode = mode.plan
+            ; chat_mode = mode.chat
+            }
       }
     in
     ( m
@@ -2958,6 +2963,23 @@ let set_mode m (mode : Session_mode.t) =
                   (Session_mode.label mode)
                   (Session_mode.describe mode)))
       ] )
+;;
+
+(* Plan mode leaves chat mode: planning needs the project. *)
+let set_plan m (s : P.State.t) ~on =
+  let mode = Session_mode.of_state s in
+  set_mode
+    m
+    (if on
+     then { mode with plan = true; chat = false }
+     else { mode with plan = false })
+;;
+
+let set_chat m (s : P.State.t) ~on =
+  let mode = Session_mode.of_state s in
+  set_mode
+    m
+    (if on then { mode with chat = true } else Session_mode.leaving_chat mode)
 ;;
 
 let cycle_mode m =
@@ -4262,14 +4284,27 @@ let run_command m (cmd : Commands.Parsed.t) =
   | "plan", [] ->
     (match m.state with
      | None -> notice m "not connected", []
-     | Some s ->
-       set_mode m { (Session_mode.of_state s) with plan = not s.plan_mode })
+     | Some s -> set_plan m s ~on:(s.chat_mode || not s.plan_mode))
   | "plan", (("on" | "off") as on) :: _ ->
     (match m.state with
      | None -> notice m "not connected", []
-     | Some s ->
-       set_mode m { (Session_mode.of_state s) with plan = String.equal on "on" })
+     | Some s -> set_plan m s ~on:(String.equal on "on"))
   | "plan", other :: _ ->
+    ( error
+        m
+        (sprintf
+           "unknown argument %S; use on or off (or nothing to toggle)"
+           other)
+    , [] )
+  | "chat", [] ->
+    (match m.state with
+     | None -> notice m "not connected", []
+     | Some s -> set_chat m s ~on:(not s.chat_mode))
+  | "chat", (("on" | "off") as on) :: _ ->
+    (match m.state with
+     | None -> notice m "not connected", []
+     | Some s -> set_chat m s ~on:(String.equal on "on"))
+  | "chat", other :: _ ->
     ( error
         m
         (sprintf
@@ -4679,6 +4714,17 @@ let shown_queued m (kind : Queued_message.Kind.t) text =
   m.queued_messages @ [ { Queued_message.kind; index; text } ]
 ;;
 
+let no_host_question reason =
+  reason ^ ". Send it as a chat (chat mode: no tool host)? (y/n: keep it)"
+;;
+
+(* Why a message cannot run now, outside chat mode: no tool host. *)
+let needs_host m =
+  match m.state with
+  | Some (s : P.State.t) when not s.chat_mode -> s.no_host
+  | Some _ | None -> None
+;;
+
 let send_prompt m text =
   let m, cmds =
     if String.is_prefix text ~prefix:"!"
@@ -4701,6 +4747,20 @@ let submit ?(kind = Queued_message.Kind.Steer) m =
   then m, []
   else (
     match Commands.parse text, focused_agent m with
+    | None, None
+      when (not (String.is_prefix text ~prefix:"!"))
+           && (not (Model.running m))
+           && Option.is_some (needs_host m) ->
+      (* Kept in the editor: Esc leaves it there. *)
+      ( { m with
+          editor = Editor.set_text m.editor text
+        ; mode =
+            Confirm
+              { question = no_host_question (Option.value_exn (needs_host m))
+              ; action = Chat_without_host text
+              }
+        }
+      , [] )
     | Some { name = "skill:"; _ }, _ -> open_skills m
     | Some { name; _ }, _ when String.is_prefix name ~prefix:"skill:" ->
       send_prompt m (String.strip text)
@@ -6150,6 +6210,17 @@ let confirm m ~(action : Mode.Confirm_action.t) (intent : Intent.t) =
             (Set_user_info { form = P.User_info.Form.empty })
             ~tag:(User_info_saved "")
         ] )
+    | Chat_without_host text ->
+      (match m.state with
+       | None -> notice m "not connected", []
+       | Some s ->
+         let m, mode_cmds =
+           set_mode m { (Session_mode.of_state s) with chat = true }
+         in
+         let m, send_cmds =
+           send_prompt { m with editor = Editor.clear m.editor } text
+         in
+         m, mode_cmds @ send_cmds)
     | Remove_worktree { worktree; force; back = _ } ->
       ( notice m (sprintf "removing the worktree at %s…" worktree.path)
       , [ call
@@ -6167,6 +6238,11 @@ let confirm m ~(action : Mode.Confirm_action.t) (intent : Intent.t) =
     | Forget_memory { back; _ } -> back_to m back, []
     | Remove_custom_instruction { back; _ } -> back_to m back, []
     | Clear_user_info -> notice m "kept what you set about yourself", []
+    | Chat_without_host _ ->
+      ( notice
+          m
+          "not sent: the message stays in the editor (/chat, or a tool host)"
+      , [] )
     | Create_dir { path; _ } -> notice m (sprintf "not created: %s" path), []
     | Cd_to_checkout path ->
       notice m (sprintf "staying here; /cd %s goes there" path), []

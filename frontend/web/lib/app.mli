@@ -262,6 +262,9 @@ module Reply_tag : sig
         follow *)
     | Plan_entered of Context_menu.Plan.t (** [set_cwd], likewise *)
     | Mode_set of string (** [set_mode]: the new state; the notice is shown *)
+    | Chat_then_send of string
+    (** [set_mode] to chat mode ([Action.Chat_without_host]): as [Mode_set],
+        then the draft is sent *)
     | Model_set (** [set_model]: the choice is no longer pending *)
     | Filter_saved of string
     (** [set_transcript_filter] in this session: one fewer pending *)
@@ -583,6 +586,9 @@ module Action : sig
     | Set_model of string (** [provider/id] *)
     | Set_thinking of string
     | Set_mode of Session_mode.t
+    | Chat_without_host
+    (** chat mode, then the draft sent (when there is one) once the backend
+        has taken it: no tool host can run the message ({!No_host_banner}) *)
     | Open_chip of Chip.t
     | Open_filter (** the transcript filter's menu; again: closes it *)
     | Filter_press of Filter_menu.Row.t option
@@ -1155,3 +1161,7 @@ val temporary_shown : Model.t -> bool
 
 val init : Model.t
 val update : Model.t -> Action.t -> Model.t * Command.t list
+
+(** The first clause of the state's [no_host], capitalised: "No tool host
+    connected". *)
+val no_host_headline : string -> string
