@@ -785,7 +785,17 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
 - MCP — `Mcp_config` reads `mcpServers` from the host's `~/.prigh/mcp.json`
   and `.mcp.json` in the cwd and its ancestors (closest wins; `${VAR}` and
   `${VAR:-default}`), and keeps approvals of project servers (by a digest of
-  the definition as written) in `~/.prigh/mcp-approvals.json`. `Mcp_client`
+  the definition as written) in `~/.prigh/mcp-approvals.json`.
+  `Mcp_settings` is the user's own servers, kept by the backend in
+  `~/.prigh/mcp-servers.json` under the world's home (mode 600, written
+  atomically under a mutex; `mcpServers` plus the names of the disabled
+  ones). The agent sends the enabled ones as `settings` with every `$mcp_*`
+  op, so they reach only that user's hosts; `Mcp_hub` merges them under the
+  host's files (source `"settings"`, no approval; a file's server of the
+  same name wins), expands `${VAR}` on the host, and on a change stops only
+  the servers whose definition changed or went (a request without
+  `settings`, from an older backend, stops only the settings' ones). Their
+  `Transport` sexps hide `env` and `header` values. `Mcp_client`
   is one connection (stdio child in its own process group, or streamable
   HTTP; `initialize`, `tools/list`, `tools/call`, cancellation, ping).
   `Mcp_hub` holds a host's running servers, shared by all its sessions: one
@@ -2103,7 +2113,13 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   `list_mcp {reconnect?}` and `mcp_approve {source, server}` (both
   `{servers: [{name, source, project, status: ready|failed|needs_approval,
   error?, tools: [{name, description}]}], problems}`, tools under their
-  prigh names),
+  prigh names), `get_mcp_settings`, `add_mcp_servers {servers | text}`
+  (an `mcpServers` object, or pasted text; all or none),
+  `update_mcp_server {name, rename?, config}`, `remove_mcp_server {name}`
+  and `set_mcp_server_enabled {name, enabled}` (all `{servers: [{name,
+  enabled, config}]}`, the user's servers with their secrets: only that
+  user's clients see them; every one of them also gets the
+  `mcp_settings_changed` event with the list, and running agents re-list),
   `tool_exec_result`, `auth_status`, `login`, `auth_respond`, `auth_cancel`,
   `logout`, `forge_status`, `forge_login {host?, kind?, method?}`,
   `forge_logout {host}`, `pr_list {state?}`, `pr_view {number}`,
@@ -2685,7 +2701,11 @@ terminal frontend and `web/` prigh-web, the browser one.
     transcript).
   - Skills and MCP: `/skills` and `/mcp` are pickers over `list_skills` and
     `list_mcp` (Enter on a server needing approval sends `mcp_approve`,
-    whose reply is the new list). `/skill:NAME ARGS` is sent as a prompt
+    whose reply is the new list); `/mcp` asks `get_mcp_settings` first, so
+    a disabled or overridden server of the user's shows too (an older
+    backend's error falls back to the host's list). `Prigh_ui.Mcp_command`
+    parses `/mcp add|remove|enable|disable` for both frontends; a refusal
+    puts the command back in the editor. `/skill:NAME ARGS` is sent as a prompt
     tagged `Skill_prompt`, so a failure (an unknown name) puts the text back
     in the editor and takes it off the queue. `Autocomplete`'s `Skill`
     source completes names from `Location_cache` (shared with the
@@ -3496,7 +3516,15 @@ terminal frontend and `web/` prigh-web, the browser one.
       `list_mcp`/`mcp_approve` replies (`Mcp_list`) into `/mcp`'s picker
       (servers to act on first; the problems under it, in `Dialog_view`),
       `/mcp reconnect`'s report and what became of an approved or restarted
-      server; a ready one's tools are the `Mcp_tools` dialog.
+      server; a ready one's tools are the `Mcp_tools` dialog. Settings →
+      MCP servers is `Mcp_page` (its state: the user's servers from
+      `get_mcp_settings` and `mcp_settings_changed`, the session's host's
+      list, the form's draft with masked `env`/header pairs, the pasted
+      JSON, the one being removed, each server's health on that host) and
+      `Mcp_settings_view`; opening it fetches both lists, a change keeps
+      what is shown until the new lists come, and the event re-asks the
+      host. `/mcp add|remove|enable|disable` go through
+      `Prigh_ui.Mcp_command`, as in the TUI.
     - Snippets: `/snippet` runs `Prigh_ui.Snippet_command`; the picker
       (Alt+N, which passes the editor's caret) inserts at the caret, as do
       `/snippet NAME` and `#name` completion (`Completion.insert_snippet`).
@@ -4146,6 +4174,8 @@ for Linux, macOS and Windows.
 - `~/.prigh/memory.json` — the `memory` tool's notes (`Memory`).
 - `~/.prigh/custom_instructions.json` — the user's standing instructions,
   in every session's context (`Custom_instructions`).
+- `~/.prigh/mcp-servers.json` — the MCP servers in the user's settings,
+  sent to their tool hosts (`Mcp_settings`; mode 600).
 - `~/.prigh/about_you.json` — what the user set about themselves, in every
   session's context (`User_info`; `user_info.md.migrated` is an earlier
   version's text, moved into it).

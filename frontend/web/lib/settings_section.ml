@@ -8,6 +8,7 @@ type t =
   | Memory
   | About_you
   | Custom_instructions
+  | Mcp
   | Git_hosting
   | Nix_store
   | Account
@@ -23,6 +24,7 @@ let available ~superuser =
     | Memory
     | About_you
     | Custom_instructions
+    | Mcp
     | Git_hosting
     | Account -> true)
 ;;
@@ -39,6 +41,7 @@ let name = function
   | Memory -> "Memory"
   | About_you -> "About you"
   | Custom_instructions -> "Custom instructions"
+  | Mcp -> "MCP servers"
   | Git_hosting -> "Git hosting"
   | Nix_store -> "Nix store"
   | Account -> "Account"
@@ -67,6 +70,10 @@ let about = function
     "Standing instructions for the model, given to it in every session; it may \
      also add or edit them when you state a lasting preference. Kept on the \
      backend, for your account."
+  | Mcp ->
+    "Tools the model can use from MCP servers. The servers here are kept on \
+     the backend for your account and run on every host your sessions use; a \
+     host's ~/.prigh/mcp.json and a project's .mcp.json add their own."
   | Git_hosting ->
     "The hosts agents push branches to and open pull requests on."
   | Nix_store ->
@@ -82,6 +89,7 @@ let arg = function
   | Memory -> "memory"
   | About_you -> "user-info"
   | Custom_instructions -> "instructions"
+  | Mcp -> "mcp"
   | Git_hosting -> "git"
   | Nix_store -> "nix"
   | Account -> "account"

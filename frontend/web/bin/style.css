@@ -1925,6 +1925,44 @@ kbd {
 .about-you-keys { color: var(--faint); font-size: 12px; }
 .about-you-elsewhere { display: flex; align-items: center; gap: 8px; }
 .about-you-elsewhere .setting-note { flex: 1; min-width: 0; }
+/* MCP servers: the user's (switch, edit, remove), the host's (from its
+   files), the form adding or editing one, and pasted mcpServers JSON. */
+.setting-note.good { color: var(--sage); }
+.btn.mcp-tools-toggle { background: none; border: 0; padding: 0; height: auto; min-height: 0; color: inherit; font: inherit; text-decoration: underline; text-underline-offset: 2px; text-decoration-color: var(--rule-2); cursor: pointer; }
+.btn.mcp-tools-toggle:hover { color: var(--chalk); text-decoration-color: currentColor; }
+.btn.mcp-tools-toggle:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; border-radius: 2px; }
+.mcp-summary, .mcp-source { font-family: var(--mono); font-size: 11.5px; color: var(--faint); overflow-wrap: anywhere; }
+.mcp-server .setting-control { gap: 2px; }
+.mcp-server .setting-control .switch { margin-right: 6px; }
+.mcp-server.off .setting-name { color: var(--muted); }
+.mcp-server.removing { background: color-mix(in srgb, var(--brick) 8%, transparent); }
+.mcp-server.removing .setting-control { gap: 8px; }
+.mcp-remove:hover { color: var(--brick); }
+.mcp-health { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 4px; }
+.mcp-settings-tools { flex: 1 1 100%; margin: 0; padding: 8px 10px; list-style: none; display: flex; flex-direction: column; gap: 6px; background: var(--bg); border: 1px solid var(--rule); border-radius: var(--r-control); max-height: 240px; overflow-y: auto; }
+.mcp-tool { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.mcp-tool-name { font: 12px var(--mono); color: var(--chalk); overflow-wrap: anywhere; }
+.mcp-tool-description { font-size: 12px; color: var(--muted); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.mcp-actions { gap: 8px; justify-content: flex-start; }
+.mcp-actions .btn, .mcp-pair-add { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.mcp-actions .btn .icon, .mcp-pair-add .icon { width: 14px; height: 14px; }
+.mcp-draft, .mcp-paste { flex-direction: column; align-items: stretch; gap: 10px; }
+.mcp-paste .setting-text { flex-basis: auto; }
+.mcp-draft .segmented { align-self: flex-start; }
+.mcp-field { display: flex; flex-direction: column; gap: 4px; }
+.mcp-field-label { color: var(--muted); font-size: 12.5px; font-weight: 500; }
+.mcp-field-hint { color: var(--faint); font-size: 12px; line-height: 1.4; }
+.mcp-field .text-input, .mcp-pair .text-input, .mcp-paste-input { width: 100%; min-width: 0; font-family: var(--mono); font-size: 12.5px; }
+.mcp-args, .mcp-paste-input { resize: vertical; line-height: 1.5; }
+.mcp-paste-input { min-height: 8em; }
+.mcp-pairs { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+.mcp-pair { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr) auto auto; gap: 6px; align-items: center; width: 100%; }
+.mcp-pair-show { min-width: 48px; justify-content: center; }
+.mcp-pair-remove:hover { color: var(--brick); }
+.mcp-error { display: block; }
+.mcp-buttons { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.mcp-keys { margin-right: auto; color: var(--faint); font-size: 12px; }
+.mcp-problem .setting-note { overflow-wrap: anywhere; }
 @media (max-width: 760px) {
   /* A phone: the page fills the screen, the sections a strip across its top. */
   .modal-backdrop:has(> .settings-dialog) { padding: 8px; }
