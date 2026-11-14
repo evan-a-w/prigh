@@ -31,13 +31,15 @@ let%expect_test "a markdown link to a session is a session link" =
   reply
     h
     (sprintf
-       "See [Fix the taskbar entry](?session=%s), [the same](prigh://session/%s), \
-        [by prefix](/?session=6cad9f6e) and [elsewhere](https://example.com/?session=%s)."
+       "See [Fix the taskbar entry](?session=%s), [the \
+        same](prigh://session/%s), [by prefix](/?session=6cad9f6e) and \
+        [elsewhere](https://example.com/?session=%s)."
        taskbar
        taskbar
        taskbar);
   H.show h ~selector:".chat .markdown p";
-  [%expect {|
+  [%expect
+    {|
     <p dir="auto">
       See
       <a href="?session=6cad9f6e0123abcd"
@@ -78,7 +80,8 @@ let%expect_test "ids of known sessions are links; other hex is not" =
        ; "[a link around 6cad9f6e](https://example.com)"
        ]);
   H.show h ~selector:".chat .markdown";
-  [%expect {|
+  [%expect
+    {|
     <div class="markdown">
       <div class="md-part">
         <p dir="auto">
@@ -144,7 +147,8 @@ let%expect_test "tool output: the sessions tool's ids are links" =
           taskbar));
   H.act h (Toggle_fold "c1#open");
   H.show h ~selector:".chat .tool .output pre";
-  [%expect {|
+  [%expect
+    {|
     <pre>
       <a href="?session=6cad9f6e0123abcd"
          data-session-link="6cad9f6e0123abcd"
@@ -169,7 +173,8 @@ let%expect_test "the session list arriving later makes ids links" =
   H.event h {|{"event":"sessions_changed"}|};
   H.reply h "list_sessions" sessions;
   H.show h ~selector:".chat .markdown p";
-  [%expect {|
+  [%expect
+    {|
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     <p dir="auto">
       Done in
@@ -185,7 +190,8 @@ let%expect_test "the session list arriving later makes ids links" =
 let%expect_test "following a link: in place, in a new window, or a toast" =
   let h = H.create ~sessions () in
   H.act h (Follow_session_link { id = "6cad9f6e"; new_window = false });
-  [%expect {|
+  [%expect
+    {|
     (Rpc (method_ switch_session)
      (params ((path /sessions/6cad9f6e0123abcd.jsonl))) (tag Reload_state))
     (Rpc (method_ get_messages_page)
@@ -199,7 +205,8 @@ let%expect_test "following a link: in place, in a new window, or a toast" =
   List.iter [ "0badc0de"; "6cad9f7e"; "7b1e2d3c" ] ~f:(fun id ->
     H.act h (Follow_session_link { id; new_window = false });
     H.text h ~selector:".toast:last-child");
-  [%expect {|
+  [%expect
+    {|
     No session 0badc0de: it was deleted, or it is not yours. The sidebar lists your sessions. (Dismiss)
     No session 6cad9f7e: it was deleted, or it is not yours. Did you mean 6cad9f6e (Fix the taskbar entry)? (Dismiss)
     Session 7b1e2d3c is ambiguous: 7b1e2d3c4f5a6b7c (fix the parser), 7b1e2d3c99999999 (another). Pick it in the sidebar. (Dismiss)
@@ -233,7 +240,8 @@ let%expect_test "which clicks the page follows in place" =
   show (own ^ "/files/?session=6cad9f6e");
   show "https://example.com/?session=6cad9f6e";
   show (own ^ "/");
-  [%expect {|
+  [%expect
+    {|
     (http://127.0.0.1:7780/?session=6cad9f6e
      (((id 6cad9f6e) (new_window false))))
     (http://127.0.0.1:7780/?session=6cad9f6e (((id 6cad9f6e) (new_window true))))

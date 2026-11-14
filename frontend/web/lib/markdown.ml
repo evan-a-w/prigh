@@ -359,8 +359,7 @@ module Inline = struct
            else (
              match Prigh_ui.Session_link.of_href href with
              | Some id when not image ->
-               emit
-                 (Link { href = Prigh_ui.Session_link.href id; children })
+               emit (Link { href = Prigh_ui.Session_link.href id; children })
              | Some _ | None -> emit_all children);
            go (paren + 1)
          | None when partial -> emit_all (parse_range s (open_ + 1) close)

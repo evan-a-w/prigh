@@ -18,9 +18,11 @@ let decide
     match session with
     | Some _ -> session
     | None ->
-      Option.bind (String.chop_prefix href ~prefix:(own_origin ^ own_path)) ~f:(fun rest ->
-        Option.bind (String.chop_prefix rest ~prefix:"?") ~f:(fun _ ->
-          Session_link.of_href rest))
+      Option.bind
+        (String.chop_prefix href ~prefix:(own_origin ^ own_path))
+        ~f:(fun rest ->
+          Option.bind (String.chop_prefix rest ~prefix:"?") ~f:(fun _ ->
+            Session_link.of_href rest))
   in
   if button > 1
   then None

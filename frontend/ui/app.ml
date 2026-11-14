@@ -7403,8 +7403,7 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
        decode
          json
          ~f:(decode_list ~f:P.Session_summary.of_json)
-         (fun sessions ->
-            refresh_autocomplete (with_sessions m sessions))
+         (fun sessions -> refresh_autocomplete (with_sessions m sessions))
      | Prefs_history ->
        (* Not worth a word when it is not what we expect. *)
        (match P.Prefs.of_reply json with

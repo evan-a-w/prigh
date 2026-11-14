@@ -10357,7 +10357,8 @@ let update_connected (m : Model.t) (action : Action.t) =
   | Leave_keep | Leave_delete -> m, []
   | Switch_session path -> switch_session m path
   | Open_session_window id -> m, [ Command.Open_window id ]
-  | Follow_session_link { id; new_window } -> follow_session_link m ~id ~new_window
+  | Follow_session_link { id; new_window } ->
+    follow_session_link m ~id ~new_window
   | Ask_delete path ->
     if Set.mem m.marks.marked path
     then

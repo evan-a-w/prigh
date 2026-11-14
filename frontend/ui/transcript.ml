@@ -884,7 +884,12 @@ let rows ~sessions (item : Item.t) ~(verbosity : Verbosity.t) ~width
      | Quiet | Normal | Verbose -> [ heading ])
 ;;
 
-let render_item ?(sessions = Session_link.Known.empty) ?(width = Int.max_value) item ~verbosity =
+let render_item
+      ?(sessions = Session_link.Known.empty)
+      ?(width = Int.max_value)
+      item
+      ~verbosity
+  =
   Log_line.wrap (rows ~sessions item ~verbosity ~width) ~width
 ;;
 
@@ -935,7 +940,12 @@ let render_all ?sessions t ~width ~verbosity : Content.t =
     ~f:(fun item -> render_item ?sessions item ~width ~verbosity)
 ;;
 
-let user_message_lines ?(filter = Transcript_filter.all) ?sessions t ~width ~verbosity
+let user_message_lines
+      ?(filter = Transcript_filter.all)
+      ?sessions
+      t
+      ~width
+      ~verbosity
   : int list
   =
   let shows item =
@@ -962,7 +972,10 @@ let user_message_lines ?(filter = Transcript_filter.all) ?sessions t ~width ~ver
         | Item.User _ | Item.Skill _ -> (offset + 1) :: acc
         (* The divider, past the folded messages and the blank line. *)
         | Item.Trimmed _ ->
-          (offset + List.length (render_item ?sessions item ~width ~verbosity) - 1) :: acc
+          (offset
+           + List.length (render_item ?sessions item ~width ~verbosity)
+           - 1)
+          :: acc
         | _ when hidden_turn -> offset :: acc
         | _ -> acc
       in

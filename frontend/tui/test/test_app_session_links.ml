@@ -14,8 +14,8 @@ let sessions =
 ;;
 
 let reply =
-  "See [Fix the taskbar entry](?session=6cad9f6e0123abcd) and \
-   [this one](?session=0badc0de).\n\
+  "See [Fix the taskbar entry](?session=6cad9f6e0123abcd) and [this \
+   one](?session=0badc0de).\n\
    Done in 6cad9f6e, also `6cad9f6e0123abcd`; not 0badc0de, 7b1e2d3c or \
    x6cad9f6e.\n\
    ```\n\
@@ -28,7 +28,8 @@ let%expect_test "markdown: session links and the ids of known sessions" =
   H.reply ~quiet:true h Sessions_cache sessions;
   let known = h.H.model.known_sessions in
   print_endline (Content.to_styled (Markdown.render ~sessions:known reply));
-  [%expect {|
+  [%expect
+    {|
     See [magenta][underline]Fix the taskbar entry[/][dim] 6cad9f6e[/] and [magenta][underline]this one[/][dim] 0badc0de[/].
     Done in [magenta][underline]6cad9f6e[/], also [magenta][underline]6cad9f6e0123abcd[/]; not 0badc0de, 7b1e2d3c or x6cad9f6e.
     [dim]──[/]
@@ -36,7 +37,8 @@ let%expect_test "markdown: session links and the ids of known sessions" =
     |}];
   (* Before the session list arrives, links are still links; ids are text *)
   print_endline (Content.to_styled (Markdown.render reply));
-  [%expect {|
+  [%expect
+    {|
     See [magenta][underline]Fix the taskbar entry[/][dim] 6cad9f6e[/] and [magenta][underline]this one[/][dim] 0badc0de[/].
     Done in 6cad9f6e, also [cyan]6cad9f6e0123abcd[/]; not 0badc0de, 7b1e2d3c or x6cad9f6e.
     [dim]──[/]
@@ -58,7 +60,8 @@ let%expect_test "the session list arriving highlights ids; /switch PREFIX" =
       then print_endline (Content.to_styled [ line ]))
   in
   transcript ();
-  [%expect {|
+  [%expect
+    {|
     ▌ earlier question
       earlier answer
 
@@ -80,7 +83,8 @@ let%expect_test "the session list arriving highlights ids; /switch PREFIX" =
   H.keys h "/switch 6cad9f6e";
   H.esc h;
   H.enter h;
-  [%expect {|
+  [%expect
+    {|
     (Rpc
       (method_ switch_session)
       (params ((path 6cad9f6e)))

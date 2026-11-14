@@ -3158,6 +3158,18 @@ restarts. Plan mode does not ask (the asked session may change things),
 and subagents neither ask nor answer. Both tools see only the
 sessions of your own user, and name them by id, never by path.
 
+Session links: the `sessions` tool lists each session with its link,
+`[title](?session=ID)`, and the system prompt gives the session its own
+(not a temporary session), so the model links the sessions it names; `ID`
+may be a unique prefix of the id. In prigh-web a click on one switches to
+that session in place, as a click in the sidebar does (Ctrl+click,
+⌘-click or a middle click: in a new window); the ids of your sessions (8
+to 16 hex digits) in a reply or tool output are links too, though not in
+code blocks; a link to a session you do not have shows a toast with the
+closest id. The TUI underlines a link's title in magenta with its short id
+dim after it, and underlines the ids of your sessions: `/switch` takes the
+id or a unique prefix.
+
 `-faux-script FILE` (a backend flag, passed through the TUI after `--`) plays
 a JSON array of scripted provider replies, so demos and tests run without API
 calls; it implies `-faux`.

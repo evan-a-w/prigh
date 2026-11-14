@@ -21,8 +21,7 @@ let anchor id children =
     match Known.find (known ()) id with
     | Found s ->
       ( s.id
-      , sprintf "Session %s: %s" (String.prefix s.id 8) (Session_link.title s)
-      )
+      , sprintf "Session %s: %s" (String.prefix s.id 8) (Session_link.title s) )
     | Ambiguous _ | Missing _ -> id, "Session " ^ id
   in
   Node.a
@@ -47,8 +46,7 @@ let linkify text =
     let pos, rev =
       List.fold spans ~init:(0, []) ~f:(fun (pos, rev) (at, len, _) ->
         let id = String.sub text ~pos:at ~len in
-        ( at + len
-        , (anchor id [ Node.text id ] :: List.rev (piece pos at)) @ rev ))
+        at + len, (anchor id [ Node.text id ] :: List.rev (piece pos at)) @ rev)
     in
     List.rev rev @ piece pos (String.length text)
 ;;

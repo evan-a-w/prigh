@@ -158,10 +158,20 @@ val render_tail
 val finished : t -> int
 
 (** Total wrapped line count, for scroll clamping. *)
-val line_count : ?sessions:Session_link.Known.t -> t -> width:int -> verbosity:Verbosity.t -> int
+val line_count
+  :  ?sessions:Session_link.Known.t
+  -> t
+  -> width:int
+  -> verbosity:Verbosity.t
+  -> int
 
 (** Every wrapped line, oldest first. *)
-val render_all : ?sessions:Session_link.Known.t -> t -> width:int -> verbosity:Verbosity.t -> Content.t
+val render_all
+  :  ?sessions:Session_link.Known.t
+  -> t
+  -> width:int
+  -> verbosity:Verbosity.t
+  -> Content.t
 
 (** Wrapped line index of each user turn's first line, oldest first, and of
     the [Trimmed] divider's (its messages are not turns of the
@@ -188,4 +198,7 @@ val render_window
 (** The item's lines in the work log, wrapped at [width] if given. *)
 val render_item
   :  ?sessions:Session_link.Known.t
-  -> ?width:int -> Item.t -> verbosity:Verbosity.t -> Content.t
+  -> ?width:int
+  -> Item.t
+  -> verbosity:Verbosity.t
+  -> Content.t

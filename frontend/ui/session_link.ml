@@ -16,7 +16,8 @@ let of_href href =
   let href = String.strip href in
   let id =
     match String.chop_prefix href ~prefix:"prigh://session/" with
-    | Some rest -> Some (List.hd_exn (String.split_on_chars rest ~on:[ '?'; '#'; '/' ]))
+    | Some rest ->
+      Some (List.hd_exn (String.split_on_chars rest ~on:[ '?'; '#'; '/' ]))
     | None ->
       let query =
         match String.chop_prefix href ~prefix:"/" with
