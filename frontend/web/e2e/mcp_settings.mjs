@@ -178,9 +178,11 @@ try {
   await page.locator(".mcp-pair-key").fill("TOKEN");
   await page.locator(".mcp-pair-value").fill("s3cret");
   await page.locator(".mcp-pair-show").click();
+  await page.locator(".mcp-pair-value[type=text]").waitFor();
   section("adding");
   console.log(`value while typing: ${await page.locator(".mcp-pair-value").getAttribute("type")}`);
   await page.locator(".mcp-pair-show").click();
+  await page.locator(".mcp-pair-value[type=password]").waitFor();
   console.log(`hidden again: ${await page.locator(".mcp-pair-value").getAttribute("type")}`);
   await screenshot(page, "adding");
   await page.locator("#mcp-args").press("Control+Enter");
@@ -192,6 +194,7 @@ try {
 
   // Editing shows the stored value masked.
   await mine(page, "echo").locator(".mcp-edit").click();
+  await page.locator(".mcp-pair-value").waitFor();
   console.log(`editing, the value: ${await page.locator(".mcp-pair-value").getAttribute("type")}`);
   await page.keyboard.press("Escape");
   await page.locator(".mcp-draft").waitFor({ state: "detached" });
