@@ -41,7 +41,8 @@ let%expect_test "opening asks for both lists; empty, it says what to do" =
   H.reply h "get_mcp_settings" {|{"servers":[]}|};
   H.reply h "list_mcp" {|{"servers":[],"problems":[]}|};
   section h;
-  [%expect {|
+  [%expect
+    {|
     (Focus dialog)
     (Rpc (method_ get_mcp_settings) (params ()) (tag Mcp_settings_loaded))
     (Rpc (method_ list_mcp) (params ()) (tag Mcp_host_listed))
@@ -65,10 +66,13 @@ let%expect_test "opening asks for both lists; empty, it says what to do" =
     |}]
 ;;
 
-let%expect_test "yours with health on this host, overridden, off; the host's below" =
+let%expect_test
+    "yours with health on this host, overridden, off; the host's below"
+  =
   let h = opened () in
   section h;
-  [%expect {|
+  [%expect
+    {|
     MCP servers
     Tools the model can use from MCP servers. The servers here are kept on the backend for your account and run on every host your sessions use; a host's ~/.prigh/mcp.json and a project's .mcp.json add their own.
     Your servers 3 servers
@@ -99,7 +103,8 @@ let%expect_test "secrets are password fields until shown" =
   H.show h ~selector:".mcp-pair-value";
   H.click h ~selector:".mcp-pair-show";
   H.show h ~selector:".mcp-pair-value";
-  [%expect {|
+  [%expect
+    {|
     (Focus mcp-name)
     <input type="password"
            aria-label="Environment variable 1: value"
@@ -129,7 +134,8 @@ let%expect_test "tools show and hide" =
   H.text h ~selector:".mcp-server[data-server=github]";
   H.click h ~selector:"[data-server=github] .mcp-tools-toggle";
   H.text h ~selector:".mcp-server[data-server=github]";
-  [%expect {|
+  [%expect
+    {|
     (Mcp_show_tools github)
     github https://api.githubcopilot.com/mcp/
     Ready on the backend · (2 tools)
@@ -143,7 +149,9 @@ let%expect_test "tools show and hide" =
     |}]
 ;;
 
-let%expect_test "add a command server: the form, Ctrl+Enter saves, the reply closes it" =
+let%expect_test
+    "add a command server: the form, Ctrl+Enter saves, the reply closes it"
+  =
   let h = opened () in
   H.click h ~selector:".mcp-add";
   H.text h ~selector:".mcp-draft";
@@ -151,8 +159,14 @@ let%expect_test "add a command server: the form, Ctrl+Enter saves, the reply clo
   H.input h ~selector:"#mcp-command" "uvx";
   H.input h ~selector:"#mcp-args" "mcp-server-search\n--port\n\n8080";
   H.click h ~selector:".mcp-pair-add";
-  H.input h ~selector:".mcp-pair input[aria-label='Environment variable 1: name']" "API_KEY";
-  H.input h ~selector:".mcp-pair input[aria-label='Environment variable 1: value']" "k-123";
+  H.input
+    h
+    ~selector:".mcp-pair input[aria-label='Environment variable 1: name']"
+    "API_KEY";
+  H.input
+    h
+    ~selector:".mcp-pair input[aria-label='Environment variable 1: value']"
+    "k-123";
   H.key h ~ctrl:true ~target:Field "Enter";
   H.text h ~selector:".mcp-draft";
   H.reply
@@ -169,7 +183,8 @@ let%expect_test "add a command server: the form, Ctrl+Enter saves, the reply clo
       "list_mcp"
       {|{"servers":[{"name":"search","source":"settings","project":false,"status":"ready","tools":[]}],"problems":[]}|});
   H.text h ~selector:".settings-panel";
-  [%expect {|
+  [%expect
+    {|
     (Mcp_edit ())
     (Focus mcp-name)
     New server
@@ -241,7 +256,8 @@ let%expect_test "add a URL server; a refusal stays in the form with the error" =
     "add_mcp_servers"
     {|there is already an MCP server "github" in the settings: choose another name, or edit that one|};
   H.text h ~selector:".mcp-draft";
-  [%expect {|
+  [%expect
+    {|
     (Mcp_edit ())
     (Focus mcp-name)
     (Mcp_field (Name github))
@@ -267,7 +283,8 @@ let%expect_test "an empty name or command is caught before sending" =
   H.click h ~selector:".mcp-add";
   H.click h ~selector:".mcp-save";
   H.text h ~selector:".mcp-draft";
-  [%expect {|
+  [%expect
+    {|
     (Mcp_edit ())
     (Focus mcp-name)
     Mcp_save
@@ -295,7 +312,8 @@ let%expect_test "edit: rename and change, Esc cancels without sending" =
   H.input h ~selector:"#mcp-name" "notebook";
   H.input h ~selector:"#mcp-command" "notes-mcp --stdio";
   H.click h ~selector:".mcp-save";
-  [%expect {|
+  [%expect
+    {|
     (Mcp_edit (notes))
     (Focus mcp-name)
     (Mcp_field (Name notebook))
@@ -349,7 +367,8 @@ let%expect_test "switch off and on; remove asks first, Keep and Esc keep it" =
   H.click h ~selector:"#mcp-remove-yes";
   H.reply h "remove_mcp_server" {|{"servers":[]}|};
   H.text h ~selector:".settings-panel";
-  [%expect {|
+  [%expect
+    {|
     (Mcp_toggle github)
     (Rpc (method_ set_mcp_server_enabled)
      (params ((name github) (enabled false))) (tag (Mcp_toggled github)))
@@ -421,7 +440,10 @@ let%expect_test "paste mcpServers JSON; a mistake is shown in place" =
   H.click h ~selector:".mcp-paste-open";
   H.input h ~selector:"#mcp-paste-text" {|{"mcpServers": {"x": {}}}|};
   H.key h ~ctrl:true ~target:Field "Enter";
-  H.fail h "add_mcp_servers" {|server "x": give a "command" (stdio) or a "url" (http)|};
+  H.fail
+    h
+    "add_mcp_servers"
+    {|server "x": give a "command" (stdio) or a "url" (http)|};
   H.text h ~selector:".mcp-paste";
   H.input
     h
@@ -433,7 +455,8 @@ let%expect_test "paste mcpServers JSON; a mistake is shown in place" =
     "add_mcp_servers"
     {|{"servers":[{"name":"x","enabled":true,"config":{"command":"x-mcp"}}]}|};
   H.text h ~selector:".settings-panel";
-  [%expect {|
+  [%expect
+    {|
     Mcp_paste
     (Focus mcp-paste-text)
     (Mcp_paste_text "{\"mcpServers\": {\"x\": {}}}")
@@ -478,7 +501,8 @@ let%expect_test "the host's: approve a project's server, retry the failed" =
   let h = opened () in
   H.click h ~selector:"[data-server=db] button";
   H.click h ~selector:"[data-server=web] button";
-  [%expect {|
+  [%expect
+    {|
     (Mcp_approve (source /work/.mcp.json) (server db))
     (Rpc (method_ mcp_approve) (params ((source /work/.mcp.json) (server db)))
      (tag Mcp_host_listed))
@@ -493,7 +517,8 @@ let%expect_test "another client's change arrives as an event" =
     h
     {|{"type":"event","event":"mcp_settings_changed","servers":[{"name":"only","enabled":true,"config":{"command":"only-mcp"}}]}|};
   H.text h ~selector:".settings-panel";
-  [%expect {|
+  [%expect
+    {|
     (Rpc (method_ list_mcp) (params ()) (tag Mcp_host_listed))
     MCP servers
     Tools the model can use from MCP servers. The servers here are kept on the backend for your account and run on every host your sessions use; a host's ~/.prigh/mcp.json and a project's .mcp.json add their own.
@@ -508,14 +533,19 @@ let%expect_test "another client's change arrives as an event" =
     |}]
 ;;
 
-let%expect_test "/mcp add in the composer; a refusal comes back to the composer" =
+let%expect_test "/mcp add in the composer; a refusal comes back to the composer"
+  =
   let h = H.create () in
   H.type_ h "/mcp add docs https://docs.example.com/mcp";
   H.key h "Enter";
-  H.fail h "add_mcp_servers" {|there is already an MCP server "docs" in the settings|};
+  H.fail
+    h
+    "add_mcp_servers"
+    {|there is already an MCP server "docs" in the settings|};
   H.text h ~selector:".toast";
   print_s [%sexp ((H.model h).draft : string)];
-  [%expect {|
+  [%expect
+    {|
     Send
     (Rpc (method_ push_pref)
      (params

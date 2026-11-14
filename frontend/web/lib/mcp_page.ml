@@ -21,7 +21,7 @@ module Pair = struct
   let sexp_of_t { key; value; shown } =
     [%sexp
       (key : string)
-      , (if shown || String.is_empty value then value else "<hidden>" : string)]
+    , (if shown || String.is_empty value then value else "<hidden>" : string)]
   ;;
 end
 
@@ -90,7 +90,11 @@ module Draft = struct
         then None
         else Some (key, p.value))
     in
-    let what = match t.kind with Stdio -> "variable" | Http -> "header" in
+    let what =
+      match t.kind with
+      | Stdio -> "variable"
+      | Http -> "header"
+    in
     if List.exists pairs ~f:(fun (k, _) -> String.is_empty k)
     then Error (sprintf "give every %s a name, or clear its value" what)
     else (
@@ -224,8 +228,7 @@ let health t (s : Mcp_settings.Server.t) : Health.t =
        | Some h ->
          (match h.status with
           | Ready -> Ready h.tools
-          | Failed ->
-            Failed (Option.value h.error ~default:"it did not start")
+          | Failed -> Failed (Option.value h.error ~default:"it did not start")
           | Needs_approval -> Not_listed)))
 ;;
 
@@ -282,7 +285,9 @@ let save t =
   | None | Some { saving = true; _ } -> t, None
   | Some d ->
     let name = String.strip d.name in
-    let refuse error = { t with draft = Some { d with error = Some error } }, None in
+    let refuse error =
+      { t with draft = Some { d with error = Some error } }, None
+    in
     if String.is_empty name
     then refuse "give the server a name: its tools are called mcp__NAME__TOOL"
     else (
@@ -308,7 +313,8 @@ let saved t = function
   | Error e ->
     { t with
       draft =
-        Option.map t.draft ~f:(fun d -> { d with saving = false; error = Some e })
+        Option.map t.draft ~f:(fun d ->
+          { d with saving = false; error = Some e })
     }
 ;;
 
@@ -354,7 +360,8 @@ let pasted t = function
   | Error e ->
     { t with
       paste =
-        Option.map t.paste ~f:(fun p -> { p with saving = false; error = Some e })
+        Option.map t.paste ~f:(fun p ->
+          { p with saving = false; error = Some e })
     }
 ;;
 

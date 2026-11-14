@@ -1951,8 +1951,8 @@ let refresh_mcp (m : Model.t) = m, mcp_lists
 let mcp_save (m : Model.t) =
   let mcp, request = Mcp_page.save m.mcp in
   ( { m with mcp }
-  , Option.to_list (Option.map request ~f:(fun r -> call r ~tag:Mcp_draft_saved))
-  )
+  , Option.to_list
+      (Option.map request ~f:(fun r -> call r ~tag:Mcp_draft_saved)) )
 ;;
 
 let mcp_paste_save (m : Model.t) =
@@ -10607,8 +10607,7 @@ let update_connected (m : Model.t) (action : Action.t) =
   | Memory_forget_cancel ->
     { m with memory = Memory_notes.cancel_forget m.memory }, []
   | Mcp_edit name ->
-    ( { m with mcp = Mcp_page.edit m.mcp name }
-    , [ Command.Focus "mcp-name" ] )
+    { m with mcp = Mcp_page.edit m.mcp name }, [ Command.Focus "mcp-name" ]
   | Mcp_field field -> { m with mcp = Mcp_page.set m.mcp field }, []
   | Mcp_save -> mcp_save m
   | Mcp_cancel -> { m with mcp = Mcp_page.cancel m.mcp }, []

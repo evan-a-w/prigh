@@ -24,7 +24,9 @@ let home (m : App.Model.t) =
      | Disconnected _ | Unset -> None)
 ;;
 
-let plural n word = if n = 1 then sprintf "1 %s" word else sprintf "%d %ss" n word
+let plural n word =
+  if n = 1 then sprintf "1 %s" word else sprintf "%d %ss" n word
+;;
 
 let tools_list (tools : Mcp_server.Tool.t list) =
   Node.ul
@@ -65,8 +67,7 @@ let health_note (m : App.Model.t) (s : Mcp_settings.Server.t) ~inject =
         ]
     , [] )
   | Failed e ->
-    ( note "warm" [ Node.textf "Failed on %s: %s" host (String.capitalize e) ]
-    , [] )
+    note "warm" [ Node.textf "Failed on %s: %s" host (String.capitalize e) ], []
   | Overridden source ->
     ( note
         "warm"
@@ -276,7 +277,8 @@ let draft_form (d : Mcp_page.Draft.t) ~inject =
                    ${VAR} takes VAR from the tool host's environment."
               ])
        ; (match d.error with
-          | Some e -> span ~cls:"setting-note warm mcp-error" (String.capitalize e)
+          | Some e ->
+            span ~cls:"setting-note warm mcp-error" (String.capitalize e)
           | None -> Node.none)
        ; div
            ~cls:"mcp-buttons"
@@ -403,8 +405,10 @@ let server_row (m : App.Model.t) (s : Mcp_settings.Server.t) ~inject =
                   ~label:("Use " ^ s.name)
                   ~title:
                     (if s.enabled
-                     then sprintf "Stop it on every host (/mcp disable %s)" s.name
-                     else sprintf "Start it on every host (/mcp enable %s)" s.name)
+                     then
+                       sprintf "Stop it on every host (/mcp disable %s)" s.name
+                     else
+                       sprintf "Start it on every host (/mcp enable %s)" s.name)
                   ~on:s.enabled
                   ~on_click:(inject (Action.Mcp_toggle s.name))
                   ()
@@ -447,7 +451,8 @@ let host_row (m : App.Model.t) (s : Mcp_server.t) ~inject =
       ( span
           ~cls:"setting-note warm mcp-health"
           ("Failed: "
-           ^ String.capitalize (Option.value s.error ~default:"it did not start"))
+           ^ String.capitalize
+               (Option.value s.error ~default:"it did not start"))
       , [ button
             ~cls:"small"
             ~disabled:busy
@@ -465,7 +470,8 @@ let host_row (m : App.Model.t) (s : Mcp_server.t) ~inject =
             ~attrs:(if busy then [ Attr.create "aria-busy" "true" ] else [])
             ~title:"Run it in this project's sessions"
             ~on_click:
-              (inject (Action.Mcp_approve { source = s.source; server = s.name }))
+              (inject
+                 (Action.Mcp_approve { source = s.source; server = s.name }))
             [ Node.text (if busy then "Approving…" else "Approve") ]
         ] )
   in
@@ -524,16 +530,18 @@ let settings_servers (m : App.Model.t) ~inject =
     | None -> []
   in
   match p.status with
-  | Unknown | Loading when List.is_empty p.servers ->
-    [ row ~name:"Reading your servers…" ~about:"" ~note:("muted", "Waiting…") [] ]
+  | (Unknown | Loading) when List.is_empty p.servers ->
+    [ row ~name:"Reading your servers…" ~about:"" ~note:("muted", "Waiting…") []
+    ]
   | Failed e ->
     [ row
         ~name:"Couldn't read your servers"
         ~about:"Kept on the backend, for your account."
         ~note:
           ( "warm"
-          , sprintf "Could not read them: %s. Open the section again to retry." e
-          )
+          , sprintf
+              "Could not read them: %s. Open the section again to retry."
+              e )
         []
     ]
   | Unknown | Loading | Loaded ->
