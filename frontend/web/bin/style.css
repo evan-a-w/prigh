@@ -731,7 +731,7 @@ kbd {
   word-break: break-word;
 }
 .confirm-answers { display: flex; flex-direction: column; gap: 6px; }
-.btn.confirm-answer { justify-content: flex-start; gap: 10px; text-align: left; height: auto; min-height: 32px; padding: 5px 10px; }
+.btn.confirm-answer { justify-content: flex-start; gap: 10px; text-align: left; height: auto; min-height: 32px; padding: 5px 10px; white-space: normal; overflow-wrap: anywhere; }
 .btn.confirm-answer kbd { flex-shrink: 0; }
 .btn.confirm-answer.primary kbd { background: var(--sodium-ink); color: var(--sodium); border-color: transparent; }
 .btn.confirm-answer.always { border-color: var(--sodium-line); }

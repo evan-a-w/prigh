@@ -515,6 +515,7 @@
   .app.narrow .composer .model-chip { padding-left: 6px; padding-right: 6px; }
   /* "auto-edit" whole: a longer word gets the room it needs. */
   .session-choice { flex: 1 1 auto; padding: 0 2px; font-size: 13px; }
+  .mode-choices > .session-choice { padding: 0 2px; }
 }
 /* A phone on its side has the room: the chips are back in the row (the ⋯
    sheet keeps them too). */
