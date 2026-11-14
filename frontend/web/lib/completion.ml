@@ -88,8 +88,18 @@ let argument_items
   match kind with
   | Model -> model_items models ~auth ~current_model
   | Thinking ->
-    List.map Prigh_ui.Commands.thinking_levels ~f:(fun level ->
-      Picker.Item.create ~id:level level)
+    let llm =
+      Option.bind current_model ~f:(fun key ->
+        List.find models ~f:(fun (l : Llm.t) -> String.equal l.key key))
+    in
+    List.map
+      (Option.value_map llm ~default:Thinking.all ~f:Thinking.options)
+      ~f:(fun level ->
+        Picker.Item.create
+          ~id:level
+          ~search:level
+          ~detail:(Thinking.description level)
+          (Thinking.label level))
   | Login ->
     List.map auth ~f:(fun s ->
       Picker.Item.create
@@ -192,6 +202,11 @@ let argument_items
       [ "on", "the model can save and recall your notes"
       ; "off", "the model is not given the memory tool"
       ]
+  | Instructions ->
+    simple
+      [ "on", "the model may add, edit and remove your custom instructions"
+      ; "off", "the model may not change them (they stay in context)"
+      ]
   | Settings ->
     List.map (Settings_section.available ~superuser) ~f:(fun section ->
       let arg = Settings_section.arg section in
@@ -259,6 +274,7 @@ let argument_items
   | Path
   | Remind
   | Compaction
+  | Generate_model
   | Naming
   | Dictation
   | Worktree
@@ -386,13 +402,20 @@ let compute
                 with
                 | [] -> None
                 | items -> Some (make (Argument kind) ~prefix:word ~start items))
-             | (Remind | Compaction | Naming | Dictation | Worktree | Review) as
-               kind ->
+             | ( Remind
+               | Compaction
+               | Generate_model
+               | Naming
+               | Dictation
+               | Worktree
+               | Review ) as kind ->
                let rest = String.lstrip rest in
                Option.bind
                  (match kind with
                   | Compaction ->
                     Prigh_ui.Compaction_command.complete ~models rest
+                  | Generate_model ->
+                    Prigh_ui.Generate_model_command.complete ~models rest
                   | Naming -> Prigh_ui.Naming_command.complete ~models rest
                   | Dictation -> Prigh_ui.Dictation_command.complete rest
                   | Worktree ->

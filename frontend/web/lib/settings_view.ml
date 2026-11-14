@@ -79,124 +79,10 @@ let model_name (m : App.Model.t) key =
   | None -> key
 ;;
 
-(* What new sessions ask before they act; the backend applies it to this
-   session too. Plan is a session's, not a default: the composer's chip. *)
-let default_mode (m : App.Model.t) ~inject =
-  let current = Option.map m.config ~f:(fun c -> c.approval_mode) in
-  row
-    ~cls:"default-mode"
-    ~name:"Mode"
-    ~about:
-      "What asks before it runs: everything (Ask), all but file edits \
-       (Auto-edit) or nothing (Auto). This session changes too."
-    ?note:(Option.value_map current ~default:(Some waiting) ~f:(fun _ -> None))
-    [ segmented
-        ~disabled:(Option.is_none current)
-        ~label:"Default mode"
-        (List.map Approval_mode.all ~f:(fun mode ->
-           let arg = Approval_mode.to_string mode in
-           ( (match mode with
-              | Ask -> "Ask"
-              | Auto_edit -> "Auto-edit"
-              | Auto -> "Auto")
-           , "/confirm " ^ arg
-           , Option.equal Approval_mode.equal current (Some mode)
-           , inject (Action.Run ("/confirm " ^ arg)) )))
-    ]
-;;
-
-let default_model (m : App.Model.t) ~inject =
-  let current =
-    match m.config with
-    | None -> None
-    | Some { default_model = None; _ } -> Some "the backend's default"
-    | Some { default_model = Some key; default_thinking; _ } ->
-      Some
-        (match default_thinking with
-         | Some level when not (String.equal level "off") ->
-           sprintf "%s · thinking %s" (model_name m key) level
-         | _ -> model_name m key)
-  in
-  let this =
-    Option.map m.state ~f:(fun s ->
-      if s.model.supports_thinking && not (String.equal s.thinking "off")
-      then sprintf "%s · thinking %s" s.model.name s.thinking
-      else s.model.name)
-  in
-  row
-    ~cls:"default-model"
-    ~name:"Model"
-    ~about:
-      (match current with
-       | Some current -> "New sessions start with " ^ current ^ "."
-       | None -> "The model and thinking level new sessions start with.")
-    ?note:(Option.value_map current ~default:(Some waiting) ~f:(fun _ -> None))
-    [ button
-        ~cls:"small"
-        ~title:
-          (match this with
-           | Some this ->
-             sprintf "Start new sessions with %s (/change_default)" this
-           | None -> "/change_default")
-        ~disabled:(Option.is_none m.config || Option.is_none m.state)
-        ~on_click:(inject (Action.Run "/change_default"))
-        [ Node.text "Use this session’s" ]
-    ]
-;;
-
-let default_dir (m : App.Model.t) ~inject =
-  let current = Option.bind m.config ~f:(fun c -> c.default_cwd) in
-  row
-    ~cls:"default-dir"
-    ~name:"Starting directory"
-    ~about:
-      (match current with
-       | Some dir -> "New sessions start in " ^ dir ^ "."
-       | None ->
-         "New sessions start in the tool host's home. /default-dir PATH sets \
-          one.")
-    (match current with
-     | Some _ ->
-       [ button
-           ~cls:"small"
-           ~title:"Start in the home directory again (/default-dir off)"
-           ~on_click:(inject (Action.Run "/default-dir off"))
-           [ Node.text "Reset" ]
-       ]
-     | None -> [])
-;;
-
-let fallback (m : App.Model.t) ~inject =
-  let models =
-    Option.value_map m.config ~default:[] ~f:(fun c -> c.fallback_models)
-  in
-  row
-    ~cls:"fallback"
-    ~name:"Fallback models"
-    ~about:
-      (match models with
-       | [] ->
-         "When a model's usage runs out, the session stops. /fallback MODEL… \
-          names models to take over, in order."
-       | models ->
-         "When a model's usage runs out: "
-         ^ String.concat ~sep:", then " (List.map models ~f:(model_name m))
-         ^ ".")
-    (match models with
-     | [] -> []
-     | _ ->
-       [ button
-           ~cls:"small"
-           ~title:"No fallback (/fallback off)"
-           ~on_click:(inject (Action.Run "/fallback off"))
-           [ Node.text "Clear" ]
-       ])
-;;
-
 module Compaction_command = Prigh_ui.Compaction_command
 
 let compact_at (m : App.Model.t) (config : Config.t option) ~inject =
-  let off = Option.exists config ~f:(fun c -> c.compact_at_tokens <= 0) in
+  let on = Option.exists config ~f:(fun c -> c.compact_at_tokens > 0) in
   let error = Compact_at.error m.compact_at in
   let value =
     match Compact_at.draft m.compact_at, config with
@@ -205,7 +91,6 @@ let compact_at (m : App.Model.t) (config : Config.t option) ~inject =
       Compaction_command.tokens c.compact_at_tokens
     | None, _ -> ""
   in
-  let disabled = Option.is_none config in
   row
     ~cls:"compact-at"
     ~name:"Compact at"
@@ -215,57 +100,28 @@ let compact_at (m : App.Model.t) (config : Config.t option) ~inject =
     ?note:
       (match error, config with
        | Some e, _ -> Some ("warm", e)
-       | None, None -> Some ("muted", "Waiting for the backend's settings…")
-       | None, Some _ when off ->
-         Some
-           ("muted", "Off: only at 80% of the window. Type a number to set one.")
+       | None, None -> Some waiting
+       | None, Some _ when not on ->
+         Some ("muted", "Off: only at 80% of the window.")
        | None, Some _ -> None)
-    [ Node.div
-        ~attrs:
-          [ Attr.class_ "segmented"
-          ; Attr.role "group"
-          ; Attr.create "aria-label" "Compact at"
-          ]
-        [ Node.label
-            ~attrs:
-              [ classes [ "segment"; "compact-at-field" ] [ "on", not off ] ]
-            [ Node.input
-                ~attrs:
-                  [ Attr.id "compact-at"
-                  ; Attr.class_ "compact-at-input"
-                  ; Attr.type_ "text"
-                  ; Attr.value value
-                  ; Attr.placeholder (if off then "150k" else "200k")
-                  ; Attr.title "/compaction at TOKENS, e.g. 150k or 200000"
-                  ; Attr.create "aria-label" "Compact at, in tokens"
-                  ; Attr.create
-                      "aria-invalid"
-                      (Bool.to_string (Option.is_some error))
-                  ; Attr.create "autocomplete" "off"
-                  ; Attr.create "spellcheck" "false"
-                  ; (if disabled then Attr.disabled else Attr.empty)
-                  ; Attr.on_input (fun _ text ->
-                      inject (Action.Compact_at_input text))
-                  ; Attr.on_change (fun _ _ -> inject Action.Compact_at_commit)
-                  ]
-                ()
-            ; span ~cls:"compact-at-unit" "tokens"
-            ]
-        ; Node.button
-            ~attrs:
-              [ classes [ "segment" ] [ "on", off ]
-              ; Attr.type_ "button"
-              ; Attr.create "aria-pressed" (Bool.to_string off)
-              ; Attr.title
-                  "Only at 80% of the model's window (/compaction at off)"
-              ; (if disabled
-                 then Attr.disabled
-                 else
-                   Attr.on_click (fun _ ->
-                     inject (Action.Run "/compaction at off")))
-              ]
-            [ Node.text "Off" ]
-        ]
+    [ number_switch
+        ~disabled:(Option.is_none config)
+        ~id:"compact-at"
+        ~label:"Compact at"
+        ~unit:"tokens"
+        ~value
+        ~placeholder:"200k"
+        ~title:"/compaction at TOKENS, e.g. 150k or 200000"
+        ~switch_title:
+          (if on
+           then "Only at 80% of the model's window (/compaction at off)"
+           else "Also at a number of tokens (/compaction at TOKENS)")
+        ~invalid:(Option.is_some error)
+        ~on
+        ~on_input:(fun text -> inject (Action.Compact_at_input text))
+        ~on_commit:(inject Action.Compact_at_commit)
+        ~on_switch:(fun on -> inject (Action.Switch_number (Compact_at, on)))
+        ()
     ]
 ;;
 
@@ -315,6 +171,29 @@ let mask (config : Config.t option) ~inject =
     ]
 ;;
 
+let generate_model (m : App.Model.t) ~inject =
+  let current =
+    match Option.bind m.config ~f:(fun c -> c.generate_model) with
+    | None -> "Default"
+    | Some key -> model_name m key
+  in
+  row
+    ~cls:"generate-model"
+    ~name:"Drafting"
+    ~about:
+      (* A no-break space keeps "✦ Generate" on one line. *)
+      "Drafts commit messages, pull request descriptions and branch names \
+       (✦\xC2\xA0Generate). Default: the session's model."
+    [ select
+        ~cls:"generate-model-choice"
+        ~title:"Choose the model (/generate-model)"
+        ~label:("Drafting model: " ^ current)
+        ~disabled:(Option.is_none m.config)
+        ~on_click:(inject (Action.Run "/generate-model"))
+        current
+    ]
+;;
+
 let naming_model (m : App.Model.t) ~inject =
   let current =
     match Option.bind m.config ~f:(fun c -> c.naming_model) with
@@ -326,7 +205,7 @@ let naming_model (m : App.Model.t) ~inject =
     ~name:"Naming"
     ~about:
       "Titles sessions and names subagents: a small, fast model is plenty. \
-       Default: the generate model, else the session's."
+       Default: the drafting model, else the session's."
     [ select
         ~cls:"naming-model-choice"
         ~title:"Choose the model (/naming model)"
@@ -372,6 +251,135 @@ let dictation_model (m : App.Model.t) ~inject =
         ~disabled:(Option.is_none m.config)
         ~on_click:(inject (Action.Run "/dictation model"))
         current
+    ]
+;;
+
+(* One of the session list's numbers, behind its switch. *)
+let sessions_number
+      (m : App.Model.t)
+      (which : Sessions_fields.Which.t)
+      ~id
+      ~label
+      ~unit
+      ~placeholder
+      ~title
+      ~switch_title
+      ~current
+      ~inject
+  =
+  let on = Option.exists current ~f:(fun n -> Float.(n > 0.)) in
+  let value =
+    match Sessions_fields.draft m.sessions_fields which, current with
+    | Some draft, _ -> draft
+    | None, Some n when Float.(n > 0.) -> sprintf "%g" n
+    | None, _ -> ""
+  in
+  let key : Switched_off.Key.t =
+    match which with
+    | Worktree_hours -> Worktree_hours
+    | Archive_days -> Archive_days
+  in
+  number_switch
+    ~disabled:(Option.is_none current)
+    ~id
+    ~label
+    ~unit
+    ~value
+    ~placeholder
+    ~title
+    ~switch_title:(switch_title on)
+    ~invalid:(Option.is_some (Sessions_fields.error m.sessions_fields which))
+    ~on
+    ~on_input:(fun text ->
+      inject (App.Action.Sessions_field_input (which, text)))
+    ~on_commit:(inject (App.Action.Sessions_field_commit which))
+    ~on_switch:(fun on -> inject (App.Action.Switch_number (key, on)))
+    ()
+;;
+
+(* A display preference, the user's on every browser: the TUI's list has no
+   folds. *)
+let worktree_hours (m : App.Model.t) ~inject =
+  let hours = Worktree_folds.hours m.worktree_folds in
+  let which = Sessions_fields.Which.Worktree_hours in
+  row
+    ~cls:"worktree-hours"
+    ~scope:Account
+    ~name:"Show worktrees"
+    ~about:
+      (sprintf
+         "Show worktrees for sessions used %s; older ones fold them behind \
+          their count. Your own fold or unfold of a session wins."
+         (if hours = 0
+          then "recently"
+          else "in the last " ^ Worktree_folds.hours_string hours))
+    ?note:
+      (match Sessions_fields.error m.sessions_fields which with
+       | Some e -> Some ("warm", e)
+       | None when hours = 0 ->
+         Some ("muted", "Off: every session's worktrees start folded.")
+       | None -> None)
+    [ sessions_number
+        m
+        which
+        ~id:"worktree-hours"
+        ~label:"Show worktrees for sessions used in the last"
+        ~unit:"hours"
+        ~placeholder:(Int.to_string Worktree_folds.default_hours)
+        ~title:
+          (sprintf
+             "Hours, 1 to %d (default %d)"
+             Worktree_folds.max_hours
+             Worktree_folds.default_hours)
+        ~switch_title:(fun on ->
+          if on
+          then "Fold every session's worktrees until opened"
+          else "Show recent sessions' worktrees")
+        ~current:(Some (Float.of_int hours))
+        ~inject
+    ]
+;;
+
+let auto_archive (m : App.Model.t) ~inject =
+  let which = Sessions_fields.Which.Archive_days in
+  let days = Option.map m.config ~f:(fun c -> c.archive_after_days) in
+  row
+    ~cls:"auto-archive"
+    ~name:"Archive after"
+    ~about:
+      (match days with
+       | Some d when Float.(d > 0.) ->
+         sprintf
+           "Sessions without activity for %s move to Archived (pinned and \
+            running ones never do)."
+           (Prigh_ui.Auto_archive_command.days d)
+       | _ ->
+         "Sessions without activity this many days move to Archived (pinned \
+          and running ones never do).")
+    ?note:
+      (match Sessions_fields.error m.sessions_fields which, days with
+       | Some e, _ -> Some ("warm", e)
+       | None, None -> Some waiting
+       | None, Some d when Float.(d <= 0.) ->
+         Some ("muted", "Off: sessions are archived only by hand.")
+       | None, Some _ -> None)
+    [ sessions_number
+        m
+        which
+        ~id:"auto-archive"
+        ~label:"Archive sessions after"
+        ~unit:"days"
+        ~placeholder:"7"
+        ~title:
+          (sprintf
+             "/auto-archive DAYS: up to %g days"
+             Prigh_ui.Auto_archive_command.max_days)
+        ~switch_title:(fun on ->
+          if on
+          then "Archive only by hand (/auto-archive off)"
+          else "Archive sessions without activity (/auto-archive DAYS)")
+        ~current:days
+        ~inject
     ]
 ;;
 
@@ -739,11 +747,114 @@ let memory_draft (d : Memory_notes.Draft.t) ~inject =
 ;;
 
 (* What the user wrote about themselves: one text, saved as a whole. *)
+let about_you_field
+      (m : App.Model.t)
+      (field : About_you.Field.t)
+      ~inject
+      ~disabled
+  =
+  let a = m.about_you in
+  let id =
+    "about-you-"
+    ^ String.tr (About_you.Field.wire field) ~target:'_' ~replacement:'-'
+  in
+  let value = About_you.value a field in
+  let on_input =
+    Attr.on_input (fun _ v -> inject (Action.About_you_field (field, v)))
+  in
+  let common =
+    [ Attr.id id
+    ; (if disabled then Attr.disabled else Attr.empty)
+    ; (match About_you.max a field with
+       | 0 -> Attr.empty
+       | max -> Attr.create "maxlength" (Int.to_string max))
+    ]
+  in
+  let control =
+    match About_you.Field.choices field with
+    | Some choices ->
+      div ~cls:"about-you-choice" ~attrs:[ Attr.id id ]
+      @@ [ segmented
+             ~disabled
+             ~label:(About_you.Field.label field)
+             (List.map
+                (("", "Not set", "Leave it out") :: choices)
+                ~f:(fun (wire, short, label) ->
+                  ( short
+                  , label
+                  , String.equal wire value
+                  , inject (Action.About_you_field (field, wire)) )))
+         ]
+    | None when About_you.Field.multiline field ->
+      Node.textarea
+        ~attrs:
+          (common
+           @ [ Attr.class_ "text-input about-you-input"
+             ; Attr.placeholder (About_you.Field.placeholder field)
+             ; Attr.value value
+             ; Attr.rows
+                 (match field with
+                  | Anything_else -> 5
+                  | _ -> 3)
+             ; on_input
+             ])
+        []
+    | None ->
+      Node.input
+        ~attrs:
+          (common
+           @ [ Attr.class_ "text-input about-you-line"
+             ; Attr.type_ "text"
+             ; Attr.placeholder (About_you.Field.placeholder field)
+             ; Attr.value value
+             ; Attr.create "autocomplete" "off"
+             ; on_input
+             ])
+        ()
+  in
+  let detected =
+    match field, m.browser_time_zone with
+    | Time_zone, Some zone when not (String.equal (String.strip value) zone) ->
+      Some
+        (button
+           ~cls:"small about-you-detect"
+           ~title:("Fill in this browser's time zone, " ^ zone)
+           ~disabled
+           ~on_click:(inject (Action.About_you_field (Time_zone, zone)))
+           [ Node.text ("Use " ^ zone) ])
+    | _ -> None
+  in
+  div
+    ~cls:
+      ("about-you-field"
+       ^ if About_you.Field.multiline field then " wide" else "")
+    ~attrs:[ Attr.id (id ^ "-field") ]
+    [ Node.label
+        ~attrs:
+          [ (match About_you.Field.choices field with
+             | Some _ -> Attr.empty
+             | None -> Attr.for_ id)
+          ; Attr.class_ "about-you-label"
+          ]
+        [ Node.text (About_you.Field.label field) ]
+    ; (match detected with
+       | None -> control
+       | Some detected -> div ~cls:"about-you-with" [ control; detected ])
+    ]
+;;
+
 let about_you (m : App.Model.t) ~inject =
   let a = m.about_you in
-  let text = About_you.text a in
-  let size = String.length (String.strip text) in
-  let max = a.info.max in
+  let size =
+    List.sum
+      (module Int)
+      About_you.Field.all
+      ~f:(fun field ->
+        match About_you.Field.choices field with
+        | Some _ -> 0
+        | None -> String.length (String.strip (About_you.value a field)))
+  in
+  let max = a.info.max_total in
   let dirty = About_you.dirty a in
   let ready = About_you.Status.equal a.status Loaded in
   let note cls text = span ~cls:("setting-note " ^ cls) text in
@@ -754,7 +865,7 @@ let about_you (m : App.Model.t) ~inject =
       note
         "warm about-you-error"
         (sprintf "Could not read it: %s. Open the section again to retry." e)
-    | (Unknown | Loading), None -> note "muted" "Reading what you wrote…"
+    | (Unknown | Loading), None -> note "muted" "Reading what you set…"
     | Loaded, None when a.elsewhere ->
       div
         ~cls:"about-you-elsewhere"
@@ -764,7 +875,7 @@ let about_you (m : App.Model.t) ~inject =
              replaces that with this."
         ; button
             ~cls:"small"
-            ~title:"Drop what is typed here for the text as it is saved now"
+            ~title:"Drop what is typed here for the form as it is saved now"
             ~on_click:(inject Action.About_you_revert)
             [ Node.text "Load that one" ]
         ]
@@ -772,41 +883,29 @@ let about_you (m : App.Model.t) ~inject =
       note
         "good about-you-saved"
         (if String.is_empty a.info.text
-         then "Removed. Open sessions are told with your next message in them."
+         then "Cleared. Open sessions are told with your next message in them."
          else
            "Saved. New sessions start with it; open ones get it with your next \
             message in them.")
     | Loaded, None -> Node.none
   in
+  let disabled = a.saving || not ready in
   div
     ~cls:"setting about-you"
     [ div
         ~cls:"setting-text"
-        [ span ~cls:"setting-name" "Describe yourself"
+        [ span ~cls:"setting-name" "Tell the model about you"
         ; span
             ~cls:"setting-about"
-            "Who you are, what you work on, how you like answers. This text is \
-             given to the model in every session: new ones start with it, and \
-             open ones get it with your next message. Memory is for notes the \
-             model looks up only when it needs them."
+            "Every field is optional. What you fill in is given to the model \
+             in every session: new ones start with it, and open ones get it \
+             with your next message. Memory is for notes the model looks up \
+             only when it needs them."
         ]
-    ; Node.textarea
-        ~attrs:
-          [ Attr.id "about-you-text"
-          ; Attr.class_ "text-input about-you-input"
-          ; Attr.create "aria-label" "About you"
-          ; Attr.placeholder
-              "I'm a backend engineer working mostly in OCaml. Keep answers \
-               short, and ask before adding a dependency."
-          ; Attr.value text
-          ; Attr.rows 8
-          ; (if max > 0
-             then Attr.create "maxlength" (Int.to_string max)
-             else Attr.empty)
-          ; (if a.saving || not ready then Attr.disabled else Attr.empty)
-          ; Attr.on_input (fun _ text -> inject (Action.About_you_text text))
-          ]
-        []
+    ; div
+        ~cls:"about-you-form"
+        (List.map About_you.Field.all ~f:(fun field ->
+           about_you_field m field ~inject ~disabled))
     ; status
     ; div
         ~cls:"about-you-buttons"
@@ -824,7 +923,7 @@ let about_you (m : App.Model.t) ~inject =
            then
              button
                ~cls:"small ghost"
-               ~title:"Back to the text as it is saved"
+               ~title:"Back to the form as it is saved"
                ~disabled:a.saving
                ~on_click:(inject Action.About_you_revert)
                [ Node.text "Revert" ]
@@ -991,6 +1090,259 @@ let memory_notes (m : App.Model.t) ~inject =
         | visible -> List.map visible ~f:(memory_note n ~inject))
 ;;
 
+(* The user's custom instructions: whether the model may change them, and
+   the list, each to edit or delete, with what they cost every session. *)
+let instructions_switch (m : App.Model.t) ~inject =
+  let n = m.instructions in
+  let on = n.instructions.enabled in
+  row
+    ~cls:"instructions-enabled"
+    ~name:"Let the model change them"
+    ~about:
+      "When you state a lasting preference or standing instruction, the model \
+       adds it here or edits the one that covers it, and tells you. Off, only \
+       you change them; they stay in every session either way."
+    ?note:
+      (match n.status with
+       | Unknown | Loading -> Some ("muted", "Reading your instructions…")
+       | Loaded | Failed _ -> None)
+    [ switch
+        ~disabled:(not (Instruction_notes.Status.equal n.status Loaded))
+        ~label:"Let the model change them"
+        ~title:
+          (if on
+           then "Only you change them (/instructions off)"
+           else "Let the model add and edit them (/instructions on)")
+        ~on
+        ~on_click:
+          (inject
+             (Action.Run
+                (if on then "/instructions off" else "/instructions on")))
+        ()
+    ]
+;;
+
+let instruction_draft
+      (n : Instruction_notes.t)
+      (d : Instruction_notes.Draft.t)
+      ~inject
+  =
+  let limits = n.instructions.limits in
+  div
+    ~cls:"setting memory-draft instruction-draft"
+    [ Node.input
+        ~attrs:
+          [ Attr.id "instruction-title"
+          ; Attr.class_ "text-input memory-title-input"
+          ; Attr.type_ "text"
+          ; Attr.create "aria-label" "Title"
+          ; Attr.placeholder "Title (optional): a few words"
+          ; Attr.value d.title
+          ; Attr.create "maxlength" (Int.to_string limits.title)
+          ; Attr.create "autocomplete" "off"
+          ; (if d.saving then Attr.disabled else Attr.empty)
+          ; Attr.on_input (fun _ text -> inject (Action.Instruction_title text))
+          ]
+        ()
+    ; Node.textarea
+        ~attrs:
+          [ Attr.id "instruction-text"
+          ; Attr.class_ "text-input memory-text-input"
+          ; Attr.create "aria-label" "Instruction"
+          ; Attr.placeholder
+              "What the model should always do, e.g. “Use Australian spelling.”"
+          ; Attr.value d.text
+          ; Attr.rows 3
+          ; Attr.create "maxlength" (Int.to_string limits.text)
+          ; (if d.saving then Attr.disabled else Attr.empty)
+          ; Attr.on_input (fun _ text -> inject (Action.Instruction_text text))
+          ]
+        []
+    ; (match d.error with
+       | Some e -> span ~cls:"setting-note warm" e
+       | None -> Node.none)
+    ; div
+        ~cls:"memory-draft-buttons"
+        [ span ~cls:"memory-draft-keys" "Ctrl+Enter saves, Esc cancels"
+        ; button
+            ~cls:"small ghost"
+            ~title:"Esc"
+            ~on_click:(inject Action.Instruction_cancel)
+            [ Node.text "Cancel" ]
+        ; button
+            ~cls:"small primary"
+            ~title:"Ctrl+Enter (Enter in the title)"
+            ~disabled:d.saving
+            ~attrs:(if d.saving then [ Attr.create "aria-busy" "true" ] else [])
+            ~on_click:(inject Action.Instruction_save)
+            [ Node.text (if d.saving then "Saving…" else "Save") ]
+        ]
+    ]
+;;
+
+let instruction_note
+      (n : Instruction_notes.t)
+      (note : Custom_instructions.Note.t)
+      ~inject
+  =
+  match n.draft with
+  | Some ({ id = Some id; _ } as d) when String.equal id note.id ->
+    instruction_draft n d ~inject
+  | _ ->
+    let removing = Option.equal String.equal n.removing (Some note.id) in
+    let name = Option.value note.title ~default:note.id in
+    div
+      ~cls:
+        (if removing
+         then "setting memory-note instruction forgetting"
+         else "setting memory-note instruction")
+      ~attrs:[ Attr.create "data-note" note.id ]
+      [ div
+          ~cls:"setting-text"
+          [ (match note.title with
+             | Some title -> span ~cls:"setting-name" title
+             | None -> Node.none)
+          ; span ~cls:"memory-note-text" note.text
+          ; span
+              ~cls:
+                (if removing then "setting-note warm" else "setting-note muted")
+              (if removing
+               then "Delete this instruction? No session gets it any more."
+               else sprintf "%s · saved %s" note.id (Memory.Note.date note))
+          ]
+      ; div
+          ~cls:"setting-control"
+          (if removing
+           then
+             [ button
+                 ~cls:"small ghost"
+                 ~title:"Keep it (Esc)"
+                 ~on_click:(inject Action.Instruction_remove_cancel)
+                 [ Node.text "Keep" ]
+             ; button
+                 ~cls:"small danger"
+                 ~attrs:[ Attr.id "instruction-remove-yes" ]
+                 ~on_click:(inject Action.Instruction_remove_confirm)
+                 [ Node.text "Delete" ]
+             ]
+           else
+             [ button
+                 ~cls:"icon ghost"
+                 ~label:("Edit " ^ name)
+                 ~title:"Edit"
+                 ~on_click:(inject (Action.Instruction_edit (Some note.id)))
+                 [ icon Pencil ]
+             ; button
+                 ~cls:"icon ghost memory-delete"
+                 ~label:("Delete " ^ name)
+                 ~title:"Delete"
+                 ~on_click:(inject (Action.Instruction_remove note.id))
+                 [ icon Trash ]
+             ])
+      ]
+;;
+
+let instructions_size (n : Instruction_notes.t) =
+  let tokens = Instruction_notes.tokens n in
+  let count = List.length n.instructions.notes in
+  if tokens > Instruction_notes.warn_tokens
+  then
+    div
+      ~cls:"setting instructions-warning"
+      ~attrs:[ Attr.role "status" ]
+      [ icon Warning
+      ; div
+          ~cls:"setting-text"
+          [ span
+              ~cls:"setting-name"
+              (sprintf
+                 "About %s tokens in every session"
+                 (Int.to_string_hum ~delimiter:',' tokens))
+          ; span
+              ~cls:"setting-about"
+              "They are added to the context of every session, before you say \
+               anything: that is cost on every message and room the work no \
+               longer has. Trim them: merge near-duplicates, drop what no \
+               longer applies, and keep what is only sometimes needed in \
+               memory."
+          ]
+      ]
+  else
+    div
+      ~cls:"setting instructions-size"
+      [ span
+          ~cls:"setting-note muted"
+          (sprintf
+             "%d of %d · about %s tokens in every session"
+             count
+             n.instructions.limits.count
+             (Int.to_string_hum ~delimiter:',' tokens))
+      ]
+;;
+
+let instruction_rows (m : App.Model.t) ~inject =
+  let n = m.instructions in
+  let notes = n.instructions.notes in
+  let add =
+    button
+      ~cls:"small memory-add instruction-add"
+      ~title:"Write an instruction for the model yourself"
+      ~disabled:(Option.is_some n.draft)
+      ~on_click:(inject (Action.Instruction_edit None))
+      [ icon Plus; Node.text "Add instruction" ]
+  in
+  let error =
+    match n.error with
+    | Some e ->
+      [ div
+          ~cls:"setting memory-error"
+          ~attrs:[ Attr.role "alert" ]
+          [ span ~cls:"setting-note warm" e ]
+      ]
+    | None -> []
+  in
+  let draft =
+    match n.draft with
+    | Some ({ id = None; _ } as d) -> [ instruction_draft n d ~inject ]
+    | _ -> []
+  in
+  match n.status, notes with
+  | (Unknown | Loading), _ -> []
+  | Failed e, _ ->
+    [ row
+        ~cls:"memory-failed"
+        ~name:"Your instructions"
+        ~about:"The backend could not read them."
+        ~note:("warm", e)
+        [ button
+            ~cls:"small ghost"
+            ~title:"Read them again (/instructions)"
+            ~on_click:(inject (Action.Run "/instructions"))
+            [ Node.text "Retry" ]
+        ]
+    ]
+  | Loaded, [] ->
+    error
+    @ draft
+    @ [ row
+          ~cls:"instructions-empty"
+          ~name:"No instructions yet"
+          ~about:
+            "Write what the model should always do (“Use Australian spelling”, \
+             “Prefer OCaml examples”), or tell it a lasting preference and it \
+             adds one here. Every session gets them."
+          (if List.is_empty draft then [ add ] else [])
+      ]
+  | Loaded, _ ->
+    (instructions_size n :: error)
+    @ List.map notes ~f:(instruction_note n ~inject)
+    @ draft
+    @
+    if List.is_empty draft
+    then [ div ~cls:"setting instructions-toolbar" [ add ] ]
+    else []
+;;
+
 module Section = Settings_section
 
 (* A section's settings, in groups: a new setting is a row in its list.
@@ -1004,20 +1356,18 @@ let content (m : App.Model.t) (section : Section.t) ~inject =
     ]
   | Sessions ->
     [ group
-        ~title:"New sessions"
-        [ default_model m ~inject
-        ; default_mode m ~inject
-        ; default_dir m ~inject
-        ; fallback m ~inject
-        ]
+        ~title:"Session list"
+        [ worktree_hours m ~inject; auto_archive m ~inject ]
     ; group ~title:"Notifications" [ notifications m ~inject ]
     ]
+  | New_sessions -> New_sessions_view.groups m ~inject
   | Models ->
     [ group ~title:"Providers" [ providers m ~inject ]
     ; group
         ~title:"Models prigh uses"
         ~note:"Besides the conversation's"
-        [ naming_model m ~inject
+        [ generate_model m ~inject
+        ; naming_model m ~inject
         ; summary_model m m.config ~inject
         ; dictation_model m ~inject
         ]
@@ -1039,6 +1389,21 @@ let content (m : App.Model.t) (section : Section.t) ~inject =
            rows
        ])
   | About_you -> [ group [ about_you m ~inject ] ]
+  | Custom_instructions ->
+    group [ instructions_switch m ~inject ]
+    ::
+    (match instruction_rows m ~inject with
+     | [] -> []
+     | rows ->
+       [ group
+           ~title:"Instructions"
+           ?note:
+             (match m.instructions.instructions.notes with
+              | [] -> None
+              | [ _ ] -> Some "1 instruction"
+              | notes -> Some (sprintf "%d instructions" (List.length notes)))
+           rows
+       ])
   | Mcp -> Mcp_settings_view.groups m ~inject
   | Git_hosting -> [ group ~title:"Hosts" (git_hosts m ~inject) ]
   | Nix_store -> [ group (nix_store m ~inject) ]
@@ -1048,9 +1413,11 @@ let content (m : App.Model.t) (section : Section.t) ~inject =
 let section_icon : Section.t -> Icon.t = function
   | Appearance -> Palette
   | Sessions -> Bot
+  | New_sessions -> Plus
   | Models -> Brain
   | Memory -> Book
   | About_you -> User
+  | Custom_instructions -> Toc
   | Mcp -> Plug
   | Git_hosting -> Repo
   | Nix_store -> Package

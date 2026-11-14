@@ -30,6 +30,7 @@ let popup (m : App.Model.t) ~inject =
       | Argument Goal -> "Goal"
       | Argument Remind -> "Reminders"
       | Argument Compaction -> "Compaction"
+      | Argument Generate_model -> "Drafting model"
       | Argument Naming -> "Naming"
       | Argument Dictation -> "Dictation"
       | Argument Worktree -> "Worktrees"
@@ -37,6 +38,7 @@ let popup (m : App.Model.t) ~inject =
       | Argument Resume -> "Automatic resume"
       | Argument Notify -> "Notifications"
       | Argument Memory -> "Memory"
+      | Argument Instructions -> "Custom instructions"
       | Argument Settings -> "Settings sections"
       | Argument Pr -> "Pull requests"
       | Argument Theme -> "Themes"
@@ -182,14 +184,20 @@ let images (m : App.Model.t) ~inject =
 let pending_chip = Session_chips_view.pending_chip
 let menu_attrs = Session_chips_view.menu_attrs
 
-(* On a phone, a model's name without its first word (the family:
-   "DeepSeek", "Claude"), rather than cut short: "V4.1 Flash", "Opus 4.5".
-   Only in names of three words or more, so that what is left still says
-   which; the tooltip and the menu have it whole. *)
-let model_label (m : App.Model.t) name =
+(* Short of room (a phone, a narrow composer), a model's name goes
+   without its first word (the family: "DeepSeek", "Claude"), rather than
+   cut short: "V4.1 Flash", "Opus 4.5". Only in names of three words or
+   more, so that what is left still says which; the tooltip and the menu
+   have it whole. The style sheet hides the family. *)
+let model_label name =
+  let label = Node.span ~attrs:[ Attr.class_ "chip-label" ] in
   match String.split name ~on:' ' with
-  | _ :: (_ :: _ :: _ as rest) when m.narrow -> String.concat ~sep:" " rest
-  | _ -> name
+  | family :: (_ :: _ :: _ as rest) ->
+    label
+      [ span ~cls:"model-family" (family ^ " ")
+      ; Node.text (String.concat ~sep:" " rest)
+      ]
+  | _ -> label [ Node.text name ]
 ;;
 
 let model_chip (m : App.Model.t) (state : State.t) ~inject =
@@ -206,9 +214,7 @@ let model_chip (m : App.Model.t) (state : State.t) ~inject =
       ~title:(sprintf "%s: switch model (Ctrl+L)" state.model.name)
       ~attrs:(menu_attrs m Model)
       ~on_click:(inject (Action.Open_chip Model))
-      [ span ~cls:"chip-label" (model_label m state.model.name)
-      ; icon ~cls:"chevron" Chevron
-      ]
+      [ model_label state.model.name; icon ~cls:"chevron" Chevron ]
 ;;
 
 (* Where tools run, always named, also while that host is disconnected (its
@@ -407,34 +413,44 @@ let planning (m : App.Model.t) =
   Option.value_map m.state ~default:false ~f:(fun (s : State.t) -> s.plan_mode)
 ;;
 
+(* The text, and where the session works when that is what it shows. *)
 let placeholder (m : App.Model.t) =
   (* A phone, or the chat beside a side panel. *)
   let cramped = m.narrow || m.agents.open_ || m.files.open_ in
+  let text s = s, None in
   if Option.is_some m.session_gone
-  then "Session gone: /new starts one"
+  then text "Session gone: /new starts one"
   else if not (connected m)
   then
-    if cramped
-    then "Offline: send once back"
-    else "Offline: write now, send once it is back"
+    text
+      (if cramped
+       then "Offline: send once back"
+       else "Offline: write now, send once it is back")
   else (
     match steered m with
-    | Some id when cramped -> sprintf "Steer %s (Alt+Enter: after its turn)…" id
+    | Some id when cramped ->
+      text (sprintf "Steer %s (Alt+Enter: after its turn)…" id)
     | Some id ->
-      sprintf
-        "Steer %s (Enter) or queue a follow-up for when it ends its turn \
-         (Alt+Enter)…"
-        id
-    | None when App.Model.running m && cramped -> "Steer the agent…"
+      text
+        (sprintf
+           "Steer %s (Enter) or queue a follow-up for when it ends its turn \
+            (Alt+Enter)…"
+           id)
+    | None when App.Model.running m && cramped -> text "Steer the agent…"
     | None when App.Model.running m ->
-      "Steer (Enter) or queue a follow-up (Alt+Enter)…"
-    | None when planning m && cramped -> "Plan mode: /plan off to implement"
+      text "Steer (Enter) or queue a follow-up (Alt+Enter)…"
+    | None when planning m && cramped ->
+      text "Plan mode: /plan off to implement"
     | None when planning m ->
-      sprintf
-        "Plan mode: discuss the plan, or leave it to implement (%s)…"
-        Session_mode.leave
-    | None when cramped -> "Ask prigh…  / commands"
-    | None -> "Ask prigh anything…  / commands, @ files")
+      text
+        (sprintf
+           "Plan mode: discuss the plan, or leave it to implement (%s)…"
+           Session_mode.leave)
+    | None ->
+      (match Cwd_placeholder.of_model m with
+       | Some where -> Cwd_placeholder.sentence where, Some where
+       | None when cramped -> text "Ask prigh…  / commands"
+       | None -> text "Ask prigh anything…  / commands, @ files"))
 ;;
 
 let view (m : App.Model.t) ~inject =
@@ -450,6 +466,7 @@ let view (m : App.Model.t) ~inject =
      subagent being steered keeps its steer). *)
   let stops = running && (not has_input) && Option.is_none (steered m) in
   let connected = connected m in
+  let placeholder, where = placeholder m in
   (* A chip's menu leaves only the chips live. *)
   let rest =
     match m.dialog with
@@ -483,38 +500,53 @@ let view (m : App.Model.t) ~inject =
             ; rest (images m ~inject)
             ; rest (Files_view.chips m ~inject)
             ; rest
-              @@ Node.textarea
-                   ~attrs:
-                     [ Attr.class_ "editor"
-                     ; Attr.id "editor"
-                     ; Attr.placeholder (placeholder m)
-                     ; Attr.create "aria-label" "Message"
-                     ; Attr.create "dir" "auto"
-                     ; (match App.Model.popup m with
-                        | None -> Attr.empty
-                        | Some c ->
-                          Attr.many
-                            [ Attr.role "combobox"
-                            ; Attr.create "aria-controls" "completion-list"
-                            ; Attr.create "aria-expanded" "true"
-                            ; Attr.create "aria-autocomplete" "list"
-                            ; Attr.create
-                                "aria-activedescendant"
-                                (sprintf
-                                   "completion-option-%d"
-                                   (Completion.selected c))
-                            ])
-                     ; Attr.value m.draft
-                     ; Attr.rows 1
-                     ; Attr.create "autocomplete" "off"
-                     ; Attr.create "enterkeyhint" "send"
-                     ; Attr.on_input (fun ev text ->
-                         let cursor =
-                           Option.value (caret ev) ~default:(String.length text)
-                         in
-                         inject (Action.Edit { text; cursor }))
-                     ]
-                   []
+              @@ div
+                   ~cls:"editor-wrap"
+                   [ Node.textarea
+                       ~attrs:
+                         [ classes
+                             [ "editor" ]
+                             [ "cwd-placeholder", Option.is_some where ]
+                         ; Attr.id "editor"
+                         ; Attr.placeholder placeholder
+                         ; (match where with
+                            | Some _ when String.is_empty m.draft && not m.narrow ->
+                              Attr.title placeholder
+                            | Some _ | None -> Attr.empty)
+                         ; Attr.create "aria-label" "Message"
+                         ; Attr.create "dir" "auto"
+                         ; (match App.Model.popup m with
+                            | None -> Attr.empty
+                            | Some c ->
+                              Attr.many
+                                [ Attr.role "combobox"
+                                ; Attr.create "aria-controls" "completion-list"
+                                ; Attr.create "aria-expanded" "true"
+                                ; Attr.create "aria-autocomplete" "list"
+                                ; Attr.create
+                                    "aria-activedescendant"
+                                    (sprintf
+                                       "completion-option-%d"
+                                       (Completion.selected c))
+                                ])
+                         ; Attr.value m.draft
+                         ; Attr.rows 1
+                         ; Attr.create "autocomplete" "off"
+                         ; Attr.create "enterkeyhint" "send"
+                         ; Attr.on_input (fun ev text ->
+                             let cursor =
+                               Option.value
+                                 (caret ev)
+                                 ~default:(String.length text)
+                             in
+                             inject (Action.Edit { text; cursor }))
+                         ]
+                       []
+                   ; (match where with
+                      | Some where when String.is_empty m.draft ->
+                        Cwd_placeholder.view where
+                      | Some _ | None -> Node.none)
+                   ]
             ; div
                 ~cls:"composer-row"
                 [ plus m ~inject

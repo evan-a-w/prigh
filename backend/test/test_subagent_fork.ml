@@ -176,7 +176,7 @@ let%expect_test
     system: the caller's
     tools: the caller's (bash read write edit ls grep find web_fetch subagent subagent_status subagent_cancel subagent_message subagent_continue)
     cache_key: the caller's
-    model: deepseek-flash, thinking: on
+    model: deepseek-flash, thinking: default
     starts with the caller's last request's messages: true
     user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  r1 read{"path":"notes.txt"}
@@ -233,7 +233,7 @@ let%expect_test
     {|
     subagent_start a1 (forked): try everything (16 tools)
       a1: subagent_status -> error: subagent_status is not available to you: you are a subagent, and background subagents are the main agent's (yours run synchronously: subagent returns their report). You see it because you were forked from your caller's conversation, with its tools.
-      a1: ask_user -> error: ask_user is not available to you: it is the main agent's (the user's plan, questions, components, goal and memory), and you are a subagent: put what you need from the user in your report. You see it because you were forked from your caller's conversation, with its tools.
+      a1: ask_user -> error: ask_user is not available to you: it is the main agent's (the user's plan, questions, components, goal, memory and custom instructions), and you are a subagent: put what you need from the user in your report. You see it because you were forked from your caller's conversation, with its tools.
       a1: subagent -> inner done | [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
     subagent_end a1 (2 turns): tried | [subagent: 2 turns, 40 in / 18 out tokens, $0.0000]
     |}];
@@ -298,7 +298,7 @@ let%expect_test
     system: its own (You are a subagent...)
     tools: its own (read subagent)
     cache_key: its own
-    model: deepseek-flash, thinking: on
+    model: deepseek-flash, thinking: default
     starts with the caller's last request's messages: true
     user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
     assistant:  c1 subagent{"task":"other model","fork":true,"model":"openai/gpt-5","thinking":"high"} c2 subagent{"task":"subset","fork":true,"tools":["read","subagent"],"context":"the plan is X"}

@@ -421,7 +421,17 @@ let mode_state state =
     ]
 ;;
 
-let thinking_levels = [ "off"; "on"; "low"; "high"; "max" ]
+(* The current model's options, as the backend lists them. *)
+let thinking_options model =
+  List.filter_map (list_field "thinking_options" model) ~f:(function
+    | `String s -> Some s
+    | _ -> None)
+;;
+
+let thinking_name = function
+  | "default" -> "provider's default"
+  | level -> level
+;;
 
 (* The models of the providers prigh has credentials for. *)
 let refresh_models t =
@@ -499,7 +509,8 @@ let config_options t state =
         ~name:"Thinking"
         ~category:"thought_level"
         ~current:(string_field "thinking" state)
-        (List.map thinking_levels ~f:(fun level -> option ~value:level level))
+        (List.map (thinking_options current_model) ~f:(fun level ->
+           option ~value:level (thinking_name level)))
     ]
 ;;
 
@@ -1690,16 +1701,7 @@ let set_config_option t params =
     match id with
     | "mode" -> Result.map (set_mode_params value) ~f:(fun p -> "set_mode", p)
     | "model" -> Ok ("set_model", [ "model", str value ])
-    | "thinking" ->
-      if List.mem thinking_levels value ~equal:String.equal
-      then Ok ("set_thinking", [ "thinking", str value ])
-      else
-        Error
-          (Error.invalid_params
-             (sprintf
-                "unknown thinking level %S: the levels are %s"
-                value
-                (String.concat ~sep:", " thinking_levels)))
+    | "thinking" -> Ok ("set_thinking", [ "thinking", str value ])
     | id ->
       Error
         (Error.invalid_params

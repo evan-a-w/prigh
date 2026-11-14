@@ -38,7 +38,7 @@ let%expect_test "the names of the controls" =
     button "Add files or images" -- Add files or images (or paste, or drop them here)
     button "Claude Opus 5.5" -- Claude Opus 5.5: switch model (Ctrl+L)
     button "backend" -- Tools run on the backend (/host switches)
-    button "Thinking on" -- Thinking on: how much the model reasons before it answers (Alt+T cycles, /thinking)
+    button "Thinking: provider's default" -- Thinking: provider's default: how much the model reasons before it answers (Alt+T cycles, /thinking)
     button "Auto: never asks" -- Tools run without asking (Alt+M cycles, /mode picks)
     button "Transcript normal" -- Transcript: normal (Ctrl+O cycles, /verbosity)
     button "Context 0% full: the session's details"
@@ -48,14 +48,14 @@ let%expect_test "the names of the controls" =
     button "Branch: main. Change it" -- Work in another worktree (/worktree)
     [switch] button "Temporary" -- Make it temporary: not saved or listed (Ctrl+Shift+O)
     input "Search sessions"
-    textarea "Message"
+    textarea "Message" -- Working in /work on main. Ask prigh anything…
     [separator] div "Resize the sessions sidebar" -- Drag to resize, double-click for the default size
     [region] div "Transcript"
     [group] div "Model and host"
     [group] div "Thinking, mode and transcript"
     [group] div "Session status"
     [status] span "Ready"
-    [tooltip] div "Status Ready Context 0 / 200k \194\183 0% Tokens 0 in \194\183 0 out \194\183 0 cached Cost $0.0000 Thinking on Mode Auto: never asks Model Claude Opus 5.5 Branch main Click for the session\226\128\153s details \194\183 /compact frees context"
+    [tooltip] div "Status Ready Context 0 / 200k \194\183 0% Tokens 0 in \194\183 0 out \194\183 0 cached Cost $0.0000 Thinking provider's default Mode Auto: never asks Model Claude Opus 5.5 Branch main Click for the session\226\128\153s details \194\183 /compact frees context"
     [switch] button "Temporary" -- Make it temporary: not saved or listed (Ctrl+Shift+O)
     |}];
   H.quiet h (fun () -> H.act h (Select_sessions true));
@@ -152,18 +152,18 @@ let%expect_test "the names in dialogs, pickers and the transcript" =
     button "Add files or images" -- Add files or images (or paste, or drop them here)
     button "Claude Opus 5.5" -- Claude Opus 5.5: switch model (Ctrl+L)
     button "backend" -- Tools run on the backend (/host switches)
-    button "Thinking on" -- Thinking on: how much the model reasons before it answers (Alt+T cycles, /thinking)
+    button "Thinking: provider's default" -- Thinking: provider's default: how much the model reasons before it answers (Alt+T cycles, /thinking)
     button "Auto: never asks" -- Tools run without asking (Alt+M cycles, /mode picks)
     button "Transcript normal" -- Transcript: normal (Ctrl+O cycles, /verbosity)
     button "Context 0% full: the session's details"
     button "Dictate" -- Dictate (speak, then click again to stop)
     button "Send" -- Send (Enter)
-    textarea "Message"
+    textarea "Message" -- Working in /work on main. Ask prigh anything…
     [group] div "Model and host"
     [group] div "Thinking, mode and transcript"
     [group] div "Session status"
     [status] span "Ready"
-    [tooltip] div "Status Ready Context 0 / 200k \194\183 0% Tokens 0 in \194\183 0 out \194\183 0 cached Cost $0.0000 Thinking on Mode Auto: never asks Model Claude Opus 5.5 Branch main Click for the session\226\128\153s details \194\183 /compact frees context"
+    [tooltip] div "Status Ready Context 0 / 200k \194\183 0% Tokens 0 in \194\183 0 out \194\183 0 cached Cost $0.0000 Thinking provider's default Mode Auto: never asks Model Claude Opus 5.5 Branch main Click for the session\226\128\153s details \194\183 /compact frees context"
     button "Dismiss"
     [alert] div "Couldn't do that" -- Dismiss
     |}];

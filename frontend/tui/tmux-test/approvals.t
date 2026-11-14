@@ -19,7 +19,7 @@ prints the captured panes.
   └──────────────────────────────────────────────────────────────────────────────────────────────────┘
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   ?
-  deepseek-flash  think:on  mode:ask  view:normal  ctx:0.0%/1.0M  $0.00  confirm: y/a/n/r
+  deepseek-flash  think:default  mode:ask  view:normal  ctx:0.0%/1.0M  $0.00  confirm: y/a/n/r
   === allowed
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
@@ -32,7 +32,7 @@ prints the captured panes.
     first done
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
-  $TMP/cwd  deepseek-flash  think:on  mode:ask  view:normal  ctx:0.0%/1.0M  $0.00
+  $TMP/cwd  deepseek-flash  think:default  mode:ask  ctx:0.0%/1.0M  $0.00
   === denied
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
@@ -52,7 +52,7 @@ prints the captured panes.
     second done
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
-  $TMP/cwd  deepseek-flash  think:on  mode:ask  view:normal  ctx:0.0%/1.0M  $0.00
+  $TMP/cwd  deepseek-flash  think:default  mode:ask  ctx:0.0%/1.0M  $0.00
   $ bash ./harness.sh approvals
   === dialog with always
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
@@ -70,7 +70,7 @@ prints the captured panes.
   └──────────────────────────────────────────────────────────────────────────────────────────────────┘
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   ?
-  deepseek-flash  think:on  mode:ask  view:normal  ctx:0.0%/1.0M  $0.00  confirm: y/a/n/r
+  deepseek-flash  think:default  mode:ask  view:normal  ctx:0.0%/1.0M  $0.00  confirm: y/a/n/r
   === the second echo ran without asking
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
@@ -89,7 +89,7 @@ prints the captured panes.
     second done
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
-  $TMP/cwd  deepseek-flash  think:on  mode:ask  view:normal  ctx:0.0%/1.0M  $0.00
+  $TMP/cwd  deepseek-flash  think:default  mode:ask  ctx:0.0%/1.0M  $0.00
   === denied with a reason
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
@@ -115,7 +115,7 @@ prints the captured panes.
     third done
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
-  $TMP/cwd  deepseek-flash  think:on  mode:ask  view:normal  ctx:0.0%/1.0M  $0.00
+  $TMP/cwd  deepseek-flash  think:default  mode:ask  ctx:0.0%/1.0M  $0.00
   === Alt+M: auto-edit
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
@@ -141,7 +141,7 @@ prints the captured panes.
     third done
   ────────────────────── mode: auto-edit — file edits run; bash, job_input and MCP tools ask first ───
   >
-  $TMP/cwd  deepseek-flash  think:on  mode:auto-edit  ctx:0.0%/1.0M  $0.00
+  $TMP/cwd  deepseek-flash  think:default  mode:auto-edit  ctx:0.0%/1.0M  $0.00
   $ bash ./harness.sh plan
   === the plan, in plan mode
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
@@ -160,7 +160,7 @@ prints the captured panes.
     2. Check it
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
-  deepseek-flash  think:on  mode:plan  (/plan off or Alt+M leaves)  view:normal  ctx:0.0%/1.0M  $0.00
+  deepseek-flash  think:default  mode:plan  (/plan off or Alt+M leaves)  ctx:0.0%/1.0M  $0.00
   === plan mode off, implemented
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
@@ -184,7 +184,7 @@ prints the captured panes.
     all done
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
-  $TMP/cwd  deepseek-flash  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00
+  $TMP/cwd  deepseek-flash  think:default  mode:auto  ctx:0.0%/1.0M  $0.00
   $ bash ./harness.sh question
   === first question
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
@@ -204,7 +204,7 @@ prints the captured panes.
   └──────────────────────────────────────────────────────────────────────────────────────────────────┘
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
-  deepseek-flash  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00  Enter accepts · Esc declines
+  deepseek-flash  think:default  mode:auto  ctx:0.0%/1.0M  $0.00  Enter accepts · Esc declines
   === second question
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
@@ -221,7 +221,7 @@ prints the captured panes.
   └──────────────────────────────────────────────────────────────────────────────────────────────────┘
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
-  deepseek-flash  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00  Enter accepts · Esc declines
+  deepseek-flash  think:default  mode:auto  ctx:0.0%/1.0M  $0.00  Enter accepts · Esc declines
   === answered
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
@@ -236,4 +236,4 @@ prints the captured panes.
     thanks
   ─────────────────────────────────────────────────────────────────────────────────────── answered ───
   >
-  $TMP/cwd  deepseek-flash  think:on  mode:auto  view:normal  ctx:0.0%/1.0M  $0.00
+  $TMP/cwd  deepseek-flash  think:default  mode:auto  ctx:0.0%/1.0M  $0.00

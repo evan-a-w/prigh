@@ -265,6 +265,10 @@ val create
        (** what the user wrote about themselves: in the system prompt of a
            new session, and told with the next message to a session that
            knows another text ({!Told_environment}); default: none *)
+  -> ?custom_instructions:Custom_instructions.t
+       (** the user's custom instructions: in the system prompt of a new
+           session, and the changes told with the next message to a session
+           that knows others ({!Told_environment}); default: none *)
   -> cwd:string
   -> unit
   -> t
@@ -477,16 +481,26 @@ val job_output : t -> job_id:string -> lines:int -> string Or_error.t
     returns its id. *)
 val start_job : t -> command:string -> string
 
+(** Switches model; a thinking setting the new model does not take becomes
+    the closest one it does ({!Model.clamp_thinking}), with a notice. *)
 val set_model : t -> Model.t -> unit
-val set_thinking : t -> Thinking.t -> unit
+
+(** Fails, listing the model's options, when the model does not take it. *)
+val set_thinking : t -> Thinking.t -> unit Or_error.t
 
 (** The agent's persistent configuration (loaded from [~/.prigh/config.json] at
     creation). *)
 val config : t -> Config.t
 
 (** Writes the configuration and emits [Event.Config_changed]. A changed
-    [approval_mode] also switches this session's mode. *)
-val set_config : t -> Config.t -> unit Or_error.t
+    [approval_mode] also switches this session's mode, unless
+    [~session_mode:false] (only the default for new sessions). A changed
+    [default_host] is a connected host's id or name, stored as its id. *)
+val set_config : ?session_mode:bool -> t -> Config.t -> unit Or_error.t
+
+(** Takes a configuration another session saved: emits
+    [Event.Config_changed], changes no session setting. *)
+val adopt_config : t -> Config.t -> unit
 
 (** When conversations (the session's and its subagents') are masked and
     compacted and who summarises them: the config's [mask_observations],

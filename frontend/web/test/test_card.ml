@@ -87,7 +87,7 @@ let%expect_test
     Context 10k / 200k · 5%
     Tokens 1.6M in · 21k out · 0 cached
     Cost $1.3021
-    Thinking on
+    Thinking provider's default
     Mode Auto: never asks
     Model Claude Opus 5.5
     Click for the session’s details · /compact frees context
@@ -108,7 +108,7 @@ let%expect_test
     [status] span "Ready"
     button "Context 5% full: the session's details"
     span "$1.30" -- Session cost: $1.3021
-    [tooltip] div "Status Ready Context 10k / 200k \194\183 5% Tokens 1.6M in \194\183 21k out \194\183 0 cached Cost $1.3021 Thinking on Mode Auto: never asks Model Claude Opus 5.5 Click for the session\226\128\153s details \194\183 /compact frees context"
+    [tooltip] div "Status Ready Context 10k / 200k \194\183 5% Tokens 1.6M in \194\183 21k out \194\183 0 cached Cost $1.3021 Thinking provider's default Mode Auto: never asks Model Claude Opus 5.5 Click for the session\226\128\153s details \194\183 /compact frees context"
     button "Context 5% full: the session's details"
     div "Context 10k / 200k \194\183 5%"
     |}];
@@ -124,7 +124,7 @@ let%expect_test
     Context 10k / 200k · 5%
     Tokens 1.6M in · 21k out · 0 cached
     Cost $1.3021
-    Thinking on
+    Thinking provider's default
     Mode Auto: never asks
     Model Claude Opus 5.5
     Click for the session’s details · /compact frees context
@@ -159,7 +159,7 @@ let%expect_test
     Context 10k / 200k · 5%
     Tokens 1.6M in · 21k out · 0 cached
     Cost $1.3021
-    Thinking on
+    Thinking provider's default
     Mode Auto: never asks
     Model Claude Opus 5.5
     Click for the session’s details · /compact frees context
@@ -188,7 +188,7 @@ let%expect_test
     Context 10k / 200k · 5%
     Tokens 1.6M in · 21k out · 0 cached
     Cost $1.3021
-    Thinking on
+    Thinking provider's default
     Mode Auto: never asks
     Model Claude Opus 5.5
     Click for the session’s details · /compact frees context
@@ -262,7 +262,7 @@ let%expect_test
     Context 10k / 200k · 5%
     Tokens 1.6M in · 21k out · 0 cached
     Cost $1.3021
-    Thinking on
+    Thinking provider's default
     Mode Auto: never asks
     Model Claude Opus 5.5
     Click for the session’s details · /compact frees context

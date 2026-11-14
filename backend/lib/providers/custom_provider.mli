@@ -13,7 +13,8 @@ open! Import
         "models": [
           { "id": "gpt-4o", "context_window": 128000, "max_output": 16384,
             "thinking": false, "images": true,
-            "cost": { "input": 2.5, "output": 10, "cache_read": 1.25 } }
+            "cost": { "input": 2.5, "output": 10, "cache_read": 1.25 } },
+          { "id": "o4-mini", "thinking_levels": ["low", "medium", "high"] }
         ]
       }
     }
@@ -43,6 +44,10 @@ module Model_override : sig
     ; context_window : int option
     ; max_output : int option
     ; thinking : bool option
+    ; thinking_levels : Thinking.Level.t list option
+      (** the effort levels it takes (implies [thinking]); by default low,
+          medium and high, and up to max (token budgets) for the Anthropic
+          API *)
     ; images : bool option
     ; cost : Model.Cost.t option
     }

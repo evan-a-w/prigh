@@ -222,7 +222,7 @@
 .session-choice {
   flex: 1 1 0;
   min-width: 0;
-  min-height: 40px;
+  min-height: 44px;
   padding: 0 4px;
   border: 0;
   border-radius: 8px;
@@ -236,6 +236,10 @@
 }
 .session-choice.on { background: var(--slate-2); color: var(--chalk); box-shadow: 0 1px 0 var(--rule-2) inset, 0 1px 3px -1px var(--edge-shadow); }
 .session-choice:focus-visible { outline: 2px solid var(--sodium); outline-offset: -2px; }
+/* A model can take up to eight thinking settings: they wrap, four or so to
+   a row, rather than shrink past their words. */
+.thinking-choices { flex-wrap: wrap; }
+.thinking-choices > .session-choice { flex: 1 0 64px; }
 .session-usage { display: flex; align-items: center; gap: 12px; padding: 0 2px; font-size: 13px; color: var(--muted); }
 .session-context { flex: 1; display: flex; align-items: center; gap: 8px; min-width: 0; }
 .session-context .meter { flex: 1; height: 5px; }
@@ -245,13 +249,25 @@
 
 /* {1 A narrow composer} (a small window, or the sidebar and a panel beside
    it): the session's chips keep their icons, the status its ring and
-   percent. */
+   percent, before the model's and the host's names are cut. */
 
-@container composer (max-width: 640px) {
+@container composer (max-width: 760px) {
   .row-chips .chip-label { display: none; }
   .row-chips .chip-button { padding: 0 6px; }
+}
+@container composer (max-width: 640px) {
   .composer-status .status-item.cost { display: none; }
   .composer-status.busy .status-item.activity > .label { display: none; }
+}
+/* Narrower still (the review page beside the chat): no room for one row,
+   so the + and where the message goes are the first, the chips and the
+   buttons a second, rather than drawn over the model's name. A phone has
+   the chips in its ⋯ sheet instead. */
+@container composer (width < 420px) {
+  .composer-controls .model-family { display: none; }
+  .app:not(.narrow) .composer-row { flex-wrap: wrap; row-gap: 2px; }
+  .app:not(.narrow) .composer-controls:has(+ .row-chips) { flex: 1 1 calc(100% - 36px); }
+  .app:not(.narrow) .row-chips { padding-left: 3px; margin-left: 0; border-left: 0; }
 }
 
 /* {1 Still} */

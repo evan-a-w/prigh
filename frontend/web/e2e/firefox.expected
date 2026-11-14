@@ -16,8 +16,9 @@ T
 token
 === firefox: signed in: chat ===
 What are we building?
+/ for commands, @ for files
 === firefox: signed in: the session's card ===
-on
+provider's default
 auto
 normal
 0%
@@ -30,7 +31,7 @@ Shift+Tab: dialog: Keys
 Shift+Tab: dialog: Close (Esc)
 Shift+Tab: dialog: Done
 Shift+Tab: dialog: Keys
-after Esc: editor
+after Esc: editor cwd-placeholder
 === firefox: a mistyped command ===
 Unknown command /modle. Did you mean /mode? (/help lists them)
 editor: /modle
@@ -103,7 +104,7 @@ printf 'one\ntwo\nthree\n'
 three lines
 <TIME>
 === firefox: the session's card after a run ===
-on
+provider's default
 auto
 normal
 0%
@@ -180,6 +181,7 @@ T
 token
 === firefox: new session ===
 What are we building?
+/ for commands, @ for files
 === firefox: sending ===
 hello again
 Sending…
@@ -379,10 +381,10 @@ Thinking
 Alt+T cycles
 Off
 answer straight away
+Provider's default
+the provider picks: high
 Low
 a little
-On
-the provider's default budget
 High
 more
 Max
@@ -742,7 +744,7 @@ on a phone: 0 handles
 hl-kw:let hl-kw:rec hl-kw:if hl-num:2 hl-kw:then hl-kw:else hl-num:1 hl-num:2 hl-com:(* slow *)
 hl-prop:"name" hl-str:"prigh" hl-prop:"ok" hl-con:true hl-prop:"n" hl-num:3
 === firefox: the session: a 700px chat column ===
-chat 700; chips: DeepSeek V4.1 Flash, <HOSTNAME>, on, auto, normal; status: 0%, $<COST>; .chat-chrome 44px high
+chat 700; chips: DeepSeek V4.1 Flash, <HOSTNAME>, icon, icon, icon; status: 0%, $<COST>; .chat-chrome 44px high
 .chat-chrome: fits
 .composer: fits
 the panels' toggles: 3 buttons 10px from the top, 14px from the right, clear of the jump list: true, open: Files
@@ -752,7 +754,7 @@ chat 520; chips: DeepSeek V4.1 Flash, icon, icon, icon, icon; status: 0%; .chat-
 .composer: fits
 the panels' toggles: 3 buttons 10px from the top, 14px from the right, clear of the jump list: true, open: Files
 === firefox: the session: a 400px chat column ===
-chat 400; chips: DeepSeek V4.1 Flash, icon, icon, icon, icon; status: 0%; .chat-chrome 44px high
+chat 400; chips: V4.1 Flash, icon, icon, icon, icon; status: 0%; .chat-chrome 44px high
 .chat-chrome: fits
 .composer: fits
 the panels' toggles: 3 buttons 10px from the top, 14px from the right, clear of the jump list: true, open: Files
@@ -760,9 +762,11 @@ the panels' toggles: 3 buttons 10px from the top, 14px from the right, clear of 
 Settings
 Appearance
 Sessions
+New sessions
 Models
 Memory
 About you
+Custom instructions
 Git hosting
 T
 token
@@ -792,14 +796,14 @@ host: under .modal-backdrop
 a choice keeps it open: true
 === firefox: settings: the sections ===
 clicked Sessions: tab Sessions, focus Sessions, showing Sessions (labelled by settings-tab-sessions)
-ArrowDown: tab Models, focus Models, showing Models (labelled by settings-tab-models)
+ArrowDown: tab New sessions, focus New sessions, showing New sessions (labelled by settings-tab-new-sessions)
 End: tab T token, focus T token, showing Account (labelled by settings-tab-account)
 ArrowDown wraps: tab Appearance, focus Appearance, showing Appearance (labelled by settings-tab-appearance)
 desktop: dialog 940x704, in the window: true; sections down the side; panel fits: true
 phone: dialog 390x844, the screen: true; back: Settings; panel fits: true
 Esc closes it, the editor has the focus: true
 === firefox: the session's bar: a 900px chat column without the sidebar ===
-chat 900; chips: DeepSeek V4.1 Flash, <HOSTNAME>, on, auto, normal; status: 0%, $<COST>; .chat-chrome 44px high
+chat 900; chips: DeepSeek V4.1 Flash, <HOSTNAME>, provider's default, auto, normal; status: 0%, $<COST>; .chat-chrome 44px high
 .chat-chrome: fits
 .composer: fits
 the panels' toggles: 4 buttons 10px from the top, 14px from the right, clear of the jump list: true, open: Files
@@ -809,14 +813,14 @@ chat 600; chips: DeepSeek V4.1 Flash, icon, icon, icon, icon; status: 0%; .chat-
 .composer: fits
 the panels' toggles: 4 buttons 10px from the top, 14px from the right, clear of the jump list: true, open: Files
 === firefox: the session's bar: a 400px chat column without the sidebar ===
-chat 400; chips: DeepSeek V4.1 Flash, icon, icon, icon, icon; status: 0%; .chat-chrome 44px high
+chat 400; chips: V4.1 Flash, icon, icon, icon, icon; status: 0%; .chat-chrome 44px high
 .chat-chrome: fits
 .composer: fits
 the panels' toggles: 4 buttons 10px from the top, 14px from the right, clear of the jump list: true, open: Files
 === firefox: errors ===
 none
 === firefox: temporary: desktop: the new-session screen ===
-heading: What are we building?
+heading: What are we building? | / for commands, @ for files
 tray: <cwd> | Temporary
 chip: false
 composer under the heading: true
@@ -857,7 +861,7 @@ stayed: true
 its command stopped: true
 saved: 0
 === firefox: temporary: 390x844: the new-session screen ===
-heading: What are we building?
+heading: What are we building? | / for commands, @ for files
 tray: cwd | Temporary
 chip: false
 composer under the heading: true
@@ -898,7 +902,7 @@ stayed: true
 its command stopped: true
 saved: 0
 === firefox: temporary: 320x640: the new-session screen ===
-heading: What are we building?
+heading: What are we building? | / for commands, @ for files
 tray: cwd | Temporary
 chip: false
 composer under the heading: true
@@ -981,9 +985,11 @@ I am bob
 === firefox: accounts: bob's settings ===
 Appearance
 Sessions
+New sessions
 Models
 Memory
 About you
+Custom instructions
 Git hosting
 B
 bob
@@ -2900,7 +2906,43 @@ session: cancelled; field menus: 0
   Paste  Ctrl+V
   Select all  Ctrl+A
 dialog: 1; focus: dialog's field; "renamed" selected 0-7
+=== firefox: field_menu: the terminal ===
+selected: "copy-me-please"
+terminal: cancelled; menu at the pointer
+> Copy  Ctrl+Shift+C
+  Paste  Ctrl+Shift+V
+  Select all
+still selected: "copy-me-please"
+clipboard: "copy-me-please"
+the shell has the focus: true
+Shift+F10: menu under the cursor
+=== firefox: field_menu: the terminal: paste ===
+> Copy  Ctrl+Shift+C
+  Paste  Ctrl+Shift+V
+  Select all
+=== firefox: field_menu: the terminal: select all ===
+selected: the whole screen
+=== firefox: field_menu: the terminal: Ctrl+Shift+C and Ctrl+Shift+V ===
+clipboard: "pasted-from-the-menu"
+Ctrl+C: interrupted
+the shell saw: ["$ echo copy-me-please","$ echo pasted-from-the-menu","pasted-from-the-menu","$ echo pasted-by-keys","pasted-by-keys"]
 === firefox: field_menu: errors ===
+none
+=== firefox: desktop_links: the browser shell, with the app's binding ===
+a click: handed over {"url":"https://example.com/docs","newWindow":true}
+Ctrl+click: handed over {"url":"https://example.com/docs","newWindow":true}
+a middle click: handed over {"url":"https://example.com/docs","newWindow":true}
+a mail link: handed over {"url":"mailto:me@example.com","newWindow":true}
+Enter on it: handed over {"url":"https://example.com/docs","newWindow":true}
+the browser's windows: none; still on prigh/
+prigh's own link: the browser opened ORIGIN/?own=1; handed over: 0
+=== firefox: desktop_links: the browser shell, without the binding (a browser tab, an older app) ===
+a click: the browser opened https://example.com/docs
+=== firefox: desktop_links: not in the browser shell, with a binding ===
+a click: the browser opened https://example.com/docs; handed over: 0
+=== firefox: desktop_links: a tap ===
+a tap: handed over {"url":"https://example.com/docs","newWindow":true}; the browser's windows: none
+=== firefox: desktop_links: errors ===
 none
 === firefox: card: idle ===
 row 1: 0% | $<COST>
@@ -2923,8 +2965,8 @@ row 1: 0% | $<COST>
 lamps: 0; accented: nothing; 28px high
 fits
 === firefox: card: the composer's chips ===
-chips 1: DeepSeek V4.1 Flash | <HOSTNAME> | on | auto | verbose
-chip problems: none
+chips 1: DeepSeek V4.1 Flash | <HOSTNAME> | provider's default | auto | verbose
+chip problems: none (host name truncated)
 === firefox: card: another host to choose ===
 ✓ <HOSTNAME>
 build-runner-eu-west-a-long-hostname (in <SESSION>)
@@ -2932,7 +2974,7 @@ build-runner-eu-west-a-long-hostname (in <SESSION>)
 row 1: 0% | $<COST>
 lamps: 0; accented: nothing; 28px high
 fits
-chips 1: DeepSeek V4.1 Flash | build-runner-eu-west-a-long-hostname | on | auto | verbose
+chips 1: DeepSeek V4.1 Flash | build-runner-eu-west-a-long-hostname | provider's default | auto | verbose
 chip problems: none (host name truncated)
 === firefox: card: the context opens the session's details ===
 Session
@@ -3027,6 +3069,11 @@ the viewer at fit, aside: 1 / 2 to 2 / 2
 down: closed: true
 === firefox: mobile: 390x844: the chat ===
 ok
+=== firefox: mobile: 390x844: where the session works ===
+placeholder: Working in …/demo on main.
+its width: more than 58%: what the shortest line needs
+one line: true; the path in mono: true; the editor on top: true
+for screen readers: Working in ~/projects/demo on main. Ask prigh anything…
 === firefox: mobile: 390x844: the chrome ===
 strip: 0 to 48; its pieces overlap: false
 the transcript starts under it: true
@@ -3038,7 +3085,7 @@ Jump to a message, Filter the transcript, Files, Terminal, Settings
 === firefox: mobile: 390x844: the settings' list ===
 ok
 === firefox: mobile: 390x844: the settings ===
-Appearance, Sessions, Models, Memory, About you, Git hosting, Account
+Appearance, Sessions, New sessions, Models, Memory, About you, Custom instructions, Git hosting, Account
 === firefox: mobile: 390x844: settings: appearance ===
 ok
 title: Appearance; back: Settings
@@ -3057,8 +3104,17 @@ full width: true; at the bottom: true
 ok
 === firefox: mobile: 390x844: the files ===
 ok
+=== firefox: mobile: 390x844: the review page ===
+ok
+=== firefox: mobile: 390x844: the review's files ===
+ok
 === firefox: mobile: 320x640: the chat ===
 ok
+=== firefox: mobile: 320x640: where the session works ===
+placeholder: Working in …/demo on main.
+its width: more than 58%: what the shortest line needs
+one line: true; the path in mono: true; the editor on top: true
+for screen readers: Working in ~/projects/demo on main. Ask prigh anything…
 === firefox: mobile: 320x640: the chrome ===
 strip: 0 to 48; its pieces overlap: false
 the transcript starts under it: true
@@ -3070,7 +3126,7 @@ Jump to a message, Filter the transcript, Files, Terminal, Settings
 === firefox: mobile: 320x640: the settings' list ===
 ok
 === firefox: mobile: 320x640: the settings ===
-Appearance, Sessions, Models, Memory, About you, Git hosting, Account
+Appearance, Sessions, New sessions, Models, Memory, About you, Custom instructions, Git hosting, Account
 === firefox: mobile: 320x640: settings: appearance ===
 ok
 title: Appearance; back: Settings
@@ -3089,6 +3145,24 @@ full width: true; at the bottom: true
 ok
 === firefox: mobile: 320x640: the files ===
 ok
+=== firefox: mobile: 320x640: the review page ===
+ok
+=== firefox: mobile: 320x640: the review's files ===
+ok
+=== firefox: mobile: desktop 1280: where the session works ===
+placeholder: Working in ~/projects/demo on main. Ask prigh anything…
+its width: 58% of the editor
+one line: true; the path in mono: true; the editor on top: true
+for screen readers: Working in ~/projects/demo on main. Ask prigh anything…
+tooltip: Working in ~/projects/demo on main. Ask prigh anything…
+=== firefox: mobile: desktop 760: where the session works ===
+placeholder: Working in …/demo on main.
+its width: 58% of the editor
+one line: true; the path in mono: true; the editor on top: true
+for screen readers: Working in ~/projects/demo on main. Ask prigh anything…
+tooltip: Working in ~/projects/demo on main. Ask prigh anything…
+=== firefox: mobile: desktop: typing ===
+no placeholder: the editor has text
 === firefox: terminal keys: a desktop ===
 the shell has the focus: true; the bar: hidden
 === firefox: terminal keys: 390x844: the keyboard up ===
@@ -3226,16 +3300,15 @@ caches: prigh-web-<BUILD>-next
 notice after: 0
 draft: a draft
 === firefox: pwa: errors ===
-none
+console: [JavaScript Error: "The connection to ws://127.0.0.1:33037/ws was interrupted while the page was loading." {file: "http://127.0.0.1:33037/main.bc.js" line: 928010}]
 === firefox: compaction: default ===
 COMPACTION
 Compact at
 Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window.
 tokens
-Off
 Mask old tool outputs
 Replace tool outputs older than the last 10 turns with placeholders first, which often saves summarising.
-field: "200k" (placeholder 200k); Off pressed: false; mask: true
+field: "200k" (placeholder 200k); on: true; mask: true
 === firefox: compaction: refused ===
 “lots” isn't a number of tokens: type one like 150k or 200000, or off to compact only at 80% of the window.
 still open: 1
@@ -3244,10 +3317,9 @@ COMPACTION
 Compact at
 Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window.
 tokens
-Off
 Mask old tool outputs
 Replace tool outputs older than the last 10 turns with placeholders first, which often saves summarising.
-field: "150k" (placeholder 200k); Off pressed: false; mask: false
+field: "150k" (placeholder 200k); on: true; mask: false
 compact_at_tokens=150000 compaction_model=null mask_observations=false
 === firefox: compaction: picker ===
 Summary model; first: The conversation's model whichever model the conversation uses
@@ -3257,26 +3329,261 @@ COMPACTION
 Compact at
 Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window.
 tokens
-Off
 Mask old tool outputs
 Replace tool outputs older than the last 10 turns with placeholders first, which often saves summarising.
-field: "150k" (placeholder 200k); Off pressed: false; mask: false
+field: "150k" (placeholder 200k); on: true; mask: false
 === firefox: compaction: /compaction ===
 Compaction: at 150k tokens, or 80% of the model's window if that is less; summaries by the session's model; observation masking off (/compaction at TOKENS|off, /compaction model MODEL|off, /compaction mask on|off)
 === firefox: compaction: off by /compaction ===
 COMPACTION
 Compact at
 Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window.
-Off: only at 80% of the window. Type a number to set one.
-tokens
-Off
+Off: only at 80% of the window.
 Mask old tool outputs
 Replace tool outputs older than the last 10 turns with placeholders first, which often saves summarising.
-field: "" (placeholder 150k); Off pressed: true; mask: false
+field: hidden; on: false; mask: false
 compact_at_tokens=0 compaction_model=null mask_observations=false
+=== firefox: compaction: switched on ===
+COMPACTION
+Compact at
+Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window.
+tokens
+Mask old tool outputs
+Replace tool outputs older than the last 10 turns with placeholders first, which often saves summarising.
+field: "150k" (placeholder 200k); on: true; mask: false
+compact_at_tokens=150000 compaction_model=null mask_observations=false
 === firefox: compaction: phone ===
 fits: true
 === firefox: compaction: errors ===
+(none)
+=== firefox: sessions settings: used days ago: folded, used now: shown ===
++ Fresh work: fix/fresh
+- Old work
+=== firefox: sessions settings: the settings ===
+Show worktrees | Your account | Show worktrees for sessions used in the last 12 hours; older ones fold them behind their count. Your own fold or unfold of a session wins. | hours
+Archive after | Sessions without activity for 7 days move to Archived (pinned and running ones never do). | days
+fields: "12" hours, "7" days
+=== firefox: sessions settings: 100 hours ===
++ Fresh work: fix/fresh
++ Old work: feat/old-a, feat/old-b
+=== firefox: sessions settings: off ===
+- Fresh work
+- Old work
+=== firefox: sessions settings: off, Old work unfolded by hand ===
+- Fresh work
++ Old work: feat/old-a, feat/old-b
+=== firefox: sessions settings: refused ===
+“a fortnight” isn't a number of days from 0 to 365: type one like 7, or off to archive only by hand.
+=== firefox: sessions settings: archive after 2 days ===
+Show worktrees | Your account | Show worktrees for sessions used recently; older ones fold them behind their count. Your own fold or unfold of a session wins. | Off: every session's worktrees start folded.
+Archive after | Sessions without activity for 2 days move to Archived (pinned and running ones never do). | days
+fields: hidden hours, "2" days
+archive_after_days=2
+- Fresh work
+archived: Archived 1
+=== firefox: sessions settings: switched on again ===
+Show worktrees | Your account | Show worktrees for sessions used in the last 100 hours; older ones fold them behind their count. Your own fold or unfold of a session wins. | hours
+Archive after | Sessions without activity for 2 days move to Archived (pinned and running ones never do). | days
+fields: "100" hours, "2" days
+=== firefox: sessions settings: phone 390x844: sidebar ===
++ Fresh work: fix/fresh
++ Old work: feat/old-a, feat/old-b
+=== firefox: sessions settings: phone 390x844: settings ===
+fits: true
+=== firefox: sessions settings: phone 320x640: sidebar ===
++ Fresh work: fix/fresh
++ Old work: feat/old-a, feat/old-b
+=== firefox: sessions settings: phone 320x640: settings ===
+fits: true
+=== firefox: sessions settings: errors ===
+(none)
+=== firefox: new sessions: the session open, before ===
+model: DeepSeek V4.1 Flash: switch model (Ctrl+L)
+thinking: Thinking: provider's default: how much the model reasons before it answers (Alt+T cycles, /thinking)
+mode: Tools run without asking (Alt+M cycles, /mode picks)
+host: Tools run on <host>, in <cwd> (/host switches)
+=== firefox: new sessions: the built-ins ===
+New sessions
+What a new session starts with. A change applies from the next new session: open ones keep theirs. Kept on the backend.
+START WITH
+From the next new session
+Model
+New sessions start with the backend's choice: a model of a provider you are logged in to.
+The backend's choice
+This session’s
+Thinking
+How hard new sessions think, on models that can. A model without the level takes its nearest one.
+Off
+Provider's default
+Minimal
+Low
+Medium
+High
+Xhigh
+Max
+Mode
+What asks before it runs: everything (Ask), all but file edits (Auto-edit) or nothing (Auto).
+Ask
+Auto-edit
+Auto
+Tool host
+New sessions you start here run their tools where the session you are on does.
+Where you are
+Starting directory
+New sessions start in their tool host's working directory. ~/ is its home.
+LIMITS
+Every session without its own
+Fallback models
+When a model's usage runs out, the next in this list takes over the conversation. Every session follows it, open ones too.
+None: a model whose usage runs out stops.
+Add
+Budget
+Sessions without their own /budget start no turn once they have cost this much, open ones too.
+Off: no limit.
+=== firefox: new sessions: all set ===
+New sessions
+What a new session starts with. A change applies from the next new session: open ones keep theirs. Kept on the backend.
+START WITH
+From the next new session
+Model
+New sessions start with Claude Fable 5.
+Claude Fable 5
+This session’s
+Thinking
+How hard new sessions think, on models that can. A model without the level takes its nearest one.
+Off
+Provider's default
+Minimal
+Low
+Medium
+High
+Xhigh
+Max
+Mode
+What asks before it runs: everything (Ask), all but file edits (Auto-edit) or nothing (Auto).
+Ask
+Auto-edit
+Auto
+Tool host
+New sessions you start here run their tools on laptop, while it is connected.
+laptop
+Starting directory
+New sessions start in ~/proj, on their tool host.
+LIMITS
+Every session without its own
+Fallback models
+When a model's usage runs out, the next in this list takes over the conversation. Every session follows it, open ones too.
+1
+DeepSeek V4.1 Flash
+Add
+Budget
+Sessions without their own /budget start no turn once they have cost this much, open ones too.
+USD
+default_model="anthropic/claude-fable-5" default_thinking="high" approval_mode="ask" default_host="host-laptop" default_cwd="~/proj" fallback_models=["deepseek/deepseek-flash"] max_budget_usd=2.5
+=== firefox: new sessions: the other browser ===
+New sessions
+What a new session starts with. A change applies from the next new session: open ones keep theirs. Kept on the backend.
+START WITH
+From the next new session
+Model
+New sessions start with Claude Fable 5.
+Claude Fable 5
+This session’s
+Thinking
+How hard new sessions think, on models that can. A model without the level takes its nearest one.
+Off
+Provider's default
+Minimal
+Low
+Medium
+High
+Xhigh
+Max
+Mode
+What asks before it runs: everything (Ask), all but file edits (Auto-edit) or nothing (Auto).
+Ask
+Auto-edit
+Auto
+Tool host
+New sessions you start here run their tools on laptop, while it is connected.
+laptop
+Starting directory
+New sessions start in ~/proj, on their tool host.
+LIMITS
+Every session without its own
+Fallback models
+When a model's usage runs out, the next in this list takes over the conversation. Every session follows it, open ones too.
+1
+DeepSeek V4.1 Flash
+Add
+Budget
+Sessions without their own /budget start no turn once they have cost this much, open ones too.
+USD
+=== firefox: new sessions: refused ===
+Budget
+Sessions without their own /budget start no turn once they have cost this much, open ones too.
+“lots” isn't an amount of dollars: type one like 5 or 2.50, or clear the field for no budget.
+USD
+=== firefox: new sessions: the session open keeps its own ===
+model: DeepSeek V4.1 Flash: switch model (Ctrl+L)
+thinking: Thinking: provider's default: how much the model reasons before it answers (Alt+T cycles, /thinking)
+mode: Tools run without asking (Alt+M cycles, /mode picks)
+host: Tools run on <host>, in <cwd> (/host switches)
+=== firefox: new sessions: a new session ===
+model: Claude Fable 5: switch model (Ctrl+L)
+thinking: Thinking: high: how much the model reasons before it answers (Alt+T cycles, /thinking)
+mode: Bash, job_input, edits and MCP tools ask first (Alt+M cycles, /mode picks)
+host: Tools run on laptop, in <dir>/laptop-home/proj (/host switches)
+Budget $2.50, $0.00 spent: /budget DOLLARS changes it, /budget off removes it
+Fallback: deepseek/deepseek-flash (now on anthropic/claude-fable-5)
+=== firefox: new sessions: phone 390x844 ===
+fits: yes; targets: all ok
+after the picker: back on the settings
+back: New sessions | What a new session starts with. A change applies from the next new session: open ones keep theirs. Kept on the backend.
+=== firefox: new sessions: phone 320x640 ===
+fits: yes; targets: all ok
+after the picker: back on the settings
+back: New sessions | What a new session starts with. A change applies from the next new session: open ones keep theirs. Kept on the backend.
+=== firefox: new sessions: reset ===
+New sessions
+What a new session starts with. A change applies from the next new session: open ones keep theirs. Kept on the backend.
+START WITH
+From the next new session
+Model
+New sessions start with the backend's choice: a model of a provider you are logged in to.
+The backend's choice
+This session’s
+Thinking
+How hard new sessions think, on models that can. A model without the level takes its nearest one.
+Off
+Provider's default
+Minimal
+Low
+Medium
+High
+Xhigh
+Max
+Mode
+What asks before it runs: everything (Ask), all but file edits (Auto-edit) or nothing (Auto).
+Ask
+Auto-edit
+Auto
+Tool host
+New sessions you start here run their tools where the session you are on does.
+Where you are
+Starting directory
+New sessions start in their tool host's working directory. ~/ is its home.
+LIMITS
+Every session without its own
+Fallback models
+When a model's usage runs out, the next in this list takes over the conversation. Every session follows it, open ones too.
+None: a model whose usage runs out stops.
+Add
+Budget
+Sessions without their own /budget start no turn once they have cost this much, open ones too.
+Off: no limit.
+default_model=null default_thinking=null approval_mode="auto" default_host=null default_cwd=null fallback_models=[] max_budget_usd=null
+=== firefox: new sessions: errors ===
 (none)
 === firefox: memory: notes ===
 Memory
@@ -3334,47 +3641,91 @@ editing fits: yes; targets: all ok
 back: Memory | What you asked the model to remember, for later sessions. Kept on the backend, for your account.
 === firefox: memory: errors ===
 (none)
-=== firefox: user info: empty ===
+=== firefox: user info: moved from user_info.md ===
 About you
 What the model should know about you, given to it in every session. Kept on the backend, for your account.
-Describe yourself
-Who you are, what you work on, how you like answers. This text is given to the model in every session: new ones start with it, and open ones get it with your next message. Memory is for notes the model looks up only when it needs them.
-0 of 4000 bytes
+Tell the model about you
+Every field is optional. What you fill in is given to the model in every session: new ones start with it, and open ones get it with your next message. Memory is for notes the model looks up only when it needs them.
+Name
+Country or region
+Time zone
+Use Australia/Sydney
+Language and spelling
+Units
+Not set
+Metric
+Imperial
+US
+Date format
+Not set
+D/M/Y
+M/D/Y
+ISO
+Occupation or role
+Background and expertise
+Anything else
+21 of 5000 bytes
 Ctrl+Enter saves
 Save
-text: ""
+values: name="" country="" time-zone="" language="" units="Not set" date-format="Not set" occupation="" background="" anything-else="I like short answers."
+files: user_info.md: no, user_info.md.migrated: yes
 === firefox: user info: saved ===
 About you
 What the model should know about you, given to it in every session. Kept on the backend, for your account.
-Describe yourself
-Who you are, what you work on, how you like answers. This text is given to the model in every session: new ones start with it, and open ones get it with your next message. Memory is for notes the model looks up only when it needs them.
+Tell the model about you
+Every field is optional. What you fill in is given to the model in every session: new ones start with it, and open ones get it with your next message. Memory is for notes the model looks up only when it needs them.
+Name
+Country or region
+Time zone
+Language and spelling
+Units
+Not set
+Metric
+Imperial
+US
+Date format
+Not set
+D/M/Y
+M/D/Y
+ISO
+Occupation or role
+Background and expertise
+Anything else
 Saved. New sessions start with it; open ones get it with your next message in them.
-57 of 4000 bytes
+79 of 5000 bytes
 Ctrl+Enter saves
 Save
-text: "I'm Lloyd. I work on prigh, in OCaml.\nKeep answers short."
-file: "I'm Lloyd. I work on prigh, in OCaml.\nKeep answers short.\n"
-reverted: "I'm Lloyd. I work on prigh, in OCaml.\nKeep answers short."
+values: name="Lloyd" country="Australia" time-zone="Australia/Sydney" language="" units="Metric" date-format="D/M/Y" occupation="" background="Undergrad pure maths and CS." anything-else="I like short answers."
+file: {
+  "version": 1,
+  "name": "Lloyd",
+  "country": "Australia",
+  "time_zone": "Australia/Sydney",
+  "units": "metric",
+  "date_format": "dmy",
+  "background": "Undergrad pure maths and CS.",
+  "anything_else": "I like short answers."
+}
+reverted: "Lloyd"
 === firefox: user info: followed on another page ===
-text: "I'm Lloyd. Keep answers short."
+values: name="Lloyd" country="Australia" time-zone="Australia/Sydney" language="" units="Metric" date-format="D/M/Y" occupation="Student" background="Undergrad pure maths and CS." anything-else="I like short answers."
 === firefox: user info: changed under a draft ===
-About you
-What the model should know about you, given to it in every session. Kept on the backend, for your account.
-Describe yourself
-Who you are, what you work on, how you like answers. This text is given to the model in every session: new ones start with it, and open ones get it with your next message. Memory is for notes the model looks up only when it needs them.
 It was changed somewhere else while you were typing. Saving replaces that with this.
 Load that one
-23 of 4000 bytes
-Ctrl+Enter saves
-Revert
-Save
-text: "typed on the other page"
-loaded: "I'm Lloyd. Keep answers short, in British English."
+loaded: name="Lloyd" country="Australia" time-zone="Australia/Sydney" language="English, Australian spelling" units="Metric" date-format="D/M/Y" occupation="Student" background="Undergrad pure maths and CS." anything-else="I like short answers."
 === firefox: user info: the session is told ===
-☺ About you: the model was given what you wrote
-[User info: what the user wrote about themselves in prigh's settings, for every session, is now:
-I'm Lloyd. Keep answers short, in British English.
-It replaces any earlier text about the user.]
+☺ About you: the model was given your details
+[User info: what the user set about themselves in prigh's settings, for every session, is now:
+- Name: Lloyd
+- Country/region: Australia
+- Time zone: Australia/Sydney
+- Language and spelling: English, Australian spelling
+- Units: metric (°C, km, kg, L)
+- Date format: day/month/year (25/12/2026)
+- Occupation/role: Student
+- Background and expertise: Undergrad pure maths and CS.
+- Anything else: I like short answers.
+It replaces anything earlier about the user from their settings.]
 === firefox: user info: phone 390x844 ===
 fits: yes; targets: all ok; Save on screen: yes
 typing fits: yes; targets: all ok; Save on screen: yes
@@ -3384,6 +3735,64 @@ fits: yes; targets: all ok; Save on screen: yes
 typing fits: yes; targets: all ok; Save on screen: yes
 back: About you | What the model should know about you, given to it in every session. Kept on the backend, for your account.
 === firefox: user info: errors ===
+(none)
+=== firefox: custom instructions: list ===
+Custom instructions
+Standing instructions for the model, given to it in every session; it may also add or edit them when you state a lasting preference. Kept on the backend, for your account.
+Let the model change them
+When you state a lasting preference or standing instruction, the model adds it here or edits the one that covers it, and tells you. Off, only you change them; they stay in every session either way.
+INSTRUCTIONS
+2 instructions
+2 of 50 · about 43 tokens in every session
+Use Australian spelling.
+ci1 · saved 2026-11-01
+Maths
+Keep a single memory note on my maths ability up to date.
+ci2 · saved 2026-11-02
+Add instruction
+switch: true
+settings still open: 1
+=== firefox: custom instructions: edited and added ===
+ci1 -: Use Australian spelling and metric units.; ci2 Maths: Keep a single memory note on my maths ability up to date.; ci3 Code: Prefer OCaml examples.
+=== firefox: custom instructions: deleting ===
+Maths | Keep a single memory note on my maths ability up to date. | Delete this instruction? No session gets it any more. | Keep | Delete
+ci1 -: Use Australian spelling and metric units.; ci3 Code: Prefer OCaml examples.
+=== firefox: custom instructions: off, followed on another page ===
+Custom instructions
+Standing instructions for the model, given to it in every session; it may also add or edit them when you state a lasting preference. Kept on the backend, for your account.
+Let the model change them
+When you state a lasting preference or standing instruction, the model adds it here or edits the one that covers it, and tells you. Off, only you change them; they stay in every session either way.
+INSTRUCTIONS
+2 instructions
+2 of 50 · about 38 tokens in every session
+Use Australian spelling and metric units.
+ci1 · saved (today)
+Code
+Prefer OCaml examples.
+ci3 · saved (today)
+Add instruction
+switch: false
+prefs: custom_instructions.enabled=false
+=== firefox: custom instructions: the session is told ===
+§ Custom instructions: the model was told 1 added, 1 edited, 1 removed
+[Custom instructions (the user's standing instructions; follow them) are now:
+[ci1] Use Australian spelling and metric units.
+[ci3] (Code) Prefer OCaml examples.
+These replace any earlier custom instructions.]
+after /instructions on: prefs custom_instructions.enabled=null
+=== firefox: custom instructions: warning ===
+About 1,757 tokens in every session | They are added to the context of every session, before you say anything: that is cost on every message and room the work no longer has. Trim them: merge near-duplicates, drop what no longer applies, and keep what is only sometimes needed in memory.
+=== firefox: custom instructions: phone 390x844 ===
+warning fits: yes; targets: all ok
+deleting fits: yes; targets: all ok
+editing fits: yes; targets: all ok
+back: Custom instructions | Standing instructions for the model, given to it in every session; it may also add or edit them when you state a lasting preference. Kept on the backend, for your account.
+=== firefox: custom instructions: phone 320x640 ===
+warning fits: yes; targets: all ok
+deleting fits: yes; targets: all ok
+editing fits: yes; targets: all ok
+back: Custom instructions | Standing instructions for the model, given to it in every session; it may also add or edit them when you state a lasting preference. Kept on the backend, for your account.
+=== firefox: custom instructions: errors ===
 (none)
 === firefox: images (desktop): refused as too large: the error card ===
 The model returned an error

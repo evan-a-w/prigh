@@ -73,7 +73,7 @@ let%expect_test "/naming shows, completes, sets, and a refusal" =
     ▌ earlier question
       earlier answer
     ┌─ Notice ─────────────────────────────────────────────────┐
-    │ sessions and subagents are named by the generate model,  │
+    │ sessions and subagents are named by the drafting model,  │
     │ else the session's model (/naming model MODEL|off)       │
     └────────────────────────────────────────── Esc dismisses ─┘
     ────────────────────────────────────────────────────────────
@@ -85,7 +85,7 @@ let%expect_test "/naming shows, completes, sets, and a refusal" =
 
     ▌ earlier question
       earlier answer
-    ▸ off                         the generate model, else the …
+    ▸ off                         the drafting model, else the …
       anthropic/claude-fable-5    Claude Fable 5
       anthropic/claude-fable-5-1  Claude Fable 5.1
       openai/gpt-5.5              GPT-5.5

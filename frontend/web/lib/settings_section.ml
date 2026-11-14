@@ -3,9 +3,11 @@ open! Core
 type t =
   | Appearance
   | Sessions
+  | New_sessions
   | Models
   | Memory
   | About_you
+  | Custom_instructions
   | Mcp
   | Git_hosting
   | Nix_store
@@ -17,9 +19,11 @@ let available ~superuser =
     | Nix_store -> superuser
     | Appearance
     | Sessions
+    | New_sessions
     | Models
     | Memory
     | About_you
+    | Custom_instructions
     | Mcp
     | Git_hosting
     | Account -> true)
@@ -32,9 +36,11 @@ let visible t ~superuser =
 let name = function
   | Appearance -> "Appearance"
   | Sessions -> "Sessions"
+  | New_sessions -> "New sessions"
   | Models -> "Models"
   | Memory -> "Memory"
   | About_you -> "About you"
+  | Custom_instructions -> "Custom instructions"
   | Mcp -> "MCP servers"
   | Git_hosting -> "Git hosting"
   | Nix_store -> "Nix store"
@@ -46,8 +52,11 @@ let about = function
     "How this page looks. Saved for your account, so it follows you to every \
      browser you sign in on."
   | Sessions ->
-    "How new sessions start, and how this browser tells you that something \
-     happened. Kept on the backend."
+    "How the session list shows sessions, and how this browser tells you that \
+     something happened. Kept on the backend."
+  | New_sessions ->
+    "What a new session starts with. A change applies from the next new \
+     session: open ones keep theirs. Kept on the backend."
   | Models ->
     "The providers whose models you use, the models prigh uses for its own \
      work, and when long conversations are summarised. Kept on the backend."
@@ -57,6 +66,10 @@ let about = function
   | About_you ->
     "What the model should know about you, given to it in every session. Kept \
      on the backend, for your account."
+  | Custom_instructions ->
+    "Standing instructions for the model, given to it in every session; it may \
+     also add or edit them when you state a lasting preference. Kept on the \
+     backend, for your account."
   | Mcp ->
     "Tools the model can use from MCP servers. The servers here are kept on \
      the backend for your account and run on every host your sessions use; a \
@@ -71,9 +84,11 @@ let about = function
 let arg = function
   | Appearance -> "appearance"
   | Sessions -> "sessions"
+  | New_sessions -> "new-sessions"
   | Models -> "models"
   | Memory -> "memory"
   | About_you -> "user-info"
+  | Custom_instructions -> "instructions"
   | Mcp -> "mcp"
   | Git_hosting -> "git"
   | Nix_store -> "nix"
@@ -93,6 +108,7 @@ let of_arg s =
     match List.find all ~f:(fun t -> String.equal (arg t) s) with
     | Some t -> Some t
     | None when String.is_prefix "behaviour" ~prefix:s -> Some Sessions
+    | None when String.is_prefix "defaults" ~prefix:s -> Some New_sessions
     | None -> List.find all ~f:matches)
 ;;
 

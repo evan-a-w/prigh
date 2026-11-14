@@ -41,6 +41,26 @@ val switch
   -> unit
   -> Node.t
 
+(** A number with its [unit] after it (a field to type it in, applied on
+    Enter or leaving it) and an On/Off switch; off hides the field.
+    [invalid] marks the field (the row's note says why). *)
+val number_switch
+  :  ?disabled:bool
+  -> id:string
+  -> label:string
+  -> unit:string
+  -> value:string
+  -> placeholder:string
+  -> title:string
+  -> switch_title:string
+  -> invalid:bool
+  -> on:bool
+  -> on_input:(string -> unit Effect.t)
+  -> on_commit:unit Effect.t
+  -> on_switch:(bool -> unit Effect.t)
+  -> unit
+  -> Node.t
+
 (** A choice made in a picker: the current [value] with a chevron, as a
     select box reads. *)
 val select

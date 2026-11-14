@@ -5,9 +5,11 @@ open! Core
 type t =
   | Appearance
   | Sessions
+  | New_sessions (** what new sessions start with *)
   | Models
   | Memory
   | About_you
+  | Custom_instructions
   | Mcp
   | Git_hosting
   | Nix_store (** superusers only *)

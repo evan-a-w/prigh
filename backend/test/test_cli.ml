@@ -42,7 +42,7 @@ let%expect_test "flags: bad values name the flag and the fix" =
   with_sandbox
   @@ fun t ->
   prigh t [ "run"; "-model"; "anthropic/nope"; "hi" ];
-  prigh t [ "run"; "-thinking"; "medium"; "hi" ];
+  prigh t [ "run"; "-thinking"; "lots"; "hi" ];
   prigh t [ "run"; "-cwd"; "/nonexistent"; "-faux"; "hi" ];
   prigh t [ "models"; "-provider"; "anthropc" ];
   prigh t [ "serve"; "-listen"; "7777" ];
@@ -55,8 +55,8 @@ let%expect_test "flags: bad values name the flag and the fix" =
     -model: unknown model "anthropic/nope"; did you mean: anthropic/claude-opus-5 (Claude Opus 5), anthropic/claude-fable-5 (Claude Fable 5), anthropic/claude-opus-4-5 (Claude Opus 4.5 (latest))
     prigh models lists them all
     [exit 2]
-    $ prigh run -thinking medium hi
-    -thinking medium: thinking must be one of: off, on, low, high, max
+    $ prigh run -thinking lots hi
+    -thinking lots: thinking must be one of: off, default, minimal, low, medium, high, xhigh, max
     [exit 2]
     $ prigh run -cwd /nonexistent -faux hi
     -cwd /nonexistent: no such directory (mkdir -p it first)
@@ -540,29 +540,29 @@ let%expect_test "compaction-eval: a developer's tool, left out of the help" =
     session <id> "Fix it. Don't touch the lexer."
       deepseek/deepseek-flash (default), window 20.0k, summarise over 10.0k: 13 messages, recorded input 0
       strategy            peak over    input uncached  cached$ inval masks  summ  final  user v/s/n    read written  errors
-      none               15.1k    0    56.8k    15.1k    23.1k     0     0     0  17.4k       1/0/1     6/6       -       -
+      none               15.4k    0    58.4k    15.4k    23.5k     0     0     0  17.6k       1/0/1     6/6       -       -
 
     aggregate over 1 sessions
       strategy            peak over    input uncached  cached$ inval masks  summ  final  user v/s/n    read written  errors
-      none               15.1k    0    56.8k    15.1k    23.1k     0     0     0  17.4k       1/0/1     6/6       -       -
+      none               15.4k    0    58.4k    15.4k    23.5k     0     0     0  17.6k       1/0/1     6/6       -       -
     $ prigh compaction-eval <prefix> -window 20000 -strategies none -compact-at 12000
     session <id> "Fix it. Don't touch the lexer."
       deepseek/deepseek-flash (default), window 20.0k, summarise over 12.0k: 13 messages, recorded input 0
       strategy            peak over    input uncached  cached$ inval masks  summ  final  user v/s/n    read written  errors
-      none               15.1k    0    56.8k    15.1k    23.1k     0     0     0  17.4k       1/0/1     6/6       -       -
+      none               15.4k    0    58.4k    15.4k    23.5k     0     0     0  17.6k       1/0/1     6/6       -       -
 
     aggregate over 1 sessions
       strategy            peak over    input uncached  cached$ inval masks  summ  final  user v/s/n    read written  errors
-      none               15.1k    0    56.8k    15.1k    23.1k     0     0     0  17.4k       1/0/1     6/6       -       -
+      none               15.4k    0    58.4k    15.4k    23.5k     0     0     0  17.6k       1/0/1     6/6       -       -
     $ prigh compaction-eval <prefix> -window 20000 -strategies none -compact-at 0
     session <id> "Fix it. Don't touch the lexer."
       deepseek/deepseek-flash (default), window 20.0k, summarise over 16.0k: 13 messages, recorded input 0
       strategy            peak over    input uncached  cached$ inval masks  summ  final  user v/s/n    read written  errors
-      none               15.1k    0    56.8k    15.1k    23.1k     0     0     0  17.4k       1/0/1     6/6       -       -
+      none               15.4k    0    58.4k    15.4k    23.5k     0     0     0  17.6k       1/0/1     6/6       -       -
 
     aggregate over 1 sessions
       strategy            peak over    input uncached  cached$ inval masks  summ  final  user v/s/n    read written  errors
-      none               15.1k    0    56.8k    15.1k    23.1k     0     0     0  17.4k       1/0/1     6/6       -       -
+      none               15.4k    0    58.4k    15.4k    23.5k     0     0     0  17.6k       1/0/1     6/6       -       -
     |}]
 ;;
 

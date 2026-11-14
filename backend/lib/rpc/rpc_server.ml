@@ -123,6 +123,10 @@ let methods =
   ; "set_memory_enabled"
   ; "get_user_info"
   ; "set_user_info"
+  ; "get_custom_instructions"
+  ; "save_custom_instruction"
+  ; "remove_custom_instruction"
+  ; "set_custom_instructions_enabled"
   ; "get_mcp_settings"
   ; "add_mcp_servers"
   ; "update_mcp_server"
@@ -414,6 +418,7 @@ type t =
   ; prefs : User_prefs.t option (** under [home] *)
   ; memory : Memory.t option (** under [home] *)
   ; user_info : User_info.t option (** under [home] *)
+  ; custom_instructions : Custom_instructions.t option (** under [home] *)
   ; mcp_settings : Mcp_settings.t option (** under [home] *)
   ; now : unit -> float
   ; listed : Listed.t String.Table.t
@@ -796,19 +801,59 @@ let memory_changed (t : t) memory =
     Hashtbl.iter t.clients ~f:(fun (c : Client.t) -> c.send json)
 ;;
 
+let custom_instructions_json ci =
+  let%map.Or_error notes = Custom_instructions.notes ci in
+  let int n = `Number (Int.to_string n) in
+  [ ("enabled", if Custom_instructions.enabled ci then `True else `False)
+  ; "notes", `Array (List.map notes ~f:Custom_instructions.Note.to_json)
+  ; ( "limits"
+    , `Object
+        [ "text", int Custom_instructions.max_text
+        ; "title", int Custom_instructions.max_title
+        ; "count", int Custom_instructions.max_notes
+        ] )
+  ]
+;;
+
+let custom_instructions_changed (t : t) ci =
+  match custom_instructions_json ci with
+  | Error _ -> ()
+  | Ok fields ->
+    let json =
+      `Object
+        ([ "type", `String "event"
+         ; "event", `String "custom_instructions_changed"
+         ]
+         @ fields)
+    in
+    Hashtbl.iter t.clients ~f:(fun (c : Client.t) -> c.send json)
+;;
+
 let user_info_json user_info =
-  [ "text", `String (User_info.get user_info)
-  ; "max", `Number (Int.to_string User_info.max_bytes)
+  let%map.Or_error form = User_info.get user_info in
+  let max key = key, `Number (Int.to_string (User_info.max_field key)) in
+  [ "form", User_info.Form.to_json form
+  ; "text", `String (Option.value (User_info.Form.render form) ~default:"")
+  ; ( "limits"
+    , `Object
+        [ max "name"
+        ; max "background"
+        ; max "anything_else"
+        ; "total", `Number (Int.to_string User_info.max_total)
+        ] )
   ]
 ;;
 
 let user_info_changed (t : t) user_info =
-  let json =
-    `Object
-      ([ "type", `String "event"; "event", `String "user_info_changed" ]
-       @ user_info_json user_info)
-  in
-  Hashtbl.iter t.clients ~f:(fun (c : Client.t) -> c.send json)
+  match user_info_json user_info with
+  | Error _ -> ()
+  | Ok fields ->
+    let json =
+      `Object
+        ([ "type", `String "event"; "event", `String "user_info_changed" ]
+         @ fields)
+    in
+    Hashtbl.iter t.clients ~f:(fun (c : Client.t) -> c.send json)
 ;;
 
 let mcp_settings_json entries =
@@ -843,6 +888,7 @@ let create
       ?forges
       ?memory
       ?user_info
+      ?custom_instructions
       ?mcp_settings
       ?transcription_http
       ?nix_store
@@ -911,6 +957,11 @@ let create
         (match user_info with
          | Some _ -> user_info
          | None -> Option.map home ~f:(fun home -> User_info.create ~home))
+    ; custom_instructions =
+        (match custom_instructions with
+         | Some _ -> custom_instructions
+         | None ->
+           Option.map home ~f:(fun home -> Custom_instructions.create ~home))
     ; mcp_settings =
         (match mcp_settings with
          | Some _ -> mcp_settings
@@ -936,6 +987,9 @@ let create
     Memory.subscribe memory ~f:(fun () -> memory_changed t memory));
   Option.iter t.user_info ~f:(fun user_info ->
     User_info.subscribe user_info ~f:(fun () -> user_info_changed t user_info));
+  Option.iter t.custom_instructions ~f:(fun ci ->
+    Custom_instructions.subscribe ci ~f:(fun () ->
+      custom_instructions_changed t ci));
   Option.iter t.mcp_settings ~f:(fun mcp_settings ->
     Mcp_settings.subscribe mcp_settings ~f:(fun () ->
       mcp_settings_changed t mcp_settings));
@@ -1803,6 +1857,23 @@ let hello t (client : Client.t) params =
             ]))))
 ;;
 
+(* The namespace's file as it is now, which another session may have
+   changed. *)
+let current_config t agent =
+  match Option.map t.home ~f:(fun home -> Config.load ~home) with
+  | Some (Ok config) -> config
+  | Some (Error _) | None -> Agent.config agent
+;;
+
+(* Every session hears of a change one of them saved, and tells its clients:
+   open settings follow, and a later [set_config] from any of them starts
+   from it. *)
+let config_saved t agent =
+  let config = Agent.config agent in
+  Hashtbl.iter t.agents ~f:(fun other ->
+    if not (phys_equal other agent) then Agent.adopt_config other config)
+;;
+
 (* The file is reread so that a change made from another session counts. *)
 let archive_after_days t (client : Client.t) =
   let config =
@@ -1850,8 +1921,50 @@ let attached_state (client : Client.t) =
 (* A temporary session is not saved or listed, and ends when its client
    leaves it ([attach]), or [temporary_grace] after the last one went. Its
    ledger exists from the start, so that a restart knows to clean up. *)
-let new_session t (client : Client.t) ~temporary =
+(* Where [new_session] starts a session. A tool host's sessions start on
+   it, where it is; another client's on the config's [default_host] while
+   that is connected, else as [start_location] says. On the default host
+   (the backend's without one), in [default_cwd] when there is one. *)
+let new_session_start t (client : Client.t) =
   let start = start_location t client ~cwd:(own_cwd client) in
+  if client.tools
+  then start
+  else (
+    let config = current_config t client.agent in
+    let hosts = Agent.hosts client.agent in
+    let find id =
+      List.find hosts ~f:(fun (h : Agent.Host.t) -> String.equal h.id id)
+    in
+    let start =
+      match Option.bind config.default_host ~f:find with
+      | Some h ->
+        Some ({ Session.Host.id = h.id; name = h.name; pinned = false }, h.cwd)
+      | None -> start
+    in
+    let on = Option.value config.default_host ~default:Agent.Host.backend_id in
+    let default_dir (h : Agent.Host.t) dir =
+      if String.equal h.id Agent.Host.backend_id
+      then (
+        let dir = Tool.expand_home dir in
+        match Sys_unix.is_directory dir with
+        | `Yes -> Some dir
+        | `No | `Unknown -> None)
+      else if String.is_prefix dir ~prefix:"~"
+      then Option.map h.home ~f:(fun home -> Tool.expand_home ~home dir)
+      else Some dir
+    in
+    match start, config.default_cwd with
+    | Some (host, cwd), Some dir when String.equal host.id on ->
+      let cwd =
+        Option.bind (find on) ~f:(fun h -> default_dir h dir)
+        |> Option.value ~default:cwd
+      in
+      Some (host, cwd)
+    | _ -> start)
+;;
+
+let new_session t (client : Client.t) ~temporary =
+  let start = new_session_start t client in
   let cwd =
     match start with
     | Some (_, cwd) -> cwd
@@ -2690,14 +2803,71 @@ let user_info t ~meth ~params =
   | None -> Or_error.error_string "this backend keeps no user info"
   | Some user_info ->
     let open Or_error.Let_syntax in
-    let%map () =
+    let%bind () =
       match meth with
       | "set_user_info" ->
-        let%bind text = string_param params "text" in
-        User_info.set user_info text
+        (match param params "form", string_param_opt params "field" with
+         | Some form, _ ->
+           let%bind form = User_info.Form.of_json form in
+           User_info.set user_info form
+         | None, Ok (Some field) ->
+           let%bind value = string_param params "value" in
+           let%bind form = User_info.get user_info in
+           let%bind form = User_info.Form.set_field form field value in
+           User_info.set user_info form
+         | None, Error e -> Error e
+         | None, Ok None ->
+           Or_error.error_string
+             "set_user_info needs a form, or a field and its value")
       | _ -> Ok ()
     in
-    `Object (user_info_json user_info)
+    let%map fields = user_info_json user_info in
+    `Object fields
+;;
+
+let custom_instructions t ~meth ~params =
+  match t.custom_instructions with
+  | None -> Or_error.error_string "this backend keeps no custom instructions"
+  | Some ci ->
+    let open Or_error.Let_syntax in
+    let now () =
+      Time_float.of_span_since_epoch (Time_float.Span.of_sec (t.now ()))
+    in
+    let note n = `Object [ "note", Custom_instructions.Note.to_json n ] in
+    (match meth with
+     | "get_custom_instructions" ->
+       let%map fields = custom_instructions_json ci in
+       `Object fields
+     | "save_custom_instruction" ->
+       let%bind id = string_param_opt params "id" in
+       let%bind title = string_param_opt params "title" in
+       let%bind text = string_param params "text" in
+       let%map n =
+         match id with
+         | Some id ->
+           Custom_instructions.edit
+             ci
+             ~id
+             ~title:(Option.value title ~default:"")
+             ~text
+             ~now:(now ())
+             ()
+         | None -> Custom_instructions.add ci ?title ~now:(now ()) text
+       in
+       note n
+     | "remove_custom_instruction" ->
+       let%bind id = string_param params "id" in
+       let%map n = Custom_instructions.remove ci id in
+       note n
+     | _ ->
+       let%bind enabled =
+         match param params "enabled" with
+         | Some `True -> Ok true
+         | Some `False -> Ok false
+         | _ -> Or_error.error_string "param \"enabled\" must be a boolean"
+       in
+       let%map () = Custom_instructions.set_enabled ci enabled in
+       `Object [ ("enabled", if enabled then `True else `False) ])
 ;;
 
 let mcp_settings t ~meth ~params =
@@ -2756,6 +2926,40 @@ let keep_session t (client : Client.t) =
     Ok (attached_state client))
 ;;
 
+let set_config t agent params =
+  match param params "config" with
+  | None -> Or_error.error_string "missing param \"config\""
+  | Some json ->
+    (* Fields left out keep their values, so a frontend that does not know a
+       field cannot reset it. *)
+    let json =
+      match Config.to_json (current_config t agent), json with
+      | `Object current, `Object given ->
+        (* [confirm_tools] from an older frontend stands for
+           [approval_mode]. *)
+        let given_names =
+          List.map given ~f:fst
+          @
+          if List.Assoc.mem given ~equal:String.equal "confirm_tools"
+          then [ "approval_mode" ]
+          else []
+        in
+        `Object
+          (List.filter current ~f:(fun (k, _) ->
+             not (List.mem given_names k ~equal:String.equal))
+           @ given)
+      | _, json -> json
+    in
+    let open Or_error.Let_syntax in
+    let%bind config = Config.of_json json in
+    let%bind defaults_only = bool_param params "defaults_only" ~default:false in
+    let%map () =
+      Agent.set_config ~session_mode:(not defaults_only) agent config
+    in
+    config_saved t agent;
+    Config.to_json (Agent.config agent)
+;;
+
 let dispatch_server t (client : Client.t) ~meth ~params
   : Json.t Or_error.t option
   =
@@ -2804,6 +3008,11 @@ let dispatch_server t (client : Client.t) ~meth ~params
   | "get_memory" | "save_memory" | "forget_memory" | "set_memory_enabled" ->
     Some (memory t ~meth ~params)
   | "get_user_info" | "set_user_info" -> Some (user_info t ~meth ~params)
+  | "get_custom_instructions"
+  | "save_custom_instruction"
+  | "remove_custom_instruction"
+  | "set_custom_instructions_enabled" ->
+    Some (custom_instructions t ~meth ~params)
   | "get_mcp_settings"
   | "add_mcp_servers"
   | "update_mcp_server"
@@ -2841,6 +3050,12 @@ let dispatch_server t (client : Client.t) ~meth ~params
     Some
       (unit_result
          (Terminal_relay.closed t.terminals ~host:client.host_id params))
+  | "set_config" -> Some (set_config t client.agent params)
+  | "change_default" ->
+    Some
+      (Or_error.map (Agent.save_as_default client.agent) ~f:(fun () ->
+         config_saved t client.agent;
+         Config.to_json (Agent.config client.agent)))
   | "new_session" ->
     Some
       (Or_error.map
@@ -3216,9 +3431,9 @@ let dispatch agent login ~(client : Client.t) ~meth ~params : Json.t Or_error.t 
           `Object []))
   | "set_thinking" ->
     Or_error.bind (string_param params "thinking") ~f:(fun s ->
-      Or_error.map (Rpc_json.thinking_of_string s) ~f:(fun thinking ->
-        Agent.set_thinking agent thinking;
-        `Object []))
+      Or_error.bind (Rpc_json.thinking_of_string s) ~f:(fun thinking ->
+        Or_error.map (Agent.set_thinking agent thinking) ~f:(fun () ->
+          `Object [])))
   | "compact" ->
     Or_error.bind
       (string_param_opt params "instructions")
@@ -3376,36 +3591,6 @@ let dispatch agent login ~(client : Client.t) ~meth ~params : Json.t Or_error.t 
     Or_error.bind (string_param_opt params "host") ~f:(fun host ->
       Agent.list_dirs ?host agent ~prefix)
   | "get_config" -> ok (Config.to_json (Agent.config agent))
-  | "set_config" ->
-    (match param params "config" with
-     | None -> Or_error.error_string "missing param \"config\""
-     | Some json ->
-       (* Fields left out keep their values, so a frontend that does not know
-          a field cannot reset it. *)
-       let json =
-         match Config.to_json (Agent.config agent), json with
-         | `Object current, `Object given ->
-           (* [confirm_tools] from an older frontend stands for
-              [approval_mode]. *)
-           let given_names =
-             List.map given ~f:fst
-             @
-             if List.Assoc.mem given ~equal:String.equal "confirm_tools"
-             then [ "approval_mode" ]
-             else []
-           in
-           `Object
-             (List.filter current ~f:(fun (k, _) ->
-                not (List.mem given_names k ~equal:String.equal))
-              @ given)
-         | _, json -> json
-       in
-       Or_error.bind (Config.of_json json) ~f:(fun config ->
-         Or_error.map (Agent.set_config agent config) ~f:(fun () ->
-           Config.to_json (Agent.config agent))))
-  | "change_default" ->
-    Or_error.map (Agent.save_as_default agent) ~f:(fun () ->
-      Config.to_json (Agent.config agent))
   | "tool_confirm_respond" ->
     let open Or_error.Let_syntax in
     let%bind call_id = string_param params "call_id" in
@@ -3496,37 +3681,52 @@ let handle t client (request : Json.t) : Json.t =
     match param request "method" with
     | Some (`String meth) ->
       let params = request_params request in
-      (match
-         if (not client.Client.authed) && not (String.equal meth "hello")
-         then
-           Or_error.error_string "unauthorised: send hello with the token first"
-         else (
-           match dispatch_server t client ~meth ~params with
-           | Some result -> result
-           | None ->
-             let agent = agent_of_client t client in
-             let by =
-               Option.map client.signed_in ~f:(fun s ->
-                 s.User_access.Signed_in.user)
-             in
-             (match
-                Option.first_some
-                  (Files_rpc.dispatch ?by agent ~meth ~params)
-                  (Option.first_some
-                     (Review_rpc.dispatch
-                        ?by
-                        ~client:client.kind
-                        agent
-                        ~meth
-                        ~params)
-                     (Git_rpc.dispatch agent ~meth ~params))
-              with
-              | Some result -> result
-              | None -> dispatch agent t.login ~client ~meth ~params))
-       with
-       | result -> result
-       | exception exn ->
-         Or_error.error_s [%message "internal error" (exn : exn)])
+      (* Every client's list shows the sessions archived by the new age. *)
+      let archive_before =
+        Option.some_if
+          (client.Client.authed && String.equal meth "set_config")
+          (archive_after_days t client)
+      in
+      let result =
+        match
+          if (not client.Client.authed) && not (String.equal meth "hello")
+          then
+            Or_error.error_string
+              "unauthorised: send hello with the token first"
+          else (
+            match dispatch_server t client ~meth ~params with
+            | Some result -> result
+            | None ->
+              let agent = agent_of_client t client in
+              let by =
+                Option.map client.signed_in ~f:(fun s ->
+                  s.User_access.Signed_in.user)
+              in
+              (match
+                 Option.first_some
+                   (Files_rpc.dispatch ?by agent ~meth ~params)
+                   (Option.first_some
+                      (Review_rpc.dispatch
+                         ?by
+                         ~client:client.kind
+                         agent
+                         ~meth
+                         ~params)
+                      (Git_rpc.dispatch agent ~meth ~params))
+               with
+               | Some result -> result
+               | None -> dispatch agent t.login ~client ~meth ~params))
+        with
+        | result -> result
+        | exception exn ->
+          Or_error.error_s [%message "internal error" (exn : exn)]
+      in
+      (match archive_before, result with
+       | Some before, Ok _
+         when not (Float.equal before (archive_after_days t client)) ->
+         sessions_changed t
+       | _ -> ());
+      result
     | _ -> Or_error.error_string "request must have a string \"method\""
   in
   match response with

@@ -351,7 +351,7 @@ let%expect_test
     (Add files or images (or paste, or drop them here))
     (Claude Opus 5.5)
     (backend)
-    (on)
+    (provider's default)
     (auto)
     (normal)
     Ready (0%) $0.00
@@ -359,7 +359,7 @@ let%expect_test
     Context 0 / 200k · 0%
     Tokens 0 in · 0 out · 0 cached
     Cost $0.0000
-    Thinking on
+    Thinking provider's default
     Mode Auto: never asks
     Model Claude Opus 5.5
     Branch main
@@ -397,7 +397,7 @@ let%expect_test "/diff, /review and /init are in the completions and /help" =
     Commands ↑↓ Tab Enter Esc   Ctrl+Enter as typed
     /diff [path] show the uncommitted changes where the tools run, untracked files too
     /dictation [model MODEL|off] show which model transcribes dictation (speech to text); model MODEL|off: transcribe with MODEL, an OpenAI or OpenAI-compatible provider's (off: openai/gpt-4o-mini-transcribe)
-    /default-dir [path|off] show or set the directory new sessions start in
+    /default-dir [path|off] show or set the directory new sessions start in (on the default host), in Settings
     /mkdir [path] create a directory (and its parents) and change to it
     /downsize-images send the conversation's images smaller (after the model refused one as too large) and retry a failed reply
     /delete-archived delete every archived session, after a confirmation
@@ -405,7 +405,8 @@ let%expect_test "/diff, /review and /init are in the completions and /help" =
     Commands ↑↓ Tab Enter Esc   Ctrl+Enter as typed
     /init write or improve the project's AGENTS.md
     /import [path] import a session from a JSONL file on the backend
-    /user-info what you wrote about yourself for the model, given to it in every session (unlike memory, which it looks up), in Settings
+    /instructions [on|off] your custom instructions, in the context of every session, in Settings; on or off lets the model add, edit and remove them or not
+    /user-info what you set about yourself for the model (name, country, units...), given to it in every session, in Settings
     /pin [session] pin a session to the top of the sidebar (this one without an argument): pinned sessions are never archived for being idle
     /diff [path] show the uncommitted changes where the tools run, untracked files too
     /trim [after|undo] drop everything before a message from the model's context (the transcript keeps it folded); after: everything after a message instead (what you send later stays); undo brings back the last trim
@@ -416,7 +417,7 @@ let%expect_test "/diff, /review and /init are in the completions and /help" =
     /login [provider|github [HOST]|forgejo HOST|HOST] [token] log in to a model provider (or /login custom), or sign in to GitHub or a Forgejo or Gitea host (token: paste one instead of OAuth)
     /filter [all|KIND...|-KIND|+KIND] show only some kinds in the transcript (your messages, replies, thinking, tools, subagents, notes); the model's context is unchanged
     /notify [on|off] tell you when a turn ends or something waits for you while the tab is hidden
-    /naming [model MODEL|off] show which model names sessions and subagents; model MODEL|off: name them with MODEL (off: the generate model, else the session's)
+    /naming [model MODEL|off] show which model names sessions and subagents; model MODEL|off: name them with MODEL (off: the drafting model, else the session's)
     /review [worktree] [--base REV] the review page, the changes file by file to approve, comment on and edit (Alt+R): of the session's worktree or another (its branch, path or name), against its base or REV; /review BASE [instructions] (HEAD: the uncommitted changes) has the model review them for prioritised findings
     /switch [path] switch to a saved session
     /rewind go back to an earlier message in this session
@@ -428,7 +429,7 @@ let%expect_test "/diff, /review and /init are in the completions and /help" =
     /archive [session] archive a session (this one without an argument): it moves under Archived in the sidebar
     /snippet [NAME|add|rm] insert a saved text at the caret (none: pick one, Alt+N); add NAME [TEXT] saves one (no TEXT: your last prompt), rm NAME deletes it
     /signout sign out of this account
-    /settings [section] appearance, sessions, models, git hosting and your account; a section opens at it (Ctrl+,)
+    /settings [section] appearance, sessions, new sessions' defaults, models, git hosting and your account; a section opens at it (Ctrl+,)
     /thinking [off|low|on|high|max] pick or set the thinking level
     /sessions search the saved sessions
     /terminal [dir] open a shell where the tools run, in the session's directory (Ctrl+`), or a shell of its own in DIR (a worktree, say)
@@ -437,7 +438,8 @@ let%expect_test "/diff, /review and /init are in the completions and /help" =
     /unarchive [session] unarchive a session (this one without an argument)
     /compaction [at|model|mask ...] show when conversations are compacted and what summarises them; at TOKENS|off: also once the context exceeds TOKENS, not only at 80% of the window; model MODEL|off: the model that writes the summaries (off: the session's); mask on|off: replace old tool outputs with placeholders first
     /permissions show the mode and the allow/ask/deny rules (config and this session)
-    /default-dir [path|off] show or set the directory new sessions start in
+    /default-dir [path|off] show or set the directory new sessions start in (on the default host), in Settings
+    /auto-archive [DAYS|off] show how long a session goes without activity before it is archived; DAYS|off: archive after DAYS days (off: never, only by hand), in Settings
     /delete-archived delete every archived session, after a confirmation
     /downsize-images send the conversation's images smaller (after the model refused one as too large) and retry a failed reply
     /retry-backend-connection reconnect to the backend now

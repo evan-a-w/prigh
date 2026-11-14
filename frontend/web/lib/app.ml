@@ -180,8 +180,11 @@ module Reply_tag = struct
     | Config_saved of string
     | Fallback_saved
     | Default_dir_saved
+    | Default_set of New_default.t
     | Compaction_saved
+    | Generate_model_saved
     | Naming_saved
+    | Auto_archive_saved
     | Dictation_saved
     | Transcribed
     | Default_saved
@@ -268,6 +271,10 @@ module Reply_tag = struct
     | Nix_status of { open_settings : bool }
     | Nix_collected
     | Memory_loaded
+    | Instructions_loaded
+    | Instruction_saved
+    | Instruction_removed
+    | Instructions_enabled
     | Memory_saved
     | Memory_forgot
     | Memory_enabled
@@ -403,6 +410,7 @@ module Action = struct
     | Reply of Reply_tag.t * (Json.t, string) Result.t
     | Tick of Time_ns.t
     | Set_utc_offset of Time_ns.Span.t
+    | Set_browser_time_zone of string
     | Set_narrow of bool
     | Set_desktop of bool
     | Set_browser_shell of bool
@@ -483,6 +491,13 @@ module Action = struct
     | Settings_move of Settings_section.Move.t
     | Compact_at_input of string
     | Compact_at_commit
+    | Sessions_field_input of Sessions_fields.Which.t * string
+    | Sessions_field_commit of Sessions_fields.Which.t
+    | Set_default of New_default.t
+    | Pick_default of New_default.Picker.t
+    | Default_field_input of Default_fields.Which.t * string
+    | Default_field_commit of Default_fields.Which.t
+    | Switch_number of Switched_off.Key.t * bool
     | Memory_filter of string
     | Memory_edit of string option
     | Memory_title of string
@@ -492,7 +507,15 @@ module Action = struct
     | Memory_forget of string
     | Memory_forget_confirm
     | Memory_forget_cancel
-    | About_you_text of string
+    | Instruction_edit of string option
+    | Instruction_title of string
+    | Instruction_text of string
+    | Instruction_save
+    | Instruction_cancel
+    | Instruction_remove of string
+    | Instruction_remove_confirm
+    | Instruction_remove_cancel
+    | About_you_field of About_you.Field.t * string
     | About_you_save
     | About_you_revert
     | Mcp_edit of string option
@@ -705,6 +728,7 @@ module Model = struct
     ; auth : Auth_status.t list
     ; now : Time_ns.t option
     ; utc_offset : Time_ns.Span.t
+    ; browser_time_zone : string option
     ; narrow : bool
     ; desktop : bool
     ; browser_shell : bool
@@ -752,7 +776,7 @@ module Model = struct
     ; skills : Skills.t
     ; worktrees : Worktrees.t
     ; repo_worktrees : Repo_listings.t
-    ; folded : String.Set.t
+    ; worktree_folds : Worktree_folds.t
     ; pending : In_flight.t
     ; marks : Session_marks.t
     ; notifications : Page_notify.t
@@ -778,9 +802,13 @@ module Model = struct
     ; forges : Forges.t
     ; nix_gc : Nix_gc.t
     ; memory : Memory_notes.t
+    ; instructions : Instruction_notes.t
     ; about_you : About_you.t
     ; mcp : Mcp_page.t
     ; compact_at : Compact_at.t
+    ; sessions_fields : Sessions_fields.t
+    ; default_fields : Default_fields.t
+    ; switched_off : Switched_off.t
     ; settings_section : Settings_section.t
       (* A phone's settings show the list of sections, not one of them. *)
     ; settings_home : bool
@@ -1012,8 +1040,6 @@ module Model = struct
   ;;
 end
 
-let thinking_levels = Prigh_ui.Commands.thinking_levels
-
 let init =
   { Model.connection = Connected
   ; drops = Drops.initial
@@ -1027,6 +1053,7 @@ let init =
   ; auth = []
   ; now = None
   ; utc_offset = Time_ns.Span.zero
+  ; browser_time_zone = None
   ; narrow = false
   ; desktop = false
   ; browser_shell = false
@@ -1074,7 +1101,7 @@ let init =
   ; skills = Skills.empty
   ; worktrees = Worktrees.empty
   ; repo_worktrees = Repo_listings.empty
-  ; folded = String.Set.empty
+  ; worktree_folds = Worktree_folds.empty
   ; pending = In_flight.none
   ; marks = Session_marks.empty
   ; notifications = Page_notify.init
@@ -1096,9 +1123,13 @@ let init =
   ; forges = Forges.empty
   ; nix_gc = Nix_gc.empty
   ; memory = Memory_notes.empty
+  ; instructions = Instruction_notes.empty
   ; about_you = About_you.empty
   ; mcp = Mcp_page.empty
   ; compact_at = Compact_at.empty
+  ; sessions_fields = Sessions_fields.empty
+  ; default_fields = Default_fields.empty
+  ; switched_off = Switched_off.empty
   ; settings_section = Appearance
   ; settings_home = true
   ; return_to_settings = false
@@ -1222,8 +1253,14 @@ let close_dialog (m : Model.t) =
     , Some
         ( Login _ | Forge_host _ | Nix_gc_confirm _
         | Picker
-            { kind = Compaction_models | Naming_models | Dictation_models; _ }
-          ) ) ->
+            { kind =
+                ( Compaction_models
+                | Generate_models
+                | Naming_models
+                | Dictation_models
+                | Defaults _ )
+            ; _
+            } ) ) ->
     ( { m with
         dialog = Some Settings
       ; return_to_settings = false
@@ -1323,7 +1360,20 @@ let review_out (m : Model.t) (outs : Code_review.Out.t list) =
     | Clear_text_selection -> m, cmds @ [ Command.Clear_text_selection ])
 ;;
 
-let with_review (m : Model.t) (review, outs) = review_out { m with review } outs
+(* On a phone the review page is a sheet: the sheets it was opened from
+   close, or they would stay over it. *)
+let with_review (m : Model.t) ((review : Code_review.t), outs) =
+  let m =
+    if m.narrow && review.open_ && not m.review.open_
+    then
+      { m with
+        files = fst (Files.update m.files Close)
+      ; agents = { m.agents with open_ = false }
+      }
+    else m
+  in
+  review_out { m with review } outs
+;;
 
 (* What the agent may have changed in the working tree: an edit, a write, a
    command, its own or a subagent's; and a run's end. *)
@@ -1732,24 +1782,38 @@ let model_picker ?query m =
   Dialog.Picker { kind = Models; picker = models_picker ?query m }
 ;;
 
+(* The session model's settings ([Thinking.all] before the state comes). *)
+let thinking_options (m : Model.t) =
+  Option.value_map m.state ~default:Thinking.all ~f:(fun s ->
+    Thinking.options s.model)
+;;
+
+(* "provider's default", and the level the provider picks when we know it. *)
+let thinking_detail (llm : Llm.t option) level =
+  match
+    Thinking.normalize level, Option.bind llm ~f:(fun l -> l.thinking_default)
+  with
+  | "default", Some known ->
+    sprintf "the provider picks: %s" (Thinking.label known)
+  | level, _ -> Thinking.description level
+;;
+
 let thinking_levels_picker (m : Model.t) =
-  let current = Option.value_map m.state ~default:"" ~f:(fun s -> s.thinking) in
-  let detail = function
-    | "off" -> "answer straight away"
-    | "low" -> "a little"
-    | "on" -> "the provider's default budget"
-    | "high" -> "more"
-    | "max" -> "as much as the model allows"
-    | _ -> ""
+  let current =
+    Option.value_map m.state ~default:"" ~f:(fun s ->
+      Thinking.normalize s.thinking)
   in
+  let llm = Option.map m.state ~f:(fun s -> s.model) in
   Picker.create
-    ~title:"Thinking level"
-    (List.map thinking_levels ~f:(fun level ->
+    ~title:
+      (Option.value_map llm ~default:"Thinking level" ~f:(fun l ->
+         "Thinking level for " ^ l.name))
+    (List.map (thinking_options m) ~f:(fun level ->
        Picker.Item.create
          ~id:level
-         ~detail:(detail level)
+         ~detail:(thinking_detail llm level)
          ~marked:(String.equal level current)
-         level))
+         (Thinking.label level)))
 ;;
 
 let custom_detail (c : Auth_status.Custom.t) =
@@ -1861,6 +1925,11 @@ let fetch_memory (m : Model.t) =
   , [ call Get_memory ~tag:Memory_loaded ] )
 ;;
 
+let fetch_instructions (m : Model.t) =
+  ( { m with instructions = Instruction_notes.loading m.instructions }
+  , [ call Get_custom_instructions ~tag:Instructions_loaded ] )
+;;
+
 let fetch_about_you (m : Model.t) =
   ( { m with about_you = About_you.loading m.about_you }
   , [ call Get_user_info ~tag:About_you_loaded ] )
@@ -1903,7 +1972,14 @@ let fetch_section (m : Model.t) : Settings_section.t -> _ = function
   | Memory -> fetch_memory m
   | About_you -> fetch_about_you m
   | Mcp -> fetch_mcp m
-  | Appearance | Sessions | Models | Git_hosting | Nix_store | Account -> m, []
+  | Custom_instructions -> fetch_instructions m
+  | Appearance
+  | Sessions
+  | New_sessions
+  | Models
+  | Git_hosting
+  | Nix_store
+  | Account -> m, []
 ;;
 
 (* Superusers see the Nix store there, as it is now; everyone their memory. *)
@@ -1913,6 +1989,8 @@ let open_settings ?(fetch = true) ?section (m : Model.t) =
     open_dialog
       { m with
         compact_at = Compact_at.empty
+      ; sessions_fields = Sessions_fields.empty
+      ; default_fields = Default_fields.empty
       ; settings_section
       ; settings_home = Option.is_none section
       }
@@ -1946,6 +2024,30 @@ let set_memory_enabled (m : Model.t) enabled =
        else "Memory off: the model no longer sees your notes")
   in
   m, cmds @ [ call (Set_memory_enabled { enabled }) ~tag:Memory_enabled ]
+;;
+
+(* The model is given the custom_instructions tool, or not, from its next
+   turn; the instructions stay in context either way. *)
+let set_instructions_enabled (m : Model.t) enabled =
+  let n = m.instructions in
+  let m =
+    { m with
+      instructions = { n with instructions = { n.instructions with enabled } }
+    }
+  in
+  let m, cmds =
+    toast
+      m
+      (if enabled
+       then "The model may now add, edit and remove your custom instructions"
+       else "The model may no longer change your custom instructions")
+  in
+  ( m
+  , cmds
+    @ [ call
+          (Set_custom_instructions_enabled { enabled })
+          ~tag:Instructions_enabled
+      ] )
 ;;
 
 (* [/settings SECTION]. *)
@@ -2137,11 +2239,16 @@ let open_thinking_picker (m : Model.t) =
 ;;
 
 let set_thinking (m : Model.t) level =
+  let level = Thinking.normalize level in
   match m.state with
   | Some state when not state.model.supports_thinking -> no_thinking m state
+  | Some state
+    when not (List.mem (Thinking.options state.model) level ~equal:String.equal)
+    -> error m (Thinking.unsupported state.model level)
   | state ->
     let unchanged =
-      Option.exists state ~f:(fun s -> String.equal s.thinking level)
+      Option.exists state ~f:(fun s ->
+        String.equal (Thinking.normalize s.thinking) level)
     in
     ( (if unchanged
        then m
@@ -2565,17 +2672,18 @@ let apply_pref (m : Model.t) ~startup ({ key; value } : Prefs.Change.t) =
       in
       { m with history = History.of_list entries })
   else if String.equal key Key.folded
-  then (
-    let folded =
-      match value with
-      | Some (`Array items) ->
-        String.Set.of_list
-          (List.filter_map items ~f:(function
-             | `String s -> Some s
-             | _ -> None))
-      | _ -> String.Set.empty
-    in
-    { m with folded })
+  then
+    { m with worktree_folds = Worktree_folds.set_folded m.worktree_folds value }
+  else if String.equal key Key.unfolded
+  then
+    { m with
+      worktree_folds = Worktree_folds.set_unfolded m.worktree_folds value
+    }
+  else if String.equal key Key.worktree_hours
+  then
+    { m with
+      worktree_folds = Worktree_folds.set_hours_pref m.worktree_folds value
+    }
   else if String.equal key Key.review
   then { m with review_memory = Review_memory.of_json value }
   else if String.equal key Key.terminal_open
@@ -3027,7 +3135,7 @@ let config (m : Model.t) = Option.value m.config ~default:Config.default
 
 (* Only [fields] are sent: the backend keeps the others, which another client
    may have changed meanwhile. *)
-let set_config config ~fields ~tag =
+let set_config ?(defaults_only = false) config ~fields ~tag =
   let changed =
     match Config.to_json config with
     | `Object all ->
@@ -3036,7 +3144,11 @@ let set_config config ~fields ~tag =
            List.mem fields name ~equal:String.equal))
     | json -> json
   in
-  rpc "set_config" [ "config", changed ] ~tag
+  rpc
+    "set_config"
+    ([ "config", changed ]
+     @ if defaults_only then [ "defaults_only", `True ] else [])
+    ~tag
 ;;
 
 let save_config (m : Model.t) config ~fields ~notice =
@@ -3102,16 +3214,13 @@ let cycle_thinking (m : Model.t) =
             /model"
            state.model.name)
     else (
-      let index =
-        List.findi thinking_levels ~f:(fun _ l -> String.equal l state.thinking)
-        |> Option.value_map ~default:0 ~f:fst
-      in
-      let next =
-        List.nth_exn thinking_levels ((index + 1) % List.length thinking_levels)
-      in
+      let next = Thinking.next state.model ~current:state.thinking in
       let m = { m with state = Some { state with thinking = next } } in
       let m, cmds =
-        toast m ~replaces:[ "Thinking: " ] (sprintf "Thinking: %s" next)
+        toast
+          m
+          ~replaces:[ "Thinking: " ]
+          (sprintf "Thinking: %s" (Thinking.label next))
       in
       ( { m with pending = { m.pending with thinking = Some next } }
       , cmds @ [ rpc "set_thinking" [ "thinking", str next ] ~tag:Thinking_set ]
@@ -3697,15 +3806,242 @@ let set_default_dir (m : Model.t) dir =
       ] ))
 ;;
 
+(* ---- the settings' New sessions *)
+
+let known_hosts (m : Model.t) =
+  Option.value_map m.state ~default:[] ~f:(fun (s : State.t) -> s.hosts)
+;;
+
+let model_display (m : Model.t) key =
+  match
+    List.find m.models ~f:(fun (model : Llm.t) -> String.equal model.key key)
+  with
+  | Some model -> model.name
+  | None -> key
+;;
+
+let mode_name : Approval_mode.t -> string = function
+  | Ask -> "Ask"
+  | Auto_edit -> "Auto-edit"
+  | Auto -> "Auto"
+;;
+
+let default_set_notice
+      (m : Model.t)
+      (change : New_default.t)
+      (config : Config.t)
+  =
+  let next = " (open sessions keep theirs)" in
+  match change with
+  | Model None -> "New sessions start with the backend's choice of model" ^ next
+  | Model (Some key) ->
+    sprintf "New sessions start with %s%s" (model_display m key) next
+  | Thinking None ->
+    sprintf
+      "New sessions think at the built-in level, %s%s"
+      (Thinking.label New_default.builtin_thinking)
+      next
+  | Thinking (Some level) ->
+    sprintf "New sessions think at %s%s" (Thinking.label level) next
+  | Mode mode -> sprintf "New sessions start in %s mode%s" (mode_name mode) next
+  | Host None -> "New sessions start where your session is" ^ next
+  | Host (Some id) ->
+    sprintf
+      "New sessions start on %s%s"
+      (Prigh_ui.Default_host_command.name ~hosts:(known_hosts m) id)
+      next
+  | Dir None -> "New sessions start in their host's working directory" ^ next
+  | Dir (Some dir) -> sprintf "New sessions start in %s%s" dir next
+  | Fallback _ -> fallback_summary m config
+  | Budget _ ->
+    String.capitalize (Prigh_ui.Default_budget_command.summary config)
+;;
+
+let default_set_failed (change : New_default.t) =
+  match change with
+  | Model _ -> "the default model"
+  | Thinking _ -> "the default thinking level"
+  | Mode _ -> "the default mode"
+  | Host _ -> "the default host"
+  | Dir _ -> "the default directory"
+  | Fallback _ -> "the fallback models"
+  | Budget _ -> "the default budget"
+;;
+
+let remember_on (m : Model.t) key ~was ~now =
+  if Float.(now <= 0.)
+  then { m with switched_off = Switched_off.remember m.switched_off key was }
+  else m
+;;
+
+(* Shown at once; [set_config]'s [defaults_only] leaves this session's mode
+   as it is. *)
+let set_default (m : Model.t) (change : New_default.t) =
+  with_config m ~f:(fun was ->
+    let m =
+      match change with
+      | Budget now ->
+        let usd = Option.value ~default:0. in
+        remember_on m Budget ~was:(usd was.max_budget_usd) ~now:(usd now)
+      | Model _ | Thinking _ | Mode _ | Host _ | Dir _ | Fallback _ -> m
+    in
+    let config, field = New_default.apply change was in
+    ( { m with config = Some config }
+    , [ set_config
+          ~defaults_only:true
+          config
+          ~fields:[ field ]
+          ~tag:(Default_set change)
+      ] ))
+;;
+
+let default_models_picker (m : Model.t) (config : Config.t) ~fallback =
+  if fallback
+  then models_picker m ~title:"Add a fallback model" ~current:None
+  else
+    models_picker
+      m
+      ~title:"New sessions' model"
+      ~current:config.default_model
+      ~leading:
+        [ Picker.Item.create
+            ~id:"builtin"
+            ~detail:"one you are logged in to"
+            ~search:"builtin default backend"
+            ~marked:(Option.is_none config.default_model)
+            "The backend's choice"
+        ]
+;;
+
+let default_hosts_picker (m : Model.t) (config : Config.t) =
+  Picker.create
+    ~title:"New sessions' host"
+    (Picker.Item.create
+       ~id:"builtin"
+       ~detail:"the host of the session you are on"
+       ~search:"builtin default here where"
+       ~marked:(Option.is_none config.default_host)
+       "Where you are"
+     :: List.map (known_hosts m) ~f:(fun (h : Host.t) ->
+       Picker.Item.create
+         ~id:h.id
+         ~detail:
+           (if String.equal h.id Host.backend_id
+            then "the backend, in " ^ h.cwd
+            else h.cwd)
+         ~search:(h.name ^ " " ^ h.id)
+         ~marked:(Option.equal String.equal config.default_host (Some h.id))
+         h.name))
+;;
+
+let pick_default (m : Model.t) (which : New_default.Picker.t) =
+  with_config m ~f:(fun config ->
+    let return_to_settings =
+      match m.dialog with
+      | Some Settings -> true
+      | _ -> m.return_to_settings
+    in
+    let picker =
+      match which with
+      | Model -> default_models_picker m config ~fallback:false
+      | Fallback -> default_models_picker m config ~fallback:true
+      | Host -> default_hosts_picker m config
+    in
+    let m, cmds = open_picker m (Picker { kind = Defaults which; picker }) in
+    { m with return_to_settings }, cmds)
+;;
+
+let default_picked (m : Model.t) (which : New_default.Picker.t) id =
+  let builtin = String.equal id "builtin" in
+  match which with
+  | Model -> set_default m (Model (Option.some_if (not builtin) id))
+  | Host -> set_default m (Host (Option.some_if (not builtin) id))
+  | Fallback ->
+    with_config m ~f:(fun config ->
+      if List.mem config.fallback_models id ~equal:String.equal
+      then toast m (sprintf "%s is in the chain already" (model_display m id))
+      else set_default m (Fallback (config.fallback_models @ [ id ])))
+;;
+
+let commit_default_field (m : Model.t) (which : Default_fields.Which.t) =
+  let default_fields, text = Default_fields.commit m.default_fields which in
+  let refuse e =
+    ( { m with
+        default_fields =
+          Default_fields.refuse
+            default_fields
+            which
+            ~draft:(Option.value text ~default:"")
+            e
+      }
+    , [] )
+  in
+  let m = { m with default_fields } in
+  match which, text with
+  | _, None -> m, []
+  | Dir, Some ("" | "off") -> set_default m (Dir None)
+  | Dir, Some dir ->
+    (match default_dir m dir with
+     | Ok dir -> set_default m (Dir (Some dir))
+     | Error e -> refuse e)
+  | Budget, Some "" -> set_default m (Budget None)
+  | Budget, Some text ->
+    (match Prigh_ui.Default_budget_command.parse text with
+     | Set usd -> set_default m (Budget usd)
+     | Show -> m, []
+     | Error _ ->
+       refuse
+         (sprintf
+            "“%s” isn't an amount of dollars: type one like 5 or 2.50, or \
+             clear the field for no budget."
+            text))
+;;
+
+let default_host_command (m : Model.t) rest =
+  match Prigh_ui.Default_host_command.parse rest with
+  | Show -> pick_default m Host
+  | Error e -> error m (String.capitalize e)
+  | Set None -> set_default m (Host None)
+  | Set (Some name) ->
+    (match
+       List.find (known_hosts m) ~f:(fun (h : Host.t) ->
+         String.equal h.id name || String.Caseless.equal h.name name)
+     with
+     | Some h -> set_default m (Host (Some h.id))
+     | None ->
+       error
+         m
+         (sprintf
+            "No connected tool host is called “%s”: /default-host lists them."
+            name))
+;;
+
+let default_budget_command (m : Model.t) rest =
+  match Prigh_ui.Default_budget_command.parse rest with
+  | Show ->
+    with_config m ~f:(fun c ->
+      toast m (String.capitalize (Prigh_ui.Default_budget_command.summary c)))
+  | Error e -> error m (String.capitalize e)
+  | Set usd -> set_default m (Budget usd)
+;;
+
 let compaction_summary config =
   String.capitalize (Prigh_ui.Compaction_command.summary config)
 ;;
 
 (* The backend resolves the model as /model does, and says which models
    come closest to one it doesn't know. *)
+(* Off: what it was, for its switch to turn back on to. *)
 let set_compaction (m : Model.t) action =
-  with_config m ~f:(fun config ->
-    let config = Prigh_ui.Compaction_command.apply action config in
+  with_config m ~f:(fun was ->
+    let config = Prigh_ui.Compaction_command.apply action was in
+    let m =
+      remember_on
+        m
+        Compact_at
+        ~was:(Float.of_int was.compact_at_tokens)
+        ~now:(Float.of_int config.compact_at_tokens)
+    in
     let compact_at =
       match action with
       | Set_at _ -> Compact_at.empty
@@ -3751,6 +4087,51 @@ let compaction_command (m : Model.t) rest =
     | (Set_at _ | Set_model _ | Set_mask _) as action -> set_compaction m action)
 ;;
 
+let generate_model_summary config =
+  String.capitalize (Prigh_ui.Generate_model_command.summary config)
+;;
+
+let set_generate_model (m : Model.t) action =
+  with_config m ~f:(fun config ->
+    let config = Prigh_ui.Generate_model_command.apply action config in
+    ( { m with config = Some config }
+    , [ set_config
+          config
+          ~fields:
+            (List.map (Prigh_ui.Generate_model_command.fields action) ~f:fst)
+          ~tag:Generate_model_saved
+      ] ))
+;;
+
+let generate_models_picker (m : Model.t) =
+  with_config m ~f:(fun config ->
+    open_picker
+      m
+      (Picker
+         { kind = Generate_models
+         ; picker =
+             models_picker
+               m
+               ~title:"Drafting model"
+               ~current:config.generate_model
+               ~leading:
+                 [ Picker.Item.create
+                     ~id:"off"
+                     ~detail:"the session's model"
+                     ~search:"off default session"
+                     ~marked:(Option.is_none config.generate_model)
+                     "Default"
+                 ]
+         }))
+;;
+
+let generate_model_command (m : Model.t) rest =
+  match Prigh_ui.Generate_model_command.parse rest with
+  | Show -> generate_models_picker m
+  | Error e -> error m (String.capitalize e)
+  | Set_model _ as action -> set_generate_model m action
+;;
+
 let naming_summary config =
   String.capitalize (Prigh_ui.Naming_command.summary config)
 ;;
@@ -3781,8 +4162,8 @@ let naming_models_picker (m : Model.t) =
                ~leading:
                  [ Picker.Item.create
                      ~id:"off"
-                     ~detail:"the generate model, else the session's"
-                     ~search:"off default generate session"
+                     ~detail:"the drafting model, else the session's"
+                     ~search:"off default drafting generate session"
                      ~marked:(Option.is_none config.naming_model)
                      "Default"
                  ]
@@ -3796,6 +4177,37 @@ let naming_command (m : Model.t) rest =
   | Show -> with_config m ~f:(fun c -> toast m (naming_summary c))
   | Error e -> error m (String.capitalize e)
   | Set_model _ as action -> set_naming m action
+;;
+
+let auto_archive_summary config =
+  String.capitalize (Prigh_ui.Auto_archive_command.summary config)
+;;
+
+(* The backend tells every client to list the sessions again. *)
+let set_auto_archive (m : Model.t) action =
+  with_config m ~f:(fun was ->
+    let config = Prigh_ui.Auto_archive_command.apply action was in
+    let m =
+      remember_on
+        m
+        Archive_days
+        ~was:was.archive_after_days
+        ~now:config.archive_after_days
+    in
+    ( { m with config = Some config }
+    , [ set_config
+          config
+          ~fields:
+            (List.map (Prigh_ui.Auto_archive_command.fields action) ~f:fst)
+          ~tag:Auto_archive_saved
+      ] ))
+;;
+
+let auto_archive_command (m : Model.t) rest =
+  match Prigh_ui.Auto_archive_command.parse rest with
+  | Show -> with_config m ~f:(fun c -> toast m (auto_archive_summary c))
+  | Error e -> error m (String.capitalize e)
+  | Set _ as action -> set_auto_archive m action
 ;;
 
 let dictation_summary config =
@@ -3890,6 +4302,13 @@ let save_about_you (m : Model.t) =
   | about_you, None -> { m with about_you }, []
 ;;
 
+let save_instruction (m : Model.t) =
+  match Instruction_notes.save m.instructions with
+  | instructions, Some request ->
+    { m with instructions }, [ call request ~tag:Instruction_saved ]
+  | instructions, None -> { m with instructions }, []
+;;
+
 let save_memory (m : Model.t) =
   match Memory_notes.save m.memory with
   | memory, Some request ->
@@ -3897,10 +4316,113 @@ let save_memory (m : Model.t) =
   | memory, None -> { m with memory }, []
 ;;
 
+(* The settings page's numbers behind a switch, as they are ([None]: the
+   backend's settings not loaded yet). *)
+let number (m : Model.t) (key : Switched_off.Key.t) =
+  match key with
+  | Worktree_hours ->
+    Some (Float.of_int (Worktree_folds.hours m.worktree_folds))
+  | Archive_days -> Option.map m.config ~f:(fun c -> c.archive_after_days)
+  | Compact_at ->
+    Option.map m.config ~f:(fun c -> Float.of_int c.compact_at_tokens)
+  | Budget ->
+    Option.map m.config ~f:(fun c -> Option.value c.max_budget_usd ~default:0.)
+;;
+
+(* Sets one ([0]: off). *)
+let set_number (m : Model.t) (key : Switched_off.Key.t) value =
+  match key with
+  | Worktree_hours ->
+    let m =
+      remember_on
+        m
+        Worktree_hours
+        ~was:(Float.of_int (Worktree_folds.hours m.worktree_folds))
+        ~now:value
+    in
+    let worktree_folds =
+      Worktree_folds.set_hours m.worktree_folds (Float.iround_nearest_exn value)
+    in
+    ( { m with worktree_folds }
+    , save_pref m Key.worktree_hours (Worktree_folds.hours_pref worktree_folds)
+    )
+  | Archive_days ->
+    set_auto_archive m (Prigh_ui.Auto_archive_command.Action.Set value)
+  | Compact_at -> set_compaction m (Set_at (Float.iround_nearest_exn value))
+  | Budget -> set_default m (Budget (Option.some_if Float.(value > 0.) value))
+;;
+
 let commit_compact_at (m : Model.t) =
   match Compact_at.commit m.compact_at with
-  | compact_at, Some n -> set_compaction { m with compact_at } (Set_at n)
+  | compact_at, Some n ->
+    set_number { m with compact_at } Compact_at (Float.of_int n)
   | compact_at, None -> { m with compact_at }, []
+;;
+
+let sessions_key : Sessions_fields.Which.t -> Switched_off.Key.t = function
+  | Worktree_hours -> Worktree_hours
+  | Archive_days -> Archive_days
+;;
+
+let commit_sessions_field (m : Model.t) (which : Sessions_fields.Which.t) =
+  let sessions_fields, value = Sessions_fields.commit m.sessions_fields which in
+  let m = { m with sessions_fields } in
+  match value with
+  | None -> m, []
+  | Some value -> set_number m (sessions_key which) value
+;;
+
+(* On: what it was before it was switched off, else its default. Whatever
+   was typed in its field goes. *)
+let switch_number (m : Model.t) (key : Switched_off.Key.t) on =
+  match number m key with
+  | None -> m, []
+  | Some current when Bool.equal on Float.(current > 0.) -> m, []
+  | Some _ ->
+    let m =
+      match key with
+      | Worktree_hours ->
+        { m with
+          sessions_fields =
+            Sessions_fields.clear m.sessions_fields Worktree_hours
+        }
+      | Archive_days ->
+        { m with
+          sessions_fields = Sessions_fields.clear m.sessions_fields Archive_days
+        }
+      | Compact_at -> { m with compact_at = Compact_at.empty }
+      | Budget ->
+        { m with default_fields = Default_fields.clear m.default_fields Budget }
+    in
+    let default =
+      match key with
+      | Worktree_hours -> Float.of_int Worktree_folds.default_hours
+      | Archive_days -> Config.default.archive_after_days
+      | Compact_at -> Float.of_int Config.default.compact_at_tokens
+      | Budget -> New_default.budget_usd
+    in
+    set_number
+      m
+      key
+      (if on then Switched_off.value m.switched_off key ~default else 0.)
+;;
+
+(* What the click changes is kept, against the session's age. *)
+let toggle_folded (m : Model.t) id =
+  match List.find m.sessions ~f:(fun s -> String.equal s.id id) with
+  | None -> m, []
+  | Some s ->
+    let worktree_folds = Worktree_folds.toggle m.worktree_folds ~now:m.now s in
+    ( { m with worktree_folds }
+    , save_prefs
+        m
+        [ { key = Key.folded
+          ; value = Worktree_folds.folded_pref worktree_folds
+          }
+        ; { key = Key.unfolded
+          ; value = Worktree_folds.unfolded_pref worktree_folds
+          }
+        ] )
 ;;
 
 let last_reply (m : Model.t) =
@@ -4320,10 +4842,14 @@ let user_switched (m : Model.t) (hello : Hello_reply.t) =
     ; forges = Forges.empty
     ; nix_gc = { Nix_gc.empty with collecting = m.nix_gc.collecting }
     ; memory = Memory_notes.empty
+    ; instructions = Instruction_notes.empty
     ; about_you = About_you.empty
     ; mcp = Mcp_page.empty
     ; config = None
     ; compact_at = Compact_at.empty
+    ; sessions_fields = Sessions_fields.empty
+    ; default_fields = Default_fields.empty
+    ; switched_off = Switched_off.empty
     }
   in
   let m, cmds =
@@ -5928,8 +6454,18 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
     error
       m
       "/user-info takes no argument here: it opens Settings, About you, where \
-       you write the text."
+       you fill in the form."
   | "memory", "" -> open_settings ~section:Memory m
+  | "instructions", "" -> open_settings ~section:Custom_instructions m
+  | "instructions", ("on" | "off") ->
+    set_instructions_enabled m (String.equal rest "on")
+  | "instructions", other ->
+    error
+      m
+      (sprintf
+         "/instructions takes on or off, not %S; /instructions alone opens \
+          them in Settings, where you add, edit and remove them."
+         other)
   | "memory", ("on" | "off") -> set_memory_enabled m (String.equal rest "on")
   | "memory", other ->
     error
@@ -5968,16 +6504,7 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
   | "fallback", "off" -> set_fallback m []
   | "fallback", _ -> set_fallback m words
   | "thinking", "" -> open_thinking_picker m
-  | "thinking", level ->
-    if List.mem thinking_levels level ~equal:String.equal
-    then set_thinking m level
-    else
-      error
-        m
-        (sprintf
-           "Unknown thinking level “%s”: use %s."
-           level
-           (String.concat ~sep:", " thinking_levels))
+  | "thinking", level -> set_thinking m level
   | "change_default", _ -> m, [ rpc "change_default" [] ~tag:Default_saved ]
   | "theme", "" -> open_picker m (theme_picker m)
   | "theme", name -> theme_named m name
@@ -6210,12 +6737,16 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
   | "default-dir", "" ->
     with_config m ~f:(fun c -> toast m (default_dir_summary c))
   | "default-dir", "off" -> set_default_dir m None
+  | "default-host", rest -> default_host_command m rest
+  | "default-budget", rest -> default_budget_command m rest
   | "default-dir", dir ->
     (match default_dir m dir with
      | Ok dir -> set_default_dir m (Some dir)
      | Error message -> error m message)
   | "compaction", rest -> compaction_command m rest
+  | "generate-model", rest -> generate_model_command m rest
   | "naming", rest -> naming_command m rest
+  | "auto-archive", rest -> auto_archive_command m rest
   | "dictation", rest -> dictation_command m rest
   | "host", "" -> hosts_picker m
   | "host", arg -> switch_host m arg
@@ -7677,6 +8208,21 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
     error m (sprintf "Couldn't set the fallback models: %s" e)
   | Default_dir_saved, Error e ->
     error m (sprintf "Couldn't set the default directory: %s" e)
+  | Default_set change, Error e ->
+    (* Shown at once, it did not happen: show the backend's. *)
+    let m, cmds =
+      error m (sprintf "Couldn't set %s: %s" (default_set_failed change) e)
+    in
+    m, cmds @ [ rpc "get_config" [] ~tag:Config ]
+  | Generate_model_saved, Error e ->
+    let m, cmds =
+      error
+        m
+        (sprintf
+           "Couldn't set the drafting model: %s. Pick one with /generate-model"
+           e)
+    in
+    m, cmds @ [ rpc "get_config" [] ~tag:Config ]
   | Naming_saved, Error e ->
     let m, cmds =
       error
@@ -7688,6 +8234,11 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
     m, cmds @ [ rpc "get_config" [] ~tag:Config ]
   | Dictation_saved, Error e ->
     let m, cmds = error m (sprintf "Couldn't set the dictation model: %s" e) in
+    m, cmds @ [ rpc "get_config" [] ~tag:Config ]
+  | Auto_archive_saved, Error e ->
+    let m, cmds =
+      error m (sprintf "Couldn't set when sessions are archived: %s" e)
+    in
     m, cmds @ [ rpc "get_config" [] ~tag:Config ]
   | Compaction_saved, Error e ->
     (* The change shown at once did not happen: show the backend's. *)
@@ -8025,6 +8576,33 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
         Result.map_error (User_info.of_json json) ~f:Error.to_string_hum)
     in
     { m with about_you = About_you.was_saved m.about_you result }, []
+  | Instructions_loaded, result ->
+    let result =
+      Result.bind result ~f:(fun json ->
+        Result.map_error
+          (Custom_instructions.of_json json)
+          ~f:Error.to_string_hum)
+    in
+    { m with instructions = Instruction_notes.loaded m.instructions result }, []
+  | Instruction_saved, result ->
+    let result =
+      Result.bind result ~f:(fun json ->
+        Result.map_error
+          (Custom_instructions.note_of_reply json)
+          ~f:Error.to_string_hum)
+    in
+    { m with instructions = Instruction_notes.saved m.instructions result }, []
+  | Instruction_removed, result ->
+    ( { m with
+        instructions =
+          Instruction_notes.removed m.instructions (Result.map result ~f:ignore)
+      }
+    , [] )
+  | Instructions_enabled, Ok _ -> m, []
+  | Instructions_enabled, Error e ->
+    let m, cmds = fetch_instructions m in
+    let m, more = error m ("Custom instructions could not be switched: " ^ e) in
+    m, cmds @ more
   | Memory_enabled, Ok _ -> m, []
   | Memory_enabled, Error e ->
     let m, cmds = fetch_memory m in
@@ -8339,6 +8917,12 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
   | Fallback_saved, Ok json ->
     decode m json Config.of_json ~f:(fun config ->
       fallback_saved { m with config = Some config } config)
+  | Default_set change, Ok json ->
+    decode m json Config.of_json ~f:(fun config ->
+      toast
+        { m with config = Some config }
+        ~replaces:[ "New sessions " ]
+        (default_set_notice m change config))
   | Default_dir_saved, Ok json ->
     decode m json Config.of_json ~f:(fun config ->
       toast
@@ -8348,9 +8932,15 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
          | None ->
            "Default directory cleared: new sessions start in the backend's \
             working directory"))
+  | Generate_model_saved, Ok json ->
+    decode m json Config.of_json ~f:(fun config ->
+      toast { m with config = Some config } (generate_model_summary config))
   | Naming_saved, Ok json ->
     decode m json Config.of_json ~f:(fun config ->
       toast { m with config = Some config } (naming_summary config))
+  | Auto_archive_saved, Ok json ->
+    decode m json Config.of_json ~f:(fun config ->
+      toast { m with config = Some config } (auto_archive_summary config))
   | Dictation_saved, Ok json ->
     decode m json Config.of_json ~f:(fun config ->
       (* The backend may transcribe now: it is asked again. *)
@@ -8763,6 +9353,8 @@ let main_event (m : Model.t) (event : Event.t) =
     m, (Command.Remember_temporary None :: deleted) @ kept
   | Nix_gc_progress p -> { m with nix_gc = Nix_gc.progress m.nix_gc p }, []
   (* Saved, edited or forgotten here, elsewhere or by the model. *)
+  | Custom_instructions_changed ci ->
+    { m with instructions = Instruction_notes.changed m.instructions ci }, []
   | Memory_changed memory ->
     { m with memory = Memory_notes.changed m.memory memory }, []
   | User_info_changed info ->
@@ -9310,12 +9902,30 @@ let picker_accepted (m : Model.t) ~kind (item : Picker.Item.t) =
         ( { m with dialog = Some Settings; return_to_settings = false }
         , Command.Focus "dialog" :: cmds )
       else m, cmds
+    | Generate_models ->
+      let m, cmds =
+        set_generate_model
+          m
+          (Set_model (Option.some_if (not (String.equal item.id "off")) item.id))
+      in
+      if m.return_to_settings
+      then
+        ( { m with dialog = Some Settings; return_to_settings = false }
+        , Command.Focus "dialog" :: cmds )
+      else m, cmds
     | Naming_models ->
       let m, cmds =
         set_naming
           m
           (Set_model (Option.some_if (not (String.equal item.id "off")) item.id))
       in
+      if m.return_to_settings
+      then
+        ( { m with dialog = Some Settings; return_to_settings = false }
+        , Command.Focus "dialog" :: cmds )
+      else m, cmds
+    | Defaults which ->
+      let m, cmds = default_picked m which item.id in
       if m.return_to_settings
       then
         ( { m with dialog = Some Settings; return_to_settings = false }
@@ -9532,6 +10142,7 @@ let dialog_accept (m : Model.t) =
      | Some _, _ -> close_dialog m
      | None, None -> m, [])
   | Some Settings when Option.is_some m.memory.draft -> save_memory m
+  | Some Settings when Option.is_some m.instructions.draft -> save_instruction m
   | Some Settings
     when Settings_section.equal m.settings_section Mcp
          && Option.is_some m.mcp.removing -> mcp_remove m
@@ -9546,6 +10157,22 @@ let dialog_accept (m : Model.t) =
          && About_you.dirty m.about_you -> save_about_you m
   | Some Settings when Option.is_some (Compact_at.draft m.compact_at) ->
     commit_compact_at m
+  | Some Settings
+    when not (List.is_empty (Default_fields.drafted m.default_fields)) ->
+    List.fold
+      (Default_fields.drafted m.default_fields)
+      ~init:(m, [])
+      ~f:(fun (m, cmds) which ->
+        let m, more = commit_default_field m which in
+        m, cmds @ more)
+  | Some Settings
+    when not (List.is_empty (Sessions_fields.drafted m.sessions_fields)) ->
+    List.fold
+      (Sessions_fields.drafted m.sessions_fields)
+      ~init:(m, [])
+      ~f:(fun (m, cmds) which ->
+        let m, more = commit_sessions_field m which in
+        m, cmds @ more)
   | Some
       ( Help
       | Hotkeys
@@ -9750,6 +10377,7 @@ let update_connected (m : Model.t) (action : Action.t) =
   (* The ages in the sidebar; the list itself follows [sessions_changed]. *)
   | Tick now -> { m with now = Some now }, []
   | Set_utc_offset utc_offset -> { m with utc_offset }, []
+  | Set_browser_time_zone zone -> { m with browser_time_zone = Some zone }, []
   | Set_desktop desktop -> { m with desktop }, []
   | Set_browser_shell browser_shell -> { m with browser_shell }, []
   | Open_field_menu { field; anchor } ->
@@ -9910,6 +10538,21 @@ let update_connected (m : Model.t) (action : Action.t) =
   | Compact_at_input text ->
     { m with compact_at = Compact_at.input m.compact_at text }, []
   | Compact_at_commit -> commit_compact_at m
+  | Sessions_field_input (which, text) ->
+    ( { m with
+        sessions_fields = Sessions_fields.input m.sessions_fields which text
+      }
+    , [] )
+  | Sessions_field_commit which -> commit_sessions_field m which
+  | Set_default change -> set_default m change
+  | Pick_default which -> pick_default m which
+  | Default_field_input (which, text) ->
+    ( { m with
+        default_fields = Default_fields.input m.default_fields which text
+      }
+    , [] )
+  | Default_field_commit which -> commit_default_field m which
+  | Switch_number (key, on) -> switch_number m key on
   | Memory_filter text ->
     { m with memory = Memory_notes.set_filter m.memory text }, []
   | Memory_edit id ->
@@ -9929,6 +10572,27 @@ let update_connected (m : Model.t) (action : Action.t) =
      | memory, Some request ->
        { m with memory }, [ call request ~tag:Memory_forgot ]
      | memory, None -> { m with memory }, [])
+  | Instruction_edit id ->
+    ( { m with instructions = Instruction_notes.edit m.instructions id }
+    , [ Command.Focus "instruction-text" ] )
+  | Instruction_title text ->
+    ( { m with instructions = Instruction_notes.set_title m.instructions text }
+    , [] )
+  | Instruction_text text ->
+    { m with instructions = Instruction_notes.set_text m.instructions text }, []
+  | Instruction_save -> save_instruction m
+  | Instruction_cancel ->
+    { m with instructions = Instruction_notes.cancel m.instructions }, []
+  | Instruction_remove id ->
+    ( { m with instructions = Instruction_notes.ask_remove m.instructions id }
+    , [ Command.Focus "instruction-remove-yes" ] )
+  | Instruction_remove_confirm ->
+    (match Instruction_notes.remove m.instructions with
+     | instructions, Some request ->
+       { m with instructions }, [ call request ~tag:Instruction_removed ]
+     | instructions, None -> { m with instructions }, [])
+  | Instruction_remove_cancel ->
+    { m with instructions = Instruction_notes.cancel_remove m.instructions }, []
   | Memory_forget_cancel ->
     { m with memory = Memory_notes.cancel_forget m.memory }, []
   | Mcp_edit name ->
@@ -9959,12 +10623,12 @@ let update_connected (m : Model.t) (action : Action.t) =
   | Mcp_approve { source; server } ->
     ( { m with mcp = Mcp_page.set_busy m.mcp server true }
     , [ call (Mcp_approve { source; server }) ~tag:Mcp_host_listed ] )
-  | About_you_text text ->
-    { m with about_you = About_you.set_text m.about_you text }, []
+  | About_you_field (field, value) ->
+    { m with about_you = About_you.set m.about_you field value }, []
   | About_you_save -> save_about_you m
   | About_you_revert ->
     ( { m with about_you = About_you.revert m.about_you }
-    , [ Command.Focus "about-you-text" ] )
+    , [ Command.Focus "about-you-name" ] )
   | Open_rename -> open_rename m
   | Open_subagents arg -> open_agents m arg
   | Toggle_subagents ->
@@ -10048,6 +10712,11 @@ let update_connected (m : Model.t) (action : Action.t) =
        { m with memory = Memory_notes.cancel m.memory }, []
      | Some Settings, _ when Option.is_some m.memory.forgetting ->
        { m with memory = Memory_notes.cancel_forget m.memory }, []
+     | Some Settings, _ when Option.is_some m.instructions.draft ->
+       { m with instructions = Instruction_notes.cancel m.instructions }, []
+     | Some Settings, _ when Option.is_some m.instructions.removing ->
+       ( { m with instructions = Instruction_notes.cancel_remove m.instructions }
+       , [] )
      | Some Settings, _ when Option.is_some (Mcp_page.escape m.mcp) ->
        { m with mcp = Option.value_exn (Mcp_page.escape m.mcp) }, []
      | _ ->
@@ -10087,21 +10756,7 @@ let update_connected (m : Model.t) (action : Action.t) =
       m
       ~command:("/remind rm " ^ name)
       (Prigh_ui.Remind_command.Action.Remove name)
-  | Toggle_folded dir ->
-    let folded =
-      if Set.mem m.folded dir
-      then Set.remove m.folded dir
-      else Set.add m.folded dir
-    in
-    ( { m with folded }
-    , save_pref
-        m
-        Key.folded
-        (if Set.is_empty folded
-         then None
-         else
-           Some (`Array (List.map (Set.to_list folded) ~f:(fun d -> `String d))))
-    )
+  | Toggle_folded id -> toggle_folded m id
   | New_session_in path -> new_session_in m path
   | Generate Commit_message -> git_action m Draft
   | Generate target -> start_generate m target
@@ -10351,7 +11006,12 @@ let update_connected (m : Model.t) (action : Action.t) =
           , Some
               ( Login _ | Forge_host _ | Nix_gc_confirm _
               | Picker
-                  { kind = Compaction_models | Naming_models | Dictation_models
+                  { kind =
+                      ( Compaction_models
+                      | Generate_models
+                      | Naming_models
+                      | Dictation_models
+                      | Defaults _ )
                   ; _
                   } ) ) -> { m' with return_to_settings = true }, cmds
         | _ -> m', cmds)

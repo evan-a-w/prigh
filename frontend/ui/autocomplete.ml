@@ -115,9 +115,15 @@ let compute_skill ~line ~line_index ~skills =
   | _ -> None
 ;;
 
-let thinking_items () =
-  List.map Commands.thinking_levels ~f:(fun level ->
-    Picker.Item.create ~id:level level)
+let thinking_items model =
+  List.map
+    (Option.value_map model ~default:P.Thinking.all ~f:P.Thinking.options)
+    ~f:(fun level ->
+      Picker.Item.create
+        ~id:level
+        ~search:level
+        ~detail:(P.Thinking.description level)
+        (P.Thinking.label level))
 ;;
 
 let verbosity_items () =
@@ -278,10 +284,11 @@ let argument_items
       ~snippets
       ~logged_in
       ~server
+      ~model
   =
   match (kind : Commands.Argument.t) with
   | Model | Models -> Some (model_items ~logged_in models)
-  | Thinking -> Some (thinking_items ())
+  | Thinking -> Some (thinking_items model)
   | Verbosity -> Some (verbosity_items ())
   | Filter ->
     Some
@@ -307,6 +314,18 @@ let argument_items
        @ pairs (Forge_accounts.login_completions forge))
   | Logout ->
     Some (provider_items auth @ pairs (Forge_accounts.logout_completions forge))
+  | User_info ->
+    Some
+      (pairs
+         (P.User_info.Form.fields
+          @ [ "clear", "clear every field (asks first)" ]))
+  | Instructions ->
+    Some
+      (pairs
+         [ "add", "add a custom instruction: the text follows"
+         ; "on", "the model may add, edit and remove them"
+         ; "off", "the model may not change them (they stay in context)"
+         ])
   | Pr -> Some (pairs Pr_command.subcommands)
   | Sessions | Delete ->
     Some (Option.value_map sessions ~default:[] ~f:session_items)
@@ -318,6 +337,7 @@ let argument_items
   | Commit
   | Agents
   | Compaction
+  | Generate_model
   | Naming
   | Dictation -> None
   | Server -> Some (server_items server)
@@ -439,6 +459,7 @@ let compute_argument
       ~logged_in
       ~default_dir_host
       ~server
+      ~model
   =
   match String.chop_prefix line ~prefix:"/" with
   | None -> None
@@ -506,14 +527,21 @@ let compute_argument
                   ; selected = 0
                   ; navigated = false
                   }
-              | (Remind | Commit | Agents | Compaction | Naming | Dictation) as
-                kind ->
+              | ( Remind
+                | Commit
+                | Agents
+                | Compaction
+                | Generate_model
+                | Naming
+                | Dictation ) as kind ->
                 let rest = String.drop_prefix line start in
                 Option.bind
                   (match kind with
                    | Commit -> Commit_command.complete rest
                    | Agents -> Agents_command.complete ~agents rest
                    | Compaction -> Compaction_command.complete ~models rest
+                   | Generate_model ->
+                     Generate_model_command.complete ~models rest
                    | Naming -> Naming_command.complete ~models rest
                    | Dictation -> Dictation_command.complete rest
                    | _ -> Remind_command.complete ~reminders rest)
@@ -585,7 +613,8 @@ let compute_argument
                        ~sessions
                        ~snippets
                        ~logged_in
-                       ~server)
+                       ~server
+                       ~model)
                     ~default:[]
                 in
                 let items =
@@ -707,6 +736,7 @@ let compute
       ~logged_in
       ~default_dir_host
       ~server
+      ~model
   =
   match
     Option.first_some
@@ -733,6 +763,7 @@ let compute
          ~logged_in
          ~default_dir_host
          ~server
+         ~model
      with
      | Some _ as t -> t
      | None ->

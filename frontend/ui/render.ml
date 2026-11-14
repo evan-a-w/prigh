@@ -247,6 +247,12 @@ let mode_hint (m : App.Model.t) : Content.Line.t option =
                 ~style:attention
                 "Enter shows it · Ctrl+D forgets it · Esc closes"
             ]
+        | Picker { kind = Custom_instructions _; _ } ->
+          Some
+            [ span
+                ~style:attention
+                "Enter shows it · Ctrl+D removes it · Esc closes"
+            ]
         | Picker { kind = Worktrees _; _ } ->
           Some
             [ span
@@ -975,7 +981,9 @@ let status (m : App.Model.t) : Content.Line.t =
               ~style:base
               (sprintf
                  "think:%s"
-                 (if s.model.supports_thinking then s.thinking else "n/a"))
+                 (if s.model.supports_thinking
+                  then P.Thinking.normalize s.thinking
+                  else "n/a"))
           ] )
       ]
       @ mode_part s

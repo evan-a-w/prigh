@@ -20,7 +20,14 @@ let hero (m : App.Model.t) =
          Node.p
            ~attrs:[ Attr.class_ "hero-sub" ]
            [ Node.text "Not saved and not listed. Deleted when you leave." ]
-       else Node.none)
+       else
+         Node.p
+           ~attrs:[ Attr.class_ "hero-sub" ]
+           [ Node.kbd [ Node.text "/" ]
+           ; Node.text " for commands, "
+           ; Node.kbd [ Node.text "@" ]
+           ; Node.text " for files"
+           ])
     ]
 ;;
 

@@ -23,7 +23,14 @@ type t =
   ; default_thinking : string option
   ; fallback_models : string list
     (** model keys that take over, in order, when a model's usage runs out *)
-  ; default_cwd : string option (** where new sessions start *)
+  ; default_cwd : string option
+    (** where new sessions start on [default_host] (the backend's when there
+        is none) *)
+  ; default_host : string option
+    (** the id of the tool host prigh-web's new sessions start on while it is
+        connected; [None]: where the session you are on is *)
+  ; max_budget_usd : float option
+    (** the cost budget of sessions that set none with [/budget] *)
   ; worktrees_dir : string option
     (** where worktrees are created on the tool host; [None] from backends
         before worktrees *)
@@ -42,8 +49,11 @@ type t =
   ; mask_observations : bool
     (** replace old tool outputs with placeholders before summarising
         (default true) *)
+  ; generate_model : string option
+    (** the model that drafts commit messages, pull requests and branch names
+        (✦ Generate); [None]: the session's *)
   ; naming_model : string option
-    (** the model that names sessions and subagents; [None]: the backend's
+    (** the model that names sessions and subagents; [None]:
         [generate_model], else the session's *)
   ; dictation_model : string option
     (** the speech-to-text model of [transcribe] ([provider/id]); [None]:

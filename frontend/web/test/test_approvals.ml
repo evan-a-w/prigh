@@ -157,7 +157,7 @@ let%expect_test "the mode chip, Alt+M, and set_mode's reply or failure" =
     Context 0 / 200k · 0%
     Tokens 0 in · 0 out · 0 cached
     Cost $0.0000
-    Thinking on
+    Thinking provider's default
     Mode Asks: commands
     Model Claude Opus 5.5
     Branch main
@@ -282,7 +282,7 @@ let%expect_test "the plan: its chip in the chrome, /todos" =
     Context 0 / 200k · 0%
     Tokens 0 in · 0 out · 0 cached
     Cost $0.0000
-    Thinking on
+    Thinking provider's default
     Mode Auto: never asks
     Model Claude Opus 5.5
     Branch main
@@ -324,7 +324,7 @@ let%expect_test "the plan: its chip in the chrome, /todos" =
     Context 0 / 200k · 0%
     Tokens 0 in · 0 out · 0 cached
     Cost $0.0000
-    Thinking on
+    Thinking provider's default
     Mode Auto: never asks
     Model Claude Opus 5.5
     Branch main
@@ -645,13 +645,13 @@ let%expect_test "plan mode: the composer says how to leave it" =
               #value=""
               @on_input> </textarea>
     <textarea id="editor"
-              placeholder="Ask prigh…  / commands"
+              placeholder="Working in /work on main. Ask prigh anything…"
               aria-label="Message"
               dir="auto"
               rows="1"
               autocomplete="off"
               enterkeyhint="send"
-              class="editor"
+              class="cwd-placeholder editor"
               #value=""
               @on_input> </textarea>
     |}]
@@ -1036,10 +1036,10 @@ let%expect_test
      (params
       ((keys
         (web.theme web.accent web.notify web.verbosity web.terminal-open
-         web.sidebar-folded web.review history web.migrated web.sidebar-width
-         web.files-width web.files-preview-width web.agents-width
-         web.terminal-height web.review-chat-width web.review-files-width
-         web.review-margin-width))))
+         web.sidebar-folded web.sidebar-unfolded web.sidebar-worktree-hours
+         web.review history web.migrated web.sidebar-width web.files-width
+         web.files-preview-width web.agents-width web.terminal-height
+         web.review-chat-width web.review-files-width web.review-margin-width))))
      (tag Prefs))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s1.jsonl) (limit 1000000)))
@@ -1058,7 +1058,7 @@ let%expect_test
     Context 0 / 200k · 0%
     Tokens 0 in · 0 out · 0 cached
     Cost $0.0000
-    Thinking on
+    Thinking provider's default
     Mode Auto: never asks
     Model Claude Opus 5.5
     Branch main

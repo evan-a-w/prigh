@@ -401,6 +401,9 @@ becomes a list):
   index or id; thinking arrives as `reasoning_content` or `reasoning`.
   Images are `image_url` data-URL parts; a tool message is text only, so a
   tool result's images follow the run of tool messages in a user message.
+  `Model.thinking_options` lists the settings each model takes and
+  `Provider.Request.prepare` clamps the request's to them, so providers only
+  map a supported level to its wire value.
   Per-server differences are `Quirks`: how the thinking level is sent
   (DeepSeek's `thinking: {type}` plus `reasoning_effort`, or OpenAI's
   `reasoning_effort`) and whether earlier thinking is replayed as
@@ -874,26 +877,60 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   broadcast to that world's clients as `memory_changed`
   (`Prigh_protocol.Memory`). prigh-web's Settings → Memory
   (`Memory_notes`, `Settings_view`) and the TUI's `/memory` picker use them.
-- `User_info` — what the user wrote about themselves for the model, plain
-  text in `~/.prigh/user_info.md` under the world's home (one per world,
-  made in `bin/main.ml` like `Memory`; at most `User_info.max_bytes`, read
-  from the file whenever it is asked for, so an edit by hand counts, and
-  replaced atomically (a longer file edited by hand is cut to the limit). Unlike memory it is always in
-  context, and no tool changes it. `Agent.create ?user_info` is asked for
-  the text: `System_prompt.build ?user_info` puts it after the
-  instructions when a session's prompt is first built (and in
-  non-forked subagents' prompts, `Tool_subagent.create ?user_info`; shared
-  forks inherit the parent's), and `Told_environment.user_info` records
-  what the session was told, so the usual diff
-  (`Told_environment.notes`) prefixes a `User_info` note
+- `Note_store` — the store `Memory` and `Custom_instructions` share: a
+  JSON file of `{next, notes: [{id, title?, text, saved}]}` under the
+  world's home, ids `<prefix><n>` never reused, caps per note and on the
+  count, an enabled switch in `User_prefs`, changes re-read and replace the
+  file atomically under its `Lock_dir` and a mutex, and subscribers told
+  of every change.
+- `Custom_instructions` / `Custom_instruction` /
+  `Tool_custom_instructions` — the user's standing instructions,
+  `~/.prigh/custom_instructions.json` (a `Note_store`, ids `ci<n>`, 50
+  notes of 1000 bytes; enabled key `custom_instructions.enabled`). Always
+  in context: `Custom_instruction.section` is the block after About you in
+  `System_prompt.build ?custom_instructions` (new sessions and non-forked
+  subagents), and `Told_environment.custom_instructions` records the list
+  a session was told, so `Custom_instruction.note` tells the next user
+  message what changed (added/edited/removed with ids and texts; the
+  whole list when most of it changed; an `Injected` `Custom_instructions`
+  note). The tool (`add | edit | remove | list`; main agent only,
+  destructive but `list`, offered only while enabled) emits
+  `Agent_event.Custom_instruction_set`, which `Agent` folds into the
+  session's told list (`Custom_instruction.apply`) so its own change is not
+  told back. RPC: `get_custom_instructions` (`{enabled, notes, limits}`),
+  `save_custom_instruction` (with `id`: edit), `remove_custom_instruction`,
+  `set_custom_instructions_enabled`, and the `custom_instructions_changed`
+  event (`Prigh_protocol.Custom_instructions`). prigh-web's Settings →
+  Custom instructions (`Instruction_notes`, `Settings_view`; the size and a
+  warning past `warn_tokens`) and the TUI's `/instructions` use them.
+- `User_info` — what the user set about themselves for the model: a
+  `User_info.Form` of optional fields (name, country, time zone, language,
+  `Units`, `Date_format`, occupation, background, anything else) in
+  `~/.prigh/about_you.json` under the world's home (`{"version": 1, ...}`
+  with only the filled fields; one per world, made in `bin/main.ml` like
+  `Memory`; `max_field` per field and `max_total` in all; read from the
+  file whenever it is asked for, so an edit by hand counts, and replaced
+  atomically). The free text of earlier versions (`~/.prigh/user_info.md`)
+  becomes `anything_else` on the first read (cut to its limit) and the old
+  file is renamed `user_info.md.migrated`. `Form.render` makes the block
+  the model sees: a `- Label: value` line per filled field, in a fixed
+  order. Unlike memory it is always in context, and no tool changes it.
+  `Agent.create ?user_info` is asked for the rendered text:
+  `System_prompt.build ?user_info` puts it after the instructions when a
+  session's prompt is first built (and in non-forked subagents' prompts,
+  `Tool_subagent.create ?user_info`; shared forks inherit the parent's),
+  and `Told_environment.user_info` records what the session was told, so
+  the usual diff (`Told_environment.notes`) prefixes a `User_info` note
   (`System_prompt.user_info_note`) to the next user message when the text
-  differs: a session from before the text or the feature, an edit, a
-  removal. The stored system prompt is never rewritten (it stays cached);
-  a session never told anything gets no note for an empty text. RPC:
-  `get_user_info` and `set_user_info {text}` (`{text, max}`), and every
-  change made through them is broadcast to that world's
-  clients as `user_info_changed` (`Prigh_protocol.User_info`). prigh-web's
-  Settings → About you (`About_you`, `Settings_view`) and the TUI's
+  differs: a session from before the form or the feature, an edit, a
+  clear. The stored system prompt is never rewritten (it stays cached); a
+  session never told anything gets no note for an empty form. RPC:
+  `get_user_info` and `set_user_info` with a whole `{form}` or one
+  `{field, value}` (both reply `{form, text, limits}`), and every change
+  made through them is broadcast to that world's clients as
+  `user_info_changed` (`Prigh_protocol.User_info`). prigh-web's Settings →
+  About you (`About_you`, `Settings_view`; the browser's time zone,
+  `App.Action.Set_browser_time_zone`, is offered as a fill) and the TUI's
   `/user-info` use them.
 - `Tool_web_search` — `web_search` is a provider-side tool: `Tools.for_model`
   keeps it only for Anthropic, OpenAI and OpenAI Codex models, whose
@@ -1480,11 +1517,13 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   `approval_mode` (new sessions' mode; read from `confirm_tools` when
   absent, which saving replaces), `permissions` (allow/ask/deny rules;
   saving keeps the file's as written), `default_model`/`default_thinking`,
-  `fallback_models` (model keys), `default_cwd`, `worktrees_dir` (where
+  `fallback_models` (model keys), `default_cwd`, `default_host` (a tool
+  host's id), `worktrees_dir` (where
   `Worktree` puts new worktrees on the tool host; default
   `~/.prigh/worktrees`), `max_budget_usd`,
   `goal_max_continuations`, `resume_on_limit_reset`, `ask_user_timeout_seconds` (default
-  300, 0 = never), `generate_model`, `naming_model`, `dictation_model`, `mask_observations` (default true),
+  300, 0 = never), `generate_model` (the drafting model, `/generate-model`),
+  `naming_model`, `dictation_model`, `mask_observations` (default true),
   `compact_at_tokens` (default 200000,
   0 = 80% of the window only), `compaction_model` and `snippets`, the
   frontends' `/snippet` texts, validated by `Snippet`), loaded at agent
@@ -1495,14 +1534,32 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   `default_model`. Each namespace has its own file, so each has its own
   defaults; `archive_after_days` (default 7, 0 = never) is when an
   inactive session counts as archived (`Session.Summary.is_archived`).
+  `Rpc_server.handle` compares the client's `archive_after_days` before
+  and after a successful `set_config` and broadcasts `sessions_changed`
+  when it moved, so every client lists the sessions again
+  (`list_sessions` reads the config each time: no restart).
   `set_config` merges the given fields over the current ones and
   resolves `fallback_models`, `generate_model`, `compaction_model` and
   `naming_model`
   like `set_model` (stored as keys; an unknown name is refused with the
   closest matches). `dictation_model` is kept as written, refused
-  only when its provider cannot transcribe (`Transcription.check_model`). A new
-  session starts in `default_cwd` (on the backend host) and on
-  `default_model`, else the first of `fallback_models`.
+  only when its provider cannot transcribe (`Transcription.check_model`).
+  `default_host` is resolved like `/host` (an id, else a name, among the
+  connected hosts) and stored as the id; one kept as it was is not checked
+  again (it may be away). `default_cwd` must be absolute or start with
+  `~`; on the backend's host it must be a directory there when it changes.
+  `set_config {config, defaults_only?}`: with `defaults_only` an
+  `approval_mode` change is the default only, the caller's session keeps
+  its mode (prigh-web's Settings → New sessions); without it `/confirm`
+  changes both. After a save every other agent of the server adopts the
+  config (`Agent.adopt_config`) and tells its clients (`config_changed`),
+  so every client's settings follow and a later `set_config` merges over
+  the file as it is (`Rpc_server.current_config` rereads it). A new
+  session starts on `default_model`, else the first of `fallback_models`;
+  `Rpc_server.new_session_start` puts one a non-tool-host client starts on
+  `default_host` while it is connected (else where the client's session
+  is), in `default_cwd` there (`~` is that host's home; on the backend's
+  host only if it is a directory).
 - `User_prefs` — a user's preferences and data that frontends keep on the
   backend, `~/.prigh/prefs.json` under the user's home (per namespace with
   `-tokens`): a JSON object of keys the backend gives no meaning
@@ -2686,9 +2743,12 @@ terminal frontend and `web/` prigh-web, the browser one.
     at a word start (a letter or digit first, only when a snippet matches),
     and `Autocomplete.insert_snippet` swaps `#name` for the text with
     `Editor.replace` (one undo step, the cursor after it).
-  - Model hand-over and default directory: `/fallback` and `/default-dir`
-    show `Config`'s `fallback_models`/`default_cwd`, or send `set_config`
-    with only that field. The backend keeps the fields a `set_config`
+  - Model hand-over and defaults: `/fallback`, `/default-dir`,
+    `/default-host` and `/default-budget` show `Config`'s
+    `fallback_models`/`default_cwd`/`default_host`/`max_budget_usd`, or
+    send `set_config` with only that field (`Default_host_command` and
+    `Default_budget_command` parse and summarise, shared with prigh-web;
+    a host is named by id or name among the state's `hosts`). The backend keeps the fields a `set_config`
     leaves out, so every one the app sends (`/confirm`, `/scoped-models`
     too) carries only its own field and a stale or missing `Config` cannot
     undo another change. A refusal (an unknown model, with the backend's
@@ -3278,9 +3338,14 @@ terminal frontend and `web/` prigh-web, the browser one.
       `Repo_listings`, the other repositories the sessions' worktrees
       belong to, each `list_worktrees {cwd: root}` asked once
       (`Repo_worktrees`) and again once stale: a turn's end, a session's
-      worktrees changing, a worktree made or removed); `Model.folded`
-      (session ids, kept in the `web.sidebar-folded` preference) folds a
-      session's worktrees. Context menus (`Context_menu`, also messages', drawn by
+      worktrees changing, a worktree made or removed);
+      `Model.worktree_folds` (`Worktree_folds`) decides whether a
+      session's worktrees show: an explicit fold or unfold (session ids in
+      the `web.sidebar-folded` and `web.sidebar-unfolded` preferences)
+      wins, else they show when the session's `updated_at` is within the
+      window (`web.sidebar-worktree-hours`, default 12, 0 = never) of
+      `Model.now`. A per-user preference rather than config.json: it is
+      a display choice of the person, not of the backend's namespace. Context menus (`Context_menu`, also messages', drawn by
       `Context_menu_view` as a `Dialog.Picker` of kind `Menu`, so it owns
       the keyboard like any picker; `Command.Place_menu` has
       `Menu_listeners` put it at the pointer or under the row and keep it
@@ -3442,6 +3507,18 @@ terminal frontend and `web/` prigh-web, the browser one.
       `Slash.parse` lets `/snippet add` span lines. Saving sends
       `set_config` with only `snippets`, shown at once; a refused
       `Config_saved` refetches the config so the page shows the backend's.
+    - New sessions: `New_sessions_view` is Settings → New sessions, every
+      default with its control (`Settings_row`'s select, segmented and
+      fields) and a reset to the built-in. `New_default.t` is one change
+      (`Model`, `Thinking`, `Mode`, `Host`, `Dir`, `Fallback`, `Budget`);
+      `App.set_default` shows it at once and sends `set_config` with that
+      field and `defaults_only`, tagged `Default_set`, whose reply or
+      refusal (refetching the config) says what new sessions get.
+      `Default_fields` holds the directory and budget drafts until Enter or
+      leaving the field. The model, host and fallback rows open a
+      `Picker` of kind `Defaults` (`New_default.Picker`), the first item
+      going back to the built-in; closing it returns to the settings.
+      `/default-host` alone opens that picker.
     - Model hand-over: `/fallback` and `/default-dir` send `set_config`
       with only the field they change (as `/confirm` and `/scoped-models`
       do), and show the config the backend replies with (`/fallback`'s
@@ -3933,7 +4010,28 @@ profile. `devtools::Links` turns its target events into effects:
 browser (the opener plugin: `xdg-open`) and either `Target.closeTarget` (a
 new tab or window: a `target=_blank` link, `window.open`) or, for a target
 last seen on prigh's sites (its window, a popup on its site),
-`Target.attachToTarget` and `Page.navigate` back to that page. The
+`Target.attachToTarget` and `Page.navigate` back to that page. That
+fallback shows a window for a moment, so prigh's pages hand links over
+first: on each session on one of prigh's windows (attached when it reaches
+prigh's site, again after a detach; bindings outlive the target's reloads
+and navigations) `Links` sends `Runtime.addBinding` for
+`devtools::BINDING` (`window.prighOpenExternal`). prigh-web's
+`External_link_listeners` (installed at start; acting only with
+`Desktop_page.in_browser` and the binding present) listens for `click` and
+`auxclick` on the window in the bubbling phase, so a click prigh's own
+handlers took (`defaultPrevented`: the image viewer, the end of a drag) is
+theirs; `External_link.decide` hands over an HTML link's absolute `href`
+when it is `mailto:` or http(s) on another origin than the page's (not a
+`download` link; the main or middle button), as `{"url", "newWindow"}`
+(`newWindow`: a target that is a new window, Ctrl/⌘/Shift, the middle
+button), and cancels the browser's default. `Runtime.bindingCalled`
+(`Links::on_link`) is honoured only from a session on one of prigh's
+windows whose page is on prigh's site (not away signing in, so a sign-in
+site cannot use it): `External` goes to the default browser through the
+same `OpenGuard` as the window's links, a URL on another of prigh's
+origins where the click would have gone (`OpenWindow` or `Page.navigate`),
+anything else is refused and logged. The fallback logs "a window opened on
+SITE: closing it", so a link that still flashes shows in the log. The
 browser's own pages (`devtools::browser_page`: `chrome:`, `chrome-search:`,
 `chrome-untrusted:`, `devtools:`, `view-source:`, `chrome-extension:` and
 the other browsers' schemes; a new tab or tabbed window is one, on its new
@@ -3966,17 +4064,26 @@ in sessionStorage) that on the backend's site Quit prigh is `window.close()`
 "Close this window to quit prigh." if the browser refuses. There
 (`Model.browser_shell`, `Set_browser_shell`) the browser's context menu
 never shows: `Field_menu_listeners` cancels every `contextmenu` (window,
-capture), and one on a text field (a textarea or a text input, not
-xterm's) opens `Field_menu` (Cut, Copy, Paste, Select all; disabled
-without a selection, read-only or a password) as `Model.field_menu`, its
-own layer over any dialog (`Field_menu_view`, styled as `Context_menu_view`,
-placed by `Command.Place_field_menu`), whose keys `Keys.handle` takes
-before anything but the terminal's. Choosing or closing it is
+capture, ahead of xterm.js's own handler, so the terminal's selection
+stays), and one on a text field (a textarea or a text input) or in the
+terminal opens `Field_menu` (Cut, Copy, Paste, Select all; the terminal,
+`Field_menu.Kind.Terminal`, has no Cut; disabled without a selection,
+read-only or a password) as `Model.field_menu`, its own layer over any
+dialog (`Field_menu_view`, styled as `Context_menu_view`, placed by
+`Command.Place_field_menu`), whose keys `Keys.handle` takes before
+anything else, the terminal's included. Choosing or closing it is
 `Command.Edit_field`: the field focused again with its selection, then
 `navigator.clipboard` writeText/readText (the desktop app grants the
 site the clipboard) and `execCommand` insertText/delete (else
 `setRangeText` and an input event), so Bonsai's state and the field's
-undo follow.
+undo follow; in the terminal, the handle `bin/terminal.js` leaves on
+xterm.js's element (`prighTerminal`: its selection, `paste`, which
+bracketed paste wraps, and `selectAll`). There Shift+F10 and the menu key
+open the terminal's menu too (`terminal.js` makes them a `contextmenu` on
+the input at the cursor, which not every browser does). Everywhere,
+`terminal.js` takes Ctrl+Shift+C (copy the selection; also not Chrome's
+inspector) and Ctrl+Shift+V (paste through `navigator.clipboard`, else
+the browser's own paste) from the shell; Ctrl+C stays its ^C.
 
 
 More windows: the page's Open in new window (`window.open` on its own site)
@@ -4037,8 +4144,11 @@ for Linux, macOS and Windows.
 - `~/.prigh/prefs.json` — the user's preferences and data kept for the
   frontends (`User_prefs`): prigh-web's `web.*` and the shared `history`.
 - `~/.prigh/memory.json` — the `memory` tool's notes (`Memory`).
-- `~/.prigh/user_info.md` — what the user wrote about themselves, in every
-  session's context (`User_info`).
+- `~/.prigh/custom_instructions.json` — the user's standing instructions,
+  in every session's context (`Custom_instructions`).
+- `~/.prigh/about_you.json` — what the user set about themselves, in every
+  session's context (`User_info`; `user_info.md.migrated` is an earlier
+  version's text, moved into it).
 - `~/.prigh/config.json` — `scoped_models`, `approval_mode`, `permissions`, `notify`, `snippets`, `providers`
   (custom endpoints; their keys are in `auth.json` under their names),
   `forges` (git hosts' kind, OAuth client id and URL, by host).

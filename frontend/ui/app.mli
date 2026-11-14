@@ -78,10 +78,18 @@ module Reply_tag : sig
     | Default_dir_saved of string (** like [Fallback_saved] *)
     | Compaction_shown (** [get_config] for [/compaction] *)
     | Compaction_saved of string (** like [Fallback_saved] *)
+    | Generate_model_shown (** [get_config] for [/generate-model] *)
+    | Generate_model_saved of string (** like [Fallback_saved] *)
     | Naming_shown (** [get_config] for [/naming] *)
     | Naming_saved of string (** like [Fallback_saved] *)
+    | Auto_archive_shown (** [get_config] for [/auto-archive] *)
+    | Auto_archive_saved of string (** like [Fallback_saved] *)
     | Dictation_shown (** [get_config] for [/dictation] *)
     | Dictation_saved of string (** like [Fallback_saved] *)
+    | Default_host_shown (** [get_config] for [/default-host] *)
+    | Default_host_saved of string (** like [Fallback_saved] *)
+    | Default_budget_shown (** [get_config] for [/default-budget] *)
+    | Default_budget_saved of string (** like [Fallback_saved] *)
     | Models_catalog
     | Models_for_scoped
     | Compact_done
@@ -154,6 +162,8 @@ module Reply_tag : sig
     | Mcp_settings_for_picker
     | Mcp_picker of P.Mcp_settings.t (** with the disabled ones listed *)
     | Memory_picker
+    | Instructions_picker
+    | Instruction_saved of string
     | User_info_shown (** [/user-info] *)
     | User_info_saved of string
     (** [/user-info TEXT] or [clear]; failing puts the command back *)

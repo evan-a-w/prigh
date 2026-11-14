@@ -24,7 +24,11 @@ let%expect_test "connecting: the chat, the composer and the status say so" =
   [%expect {| <footer class="busy composer offline"> |}];
   H.quiet h (fun () -> H.reply h "get_state" (H.state_json ()));
   H.text h ~selector:".chat";
-  [%expect {| What are we building? |}];
+  [%expect
+    {|
+    What are we building?
+    / for commands, @ for files
+    |}];
   H.reply h "get_messages_page" (H.page "[]");
   H.text h ~selector:".chat .empty h2";
   H.text h ~selector:".status-item.idle";
@@ -55,7 +59,7 @@ let%expect_test "reconnecting: the composer is marked and does not send" =
     Context 0 / 200k · 0%
     Tokens 0 in · 0 out · 0 cached
     Cost $0.0000
-    Thinking on
+    Thinking provider's default
     Mode Auto: never asks
     Model Claude Opus 5.5
     Branch main
@@ -120,6 +124,7 @@ let%expect_test "a prompt the backend refuses goes back to the editor" =
   [%expect
     {|
     What are we building?
+    / for commands, @ for files
     [hello]
     Couldn't send: a run is already in progress. Your message is back in the editor. (Dismiss)
     |}]

@@ -11,10 +11,11 @@ let%expect_test
   [%expect
     {|
     []
+    Working in /work on main . Working in /work on main . Ask prigh anything…
     (Add files or images (or paste, or drop them here))
     (Claude Opus 5.5)
     (backend)
-    (on)
+    (provider's default)
     (auto)
     (normal)
     Ready (0%) $0.00
@@ -22,7 +23,7 @@ let%expect_test
     Context 0 / 200k · 0%
     Tokens 0 in · 0 out · 0 cached
     Cost $0.0000
-    Thinking on
+    Thinking provider's default
     Mode Auto: never asks
     Model Claude Opus 5.5
     Branch main
@@ -399,7 +400,7 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     Commands ↑↓ Tab Enter Esc   Ctrl+Enter as typed
     /help [command] show commands and keys, or a command's usage
     /hotkeys show the keyboard shortcuts
-    /settings [section] appearance, sessions, models, git hosting and your account; a section opens at it (Ctrl+,)
+    /settings [section] appearance, sessions, new sessions' defaults, models, git hosting and your account; a section opens at it (Ctrl+,)
     /new start a new session
     /temporary a temporary session: not saved or listed, deleted when you leave it (Ctrl+Shift+O); in one, keep it or delete it
     /model [name] pick or switch the model
@@ -418,9 +419,11 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /permissions show the mode and the allow/ask/deny rules (config and this session)
     /notify [on|off] tell you when a turn ends or something waits for you while the tab is hidden
     /memory [on|off] your notes the model saves when you ask it to remember something, in Settings; on or off gives the model the memory tool or takes it away
-    /user-info what you wrote about yourself for the model, given to it in every session (unlike memory, which it looks up), in Settings
+    /instructions [on|off] your custom instructions, in the context of every session, in Settings; on or off lets the model add, edit and remove them or not
+    /user-info what you set about yourself for the model (name, country, units...), given to it in every session, in Settings
     /compact [instructions] summarise older messages to free context
-    /naming [model MODEL|off] show which model names sessions and subagents; model MODEL|off: name them with MODEL (off: the generate model, else the session's)
+    /generate-model [MODEL|off] pick the model that drafts commit messages, pull requests and branch names (✦ Generate); MODEL|off: draft them with MODEL (off: the session's)
+    /naming [model MODEL|off] show which model names sessions and subagents; model MODEL|off: name them with MODEL (off: the drafting model, else the session's)
     /dictation [model MODEL|off] show which model transcribes dictation (speech to text); model MODEL|off: transcribe with MODEL, an OpenAI or OpenAI-compatible provider's (off: openai/gpt-4o-mini-transcribe)
     /compaction [at|model|mask ...] show when conversations are compacted and what summarises them; at TOKENS|off: also once the context exceeds TOKENS, not only at 80% of the window; model MODEL|off: the model that writes the summaries (off: the session's); mask on|off: replace old tool outputs with placeholders first
     /diff [path] show the uncommitted changes where the tools run, untracked files too
@@ -437,6 +440,7 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /unpin [session] unpin a session (this one without an argument)
     /delete [undo|session...] delete a message from the transcript and the model's context (a reply with its tool calls' results): pick it, newest first; undo brings the latest deletion back; with sessions, deletes them after a confirmation
     /delete-archived delete every archived session, after a confirmation
+    /auto-archive [DAYS|off] show how long a session goes without activity before it is archived; DAYS|off: archive after DAYS days (off: never, only by hand), in Settings
     /clone copy this session into a new one
     /fork start a new session from an earlier message
     /rewind go back to an earlier message in this session
@@ -444,9 +448,6 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /tree show the session tree and move to any message in it
     /cd [path] change the working directory (asks to create a missing one)
     /mkdir [path] create a directory (and its parents) and change to it
-    /worktree [list|new|open|back|rm] pick a git worktree of the repository to work in (Alt+Enter: in a new session, Alt+R: review its changes, Delete removes it); new BRANCH [BASE] creates one and works there; open [-n] TARGET (-n: in a new session); back [main]: back where the session switched into worktrees from; rm [-f] TARGET (-f: with uncommitted changes)
-    /default-dir [path|off] show or set the directory new sessions start in
-    /host [name|backend] pick where tools run, and the directory there
     |}];
   H.type_ h "/mod";
   H.key h "Tab";

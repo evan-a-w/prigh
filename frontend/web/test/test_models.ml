@@ -126,10 +126,11 @@ let%expect_test "thinking: a picker and /thinking, when the model supports it" =
   [%expect
     {|
     (Focus picker-input)
-    off answer straight away
+    provider's default the provider picks: medium ✓
     low a little
-    on the provider's default budget ✓
+    medium some
     high more
+    xhigh a lot, for long agentic work
     max as much as the model allows
     |}];
   H.act h (Picker_choose "high");
@@ -153,7 +154,7 @@ let%expect_test "thinking: a picker and /thinking, when the model supports it" =
     {|
     (Rpc (method_ push_pref)
      (params ((key history) (value "/thinking lots") (max 500))) (tag Ignore))
-    Unknown thinking level “lots”: use off, low, on, high, max. (Dismiss)
+    Claude Opus 5.5 has no thinking “lots”: use default, low, medium, high, xhigh, max. (Dismiss)
     |}];
   let deepseek =
     Jsonaf.of_string
@@ -222,7 +223,7 @@ let%expect_test
     Context 0 / 200k · 0%
     Tokens 0 in · 0 out · 0 cached
     Cost $0.0000
-    Thinking on
+    Thinking provider's default
     Mode Auto: never asks
     Model Claude Opus 5.5
     Branch main
@@ -256,7 +257,7 @@ let%expect_test
     Context 150k / 200k · 75%
     Tokens 123k in · 7.9k out · 100k cached
     Cost $1.2345
-    Thinking on
+    Thinking provider's default
     Mode Auto: never asks
     Model Claude Opus 5.5
     Branch main
@@ -338,7 +339,7 @@ let%expect_test "aborting brings the queued prompts back into the editor" =
     Context 150k / 200k · 75%
     Tokens 123k in · 7.9k out · 100k cached
     Cost $1.2345
-    Thinking on
+    Thinking provider's default
     Mode Auto: never asks
     Model Claude Opus 5.5
     Branch main

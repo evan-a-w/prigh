@@ -156,6 +156,9 @@ type t =
   (** another frontend of the user changed their preferences *)
   | Memory_changed of Memory.t
   (** a note was saved, edited or forgotten, or memory turned on or off *)
+  | Custom_instructions_changed of Custom_instructions.t
+  (** one was added, edited or removed (by the user or a model), or the
+      model's say over them turned on or off *)
   | User_info_changed of User_info.t
   (** the user changed what they wrote about themselves *)
   | Mcp_settings_changed of Mcp_settings.t

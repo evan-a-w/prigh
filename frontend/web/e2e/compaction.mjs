@@ -76,14 +76,17 @@ const openSettings = async p => {
   await p.keyboard.press("Control+,");
   await p.locator(".settings-dialog").waitFor();
   await p.locator(".settings-tab-models").click();
-  await p.locator(".compact-at-input:not([disabled])").waitFor();
+  await p.locator(".setting.compact-at .switch:not([disabled])").waitFor();
   await compaction(p).scrollIntoViewIfNeeded();
 };
 const show = async p => {
   console.log((await compaction(p).innerText()).replace(/\n+/g, "\n"));
-  const input = p.locator(".compact-at-input");
-  console.log(`field: ${JSON.stringify(await input.inputValue())} (placeholder ${await input.getAttribute("placeholder")}); \
-Off pressed: ${await p.locator(".setting.compact-at button.segment").getAttribute("aria-pressed")}; \
+  const input = p.locator("#compact-at");
+  const field = await input.count()
+    ? `${JSON.stringify(await input.inputValue())} (placeholder ${await input.getAttribute("placeholder")})`
+    : "hidden";
+  console.log(`field: ${field}; \
+on: ${await p.locator(".setting.compact-at .switch").getAttribute("aria-checked")}; \
 mask: ${await p.locator(".setting.mask .switch").getAttribute("aria-checked")}`);
 };
 const configFile = () => {
@@ -103,16 +106,16 @@ try {
   await show(page);
   await screenshot(page, "default");
 
-  await page.locator(".compact-at-input").fill("lots");
-  await page.locator(".compact-at-input").press("Enter");
+  await page.locator("#compact-at").fill("lots");
+  await page.locator("#compact-at").press("Enter");
   await page.locator(".setting.compact-at .setting-note").waitFor();
   section("refused");
   console.log(await page.locator(".setting.compact-at .setting-note").innerText());
   console.log(`still open: ${await page.locator(".settings-dialog").count()}`);
   await screenshot(page, "refused");
 
-  await page.locator(".compact-at-input").fill("150k");
-  await page.locator(".compact-at-input").press("Enter");
+  await page.locator("#compact-at").fill("150k");
+  await page.locator("#compact-at").press("Enter");
   await saved(page, "at 150k tokens");
   await page.locator(".setting.mask .switch").click();
   await page.locator(".setting.mask .switch[aria-checked=false]").waitFor();
@@ -160,8 +163,16 @@ ${(await page.locator(".picker-item").first().innerText()).replace(/\s+/g, " ")}
   await composer(page).press("Enter");
   await saved(page, "80% of the model's window;");
   await openSettings(page);
-  await page.locator(".setting.compact-at .segment[aria-pressed=true]").waitFor();
+  await page.locator(".setting.compact-at .switch[aria-checked=false]").waitFor();
   section("off by /compaction");
+  await show(page);
+  console.log(configFile());
+  await screenshot(page, "off");
+  // Its switch: on again at what it was.
+  await page.locator(".setting.compact-at .switch").click();
+  await page.locator("#compact-at").waitFor();
+  await saved(page, "at 150k tokens");
+  section("switched on");
   await show(page);
   console.log(configFile());
 

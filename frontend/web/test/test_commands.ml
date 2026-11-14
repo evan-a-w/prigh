@@ -78,7 +78,7 @@ let%expect_test "every command does something (none is unknown)" =
     /model                     picker: Switch model
     /scoped-models             scoped models dialog
     /fallback                  toast: No fallback models: /fallback MODEL [MODEL...] sets the chain that takes over when a model's usage runs out
-    /thinking                  picker: Thinking level
+    /thinking                  picker: Thinking level for Claude Opus 5.5
     /change_default            rpc change_default
     /verbosity                 picker: Transcript verbosity (Ctrl+O cycles)
     /filter                    transcript filter menu
@@ -91,9 +91,11 @@ let%expect_test "every command does something (none is unknown)" =
     /permissions               text: Permissions
     /notify                    toast: Notifications are on, but the browser has not been asked yet: /notify on asks it
     /memory                    Settings
+    /instructions              Settings
     /user-info                 Settings
     /compact                   toast: Compacting the conversation…
-    /naming                    toast: Sessions and subagents are named by the generate model, else the session's model (/naming model MODEL|off)
+    /generate-model            picker: Drafting model
+    /naming                    toast: Sessions and subagents are named by the drafting model, else the session's model (/naming model MODEL|off)
     /dictation                 toast: Dictation is transcribed by openai/gpt-4o-mini-transcribe, the default (/dictation model MODEL|off)
     /compaction                toast: Compaction: at 200k tokens, or 80% of the model's window if that is less; summaries by the session's model; observation masking on (/compaction at TOKENS|off, /compaction model MODEL|off, /compaction mask on|off)
     /diff                      toast: Reading the changes…
@@ -110,6 +112,7 @@ let%expect_test "every command does something (none is unknown)" =
     /unpin                     toast: This session isn't saved yet: send a message first.
     /delete                    loading Delete a message: rpc push_pref, rpc get_message_points
     /delete-archived           toast: There are no archived sessions.
+    /auto-archive              toast: Sessions are archived after 7 days without activity (/auto-archive DAYS|off)
     /clone                     rpc clone
     /fork                      loading Fork from: rpc push_pref, rpc get_entries
     /rewind                    loading Rewind to: rpc push_pref, rpc get_entries
@@ -119,6 +122,8 @@ let%expect_test "every command does something (none is unknown)" =
     /mkdir                     path prompt
     /worktree                  loading Worktrees: rpc push_pref, rpc list_worktrees
     /default-dir               toast: No default directory: new sessions start in the backend's working directory; /default-dir PATH sets one
+    /default-host              picker: New sessions' host
+    /default-budget            toast: No default budget: /default-budget DOLLARS sets one for sessions without their own /budget
     /host                      picker: Where tools run
     /export                    path prompt
     /import                    path prompt
@@ -210,6 +215,7 @@ let%expect_test "/help <command> and /hotkeys" =
     Shift+F10 / ContextMenu (on a session or worktree) its menu: open, rename, fork, new worktree, review, files, terminal, pull request, copy, delete or remove (also right-click, a long press or its ⋯)
     Shift+F10 / ContextMenu (on a message) its menu: copy, trim everything before or after it, delete it (also right-click or a long press, at the pointer; with text selected, right-click is the browser's, to copy it; on a phone, its Select text selects its words)
     Shift+F10 / ContextMenu (in a text field, the desktop app's browser window) its menu: cut, copy, paste, select all (also right-click; ↑ ↓ move, Enter chooses, Esc closes); the browser's own menus are hidden there
+    Shift+F10 / ContextMenu (in the terminal, the desktop app's browser window) its menu: copy the selection, paste, select all (also right-click)
     Space (selecting) mark a session (Shift: the range from the last one); Delete deletes the marked ones, Esc stops selecting
     Ctrl+Q / ⌘+Q (desktop app) quit prigh: its window and this machine's tool host (/quit)
     Ctrl+B show or hide the sidebar (while reviewing, over the review)
@@ -233,7 +239,7 @@ let%expect_test "/help <command> and /hotkeys" =
     l / Shift+L (reviewing) what changed since your latest action on the file (or the hunks again); choose the action it compares with: Latest follows your newest
     Esc (reviewing) drop the comment, the selected code, the selected files, then close the review
     Enter / Ctrl+S (reviewing) add the comment or reply (Shift+Enter: a new line); save the file being edited
-    Ctrl+` open or close the terminal (/terminal); in it, every other key goes to the shell. On a touch screen a bar over the keyboard has Esc, Tab, Ctrl and Alt (tap: the next key; double-tap: locked), the arrows (held: repeat), | ~ / - and Home, End, PgUp, PgDn
+    Ctrl+` open or close the terminal (/terminal); in it, every other key goes to the shell but Ctrl+Shift+C (copy the selection) and Ctrl+Shift+V (paste). On a touch screen a bar over the keyboard has Esc, Tab, Ctrl and Alt (tap: the next key; double-tap: locked), the arrows (held: repeat), | ~ / - and Home, End, PgUp, PgDn
     Esc (in a pull request) back to the list it was opened from (/pr); Enter closes it
     Alt+G (a pull request, commit message, branch or session name) ✦ Generate: the model drafts it from the changes, the commits and the session (Esc stops, keeping what came; Undo puts the text back)
     Ctrl+Enter / Esc (the review's commit message) commit the files listed above it; close the commit, keeping the message
@@ -362,9 +368,10 @@ let%expect_test "/scoped-models, Ctrl+P and Alt+P" =
         deepseek/deepseek-chat))
       (approval_mode Auto) (permissions ((allow ()) (ask ()) (deny ())))
       (default_model ()) (default_thinking ()) (fallback_models ())
-      (default_cwd ()) (worktrees_dir ()) (archive_after_days 7) (notify bell)
-      (snippets ()) (compact_at_tokens 200000) (compaction_model ())
-      (mask_observations true) (naming_model ()) (dictation_model ())))
+      (default_cwd ()) (default_host ()) (max_budget_usd ()) (worktrees_dir ())
+      (archive_after_days 7) (notify bell) (snippets ())
+      (compact_at_tokens 200000) (compaction_model ()) (mask_observations true)
+      (generate_model ()) (naming_model ()) (dictation_model ())))
     |}]
 ;;
 
@@ -376,14 +383,14 @@ let%expect_test "/thinking and Alt+T" =
     {|
     Cycle_thinking
     (Expire_toast (id 0) (after_ms 2500))
-    (Rpc (method_ set_thinking) (params ((thinking high))) (tag Thinking_set))
+    (Rpc (method_ set_thinking) (params ((thinking low))) (tag Thinking_set))
     Cycle_thinking
     (Expire_toast (id 1) (after_ms 2500))
-    (Rpc (method_ set_thinking) (params ((thinking max))) (tag Thinking_set))
+    (Rpc (method_ set_thinking) (params ((thinking medium))) (tag Thinking_set))
     |}];
   let state = (H.model h).state |> Option.value_exn in
   print_endline state.thinking;
-  [%expect {| max |}];
+  [%expect {| medium |}];
   H.act h (Set_model "deepseek/deepseek-chat");
   H.event
     h
@@ -487,7 +494,7 @@ let%expect_test "/verbosity and Ctrl+O" =
     Context 0 / 200k · 0%
     Tokens 0 in · 0 out · 0 cached
     Cost $0.0000
-    Thinking on
+    Thinking provider's default
     Mode Auto: never asks
     Model Claude Opus 5.5
     Branch main
@@ -523,7 +530,7 @@ let%expect_test "/verbosity and Ctrl+O" =
     Context 0 / 200k · 0%
     Tokens 0 in · 0 out · 0 cached
     Cost $0.0000
-    Thinking on
+    Thinking provider's default
     Mode Auto: never asks
     Model Claude Opus 5.5
     Branch main
@@ -615,7 +622,7 @@ let%expect_test "/session" =
     (Focus dialog)
     Session
     (Close (Esc))
-    Name (unnamed) Id s1 File /sessions/s1.jsonl Directory /work Model Claude Opus 5.5 (anthropic/claude-opus-5-5) Thinking on
+    Name (unnamed) Id s1 File /sessions/s1.jsonl Directory /work Model Claude Opus 5.5 (anthropic/claude-opus-5-5) Thinking default
     12 Messages
     4 Turns
     $0.4321 Cost
@@ -1779,10 +1786,10 @@ let%expect_test "/setusr: a superuser acts as another user, and back" =
      (params
       ((keys
         (web.theme web.accent web.notify web.verbosity web.terminal-open
-         web.sidebar-folded web.review history web.migrated web.sidebar-width
-         web.files-width web.files-preview-width web.agents-width
-         web.terminal-height web.review-chat-width web.review-files-width
-         web.review-margin-width))))
+         web.sidebar-folded web.sidebar-unfolded web.sidebar-worktree-hours
+         web.review history web.migrated web.sidebar-width web.files-width
+         web.files-preview-width web.agents-width web.terminal-height
+         web.review-chat-width web.review-files-width web.review-margin-width))))
      (tag Prefs))
     Acting as bob
     Back to alice
@@ -1834,10 +1841,10 @@ let%expect_test "/retry-backend-connection, /state, /clear, /quit" =
      (params
       ((keys
         (web.theme web.accent web.notify web.verbosity web.terminal-open
-         web.sidebar-folded web.review history web.migrated web.sidebar-width
-         web.files-width web.files-preview-width web.agents-width
-         web.terminal-height web.review-chat-width web.review-files-width
-         web.review-margin-width))))
+         web.sidebar-folded web.sidebar-unfolded web.sidebar-worktree-hours
+         web.review history web.migrated web.sidebar-width web.files-width
+         web.files-preview-width web.agents-width web.terminal-height
+         web.review-chat-width web.review-files-width web.review-margin-width))))
      (tag Prefs))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s1.jsonl) (limit 1000000)))
@@ -1862,8 +1869,11 @@ let%expect_test "/retry-backend-connection, /state, /clear, /quit" =
      (model
       ((id claude-opus-5-5) (provider anthropic) (key anthropic/claude-opus-5-5)
        (name "Claude Opus 5.5") (context_window 200000) (max_output 64000)
-       (supports_thinking true) (cost ((input 5) (output 25) (cache_read 0.5)))))
-     (thinking on) (running false) (message_count 0)
+       (supports_thinking true)
+       (thinking_options (default low medium high xhigh max))
+       (thinking_default (medium))
+       (cost ((input 5) (output 25) (cache_read 0.5)))))
+     (thinking default) (running false) (message_count 0)
      (usage ((input 0) (output 0) (cache_read 0))) (cost_usd 0)
      (context_tokens 0) (active_host backend) (active_host_name ()) (hosts ())
      (subagents ()) (jobs ()) (budget_usd ()) (goal ()) (reminders ())
@@ -1886,6 +1896,7 @@ let%expect_test "/retry-backend-connection, /state, /clear, /quit" =
      (tag Ignore))
     (Expire_toast (id 2) (after_ms 4780))
     What are we building?
+    / for commands, @ for files
     (Rpc (method_ push_pref) (params ((key history) (value /quit) (max 500)))
      (tag Ignore))
     (Expire_toast (id 3) (after_ms 4620))

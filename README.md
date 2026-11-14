@@ -329,7 +329,9 @@ but built for the browser rather than mounting the terminal UI: a real DOM
 (Bonsai_web, js_of_ocaml) with a session sidebar, a chat transcript with
 markdown, collapsible tool calls and their images, model and thinking
 selectors, and a composer that takes pasted or dropped images, `/`
-commands, `@` paths, `#` snippets and `!cmd` like the TUI. Messages show when they were
+commands, `@` paths, `#` snippets and `!cmd` like the TUI. Empty, the
+composer says where the session works ("Working in `~/projects/prigh` on
+`main`.", with the tool host when it is not the backend's default). Messages show when they were
 sent, in the browser's time zone (`14:32`, `Yesterday 14:32`, `3 Oct
 14:32`; the full date on hover): under your messages and in a reply's
 footer, with a separator where the day changes. The backend serves it and
@@ -517,9 +519,15 @@ against its upstream; the one it works in says `here`. A worktree two
 sessions use is under both; one removed (from any session, or outside
 prigh) goes. On disk worktrees still go by repository
 (`<worktrees_dir>/<project>/<branch>`), and `/worktree` lists all of the
-repository's. The fold at the right of a session's second line (`⑂ 3`)
-hides its worktrees; the folds are kept with your preferences, so they
-follow you to other browsers.
+repository's. A session used in the last 12 hours (its age on the card)
+shows its worktrees; an older one folds them behind the count at the
+right of its second line (`⑂ 3`). Settings → Sessions → Show worktrees
+sets the window in hours (up to 720; its switch off, or 0: every
+session's start folded; on again: the hours it had). Clicking the count folds or unfolds a session's worktrees
+whatever its age, and that choice wins over the window until you click
+again; the window and the choices are kept with your preferences
+(`web.sidebar-worktree-hours`, `web.sidebar-folded`,
+`web.sidebar-unfolded`), so they follow you to other browsers.
 
 A session that switched into a worktree (`/worktree open`, `/worktree
 new`, `/pr checkout`, Switch session here) remembers where it came from,
@@ -647,7 +655,8 @@ shell where the session's tools run (the active `/host`, in its
 directory; `/terminal DIR`, or a worktree's "Open terminal there", a shell
 of its own in DIR) in a panel under the chat: drag its top edge to resize it (the
 height is remembered), a full-screen sheet on a phone. Keys typed in it
-are the shell's, Esc included; Ctrl+` closes it (so does its ×) and
+are the shell's, Esc and Ctrl+C included, but Ctrl+Shift+C copies the
+selection and Ctrl+Shift+V pastes; Ctrl+` closes it (so does its ×) and
 gives the keyboard back to the editor. On a touch screen (a phone, a
 tablet), while the shell has the focus, a row of the keys a phone's keyboard
 lacks sits over the keyboard: Esc, Tab, Ctrl and Alt (a tap applies to the
@@ -910,12 +919,25 @@ The settings page (the gear beside your account at the foot of the
 sidebar, Settings in the account menu, `/settings` or Ctrl+,) holds what is not
 about the session, in sections listed down its side (across its top on a
 phone): **Appearance** (the theme and accent, transcript detail
-(`/verbosity`)), **Behaviour** (tool confirmation (`/confirm`);
-notifications, on or off, and what to do when the browser has
-not been asked, blocks them or cannot show them), **Models** (the providers
+(`/verbosity`)), **Sessions** (the session list: Show worktrees, the hours a session's worktrees stay
+unfolded in the sidebar after it was used, and Archive after, the days
+without activity that archive it (`/auto-archive`), each a number with
+a switch that turns it off and back on to what it was; notifications, on or
+off, and what to do when the browser has not been asked, blocks them or
+cannot show them), **New sessions** (what a new session starts with, each
+with its control and a ↶ back to the built-in: the model (a picker, or This
+session's: `/change_default`), thinking, mode (Ask, Auto-edit, Auto), the
+tool host (a picker of the connected ones, `/default-host`) and the starting
+directory (typed, applied on Enter or leaving the field, `/default-dir`);
+and the limits every session without its own follows: the fallback models
+(added from a picker, removed one by one, `/fallback`) and the budget
+(`/default-budget`). They are the backend's `config.json`: a change applies
+from the next new session, open sessions keep their own (the fallback chain
+and the budget, which open sessions follow too, aside), and every client's
+settings follow it at once), **Models** (the providers
 (`/auth`) and compaction), **Memory** (the model's notes and the switch
-that turns memory off), **About you** (what you wrote about yourself for
-the model, `/user-info`), **Git hosting**, **Nix store** (superusers) and
+that turns memory off), **About you** (a form about yourself for the
+model, `/user-info`), **Git hosting**, **Nix store** (superusers) and
 **Account** (who you are signed in, and acting, as, with Switch account and
 Sign out). `/settings SECTION` (e.g. `/settings git`, completed as you type)
 opens it at a section; on the list, the arrows, Home and End move between
@@ -1269,11 +1291,14 @@ Where it shows it (`PRIGH_DESKTOP_WINDOW`, `programs.prigh.desktop.window`):
   closes the window, which does the same. A browser left running on prigh's
   profile (by an app that was killed) is closed when the app starts. Links
   to other sites open in your default browser (`xdg-open` on Linux), with
-  your own profile, as in the app's own window: the app watches the
-  browser's windows (its DevTools, on a pipe only the app holds, no port)
-  and closes a new tab or window on another site, or sends prigh's window
-  back, opening the link in your browser instead (Linux only: elsewhere
-  they open in the browser on prigh's profile).
+  your own profile, as in the app's own window, at once: prigh's page hands
+  a click on such a link (Ctrl+click and a middle click too) to the app,
+  which opens it in your browser before Chrome opens anything. The app
+  also watches the browser's windows (its DevTools, on a pipe only the app
+  holds, no port) and closes a new tab or window on another site that
+  opens anyway, or sends prigh's window back, opening the link in your
+  browser instead (Linux only: elsewhere they open in the browser on
+  prigh's profile).
   The window is an app's, not a browser's (also Linux only, through the
   same DevTools pipe): the browser's own pages are closed as soon as they
   open and the focus goes back to prigh's window, so Ctrl+T, Ctrl+N
@@ -1308,7 +1333,8 @@ Where it shows it (`PRIGH_DESKTOP_WINDOW`, `programs.prigh.desktop.window`):
   The browser's own right-click menu never shows there (it would give away
   that the window is Chrome): a text field's right-click (or Shift+F10)
   opens prigh's Cut, Copy, Paste and Select all instead (↑↓, Enter, Esc),
-  over a dialog too, and sessions, worktrees, messages and the review's
+  over a dialog too; the terminal's opens Copy, Paste and Select all,
+  keeping its selection; sessions, worktrees, messages and the review's
   files have their usual menus; elsewhere a right-click does nothing.
 - **webview**: the app's own window on the system's webview (below).
 
@@ -2376,19 +2402,53 @@ and delete, and the TUI's `/memory` picks among them (Enter shows one,
 Ctrl+D forgets it after a confirmation).
 
 About you: where memory is notes the model looks up only when it needs
-them, what you write about yourself (who you are, what you work on, how you
-like answers) is in the model's context in every session. Write it in
-prigh-web's Settings → About you (`/user-info` opens it; Ctrl+Enter saves,
-Revert drops what is typed, and a change made in another browser is shown
-at once, or offered if you were typing), or in the TUI with `/user-info
-TEXT` (`/user-info` shows it, `/user-info clear` removes it after a
-confirmation). It is kept as plain text in `~/.prigh/user_info.md` on the
-backend, one per user (per namespace with `-tokens`), at most 4000 bytes;
-editing the file by hand works too. A new session starts with it in its
-system prompt (and so do its subagents); a session that is already open is
-told the text with your next message in it, once, and again whenever you
-change or remove it (a "☺ About you" note over your message shows what it
-was told). Only you write it: the model has no tool to change it.
+them, what you set about yourself is in the model's context in every
+session. It is a form of optional fields: name, country or region, time zone
+(prigh-web offers the browser's with one tap), language and spelling, units
+(metric, imperial or US customary), date format (D/M/Y, M/D/Y or ISO),
+occupation or role, background and expertise, and anything else. Only the
+filled fields are given to the model, as a short list ("- Name: Lloyd",
+"- Units: metric (°C, km, kg, L)"). Fill it in in prigh-web's Settings →
+About you (`/user-info` opens it; Ctrl+Enter saves, Revert drops what is
+typed, and a change made in another browser is shown at once, or offered if
+you were typing), or in the TUI: `/user-info` shows what the model is given
+and the fields, `/user-info FIELD VALUE` sets one (`/user-info timezone
+Australia/Sydney`; no VALUE clears it) and `/user-info clear` clears them
+all after a confirmation. It is kept in `~/.prigh/about_you.json` on the
+backend, one per user (per namespace with `-tokens`): 100 bytes for each
+short field, 1000 for background, 4000 for anything else and 5000 in all.
+The free text of earlier versions (`~/.prigh/user_info.md`) is moved into
+"Anything else" the first time it is read (the old file is renamed
+`user_info.md.migrated`). A new session starts with it in its system prompt
+(and so do its subagents); a session that is already open is told it with
+your next message in it, once, and again whenever you change it (a "☺ About
+you" note over your message shows what it was told). Only you write it: the
+model has no tool to change it.
+
+Custom instructions: standing instructions given to the model in every
+session, after About you ("Use Australian spelling", "keep one memory note
+on my maths ability up to date"). Each has an id (`ci1`, `ci2`, ...) and
+shows in the context with it. Manage them in prigh-web's Settings → Custom
+instructions (`/instructions` opens it: add, edit, delete after a
+confirmation; it shows their size, about bytes/4 tokens, and warns past
+about 1,500 tokens that they cost every session) or in the TUI:
+`/instructions` lists them (Enter shows one, Ctrl+D removes it after a
+confirmation) and `/instructions add TEXT` adds one; editing is left to
+prigh-web. The model can change them too with the `custom_instructions`
+tool (`add`, `edit`, `remove`, `list`): it is told to do so when you state
+a lasting preference, fact about yourself or standing instruction that is
+not covered yet (editing the one that covers it rather than adding a
+near-duplicate), never for task details, and to tell you when it does.
+Only the main agent has it; changes ask in the `ask` approval mode, like
+memory's. `/instructions off` (or the switch in Settings; kept in your
+prefs as `custom_instructions.enabled`) stops the model changing them; they
+stay in context either way. They are kept in
+`~/.prigh/custom_instructions.json` on the backend, one list per user (per
+namespace with `-tokens`), at most 50, 1000 bytes each. New sessions (and
+their subagents) get them in the system prompt; an open session is told
+what changed with your next message (a "§ Custom instructions" note: what
+was added, edited and removed, or the whole list when most of it changed),
+but not the changes it made itself.
 
 Models see images. The `read` tool returns PNG, JPEG, GIF and WebP files
 (recognised by content, not by name) as images the model can look at, and an
@@ -2449,10 +2509,12 @@ from the model waits for you, above), `snippets` (texts to insert into the
 editor, `/snippet` below) and
 `auto_background_seconds` (default 30, `0` = never: when a foreground
 command moves to the background and how long a wait lasts, above),
-`generate_model` (the model ✦ Generate drafts commit messages, pull
-requests and branch names with; default: the session's),
+`generate_model` (the drafting model: the one ✦ Generate drafts commit
+messages, pull requests and branch names with; default: the session's;
+`/generate-model` picks it, also on prigh-web's settings page, Models →
+Drafting),
 `naming_model` (the model that names sessions and subagents; default:
-`generate_model`, else the session's; `/naming model` picks it, also on
+the drafting model, else the session's; `/naming model` picks it, also on
 prigh-web's settings page),
 `dictation_model` (the speech-to-text model of the `transcribe` method,
 `provider/id` on OpenAI or an OpenAI-compatible custom provider; default
@@ -2470,8 +2532,23 @@ built-in computer-use tool),
 exceeds this many tokens, if that comes before 80% of the window) and
 `compaction_model` (the model that writes compaction summaries; default:
 the conversation's), all three set with `/compaction` (below).
-Without a `default_thinking`, sessions start with thinking `on`; models that
-cannot think ignore it. A fallback model keeps the session's thinking level.
+Thinking is `off`, `default` (the provider's default: thinking on, no effort
+sent, the provider decides; `on` is an alias, as older sessions and configs
+say) or an effort level: `minimal`, `low`, `medium`, `high`, `xhigh` or
+`max`. Each model takes only some of these (`prigh models`, the `/thinking`
+picker, the RPC's `thinking_options`): Anthropic's adaptive models their
+`output_config.effort` levels (xhigh on Opus 4.7 and later, max on the 4.6
+generation and later; Claude 5 models cannot turn thinking off), older
+Claude models a `budget_tokens` per level, OpenAI's models their
+`reasoning.effort` values (`none` is `off`), DeepSeek low, high and max. An
+explicit `/thinking` level the model lacks is refused with its options;
+switching to a model without the session's level moves to its nearest one
+(the lower on a tie) and says so. A custom provider's model declares its
+levels with `"thinking_levels": ["low", "medium", "high"]` (with `"thinking":
+true` and none listed: low to high, low to max for an Anthropic API).
+Without a `default_thinking`, sessions start with the provider's default;
+models that cannot think ignore it. A fallback model keeps the session's
+thinking level, clamped to its own.
 
 `fallback_models` is a chain of models that take over from each other
 (`/fallback MODEL...` sets it; names, ids and prefixes work as for
@@ -2483,13 +2560,24 @@ it), the transcript shows `↪ Handed over from A to B`, and B carries on with
 the task. At the end of the chain the run stops with a note saying so
 (`/model` picks another). Without a `default_model`, new sessions start on
 the chain's first model. `/fallback` shows the chain and `/fallback off`
-clears it. `default_cwd` (`/default-dir PATH`, `/default-dir off`) is the
-directory, on the backend's host (`~` allowed), that a session starts in
-when the backend starts one for a frontend, instead of the backend's
-working directory; it is ignored if it is not a directory there.
+clears it. `default_host` (`/default-host NAME`, `/default-host off`, or
+Settings → New sessions → Tool host) is the tool host, by id, that sessions
+a frontend starts (`new_session`) run their tools on, while it is connected
+(a tool host's own new sessions stay on it; without one, or while it is
+away, a session starts where the client's session is). `default_cwd`
+(`/default-dir PATH`, `/default-dir off`) is the directory on that host
+(`~` is its home; the backend's host without a `default_host`) that such a
+session starts in, instead of the host's working directory; on the backend's
+host it must be a directory when set, and it is ignored if it is not one
+when a session starts. Both are per namespace (each user's or project's
+`config.json`).
 `archive_after_days` (default 7, `0` = never) archives a session
 automatically once its last message is that many days old: the session
-lists show it as archived (frontends put archived ones apart). Archiving
+lists show it as archived (frontends put archived ones apart). Set it
+with `/auto-archive DAYS|off` (fractions allowed, at most 365) or
+prigh-web's Settings → Sessions → Archive after; the change applies to
+the next `list_sessions` without a restart, and every connected client
+is told to list the sessions again. Archiving
 or unarchiving by hand is recorded in the session file; a new message
 unarchives it, an unarchived one stays active for another
 `archive_after_days`, and a session is never archived while a run or a
@@ -2641,7 +2729,8 @@ compactions included, counted as they happen — no further turn starts, the
 run stops between turns with a note saying how to raise it, and prompts are
 refused until you do. `max_budget_usd` in `config.json` (or `prigh run|serve
 -max-budget-usd DOLLARS`, which wins) is the budget of sessions that set
-none; `/budget` is recorded in the session.
+none (`/default-budget DOLLARS|off`, or prigh-web's Settings → New
+sessions → Budget); `/budget` is recorded in the session.
 
 `/goal TEXT` sets a goal and starts working on it: the agent keeps going
 across turns until it judges the goal met and calls `goal_complete` with a
@@ -2712,11 +2801,13 @@ it.
 | `/scoped-models` | pick the models Ctrl+P cycles through |
 | `/change_default` | save the current model and thinking level as the default for new sessions |
 | `/fallback [off\|model...]` | show or set the models that take over, in order, when a model's usage runs out (each word completes a model) |
-| `/default-dir [off\|path]` | show or set the directory new sessions start in |
+| `/default-dir [off\|path]` | show or set the directory new sessions start in (on the default host) |
+| `/default-host [off\|name]` | show or set the tool host new sessions start on (`default_host`; `off`: where you are); in prigh-web, bare: a picker |
+| `/default-budget [off\|dollars]` | show or set the budget sessions without their own `/budget` follow (`max_budget_usd`) |
 | `/login [provider\|custom] [api_key\|oauth]`, `/logout [provider]`, `/auth` | credentials; `/login custom` adds an OpenAI-compatible endpoint |
 | `/login github [HOST] [token]`, `/login forgejo HOST [token]`, `/login HOST [token]`, `/logout HOST` | sign in to or out of a git host (see [Git hosting](#git-hosting)) |
 | `/pr [list [open\|closed\|all]\|view N\|new [--generate] [title]\|checkout N]` | pull requests of the session's repository: pick one (Enter shows it), show one (also `/pr N`), create one from the current branch (`--generate`: the model drafts its title and body), or check one out in a git worktree |
-| `/thinking [off\|on\|low\|high\|max]` | set the thinking level |
+| `/thinking [off\|default\|LEVEL]` | pick or set the thinking level among the model's (`default`, alias `on`: the provider's default) |
 | `/verbosity [quiet\|normal\|verbose]` | set the transcript verbosity |
 | `/filter [all\|KIND...\|-KIND\|+KIND]` | show only some kinds in the transcript (`user`, `assistant`, `thinking`, `tools`, `subagents`, `notes`); bare: a checklist |
 | `/theme [original\|dark\|light]`, `/accent [name\|#rrggbb]` (prigh-web) | pick or set the theme and the accent colour, for you in every browser |
@@ -2729,7 +2820,8 @@ it.
 | `/trim [after\|undo\|show\|hide]` | drop everything before a message from the model's context (a picker, then a confirmation); `after`: everything after a message instead; `undo` brings the latest trim back, `show`/`hide` (TUI) unfold or fold the trimmed messages; see [Trimming the context](#trimming-the-context) |
 | `/delete [undo]` | drop a message from the transcript and the model's context (a picker, newest first; a reply goes with its tool results); `undo` brings the latest deletion back; see [Trimming the context](#trimming-the-context) |
 | `/compaction`, `/compaction at TOKENS\|off`, `/compaction model MODEL\|off`, `/compaction mask on\|off` | show or set when conversations are compacted (`compact_at_tokens`: also once the context exceeds TOKENS, e.g. `150k`), which model writes the summaries (`compaction_model`; `off`: the session's) and whether old tool outputs are masked first (`mask_observations`); also on prigh-web's settings page |
-| `/naming`, `/naming model MODEL\|off` | show or set the model that names sessions and subagents (`naming_model`; `off`: `generate_model`, else the session's); in the TUI `/naming model ` completes the models, in prigh-web `/naming model` alone opens a picker; also on prigh-web's settings page |
+| `/generate-model`, `/generate-model MODEL\|off` | show or set the drafting model, the one ✦ Generate drafts commit messages, pull requests and branch names with (`generate_model`; `off`: the session's); in the TUI `/generate-model ` completes `off` and the models, in prigh-web `/generate-model` alone opens a picker; also on prigh-web's settings page (Models → Drafting) |
+| `/naming`, `/naming model MODEL\|off` | show or set the model that names sessions and subagents (`naming_model`; `off`: the drafting model, else the session's); in the TUI `/naming model ` completes the models, in prigh-web `/naming model` alone opens a picker; also on prigh-web's settings page |
 | `/dictation`, `/dictation model MODEL\|off` | show or set the model that transcribes dictation (`dictation_model`: OpenAI's `gpt-4o-mini-transcribe`, `gpt-4o-transcribe`, `whisper-1`, or a custom OpenAI-compatible provider's model; `off`: `openai/gpt-4o-mini-transcribe`); the TUI completes them, prigh-web opens a picker that also takes a typed key; also on prigh-web's settings page |
 | `/commit [-a] [--amend] [-m MESSAGE \| --generate]` | commit what is staged in the session's worktree (`-a`: every change to tracked files first); `--generate` drafts the message with the model into the editor, see [Git hosting](#git-hosting) |
 | `/push` | push the worktree's branch to its upstream (set when it has none), with the tool host's git credentials |
@@ -2740,7 +2832,7 @@ it.
 | `/budget [dollars\|off]` | show or set the session's cost budget: no turn starts once it is spent |
 | `/goal [text\|off\|resume]` | set a goal the agent keeps working toward until it is met; show, clear or resume it |
 | `/memory [on\|off]` | pick among the notes the model saved (Ctrl+D forgets one; prigh-web opens Settings → Memory); `on`/`off` gives the model the memory tool or takes it away |
-| `/user-info [TEXT\|clear]` | what you wrote about yourself for the model, in the context of every session: show it, replace it with TEXT or clear it (prigh-web opens Settings → About you) |
+| `/user-info [FIELD VALUE\|clear]` | what you set about yourself for the model (name, country, time zone, units…), in the context of every session: show it, set one field (no VALUE clears it) or clear them all (prigh-web opens Settings → About you) |
 | `/remind [stop [N] TEXT\|every N TEXT\|rm NAME\|off]` | remind the agent when it ends its turn (at most N times in a row, default 3) or every N turns; without arguments, pick among the session's (Ctrl+D / Delete removes one); `rm` removes one, `off` all |
 | `/resume [now\|cancel]` | show, run now or cancel the automatic resume after a usage limit |
 | `/new`, `/clear`, `/quit` | new session / clear transcript / exit |
@@ -2753,6 +2845,7 @@ it.
 | `/pin [session]`, `/unpin [session]` | pin a session to the top of the session lists (never archived for being idle), or unpin it (as `/archive` takes its argument) |
 | `/delete session...` | delete sessions after a confirmation (or pick them in `/sessions`) |
 | `/delete-archived` | delete every archived session after a confirmation |
+| `/auto-archive`, `/auto-archive DAYS\|off` | show or set how many days without activity archive a session (`archive_after_days`; `off` or `0`: never, only by hand; at most 365); also on prigh-web's settings page (Sessions → Archive after) |
 | `/switch [path]` | switch to a saved session |
 | `/cd [path]` | change the working directory (on the active tool host: `~` is that host's home, a relative path is under the current directory); a missing one is created once you confirm (`Create /x? (y/n)`; in prigh-web a "Create folder?" dialog); `/host`'s directory asks the same |
 | `/mkdir [path]` | create a directory (with its parents) on the tool host and change to it |
@@ -2930,8 +3023,9 @@ back; it stays editable before use. In the TUI, `/pr new --generate [title]`
 drafts the form's title (unless one is given) and body, Ctrl+G in the form
 drafts on demand (Esc stops, Ctrl+_ swaps back to the text from before), and
 `/commit --generate` drafts a commit message. One tool-less request per
-draft, without thinking, on `generate_model` from `config.json` (a model name,
-id or prefix, e.g. a cheap fast one like `claude-haiku-4-5`), else the
+draft, without thinking, on the drafting model (`generate_model` in
+`config.json`, set with `/generate-model` or in prigh-web's settings: a model
+name, id or prefix, e.g. a cheap fast one like `claude-haiku-4-5`), else the
 session's model; its cost counts towards the session's. Large diffs are cut
 down to fit (every file keeps a share of its hunks, the rest listed with
 their line counts).

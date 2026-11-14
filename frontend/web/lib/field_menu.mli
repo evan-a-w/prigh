@@ -1,16 +1,26 @@
 open! Core
 open! Import
 
-(** A text field's context menu in a browser's app window (the desktop app's
-    browser shell, see {!Desktop_link.browser_shell_of_hash}), where the
-    browser's own menu is suppressed because it gives away that the window
-    is Chrome: Cut, Copy, Paste, Select all. Its own layer, over any dialog
-    (whose fields it serves), owning the keyboard until it closes. *)
+(** A text field's or the terminal's context menu in a browser's app window
+    (the desktop app's browser shell, see
+    {!Desktop_link.browser_shell_of_hash}), where the browser's own menu is
+    suppressed because it gives away that the window is Chrome: Cut, Copy,
+    Paste, Select all (the terminal: Copy, Paste, Select all). Its own layer,
+    over any dialog (whose fields it serves), owning the keyboard until it
+    closes. *)
+
+module Kind : sig
+  type t =
+    | Text_field (** a textarea or a text input *)
+    | Terminal (** the terminal panel's xterm.js *)
+  [@@deriving sexp_of, equal]
+end
 
 module Field : sig
   (** The right-clicked field as it stood. *)
   type t =
-    { selection : bool (** text is selected in it *)
+    { kind : Kind.t
+    ; selection : bool (** text is selected in it *)
     ; editable : bool (** neither read-only nor disabled *)
     ; secret : bool (** a password: what it holds is not copied out *)
     }
@@ -27,8 +37,9 @@ module Item : sig
 
   val label : t -> string
 
-  (** Its key: [Ctrl+X] and so on. *)
-  val key : t -> string
+  (** Its key in that kind of field: [Ctrl+X], the terminal's
+      [Ctrl+Shift+C] and so on. *)
+  val key : Kind.t -> t -> string option
 end
 
 type t [@@deriving sexp_of, equal]
@@ -37,8 +48,11 @@ val create : Field.t -> anchor:Context_menu.Anchor.t -> t
 val field : t -> Field.t
 val anchor : t -> Context_menu.Anchor.t
 
-(** Cut and Copy need a selection (and not a password), Cut and Paste an
-    editable field. *)
+(** The items it shows, in groups: the terminal has no Cut. *)
+val sections : t -> Item.t list list
+
+(** Shown, and: Cut and Copy need a selection (and not a password), Cut and
+    Paste an editable field. *)
 val enabled : t -> Item.t -> bool
 
 (** The highlighted item: the first enabled one when it opens. *)

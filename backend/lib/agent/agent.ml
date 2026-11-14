@@ -198,6 +198,7 @@ type t =
   ; tools : Tool.t list
   ; offered : Tool.t -> bool
   ; user_info : User_info.t option
+  ; custom_instructions : Custom_instructions.t option
   ; sessions_dir : string
   ; home : string
   ; models : Model_registry.t
@@ -317,6 +318,15 @@ let restore_approvals t =
   t.plan <- Plan.latest (path_messages t.session)
 ;;
 
+(* The setting kept when [model] becomes the session's: the closest one it
+   takes. A model that does not think keeps the setting for the next one
+   (its requests send none). *)
+let settle_thinking model thinking =
+  if Model.supports_thinking model
+  then Model.clamp_thinking model thinking
+  else thinking
+;;
+
 let restore_settings t =
   t.goal <- Session.goal t.session;
   t.review <- Session.review t.session;
@@ -325,7 +335,7 @@ let restore_settings t =
    | Some (model_id, thinking) ->
      Option.iter (Model_registry.find t.models model_id) ~f:(fun m ->
        t.model <- m);
-     t.thinking <- thinking
+     t.thinking <- settle_thinking t.model thinking
    | None -> ());
   restore_approvals t
 ;;
@@ -421,11 +431,29 @@ let record_worktrees t ~agent ~added ~removed =
     then ignore (Session.worktree_removed t.session ~path : Session.Entry.t))
 ;;
 
+let record_told t =
+  if
+    not
+      (Option.equal
+         Told_environment.equal
+         (Session.told_environment t.session)
+         (Some t.told))
+  then ignore (Session.set_told_environment t.session t.told : Session.Entry.t)
+;;
+
 let broadcast t (event : Event.t) =
   match event with
   | Loop e when Option.is_some (worktrees_changed e) ->
     Option.iter (worktrees_changed e) ~f:(fun (agent, added, removed) ->
       record_worktrees t ~agent ~added ~removed)
+  | Loop (Custom_instruction_set { id; instruction }) ->
+    (* The model made this change: it is not told it back. *)
+    t.told
+    <- { t.told with
+         custom_instructions =
+           Custom_instruction.apply t.told.custom_instructions ~id instruction
+       };
+    record_told t
   | _ ->
     (match event with
      | Loop e ->
@@ -590,17 +618,12 @@ let environment t =
   ; plan_mode = t.plan_mode
   ; client = Some (Option.value t.client ~default:Other)
   ; user_info = Option.bind t.user_info ~f:User_info.text
+  ; custom_instructions =
+      Option.value_map
+        t.custom_instructions
+        ~default:[]
+        ~f:Custom_instructions.for_model
   }
-;;
-
-let record_told t =
-  if
-    not
-      (Option.equal
-         Told_environment.equal
-         (Session.told_environment t.session)
-         (Some t.told))
-  then ignore (Session.set_told_environment t.session t.told : Session.Entry.t)
 ;;
 
 (* A session from before [told] was recorded starts from its environment as
@@ -609,7 +632,12 @@ let restore_told t =
   t.told
   <- (match Session.told_environment t.session with
       | Some told -> told
-      | None -> { (environment t) with client = None; user_info = None });
+      | None ->
+        { (environment t) with
+          client = None
+        ; user_info = None
+        ; custom_instructions = []
+        });
   t.client <- t.told.client
 ;;
 
@@ -848,9 +876,41 @@ let track_plan t (event : Agent_event.t) =
 
 let config t = t.config
 
+let adopt_config t config =
+  t.config <- config;
+  Trace.set_level t.tracer (Trace.Level.effective ~configured:config.trace);
+  broadcast t (Config_changed config)
+;;
+
 (* Fallback models are stored as keys, so a name or prefix that resolves
    now keeps meaning the same model. *)
-let set_config t (config : Config.t) =
+(* A host is named as [/host] names it (its id, else its name), and stored
+   by id, which stays the same across its reconnects. *)
+let resolve_default_host t name =
+  let hosts = hosts t in
+  match
+    Option.first_some
+      (List.find hosts ~f:(fun h -> String.equal h.id name))
+      (List.find hosts ~f:(fun h -> String.Caseless.equal h.name name))
+  with
+  | Some h -> Ok h.id
+  | None ->
+    Or_error.errorf
+      "default_host: no connected tool host is called %S; %s"
+      name
+      (match hosts with
+       | [] -> "none is connected (start prigh or prigh tool-host there)"
+       | hosts ->
+         "connected: "
+         ^ String.concat
+             ~sep:", "
+             (List.map hosts ~f:(fun h ->
+                if String.equal h.id Host.backend_id
+                then sprintf "%s (the backend)" h.name
+                else h.name)))
+;;
+
+let set_config ?(session_mode = true) t (config : Config.t) =
   let open Or_error.Let_syntax in
   let%bind fallback_models =
     List.map config.fallback_models ~f:(fun name ->
@@ -897,6 +957,13 @@ let set_config t (config : Config.t) =
       |> Result.map_error ~f:(fun e ->
         Error.createf "dictation_model: %s" (Error.to_string_hum e))
   in
+  let%bind default_host =
+    match config.default_host with
+    | None -> Ok None
+    | Some name when Option.equal String.equal t.config.default_host (Some name)
+      -> Ok (Some name)
+    | Some name -> Or_error.map (resolve_default_host t name) ~f:Option.some
+  in
   let config =
     { config with
       fallback_models =
@@ -904,14 +971,23 @@ let set_config t (config : Config.t) =
     ; generate_model
     ; compaction_model
     ; naming_model
+    ; default_host
     }
+  in
+  let on_backend =
+    Option.value_map
+      config.default_host
+      ~default:true
+      ~f:(String.equal Host.backend_id)
   in
   let%bind () =
     match config.default_cwd with
     | Some dir when not (Filename.is_absolute (Tool.expand_home dir)) ->
       Or_error.errorf "default_cwd: %s must be absolute (or start with ~/)" dir
     | Some dir
-      when t.backend_host_enabled
+      when on_backend
+           && t.backend_host_enabled
+           && (not (Option.equal String.equal t.config.default_cwd (Some dir)))
            && not (Sys_unix.is_directory_exn (Tool.expand_home dir)) ->
       Or_error.errorf
         "default_cwd: %s is not a directory on the backend (%s)"
@@ -923,11 +999,9 @@ let set_config t (config : Config.t) =
   let mode_changed =
     not (Approval_mode.equal config.approval_mode t.config.approval_mode)
   in
-  t.config <- config;
-  Trace.set_level t.tracer (Trace.Level.effective ~configured:config.trace);
-  broadcast t (Config_changed config);
+  adopt_config t config;
   (* [/confirm on|off] changes the default and the session at once. *)
-  if mode_changed then set_approval_mode t config.approval_mode
+  if session_mode && mode_changed then set_approval_mode t config.approval_mode
 ;;
 
 let save_as_default t =
@@ -1846,7 +1920,11 @@ let instructions t ~cancel ~cwd =
    the next user message instead. *)
 let tools t = Tools.for_model t.model (own_tools t @ t.mcp_tools)
 
-let build_system_prompt ?(cancel = Cancellation.never) ?user_info t =
+let build_system_prompt
+      ?(cancel = Cancellation.never)
+      (now : Told_environment.t)
+      t
+  =
   let { Host_ops.Instructions.files; nix; skills } =
     instructions t ~cancel ~cwd:t.cwd
   in
@@ -1855,7 +1933,8 @@ let build_system_prompt ?(cancel = Cancellation.never) ?user_info t =
     ~nix
     ~skills
     ?auto_background:(Config.auto_background t.config)
-    ?user_info
+    ?user_info:now.user_info
+    ~custom_instructions:now.custom_instructions
     ~cwd:t.cwd
     ~home:t.home
     ~tools:(Tools.specs (tools t))
@@ -2002,7 +2081,7 @@ let system_prompt ?(cancel = Cancellation.never) t =
   | Some text -> text
   | None ->
     let now = environment t in
-    let text = build_system_prompt ~cancel ?user_info:now.user_info t in
+    let text = build_system_prompt ~cancel now t in
     (* Without its instructions: the next run builds it again. *)
     if not (Cancellation.is_cancelled cancel)
     then (
@@ -2379,6 +2458,23 @@ let deliveries t =
 (* The system prompt names the tools of the model it was built for. *)
 let set_model t model =
   t.model <- model;
+  let thinking = settle_thinking model t.thinking in
+  if not (Thinking.equal thinking t.thinking)
+  then (
+    broadcast
+      t
+      (Notice
+         (sprintf
+            "%s: thinking is now %s"
+            (match t.thinking with
+             | Off -> model.name ^ " always thinks"
+             | On _ ->
+               sprintf
+                 "%s has no %s thinking"
+                 model.name
+                 (Thinking.label t.thinking))
+            (Thinking.label thinking)));
+    t.thinking <- thinking);
   environment_changed t;
   ignore
     (Session.set_model t.session ~model:(Model.key model) ~thinking:t.thinking
@@ -2567,7 +2663,7 @@ let generate_model t =
     Model_registry.resolve t.models name
     |> Result.map_error ~f:(fun e ->
       Error.createf
-        "generate_model: %s (fix it with /settings or in config.json)"
+        "generate_model: %s (fix it with /generate-model or in config.json)"
         (Error.to_string_hum e))
 ;;
 
@@ -3205,6 +3301,7 @@ let create
       ?(offered = fun (_ : Tool.t) -> true)
       ?mcp_settings
       ?user_info
+      ?custom_instructions
       ~cwd
       ()
   =
@@ -3232,6 +3329,7 @@ let create
   let thinking =
     Option.first_some thinking config.default_thinking
     |> Option.value ~default:Thinking.default
+    |> settle_thinking model
   in
   let session =
     match session with
@@ -3254,6 +3352,7 @@ let create
     ; tools
     ; offered
     ; user_info
+    ; custom_instructions
     ; sessions_dir
     ; home
     ; models
@@ -3301,6 +3400,7 @@ let create
         ; plan_mode = false
         ; client = None
         ; user_info = None
+        ; custom_instructions = []
         }
     ; background =
         Background_tasks.create
@@ -3630,11 +3730,12 @@ let shell t ~command ~add_to_context =
 ;;
 
 let set_thinking t thinking =
-  t.thinking <- thinking;
-  ignore
-    (Session.set_model t.session ~model:(Model.key t.model) ~thinking
-     : Session.Entry.t);
-  state_changed t
+  Or_error.map (Model.check_thinking t.model thinking) ~f:(fun thinking ->
+    t.thinking <- thinking;
+    ignore
+      (Session.set_model t.session ~model:(Model.key t.model) ~thinking
+       : Session.Entry.t);
+    state_changed t)
 ;;
 
 let compact ?instructions t =
@@ -4107,7 +4208,7 @@ let btw t ~question ~cancel ~on_delta =
   let system =
     match Session.system_prompt session with
     | Some text -> text
-    | None -> build_system_prompt ~cancel ?user_info:(environment t).user_info t
+    | None -> build_system_prompt ~cancel (environment t) t
   in
   let request =
     Btw.request

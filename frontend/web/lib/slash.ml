@@ -18,6 +18,7 @@ module Argument = struct
     | Plan
     | Notify
     | Memory
+    | Instructions
     | Settings
     | Session
     | Path
@@ -30,6 +31,7 @@ module Argument = struct
     | Snippet
     | Remind
     | Compaction
+    | Generate_model
     | Naming
     | Dictation
     | Pr
@@ -65,8 +67,8 @@ let every =
       ~argument:Settings
       ~args:"[section]"
       "settings"
-      "appearance, sessions, models, git hosting and your account; a section \
-       opens at it (Ctrl+,)"
+      "appearance, sessions, new sessions' defaults, models, git hosting and \
+       your account; a section opens at it (Ctrl+,)"
   ; c "new" "start a new session"
   ; c
       "temporary"
@@ -145,19 +147,32 @@ let every =
       "your notes the model saves when you ask it to remember something, in \
        Settings; on or off gives the model the memory tool or takes it away"
   ; c
+      ~argument:Instructions
+      ~args:"[on|off]"
+      "instructions"
+      "your custom instructions, in the context of every session, in Settings; \
+       on or off lets the model add, edit and remove them or not"
+  ; c
       "user-info"
-      "what you wrote about yourself for the model, given to it in every \
-       session (unlike memory, which it looks up), in Settings"
+      "what you set about yourself for the model (name, country, units...), \
+       given to it in every session, in Settings"
   ; c
       ~args:"[instructions]"
       "compact"
       "summarise older messages to free context"
   ; c
+      ~argument:Generate_model
+      ~args:"[MODEL|off]"
+      "generate-model"
+      "pick the model that drafts commit messages, pull requests and branch \
+       names (✦ Generate); MODEL|off: draft them with MODEL (off: the \
+       session's)"
+  ; c
       ~argument:Naming
       ~args:"[model MODEL|off]"
       "naming"
       "show which model names sessions and subagents; model MODEL|off: name \
-       them with MODEL (off: the generate model, else the session's)"
+       them with MODEL (off: the drafting model, else the session's)"
   ; c
       ~argument:Dictation
       ~args:"[model MODEL|off]"
@@ -226,6 +241,12 @@ let every =
        with its tool calls' results): pick it, newest first; undo brings the \
        latest deletion back; with sessions, deletes them after a confirmation"
   ; c "delete-archived" "delete every archived session, after a confirmation"
+  ; c
+      ~args:"[DAYS|off]"
+      "auto-archive"
+      "show how long a session goes without activity before it is archived; \
+       DAYS|off: archive after DAYS days (off: never, only by hand), in \
+       Settings"
   ; c "clone" "copy this session into a new one"
   ; c "fork" "start a new session from an earlier message"
   ; c "rewind" "go back to an earlier message in this session"
@@ -260,7 +281,19 @@ let every =
       ~argument:Backend_directory
       ~args:"[path|off]"
       "default-dir"
-      "show or set the directory new sessions start in"
+      "show or set the directory new sessions start in (on the default host), \
+       in Settings"
+  ; c
+      ~argument:Host
+      ~args:"[off|name]"
+      "default-host"
+      "pick or set the tool host new sessions start on (off: where you are), \
+       in Settings"
+  ; c
+      ~args:"[off|dollars]"
+      "default-budget"
+      "show or set the cost budget of sessions that set none with /budget, in \
+       Settings"
   ; c
       ~argument:Host
       ~args:"[name|backend]"

@@ -69,7 +69,7 @@ let%expect_test "Settings shows superusers the store; others do not see it" =
   [%expect
     {|
     (Focus dialog)
-    (Appearance) (Sessions) (Models) (Memory) (About you) (Git hosting) (Account)
+    (Appearance) (Sessions) (New sessions) (Models) (Memory) (About you) (Custom instructions) (Git hosting) (Account)
     Appearance
     |}]
 ;;

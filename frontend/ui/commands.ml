@@ -27,6 +27,8 @@ module Argument = struct
     | Snippet
     | Remind
     | Memory
+    | Instructions
+    | User_info
     | Worktree
     | Review
     | Server
@@ -34,6 +36,7 @@ module Argument = struct
     | Commit
     | Agents
     | Compaction
+    | Generate_model
     | Naming
     | Dictation
   [@@deriving sexp_of, equal]
@@ -52,7 +55,6 @@ end
 let c ?argument name args help = { Spec.name; args; help; argument }
 
 (* In cycling order: "on" is the provider's default budget. *)
-let thinking_levels = [ "off"; "low"; "on"; "high"; "max" ]
 
 let every =
   [ c "help" "" "show commands and keys"
@@ -78,7 +80,16 @@ let every =
       ~argument:Argument.Default_directory
       "default-dir"
       "[off|path]"
-      "show or set the directory new sessions start in"
+      "show or set the directory new sessions start in (on the default host)"
+  ; c
+      "default-host"
+      "[off|name]"
+      "show or set the tool host prigh-web's new sessions start on (a \
+       terminal's start on its machine)"
+  ; c
+      "default-budget"
+      "[off|dollars]"
+      "show or set the cost budget of sessions that set none with /budget"
   ; c
       ~argument:Argument.Login
       "login"
@@ -93,8 +104,8 @@ let every =
   ; c
       ~argument:Argument.Thinking
       "thinking"
-      "[off|low|on|high|max]"
-      "pick or set the thinking level"
+      "[off|default|LEVEL]"
+      "pick or set the thinking level (the model's; default: the provider's)"
   ; c
       ~argument:Argument.Verbosity
       "verbosity"
@@ -162,11 +173,20 @@ let every =
        (Ctrl+D forgets one); on or off gives the model the memory tool or \
        takes it away"
   ; c
+      ~argument:Argument.Instructions
+      "instructions"
+      "[add TEXT|on|off]"
+      "your custom instructions, in the context of every session (Enter shows \
+       one, Ctrl+D removes it): add TEXT adds one; on or off lets the model \
+       add, edit and remove them or not; prigh-web's Settings edits them"
+  ; c
+      ~argument:Argument.User_info
       "user-info"
-      "[TEXT|clear]"
-      "what you wrote about yourself for the model, in the context of every \
-       session (unlike memory, which it looks up): show it, replace it with \
-       TEXT, or clear it"
+      "[FIELD VALUE|clear]"
+      "what you set about yourself for the model (name, country, time zone, \
+       units...), in the context of every session (unlike memory, which it \
+       looks up): show it, set a field (an empty VALUE clears it), or clear \
+       them all"
   ; c
       ~argument:Argument.Resume
       "resume"
@@ -188,11 +208,17 @@ let every =
        the session's); mask on|off: replace old tool outputs with placeholders \
        first"
   ; c
+      ~argument:Argument.Generate_model
+      "generate-model"
+      "[MODEL|off]"
+      "show which model drafts commit messages, pull requests and branch names \
+       (✦ Generate); MODEL|off: draft them with MODEL (off: the session's)"
+  ; c
       ~argument:Argument.Naming
       "naming"
       "[model MODEL|off]"
       "show which model names sessions and subagents; model MODEL|off: name \
-       them with MODEL (off: the generate model, else the session's)"
+       them with MODEL (off: the drafting model, else the session's)"
   ; c
       ~argument:Argument.Dictation
       "dictation"
@@ -290,6 +316,11 @@ let every =
       "[session]"
       "unpin a session (the current one without an argument)"
   ; c "delete-archived" "" "delete every archived session, after a confirmation"
+  ; c
+      "auto-archive"
+      "[DAYS|off]"
+      "show how long a session goes without activity before it is archived; \
+       DAYS|off: archive after DAYS days (off: never, only by hand)"
   ; c
       ~argument:Argument.Agents
       "agents"

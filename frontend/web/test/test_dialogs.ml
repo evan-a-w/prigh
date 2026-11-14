@@ -169,6 +169,7 @@ let%expect_test "help lists every key and command" =
     Shift+F10 / ContextMenu (on a session or worktree) its menu: open, rename, fork, new worktree, review, files, terminal, pull request, copy, delete or remove (also right-click, a long press or its ⋯)
     Shift+F10 / ContextMenu (on a message) its menu: copy, trim everything before or after it, delete it (also right-click or a long press, at the pointer; with text selected, right-click is the browser's, to copy it; on a phone, its Select text selects its words)
     Shift+F10 / ContextMenu (in a text field, the desktop app's browser window) its menu: cut, copy, paste, select all (also right-click; ↑ ↓ move, Enter chooses, Esc closes); the browser's own menus are hidden there
+    Shift+F10 / ContextMenu (in the terminal, the desktop app's browser window) its menu: copy the selection, paste, select all (also right-click)
     Space (selecting) mark a session (Shift: the range from the last one); Delete deletes the marked ones, Esc stops selecting
     Ctrl+Q / ⌘+Q (desktop app) quit prigh: its window and this machine's tool host (/quit)
     Ctrl+B show or hide the sidebar (while reviewing, over the review)
@@ -192,7 +193,7 @@ let%expect_test "help lists every key and command" =
     l / Shift+L (reviewing) what changed since your latest action on the file (or the hunks again); choose the action it compares with: Latest follows your newest
     Esc (reviewing) drop the comment, the selected code, the selected files, then close the review
     Enter / Ctrl+S (reviewing) add the comment or reply (Shift+Enter: a new line); save the file being edited
-    Ctrl+` open or close the terminal (/terminal); in it, every other key goes to the shell. On a touch screen a bar over the keyboard has Esc, Tab, Ctrl and Alt (tap: the next key; double-tap: locked), the arrows (held: repeat), | ~ / - and Home, End, PgUp, PgDn
+    Ctrl+` open or close the terminal (/terminal); in it, every other key goes to the shell but Ctrl+Shift+C (copy the selection) and Ctrl+Shift+V (paste). On a touch screen a bar over the keyboard has Esc, Tab, Ctrl and Alt (tap: the next key; double-tap: locked), the arrows (held: repeat), | ~ / - and Home, End, PgUp, PgDn
     Esc (in a pull request) back to the list it was opened from (/pr); Enter closes it
     Alt+G (a pull request, commit message, branch or session name) ✦ Generate: the model drafts it from the changes, the commits and the session (Esc stops, keeping what came; Undo puts the text back)
     Ctrl+Enter / Esc (the review's commit message) commit the files listed above it; close the commit, keeping the message
@@ -206,7 +207,7 @@ let%expect_test "help lists every key and command" =
     Commands
     /help [command] show commands and keys, or a command's usage
     /hotkeys show the keyboard shortcuts
-    /settings [section] appearance, sessions, models, git hosting and your account; a section opens at it (Ctrl+,)
+    /settings [section] appearance, sessions, new sessions' defaults, models, git hosting and your account; a section opens at it (Ctrl+,)
     /new start a new session
     /temporary a temporary session: not saved or listed, deleted when you leave it (Ctrl+Shift+O); in one, keep it or delete it
     /model [name] pick or switch the model
@@ -225,9 +226,11 @@ let%expect_test "help lists every key and command" =
     /permissions show the mode and the allow/ask/deny rules (config and this session)
     /notify [on|off] tell you when a turn ends or something waits for you while the tab is hidden
     /memory [on|off] your notes the model saves when you ask it to remember something, in Settings; on or off gives the model the memory tool or takes it away
-    /user-info what you wrote about yourself for the model, given to it in every session (unlike memory, which it looks up), in Settings
+    /instructions [on|off] your custom instructions, in the context of every session, in Settings; on or off lets the model add, edit and remove them or not
+    /user-info what you set about yourself for the model (name, country, units...), given to it in every session, in Settings
     /compact [instructions] summarise older messages to free context
-    /naming [model MODEL|off] show which model names sessions and subagents; model MODEL|off: name them with MODEL (off: the generate model, else the session's)
+    /generate-model [MODEL|off] pick the model that drafts commit messages, pull requests and branch names (✦ Generate); MODEL|off: draft them with MODEL (off: the session's)
+    /naming [model MODEL|off] show which model names sessions and subagents; model MODEL|off: name them with MODEL (off: the drafting model, else the session's)
     /dictation [model MODEL|off] show which model transcribes dictation (speech to text); model MODEL|off: transcribe with MODEL, an OpenAI or OpenAI-compatible provider's (off: openai/gpt-4o-mini-transcribe)
     /compaction [at|model|mask ...] show when conversations are compacted and what summarises them; at TOKENS|off: also once the context exceeds TOKENS, not only at 80% of the window; model MODEL|off: the model that writes the summaries (off: the session's); mask on|off: replace old tool outputs with placeholders first
     /diff [path] show the uncommitted changes where the tools run, untracked files too
@@ -244,6 +247,7 @@ let%expect_test "help lists every key and command" =
     /unpin [session] unpin a session (this one without an argument)
     /delete [undo|session...] delete a message from the transcript and the model's context (a reply with its tool calls' results): pick it, newest first; undo brings the latest deletion back; with sessions, deletes them after a confirmation
     /delete-archived delete every archived session, after a confirmation
+    /auto-archive [DAYS|off] show how long a session goes without activity before it is archived; DAYS|off: archive after DAYS days (off: never, only by hand), in Settings
     /clone copy this session into a new one
     /fork start a new session from an earlier message
     /rewind go back to an earlier message in this session
@@ -252,7 +256,9 @@ let%expect_test "help lists every key and command" =
     /cd [path] change the working directory (asks to create a missing one)
     /mkdir [path] create a directory (and its parents) and change to it
     /worktree [list|new|open|back|rm] pick a git worktree of the repository to work in (Alt+Enter: in a new session, Alt+R: review its changes, Delete removes it); new BRANCH [BASE] creates one and works there; open [-n] TARGET (-n: in a new session); back [main]: back where the session switched into worktrees from; rm [-f] TARGET (-f: with uncommitted changes)
-    /default-dir [path|off] show or set the directory new sessions start in
+    /default-dir [path|off] show or set the directory new sessions start in (on the default host), in Settings
+    /default-host [off|name] pick or set the tool host new sessions start on (off: where you are), in Settings
+    /default-budget [off|dollars] show or set the cost budget of sessions that set none with /budget, in Settings
     /host [name|backend] pick where tools run, and the directory there
     /export [path] export the transcript on the backend (markdown, or .jsonl)
     /import [path] import a session from a JSONL file on the backend
@@ -605,10 +611,10 @@ let%expect_test
      (params
       ((keys
         (web.theme web.accent web.notify web.verbosity web.terminal-open
-         web.sidebar-folded web.review history web.migrated web.sidebar-width
-         web.files-width web.files-preview-width web.agents-width
-         web.terminal-height web.review-chat-width web.review-files-width
-         web.review-margin-width))))
+         web.sidebar-folded web.sidebar-unfolded web.sidebar-worktree-hours
+         web.review history web.migrated web.sidebar-width web.files-width
+         web.files-preview-width web.agents-width web.terminal-height
+         web.review-chat-width web.review-files-width web.review-margin-width))))
      (tag Prefs))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s1.jsonl) (limit 1000000)))

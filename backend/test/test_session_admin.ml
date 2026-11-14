@@ -246,28 +246,45 @@ let%expect_test
      the config's, reread on every listing. *)
   let server2 = Server.create t ~sw ~provider in
   let c = Client.connect server2 "c" in
+  (* Another session's client: told to list the sessions again. *)
+  let d = Client.connect server2 "d" ~session:(Session.id old) in
   print_sessions c;
   Client.call
     t
     c
     "set_config"
     [ "config", `Object [ "archive_after_days", `Number "0" ] ];
-  print_sessions c;
+  Client.sessions_changed c;
+  Client.sessions_changed d;
+  print_sessions d;
   Client.call
     t
     c
     "set_config"
     [ "config", `Object [ "archive_after_days", `String "7" ] ];
+  (* Refused, or the same age: nothing to list again. *)
+  Client.call
+    t
+    c
+    "set_config"
+    [ "config", `Object [ "archive_after_days", `Number "0" ] ];
+  Client.sessions_changed c;
+  Client.sessions_changed d;
   [%expect
     {|
-    old         background=0 clients=-
+    old        live background=0 clients=1
     recent     archived background=0 clients=-
     ancient    archived background=0 clients=-
-    {"type":"response","id":"r","ok":true,"result":{"scoped_models":[],"approval_mode":"auto","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":null,"default_thinking":null,"fallback_models":[],"default_cwd":null,"worktrees_dir":"~/.prigh/worktrees","max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true,"ask_user_timeout_seconds":300,"archive_after_days":0,"notify":"bell","snippets":[],"auto_background_seconds":30,"generate_model":null,"mask_observations":true,"computer_screenshots":3,"computer_screenshots_max":8,"computer_native":true,"compact_at_tokens":200000,"compaction_model":null,"naming_model":null,"dictation_model":null,"trace":"default"}}
-    old         background=0 clients=-
+    {"type":"response","id":"r","ok":true,"result":{"scoped_models":[],"approval_mode":"auto","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":null,"default_thinking":null,"fallback_models":[],"default_cwd":null,"default_host":null,"worktrees_dir":"~/.prigh/worktrees","max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true,"ask_user_timeout_seconds":300,"archive_after_days":0,"notify":"bell","snippets":[],"auto_background_seconds":30,"generate_model":null,"mask_observations":true,"computer_screenshots":3,"computer_screenshots_max":8,"computer_native":true,"compact_at_tokens":200000,"compaction_model":null,"naming_model":null,"dictation_model":null,"trace":"default"}}
+    c: 1 sessions_changed
+    d: 1 sessions_changed
+    old        live background=0 clients=1
     recent     archived background=0 clients=-
     ancient     background=0 clients=-
     {"type":"response","id":"r","ok":false,"error":"config.archive_after_days must be a number of days (0: never)"}
+    {"type":"response","id":"r","ok":true,"result":{"scoped_models":[],"approval_mode":"auto","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":null,"default_thinking":null,"fallback_models":[],"default_cwd":null,"default_host":null,"worktrees_dir":"~/.prigh/worktrees","max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true,"ask_user_timeout_seconds":300,"archive_after_days":0,"notify":"bell","snippets":[],"auto_background_seconds":30,"generate_model":null,"mask_observations":true,"computer_screenshots":3,"computer_screenshots_max":8,"computer_native":true,"compact_at_tokens":200000,"compaction_model":null,"naming_model":null,"dictation_model":null,"trace":"default"}}
+    c: 0 sessions_changed
+    d: 0 sessions_changed
     |}];
   (* A new message unarchives; a running session cannot be archived. *)
   Client.call t c "switch_session" (path recent);
@@ -280,14 +297,14 @@ let%expect_test
   print_sessions c;
   [%expect
     {|
-    {"type":"response","id":"r","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":"recent","session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"supports_images":false,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":1,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","active_host_name":"<host>","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"computer_control":null,"plan":null,"session_rules":[]}}}
+    {"type":"response","id":"r","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":"recent","session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"thinking_options":["off","default","low","high","max"],"thinking_default":"high","supports_images":false,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"default","running":false,"message_count":1,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","active_host_name":"<host>","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"computer_control":null,"plan":null,"session_rules":[]}}}
     {"type":"response","id":"r","ok":true,"result":{}}
     {"type":"response","id":"r","ok":false,"error":"session \"recent\" is running: wait for it or /abort it before archiving"}
     recent     running live background=0 clients=1
-    old         background=0 clients=-
+    old        live background=0 clients=1
     ancient     background=0 clients=-
     recent     live background=0 clients=1
-    old         background=0 clients=-
+    old        live background=0 clients=1
     ancient     background=0 clients=-
     |}]
 ;;
@@ -455,7 +472,7 @@ let%expect_test "a session is active while its background work runs" =
   [%expect
     {|
     {"type":"response","id":"r","ok":true,"result":{"job_id":"j1"}}
-    {"type":"response","id":"r","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"supports_images":false,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"on","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","active_host_name":"<host>","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"computer_control":null,"plan":null,"session_rules":[]}}}
+    {"type":"response","id":"r","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"thinking_options":["off","default","low","high","max"],"thinking_default":"high","supports_images":false,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"default","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","active_host_name":"<host>","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"computer_control":null,"plan":null,"session_rules":[]}}}
     worker     running live background=1 clients=0
     {"type":"response","id":"r","ok":true,"result":{"deleted":[],"refused":[{"path":"$DIR/sessions/<stamp>_<id>.jsonl","error":"session \"worker\" is running: wait for it or /abort it first"}]}}
     b: 1 sessions_changed

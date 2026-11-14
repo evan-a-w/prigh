@@ -151,6 +151,7 @@ let rec summarise (e : Event.t) : string option =
   | Nix_gc_progress p -> Some (sprintf "nix_gc_progress %d" p.paths_deleted)
   | Prefs_changed _
   | Memory_changed _
+  | Custom_instructions_changed _
   | User_info_changed _
   | Mcp_settings_changed _ -> None
   | Generate_delta { gen_id; delta } ->

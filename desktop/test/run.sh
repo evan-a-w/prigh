@@ -264,6 +264,24 @@ if [ -n "${REAL_CHROMIUM:-}" ]; then
 	wait "$app_pid"
 	echo "exit $?; left running: $(ps -eo args= | grep -F -- "--user-data-dir=$profile" | grep -vc grep)"
 
+	# prigh's page hands a link to another site to the shell (its DevTools
+	# binding): it opens in the default browser, and no window opens in
+	# Chromium; a window the page opens itself still does, and is closed.
+	: >"$work/log"
+	: >"$work/opened"
+	browser_app PRIGH_DESKTOP_BROWSER="$work/chromium" FAKE_PAGE_HANDOVER=1 PATH="$work/opener:$PATH"
+	for _ in $(seq 300); do
+		[ "$(wc -l <"$work/opened")" = 2 ] && [ "$(pages | wc -w)" = 1 ] && break
+		sleep 0.1
+	done
+	echo "== real Chromium: a link handed over opens in the default browser, no window"
+	normalize <"$work/opened"
+	normalize <"$work/stderr" | grep -E '^prigh-desktop: (a window opened|ignored|refused)'
+	echo "Chromium's windows: $(urls | normalize)"
+	for id in $(pages); do curl -s -o /dev/null "http://127.0.0.1:9333/json/close/$id"; done
+	wait "$app_pid"
+	echo "exit $?; left running: $(ps -eo args= | grep -F -- "--user-data-dir=$profile" | grep -vc grep)"
+
 	# The backend's site behind a sign-in proxy, in Chromium: the window
 	# signs in there (the proxy's redirects are not links); signed in with
 	# the default browser, the cookie lands in the window (through its

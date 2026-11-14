@@ -374,9 +374,9 @@ let%expect_test "fuzzy ranking: command names" =
       (String.concat ~sep:" " (Fuzzy.rank ~query names ~key:Fn.id)));
   [%expect
     {|
-    "mo" -> mode model scoped-models memory import compaction permissions
-    "lo" -> login logout clone
-    "s"  -> state switch skills skill: signin setusr session snippet signout sessions scoped-models push jobs host todos resume agents hotkeys verbosity user-info permissions downsize-images
+    "mo" -> mode model scoped-models generate-model memory import compaction permissions
+    "lo" -> login logout clone default-host
+    "s"  -> state switch skills skill: signin setusr session snippet signout sessions scoped-models push jobs host todos resume agents hotkeys verbosity user-info permissions default-host instructions downsize-images
     "sw" -> switch
     "xyz" ->
     |}]
@@ -498,6 +498,8 @@ let%expect_test "model matching" =
     ; context_window = 1000
     ; max_output = 100
     ; supports_thinking = true
+    ; thinking_options = []
+    ; thinking_default = None
     ; cost = { input = 1.; output = 2.; cache_read = 0.1 }
     ; image_limit = None
     }
@@ -695,10 +697,12 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /scoped-models                     pick the models Ctrl+P cycles through
     /change_default                    save the current model and thinking level as the default for new sessions
     /fallback [off|model...]           show or set the models that take over, in order, when a model's usage runs out
-    /default-dir [off|path]            show or set the directory new sessions start in
+    /default-dir [off|path]            show or set the directory new sessions start in (on the default host)
+    /default-host [off|name]           show or set the tool host prigh-web's new sessions start on (a terminal's start on its machine)
+    /default-budget [off|dollars]      show or set the cost budget of sessions that set none with /budget
     /login [provider] [api_key|oauth]  log in to a provider, or a git host: github [HOST] [token], forgejo HOST [token], HOST [token]
     /logout [provider|HOST]            remove a provider's or a git host's stored credential
-    /thinking [off|low|on|high|max]    pick or set the thinking level
+    /thinking [off|default|LEVEL]      pick or set the thinking level (the model's; default: the provider's)
     /verbosity [quiet|normal|verbose]  set the transcript verbosity
     /filter [all|KIND...|-KIND|+KIND]  show only some kinds of the transcript (user, assistant, thinking, tools, subagents, notes); the model's context is unchanged
     /confirm [on|off|mode]             ask before destructive tools: the approval mode new sessions (and this one) start in; on: ask, off: auto, or ask, auto-edit, auto
@@ -712,12 +716,14 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /goal [text|off|resume]            set a goal the agent keeps working toward until it is met; show, clear or resume it
     /remind [stop|every|rm|off ...]    stop [N] TEXT: remind the agent when it ends its turn (at most N times in a row, default 3); every N TEXT: every N turns; rm NAME, off: remove one or all; none: list the session's (Ctrl+D removes one)
     /memory [on|off]                   the notes the model saved when you asked it to remember something (Ctrl+D forgets one); on or off gives the model the memory tool or takes it away
-    /user-info [TEXT|clear]            what you wrote about yourself for the model, in the context of every session (unlike memory, which it looks up): show it, replace it with TEXT, or clear it
+    /instructions [add TEXT|on|off]    your custom instructions, in the context of every session (Enter shows one, Ctrl+D removes it): add TEXT adds one; on or off lets the model add, edit and remove them or not; prigh-web's Settings edits them
+    /user-info [FIELD VALUE|clear]     what you set about yourself for the model (name, country, time zone, units...), in the context of every session (unlike memory, which it looks up): show it, set a field (an empty VALUE clears it), or clear them all
     /resume [now|cancel]               show, run now or cancel the automatic resume after a usage limit
     /downsize-images                   send the conversation's images smaller (after the model refused one as too large) and retry a failed reply
     /compact [instructions]            summarise older messages to free context
     /compaction [at|model|mask ...]    show when conversations are compacted and what summarises them; at TOKENS|off: also once the context exceeds TOKENS, not only at 80% of the window; model MODEL|off: the model that writes the summaries (off: the session's); mask on|off: replace old tool outputs with placeholders first
-    /naming [model MODEL|off]          show which model names sessions and subagents; model MODEL|off: name them with MODEL (off: the generate model, else the session's)
+    /generate-model [MODEL|off]        show which model drafts commit messages, pull requests and branch names (✦ Generate); MODEL|off: draft them with MODEL (off: the session's)
+    /naming [model MODEL|off]          show which model names sessions and subagents; model MODEL|off: name them with MODEL (off: the drafting model, else the session's)
     /dictation [model MODEL|off]       show which model transcribes dictation (speech to text); model MODEL|off: transcribe with MODEL, an OpenAI or OpenAI-compatible provider's (off: openai/gpt-4o-mini-transcribe)
     /trim [after|undo|show|hide]       drop everything before a message from the model's context: pick the message (newest first, with what it frees), confirm; after: everything after a message instead (what you send later stays); undo brings the latest trim back, show/hide unfolds the trimmed messages
     /delete [undo|session...]          drop a message from the transcript and the model's context (a reply with its tool results): pick it, newest first; undo brings the latest deletion back; with sessions: delete them, after a confirmation
@@ -737,6 +743,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /pin [session]                     pin a session to the top of /sessions, where it is never archived for being idle (the current one without an argument)
     /unpin [session]                   unpin a session (the current one without an argument)
     /delete-archived                   delete every archived session, after a confirmation
+    /auto-archive [DAYS|off]           show how long a session goes without activity before it is archived; DAYS|off: archive after DAYS days (off: never, only by hand)
     /agents [steer|cancel ...]         focus a subagent (Ctrl+D cancels one); steer N TEXT: tell subagent N (its number or id) at its next step, follow-up N TEXT: before it reports; cancel N
     /jobs [id|kill <id>]               list background jobs (Enter shows output, Ctrl+D kills), or show/kill one
     /queue                             the queued steers and follow-ups (Enter edits one, Ctrl+D removes it)
@@ -2225,6 +2232,7 @@ let%expect_test
       ~logged_in:(fun _ -> true)
       ~default_dir_host:None
       ~server:None
+      ~model:None
   in
   let show name ac =
     printf
@@ -2255,7 +2263,7 @@ let%expect_test
   show "host prompt" (Autocomplete.directory ~host:"client-1" ~text:"~/de");
   [%expect
     {|
-    /mo          command    prefix="mo" navigated=false enter_accepts=true items=7
+    /mo          command    prefix="mo" navigated=false enter_accepts=true items=8
     /model       arg:model  prefix="" navigated=false enter_accepts=false items=4
     /model down  arg:model  prefix="" navigated=true enter_accepts=true items=4
     /model gp    arg:model  prefix="gp" navigated=false enter_accepts=true items=1
@@ -2307,6 +2315,7 @@ let%expect_test "autocomplete: /skill: completes skill names" =
       ~logged_in:(fun _ -> true)
       ~default_dir_host:None
       ~server:None
+      ~model:None
   in
   let show line ?skills () =
     match compute ?skills line with
@@ -2461,6 +2470,7 @@ let%expect_test
         ~logged_in:(fun _ -> true)
         ~default_dir_host
         ~server:None
+        ~model:None
     with
     | None -> printf "%S none\n" line
     | Some ac ->

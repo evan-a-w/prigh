@@ -15,6 +15,8 @@ module Note : sig
 
   (** [saved]'s date, [YYYY-MM-DD]. *)
   val date : t -> string
+
+  val of_json : Json.t -> t Or_error.t
 end
 
 type t =

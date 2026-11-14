@@ -317,7 +317,9 @@ const layoutProblems = selector => page.evaluate(selector => {
   };
   const name = e => `${e.tagName.toLowerCase()}.${[...e.classList].join(".")}`;
   const problems = [];
-  const all = [root, ...root.querySelectorAll("*")].filter(e => (e instanceof HTMLElement || e.tagName === "svg") && shown(e) && !e.closest(":popover-open"));
+  // The empty composer's line of where the session works lies under the
+  // editor in layers, each cut by design (mobile.mjs checks what it shows).
+  const all = [root, ...root.querySelectorAll("*")].filter(e => (e instanceof HTMLElement || e.tagName === "svg") && shown(e) && !e.closest(":popover-open, .cwd-hint"));
   // A box without one of its own (display: contents) lays its children out
   // in its parent's.
   const contents = e => getComputedStyle(e).display === "contents";
@@ -1045,7 +1047,7 @@ try {
   // The header's thinking chip opens its menu under it; → goes to the
   // mode's beside it.
   await page.locator(".thinking-chip").click();
-  await page.locator("#chip-popover .popover-item", { hasText: "high" }).waitFor();
+  await page.locator("#chip-popover .popover-item", { has: page.locator(".menu-label", { hasText: /^high$/ }) }).waitFor();
   await page.waitForTimeout(300); // its rise
   await show("the thinking chip's menu", "#chip-popover");
   console.log(await popoverPlace());
@@ -1053,7 +1055,7 @@ try {
   await page.locator("#chip-popover[data-chip=mode]").waitFor();
   await page.keyboard.press("ArrowLeft");
   await page.locator("#chip-popover[data-chip=thinking]").waitFor();
-  await page.locator("#chip-popover .popover-item", { hasText: "high" }).click();
+  await page.locator("#chip-popover .popover-item", { has: page.locator(".menu-label", { hasText: /^high$/ }) }).click();
   await page.locator(".thinking-chip:not(.awaiting) .chip-label", { hasText: "high" }).waitFor();
   console.log(`closed: ${await page.locator("#chip-popover").count() === 0}; focus: ${await page.evaluate(() => document.activeElement?.id)}`);
   // The model's: a filter, the models under their providers.
@@ -1651,11 +1653,11 @@ try {
     console.log(`${label}: tab ${at.tab}, focus ${at.focus}, showing ${at.panel} (labelled by ${at.labelled})`);
   };
   section("settings: the sections");
-  await page.locator(".settings-tab", { hasText: "Sessions" }).click();
+  await page.locator("#settings-tab-sessions").click();
   await page.locator(".settings-panel-sessions").waitFor();
   await settingsAt("clicked Sessions");
   await page.keyboard.press("ArrowDown");
-  await page.locator(".settings-panel-models").waitFor();
+  await page.locator(".settings-panel-new-sessions").waitFor();
   await settingsAt("ArrowDown");
   await page.keyboard.press("End");
   await page.locator(".settings-panel-account").waitFor();

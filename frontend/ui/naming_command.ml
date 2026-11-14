@@ -42,7 +42,7 @@ let summary (config : P.Config.t) =
     "sessions and subagents are named by %s (/naming model MODEL|off)"
     (match config.naming_model with
      | Some model -> model
-     | None -> "the generate model, else the session's model")
+     | None -> "the drafting model, else the session's model")
 ;;
 
 let complete ~models rest =
@@ -59,7 +59,7 @@ let complete ~models rest =
       | "model" ->
         Some
           ( offset
-          , ("off", "the generate model, else the session's, names them")
+          , ("off", "the drafting model, else the session's, names them")
             :: List.map models ~f:(fun (m : P.Model.t) -> m.key, m.name) )
       | _ -> None)
 ;;

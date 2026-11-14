@@ -228,9 +228,7 @@ let full_request
           else [])
        @ [ sections ])
   in
-  let thinking : Thinking.t =
-    if model.supports_thinking then prompt.thinking else Off
-  in
+  let thinking : Thinking.t = Model.clamp_thinking model prompt.thinking in
   { Provider.Request.model
   ; system = prompt.system
   ; messages =

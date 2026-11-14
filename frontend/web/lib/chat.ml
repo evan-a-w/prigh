@@ -419,6 +419,7 @@ let rec apply t (event : Event.t) =
   | Masked _
   | Prefs_changed _
   | Memory_changed _
+  | Custom_instructions_changed _
   | User_info_changed _
   | Mcp_settings_changed _ -> t
 ;;

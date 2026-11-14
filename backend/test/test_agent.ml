@@ -392,7 +392,7 @@ let%expect_test "model and thinking changes persist across session reload" =
   with_agent [ Reply.text "ok" ]
   @@ fun t agent _dump ->
   Agent.set_model agent (Option.value_exn (Model.find "deepseek-v4-pro"));
-  Agent.set_thinking agent (On (Some Max));
+  ok_exn (Agent.set_thinking agent (On (Some Max)));
   let path = (Agent.state agent).session_path in
   (* Settings alone do not create the file; the first message does. *)
   print_s [%sexp (Sys_unix.file_exists_exn path : bool)];
@@ -420,6 +420,65 @@ let%expect_test "model and thinking changes persist across session reload" =
     false
     true
     (deepseek-v4-pro (On (Max)))
+    |}]
+;;
+
+let%expect_test
+    "thinking: an explicit level the model lacks is refused; switching models \
+     clamps with a notice; a model that does not think keeps the setting"
+  =
+  with_agent []
+  @@ fun _t agent dump ->
+  let show () =
+    let s = Agent.state agent in
+    printf "%s %s\n" (Model.key s.model) (Thinking.to_string s.thinking)
+  in
+  let set_model id = Agent.set_model agent (Option.value_exn (Model.find id)) in
+  set_model "claude-opus-4-8";
+  ok_exn (Agent.set_thinking agent (On (Some Xhigh)));
+  show ();
+  set_model "claude-opus-4-6";
+  show ();
+  print_s [%sexp (Agent.set_thinking agent (On (Some Xhigh)) : unit Or_error.t)];
+  print_s
+    [%sexp (Agent.set_thinking agent (On (Some Minimal)) : unit Or_error.t)];
+  ok_exn (Agent.set_thinking agent Off);
+  set_model "claude-opus-5-5";
+  show ();
+  set_model "gpt-4.1";
+  show ();
+  print_s [%sexp (Agent.set_thinking agent (On (Some High)) : unit Or_error.t)];
+  set_model "gpt-5";
+  show ();
+  ok_exn (Agent.set_thinking agent (On (Some Minimal)));
+  set_model "deepseek-flash";
+  show ();
+  dump ();
+  [%expect
+    {|
+    anthropic/claude-opus-4-8 xhigh
+    anthropic/claude-opus-4-6 high
+    (Error
+     "Claude Opus 4.6 does not take thinking xhigh; it takes: off, default, low, medium, high, max")
+    (Error
+     "Claude Opus 4.6 does not take thinking minimal; it takes: off, default, low, medium, high, max")
+    anthropic/claude-opus-5-5 default
+    openai/gpt-4.1 default
+    (Error "GPT-4.1 does not take thinking high; it takes: off")
+    openai/gpt-5 default
+    deepseek/deepseek-flash low
+    state: running=false messages=0
+    state: running=false messages=0
+    notice: Claude Opus 4.6 has no xhigh thinking: thinking is now high
+    state: running=false messages=0
+    state: running=false messages=0
+    notice: Claude Opus 5.5 always thinks: thinking is now provider's default
+    state: running=false messages=0
+    state: running=false messages=0
+    state: running=false messages=0
+    state: running=false messages=0
+    notice: DeepSeek V4.1 Flash has no minimal thinking: thinking is now low
+    state: running=false messages=0
     |}]
 ;;
 
@@ -453,7 +512,7 @@ let%expect_test "save_as_default applies to new agents, not saved sessions" =
   in
   show "no default: fallback" (new_agent ());
   Agent.set_model agent (Option.value_exn (Model.find "deepseek-flash"));
-  Agent.set_thinking agent (On (Some High));
+  ok_exn (Agent.set_thinking agent (On (Some High)));
   Or_error.ok_exn (Agent.prompt agent "hello");
   Agent.wait_idle agent;
   let saved_path = (Agent.state agent).session_path in
@@ -474,7 +533,7 @@ let%expect_test "save_as_default applies to new agents, not saved sessions" =
        ~thinking:Off
        ());
   Agent.set_model agent (Option.value_exn (Model.find "deepseek-v4-pro"));
-  Agent.set_thinking agent (On (Some Low));
+  ok_exn (Agent.set_thinking agent (On (Some Low)));
   Or_error.ok_exn (Agent.prompt agent "again");
   Agent.wait_idle agent;
   show
@@ -491,8 +550,9 @@ let%expect_test "save_as_default applies to new agents, not saved sessions" =
     ((scoped_models (a)) (approval_mode Auto)
      (permissions ((allow ()) (ask ()) (deny ())))
      (default_model (deepseek/deepseek-flash)) (default_thinking ((On (High))))
-     (fallback_models ()) (default_cwd ()) (worktrees_dir ~/.prigh/worktrees)
-     (max_budget_usd ()) (goal_max_continuations 20) (resume_on_limit_reset true)
+     (fallback_models ()) (default_cwd ()) (default_host ())
+     (worktrees_dir ~/.prigh/worktrees) (max_budget_usd ())
+     (goal_max_continuations 20) (resume_on_limit_reset true)
      (ask_user_timeout_seconds 300) (archive_after_days 7) (notify Bell)
      (snippets ()) (auto_background_seconds 30) (generate_model ())
      (mask_observations true) (computer_screenshots 3)
@@ -508,6 +568,7 @@ let%expect_test "save_as_default applies to new agents, not saved sessions" =
       "default_thinking": "high",
       "fallback_models": [],
       "default_cwd": null,
+      "default_host": null,
       "worktrees_dir": "~/.prigh/worktrees",
       "max_budget_usd": null,
       "goal_max_continuations": 20,
