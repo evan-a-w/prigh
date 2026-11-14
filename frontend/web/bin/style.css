@@ -1869,9 +1869,9 @@ kbd {
 /* MCP servers: the user's (switch, edit, remove), the host's (from its
    files), the form adding or editing one, and pasted mcpServers JSON. */
 .setting-note.good { color: var(--sage); }
-.btn.link { background: none; border: 0; padding: 0; height: auto; min-height: 0; color: inherit; font: inherit; text-decoration: underline; text-underline-offset: 2px; text-decoration-color: var(--rule-2); cursor: pointer; }
-.btn.link:hover { color: var(--chalk); text-decoration-color: currentColor; }
-.btn.link:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; border-radius: 2px; }
+.btn.mcp-tools-toggle { background: none; border: 0; padding: 0; height: auto; min-height: 0; color: inherit; font: inherit; text-decoration: underline; text-underline-offset: 2px; text-decoration-color: var(--rule-2); cursor: pointer; }
+.btn.mcp-tools-toggle:hover { color: var(--chalk); text-decoration-color: currentColor; }
+.btn.mcp-tools-toggle:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; border-radius: 2px; }
 .mcp-summary, .mcp-source { font-family: var(--mono); font-size: 11.5px; color: var(--faint); overflow-wrap: anywhere; }
 .mcp-server .setting-control { gap: 2px; }
 .mcp-server .setting-control .switch { margin-right: 6px; }

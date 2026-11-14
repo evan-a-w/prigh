@@ -41,7 +41,7 @@ let tools_list (tools : Mcp_server.Tool.t list) =
 
 let tools_button ~shown ~name ~count ~inject =
   button
-    ~cls:"link mcp-tools-toggle"
+    ~cls:"mcp-tools-toggle"
     ~attrs:[ Attr.create "aria-expanded" (Bool.to_string shown) ]
     ~title:(if shown then "Hide its tools" else "Show its tools")
     ~on_click:(inject (Action.Mcp_show_tools name))
@@ -436,7 +436,7 @@ let host_row (m : App.Model.t) (s : Mcp_server.t) ~inject =
           ~cls:"setting-note good mcp-health"
           [ Node.text "Ready · "
           ; button
-              ~cls:"link mcp-tools-toggle"
+              ~cls:"mcp-tools-toggle"
               ~attrs:[ Attr.create "aria-expanded" (Bool.to_string shown) ]
               ~title:(if shown then "Hide its tools" else "Show its tools")
               ~on_click:(inject (Action.Mcp_show_tools ("host:" ^ s.name)))
