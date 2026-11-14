@@ -519,3 +519,20 @@
 .app.narrow .about-you-buttons .btn, .app.narrow .about-you-elsewhere .btn { min-height: var(--tap); min-width: 88px; }
 .app.narrow .about-you-elsewhere { flex-wrap: wrap; }
 .app.narrow .memory-draft-buttons .btn { flex: 1; }
+/* MCP servers: thumb-sized controls, the form's fields in a column. */
+.app.narrow .mcp-server .setting-text { flex-basis: 0; }
+.app.narrow .mcp-server .btn.icon { width: var(--tap); height: var(--tap); }
+.app.narrow .mcp-server.removing { flex-wrap: wrap; }
+.app.narrow .mcp-server.removing .setting-text { flex-basis: 100%; }
+.app.narrow :is(.mcp-server.removing .setting-control, .mcp-host-server .setting-control:not(:empty)) { width: 100%; }
+.app.narrow :is(.mcp-server.removing, .mcp-host-server) .setting-control .btn { flex: 1; min-height: var(--tap); }
+.app.narrow :is(.mcp-actions, .mcp-buttons) .btn { flex: 1; min-height: var(--tap); justify-content: center; }
+.app.narrow .mcp-keys { display: none; }
+.app.narrow .mcp-pair { grid-template-columns: minmax(0, 1fr) auto auto; }
+.app.narrow .mcp-pair-key { grid-column: 1 / -1; }
+.app.narrow .mcp-pair .text-input { min-height: var(--tap); }
+.app.narrow .mcp-pair .btn { min-height: var(--tap); }
+.app.narrow .mcp-pair-remove { width: var(--tap); }
+.app.narrow .mcp-pair-add { min-height: var(--tap); }
+.app.narrow .mcp-field .text-input:not(textarea) { min-height: var(--tap); }
+.app.narrow .mcp-tools-toggle { min-height: 0; padding: 6px 0; margin: -6px 0; }
