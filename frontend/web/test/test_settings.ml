@@ -299,12 +299,12 @@ let%expect_test "the names of the settings' controls" =
     [radio] button "Yellow" -- Yellow (/accent yellow)
     [group] div "Transcript detail"
     -- Sessions
-    [switch] button "Show worktrees for sessions used in the last" -- Fold every session's worktrees until opened
+    [switch] button "Show worktrees for sessions used in the last" -- Fold every session's worktrees
     [switch] button "Archive sessions after" -- Archive only by hand (/auto-archive off)
     button "Allow" -- Ask the browser to allow notifications (/notify on)
     [switch] button "Notifications" -- Turn notifications off (/notify off)
     [group] div "Show worktrees for sessions used in the last"
-    [switch] button "Show worktrees for sessions used in the last" -- Fold every session's worktrees until opened
+    [switch] button "Show worktrees for sessions used in the last" -- Fold every session's worktrees
     [group] div "Archive sessions after"
     [switch] button "Archive sessions after" -- Archive only by hand (/auto-archive off)
     [switch] button "Notifications" -- Turn notifications off (/notify off)

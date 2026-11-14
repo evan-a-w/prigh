@@ -3360,11 +3360,18 @@ terminal frontend and `web/` prigh-web, the browser one.
       (`Repo_worktrees`) and again once stale: a turn's end, a session's
       worktrees changing, a worktree made or removed);
       `Model.worktree_folds` (`Worktree_folds`) decides whether a
-      session's worktrees show: an explicit fold or unfold (session ids in
-      the `web.sidebar-folded` and `web.sidebar-unfolded` preferences)
-      wins, else they show when the session's `updated_at` is within the
-      window (`web.sidebar-worktree-hours`, default 12, 0 = never) of
-      `Model.now`. A per-user preference rather than config.json: it is
+      session's worktrees show (`Model.worktrees_shown`): a fold or
+      unfold by hand (session id → when, in the `web.sidebar-folded` and
+      `web.sidebar-unfolded` preferences) made since the session was last
+      opened wins; else pinned sessions show, and the rest when last used
+      within the window (`web.sidebar-worktree-hours`, default 12, 0 =
+      fold all) of `Model.now`. Used is the latest of `updated_at`, the
+      last time the user went into it (`web.sidebar-opened`, written by
+      `note_opened` on a session change and the first `Tick`, merged
+      across browsers by the later time, and uploaded when this browser's
+      cache is ahead once the preferences load), and now while it runs or
+      is open; a session whose cwd is inside another's worktree lends that
+      one its use and openings. A per-user preference rather than config.json: it is
       a display choice of the person, not of the backend's namespace. Context menus (`Context_menu`, also messages', drawn by
       `Context_menu_view` as a `Dialog.Picker` of kind `Menu`, so it owns
       the keyboard like any picker; `Command.Place_menu` has

@@ -519,15 +519,20 @@ against its upstream; the one it works in says `here`. A worktree two
 sessions use is under both; one removed (from any session, or outside
 prigh) goes. On disk worktrees still go by repository
 (`<worktrees_dir>/<project>/<branch>`), and `/worktree` lists all of the
-repository's. A session used in the last 12 hours (its age on the card)
-shows its worktrees; an older one folds them behind the count at the
-right of its second line (`⑂ 3`). Settings → Sessions → Show worktrees
-sets the window in hours (up to 720; its switch off, or 0: every
-session's start folded; on again: the hours it had). Clicking the count folds or unfolds a session's worktrees
-whatever its age, and that choice wins over the window until you click
-again; the window and the choices are kept with your preferences
-(`web.sidebar-worktree-hours`, `web.sidebar-folded`,
-`web.sidebar-unfolded`), so they follow you to other browsers.
+repository's. A session used in the last 12 hours shows its worktrees,
+and so does a pinned one; others fold them behind the count at the right
+of its second line (`⑂ 3`). Used means changed (its age on the card),
+running, open in front of you, or gone into (in any of your browsers);
+a session working in one of another's worktrees uses that one too.
+Settings → Sessions → Show worktrees sets the window in hours (up to
+720; its switch off, or 0: every session's worktrees fold, pinned and open ones
+too; on again: the hours it had). Clicking the count folds or unfolds a
+session's worktrees whatever its age, and that choice holds until you
+next go into the session (or into one working in its worktrees); the
+window, the choices and when you last went into each session are kept
+with your preferences (`web.sidebar-worktree-hours`,
+`web.sidebar-folded`, `web.sidebar-unfolded`, `web.sidebar-opened`), so
+they follow you to other browsers.
 
 A session that switched into a worktree (`/worktree open`, `/worktree
 new`, `/pr checkout`, Switch session here) remembers where it came from,

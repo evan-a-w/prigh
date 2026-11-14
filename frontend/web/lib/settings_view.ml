@@ -308,8 +308,9 @@ let worktree_hours (m : App.Model.t) ~inject =
     ~name:"Show worktrees"
     ~about:
       (sprintf
-         "Show worktrees for sessions used %s; older ones fold them behind \
-          their count. Your own fold or unfold of a session wins."
+         "Show worktrees for pinned sessions and those used %s (changed, \
+          running, opened or worked in); others fold them behind their count. \
+          Your own fold or unfold of a session holds until you next open it."
          (if hours = 0
           then "recently"
           else "in the last " ^ Worktree_folds.hours_string hours))
@@ -317,7 +318,7 @@ let worktree_hours (m : App.Model.t) ~inject =
       (match Sessions_fields.error m.sessions_fields which with
        | Some e -> Some ("warm", e)
        | None when hours = 0 ->
-         Some ("muted", "Off: every session's worktrees start folded.")
+         Some ("muted", "Off: every session's worktrees fold, pinned ones too.")
        | None -> None)
     [ sessions_number
         m
@@ -333,7 +334,7 @@ let worktree_hours (m : App.Model.t) ~inject =
              Worktree_folds.default_hours)
         ~switch_title:(fun on ->
           if on
-          then "Fold every session's worktrees until opened"
+          then "Fold every session's worktrees"
           else "Show recent sessions' worktrees")
         ~current:(Some (Float.of_int hours))
         ~inject
