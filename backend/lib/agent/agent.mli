@@ -160,6 +160,7 @@ module Queued : sig
         command's prompt *)
     ; source : Injected.Source.t option
     ; attachments : string list
+    ; pasted : string list
     ; images : Image.t list
     ; client : Client_kind.t option
       (** the kind of client that sent it; when it is sent to the model it
@@ -280,6 +281,10 @@ val messages : t -> Message.t list
     contents are appended to the user message as [<file>] blocks, read with
     [Tool_read] limits (image files are attached as images, like [images]).
 
+    [pasted] are texts the user pasted, sent in full as [<pasted_text>]
+    blocks before them ({!Injected.Pasted}); one over
+    [Injected.Pasted.max_bytes] is refused, saying to attach it as a file.
+
     A text [/skill:NAME ARGS] invokes the skill [NAME] from the tool host
     ({!Skill.expand}); an unknown name is an error. *)
 
@@ -292,6 +297,7 @@ val messages : t -> Message.t list
 (** Starts a run. Fails if one is already running. *)
 val prompt
   :  ?attachments:string list
+  -> ?pasted:string list
   -> ?images:Image.t list
   -> ?client:Client_kind.t
   -> ?ui_action:Ui_action.t
@@ -303,6 +309,7 @@ val prompt
     run when idle. *)
 val steer
   :  ?attachments:string list
+  -> ?pasted:string list
   -> ?images:Image.t list
   -> ?client:Client_kind.t
   -> t
@@ -312,6 +319,7 @@ val steer
 (** Queued to run after the current run finishes, or starts a run when idle. *)
 val follow_up
   :  ?attachments:string list
+  -> ?pasted:string list
   -> ?images:Image.t list
   -> ?client:Client_kind.t
   -> ?ui_action:Ui_action.t
@@ -339,6 +347,10 @@ val approve_mcp
     that were queued and are therefore restored to the caller: steer messages
     in order, then follow-ups (not answers through components). Emits [Queue_update]. *)
 val abort : t -> string list
+
+(** [abort], with the messages restored as they were queued (their pasted
+    texts too). *)
+val abort_queued : t -> Queued.t list
 
 (** Pops the most recently queued message: follow-ups take priority over steer
     messages. Emits [Queue_update] when a message was removed. An answer

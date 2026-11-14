@@ -110,6 +110,52 @@ let%expect_test "attached files behind a message" =
   [%expect {| plain |}]
 ;;
 
+let%expect_test "pasted texts: recorded, between the typed text and the files" =
+  let note = System_prompt.host_changed_note ~host:"laptop" in
+  let p1, b1 = Injected.Pasted.make ~n:1 "trace\n  at f\n  at g\n" in
+  let p2, b2 = Injected.Pasted.make ~n:2 "" in
+  let file = "<file path=\"a.ml\">\nlet x = 1\n</file>" in
+  let text =
+    String.concat ~sep:"\n\n" [ note; "why does this fail?"; b1; b2; file ]
+  in
+  let origin =
+    { Injected.notes = (Option.value_exn (Injected.infer text)).notes
+    ; pasted = [ p1; p2 ]
+    ; attachments = [ { path = "a.ml"; length = String.length file } ]
+    ; source = None
+    }
+  in
+  print_endline b1;
+  print_s [%sexp (origin.pasted : Injected.Pasted.t list)];
+  print_endline (Injected.body origin text);
+  print_endline (Jsonaf.to_string (Injected.to_json origin ~text));
+  (* A text too short for what the record says (changed since): no offsets. *)
+  print_endline
+    (Jsonaf.to_string
+       (Injected.to_json { Injected.empty with pasted = [ p1 ] } ~text:"short"));
+  List.iter [ ""; "a"; "a\n"; "a\nb"; "a\n\n" ] ~f:(fun s ->
+    printf "%S: %d\n" s (Injected.Pasted.count_lines s));
+  [%expect
+    {|
+    <pasted_text name="Pasted text #1" lines="3">
+    trace
+      at f
+      at g
+
+    </pasted_text>
+    (((name "Pasted text #1") (lines 3) (length 20))
+     ((name "Pasted text #2") (lines 0) (length 0)))
+    why does this fail?
+    {"body":"why does this fail?","notes":[{"kind":"host","title":"Tools now run on laptop","text":"[Environment: the tool host is now laptop, so tools run there and its filesystem may differ from the one described above. Re-reading AGENTS.md/CLAUDE.md there is at your discretion: they are often unchanged, and missing an update is not serious.]"}],"pasted":[{"name":"Pasted text #1","lines":3,"start":315,"length":20},{"name":"Pasted text #2","lines":0,"start":398,"length":0}],"attachments":[{"path":"a.ml"}]}
+    {"body":"short"}
+    "": 0
+    "a": 1
+    "a\n": 1
+    "a\nb": 2
+    "a\n\n": 2
+    |}]
+;;
+
 let%expect_test "messages of the harness's" =
   let goal =
     { Goal.text = "all tests pass"; status = Active; continuations = 3 }

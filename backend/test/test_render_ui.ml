@@ -554,8 +554,8 @@ let%expect_test
     prompt: error "render_ui call c1 has no interactive component \"todo\" (its forms, choices and checklists with submit: deploy, done)"
     prompt: error "render_ui call c1 has no interactive component \"note\" (its forms, choices and checklists with submit: deploy, done)"
     prompt: error "render_ui call c2 failed, so nothing of it was shown: answer a component the session shows"
-    prompt: error "a prompt with ui_action takes no attachments or images: send them in a message of their own"
-    prompt: error "a prompt with ui_action takes no attachments or images: send them in a message of their own"
+    prompt: error "a prompt with ui_action takes no attachments, pasted texts or images: send them in a message of their own"
+    prompt: error "a prompt with ui_action takes no attachments, pasted texts or images: send them in a message of their own"
     |}];
   action
     {|"call_id": "c1", "component": "deploy", "title": "Deploy\n  options\t\u0001now ", "values": {"env": "a\nb"}|};
