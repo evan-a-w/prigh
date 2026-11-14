@@ -32,10 +32,11 @@ let too_large text =
   Option.some_if
     (bytes > max_bytes)
     (sprintf
-       "That paste is %s, over the %s a pasted text may be: save it to a file \
-        and attach that instead."
-       (size bytes)
-       (size max_bytes))
+       "That paste is %s bytes, over the %s (%s bytes) a pasted text may be: \
+        save it to a file and attach that instead."
+       (Int.to_string_hum ~delimiter:',' bytes)
+       (size max_bytes)
+       (Int.to_string_hum ~delimiter:',' max_bytes))
 ;;
 
 let name n = sprintf "Pasted text #%d" n
@@ -92,7 +93,9 @@ let block ~n text =
 
 let inline ~text pasted =
   String.concat
-    (text :: List.mapi pasted ~f:(fun i p -> "\n\n" ^ block ~n:(i + 1) p))
+    ~sep:"\n\n"
+    (List.filter ~f:(Fn.non String.is_empty) [ text ]
+     @ List.mapi pasted ~f:(fun i p -> block ~n:(i + 1) p))
 ;;
 
 module Token = struct

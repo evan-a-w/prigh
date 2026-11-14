@@ -588,7 +588,8 @@ let%expect_test "paths into the composer, files attached from the browser" =
       (Sent_with_files (text @README.md) (images ())
        (attachments
         (((file ()) (name README.md) (size (2048))
-          (status (Ready /home/me/proj/README.md))))))))
+          (status (Ready /home/me/proj/README.md)))))
+       (pasted ()))))
     |}];
   (* Sent: the chips are gone; a failure brings them back. *)
   H.text h ~selector:".attach-chips";
@@ -688,7 +689,8 @@ let%expect_test "files dropped on the composer upload into the chat's uploads" =
       (Sent_with_files (text summarise) (images ())
        (attachments
         (((file (1)) (name report.pdf) (size (2000000))
-          (status (Ready /home/me/proj/.prigh/uploads/report.pdf))))))))
+          (status (Ready /home/me/proj/.prigh/uploads/report.pdf)))))
+       (pasted ()))))
     |}]
 ;;
 

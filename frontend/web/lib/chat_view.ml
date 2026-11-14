@@ -133,7 +133,7 @@ let pasted_key (u : Message.User.t) i =
   sprintf
     "pasted:%s:%d"
     (Option.value_map u.at ~default:"" ~f:(fun at ->
-       Int.to_string (Time_ns.to_int_ns_since_epoch at)))
+       sprintf "%.0f" (Time_ns.Span.to_ms (Time_ns.to_span_since_epoch at))))
     i
 ;;
 

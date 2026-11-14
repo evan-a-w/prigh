@@ -228,6 +228,7 @@ let%expect_test "/help <command> and /hotkeys" =
     Enter / Alt+Enter (steering a subagent) send it a message: at its next step / when it ends its turn (its Steer button in the agents panel; /agents steer N TEXT sends one)
     Alt+↑ (steering a subagent) take its last queued message back
     Esc (steering a subagent) write to the main agent again
+    Ctrl+Shift+V / ⌘+Shift+V (in the message box) paste a long text into the box as text; a plain paste of over 2,000 characters or 40 lines becomes a Pasted text chip, sent whole with the message (its dialog: Insert as text, Remove)
     Ctrl+Shift+O a new temporary session (/temporary): not saved or listed, deleted when you leave it; on the new-session screen, its Temporary chip
     Ctrl+Shift+F open or close the file browser (/files): ↑↓ select, Enter opens, Backspace goes up, F2 renames, Delete deletes, Esc closes
     Alt+R open or close the review page (/review): the changes file by file, beside the chat

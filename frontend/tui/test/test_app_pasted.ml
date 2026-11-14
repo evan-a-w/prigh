@@ -182,8 +182,8 @@ let%expect_test "a paste over the limit is refused, saying what to do" =
     ▌ earlier question
       earlier answer
     ┌─ Notice ───────────────────────────────────────────────────────────┐
-    │ That paste is 2.0 MB, over the 2.0 MB a pasted text may be: save   │
-    │ it to a file and attach that instead.                              │
+    │ That paste is 2,097,153 bytes, over the 2.0 MB (2,097,152 bytes) a │
+    │ pasted text may be: save it to a file and attach that instead.     │
     └──────────────────────────────────────────────────── Esc dismisses ─┘
     ──────────────────────────────────────────────────────────────────────
     > ▏
