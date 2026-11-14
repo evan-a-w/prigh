@@ -177,6 +177,19 @@ module Method = struct
     | Set_memory_enabled of { enabled : bool }
     | Get_user_info
     | Set_user_info of { text : string }
+    | Get_mcp_settings
+    | Add_mcp_servers of (string * Mcp_settings.Transport.t) list
+    | Add_mcp_servers_text of { text : string }
+    | Update_mcp_server of
+        { name : string
+        ; rename : string option
+        ; transport : Mcp_settings.Transport.t
+        }
+    | Remove_mcp_server of { name : string }
+    | Set_mcp_server_enabled of
+        { name : string
+        ; enabled : bool
+        }
   [@@deriving sexp_of, equal]
 
   let name = function
@@ -244,6 +257,11 @@ module Method = struct
     | Set_memory_enabled _ -> "set_memory_enabled"
     | Get_user_info -> "get_user_info"
     | Set_user_info _ -> "set_user_info"
+    | Get_mcp_settings -> "get_mcp_settings"
+    | Add_mcp_servers _ | Add_mcp_servers_text _ -> "add_mcp_servers"
+    | Update_mcp_server _ -> "update_mcp_server"
+    | Remove_mcp_server _ -> "remove_mcp_server"
+    | Set_mcp_server_enabled _ -> "set_mcp_server_enabled"
   ;;
 
   let dir_param = function
@@ -271,6 +289,7 @@ module Method = struct
     | Nix_store_status
     | Get_memory
     | Get_user_info
+    | Get_mcp_settings
     | Get_trim_points
     | Get_trimmed
     | Untrim
@@ -281,6 +300,21 @@ module Method = struct
     | Forget_memory { id } -> Memory.forget_params ~id
     | Set_memory_enabled { enabled } -> Memory.set_enabled_params enabled
     | Set_user_info { text } -> User_info.set_params text
+    | Add_mcp_servers servers ->
+      [ ( "servers"
+        , Json.obj
+            (List.map servers ~f:(fun (name, transport) ->
+               name, Mcp_settings.Transport.to_json transport)) )
+      ]
+    | Add_mcp_servers_text { text } -> [ "text", Json.str text ]
+    | Update_mcp_server { name; rename; transport } ->
+      [ "name", Json.str name ]
+      @ Option.value_map rename ~default:[] ~f:(fun r ->
+        [ "rename", Json.str r ])
+      @ [ "config", Mcp_settings.Transport.to_json transport ]
+    | Remove_mcp_server { name } -> [ "name", Json.str name ]
+    | Set_mcp_server_enabled { name; enabled } ->
+      [ "name", Json.str name; "enabled", Json.bool enabled ]
     | Nix_store_gc { delete_generations = Some _ as generations } ->
       [ "delete_generations", Nix_generations.to_json generations ]
     | Review_submit { root = None } -> []

@@ -151,7 +151,8 @@ module Reply_tag : sig
     | Skills_for_autocomplete of string (** the [Location_cache] key *)
     | Skill_prompt of string
     (** a [/skill:] prompt, steer or follow-up; failing puts it back *)
-    | Mcp_picker
+    | Mcp_settings_for_picker
+    | Mcp_picker of P.Mcp_settings.t (** with the disabled ones listed *)
     | Memory_picker
     | User_info_shown (** [/user-info] *)
     | User_info_saved of string

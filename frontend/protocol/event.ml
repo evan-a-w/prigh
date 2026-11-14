@@ -160,6 +160,7 @@ type t =
   | Prefs_changed of Prefs.Change.t list
   | Memory_changed of Memory.t
   | User_info_changed of User_info.t
+  | Mcp_settings_changed of Mcp_settings.t
   | Nix_gc_progress of Nix_gc_progress.t
 [@@deriving sexp_of, equal]
 
@@ -243,6 +244,8 @@ let rec of_json j =
   | "memory_changed" -> Memory.of_json j >>| fun m -> Memory_changed m
   | "user_info_changed" ->
     User_info.of_json j >>| fun info -> User_info_changed info
+  | "mcp_settings_changed" ->
+    Mcp_settings.of_json j >>| fun servers -> Mcp_settings_changed servers
   | "prefs_changed" ->
     Json.object_field j "prefs"
     >>= Prefs.changes_of_json
