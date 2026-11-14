@@ -6,8 +6,14 @@ module H = Harness
    Paste and Select all, where the browser's own menu is hidden; disabled
    items; the keyboard; and nothing of it outside the browser shell. *)
 
-let field ?(selection = false) ?(editable = true) ?(secret = false) () =
-  { Field_menu.Field.selection; editable; secret }
+let field
+      ?(kind = Field_menu.Kind.Text_field)
+      ?(selection = false)
+      ?(editable = true)
+      ?(secret = false)
+      ()
+  =
+  { Field_menu.Field.kind; selection; editable; secret }
 ;;
 
 (* What the page's listener does ({!Field_menu_listeners}) on a
@@ -47,11 +53,14 @@ let%expect_test "what a right-click does where" =
     {|
     ((browser_shell false) (field ()) Native)
     ((browser_shell false)
-     (field (((selection true) (editable true) (secret false)))) Native)
+     (field
+      (((kind Text_field) (selection true) (editable true) (secret false))))
+     Native)
     ((browser_shell true) (field ()) Suppress)
     ((browser_shell true)
-     (field (((selection false) (editable true) (secret false))))
-     (Open ((selection false) (editable true) (secret false))))
+     (field
+      (((kind Text_field) (selection false) (editable true) (secret false))))
+     (Open ((kind Text_field) (selection false) (editable true) (secret false))))
     |}]
 ;;
 
@@ -260,4 +269,56 @@ let%expect_test "not outside the browser shell" =
   H.elements h ~selector:".field-menu";
   H.key h "Escape";
   [%expect {| (browser default) |}]
+;;
+
+(* The terminal's: Copy, Paste and Select all, with the terminal's keys; its
+   keys are the menu's while it is open (the shell's again after). *)
+let%expect_test "in the terminal" =
+  let h = shell () in
+  let right_click ~selection =
+    H.act
+      h
+      (Open_field_menu
+         { field = field ~kind:Terminal ~selection ()
+         ; anchor = Point { x = 300; y = 200 }
+         })
+  in
+  right_click ~selection:true;
+  items h;
+  H.elements h ~selector:".field-menu .menu-section";
+  [%expect
+    {|
+    (Place_field_menu (Point (x 300) (y 200)))
+    [menuitem] div "Copy Ctrl+Shift+C"
+    [menuitem] div "Paste Ctrl+Shift+V"
+    [menuitem] div "Select all"
+    <div class="menu-section">
+    <div class="menu-section">
+    |}];
+  H.key h ~target:Terminal "ArrowDown";
+  H.text h ~selector:".field-menu .menu-item.selected";
+  H.key h ~target:Terminal "Enter";
+  [%expect
+    {|
+    (Field_menu_move 1)
+    Paste Ctrl+Shift+V
+    (Field_menu_choose ())
+    (Edit_field (Paste))
+    |}];
+  (* Closed, Esc and Enter are the shell's again. *)
+  H.key h ~target:Terminal "Escape";
+  [%expect {| (browser default) |}];
+  (* Nothing selected: Copy is disabled and Paste comes first. *)
+  right_click ~selection:false;
+  H.elements h ~selector:".field-menu .menu-item";
+  H.key h ~target:Terminal "Escape";
+  [%expect
+    {|
+    (Place_field_menu (Point (x 300) (y 200)))
+    <div class="disabled menu-item">
+    <div class="menu-item selected">
+    <div class="menu-item">
+    Close_field_menu
+    (Edit_field ())
+    |}]
 ;;

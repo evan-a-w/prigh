@@ -4064,17 +4064,26 @@ in sessionStorage) that on the backend's site Quit prigh is `window.close()`
 "Close this window to quit prigh." if the browser refuses. There
 (`Model.browser_shell`, `Set_browser_shell`) the browser's context menu
 never shows: `Field_menu_listeners` cancels every `contextmenu` (window,
-capture), and one on a text field (a textarea or a text input, not
-xterm's) opens `Field_menu` (Cut, Copy, Paste, Select all; disabled
-without a selection, read-only or a password) as `Model.field_menu`, its
-own layer over any dialog (`Field_menu_view`, styled as `Context_menu_view`,
-placed by `Command.Place_field_menu`), whose keys `Keys.handle` takes
-before anything but the terminal's. Choosing or closing it is
+capture, ahead of xterm.js's own handler, so the terminal's selection
+stays), and one on a text field (a textarea or a text input) or in the
+terminal opens `Field_menu` (Cut, Copy, Paste, Select all; the terminal,
+`Field_menu.Kind.Terminal`, has no Cut; disabled without a selection,
+read-only or a password) as `Model.field_menu`, its own layer over any
+dialog (`Field_menu_view`, styled as `Context_menu_view`, placed by
+`Command.Place_field_menu`), whose keys `Keys.handle` takes before
+anything else, the terminal's included. Choosing or closing it is
 `Command.Edit_field`: the field focused again with its selection, then
 `navigator.clipboard` writeText/readText (the desktop app grants the
 site the clipboard) and `execCommand` insertText/delete (else
 `setRangeText` and an input event), so Bonsai's state and the field's
-undo follow.
+undo follow; in the terminal, the handle `bin/terminal.js` leaves on
+xterm.js's element (`prighTerminal`: its selection, `paste`, which
+bracketed paste wraps, and `selectAll`). There Shift+F10 and the menu key
+open the terminal's menu too (`terminal.js` makes them a `contextmenu` on
+the input at the cursor, which not every browser does). Everywhere,
+`terminal.js` takes Ctrl+Shift+C (copy the selection; also not Chrome's
+inspector) and Ctrl+Shift+V (paste through `navigator.clipboard`, else
+the browser's own paste) from the shell; Ctrl+C stays its ^C.
 
 
 More windows: the page's Open in new window (`window.open` on its own site)

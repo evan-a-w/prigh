@@ -169,6 +169,16 @@ let mount (input : Input.t) (mounted : Mounted.t) host =
                       (Terminal_keys_widget.transform
                          mounted.keys
                          (Js.to_string data)))) )
+           ; ( "copy"
+             , Js.Unsafe.inject
+                 (Js.wrap_callback (fun text ->
+                    Async_kernel.upon
+                      (Browser.copy_to_clipboard (Js.to_string text))
+                      ignore)) )
+           ; ( "menuKey"
+             , Js.Unsafe.inject
+                 (Js.wrap_callback (fun () ->
+                    Js.bool (Desktop_page.in_browser ()))) )
           |]
       in
       focus_owed := false;

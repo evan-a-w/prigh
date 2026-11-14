@@ -655,7 +655,8 @@ shell where the session's tools run (the active `/host`, in its
 directory; `/terminal DIR`, or a worktree's "Open terminal there", a shell
 of its own in DIR) in a panel under the chat: drag its top edge to resize it (the
 height is remembered), a full-screen sheet on a phone. Keys typed in it
-are the shell's, Esc included; Ctrl+` closes it (so does its ×) and
+are the shell's, Esc and Ctrl+C included, but Ctrl+Shift+C copies the
+selection and Ctrl+Shift+V pastes; Ctrl+` closes it (so does its ×) and
 gives the keyboard back to the editor. On a touch screen (a phone, a
 tablet), while the shell has the focus, a row of the keys a phone's keyboard
 lacks sits over the keyboard: Esc, Tab, Ctrl and Alt (a tap applies to the
@@ -1332,7 +1333,8 @@ Where it shows it (`PRIGH_DESKTOP_WINDOW`, `programs.prigh.desktop.window`):
   The browser's own right-click menu never shows there (it would give away
   that the window is Chrome): a text field's right-click (or Shift+F10)
   opens prigh's Cut, Copy, Paste and Select all instead (↑↓, Enter, Esc),
-  over a dialog too, and sessions, worktrees, messages and the review's
+  over a dialog too; the terminal's opens Copy, Paste and Select all,
+  keeping its selection; sessions, worktrees, messages and the review's
   files have their usual menus; elsewhere a right-click does nothing.
 - **webview**: the app's own window on the system's webview (below).
 

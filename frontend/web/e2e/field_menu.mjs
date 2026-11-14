@@ -1,7 +1,9 @@
 // The desktop app's browser window (#shell=browser): the browser's context
 // menu never shows, a text field's right-click opens prigh's Cut, Copy,
 // Paste, Select all menu (over a dialog too), a session's menu is still
-// prigh's; on a page opened plainly the browser's menu is left alone.
+// prigh's; on a page opened plainly the browser's menu is left alone. In the
+// terminal a right-click (or Shift+F10) opens Copy, Paste, Select all, which
+// keep xterm.js's selection, and Ctrl+Shift+C and V copy and paste.
 // Chromium is granted the clipboard (as the desktop app grants its window);
 // Firefox and WebKit, which would ask the user before a page reads it, get a
 // stand-in clipboard for the same steps.
@@ -34,7 +36,10 @@ const server = spawn(
   backend,
   ["serve", "-web", "127.0.0.1:0", "-web-root", site, "-faux-script", join(dir, "script.json"),
     "-token", token, "-cwd", cwd],
-  { env: { ...process.env, HOME: home }, stdio: ["ignore", "ignore", "pipe"] },
+  // The terminal's tmux server is ours; its shell is $SHELL (see
+  // terminal_keys.mjs).
+  { env: { ...process.env, HOME: home, TMUX_TMPDIR: dir, SHELL: process.env.PRIGH_E2E_SHELL || "/bin/sh" },
+    stdio: ["ignore", "ignore", "pipe"] },
 );
 const url = await new Promise((resolve, reject) => {
   let err = "";
@@ -111,7 +116,7 @@ const lastMenu = async () => {
 let menusSeen = 0;
 const items = () => menu().locator("[role=menuitem]").evaluateAll(els => els.map(e =>
   `${e.classList.contains("selected") ? "> " : "  "}${e.querySelector(".menu-label").innerText}`
-  + `${e.getAttribute("aria-disabled") ? " (disabled)" : ""}  ${e.querySelector(".menu-command").innerText}`).join("\n"));
+  + `${e.getAttribute("aria-disabled") ? " (disabled)" : ""}${e.querySelector(".menu-command") ? `  ${e.querySelector(".menu-command").innerText}` : ""}`).join("\n"));
 const field = () => page.evaluate(() => {
   const el = document.activeElement;
   const where = el?.closest(".composer") ? "composer" : el?.closest(".modal") ? "dialog's field" : el?.tagName.toLowerCase();
@@ -260,6 +265,105 @@ try {
   console.log(`dialog: ${await page.locator(".modal").count()}; ${await field()}`);
   await page.keyboard.press("Escape");
   await page.waitForFunction(() => !document.querySelector(".modal"));
+
+  section("the terminal");
+  const rows = () => page.evaluate(() =>
+    [...document.querySelectorAll(".terminal-panel .xterm-rows > div")].map(r => r.textContent.trimEnd()));
+  const shows = text => page.waitForFunction(t =>
+    [...document.querySelectorAll(".terminal-panel .xterm-rows > div")].some(r => r.textContent.trimEnd() === t), text);
+  const termRow = text => page.locator(".terminal-panel .xterm-rows > div").filter({ hasText: new RegExp(`^${text}\\s*$`) }).first();
+  // xterm.js's screen takes the pointer over its rows: the mouse, at a row.
+  const at = async (text, dx = 20) => {
+    const box = await termRow(text).boundingBox();
+    return [box.x + dx, box.y + box.height / 2];
+  };
+  const dblclickAt = async text => page.mouse.dblclick(...await at(text));
+  const rightClickAt = async (x, y) => { await page.mouse.click(x, y, { button: "right" }); await menu().waitFor(); };
+  const empty = async () => {
+    const box = await page.locator(".terminal-panel .xterm-screen").boundingBox();
+    return [box.x + box.width - 40, box.y + box.height - 20];
+  };
+  const termSelection = () => page.evaluate(() => document.querySelector(".terminal-panel .xterm").prighTerminal.selection());
+  await page.locator(".terminal-toggle").click();
+  await page.waitForFunction(() =>
+    document.querySelector(".terminal-panel .xterm-rows")?.textContent.trim().endsWith("$"), null, { timeout: 60000 });
+  await page.waitForFunction(() => document.activeElement?.closest(".terminal-host"));
+  await page.keyboard.type("echo copy-me-please");
+  await page.keyboard.press("Enter");
+  await shows("copy-me-please");
+  // A double-click selects the word; a right-click keeps it.
+  await dblclickAt("copy-me-please");
+  console.log(`selected: ${JSON.stringify(await termSelection())}`);
+  await page.evaluate(() => navigator.clipboard.writeText("old"));
+  const [x, y] = await at("copy-me-please");
+  await rightClickAt(x, y);
+  await settled();
+  const box = await menu().boundingBox();
+  console.log(`terminal: ${await lastMenu()}; ${Math.abs(box.x - x) <= 4 && Math.abs(box.y - y) <= 4 ? "menu at the pointer" : `menu at ${box.x},${box.y}, the pointer at ${x},${y}`}`);
+  console.log(await items());
+  console.log(`still selected: ${JSON.stringify(await termSelection())}`);
+  await screenshot("the terminal's menu");
+  await menu().locator("[data-item=copy]").click();
+  await gone();
+  console.log(`clipboard: ${await clipboard()}`);
+  console.log(`the shell has the focus: ${await page.evaluate(() => !!document.activeElement?.closest(".terminal-host"))}`);
+
+  // Esc closes the menu, not the shell's: nothing reaches it.
+  await rightClickAt(x, y);
+  await page.keyboard.press("Escape");
+  await gone();
+  // From the keyboard: Shift+F10, at the shell's cursor.
+  await page.keyboard.press("Shift+F10");
+  await menu().waitFor();
+  await settled();
+  const cursor = await page.locator(".terminal-panel .xterm-helper-textarea").boundingBox();
+  const kbox = await menu().boundingBox();
+  console.log(`Shift+F10: ${Math.abs(kbox.x - cursor.x) <= 4 && Math.abs(kbox.y - cursor.y - 24) <= 4 ? "menu under the cursor" : `menu at ${kbox.x},${kbox.y}, the cursor at ${cursor.x},${cursor.y}`}`);
+  await page.keyboard.press("Escape");
+  await gone();
+
+  section("the terminal: paste");
+  await page.evaluate(() => navigator.clipboard.writeText("echo pasted-from-the-menu"));
+  await rightClickAt(...await empty());
+  console.log(await items());
+  await menu().locator("[data-item=paste]").click();
+  await gone();
+  await page.waitForFunction(() =>
+    document.querySelector(".terminal-panel .xterm-rows").textContent.includes("$ echo pasted-from-the-menu"));
+  await page.keyboard.press("Enter");
+  await shows("pasted-from-the-menu");
+
+  section("the terminal: select all");
+  await rightClickAt(...await empty());
+  await menu().locator("[data-item=select_all]").click();
+  await gone();
+  const all = await termSelection();
+  console.log(`selected: ${["copy-me-please", "pasted-from-the-menu"].every(t => all.includes(t)) ? "the whole screen" : JSON.stringify(all)}`);
+
+  section("the terminal: Ctrl+Shift+C and Ctrl+Shift+V");
+  await dblclickAt("pasted-from-the-menu");
+  await page.keyboard.press("Control+Shift+C");
+  await page.waitForFunction(() => navigator.clipboard.readText().then(t => t !== "echo pasted-from-the-menu"));
+  console.log(`clipboard: ${await clipboard()}`);
+  await page.evaluate(() => navigator.clipboard.writeText("echo pasted-by-keys"));
+  await page.keyboard.press("Control+Shift+V");
+  await page.waitForFunction(() =>
+    document.querySelector(".terminal-panel .xterm-rows").textContent.includes("$ echo pasted-by-keys"));
+  await page.keyboard.press("Enter");
+  await shows("pasted-by-keys");
+  // Ctrl+C is still the shell's interrupt.
+  await page.keyboard.type("sleep 100");
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Control+C");
+  await page.waitForFunction(() => {
+    const rows = [...document.querySelectorAll(".terminal-panel .xterm-rows > div")].map(r => r.textContent.trimEnd()).filter(r => r);
+    return rows.at(-1).endsWith("$") && rows.some(r => r.includes("sleep 100"));
+  });
+  console.log("Ctrl+C: interrupted");
+  console.log(`the shell saw: ${JSON.stringify((await rows())
+    .filter(r => r.includes("echo") || r.includes("pasted")).map(r => r.replace(/^.*\$ /, "$ ")))}`);
+  await page.locator(".terminal-close").click();
+  await page.waitForSelector(".terminal-panel", { state: "detached" });
 
   section("errors");
   console.log(errors.length ? errors.join("\n") : "none");
