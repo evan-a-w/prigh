@@ -2300,5 +2300,7 @@ kbd {
   .no-host-banner-chat .long { display: none; }
   .no-host-banner-chat .short { display: inline; }
 }
-/* "no host" whole beside the model: it is what says the session is a chat. */
-.chip-anchor.host:has(> .host-chip.chatting), .composer-controls .host-chip.chatting { flex-shrink: 0; }
+/* "No host" whole beside the model: it says the session is a chat, or that
+   nothing runs its tools. */
+.chip-anchor.host:has(> .host-chip:is(.chatting, .warm)),
+.composer-controls .host-chip:is(.chatting, .warm) { flex-shrink: 0; }
