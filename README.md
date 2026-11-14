@@ -3348,9 +3348,9 @@ off.
 
 The servers in **Settings → MCP servers** are yours: the backend keeps them
 for your account (`~/.prigh/mcp-servers.json` in its home, readable by its
-owner only, so neither the agent nor another user on a tool host can read
-or change them) and sends the enabled ones to every tool host your sessions
-use, which starts them as it starts its own; they need no approval. A
+owner only: where the backend runs as another user than the tool hosts, as
+in the Docker image, the agent cannot read or change them) and sends the
+enabled ones to every tool host your sessions use, which starts them as it starts its own; they need no approval. A
 host's `~/.prigh/mcp.json` or a project's `.mcp.json` that defines the same
 name wins, and Settings says which file overrides it. The section lists
 your servers with their state on the session's host (ready with their
