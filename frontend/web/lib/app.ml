@@ -165,6 +165,16 @@ module Reply_tag = struct
         { command : string
         ; notice : string option
         }
+    | Mcp_command of
+        { command : string
+        ; notice : string
+        }
+    | Mcp_settings_loaded
+    | Mcp_host_listed
+    | Mcp_draft_saved
+    | Mcp_pasted
+    | Mcp_removed of string
+    | Mcp_toggled of string
     | Reconnect of int
     | Config
     | Config_saved of string
@@ -485,6 +495,23 @@ module Action = struct
     | About_you_text of string
     | About_you_save
     | About_you_revert
+    | Mcp_edit of string option
+    | Mcp_field of Mcp_page.Field.t
+    | Mcp_save
+    | Mcp_cancel
+    | Mcp_paste
+    | Mcp_paste_text of string
+    | Mcp_paste_save
+    | Mcp_remove of string
+    | Mcp_remove_confirm
+    | Mcp_remove_cancel
+    | Mcp_toggle of string
+    | Mcp_show_tools of string
+    | Mcp_reconnect
+    | Mcp_approve of
+        { source : string
+        ; server : string
+        }
     | Open_rename
     | Open_subagents of string option
     (** the agents panel; with a number, an agent's or a job's id *)
@@ -752,6 +779,7 @@ module Model = struct
     ; nix_gc : Nix_gc.t
     ; memory : Memory_notes.t
     ; about_you : About_you.t
+    ; mcp : Mcp_page.t
     ; compact_at : Compact_at.t
     ; settings_section : Settings_section.t
       (* A phone's settings show the list of sections, not one of them. *)
@@ -1069,6 +1097,7 @@ let init =
   ; nix_gc = Nix_gc.empty
   ; memory = Memory_notes.empty
   ; about_you = About_you.empty
+  ; mcp = Mcp_page.empty
   ; compact_at = Compact_at.empty
   ; settings_section = Appearance
   ; settings_home = true
@@ -1837,10 +1866,43 @@ let fetch_about_you (m : Model.t) =
   , [ call Get_user_info ~tag:About_you_loaded ] )
 ;;
 
+(* The servers in the settings, and how the session's host is doing with
+   them and its own. *)
+let fetch_mcp (m : Model.t) =
+  ( { m with mcp = Mcp_page.loading m.mcp }
+  , [ call Get_mcp_settings ~tag:Mcp_settings_loaded
+    ; call (List_mcp { reconnect = false }) ~tag:Mcp_host_listed
+    ] )
+;;
+
+let mcp_save (m : Model.t) =
+  let mcp, request = Mcp_page.save m.mcp in
+  ( { m with mcp }
+  , Option.to_list (Option.map request ~f:(fun r -> call r ~tag:Mcp_draft_saved))
+  )
+;;
+
+let mcp_paste_save (m : Model.t) =
+  let mcp, request = Mcp_page.save_paste m.mcp in
+  ( { m with mcp }
+  , Option.to_list (Option.map request ~f:(fun r -> call r ~tag:Mcp_pasted)) )
+;;
+
+let mcp_remove (m : Model.t) =
+  match m.mcp.removing with
+  | None -> m, []
+  | Some name ->
+    let mcp, request = Mcp_page.remove m.mcp in
+    ( { m with mcp }
+    , Option.to_list
+        (Option.map request ~f:(fun r -> call r ~tag:(Mcp_removed name))) )
+;;
+
 (* What a section shows is asked for as it opens. *)
 let fetch_section (m : Model.t) : Settings_section.t -> _ = function
   | Memory -> fetch_memory m
   | About_you -> fetch_about_you m
+  | Mcp -> fetch_mcp m
   | Appearance | Sessions | Models | Git_hosting | Nix_store | Account -> m, []
 ;;
 
@@ -4259,6 +4321,7 @@ let user_switched (m : Model.t) (hello : Hello_reply.t) =
     ; nix_gc = { Nix_gc.empty with collecting = m.nix_gc.collecting }
     ; memory = Memory_notes.empty
     ; about_you = About_you.empty
+    ; mcp = Mcp_page.empty
     ; config = None
     ; compact_at = Compact_at.empty
     }
@@ -6173,21 +6236,28 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
          ~snippets:(snippets m)
          ~last_prompt:(last_prompt m)
          rest)
-  | "mcp", "" ->
-    loading
-      m
-      "MCP servers"
-      [ call (List_mcp { reconnect = false }) ~tag:(Mcp Picker) ]
-  | "mcp", "reconnect" ->
-    let m, cmds = toast m "Restarting the failed MCP servers…" in
-    m, cmds @ [ call (List_mcp { reconnect = true }) ~tag:(Mcp Reconnect) ]
-  | "mcp", other ->
-    error
-      m
-      (sprintf
-         "Unknown /mcp argument “%s”: /mcp lists the servers, /mcp reconnect \
-          restarts the failed ones."
-         other)
+  | "mcp", rest ->
+    (match Prigh_ui.Mcp_command.parse rest with
+     | List ->
+       loading
+         m
+         "MCP servers"
+         [ call (List_mcp { reconnect = false }) ~tag:(Mcp Picker) ]
+     | Reconnect ->
+       let m, cmds = toast m "Restarting the failed MCP servers…" in
+       m, cmds @ [ call (List_mcp { reconnect = true }) ~tag:(Mcp Reconnect) ]
+     | Change { request; done_ } ->
+       ( m
+       , [ call
+             request
+             ~tag:
+               (Mcp_command
+                  { command = String.strip ("/mcp " ^ rest); notice = done_ })
+         ] )
+     | Error e ->
+       error
+         (back_in_editor m (String.strip ("/mcp " ^ rest)))
+         (String.capitalize e))
   | "copy", _ -> copy_last m
   | "btw", "" -> error m "Usage: /btw <question> (asked aside; the run goes on)"
   | "btw", question -> start_btw m question
@@ -7676,6 +7746,55 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
         (set_draft m command)
         (sprintf "%s. %s is back in the editor." (String.capitalize e) command)
     else error m (String.capitalize e)
+  | Mcp_command { command; _ }, Error e ->
+    if String.is_empty m.draft && List.is_empty m.images
+    then
+      error
+        (set_draft m command)
+        (sprintf "%s. %s is back in the editor." (String.capitalize e) command)
+    else error m (String.capitalize e)
+  | Mcp_command { notice; _ }, Ok _ -> toast m (String.capitalize notice)
+  | Mcp_settings_loaded, result ->
+    let result =
+      Result.bind result ~f:(fun json ->
+        Result.map_error (Mcp_settings.of_json json) ~f:Error.to_string_hum)
+    in
+    { m with mcp = Mcp_page.loaded m.mcp result }, []
+  | Mcp_host_listed, result ->
+    let result =
+      Result.bind result ~f:(fun json ->
+        Result.map_error (Mcp_list.of_json json) ~f:Error.to_string_hum)
+    in
+    { m with mcp = Mcp_page.host_listed m.mcp result }, []
+  | Mcp_draft_saved, result ->
+    let mcp = Mcp_page.saved m.mcp (Result.map result ~f:ignore) in
+    (match result with
+     | Ok _ -> fetch_mcp { m with mcp }
+     | Error _ -> { m with mcp }, [])
+  | Mcp_pasted, result ->
+    let mcp = Mcp_page.pasted m.mcp (Result.map result ~f:ignore) in
+    (match result with
+     | Ok _ -> fetch_mcp { m with mcp }
+     | Error _ -> { m with mcp }, [])
+  | Mcp_removed name, Ok _ ->
+    let m, cmds = fetch_mcp m in
+    let m, more = toast m (sprintf "Removed %s from your settings" name) in
+    m, cmds @ more
+  | Mcp_removed name, Error e ->
+    ( { m with
+        mcp = Mcp_page.failed m.mcp (sprintf "Couldn't remove %s: %s" name e)
+      }
+    , [] )
+  | Mcp_toggled name, Ok _ ->
+    fetch_mcp { m with mcp = Mcp_page.set_busy m.mcp name false }
+  | Mcp_toggled name, Error e ->
+    ( { m with
+        mcp =
+          Mcp_page.failed
+            (Mcp_page.set_busy m.mcp name false)
+            (sprintf "Couldn't switch %s: %s" name e)
+      }
+    , [] )
   | Reminder { notice; _ }, Ok json ->
     toast
       m
@@ -8648,6 +8767,8 @@ let main_event (m : Model.t) (event : Event.t) =
     { m with memory = Memory_notes.changed m.memory memory }, []
   | User_info_changed info ->
     { m with about_you = About_you.changed m.about_you info }, []
+  | Mcp_settings_changed servers ->
+    { m with mcp = Mcp_page.changed m.mcp servers }, []
   (* Another of the user's frontends changed their preferences. *)
   | Prefs_changed changes ->
     apply_prefs m ~startup:false changes, [ Command.Cache_prefs changes ]
@@ -9412,6 +9533,15 @@ let dialog_accept (m : Model.t) =
      | None, None -> m, [])
   | Some Settings when Option.is_some m.memory.draft -> save_memory m
   | Some Settings
+    when Settings_section.equal m.settings_section Mcp
+         && Option.is_some m.mcp.removing -> mcp_remove m
+  | Some Settings
+    when Settings_section.equal m.settings_section Mcp
+         && Option.is_some m.mcp.paste -> mcp_paste_save m
+  | Some Settings
+    when Settings_section.equal m.settings_section Mcp
+         && Option.is_some m.mcp.draft -> mcp_save m
+  | Some Settings
     when Settings_section.equal m.settings_section About_you
          && About_you.dirty m.about_you -> save_about_you m
   | Some Settings when Option.is_some (Compact_at.draft m.compact_at) ->
@@ -9801,6 +9931,34 @@ let update_connected (m : Model.t) (action : Action.t) =
      | memory, None -> { m with memory }, [])
   | Memory_forget_cancel ->
     { m with memory = Memory_notes.cancel_forget m.memory }, []
+  | Mcp_edit name ->
+    ( { m with mcp = Mcp_page.edit m.mcp name }
+    , [ Command.Focus "mcp-name" ] )
+  | Mcp_field field -> { m with mcp = Mcp_page.set m.mcp field }, []
+  | Mcp_save -> mcp_save m
+  | Mcp_cancel -> { m with mcp = Mcp_page.cancel m.mcp }, []
+  | Mcp_paste ->
+    ( { m with mcp = Mcp_page.open_paste m.mcp }
+    , [ Command.Focus "mcp-paste-text" ] )
+  | Mcp_remove name ->
+    ( { m with mcp = Mcp_page.ask_remove m.mcp name }
+    , [ Command.Focus "mcp-remove-yes" ] )
+  | Mcp_paste_text text -> { m with mcp = Mcp_page.set_paste m.mcp text }, []
+  | Mcp_paste_save -> mcp_paste_save m
+  | Mcp_remove_confirm -> mcp_remove m
+  | Mcp_remove_cancel -> { m with mcp = Mcp_page.cancel_remove m.mcp }, []
+  | Mcp_toggle name ->
+    let mcp, request = Mcp_page.toggle_enabled m.mcp name in
+    ( { m with mcp }
+    , Option.to_list
+        (Option.map request ~f:(fun r -> call r ~tag:(Mcp_toggled name))) )
+  | Mcp_show_tools name -> { m with mcp = Mcp_page.toggle_tools m.mcp name }, []
+  | Mcp_reconnect ->
+    ( { m with mcp = { m.mcp with host = None } }
+    , [ call (List_mcp { reconnect = true }) ~tag:Mcp_host_listed ] )
+  | Mcp_approve { source; server } ->
+    ( { m with mcp = Mcp_page.set_busy m.mcp server true }
+    , [ call (Mcp_approve { source; server }) ~tag:Mcp_host_listed ] )
   | About_you_text text ->
     { m with about_you = About_you.set_text m.about_you text }, []
   | About_you_save -> save_about_you m
@@ -9890,6 +10048,8 @@ let update_connected (m : Model.t) (action : Action.t) =
        { m with memory = Memory_notes.cancel m.memory }, []
      | Some Settings, _ when Option.is_some m.memory.forgetting ->
        { m with memory = Memory_notes.cancel_forget m.memory }, []
+     | Some Settings, _ when Option.is_some (Mcp_page.escape m.mcp) ->
+       { m with mcp = Option.value_exn (Mcp_page.escape m.mcp) }, []
      | _ ->
        (match m.dialog with
         | Some (Login { failed = None; provider; _ }) ->

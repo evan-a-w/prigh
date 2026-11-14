@@ -1039,6 +1039,7 @@ let content (m : App.Model.t) (section : Section.t) ~inject =
            rows
        ])
   | About_you -> [ group [ about_you m ~inject ] ]
+  | Mcp -> Mcp_settings_view.groups m ~inject
   | Git_hosting -> [ group ~title:"Hosts" (git_hosts m ~inject) ]
   | Nix_store -> [ group (nix_store m ~inject) ]
   | Account -> [ group (account m ~inject) ]
@@ -1050,6 +1051,7 @@ let section_icon : Section.t -> Icon.t = function
   | Models -> Brain
   | Memory -> Book
   | About_you -> User
+  | Mcp -> Plug
   | Git_hosting -> Repo
   | Nix_store -> Package
   | Account -> User

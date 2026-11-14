@@ -189,6 +189,16 @@ module Reply_tag : sig
         ; notice : string option
           (** shown on success; [None]: the reminder added, by its name *)
         }
+    | Mcp_command of
+        { command : string (** back into the editor if refused *)
+        ; notice : string (** shown on success *)
+        }
+    | Mcp_settings_loaded (** [get_mcp_settings] *)
+    | Mcp_host_listed (** [list_mcp] or [mcp_approve], for the settings *)
+    | Mcp_draft_saved
+    | Mcp_pasted
+    | Mcp_removed of string
+    | Mcp_toggled of string
     | Reconnect of int (** generation; stale replies are ignored *)
     | Config (** [get_config] *)
     | Config_saved of string (** the new config; the notice is shown *)
@@ -595,6 +605,24 @@ module Action : sig
     | About_you_text of string (** the settings page's About you: its text *)
     | About_you_save (** Ctrl+Enter *)
     | About_you_revert (** back to what the backend has *)
+    | Mcp_edit of string option
+    (** the settings' MCP servers: add one ([None]) or edit one *)
+    | Mcp_field of Mcp_page.Field.t
+    | Mcp_save
+    | Mcp_cancel
+    | Mcp_paste (** add servers from pasted [mcpServers] JSON *)
+    | Mcp_paste_text of string
+    | Mcp_paste_save
+    | Mcp_remove of string (** asks first *)
+    | Mcp_remove_confirm
+    | Mcp_remove_cancel
+    | Mcp_toggle of string (** enables or disables it *)
+    | Mcp_show_tools of string (** shows or hides its tools *)
+    | Mcp_reconnect (** restarts the failed servers on the session's host *)
+    | Mcp_approve of
+        { source : string
+        ; server : string
+        } (** a project's server *)
     | Open_rename
     | Open_subagents of string option
     (** the agents panel: its list, or the agent or job with this number
@@ -955,6 +983,7 @@ module Model : sig
     ; nix_gc : Nix_gc.t (** superusers': the Nix store *)
     ; memory : Memory_notes.t (** the settings page's Memory *)
     ; about_you : About_you.t (** the settings page's About you *)
+    ; mcp : Mcp_page.t (** the settings page's MCP servers *)
     ; compact_at : Compact_at.t (** the settings page's "Compact at" *)
     ; settings_section : Settings_section.t
     (* A phone's settings show the list of sections, not one of them. *)

@@ -8,6 +8,7 @@ type t =
   | Models
   | Memory
   | About_you
+  | Mcp
   | Git_hosting
   | Nix_store (** superusers only *)
   | Account
