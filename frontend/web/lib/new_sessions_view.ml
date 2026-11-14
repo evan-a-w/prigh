@@ -116,6 +116,7 @@ let thinking (config : Config.t option) ~inject =
 let mode_label : Approval_mode.t -> string = function
   | Ask -> "Ask"
   | Auto_edit -> "Auto-edit"
+  | Smart -> "Smart"
   | Auto -> "Auto"
 ;;
 
@@ -128,7 +129,8 @@ let mode (config : Config.t option) ~inject =
     ~name:"Mode"
     ~about:
       "What asks before it runs: everything (Ask), all but file edits \
-       (Auto-edit) or nothing (Auto)."
+       (Auto-edit), what the approval model leaves to you (Smart) or nothing \
+       (Auto)."
     ?note:(Option.value_map current ~default:(Some waiting) ~f:(fun _ -> None))
     [ segmented
         ~disabled:(Option.is_none current)

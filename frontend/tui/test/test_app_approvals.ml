@@ -129,10 +129,11 @@ let%expect_test "/mode picks or sets the mode; /plan toggles plan mode" =
 
     ▌ earlier question
       earlier answer
-    Mode (Alt+M cycles)  (4)
+    Mode (Alt+M cycles)  (5)
     / ▏
        ask        bash, job_input, edits and MCP tools ask first
     ▸* auto-edit  file edits run; bash, job_input and MCP tools…
+       smart      edits in the project run; the approval model …
        auto       tools run without asking
        plan       read-only planning, until you leave it (/plan…
     ────────────────────────────────────────────────────────────

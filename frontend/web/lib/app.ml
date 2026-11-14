@@ -3761,6 +3761,7 @@ let model_display (m : Model.t) key =
 let mode_name : Approval_mode.t -> string = function
   | Ask -> "Ask"
   | Auto_edit -> "Auto-edit"
+  | Smart -> "Smart"
   | Auto -> "Auto"
 ;;
 

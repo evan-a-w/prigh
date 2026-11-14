@@ -912,7 +912,7 @@ let%expect_test "bash timeout is merged into the tool line at each verbosity" =
   in
   let item =
     Transcript.Item.Tool
-      { call; result = Some result; live_tail = None; subagent = None }
+      { call; result = Some result; live_tail = None; subagent = None; allowed = None }
   in
   List.iter [ Verbosity.Quiet; Normal; Verbose ] ~f:(fun verbosity ->
     printf "== %s ==\n" (Verbosity.name verbosity);
@@ -1123,6 +1123,7 @@ let%expect_test "diff colouring at Normal and Verbose through to_styled" =
       ; result = Some (edit_result text)
       ; live_tail = None
       ; subagent = None
+      ; allowed = None
       }
   in
   List.iter [ Verbosity.Normal; Verbosity.Verbose ] ~f:(fun verbosity ->
@@ -1165,6 +1166,7 @@ let tool ?result ?live_tail name arguments =
     ; result
     ; live_tail
     ; subagent = None
+    ; allowed = None
     }
 ;;
 

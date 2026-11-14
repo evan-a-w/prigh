@@ -12,22 +12,23 @@ type t =
 
 val of_state : P.State.t -> t
 
-(** Alt+M: ask → auto-edit → auto → plan → ask. Entering plan mode keeps
+(** Alt+M: ask → auto-edit → smart → auto → plan → ask. Entering plan mode keeps
     the approval mode; leaving it by cycling goes to [ask]. *)
 val cycle : t -> t
 
-(** ["ask"], ["auto-edit"], ["auto"], ["plan"]. *)
+(** ["ask"], ["auto-edit"], ["smart"], ["auto"], ["plan"]. *)
 val label : t -> string
 
-(** The modes [/mode] offers, in cycle order, as from [current]: the three
-    approval modes leave plan mode, [plan] keeps the approval mode. *)
+(** The modes [/mode] offers, in cycle order, as from [current]: the approval
+    modes leave plan mode, [plan] keeps the approval mode. *)
 val choices : current:t -> t list
 
 (** What [/mode NAME] means, as from [current]; [None] for an unknown name. *)
 val of_name : current:t -> string -> t option
 
 (** What asks first, in a few words for a control: ["Asks: edits &
-    commands"], ["Asks: commands"], ["Auto: never asks"], ["Plan mode"]. *)
+    commands"], ["Asks: commands"], ["Smart: a model decides"],
+    ["Auto: never asks"], ["Plan mode"]. *)
 val title : t -> string
 
 (** How the user leaves plan mode (the model cannot): ["/plan off or

@@ -204,8 +204,9 @@ let%expect_test "transcript detail, default mode, providers, shortcuts" =
     {|
     (Settings_section New_sessions)
     Mode
-    What asks before it runs: everything (Ask), all but file edits (Auto-edit) or nothing (Auto).
-    (Ask) (Auto-edit) (Auto)
+    What asks before it runs: everything (Ask), all but file edits (Auto-edit), what the approval model leaves to you (Smart) or nothing (Auto).
+    (Ask) (Auto-edit) (Smart) (Auto)
+    <button class="segment">
     <button class="segment">
     <button class="segment">
     <button class="on segment">
@@ -215,6 +216,7 @@ let%expect_test "transcript detail, default mode, providers, shortcuts" =
      (tag (Default_set (Mode Auto_edit))))
     <button class="segment">
     <button class="on segment">
+    <button class="segment">
     <button class="segment">
     <div class="modal settings-dialog">
     |}];
@@ -321,6 +323,7 @@ let%expect_test "the names of the settings' controls" =
     button "Max" -- New sessions think at max
     button "Ask" -- New sessions start in Ask mode
     button "Auto-edit" -- New sessions start in Auto-edit mode
+    button "Smart" -- New sessions start in Smart mode
     button "Auto" -- New sessions start in Auto mode
     button "New sessions' tool host: Where you are" -- Choose the tool host new sessions start on (/default-host)
     button "Add" -- Add a model to the end of the chain (/fallback MODEL…)

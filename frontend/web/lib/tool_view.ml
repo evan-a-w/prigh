@@ -1061,5 +1061,12 @@ let server_tool ~fold ~running (s : Content.Server_tool.t) =
     ~running
     call
     (Some
-       { call; output = ""; lines = 0; missed = false; result; subagent = None })
+       { call
+       ; output = ""
+       ; lines = 0
+       ; missed = false
+       ; result
+       ; subagent = None
+       ; allowed = None
+       })
 ;;

@@ -803,12 +803,14 @@ let%expect_test "entries and session stats" =
        (input      30)
        (output     13)
        (cache_read 5)))
-     (cost_usd         0.0001)
-     (context_percent  1.5)
-     (model_changes    1)
-     (compactions      0)
-     (masks            0)
-     (duration_seconds 12.5))
+     (cost_usd           0.0001)
+     (context_percent    1.5)
+     (model_changes      1)
+     (compactions        0)
+     (masks              0)
+     (duration_seconds   12.5)
+     (approvals_judged   0)
+     (approvals_cost_usd 0))
     |}]
 ;;
 
@@ -940,6 +942,7 @@ let%expect_test "config round trip and config_changed event" =
          ; mask_observations = false
          ; generate_model = None
          ; naming_model = None
+         ; approval_model = Some "anthropic/claude-haiku-4-5"
          ; dictation_model = Some "openai/whisper-1"
          }
        : Json.t)];
@@ -968,6 +971,7 @@ let%expect_test "config round trip and config_changed event" =
      (mask_observations true)
      (generate_model  ())
      (naming_model    ())
+     (approval_model  ())
      (dictation_model ()))
     ((scoped_models ())
      (approval_mode Auto)
@@ -990,6 +994,7 @@ let%expect_test "config round trip and config_changed event" =
      (mask_observations true)
      (generate_model  ())
      (naming_model    ())
+     (approval_model  ())
      (dictation_model ()))
     ((scoped_models ())
      (approval_mode Auto)
@@ -1012,6 +1017,7 @@ let%expect_test "config round trip and config_changed event" =
      (mask_observations true)
      (generate_model  ())
      (naming_model    ())
+     (approval_model  ())
      (dictation_model ()))
     (decode (e "default_model must be a string"))
     ((scoped_models ())
@@ -1035,6 +1041,7 @@ let%expect_test "config round trip and config_changed event" =
      (mask_observations true)
      (generate_model  ())
      (naming_model    ())
+     (approval_model  ())
      (dictation_model ()))
     (decode (e "fallback_models must be an array of strings"))
     (decode (e "default_cwd must be a string"))
@@ -1061,6 +1068,7 @@ let%expect_test "config round trip and config_changed event" =
      (mask_observations true)
      (generate_model  ())
      (naming_model    ())
+     (approval_model  ())
      (dictation_model ()))
     (decode (e (in snippets[0] "missing field \"text\"")))
     ((scoped_models ())
@@ -1084,6 +1092,7 @@ let%expect_test "config round trip and config_changed event" =
      (mask_observations true)
      (generate_model  ())
      (naming_model    ())
+     (approval_model  ())
      (dictation_model ()))
     (decode (e "compact_at_tokens must be a whole number"))
     ((scoped_models ())
@@ -1107,6 +1116,7 @@ let%expect_test "config round trip and config_changed event" =
      (mask_observations false)
      (generate_model  ())
      (naming_model    ())
+     (approval_model  ())
      (dictation_model ()))
     (decode (e "mask_observations must be a boolean"))
     ((scoped_models ())
@@ -1130,6 +1140,7 @@ let%expect_test "config round trip and config_changed event" =
      (mask_observations true)
      (generate_model ())
      (naming_model   ())
+     (approval_model ())
      (dictation_model (aiproxy/whisper)))
     ((scoped_models ())
      (approval_mode Auto)
@@ -1152,6 +1163,7 @@ let%expect_test "config round trip and config_changed event" =
      (mask_observations true)
      (generate_model (deepseek/deepseek-flash))
      (naming_model    ())
+     (approval_model  ())
      (dictation_model ()))
     (decode (e "generate_model must be a string"))
     ("round trip" (generate_model (deepseek/deepseek-flash)) (equal (Ok true)))
@@ -1178,6 +1190,7 @@ let%expect_test "config round trip and config_changed event" =
      (mask_observations false)
      (generate_model    null)
      (naming_model      null)
+     (approval_model    anthropic/claude-haiku-4-5)
      (dictation_model   openai/whisper-1))
     (Event (
       Config_changed (
@@ -1202,6 +1215,7 @@ let%expect_test "config round trip and config_changed event" =
         (mask_observations true)
         (generate_model  ())
         (naming_model    ())
+        (approval_model  ())
         (dictation_model ()))))
     |}]
 ;;

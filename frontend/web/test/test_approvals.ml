@@ -126,6 +126,7 @@ let%expect_test "the mode chip, Alt+M, and set_mode's reply or failure" =
     When tools ask first Alt+M cycles
     Asks: edits & commands bash, job_input, edits and MCP tools ask first
     Asks: commands file edits run; bash, job_input and MCP tools ask first
+    Smart: a model decides edits in the project run; the approval model lets other calls run or asks you, saying why (/approval-model)
     Auto: never asks tools run without asking
     ✓ Plan mode read-only planning, until you leave it (/plan off or Alt+M): no file edits; bash, job_input and MCP tools ask first
     Enter chooses, ← → the next setting, Esc closes
@@ -176,7 +177,7 @@ let%expect_test "/mode NAME, /plan, /confirm" =
     {|
     (Rpc (method_ push_pref)
      (params ((key history) (value "/mode bogus") (max 500))) (tag Ignore))
-    Unknown mode “bogus”: use ask, auto-edit, auto, plan (/mode picks one). (Dismiss)
+    Unknown mode “bogus”: use ask, auto-edit, smart, auto, plan (/mode picks one). (Dismiss)
     "/mode bogus"
     |}];
   run h "/mode auto";
@@ -249,6 +250,7 @@ let%expect_test "/mode NAME, /plan, /confirm" =
     Modes ↑↓ Tab Enter Esc   Ctrl+Enter as typed
     ask bash, job_input, edits and MCP tools ask first
     auto-edit file edits run; bash, job_input and MCP tools ask first
+    smart edits in the project run; the approval model lets other calls run or asks you, saying why (/approval-model)
     auto tools run without asking
     plan read-only planning, until you leave it (/plan off or Alt+M): no file edits; bash, job_input and MCP tools ask first
     Plan mode ↑↓ Tab Enter Esc   Ctrl+Enter as typed

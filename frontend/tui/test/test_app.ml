@@ -852,6 +852,7 @@ let%expect_test
       earlier answer
     ▸ ask
       auto-edit
+      smart
       auto
       plan
     ────────────────────────────────────────────────────────────
@@ -5474,6 +5475,7 @@ let%expect_test
       (mask_observations true)
       (generate_model  ())
       (naming_model    ())
+      (approval_model  ())
       (dictation_model ())))
     ((
       (scoped_models (deepseek/deepseek-flash))
@@ -5497,6 +5499,7 @@ let%expect_test
       (mask_observations true)
       (generate_model  ())
       (naming_model    ())
+      (approval_model  ())
       (dictation_model ())))
     |}]
 ;;
@@ -6536,6 +6539,7 @@ let%expect_test "/change_default saves the model and thinking level" =
       (mask_observations true)
       (generate_model  ())
       (naming_model    ())
+      (approval_model  ())
       (dictation_model ())))
 
 

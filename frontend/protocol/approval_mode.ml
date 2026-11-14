@@ -3,8 +3,8 @@ open! Core
 type t =
   | Ask
   | Auto_edit
-  | Auto
   | Smart
+  | Auto
 [@@deriving sexp_of, equal, enumerate]
 
 let to_string = function

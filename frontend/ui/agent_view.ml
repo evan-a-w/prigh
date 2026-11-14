@@ -79,8 +79,25 @@ let finish agents ~agent_id ~turns ~cost_usd ~result =
 
 let is_descendant t id = String.is_prefix id ~prefix:(t.id ^ "/")
 
+(* [Tool_allowed] is not wrapped in [Subagent] events: its [agent_id] says
+   whose call it is. *)
+let route_allowed agents ~id f =
+  List.map agents ~f:(fun a ->
+    if String.equal a.id id || is_descendant a id then f a else a)
+;;
+
 let rec apply (t : t) (event : P.Event.t) : t =
   match event with
+  | P.Event.Tool_allowed ({ agent_id = Some id; _ } as allowed) ->
+    if String.equal id t.id
+    then
+      { t with
+        transcript =
+          Transcript.apply
+            t.transcript
+            (Tool_allowed { allowed with agent_id = None })
+      }
+    else { t with children = route_allowed t.children ~id (fun c -> apply c event) }
   | P.Event.Subagent { agent_id; event = inner; _ } ->
     if is_descendant t agent_id
     then (
@@ -132,5 +149,7 @@ let apply_all agents (event : P.Event.t) =
      | Some agent -> replace agents agent_id (fun _ -> apply agent inner))
   | P.Event.Subagent_end { agent_id; turns; cost_usd; result; _ } ->
     finish agents ~agent_id ~turns ~cost_usd ~result
+  | P.Event.Tool_allowed { agent_id = Some id; _ } ->
+    route_allowed agents ~id (fun a -> apply a event)
   | _ -> agents
 ;;

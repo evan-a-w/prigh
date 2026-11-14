@@ -17,12 +17,13 @@ let cycle t =
   else (
     match t.approval with
     | Ask -> { t with approval = Auto_edit }
-    | Auto_edit -> { t with approval = Auto }
+    | Auto_edit -> { t with approval = Smart }
+    | Smart -> { t with approval = Auto }
     | Auto -> { t with plan = true })
 ;;
 
 let label t = if t.plan then "plan" else P.Approval_mode.to_string t.approval
-let names = [ "ask"; "auto-edit"; "auto"; "plan" ]
+let names = [ "ask"; "auto-edit"; "smart"; "auto"; "plan" ]
 
 let choices ~current =
   List.map P.Approval_mode.all ~f:(fun approval -> { approval; plan = false })
@@ -49,6 +50,7 @@ let title t =
     match t.approval with
     | Ask -> "Asks: edits & commands"
     | Auto_edit -> "Asks: commands"
+    | Smart -> "Smart: a model decides"
     | Auto -> "Auto: never asks")
 ;;
 
@@ -63,6 +65,9 @@ let describe t =
     match t.approval with
     | Ask -> "bash, job_input, edits and MCP tools ask first"
     | Auto_edit -> "file edits run; " ^ others_ask
+    | Smart ->
+      "edits in the project run; the approval model lets other calls run or \
+       asks you, saying why (/approval-model)"
     | Auto -> "tools run without asking")
 ;;
 

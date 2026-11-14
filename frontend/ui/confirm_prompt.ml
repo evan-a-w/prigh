@@ -21,7 +21,7 @@ let title (c : P.Pending.Confirm.t) =
     match c.kind, c.name with
     | Computer_use { host }, _ ->
       sprintf "Let prigh control %s's screen, mouse and keyboard?" host
-    | Tool, name ->
+    | (Tool | Judged _), name ->
       (match name with
        | "bash" -> sprintf "Run bash: %s?" c.summary
        | "write" -> sprintf "Write %s?" c.summary
@@ -35,9 +35,13 @@ let title (c : P.Pending.Confirm.t) =
   who c ^ what
 ;;
 
+let judged ~model ~reason = sprintf "%s left this to you: %s" model reason
+let allowed ~model ~reason = sprintf "allowed by %s: %s" model reason
+
 let detail (c : P.Pending.Confirm.t) =
   match c.kind with
   | Tool -> None
+  | Judged { model; reason } -> Some (judged ~model ~reason)
   | Computer_use _ ->
     let until =
       "Until you move the mouse or press a key there, press Stop, or the agent \
@@ -50,7 +54,7 @@ let answers (c : P.Pending.Confirm.t) =
   [ ( Answer.Allow
     , "y"
     , match c.kind with
-      | Tool -> "allow once"
+      | Tool | Judged _ -> "allow once"
       | Computer_use _ -> "allow" )
   ]
   @ (match c.rules with
@@ -91,7 +95,7 @@ let acknowledgement (c : P.Pending.Confirm.t) (answer : Answer.t) =
     sprintf "allowed computer use on %s" host
   | Computer_use { host }, (Deny | Deny_with_reason) ->
     sprintf "denied computer use on %s" host
-  | Tool, answer ->
+  | (Tool | Judged _), answer ->
     (match answer with
      | Allow -> sprintf "allowed %s" c.name
      | Always ->

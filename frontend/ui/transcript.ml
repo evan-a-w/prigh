@@ -40,6 +40,7 @@ module Item = struct
         ; result : P.Message.Tool_result.t option
         ; live_tail : string option
         ; subagent : Subagent.t option
+        ; allowed : string option
         }
     | Server_tool of
         { tool : P.Content.Server_tool.t
@@ -219,7 +220,7 @@ let update_tail previous chunk =
 let add_tool t (call : P.Tool_call.t) =
   add
     (flush t)
-    (Tool { call; result = None; live_tail = None; subagent = None })
+    (Tool { call; result = None; live_tail = None; subagent = None; allowed = None })
 ;;
 
 let append_tool_output t ~call_id chunk =
@@ -229,6 +230,16 @@ let append_tool_output t ~call_id chunk =
       when String.equal tool.call.id call_id && Option.is_none tool.result ->
       let live_tail = Some (update_tail tool.live_tail chunk) in
       List.rev_append acc (Item.Tool { tool with live_tail } :: rest)
+    | item :: rest -> go (item :: acc) rest
+  in
+  { t with items_rev = go [] t.items_rev }
+;;
+
+let allow_tool t ~call_id note =
+  let rec go acc = function
+    | [] -> List.rev acc
+    | Item.Tool tool :: rest when String.equal tool.call.id call_id ->
+      List.rev_append acc (Item.Tool { tool with allowed = Some note } :: rest)
     | item :: rest -> go (item :: acc) rest
   in
   { t with items_rev = go [] t.items_rev }
@@ -249,7 +260,7 @@ let end_tool t ~(call : P.Tool_call.t) ~(result : P.Message.Tool_result.t) =
   else
     add
       t
-      (Tool { call; result = Some result; live_tail = None; subagent = None })
+      (Tool { call; result = Some result; live_tail = None; subagent = None; allowed = None })
 ;;
 
 let pair_result t (r : P.Message.Tool_result.t) =
@@ -282,7 +293,7 @@ let add_message t (m : P.Message.t) =
         | Tool_call call ->
           add
             t
-            (Tool { call; result = None; live_tail = None; subagent = None })
+            (Tool { call; result = None; live_tail = None; subagent = None; allowed = None })
         | Server_tool tool -> add t (Server_tool { tool; ended = true }))
     in
     (match a.stop_reason with
@@ -551,6 +562,9 @@ let apply t (event : P.Event.t) =
   | P.Event.Tool_output { chunk; call_id } ->
     append_tool_output t ~call_id chunk
   | P.Event.Tool_end { call; result } -> end_tool t ~call ~result
+  | P.Event.Tool_allowed { call_id; agent_id = None; model; reason } ->
+    allow_tool t ~call_id (Confirm_prompt.allowed ~model ~reason)
+  | P.Event.Tool_allowed { agent_id = Some _; _ } -> t
   | P.Event.Compacted summary -> add t (Compaction summary)
   | P.Event.Notice text -> notice t text
   | P.Event.Masked { masked; tokens_saved } ->
@@ -834,10 +848,16 @@ let rows (item : Item.t) ~(verbosity : Verbosity.t) ~width : Log_line.t list =
        markdown first
      | Quiet | Normal | Verbose -> markdown text)
   | Thinking text -> render_thinking text ~verbosity
-  | Tool { call; result; live_tail; subagent } ->
-    (match subagent with
-     | Some s -> render_subagent ~verbosity ~width s
-     | None -> Tool_render.render ~verbosity ~width call result ~live_tail)
+  | Tool { call; result; live_tail; subagent; allowed } ->
+    let rows =
+      match subagent with
+      | Some s -> render_subagent ~verbosity ~width s
+      | None -> Tool_render.render ~verbosity ~width call result ~live_tail
+    in
+    (match allowed, verbosity, rows with
+     | Some note, (Normal | Verbose), header :: rest ->
+       header :: lines_at ~depth:2 ~style:dim note @ rest
+     | _ -> rows)
   | Server_tool { tool; ended } ->
     Tool_render.server_tool ~verbosity ~width ~ended tool
   | Notice (severity, text) ->

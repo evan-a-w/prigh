@@ -17,8 +17,18 @@ end
     prigh control desk's screen, mouse and keyboard?] for computer use. *)
 val title : P.Pending.Confirm.t -> string
 
-(** A line under the title: for computer use, how long the consent lasts. *)
+(** A line under the title: for computer use, how long the consent lasts.
+    For a call the approval model left to the user ([smart] mode), its
+    reason ({!judged}). *)
 val detail : P.Pending.Confirm.t -> string option
+
+(** ["MODEL left this to you: REASON"]: why the approval model held a call
+    for the user. *)
+val judged : model:string -> reason:string -> string
+
+(** ["allowed by MODEL: REASON"]: the note on a call the approval model let
+    run ([tool_allowed]). *)
+val allowed : model:string -> reason:string -> string
 
 (** The answers offered, with their keys ([y], [a], [n], [r]) and labels;
     [Always] only when the confirmation has rules, its label naming them. *)

@@ -6502,6 +6502,7 @@ let event m (e : P.Event.t) =
   | Tool_start _
   | Tool_output _
   | Tool_end _
+  | Tool_allowed _
   | Compacted _
   | Masked _
   | Notice _

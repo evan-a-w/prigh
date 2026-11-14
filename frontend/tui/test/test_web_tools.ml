@@ -284,6 +284,7 @@ let tool ?result name arguments =
           })
     ; live_tail = None
     ; subagent = None
+    ; allowed = None
     }
 ;;
 

@@ -371,7 +371,8 @@ let%expect_test "/scoped-models, Ctrl+P and Alt+P" =
       (default_cwd ()) (default_host ()) (max_budget_usd ()) (worktrees_dir ())
       (archive_after_days 7) (notify bell) (snippets ())
       (compact_at_tokens 200000) (compaction_model ()) (mask_observations true)
-      (generate_model ()) (naming_model ()) (dictation_model ())))
+      (generate_model ()) (naming_model ()) (approval_model ())
+      (dictation_model ())))
     |}]
 ;;
 

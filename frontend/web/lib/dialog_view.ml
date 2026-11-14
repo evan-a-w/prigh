@@ -770,10 +770,12 @@ let confirm (m : App.Model.t) ~inject =
       ~cls:
         (match c.kind with
          | Tool -> "confirm-dialog"
+         | Judged _ -> "confirm-dialog judged"
          | Computer_use _ -> "confirm-dialog computer-consent")
       ~title:
         (match c.kind with
          | Tool -> "Confirm"
+         | Judged _ -> "Confirm (smart)"
          | Computer_use _ -> "Computer use")
       ~on_close
       ~footer

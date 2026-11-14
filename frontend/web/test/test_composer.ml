@@ -461,6 +461,7 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     Modes ↑↓ Tab Enter Esc   Ctrl+Enter as typed
     ask bash, job_input, edits and MCP tools ask first
     auto-edit file edits run; bash, job_input and MCP tools ask first
+    smart edits in the project run; the approval model lets other calls run or asks you, saying why (/approval-model)
     auto tools run without asking
     plan read-only planning, until you leave it (/plan off or Alt+M): no file edits; bash, job_input and MCP tools ask first
     |}];
