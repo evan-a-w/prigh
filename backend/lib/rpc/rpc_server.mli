@@ -81,6 +81,13 @@ val create
            [set_user_info] (default: the one under [home]; without either
            they fail). Every client hears [user_info_changed] after a
            change. *)
+  -> ?mcp_settings:Mcp_settings.t
+       (** the MCP servers in the user's settings, for [get_mcp_settings],
+           [add_mcp_servers], [update_mcp_server], [remove_mcp_server] and
+           [set_mcp_server_enabled] (default: the one under [home]; without
+           either they fail). After a change every client hears
+           [mcp_settings_changed] and every live session updates its
+           servers. *)
   -> ?transcription_http:Transcription.Http.t
        (** where [transcribe] posts the audio (default: real HTTP) *)
   -> ?nix_store:Nix_store.t

@@ -79,16 +79,31 @@ let print_servers ~dir (statuses, problems) =
     print_endline (mask ~dir ("problem: " ^ problem)))
 ;;
 
-let servers ?reconnect hub ~dir (setup : Setup.t) =
+let servers ?reconnect ?settings hub ~dir (setup : Setup.t) =
   print_servers
     ~dir
-    (Mcp_hub.servers hub ?reconnect ~cwd:setup.cwd ~home:setup.home ())
+    (Mcp_hub.servers
+       hub
+       ?reconnect
+       ?settings
+       ~cwd:setup.cwd
+       ~home:setup.home
+       ())
 ;;
 
-let call hub ~dir (setup : Setup.t) ~source ~server ~tool =
+let call
+      ?(settings = `Object [])
+      hub
+      ~dir
+      (setup : Setup.t)
+      ~source
+      ~server
+      ~tool
+  =
   Mcp_hub.call
     hub
     ~cancel:(Cancellation.create ())
+    ~settings
     ~source
     ~server
     ~home:setup.home
@@ -261,4 +276,87 @@ let%expect_test "a server that dies is failed until reconnected" =
   Mcp_hub.close hub;
   print_counts ~dir [ "mine" ];
   [%expect {| mine: 2 starts, 1 stops |}]
+;;
+
+let%expect_test
+    "settings' servers: ranked last, restarted only when changed, stopped when \
+     gone"
+  =
+  run
+  @@ fun ~env ~sw ~dir ->
+  let setup = Setup.create ~dir in
+  let settings entries = `Object entries in
+  let hub = Mcp_hub.create ~env ~sw () in
+  let a = entry ~dir "a"
+  and b = entry ~dir "b" in
+  servers hub ~dir setup ~settings:(settings [ a; b ]);
+  call
+    hub
+    ~dir
+    setup
+    ~settings:(settings [ a; b ])
+    ~source:Mcp_config.settings_source
+    ~server:"a"
+    ~tool:"echo";
+  print_counts ~dir [ "a"; "b" ];
+  [%expect
+    {|
+    a (settings): ready, 7 tools
+    b (settings): ready, 7 tools
+    hi
+    (echoed)
+    a: 1 starts, 0 stops
+    b: 1 starts, 0 stops
+    |}];
+  (* Editing [b] restarts only [b]. *)
+  let b' = entry ~dir "b" ~env:[ "FOO", "bar" ] in
+  servers hub ~dir setup ~settings:(settings [ a; b' ]);
+  print_counts ~dir [ "a"; "b" ];
+  [%expect
+    {|
+    a (settings): ready, 7 tools
+    b (settings): ready, 7 tools
+    a: 1 starts, 0 stops
+    b: 2 starts, 1 stops
+    |}];
+  (* The host's own file wins over the settings, for that name. *)
+  write_config setup.user_file [ entry ~dir "a" ~env:[ "FROM", "host" ] ];
+  servers hub ~dir setup ~settings:(settings [ a; b' ]);
+  print_counts ~dir [ "a"; "b" ];
+  [%expect
+    {|
+    a ($DIR/home/.prigh/mcp.json): ready, 7 tools
+    b (settings): ready, 7 tools
+    a: 2 starts, 0 stops
+    b: 2 starts, 1 stops
+    |}];
+  Core_unix.unlink setup.user_file;
+  (* Removing (or disabling) one stops it; calls to it say so. *)
+  servers hub ~dir setup ~settings:(settings [ a ]);
+  call
+    hub
+    ~dir
+    setup
+    ~settings:(settings [ a ])
+    ~source:Mcp_config.settings_source
+    ~server:"b"
+    ~tool:"echo";
+  print_counts ~dir [ "a"; "b" ];
+  [%expect
+    {|
+    a (settings): ready, 7 tools
+    ERROR: Settings → MCP servers no longer defines the MCP server "b"
+    a: 2 starts, 0 stops
+    b: 2 starts, 2 stops
+    |}];
+  (* A request without settings (an older backend) stops theirs (the
+     host's own [a] runs on, as servers of files do until the hub closes). *)
+  servers hub ~dir setup;
+  print_counts ~dir [ "a"; "b" ];
+  [%expect
+    {|
+    a: 2 starts, 1 stops
+    b: 2 starts, 2 stops
+    |}];
+  Mcp_hub.close hub
 ;;

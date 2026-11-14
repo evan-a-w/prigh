@@ -14,7 +14,13 @@ open! Import
     A project's servers run commands that came with the project, so they
     start only once the user approves them ({!approve}, [/mcp]); approvals
     are kept in [~/.prigh/mcp-approvals.json] and lapse when the server's
-    definition changes. *)
+    definition changes.
+
+    The servers the user added in prigh's settings ({!Mcp_settings}) come
+    from the backend with every request, as an [mcpServers] object
+    ([~settings]); like the user's file they need no approval, and they
+    rank below it: a project's [.mcp.json], then [~/.prigh/mcp.json], then
+    the settings. *)
 
 module Transport : sig
   type t =
@@ -27,7 +33,10 @@ module Transport : sig
         { url : string
         ; headers : (string * string) list
         }
-  [@@deriving sexp_of, compare]
+  [@@deriving compare]
+
+  (** With the values of [env] and [headers] hidden: they hold secrets. *)
+  val sexp_of_t : t -> Sexp.t
 end
 
 module Server : sig
@@ -57,18 +66,33 @@ end
 
 val user_file : home:string -> string
 
+(** The {!Server.source} of the servers from the settings. *)
+val settings_source : string
+
+(** The servers of an [mcpServers] object from the settings, run in
+    [home]. *)
+val settings_servers
+  :  ?getenv:(string -> string option)
+  -> home:string
+  -> Json.t
+  -> Discovered.t
+
 (** The servers for a session in [cwd]. The closest definition of a name
-    wins: the cwd's [.mcp.json], then its ancestors', then the user's. *)
+    wins: the cwd's [.mcp.json], then its ancestors', then the user's, then
+    [settings] (an [mcpServers] object). *)
 val discover
   :  ?getenv:(string -> string option)
+  -> ?settings:Json.t
   -> cwd:string
   -> home:string
   -> unit
   -> Discovered.t
 
-(** The server [name] as [source] defines it now. *)
+(** The server [name] as [source] defines it now ([settings] for
+    {!settings_source}). *)
 val find
   :  ?getenv:(string -> string option)
+  -> ?settings:Json.t
   -> home:string
   -> source:string
   -> string
@@ -78,3 +102,11 @@ val find
 val is_approved : home:string -> Server.t -> bool
 
 val approve : home:string -> Server.t -> unit Or_error.t
+
+(** Whether [name] can name a server: letters, digits, [-] and [_] (no
+    [__]), at most 32 characters, so that [mcp__NAME__TOOL] reads back. *)
+val check_name : string -> unit Or_error.t
+
+(** Whether [spec] is a server definition, without expanding its
+    variables (that happens where it runs); the error says what to fix. *)
+val check : Json.t -> unit Or_error.t

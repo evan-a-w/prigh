@@ -253,6 +253,7 @@ type t =
   ; questions : Session_questions.t option
   ; subagent_log : Subagent_log.t
   ; mcp : Mcp_hub.t option
+  ; mcp_settings : Mcp_settings.t option
     (** the backend's own servers; [None] turns MCP off on every host *)
   ; mutable mcp_tools : Tool.t list (** as of the latest run's start *)
   ; mutable mcp_noticed : String.Set.t
@@ -1896,6 +1897,10 @@ let expand_skill t text =
       Some (Skill.expand skill ~body ~args))
 ;;
 
+let mcp_settings t =
+  Option.value_map t.mcp_settings ~default:(`Object []) ~f:Mcp_settings.enabled
+;;
+
 let mcp_exec t ?(cancel = Cancellation.never) ~call_id name arguments =
   Host_ops.listing_of_result
     (host_exec t ~cancel ~on_output:ignore ~call_id ~cwd:t.cwd ~name ~arguments)
@@ -1910,7 +1915,13 @@ let mcp_call t (context : Tool.Context.t) ~source ~server ~tool arguments =
     ~cwd:context.cwd
     ~name:Host_ops.mcp_call_op
     ~arguments:
-      (Host_ops.mcp_call_args ~home:t.home ~source ~server ~tool arguments)
+      (Host_ops.mcp_call_args
+         ~home:t.home
+         ~settings:(mcp_settings t)
+         ~source
+         ~server
+         ~tool
+         arguments)
 ;;
 
 let use_listing t (listing : Mcp_tools.Listing.t) =
@@ -1933,7 +1944,10 @@ let refresh_mcp t ~cancel =
         ~cancel
         ~call_id:"mcp"
         Host_ops.mcp_servers_op
-        (Host_ops.mcp_servers_args ~home:t.home ~reconnect:false)
+        (Host_ops.mcp_servers_args
+           ~home:t.home
+           ~settings:(mcp_settings t)
+           ~reconnect:false)
     with
     | Ok listing -> use_listing t listing
     | Error _ -> t.mcp_tools <- [])
@@ -1950,10 +1964,18 @@ let mcp_servers ?(reconnect = false) t =
          t
          ~call_id:"mcp"
          Host_ops.mcp_servers_op
-         (Host_ops.mcp_servers_args ~home:t.home ~reconnect))
+         (Host_ops.mcp_servers_args
+            ~home:t.home
+            ~settings:(mcp_settings t)
+            ~reconnect))
       ~f:(fun listing ->
         use_listing t listing;
         listing)
+;;
+
+let mcp_settings_changed t =
+  if Option.is_some t.mcp
+  then Fiber.fork ~sw:t.sw (fun () -> refresh_mcp t ~cancel:Cancellation.never)
 ;;
 
 let approve_mcp t ~source ~server =
@@ -1965,7 +1987,11 @@ let approve_mcp t ~source ~server =
          t
          ~call_id:"mcp"
          Host_ops.mcp_approve_op
-         (Host_ops.mcp_approve_args ~home:t.home ~source ~server))
+         (Host_ops.mcp_approve_args
+            ~home:t.home
+            ~settings:(mcp_settings t)
+            ~source
+            ~server))
       ~f:(fun listing ->
         use_listing t listing;
         listing)
@@ -3177,6 +3203,7 @@ let create
       ?questions
       ?trace_clock
       ?(offered = fun (_ : Tool.t) -> true)
+      ?mcp_settings
       ?user_info
       ~cwd
       ()
@@ -3285,6 +3312,7 @@ let create
     ; subagent_log = Subagent_log.create ()
     ; mcp
     ; mcp_tools = []
+    ; mcp_settings
     ; mcp_noticed = String.Set.empty
     ; max_budget_usd
     ; goal = None
