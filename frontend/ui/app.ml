@@ -321,6 +321,7 @@ module Model = struct
     ; namespace : string option
     ; user : string option
     ; superuser : bool
+    ; pasted_text : bool
     ; stderr_tail : string list
     ; pending_confirms : P.Pending.Confirm.t list
     ; pending_questions : P.Pending.Ask.t list
@@ -372,6 +373,7 @@ module Model = struct
       ; namespace = t.namespace
       ; user = t.user
       ; superuser = t.superuser
+      ; features = []
       }
   ;;
 end
@@ -685,6 +687,7 @@ let init =
   ; namespace = None
   ; user = None
   ; superuser = false
+  ; pasted_text = false
   ; stderr_tail = []
   ; pending_confirms = []
   ; pending_questions = []
@@ -806,13 +809,45 @@ let decode_list json ~f =
   | other -> Or_error.errorf "expected array, got %s" (P.Json.to_string other)
 ;;
 
+let strings json = decode_list json ~f:P.Json.to_string_or_error
+
+(* The texts given back, each with its pasted texts ([pasted] is there when
+   any has some). *)
 let decode_restored json =
-  match P.Json.field json "restored" with
-  | None -> Ok []
-  | Some (`Array items) ->
-    Or_error.all (List.map items ~f:P.Json.to_string_or_error)
-  | Some other ->
-    Or_error.errorf "restored: expected array, got %s" (P.Json.to_string other)
+  let open Or_error.Let_syntax in
+  let%bind restored =
+    match P.Json.field json "restored" with
+    | None -> Ok []
+    | Some (`Array _ as items) -> strings items
+    | Some other ->
+      Or_error.errorf
+        "restored: expected array, got %s"
+        (P.Json.to_string other)
+  in
+  let%bind pasted = P.Json.optional_list_field json "pasted" ~f:strings in
+  match List.zip restored pasted with
+  | Ok pairs -> Ok pairs
+  | Unequal_lengths -> Ok (List.map restored ~f:(fun text -> text, []))
+;;
+
+(* A message given back to the editor: its pasted texts are tokens again,
+   where the text names them or else after it. *)
+let restore_pasted editor (text, pasted) =
+  let editor, pairs =
+    List.fold_mapi pasted ~init:editor ~f:(fun i editor p ->
+      let editor, token = Editor.paste_token editor p in
+      editor, (sprintf "[%s]" (Pasted_text.name (i + 1)), token))
+  in
+  let missing =
+    List.filter_map pairs ~f:(fun (name, token) ->
+      Option.some_if (not (String.is_substring text ~substring:name)) token)
+  in
+  ( editor
+  , String.concat
+      ~sep:" "
+      (List.filter
+         (Pasted_text.replace_tokens text pairs :: missing)
+         ~f:(Fn.non String.is_empty)) )
 ;;
 
 let logged_in m provider =
@@ -2181,7 +2216,12 @@ let message_agent
           "steer_agent"
           ~params:
             [ "agent_id", str a.id
-            ; "text", str text
+            ; ( "text"
+              , str
+                  (let text, pasted =
+                     Pasted_text.resolve text (Editor.pasted m.editor)
+                   in
+                   Pasted_text.inline ~text pasted) )
             ; "mode", str (Queued_message.Kind.wire kind)
             ]
           ~tag:(Agent_message { agent_id = a.id; kind; text; retry })
@@ -2436,6 +2476,7 @@ let reset_connection m =
   ; namespace = None
   ; user = None
   ; superuser = false
+  ; pasted_text = false
   ; stderr_tail = []
   ; known_paths = String.Set.empty
   ; login_lines = []
@@ -2689,8 +2730,15 @@ let relinked m ~generation (outcome : Server_link.Outcome.t) =
        let m = reset_connection m in
        let m =
          match P.Hello_reply.of_json json with
-         | Ok { client_id; namespace; user; superuser } ->
-           { m with client_id = Some client_id; namespace; user; superuser }
+         | Ok ({ client_id; namespace; user; superuser; features = _ } as hello)
+           ->
+           { m with
+             client_id = Some client_id
+           ; namespace
+           ; user
+           ; superuser
+           ; pasted_text = P.Hello_reply.pasted_text hello
+           }
          | Error _ -> m
        in
        let m = { m with connection = Connected } in
@@ -2758,11 +2806,17 @@ let reconnect_reply m ~generation result =
          ~delay_ms
          ~session
      | Ok json ->
-       let client_id, namespace, user, superuser =
+       let client_id, namespace, user, superuser, pasted_text =
          match P.Hello_reply.of_json json with
-         | Ok { client_id; namespace; user; superuser } ->
-           Some client_id, namespace, user, superuser
-         | Error _ -> m.client_id, m.namespace, m.user, m.superuser
+         | Ok ({ client_id; namespace; user; superuser; features = _ } as hello)
+           ->
+           ( Some client_id
+           , namespace
+           , user
+           , superuser
+           , P.Hello_reply.pasted_text hello )
+         | Error _ ->
+           m.client_id, m.namespace, m.user, m.superuser, m.pasted_text
        in
        let m, session_commands =
          reset_session
@@ -2772,6 +2826,7 @@ let reconnect_reply m ~generation result =
            ; namespace
            ; user
            ; superuser
+           ; pasted_text
            }
        in
        let m =
@@ -4643,13 +4698,14 @@ let attachments m text =
 ;;
 
 let user_params m text =
+  let text, pasted = Pasted_text.resolve text (Editor.pasted m.editor) in
   let attachments = attachments m text in
-  ("text", str text)
-  ::
-  (if List.is_empty attachments
-   then []
-   else
-     [ "attachments", `Array (List.map attachments ~f:(fun p -> P.Json.str p)) ])
+  Pasted_text.params ~backend_takes:m.pasted_text ~text pasted
+  @
+  if List.is_empty attachments
+  then []
+  else
+    [ "attachments", `Array (List.map attachments ~f:(fun p -> P.Json.str p)) ]
 ;;
 
 let shell_command m text =
@@ -5164,7 +5220,14 @@ let editing_intent m (intent : Intent.t) =
   let ed f = { m with editor = f m.editor }, [] in
   match intent with
   | Insert s -> ed (fun e -> Editor.insert e s)
-  | Paste s -> ed (fun e -> Editor.insert_paste e s)
+  | Paste s ->
+    (match
+       Option.bind
+         (Option.some_if (Pasted_text.is_long s) s)
+         ~f:Pasted_text.too_large
+     with
+     | Some error -> notice m error, []
+     | None -> ed (fun e -> Editor.insert_paste e s))
   | Submit -> submit m
   | Submit_as_typed -> submit { m with autocomplete = None }
   | Newline -> ed Editor.newline
@@ -7107,7 +7170,10 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
          match restored with
          | [] -> m, []
          | restored ->
-           let joined = String.concat ~sep:"\n\n" restored in
+           let editor, texts =
+             List.fold_map restored ~init:m.editor ~f:restore_pasted
+           in
+           let joined = String.concat ~sep:"\n\n" texts in
            let text =
              if Editor.is_empty m.editor
              then joined
@@ -7117,7 +7183,7 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
            let noun = if count = 1 then "message" else "messages" in
            let m =
              { m with
-               editor = Editor.set_text m.editor text
+               editor = Editor.set_text editor text
              ; queued_messages = []
              }
            in
@@ -7212,7 +7278,10 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
        decode
          json
          ~f:P.Hello_reply.of_json
-         (fun { client_id; namespace; user; superuser = _ } ->
+         (fun
+             ({ client_id; namespace; user; superuser = _; features = _ } as
+              hello)
+            ->
             let m, session_commands =
               reset_session
                 { m with
@@ -7220,6 +7289,7 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
                 ; namespace
                 ; user
                 ; sessions = None
+                ; pasted_text = P.Hello_reply.pasted_text hello
                 }
             in
             let m =
@@ -7591,15 +7661,22 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
         | _ ->
           decode
             json
-            ~f:(fun j -> P.Json.string_field j "text")
-            (fun text ->
+            ~f:(fun j ->
+              let%bind.Or_error text = P.Json.string_field j "text" in
+              let%map.Or_error pasted =
+                P.Json.optional_list_field
+                  j
+                  "pasted"
+                  ~f:P.Json.to_string_or_error
+              in
+              text, pasted)
+            (fun queued ->
+               let editor, text = restore_pasted m.editor queued in
                let editor =
                  if Editor.is_empty m.editor
-                 then Editor.set_text m.editor text
+                 then Editor.set_text editor text
                  else
-                   Editor.set_text
-                     m.editor
-                     (text ^ "\n\n" ^ Editor.text m.editor)
+                   Editor.set_text editor (text ^ "\n\n" ^ Editor.text m.editor)
                in
                { m with editor }, []))
      | Paths_for_autocomplete prefix ->
@@ -7718,8 +7795,16 @@ let update m (action : Action.t) =
       | Set_utc_offset utc_offset -> { m with utc_offset }, []
       | Focus focused ->
         { m with terminal_focus = (if focused then Focused else Unfocused) }, []
-      | Hello { client_id; namespace; user; superuser } ->
-        { m with client_id = Some client_id; namespace; user; superuser }, []
+      | Hello ({ client_id; namespace; user; superuser; features = _ } as hello)
+        ->
+        ( { m with
+            client_id = Some client_id
+          ; namespace
+          ; user
+          ; superuser
+          ; pasted_text = P.Hello_reply.pasted_text hello
+          }
+        , [] )
       | Server_link link -> { m with server = Some link }, []
       | Relinked { generation; outcome } -> relinked m ~generation outcome
       | Rejected reason -> signed_out m ~reason, []

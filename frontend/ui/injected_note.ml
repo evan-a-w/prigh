@@ -48,6 +48,7 @@ let label (user : P.Message.User.t) =
   | None ->
     (match first_line (typed user), user.images, user.origin with
      | "", image :: _, _ -> P.Image.to_string_hum image
+     | "", [], Some { pasted = p :: _; _ } -> p.name
      | "", [], Some { notes = note :: _; _ } ->
        glyph note.kind ^ " " ^ note.title
      | line, _, _ -> line)

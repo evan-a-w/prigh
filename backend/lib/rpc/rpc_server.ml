@@ -225,6 +225,16 @@ let index_param params =
 
 let unit_result r = Or_error.map r ~f:(fun () -> `Object [])
 
+(* [hello]'s reply's [features]: what this backend takes beyond the basics
+   ([pasted_text]: prompts' [pasted]). *)
+let backend_features = [ "pasted_text" ]
+let strings l = `Array (List.map l ~f:(fun s -> `String s))
+
+let pasted_field = function
+  | [] -> []
+  | pasted -> [ "pasted", strings pasted ]
+;;
+
 (* An answer through a component is dropped, not given back to edit: its
    text is empty, and [ui_action] says what it was. *)
 let queued_json (queued : Agent.Queued.t) =
@@ -242,10 +252,10 @@ let queued_json (queued : Agent.Queued.t) =
       ]
   | None ->
     `Object
-      [ "text", `String queued.text
-      ; ( "attachments"
-        , `Array (List.map queued.attachments ~f:(fun a -> `String a)) )
-      ]
+      ([ "text", `String queued.text
+       ; "attachments", strings queued.attachments
+       ]
+       @ pasted_field queued.pasted)
 ;;
 
 let provider_of_string login s =
@@ -1854,6 +1864,7 @@ let hello t (client : Client.t) params =
               , if Option.exists client.signed_in ~f:(fun s -> s.superuser)
                 then `True
                 else `False )
+            ; "features", strings backend_features
             ; "state", Rpc_json.state (Agent.state agent)
             ]))))
 ;;
@@ -3272,17 +3283,32 @@ let dispatch agent login ~(client : Client.t) ~meth ~params : Json.t Or_error.t 
       | None -> string_param params "text"
     in
     let%bind attachments = string_list_param params "attachments" in
+    let%bind pasted = string_list_param params "pasted" in
     let%bind images = images_param ~env:(Agent.env agent) params in
     let client = client.kind in
     (match meth with
      | "prompt" ->
        unit_result
-         (Agent.prompt ~attachments ~images ~client ?ui_action agent text)
+         (Agent.prompt
+            ~attachments
+            ~pasted
+            ~images
+            ~client
+            ?ui_action
+            agent
+            text)
      | "steer" ->
-       unit_result (Agent.steer ~attachments ~images ~client agent text)
+       unit_result (Agent.steer ~attachments ~pasted ~images ~client agent text)
      | _ ->
        unit_result
-         (Agent.follow_up ~attachments ~images ~client ?ui_action agent text))
+         (Agent.follow_up
+            ~attachments
+            ~pasted
+            ~images
+            ~client
+            ?ui_action
+            agent
+            text))
   | "list_skills" ->
     Or_error.map (Agent.skills agent) ~f:(fun skills ->
       `Object [ "skills", `Array (List.map skills ~f:[%jsonaf_of: Skill.t]) ])
@@ -3301,10 +3327,24 @@ let dispatch agent login ~(client : Client.t) ~meth ~params : Json.t Or_error.t 
       (Agent.approve_mcp agent ~source ~server)
       ~f:Mcp_tools.Listing.to_rpc_json
   | "abort" ->
-    let restored = Agent.abort agent in
+    let restored = Agent.abort_queued agent in
     ok
       (`Object
-          [ "restored", `Array (List.map restored ~f:(fun s -> `String s)) ])
+          (( "restored"
+           , strings (List.map restored ~f:(fun (q : Agent.Queued.t) -> q.text))
+           )
+           ::
+           (* Each restored message's, when any has some. *)
+           (if
+              List.for_all restored ~f:(fun (q : Agent.Queued.t) ->
+                List.is_empty q.pasted)
+            then []
+            else
+              [ ( "pasted"
+                , `Array
+                    (List.map restored ~f:(fun (q : Agent.Queued.t) ->
+                       strings q.pasted)) )
+              ])))
   | "cancel_subagent" ->
     Or_error.bind (string_param params "agent_id") ~f:(fun agent_id ->
       unit_result (Agent.cancel_subagent agent ~agent_id))

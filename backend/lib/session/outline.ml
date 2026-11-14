@@ -58,9 +58,15 @@ let point index ({ message; at } : Timed_message.t) =
      | Some ({ source = None; _ } as origin) ->
        let body = Injected.body origin u.text in
        (* Notes between turns, nothing of the user's. *)
-       if String.is_empty (String.strip body) && List.is_empty u.images
-       then None
-       else point User body)
+       (match String.strip body, origin.pasted with
+        | "", [] when List.is_empty u.images -> None
+        | "", (_ :: _ as pasted) ->
+          point
+            User
+            (String.concat
+               ~sep:", "
+               (List.map pasted ~f:(fun (p : Injected.Pasted.t) -> p.name)))
+        | _ -> point User body))
   | Assistant { stop_reason = Error e; _ } -> point Error e
   | Assistant _ | Tool_result _ -> None
 ;;

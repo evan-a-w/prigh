@@ -116,6 +116,7 @@ type t =
       { title : string
       ; text : string
       }
+  | Pasted of int (** the composer's pasted text: view, insert, remove *)
   | Mcp_tools of Mcp_server.t (** a ready server's tools *)
   | Loading of string
   (** the title of a dialog waiting for its list from the backend *)

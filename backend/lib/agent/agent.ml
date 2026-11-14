@@ -8,6 +8,7 @@ module Queued = struct
       (** what the model gets instead: a skill's or a command's prompt *)
     ; source : Injected.Source.t option
     ; attachments : string list
+    ; pasted : string list
     ; images : Image.t list
     ; client : Client_kind.t option
     ; ui_action : Ui_action.t option
@@ -2429,6 +2430,15 @@ let with_attachments t ~cancel text attachments =
     , List.concat images )
 ;;
 
+(* The text with the pasted texts' [<pasted_text>] blocks, and what they are. *)
+let with_pasted text pasted =
+  let pasted, blocks =
+    List.unzip
+      (List.mapi pasted ~f:(fun i p -> Injected.Pasted.make ~n:(i + 1) p))
+  in
+  String.concat (text :: List.map blocks ~f:(fun b -> "\n\n" ^ b)), pasted
+;;
+
 (* Without a system prompt yet, it is to be built from the current
    environment: only plan mode, which it does not describe, is told. *)
 let take_notes t =
@@ -2456,11 +2466,12 @@ let user_message ?(cancel = Cancellation.never) t (q : Queued.t) =
       (String.concat ~sep:"\n" (List.map notes ~f:(fun n -> n.text)))
   | None ->
     let text = Option.value q.expanded ~default:q.text in
+    let text, pasted = with_pasted text q.pasted in
     let text, attachments, attached =
       with_attachments t ~cancel text q.attachments
     in
     let notes = take_notes t in
-    let origin = { Injected.notes; attachments; source = q.source } in
+    let origin = { Injected.notes; pasted; attachments; source = q.source } in
     Message.user
       ~images:(q.images @ attached)
       ?origin:(Option.some_if (not (Injected.is_empty origin)) origin)
@@ -3560,9 +3571,27 @@ let create
   t
 ;;
 
+let megabytes bytes = sprintf "%.1f MB" (Float.of_int bytes /. 1_048_576.)
+
+let check_pasted pasted =
+  match
+    List.findi pasted ~f:(fun _ p ->
+      String.length p > Injected.Pasted.max_bytes)
+  with
+  | None -> Ok ()
+  | Some (i, p) ->
+    Or_error.errorf
+      "pasted text #%d is %s, over the %s a pasted text may be: attach it as a \
+       file instead (prigh-web: its + or drop it on the page; the TUI: save it \
+       and @mention its path)"
+      (i + 1)
+      (megabytes (String.length p))
+      (megabytes Injected.Pasted.max_bytes)
+;;
+
 (* What [prompt], [steer] and [follow_up] queue: the text with its skill
    expanded, or the answer through a component. *)
-let to_queue t ~attachments ~images ~client ~ui_action text =
+let to_queue t ~attachments ~pasted ~images ~client ~ui_action text =
   match ui_action with
   | None when t.chat_mode && not (List.is_empty attachments) ->
     Or_error.error_string
@@ -3573,10 +3602,14 @@ let to_queue t ~attachments ~images ~client ~ui_action text =
     Or_error.error_string
       "skills are read on the tool host, and chat mode has none: leave chat \
        mode (/mode) to use one"
-  | Some _ when not (List.is_empty attachments && List.is_empty images) ->
+  | Some _
+    when not
+           (List.is_empty attachments
+            && List.is_empty pasted
+            && List.is_empty images) ->
     Or_error.error_string
-      "a prompt with ui_action takes no attachments or images: send them in a \
-       message of their own"
+      "a prompt with ui_action takes no attachments, pasted texts or images: \
+       send them in a message of their own"
   | Some action ->
     Or_error.map
       (Ui_action.check action (path_messages t.session))
@@ -3585,16 +3618,19 @@ let to_queue t ~attachments ~images ~client ~ui_action text =
         ; expanded = None
         ; source = None
         ; attachments = []
+        ; pasted = []
         ; images = []
         ; client
         ; ui_action = Some action
         })
   | None ->
+    let%bind.Or_error () = check_pasted pasted in
     Or_error.map (expand_skill t text) ~f:(fun expanded ->
       { Queued.text
       ; expanded
       ; source = None
       ; attachments
+      ; pasted
       ; images
       ; client
       ; ui_action = None
@@ -3609,7 +3645,15 @@ let cannot_start t =
   | None -> if t.chat_mode then None else no_host t
 ;;
 
-let prompt ?(attachments = []) ?(images = []) ?client ?ui_action t text =
+let prompt
+      ?(attachments = [])
+      ?(pasted = [])
+      ?(images = [])
+      ?client
+      ?ui_action
+      t
+      text
+  =
   let running () =
     Or_error.error_string "a run is already in progress; use steer or follow_up"
   in
@@ -3619,7 +3663,7 @@ let prompt ?(attachments = []) ?(images = []) ?client ?ui_action t text =
   then Or_error.error_string (Option.value_exn (cannot_start t))
   else
     Or_error.bind
-      (to_queue t ~attachments ~images ~client ~ui_action text)
+      (to_queue t ~attachments ~pasted ~images ~client ~ui_action text)
       ~f:(fun queued ->
         if is_running t
         then running ()
@@ -3637,29 +3681,38 @@ let enqueue_queued t kind queued =
   else start_run t [] ~then_:(fun ~cancel -> [ user_message ~cancel t queued ])
 ;;
 
-let enqueue t kind ?(attachments = []) ?(images = []) ?client ?ui_action text =
+let enqueue
+      t
+      kind
+      ?(attachments = [])
+      ?(pasted = [])
+      ?(images = [])
+      ?client
+      ?ui_action
+      text
+  =
   match if is_running t then budget_exhausted t else cannot_start t with
   | Some reason -> Or_error.error_string reason
   | None ->
     Or_error.map
-      (to_queue t ~attachments ~images ~client ~ui_action text)
+      (to_queue t ~attachments ~pasted ~images ~client ~ui_action text)
       ~f:(enqueue_queued t kind)
 ;;
 
-let steer ?attachments ?images ?client t text =
-  enqueue t Steer ?attachments ?images ?client text
+let steer ?attachments ?pasted ?images ?client t text =
+  enqueue t Steer ?attachments ?pasted ?images ?client text
 ;;
 
-let follow_up ?attachments ?images ?client ?ui_action t text =
-  enqueue t Follow_up ?attachments ?images ?client ?ui_action text
+let follow_up ?attachments ?pasted ?images ?client ?ui_action t text =
+  enqueue t Follow_up ?attachments ?pasted ?images ?client ?ui_action text
 ;;
 
 (* Queued text is restored verbatim: attachments are only inlined when the
    message is actually sent. *)
-let abort t =
+let abort_queued t =
   let restored =
-    List.filter_map (Steer_queue.take_all t.queue) ~f:(fun (q : Queued.t) ->
-      Option.some_if (Option.is_none q.ui_action) q.text)
+    List.filter (Steer_queue.take_all t.queue) ~f:(fun (q : Queued.t) ->
+      Option.is_none q.ui_action)
   in
   queue_update t;
   Option.iter t.run ~f:(fun run -> Cancellation.cancel run.cancel);
@@ -3670,6 +3723,8 @@ let abort t =
     state_changed t);
   restored
 ;;
+
+let abort t = List.map (abort_queued t) ~f:(fun (q : Queued.t) -> q.text)
 
 let rec wait_idle t =
   match t.run, t.describing with
@@ -4003,6 +4058,7 @@ let command_prompt ?client t ~text ~expanded ~source =
       ; expanded = Some expanded
       ; source = Some source
       ; attachments = []
+      ; pasted = []
       ; images = []
       ; client
       ; ui_action = None
@@ -4073,6 +4129,7 @@ let submit_review ?client ?root t =
           ; expanded = Some text
           ; source = Some (Review_comments { count })
           ; attachments = []
+          ; pasted = []
           ; images = []
           ; client
           ; ui_action = None

@@ -13,6 +13,7 @@ let superuser () =
          ; namespace = Some "alice"
          ; user = Some "alice"
          ; superuser = true
+         ; features = []
          }));
   h
 ;;
@@ -179,6 +180,7 @@ let%expect_test "to everyone else /nix-gc does not exist" =
          ; namespace = Some "bob"
          ; user = Some "bob"
          ; superuser = false
+         ; features = []
          }));
   let completions () =
     print_s
@@ -225,6 +227,7 @@ let%expect_test "a superuser acting as another user keeps /nix-gc" =
          ; namespace = Some "bob"
          ; user = Some "alice"
          ; superuser = true
+         ; features = []
          });
     H.type_ h "/nix-gc");
   H.act h Send;

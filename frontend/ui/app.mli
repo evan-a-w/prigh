@@ -351,6 +351,9 @@ module Model : sig
     ; superuser : bool
       (** [user] is a superuser (even when acting as another): has the
           commands only superusers have ([/nix-gc]) *)
+    ; pasted_text : bool
+      (** the backend takes prompts' [pasted] texts ([hello]'s [features]);
+          else they go inline *)
     ; stderr_tail : string list
     ; pending_confirms : P.Pending.Confirm.t list
     ; pending_questions : P.Pending.Ask.t list

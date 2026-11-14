@@ -82,20 +82,46 @@ module Source = struct
   ;;
 end
 
+module Pasted = struct
+  type t =
+    { name : string
+    ; lines : int
+    ; text : string
+    }
+  [@@deriving sexp_of, equal]
+
+  let of_json ~text j =
+    let open Or_error.Let_syntax in
+    let%bind name = Json.string_field j "name" in
+    let%bind lines = Json.int_field j "lines" in
+    let%bind start = Json.int_field j "start" in
+    let%bind length = Json.int_field j "length" in
+    if start < 0 || length < 0 || start + length > String.length text
+    then Or_error.errorf "pasted text %S is not in the message" name
+    else Ok { name; lines; text = String.sub text ~pos:start ~len:length }
+  ;;
+end
+
 type t =
   { body : string option [@sexp.option]
   ; notes : Note.t list [@sexp.list]
+  ; pasted : Pasted.t list [@sexp.list]
   ; attachments : string list [@sexp.list]
   ; source : Source.t option [@sexp.option]
   }
 [@@deriving sexp_of, equal]
 
-let empty = { body = None; notes = []; attachments = []; source = None }
+let empty =
+  { body = None; notes = []; pasted = []; attachments = []; source = None }
+;;
 
-let of_json j =
+let of_json ~text j =
   let open Or_error.Let_syntax in
   let%bind body = Json.string_opt_field j "body" in
   let%bind notes = Json.optional_list_field j "notes" ~f:Note.of_json in
+  let%bind pasted =
+    Json.optional_list_field j "pasted" ~f:(Pasted.of_json ~text)
+  in
   let%bind attachments =
     Json.optional_list_field j "attachments" ~f:(fun a ->
       Json.string_field a "path")
@@ -105,5 +131,5 @@ let of_json j =
     | None -> Ok None
     | Some s -> Source.of_json s >>| Option.some
   in
-  { body; notes; attachments; source }
+  { body; notes; pasted; attachments; source }
 ;;

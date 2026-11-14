@@ -127,11 +127,76 @@ let menu_classes (more : More.t) =
      | Some _ | None -> [])
 ;;
 
-let user ?skill times (u : Message.User.t) =
-  let notes, attachments =
+(* A pasted text's fold: by the message's time, which only its own
+   messages share. *)
+let pasted_key (u : Message.User.t) i =
+  sprintf
+    "pasted:%s:%d"
+    (Option.value_map u.at ~default:"" ~f:(fun at ->
+       sprintf "%.0f" (Time_ns.Span.to_ms (Time_ns.to_span_since_epoch at))))
+    i
+;;
+
+(* A chip each, its text only in the page once opened: it may be long. *)
+let pasted_texts ~fold (u : Message.User.t) (pasted : Origin.Pasted.t list) =
+  match pasted with
+  | [] -> Node.none
+  | pasted ->
+    div
+      "pasted-texts"
+      (List.mapi pasted ~f:(fun i (p : Origin.Pasted.t) ->
+         let key = pasted_key u i in
+         let open_ = Fold.toggled fold key in
+         let summary =
+           Prigh_ui.Pasted_text.summary
+             ~lines:p.lines
+             ~bytes:(String.length p.text)
+         in
+         Node.div
+           ~attrs:
+             [ Attr.classes
+                 ([ "pasted"; "copyable" ] @ if open_ then [ "open" ] else [])
+             ]
+           [ Node.button
+               ~attrs:
+                 [ Attr.class_ "pasted-head"
+                 ; Attr.type_ "button"
+                 ; Fold.toggle_attr fold key
+                 ; Attr.create "aria-expanded" (Bool.to_string open_)
+                 ; Attr.title (if open_ then "Fold it" else "Show it all")
+                 ]
+               [ Node.span ~attrs:[ Attr.class_ "chev" ] []
+               ; span "pasted-name" p.name
+               ; span "pasted-detail" summary
+               ; (if open_
+                  then Node.none
+                  else
+                    span "pasted-preview" (Prigh_ui.Pasted_text.preview p.text))
+               ]
+           ; (if open_
+              then
+                Node.div
+                  ~attrs:[ Attr.class_ "pasted-body" ]
+                  [ Node.button
+                      ~attrs:
+                        [ Attr.class_ "copy"
+                        ; Attr.type_ "button"
+                        ; Attr.title "Copy"
+                        ]
+                      [ Node.text "Copy" ]
+                  ; Node.pre
+                      ~attrs:[ Attr.class_ "pasted-text copy-text" ]
+                      [ Node.text p.text ]
+                  ]
+              else Node.none)
+           ]))
+;;
+
+let user ?skill ~fold times (u : Message.User.t) =
+  let notes, pasted, attachments =
     match u.origin with
-    | None -> [], []
-    | Some origin -> origin.notes, origin.attachments
+    | None -> [], [], []
+    | Some origin -> origin.notes, origin.pasted, origin.attachments
   in
   let text =
     Option.value_map
@@ -150,6 +215,7 @@ let user ?skill times (u : Message.User.t) =
            Node.div
              ~attrs:[ Attr.class_ "bubble"; Attr.create "dir" "auto" ]
              [ Node.text text ])
+      ; pasted_texts ~fold u pasted
       ; (match attachments with
          | [] -> Node.none
          | paths ->
@@ -168,6 +234,7 @@ let user ?skill times (u : Message.User.t) =
   | notes
     when String.is_empty (String.strip text)
          && List.is_empty u.images
+         && List.is_empty pasted
          && List.is_empty attachments ->
     (* Notes sent between turns, with nothing of the user's. *)
     div "msg noted" (List.map notes ~f:(margin_note ?at:u.at times))
@@ -493,7 +560,8 @@ and render_entry ~ui ~fold times chat (entry : Chat.Entry.t) =
             (String.chop_prefix u.text ~prefix:summary_prefix)
             ~default:u.text)
      | Some { kind; title } -> noted (note ?at:u.at times ~kind ~title u.text)
-     | None -> user ?skill:(Skill_message.parse (Message.User.body u)) times u)
+     | None ->
+       user ?skill:(Skill_message.parse (Message.User.body u)) ~fold times u)
   | Shell call ->
     let tool = Chat.tool chat call.id in
     div
@@ -536,6 +604,8 @@ and entry ?menu ?index ~ui ~fold times chat ~n (entry : Chat.Entry.t) =
         | Tool_call call -> Some call.id
         | Text _ | Thinking _ | Server_tool _ -> None)
     | Shell call -> [ call.id ]
+    | User ({ origin = Some { pasted = _ :: _ as pasted; _ }; _ } as u) ->
+      List.mapi pasted ~f:(fun i _ -> pasted_key u i)
     | User u when String.is_prefix u.text ~prefix:"[" ->
       (* A delivery's jobs fold. *)
       (match Prigh_ui.Delivery.parse u.text with

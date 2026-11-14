@@ -1267,6 +1267,7 @@ let%expect_test "hello reply: client id and namespace" =
     ; {|{"client_id":"client-1","namespace":null}|}
     ; {|{"client_id":"client-1"}|}
     ; {|{"client_id":"client-1","host_id":"host-abc"}|}
+    ; {|{"client_id":"client-1","features":["pasted_text","heartbeat"]}|}
     ; {|{"namespace":"lloyd"}|}
     ; {|{"client_id":"client-1","namespace":3}|}
     ]
@@ -1293,6 +1294,12 @@ let%expect_test "hello reply: client id and namespace" =
       (namespace ())
       (user      ())
       (superuser false)))
+    (Ok (
+      (client_id client-1)
+      (namespace ())
+      (user      ())
+      (superuser false)
+      (features (pasted_text heartbeat))))
     (Error "missing field \"client_id\"")
     (Error "field \"namespace\": expected string, got 3")
     |}]
@@ -1980,6 +1987,60 @@ let%expect_test "hidden ranges, message points and the requests about them" =
     {"id":1,"method":"trim_after","params":{"after":"a3"}}
     {"id":1,"method":"untrim","params":{}}
     {"id":1,"method":"get_trimmed","params":{"entry":"t1"}}
+    |}]
+;;
+
+let%expect_test "hello reply: whether the backend takes pasted texts" =
+  List.iter
+    [ {|{"client_id":"c","features":["pasted_text"]}|}
+    ; {|{"client_id":"c","features":[]}|}
+    ; {|{"client_id":"c"}|}
+    ]
+    ~f:(fun json ->
+      print_s
+        [%sexp
+          (Hello_reply.of_json (Or_error.ok_exn (Json.parse json))
+           |> Or_error.map ~f:Hello_reply.pasted_text
+           : bool Or_error.t)]);
+  [%expect
+    {|
+    (Ok true)
+    (Ok false)
+    (Ok false)
+    |}]
+;;
+
+let%expect_test "origin: pasted texts are taken out of the message's text" =
+  let text =
+    "fix [Pasted text #1]\n\n\
+     <pasted_text name=\"Pasted text #1\" lines=\"2\">\n\
+     a\n\
+     b\n\
+     </pasted_text>"
+  in
+  let start = String.substr_index_exn text ~pattern:"\na\nb" + 1 in
+  List.iter
+    [ sprintf
+        {|{"body":"fix [Pasted text #1]","pasted":[{"name":"Pasted text #1","lines":2,"start":%d,"length":3}]}|}
+        start
+    ; {|{"body":"x","pasted":[{"name":"Pasted text #1","lines":2,"start":90,"length":30}]}|}
+    ; {|{"body":"x"}|}
+    ]
+    ~f:(fun json ->
+      print_s
+        [%sexp
+          (Origin.of_json ~text (Or_error.ok_exn (Json.parse json))
+           : Origin.t Or_error.t)]);
+  [%expect
+    {|
+    (Ok (
+      (body "fix [Pasted text #1]")
+      (pasted ((
+        (name  "Pasted text #1")
+        (lines 2)
+        (text  "a\nb"))))))
+    (Error (in pasted[0] "pasted text \"Pasted text #1\" is not in the message"))
+    (Ok ((body x)))
     |}]
 ;;
 

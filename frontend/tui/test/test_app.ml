@@ -7943,6 +7943,7 @@ let%expect_test "~ in the cwd shown is the active tool host's home, not ours" =
        ; namespace = None
        ; user = None
        ; superuser = false
+       ; features = []
        });
   show_where ~active:"client-2" ~cwd:"/home/me/d";
   [%expect
@@ -7987,6 +7988,7 @@ let%expect_test
        ; namespace = None
        ; user = None
        ; superuser = false
+       ; features = []
        });
   H.keys h "/host laptop";
   H.enter h;
@@ -8297,6 +8299,7 @@ let%expect_test "the host picker shows which session other frontends are in" =
        ; namespace = None
        ; user = None
        ; superuser = false
+       ; features = []
        });
   H.keys h "/host";
   H.enter h;
@@ -9094,6 +9097,7 @@ let%expect_test
        ; namespace = Some "lloyd"
        ; user = Some "lloyd"
        ; superuser = false
+       ; features = []
        });
   H.show h;
   [%expect
@@ -9368,6 +9372,7 @@ let%expect_test "/setusr: lists users, acts as one, reconnects as them" =
        ; namespace = Some "s"
        ; user = Some "s"
        ; superuser = false
+       ; features = []
        });
   H.keys h "/setusr";
   H.enter h;

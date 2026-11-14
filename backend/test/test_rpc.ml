@@ -335,6 +335,116 @@ let%expect_test "prompt attachments are inlined into the user message" =
     |}]
 ;;
 
+let%expect_test
+    "pasted texts reach the model in full as blocks; the message shows them \
+     apart"
+  =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  write t "a.txt" "attached\n";
+  let on_request (request : Provider.Request.t) =
+    List.iter request.messages ~f:(function
+      | Message.User u -> print_endline (mask t u.text)
+      | _ -> ())
+  in
+  let agent, h =
+    make_server
+      t
+      ~sw
+      ~provider:(Faux_provider.create ~on_request [ Reply.text "ok" ])
+  in
+  call
+    t
+    h
+    ~params:
+      {|{"text": "what is wrong here?", "pasted": ["line one\nline two\n", "x"], "attachments": ["a.txt"]}|}
+    "prompt";
+  Agent.wait_idle agent;
+  [%expect
+    {|
+    [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]
+
+    what is wrong here?
+
+    <pasted_text name="Pasted text #1" lines="2">
+    line one
+    line two
+
+    </pasted_text>
+
+    <pasted_text name="Pasted text #2" lines="1">
+    x
+    </pasted_text>
+
+    <file path="a.txt">
+    attached
+    </file>
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    |}];
+  let shown (json : Json.t) =
+    match json with
+    | `Array (`Object fields :: _) ->
+      let text =
+        match List.Assoc.find fields "text" ~equal:String.equal with
+        | Some (`String s) -> s
+        | _ -> ""
+      in
+      let origin = List.Assoc.find_exn fields "origin" ~equal:String.equal in
+      print_endline (mask t (Json.to_string origin));
+      (match Json.member "pasted" origin with
+       | Some (`Array pasted) ->
+         List.iter pasted ~f:(fun p ->
+           let int name =
+             match Json.member name p with
+             | Some (`Number n) -> Int.of_string n
+             | _ -> -1
+           in
+           printf
+             "%S\n"
+             (String.sub text ~pos:(int "start") ~len:(int "length")))
+       | _ -> print_endline "no pasted")
+    | _ -> print_endline "no message"
+  in
+  (* As frontends get it, and from the session file after a reload. *)
+  shown
+    (`Array
+        (List.map (Agent.messages agent) ~f:Rpc_json.message
+         |> List.filter ~f:(fun m ->
+           match Json.member "role" m with
+           | Some (`String "user") -> true
+           | _ -> false)));
+  let reloaded =
+    Or_error.ok_exn (Session.load (Agent.state agent).session_path)
+  in
+  shown
+    (`Array
+        (List.filter_map (Session.messages reloaded) ~f:(function
+           | Message.User _ as m -> Some (Rpc_json.message m)
+           | _ -> None)));
+  [%expect
+    {|
+    {"body":"what is wrong here?","notes":[{"kind":"client","title":"Using another client","text":"[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]"}],"pasted":[{"name":"Pasted text #1","lines":2,"start":200,"length":18},{"name":"Pasted text #2","lines":1,"start":281,"length":1}],"attachments":[{"path":"a.txt"}]}
+    "line one\nline two\n"
+    "x"
+    {"body":"what is wrong here?","notes":[{"kind":"client","title":"Using another client","text":"[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]"}],"pasted":[{"name":"Pasted text #1","lines":2,"start":200,"length":18},{"name":"Pasted text #2","lines":1,"start":281,"length":1}],"attachments":[{"path":"a.txt"}]}
+    "line one\nline two\n"
+    "x"
+    |}];
+  (* Past the limit: refused, saying what to do instead. *)
+  call
+    t
+    h
+    ~params:
+      (sprintf
+         {|{"text": "big", "pasted": ["ok", "%s"]}|}
+         (String.make (Injected.Pasted.max_bytes + 1) 'a'))
+    "prompt";
+  [%expect
+    {| {"type":"response","id":"r1","ok":false,"error":"pasted text #2 is 2.0 MB, over the 2.0 MB a pasted text may be: attach it as a file instead (prigh-web: its + or drop it on the page; the TUI: save it and @mention its path)"} |}]
+;;
+
 let%expect_test "images: in prompts, from attachments, and refused" =
   with_sandbox
   @@ fun t ->
@@ -535,8 +645,8 @@ let%expect_test "abort returns restored messages and emits queue_update" =
   let events = Queue.create () in
   Agent.subscribe agent ~f:(fun e -> Queue.enqueue events (Rpc_json.event e));
   call t h ~params:{|{"text": "go"}|} "prompt";
-  call t h ~params:{|{"text": "first steer"}|} "steer";
-  call t h ~params:{|{"text": "second follow up"}|} "follow_up";
+  call t h ~params:{|{"text": "first steer", "pasted": ["a\nb"]}|} "steer";
+  call t h ~params:{|{"text": "second follow up", "pasted": ["c"]}|} "follow_up";
   call t h "abort";
   Agent.wait_idle agent;
   Queue.iter events ~f:(fun e -> print_endline (mask t (Json.to_string e)));
@@ -545,7 +655,7 @@ let%expect_test "abort returns restored messages and emits queue_update" =
     {"type":"response","id":"r1","ok":true,"result":{}}
     {"type":"response","id":"r1","ok":true,"result":{}}
     {"type":"response","id":"r1","ok":true,"result":{}}
-    {"type":"response","id":"r1","ok":true,"result":{"restored":["first steer","second follow up"]}}
+    {"type":"response","id":"r1","ok":true,"result":{"restored":["first steer","second follow up"],"pasted":[["a\nb"],["c"]]}}
     {"type":"event","event":"state","state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"thinking_options":["off","default","low","high","max"],"thinking_default":"high","supports_images":false,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"default","running":true,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","active_host_name":"<host>","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"chat_mode":false,"no_host":null,"computer_control":null,"plan":null,"session_rules":[]}}
     {"type":"event","event":"agent_start"}
     {"type":"event","event":"message_start","message":{"role":"user","text":"[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\ngo","origin":{"body":"go","notes":[{"kind":"client","title":"Using another client","text":"[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]"}]}}}
@@ -837,7 +947,7 @@ let%expect_test "dequeue returns queued messages and null when empty" =
   @@ fun t agent h ->
   call t h ~params:{|{"text": "go"}|} "prompt";
   call t h ~params:{|{"text": "steer one"}|} "steer";
-  call t h ~params:{|{"text": "follow up"}|} "follow_up";
+  call t h ~params:{|{"text": "follow up", "pasted": ["log"]}|} "follow_up";
   call t h "dequeue";
   call t h "dequeue";
   call t h "dequeue";
@@ -847,7 +957,7 @@ let%expect_test "dequeue returns queued messages and null when empty" =
     {"type":"response","id":"r1","ok":true,"result":{}}
     {"type":"response","id":"r1","ok":true,"result":{}}
     {"type":"response","id":"r1","ok":true,"result":{}}
-    {"type":"response","id":"r1","ok":true,"result":{"text":"follow up","attachments":[]}}
+    {"type":"response","id":"r1","ok":true,"result":{"text":"follow up","attachments":[],"pasted":["log"]}}
     {"type":"response","id":"r1","ok":true,"result":{"text":"steer one","attachments":[]}}
     {"type":"response","id":"r1","ok":true,"result":null}
     |}]
@@ -1034,7 +1144,7 @@ let%expect_test "remote tool host: exec round trip, switch, disconnect" =
     | _ -> ());
   [%expect
     {|
-    {"type":"response","id":"r2","ok":true,"result":{"client_id":"client-2","host_id":"client-2","namespace":null,"user":null,"superuser":false,"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"/home/me/proj","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"thinking_options":["off","default","low","high","max"],"thinking_default":"high","supports_images":false,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"default","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"client-2","active_host_name":"laptop","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"},{"id":"client-2","name":"laptop","cwd":"/home/me/proj","session_id":"<id>","session_name":null}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"chat_mode":false,"no_host":null,"computer_control":null,"plan":null,"session_rules":[]}}}
+    {"type":"response","id":"r2","ok":true,"result":{"client_id":"client-2","host_id":"client-2","namespace":null,"user":null,"superuser":false,"features":["pasted_text"],"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"/home/me/proj","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"thinking_options":["off","default","low","high","max"],"thinking_default":"high","supports_images":false,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"default","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"client-2","active_host_name":"laptop","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"},{"id":"client-2","name":"laptop","cwd":"/home/me/proj","session_id":"<id>","session_name":null}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"chat_mode":false,"no_host":null,"computer_control":null,"plan":null,"session_rules":[]}}}
     client-2 /home/me/proj
     {"type":"response","id":"r1","ok":true,"result":{}}
     (host answered $instructions)

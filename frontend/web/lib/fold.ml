@@ -34,6 +34,7 @@ let shows t kind = Transcript_filter.shows t.filter kind
 let scoped t agent_id = { t with scope = agent_id ^ "/" }
 let key t id = t.scope ^ id
 let expanded t id = Bool.( <> ) t.verbose (Set.mem t.toggled (key t id))
+let toggled t id = Set.mem t.toggled (key t id)
 
 let opened ~by_default t id =
   Bool.( <> )

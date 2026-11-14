@@ -219,6 +219,7 @@ let%expect_test
        ; namespace = Some "bob"
        ; user = Some "alice"
        ; superuser = false
+       ; features = []
        });
   run h "/accent teal";
   [%expect

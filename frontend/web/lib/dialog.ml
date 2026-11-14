@@ -92,6 +92,7 @@ type t =
       { title : string
       ; text : string
       }
+  | Pasted of int
   | Mcp_tools of Mcp_server.t
   | Loading of string
   | Diff of Git_diff.t
@@ -133,6 +134,7 @@ let per_session = function
   | Create_dir _
   | Session _
   | Text _
+  | Pasted _
   | Mcp_tools _
   | Loading _
   | Diff _
