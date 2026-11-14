@@ -245,6 +245,7 @@ try {
 
   // Remove asks first; Keep keeps it.
   await mine(page, "local").locator(".mcp-remove").click();
+  await page.locator("#mcp-remove-yes").waitFor();
   section("removing");
   console.log(tidy(await mine(page, "local").innerText()));
   await screenshot(page, "removing");
