@@ -127,6 +127,11 @@ let methods =
   ; "save_custom_instruction"
   ; "remove_custom_instruction"
   ; "set_custom_instructions_enabled"
+  ; "get_mcp_settings"
+  ; "add_mcp_servers"
+  ; "update_mcp_server"
+  ; "remove_mcp_server"
+  ; "set_mcp_server_enabled"
   ]
   @ Files_rpc.methods
   @ Review_rpc.methods
@@ -414,6 +419,7 @@ type t =
   ; memory : Memory.t option (** under [home] *)
   ; user_info : User_info.t option (** under [home] *)
   ; custom_instructions : Custom_instructions.t option (** under [home] *)
+  ; mcp_settings : Mcp_settings.t option (** under [home] *)
   ; now : unit -> float
   ; listed : Listed.t String.Table.t
     (** what [list_sessions] last showed of each live session *)
@@ -850,6 +856,23 @@ let user_info_changed (t : t) user_info =
     Hashtbl.iter t.clients ~f:(fun (c : Client.t) -> c.send json)
 ;;
 
+let mcp_settings_json entries =
+  [ "servers", `Array (List.map entries ~f:Mcp_settings.Entry.to_json) ]
+;;
+
+let mcp_settings_changed (t : t) mcp_settings =
+  (match Mcp_settings.list mcp_settings with
+   | Error _ -> ()
+   | Ok entries ->
+     let json =
+       `Object
+         ([ "type", `String "event"; "event", `String "mcp_settings_changed" ]
+          @ mcp_settings_json entries)
+     in
+     Hashtbl.iter t.clients ~f:(fun (c : Client.t) -> c.send json));
+  Hashtbl.iter t.agents ~f:Agent.mcp_settings_changed
+;;
+
 let create
       ~env
       ~sw
@@ -866,6 +889,7 @@ let create
       ?memory
       ?user_info
       ?custom_instructions
+      ?mcp_settings
       ?transcription_http
       ?nix_store
       ~login
@@ -938,6 +962,10 @@ let create
          | Some _ -> custom_instructions
          | None ->
            Option.map home ~f:(fun home -> Custom_instructions.create ~home))
+    ; mcp_settings =
+        (match mcp_settings with
+         | Some _ -> mcp_settings
+         | None -> Option.map home ~f:(fun home -> Mcp_settings.create ~home))
     ; now = (fun () -> Eio.Time.now (Eio.Stdenv.clock env))
     ; listed = String.Table.create ()
     ; on_session_deleted = []
@@ -962,6 +990,9 @@ let create
   Option.iter t.custom_instructions ~f:(fun ci ->
     Custom_instructions.subscribe ci ~f:(fun () ->
       custom_instructions_changed t ci));
+  Option.iter t.mcp_settings ~f:(fun mcp_settings ->
+    Mcp_settings.subscribe mcp_settings ~f:(fun () ->
+      mcp_settings_changed t mcp_settings));
   Login_manager.subscribe login ~f:(fun event ->
     let json = Rpc_json.login_event event in
     match event with
@@ -2839,6 +2870,47 @@ let custom_instructions t ~meth ~params =
        `Object [ ("enabled", if enabled then `True else `False) ])
 ;;
 
+let mcp_settings t ~meth ~params =
+  match t.mcp_settings with
+  | None ->
+    Or_error.error_string "this backend keeps no MCP servers in settings"
+  | Some settings ->
+    let open Or_error.Let_syntax in
+    let%map entries =
+      match meth with
+      | "add_mcp_servers" ->
+        (match param params "servers", param params "text" with
+         | Some (`Object servers), _ -> Mcp_settings.add settings servers
+         | None, Some (`String text) ->
+           Or_error.bind
+             (Mcp_settings.parse text)
+             ~f:(Mcp_settings.add settings)
+         | _ ->
+           Or_error.error_string
+             "give \"servers\" (an mcpServers object) or \"text\" (pasted JSON)")
+      | "update_mcp_server" ->
+        let%bind name = string_param params "name" in
+        let%bind rename = string_param_opt params "rename" in
+        (match param params "config" with
+         | Some config -> Mcp_settings.update settings ~name ?rename config
+         | None -> Or_error.error_string "missing param \"config\"")
+      | "remove_mcp_server" ->
+        let%bind name = string_param params "name" in
+        Mcp_settings.remove settings ~name
+      | "set_mcp_server_enabled" ->
+        let%bind name = string_param params "name" in
+        let%bind enabled =
+          match param params "enabled" with
+          | Some `True -> Ok true
+          | Some `False -> Ok false
+          | _ -> Or_error.error_string "param \"enabled\" must be a boolean"
+        in
+        Mcp_settings.set_enabled settings ~name enabled
+      | _ -> Mcp_settings.list settings
+    in
+    `Object (mcp_settings_json entries)
+;;
+
 let keep_session t (client : Client.t) =
   let agent = client.agent in
   if not (Agent.temporary agent)
@@ -2941,6 +3013,11 @@ let dispatch_server t (client : Client.t) ~meth ~params
   | "remove_custom_instruction"
   | "set_custom_instructions_enabled" ->
     Some (custom_instructions t ~meth ~params)
+  | "get_mcp_settings"
+  | "add_mcp_servers"
+  | "update_mcp_server"
+  | "remove_mcp_server"
+  | "set_mcp_server_enabled" -> Some (mcp_settings t ~meth ~params)
   | "nix_store_status" | "nix_store_gc" ->
     Nix_store_rpc.dispatch
       t.nix_store

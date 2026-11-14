@@ -767,6 +767,7 @@ Models
 Memory
 About you
 Custom instructions
+MCP servers
 Git hosting
 T
 token
@@ -990,6 +991,7 @@ Models
 Memory
 About you
 Custom instructions
+MCP servers
 Git hosting
 B
 bob
@@ -3085,7 +3087,7 @@ Jump to a message, Filter the transcript, Files, Terminal, Settings
 === webkit: mobile: 390x844: the settings' list ===
 ok
 === webkit: mobile: 390x844: the settings ===
-Appearance, Sessions, New sessions, Models, Memory, About you, Custom instructions, Git hosting, Account
+Appearance, Sessions, New sessions, Models, Memory, About you, Custom instructions, MCP servers, Git hosting, Account
 === webkit: mobile: 390x844: settings: appearance ===
 ok
 title: Appearance; back: Settings
@@ -3132,7 +3134,7 @@ Jump to a message, Filter the transcript, Files, Terminal, Settings
 === webkit: mobile: 320x640: the settings' list ===
 ok
 === webkit: mobile: 320x640: the settings ===
-Appearance, Sessions, New sessions, Models, Memory, About you, Custom instructions, Git hosting, Account
+Appearance, Sessions, New sessions, Models, Memory, About you, Custom instructions, MCP servers, Git hosting, Account
 === webkit: mobile: 320x640: settings: appearance ===
 ok
 title: Appearance; back: Settings
@@ -3805,6 +3807,99 @@ deleting fits: yes; targets: all ok
 editing fits: yes; targets: all ok
 back: Custom instructions | Standing instructions for the model, given to it in every session; it may also add or edit them when you state a lasting preference. Kept on the backend, for your account.
 === webkit: custom instructions: errors ===
+(none)
+=== webkit: mcp settings: empty, the host's own ===
+MCP servers
+Tools the model can use from MCP servers. The servers here are kept on the backend for your account and run on every host your sessions use; a host's ~/.prigh/mcp.json and a project's .mcp.json add their own.
+YOUR SERVERS
+No servers yet
+Add one by the command that starts it or by its URL, or paste the mcpServers JSON from another tool's settings. It runs on every host your sessions use.
+Add server
+Paste JSON
+ON HOST
+From its files: change them there
+local
+~/.prigh/mcp.json
+Ready ·
+1 tool
+=== webkit: mcp settings: adding ===
+value while typing: text
+hidden: password
+shown again: text
+=== webkit: mcp settings: added: started with the env ===
+echo
+NODE FAKE echo
+Ready on HOST ·
+1 tool
+file (mode 600): echo: {"command":"NODE","args":["FAKE","echo"],"env":{"TOKEN":"s3cret"}}
+editing, the value: password
+settings still open: 1
+=== webkit: mcp settings: a wrong secret ===
+echo
+NODE FAKE echo
+Failed on HOST: The server exited (code 1): echo: wrong TOKEN
+=== webkit: mcp settings: pasted, one broken ===
+Paste JSON
+An mcpServers object, as in Claude Code's or Cursor's settings, with or without the mcpServers around it. Every server in it is added, or none is.
+Server "broken": give a "command" (stdio) or a "url" (http)
+Ctrl+Enter adds, Esc cancels
+Cancel
+Add servers
+=== webkit: mcp settings: pasted ===
+MCP servers
+Tools the model can use from MCP servers. The servers here are kept on the backend for your account and run on every host your sessions use; a host's ~/.prigh/mcp.json and a project's .mcp.json add their own.
+YOUR SERVERS
+3 servers
+echo
+NODE FAKE echo
+Ready on HOST ·
+1 tool
+pasted
+NODE FAKE pasted
+Ready on HOST ·
+1 tool
+local
+https://example.com/mcp
+Overridden by ~/.prigh/mcp.json on HOST: that one runs instead. Rename one of them to use both.
+Add server
+Paste JSON
+ON HOST
+From its files: change them there
+local
+~/.prigh/mcp.json
+Ready ·
+1 tool
+file (mode 600): echo: {"command":"NODE","args":["FAKE","echo"],"env":{"TOKEN":"s3cret"}}; pasted: {"command":"NODE","args":["FAKE","pasted"]}; local: {"url":"https://example.com/mcp","headers":{"Authorization":"Bearer t"}}
+=== webkit: mcp settings: off, followed on another page ===
+pasted
+NODE FAKE pasted
+Off: not started on any host
+file (mode 600): echo: {"command":"NODE","args":["FAKE","echo"],"env":{"TOKEN":"s3cret"}}; pasted (off): {"command":"NODE","args":["FAKE","pasted"]}; local: {"url":"https://example.com/mcp","headers":{"Authorization":"Bearer t"}}
+=== webkit: mcp settings: removing ===
+local
+https://example.com/mcp
+Remove it from your settings? Its tools go from every session.
+Keep
+Remove
+file (mode 600): echo: {"command":"NODE","args":["FAKE","echo"],"env":{"TOKEN":"s3cret"}}; pasted: {"command":"NODE","args":["FAKE","pasted"]}
+=== webkit: mcp settings: /mcp disable ===
+Disabled MCP server pasted
+file (mode 600): echo: {"command":"NODE","args":["FAKE","echo"],"env":{"TOKEN":"s3cret"}}; pasted (off): {"command":"NODE","args":["FAKE","pasted"]}
+There is already an MCP server "echo" in the settings: choose another name, or edit that one. /mcp add echo https://example.com/mcp is back in the editor.
+composer: /mcp add echo https://example.com/mcp
+=== webkit: mcp settings: phone 390x844 ===
+list fits: yes; targets: all ok
+editing fits: yes; targets: all ok
+pasting fits: yes; targets: all ok
+removing fits: yes; targets: all ok
+back: MCP servers | Tools the model can use from MCP servers. The servers here are kept on the backend for your account and run on every host your sessions use; a host's ~/.prigh/mcp.json and a project's .mcp.json add their own.
+=== webkit: mcp settings: phone 320x640 ===
+list fits: yes; targets: all ok
+editing fits: yes; targets: all ok
+pasting fits: yes; targets: all ok
+removing fits: yes; targets: all ok
+back: MCP servers | Tools the model can use from MCP servers. The servers here are kept on the backend for your account and run on every host your sessions use; a host's ~/.prigh/mcp.json and a project's .mcp.json add their own.
+=== webkit: mcp settings: errors ===
 (none)
 === webkit: images (desktop): refused as too large: the error card ===
 The model returned an error

@@ -17,7 +17,7 @@ let%expect_test "the gear, /settings and Ctrl+, open it; Esc closes it" =
     (Focus dialog)
     Settings
     (Close (Esc))
-    (Appearance) (Sessions) (New sessions) (Models) (Memory) (About you) (Custom instructions) (Git hosting) (Account)
+    (Appearance) (Sessions) (New sessions) (Models) (Memory) (About you) (Custom instructions) (MCP servers) (Git hosting) (Account)
     Appearance
     How this page looks. Saved for your account, so it follows you to every browser you sign in on.
     Look
@@ -358,6 +358,7 @@ let%expect_test "the names of the settings' controls" =
     -- Custom instructions
     [switch] button "Let the model change them" -- Only you change them (/instructions off)
     [switch] button "Let the model change them" -- Only you change them (/instructions off)
+    -- MCP servers
     -- Git hosting
     button "Connect GitHub (github.com) with a token" -- /login github token
     button "Connect GitHub (github.com)" -- /login github
@@ -375,6 +376,7 @@ let%expect_test "the names of the settings' controls" =
     [tab] button "Memory" -- /settings memory
     [tab] button "About you" -- /settings user-info
     [tab] button "Custom instructions" -- /settings instructions
+    [tab] button "MCP servers" -- /settings mcp
     [tab] button "Git hosting" -- /settings git
     [tab] button "Account" -- /settings account
     button "Keyboard shortcuts" -- /hotkeys
@@ -517,9 +519,9 @@ let%expect_test "sections: clicks, arrows, Home and End, /settings SECTION" =
     Close_dialog
     (Focus editor)
     Send
-    Nix store is only for superusers: try /settings appearance, /settings sessions, /settings new-sessions, /settings models, /settings memory, /settings user-info, /settings instructions, /settings git, /settings account. (Dismiss)
+    Nix store is only for superusers: try /settings appearance, /settings sessions, /settings new-sessions, /settings models, /settings memory, /settings user-info, /settings instructions, /settings mcp, /settings git, /settings account. (Dismiss)
     Send
-    No settings section "colours": try /settings appearance, /settings sessions, /settings new-sessions, /settings models, /settings memory, /settings user-info, /settings instructions, /settings git, /settings account. (Dismiss)
+    No settings section "colours": try /settings appearance, /settings sessions, /settings new-sessions, /settings models, /settings memory, /settings user-info, /settings instructions, /settings mcp, /settings git, /settings account. (Dismiss)
     |}]
 ;;
 
@@ -536,7 +538,7 @@ let%expect_test "superusers have the Nix store's section" =
   H.quiet h (fun () -> H.act h Open_settings);
   H.text h ~selector:".settings-nav";
   [%expect
-    {| (Appearance) (Sessions) (New sessions) (Models) (Memory) (About you) (Custom instructions) (Git hosting) (Nix store) (R root) |}]
+    {| (Appearance) (Sessions) (New sessions) (Models) (Memory) (About you) (Custom instructions) (MCP servers) (Git hosting) (Nix store) (R root) |}]
 ;;
 
 let%expect_test "/settings completes the sections" =
@@ -553,6 +555,7 @@ let%expect_test "/settings completes the sections" =
     memory What you asked the model to remember, for later sessions. Kept on the backend, for your account.
     user-info What the model should know about you, given to it in every session. Kept on the backend, for your account.
     instructions Standing instructions for the model, given to it in every session; it may also add or edit them when you state a lasting preference. Kept on the backend, for your account.
+    mcp Tools the model can use from MCP servers. The servers here are kept on the backend for your account and run on every host your sessions use; a host's ~/.prigh/mcp.json and a project's .mcp.json add their own.
     git The hosts agents push branches to and open pull requests on.
     account Who you are on this backend.
     |}]
@@ -581,7 +584,7 @@ let%expect_test
     (Focus dialog)
     Settings
     (Close (Esc))
-    (Appearance How this page looks. Saved for your account, so it follows you to every browser you sign in on.) (Sessions How the session list shows sessions, and how this browser tells you that something happened. Kept on the backend.) (New sessions What a new session starts with. A change applies from the next new session: open ones keep theirs. Kept on the backend.) (Models The providers whose models you use, the models prigh uses for its own work, and when long conversations are summarised. Kept on the backend.) (Memory What you asked the model to remember, for later sessions. Kept on the backend, for your account.) (About you What the model should know about you, given to it in every session. Kept on the backend, for your account.) (Custom instructions Standing instructions for the model, given to it in every session; it may also add or edit them when you state a lasting preference. Kept on the backend, for your account.) (Git hosting The hosts agents push branches to and open pull requests on.) (Account Who you are on this backend.)
+    (Appearance How this page looks. Saved for your account, so it follows you to every browser you sign in on.) (Sessions How the session list shows sessions, and how this browser tells you that something happened. Kept on the backend.) (New sessions What a new session starts with. A change applies from the next new session: open ones keep theirs. Kept on the backend.) (Models The providers whose models you use, the models prigh uses for its own work, and when long conversations are summarised. Kept on the backend.) (Memory What you asked the model to remember, for later sessions. Kept on the backend, for your account.) (About you What the model should know about you, given to it in every session. Kept on the backend, for your account.) (Custom instructions Standing instructions for the model, given to it in every session; it may also add or edit them when you state a lasting preference. Kept on the backend, for your account.) (MCP servers Tools the model can use from MCP servers. The servers here are kept on the backend for your account and run on every host your sessions use; a host's ~/.prigh/mcp.json and a project's .mcp.json add their own.) (Git hosting The hosts agents push branches to and open pull requests on.) (Account Who you are on this backend.)
     (Settings_section Models)
     <button class="btn ghost modal-back">
     <h2 class="">

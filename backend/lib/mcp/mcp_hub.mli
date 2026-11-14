@@ -28,13 +28,17 @@ type t
 
 val create : env:Env.t -> sw:Switch.t -> unit -> t
 
-(** The servers for [cwd] ({!Mcp_config.discover}) with their tools,
-    starting approved ones not running yet (concurrently; concurrent callers
-    share a start). With [reconnect], failed and dead servers are started
-    again. Also returns the configuration problems. *)
+(** The servers for [cwd] ({!Mcp_config.discover}, with the [settings]'
+    servers) with their tools, starting approved ones not running yet
+    (concurrently; concurrent callers share a start). With [reconnect],
+    failed and dead servers are started again. Also returns the
+    configuration problems. Servers from earlier settings that [settings]
+    no longer defines as they ran (removed, disabled or edited) are stopped:
+    the backend sends one user's settings to a host. *)
 val servers
   :  t
   -> ?reconnect:bool
+  -> ?settings:Json.t
   -> cwd:string
   -> home:string
   -> unit
@@ -45,6 +49,7 @@ val servers
 val call
   :  t
   -> cancel:Cancellation.t
+  -> settings:Json.t (** the servers from the settings *)
   -> source:string
   -> server:string
   -> home:string
