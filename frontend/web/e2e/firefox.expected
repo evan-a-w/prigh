@@ -3812,7 +3812,8 @@ Ready ·
 1 tool
 === firefox: mcp settings: adding ===
 value while typing: text
-hidden again: password
+hidden: password
+shown again: text
 === firefox: mcp settings: added: started with the env ===
 echo
 NODE FAKE echo

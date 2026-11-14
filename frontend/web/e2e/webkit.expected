@@ -3824,7 +3824,8 @@ Ready ·
 1 tool
 === webkit: mcp settings: adding ===
 value while typing: text
-hidden again: password
+hidden: password
+shown again: text
 === webkit: mcp settings: added: started with the env ===
 echo
 NODE FAKE echo

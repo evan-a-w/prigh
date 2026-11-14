@@ -177,13 +177,18 @@ try {
   await page.locator(".mcp-pair-add").click();
   await page.locator(".mcp-pair-key").fill("TOKEN");
   await page.locator(".mcp-pair-value").fill("s3cret");
-  await page.locator(".mcp-pair-show").click();
-  await page.locator(".mcp-pair-value[type=text]").waitFor();
+  // A new value shows while it is typed; Hide masks it, Show shows it again.
+  const valueType = async () => page.locator(".mcp-pair-value").getAttribute("type");
+  const toggle = async (label, type) => {
+    await page.locator(".mcp-pair-show", { hasText: label }).click();
+    await page.locator(`.mcp-pair-value[type=${type}]`).waitFor();
+  };
   section("adding");
-  console.log(`value while typing: ${await page.locator(".mcp-pair-value").getAttribute("type")}`);
-  await page.locator(".mcp-pair-show").click();
-  await page.locator(".mcp-pair-value[type=password]").waitFor();
-  console.log(`hidden again: ${await page.locator(".mcp-pair-value").getAttribute("type")}`);
+  console.log(`value while typing: ${await valueType()}`);
+  await toggle("Hide", "password");
+  console.log(`hidden: ${await valueType()}`);
+  await toggle("Show", "text");
+  console.log(`shown again: ${await valueType()}`);
   await screenshot(page, "adding");
   await page.locator("#mcp-args").press("Control+Enter");
   await page.locator(".mcp-draft").waitFor({ state: "detached" });

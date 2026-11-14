@@ -3932,7 +3932,8 @@ Ready ·
 1 tool
 === chromium: mcp settings: adding ===
 value while typing: text
-hidden again: password
+hidden: password
+shown again: text
 === chromium: mcp settings: added: started with the env ===
 echo
 NODE FAKE echo
