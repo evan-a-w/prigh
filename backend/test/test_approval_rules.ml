@@ -255,6 +255,8 @@ let%expect_test "decisions" =
     ; "bash", {|{"command": "make"}|}, true
     ; "bash", {|{"command": "make && rm -rf build"}|}, true
     ; "edit", {|{"path": "a.ml"}|}, true
+    ; "edit", {|{"path": "/etc/hosts"}|}, true
+    ; "edit", {|{"path": ".git/config"}|}, true
     ; "read", {|{"path": "a.ml"}|}, false
     ; "read", {|{"path": "secrets/key"}|}, false
     ; "mcp__x__y", {|{}|}, true
@@ -267,7 +269,13 @@ let%expect_test "decisions" =
     ]
   in
   List.iter
-    [ Approval_mode.Ask, false; Auto_edit, false; Auto, false; Auto, true ]
+    [ Approval_mode.Ask, false
+    ; Auto_edit, false
+    ; Auto, false
+    ; Auto, true
+    ; Smart, false
+    ; Smart, true
+    ]
     ~f:(fun (mode, plan) ->
       printf
         "%s%s:\n"
@@ -298,6 +306,12 @@ let%expect_test "decisions" =
                (String.concat
                   ~sep:" "
                   (List.map rules ~f:Approval_rule.to_string))
+           | Judge { rules } ->
+             sprintf
+               "judge [%s]"
+               (String.concat
+                  ~sep:" "
+                  (List.map rules ~f:Approval_rule.to_string))
            | Deny text -> "deny " ^ String.prefix text 40)));
   [%expect
     {|
@@ -306,6 +320,8 @@ let%expect_test "decisions" =
       bash         {"command": "make"}                        ask [bash(make:*)]
       bash         {"command": "make && rm -rf build"}        deny [denied by the rule bash(rm:*) in permis
       edit         {"path": "a.ml"}                           ask [edit]
+      edit         {"path": "/etc/hosts"}                     ask [edit]
+      edit         {"path": ".git/config"}                    ask [edit]
       read         {"path": "a.ml"}                           allow
       read         {"path": "secrets/key"}                    ask []
       mcp__x__y    {}                                         ask [mcp__x__y]
@@ -320,6 +336,8 @@ let%expect_test "decisions" =
       bash         {"command": "make"}                        ask [bash(make:*)]
       bash         {"command": "make && rm -rf build"}        deny [denied by the rule bash(rm:*) in permis
       edit         {"path": "a.ml"}                           allow
+      edit         {"path": "/etc/hosts"}                     allow
+      edit         {"path": ".git/config"}                    allow
       read         {"path": "a.ml"}                           allow
       read         {"path": "secrets/key"}                    ask []
       mcp__x__y    {}                                         ask [mcp__x__y]
@@ -334,6 +352,8 @@ let%expect_test "decisions" =
       bash         {"command": "make"}                        allow
       bash         {"command": "make && rm -rf build"}        deny [denied by the rule bash(rm:*) in permis
       edit         {"path": "a.ml"}                           allow
+      edit         {"path": "/etc/hosts"}                     allow
+      edit         {"path": ".git/config"}                    allow
       read         {"path": "a.ml"}                           allow
       read         {"path": "secrets/key"}                    ask []
       mcp__x__y    {}                                         allow
@@ -348,9 +368,43 @@ let%expect_test "decisions" =
       bash         {"command": "make"}                        ask [bash(make:*)]
       bash         {"command": "make && rm -rf build"}        deny [denied by the rule bash(rm:*) in permis
       edit         {"path": "a.ml"}                           deny [plan mode] Plan mode is on: you are pla
+      edit         {"path": "/etc/hosts"}                     deny [plan mode] Plan mode is on: you are pla
+      edit         {"path": ".git/config"}                    deny [plan mode] Plan mode is on: you are pla
       read         {"path": "a.ml"}                           allow
       read         {"path": "secrets/key"}                    ask []
       mcp__x__y    {}                                         ask [mcp__x__y]
+      worktree     {"action": "list"}                         allow
+      worktree     {"action": "create"}                       deny [plan mode] Plan mode is on: you are pla
+      pull_request {"action": "view"}                         allow
+      pull_request {"action": "create"}                       deny [plan mode] Plan mode is on: you are pla
+      subagent     {"task": "look"}                           allow
+      subagent     {"task": "fix", "worktree": "auto"}        deny [plan mode] Plan mode is on: you are pla
+    smart:
+      bash         {"command": "git status"}                  allow
+      bash         {"command": "make"}                        judge [bash(make:*)]
+      bash         {"command": "make && rm -rf build"}        deny [denied by the rule bash(rm:*) in permis
+      edit         {"path": "a.ml"}                           allow
+      edit         {"path": "/etc/hosts"}                     judge [edit]
+      edit         {"path": ".git/config"}                    judge [edit]
+      read         {"path": "a.ml"}                           allow
+      read         {"path": "secrets/key"}                    ask []
+      mcp__x__y    {}                                         judge [mcp__x__y]
+      worktree     {"action": "list"}                         allow
+      worktree     {"action": "create"}                       judge [worktree]
+      pull_request {"action": "view"}                         allow
+      pull_request {"action": "create"}                       judge [pull_request]
+      subagent     {"task": "look"}                           allow
+      subagent     {"task": "fix", "worktree": "auto"}        allow
+    smart + plan:
+      bash         {"command": "git status"}                  allow
+      bash         {"command": "make"}                        judge [bash(make:*)]
+      bash         {"command": "make && rm -rf build"}        deny [denied by the rule bash(rm:*) in permis
+      edit         {"path": "a.ml"}                           deny [plan mode] Plan mode is on: you are pla
+      edit         {"path": "/etc/hosts"}                     deny [plan mode] Plan mode is on: you are pla
+      edit         {"path": ".git/config"}                    deny [plan mode] Plan mode is on: you are pla
+      read         {"path": "a.ml"}                           allow
+      read         {"path": "secrets/key"}                    ask []
+      mcp__x__y    {}                                         judge [mcp__x__y]
       worktree     {"action": "list"}                         allow
       worktree     {"action": "create"}                       deny [plan mode] Plan mode is on: you are pla
       pull_request {"action": "view"}                         allow
@@ -375,6 +429,7 @@ let%expect_test "which built-in tools ask in each mode" =
     [ "ask", Approval_mode.Ask, false
     ; "auto-edit", Auto_edit, false
     ; "auto", Auto, false
+    ; "smart", Smart, false
     ; "plan", Ask, true
     ]
     ~f:(fun (label, mode, plan) ->
@@ -396,6 +451,7 @@ let%expect_test "which built-in tools ask in each mode" =
           with
           | Allow -> None
           | Ask _ -> Some name
+          | Judge _ -> Some (name ^ " (judged)")
           | Deny _ -> Some (name ^ " (denied)"))
       in
       printf "%-10s %s\n" label (String.concat ~sep:", " held));
@@ -404,6 +460,7 @@ let%expect_test "which built-in tools ask in each mode" =
     ask        bash, write, edit, apply_patch, job_input
     auto-edit  bash, job_input
     auto
+    smart      bash (judged), write (judged), edit (judged), apply_patch (judged), job_input (judged)
     plan       bash, write (denied), edit (denied), apply_patch (denied), job_input
     |}]
 ;;

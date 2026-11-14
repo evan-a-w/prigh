@@ -337,6 +337,7 @@ let%expect_test
       "compact_at_tokens": 200000,
       "compaction_model": null,
       "naming_model": null,
+      "approval_model": null,
       "dictation_model": null,
       "trace": "default"
     }

@@ -43,6 +43,8 @@ let rec show_event (e : Agent_event.t) =
   | Tool_confirm { call_id; name; summary; agent_id = _; rules = _; kind = _ }
     -> sprintf "tool_confirm %s %s %S" call_id name summary
   | Tool_confirm_done { call_id; _ } -> "tool_confirm_done " ^ call_id
+  | Tool_allowed { call_id; model; reason; _ } ->
+    sprintf "tool_allowed %s by %s: %s" call_id model reason
   | Ask_user_done { call_id; timed_out = _ } -> "ask_user_done " ^ call_id
   | Ask_user { call_id; questions; deadline = _ } ->
     sprintf "ask_user %s (%d questions)" call_id (List.length questions)

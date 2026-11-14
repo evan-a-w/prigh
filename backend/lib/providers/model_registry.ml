@@ -305,6 +305,22 @@ let unknown_naming_model t ~home =
   | Ok _ | Error _ -> []
 ;;
 
+let unknown_approval_model t ~home =
+  match Config.load ~home with
+  | Ok { approval_model = Some name; _ } ->
+    (match resolve t name with
+     | Ok _ -> []
+     | Error e ->
+       [ sprintf
+           "approval_model in %s is unknown, so the smart approval mode asks \
+            you about every call it would judge (/approval-model MODEL|off \
+            changes it): %s"
+           (Config.path ~home)
+           (Error.to_string_hum e)
+       ])
+  | Ok _ | Error _ -> []
+;;
+
 let unknown_dictation_model t ~home =
   match Config.load ~home with
   | Ok { dictation_model = Some name; _ } ->
@@ -349,6 +365,7 @@ let reload ?listed t =
       @ unknown_start_model t ~home:source.home
       @ unknown_compaction_model t ~home:source.home
       @ unknown_naming_model t ~home:source.home
+      @ unknown_approval_model t ~home:source.home
       @ unknown_dictation_model t ~home:source.home
     in
     let new_problems =

@@ -73,12 +73,28 @@ module Decision = struct
   type t =
     | Allow
     | Ask of { rules : Approval_rule.t list }
+    | Judge of { rules : Approval_rule.t list }
     | Deny of string
   [@@deriving sexp_of]
 end
 
 let is_edit name =
   List.mem [ "edit"; "write"; "apply_patch" ] name ~equal:String.equal
+;;
+
+(* Whether [path] is under [dir] and not in a [.git] directory there (its
+   hooks and config run commands). *)
+let in_project ~dir path =
+  match
+    String.chop_prefix
+      path
+      ~prefix:(String.rstrip dir ~drop:(Char.equal '/') ^ "/")
+  with
+  | None -> false
+  | Some rest ->
+    not
+      (List.exists (String.split rest ~on:'/') ~f:(fun part ->
+         String.equal part ".git" || String.equal part ".."))
 ;;
 
 let plan_mode_refusal =
@@ -119,10 +135,20 @@ let decide
     else if not destructive
     then Allow
     else if plan
-    then ask ()
+    then (
+      match mode with
+      | Smart -> Judge { rules = Approval_rule.suggest call }
+      | Ask | Auto_edit | Auto -> ask ())
     else (
       match mode with
       | Ask -> ask ()
       | Auto_edit -> if is_edit call.tool then Allow else ask ()
-      | Auto -> Allow)
+      | Auto -> Allow
+      | Smart ->
+        if
+          is_edit call.tool
+          && (not (List.is_empty call.paths))
+          && List.for_all call.paths ~f:(in_project ~dir:cwd)
+        then Allow
+        else Judge { rules = Approval_rule.suggest call })
 ;;

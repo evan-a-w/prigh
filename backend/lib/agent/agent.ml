@@ -60,6 +60,13 @@ module Waiting_confirm = struct
     }
 end
 
+(* A verdict of the approval model, shared by the calls whose requests are
+   the same: started for every call of a turn at once, and kept for the
+   session ([judge]). *)
+module Judgement = struct
+  type t = (Approval_judge.Verdict.t, string) Result.t Promise.t
+end
+
 module Host = struct
   type t =
     { id : string
@@ -129,6 +136,8 @@ module Session_stats = struct
     ; compactions : int
     ; masks : int
     ; duration_seconds : float
+    ; approvals_judged : int
+    ; approvals_cost_usd : float
     }
   [@@deriving sexp_of]
 end
@@ -217,6 +226,8 @@ type t =
   ; mutable subscribers : (Event.t -> unit) list
   ; mutable config : Config.t
   ; pending_confirms : Waiting_confirm.t String.Table.t
+  ; judgements : Judgement.t String.Table.t
+    (** the approval model's verdicts by request (see [judge]) *)
   ; computer_consent : Computer_consent.t
   ; mutable unattended : unit -> string option
     (** why nobody can answer a computer-use consent now, if so *)
@@ -946,6 +957,15 @@ let set_config ?(session_mode = true) t (config : Config.t) =
       |> Result.map_error ~f:(fun e ->
         Error.createf "naming_model: %s" (Error.to_string_hum e))
   in
+  let%bind approval_model =
+    match config.approval_model with
+    | None -> Ok None
+    | Some name ->
+      Model_registry.resolve t.models name
+      |> Or_error.map ~f:(fun m -> Some (Model.key m))
+      |> Result.map_error ~f:(fun e ->
+        Error.createf "approval_model: %s" (Error.to_string_hum e))
+  in
   let%bind () =
     match config.dictation_model with
     | None -> Ok ()
@@ -970,6 +990,7 @@ let set_config ?(session_mode = true) t (config : Config.t) =
     ; generate_model
     ; compaction_model
     ; naming_model
+    ; approval_model
     ; default_host
     }
   in
@@ -1560,12 +1581,102 @@ let tool_hosts t =
     })
 ;;
 
+let approval_model t =
+  match t.config.approval_model with
+  | None -> Ok t.model
+  | Some name ->
+    Model_registry.resolve t.models name
+    |> Result.map_error ~f:(fun e ->
+      Error.createf
+        "approval_model: %s (fix it with /approval-model or in config.json)"
+        (Error.to_string_hum e))
+;;
+
+(* Seconds the approval model has for a verdict before the user is asked. *)
+let judge_timeout = 60.
+
+(* The approval model's verdict on [input], shared by identical requests:
+   started once and kept for the session, unless it failed. *)
+let judge t ~(model : Model.t) (input : Approval_judge.Input.t) : Judgement.t =
+  let key = Model.key model ^ "\n" ^ Approval_judge.prompt input in
+  match Hashtbl.find t.judgements key with
+  | Some judgement -> judgement
+  | None ->
+    if Hashtbl.length t.judgements >= 256 then Hashtbl.clear t.judgements;
+    let judgement, resolver = Promise.create () in
+    Hashtbl.set t.judgements ~key ~data:judgement;
+    let session = t.session in
+    let finish result =
+      if Result.is_error result
+      then
+        Hashtbl.change t.judgements key ~f:(function
+          | Some p when phys_equal p judgement -> None
+          | other -> other);
+      ignore (Promise.try_resolve resolver result : bool)
+    in
+    Guarded.fork
+      ~sw:t.sw
+      ~what:"an approval judgement"
+      ~on_error:(fun exn -> finish (Error (Exn.to_string exn)))
+      (fun () ->
+         let at = Eio.Time.now (Eio.Stdenv.clock t.env) +. judge_timeout in
+         let cancel = Cancellation.create () in
+         let result =
+           Fiber.first
+             (fun () ->
+                let verdict, usage =
+                  Approval_judge.judge
+                    ~cache_key:(Session.id session ^ "/approval")
+                    ~provider:t.provider
+                    ~model
+                    ~cancel
+                    input
+                in
+                let cost_usd = Model.cost_usd model usage in
+                if Usage.total_tokens usage > 0
+                then (
+                  ignore
+                    (Session.add_spend
+                       session
+                       ~purpose:Approval_judge.purpose
+                       ~usage
+                       ~cost_usd
+                     : Session.Entry.t);
+                  if phys_equal session t.session then state_changed t);
+                verdict)
+             (fun () ->
+                t.sleep_until at;
+                Cancellation.cancel cancel;
+                Error (sprintf "no answer within %.0fs" judge_timeout))
+         in
+         finish result);
+    judgement
+;;
+
+let plan_text (p : Plan.t) =
+  String.concat
+    ~sep:"\n"
+    (Option.to_list p.explanation
+     @ List.map p.steps ~f:(fun s ->
+       sprintf "- [%s] %s" (Plan.Status.to_string s.status) s.step))
+;;
+
+(* What [approve] weighs about a call. *)
+module Check = struct
+  type t =
+    { decide : unit -> Approval.Decision.t
+    ; elsewhere : bool
+    ; name : string (** as the user sees it: [on_host] for a call elsewhere *)
+    ; summary : string
+    ; input : Approval_judge.Input.t
+    }
+end
+
 (* A call [on_host] runs on another host ([context.host]) follows the mode,
    but no allow rule: rules are written for the session's own host (its
    paths, its commands), so none lets a call elsewhere through and the user
    is not offered one to add; deny and ask rules still apply. *)
-let approve t : Tool.approver =
-  fun context tool args ->
+let check t (context : Tool.Context.t) tool args : Check.t =
   let name = Tool.name tool in
   let elsewhere =
     Option.filter context.host ~f:(fun id ->
@@ -1600,12 +1711,12 @@ let approve t : Tool.approver =
       ~changes_work:(Plan_mode.changes_work ~tool:name args)
       call
   in
-  let name, summary =
+  let host_name =
+    Option.value_map host ~default:host_id ~f:(fun (h : Host.t) -> h.name)
+  in
+  let shown_name, summary =
     match elsewhere with
-    | Some id ->
-      let host_name =
-        Option.value_map host ~default:id ~f:(fun (h : Host.t) -> h.name)
-      in
+    | Some _ ->
       ( Tool_on_host.name
       , Agent_loop.tool_summary
           ~name:Tool_on_host.name
@@ -1619,42 +1730,155 @@ let approve t : Tool.approver =
          | Error _ -> "") )
     | None -> name, Agent_loop.tool_summary ~name args
   in
-  let approved () =
-    match decide () with
+  let task =
+    match context.agent_id, context.conversation with
+    | Some _, Some conversation ->
+      List.find_map conversation.messages ~f:(function
+        | Message.User u -> Some (Message.User.body u)
+        | Assistant _ | Tool_result _ -> None)
+    | _ -> None
+  in
+  { decide
+  ; elsewhere = Option.is_some elsewhere
+  ; name = shown_name
+  ; summary
+  ; input =
+      { tool = name
+      ; arguments = args
+      ; host = host_name
+      ; elsewhere = Option.is_some elsewhere
+      ; cwd = context.cwd
+      ; requests = Approval_judge.requests (Session.messages t.session)
+      ; task
+      ; goal = Option.map t.goal ~f:(fun g -> g.text)
+      ; plan = Option.map t.plan ~f:plan_text
+      ; plan_mode = t.plan_mode
+      }
+  }
+;;
+
+(* The other calls of the turn that made [context]'s call, which run one
+   after another, are judged meanwhile so that they need not wait. *)
+let judge_turn t (context : Tool.Context.t) ~model =
+  match context.host, context.conversation with
+  | Some _, _ | None, None -> ()
+  | None, Some conversation ->
+    (match List.last conversation.messages with
+     | Some (Message.Assistant a) ->
+       List.iter
+         (Message.Assistant.tool_calls a)
+         ~f:(fun (call : Content.Tool_call.t) ->
+           if not (String.equal call.id context.call_id)
+           then (
+             match
+               ( List.find context.tools ~f:(fun tool ->
+                   String.equal (Tool.name tool) call.name)
+               , Content.Tool_call.parse_arguments call )
+             with
+             | Some tool, Ok args ->
+               let check =
+                 check t { context with call_id = call.id } tool args
+               in
+               (match check.decide () with
+                | Judge _ -> ignore (judge t ~model check.input : Judgement.t)
+                | Allow | Ask _ | Deny _ -> ())
+             | None, _ | _, Error _ -> ()))
+     | Some (User _ | Tool_result _) | None -> ())
+;;
+
+let approve t : Tool.approver =
+  fun context tool args ->
+  let ({ decide; elsewhere; name; summary; input } : Check.t) =
+    check t context tool args
+  in
+  let ask ?(kind = Confirm_kind.Tool) rules =
+    let recheck () =
+      match decide () with
+      | Allow -> true
+      | Ask _ | Judge _ | Deny _ -> false
+    in
+    let rules = if elsewhere then [] else rules in
+    match confirm t context ~kind ~name ~summary ~rules ~recheck with
+    | None -> Some (Tool.Result.error "[cancelled]")
+    | Some (Error _) -> assert false (* no timeout *)
+    | Some (Ok (Deny reason)) -> Some (Tool.Result.error (denied_text reason))
+    | Some (Ok (Allow | Always)) ->
+      (* Plan mode may have started while the user was deciding. *)
+      (match decide () with
+       | Deny text -> Some (Tool.Result.error text)
+       | Allow | Ask _ | Judge _ -> None)
+  in
+  let rec decided (decision : Approval.Decision.t) =
+    match decision with
     | Allow -> None
     | Deny text -> Some (Tool.Result.error text)
-    | Ask { rules } ->
-      let recheck () =
-        match decide () with
-        | Allow -> true
-        | Ask _ | Deny _ -> false
-      in
-      let rules = if Option.is_some elsewhere then [] else rules in
-      (match confirm t context ~name ~summary ~rules ~recheck with
-       | None -> Some (Tool.Result.error "[cancelled]")
-       | Some (Error _) -> assert false (* no timeout *)
-       | Some (Ok (Deny reason)) ->
-         Some (Tool.Result.error (denied_text reason))
-       | Some (Ok (Allow | Always)) ->
-         (* Plan mode may have started while the user was deciding. *)
-         (match decide () with
-          | Deny text -> Some (Tool.Result.error text)
-          | Allow | Ask _ -> None))
+    | Ask { rules } -> ask rules
+    | Judge { rules } ->
+      (match approval_model t with
+       | Error e ->
+         ask
+           ~kind:
+             (Judged
+                { model = Option.value t.config.approval_model ~default:"?"
+                ; reason = Error.to_string_hum e
+                })
+           rules
+       | Ok model ->
+         let key = Model.key model in
+         judge_turn t context ~model;
+         let judgement = judge t ~model input in
+         (match
+            Trace.span "approval_judge" (fun () ->
+              Cancellation.protect context.cancel ~f:(fun () ->
+                Promise.await judgement))
+          with
+          | None -> Some (Tool.Result.error "[cancelled]")
+          | Some verdict ->
+            (* The mode may have changed while the model judged. *)
+            (match decide () with
+             | Judge _ ->
+               (match verdict with
+                | Ok (Allow reason) ->
+                  broadcast
+                    t
+                    (Loop
+                       (Tool_allowed
+                          { call_id = context.call_id
+                          ; agent_id = context.agent_id
+                          ; model = key
+                          ; reason
+                          }));
+                  None
+                | Ok (Ask reason) ->
+                  ask ~kind:(Judged { model = key; reason }) rules
+                | Error why ->
+                  ask
+                    ~kind:
+                      (Judged
+                         { model = key
+                         ; reason =
+                             sprintf
+                               "no verdict (%s): decide yourself, or change \
+                                the model with /approval-model"
+                               why
+                         })
+                    rules)
+             | other -> decided other)))
   in
-  if String.equal name Tool_computer.name
+  if String.equal (Tool.name tool) Tool_computer.name
   then (
     (* The consent stands for the approval mode's question too: a deny rule
        or plan mode still refuses. *)
     match decide () with
     | Deny text -> Some (Tool.Result.error text)
-    | Allow | Ask _ ->
+    | Allow | Ask _ | Judge _ ->
       (match computer_consent t context ~name ~summary with
        | Some _ as refused -> refused
        | None ->
          (match decide () with
           | Deny text -> Some (Tool.Result.error text)
-          | Allow | Ask _ -> None)))
-  else approved ()
+          | Allow | Ask _ | Judge _ -> None)))
+  else decided (decide ())
 ;;
 
 (* Where [path] would take the session on [host], creating it or asking
@@ -3346,6 +3570,7 @@ let create
     ; subscribers = []
     ; config
     ; pending_confirms = String.Table.create ()
+    ; judgements = String.Table.create ()
     ; computer_consent = Computer_consent.create ()
     ; unattended = (fun () -> None)
     ; pending_questions = String.Table.create ()
@@ -4256,6 +4481,7 @@ let replace_session t session ~keep_host =
   wait_idle t;
   Background_tasks.forget_finished t.background;
   t.session <- session;
+  Hashtbl.clear t.judgements;
   t.tracer <- tracer_for ~clock:t.trace_clock ~config:t.config session;
   Reminder.Tracker.reset t.reminder_tracker;
   load_subagent_log t;
@@ -4608,6 +4834,9 @@ let session_stats t =
       | _ -> false)
   in
   let state = state t in
+  let approvals_judged, approvals_cost_usd =
+    Session.spend_for t.session ~purpose:Approval_judge.purpose
+  in
   let context_percent =
     match state.context_tokens with
     | 0 -> 0.
@@ -4626,6 +4855,8 @@ let session_stats t =
   ; compactions = count false
   ; masks
   ; duration_seconds = Session.duration_seconds t.session
+  ; approvals_judged
+  ; approvals_cost_usd
   }
 ;;
 

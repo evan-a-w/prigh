@@ -368,6 +368,7 @@ let%expect_test "spec: backend-side, main agent only; approvals as memory's" =
                     (match decide ~mode ~plan tool action with
                      | Allow -> "allow"
                      | Ask _ -> "ask"
+                     | Judge _ -> "judge"
                      | Deny _ -> "deny"))))));
   print_s
     [%sexp

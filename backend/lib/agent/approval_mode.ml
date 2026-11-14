@@ -5,12 +5,14 @@ type t =
   | Ask
   | Auto_edit
   | Auto
+  | Smart
 [@@deriving sexp, equal, compare, enumerate]
 
 let to_string = function
   | Ask -> "ask"
   | Auto_edit -> "auto-edit"
   | Auto -> "auto"
+  | Smart -> "smart"
 ;;
 
 let of_string s =
@@ -18,6 +20,7 @@ let of_string s =
   | "ask" -> Ok Ask
   | "auto-edit" | "auto_edit" -> Ok Auto_edit
   | "auto" -> Ok Auto
+  | "smart" -> Ok Smart
   | _ ->
     Or_error.errorf
       "unknown approval mode %S; the modes are %s"

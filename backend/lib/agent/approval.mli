@@ -29,6 +29,9 @@ module Decision : sig
     | Ask of { rules : Approval_rule.t list }
     (** with the rules "don't ask again" would add; none when an ask rule
         matched, since allow rules cannot override it *)
+    | Judge of { rules : Approval_rule.t list }
+    (** [Smart] mode: the approval model ({!Approval_judge}) decides
+        whether it runs or asks the user (offering [rules], as [Ask]) *)
     | Deny of string (** the tool result the model sees *)
   [@@deriving sexp_of]
 end
@@ -41,7 +44,10 @@ val is_edit : string -> bool
     touching it asks; an allow rule (the config's or the session's) covering
     it allows it; plan mode asks for every other destructive tool; then the
     mode decides for destructive tools ([Ask] asks, [Auto_edit] asks unless
-    it is an edit, [Auto] allows), and non-destructive ones run. *)
+    it is an edit, [Auto] allows, [Smart] allows edits of files under
+    [cwd] (not in a [.git] directory) and has the approval model judge the
+    rest), and non-destructive ones run. In plan mode, [Smart] has the
+    approval model judge what the other modes ask about. *)
 val decide
   :  mode:Approval_mode.t
   -> plan:bool

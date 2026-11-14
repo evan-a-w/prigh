@@ -79,6 +79,9 @@ module Entry : sig
       | Spend of
           { usage : Usage.t
           ; cost_usd : float
+          ; purpose : string option [@jsonaf.option] [@sexp.option]
+            (** what it was for, when it is not a subagent, compaction or
+                [btw]: ["approval"] for the approval model ({!Approval_judge}) *)
           }
       (** spend the messages do not record: a subagent's response, a
           compaction, a [btw] answer *)
@@ -426,10 +429,19 @@ val pinned : t -> bool
 (** Pinning a session archived by hand unarchives it too (which counts as
     activity, as unarchiving does). Returns the [Pinned] entry. *)
 val set_pinned : t -> pinned:bool -> Entry.t
-val add_spend : t -> usage:Usage.t -> cost_usd:float -> Entry.t
+val add_spend
+  :  ?purpose:string
+  -> t
+  -> usage:Usage.t
+  -> cost_usd:float
+  -> Entry.t
 
 (** The [Spend] entries' total, on every branch. *)
 val spend : t -> Usage.t * float
+
+(** How many [Spend] entries were for [purpose], on every branch, and their
+    cost. *)
+val spend_for : t -> purpose:string -> int * float
 
 (** The last [Resume_at] entry's time, on any branch. *)
 val resume_at : t -> float option
