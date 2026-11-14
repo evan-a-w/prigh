@@ -1521,10 +1521,11 @@ let listed_ids (m : Model.t) =
 ;;
 
 (* The user is in the session now: it was used, and its worktrees' hand
-   folds have had their day. *)
+   folds have had their day. Not another user's sessions, when acting as
+   them. *)
 let note_opened (m : Model.t) =
   match m.now, m.state with
-  | Some now, Some state ->
+  | Some now, Some state when Option.is_none (acting_as m) ->
     let worktree_folds =
       Worktree_folds.open_
         m.worktree_folds
@@ -1534,7 +1535,7 @@ let note_opened (m : Model.t) =
     in
     ( { m with worktree_folds }
     , save_pref m Key.opened (Worktree_folds.opened_pref worktree_folds) )
-  | None, _ | _, None -> m, []
+  | _ -> m, []
 ;;
 
 let set_state_without_files (m : Model.t) (state : State.t) =
@@ -4425,7 +4426,6 @@ let toggle_folded (m : Model.t) id =
           }
         ] ))
 ;;
-
 
 let last_reply (m : Model.t) =
   List.rev (Chat.entries m.chat)
