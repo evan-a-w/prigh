@@ -16,7 +16,7 @@ module User = struct
     let%bind origin =
       match Json.field j "origin" with
       | None -> Ok None
-      | Some o -> Origin.of_json o >>| Option.some
+      | Some o -> Origin.of_json ~text o >>| Option.some
     in
     let%map at = Json.time_ms_opt_field j "at" in
     { text; images; origin; at }

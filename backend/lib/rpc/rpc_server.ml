@@ -3255,9 +3255,17 @@ let dispatch agent login ~(client : Client.t) ~meth ~params : Json.t Or_error.t 
           (( "restored"
            , strings (List.map restored ~f:(fun (q : Agent.Queued.t) -> q.text))
            )
-           :: pasted_field
-                (List.concat_map restored ~f:(fun (q : Agent.Queued.t) ->
-                   q.pasted))))
+           ::
+           (* Each restored message's, when any has some. *)
+           (if List.for_all restored ~f:(fun (q : Agent.Queued.t) ->
+                 List.is_empty q.pasted)
+            then []
+            else
+              [ ( "pasted"
+                , `Array
+                    (List.map restored ~f:(fun (q : Agent.Queued.t) ->
+                       strings q.pasted)) )
+              ])))
   | "cancel_subagent" ->
     Or_error.bind (string_param params "agent_id") ~f:(fun agent_id ->
       unit_result (Agent.cancel_subagent agent ~agent_id))

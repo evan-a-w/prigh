@@ -532,6 +532,7 @@ let%expect_test "superusers have the Nix store's section" =
        ; namespace = None
        ; user = Some "root"
        ; superuser = true
+       ; features = []
        });
   H.quiet h (fun () -> H.act h Open_settings);
   H.text h ~selector:".settings-nav";

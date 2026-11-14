@@ -25,6 +25,7 @@ let on ?(width = 100) ?(height = 14) (link : Server_link.t) =
        ; namespace = link.user
        ; user = link.user
        ; superuser = false
+       ; features = []
        });
   h
 ;;

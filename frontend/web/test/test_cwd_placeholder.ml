@@ -167,13 +167,13 @@ let%expect_test "another host: named first; its branch from the session list" =
     H.act
       h
       (Hello
-         { client_id = "c7"; namespace = None; user = None; superuser = false }));
+         { client_id = "c7"; namespace = None; user = None; superuser = false; features = [] }));
   show h;
   H.quiet h (fun () ->
     H.act
       h
       (Hello
-         { client_id = "c1"; namespace = None; user = None; superuser = false });
+         { client_id = "c1"; namespace = None; user = None; superuser = false; features = [] });
     H.act
       h
       (Reply

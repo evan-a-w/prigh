@@ -35,6 +35,7 @@ let handover ~from ~to_ =
 let handover_origin ~from ~to_ : P.Origin.t =
   { body = None
   ; notes = []
+  ; pasted = []
   ; attachments = []
   ; source =
       Some

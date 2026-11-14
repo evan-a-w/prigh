@@ -11,6 +11,8 @@ type t =
   ; namespace : string option
   ; user : string option
   ; superuser : bool (** [user] is one: may act as anyone, clean the Nix store *)
+  ; features : string list
+    (** what the backend takes beyond the basics: [pasted_text] *)
   }
 [@@deriving sexp_of, equal]
 
@@ -18,3 +20,7 @@ val of_json : Json.t -> t Or_error.t
 
 (** [namespace] when it is not [user]'s. *)
 val acting_as : t -> string option
+
+(** The backend takes prompts' [pasted] texts; else they go inline
+    (as their blocks in the text). *)
+val pasted_text : t -> bool

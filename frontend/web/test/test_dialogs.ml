@@ -666,6 +666,7 @@ let%expect_test "signing out" =
        ; namespace = Some "bob"
        ; user = Some "ann"
        ; superuser = false
+       ; features = []
        });
   H.text h ~selector:".sidebar-footer";
   [%expect {| (A ann acting as bob) (Settings (Ctrl+, or /settings)) |}];

@@ -30,6 +30,7 @@ let%expect_test "every command does something (none is unknown)" =
       ; namespace = Some "alice"
       ; user = Some "alice"
       ; superuser = true
+      ; features = []
       }
     in
     let m', commands =
@@ -1064,7 +1065,7 @@ let%expect_test "/host: pick a host, then the directory there" =
   H.act
     h
     (Hello
-       { client_id = "c7"; namespace = None; user = None; superuser = false });
+       { client_id = "c7"; namespace = None; user = None; superuser = false; features = [] });
   run h "/host";
   H.text h ~selector:".picker-items";
   [%expect
@@ -1141,7 +1142,7 @@ let%expect_test "/cd and /host to a missing directory ask to create it" =
   H.act
     h
     (Hello
-       { client_id = "c7"; namespace = None; user = None; superuser = false });
+       { client_id = "c7"; namespace = None; user = None; superuser = false; features = [] });
   run h "/cd /work/new";
   H.reply h "set_cwd" {|{"missing":"/work/new"}|};
   H.text h ~selector:".modal";
@@ -1716,6 +1717,7 @@ let%expect_test "/setusr: a superuser acts as another user, and back" =
        ; namespace = Some "alice"
        ; user = Some "alice"
        ; superuser = false
+       ; features = []
        });
   run h "/setusr";
   H.reply h "list_users" {|["alice","bob","carol"]|};

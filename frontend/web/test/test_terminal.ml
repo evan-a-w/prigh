@@ -188,6 +188,7 @@ let%expect_test "the panel follows the session, the host and the user" =
        ; namespace = Some "bob"
        ; user = Some "alice"
        ; superuser = false
+       ; features = []
        });
   show ();
   [%expect
