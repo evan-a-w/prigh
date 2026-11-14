@@ -525,15 +525,10 @@ let settings_servers (m : App.Model.t) ~inject =
   in
   match p.status with
   | Unknown | Loading when List.is_empty p.servers ->
-    [ row
-        ~name:"Your servers"
-        ~about:"Kept on the backend, for your account."
-        ~note:("muted", "Reading your settings…")
-        []
-    ]
+    [ row ~name:"Reading your servers…" ~about:"" ~note:("muted", "Waiting…") [] ]
   | Failed e ->
     [ row
-        ~name:"Your servers"
+        ~name:"Couldn't read your servers"
         ~about:"Kept on the backend, for your account."
         ~note:
           ( "warm"

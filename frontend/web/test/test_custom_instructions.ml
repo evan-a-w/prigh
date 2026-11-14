@@ -62,7 +62,7 @@ let%expect_test "opening reads them; empty, it says what they are" =
     No instructions yet
     Write what the model should always do (“Use Australian spelling”, “Prefer OCaml examples”), or tell it a lasting preference and it adds one here. Every session gets them.
     (Add instruction)
-    (Appearance) (Sessions) (New sessions) (Models) (Memory) (About you) (Custom instructions) (Git hosting) (Account)
+    (Appearance) (Sessions) (New sessions) (Models) (Memory) (About you) (Custom instructions) (MCP servers) (Git hosting) (Account)
     |}]
 ;;
 

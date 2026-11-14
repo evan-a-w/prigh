@@ -1937,12 +1937,16 @@ let fetch_about_you (m : Model.t) =
 
 (* The servers in the settings, and how the session's host is doing with
    them and its own. *)
-let fetch_mcp (m : Model.t) =
-  ( { m with mcp = Mcp_page.loading m.mcp }
-  , [ call Get_mcp_settings ~tag:Mcp_settings_loaded
-    ; call (List_mcp { reconnect = false }) ~tag:Mcp_host_listed
-    ] )
+let mcp_lists =
+  [ call Get_mcp_settings ~tag:Mcp_settings_loaded
+  ; call (List_mcp { reconnect = false }) ~tag:Mcp_host_listed
+  ]
 ;;
+
+let fetch_mcp (m : Model.t) = { m with mcp = Mcp_page.loading m.mcp }, mcp_lists
+
+(* After a change: what is shown stays until the new lists replace it. *)
+let refresh_mcp (m : Model.t) = m, mcp_lists
 
 let mcp_save (m : Model.t) =
   let mcp, request = Mcp_page.save m.mcp in
@@ -8320,15 +8324,15 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
   | Mcp_draft_saved, result ->
     let mcp = Mcp_page.saved m.mcp (Result.map result ~f:ignore) in
     (match result with
-     | Ok _ -> fetch_mcp { m with mcp }
+     | Ok _ -> refresh_mcp { m with mcp }
      | Error _ -> { m with mcp }, [])
   | Mcp_pasted, result ->
     let mcp = Mcp_page.pasted m.mcp (Result.map result ~f:ignore) in
     (match result with
-     | Ok _ -> fetch_mcp { m with mcp }
+     | Ok _ -> refresh_mcp { m with mcp }
      | Error _ -> { m with mcp }, [])
   | Mcp_removed name, Ok _ ->
-    let m, cmds = fetch_mcp m in
+    let m, cmds = refresh_mcp m in
     let m, more = toast m (sprintf "Removed %s from your settings" name) in
     m, cmds @ more
   | Mcp_removed name, Error e ->
@@ -8337,7 +8341,7 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
       }
     , [] )
   | Mcp_toggled name, Ok _ ->
-    fetch_mcp { m with mcp = Mcp_page.set_busy m.mcp name false }
+    refresh_mcp { m with mcp = Mcp_page.set_busy m.mcp name false }
   | Mcp_toggled name, Error e ->
     ( { m with
         mcp =
@@ -9360,7 +9364,14 @@ let main_event (m : Model.t) (event : Event.t) =
   | User_info_changed info ->
     { m with about_you = About_you.changed m.about_you info }, []
   | Mcp_settings_changed servers ->
-    { m with mcp = Mcp_page.changed m.mcp servers }, []
+    let m = { m with mcp = Mcp_page.changed m.mcp servers } in
+    (* The host starts or stops them as it hears: ask it again, so a new
+       server reads "checking", then its state, rather than "not running". *)
+    (match m.dialog, m.settings_section with
+     | Some Settings, Mcp ->
+       ( { m with mcp = { m.mcp with host = None; host_error = None } }
+       , [ call (List_mcp { reconnect = false }) ~tag:Mcp_host_listed ] )
+     | _ -> m, [])
   (* Another of the user's frontends changed their preferences. *)
   | Prefs_changed changes ->
     apply_prefs m ~startup:false changes, [ Command.Cache_prefs changes ]
