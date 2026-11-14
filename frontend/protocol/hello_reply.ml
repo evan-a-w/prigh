@@ -33,4 +33,3 @@ let acting_as t =
 ;;
 
 let pasted_text t = List.mem t.features "pasted_text" ~equal:String.equal
-

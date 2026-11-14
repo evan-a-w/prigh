@@ -6,7 +6,9 @@ module H = Test_app.H
 module P = Prigh_protocol
 
 (* Long by its lines (over [Pasted_text.long_lines]), short to print. *)
-let long_text = String.concat ~sep:"\n" (List.init 41 ~f:(fun i -> Int.to_string (i % 10)))
+let long_text =
+  String.concat ~sep:"\n" (List.init 41 ~f:(fun i -> Int.to_string (i % 10)))
+;;
 
 let connected ?(features = [ "pasted_text" ]) () =
   let h = Test_app.connected ~width:70 ~height:12 () in
@@ -32,7 +34,8 @@ let%expect_test "a long paste is a token; it goes as a pasted text, in full" =
   paste h long_text;
   editor h;
   H.show h;
-  [%expect {|
+  [%expect
+    {|
     "why? [Pasted text #1 +41 lines]"
 
 
@@ -48,7 +51,8 @@ let%expect_test "a long paste is a token; it goes as a pasted text, in full" =
     /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}];
   H.enter h;
-  [%expect {|
+  [%expect
+    {|
     (Rpc
       (method_ prompt)
       (params (
@@ -73,7 +77,8 @@ let%expect_test "short pastes go into the editor as before" =
   editor h;
   paste h (String.make 2000 'x');
   print_s [%sexp (String.length (Editor.text h.H.model.editor) : int)];
-  [%expect {|
+  [%expect
+    {|
     "l1\nl2\nl3\nl4"
     2011
     |}]
@@ -85,19 +90,65 @@ let%expect_test "only a paste: nothing typed is sent; two pastes are numbered" =
   paste h (String.make 2001 'y');
   print_s
     [%sexp
-      (List.map (Editor.pasted h.H.model.editor) ~f:(fun (t : Pasted_text.Token.t) ->
-         t.token, String.length t.text)
+      (List.map
+         (Editor.pasted h.H.model.editor)
+         ~f:(fun (t : Pasted_text.Token.t) -> t.token, String.length t.text)
        : (string * int) list)];
   H.key h (Key.plain Backspace);
-  paste h "y\ny\ny\ny\ny\ny\ny\ny\ny\ny\ny\ny\ny\ny\ny\ny\ny\ny\ny\ny\ny\ny\ny\ny\ny\ny\ny\ny\ny\ny\ny\ny\ny\ny\ny\ny\ny\ny\ny\ny\ny\ny";
+  paste
+    h
+    "y\n\
+     y\n\
+     y\n\
+     y\n\
+     y\n\
+     y\n\
+     y\n\
+     y\n\
+     y\n\
+     y\n\
+     y\n\
+     y\n\
+     y\n\
+     y\n\
+     y\n\
+     y\n\
+     y\n\
+     y\n\
+     y\n\
+     y\n\
+     y\n\
+     y\n\
+     y\n\
+     y\n\
+     y\n\
+     y\n\
+     y\n\
+     y\n\
+     y\n\
+     y\n\
+     y\n\
+     y\n\
+     y\n\
+     y\n\
+     y\n\
+     y\n\
+     y\n\
+     y\n\
+     y\n\
+     y\n\
+     y\n\
+     y";
   editor h;
-  [%expect {|
+  [%expect
+    {|
     (("[Pasted text #2 +1 line]"   2001)
      ("[Pasted text #1 +41 lines]" 81))
     "[Pasted text #1 +41 lines][Pasted text #3 +42 lines]"
     |}];
   H.enter h;
-  [%expect {|
+  [%expect
+    {|
     (Rpc
       (method_ prompt)
       (params (
@@ -130,7 +181,8 @@ let%expect_test "Backspace and Delete remove a token whole; it is not sent" =
   editor h;
   H.keys h "done";
   H.enter h;
-  [%expect {|
+  [%expect
+    {|
     ""
     ""
     (Rpc (method_ prompt) (params ((text done))) (tag Show_error))
@@ -148,10 +200,11 @@ let%expect_test "Backspace and Delete remove a token whole; it is not sent" =
 let%expect_test "an older backend gets the pasted text inline" =
   let h = connected ~features:[] () in
   H.keys h "see ";
-  paste h "a\nb\nc\n" ;
+  paste h "a\nb\nc\n";
   paste h long_text;
   H.enter h;
-  [%expect {|
+  [%expect
+    {|
     (Rpc
       (method_ prompt)
       (params ((
@@ -174,7 +227,8 @@ let%expect_test "a paste over the limit is refused, saying what to do" =
   paste h (String.make (Pasted_text.max_bytes + 1) 'z');
   editor h;
   H.show h;
-  [%expect {|
+  [%expect
+    {|
     ""
 
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
@@ -196,7 +250,8 @@ let%expect_test "history and Esc's restore bring pasted texts back" =
   H.keys h "fix ";
   paste h long_text;
   H.enter h;
-  [%expect {|
+  [%expect
+    {|
     (Rpc
       (method_ prompt)
       (params (
@@ -216,7 +271,8 @@ let%expect_test "history and Esc's restore bring pasted texts back" =
   H.key h (Key.plain Up);
   editor h;
   H.enter h;
-  [%expect {|
+  [%expect
+    {|
     "fix [Pasted text #1 +41 lines]"
     (Rpc
       (method_ prompt)
@@ -243,7 +299,8 @@ let%expect_test "history and Esc's restore bring pasted texts back" =
        (P.Json.to_string (P.Json.str "p\nq")));
   editor h;
   H.enter h;
-  [%expect {|
+  [%expect
+    {|
     "fix [Pasted text #2 +2 lines]\n\nb"
     (Rpc
       (method_ prompt)
@@ -263,7 +320,10 @@ let%expect_test "history and Esc's restore bring pasted texts back" =
 let%expect_test "the transcript names pasted texts rather than showing them" =
   let h = connected () in
   let pasted, block =
-    long_text, sprintf "<pasted_text name=\"Pasted text #1\" lines=\"41\">\n%s\n</pasted_text>" long_text
+    ( long_text
+    , sprintf
+        "<pasted_text name=\"Pasted text #1\" lines=\"41\">\n%s\n</pasted_text>"
+        long_text )
   in
   let text = "fix this\n\n" ^ block in
   let origin : P.Origin.t =
@@ -275,7 +335,8 @@ let%expect_test "the transcript names pasted texts rather than showing them" =
   H.event h (Message_start (user ~origin text));
   H.event h (Message_end (user ~origin text));
   H.show h;
-  [%expect {|
+  [%expect
+    {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question

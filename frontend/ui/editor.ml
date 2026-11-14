@@ -264,11 +264,10 @@ let backspace t =
     let t = set_line t t.cursor.line (before ^ after) in
     { t with cursor = { t.cursor with col = length before } }
   | None when t.cursor.col > 0 ->
-    (
     let before, after = split_at (current t) t.cursor.col in
     let before = of_chars (List.drop_last_exn (chars before)) in
     let t = set_line t t.cursor.line (before ^ after) in
-    { t with cursor = { t.cursor with col = t.cursor.col - 1 } })
+    { t with cursor = { t.cursor with col = t.cursor.col - 1 } }
   | None -> if t.cursor.line > 0 then join_with_previous t else t
 ;;
 
@@ -279,12 +278,14 @@ let delete t =
   let before, after = split_at line t.cursor.col in
   match token_starting after t.pasted with
   | Some token ->
-    set_line t t.cursor.line (before ^ String.drop_prefix after (String.length token))
+    set_line
+      t
+      t.cursor.line
+      (before ^ String.drop_prefix after (String.length token))
   | None when t.cursor.col < length line ->
-    (
     let before, after = split_at line t.cursor.col in
     let after = of_chars (List.tl_exn (chars after)) in
-    set_line t t.cursor.line (before ^ after))
+    set_line t t.cursor.line (before ^ after)
   | None when t.cursor.line < List.length t.lines - 1 ->
     let next = { t with cursor = { line = t.cursor.line + 1; col = 0 } } in
     let joined = join_with_previous next in

@@ -1066,7 +1066,12 @@ let%expect_test "/host: pick a host, then the directory there" =
   H.act
     h
     (Hello
-       { client_id = "c7"; namespace = None; user = None; superuser = false; features = [] });
+       { client_id = "c7"
+       ; namespace = None
+       ; user = None
+       ; superuser = false
+       ; features = []
+       });
   run h "/host";
   H.text h ~selector:".picker-items";
   [%expect
@@ -1143,7 +1148,12 @@ let%expect_test "/cd and /host to a missing directory ask to create it" =
   H.act
     h
     (Hello
-       { client_id = "c7"; namespace = None; user = None; superuser = false; features = [] });
+       { client_id = "c7"
+       ; namespace = None
+       ; user = None
+       ; superuser = false
+       ; features = []
+       });
   run h "/cd /work/new";
   H.reply h "set_cwd" {|{"missing":"/work/new"}|};
   H.text h ~selector:".modal";

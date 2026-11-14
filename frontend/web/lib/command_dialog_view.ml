@@ -652,7 +652,6 @@ let text ~title ~text ~inject =
     [ Node.pre ~attrs:[ Attr.class_ "text-block" ] [ Node.text text ] ]
 ;;
 
-
 (* A long paste of the composer's, before it is sent: read it, put it in the
    box as text after all, or drop it. *)
 let pasted (m : App.Model.t) i ~inject =
@@ -684,6 +683,7 @@ let pasted (m : App.Model.t) i ~inject =
            ]
          [ Node.pre ~attrs:[ Attr.class_ "text-block" ] [ Node.text t ] ])
 ;;
+
 let mcp_tools (server : Mcp_server.t) ~inject =
   Modal.view
     ~cls:"mcp-tools-dialog"

@@ -153,7 +153,10 @@ let pasted_texts ~fold (u : Message.User.t) (pasted : Origin.Pasted.t list) =
              ~bytes:(String.length p.text)
          in
          Node.div
-           ~attrs:[ Attr.classes ([ "pasted"; "copyable" ] @ if open_ then [ "open" ] else []) ]
+           ~attrs:
+             [ Attr.classes
+                 ([ "pasted"; "copyable" ] @ if open_ then [ "open" ] else [])
+             ]
            [ Node.button
                ~attrs:
                  [ Attr.class_ "pasted-head"
@@ -167,7 +170,8 @@ let pasted_texts ~fold (u : Message.User.t) (pasted : Origin.Pasted.t list) =
                ; span "pasted-detail" summary
                ; (if open_
                   then Node.none
-                  else span "pasted-preview" (Prigh_ui.Pasted_text.preview p.text))
+                  else
+                    span "pasted-preview" (Prigh_ui.Pasted_text.preview p.text))
                ]
            ; (if open_
               then
@@ -175,7 +179,10 @@ let pasted_texts ~fold (u : Message.User.t) (pasted : Origin.Pasted.t list) =
                   ~attrs:[ Attr.class_ "pasted-body" ]
                   [ Node.button
                       ~attrs:
-                        [ Attr.class_ "copy"; Attr.type_ "button"; Attr.title "Copy" ]
+                        [ Attr.class_ "copy"
+                        ; Attr.type_ "button"
+                        ; Attr.title "Copy"
+                        ]
                       [ Node.text "Copy" ]
                   ; Node.pre
                       ~attrs:[ Attr.class_ "pasted-text copy-text" ]

@@ -14,8 +14,7 @@ let count_lines text =
 let chars text = String.count text ~f:(fun c -> Char.to_int c land 0xC0 <> 0x80)
 
 let is_long text =
-  String.length text > long_chars
-  && chars text > long_chars
+  (String.length text > long_chars && chars text > long_chars)
   || count_lines text > long_lines
 ;;
 
@@ -109,13 +108,12 @@ end
 let resolve text tokens =
   let found =
     List.filter_map tokens ~f:(fun (t : Token.t) ->
-      Option.map (String.substr_index text ~pattern:t.token) ~f:(fun at -> at, t))
+      Option.map (String.substr_index text ~pattern:t.token) ~f:(fun at ->
+        at, t))
     |> List.sort ~compare:(fun (a, _) (b, _) -> Int.compare a b)
     |> List.map ~f:snd
   in
-  let typed =
-    replace_tokens text (List.map found ~f:(fun t -> t.token, ""))
-  in
+  let typed = replace_tokens text (List.map found ~f:(fun t -> t.token, "")) in
   let text =
     if String.is_empty (String.strip typed)
     then ""
@@ -131,6 +129,8 @@ let params ~backend_takes ~text pasted =
   match pasted with
   | [] -> [ "text", P.Json.str text ]
   | pasted when backend_takes ->
-    [ "text", P.Json.str text; "pasted", `Array (List.map pasted ~f:P.Json.str) ]
+    [ "text", P.Json.str text
+    ; "pasted", `Array (List.map pasted ~f:P.Json.str)
+    ]
   | pasted -> [ "text", P.Json.str (inline ~text pasted) ]
 ;;

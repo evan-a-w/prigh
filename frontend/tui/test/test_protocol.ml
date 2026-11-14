@@ -1967,7 +1967,8 @@ let%expect_test "hello reply: whether the backend takes pasted texts" =
           (Hello_reply.of_json (Or_error.ok_exn (Json.parse json))
            |> Or_error.map ~f:Hello_reply.pasted_text
            : bool Or_error.t)]);
-  [%expect {|
+  [%expect
+    {|
     (Ok true)
     (Ok false)
     (Ok false)
@@ -1975,7 +1976,13 @@ let%expect_test "hello reply: whether the backend takes pasted texts" =
 ;;
 
 let%expect_test "origin: pasted texts are taken out of the message's text" =
-  let text = "fix [Pasted text #1]\n\n<pasted_text name=\"Pasted text #1\" lines=\"2\">\na\nb\n</pasted_text>" in
+  let text =
+    "fix [Pasted text #1]\n\n\
+     <pasted_text name=\"Pasted text #1\" lines=\"2\">\n\
+     a\n\
+     b\n\
+     </pasted_text>"
+  in
   let start = String.substr_index_exn text ~pattern:"\na\nb" + 1 in
   List.iter
     [ sprintf
@@ -1989,7 +1996,8 @@ let%expect_test "origin: pasted texts are taken out of the message's text" =
         [%sexp
           (Origin.of_json ~text (Or_error.ok_exn (Json.parse json))
            : Origin.t Or_error.t)]);
-  [%expect {|
+  [%expect
+    {|
     (Ok (
       (body "fix [Pasted text #1]")
       (pasted ((

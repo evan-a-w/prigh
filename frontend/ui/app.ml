@@ -819,7 +819,9 @@ let decode_restored json =
     | None -> Ok []
     | Some (`Array _ as items) -> strings items
     | Some other ->
-      Or_error.errorf "restored: expected array, got %s" (P.Json.to_string other)
+      Or_error.errorf
+        "restored: expected array, got %s"
+        (P.Json.to_string other)
   in
   let%bind pasted = P.Json.optional_list_field json "pasted" ~f:strings in
   match List.zip restored pasted with
@@ -4587,10 +4589,10 @@ let user_params m text =
   let attachments = attachments m text in
   Pasted_text.params ~backend_takes:m.pasted_text ~text pasted
   @
-  (if List.is_empty attachments
-   then []
-   else
-     [ "attachments", `Array (List.map attachments ~f:(fun p -> P.Json.str p)) ])
+  if List.is_empty attachments
+  then []
+  else
+    [ "attachments", `Array (List.map attachments ~f:(fun p -> P.Json.str p)) ]
 ;;
 
 let shell_command m text =
@@ -5081,7 +5083,11 @@ let editing_intent m (intent : Intent.t) =
   match intent with
   | Insert s -> ed (fun e -> Editor.insert e s)
   | Paste s ->
-    (match Option.bind (Option.some_if (Pasted_text.is_long s) s) ~f:Pasted_text.too_large with
+    (match
+       Option.bind
+         (Option.some_if (Pasted_text.is_long s) s)
+         ~f:Pasted_text.too_large
+     with
      | Some error -> notice m error, []
      | None -> ed (fun e -> Editor.insert_paste e s))
   | Submit -> submit m
@@ -7111,8 +7117,10 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
        decode
          json
          ~f:P.Hello_reply.of_json
-         (fun ({ client_id; namespace; user; superuser = _; features = _ } as
-               hello) ->
+         (fun
+             ({ client_id; namespace; user; superuser = _; features = _ } as
+              hello)
+            ->
             let m, session_commands =
               reset_session
                 { m with
@@ -7495,7 +7503,10 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
             ~f:(fun j ->
               let%bind.Or_error text = P.Json.string_field j "text" in
               let%map.Or_error pasted =
-                P.Json.optional_list_field j "pasted" ~f:P.Json.to_string_or_error
+                P.Json.optional_list_field
+                  j
+                  "pasted"
+                  ~f:P.Json.to_string_or_error
               in
               text, pasted)
             (fun queued ->
@@ -7504,9 +7515,7 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
                  if Editor.is_empty m.editor
                  then Editor.set_text editor text
                  else
-                   Editor.set_text
-                     editor
-                     (text ^ "\n\n" ^ Editor.text m.editor)
+                   Editor.set_text editor (text ^ "\n\n" ^ Editor.text m.editor)
                in
                { m with editor }, []))
      | Paths_for_autocomplete prefix ->

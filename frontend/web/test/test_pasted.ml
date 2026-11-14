@@ -9,7 +9,12 @@ let hello ?(features = [ "pasted_text" ]) h =
   H.act
     h
     (Hello
-       { client_id = "c1"; namespace = None; user = None; superuser = false; features })
+       { client_id = "c1"
+       ; namespace = None
+       ; user = None
+       ; superuser = false
+       ; features
+       })
 ;;
 
 (* Long by its lines (over 40), short to print. *)
@@ -30,7 +35,8 @@ let%expect_test "is_long: 2,000 characters or 40 lines" =
         (String.length s)
         (Prigh_ui.Pasted_text.count_lines s)
         (Prigh_ui.Pasted_text.is_long s));
-  [%expect {|
+  [%expect
+    {|
     2000 bytes, 1 lines: false
     2001 bytes, 1 lines: true
     1000 bytes, 1 lines: false
@@ -47,7 +53,8 @@ let%expect_test "a long paste is a chip; opened, removed, inserted as text" =
   H.act h (Paste_text (String.make 3000 'y'));
   print_s [%sexp ((H.model h).draft : string)];
   chips h;
-  [%expect {|
+  [%expect
+    {|
     (Focus editor)
     (Focus editor)
     why?
@@ -56,7 +63,8 @@ let%expect_test "a long paste is a chip; opened, removed, inserted as text" =
     |}];
   H.click h ~selector:".pasted-chip-open";
   H.text h ~selector:".pasted-dialog";
-  [%expect {|
+  [%expect
+    {|
     (View_pasted 0)
     (Focus dialog)
     Pasted text #1 · 41 lines · 153 B
@@ -107,7 +115,8 @@ let%expect_test "a long paste is a chip; opened, removed, inserted as text" =
   H.act h Dialog_accept;
   H.click ~nth:1 h ~selector:".attach-chip-remove";
   chips h;
-  [%expect {|
+  [%expect
+    {|
     (Focus editor)
     (Remove_pasted 1)
     (Focus editor)
@@ -118,7 +127,8 @@ let%expect_test "a long paste is a chip; opened, removed, inserted as text" =
   print_s [%sexp ((H.model h).draft : string)];
   chips h;
   print_s [%sexp (Option.is_some (H.model h).dialog : bool)];
-  [%expect {|
+  [%expect
+    {|
     (View_pasted 0)
     (Focus dialog)
     (Focus editor)
@@ -173,17 +183,21 @@ let%expect_test "too large: refused, saying the limit and what to do" =
   H.act h (Paste_text (String.make (Prigh_ui.Pasted_text.max_bytes + 1) 'z'));
   chips h;
   H.text h ~selector:".toast";
-  [%expect {| That paste is 2,097,153 bytes, over the 2.0 MB (2,097,152 bytes) a pasted text may be: save it to a file and attach that instead. (Dismiss) |}]
+  [%expect
+    {| That paste is 2,097,153 bytes, over the 2.0 MB (2,097,152 bytes) a pasted text may be: save it to a file and attach that instead. (Dismiss) |}]
 ;;
 
-let%expect_test "sending carries the pasted texts; an old backend gets them inline" =
+let%expect_test
+    "sending carries the pasted texts; an old backend gets them inline"
+  =
   let h = H.create () in
   hello h;
   H.type_ h "why?";
   H.act h (Paste_text long);
   H.act h Send;
   chips h;
-  [%expect {|
+  [%expect
+    {|
     (Focus editor)
     (Rpc (method_ push_pref) (params ((key history) (value why?) (max 500)))
      (tag Ignore))
@@ -286,7 +300,8 @@ let%expect_test "sending carries the pasted texts; an old backend gets them inli
   hello ~features:[] h;
   H.act h (Paste_text "a\nb");
   H.act h Send;
-  [%expect {|
+  [%expect
+    {|
     (Focus editor)
     Scroll_to_bottom
     (Rpc (method_ prompt)
@@ -308,10 +323,15 @@ let%expect_test "the transcript shows a chip, its text only once opened" =
   let pasted = "first line\nsecond\nthird" in
   let text =
     sprintf
-      "why?\n\n<pasted_text name=\"Pasted text #1\" lines=\"3\">\n%s\n</pasted_text>"
+      "why?\n\n\
+       <pasted_text name=\"Pasted text #1\" lines=\"3\">\n\
+       %s\n\
+       </pasted_text>"
       pasted
   in
-  let start = String.length text - String.length "\n</pasted_text>" - String.length pasted in
+  let start =
+    String.length text - String.length "\n</pasted_text>" - String.length pasted
+  in
   H.event
     h
     (sprintf
@@ -320,7 +340,8 @@ let%expect_test "the transcript shows a chip, its text only once opened" =
        start
        (String.length pasted));
   H.show h ~selector:".msg.user";
-  [%expect {|
+  [%expect
+    {|
     <div data-entry="0" data-message-entry="0" id="msg-0" tabindex="-1" class="msg user">
       <div dir="auto" class="bubble"> why? </div>
       <div class="pasted-texts">
@@ -344,7 +365,8 @@ let%expect_test "the transcript shows a chip, its text only once opened" =
   (* The page's listener turns a click on [data-fold] into this. *)
   H.act h (Toggle_fold "pasted:1791194280000:0");
   H.show h ~selector:".pasted";
-  [%expect {|
+  [%expect
+    {|
     <div class="copyable open pasted">
       <button type="button"
               data-fold="pasted:1791194280000:0"
@@ -370,13 +392,11 @@ let%expect_test "Stop gives queued pasted texts back as chips" =
   let h = H.create () in
   hello h;
   H.act h Abort;
-  H.reply
-    h
-    "abort"
-    {|{"restored":["look"],"pasted":[["log one\nlog two"]]}|};
+  H.reply h "abort" {|{"restored":["look"],"pasted":[["log one\nlog two"]]}|};
   print_s [%sexp ((H.model h).draft : string)];
   chips h;
-  [%expect {|
+  [%expect
+    {|
     (Rpc (method_ abort) (params ()) (tag Restored))
     (Expire_toast (id 0) (after_ms 3260))
     (Focus editor)

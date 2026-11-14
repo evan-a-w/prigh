@@ -12,7 +12,13 @@ let connected ?(superuser = true) () =
   H.step
     ~quiet:true
     h
-    (Hello { client_id = "c1"; namespace = None; user = None; superuser; features = [] });
+    (Hello
+       { client_id = "c1"
+       ; namespace = None
+       ; user = None
+       ; superuser
+       ; features = []
+       });
   H.event h (State (state ()));
   h
 ;;

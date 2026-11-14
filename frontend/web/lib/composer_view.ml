@@ -134,6 +134,7 @@ let pasted (m : App.Model.t) ~inject =
                [ icon Close ]
            ]))
 ;;
+
 let images (m : App.Model.t) ~inject =
   match m.images with
   | [] -> Node.none

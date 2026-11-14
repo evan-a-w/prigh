@@ -574,7 +574,7 @@ module Action = struct
     | Add_image of Image.t
     | Remove_image of int
     | Paste_text of string
-      (** a long paste into the composer ({!Prigh_ui.Pasted_text.is_long}):
+    (** a long paste into the composer ({!Prigh_ui.Pasted_text.is_long}):
           a chip *)
     | Remove_pasted of int
     | Insert_pasted of int (** into [draft], as text *)
@@ -1227,7 +1227,8 @@ let restored_pasted json =
   | Some (`Array items) ->
     List.concat_map items ~f:(function
       | `String s -> [ s ]
-      | `Array _ as texts -> Option.value (Or_error.ok (strings texts)) ~default:[]
+      | `Array _ as texts ->
+        Option.value (Or_error.ok (strings texts)) ~default:[]
       | _ -> [])
   | _ -> []
 ;;
@@ -9510,7 +9511,11 @@ let send (m : Model.t) ~follow_up =
      | Error e -> error m (Error.to_string_hum e)
      | Ok _ -> m, [])
   | _ ->
-    if String.is_empty text && List.is_empty m.images && (not attached) && not pasted
+    if
+      String.is_empty text
+      && List.is_empty m.images
+      && (not attached)
+      && not pasted
     then m, []
     else (
       let method_ =

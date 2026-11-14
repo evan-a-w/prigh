@@ -3257,8 +3257,9 @@ let dispatch agent login ~(client : Client.t) ~meth ~params : Json.t Or_error.t 
            )
            ::
            (* Each restored message's, when any has some. *)
-           (if List.for_all restored ~f:(fun (q : Agent.Queued.t) ->
-                 List.is_empty q.pasted)
+           (if
+              List.for_all restored ~f:(fun (q : Agent.Queued.t) ->
+                List.is_empty q.pasted)
             then []
             else
               [ ( "pasted"
