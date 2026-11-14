@@ -10,7 +10,4 @@ open! Import
 (** The reason, when the strip shows. *)
 val reason : App.Model.t -> string option
 
-(** The reason's first clause, capitalised: "No tool host connected". *)
-val headline : string -> string
-
 val view : App.Model.t -> inject:(App.Action.t -> unit Effect.t) -> Node.t

@@ -171,7 +171,8 @@ let%expect_test "no tool host: the banner, the message kept, one click to chat" 
               class="btn no-host-banner-chat"
               @on_click>
         <icon class="message"> </icon>
-        Chat without a host
+        <span class="long"> Chat without a host </span>
+        <span class="short"> Chat anyway </span>
       </button>
     </div>
     |}];
@@ -180,7 +181,7 @@ let%expect_test "no tool host: the banner, the message kept, one click to chat" 
   toasts h;
   print_s [%sexp ((H.model h).draft : string)];
   [%expect {|
-    No tool host connected: connect one with `prigh tool-host -connect ...` or a TUI, then pick it with /host, or talk without one in chat mode (/mode chat). Your message stays here: Chat without a host (above it) sends it as a chat, with no files or commands. (Dismiss)
+    No tool host connected: your message stays here. Chat without a host (over it) sends it as a chat, or connect a tool host and pick it (/host). (Dismiss)
     "what is a monad?"
     |}];
   (* The button: chat mode first, then the message once it is taken. *)

@@ -4033,3 +4033,75 @@ tap shows a tooltip: true
 page fits: true; overflowing: 0
 === firefox: ui: errors ===
 none
+=== firefox: chat: a new session with no tool host ===
+mode chip: chat
+host chip: no host
+placeholder: Chat, without a tool host: no files or commands. Ask anything…
+strip: (none)
+=== firefox: chat: a reply, with no tool host ===
+you: what is a monad? (time)
+prigh: faux reply deepseek-flash 10 in 5 out (time)
+=== firefox: chat: the mode menu ===
+When tools ask first
+Alt+M cycles
+Asks: edits & commands
+bash, job_input, edits and MCP tools ask first
+Asks: commands
+file edits run; bash, job_input and MCP tools ask first
+Auto: never asks
+tools run without asking
+Plan mode
+read-only planning, until you leave it (/plan off or Alt+M): no file edits; bash, job_input and MCP tools ask first
+Chat: no tool host
+a chat without the tool host: no files, commands or project, only the web and other host-free tools, until you leave it (/chat off or Alt+M)
+Enter chooses, ← → the next setting, Esc closes
+=== firefox: chat: mode ask, no tool host ===
+mode chip: ask
+host chip: No host
+placeholder: Working in $CWD. Ask prigh anything…
+strip: No tool host connected Chat without a host
+toast: No tool host connected: your message stays here. Chat without a host (over it) sends it as a chat, or connect a tool host and pick it (/host).
+draft: and a functor?
+messages: 1
+=== firefox: chat: chat without a host: sent ===
+mode chip: chat
+host chip: no host
+placeholder: Chat, without a tool host: no files or commands. Ask anything…
+strip: (none)
+draft: ""
+you: what is a monad? (time) | and a functor? (time)
+replies: 2
+=== firefox: chat: phone 390x844: chat ===
+mode chip: (in the ⋯ sheet)
+host chip: no host
+placeholder: Chat: no files or commands…
+strip: (none)
+audit: ok
+=== firefox: chat: phone 390x844: the ⋯ sheet's mode ===
+Mode ask auto-edit auto plan [chat]
+audit: ok
+=== firefox: chat: phone 390x844: mode ask, no tool host ===
+mode chip: (in the ⋯ sheet)
+host chip: No host
+placeholder: Working in $CWD. Ask prigh anything…
+strip: No tool host connected Chat without a host
+audit: ok
+after Chat without a host: strip (none)
+=== firefox: chat: phone 320x640: chat ===
+mode chip: (in the ⋯ sheet)
+host chip: no host
+placeholder: Chat: no files or commands…
+strip: (none)
+audit: ok
+=== firefox: chat: phone 320x640: the ⋯ sheet's mode ===
+Mode ask auto-edit auto plan [chat]
+audit: ok
+=== firefox: chat: phone 320x640: mode ask, no tool host ===
+mode chip: (in the ⋯ sheet)
+host chip: No host
+placeholder: Working in $CWD. Ask prigh anything…
+strip: No tool host connected Chat anyway
+audit: ok
+after Chat without a host: strip (none)
+=== firefox: chat: errors ===
+(none)

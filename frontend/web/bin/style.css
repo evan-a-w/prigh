@@ -975,7 +975,7 @@ kbd {
 .chip-anchor.host, .chip-anchor.host > .host-chip { flex-shrink: 6; min-width: 52px; }
 .chip-anchor.host .chip-label { max-width: 180px; }
 .composer-controls .host-chip.warm { color: var(--sodium); }
-.composer-controls .host-chip.chat { color: var(--muted); }
+.composer-controls .host-chip.chatting { color: var(--sodium); }
 /* A disconnected host keeps its name; its server is struck through in
    brick and "offline" follows, which the name gives way to first. */
 .host-chip.offline > .icon:first-child { color: var(--brick); }
@@ -1797,7 +1797,7 @@ kbd {
   .composer-controls .chip-button { padding: 0 7px; gap: 5px; }
   /* The host is its server alone (its name in the tooltip and its menu),
      so the model keeps its name. */
-  .composer-controls .host-chip:not(.warm) .chip-label,
+  .composer-controls .host-chip:not(.warm, .chatting) .chip-label,
   .composer-controls .host-chip .chip-state { display: none; }
   .chip-anchor.host, .chip-anchor.host > .host-chip { min-width: 0; flex-shrink: 0; }
   .composer-controls .host-chip { padding: 0 8px; }
@@ -2293,6 +2293,12 @@ kbd {
   animation: rise 0.12s ease-out;
 }
 .no-host-banner > .icon { color: var(--sodium); flex: none; }
-.no-host-banner-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.no-host-banner-text { flex: 1; min-width: 0; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-height: 1.25; }
 .no-host-banner .btn.no-host-banner-chat { height: 28px; flex: none; gap: 6px; color: var(--sodium); border-color: var(--sodium-line); }
-@media (pointer: coarse) { .no-host-banner .btn.no-host-banner-chat { height: 40px; } }
+.no-host-banner-chat .short { display: none; }
+@media (max-width: 359px) {
+  .no-host-banner-chat .long { display: none; }
+  .no-host-banner-chat .short { display: inline; }
+}
+/* "no host" whole beside the model: it is what says the session is a chat. */
+.chip-anchor.host:has(> .host-chip.chatting), .composer-controls .host-chip.chatting { flex-shrink: 0; }

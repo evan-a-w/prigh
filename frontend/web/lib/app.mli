@@ -1129,3 +1129,7 @@ val temporary_shown : Model.t -> bool
 
 val init : Model.t
 val update : Model.t -> Action.t -> Model.t * Command.t list
+
+(** The first clause of the state's [no_host], capitalised: "No tool host
+    connected". *)
+val no_host_headline : string -> string

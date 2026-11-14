@@ -225,12 +225,12 @@ let host_chip (m : App.Model.t) (state : State.t) ~inject =
   let cls, title, aria, content =
     match Active_host.of_state state with
     | _ when state.chat_mode ->
-      ( " chat"
+      ( " chatting"
       , sprintf
           "Chat mode uses no tool host (%s to work on one)"
           Session_mode.leave_chat
       , Some "No tool host (chat mode)"
-      , [ icon Server_off; span ~cls:"chip-label" "no host" ] )
+      , [ icon Message; span ~cls:"chip-label" "no host" ] )
     | Connected h ->
       ( ""
       , sprintf "Tools run on %s, in %s (/host switches)" h.name h.cwd

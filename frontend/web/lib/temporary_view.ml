@@ -59,7 +59,14 @@ let tray (m : App.Model.t) ~inject =
     in
     div
       ~cls:"tray"
-      [ button
+      [ (if state.chat_mode
+         then
+           div
+             ~cls:"tray-chat"
+             ~attrs:[ Attr.title "Chat mode: no tool host, folder or branch" ]
+             [ icon Message; span "Chat: no tool host" ]
+         else Node.none)
+      ; (if state.chat_mode then Node.none else button
           ~cls:"ghost tray-where"
           ~title:"Start in another folder (/cd)"
           ~label:(sprintf "Folder: %s. Change it" folder)
@@ -67,8 +74,9 @@ let tray (m : App.Model.t) ~inject =
           [ icon Folder
           ; span ~cls:"tray-folder" folder
           ; span ~cls:"tray-folder-short" (Filename.basename folder)
-          ]
+          ])
       ; (match state.git_branch with
+         | Some _ when state.chat_mode -> Node.none
          | Some branch ->
            button
              ~cls:"ghost tray-where"

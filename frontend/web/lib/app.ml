@@ -9391,6 +9391,12 @@ let invokes_skill ({ name; _ } : Slash.Parsed.t) =
   | None -> false
 ;;
 
+(* "No tool host connected", from the backend's reason. *)
+let no_host_headline reason =
+  String.capitalize
+    (String.strip (Option.value_map (String.lsplit2 reason ~on:':') ~default:reason ~f:fst))
+;;
+
 (* Why a message cannot start a run: no tool host, outside chat mode. *)
 let no_host (m : Model.t) =
   match m.state with
@@ -9490,9 +9496,9 @@ let send (m : Model.t) ~follow_up =
     error
       m
       (sprintf
-         "%s. Your message stays here: Chat without a host (above it) sends \
-          it as a chat, with no files or commands."
-         (String.capitalize (Option.value_exn (no_host m))))
+         "%s: your message stays here. Chat without a host (over it) sends \
+          it as a chat, or connect a tool host and pick it (/host)."
+         (no_host_headline (Option.value_exn (no_host m))))
   | _ when attached && Or_error.is_error (Files.prompt_attachments m.files) ->
     (match Files.prompt_attachments m.files with
      | Error e -> error m (Error.to_string_hum e)
