@@ -480,6 +480,36 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
   text-underline-offset: 3px;
 }
 .markdown a:hover { text-decoration-color: var(--sodium); }
+/* A link to one of the user's sessions (followed in place): washed, with a
+   solid underline, apart from links that leave prigh. */
+.session-link {
+  position: relative;
+  color: var(--chalk);
+  background: var(--sodium-wash);
+  border-radius: 3px;
+  padding: 0 2px;
+  text-decoration: underline;
+  text-decoration-color: var(--sodium);
+  text-underline-offset: 3px;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+.session-link:hover { background: var(--sodium-glow); }
+.session-link:focus-visible { outline: 2px solid var(--sodium); outline-offset: 1px; }
+.markdown .session-link > code { background: none; padding: 0; font-family: inherit; font-size: inherit; color: inherit; }
+/* A thumb's target (44px tall) around the line's text, without spacing the
+   lines apart. */
+@media (pointer: coarse) {
+  .session-link::after {
+    content: "";
+    position: absolute;
+    left: -4px;
+    right: -4px;
+    top: 50%;
+    height: 44px;
+    transform: translateY(-50%);
+  }
+}
 .markdown strong { font-weight: 650; }
 .markdown del { color: var(--muted); }
 .markdown :not(pre) > code {
@@ -839,6 +869,7 @@ button.tool-head:is(:hover, :focus-visible) > .chev, .tool.open > button.tool-he
 }
 .output :is(.earlier, .missed) + pre { padding-top: 0; }
 .output pre:has(+ .fold) { padding-bottom: 2px; }
+.output pre a.session-link { padding: 0; text-underline-offset: 2px; }
 .output.error { background: var(--err-bg); box-shadow: inset 2px 0 0 var(--brick); border-radius: 0 var(--r-control) var(--r-control) 0; }
 .output.error pre { color: var(--del-fg); }
 /* Unfolding grows the well once, from the lines it showed. */
@@ -1230,3 +1261,44 @@ dialog.viewer::backdrop { background: transparent; }
   pointer-events: none;
 }
 .tool-body .screen + .caption { display: block; margin-top: 4px; white-space: pre-line; }
+
+/* Long pastes sent with the message: a line each, the text only once
+   opened. */
+.msg.user .pasted-texts { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; max-width: 100%; }
+.msg.user .pasted { max-width: min(100%, 640px); background: var(--well); border: 1px solid var(--rule); border-radius: var(--r-control); overflow: hidden; }
+.msg.user .pasted.open { width: min(100%, 640px); }
+.pasted-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  padding: 6px 10px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: 12px var(--mono);
+  text-align: left;
+  cursor: pointer;
+}
+.pasted-head:hover { background: var(--slate-2); }
+.pasted-head:focus-visible { outline: 2px solid var(--sodium-line); outline-offset: -2px; }
+.pasted-head > .chev {
+  flex-shrink: 0;
+  align-self: center;
+  width: 5px;
+  height: 5px;
+  border-right: 1.5px solid var(--faint);
+  border-bottom: 1.5px solid var(--faint);
+  transform: rotate(-45deg);
+  transition: transform 0.15s;
+}
+.pasted.open > .pasted-head > .chev { transform: translateY(-1px) rotate(45deg); }
+.pasted-name { color: var(--fg); white-space: nowrap; flex-shrink: 0; }
+.pasted-detail { color: var(--faint); font-size: 11.5px; white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.pasted-preview { color: var(--muted); flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pasted-body { position: relative; border-top: 1px solid var(--rule); }
+.pasted-body > .copy { position: absolute; top: 4px; right: 6px; background: var(--well); }
+.pasted-text { margin: 0; padding: 10px 12px; max-height: 50vh; overflow: auto; font: 12px/1.5 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+@media (prefers-reduced-motion: reduce) { .pasted-head > .chev { transition: none; } }
+@media (pointer: coarse) { .pasted-head { min-height: 44px; align-items: center; } }

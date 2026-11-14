@@ -184,9 +184,9 @@ let%expect_test "set_mode, confirmations with rules, the first answer wins" =
     one
 
     [denied by user] Their reason: keep x
-    {"kind":"approval","mode":"ask","plan":false}
-    {"kind":"approval","mode":"ask","plan":true}
-    {"kind":"approval","mode":"ask","plan":false}
+    {"kind":"approval","mode":"ask","plan":false,"chat":false}
+    {"kind":"approval","mode":"ask","plan":true,"chat":false}
+    {"kind":"approval","mode":"ask","plan":false,"chat":false}
     {"kind":"allow_rule","rule":"bash(echo:*)"}
     |}]
 ;;

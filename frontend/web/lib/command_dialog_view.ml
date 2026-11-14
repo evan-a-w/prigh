@@ -655,6 +655,38 @@ let text ~title ~text ~inject =
     [ Node.pre ~attrs:[ Attr.class_ "text-block" ] [ Node.text text ] ]
 ;;
 
+(* A long paste of the composer's, before it is sent: read it, put it in the
+   box as text after all, or drop it. *)
+let pasted (m : App.Model.t) i ~inject =
+  match List.nth m.pasted i with
+  | None -> None
+  | Some t ->
+    Some
+      (Modal.view
+         ~cls:"text-dialog pasted-dialog"
+         ~title:
+           (sprintf
+              "%s · %s"
+              (Prigh_ui.Pasted_text.name (i + 1))
+              (Prigh_ui.Pasted_text.summary
+                 ~lines:(Prigh_ui.Pasted_text.count_lines t)
+                 ~bytes:(String.length t)))
+         ~on_close:(inject Action.Close_dialog)
+         ~footer:
+           [ keys_only "Sent whole with the message, not in the box"
+           ; button
+               ~cls:"danger"
+               ~on_click:(inject (Action.Remove_pasted i))
+               [ Node.text "Remove" ]
+           ; button
+               ~title:"Put it in the message box as text"
+               ~on_click:(inject (Action.Insert_pasted i))
+               [ Node.text "Insert as text" ]
+           ; done_button ~inject
+           ]
+         [ Node.pre ~attrs:[ Attr.class_ "text-block" ] [ Node.text t ] ])
+;;
+
 let mcp_tools (server : Mcp_server.t) ~inject =
   Modal.view
     ~cls:"mcp-tools-dialog"
@@ -717,6 +749,7 @@ let view (m : App.Model.t) (dialog : Dialog.t) ~inject =
     Some (create_dir m ~target ~path ~busy ~error ~inject)
   | Session stats -> Some (session m stats ~inject)
   | Text { title; text = t } -> Some (text ~title ~text:t ~inject)
+  | Pasted i -> pasted m i ~inject
   | Mcp_tools server -> Some (mcp_tools server ~inject)
   | Loading title -> Some (loading ~title ~inject)
   | Diff diff -> Some (Git_diff_view.view ~fold:(App.Model.fold m) diff ~inject)

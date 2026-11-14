@@ -588,7 +588,8 @@ let%expect_test "paths into the composer, files attached from the browser" =
       (Sent_with_files (text @README.md) (images ())
        (attachments
         (((file ()) (name README.md) (size (2048))
-          (status (Ready /home/me/proj/README.md))))))))
+          (status (Ready /home/me/proj/README.md)))))
+       (pasted ()))))
     |}];
   (* Sent: the chips are gone; a failure brings them back. *)
   H.text h ~selector:".attach-chips";
@@ -688,7 +689,8 @@ let%expect_test "files dropped on the composer upload into the chat's uploads" =
       (Sent_with_files (text summarise) (images ())
        (attachments
         (((file (1)) (name report.pdf) (size (2000000))
-          (status (Ready /home/me/proj/.prigh/uploads/report.pdf))))))))
+          (status (Ready /home/me/proj/.prigh/uploads/report.pdf)))))
+       (pasted ()))))
     |}]
 ;;
 
@@ -713,6 +715,15 @@ let%expect_test "another session or host resets the browser and drops the chips"
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
+    (Cache_prefs
+     (((key web.sidebar-opened)
+       (value (((s1 "2026-10-05 10:00:00Z") (s2 "2026-10-05 10:00:00Z")))))))
+    (Rpc (method_ set_prefs)
+     (params
+      ((prefs
+        ((web.sidebar-opened
+          ((s1 "2026-10-05 10:00:00Z") (s2 "2026-10-05 10:00:00Z")))))))
+     (tag Show_error))
     (Files (Abort_upload 9))
     (Rpc (method_ fs_list) (params ((hidden false))) (tag (Files (Listed ""))))
     (Rpc (method_ get_review) (params ()) (tag (Review Review)))

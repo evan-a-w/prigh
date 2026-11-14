@@ -127,6 +127,11 @@ let methods =
   ; "save_custom_instruction"
   ; "remove_custom_instruction"
   ; "set_custom_instructions_enabled"
+  ; "get_mcp_settings"
+  ; "add_mcp_servers"
+  ; "update_mcp_server"
+  ; "remove_mcp_server"
+  ; "set_mcp_server_enabled"
   ]
   @ Files_rpc.methods
   @ Review_rpc.methods
@@ -220,6 +225,16 @@ let index_param params =
 
 let unit_result r = Or_error.map r ~f:(fun () -> `Object [])
 
+(* [hello]'s reply's [features]: what this backend takes beyond the basics
+   ([pasted_text]: prompts' [pasted]). *)
+let backend_features = [ "pasted_text" ]
+let strings l = `Array (List.map l ~f:(fun s -> `String s))
+
+let pasted_field = function
+  | [] -> []
+  | pasted -> [ "pasted", strings pasted ]
+;;
+
 (* An answer through a component is dropped, not given back to edit: its
    text is empty, and [ui_action] says what it was. *)
 let queued_json (queued : Agent.Queued.t) =
@@ -237,10 +252,10 @@ let queued_json (queued : Agent.Queued.t) =
       ]
   | None ->
     `Object
-      [ "text", `String queued.text
-      ; ( "attachments"
-        , `Array (List.map queued.attachments ~f:(fun a -> `String a)) )
-      ]
+      ([ "text", `String queued.text
+       ; "attachments", strings queued.attachments
+       ]
+       @ pasted_field queued.pasted)
 ;;
 
 let provider_of_string login s =
@@ -414,6 +429,7 @@ type t =
   ; memory : Memory.t option (** under [home] *)
   ; user_info : User_info.t option (** under [home] *)
   ; custom_instructions : Custom_instructions.t option (** under [home] *)
+  ; mcp_settings : Mcp_settings.t option (** under [home] *)
   ; now : unit -> float
   ; listed : Listed.t String.Table.t
     (** what [list_sessions] last showed of each live session *)
@@ -850,6 +866,23 @@ let user_info_changed (t : t) user_info =
     Hashtbl.iter t.clients ~f:(fun (c : Client.t) -> c.send json)
 ;;
 
+let mcp_settings_json entries =
+  [ "servers", `Array (List.map entries ~f:Mcp_settings.Entry.to_json) ]
+;;
+
+let mcp_settings_changed (t : t) mcp_settings =
+  (match Mcp_settings.list mcp_settings with
+   | Error _ -> ()
+   | Ok entries ->
+     let json =
+       `Object
+         ([ "type", `String "event"; "event", `String "mcp_settings_changed" ]
+          @ mcp_settings_json entries)
+     in
+     Hashtbl.iter t.clients ~f:(fun (c : Client.t) -> c.send json));
+  Hashtbl.iter t.agents ~f:Agent.mcp_settings_changed
+;;
+
 let create
       ~env
       ~sw
@@ -866,6 +899,7 @@ let create
       ?memory
       ?user_info
       ?custom_instructions
+      ?mcp_settings
       ?transcription_http
       ?nix_store
       ~login
@@ -938,6 +972,10 @@ let create
          | Some _ -> custom_instructions
          | None ->
            Option.map home ~f:(fun home -> Custom_instructions.create ~home))
+    ; mcp_settings =
+        (match mcp_settings with
+         | Some _ -> mcp_settings
+         | None -> Option.map home ~f:(fun home -> Mcp_settings.create ~home))
     ; now = (fun () -> Eio.Time.now (Eio.Stdenv.clock env))
     ; listed = String.Table.create ()
     ; on_session_deleted = []
@@ -962,6 +1000,9 @@ let create
   Option.iter t.custom_instructions ~f:(fun ci ->
     Custom_instructions.subscribe ci ~f:(fun () ->
       custom_instructions_changed t ci));
+  Option.iter t.mcp_settings ~f:(fun mcp_settings ->
+    Mcp_settings.subscribe mcp_settings ~f:(fun () ->
+      mcp_settings_changed t mcp_settings));
   Login_manager.subscribe login ~f:(fun event ->
     let json = Rpc_json.login_event event in
     match event with
@@ -998,9 +1039,10 @@ let attach t (client : Client.t) agent =
   publish_hosts t;
   if client.tools
   then Agent.prefer_host agent client.host_id
-  else
+  else (
     Option.iter (preferred_host t client) ~f:(fun host ->
-      Agent.prefer_host agent host.host_id)
+      Agent.prefer_host agent host.host_id);
+    Agent.chat_without_host agent)
 ;;
 
 (* A brand-new session made or opened for [client] starts on a host chosen
@@ -1309,14 +1351,15 @@ let find_temporary t ~session ~key =
       session
 ;;
 
-(* The file of a saved session, by path or id. *)
+(* The file of a saved session, by path, id or a unique prefix of its id
+   (what the frontends show, and session links may hold). *)
 let saved_path t key =
   if Sys_unix.file_exists_exn key
   then session_file t key
-  else (
-    match List.find (saved_sessions t) ~f:(fun s -> String.equal s.id key) with
-    | Some summary -> Ok summary.path
-    | None -> Or_error.errorf "no session %S" key)
+  else
+    Or_error.map
+      (Session.find_summary (saved_sessions t) key)
+      ~f:(fun s -> s.path)
 ;;
 
 (* Finds a live session by id or path, or loads it from disk for [client]
@@ -1822,6 +1865,7 @@ let hello t (client : Client.t) params =
               , if Option.exists client.signed_in ~f:(fun s -> s.superuser)
                 then `True
                 else `False )
+            ; "features", strings backend_features
             ; "state", Rpc_json.state (Agent.state agent)
             ]))))
 ;;
@@ -2839,6 +2883,47 @@ let custom_instructions t ~meth ~params =
        `Object [ ("enabled", if enabled then `True else `False) ])
 ;;
 
+let mcp_settings t ~meth ~params =
+  match t.mcp_settings with
+  | None ->
+    Or_error.error_string "this backend keeps no MCP servers in settings"
+  | Some settings ->
+    let open Or_error.Let_syntax in
+    let%map entries =
+      match meth with
+      | "add_mcp_servers" ->
+        (match param params "servers", param params "text" with
+         | Some (`Object servers), _ -> Mcp_settings.add settings servers
+         | None, Some (`String text) ->
+           Or_error.bind
+             (Mcp_settings.parse text)
+             ~f:(Mcp_settings.add settings)
+         | _ ->
+           Or_error.error_string
+             "give \"servers\" (an mcpServers object) or \"text\" (pasted JSON)")
+      | "update_mcp_server" ->
+        let%bind name = string_param params "name" in
+        let%bind rename = string_param_opt params "rename" in
+        (match param params "config" with
+         | Some config -> Mcp_settings.update settings ~name ?rename config
+         | None -> Or_error.error_string "missing param \"config\"")
+      | "remove_mcp_server" ->
+        let%bind name = string_param params "name" in
+        Mcp_settings.remove settings ~name
+      | "set_mcp_server_enabled" ->
+        let%bind name = string_param params "name" in
+        let%bind enabled =
+          match param params "enabled" with
+          | Some `True -> Ok true
+          | Some `False -> Ok false
+          | _ -> Or_error.error_string "param \"enabled\" must be a boolean"
+        in
+        Mcp_settings.set_enabled settings ~name enabled
+      | _ -> Mcp_settings.list settings
+    in
+    `Object (mcp_settings_json entries)
+;;
+
 let keep_session t (client : Client.t) =
   let agent = client.agent in
   if not (Agent.temporary agent)
@@ -2941,6 +3026,11 @@ let dispatch_server t (client : Client.t) ~meth ~params
   | "remove_custom_instruction"
   | "set_custom_instructions_enabled" ->
     Some (custom_instructions t ~meth ~params)
+  | "get_mcp_settings"
+  | "add_mcp_servers"
+  | "update_mcp_server"
+  | "remove_mcp_server"
+  | "set_mcp_server_enabled" -> Some (mcp_settings t ~meth ~params)
   | "nix_store_status" | "nix_store_gc" ->
     Nix_store_rpc.dispatch
       t.nix_store
@@ -3194,17 +3284,32 @@ let dispatch agent login ~(client : Client.t) ~meth ~params : Json.t Or_error.t 
       | None -> string_param params "text"
     in
     let%bind attachments = string_list_param params "attachments" in
+    let%bind pasted = string_list_param params "pasted" in
     let%bind images = images_param ~env:(Agent.env agent) params in
     let client = client.kind in
     (match meth with
      | "prompt" ->
        unit_result
-         (Agent.prompt ~attachments ~images ~client ?ui_action agent text)
+         (Agent.prompt
+            ~attachments
+            ~pasted
+            ~images
+            ~client
+            ?ui_action
+            agent
+            text)
      | "steer" ->
-       unit_result (Agent.steer ~attachments ~images ~client agent text)
+       unit_result (Agent.steer ~attachments ~pasted ~images ~client agent text)
      | _ ->
        unit_result
-         (Agent.follow_up ~attachments ~images ~client ?ui_action agent text))
+         (Agent.follow_up
+            ~attachments
+            ~pasted
+            ~images
+            ~client
+            ?ui_action
+            agent
+            text))
   | "list_skills" ->
     Or_error.map (Agent.skills agent) ~f:(fun skills ->
       `Object [ "skills", `Array (List.map skills ~f:[%jsonaf_of: Skill.t]) ])
@@ -3223,10 +3328,24 @@ let dispatch agent login ~(client : Client.t) ~meth ~params : Json.t Or_error.t 
       (Agent.approve_mcp agent ~source ~server)
       ~f:Mcp_tools.Listing.to_rpc_json
   | "abort" ->
-    let restored = Agent.abort agent in
+    let restored = Agent.abort_queued agent in
     ok
       (`Object
-          [ "restored", `Array (List.map restored ~f:(fun s -> `String s)) ])
+          (( "restored"
+           , strings (List.map restored ~f:(fun (q : Agent.Queued.t) -> q.text))
+           )
+           ::
+           (* Each restored message's, when any has some. *)
+           (if
+              List.for_all restored ~f:(fun (q : Agent.Queued.t) ->
+                List.is_empty q.pasted)
+            then []
+            else
+              [ ( "pasted"
+                , `Array
+                    (List.map restored ~f:(fun (q : Agent.Queued.t) ->
+                       strings q.pasted)) )
+              ])))
   | "cancel_subagent" ->
     Or_error.bind (string_param params "agent_id") ~f:(fun agent_id ->
       unit_result (Agent.cancel_subagent agent ~agent_id))
@@ -3544,14 +3663,16 @@ let dispatch agent login ~(client : Client.t) ~meth ~params : Json.t Or_error.t 
       | None -> Ok None
       | Some s -> Or_error.map (Approval_mode.of_string s) ~f:Option.some
     in
-    let%bind plan =
-      match param params "plan_mode" with
+    let flag name =
+      match param params name with
       | None | Some `Null -> Ok None
       | Some `True -> Ok (Some true)
       | Some `False -> Ok (Some false)
-      | Some _ -> Or_error.error_string "param \"plan_mode\" must be a boolean"
+      | Some _ -> Or_error.errorf "param %S must be a boolean" name
     in
-    Agent.set_mode ?approval ?plan agent;
+    let%bind plan = flag "plan_mode" in
+    let%bind chat = flag "chat_mode" in
+    Agent.set_mode ?approval ?plan ?chat agent;
     ok (Rpc_json.state (Agent.state agent))
   | "ask_user_respond" ->
     let open Or_error.Let_syntax in

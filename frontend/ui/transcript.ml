@@ -113,6 +113,7 @@ let user_items (user : P.Message.User.t) : Item.t list =
     when (not (List.is_empty notes))
          && String.is_empty (String.strip (P.Message.User.body user))
          && List.is_empty user.images
+         && List.is_empty origin.pasted
          && List.is_empty origin.attachments -> notes
   | None -> [ user_item user ]
 ;;
@@ -621,6 +622,7 @@ let apply t (event : P.Event.t) =
   | P.Event.Memory_changed _
   | P.Event.User_info_changed _
   | P.Event.Custom_instructions_changed _
+  | P.Event.Mcp_settings_changed _
   | P.Event.Config_changed _
   | P.Event.Review _
   | P.Event.Generate_delta _
@@ -729,9 +731,21 @@ let user_notes (user : P.Message.User.t) ~verbosity =
       note_lines ~kind:n.kind ~title:n.title ~text:n.text ~verbosity))
 ;;
 
+(* Pasted texts are named, not shown: they are long. *)
 let attachment_lines (user : P.Message.User.t) =
   Option.value_map user.origin ~default:[] ~f:(fun origin ->
-    List.map origin.attachments ~f:(fun path ->
+    List.map origin.pasted ~f:(fun (p : P.Origin.Pasted.t) ->
+      Log_line.bar
+        turn_bar
+        [ { text = p.name; style = cyan }
+        ; { text =
+              "  "
+              ^ Pasted_text.summary ~lines:p.lines ~bytes:(String.length p.text)
+              ^ "  pasted"
+          ; style = dim
+          }
+        ])
+    @ List.map origin.attachments ~f:(fun path ->
       Log_line.bar
         turn_bar
         [ { text = "@" ^ path; style = cyan }
@@ -836,14 +850,16 @@ let trimmed_rows ~messages ~tokens ~shown =
     @ [ turn_start; divider "/trim hide · /trim undo" ]
 ;;
 
-let rows (item : Item.t) ~(verbosity : Verbosity.t) ~width : Log_line.t list =
+let rows ~sessions (item : Item.t) ~(verbosity : Verbosity.t) ~width
+  : Log_line.t list
+  =
   let markdown text =
     let width =
       if width = Int.max_value
       then None
       else Some (width - Log_line.gutter_width)
     in
-    List.map (Markdown.render ?width text) ~f:Log_line.indent
+    List.map (Markdown.render ~sessions ?width text) ~f:Log_line.indent
   in
   match item with
   | User user ->
@@ -920,8 +936,13 @@ let rows (item : Item.t) ~(verbosity : Verbosity.t) ~width : Log_line.t list =
      | Quiet | Normal | Verbose -> [ heading ])
 ;;
 
-let render_item ?(width = Int.max_value) item ~verbosity =
-  Log_line.wrap (rows item ~verbosity ~width) ~width
+let render_item
+      ?(sessions = Session_link.Known.empty)
+      ?(width = Int.max_value)
+      item
+      ~verbosity
+  =
+  Log_line.wrap (rows ~sessions item ~verbosity ~width) ~width
 ;;
 
 let live_items t : Item.t list =
@@ -933,7 +954,7 @@ let live_items t : Item.t list =
 
 let all_items_rev t = List.rev_append (live_items t) t.items_rev
 
-let render_tail t ~width ~rows ~skip ~verbosity : Content.t =
+let render_tail ?sessions t ~width ~rows ~skip ~verbosity : Content.t =
   let needed = rows + skip in
   let rec gather items acc count =
     if count >= needed
@@ -942,7 +963,7 @@ let render_tail t ~width ~rows ~skip ~verbosity : Content.t =
       match items with
       | [] -> acc
       | item :: rest ->
-        let lines = render_item item ~width ~verbosity in
+        let lines = render_item ?sessions item ~width ~verbosity in
         gather rest (lines @ acc) (count + List.length lines))
   in
   let lines = gather (all_items_rev t) [] 0 in
@@ -958,20 +979,25 @@ let finished t =
     | _ -> true)
 ;;
 
-let line_count t ~width ~verbosity =
+let line_count ?sessions t ~width ~verbosity =
   List.sum
     (module Int)
     (all_items_rev t)
-    ~f:(fun item -> List.length (render_item item ~width ~verbosity))
+    ~f:(fun item -> List.length (render_item ?sessions item ~width ~verbosity))
 ;;
 
-let render_all t ~width ~verbosity : Content.t =
+let render_all ?sessions t ~width ~verbosity : Content.t =
   List.concat_map
     (List.rev (all_items_rev t))
-    ~f:(fun item -> render_item item ~width ~verbosity)
+    ~f:(fun item -> render_item ?sessions item ~width ~verbosity)
 ;;
 
-let user_message_lines ?(filter = Transcript_filter.all) t ~width ~verbosity
+let user_message_lines
+      ?(filter = Transcript_filter.all)
+      ?sessions
+      t
+      ~width
+      ~verbosity
   : int list
   =
   let shows item =
@@ -998,21 +1024,24 @@ let user_message_lines ?(filter = Transcript_filter.all) t ~width ~verbosity
         | Item.User _ | Item.Skill _ -> (offset + 1) :: acc
         (* The divider, past the folded messages and the blank line. *)
         | Item.Trimmed _ ->
-          (offset + List.length (render_item item ~width ~verbosity) - 1) :: acc
+          (offset
+           + List.length (render_item ?sessions item ~width ~verbosity)
+           - 1)
+          :: acc
         | _ when hidden_turn -> offset :: acc
         | _ -> acc
       in
       go
         rest
         acc
-        (offset + List.length (render_item item ~width ~verbosity))
+        (offset + List.length (render_item ?sessions item ~width ~verbosity))
         ~hidden_turn:false
   in
   go (List.rev (all_items_rev t)) [] 0 ~hidden_turn:false
 ;;
 
-let render_window t ~width ~rows ~top ~verbosity : Content.t =
-  let total = line_count t ~width ~verbosity in
+let render_window ?sessions t ~width ~rows ~top ~verbosity : Content.t =
+  let total = line_count ?sessions t ~width ~verbosity in
   let skip = Int.max 0 (total - top - rows) in
-  render_tail t ~width ~rows ~skip ~verbosity
+  render_tail ?sessions t ~width ~rows ~skip ~verbosity
 ;;

@@ -25,6 +25,7 @@ let on ?(width = 100) ?(height = 14) (link : Server_link.t) =
        ; namespace = link.user
        ; user = link.user
        ; superuser = false
+       ; features = []
        });
   h
 ;;
@@ -260,6 +261,7 @@ let%expect_test
     (Rpc (method_ get_config) (params ()) (tag Config))
     (Rpc (method_ list_models) (params ()) (tag Models_catalog))
     (Rpc (method_ get_pending) (params ()) (tag Pending))
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions_cache))
     |}];
   H.show h;
   [%expect
@@ -317,6 +319,7 @@ let%expect_test
     (Rpc (method_ get_config) (params ()) (tag Config))
     (Rpc (method_ list_models) (params ()) (tag Models_catalog))
     (Rpc (method_ get_pending) (params ()) (tag Pending))
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions_cache))
 
 
 
@@ -410,6 +413,7 @@ let%expect_test "/connect local" =
     (Rpc (method_ get_config) (params ()) (tag Config))
     (Rpc (method_ list_models) (params ()) (tag Models_catalog))
     (Rpc (method_ get_pending) (params ()) (tag Pending))
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions_cache))
 
 
 
@@ -621,6 +625,7 @@ let%expect_test "the sign-in dialog: prefilled, masked, owns the keyboard" =
     (Rpc (method_ get_config) (params ()) (tag Config))
     (Rpc (method_ list_models) (params ()) (tag Models_catalog))
     (Rpc (method_ get_pending) (params ()) (tag Pending))
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions_cache))
 
 
 
@@ -792,6 +797,7 @@ let%expect_test "startup: the server refuses the saved credentials" =
     (Rpc (method_ get_config) (params ()) (tag Config))
     (Rpc (method_ list_models) (params ()) (tag Models_catalog))
     (Rpc (method_ get_pending) (params ()) (tag Pending))
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions_cache))
     Connected
     |}]
 ;;
@@ -908,6 +914,7 @@ let%expect_test
     (Rpc (method_ get_config) (params ()) (tag Config))
     (Rpc (method_ list_models) (params ()) (tag Models_catalog))
     (Rpc (method_ get_pending) (params ()) (tag Pending))
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions_cache))
 
 
 
@@ -1082,6 +1089,7 @@ let%expect_test
     (Rpc (method_ get_config) (params ()) (tag Config))
     (Rpc (method_ list_models) (params ()) (tag Models_catalog))
     (Rpc (method_ get_pending) (params ()) (tag Pending))
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions_cache))
     Connected
     |}]
 ;;
@@ -1246,6 +1254,7 @@ let%expect_test "over SSH: the code the page shows, pasted into the dialog" =
     (Rpc (method_ get_config) (params ()) (tag Config))
     (Rpc (method_ list_models) (params ()) (tag Models_catalog))
     (Rpc (method_ get_pending) (params ()) (tag Pending))
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions_cache))
     editing
     Connected
     |}]
@@ -1309,6 +1318,7 @@ let%expect_test
     (Rpc (method_ get_config) (params ()) (tag Config))
     (Rpc (method_ list_models) (params ()) (tag Models_catalog))
     (Rpc (method_ get_pending) (params ()) (tag Pending))
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions_cache))
     editing
 
 

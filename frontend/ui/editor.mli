@@ -69,8 +69,18 @@ val yank : t -> t
 val yank_pop : t -> t
 val undo : t -> t
 
-(** Inserts a bracketed paste and chips blocks longer than three lines. *)
+(** Inserts a bracketed paste and chips blocks longer than three lines; a
+    long one ({!Pasted_text.is_long}) is a token instead, which Backspace and
+    Delete remove whole, standing for it ({!pasted}). *)
 val insert_paste : t -> string -> t
+
+(** The long pastes' tokens and texts, kept for the editor's life (so
+    history brings them back): {!Pasted_text.resolve} finds those in a text. *)
+val pasted : t -> Pasted_text.Token.t list
+
+(** Keeps [text] as a long paste, without inserting its token: the token,
+    for the caller to put in the text (e.g. a queued message given back). *)
+val paste_token : t -> string -> t * string
 
 (** Returns the text and the editor reset; records history unless [secret]. *)
 val submit : ?secret:bool -> t -> string * t

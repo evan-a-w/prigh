@@ -26,6 +26,9 @@ module Note : sig
       | Plan_mode of { on : bool }
       (** plan mode turned on or off ([System_prompt.plan_mode_note]), also
           as a message of its own between turns *)
+      | Chat_mode of { on : bool }
+      (** chat mode turned on or off ([System_prompt.chat_mode_note]), like
+          [Plan_mode] *)
       | Steer of
           { from_user : bool (** else the main agent ([subagent_message]) *)
           ; follow_up : bool
@@ -77,6 +80,27 @@ module Attachment : sig
     ; length : int
     }
   [@@deriving sexp, jsonaf, equal]
+end
+
+module Pasted : sig
+  (** A long text the user pasted, sent behind what they typed as a
+      [<pasted_text>] block (named [Pasted text #N]) rather than in the
+      message itself; [length] is the pasted text's, in bytes. *)
+  type t =
+    { name : string
+    ; lines : int
+    ; length : int
+    }
+  [@@deriving sexp, jsonaf, equal]
+
+  (** The most a pasted text may be, in bytes. *)
+  val max_bytes : int
+
+  (** The [n]th (from 1) of a message's pasted texts, and its block. *)
+  val make : n:int -> string -> t * string
+
+  (** The number of lines of a text: a last one without a newline counts. *)
+  val count_lines : string -> int
 end
 
 module Source : sig
@@ -134,6 +158,7 @@ end
 
 type t =
   { notes : Note.t list
+  ; pasted : Pasted.t list (** their blocks come before [attachments]' *)
   ; attachments : Attachment.t list
   ; source : Source.t option
   }
@@ -163,5 +188,7 @@ val of_message : origin:t option -> string -> t option
 
 (** The RPC's [origin] object: [source: {kind, title}] for a message of the
     harness's, otherwise [body] (what the user wrote), with [notes: [{kind,
-    title, text}]] and [attachments: [{path}]] when there are any. *)
+    title, text}]], [pasted: [{name, lines, start, length}]] (where in
+    [text] the pasted text is, in bytes) and [attachments: [{path}]] when
+    there are any. *)
 val to_json : t -> text:string -> Jsonaf.t

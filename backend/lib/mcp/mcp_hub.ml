@@ -99,9 +99,28 @@ let client t ~reconnect (server : Mcp_config.Server.t) =
      | Some failure -> Error failure)
 ;;
 
-let servers t ?(reconnect = false) ~cwd ~home () =
+(* Stops the servers from the settings that the settings no longer define
+   as they were started: removed, disabled or edited ones. *)
+let prune_settings t ~home settings =
+  let current =
+    (Mcp_config.settings_servers ~home settings).servers
+    |> List.map ~f:Mcp_config.Server.key
+    |> String.Set.of_list
+  in
+  let stale =
+    Hashtbl.to_alist t.entries
+    |> List.filter ~f:(fun (key, (entry : Entry.t)) ->
+      String.equal entry.server.source Mcp_config.settings_source
+      && not (Set.mem current key))
+  in
+  List.iter stale ~f:(fun (key, _) -> Hashtbl.remove t.entries key);
+  List.iter stale ~f:(fun (_, entry) -> close_entry t entry)
+;;
+
+let servers t ?(reconnect = false) ?(settings = `Object []) ~cwd ~home () =
+  prune_settings t ~home settings;
   let { Mcp_config.Discovered.servers; problems } =
-    Mcp_config.discover ~cwd ~home ()
+    Mcp_config.discover ~settings ~cwd ~home ()
   in
   let statuses =
     Fiber.List.map
@@ -123,8 +142,8 @@ let servers t ?(reconnect = false) ~cwd ~home () =
   statuses, problems
 ;;
 
-let call t ~cancel ~source ~server:name ~home ~tool ~arguments =
-  match Mcp_config.find ~home ~source name with
+let call t ~cancel ~settings ~source ~server:name ~home ~tool ~arguments =
+  match Mcp_config.find ~settings ~home ~source name with
   | Error e -> Tool_result.error (Error.to_string_hum e)
   | Ok server when not (Mcp_config.is_approved ~home server) ->
     Tool_result.error

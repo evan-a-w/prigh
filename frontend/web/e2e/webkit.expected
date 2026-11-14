@@ -767,6 +767,7 @@ Models
 Memory
 About you
 Custom instructions
+MCP servers
 Git hosting
 T
 token
@@ -990,6 +991,7 @@ Models
 Memory
 About you
 Custom instructions
+MCP servers
 Git hosting
 B
 bob
@@ -2788,6 +2790,28 @@ sidebar overflows sideways: false
 snippets inside the screen: true
 === webkit: search: errors ===
 none
+=== webkit: session_links: drawn ===
+Fix the taskbar entry -> ?session=6cad9f6e0123abcd (6cad9f6e0123abcd; "Session 6cad9f6e: Fix the taskbar entry")
+6cad9f6e -> ?session=6cad9f6e0123abcd (6cad9f6e0123abcd; "Session 6cad9f6e: Fix the taskbar entry")
+this one -> ?session=0badc0de (0badc0de; "Session 0badc0de")
+=== webkit: session_links: a click on the link switches in place ===
+session=6cad9f6e0123abcd; showing "The taskbar entry is blank."; reloaded: false
+=== webkit: session_links: a click on the bare id too ===
+session=6cad9f6e0123abcd; showing "The taskbar entry is blank."; reloaded: false
+=== webkit: session_links: Ctrl/⌘+click opens a new window; this one stays ===
+new window: session=6cad9f6e0123abcd
+session=3b5c0d1e2f3a4b5c; showing "Hello."; reloaded: false
+=== webkit: session_links: a session the user does not have: a toast ===
+No session 0badc0de: it was deleted, or it is not yours. The sidebar lists your sessions.
+session=3b5c0d1e2f3a4b5c; showing "Hello."; reloaded: false
+=== webkit: session_links: 390x844 ===
+tap target: at least 44px tall; page overflows sideways: false
+session=6cad9f6e0123abcd; showing "The taskbar entry is blank."; reloaded: false
+=== webkit: session_links: 320x640 ===
+tap target: at least 44px tall; page overflows sideways: false
+session=6cad9f6e0123abcd; showing "The taskbar entry is blank."; reloaded: false
+=== webkit: session_links: errors ===
+none
 === webkit: viewer: desktop: fit ===
 thumbnails: 3, named: View [image: image/png, 4.1 KB]
 focused: Close
@@ -3085,7 +3109,7 @@ Jump to a message, Filter the transcript, Files, Terminal, Settings
 === webkit: mobile: 390x844: the settings' list ===
 ok
 === webkit: mobile: 390x844: the settings ===
-Appearance, Sessions, New sessions, Models, Memory, About you, Custom instructions, Git hosting, Account
+Appearance, Sessions, New sessions, Models, Memory, About you, Custom instructions, MCP servers, Git hosting, Account
 === webkit: mobile: 390x844: settings: appearance ===
 ok
 title: Appearance; back: Settings
@@ -3132,7 +3156,7 @@ Jump to a message, Filter the transcript, Files, Terminal, Settings
 === webkit: mobile: 320x640: the settings' list ===
 ok
 === webkit: mobile: 320x640: the settings ===
-Appearance, Sessions, New sessions, Models, Memory, About you, Custom instructions, Git hosting, Account
+Appearance, Sessions, New sessions, Models, Memory, About you, Custom instructions, MCP servers, Git hosting, Account
 === webkit: mobile: 320x640: settings: appearance ===
 ok
 title: Appearance; back: Settings
@@ -3372,7 +3396,7 @@ fits: true
 + Fresh work: fix/fresh
 - Old work
 === webkit: sessions settings: the settings ===
-Show worktrees | Your account | Show worktrees for sessions used in the last 12 hours; older ones fold them behind their count. Your own fold or unfold of a session wins. | hours
+Show worktrees | Your account | Show worktrees for pinned sessions and those used in the last 12 hours (changed, running, opened or worked in); others fold them behind their count. Your own fold or unfold of a session holds until you next open it. | hours
 Archive after | Sessions without activity for 7 days move to Archived (pinned and running ones never do). | days
 fields: "12" hours, "7" days
 === webkit: sessions settings: 100 hours ===
@@ -3387,14 +3411,14 @@ fields: "12" hours, "7" days
 === webkit: sessions settings: refused ===
 “a fortnight” isn't a number of days from 0 to 365: type one like 7, or off to archive only by hand.
 === webkit: sessions settings: archive after 2 days ===
-Show worktrees | Your account | Show worktrees for sessions used recently; older ones fold them behind their count. Your own fold or unfold of a session wins. | Off: every session's worktrees start folded.
+Show worktrees | Your account | Show worktrees for pinned sessions and those used recently (changed, running, opened or worked in); others fold them behind their count. Your own fold or unfold of a session holds until you next open it. | Off: every session's worktrees fold, pinned ones too.
 Archive after | Sessions without activity for 2 days move to Archived (pinned and running ones never do). | days
 fields: hidden hours, "2" days
 archive_after_days=2
 - Fresh work
 archived: Archived 1
 === webkit: sessions settings: switched on again ===
-Show worktrees | Your account | Show worktrees for sessions used in the last 100 hours; older ones fold them behind their count. Your own fold or unfold of a session wins. | hours
+Show worktrees | Your account | Show worktrees for pinned sessions and those used in the last 100 hours (changed, running, opened or worked in); others fold them behind their count. Your own fold or unfold of a session holds until you next open it. | hours
 Archive after | Sessions without activity for 2 days move to Archived (pinned and running ones never do). | days
 fields: "100" hours, "2" days
 === webkit: sessions settings: phone 390x844: sidebar ===
@@ -3810,6 +3834,99 @@ editing fits: yes; targets: all ok
 back: Custom instructions | Standing instructions for the model, given to it in every session; it may also add or edit them when you state a lasting preference. Kept on the backend, for your account.
 === webkit: custom instructions: errors ===
 (none)
+=== webkit: mcp settings: empty, the host's own ===
+MCP servers
+Tools the model can use from MCP servers. The servers here are kept on the backend for your account and run on every host your sessions use; a host's ~/.prigh/mcp.json and a project's .mcp.json add their own.
+YOUR SERVERS
+No servers yet
+Add one by the command that starts it or by its URL, or paste the mcpServers JSON from another tool's settings. It runs on every host your sessions use.
+Add server
+Paste JSON
+ON HOST
+From its files: change them there
+local
+~/.prigh/mcp.json
+Ready ·
+1 tool
+=== webkit: mcp settings: adding ===
+value while typing: text
+hidden: password
+shown again: text
+=== webkit: mcp settings: added: started with the env ===
+echo
+NODE FAKE echo
+Ready on HOST ·
+1 tool
+file (mode 600): echo: {"command":"NODE","args":["FAKE","echo"],"env":{"TOKEN":"s3cret"}}
+editing, the value: password
+settings still open: 1
+=== webkit: mcp settings: a wrong secret ===
+echo
+NODE FAKE echo
+Failed on HOST: The server exited (code 1): echo: wrong TOKEN
+=== webkit: mcp settings: pasted, one broken ===
+Paste JSON
+An mcpServers object, as in Claude Code's or Cursor's settings, with or without the mcpServers around it. Every server in it is added, or none is.
+Server "broken": give a "command" (stdio) or a "url" (http)
+Ctrl+Enter adds, Esc cancels
+Cancel
+Add servers
+=== webkit: mcp settings: pasted ===
+MCP servers
+Tools the model can use from MCP servers. The servers here are kept on the backend for your account and run on every host your sessions use; a host's ~/.prigh/mcp.json and a project's .mcp.json add their own.
+YOUR SERVERS
+3 servers
+echo
+NODE FAKE echo
+Ready on HOST ·
+1 tool
+pasted
+NODE FAKE pasted
+Ready on HOST ·
+1 tool
+local
+https://example.com/mcp
+Overridden by ~/.prigh/mcp.json on HOST: that one runs instead. Rename one of them to use both.
+Add server
+Paste JSON
+ON HOST
+From its files: change them there
+local
+~/.prigh/mcp.json
+Ready ·
+1 tool
+file (mode 600): echo: {"command":"NODE","args":["FAKE","echo"],"env":{"TOKEN":"s3cret"}}; pasted: {"command":"NODE","args":["FAKE","pasted"]}; local: {"url":"https://example.com/mcp","headers":{"Authorization":"Bearer t"}}
+=== webkit: mcp settings: off, followed on another page ===
+pasted
+NODE FAKE pasted
+Off: not started on any host
+file (mode 600): echo: {"command":"NODE","args":["FAKE","echo"],"env":{"TOKEN":"s3cret"}}; pasted (off): {"command":"NODE","args":["FAKE","pasted"]}; local: {"url":"https://example.com/mcp","headers":{"Authorization":"Bearer t"}}
+=== webkit: mcp settings: removing ===
+local
+https://example.com/mcp
+Remove it from your settings? Its tools go from every session.
+Keep
+Remove
+file (mode 600): echo: {"command":"NODE","args":["FAKE","echo"],"env":{"TOKEN":"s3cret"}}; pasted: {"command":"NODE","args":["FAKE","pasted"]}
+=== webkit: mcp settings: /mcp disable ===
+Disabled MCP server pasted
+file (mode 600): echo: {"command":"NODE","args":["FAKE","echo"],"env":{"TOKEN":"s3cret"}}; pasted (off): {"command":"NODE","args":["FAKE","pasted"]}
+There is already an MCP server "echo" in the settings: choose another name, or edit that one. /mcp add echo https://example.com/mcp is back in the editor.
+composer: /mcp add echo https://example.com/mcp
+=== webkit: mcp settings: phone 390x844 ===
+list fits: yes; targets: all ok
+editing fits: yes; targets: all ok
+pasting fits: yes; targets: all ok
+removing fits: yes; targets: all ok
+back: MCP servers | Tools the model can use from MCP servers. The servers here are kept on the backend for your account and run on every host your sessions use; a host's ~/.prigh/mcp.json and a project's .mcp.json add their own.
+=== webkit: mcp settings: phone 320x640 ===
+list fits: yes; targets: all ok
+editing fits: yes; targets: all ok
+pasting fits: yes; targets: all ok
+removing fits: yes; targets: all ok
+back: MCP servers | Tools the model can use from MCP servers. The servers here are kept on the backend for your account and run on every host your sessions use; a host's ~/.prigh/mcp.json and a project's .mcp.json add their own.
+=== webkit: mcp settings: errors ===
+(none)
 === webkit: images (desktop): refused as too large: the error card ===
 The model returned an error
 HTTP 400: invalid_request_error: messages.0.content.0: image exceeds 5 MB maximum (Claude Opus 4.6 still refused the images downsized to 0.8 MB, 1500 px: /downsize-images makes them smaller and tries again)
@@ -3897,6 +4014,124 @@ composer cleared: true
 843x3
 48x48
 === webkit: images (small): errors ===
+none
+=== webkit: pasted (desktop): a long paste ===
+kept from the box
+box: "why does this fail?"
+Pasted text #1
+420 lines · 12.5 KB
+chip: on screen; remove: on screen; fits the width
+=== webkit: pasted (desktop): its dialog ===
+Pasted text #1 · 420 lines · 12.5 KB
+Sent whole with the message, not in the box
+Remove
+Insert as text
+Done
+lines shown: 420
+=== webkit: pasted (desktop): Ctrl+Shift+V ===
+into the box
+chips: 1 → 1; box lines: 51
+Ctrl+Shift+V without a paste, then a paste from a menu: kept from the box
+Pasted text #1
+420 lines · 12.5 KB
+Pasted text #2
+420 lines · 12.5 KB
+=== webkit: pasted (desktop): sent ===
+chips left: 0
+why does this fail?
+Pasted text #1
+420 lines · 12.5 KB
+at frame 0 (worker.py:10)
+<TIME>
+text in the page: false; fits the width
+head: on screen
+=== webkit: pasted (desktop): opened ===
+the whole text: true; fits the width
+=== webkit: pasted (desktop): reloaded ===
+why does this fail?
+Pasted text #1
+420 lines · 12.5 KB
+at frame 0 (worker.py:10)
+<TIME>
+=== webkit: pasted (desktop): errors ===
+none
+=== webkit: pasted (phone): a long paste ===
+kept from the box
+box: "why does this fail?"
+Pasted text #1
+420 lines · 12.5 KB
+chip: on screen, tappable; remove: on screen, tappable; fits the width
+=== webkit: pasted (phone): its dialog ===
+Pasted text #1 · 420 lines · 12.5 KB
+Remove
+Insert as text
+Done
+lines shown: 420
+=== webkit: pasted (phone): Ctrl+Shift+V ===
+into the box
+chips: 1 → 1; box lines: 51
+Ctrl+Shift+V without a paste, then a paste from a menu: kept from the box
+Pasted text #1
+420 lines · 12.5 KB
+Pasted text #2
+420 lines · 12.5 KB
+=== webkit: pasted (phone): sent ===
+chips left: 0
+why does this fail?
+Pasted text #1
+420 lines · 12.5 KB
+at frame 0 (worker.py:10)
+<TIME>
+text in the page: false; fits the width
+head: on screen, tappable
+=== webkit: pasted (phone): opened ===
+the whole text: true; fits the width
+=== webkit: pasted (phone): reloaded ===
+why does this fail?
+Pasted text #1
+420 lines · 12.5 KB
+at frame 0 (worker.py:10)
+<TIME>
+=== webkit: pasted (phone): errors ===
+none
+=== webkit: pasted (small): a long paste ===
+kept from the box
+box: "why does this fail?"
+Pasted text #1
+420 lines · 12.5 KB
+chip: on screen, tappable; remove: on screen, tappable; fits the width
+=== webkit: pasted (small): its dialog ===
+Pasted text #1 · 420 lines · 12.5 KB
+Remove
+Insert as text
+Done
+lines shown: 420
+=== webkit: pasted (small): Ctrl+Shift+V ===
+into the box
+chips: 1 → 1; box lines: 51
+Ctrl+Shift+V without a paste, then a paste from a menu: kept from the box
+Pasted text #1
+420 lines · 12.5 KB
+Pasted text #2
+420 lines · 12.5 KB
+=== webkit: pasted (small): sent ===
+chips left: 0
+why does this fail?
+Pasted text #1
+420 lines · 12.5 KB
+at frame 0 (worker.py:10)
+<TIME>
+text in the page: false; fits the width
+head: on screen, tappable
+=== webkit: pasted (small): opened ===
+the whole text: true; fits the width
+=== webkit: pasted (small): reloaded ===
+why does this fail?
+Pasted text #1
+420 lines · 12.5 KB
+at frame 0 (worker.py:10)
+<TIME>
+=== webkit: pasted (small): errors ===
 none
 === webkit: computer (desktop): cards ===
 computer click (640, 312) 1280×800 | 1280x800, fits | mark at 640,312 | click (640, 312) → (1280, 624) on the screen
@@ -4009,6 +4244,7 @@ Asks: commands file edits run; bash, job_input and MCP tools ask first
 Smart: a model decides edits in the project run; the approval model lets other calls run or asks you, saying why (/approval-model)
 Auto: never asks tools run without asking
 Plan mode read-only planning, until you leave it (/plan off or Alt+M): no file edits; bash, job_input and MCP tools ask first
+Chat: no tool host a chat without the tool host: no files, commands or project, only the web and other host-free tools, until you leave it (/chat off or Alt+M)
 === webkit: smart (desktop): the mode chip ===
 smart: Edits in the project run; the approval model lets other calls run or asks you, saying why (/approval-model) (Alt+M cycles, /mode picks)
 === webkit: smart (desktop): left to the user ===
@@ -4120,3 +4356,77 @@ tap shows a tooltip: true
 page fits: true; overflowing: 0
 === webkit: ui: errors ===
 none
+=== webkit: chat: a new session with no tool host ===
+mode chip: chat
+host chip: no host
+placeholder: Chat, without a tool host: no files or commands. Ask anything…
+strip: (none)
+=== webkit: chat: a reply, with no tool host ===
+you: what is a monad? (time)
+prigh: faux reply deepseek-flash 10 in 5 out (time)
+=== webkit: chat: the mode menu ===
+When tools ask first
+Alt+M cycles
+Asks: edits & commands
+bash, job_input, edits and MCP tools ask first
+Asks: commands
+file edits run; bash, job_input and MCP tools ask first
+Smart: a model decides
+edits in the project run; the approval model lets other calls run or asks you, saying why (/approval-model)
+Auto: never asks
+tools run without asking
+Plan mode
+read-only planning, until you leave it (/plan off or Alt+M): no file edits; bash, job_input and MCP tools ask first
+Chat: no tool host
+a chat without the tool host: no files, commands or project, only the web and other host-free tools, until you leave it (/chat off or Alt+M)
+Enter chooses, ← → the next setting, Esc closes
+=== webkit: chat: mode ask, no tool host ===
+mode chip: ask
+host chip: No host
+placeholder: Working in $CWD. Ask prigh anything…
+strip: No tool host connected Chat without a host
+toast: No tool host connected: your message stays here. Chat without a host (over it) sends it as a chat, or connect a tool host and pick it (/host).
+draft: and a functor?
+messages: 1
+=== webkit: chat: chat without a host: sent ===
+mode chip: chat
+host chip: no host
+placeholder: Chat, without a tool host: no files or commands. Ask anything…
+strip: (none)
+draft: ""
+you: what is a monad? (time) | and a functor? (time)
+replies: 2
+=== webkit: chat: phone 390x844: chat ===
+mode chip: (in the ⋯ sheet)
+host chip: no host
+placeholder: Chat: no files or commands…
+strip: (none)
+audit: ok
+=== webkit: chat: phone 390x844: the ⋯ sheet's mode ===
+Mode ask auto-edit smart auto plan [chat]
+audit: ok
+=== webkit: chat: phone 390x844: mode ask, no tool host ===
+mode chip: (in the ⋯ sheet)
+host chip: No host
+placeholder: Working in $CWD. Ask prigh anything…
+strip: No tool host connected Chat without a host
+audit: ok
+after Chat without a host: strip (none)
+=== webkit: chat: phone 320x640: chat ===
+mode chip: (in the ⋯ sheet)
+host chip: no host
+placeholder: Chat: no files or commands…
+strip: (none)
+audit: ok
+=== webkit: chat: phone 320x640: the ⋯ sheet's mode ===
+Mode ask auto-edit smart auto plan [chat]
+audit: ok
+=== webkit: chat: phone 320x640: mode ask, no tool host ===
+mode chip: (in the ⋯ sheet)
+host chip: No host
+placeholder: Working in $CWD. Ask prigh anything…
+strip: No tool host connected Chat anyway
+audit: ok
+after Chat without a host: strip (none)
+=== webkit: chat: errors ===
+(none)

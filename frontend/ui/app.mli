@@ -161,7 +161,8 @@ module Reply_tag : sig
     | Skills_for_autocomplete of string (** the [Location_cache] key *)
     | Skill_prompt of string
     (** a [/skill:] prompt, steer or follow-up; failing puts it back *)
-    | Mcp_picker
+    | Mcp_settings_for_picker
+    | Mcp_picker of P.Mcp_settings.t (** with the disabled ones listed *)
     | Memory_picker
     | Instructions_picker
     | Instruction_saved of string
@@ -326,6 +327,8 @@ module Model : sig
     ; mode : Mode.t
     ; autocomplete : Autocomplete.t option
     ; sessions : P.Session_summary.t list option
+    ; known_sessions : (Session_link.Known.t[@sexp.opaque])
+      (** [sessions], whose ids the transcript highlights *)
     ; skills : P.Skill.t list Location_cache.t
     ; worktrees : P.Worktree.Listing.t Location_cache.t
     ; refs : P.Git_diff.Refs.t Location_cache.t
@@ -352,6 +355,9 @@ module Model : sig
     ; superuser : bool
       (** [user] is a superuser (even when acting as another): has the
           commands only superusers have ([/nix-gc]) *)
+    ; pasted_text : bool
+      (** the backend takes prompts' [pasted] texts ([hello]'s [features]);
+          else they go inline *)
     ; stderr_tail : string list
     ; pending_confirms : P.Pending.Confirm.t list
     ; pending_questions : P.Pending.Ask.t list

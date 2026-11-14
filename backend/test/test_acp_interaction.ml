@@ -329,7 +329,7 @@ let%expect_test "slash commands run prigh's commands" =
   [%expect
     {|
     > request 3 session/prompt {"sessionId":"<id>","prompt":[{"type":"text","text":"/budget 5"}]}
-    < _prigh/state {"sessionId":"<id>","model":"deepseek/deepseek-flash","thinking":"default","running":false,"context_tokens":0,"context_window":1000000,"cost_usd":0,"budget_usd":5,"approval_mode":"auto","plan_mode":false,"queued":{"steer":0,"follow_up":0},"subagents":[],"jobs":0,"goal":null,"reminders":0,"active_host":"testhost"}
+    < _prigh/state {"sessionId":"<id>","model":"deepseek/deepseek-flash","thinking":"default","running":false,"context_tokens":0,"context_window":1000000,"cost_usd":0,"budget_usd":5,"approval_mode":"auto","plan_mode":false,"chat_mode":false,"queued":{"steer":0,"follow_up":0},"subagents":[],"jobs":0,"goal":null,"reminders":0,"active_host":"testhost"}
     < update agent_message_chunk {"content":{"type":"text","text":"budget set to $5.00"}}
     < result 3 {"stopReason":"end_turn"}
     |}];
@@ -352,8 +352,8 @@ let%expect_test "slash commands run prigh's commands" =
   [%expect
     {|
     > request 6 session/prompt {"sessionId":"<id>","prompt":[{"type":"text","text":"/thinking high"}]}
-    < update config_option_update {"configOptions":"mode=auto[ask|auto-edit|auto|smart|plan] model=deepseek/deepseek-flash[deepseek/deepseek-flash] thinking=high[off|default|low|high|max]"}
-    < _prigh/state {"sessionId":"<id>","model":"deepseek/deepseek-flash","thinking":"high","running":false,"context_tokens":0,"context_window":1000000,"cost_usd":0,"budget_usd":5,"approval_mode":"auto","plan_mode":false,"queued":{"steer":0,"follow_up":0},"subagents":[],"jobs":0,"goal":null,"reminders":0,"active_host":"testhost"}
+    < update config_option_update {"configOptions":"mode=auto[ask|auto-edit|auto|smart|plan|chat] model=deepseek/deepseek-flash[deepseek/deepseek-flash] thinking=high[off|default|low|high|max]"}
+    < _prigh/state {"sessionId":"<id>","model":"deepseek/deepseek-flash","thinking":"high","running":false,"context_tokens":0,"context_window":1000000,"cost_usd":0,"budget_usd":5,"approval_mode":"auto","plan_mode":false,"chat_mode":false,"queued":{"steer":0,"follow_up":0},"subagents":[],"jobs":0,"goal":null,"reminders":0,"active_host":"testhost"}
     < update agent_message_chunk {"content":{"type":"text","text":"thinking set to high"}}
     < result 6 {"stopReason":"end_turn"}
     |}];
@@ -375,7 +375,7 @@ let%expect_test "slash commands run prigh's commands" =
   [%expect
     {|
     > request 9 session/prompt {"sessionId":"<id>","prompt":[{"type":"text","text":"/remind stop 1 check the tests"}]}
-    < _prigh/state {"sessionId":"<id>","model":"deepseek/deepseek-flash","thinking":"high","running":false,"context_tokens":0,"context_window":1000000,"cost_usd":0,"budget_usd":5,"approval_mode":"auto","plan_mode":false,"queued":{"steer":0,"follow_up":0},"subagents":[],"jobs":0,"goal":null,"reminders":1,"active_host":"testhost"}
+    < _prigh/state {"sessionId":"<id>","model":"deepseek/deepseek-flash","thinking":"high","running":false,"context_tokens":0,"context_window":1000000,"cost_usd":0,"budget_usd":5,"approval_mode":"auto","plan_mode":false,"chat_mode":false,"queued":{"steer":0,"follow_up":0},"subagents":[],"jobs":0,"goal":null,"reminders":1,"active_host":"testhost"}
     < update agent_message_chunk {"content":{"type":"text","text":"reminder added: r1 · on stop (0/1) · check the tests"}}
     < result 9 {"stopReason":"end_turn"}
     |}];
@@ -383,12 +383,12 @@ let%expect_test "slash commands run prigh's commands" =
   [%expect
     {|
     > request 10 session/prompt {"sessionId":"<id>","prompt":[{"type":"text","text":"go"}]}
-    < _prigh/state {"sessionId":"<id>","model":"deepseek/deepseek-flash","thinking":"high","running":true,"context_tokens":0,"context_window":1000000,"cost_usd":0,"budget_usd":5,"approval_mode":"auto","plan_mode":false,"queued":{"steer":0,"follow_up":0},"subagents":[],"jobs":0,"goal":null,"reminders":1,"active_host":"testhost"}
+    < _prigh/state {"sessionId":"<id>","model":"deepseek/deepseek-flash","thinking":"high","running":true,"context_tokens":0,"context_window":1000000,"cost_usd":0,"budget_usd":5,"approval_mode":"auto","plan_mode":false,"chat_mode":false,"queued":{"steer":0,"follow_up":0},"subagents":[],"jobs":0,"goal":null,"reminders":1,"active_host":"testhost"}
     < update agent_message_chunk {"content":{"type":"text","text":"done"}}
     < update user_message_chunk {"content":{"type":"text","text":"Reminder r1: check the tests (1/1)"}}
     < update agent_message_chunk {"content":{"type":"text","text":"checked the tests"}}
     < _prigh/notice {"sessionId":"<id>","text":"reminder r1 fired once; it fires again after your next message"}
-    < _prigh/state {"sessionId":"<id>","model":"deepseek/deepseek-flash","thinking":"high","running":false,"context_tokens":0,"context_window":1000000,"cost_usd":0,"budget_usd":5,"approval_mode":"auto","plan_mode":false,"queued":{"steer":0,"follow_up":0},"subagents":[],"jobs":0,"goal":null,"reminders":1,"active_host":"testhost"}
+    < _prigh/state {"sessionId":"<id>","model":"deepseek/deepseek-flash","thinking":"high","running":false,"context_tokens":0,"context_window":1000000,"cost_usd":0,"budget_usd":5,"approval_mode":"auto","plan_mode":false,"chat_mode":false,"queued":{"steer":0,"follow_up":0},"subagents":[],"jobs":0,"goal":null,"reminders":1,"active_host":"testhost"}
     < result 10 {"stopReason":"end_turn"}
     |}];
   run "/remind";
@@ -403,19 +403,39 @@ let%expect_test "slash commands run prigh's commands" =
     {|
     > request 12 session/prompt {"sessionId":"<id>","prompt":[{"type":"text","text":"/plan"}]}
     < update current_mode_update {"currentModeId":"plan"}
-    < update config_option_update {"configOptions":"mode=plan[ask|auto-edit|auto|smart|plan] model=deepseek/deepseek-flash[deepseek/deepseek-flash] thinking=high[off|default|low|high|max]"}
-    < _prigh/state {"sessionId":"<id>","model":"deepseek/deepseek-flash","thinking":"high","running":false,"context_tokens":0,"context_window":1000000,"cost_usd":0,"budget_usd":5,"approval_mode":"auto","plan_mode":true,"queued":{"steer":0,"follow_up":0},"subagents":[],"jobs":0,"goal":null,"reminders":1,"active_host":"testhost"}
+    < update config_option_update {"configOptions":"mode=plan[ask|auto-edit|auto|smart|plan|chat] model=deepseek/deepseek-flash[deepseek/deepseek-flash] thinking=high[off|default|low|high|max]"}
+    < _prigh/state {"sessionId":"<id>","model":"deepseek/deepseek-flash","thinking":"high","running":false,"context_tokens":0,"context_window":1000000,"cost_usd":0,"budget_usd":5,"approval_mode":"auto","plan_mode":true,"chat_mode":false,"queued":{"steer":0,"follow_up":0},"subagents":[],"jobs":0,"goal":null,"reminders":1,"active_host":"testhost"}
     < update agent_message_chunk {"content":{"type":"text","text":"plan mode on"}}
     < result 12 {"stopReason":"end_turn"}
+    |}];
+  run "/chat";
+  [%expect
+    {|
+    > request 13 session/prompt {"sessionId":"<id>","prompt":[{"type":"text","text":"/chat"}]}
+    < update current_mode_update {"currentModeId":"chat"}
+    < update config_option_update {"configOptions":"mode=chat[ask|auto-edit|auto|smart|plan|chat] model=deepseek/deepseek-flash[deepseek/deepseek-flash] thinking=high[off|default|low|high|max]"}
+    < _prigh/state {"sessionId":"<id>","model":"deepseek/deepseek-flash","thinking":"high","running":false,"context_tokens":0,"context_window":1000000,"cost_usd":0,"budget_usd":5,"approval_mode":"auto","plan_mode":true,"chat_mode":true,"queued":{"steer":0,"follow_up":0},"subagents":[],"jobs":0,"goal":null,"reminders":1,"active_host":"testhost"}
+    < update agent_message_chunk {"content":{"type":"text","text":"chat mode on"}}
+    < result 13 {"stopReason":"end_turn"}
+    |}];
+  run "/chat off";
+  [%expect
+    {|
+    > request 14 session/prompt {"sessionId":"<id>","prompt":[{"type":"text","text":"/chat off"}]}
+    < update current_mode_update {"currentModeId":"plan"}
+    < update config_option_update {"configOptions":"mode=plan[ask|auto-edit|auto|smart|plan|chat] model=deepseek/deepseek-flash[deepseek/deepseek-flash] thinking=high[off|default|low|high|max]"}
+    < _prigh/state {"sessionId":"<id>","model":"deepseek/deepseek-flash","thinking":"high","running":false,"context_tokens":0,"context_window":1000000,"cost_usd":0,"budget_usd":5,"approval_mode":"auto","plan_mode":true,"chat_mode":false,"queued":{"steer":0,"follow_up":0},"subagents":[],"jobs":0,"goal":null,"reminders":1,"active_host":"testhost"}
+    < update agent_message_chunk {"content":{"type":"text","text":"chat mode off"}}
+    < result 14 {"stopReason":"end_turn"}
     |}];
   run "/unknown thing";
   [%expect
     {|
-    > request 13 session/prompt {"sessionId":"<id>","prompt":[{"type":"text","text":"/unknown thing"}]}
-    < _prigh/state {"sessionId":"<id>","model":"deepseek/deepseek-flash","thinking":"high","running":true,"context_tokens":0,"context_window":1000000,"cost_usd":0,"budget_usd":5,"approval_mode":"auto","plan_mode":true,"queued":{"steer":0,"follow_up":0},"subagents":[],"jobs":0,"goal":null,"reminders":1,"active_host":"testhost"}
+    > request 15 session/prompt {"sessionId":"<id>","prompt":[{"type":"text","text":"/unknown thing"}]}
+    < _prigh/state {"sessionId":"<id>","model":"deepseek/deepseek-flash","thinking":"high","running":true,"context_tokens":0,"context_window":1000000,"cost_usd":0,"budget_usd":5,"approval_mode":"auto","plan_mode":true,"chat_mode":false,"queued":{"steer":0,"follow_up":0},"subagents":[],"jobs":0,"goal":null,"reminders":1,"active_host":"testhost"}
     < update agent_message_chunk {"content":{"type":"text","text":"echoed"}}
-    < _prigh/state {"sessionId":"<id>","model":"deepseek/deepseek-flash","thinking":"high","running":false,"context_tokens":0,"context_window":1000000,"cost_usd":0,"budget_usd":5,"approval_mode":"auto","plan_mode":true,"queued":{"steer":0,"follow_up":0},"subagents":[],"jobs":0,"goal":null,"reminders":1,"active_host":"testhost"}
-    < result 13 {"stopReason":"end_turn"}
+    < _prigh/state {"sessionId":"<id>","model":"deepseek/deepseek-flash","thinking":"high","running":false,"context_tokens":0,"context_window":1000000,"cost_usd":0,"budget_usd":5,"approval_mode":"auto","plan_mode":true,"chat_mode":false,"queued":{"steer":0,"follow_up":0},"subagents":[],"jobs":0,"goal":null,"reminders":1,"active_host":"testhost"}
+    < result 15 {"stopReason":"end_turn"}
     |}];
   H.print_prompts h;
   [%expect
@@ -451,17 +471,17 @@ let%expect_test "_prigh/state follows the queue another frontend fills" =
   [%expect
     {|
     > request 2 session/prompt {"sessionId":"<id>","prompt":[{"type":"text","text":"work"}]}
-    < _prigh/state {"sessionId":"<id>","model":"deepseek/deepseek-flash","thinking":"default","running":true,"context_tokens":0,"context_window":1000000,"cost_usd":0,"budget_usd":null,"approval_mode":"auto","plan_mode":false,"queued":{"steer":0,"follow_up":0},"subagents":[],"jobs":0,"goal":null,"reminders":0,"active_host":"testhost"}
+    < _prigh/state {"sessionId":"<id>","model":"deepseek/deepseek-flash","thinking":"default","running":true,"context_tokens":0,"context_window":1000000,"cost_usd":0,"budget_usd":null,"approval_mode":"auto","plan_mode":false,"chat_mode":false,"queued":{"steer":0,"follow_up":0},"subagents":[],"jobs":0,"goal":null,"reminders":0,"active_host":"testhost"}
     < update tool_call {"toolCallId":"c1","title":"bash","kind":"execute","status":"pending"}
     < update tool_call_update {"toolCallId":"c1","title":"echo started; until [ -e go ]; do sleep 0.01; done","kind":"execute","status":"in_progress","rawInput":{"command":"echo started; until [ -e go ]; do sleep 0.01; done"}}
     < update tool_call_update {"toolCallId":"c1","content":[{"type":"content","content":{"type":"text","text":"```\nstarted\n```"}}]}
-    < _prigh/state {"sessionId":"<id>","model":"deepseek/deepseek-flash","thinking":"default","running":true,"context_tokens":0,"context_window":1000000,"cost_usd":0,"budget_usd":null,"approval_mode":"auto","plan_mode":false,"queued":{"steer":0,"follow_up":1},"subagents":[],"jobs":0,"goal":null,"reminders":0,"active_host":"testhost"}
+    < _prigh/state {"sessionId":"<id>","model":"deepseek/deepseek-flash","thinking":"default","running":true,"context_tokens":0,"context_window":1000000,"cost_usd":0,"budget_usd":null,"approval_mode":"auto","plan_mode":false,"chat_mode":false,"queued":{"steer":0,"follow_up":1},"subagents":[],"jobs":0,"goal":null,"reminders":0,"active_host":"testhost"}
     < update tool_call_update {"toolCallId":"c1","status":"completed","content":[{"type":"content","content":{"type":"text","text":"```\nstarted\n```"}}]}
     < update agent_message_chunk {"content":{"type":"text","text":"first"}}
-    < _prigh/state {"sessionId":"<id>","model":"deepseek/deepseek-flash","thinking":"default","running":true,"context_tokens":0,"context_window":1000000,"cost_usd":0,"budget_usd":null,"approval_mode":"auto","plan_mode":false,"queued":{"steer":0,"follow_up":0},"subagents":[],"jobs":0,"goal":null,"reminders":0,"active_host":"testhost"}
+    < _prigh/state {"sessionId":"<id>","model":"deepseek/deepseek-flash","thinking":"default","running":true,"context_tokens":0,"context_window":1000000,"cost_usd":0,"budget_usd":null,"approval_mode":"auto","plan_mode":false,"chat_mode":false,"queued":{"steer":0,"follow_up":0},"subagents":[],"jobs":0,"goal":null,"reminders":0,"active_host":"testhost"}
     < update user_message_chunk {"content":{"type":"text","text":"and then this"}}
     < update agent_message_chunk {"content":{"type":"text","text":"queued one answered"}}
-    < _prigh/state {"sessionId":"<id>","model":"deepseek/deepseek-flash","thinking":"default","running":false,"context_tokens":0,"context_window":1000000,"cost_usd":0,"budget_usd":null,"approval_mode":"auto","plan_mode":false,"queued":{"steer":0,"follow_up":0},"subagents":[],"jobs":0,"goal":null,"reminders":0,"active_host":"testhost"}
+    < _prigh/state {"sessionId":"<id>","model":"deepseek/deepseek-flash","thinking":"default","running":false,"context_tokens":0,"context_window":1000000,"cost_usd":0,"budget_usd":null,"approval_mode":"auto","plan_mode":false,"chat_mode":false,"queued":{"steer":0,"follow_up":0},"subagents":[],"jobs":0,"goal":null,"reminders":0,"active_host":"testhost"}
     < result 2 {"stopReason":"end_turn"}
     |}]
 ;;

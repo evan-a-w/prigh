@@ -519,15 +519,20 @@ against its upstream; the one it works in says `here`. A worktree two
 sessions use is under both; one removed (from any session, or outside
 prigh) goes. On disk worktrees still go by repository
 (`<worktrees_dir>/<project>/<branch>`), and `/worktree` lists all of the
-repository's. A session used in the last 12 hours (its age on the card)
-shows its worktrees; an older one folds them behind the count at the
-right of its second line (`⑂ 3`). Settings → Sessions → Show worktrees
-sets the window in hours (up to 720; its switch off, or 0: every
-session's start folded; on again: the hours it had). Clicking the count folds or unfolds a session's worktrees
-whatever its age, and that choice wins over the window until you click
-again; the window and the choices are kept with your preferences
-(`web.sidebar-worktree-hours`, `web.sidebar-folded`,
-`web.sidebar-unfolded`), so they follow you to other browsers.
+repository's. A session used in the last 12 hours shows its worktrees,
+and so does a pinned one; others fold them behind the count at the right
+of its second line (`⑂ 3`). Used means changed (its age on the card),
+running, open in front of you, or gone into (in any of your browsers);
+a session working in one of another's worktrees uses that one too.
+Settings → Sessions → Show worktrees sets the window in hours (up to
+720; its switch off, or 0: every session's worktrees fold, pinned and open ones
+too; on again: the hours it had). Clicking the count folds or unfolds a
+session's worktrees whatever its age, and that choice holds until you
+next go into the session (or into one working in its worktrees); the
+window, the choices and when you last went into each session are kept
+with your preferences (`web.sidebar-worktree-hours`,
+`web.sidebar-folded`, `web.sidebar-unfolded`, `web.sidebar-opened`), so
+they follow you to other browsers.
 
 A session that switched into a worktree (`/worktree open`, `/worktree
 new`, `/pr checkout`, Switch session here) remembers where it came from,
@@ -715,6 +720,18 @@ sent, and in the transcript as an `@path` chip. A message waits for its
 uploads; one that failed says to remove it or attach it again. While
 files upload (or a download is being prepared), the status says so
 with the work lamp: "Uploading 2 files 40%".
+
+A long paste (over 2,000 characters or 40 lines: a log, a stack trace)
+does not fill the composer: it becomes a **Pasted text #1** chip with its
+lines and size (× removes it; clicking it shows the text, with Remove and
+Insert as text). Ctrl+Shift+V (⌘+Shift+V) pastes it into the box as text
+instead. It goes to the model whole with the message, after what you
+typed, as a `<pasted_text name="Pasted text #1" lines="420">` block (no
+tool or host needed; up to 2 MiB each: attach a larger one as a file), and
+the transcript shows it as one folded line that opens to the text. Stop
+or a failed send puts the chips back. The TUI does the same with a
+bracketed paste: a `[Pasted text #1 +420 lines]` token in the editor,
+which Backspace or Delete removes whole.
 
 Transfers go through the backend, so they work on any tool host: the page
 asks over its signed-in connection for a one-time link (a random ticket,
@@ -1717,11 +1734,11 @@ What the editor gets:
   rule prigh offers, reject); `ask_user` questions as forms when the editor
   supports elicitation, as a permission request for a single choice, else
   the model is told the user cannot be asked;
-- modes `ask`, `auto-edit`, `smart`, `auto` (the approval modes) and `plan` (plan
-  mode), and config options for the mode, the model (of the providers you
+- modes `ask`, `auto-edit`, `smart`, `auto` (the approval modes), `plan` (plan
+  mode) and `chat` (chat mode), and config options for the mode, the model (of the providers you
   are logged in to) and the thinking level;
 - the slash commands `/compact`, `/goal`, `/remind`, `/budget`, `/model`,
-  `/thinking`, `/plan`, `/review`, `/init`, `/btw`, `/name`, `/diff`, and
+  `/thinking`, `/plan`, `/chat`, `/review`, `/init`, `/btw`, `/name`, `/diff`, and
   your skills (any other `/text` goes to the model).
 
 When the editor offers `fs/read_text_file` and `fs/write_text_file`, the
@@ -2017,8 +2034,8 @@ that no longer exists.
 | PageUp / PageDown | scroll the transcript / list a page |
 | mouse wheel | scroll the transcript (selecting text needs Shift) |
 | Ctrl+Up / Ctrl+Down | jump to the previous/next user message (or the trimmed divider) |
-| Backspace / Ctrl+H | delete the character before the cursor |
-| Delete | delete the character under the cursor |
+| Backspace / Ctrl+H | delete the character before the cursor (a `[Pasted text #N +L lines]` token whole) |
+| Delete | delete the character under the cursor (a pasted text's token whole) |
 | Ctrl+K / Ctrl+U | delete to the end / start of the line |
 | Ctrl+W / Alt+Backspace | delete the word before the cursor |
 | Ctrl+Y / Alt+Y | paste the most recent kill / replace it with an older kill |
@@ -2030,7 +2047,7 @@ that no longer exists.
 | Ctrl+L | pick a model |
 | Ctrl+P / Alt+P | cycle to the next / previous scoped model |
 | Ctrl+T | cycle the thinking level |
-| Alt+M | cycle the mode: ask → auto-edit → smart → auto → plan (read-only) |
+| Alt+M | cycle the mode: ask → auto-edit → smart → auto → plan (read-only) → chat (no tool host) |
 | Alt+N | pick a snippet to insert at the cursor (`/snippet`) |
 | Ctrl+N | picker: toggle the named-only / logged-in-only filter |
 | Tab / Alt+A / Alt+T / Alt+D | `/sessions`: mark a session / archive or unarchive it / pin or unpin it / delete every archived one |
@@ -2815,8 +2832,9 @@ it.
 | `/filter [all\|KIND...\|-KIND\|+KIND]` | show only some kinds in the transcript (`user`, `assistant`, `thinking`, `tools`, `subagents`, `notes`); bare: a checklist |
 | `/theme [original\|dark\|light]`, `/accent [name\|#rrggbb]` (prigh-web) | pick or set the theme and the accent colour, for you in every browser |
 | `/confirm [on\|off]` | ask before destructive tools: sets the approval mode `ask` or `auto`, here and for new sessions |
-| `/mode [ask\|auto-edit\|smart\|auto\|plan]` | pick or set this session's mode (Alt+M cycles) |
+| `/mode [ask\|auto-edit\|smart\|auto\|plan\|chat]` | pick or set this session's mode (Alt+M cycles) |
 | `/plan [on\|off]` | toggle plan mode (read-only planning until you turn it off) |
+| `/chat [on\|off]` | toggle chat mode (a chat without the tool host until you turn it off) |
 | `/todos` | show the model's plan (its `update_plan` steps) |
 | `/permissions` | show the mode and the allow/ask/deny rules (config and this session) |
 | `/compact [instructions]` | summarise older messages to free context, focusing on the instructions |
@@ -2865,7 +2883,7 @@ it.
 | `/downsize-images` | send the conversation's images smaller (the model refused one as too large) and retry a failed reply |
 | `/snippet [NAME\|add NAME [TEXT]\|rm NAME]` | insert a snippet at the cursor without sending it (alone: a picker, also Alt+N); `add` saves one (TEXT is the rest of the prompt, new lines included; without it, your last prompt), `rm` deletes one |
 | `/skills`, `/skill:NAME [args]` | pick a skill (Enter puts `/skill:NAME ` in the editor for its arguments) / run one |
-| `/mcp [reconnect]` | MCP servers and their state: Enter approves a project's server or lists a ready one's tools; `reconnect` restarts failed ones |
+| `/mcp [reconnect\|add ...\|remove\|enable\|disable NAME]` | MCP servers and their state: Enter approves a project's server or lists a ready one's tools; `reconnect` restarts failed ones; `add NAME URL\|COMMAND [ARGS...]` or `add {"NAME": {...}}` adds to your settings, `remove`, `enable` and `disable` change them (see [MCP servers](#mcp-servers)) |
 | `/retry-backend-connection` | reconnect to the backend now |
 | `/connect [HOST:PORT\|URL\|local]` | (TUI) switch to another backend (`HOST:PORT` or a prigh-web URL such as `wss://host/ws`), saved for next time, or to a spawned one; alone: pick or type the address |
 | `/signin [user]` | (TUI) sign in to the server: a dialog for the user and the token or password |
@@ -3162,6 +3180,18 @@ restarts. Plan mode does not ask (the asked session may change things),
 and subagents neither ask nor answer. Both tools see only the
 sessions of your own user, and name them by id, never by path.
 
+Session links: the `sessions` tool lists each session with its link,
+`[title](?session=ID)`, and the system prompt gives the session its own
+(not a temporary session), so the model links the sessions it names; `ID`
+may be a unique prefix of the id. In prigh-web a click on one switches to
+that session in place, as a click in the sidebar does (Ctrl+click,
+⌘-click or a middle click: in a new window); the ids of your sessions (8
+to 16 hex digits) in a reply or tool output are links too, though not in
+code blocks; a link to a session you do not have shows a toast with the
+closest id. The TUI underlines a link's title in magenta with its short id
+dim after it, and underlines the ids of your sessions: `/switch` takes the
+id or a unique prefix.
+
 `-faux-script FILE` (a backend flag, passed through the TUI after `--`) plays
 a JSON array of scripted provider replies, so demos and tests run without API
 calls; it implies `-faux`.
@@ -3188,12 +3218,13 @@ was last told, so the note still comes if you switch to another session,
 reconnect or restart the backend first, and none comes when you changed
 things back.
 
-### Approvals, plan mode and questions
+### Approvals, plan mode, chat mode and questions
 
 Each session has an approval mode, always shown in the status line
-(`mode:ask`, `mode:auto-edit`, `mode:smart`, `mode:auto`, `mode:plan`; in prigh-web
-beside the model, along the composer's bottom edge) and switched with
-`/mode` or Alt+M (ask → auto-edit → smart → auto → plan → ask):
+(`mode:ask`, `mode:auto-edit`, `mode:smart`, `mode:auto`, `mode:plan`,
+`mode:chat`; in prigh-web beside the model, along the composer's bottom edge)
+and switched with `/mode` or Alt+M (ask → auto-edit → smart → auto → plan →
+chat → ask):
 
 - `ask`: destructive tools (`bash`, `write`, `edit`, `apply_patch`,
   `job_input`, which writes to a running job that may run what it reads,
@@ -3283,6 +3314,27 @@ ahead has it implement the plan. An active `/goal` gets no automatic
 continuations while plan mode is on (the model cannot make progress on it,
 only plan); leaving plan mode carries on with it.
 
+Chat mode (`/chat`, `/mode chat` or Alt+M after plan) is a conversation
+that ignores the tool host: the model is offered only tools that need no
+machine (`web_search`, `web_fetch`, `ask_user`, `render_ui`,
+`update_plan`, `memory`, `custom_instructions`, the sessions tools and
+subagents, which are chats too and get no worktree); no shell, files,
+terminals, worktrees, computer use, `on_host`, MCP servers or git-host
+tools. Its system prompt has no working directory, OS, project
+instructions or skills, and says plainly that there is no machine;
+switching in or out mid-session tells the model (like plan mode), and a
+host tool call that slips through is refused. `web_fetch` runs in the
+backend itself in chat mode (on a backend whose own host is disabled,
+`-no-backend-host`, it refuses addresses on the server's own network).
+Nothing waits for a tool host, so a session needs none: when no host is
+connected, a brand-new session starts in chat mode (switching to another
+mode stays your choice, also once a host connects), and a message in
+another mode is refused with what to do, chat mode included: the TUI asks
+whether to send it as a chat (y/n, the text stays in the editor), and
+prigh-web shows a "Chat without a host" button over the composer. Leaving
+chat mode (`/chat off`) returns to the mode you had; the status line and
+prigh-web's mode chip show `chat`.
+
 The model's plan (`update_plan`: steps pending, in progress or done, as in
 Codex) is session state: the status line shows `plan 2/5: current step`
 (`(+2 running)` when several run in parallel) while steps remain, `/todos` shows it whole, and the transcript shows every
@@ -3337,9 +3389,10 @@ refused with the closest ones. `/skills` lists them.
 
 ### MCP servers
 
-MCP servers are configured in Claude Code's `mcpServers` format, in the
-tool host's `~/.prigh/mcp.json` and in a project's `.mcp.json` (in the
-working directory or an ancestor; the closest definition of a name wins):
+MCP servers are configured in Claude Code's `mcpServers` format, in
+**Settings → MCP servers** (or `/mcp add`), in the tool host's
+`~/.prigh/mcp.json` and in a project's `.mcp.json` (in the working directory
+or an ancestor; the closest definition of a name wins):
 
 ```json
 {
@@ -3365,6 +3418,26 @@ came with the project, so they only start once you approve them in `/mcp`
 approval are reported once each; `/mcp` shows every server with its status
 and tools, and `/mcp reconnect` restarts failed ones. `-no-tools` turns MCP
 off.
+
+The servers in **Settings → MCP servers** are yours: the backend keeps them
+for your account (`~/.prigh/mcp-servers.json` in its home, readable by its
+owner only: where the backend runs as another user than the tool hosts, as
+in the Docker image, the agent cannot read or change them) and sends the
+enabled ones to every tool host your sessions use, which starts them as it starts its own; they need no approval. A
+host's `~/.prigh/mcp.json` or a project's `.mcp.json` that defines the same
+name wins, and Settings says which file overrides it. The section lists
+your servers with their state on the session's host (ready with their
+tools, failed with the error, off, overridden), and below them the host's
+own; add one with the form (a command and its arguments one per line, or a
+URL; environment variables and headers are masked until you show them) or
+paste an `mcpServers` object from another tool's settings (all of it is
+added, or none); switch one off, edit, rename or remove it (asked first);
+Approve a project's server and Retry a failed one there. A change reaches
+running sessions at once: only the servers whose definition changed
+restart. In the composer, `/mcp add NAME URL`, `/mcp add NAME COMMAND
+[ARGS...]` (split like a shell's), `/mcp add {"NAME": {...}}` and `/mcp
+remove|enable|disable NAME` do the same; a refusal puts the command back in
+the editor.
 
 ### Testing
 

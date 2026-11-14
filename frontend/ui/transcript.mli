@@ -148,7 +148,8 @@ val end_tool : t -> call:P.Tool_call.t -> result:P.Message.Tool_result.t -> t
 (** Renders wrapped lines, newest last. Only the last [rows + skip] lines are
     produced; [skip] is how many bottom lines to hide (scrolling). *)
 val render_tail
-  :  t
+  :  ?sessions:Session_link.Known.t
+  -> t
   -> width:int
   -> rows:int
   -> skip:int
@@ -160,10 +161,20 @@ val render_tail
 val finished : t -> int
 
 (** Total wrapped line count, for scroll clamping. *)
-val line_count : t -> width:int -> verbosity:Verbosity.t -> int
+val line_count
+  :  ?sessions:Session_link.Known.t
+  -> t
+  -> width:int
+  -> verbosity:Verbosity.t
+  -> int
 
 (** Every wrapped line, oldest first. *)
-val render_all : t -> width:int -> verbosity:Verbosity.t -> Content.t
+val render_all
+  :  ?sessions:Session_link.Known.t
+  -> t
+  -> width:int
+  -> verbosity:Verbosity.t
+  -> Content.t
 
 (** Wrapped line index of each user turn's first line, oldest first, and of
     the [Trimmed] divider's (its messages are not turns of the
@@ -171,6 +182,7 @@ val render_all : t -> width:int -> verbosity:Verbosity.t -> Content.t
     it hides your messages, the first line shown after each. *)
 val user_message_lines
   :  ?filter:Transcript_filter.t
+  -> ?sessions:Session_link.Known.t
   -> t
   -> width:int
   -> verbosity:Verbosity.t
@@ -178,7 +190,8 @@ val user_message_lines
 
 (** Renders the wrapped lines in [\[top, top + rows)]. *)
 val render_window
-  :  t
+  :  ?sessions:Session_link.Known.t
+  -> t
   -> width:int
   -> rows:int
   -> top:int
@@ -186,4 +199,9 @@ val render_window
   -> Content.t
 
 (** The item's lines in the work log, wrapped at [width] if given. *)
-val render_item : ?width:int -> Item.t -> verbosity:Verbosity.t -> Content.t
+val render_item
+  :  ?sessions:Session_link.Known.t
+  -> ?width:int
+  -> Item.t
+  -> verbosity:Verbosity.t
+  -> Content.t

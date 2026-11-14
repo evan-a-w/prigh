@@ -29,7 +29,8 @@ let%expect_test "Alt+M: auto-edit → smart → auto; the status line shows smar
       (method_ set_mode)
       (params (
         (approval_mode smart)
-        (plan_mode     false)))
+        (plan_mode     false)
+        (chat_mode     false)))
       (tag (
         Mode_set
         "mode: smart \226\128\148 edits in the project run; the approval model lets other calls run or asks you, saying why (/approval-model)")))
@@ -51,7 +52,8 @@ let%expect_test "Alt+M: auto-edit → smart → auto; the status line shows smar
       (method_ set_mode)
       (params (
         (approval_mode auto)
-        (plan_mode     false)))
+        (plan_mode     false)
+        (chat_mode     false)))
       (tag (Mode_set "mode: auto \226\128\148 tools run without asking")))
     |}]
 ;;

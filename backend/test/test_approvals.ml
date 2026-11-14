@@ -183,7 +183,7 @@ let%expect_test
   print_s
     [%sexp
       (Session.approval (Or_error.ok_exn (Session.load path))
-       : (string * bool) option)
+       : Session.Mode.t option)
     , (Session.allow_rules (Or_error.ok_exn (Session.load path)) : string list)];
   Eio.Switch.run (fun sw ->
     let reloaded =
@@ -217,7 +217,8 @@ let%expect_test
       -> Always
     mode=auto-edit plan=none rules=[bash(echo:*) bash(true:*) bash(printf:*)]
     bash {"command":"printf three"} -> three
-    (((auto-edit false)) ("bash(echo:*)" "bash(true:*)" "bash(printf:*)"))
+    ((((approval auto-edit) (plan false) (chat false)))
+     ("bash(echo:*)" "bash(true:*)" "bash(printf:*)"))
     (reloaded (mode auto-edit)
      (rules ("bash(echo:*)" "bash(true:*)" "bash(printf:*)")))
     |}]

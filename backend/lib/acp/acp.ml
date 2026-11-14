@@ -401,11 +401,17 @@ let modes =
     , "Plan"
     , "investigate and plan, changing no files, until you switch to another \
        mode" )
+  ; ( "chat"
+    , "Chat"
+    , "talk without the tool host: no files, commands or project, only the web \
+       and other host-free tools" )
   ]
 ;;
 
 let mode_id state =
-  if is_true "plan_mode" state
+  if is_true "chat_mode" state
+  then "chat"
+  else if is_true "plan_mode" state
   then "plan"
   else string_field "approval_mode" state
 ;;
@@ -573,6 +579,7 @@ let prigh_state (s : Session.t) =
     ; "budget_usd", field "budget_usd" st
     ; "approval_mode", field "approval_mode" st
     ; "plan_mode", field "plan_mode" st
+    ; "chat_mode", field "chat_mode" st
     ; "queued", `Object [ "steer", int steer; "follow_up", int follow_up ]
     ; ( "subagents"
       , `Array
@@ -1684,9 +1691,10 @@ let mode_ids = List.map modes ~f:(fun (id, _, _) -> id)
 
 let set_mode_params mode =
   match mode with
-  | "plan" -> Ok [ "plan_mode", `True ]
+  | "chat" -> Ok [ "chat_mode", `True ]
+  | "plan" -> Ok [ "plan_mode", `True; "chat_mode", `False ]
   | mode when List.mem mode_ids mode ~equal:String.equal ->
-    Ok [ "approval_mode", str mode; "plan_mode", `False ]
+    Ok [ "approval_mode", str mode; "plan_mode", `False; "chat_mode", `False ]
   | mode ->
     Error
       (Error.invalid_params

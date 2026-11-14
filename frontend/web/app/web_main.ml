@@ -1089,12 +1089,40 @@ let install_listeners ~schedule ~current =
     autosize ();
     schedule (App.Action.Set_narrow (narrow ()));
     schedule (Resize_widget.viewport ()));
+  (* Ctrl+Shift+V (Cmd+Shift+V), "paste as plain text": a long paste goes in
+     the box as text rather than as a chip. The keydown comes just before
+     its paste, and the keyup after it (the terminal's Ctrl+Shift+V reads the
+     clipboard instead: no paste). *)
+  let plain_paste = ref false in
+  listen ~capture:true Dom_html.Event.keydown (fun ev ->
+    plain_paste
+    := Js.to_bool ev##.shiftKey
+       && (Js.to_bool ev##.ctrlKey || Js.to_bool ev##.metaKey)
+       && ev##.keyCode = 86;
+    Js._true);
+  listen ~capture:true Dom_html.Event.keyup (fun _ ->
+    plain_paste := false;
+    Js._true);
+  let in_editor (ev : #Dom_html.event Js.t) =
+    Js.Opt.case ev##.target (fun () -> false) (fun t ->
+      String.equal (Js.to_string t##.id) "editor")
+  in
   listen Dom_html.Event.paste (fun (ev : Dom_html.clipboardEvent Js.t) ->
+    let plain = !plain_paste in
+    plain_paste := false;
     Js.Opt.iter ev##.clipboardData (fun data ->
       if data##.files##.length > 0 && not (in_terminal ev)
       then (
         Dom.preventDefault ev;
-        read_images ~schedule data##.files));
+        read_images ~schedule data##.files)
+      else if in_editor ev && not plain
+      then (
+        (* Before the textarea takes it: a long one never reaches it. *)
+        let text = Js.to_string (data##getData (Js.string "text/plain")) in
+        if Prigh_ui.Pasted_text.is_long text
+        then (
+          Dom.preventDefault ev;
+          schedule (App.Action.Paste_text text))));
     Js._true);
   listen Dom_html.Event.dragover (fun ev ->
     Dom.preventDefault ev;
@@ -1128,6 +1156,7 @@ let install_listeners ~schedule ~current =
                    (App.update !current (Picker_choose (Js.to_string id)))))));
     Js._true);
   Chat_listeners.install ~schedule;
+  Session_link_listeners.install ~schedule;
   Gesture_listeners.install ~schedule;
   Dictation_widget.install ~schedule;
   Annotate_widget.install ~schedule;

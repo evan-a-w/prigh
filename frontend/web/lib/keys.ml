@@ -119,6 +119,10 @@ let help =
        button in the agents panel; /agents steer N TEXT sends one)" )
   ; "Alt+↑ (steering a subagent)", "take its last queued message back"
   ; "Esc (steering a subagent)", "write to the main agent again"
+  ; ( "Ctrl+Shift+V / ⌘+Shift+V (in the message box)"
+    , "paste a long text into the box as text; a plain paste of over 2,000 \
+       characters or 40 lines becomes a Pasted text chip, sent whole with the \
+       message (its dialog: Insert as text, Remove)" )
   ; ( "Ctrl+Shift+O"
     , "a new temporary session (/temporary): not saved or listed, deleted when \
        you leave it; on the new-session screen, its Temporary chip" )

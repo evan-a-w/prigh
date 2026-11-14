@@ -130,7 +130,7 @@ let%expect_test "state, models, thinking, errors" =
   [%expect
     {|
     {"type":"response","id":"r1","ok":true,"result":"pong"}
-    {"type":"response","id":"r1","ok":true,"result":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"thinking_options":["off","default","low","high","max"],"thinking_default":"high","supports_images":false,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"default","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","active_host_name":"<host>","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"computer_control":null,"plan":null,"session_rules":[]}}
+    {"type":"response","id":"r1","ok":true,"result":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"thinking_options":["off","default","low","high","max"],"thinking_default":"high","supports_images":false,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"default","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","active_host_name":"<host>","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"chat_mode":false,"no_host":null,"computer_control":null,"plan":null,"session_rules":[]}}
     {"type":"response","id":"r1","ok":true,"result":{}}
     {"type":"response","id":"r1","ok":false,"error":"thinking must be one of: off, default, minimal, low, medium, high, xhigh, max"}
     {"type":"response","id":"r1","ok":true,"result":{}}
@@ -140,7 +140,7 @@ let%expect_test "state, models, thinking, errors" =
     {"type":"response","id":"r1","ok":false,"error":"model \"claude fabl\" is ambiguous; one of: anthropic/claude-fable-5, anthropic/claude-fable-5-1, anthropic/claude-fable-5-2"}
     {"type":"response","id":"r1","ok":true,"result":{}}
     {"type":"response","id":"r1","ok":true,"result":{}}
-    {"type":"response","id":"r1","ok":true,"result":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-v4-pro","provider":"deepseek","key":"deepseek/deepseek-v4-pro","name":"DeepSeek V4 Pro","context_window":1000000,"max_output":384000,"supports_thinking":true,"thinking_options":["off","default","low","high","max"],"thinking_default":"high","supports_images":false,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":1.32,"output":3.96,"cache_read":0.044}},"thinking":"high","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","active_host_name":"<host>","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"computer_control":null,"plan":null,"session_rules":[]}}
+    {"type":"response","id":"r1","ok":true,"result":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-v4-pro","provider":"deepseek","key":"deepseek/deepseek-v4-pro","name":"DeepSeek V4 Pro","context_window":1000000,"max_output":384000,"supports_thinking":true,"thinking_options":["off","default","low","high","max"],"thinking_default":"high","supports_images":false,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":1.32,"output":3.96,"cache_read":0.044}},"thinking":"high","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","active_host_name":"<host>","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"chat_mode":false,"no_host":null,"computer_control":null,"plan":null,"session_rules":[]}}
     {"type":"response","id":"r1","ok":false,"error":"unknown method \"nope\""}
     {"type":"response","id":"r1","ok":false,"error":"param \"text\" must be a string"}
     {"type":"response","id":7,"ok":false,"error":"request must have a string \"method\""}
@@ -164,7 +164,7 @@ let%expect_test "prompt emits events, get_messages/get_entries reflect the run" 
     {|
     {"type":"response","id":"r1","ok":true,"result":{}}
     {"type":"response","id":"r1","ok":false,"error":"a run is already in progress; use steer or follow_up"}
-    {"type":"event","event":"state","state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"thinking_options":["off","default","low","high","max"],"thinking_default":"high","supports_images":false,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"default","running":true,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","active_host_name":"<host>","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"computer_control":null,"plan":null,"session_rules":[]}}
+    {"type":"event","event":"state","state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"thinking_options":["off","default","low","high","max"],"thinking_default":"high","supports_images":false,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"default","running":true,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","active_host_name":"<host>","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"chat_mode":false,"no_host":null,"computer_control":null,"plan":null,"session_rules":[]}}
     {"type":"event","event":"agent_start"}
     {"type":"event","event":"message_start","message":{"role":"user","text":"[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\nwhat is here?","origin":{"body":"what is here?","notes":[{"kind":"client","title":"Using another client","text":"[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]"}]}}}
     {"type":"event","event":"message_end","message":{"role":"user","text":"[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\nwhat is here?","origin":{"body":"what is here?","notes":[{"kind":"client","title":"Using another client","text":"[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]"}]}}}
@@ -185,7 +185,7 @@ let%expect_test "prompt emits events, get_messages/get_entries reflect the run" 
     {"type":"event","event":"message_end","message":{"role":"assistant","content":[{"type":"text","text":"Empty."}],"stop_reason":{"type":"end_turn"},"usage":{"input":10,"output":5,"cache_read":0},"model":"deepseek-flash"}}
     {"type":"event","event":"turn_end","assistant":{"role":"assistant","content":[{"type":"text","text":"Empty."}],"stop_reason":{"type":"end_turn"},"usage":{"input":10,"output":5,"cache_read":0},"model":"deepseek-flash"},"tool_results":[]}
     {"type":"event","event":"agent_end","messages":[{"role":"user","text":"[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\nwhat is here?","origin":{"body":"what is here?","notes":[{"kind":"client","title":"Using another client","text":"[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]"}]}},{"role":"assistant","content":[{"type":"text","text":"Looking."},{"type":"tool_call","id":"c1","name":"ls","arguments":"{}"}],"stop_reason":{"type":"tool_use"},"usage":{"input":20,"output":8,"cache_read":5},"model":"deepseek-flash"},{"role":"tool_result","tool_call_id":"c1","tool_name":"ls","text":"sessions/\n","is_error":false},{"role":"assistant","content":[{"type":"text","text":"Empty."}],"stop_reason":{"type":"end_turn"},"usage":{"input":10,"output":5,"cache_read":0},"model":"deepseek-flash"}]}
-    {"type":"event","event":"state","state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"thinking_options":["off","default","low","high","max"],"thinking_default":"high","supports_images":false,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"default","running":false,"message_count":4,"usage":{"input":30,"output":13,"cache_read":5},"cost_usd":2.313e-05,"context_tokens":10,"active_host":"backend","active_host_name":"<host>","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"computer_control":null,"plan":null,"session_rules":[]}}
+    {"type":"event","event":"state","state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"thinking_options":["off","default","low","high","max"],"thinking_default":"high","supports_images":false,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"default","running":false,"message_count":4,"usage":{"input":30,"output":13,"cache_read":5},"cost_usd":2.313e-05,"context_tokens":10,"active_host":"backend","active_host_name":"<host>","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"chat_mode":false,"no_host":null,"computer_control":null,"plan":null,"session_rules":[]}}
     |}];
   call t h "get_messages";
   call t h "get_entries";
@@ -335,6 +335,116 @@ let%expect_test "prompt attachments are inlined into the user message" =
     |}]
 ;;
 
+let%expect_test
+    "pasted texts reach the model in full as blocks; the message shows them \
+     apart"
+  =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  write t "a.txt" "attached\n";
+  let on_request (request : Provider.Request.t) =
+    List.iter request.messages ~f:(function
+      | Message.User u -> print_endline (mask t u.text)
+      | _ -> ())
+  in
+  let agent, h =
+    make_server
+      t
+      ~sw
+      ~provider:(Faux_provider.create ~on_request [ Reply.text "ok" ])
+  in
+  call
+    t
+    h
+    ~params:
+      {|{"text": "what is wrong here?", "pasted": ["line one\nline two\n", "x"], "attachments": ["a.txt"]}|}
+    "prompt";
+  Agent.wait_idle agent;
+  [%expect
+    {|
+    [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]
+
+    what is wrong here?
+
+    <pasted_text name="Pasted text #1" lines="2">
+    line one
+    line two
+
+    </pasted_text>
+
+    <pasted_text name="Pasted text #2" lines="1">
+    x
+    </pasted_text>
+
+    <file path="a.txt">
+    attached
+    </file>
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    |}];
+  let shown (json : Json.t) =
+    match json with
+    | `Array (`Object fields :: _) ->
+      let text =
+        match List.Assoc.find fields "text" ~equal:String.equal with
+        | Some (`String s) -> s
+        | _ -> ""
+      in
+      let origin = List.Assoc.find_exn fields "origin" ~equal:String.equal in
+      print_endline (mask t (Json.to_string origin));
+      (match Json.member "pasted" origin with
+       | Some (`Array pasted) ->
+         List.iter pasted ~f:(fun p ->
+           let int name =
+             match Json.member name p with
+             | Some (`Number n) -> Int.of_string n
+             | _ -> -1
+           in
+           printf
+             "%S\n"
+             (String.sub text ~pos:(int "start") ~len:(int "length")))
+       | _ -> print_endline "no pasted")
+    | _ -> print_endline "no message"
+  in
+  (* As frontends get it, and from the session file after a reload. *)
+  shown
+    (`Array
+        (List.map (Agent.messages agent) ~f:Rpc_json.message
+         |> List.filter ~f:(fun m ->
+           match Json.member "role" m with
+           | Some (`String "user") -> true
+           | _ -> false)));
+  let reloaded =
+    Or_error.ok_exn (Session.load (Agent.state agent).session_path)
+  in
+  shown
+    (`Array
+        (List.filter_map (Session.messages reloaded) ~f:(function
+           | Message.User _ as m -> Some (Rpc_json.message m)
+           | _ -> None)));
+  [%expect
+    {|
+    {"body":"what is wrong here?","notes":[{"kind":"client","title":"Using another client","text":"[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]"}],"pasted":[{"name":"Pasted text #1","lines":2,"start":200,"length":18},{"name":"Pasted text #2","lines":1,"start":281,"length":1}],"attachments":[{"path":"a.txt"}]}
+    "line one\nline two\n"
+    "x"
+    {"body":"what is wrong here?","notes":[{"kind":"client","title":"Using another client","text":"[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]"}],"pasted":[{"name":"Pasted text #1","lines":2,"start":200,"length":18},{"name":"Pasted text #2","lines":1,"start":281,"length":1}],"attachments":[{"path":"a.txt"}]}
+    "line one\nline two\n"
+    "x"
+    |}];
+  (* Past the limit: refused, saying what to do instead. *)
+  call
+    t
+    h
+    ~params:
+      (sprintf
+         {|{"text": "big", "pasted": ["ok", "%s"]}|}
+         (String.make (Injected.Pasted.max_bytes + 1) 'a'))
+    "prompt";
+  [%expect
+    {| {"type":"response","id":"r1","ok":false,"error":"pasted text #2 is 2.0 MB, over the 2.0 MB a pasted text may be: attach it as a file instead (prigh-web: its + or drop it on the page; the TUI: save it and @mention its path)"} |}]
+;;
+
 let%expect_test "images: in prompts, from attachments, and refused" =
   with_sandbox
   @@ fun t ->
@@ -430,12 +540,50 @@ let%expect_test "sessions: list, new, switch, fork, rewind" =
   [%expect
     {|
     {"type":"response","id":"r1","ok":true,"result":{}}
-    {"type":"response","id":"r1","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"thinking_options":["off","default","low","high","max"],"thinking_default":"high","supports_images":false,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"default","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","active_host_name":"<host>","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"computer_control":null,"plan":null,"session_rules":[]}}}
+    {"type":"response","id":"r1","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"thinking_options":["off","default","low","high","max"],"thinking_default":"high","supports_images":false,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"default","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","active_host_name":"<host>","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"chat_mode":false,"no_host":null,"computer_control":null,"plan":null,"session_rules":[]}}}
     {"type":"response","id":"r1","ok":true,"result":[{"id":"<id>","path":"$DIR/sessions/<stamp>_<id>.jsonl","name":null,"description":null,"cwd":"$DIR","created_at":"<time>","updated_at":"<time>","first_prompt":"first","message_count":2,"failed":false,"pinned":false,"parent":null,"host":null,"repo":null,"worktrees":[],"bytes":<n>,"live":false,"running":false,"background":0,"archived":false}]}
-    {"type":"response","id":"r1","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"thinking_options":["off","default","low","high","max"],"thinking_default":"high","supports_images":false,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"default","running":false,"message_count":2,"usage":{"input":10,"output":5,"cache_read":0},"cost_usd":9e-06,"context_tokens":10,"active_host":"backend","active_host_name":"<host>","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"computer_control":null,"plan":null,"session_rules":[]}}}
+    {"type":"response","id":"r1","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"thinking_options":["off","default","low","high","max"],"thinking_default":"high","supports_images":false,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"default","running":false,"message_count":2,"usage":{"input":10,"output":5,"cache_read":0},"cost_usd":9e-06,"context_tokens":10,"active_host":"backend","active_host_name":"<host>","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"chat_mode":false,"no_host":null,"computer_control":null,"plan":null,"session_rules":[]}}}
     {"type":"response","id":"r1","ok":false,"error":"no session \"/nowhere.jsonl\""}
-    {"type":"response","id":"r1","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"thinking_options":["off","default","low","high","max"],"thinking_default":"high","supports_images":false,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"default","running":false,"message_count":2,"usage":{"input":10,"output":5,"cache_read":0},"cost_usd":9e-06,"context_tokens":10,"active_host":"backend","active_host_name":"<host>","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"computer_control":null,"plan":null,"session_rules":[]}}}
+    {"type":"response","id":"r1","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"thinking_options":["off","default","low","high","max"],"thinking_default":"high","supports_images":false,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"default","running":false,"message_count":2,"usage":{"input":10,"output":5,"cache_read":0},"cost_usd":9e-06,"context_tokens":10,"active_host":"backend","active_host_name":"<host>","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"chat_mode":false,"no_host":null,"computer_control":null,"plan":null,"session_rules":[]}}}
     {"type":"response","id":"r1","ok":false,"error":"(\"no such entry\" (to_ bogus))"}
+    |}]
+;;
+
+let%expect_test
+    "switch_session takes a unique prefix of an id (a session link's)"
+  =
+  with_agent [ Reply.text "one" ]
+  @@ fun t agent h ->
+  call t h ~params:{|{"text": "first"}|} "prompt";
+  Agent.wait_idle agent;
+  let first = (Agent.state agent).session_id in
+  call t h "new_session";
+  [%expect.output] |> (ignore : string -> unit);
+  let switch key =
+    let request =
+      Json.of_string
+        (sprintf
+           {|{"id": "r1", "method": "switch_session", "params": {"path": %S}}|}
+           key)
+    in
+    match Rpc_server.handle h.server h.client request with
+    | `Object fields
+      when Option.is_some (List.Assoc.find fields "error" ~equal:String.equal)
+      -> print_endline (mask t (Json.to_string (`Object fields)))
+    | (_ : Json.t) ->
+      print_s
+        [%sexp
+          { switched_to_first =
+              (String.equal (Session.id (Agent.session (current h))) first
+               : bool)
+          }]
+  in
+  switch (String.prefix first 8);
+  switch "ffffffffzz";
+  [%expect
+    {|
+    ((switched_to_first true))
+    {"type":"response","id":"r1","ok":false,"error":"no session \"ffffffffzz\""}
     |}]
 ;;
 
@@ -535,8 +683,8 @@ let%expect_test "abort returns restored messages and emits queue_update" =
   let events = Queue.create () in
   Agent.subscribe agent ~f:(fun e -> Queue.enqueue events (Rpc_json.event e));
   call t h ~params:{|{"text": "go"}|} "prompt";
-  call t h ~params:{|{"text": "first steer"}|} "steer";
-  call t h ~params:{|{"text": "second follow up"}|} "follow_up";
+  call t h ~params:{|{"text": "first steer", "pasted": ["a\nb"]}|} "steer";
+  call t h ~params:{|{"text": "second follow up", "pasted": ["c"]}|} "follow_up";
   call t h "abort";
   Agent.wait_idle agent;
   Queue.iter events ~f:(fun e -> print_endline (mask t (Json.to_string e)));
@@ -545,8 +693,8 @@ let%expect_test "abort returns restored messages and emits queue_update" =
     {"type":"response","id":"r1","ok":true,"result":{}}
     {"type":"response","id":"r1","ok":true,"result":{}}
     {"type":"response","id":"r1","ok":true,"result":{}}
-    {"type":"response","id":"r1","ok":true,"result":{"restored":["first steer","second follow up"]}}
-    {"type":"event","event":"state","state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"thinking_options":["off","default","low","high","max"],"thinking_default":"high","supports_images":false,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"default","running":true,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","active_host_name":"<host>","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"computer_control":null,"plan":null,"session_rules":[]}}
+    {"type":"response","id":"r1","ok":true,"result":{"restored":["first steer","second follow up"],"pasted":[["a\nb"],["c"]]}}
+    {"type":"event","event":"state","state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"thinking_options":["off","default","low","high","max"],"thinking_default":"high","supports_images":false,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"default","running":true,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","active_host_name":"<host>","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"chat_mode":false,"no_host":null,"computer_control":null,"plan":null,"session_rules":[]}}
     {"type":"event","event":"agent_start"}
     {"type":"event","event":"message_start","message":{"role":"user","text":"[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\ngo","origin":{"body":"go","notes":[{"kind":"client","title":"Using another client","text":"[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]"}]}}}
     {"type":"event","event":"message_end","message":{"role":"user","text":"[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\ngo","origin":{"body":"go","notes":[{"kind":"client","title":"Using another client","text":"[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]"}]}}}
@@ -558,7 +706,7 @@ let%expect_test "abort returns restored messages and emits queue_update" =
     {"type":"event","event":"message_end","message":{"role":"assistant","content":[],"stop_reason":{"type":"aborted"},"usage":{"input":20,"output":8,"cache_read":5},"model":"deepseek-flash"}}
     {"type":"event","event":"turn_end","assistant":{"role":"assistant","content":[],"stop_reason":{"type":"aborted"},"usage":{"input":20,"output":8,"cache_read":5},"model":"deepseek-flash"},"tool_results":[]}
     {"type":"event","event":"agent_end","messages":[{"role":"user","text":"[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\ngo","origin":{"body":"go","notes":[{"kind":"client","title":"Using another client","text":"[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]"}]}},{"role":"assistant","content":[],"stop_reason":{"type":"aborted"},"usage":{"input":20,"output":8,"cache_read":5},"model":"deepseek-flash"}]}
-    {"type":"event","event":"state","state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"thinking_options":["off","default","low","high","max"],"thinking_default":"high","supports_images":false,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"default","running":false,"message_count":2,"usage":{"input":20,"output":8,"cache_read":5},"cost_usd":1.413e-05,"context_tokens":20,"active_host":"backend","active_host_name":"<host>","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"computer_control":null,"plan":null,"session_rules":[]}}
+    {"type":"event","event":"state","state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"thinking_options":["off","default","low","high","max"],"thinking_default":"high","supports_images":false,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"default","running":false,"message_count":2,"usage":{"input":20,"output":8,"cache_read":5},"cost_usd":1.413e-05,"context_tokens":20,"active_host":"backend","active_host_name":"<host>","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"chat_mode":false,"no_host":null,"computer_control":null,"plan":null,"session_rules":[]}}
     |}]
 ;;
 
@@ -707,16 +855,16 @@ let%expect_test "import, set_session_name, export, clone, set_cwd" =
   [%expect
     {|
     {"type":"response","id":"r1","ok":true,"result":{"path":"$DIR/sessions/<stamp>_<id>.jsonl"}}
-    {"type":"response","id":"r1","ok":true,"result":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"thinking_options":["off","default","low","high","max"],"thinking_default":"high","supports_images":false,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"default","running":false,"message_count":1,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","active_host_name":"<host>","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"computer_control":null,"plan":null,"session_rules":[]}}
+    {"type":"response","id":"r1","ok":true,"result":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"thinking_options":["off","default","low","high","max"],"thinking_default":"high","supports_images":false,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"default","running":false,"message_count":1,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","active_host_name":"<host>","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"chat_mode":false,"no_host":null,"computer_control":null,"plan":null,"session_rules":[]}}
     {"type":"response","id":"r1","ok":true,"result":{}}
-    {"type":"response","id":"r1","ok":true,"result":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":"imported","session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"thinking_options":["off","default","low","high","max"],"thinking_default":"high","supports_images":false,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"default","running":false,"message_count":1,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","active_host_name":"<host>","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"computer_control":null,"plan":null,"session_rules":[]}}
+    {"type":"response","id":"r1","ok":true,"result":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":"imported","session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"thinking_options":["off","default","low","high","max"],"thinking_default":"high","supports_images":false,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"default","running":false,"message_count":1,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","active_host_name":"<host>","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"chat_mode":false,"no_host":null,"computer_control":null,"plan":null,"session_rules":[]}}
     {"type":"response","id":"r1","ok":true,"result":{"path":"$DIR/sessions/exports/<stamp>_<id>.md"}}
     {"type":"response","id":"r1","ok":true,"result":{"path":"$DIR/sessions/exports/<stamp>_<id>.jsonl"}}
     {"type":"response","id":"r1","ok":false,"error":"unknown export format \"html\" (expected markdown or jsonl)"}
     {"type":"response","id":"r1","ok":false,"error":"(Sys_error \"/nowhere.jsonl: No such file or directory\")"}
-    {"type":"response","id":"r1","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":"imported","session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"thinking_options":["off","default","low","high","max"],"thinking_default":"high","supports_images":false,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"default","running":false,"message_count":1,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","active_host_name":"<host>","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"computer_control":null,"plan":null,"session_rules":[]}}}
+    {"type":"response","id":"r1","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":"imported","session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"thinking_options":["off","default","low","high","max"],"thinking_default":"high","supports_images":false,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"default","running":false,"message_count":1,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","active_host_name":"<host>","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"chat_mode":false,"no_host":null,"computer_control":null,"plan":null,"session_rules":[]}}}
     {"type":"response","id":"r1","ok":true,"result":{"cwd":"$DIR/sub","created":false}}
-    {"type":"response","id":"r1","ok":true,"result":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":"imported","session_description":null,"cwd":"$DIR/sub","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"thinking_options":["off","default","low","high","max"],"thinking_default":"high","supports_images":false,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"default","running":false,"message_count":1,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","active_host_name":"<host>","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR/sub","session_id":null,"session_name":null,"home":"$HOME"}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"computer_control":null,"plan":null,"session_rules":[]}}
+    {"type":"response","id":"r1","ok":true,"result":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":"imported","session_description":null,"cwd":"$DIR/sub","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"thinking_options":["off","default","low","high","max"],"thinking_default":"high","supports_images":false,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"default","running":false,"message_count":1,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","active_host_name":"<host>","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR/sub","session_id":null,"session_name":null,"home":"$HOME"}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"chat_mode":false,"no_host":null,"computer_control":null,"plan":null,"session_rules":[]}}
     |}]
 ;;
 
@@ -781,7 +929,7 @@ let%expect_test "shell runs a command, streams tool events, and adds to context"
     {"type":"event","event":"tool_end","call":{"id":"shell-0","name":"shell","arguments":"{\"command\":\"printf 'a\\\\nb'\"}"},"result":{"role":"tool_result","tool_call_id":"shell-0","tool_name":"shell","text":"a\nb","is_error":false}}
     {"type":"event","event":"message_start","message":{"role":"user","text":"$ printf 'a\\nb'\na\nb","origin":{"source":{"kind":"shell","title":"Output of $ printf 'a\\nb' added to the context"}}}}
     {"type":"event","event":"message_end","message":{"role":"user","text":"$ printf 'a\\nb'\na\nb","origin":{"source":{"kind":"shell","title":"Output of $ printf 'a\\nb' added to the context"}}}}
-    {"type":"event","event":"state","state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"thinking_options":["off","default","low","high","max"],"thinking_default":"high","supports_images":false,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"default","running":false,"message_count":1,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","active_host_name":"<host>","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"computer_control":null,"plan":null,"session_rules":[]}}
+    {"type":"event","event":"state","state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"thinking_options":["off","default","low","high","max"],"thinking_default":"high","supports_images":false,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"default","running":false,"message_count":1,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","active_host_name":"<host>","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"chat_mode":false,"no_host":null,"computer_control":null,"plan":null,"session_rules":[]}}
     {"type":"response","id":"r1","ok":true,"result":{"text":"a\nb","is_error":false}}
     {"type":"response","id":"r1","ok":true,"result":[{"role":"user","text":"$ printf 'a\\nb'\na\nb","origin":{"source":{"kind":"shell","title":"Output of $ printf 'a\\nb' added to the context"}},"at":<at>}]}
     |}]
@@ -837,7 +985,7 @@ let%expect_test "dequeue returns queued messages and null when empty" =
   @@ fun t agent h ->
   call t h ~params:{|{"text": "go"}|} "prompt";
   call t h ~params:{|{"text": "steer one"}|} "steer";
-  call t h ~params:{|{"text": "follow up"}|} "follow_up";
+  call t h ~params:{|{"text": "follow up", "pasted": ["log"]}|} "follow_up";
   call t h "dequeue";
   call t h "dequeue";
   call t h "dequeue";
@@ -847,7 +995,7 @@ let%expect_test "dequeue returns queued messages and null when empty" =
     {"type":"response","id":"r1","ok":true,"result":{}}
     {"type":"response","id":"r1","ok":true,"result":{}}
     {"type":"response","id":"r1","ok":true,"result":{}}
-    {"type":"response","id":"r1","ok":true,"result":{"text":"follow up","attachments":[]}}
+    {"type":"response","id":"r1","ok":true,"result":{"text":"follow up","attachments":[],"pasted":["log"]}}
     {"type":"response","id":"r1","ok":true,"result":{"text":"steer one","attachments":[]}}
     {"type":"response","id":"r1","ok":true,"result":null}
     |}]
@@ -1034,7 +1182,7 @@ let%expect_test "remote tool host: exec round trip, switch, disconnect" =
     | _ -> ());
   [%expect
     {|
-    {"type":"response","id":"r2","ok":true,"result":{"client_id":"client-2","host_id":"client-2","namespace":null,"user":null,"superuser":false,"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"/home/me/proj","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"thinking_options":["off","default","low","high","max"],"thinking_default":"high","supports_images":false,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"default","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"client-2","active_host_name":"laptop","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"},{"id":"client-2","name":"laptop","cwd":"/home/me/proj","session_id":"<id>","session_name":null}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"computer_control":null,"plan":null,"session_rules":[]}}}
+    {"type":"response","id":"r2","ok":true,"result":{"client_id":"client-2","host_id":"client-2","namespace":null,"user":null,"superuser":false,"features":["pasted_text"],"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"/home/me/proj","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"thinking_options":["off","default","low","high","max"],"thinking_default":"high","supports_images":false,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"default","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"client-2","active_host_name":"laptop","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"},{"id":"client-2","name":"laptop","cwd":"/home/me/proj","session_id":"<id>","session_name":null}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"chat_mode":false,"no_host":null,"computer_control":null,"plan":null,"session_rules":[]}}}
     client-2 /home/me/proj
     {"type":"response","id":"r1","ok":true,"result":{}}
     (host answered $instructions)
@@ -1110,8 +1258,7 @@ let%expect_test "remote tool host: disconnect mid-call fails the call" =
     (host answered $instructions)
     client-2
     tool_result: "[the tool host disconnected during this call, so its result is lost: run it again if you still need it]"
-    {"type":"response","id":"r1","ok":true,"result":{}}
-    tool_result: "waiting for tool host \"laptop\" to reconnect; /host picks another"
+    {"type":"response","id":"r1","ok":false,"error":"tool host \"laptop\" is not connected: /host picks another, or talk without one in chat mode (/mode chat)"}
     |}]
 ;;
 
@@ -1161,7 +1308,7 @@ let%expect_test "remote tool host: attached to another session" =
   show_hosts "side" other;
   [%expect
     {|
-    {"type":"response","id":"r2","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"/home/me/proj","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"thinking_options":["off","default","low","high","max"],"thinking_default":"high","supports_images":false,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"default","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"client-2","active_host_name":"laptop","hosts":[{"id":"backend","name":"<host>","cwd":"/home/me/proj","session_id":null,"session_name":null,"home":"$HOME"},{"id":"client-2","name":"laptop","cwd":"/home/me/proj","session_id":"<id>","session_name":null}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"computer_control":null,"plan":null,"session_rules":[]}}}
+    {"type":"response","id":"r2","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"/home/me/proj","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"thinking_options":["off","default","low","high","max"],"thinking_default":"high","supports_images":false,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"default","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"client-2","active_host_name":"laptop","hosts":[{"id":"backend","name":"<host>","cwd":"/home/me/proj","session_id":null,"session_name":null,"home":"$HOME"},{"id":"client-2","name":"laptop","cwd":"/home/me/proj","session_id":"<id>","session_name":null}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"chat_mode":false,"no_host":null,"computer_control":null,"plan":null,"session_rules":[]}}}
     {"type":"response","id":"r2","ok":true,"result":{}}
     {"type":"response","id":"r2","ok":true,"result":{"cwd":"/home/me/proj","created":false}}
     main: active=client-2 hosts=(((id backend)(name <host>)(cwd $DIR)(session_id())(session_name())(home $HOME)(git_location))((id client-2)(name laptop)(cwd /home/me/proj)(session_id(<id>))(session_name(side))))
@@ -1444,7 +1591,7 @@ let%expect_test "change_default saves the current model and thinking level" =
     {"type":"event","event":"config_changed","config":{"scoped_models":[],"approval_mode":"auto","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":"deepseek/deepseek-v4-pro","default_thinking":"max","fallback_models":[],"default_cwd":null,"default_host":null,"worktrees_dir":"~/.prigh/worktrees","max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true,"ask_user_timeout_seconds":300,"archive_after_days":7,"notify":"bell","snippets":[],"auto_background_seconds":30,"generate_model":null,"mask_observations":true,"computer_screenshots":3,"computer_screenshots_max":8,"computer_native":true,"compact_at_tokens":200000,"compaction_model":null,"naming_model":null,"approval_model":null,"dictation_model":null,"trace":"default"}}
     {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"approval_mode":"auto","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":"deepseek/deepseek-v4-pro","default_thinking":"max","fallback_models":[],"default_cwd":null,"default_host":null,"worktrees_dir":"~/.prigh/worktrees","max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true,"ask_user_timeout_seconds":300,"archive_after_days":7,"notify":"bell","snippets":[],"auto_background_seconds":30,"generate_model":null,"mask_observations":true,"computer_screenshots":3,"computer_screenshots_max":8,"computer_native":true,"compact_at_tokens":200000,"compaction_model":null,"naming_model":null,"approval_model":null,"dictation_model":null,"trace":"default"}}
     {"type":"response","id":"r1","ok":true,"result":{"scoped_models":[],"approval_mode":"auto","permissions":{"allow":[],"ask":[],"deny":[]},"default_model":"deepseek/deepseek-v4-pro","default_thinking":"max","fallback_models":[],"default_cwd":null,"default_host":null,"worktrees_dir":"~/.prigh/worktrees","max_budget_usd":null,"goal_max_continuations":20,"resume_on_limit_reset":true,"ask_user_timeout_seconds":300,"archive_after_days":7,"notify":"bell","snippets":[],"auto_background_seconds":30,"generate_model":null,"mask_observations":true,"computer_screenshots":3,"computer_screenshots_max":8,"computer_native":true,"compact_at_tokens":200000,"compaction_model":null,"naming_model":null,"approval_model":null,"dictation_model":null,"trace":"default"}}
-    {"type":"response","id":"r1","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-v4-pro","provider":"deepseek","key":"deepseek/deepseek-v4-pro","name":"DeepSeek V4 Pro","context_window":1000000,"max_output":384000,"supports_thinking":true,"thinking_options":["off","default","low","high","max"],"thinking_default":"high","supports_images":false,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":1.32,"output":3.96,"cache_read":0.044}},"thinking":"max","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","active_host_name":"<host>","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"computer_control":null,"plan":null,"session_rules":[]}}}
+    {"type":"response","id":"r1","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-v4-pro","provider":"deepseek","key":"deepseek/deepseek-v4-pro","name":"DeepSeek V4 Pro","context_window":1000000,"max_output":384000,"supports_thinking":true,"thinking_options":["off","default","low","high","max"],"thinking_default":"high","supports_images":false,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":1.32,"output":3.96,"cache_read":0.044}},"thinking":"max","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","active_host_name":"<host>","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"chat_mode":false,"no_host":null,"computer_control":null,"plan":null,"session_rules":[]}}}
     (deepseek/deepseek-v4-pro (On (Max)))
     |}]
 ;;
@@ -1849,9 +1996,9 @@ let%expect_test "a session left to run a queued follow-up stays live" =
     go: running in list_sessions: true
     {"type":"response","id":"r1","ok":true,"result":{}}
     {"type":"response","id":"r1","ok":true,"result":{}}
-    {"type":"response","id":"r1","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"thinking_options":["off","default","low","high","max"],"thinking_default":"high","supports_images":false,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"default","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","active_host_name":"<host>","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"computer_control":null,"plan":null,"session_rules":[]}}}
+    {"type":"response","id":"r1","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"thinking_options":["off","default","low","high","max"],"thinking_default":"high","supports_images":false,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"default","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","active_host_name":"<host>","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"chat_mode":false,"no_host":null,"computer_control":null,"plan":null,"session_rules":[]}}}
     next: running in list_sessions: true
-    {"type":"response","id":"r1","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"thinking_options":["off","default","low","high","max"],"thinking_default":"high","supports_images":false,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"default","running":false,"message_count":4,"usage":{"input":20,"output":10,"cache_read":0},"cost_usd":1.8e-05,"context_tokens":10,"active_host":"backend","active_host_name":"<host>","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"computer_control":null,"plan":null,"session_rules":[]}}}
+    {"type":"response","id":"r1","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"thinking_options":["off","default","low","high","max"],"thinking_default":"high","supports_images":false,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"default","running":false,"message_count":4,"usage":{"input":20,"output":10,"cache_read":0},"cost_usd":1.8e-05,"context_tokens":10,"active_host":"backend","active_host_name":"<host>","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"chat_mode":false,"no_host":null,"computer_control":null,"plan":null,"session_rules":[]}}}
     ("reopened anew" true)
     ("another client joins the live agent" true)
     |}]

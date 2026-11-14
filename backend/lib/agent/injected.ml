@@ -22,6 +22,7 @@ module Note = struct
           ; after : string
           }
       | Plan_mode of { on : bool }
+      | Chat_mode of { on : bool }
       | Steer of
           { from_user : bool
           ; follow_up : bool
@@ -45,6 +46,7 @@ module Note = struct
       | Cwd _ -> "cwd"
       | Tools _ | Editor _ -> "tools"
       | Plan_mode _ -> "plan_mode"
+      | Chat_mode _ -> "chat_mode"
       | Steer _ -> "steer"
       | Client _ -> "client"
       | Ui_action _ -> "ui_action"
@@ -78,6 +80,10 @@ module Note = struct
       "Plan mode on: the model was told to plan, not change files"
     | Plan_mode { on = false } ->
       "Plan mode off: the model was told it can change files"
+    | Chat_mode { on = true } ->
+      "Chat mode on: the model was told it has no machine, only chat tools"
+    | Chat_mode { on = false } ->
+      "Chat mode off: the model was told it works on a tool host again"
     | Steer { from_user; follow_up } ->
       sprintf
         "%s (%s)"
@@ -139,6 +145,10 @@ module Note = struct
           Some (Plan_mode { on = true })
         | None when String.is_prefix line ~prefix:"[Plan mode is off: " ->
           Some (Plan_mode { on = false })
+        | None when String.is_prefix line ~prefix:"[Chat mode is on: " ->
+          Some (Chat_mode { on = true })
+        | None when String.is_prefix line ~prefix:"[Chat mode is off: " ->
+          Some (Chat_mode { on = false })
         | None ->
           (match
              between
@@ -190,6 +200,43 @@ module Attachment = struct
     ; length : int
     }
   [@@deriving sexp, jsonaf, equal]
+end
+
+module Pasted = struct
+  type t =
+    { name : string
+    ; lines : int
+    ; length : int
+    }
+  [@@deriving sexp, jsonaf, equal]
+
+  let max_bytes = 2 * 1024 * 1024
+
+  let count_lines text =
+    String.count text ~f:(Char.equal '\n')
+    +
+    if String.is_empty text || String.is_suffix text ~suffix:"\n" then 0 else 1
+  ;;
+
+  let header t =
+    sprintf "<pasted_text name=\"%s\" lines=\"%d\">\n" t.name t.lines
+  ;;
+
+  let footer = "\n</pasted_text>"
+
+  let block_length t =
+    String.length (header t) + t.length + String.length footer
+  ;;
+
+  let make ~n text =
+    let t =
+      { name = sprintf "Pasted text #%d" n
+      ; lines = count_lines text
+      ; length = String.length text
+      }
+    in
+    t, header t ^ text ^ footer
+  ;;
 end
 
 module Source = struct
@@ -362,12 +409,14 @@ end
 
 type t =
   { notes : Note.t list [@sexp.list] [@jsonaf.default []]
+  ; pasted : Pasted.t list
+        [@sexp.list] [@jsonaf.default []] [@jsonaf_drop_default.equal]
   ; attachments : Attachment.t list [@sexp.list] [@jsonaf.default []]
   ; source : Source.t option [@sexp.option] [@jsonaf.option]
   }
 [@@deriving sexp, jsonaf, equal]
 
-let empty = { notes = []; attachments = []; source = None }
+let empty = { notes = []; pasted = []; attachments = []; source = None }
 let is_empty = equal empty
 
 let notes_text (notes : Note.t list) =
@@ -380,6 +429,18 @@ let prefix_notes notes text =
   match notes with
   | [] -> text
   | notes -> notes_prefix notes ^ text
+;;
+
+(* Each block follows a blank line. *)
+let attachments_length t =
+  List.sum
+    (module Int)
+    t.attachments
+    ~f:(fun (a : Attachment.t) -> a.length + 2)
+;;
+
+let pasted_length t =
+  List.sum (module Int) t.pasted ~f:(fun p -> Pasted.block_length p + 2)
 ;;
 
 let body t text =
@@ -397,18 +458,10 @@ let body t text =
             (String.chop_prefix text ~prefix:(notes_prefix notes))
             ~default:text
     in
-    (match t.attachments with
-     | [] -> text
-     | attachments ->
-       let suffix =
-         List.sum
-           (module Int)
-           attachments
-           ~f:(fun (a : Attachment.t) -> a.length + 2)
-       in
-       if suffix <= String.length text
-       then String.drop_suffix text suffix
-       else text)
+    let suffix = attachments_length t + pasted_length t in
+    if suffix <= String.length text
+    then String.drop_suffix text suffix
+    else text
 ;;
 
 (* [<file path="P">\n...</file>] or [<file path="P" error="E"/>] blocks, each
@@ -488,6 +541,28 @@ let of_message ~origin text =
   | None -> infer text
 ;;
 
+(* Where each pasted text is in [text]: none when [text] is too short to
+   hold them (it was changed). *)
+let pasted_json t ~text : (string * Json.t) list =
+  let start = String.length text - attachments_length t - pasted_length t in
+  match t.pasted with
+  | [] -> []
+  | _ when start < 0 -> []
+  | pasted ->
+    let _, items =
+      List.fold_map pasted ~init:start ~f:(fun at (p : Pasted.t) ->
+        let content = at + 2 + String.length (Pasted.header p) in
+        ( at + 2 + Pasted.block_length p
+        , `Object
+            [ "name", `String p.name
+            ; "lines", `Number (Int.to_string p.lines)
+            ; "start", `Number (Int.to_string content)
+            ; "length", `Number (Int.to_string p.length)
+            ] ))
+    in
+    [ "pasted", `Array items ]
+;;
+
 let to_json t ~text : Json.t =
   let list name items ~f =
     match items with
@@ -511,6 +586,7 @@ let to_json t ~text : Json.t =
              ; "title", `String (Note.title n)
              ; "text", `String n.text
              ])
+       ; pasted_json t ~text
        ; list "attachments" t.attachments ~f:(fun (a : Attachment.t) ->
            `Object [ "path", `String a.path ])
        ])

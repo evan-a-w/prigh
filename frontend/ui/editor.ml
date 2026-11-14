@@ -60,6 +60,7 @@ type t =
   ; undo_coalesce : bool
   ; chips : Chip.t list
   ; last_yank : Yank.t option
+  ; pasted : Pasted_text.Token.t list (* most recent first *)
   }
 [@@deriving sexp_of]
 
@@ -78,6 +79,7 @@ let empty =
   ; undo_coalesce = false
   ; chips = []
   ; last_yank = None
+  ; pasted = []
   }
 ;;
 
@@ -86,6 +88,7 @@ let lines t = t.lines
 let position t = t.cursor
 let kill_ring t = t.kill_ring
 let chips t = t.chips
+let pasted t = t.pasted
 let is_empty t = String.is_empty (text t)
 
 (* Cursor columns count scalar values so that multi-byte input moves as one. *)
@@ -240,35 +243,54 @@ let join_with_previous t =
   { t with cursor = { line = i - 1; col = length prev } }
 ;;
 
+(* A paste's token goes as one, from either end. *)
+let token_ending s pasted =
+  List.find_map pasted ~f:(fun (p : Pasted_text.Token.t) ->
+    Option.some_if (String.is_suffix s ~suffix:p.token) p.token)
+;;
+
+let token_starting s pasted =
+  List.find_map pasted ~f:(fun (p : Pasted_text.Token.t) ->
+    Option.some_if (String.is_prefix s ~prefix:p.token) p.token)
+;;
+
 let backspace t =
   let t = dissolve_chip t t.cursor in
   let t = push_undo t ~coalesce:false in
-  if t.cursor.col > 0
-  then (
+  let before, after = split_at (current t) t.cursor.col in
+  match token_ending before t.pasted with
+  | Some token ->
+    let before = String.drop_suffix before (String.length token) in
+    let t = set_line t t.cursor.line (before ^ after) in
+    { t with cursor = { t.cursor with col = length before } }
+  | None when t.cursor.col > 0 ->
     let before, after = split_at (current t) t.cursor.col in
     let before = of_chars (List.drop_last_exn (chars before)) in
     let t = set_line t t.cursor.line (before ^ after) in
-    { t with cursor = { t.cursor with col = t.cursor.col - 1 } })
-  else if t.cursor.line > 0
-  then join_with_previous t
-  else t
+    { t with cursor = { t.cursor with col = t.cursor.col - 1 } }
+  | None -> if t.cursor.line > 0 then join_with_previous t else t
 ;;
 
 let delete t =
   let t = dissolve_chip t t.cursor in
   let t = push_undo t ~coalesce:false in
   let line = current t in
-  if t.cursor.col < length line
-  then (
+  let before, after = split_at line t.cursor.col in
+  match token_starting after t.pasted with
+  | Some token ->
+    set_line
+      t
+      t.cursor.line
+      (before ^ String.drop_prefix after (String.length token))
+  | None when t.cursor.col < length line ->
     let before, after = split_at line t.cursor.col in
     let after = of_chars (List.tl_exn (chars after)) in
-    set_line t t.cursor.line (before ^ after))
-  else if t.cursor.line < List.length t.lines - 1
-  then (
+    set_line t t.cursor.line (before ^ after)
+  | None when t.cursor.line < List.length t.lines - 1 ->
     let next = { t with cursor = { line = t.cursor.line + 1; col = 0 } } in
     let joined = join_with_previous next in
-    { joined with cursor = t.cursor })
-  else t
+    { joined with cursor = t.cursor }
+  | None -> t
 ;;
 
 let left t =
@@ -454,11 +476,24 @@ let yank_pop t =
   | _ -> t
 ;;
 
+let paste_token t text =
+  let token =
+    Pasted_text.token
+      ~n:(List.length t.pasted + 1)
+      ~lines:(Pasted_text.count_lines text)
+  in
+  { t with pasted = { token; text } :: t.pasted }, token
+;;
+
 let insert_paste t s =
   let s = String.substr_replace_all s ~pattern:"\r\n" ~with_:"\n" in
   let s = String.substr_replace_all s ~pattern:"\r" ~with_:"\n" in
   if String.is_empty s
   then t
+  else if Pasted_text.is_long s
+  then (
+    let t, token = paste_token t s in
+    insert t token)
   else (
     let start = t.cursor in
     let t = dissolve_chip t t.cursor in

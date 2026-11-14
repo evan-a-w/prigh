@@ -111,7 +111,7 @@ let%expect_test "search: names and what was said, the best first" =
   search t "PARSER";
   [%expect
     {|
-    <id>  2026-01-02  "Fix the parser"  /work/app  4 messages
+    <id>  2026-01-02  [Fix the parser](?session=<id>)  /work/app  4 messages
     (for message indices to read from: search with session, or outline)
     |}];
   (* Directories are not searched. *)
@@ -122,9 +122,9 @@ let%expect_test "search: names and what was said, the best first" =
   search t "lexer";
   [%expect
     {|
-    <id>  2026-01-03  "deploy the staging cluster"  /work/infra  2 messages
+    <id>  2026-01-03  [deploy the staging cluster](?session=<id>)  /work/infra  2 messages
       …strategy; the lexer is fine.
-    <id>  2026-01-02  "Fix the parser"  /work/app  4 messages
+    <id>  2026-01-02  [Fix the parser](?session=<id>)  /work/app  4 messages
       Looking at the Lexer module.
     (for message indices to read from: search with session, or outline)
     |}];
@@ -133,7 +133,7 @@ let%expect_test "search: names and what was said, the best first" =
   search t "release lexer";
   [%expect
     {|
-    <id>  2026-01-04  "Release notes"  /work/app  2 messages
+    <id>  2026-01-04  [Release notes](?session=<id>)  /work/app  2 messages
       write release notes
     (for message indices to read from: search with session, or outline)
     No session matches: every word must match what was said in a session or its name, so try fewer or other words.
@@ -145,7 +145,7 @@ let%expect_test "search: names and what was said, the best first" =
   search ~current:(Session.id parser) t "tokenizr";
   [%expect
     {|
-    <id>  2026-01-02  "Fix the parser"  /work/app  4 messages  (this session)
+    <id>  2026-01-02  [Fix the parser](?session=<id>)  /work/app  4 messages  (this session)
       the tokenizer drops the last token
     (for message indices to read from: search with session, or outline)
     |}];
@@ -163,7 +163,7 @@ let%expect_test "search: limit" =
   search t ~limit:1 "lexer";
   [%expect
     {|
-    <id>  2026-01-05  "say \"quoted\" things about the lexer"  /work/app  1 messages
+    <id>  2026-01-05  [say "quoted" things about the lexer](?session=<id>)  /work/app  1 messages
       …things about the lexer
     (more sessions match: add words or raise limit)
     (for message indices to read from: search with session, or outline)
@@ -171,9 +171,9 @@ let%expect_test "search: limit" =
   search t ~limit:2 "the";
   [%expect
     {|
-    <id>  2026-01-02  "Fix the parser"  /work/app  4 messages
+    <id>  2026-01-02  [Fix the parser](?session=<id>)  /work/app  4 messages
       the tokenizer drops the last token
-    <id>  2026-01-05  "say \"quoted\" things about the lexer"  /work/app  1 messages
+    <id>  2026-01-05  [say "quoted" things about the lexer](?session=<id>)  /work/app  1 messages
       …things about the lexer
     (more sessions match: add words or raise limit)
     (for message indices to read from: search with session, or outline)
@@ -184,7 +184,7 @@ let%expect_test "search: limit" =
   search t {|"quoted" things|};
   [%expect
     {|
-    <id>  2026-01-05  "say \"quoted\" things about the lexer"  /work/app  1 messages
+    <id>  2026-01-05  [say "quoted" things about the lexer](?session=<id>)  /work/app  1 messages
       say "quoted" things about the lexer
     (for message indices to read from: search with session, or outline)
     |}]
@@ -197,7 +197,7 @@ let%expect_test "search inside one session" =
   search t ~session:parser "lexer string";
   [%expect
     {|
-    <id>  2026-01-02  "Fix the parser"  /work/app  4 messages
+    <id>  2026-01-02  [Fix the parser](?session=<id>)  /work/app  4 messages
       [1] assistant: Looking at the Lexer module. bash {"command": "dune build @runtest"}
       [2] result bash: 1 test failed: unterminated string
       [3] assistant: Fixed: the lexer now flushes at end of input.
@@ -205,7 +205,7 @@ let%expect_test "search inside one session" =
   search t ~session:notes "lexer";
   [%expect
     {|
-    <id>  2026-01-04  "Release notes"  /work/app  2 messages
+    <id>  2026-01-04  [Release notes](?session=<id>)  /work/app  2 messages
     No message has any of these words.
     |}];
   let long =
@@ -223,7 +223,7 @@ let%expect_test "search inside one session" =
   search t ~session:long "needle";
   [%expect
     {|
-    <id>  2026-01-06  "yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy\226\128\166"  /work/app  14 messages
+    <id>  2026-01-06  [yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy…](?session=<id>)  /work/app  14 messages
       [0] user: …yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy needle 0 zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz…
       [1] user: …yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy needle 1 zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz…
       [2] user: …yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy needle 2 zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz…
@@ -252,7 +252,7 @@ let%expect_test "sessions are named by id or unique prefix, never by path" =
   outline (String.prefix id 12);
   [%expect
     {|
-    <id>  2026-01-02  "Fix the parser"  /work/app  4 messages
+    <id>  2026-01-02  [Fix the parser](?session=<id>)  /work/app  4 messages
     [0] user 2026-01-02 00:00: the tokenizer drops the last token
     |}];
   outline "zz";
@@ -318,7 +318,7 @@ let%expect_test "outline: the prompts, the last ones first" =
   outline parser;
   [%expect
     {|
-    <id>  2026-01-02  "Fix the parser"  /work/app  4 messages
+    <id>  2026-01-02  [Fix the parser](?session=<id>)  /work/app  4 messages
     [0] user 2026-01-02 00:00: the tokenizer drops the last token
     |}];
   let long =
@@ -335,7 +335,7 @@ let%expect_test "outline: the prompts, the last ones first" =
   outline long;
   [%expect
     {|
-    <id>  2026-01-06  "Long"  /work/app  90 messages
+    <id>  2026-01-06  [Long](?session=<id>)  /work/app  90 messages
     (5 earlier prompts: outline with before=10)
     [10] user 2026-01-06 00:10: prompt 5 with a second line
     [12] user 2026-01-06 00:12: prompt 6 with a second line
@@ -381,7 +381,7 @@ let%expect_test "outline: the prompts, the last ones first" =
   outline ~before:10 long;
   [%expect
     {|
-    <id>  2026-01-06  "Long"  /work/app  90 messages
+    <id>  2026-01-06  [Long](?session=<id>)  /work/app  90 messages
     [0] user 2026-01-06 00:00: prompt 0 with a second line
     [2] user 2026-01-06 00:02: prompt 1 with a second line
     [4] user 2026-01-06 00:04: prompt 2 with a second line
@@ -408,7 +408,7 @@ let%expect_test "read: a few messages, cut, with the outline's indices" =
   read parser;
   [%expect
     {|
-    <id>  2026-01-02  "Fix the parser"  /work/app  4 messages
+    <id>  2026-01-02  [Fix the parser](?session=<id>)  /work/app  4 messages
     messages 0 to 3 of 4
     [0] user (2026-01-02 00:00): the tokenizer drops the last token
     [1] assistant:
@@ -420,7 +420,7 @@ let%expect_test "read: a few messages, cut, with the outline's indices" =
   read ~from:1 ~limit:2 parser;
   [%expect
     {|
-    <id>  2026-01-02  "Fix the parser"  /work/app  4 messages
+    <id>  2026-01-02  [Fix the parser](?session=<id>)  /work/app  4 messages
     messages 1 to 2 of 4
     [1] assistant:
     Looking at the Lexer module.
@@ -456,7 +456,7 @@ let%expect_test "read: a few messages, cut, with the outline's indices" =
   lines ();
   [%expect
     {|
-    <id>  2026-01-06  "Big"  /work/app  23 messages
+    <id>  2026-01-06  [Big](?session=<id>)  … (62 bytes)
     messages 0 to 2 of 23
     [0] user (2026-01-06 00:00): start uuuuu… (1545 bytes)
     [1] assistant:
@@ -469,7 +469,7 @@ let%expect_test "read: a few messages, cut, with the outline's indices" =
   lines ();
   [%expect
     {|
-    <id>  2026-01-06  "Big"  /work/app  23 messages
+    <id>  2026-01-06  [Big](?session=<id>)  … (62 bytes)
     messages 3 to 10 of 23
     [3] assistant: reply 0 zzzzzzzzzzzzzzzzz… (1423 bytes)
     [4] assistant: reply 1 zzzzzzzzzzzzzzzzz… (1423 bytes)
@@ -485,7 +485,7 @@ let%expect_test "read: a few messages, cut, with the outline's indices" =
   lines ();
   [%expect
     {|
-    <id>  2026-01-06  "Big"  /work/app  23 messages
+    <id>  2026-01-06  [Big](?session=<id>)  … (62 bytes)
     messages 11 to 18 of 23
     [11] assistant: reply 8 zzzzzzzzzzzzzzzz… (1424 bytes)
     [12] assistant: reply 9 zzzzzzzzzzzzzzzz… (1424 bytes)
@@ -501,7 +501,7 @@ let%expect_test "read: a few messages, cut, with the outline's indices" =
   read empty;
   [%expect
     {|
-    <id>  2026-01-07  "Empty"  /work/app  0 messages
+    <id>  2026-01-07  [Empty](?session=<id>)  /work/app  0 messages
     It has no messages.
     |}]
 ;;

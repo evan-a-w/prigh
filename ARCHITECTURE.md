@@ -332,7 +332,9 @@ the turn that launched them), `Background_tasks` (`job`, on track
   plan mode note
   sent between turns is a message of notes only, with an empty body), `@`
   files behind
-  (`Attachment`: path and length), or a whole message written in the
+  (`Attachment`: path and length), long pastes between the user's text and
+  the files (`Pasted`: name, lines and length; each a `<pasted_text
+  name="Pasted text #N" lines="L">` block), or a whole message written in the
   user's place (`Source`: delivery, hand-over, goal start/continuation,
   reminder, resume, `!cmd` output, compaction summary, `/review`, `/init`; a goal's
   or a reminder's message may carry a plan mode note too). The
@@ -341,7 +343,10 @@ the turn that launched them), `Background_tasks` (`job`, on track
   `Injected.infer` recognises the same things by their wording in sessions
   written before `origin` existed, and `Rpc_json`
   sends `origin` (recorded, else inferred) as `{body, notes: [{kind,
-  title, text}], attachments: [{path}]}` or `{source: {kind, title}}`.
+  title, text}], pasted: [{name, lines, start, length}], attachments:
+  [{path}]}` or `{source: {kind, title}}`; a pasted text's `start` and
+  `length` are its contents' byte range in the message's text, so it is
+  not sent twice.
 - `Image` — what models accept: PNG/JPEG/GIF/WebP sniffed from the bytes,
   dimensions from the header, and `load`, which downscales anything over
   2000 px or 4.5 MB of base64 by running ImageMagick or `sips` (PNG, then
@@ -785,7 +790,17 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
 - MCP — `Mcp_config` reads `mcpServers` from the host's `~/.prigh/mcp.json`
   and `.mcp.json` in the cwd and its ancestors (closest wins; `${VAR}` and
   `${VAR:-default}`), and keeps approvals of project servers (by a digest of
-  the definition as written) in `~/.prigh/mcp-approvals.json`. `Mcp_client`
+  the definition as written) in `~/.prigh/mcp-approvals.json`.
+  `Mcp_settings` is the user's own servers, kept by the backend in
+  `~/.prigh/mcp-servers.json` under the world's home (mode 600, written
+  atomically under a mutex; `mcpServers` plus the names of the disabled
+  ones). The agent sends the enabled ones as `settings` with every `$mcp_*`
+  op, so they reach only that user's hosts; `Mcp_hub` merges them under the
+  host's files (source `"settings"`, no approval; a file's server of the
+  same name wins), expands `${VAR}` on the host, and on a change stops only
+  the servers whose definition changed or went (a request without
+  `settings`, from an older backend, stops only the settings' ones). Their
+  `Transport` sexps hide `env` and `header` values. `Mcp_client`
   is one connection (stdio child in its own process group, or streamable
   HTTP; `initialize`, `tools/list`, `tools/call`, cancellation, ping).
   `Mcp_hub` holds a host's running servers, shared by all its sessions: one
@@ -839,7 +854,9 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   names another machine.
 - `Tool_web_fetch` / `Html_text` — `web_fetch` runs on the active host
   (`on_host`, so `localhost` is the host's; a host predating it answers
-  `unknown host tool`), through `Http_client.get_stream`: up to 10
+  `unknown host tool`), or in the backend in chat mode (`in_backend`: no
+  saved full text, and without the backend host it refuses loopback,
+  private and link-local addresses, also after a redirect), through `Http_client.get_stream`: up to 10
   redirects, a 5 MB body limit, a 30 s default timeout (at most 120). HTML
   goes through `Html_text` (a hand-written tokenizer and renderer: headings,
   lists, links resolved against the final URL, `pre` fences, tables,
@@ -1041,7 +1058,8 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   `Pr_actions`; only list, view, checks, diff and comments are not
   `destructive`.
 - `Tool_sessions` — the model's `sessions` tool (`action` search, outline
-  or read; `query`, `session`, `from`, `before`, `limit`), made in
+  or read; `query`, `session`, `from`, `before`, `limit`), whose lines
+  are `ID DATE [title](?session=ID) cwd N messages` (`Session_link`), made in
   `bin/main.ml` with the world's `sessions_dir` (so within the namespace)
   and the agent's session id. It reads session files in the backend and
   changes nothing. A session is named by id or unique prefix (`find`), never
@@ -1282,8 +1300,8 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   changed and leave re-reading the instructions to the model's discretion,
   since they are often unchanged.
 - `Told_environment` — what the model was last told about its environment
-  (host id, cwd, the tool names `Tools.for_model` gives it, plan mode, the
-  kind of client, once one prompted):
+  (host id, cwd, the tool names `Tools.for_model` gives it, plan mode, chat
+  mode, the kind of client, once one prompted):
   set from the current environment when the system prompt is built (plan
   mode excepted: the prompt does not describe it) and whenever notes are
   delivered, and recorded as a `Told_environment` session entry on the
@@ -1417,8 +1435,14 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   forget the finished tasks (`list_jobs` starts empty).
   `prompt`/`steer`/`follow_up` accept optional `attachments`
   (paths whose contents are appended to the user message as `<file>` blocks;
-  image files are read like `read` does and attached as images) and
-  `images`; `prompt`/`follow_up` accept `ui_action` (`{call_id, component,
+  image files are read like `read` does and attached as images),
+  `pasted` (texts appended whole as `<pasted_text>` blocks, before the
+  files and needing no host; over 2 MiB is refused, saying to attach it as
+  a file; `abort`'s and `dequeue`'s restored messages give them back as
+  `pasted`) and `images`. `hello`'s reply lists what the backend takes
+  beyond the basics in `features` (`pasted_text`): the frontends
+  (`Pasted_text.params`) send `pasted` only to a backend that says so, and
+  to an older one the blocks inline in the text; `prompt`/`follow_up` accept `ui_action` (`{call_id, component,
   title, values}`, with `text: ""`): the user's answer through a
   `render_ui` component, whose text for the model is `The user responded
   through "<title>" (render_ui call <call_id>, component <component>):`
@@ -1456,7 +1480,24 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   model is told about plan mode by `System_prompt.plan_mode_note`, on the
   next user message (or goal message) or, while a loop runs, as a message
   of its own at the next turn boundary, recorded as an `Injected` note of
-  kind `Plan_mode`. `ask_user` emits `Ask_user` and waits for
+  kind `Plan_mode`. Chat mode (`Chat_mode`; `set_mode`'s `chat_mode`, kept in
+  the session's `approval` entry with `chat`) overrides both, keeping them
+  to return to: `own_tools` offers only `Chat_mode.allowed` (no MCP or
+  review tools), with `web_fetch` swapped for `Tool_web_fetch.in_backend`;
+  `approve` refuses anything else (a cached tool list, an `ls` from before
+  the switch) and the executor refuses `on_host` tools other than
+  `web_fetch`, which it runs in the backend; `System_prompt.build ~chat`
+  drops the environment, project instructions, skills, Nix and the
+  orchestration guidance; `Tool.Context.chat` makes a subagent a chat too
+  (its prompt and tools); `refresh_location`, MCP and `await_host` do not
+  touch the host. `Told_environment` records `chat_mode` with an empty host
+  and cwd, and its chat note (`System_prompt.chat_mode_note`, kind
+  `Chat_mode`) stands for the host, cwd and tool changes; `mode_notes`
+  delivers it between turns like plan mode's. `State.no_host` says why a
+  message outside chat mode cannot run (no host connected, or the
+  session's gone for good) and `prompt` and the queue refuse with it;
+  `Agent.chat_without_host`, called when a non-host client attaches,
+  puts a brand-new session with no host in reach in chat mode. `ask_user` emits `Ask_user` and waits for
   `answer_question` (the first answer wins; abort withdraws it;
   `Ask_user_done` follows). Its timeout (`User_question.timeout`: the
   config's `ask_user_timeout_seconds`, or the call's `timeout_seconds`,
@@ -1611,6 +1652,12 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   `/change_default`) rereads the file and records the agent's current model
   and thinking level there; agents created without an explicit `-model`/
   `-thinking` start from them (a loaded session's own settings still win).
+- `Session_link` — a session's link, `?session=ID` (relative, so it works
+  at any address prigh-web is reached at), and `[title](?session=ID)`. The
+  `sessions` tool, `ask_session`'s answers and the system prompt's
+  Environment block (the session's own link, not for temporary sessions; a
+  fork's is the fork's) write them; the frontends follow them
+  (`Prigh_ui.Session_link` parses and resolves them).
 - `Session` — an append-only JSONL log forming a tree: every entry has a
   `parent` and `at`, when it was appended (seconds; optional, so files
   written before it load, without times; a fork keeps the copied entries'
@@ -2033,7 +2080,8 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   provider's `logout` is a flow owned by its caller like a login;
   `list_models` rereads the registry; `auth_status` entries of custom
   providers carry `custom: {base_url, api, api_label}`. The session methods
-  (`new_session`, `switch_session` by id or path, `fork`, `clone`, `import`)
+  (`new_session`, `switch_session` by id, a unique prefix of one, or path,
+  `fork`, `clone`, `import`)
   create or load an agent and move only the calling client (`new_session`,
   `switch_session`, `fork` and `clone` answer `{state}`, the new session's
   state, so a frontend needs no `get_state` round trip); `list_sessions`
@@ -2121,7 +2169,13 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   `list_mcp {reconnect?}` and `mcp_approve {source, server}` (both
   `{servers: [{name, source, project, status: ready|failed|needs_approval,
   error?, tools: [{name, description}]}], problems}`, tools under their
-  prigh names),
+  prigh names), `get_mcp_settings`, `add_mcp_servers {servers | text}`
+  (an `mcpServers` object, or pasted text; all or none),
+  `update_mcp_server {name, rename?, config}`, `remove_mcp_server {name}`
+  and `set_mcp_server_enabled {name, enabled}` (all `{servers: [{name,
+  enabled, config}]}`, the user's servers with their secrets: only that
+  user's clients see them; every one of them also gets the
+  `mcp_settings_changed` event with the list, and running agents re-list),
   `tool_exec_result`, `auth_status`, `login`, `auth_respond`, `auth_cancel`,
   `logout`, `forge_status`, `forge_login {host?, kind?, method?}`,
   `forge_logout {host}`, `pr_list {state?}`, `pr_view {number}`,
@@ -2691,7 +2745,15 @@ terminal frontend and `web/` prigh-web, the browser one.
     shown queue and puts the text back, and `App.shown_queue` lists the
     focused agent's queue; `Agents_command` parses and completes `/agents
     steer|follow-up|cancel N`), `Commands` (slash table, parse, complete,
-    closest), `Model_match` (display-name/prefix/did-you-mean), `Markdown`,
+    closest), `Model_match` (display-name/prefix/did-you-mean), `Markdown`
+    (a session link is its title underlined in magenta and its short id,
+    dim, without OSC 8, which a relative link means nothing to; the ids of
+    `known_sessions`, the session list fetched at startup and on
+    `sessions_changed`, are underlined too), `Session_link` (shared with
+    prigh-web: parses `?session=`, `/?session=` and `prigh://session/ID`,
+    resolves an id or prefix against the session list to found, ambiguous
+    or missing with the closest, and finds the bare ids of known sessions
+    in text),
     `Btw_box` (the `/btw` panel above the composer: a newer question cancels
     and replaces it; Esc dismisses it before Esc's other meanings, so it
     never aborts the run), `Boxed` (the framed dialogs, with an optional
@@ -2703,7 +2765,11 @@ terminal frontend and `web/` prigh-web, the browser one.
     transcript).
   - Skills and MCP: `/skills` and `/mcp` are pickers over `list_skills` and
     `list_mcp` (Enter on a server needing approval sends `mcp_approve`,
-    whose reply is the new list). `/skill:NAME ARGS` is sent as a prompt
+    whose reply is the new list); `/mcp` asks `get_mcp_settings` first, so
+    a disabled or overridden server of the user's shows too (an older
+    backend's error falls back to the host's list). `Prigh_ui.Mcp_command`
+    parses `/mcp add|remove|enable|disable` for both frontends; a refusal
+    puts the command back in the editor. `/skill:NAME ARGS` is sent as a prompt
     tagged `Skill_prompt`, so a failure (an unknown name) puts the text back
     in the editor and takes it off the queue. `Autocomplete`'s `Skill`
     source completes names from `Location_cache` (shared with the
@@ -3362,11 +3428,18 @@ terminal frontend and `web/` prigh-web, the browser one.
       (`Repo_worktrees`) and again once stale: a turn's end, a session's
       worktrees changing, a worktree made or removed);
       `Model.worktree_folds` (`Worktree_folds`) decides whether a
-      session's worktrees show: an explicit fold or unfold (session ids in
-      the `web.sidebar-folded` and `web.sidebar-unfolded` preferences)
-      wins, else they show when the session's `updated_at` is within the
-      window (`web.sidebar-worktree-hours`, default 12, 0 = never) of
-      `Model.now`. A per-user preference rather than config.json: it is
+      session's worktrees show (`Model.worktrees_shown`): a fold or
+      unfold by hand (session id → when, in the `web.sidebar-folded` and
+      `web.sidebar-unfolded` preferences) made since the session was last
+      opened wins; else pinned sessions show, and the rest when last used
+      within the window (`web.sidebar-worktree-hours`, default 12, 0 =
+      fold all) of `Model.now`. Used is the latest of `updated_at`, the
+      last time the user went into it (`web.sidebar-opened`, written by
+      `note_opened` on a session change and the first `Tick`, merged
+      across browsers by the later time, and uploaded when this browser's
+      cache is ahead once the preferences load), and now while it runs or
+      is open; a session whose cwd is inside another's worktree lends that
+      one its use and openings. A per-user preference rather than config.json: it is
       a display choice of the person, not of the backend's namespace. Context menus (`Context_menu`, also messages', drawn by
       `Context_menu_view` as a `Dialog.Picker` of kind `Menu`, so it owns
       the keyboard like any picker; `Command.Place_menu` has
@@ -3518,7 +3591,15 @@ terminal frontend and `web/` prigh-web, the browser one.
       `list_mcp`/`mcp_approve` replies (`Mcp_list`) into `/mcp`'s picker
       (servers to act on first; the problems under it, in `Dialog_view`),
       `/mcp reconnect`'s report and what became of an approved or restarted
-      server; a ready one's tools are the `Mcp_tools` dialog.
+      server; a ready one's tools are the `Mcp_tools` dialog. Settings →
+      MCP servers is `Mcp_page` (its state: the user's servers from
+      `get_mcp_settings` and `mcp_settings_changed`, the session's host's
+      list, the form's draft with masked `env`/header pairs, the pasted
+      JSON, the one being removed, each server's health on that host) and
+      `Mcp_settings_view`; opening it fetches both lists, a change keeps
+      what is shown until the new lists come, and the event re-asks the
+      host. `/mcp add|remove|enable|disable` go through
+      `Prigh_ui.Mcp_command`, as in the TUI.
     - Snippets: `/snippet` runs `Prigh_ui.Snippet_command`; the picker
       (Alt+N, which passes the editor's caret) inserts at the caret, as do
       `/snippet NAME` and `#name` completion (`Completion.insert_snippet`).
@@ -3753,6 +3834,18 @@ terminal frontend and `web/` prigh-web, the browser one.
       as Android and iOS require), `visibilitychange` and the favicon with
       a sodium dot while something is unseen; whether they are on is a
       preference (`web.notify`).
+    - Session links: `Session_link_view` draws links to `?session=` (and
+      the bare ids of the session list's sessions in text, inline code
+      that is all an id, and tool output; not code blocks or other links)
+      as `a.session-link` with `data-session-link`; the session list is in
+      the transcript's cache keys (`Known.stamp`). `app/`'s
+      `Session_link_listeners` (a capturing click and auxclick listener,
+      before the desktop app's external-link handler) asks
+      `Session_link_click.decide` which clicks are ours and sends
+      `Follow_session_link`: in place as a sidebar click
+      (`switch_session`), with Ctrl/⌘/Shift or the middle button
+      `Open_window`; an unknown id or an ambiguous prefix is a toast naming
+      the closest or the candidates.
     - Open in new window: `Command.Open_window` (the session menu's item,
       `Action.Open_session_window` from a Ctrl/⌘- or middle click in the
       sidebar) opens the page on `?session=ID` in another window
@@ -4168,6 +4261,8 @@ for Linux, macOS and Windows.
 - `~/.prigh/memory.json` — the `memory` tool's notes (`Memory`).
 - `~/.prigh/custom_instructions.json` — the user's standing instructions,
   in every session's context (`Custom_instructions`).
+- `~/.prigh/mcp-servers.json` — the MCP servers in the user's settings,
+  sent to their tool hosts (`Mcp_settings`; mode 600).
 - `~/.prigh/about_you.json` — what the user set about themselves, in every
   session's context (`User_info`; `user_info.md.migrated` is an earlier
   version's text, moved into it).

@@ -58,7 +58,8 @@ let%expect_test "the mode chip, Alt+M, and set_mode's reply or failure" =
   [%expect
     {|
     Cycle_mode
-    (Rpc (method_ set_mode) (params ((approval_mode auto) (plan_mode true)))
+    (Rpc (method_ set_mode)
+     (params ((approval_mode auto) (plan_mode true) (chat_mode false)))
      (tag
       (Mode_set
        "Mode: plan (read-only planning, until you leave it (/plan off or Alt+M): no file edits; bash, job_input and MCP tools ask first)")))
@@ -97,10 +98,12 @@ let%expect_test "the mode chip, Alt+M, and set_mode's reply or failure" =
   [%expect
     {|
     Cycle_mode
-    (Rpc (method_ set_mode) (params ((approval_mode ask) (plan_mode false)))
+    (Rpc (method_ set_mode)
+     (params ((approval_mode auto) (plan_mode true) (chat_mode true)))
      (tag
-      (Mode_set "Mode: ask (bash, job_input, edits and MCP tools ask first)")))
-    (ask)
+      (Mode_set
+       "Mode: chat (a chat without the tool host: no files, commands or project, only the web and other host-free tools, until you leave it (/chat off or Alt+M))")))
+    (chat)
     Mode: plan (read-only planning, until you leave it (/plan off or Alt+M): no file edits; bash, job_input and MCP tools ask first)
     |}];
   (* Not taken: said, and the backend's state shown again. *)
@@ -129,6 +132,7 @@ let%expect_test "the mode chip, Alt+M, and set_mode's reply or failure" =
     Smart: a model decides edits in the project run; the approval model lets other calls run or asks you, saying why (/approval-model)
     Auto: never asks tools run without asking
     ✓ Plan mode read-only planning, until you leave it (/plan off or Alt+M): no file edits; bash, job_input and MCP tools ask first
+    Chat: no tool host a chat without the tool host: no files, commands or project, only the web and other host-free tools, until you leave it (/chat off or Alt+M)
     Enter chooses, ← → the next setting, Esc closes
     |}];
   (* The filter knows the short names too. *)
@@ -143,7 +147,7 @@ let%expect_test "the mode chip, Alt+M, and set_mode's reply or failure" =
     Dialog_accept
     (Focus editor)
     (Rpc (method_ set_mode)
-     (params ((approval_mode auto-edit) (plan_mode false)))
+     (params ((approval_mode auto-edit) (plan_mode false) (chat_mode false)))
      (tag
       (Mode_set
        "Mode: auto-edit (file edits run; bash, job_input and MCP tools ask first)")))
@@ -177,7 +181,7 @@ let%expect_test "/mode NAME, /plan, /confirm" =
     {|
     (Rpc (method_ push_pref)
      (params ((key history) (value "/mode bogus") (max 500))) (tag Ignore))
-    Unknown mode “bogus”: use ask, auto-edit, smart, auto, plan (/mode picks one). (Dismiss)
+    Unknown mode “bogus”: use ask, auto-edit, smart, auto, plan, chat (/mode picks one). (Dismiss)
     "/mode bogus"
     |}];
   run h "/mode auto";
@@ -186,7 +190,8 @@ let%expect_test "/mode NAME, /plan, /confirm" =
     {|
     (Rpc (method_ push_pref)
      (params ((key history) (value "/mode auto") (max 500))) (tag Ignore))
-    (Rpc (method_ set_mode) (params ((approval_mode auto) (plan_mode false)))
+    (Rpc (method_ set_mode)
+     (params ((approval_mode auto) (plan_mode false) (chat_mode false)))
      (tag (Mode_set "Mode: auto (tools run without asking)")))
     (auto)
     |}];
@@ -203,25 +208,29 @@ let%expect_test "/mode NAME, /plan, /confirm" =
     {|
     (Rpc (method_ push_pref) (params ((key history) (value /plan) (max 500)))
      (tag Ignore))
-    (Rpc (method_ set_mode) (params ((approval_mode auto) (plan_mode true)))
+    (Rpc (method_ set_mode)
+     (params ((approval_mode auto) (plan_mode true) (chat_mode false)))
      (tag
       (Mode_set
        "Mode: plan (read-only planning, until you leave it (/plan off or Alt+M): no file edits; bash, job_input and MCP tools ask first)")))
     (plan)
     (Rpc (method_ push_pref) (params ((key history) (value /plan) (max 500)))
      (tag Ignore))
-    (Rpc (method_ set_mode) (params ((approval_mode auto) (plan_mode false)))
+    (Rpc (method_ set_mode)
+     (params ((approval_mode auto) (plan_mode false) (chat_mode false)))
      (tag (Mode_set "Mode: auto (tools run without asking)")))
     (auto)
     (Rpc (method_ push_pref)
      (params ((key history) (value "/plan on") (max 500))) (tag Ignore))
-    (Rpc (method_ set_mode) (params ((approval_mode auto) (plan_mode true)))
+    (Rpc (method_ set_mode)
+     (params ((approval_mode auto) (plan_mode true) (chat_mode false)))
      (tag
       (Mode_set
        "Mode: plan (read-only planning, until you leave it (/plan off or Alt+M): no file edits; bash, job_input and MCP tools ask first)")))
     (Rpc (method_ push_pref)
      (params ((key history) (value "/plan off") (max 500))) (tag Ignore))
-    (Rpc (method_ set_mode) (params ((approval_mode auto) (plan_mode false)))
+    (Rpc (method_ set_mode)
+     (params ((approval_mode auto) (plan_mode false) (chat_mode false)))
      (tag (Mode_set "Mode: auto (tools run without asking)")))
     (Rpc (method_ push_pref)
      (params ((key history) (value "/plan maybe") (max 500))) (tag Ignore))
@@ -253,6 +262,7 @@ let%expect_test "/mode NAME, /plan, /confirm" =
     smart edits in the project run; the approval model lets other calls run or asks you, saying why (/approval-model)
     auto tools run without asking
     plan read-only planning, until you leave it (/plan off or Alt+M): no file edits; bash, job_input and MCP tools ask first
+    chat a chat without the tool host: no files, commands or project, only the web and other host-free tools, until you leave it (/chat off or Alt+M)
     Plan mode ↑↓ Tab Enter Esc   Ctrl+Enter as typed
     on read-only planning until you turn it off
     off leave plan mode
@@ -1038,10 +1048,11 @@ let%expect_test
      (params
       ((keys
         (web.theme web.accent web.notify web.verbosity web.terminal-open
-         web.sidebar-folded web.sidebar-unfolded web.sidebar-worktree-hours
-         web.review history web.migrated web.sidebar-width web.files-width
-         web.files-preview-width web.agents-width web.terminal-height
-         web.review-chat-width web.review-files-width web.review-margin-width))))
+         web.sidebar-folded web.sidebar-unfolded web.sidebar-opened
+         web.sidebar-worktree-hours web.review history web.migrated
+         web.sidebar-width web.files-width web.files-preview-width
+         web.agents-width web.terminal-height web.review-chat-width
+         web.review-files-width web.review-margin-width))))
      (tag Prefs))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s1.jsonl) (limit 1000000)))
@@ -1130,6 +1141,15 @@ let%expect_test "switching session drops what the old one waited for" =
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
+    (Cache_prefs
+     (((key web.sidebar-opened)
+       (value (((s1 "2026-10-05 10:00:00Z") (s2 "2026-10-05 10:00:00Z")))))))
+    (Rpc (method_ set_prefs)
+     (params
+      ((prefs
+        ((web.sidebar-opened
+          ((s1 "2026-10-05 10:00:00Z") (s2 "2026-10-05 10:00:00Z")))))))
+     (tag Show_error))
     (Rpc (method_ get_review) (params ()) (tag (Review Review)))
     (Rpc (method_ list_worktrees) (params ())
      (tag (Worktrees (place  "s2\

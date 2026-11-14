@@ -280,6 +280,7 @@ let transcript (m : Model.t) ~inject =
 ;;
 
 let view (m : Model.t) ~inject ~terminal =
+  Session_link_view.set m.sessions;
   (* Each layer over a part makes it inert once: the attribute twice would
      not combine. *)
   let inert_if covered = if covered then inert else Fn.id in

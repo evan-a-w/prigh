@@ -12,7 +12,13 @@ let connected ?(superuser = true) () =
   H.step
     ~quiet:true
     h
-    (Hello { client_id = "c1"; namespace = None; user = None; superuser });
+    (Hello
+       { client_id = "c1"
+       ; namespace = None
+       ; user = None
+       ; superuser
+       ; features = []
+       });
   H.event h (State (state ()));
   h
 ;;
@@ -294,6 +300,7 @@ let%expect_test "a superuser acting as another user keeps /nix-gc" =
        ; namespace = Some "bob"
        ; user = Some "alice"
        ; superuser = true
+       ; features = []
        });
   run h "/nix-gc";
   [%expect

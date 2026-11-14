@@ -252,7 +252,7 @@ let%expect_test "the note a session is told with is a chip in the transcript" =
       (Or_error.bind
          (P.Json.parse
             {|{"body":"hello","notes":[{"kind":"user_info","title":"About you: the model was given your details","text":"[User info: ...]"}]}|})
-         ~f:P.Origin.of_json)
+         ~f:(P.Origin.of_json ~text:""))
   in
   print_s [%sexp (origin : P.Origin.t)];
   List.iter origin.notes ~f:(fun n ->

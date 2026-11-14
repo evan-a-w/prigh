@@ -400,6 +400,7 @@ let tools_part (m : App.Model.t) (s : P.State.t) =
     Option.value_map m.client_id ~default:false ~f:(String.equal id)
   in
   match Active_host.of_state s with
+  | _ when s.chat_mode -> []
   | Unset when List.is_empty s.hosts -> []
   | Unset -> [ 2, [ span ~style:(Style.fg Red) "tools:none" ] ]
   | Disconnected { name; _ } ->
@@ -408,18 +409,22 @@ let tools_part (m : App.Model.t) (s : P.State.t) =
   | Connected h -> [ 4, [ span ~style:attention ("tools:" ^ h.name) ] ]
 ;;
 
-(* Always shown, like the thinking level; plan mode in yellow, then how to
-   leave it while there is room. A mode that asks first or refuses outlasts
-   [auto] at narrow widths. *)
+(* Always shown, like the thinking level; plan and chat mode in yellow, then
+   how to leave them while there is room. A mode that asks first or refuses
+   outlasts [auto] at narrow widths. *)
 let mode_part (s : P.State.t) =
   let mode = Session_mode.of_state s in
-  let style = if mode.plan then attention else gray in
+  let special = mode.plan || mode.chat in
+  let style = if special then attention else gray in
   let priority =
-    if (not mode.plan) && P.Approval_mode.equal mode.approval Auto then 4 else 3
+    if (not special) && P.Approval_mode.equal mode.approval Auto then 4 else 3
   in
   [ priority, [ span ~style ("mode:" ^ Session_mode.label mode) ] ]
   @
-  if mode.plan
+  if mode.chat
+  then
+    [ 5, [ span ~style:gray (sprintf "(%s leaves)" Session_mode.leave_chat) ] ]
+  else if mode.plan
   then [ 5, [ span ~style:gray (sprintf "(%s leaves)" Session_mode.leave) ] ]
   else []
 ;;
@@ -974,7 +979,10 @@ let status (m : App.Model.t) : Content.Line.t =
     (* Each part after the model carries a priority: at narrow widths the mode
        hint and context survive before think, the mode and the cost, those
        before view. Display order is fixed. *)
-    let cwd = [ span ~style:base (format_cwd m s) ] in
+    (* A chat has no working directory. *)
+    let cwd =
+      if s.chat_mode then [] else [ span ~style:base (format_cwd m s) ]
+    in
     let model = [ span ~style:base s.model.id ] in
     let after_model =
       [ ( 4
@@ -1113,7 +1121,7 @@ let status (m : App.Model.t) : Content.Line.t =
       | None -> fst (fill model_width), false
     in
     let line =
-      (if cwd_fits then cwd @ [ span "  " ] else [])
+      (if cwd_fits && not (List.is_empty cwd) then cwd @ [ span "  " ] else [])
       @ model
       @ List.concat_map right ~f:(fun part -> span "  " :: part)
     in
@@ -1817,6 +1825,7 @@ let frame (m : App.Model.t) =
     | Viewport.Follow ->
       Transcript.render_tail
         source
+        ~sessions:m.known_sessions
         ~width:area
         ~rows:body_rows
         ~skip:0
@@ -1824,6 +1833,7 @@ let frame (m : App.Model.t) =
     | Viewport.Anchored { top; _ } ->
       Transcript.render_window
         source
+        ~sessions:m.known_sessions
         ~width:area
         ~rows:body_rows
         ~top
