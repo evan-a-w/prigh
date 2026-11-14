@@ -220,7 +220,13 @@ let update_tail previous chunk =
 let add_tool t (call : P.Tool_call.t) =
   add
     (flush t)
-    (Tool { call; result = None; live_tail = None; subagent = None; allowed = None })
+    (Tool
+       { call
+       ; result = None
+       ; live_tail = None
+       ; subagent = None
+       ; allowed = None
+       })
 ;;
 
 let append_tool_output t ~call_id chunk =
@@ -260,7 +266,13 @@ let end_tool t ~(call : P.Tool_call.t) ~(result : P.Message.Tool_result.t) =
   else
     add
       t
-      (Tool { call; result = Some result; live_tail = None; subagent = None; allowed = None })
+      (Tool
+         { call
+         ; result = Some result
+         ; live_tail = None
+         ; subagent = None
+         ; allowed = None
+         })
 ;;
 
 let pair_result t (r : P.Message.Tool_result.t) =
@@ -293,7 +305,13 @@ let add_message t (m : P.Message.t) =
         | Tool_call call ->
           add
             t
-            (Tool { call; result = None; live_tail = None; subagent = None; allowed = None })
+            (Tool
+               { call
+               ; result = None
+               ; live_tail = None
+               ; subagent = None
+               ; allowed = None
+               })
         | Server_tool tool -> add t (Server_tool { tool; ended = true }))
     in
     (match a.stop_reason with
@@ -856,7 +874,7 @@ let rows (item : Item.t) ~(verbosity : Verbosity.t) ~width : Log_line.t list =
     in
     (match allowed, verbosity, rows with
      | Some note, (Normal | Verbose), header :: rest ->
-       header :: lines_at ~depth:2 ~style:dim note @ rest
+       (header :: lines_at ~depth:2 ~style:dim note) @ rest
      | _ -> rows)
   | Server_tool { tool; ended } ->
     Tool_render.server_tool ~verbosity ~width ~ended tool

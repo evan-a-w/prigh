@@ -97,7 +97,10 @@ let rec apply (t : t) (event : P.Event.t) : t =
             t.transcript
             (Tool_allowed { allowed with agent_id = None })
       }
-    else { t with children = route_allowed t.children ~id (fun c -> apply c event) }
+    else
+      { t with
+        children = route_allowed t.children ~id (fun c -> apply c event)
+      }
   | P.Event.Subagent { agent_id; event = inner; _ } ->
     if is_descendant t agent_id
     then (

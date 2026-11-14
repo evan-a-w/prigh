@@ -1424,10 +1424,7 @@ let format_stats (s : P.Session_stats.t) : Content.t =
     ; "compactions", Int.to_string s.compactions
     ; "maskings", Int.to_string s.masks
     ; ( "approvals"
-      , sprintf
-          "%d judged, $%.4f"
-          s.approvals_judged
-          s.approvals_cost_usd )
+      , sprintf "%d judged, $%.4f" s.approvals_judged s.approvals_cost_usd )
     ; "duration", sprintf "%.1fs" s.duration_seconds
     ]
   in

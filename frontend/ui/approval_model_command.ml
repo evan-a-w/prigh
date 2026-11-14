@@ -38,8 +38,8 @@ let apply (action : Action.t) (config : P.Config.t) =
 
 let summary (config : P.Config.t) =
   sprintf
-    "in smart mode, %s judges the tool calls that would ask \
-     (/approval-model MODEL|off)"
+    "in smart mode, %s judges the tool calls that would ask (/approval-model \
+     MODEL|off)"
     (Option.value config.approval_model ~default:"the session's model")
 ;;
 

@@ -1989,7 +1989,9 @@ let%expect_test "smart approval mode: the judge's events, confirms and spend" =
   show
     (fun j -> Or_error.map (Session_stats.of_json j) ~f:Session_stats.sexp_of_t)
     {|{"message_count":4,"turns":2,"tool_calls":{},"usage":{"input":30,"output":13,"cache_read":5},"cost_usd":0.0003,"context_percent":1.5,"model_changes":0,"compactions":0,"duration_seconds":1,"approvals_judged":3,"approvals_cost_usd":0.0002}|};
-  let config = { Config.default with approval_model = Some "deepseek/deepseek-flash" } in
+  let config =
+    { Config.default with approval_model = Some "deepseek/deepseek-flash" }
+  in
   print_s
     [%message
       "config round trip"
@@ -2001,9 +2003,12 @@ let%expect_test "smart approval mode: the judge's events, confirms and spend" =
              ~f:(fun c -> Config.equal c config)
            : bool Or_error.t)];
   show
-    (fun j -> Or_error.map (Config.of_json j) ~f:(fun c -> [%sexp (c.approval_model : string option)]))
+    (fun j ->
+       Or_error.map (Config.of_json j) ~f:(fun c ->
+         [%sexp (c.approval_model : string option)]))
     {|{"approval_model":null}|};
-  [%expect {|
+  [%expect
+    {|
     (ask (decoded (Ok Ask)))
     (auto-edit (decoded (Ok Auto_edit)))
     (smart (decoded (Ok Smart)))

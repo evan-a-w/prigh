@@ -640,10 +640,8 @@ let session (m : App.Model.t) (s : Session_stats.t) ~inject =
         ; "Compactions", Int.to_string s.compactions
         ; "Maskings", Int.to_string s.masks
         ; ( "Approvals"
-          , sprintf
-              "%d judged · $%.4f"
-              s.approvals_judged
-              s.approvals_cost_usd )
+          , sprintf "%d judged · $%.4f" s.approvals_judged s.approvals_cost_usd
+          )
         ]
     ]
 ;;

@@ -109,13 +109,19 @@ let%expect_test "a subagent's allowed call: the note goes to its transcript" =
          })
   in
   let call = tool_call ~arguments:{|{"command":"make"}|} "c1" in
-  let inner e : P.Event.t = Subagent { call_id = "s1"; agent_id = "a1"; event = e } in
+  let inner e : P.Event.t =
+    Subagent { call_id = "s1"; agent_id = "a1"; event = e }
+  in
   let agents = Agent_view.apply_all agents (inner (Tool_start call)) in
   let agents =
     Agent_view.apply_all
       agents
       (Tool_allowed
-         { call_id = "c1"; agent_id = Some "a1"; model = "m"; reason = "builds" })
+         { call_id = "c1"
+         ; agent_id = Some "a1"
+         ; model = "m"
+         ; reason = "builds"
+         })
   in
   List.iter agents ~f:(fun (a : Agent_view.t) ->
     List.iter (Transcript.items a.transcript) ~f:(function
@@ -144,7 +150,8 @@ let%expect_test "a call the approval model left to the user shows its reason" =
        });
   H.show h;
   H.keys h "y";
-  [%expect {|
+  [%expect
+    {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
@@ -177,7 +184,8 @@ let%expect_test "parsing /approval-model's arguments" =
           ~_:
             (Approval_model_command.parse rest
              : Approval_model_command.Action.t)]);
-  [%expect {|
+  [%expect
+    {|
     ("" Show)
     (claude-haiku-4-5 (Set_model (claude-haiku-4-5)))
     (" off " (Set_model ()))
@@ -215,7 +223,8 @@ let%expect_test "/approval-model shows, completes, sets, clears, and a refusal" 
     "approval_model: unknown model \"claude-haku\"; did you mean: \
      anthropic/claude-haiku-4-5 (Claude Haiku 4.5)";
   H.show h;
-  [%expect {|
+  [%expect
+    {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
@@ -294,7 +303,8 @@ let%expect_test "/session counts the judged calls and their cost" =
     Session_stats
     {|{"message_count":4,"turns":2,"tool_calls":{"bash":3},"usage":{"input":30,"output":13,"cache_read":5},"cost_usd":0.0031,"context_percent":1.5,"model_changes":0,"compactions":0,"masks":0,"duration_seconds":12.5,"approvals_judged":3,"approvals_cost_usd":0.0012}|};
   H.show h;
-  [%expect {|
+  [%expect
+    {|
     (Rpc (method_ session_stats) (params ()) (tag Session_stats))
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 

@@ -27,7 +27,8 @@ let%expect_test "the mode chip in smart mode, and Alt+M on from it" =
   H.show h ~selector:".mode-chip";
   H.quiet h (fun () -> H.click h ~selector:".mode-chip");
   H.text h ~selector:".popover-items";
-  [%expect {|
+  [%expect
+    {|
     Cycle_mode
     (Rpc (method_ set_mode) (params ((approval_mode smart) (plan_mode false)))
      (tag
@@ -53,7 +54,8 @@ let%expect_test "the mode chip in smart mode, and Alt+M on from it" =
     |}];
   H.quiet h (fun () -> H.key h "Escape" ~target:Field);
   H.key h "m" ~alt:true;
-  [%expect {|
+  [%expect
+    {|
     Close_dialog
     Cycle_mode
     (Rpc (method_ set_mode) (params ((approval_mode auto) (plan_mode false)))
@@ -69,13 +71,16 @@ let settings () =
   h
 ;;
 
-let%expect_test "Settings → Models → Approvals: shown, picked, back to the default" =
+let%expect_test
+    "Settings → Models → Approvals: shown, picked, back to the default"
+  =
   let h = settings () in
   H.text h ~selector:".setting.approval-model";
   H.names h ~selector:".setting.approval-model button";
   H.click h ~selector:".approval-model-choice";
   H.text h ~selector:".modal";
-  [%expect {|
+  [%expect
+    {|
     Approvals
     In smart mode, lets a tool call run or asks you, saying why. Default: the session's model.
     (Default)
@@ -97,7 +102,8 @@ let%expect_test "Settings → Models → Approvals: shown, picked, back to the d
   H.reply h "set_config" (config ~model:"anthropic/claude-sonnet-5" ());
   H.text h ~selector:".setting.approval-model";
   H.text h ~selector:".toast:last-child";
-  [%expect {|
+  [%expect
+    {|
     Dialog_accept
     (Focus dialog)
     (Rpc (method_ set_config)
@@ -114,7 +120,8 @@ let%expect_test "Settings → Models → Approvals: shown, picked, back to the d
   H.key h "Enter" ~target:Field;
   H.reply h "set_config" (config ());
   H.text h ~selector:".setting.approval-model";
-  [%expect {|
+  [%expect
+    {|
     (Run /approval-model)
     Dialog_accept
     (Focus dialog)
@@ -127,11 +134,14 @@ let%expect_test "Settings → Models → Approvals: shown, picked, back to the d
     |}]
 ;;
 
-let%expect_test "/approval-model from the composer, and a model the backend refuses" =
+let%expect_test
+    "/approval-model from the composer, and a model the backend refuses"
+  =
   let h = H.create () in
   H.type_ h "/approval-model ";
   H.text h ~selector:".popup";
-  [%expect {|
+  [%expect
+    {|
     Approval model ↑↓ Tab Enter Esc   Ctrl+Enter as typed
     off the session's model judges them
     openai/gpt-6 GPT-6
@@ -147,7 +157,8 @@ let%expect_test "/approval-model from the composer, and a model the backend refu
     "set_config"
     {|approval_model: unknown model "nosuch"; did you mean: anthropic/claude-sonnet-5|};
   H.text h ~selector:".toast:last-child";
-  [%expect {|
+  [%expect
+    {|
     (Rpc (method_ get_config) (params ()) (tag Config))
     Couldn't set the approval model: approval_model: unknown model "nosuch"; did you mean: anthropic/claude-sonnet-5. Pick one with /approval-model (Dismiss)
     |}]
@@ -161,21 +172,27 @@ let allowed ?agent id reason =
     (Jsonaf.to_string (`String reason))
 ;;
 
-let%expect_test "a call the approval model let run: a chip, its note in the card" =
+let%expect_test
+    "a call the approval model let run: a chip, its note in the card"
+  =
   let chat =
     Chat_harness.chat
-    [ tool_start ~id:"c1" ~name:"bash" {|{"command":"make test"}|}
-    ; allowed "c1" "runs the project's tests"
-    ; tool_end ~id:"c1" ~name:"bash" "ok"
-    ]
+      [ tool_start ~id:"c1" ~name:"bash" {|{"command":"make test"}|}
+      ; allowed "c1" "runs the project's tests"
+      ; tool_end ~id:"c1" ~name:"bash" "ok"
+      ]
   in
   Chat_harness.show chat ~selector:".tool-bash .tool-head";
   Chat_harness.text
     chat
     ~fold:
-      (Fold.create ~verbosity:Normal ~toggled:(String.Set.singleton "c1#open") ())
+      (Fold.create
+         ~verbosity:Normal
+         ~toggled:(String.Set.singleton "c1#open")
+         ())
     ~selector:".tool-bash .tool-body";
-  [%expect {|
+  [%expect
+    {|
     <button type="button" data-fold="c1#open" aria-expanded="true" class="tool-head">
       <span title="Done" role="img" aria-label="Done" class="done mark">
         <icon class="check"> </icon>
@@ -195,7 +212,10 @@ let%expect_test "a subagent's allowed call: the note goes to its transcript" =
     [ call ~id:"s1" ~name:"subagent" {|{"task":"Build"}|}
     ; tool_start ~id:"s1" ~name:"subagent" {|{"task":"Build"}|}
     ; start ~call:"s1" ~agent:"a1" "Build"
-    ; inner ~call:"s1" ~agent:"a1" (tool_start ~id:"c1" ~name:"bash" {|{"command":"make"}|})
+    ; inner
+        ~call:"s1"
+        ~agent:"a1"
+        (tool_start ~id:"c1" ~name:"bash" {|{"command":"make"}|})
     ; allowed ~agent:"a1" "c1" "builds the project"
     ; allowed "c1" "not this one: the main agent has no c1"
     ]
@@ -211,20 +231,24 @@ let%expect_test "a subagent's allowed call: the note goes to its transcript" =
       ""
         ~main:(note chat "c1" : string option)
         ~subagent:(note sub.chat "c1" : string option)];
-  [%expect {|
+  [%expect
+    {|
     ((main ())
      (subagent ("allowed by anthropic/claude-haiku-4-5: builds the project")))
     |}]
 ;;
 
-let%expect_test "a call the approval model left to the user: its reason on the card" =
+let%expect_test
+    "a call the approval model left to the user: its reason on the card"
+  =
   let h = H.create ~state:(state "smart") () in
   H.event
     h
     {|{"event":"tool_confirm","call_id":"c1","agent_id":null,"name":"bash","summary":"rm -rf ~/build","rules":["bash(rm:*)"],"kind":"judged","model":"anthropic/claude-haiku-4-5","reason":"deletes a directory outside the project"}|};
   H.text h ~selector:".modal";
   H.names h ~selector:".confirm-dialog button";
-  [%expect {|
+  [%expect
+    {|
     (Focus confirm)
     Confirm (smart)
     (Close (Esc))

@@ -913,7 +913,12 @@ let%expect_test "bash timeout is merged into the tool line at each verbosity" =
   in
   let item =
     Transcript.Item.Tool
-      { call; result = Some result; live_tail = None; subagent = None; allowed = None }
+      { call
+      ; result = Some result
+      ; live_tail = None
+      ; subagent = None
+      ; allowed = None
+      }
   in
   List.iter [ Verbosity.Quiet; Normal; Verbose ] ~f:(fun verbosity ->
     printf "== %s ==\n" (Verbosity.name verbosity);
