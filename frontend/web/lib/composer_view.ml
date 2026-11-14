@@ -96,6 +96,44 @@ let popup (m : App.Model.t) ~inject =
    composer would be held to it: its container query contains fixed
    positions), where saving a drawing replaces it; the cross takes it off
    the message. *)
+
+(* Long pastes: a chip each, opening a dialog with the text. Never their
+   whole text in the page here. *)
+let pasted (m : App.Model.t) ~inject =
+  match m.pasted with
+  | [] -> Node.none
+  | pasted ->
+    div
+      ~cls:"attach-chips pasted-chips"
+      ~attrs:[ Attr.create "aria-label" "Pasted texts" ]
+      (List.mapi pasted ~f:(fun i text ->
+         let name = Prigh_ui.Pasted_text.name (i + 1) in
+         let summary =
+           Prigh_ui.Pasted_text.summary
+             ~lines:(Prigh_ui.Pasted_text.count_lines text)
+             ~bytes:(String.length text)
+         in
+         Node.div
+           ~attrs:[ Attr.class_ "attach-chip pasted-chip" ]
+           [ button
+               ~cls:"ghost pasted-chip-open"
+               ~title:
+                 (sprintf
+                    "%s: %s. Open it to read it, or to insert it as text"
+                    name
+                    (Prigh_ui.Pasted_text.preview text))
+               ~on_click:(inject (Action.View_pasted i))
+               [ span ~cls:"attach-chip-name" name
+               ; span ~cls:"attach-chip-detail" summary
+               ]
+           ; button
+               ~cls:"icon ghost attach-chip-remove"
+               ~title:(sprintf "Remove %s" name)
+               ~label:(sprintf "Remove %s" name)
+               ~on_click:(inject (Action.Remove_pasted i))
+               [ icon Close ]
+           ]))
+;;
 let images (m : App.Model.t) ~inject =
   match m.images with
   | [] -> Node.none
@@ -459,6 +497,7 @@ let view (m : App.Model.t) ~inject =
     not
       (String.is_empty (String.strip m.draft)
        && List.is_empty m.images
+       && List.is_empty m.pasted
        && List.is_empty m.files.attachments)
   in
   let sending = m.pending.sending > 0 in
@@ -498,6 +537,7 @@ let view (m : App.Model.t) ~inject =
                | Main -> Node.none
                | Agent id -> rest (steer_chip m id ~inject))
             ; rest (images m ~inject)
+            ; rest (pasted m ~inject)
             ; rest (Files_view.chips m ~inject)
             ; rest
               @@ div

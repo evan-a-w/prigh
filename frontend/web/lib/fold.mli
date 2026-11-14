@@ -35,6 +35,10 @@ val key : t -> string -> string
 
 val expanded : t -> string -> bool
 
+(** Whether the user toggled [id], whatever the verbosity: for what is too
+    long to unfold with the rest (pasted texts). *)
+val toggled : t -> string -> bool
+
 (** Whether the card [id] is open: verbose, [cards_open] or [by_default]
     open it, toggling it flips that. *)
 val opened : by_default:bool -> t -> string -> bool

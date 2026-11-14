@@ -229,6 +229,7 @@ module Reply_tag = struct
         { text : string
         ; images : Image.t list
         ; attachments : Files.Attachment.t list
+        ; pasted : string list
         }
     | Resync of
         { session : string (** its id *)
@@ -572,6 +573,12 @@ module Action = struct
     | Cycle_mode
     | Add_image of Image.t
     | Remove_image of int
+    | Paste_text of string
+      (** a long paste into the composer ({!Prigh_ui.Pasted_text.is_long}):
+          a chip *)
+    | Remove_pasted of int
+    | Insert_pasted of int (** into [draft], as text *)
+    | View_pasted of int
     | Downsize_image of int
     | Downsized of
         { original : Image.t
@@ -711,6 +718,7 @@ module Model = struct
     ; completion : Completion.t option
     ; history : History.t
     ; images : Image.t list
+    ; pasted : string list
     ; downsizing : Image.t list
     ; dictation : Dictation.t
     ; dictation_engine : Dictation.Engine.t
@@ -1035,6 +1043,7 @@ let init =
   ; completion = None
   ; history = History.empty
   ; images = []
+  ; pasted = []
   ; downsizing = []
   ; dictation = Idle
   ; dictation_engine = Server
@@ -1209,6 +1218,18 @@ let field json name =
   match json with
   | `Object fields -> List.Assoc.find fields ~equal:String.equal name
   | _ -> None
+;;
+
+(* A queued message's pasted texts given back ([dequeue]), or each of
+   several's ([abort]'s [restored]): chips again. *)
+let restored_pasted json =
+  match field json "pasted" with
+  | Some (`Array items) ->
+    List.concat_map items ~f:(function
+      | `String s -> [ s ]
+      | `Array _ as texts -> Option.value (Or_error.ok (strings texts)) ~default:[]
+      | _ -> [])
+  | _ -> []
 ;;
 
 let close_dialog (m : Model.t) =
@@ -4766,6 +4787,7 @@ let user_switched (m : Model.t) (hello : Hello_reply.t) =
     ; downsizing = []
     ; git_bar = Git_bar.empty
     ; images = []
+    ; pasted = []
     ; skills = Skills.empty
     ; worktrees = Worktrees.reset m.worktrees
     ; pending = In_flight.none
@@ -7950,11 +7972,16 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
        let m, more = remember_review (refresh_review_pick m) in
        m, cmds @ more
      | _ -> m, cmds)
-  | Sent_with_files { text; images; attachments }, result ->
+  | Sent_with_files { text; images; attachments; pasted }, result ->
     let m, cmds = reply_to m (Sent { text; images }) result in
     (match result with
      | Ok _ -> m, cmds
-     | Error _ -> { m with files = Files.restore m.files attachments }, cmds)
+     | Error _ ->
+       ( { m with
+           files = Files.restore m.files attachments
+         ; pasted = pasted @ m.pasted
+         }
+       , cmds ))
   | Reconnect _, Error e when Rejoin.refused e ->
     m, [ Command.Auth_failed (Rejoin.refused_message e) ]
   (* The banner says that we are reconnecting: a toast per attempt would
@@ -8713,6 +8740,7 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
            (texts @ List.filter [ m.draft ] ~f:(Fn.non String.is_empty))
        in
        let m = set_draft m draft in
+       let m = { m with pasted = restored_pasted json @ m.pasted } in
        let m, cmds =
          toast
            m
@@ -8739,6 +8767,7 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
        let draft =
          if String.is_empty m.draft then text else text ^ "\n\n" ^ m.draft
        in
+       let m = { m with pasted = restored_pasted json @ m.pasted } in
        set_draft m draft, [ focus_editor ]
      | _ -> toast m "Nothing is queued")
   | Moved_and_deleted switch_to, Ok json ->
@@ -9354,6 +9383,34 @@ let invokes_skill ({ name; _ } : Slash.Parsed.t) =
   | None -> false
 ;;
 
+(* Long pastes are chips: the composer never holds them, so it stays quick. *)
+let paste_text (m : Model.t) text =
+  match Prigh_ui.Pasted_text.too_large text with
+  | Some e -> error m e
+  | None -> { m with pasted = m.pasted @ [ text ] }, [ focus_editor ]
+;;
+
+let remove_pasted (m : Model.t) i =
+  let m = { m with pasted = List.filteri m.pasted ~f:(fun j _ -> j <> i) } in
+  match m.dialog with
+  | Some (Pasted _) -> close_dialog m
+  | _ -> m, [ focus_editor ]
+;;
+
+(* At the caret, as if pasted into the box. *)
+let insert_pasted (m : Model.t) i =
+  match List.nth m.pasted i with
+  | None -> m, []
+  | Some text ->
+    let m, closed = remove_pasted m i in
+    let cursor = Int.min m.cursor (String.length m.draft) in
+    let draft =
+      String.prefix m.draft cursor ^ text ^ String.drop_prefix m.draft cursor
+    in
+    let m, cmds = edit_at_caret m ~cursor:(cursor + String.length text) draft in
+    m, closed @ cmds
+;;
+
 let send (m : Model.t) ~follow_up =
   let text = String.strip m.draft in
   (* The errors were about what was sent before. *)
@@ -9395,17 +9452,21 @@ let send (m : Model.t) ~follow_up =
         else [] ))
   in
   let attached = not (List.is_empty m.files.attachments) in
+  let pasted = not (List.is_empty m.pasted) in
   match Slash.parse text with
   | _
     when String.is_prefix text ~prefix:"!"
          && List.is_empty m.images
-         && not attached ->
+         && (not attached)
+         && not pasted ->
     let m, save = sent m in
     let m, cmds = shell m text in
     m, save @ (Command.Scroll_to_bottom :: cmds)
   | Some parsed
-    when List.is_empty m.images && (not attached) && not (invokes_skill parsed)
-    ->
+    when List.is_empty m.images
+         && (not attached)
+         && (not pasted)
+         && not (invokes_skill parsed) ->
     let first_toast = m.next_toast in
     let m, save = sent m in
     let m, cmds = run_command m parsed in
@@ -9437,17 +9498,19 @@ let send (m : Model.t) ~follow_up =
             "%s takes text only: remove the images and files, or Esc to send \
              them to the main agent."
             agent)
-     | Agent _ when String.is_empty text -> m, []
+     | Agent _ when String.is_empty text && not pasted -> m, []
      | Agent agent ->
-       let m, save = sent m in
-       let m, cmds = message_agent m ~agent ~text ~follow_up ~draft:text in
+       (* A subagent takes text only: the pasted texts go in it. *)
+       let full = Prigh_ui.Pasted_text.inline ~text m.pasted in
+       let m, save = sent { m with pasted = [] } in
+       let m, cmds = message_agent m ~agent ~text:full ~follow_up ~draft:full in
        m, save @ cmds)
   | _ when attached && Or_error.is_error (Files.prompt_attachments m.files) ->
     (match Files.prompt_attachments m.files with
      | Error e -> error m (Error.to_string_hum e)
      | Ok _ -> m, [])
   | _ ->
-    if String.is_empty text && List.is_empty m.images && not attached
+    if String.is_empty text && List.is_empty m.images && (not attached) && not pasted
     then m, []
     else (
       let method_ =
@@ -9481,16 +9544,32 @@ let send (m : Model.t) ~follow_up =
         | Ok [] | Error _ -> []
       in
       let tag : Reply_tag.t =
-        if attached
+        if attached || pasted
         then
           Sent_with_files
-            { text; images = m.images; attachments = m.files.attachments }
+            { text
+            ; images = m.images
+            ; attachments = m.files.attachments
+            ; pasted = m.pasted
+            }
         else Sent { text; images = m.images }
       in
-      ( { m with images = []; agents; pending; files = Files.sent m.files }
+      let text_params =
+        Prigh_ui.Pasted_text.params
+          ~backend_takes:(Option.exists m.hello ~f:Hello_reply.pasted_text)
+          ~text
+          m.pasted
+      in
+      ( { m with
+          images = []
+        ; pasted = []
+        ; agents
+        ; pending
+        ; files = Files.sent m.files
+        }
       , save
         @ [ Command.Scroll_to_bottom
-          ; rpc method_ ((("text", str text) :: images) @ attachments) ~tag
+          ; rpc method_ ((text_params @ images) @ attachments) ~tag
           ] ))
 ;;
 
@@ -10052,6 +10131,7 @@ let dialog_accept (m : Model.t) =
       | Text _
       | Mcp_tools _
       | Diff _ ) -> close_dialog m
+  | Some (Pasted _) -> close_dialog m
   | Some (Loading _) -> m, []
   | Some (Scoped_models { checked; _ }) ->
     let m, cmds = save_scoped m checked in
@@ -10766,6 +10846,11 @@ let update_connected (m : Model.t) (action : Action.t) =
       ("Could not downsize the image: " ^ reason)
   | Remove_image i ->
     { m with images = List.filteri m.images ~f:(fun j _ -> j <> i) }, []
+  | Paste_text text -> paste_text m text
+  | Remove_pasted i -> remove_pasted m i
+  | Insert_pasted i -> insert_pasted m i
+  | View_pasted i ->
+    if i < List.length m.pasted then open_dialog m (Pasted i) else m, []
   | Show_toast { text; error } -> toast m ~error text
   | Dismiss_toast id ->
     { m with toasts = List.filter m.toasts ~f:(fun t -> t.id <> id) }, []

@@ -264,7 +264,9 @@ module Reply_tag : sig
         { text : string
         ; images : Image.t list
         ; attachments : Files.Attachment.t list
-        } (** [Sent] with attachments: back to the composer if it fails *)
+        ; pasted : string list
+        } (** [Sent] with attachments or pasted texts: back to the composer if
+          it fails *)
     | Resync of
         { session : string (** its id *)
         ; from : string option
@@ -713,6 +715,12 @@ module Action : sig
     | Cycle_mode (** Alt+M: ask → auto-edit → auto → plan *)
     | Add_image of Image.t
     | Remove_image of int
+    | Paste_text of string
+      (** a long paste into the composer ({!Prigh_ui.Pasted_text.is_long}):
+          a chip *)
+    | Remove_pasted of int
+    | Insert_pasted of int (** into [draft], as text *)
+    | View_pasted of int
     | Downsize_image of int
     | Downsized of
         { original : Image.t
@@ -900,6 +908,9 @@ module Model : sig
     ; completion : Completion.t option
     ; history : History.t
     ; images : Image.t list (** attached to the next prompt *)
+    ; pasted : string list
+      (** long texts pasted, sent with the next prompt as pasted texts
+          ({!Prigh_ui.Pasted_text}): chips, not in [draft] *)
     ; downsizing : Image.t list (** of [images], being made smaller *)
     ; dictation : Dictation.t
     ; dictation_engine : Dictation.Engine.t
