@@ -1,20 +1,20 @@
 // prigh-web's service worker: the app shell offline, nothing else.
 //
 // The build (site_gen/, site/dune) fills in VERSION, a hash of the shell's
-// files, SHELL, their names, and VERSIONS, each one's version (the page
-// asks for some as NAME?v=VERSION): a new build is a new worker, with a
-// cache of its own, which waits until the page reloads into it (the page
-// offers to). Only the shell's files are answered here; everything else (the
+// files, and SHELL, their names as the page asks for them (NAME?v=VERSION
+// for those index.html and app.css name so; kept under that URL, so that
+// the browser's compiled code for a script kept here applies): a new build
+// is a new worker, with a cache of its own, which waits until the page
+// reloads into it (the page offers to). Only the shell's files are answered here; everything else (the
 // RPC and terminal WebSockets, file transfers, the sign-in link, anything
 // unknown) goes to the network untouched.
 const VERSION = "@@VERSION@@";
 const SHELL = @@SHELL@@;
-const VERSIONS = @@VERSIONS@@;
 
 const PREFIX = "prigh-web-";
 const CACHE = PREFIX + VERSION;
 const scope = new URL(self.registration.scope);
-const shellUrls = new Map(SHELL.map(name => [new URL(name, scope).href, VERSIONS[name]]));
+const shellUrls = new Set(SHELL.map(name => new URL(name, scope).href));
 const index = new URL("index.html", scope).href;
 // The page: what a navigation to the scope's root or index.html loads.
 const pages = new Set([scope.href, index]);
@@ -28,7 +28,7 @@ self.addEventListener("install", event => {
   // browser allows the host and queue the page's requests behind these.
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE);
-    for (const url of shellUrls.keys()) {
+    for (const url of shellUrls) {
       const response = await fetch(new Request(url, { cache: "reload", redirect: "error" }));
       if (!response.ok) throw new Error(`${url}: ${response.status}`);
       await cache.put(url, response);
@@ -101,10 +101,9 @@ self.addEventListener("fetch", event => {
     if (pages.has(bare)) event.respondWith(page(event));
     return;
   }
-  // A versioned name is this build's file only with this build's version.
-  if (shellUrls.has(bare) && (url.search === "" || url.search === `?v=${shellUrls.get(bare)}`))
+  if (shellUrls.has(url.origin + url.pathname + url.search))
     event.respondWith(
-      caches.match(bare, { cacheName: CACHE }).then(cached => cached ?? fetch(request)));
+      caches.match(request, { cacheName: CACHE }).then(cached => cached ?? fetch(request)));
 });
 
 // A notification shown through the worker (where pages cannot make their

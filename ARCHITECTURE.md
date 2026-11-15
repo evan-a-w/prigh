@@ -4178,11 +4178,12 @@ terminal frontend and `web/` prigh-web, the browser one.
     `icon-maskable.svg` with the mark in the safe zone; the PNGs are
     rendered from them with resvg and committed, as is
     `apple-touch-icon.png`), and `sw.js`, which `bin/site_gen/` makes from
-    `sw.template.js` with the shell's file names, their versions and `VERSION`, a hash of
+    `sw.template.js` with the shell's files as the page asks for them
+    (versioned where `index.html` or `app.css` names them so, so that the
+    script's compiled code kept with it applies) and `VERSION`, a hash of
     their contents, so each build that changes the shell is a new worker
     with a cache of its own (`prigh-web-VERSION`; activating deletes the
-    others). It answers the shell's files from that cache (bare or with
-    their version) and navigations to the page with its cached
+    others). It answers the shell's files from that cache and navigations to the page with its cached
     `index.html` at once, so the app opens offline, or on a slow link, and
     reconnects; the page is still fetched behind it, and when a sign-in
     proxy in front answers that with a redirect or 401/403/407, the worker

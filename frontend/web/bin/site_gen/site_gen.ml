@@ -10,11 +10,7 @@ let files paths =
        ~compare:(Tuple2.compare ~cmp1:String.compare ~cmp2:String.compare)
 ;;
 
-let json_object pairs =
-  List.map pairs ~f:(fun (k, v) -> sprintf "%S: %S" k v)
-  |> String.concat ~sep:", "
-  |> sprintf "{%s}"
-;;
+let versioned_name ~name ~version = sprintf "%s?v=%s" name version
 
 let sw template paths =
   let versions =
@@ -27,17 +23,27 @@ let sw template paths =
     |> Md5.to_hex
     |> fun hex -> String.prefix hex 16
   in
+  (* Each file as the page asks for it: by its versioned name where a file
+     of the shell (index.html, app.css) names it so. *)
+  let contents =
+    List.map (files paths) ~f:(fun (_, path) -> In_channel.read_all path)
+  in
   let shell =
-    List.map versions ~f:(fun (name, _) -> sprintf "%S" name)
+    List.map versions ~f:(fun (name, version) ->
+      let versioned = versioned_name ~name ~version in
+      sprintf
+        "%S"
+        (if
+           List.exists contents ~f:(fun text ->
+             String.is_substring text ~substring:versioned)
+         then versioned
+         else name))
     |> String.concat ~sep:", "
     |> sprintf "[%s]"
   in
   In_channel.read_all template
   |> String.substr_replace_all ~pattern:"@@VERSION@@" ~with_:hash
   |> String.substr_replace_all ~pattern:"@@SHELL@@" ~with_:shell
-  |> String.substr_replace_all
-       ~pattern:"@@VERSIONS@@"
-       ~with_:(json_object versions)
 ;;
 
 let versioned template paths =
@@ -50,7 +56,7 @@ let versioned template paths =
         String.substr_replace_all
           text
           ~pattern:(quote ^ name ^ quote)
-          ~with_:(sprintf "%s%s?v=%s%s" quote name v quote)))
+          ~with_:(quote ^ versioned_name ~name ~version:v ^ quote)))
 ;;
 
 let () =
