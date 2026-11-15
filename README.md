@@ -860,32 +860,33 @@ with its line counts); `/notify on|off`, the settings page and the
 account menu control browser notifications while the tab is hidden, and the
 title (`(2) prigh`) and favicon count what happened meanwhile.
 
-The composer is one box: the editor on top and, along its bottom edge in
-the box's own quiet text, the model, the thinking level ("Thinking high",
-"No thinking" for a model without levels) and the approval mode ("Asks:
-edits & commands", "Asks: commands", "Auto: never asks", "Plan mode",
-lit) and where tools run (a server icon and the tool host's name, always
-shown; a disconnected host keeps its name, its server struck through in
-red and "offline" beside it, with how to bring it back in its tooltip; lit
-as "No host" when none runs them), each lit with a chevron when pointed at, then attach, stop and send
-on the right. A chip opens a small menu standing on it, above the composer
-(below it only when there is no room above), with its command's choices
-(`/model`, `/thinking`, `/mode`, `/host`), the current one checked: the
-models under their providers with their context windows and a filter field
-to type in (the list scrolls; filtered, best match first), the thinking
-levels with how hard each thinks, the modes with what each asks first, the
-hosts with their directories and a filter too (choosing one asks for the
-directory there, as `/host` does; with only one host, or none, it says how
-to add one: `prigh tool-host -connect SERVER`, or a TUI). The hosts' menu
-follows hosts as they connect and leave. ↑↓ move, Enter
-or a click takes the choice, Esc or a click beside the menu closes it
-unchanged and gives the editor back the focus; ← →, Tab and a click on
-another chip open the next chip's menu, one at a time. On a phone the menu
-is as wide as the composer. The commands themselves open the larger
-picker dialog. Ctrl+L opens the model's menu, Alt+T and Alt+M cycle the
-other two; in a narrow composer the labels get short
-(`high`, `ask`, `plan`, after an icon), and the model's and the host's
-names are cut short with an ellipsis, the host's first.
+The composer is one box: the editor on top and, along its bottom edge
+in the box's own quiet text, chips: the model and, in short lower-case
+words, the thinking level (a brain and "high", or "none" for a model
+without levels), the approval mode (a shield and "ask", "auto-edit",
+"smart", "auto" or "plan", lit where nothing asks; a speech bubble
+and "chat" in chat mode) and where tools run (a server icon and the
+tool host's name, always shown; a disconnected host keeps its name,
+its server struck through in red and "offline" beside it, with how to
+bring it back in its tooltip; lit as "no host" when none runs them or
+in chat mode), each lit with a chevron when pointed at, then attach,
+stop and send on the right. A chip opens a small menu standing on it,
+above the composer (below it only when there is no room above), with its
+command's choices (`/model`, `/thinking`, `/mode`, `/host`), the current
+one checked: the models under their providers with their context windows
+and a filter field to type in (the list scrolls; filtered, best match
+first), the thinking levels with how hard each thinks, the modes with
+what each asks first, the hosts with their directories and a filter too
+(choosing one asks for the directory there, as `/host` does; with only
+one host, or none, it says how to add one: `prigh tool-host -connect
+SERVER`, or a TUI). The hosts' menu follows hosts as they connect and
+leave. ↑↓ move, Enter or a click takes the choice, Esc or a click
+beside the menu closes it unchanged and gives the editor back the focus;
+← →, Tab and a click on another chip open the next chip's menu, one
+at a time. On a phone the menu is as wide as the composer. The commands
+themselves open the larger picker dialog. Ctrl+L opens the model's menu,
+Alt+T and Alt+M cycle the other two; in a narrow composer the model's
+and the host's names are cut short with an ellipsis, the host's first.
 
 There is no bar over the chat. The session's title is in the sidebar's tree
 (its row has the cwd as it is now, relative to its project or worktree, and
