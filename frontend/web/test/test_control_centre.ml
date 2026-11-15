@@ -53,9 +53,9 @@ let%expect_test
     0% · $0.00
     Recent sessions
     fix the parser bug
-    /work · 2h ago
+    2h ago · /work
     Release notes
-    /work · 1d ago
+    1d ago · /work
     Commands
     /new
     start a new session
@@ -454,7 +454,7 @@ let%expect_test
     (Search_sessions_later (search 2) (after_ms 150))
     Sessions
     Make the port config urable
-    /work · 1h ago
+    1h ago · /work
     |}];
   (* The first pause came too soon: the query changed since. *)
   H.act h (Search_sessions 1);
@@ -474,9 +474,9 @@ let%expect_test
      (tag (Session_hits 2)))
     Sessions
     Make the port config urable
-    /work · 1h ago
+    1h ago · /work
     fix the parser bug …then make the port config urable via the config file
-    /work · 2h ago
+    2h ago · /work
     <span dir="auto" class="control-snippet">
       …then make the
       <mark> port </mark>
@@ -590,9 +590,9 @@ let%expect_test "switching sessions resets it" =
     0% · $0.00
     Recent sessions
     fix the parser bug
-    /work · 2h ago
+    2h ago · /work
     Release notes
-    /work · 1d ago
+    1d ago · /work
     Commands
     /new
     start a new session

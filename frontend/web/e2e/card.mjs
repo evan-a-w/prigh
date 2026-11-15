@@ -224,13 +224,14 @@ try {
   await page.locator(".composer-status .activity.idle").waitFor({ state: "attached" });
   await both("ready, a subagent running");
 
-  // All done, and a mode on (the transcript's verbosity).
+  // All done, and a mode on (Alt+M: ask).
   open("sub-go");
   // The agent answers its subagent's report: wait for that turn to end.
   await page.waitForFunction(() => document.querySelector(".chat")?.innerText.includes("The survey is in."));
   await page.locator(".composer-status .activity.idle").waitFor({ state: "attached" });
-  await page.keyboard.press("Control+o");
-  await page.locator(".composer .chip-anchor.verbosity", { hasText: "verbose" }).waitFor();
+  const before = await page.locator(".composer .chip-anchor.mode").innerText();
+  await page.keyboard.press("Alt+m");
+  await page.waitForFunction(b => document.querySelector(".composer .chip-anchor.mode")?.innerText !== b, before);
   await both("idle, a mode on");
 
   // The sidebar at its narrowest: still one line for the activity and the

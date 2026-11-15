@@ -287,7 +287,7 @@ try {
   // The control centre finds sessions by their worktrees' branches.
   await page.locator("#control-open").click();
   await page.locator("#control-input").fill("tidy-the-docs");
-  await page.locator(".control-group", { hasText: "Sessions" }).waitFor();
+  await page.locator(".control-group", { hasText: /^Sessions$/ }).waitFor();
   section("searching");
   console.log((await page.locator("#control-list .control-row .control-label").allTextContents()).join("\n"));
   await screenshot("searching");

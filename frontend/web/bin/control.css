@@ -79,7 +79,7 @@
 .control-row.selected { background: var(--slate-2); box-shadow: inset 2px 0 0 var(--sodium); border-radius: 0 var(--r-control) var(--r-control) 0; }
 .control-row.dimmed { opacity: 0.5; }
 .control-main { display: flex; align-items: baseline; gap: 10px; flex: 1 1 auto; min-width: 0; }
-.control-label { flex: 0 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.control-label { flex: 0 0 auto; max-width: 100%; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .control-label mark, .control-snippet mark { background: none; color: var(--sodium); font-weight: 600; }
 .control-about, .control-snippet { flex: 1 1 auto; min-width: 0; color: var(--faint); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .control-detail { flex: 0 1 auto; max-width: 45%; color: var(--muted); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

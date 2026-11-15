@@ -171,8 +171,7 @@ const pick = async (chip, option, how) => {
     await button.focus();
     await page.keyboard.press("Enter");
     await page.locator("#chip-popover").waitFor();
-    // The transcript's choice is its last: up from it.
-    await page.keyboard.press(chip === "verbosity" ? "ArrowUp" : "ArrowDown");
+    await page.keyboard.press("ArrowDown");
     await page.keyboard.press("Enter");
   }
   await page.locator("#chip-popover").waitFor({ state: "detached", timeout: 5000 }).catch(() => {});
@@ -205,14 +204,12 @@ const desktop = async () => {
   section("desktop: the chips' menus act");
   await pick("thinking", "high", "mouse");
   await pick("mode", "ask", "mouse");
-  await pick("verbosity", "verbose", "mouse");
   await pick("thinking", "", "keyboard");
   await pick("mode", "", "keyboard");
-  await pick("verbosity", "", "keyboard");
   await shoot("desktop-chips");
 
   section("desktop: a click outside closes, and goes no further");
-  for (const [chip, sel] of [["model", ".model-chip"], ["host", ".host-chip"], ["+", ".composer-plus .plus"], ["thinking", ".chip-anchor.thinking > button"], ["mode", ".chip-anchor.mode > button"], ["verbosity", ".chip-anchor.verbosity > button"]]) {
+  for (const [chip, sel] of [["model", ".model-chip"], ["host", ".host-chip"], ["+", ".composer-plus .plus"], ["thinking", ".chip-anchor.thinking > button"], ["mode", ".chip-anchor.mode > button"]]) {
     await page.locator(`.composer ${sel}`).first().click();
     await page.locator("#chip-popover").waitFor();
     // On the filter's button: had the click gone through, its menu would open.

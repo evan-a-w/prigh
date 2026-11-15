@@ -108,9 +108,9 @@ let%expect_test "the control centre finds pinned sessions too, best match first"
     Settings › Memory
     Sessions
     Release notes
-    /work · 2m ago
+    2m ago · /work
     Long-running notes
-    /work · 2m ago
+    2m ago · /work
     Commands
     /filter
     show only some kinds in the transcript (your messages, replies, thinking, tools, subagents, notes); the model's context is unchanged
@@ -163,11 +163,11 @@ let%expect_test
      (tag (Session_hits 1)))
     Sessions
     Deploy the docs
-    /work · 1h ago
+    1h ago · /work
     Deploy checklist
-    /work · 1d ago
+    1d ago · /work
     Old deploy
-    /work · 3d ago
+    3d ago · /work
     |}];
   (* The messages of a pinned and an unpinned session mention it too. *)
   H.reply
@@ -184,15 +184,15 @@ let%expect_test
     {|
     Sessions
     Deploy the docs
-    /work · 1h ago
+    1h ago · /work
     Deploy checklist
-    /work · 1d ago
+    1d ago · /work
     Old deploy
-    /work · 3d ago
+    3d ago · /work
     Weekly notes …before we deploy on Friday
-    /work · 2h ago
+    2h ago · /work
     Lexer … deploy the lexer
-    /work · 2d ago
+    2d ago · /work
     |}];
   H.show h ~selector:"[data-session=s2] .session-main";
   H.show h ~selector:"[data-session=s3] .session-title";

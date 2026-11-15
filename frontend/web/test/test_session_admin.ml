@@ -125,9 +125,9 @@ let%expect_test "active sessions first, then the archived ones under a divider" 
     on
     Sessions
     Old lexer
-    /work · 2m ago
+    2m ago · /work
     Old er docs
-    /work · 2m ago
+    2m ago · /work
     Commands
     /compact
     summarise older messages to free context

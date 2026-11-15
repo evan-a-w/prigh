@@ -137,15 +137,15 @@ const rows = () => page.locator("#control-list > *").evaluateAll(es => es.map(e 
     : null;
   if (e.matches(".control-group")) return `-- ${e.textContent} --`;
   const sel = e.matches(".selected") ? "> " : "  ";
-  const dot = e.querySelector(".control-dot") ? "● " : "";
+  const dot = e.querySelector(".control-dot.on") ? "● " : e.querySelector(".control-dot") ? "○ " : "";
   const label = marked(e.querySelector(".control-label"));
   const snippet = marked(e.querySelector(".control-snippet"));
   const right = [e.querySelector(".control-detail")?.textContent, e.querySelector(".control-keys")?.textContent]
     .filter(Boolean).join(" ");
   const about = e.querySelector(".control-about")?.textContent;
   return `${sel}${dot}${label}${snippet ? ` ${snippet}` : ""}${about ? ` — ${about}` : ""}${right ? ` | ${right}` : ""}`
-    .replace(/\d+[mhd] ago/, "<age>");
-}).join("\n"));
+    .replace(/\d+[mhd] ago|just now/, "<age>");
+}).join("\n")).then(s => s.replaceAll(cwd, "<CWD>"));
 const search = async query => {
   await page.locator("#control-input").fill(query);
   await page.waitForFunction(q => document.querySelector("#control-input")?.value === q, query);
@@ -231,7 +231,7 @@ try {
   await page.locator("#control-open").click();
   await page.locator("#control-centre").waitFor();
   await search("port");
-  await page.waitForFunction(() => document.querySelectorAll(".control-snippet").length === 1);
+  await page.waitForFunction(() => document.querySelectorAll(".control-snippet").length === 2);
   console.log(await rows());
 
   section("the messages, once typing pauses");

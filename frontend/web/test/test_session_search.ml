@@ -47,7 +47,7 @@ let%expect_test
     (Search_sessions_later (search 2) (after_ms 150))
     Sessions
     Make the port config urable
-    /work · 1h ago
+    1h ago · /work
     |}];
   (* The first pause came too soon: the query changed since. *)
   H.act h (Search_sessions 1);
@@ -64,9 +64,9 @@ let%expect_test
     {|
     Sessions
     Make the port config urable
-    /work · 1h ago
+    1h ago · /work
     fix the parser bug …then make the port config urable via the config file
-    /work · 2h ago
+    2h ago · /work
     <span dir="auto" class="control-snippet">
       …then make the
       <mark> port </mark>
@@ -97,7 +97,7 @@ let%expect_test
     (Search_sessions_later (search 2) (after_ms 150))
     Sessions
     Make the port config urable
-    /work · 1h ago
+    1h ago · /work
     |}];
   H.key h "Escape" ~target:Field;
   print_s [%sexp (Option.is_some (H.model h).dialog : bool)];

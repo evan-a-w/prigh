@@ -10736,7 +10736,7 @@ let describe_session (m : Model.t) (s : Session_summary.t) =
   match
     m.now, Rel_time.parse (Option.value s.updated_at ~default:s.created_at)
   with
-  | Some now, Some time -> sprintf "%s · %s" where (Rel_time.ago ~now time)
+  | Some now, Some time -> sprintf "%s · %s" (Rel_time.ago ~now time) where
   | _ -> where
 ;;
 
