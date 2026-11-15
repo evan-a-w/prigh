@@ -393,7 +393,7 @@ let%expect_test
      (tag (Worktrees (place  "s1\
                             \n\
                             \n/work") (purpose (Sidebar 3)))))
-    button "No host" -- No host runs the tools: /host picks one
+    button "No tool host" -- No host runs the tools: /host picks one
     <button class="btn chip-button host-chip warm">
     |}];
   (* No host at all: the menu says how to add one. *)

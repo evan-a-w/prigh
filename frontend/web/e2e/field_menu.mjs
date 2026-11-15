@@ -288,6 +288,11 @@ try {
   await page.waitForFunction(() =>
     document.querySelector(".terminal-panel .xterm-rows")?.textContent.trim().endsWith("$"), null, { timeout: 60000 });
   await page.waitForFunction(() => document.activeElement?.closest(".terminal-host"));
+  // A short prompt: the machine's (its name, the test's long directory)
+  // would wrap the commands.
+  await page.keyboard.type(String.raw`PS1='$ '; printf '\033[H\033[2J\033[3J'`);
+  await page.keyboard.press("Enter");
+  await page.waitForFunction(() => document.querySelector(".terminal-panel .xterm-rows").textContent.trim() === "$");
   await page.keyboard.type("echo copy-me-please");
   await page.keyboard.press("Enter");
   await shows("copy-me-please");

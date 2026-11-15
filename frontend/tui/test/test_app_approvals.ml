@@ -224,6 +224,41 @@ let%expect_test "/mode picks or sets the mode; /plan toggles plan mode" =
     |}]
 ;;
 
+let%expect_test "/mode completes every mode, in Alt+M's order" =
+  let h = Test_app.connected ~height:16 () in
+  H.keys h "/mode ";
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ▸ ask
+      auto-edit
+      smart
+      auto
+      plan
+      chat
+    ────────────────────────────────────────────────────────────
+    > /mode ▏
+    deepseek-flash  Tab accepts · Enter as typed · Esc hides
+    |}];
+  H.keys h "sm";
+  H.key h (Key.plain Tab);
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ────────────────────────────────────────────────────────────
+    > /mode smart▏
+    deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    |}]
+;;
+
 let%expect_test "the plan in the status line, /todos and /permissions" =
   let h = Test_app.connected ~width:90 ~height:20 () in
   command h "/todos";

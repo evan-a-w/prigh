@@ -23,16 +23,10 @@ let laptop t =
 
 let show t s =
   let s = mask t s in
-  let s =
-    match Sys.getenv "HOME" with
-    | Some home when String.length home > 1 ->
-      String.substr_replace_all s ~pattern:home ~with_:"$HOME"
-    | _ -> s
-  in
-  String.substr_replace_all
-    s
-    ~pattern:(Core_unix.gethostname ())
-    ~with_:"<backend>"
+  match Sys.getenv "HOME" with
+  | Some home when String.length home > 1 ->
+    String.substr_replace_all s ~pattern:home ~with_:"$HOME"
+  | _ -> s
 ;;
 
 let with_agent
@@ -158,7 +152,7 @@ let%expect_test "without host: the hosts" =
   [%expect
     {|
     on_host -> tool hosts:
-    - <backend> (id backend): home $HOME, the session's active host (call tools directly)
+    - <host> (id backend): home $HOME, the session's active host (call tools directly)
     - laptop (id host-laptop): home $DIR/laptop
     run a tool on another one: on_host {host: "NAME", tool: "bash", args: {command: "uname -a"}}
     |}]
@@ -294,13 +288,13 @@ let%expect_test "refusals" =
     {|
     on_host -> ERROR no connected tool host "laptp" (it may have disconnected: the user can connect it with `prigh tool-host -connect` or a TUI there). Connected:
     - laptop (id host-laptop): home $DIR/laptop
-    - <backend> (id backend): home $HOME, the session's active host (call tools directly)
-    on_host -> ERROR <backend> is the session's active host: call bash directly
+    - <host> (id backend): home $HOME, the session's active host (call tools directly)
+    on_host -> ERROR <host> is the session's active host: call bash directly
     on_host -> ERROR on_host needs tool and args with host, e.g. on_host {host: "laptop", tool: "bash", args: {command: "uname -a"}}
     on_host -> ERROR on_host needs args: bash's own arguments, as for a normal call
     on_host -> ERROR on_host's args must be an object: the tool's arguments
     on_host -> ERROR on_host needs host with tool. tool hosts:
-    - <backend> (id backend): home $HOME, the session's active host (call tools directly)
+    - <host> (id backend): home $HOME, the session's active host (call tools directly)
     - laptop (id host-laptop): home $DIR/laptop
     run a tool on another one: on_host {host: "NAME", tool: "bash", args: {command: "uname -a"}}
     on_host -> ERROR subagent runs in the backend, not on a tool host; a subagent can use on_host itself: on_host runs bash, read, write, edit, apply_patch, ls, grep, find
@@ -324,7 +318,7 @@ let%expect_test "a host that disconnected" =
   [%expect
     {|
     on_host -> ERROR no connected tool host "laptop" (it may have disconnected: the user can connect it with `prigh tool-host -connect` or a TUI there). Connected:
-    - <backend> (id backend): home $HOME, the session's active host (call tools directly)
+    - <host> (id backend): home $HOME, the session's active host (call tools directly)
     |}]
 ;;
 

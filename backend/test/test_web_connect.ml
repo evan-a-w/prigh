@@ -357,13 +357,7 @@ let page_hello t ~sw ~port params =
                 List.filter_map hosts ~f:(fun h ->
                   match field h "id", field h "name", field h "cwd" with
                   | Some (`String id), Some (`String name), Some (`String cwd)
-                    ->
-                    let name =
-                      if String.equal name (Core_unix.gethostname ())
-                      then "<host>"
-                      else name
-                    in
-                    Some (sprintf "%s (%s, %s)" id name (mask t cwd))
+                    -> Some (sprintf "%s (%s, %s)" id name (mask t cwd))
                   | _ -> None)
               | _ -> []
             in

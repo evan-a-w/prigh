@@ -21,3 +21,11 @@
   eio_posix
   expect_test_helpers_core
   re))
+
+; The backend's own host by a fixed name, the same on every machine: never
+; one of the tests' tool hosts ("laptop", "desktop", ...).
+
+(env
+ (_
+  (env-vars
+   (PRIGH_HOST_NAME <host>))))
