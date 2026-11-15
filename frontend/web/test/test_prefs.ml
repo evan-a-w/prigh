@@ -73,7 +73,7 @@ let%expect_test "the cache first, then the backend's, which win" =
       ((key web.sidebar-unfolded) (value ()))
       ((key web.sidebar-opened) (value ()))
       ((key web.sidebar-worktree-hours) (value ())) ((key web.review) (value ()))
-      ((key history) (value (("from the tui"))))
+      ((key web.code-size) (value ())) ((key history) (value (("from the tui"))))
       ((key web.migrated) (value (true))) ((key web.sidebar-width) (value ()))
       ((key web.files-width) (value ()))
       ((key web.files-preview-width) (value ()))
@@ -111,7 +111,7 @@ let%expect_test "a page from before uploads the browser's once" =
       ((key web.sidebar-unfolded) (value ()))
       ((key web.sidebar-opened) (value ()))
       ((key web.sidebar-worktree-hours) (value ())) ((key web.review) (value ()))
-      ((key history) (value (("tui prompt"))))
+      ((key web.code-size) (value ())) ((key history) (value (("tui prompt"))))
       ((key web.migrated) (value (true))) ((key web.sidebar-width) (value ()))
       ((key web.files-width) (value ()))
       ((key web.files-preview-width) (value ()))
@@ -144,8 +144,9 @@ let%expect_test "a page from before uploads the browser's once" =
       ((key web.sidebar-unfolded) (value ()))
       ((key web.sidebar-opened) (value ()))
       ((key web.sidebar-worktree-hours) (value ())) ((key web.review) (value ()))
-      ((key history) (value ())) ((key web.migrated) (value (true)))
-      ((key web.sidebar-width) (value ())) ((key web.files-width) (value ()))
+      ((key web.code-size) (value ())) ((key history) (value ()))
+      ((key web.migrated) (value (true))) ((key web.sidebar-width) (value ()))
+      ((key web.files-width) (value ()))
       ((key web.files-preview-width) (value ()))
       ((key web.agents-width) (value ())) ((key web.terminal-height) (value ()))
       ((key web.review-chat-width) (value ()))
@@ -278,7 +279,7 @@ let%expect_test
       ((keys
         (web.theme web.accent web.notify web.verbosity web.terminal-open
          web.sidebar-folded web.sidebar-unfolded web.sidebar-opened
-         web.sidebar-worktree-hours web.review history web.migrated
+         web.sidebar-worktree-hours web.review web.code-size history web.migrated
          web.sidebar-width web.files-width web.files-preview-width
          web.agents-width web.terminal-height web.review-chat-width
          web.review-files-width web.review-margin-width))))

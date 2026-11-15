@@ -39,6 +39,9 @@ module Key : sig
   (** What the review page compared last ({!Review_memory}). *)
   val review : string
 
+  (** How large code shows in diffs ({!Code_size}). *)
+  val code_size : string
+
   (** ["history"]: the prompts sent, newest first, shared with the TUI. *)
   val history : string
 
