@@ -272,7 +272,7 @@ let%expect_test
       h
       (Prigh_ui.App.Action.Event
          (P.Event.Message_update
-            { partial; delta = P.Delta.Text_delta "\nstreamed reply" }));
+            (unnumbered (P.Delta.Text_delta "\nstreamed reply"))));
     let%bind () = H.paint h in
     H.show h;
     [%expect
@@ -444,10 +444,8 @@ let%expect_test "styled frame: markdown link, diff and autocomplete" =
       h
       (Prigh_ui.App.Action.Event
          (P.Event.Message_update
-            { partial
-            ; delta =
-                P.Delta.Text_delta "See [the docs](https://example.com).\n"
-            }));
+            (unnumbered
+               (P.Delta.Text_delta "See [the docs](https://example.com).\n"))));
     let call = tool_call "c1" in
     H.incoming h (Prigh_ui.App.Action.Event (P.Event.Tool_start call));
     H.incoming

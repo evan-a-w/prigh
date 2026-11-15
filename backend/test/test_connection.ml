@@ -137,10 +137,11 @@ let many_deltas n =
 ;;
 
 (* A frontend that reads slower than the model writes (a slow link, a busy
-   machine) while a long reply streams: each update carries the whole
-   message so far. The updates waiting for it merge, so it is not dropped
-   for being behind, and it ends up with the whole message. *)
-let%expect_test "a slow peer under a long streamed reply keeps up" =
+   machine) while a long reply streams. The updates waiting for it merge, so
+   it is not dropped for being behind, and it ends up with the whole
+   message: as deltas covering every piece once, or (a frontend that does
+   not take deltas) with each update carrying the whole message so far. *)
+let slow_peer_keeps_up ~takes_deltas =
   with_sandbox
   @@ fun t ->
   Eio.Switch.run
@@ -171,8 +172,9 @@ let%expect_test "a slow peer under a long streamed reply keeps up" =
   Conn.send
     slow
     (sprintf
-       {|{"id": 1, "method": "hello", "params": {"session": "%s"}}|}
-       session);
+       {|{"id": 1, "method": "hello", "params": {"session": "%s"%s}}|}
+       session
+       (if takes_deltas then {|, "features": ["stream_deltas"]|} else ""));
   Conn.send watcher {|{"id": 2, "method": "prompt", "params": {"text": "go"}}|};
   print_endline (Conn.ok t watcher 2);
   let rec wait_for_the_run id =
@@ -223,8 +225,18 @@ let%expect_test "a slow peer under a long streamed reply keeps up" =
   let thinking = joined "thinking_delta" in
   let last_partial =
     match List.last updates with
-    | Some e -> Json.to_string (Option.value_exn (member [ "partial" ] e))
-    | None -> ""
+    | Some e -> Option.map (member [ "partial" ] e) ~f:Json.to_string
+    | None -> None
+  in
+  let number key e =
+    match member [ key ] e with
+    | Some (`Number n) -> Some (Int.of_string n)
+    | _ -> None
+  in
+  let pieces =
+    List.map updates ~f:(fun e ->
+      let seq = Option.value_exn (number "seq" e) in
+      Option.value (number "from" e) ~default:seq, seq)
   in
   let final =
     Queue.to_list slow.events
@@ -249,19 +261,157 @@ let%expect_test "a slow peer under a long streamed reply keeps up" =
            : bool)
         ~thinking_length:(String.length thinking : int)
         ~last_partial_has_the_whole_text:
-          (String.is_substring last_partial ~substring:text : bool)
+          (Option.map last_partial ~f:(String.is_substring ~substring:text)
+           : bool option)
+        (pieces : (int * int) list)
         ~final_content:
           (Option.map final ~f:Json.to_string |> Option.map ~f:String.length
            : int option)];
   Conn.close watcher;
   Conn.close slow;
-  Rpc_server.shutdown server;
+  Rpc_server.shutdown server
+;;
+
+let%expect_test "a slow peer under a long streamed reply keeps up" =
+  slow_peer_keeps_up ~takes_deltas:false;
   [%expect
     {|
     ok
     ((ended false) (updates 2) (text_length 10000) (text_is_the_reply true)
-     (thinking_length 2000) (last_partial_has_the_whole_text true)
-     (final_content (12057)))
+     (thinking_length 2000) (last_partial_has_the_whole_text (true))
+     (pieces ((1 2000) (2001 12000))) (final_content (12057)))
+    |}];
+  slow_peer_keeps_up ~takes_deltas:true;
+  [%expect
+    {|
+    ok
+    ((ended false) (updates 2) (text_length 10000) (text_is_the_reply true)
+     (thinking_length 2000) (last_partial_has_the_whole_text ())
+     (pieces ((1 2000) (2001 12000))) (final_content (12057)))
+    |}]
+;;
+
+(* A frontend that attaches to the session while a reply streams (a second
+   tab, a reconnect) gets the message so far with its first update, then
+   deltas; so does one that asks for it ([resync]: it found pieces
+   missing). The others keep getting deltas. *)
+let%expect_test "a peer joining mid-stream, or asking, gets the whole message" =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let events = ref 0 in
+  let pauses = Queue.create () in
+  let pause_after = [ 3; 6 ] in
+  let delay_between_events () =
+    incr events;
+    if List.mem pause_after !events ~equal:Int.equal
+    then (
+      let resume, set_resume = Eio.Promise.create () in
+      Queue.enqueue pauses set_resume;
+      Eio.Promise.await resume)
+    else Fiber.yield ()
+  in
+  let reply =
+    { Reply.events =
+        List.init 9 ~f:(fun i -> Assistant_event.Text_delta (Int.to_string i))
+    ; stop_reason = End_turn
+    ; usage = Usage.zero
+    }
+  in
+  let server =
+    make_server
+      t
+      ~sw
+      ~provider:(Faux_provider.create ~delay_between_events [ reply ])
+  in
+  let hello ?session c =
+    Conn.send
+      c
+      (sprintf
+         {|{"id": 1, "method": "hello", "params": {%s"features": ["stream_deltas"]}}|}
+         (Option.value_map
+            session
+            ~default:""
+            ~f:(sprintf {|"session": "%s", |})))
+  in
+  let watcher = Conn.start server ~sw in
+  hello watcher;
+  let session = session_id_of t watcher 1 in
+  Conn.send watcher {|{"id": 2, "method": "prompt", "params": {"text": "go"}}|};
+  print_endline (Conn.ok t watcher 2);
+  let resume () = Eio.Promise.resolve (Queue.dequeue_exn pauses) () in
+  wait_until t (fun () -> Queue.length pauses = 1);
+  let joiner = Conn.start server ~sw in
+  hello joiner ~session;
+  print_endline (Conn.ok t joiner 1);
+  resume ();
+  wait_until t (fun () -> Queue.length pauses = 1);
+  Conn.send joiner {|{"id": 2, "method": "resync"}|};
+  print_endline (Conn.ok t joiner 2);
+  resume ();
+  let member path json =
+    List.fold path ~init:(Some json) ~f:(fun json key ->
+      Option.bind json ~f:(Json.member key))
+  in
+  let ended (c : Conn.t) =
+    Queue.exists c.events ~f:(fun e ->
+      match member [ "event" ] e, member [ "message"; "role" ] e with
+      | Some (`String "message_end"), Some (`String "assistant") -> true
+      | _ -> false)
+  in
+  wait_until t (fun () -> ended watcher && ended joiner);
+  let show name (c : Conn.t) =
+    Queue.iter c.events ~f:(fun e ->
+      match member [ "event" ] e with
+      | Some (`String "message_update") ->
+        let field key =
+          Option.value_map (member [ key ] e) ~default:"-" ~f:Json.to_string
+        in
+        let partial =
+          Option.value_map
+            (member [ "partial"; "content" ] e)
+            ~default:""
+            ~f:(fun c -> " partial " ^ Json.to_string c)
+        in
+        printf
+          "%s: seq %s from %s delta %s%s\n"
+          name
+          (field "seq")
+          (field "from")
+          (Option.value_map
+             (member [ "delta"; "text" ] e)
+             ~default:""
+             ~f:Json.to_string)
+          partial
+      | _ -> ())
+  in
+  show "watcher" watcher;
+  show "joiner" joiner;
+  Conn.close watcher;
+  Conn.close joiner;
+  Rpc_server.shutdown server;
+  [%expect
+    {|
+    ok
+    ok
+    ok
+    watcher: seq 1 from - delta "0"
+    watcher: seq 2 from - delta "1"
+    watcher: seq 3 from - delta "2"
+    watcher: seq 4 from - delta "3"
+    watcher: seq 5 from - delta "4"
+    watcher: seq 6 from - delta "5"
+    watcher: seq 7 from - delta "6"
+    watcher: seq 8 from - delta "7"
+    watcher: seq 9 from - delta "8"
+    joiner: seq 3 from - delta "2" partial [{"type":"text","text":"012"}]
+    joiner: seq 4 from - delta "3"
+    joiner: seq 5 from - delta "4"
+    joiner: seq 6 from - delta "5" partial [{"type":"text","text":"012345"}]
+    joiner: seq 7 from - delta "6"
+    joiner: seq 8 from - delta "7"
+    joiner: seq 9 from - delta "8"
     |}]
 ;;
 

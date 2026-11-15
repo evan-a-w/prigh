@@ -424,7 +424,7 @@ let%expect_test
           (handover
              ~from:"deepseek/deepseek-flash"
              ~to_:"anthropic/claude-fable-5-1")));
-  H.event h (Message_update { partial; delta = Text_delta "fixed it" });
+  H.event h (Message_update (unnumbered (Text_delta "fixed it")));
   H.event h (Message_end (assistant "fixed it"));
   H.event h (State (state ~model:fable ()));
   H.show h;

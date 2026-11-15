@@ -186,6 +186,10 @@ let partial =
   | _ -> assert false
 ;;
 
+let unnumbered delta : P.Stream_update.t =
+  { stream = 0; from = 0; seq = 0; block = -1; delta; partial = Some partial }
+;;
+
 let tool_call ?(name = "bash") ?(arguments = "{}") id : P.Tool_call.t =
   { id; name; arguments }
 ;;

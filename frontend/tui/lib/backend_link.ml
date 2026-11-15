@@ -69,7 +69,8 @@ end
 
 let connection_hello ?home hello ~host_id =
   match host_id with
-  | None -> hello @ [ "tools", `False ]
+  | None ->
+    hello @ [ "tools", `False; "features", `Array [ `String "stream_deltas" ] ]
   | Some id ->
     hello
     @ Option.value_map home ~default:[] ~f:(fun home ->
@@ -81,6 +82,7 @@ let connection_hello ?home hello ~host_id =
             [ `String "exec_input"
             ; `String "terminal_kill"
             ; `String "git_location"
+            ; `String "stream_deltas"
             ] )
       ]
 ;;

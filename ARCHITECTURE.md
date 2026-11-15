@@ -2127,12 +2127,30 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   `tool_exec_result`). Nothing waits for a peer: what a connection sends
   goes into its `Outbox`, a queue that never blocks the sender (an agent's
   events, the broadcasts to every client such as `sessions_changed`, other
-  clients' requests), through `Update_coalescer`: a `message_update`
-  carries the whole message so far, so those of one stream (the agent's or
-  a subagent's) still waiting merge (latest `partial`, deltas joined) and a
-  peer reading slower than the model writes gets fewer, current updates
-  instead of falling behind by ever larger copies (they are rendered when
-  written, `Outbox.send_late`). Before, a page that stopped reading (a suspended
+  clients' requests), through `Update_coalescer`: the `message_update`s of
+  one stream (the agent's or a subagent's) still waiting merge (deltas of
+  one block joined, `from`..`seq` covering both; the latest `partial` for
+  whole-message updates), so a peer reading slower than the model writes
+  gets fewer updates instead of falling behind (they are rendered when
+  written, `Outbox.send_late`).
+
+  Streaming is linear in the reply's length. Each streamed message has a
+  process-unique `stream` id, and each of its pieces a `seq` (from 1) and
+  the `block` of the content it changes; the agent loop does not snapshot
+  the message per piece (`Message_update.partial` is a function).
+  `route` serialises an event once for all the session's clients
+  (`send_shared`). A client whose `hello` `features` has `stream_deltas`
+  (the TUI, prigh-web, ACP) gets bare deltas while it has every piece
+  before (`Stream_sync`, per connection and stream); when it has not (it
+  attached mid-stream, reconnected, or called `resync` because it saw a gap
+  in `seq`), the next update also carries `partial`, the whole message
+  through that piece, serialised once. Other clients get `partial` with
+  every update, as before. Frontends (`Stream_update.apply` in prigh-web,
+  `Transcript` in the TUI, which appends to a `Stream_text` instead of
+  copying) skip pieces they have, ask for a `resync` once on a gap, and
+  ignore deltas until it comes; updates without `seq` (an older backend)
+  are applied as before. A 16 KB reply in 4000 pieces is 0.5 MB on the
+  wire instead of 33 MB. Before, a page that stopped reading (a suspended
   laptop, a phone gone behind a proxy that keeps its socket) filled a
   bounded queue, and then the agent emitting events to it, and every
   request broadcasting to all clients, waited forever: every session of the

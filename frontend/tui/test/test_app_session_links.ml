@@ -49,7 +49,7 @@ let%expect_test "markdown: session links and the ids of known sessions" =
 let%expect_test "the session list arriving highlights ids; /switch PREFIX" =
   let h = Test_app.connected ~height:12 () in
   H.event h (Message_start (user "which session fixed the taskbar?"));
-  H.event h (Message_update { partial; delta = Text_delta reply });
+  H.event h (Message_update (unnumbered (Text_delta reply)));
   H.event h (Message_end (assistant reply));
   H.show h;
   H.reply h Sessions_cache sessions;

@@ -62,6 +62,10 @@ let create ~paging chat =
   match !last with
   | Some (paging', chat', t)
     when Paging.equal paging paging' && phys_equal chat chat' -> t
+  | Some (paging', chat', t)
+    when Paging.equal paging paging' && Chat.only_streamed ~before:chat' chat ->
+    last := Some (paging, chat, t);
+    t
   | _ ->
     let t = compute ~paging chat in
     last := Some (paging, chat, t);

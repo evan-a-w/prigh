@@ -152,7 +152,8 @@ val close : t -> unit Deferred.t
     again when we reconnect or restart (and resumes its sessions on it), and
     the [features] our tool host has ([exec_input]: it forwards
     [Tool_exec_input] to running tools), and with [home] our tool host's home
-    directory, which [~] in paths for it means. *)
+    directory, which [~] in paths for it means. [features] also has
+    [stream_deltas]: [message_update]s need not carry the whole message. *)
 val connection_hello
   :  ?home:string
   -> (string * Prigh_protocol.Json.t) list

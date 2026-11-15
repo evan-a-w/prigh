@@ -105,39 +105,37 @@ let message_at m ~(at : float option) =
 
 let timed_message ({ message; at } : Timed_message.t) = message_at message ~at
 
-let delta (d : Assistant_event.t) =
-  match d with
-  | Text_delta text -> `Object [ "type", str "text_delta"; "text", str text ]
-  | Thinking_delta text ->
-    `Object [ "type", str "thinking_delta"; "text", str text ]
-  | Thinking_signature _ -> `Object [ "type", str "thinking_signature" ]
-  | Tool_call_start { index; id; name } ->
-    `Object
+let delta (d : Assistant_event.t) ~block =
+  let fields =
+    match d with
+    | Text_delta text -> [ "type", str "text_delta"; "text", str text ]
+    | Thinking_delta text -> [ "type", str "thinking_delta"; "text", str text ]
+    | Thinking_signature _ -> [ "type", str "thinking_signature" ]
+    | Tool_call_start { index; id; name } ->
       [ "type", str "tool_call_start"
       ; "index", int index
       ; "id", str id
       ; "name", str name
       ]
-  | Tool_call_delta { index; arguments } ->
-    `Object
+    | Tool_call_delta { index; arguments } ->
       [ "type", str "tool_call_delta"
       ; "index", int index
       ; "arguments", str arguments
       ]
-  | Server_tool_use { id; name; input } ->
-    `Object
+    | Server_tool_use { id; name; input } ->
       [ "type", str "server_tool_use"
       ; "id", str id
       ; "name", str name
       ; "input", str input
       ]
-  | Server_tool_result { id; output; is_error; raw = _ } ->
-    `Object
+    | Server_tool_result { id; output; is_error; raw = _ } ->
       [ "type", str "server_tool_result"
       ; "id", str id
       ; "output", str output
       ; "is_error", bool is_error
       ]
+  in
+  `Object (fields @ [ "block", int block ])
 ;;
 
 let thinking t = str (Thinking.to_string t)
@@ -740,7 +738,7 @@ let agent_queues agents =
          ]))
 ;;
 
-let rec event ?now (e : Agent.Event.t) =
+let rec event ?now ?(resync = false) (e : Agent.Event.t) =
   let fields =
     match e with
     | Loop Agent_start -> [ "event", str "agent_start" ]
@@ -756,11 +754,10 @@ let rec event ?now (e : Agent.Event.t) =
       ]
     | Loop (Message_start m) ->
       [ "event", str "message_start"; "message", message_at m ~at:now ]
-    | Loop (Message_update { partial; delta = d }) ->
-      [ "event", str "message_update"
-      ; "partial", assistant partial
-      ; "delta", delta d
-      ]
+    | Loop (Message_update { delta = d; block; stream; seq; partial }) ->
+      [ "event", str "message_update"; "stream", int stream; "seq", int seq ]
+      @ (if resync then [ "partial", assistant (partial ()) ] else [])
+      @ [ "delta", delta d ~block ]
     | Loop (Message_end m) ->
       [ "event", str "message_end"; "message", message_at m ~at:now ]
     | Loop (Retry { attempt; max_attempts; error; delay }) ->
@@ -841,7 +838,7 @@ let rec event ?now (e : Agent.Event.t) =
       [ "event", str "subagent"
       ; "call_id", str call_id
       ; "agent_id", str agent_id
-      ; "inner", event ?now (Loop inner)
+      ; "inner", event ?now ~resync (Loop inner)
       ]
     | Loop
         (Subagent_end { call_id; agent_id; usage = u; turns; cost_usd; result })

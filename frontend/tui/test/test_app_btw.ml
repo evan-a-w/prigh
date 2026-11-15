@@ -6,12 +6,13 @@ module H = Test_app.H
 
 let transcript_sexp (h : H.t) = [%sexp (h.model.transcript : Transcript.t)]
 
-let%expect_test "/btw while running: streamed box, Esc dismisses without \
-                 aborting, transcript untouched"
+let%expect_test
+    "/btw while running: streamed box, Esc dismisses without aborting, \
+     transcript untouched"
   =
   let h = Test_app.connected ~height:16 () in
   H.event h (State (state ~running:true ()));
-  H.event h (Message_update { partial; delta = Text_delta "Working on it" });
+  H.event h (Message_update (unnumbered (Text_delta "Working on it")));
   let before = transcript_sexp h in
   H.keys h "/btw which file are you editing?";
   H.enter h;

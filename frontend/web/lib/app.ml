@@ -8249,7 +8249,10 @@ let ui_event (m : Model.t) (e : Ui_event.t) =
 (* The images the transcript's [render_ui] calls show: asked for as they
    appear (each session afresh: the links expire). *)
 let follow_ui_images (before : Model.t) ((m : Model.t), cmds) =
-  if phys_equal before.chat m.chat && phys_equal before.ui m.ui
+  if
+    phys_equal before.ui m.ui
+    && (phys_equal before.chat m.chat
+        || Chat.only_streamed ~before:before.chat m.chat)
   then m, cmds
   else (
     match m.state with
@@ -9772,6 +9775,11 @@ let event (m : Model.t) (e : Event.t) =
     | _ -> m.pending
   in
   let chat = Chat.apply m.chat e in
+  let chat, ask_resync =
+    if Chat.wants_resync chat
+    then Chat.resync_asked chat, [ rpc "resync" [] ~tag:Ignore ]
+    else chat, []
+  in
   let m =
     { m with
       chat
@@ -9806,7 +9814,8 @@ let event (m : Model.t) (e : Event.t) =
     else m, []
   in
   ( m
-  , resync
+  , ask_resync
+    @ resync
     @ cmds
     @ review
     @ if Agents.starts_or_ends e then [ list_subagents ] else [] )

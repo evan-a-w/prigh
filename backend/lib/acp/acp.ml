@@ -229,13 +229,27 @@ let credentials t =
 
 let client_label t = sprintf "%s (ACP)" t.client_name
 
+(* Only the deltas of [message_update]s are used: they need not carry the
+   whole message. *)
+let deltas hello =
+  match List.Assoc.find hello "features" ~equal:String.equal with
+  | Some (`Array features) ->
+    List.Assoc.add
+      hello
+      "features"
+      (`Array (str "stream_deltas" :: features))
+      ~equal:String.equal
+  | Some _ | None -> hello @ [ "features", `Array [ str "stream_deltas" ] ]
+;;
+
 let open_link t ~on_event ~on_close hello =
   Or_error.bind (t.config.connector ~on_event ~on_close) ~f:(fun link ->
     match
       Rpc_client.call
         link
         "hello"
-        ((("client", str (Client_kind.to_string Acp)) :: credentials t) @ hello)
+        ((("client", str (Client_kind.to_string Acp)) :: credentials t)
+         @ deltas hello)
     with
     | Ok result -> Ok (link, result)
     | Error e ->

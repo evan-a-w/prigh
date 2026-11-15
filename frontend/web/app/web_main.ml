@@ -51,6 +51,7 @@ module Settings = struct
     ; "client", `String "web"
     ; "tools", `False
     ; "tab", `String tab
+    ; "features", `Array [ `String "stream_deltas" ]
     ]
     @ Login.hello_fields t.login
     @ Option.value_map t.prefer_host ~default:[] ~f:(fun host ->

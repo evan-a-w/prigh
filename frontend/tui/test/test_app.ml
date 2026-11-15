@@ -155,11 +155,9 @@ let%expect_test
     |}];
   H.event h (State (state ~running:true ()));
   H.event h (Message_start (user "list the files"));
-  H.event h (Message_update { partial; delta = Thinking_delta "let me look" });
-  H.event h (Message_update { partial; delta = Text_delta "Sure, here" });
-  H.event
-    h
-    (Message_update { partial; delta = Text_delta " they are:\nfirst li" });
+  H.event h (Message_update (unnumbered (Thinking_delta "let me look")));
+  H.event h (Message_update (unnumbered (Text_delta "Sure, here")));
+  H.event h (Message_update (unnumbered (Text_delta " they are:\nfirst li")));
   H.show h;
   [%expect
     {|
@@ -176,7 +174,7 @@ let%expect_test
     > ▏
     deepseek-flash  $0.01  ⠋ writing · Esc aborts · Enter steers
     |}];
-  H.event h (Message_update { partial; delta = Text_delta "ne done" });
+  H.event h (Message_update (unnumbered (Text_delta "ne done")));
   H.event
     h
     (Tool_start
@@ -3143,7 +3141,7 @@ let%expect_test "verbosity cycles Normal / Verbose / Quiet; /verbosity sets it" 
     String.concat ~sep:"\n" (List.init 20 ~f:(fun i -> sprintf "out %d" i))
   in
   H.event h (Tool_end { call; result = tool_result ~id:"c1" text });
-  H.event h (Message_update { partial; delta = Text_delta "all done" });
+  H.event h (Message_update (unnumbered (Text_delta "all done")));
   H.event h (Message_end (assistant "all done"));
   H.event h (State (state ()));
   H.show h;
@@ -3260,7 +3258,7 @@ let%expect_test
              "Read image file [image/png, 800x600]\n\
               [Image downscaled from 4000x3000 to fit]"
        });
-  H.event h (Message_update { partial; delta = Text_delta "A cat." });
+  H.event h (Message_update (unnumbered (Text_delta "A cat.")));
   H.event h (Message_end (assistant "A cat."));
   H.event h (State (state ()));
   H.show h;
@@ -3426,15 +3424,14 @@ let%expect_test "quiet hides intermediate text and thinking" =
   H.event h (Message_start (user "hi"));
   H.event
     h
-    (Message_update
-       { partial; delta = Thinking_delta "secret chain of thought" });
+    (Message_update (unnumbered (Thinking_delta "secret chain of thought")));
   H.event
     h
-    (Message_update { partial; delta = Text_delta "let me look at the files" });
+    (Message_update (unnumbered (Text_delta "let me look at the files")));
   let call = tool_call ~arguments:{|{"command":"ls"}|} "c1" in
   H.event h (Tool_start call);
   H.event h (Tool_end { call; result = tool_result ~id:"c1" "a.ml\nb.ml" });
-  H.event h (Message_update { partial; delta = Text_delta "all done" });
+  H.event h (Message_update (unnumbered (Text_delta "all done")));
   H.event h (Message_end (assistant "all done"));
   H.event h (State (state ()));
   H.show h;
@@ -3528,12 +3525,10 @@ let%expect_test "resize mid-stream re-wraps without losing lines" =
   H.event
     h
     (Message_update
-       { partial
-       ; delta =
-           Text_delta
+       (unnumbered
+          (Text_delta
              "The quick brown fox jumps over the lazy dog and keeps running.\n\
-              second"
-       });
+              second")));
   H.show h;
   [%expect
     {|
@@ -3560,7 +3555,7 @@ let%expect_test "resize mid-stream re-wraps without losing lines" =
     deepseek-flash  ctx:0.1%/1.0M
     |}];
   H.step h (Resize { width = 60; height = 8 });
-  H.event h (Message_update { partial; delta = Text_delta " part" });
+  H.event h (Message_update (unnumbered (Text_delta " part")));
   H.show h;
   [%expect
     {|
@@ -3817,8 +3812,7 @@ let%expect_test "scroll stays anchored while streaming" =
   let stream from count =
     List.iter
       (List.init count ~f:(fun i -> sprintf "line %d\n" (from + i)))
-      ~f:(fun text ->
-        H.event h (Message_update { partial; delta = Text_delta text }))
+      ~f:(fun text -> H.event h (Message_update (unnumbered (Text_delta text))))
   in
   stream 0 12;
   H.show h;
@@ -3902,8 +3896,7 @@ let%expect_test "page_down past the bottom returns to follow" =
   let stream =
     List.iter
       (List.init 20 ~f:(fun i -> sprintf "line %d\n" i))
-      ~f:(fun text ->
-        H.event h (Message_update { partial; delta = Text_delta text }))
+      ~f:(fun text -> H.event h (Message_update (unnumbered (Text_delta text))))
   in
   stream;
   H.key h (Key.plain Page_up);
@@ -3976,8 +3969,7 @@ let%expect_test
   let stream =
     List.iter
       (List.init 20 ~f:(fun i -> sprintf "line %d\n" i))
-      ~f:(fun text ->
-        H.event h (Message_update { partial; delta = Text_delta text }))
+      ~f:(fun text -> H.event h (Message_update (unnumbered (Text_delta text))))
   in
   stream;
   H.key h (Key.plain Page_up);
@@ -4064,7 +4056,7 @@ let%expect_test "abort restore is singular, prepends, and tolerates no field" =
 ;;
 
 let say h text =
-  H.event h (Message_update { partial; delta = Text_delta text });
+  H.event h (Message_update (unnumbered (Text_delta text)));
   H.event h (Message_end (assistant text))
 ;;
 
@@ -4515,7 +4507,7 @@ let%expect_test "two parallel subagents: strip, live tails, focus cycling, Esc" 
     (Subagent
        { call_id = "c2"
        ; agent_id = "c2"
-       ; event = Message_update { partial; delta = Text_delta "all tests pass" }
+       ; event = Message_update (unnumbered (Text_delta "all tests pass"))
        });
   H.event
     h
@@ -5445,7 +5437,7 @@ let%expect_test
     (Subagent
        { call_id = "c1"
        ; agent_id = "c1"
-       ; event = Message_update { partial; delta = Text_delta "the report" }
+       ; event = Message_update (unnumbered (Text_delta "the report"))
        });
   H.event
     h
@@ -6139,7 +6131,7 @@ let%expect_test "Ctrl+Up / Ctrl+Down jump between user messages at height 8" =
   let h = connected ~height:8 () in
   let add_exchange question answer =
     H.event h (Message_start (user question));
-    H.event h (Message_update { partial; delta = Text_delta answer });
+    H.event h (Message_update (unnumbered (Text_delta answer)));
     H.event h (Message_end (assistant answer))
   in
   add_exchange "second question" "second answer";
@@ -6888,13 +6880,11 @@ let%expect_test "resize 120->40 mid-stream keeps every line" =
     H.event
       h
       (Message_update
-         { partial
-         ; delta =
-             Text_delta
+         (unnumbered
+            (Text_delta
                (sprintf
                   "delta %d with several words that wrap at forty columns\n"
-                  i)
-         })
+                  i))))
   done;
   H.show h;
   [%expect
@@ -7158,7 +7148,7 @@ let%expect_test "wide characters keep the editor cursor column" =
     |}];
   H.enter h;
   H.event h (Message_start (user "日本語🐹 wide"));
-  H.event h (Message_update { partial; delta = Text_delta "emoji 🐹 and 日本語" });
+  H.event h (Message_update (unnumbered (Text_delta "emoji 🐹 and 日本語")));
   H.event h (Message_end (assistant "emoji 🐹 and 日本語"));
   H.show h;
   [%expect
@@ -8917,7 +8907,7 @@ let%expect_test
     deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}];
   H.event h (Message_start (Assistant partial));
-  H.event h (Message_update { partial; delta = Text_delta "streaming" });
+  H.event h (Message_update (unnumbered (Text_delta "streaming")));
   H.show h;
   [%expect
     {|
@@ -10475,15 +10465,15 @@ let%expect_test
   H.show h;
   (* Newer models' thinking has no text to show: a block starts, nothing
      more comes until it ends. *)
-  H.event h (Message_update { partial; delta = Thinking_delta "" });
+  H.event h (Message_update (unnumbered (Thinking_delta "")));
   H.show h;
   (* What the failed attempt streamed is dropped for the retry's notice. *)
-  H.event h (Message_update { partial; delta = Text_delta "half a rep" });
+  H.event h (Message_update (unnumbered (Text_delta "half a rep")));
   H.event h (Retry retry);
   H.show h;
   H.event h (Message_start (Assistant partial));
   H.show h;
-  H.event h (Message_update { partial; delta = Text_delta "A reply." });
+  H.event h (Message_update (unnumbered (Text_delta "A reply.")));
   H.show h;
   H.event h (Tool_start (tool_call "c1"));
   H.show h;

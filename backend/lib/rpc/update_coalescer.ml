@@ -2,7 +2,10 @@ open! Core
 open! Import
 
 module Waiting = struct
-  type t = { mutable event : Json.t }
+  type t =
+    { mutable event : Json.t
+    ; mutable line : string Lazy.t option (** until merged *)
+    }
 end
 
 type t =
@@ -46,21 +49,54 @@ let rec stream json =
   | _ -> None
 ;;
 
+let same_number a b key =
+  match field a key, field b key with
+  | Some (`Number a), Some (`Number b) -> String.equal a b
+  | None, None -> true
+  | _ -> false
+;;
+
 let join_deltas earlier later =
   let concat key =
     match string_field earlier key, string_field later key with
     | Some a, Some b -> Some (replace later key (`String (a ^ b)))
     | _ -> None
   in
-  match string_field earlier "type", string_field later "type" with
-  | Some "text_delta", Some "text_delta"
-  | Some "thinking_delta", Some "thinking_delta" -> concat "text"
-  | Some "tool_call_delta", Some "tool_call_delta" ->
-    (match field earlier "index", field later "index" with
-     | Some (`Number a), Some (`Number b) when String.equal a b ->
-       concat "arguments"
-     | _ -> None)
-  | _ -> None
+  if not (same_number earlier later "block")
+  then None
+  else (
+    match string_field earlier "type", string_field later "type" with
+    | Some "text_delta", Some "text_delta"
+    | Some "thinking_delta", Some "thinking_delta" -> concat "text"
+    | Some "tool_call_delta", Some "tool_call_delta"
+      when same_number earlier later "index" -> concat "arguments"
+    | _ -> None)
+;;
+
+(* [later]'s delta joined to [earlier]'s, covering both: [from] is the
+   earlier's first. *)
+let join_updates earlier later =
+  if
+    (not (same_number earlier later "stream"))
+    || not
+         (Bool.equal
+            (Option.is_some (field earlier "partial"))
+            (Option.is_some (field later "partial")))
+  then None
+  else
+    Option.both (field earlier "delta") (field later "delta")
+    |> Option.bind ~f:(fun (a, b) -> join_deltas a b)
+    |> Option.map ~f:(fun delta ->
+      let later = replace later "delta" delta in
+      match field earlier "from", field earlier "seq", later with
+      | Some from, _, `Object fields | None, Some from, `Object fields ->
+        `Object
+          (List.concat_map fields ~f:(fun (k, v) ->
+             match k with
+             | "from" -> []
+             | "seq" -> [ "from", from; k, v ]
+             | _ -> [ k, v ]))
+      | _ -> later)
 ;;
 
 (* Both are updates of one stream. *)
@@ -70,29 +106,34 @@ let rec join earlier later =
     Option.both (field earlier "inner") (field later "inner")
     |> Option.bind ~f:(fun (a, b) ->
       Option.map (join a b) ~f:(replace later "inner"))
-  | _ ->
-    Option.both (field earlier "delta") (field later "delta")
-    |> Option.bind ~f:(fun (a, b) ->
-      Option.map (join_deltas a b) ~f:(replace later "delta"))
+  | _ -> join_updates earlier later
 ;;
 
-let send t json =
+let render ?line json =
+  match line with
+  | Some line -> force line
+  | None -> Json.to_string json
+;;
+
+let send t ?line json =
   match stream json with
   | None ->
     Hashtbl.clear t.waiting;
-    Outbox.send t.outbox (Json.to_string json)
+    Outbox.send t.outbox (render ?line json)
   | Some key ->
     let joined =
       Option.bind (Hashtbl.find t.waiting key) ~f:(fun (w : Waiting.t) ->
-        Option.map (join w.event json) ~f:(fun event -> w.event <- event))
+        Option.map (join w.event json) ~f:(fun event ->
+          w.event <- event;
+          w.line <- None))
     in
     if Option.is_none joined
     then (
-      let w = { Waiting.event = json } in
+      let w = { Waiting.event = json; line } in
       Hashtbl.set t.waiting ~key ~data:w;
       Outbox.send_late t.outbox (fun () ->
         (match Hashtbl.find t.waiting key with
          | Some w' when phys_equal w w' -> Hashtbl.remove t.waiting key
          | Some _ | None -> ());
-        Json.to_string w.event))
+        render ?line:w.line w.event))
 ;;

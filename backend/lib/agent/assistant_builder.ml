@@ -29,50 +29,75 @@ end
 type t =
   { model : string
   ; mutable blocks : Block.t list (* reversed *)
+  ; mutable count : int (* of [blocks] *)
   }
 
-let create ~model = { model; blocks = [] }
+let create ~model = { model; blocks = []; count = 0 }
+
+let push t block =
+  t.blocks <- block :: t.blocks;
+  t.count <- t.count + 1
+;;
+
+(* The block [f] selects, with its index. *)
+let find t ~f =
+  List.find_mapi t.blocks ~f:(fun i block ->
+    Option.map (f block) ~f:(fun found -> found, t.count - 1 - i))
+;;
 
 let server_tool t id =
-  List.find_map t.blocks ~f:(function
+  find t ~f:(function
     | Server_tool tool when String.equal !tool.id id -> Some tool
     | Text _ | Thinking _ | Tool_call _ | Server_tool _ -> None)
 ;;
 
-let apply t (event : Assistant_event.t) =
+let apply_block t (event : Assistant_event.t) =
+  let last = t.count - 1 in
   match event, t.blocks with
-  | Text_delta s, Text b :: _ -> Buffer.add_string b s
+  | Text_delta s, Text b :: _ ->
+    Buffer.add_string b s;
+    last
   | Text_delta s, _ ->
     let b = Buffer.create 256 in
     Buffer.add_string b s;
-    t.blocks <- Text b :: t.blocks
+    push t (Text b);
+    last + 1
   | Thinking_delta s, Thinking ({ signature = None; _ } as b) :: _ ->
-    Buffer.add_string b.text s
+    Buffer.add_string b.text s;
+    last
   | Thinking_delta s, _ ->
     let b = Buffer.create 256 in
     Buffer.add_string b s;
-    t.blocks <- Thinking { text = b; signature = None } :: t.blocks
-  | Thinking_signature s, Thinking b :: _ -> b.signature <- Some s
+    push t (Thinking { text = b; signature = None });
+    last + 1
+  | Thinking_signature s, Thinking b :: _ ->
+    b.signature <- Some s;
+    last
   | Thinking_signature s, _ ->
-    t.blocks
-    <- Thinking { text = Buffer.create 0; signature = Some s } :: t.blocks
+    push t (Thinking { text = Buffer.create 0; signature = Some s });
+    last + 1
   | Tool_call_start { index; id; name }, _ ->
-    t.blocks
-    <- Tool_call { index; id; name; arguments = Buffer.create 64 } :: t.blocks
+    push t (Tool_call { index; id; name; arguments = Buffer.create 64 });
+    last + 1
   | Tool_call_delta { index; arguments }, _ ->
     (match
-       List.find t.blocks ~f:(function
-         | Tool_call c -> c.index = index
-         | Text _ | Thinking _ | Server_tool _ -> false)
+       find t ~f:(function
+         | Tool_call c when c.index = index -> Some c.arguments
+         | Text _ | Thinking _ | Tool_call _ | Server_tool _ -> None)
      with
-     | Some (Tool_call c) -> Buffer.add_string c.arguments arguments
-     | Some (Text _ | Thinking _ | Server_tool _) | None -> ())
+     | Some (b, i) ->
+       Buffer.add_string b arguments;
+       i
+     | None -> last)
   | Server_tool_use { id; name; input }, _ ->
     (match server_tool t id with
-     | Some tool -> tool := { !tool with name; input }
+     | Some (tool, i) ->
+       tool := { !tool with name; input };
+       i
      | None ->
-       t.blocks
-       <- Server_tool
+       push
+         t
+         (Server_tool
             (ref
                { Content.Server_tool.id
                ; name
@@ -80,14 +105,17 @@ let apply t (event : Assistant_event.t) =
                ; output = None
                ; is_error = false
                ; raw = None
-               })
-          :: t.blocks)
+               }));
+       last + 1)
   | Server_tool_result { id; output; is_error; raw }, _ ->
     (match server_tool t id with
-     | Some tool -> tool := { !tool with output = Some output; is_error; raw }
+     | Some (tool, i) ->
+       tool := { !tool with output = Some output; is_error; raw };
+       i
      | None ->
-       t.blocks
-       <- Server_tool
+       push
+         t
+         (Server_tool
             (ref
                { Content.Server_tool.id
                ; name = ""
@@ -95,10 +123,11 @@ let apply t (event : Assistant_event.t) =
                ; output = Some output
                ; is_error
                ; raw
-               })
-          :: t.blocks)
+               }));
+       last + 1)
 ;;
 
+let apply t event = ignore (apply_block t event : int)
 let content t = List.rev_map t.blocks ~f:Block.to_content
 
 let snapshot t =

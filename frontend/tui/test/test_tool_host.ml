@@ -410,9 +410,9 @@ let%expect_test "the hello carries one host id, also when reconnecting" =
   print_endline (hex_masked (Option.value_exn !host_id));
   [%expect
     {|
-    {"id":1,"method":"hello","params":{"name":"laptop","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location"]}}
+    {"id":1,"method":"hello","params":{"name":"laptop","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location","stream_deltas"]}}
     true
-    {"id":2,"method":"hello","params":{"name":"laptop","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location"],"session":"s1"}}
+    {"id":2,"method":"hello","params":{"name":"laptop","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location","stream_deltas"],"session":"s1"}}
     true
     host-xxxxxxxxxxxxxxxx
     |}];
@@ -462,7 +462,7 @@ let%expect_test
     ((id            host-xxxxxxxxxxxxxxxx)
      (all_from_file true)
      (files (host-id)))
-    ((tools False))
+    ((tools False) (features (Array ((String stream_deltas)))))
     my-desk
     |}];
   return ()
