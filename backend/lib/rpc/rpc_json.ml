@@ -916,14 +916,15 @@ let opt f = Option.value_map ~default:`Null ~f
 
 let subagent_summary (s : Subagent_log.Summary.t) =
   `Object
-    [ "id", str s.id
+    ([ "id", str s.id
     ; "call_id", str s.call_id
     ; "parent", opt str s.parent
     ; "task", str s.task
     ; "name", opt str s.name
     ; "model", str s.model
-    ; "host", opt str s.host
-    ; "state", str (Subagent_log.State.to_string s.state)
+    ]
+    @ Option.value_map s.host ~default:[] ~f:(fun host -> [ "host", str host ])
+    @ [ "state", str (Subagent_log.State.to_string s.state)
     ; "started_at_ms", ms s.started_at
     ; "updated_at_ms", ms s.updated_at
     ; "ended_at_ms", opt ms s.ended_at
@@ -934,7 +935,7 @@ let subagent_summary (s : Subagent_log.Summary.t) =
     ; "message_count", int s.message_count
     ; "stale", bool s.stale
     ; "result", opt tool_result_value s.result
-    ]
+    ])
 ;;
 
 let subagent ((s : Subagent_log.Summary.t), messages) =

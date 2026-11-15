@@ -224,7 +224,7 @@ let%expect_test "host tools are refused in a chat; a subagent is a chat too" =
     assistant:
     read: unknown tool "read"
     assistant:
-    subagent: a subagent cannot have a worktree in chat mode, which has no machine: start it without one
+    subagent: a subagent cannot have a worktree or a tool host in chat mode, which has no machine: start it without them
     assistant:
     subagent: started agent a1 (look it up); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
     assistant: done
