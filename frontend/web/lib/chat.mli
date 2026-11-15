@@ -74,6 +74,10 @@ val missed_output : t -> t
 (** Oldest first. *)
 val entries : t -> Entry.t list
 
+(** Newest first, as kept: events change the newest entry and add new ones
+    in front, so the rest of the list stays physically the same. *)
+val rev_entries : t -> Entry.t list
+
 (** The number of the oldest of [entries]: they are numbered in order, and
     keep their numbers as messages are added after them or [prepend]ed
     before them. *)
