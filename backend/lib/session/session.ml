@@ -1818,6 +1818,34 @@ let rec usage path =
 
 let disk_usage path = List.sum (module Int) (files path) ~f:usage
 
+(* What changes when [disk_usage] does, short of a walk: the sizes and
+   mtimes of the trace files and of the data directory and the directories
+   in it (where files are added). *)
+let usage_stamp path =
+  let stamp p =
+    match Core_unix.lstat p with
+    | exception _ -> None
+    | { st_size; st_mtime; st_kind; _ } ->
+      Some (st_kind, sprintf "%s %Ld %.6f" (Filename.basename p) st_size st_mtime)
+  in
+  List.concat_map
+    (data_dir path :: Trace_file.paths ~session_path:path)
+    ~f:(fun p ->
+      match stamp p with
+      | None -> []
+      | Some (S_DIR, s) ->
+        s
+        :: List.filter_map
+             (try Sys_unix.ls_dir p with
+              | _ -> [])
+             ~f:(fun name ->
+               match stamp (Filename.concat p name) with
+               | Some (S_DIR, s) -> Some s
+               | Some _ | None -> None)
+      | Some (_, s) -> [ s ])
+  |> String.concat ~sep:"\n"
+;;
+
 let rec remove path =
   if is_directory path
   then (
@@ -1947,6 +1975,7 @@ module Cache_entry = struct
   type t =
     { size : Int64.t
     ; mtime : float
+    ; usage : string (** {!usage_stamp} when [summary]'s bytes were counted *)
     ; summary : Summary.t option (** [None]: the file could not be read *)
     }
   [@@deriving sexp]
@@ -1964,13 +1993,14 @@ let cache_dir ~dir = Filename.concat dir ".cache"
 (* Writes [path] whole or not at all, so that a reader never sees part of
    it; failing quietly (e.g. a read-only directory): it is only a cache. *)
 let write_atomically path ~data =
+  let tmp = sprintf "%s.%d.tmp" path (Core_unix.getpid () |> Pid.to_int) in
   try
     Core_unix.mkdir_p (Filename.dirname path);
-    let tmp = sprintf "%s.%d.tmp" path (Core_unix.getpid () |> Pid.to_int) in
     Out_channel.write_all tmp ~data;
     Core_unix.rename ~src:tmp ~dst:path
   with
-  | _ -> ()
+  | _ -> (try Core_unix.unlink tmp with
+          | _ -> ())
 ;;
 
 (* The summaries of a directory's sessions by file name, as last listed.
@@ -2027,23 +2057,25 @@ let write_summary_file ~dir =
   |> Summary_file.write ~dir
 ;;
 
-(* The file's summary, and whether it was parsed (not cached, not live).
-   The disk usage of a session that is not live is cached with its
-   summary: its data directory and trace only change while it is. *)
+(* The file's summary, and whether the cache changed. Its disk usage is
+   cached with it, counted again when {!usage_stamp} changes. *)
 let cached_summary ~live ~load path =
   match Core_unix.stat path with
   | exception _ -> None
   | { st_size = size; st_mtime = mtime; _ } ->
     let live = live path in
+    let usage = usage_stamp path in
     let summary, parsed =
       match Hashtbl.find summary_cache path with
       | Some entry when Cache_entry.fresh entry ~size ~mtime ->
-        ( (match live with
-           | Some _ ->
-             Option.map entry.summary ~f:(fun s ->
-               { s with bytes = disk_usage path })
-           | None -> entry.summary)
-        , false )
+        if String.equal entry.usage usage
+        then entry.summary, false
+        else (
+          let summary =
+            Option.map entry.summary ~f:(fun s -> { s with bytes = disk_usage path })
+          in
+          Hashtbl.set summary_cache ~key:path ~data:{ entry with usage; summary };
+          summary, Option.is_none live)
       | Some _ | None ->
         let summary =
           (* A live session's file grows with every message: summing up
@@ -2054,7 +2086,7 @@ let cached_summary ~live ~load path =
           |> Option.map ~f:(fun t ->
             { (summarise t ~path ~mtime) with bytes = disk_usage path })
         in
-        Hashtbl.set summary_cache ~key:path ~data:{ size; mtime; summary };
+        Hashtbl.set summary_cache ~key:path ~data:{ size; mtime; usage; summary };
         summary, Option.is_none live
     in
     Some (parsed, Option.map summary ~f:(fun s -> mtime, s))
@@ -2098,6 +2130,11 @@ let summary_with ~live ~load path =
 ;;
 
 let list ~dir = list_with ~live:(fun _ -> None) ~load ~dir
+
+let forget_cached_summaries () =
+  Hashtbl.clear summary_cache;
+  Hash_set.clear summary_files_read
+;;
 
 let find_summary summaries key =
   let key = String.strip key in

@@ -2170,6 +2170,8 @@ let indexed_sessions t = Session_search.indexed t.search
 
 let start_background t =
   Fiber.fork_daemon ~sw:t.sw (fun () ->
+    (* The server serves first. *)
+    Fiber.yield ();
     restore_resumes t;
     (match index_sessions t with
      | () -> ()

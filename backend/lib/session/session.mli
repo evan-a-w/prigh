@@ -582,6 +582,10 @@ val summary_with
   -> string
   -> Summary.t option
 
+(** Forgets the summaries in memory, as a new process starts: the next
+    listing reads them from the [.cache] file. For tests. *)
+val forget_cached_summaries : unit -> unit
+
 (** The directory under [dir] where caches of what is in its session files
     are kept ({!list}'s summaries, the search index). *)
 val cache_dir : dir:string -> string
