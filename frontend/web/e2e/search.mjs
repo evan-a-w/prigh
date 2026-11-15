@@ -10,7 +10,7 @@
 // Environment: PLAYWRIGHT_MODULE, PRIGH_BACKEND, SITE, TEST_DIR, TOKEN, and
 // optionally SHOTS.
 import { spawn } from "node:child_process";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, utimesSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { end } from "./end.mjs";
 
@@ -45,7 +45,10 @@ const writeSession = (sid, name, minutesAgo, messages, { pinned = false } = {}) 
   entry(["Name", { name }]);
   if (pinned) entry(["Pinned", { pinned: true }]);
   for (const m of messages) entry(["Message", m]);
-  writeFileSync(join(sessions, `20261001-100000000_${sid}.jsonl`), lines.join("\n") + "\n");
+  const file = join(sessions, `20261001-100000000_${sid}.jsonl`);
+  writeFileSync(file, lines.join("\n") + "\n");
+  // The list orders sessions by their files' mtimes: as of their last entries.
+  utimesSync(file, at, at);
 };
 const reply = text => ["Assistant", { content: [["Text", text]], stop_reason: ["End_turn"], usage, model: "faux" }];
 writeSession("a1a1a1a1a1a1a1a1", "Port the tmux tests", 60, [
