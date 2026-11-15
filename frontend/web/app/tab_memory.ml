@@ -90,8 +90,7 @@ let save_draft_soon draft =
     then flush_draft ()
     else if not scheduled
     then
-      ignore
-        (Dom_html.setTimeout flush_draft 300. : Dom_html.timeout_id_safe))
+      ignore (Dom_html.setTimeout flush_draft 300. : Dom_html.timeout_id_safe))
 ;;
 
 let draft =

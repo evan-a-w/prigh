@@ -2,8 +2,8 @@
 // While a reply streams, then ends, and while the page idles, the earlier
 // messages, the session's card or bar and the composer are not redrawn, the transcript
 // does not shift, a streamed reply keeps the nodes (and the selection) it
-// was drawn with, and the editor grows with its text in the frame that shows
-// the text, and the session's status keeps its place in every frame as turns
+// was drawn with, a key typed draws no message again, and the editor grows
+// with its text in the frame that shows the text, and the session's status keeps its place in every frame as turns
 // start and end, in the sidebar on a desktop and in the bar on a phone. Run by prigh_web.sh; prints normalised results (the expected
 // output is in ENGINE.expected).
 //
@@ -233,6 +233,28 @@ try {
   console.log(`its parts kept: ${await page.evaluate(() => window.__parts.every(p => p.isConnected))}`);
   const after = await page.evaluate(() => getSelection().toString());
   console.log(`selection kept: ${after === during && during.startsWith("Paragraph 1 with bold")}`);
+
+  // Keys typed: the messages (View_cache's lazy nodes, app/vdom_thunk.js)
+  // are neither drawn nor compared again.
+  await page.evaluate(() => {
+    window.__thunks = { reused: 0, drawn: 0 };
+    const render = VdomThunk.prototype.render;
+    VdomThunk.prototype.render = function (prev) {
+      const vnode = render.call(this, prev);
+      if (prev && vnode === prev.vnode) window.__thunks.reused++;
+      else window.__thunks.drawn++;
+      return vnode;
+    };
+  });
+  await composer().click();
+  await page.keyboard.type("hello");
+  await page.waitForFunction(() => window.__thunks.reused > 0);
+  await page.waitForTimeout(200);
+  section("keys typed");
+  const thunks = await page.evaluate(() => window.__thunks);
+  console.log(`messages reused: ${thunks.reused > 0}`);
+  console.log(`messages drawn again: ${thunks.drawn}`);
+  await composer().fill("");
 
   // Lines typed and sent: the editor shows them all in every frame, and is
   // back to one line in the frame that clears it.

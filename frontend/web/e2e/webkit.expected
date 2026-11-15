@@ -1104,7 +1104,7 @@ pages loaded since: 0
 === webkit: reconnect: reloaded ===
 same session: true
 scroll position kept: true
-draft: half-written thought
+draft: half-written thought!
 sign-in page: false
 jump button: 1
 === webkit: reconnect: reloaded out of reach ===
@@ -1113,7 +1113,7 @@ sign-in page: false
 === webkit: reconnect: back in reach ===
 same session: true
 scroll position kept: true
-draft: half-written thought
+draft: half-written thought!
 sign-in page: false
 === webkit: reconnect: errors ===
 none
@@ -1196,6 +1196,9 @@ layout shift in the transcript and the session's status: none
 === webkit: stability: the streamed reply once ended ===
 its parts kept: true
 selection kept: true
+=== webkit: stability: keys typed ===
+messages reused: true
+messages drawn again: 0
 === webkit: stability: the editor ===
 frames sampled: true
 frames with lines out of view: 0

@@ -61,8 +61,7 @@ let format_response
     Option.value_map content_length ~default:[] ~f:(fun n ->
       [ "Content-Length", Int.to_string n ])
     @ [ "Connection", "close" ]
-    @ (if
-         List.Assoc.mem headers ~equal:String.Caseless.equal "Cache-Control"
+    @ (if List.Assoc.mem headers ~equal:String.Caseless.equal "Cache-Control"
        then []
        else [ "Cache-Control", "no-cache" ])
     @ headers

@@ -169,8 +169,7 @@ module Representation = struct
      new build's same-sized file would otherwise look unchanged. Hashed once
      per file version (ctime too: a rewrite may keep the size, mtime and
      inode). *)
-  let cached (table : (int * float * int * float * string) String.Table.t) t ~f
-    =
+  let cached (table : (int * float * int * float * string) String.Table.t) t ~f =
     match Hashtbl.find table t.file with
     | Some (size, mtime, inode, ctime, value)
       when size = t.size

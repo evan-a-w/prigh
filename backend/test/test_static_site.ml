@@ -492,7 +492,8 @@ let%expect_test "static site: a versioned name of the file is immutable" =
     "/new.css"
     ~query:[ "v", version ]
     ~headers:[ "If-None-Match", {|"62368a1a29259b30bac235c0"|} ];
-  [%expect {|
+  [%expect
+    {|
     fcdce6b6d6e2175f
     GET /new.css?v=fcdce6b6d6e2175f
       200 OK
