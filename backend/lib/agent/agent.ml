@@ -118,6 +118,7 @@ module State = struct
     ; computer_control : string option
     ; plan : Plan.t option
     ; session_rules : string list
+    ; allowed_calls : string list
     ; home : Session.Home.t option
     ; trim : Session.Trim.t option [@sexp.option]
     ; hidden : Session.Hidden.t list [@sexp.list]
@@ -231,6 +232,8 @@ type t =
   ; pending_confirms : Waiting_confirm.t String.Table.t
   ; judgements : Judgement.t String.Table.t
     (** the approval model's verdicts by request (see [judge]) *)
+  ; allowed_calls : Allowed_call.t Allowed_call.Call.Table.t
+    (** the session's, by call: see [remember_allowed] *)
   ; computer_consent : Computer_consent.t
   ; mutable unattended : unit -> string option
     (** why nobody can answer a computer-use consent now, if so *)
@@ -329,6 +332,9 @@ let restore_approvals t =
      t.approval_mode <- t.config.approval_mode;
      t.plan_mode <- false;
      t.chat_mode <- false);
+  Hashtbl.clear t.allowed_calls;
+  List.iter (Session.allowed_calls t.session) ~f:(fun (a : Allowed_call.t) ->
+    Hashtbl.set t.allowed_calls ~key:a.call ~data:a);
   t.session_rules
   <- List.filter_map (Session.allow_rules t.session) ~f:(fun rule ->
        Result.ok (Approval_rule.of_string rule));
@@ -622,6 +628,17 @@ let state t =
         | None -> t.active_host_name)
   ; plan = t.plan
   ; session_rules = List.map t.session_rules ~f:Approval_rule.to_string
+  ; allowed_calls =
+      Hashtbl.data t.allowed_calls
+      |> List.map
+           ~f:
+             (Allowed_call.describe ~host_name:(fun id ->
+                match
+                  List.find (hosts t) ~f:(fun h -> String.equal h.id id)
+                with
+                | Some host -> host.name
+                | None -> id))
+      |> List.sort ~compare:String.compare
   ; home = Session.home t.session
   ; trim = Session.trim t.session
   ; hidden = Session.hidden t.session
@@ -1720,6 +1737,16 @@ let judge t ~(model : Model.t) (input : Approval_judge.Input.t) : Judgement.t =
     judgement
 ;;
 
+(* A call let through in smart mode is not judged again in the session:
+   recorded in it, like the rules "always" adds. *)
+let remember_allowed t (allowed : Allowed_call.t) =
+  if not (Hashtbl.mem t.allowed_calls allowed.call)
+  then (
+    Hashtbl.set t.allowed_calls ~key:allowed.call ~data:allowed;
+    ignore (Session.add_allowed_call t.session allowed : Session.Entry.t);
+    state_changed t)
+;;
+
 let plan_text (p : Plan.t) =
   String.concat
     ~sep:"\n"
@@ -1736,6 +1763,7 @@ module Check = struct
     ; name : string (** as the user sees it: [on_host] for a call elsewhere *)
     ; summary : string
     ; input : Approval_judge.Input.t
+    ; call : Allowed_call.Call.t
     }
 end
 
@@ -1821,6 +1849,12 @@ let check t (context : Tool.Context.t) tool args : Check.t =
       ; plan = Option.map t.plan ~f:plan_text
       ; plan_mode = t.plan_mode
       }
+  ; call =
+      Allowed_call.Call.create
+        ~tool:name
+        ~arguments:args
+        ~host:host_id
+        ~cwd:context.cwd
   }
 ;;
 
@@ -1847,15 +1881,16 @@ let judge_turn t (context : Tool.Context.t) ~model =
                  check t { context with call_id = call.id } tool args
                in
                (match check.decide () with
-                | Judge _ -> ignore (judge t ~model check.input : Judgement.t)
-                | Allow | Ask _ | Deny _ -> ())
+                | Judge _ when not (Hashtbl.mem t.allowed_calls check.call) ->
+                  ignore (judge t ~model check.input : Judgement.t)
+                | Allow | Ask _ | Judge _ | Deny _ -> ())
              | None, _ | _, Error _ -> ()))
      | Some (User _ | Tool_result _) | None -> ())
 ;;
 
 let approve_on_host t : Tool.approver =
   fun context tool args ->
-  let ({ decide; elsewhere; name; summary; input } : Check.t) =
+  let ({ decide; elsewhere; name; summary; input; call } : Check.t) =
     check t context tool args
   in
   let ask ?(kind = Confirm_kind.Tool) rules =
@@ -1875,62 +1910,82 @@ let approve_on_host t : Tool.approver =
        | Deny text -> Some (Tool.Result.error text)
        | Allow | Ask _ | Judge _ -> None)
   in
+  let allowed ~model ~reason =
+    broadcast
+      t
+      (Loop
+         (Tool_allowed
+            { call_id = context.call_id
+            ; agent_id = context.agent_id
+            ; model
+            ; reason
+            }))
+  in
+  (* What the user lets through after the model held it is not judged
+     again; what they deny is asked about again. *)
+  let ask_held ~kind rules =
+    let answer = ask ~kind rules in
+    (match answer, decide () with
+     | None, Judge _ ->
+       remember_allowed t { call; by = Allowed_call.you; reason = None }
+     | None, (Allow | Ask _ | Deny _) | Some _, _ -> ());
+    answer
+  in
   let rec decided (decision : Approval.Decision.t) =
     match decision with
     | Allow -> None
     | Deny text -> Some (Tool.Result.error text)
     | Ask { rules } -> ask rules
     | Judge { rules } ->
-      (match approval_model t with
-       | Error e ->
-         ask
-           ~kind:
-             (Judged
-                { model = Option.value t.config.approval_model ~default:"?"
-                ; reason = Error.to_string_hum e
-                })
-           rules
-       | Ok model ->
-         let key = Model.key model in
-         judge_turn t context ~model;
-         let judgement = judge t ~model input in
-         (match
-            Trace.span "approval_judge" (fun () ->
-              Cancellation.protect context.cancel ~f:(fun () ->
-                Promise.await judgement))
-          with
-          | None -> Some (Tool.Result.error "[cancelled]")
-          | Some verdict ->
-            (* The mode may have changed while the model judged. *)
-            (match decide () with
-             | Judge _ ->
-               (match verdict with
-                | Ok (Allow reason) ->
-                  broadcast
-                    t
-                    (Loop
-                       (Tool_allowed
-                          { call_id = context.call_id
-                          ; agent_id = context.agent_id
-                          ; model = key
-                          ; reason
-                          }));
-                  None
-                | Ok (Ask reason) ->
-                  ask ~kind:(Judged { model = key; reason }) rules
-                | Error why ->
-                  ask
-                    ~kind:
-                      (Judged
-                         { model = key
-                         ; reason =
-                             sprintf
-                               "no verdict (%s): decide yourself, or change \
-                                the model with /approval-model"
-                               why
-                         })
-                    rules)
-             | other -> decided other)))
+      (match Hashtbl.find t.allowed_calls call with
+       | Some earlier ->
+         allowed ~model:earlier.by ~reason:(Allowed_call.note earlier);
+         None
+       | None -> judged rules)
+  and judged rules =
+    match approval_model t with
+    | Error e ->
+      ask_held
+        ~kind:
+          (Judged
+             { model = Option.value t.config.approval_model ~default:"?"
+             ; reason = Error.to_string_hum e
+             })
+        rules
+    | Ok model ->
+      let key = Model.key model in
+      judge_turn t context ~model;
+      let judgement = judge t ~model input in
+      (match
+         Trace.span "approval_judge" (fun () ->
+           Cancellation.protect context.cancel ~f:(fun () ->
+             Promise.await judgement))
+       with
+       | None -> Some (Tool.Result.error "[cancelled]")
+       | Some verdict ->
+         (* The mode may have changed while the model judged. *)
+         (match decide () with
+          | Judge _ ->
+            (match verdict with
+             | Ok (Allow reason) ->
+               remember_allowed t { call; by = key; reason = Some reason };
+               allowed ~model:key ~reason;
+               None
+             | Ok (Ask reason) ->
+               ask_held ~kind:(Judged { model = key; reason }) rules
+             | Error why ->
+               ask_held
+                 ~kind:
+                   (Judged
+                      { model = key
+                      ; reason =
+                          sprintf
+                            "no verdict (%s): decide yourself, or change the \
+                             model with /approval-model"
+                            why
+                      })
+                 rules)
+          | other -> decided other))
   in
   if String.equal (Tool.name tool) Tool_computer.name
   then (
@@ -3728,6 +3783,7 @@ let create
     ; config
     ; pending_confirms = String.Table.create ()
     ; judgements = String.Table.create ()
+    ; allowed_calls = Allowed_call.Call.Table.create ()
     ; computer_consent = Computer_consent.create ()
     ; unattended = (fun () -> None)
     ; pending_questions = String.Table.create ()

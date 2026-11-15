@@ -294,82 +294,86 @@ let reminder ~stops (r : Reminder.t) =
 
 let state (s : Agent.State.t) =
   `Object
-    [ "session_id", str s.session_id
-    ; "session_path", str s.session_path
-    ; "session_name", Option.value_map s.session_name ~default:`Null ~f:str
-    ; ( "session_description"
-      , Option.value_map s.session_description ~default:`Null ~f:str )
-    ; "cwd", str s.cwd
-    ; "git_branch", Option.value_map s.git_branch ~default:`Null ~f:str
-    ; "model", model s.model
-    ; "thinking", thinking s.thinking
-    ; "running", bool s.running
-    ; "message_count", int s.message_count
-    ; "usage", usage s.usage
-    ; "cost_usd", float s.cost_usd
-    ; "context_tokens", int s.context_tokens
-    ; "active_host", str s.active_host
-    ; ( "active_host_name"
-      , Option.value_map s.active_host_name ~default:`Null ~f:str )
-    ; ( "hosts"
-      , `Array
-          (List.map s.hosts ~f:(fun (h : Agent.Host.t) ->
-             let opt = Option.value_map ~default:`Null ~f:str in
-             `Object
-               ([ "id", str h.id
-                ; "name", str h.name
-                ; "cwd", str h.cwd
-                ; "session_id", opt h.session_id
-                ; "session_name", opt h.session_name
-                ]
-                @ Option.value_map h.home ~default:[] ~f:(fun home ->
-                  [ "home", str home ])
-                @ Option.value_map h.computer ~default:[] ~f:(fun info ->
-                  [ "computer", Computer_info.to_json info ])))) )
-    ; ( "subagents"
-      , `Array
-          (List.map s.subagents ~f:(fun (a : Background_tasks.Summary.t) ->
-             `Object
-               ([ "id", str a.id; "task", str a.label ]
-                @ Option.value_map a.name ~default:[] ~f:(fun n ->
-                  [ "name", str n ])
-                @ [ "running", bool a.running ]))) )
-    ; ( "jobs"
-      , `Array
-          (List.map s.jobs ~f:(fun (j : Background_tasks.Summary.t) ->
-             `Object
-               [ "id", str j.id
-               ; "command", str j.label
-               ; "running", bool j.running
-               ; "exit", Option.value_map j.status ~default:`Null ~f:str
-               ])) )
-    ; "budget_usd", Option.value_map s.budget_usd ~default:`Null ~f:float
-    ; ( "goal"
-      , Option.value_map s.goal ~default:`Null ~f:(fun (g : Goal.t) ->
-          `Object
-            ([ "text", str g.text
-             ; "status", str (Goal.Status.to_string g.status)
-             ; "continuations", int g.continuations
-             ; "max_continuations", int s.goal_max_continuations
-             ]
-             @
-             match g.status with
-             | Active -> []
-             | Done { summary } -> [ "summary", str summary ]
-             | Stopped { reason } -> [ "reason", str reason ])) )
-    ; ( "reminders"
-      , `Array (List.map s.reminders ~f:(reminder ~stops:s.reminder_stops)) )
-    ; ( "resume_at_ms"
-      , Option.value_map s.resume_at ~default:`Null ~f:(fun at -> ms at) )
-    ; "approval_mode", str (Approval_mode.to_string s.approval_mode)
-    ; "plan_mode", bool s.plan_mode
-    ; "chat_mode", bool s.chat_mode
-    ; "no_host", Option.value_map s.no_host ~default:`Null ~f:str
-    ; ( "computer_control"
-      , Option.value_map s.computer_control ~default:`Null ~f:str )
-    ; "plan", Option.value_map s.plan ~default:`Null ~f:Plan.to_json
-    ; "session_rules", `Array (List.map s.session_rules ~f:str)
-    ]
+    ([ "session_id", str s.session_id
+     ; "session_path", str s.session_path
+     ; "session_name", Option.value_map s.session_name ~default:`Null ~f:str
+     ; ( "session_description"
+       , Option.value_map s.session_description ~default:`Null ~f:str )
+     ; "cwd", str s.cwd
+     ; "git_branch", Option.value_map s.git_branch ~default:`Null ~f:str
+     ; "model", model s.model
+     ; "thinking", thinking s.thinking
+     ; "running", bool s.running
+     ; "message_count", int s.message_count
+     ; "usage", usage s.usage
+     ; "cost_usd", float s.cost_usd
+     ; "context_tokens", int s.context_tokens
+     ; "active_host", str s.active_host
+     ; ( "active_host_name"
+       , Option.value_map s.active_host_name ~default:`Null ~f:str )
+     ; ( "hosts"
+       , `Array
+           (List.map s.hosts ~f:(fun (h : Agent.Host.t) ->
+              let opt = Option.value_map ~default:`Null ~f:str in
+              `Object
+                ([ "id", str h.id
+                 ; "name", str h.name
+                 ; "cwd", str h.cwd
+                 ; "session_id", opt h.session_id
+                 ; "session_name", opt h.session_name
+                 ]
+                 @ Option.value_map h.home ~default:[] ~f:(fun home ->
+                   [ "home", str home ])
+                 @ Option.value_map h.computer ~default:[] ~f:(fun info ->
+                   [ "computer", Computer_info.to_json info ])))) )
+     ; ( "subagents"
+       , `Array
+           (List.map s.subagents ~f:(fun (a : Background_tasks.Summary.t) ->
+              `Object
+                ([ "id", str a.id; "task", str a.label ]
+                 @ Option.value_map a.name ~default:[] ~f:(fun n ->
+                   [ "name", str n ])
+                 @ [ "running", bool a.running ]))) )
+     ; ( "jobs"
+       , `Array
+           (List.map s.jobs ~f:(fun (j : Background_tasks.Summary.t) ->
+              `Object
+                [ "id", str j.id
+                ; "command", str j.label
+                ; "running", bool j.running
+                ; "exit", Option.value_map j.status ~default:`Null ~f:str
+                ])) )
+     ; "budget_usd", Option.value_map s.budget_usd ~default:`Null ~f:float
+     ; ( "goal"
+       , Option.value_map s.goal ~default:`Null ~f:(fun (g : Goal.t) ->
+           `Object
+             ([ "text", str g.text
+              ; "status", str (Goal.Status.to_string g.status)
+              ; "continuations", int g.continuations
+              ; "max_continuations", int s.goal_max_continuations
+              ]
+              @
+              match g.status with
+              | Active -> []
+              | Done { summary } -> [ "summary", str summary ]
+              | Stopped { reason } -> [ "reason", str reason ])) )
+     ; ( "reminders"
+       , `Array (List.map s.reminders ~f:(reminder ~stops:s.reminder_stops)) )
+     ; ( "resume_at_ms"
+       , Option.value_map s.resume_at ~default:`Null ~f:(fun at -> ms at) )
+     ; "approval_mode", str (Approval_mode.to_string s.approval_mode)
+     ; "plan_mode", bool s.plan_mode
+     ; "chat_mode", bool s.chat_mode
+     ; "no_host", Option.value_map s.no_host ~default:`Null ~f:str
+     ; ( "computer_control"
+       , Option.value_map s.computer_control ~default:`Null ~f:str )
+     ; "plan", Option.value_map s.plan ~default:`Null ~f:Plan.to_json
+     ; "session_rules", `Array (List.map s.session_rules ~f:str)
+     ]
+     @
+     if List.is_empty s.allowed_calls
+     then []
+     else [ "allowed_calls", `Array (List.map s.allowed_calls ~f:str) ])
 ;;
 
 let job ~now task =
@@ -581,6 +585,12 @@ let entry (e : Session.Entry.t) =
       ; "chat", bool chat
       ]
     | Allow_rule { rule } -> [ "kind", str "allow_rule"; "rule", str rule ]
+    | Allowed_call { call; by; reason = _ } ->
+      [ "kind", str "allowed_call"
+      ; "tool", str call.tool
+      ; "arguments", str call.arguments
+      ; "by", str by
+      ]
     | Archived { archived } ->
       [ "kind", str "archived"
       ; ("archived", if archived then `True else `False)

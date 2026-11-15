@@ -3781,6 +3781,12 @@ let show_permissions (m : Model.t) =
               adds to it)"
            ]
          | r -> rules "Allowed this session" r)
+      @ (match s.allowed_calls with
+         | [] -> []
+         | calls ->
+           "Exact calls allowed this session (smart mode does not judge them \
+            again):"
+           :: List.map calls ~f:(fun c -> "  " ^ c))
       @ config
       @ [ ""
         ; "Rules are permissions in ~/.prigh/config.json, e.g. {\"allow\": \

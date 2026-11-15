@@ -238,7 +238,15 @@ let%expect_test "the plan in the status line, /todos and /permissions" =
            ; deny = [ "bash(rm:*)" ]
            }
        });
-  H.event h (State { (with_mode ~plan Ask) with session_rules = [ "edit" ] });
+  H.event
+    h
+    (State
+       { (with_mode ~plan Ask) with
+         session_rules = [ "edit" ]
+       ; allowed_calls =
+           [ {|bash {"command":"make"} on laptop in /work (by deepseek/deepseek-flash)|}
+           ]
+       });
   command h "/todos";
   command h "/permissions";
   H.show h;
@@ -251,6 +259,8 @@ let%expect_test "the plan in the status line, /todos and /permissions" =
     ┌─ Permissions ──────────────────────────────────────────────────────────────────────────┐
     │ mode: ask — bash, job_input, edits and MCP tools ask first                             │
     │ allowed this session: edit                                                             │
+    │ exact calls allowed this session (smart mode does not judge them again):               │
+    │   bash {"command":"make"} on laptop in /work (by deepseek/deepseek-flash)              │
     │ allow (config): bash(git status:*)                                                     │
     │ deny (config): bash(rm:*)                                                              │
     │ rules: permissions in ~/.prigh/config.json, e.g. {"allow": ["bash(git status:*)"],     │

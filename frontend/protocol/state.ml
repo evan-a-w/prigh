@@ -70,6 +70,7 @@ type t =
   ; computer_control : string option [@sexp.option]
   ; plan : Plan.t option
   ; session_rules : string list
+  ; allowed_calls : string list [@sexp.list]
   ; trim : Trim.t option [@sexp.option]
   ; hidden : Hidden.t list [@sexp.list]
   ; transcript_filter : string option [@sexp.option]
@@ -156,6 +157,9 @@ let of_json j =
   let%bind session_rules =
     Json.optional_list_field j "session_rules" ~f:Json.to_string_or_error
   in
+  let%bind allowed_calls =
+    Json.optional_list_field j "allowed_calls" ~f:Json.to_string_or_error
+  in
   let%bind trim = Trim.field j in
   let%bind hidden = Hidden.field j in
   let%bind transcript_filter = Json.string_opt_field j "transcript_filter" in
@@ -190,6 +194,7 @@ let of_json j =
   ; computer_control
   ; plan
   ; session_rules
+  ; allowed_calls
   ; trim
   ; hidden
   ; transcript_filter
