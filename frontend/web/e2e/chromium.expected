@@ -2823,7 +2823,7 @@ Nothing matches “zebra quokka”: Backspace widens the search.
 switched to Release notes
 === chromium: search: 390x844 ===
 page overflows sideways: false
-the box inside the screen: false
+the box inside the screen: true
 its input's font: 16px
 rows at least 44px: true
 -- Sessions --
@@ -2835,7 +2835,7 @@ its input's font: 16px
 rows at least 44px: true
 === chromium: search: 320x640 ===
 page overflows sideways: false
-the box inside the screen: false
+the box inside the screen: true
 its input's font: 16px
 rows at least 44px: true
 -- Sessions --
