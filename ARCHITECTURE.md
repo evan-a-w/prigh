@@ -3395,10 +3395,7 @@ terminal frontend and `web/` prigh-web, the browser one.
       handlers capture. virtual_dom only reuses a lazy node whose function
       is the same JavaScript closure, and its `Thunk.create` makes a new
       one every time: `app/vdom_thunk.js`, installed as the page starts,
-      reuses one on its argument alone, the cached lazy value. In
-      `chat.css`, the transcript's messages but the newest are
-      `content-visibility: auto`: the browser lays out and paints only
-      those near the view, where it has scroll anchoring (not WebKit)),
+      reuses one on its argument alone, the cached lazy value.),
       `Tool_view` (a card per tool: bash, read with images, write, edit
       with `Line_diff`/`Diff_view`, apply_patch file by file,
       ls/grep/find, subagents (marked with `data-call` and `data-agent`
