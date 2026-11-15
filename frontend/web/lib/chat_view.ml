@@ -275,7 +275,6 @@ let thinking ~live text =
       (div "thinking-text" [ Markdown_view.render text ])
 ;;
 
-
 (* Quiet: thinking as a step of a run, a line that opens its text. *)
 let thinking_step ~fold ~key ~live text =
   let opened = Fold.opened ~by_default:false fold key in
@@ -294,13 +293,18 @@ let thinking_step ~fold ~key ~live text =
           ; Attr.create "aria-expanded" (Bool.to_string opened)
           ]
         (present
-           [ (if live then Html.lamp () else Html.mark ~cls:"done" ~label:"Done" Check)
+           [ (if live
+              then Html.lamp ()
+              else Html.mark ~cls:"done" ~label:"Done" Check)
            ; span "name" "Thinking"
-           ; (if opened || String.is_empty preview then Node.none else span "arg" preview)
+           ; (if opened || String.is_empty preview
+              then Node.none
+              else span "arg" preview)
            ; span "chev" ""
            ])
     ; (if opened && not (String.is_empty (String.strip text))
-       then div "tool-body" [ div "thinking-text" [ Markdown_view.render text ] ]
+       then
+         div "tool-body" [ div "thinking-text" [ Markdown_view.render text ] ]
        else Node.none)
     ]
 ;;
@@ -655,8 +659,7 @@ and activity ~ui ~fold times chat runs (box : Activity_runs.Box.t) =
         Prigh_ui.Tool_phrase.doing (Activity_runs.Step.phrase step)
       | None when running -> "Thinking"
       | None ->
-        Prigh_ui.Tool_phrase.did
-          (List.map steps ~f:Activity_runs.Step.phrase)
+        Prigh_ui.Tool_phrase.did (List.map steps ~f:Activity_runs.Step.phrase)
     in
     (* From the message before it to its last step's end. *)
     let took =
@@ -674,7 +677,10 @@ and activity ~ui ~fold times chat runs (box : Activity_runs.Box.t) =
             | Report { user; _ } -> user.at
             | Thinking _ | Server _ -> None)
         in
-        match Activity_runs.Box.since box, List.max_elt ends ~compare:Time_ns.compare with
+        match
+          ( Activity_runs.Box.since box
+          , List.max_elt ends ~compare:Time_ns.compare )
+        with
         | Some since, Some until when Time_ns.( >= ) until since ->
           Some (Prigh_ui.Tool_phrase.duration (Time_ns.diff until since))
         | _ -> None)
@@ -692,7 +698,11 @@ and activity ~ui ~fold times chat runs (box : Activity_runs.Box.t) =
       ~attrs:
         [ Attr.classes
             ([ "run"
-             ; (if running then "running" else if failed > 0 then "error" else "ok")
+             ; (if running
+                then "running"
+                else if failed > 0
+                then "error"
+                else "ok")
              ]
              @ if opened then [ "open" ] else [])
         ]
@@ -730,7 +740,11 @@ and activity ~ui ~fold times chat runs (box : Activity_runs.Box.t) =
                 | Server { tool; streaming; _ } ->
                   Tool_view.server_tool ~fold ~running:streaming tool
                 | Thinking { text; live; _ } ->
-                  thinking_step ~fold ~key:(Activity_runs.Step.key step) ~live text
+                  thinking_step
+                    ~fold
+                    ~key:(Activity_runs.Step.key step)
+                    ~live
+                    text
                 | Report { user; _ } ->
                   render_entry ~ui ~fold times chat ~n:0 (Chat.Entry.User user)))
          else Node.none)
@@ -752,61 +766,63 @@ and render_entry ?quiet ~ui ~fold times chat ~n (entry : Chat.Entry.t) =
      | [] -> Node.none
      | boxes -> div "msg steps" boxes)
   | _ ->
-  match entry with
-  | User u when not (Fold.shows fold (user_kind u)) -> Node.none
-  | Shell _ when not (Fold.shows fold Tools) -> Node.none
-  | Compaction _ when not (Fold.shows fold Notes) -> Node.none
-  | User u ->
-    let notes =
-      Option.value_map u.origin ~default:[] ~f:(fun (o : Origin.t) -> o.notes)
-    in
-    (* Notes before a message of the harness's: plan mode turned on or off
+    (match entry with
+     | User u when not (Fold.shows fold (user_kind u)) -> Node.none
+     | Shell _ when not (Fold.shows fold Tools) -> Node.none
+     | Compaction _ when not (Fold.shows fold Notes) -> Node.none
+     | User u ->
+       let notes =
+         Option.value_map u.origin ~default:[] ~f:(fun (o : Origin.t) ->
+           o.notes)
+       in
+       (* Notes before a message of the harness's: plan mode turned on or off
        with a goal's message. *)
-    let noted main =
-      match notes with
-      | [] -> main
-      | notes ->
-        div "msg noted" (List.map notes ~f:(margin_note times) @ [ main ])
-    in
-    (match Message.User.source u with
-     | Some { kind = Delivery; title } ->
-       noted
-         (match Prigh_ui.Delivery.parse u.text with
-          | Some sections ->
-            div
-              "msg"
-              [ Delivery_view.view
-                  ~name:(Tool_view.agent_name chat)
-                  ~fold
-                  sections
-              ]
-          | None -> note ?at:u.at times ~kind:Delivery ~title u.text)
-     | Some { kind = Summary; _ } ->
-       compaction
-         (Option.value
-            (String.chop_prefix u.text ~prefix:summary_prefix)
-            ~default:u.text)
-     | Some { kind; title } -> noted (note ?at:u.at times ~kind ~title u.text)
-     | None ->
-       user ?skill:(Skill_message.parse (Message.User.body u)) ~fold times u)
-  | Shell call ->
-    let tool = Chat.tool chat call.id in
-    div
-      "msg shell"
-      [ Tool_view.view
-          ~ui
-          ~nested:(nested ~ui ~fold times)
-          ~fold
-          ~streaming:false
-          ~running:
-            (Option.value_map tool ~default:true ~f:(fun t ->
-               Option.is_none t.result))
-          { call with name = "bash" }
-          tool
-      ]
-  | Compaction summary -> compaction summary
-  | Assistant { message; streaming } ->
-    assistant ?quiet ~ui ~fold times chat ~n message ~streaming
+       let noted main =
+         match notes with
+         | [] -> main
+         | notes ->
+           div "msg noted" (List.map notes ~f:(margin_note times) @ [ main ])
+       in
+       (match Message.User.source u with
+        | Some { kind = Delivery; title } ->
+          noted
+            (match Prigh_ui.Delivery.parse u.text with
+             | Some sections ->
+               div
+                 "msg"
+                 [ Delivery_view.view
+                     ~name:(Tool_view.agent_name chat)
+                     ~fold
+                     sections
+                 ]
+             | None -> note ?at:u.at times ~kind:Delivery ~title u.text)
+        | Some { kind = Summary; _ } ->
+          compaction
+            (Option.value
+               (String.chop_prefix u.text ~prefix:summary_prefix)
+               ~default:u.text)
+        | Some { kind; title } ->
+          noted (note ?at:u.at times ~kind ~title u.text)
+        | None ->
+          user ?skill:(Skill_message.parse (Message.User.body u)) ~fold times u)
+     | Shell call ->
+       let tool = Chat.tool chat call.id in
+       div
+         "msg shell"
+         [ Tool_view.view
+             ~ui
+             ~nested:(nested ~ui ~fold times)
+             ~fold
+             ~streaming:false
+             ~running:
+               (Option.value_map tool ~default:true ~f:(fun t ->
+                  Option.is_none t.result))
+             { call with name = "bash" }
+             tool
+         ]
+     | Compaction summary -> compaction summary
+     | Assistant { message; streaming } ->
+       assistant ?quiet ~ui ~fold times chat ~n message ~streaming)
 
 (* An entry's card depends on the state of its tool calls, and on whether the
    agent is still running while one of them has no result. *)

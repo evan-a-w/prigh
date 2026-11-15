@@ -108,15 +108,15 @@ let add_step (t, parts) ~n (step : Step.t) =
   | Some box ->
     ( { t with
         boxes =
-          Map.set t.boxes ~key:box.key
+          Map.set
+            t.boxes
+            ~key:box.key
             ~data:{ box with rev_steps = step :: box.rev_steps }
       }
     , parts )
   | None ->
     let key = "run:" ^ Step.key step in
-    let box =
-      { Box.key; start = n; rev_steps = [ step ]; since = t.last_at }
-    in
+    let box = { Box.key; start = n; rev_steps = [ step ]; since = t.last_at } in
     ( { t with boxes = Map.set t.boxes ~key ~data:box; open_ = Some key }
     , Part.Box key :: parts )
 ;;
@@ -148,11 +148,15 @@ let add t (entry : Chat.Entry.t) =
           | Text text when blank text -> acc
           | Text _ -> add_block acc i
           | Thinking text when blank text && not live -> acc
-          | Thinking text -> add_step acc ~n (Thinking { n; index = i; text; live })
+          | Thinking text ->
+            add_step acc ~n (Thinking { n; index = i; text; live })
           | Tool_call call when String.equal call.name "render_ui" ->
             add_block acc i
           | Tool_call call ->
-            add_step acc ~n (Call { n; call; streaming = live; at = message.at })
+            add_step
+              acc
+              ~n
+              (Call { n; call; streaming = live; at = message.at })
           | Server_tool tool ->
             add_step acc ~n (Server { n; index = i; tool; streaming }))
       in
@@ -217,7 +221,9 @@ let segments ({ first; t } : Grouping.t) n =
     | Box key -> Box (Map.find_exn t.boxes key))
 ;;
 
-let tail ({ first = _; t } : Grouping.t) = Option.bind t.open_ ~f:(Map.find t.boxes)
+let tail ({ first = _; t } : Grouping.t) =
+  Option.bind t.open_ ~f:(Map.find t.boxes)
+;;
 
 let continues ({ first; t = _ } as g : Grouping.t) n =
   match tail g with

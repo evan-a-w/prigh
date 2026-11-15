@@ -42,7 +42,10 @@ let streaming content =
 ;;
 
 let reply ?(s = 30) text =
-  assistant ~stop:{|{"type":"end_turn"}|} ~s [ sprintf {|{"type":"text","text":%s}|} (json text) ]
+  assistant
+    ~stop:{|{"type":"end_turn"}|}
+    ~s
+    [ sprintf {|{"type":"text","text":%s}|} (json text) ]
 ;;
 
 let thinking text = sprintf {|{"type":"thinking","text":%s}|} (json text)
@@ -83,8 +86,19 @@ let edit = {|{"path":"src/a.ml","old_text":"a","new_text":"b"}|}
    says it is done. *)
 let fixed =
   [ user 0 "fix the bug"
-  ; assistant ~s:2 [ thinking "Let me build it first."; call "c1" "bash" bash; call "c2" "read" read ]
-  ; finish ~is_error:true ~s:5 "c1" "bash" bash "Error: a is not b\n[exit code 2]"
+  ; assistant
+      ~s:2
+      [ thinking "Let me build it first."
+      ; call "c1" "bash" bash
+      ; call "c2" "read" read
+      ]
+  ; finish
+      ~is_error:true
+      ~s:5
+      "c1"
+      "bash"
+      bash
+      "Error: a is not b\n[exit code 2]"
   ; finish ~s:5 "c2" "read" read "let a = 1"
   ; assistant ~s:8 [ call "c3" "edit" edit ]
   ; finish ~s:9 "c3" "edit" edit "edited src/a.ml"
@@ -131,15 +145,18 @@ let%expect_test "a run of steps is one line: what it did and how long it took" =
     |}];
   (* Normal shows each step as before. *)
   Chat_harness.text ~fold:Fold.default chat;
-  [%expect {| fix the bug 15:00 Thought Let me build it first. Let me build it first. ✕ bash make exit code 2 Error: a is not b ✓ read src/a.ml ✓ edit src/a.ml ✓ edit src/a.ml Fixed it. 15:00 |}]
+  [%expect
+    {| fix the bug 15:00 Thought Let me build it first. Let me build it first. ✕ bash make exit code 2 Error: a is not b ✓ read src/a.ml ✓ edit src/a.ml ✓ edit src/a.ml Fixed it. 15:00 |}]
 ;;
 
 let%expect_test "opened, it lists the steps; a step opens its detail" =
   let chat = Chat_harness.chat fixed in
   text ~toggled:[ box ] ~selector:".run" chat;
-  [%expect {| ✕ Ran a command, read a file, edited a file 1 failed 12s ✓ Thinking Let me build it first. ✕ bash make exit code 2 Error: a is not b ✓ read src/a.ml ✓ edit src/a.ml ✓ edit src/a.ml |}];
+  [%expect
+    {| ✕ Ran a command, read a file, edited a file 1 failed 12s ✓ Thinking Let me build it first. ✕ bash make exit code 2 Error: a is not b ✓ read src/a.ml ✓ edit src/a.ml ✓ edit src/a.ml |}];
   text ~toggled:[ box; "c1#open"; "think:1:0" ] ~selector:".run" chat;
-  [%expect {| ✕ Ran a command, read a file, edited a file 1 failed 12s ✓ Thinking Let me build it first. ✕ bash make exit code 2 ✓ read src/a.ml ✓ edit src/a.ml ✓ edit src/a.ml |}]
+  [%expect
+    {| ✕ Ran a command, read a file, edited a file 1 failed 12s ✓ Thinking Let me build it first. ✕ bash make exit code 2 ✓ read src/a.ml ✓ edit src/a.ml ✓ edit src/a.ml |}]
 ;;
 
 let%expect_test "messages break runs; a failed step marks its run" =
@@ -158,7 +175,8 @@ let%expect_test "messages break runs; a failed step marks its run" =
       ]
   in
   text chat;
-  [%expect {| look around 15:00 ✓ Listed a directory 2s Now the tests. ✓ Ran a command 6s All good. 15:00 |}]
+  [%expect
+    {| look around 15:00 ✓ Listed a directory 2s Now the tests. ✓ Ran a command 6s All good. 15:00 |}]
 ;;
 
 let%expect_test "while it runs, the line says what it is doing" =
@@ -177,7 +195,9 @@ let%expect_test "while it runs, the line says what it is doing" =
   text ~selector:".run" chat;
   [%expect {| Thinking |}];
   let chat =
-    Chat_harness.apply chat (streaming [ call "c2" "edit" {|{"path":"src/b.ml"|} ])
+    Chat_harness.apply
+      chat
+      (streaming [ call "c2" "edit" {|{"path":"src/b.ml"|} ])
   in
   text ~selector:".run" chat;
   [%expect {| Editing src/b.ml |}];
@@ -186,7 +206,9 @@ let%expect_test "while it runs, the line says what it is doing" =
   [%expect {| Thinking |}];
   (* Text ends the run: what it did. *)
   let chat =
-    Chat_harness.apply chat (streaming [ sprintf {|{"type":"text","text":"Done"}|} ])
+    Chat_harness.apply
+      chat
+      (streaming [ sprintf {|{"type":"text","text":"Done"}|} ])
   in
   text chat;
   [%expect {| fix the bug 15:00 ✓ Ran a command 3s Done |}]
@@ -196,7 +218,9 @@ let%expect_test "reports of background work join the run; errors stay out" =
   let chat =
     Chat_harness.chat
       [ user 0 "build it in the background"
-      ; assistant ~s:1 [ call "c1" "bash" {|{"command":"make","background":true}|} ]
+      ; assistant
+          ~s:1
+          [ call "c1" "bash" {|{"command":"make","background":true}|} ]
       ; finish ~s:1 "c1" "bash" bash "started job j1: make"
       ; reply ~s:2 "Started."
       ; user
@@ -212,7 +236,8 @@ let%expect_test "reports of background work join the run; errors stay out" =
       ]
   in
   text chat;
-  [%expect {| build it in the background 15:00 ✓ Ran a command 1s Started. 15:00 ✓ Got a report, read a job's output 9s The model returned an error overloaded Send a message to retry, or switch model. 15:00 |}];
+  [%expect
+    {| build it in the background 15:00 ✓ Ran a command 1s Started. 15:00 ✓ Got a report, read a job's output 9s The model returned an error overloaded Send a message to retry, or switch model. 15:00 |}];
   text ~toggled:[ "run:report:4" ] ~selector:".run-steps" chat;
   [%expect {| |}]
 ;;
@@ -222,13 +247,42 @@ let%expect_test "every tool the backend has reads in plain words" =
      agent/ and computer/), and the [!command]'s [shell]: a new one needs a
      phrase in frontend/ui/tool_phrase.ml. *)
   let backend =
-    [ "answer_session"; "apply_patch"; "ask_session"; "ask_user"; "bash"
-    ; "computer"; "custom_instructions"; "edit"; "find"; "goal_complete"
-    ; "grep"; "issue"; "job_input"; "job_kill"; "job_output"; "job_status"
-    ; "ls"; "memory"; "on_host"; "pull_request"; "read"; "render_ui"
-    ; "reply_to_comment"; "repo"; "sessions"; "shell"; "subagent"
-    ; "subagent_cancel"; "subagent_continue"; "subagent_message"
-    ; "subagent_status"; "update_plan"; "web_fetch"; "web_search"; "worktree"; "write"
+    [ "answer_session"
+    ; "apply_patch"
+    ; "ask_session"
+    ; "ask_user"
+    ; "bash"
+    ; "computer"
+    ; "custom_instructions"
+    ; "edit"
+    ; "find"
+    ; "goal_complete"
+    ; "grep"
+    ; "issue"
+    ; "job_input"
+    ; "job_kill"
+    ; "job_output"
+    ; "job_status"
+    ; "ls"
+    ; "memory"
+    ; "on_host"
+    ; "pull_request"
+    ; "read"
+    ; "render_ui"
+    ; "reply_to_comment"
+    ; "repo"
+    ; "sessions"
+    ; "shell"
+    ; "subagent"
+    ; "subagent_cancel"
+    ; "subagent_continue"
+    ; "subagent_message"
+    ; "subagent_status"
+    ; "update_plan"
+    ; "web_fetch"
+    ; "web_search"
+    ; "worktree"
+    ; "write"
     ]
   in
   let missing =
@@ -247,7 +301,8 @@ let%expect_test "every tool the backend has reads in plain words" =
       (Prigh_ui.Tool_phrase.doing step)
       (Prigh_ui.Tool_phrase.did [ step ])
       (Prigh_ui.Tool_phrase.did [ step; step; step ]));
-  [%expect {|
+  [%expect
+    {|
     (missing ())
     answer_session       Answering another session    | Answered another session | Answered 3 questions
     apply_patch          Editing a file               | Edited a file | Edited 3 files
@@ -305,7 +360,8 @@ let%expect_test "every tool the backend has reads in plain words" =
        ]);
   List.iter [ 0.4; 14.; 125.; 3600.; 3780. ] ~f:(fun s ->
     print_endline (duration (Time_ns.Span.of_sec s)));
-  [%expect {|
+  [%expect
+    {|
     Editing src/a.ml
     Using mcp__linear__create
     Reading a file
@@ -321,7 +377,10 @@ let%expect_test "every tool the backend has reads in plain words" =
 
 (* The app: the box's line toggles it; its open state survives new steps
    arriving; what waits on the user is outside it. *)
-let%expect_test "in the app: toggled by its line, open while steps arrive, approvals outside" =
+let%expect_test
+    "in the app: toggled by its line, open while steps arrive, approvals \
+     outside"
+  =
   let h = H.create () in
   H.quiet h (fun () ->
     H.act h Cycle_verbosity;
@@ -338,7 +397,8 @@ let%expect_test "in the app: toggled by its line, open while steps arrive, appro
   H.show h ~selector:".run-head";
   H.act h (Toggle_fold "run:c1#open");
   H.text h ~selector:".run";
-  [%expect {|
+  [%expect
+    {|
     <button type="button" data-fold="run:c1#open" aria-expanded="false" class="run-head">
       <span aria-hidden="true" class="lamp"> </span>
       <span class="run-label"> Thinking </span>
@@ -347,14 +407,17 @@ let%expect_test "in the app: toggled by its line, open while steps arrive, appro
     (Thinking)
     (✓ bash make)
     |}];
-  H.event h (assistant ~s:4 [ call "c2" "write" {|{"path":"x.ml","content":"x"}|} ]);
+  H.event
+    h
+    (assistant ~s:4 [ call "c2" "write" {|{"path":"x.ml","content":"x"}|} ]);
   H.event h (start "c2" "write" {|{"path":"x.ml","content":"x"}|});
   H.event
     h
     {|{"event":"tool_confirm","call_id":"c2","agent_id":null,"name":"write","summary":"x.ml","rules":[]}|};
   H.text h ~selector:".run";
   H.elements h ~selector:".confirm";
-  [%expect {|
+  [%expect
+    {|
     (Focus confirm)
     (Writing x.ml)
     (✓ bash make)

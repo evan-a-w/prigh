@@ -31,12 +31,18 @@ module Phrase = struct
 end
 
 let command =
-  Phrase.v "command" ~doing:"Running a command" ~one:"ran a command"
+  Phrase.v
+    "command"
+    ~doing:"Running a command"
+    ~one:"ran a command"
     ~many:"ran # commands"
 ;;
 
 let search =
-  Phrase.v "search" ~doing:"Searching the code" ~one:"searched the code"
+  Phrase.v
+    "search"
+    ~doing:"Searching the code"
+    ~one:"searched the code"
     ~many:"searched the code # times"
 ;;
 
@@ -51,14 +57,21 @@ let edit =
 ;;
 
 let web_search =
-  Phrase.v "web_search" ~doing:"Searching the web" ~one:"searched the web"
+  Phrase.v
+    "web_search"
+    ~doing:"Searching the web"
+    ~one:"searched the web"
     ~many:"searched the web # times"
 ;;
 
 let table =
   [ [ "bash"; "shell" ], command
   ; ( [ "read" ]
-    , Phrase.v "read" ~by_path:true ~doing:"Reading a file" ~one:"read a file"
+    , Phrase.v
+        "read"
+        ~by_path:true
+        ~doing:"Reading a file"
+        ~one:"read a file"
         ~many:"read # files" )
   ; ( [ "write" ]
     , Phrase.v
@@ -70,92 +83,170 @@ let table =
         ~many:"wrote # files" )
   ; [ "edit"; "apply_patch" ], edit
   ; ( [ "ls" ]
-    , Phrase.v "ls" ~by_path:true ~doing:"Listing a directory"
-        ~one:"listed a directory" ~many:"listed # directories" )
+    , Phrase.v
+        "ls"
+        ~by_path:true
+        ~doing:"Listing a directory"
+        ~one:"listed a directory"
+        ~many:"listed # directories" )
   ; [ "grep"; "find" ], search
   ; ( [ "web_fetch" ]
-    , Phrase.v "web_fetch" ~doing:"Fetching a page" ~one:"fetched a page"
+    , Phrase.v
+        "web_fetch"
+        ~doing:"Fetching a page"
+        ~one:"fetched a page"
         ~many:"fetched # pages" )
   ; [ "web_search" ], web_search
   ; ( [ "update_plan" ]
-    , Phrase.v "plan" ~doing:"Updating the plan" ~one:"updated the plan"
+    , Phrase.v
+        "plan"
+        ~doing:"Updating the plan"
+        ~one:"updated the plan"
         ~many:"updated the plan # times" )
   ; ( [ "ask_user" ]
-    , Phrase.v "ask_user" ~doing:"Asking you" ~one:"asked you a question"
+    , Phrase.v
+        "ask_user"
+        ~doing:"Asking you"
+        ~one:"asked you a question"
         ~many:"asked you # questions" )
   ; ( [ "render_ui" ]
-    , Phrase.v "render_ui" ~doing:"Showing you a view" ~one:"showed a view"
+    , Phrase.v
+        "render_ui"
+        ~doing:"Showing you a view"
+        ~one:"showed a view"
         ~many:"showed # views" )
   ; ( [ "subagent" ]
-    , Phrase.v "subagent" ~doing:"Starting a subagent"
-        ~one:"started a subagent" ~many:"started # subagents" )
+    , Phrase.v
+        "subagent"
+        ~doing:"Starting a subagent"
+        ~one:"started a subagent"
+        ~many:"started # subagents" )
   ; ( [ "subagent_continue" ]
-    , Phrase.v "subagent_continue" ~doing:"Continuing a subagent"
-        ~one:"continued a subagent" ~many:"continued # subagents" )
+    , Phrase.v
+        "subagent_continue"
+        ~doing:"Continuing a subagent"
+        ~one:"continued a subagent"
+        ~many:"continued # subagents" )
   ; ( [ "subagent_status" ]
-    , Phrase.v "subagent_status" ~doing:"Checking on subagents"
-        ~one:"checked on subagents" ~many:"checked on subagents # times" )
+    , Phrase.v
+        "subagent_status"
+        ~doing:"Checking on subagents"
+        ~one:"checked on subagents"
+        ~many:"checked on subagents # times" )
   ; ( [ "subagent_cancel" ]
-    , Phrase.v "subagent_cancel" ~doing:"Cancelling a subagent"
-        ~one:"cancelled a subagent" ~many:"cancelled # subagents" )
+    , Phrase.v
+        "subagent_cancel"
+        ~doing:"Cancelling a subagent"
+        ~one:"cancelled a subagent"
+        ~many:"cancelled # subagents" )
   ; ( [ "subagent_message" ]
-    , Phrase.v "subagent_message" ~doing:"Messaging a subagent"
-        ~one:"messaged a subagent" ~many:"messaged subagents # times" )
+    , Phrase.v
+        "subagent_message"
+        ~doing:"Messaging a subagent"
+        ~one:"messaged a subagent"
+        ~many:"messaged subagents # times" )
   ; ( [ "job_status" ]
-    , Phrase.v "job_status" ~doing:"Checking on jobs" ~one:"checked on jobs"
+    , Phrase.v
+        "job_status"
+        ~doing:"Checking on jobs"
+        ~one:"checked on jobs"
         ~many:"checked on jobs # times" )
   ; ( [ "job_output" ]
-    , Phrase.v "job_output" ~doing:"Reading a job's output"
-        ~one:"read a job's output" ~many:"read jobs' output # times" )
+    , Phrase.v
+        "job_output"
+        ~doing:"Reading a job's output"
+        ~one:"read a job's output"
+        ~many:"read jobs' output # times" )
   ; ( [ "job_input" ]
-    , Phrase.v "job_input" ~doing:"Sending input to a job"
-        ~one:"sent input to a job" ~many:"sent input to jobs # times" )
+    , Phrase.v
+        "job_input"
+        ~doing:"Sending input to a job"
+        ~one:"sent input to a job"
+        ~many:"sent input to jobs # times" )
   ; ( [ "job_kill" ]
-    , Phrase.v "job_kill" ~doing:"Stopping a job" ~one:"stopped a job"
+    , Phrase.v
+        "job_kill"
+        ~doing:"Stopping a job"
+        ~one:"stopped a job"
         ~many:"stopped # jobs" )
   ; ( [ "goal_complete" ]
-    , Phrase.v "goal" ~doing:"Completing the goal" ~one:"completed the goal"
+    , Phrase.v
+        "goal"
+        ~doing:"Completing the goal"
+        ~one:"completed the goal"
         ~many:"completed the goal # times" )
   ; ( [ "memory" ]
-    , Phrase.v "memory" ~doing:"Using its memory" ~one:"used its memory"
+    , Phrase.v
+        "memory"
+        ~doing:"Using its memory"
+        ~one:"used its memory"
         ~many:"used its memory # times" )
   ; ( [ "custom_instructions" ]
-    , Phrase.v "custom_instructions" ~doing:"Updating your instructions"
+    , Phrase.v
+        "custom_instructions"
+        ~doing:"Updating your instructions"
         ~one:"updated your instructions"
         ~many:"updated your instructions # times" )
   ; ( [ "reply_to_comment" ]
-    , Phrase.v "reply_to_comment" ~doing:"Replying to a comment"
-        ~one:"replied to a comment" ~many:"replied to # comments" )
+    , Phrase.v
+        "reply_to_comment"
+        ~doing:"Replying to a comment"
+        ~one:"replied to a comment"
+        ~many:"replied to # comments" )
   ; ( [ "sessions" ]
-    , Phrase.v "sessions" ~doing:"Looking through sessions"
+    , Phrase.v
+        "sessions"
+        ~doing:"Looking through sessions"
         ~one:"looked through sessions"
         ~many:"looked through sessions # times" )
   ; ( [ "ask_session" ]
-    , Phrase.v "ask_session" ~doing:"Asking another session"
-        ~one:"asked another session" ~many:"asked other sessions # times" )
+    , Phrase.v
+        "ask_session"
+        ~doing:"Asking another session"
+        ~one:"asked another session"
+        ~many:"asked other sessions # times" )
   ; ( [ "answer_session" ]
-    , Phrase.v "answer_session" ~doing:"Answering another session"
-        ~one:"answered another session" ~many:"answered # questions" )
+    , Phrase.v
+        "answer_session"
+        ~doing:"Answering another session"
+        ~one:"answered another session"
+        ~many:"answered # questions" )
   ; ( [ "worktree" ]
-    , Phrase.v "worktree" ~doing:"Managing worktrees"
-        ~one:"managed worktrees" ~many:"managed worktrees # times" )
+    , Phrase.v
+        "worktree"
+        ~doing:"Managing worktrees"
+        ~one:"managed worktrees"
+        ~many:"managed worktrees # times" )
   ; ( [ "pull_request" ]
-    , Phrase.v "pull_request" ~doing:"Working on a pull request"
+    , Phrase.v
+        "pull_request"
+        ~doing:"Working on a pull request"
         ~one:"worked on a pull request"
         ~many:"worked on pull requests # times" )
   ; ( [ "issue" ]
-    , Phrase.v "issue" ~doing:"Working on an issue" ~one:"worked on an issue"
+    , Phrase.v
+        "issue"
+        ~doing:"Working on an issue"
+        ~one:"worked on an issue"
         ~many:"worked on issues # times" )
   ; ( [ "repo" ]
-    , Phrase.v "repo" ~doing:"Checking the repository"
-        ~one:"checked the repository" ~many:"checked the repository # times"
-    )
+    , Phrase.v
+        "repo"
+        ~doing:"Checking the repository"
+        ~one:"checked the repository"
+        ~many:"checked the repository # times" )
   ; ( [ "on_host" ]
-    , Phrase.v "on_host" ~doing:"Listing the machines"
-        ~one:"listed the machines" ~many:"listed the machines # times" )
+    , Phrase.v
+        "on_host"
+        ~doing:"Listing the machines"
+        ~one:"listed the machines"
+        ~many:"listed the machines # times" )
   ; ( [ "computer" ]
-    , Phrase.v "computer" ~doing:"Using the computer"
-        ~one:"used the computer" ~many:"used the computer # times" )
+    , Phrase.v
+        "computer"
+        ~doing:"Using the computer"
+        ~one:"used the computer"
+        ~many:"used the computer # times" )
   ]
 ;;
 
@@ -172,7 +263,10 @@ let thinking =
 ;;
 
 let report =
-  Phrase.v "report" ~doing:"Reading a report" ~one:"got a report"
+  Phrase.v
+    "report"
+    ~doing:"Reading a report"
+    ~one:"got a report"
     ~many:"got # reports"
 ;;
 
@@ -222,7 +316,9 @@ let did steps =
       match List.Assoc.find kinds ~equal:String.equal p.kind with
       | Some _ ->
         List.map kinds ~f:(fun (kind, (p', keys)) ->
-          if String.equal kind p.kind then kind, (p', key :: keys) else kind, (p', keys))
+          if String.equal kind p.kind
+          then kind, (p', key :: keys)
+          else kind, (p', keys))
       | None -> kinds @ [ p.kind, (p, [ key ]) ])
   in
   let parts =
@@ -247,7 +343,10 @@ let duration span =
   else if s < 60
   then sprintf "%ds" s
   else if s < 3600
-  then if s % 60 = 0 then sprintf "%dm" (s / 60) else sprintf "%dm %ds" (s / 60) (s % 60)
+  then
+    if s % 60 = 0
+    then sprintf "%dm" (s / 60)
+    else sprintf "%dm %ds" (s / 60) (s % 60)
   else if s / 60 % 60 = 0
   then sprintf "%dh" (s / 3600)
   else sprintf "%dh %dm" (s / 3600) (s / 60 % 60)
