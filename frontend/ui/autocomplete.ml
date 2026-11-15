@@ -238,6 +238,16 @@ let mcp_items () =
       ~search:"disable"
       ~detail:"NAME: stop a server from your settings, keeping it"
       "disable"
+  ; Picker.Item.create
+      ~id:"signin"
+      ~search:"signin sign in login"
+      ~detail:"NAME: sign in to a remote server (OAuth) in the browser"
+      "signin"
+  ; Picker.Item.create
+      ~id:"signout"
+      ~search:"signout sign out logout"
+      ~detail:"NAME: forget the sign-in to a remote server"
+      "signout"
   ]
 ;;
 

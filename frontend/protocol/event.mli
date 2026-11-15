@@ -174,6 +174,9 @@ type t =
   (** the user changed what they wrote about themselves *)
   | Mcp_settings_changed of Mcp_settings.t
   (** the MCP servers in the user's settings changed *)
+  | Mcp_auth_changed
+  (** the user signed in to or out of an MCP server (or a sign-in lapsed):
+      list the servers again *)
   | Nix_gc_progress of Nix_gc_progress.t
   (** how far the [nix_store_gc] we asked for got *)
 [@@deriving sexp_of, equal]

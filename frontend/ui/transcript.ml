@@ -627,7 +627,8 @@ let apply t (event : P.Event.t) =
   | P.Event.Review _
   | P.Event.Generate_delta _
   | P.Event.Agent_queues _
-  | P.Event.Temporary_ended _ -> t
+  | P.Event.Temporary_ended _
+  | P.Event.Mcp_auth_changed -> t
 ;;
 
 let gray = Style.fg Gray

@@ -5,6 +5,8 @@ module Action = struct
   type t =
     | List
     | Reconnect
+    | Sign_in of string
+    | Sign_out of string
     | Change of
         { request : P.Request.Method.t
         ; done_ : string
@@ -15,7 +17,8 @@ end
 
 let usage =
   "usage: /mcp [reconnect], /mcp add NAME URL|COMMAND [ARGS...], /mcp add \
-   {\"NAME\": {...}} (mcpServers JSON), /mcp remove|enable|disable NAME"
+   {\"NAME\": {...}} (mcpServers JSON), /mcp \
+   remove|enable|disable|signin|signout NAME"
 ;;
 
 let split_words s =
@@ -97,7 +100,8 @@ let add rest =
          [ARGS...]"
     | Ok [ name; url ] when is_url url ->
       Change
-        { request = Add_mcp_servers [ name, Http { url; headers = [] } ]
+        { request =
+            Add_mcp_servers [ name, Http { url; headers = []; oauth = None } ]
         ; done_ = sprintf "added MCP server %s (%s) to your settings" name url
         }
     | Ok (name :: command :: args) ->
@@ -143,7 +147,26 @@ let parse rest =
         { request = Set_mcp_server_enabled { name; enabled }
         ; done_ = sprintf "%sd MCP server %s" verb name
         })
+  | "signin" | "login" -> one_name ~f:(fun name -> Sign_in name)
+  | "signout" | "logout" -> one_name ~f:(fun name -> Sign_out name)
   | _ -> Error usage
+;;
+
+let find_server (list : P.Mcp_list.t) name =
+  match
+    List.find list.servers ~f:(fun (s : P.Mcp_server.t) ->
+      String.equal s.name name)
+  with
+  | Some s -> Ok s
+  | None ->
+    let names = List.map list.servers ~f:(fun (s : P.Mcp_server.t) -> s.name) in
+    Error
+      (sprintf
+         "no MCP server %s%s"
+         name
+         (if List.is_empty names
+          then ""
+          else "; servers: " ^ String.concat ~sep:", " names))
 ;;
 
 let source_label ~home source =

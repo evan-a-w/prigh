@@ -7,6 +7,7 @@ module Status : sig
     | Ready
     | Failed
     | Needs_approval (** a project server the user has not approved *)
+    | Needs_sign_in (** a remote server that wants an OAuth sign-in *)
   [@@deriving sexp_of, equal]
 end
 
@@ -23,7 +24,9 @@ type t =
   ; source : string (** the config file that defines it *)
   ; project : bool (** from a project's [.mcp.json] *)
   ; status : Status.t
-  ; error : string option (** when [Failed] *)
+  ; error : string option (** when [Failed] or [Needs_sign_in] *)
+  ; url : string option (** a remote server's *)
+  ; signed_in : bool (** the user holds a sign-in for [url] *)
   ; tools : Tool.t list (** empty unless [Ready] *)
   }
 [@@deriving sexp_of, equal]

@@ -5,12 +5,14 @@ module Status = struct
     | Ready
     | Failed
     | Needs_approval
+    | Needs_sign_in
   [@@deriving sexp_of, equal]
 
   let of_string = function
     | "ready" -> Ok Ready
     | "failed" -> Ok Failed
     | "needs_approval" -> Ok Needs_approval
+    | "needs_sign_in" -> Ok Needs_sign_in
     | other -> Or_error.errorf "unknown MCP server status %S" other
   ;;
 end
@@ -36,6 +38,8 @@ type t =
   ; project : bool
   ; status : Status.t
   ; error : string option
+  ; url : string option
+  ; signed_in : bool
   ; tools : Tool.t list
   }
 [@@deriving sexp_of, equal]
@@ -51,6 +55,12 @@ let of_json j =
     |> Or_error.tag ~tag:"field \"status\""
   in
   let%bind error = Json.string_opt_field j "error" in
+  let%bind url = Json.string_opt_field j "url" in
+  let%bind signed_in =
+    match Json.field j "signed_in" with
+    | None -> Ok false
+    | Some _ -> Json.bool_field j "signed_in"
+  in
   let%map tools = Json.optional_list_field j "tools" ~f:Tool.of_json in
-  { name; source; project; status; error; tools }
+  { name; source; project; status; error; url; signed_in; tools }
 ;;

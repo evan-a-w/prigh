@@ -6,6 +6,20 @@ open! Core
     use. Their definitions may hold secrets (in [env] and [headers]): the
     sexps hide those values. *)
 
+(** The OAuth client to sign in with, for a server whose authorization
+    server does not register clients itself. *)
+module Oauth : sig
+  type t =
+    { client_id : string
+    ; client_secret : string option
+    ; scopes : string list option
+    }
+  [@@deriving equal]
+
+  (** With the secret hidden. *)
+  val sexp_of_t : t -> Sexp.t
+end
+
 module Transport : sig
   type t =
     | Stdio of
@@ -16,6 +30,7 @@ module Transport : sig
     | Http of
         { url : string
         ; headers : (string * string) list
+        ; oauth : Oauth.t option
         }
   [@@deriving equal]
 

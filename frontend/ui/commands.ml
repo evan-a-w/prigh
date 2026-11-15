@@ -414,10 +414,11 @@ let every =
       ~argument:Argument.Mcp
       "mcp"
       "[reconnect|add|remove ...]"
-      "list MCP servers (Enter approves one or lists its tools); reconnect \
-       restarts failed ones; add NAME URL|COMMAND [ARGS...] (or add \
-       {mcpServers JSON}), remove, enable or disable NAME change the servers \
-       in your settings, which run on every host"
+      "list MCP servers (Enter approves one, signs in to one or lists its \
+       tools); reconnect restarts failed ones; add NAME URL|COMMAND [ARGS...] \
+       (or add {mcpServers JSON}), remove, enable or disable NAME change the \
+       servers in your settings, which run on every host; signin NAME opens a \
+       remote server's OAuth sign-in in the browser, signout NAME forgets it"
   ; c
       "retry-backend-connection"
       ""

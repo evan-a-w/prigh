@@ -276,7 +276,7 @@ let mode_hint (m : App.Model.t) : Content.Line.t option =
           Some
             [ span
                 ~style:attention
-                "Enter approves a server or lists its tools · Esc closes"
+                "Enter approves, signs in or lists tools · Esc closes"
             ]
         | Picker _ ->
           Some [ span ~style:attention "Enter selects · Esc closes" ]

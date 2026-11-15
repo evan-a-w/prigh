@@ -16,6 +16,17 @@ module Method : sig
         { source : string (** the [.mcp.json] that defines the server *)
         ; server : string
         }
+    | Mcp_sign_in of
+        { source : string
+        ; server : string
+        ; redirect_base : string option
+          (** where the authorization server sends the browser back: the
+              page's origin; [None] from a terminal *)
+        } (** answered with [{url}], the page to open *)
+    | Mcp_sign_out of
+        { source : string
+        ; server : string
+        } (** answered like [List_mcp] *)
     | Set_archived of
         { path : string (** a session's path or id *)
         ; archived : bool
