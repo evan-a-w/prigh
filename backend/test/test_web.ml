@@ -513,8 +513,6 @@ let%expect_test
         | Some (`Array hosts) ->
           List.map hosts ~f:(fun h ->
             match Jsonaf.member "name" h with
-            | Some (`String n) when String.equal n (Core_unix.gethostname ()) ->
-              "<host>"
             | Some (`String n) -> n
             | _ -> "?")
           |> String.concat ~sep:","

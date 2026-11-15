@@ -42,7 +42,7 @@ module Paste = struct
       Eio.Buf_read.of_flow ~max_size:(64 * 1024) (Eio.Stdenv.stdin env)
     in
     { secret = None
-    ; from = Core_unix.gethostname ()
+    ; from = Machine_name.get ()
     ; read_line =
         (fun () ->
           match Eio.Buf_read.line reader with

@@ -286,6 +286,8 @@ try {
   // 8. One not loaded: the pages down to it, then there.
   await tick(3).click();
   await atTop(3);
+  // At the top, the page before it follows.
+  await page.waitForFunction(() => !document.querySelector(".rail .tick.unloaded"));
   await page.waitForTimeout(300);
   section("jump: to a message not loaded");
   console.log(await loaded());

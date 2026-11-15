@@ -1185,7 +1185,9 @@ let tool_host_command =
        flag
          "-name"
          (optional string)
-         ~doc:"NAME how the host is shown (default: the hostname)"
+         ~doc:
+           "NAME how the host is shown (default: $PRIGH_HOST_NAME or the \
+            hostname)"
      and host_id =
        flag
          "-host-id"
@@ -1258,7 +1260,7 @@ let tool_host_command =
          let host_id =
            Host_id.choose ?given:host_id ~home ~warn:(eprintf "%s\n%!") ()
          in
-         let name = Option.value name ~default:(Core_unix.gethostname ()) in
+         let name = Option.value name ~default:(Machine_name.get ()) in
          (* Not for the tools it runs. *)
          List.iter
            [ "PRIGH_TOKEN"; "PRIGH_USER"; "PRIGH_CONNECT" ]
@@ -1392,7 +1394,9 @@ let web_command =
        flag
          "-name"
          (optional string)
-         ~doc:"NAME how this machine's tool host is shown (default: hostname)"
+         ~doc:
+           "NAME how this machine's tool host is shown (default: \
+            $PRIGH_HOST_NAME or the hostname)"
      and host_id =
        flag
          "-host-id"
@@ -1544,7 +1548,7 @@ let web_command =
              { remote
              ; credentials
              ; tools
-             ; name = Option.value name ~default:(Core_unix.gethostname ())
+             ; name = Option.value name ~default:(Machine_name.get ())
              ; host_id
              ; cwd
              ; computer = Computer_flag.enable ~env ~sw ~log computer
@@ -1622,7 +1626,9 @@ let desktop_command =
        flag
          "-name"
          (optional string)
-         ~doc:"NAME how this machine's tool host is shown (default: hostname)"
+         ~doc:
+           "NAME how this machine's tool host is shown (default: \
+            $PRIGH_HOST_NAME or the hostname)"
      and host_id =
        flag
          "-host-id"
@@ -1736,7 +1742,7 @@ let desktop_command =
              { initial
              ; ui
              ; tools
-             ; name = Option.value name ~default:(Core_unix.gethostname ())
+             ; name = Option.value name ~default:(Machine_name.get ())
              ; host_id
              ; cwd
              ; computer
@@ -1787,8 +1793,8 @@ let acp_command =
          "-name"
          (optional string)
          ~doc:
-           "NAME how this machine is shown as a tool host (default: the \
-            hostname)"
+           "NAME how this machine is shown as a tool host (default: \
+            $PRIGH_HOST_NAME or the hostname)"
      and host_id =
        flag
          "-host-id"
@@ -1856,7 +1862,7 @@ let acp_command =
                    ~home:(home ())
                    ~warn:(eprintf "prigh acp: %s\n%!")
                    ()
-             ; name = Option.value name ~default:(Core_unix.gethostname ())
+             ; name = Option.value name ~default:(Machine_name.get ())
              ; cwd
              }
        in

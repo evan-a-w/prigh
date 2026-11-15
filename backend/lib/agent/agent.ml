@@ -359,7 +359,7 @@ let restore_settings t =
 
 let backend_host t =
   { Host.id = Host.backend_id
-  ; name = Core_unix.gethostname ()
+  ; name = Machine_name.get ()
   ; cwd = t.backend_cwd
   ; session_id = None
   ; session_name = None
@@ -1073,7 +1073,7 @@ let set_config ?(session_mode = true) t (config : Config.t) =
       Or_error.errorf
         "default_cwd: %s is not a directory on the backend (%s)"
         dir
-        (Core_unix.gethostname ())
+        (Machine_name.get ())
     | Some _ | None -> Ok ()
   in
   let%map () = Config.save ~home:t.home config in

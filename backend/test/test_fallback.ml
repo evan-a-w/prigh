@@ -307,12 +307,7 @@ let%expect_test "default_cwd: where new sessions start" =
         { (Agent.config agent) with default_cwd = Some dir }
     with
     | Ok () -> print_endline "ok"
-    | Error e ->
-      print_endline
-        (String.substr_replace_all
-           (Error.to_string_hum e)
-           ~pattern:(Core_unix.gethostname ())
-           ~with_:"HOST")
+    | Error e -> print_endline (Error.to_string_hum e)
   in
   set "/no/such/dir";
   set "work";
@@ -320,7 +315,7 @@ let%expect_test "default_cwd: where new sessions start" =
   [%expect
     {|
     /
-    default_cwd: /no/such/dir is not a directory on the backend (HOST)
+    default_cwd: /no/such/dir is not a directory on the backend (<host>)
     default_cwd: work must be absolute (or start with ~/)
     ok
     |}]
