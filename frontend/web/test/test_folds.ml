@@ -225,7 +225,7 @@ let%expect_test "verbosity: verbose unfolds everything, quiet hides it" =
     (Cache_prefs (((key web.verbosity) (value (quiet)))))
     (Rpc (method_ set_prefs) (params ((prefs ((web.verbosity quiet)))))
      (tag Show_error))
-    (Expire_toast (id 1) (after_ms 4660))
+    (Expire_toast (id 1) (after_ms 4420))
     <div class="chat verbosity-quiet">
     ()
     |}];

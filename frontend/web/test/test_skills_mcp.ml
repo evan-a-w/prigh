@@ -491,7 +491,7 @@ let%expect_test "an invoked skill in the page: verbosity classes, /fork" =
     (Cache_prefs (((key web.verbosity) (value (quiet)))))
     (Rpc (method_ set_prefs) (params ((prefs ((web.verbosity quiet)))))
      (tag Show_error))
-    (Expire_toast (id 1) (after_ms 4660))
+    (Expire_toast (id 1) (after_ms 4420))
     <div id="chat" role="region" aria-label="Transcript" tabindex="0" class="chat verbosity-quiet">
       <Vdom.Node.none-widget> </Vdom.Node.none-widget>
       <div class="entries">

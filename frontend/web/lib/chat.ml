@@ -114,6 +114,7 @@ let set_running t running =
 ;;
 
 let entries t = List.rev t.rev_entries
+let rev_entries t = t.rev_entries
 let tool t id = Map.find t.tools id
 let add t entry = { t with rev_entries = entry :: t.rev_entries }
 

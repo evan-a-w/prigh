@@ -21,6 +21,11 @@ val create
   -> t
 
 val filter : t -> Transcript_filter.t
+
+(** Quiet verbosity: runs of steps between messages fold into one line
+    ({!Activity_runs}). *)
+val quiet : t -> bool
+
 val shows : t -> Transcript_filter.Kind.t -> bool
 
 (** Normal verbosity, nothing toggled. *)

@@ -454,7 +454,7 @@ let%expect_test "/verbosity and Ctrl+O" =
     (Rpc (method_ push_pref)
      (params ((key history) (value /verbosity) (max 500))) (tag Ignore))
     (Focus picker-input)
-    Quiet tool calls without their output; no thinking
+    Quiet each run of steps folded into one line
     Normal tool output and thinking folded ✓
     Verbose everything unfolded
     |}];
@@ -471,7 +471,7 @@ let%expect_test "/verbosity and Ctrl+O" =
     (Cache_prefs (((key web.verbosity) (value (quiet)))))
     (Rpc (method_ set_prefs) (params ((prefs ((web.verbosity quiet)))))
      (tag Show_error))
-    (Expire_toast (id 0) (after_ms 4660))
+    (Expire_toast (id 0) (after_ms 4420))
     <div id="chat" role="region" aria-label="Transcript" tabindex="0" class="chat verbosity-quiet">
       <Vdom.Node.none-widget> </Vdom.Node.none-widget>
       <div class="entries">

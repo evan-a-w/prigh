@@ -275,6 +275,40 @@ let thinking ~live text =
       (div "thinking-text" [ Markdown_view.render text ])
 ;;
 
+(* Quiet: thinking as a step of a run, a line that opens its text. *)
+let thinking_step ~fold ~key ~live text =
+  let opened = Fold.opened ~by_default:false fold key in
+  let preview = Markdown.preview text in
+  Node.div
+    ~attrs:
+      [ Attr.classes
+          ([ "tool"; "tool-thinking"; (if live then "running" else "ok") ]
+           @ if opened then [ "open" ] else [])
+      ]
+    [ Node.button
+        ~attrs:
+          [ Attr.class_ "tool-head"
+          ; Attr.type_ "button"
+          ; Fold.toggle_attr fold key
+          ; Attr.create "aria-expanded" (Bool.to_string opened)
+          ]
+        (present
+           [ (if live
+              then Html.lamp ()
+              else Html.mark ~cls:"done" ~label:"Done" Check)
+           ; span "name" "Thinking"
+           ; (if opened || String.is_empty preview
+              then Node.none
+              else span "arg" preview)
+           ; span "chev" ""
+           ])
+    ; (if opened && not (String.is_empty (String.strip text))
+       then
+         div "tool-body" [ div "thinking-text" [ Markdown_view.render text ] ]
+       else Node.none)
+    ]
+;;
+
 let stopped (message : Message.Assistant.t) =
   match message.stop_reason with
   | Error e ->
@@ -382,6 +416,22 @@ let hidden ?(deleting = Int.Set.empty) ~fold chat =
         sum + List.count (parts e) ~f:(fun kind -> not (Fold.shows fold kind)))
 ;;
 
+module Quiet_deps = struct
+  type t =
+    { segments : Activity_runs.Segment.t list
+    ; continues : bool
+    ; tail : bool (** a box here is still taking steps *)
+    ; chat_running : bool
+    }
+
+  let equal a b =
+    Activity_runs.equal_segments a.segments b.segments
+    && Bool.equal a.continues b.continues
+    && Bool.equal a.tail b.tail
+    && Bool.equal a.chat_running b.chat_running
+  ;;
+end
+
 module Deps = struct
   type t =
     { n : int
@@ -395,6 +445,7 @@ module Deps = struct
     ; ui : Ui_context.Page.t option
       (** with a [render_ui] call: what its components show *)
     ; sessions : int (** {!Session_link_view.stamp} *)
+    ; quiet : Quiet_deps.t option (** the boxes that start in it *)
     }
 
   let equal a b =
@@ -407,6 +458,7 @@ module Deps = struct
     && Message_time.equal a.times b.times
     && List.equal Bool.equal a.expanded b.expanded
     && Option.equal Fold.equal a.nested b.nested
+    && Option.equal Quiet_deps.equal a.quiet b.quiet
     && Option.equal
          (fun (a : Ui_context.Page.t) (b : Ui_context.Page.t) ->
             phys_equal a.state b.state
@@ -457,33 +509,58 @@ let chats : (Chat.t, Chat_deps.t) View_cache.t = View_cache.create ()
 let rec nested ~ui ~fold times (s : Chat.Subagent.t) =
   view ~ui ~fold:(Fold.scoped fold s.agent_id) times s.chat
 
-and assistant ~ui ~fold times chat (message : Message.Assistant.t) ~streaming =
+and assistant
+      ?quiet
+      ~ui
+      ~fold
+      times
+      chat
+      ~n
+      (message : Message.Assistant.t)
+      ~streaming
+  =
   let count = List.length message.content in
+  let block i (content : Content.t) =
+    let last = i = count - 1 in
+    match content with
+    | content when not (Fold.shows fold (content_kind content)) -> Node.none
+    | Text text when String.is_empty (String.strip text) -> Node.none
+    | Text text -> Markdown_view.render ~streaming:(streaming && last) text
+    | Thinking text
+      when String.is_empty (String.strip text) && not (streaming && last) ->
+      Node.none
+    | Thinking text -> thinking ~live:(streaming && last) text
+    | Tool_call call ->
+      Tool_view.view
+        ~ui
+        ~nested:(nested ~ui ~fold times)
+        ~fold
+        ~streaming:(streaming && last)
+        ~running:(Chat.running chat)
+        call
+        (Chat.tool chat call.id)
+    | Server_tool s -> Tool_view.server_tool ~fold ~running:streaming s
+  in
   let blocks =
-    List.mapi message.content ~f:(fun i content ->
-      let last = i = count - 1 in
-      match (content : Content.t) with
-      | content when not (Fold.shows fold (content_kind content)) -> Node.none
-      | Text text when String.is_empty (String.strip text) -> Node.none
-      | Text text -> Markdown_view.render ~streaming:(streaming && last) text
-      | Thinking text
-        when String.is_empty (String.strip text) && not (streaming && last) ->
-        Node.none
-      | Thinking text -> thinking ~live:(streaming && last) text
-      | Tool_call call ->
-        Tool_view.view
-          ~ui
-          ~nested:(nested ~ui ~fold times)
-          ~fold
-          ~streaming:(streaming && last)
-          ~running:(Chat.running chat)
-          call
-          (Chat.tool chat call.id)
-      | Server_tool s -> Tool_view.server_tool ~fold ~running:streaming s)
+    match quiet with
+    | None -> List.mapi message.content ~f:block
+    | Some runs ->
+      let content = Array.of_list message.content in
+      List.concat_map (Activity_runs.segments runs n) ~f:(function
+        | Whole -> List.mapi message.content ~f:block
+        | Blocks is -> List.map is ~f:(fun i -> block i content.(i))
+        | Box box -> [ activity ~ui ~fold times chat runs box ])
   in
   let blocks = present blocks in
+  (* Quiet: the box of the run it goes on with says what it does, unless
+     the model is failing. *)
+  let in_box =
+    match quiet, Chat.activity chat with
+    | _, (Retrying _ | Waiting (Some _)) | None, _ -> false
+    | Some runs, _ -> Activity_runs.continues runs n
+  in
   let pending =
-    if streaming && count = 0
+    if streaming && count = 0 && not in_box
     then (
       let label, detail =
         match Chat.activity chat with
@@ -513,7 +590,11 @@ and assistant ~ui ~fold times chat (message : Message.Assistant.t) ~streaming =
     else Node.none
   in
   let stopped = if Fold.shows fold Notes then stopped message else Node.none in
-  if List.is_empty blocks && (not streaming) && phys_equal stopped Node.none
+  if
+    List.is_empty blocks
+    && phys_equal pending Node.none
+    && phys_equal stopped Node.none
+    && ((not streaming) || Option.is_some quiet)
   then Node.none
   else
     div
@@ -528,66 +609,224 @@ and assistant ~ui ~fold times chat (message : Message.Assistant.t) ~streaming =
             else footer times message)
          ])
 
-and render_entry ~ui ~fold times chat (entry : Chat.Entry.t) =
-  match entry with
-  | User u when not (Fold.shows fold (user_kind u)) -> Node.none
-  | Shell _ when not (Fold.shows fold Tools) -> Node.none
-  | Compaction _ when not (Fold.shows fold Notes) -> Node.none
-  | User u ->
-    let notes =
-      Option.value_map u.origin ~default:[] ~f:(fun (o : Origin.t) -> o.notes)
+(* Quiet: a run of steps as one line saying what it is doing, or what it
+   did and how long it took; the line opens the steps, each a line that
+   opens its detail. Collapsed, the steps are not rendered at all. *)
+and activity ~ui ~fold times chat runs (box : Activity_runs.Box.t) =
+  let steps =
+    List.filter (Activity_runs.Box.steps box) ~f:(fun step ->
+      Fold.shows fold (Activity_runs.Step.kind step))
+  in
+  if List.is_empty steps
+  then Node.none
+  else (
+    let chat_running = Chat.running chat in
+    let tail =
+      Option.exists (Activity_runs.tail runs) ~f:(fun tail ->
+        phys_equal tail box)
     in
-    (* Notes before a message of the harness's: plan mode turned on or off
+    let status : Activity_runs.Step.t -> Tool_view.Status.t = function
+      | Call { call; streaming; _ } ->
+        Tool_view.status
+          ~streaming
+          ~running:chat_running
+          (Chat.tool chat call.id)
+      | Server { tool; streaming; _ } ->
+        if Option.is_none (snd (Tool_summary.as_call tool)) && streaming
+        then Running
+        else Done
+      | Thinking { live; _ } -> if live then Running else Done
+      | Report _ -> Done
+    in
+    let statuses = List.map steps ~f:(fun step -> step, status step) in
+    let busy : Tool_view.Status.t -> bool = function
+      | Preparing | Running -> true
+      | Done | Failed | Interrupted -> false
+    in
+    let current =
+      List.rev statuses |> List.find ~f:(fun (_, status) -> busy status)
+    in
+    let running = Option.is_some current || (chat_running && tail) in
+    let failed =
+      List.count statuses ~f:(fun (_, status) ->
+        match status with
+        | Failed -> true
+        | Preparing | Running | Done | Interrupted -> false)
+    in
+    let label =
+      match current with
+      | Some (step, _) ->
+        Prigh_ui.Tool_phrase.doing (Activity_runs.Step.phrase step)
+      | None when running -> "Thinking"
+      | None ->
+        Prigh_ui.Tool_phrase.did (List.map steps ~f:Activity_runs.Step.phrase)
+    in
+    (* From the message before it to its last step's end. *)
+    let took =
+      if running
+      then None
+      else (
+        let ends =
+          List.filter_map steps ~f:(fun (step : Activity_runs.Step.t) ->
+            match step with
+            | Call { call; at; _ } ->
+              Option.first_some
+                (Option.bind (Chat.tool chat call.id) ~f:(fun t ->
+                   Option.bind t.result ~f:(fun r -> r.at)))
+                at
+            | Report { user; _ } -> user.at
+            | Thinking _ | Server _ -> None)
+        in
+        match
+          ( Activity_runs.Box.since box
+          , List.max_elt ends ~compare:Time_ns.compare )
+        with
+        | Some since, Some until when Time_ns.( >= ) until since ->
+          Some (Prigh_ui.Tool_phrase.duration (Time_ns.diff until since))
+        | _ -> None)
+    in
+    let key = Activity_runs.Box.key box in
+    let opened = Fold.opened ~by_default:false fold key in
+    let icon =
+      if running
+      then Html.lamp ()
+      else if failed > 0
+      then Html.mark ~cls:"failed" ~label:"A step failed" Cross
+      else Html.mark ~cls:"done" ~label:"Done" Check
+    in
+    Node.div
+      ~attrs:
+        [ Attr.classes
+            ([ "run"
+             ; (if running
+                then "running"
+                else if failed > 0
+                then "error"
+                else "ok")
+             ]
+             @ if opened then [ "open" ] else [])
+        ]
+      [ Node.button
+          ~attrs:
+            [ Attr.class_ "run-head"
+            ; Attr.type_ "button"
+            ; Fold.toggle_attr fold key
+            ; Attr.create "aria-expanded" (Bool.to_string opened)
+            ]
+          (present
+             [ icon
+             ; span "run-label" label
+             ; (if failed > 0
+                then span "run-failed" (sprintf "%d failed" failed)
+                else Node.none)
+             ; Option.value_map took ~default:Node.none ~f:(span "run-time")
+             ; span "chev" ""
+             ])
+      ; (if opened
+         then
+           div
+             "run-steps"
+             (List.map steps ~f:(fun (step : Activity_runs.Step.t) ->
+                match step with
+                | Call { call; streaming; _ } ->
+                  Tool_view.view
+                    ~ui
+                    ~nested:(nested ~ui ~fold times)
+                    ~fold
+                    ~streaming
+                    ~running:chat_running
+                    call
+                    (Chat.tool chat call.id)
+                | Server { tool; streaming; _ } ->
+                  Tool_view.server_tool ~fold ~running:streaming tool
+                | Thinking { text; live; _ } ->
+                  thinking_step
+                    ~fold
+                    ~key:(Activity_runs.Step.key step)
+                    ~live
+                    text
+                | Report { user; _ } ->
+                  render_entry ~ui ~fold times chat ~n:0 (Chat.Entry.User user)))
+         else Node.none)
+      ])
+
+and render_entry ?quiet ~ui ~fold times chat ~n (entry : Chat.Entry.t) =
+  let segments =
+    Option.map quiet ~f:(fun runs -> runs, Activity_runs.segments runs n)
+  in
+  match entry, segments with
+  | (User _ | Shell _ | Compaction _), Some (runs, segments)
+    when not (Activity_runs.equal_segments segments [ Whole ]) ->
+    (match
+       List.filter_map segments ~f:(function
+         | Box box -> Some (activity ~ui ~fold times chat runs box)
+         | Whole | Blocks _ -> None)
+       |> present
+     with
+     | [] -> Node.none
+     | boxes -> div "msg steps" boxes)
+  | _ ->
+    (match entry with
+     | User u when not (Fold.shows fold (user_kind u)) -> Node.none
+     | Shell _ when not (Fold.shows fold Tools) -> Node.none
+     | Compaction _ when not (Fold.shows fold Notes) -> Node.none
+     | User u ->
+       let notes =
+         Option.value_map u.origin ~default:[] ~f:(fun (o : Origin.t) ->
+           o.notes)
+       in
+       (* Notes before a message of the harness's: plan mode turned on or off
        with a goal's message. *)
-    let noted main =
-      match notes with
-      | [] -> main
-      | notes ->
-        div "msg noted" (List.map notes ~f:(margin_note times) @ [ main ])
-    in
-    (match Message.User.source u with
-     | Some { kind = Delivery; title } ->
-       noted
-         (match Prigh_ui.Delivery.parse u.text with
-          | Some sections ->
-            div
-              "msg"
-              [ Delivery_view.view
-                  ~name:(Tool_view.agent_name chat)
-                  ~fold
-                  sections
-              ]
-          | None -> note ?at:u.at times ~kind:Delivery ~title u.text)
-     | Some { kind = Summary; _ } ->
-       compaction
-         (Option.value
-            (String.chop_prefix u.text ~prefix:summary_prefix)
-            ~default:u.text)
-     | Some { kind; title } -> noted (note ?at:u.at times ~kind ~title u.text)
-     | None ->
-       user ?skill:(Skill_message.parse (Message.User.body u)) ~fold times u)
-  | Shell call ->
-    let tool = Chat.tool chat call.id in
-    div
-      "msg shell"
-      [ Tool_view.view
-          ~ui
-          ~nested:(nested ~ui ~fold times)
-          ~fold
-          ~streaming:false
-          ~running:
-            (Option.value_map tool ~default:true ~f:(fun t ->
-               Option.is_none t.result))
-          { call with name = "bash" }
-          tool
-      ]
-  | Compaction summary -> compaction summary
-  | Assistant { message; streaming } ->
-    assistant ~ui ~fold times chat message ~streaming
+       let noted main =
+         match notes with
+         | [] -> main
+         | notes ->
+           div "msg noted" (List.map notes ~f:(margin_note times) @ [ main ])
+       in
+       (match Message.User.source u with
+        | Some { kind = Delivery; title } ->
+          noted
+            (match Prigh_ui.Delivery.parse u.text with
+             | Some sections ->
+               div
+                 "msg"
+                 [ Delivery_view.view
+                     ~name:(Tool_view.agent_name chat)
+                     ~fold
+                     sections
+                 ]
+             | None -> note ?at:u.at times ~kind:Delivery ~title u.text)
+        | Some { kind = Summary; _ } ->
+          compaction
+            (Option.value
+               (String.chop_prefix u.text ~prefix:summary_prefix)
+               ~default:u.text)
+        | Some { kind; title } ->
+          noted (note ?at:u.at times ~kind ~title u.text)
+        | None ->
+          user ?skill:(Skill_message.parse (Message.User.body u)) ~fold times u)
+     | Shell call ->
+       let tool = Chat.tool chat call.id in
+       div
+         "msg shell"
+         [ Tool_view.view
+             ~ui
+             ~nested:(nested ~ui ~fold times)
+             ~fold
+             ~streaming:false
+             ~running:
+               (Option.value_map tool ~default:true ~f:(fun t ->
+                  Option.is_none t.result))
+             { call with name = "bash" }
+             tool
+         ]
+     | Compaction summary -> compaction summary
+     | Assistant { message; streaming } ->
+       assistant ?quiet ~ui ~fold times chat ~n message ~streaming)
 
 (* An entry's card depends on the state of its tool calls, and on whether the
    agent is still running while one of them has no result. *)
-and entry ?menu ?index ~ui ~fold times chat ~n (entry : Chat.Entry.t) =
+and entry ?menu ?index ?quiet ~ui ~fold times chat ~n (entry : Chat.Entry.t) =
   let span = Option.bind index ~f:(fun index -> Message_index.span index n) in
   let more : More.t option =
     match span, entry with
@@ -617,10 +856,41 @@ and entry ?menu ?index ~ui ~fold times chat ~n (entry : Chat.Entry.t) =
        | None -> [])
     | User _ | Compaction _ -> []
   in
+  (* Quiet: the boxes that start here, with their steps from the entries
+     after it. *)
+  let quiet_deps, boxes =
+    match quiet with
+    | None -> None, []
+    | Some runs ->
+      let segments = Activity_runs.segments runs n in
+      let boxes =
+        List.filter_map segments ~f:(function
+          | Box box -> Some box
+          | Whole | Blocks _ -> None)
+      in
+      let tail =
+        Option.exists (Activity_runs.tail runs) ~f:(fun tail ->
+          List.exists boxes ~f:(phys_equal tail))
+      in
+      ( Some
+          { Quiet_deps.segments
+          ; continues = Activity_runs.continues runs n
+          ; tail
+          ; chat_running = tail && Chat.running chat
+          }
+      , boxes )
+  in
+  let steps = List.concat_map boxes ~f:Activity_runs.Box.steps in
+  let box_calls =
+    List.filter_map steps ~f:(function
+      | Call { call; _ } -> Some call.id
+      | Thinking _ | Server _ | Report _ -> None)
+  in
   let tools =
-    match entry with
-    | Assistant _ | Shell _ -> List.map ids ~f:(Chat.tool chat)
-    | User _ | Compaction _ -> []
+    (match entry with
+     | Assistant _ | Shell _ -> List.map ids ~f:(Chat.tool chat)
+     | User _ | Compaction _ -> [])
+    @ List.map box_calls ~f:(Chat.tool chat)
   in
   let running =
     Chat.running chat
@@ -640,6 +910,12 @@ and entry ?menu ?index ~ui ~fold times chat ~n (entry : Chat.Entry.t) =
             [ Fold.expanded fold id
             ; Fold.expanded fold (Tool_view.open_key id)
             ])
+          @ List.concat_map boxes ~f:(fun box ->
+            Fold.expanded fold (Activity_runs.Box.key box)
+            :: List.map (Activity_runs.Box.steps box) ~f:(fun step ->
+              Fold.expanded fold (Activity_runs.Step.key step)))
+          @ List.map box_calls ~f:(Fold.expanded fold)
+      ; quiet = quiet_deps
       ; nested =
           Option.some_if
             (List.exists tools ~f:(fun tool ->
@@ -657,7 +933,7 @@ and entry ?menu ?index ~ui ~fold times chat ~n (entry : Chat.Entry.t) =
       }
     ~equal:Deps.equal
     ~f:(fun () ->
-      let node = render_entry ~ui ~fold times chat entry in
+      let node = render_entry ?quiet ~ui ~fold times chat ~n entry in
       let places =
         (if Jump.landmark entry
          then [ Attr.create "data-entry" (Int.to_string n) ]
@@ -819,6 +1095,9 @@ and divider ~ui ~fold times (d : Divider.t) =
 
 and entries_view ?menu ?index ~ui ~deleting ~dividers ~fold times chat =
   let ui = { ui with Ui_context.Page.sent = ui_sent chat } in
+  let quiet =
+    if Fold.quiet fold then Some (Activity_runs.of_chat chat) else None
+  in
   let dividers_after n =
     List.filter_map dividers ~f:(fun (d : Divider.t) ->
       Option.some_if
@@ -852,7 +1131,7 @@ and entries_view ?menu ?index ~ui ~deleting ~dividers ~fold times chat =
               (dividers_after i)
               (keyed
                  (Int.to_string i)
-                 (entry ?menu ?index ~ui ~fold times chat ~n:i e)
+                 (entry ?menu ?index ?quiet ~ui ~fold times chat ~n:i e)
                :: rev_nodes) )))
   in
   div "entries" (List.rev rev_nodes)

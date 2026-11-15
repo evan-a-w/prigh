@@ -1603,10 +1603,8 @@ kbd {
 @media (prefers-reduced-motion: reduce) { .diff-file > summary::before { transition: none; } }
 .text-dialog .text-block { max-height: none; overflow: visible; }
 
-/* Quiet: tool calls without their output, no thinking. Verbose: every fold
-   open (images open the viewer). */
-.chat.verbosity-quiet .tool-body,
-.chat.verbosity-quiet .thinking { display: none; }
+/* Verbose: every fold open (images open the viewer). Quiet folds runs of
+   steps into one line each (chat.css). */
 .chat.verbosity-verbose details::details-content { content-visibility: visible; display: block; }
 .chat.verbosity-verbose details > summary > .preview { visibility: hidden; }
 .chat.verbosity-verbose details > summary > .label::before { transform: translateY(-1px) rotate(45deg); }

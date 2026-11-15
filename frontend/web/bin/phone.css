@@ -416,6 +416,10 @@
 .app.narrow .composer-status .ring.mini { width: 15px; height: 15px; }
 /* A tool's line is the toggle for its output: a thumb's height. */
 .app.narrow .tool-head { min-height: var(--tap); }
+/* So is a run's line in quiet. */
+.app.narrow .run-head { min-height: var(--tap); }
+.app.narrow .msg > .run > .run-head > .mark { top: 15px; }
+.app.narrow .msg > .run > .run-head > .lamp { top: 18.5px; }
 
 /* {1 Thumb-sized, the rest of the way} */
 .app.narrow .composer-buttons .send { width: 40px; height: 40px; }

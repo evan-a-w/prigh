@@ -2773,14 +2773,14 @@ esc close
 === firefox: search: verbos ===
 -- Settings --
 > Set [verbos]ity | normal Ctrl+O
-  ○ [Verbos]ity: Quiet | tool calls without their output; no thinking
+  ○ [Verbos]ity: Quiet | each run of steps folded into one line
   ● [Verbos]ity: Normal | current
   ○ [Verbos]ity: Verbose | everything unfolded
 -- Commands --
   /[verbos]ity | how much of tool calls and thinking the transcript shows
 === firefox: search: Enter opens the setting's values; ⌫ goes back; Enter sets one ===
 crumb: Verbosity
-  ○ Quiet — tool calls without their output; no thinking
+  ○ Quiet — each run of steps folded into one line
 > ● Normal — tool output and thinking folded | current
   ○ Verbose — everything unfolded
 back: "verbos"
@@ -4515,4 +4515,91 @@ strip: No tool host connected Chat anyway
 audit: ok
 after Chat without a host: strip (none)
 === firefox: chat: errors ===
+(none)
+=== firefox: quiet desktop: a turn: two runs of steps, the first with a failed step ===
+prigh: ▢ Using prigh-web fix the bug (time)
+prigh: [run] Ran 2 commands, read a file 1 failed (took)
+prigh: Now the fix. [run] Wrote a file (took)
+prigh: Done: wrote fix.txt. (time)
+first run's line: false
+sideways: none
+=== firefox: quiet desktop: the first run opened: its steps ===
+Ran 2 commands, read a file 1 failed (took) Thinking Let me look around first. bash ls read notes.txt bash echo no such target >&2; exit 3 exit code 3 no such target
+sideways: none
+=== firefox: quiet desktop: a step opened: its output ===
+Ran 2 commands, read a file 1 failed (took) Thinking Let me look around first. bash ls read notes.txt the bug is in fix.txt bash echo no such target >&2; exit 3 exit code 3 no such target
+sideways: none
+=== firefox: quiet desktop: closed again ===
+first run's line: false
+=== firefox: quiet desktop: waiting for an approval ===
+last run: Running a command
+last run running: true
+approval inside a run: 0
+=== firefox: quiet desktop: approved ===
+prigh: ▢ Using prigh-web fix the bug (time)
+prigh: [run] Ran 2 commands, read a file 1 failed (took)
+prigh: Now the fix. [run] Wrote a file (took)
+prigh: Done: wrote fix.txt. (time)
+you: clean up (time)
+prigh: [run] Ran a command (took)
+prigh: Cleaned up. (time)
+=== firefox: quiet desktop: errors ===
+(none)
+=== firefox: quiet phone: a turn: two runs of steps, the first with a failed step ===
+prigh: ▢ Using prigh-web fix the bug (time)
+prigh: [run] Ran 2 commands, read a file 1 failed (took)
+prigh: Now the fix. [run] Wrote a file (took)
+prigh: Done: wrote fix.txt. (time)
+first run's line: false, 44px tall
+sideways: none
+=== firefox: quiet phone: the first run opened: its steps ===
+Ran 2 commands, read a file 1 failed (took) Thinking Let me look around first. bash ls read notes.txt bash echo no such target >&2; exit 3 exit code 3 no such target
+sideways: none
+=== firefox: quiet phone: a step opened: its output ===
+Ran 2 commands, read a file 1 failed (took) Thinking Let me look around first. bash ls read notes.txt the bug is in fix.txt bash echo no such target >&2; exit 3 exit code 3 no such target
+sideways: none
+=== firefox: quiet phone: closed again ===
+first run's line: false, 44px tall
+=== firefox: quiet phone: waiting for an approval ===
+last run: Running a command
+last run running: true
+approval inside a run: 0
+=== firefox: quiet phone: approved ===
+prigh: ▢ Using prigh-web fix the bug (time)
+prigh: [run] Ran 2 commands, read a file 1 failed (took)
+prigh: Now the fix. [run] Wrote a file (took)
+prigh: Done: wrote fix.txt. (time)
+you: clean up (time)
+prigh: [run] Ran a command (took)
+prigh: Cleaned up. (time)
+=== firefox: quiet phone: errors ===
+(none)
+=== firefox: quiet small: a turn: two runs of steps, the first with a failed step ===
+prigh: ▢ Using prigh-web fix the bug (time)
+prigh: [run] Ran 2 commands, read a file 1 failed (took)
+prigh: Now the fix. [run] Wrote a file (took)
+prigh: Done: wrote fix.txt. (time)
+first run's line: false, 44px tall
+sideways: none
+=== firefox: quiet small: the first run opened: its steps ===
+Ran 2 commands, read a file 1 failed (took) Thinking Let me look around first. bash ls read notes.txt bash echo no such target >&2; exit 3 exit code 3 no such target
+sideways: none
+=== firefox: quiet small: a step opened: its output ===
+Ran 2 commands, read a file 1 failed (took) Thinking Let me look around first. bash ls read notes.txt the bug is in fix.txt bash echo no such target >&2; exit 3 exit code 3 no such target
+sideways: none
+=== firefox: quiet small: closed again ===
+first run's line: false, 44px tall
+=== firefox: quiet small: waiting for an approval ===
+last run: Running a command
+last run running: true
+approval inside a run: 0
+=== firefox: quiet small: approved ===
+prigh: ▢ Using prigh-web fix the bug (time)
+prigh: [run] Ran 2 commands, read a file 1 failed (took)
+prigh: Now the fix. [run] Wrote a file (took)
+prigh: Done: wrote fix.txt. (time)
+you: clean up (time)
+prigh: [run] Ran a command (took)
+prigh: Cleaned up. (time)
+=== firefox: quiet small: errors ===
 (none)
