@@ -12,3 +12,50 @@
   (flags
    (:standard --opt 3)))
  (libraries prigh_web_app))
+
+; The stylesheets as one (index.html loads it): one request, and the page
+; waits for one file rather than eighteen. In this order: later rules win.
+
+(rule
+ (target app.css)
+ (deps
+  theme.css
+  style.css
+  chat.css
+  agents.css
+  terminal.css
+  files.css
+  review.css
+  highlight.css
+  resize.css
+  paging.css
+  jump.css
+  forge.css
+  status.css
+  temporary.css
+  control.css
+  ui.css
+  ui-chart.css
+  phone.css)
+ (action
+  (with-stdout-to
+   app.css
+   (progn
+    (cat theme.css)
+    (cat style.css)
+    (cat chat.css)
+    (cat agents.css)
+    (cat terminal.css)
+    (cat files.css)
+    (cat review.css)
+    (cat highlight.css)
+    (cat resize.css)
+    (cat paging.css)
+    (cat jump.css)
+    (cat forge.css)
+    (cat status.css)
+    (cat temporary.css)
+    (cat control.css)
+    (cat ui.css)
+    (cat ui-chart.css)
+    (cat phone.css)))))

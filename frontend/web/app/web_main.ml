@@ -672,14 +672,21 @@ module Result_ = struct
   let incoming t action = t.inject action
 end
 
-(* The editor grows with its text, up to the CSS max-height. *)
-let autosize () =
+(* The editor grows with its text, up to the CSS max-height. Measuring it
+   from scratch (height auto, then its scrollHeight) lays the page out twice
+   per key; text added at its end can only make it taller, which reading
+   [scrollHeight] alone tells. *)
+let autosize ~grown =
   Browser.after_render (fun () ->
     Option.iter
       (Dom_html.getElementById_coerce "editor" Dom_html.CoerceTo.textarea)
       ~f:(fun el ->
-        el##.style##.height := Js.string "auto";
-        el##.style##.height := Js.string (sprintf "%dpx" el##.scrollHeight)))
+        if not grown then el##.style##.height := Js.string "auto";
+        if (not grown) || el##.scrollHeight > el##.clientHeight
+        then (
+          let height = Js.string (sprintf "%dpx" el##.scrollHeight) in
+          if not (Js.equals el##.style##.height height)
+          then el##.style##.height := height)))
 ;;
 
 (* When the first of the tool confirmations on show appeared: an Enter typed
@@ -715,7 +722,7 @@ let component client settings ~init ~current (local_ graph) =
         let model', commands = App.update model action in
         current := model';
         if not (String.equal model.draft model'.draft)
-        then Tab_memory.save_draft model'.draft;
+        then Tab_memory.save_draft_soon model'.draft;
         (* A confirmation or question just showed (also one over another). *)
         if
           (App.Model.waiting model' && not (App.Model.waiting model))
@@ -733,12 +740,15 @@ let component client settings ~init ~current (local_ graph) =
         in
         if
           not
-            (String.equal model.draft model'.draft
-             && [%equal: bool * bool * bool * bool * bool * bool]
-                  (layout model)
-                  (layout model')
+            ([%equal: bool * bool * bool * bool * bool * bool]
+               (layout model)
+               (layout model')
              && App.Connection.equal model.connection model'.connection)
-        then autosize ();
+        then autosize ~grown:false
+        else if not (String.equal model.draft model'.draft)
+        then
+          autosize
+            ~grown:(String.is_prefix model'.draft ~prefix:model.draft);
         sync_title model';
         List.iter commands ~f:(perform client settings ctx model');
         model')
@@ -1088,7 +1098,7 @@ let install_listeners ~schedule ~current =
   set_visual_height ();
   Browser.on_viewport_change (fun () ->
     set_visual_height ();
-    autosize ();
+    autosize ~grown:false;
     schedule (App.Action.Set_narrow (narrow ()));
     schedule (Resize_widget.viewport ()));
   (* Ctrl+Shift+V (Cmd+Shift+V), "paste as plain text": a long paste goes in
@@ -1228,12 +1238,18 @@ let install_listeners ~schedule ~current =
        (Dom_html.Event.make "pagehide")
        (Dom.handler (fun _ ->
           save_scroll ();
+          Tab_memory.flush_draft ();
           Js._true))
        Js._false
      : Dom_html.event_listener_id);
   listen (Dom_html.Event.make "visibilitychange") (fun _ ->
     if Js.to_bool (Js.Unsafe.get Dom_html.document "hidden")
-    then save_scroll ();
+    then (
+      save_scroll ();
+      Tab_memory.flush_draft ());
+    Js._true);
+  listen (Dom_html.Event.make "focusout") (fun _ ->
+    Tab_memory.flush_draft ();
     Js._true);
   List.iter
     [ Dom_html.Event.make "wheel"
@@ -1857,7 +1873,11 @@ and desktop_signed_in ~key : Desktop_link.Signin_reply.t option -> unit =
   | None -> desktop_lost ()
 ;;
 
+(* vdom_thunk.js: without it, no [View_cache] node is ever reused. *)
+external reuse_vdom_thunks : unit -> unit = "prigh_reuse_vdom_thunks"
+
 let run () =
+  reuse_vdom_thunks ();
   Async_js.init ();
   Service_worker.register ();
   Desktop_page.take_shell ();

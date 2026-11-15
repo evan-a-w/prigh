@@ -5,7 +5,9 @@ open! Core
     in a secure context (https, or localhost): elsewhere these do nothing. *)
 
 (** Registers [sw.js] (or picks up the registration there is), and checks for
-    a new build hourly and when the page is shown again. *)
+    a new build hourly and when the page is shown again. Reloads the page
+    when the worker asks (it showed its own copy of the page, and a proxy in
+    front wants its sign-in). *)
 val register : unit -> unit
 
 (** Calls [f] once a new build's worker is installed and waiting for the page

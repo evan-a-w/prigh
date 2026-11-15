@@ -1,0 +1,8 @@
+; Fills in the site's generated files (../site/dune): sw.template.js with the
+; app shell's files, their versions and a hash of them, so that each build
+; that changes the shell is a new service worker; and the versioned
+; references (NAME?v=VERSION) in index.html and app.css.
+
+(executable
+ (name site_gen)
+ (libraries core))

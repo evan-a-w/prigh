@@ -169,31 +169,40 @@ module Representation = struct
      new build's same-sized file would otherwise look unchanged. Hashed once
      per file version (ctime too: a rewrite may keep the size, mtime and
      inode). *)
-  let etags : (int * float * int * float * string) String.Table.t =
-    String.Table.create ()
-  ;;
-
-  let etag t =
-    match Hashtbl.find etags t.file with
-    | Some (size, mtime, inode, ctime, etag)
+  let cached (table : (int * float * int * float * string) String.Table.t) t ~f
+    =
+    match Hashtbl.find table t.file with
+    | Some (size, mtime, inode, ctime, value)
       when size = t.size
            && Float.equal mtime t.mtime
            && inode = t.inode
-           && Float.equal ctime t.ctime -> etag
+           && Float.equal ctime t.ctime -> value
     | _ ->
-      let etag =
-        sprintf
-          "\"%s\""
-          (String.prefix
-             (Digestif.SHA256.to_hex
-                (Digestif.SHA256.digest_string (In_channel.read_all t.file)))
-             24)
-      in
+      let value = f (In_channel.read_all t.file) in
       Hashtbl.set
-        etags
+        table
         ~key:t.file
-        ~data:(t.size, t.mtime, t.inode, t.ctime, etag);
-      etag
+        ~data:(t.size, t.mtime, t.inode, t.ctime, value);
+      value
+  ;;
+
+  let etags = String.Table.create ()
+
+  let etag t =
+    cached etags t ~f:(fun data ->
+      sprintf
+        "\"%s\""
+        (String.prefix
+           (Digestif.SHA256.to_hex (Digestif.SHA256.digest_string data))
+           24))
+  ;;
+
+  let versions = String.Table.create ()
+
+  (* As the frontend's build names it (site_gen): [NAME?v=VERSION]. *)
+  let version t =
+    cached versions t ~f:(fun data ->
+      String.prefix (Md5.to_hex (Md5.digest_string data)) 16)
   ;;
 end
 
@@ -227,7 +236,16 @@ let not_modified ~headers (r : Representation.t) =
   | None, _ -> false
 ;;
 
-let respond ~root ~meth ~path ~headers =
+(* A versioned name of this very file ([?v=] its version) never changes: a
+   new build's is another name. Everything else may, and is revalidated. *)
+let cache_control ~query (original : Representation.t) =
+  match List.Assoc.find query ~equal:String.equal "v" with
+  | Some v when String.equal v (Representation.version original) ->
+    "public, max-age=31536000, immutable"
+  | _ -> "no-cache"
+;;
+
+let respond ?(query = []) ~root ~meth ~path ~headers () =
   let not_found () =
     Response.text ~status:404 ~reason:"Not Found" "not found\n"
   in
@@ -253,7 +271,8 @@ let respond ~root ~meth ~path ~headers =
            |> Option.value ~default:original
          in
          let headers' =
-           (("ETag", Representation.etag chosen)
+           (("Cache-Control", cache_control ~query original)
+            :: ("ETag", Representation.etag chosen)
             :: Option.to_list
                  (Option.map (last_modified chosen) ~f:(fun d ->
                     "Last-Modified", d)))

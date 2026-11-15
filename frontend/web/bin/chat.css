@@ -73,6 +73,20 @@
 .entries > .day-sep { margin: 34px 0 18px; }
 .entries > .day-sep:first-child { margin-top: 0; }
 
+/* A long transcript: the browser lays out and paints only the messages
+   near the view ("auto" keeps the size each had when it last showed; 240px
+   is a guess for the others). The newest ones always, as the end is where
+   the page follows the output. Only where the browser keeps what shows in
+   place as the guesses become sizes (scroll anchoring; not WebKit). The
+   clip margin lets the spine reach up to the step above. */
+@supports (overflow-anchor: auto) {
+  .entries > .msg:nth-last-child(n + 9) {
+    content-visibility: auto;
+    contain-intrinsic-block-size: auto 240px;
+    overflow-clip-margin: 24px;
+  }
+}
+
 /* Folded parts: a summary line with a label and a one-line preview. */
 
 .entries details > summary {

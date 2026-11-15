@@ -12,14 +12,16 @@ let storage () =
 
 let session () = Browser.query_param "session"
 
+let save_for ~session key fields =
+  Option.iter (storage ()) ~f:(fun storage ->
+    storage##setItem
+      (Js.string key)
+      (Js.string
+         (Jsonaf.to_string (`Object (("session", `String session) :: fields)))))
+;;
+
 let save key fields =
-  Option.iter
-    (Option.both (storage ()) (session ()))
-    ~f:(fun (storage, session) ->
-      storage##setItem
-        (Js.string key)
-        (Js.string
-           (Jsonaf.to_string (`Object (("session", `String session) :: fields)))))
+  Option.iter (session ()) ~f:(fun session -> save_for ~session key fields)
 ;;
 
 (* Read as the page starts: the chat's scroll events while it loads
@@ -70,7 +72,27 @@ let take_scroll () =
     for_this_session scroll)
 ;;
 
-let save_draft draft = save draft_key [ "draft", `String draft ]
+(* The session is the one the draft was typed in: the page may be in another
+   by the time it is written. *)
+let pending_draft = ref None
+
+let flush_draft () =
+  Option.iter !pending_draft ~f:(fun (session, draft) ->
+    pending_draft := None;
+    save_for ~session draft_key [ "draft", `String draft ])
+;;
+
+let save_draft_soon draft =
+  Option.iter (session ()) ~f:(fun session ->
+    let scheduled = Option.is_some !pending_draft in
+    pending_draft := Some (session, draft);
+    if String.is_empty draft
+    then flush_draft ()
+    else if not scheduled
+    then
+      ignore
+        (Dom_html.setTimeout flush_draft 300. : Dom_html.timeout_id_safe))
+;;
 
 let draft =
   load draft_key ~f:(fun json ->

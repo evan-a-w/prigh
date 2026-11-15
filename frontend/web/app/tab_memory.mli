@@ -15,7 +15,13 @@ val save_scroll : Js_of_ocaml.Dom_html.element Js_of_ocaml.Js.t -> unit
     [None]. *)
 val take_scroll : unit -> float option
 
-val save_draft : string -> unit
+(** Kept within 300ms (at once when it is empty: sent or cleared), for the
+    session the page is in now. *)
+val save_draft_soon : string -> unit
+
+(** Writes the draft waiting to be kept, if any: when the page may go (hidden,
+    unloaded) or the editor loses focus. *)
+val flush_draft : unit -> unit
 
 (** The draft the URL's session had before the page loaded. *)
 val saved_draft : unit -> string option

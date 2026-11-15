@@ -60,7 +60,11 @@ let format_response
   let headers =
     Option.value_map content_length ~default:[] ~f:(fun n ->
       [ "Content-Length", Int.to_string n ])
-    @ [ "Connection", "close"; "Cache-Control", "no-cache" ]
+    @ [ "Connection", "close" ]
+    @ (if
+         List.Assoc.mem headers ~equal:String.Caseless.equal "Cache-Control"
+       then []
+       else [ "Cache-Control", "no-cache" ])
     @ headers
   in
   sprintf
@@ -223,10 +227,12 @@ let handle
          Eio.Flow.copy_string
            (format_response
               (Static_site.respond
+                 ~query:request.query
                  ~root
                  ~meth:request.meth
                  ~path:request.path
-                 ~headers:request.headers))
+                 ~headers:request.headers
+                 ()))
            flow))
 ;;
 

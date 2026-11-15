@@ -4,119 +4,30 @@
  (action
   (copy ../main.bc.js main.bc.js)))
 
+; The page and its stylesheet (../app.css, all of them in one), naming the
+; files they load as NAME?v=VERSION (../site_gen): the backend serves those
+; as immutable, and a new build's are new names.
+
 (rule
  (target index.html)
- (deps ../index.html)
+ (deps
+  ../index.html
+  app.css
+  main.bc.js
+  temporal-polyfill.js
+  recursive-sans.woff2)
  (action
-  (copy ../index.html index.html)))
+  (with-stdout-to
+   index.html
+   (run %{exe:../site_gen/site_gen.exe} versioned %{deps}))))
 
 (rule
- (target theme.css)
- (deps ../theme.css)
+ (target app.css)
+ (deps ../app.css recursive-sans.woff2 recursive-mono.woff2)
  (action
-  (copy ../theme.css theme.css)))
-
-(rule
- (target style.css)
- (deps ../style.css)
- (action
-  (copy ../style.css style.css)))
-
-(rule
- (target chat.css)
- (deps ../chat.css)
- (action
-  (copy ../chat.css chat.css)))
-
-(rule
- (target agents.css)
- (deps ../agents.css)
- (action
-  (copy ../agents.css agents.css)))
-
-(rule
- (target terminal.css)
- (deps ../terminal.css)
- (action
-  (copy ../terminal.css terminal.css)))
-
-(rule
- (target files.css)
- (deps ../files.css)
- (action
-  (copy ../files.css files.css)))
-
-(rule
- (target review.css)
- (deps ../review.css)
- (action
-  (copy ../review.css review.css)))
-
-(rule
- (target highlight.css)
- (deps ../highlight.css)
- (action
-  (copy ../highlight.css highlight.css)))
-
-(rule
- (target resize.css)
- (deps ../resize.css)
- (action
-  (copy ../resize.css resize.css)))
-
-(rule
- (target paging.css)
- (deps ../paging.css)
- (action
-  (copy ../paging.css paging.css)))
-
-(rule
- (target jump.css)
- (deps ../jump.css)
- (action
-  (copy ../jump.css jump.css)))
-
-(rule
- (target status.css)
- (deps ../status.css)
- (action
-  (copy ../status.css status.css)))
-
-(rule
- (target ui-chart.css)
- (deps ../ui-chart.css)
- (action
-  (copy ../ui-chart.css ui-chart.css)))
-
-(rule
- (target ui.css)
- (deps ../ui.css)
- (action
-  (copy ../ui.css ui.css)))
-
-(rule
- (target temporary.css)
- (deps ../temporary.css)
- (action
-  (copy ../temporary.css temporary.css)))
-
-(rule
- (target control.css)
- (deps ../control.css)
- (action
-  (copy ../control.css control.css)))
-
-(rule
- (target phone.css)
- (deps ../phone.css)
- (action
-  (copy ../phone.css phone.css)))
-
-(rule
- (target forge.css)
- (deps ../forge.css)
- (action
-  (copy ../forge.css forge.css)))
+  (with-stdout-to
+   app.css
+   (run %{exe:../site_gen/site_gen.exe} versioned %{deps}))))
 
 ; Recursive (SIL OFL 1.1, recursive-OFL.txt), cut down by
 ; fontTools to Latin and two instances: sans (casual axis kept, for
@@ -232,24 +143,7 @@
   ../sw.template.js
   index.html
   main.bc.js
-  theme.css
-  style.css
-  chat.css
-  agents.css
-  terminal.css
-  files.css
-  review.css
-  highlight.css
-  resize.css
-  paging.css
-  jump.css
-  forge.css
-  status.css
-  temporary.css
-  control.css
-  ui.css
-  ui-chart.css
-  phone.css
+  app.css
   recursive-sans.woff2
   recursive-mono.woff2
   terminal.js
@@ -271,7 +165,7 @@
  (action
   (with-stdout-to
    sw.js
-   (run %{exe:../sw_gen/sw_gen.exe} %{deps}))))
+   (run %{exe:../site_gen/site_gen.exe} sw %{deps}))))
 
 (install
  (section share)
@@ -279,24 +173,7 @@
  (files
   (index.html as web/index.html)
   (main.bc.js as web/main.bc.js)
-  (theme.css as web/theme.css)
-  (style.css as web/style.css)
-  (chat.css as web/chat.css)
-  (agents.css as web/agents.css)
-  (terminal.css as web/terminal.css)
-  (files.css as web/files.css)
-  (review.css as web/review.css)
-  (highlight.css as web/highlight.css)
-  (resize.css as web/resize.css)
-  (paging.css as web/paging.css)
-  (jump.css as web/jump.css)
-  (forge.css as web/forge.css)
-  (status.css as web/status.css)
-  (temporary.css as web/temporary.css)
-  (control.css as web/control.css)
-  (ui.css as web/ui.css)
-  (ui-chart.css as web/ui-chart.css)
-  (phone.css as web/phone.css)
+  (app.css as web/app.css)
   (recursive-sans.woff2 as web/recursive-sans.woff2)
   (recursive-mono.woff2 as web/recursive-mono.woff2)
   (recursive-OFL.txt as web/recursive-OFL.txt)

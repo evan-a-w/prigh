@@ -6,7 +6,7 @@
  (preprocess
   (pps ppx_jane js_of_ocaml-ppx bonsai.ppx_bonsai))
  (js_of_ocaml
-  (javascript_files paste_seal.js))
+  (javascript_files paste_seal.js vdom_thunk.js))
  (libraries
   core
   async_kernel

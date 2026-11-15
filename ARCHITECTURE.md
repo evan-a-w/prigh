@@ -3389,7 +3389,13 @@ terminal frontend and `web/` prigh-web, the browser one.
       delta or a key press costs the same in a long session as in a short
       one; the cache's deps include the entry's folds; sidebar and file
       rows are cached the same way, also keyed on the `inject` their
-      handlers capture),
+      handlers capture. virtual_dom only reuses a lazy node whose function
+      is the same JavaScript closure, and its `Thunk.create` makes a new
+      one every time: `app/vdom_thunk.js`, installed as the page starts,
+      reuses one on its argument alone, the cached lazy value. In
+      `chat.css`, the transcript's messages but the newest are
+      `content-visibility: auto`: the browser lays out and paints only
+      those near the view, where it has scroll anchoring (not WebKit)),
       `Tool_view` (a card per tool: bash, read with images, write, edit
       with `Line_diff`/`Diff_view`, apply_patch file by file,
       ls/grep/find, subagents (marked with `data-call` and `data-agent`
@@ -4067,7 +4073,9 @@ terminal frontend and `web/` prigh-web, the browser one.
     notes its message in localStorage (`prigh-web.refused`) and reloads
     into the sign-in form, keeping `?session=`), keeps the chat's scroll
     position and the draft in sessionStorage (`Tab_memory`:
-    `prigh-web.scroll`, `prigh-web.draft`, for the URL's session) and puts
+    `prigh-web.scroll`, `prigh-web.draft`, for the URL's session; both
+    written at most every 300ms, and when the page is hidden or left, the
+    draft also when the focus moves and at once when it is emptied) and puts
     them back after a reload (the position as the distance from the end of
     the transcript, saved on scrolling and when the page is hidden or left:
     only the newest page loads at first, and older ones are loaded until
