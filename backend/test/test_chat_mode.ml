@@ -318,7 +318,8 @@ let%expect_test "no tool host: other modes refuse, a chat runs" =
     |}]
 ;;
 
-let%expect_test "default_chat_mode: the agent's own new sessions are chats" =
+let%expect_test "default_chat_mode: new sessions are chats, not the one created"
+  =
   with_chat_agent
     ~config:{|{"approval_mode": "auto-edit", "default_chat_mode": true}|}
     (fixed [ Reply.text "hello from the chat" ])
@@ -327,18 +328,22 @@ let%expect_test "default_chat_mode: the agent's own new sessions are chats" =
     let s = Agent.state agent in
     printf "%s chat=%b\n" (Approval_mode.to_string s.approval_mode) s.chat_mode
   in
+  (* The session [create] makes (prigh run's) keeps the approval mode. *)
+  show ();
+  Agent.new_session agent;
   show ();
   prompt agent "hi";
   Agent.set_mode agent ~chat:false;
   show ();
-  let first = (Agent.state agent).session_path in
+  let left = (Agent.state agent).session_path in
   Agent.new_session agent;
   show ();
-  (* Back to the first, which left chat: it stays out of it. *)
-  Or_error.ok_exn (Agent.switch_session agent ~path:first);
+  (* Back to the one that left chat: it stays out of it. *)
+  Or_error.ok_exn (Agent.switch_session agent ~path:left);
   show ();
   [%expect
     {|
+    auto-edit chat=false
     auto-edit chat=true
     assistant: hello from the chat
     auto-edit chat=false

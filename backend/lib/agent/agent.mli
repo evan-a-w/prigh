@@ -606,9 +606,9 @@ val chat_without_host : t -> unit
 
 (** Puts a session made just now (not from disk, no messages, no mode chosen)
     in chat mode when the config's [default_chat_mode] says so, over the
-    approval mode it started in. A session [create] makes itself and
-    [new_session]'s already start so; [Rpc_server] calls it for the sessions
-    it makes. *)
+    approval mode it started in. [new_session] calls it, and [Rpc_server]
+    for the sessions it makes for clients; [create] does not, so that
+    [prigh run] keeps the approval mode. *)
 val start_in_default_mode : t -> unit
 
 (** Answers a pending [ask_user] call ([Answered], one list per question, or

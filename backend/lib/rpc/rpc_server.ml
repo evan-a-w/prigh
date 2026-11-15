@@ -1130,7 +1130,11 @@ let loaded_start t (client : Client.t) session =
       (start_location t client ~cwd:(host_of client).cwd)
 ;;
 
-let fresh_agent t = register t (t.new_agent ~cwd:t.cwd ())
+let fresh_agent t =
+  let agent = register t (t.new_agent ~cwd:t.cwd ()) in
+  Agent.start_in_default_mode agent;
+  agent
+;;
 
 (* Parsing a large session file takes a while (a second for 80 MB): it
    yields as it goes, so that every other client is served meanwhile, and

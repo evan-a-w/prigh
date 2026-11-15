@@ -3699,7 +3699,6 @@ let create
     |> Option.value ~default:Thinking.default
     |> settle_thinking model
   in
-  let fresh = Option.is_none session in
   let session =
     match session with
     | Some s -> s
@@ -3814,7 +3813,6 @@ let create
       broadcast t (Loop event))
     ~on_change:(fun () -> background_changed t)
     ~on_queue_change:(fun () -> subagent_queue_changed t);
-  if fresh then start_in_default_mode t;
   t
 ;;
 
