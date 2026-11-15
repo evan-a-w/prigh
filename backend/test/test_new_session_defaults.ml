@@ -341,3 +341,123 @@ let%expect_test "set_config: defaults_only, and every session follows" =
     on backend in $DIR (mode auto-edit)
     |}]
 ;;
+
+let show_mode server client =
+  let s = Agent.state (Rpc_server.agent_of_client server client) in
+  printf
+    "mode %s%s\n"
+    (Approval_mode.to_string s.approval_mode)
+    (if s.chat_mode then ", chat" else "")
+;;
+
+(* A session on disk, as an older backend wrote it: [chat] false is not
+   written, and before modes were recorded there was no approval entry. *)
+let saved_session ~dir ~approval =
+  let session = Session.create ~dir ~cwd:"/old" () in
+  Option.iter approval ~f:(fun mode ->
+    ignore
+      (Session.set_approval session ~mode ~plan:false ~chat:false
+       : Session.Entry.t));
+  ignore (Session.append_message session (Message.user "hi") : Session.Entry.t);
+  Session.path session
+;;
+
+let%expect_test "default_chat_mode: new sessions start in chat, over the mode" =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let router = make_router t ~sw "a=tok-a" in
+  let a = server router "a" in
+  let page, _ = connect a ~token:"tok-a" () in
+  let dir =
+    Filename.dirname
+      (Session.path (Agent.session (Rpc_server.agent_of_client a page)))
+  in
+  let config fields =
+    sprintf {|{"config": {%s}, "defaults_only": true}|} fields
+  in
+  print_endline
+    (Json.to_string
+       (Option.value_exn
+          (Json.member
+             "default_chat_mode"
+             (Option.value_exn
+                (Json.member "result" (call a page "get_config"))))));
+  let response =
+    call
+      a
+      page
+      ~params:(config {|"approval_mode": "ask", "default_chat_mode": true|})
+      "set_config"
+  in
+  show_config t response;
+  print_endline
+    (Json.to_string
+       (Option.value_exn
+          (Json.member
+             "default_chat_mode"
+             (Option.value_exn (Json.member "result" response)))));
+  (* Settings change only the default: this session stays as it was. *)
+  show_mode a page;
+  [%expect
+    {|
+    false
+    default_host=- default_cwd=- approval_mode=ask
+    true
+    mode auto
+    |}];
+  (* A new session is a chat; leaving it gives the default approval mode. *)
+  ignore (call a page "new_session" : Json.t);
+  show_mode a page;
+  ignore (call a page ~params:{|{"chat_mode": false}|} "set_mode" : Json.t);
+  show_mode a page;
+  ignore (call a page ~params:{|{"temporary": true}|} "new_session" : Json.t);
+  show_mode a page;
+  (* A page connecting now starts in a new session, a chat too. *)
+  let other, _ = connect a ~token:"tok-a" () in
+  show_mode a other;
+  [%expect
+    {|
+    mode ask, chat
+    mode ask
+    mode ask, chat
+    mode ask, chat
+    |}];
+  (* Sessions from disk keep their own mode, recorded or not. *)
+  List.iter [ None; Some "auto-edit" ] ~f:(fun approval ->
+    let path = saved_session ~dir ~approval in
+    ignore
+      (call a page ~params:(sprintf {|{"path": %S}|} path) "switch_session"
+       : Json.t);
+    show_mode a page);
+  [%expect
+    {|
+    mode ask
+    mode auto-edit
+    |}];
+  (* Without [defaults_only] (/confirm smart, /confirm chat), this session
+     changes too: into the approval mode, out of chat; then into chat, over
+     it. *)
+  let confirm fields =
+    show_config
+      t
+      (call a page ~params:(sprintf {|{"config": {%s}}|} fields) "set_config");
+    show_mode a page
+  in
+  confirm {|"approval_mode": "smart", "default_chat_mode": false|};
+  ignore (call a page "new_session" : Json.t);
+  show_mode a page;
+  confirm {|"default_chat_mode": true|};
+  ignore (call a page ~params:{|{"chat_mode": false}|} "set_mode" : Json.t);
+  show_mode a page;
+  [%expect
+    {|
+    default_host=- default_cwd=- approval_mode=smart
+    mode smart
+    mode smart
+    default_host=- default_cwd=- approval_mode=smart
+    mode smart, chat
+    mode smart
+    |}]
+;;

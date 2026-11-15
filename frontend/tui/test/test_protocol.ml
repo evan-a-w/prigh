@@ -938,10 +938,17 @@ let%expect_test "config round trip and config_changed event" =
   show
     (fun j -> Or_error.map (Config.of_json j) ~f:Config.sexp_of_t)
     {|{"generate_model":3}|};
+  show
+    (fun j -> Or_error.map (Config.of_json j) ~f:Config.sexp_of_t)
+    {|{"approval_mode":"smart","default_chat_mode":true}|};
+  show
+    (fun j -> Or_error.map (Config.of_json j) ~f:Config.sexp_of_t)
+    {|{"default_chat_mode":"yes"}|};
   let config =
     { Config.default with
       generate_model = Some "deepseek/deepseek-flash"
     ; naming_model = Some "anthropic/claude-haiku-4-5"
+    ; default_chat_mode = true
     }
   in
   print_s
@@ -949,6 +956,9 @@ let%expect_test "config round trip and config_changed event" =
       "round trip"
         ~generate_model:
           (Json.field (Config.to_json config) "generate_model" : Json.t option)
+        ~default_chat_mode:
+          (Json.field (Config.to_json config) "default_chat_mode"
+           : Json.t option)
         ~equal:
           (Or_error.map
              (Config.of_json (Config.to_json config))
@@ -959,6 +969,7 @@ let%expect_test "config round trip and config_changed event" =
       (Config.to_json
          { Config.scoped_models = [ "a"; "b" ]
          ; approval_mode = Ask
+         ; default_chat_mode = false
          ; permissions = Config.Permissions.empty
          ; default_model = Some "deepseek/deepseek-flash"
          ; default_thinking = Some "max"
@@ -986,7 +997,8 @@ let%expect_test "config round trip and config_changed event" =
   [%expect
     {|
     ((scoped_models (anthropic/claude-fable-5-1 deepseek/deepseek-flash))
-     (approval_mode Ask)
+     (approval_mode     Ask)
+     (default_chat_mode false)
      (permissions (
        (allow ())
        (ask   ())
@@ -1009,7 +1021,8 @@ let%expect_test "config round trip and config_changed event" =
      (approval_model  ())
      (dictation_model ()))
     ((scoped_models ())
-     (approval_mode Auto)
+     (approval_mode     Auto)
+     (default_chat_mode false)
      (permissions (
        (allow ())
        (ask   ())
@@ -1032,7 +1045,8 @@ let%expect_test "config round trip and config_changed event" =
      (approval_model  ())
      (dictation_model ()))
     ((scoped_models ())
-     (approval_mode Auto)
+     (approval_mode     Auto)
+     (default_chat_mode false)
      (permissions (
        (allow ())
        (ask   ())
@@ -1056,7 +1070,8 @@ let%expect_test "config round trip and config_changed event" =
      (dictation_model ()))
     (decode (e "default_model must be a string"))
     ((scoped_models ())
-     (approval_mode Auto)
+     (approval_mode     Auto)
+     (default_chat_mode false)
      (permissions (
        (allow ())
        (ask   ())
@@ -1081,7 +1096,8 @@ let%expect_test "config round trip and config_changed event" =
     (decode (e "fallback_models must be an array of strings"))
     (decode (e "default_cwd must be a string"))
     ((scoped_models ())
-     (approval_mode Auto)
+     (approval_mode     Auto)
+     (default_chat_mode false)
      (permissions (
        (allow ())
        (ask   ())
@@ -1107,7 +1123,8 @@ let%expect_test "config round trip and config_changed event" =
      (dictation_model ()))
     (decode (e (in snippets[0] "missing field \"text\"")))
     ((scoped_models ())
-     (approval_mode Auto)
+     (approval_mode     Auto)
+     (default_chat_mode false)
      (permissions (
        (allow ())
        (ask   ())
@@ -1131,7 +1148,8 @@ let%expect_test "config round trip and config_changed event" =
      (dictation_model ()))
     (decode (e "compact_at_tokens must be a whole number"))
     ((scoped_models ())
-     (approval_mode Auto)
+     (approval_mode     Auto)
+     (default_chat_mode false)
      (permissions (
        (allow ())
        (ask   ())
@@ -1155,7 +1173,8 @@ let%expect_test "config round trip and config_changed event" =
      (dictation_model ()))
     (decode (e "mask_observations must be a boolean"))
     ((scoped_models ())
-     (approval_mode Auto)
+     (approval_mode     Auto)
+     (default_chat_mode false)
      (permissions (
        (allow ())
        (ask   ())
@@ -1178,7 +1197,8 @@ let%expect_test "config round trip and config_changed event" =
      (approval_model ())
      (dictation_model (aiproxy/whisper)))
     ((scoped_models ())
-     (approval_mode Auto)
+     (approval_mode     Auto)
+     (default_chat_mode false)
      (permissions (
        (allow ())
        (ask   ())
@@ -1201,9 +1221,38 @@ let%expect_test "config round trip and config_changed event" =
      (approval_model  ())
      (dictation_model ()))
     (decode (e "generate_model must be a string"))
-    ("round trip" (generate_model (deepseek/deepseek-flash)) (equal (Ok true)))
+    ((scoped_models ())
+     (approval_mode     Smart)
+     (default_chat_mode true)
+     (permissions (
+       (allow ())
+       (ask   ())
+       (deny  ())))
+     (default_model    ())
+     (default_thinking ())
+     (fallback_models  ())
+     (default_cwd      ())
+     (default_host     ())
+     (max_budget_usd   ())
+     (worktrees_dir    ())
+     (archive_after_days 7)
+     (notify             bell)
+     (snippets ())
+     (compact_at_tokens 200000)
+     (compaction_model ())
+     (mask_observations true)
+     (generate_model  ())
+     (naming_model    ())
+     (approval_model  ())
+     (dictation_model ()))
+    (decode (e "default_chat_mode must be a boolean"))
+    ("round trip"
+      (generate_model    (deepseek/deepseek-flash))
+      (default_chat_mode (true))
+      (equal (Ok true)))
     ((scoped_models (a b))
-     (approval_mode ask)
+     (approval_mode     ask)
+     (default_chat_mode false)
      (permissions (
        (allow ())
        (ask   ())
@@ -1230,7 +1279,8 @@ let%expect_test "config round trip and config_changed event" =
     (Event (
       Config_changed (
         (scoped_models (a))
-        (approval_mode Auto)
+        (approval_mode     Auto)
+        (default_chat_mode false)
         (permissions (
           (allow ())
           (ask   ())

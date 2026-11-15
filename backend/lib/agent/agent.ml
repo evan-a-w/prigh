@@ -760,8 +760,6 @@ let switch_mode ?approval ?plan ?chat t =
     state_changed t)
 ;;
 
-let set_approval_mode t mode = switch_mode t ~approval:mode
-
 (* The notes for the model when chat or plan mode changed since it was last
    told. *)
 let mode_notes t =
@@ -1095,11 +1093,15 @@ let set_config ?(session_mode = true) t (config : Config.t) =
   in
   let%map () = Config.save ~home:t.home config in
   let mode_changed =
-    not (Approval_mode.equal config.approval_mode t.config.approval_mode)
+    not
+      (Approval_mode.equal config.approval_mode t.config.approval_mode
+       && Bool.equal config.default_chat_mode t.config.default_chat_mode)
   in
   adopt_config t config;
-  (* [/confirm on|off] changes the default and the session at once. *)
-  if session_mode && mode_changed then set_approval_mode t config.approval_mode
+  (* [/confirm MODE] changes the default and the session at once. *)
+  if session_mode && mode_changed
+  then
+    switch_mode t ~approval:config.approval_mode ~chat:config.default_chat_mode
 ;;
 
 let save_as_default t =
@@ -1384,6 +1386,18 @@ let chat_without_host t =
   if
     (not t.chat_mode)
     && List.is_empty (hosts t)
+    && Option.is_none (Session.approval t.session)
+    && List.is_empty (Session.messages t.session)
+  then switch_mode t ~chat:true
+;;
+
+(* Only a session made just now: one from disk, or one that already has a
+   mode or a message, keeps its own. *)
+let start_in_default_mode t =
+  if
+    t.config.default_chat_mode
+    && (not t.chat_mode)
+    && (not (Session.persisted t.session))
     && Option.is_none (Session.approval t.session)
     && List.is_empty (Session.messages t.session)
   then switch_mode t ~chat:true
@@ -4783,7 +4797,8 @@ let new_session t =
   replace_session
     t
     (Session.create ~dir:t.sessions_dir ~cwd:t.cwd ())
-    ~keep_host:true
+    ~keep_host:true;
+  start_in_default_mode t
 ;;
 
 let switch_session t ~path =

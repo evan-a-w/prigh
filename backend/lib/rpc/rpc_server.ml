@@ -1106,6 +1106,12 @@ let start_agent t session start =
   register t (t.new_agent ~session ~cwd:(Session.cwd session) ())
 ;;
 
+let start_new_agent t session start =
+  let agent = start_agent t session start in
+  Agent.start_in_default_mode agent;
+  agent
+;;
+
 (* A session loaded from disk keeps the host it recorded (waiting for it if
    need be); one without (or on the disabled backend) would adopt the first
    host to connect, so it starts like a new session for [client] instead. *)
@@ -1124,7 +1130,11 @@ let loaded_start t (client : Client.t) session =
       (start_location t client ~cwd:(host_of client).cwd)
 ;;
 
-let fresh_agent t = register t (t.new_agent ~cwd:t.cwd ())
+let fresh_agent t =
+  let agent = register t (t.new_agent ~cwd:t.cwd ()) in
+  Agent.start_in_default_mode agent;
+  agent
+;;
 
 (* Parsing a large session file takes a while (a second for 80 MB): it
    yields as it goes, so that every other client is served meanwhile, and
@@ -1568,7 +1578,7 @@ let first_session t (client : Client.t) =
          && List.is_empty (Session.messages (Agent.session agent))
          && List.for_all (clients_of t agent) ~f:(phys_equal client) ->
     let cwd = (host_of client).cwd in
-    start_agent
+    start_new_agent
       t
       (Session.create ~dir:t.sessions_dir ~cwd ())
       (start_location t client ~cwd)
@@ -1999,7 +2009,7 @@ let new_session t (client : Client.t) ~temporary =
       eprintf
         "prigh: the ledger of a temporary session: %s\n%!"
         (Exn.to_string exn));
-  start_agent t session start |> attach t client;
+  start_new_agent t session start |> attach t client;
   match attached_state client, key with
   | `Object fields, Some key ->
     `Object (fields @ [ "temporary_key", `String key ])

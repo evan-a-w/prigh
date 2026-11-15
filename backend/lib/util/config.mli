@@ -20,6 +20,9 @@ type t =
   ; approval_mode : Approval_mode.t
     (** the mode new sessions start in; [confirm_tools] (true: [ask], false:
         [auto]) in files written before it, replaced by it on save *)
+  ; default_chat_mode : bool
+    (** whether new sessions start in chat mode, over [approval_mode] (which
+        leaving chat returns to); sessions from disk keep their own mode *)
   ; permissions : Approval.Rules.t
     (** [permissions]: allow/ask/deny rules for every session *)
   ; default_model : string option

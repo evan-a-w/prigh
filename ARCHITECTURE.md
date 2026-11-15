@@ -1512,7 +1512,12 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   message outside chat mode cannot run (no host connected, or the
   session's gone for good) and `prompt` and the queue refuse with it;
   `Agent.chat_without_host`, called when a non-host client attaches,
-  puts a brand-new session with no host in reach in chat mode. `ask_user` emits `Ask_user` and waits for
+  puts a brand-new session with no host in reach in chat mode, and
+  `Agent.start_in_default_mode` one made just now for a client
+  (`Agent.new_session`, `Rpc_server.start_new_agent` and `fresh_agent`:
+  not from disk, no messages, no mode recorded; not `prigh run`'s) when
+  the config's `default_chat_mode` says so, over the configured
+  `approval_mode`. `ask_user` emits `Ask_user` and waits for
   `answer_question` (the first answer wins; abort withdraws it;
   `Ask_user_done` follows). Its timeout (`User_question.timeout`: the
   config's `ask_user_timeout_seconds`, or the call's `timeout_seconds`,
@@ -1587,7 +1592,8 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
 - `Config` — `~/.prigh/config.json` (`auto_background_seconds` (default
   30, 0 = off: see background jobs), `scoped_models : string list`,
   `approval_mode` (new sessions' mode; read from `confirm_tools` when
-  absent, which saving replaces), `permissions` (allow/ask/deny rules;
+  absent, which saving replaces), `default_chat_mode` (new sessions start
+  in chat mode over `approval_mode`), `permissions` (allow/ask/deny rules;
   saving keeps the file's as written), `default_model`/`default_thinking`,
   `fallback_models` (model keys), `default_cwd`, `default_host` (a tool
   host's id), `worktrees_dir` (where
@@ -1622,9 +1628,12 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   again (it may be away). `default_cwd` must be absolute or start with
   `~`; on the backend's host it must be a directory there when it changes.
   `set_config {config, defaults_only?}`: with `defaults_only` an
-  `approval_mode` change is the default only, the caller's session keeps
-  its mode (prigh-web's Settings → New sessions); without it `/confirm`
-  changes both. After a save every other agent of the server adopts the
+  `approval_mode` or `default_chat_mode` change is the default only, the
+  caller's session keeps its mode (prigh-web's Settings → New sessions);
+  without it `/confirm` changes both (chat or not, over that approval
+  mode). The frontends show the two as one choice (`Default_mode` in
+  `frontend/ui`): chat sends only `default_chat_mode`, keeping the
+  approval mode under it; another mode sends both, chat off. After a save every other agent of the server adopts the
   config (`Agent.adopt_config`) and tells its clients (`config_changed`),
   so every client's settings follow and a later `set_config` merges over
   the file as it is (`Rpc_server.current_config` rereads it). A new

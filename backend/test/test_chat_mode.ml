@@ -13,12 +13,14 @@ let with_chat_agent
       ?(backend_host = true)
       ?(children = [])
       ?(before = fun _ -> ())
+      ?config
       replies
       f
   =
   with_sandbox
   @@ fun t ->
   write t "AGENTS.md" "Project rule: use tabs.";
+  Option.iter config ~f:(write t ".prigh/config.json");
   Eio.Switch.run
   @@ fun sw ->
   let server =
@@ -313,6 +315,40 @@ let%expect_test "no tool host: other modes refuse, a chat runs" =
     ((chat_mode false) (plan_mode false)
      (no_host
       ("no tool host connected: connect one with `prigh tool-host -connect ...` or a TUI, then pick it with /host, or talk without one in chat mode (/mode chat)")))
+    |}]
+;;
+
+let%expect_test "default_chat_mode: new sessions are chats, not the one created"
+  =
+  with_chat_agent
+    ~config:{|{"approval_mode": "auto-edit", "default_chat_mode": true}|}
+    (fixed [ Reply.text "hello from the chat" ])
+  @@ fun _ agent _ ->
+  let show () =
+    let s = Agent.state agent in
+    printf "%s chat=%b\n" (Approval_mode.to_string s.approval_mode) s.chat_mode
+  in
+  (* The session [create] makes (prigh run's) keeps the approval mode. *)
+  show ();
+  Agent.new_session agent;
+  show ();
+  prompt agent "hi";
+  Agent.set_mode agent ~chat:false;
+  show ();
+  let left = (Agent.state agent).session_path in
+  Agent.new_session agent;
+  show ();
+  (* Back to the one that left chat: it stays out of it. *)
+  Or_error.ok_exn (Agent.switch_session agent ~path:left);
+  show ();
+  [%expect
+    {|
+    auto-edit chat=false
+    auto-edit chat=true
+    assistant: hello from the chat
+    auto-edit chat=false
+    auto-edit chat=true
+    auto-edit chat=false
     |}]
 ;;
 

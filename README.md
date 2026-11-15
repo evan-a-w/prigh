@@ -945,7 +945,8 @@ a switch that turns it off and back on to what it was; notifications, on or
 off, and what to do when the browser has not been asked, blocks them or
 cannot show them), **New sessions** (what a new session starts with, each
 with its control and a ↶ back to the built-in: the model (a picker, or This
-session's: `/change_default`), thinking, mode (Ask, Auto-edit, Auto), the
+session's: `/change_default`), thinking, mode (Ask, Auto-edit, Smart, Auto,
+or Chat over the approval mode chosen before it), the
 tool host (a picker of the connected ones, `/default-host`) and the starting
 directory (typed, applied on Enter or leaving the field, `/default-dir`);
 and the limits every session without its own follows: the fallback models
@@ -2518,6 +2519,9 @@ through; `/scoped-models` edits it), `approval_mode` (`ask`, `auto-edit`,
 `smart` or `auto`: the mode new sessions start in, see below; `/confirm on|off`
 sets `ask` or `auto`; files with the older `confirm_tools` still work, and
 it is replaced by `approval_mode` when prigh saves the file),
+`default_chat_mode` (`true`: new sessions start in chat mode, over
+`approval_mode`, which leaving the chat gives; `/confirm chat`; `prigh run`
+keeps `approval_mode`),
 `permissions` (allow/ask/deny rules, below; edited by hand) and
 `default_model`/`default_thinking` (what new sessions start with unless
 `-model`/`-thinking` is given; `/change_default` saves the current ones),
@@ -2834,7 +2838,7 @@ it.
 | `/verbosity [quiet\|normal\|verbose]` | set the transcript verbosity |
 | `/filter [all\|KIND...\|-KIND\|+KIND]` | show only some kinds in the transcript (`user`, `assistant`, `thinking`, `tools`, `subagents`, `notes`); bare: a checklist |
 | `/theme [original\|dark\|light]`, `/accent [name\|#rrggbb]` (prigh-web) | pick or set the theme and the accent colour, for you in every browser |
-| `/confirm [on\|off]` | ask before destructive tools: sets the approval mode `ask` or `auto`, here and for new sessions |
+| `/confirm [on\|off\|mode]` | the mode here and for new sessions: `on` (`ask`), `off` (`auto`), `ask`, `auto-edit`, `smart`, `auto`, or `chat` (chat mode over the approval mode, `default_chat_mode`); bare: says both (prigh-web: a picker) |
 | `/mode [mode]` | pick or set this session's mode, in Alt+M's order: `ask`, `auto-edit`, `smart`, `auto`, `plan` or `chat` (completion and the bare command's picker offer them all) |
 | `/plan [on\|off]` | toggle plan mode (read-only planning until you turn it off) |
 | `/chat [on\|off]` | toggle chat mode (a chat without the tool host until you turn it off) |
@@ -3244,10 +3248,14 @@ chat → ask):
   directory run unjudged unless the path has `.git` or `..`.
 - `auto`: nothing asks (the default, as before).
 
-A new session starts in the config's `approval_mode`; a session keeps its
+A new session starts in the config's `approval_mode` (in chat mode over it
+with `default_chat_mode`: `/confirm chat` or Settings → New sessions →
+Chat; any other mode turns it off); a session keeps its
 mode (and the rules below) in its file, so it survives a reload or a backend
-restart, and forks take it along. Subagents' tool calls are checked like the
-main agent's (their confirmations name the subagent).
+restart, and forks take it along. A session from before
+`default_chat_mode` (no mode recorded) is never made a chat by it.
+Subagents' tool calls are checked like the main agent's (their
+confirmations name the subagent).
 
 In `smart` mode, rules still come first (deny, ask, then allow rules), and
 read-only tools run. Any other call that `ask` would hold goes to the

@@ -300,7 +300,11 @@ let argument_items
               | Some kind -> Transcript_filter.Kind.label kind
               | None -> "show everything")
            word))
-  | Confirm | Plan | Chat | Memory -> Some (confirm_items ())
+  | Confirm ->
+    Some
+      (List.map Default_mode.arguments ~f:(fun (name, detail) ->
+         Picker.Item.create ~id:name ~detail name))
+  | Plan | Chat | Memory -> Some (confirm_items ())
   | Mode -> Some (mode_items ())
   | Notify -> Some (notify_items ())
   | Login ->

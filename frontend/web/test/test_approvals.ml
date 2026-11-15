@@ -252,7 +252,8 @@ let%expect_test "/mode NAME, /plan, /confirm" =
     {|
     (Rpc (method_ push_pref)
      (params ((key history) (value "/confirm on") (max 500))) (tag Ignore))
-    (Rpc (method_ set_config) (params ((config ((approval_mode ask)))))
+    (Rpc (method_ set_config)
+     (params ((config ((approval_mode ask) (default_chat_mode false)))))
      (tag
       (Config_saved
        "Mode ask, also for new sessions: bash, job_input, edits and MCP tools ask first")))

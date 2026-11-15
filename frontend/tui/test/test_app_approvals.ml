@@ -858,7 +858,10 @@ let%expect_test "/confirm shows the mode and sets ask or auto as the default" =
     {|
     (Rpc
       (method_ set_config)
-      (params ((config ((approval_mode ask)))))
+      (params ((
+        config (
+          (approval_mode     ask)
+          (default_chat_mode false)))))
       (tag (
         Notice_on_success
         "tool confirmation on (approval mode ask, also for new sessions)")))
@@ -873,6 +876,74 @@ let%expect_test "/confirm shows the mode and sets ask or auto as the default" =
     ────────────────────────────────────────────────────────────
     > ▏
     deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    |}]
+;;
+
+let%expect_test "/confirm chat: new sessions are chats, over the approval mode" =
+  let h = Test_app.connected ~height:16 () in
+  H.reply
+    ~quiet:true
+    h
+    Config
+    {|{"scoped_models":[],"approval_mode":"auto-edit","default_chat_mode":false}|};
+  H.keys h "/confirm ";
+  H.show h;
+  H.esc h;
+  H.key h (Key.ctrl 'u');
+  (* Only the flag is sent: the approval mode under the chat stays. *)
+  command h "/confirm chat";
+  H.reply ~quiet:true h (Notice_on_success "chat") {|{}|};
+  H.event h (State { (with_mode Auto_edit) with chat_mode = true });
+  command h "/confirm";
+  H.show h;
+  H.esc h;
+  (* Any other mode leaves chat. *)
+  command h "/confirm smart";
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ▸ on         bash, job_input, edits and MCP tools ask first…
+      off        tools run without asking (mode auto)
+      ask        bash, job_input, edits and MCP tools ask first
+      auto-edit  file edits run; bash, job_input and MCP tools …
+      smart      edits in the project run; the approval model l…
+      auto       tools run without asking
+      chat       a chat without the tool host; leaving it retur…
+    ────────────────────────────────────────────────────────────
+    > /confirm ▏
+    deepseek-flash  Tab accepts · Enter as typed · Esc hides
+    (Rpc
+      (method_ set_config)
+      (params ((config ((default_chat_mode true)))))
+      (tag (
+        Notice_on_success
+        "chat mode, also for new sessions (leaving it: auto-edit)")))
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ┌─ Notice ─────────────────────────────────────────────────┐
+    │ mode: chat — a chat without the tool host: no files,     │
+    │ commands or project, only the web and other host-free    │
+    │ tools, until you leave it (/chat off or Alt+M); new      │
+    │ sessions: chat (leaving it: auto-edit) (/confirm MODE    │
+    │ sets both: on, off, ask, auto-edit, smart, auto or chat; │
+    │ /mode only this session's)                               │
+    └────────────────────────────────────────── Esc dismisses ─┘
+    ────────────────────────────────────────────────────────────
+    > ▏
+    deepseek-flash  think:off  mode:chat  ctx:0.1%/1.0M  $0.01
+    (Rpc
+      (method_ set_config)
+      (params ((
+        config (
+          (approval_mode     smart)
+          (default_chat_mode false)))))
+      (tag (Notice_on_success "approval mode smart, also for new sessions")))
     |}]
 ;;
 

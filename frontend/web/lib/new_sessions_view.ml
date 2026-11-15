@@ -113,39 +113,42 @@ let thinking (config : Config.t option) ~inject =
     ]
 ;;
 
-let mode_label : Approval_mode.t -> string = function
-  | Ask -> "Ask"
-  | Auto_edit -> "Auto-edit"
-  | Smart -> "Smart"
-  | Auto -> "Auto"
-;;
+let mode_label mode = String.capitalize (Default_mode.to_string mode)
 
 (* The mode changes only for new sessions here; /confirm changes this
-   session's too. Plan is a session's, not a default: the composer's chip. *)
+   session's too. Plan is a session's, not a default: the composer's chip.
+   Chat keeps the approval mode under it, which leaving a chat gives. *)
 let mode (config : Config.t option) ~inject =
-  let current = Option.map config ~f:(fun c -> c.approval_mode) in
+  let current = Option.map config ~f:Default_mode.of_config in
   row
     ~cls:"default-mode"
     ~name:"Mode"
     ~about:
-      "What asks before it runs: everything (Ask), all but file edits \
-       (Auto-edit), what the approval model leaves to you (Smart) or nothing \
-       (Auto)."
+      (match config with
+       | Some ({ default_chat_mode = true; _ } as c) ->
+         sprintf
+           "New sessions are chats without the tool host; leaving one gives %s \
+            mode. Choose another mode to start in it."
+           (String.capitalize (Approval_mode.to_string c.approval_mode))
+       | Some _ | None ->
+         "What asks before it runs: everything (Ask), all but file edits \
+          (Auto-edit), what the approval model leaves to you (Smart) or \
+          nothing (Auto); or a chat without the tool host (Chat).")
     ?note:(Option.value_map current ~default:(Some waiting) ~f:(fun _ -> None))
     [ segmented
         ~disabled:(Option.is_none current)
         ~label:"New sessions' mode"
-        (List.map Approval_mode.all ~f:(fun mode ->
+        (List.map Default_mode.all ~f:(fun mode ->
            ( mode_label mode
            , sprintf "New sessions start in %s mode" (mode_label mode)
-           , Option.equal Approval_mode.equal current (Some mode)
+           , Option.equal Default_mode.equal current (Some mode)
            , set_default ~inject (Mode mode) )))
     ; reset
         ~name:"Mode"
         ~builtin:(mode_label New_default.builtin_mode)
         ~set:
           (Option.exists current ~f:(fun mode ->
-             not (Approval_mode.equal mode New_default.builtin_mode)))
+             not (Default_mode.equal mode New_default.builtin_mode)))
         ~on_click:(set_default ~inject (Mode New_default.builtin_mode))
     ]
 ;;

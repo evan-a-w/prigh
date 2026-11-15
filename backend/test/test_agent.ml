@@ -547,7 +547,7 @@ let%expect_test "save_as_default applies to new agents, not saved sessions" =
   [%expect
     {|
     ("no default: fallback" deepseek/deepseek-v4-pro (On ()))
-    ((scoped_models (a)) (approval_mode Auto)
+    ((scoped_models (a)) (approval_mode Auto) (default_chat_mode false)
      (permissions ((allow ()) (ask ()) (deny ())))
      (default_model (deepseek/deepseek-flash)) (default_thinking ((On (High))))
      (fallback_models ()) (default_cwd ()) (default_host ())
@@ -564,6 +564,7 @@ let%expect_test "save_as_default applies to new agents, not saved sessions" =
         "a"
       ],
       "approval_mode": "auto",
+      "default_chat_mode": false,
       "default_model": "deepseek/deepseek-flash",
       "default_thinking": "high",
       "fallback_models": [],

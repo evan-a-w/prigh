@@ -116,10 +116,10 @@ let every =
        yellow or any #rrggbb"
   ; c
       ~argument:Confirm
-      ~args:"[on|off]"
+      ~args:"[on|off|mode]"
       "confirm"
-      "ask before bash, job_input, edits and MCP tools run (mode ask or auto, \
-       also for new sessions)"
+      "the mode this session and new ones start in: on (ask), off (auto), ask, \
+       auto-edit, smart, auto or chat"
   ; c
       ~argument:Mode
       ~args:"[mode]"

@@ -39,7 +39,9 @@ let handover_origin ~from ~to_ : P.Origin.t =
   ; attachments = []
   ; source =
       Some
-        { kind = Handover; title = sprintf "Handed over from %s to %s" from to_ }
+        { kind = Handover
+        ; title = sprintf "Handed over from %s to %s" from to_
+        }
   }
 ;;
 
@@ -210,7 +212,8 @@ let%expect_test
     {|
     ((
       (scoped_models (deepseek/deepseek-flash))
-      (approval_mode Ask)
+      (approval_mode     Ask)
+      (default_chat_mode false)
       (permissions (
         (allow ())
         (ask   ())
@@ -372,7 +375,10 @@ let%expect_test
     {|
     (Rpc
       (method_ set_config)
-      (params ((config ((approval_mode ask)))))
+      (params ((
+        config (
+          (approval_mode     ask)
+          (default_chat_mode false)))))
       (tag (
         Notice_on_success
         "tool confirmation on (approval mode ask, also for new sessions)")))

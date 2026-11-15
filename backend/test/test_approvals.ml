@@ -903,6 +903,7 @@ let%expect_test
         "x"
       ],
       "approval_mode": "ask",
+      "default_chat_mode": false,
       "default_model": null,
       "default_thinking": null,
       "fallback_models": [],

@@ -5456,7 +5456,8 @@ let%expect_test
     {|
     ((
       (scoped_models (anthropic/claude-fable-5-1))
-      (approval_mode Ask)
+      (approval_mode     Ask)
+      (default_chat_mode false)
       (permissions (
         (allow ())
         (ask   ())
@@ -5480,7 +5481,8 @@ let%expect_test
       (dictation_model ())))
     ((
       (scoped_models (deepseek/deepseek-flash))
-      (approval_mode Auto)
+      (approval_mode     Auto)
+      (default_chat_mode false)
       (permissions (
         (allow ())
         (ask   ())
@@ -6520,7 +6522,8 @@ let%expect_test "/change_default saves the model and thinking level" =
     (Rpc (method_ change_default) (params ()) (tag Default_saved))
     ((
       (scoped_models (deepseek/deepseek-flash))
-      (approval_mode Ask)
+      (approval_mode     Ask)
+      (default_chat_mode false)
       (permissions (
         (allow ())
         (ask   ())
@@ -6556,7 +6559,10 @@ let%expect_test "/change_default saves the model and thinking level" =
     deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     (Rpc
       (method_ set_config)
-      (params ((config ((approval_mode auto)))))
+      (params ((
+        config (
+          (approval_mode     auto)
+          (default_chat_mode false)))))
       (tag (
         Notice_on_success
         "tool confirmation off (approval mode auto, also for new sessions)")))
@@ -6576,7 +6582,10 @@ let%expect_test "/confirm on saves confirm_tools through set_config" =
     {|
     (Rpc
       (method_ set_config)
-      (params ((config ((approval_mode ask)))))
+      (params ((
+        config (
+          (approval_mode     ask)
+          (default_chat_mode false)))))
       (tag (
         Notice_on_success
         "tool confirmation on (approval mode ask, also for new sessions)")))
@@ -6604,8 +6613,9 @@ let%expect_test "/confirm on saves confirm_tools through set_config" =
     ▌ earlier question
       earlier answer
     ┌─ Notice ─────────────────────────────────────────────────┐
-    │ mode: auto — tools run without asking (/confirm on|off   │
-    │ sets ask or auto; /mode has all)                         │
+    │ mode: auto — tools run without asking; new sessions: ask │
+    │ (/confirm MODE sets both: on, off, ask, auto-edit,       │
+    │ smart, auto or chat; /mode only this session's)          │
     └────────────────────────────────────────── Esc dismisses ─┘
     ────────────────────────────────────────────────────────────
     > ▏
@@ -6620,7 +6630,10 @@ let%expect_test "/confirm on saves confirm_tools through set_config" =
     {|
     (Rpc
       (method_ set_config)
-      (params ((config ((approval_mode auto)))))
+      (params ((
+        config (
+          (approval_mode     auto)
+          (default_chat_mode false)))))
       (tag (
         Notice_on_success
         "tool confirmation off (approval mode auto, also for new sessions)")))

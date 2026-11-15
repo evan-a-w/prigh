@@ -1,5 +1,5 @@
 // The settings page's New sessions section: every default set from it (the
-// model from the picker, thinking, mode, the tool host from the hosts
+// model from the picker, thinking, mode, chat, the tool host from the hosts
 // connected, the starting directory, a fallback model, a budget), saved in
 // config.json, followed by a second browser at once, and a new session
 // started with them all while the one open keeps its own; then each reset to
@@ -111,7 +111,7 @@ const normalise = text =>
 const show = async p => console.log(normalise(await panel(p).innerText()));
 const configFile = () => {
   const c = JSON.parse(readFileSync(join(home, ".prigh/config.json"), "utf8"));
-  const keys = ["default_model", "default_thinking", "approval_mode", "default_host", "default_cwd", "fallback_models", "max_budget_usd"];
+  const keys = ["default_model", "default_thinking", "approval_mode", "default_chat_mode", "default_host", "default_cwd", "fallback_models", "max_budget_usd"];
   return keys.map(k => `${k}=${JSON.stringify(c[k] ?? null)}`).join(" ");
 };
 const toast = (p, text) => p.locator(".toast", { hasText: text }).last().waitFor();
@@ -250,6 +250,28 @@ try {
   console.log(normalise(await page.locator(".toast", { hasText: "Fallback:" }).last().innerText()));
   await screenshot(page, "new-session");
 
+  // Chat by default: over the approval mode (Ask), which leaving it gives.
+  await openSection(page);
+  await page.locator(".setting.default-mode .segment", { hasText: exactly("Chat") }).click();
+  await toast(page, "Chat mode");
+  section("chat by default");
+  console.log(normalise(await page.locator(".setting.default-mode").innerText()));
+  console.log(configFile());
+  await page.locator(".setting.default-mode").scrollIntoViewIfNeeded();
+  await screenshot(page, "chat-default");
+  await page.keyboard.press("Escape");
+  await page.locator(".settings-dialog").waitFor({ state: "detached" });
+  await page.locator(".new-session").click();
+  await page.waitForFunction(() => !document.querySelector(".new-session.opening"));
+  await page.locator(".host-chip.chatting").waitFor();
+  section("a new session, a chat");
+  console.log(normalise(await chips(page)));
+  await run(page, "/chat off");
+  await page.locator(".host-chip:not(.chatting) .chip-label", { hasText: laptopName }).waitFor();
+  await page.waitForFunction(() => !/Switching/.test(document.querySelector(".mode-chip")?.getAttribute("title") ?? "Switching"));
+  section("leaving the chat");
+  console.log(normalise(await chips(page)));
+
   // Phones, and the PWA's insets: the section fits, every control is a
   // target; the host picker opens over it.
   for (const [w, h, safe] of [[390, 844, false], [320, 640, false], ...(engineName === "chromium" ? [[390, 844, true]] : [])]) {
@@ -261,6 +283,8 @@ try {
     section(`phone ${tag}`);
     console.log(`fits: ${await fits(phone)}; targets: ${await targets(phone)}`);
     await screenshot(phone, `phone-${tag}`);
+    await phone.locator(".setting.default-mode").scrollIntoViewIfNeeded();
+    await screenshot(phone, `phone-${tag}-mode`);
     await phone.locator(".setting.default-budget").scrollIntoViewIfNeeded();
     await screenshot(phone, `phone-${tag}-limits`);
     await phone.locator(".default-host-choice").tap();

@@ -2979,32 +2979,36 @@ let notify m (e : P.Event.t) =
 
 (* The default mode for new sessions, which the backend applies to this
    one too. *)
-let set_default_mode m ?enabled (approval_mode : P.Approval_mode.t) =
+let set_default_mode m ?enabled (mode : Default_mode.t) =
   let label =
-    match enabled with
-    | Some enabled ->
+    match enabled, mode, m.config with
+    | Some enabled, _, _ ->
       sprintf
         "tool confirmation %s (approval mode %s, also for new sessions)"
         (if enabled then "on" else "off")
-        (P.Approval_mode.to_string approval_mode)
-    | None ->
+        (Default_mode.to_string mode)
+    | None, Approval approval, _ ->
       sprintf
         "approval mode %s, also for new sessions"
-        (P.Approval_mode.to_string approval_mode)
+        (P.Approval_mode.to_string approval)
+    | None, Chat, Some config ->
+      sprintf
+        "chat mode, also for new sessions (leaving it: %s)"
+        (P.Approval_mode.to_string config.approval_mode)
+    | None, Chat, None -> "chat mode, also for new sessions"
   in
-  ( { m with
-      config =
-        Option.map m.config ~f:(fun config ->
-          { config with P.Config.approval_mode })
-    }
+  let config =
+    Default_mode.apply mode (Option.value m.config ~default:P.Config.default)
+  in
+  ( { m with config = Option.map m.config ~f:(Default_mode.apply mode) }
   , [ set_config
         ~tag:(Notice_on_success label)
-        [ "approval_mode", str (P.Approval_mode.to_string approval_mode) ]
+        (Default_mode.json_fields mode config)
     ] )
 ;;
 
 let set_confirm m enabled =
-  set_default_mode m ~enabled (if enabled then Ask else Auto)
+  set_default_mode m ~enabled (Approval (if enabled then Ask else Auto))
 ;;
 
 (* Shown at once; the backend's state follows. *)
@@ -4371,9 +4375,12 @@ let run_command m (cmd : Commands.Parsed.t) =
        ( notice
            m
            (sprintf
-              "mode: %s — %s (/confirm on|off sets ask or auto; /mode has all)"
+              "mode: %s — %s%s (/confirm MODE sets both: on, off, ask, \
+               auto-edit, smart, auto or chat; /mode only this session's)"
               (Session_mode.label mode)
-              (Session_mode.describe mode))
+              (Session_mode.describe mode)
+              (Option.value_map m.config ~default:"" ~f:(fun c ->
+                 "; new sessions: " ^ Default_mode.summary c)))
        , [] )
      | None -> notice m "not connected", [])
   | "mode", [] -> mode_picker m
@@ -4413,13 +4420,14 @@ let run_command m (cmd : Commands.Parsed.t) =
   | "confirm", ("on" | "true") :: _ -> set_confirm m true
   | "confirm", ("off" | "false") :: _ -> set_confirm m false
   | "confirm", other :: _ ->
-    (match P.Approval_mode.of_string other with
+    (match Default_mode.of_string other with
      | Some mode -> set_default_mode m mode
      | None ->
        ( error
            m
            (sprintf
-              "unknown argument %S; use on, off, ask, auto-edit, smart or auto"
+              "unknown argument %S; use on, off, ask, auto-edit, smart, auto \
+               or chat"
               other)
        , [] ))
   | "notify", [] -> notice m (notify_summary m), []

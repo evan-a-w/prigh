@@ -204,18 +204,22 @@ let%expect_test "transcript detail, default mode, providers, shortcuts" =
     {|
     (Settings_section New_sessions)
     Mode
-    What asks before it runs: everything (Ask), all but file edits (Auto-edit), what the approval model leaves to you (Smart) or nothing (Auto).
-    (Ask) (Auto-edit) (Smart) (Auto)
+    What asks before it runs: everything (Ask), all but file edits (Auto-edit), what the approval model leaves to you (Smart) or nothing (Auto); or a chat without the tool host (Chat).
+    (Ask) (Auto-edit) (Smart) (Auto) (Chat)
     <button class="segment">
     <button class="segment">
     <button class="segment">
     <button class="on segment">
-    (Set_default (Mode Auto_edit))
+    <button class="segment">
+    (Set_default (Mode (Approval Auto_edit)))
     (Rpc (method_ set_config)
-     (params ((config ((approval_mode auto-edit))) (defaults_only true)))
-     (tag (Default_set (Mode Auto_edit))))
+     (params
+      ((config ((approval_mode auto-edit) (default_chat_mode false)))
+       (defaults_only true)))
+     (tag (Default_set (Mode (Approval Auto_edit)))))
     <button class="segment">
     <button class="on segment">
+    <button class="segment">
     <button class="segment">
     <button class="segment">
     <div class="modal settings-dialog">
@@ -325,6 +329,7 @@ let%expect_test "the names of the settings' controls" =
     button "Auto-edit" -- New sessions start in Auto-edit mode
     button "Smart" -- New sessions start in Smart mode
     button "Auto" -- New sessions start in Auto mode
+    button "Chat" -- New sessions start in Chat mode
     button "New sessions' tool host: Where you are" -- Choose the tool host new sessions start on (/default-host)
     button "Add" -- Add a model to the end of the chain (/fallback MODEL…)
     [switch] button "Budget" -- Stop sessions starting turns past a cost (/default-budget)

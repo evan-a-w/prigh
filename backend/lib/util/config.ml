@@ -27,6 +27,7 @@ end
 type t =
   { scoped_models : string list
   ; approval_mode : Approval_mode.t
+  ; default_chat_mode : bool
   ; permissions : Approval.Rules.t
   ; default_model : string option
   ; default_thinking : Thinking.t option
@@ -61,6 +62,7 @@ let default_worktrees_dir = "~/.prigh/worktrees"
 let default =
   { scoped_models = []
   ; approval_mode = Auto
+  ; default_chat_mode = false
   ; permissions = Approval.Rules.empty
   ; default_model = None
   ; default_thinking = None
@@ -123,6 +125,7 @@ let to_json t =
   `Object
     [ "scoped_models", `Array (List.map t.scoped_models ~f:(fun s -> `String s))
     ; "approval_mode", `String (Approval_mode.to_string t.approval_mode)
+    ; ("default_chat_mode", if t.default_chat_mode then `True else `False)
     ; "permissions", Approval.Rules.to_json t.permissions
     ; "default_model", option (fun s -> `String s) t.default_model
     ; ( "default_thinking"
@@ -215,6 +218,16 @@ let of_json json =
       | None, Some `True -> Ok Approval_mode.Ask
       | None, Some _ ->
         Or_error.error_string "config.confirm_tools must be a boolean"
+    in
+    let%bind default_chat_mode =
+      match find "default_chat_mode" with
+      | None | Some `Null -> Ok default.default_chat_mode
+      | Some `True -> Ok true
+      | Some `False -> Ok false
+      | Some _ ->
+        Or_error.error_string
+          "config.default_chat_mode must be a boolean (true: new sessions \
+           start in chat mode)"
     in
     let%bind permissions =
       Or_error.map
@@ -443,6 +456,7 @@ let of_json json =
     in
     { scoped_models
     ; approval_mode
+    ; default_chat_mode
     ; permissions
     ; default_model
     ; default_thinking
