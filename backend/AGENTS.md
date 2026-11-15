@@ -46,7 +46,9 @@ Concurrency uses Eio (effects, direct style). Functions that do I/O take
 
 Tests use the helpers in `test/tool_test_helpers.ml` ([with_sandbox] for a
 temporary directory and environment, [mask] to hide paths, ids and
-timestamps in printed output).
+timestamps in printed output). `test/dune` sets `PRIGH_HOST_NAME` to
+`<host>`, so the backend's own host has that name on every machine (never
+one of the tool hosts the tests make up: `laptop`, `desktop`, ...).
 
 Anything a client can name (paths, sessions, users) must respect the
 server's mode: with token namespaces a client only reaches its own

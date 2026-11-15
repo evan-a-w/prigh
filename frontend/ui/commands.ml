@@ -128,9 +128,10 @@ let every =
   ; c
       ~argument:Argument.Mode
       "mode"
-      "[ask|auto-edit|auto|plan|chat]"
-      "pick or set the mode: what asks first, read-only planning, or a chat \
-       without the tool host (Alt+M cycles)"
+      "[mode]"
+      "pick or set the mode, in Alt+M's order: ask, auto-edit, smart or auto \
+       (what asks first), plan (read-only planning) or chat (without the tool \
+       host)"
   ; c
       ~argument:Argument.Plan
       "plan"

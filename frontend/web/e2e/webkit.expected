@@ -4382,7 +4382,7 @@ a chat without the tool host: no files, commands or project, only the web and ot
 Enter chooses, ← → the next setting, Esc closes
 === webkit: chat: mode ask, no tool host ===
 mode chip: ask
-host chip: No host
+host chip: no host
 placeholder: Working in $CWD. Ask prigh anything…
 strip: No tool host connected Chat without a host
 toast: No tool host connected: your message stays here. Chat without a host (over it) sends it as a chat, or connect a tool host and pick it (/host).
@@ -4407,7 +4407,7 @@ Mode ask auto-edit smart auto plan [chat]
 audit: ok
 === webkit: chat: phone 390x844: mode ask, no tool host ===
 mode chip: (in the ⋯ sheet)
-host chip: No host
+host chip: no host
 placeholder: Working in $CWD. Ask prigh anything…
 strip: No tool host connected Chat without a host
 audit: ok
@@ -4423,7 +4423,7 @@ Mode ask auto-edit smart auto plan [chat]
 audit: ok
 === webkit: chat: phone 320x640: mode ask, no tool host ===
 mode chip: (in the ⋯ sheet)
-host chip: No host
+host chip: no host
 placeholder: Working in $CWD. Ask prigh anything…
 strip: No tool host connected Chat anyway
 audit: ok

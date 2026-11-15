@@ -151,12 +151,7 @@ let print_request t (r : Provider.Request.t) =
     (Thinking.to_string r.thinking)
     (String.concat ~sep:" " (List.map r.tools ~f:(fun s -> s.name)));
   List.iter r.messages ~f:(function
-    | User u ->
-      print_endline
-        (String.substr_replace_all
-           (mask t u.text)
-           ~pattern:("host: " ^ Core_unix.gethostname ())
-           ~with_:"host: <host>")
+    | User u -> print_endline (mask t u.text)
     | Assistant _ | Tool_result _ -> print_endline "(not a user message)")
 ;;
 

@@ -141,7 +141,9 @@ let command =
        flag
          "-name"
          (optional string)
-         ~doc:"NAME how this frontend appears in /host (default: hostname)"
+         ~doc:
+           "NAME how this frontend appears in /host (default: $PRIGH_HOST_NAME \
+            or the hostname)"
      and faux = flag "-faux" no_arg ~doc:" scripted provider, no API calls"
      and session =
        flag "-session" (optional string) ~doc:"PATH resume a session file"
@@ -284,8 +286,8 @@ let command =
                  (Sys.getenv "PRIGH_CONNECT_HEADERS")
                  ~default:[]
                  ~f:String.split_lines
-               |> List.filter
-                    ~f:(Fn.non (String.for_all ~f:Char.is_whitespace)) )
+               |> List.filter ~f:(Fn.non (String.for_all ~f:Char.is_whitespace))
+             )
            | headers -> "-header", headers
          in
          List.map headers ~f:(fun header ->
@@ -318,7 +320,12 @@ let command =
             serve arguments already carry it. *)
          let hello =
            [ ( "name"
-             , `String (Option.value name ~default:(Core_unix.gethostname ())) )
+             , `String
+                 (match name, Sys.getenv "PRIGH_HOST_NAME" with
+                  | Some name, _ -> name
+                  | None, Some name
+                    when not (String.is_empty (String.strip name)) -> name
+                  | None, (Some _ | None) -> Core_unix.gethostname ()) )
            ; "cwd", `String (Option.value cwd ~default:(Core_unix.getcwd ()))
            ; "client", `String "tui"
            ]
