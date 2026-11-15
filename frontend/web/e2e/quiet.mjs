@@ -111,7 +111,7 @@ const plain = s => s
 const runs = page.locator("#chat .run");
 const transcript = async () => {
   for (const line of await page.locator("#chat .entries > .msg").evaluateAll(es =>
-    es.map(e => (e.matches(".steps") ? "[run] " : e.matches(".user") ? "you: " : "prigh: ") + e.innerText))) {
+    es.map(e => (e.matches(".user") ? "you: " : "prigh: ") + [...e.querySelectorAll(":scope > .run, :scope > :not(.run)")].map(c => (c.matches(".run") ? "[run] " : "") + c.innerText).join(" "))) ) {
     console.log(plain(line));
   }
 };
@@ -152,10 +152,11 @@ try {
   console.log(`sideways: ${await sideways()}`);
   await screenshot("opened");
 
-  const failed = runs.first().locator(".run-steps > .tool.error .tool-head");
-  await press(failed);
-  await runs.first().locator(".run-steps > .tool.error .tool-body").waitFor();
-  section("its failed step opened: the output");
+  // A failed step shows its output as in normal; the others open theirs.
+  const read = runs.first().locator(".run-steps > .tool", { hasText: "notes.txt" });
+  await press(read.locator(".tool-head"));
+  await read.locator(".tool-body").waitFor();
+  section("a step opened: its output");
   console.log(plain(await runs.first().innerText()));
   console.log(`sideways: ${await sideways()}`);
   await screenshot("step-opened");
@@ -170,11 +171,11 @@ try {
   await page.locator(".mode-chip, .session-choice").first().waitFor({ state: "attached" });
   await composer.fill("clean up");
   await composer.press("Enter");
-  await page.locator(".confirm").waitFor();
+  await page.locator("#confirm").waitFor();
   section("waiting for an approval");
   console.log(`last run: ${plain(await runs.last().innerText())}`);
   console.log(`last run running: ${await runs.last().evaluate(e => e.classList.contains("running"))}`);
-  console.log(`approval inside a run: ${await page.locator("#chat .run .confirm").count()}`);
+  console.log(`approval inside a run: ${await page.locator("#chat .run #confirm").count()}`);
   await screenshot("approval");
   await page.keyboard.press("y");
   await page.locator("#chat .msg.assistant", { hasText: "Cleaned up." }).waitFor();
