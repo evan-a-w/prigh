@@ -438,8 +438,8 @@ let%expect_test "start_background: the index is built without a search" =
     |}]
 ;;
 
-let%expect_test "the index is kept in a file: a new process reads only what \
-                 changed"
+let%expect_test
+    "the index is kept in a file: a new process reads only what changed"
   =
   with_sandbox
   @@ fun t ->
@@ -478,14 +478,21 @@ let%expect_test "the index is kept in a file: a new process reads only what \
       ~sessions:(fun () -> Session.list ~dir)
       ~load
       ~yield:ignore;
-    printf "%s: %d indexed, %d read\n" what (Session_search.indexed index) !reads;
+    printf
+      "%s: %d indexed, %d read\n"
+      what
+      (Session_search.indexed index)
+      !reads;
     search index t ~labels "port 8080";
     search index t ~labels "summary plan"
   in
   run "first run";
   run "second run";
   ignore
-    (Session.append_message port ~at:300. (Message.user "and the kubernetes port")
+    (Session.append_message
+       port
+       ~at:300.
+       (Message.user "and the kubernetes port")
      : Session.Entry.t);
   run "after a message";
   search (Session_search.create ~file ()) t ~labels "kubernetes";
@@ -495,7 +502,8 @@ let%expect_test "the index is kept in a file: a new process reads only what \
     [ "torn", String.prefix good (String.length good - 7)
     ; "garbage", "prigh-search-index\n\255\255\255\255"
     ; "not ours", "hello"
-    ; "another version", String.substr_replace_first good ~pattern:"\001" ~with_:"\009"
+    ; ( "another version"
+      , String.substr_replace_first good ~pattern:"\001" ~with_:"\009" )
     ]
     ~f:(fun (what, data) ->
       Out_channel.write_all file ~data;
@@ -517,7 +525,8 @@ let%expect_test "the index is kept in a file: a new process reads only what \
         indexed
         read
         read_next);
-  [%expect {|
+  [%expect
+    {|
     first run: 2 indexed, 2 read
     "port 8080" (read 0)
       port      60  I'll add a --[port] flag; the default stays [8080].

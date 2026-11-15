@@ -45,8 +45,8 @@ let list_fresh ~dir =
     (String.concat ~sep:"," (cache_files ~dir))
 ;;
 
-let%expect_test "summaries are kept on disk: a new process parses only what \
-                 changed"
+let%expect_test
+    "summaries are kept on disk: a new process parses only what changed"
   =
   with_dir
   @@ fun dir ->
@@ -58,7 +58,8 @@ let%expect_test "summaries are kept on disk: a new process parses only what \
   (* A new process: nothing changed, nothing parsed. *)
   list_fresh ~dir;
   (* One grew (its size and mtime changed): only it is parsed. *)
-  ignore (Session.append_message a (Message.user "alpha again") : Session.Entry.t);
+  ignore
+    (Session.append_message a (Message.user "alpha again") : Session.Entry.t);
   list_fresh ~dir;
   list_fresh ~dir;
   (* One went: it is no longer listed, nor kept in the cache. *)
@@ -123,8 +124,13 @@ let%expect_test "a cache file that cannot be used is rebuilt" =
   try_with "garbage" "\000\001 not a sexp ((";
   try_with
     "another version's, under this one's name"
-    (String.substr_replace_first good ~pattern:"(version 1)" ~with_:"(version 2)");
-  try_with "entries of another shape" "((version 1)(summaries((x.jsonl(1 2 3)))))";
+    (String.substr_replace_first
+       good
+       ~pattern:"(version 1)"
+       ~with_:"(version 2)");
+  try_with
+    "entries of another shape"
+    "((version 1)(summaries((x.jsonl(1 2 3)))))";
   try_with "empty" "";
   (* A directory where the file should be: listing still works, uncached. *)
   Core_unix.unlink (cache_file ~dir);
@@ -177,8 +183,8 @@ let%expect_test "a session's disk usage is counted again when its data changes" 
     |}]
 ;;
 
-let%expect_test "a file is read a chunk at a time: lines across chunks, a torn \
-                 end, offsets"
+let%expect_test
+    "a file is read a chunk at a time: lines across chunks, a torn end, offsets"
   =
   with_dir
   @@ fun dir ->
@@ -186,7 +192,9 @@ let%expect_test "a file is read a chunk at a time: lines across chunks, a torn \
      past one. *)
   let sizes = [ 10; 70_000; 3; 200_000; 65_400; 65_536; 1 ] in
   let t =
-    saved ~dir (List.mapi sizes ~f:(fun i n -> String.make n (Char.of_int_exn (97 + i))))
+    saved
+      ~dir
+      (List.mapi sizes ~f:(fun i n -> String.make n (Char.of_int_exn (97 + i))))
   in
   let path = Session.path t in
   let show (s : Session.t) =
@@ -207,7 +215,9 @@ let%expect_test "a file is read a chunk at a time: lines across chunks, a torn \
       let offset = Session.entry_offset t e.id in
       Option.equal Int.equal offset (Session.entry_offset loaded e.id)
       &&
-      match Option.bind offset ~f:(fun offset -> Session.read_entry_at path ~offset) with
+      match
+        Option.bind offset ~f:(fun offset -> Session.read_entry_at path ~offset)
+      with
       | Some read -> String.equal read.id e.id
       | None -> false)
   in
@@ -230,8 +240,10 @@ let%expect_test "a file is read a chunk at a time: lines across chunks, a torn \
     "last offset leads to it: %b\n"
     (Option.bind (Session.entry_offset again last.id) ~f:(fun offset ->
        Session.read_entry_at path ~offset)
-     |> Option.exists ~f:(fun (e : Session.Entry.t) -> String.equal e.id last.id));
-  [%expect {|
+     |> Option.exists ~f:(fun (e : Session.Entry.t) ->
+       String.equal e.id last.id));
+  [%expect
+    {|
     ((10 70000 3 200000 65400 65536 1) ())
     offsets agree: true of 7
     (false false)

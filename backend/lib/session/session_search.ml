@@ -169,7 +169,9 @@ module Doc = struct
     in
     let first_user = ref true in
     List.map messages ~f:(fun (id, who, text) ->
-      let offset = Option.value (Session.entry_offset session id) ~default:(-1) in
+      let offset =
+        Option.value (Session.entry_offset session id) ~default:(-1)
+      in
       match who with
       | `User when !first_user ->
         first_user := false;
@@ -373,10 +375,14 @@ module Stored = struct
         ; mtime = d.mtime
         ; name = d.name
         ; texts = d.texts
-        ; words = Array.mapi d.words ~f:(fun i w -> (id w lsl 3) lor d.weights.(i))
+        ; words =
+            Array.mapi d.words ~f:(fun i w -> (id w lsl 3) lor d.weights.(i))
         })
     in
-    { version; words = Array.of_list (List.rev !words); docs = Array.of_list docs }
+    { version
+    ; words = Array.of_list (List.rev !words)
+    ; docs = Array.of_list docs
+    }
   ;;
 
   let write t ~path =
@@ -436,22 +442,24 @@ let read_file t =
   if not t.read
   then (
     t.read <- true;
-    Option.iter (Option.bind t.file ~f:(fun path -> Stored.read ~path)) ~f:(fun stored ->
-    Array.iter stored.docs ~f:(fun (d : Stored.Entry.t) ->
-      add
-        t
-        { num = fresh_num t
-        ; id = d.id
-        ; path = d.path
-        ; size = d.size
-        ; mtime = d.mtime
-        ; name = d.name
-        ; texts = d.texts
-        ; words = Array.map d.words ~f:(fun w -> stored.words.(w lsr 3))
-        ; weights = Array.map d.words ~f:(fun w -> w land 7)
-        });
-    Hashtbl.iter t.postings ~f:Posting.trim;
-    t.changed <- false))
+    Option.iter
+      (Option.bind t.file ~f:(fun path -> Stored.read ~path))
+      ~f:(fun stored ->
+        Array.iter stored.docs ~f:(fun (d : Stored.Entry.t) ->
+          add
+            t
+            { num = fresh_num t
+            ; id = d.id
+            ; path = d.path
+            ; size = d.size
+            ; mtime = d.mtime
+            ; name = d.name
+            ; texts = d.texts
+            ; words = Array.map d.words ~f:(fun w -> stored.words.(w lsr 3))
+            ; weights = Array.map d.words ~f:(fun w -> w land 7)
+            });
+        Hashtbl.iter t.postings ~f:Posting.trim;
+        t.changed <- false))
 ;;
 
 let file ~dir = Stored.file ~dir
@@ -617,7 +625,8 @@ module Snippet = struct
     (* For each of the session's words, its best match per query word. *)
     let word_kinds =
       Array.map doc.words ~f:(fun v ->
-        Array.map ws ~f:(fun w -> Option.value_map (kind ~w v) ~default:0 ~f:fst))
+        Array.map ws ~f:(fun w ->
+          Option.value_map (kind ~w v) ~default:0 ~f:fst))
     in
     let best =
       Array.fold doc.texts ~init:None ~f:(fun best (text : Text.t) ->
@@ -631,8 +640,8 @@ module Snippet = struct
         else (
           let rank = matched, Array.sum (module Int) per_word ~f:Fn.id in
           match best with
-          | Some (best_rank, _) when [%compare: int * int] rank best_rank <= 0 ->
-            best
+          | Some (best_rank, _) when [%compare: int * int] rank best_rank <= 0
+            -> best
           | _ -> Some (rank, text)))
     in
     Option.bind best ~f:(fun (_, text) ->

@@ -743,30 +743,29 @@ let listing_json t (l : Listing.t) =
   let bool b = if b then `True else `False in
   let int n = `Number (Int.to_string n) in
   let live =
-         match l.agent with
-         | Some agent ->
-           [ "live", `True
-           ; "clients", int (List.length (clients_of t agent))
-           ; "waiting", int (waiting agent)
-           ]
-         | None -> [ "live", `False ]
-       in
-       match Rpc_json.session_summary (with_repo t l.summary) with
-       | `Object fields ->
-         `Object
-           (fields
-            @ live
-            @ [ "running", bool l.active
-              ; "background", int l.background
-              ; "archived", bool l.archived
-              ])
-       | other -> other
+    match l.agent with
+    | Some agent ->
+      [ "live", `True
+      ; "clients", int (List.length (clients_of t agent))
+      ; "waiting", int (waiting agent)
+      ]
+    | None -> [ "live", `False ]
+  in
+  match Rpc_json.session_summary (with_repo t l.summary) with
+  | `Object fields ->
+    `Object
+      (fields
+       @ live
+       @ [ "running", bool l.active
+         ; "background", int l.background
+         ; "archived", bool l.archived
+         ])
+  | other -> other
 ;;
 
 let list_sessions t client =
   `Array (List.map (listings t client) ~f:(listing_json t))
 ;;
-
 
 (* Every client of the server, whichever session it is in. With [changed]
    (sessions whose entries changed, in memory as they are now) or
@@ -776,8 +775,7 @@ let list_sessions t client =
 let sessions_changed ?(changed = []) ?(removed = []) t =
   let event fields =
     `Object
-      ([ "type", `String "event"; "event", `String "sessions_changed" ]
-       @ fields)
+      ([ "type", `String "event"; "event", `String "sessions_changed" ] @ fields)
   in
   if List.is_empty changed && List.is_empty removed
   then (
@@ -795,7 +793,10 @@ let sessions_changed ?(changed = []) ?(removed = []) t =
     let summaries, gone =
       List.partition_map changed ~f:(fun session ->
         match
-          Session.summary_with ~live ~load:(load_session t) (Session.path session)
+          Session.summary_with
+            ~live
+            ~load:(load_session t)
+            (Session.path session)
         with
         | Some summary -> First summary
         | None -> Second (Session.id session))
@@ -815,9 +816,8 @@ let sessions_changed ?(changed = []) ?(removed = []) t =
            [ ( "changed"
              , `Array
                  (List.map summaries ~f:(fun summary ->
-                    listing_json
-                      t
-                      (listing t ~now ~archive_after_days summary))) )
+                    listing_json t (listing t ~now ~archive_after_days summary)))
+             )
            ; removed
            ])))
 ;;

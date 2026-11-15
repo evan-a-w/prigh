@@ -142,11 +142,13 @@ module Change = struct
 
   let apply { changed; removed } sessions =
     let gone =
-      String.Set.of_list (removed @ List.map changed ~f:(fun (s : summary) -> s.id))
+      String.Set.of_list
+        (removed @ List.map changed ~f:(fun (s : summary) -> s.id))
     in
     List.fold
       changed
-      ~init:(List.filter sessions ~f:(fun (s : summary) -> not (Set.mem gone s.id)))
+      ~init:
+        (List.filter sessions ~f:(fun (s : summary) -> not (Set.mem gone s.id)))
       ~f:insert
   ;;
 end

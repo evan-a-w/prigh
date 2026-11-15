@@ -169,15 +169,21 @@ let%expect_test "the downscaled images kept are bounded" =
   let limit = { Image.Limit.default with max_dimension = 2000 } in
   let search_path = fake_magick t (F.png_header ~width:2000 ~height:1500) in
   let send width =
-    let messages = [ Message.user ~images:[ image ~width ~height:3000 ] "look" ] in
-    let _, outcome = Image_fit.messages ~env:t.env ~search_path limit messages in
+    let messages =
+      [ Message.user ~images:[ image ~width ~height:3000 ] "look" ]
+    in
+    let _, outcome =
+      Image_fit.messages ~env:t.env ~search_path limit messages
+    in
     printf "downscaled %d, kept %d\n" outcome.downscaled (Image_fit.cached ())
   in
   send 4000;
   send 4001;
   send 4000;
   (* Room for one: the least recently sent goes. *)
-  let one = String.length (Base64.encode_exn (F.png_header ~width:2000 ~height:1500)) in
+  let one =
+    String.length (Base64.encode_exn (F.png_header ~width:2000 ~height:1500))
+  in
   Image_fit.set_max_bytes (one + 100);
   send 4002;
   send 4002;
@@ -185,7 +191,8 @@ let%expect_test "the downscaled images kept are bounded" =
   send 4003;
   Image_fit.set_max_bytes (64 * 1024 * 1024);
   Image_fit.reset ();
-  [%expect {|
+  [%expect
+    {|
     downscaled 1, kept 1
     downscaled 1, kept 2
     downscaled 1, kept 2

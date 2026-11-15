@@ -63,10 +63,13 @@ module Cache = struct
     if t.bytes > t.max_bytes
     then (
       match
-        Hashtbl.fold t.entries ~init:None ~f:(fun ~key ~data:(e : Entry.t) acc ->
-          match acc with
-          | Some (_, (o : Entry.t)) when o.used <= e.used -> acc
-          | _ -> Some (key, e))
+        Hashtbl.fold
+          t.entries
+          ~init:None
+          ~f:(fun ~key ~data:(e : Entry.t) acc ->
+            match acc with
+            | Some (_, (o : Entry.t)) when o.used <= e.used -> acc
+            | _ -> Some (key, e))
       with
       | Some (key, _) ->
         remove key;

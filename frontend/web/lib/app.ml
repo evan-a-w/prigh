@@ -8295,7 +8295,8 @@ let sessions_listed (m : Model.t) sessions =
   { m with
     sessions
   ; marks = Session_marks.prune m.marks ~paths
-  ; chat_cache = Chat_cache.retain m.chat_cache ~paths:(String.Set.of_list paths)
+  ; chat_cache =
+      Chat_cache.retain m.chat_cache ~paths:(String.Set.of_list paths)
   }
 ;;
 

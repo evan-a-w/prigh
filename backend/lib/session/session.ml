@@ -236,7 +236,10 @@ let create_file t =
     output_line oc (header t);
     let entries = List.rev t.entries in
     List.iter entries ~f:(fun e ->
-      Hashtbl.set t.offsets ~key:e.id ~data:(Int64.to_int_exn (Out_channel.pos oc));
+      Hashtbl.set
+        t.offsets
+        ~key:e.id
+        ~data:(Int64.to_int_exn (Out_channel.pos oc));
       output_line oc (Entry e));
     match t.head, List.last entries with
     | Some head, Some last when not (String.equal head last.id) ->
@@ -349,7 +352,6 @@ let empty ~id ~path ~cwd ~created_at ~parent ~persisted ~temporary =
   }
 ;;
 
-
 let create ~dir ~cwd ?parent ?(temporary = false) () =
   let id = new_id () in
   let created_at = next_created_at () in
@@ -358,7 +360,6 @@ let create ~dir ~cwd ?parent ?(temporary = false) () =
   let path = Filename.concat dir (sprintf "%s_%s.jsonl" stamp id) in
   empty ~id ~path ~cwd ~created_at ~parent ~persisted:false ~temporary
 ;;
-
 
 (* The first way it mattered stays; its branch follows. *)
 let track_worktree t (w : Session_worktree.t) =
@@ -507,7 +508,10 @@ let iter_lines ?(yield = fun () -> ()) path ~f =
     if Buffer.length partial > 0
     then (
       incr number;
-      f ~number:!number ~offset:!partial_at (Utf8.sanitize (Buffer.contents partial));
+      f
+        ~number:!number
+        ~offset:!partial_at
+        (Utf8.sanitize (Buffer.contents partial));
       true)
     else false)
 ;;
@@ -535,15 +539,15 @@ let read_json t ~number ~offset json =
          t
          ~number
          (sprintf
-            "skipped a %S entry this version of prigh cannot read (written \
-             by a newer one?)"
+            "skipped a %S entry this version of prigh cannot read (written by \
+             a newer one?)"
             kind)
      | None ->
        skip
          t
          ~number
-         "skipped a line this version of prigh cannot read (written by a \
-          newer one?)")
+         "skipped a line this version of prigh cannot read (written by a newer \
+          one?)")
 ;;
 
 (* A line that cannot be read is skipped with a warning rather than making
@@ -1826,7 +1830,8 @@ let usage_stamp path =
     match Core_unix.lstat p with
     | exception _ -> None
     | { st_size; st_mtime; st_kind; _ } ->
-      Some (st_kind, sprintf "%s %Ld %.6f" (Filename.basename p) st_size st_mtime)
+      Some
+        (st_kind, sprintf "%s %Ld %.6f" (Filename.basename p) st_size st_mtime)
   in
   List.concat_map
     (data_dir path :: Trace_file.paths ~session_path:path)
@@ -1980,14 +1985,15 @@ module Cache_entry = struct
     }
   [@@deriving sexp]
 
-  let fresh t ~size ~mtime = Int64.equal t.size size && Float.equal t.mtime mtime
+  let fresh t ~size ~mtime =
+    Int64.equal t.size size && Float.equal t.mtime mtime
+  ;;
 end
 
 let summary_cache : Cache_entry.t String.Table.t = String.Table.create ()
 
 (* Directories whose [Summary_file] was read into [summary_cache]. *)
 let summary_files_read = String.Hash_set.create ()
-
 let cache_dir ~dir = Filename.concat dir ".cache"
 
 (* Writes [path] whole or not at all, so that a reader never sees part of
@@ -1999,8 +2005,9 @@ let write_atomically path ~data =
     Out_channel.write_all tmp ~data;
     Core_unix.rename ~src:tmp ~dst:path
   with
-  | _ -> (try Core_unix.unlink tmp with
-          | _ -> ())
+  | _ ->
+    (try Core_unix.unlink tmp with
+     | _ -> ())
 ;;
 
 (* The summaries of a directory's sessions by file name, as last listed.
@@ -2017,7 +2024,9 @@ module Summary_file = struct
     }
   [@@deriving sexp]
 
-  let path ~dir = Filename.concat (cache_dir ~dir) (sprintf "summaries-v%d" version)
+  let path ~dir =
+    Filename.concat (cache_dir ~dir) (sprintf "summaries-v%d" version)
+  ;;
 
   let read ~dir =
     match t_of_sexp (Sexp.load_sexp (path ~dir)) with
@@ -2036,16 +2045,18 @@ let read_summary_file ~dir =
   if not (Hash_set.mem summary_files_read dir)
   then (
     Hash_set.add summary_files_read dir;
-    List.iter (Summary_file.read ~dir) ~f:(fun (name, (entry : Cache_entry.t)) ->
-      let path = Filename.concat dir name in
-      (* The directory may have moved since. *)
-      let entry =
-        { entry with
-          summary = Option.map entry.summary ~f:(fun s -> { s with path })
-        }
-      in
-      if not (Hashtbl.mem summary_cache path)
-      then Hashtbl.set summary_cache ~key:path ~data:entry))
+    List.iter
+      (Summary_file.read ~dir)
+      ~f:(fun (name, (entry : Cache_entry.t)) ->
+        let path = Filename.concat dir name in
+        (* The directory may have moved since. *)
+        let entry =
+          { entry with
+            summary = Option.map entry.summary ~f:(fun s -> { s with path })
+          }
+        in
+        if not (Hashtbl.mem summary_cache path)
+        then Hashtbl.set summary_cache ~key:path ~data:entry))
 ;;
 
 let write_summary_file ~dir =
@@ -2072,9 +2083,13 @@ let cached_summary ~live ~load path =
         then entry.summary, false
         else (
           let summary =
-            Option.map entry.summary ~f:(fun s -> { s with bytes = disk_usage path })
+            Option.map entry.summary ~f:(fun s ->
+              { s with bytes = disk_usage path })
           in
-          Hashtbl.set summary_cache ~key:path ~data:{ entry with usage; summary };
+          Hashtbl.set
+            summary_cache
+            ~key:path
+            ~data:{ entry with usage; summary };
           summary, Option.is_none live)
       | Some _ | None ->
         let summary =
@@ -2086,7 +2101,10 @@ let cached_summary ~live ~load path =
           |> Option.map ~f:(fun t ->
             { (summarise t ~path ~mtime) with bytes = disk_usage path })
         in
-        Hashtbl.set summary_cache ~key:path ~data:{ size; mtime; usage; summary };
+        Hashtbl.set
+          summary_cache
+          ~key:path
+          ~data:{ size; mtime; usage; summary };
         summary, Option.is_none live
     in
     Some (parsed, Option.map summary ~f:(fun s -> mtime, s))

@@ -5874,6 +5874,18 @@ let sessions_picker_shown m =
   | _ -> false
 ;;
 
+(* What the open sessions picker lists. *)
+let picker_sessions m =
+  match m.mode with
+  | Picker { kind = Sessions selection; _ }
+  | Confirm
+      { action =
+          Delete_sessions { back = Some { kind = Sessions selection; _ }; _ }
+      ; _
+      } -> Some selection.Session_selection.sessions
+  | _ -> None
+;;
+
 (* The cached list and the open picker show [sessions]. *)
 let sessions_refreshed m sessions =
   let m =
@@ -6857,7 +6869,7 @@ let event m (e : P.Event.t) =
      | None -> m, [])
   | Temporary_ended _ -> m, []
   | Sessions_changed change ->
-    (match change, m.sessions with
+    (match change, Option.first_some m.sessions (picker_sessions m) with
      | Some change, Some sessions ->
        sessions_refreshed m (P.Session_summary.Change.apply change sessions)
      | _ ->

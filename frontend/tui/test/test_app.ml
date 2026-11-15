@@ -2301,6 +2301,42 @@ let%expect_test "/delete completes session after session" =
     |}]
 ;;
 
+let%expect_test "sessions_changed with entries updates the open picker in place"
+  =
+  let h = sessions_open () in
+  let changed =
+    P.Json.parse
+      {|{"id":"2","path":"/s/2.jsonl","name":"deploy v2","cwd":"/work","created_at":"2025-06-03T10:00:00Z","updated_at":"2025-06-06T10:00:00Z","first_prompt":"deploy it","message_count":8,"live":true,"bytes":4096}|}
+    |> Or_error.ok_exn
+    |> P.Session_summary.of_json
+    |> Or_error.ok_exn
+  in
+  H.event
+    h
+    (Sessions_changed (Some { changed = [ changed ]; removed = [ "5" ] }));
+  H.show h;
+  [%expect
+    {|
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions_picker))
+
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    Sessions  (4)  Alt+A (un)archives · Alt+D deletes archived · Ctrl+N named · Alt+T (un)pins
+    / ▏
+       ● deploy v2 ∣ 2025-06-06T10:00 ∣ 8 msgs ∣ deploy it  /work
+    ▸* ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build  /work
+      ── archived ──
+       (unnamed) ∣ 2025-06-04T10:00 ∣ 4 msgs ∣ try a spike  /old
+       old spike ∣ 2025-04-02T10:00 ∣ 2 msgs ∣ another spike  /old
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    >
+    deepseek-flash  think:off  ctx:0.1%/1.0M  Enter switches · Tab marks · Ctrl+D deletes · Esc closes
+    |}]
+;;
+
 let%expect_test
     "sessions_changed refetches the open picker and the cached list, keeping \
      the query, marks and highlight"

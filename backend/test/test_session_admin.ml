@@ -867,8 +867,8 @@ let print_changes ids (c : Client.t) =
   Queue.clear c.sent
 ;;
 
-let%expect_test "sessions_changed carries the changed entries, as each client \
-                 lists them"
+let%expect_test
+    "sessions_changed carries the changed entries, as each client lists them"
   =
   with_sandbox
   @@ fun t ->
@@ -878,7 +878,10 @@ let%expect_test "sessions_changed carries the changed entries, as each client \
   let old = saved t "old" ~days_ago:10. in
   let recent = saved t "recent" ~days_ago:0.1 in
   let ids =
-    [ Session.id ancient, "ancient"; Session.id old, "old"; Session.id recent, "recent" ]
+    [ Session.id ancient, "ancient"
+    ; Session.id old, "old"
+    ; Session.id recent, "recent"
+    ]
   in
   let provider = Routed_provider.create ~main:[ Reply.text "hi" ] [] in
   let server = Server.create t ~sw ~provider in
@@ -893,10 +896,15 @@ let%expect_test "sessions_changed carries the changed entries, as each client \
   (* Opening one: b's session is no longer live once b leaves it. *)
   Client.call t b "switch_session" (path recent);
   print_changes ids a;
-  Client.call t a "delete_sessions" [ "paths", `Array [ `String (Session.path old) ] ];
+  Client.call
+    t
+    a
+    "delete_sessions"
+    [ "paths", `Array [ `String (Session.path old) ] ];
   print_changes ids a;
   print_changes ids b;
-  [%expect {|
+  [%expect
+    {|
     {"type":"response","id":"r","ok":true,"result":{}}
     a: changed [ancient pinned] removed []
     b: changed [ancient pinned] removed []
