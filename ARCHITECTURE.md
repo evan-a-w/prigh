@@ -2486,7 +2486,10 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   found via `-web-root`, `$PRIGH_WEB_ROOT` or next to the executable)
   by `Static_site`: no `..`, no dot files; `Cache-Control: no-cache` with
   an `ETag` (content hash, cached per file version) and `Last-Modified` (not for Nix's mtime 1), so reloads revalidate to
-  `304`; `.webmanifest` is `application/manifest+json`; a precompressed `file.br`/`file.gz` no older than the file is
+  `304`, except a request for `NAME?v=VERSION` with the file's version (the
+  first 16 hex digits of its contents' MD5, as `index.html` names its
+  script, stylesheet and font): `public, max-age=31536000, immutable`, as
+  another build is another name; `.webmanifest` is `application/manifest+json`; a precompressed `file.br`/`file.gz` no older than the file is
   sent with `Content-Encoding` when `Accept-Encoding` allows it (`Vary:
   Accept-Encoding`). The Nix build adds those siblings to the installed
   sites (zopfli, brotli); local dune builds stay uncompressed. Upgraded sockets set `TCP_NODELAY`, so that a
@@ -4137,7 +4140,9 @@ terminal frontend and `web/` prigh-web, the browser one.
     in); `Page_theme` applies `Apply_theme` to `<html>`, that cache, the
     terminal and `<meta name=theme-color>` (the page's background, for an
     installed app's title bar).
-  - `bin/` — `main.bc.js` plus `index.html`, `theme.css` (every colour,
+  - `bin/` — `main.bc.js` plus `index.html` (which loads the stylesheets
+    as one, `app.css`, which `bin/dune` concatenates in order, preloads
+    the sans font and defers `main.bc.js`), `theme.css` (every colour,
     as variables: the original theme on `:root`, `[data-theme=dark]` and
     `[data-theme=light]` overriding them, the accent presets
     `[data-accent=...]` and what derives from the accent by `color-mix`),
@@ -4157,26 +4162,34 @@ terminal frontend and `web/` prigh-web, the browser one.
     keeps it all), temporal-polyfill (which `index.html` loads before
     `main.bc.js` only where the browser has no `Temporal`, e.g. WebKitGTK:
     Core's `Timezone_js_loader` needs it and Bonsai_web's start asks for
-    the local zone, so without it the app never starts), assembled under
+    the local zone, so without it the app never starts; above the
+    stylesheet, which an inline script waits for), assembled under
     `bin/site/` and installed to `share/prigh_frontend/web` (the Nix
     wrapper exports it as `$PRIGH_WEB_ROOT`). The dev profile links
     separately compiled units with inline source maps (~49 MB, fast to
     relink); release builds (`dune build -p`, so Nix) are whole-program at
-    `--opt 3`, ~2 MB (590 KB as the installed `.gz`, 500 KB `.br`).
+    `--opt 3`, ~3.2 MB (940 KB as the installed `.gz`, 740 KB `.br`;
+    `app.css` 340 KB, 57 KB `.br`). `bin/site_gen/` names the shell's
+    files in `index.html` and `app.css`'s font URLs as `NAME?v=VERSION`
+    (a hash of its contents), which the backend serves as immutable.
     Installing it: `manifest.webmanifest` (`start_url` and `scope` `./`,
     no credentials: the installed app signs in from localStorage like a
     tab), the icons (`icon.svg`, the favicon `Page_notifications` draws;
     `icon-maskable.svg` with the mark in the safe zone; the PNGs are
     rendered from them with resvg and committed, as is
-    `apple-touch-icon.png`), and `sw.js`, which `bin/sw_gen/` makes from
-    `sw.template.js` with the shell's file names and `VERSION`, a hash of
+    `apple-touch-icon.png`), and `sw.js`, which `bin/site_gen/` makes from
+    `sw.template.js` with the shell's file names, their versions and `VERSION`, a hash of
     their contents, so each build that changes the shell is a new worker
     with a cache of its own (`prigh-web-VERSION`; activating deletes the
-    others). It answers the shell's files from that cache and navigations
-    to the page from the network first (the cached `index.html` when the
-    backend cannot be reached, so the app opens offline and reconnects);
-    nothing else (the RPC and terminal WebSockets, `/files/*`,
-    `/signin-handoff`, any query string) is intercepted. A new worker
+    others). It answers the shell's files from that cache (bare or with
+    their version) and navigations to the page with its cached
+    `index.html` at once, so the app opens offline, or on a slow link, and
+    reconnects; the page is still fetched behind it, and when a sign-in
+    proxy in front answers that with a redirect or 401/403/407, the worker
+    marks its cache network-first (until a navigation gets the page) and
+    asks the page to reload, which shows the proxy's sign-in. Nothing else
+    (the RPC and terminal WebSockets, `/files/*`, `/signin-handoff`, any
+    other query string) is intercepted. A new worker
     waits until the page's update notice reloads into it.
   - `test/` — inline expect tests under node: a `Harness` drives
     `App.update`, answers RPCs and prints the commands and the rendered
