@@ -104,9 +104,25 @@ let plan_mode_refusal =
    with read-only tools, then present the plan in your reply and wait."
 ;;
 
+let is_word_char c = Char.is_alphanum c || Char.equal c '_' || Char.equal c '-'
+
+let names_host text ~names =
+  let text = String.lowercase text in
+  List.exists names ~f:(fun name ->
+    let name = String.lowercase (String.strip name) in
+    (not (String.is_empty name))
+    && List.exists
+         (String.substr_index_all text ~may_overlap:false ~pattern:name)
+         ~f:(fun i ->
+           let j = i + String.length name in
+           (i = 0 || not (is_word_char text.[i - 1]))
+           && (j = String.length text || not (is_word_char text.[j]))))
+;;
+
 let decide
       ~(mode : Approval_mode.t)
       ~plan
+      ?(host_permitted = true)
       ~(rules : Rules.t)
       ~session
       ~cwd
@@ -130,6 +146,11 @@ let decide
     else if Option.is_some (find rules.ask Approval_rule.touches)
     then (* an allow rule could not cover it: ask rules come first *)
       Decision.Ask { rules = [] }
+    else if not host_permitted
+    then (
+      match mode with
+      | Smart -> Judge { rules = Approval_rule.suggest call }
+      | Ask | Auto_edit | Auto -> ask ())
     else if Approval_rule.covers (rules.allow @ session) ~cwd ~home call
     then Allow
     else if not destructive

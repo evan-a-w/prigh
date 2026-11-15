@@ -21,6 +21,47 @@ let laptop t =
   }
 ;;
 
+let desktop t =
+  { (laptop t) with
+    id = "host-desktop"
+  ; name = "desktop"
+  ; cwd = Filename.concat t.dir "desktop"
+  ; home = Some (Filename.concat t.dir "desktop")
+  }
+;;
+
+(* The session's replies, and [judge]'s for the approval model ([smart]
+   mode), whose prompts are printed. *)
+let provider ~show ~judge replies =
+  let session = Faux_provider.create replies in
+  let judge = Faux_provider.create judge in
+  { Provider.name = "test"
+  ; stream =
+      (fun (request : Provider.Request.t) ~cancel ~on_event ->
+        if
+          Option.equal
+            String.equal
+            request.system
+            (Some Approval_judge.system_prompt)
+        then (
+          List.iter request.messages ~f:(function
+            | User u -> printf "judge sees:\n%s\n" (show u.text)
+            | Assistant _ | Tool_result _ -> ());
+          judge.stream request ~cancel ~on_event)
+        else session.stream request ~cancel ~on_event)
+  }
+;;
+
+let verdict decision reason =
+  Reply.tool_call
+    ~id:"v"
+    ~name:"verdict"
+    ~arguments:
+      (Json.to_string
+         (`Object [ "decision", `String decision; "reason", `String reason ]))
+    ()
+;;
+
 let show t s =
   let s = mask t s in
   match Sys.getenv "HOME" with
@@ -34,6 +75,7 @@ let with_agent
       ?(answer = fun (_ : string) -> Agent.Confirm_answer.Allow)
       ?(sub_replies = [])
       ?config
+      ?(judge = [])
       replies
       f
   =
@@ -42,6 +84,7 @@ let with_agent
   Eio.Switch.run
   @@ fun sw ->
   Core_unix.mkdir_p (Filename.concat t.dir "laptop/sub");
+  Core_unix.mkdir_p (Filename.concat t.dir "desktop");
   Option.iter config ~f:(fun json -> write t ".prigh/config.json" json);
   let agent_ref = ref None in
   let on_host =
@@ -62,7 +105,7 @@ let with_agent
     Agent.create
       ~env:t.env
       ~sw
-      ~provider:(Faux_provider.create replies)
+      ~provider:(provider ~show:(show t) ~judge replies)
       ~tools:
         (Tools.all
          @ (subagent :: Tool_subagent.control_tools)
@@ -104,13 +147,17 @@ let with_agent
       printf "%s cancels its call\n" host;
       Option.iter (Hashtbl.find running exec_id) ~f:Cancellation.cancel
     | Loop (Tool_output { chunk; _ }) -> Buffer.add_string output chunk
-    | Loop (Tool_confirm { call_id; agent_id; name; summary; rules; kind = _ })
-      ->
+    | Loop (Tool_allowed { model; reason; _ }) ->
+      printf "allowed by %s: %s\n" model reason
+    | Loop (Tool_confirm { call_id; agent_id; name; summary; rules; kind }) ->
       printf
-        "confirm %s: %s [%s]\n"
+        "confirm %s: %s [%s]%s\n"
         name
         (show t summary)
-        (String.concat ~sep:" " rules);
+        (String.concat ~sep:" " rules)
+        (match kind with
+         | Judged { model; reason } -> sprintf " (%s left it: %s)" model reason
+         | Tool | Computer_use _ -> "");
       Or_error.ok_exn
         (Agent.respond_confirm ?agent_id agent ~call_id (answer summary))
     | Loop (Tool_end { call; result }) ->
@@ -139,8 +186,10 @@ let on_host ?(id = "c") args =
   Reply.tool_call ~id ~name:"on_host" ~arguments:args ()
 ;;
 
-let run agent =
-  Or_error.ok_exn (Agent.prompt agent "go");
+(* The user names laptop, which lets the agent work there; the tests of that
+   permission say something else. *)
+let run ?(text = "go, on laptop") agent =
+  Or_error.ok_exn (Agent.prompt agent text);
   Agent.wait_idle agent
 ;;
 
@@ -440,4 +489,188 @@ let%expect_test "summaries, ACP titles and what the model is told" =
     on laptop                           | On laptop
     Run one tool call on another tool host; only when the user names that machine or
     |}]
+;;
+
+let%expect_test "names_host: a whole word, ignoring case" =
+  List.iter
+    [ "check the disk on Laptop"
+    ; "laptop's disk"
+    ; "on host-laptop please"
+    ; "my laptops"
+    ; "laptop-2"
+    ; "nothing here"
+    ]
+    ~f:(fun text ->
+      printf
+        "%-26s %b\n"
+        text
+        (Approval.names_host text ~names:[ "laptop"; "host-laptop" ]));
+  [%expect
+    {|
+    check the disk on Laptop   true
+    laptop's disk              true
+    on host-laptop please      true
+    my laptops                 false
+    laptop-2                   false
+    nothing here               false
+    |}]
+;;
+
+(* A call on a host the user has not named is held for them in every mode,
+   reads included; denied, it is not run. *)
+let%expect_test "a host the user has not named: held in every mode" =
+  List.iter [ Approval_mode.Ask; Auto_edit; Auto ] ~f:(fun mode ->
+    printf "-- %s\n" (Approval_mode.to_string mode);
+    with_agent
+      ~mode
+      ~answer:(fun _ -> Deny None)
+      [ on_host {|{"host":"laptop","tool":"ls","args":{}}|}; Reply.text "ok" ]
+    @@ fun _t agent -> run ~text:"what is in this directory?" agent);
+  [%expect
+    {|
+    -- ask
+    confirm on_host: on laptop: ls (runs on laptop, which you haven't named in this session) []
+    on_host -> ERROR [denied by user]
+    -- auto-edit
+    confirm on_host: on laptop: ls (runs on laptop, which you haven't named in this session) []
+    on_host -> ERROR [denied by user]
+    -- auto
+    confirm on_host: on laptop: ls (runs on laptop, which you haven't named in this session) []
+    on_host -> ERROR [denied by user]
+    |}]
+;;
+
+(* Named (by name or id, in any case) in a message of the user's, the host
+   is permitted: its calls follow the mode. *)
+let%expect_test "a host the user named: calls follow the mode" =
+  List.iter [ Approval_mode.Ask; Auto_edit; Auto ] ~f:(fun mode ->
+    printf "-- %s\n" (Approval_mode.to_string mode);
+    with_agent
+      ~mode
+      [ on_host {|{"host":"laptop","tool":"ls","args":{}}|}
+      ; on_host
+          ~id:"c2"
+          {|{"host":"laptop","tool":"write","args":{"path":"n","content":"x"}}|}
+      ; on_host
+          ~id:"c3"
+          {|{"host":"laptop","tool":"bash","args":{"command":"echo hi"}}|}
+      ; Reply.text "ok"
+      ]
+    @@ fun _t agent -> run ~text:"what's on the LAPTOP?" agent);
+  [%expect
+    {|
+    -- ask
+    host-laptop runs ls in $DIR/laptop
+    on_host -> sub/
+    confirm on_host: on laptop: write n []
+    host-laptop runs write in $DIR/laptop
+    on_host -> wrote 1 bytes to $DIR/laptop/n
+    confirm on_host: on laptop: bash echo hi []
+    host-laptop runs bash in $DIR/laptop
+      output: "hi\n"
+    on_host -> hi
+    -- auto-edit
+    host-laptop runs ls in $DIR/laptop
+    on_host -> sub/
+    host-laptop runs write in $DIR/laptop
+    on_host -> wrote 1 bytes to $DIR/laptop/n
+    confirm on_host: on laptop: bash echo hi []
+    host-laptop runs bash in $DIR/laptop
+      output: "hi\n"
+    on_host -> hi
+    -- auto
+    host-laptop runs ls in $DIR/laptop
+    on_host -> sub/
+    host-laptop runs write in $DIR/laptop
+    on_host -> wrote 1 bytes to $DIR/laptop/n
+    host-laptop runs bash in $DIR/laptop
+      output: "hi\n"
+    on_host -> hi
+    |}]
+;;
+
+(* Letting one call run permits its host for the session (kept in its file
+   with the calls smart mode allowed): later calls there follow the mode;
+   another host is still held. *)
+let%expect_test "an approval permits that host, not the others" =
+  with_agent
+    ~answer:(fun summary ->
+      if String.is_substring summary ~substring:"desktop"
+      then Deny None
+      else Allow)
+    [ on_host {|{"host":"laptop","tool":"ls","args":{}}|}
+    ; on_host ~id:"c2" {|{"host":"laptop","tool":"ls","args":{"path":"sub"}}|}
+    ; on_host ~id:"c3" {|{"host":"desktop","tool":"ls","args":{}}|}
+    ; Reply.text "ok"
+    ]
+  @@ fun t agent ->
+  Agent.set_hosts agent [ laptop t; desktop t ];
+  run ~text:"look around" agent;
+  List.iter (Session.allowed_calls (Agent.session agent)) ~f:(fun a ->
+    print_endline
+      (show
+         t
+         (Allowed_call.describe a ~host_name:(fun id ->
+            String.chop_prefix_if_exists id ~prefix:"host-"))));
+  [%expect
+    {|
+    confirm on_host: on laptop: ls (runs on laptop, which you haven't named in this session) []
+    host-laptop runs ls in $DIR/laptop
+    on_host -> sub/
+    host-laptop runs ls in $DIR/laptop
+    on_host -> (empty directory)
+    confirm on_host: on desktop: ls (runs on desktop, which you haven't named in this session) []
+    on_host -> ERROR [denied by user]
+    |}]
+;;
+
+let%expect_test "a deny rule wins over everything" =
+  with_agent
+    ~config:{|{"permissions": {"deny": ["bash(rm:*)"]}}|}
+    [ on_host {|{"host":"laptop","tool":"bash","args":{"command":"rm -r x"}}|}
+    ; Reply.text "ok"
+    ]
+  @@ fun _t agent ->
+  run ~text:"tidy up" agent;
+  [%expect {| |}]
+;;
+
+(* In smart mode the approval model decides about a host the user has not
+   named, told which host the session runs on, which one the call targets
+   and which are connected. *)
+let%expect_test "smart: the judge weighs the host" =
+  with_agent
+    ~mode:Smart
+    ~answer:(fun _ -> Deny None)
+    ~judge:[ verdict "ask" "reads files on laptop, which you didn't mention" ]
+    [ on_host {|{"host":"laptop","tool":"read","args":{"path":"notes"}}|}
+    ; Reply.text "ok"
+    ]
+  @@ fun _t agent ->
+  run ~text:"what do my notes say?" agent;
+  [%expect {| |}]
+;;
+
+(* Once the user named the host, reads there run unjudged as on the session's
+   own host; the judge's allow covers only that exact call on that host. *)
+let%expect_test "smart: a named host follows the mode" =
+  with_agent
+    ~mode:Smart
+    ~judge:[ verdict "allow" "prints a word on laptop, as asked" ]
+    [ on_host {|{"host":"laptop","tool":"ls","args":{}}|}
+    ; on_host
+        ~id:"c2"
+        {|{"host":"laptop","tool":"bash","args":{"command":"echo hi"}}|}
+    ; on_host
+        ~id:"c3"
+        {|{"host":"laptop","tool":"bash","args":{"command":"echo hi"}}|}
+    ; on_host
+        ~id:"c4"
+        {|{"host":"desktop","tool":"bash","args":{"command":"echo hi"}}|}
+    ; Reply.text "ok"
+    ]
+  @@ fun t agent ->
+  Agent.set_hosts agent [ laptop t; desktop t ];
+  run ~text:"say hi on laptop" agent;
+  [%expect {| |}]
 ;;

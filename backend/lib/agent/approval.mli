@@ -39,9 +39,15 @@ end
 (** The tools that change files: [edit], [write], [apply_patch]. *)
 val is_edit : string -> bool
 
+(** Whether [text] names one of [names] (a host's name or id): as a whole
+    word (letters, digits, [_] and [-]), ignoring case. *)
+val names_host : string -> names:string list -> bool
+
 (** In order: a deny rule touching the call denies it; plan mode denies a
     call that [changes_work] ({!Plan_mode.changes_work}); an ask rule
-    touching it asks; an allow rule (the config's or the session's) covering
+    touching it asks; a call on another host the user has not permitted
+    ([host_permitted] false, default true: see {!Agent}'s [on_host]) asks,
+    read-only or not ([Smart]: the approval model judges it); an allow rule (the config's or the session's) covering
     it allows it; plan mode asks for every other destructive tool; then the
     mode decides for destructive tools ([Ask] asks, [Auto_edit] asks unless
     it is an edit, [Auto] allows, [Smart] allows edits of files under
@@ -51,6 +57,7 @@ val is_edit : string -> bool
 val decide
   :  mode:Approval_mode.t
   -> plan:bool
+  -> ?host_permitted:bool
   -> rules:Rules.t
   -> session:Approval_rule.t list
   -> cwd:string
