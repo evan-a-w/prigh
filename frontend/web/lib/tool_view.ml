@@ -218,6 +218,20 @@ let cancelled (r : Message.Tool_result.t) =
       || String.is_suffix text ~suffix:"[cancelled]")
 ;;
 
+let status ~streaming ~running (tool : Chat.Tool.t option) : Status.t =
+  let result = Option.bind tool ~f:(fun t -> t.result) in
+  let subagent = Option.bind tool ~f:(fun t -> t.subagent) in
+  match result, subagent with
+  | Some r, _ when cancelled r -> Interrupted
+  | Some { is_error = true; _ }, _
+  | _, Some { result = Some { is_error = true; _ }; _ } -> Failed
+  | _, Some { result = None; _ } -> Running
+  | _, Some { result = Some _; _ } -> Done
+  | Some _, _ -> Done
+  | None, _ ->
+    if streaming then Preparing else if running then Running else Interrupted
+;;
+
 let link ~cls url text =
   Node.a
     ~attrs:
@@ -874,17 +888,7 @@ let card
       else r)
   in
   let subagent = Option.bind tool ~f:(fun t -> t.subagent) in
-  let status : Status.t =
-    match result, subagent with
-    | _ when cancelled -> Interrupted
-    | Some { is_error = true; _ }, _
-    | _, Some { result = Some { is_error = true; _ }; _ } -> Failed
-    | _, Some { result = None; _ } -> Running
-    | _, Some { result = Some _; _ } -> Done
-    | Some _, _ -> Done
-    | None, _ ->
-      if streaming then Preparing else if running then Running else Interrupted
-  in
+  let status = status ~streaming ~running tool in
   let { arg; chips; details; body } =
     present ~nested ~fold ~streaming ~tool call ~result ~subagent
   in

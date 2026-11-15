@@ -34,3 +34,19 @@ val server_tool : fold:Fold.t -> running:bool -> Content.Server_tool.t -> Node.t
 (** A subagent's latest step: its current tool call, or the last line of its
     text. *)
 val last_activity : Chat.t -> string option
+
+module Status : sig
+  type t =
+    | Preparing (** its arguments are still arriving *)
+    | Running
+    | Done
+    | Failed
+    | Interrupted (** cancelled, or the agent stopped before its result *)
+
+  (** The lamp while it runs, else its mark. *)
+  val icon : t -> Node.t
+end
+
+(** Where a call is, as its card shows it: [streaming] and [running] as for
+    [view]. *)
+val status : streaming:bool -> running:bool -> Chat.Tool.t option -> Status.t

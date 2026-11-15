@@ -3,6 +3,7 @@ open! Import
 
 type t =
   { verbose : bool
+  ; quiet : bool
   ; cards_open : bool
   ; toggled : String.Set.t
   ; scope : string
@@ -21,6 +22,10 @@ let create
       (match verbosity with
        | Verbose -> true
        | Quiet | Normal -> false)
+  ; quiet =
+      (match verbosity with
+       | Quiet -> true
+       | Normal | Verbose -> false)
   ; cards_open
   ; toggled
   ; scope = ""
@@ -30,6 +35,7 @@ let create
 
 let default = create ~verbosity:Normal ~toggled:String.Set.empty ()
 let filter t = t.filter
+let quiet t = t.quiet
 let shows t kind = Transcript_filter.shows t.filter kind
 let scoped t agent_id = { t with scope = agent_id ^ "/" }
 let key t id = t.scope ^ id
@@ -45,6 +51,7 @@ let opened ~by_default t id =
 let equal a b =
   phys_equal a b
   || (Bool.equal a.verbose b.verbose
+      && Bool.equal a.quiet b.quiet
       && Bool.equal a.cards_open b.cards_open
       && String.equal a.scope b.scope
       && Transcript_filter.equal a.filter b.filter
