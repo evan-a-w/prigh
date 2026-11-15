@@ -24,6 +24,9 @@ module Agent : sig
     ; task : string
     ; name : string option (** a few words saying what it does *)
     ; model : string
+    ; host : string option
+      (** the tool host it works on (its name), when not the session's
+          active one *)
     ; status : Status.t
     ; started_at : Time_ns.t
     ; ended_at : Time_ns.t option

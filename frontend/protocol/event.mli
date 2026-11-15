@@ -90,6 +90,9 @@ type t =
         (** a few words saying what it does; [None] from older backends *)
       ; model : string
       ; tools : string list
+      ; host : string option
+        (** the tool host it works on (its name), when not the session's
+            active one *)
       ; worktree : Agent_worktree.t option
         (** a worktree made for it, which it works in *)
       ; forked : bool (** it started from its caller's conversation *)

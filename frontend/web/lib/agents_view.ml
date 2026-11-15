@@ -167,6 +167,7 @@ let agent_meta (m : App.Model.t) (a : Agent.t) =
   in
   List.filter_opt
     [ Option.some_if (queued > 0) (sprintf "%d queued" queued)
+    ; Option.map a.host ~f:(sprintf "on %s")
     ; Some a.model
     ; Option.some_if (a.turns > 0) (plural a.turns "turn")
     ; Option.some_if (a.tool_calls > 0) (plural a.tool_calls "tool call")

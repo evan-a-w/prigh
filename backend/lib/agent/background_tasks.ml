@@ -95,6 +95,7 @@ module Summary = struct
     { id : string
     ; label : string
     ; name : string option
+    ; host : string option
     ; running : bool
     ; status : string option
     }
@@ -439,6 +440,7 @@ let summaries t ~kind =
         { Summary.id = task.id
         ; label = task.label
         ; name = task.name
+        ; host = task.host
         ; running = Task.running task
         ; status = Option.map task.outcome ~f:(fun (o : Outcome.t) -> o.status)
         })

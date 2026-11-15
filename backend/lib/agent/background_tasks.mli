@@ -80,6 +80,8 @@ module Summary : sig
     { id : string
     ; label : string
     ; name : string option (** a subagent's ({!Subagent_name}) *)
+    ; host : string option
+      (** a subagent's tool host, when not the session's active one *)
     ; running : bool
     ; status : string option (** the outcome's, once finished *)
     }

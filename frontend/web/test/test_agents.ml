@@ -895,6 +895,7 @@ let%expect_test
       ; task
       ; name
       ; model = "m"
+      ; host = None
       ; status = Running
       ; started_at = H.now
       ; ended_at = None
@@ -924,5 +925,37 @@ let%expect_test
     "Count the files in src"                 Count files                false
     "Survey the project\nthen report"        Survey the project         false
     "Survey the project\nthen report"        Survey the project         false
+    |}]
+;;
+
+let%expect_test "a subagent on another tool host says which" =
+  let h = H.create () in
+  events
+    h
+    [ {|{"event":"agent_start"}|}
+    ; call ~id:"s1" ~name:"subagent" {|{"task":"Build it","host":"laptop"}|}
+    ; tool_start
+        ~id:"s1"
+        ~name:"subagent"
+        {|{"task":"Build it","host":"laptop"}|}
+    ; start ~host:"laptop" ~call:"s1" ~agent:"a1" "Build it"
+    ; in_a1 {|{"event":"agent_start"}|}
+    ; in_a1 {|{"event":"turn_start"}|}
+    ];
+  H.act h (Open_subagents None);
+  H.show h ~selector:".agents-row .row-meta";
+  H.act h (Open_subagents (Some "a1"));
+  H.text h ~selector:".agents-panel";
+  [%expect {|
+    (Rpc (method_ list_subagents) (params ()) (tag Subagents))
+    (Rpc (method_ list_subagents) (params ()) (tag Subagents))
+    (Rpc (method_ list_jobs) (params ()) (tag Jobs))
+    <span class="row-meta"> a1  on laptop  deepseek-flash  1 turn </span>
+    (All agents (Esc))
+    Subagent a1
+    (Close (Alt+0))
+    Starting…
+    Build it
+    (Steer) (Cancel) (Show in chat) Running 0s on laptop  deepseek-flash  1 turn
     |}]
 ;;

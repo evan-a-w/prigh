@@ -8,6 +8,9 @@ module Subagent : sig
     ; task : string
     ; name : string option
       (** a few words saying what it does; [None] from older backends *)
+    ; host : string option
+      (** the tool host it works on (its name), when not the session's
+        active one *)
     ; running : bool
     }
   [@@deriving sexp_of, equal]

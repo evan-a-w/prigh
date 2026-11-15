@@ -6,6 +6,7 @@ type t =
   ; path : string
   ; branch : string
   ; root : string
+  ; host : string option
   }
 [@@deriving sexp_of, equal]
 
@@ -15,6 +16,7 @@ let of_json j =
   let%bind task = Json.string_field j "task" in
   let%bind path = Json.string_field j "path" in
   let%bind branch = Json.string_field j "branch" in
-  let%map root = Json.string_field j "root" in
-  { agent; task; path; branch; root }
+  let%bind root = Json.string_field j "root" in
+  let%map host = Json.string_opt_field j "host" in
+  { agent; task; path; branch; root; host }
 ;;

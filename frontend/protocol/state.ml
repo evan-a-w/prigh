@@ -5,6 +5,7 @@ module Subagent = struct
     { id : string
     ; task : string
     ; name : string option
+    ; host : string option
     ; running : bool
     }
   [@@deriving sexp_of, equal]
@@ -14,8 +15,9 @@ module Subagent = struct
     let%bind id = Json.string_field j "id" in
     let%bind task = Json.string_field j "task" in
     let%bind name = Json.string_opt_field j "name" in
+    let%bind host = Json.string_opt_field j "host" in
     let%map running = Json.bool_field j "running" in
-    { id; task; name; running }
+    { id; task; name; host; running }
   ;;
 end
 

@@ -333,6 +333,8 @@ let state (s : Agent.State.t) =
                 ([ "id", str a.id; "task", str a.label ]
                  @ Option.value_map a.name ~default:[] ~f:(fun n ->
                    [ "name", str n ])
+                 @ Option.value_map a.host ~default:[] ~f:(fun h ->
+                   [ "host", str h ])
                  @ [ "running", bool a.running ]))) )
      ; ( "jobs"
        , `Array

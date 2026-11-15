@@ -10,6 +10,8 @@ type t =
   ; path : string
   ; branch : string
   ; root : string (** the repository's main checkout *)
+  ; host : string option
+    (** the tool host it is on (its name), when not the session's own *)
   }
 [@@deriving sexp_of, equal]
 

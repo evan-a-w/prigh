@@ -16,6 +16,7 @@ let started ?(height = 14) () =
        ; name = None
        ; model = "claude-haiku"
        ; tools = [ "bash" ]
+       ; host = None
        ; worktree = None
        ; forked = false
        ; continued = false

@@ -8,6 +8,9 @@ type t =
   ; task : string
   ; name : string option (** [None] from older backends *)
   ; model : string
+  ; host : string option
+    (** the tool host it works on (its name), when not the session's
+      active one *)
   ; turns : int
   ; result : Event.Subagent_result.t option (** [None] while it runs *)
   ; messages : Message.t list

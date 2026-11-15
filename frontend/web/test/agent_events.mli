@@ -17,6 +17,7 @@ val inner : call:string -> agent:string -> string -> string
 val start
   :  ?forked:bool
   -> ?continued:bool
+  -> ?host:string
   -> call:string
   -> agent:string
   -> string

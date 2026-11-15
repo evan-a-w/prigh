@@ -23,8 +23,12 @@ let laptop t =
   }
 ;;
 
+(* [subagent_status]'s elapsed time depends on the machine. *)
+let elapsed_re = Re.compile (Re.Perl.re "  [0-9]+s  ")
+
 let show t s =
   let s = Test_worktree.show t s in
+  let s = Re.replace_string elapsed_re ~by:"  <elapsed>  " s in
   match Sys.getenv "HOME" with
   | Some home when String.length home > 1 ->
     String.substr_replace_all s ~pattern:home ~with_:"$HOME"
@@ -376,5 +380,26 @@ let%expect_test "its worktree is made on its host" =
     - $DIR/laptop/trees/repo/fix-it  fix-it  clean
     [worktree: the work is on branch fix-it, checked out in $DIR/laptop/trees/repo/fix-it (a worktree of $DIR/laptop/repo) on the tool host laptop; review it there, then merge the branch or remove the worktree (the worktree tool with host laptop and action remove)]
     ()
+    |}]
+;;
+
+let%expect_test "subagent_status says which host it is on" =
+  with_agent
+    ~main:
+      [ call "subagent" {|{"task":"look","host":"laptop"}|}
+      ; call ~id:"st" "subagent_status" {|{}|}
+      ; Reply.text "started"
+      ; Reply.text "noted"
+      ]
+    [ "look", [ Reply.text "looked" ] ]
+  @@ fun _t agent ->
+  run agent ~prompt:"look around on the laptop";
+  [%expect {|
+    host-laptop runs $instructions in $DIR/laptop
+    subagent -> started agent a1 on laptop (look); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
+    subagent a1 starts on laptop
+    subagent_status -> a1  running, on laptop  <elapsed>  look  (last: waiting for the model)
+    subagent a1 ends: looked
+    [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
     |}]
 ;;
