@@ -141,7 +141,7 @@ let many_deltas n =
    it is not dropped for being behind, and it ends up with the whole
    message: as deltas covering every piece once, or (a frontend that does
    not take deltas) with each update carrying the whole message so far. *)
-let slow_peer_keeps_up ~deltas =
+let slow_peer_keeps_up ~takes_deltas =
   with_sandbox
   @@ fun t ->
   Eio.Switch.run
@@ -174,7 +174,7 @@ let slow_peer_keeps_up ~deltas =
     (sprintf
        {|{"id": 1, "method": "hello", "params": {"session": "%s"%s}}|}
        session
-       (if deltas then {|, "features": ["stream_deltas"]|} else ""));
+       (if takes_deltas then {|, "features": ["stream_deltas"]|} else ""));
   Conn.send watcher {|{"id": 2, "method": "prompt", "params": {"text": "go"}}|};
   print_endline (Conn.ok t watcher 2);
   let rec wait_for_the_run id =
@@ -273,10 +273,20 @@ let slow_peer_keeps_up ~deltas =
 ;;
 
 let%expect_test "a slow peer under a long streamed reply keeps up" =
-  slow_peer_keeps_up ~deltas:false;
-  [%expect {| |}];
-  slow_peer_keeps_up ~deltas:true;
-  [%expect {| |}]
+  slow_peer_keeps_up ~takes_deltas:false;
+  [%expect {|
+    ok
+    ((ended false) (updates 2) (text_length 10000) (text_is_the_reply true)
+     (thinking_length 2000) (last_partial_has_the_whole_text (true))
+     (pieces ((1 2000) (2001 12000))) (final_content (12057)))
+    |}];
+  slow_peer_keeps_up ~takes_deltas:true;
+  [%expect {|
+    ok
+    ((ended false) (updates 2) (text_length 10000) (text_is_the_reply true)
+     (thinking_length 2000) (last_partial_has_the_whole_text ())
+     (pieces ((1 2000) (2001 12000))) (final_content (12057)))
+    |}]
 ;;
 
 (* A frontend that attaches to the session while a reply streams (a second
@@ -376,7 +386,27 @@ let%expect_test "a peer joining mid-stream, or asking, gets the whole message" =
   Conn.close watcher;
   Conn.close joiner;
   Rpc_server.shutdown server;
-  [%expect {| |}]
+  [%expect {|
+    ok
+    ok
+    ok
+    watcher: seq 1 from - delta "0"
+    watcher: seq 2 from - delta "1"
+    watcher: seq 3 from - delta "2"
+    watcher: seq 4 from - delta "3"
+    watcher: seq 5 from - delta "4"
+    watcher: seq 6 from - delta "5"
+    watcher: seq 7 from - delta "6"
+    watcher: seq 8 from - delta "7"
+    watcher: seq 9 from - delta "8"
+    joiner: seq 3 from - delta "2" partial [{"type":"text","text":"012"}]
+    joiner: seq 4 from - delta "3"
+    joiner: seq 5 from - delta "4"
+    joiner: seq 6 from - delta "5" partial [{"type":"text","text":"012345"}]
+    joiner: seq 7 from - delta "6"
+    joiner: seq 8 from - delta "7"
+    joiner: seq 9 from - delta "8"
+    |}]
 ;;
 
 (* A laptop that went to sleep, a phone gone from the network behind a proxy

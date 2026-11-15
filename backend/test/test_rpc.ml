@@ -159,7 +159,14 @@ let%expect_test "prompt emits events, get_messages/get_entries reflect the run" 
   call t h ~params:{|{"text": "what is here?"}|} "prompt";
   call t h ~params:{|{"text": "again"}|} "prompt";
   Agent.wait_idle agent;
-  Queue.iter events ~f:(fun e -> print_endline (mask t (Json.to_string e)));
+  (* Stream ids are unique in the process: they depend on the tests before. *)
+  let stream_id = Re.compile (Re.Perl.re {|"stream":[0-9]+|}) in
+  Queue.iter events ~f:(fun e ->
+    print_endline
+      (Re.replace_string
+         stream_id
+         ~by:{|"stream":<n>|}
+         (mask t (Json.to_string e))));
   [%expect
     {|
     {"type":"response","id":"r1","ok":true,"result":{}}
@@ -170,9 +177,9 @@ let%expect_test "prompt emits events, get_messages/get_entries reflect the run" 
     {"type":"event","event":"message_end","message":{"role":"user","text":"[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\nwhat is here?","origin":{"body":"what is here?","notes":[{"kind":"client","title":"Using another client","text":"[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]"}]}}}
     {"type":"event","event":"turn_start"}
     {"type":"event","event":"message_start","message":{"role":"assistant","content":[],"stop_reason":{"type":"end_turn"},"usage":{"input":0,"output":0,"cache_read":0},"model":"deepseek-flash"}}
-    {"type":"event","event":"message_update","partial":{"role":"assistant","content":[{"type":"text","text":"Looking."}],"stop_reason":{"type":"end_turn"},"usage":{"input":0,"output":0,"cache_read":0},"model":"deepseek-flash"},"delta":{"type":"text_delta","text":"Looking."}}
-    {"type":"event","event":"message_update","partial":{"role":"assistant","content":[{"type":"text","text":"Looking."},{"type":"tool_call","id":"c1","name":"ls","arguments":""}],"stop_reason":{"type":"end_turn"},"usage":{"input":0,"output":0,"cache_read":0},"model":"deepseek-flash"},"delta":{"type":"tool_call_start","index":0,"id":"c1","name":"ls"}}
-    {"type":"event","event":"message_update","partial":{"role":"assistant","content":[{"type":"text","text":"Looking."},{"type":"tool_call","id":"c1","name":"ls","arguments":"{}"}],"stop_reason":{"type":"end_turn"},"usage":{"input":0,"output":0,"cache_read":0},"model":"deepseek-flash"},"delta":{"type":"tool_call_delta","index":0,"arguments":"{}"}}
+    {"type":"event","event":"message_update","stream":<n>,"seq":1,"delta":{"type":"text_delta","text":"Looking.","block":0}}
+    {"type":"event","event":"message_update","stream":<n>,"seq":2,"delta":{"type":"tool_call_start","index":0,"id":"c1","name":"ls","block":1}}
+    {"type":"event","event":"message_update","stream":<n>,"seq":3,"delta":{"type":"tool_call_delta","index":0,"arguments":"{}","block":1}}
     {"type":"event","event":"message_end","message":{"role":"assistant","content":[{"type":"text","text":"Looking."},{"type":"tool_call","id":"c1","name":"ls","arguments":"{}"}],"stop_reason":{"type":"tool_use"},"usage":{"input":20,"output":8,"cache_read":5},"model":"deepseek-flash"}}
     {"type":"event","event":"tool_start","call":{"id":"c1","name":"ls","arguments":"{}"}}
     {"type":"event","event":"tool_end","call":{"id":"c1","name":"ls","arguments":"{}"},"result":{"role":"tool_result","tool_call_id":"c1","tool_name":"ls","text":"sessions/\n","is_error":false}}
@@ -181,7 +188,7 @@ let%expect_test "prompt emits events, get_messages/get_entries reflect the run" 
     {"type":"event","event":"turn_end","assistant":{"role":"assistant","content":[{"type":"text","text":"Looking."},{"type":"tool_call","id":"c1","name":"ls","arguments":"{}"}],"stop_reason":{"type":"tool_use"},"usage":{"input":20,"output":8,"cache_read":5},"model":"deepseek-flash"},"tool_results":[{"role":"tool_result","tool_call_id":"c1","tool_name":"ls","text":"sessions/\n","is_error":false}]}
     {"type":"event","event":"turn_start"}
     {"type":"event","event":"message_start","message":{"role":"assistant","content":[],"stop_reason":{"type":"end_turn"},"usage":{"input":0,"output":0,"cache_read":0},"model":"deepseek-flash"}}
-    {"type":"event","event":"message_update","partial":{"role":"assistant","content":[{"type":"text","text":"Empty."}],"stop_reason":{"type":"end_turn"},"usage":{"input":0,"output":0,"cache_read":0},"model":"deepseek-flash"},"delta":{"type":"text_delta","text":"Empty."}}
+    {"type":"event","event":"message_update","stream":<n>,"seq":1,"delta":{"type":"text_delta","text":"Empty.","block":0}}
     {"type":"event","event":"message_end","message":{"role":"assistant","content":[{"type":"text","text":"Empty."}],"stop_reason":{"type":"end_turn"},"usage":{"input":10,"output":5,"cache_read":0},"model":"deepseek-flash"}}
     {"type":"event","event":"turn_end","assistant":{"role":"assistant","content":[{"type":"text","text":"Empty."}],"stop_reason":{"type":"end_turn"},"usage":{"input":10,"output":5,"cache_read":0},"model":"deepseek-flash"},"tool_results":[]}
     {"type":"event","event":"agent_end","messages":[{"role":"user","text":"[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\nwhat is here?","origin":{"body":"what is here?","notes":[{"kind":"client","title":"Using another client","text":"[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]"}]}},{"role":"assistant","content":[{"type":"text","text":"Looking."},{"type":"tool_call","id":"c1","name":"ls","arguments":"{}"}],"stop_reason":{"type":"tool_use"},"usage":{"input":20,"output":8,"cache_read":5},"model":"deepseek-flash"},{"role":"tool_result","tool_call_id":"c1","tool_name":"ls","text":"sessions/\n","is_error":false},{"role":"assistant","content":[{"type":"text","text":"Empty."}],"stop_reason":{"type":"end_turn"},"usage":{"input":10,"output":5,"cache_read":0},"model":"deepseek-flash"}]}

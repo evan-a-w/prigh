@@ -91,10 +91,10 @@ let%expect_test "anthropic: a search streams as a server tool between text" =
     {"type":"text","text":"Let me search."}
     {"type":"server_tool","id":"srvtoolu_1","name":"web_search","input":"{\"query\": \"ocaml eio\"}","output":"1. Eio docs — https://ocaml.org/p/eio (2 days ago)\n2. https://github.com/ocaml-multicore/eio — https://github.com/ocaml-multicore/eio","is_error":false}
     {"type":"text","text":"Eio is an effects-based IO library."}
-    {"type":"text_delta","text":"Let me search."}
-    {"type":"server_tool_use","id":"srvtoolu_1","name":"web_search","input":"{\"query\": \"ocaml eio\"}"}
-    {"type":"server_tool_result","id":"srvtoolu_1","output":"1. Eio docs — https://ocaml.org/p/eio (2 days ago)\n2. https://github.com/ocaml-multicore/eio — https://github.com/ocaml-multicore/eio","is_error":false}
-    {"type":"text_delta","text":"Eio is an effects-based IO library."}
+    {"type":"text_delta","text":"Let me search.","block":0}
+    {"type":"server_tool_use","id":"srvtoolu_1","name":"web_search","input":"{\"query\": \"ocaml eio\"}","block":1}
+    {"type":"server_tool_result","id":"srvtoolu_1","output":"1. Eio docs — https://ocaml.org/p/eio (2 days ago)\n2. https://github.com/ocaml-multicore/eio — https://github.com/ocaml-multicore/eio","is_error":false,"block":1}
+    {"type":"text_delta","text":"Eio is an effects-based IO library.","block":2}
     |}];
   (* Replayed to Anthropic as it came; to others as text. *)
   let body =
@@ -398,10 +398,10 @@ let%expect_test "a search in a session: streamed to clients, saved, reloaded" =
   [%expect
     {|
     {"type":"response","id":"r1","ok":true,"result":{}}
-    {"type":"text_delta","text":"Searching."}
-    {"type":"server_tool_use","id":"s1","name":"web_search","input":"{\"query\":\"eio\"}"}
-    {"type":"server_tool_result","id":"s1","output":"1. Eio — https://eio","is_error":false}
-    {"type":"text_delta","text":"Found."}
+    {"type":"text_delta","text":"Searching.","block":0}
+    {"type":"server_tool_use","id":"s1","name":"web_search","input":"{\"query\":\"eio\"}","block":1}
+    {"type":"server_tool_result","id":"s1","output":"1. Eio — https://eio","is_error":false,"block":1}
+    {"type":"text_delta","text":"Found.","block":2}
     ((Text Searching.)
      (Server_tool
       ((id s1) (name web_search) (input "{\"query\":\"eio\"}")
