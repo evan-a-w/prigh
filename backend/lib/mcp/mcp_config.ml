@@ -1,6 +1,33 @@
 open! Core
 open! Import
 
+module Oauth = struct
+  type t =
+    { client_id : string
+    ; client_secret : string option
+    ; scopes : string list option
+    }
+  [@@deriving sexp_of, compare]
+
+  let fingerprint = sexp_of_t
+
+  let sexp_of_t t =
+    sexp_of_t
+      { t with
+        client_secret = Option.map t.client_secret ~f:(Fn.const "<hidden>")
+      }
+  ;;
+
+  let to_json { client_id; client_secret; scopes } =
+    `Object
+      ([ "clientId", `String client_id ]
+       @ Option.value_map client_secret ~default:[] ~f:(fun s ->
+         [ "clientSecret", `String s ])
+       @ Option.value_map scopes ~default:[] ~f:(fun scopes ->
+         [ "scopes", `Array (List.map scopes ~f:(fun s -> `String s)) ]))
+  ;;
+end
+
 module Transport = struct
   type t =
     | Stdio of
@@ -11,11 +38,17 @@ module Transport = struct
     | Http of
         { url : string
         ; headers : (string * string) list
+        ; oauth : Oauth.t option [@sexp.option]
         }
   [@@deriving sexp_of, compare]
 
   (* Identifies the definition, secrets included: never shown. *)
-  let fingerprint = sexp_of_t
+  let fingerprint t =
+    match t with
+    | Stdio _ | Http { oauth = None; _ } -> sexp_of_t t
+    | Http { oauth = Some oauth; _ } ->
+      Sexp.List [ sexp_of_t t; Oauth.fingerprint oauth ]
+  ;;
 
   let sexp_of_t t =
     let hide = List.map ~f:(fun (k, _) -> k, "<hidden>") in
@@ -118,6 +151,39 @@ let field json name =
   | _ -> None
 ;;
 
+let oauth ~expand json ~what:_ =
+  let open Or_error.Let_syntax in
+  let string name =
+    match field json name with
+    | None -> Ok None
+    | Some (`String s) -> expand s >>| Option.some
+    | Some _ -> Or_error.errorf "oauth.%s must be a string" name
+  in
+  match json with
+  | `Object _ ->
+    let%bind client_id = string "clientId" in
+    let%bind client_secret = string "clientSecret" in
+    let%bind scopes =
+      match field json "scopes" with
+      | None -> Ok None
+      | Some (`String s) ->
+        Ok
+          (Some
+             (String.split s ~on:' ' |> List.filter ~f:(Fn.non String.is_empty)))
+      | Some v -> strings v ~what:"oauth.scopes" >>| Option.some
+    in
+    (match client_id with
+     | None | Some "" ->
+       Or_error.error_string
+         "\"oauth\" needs the \"clientId\" of the OAuth client registered for \
+          prigh"
+     | Some client_id -> Ok (Some { Oauth.client_id; client_secret; scopes }))
+  | _ ->
+    Or_error.error_string
+      "\"oauth\" must be an object: {\"clientId\": ..., \"clientSecret\"?: \
+       ..., \"scopes\"?: [...]}"
+;;
+
 let transport ~getenv json =
   let open Or_error.Let_syntax in
   let expand = expand ~getenv in
@@ -148,9 +214,10 @@ let transport ~getenv json =
     Transport.Stdio { command; args; env }
   | (None | Some ("http" | "streamable-http")), _, Some (`String url) ->
     let%bind headers = opt "headers" ~default:[] ~f:string_map in
+    let%bind oauth = opt "oauth" ~default:None ~f:(oauth ~expand) in
     let%bind url = expand url in
     let%map headers = expand_pairs headers |> Result.all in
-    Transport.Http { url; headers }
+    Transport.Http { url; headers; oauth }
   | Some "stdio", _, _ ->
     Or_error.error_string "give the \"command\" to run (a string)"
   | Some ("http" | "streamable-http"), _, _ ->

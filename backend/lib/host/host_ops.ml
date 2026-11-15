@@ -263,20 +263,23 @@ let is_mcp_op name =
     ~equal:String.equal
 ;;
 
-(* The servers from the user's settings go with every request: the host
+(* The servers from the user's settings, and the user's OAuth tokens for
+   HTTP servers (an object by server URL), go with every request: the host
    keeps none of them. *)
-let mcp_servers_args ~home ~settings ~reconnect =
+let mcp_servers_args ~home ~settings ~tokens ~reconnect =
   `Object
     [ "home", `String home
     ; ("reconnect", if reconnect then `True else `False)
     ; "settings", settings
+    ; "tokens", tokens
     ]
 ;;
 
-let mcp_call_args ~home ~settings ~source ~server ~tool arguments =
+let mcp_call_args ~home ~settings ~tokens ~source ~server ~tool arguments =
   `Object
     [ "home", `String home
     ; "settings", settings
+    ; "tokens", tokens
     ; "source", `String source
     ; "server", `String server
     ; "tool", `String tool
@@ -284,10 +287,11 @@ let mcp_call_args ~home ~settings ~source ~server ~tool arguments =
     ]
 ;;
 
-let mcp_approve_args ~home ~settings ~source ~server =
+let mcp_approve_args ~home ~settings ~tokens ~source ~server =
   `Object
     [ "home", `String home
     ; "settings", settings
+    ; "tokens", tokens
     ; "source", `String source
     ; "server", `String server
     ]
@@ -304,12 +308,20 @@ let mcp ~mcp ~cancel ~cwd ~name ~(arguments : Json.t) =
   let settings =
     Option.value (Json.member "settings" arguments) ~default:(`Object [])
   in
+  let tokens =
+    match Json.member "tokens" arguments with
+    | Some (`Object fields) ->
+      Some
+        (List.filter_map fields ~f:(fun (url, token) ->
+           Option.map (Json.string token) ~f:(fun token -> url, token)))
+    | _ -> None
+  in
   let listing ~reconnect =
     Tool.Result.ok
       (Json.to_string
          (Mcp_tools.Listing.to_json
             (Mcp_tools.Listing.of_hub
-               (Mcp_hub.servers mcp ~reconnect ~settings ~cwd ~home ()))))
+               (Mcp_hub.servers mcp ~reconnect ~settings ?tokens ~cwd ~home ()))))
   in
   let string key = Tool_args.string arguments key in
   if String.equal name mcp_servers_op
@@ -323,12 +335,14 @@ let mcp ~mcp ~cancel ~cwd ~name ~(arguments : Json.t) =
       mcp
       ~cancel
       ~settings
+      ?tokens
       ~source:(string "source")
       ~server:(string "server")
       ~home
       ~tool:(string "tool")
       ~arguments:
         (Option.value (Json.member "arguments" arguments) ~default:(`Object []))
+      ()
   else (
     match
       Or_error.bind

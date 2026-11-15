@@ -21,18 +21,24 @@ let listing =
         ; project = true
         ; status = Ready
         ; tools = [ tool ~read_only:true "read_file"; tool "write file" ]
+        ; url = None
+        ; oauth = None
         }
       ; { name = "gh"
         ; source = "/h/.prigh/mcp.json"
         ; project = false
         ; status = Failed "server exited (code 1): no token"
         ; tools = []
+        ; url = None
+        ; oauth = None
         }
       ; { name = "db"
         ; source = "/p/.mcp.json"
         ; project = true
         ; status = Needs_approval
         ; tools = []
+        ; url = None
+        ; oauth = None
         }
       ]
   ; problems =

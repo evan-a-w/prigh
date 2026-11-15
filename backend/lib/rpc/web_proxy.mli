@@ -11,8 +11,9 @@ open! Import
       ports);
     - the terminal WebSocket ([/terminal]) message by message to the
       remote's;
-    - file transfers ({!File_http}'s paths) are forwarded as they are,
-      under the remote's prefix and with its [Host].
+    - file transfers ({!File_http}'s paths) and MCP sign-ins' redirects
+      ({!Mcp_auth.callback_path}) are forwarded as they are, under the
+      remote's prefix and with its [Host].
 
     The page's credentials pass through: the remote checks them. [log]
     reports a remote that cannot be reached. *)

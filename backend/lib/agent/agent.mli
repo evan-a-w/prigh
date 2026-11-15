@@ -273,6 +273,7 @@ val create
        (** which of [tools] the model is given, asked again for every turn
            (the user's memory is offered while it is on); default: all *)
   -> ?mcp_settings:Mcp_settings.t
+  -> ?mcp_auth:Mcp_auth.t
        (** the MCP servers from the user's settings: sent to every host the
            session uses with its own; default: none *)
   -> ?user_info:User_info.t
@@ -356,6 +357,25 @@ val mcp_servers : ?reconnect:bool -> t -> Mcp_tools.Listing.t Or_error.t
     changed, and the session's tools follow (in the background; in chat
     mode, which uses no host, at the first turn after it). *)
 val mcp_settings_changed : t -> unit
+
+(** Whether the user is signed in to the HTTP MCP server at [url]. *)
+val mcp_signed_in : t -> url:string -> bool
+
+(** Starts signing in to the host's HTTP server [server] from [source]
+    ({!Mcp_auth.sign_in}): the URL to open. *)
+val mcp_sign_in
+  :  t
+  -> source:string
+  -> server:string
+  -> redirect_base:string option
+  -> string Or_error.t
+
+(** Signs out of it; the new listing. *)
+val mcp_sign_out
+  :  t
+  -> source:string
+  -> server:string
+  -> Mcp_tools.Listing.t Or_error.t
 
 (** Approves a project's MCP server on the host and starts it. *)
 val approve_mcp

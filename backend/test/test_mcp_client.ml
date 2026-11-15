@@ -7,7 +7,8 @@ module Json = Jsonaf
 let connect ~env ~sw ?timeout server =
   match Mcp_client.connect ~env ~sw ?timeout server with
   | Ok client -> client
-  | Error e -> raise_s [%message "connect failed" (e : Error.t)]
+  | Error e ->
+    raise_s [%message "connect failed" (e : Mcp_client.Connect_error.t)]
 ;;
 
 let print_tools ~dir client =
@@ -223,7 +224,7 @@ let print_connect_error ~env ~sw ~dir ?timeout server =
   | Ok client ->
     Mcp_client.close client;
     print_endline "connected"
-  | Error e -> print_endline (mask ~dir (Error.to_string_hum e))
+  | Error e -> print_endline (mask ~dir e.message)
 ;;
 
 let%expect_test "stdio: startup failures" =
@@ -349,7 +350,8 @@ let http_server ~url ~dir =
   ; source = Filename.concat dir ".mcp.json"
   ; project = false
   ; dir
-  ; transport = Http { url; headers = [ "Authorization", "Bearer secret" ] }
+  ; transport =
+      Http { url; headers = [ "Authorization", "Bearer secret" ]; oauth = None }
   ; approval = ""
   }
 ;;
@@ -418,12 +420,18 @@ let%expect_test "http: JSON and SSE replies, the session id, server requests" =
 let%expect_test "http: errors" =
   run
   @@ fun ~env ~sw ~dir ->
-  let print_error ~url e =
+  let print_error ~url (e : Mcp_client.Connect_error.t) =
     print_endline
-      (mask ~dir (Error.to_string_hum e)
+      (mask ~dir e.message
        |> String.substr_replace_all ~pattern:url ~with_:"$URL")
   in
-  let unauthorized = Server.start ~sw ~env ~handler:(mcp_handler ~status:401) in
+  let unauthorized =
+    Server.start ~sw ~env ~handler:(fun request ->
+      (* No OAuth metadata. *)
+      if String.is_prefix request.request_line ~prefix:"GET "
+      then Server.Reply.simple 404 ""
+      else mcp_handler ~status:401 request)
+  in
   let url = Server.url unauthorized "/mcp" in
   (match Mcp_client.connect ~env ~sw (http_server ~url ~dir) with
    | Ok _ -> print_endline "connected"
@@ -441,7 +449,8 @@ let%expect_test "http: errors" =
   let client = connect ~env ~sw (http_server ~url ~dir) in
   (match Mcp_client.tools client with
    | Ok _ -> print_endline "listed"
-   | Error e -> print_error ~url e);
+   | Error e ->
+     print_error ~url { message = Error.to_string_hum e; needs_sign_in = false });
   print_s [%sexp (Mcp_client.failure client : string option)];
   [%expect
     {|

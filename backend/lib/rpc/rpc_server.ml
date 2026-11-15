@@ -30,6 +30,8 @@ let methods =
   ; "list_skills"
   ; "list_mcp"
   ; "mcp_approve"
+  ; "mcp_signin"
+  ; "mcp_signout"
   ; "shell"
   ; "get_state"
   ; "get_messages"
@@ -430,6 +432,7 @@ type t =
   ; user_info : User_info.t option (** under [home] *)
   ; custom_instructions : Custom_instructions.t option (** under [home] *)
   ; mcp_settings : Mcp_settings.t option (** under [home] *)
+  ; mcp_auth : Mcp_auth.t option (** the user's MCP sign-ins *)
   ; now : unit -> float
   ; listed : Listed.t String.Table.t
     (** what [list_sessions] last showed of each live session *)
@@ -866,6 +869,12 @@ let user_info_changed (t : t) user_info =
     Hashtbl.iter t.clients ~f:(fun (c : Client.t) -> c.send json)
 ;;
 
+let mcp_listing_json agent listing =
+  Mcp_tools.Listing.to_rpc_json
+    ~signed_in:(fun url -> Agent.mcp_signed_in agent ~url)
+    listing
+;;
+
 let mcp_settings_json entries =
   [ "servers", `Array (List.map entries ~f:Mcp_settings.Entry.to_json) ]
 ;;
@@ -880,6 +889,16 @@ let mcp_settings_changed (t : t) mcp_settings =
           @ mcp_settings_json entries)
      in
      Hashtbl.iter t.clients ~f:(fun (c : Client.t) -> c.send json));
+  Hashtbl.iter t.agents ~f:Agent.mcp_settings_changed
+;;
+
+(* A sign-in came back or a token went: the hosts reconnect when the agents
+   list again, and clients ask for the list again. *)
+let mcp_auth_changed (t : t) =
+  let json =
+    `Object [ "type", `String "event"; "event", `String "mcp_auth_changed" ]
+  in
+  Hashtbl.iter t.clients ~f:(fun (c : Client.t) -> c.send json);
   Hashtbl.iter t.agents ~f:Agent.mcp_settings_changed
 ;;
 
@@ -900,6 +919,7 @@ let create
       ?user_info
       ?custom_instructions
       ?mcp_settings
+      ?mcp_auth
       ?transcription_http
       ?nix_store
       ~login
@@ -976,6 +996,7 @@ let create
         (match mcp_settings with
          | Some _ -> mcp_settings
          | None -> Option.map home ~f:(fun home -> Mcp_settings.create ~home))
+    ; mcp_auth
     ; now = (fun () -> Eio.Time.now (Eio.Stdenv.clock env))
     ; listed = String.Table.create ()
     ; on_session_deleted = []
@@ -1003,6 +1024,8 @@ let create
   Option.iter t.mcp_settings ~f:(fun mcp_settings ->
     Mcp_settings.subscribe mcp_settings ~f:(fun () ->
       mcp_settings_changed t mcp_settings));
+  Option.iter t.mcp_auth ~f:(fun auth ->
+    Mcp_auth.subscribe auth ~f:(fun () -> mcp_auth_changed t));
   Login_manager.subscribe login ~f:(fun event ->
     let json = Rpc_json.login_event event in
     match event with
@@ -3329,14 +3352,28 @@ let dispatch agent login ~(client : Client.t) ~meth ~params : Json.t Or_error.t 
       ~f:(fun reconnect ->
         Or_error.map
           (Agent.mcp_servers ~reconnect agent)
-          ~f:Mcp_tools.Listing.to_rpc_json)
+          ~f:(mcp_listing_json agent))
   | "mcp_approve" ->
     let open Or_error.Let_syntax in
     let%bind source = string_param params "source" in
     let%bind server = string_param params "server" in
     Or_error.map
       (Agent.approve_mcp agent ~source ~server)
-      ~f:Mcp_tools.Listing.to_rpc_json
+      ~f:(mcp_listing_json agent)
+  | "mcp_signin" ->
+    let open Or_error.Let_syntax in
+    let%bind source = string_param params "source" in
+    let%bind server = string_param params "server" in
+    let%bind redirect_base = string_param_opt params "redirect_base" in
+    let%map url = Agent.mcp_sign_in agent ~source ~server ~redirect_base in
+    `Object [ "url", `String url ]
+  | "mcp_signout" ->
+    let open Or_error.Let_syntax in
+    let%bind source = string_param params "source" in
+    let%bind server = string_param params "server" in
+    Or_error.map
+      (Agent.mcp_sign_out agent ~source ~server)
+      ~f:(mcp_listing_json agent)
   | "abort" ->
     let restored = Agent.abort_queued agent in
     ok

@@ -6,13 +6,20 @@ open! Import
     server is started the first time a session needs it and kept, keyed by
     {!Mcp_config.Server.key}, so editing its definition starts a new one;
     a failed start is remembered (not retried on every turn) until
-    [reconnect]. *)
+    [reconnect].
+
+    HTTP servers get the OAuth access tokens the backend sends with each
+    request ([~tokens], by server URL; {!Mcp_auth}): a server that wanted a
+    sign-in starts again once its token changes, and one whose token went
+    away (signed out) is restarted without it. *)
 
 module Status : sig
   type t =
     | Ready of Mcp_client.Tool.t list
     | Failed of string
     | Needs_approval
+    | Needs_sign_in of string
+    (** an HTTP server that advertises OAuth answered 401 *)
   [@@deriving sexp_of]
 end
 
@@ -39,6 +46,7 @@ val servers
   :  t
   -> ?reconnect:bool
   -> ?settings:Json.t
+  -> ?tokens:(string * string) list
   -> cwd:string
   -> home:string
   -> unit
@@ -50,11 +58,13 @@ val call
   :  t
   -> cancel:Cancellation.t
   -> settings:Json.t (** the servers from the settings *)
+  -> ?tokens:(string * string) list
   -> source:string
   -> server:string
   -> home:string
   -> tool:string
   -> arguments:Json.t
+  -> unit
   -> Tool_result.t
 
 (** Stops every server. *)
