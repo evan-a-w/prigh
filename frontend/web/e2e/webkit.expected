@@ -3414,7 +3414,7 @@ caches: prigh-web-<BUILD>
 cached the shell: true
   index.html: true
   main.bc.js: true
-  theme.css: true
+  app.css: true
   recursive-sans.woff2: true
   katex.min.js: true
   KaTeX_Main-Regular.woff2: true

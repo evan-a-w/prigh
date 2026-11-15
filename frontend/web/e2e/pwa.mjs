@@ -172,8 +172,10 @@ try {
   console.log(`caches: ${cached.map(c => c.name.replace(first, "<BUILD>")).join(", ")}`);
   const expected = shell.map(name => `/${name}`).sort();
   console.log(`cached the shell: ${JSON.stringify(cached[0].paths) === JSON.stringify(expected)}`);
-  for (const name of ["index.html", "main.bc.js", "theme.css", "recursive-sans.woff2", "katex.min.js", "KaTeX_Main-Regular.woff2", "xterm.js", "icon-192.png", "manifest.webmanifest"])
-    console.log(`  ${name}: ${cached[0].paths.includes(`/${name}`)}`);
+  // The names the page asks for: NAME?v=VERSION for the versioned ones.
+  const asked = name => shell.find(n => n.split("?")[0] === name) ?? name;
+  for (const name of ["index.html", "main.bc.js", "app.css", "recursive-sans.woff2", "katex.min.js", "KaTeX_Main-Regular.woff2", "xterm.js", "icon-192.png", "manifest.webmanifest"])
+    console.log(`  ${name}: ${cached[0].paths.includes(`/${asked(name)}`)}`);
 
   // The title bar follows the theme.
   const themeColor = () => page.evaluate(() =>
@@ -214,7 +216,7 @@ try {
   console.log(`composer: ${await composer().count()}`);
   console.log(`file download: ${await request("files/download?ticket=nope")}`);
   console.log(`sign-in link: ${await request("signin-handoff", { method: "POST", body: "nope" })}`);
-  console.log(`main.bc.js: ${await request("main.bc.js")}`);
+  console.log(`main.bc.js: ${await request(asked("main.bc.js"))}`);
   await screenshot("offline");
 
   // 5. Back, with a new build deployed: its worker installs, waits, and the
