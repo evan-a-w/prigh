@@ -315,6 +315,7 @@ let%expect_test
         }
       },
       "approval_mode": "ask",
+      "default_chat_mode": false,
       "default_model": null,
       "default_thinking": null,
       "fallback_models": [],

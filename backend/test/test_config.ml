@@ -11,7 +11,7 @@ let%expect_test "a missing file yields the default" =
   [%expect
     {|
     (Ok
-     ((scoped_models ()) (approval_mode Auto)
+     ((scoped_models ()) (approval_mode Auto) (default_chat_mode false)
       (permissions ((allow ()) (ask ()) (deny ()))) (default_model ())
       (default_thinking ()) (fallback_models ()) (default_cwd ())
       (default_host ()) (worktrees_dir ~/.prigh/worktrees) (max_budget_usd ())
@@ -31,6 +31,7 @@ let%expect_test "save then load round trips" =
   let config =
     { Config.scoped_models = [ "anthropic/claude-fable-5"; "deepseek-v4-pro" ]
     ; approval_mode = Ask
+    ; default_chat_mode = true
     ; permissions = Approval.Rules.empty
     ; default_model = Some "anthropic/claude-fable-5"
     ; default_thinking = Some (On (Some High))
@@ -72,6 +73,7 @@ let%expect_test "save then load round trips" =
         "deepseek-v4-pro"
       ],
       "approval_mode": "ask",
+      "default_chat_mode": true,
       "default_model": "anthropic/claude-fable-5",
       "default_thinking": "high",
       "fallback_models": [],
@@ -105,7 +107,8 @@ let%expect_test "save then load round trips" =
     }
     (Ok
      ((scoped_models (anthropic/claude-fable-5 deepseek-v4-pro))
-      (approval_mode Ask) (permissions ((allow ()) (ask ()) (deny ())))
+      (approval_mode Ask) (default_chat_mode true)
+      (permissions ((allow ()) (ask ()) (deny ())))
       (default_model (anthropic/claude-fable-5)) (default_thinking ((On (High))))
       (fallback_models ()) (default_cwd ()) (default_host ())
       (worktrees_dir ~/work/trees) (max_budget_usd ())
@@ -135,7 +138,7 @@ let%expect_test "unknown fields are ignored" =
   [%expect
     {|
     (Ok
-     ((scoped_models (x)) (approval_mode Ask)
+     ((scoped_models (x)) (approval_mode Ask) (default_chat_mode false)
       (permissions ((allow ()) (ask ()) (deny ()))) (default_model ())
       (default_thinking ()) (fallback_models ()) (default_cwd ())
       (default_host ()) (worktrees_dir ~/.prigh/worktrees) (max_budget_usd ())
@@ -170,6 +173,8 @@ let%expect_test "malformed JSON and wrong types are errors" =
   print_s [%sexp (Config.load ~home:t.dir : Config.t Or_error.t)];
   write t ".prigh/config.json" {|{"dictation_model": 1}|};
   print_s [%sexp (Config.load ~home:t.dir : Config.t Or_error.t)];
+  write t ".prigh/config.json" {|{"default_chat_mode": "yes"}|};
+  print_s [%sexp (Config.load ~home:t.dir : Config.t Or_error.t)];
   [%expect
     {|
     (Error
@@ -183,6 +188,8 @@ let%expect_test "malformed JSON and wrong types are errors" =
     (Error "config.default_thinking must be a string")
     (Error
      "config.dictation_model must be a model's provider/id (or null: openai/gpt-4o-mini-transcribe)")
+    (Error
+     "config.default_chat_mode must be a boolean (true: new sessions start in chat mode)")
     |}]
 ;;
 
@@ -203,7 +210,7 @@ let%expect_test
     {|
     config.confirm_tools must be a boolean (in $DIR/.prigh/config.json); prigh ignores the file's settings until it is fixed
     unknown setting "providrs" in $DIR/.prigh/config.json is ignored; did you mean "providers"?
-    unknown setting "colour" in $DIR/.prigh/config.json is ignored (known: providers, forges, confirm_tools, scoped_models, approval_mode, permissions, default_model, default_thinking, fallback_models, default_cwd, default_host, worktrees_dir, max_budget_usd, goal_max_continuations, resume_on_limit_reset, ask_user_timeout_seconds, archive_after_days, notify, snippets, auto_background_seconds, generate_model, mask_observations, computer_screenshots, computer_screenshots_max, computer_native, compact_at_tokens, compaction_model, naming_model, approval_model, dictation_model, trace)
+    unknown setting "colour" in $DIR/.prigh/config.json is ignored (known: providers, forges, confirm_tools, scoped_models, approval_mode, default_chat_mode, permissions, default_model, default_thinking, fallback_models, default_cwd, default_host, worktrees_dir, max_budget_usd, goal_max_continuations, resume_on_limit_reset, ask_user_timeout_seconds, archive_after_days, notify, snippets, auto_background_seconds, generate_model, mask_observations, computer_screenshots, computer_screenshots_max, computer_native, compact_at_tokens, compaction_model, naming_model, approval_model, dictation_model, trace)
     |}];
   show {|{"archive_after_days": "a week"}|};
   show {|{"archive_after_days": -1}|};
@@ -234,7 +241,7 @@ let%expect_test "null defaults are unset" =
   [%expect
     {|
     (Ok
-     ((scoped_models ()) (approval_mode Auto)
+     ((scoped_models ()) (approval_mode Auto) (default_chat_mode false)
       (permissions ((allow ()) (ask ()) (deny ()))) (default_model ())
       (default_thinking ()) (fallback_models ()) (default_cwd ())
       (default_host ()) (worktrees_dir ~/.prigh/worktrees) (max_budget_usd ())
@@ -246,7 +253,7 @@ let%expect_test "null defaults are unset" =
       (compact_at_tokens 200000) (compaction_model ()) (naming_model ())
       (approval_model ()) (dictation_model ()) (trace Default)))
     (Ok
-     ((scoped_models ()) (approval_mode Auto)
+     ((scoped_models ()) (approval_mode Auto) (default_chat_mode false)
       (permissions ((allow ()) (ask ()) (deny ())))
       (default_model (deepseek/deepseek-flash)) (default_thinking ((On ())))
       (fallback_models ()) (default_cwd ()) (default_host ())
@@ -305,13 +312,13 @@ let%expect_test "a leftover reminders setting says where reminders went" =
     {|
     "reminders" in $DIR/.prigh/config.json is ignored: reminders are per session now; /remind adds one
     Off
-    (reminders notify scoped_models approval_mode default_model default_thinking
-     fallback_models default_cwd default_host worktrees_dir max_budget_usd
-     goal_max_continuations resume_on_limit_reset ask_user_timeout_seconds
-     archive_after_days snippets auto_background_seconds generate_model
-     mask_observations computer_screenshots computer_screenshots_max
-     computer_native compact_at_tokens compaction_model naming_model
-     approval_model dictation_model trace)
+    (reminders notify scoped_models approval_mode default_chat_mode default_model
+     default_thinking fallback_models default_cwd default_host worktrees_dir
+     max_budget_usd goal_max_continuations resume_on_limit_reset
+     ask_user_timeout_seconds archive_after_days snippets auto_background_seconds
+     generate_model mask_observations computer_screenshots
+     computer_screenshots_max computer_native compact_at_tokens compaction_model
+     naming_model approval_model dictation_model trace)
     |}]
 ;;
 

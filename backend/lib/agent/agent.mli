@@ -516,8 +516,9 @@ val set_thinking : t -> Thinking.t -> unit Or_error.t
 val config : t -> Config.t
 
 (** Writes the configuration and emits [Event.Config_changed]. A changed
-    [approval_mode] also switches this session's mode, unless
-    [~session_mode:false] (only the default for new sessions). A changed
+    [approval_mode] or [default_chat_mode] also puts this session in that
+    mode (chat or not, over that approval mode), unless [~session_mode:false]
+    (only the default for new sessions). A changed
     [default_host] is a connected host's id or name, stored as its id. *)
 val set_config : ?session_mode:bool -> t -> Config.t -> unit Or_error.t
 
@@ -602,6 +603,13 @@ val set_mode
     no tool host is connected, so that it can be used at once; leaving chat
     mode, also once a host connects, is the user's choice. *)
 val chat_without_host : t -> unit
+
+(** Puts a session made just now (not from disk, no messages, no mode chosen)
+    in chat mode when the config's [default_chat_mode] says so, over the
+    approval mode it started in. A session [create] makes itself and
+    [new_session]'s already start so; [Rpc_server] calls it for the sessions
+    it makes. *)
+val start_in_default_mode : t -> unit
 
 (** Answers a pending [ask_user] call ([Answered], one list per question, or
     [Declined]). Unanswered, it times out at its deadline: the model gets
