@@ -149,7 +149,7 @@ let%expect_test "typing ranks the settings, their values, sessions and commands"
     Set verbos ity
     normal Ctrl+O
     Verbos ity: Quiet
-    tool calls without their output; no thinking
+    each run of steps folded into one line
     Verbos ity: Normal
     current
     Verbos ity: Verbose
@@ -242,7 +242,7 @@ let%expect_test
     Dialog_accept
     (Focus control-input)
     (Verbosity) [] (Close (Esc))
-    Quiet tool calls without their output; no thinking
+    Quiet each run of steps folded into one line
     Normal tool output and thinking folded
     current
     Verbose everything unfolded
@@ -283,7 +283,7 @@ let%expect_test
     Set verbos ity
     normal Ctrl+O
     Verbos ity: Quiet
-    tool calls without their output; no thinking
+    each run of steps folded into one line
     Verbos ity: Normal
     current
     Verbos ity: Verbose
