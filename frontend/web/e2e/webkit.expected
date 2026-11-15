@@ -3458,11 +3458,12 @@ High
 Xhigh
 Max
 Mode
-What asks before it runs: everything (Ask), all but file edits (Auto-edit), what the approval model leaves to you (Smart) or nothing (Auto).
+What asks before it runs: everything (Ask), all but file edits (Auto-edit), what the approval model leaves to you (Smart) or nothing (Auto); or a chat without the tool host (Chat).
 Ask
 Auto-edit
 Smart
 Auto
+Chat
 Tool host
 New sessions you start here run their tools where the session you are on does.
 Where you are
@@ -3497,11 +3498,12 @@ High
 Xhigh
 Max
 Mode
-What asks before it runs: everything (Ask), all but file edits (Auto-edit), what the approval model leaves to you (Smart) or nothing (Auto).
+What asks before it runs: everything (Ask), all but file edits (Auto-edit), what the approval model leaves to you (Smart) or nothing (Auto); or a chat without the tool host (Chat).
 Ask
 Auto-edit
 Smart
 Auto
+Chat
 Tool host
 New sessions you start here run their tools on laptop, while it is connected.
 laptop
@@ -3517,7 +3519,7 @@ Add
 Budget
 Sessions without their own /budget start no turn once they have cost this much, open ones too.
 USD
-default_model="anthropic/claude-fable-5" default_thinking="high" approval_mode="ask" default_host="host-laptop" default_cwd="~/proj" fallback_models=["deepseek/deepseek-flash"] max_budget_usd=2.5
+default_model="anthropic/claude-fable-5" default_thinking="high" approval_mode="ask" default_chat_mode=false default_host="host-laptop" default_cwd="~/proj" fallback_models=["deepseek/deepseek-flash"] max_budget_usd=2.5
 === webkit: new sessions: the other browser ===
 New sessions
 What a new session starts with. A change applies from the next new session: open ones keep theirs. Kept on the backend.
@@ -3538,11 +3540,12 @@ High
 Xhigh
 Max
 Mode
-What asks before it runs: everything (Ask), all but file edits (Auto-edit), what the approval model leaves to you (Smart) or nothing (Auto).
+What asks before it runs: everything (Ask), all but file edits (Auto-edit), what the approval model leaves to you (Smart) or nothing (Auto); or a chat without the tool host (Chat).
 Ask
 Auto-edit
 Smart
 Auto
+Chat
 Tool host
 New sessions you start here run their tools on laptop, while it is connected.
 laptop
@@ -3575,6 +3578,25 @@ mode: Bash, job_input, edits and MCP tools ask first (Alt+M cycles, /mode picks)
 host: Tools run on laptop, in <dir>/laptop-home/proj (/host switches)
 Budget $2.50, $0.00 spent: /budget DOLLARS changes it, /budget off removes it
 Fallback: deepseek/deepseek-flash (now on anthropic/claude-fable-5)
+=== webkit: new sessions: chat by default ===
+Mode
+New sessions are chats without the tool host; leaving one gives Ask mode. Choose another mode to start in it.
+Ask
+Auto-edit
+Smart
+Auto
+Chat
+default_model="anthropic/claude-fable-5" default_thinking="high" approval_mode="ask" default_chat_mode=true default_host="host-laptop" default_cwd="~/proj" fallback_models=["deepseek/deepseek-flash"] max_budget_usd=2.5
+=== webkit: new sessions: a new session, a chat ===
+model: Claude Fable 5: switch model (Ctrl+L)
+thinking: Thinking: high: how much the model reasons before it answers (Alt+T cycles, /thinking)
+mode: A chat without the tool host: no files, commands or project, only the web and other host-free tools, until you leave it (/chat off or Alt+M) (Alt+M cycles, /mode picks)
+host: Chat mode uses no tool host (/chat off or Alt+M to work on one)
+=== webkit: new sessions: leaving the chat ===
+model: Claude Fable 5: switch model (Ctrl+L)
+thinking: Thinking: high: how much the model reasons before it answers (Alt+T cycles, /thinking)
+mode: Bash, job_input, edits and MCP tools ask first (Alt+M cycles, /mode picks)
+host: Tools run on laptop, in <dir>/laptop-home/proj (/host switches)
 === webkit: new sessions: phone 390x844 ===
 fits: yes; targets: all ok
 after the picker: back on the settings
@@ -3603,11 +3625,12 @@ High
 Xhigh
 Max
 Mode
-What asks before it runs: everything (Ask), all but file edits (Auto-edit), what the approval model leaves to you (Smart) or nothing (Auto).
+What asks before it runs: everything (Ask), all but file edits (Auto-edit), what the approval model leaves to you (Smart) or nothing (Auto); or a chat without the tool host (Chat).
 Ask
 Auto-edit
 Smart
 Auto
+Chat
 Tool host
 New sessions you start here run their tools where the session you are on does.
 Where you are
@@ -3622,7 +3645,7 @@ Add
 Budget
 Sessions without their own /budget start no turn once they have cost this much, open ones too.
 Off: no limit.
-default_model=null default_thinking=null approval_mode="auto" default_host=null default_cwd=null fallback_models=[] max_budget_usd=null
+default_model=null default_thinking=null approval_mode="auto" default_chat_mode=false default_host=null default_cwd=null fallback_models=[] max_budget_usd=null
 === webkit: new sessions: errors ===
 (none)
 === webkit: memory: notes ===

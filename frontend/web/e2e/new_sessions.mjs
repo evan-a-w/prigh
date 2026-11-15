@@ -268,6 +268,7 @@ try {
   console.log(normalise(await chips(page)));
   await run(page, "/chat off");
   await page.locator(".host-chip:not(.chatting) .chip-label", { hasText: laptopName }).waitFor();
+  await page.waitForFunction(() => !/Switching/.test(document.querySelector(".mode-chip")?.getAttribute("title") ?? "Switching"));
   section("leaving the chat");
   console.log(normalise(await chips(page)));
 
