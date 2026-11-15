@@ -79,7 +79,9 @@ let%expect_test
     |}]
 ;;
 
-let%expect_test "a reply to an older search is ignored; Esc closes the control centre" =
+let%expect_test
+    "a reply to an older search is ignored; Esc closes the control centre"
+  =
   let h = H.create ~sessions () in
   H.quiet h (fun () -> H.act h Open_control);
   H.act h (Control_query "port");
@@ -159,11 +161,8 @@ let%expect_test
     H.reply h "list_sessions" sessions;
     H.act h (Tick H.now));
   H.reply h "search_sessions" (hits ~query:"port config");
-  print_s
-    [%sexp
-      (Option.is_some (H.model h).dialog : bool)];
+  print_s [%sexp (Option.is_some (H.model h).dialog : bool)];
   H.show h ~selector:"#control-input";
   H.text h ~selector:".control-list";
-  [%expect
-    {| false |}]
+  [%expect {| false |}]
 ;;

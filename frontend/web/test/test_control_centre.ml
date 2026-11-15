@@ -26,8 +26,9 @@ let sessions =
 
 let palette h = H.text h ~selector:"#control-centre"
 
-let%expect_test "Ctrl+K opens the control centre: the session's settings, \
-                 recent sessions, a few commands"
+let%expect_test
+    "Ctrl+K opens the control centre: the session's settings, recent sessions, \
+     a few commands"
   =
   let h = H.create ~sessions () in
   H.key h "k" ~ctrl:true;
@@ -69,7 +70,8 @@ let%expect_test "Ctrl+K opens the control centre: the session's settings, \
     ↑↓ move ↵ open ⌫ back esc close
     |}];
   H.show h ~selector:".control-input-row";
-  [%expect {|
+  [%expect
+    {|
     <div class="control-input-row">
       <icon class="search"> </icon>
       <Vdom.Node.none-widget> </Vdom.Node.none-widget>
@@ -97,7 +99,8 @@ let%expect_test "Ctrl+K opens the control centre: the session's settings, \
     |}];
   (* Again: closed. *)
   H.key h "k" ~ctrl:true ~target:Field;
-  [%expect {|
+  [%expect
+    {|
     Close_dialog
     (Focus editor)
     |}];
@@ -117,7 +120,8 @@ let%expect_test "the sidebar's Search opens it; Esc closes it, nothing changed" 
       ""
         ~dialog:(Option.is_some (H.model h).dialog : bool)
         ~verbosity:(Prigh_ui.Verbosity.name (H.model h).verbosity)];
-  [%expect {|
+  [%expect
+    {|
     Open_control
     (Focus control-input)
     (Control_query verbos)
@@ -128,13 +132,15 @@ let%expect_test "the sidebar's Search opens it; Esc closes it, nothing changed" 
     |}]
 ;;
 
-let%expect_test "typing ranks the settings, their values, sessions and commands" =
+let%expect_test "typing ranks the settings, their values, sessions and commands"
+  =
   let h = H.create ~sessions () in
   H.act h Open_control;
   H.input h ~selector:"#control-input" "verbos";
   palette h;
   H.show h ~selector:".control-row.selected";
-  [%expect {|
+  [%expect
+    {|
     (Focus control-input)
     (Control_query verbos)
     (Search_sessions_later (search 1) (after_ms 150))
@@ -172,7 +178,8 @@ let%expect_test "typing ranks the settings, their values, sessions and commands"
     |}];
   H.input h ~selector:"#control-input" "default mode";
   palette h;
-  [%expect {|
+  [%expect
+    {|
     (Control_query "default mode")
     (Search_sessions_later (search 2) (after_ms 150))
     [default mode] (Close (Esc))
@@ -202,7 +209,8 @@ let%expect_test "a value applies in one step" =
       ""
         ~dialog:(Option.is_some (H.model h).dialog : bool)
         ~verbosity:(Prigh_ui.Verbosity.name (H.model h).verbosity)];
-  [%expect {|
+  [%expect
+    {|
     (Focus control-input)
     (Control_query "verbosity verbose")
     (Search_sessions_later (search 1) (after_ms 150))
@@ -216,8 +224,9 @@ let%expect_test "a value applies in one step" =
     |}]
 ;;
 
-let%expect_test "Enter on a setting opens its values; ⌫ in the empty filter \
-                 goes back; Enter sets one and closes"
+let%expect_test
+    "Enter on a setting opens its values; ⌫ in the empty filter goes back; \
+     Enter sets one and closes"
   =
   let h = H.create ~sessions () in
   H.act h Open_control;
@@ -225,7 +234,8 @@ let%expect_test "Enter on a setting opens its values; ⌫ in the empty filter \
   H.key h "Enter" ~target:Field;
   palette h;
   H.show h ~selector:".control-input-row";
-  [%expect {|
+  [%expect
+    {|
     (Focus control-input)
     (Control_query verbos)
     (Search_sessions_later (search 1) (after_ms 150))
@@ -264,7 +274,8 @@ let%expect_test "Enter on a setting opens its values; ⌫ in the empty filter \
     |}];
   H.key h "Backspace" ~target:Field;
   palette h;
-  [%expect {|
+  [%expect
+    {|
     Control_back
     (Focus control-input)
     [verbos] (Close (Esc))
@@ -292,7 +303,8 @@ let%expect_test "Enter on a setting opens its values; ⌫ in the empty filter \
       ""
         ~dialog:(Option.is_some (H.model h).dialog : bool)
         ~verbosity:(Prigh_ui.Verbosity.name (H.model h).verbosity)];
-  [%expect {|
+  [%expect
+    {|
     Dialog_accept
     (Focus control-input)
     (Dialog_move 1)
@@ -327,7 +339,8 @@ let%expect_test "a setting's values filter; a click sets one" =
   H.input h ~selector:"#control-input" "hi";
   palette h;
   H.click h ~selector:".control-row";
-  [%expect {|
+  [%expect
+    {|
     (Focus control-input)
     (Control_query "set thinking")
     (Search_sessions_later (search 1) (after_ms 150))
@@ -352,7 +365,8 @@ let%expect_test "the session's mode and a default through it" =
   H.input h ~selector:"#control-input" "set mode";
   H.key h "Enter" ~target:Field;
   palette h;
-  [%expect {|
+  [%expect
+    {|
     (Focus control-input)
     (Control_query "set mode")
     (Search_sessions_later (search 1) (after_ms 150))
@@ -373,7 +387,8 @@ let%expect_test "the session's mode and a default through it" =
   H.input h ~selector:"#control-input" "new sessions' mode: auto";
   palette h;
   H.key h "Enter" ~target:Field;
-  [%expect {|
+  [%expect
+    {|
     Close_dialog
     (Focus editor)
     (Focus control-input)
@@ -404,9 +419,14 @@ let%expect_test "a setting kept on the settings page opens it there" =
   print_s
     [%message
       ""
-        ~dialog:(Option.map (H.model h).dialog ~f:(fun d -> Sexp.to_string_hum ([%sexp_of: Dialog.t] d) |> Fn.flip String.prefix 40) : string option)
+        ~dialog:
+          (Option.map (H.model h).dialog ~f:(fun d ->
+             Sexp.to_string_hum ([%sexp_of: Dialog.t] d)
+             |> Fn.flip String.prefix 40)
+           : string option)
         ~section:((H.model h).settings_section : Settings_section.t)];
-  [%expect {|
+  [%expect
+    {|
     (Focus control-input)
     (Control_query "archive after")
     (Search_sessions_later (search 1) (after_ms 150))
@@ -416,15 +436,17 @@ let%expect_test "a setting kept on the settings page opens it there" =
     |}]
 ;;
 
-let%expect_test "sessions: titles at once, the messages once the typing \
-                 pauses; Enter switches"
+let%expect_test
+    "sessions: titles at once, the messages once the typing pauses; Enter \
+     switches"
   =
   let h = H.create ~sessions () in
   H.act h Open_control;
   H.input h ~selector:"#control-input" "port";
   H.input h ~selector:"#control-input" "port config";
   H.text h ~selector:".control-list";
-  [%expect {|
+  [%expect
+    {|
     (Focus control-input)
     (Control_query port)
     (Search_sessions_later (search 1) (after_ms 150))
@@ -446,7 +468,8 @@ let%expect_test "sessions: titles at once, the messages once the typing \
       {"id":"s1","path":"/sessions/s1.jsonl","score":30,"snippet":null}]}|};
   H.text h ~selector:".control-list";
   H.show h ~selector:".control-snippet";
-  [%expect {|
+  [%expect
+    {|
     (Rpc (method_ search_sessions) (params ((query "port config") (limit 50)))
      (tag (Session_hits 2)))
     Sessions
@@ -466,7 +489,8 @@ let%expect_test "sessions: titles at once, the messages once the typing \
     |}];
   H.key h "ArrowDown" ~target:Field;
   H.key h "Enter" ~target:Field;
-  [%expect {|
+  [%expect
+    {|
     (Dialog_move 1)
     Dialog_accept
     (Focus editor)
@@ -484,7 +508,8 @@ let%expect_test "nothing found says what to do; a command runs" =
   H.act h Open_control;
   H.input h ~selector:"#control-input" "zzzz";
   palette h;
-  [%expect {|
+  [%expect
+    {|
     (Focus control-input)
     (Control_query zzzz)
     (Search_sessions_later (search 1) (after_ms 150))
@@ -494,7 +519,8 @@ let%expect_test "nothing found says what to do; a command runs" =
     |}];
   H.input h ~selector:"#control-input" "/hotkeys";
   H.key h "Enter" ~target:Field;
-  [%expect {|
+  [%expect
+    {|
     (Control_query /hotkeys)
     (Search_sessions_later (search 2) (after_ms 150))
     Dialog_accept
@@ -507,7 +533,8 @@ let%expect_test "nothing found says what to do; a command runs" =
   palette h;
   H.key h "Enter" ~target:Field;
   print_s [%sexp ((H.model h).draft : string)];
-  [%expect {|
+  [%expect
+    {|
     (Focus editor)
     (Focus control-input)
     (Control_query rename)
@@ -532,7 +559,8 @@ let%expect_test "switching sessions resets it" =
   print_s [%sexp (Option.is_some (H.model h).dialog : bool)];
   H.act h Open_control;
   palette h;
-  [%expect {|
+  [%expect
+    {|
     (Focus control-input)
     (Control_query release)
     (Search_sessions_later (search 1) (after_ms 150))
@@ -583,7 +611,15 @@ let%expect_test "switching sessions resets it" =
 (* Every row of the settings page is in the control centre's table. *)
 let%expect_test "each setting has an entry" =
   let h = H.create ~sessions () in
-  H.act h (Hello { client_id = "c1"; namespace = None; user = None; superuser = true; features = [] });
+  H.act
+    h
+    (Hello
+       { client_id = "c1"
+       ; namespace = None
+       ; user = None
+       ; superuser = true
+       ; features = []
+       });
   let covered =
     List.filter_map Control_setting.all ~f:Control_setting.page
     |> List.map ~f:(fun (section, name) -> Settings_section.name section, name)
@@ -605,13 +641,15 @@ let%expect_test "each setting has an entry" =
   [%expect {| () |}]
 ;;
 
-let%expect_test "the composer's row: the model, host, thinking and mode chips, \
-                 no verbosity, no divider"
+let%expect_test
+    "the composer's row: the model, host, thinking and mode chips, no \
+     verbosity, no divider"
   =
   let h = H.create ~sessions () in
   H.names ~selector:".composer-row button" h;
   H.elements ~selector:".row-chips > *" h;
-  [%expect {|
+  [%expect
+    {|
     button "Add files or images" -- Add files or images (or paste, or drop them here)
     button "Claude Opus 5.5" -- Claude Opus 5.5: switch model (Ctrl+L)
     button "backend" -- Tools run on the backend (/host switches)

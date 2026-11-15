@@ -677,19 +677,19 @@ let view (m : App.Model.t) ~inject =
     ; div
         ~cls:"sidebar-actions"
         [ (match m.pending.session with
-       | Some Starting ->
-         button
-           ~cls:"new-session opening"
-           ~title:"Starting a session…"
-           ~disabled:true
-           ~on_click:Effect.Ignore
-           [ lamp (); Node.text "Starting…" ]
-       | Some (Switching _) | None ->
-         button
-           ~cls:"new-session"
-           ~title:"Start a new session (/new)"
-           ~on_click:(inject Action.New_session)
-           [ icon Plus; Node.text "New session" ])
+           | Some Starting ->
+             button
+               ~cls:"new-session opening"
+               ~title:"Starting a session…"
+               ~disabled:true
+               ~on_click:Effect.Ignore
+               [ lamp (); Node.text "Starting…" ]
+           | Some (Switching _) | None ->
+             button
+               ~cls:"new-session"
+               ~title:"Start a new session (/new)"
+               ~on_click:(inject Action.New_session)
+               [ icon Plus; Node.text "New session" ])
         ; button
             ~cls:"control-open"
             ~title:"Search sessions, settings and commands (Ctrl+K)"

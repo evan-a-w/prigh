@@ -337,8 +337,7 @@ let view (m : App.Model.t) ~(chip : Chip.t) (p : Picker.t) ~inject =
            @
            match chip with
            | Model | Host -> []
-           | Thinking | Mode | Attach -> [ Attr.tabindex 0; active ]
-          )
+           | Thinking | Mode | Attach -> [ Attr.tabindex 0; active ])
         (rows m ~chip p ~inject)
   in
   Node.div

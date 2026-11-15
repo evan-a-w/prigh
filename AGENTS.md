@@ -140,9 +140,11 @@ The UX reference is pi (https://github.com/evan-a-w/pi). In every frontend:
 - Every error tells you what to do next (closest matches, the command to run).
 - State is always visible: the status line shows model, thinking, context,
   cost, user, queued messages, agents, and any mode the UI is in (prigh-web
-  has no header: the composer's row has the model, host, thinking, mode and
-  verbosity chips, then the status (activity, context, cost) with its
-  details card; on a phone the thinking, mode, verbosity and usage are at
+  has no header: the composer's row has the +, then the model, host,
+  thinking and mode chips, then the status (activity, context, cost) with
+  its details card and send; the verbosity has no chip (Ctrl+O, the
+  control centre); Ctrl+K and the sidebar's Search open the control
+  centre over sessions, settings and commands; on a phone the thinking, mode, verbosity and usage are at
   the top of the ⋯ sheet, the top strip (under the safe area) has the
   sidebar's ☰, the session's name and ⋯, and the user is at the foot of the
   sidebar and on its settings page).

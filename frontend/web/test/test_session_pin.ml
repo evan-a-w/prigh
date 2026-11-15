@@ -91,7 +91,8 @@ let%expect_test "the keyboard walks pinned, then recent, then archived" =
     |}]
 ;;
 
-let%expect_test "the control centre finds pinned sessions too, best match first" =
+let%expect_test "the control centre finds pinned sessions too, best match first"
+  =
   let h = H.create ~sessions () in
   H.act h Open_control;
   H.act h (Control_query "notes");

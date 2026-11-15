@@ -1,7 +1,9 @@
-// The sidebar's search: words matched in the titles at once, then the
-// sessions whose messages match (the backend's search_sessions), each with
-// the passage that matched, the matched words marked; nothing found; Esc
-// clearing it; and the same on two phones, nothing spilling sideways.
+// The control centre (Ctrl+K, the sidebar's Search): the session's
+// settings with nothing typed; a setting found, its values, one set; the
+// sessions, by title at once and then by message (the backend's
+// search_sessions), each with the passage that matched, the matched words
+// marked; nothing found; Esc; and the same on two phones, nothing spilling
+// sideways. Also the sidebar's row and the composer's chips.
 // Run by prigh_web.sh; prints normalised results (the expected output is in
 // ENGINE.expected).
 //
@@ -127,32 +129,45 @@ const signIn = async () => {
   await page.locator(".composer textarea").waitFor();
 };
 
-// Each group's heading, then its rows: the title (after "📌 " when it shows
-// the pin), then its passage, the marked words in [..].
-const rows = () => page.locator(".sessions .sessions-group, .sessions .session").evaluateAll(es => es.map(e => {
-  if (e.matches(".sessions-group"))
-    return `-- ${e.querySelector(".divider-label").textContent} ${e.querySelector(".divider-count").textContent} --`;
+// The control centre's rows: each group's heading, then its rows, the label
+// (matched letters in [..]), its passage and what is on its right.
+const rows = () => page.locator("#control-list > *").evaluateAll(es => es.map(e => {
   const marked = el => el
-    ? [...el.childNodes].map(n => (n.nodeName === "MARK" ? `[${n.textContent}]` : n.textContent)).join("")
+    ? [...el.childNodes].map(n => (n.nodeName === "MARK" ? `[${n.textContent}]` : n.textContent)).join("").trim()
     : null;
-  const pin = e.querySelector(".session-title .session-pin") ? "📌 " : "";
-  const title = pin + marked(e.querySelector(".session-title")).trim();
-  const snippet = marked(e.querySelector(".session-snippet"));
-  return snippet ? `${title}\n    ${snippet}` : title;
+  if (e.matches(".control-group")) return `-- ${e.textContent} --`;
+  const sel = e.matches(".selected") ? "> " : "  ";
+  const dot = e.querySelector(".control-dot") ? "● " : "";
+  const label = marked(e.querySelector(".control-label"));
+  const snippet = marked(e.querySelector(".control-snippet"));
+  const right = [e.querySelector(".control-detail")?.textContent, e.querySelector(".control-keys")?.textContent]
+    .filter(Boolean).join(" ");
+  const about = e.querySelector(".control-about")?.textContent;
+  return `${sel}${dot}${label}${snippet ? ` ${snippet}` : ""}${about ? ` — ${about}` : ""}${right ? ` | ${right}` : ""}`
+    .replace(/\d+[mhd] ago/, "<age>");
 }).join("\n"));
 const search = async query => {
-  await page.locator("#session-search").fill(query);
-  await page.waitForFunction(q => document.querySelector("#session-search").value === q, query);
+  await page.locator("#control-input").fill(query);
+  await page.waitForFunction(q => document.querySelector("#control-input")?.value === q, query);
 };
-
-const query = "configurable port";
-// Both passages that say it: the pinned checklist's and the new session's.
 const configurableTwice = (options = {}) =>
   page.waitForFunction(
-    () => [...document.querySelectorAll(".session-snippet mark")].filter(m => m.textContent === "configurable").length === 2,
+    () => [...document.querySelectorAll(".control-snippet mark")].filter(m => m.textContent === "configurable").length === 2,
     null,
     options,
   );
+const fits = () => page.evaluate(() => {
+  const doc = document.documentElement;
+  const box = document.querySelector("#control-centre").getBoundingClientRect();
+  const input = document.querySelector("#control-input");
+  return [
+    `page overflows sideways: ${doc.scrollWidth > doc.clientWidth}`,
+    `the box inside the screen: ${box.left >= 0 && box.right <= innerWidth + 0.5 && box.top >= 0 && box.bottom <= innerHeight + 0.5}`,
+    `its input's font: ${getComputedStyle(input).fontSize}`,
+    `rows at least 44px: ${[...document.querySelectorAll(".control-row")].every(r => r.getBoundingClientRect().height >= 44)}`,
+  ].join("\n");
+});
+const query = "configurable port";
 
 try {
   await open({ viewport: { width: 1280, height: 800 } });
@@ -164,9 +179,59 @@ try {
   sessionUrl = page.url();
   await page.locator(".session", { hasText: "Release notes" }).waitFor();
 
-  section("a title and a reply");
+  section("the sidebar's row and the composer's");
+  await editor.evaluate(e => e.blur());
+  console.log(await page.locator(".sidebar-actions > *").evaluateAll(es => es.map(e => {
+    const r = e.getBoundingClientRect();
+    return `${e.innerText.trim()}: ${r.width < 120 ? "narrow" : "wide"}, ${Math.round(r.height)}px high`;
+  }).join("\n")));
+  console.log(`composer: ${await page.locator(".composer-row button:visible").evaluateAll(bs => bs.map(b => (b.getAttribute("aria-label") || b.innerText).trim().split("\n")[0].split(":")[0]).join(", "))}`);
+  await screenshot("desktop composer unfocused");
+  await editor.focus();
+  await screenshot("desktop composer focused");
+
+  section("Ctrl+K: the session's settings, recent sessions, commands");
+  await editor.press("Control+k");
+  await page.locator("#control-centre").waitFor();
+  console.log(`focus in the filter: ${await page.evaluate(() => document.activeElement?.id)}`);
+  console.log(await rows());
+  console.log(await page.locator(".control-foot").innerText());
+  await screenshot("palette empty");
+
+  section("verbos");
+  await search("verbos");
+  await page.locator(".control-row", { hasText: "Set verbosity" }).waitFor();
+  console.log(await rows());
+  await screenshot("palette verbos");
+
+  section("Enter opens the setting's values; ⌫ goes back; Enter sets one");
+  await page.keyboard.press("Enter");
+  await page.locator(".control-crumb").waitFor();
+  console.log(`crumb: ${await page.locator(".control-crumb").innerText()}`);
+  console.log(await rows());
+  await screenshot("palette submenu");
+  await page.keyboard.press("Backspace");
+  await page.locator(".control-crumb").waitFor({ state: "detached" });
+  console.log(`back: "${await page.locator("#control-input").inputValue()}"`);
+  await page.keyboard.press("Enter");
+  await page.locator(".control-crumb").waitFor();
+  await page.locator(".control-row", { hasText: "Verbose" }).click();
+  await page.locator("#control-centre").waitFor({ state: "detached" });
+  await page.keyboard.press("Control+k");
+  await search("set verbosity");
+  await page.locator(".control-row", { hasText: "Set verbosity" }).waitFor();
+  console.log(`now: ${await page.locator(".control-row", { hasText: "Set verbosity" }).locator(".control-detail").innerText()}`);
+
+  section("Esc closes it");
+  await page.keyboard.press("Escape");
+  await page.locator("#control-centre").waitFor({ state: "detached" });
+  console.log(`open: ${await page.locator("#control-centre").count() > 0}`);
+
+  section("the sidebar's Search: a title and a reply");
+  await page.locator("#control-open").click();
+  await page.locator("#control-centre").waitFor();
   await search("port");
-  await page.waitForFunction(() => document.querySelectorAll(".session-snippet").length === 2);
+  await page.waitForFunction(() => document.querySelectorAll(".control-snippet").length === 1);
   console.log(await rows());
 
   section("the messages, once typing pauses");
@@ -177,14 +242,16 @@ try {
 
   section("nothing matches");
   await search("zebra quokka");
-  await page.locator(".sessions-empty").waitFor();
-  console.log(await page.locator(".sessions-empty").innerText());
+  await page.locator(".control-empty").waitFor();
+  console.log(await page.locator(".control-empty").innerText());
 
-  section("Esc clears the search");
-  await page.locator("#session-search").press("Escape");
-  await page.waitForFunction(() => document.querySelector("#session-search").value === "");
-  await page.locator(".session", { hasText: "Release notes" }).waitFor();
-  console.log(`query: "${await page.locator("#session-search").inputValue()}"; rows: ${await page.locator(".sessions .session").count()}`);
+  section("Enter opens the session");
+  await search("release notes");
+  await page.locator(".control-row.selected", { hasText: "Release notes" }).waitFor();
+  await page.keyboard.press("Enter");
+  await page.locator("#control-centre").waitFor({ state: "detached" });
+  await page.waitForFunction(() => document.querySelector("#chat")?.innerText.includes("notes for this release"));
+  console.log("switched to Release notes");
   await page.context().close();
 
   for (const [w, h] of [[390, 844], [320, 640]]) {
@@ -192,29 +259,18 @@ try {
     if (engineName !== "firefox") options.isMobile = true;
     await open(options);
     await signIn();
-    // Typed while the session rejoins: its state arriving keeps the search.
-    // The drawer is inert until the tap is rendered: a fill before that
-    // types nowhere.
+    await page.waitForFunction(() => document.querySelector("#chat")?.innerText.includes("through the config file"));
     await page.getByRole("button", { name: "Sessions" }).first().tap();
-    await page.waitForFunction(() => document.querySelector(".app.narrow.sidebar-open #session-search:not([inert] *)"));
-    await page.locator(".session", { hasText: "Release notes" }).waitFor();
+    await page.waitForFunction(() => document.querySelector(".app.narrow.sidebar-open #control-open:not([inert] *)"));
+    await page.locator("#control-open").tap();
+    await page.locator("#control-centre").waitFor();
+    section(`${w}x${h}`);
+    console.log(await fits());
+    await screenshot(`${w}x${h} palette`);
     await search(query);
     await configurableTwice();
-    await page.waitForFunction(() => document.querySelector("#chat")?.innerText.includes("through the config file"));
-    section(`${w}x${h}`);
-    console.log(`once the session is in, the search box: "${await page.locator("#session-search").inputValue()}"`);
     console.log(await rows());
-    console.log(await page.evaluate(() => {
-      const doc = document.documentElement;
-      const sidebar = document.querySelector(".sidebar");
-      const inside = [...document.querySelectorAll(".session-snippet")].map(e => e.getBoundingClientRect())
-        .every(s => s.left >= 0 && s.right <= innerWidth && s.top >= 0 && s.bottom <= innerHeight);
-      return [
-        `page overflows sideways: ${doc.scrollWidth > doc.clientWidth}`,
-        `sidebar overflows sideways: ${sidebar.scrollWidth > sidebar.clientWidth}`,
-        `snippets inside the screen: ${inside}`,
-      ].join("\n");
-    }));
+    console.log(await fits());
     await screenshot(`${w}x${h} found`);
     await page.context().close();
   }

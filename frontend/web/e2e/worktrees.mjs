@@ -284,13 +284,15 @@ try {
   await tree("folded");
   await first.locator(".session-fold").click();
 
-  // Search finds sessions by their worktrees' branches.
-  await page.locator("#session-search").fill("tidy-the-docs");
-  await page.locator(".session", { hasText: "Shopping list" }).waitFor({ state: "detached" });
+  // The control centre finds sessions by their worktrees' branches.
+  await page.locator("#control-open").click();
+  await page.locator("#control-input").fill("tidy-the-docs");
+  await page.locator(".control-group", { hasText: "Sessions" }).waitFor();
   section("searching");
-  console.log((await page.locator(".sessions .session-title").allTextContents()).join("\n"));
+  console.log((await page.locator("#control-list .control-row .control-label").allTextContents()).join("\n"));
   await screenshot("searching");
-  await page.locator("#session-search").fill("");
+  await page.keyboard.press("Escape");
+  await page.locator("#control-centre").waitFor({ state: "detached" });
   await session("Shopping list").waitFor();
 
   // Switched into feat/login, then docs: its home is still main, and

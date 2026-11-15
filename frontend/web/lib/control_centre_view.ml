@@ -35,7 +35,8 @@ let dot marked =
 let root_rows ~inject (root : Control_centre.t) rows =
   let row i (r : Control_centre.Row.t) =
     Node.div
-      ~attrs:(row_attrs ~inject ~selected:(i = root.selected) ~marked:r.marked i)
+      ~attrs:
+        (row_attrs ~inject ~selected:(i = root.selected) ~marked:r.marked i)
       [ div
           ~cls:"control-main"
           [ (match r.target with
@@ -50,7 +51,11 @@ let root_rows ~inject (root : Control_centre.t) rows =
          then Node.none
          else span ~cls:"control-detail" r.detail)
       ; (match r.keys with
-         | Some k -> Node.create "kbd" ~attrs:[ Attr.class_ "control-keys" ] [ Node.text k ]
+         | Some k ->
+           Node.create
+             "kbd"
+             ~attrs:[ Attr.class_ "control-keys" ]
+             [ Node.text k ]
          | None -> Node.none)
       ]
   in
@@ -163,7 +168,8 @@ let view (m : App.Model.t) ~(root : Control_centre.t) ~options ~inject =
                   ; Attr.value query
                   ; Attr.create "autocomplete" "off"
                   ; Attr.create "spellcheck" "false"
-                  ; Attr.on_input (fun _ text -> inject (Action.Control_query text))
+                  ; Attr.on_input (fun _ text ->
+                      inject (Action.Control_query text))
                   ]
                 ()
             ; button

@@ -3621,8 +3621,8 @@ terminal frontend and `web/` prigh-web, the browser one.
       the sidebar's toggle, the title, the extras, the status, the panel
       toggles and the gear — its
       steps are container queries on the bar in `style.css`),
-      `Composer_view` (one box: the editor, then the model, thinking,
-      approval mode and tool host chips, plain text until pointed at, and attach, stop
+      `Composer_view` (one box: the editor, then the model, tool host,
+      thinking and approval mode chips (the verbosity has none), plain text until pointed at, and attach, stop
       and send along its bottom; the composer's container queries shorten
       the chips). A chip (`Chip`, `Open_chip`; Ctrl+L for the model's)
       opens `Dialog.Popover`: its command's `Picker` (the same items as
@@ -3660,7 +3660,18 @@ terminal frontend and `web/` prigh-web, the browser one.
       `Prompt` — a path with the backend's completions whose failures stay
       in the dialog, for `/cd`, `/mkdir`, `/host`, `/export`, `/import` —
       the "Create folder?" confirmation of a missing directory, `/rewind`'s
-      confirmation, `/session`, text), `Session_tree` (`get_entries`
+      confirmation, `/session`, text), `Control_centre_view` (the control centre, Ctrl+K and the
+      sidebar's Search: `Dialog.Control`, its root `Control_centre` — the
+      filter, the selection and the rows built from `App.control_rows`:
+      the settings of `Control_setting`, one table of every setting with
+      its name, keywords, shortcut and place on the settings page, their
+      values from the same pickers the chips and commands open, the
+      sessions through `Session_search` with the backend's `session_hits`,
+      and the commands of `Slash`, matched by `Fuzzy` with `Fuzzy.positions`
+      marking the letters — and, a level down, `Control_options`, a
+      setting's picker, whose choice goes through `picker_accepted` as the
+      chip's or the command's would; switching sessions or users closes it
+      with the other per-session dialogs), `Session_tree` (`get_entries`
       as `/fork`/`/rewind`/`/tree` pickers), `Btw_view`, `Account_view` (the
       sidebar's account button and the account menu, a `Picker` of
       accounts and actions, the settings and the commands and keys) over `Accounts` (the saved sign-ins in

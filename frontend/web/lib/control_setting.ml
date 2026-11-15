@@ -145,7 +145,8 @@ let keys = function
 ;;
 
 let direct = function
-  | Thinking | Verbosity | Mode | Theme | Default_mode | Default_thinking -> true
+  | Thinking | Verbosity | Mode | Theme | Default_mode | Default_thinking ->
+    true
   | _ -> false
 ;;
 

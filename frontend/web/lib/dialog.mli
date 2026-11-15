@@ -167,7 +167,8 @@ type t =
   (** leaving a temporary session that is still working ([Model.leaving]) *)
   | Control of
       { root : Control_centre.t
-      ; options : Control_options.t option (** a setting's values, a level down *)
+      ; options : Control_options.t option
+        (** a setting's values, a level down *)
       } (** the control centre (Ctrl+K) *)
 [@@deriving sexp_of, equal]
 

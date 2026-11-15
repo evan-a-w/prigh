@@ -319,11 +319,19 @@ let dialog_key (dialog : Dialog.t) t : App.Action.t option =
       | Pulls _
       | Control _ ) ) -> Some (Dialog_move 1)
   | ( "PageUp"
-    , (Picker _ | Popover _ | Review_pick _ | Scoped_models _ | Pulls _ | Control _) )
-    -> Some (Dialog_move (-8))
+    , ( Picker _
+      | Popover _
+      | Review_pick _
+      | Scoped_models _
+      | Pulls _
+      | Control _ ) ) -> Some (Dialog_move (-8))
   | ( "PageDown"
-    , (Picker _ | Popover _ | Review_pick _ | Scoped_models _ | Pulls _ | Control _) ) ->
-    Some (Dialog_move 8)
+    , ( Picker _
+      | Popover _
+      | Review_pick _
+      | Scoped_models _
+      | Pulls _
+      | Control _ ) ) -> Some (Dialog_move 8)
   (* In the model's filter ← → move the caret once something is typed. *)
   | ("ArrowLeft" | "ArrowRight"), Popover { picker; _ }
     when plain t && String.is_empty (Picker.query picker) ->
@@ -489,10 +497,8 @@ let worktree_key (m : App.Model.t) t ~session ~path : App.Action.t option =
             { target = Worktree { session = s.path; path }
             ; anchor = Element (Context_menu.worktree_dom_id ~session path)
             })
-     | "ArrowDown" when plain t ->
-       Some (Session_nav { from = session; by = 1 })
-     | "ArrowUp" when plain t ->
-       Some (Session_nav { from = session; by = 0 })
+     | "ArrowDown" when plain t -> Some (Session_nav { from = session; by = 1 })
+     | "ArrowUp" when plain t -> Some (Session_nav { from = session; by = 0 })
      | ("Delete" | "Backspace") when plain t -> Some (Ask_remove_worktree path)
      | "Escape" -> Some Leave_sidebar
      | _ -> None)

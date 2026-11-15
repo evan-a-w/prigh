@@ -287,6 +287,18 @@ const visit = async (w, h, { safe = false } = {}) => {
   await page.waitForSelector(".modal", { state: "detached" });
 
   await step("the drawer", () => page.getByRole("button", { name: "Sessions" }).first().tap());
+  await step("the control centre", async () => {
+    await page.locator("#control-open").tap();
+    await page.locator("#control-centre").waitFor();
+  });
+  await step("the control centre: a setting's values", async () => {
+    await page.locator("#control-input").fill("set verbosity");
+    await page.locator(".control-row.selected", { hasText: "Set verbosity" }).waitFor();
+    await page.locator(".control-row.selected").tap();
+    await page.locator(".control-crumb").waitFor();
+  });
+  await close();
+  await page.waitForSelector("#control-centre", { state: "detached" });
   await page.locator(".scrim").tap({ position: { x: w - 10, y: h / 2 } });
   await page.waitForTimeout(250);
 

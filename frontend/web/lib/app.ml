@@ -10608,7 +10608,8 @@ let setting_options (m : Model.t) setting =
   let opened, cmds = setting_opener { m with dialog = None } setting in
   let options =
     match opened.dialog with
-    | Some (Picker { kind; picker }) -> Some { Dialog.Control_options.setting; kind; picker }
+    | Some (Picker { kind; picker }) ->
+      Some { Dialog.Control_options.setting; kind; picker }
     | Some (Popover { chip; picker }) ->
       Some { setting; kind = chip_kind chip; picker }
     | _ -> None
@@ -10657,19 +10658,29 @@ let config_value (m : Model.t) (config : Config.t) (setting : Control_setting.t)
                config.default_thinking
                ~default:New_default.builtin_thinking)))
   | Default_mode -> Some (Default_mode.summary config)
-  | Default_host -> Some (Option.value config.default_host ~default:"where you are")
-  | Default_directory -> Some (Option.value config.default_cwd ~default:"the host's")
+  | Default_host ->
+    Some (Option.value config.default_host ~default:"where you are")
+  | Default_directory ->
+    Some (Option.value config.default_cwd ~default:"the host's")
   | Fallback_models ->
     Some
       (match config.fallback_models with
        | [] -> "none"
-       | models -> String.concat ~sep:", " (List.map models ~f:(model_display m)))
+       | models ->
+         String.concat ~sep:", " (List.map models ~f:(model_display m)))
   | Budget ->
-    Some (Option.value_map config.max_budget_usd ~default:"none" ~f:(sprintf "$%.2f"))
+    Some
+      (Option.value_map
+         config.max_budget_usd
+         ~default:"none"
+         ~f:(sprintf "$%.2f"))
   | Notifications -> Some config.notify
-  | Summary_model -> Some (model config.compaction_model ~default:"the conversation's")
-  | Drafting_model -> Some (model config.generate_model ~default:"the session's")
-  | Approval_model -> Some (model config.approval_model ~default:"the session's")
+  | Summary_model ->
+    Some (model config.compaction_model ~default:"the conversation's")
+  | Drafting_model ->
+    Some (model config.generate_model ~default:"the session's")
+  | Approval_model ->
+    Some (model config.approval_model ~default:"the session's")
   | Naming_model -> Some (model config.naming_model ~default:"the drafting one")
   | Dictation_model ->
     Some
@@ -10719,8 +10730,12 @@ let control_settings (m : Model.t) =
 ;;
 
 let describe_session (m : Model.t) (s : Session_summary.t) =
-  let where = Tilde.of_path ?host_home:(Tilde.session_host_home m.state s) s.cwd in
-  match m.now, Rel_time.parse (Option.value s.updated_at ~default:s.created_at) with
+  let where =
+    Tilde.of_path ?host_home:(Tilde.session_host_home m.state s) s.cwd
+  in
+  match
+    m.now, Rel_time.parse (Option.value s.updated_at ~default:s.created_at)
+  with
   | Some now, Some time -> sprintf "%s · %s" where (Rel_time.ago ~now time)
   | _ -> where
 ;;
@@ -10745,11 +10760,22 @@ let control_query (m : Model.t) query =
     ( { m with
         dialog =
           Some
-            (Control { root; options = Some { o with picker = Picker.set_query o.picker query } })
+            (Control
+               { root
+               ; options =
+                   Some { o with picker = Picker.set_query o.picker query }
+               })
       }
     , [] )
   | Some (Control { root; options = None }) ->
-    let m = { m with dialog = Some (Control { root = Control_centre.set_query root query; options = None }) } in
+    let m =
+      { m with
+        dialog =
+          Some
+            (Control
+               { root = Control_centre.set_query root query; options = None })
+      }
+    in
     (* Titles match at once; the messages, searched by the backend, once the
        typing pauses. *)
     let search = m.session_search + 1 in
@@ -10763,12 +10789,22 @@ let control_query (m : Model.t) query =
 let control_move (m : Model.t) delta =
   match m.dialog with
   | Some (Control { root; options = Some o }) ->
-    ( { m with dialog = Some (Control { root; options = Some { o with picker = Picker.move o.picker delta } }) }
+    ( { m with
+        dialog =
+          Some
+            (Control
+               { root
+               ; options = Some { o with picker = Picker.move o.picker delta }
+               })
+      }
     , [] )
   | Some (Control { root; options = None }) ->
     let count = List.length (control_rows m root) in
     ( { m with
-        dialog = Some (Control { root = Control_centre.move root delta ~count; options = None })
+        dialog =
+          Some
+            (Control
+               { root = Control_centre.move root delta ~count; options = None })
       }
     , [] )
   | _ -> m, []
@@ -10777,14 +10813,23 @@ let control_move (m : Model.t) delta =
 let control_back (m : Model.t) =
   match m.dialog with
   | Some (Control { root; options = Some _ }) ->
-    { m with dialog = Some (Control { root; options = None }) }, [ Command.Focus "control-input" ]
+    ( { m with dialog = Some (Control { root; options = None }) }
+    , [ Command.Focus "control-input" ] )
   | _ -> m, []
 ;;
 
 (* Done: the palette goes, and what the choice did says so itself (a
    toast, the chip). *)
-let control_apply (m : Model.t) (options : Dialog.Control_options.t) (item : Picker.Item.t) =
-  let m = { m with dialog = Some (Picker { kind = options.kind; picker = options.picker }) } in
+let control_apply
+      (m : Model.t)
+      (options : Dialog.Control_options.t)
+      (item : Picker.Item.t)
+  =
+  let m =
+    { m with
+      dialog = Some (Picker { kind = options.kind; picker = options.picker })
+    }
+  in
   picker_accept m ~kind:options.kind item
 ;;
 
@@ -10803,7 +10848,8 @@ let control_target (m : Model.t) ~root (target : Control_centre.Target.t) =
     (match setting_options m setting with
      | Some options, _ ->
        (match
-          List.find (Picker.visible options.picker) ~f:(fun i -> String.equal i.id id)
+          List.find (Picker.visible options.picker) ~f:(fun i ->
+            String.equal i.id id)
         with
         | Some item -> control_apply m options item
         | None -> m, [])
@@ -10838,7 +10884,11 @@ let control_accept ?index (m : Model.t) =
      | Some item -> control_apply m o item
      | None -> m, [])
   | Some (Control { root; options = None }) ->
-    (match List.nth (control_rows m root) (Option.value index ~default:root.selected) with
+    (match
+       List.nth
+         (control_rows m root)
+         (Option.value index ~default:root.selected)
+     with
      | Some row -> control_target m ~root row.target
      | None -> m, [])
   | _ -> m, []

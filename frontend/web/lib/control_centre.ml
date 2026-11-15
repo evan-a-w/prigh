@@ -84,7 +84,9 @@ let close ~query label =
   | None -> false
   | Some positions ->
     List.length (ranges positions)
-    <= List.length (String.split query ~on:' ' |> List.filter ~f:(Fn.non String.is_empty)) + 1
+    <= List.length
+         (String.split query ~on:' ' |> List.filter ~f:(Fn.non String.is_empty))
+       + 1
 ;;
 
 let common_commands = [ "new"; "settings"; "review"; "files"; "help" ]
@@ -93,7 +95,15 @@ let most_settings = 12
 let most_sessions = 30
 let most_commands = 8
 
-let row ?keys ?(marked = false) ?snippet ?(matched = []) ~group ~detail target label
+let row
+      ?keys
+      ?(marked = false)
+      ?snippet
+      ?(matched = [])
+      ~group
+      ~detail
+      target
+      label
   =
   { Row.target; group; label; matched; detail; keys; marked; snippet }
 ;;
@@ -104,10 +114,7 @@ let setting_row ~group (e : Setting_entry.t) ~query =
     ~group
     ?keys:(Control_setting.keys e.setting)
     ~matched:
-      (Option.value_map
-         (Fuzzy.positions ~query label)
-         ~default:[]
-         ~f:ranges)
+      (Option.value_map (Fuzzy.positions ~query label) ~default:[] ~f:ranges)
     ~detail:e.value
     (Setting e.setting)
     label
@@ -236,15 +243,16 @@ let rows t ~settings ~sessions ?content ~current ~describe ~commands () =
     @ (Session_search.sessions ?content ~query sessions
        |> Fn.flip List.take most_sessions
        |> List.map ~f:(session_row ~group:Sessions ~describe))
-    @ (let by_name =
-         Fuzzy.rank ~query commands ~key:(fun (c : Slash.Spec.t) -> "/" ^ c.name)
-         |> List.filter ~f:(fun (c : Slash.Spec.t) -> close ~query ("/" ^ c.name))
-       in
-       (* Then those whose description has the words: "rename" finds /name. *)
-       by_name
-       @ List.filter commands ~f:(fun (c : Slash.Spec.t) ->
-         word_prefixes ~query c.help
-         && not (List.mem by_name c ~equal:Slash.Spec.equal))
-       |> Fn.flip List.take most_commands
-       |> List.map ~f:(command_row ~query))
+    @
+    let by_name =
+      Fuzzy.rank ~query commands ~key:(fun (c : Slash.Spec.t) -> "/" ^ c.name)
+      |> List.filter ~f:(fun (c : Slash.Spec.t) -> close ~query ("/" ^ c.name))
+    in
+    (* Then those whose description has the words: "rename" finds /name. *)
+    by_name
+    @ List.filter commands ~f:(fun (c : Slash.Spec.t) ->
+      word_prefixes ~query c.help
+      && not (List.mem by_name c ~equal:Slash.Spec.equal))
+    |> Fn.flip List.take most_commands
+    |> List.map ~f:(command_row ~query)
 ;;
