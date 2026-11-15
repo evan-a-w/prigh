@@ -364,7 +364,9 @@ the turn that launched them), `Background_tasks` (`job`, on track
   only knows the built-in names and custom ones are looked up in the
   `Model_registry`.
 - `Model` — the static model table (id, provider, context window, max output,
-  thinking support, prices). Ids may repeat across providers, so `Model.key`
+  thinking support, prices; some, like Claude Haiku 5.5 and the GPT Pro
+  models, price a request whose prompt is over a threshold higher, so
+  `Model.cost_usd` prices one request at a time). Ids may repeat across providers, so `Model.key`
   is `provider/id` and `Model.find` accepts either form.
 - `Custom_provider` — a user-defined endpoint from `config.json`'s
   `providers` (`base_url`, `api`: `chat`/`responses`/`anthropic`, extra
