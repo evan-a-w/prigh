@@ -612,27 +612,6 @@ let await_return t agent =
       `Stop_daemon)
 ;;
 
-let maybe_evict t agent =
-  if Agent.temporary agent
-  then (if List.is_empty (clients_of t agent) then await_return t agent)
-  else if
-    (* a stale agent of a session reopened since is not the live one *)
-    Option.exists
-      (Hashtbl.find t.agents (session_id agent))
-      ~f:(phys_equal agent)
-    && (not (Option.exists t.default_agent ~f:(phys_equal agent)))
-    && (not (Agent.is_running agent))
-    && (not (Agent.has_running_background agent))
-    && (not (Agent.resume_pending agent))
-    && List.is_empty (clients_of t agent)
-  then (
-    Hashtbl.remove t.agents (session_id agent);
-    Hashtbl.remove t.listed (session_id agent);
-    let session = Agent.session agent in
-    if Session.persisted session && not (Session.gone session)
-    then File_cache.set t.loaded (Session.path session) session)
-;;
-
 (* Parsing a large session file takes a while (a second for 80 MB): it
    yields as it goes, so that every other client is served meanwhile, and
    those who want the same file meanwhile wait for the same parse, which
@@ -820,6 +799,30 @@ let sessions_changed ?(changed = []) ?(removed = []) t =
              )
            ; removed
            ])))
+;;
+
+let maybe_evict t agent =
+  if Agent.temporary agent
+  then (if List.is_empty (clients_of t agent) then await_return t agent)
+  else if
+    (* a stale agent of a session reopened since is not the live one *)
+    Option.exists
+      (Hashtbl.find t.agents (session_id agent))
+      ~f:(phys_equal agent)
+    && (not (Option.exists t.default_agent ~f:(phys_equal agent)))
+    && (not (Agent.is_running agent))
+    && (not (Agent.has_running_background agent))
+    && (not (Agent.resume_pending agent))
+    && List.is_empty (clients_of t agent)
+  then (
+    Hashtbl.remove t.agents (session_id agent);
+    Hashtbl.remove t.listed (session_id agent);
+    let session = Agent.session agent in
+    if Session.persisted session && not (Session.gone session)
+    then (
+      File_cache.set t.loaded (Session.path session) session;
+      (* No longer live. *)
+      sessions_changed t ~changed:[ session ]))
 ;;
 
 (* Only for changes: what is shown at [register] is the baseline. *)

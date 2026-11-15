@@ -485,8 +485,8 @@ let%expect_test "a session is active while its background work runs" =
   [%expect
     {|
     worker      background=0 clients=-
-    a: 3 sessions_changed
-    b: 2 sessions_changed
+    a: 4 sessions_changed
+    b: 3 sessions_changed
     |}]
 ;;
 
@@ -727,7 +727,7 @@ let%expect_test "deleting the session you are in moves you first" =
     other       background=0 clients=-
     shared     live background=0 clients=1
     next       live background=0 clients=1
-    b: 1 sessions_changed
+    b: 2 sessions_changed
     |}];
   print_s [%sexp (Sys_unix.file_exists_exn (Session.path mine) : bool)];
   [%expect {| false |}];
@@ -912,8 +912,10 @@ let%expect_test
     a: changed [recent archived] removed []
     b: changed [recent archived] removed []
     {"type":"response","id":"r","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":"recent","session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"thinking_options":["off","default","low","high","max"],"thinking_default":"high","supports_images":true,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"default","running":false,"message_count":1,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","active_host_name":"<host>","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"chat_mode":false,"no_host":null,"computer_control":null,"plan":null,"session_rules":[]}}}
+    a: changed [old archived] removed []
     {"type":"response","id":"r","ok":true,"result":{"deleted":[{"path":"$DIR/sessions/<stamp>_<id>.jsonl","id":"<id>","bytes":<n>}],"refused":[]}}
     a: changed [] removed [old]
+    b: changed [old archived] removed []
     b: changed [] removed [old]
     |}]
 ;;
