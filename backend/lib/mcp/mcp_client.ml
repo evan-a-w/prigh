@@ -123,10 +123,16 @@ module State = struct
     ; mutable tools : Tool.t list option
     ; mutable tools_generation : int
     ; mutable failure : string option
+    ; mutable sign_in : bool
     }
 
   let create () =
-    { next_id = 0; tools = None; tools_generation = 0; failure = None }
+    { next_id = 0
+    ; tools = None
+    ; tools_generation = 0
+    ; failure = None
+    ; sign_in = false
+    }
   ;;
 
   let on_notification t method_ =
@@ -422,6 +428,33 @@ module Http = struct
     if String.length body > 300 then String.prefix body 300 ^ "..." else body
   ;;
 
+  let has_authorization headers =
+    List.exists headers ~f:(fun (k, _) ->
+      String.Caseless.equal k "authorization")
+  ;;
+
+  (* A 401 from a server that advertises OAuth wants a sign-in, not a
+     header. *)
+  let unauthorized ~env ~(state : State.t) ~url ~bearer ~response =
+    let challenge =
+      Option.bind
+        (Http_client.Response.header response "www-authenticate")
+        ~f:Mcp_oauth.Challenge.parse
+    in
+    match Mcp_oauth.discover ~env ~url ?challenge () with
+    | Error _ -> None
+    | Ok _ ->
+      let message =
+        match bearer with
+        | Some _ ->
+          sprintf "%s refused the sign-in (HTTP 401): sign in again" url
+        | None -> sprintf "%s needs you to sign in (HTTP 401)" url
+      in
+      state.sign_in <- true;
+      State.fail state message;
+      Some message
+  ;;
+
   let status_error ~(server : Mcp_config.Server.t) ~url ~status ~body =
     let message =
       match snippet body with
@@ -445,14 +478,18 @@ module Http = struct
         ~(server : Mcp_config.Server.t)
         ~url
         ~headers
+        ~bearer
     =
     let session_id = ref None in
     let initialized = ref false in
-    let request_headers () =
+    let bearer () = if has_authorization headers then None else bearer () in
+    let request_headers ~bearer =
       [ "Content-Type", "application/json"
       ; "Accept", "application/json, text/event-stream"
       ]
       @ headers
+      @ Option.value_map bearer ~default:[] ~f:(fun token ->
+        [ "Authorization", "Bearer " ^ token ])
       @ (if !initialized
          then [ "MCP-Protocol-Version", protocol_version ]
          else [])
@@ -497,11 +534,12 @@ module Http = struct
         then List.iter (Sse.feed sse chunk) ~f:(fun event -> handle event.data)
         else Buffer.add_string body chunk
       in
+      let bearer = bearer () in
       match
         Http_client.post_stream
           ~env
           ~url
-          ~headers:(request_headers ())
+          ~headers:(request_headers ~bearer)
           ~body:(Json.to_string json)
           ~on_response:(fun r -> response := Some r)
           ~on_chunk
@@ -515,12 +553,19 @@ module Http = struct
         then (
           if r.status = 404 && Option.is_some !session_id
           then State.fail state "the server ended the session (HTTP 404)";
-          Error
-            (status_error
-               ~server
-               ~url
-               ~status:r.status
-               ~body:(Buffer.contents body)))
+          match
+            if r.status = 401
+            then unauthorized ~env ~state ~url ~bearer ~response:r
+            else None
+          with
+          | Some message -> Error message
+          | None ->
+            Error
+              (status_error
+                 ~server
+                 ~url
+                 ~status:r.status
+                 ~body:(Buffer.contents body)))
         else (
           if is_sse ()
           then Option.iter (Sse.finish sse) ~f:(fun event -> handle event.data)
@@ -584,12 +629,23 @@ let notify t ~method_ ~params =
 ;;
 
 let failure t = t.state.failure
+let needs_sign_in t = t.state.sign_in
+
+module Connect_error = struct
+  type t =
+    { message : string
+    ; needs_sign_in : bool
+    }
+  [@@deriving sexp_of]
+end
+
 let close t = t.transport.close ()
 
 let connect
       ~env
       ~sw
       ?(timeout = Time_ns.Span.of_int_sec 60)
+      ?(bearer = fun () -> None)
       (server : Mcp_config.Server.t)
   =
   let state = State.create () in
@@ -597,11 +653,14 @@ let connect
     match server.transport with
     | Stdio { command; args; env = extra_env } ->
       Stdio.connect ~env ~sw ~state ~server ~command ~args ~extra_env
-    | Http { url; headers } ->
-      Ok (Http.connect ~env ~sw ~state ~server ~url ~headers)
+    | Http { url; headers; oauth = _ } ->
+      Ok (Http.connect ~env ~sw ~state ~server ~url ~headers ~bearer)
+  in
+  let error message =
+    Error { Connect_error.message; needs_sign_in = state.sign_in }
   in
   match transport with
-  | Error e -> Or_error.error_string e
+  | Error e -> error e
   | Ok transport ->
     let t = { state; transport } in
     let handshake () =
@@ -640,7 +699,7 @@ let connect
      | Ok (Ok ()) -> Ok t
      | Ok (Error e) ->
        close t;
-       Or_error.error_string e
+       error e
      | Error `Timeout ->
        let message =
          with_stderr
@@ -649,7 +708,7 @@ let connect
               (Time_ns.Span.to_string_hum timeout))
        in
        close t;
-       Or_error.error_string message)
+       error message)
 ;;
 
 let tools t =

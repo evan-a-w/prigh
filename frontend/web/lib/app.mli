@@ -46,6 +46,9 @@ module Mcp_purpose : sig
     | Reconnect (** [/mcp reconnect]: report it *)
     | Refreshed of string
     (** a server ([Mcp_servers.id]) approved or restarted from the picker *)
+    | Sign_in_lookup of string (** [/mcp signin NAME]: find its source *)
+    | Sign_out_lookup of string (** [/mcp signout NAME] *)
+    | Auth_changed (** [mcp_auth_changed]: the sign-ins changed *)
   [@@deriving sexp_of, equal]
 end
 
@@ -194,7 +197,13 @@ module Reply_tag : sig
         ; notice : string (** shown on success *)
         }
     | Mcp_settings_loaded (** [get_mcp_settings] *)
-    | Mcp_host_listed (** [list_mcp] or [mcp_approve], for the settings *)
+    | Mcp_host_listed
+    (** [list_mcp], [mcp_approve] or [mcp_signout], for the settings *)
+    | Mcp_sign_in_url of
+        { source : string
+        ; server : string
+        } (** [mcp_signin]: the page to open *)
+    | Mcp_signed_out of string (** [/mcp signout NAME] *)
     | Mcp_draft_saved
     | Mcp_pasted
     | Mcp_removed of string
@@ -507,6 +516,8 @@ module Action : sig
     (** the browser's IANA time zone, offered in About you *)
     | Set_narrow of bool (** a phone-sized window: the sidebar is a drawer *)
     | Set_desktop of bool (** the page runs under [prigh desktop] *)
+    | Set_origin of string
+    (** the page's [location.origin]: where MCP sign-ins come back to *)
     | Set_browser_shell of bool
     (** the page is in the desktop app's browser window
         ({!Desktop_link.browser_shell_of_hash}): text fields have
@@ -678,6 +689,14 @@ module Action : sig
         { source : string
         ; server : string
         } (** a project's server *)
+    | Mcp_sign_in of
+        { source : string
+        ; server : string
+        } (** asks for its sign-in page *)
+    | Mcp_sign_out of
+        { source : string
+        ; server : string
+        }
     | Open_rename
     | Open_subagents of string option
     (** the agents panel: its list, or the agent or job with this number
@@ -940,6 +959,7 @@ module Model : sig
     ; narrow : bool
     ; desktop : bool
     (** under [prigh desktop], the desktop app: Quit prigh is offered *)
+    ; origin : string option (** the page's, once known *)
     ; browser_shell : bool
     (** in the desktop app's browser window: the browser's context menus
         are hidden *)

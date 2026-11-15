@@ -76,7 +76,7 @@ let%expect_test "/mcp lists settings servers, disabled and overridden ones too" 
        fs   overridden by /home/u/.prigh/mcp.json  Settings
     ────────────────────────────────────────────────────────────────────────────────
     >
-    deepseek-flash  $0.01  Enter approves a server or lists its tools · Esc closes
+    deepseek-flash  think:off  Enter approves, signs in or lists tools · Esc closes
     |}];
   H.keys h "off";
   H.enter h;
@@ -266,7 +266,7 @@ let%expect_test "/mcp: mistakes say what to type; a refusal puts it back" =
     ┌─ Error ──────────────────────────────────────────────────────────────────────┐
     │ a double quote (") is not closed; usage: /mcp [reconnect], /mcp add NAME     │
     │ URL|COMMAND [ARGS...], /mcp add {"NAME": {...}} (mcpServers JSON), /mcp      │
-    │ remove|enable|disable NAME                                                   │
+    │ remove|enable|disable|signin|signout NAME                                    │
     └────────────────────────────────────────────────────────────── Esc dismisses ─┘
     ────────────────────────────────────────────────────────────────────────────────
     > /mcp add fs npx "unclosed▏
@@ -295,7 +295,8 @@ let%expect_test "/mcp: mistakes say what to type; a refusal puts it back" =
       earlier answer
     ┌─ Error ──────────────────────────────────────────────────────────────────────┐
     │ usage: /mcp [reconnect], /mcp add NAME URL|COMMAND [ARGS...], /mcp add       │
-    │ {"NAME": {...}} (mcpServers JSON), /mcp remove|enable|disable NAME           │
+    │ {"NAME": {...}} (mcpServers JSON), /mcp remove|enable|disable|signin|signout │
+    │ NAME                                                                         │
     └────────────────────────────────────────────────────────────── Esc dismisses ─┘
     ────────────────────────────────────────────────────────────────────────────────
     > /mcp frobnicate▏

@@ -8,12 +8,16 @@ open! Import
     the command line is split like a shell's: quote arguments with spaces),
     [/mcp add {"NAME": {...}}] (Claude Code [mcpServers] JSON, e.g. to give
     [env] or [headers]), [/mcp remove NAME], [/mcp enable NAME] and
-    [/mcp disable NAME]. *)
+    [/mcp disable NAME]; [/mcp signin NAME] signs in to a remote server
+    that wants OAuth (the page to open in a browser) and [/mcp signout NAME]
+    forgets the sign-in. *)
 
 module Action : sig
   type t =
     | List
     | Reconnect
+    | Sign_in of string (** a server's name *)
+    | Sign_out of string
     | Change of
         { request : P.Request.Method.t
         ; done_ : string (** the notice once it succeeded *)
@@ -37,3 +41,6 @@ val source_label : home:string option -> string -> string
 
 (** Where to change a server from [source]. *)
 val edit_hint : string -> string
+
+(** The server called [name] in a listing, or what to do instead. *)
+val find_server : P.Mcp_list.t -> string -> (P.Mcp_server.t, string) Result.t

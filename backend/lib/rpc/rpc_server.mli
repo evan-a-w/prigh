@@ -96,6 +96,9 @@ val create
            either they fail). After a change every client hears
            [mcp_settings_changed] and every live session updates its
            servers. *)
+  -> ?mcp_auth:Mcp_auth.t
+       (** the user's MCP sign-ins (the sessions' own), whose changes every
+           client hears as [mcp_auth_changed] *)
   -> ?transcription_http:Transcription.Http.t
        (** where [transcribe] posts the audio (default: real HTTP) *)
   -> ?nix_store:Nix_store.t

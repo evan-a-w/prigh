@@ -39,7 +39,9 @@
 # its Memory section, on a desktop and phones, then user_info.mjs, its About
 # you section, likewise, then custom_instructions.mjs, its Custom
 # instructions section, likewise, then mcp_settings.mjs, its MCP servers
-# section with a small MCP server (fake_mcp.mjs), likewise, then images.mjs,
+# section with a small MCP server (fake_mcp.mjs), likewise, then
+# mcp_oauth.mjs, signing in to a remote MCP server with OAuth from there
+# (a fake server and authorization server in the script), then images.mjs,
 # images too large for the model and image files, on a desktop and two
 # phones, then pasted.mjs, long pastes as chips (sent whole, folded in
 # the transcript) on a desktop and two phones, then computer.mjs, the computer tool's cards and the strip while
@@ -84,7 +86,7 @@ test -x "$PRIGH_BACKEND" || { echo "no backend at $PRIGH_BACKEND: build it (cd b
 test -f "$SITE/main.bc.js" || { echo "no site at $SITE: build it (cd frontend && dune build ./web/bin/site)" >&2; exit 1; }
 if [ -n "${SHOTS:-}" ]; then mkdir -p "$SHOTS"; fi
 
-scripts="prigh_web temporary accounts reconnect paging resilience:slow resilience:drops stability themes worktrees review review_git remote cli_signin desktop desktop_signin steer subagent_paged trim filter search session_links viewer math clipboard field_menu desktop_links card status mobile terminal_keys long_press pwa compaction sessions_settings new_sessions memory user_info custom_instructions mcp_settings images:desktop images:phone images:small pasted:desktop pasted:phone pasted:small computer:desktop computer:phone computer:small smart:desktop smart:phone smart:small ui chat"
+scripts="prigh_web temporary accounts reconnect paging resilience:slow resilience:drops stability themes worktrees review review_git remote cli_signin desktop desktop_signin steer subagent_paged trim filter search session_links viewer math clipboard field_menu desktop_links card status mobile terminal_keys long_press pwa compaction sessions_settings new_sessions memory user_info custom_instructions mcp_settings mcp_oauth images:desktop images:phone images:small pasted:desktop pasted:phone pasted:small computer:desktop computer:phone computer:small smart:desktop smart:phone smart:small ui chat"
 engines="${ENGINES:-chromium firefox webkit}"
 jobs="${JOBS:-$(nproc)}"
 # Measured peaks (PSS of the script, its backend and browser): 1.2 to 1.7 GiB,

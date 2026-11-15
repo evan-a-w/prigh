@@ -52,6 +52,42 @@ let tools_button ~shown ~name ~count ~inject =
 
 (* What the server is doing on the session's host, in a line, and its tools
    when shown. *)
+(* A remote server's sign-in: a button asking for the page, then the page
+   itself, a link (a new tab; a link rather than a window opened later, which
+   a browser would block). *)
+let sign_in_control (m : App.Model.t) ~source ~name ~inject =
+  let busy = Set.mem m.mcp.busy name in
+  match Mcp_page.sign_in_link m.mcp ~source ~name with
+  | Some url ->
+    Node.a
+      ~attrs:
+        [ Attr.href url
+        ; Attr.target "_blank"
+        ; Attr.create "rel" "noopener noreferrer"
+        ; Attr.class_ "btn small primary link-button mcp-sign-in-open"
+        ; Attr.title "Opens the server's sign-in page in a new tab"
+        ]
+      [ Node.text "Open sign-in page"; icon External ]
+  | None ->
+    button
+      ~cls:"small primary mcp-sign-in"
+      ~disabled:busy
+      ~attrs:(if busy then [ Attr.create "aria-busy" "true" ] else [])
+      ~title:(sprintf "/mcp signin %s" name)
+      ~on_click:(inject (Action.Mcp_sign_in { source; server = name }))
+      [ Node.text (if busy then "Starting…" else "Sign in") ]
+;;
+
+let sign_out_control (m : App.Model.t) ~source ~name ~inject =
+  let busy = Set.mem m.mcp.busy name in
+  button
+    ~cls:"small ghost mcp-sign-out"
+    ~disabled:busy
+    ~title:(sprintf "Forget the sign-in (/mcp signout %s)" name)
+    ~on_click:(inject (Action.Mcp_sign_out { source; server = name }))
+    [ Node.text "Sign out" ]
+;;
+
 let health_note (m : App.Model.t) (s : Mcp_settings.Server.t) ~inject =
   let host = host_name m in
   let note level parts = div ~cls:("setting-note mcp-health " ^ level) parts in
@@ -78,13 +114,27 @@ let health_note (m : App.Model.t) (s : Mcp_settings.Server.t) ~inject =
             host
         ]
     , [] )
-  | Ready tools ->
+  | Needs_sign_in _ ->
+    ( note
+        "warm mcp-needs-sign-in"
+        [ Node.text "Needs you to sign in "
+        ; sign_in_control m ~source:Mcp_settings.source ~name:s.name ~inject
+        ]
+    , [] )
+  | Ready { tools; signed_in } ->
     let shown = Set.mem m.mcp.expanded s.name in
     ( note
         "good"
-        [ Node.textf "Ready on %s · " host
-        ; tools_button ~shown ~name:s.name ~count:(List.length tools) ~inject
-        ]
+        ([ Node.textf "Ready on %s · " host
+         ; tools_button ~shown ~name:s.name ~count:(List.length tools) ~inject
+         ]
+         @
+         if signed_in
+         then
+           [ Node.text " · Signed in "
+           ; sign_out_control m ~source:Mcp_settings.source ~name:s.name ~inject
+           ]
+         else [])
     , if shown then [ tools_list tools ] else [] )
 ;;
 
@@ -438,15 +488,21 @@ let host_row (m : App.Model.t) (s : Mcp_server.t) ~inject =
     | Ready ->
       ( div
           ~cls:"setting-note good mcp-health"
-          [ Node.text "Ready · "
-          ; button
-              ~cls:"mcp-tools-toggle"
-              ~attrs:[ Attr.create "aria-expanded" (Bool.to_string shown) ]
-              ~title:(if shown then "Hide its tools" else "Show its tools")
-              ~on_click:(inject (Action.Mcp_show_tools ("host:" ^ s.name)))
-              [ Node.text (plural (List.length s.tools) "tool") ]
-          ]
-      , [] )
+          ([ Node.text "Ready · "
+           ; button
+               ~cls:"mcp-tools-toggle"
+               ~attrs:[ Attr.create "aria-expanded" (Bool.to_string shown) ]
+               ~title:(if shown then "Hide its tools" else "Show its tools")
+               ~on_click:(inject (Action.Mcp_show_tools ("host:" ^ s.name)))
+               [ Node.text (plural (List.length s.tools) "tool") ]
+           ]
+           @ if s.signed_in then [ Node.text " · Signed in" ] else [])
+      , if s.signed_in
+        then [ sign_out_control m ~source:s.source ~name:s.name ~inject ]
+        else [] )
+    | Needs_sign_in ->
+      ( span ~cls:"setting-note warm mcp-health" "Needs you to sign in"
+      , [ sign_in_control m ~source:s.source ~name:s.name ~inject ] )
     | Failed ->
       ( span
           ~cls:"setting-note warm mcp-health"

@@ -19,15 +19,27 @@ end
 
 type t
 
+module Connect_error : sig
+  type t =
+    { message : string (** what failed, with the end of a process's stderr *)
+    ; needs_sign_in : bool
+      (** an HTTP server answered 401 and advertises OAuth
+          ({!Mcp_oauth.discover}) *)
+    }
+  [@@deriving sexp_of]
+end
+
 (** Starts the server (as a process in [sw], in [server.dir]) and performs
     the [initialize] handshake, giving up after [timeout] (default 60s).
-    Errors say what failed, with the end of a process's stderr. *)
+    An HTTP server's requests carry [Authorization: Bearer (bearer ())]
+    (read at every request) unless its [headers] have an [Authorization]. *)
 val connect
   :  env:Env.t
   -> sw:Switch.t
   -> ?timeout:Time_ns.Span.t
+  -> ?bearer:(unit -> string option)
   -> Mcp_config.Server.t
-  -> t Or_error.t
+  -> (t, Connect_error.t) Result.t
 
 (** [tools/list], following pagination. Cached until the server sends
     [notifications/tools/list_changed]. *)
@@ -46,6 +58,9 @@ val call
 (** [Some reason] once the connection is unusable (the process exited, the
     stream closed). *)
 val failure : t -> string option
+
+(** Whether it failed because the server wants a (new) OAuth sign-in. *)
+val needs_sign_in : t -> bool
 
 (** Stops the server: closes its stdin, then kills its process group. *)
 val close : t -> unit

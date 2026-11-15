@@ -435,7 +435,8 @@ let rec apply t (event : Event.t) =
   | Memory_changed _
   | Custom_instructions_changed _
   | User_info_changed _
-  | Mcp_settings_changed _ -> t
+  | Mcp_settings_changed _
+  | Mcp_auth_changed -> t
 ;;
 
 let rec received (event : Event.t) ~at : Event.t =

@@ -22,6 +22,23 @@ open! Import
     rank below it: a project's [.mcp.json], then [~/.prigh/mcp.json], then
     the settings. *)
 
+(** A server's [oauth]: the OAuth client to sign in with when its
+    authorization server offers no dynamic client registration
+    ({!Mcp_oauth}). *)
+module Oauth : sig
+  type t =
+    { client_id : string (** [clientId] *)
+    ; client_secret : string option (** [clientSecret] *)
+    ; scopes : string list option (** [scopes]: a list, or a string *)
+    }
+  [@@deriving compare]
+
+  (** With the secret hidden. *)
+  val sexp_of_t : t -> Sexp.t
+
+  val to_json : t -> Json.t
+end
+
 module Transport : sig
   type t =
     | Stdio of
@@ -32,10 +49,12 @@ module Transport : sig
     | Http of
         { url : string
         ; headers : (string * string) list
+        ; oauth : Oauth.t option
         }
   [@@deriving compare]
 
-  (** With the values of [env] and [headers] hidden: they hold secrets. *)
+  (** With the values of [env] and [headers], and the OAuth client's
+      secret, hidden: they hold secrets. *)
   val sexp_of_t : t -> Sexp.t
 end
 

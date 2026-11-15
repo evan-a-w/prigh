@@ -41,6 +41,7 @@ module Draft = struct
     ; args : string
     ; url : string
     ; pairs : Pair.t list
+    ; oauth : Mcp_settings.Oauth.t option
     ; saving : bool
     ; error : string option
     }
@@ -54,6 +55,7 @@ module Draft = struct
     ; args = ""
     ; url = ""
     ; pairs = []
+    ; oauth = None
     ; saving = false
     ; error = None
     }
@@ -72,9 +74,10 @@ module Draft = struct
       ; args = String.concat ~sep:"\n" args
       ; pairs = pairs env
       }
-    | Http { url; headers } ->
+    | Http { url; headers; oauth } ->
       { empty with
-        editing = Some s.name
+        oauth
+      ; editing = Some s.name
       ; name = s.name
       ; kind = Http
       ; url
@@ -114,7 +117,7 @@ module Draft = struct
         let url = String.strip t.url in
         if String.is_empty url
         then Error "give the server's URL, e.g. https://example.com/mcp"
-        else Ok (Http { url; headers = pairs }))
+        else Ok (Http { url; headers = pairs; oauth = t.oauth }))
   ;;
 end
 
@@ -146,7 +149,11 @@ module Health = struct
   type t =
     | Off
     | Checking
-    | Ready of Mcp_server.Tool.t list
+    | Ready of
+        { tools : Mcp_server.Tool.t list
+        ; signed_in : bool
+        }
+    | Needs_sign_in of string
     | Failed of string
     | Overridden of string
     | Not_listed
@@ -163,6 +170,7 @@ type t =
   ; removing : string option
   ; expanded : String.Set.t
   ; busy : String.Set.t
+  ; sign_in_links : string String.Map.t
   ; error : string option
   }
 [@@deriving sexp_of, equal]
@@ -177,6 +185,7 @@ let empty =
   ; removing = None
   ; expanded = String.Set.empty
   ; busy = String.Set.empty
+  ; sign_in_links = String.Map.empty
   ; error = None
   }
 ;;
@@ -206,8 +215,22 @@ let loaded t = function
   | Error e -> { t with status = Failed e }
 ;;
 
+let server_key ~source ~name = source ^ "#" ^ name
+
 let host_listed t = function
-  | Ok l -> { t with host = Some l; host_error = None; busy = String.Set.empty }
+  | Ok (l : Mcp_list.t) ->
+    let sign_in_links =
+      Map.filter_keys t.sign_in_links ~f:(fun key ->
+        List.exists l.servers ~f:(fun (s : Mcp_server.t) ->
+          Mcp_server.Status.equal s.status Needs_sign_in
+          && String.equal key (server_key ~source:s.source ~name:s.name)))
+    in
+    { t with
+      host = Some l
+    ; host_error = None
+    ; busy = String.Set.empty
+    ; sign_in_links
+    }
   | Error e -> { t with host_error = Some e; busy = String.Set.empty }
 ;;
 
@@ -227,7 +250,9 @@ let health t (s : Mcp_settings.Server.t) : Health.t =
          Overridden h.source
        | Some h ->
          (match h.status with
-          | Ready -> Ready h.tools
+          | Ready -> Ready { tools = h.tools; signed_in = h.signed_in }
+          | Needs_sign_in ->
+            Needs_sign_in (Option.value h.error ~default:"it needs a sign-in")
           | Failed -> Failed (Option.value h.error ~default:"it did not start")
           | Needs_approval -> Not_listed)))
 ;;
@@ -413,4 +438,30 @@ let escape t =
   else if Option.is_some t.draft
   then Some (cancel t)
   else None
+;;
+
+let sign_in_link t ~source ~name =
+  Map.find t.sign_in_links (server_key ~source ~name)
+;;
+
+let signing_in t ~source ~name =
+  { t with
+    busy = Set.add t.busy name
+  ; sign_in_links = Map.remove t.sign_in_links (server_key ~source ~name)
+  }
+;;
+
+let sign_in_started t ~source ~name = function
+  | Ok url ->
+    { t with
+      busy = Set.remove t.busy name
+    ; sign_in_links =
+        Map.set t.sign_in_links ~key:(server_key ~source ~name) ~data:url
+    ; error = None
+    }
+  | Error e ->
+    { t with
+      busy = Set.remove t.busy name
+    ; error = Some (sprintf "signing in to %s failed: %s" name e)
+    }
 ;;

@@ -15,6 +15,15 @@ module Method = struct
         { source : string
         ; server : string
         }
+    | Mcp_sign_in of
+        { source : string
+        ; server : string
+        ; redirect_base : string option
+        }
+    | Mcp_sign_out of
+        { source : string
+        ; server : string
+        }
     | Set_archived of
         { path : string
         ; archived : bool
@@ -208,6 +217,8 @@ module Method = struct
     | List_skills -> "list_skills"
     | List_mcp _ -> "list_mcp"
     | Mcp_approve _ -> "mcp_approve"
+    | Mcp_sign_in _ -> "mcp_signin"
+    | Mcp_sign_out _ -> "mcp_signout"
     | Set_archived _ -> "set_archived"
     | Set_pinned _ -> "set_pinned"
     | Delete_sessions _ -> "delete_sessions"
@@ -380,8 +391,12 @@ module Method = struct
     | List_worktrees { cwd = None } -> []
     | List_worktrees { cwd = Some cwd } -> [ "cwd", Json.str cwd ]
     | List_mcp { reconnect = true } -> [ "reconnect", Json.bool true ]
-    | Mcp_approve { source; server } ->
+    | Mcp_approve { source; server } | Mcp_sign_out { source; server } ->
       [ "source", Json.str source; "server", Json.str server ]
+    | Mcp_sign_in { source; server; redirect_base } ->
+      [ "source", Json.str source; "server", Json.str server ]
+      @ Option.value_map redirect_base ~default:[] ~f:(fun b ->
+        [ "redirect_base", Json.str b ])
     | Set_archived { path; archived } ->
       [ "path", Json.str path; "archived", Json.bool archived ]
     | Set_pinned { path; pinned } ->

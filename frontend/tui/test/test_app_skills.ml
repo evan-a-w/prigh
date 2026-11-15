@@ -788,7 +788,7 @@ let%expect_test
        db  needs approval  /work/.mcp.json
     ────────────────────────────────────────────────────────────────────────────────
     >
-    deepseek-flash  $0.01  Enter approves a server or lists its tools · Esc closes
+    deepseek-flash  think:off  Enter approves, signs in or lists tools · Esc closes
     |}];
   H.enter h;
   H.show h;
@@ -892,7 +892,7 @@ let%expect_test
        db  ready, 1 tool  /work/.mcp.json
     ───────────────────────────────────────────────── approved db: ready, 1 tool ───
     >
-    deepseek-flash  $0.01  Enter approves a server or lists its tools · Esc closes
+    deepseek-flash  think:off  Enter approves, signs in or lists tools · Esc closes
     |}];
   H.esc h;
   H.mode h;
@@ -976,7 +976,7 @@ let%expect_test
     ┌─ Error ──────────────────────────────────────────────────┐
     │ usage: /mcp [reconnect], /mcp add NAME URL|COMMAND       │
     │ [ARGS...], /mcp add {"NAME": {...}} (mcpServers JSON),   │
-    │ /mcp remove|enable|disable NAME                          │
+    │ /mcp remove|enable|disable|signin|signout NAME           │
     └────────────────────────────────────────── Esc dismisses ─┘
     ────────────────────────────────────────────────────────────
     > /mcp restart▏
@@ -999,14 +999,176 @@ let%expect_test "/help lists the skill and MCP commands" =
       earlier answer
     ┌─ /mcp ───────────────────────────────────────────────────┐
     │ /mcp [reconnect|add|remove ...]  list MCP servers (Enter │
-    │ approves one or lists its tools); reconnect restarts     │
-    │ failed ones; add NAME URL|COMMAND [ARGS...] (or add      │
-    │ {mcpServers JSON}), remove, enable or disable NAME       │
-    │ change the servers in your settings, which run on every  │
-    │ host                                                     │
+    │ approves one, signs in to one or lists its tools);       │
+    │ reconnect restarts failed ones; add NAME URL|COMMAND     │
+    │ [ARGS...] (or add {mcpServers JSON}), remove, enable or  │
+    │ disable NAME change the servers in your settings, which  │
+    │ run on every host; signin NAME opens a remote server's   │
+    │ OAuth sign-in in the browser, signout NAME forgets it    │
     └───────────────────────────────────────────── Esc closes ─┘
     ────────────────────────────────────────────────────────────
     > ▏
     deepseek-flash  ctx:0.1%/1.0M  ↑↓ scroll · Esc closes
+    |}]
+;;
+
+let sign_in_json ~status ~signed_in =
+  sprintf
+    {|{"servers":[{"name":"figma","source":"settings","project":false,"status":"%s",%s"url":"https://mcp.figma.com/mcp","signed_in":%b,"tools":[%s]}],"problems":[]}|}
+    status
+    (if signed_in
+     then ""
+     else
+       {|"error":"https://mcp.figma.com/mcp needs you to sign in (HTTP 401)",|})
+    signed_in
+    (if signed_in
+     then {|{"name":"mcp__figma__get_code","description":""}|}
+     else "")
+;;
+
+let%expect_test
+    "/mcp: a remote server needing a sign-in; Enter shows the page and the \
+     sign-in coming back says so"
+  =
+  let h = connected ~width:80 () in
+  H.keys h "/mcp";
+  H.enter h;
+  H.enter h;
+  H.reply ~quiet:true h Mcp_settings_for_picker no_settings;
+  H.reply
+    h
+    (Mcp_picker [])
+    (sign_in_json ~status:"needs_sign_in" ~signed_in:false);
+  H.show h;
+  H.enter h;
+  H.reply
+    h
+    (Mcp_sign_in_url "figma")
+    {|{"url":"https://www.figma.com/oauth?client_id=c&state=s"}|};
+  H.show h;
+  (* The browser came back to the backend: it says so to every client. *)
+  H.event h Mcp_auth_changed;
+  H.reply h Mcp_auth_refreshed (sign_in_json ~status:"ready" ~signed_in:true);
+  H.show h;
+  [%expect
+    {|
+    (Rpc (method_ get_mcp_settings) (params ()) (tag Mcp_settings_for_picker))
+
+
+
+
+
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    MCP servers  (1)
+    / ▏
+    ▸  figma  needs sign-in: Enter signs in  Settings
+    ────────────────────────────────────────────────────────────────────────────────
+    >
+    deepseek-flash  think:off  Enter approves, signs in or lists tools · Esc closes
+    (Rpc
+      (method_ mcp_signin)
+      (params (
+        (source settings)
+        (server figma)))
+      (tag (Mcp_sign_in_url figma)))
+    (Copy_to_clipboard https://www.figma.com/oauth?client_id=c&state=s)
+    (Open_browser https://www.figma.com/oauth?client_id=c&state=s)
+
+
+
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ┌─ MCP sign-in: figma ─────────────────────────────────────────────────────────┐
+    │ Open this page to sign in (copied; opening your browser):                    │
+    │   https://www.figma.com/oauth?client_id=c&state=s                            │
+    │ The server reconnects once you have signed in.                               │
+    └───────────────────────────────────────────────────────────────── Esc closes ─┘
+    ────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    deepseek-flash  think:off  ↑↓ scroll · Esc closes · typing goes to the editor
+    (Rpc (method_ list_mcp) (params ()) (tag Mcp_auth_refreshed))
+
+
+
+
+
+
+
+
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ─────────────────────── MCP sign-ins changed: figma ready, 1 tool, signed in ───
+    > ▏
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
+    |}]
+;;
+
+let%expect_test "/mcp signin NAME and /mcp signout NAME" =
+  let h = connected ~width:80 () in
+  let listing = sign_in_json ~status:"ready" ~signed_in:true in
+  H.keys h "/mcp signout figma";
+  H.enter h;
+  H.reply h (Mcp_sign_out_lookup "figma") listing;
+  H.reply
+    h
+    (Mcp_signed_out "figma")
+    (sign_in_json ~status:"needs_sign_in" ~signed_in:false);
+  H.show h;
+  H.keys h "/mcp signin nope";
+  H.enter h;
+  H.reply h (Mcp_sign_in_lookup "nope") listing;
+  H.show h;
+  [%expect
+    {|
+    (Rpc (method_ list_mcp) (params ()) (tag (Mcp_sign_out_lookup figma)))
+    (Rpc
+      (method_ mcp_signout)
+      (params (
+        (source settings)
+        (server figma)))
+      (tag (Mcp_signed_out figma)))
+
+
+
+
+
+
+
+
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ──────────────────────────────────────────────────────── signed out of figma ───
+    > ▏
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
+    (Rpc (method_ list_mcp) (params ()) (tag (Mcp_sign_in_lookup nope)))
+
+
+
+
+
+
+
+
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ──────────────────────── no MCP server nope; servers: figma; /mcp lists them ───
+    > ▏
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
     |}]
 ;;

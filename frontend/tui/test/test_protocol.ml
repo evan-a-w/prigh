@@ -1417,6 +1417,14 @@ let%expect_test "skills and MCP requests" =
     ; List_mcp { reconnect = false }
     ; List_mcp { reconnect = true }
     ; Mcp_approve { source = "/p/.mcp.json"; server = "fs" }
+    ; Mcp_sign_in
+        { source = "settings"
+        ; server = "figma"
+        ; redirect_base = Some "https://prigh.example"
+        }
+    ; Mcp_sign_in
+        { source = "settings"; server = "figma"; redirect_base = None }
+    ; Mcp_sign_out { source = "settings"; server = "figma" }
     ]
     ~f:(fun m -> print_endline (Request.to_line (Request.create ~id:1 m)));
   [%expect
@@ -1425,6 +1433,9 @@ let%expect_test "skills and MCP requests" =
     {"id":1,"method":"list_mcp","params":{}}
     {"id":1,"method":"list_mcp","params":{"reconnect":true}}
     {"id":1,"method":"mcp_approve","params":{"source":"/p/.mcp.json","server":"fs"}}
+    {"id":1,"method":"mcp_signin","params":{"source":"settings","server":"figma","redirect_base":"https://prigh.example"}}
+    {"id":1,"method":"mcp_signin","params":{"source":"settings","server":"figma"}}
+    {"id":1,"method":"mcp_signout","params":{"source":"settings","server":"figma"}}
     |}]
 ;;
 
@@ -1463,6 +1474,8 @@ let%expect_test "list_skills and list_mcp results" =
         (project true)
         (status  Ready)
         (error ())
+        (url   ())
+        (signed_in false)
         (tools ((
           (name        mcp__fs__read_file)
           (description "Read a file")))))
@@ -1471,12 +1484,16 @@ let%expect_test "list_skills and list_mcp results" =
         (project false)
         (status  Failed)
         (error ("exited 1"))
+        (url ())
+        (signed_in false)
         (tools ()))
        ((name    db)
         (source  /p/.mcp.json)
         (project true)
         (status  Needs_approval)
         (error ())
+        (url   ())
+        (signed_in false)
         (tools ()))))
      (problems (
        "/p/.mcp.json: server \"x\": give a \"command\" (stdio) or a \"url\" (http)")))
@@ -2222,7 +2239,9 @@ let%expect_test "MCP servers in the settings: requests, the event, round trips" 
               ; args = [ "-y"; "server fs" ]
               ; env = [ "TOKEN", "s3cret" ]
               } )
-        ; "web", Http { url = "https://example.com/mcp"; headers = [] }
+        ; ( "web"
+          , Http { url = "https://example.com/mcp"; headers = []; oauth = None }
+          )
         ]
     ; Add_mcp_servers_text { text = {|{"a":{"command":"a"}}|} }
     ; Update_mcp_server
@@ -2232,6 +2251,7 @@ let%expect_test "MCP servers in the settings: requests, the event, round trips" 
             Http
               { url = "https://example.com/mcp"
               ; headers = [ "Authorization", "Bearer t" ]
+              ; oauth = None
               }
         }
     ; Update_mcp_server
@@ -2299,5 +2319,55 @@ let%expect_test "MCP servers in the settings: requests, the event, round trips" 
         "while decoding"
         "{\"type\":\"event\",\"event\":\"mcp_settings_changed\",\"servers\":[{\"name\":\"x\",\"enabled\":true,\"config\":{\"args\":[\"a\"]}}]}"
         (in servers[0] ("server \"x\"" "missing field \"command\"")))))
+    |}]
+;;
+
+let%expect_test "MCP sign-ins: the listing, the event, an OAuth client" =
+  let show json =
+    match Or_error.bind (Json.parse json) ~f:Mcp_list.of_json with
+    | Ok v -> print_s (Mcp_list.sexp_of_t v)
+    | Error e -> print_s [%message "error" (e : Error.t)]
+  in
+  show
+    {|{"servers":[{"name":"figma","source":"settings","project":false,"status":"needs_sign_in","error":"https://mcp.figma.com/mcp needs you to sign in (HTTP 401)","url":"https://mcp.figma.com/mcp","signed_in":false,"tools":[]},{"name":"docs","source":"settings","project":false,"status":"ready","url":"https://d.example/mcp","signed_in":true,"tools":[]}],"problems":[]}|};
+  [%expect
+    {|
+    ((servers (
+       ((name    figma)
+        (source  settings)
+        (project false)
+        (status  Needs_sign_in)
+        (error ("https://mcp.figma.com/mcp needs you to sign in (HTTP 401)"))
+        (url (https://mcp.figma.com/mcp))
+        (signed_in false)
+        (tools ()))
+       ((name    docs)
+        (source  settings)
+        (project false)
+        (status  Ready)
+        (error ())
+        (url (https://d.example/mcp))
+        (signed_in true)
+        (tools ()))))
+     (problems ()))
+    |}];
+  decode {|{"type":"event","event":"mcp_auth_changed"}|};
+  [%expect {| (Event Mcp_auth_changed) |}];
+  let config =
+    {|{"type":"http","url":"https://x.example/mcp","oauth":{"clientId":"app","clientSecret":"s3cret","scopes":["a","b"]}}|}
+  in
+  let transport =
+    Or_error.ok_exn
+      (Or_error.bind (Json.parse config) ~f:Mcp_settings.Transport.of_json)
+  in
+  print_s (Mcp_settings.Transport.sexp_of_t transport);
+  print_endline (Json.to_string (Mcp_settings.Transport.to_json transport));
+  [%expect
+    {|
+    (Http
+      (url https://x.example/mcp)
+      (headers ())
+      (oauth ((client_id app) (client_secret (<hidden>)) (scopes ((a b))))))
+    {"type":"http","url":"https://x.example/mcp","oauth":{"clientId":"app","clientSecret":"s3cret","scopes":["a","b"]}}
     |}]
 ;;

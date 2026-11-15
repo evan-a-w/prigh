@@ -273,6 +273,7 @@ type t =
   ; subagent_log : Subagent_log.t
   ; mcp : Mcp_hub.t option
   ; mcp_settings : Mcp_settings.t option
+  ; mcp_auth : Mcp_auth.t option
     (** the backend's own servers; [None] turns MCP off on every host *)
   ; mutable mcp_tools : Tool.t list (** as of the latest run's start *)
   ; mutable mcp_noticed : String.Set.t
@@ -2459,9 +2460,8 @@ let mcp_settings t =
   Option.value_map t.mcp_settings ~default:(`Object []) ~f:Mcp_settings.enabled
 ;;
 
-let mcp_exec t ?(cancel = Cancellation.never) ~call_id name arguments =
-  Host_ops.listing_of_result
-    (host_exec t ~cancel ~on_output:ignore ~call_id ~cwd:t.cwd ~name ~arguments)
+let mcp_tokens t =
+  Option.value_map t.mcp_auth ~default:(`Object []) ~f:Mcp_auth.tokens
 ;;
 
 let mcp_call t (context : Tool.Context.t) ~source ~server ~tool arguments =
@@ -2476,6 +2476,7 @@ let mcp_call t (context : Tool.Context.t) ~source ~server ~tool arguments =
       (Host_ops.mcp_call_args
          ~home:t.home
          ~settings:(mcp_settings t)
+         ~tokens:(mcp_tokens t)
          ~source
          ~server
          ~tool
@@ -2491,6 +2492,44 @@ let use_listing t (listing : Mcp_tools.Listing.t) =
       broadcast t (Notice notice)))
 ;;
 
+(* An MCP op whose reply is a listing ([args] given the tokens). A server
+   that refused the token sent is asked again once, when the token could
+   be refreshed. *)
+let mcp_exec t ?(cancel = Cancellation.never) name args =
+  let run tokens =
+    Host_ops.listing_of_result
+      (host_exec
+         t
+         ~cancel
+         ~on_output:ignore
+         ~call_id:"mcp"
+         ~cwd:t.cwd
+         ~name
+         ~arguments:(args ~tokens))
+  in
+  let tokens = mcp_tokens t in
+  match run tokens, t.mcp_auth with
+  | Ok (listing : Mcp_tools.Listing.t), Some auth ->
+    let sent url =
+      match tokens with
+      | `Object fields ->
+        Option.bind
+          (List.Assoc.find fields ~equal:String.equal url)
+          ~f:Json.string
+      | _ -> None
+    in
+    let renewed =
+      List.filter_map listing.servers ~f:(fun server ->
+        match server.status, server.url with
+        | Needs_sign_in _, Some url ->
+          Option.map (sent url) ~f:(fun rejected ->
+            Mcp_auth.renew auth ~url ~rejected)
+        | _ -> None)
+    in
+    if List.exists renewed ~f:Fn.id then run (mcp_tokens t) else Ok listing
+  | result, _ -> result
+;;
+
 (* The host's MCP servers as of now. A host that cannot tell (an older
    tool host, none connected) has none. *)
 let refresh_mcp t ~cancel =
@@ -2500,7 +2539,6 @@ let refresh_mcp t ~cancel =
       mcp_exec
         t
         ~cancel
-        ~call_id:"mcp"
         Host_ops.mcp_servers_op
         (Host_ops.mcp_servers_args
            ~home:t.home
@@ -2520,7 +2558,6 @@ let mcp_servers ?(reconnect = false) t =
     Or_error.map
       (mcp_exec
          t
-         ~call_id:"mcp"
          Host_ops.mcp_servers_op
          (Host_ops.mcp_servers_args
             ~home:t.home
@@ -2543,7 +2580,6 @@ let approve_mcp t ~source ~server =
     Or_error.map
       (mcp_exec
          t
-         ~call_id:"mcp"
          Host_ops.mcp_approve_op
          (Host_ops.mcp_approve_args
             ~home:t.home
@@ -2553,6 +2589,48 @@ let approve_mcp t ~source ~server =
       ~f:(fun listing ->
         use_listing t listing;
         listing)
+;;
+
+let mcp_signed_in t ~url =
+  Option.value_map t.mcp_auth ~default:false ~f:(fun auth ->
+    Mcp_auth.signed_in auth ~url)
+;;
+
+(* The server's URL and OAuth client, as the host defines it now. *)
+let mcp_server_url t ~source ~server =
+  match t.mcp_auth with
+  | None ->
+    Or_error.error_string
+      "this backend keeps no MCP sign-ins (it has no credential store)"
+  | Some auth ->
+    let open Or_error.Let_syntax in
+    let%bind listing = mcp_servers t in
+    (match
+       List.find listing.servers ~f:(fun (s : Mcp_tools.Server.t) ->
+         String.equal s.name server && String.equal s.source source)
+     with
+     | None ->
+       Or_error.errorf
+         "there is no MCP server %S from %s; /mcp lists them"
+         server
+         source
+     | Some { url = None; _ } ->
+       Or_error.errorf
+         "the MCP server %S runs a command: only HTTP servers sign in"
+         server
+     | Some ({ url = Some url; _ } as s) -> Ok (auth, url, s))
+;;
+
+let mcp_sign_in t ~source ~server ~redirect_base =
+  Or_error.bind (mcp_server_url t ~source ~server) ~f:(fun (auth, url, s) ->
+    Mcp_auth.sign_in auth ~url ~oauth:s.oauth ~redirect_base)
+;;
+
+let mcp_sign_out t ~source ~server =
+  let open Or_error.Let_syntax in
+  let%bind auth, url, _ = mcp_server_url t ~source ~server in
+  let%bind () = Mcp_auth.sign_out auth ~url in
+  mcp_servers t
 ;;
 
 let system_prompt ?(cancel = Cancellation.never) t =
@@ -3795,6 +3873,7 @@ let create
       ?trace_clock
       ?(offered = fun (_ : Tool.t) -> true)
       ?mcp_settings
+      ?mcp_auth
       ?user_info
       ?custom_instructions
       ~cwd
@@ -3912,6 +3991,7 @@ let create
     ; mcp
     ; mcp_tools = []
     ; mcp_settings
+    ; mcp_auth
     ; mcp_noticed = String.Set.empty
     ; max_budget_usd
     ; goal = None

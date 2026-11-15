@@ -44,6 +44,8 @@ module Draft : sig
     ; args : string (** one per line *)
     ; url : string
     ; pairs : Pair.t list (** [env] (stdio) or [headers] (HTTP) *)
+    ; oauth : Mcp_settings.Oauth.t option
+    (** an HTTP server's OAuth client, kept as it is *)
     ; saving : bool (** sent, no reply yet *)
     ; error : string option (** why it was not sent or was refused *)
     }
@@ -80,7 +82,11 @@ module Health : sig
   type t =
     | Off (** disabled *)
     | Checking (** the host's list is not in yet *)
-    | Ready of Mcp_server.Tool.t list
+    | Ready of
+        { tools : Mcp_server.Tool.t list
+        ; signed_in : bool (** with an OAuth sign-in *)
+        }
+    | Needs_sign_in of string (** what the server said *)
     | Failed of string
     | Overridden of string (** by the definition in this file *)
     | Not_listed (** the host does not list it (an older host) *)
@@ -96,7 +102,11 @@ type t =
   ; paste : Paste.t option
   ; removing : string option (** the server asked about *)
   ; expanded : String.Set.t (** whose tools are shown *)
-  ; busy : String.Set.t (** being switched, approved or restarted *)
+  ; busy : String.Set.t
+  (** being switched, approved, restarted, signed in or out *)
+  ; sign_in_links : string String.Map.t
+  (** the sign-in pages to open ([mcp_signin]'s), by server (source and
+      name); dropped once the server no longer needs a sign-in *)
   ; error : string option (** the last change that failed *)
   }
 [@@deriving sexp_of, equal]
@@ -154,3 +164,17 @@ val failed : t -> string -> t
 (** Esc: closes the confirmation, the paste or the draft, the innermost
     first; [None] when there is none. *)
 val escape : t -> t option
+
+(** The sign-in page to open for a server, once [mcp_signin] gave it. *)
+val sign_in_link : t -> source:string -> name:string -> string option
+
+(** [mcp_signin] was sent. *)
+val signing_in : t -> source:string -> name:string -> t
+
+(** Its reply: the page to open, or why not. *)
+val sign_in_started
+  :  t
+  -> source:string
+  -> name:string
+  -> (string, string) Result.t
+  -> t

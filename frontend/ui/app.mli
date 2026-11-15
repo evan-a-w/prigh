@@ -171,6 +171,11 @@ module Reply_tag : sig
     (** [/user-info TEXT] or [clear]; failing puts the command back *)
     | Mcp_reconnected
     | Mcp_approved of string (** server *)
+    | Mcp_sign_in_lookup of string (** [/mcp signin NAME]: find its source *)
+    | Mcp_sign_out_lookup of string
+    | Mcp_sign_in_url of string (** server *)
+    | Mcp_signed_out of string
+    | Mcp_auth_refreshed
     | Pending (** [get_pending]: confirmations and questions to show *)
     | Mode_set of string (** the notice *)
     | Refresh_state

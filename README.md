@@ -3497,6 +3497,53 @@ restart. In the composer, `/mcp add NAME URL`, `/mcp add NAME COMMAND
 remove|enable|disable NAME` do the same; a refusal puts the command back in
 the editor.
 
+#### Signing in to remote servers (OAuth)
+
+A remote (streamable HTTP) server that answers 401 and advertises OAuth (the
+MCP authorization spec: a `WWW-Authenticate` challenge with
+`resource_metadata`, or `/.well-known/oauth-protected-resource`) shows as
+**needs sign-in** rather than failed. prigh finds its authorization server
+(RFC 8414's `/.well-known/oauth-authorization-server`, else OpenID's
+`/.well-known/openid-configuration`), registers itself as a client when the
+server allows dynamic registration (RFC 7591), and signs in with the
+authorization code flow and PKCE (S256), the `resource` parameter (RFC 8707)
+and a checked `state`. A server without dynamic registration needs a client
+you registered with it, in the server's config:
+
+```json
+"docs": { "type": "http", "url": "https://docs.example.com/mcp",
+          "oauth": { "clientId": "...", "clientSecret": "...",
+                     "scopes": ["read"] } }
+```
+
+(`clientSecret` and `scopes` are optional; the secret is masked like
+headers.) In prigh-web, **Sign in** (Settings → MCP servers, or Enter on the
+server in `/mcp`) opens the server's sign-in page in a new tab; the page it
+comes back to says you can close the tab, and the server connects in every
+client at once, showing **Signed in** and **Sign out**. In the terminal,
+Enter on it in `/mcp`, or `/mcp signin NAME`, shows the page's URL, copies it
+and opens the browser; `/mcp signout NAME` forgets the sign-in (revoking the
+token when the server has a revocation endpoint).
+
+The browser comes back to `/mcp/oauth/callback` on prigh's own web server:
+prigh-web passes its own origin (so it works through a proxy, a public URL
+or on a phone, as long as the page's address is reachable from the browser
+that signs in); a terminal's sign-in uses the backend's web server
+(`-web`), or without one a listener on `127.0.0.1` that lasts until the
+sign-in ends. `prigh web -connect` forwards the callback to its backend.
+
+The tokens are the backend's, per user and server URL (`mcp:URL` entries in
+your `auth.json`, mode 600, next to your provider credentials); they reach a
+tool host only with each MCP request, never stored there. prigh refreshes a
+token before it expires and when the server rejects it; when that fails,
+the server needs a sign-in again. A server's own `Authorization` in
+`headers` wins over the sign-in. Without OAuth metadata, a 401 still says
+to add an `Authorization` header.
+
+Figma's remote server (`https://mcp.figma.com/mcp`) is an example of a
+server using this flow; it has not been tried with prigh and may only
+accept clients it knows.
+
 ### Testing
 
 `./test` runs everything below (the dune tests one project after the other,

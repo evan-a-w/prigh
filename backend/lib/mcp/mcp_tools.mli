@@ -9,6 +9,7 @@ module Status : sig
     | Ready
     | Failed of string
     | Needs_approval
+    | Needs_sign_in of string
   [@@deriving sexp_of]
 end
 
@@ -19,6 +20,8 @@ module Server : sig
     ; project : bool
     ; status : Status.t
     ; tools : Mcp_client.Tool.t list
+    ; url : string option (** an HTTP server's *)
+    ; oauth : Mcp_config.Oauth.t option (** its configured client *)
     }
   [@@deriving sexp_of]
 end
@@ -35,11 +38,13 @@ module Listing : sig
   val to_json : t -> Json.t
   val of_json : Json.t -> t Or_error.t
 
-  (** The RPC's [list_mcp] result: tools under their prigh names. *)
-  val to_rpc_json : t -> Json.t
+  (** The RPC's [list_mcp] result: tools under their prigh names, an HTTP
+      server's [url] and whether the user is [signed_in] to it (never the
+      OAuth client's configuration). *)
+  val to_rpc_json : ?signed_in:(string -> bool) -> t -> Json.t
 
-  (** One line per problem, failed server and server awaiting approval,
-      each saying what to do. *)
+  (** One line per problem, failed server and server awaiting approval or a
+      sign-in, each saying what to do. *)
   val notices : t -> string list
 end
 

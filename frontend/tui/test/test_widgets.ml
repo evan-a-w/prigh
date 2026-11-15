@@ -765,7 +765,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /skills                            pick a skill to run (Enter puts /skill:NAME in the editor)
     /skill:NAME [args]                 run a skill, with what follows as its arguments
     /snippet [NAME|add|rm]             insert a saved text at the cursor (none: pick one, Alt+N); add NAME [TEXT] saves one (no TEXT: your last prompt), rm NAME deletes it
-    /mcp [reconnect|add|remove ...]    list MCP servers (Enter approves one or lists its tools); reconnect restarts failed ones; add NAME URL|COMMAND [ARGS...] (or add {mcpServers JSON}), remove, enable or disable NAME change the servers in your settings, which run on every host
+    /mcp [reconnect|add|remove ...]    list MCP servers (Enter approves one, signs in to one or lists its tools); reconnect restarts failed ones; add NAME URL|COMMAND [ARGS...] (or add {mcpServers JSON}), remove, enable or disable NAME change the servers in your settings, which run on every host; signin NAME opens a remote server's OAuth sign-in in the browser, signout NAME forgets it
     /retry-backend-connection          reconnect to the backend now instead of waiting for the next retry
     /state                             show session state
     /clear                             clear the transcript
@@ -2362,7 +2362,7 @@ let%expect_test "autocomplete: /skill: completes skill names" =
     /skill:zzz     none
     /skill:review x none
     /skill:        Skill prefix="" enter_accepts=false items=[] accept="/skill:"
-    /mcp           arg:mcp prefix="" enter_accepts=false items=[reconnect add remove enable disable] accept="/mcp reconnect"
+    /mcp           arg:mcp prefix="" enter_accepts=false items=[reconnect add remove enable disable signin signout] accept="/mcp reconnect"
     |}]
 ;;
 

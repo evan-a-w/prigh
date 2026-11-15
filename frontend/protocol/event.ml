@@ -169,6 +169,7 @@ type t =
   | Custom_instructions_changed of Custom_instructions.t
   | User_info_changed of User_info.t
   | Mcp_settings_changed of Mcp_settings.t
+  | Mcp_auth_changed
   | Nix_gc_progress of Nix_gc_progress.t
 [@@deriving sexp_of, equal]
 
@@ -260,6 +261,7 @@ let rec of_json j =
     Custom_instructions.of_json j >>| fun c -> Custom_instructions_changed c
   | "user_info_changed" ->
     User_info.of_json j >>| fun info -> User_info_changed info
+  | "mcp_auth_changed" -> Ok Mcp_auth_changed
   | "mcp_settings_changed" ->
     Mcp_settings.of_json j >>| fun servers -> Mcp_settings_changed servers
   | "prefs_changed" ->

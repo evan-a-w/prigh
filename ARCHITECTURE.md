@@ -805,6 +805,17 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   `Transport` sexps hide `env` and `header` values. `Mcp_client`
   is one connection (stdio child in its own process group, or streamable
   HTTP; `initialize`, `tools/list`, `tools/call`, cancellation, ping).
+  `Mcp_oauth` is the MCP authorization spec's client side (the 401
+  challenge, protected resource and authorization server metadata, dynamic
+  client registration, PKCE authorization URLs, token exchange, refresh,
+  revocation); `Mcp_auth` is the backend's sign-ins, per user (in
+  `Auth_store` entries `mcp:URL`): pending sign-ins by `state`, the
+  `/mcp/oauth/callback` page (`Mcp_callback` routes it on the web server,
+  or a one-shot loopback listener), refreshing, and `subscribe` for the
+  `mcp_auth_changed` event. The agent sends the access tokens as `tokens`
+  (by URL) with every `$mcp_*` op; a server answering 401 with OAuth
+  metadata is `needs_sign_in`, and a rejected token is renewed once
+  (`Mcp_auth.renew`) before the call is retried.
   `Mcp_hub` holds a host's running servers, shared by all its sessions: one
   per tool-host process, and one per namespace in the backend (none with
   `-no-tools`, which turns MCP off for every host). A server starts the first
@@ -2227,7 +2238,11 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   `list_mcp {reconnect?}` and `mcp_approve {source, server}` (both
   `{servers: [{name, source, project, status: ready|failed|needs_approval,
   error?, tools: [{name, description}]}], problems}`, tools under their
-  prigh names), `get_mcp_settings`, `add_mcp_servers {servers | text}`
+  prigh names; `status` may also be `needs_sign_in`, and remote servers
+  have `url` and `signed_in`), `mcp_signin {source, server,
+  redirect_base?}` (`{url}`: the page to open), `mcp_signout {source,
+  server}` (the listing; every client of the user hears
+  `mcp_auth_changed` after a sign-in or sign-out), `get_mcp_settings`, `add_mcp_servers {servers | text}`
   (an `mcpServers` object, or pasted text; all or none),
   `update_mcp_server {name, rename?, config}`, `remove_mcp_server {name}`
   and `set_mcp_server_enabled {name, enabled}` (all `{servers: [{name,

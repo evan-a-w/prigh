@@ -1,5 +1,46 @@
 open! Core
 
+module Oauth = struct
+  type t =
+    { client_id : string
+    ; client_secret : string option
+    ; scopes : string list option
+    }
+  [@@deriving sexp_of, equal]
+
+  let sexp_of_t t =
+    sexp_of_t
+      { t with
+        client_secret = Option.map t.client_secret ~f:(fun _ -> "<hidden>")
+      }
+  ;;
+
+  let to_json { client_id; client_secret; scopes } =
+    Json.obj
+      ([ "clientId", Json.str client_id ]
+       @ Option.value_map client_secret ~default:[] ~f:(fun s ->
+         [ "clientSecret", Json.str s ])
+       @ Option.value_map scopes ~default:[] ~f:(fun s ->
+         [ "scopes", `Array (List.map s ~f:Json.str) ]))
+  ;;
+
+  let of_json j =
+    let open Or_error.Let_syntax in
+    let%bind client_id = Json.string_field j "clientId" in
+    let%bind client_secret = Json.string_opt_field j "clientSecret" in
+    let%map scopes =
+      match Json.field j "scopes" with
+      | None | Some `Null -> Ok None
+      | Some _ ->
+        Json.optional_list_field j "scopes" ~f:(function
+          | `String s -> Ok s
+          | _ -> Or_error.error_string "oauth.scopes must be strings")
+        |> Or_error.map ~f:Option.some
+    in
+    { client_id; client_secret; scopes }
+  ;;
+end
+
 module Transport = struct
   type t =
     | Stdio of
@@ -10,6 +51,7 @@ module Transport = struct
     | Http of
         { url : string
         ; headers : (string * string) list
+        ; oauth : Oauth.t option [@sexp.option]
         }
   [@@deriving sexp_of, equal]
 
@@ -33,12 +75,14 @@ module Transport = struct
             then []
             else [ "args", `Array (List.map args ~f:Json.str) ])
          @ if List.is_empty env then [] else [ "env", pairs_json env ])
-    | Http { url; headers } ->
+    | Http { url; headers; oauth } ->
       Json.obj
         ([ "type", Json.str "http"; "url", Json.str url ]
-         @
-         if List.is_empty headers then [] else [ "headers", pairs_json headers ]
-        )
+         @ (if List.is_empty headers
+            then []
+            else [ "headers", pairs_json headers ])
+         @ Option.value_map oauth ~default:[] ~f:(fun o ->
+           [ "oauth", Oauth.to_json o ]))
   ;;
 
   let pairs j name =
@@ -57,8 +101,16 @@ module Transport = struct
     let open Or_error.Let_syntax in
     match Json.field j "url" with
     | Some (`String url) ->
-      let%map headers = pairs j "headers" in
-      Http { url; headers }
+      let%bind headers = pairs j "headers" in
+      let%map oauth =
+        match Json.field j "oauth" with
+        | None | Some `Null -> Ok None
+        | Some o ->
+          Oauth.of_json o
+          |> Or_error.tag ~tag:"oauth"
+          |> Or_error.map ~f:Option.some
+      in
+      Http { url; headers; oauth }
     | _ ->
       let%bind command = Json.string_field j "command" in
       let%bind args =

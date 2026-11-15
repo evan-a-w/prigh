@@ -146,6 +146,7 @@ let forward
 
 let routes ~env ~log remote (request : Web_server.Request.t) =
   Option.some_if
-    (File_http.handles ~path:request.path)
+    (File_http.handles ~path:request.path
+     || String.equal request.path Mcp_auth.callback_path)
     (forward ~env ~log remote)
 ;;

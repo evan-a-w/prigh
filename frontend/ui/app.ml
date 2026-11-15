@@ -155,6 +155,11 @@ module Reply_tag = struct
     | User_info_saved of string
     | Mcp_reconnected
     | Mcp_approved of string (** server *)
+    | Mcp_sign_in_lookup of string (** [/mcp signin NAME]: find its source *)
+    | Mcp_sign_out_lookup of string
+    | Mcp_sign_in_url of string (** server *)
+    | Mcp_signed_out of string
+    | Mcp_auth_refreshed
     | Pending
     | Mode_set of string (** the notice *)
     | Refresh_state
@@ -1839,9 +1844,19 @@ let plural n word = sprintf "%d %s%s" n word (if n = 1 then "" else "s")
 
 let mcp_status (s : P.Mcp_server.t) =
   match s.status with
-  | Ready -> "ready, " ^ plural (List.length s.tools) "tool"
+  | Ready ->
+    "ready, "
+    ^ plural (List.length s.tools) "tool"
+    ^ if s.signed_in then ", signed in" else ""
   | Failed -> "failed: " ^ Option.value s.error ~default:"unknown error"
   | Needs_approval -> "needs approval"
+  | Needs_sign_in -> "needs sign-in: Enter signs in"
+;;
+
+let mcp_sign_in (s : P.Mcp_server.t) =
+  call
+    (Mcp_sign_in { source = s.source; server = s.name; redirect_base = None })
+    ~tag:(Mcp_sign_in_url s.name)
 ;;
 
 let mcp_problems m (list : P.Mcp_list.t) =
@@ -1963,6 +1978,9 @@ let mcp_selected m (list : P.Mcp_list.t) id =
               (mcp_status s)
               (Mcp_command.edit_hint s.source))
        , [] )
+     | Needs_sign_in ->
+       ( notice m (sprintf "starting the sign-in to %s…" s.name)
+       , [ mcp_sign_in s ] )
      | Needs_approval ->
        ( notice m (sprintf "approving %s from %s…" s.name s.source)
        , [ call
@@ -1982,7 +2000,7 @@ let mcp_summary m (list : P.Mcp_list.t) : Content.t =
       match s.status with
       | Ready -> Style.fg Green
       | Failed -> Style.fg Red
-      | Needs_approval -> Style.fg Yellow
+      | Needs_approval | Needs_sign_in -> Style.fg Yellow
     in
     [ { Content.Span.text = Text_width.pad_right s.name ~width
       ; style = Style.bold Style.plain
@@ -4704,6 +4722,14 @@ let run_command m (cmd : Commands.Parsed.t) =
      | Reconnect ->
        ( notice m "reconnecting MCP servers…"
        , [ call (List_mcp { reconnect = true }) ~tag:Mcp_reconnected ] )
+     | Sign_in name ->
+       ( notice m (sprintf "starting the sign-in to %s…" name)
+       , [ call (List_mcp { reconnect = false }) ~tag:(Mcp_sign_in_lookup name)
+         ] )
+     | Sign_out name ->
+       ( notice m (sprintf "signing out of %s…" name)
+       , [ call (List_mcp { reconnect = false }) ~tag:(Mcp_sign_out_lookup name)
+         ] )
      | Change { request; done_ } ->
        ( { m with mode = Editing }
        , [ call
@@ -6796,6 +6822,8 @@ let event m (e : P.Event.t) =
   | Memory_changed memory -> memory_changed m memory, []
   | Custom_instructions_changed ci -> instructions_changed m ci, []
   | User_info_changed _ | Mcp_settings_changed _ -> m, []
+  | Mcp_auth_changed ->
+    m, [ call (List_mcp { reconnect = false }) ~tag:Mcp_auth_refreshed ]
   | Prefs_changed changes ->
     let m = filter_of_prefs m changes in
     (match
@@ -6846,6 +6874,56 @@ let skills_for_autocomplete m =
     when Autocomplete.Source.equal (Autocomplete.source ac) Skill ->
     refresh_autocomplete m
   | _ -> m, []
+;;
+
+let mcp_sign_in_title server = "MCP sign-in: " ^ server
+
+let mcp_sign_in_url m server url =
+  ( output
+      { m with notice = None }
+      ~title:(mcp_sign_in_title server)
+      (Content.lines
+         (String.concat
+            ~sep:"\n"
+            [ "Open this page to sign in (copied; opening your browser):"
+            ; "  " ^ url
+            ; "The server reconnects once you have signed in."
+            ]))
+  , [ Command.Copy_to_clipboard url; Command.Open_browser url ] )
+;;
+
+(* After a sign-in or sign-out (here or on another client): the open list
+   follows, otherwise the remote servers' states are told. *)
+let mcp_auth_refreshed m (list : P.Mcp_list.t) =
+  match m.mode with
+  | Picker { kind = Mcp _; _ } ->
+    mcp_picker ~problems:false { m with mode = Editing } list, []
+  | _ ->
+    (* The sign-in's box closes once its server is up. *)
+    let m =
+      match m.mode with
+      | Output box
+        when List.exists list.servers ~f:(fun (s : P.Mcp_server.t) ->
+               String.equal box.Output_box.title (mcp_sign_in_title s.name)
+               && not (P.Mcp_server.Status.equal s.status Needs_sign_in)) ->
+        { m with mode = Editing }
+      | _ -> m
+    in
+    let remote =
+      List.filter list.servers ~f:(fun (s : P.Mcp_server.t) ->
+        Option.is_some s.url)
+    in
+    if List.is_empty remote
+    then m, []
+    else
+      ( notice
+          m
+          ("MCP sign-ins changed: "
+           ^ String.concat
+               ~sep:"; "
+               (List.map remote ~f:(fun (s : P.Mcp_server.t) ->
+                  s.name ^ " " ^ mcp_status s)))
+      , [] )
 ;;
 
 let mcp_approved m server (list : P.Mcp_list.t) =
@@ -6968,6 +7046,11 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
          { m with skills = Location_cache.set m.skills ~key [] }
      | Mcp_approved server ->
        error m (sprintf "approving MCP server %s failed: %s" server e), []
+     | Mcp_sign_in_lookup server | Mcp_sign_in_url server ->
+       error m (sprintf "signing in to MCP server %s failed: %s" server e), []
+     | Mcp_sign_out_lookup server | Mcp_signed_out server ->
+       error m (sprintf "signing out of MCP server %s failed: %s" server e), []
+     | Mcp_auth_refreshed -> m, []
      | Mcp_settings_for_picker ->
        (* An older backend, without servers in the settings. *)
        m, [ call (List_mcp { reconnect = false }) ~tag:(Mcp_picker []) ]
@@ -7070,6 +7153,38 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
          else output m ~title:"MCP servers" (mcp_summary m list), [])
      | Mcp_approved server ->
        decode json ~f:P.Mcp_list.of_json (mcp_approved m server)
+     | Mcp_sign_in_lookup name ->
+       decode json ~f:P.Mcp_list.of_json (fun list ->
+         match Mcp_command.find_server list name with
+         | Error e -> error m (e ^ "; /mcp lists them"), []
+         | Ok s when Option.is_none s.url ->
+           ( error
+               m
+               (sprintf
+                  "%s is not a remote (HTTP) server: it has no sign-in"
+                  name)
+           , [] )
+         | Ok s -> m, [ mcp_sign_in s ])
+     | Mcp_sign_out_lookup name ->
+       decode json ~f:P.Mcp_list.of_json (fun list ->
+         match Mcp_command.find_server list name with
+         | Error e -> error m (e ^ "; /mcp lists them"), []
+         | Ok s ->
+           ( m
+           , [ call
+                 (Mcp_sign_out { source = s.source; server = s.name })
+                 ~tag:(Mcp_signed_out name)
+             ] ))
+     | Mcp_sign_in_url server ->
+       decode
+         json
+         ~f:(fun j -> P.Json.string_field j "url")
+         (mcp_sign_in_url m server)
+     | Mcp_signed_out server ->
+       decode json ~f:P.Mcp_list.of_json (fun _ ->
+         notice m (sprintf "signed out of %s" server), [])
+     | Mcp_auth_refreshed ->
+       decode json ~f:P.Mcp_list.of_json (mcp_auth_refreshed m)
      | Pending ->
        decode json ~f:P.Pending.of_json (fun pending ->
          let m =

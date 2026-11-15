@@ -6,6 +6,7 @@ module Status = struct
     | Ready of Mcp_client.Tool.t list
     | Failed of string
     | Needs_approval
+    | Needs_sign_in of string
   [@@deriving sexp_of]
 end
 
@@ -20,7 +21,8 @@ end
 module Entry = struct
   type t =
     { server : Mcp_config.Server.t
-    ; client : (Mcp_client.t, string) Result.t Promise.t
+    ; client : (Mcp_client.t, Mcp_client.Connect_error.t) Result.t Promise.t
+    ; bearer : string option (** the token it started with *)
     }
 
   let same_server t (server : Mcp_config.Server.t) =
@@ -33,11 +35,23 @@ type t =
   { env : Env.t
   ; sw : Switch.t
   ; entries : Entry.t String.Table.t (** by {!Mcp_config.Server.key} *)
+  ; mutable tokens : string String.Map.t (** by server URL *)
   ; mutable closed : bool
   }
 
 let create ~env ~sw () =
-  { env; sw; entries = String.Table.create (); closed = false }
+  { env
+  ; sw
+  ; entries = String.Table.create ()
+  ; tokens = String.Map.empty
+  ; closed = false
+  }
+;;
+
+let bearer t (server : Mcp_config.Server.t) =
+  match server.transport with
+  | Http { url; _ } -> Map.find t.tokens url
+  | Stdio _ -> None
 ;;
 
 let close_entry t (entry : Entry.t) =
@@ -62,16 +76,24 @@ let start t (server : Mcp_config.Server.t) =
   Hashtbl.set
     t.entries
     ~key:(Mcp_config.Server.key server)
-    ~data:{ server; client };
+    ~data:{ server; client; bearer = bearer t server };
+  let error message =
+    Error { Mcp_client.Connect_error.message; needs_sign_in = false }
+  in
   Fiber.fork ~sw:t.sw (fun () ->
     let result =
-      match Mcp_client.connect ~env:t.env ~sw:t.sw server with
-      | Ok client -> Ok client
-      | Error e -> Error (Error.to_string_hum e)
+      match
+        Mcp_client.connect
+          ~env:t.env
+          ~sw:t.sw
+          ~bearer:(fun () -> bearer t server)
+          server
+      with
+      | result -> result
       | exception (Eio.Cancel.Cancelled _ as exn) ->
-        Promise.resolve resolver (Error "the MCP hub was shut down");
+        Promise.resolve resolver (error "the MCP hub was shut down");
         raise exn
-      | exception exn -> Error (Exn.to_string exn)
+      | exception exn -> error (Exn.to_string exn)
     in
     if t.closed then Result.iter result ~f:Mcp_client.close;
     Promise.resolve resolver result);
@@ -84,19 +106,38 @@ let client t ~reconnect (server : Mcp_config.Server.t) =
     match Hashtbl.find t.entries (Mcp_config.Server.key server) with
     | None -> start t server
     | Some entry ->
+      (* A new token retries a server that wanted a sign-in; losing it
+         (signing out) disconnects one that had it. *)
+      let bearer = bearer t server in
+      let changed = not (Option.equal String.equal bearer entry.bearer) in
       (match Promise.peek entry.client with
        | None -> entry.client
        | Some (Ok client) when Option.is_none (Mcp_client.failure client) ->
-         entry.client
+         if changed && Option.is_none bearer
+         then start t server
+         else entry.client
        | Some (Ok _ | Error _) ->
-         if reconnect then start t server else entry.client)
+         if reconnect || changed then start t server else entry.client)
   in
   match Promise.await promise with
   | Error e -> Error e
   | Ok client ->
     (match Mcp_client.failure client with
      | None -> Ok client
-     | Some failure -> Error failure)
+     | Some message ->
+       Error { message; needs_sign_in = Mcp_client.needs_sign_in client })
+;;
+
+let status_of_error ({ message; needs_sign_in } : Mcp_client.Connect_error.t)
+  : Status.t
+  =
+  if needs_sign_in then Needs_sign_in message else Failed message
+;;
+
+let set_tokens t = function
+  | None -> ()
+  | Some tokens ->
+    t.tokens <- String.Map.of_alist_reduce tokens ~f:(fun _ latest -> latest)
 ;;
 
 (* Stops the servers from the settings that the settings no longer define
@@ -117,7 +158,16 @@ let prune_settings t ~home settings =
   List.iter stale ~f:(fun (_, entry) -> close_entry t entry)
 ;;
 
-let servers t ?(reconnect = false) ?(settings = `Object []) ~cwd ~home () =
+let servers
+      t
+      ?(reconnect = false)
+      ?(settings = `Object [])
+      ?tokens
+      ~cwd
+      ~home
+      ()
+  =
+  set_tokens t tokens;
   prune_settings t ~home settings;
   let { Mcp_config.Discovered.servers; problems } =
     Mcp_config.discover ~settings ~cwd ~home ()
@@ -130,11 +180,14 @@ let servers t ?(reconnect = false) ?(settings = `Object []) ~cwd ~home () =
            then Needs_approval
            else (
              match client t ~reconnect server with
-             | Error e -> Failed e
+             | Error e -> status_of_error e
              | Ok client ->
                (match Mcp_client.tools client with
                 | Ok tools -> Ready tools
-                | Error e -> Failed (Error.to_string_hum e)))
+                | Error e ->
+                  if Mcp_client.needs_sign_in client
+                  then Needs_sign_in (Error.to_string_hum e)
+                  else Failed (Error.to_string_hum e)))
          in
          { Server_status.server; status })
       servers
@@ -142,7 +195,19 @@ let servers t ?(reconnect = false) ?(settings = `Object []) ~cwd ~home () =
   statuses, problems
 ;;
 
-let call t ~cancel ~settings ~source ~server:name ~home ~tool ~arguments =
+let call
+      t
+      ~cancel
+      ~settings
+      ?tokens
+      ~source
+      ~server:name
+      ~home
+      ~tool
+      ~arguments
+      ()
+  =
+  set_tokens t tokens;
   match Mcp_config.find ~settings ~home ~source name with
   | Error e -> Tool_result.error (Error.to_string_hum e)
   | Ok server when not (Mcp_config.is_approved ~home server) ->
@@ -157,13 +222,21 @@ let call t ~cancel ~settings ~source ~server:name ~home ~tool ~arguments =
          client t ~reconnect:false server)
      with
      | None -> Tool_result.error "[cancelled]"
-     | Some (Error e) ->
+     | Some (Error { message; needs_sign_in = true }) ->
+       Tool_result.error
+         (sprintf
+            "the MCP server %S is not running: %s; the user can sign in with \
+             /mcp signin %s (or in Settings → MCP servers)"
+            name
+            message
+            name)
+     | Some (Error { message; needs_sign_in = false }) ->
        Tool_result.error
          (sprintf
             "the MCP server %S is not running: %s; once that is fixed, \
              reconnect it with /mcp"
             name
-            e)
+            message)
      | Some (Ok client) -> Mcp_client.call client ~cancel ~tool ~arguments)
 ;;
 

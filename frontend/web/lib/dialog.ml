@@ -95,6 +95,12 @@ type t =
       }
   | Pasted of int
   | Mcp_tools of Mcp_server.t
+  | Mcp_sign_in of
+      { source : string
+      ; server : string
+      ; url : string option
+      ; error : string option
+      }
   | Loading of string
   | Diff of Git_diff.t
   | Pulls of Pull_requests.t
@@ -137,6 +143,7 @@ let per_session = function
   | Text _
   | Pasted _
   | Mcp_tools _
+  | Mcp_sign_in _
   | Loading _
   | Diff _
   | Pulls _

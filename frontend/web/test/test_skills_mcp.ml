@@ -744,7 +744,7 @@ let%expect_test "/mcp reconnect reports; no servers says where to add them" =
     MCP servers: 1 ready (1 tool)
     No MCP servers: configure them under "mcpServers" in ~/.prigh/mcp.json, or in a project's .mcp.json.
     No MCP servers: configure them under "mcpServers" in ~/.prigh/mcp.json, or in a project's .mcp.json.
-    Usage: /mcp [reconnect], /mcp add NAME URL|COMMAND [ARGS...], /mcp add {"NAME": {...}} (mcpServers JSON), /mcp remove|enable|disable NAME
+    Usage: /mcp [reconnect], /mcp add NAME URL|COMMAND [ARGS...], /mcp add {"NAME": {...}} (mcpServers JSON), /mcp remove|enable|disable|signin|signout NAME
     Couldn't list the MCP servers: unknown method list_mcp
     |}]
 ;;
@@ -817,5 +817,100 @@ let%expect_test "/help /skill: and /help mcp" =
     (Expire_toast (id 1) (after_ms 4980))
     /skill:<name> [args]: send a skill's instructions to the agent, with your arguments
     /mcp [reconnect]: MCP servers: their tools, approve a project's, or restart failed ones
+    |}]
+;;
+
+let last_toast h = print_endline (List.last_exn (H.model h).toasts).text
+
+let%expect_test "/mcp: Enter signs in to a remote server; it closes when done" =
+  let h = H.create () in
+  let last_toast () = last_toast h in
+  H.act h (Set_origin "https://prigh.example");
+  run h "/mcp";
+  H.reply
+    h
+    "list_mcp"
+    {|{"servers":[{"name":"figma","source":"settings","project":false,"status":"needs_sign_in","error":"https://mcp.figma.com/mcp needs you to sign in (HTTP 401)","url":"https://mcp.figma.com/mcp","signed_in":false,"tools":[]}],"problems":[]}|};
+  H.text h ~selector:".picker-item";
+  H.key h "Enter" ~target:Field;
+  H.text h ~selector:".modal";
+  H.reply h "mcp_signin" {|{"url":"https://www.figma.com/oauth?state=s"}|};
+  H.text h ~selector:".modal";
+  H.event h {|{"type":"event","event":"mcp_auth_changed"}|};
+  H.reply
+    h
+    "list_mcp"
+    {|{"servers":[{"name":"figma","source":"settings","project":false,"status":"ready","url":"https://mcp.figma.com/mcp","signed_in":true,"tools":[{"name":"mcp__figma__get_code","description":""}]}],"problems":[]}|};
+  last_toast ();
+  print_s [%sexp (Option.is_some (H.model h).dialog : bool)];
+  [%expect
+    {|
+    (Rpc (method_ push_pref) (params ((key history) (value /mcp) (max 500)))
+     (tag Ignore))
+    (Focus dialog)
+    (Rpc (method_ list_mcp) (params ()) (tag (Mcp Picker)))
+    (Focus picker-input)
+    figma needs you to sign in: Enter signs in, settings
+    Dialog_accept
+    (Focus dialog)
+    (Rpc (method_ mcp_signin)
+     (params
+      ((source settings) (server figma) (redirect_base https://prigh.example)))
+     (tag (Mcp_sign_in_url (source settings) (server figma))))
+    Sign in to figma
+    (Close (Esc))
+    Starting the sign-in…
+    Esc closes
+    Sign in to figma
+    (Close (Esc))
+    Sign in on the server's page, in a new tab. The server connects once you have, and this closes.
+    (Open the sign-in page)
+    https://www.figma.com/oauth?state=s
+    Esc closes
+    (Rpc (method_ list_mcp) (params ()) (tag (Mcp Auth_changed)))
+    (Focus editor)
+    (Expire_toast (id 0) (after_ms 3260))
+    figma is ready with 1 tool: Enter lists them
+    false
+    |}]
+;;
+
+let%expect_test "/mcp signin NAME and signout NAME find the server first" =
+  let h = H.create () in
+  let last_toast () = last_toast h in
+  let listing =
+    {|{"servers":[{"name":"figma","source":"settings","project":false,"status":"ready","url":"https://mcp.figma.com/mcp","signed_in":true,"tools":[]},{"name":"fs","source":"settings","project":false,"status":"ready","tools":[]}],"problems":[]}|}
+  in
+  run h "/mcp signout figma";
+  H.reply h "list_mcp" listing;
+  H.reply
+    h
+    "mcp_signout"
+    {|{"servers":[{"name":"figma","source":"settings","project":false,"status":"needs_sign_in","url":"https://mcp.figma.com/mcp","signed_in":false,"tools":[]}],"problems":[]}|};
+  last_toast ();
+  run h "/mcp signin fs";
+  H.reply h "list_mcp" listing;
+  last_toast ();
+  run h "/mcp signin nope";
+  H.reply h "list_mcp" listing;
+  last_toast ();
+  [%expect
+    {|
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/mcp signout figma") (max 500)))
+     (tag Ignore))
+    (Rpc (method_ list_mcp) (params ()) (tag (Mcp (Sign_out_lookup figma))))
+    (Rpc (method_ mcp_signout) (params ((source settings) (server figma)))
+     (tag (Mcp_signed_out figma)))
+    (Expire_toast (id 0) (after_ms 2500))
+    Signed out of figma.
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/mcp signin fs") (max 500))) (tag Ignore))
+    (Rpc (method_ list_mcp) (params ()) (tag (Mcp (Sign_in_lookup fs))))
+    fs is not a remote (HTTP) server: it has no sign-in.
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/mcp signin nope") (max 500))) (tag Ignore))
+    (Rpc (method_ list_mcp) (params ()) (tag (Mcp (Sign_in_lookup nope))))
+    No MCP server nope; servers: figma, fs: /mcp lists them.
     |}]
 ;;

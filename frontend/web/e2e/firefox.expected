@@ -3938,6 +3938,37 @@ removing fits: yes; targets: all ok
 back: MCP servers | Tools the model can use from MCP servers. The servers here are kept on the backend for your account and run on every host your sessions use; a host's ~/.prigh/mcp.json and a project's .mcp.json add their own.
 === firefox: mcp settings: errors ===
 (none)
+=== firefox: mcp oauth: needs sign-in ===
+designs
+FAKE/mcp
+Needs you to sign in
+Sign in
+=== firefox: mcp oauth: the sign-in page's link ===
+target _blank, rel noopener noreferrer
+=== firefox: mcp oauth: the callback page ===
+Signed in
+prigh is signed in to FAKE/mcp and reconnects to it. You can close this tab.
+=== firefox: mcp oauth: signed in, without a reload ===
+designs
+FAKE/mcp
+Ready on HOST ·
+1 tool
+· Signed in
+Sign out
+server saw: 401; protected resource metadata; authorization server metadata; register (redirect PRIGH/mcp/oauth/callback); authorize (client client-1, S256, resource true, state true); token (authorization_code, verifier true)
+stored: mcp:FAKE/mcp (mode 600)
+=== firefox: mcp oauth: phone 390x844 ===
+fits: yes; targets: all ok
+=== firefox: mcp oauth: phone 320x640 ===
+fits: yes; targets: all ok
+=== firefox: mcp oauth: signed out ===
+designs
+FAKE/mcp
+Needs you to sign in
+Sign in
+stored: nothing (mode 600)
+=== firefox: mcp oauth: errors ===
+(none)
 === firefox: images (desktop): refused as too large: the error card ===
 The model returned an error
 HTTP 400: invalid_request_error: messages.0.content.0: image exceeds 5 MB maximum (Claude Opus 4.6 still refused the images downsized to 0.8 MB, 1500 px: /downsize-images makes them smaller and tries again)

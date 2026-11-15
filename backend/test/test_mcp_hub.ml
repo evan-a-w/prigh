@@ -72,6 +72,7 @@ let print_servers ~dir (statuses, problems) =
       | Ready tools -> sprintf "ready, %d tools" (List.length tools)
       | Failed e -> "failed: " ^ e
       | Needs_approval -> "needs approval"
+      | Needs_sign_in e -> "needs sign-in: " ^ e
     in
     print_endline
       (mask ~dir (sprintf "%s (%s): %s" server.name server.source status)));
@@ -79,13 +80,14 @@ let print_servers ~dir (statuses, problems) =
     print_endline (mask ~dir ("problem: " ^ problem)))
 ;;
 
-let servers ?reconnect ?settings hub ~dir (setup : Setup.t) =
+let servers ?reconnect ?settings ?tokens hub ~dir (setup : Setup.t) =
   print_servers
     ~dir
     (Mcp_hub.servers
        hub
        ?reconnect
        ?settings
+       ?tokens
        ~cwd:setup.cwd
        ~home:setup.home
        ())
@@ -109,6 +111,7 @@ let call
     ~home:setup.home
     ~tool
     ~arguments:(`Object [ "text", `String "hi" ])
+    ()
   |> print_result ~dir
 ;;
 
