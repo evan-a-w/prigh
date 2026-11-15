@@ -115,10 +115,17 @@ const configFile = () => {
   return keys.map(k => `${k}=${JSON.stringify(c[k] ?? null)}`).join(" ");
 };
 const toast = (p, text) => p.locator(".toast", { hasText: text }).last().waitFor();
-const pick = async (p, opener, query, item) => {
+// Items by their whole label: the backend's own host is named after the
+// machine, which may contain the test host's name ("server-laptop"). The
+// one wanted is the best match, chosen with Enter.
+const exactly = name => new RegExp(`^${name.replace(/\W/g, "\\$&")}$`);
+const laptopName = exactly("laptop");
+const pickerItem = (p, label) =>
+  p.locator(".picker-dialog .picker-item", { has: p.locator(".picker-label", { hasText: exactly(label) }) });
+const pick = async (p, opener, query, label) => {
   await p.locator(opener).click();
   await p.locator(".picker-dialog #picker-input").fill(query);
-  await p.locator(".picker-dialog .picker-item", { hasText: item }).first().waitFor();
+  await pickerItem(p, label).and(p.locator(".selected")).waitFor();
   await p.locator(".picker-dialog #picker-input").press("Enter");
   await p.locator(".setting.default-model").waitFor();
 };
@@ -184,7 +191,7 @@ try {
   await signIn(other);
   await openSection(other);
 
-  await pick(page, ".default-model-choice", "fable", "Fable");
+  await pick(page, ".default-model-choice", "fable", "Claude Fable 5");
   await toast(page, "New sessions start with");
   await page.locator(".setting.default-thinking").getByRole("button", { name: "High", exact: true }).click();
   await toast(page, "think at high");
@@ -195,7 +202,7 @@ try {
   await page.locator("#default-dir").fill("~/proj");
   await page.locator("#default-dir").press("Enter");
   await toast(page, "~/proj");
-  await pick(page, ".fallback-add", "flash", "Flash");
+  await pick(page, ".fallback-add", "flash", "DeepSeek V4.1 Flash");
   await page.locator(".fallback-list li").first().waitFor();
   // The budget is off: its switch sets $5, typed over.
   await page.locator(".setting.default-budget .switch").click();
@@ -208,7 +215,7 @@ try {
   console.log(configFile());
   await screenshot(page, "all-set");
   await other.waitForFunction(() => document.querySelector("#default-budget")?.value === "2.50");
-  await other.locator(".setting.default-host", { hasText: "laptop" }).waitFor();
+  await other.locator(".default-host-choice .setting-select-value", { hasText: laptopName }).waitFor();
   section("the other browser");
   await show(other);
   await other.close();
@@ -231,7 +238,7 @@ try {
   await page.waitForFunction(() => !document.querySelector(".new-session.opening"));
   await run(page, "second");
   await page.locator(".session-item .session-title", { hasText: "second" }).waitFor();
-  await page.locator(".host-chip", { hasText: "laptop" }).waitFor();
+  await page.locator(".host-chip .chip-label", { hasText: laptopName }).waitFor();
   await page.locator(".model-chip", { hasText: "Fable" }).waitFor();
   section("a new session");
   console.log(normalise(await chips(page)));
@@ -280,7 +287,7 @@ try {
     await phone.locator(".setting.default-budget").scrollIntoViewIfNeeded();
     await screenshot(phone, `phone-${tag}-limits`);
     await phone.locator(".default-host-choice").tap();
-    await phone.locator(".picker-dialog .picker-item", { hasText: "laptop" }).waitFor();
+    await pickerItem(phone, "laptop").waitFor();
     await screenshot(phone, `phone-${tag}-host-picker`);
     await phone.keyboard.press("Escape");
     await phone.locator(".setting.default-host").waitFor();

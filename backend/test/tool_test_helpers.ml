@@ -66,28 +66,12 @@ let mask t s =
   |> Re.replace_string session_bytes_re ~by:{|"bytes":<n>,"live"|}
   |> Re.replace_string id_re ~by:"<id>"
   |> Re.replace_string stamp_re ~by:"<stamp>"
-  |> String.substr_replace_all
-       ~pattern:(sprintf {|"name":"%s"|} (Core_unix.gethostname ()))
-       ~with_:{|"name":"<host>"|}
-  |> String.substr_replace_all
-       ~pattern:(sprintf {|"active_host_name":"%s"|} (Core_unix.gethostname ()))
-       ~with_:{|"active_host_name":"<host>"|}
-  |> String.substr_replace_all
-       ~pattern:(sprintf "tools now run on %s" (Core_unix.gethostname ()))
-       ~with_:"tools now run on <host>"
-  |> String.substr_replace_all
-       ~pattern:(sprintf "%s: " (Core_unix.gethostname ()))
-       ~with_:"<host>: "
-  |> String.substr_replace_all
-       ~pattern:(sprintf "(name %s)" (Core_unix.gethostname ()))
-       ~with_:"(name <host>)"
 ;;
 
 (* [mask] on the atoms, before the layout: the real path's length must not
    change where lines wrap. *)
 let mask_sexp t sexp =
   let rec go : Sexp.t -> Sexp.t = function
-    | Atom s when String.equal s (Core_unix.gethostname ()) -> Atom "<host>"
     | List [ Atom "home"; Atom home ]
       when Option.exists (Sys.getenv "HOME") ~f:(String.equal home) ->
       List [ Atom "home"; Atom "$HOME" ]

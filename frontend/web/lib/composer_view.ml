@@ -292,8 +292,8 @@ let host_chip (m : App.Model.t) (state : State.t) ~inject =
     | Unset ->
       ( " warm"
       , "No host runs the tools: /host picks one"
-      , None
-      , [ icon Server; span ~cls:"chip-label" "No host" ] )
+      , Some "No tool host"
+      , [ icon Server; span ~cls:"chip-label" "no host" ] )
   in
   button
     ~cls:("chip-button host-chip" ^ cls)

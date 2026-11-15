@@ -122,10 +122,11 @@ let every =
        auto-edit, smart, auto or chat"
   ; c
       ~argument:Mode
-      ~args:"[ask|auto-edit|auto|plan|chat]"
+      ~args:"[mode]"
       "mode"
-      "pick or set the mode: what asks first, read-only planning, or a chat \
-       without the tool host (Alt+M cycles)"
+      "pick or set the mode, in Alt+M's order: ask, auto-edit, smart or auto \
+       (what asks first), plan (read-only planning) or chat (without the tool \
+       host)"
   ; c
       ~argument:Plan
       ~args:"[on|off]"

@@ -882,7 +882,7 @@ let%expect_test "Esc closes autocomplete without abort while running" =
   H.show h;
   [%expect
     {|
-    ▸ /mode [ask|auto-edit|auto|plan|chat]  pick or set the mod…
+    ▸ /mode [mode]                    pick or set the mode, in …
       /model [name|id|provider/id]    pick or switch the model
       /scoped-models                  pick the models Ctrl+P cy…
       /generate-model [MODEL|off]     show which model drafts c…
@@ -2999,17 +2999,17 @@ let%expect_test "/auth, /help, /state, /clear, unknown method errors" =
     {|
     ┌─ Help ───────────────────────────────────────────────────┐
     │ Commands                                                 │
-    │ /help                                 show commands and  │
+    │ /help                              show commands and     │
     │ keys                                                     │
-    │ /hotkeys                              show keyboard      │
+    │ /hotkeys                           show keyboard         │
     │ shortcuts                                                │
-    │ /model [name|id|provider/id]          pick or switch the │
+    │ /model [name|id|provider/id]       pick or switch the    │
     │ model                                                    │
-    │ /scoped-models                        pick the models    │
+    │ /scoped-models                     pick the models       │
     │ Ctrl+P cycles through                                    │
-    │ /change_default                       save the current   │
+    │ /change_default                    save the current      │
     │ model and thinking level as the default for new sessions │
-    └───────── 1–11 of 369 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
+    └───────── 1–11 of 364 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
     ────────────────────────────────────────────────────────────
     > ▏
     deepseek-flash  ctx:0.1%/1.0M  ↑↓ scroll · Esc closes

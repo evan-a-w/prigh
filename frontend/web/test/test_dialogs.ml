@@ -220,8 +220,8 @@ let%expect_test "help lists every key and command" =
     /filter [all|KIND...|-KIND|+KIND] show only some kinds in the transcript (your messages, replies, thinking, tools, subagents, notes); the model's context is unchanged
     /theme [original|dark|light] pick or set the theme, for you in every browser
     /accent [name|#rrggbb] pick or set the accent colour: orange, blue, green, purple, pink, teal, yellow or any #rrggbb
-    /confirm [on|off|mode] the mode this session and new ones start in: on (ask), off (auto), ask, auto-edit, smart, auto or chat
-    /mode [ask|auto-edit|auto|plan|chat] pick or set the mode: what asks first, read-only planning, or a chat without the tool host (Alt+M cycles)
+    /confirm [on|off] ask before bash, job_input, edits and MCP tools run (mode ask or auto, also for new sessions)
+    /mode [mode] pick or set the mode, in Alt+M's order: ask, auto-edit, smart or auto (what asks first), plan (read-only planning) or chat (without the tool host)
     /plan [on|off] toggle plan mode: the model investigates and plans, changing no files, until you turn it off
     /chat [on|off] toggle chat mode: talk without the tool host (no files, commands or project; the web and other host-free tools), until you turn it off
     /todos show the model's plan (its update_plan steps)
