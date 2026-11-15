@@ -1154,7 +1154,9 @@ let create
     ; sw
     ; login_owner = None
     ; terminals = Terminal_relay.create ()
-    ; loaded = File_cache.create ~max_bytes:(128 * 1024 * 1024) ()
+    ; loaded =
+        (* A parsed session takes about as much memory as its file. *)
+        File_cache.create ~max_bytes:(64 * 1024 * 1024) ()
     ; home
     ; prefs =
         Option.map home ~f:(fun home ->

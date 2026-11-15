@@ -1604,9 +1604,10 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   `abort`, any new run and a session switch end it. It is recorded in the
   session (`Resume_at`; `None` when it runs or ends): an agent created for
   (or switched to) the session arms it again while its time is still to
-  come, and drops it otherwise; `Rpc_server.restore_resumes` (called by
-  `main` for each server at startup) loads every session whose recorded
-  resume is to come. When the timer fires on a session whose file was
+  come, and drops it otherwise; `Rpc_server.restore_resumes` (run by
+  `start_background`, which `main` calls for each server at startup, once
+  the server serves) loads every session whose recorded resume is to
+  come, listing them from the cached summaries. When the timer fires on a session whose file was
   deleted meanwhile (`Session.gone`), a notice says so and nothing runs.
   `Rpc_server` keeps the agent loaded while one is scheduled.
 - Reminders (`Reminder`, `Agent`) — the session's (`/remind`), each named
@@ -1849,7 +1850,22 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   it, `data_dir`, for per-session data; `delete_files` removes both),
   most recently modified first; it caches each file's summary by (path,
   size, mtime), so only changed files are parsed again (300 sessions of
-  50 messages: `list_sessions` 170 ms → 3.5 ms). `list_with` (what
+  50 messages: `list_sessions` 170 ms → 3.5 ms), in memory and in
+  `<sessions>/.cache/summaries-v<N>` (`cache_dir`; a sexp of file name →
+  size, mtime, summary, written atomically whenever a listing parsed a
+  file or found one gone), so that a new process parses only what changed
+  since (300 sessions of 60 turns, cold: 7.4 s → 13 ms). The file is only
+  a cache: one that is torn, corrupt, of another shape or another version
+  (the version is in its name and in it) is ignored and rebuilt, and one
+  that cannot be written leaves listing uncached. `bytes` is cached with
+  the summary and counted again when `usage_stamp` (the sizes and mtimes of
+  the data directory, the directories in it and the trace files) changes,
+  rather than walking the directory on every listing. `summary_with` is
+  `list_with` for one file (what `sessions_changed` sends). `load` reads
+  the file 64 KiB at a time, parsing each line as it completes (a 12 MB
+  session: no copy of the whole file nor a list of its lines), and records
+  where each entry's line starts (`entry_offset`; appends record theirs
+  too), which `read_entry_at` reads back alone. `list_with` (what
   `Rpc_server` uses) sums up the live sessions (whose files grow with every
   message) from memory instead of parsing them again (an 80 MB session
   being worked on: `list_sessions` 950 ms → 3 ms), and parses the others
@@ -2194,8 +2210,13 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   `background`, `waiting`, persisted, name, description, repository or
   subagents' worktrees (`Listed`, compared per live session on its state
   changes, message ends, confirmations and questions, so never per delta), and after
-  archiving, deleting, importing, forking and cloning; frontends refetch
-  the list. A session with running background subagents or jobs
+  archiving, pinning, deleting, importing, forking and cloning. When the
+  sessions concerned are known the event carries them: `changed` (their
+  `list_sessions` entries, as that client would see them: archiving by age
+  depends on its config) and `removed` (ids no longer listed), and the
+  frontends apply that to their list (`Session_summary.Change.apply`:
+  replace or insert by `updated_at`, drop the removed); without either
+  (a config change re-archiving by age) they refetch it. A session with running background subagents or jobs
   is not evicted (it delivers their reports into its own session even with
   no client attached); `shutdown` cancels them (killing the jobs).
   `kill_job {job_id}`, `job_output {job_id, lines}` (`{text}`: a header line
@@ -2218,8 +2239,18 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   (`{query, limit}`: the listed sessions by name and what the user and
   assistant wrote, best first, each with a snippet and its match ranges;
   `Session_search` keeps an inverted index in memory, re-reading only the
-  files that changed; each server builds it as it starts, in a fiber that
-  yields after each session, and a search meanwhile waits for it), `set_session_name`,
+  files that changed; it holds each message's word ids and the offset of
+  its entry in the file, not its text, and a hit's snippet reads that one
+  message back (`Session.read_entry_at`), so only the returned hits cut
+  snippets. It is kept in `<sessions>/.cache/search-v<N>` (bin_prot after
+  a magic line, written atomically when indexing changed it and at most a
+  minute apart by searches, read lazily on first use; a file that is torn,
+  corrupt or of another version is ignored and rebuilt). Each server
+  brings it up to date as it starts (`start_background`: after resuming
+  the sessions due to resume, in a fiber that first lets the server serve,
+  then yields after each session; a new process reads only the sessions
+  that changed since the file was written: 300 sessions, 8.1 s → 10 ms),
+  and a search meanwhile waits for it), `set_session_name`,
   `delete_session`, `delete_sessions`, `delete_archived`, `set_archived`,
   `set_pinned`,
   `export`, `import`, `fork`, `clone`, `rewind`, `trim`, `untrim`,
@@ -2880,7 +2911,9 @@ terminal frontend and `web/` prigh-web, the browser one.
     pinned, the rest, archived. `/pin`, `/unpin`, `/archive`,
     `/unarchive` and `/delete` look their arguments up in a fresh list
     (`Session_selection.resolve`: path, id, unique id prefix or name).
-    `sessions_changed` refetches `list_sessions` (`Sessions_refresh`) while
+    `sessions_changed` applies its changed and removed entries to the
+    cached list (and the open picker), or, without them or without a
+    cached list, refetches `list_sessions` (`Sessions_refresh`) while
     the picker is open (or behind its confirmation) or the completion's
     list is cached; `Picker.set_items` keeps the query, marks and highlight
     (Ctrl+N keeps marks on the sessions it hides and moves a hidden
@@ -3541,8 +3574,9 @@ terminal frontend and `web/` prigh-web, the browser one.
       follow; a search shows them), muted, and
       "Delete archived"; a session is running while its
       turn or background work runs (`list_sessions`' `running`, and
-      `Model.active` for the current one); the list is refetched on
-      `sessions_changed`, never polled; `Session_marks`, the selection mode: clicks and
+      `Model.active` for the current one); `sessions_changed` updates the
+      list with the entries it carries (or refetches it, without them),
+      never polled; `Session_marks`, the selection mode: clicks and
       Space mark, shift-click and Shift+Space mark the range from the last
       one, and a bar at the list's foot deletes them; the `Delete` dialog (`Dialog.Delete_target`: paths or every
       archived one) lists them with their sizes and warns about those the
