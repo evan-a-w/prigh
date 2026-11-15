@@ -167,7 +167,8 @@ try {
 
   await composer(page).fill("what is a monad?");
   await composer(page).press("Enter");
-  await replies(page).first().waitFor();
+  // Streamed: finished once it shows its usage.
+  await replies(page).first().locator(".meta").waitFor();
   const sessionUrl = page.url();
   section("a reply, with no tool host");
   console.log(`you: ${await text(page, "#chat .msg.user")}`);
