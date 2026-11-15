@@ -220,8 +220,7 @@ let%expect_test
   [%expect
     {|
     <div class="sidebar-head">
-    <button class="btn new-session">
-    <div class="search">
+    <div class="sidebar-actions">
     <Vdom.Node.none-widget class="">
     <div class="sessions">
     <Vdom.Node.none-widget class="">
@@ -716,7 +715,6 @@ let%expect_test
     button "backend" -- Tools run on the backend (/host switches)
     button "Thinking: provider's default" -- Thinking: provider's default: how much the model reasons before it answers (Alt+T cycles, /thinking)
     button "Auto: never asks" -- Tools run without asking (Alt+M cycles, /mode picks)
-    button "Transcript normal" -- Transcript: normal (Ctrl+O cycles, /verbosity)
     button "Dictate" -- Dictate (speak, then click again to stop)
     button "Send" -- Send (Enter)
     |}];
@@ -780,7 +778,6 @@ let%expect_test
     button "backend" -- Tools run on the backend (/host switches)
     button "Thinking: provider's default" -- Thinking: provider's default: how much the model reasons before it answers (Alt+T cycles, /thinking)
     button "Auto: never asks" -- Tools run without asking (Alt+M cycles, /mode picks)
-    button "Transcript normal" -- Transcript: normal (Ctrl+O cycles, /verbosity)
     button "Dictate" -- Dictate (speak, then click again to stop)
     button "Stop" -- Stop (Esc)
     button "Steer" -- Steer (Enter)
@@ -1019,9 +1016,9 @@ let%expect_test
     (Focus popover-list)
     Place_popover
     (Chip_step 1)
-    (Focus popover-list)
+    (Focus popover-filter)
     Place_popover
-    Verbosity
+    Model
     |}];
   (* In the model's filter, once something is typed, ← → move the caret. *)
   H.key h "Escape" ~target:Field;
@@ -1060,7 +1057,6 @@ let%expect_test
     <div class="chip-anchor host">
     <div class="chip-anchor thinking">
     <div class="chip-anchor mode">
-    <div class="chip-anchor verbosity">
     |}];
   H.click h ~selector:".host-chip";
   shown ();
@@ -1273,7 +1269,6 @@ let%expect_test "← → go along the composer's chips" =
     (Chip_step 1)
     When tools ask first Alt+M cycles
     (Chip_step 1)
-    Transcript Ctrl+O cycles
     Close_dialog
     (Open_chip Model)
     (Chip_step 1)

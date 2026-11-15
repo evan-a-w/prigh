@@ -34,5 +34,7 @@ module Picker = struct
     | Model
     | Fallback
     | Host
+    | Thinking
+    | Mode
   [@@deriving sexp_of, equal]
 end

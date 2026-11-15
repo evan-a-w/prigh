@@ -1,0 +1,128 @@
+/* The control centre (Ctrl+K, the sidebar's Search): one filter over the
+   sessions, the settings and the commands. A centred box under the top of
+   the window; on a phone, the whole screen. */
+
+/* The sidebar's row: New session takes the room, Search its own width, a
+   sibling button at rest. */
+.sidebar-actions { display: flex; gap: 6px; min-width: 0; }
+.sidebar-actions > .new-session { flex: 1 1 auto; min-width: 0; width: auto; }
+.btn.control-open { flex: 0 0 auto; gap: 6px; padding: 5px 10px; color: var(--muted); font-weight: 400; }
+.btn.control-open .icon { width: 14px; height: 14px; }
+.btn.control-open:hover { color: var(--chalk); }
+
+.control-backdrop { padding-top: 12vh; }
+.control-centre {
+  background: var(--slate);
+  border: 1px solid var(--rule-2);
+  border-radius: var(--r-surface);
+  width: min(640px, 100%);
+  max-height: 72vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--float-shadow);
+  outline: none;
+  overflow: hidden;
+  animation: appear 0.12s ease-out;
+}
+
+.control-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 6px 0 14px;
+  min-height: 50px;
+  border-bottom: 1px solid var(--rule);
+}
+.control-input-row > .icon { color: var(--faint); width: 16px; height: 16px; }
+#control-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  outline: none;
+  padding: 12px 0;
+  font-size: 16px;
+}
+#control-input::placeholder { color: var(--faint); }
+.btn.control-crumb {
+  flex: 0 0 auto;
+  padding: 2px 8px;
+  font-size: 12.5px;
+  border-radius: var(--r-chip);
+  color: var(--chalk);
+  max-width: 45%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.btn.control-close { flex: 0 0 auto; }
+
+.control-list { overflow-y: auto; min-height: 0; padding: 4px 6px 8px; scrollbar-gutter: stable; overscroll-behavior: contain; }
+.control-group {
+  padding: 10px 10px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+.control-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 10px;
+  min-height: 34px;
+  border-radius: var(--r-control);
+  cursor: pointer;
+  min-width: 0;
+}
+.control-row:hover { background: var(--slate-2); }
+.control-row.selected { background: var(--slate-2); box-shadow: inset 2px 0 0 var(--sodium); border-radius: 0 var(--r-control) var(--r-control) 0; }
+.control-row.dimmed { opacity: 0.5; }
+.control-main { display: flex; align-items: baseline; gap: 10px; flex: 1 1 auto; min-width: 0; }
+.control-label { flex: 0 0 auto; max-width: 100%; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.control-label mark, .control-snippet mark { background: none; color: var(--sodium); font-weight: 600; }
+.control-about, .control-snippet { flex: 1 1 auto; min-width: 0; color: var(--faint); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.control-detail { flex: 0 1 auto; max-width: 45%; color: var(--muted); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.control-keys { flex: 0 0 auto; color: var(--faint); }
+.control-dot { flex: 0 0 auto; align-self: center; width: 7px; height: 7px; border-radius: 50%; box-shadow: inset 0 0 0 1px var(--rule-2); }
+.control-dot.on { background: var(--sage); box-shadow: none; }
+.control-empty { color: var(--muted); padding: 18px 16px; font-size: 12.5px; }
+
+.control-foot {
+  display: flex;
+  gap: 16px;
+  padding: 8px 14px;
+  border-top: 1px solid var(--rule);
+  color: var(--faint);
+  font-size: 11.5px;
+}
+.control-hint kbd { color: var(--muted); }
+
+/* A phone: the whole screen, the filter at the top under the notch, rows
+   a finger tall; no keys to hint at. */
+.app.narrow .control-backdrop { padding: 0; align-items: stretch; }
+.app.narrow .control-centre {
+  width: 100%;
+  height: var(--vvh, 100dvh);
+  max-height: none;
+  border: 0;
+  border-radius: 0;
+  padding-top: var(--safe-t);
+  padding-bottom: var(--safe-b);
+  animation: page-in 0.18s ease-out;
+}
+.app.narrow .control-input-row { min-height: var(--strip-h, 52px); padding-left: max(14px, var(--safe-l)); padding-right: max(4px, var(--safe-r)); }
+.app.narrow .btn.control-close, .app.narrow .btn.control-crumb { min-height: var(--tap); min-width: var(--tap); }
+.app.narrow .btn.control-close { width: var(--tap); height: var(--tap); }
+.app.narrow .control-list { flex: 1 1 auto; padding-left: max(6px, var(--safe-l)); padding-right: max(6px, var(--safe-r)); scrollbar-gutter: auto; }
+.app.narrow .control-row { min-height: var(--tap); }
+.app.narrow .control-detail { max-width: 40%; }
+/* A session's passage that matched goes under its title: there is no room beside it. */
+.app.narrow .control-main { flex-wrap: wrap; row-gap: 2px; padding: 4px 0; }
+.app.narrow .control-snippet { flex: 1 1 100%; }
+.app.narrow .control-keys, .app.narrow .control-foot { display: none; }
+.app.narrow .btn.control-open { min-height: var(--tap); }
+@media (pointer: coarse) {
+  .btn.control-open { min-height: var(--tap); }
+}
+@media (prefers-reduced-motion: reduce) { .control-centre { animation: none !important; } }

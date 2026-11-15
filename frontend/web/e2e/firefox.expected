@@ -11,6 +11,7 @@ Sign in
 prigh
 web
 New session
+Search
 No sessions yet: send a message to start one.
 T
 token
@@ -20,7 +21,6 @@ What are we building?
 === firefox: signed in: the session's card ===
 provider's default
 auto
-normal
 0%
 $<COST>
 === firefox: a dialog keeps the focus ===
@@ -106,7 +106,6 @@ three lines
 === firefox: the session's card after a run ===
 provider's default
 auto
-normal
 0%
 $<COST>
 === firefox: a budget in the status line ===
@@ -172,6 +171,7 @@ same session after reload: true
 prigh
 web
 New session
+Search
 Sessions
 Select
 count some lines
@@ -191,6 +191,7 @@ new session in the url: true
 prigh
 web
 New session
+Search
 Sessions
 Select
 hello again
@@ -407,7 +408,6 @@ host's menu: over the composer, at the chip's left edge, inside the window; focu
 === firefox: mode ask ===
 high
 ask
-normal
 === firefox: a confirmation ===
 Confirm
 Run bash: echo built-ok?
@@ -448,11 +448,9 @@ SQLite it is.
 === firefox: plan mode (Alt+M) ===
 high
 plan
-normal
 === firefox: plan mode: the status line ===
 high
 plan
-normal
 0%
 $<COST>
 === firefox: plan mode: the composer's placeholder ===
@@ -472,12 +470,10 @@ Test it
 === firefox: plan mode off ===
 high
 auto
-normal
 === firefox: plan mode off: the status line ===
 plan 0/2: Write the schema
 high
 auto
-normal
 0%
 $<COST>
 === firefox: implementing ===
@@ -744,17 +740,17 @@ on a phone: 0 handles
 hl-kw:let hl-kw:rec hl-kw:if hl-num:2 hl-kw:then hl-kw:else hl-num:1 hl-num:2 hl-com:(* slow *)
 hl-prop:"name" hl-str:"prigh" hl-prop:"ok" hl-con:true hl-prop:"n" hl-num:3
 === firefox: the session: a 700px chat column ===
-chat 700; chips: DeepSeek V4.1 Flash, <HOSTNAME>, icon, icon, icon; status: 0%, $<COST>; .chat-chrome 44px high
+chat 700; chips: DeepSeek V4.1 Flash, <HOSTNAME>, icon, icon; status: 0%, $<COST>; .chat-chrome 44px high
 .chat-chrome: fits
 .composer: fits
 the panels' toggles: 3 buttons 10px from the top, 14px from the right, clear of the jump list: true, open: Files
 === firefox: the session: a 520px chat column ===
-chat 520; chips: DeepSeek V4.1 Flash, icon, icon, icon, icon; status: 0%; .chat-chrome 44px high
+chat 520; chips: DeepSeek V4.1 Flash, icon, icon, icon; status: 0%; .chat-chrome 44px high
 .chat-chrome: fits
 .composer: fits
 the panels' toggles: 3 buttons 10px from the top, 14px from the right, clear of the jump list: true, open: Files
 === firefox: the session: a 400px chat column ===
-chat 400; chips: V4.1 Flash, icon, icon, icon, icon; status: 0%; .chat-chrome 44px high
+chat 400; chips: V4.1 Flash, icon, icon, icon; status: 0%; .chat-chrome 44px high
 .chat-chrome: fits
 .composer: fits
 the panels' toggles: 3 buttons 10px from the top, 14px from the right, clear of the jump list: true, open: Files
@@ -804,17 +800,17 @@ desktop: dialog 940x704, in the window: true; sections down the side; panel fits
 phone: dialog 390x844, the screen: true; back: Settings; panel fits: true
 Esc closes it, the editor has the focus: true
 === firefox: the session's bar: a 900px chat column without the sidebar ===
-chat 900; chips: DeepSeek V4.1 Flash, <HOSTNAME>, provider's default, auto, normal; status: 0%, $<COST>; .chat-chrome 44px high
+chat 900; chips: DeepSeek V4.1 Flash, <HOSTNAME>, provider's default, auto; status: 0%, $<COST>; .chat-chrome 44px high
 .chat-chrome: fits
 .composer: fits
 the panels' toggles: 4 buttons 10px from the top, 14px from the right, clear of the jump list: true, open: Files
 === firefox: the session's bar: a 600px chat column without the sidebar ===
-chat 600; chips: DeepSeek V4.1 Flash, icon, icon, icon, icon; status: 0%; .chat-chrome 44px high
+chat 600; chips: DeepSeek V4.1 Flash, icon, icon, icon; status: 0%; .chat-chrome 44px high
 .chat-chrome: fits
 .composer: fits
 the panels' toggles: 4 buttons 10px from the top, 14px from the right, clear of the jump list: true, open: Files
 === firefox: the session's bar: a 400px chat column without the sidebar ===
-chat 400; chips: V4.1 Flash, icon, icon, icon, icon; status: 0%; .chat-chrome 44px high
+chat 400; chips: V4.1 Flash, icon, icon, icon; status: 0%; .chat-chrome 44px high
 .chat-chrome: fits
 .composer: fits
 the panels' toggles: 4 buttons 10px from the top, 14px from the right, clear of the jump list: true, open: Files
@@ -2747,47 +2743,90 @@ note inside the screen: true; Show all clickable; button inside: true
 after Show all: user 2, replies 3, thinking 1, tools 1, subagents 1, stopped 1
 === firefox: filter: errors ===
 none
-=== firefox: search: a title and a reply ===
--- Pinned 2 --
-📌 [Port] the tmux tests
-📌 Deploy checklist
-    That the [port] stays configurable, and the certificates are fresh.
--- Recent 1 --
-where does the server listen?
-    …can make the listen [port] configurable through the config file: add a `[port]` key.
+=== firefox: search: the sidebar's row and the composer's ===
+New session: wide, 34px high
+Search: narrow, 34px high
+composer: Add files or images, DeepSeek V4.1 Flash, server-laptop, Thinking, Auto, Context 0% full, Dictate, Send
+=== firefox: search: Ctrl+K: the session's settings, recent sessions, commands ===
+focus in the filter: control-input
+-- This session --
+> Set model | DeepSeek V4.1 Flash Ctrl+L
+  Set thinking | provider's default Alt+T
+  Set verbosity | normal Ctrl+O
+  Switch host | server-laptop
+  Set mode | auto Alt+M
+  Context and cost | 0% · $0.00
+-- Recent sessions --
+  Port the tmux tests | <age> · <CWD>
+  Release notes | <age> · <CWD>
+  Deploy checklist | <age> · <CWD>
+-- Commands --
+  /new | start a new session
+  /settings | appearance, sessions, new sessions' defaults, models, git hosting and your account; a section opens at it (Ctrl+,)
+  /review | the review page, the changes file by file to approve, comment on and edit (Alt+R): of the session's worktree or another (its branch, path or name), against its base or REV; /review BASE [instructions] (HEAD: the uncommitted changes) has the model review them for prioritised findings
+  /files | browse, preview, upload and download files where the tools run (Ctrl+Shift+F)
+  /help | show commands and keys, or a command's usage
+↑↓ move
+↵ open
+⌫ back
+esc close
+=== firefox: search: verbos ===
+-- Settings --
+> Set [verbos]ity | normal Ctrl+O
+  ○ [Verbos]ity: Quiet | tool calls without their output; no thinking
+  ● [Verbos]ity: Normal | current
+  ○ [Verbos]ity: Verbose | everything unfolded
+-- Commands --
+  /[verbos]ity | how much of tool calls and thinking the transcript shows
+=== firefox: search: Enter opens the setting's values; ⌫ goes back; Enter sets one ===
+crumb: Verbosity
+  ○ Quiet — tool calls without their output; no thinking
+> ● Normal — tool output and thinking folded | current
+  ○ Verbose — everything unfolded
+back: "verbos"
+now: verbose
+=== firefox: search: Esc closes it ===
+open: false
+=== firefox: search: the sidebar's Search: a title and a reply ===
+-- Sessions --
+> [Port] the tmux tests | <age> · <CWD>
+  where does the server listen? …can make the listen [port] configurable through the config file: add a `[port]` key. | <age> · <CWD>
+  Deploy checklist That the [port] stays configurable, and the certificates are fresh. | <age> · <CWD>
+-- Commands --
+  /ex[port] | export the transcript on the backend (markdown, or .jsonl)
+  /im[port] | import a session from a JSONL file on the backend
 === firefox: search: the messages, once typing pauses ===
--- Pinned 1 --
-📌 Deploy checklist
-    That the [port] stays [configurable], and the certificates are fresh.
--- Recent 1 --
-where does the server listen?
-    …can make the listen [port] [configurable] through the config file: add a `[port]` key.
+-- Sessions --
+> where does the server listen? …can make the listen [port] [configurable] through the config file: add a `[port]` key. | <age> · <CWD>
+  Deploy checklist That the [port] stays [configurable], and the certificates are fresh. | <age> · <CWD>
 === firefox: search: nothing matches ===
-No sessions match “zebra quokka”. Search looks in titles and messages.
-=== firefox: search: Esc clears the search ===
-query: ""; rows: 4
+Nothing matches “zebra quokka”: Backspace widens the search.
+=== firefox: search: Enter opens the session ===
+switched to Release notes
 === firefox: search: 390x844 ===
-once the session is in, the search box: "configurable port"
--- Pinned 1 --
-📌 Deploy checklist
-    That the [port] stays [configurable], and the certificates are fresh.
--- Recent 1 --
-where does the server listen?
-    …can make the listen [port] [configurable] through the config file: add a `[port]` key.
 page overflows sideways: false
-sidebar overflows sideways: false
-snippets inside the screen: true
+the box inside the screen: true
+its input's font: 16px
+rows at least 44px: true
+-- Sessions --
+> where does the server listen? …can make the listen [port] [configurable] through the config file: add a `[port]` key. | <age> · <CWD>
+  Deploy checklist That the [port] stays [configurable], and the certificates are fresh. | <age> · <CWD>
+page overflows sideways: false
+the box inside the screen: true
+its input's font: 16px
+rows at least 44px: true
 === firefox: search: 320x640 ===
-once the session is in, the search box: "configurable port"
--- Pinned 1 --
-📌 Deploy checklist
-    That the [port] stays [configurable], and the certificates are fresh.
--- Recent 1 --
-where does the server listen?
-    …can make the listen [port] [configurable] through the config file: add a `[port]` key.
 page overflows sideways: false
-sidebar overflows sideways: false
-snippets inside the screen: true
+the box inside the screen: true
+its input's font: 16px
+rows at least 44px: true
+-- Sessions --
+> where does the server listen? …can make the listen [port] [configurable] through the config file: add a `[port]` key. | <age> · <CWD>
+  Deploy checklist That the [port] stays [configurable], and the certificates are fresh. | <age> · <CWD>
+page overflows sideways: false
+the box inside the screen: true
+its input's font: 16px
+rows at least 44px: true
 === firefox: search: errors ===
 none
 === firefox: session_links: drawn ===
@@ -2989,8 +3028,8 @@ row 1: 0% | $<COST>
 lamps: 0; accented: nothing; 28px high
 fits
 === firefox: card: the composer's chips ===
-chips 1: DeepSeek V4.1 Flash | <HOSTNAME> | provider's default | auto | verbose
-chip problems: none (host name truncated)
+chips 1: DeepSeek V4.1 Flash | <HOSTNAME> | provider's default | plan
+chip problems: none
 === firefox: card: another host to choose ===
 ✓ <HOSTNAME>
 build-runner-eu-west-a-long-hostname (in <SESSION>)
@@ -2998,7 +3037,7 @@ build-runner-eu-west-a-long-hostname (in <SESSION>)
 row 1: 0% | $<COST>
 lamps: 0; accented: nothing; 28px high
 fits
-chips 1: DeepSeek V4.1 Flash | build-runner-eu-west-a-long-hostname | provider's default | auto | verbose
+chips 1: DeepSeek V4.1 Flash | build-runner-eu-west-a-long-hostname | provider's default | plan
 chip problems: none (host name truncated)
 === firefox: card: the context opens the session's details ===
 Session
@@ -3032,17 +3071,14 @@ it says: 36%
 === firefox: status: desktop: the chips' menus act ===
 thinking by mouse: high; menu closed: true
 mode by mouse: ask; menu closed: true
-verbosity by mouse: verbose; menu closed: true
 thinking by keyboard: max; menu closed: true
 mode by keyboard: auto-edit; menu closed: true
-verbosity by keyboard: normal; menu closed: true
 === firefox: status: desktop: a click outside closes, and goes no further ===
 model: closed: true; the filter's menu opened: false
 host: closed: true; the filter's menu opened: false
 +: closed: true; the filter's menu opened: false
 thinking: closed: true; the filter's menu opened: false
 mode: closed: true; the filter's menu opened: false
-verbosity: closed: true; the filter's menu opened: false
 === firefox: status: desktop: the status's details ===
 on hover: true
 on keyboard focus (Context 36% full): true
@@ -3120,6 +3156,10 @@ ok
 choice controls fit: true
 === firefox: mobile: 390x844: the drawer ===
 ok
+=== firefox: mobile: 390x844: the control centre ===
+ok
+=== firefox: mobile: 390x844: the control centre: a setting's values ===
+ok
 === firefox: mobile: 390x844: the model menu ===
 ok
 === firefox: mobile: 390x844: the model menu is a sheet ===
@@ -3160,6 +3200,10 @@ back to the list: true
 ok
 choice controls fit: true
 === firefox: mobile: 320x640: the drawer ===
+ok
+=== firefox: mobile: 320x640: the control centre ===
+ok
+=== firefox: mobile: 320x640: the control centre: a setting's values ===
 ok
 === firefox: mobile: 320x640: the model menu ===
 ok

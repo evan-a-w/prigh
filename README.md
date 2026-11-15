@@ -596,11 +596,24 @@ first under a "Pinned" heading, marked with a pin, then the others under
 first; a pinned session is never archived for being idle. Archiving a
 pinned session unpins it, and pinning an archived one unarchives it. Below
 the list a faint "Archived 14" rule unfolds the archived sessions, muted,
-with their directory. A search (Ctrl+K) finds sessions by title, prompt,
-directory, repository, branch or their worktrees' branches, the archived
-ones too, each in its group (best match first within it), and by what was said
-in them: see "Searching sessions" under Keys. Esc clears it, then goes back to
-the editor. Where a session is in git is found on its
+with their directory. Above the list, beside "+ New session", Search (or
+Ctrl+K) opens the control centre: one filter over the sessions, the
+settings and the commands. With nothing typed it lists this session's
+settings (model, thinking, verbosity, host, mode, context and cost, each
+with its value and shortcut), a few recent sessions and common commands.
+Typing finds, fuzzily (the matched letters marked): the settings, the
+session's and the settings page's (new sessions' defaults, the approval
+model, the theme…), and their values as entries of their own
+("Verbosity: verbose", "Thinking: high") that apply in one step; sessions
+by title, prompt, directory, repository, branch or their worktrees'
+branches, the archived ones too, and by what was said in them (see
+"Searching sessions" under Keys); and the commands. Enter on a setting
+lists its values in the palette, under a breadcrumb, the current one
+marked; Enter sets one and closes it; a setting with a page of its own
+opens Settings at it. ↑ ↓ move, Backspace in an empty filter goes back a
+level, Esc closes without changing anything; on a phone it fills the
+screen. Its settings are one table (`Control_setting`), so a new setting
+is added once. Where a session is in git is found on its
 tool host whenever its directory changes, by reading the repository's
 files (no git command), and kept in the session; a tool host running an
 older prigh cannot tell, and its sessions show their directory. On a focused session P pins or unpins it, A archives or unarchives it
@@ -925,11 +938,12 @@ button in the top left and the settings gear after the toggles. On a phone
 the top right is a single ⋯ that opens all of these in a small menu. The
 chat starts under them and fades out beneath them as it scrolls.
 
-The composer's row has, after the model and host chips, the session's
-thinking level (a brain and the level), its mode (a shield and the mode's
-short name) and the transcript's verbosity (lines and `quiet`, `normal` or
-`verbose`), each opening a small menu over itself (Alt+T, Alt+M and Ctrl+O
-cycle them; under a 600px column they are icons alone). At the row's right,
+The composer's row has, after the + and the model and host chips, the
+session's thinking level (a brain and the level) and its mode (a shield and
+the mode's short name), each opening a small menu over itself (Alt+T and
+Alt+M cycle them; under a 600px column they are icons alone). The
+transcript's verbosity has no chip: Ctrl+O cycles it, and `/verbosity`, the
+control centre (Ctrl+K) and a phone's ⋯ sheet set it. At the row's right,
 before the microphone, the session's status: what the agent is doing while
 it works (`Thinking`, `Running tools`…; idle, nothing), how full the context
 is (a ring and the percent) and the cost, to the cent, or against the budget.
@@ -2103,7 +2117,7 @@ and `/scoped-models` toggles with Space (Ctrl+A all, Ctrl+X none). `/help`
 lists the commands, the prompt prefixes (`!cmd`, `!!cmd`, `!&cmd`, `@path`, `#name`)
 and these keys.
 
-**Searching sessions.** prigh-web's sidebar search and the TUI's `/sessions` filter work the
+**Searching sessions.** prigh-web's control centre (Ctrl+K) and the TUI's `/sessions` filter work the
 same way. The query is split into words, and a session matches when every
 word matches, in any order and in any of its fields: its name, its first
 prompt, its description, its directory, repository and branches, and
@@ -2120,8 +2134,7 @@ matched under its title, the matched words marked (in titles too). The
 backend keeps an index of every session's words in memory, updated as
 sessions change, so a search of thousands of sessions takes tens of
 milliseconds (the first one reads them all).
- Pinned sessions stay in their group
-above the others while searching, ranked the same way within it.
+ prigh-web lists them under the control centre's settings, best first.
 
 `/sessions` lists the pinned sessions first (under `── pinned ──`, with
 `── sessions ──` before the rest), then the active ones, most recent first, each with

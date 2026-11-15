@@ -57,6 +57,16 @@ module Picker_kind : sig
   [@@deriving sexp_of, equal]
 end
 
+module Control_options : sig
+  (** A setting's values in the control centre, a level down from its root. *)
+  type t =
+    { setting : Control_setting.t
+    ; kind : Picker_kind.t (** its picker's: a choice sets it as there *)
+    ; picker : Picker.t
+    }
+  [@@deriving sexp_of, equal]
+end
+
 module Delete_target : sig
   type t =
     | Sessions of string list (** paths *)
@@ -155,6 +165,11 @@ type t =
   | Temporary_menu (** a temporary session's: keep it, or delete it *)
   | Leave_temporary
   (** leaving a temporary session that is still working ([Model.leaving]) *)
+  | Control of
+      { root : Control_centre.t
+      ; options : Control_options.t option
+        (** a setting's values, a level down *)
+      } (** the control centre (Ctrl+K) *)
 [@@deriving sexp_of, equal]
 
 (** Belongs to the session (closed when switching). *)

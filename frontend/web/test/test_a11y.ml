@@ -24,6 +24,7 @@ let%expect_test "the names of the controls" =
     {|
     button "Hide sidebar" -- Hide sidebar (Ctrl+B)
     button "New session" -- Start a new session (/new)
+    button "Search" -- Search sessions, settings and commands (Ctrl+K)
     button "Select" -- Select sessions to delete (/delete)
     button "Fix the build 2m ago /work" -- /sessions/s1.jsonl
     button "More for Fix the build" -- More (right-click, Shift+F10)
@@ -40,19 +41,17 @@ let%expect_test "the names of the controls" =
     button "backend" -- Tools run on the backend (/host switches)
     button "Thinking: provider's default" -- Thinking: provider's default: how much the model reasons before it answers (Alt+T cycles, /thinking)
     button "Auto: never asks" -- Tools run without asking (Alt+M cycles, /mode picks)
-    button "Transcript normal" -- Transcript: normal (Ctrl+O cycles, /verbosity)
     button "Context 0% full: the session's details"
     button "Dictate" -- Dictate (speak, then click again to stop)
     button "Send" -- Send (Enter)
     button "Folder: /work. Change it" -- Start in another folder (/cd)
     button "Branch: main. Change it" -- Work in another worktree (/worktree)
     [switch] button "Temporary" -- Make it temporary: not saved or listed (Ctrl+Shift+O)
-    input "Search sessions"
     textarea "Message" -- Working in /work on main. Ask prigh anything…
     [separator] div "Resize the sessions sidebar" -- Drag to resize, double-click for the default size
     [region] div "Transcript"
     [group] div "Model and host"
-    [group] div "Thinking, mode and transcript"
+    [group] div "Thinking and mode"
     [group] div "Session status"
     [status] span "Ready"
     [tooltip] div "Status Ready Context 0 / 200k \194\183 0% Tokens 0 in \194\183 0 out \194\183 0 cached Cost $0.0000 Thinking provider's default Mode Auto: never asks Model Claude Opus 5.5 Branch main Click for the session\226\128\153s details \194\183 /compact frees context"
@@ -64,13 +63,13 @@ let%expect_test "the names of the controls" =
     {|
     button "Hide sidebar" -- Hide sidebar (Ctrl+B)
     button "New session" -- Start a new session (/new)
+    button "Search" -- Search sessions, settings and commands (Ctrl+K)
     [checkbox] button "Fix the build 2m ago /work 0 B" -- /sessions/s1.jsonl
     button "Archived 1" -- Show the archived sessions
     button "Cancel" -- Stop selecting (Esc)
     button "Delete sessions" -- Delete the selected sessions (Delete)
     button "Commands & keys" -- Commands and keys (/help)
     button "Settings" -- Settings (Ctrl+, or /settings)
-    input "Search sessions"
     [checkbox] button "Fix the build 2m ago /work 0 B" -- /sessions/s1.jsonl
     |}]
 ;;
@@ -154,13 +153,12 @@ let%expect_test "the names in dialogs, pickers and the transcript" =
     button "backend" -- Tools run on the backend (/host switches)
     button "Thinking: provider's default" -- Thinking: provider's default: how much the model reasons before it answers (Alt+T cycles, /thinking)
     button "Auto: never asks" -- Tools run without asking (Alt+M cycles, /mode picks)
-    button "Transcript normal" -- Transcript: normal (Ctrl+O cycles, /verbosity)
     button "Context 0% full: the session's details"
     button "Dictate" -- Dictate (speak, then click again to stop)
     button "Send" -- Send (Enter)
     textarea "Message" -- Working in /work on main. Ask prigh anything…
     [group] div "Model and host"
-    [group] div "Thinking, mode and transcript"
+    [group] div "Thinking and mode"
     [group] div "Session status"
     [status] span "Ready"
     [tooltip] div "Status Ready Context 0 / 200k \194\183 0% Tokens 0 in \194\183 0 out \194\183 0 cached Cost $0.0000 Thinking provider's default Mode Auto: never asks Model Claude Opus 5.5 Branch main Click for the session\226\128\153s details \194\183 /compact frees context"

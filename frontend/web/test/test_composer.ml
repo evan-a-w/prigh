@@ -17,7 +17,6 @@ let%expect_test
     (backend)
     (provider's default)
     (auto)
-    (normal)
     Ready (0%) $0.00
     Status Ready
     Context 0 / 200k · 0%

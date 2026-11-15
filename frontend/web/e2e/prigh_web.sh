@@ -17,7 +17,7 @@
 # subagent whose call is in a page not loaded, then trim.mjs, trimming the
 # context before a message and undoing it, then filter.mjs, the transcript
 # filter's button, menu and note, on a desktop and a phone, then
-# search.mjs, the sidebar's search of titles and messages, on a desktop
+# search.mjs, the control centre (Ctrl+K) over sessions and settings, on a desktop
 # and two phones, then session_links.mjs, links to sessions in a reply
 # followed in place, in a new window, or to a toast, on a desktop and two
 # phones, then

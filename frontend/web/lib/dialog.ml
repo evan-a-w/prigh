@@ -38,6 +38,15 @@ module Picker_kind = struct
   [@@deriving sexp_of, equal]
 end
 
+module Control_options = struct
+  type t =
+    { setting : Control_setting.t
+    ; kind : Picker_kind.t
+    ; picker : Picker.t
+    }
+  [@@deriving sexp_of, equal]
+end
+
 module Delete_target = struct
   type t =
     | Sessions of string list
@@ -127,6 +136,10 @@ type t =
   | Annotate of Annotate.t
   | Temporary_menu
   | Leave_temporary
+  | Control of
+      { root : Control_centre.t
+      ; options : Control_options.t option
+      }
 [@@deriving sexp_of, equal]
 
 let per_session = function
@@ -167,7 +180,7 @@ let per_session = function
           | Trim_after _ )
       ; _
       }
-  | Annotate _ | Temporary_menu | Leave_temporary
+  | Annotate _ | Temporary_menu | Leave_temporary | Control _
   | Picker { kind = Snippets | Reminders | Worktrees _ | Menu _; _ } -> true
   | Picker
       { kind =

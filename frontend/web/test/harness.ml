@@ -664,3 +664,15 @@ let change ?nth t ~selector value =
   interact ?nth t ~selector ~f:(fun node ->
     Node_helpers.User_actions.change node ~value)
 ;;
+
+let texts ~selector t =
+  let rec inline (node : Node_helpers.t) =
+    match node with
+    | Text s -> [ String.strip s ]
+    | Widget -> []
+    | Element e -> List.concat_map e.children ~f:inline
+  in
+  List.map (node t ~selector ()) ~f:(fun node ->
+    List.filter (inline node) ~f:(Fn.non String.is_empty)
+    |> String.concat ~sep:" ")
+;;
