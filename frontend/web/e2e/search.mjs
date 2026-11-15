@@ -205,7 +205,11 @@ try {
 
   section("verbos");
   await search("verbos");
-  await page.locator(".control-row", { hasText: "Set verbosity" }).waitFor();
+  // "Set verbosity" is in the list before the query too: wait for its results.
+  await page.waitForFunction(() => {
+    const groups = [...document.querySelectorAll("#control-list > .control-group")].map(g => g.textContent);
+    return groups.join() === "Settings,Commands";
+  });
   console.log(await rows());
   await screenshot("palette verbos");
 
