@@ -37,6 +37,9 @@ module Mcp_purpose = struct
     | Picker
     | Reconnect
     | Refreshed of string
+    | Sign_in_lookup of string
+    | Sign_out_lookup of string
+    | Auth_changed
   [@@deriving sexp_of, equal]
 end
 
@@ -171,6 +174,11 @@ module Reply_tag = struct
         }
     | Mcp_settings_loaded
     | Mcp_host_listed
+    | Mcp_sign_in_url of
+        { source : string
+        ; server : string
+        }
+    | Mcp_signed_out of string
     | Mcp_draft_saved
     | Mcp_pasted
     | Mcp_removed of string
@@ -417,6 +425,7 @@ module Action = struct
     | Set_browser_time_zone of string
     | Set_narrow of bool
     | Set_desktop of bool
+    | Set_origin of string
     | Set_browser_shell of bool
     | Quit_desktop
     | Page_hidden of bool
@@ -541,6 +550,14 @@ module Action = struct
     | Mcp_show_tools of string
     | Mcp_reconnect
     | Mcp_approve of
+        { source : string
+        ; server : string
+        }
+    | Mcp_sign_in of
+        { source : string
+        ; server : string
+        }
+    | Mcp_sign_out of
         { source : string
         ; server : string
         }
@@ -746,6 +763,7 @@ module Model = struct
     ; browser_time_zone : string option
     ; narrow : bool
     ; desktop : bool
+    ; origin : string option
     ; browser_shell : bool
     ; field_menu : Field_menu.t option
     ; draft : string
@@ -1082,6 +1100,7 @@ let init =
   ; browser_time_zone = None
   ; narrow = false
   ; desktop = false
+  ; origin = None
   ; browser_shell = false
   ; field_menu = None
   ; draft = ""
@@ -5137,6 +5156,24 @@ let open_skills (m : Model.t) ~query =
         [ call List_skills ~tag:(Skills { place; purpose = Picker query }) ])
 ;;
 
+(* From the /mcp picker the sign-in has a dialog of its own; from the
+   settings, the server's row offers the page. *)
+let mcp_sign_in ~dialog (m : Model.t) ~source ~server =
+  let m = { m with mcp = Mcp_page.signing_in m.mcp ~source ~name:server } in
+  let m, cmds =
+    if dialog
+    then
+      open_dialog m (Mcp_sign_in { source; server; url = None; error = None })
+    else m, []
+  in
+  ( m
+  , cmds
+    @ [ call
+          (Mcp_sign_in { source; server; redirect_base = m.origin })
+          ~tag:(Mcp_sign_in_url { source; server })
+      ] )
+;;
+
 let mcp_chosen (m : Model.t) (l : Mcp_list.t) id =
   match Mcp_servers.find l ~id with
   | None -> m, []
@@ -5157,7 +5194,9 @@ let mcp_chosen (m : Model.t) (l : Mcp_list.t) id =
        let m, cmds = toast m "Restarting the failed MCP servers…" in
        ( m
        , cmds
-         @ [ call (List_mcp { reconnect = true }) ~tag:(Mcp (Refreshed id)) ] ))
+         @ [ call (List_mcp { reconnect = true }) ~tag:(Mcp (Refreshed id)) ] )
+     | Needs_sign_in ->
+       mcp_sign_in ~dialog:true m ~source:server.source ~server:server.name)
 ;;
 
 let mcp_listed (m : Model.t) (purpose : Mcp_purpose.t) (l : Mcp_list.t) =
@@ -5168,6 +5207,40 @@ let mcp_listed (m : Model.t) (purpose : Mcp_purpose.t) (l : Mcp_list.t) =
     then toast m Mcp_servers.none
     else open_picker m (Mcp_servers.picker l)
   | Reconnect -> say (Mcp_servers.summary l)
+  | Sign_in_lookup name ->
+    (match Prigh_ui.Mcp_command.find_server l name with
+     | Error e -> error m (String.capitalize e ^ ": /mcp lists them.")
+     | Ok s when Option.is_none s.url ->
+       error
+         m
+         (sprintf "%s is not a remote (HTTP) server: it has no sign-in." name)
+     | Ok s -> mcp_sign_in ~dialog:true m ~source:s.source ~server:s.name)
+  | Sign_out_lookup name ->
+    (match Prigh_ui.Mcp_command.find_server l name with
+     | Error e -> error m (String.capitalize e ^ ": /mcp lists them.")
+     | Ok s ->
+       ( m
+       , [ call
+             (Mcp_sign_out { source = s.source; server = s.name })
+             ~tag:(Mcp_signed_out s.name)
+         ] ))
+  | Auth_changed ->
+    let m = { m with mcp = Mcp_page.host_listed m.mcp (Ok l) } in
+    (match m.dialog with
+     | Some (Mcp_sign_in { source; server; _ }) ->
+       (match
+          List.find l.servers ~f:(fun (s : Mcp_server.t) ->
+            String.equal s.source source && String.equal s.name server)
+        with
+        | Some s when not (Mcp_server.Status.equal s.status Needs_sign_in) ->
+          let m, cmds = close_dialog m in
+          let text, `Error error =
+            Mcp_servers.outcome l ~id:(Mcp_servers.id s)
+          in
+          let m, more = toast m ~error text in
+          m, cmds @ more
+        | _ -> m, [])
+     | _ -> m, [])
   | Refreshed id ->
     let m, toast_cmds = say (Mcp_servers.outcome l ~id) in
     (* Back to the list, unless something else has been opened since. *)
@@ -6984,6 +7057,18 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
      | Reconnect ->
        let m, cmds = toast m "Restarting the failed MCP servers…" in
        m, cmds @ [ call (List_mcp { reconnect = true }) ~tag:(Mcp Reconnect) ]
+     | Sign_in name ->
+       ( m
+       , [ call
+             (List_mcp { reconnect = false })
+             ~tag:(Mcp (Sign_in_lookup name))
+         ] )
+     | Sign_out name ->
+       ( m
+       , [ call
+             (List_mcp { reconnect = false })
+             ~tag:(Mcp (Sign_out_lookup name))
+         ] )
      | Change { request; done_ } ->
        ( m
        , [ call
@@ -8538,6 +8623,36 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
         Result.map_error (Mcp_list.of_json json) ~f:Error.to_string_hum)
     in
     { m with mcp = Mcp_page.host_listed m.mcp result }, []
+  | Mcp_sign_in_url { source; server }, result ->
+    let result =
+      Result.bind result ~f:(fun json ->
+        Result.map_error (Json.string_field json "url") ~f:Error.to_string_hum)
+    in
+    let m =
+      { m with
+        mcp = Mcp_page.sign_in_started m.mcp ~source ~name:server result
+      }
+    in
+    (match m.dialog with
+     | Some (Mcp_sign_in d)
+       when String.equal d.source source && String.equal d.server server ->
+       let d =
+         match result with
+         | Ok url -> Dialog.Mcp_sign_in { d with url = Some url; error = None }
+         | Error e -> Mcp_sign_in { d with error = Some (String.capitalize e) }
+       in
+       { m with dialog = Some d }, []
+     | _ -> m, [])
+  | Mcp_signed_out server, result ->
+    (match
+       Result.bind result ~f:(fun json ->
+         Result.map_error (Mcp_list.of_json json) ~f:Error.to_string_hum)
+     with
+     | Ok l ->
+       toast
+         { m with mcp = Mcp_page.host_listed m.mcp (Ok l) }
+         (sprintf "Signed out of %s." server)
+     | Error e -> error m (sprintf "Signing out of %s failed: %s" server e))
   | Mcp_draft_saved, result ->
     let mcp = Mcp_page.saved m.mcp (Result.map result ~f:ignore) in
     (match result with
@@ -9590,6 +9705,8 @@ let main_event (m : Model.t) (event : Event.t) =
     { m with memory = Memory_notes.changed m.memory memory }, []
   | User_info_changed info ->
     { m with about_you = About_you.changed m.about_you info }, []
+  | Mcp_auth_changed ->
+    m, [ call (List_mcp { reconnect = false }) ~tag:(Mcp Auth_changed) ]
   | Mcp_settings_changed servers ->
     let m = { m with mcp = Mcp_page.changed m.mcp servers } in
     (* The host starts or stops them as it hears: ask it again, so a new
@@ -10508,6 +10625,7 @@ let dialog_accept (m : Model.t) =
       | Session _
       | Text _
       | Mcp_tools _
+      | Mcp_sign_in _
       | Diff _ ) -> close_dialog m
   | Some (Pasted _) -> close_dialog m
   | Some (Loading _) -> m, []
@@ -10715,6 +10833,7 @@ let update_connected (m : Model.t) (action : Action.t) =
   | Set_utc_offset utc_offset -> { m with utc_offset }, []
   | Set_browser_time_zone zone -> { m with browser_time_zone = Some zone }, []
   | Set_desktop desktop -> { m with desktop }, []
+  | Set_origin origin -> { m with origin = Some origin }, []
   | Set_browser_shell browser_shell -> { m with browser_shell }, []
   | Open_field_menu { field; anchor } ->
     (match Field_menu.decide ~browser_shell:m.browser_shell (Some field) with
@@ -10963,6 +11082,11 @@ let update_connected (m : Model.t) (action : Action.t) =
   | Mcp_approve { source; server } ->
     ( { m with mcp = Mcp_page.set_busy m.mcp server true }
     , [ call (Mcp_approve { source; server }) ~tag:Mcp_host_listed ] )
+  | Mcp_sign_in { source; server } ->
+    mcp_sign_in ~dialog:false m ~source ~server
+  | Mcp_sign_out { source; server } ->
+    ( { m with mcp = Mcp_page.set_busy m.mcp server true }
+    , [ call (Mcp_sign_out { source; server }) ~tag:Mcp_host_listed ] )
   | About_you_field (field, value) ->
     { m with about_you = About_you.set m.about_you field value }, []
   | About_you_save -> save_about_you m

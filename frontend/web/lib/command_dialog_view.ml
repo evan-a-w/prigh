@@ -687,6 +687,42 @@ let pasted (m : App.Model.t) i ~inject =
          [ Node.pre ~attrs:[ Attr.class_ "text-block" ] [ Node.text t ] ])
 ;;
 
+let mcp_sign_in ~server ~url ~error ~inject =
+  Modal.view
+    ~cls:"mcp-sign-in-dialog"
+    ~title:("Sign in to " ^ server)
+    ~on_close:(inject Action.Close_dialog)
+    ~footer:[ keys_only "Esc closes" ]
+    [ (match url, error with
+       | _, Some e ->
+         Node.p ~attrs:[ Attr.class_ "dialog-error" ] [ Node.text e ]
+       | None, None ->
+         div
+           ~cls:"loading-row"
+           ~attrs:[ Attr.role "status" ]
+           [ Html.lamp (); Node.text "Starting the sign-in…" ]
+       | Some url, None ->
+         div
+           ~cls:"mcp-sign-in"
+           [ Node.p
+               ~attrs:[ Attr.class_ "dialog-note" ]
+               [ Node.text
+                   "Sign in on the server's page, in a new tab. The server \
+                    connects once you have, and this closes."
+               ]
+           ; Node.a
+               ~attrs:
+                 [ Attr.href url
+                 ; Attr.target "_blank"
+                 ; Attr.create "rel" "noopener noreferrer"
+                 ; Attr.class_ "btn primary link-button mcp-sign-in-open"
+                 ]
+               [ Node.text "Open the sign-in page"; icon External ]
+           ; div ~cls:"login-url-text" [ Node.text url ]
+           ])
+    ]
+;;
+
 let mcp_tools (server : Mcp_server.t) ~inject =
   Modal.view
     ~cls:"mcp-tools-dialog"
@@ -751,6 +787,8 @@ let view (m : App.Model.t) (dialog : Dialog.t) ~inject =
   | Text { title; text = t } -> Some (text ~title ~text:t ~inject)
   | Pasted i -> pasted m i ~inject
   | Mcp_tools server -> Some (mcp_tools server ~inject)
+  | Mcp_sign_in { server; url; error; source = _ } ->
+    Some (mcp_sign_in ~server ~url ~error ~inject)
   | Loading title -> Some (loading ~title ~inject)
   | Diff diff -> Some (Git_diff_view.view ~fold:(App.Model.fold m) diff ~inject)
   | Picker _

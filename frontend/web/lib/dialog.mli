@@ -120,6 +120,12 @@ type t =
       }
   | Pasted of int (** the composer's pasted text: view, insert, remove *)
   | Mcp_tools of Mcp_server.t (** a ready server's tools *)
+  | Mcp_sign_in of
+      { source : string
+      ; server : string
+      ; url : string option (** the sign-in page, once the backend gave it *)
+      ; error : string option
+      } (** [/mcp]'s sign-in to a remote server *)
   | Loading of string
   (** the title of a dialog waiting for its list from the backend *)
   | Diff of Git_diff.t (** [/diff] *)

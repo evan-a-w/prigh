@@ -563,3 +563,142 @@ let%expect_test "/mcp add in the composer; a refusal comes back to the composer"
     "/mcp add docs https://docs.example.com/mcp"
     |}]
 ;;
+
+(* A remote server that wants OAuth: Sign in asks the backend for the page,
+   which then opens in a new tab; the sign-in coming back (an event) brings
+   the server up, signed in, with Sign out. *)
+let figma_settings =
+  {|{"servers":[{"name":"figma","enabled":true,"config":{"type":"http","url":"https://mcp.figma.com/mcp"}}]}|}
+;;
+
+let figma_host ~status ~signed_in =
+  sprintf
+    {|{"servers":[
+       {"name":"figma","source":"settings","project":false,"status":"%s",%s"url":"https://mcp.figma.com/mcp","signed_in":%b,"tools":[%s]},
+       {"name":"docs","source":"/home/u/.prigh/mcp.json","project":false,"status":"%s","url":"https://docs.example/mcp","signed_in":%b,"tools":[]}],
+     "problems":[]}|}
+    status
+    (if signed_in
+     then ""
+     else
+       {|"error":"https://mcp.figma.com/mcp needs you to sign in (HTTP 401)",|})
+    signed_in
+    (if signed_in
+     then {|{"name":"mcp__figma__get_code","description":""}|}
+     else "")
+    status
+    signed_in
+;;
+
+let%expect_test "sign in to a remote server, then sign out" =
+  let h =
+    opened
+      ~settings:figma_settings
+      ~host:(figma_host ~status:"needs_sign_in" ~signed_in:false)
+      ()
+  in
+  H.act h (Set_origin "https://prigh.example");
+  section h;
+  [%expect
+    {|
+    MCP servers
+    Tools the model can use from MCP servers. The servers here are kept on the backend for your account and run on every host your sessions use; a host's ~/.prigh/mcp.json and a project's .mcp.json add their own.
+    Your servers 1 server
+    figma https://mcp.figma.com/mcp
+    Needs you to sign in (Sign in)
+    (Stop it on every host (/mcp disable figma)) (Edit) (Remove (/mcp remove figma))
+    (Add server) (Paste JSON)
+    On the backend From its files: change them there
+    docs /home/u/.prigh/mcp.json Needs you to sign in
+    (Sign in)
+    |}];
+  H.click h ~selector:"[data-server=figma] .mcp-sign-in";
+  H.text h ~selector:"[data-server=figma] .mcp-needs-sign-in";
+  [%expect
+    {|
+    (Mcp_sign_in (source settings) (server figma))
+    (Rpc (method_ mcp_signin)
+     (params
+      ((source settings) (server figma) (redirect_base https://prigh.example)))
+     (tag (Mcp_sign_in_url (source settings) (server figma))))
+    Needs you to sign in (Starting…)
+    |}];
+  H.reply
+    h
+    "mcp_signin"
+    {|{"url":"https://www.figma.com/oauth?client_id=c&state=s"}|};
+  H.show h ~selector:"[data-server=figma] .mcp-sign-in-open";
+  [%expect
+    {|
+    <a href="https://www.figma.com/oauth?client_id=c&state=s"
+       target="_blank"
+       rel="noopener noreferrer"
+       title="Opens the server's sign-in page in a new tab"
+       class="btn link-button mcp-sign-in-open primary small">
+      Open sign-in page
+      <icon class="external"> </icon>
+    </a>
+    |}];
+  (* The callback page was visited: the backend says the sign-ins changed. *)
+  H.event h {|{"type":"event","event":"mcp_auth_changed"}|};
+  H.reply h "list_mcp" (figma_host ~status:"ready" ~signed_in:true);
+  section h;
+  [%expect
+    {|
+    (Rpc (method_ list_mcp) (params ()) (tag (Mcp Auth_changed)))
+    MCP servers
+    Tools the model can use from MCP servers. The servers here are kept on the backend for your account and run on every host your sessions use; a host's ~/.prigh/mcp.json and a project's .mcp.json add their own.
+    Your servers 1 server
+    figma https://mcp.figma.com/mcp
+    Ready on the backend · (1 tool) · Signed in (Sign out)
+    (Stop it on every host (/mcp disable figma)) (Edit) (Remove (/mcp remove figma))
+    (Add server) (Paste JSON)
+    On the backend From its files: change them there
+    docs /home/u/.prigh/mcp.json
+    Ready · (0 tools) · Signed in
+    (Sign out)
+    |}];
+  H.click h ~selector:"[data-server=figma] .mcp-sign-out";
+  H.reply h "mcp_signout" (figma_host ~status:"needs_sign_in" ~signed_in:false);
+  H.text h ~selector:"[data-server=figma] .mcp-needs-sign-in";
+  [%expect
+    {|
+    (Mcp_sign_out (source settings) (server figma))
+    (Rpc (method_ mcp_signout) (params ((source settings) (server figma)))
+     (tag Mcp_host_listed))
+    Needs you to sign in (Sign in)
+    |}]
+;;
+
+let%expect_test "a refused sign-in says why, and Sign in comes back" =
+  let h =
+    opened
+      ~settings:figma_settings
+      ~host:(figma_host ~status:"needs_sign_in" ~signed_in:false)
+      ()
+  in
+  H.click h ~selector:"[data-server=figma] .mcp-sign-in";
+  H.fail
+    h
+    "mcp_signin"
+    "https://mcp.figma.com/mcp: the authorization server supports no dynamic \
+     client registration: set \"oauth\": {\"clientId\": ...}";
+  section h;
+  [%expect
+    {|
+    (Mcp_sign_in (source settings) (server figma))
+    (Rpc (method_ mcp_signin) (params ((source settings) (server figma)))
+     (tag (Mcp_sign_in_url (source settings) (server figma))))
+    MCP servers
+    Tools the model can use from MCP servers. The servers here are kept on the backend for your account and run on every host your sessions use; a host's ~/.prigh/mcp.json and a project's .mcp.json add their own.
+    Your servers 1 server
+    Signing in to figma failed: https://mcp.figma.com/mcp: the authorization server supports no dynamic client registration: set "oauth": {"clientId": ...}
+    figma https://mcp.figma.com/mcp
+    Needs you to sign in (Sign in)
+    (Stop it on every host (/mcp disable figma)) (Edit) (Remove (/mcp remove figma))
+    (Add server) (Paste JSON)
+    On the backend From its files: change them there
+    docs /home/u/.prigh/mcp.json Needs you to sign in
+    (Sign in)
+    |}]
+;;

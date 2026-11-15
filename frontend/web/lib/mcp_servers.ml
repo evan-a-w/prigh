@@ -17,18 +17,23 @@ let tools n = Chat_html.plural n "tool"
 let detail (s : Mcp_server.t) =
   let status =
     match s.status with
-    | Ready -> sprintf "ready, %s" (tools (List.length s.tools))
+    | Ready ->
+      sprintf
+        "ready, %s%s"
+        (tools (List.length s.tools))
+        (if s.signed_in then ", signed in" else "")
     | Failed ->
       sprintf
         "failed: %s. Enter restarts it"
         (Option.value s.error ~default:"no reason given")
     | Needs_approval -> "needs your approval: Enter starts it"
+    | Needs_sign_in -> "needs you to sign in: Enter signs in"
   in
   sprintf "%s, %s" status s.source
 ;;
 
 let rank : Mcp_server.Status.t -> int = function
-  | Needs_approval -> 0
+  | Needs_approval | Needs_sign_in -> 0
   | Failed -> 1
   | Ready -> 2
 ;;
@@ -62,6 +67,7 @@ let summary (l : Mcp_list.t) =
   let ready = with_status Ready in
   let failed = with_status Failed in
   let waiting = with_status Needs_approval in
+  let signed_out = with_status Needs_sign_in in
   let parts =
     List.filter_opt
       [ (match ready with
@@ -94,6 +100,9 @@ let summary (l : Mcp_list.t) =
           (not (List.is_empty waiting))
           (sprintf "%d awaiting approval" (List.length waiting))
       ; Option.some_if
+          (not (List.is_empty signed_out))
+          (sprintf "%d needing a sign-in" (List.length signed_out))
+      ; Option.some_if
           (not (List.is_empty l.problems))
           (Chat_html.plural (List.length l.problems) "configuration problem")
       ]
@@ -105,7 +114,7 @@ let summary (l : Mcp_list.t) =
     ( sprintf
         "MCP servers: %s%s"
         (String.concat ~sep:", " parts)
-        (if wrong || not (List.is_empty waiting)
+        (if wrong || not (List.is_empty waiting && List.is_empty signed_out)
          then ": /mcp shows them"
          else "")
     , `Error wrong )
@@ -132,5 +141,8 @@ let outcome l ~id =
        , `Error true )
      | Needs_approval ->
        ( sprintf "%s still needs approval: Enter in /mcp starts it." s.name
+       , `Error true )
+     | Needs_sign_in ->
+       ( sprintf "%s still needs you to sign in: Enter in /mcp signs in." s.name
        , `Error true ))
 ;;

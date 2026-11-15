@@ -1515,6 +1515,9 @@ let run_app (settings : Settings.t) =
             });
        schedule (App.Action.Set_narrow (narrow ()));
        schedule (App.Action.Set_desktop (Desktop_page.active ()));
+       schedule
+         (App.Action.Set_origin
+            (Js.to_string Dom_html.window##.location##.origin));
        schedule (App.Action.Set_browser_shell (Desktop_page.in_browser ()));
        schedule
          (App.Action.Set_notification_permission
