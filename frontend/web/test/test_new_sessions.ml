@@ -53,8 +53,8 @@ let%expect_test "the section: the built-ins, every control" =
     How hard new sessions think, on models that can. A model without the level takes its nearest one.
     (Off answer straight away) (Provider's default the provider picks the effort) (Minimal barely) (Low a little) (Medium some) (High more) (Xhigh a lot, for long agentic work) (Max as much as the model allows)
     Mode
-    What asks before it runs: everything (Ask), all but file edits (Auto-edit), what the approval model leaves to you (Smart) or nothing (Auto).
-    (Ask) (Auto-edit) (Smart) (Auto)
+    What asks before it runs: everything (Ask), all but file edits (Auto-edit), what the approval model leaves to you (Smart) or nothing (Auto); or a chat without the tool host (Chat).
+    (Ask) (Auto-edit) (Smart) (Auto) (Chat)
     Tool host
     New sessions you start here run their tools where the session you are on does.
     (Where you are)
@@ -82,6 +82,7 @@ let%expect_test "the section: the built-ins, every control" =
     button "Auto-edit" -- New sessions start in Auto-edit mode
     button "Smart" -- New sessions start in Smart mode
     button "Auto" -- New sessions start in Auto mode
+    button "Chat" -- New sessions start in Chat mode
     button "New sessions' tool host: Where you are" -- Choose the tool host new sessions start on (/default-host)
     button "Add" -- Add a model to the end of the chain (/fallback MODEL…)
     [switch] button "Budget" -- Stop sessions starting turns past a cost (/default-budget)
@@ -182,17 +183,96 @@ let%expect_test "thinking and mode: segmented, for new sessions only" =
        Prigh_protocol.Approval_mode.to_string s.approval_mode));
   [%expect
     {|
-    (Set_default (Mode Ask))
+    (Set_default (Mode (Approval Ask)))
     (Rpc (method_ set_config)
-     (params ((config ((approval_mode ask))) (defaults_only true)))
-     (tag (Default_set (Mode Ask))))
+     (params
+      ((config ((approval_mode ask) (default_chat_mode false)))
+       (defaults_only true)))
+     (tag (Default_set (Mode (Approval Ask)))))
     (Expire_toast (id 2) (after_ms 3820))
     Mode
-    What asks before it runs: everything (Ask), all but file edits (Auto-edit), what the approval model leaves to you (Smart) or nothing (Auto).
-    (Ask) (Auto-edit) (Smart) (Auto)
+    What asks before it runs: everything (Ask), all but file edits (Auto-edit), what the approval model leaves to you (Smart) or nothing (Auto); or a chat without the tool host (Chat).
+    (Ask) (Auto-edit) (Smart) (Auto) (Chat)
     (Back to the built-in: Auto)
     New sessions start in Ask mode (open sessions keep theirs)
     auto
+    |}]
+;;
+
+let%expect_test "mode: chat, over the approval mode, which another mode leaves" =
+  let h = section () in
+  H.click h ~selector:".setting.default-mode .segment:nth-child(3)";
+  H.reply h "set_config" (config [ "approval_mode", `String "smart" ]);
+  H.click h ~selector:".setting.default-mode .segment:nth-child(5)";
+  H.reply
+    h
+    "set_config"
+    (config [ "approval_mode", `String "smart"; "default_chat_mode", `True ]);
+  H.text h ~selector:".setting.default-mode";
+  H.text h ~selector:".toast:last-child";
+  (* This session keeps its mode. *)
+  print_endline
+    (Option.value_map (H.model h).state ~default:"?" ~f:(fun s ->
+       sprintf
+         "%s chat=%b"
+         (Prigh_protocol.Approval_mode.to_string s.approval_mode)
+         s.chat_mode));
+  [%expect
+    {|
+    (Set_default (Mode (Approval Smart)))
+    (Rpc (method_ set_config)
+     (params
+      ((config ((approval_mode smart) (default_chat_mode false)))
+       (defaults_only true)))
+     (tag (Default_set (Mode (Approval Smart)))))
+    (Expire_toast (id 0) (after_ms 3900))
+    (Set_default (Mode Chat))
+    (Rpc (method_ set_config)
+     (params ((config ((default_chat_mode true))) (defaults_only true)))
+     (tag (Default_set (Mode Chat))))
+    (Expire_toast (id 1) (after_ms 4740))
+    Mode
+    New sessions are chats without the tool host; leaving one gives Smart mode. Choose another mode to start in it.
+    (Ask) (Auto-edit) (Smart) (Auto) (Chat)
+    (Back to the built-in: Auto)
+    New sessions start in Chat mode, leaving it for Smart (open sessions keep theirs)
+    auto chat=false
+    |}];
+  (* Another mode leaves chat; Reset goes back to the built-in, Auto. *)
+  H.click h ~selector:".setting.default-mode .segment:nth-child(2)";
+  H.reply h "set_config" (config [ "approval_mode", `String "auto-edit" ]);
+  H.text h ~selector:".setting.default-mode";
+  H.click h ~selector:".setting.default-mode .segment:nth-child(5)";
+  H.reply
+    h
+    "set_config"
+    (config
+       [ "approval_mode", `String "auto-edit"; "default_chat_mode", `True ]);
+  H.click h ~selector:".setting.default-mode .default-reset";
+  [%expect
+    {|
+    (Set_default (Mode (Approval Auto_edit)))
+    (Rpc (method_ set_config)
+     (params
+      ((config ((approval_mode auto-edit) (default_chat_mode false)))
+       (defaults_only true)))
+     (tag (Default_set (Mode (Approval Auto_edit)))))
+    (Expire_toast (id 2) (after_ms 4060))
+    Mode
+    What asks before it runs: everything (Ask), all but file edits (Auto-edit), what the approval model leaves to you (Smart) or nothing (Auto); or a chat without the tool host (Chat).
+    (Ask) (Auto-edit) (Smart) (Auto) (Chat)
+    (Back to the built-in: Auto)
+    (Set_default (Mode Chat))
+    (Rpc (method_ set_config)
+     (params ((config ((default_chat_mode true))) (defaults_only true)))
+     (tag (Default_set (Mode Chat))))
+    (Expire_toast (id 3) (after_ms 4900))
+    (Set_default (Mode (Approval Auto)))
+    (Rpc (method_ set_config)
+     (params
+      ((config ((approval_mode auto) (default_chat_mode false)))
+       (defaults_only true)))
+     (tag (Default_set (Mode (Approval Auto)))))
     |}]
 ;;
 

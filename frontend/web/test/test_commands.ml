@@ -85,7 +85,7 @@ let%expect_test "every command does something (none is unknown)" =
     /filter                    transcript filter menu
     /theme                     picker: Theme
     /accent                    picker: Accent colour (or type #rrggbb)
-    /confirm                   picker: Tool confirmation
+    /confirm                   picker: Mode, also for new sessions
     /mode                      picker: When tools ask first (Alt+M cycles)
     /plan                      rpc set_mode
     /chat                      rpc set_mode
@@ -370,9 +370,10 @@ let%expect_test "/scoped-models, Ctrl+P and Alt+P" =
     (((scoped_models
        (anthropic/claude-opus-5-5 anthropic/claude-sonnet-5
         deepseek/deepseek-chat))
-      (approval_mode Auto) (permissions ((allow ()) (ask ()) (deny ())))
-      (default_model ()) (default_thinking ()) (fallback_models ())
-      (default_cwd ()) (default_host ()) (max_budget_usd ()) (worktrees_dir ())
+      (approval_mode Auto) (default_chat_mode false)
+      (permissions ((allow ()) (ask ()) (deny ()))) (default_model ())
+      (default_thinking ()) (fallback_models ()) (default_cwd ())
+      (default_host ()) (max_budget_usd ()) (worktrees_dir ())
       (archive_after_days 7) (notify bell) (snippets ())
       (compact_at_tokens 200000) (compaction_model ()) (mask_observations true)
       (generate_model ()) (naming_model ()) (approval_model ())
@@ -552,10 +553,13 @@ let%expect_test "/confirm" =
     (Rpc (method_ push_pref) (params ((key history) (value /confirm) (max 500)))
      (tag Ignore))
     (Focus picker-input)
-    On ask before bash, write and edit run
-    Off run tools without asking ✓
+    Ask bash, job_input, edits and MCP tools ask first
+    Auto-edit file edits run; bash, job_input and MCP tools ask first
+    Smart edits in the project run; the approval model lets other calls run or asks you, saying why (/approval-model)
+    Auto tools run without asking ✓
+    Chat a chat without the tool host; leaving it returns to the approval mode underneath
     |}];
-  H.act h (Picker_choose "on");
+  H.act h (Picker_choose "ask");
   H.reply
     h
     "set_config"
@@ -567,7 +571,8 @@ let%expect_test "/confirm" =
   [%expect
     {|
     (Focus editor)
-    (Rpc (method_ set_config) (params ((config ((approval_mode ask)))))
+    (Rpc (method_ set_config)
+     (params ((config ((approval_mode ask) (default_chat_mode false)))))
      (tag
       (Config_saved
        "Mode ask, also for new sessions: bash, job_input, edits and MCP tools ask first")))
@@ -575,13 +580,52 @@ let%expect_test "/confirm" =
     (ask)
     (Rpc (method_ push_pref)
      (params ((key history) (value "/confirm off") (max 500))) (tag Ignore))
-    (Rpc (method_ set_config) (params ((config ((approval_mode auto)))))
+    (Rpc (method_ set_config)
+     (params ((config ((approval_mode auto) (default_chat_mode false)))))
      (tag
       (Config_saved "Mode auto, also for new sessions: tools run without asking")))
     (Rpc (method_ push_pref)
      (params ((key history) (value "/confirm maybe") (max 500))) (tag Ignore))
     Mode ask, also for new sessions: bash, job_input, edits and MCP tools ask first
-    Unknown setting “maybe”: use on, off, ask, auto-edit, smart or auto. (Dismiss)
+    Unknown setting “maybe”: use on, off, ask, auto-edit, smart, auto or chat. (Dismiss)
+    |}];
+  (* Chat sends only its flag: the approval mode under it stays, and leaving
+     the chat gives it. *)
+  run h "/confirm chat";
+  H.text h ~selector:".mode-chip";
+  H.reply
+    h
+    "set_config"
+    {|{"scoped_models":[],"approval_mode":"auto","default_chat_mode":true}|};
+  run h "/confirm";
+  H.text h ~selector:".picker-items";
+  H.act h (Picker_choose "smart");
+  H.text h ~selector:".mode-chip";
+  [%expect
+    {|
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/confirm chat") (max 500))) (tag Ignore))
+    (Rpc (method_ set_config) (params ((config ((default_chat_mode true)))))
+     (tag
+      (Config_saved
+       "Mode chat (leaving it: auto), also for new sessions: a chat without the tool host: no files, commands or project, only the web and other host-free tools, until you leave it (/chat off or Alt+M)")))
+    (chat)
+    (Expire_toast (id 2) (after_ms 3820))
+    (Rpc (method_ push_pref) (params ((key history) (value /confirm) (max 500)))
+     (tag Ignore))
+    (Focus picker-input)
+    Ask bash, job_input, edits and MCP tools ask first
+    Auto-edit file edits run; bash, job_input and MCP tools ask first
+    Smart edits in the project run; the approval model lets other calls run or asks you, saying why (/approval-model)
+    Auto tools run without asking
+    Chat a chat without the tool host; leaving it returns to the approval mode underneath ✓
+    (Focus editor)
+    (Rpc (method_ set_config)
+     (params ((config ((approval_mode smart) (default_chat_mode false)))))
+     (tag
+      (Config_saved
+       "Mode smart, also for new sessions: edits in the project run; the approval model lets other calls run or asks you, saying why (/approval-model)")))
+    (smart)
     |}]
 ;;
 

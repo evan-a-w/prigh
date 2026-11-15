@@ -8,7 +8,7 @@ open! Import
 type t =
   | Model of string option (** a model key; [None]: the backend picks *)
   | Thinking of string option (** a level; [None]: the built-in, [on] *)
-  | Mode of Approval_mode.t
+  | Mode of Default_mode.t (** an approval mode, or chat over the set one *)
   | Host of string option (** a host's id; [None]: where you are *)
   | Dir of string option (** [None]: where the host's sessions start *)
   | Fallback of string list (** model keys, in order *)
@@ -16,7 +16,7 @@ type t =
 [@@deriving sexp_of, equal]
 
 (** The built-in mode new sessions start in when none is set. *)
-val builtin_mode : Approval_mode.t
+val builtin_mode : Default_mode.t
 
 (** The built-in thinking level. *)
 val builtin_thinking : string
@@ -24,8 +24,8 @@ val builtin_thinking : string
 (** The budget, in dollars, switching it on sets when none was set before. *)
 val budget_usd : float
 
-(** [config] with [t] applied, and the field [set_config] sends. *)
-val apply : t -> Config.t -> Config.t * string
+(** [config] with [t] applied, and the fields [set_config] sends. *)
+val apply : t -> Config.t -> Config.t * string list
 
 (** The pickers the section opens. *)
 module Picker : sig

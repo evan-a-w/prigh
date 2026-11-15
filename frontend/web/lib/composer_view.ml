@@ -18,7 +18,7 @@ let popup (m : App.Model.t) ~inject =
       | Argument Backend_directory -> "Directories on the backend"
       | Argument Path | Path -> "Files"
       | Argument Verbosity -> "Verbosity"
-      | Argument Confirm -> "Tool confirmation"
+      | Argument Confirm -> "Mode, also for new sessions"
       | Argument Mode -> "Modes"
       | Argument Plan -> "Plan mode"
       | Argument Chat -> "Chat mode"

@@ -170,13 +170,7 @@ let argument_items
         ~detail:
           ("only " ^ String.uncapitalize (Transcript_filter.Kind.label kind))
         name)
-  | Confirm ->
-    simple
-      [ ( "on"
-        , Session_mode.describe { approval = Ask; plan = false; chat = false }
-          ^ " (mode ask)" )
-      ; "off", "run tools without asking (mode auto)"
-      ]
+  | Confirm -> simple Default_mode.arguments
   | Mode ->
     simple
       (List.map Session_mode.names ~f:(fun name ->

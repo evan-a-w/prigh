@@ -31,6 +31,7 @@ end
 type t =
   { scoped_models : string list
   ; approval_mode : Approval_mode.t
+  ; default_chat_mode : bool
   ; permissions : Permissions.t
   ; default_model : string option
   ; default_thinking : string option
@@ -55,6 +56,7 @@ type t =
 let default =
   { scoped_models = []
   ; approval_mode = Auto
+  ; default_chat_mode = false
   ; permissions = Permissions.empty
   ; default_model = None
   ; default_thinking = None
@@ -95,6 +97,13 @@ let of_json j =
     | None, Some `True -> Ok Approval_mode.Ask
     | None, (None | Some `False) -> Ok Approval_mode.Auto
     | None, Some _ -> Or_error.error_string "confirm_tools must be a boolean"
+  in
+  let%bind default_chat_mode =
+    match Json.field j "default_chat_mode" with
+    | None | Some `Null -> Ok default.default_chat_mode
+    | Some `True -> Ok true
+    | Some `False -> Ok false
+    | Some _ -> Or_error.error_string "default_chat_mode must be a boolean"
   in
   let%bind permissions =
     match Json.field j "permissions" with
@@ -153,6 +162,7 @@ let of_json j =
   let%map snippets = Json.optional_list_field j "snippets" ~f:Snippet.of_json in
   { scoped_models
   ; approval_mode
+  ; default_chat_mode
   ; permissions
   ; default_model
   ; default_thinking
@@ -180,6 +190,7 @@ let to_json t =
   `Object
     ([ "scoped_models", strings t.scoped_models
      ; "approval_mode", `String (Approval_mode.to_string t.approval_mode)
+     ; ("default_chat_mode", if t.default_chat_mode then `True else `False)
      ; "permissions", Permissions.to_json t.permissions
      ; "default_model", optional t.default_model
      ; "default_thinking", optional t.default_thinking

@@ -3451,33 +3451,38 @@ let verbosity_picker (m : Model.t) =
   Dialog.Picker { kind = Verbosity; picker = verbosity_list m }
 ;;
 
-(* The default mode for new sessions, which the backend applies to this
-   session too. *)
-(* The default mode, which the backend also gives this session. *)
-let set_default_mode (m : Model.t) (approval_mode : Approval_mode.t) =
+(* The default mode, which the backend also gives this session when the
+   default changed. *)
+let set_default_mode (m : Model.t) (mode : Default_mode.t) =
+  let was = config m in
+  let config = Default_mode.apply mode was in
+  let default = Default_mode.session_mode config in
   let m =
-    { m with
-      state =
-        Option.map m.state ~f:(fun s ->
-          { s with approval_mode; plan_mode = false; chat_mode = false })
-    }
-  in
-  let mode : Session_mode.t =
-    { approval = approval_mode; plan = false; chat = false }
+    if Session_mode.equal (Default_mode.session_mode was) default
+    then m
+    else
+      { m with
+        state =
+          Option.map m.state ~f:(fun s ->
+            { s with
+              approval_mode = config.approval_mode
+            ; chat_mode = config.default_chat_mode
+            })
+      }
   in
   save_config
     m
-    { (config m) with approval_mode }
-    ~fields:[ "approval_mode" ]
+    config
+    ~fields:(Default_mode.fields mode)
     ~notice:
       (sprintf
          "Mode %s, also for new sessions: %s"
-         (Approval_mode.to_string approval_mode)
-         (Session_mode.describe mode))
+         (Default_mode.summary config)
+         (Session_mode.describe default))
 ;;
 
 let set_confirm (m : Model.t) enabled =
-  set_default_mode m (if enabled then Ask else Auto)
+  set_default_mode m (Approval (if enabled then Ask else Auto))
 ;;
 
 let mode_text (mode : Session_mode.t) =
@@ -3794,26 +3799,18 @@ let show_permissions (m : Model.t) =
 ;;
 
 let confirm_picker (m : Model.t) =
-  let current =
-    Option.map m.config ~f:(fun c ->
-      not (Prigh_protocol.Approval_mode.equal c.approval_mode Auto))
-  in
+  let current = Option.map m.config ~f:Default_mode.of_config in
   Dialog.Picker
     { kind = Confirm_tools
     ; picker =
         Picker.create
-          ~title:"Tool confirmation"
-          [ Picker.Item.create
-              ~id:"on"
-              ~detail:"ask before bash, write and edit run"
-              ~marked:(Option.equal Bool.equal current (Some true))
-              "On"
-          ; Picker.Item.create
-              ~id:"off"
-              ~detail:"run tools without asking"
-              ~marked:(Option.equal Bool.equal current (Some false))
-              "Off"
-          ]
+          ~title:"Mode, also for new sessions"
+          (List.map Default_mode.all ~f:(fun mode ->
+             Picker.Item.create
+               ~id:(Default_mode.to_string mode)
+               ~detail:(Default_mode.describe mode)
+               ~marked:(Option.equal Default_mode.equal current (Some mode))
+               (String.capitalize (Default_mode.to_string mode))))
     }
 ;;
 
@@ -3968,13 +3965,6 @@ let model_display (m : Model.t) key =
   | None -> key
 ;;
 
-let mode_name : Approval_mode.t -> string = function
-  | Ask -> "Ask"
-  | Auto_edit -> "Auto-edit"
-  | Smart -> "Smart"
-  | Auto -> "Auto"
-;;
-
 let default_set_notice
       (m : Model.t)
       (change : New_default.t)
@@ -3992,7 +3982,16 @@ let default_set_notice
       next
   | Thinking (Some level) ->
     sprintf "New sessions think at %s%s" (Thinking.label level) next
-  | Mode mode -> sprintf "New sessions start in %s mode%s" (mode_name mode) next
+  | Mode (Approval _ as mode) ->
+    sprintf
+      "New sessions start in %s mode%s"
+      (String.capitalize (Default_mode.to_string mode))
+      next
+  | Mode Chat ->
+    sprintf
+      "New sessions start in Chat mode, leaving it for %s%s"
+      (String.capitalize (Approval_mode.to_string config.approval_mode))
+      next
   | Host None -> "New sessions start where your session is" ^ next
   | Host (Some id) ->
     sprintf
@@ -4034,13 +4033,9 @@ let set_default (m : Model.t) (change : New_default.t) =
         remember_on m Budget ~was:(usd was.max_budget_usd) ~now:(usd now)
       | Model _ | Thinking _ | Mode _ | Host _ | Dir _ | Fallback _ -> m
     in
-    let config, field = New_default.apply change was in
+    let config, fields = New_default.apply change was in
     ( { m with config = Some config }
-    , [ set_config
-          ~defaults_only:true
-          config
-          ~fields:[ field ]
-          ~tag:(Default_set change)
+    , [ set_config ~defaults_only:true config ~fields ~tag:(Default_set change)
       ] ))
 ;;
 
@@ -6739,13 +6734,14 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
   | "confirm", ("on" | "true") -> set_confirm m true
   | "confirm", ("off" | "false") -> set_confirm m false
   | "confirm", other ->
-    (match Approval_mode.of_string other with
+    (match Default_mode.of_string other with
      | Some mode -> set_default_mode m mode
      | None ->
        error
          m
          (sprintf
-            "Unknown setting “%s”: use on, off, ask, auto-edit, smart or auto."
+            "Unknown setting “%s”: use on, off, ask, auto-edit, smart, auto or \
+             chat."
             other))
   | "budget", "" ->
     current_state m ~f:(fun s ->
@@ -10188,7 +10184,10 @@ let picker_accepted (m : Model.t) ~kind (item : Picker.Item.t) =
        with
        | Some v -> set_verbosity m v
        | None -> m, [])
-    | Confirm_tools -> set_confirm m (String.equal item.id "on")
+    | Confirm_tools ->
+      (match Default_mode.of_string item.id with
+       | Some mode -> set_default_mode m mode
+       | None -> m, [])
     | Themes -> theme_named m item.id
     | Accents -> accent_named m item.id
     | Compaction_models ->
