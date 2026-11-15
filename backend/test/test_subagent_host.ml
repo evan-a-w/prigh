@@ -71,9 +71,10 @@ let with_agent
   let provider =
     Routed_provider.create
       ~on_request:(fun ~key request ->
-        if prompts
-           && (not (String.equal key "main"))
-           && not (Hash_set.mem seen key)
+        if
+          prompts
+          && (not (String.equal key "main"))
+          && not (Hash_set.mem seen key)
         then (
           Hash_set.add seen key;
           print_prompt t request))
@@ -189,7 +190,8 @@ let%expect_test "a subagent on another host runs its tools there" =
     ]
   @@ fun _t agent ->
   run agent ~prompt:"look around on the laptop";
-  [%expect {|
+  [%expect
+    {|
     host-laptop runs $instructions in $DIR/laptop
     subagent -> started agent a1 on laptop (look); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
     subagent a1 starts on laptop
@@ -217,14 +219,16 @@ let%expect_test "an unknown host is an error listing the connected ones" =
     []
   @@ fun _t agent ->
   run agent ~prompt:"look around on the laptop";
-  [%expect {|
+  [%expect
+    {|
     subagent -> ERROR invalid arguments: no connected tool host "laptp" (it may have disconnected: the user can connect it with `prigh tool-host -connect` or a TUI there). Connected:
     - laptop (id host-laptop): home $DIR/laptop
     - <host> (id backend): home $HOME, the session's active host (call tools directly)
     |}]
 ;;
 
-let%expect_test "a host the user has not named is asked about; denied, it fails" =
+let%expect_test "a host the user has not named is asked about; denied, it fails"
+  =
   with_agent
     ~answer:(fun _ -> Deny None)
     ~main:
@@ -232,7 +236,8 @@ let%expect_test "a host the user has not named is asked about; denied, it fails"
     []
   @@ fun _t agent ->
   run agent ~prompt:"look around";
-  [%expect {|
+  [%expect
+    {|
     confirm on_host: on laptop: subagent (runs on laptop, which you haven't named in this session)
     subagent -> ERROR [denied by user]
     |}]
@@ -255,7 +260,8 @@ let%expect_test
     ]
   @@ fun _t agent ->
   run agent ~prompt:"look around";
-  [%expect {|
+  [%expect
+    {|
     confirm on_host: on laptop: subagent (runs on laptop, which you haven't named in this session)
     host-laptop runs $instructions in $DIR/laptop/sub
     subagent -> started agent a1 on laptop (look); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
@@ -285,7 +291,8 @@ let%expect_test "in ask mode, its calls there ask as the session's would" =
     ]
   @@ fun _t agent ->
   run agent ~prompt:"look around on laptop";
-  [%expect {|
+  [%expect
+    {|
     host-laptop runs $instructions in $DIR/laptop
     subagent -> started agent a1 on laptop (look); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
     subagent a1 starts on laptop
@@ -316,7 +323,8 @@ let%expect_test "subagent_continue keeps its host" =
     ]
   @@ fun _t agent ->
   run agent ~prompt:"look around on the laptop";
-  [%expect {|
+  [%expect
+    {|
     host-laptop runs $instructions in $DIR/laptop
     subagent -> started agent a1 on laptop (look); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
     subagent a1 starts on laptop
@@ -352,19 +360,22 @@ let%expect_test "its worktree is made on its host" =
   @@ fun t agent ->
   Test_worktree.init_repo ~dir:"laptop/repo" t;
   run agent ~prompt:"fix it on the laptop";
-  List.iter (Session.messages (Agent.session agent)) ~f:(function
-    | Message.User u ->
-      List.iter
-        (String.split_lines (Message.User.body u))
-        ~f:(fun line ->
-          if String.is_prefix line ~prefix:"[worktree:"
-          then print_endline (show t line))
-    | Assistant _ | Tool_result _ -> ());
+  List.iter
+    (Session.messages (Agent.session agent))
+    ~f:(function
+      | Message.User u ->
+        List.iter
+          (String.split_lines (Message.User.body u))
+          ~f:(fun line ->
+            if String.is_prefix line ~prefix:"[worktree:"
+            then print_endline (show t line))
+      | Assistant _ | Tool_result _ -> ());
   print_s
     [%sexp
       (List.map (Session.worktrees (Agent.session agent)) ~f:(fun w -> w.path)
        : string list)];
-  [%expect {|
+  [%expect
+    {|
     host-laptop runs $worktree_create in $DIR/laptop/repo
     host-laptop runs $instructions in $DIR/laptop/trees/repo/fix-it
     subagent -> started agent a1 on laptop (fix); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
@@ -394,7 +405,8 @@ let%expect_test "subagent_status says which host it is on" =
     [ "look", [ Reply.text "looked" ] ]
   @@ fun _t agent ->
   run agent ~prompt:"look around on the laptop";
-  [%expect {|
+  [%expect
+    {|
     host-laptop runs $instructions in $DIR/laptop
     subagent -> started agent a1 on laptop (look); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
     subagent a1 starts on laptop

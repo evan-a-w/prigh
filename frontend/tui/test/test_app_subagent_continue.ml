@@ -201,7 +201,8 @@ let%expect_test "a subagent on another host" =
   H.keys h "/agents";
   H.enter h;
   H.show h;
-  [%expect {|
+  [%expect
+    {|
     ◆ subagent 1/1  claude-haiku  on laptop  ⠋ running 1 turns  "fix the parser"
 
 

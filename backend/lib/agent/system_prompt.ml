@@ -347,12 +347,12 @@ let build
           date
           link
       | None ->
-      sprintf
-        "Environment:\n- Working directory: %s\n- Date: %s\n- OS: %s%s"
-        cwd
-        date
-        (Core_unix.Utsname.sysname (Core_unix.uname ()))
-        link)
+        sprintf
+          "Environment:\n- Working directory: %s\n- Date: %s\n- OS: %s%s"
+          cwd
+          date
+          (Core_unix.Utsname.sysname (Core_unix.uname ()))
+          link)
   in
   let instructions =
     match instructions with

@@ -594,7 +594,13 @@ let%expect_test "over RPC: sessions by project, subagents' worktrees, removal" =
   ignore
     (Session.add_agent_worktree
        (Agent.session agent)
-       { agent = "9"; task = "t"; path = gone; branch = "gone"; root = repo; host = None }
+       { agent = "9"
+       ; task = "t"
+       ; path = gone
+       ; branch = "gone"
+       ; root = repo
+       ; host = None
+       }
      : Session.Entry.t);
   print_endline
     (show

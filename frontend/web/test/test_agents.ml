@@ -946,7 +946,8 @@ let%expect_test "a subagent on another tool host says which" =
   H.show h ~selector:".agents-row .row-meta";
   H.act h (Open_subagents (Some "a1"));
   H.text h ~selector:".agents-panel";
-  [%expect {|
+  [%expect
+    {|
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))

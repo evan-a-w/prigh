@@ -979,8 +979,8 @@ let create
          in
          Tool.Result.ok
            (sprintf
-              "started agent %s%s (%s%s); its result will be delivered to \
-               you when it finishes: keep working or end your turn meanwhile"
+              "started agent %s%s (%s%s); its result will be delivered to you \
+               when it finishes: keep working or end your turn meanwhile"
               id
               (Option.value_map prepared.host ~default:"" ~f:(fun h ->
                  " on " ^ h.name))

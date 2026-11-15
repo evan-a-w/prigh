@@ -23,5 +23,6 @@ let report_line t =
        sprintf " on the tool host %s" host))
     (match t.host with
      | None -> "/worktree rm " ^ t.path
-     | Some host -> sprintf "the worktree tool with host %s and action remove" host)
+     | Some host ->
+       sprintf "the worktree tool with host %s and action remove" host)
 ;;

@@ -256,7 +256,22 @@ told which host the session runs on and which one the call targets. Once
 the host is permitted, its calls follow the approval mode, confirmations
 reading `on HOST: ...`. Approval rules you saved apply only on the
 session's own host (deny rules everywhere, and they win), and a file read
-on one host does not count as read on another. Several frontends can attach
+on one host does not count as read on another. For more than a call or
+two on another machine ("build it on laptop"), the model starts a subagent
+there instead (the `subagent` tool's `host`): all its tools run on that
+host, in its home or the `cwd` given there, its prompt names the host and
+reads the project instructions there, and the `computer` tool, the active
+host's screen, is left out; with `worktree` too, the worktree is made in
+that host's repository under its `worktrees_dir` (the report says on which
+host; the session's own worktree list keeps to its own host), and the
+`worktree` tool's `host` lists, makes and removes worktrees there.
+Starting it follows the same gate as an `on_host` call (asked about, in
+every mode, until you named the host or let a call there run; letting the
+start run permits the host), and the subagent's own calls then follow the
+approval mode, with your saved allow rules still only for the session's
+own host. `subagent_continue` keeps it on its host; the agents panel,
+`/agents`, the subagent's view and `subagent_status` say `on HOST`.
+Several frontends can attach
 to one session (`/sessions` marks live ones) and all see the same stream; a
 session keeps running when its frontends disconnect. `prigh serve` itself
 speaks plain TCP and HTTP with a shared token (it warns when `-listen` or

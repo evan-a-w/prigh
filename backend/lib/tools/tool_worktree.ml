@@ -251,9 +251,7 @@ let create
   let run (context : Tool.Context.t) args =
     let context, cwd = on_host ~hosts context args in
     (* The session's worktrees are those of its active host. *)
-    let session () =
-      if Option.is_none context.host then session () else None
-    in
+    let session () = if Option.is_none context.host then session () else None in
     let dir = worktrees_dir () in
     match Tool_args.string args "action" with
     | "create" -> create_worktree context ~cwd ~dir args

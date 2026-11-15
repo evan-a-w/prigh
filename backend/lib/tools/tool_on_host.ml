@@ -183,7 +183,10 @@ let run_on (context : Tool.Context.t) (host : Host.t) ~tool ~args ~cwd =
          tool)
   | Some _ when [%equal: string option] context.host (Some host.id) ->
     Tool.Result.error
-      (sprintf "%s is the host your tools run on: call %s directly" host.name tool)
+      (sprintf
+         "%s is the host your tools run on: call %s directly"
+         host.name
+         tool)
   | Some _ when String.equal tool "bash" && starts_job args ->
     Tool.Result.error
       (sprintf
