@@ -236,7 +236,7 @@ let%expect_test "refused at the start, signed in, switched, signed out" =
   [%expect
     {|
     open (Tcp (host srv) (port 1))
-    srv:1 hello {"name":"laptop","user":"alice","home":"<home>","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location"]}
+    srv:1 hello {"name":"laptop","user":"alice","home":"<home>","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location","stream_deltas"]}
     (Rejected "unauthorised: bad user name or password")
     tool host: true
     |}];
@@ -256,7 +256,7 @@ let%expect_test "refused at the start, signed in, switched, signed out" =
   [%expect
     {|
     open (Tcp (host srv) (port 1))
-    srv:1 hello {"name":"laptop","token":"nope","user":"alice","home":"<home>","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location"]}
+    srv:1 hello {"name":"laptop","token":"nope","user":"alice","home":"<home>","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location","stream_deltas"]}
     (rejected "unauthorised: bad user name or password")
     ((address (srv:1))
      (user    (alice))
@@ -265,7 +265,7 @@ let%expect_test "refused at the start, signed in, switched, signed out" =
       (connect srv:1)
       (user    alice)))
     open (Tcp (host srv) (port 1))
-    srv:1 hello {"name":"laptop","token":"pw","user":"alice","home":"<home>","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location"]}
+    srv:1 hello {"name":"laptop","token":"pw","user":"alice","home":"<home>","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location","stream_deltas"]}
     (connected "")
     ((address (srv:1))
      (user    (alice))
@@ -301,7 +301,7 @@ let%expect_test "refused at the start, signed in, switched, signed out" =
   [%expect
     {|
     open (Tcp (host srv) (port 2))
-    srv:2 hello {"name":"laptop","home":"<home>","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location"]}
+    srv:2 hello {"name":"laptop","home":"<home>","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location","stream_deltas"]}
     (rejected "unauthorised: bad user name or password")
     ((address (srv:2)) (user ()) (saved (srv:1)))
     ((
@@ -309,7 +309,7 @@ let%expect_test "refused at the start, signed in, switched, signed out" =
       (token   pw)
       (user    alice)))
     open (Tcp (host srv) (port 2))
-    srv:2 hello {"name":"laptop","token":"t2","home":"<home>","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location"]}
+    srv:2 hello {"name":"laptop","token":"t2","home":"<home>","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location","stream_deltas"]}
     (connected "")
     ((address (srv:2)) (user ()) (saved (srv:2)))
     ((
@@ -328,14 +328,14 @@ let%expect_test "refused at the start, signed in, switched, signed out" =
   [%expect
     {|
     open (Process (prog /bin/prigh) (args (serve -cwd /w)))
-    spawned hello {"name":"laptop","tools":false}
+    spawned hello {"name":"laptop","tools":false,"features":["stream_deltas"]}
     (connected "")
     ((address ())
      (user    ())
      (saved (srv:2)))
     tool host: false
     open (Tcp (host srv) (port 2))
-    srv:2 hello {"name":"laptop","token":"t2","home":"<home>","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location"]}
+    srv:2 hello {"name":"laptop","token":"t2","home":"<home>","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location","stream_deltas"]}
     (connected "")
     ((address (srv:2)) (user ()) (saved (srv:2)))
     tool host: true
@@ -363,7 +363,7 @@ let%expect_test "refused at the start, signed in, switched, signed out" =
     false
     tool host: false
     open (Tcp (host srv) (port 2))
-    srv:2 hello {"name":"laptop","home":"<home>","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location"]}
+    srv:2 hello {"name":"laptop","home":"<home>","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location","stream_deltas"]}
     (Error "unauthorised: bad user name or password")
     |}];
   let%bind () = Link.close link in
@@ -392,7 +392,7 @@ let%expect_test
   [%expect
     {|
     open (Process (prog /bin/prigh) (args (serve -cwd /w -session /s/1.jsonl)))
-    spawned hello {"name":"laptop","session":"/s/1.jsonl","home":"<home>","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location"]}
+    spawned hello {"name":"laptop","session":"/s/1.jsonl","home":"<home>","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location","stream_deltas"]}
     (Connected (
       (client_id c)
       (namespace null)
@@ -417,7 +417,7 @@ let%expect_test
   [%expect
     {|
     open (Process (prog /bin/prigh) (args (serve -cwd /w)))
-    spawned hello {"name":"laptop","home":"<home>","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location"]}
+    spawned hello {"name":"laptop","home":"<home>","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location","stream_deltas"]}
     (connected "")
     ((address ())
      (user    ())
@@ -439,7 +439,7 @@ let%expect_test
   [%expect
     {|
     open (Tcp (host srv) (port 3))
-    srv:3 hello {"name":"laptop","tools":false}
+    srv:3 hello {"name":"laptop","tools":false,"features":["stream_deltas"]}
     tool host: false
     |}];
   return ()
@@ -475,9 +475,9 @@ let%expect_test
   [%expect
     {|
     open (Tcp (host srv) (port 3))
-    srv:3 hello {"name":"laptop","home":"<home>","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location"]}
+    srv:3 hello {"name":"laptop","home":"<home>","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location","stream_deltas"]}
     open (Tcp (host srv) (port 4))
-    srv:4 hello {"name":"laptop","home":"<home>","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location"]}
+    srv:4 hello {"name":"laptop","home":"<home>","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location","stream_deltas"]}
     (Error "superseded by another connection")
     ()
     |}];
@@ -513,9 +513,9 @@ let%expect_test
   [%expect
     {|
     open (Tcp (host srv) (port 3))
-    srv:3 hello {"name":"laptop","home":"<home>","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location"]}
+    srv:3 hello {"name":"laptop","home":"<home>","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location","stream_deltas"]}
     open (Tcp (host srv) (port 4))
-    srv:4 hello {"name":"laptop","home":"<home>","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location"]}
+    srv:4 hello {"name":"laptop","home":"<home>","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location","stream_deltas"]}
     ()
     |}];
   (* Signing out drops the connection too. *)
@@ -555,10 +555,10 @@ let%expect_test
   [%expect
     {|
     open (Tcp (host srv) (port 3))
-    srv:3 hello {"name":"laptop","home":"<home>","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location"]}
+    srv:3 hello {"name":"laptop","home":"<home>","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location","stream_deltas"]}
     open (Tcp (host srv) (port 3))
     open (Tcp (host srv) (port 4))
-    srv:4 hello {"name":"laptop","home":"<home>","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location"]}
+    srv:4 hello {"name":"laptop","home":"<home>","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location","stream_deltas"]}
     (Error "superseded by another connection")
     (connected "")
     ((address (srv:4)) (user ()) (saved (srv:4)))
@@ -593,12 +593,12 @@ let%expect_test
   [%expect
     {|
     open (Tcp (host srv) (port 3))
-    srv:3 hello {"name":"laptop","home":"<home>","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location"]}
+    srv:3 hello {"name":"laptop","home":"<home>","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location","stream_deltas"]}
     open (Websocket (url wss://srv.example/prigh/ws)
      (address
       ((tls true) (host srv.example) (port 443) (prefix /prigh) (lines false)))
      (headers ((X-Auth secret))))
-    wss://srv.example/prigh/ws hello {"name":"laptop","home":"<home>","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location"]}
+    wss://srv.example/prigh/ws hello {"name":"laptop","home":"<home>","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location","stream_deltas"]}
     (connected "")
     ((address (wss://srv.example/prigh/ws))
      (user ())
@@ -608,7 +608,7 @@ let%expect_test
     open (Websocket (url ws://[::1]:7790/ws)
      (address ((tls false) (host ::1) (port 7790) (prefix "") (lines false)))
      (headers ((X-Auth secret))))
-    ws://[::1]:7790/ws hello {"name":"laptop","home":"<home>","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location"]}
+    ws://[::1]:7790/ws hello {"name":"laptop","home":"<home>","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location","stream_deltas"]}
     (connected "")
     ((address (ws://[::1]:7790/ws)) (user ()) (saved (ws://[::1]:7790/ws)))
     |}];
@@ -674,7 +674,7 @@ let%expect_test
      (address
       ((tls true) (host ai.example.com) (port 443) (prefix "") (lines false)))
      (headers ((Cookie proxy_session=ok))))
-    https://ai.example.com/ hello {"name":"laptop","token":"page-token","user":"alice","home":"<home>","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location"]}
+    https://ai.example.com/ hello {"name":"laptop","token":"page-token","user":"alice","home":"<home>","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location","stream_deltas"]}
     (connected "")
     ((address (https://ai.example.com/))
      (user    (alice))
@@ -706,7 +706,7 @@ let%expect_test
      (address
       ((tls true) (host ai.example.com) (port 443) (prefix "") (lines false)))
      (headers ((Cookie proxy_session=ok))))
-    https://ai.example.com/ hello {"name":"laptop","token":"page-token","user":"alice","home":"<home>","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location"]}
+    https://ai.example.com/ hello {"name":"laptop","token":"page-token","user":"alice","home":"<home>","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location","stream_deltas"]}
     (connected "")
     ((address (https://ai.example.com/))
      (user    (alice))
@@ -715,7 +715,7 @@ let%expect_test
      (address
       ((tls true) (host ai.example.com) (port 443) (prefix "") (lines false)))
      (headers ((Cookie proxy_session=ok))))
-    https://ai.example.com/ hello {"name":"laptop","token":"page-token","user":"alice","home":"<home>","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location"]}
+    https://ai.example.com/ hello {"name":"laptop","token":"page-token","user":"alice","home":"<home>","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location","stream_deltas"]}
     (Connected (
       (client_id c)
       (namespace alice)
@@ -809,7 +809,7 @@ let%expect_test
      (address
       ((tls true) (host ai.example.com) (port 443) (prefix "") (lines false)))
      (headers ((Cookie proxy_session=ok))))
-    https://ai.example.com/ hello {"name":"laptop","token":"page-token","user":"alice","home":"<home>","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location"]}
+    https://ai.example.com/ hello {"name":"laptop","token":"page-token","user":"alice","home":"<home>","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location","stream_deltas"]}
     (connected "")
     ((address (https://ai.example.com/))
      (user    (alice))

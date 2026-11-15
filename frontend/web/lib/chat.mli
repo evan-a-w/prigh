@@ -111,6 +111,11 @@ val apply : t -> Event.t -> t
     message so far, and say so with [resync_asked]. *)
 val wants_resync : t -> bool
 
+(** [t] is [before] but for the message streaming, which has no tool
+    results yet (its calls run once it ends): what is worked out from the
+    entries before it and the tools' results still holds. *)
+val only_streamed : before:t -> t -> bool
+
 val resync_asked : t -> t
 
 (** Whether [apply] left the entries and tool calls as they were. *)

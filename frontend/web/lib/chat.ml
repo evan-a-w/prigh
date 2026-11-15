@@ -359,6 +359,15 @@ let stream_update t (update : Stream_update.t) =
   | Gap -> if t.lost then t else { t with lost = true; ask_resync = true }
 ;;
 
+let only_streamed ~before t =
+  before.first = t.first
+  &&
+  match before.rev_entries, t.rev_entries with
+  | ( Assistant { streaming = true; _ } :: older
+    , Assistant { streaming = true; _ } :: older' ) -> phys_equal older older'
+  | _ -> false
+;;
+
 let wants_resync t = t.ask_resync
 let resync_asked t = if t.ask_resync then { t with ask_resync = false } else t
 

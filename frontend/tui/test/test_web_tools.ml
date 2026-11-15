@@ -74,50 +74,62 @@ let%expect_test
   [%expect
     {|
     (Event (
-      Message_update
-      (partial (
-        (content ())
-        (stop_reason End_turn)
-        (usage (
-          (input      0)
-          (output     0)
-          (cache_read 0)))
-        (model m)))
-      (delta (
-        Server_tool_use
-        (id    srvtoolu_1)
-        (name  web_search)
-        (input "{\"query\":\"ocaml eio\"}")))))
+      Message_update (
+        (stream 0)
+        (from   0)
+        (seq    0)
+        (block  -1)
+        (delta (
+          Server_tool_use
+          (id    srvtoolu_1)
+          (name  web_search)
+          (input "{\"query\":\"ocaml eio\"}")))
+        (partial ((
+          (content ())
+          (stop_reason End_turn)
+          (usage (
+            (input      0)
+            (output     0)
+            (cache_read 0)))
+          (model m)))))))
     (Event (
-      Message_update
-      (partial (
-        (content ())
-        (stop_reason End_turn)
-        (usage (
-          (input      0)
-          (output     0)
-          (cache_read 0)))
-        (model m)))
-      (delta (
-        Server_tool_result
-        (id       srvtoolu_1)
-        (output   searched)
-        (is_error true)))))
+      Message_update (
+        (stream 0)
+        (from   0)
+        (seq    0)
+        (block  -1)
+        (delta (
+          Server_tool_result
+          (id       srvtoolu_1)
+          (output   searched)
+          (is_error true)))
+        (partial ((
+          (content ())
+          (stop_reason End_turn)
+          (usage (
+            (input      0)
+            (output     0)
+            (cache_read 0)))
+          (model m)))))))
     (Event (
-      Message_update
-      (partial (
-        (content ())
-        (stop_reason End_turn)
-        (usage (
-          (input      0)
-          (output     0)
-          (cache_read 0)))
-        (model m)))
-      (delta (
-        Server_tool_result
-        (id       srvtoolu_1)
-        (output   searched)
-        (is_error false)))))
+      Message_update (
+        (stream 0)
+        (from   0)
+        (seq    0)
+        (block  -1)
+        (delta (
+          Server_tool_result
+          (id       srvtoolu_1)
+          (output   searched)
+          (is_error false)))
+        (partial ((
+          (content ())
+          (stop_reason End_turn)
+          (usage (
+            (input      0)
+            (output     0)
+            (cache_read 0)))
+          (model m)))))))
     (Event (
       Tool_exec
       (exec_id e1)

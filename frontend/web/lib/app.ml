@@ -8249,7 +8249,10 @@ let ui_event (m : Model.t) (e : Ui_event.t) =
 (* The images the transcript's [render_ui] calls show: asked for as they
    appear (each session afresh: the links expire). *)
 let follow_ui_images (before : Model.t) ((m : Model.t), cmds) =
-  if phys_equal before.chat m.chat && phys_equal before.ui m.ui
+  if
+    phys_equal before.ui m.ui
+    && (phys_equal before.chat m.chat
+        || Chat.only_streamed ~before:before.chat m.chat)
   then m, cmds
   else (
     match m.state with

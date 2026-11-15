@@ -106,20 +106,24 @@ let%expect_test "state event and messages" =
             (cache_read 0)))
           (model anthropic/claude-fable-5-1)))))
     (Event (
-      Message_update
-      (partial (
-        (content ())
-        (stop_reason End_turn)
-        (usage (
-          (input      0)
-          (output     0)
-          (cache_read 0)))
-        (model m)))
-      (delta (
-        Tool_call_start
-        (index 0)
-        (id    c1)
-        (name  read)))))
+      Message_update (
+        (stream 0)
+        (from   0)
+        (seq    0)
+        (block  -1)
+        (delta (
+          Tool_call_start
+          (index 0)
+          (id    c1)
+          (name  read)))
+        (partial ((
+          (content ())
+          (stop_reason End_turn)
+          (usage (
+            (input      0)
+            (output     0)
+            (cache_read 0)))
+          (model m)))))))
     (Event (
       Tool_end
       (call (
