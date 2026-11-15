@@ -2,10 +2,23 @@ open! Core
 
 (** Per-million-token prices in USD. *)
 module Cost : sig
+  (** The prices of a request whose prompt (input, cache reads included) is
+      over [above] tokens, for all of it. *)
+  module Long_prompt : sig
+    type t =
+      { above : int
+      ; input : float
+      ; output : float
+      ; cache_read : float
+      }
+    [@@deriving sexp_of]
+  end
+
   type t =
     { input : float
     ; output : float
     ; cache_read : float
+    ; long_prompt : Long_prompt.t option
     }
   [@@deriving sexp_of]
 end
@@ -89,6 +102,8 @@ val resolve : string -> t Or_error.t
     be replayed to it. *)
 val written_by : string -> Provider_id.t -> bool
 
+(** Of one request: [usage] summed over several requests can be priced as
+    one long prompt. *)
 val cost_usd : t -> Usage.t -> float
 
 (** Whether the provider checks that what came before each thinking block

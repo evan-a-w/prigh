@@ -318,17 +318,7 @@ let%expect_test "only models whose provider searches get web_search" =
      ; deepseek_model
      ]
      @ List.map
-         [ "gpt-4"
-         ; "gpt-4-turbo"
-         ; "gpt-4.1"
-         ; "gpt-4.1-nano"
-         ; "gpt-4o"
-         ; "o1"
-         ; "o1-pro"
-         ; "o3"
-         ; "o3-mini"
-         ; "o4-mini"
-         ]
+         [ "gpt-4.1"; "gpt-4o"; "o3"; "gpt-realtime-2.1" ]
          ~f:(fun id -> Option.value_exn (Model.find ("openai/" ^ id))))
     ~f:(fun model ->
       printf

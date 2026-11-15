@@ -137,7 +137,7 @@ let%expect_test "model override and bad model" =
   let subagent = subagent ~provider in
   let tools = Tools.all @ [ subagent ] in
   let (_ : Tool.Result.t) =
-    run_tool t ~tools ~emit:ignore subagent {|{"task":"x","model":"gpt-4"}|}
+    run_tool t ~tools ~emit:ignore subagent {|{"task":"x","model":"gpt-4.1"}|}
   in
   print_s
     [%sexp (Model.default.id : string), (List.rev !requests : string list)];

@@ -68,9 +68,12 @@ let of_model (provider : Provider_id.t) id =
     then Some computer_20250124
     else None
   | Openai ->
+    (* Each model's page lists [computer_use] among its tools (November
+       2026); GPT-5.4 nano and GPT-5.5 Pro do not. *)
     if
       List.exists [ "gpt-5.4"; "gpt-5.5"; "gpt-5.6"; "gpt-6" ] ~f:(fun prefix ->
         String.is_prefix id ~prefix)
+      && not (family id ~prefixes:[ "gpt-5.4-nano"; "gpt-5.5-pro" ])
     then Some Openai
     else None
   | Openai_codex | Deepseek | Custom _ -> None

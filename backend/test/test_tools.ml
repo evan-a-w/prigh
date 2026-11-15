@@ -18,10 +18,10 @@ let%expect_test "registry" =
 let%expect_test "the file editor suits the model" =
   let names tools = List.map tools ~f:Tool.name in
   List.iter
-    [ "openai-codex/gpt-5.5"
+    [ "openai-codex/gpt-6.1-sol"
     ; "openai/gpt-5"
     ; "openai/gpt-6.1-sol"
-    ; "openai/gpt-5-chat-latest"
+    ; "openai/chat-latest"
     ; "openai/gpt-4.1"
     ; "anthropic/claude-opus-4-6"
     ; "deepseek/deepseek-flash"

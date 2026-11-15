@@ -325,7 +325,7 @@ let run
           (Compacted
              { summary = outcome.summary
              ; usage = outcome.usage
-             ; cost_usd = Model.cost_usd model outcome.usage
+             ; cost_usd = outcome.cost_usd
              }))
   in
   let mask =

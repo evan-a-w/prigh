@@ -2885,13 +2885,13 @@ let mask_session session ~through =
     Or_error.error_s [%message "no entry to mask up to" (through : int)]
 ;;
 
-let compacted t ~model (outcome : Compaction.Outcome.t) =
+let compacted t (outcome : Compaction.Outcome.t) =
   account
     t
     (Compacted
        { summary = outcome.summary
        ; usage = outcome.usage
-       ; cost_usd = Model.cost_usd model outcome.usage
+       ; cost_usd = outcome.cost_usd
        });
   broadcast t (Compacted { summary = outcome.summary })
 ;;
@@ -3548,7 +3548,7 @@ and auto_compact t =
         ~prompt:(Agent_loop.Config.compaction_prompt (loop_config t))
         t.session
     with
-    | Ok outcome -> compacted t ~model outcome
+    | Ok outcome -> compacted t outcome
     | Error e ->
       broadcast t (Notice ("auto-compaction failed: " ^ Error.to_string_hum e)))
 ;;
@@ -4170,7 +4170,7 @@ let compact ?instructions t =
         ?instructions
         t.session)
     |> Or_error.map ~f:(fun (outcome : Compaction.Outcome.t) ->
-      compacted t ~model outcome;
+      compacted t outcome;
       state_changed t;
       outcome.summary))
 ;;

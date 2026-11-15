@@ -2,10 +2,21 @@ open! Core
 open! Import
 
 module Cost = struct
+  module Long_prompt = struct
+    type t =
+      { above : int
+      ; input : float
+      ; output : float
+      ; cache_read : float
+      }
+    [@@deriving sexp_of]
+  end
+
   type t =
     { input : float
     ; output : float
     ; cache_read : float
+    ; long_prompt : Long_prompt.t option [@sexp.option]
     }
   [@@deriving sexp_of]
 end
@@ -48,6 +59,7 @@ end
 
 let m
       ?(images = true)
+      ?long_prompt
       provider
       id
       name
@@ -67,7 +79,7 @@ let m
   ; can_disable_thinking = thinking.off
   ; thinking_default = thinking.default
   ; thinking_style = thinking.style
-  ; cost = { input; output; cache_read }
+  ; cost = { input; output; cache_read; long_prompt }
   ; supports_images = images
   ; native_computer = Native_computer.of_model provider id
   }
@@ -90,8 +102,8 @@ let pro : Thinking.Level.t list = [ Medium; High; Xhigh ]
 (* Anthropic's effort docs and the per-model table of "Troubleshooting
    thinking" (November 2026): which effort levels each model takes, its
    default, and whether [thinking.type = disabled] (or, on Claude Sonnet 5.5,
-   [between_tools]) is accepted. Claude Opus 5 rejects [disabled] only at
-   xhigh and max, which off never sends. *)
+   [between_tools]) is accepted. Claude Opus 5 and Haiku 5.5 reject [disabled]
+   only at xhigh and max, which off never sends. *)
 let claude_adaptive
       ?(off = true)
       ?(between_tools = false)
@@ -130,6 +142,12 @@ let claude_budget_effort =
    otherwise it always reasons. *)
 let openai ?(none = false) ?(default = level Medium) levels =
   { Spec.levels; off = none; default; style = Effort { off_is_none = none } }
+;;
+
+(* Over 272K input tokens: twice the input price and 1.5 times the
+   output. *)
+let openai_pro_long_prompt =
+  { Cost.Long_prompt.above = 272000; input = 60.; output = 270.; cache_read = 0. }
 ;;
 
 let gpt5 = openai [ Minimal; Low; Medium; High ]
@@ -197,6 +215,48 @@ let all =
       ~input:1.
       ~output:5.
       ~cache_read:0.1
+  ; m
+      Anthropic
+      "claude-haiku-5-5"
+      "Claude Haiku 5.5"
+      ~ctx:1000000
+      ~max:128000
+      ~thinking:(claude_adaptive ~default:Medium five)
+      ~input:0.1
+      ~output:0.5
+      ~cache_read:0.01
+      ~long_prompt:
+        { above = 100000; input = 0.5; output = 2.5; cache_read = 0.05 }
+  ; m
+      Anthropic
+      "claude-mythos-5"
+      "Claude Mythos 5"
+      ~ctx:1000000
+      ~max:128000
+      ~thinking:(claude_adaptive ~off:false five)
+      ~input:10.
+      ~output:50.
+      ~cache_read:1.
+  ; m
+      Anthropic
+      "claude-mythos-5-1"
+      "Claude Mythos 5.1"
+      ~ctx:1000000
+      ~max:128000
+      ~thinking:(claude_adaptive ~off:false five)
+      ~input:10.
+      ~output:50.
+      ~cache_read:0.25
+  ; m
+      Anthropic
+      "claude-mythos-5-2"
+      "Claude Mythos 5.2"
+      ~ctx:1000000
+      ~max:128000
+      ~thinking:(claude_adaptive ~off:false five)
+      ~input:8.
+      ~output:40.
+      ~cache_read:0.2
   ; m
       Anthropic
       "claude-opus-4-5"
@@ -271,7 +331,7 @@ let all =
       Anthropic
       "claude-sonnet-4-5"
       "Claude Sonnet 4.5 (latest)"
-      ~ctx:1000000
+      ~ctx:200000
       ~max:64000
       ~thinking:claude_budget
       ~input:3.
@@ -281,7 +341,7 @@ let all =
       Anthropic
       "claude-sonnet-4-5-20250929"
       "Claude Sonnet 4.5"
-      ~ctx:1000000
+      ~ctx:200000
       ~max:64000
       ~thinking:claude_budget
       ~input:3.
@@ -319,24 +379,14 @@ let all =
       ~cache_read:0.2
   ; m
       Openai
-      "gpt-4"
-      "GPT-4"
-      ~ctx:8192
-      ~max:8192
+      "chat-latest"
+      "Chat Latest"
+      ~ctx:400000
+      ~max:128000
       ~thinking:no_thinking
-      ~input:30.
-      ~output:60.
-      ~cache_read:0.
-  ; m
-      Openai
-      "gpt-4-turbo"
-      "GPT-4 Turbo"
-      ~ctx:128000
-      ~max:4096
-      ~thinking:no_thinking
-      ~input:10.
+      ~input:5.
       ~output:30.
-      ~cache_read:0.
+      ~cache_read:0.5
   ; m
       Openai
       "gpt-4.1"
@@ -359,16 +409,6 @@ let all =
       ~cache_read:0.1
   ; m
       Openai
-      "gpt-4.1-nano"
-      "GPT-4.1 nano"
-      ~ctx:1047576
-      ~max:32768
-      ~thinking:no_thinking
-      ~input:0.1
-      ~output:0.4
-      ~cache_read:0.025
-  ; m
-      Openai
       "gpt-4o"
       "GPT-4o"
       ~ctx:128000
@@ -377,16 +417,6 @@ let all =
       ~input:2.5
       ~output:10.
       ~cache_read:1.25
-  ; m
-      Openai
-      "gpt-4o-2024-05-13"
-      "GPT-4o (2024-05-13)"
-      ~ctx:128000
-      ~max:4096
-      ~thinking:no_thinking
-      ~input:5.
-      ~output:15.
-      ~cache_read:0.
   ; m
       Openai
       "gpt-4o-2024-08-06"
@@ -429,16 +459,6 @@ let all =
       ~cache_read:0.125
   ; m
       Openai
-      "gpt-5-chat-latest"
-      "GPT-5 Chat Latest"
-      ~ctx:128000
-      ~max:16384
-      ~thinking:no_thinking
-      ~input:1.25
-      ~output:10.
-      ~cache_read:0.125
-  ; m
-      Openai
       "gpt-5-mini"
       "GPT-5 Mini"
       ~ctx:400000
@@ -462,7 +482,7 @@ let all =
       "gpt-5-pro"
       "GPT-5 Pro"
       ~ctx:400000
-      ~max:128000
+      ~max:272000
       ~thinking:(openai ~default:(level High) [ High ])
       ~input:15.
       ~output:120.
@@ -489,16 +509,6 @@ let all =
       ~cache_read:0.175
   ; m
       Openai
-      "gpt-5.2-chat-latest"
-      "GPT-5.2 Chat"
-      ~ctx:128000
-      ~max:16384
-      ~thinking:no_thinking
-      ~input:1.75
-      ~output:14.
-      ~cache_read:0.175
-  ; m
-      Openai
       "gpt-5.2-pro"
       "GPT-5.2 Pro"
       ~ctx:400000
@@ -509,31 +519,11 @@ let all =
       ~cache_read:0.
   ; m
       Openai
-      "gpt-5.3-chat-latest"
-      "GPT-5.3 Chat (latest)"
-      ~ctx:128000
-      ~max:16384
-      ~thinking:no_thinking
-      ~input:1.75
-      ~output:14.
-      ~cache_read:0.175
-  ; m
-      Openai
       "gpt-5.3-codex"
       "GPT-5.3 Codex"
       ~ctx:400000
       ~max:128000
       ~thinking:(openai ~default:None to_xhigh)
-      ~input:1.75
-      ~output:14.
-      ~cache_read:0.175
-  ; m
-      Openai
-      "gpt-5.3-codex-spark"
-      "GPT-5.3 Codex Spark"
-      ~ctx:128000
-      ~max:32000
-      ~thinking:no_thinking
       ~input:1.75
       ~output:14.
       ~cache_read:0.175
@@ -577,6 +567,7 @@ let all =
       ~input:30.
       ~output:180.
       ~cache_read:0.
+      ~long_prompt:openai_pro_long_prompt
   ; m
       Openai
       "gpt-5.5"
@@ -597,6 +588,7 @@ let all =
       ~input:30.
       ~output:180.
       ~cache_read:0.
+      ~long_prompt:openai_pro_long_prompt
   ; m
       Openai
       "gpt-5.6-luna"
@@ -639,6 +631,26 @@ let all =
       ~cache_read:1.
   ; m
       Openai
+      "gpt-6-luna"
+      "GPT-6 Luna"
+      ~ctx:272000
+      ~max:128000
+      ~thinking:(openai ~none:true five)
+      ~input:0.1
+      ~output:0.5
+      ~cache_read:0.01
+  ; m
+      Openai
+      "gpt-6-sol"
+      "GPT-6 Sol"
+      ~ctx:272000
+      ~max:128000
+      ~thinking:(openai ~none:true five)
+      ~input:2.
+      ~output:10.
+      ~cache_read:0.2
+  ; m
+      Openai
       "gpt-6.1-sol"
       "GPT-6.1 Sol"
       ~ctx:272000
@@ -647,6 +659,16 @@ let all =
       ~input:2.
       ~output:10.
       ~cache_read:0.1
+  ; m
+      Openai
+      "gpt-6.1-terra"
+      "GPT-6.1 Terra"
+      ~ctx:272000
+      ~max:128000
+      ~thinking:(openai ~none:true five)
+      ~input:1.
+      ~output:5.
+      ~cache_read:0.05
   ; m
       Openai
       "gpt-realtime-2.1"
@@ -660,26 +682,6 @@ let all =
       ~cache_read:0.4
   ; m
       Openai
-      "o1"
-      "o1"
-      ~ctx:200000
-      ~max:100000
-      ~thinking:o_series
-      ~input:15.
-      ~output:60.
-      ~cache_read:7.5
-  ; m
-      Openai
-      "o1-pro"
-      "o1-pro"
-      ~ctx:200000
-      ~max:100000
-      ~thinking:o_series
-      ~input:150.
-      ~output:600.
-      ~cache_read:0.
-  ; m
-      Openai
       "o3"
       "o3"
       ~ctx:200000
@@ -690,16 +692,6 @@ let all =
       ~cache_read:0.5
   ; m
       Openai
-      "o3-mini"
-      "o3-mini"
-      ~ctx:200000
-      ~max:100000
-      ~thinking:o_series
-      ~input:1.1
-      ~output:4.4
-      ~cache_read:0.55
-  ; m
-      Openai
       "o3-pro"
       "o3-pro"
       ~ctx:200000
@@ -708,36 +700,6 @@ let all =
       ~input:20.
       ~output:80.
       ~cache_read:0.
-  ; m
-      Openai
-      "o4-mini"
-      "o4-mini"
-      ~ctx:200000
-      ~max:100000
-      ~thinking:o_series
-      ~input:1.1
-      ~output:4.4
-      ~cache_read:0.275
-  ; m
-      Openai_codex
-      "gpt-5.3-codex-spark"
-      "GPT-5.3 Codex Spark"
-      ~ctx:128000
-      ~max:128000
-      ~thinking:no_thinking
-      ~input:1.75
-      ~output:14.
-      ~cache_read:0.175
-  ; m
-      Openai_codex
-      "gpt-5.5"
-      "GPT-5.5"
-      ~ctx:272000
-      ~max:128000
-      ~thinking:(openai ~none:true to_xhigh)
-      ~input:5.
-      ~output:30.
-      ~cache_read:0.5
   ; m
       Openai_codex
       "gpt-5.6-luna"
@@ -755,9 +717,9 @@ let all =
       ~ctx:272000
       ~max:128000
       ~thinking:(openai ~none:true five)
-      ~input:5.
-      ~output:30.
-      ~cache_read:0.5
+      ~input:4.
+      ~output:20.
+      ~cache_read:0.4
   ; m
       Openai_codex
       "gpt-5.6-terra"
@@ -809,7 +771,16 @@ let all =
       ~output:10.
       ~cache_read:0.1
   ; m
-      ~images:false
+      Openai_codex
+      "gpt-6.1-terra"
+      "GPT-6.1 Terra"
+      ~ctx:272000
+      ~max:128000
+      ~thinking:(openai ~none:true five)
+      ~input:1.
+      ~output:5.
+      ~cache_read:0.05
+  ; m
       Deepseek
       "deepseek-flash"
       "DeepSeek V4.1 Flash"
@@ -839,7 +810,7 @@ let default = find_exn "deepseek/deepseek-flash"
 let default_for : Provider_id.t -> t option = function
   | Anthropic -> Some (find_exn "anthropic/claude-opus-4-6")
   | Openai -> Some (find_exn "openai/gpt-5.5")
-  | Openai_codex -> Some (find_exn "openai-codex/gpt-5.5")
+  | Openai_codex -> Some (find_exn "openai-codex/gpt-6.1-sol")
   | Deepseek -> Some default
   | Custom _ -> None
 ;;
@@ -940,9 +911,15 @@ let written_by model_key provider =
 
 let cost_usd t (usage : Usage.t) =
   let per_m tokens price = Float.of_int tokens *. price /. 1e6 in
-  per_m (usage.input - usage.cache_read) t.cost.input
-  +. per_m usage.cache_read t.cost.cache_read
-  +. per_m usage.output t.cost.output
+  let input, output, cache_read =
+    match t.cost.long_prompt with
+    | Some long when usage.input > long.above ->
+      long.input, long.output, long.cache_read
+    | Some _ | None -> t.cost.input, t.cost.output, t.cost.cache_read
+  in
+  per_m (usage.input - usage.cache_read) input
+  +. per_m usage.cache_read cache_read
+  +. per_m usage.output output
 ;;
 
 (* As of the preserved thinking docs (November 2026). *)
