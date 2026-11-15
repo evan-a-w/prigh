@@ -201,29 +201,29 @@ let selection_bar (m : App.Model.t) ~inject =
     in
     let more =
       Node.button
-          ~attrs:
-            [ Attr.class_ "btn icon ghost small"
-            ; Attr.type_ "button"
-            ; Attr.id "review-selection-more"
-            ; Attr.title "More for them (Shift+F10)"
-            ; Attr.create "aria-label" "More for the selected files"
-            ; Attr.create "aria-haspopup" "menu"
-            ; Attr.on_click (fun _ ->
-                inject
-                  (App.Action.Open_menu
-                     { target = Review_files paths
-                     ; anchor = Element "review-selection-more"
-                     }))
-            ]
-          [ icon More ]
+        ~attrs:
+          [ Attr.class_ "btn icon ghost small"
+          ; Attr.type_ "button"
+          ; Attr.id "review-selection-more"
+          ; Attr.title "More for them (Shift+F10)"
+          ; Attr.create "aria-label" "More for the selected files"
+          ; Attr.create "aria-haspopup" "menu"
+          ; Attr.on_click (fun _ ->
+              inject
+                (App.Action.Open_menu
+                   { target = Review_files paths
+                   ; anchor = Element "review-selection-more"
+                   }))
+          ]
+        [ icon More ]
     in
     let clear =
       button
-          ~cls:"icon ghost small review-selection-clear"
-          ~title:"Unselect them (Esc)"
-          ~label:"Unselect the files"
-          ~on_click:(inject (review Unmark_all))
-          [ icon Close ]
+        ~cls:"icon ghost small review-selection-clear"
+        ~title:"Unselect them (Esc)"
+        ~label:"Unselect the files"
+        ~on_click:(inject (review Unmark_all))
+        [ icon Close ]
     in
     div
       ~cls:"review-selection"
@@ -237,25 +237,26 @@ let selection_bar (m : App.Model.t) ~inject =
       ; div
           ~cls:"review-selection-actions"
           [ button
-          ~cls:"small"
-          ~title:
-            (if all_approved
-             then "Take back their approvals"
-             else "Approve them as they are now")
-          ~on_click:
-            (inject
-               (review (Approve_files { paths; approve = not all_approved })))
-          [ icon Check
-          ; Node.text (if all_approved then "Unapprove" else "Approve")
-          ]
-      ; (if Option.is_some (Code_review.read_only m.review)
-         then Node.none
-         else
-           button
-             ~cls:"small"
-             ~title:"Commit them (Shift+C)"
-             ~on_click:(inject App.Action.Compose_commit)
-             [ Node.text "Commit…" ])
+              ~cls:"small"
+              ~title:
+                (if all_approved
+                 then "Take back their approvals"
+                 else "Approve them as they are now")
+              ~on_click:
+                (inject
+                   (review
+                      (Approve_files { paths; approve = not all_approved })))
+              [ icon Check
+              ; Node.text (if all_approved then "Unapprove" else "Approve")
+              ]
+          ; (if Option.is_some (Code_review.read_only m.review)
+             then Node.none
+             else
+               button
+                 ~cls:"small"
+                 ~title:"Commit them (Shift+C)"
+                 ~on_click:(inject App.Action.Compose_commit)
+                 [ Node.text "Commit…" ])
           ]
       ]
 ;;
@@ -280,6 +281,22 @@ let dock (m : App.Model.t) path ~inject =
   in
   let left = total - Code_review.approved t in
   let kbd k = Node.create "kbd" [ Node.text k ] in
+  (* On a phone, the next and previous change beside Approve. *)
+  let change by =
+    if not m.narrow
+    then Node.none
+    else
+      button
+        ~cls:"review-dock-step change"
+        ~attrs:[ review_keys ]
+        ~title:
+          (if by > 0
+           then "Next change (Shift+J)"
+           else "Previous change (Shift+K)")
+        ~label:(if by > 0 then "Next change" else "Previous change")
+        ~on_click:(inject (review (Step_change by)))
+        [ icon ~cls:(if by > 0 then "down" else "up") Arrow_down ]
+  in
   div
     ~cls:"review-dock"
     ~attrs:[ Attr.role "toolbar"; Attr.create "aria-label" "Review the file" ]
@@ -291,6 +308,7 @@ let dock (m : App.Model.t) path ~inject =
         ~disabled:(total < 2)
         ~on_click:(inject (review (Step (-1))))
         [ kbd "←" ]
+    ; change (-1)
     ; (match status with
        | None -> Node.none
        | Some status ->
@@ -323,6 +341,7 @@ let dock (m : App.Model.t) path ~inject =
                ]
            ; kbd "Space"
            ])
+    ; change 1
     ; button
         ~cls:"review-dock-step"
         ~attrs:[ review_keys ]
@@ -503,7 +522,9 @@ let current_file ?(head = true) (m : App.Model.t) path ~inject =
     ~cls:"review-current"
     [ head
     ; div ~cls:"review-scroll" ~attrs:[ Attr.id "review-scroll" ] [ body ]
-    ; dock m path ~inject
+    ; (match t.mode, Review_code_view.sheet m ~path ~inject with
+       | Comment, Some sheet -> sheet
+       | (Comment | Edit), _ -> dock m path ~inject)
     ]
 ;;
 
@@ -867,7 +888,30 @@ let view (m : App.Model.t) ~inject =
       match t.files, t.current with
       | [], _ | _, None -> [], empty_state t
       | files, Some path when m.narrow ->
-        ( [ files_toggle m path ~open_:files_shown ~inject ]
+        ( [ div
+              ~cls:"review-file-bar"
+              [ files_toggle m path ~open_:files_shown ~inject
+              ; (if files_shown
+                 then Node.none
+                 else
+                   Node.button
+                     ~attrs:
+                       [ classes
+                           [ "btn"; "icon"; "ghost"; "review-display-button" ]
+                           [ "on", t.display_open ]
+                       ; Attr.type_ "button"
+                       ; review_keys
+                       ; Attr.create
+                           "aria-pressed"
+                           (Bool.to_string t.display_open)
+                       ; Attr.create "aria-label" "Display options"
+                       ; Attr.title
+                           "Wrap long lines or not, the code's size (w, + -)"
+                       ; Attr.on_click (fun _ -> inject (review Toggle_display))
+                       ]
+                     [ Node.text "Aa" ])
+              ]
+          ]
         , div
             ~cls:"review-body"
             [ (if files_shown

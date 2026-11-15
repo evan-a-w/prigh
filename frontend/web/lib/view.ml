@@ -318,18 +318,22 @@ let view (m : Model.t) ~inject ~terminal =
     ~attrs:
       [ classes
           [ "app" ]
-          [ "sidebar-open", Model.sidebar_shown m
-          ; "sidebar-drawer", drawer
-          ; "narrow", m.narrow
-          ; "agents-open", m.agents.open_
-          ; "terminal-open", m.terminal.open_
-          ; ( "offline"
-            , match m.connection with
-              | Reconnecting _ -> true
-              | Connected -> false )
-          ; "files-open", m.files.open_
-          ; "reviewing", m.review.open_
-          ]
+          ([ "sidebar-open", Model.sidebar_shown m
+           ; "sidebar-drawer", drawer
+           ; "narrow", m.narrow
+           ; "agents-open", m.agents.open_
+           ; "terminal-open", m.terminal.open_
+           ; ( "offline"
+             , match m.connection with
+               | Reconnecting _ -> true
+               | Connected -> false )
+           ; "files-open", m.files.open_
+           ; "reviewing", m.review.open_
+           ]
+           @ List.map Code_size.all ~f:(fun s ->
+             ( "code-" ^ Code_size.name s
+             , Code_size.equal s m.code_size
+               && not (Code_size.equal s Code_size.default) )))
       ; Resize_view.vars m
       ]
     [ (* A closed drawer is only out of sight. *)

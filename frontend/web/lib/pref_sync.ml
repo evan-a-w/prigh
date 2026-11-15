@@ -12,6 +12,7 @@ module Key = struct
   let opened = "web.sidebar-opened"
   let worktree_hours = "web.sidebar-worktree-hours"
   let review = "web.review"
+  let code_size = "web.code-size"
   let history = "history"
   let migrated = "web.migrated"
 
@@ -26,6 +27,7 @@ module Key = struct
     ; opened
     ; worktree_hours
     ; review
+    ; code_size
     ; history
     ; migrated
     ]

@@ -248,7 +248,9 @@ let%expect_test
                   <td class="text">
                     <span class="hl-kw"> let </span>
                      y =
-                    <span class="hl-num"> 2 </span>
+                    <span class="wd">
+                      <span class="hl-num"> 2 </span>
+                    </span>
                   </td>
                 </tr>
                 <tr class="add">
@@ -257,7 +259,9 @@ let%expect_test
                   <td class="text">
                     <span class="hl-kw"> let </span>
                      y =
-                    <span class="hl-num"> 3 </span>
+                    <span class="wd">
+                      <span class="hl-num"> 3 </span>
+                    </span>
                   </td>
                 </tr>
               </tbody>

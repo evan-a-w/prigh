@@ -170,6 +170,17 @@ type t =
   ; files_open : bool
     (** on a phone, the files (what is reviewed, and git) shown in the
         code's place *)
+  ; narrow : bool
+    (** a phone's page (set with the app's): [rows] folds the changes'
+        context ({!Context_fold}), a tap on a line selects it *)
+  ; gaps : Context_fold.t String.Map.t
+    (** what of each file's folded context the user showed *)
+  ; scrolled : String.Set.t
+    (** files whose lines do not wrap: they scroll sideways instead *)
+  ; display_open : bool (** on a phone, the sheet of display options *)
+  ; ask : bool
+    (** a quick ask ({!Quick_ask}) is being added: the review is sent to
+        the agent once it is in *)
   }
 [@@deriving sexp_of]
 
@@ -211,6 +222,9 @@ module Out : sig
         }
     | Focus of string (** an element's id, once rendered *)
     | Clear_text_selection (** the page's: the selection is dropped *)
+    | Scroll_change of int
+    (** the page's next (1) or previous (-1) change, from what is in view:
+        past the file's last or first, the next or previous file *)
   [@@deriving sexp_of, equal]
 end
 
@@ -288,6 +302,24 @@ module Action : sig
     | Save
     | Reload (** the file, dropping the editor's changes *)
     | Refresh
+    | Step_change of int (** see [Out.Scroll_change] *)
+    | Reveal of
+        { path : string
+        ; gap : Diff_view.Gap.t
+        ; how : Context_fold.How.t
+        } (** more of a file's folded context *)
+    | Toggle_wrap of string (** the file's lines wrap, or scroll sideways *)
+    | Toggle_display (** on a phone, the sheet of display options *)
+    | Tap_line of
+        { path : string
+        ; side : Review_comment.Side.t
+        ; line : int
+        }
+    (** on a phone, a line tapped: selects it, or extends the lines
+        selected to it, or (the only line selected) unselects it *)
+    | Quick of Quick_ask.t
+    (** comment on the selection (or the draft's lines) with that, and send
+        the review to the agent *)
   [@@deriving sexp_of]
 end
 
@@ -389,8 +421,9 @@ val unsent : t -> int
     the file in the list (Shift+X: the files from the last selected), [c]
     comment on the selected code, [e] edit or comment mode, [v] the whole
     file or the hunks, [l] what changed since the last action or not, [s]
-    send the comments, Esc drops the comment, the selected code, the
-    selected files, then closes. *)
+    send the comments, Shift+J / Shift+K the next or previous change, [w]
+    wrap the file's lines or not, Esc closes the display sheet, drops the
+    comment, the selected code, the selected files, then closes. *)
 val key
   :  t
   -> key:string

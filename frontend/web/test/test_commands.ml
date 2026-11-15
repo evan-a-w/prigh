@@ -243,7 +243,9 @@ let%expect_test "/help <command> and /hotkeys" =
     c / e / v / s (reviewing) comment on the code selected (drag across it, in the review or a changed file's preview); edit or comment; the whole file or the changes; send the new comments to prigh
     r / b / d (reviewing) choose what to review (a worktree, or a branch read-only); what to compare it with (a branch, tag, commit or any revision typed); since the merge base or directly
     l / Shift+L (reviewing) what changed since your latest action on the file (or the hunks again); choose the action it compares with: Latest follows your newest
-    Esc (reviewing) drop the comment, the selected code, the selected files, then close the review
+    Shift+J / Shift+K (reviewing) the next / previous change, past the file's last or first: the next / previous file (on a phone, the bar's ↓ ↑)
+    w / + / - (reviewing) wrap the file's long lines (continuing under their indent) or scroll them sideways; code in diffs bigger / smaller (on a phone: the file's Aa)
+    Esc (reviewing) close the display options, drop the comment, the selected code, the selected files, then close the review
     Enter / Ctrl+S (reviewing) add the comment or reply (Shift+Enter: a new line); save the file being edited
     Ctrl+` open or close the terminal (/terminal); in it, every other key goes to the shell but Ctrl+Shift+C (copy the selection) and Ctrl+Shift+V (paste). On a touch screen a bar over the keyboard has Esc, Tab, Ctrl and Alt (tap: the next key; double-tap: locked), the arrows (held: repeat), | ~ / - and Home, End, PgUp, PgDn
     Esc (in a pull request) back to the list it was opened from (/pr); Enter closes it
@@ -1848,7 +1850,7 @@ let%expect_test "/setusr: a superuser acts as another user, and back" =
       ((keys
         (web.theme web.accent web.notify web.verbosity web.terminal-open
          web.sidebar-folded web.sidebar-unfolded web.sidebar-opened
-         web.sidebar-worktree-hours web.review history web.migrated
+         web.sidebar-worktree-hours web.review web.code-size history web.migrated
          web.sidebar-width web.files-width web.files-preview-width
          web.agents-width web.terminal-height web.review-chat-width
          web.review-files-width web.review-margin-width))))
@@ -1904,7 +1906,7 @@ let%expect_test "/retry-backend-connection, /state, /clear, /quit" =
       ((keys
         (web.theme web.accent web.notify web.verbosity web.terminal-open
          web.sidebar-folded web.sidebar-unfolded web.sidebar-opened
-         web.sidebar-worktree-hours web.review history web.migrated
+         web.sidebar-worktree-hours web.review web.code-size history web.migrated
          web.sidebar-width web.files-width web.files-preview-width
          web.agents-width web.terminal-height web.review-chat-width
          web.review-files-width web.review-margin-width))))

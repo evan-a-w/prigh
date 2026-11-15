@@ -784,3 +784,86 @@ mark.review-mark.quiet.hot { background: color-mix(in srgb, var(--sage) 14%, tra
 .git-failure { color: var(--brick); }
 .git-notice { color: var(--sage); }
 .app.narrow .git-actions { margin-left: 0; }
+
+/* ---- reading and commenting on a phone */
+
+.review-code { font-size: var(--code-size, 12.5px); }
+/* Wrapping off (w, or the Aa sheet): the file's lines scroll sideways, in
+   the file's own box, not the page. */
+.review-code.scrolls { overflow-x: auto; }
+.review-code.scrolls table.review-diff { width: max-content; min-width: 100%; }
+.review-code.scrolls table.review-diff td.text { white-space: pre; padding-left: 0; text-indent: 0; background-image: none; }
+.app.narrow .review-code-main { overflow-x: visible; }
+.app.narrow table.review-diff tr[data-line] { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.app.narrow table.review-diff td.ln { min-width: 3ch; padding: 0 3px 0 6px; }
+.app.narrow table.review-diff td.sign { padding: 0 3px 0 2px; }
+.app.narrow table.review-diff tr.selected td.text { box-shadow: inset -3px 0 0 var(--sodium); }
+
+/* Unchanged lines folded away between changes, shown on a tap. */
+table.review-diff tr.gap td { padding: 0; border-top: 1px dashed var(--rule); border-bottom: 1px dashed var(--rule); }
+.review-gap { display: flex; align-items: center; gap: 4px; padding: 2px 6px; font: 11.5px var(--sans); color: var(--faint); }
+.review-gap-text { flex: 1; min-width: 0; }
+.review-gap-show.btn { font: 11.5px var(--sans); color: var(--muted); }
+.app.narrow .review-gap-show.btn { min-height: var(--tap); min-width: var(--tap); }
+
+/* A generated file or a pure rename, folded. */
+.review-folded-file { padding: 12px; border: 1px dashed var(--rule-2); border-radius: var(--r-control); font: 13px/1.5 var(--sans); color: var(--muted); }
+.review-folded-file p { margin: 0 0 10px; }
+.review-folded-file .chip { font: 11px var(--sans); background: var(--well); border: 1px solid var(--rule-2); border-radius: var(--r-chip); padding: 0 5px; margin-right: 6px; }
+.review-folded-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.app.narrow .review-folded-actions .btn { min-height: var(--tap); }
+
+/* The file's head: the file picker and the display options (Aa). */
+.review-file-bar { display: flex; align-items: stretch; gap: 4px; }
+.review-file-bar > .review-files-toggle { flex: 1; min-width: 0; }
+.review-display-button.btn { min-width: var(--tap); min-height: var(--tap); font: 600 14px var(--sans); color: var(--muted); }
+.review-display-button.on { color: var(--chalk); background: var(--sodium-wash); }
+
+/* The dock on a phone: ← ↑ Approve ↓ →, the file's place being in the
+   head; gone while the keyboard is up (a field has the focus). */
+.app.narrow .review-dock { grid-template-columns: auto auto 1fr auto auto; gap: 4px; }
+.app.narrow .review-dock > :first-child { grid-column: auto; }
+.app.narrow .review-dock-where { display: none; }
+.app.narrow .review-dock .review-approve.btn { min-width: 0; justify-content: center; }
+.app.narrow .review-dock-step.change .icon { width: 16px; height: 16px; }
+.review-dock-step.change .icon.up { transform: rotate(180deg); }
+.app.narrow .review-page:has(:is(textarea, input):focus) .review-dock { display: none; }
+
+/* The bottom sheet: the selected lines, the comment being written, the
+   display options. It takes the dock's place, so it sits above the home
+   indicator and, the app being as tall as the visual viewport, above the
+   keyboard. */
+.review-sheet {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 60%;
+  overflow-y: auto;
+  padding: 8px 10px 10px;
+  background: var(--slate);
+  border-top: 1px solid var(--rule-2);
+  border-radius: 12px 12px 0 0;
+  box-shadow: 0 -6px 18px rgb(0 0 0 / 0.25);
+}
+.review-sheet-head { display: flex; align-items: center; gap: 8px; min-height: var(--tap); }
+.review-sheet-title { font: 600 13px var(--sans); white-space: nowrap; }
+.review-sheet-hint { flex: 1; min-width: 0; font: 12px var(--sans); color: var(--faint); }
+.review-sheet-close.btn { min-width: var(--tap); min-height: var(--tap); margin-left: auto; }
+.review-sheet .review-quote { max-height: 7.5em; overflow: auto; }
+.review-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.review-chip.btn { min-height: var(--tap); border-radius: 999px; padding: 0 14px; }
+.review-sheet-comment.btn { min-height: var(--tap); justify-content: center; gap: 8px; }
+.review-sheet textarea { font-size: 16px; }
+.review-sheet .btn { min-height: var(--tap); }
+.review-sheet-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.review-sheet-label { font: 13px var(--sans); color: var(--muted); }
+.review-size { display: flex; align-items: center; gap: 6px; }
+.review-size-step.btn { min-width: var(--tap); min-height: var(--tap); font: 600 14px var(--sans); }
+.review-size-name { min-width: 7ch; text-align: center; font: 12.5px var(--sans); }
+.review-sheet .segment { min-height: var(--tap); }
+/* Scrolling sideways, the gaps' buttons stay in sight. */
+.review-code.scrolls .review-gap { position: sticky; left: 0; width: calc(100vw - 8px - var(--safe-l, 0px) - var(--safe-r, 0px)); box-sizing: border-box; }
+.app.narrow .review-dock { grid-template-columns: auto auto minmax(0, 1fr) auto auto; }
+.app.narrow .review-dock .review-approve.btn { padding: 0 8px; white-space: nowrap; overflow: hidden; }
+@media (max-width: 359px) { .app.narrow .review-dock .review-approve .icon { display: none; } }

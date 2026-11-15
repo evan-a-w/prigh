@@ -322,7 +322,7 @@ let%expect_test "a superuser acts as another user from the account menu" =
       ((keys
         (web.theme web.accent web.notify web.verbosity web.terminal-open
          web.sidebar-folded web.sidebar-unfolded web.sidebar-opened
-         web.sidebar-worktree-hours web.review history web.migrated
+         web.sidebar-worktree-hours web.review web.code-size history web.migrated
          web.sidebar-width web.files-width web.files-preview-width
          web.agents-width web.terminal-height web.review-chat-width
          web.review-files-width web.review-margin-width))))
@@ -416,7 +416,7 @@ let%expect_test "a superuser acts as another user from the account menu" =
       ((keys
         (web.theme web.accent web.notify web.verbosity web.terminal-open
          web.sidebar-folded web.sidebar-unfolded web.sidebar-opened
-         web.sidebar-worktree-hours web.review history web.migrated
+         web.sidebar-worktree-hours web.review web.code-size history web.migrated
          web.sidebar-width web.files-width web.files-preview-width
          web.agents-width web.terminal-height web.review-chat-width
          web.review-files-width web.review-margin-width))))

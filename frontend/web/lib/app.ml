@@ -355,6 +355,7 @@ module Command = struct
     | Reveal of string list
     (** scroll the main chat to a subagent's card: the call ids from the
         top-level one down *)
+    | Scroll_change of int
     | Copy of
         { text : string
         ; copied : string
@@ -424,6 +425,7 @@ module Action = struct
     | Set_utc_offset of Time_ns.Span.t
     | Set_browser_time_zone of string
     | Set_narrow of bool
+    | Code_size of int
     | Set_desktop of bool
     | Set_origin of string
     | Set_browser_shell of bool
@@ -819,6 +821,7 @@ module Model = struct
     ; files : Files.t
     ; review : Code_review.t
     ; review_memory : Review_memory.t
+    ; code_size : Code_size.t
     ; layout : Resize.t
     ; paging : Paging.t
     ; transcript_events : int
@@ -1153,6 +1156,7 @@ let init =
   ; files = Files.closed
   ; review = Code_review.empty
   ; review_memory = Review_memory.empty
+  ; code_size = Code_size.default
   ; layout = Resize.empty
   ; paging = Paging.all
   ; transcript_events = 0
@@ -1416,7 +1420,8 @@ let review_out (m : Model.t) (outs : Code_review.Out.t list) =
       let m, more = toast m ~error text in
       m, cmds @ more
     | Focus id -> m, cmds @ [ Command.Focus id ]
-    | Clear_text_selection -> m, cmds @ [ Command.Clear_text_selection ])
+    | Clear_text_selection -> m, cmds @ [ Command.Clear_text_selection ]
+    | Scroll_change by -> m, cmds @ [ Command.Scroll_change by ])
 ;;
 
 (* On a phone the review page is a sheet: the sheets it was opened from
@@ -2798,6 +2803,14 @@ let apply_pref (m : Model.t) ~startup ({ key; value } : Prefs.Change.t) =
     }
   else if String.equal key Key.review
   then { m with review_memory = Review_memory.of_json value }
+  else if String.equal key Key.code_size
+  then
+    { m with
+      code_size =
+        Option.value
+          (Option.bind string ~f:Code_size.of_name)
+          ~default:Code_size.default
+    }
   else if String.equal key Key.terminal_open
   then
     if startup
@@ -11259,7 +11272,25 @@ let update_connected (m : Model.t) (action : Action.t) =
   | Set_narrow narrow ->
     if Bool.equal narrow m.narrow
     then m, []
-    else { m with narrow; sidebar_open = not narrow; review_drawer = false }, []
+    else
+      ( { m with
+          narrow
+        ; sidebar_open = not narrow
+        ; review_drawer = false
+        ; review = { m.review with narrow; display_open = false }
+        }
+      , [] )
+  | Code_size by ->
+    let code_size = Code_size.step m.code_size by in
+    let m, cmds =
+      toast
+        { m with code_size }
+        ~replaces:[ "Code size: " ]
+        (sprintf "Code size: %s (+ and - change it)" (Code_size.name code_size))
+    in
+    ( m
+    , save_pref m Key.code_size (Some (`String (Code_size.name code_size)))
+      @ cmds )
   | Set_draft draft -> edit m draft
   | Edit { text; cursor } -> edit m ~cursor text
   | Send -> sent_to_bottom (send m ~follow_up:false)

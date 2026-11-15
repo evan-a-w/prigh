@@ -156,9 +156,16 @@ let help =
   ; ( "l / Shift+L (reviewing)"
     , "what changed since your latest action on the file (or the hunks again); \
        choose the action it compares with: Latest follows your newest" )
+  ; ( "Shift+J / Shift+K (reviewing)"
+    , "the next / previous change, past the file's last or first: the next / \
+       previous file (on a phone, the bar's ↓ ↑)" )
+  ; ( "w / + / - (reviewing)"
+    , "wrap the file's long lines (continuing under their indent) or scroll \
+       them sideways; code in diffs bigger / smaller (on a phone: the file's \
+       Aa)" )
   ; ( "Esc (reviewing)"
-    , "drop the comment, the selected code, the selected files, then close the \
-       review" )
+    , "close the display options, drop the comment, the selected code, the \
+       selected files, then close the review" )
   ; ( "Enter / Ctrl+S (reviewing)"
     , "add the comment or reply (Shift+Enter: a new line); save the file being \
        edited" )
@@ -258,6 +265,8 @@ let review_key (m : App.Model.t) t : App.Action.t option =
     Option.map m.review.diff ~f:(fun d ->
       App.Action.Review_direct (not d.direct))
   | "C" when t.shift && not (t.alt || t.ctrl || t.meta) -> Some Compose_commit
+  | ("+" | "=") when not (t.alt || t.ctrl || t.meta) -> Some (Code_size 1)
+  | "-" when plain t -> Some (Code_size (-1))
   | _ when menu_key t ->
     let paths =
       match Code_review.marked m.review with

@@ -65,6 +65,7 @@ let rec act t action =
      | Reload_page _
      | Auth_failed _
      | Remember_temporary _
+     | Scroll_change _
      | Apply_update -> ());
     if not t.quiet then print_s [%sexp (command : App.Command.t)]);
   List.iter commands ~f:(function

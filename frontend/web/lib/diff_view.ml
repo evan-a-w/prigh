@@ -1,9 +1,21 @@
 open! Core
 open! Import
 
+module Gap = struct
+  type t =
+    { id : int
+    ; first : int
+    ; hidden : int
+    ; before : bool
+    ; after : bool
+    }
+  [@@deriving sexp_of, equal]
+end
+
 module Row = struct
   type t =
     | Hunk of string
+    | Gap of Gap.t
     | Line of
         { kind : [ `Same | `Added | `Removed ]
         ; old_line : int option
@@ -83,7 +95,7 @@ let counts rows =
     match row with
     | Line { kind = `Added; _ } -> a + 1, r
     | Line { kind = `Removed; _ } -> a, r + 1
-    | Line { kind = `Same; _ } | Hunk _ -> a, r)
+    | Line { kind = `Same; _ } | Hunk _ | Gap _ -> a, r)
 ;;
 
 let unified_counts text = counts (unified_rows text)
@@ -99,7 +111,7 @@ let highlighted lang rows =
       ~init:(initial, initial, [])
       ~f:(fun (old, new_, acc) (row : Row.t) ->
         match row with
-        | Hunk _ -> initial, initial, None :: acc
+        | Hunk _ | Gap _ -> initial, initial, None :: acc
         | Line { kind; text; _ } ->
           let tokens state = Highlight.line lang state text in
           (match kind with
@@ -146,49 +158,178 @@ let number_cell (kind : [ `Same | `Added | `Removed ]) ~old_line ~new_line =
   | _, _, None -> Node.td ~attrs:[ Attr.class_ "ln" ] []
 ;;
 
+let tab_width = 8
+
+let hang text =
+  let rec indent i col ~tabs =
+    if i >= String.length text
+    then col, tabs
+    else (
+      match text.[i] with
+      | ' ' -> indent (i + 1) (col + 1) ~tabs
+      | '\t' ->
+        indent (i + 1) ((col / tab_width * tab_width) + tab_width) ~tabs:true
+      | _ -> col, tabs)
+  in
+  match indent 0 0 ~tabs:false with
+  | col, false -> col + 2
+  | col, true -> col / tab_width * tab_width
+;;
+
+let default_hang = 2
+
+let text_attrs text =
+  match hang text with
+  | n when n = default_hang -> [ Attr.class_ "text" ]
+  | n -> [ Attr.class_ "text"; Attr.create "style" (sprintf "--hang: %dch" n) ]
+;;
+
+let word_changes rows =
+  let rows = Array.of_list rows in
+  let n = Array.length rows in
+  let changes = Array.create ~len:n [] in
+  let is kind i =
+    i < n
+    &&
+    match rows.(i) with
+    | Row.Line l -> Poly.equal l.kind kind
+    | Hunk _ | Gap _ -> false
+  in
+  let text i =
+    match rows.(i) with
+    | Row.Line l -> l.text
+    | Hunk _ | Gap _ -> ""
+  in
+  let rec run i =
+    if i < n
+    then
+      if is `Removed i
+      then (
+        let rec past kind j = if is kind j then past kind (j + 1) else j in
+        let removed_end = past `Removed i in
+        let added_end = past `Added removed_end in
+        let pairs = Int.min (removed_end - i) (added_end - removed_end) in
+        for k = 0 to pairs - 1 do
+          let o = i + k
+          and a = removed_end + k in
+          match Word_diff.ranges ~old:(text o) ~new_:(text a) with
+          | Some (old, new_) ->
+            changes.(o) <- old;
+            changes.(a) <- new_
+          | None -> ()
+        done;
+        run (Int.max added_end (i + 1)))
+      else run (i + 1)
+  in
+  run 0;
+  Array.to_list changes
+;;
+
+let pieces tokens ~cuts =
+  List.fold
+    tokens
+    ~init:(0, [])
+    ~f:(fun (pos, acc) ({ kind; text } : Highlight.Token.t) ->
+      let len = String.length text in
+      let inside = List.filter cuts ~f:(fun c -> c > pos && c < pos + len) in
+      let bounds = (pos :: inside) @ [ pos + len ] in
+      let rec split acc = function
+        | a :: (b :: _ as rest) ->
+          split
+            (( a
+             , { Highlight.Token.kind
+               ; text = String.sub text ~pos:(a - pos) ~len:(b - a)
+               } )
+             :: acc)
+            rest
+        | [ _ ] | [] -> acc
+      in
+      pos + len, split acc bounds)
+  |> snd
+  |> List.rev
+;;
+
+let in_change (changed : Word_diff.Range.t list) at =
+  List.exists changed ~f:(fun r -> r.start <= at && at < r.end_)
+;;
+
+let changed_spans tokens ~(changed : Word_diff.Range.t list) =
+  match changed with
+  | [] -> Highlight_view.spans tokens
+  | changed ->
+    let cuts = List.concat_map changed ~f:(fun r -> [ r.start; r.end_ ]) in
+    List.group (pieces tokens ~cuts) ~break:(fun (a, _) (b, _) ->
+      Bool.( <> ) (in_change changed a) (in_change changed b))
+    |> List.concat_map ~f:(fun group ->
+      let spans = Highlight_view.spans (List.map group ~f:snd) in
+      if in_change changed (fst (List.hd_exn group))
+      then [ Node.span ~attrs:[ Attr.class_ "wd" ] spans ]
+      else spans)
+;;
+
+let gap_text (g : Gap.t) =
+  if g.hidden = 1 then "1 line hidden" else sprintf "%d lines hidden" g.hidden
+;;
+
 let table ?lang ~numbers rows =
-  let td cls text = Node.td ~attrs:[ Attr.class_ cls ] [ Node.text text ] in
   let tokens =
     match lang with
     | Some lang -> highlighted lang rows
     | None -> List.map rows ~f:(fun _ -> None)
   in
+  let changes = word_changes rows in
   Node.table
     ~attrs:[ Attr.class_ "diff" ]
     [ Node.tbody
-        (List.map2_exn rows tokens ~f:(fun (row : Row.t) tokens ->
-           match row with
-           | Hunk text ->
-             Node.tr
-               ~attrs:[ Attr.class_ "hunk" ]
-               [ Node.td
-                   ~attrs:
-                     [ Attr.create "colspan" (if numbers then "3" else "2") ]
-                   (hunk_header text)
-               ]
-           | Line { kind; old_line; new_line; text } ->
-             let cls, sign =
-               match kind with
-               | `Same -> "same", " "
-               | `Added -> "add", "+"
-               | `Removed -> "del", "-"
-             in
-             Node.tr
-               ~attrs:[ Attr.class_ cls ]
-               ((if numbers
-                 then [ number_cell kind ~old_line ~new_line ]
-                 else [])
-                @ [ Node.td
-                      ~attrs:
-                        [ Attr.class_ "sign"; Attr.create "aria-hidden" "true" ]
-                      [ Node.text sign ]
-                  ; (match tokens with
-                     | Some tokens ->
-                       Node.td
-                         ~attrs:[ Attr.class_ "text" ]
-                         (Highlight_view.spans tokens)
-                     | None -> td "text" text)
-                  ])))
+        (List.map3_exn
+           rows
+           tokens
+           changes
+           ~f:(fun (row : Row.t) tokens changed ->
+             match row with
+             | Gap g ->
+               Node.tr
+                 ~attrs:[ Attr.class_ "hunk" ]
+                 [ Node.td
+                     ~attrs:
+                       [ Attr.create "colspan" (if numbers then "3" else "2") ]
+                     [ Node.text (gap_text g) ]
+                 ]
+             | Hunk text ->
+               Node.tr
+                 ~attrs:[ Attr.class_ "hunk" ]
+                 [ Node.td
+                     ~attrs:
+                       [ Attr.create "colspan" (if numbers then "3" else "2") ]
+                     (hunk_header text)
+                 ]
+             | Line { kind; old_line; new_line; text } ->
+               let cls, sign =
+                 match kind with
+                 | `Same -> "same", " "
+                 | `Added -> "add", "+"
+                 | `Removed -> "del", "-"
+               in
+               Node.tr
+                 ~attrs:[ Attr.class_ cls ]
+                 ((if numbers
+                   then [ number_cell kind ~old_line ~new_line ]
+                   else [])
+                  @ [ Node.td
+                        ~attrs:
+                          [ Attr.class_ "sign"
+                          ; Attr.create "aria-hidden" "true"
+                          ]
+                        [ Node.text sign ]
+                    ; Node.td
+                        ~attrs:(text_attrs text)
+                        (changed_spans
+                           (Option.value
+                              tokens
+                              ~default:
+                                [ { Highlight.Token.kind = Plain; text } ])
+                           ~changed)
+                    ])))
     ]
 ;;
 
@@ -216,7 +357,7 @@ let hunks ?lang ~fold lines =
       (unified_rows (String.concat ~sep:"\n" lines))
       ~f:(fun (row : Row.t) ->
         match row with
-        | Hunk _ -> row
+        | Hunk _ | Gap _ -> row
         | Line l -> Line { l with old_line = None; new_line = None })
   in
   view ?lang ~fold ~numbers:false rows

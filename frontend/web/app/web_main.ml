@@ -564,6 +564,9 @@ let perform client settings ctx (model : App.Model.t) (command : App.Command.t) 
       inject (App.Action.Search_sessions search)
     | Focus id -> Effect.of_sync_fun focus id
     | Clear_text_selection -> Effect.of_sync_fun Selection_listeners.clear ()
+    | Scroll_change by ->
+      let%bind.Effect found = Effect.of_sync_fun Review_changes.scroll by in
+      if found then Effect.Ignore else inject (App.Action.Review (Step by))
     | Place_popover -> Effect.of_sync_fun place_popover ()
     | Pick_images -> Effect.of_sync_fun pick_images ()
     | Downsize_image { image; target } ->

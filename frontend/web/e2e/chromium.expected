@@ -3315,6 +3315,99 @@ for screen readers: Working in ~/projects/demo on main. Ask prigh anything…
 tooltip: Working in ~/projects/demo on main. Ask prigh anything…
 === chromium: mobile: desktop: typing ===
 no placeholder: the editor has text
+=== chromium: review_phone: 390x844: the renamed file, folded ===
+ok
+head: docs/ guide.md new 1/5
+card: renamedRenamed from docs/old-guide.md, its text unchanged. Show the changes Approve the 3 generated and renamed
+head: package-lock.json 3/5
+=== chromium: review_phone: 390x844: the lock file, folded ===
+ok
+card: generatedA generated file (a lock file, build output or minified code): its changes are folded. Show the changes Approve the 3 generated and renamed
+head: src/ scheduler.ml 5/5
+=== chromium: review_phone: 390x844: the long lines ===
+ok
+del line 48: wrapped, continues under its indent
+del line 49: wrapped, continues under its indent
+add line 48: wrapped, continues under its indent
+add line 49: wrapped, continues under its indent
+changed words: retries | max_retries | ~label:(Job.name | ) job | %s | Job.name job) ( | x + | max x
+gaps: 44 lines hidden | 27 lines hidden | 7 lines hidden
+=== chromium: review_phone: 390x844: next change ===
+ok
+=== chromium: review_phone: 390x844: lines selected ===
+ok
+sheet: lines 48–49 Tap another line to select to it
+chips: Explain this | Why? | Revert this | Add a test
+=== chromium: review_phone: 390x844: writing a comment ===
+ok
+dock while typing: gone
+=== chromium: review_phone: 390x844: display options ===
+ok
+=== chromium: review_phone: 390x844: scrolling, larger ===
+ok
+file scrolls sideways: true
+=== chromium: review_phone: 320x640: the renamed file, folded ===
+ok
+head: docs/ guide.md new 1/5
+card: renamedRenamed from docs/old-guide.md, its text unchanged. Show the changes Approve the 3 generated and renamed
+head: package-lock.json 3/5
+=== chromium: review_phone: 320x640: the lock file, folded ===
+ok
+card: generatedA generated file (a lock file, build output or minified code): its changes are folded. Show the changes Approve the 3 generated and renamed
+head: src/ scheduler.ml 5/5
+=== chromium: review_phone: 320x640: the long lines ===
+ok
+del line 48: wrapped, continues under its indent
+del line 49: wrapped, continues under its indent
+add line 48: wrapped, continues under its indent
+add line 49: wrapped, continues under its indent
+changed words: retries | max_retries | ~label:(Job.name | ) job | %s | Job.name job) ( | x + | max x
+gaps: 44 lines hidden | 27 lines hidden | 7 lines hidden
+=== chromium: review_phone: 320x640: next change ===
+ok
+=== chromium: review_phone: 320x640: lines selected ===
+ok
+sheet: lines 48–49 Tap another line to select to it
+chips: Explain this | Why? | Revert this | Add a test
+=== chromium: review_phone: 320x640: writing a comment ===
+ok
+dock while typing: gone
+=== chromium: review_phone: 320x640: display options ===
+ok
+=== chromium: review_phone: 320x640: scrolling, larger ===
+ok
+file scrolls sideways: true
+=== chromium: review_phone: 390x844-pwa: the renamed file, folded ===
+ok
+head: docs/ guide.md new 1/5
+card: renamedRenamed from docs/old-guide.md, its text unchanged. Show the changes Approve the 3 generated and renamed
+head: package-lock.json 3/5
+=== chromium: review_phone: 390x844-pwa: the lock file, folded ===
+ok
+card: generatedA generated file (a lock file, build output or minified code): its changes are folded. Show the changes Approve the 3 generated and renamed
+head: src/ scheduler.ml 5/5
+=== chromium: review_phone: 390x844-pwa: the long lines ===
+ok
+del line 48: wrapped, continues under its indent
+del line 49: wrapped, continues under its indent
+add line 48: wrapped, continues under its indent
+add line 49: wrapped, continues under its indent
+changed words: retries | max_retries | ~label:(Job.name | ) job | %s | Job.name job) ( | x + | max x
+gaps: 44 lines hidden | 27 lines hidden | 7 lines hidden
+=== chromium: review_phone: 390x844-pwa: next change ===
+ok
+=== chromium: review_phone: 390x844-pwa: lines selected ===
+ok
+sheet: lines 48–49 Tap another line to select to it
+chips: Explain this | Why? | Revert this | Add a test
+=== chromium: review_phone: 390x844-pwa: writing a comment ===
+ok
+dock while typing: gone
+=== chromium: review_phone: 390x844-pwa: display options ===
+ok
+=== chromium: review_phone: 390x844-pwa: scrolling, larger ===
+ok
+file scrolls sideways: true
 === chromium: terminal keys: a desktop ===
 the shell has the focus: true; the bar: hidden
 === chromium: terminal keys: 390x844: the keyboard up ===
