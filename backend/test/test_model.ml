@@ -32,12 +32,12 @@ let%expect_test "GPT-6.1 Sol on the OpenAI API and Codex" =
     ("GPT-6.1 Sol"
      "model \"GPT-6.1 Sol\" is ambiguous; one of: openai/gpt-6.1-sol, openai-codex/gpt-6.1-sol")
     (gpt-6-sol
-     ((id gpt-6-sol) (provider Openai_codex) (name "GPT-6 Sol")
-      (context_window 272000) (max_output 128000)
-      (thinking_levels (Low Medium High Xhigh Max)) (can_disable_thinking true)
-      (thinking_default ((On (Medium))))
+     ((id gpt-6-sol) (provider Openai) (name "GPT-6 Sol") (context_window 272000)
+      (max_output 128000) (thinking_levels (Low Medium High Xhigh Max))
+      (can_disable_thinking true) (thinking_default ((On (Medium))))
       (thinking_style (Effort (off_is_none true)))
-      (cost ((input 2) (output 10) (cache_read 0.2))) (supports_images true)))
+      (cost ((input 2) (output 10) (cache_read 0.2))) (supports_images true)
+      (native_computer Openai)))
     |}]
 ;;
 
@@ -52,6 +52,28 @@ let%expect_test "GPT-6.1 Sol cost: cached input is billed at the cache rate" =
   [%expect {| 2.05 |}]
 ;;
 
+let%expect_test "long prompts: the whole request at the higher prices" =
+  List.iter
+    [ "anthropic/claude-haiku-5-5", 100_000
+    ; "anthropic/claude-haiku-5-5", 100_001
+    ; "openai/gpt-5.5-pro", 272_000
+    ; "openai/gpt-5.5-pro", 272_001
+    ]
+    ~f:(fun (key, input) ->
+      let m = Option.value_exn (Model.find key) in
+      let cost =
+        Model.cost_usd m { input; cache_read = 50_000; output = 10_000 }
+      in
+      printf "%s %d: %.6f\n" key input cost);
+  [%expect
+    {|
+    anthropic/claude-haiku-5-5 100000: 0.010500
+    anthropic/claude-haiku-5-5 100001: 0.052500
+    openai/gpt-5.5-pro 272000: 8.460000
+    openai/gpt-5.5-pro 272001: 16.020060
+    |}]
+;;
+
 let%expect_test "unknown models: suggestions stay within a named provider" =
   List.iter [ "anthropic/nope"; "opus-55"; "nosuch/claude-opus" ] ~f:(fun q ->
     match Model.resolve q with
@@ -60,7 +82,7 @@ let%expect_test "unknown models: suggestions stay within a named provider" =
   [%expect
     {|
     unknown model "anthropic/nope"; did you mean: anthropic/claude-opus-5 (Claude Opus 5), anthropic/claude-fable-5 (Claude Fable 5), anthropic/claude-opus-4-5 (Claude Opus 4.5 (latest))
-    unknown model "opus-55"; did you mean: openai/gpt-5 (GPT-5), openai/gpt-5.5 (GPT-5.5), openai-codex/gpt-5.5 (GPT-5.5)
+    unknown model "opus-55"; did you mean: openai/gpt-5 (GPT-5), openai/gpt-5.5 (GPT-5.5), openai/gpt-4o (GPT-4o)
     unknown model "nosuch/claude-opus"; did you mean: anthropic/claude-opus-5 (Claude Opus 5), anthropic/claude-opus-4-5 (Claude Opus 4.5 (latest)), anthropic/claude-opus-4-6 (Claude Opus 4.6)
     |}]
 ;;
@@ -87,6 +109,10 @@ let%expect_test
     anthropic/claude-fable-5-2           default low medium high xhigh max          high     Adaptive
     anthropic/claude-haiku-4-5           off default low medium high xhigh max      medium   (Budget(effort false))
     anthropic/claude-haiku-4-5-20251001  off default low medium high xhigh max      medium   (Budget(effort false))
+    anthropic/claude-haiku-5-5           off default low medium high xhigh max      medium   Adaptive
+    anthropic/claude-mythos-5            default low medium high xhigh max          high     Adaptive
+    anthropic/claude-mythos-5-1          default low medium high xhigh max          high     Adaptive
+    anthropic/claude-mythos-5-2          default low medium high xhigh max          high     Adaptive
     anthropic/claude-opus-4-5            off default low medium high                high     (Budget(effort true))
     anthropic/claude-opus-4-5-20251101   off default low medium high                high     (Budget(effort true))
     anthropic/claude-opus-4-6            off default low medium high max            high     Adaptive
@@ -99,28 +125,21 @@ let%expect_test
     anthropic/claude-sonnet-4-6          off default low medium high max            high     Adaptive
     anthropic/claude-sonnet-5            off default low medium high xhigh max      high     Adaptive
     anthropic/claude-sonnet-5-5          off default low medium high xhigh max      high     Adaptive_between_tools
-    openai/gpt-4                         off                                        ?        (Effort(off_is_none false))
-    openai/gpt-4-turbo                   off                                        ?        (Effort(off_is_none false))
+    openai/chat-latest                   off                                        ?        (Effort(off_is_none false))
     openai/gpt-4.1                       off                                        ?        (Effort(off_is_none false))
     openai/gpt-4.1-mini                  off                                        ?        (Effort(off_is_none false))
-    openai/gpt-4.1-nano                  off                                        ?        (Effort(off_is_none false))
     openai/gpt-4o                        off                                        ?        (Effort(off_is_none false))
-    openai/gpt-4o-2024-05-13             off                                        ?        (Effort(off_is_none false))
     openai/gpt-4o-2024-08-06             off                                        ?        (Effort(off_is_none false))
     openai/gpt-4o-2024-11-20             off                                        ?        (Effort(off_is_none false))
     openai/gpt-4o-mini                   off                                        ?        (Effort(off_is_none false))
     openai/gpt-5                         default minimal low medium high            medium   (Effort(off_is_none false))
-    openai/gpt-5-chat-latest             off                                        ?        (Effort(off_is_none false))
     openai/gpt-5-mini                    default minimal low medium high            medium   (Effort(off_is_none false))
     openai/gpt-5-nano                    default minimal low medium high            medium   (Effort(off_is_none false))
     openai/gpt-5-pro                     default high                               high     (Effort(off_is_none false))
     openai/gpt-5.1                       off default low medium high                off      (Effort(off_is_none true))
     openai/gpt-5.2                       off default low medium high xhigh          off      (Effort(off_is_none true))
-    openai/gpt-5.2-chat-latest           off                                        ?        (Effort(off_is_none false))
     openai/gpt-5.2-pro                   default medium high xhigh                  ?        (Effort(off_is_none false))
-    openai/gpt-5.3-chat-latest           off                                        ?        (Effort(off_is_none false))
     openai/gpt-5.3-codex                 default low medium high xhigh              ?        (Effort(off_is_none false))
-    openai/gpt-5.3-codex-spark           off                                        ?        (Effort(off_is_none false))
     openai/gpt-5.4                       off default low medium high xhigh          off      (Effort(off_is_none true))
     openai/gpt-5.4-mini                  off default low medium high xhigh          off      (Effort(off_is_none true))
     openai/gpt-5.4-nano                  off default low medium high xhigh          off      (Effort(off_is_none true))
@@ -131,16 +150,13 @@ let%expect_test
     openai/gpt-5.6-sol                   off default low medium high xhigh max      medium   (Effort(off_is_none true))
     openai/gpt-5.6-terra                 off default low medium high xhigh max      medium   (Effort(off_is_none true))
     openai/gpt-6-astra                   default low medium high xhigh max          ?        (Effort(off_is_none false))
+    openai/gpt-6-luna                    off default low medium high xhigh max      medium   (Effort(off_is_none true))
+    openai/gpt-6-sol                     off default low medium high xhigh max      medium   (Effort(off_is_none true))
     openai/gpt-6.1-sol                   default low medium high xhigh max          medium   (Effort(off_is_none false))
+    openai/gpt-6.1-terra                 off default low medium high xhigh max      medium   (Effort(off_is_none true))
     openai/gpt-realtime-2.1              default minimal low medium high xhigh      low      (Effort(off_is_none false))
-    openai/o1                            default low medium high                    medium   (Effort(off_is_none false))
-    openai/o1-pro                        default low medium high                    medium   (Effort(off_is_none false))
     openai/o3                            default low medium high                    medium   (Effort(off_is_none false))
-    openai/o3-mini                       default low medium high                    medium   (Effort(off_is_none false))
     openai/o3-pro                        default low medium high                    medium   (Effort(off_is_none false))
-    openai/o4-mini                       default low medium high                    medium   (Effort(off_is_none false))
-    openai-codex/gpt-5.3-codex-spark     off                                        ?        (Effort(off_is_none false))
-    openai-codex/gpt-5.5                 off default low medium high xhigh          medium   (Effort(off_is_none true))
     openai-codex/gpt-5.6-luna            off default low medium high xhigh max      medium   (Effort(off_is_none true))
     openai-codex/gpt-5.6-sol             off default low medium high xhigh max      medium   (Effort(off_is_none true))
     openai-codex/gpt-5.6-terra           off default low medium high xhigh max      medium   (Effort(off_is_none true))
@@ -148,6 +164,7 @@ let%expect_test
     openai-codex/gpt-6-luna              off default low medium high xhigh max      medium   (Effort(off_is_none true))
     openai-codex/gpt-6-sol               off default low medium high xhigh max      medium   (Effort(off_is_none true))
     openai-codex/gpt-6.1-sol             default low medium high xhigh max          medium   (Effort(off_is_none false))
+    openai-codex/gpt-6.1-terra           off default low medium high xhigh max      medium   (Effort(off_is_none true))
     deepseek/deepseek-flash              off default low high max                   high     (Effort(off_is_none false))
     deepseek/deepseek-v4-pro             off default low high max                   high     (Effort(off_is_none false))
     |}]

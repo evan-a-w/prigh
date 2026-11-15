@@ -507,11 +507,29 @@ let%expect_test "images: replaced by a note, the model cannot see them" =
     [
       {
         "role": "user",
-        "content": "what is this?\n[image/png image omitted: this model cannot see images]"
+        "content": [
+          {
+            "type": "text",
+            "text": "what is this?"
+          },
+          {
+            "type": "image_url",
+            "image_url": {
+              "url": "data:image/png;base64,SHOT"
+            }
+          }
+        ]
       },
       {
         "role": "user",
-        "content": "[image/jpeg image omitted: this model cannot see images]"
+        "content": [
+          {
+            "type": "image_url",
+            "image_url": {
+              "url": "data:image/jpeg;base64,PHOTO"
+            }
+          }
+        ]
       },
       {
         "role": "assistant",
@@ -530,7 +548,22 @@ let%expect_test "images: replaced by a note, the model cannot see them" =
       {
         "role": "tool",
         "tool_call_id": "call_1",
-        "content": "Read image file [image/png, 3x2]\n[image/png image omitted: this model cannot see images]"
+        "content": "Read image file [image/png, 3x2]\n[1 image attached in the next message]"
+      },
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "[1 image from the read result call_1]"
+          },
+          {
+            "type": "image_url",
+            "image_url": {
+              "url": "data:image/png;base64,READ"
+            }
+          }
+        ]
       }
     ]
     |}]

@@ -313,7 +313,7 @@ let%expect_test "generate_model, cancelling" =
   Queue.iter requests ~f:(fun r -> print_endline (Model.key r.model));
   [%expect
     {|
-    {"type":"response","id":"r1","ok":false,"error":"generate_model: unknown model \"no-such-model\"; did you mean: openai/gpt-5.3-codex (GPT-5.3 Codex), openai/gpt-5.6-sol (GPT-5.6 Sol), openai/gpt-6.1-sol (GPT-6.1 Sol)"}
+    {"type":"response","id":"r1","ok":false,"error":"generate_model: unknown model \"no-such-model\"; did you mean: openai/gpt-5.3-codex (GPT-5.3 Codex), openai/gpt-5.6-sol (GPT-5.6 Sol), openai/gpt-6-sol (GPT-6 Sol)"}
     {"type":"response","id":"r1","ok":true,"result":{"cancelled":true}}
     {"type":"response","id":"r1","ok":false,"error":"cancelled"}
     {"type":"response","id":"r1","ok":true,"result":{"cancelled":false}}

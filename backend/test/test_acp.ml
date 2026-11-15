@@ -474,7 +474,8 @@ let%expect_test "modes and config options" =
     {|
     > request 8 session/set_config_option {"sessionId":"<id>","configId":"model","value":"claude-sonnet-4-5"}
     < result 8 {"configOptions":"mode=plan[ask|auto-edit|auto|smart|plan|chat] model=anthropic/claude-sonnet-4-5[anthropic/claude-sonnet-4-5] thinking=high[off|default|low|medium|high|xhigh|max]"}
-    < _prigh/state {"sessionId":"<id>","model":"anthropic/claude-sonnet-4-5","thinking":"high","running":false,"context_tokens":0,"context_window":1000000,"cost_usd":0,"budget_usd":null,"approval_mode":"auto-edit","plan_mode":true,"chat_mode":false,"queued":{"steer":0,"follow_up":0},"subagents":[],"jobs":0,"goal":null,"reminders":0,"active_host":"testhost"}
+    < update usage_update {"used":0,"size":200000,"cost":{"amount":0,"currency":"USD"}}
+    < _prigh/state {"sessionId":"<id>","model":"anthropic/claude-sonnet-4-5","thinking":"high","running":false,"context_tokens":0,"context_window":200000,"cost_usd":0,"budget_usd":null,"approval_mode":"auto-edit","plan_mode":true,"chat_mode":false,"queued":{"steer":0,"follow_up":0},"subagents":[],"jobs":0,"goal":null,"reminders":0,"active_host":"testhost"}
     |}];
   set_option "mode" "ask";
   [%expect
@@ -482,7 +483,7 @@ let%expect_test "modes and config options" =
     > request 9 session/set_config_option {"sessionId":"<id>","configId":"mode","value":"ask"}
     < result 9 {"configOptions":"mode=ask[ask|auto-edit|auto|smart|plan|chat] model=anthropic/claude-sonnet-4-5[anthropic/claude-sonnet-4-5] thinking=high[off|default|low|medium|high|xhigh|max]"}
     < update current_mode_update {"currentModeId":"ask"}
-    < _prigh/state {"sessionId":"<id>","model":"anthropic/claude-sonnet-4-5","thinking":"high","running":false,"context_tokens":0,"context_window":1000000,"cost_usd":0,"budget_usd":null,"approval_mode":"ask","plan_mode":false,"chat_mode":false,"queued":{"steer":0,"follow_up":0},"subagents":[],"jobs":0,"goal":null,"reminders":0,"active_host":"testhost"}
+    < _prigh/state {"sessionId":"<id>","model":"anthropic/claude-sonnet-4-5","thinking":"high","running":false,"context_tokens":0,"context_window":200000,"cost_usd":0,"budget_usd":null,"approval_mode":"ask","plan_mode":false,"chat_mode":false,"queued":{"steer":0,"follow_up":0},"subagents":[],"jobs":0,"goal":null,"reminders":0,"active_host":"testhost"}
     |}];
   set_option "thinking" "lots";
   [%expect
@@ -494,7 +495,7 @@ let%expect_test "modes and config options" =
   [%expect
     {|
     > request 11 session/set_config_option {"sessionId":"<id>","configId":"model","value":"no-such-model"}
-    < error 11 {"code":-32602,"message":"unknown model \"no-such-model\"; did you mean: openai/gpt-5.3-codex (GPT-5.3 Codex), openai/gpt-5.6-sol (GPT-5.6 Sol), openai/gpt-6.1-sol (GPT-6.1 Sol)"}
+    < error 11 {"code":-32602,"message":"unknown model \"no-such-model\"; did you mean: openai/gpt-5.3-codex (GPT-5.3 Codex), openai/gpt-5.6-sol (GPT-5.6 Sol), openai/gpt-6-sol (GPT-6 Sol)"}
     |}];
   set_option "colour" "blue";
   [%expect

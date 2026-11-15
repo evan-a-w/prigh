@@ -384,8 +384,7 @@ module State = struct
   let cost_usd t =
     Hashtbl.fold
       t.children
-      ~init:
-        (t.local_cost_usd +. t.compaction_cost_usd)
+      ~init:(t.local_cost_usd +. t.compaction_cost_usd)
       ~f:(fun ~key:_ ~data:(_, cost) acc -> acc +. cost)
   ;;
 end
@@ -541,7 +540,8 @@ let run_once
     | Message.Assistant assistant ->
       state.local_usage <- Usage.add state.local_usage assistant.usage;
       state.local_cost_usd
-      <- state.local_cost_usd +. Model.cost_usd state.prepared.model assistant.usage
+      <- state.local_cost_usd
+         +. Model.cost_usd state.prepared.model assistant.usage
     | User _ | Tool_result _ -> ());
   let usage = State.usage state in
   let last_assistant =

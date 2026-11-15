@@ -95,7 +95,7 @@ let%expect_test
   [%expect
     {|
     {
-      "model": "gpt-5.5",
+      "model": "gpt-6.1-sol",
       "stream": true,
       "store": false,
       "instructions": "Be brief.",
@@ -194,7 +194,7 @@ let%expect_test
         }
       ],
       "reasoning": {
-        "effort": "xhigh",
+        "effort": "max",
         "summary": "auto"
       },
       "text": {
@@ -427,7 +427,7 @@ let%expect_test "stream end to end against the codex endpoint" =
        (Tool_call ((id call_9) (name bash) (arguments "{\"cmd\":\"ls\"}")))
        (Tool_call ((id call_10) (name bash) (arguments "{\"cmd\":\"pwd\"}")))))
      (stop_reason Tool_use) (usage ((input 100) (output 20) (cache_read 80)))
-     (model openai-codex/gpt-5.5))
+     (model openai-codex/gpt-6.1-sol))
     POST /codex/responses HTTP/1.1
     authorization: Bearer tok
     chatgpt-account-id: acct-1

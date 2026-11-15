@@ -35,13 +35,13 @@ let%expect_test "the file editor suits the model" =
         , (names (Tools.for_model model Tools.all) : string list)]);
   [%expect
     {|
-    (openai-codex/gpt-5.5 true
+    (openai-codex/gpt-6.1-sol true
      (bash read write apply_patch ls grep find web_fetch web_search))
     (openai/gpt-5 true
      (bash read write apply_patch ls grep find web_fetch web_search))
     (openai/gpt-6.1-sol true
      (bash read write apply_patch ls grep find web_fetch web_search))
-    (openai/gpt-5-chat-latest false
+    (openai/chat-latest false
      (bash read write edit ls grep find web_fetch web_search))
     (openai/gpt-4.1 false
      (bash read write edit ls grep find web_fetch web_search))

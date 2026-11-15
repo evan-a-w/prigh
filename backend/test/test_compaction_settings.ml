@@ -424,7 +424,7 @@ let%expect_test
     {|
     config no-such-model, cap 200000: the session's model
     config anthropic/claude-haiku-4-5, cap 200000: anthropic/claude-haiku-4-5
-    error: compaction_model: unknown model "claude-haku"; did you mean: anthropic/claude-haiku-4-5 (Claude Haiku 4.5 (latest)), anthropic/claude-fable-5 (Claude Fable 5), anthropic/claude-haiku-4-5-20251001 (Claude Haiku 4.5)
+    error: compaction_model: unknown model "claude-haku"; did you mean: anthropic/claude-haiku-4-5 (Claude Haiku 4.5 (latest)), anthropic/claude-haiku-5-5 (Claude Haiku 5.5), anthropic/claude-fable-5 (Claude Fable 5)
     config anthropic/claude-haiku-4-5, cap none: anthropic/claude-haiku-4-5
     config -, cap none: the session's model
     |}]

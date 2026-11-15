@@ -147,7 +147,11 @@ let openai ?(none = false) ?(default = level Medium) levels =
 (* Over 272K input tokens: twice the input price and 1.5 times the
    output. *)
 let openai_pro_long_prompt =
-  { Cost.Long_prompt.above = 272000; input = 60.; output = 270.; cache_read = 0. }
+  { Cost.Long_prompt.above = 272000
+  ; input = 60.
+  ; output = 270.
+  ; cache_read = 0.
+  }
 ;;
 
 let gpt5 = openai [ Minimal; Low; Medium; High ]
