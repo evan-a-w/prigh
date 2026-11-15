@@ -366,7 +366,7 @@ let%expect_test "live: the compaction model writes the summaries" =
     { Model.default with
       id = "cheap"
     ; context_window = window
-    ; cost = { input = 0.1; output = 0.1; cache_read = 0. }
+    ; cost = { input = 0.1; output = 0.1; cache_read = 0.; long_prompt = None }
     }
   in
   let usage = { Usage.input = 1000; output = 200; cache_read = 0 } in

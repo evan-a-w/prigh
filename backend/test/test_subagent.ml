@@ -137,7 +137,7 @@ let%expect_test "model override and bad model" =
   let subagent = subagent ~provider in
   let tools = Tools.all @ [ subagent ] in
   let (_ : Tool.Result.t) =
-    run_tool t ~tools ~emit:ignore subagent {|{"task":"x","model":"gpt-4"}|}
+    run_tool t ~tools ~emit:ignore subagent {|{"task":"x","model":"gpt-4.1"}|}
   in
   print_s
     [%sexp (Model.default.id : string), (List.rev !requests : string list)];
@@ -147,9 +147,9 @@ let%expect_test "model override and bad model" =
   print_s [%sexp (result : Tool.Result.t)];
   [%expect
     {|
-    (deepseek-flash (gpt-4))
+    (deepseek-flash (gpt-4.1))
     ((text
-      "invalid arguments: unknown model \"gpt-9\"; did you mean: openai/gpt-4 (GPT-4), openai/gpt-5 (GPT-5), openai/gpt-4o (GPT-4o)")
+      "invalid arguments: unknown model \"gpt-9\"; did you mean: openai/gpt-5 (GPT-5), openai/gpt-4o (GPT-4o), openai/gpt-4.1 (GPT-4.1)")
      (is_error true))
     |}]
 ;;

@@ -199,7 +199,12 @@ let model t ?listed id =
   ; cost =
       Option.value
         (get (fun o -> o.cost))
-        ~default:{ Model.Cost.input = 0.; output = 0.; cache_read = 0. }
+        ~default:
+          { Model.Cost.input = 0.
+          ; output = 0.
+          ; cache_read = 0.
+          ; long_prompt = None
+          }
   ; supports_images = Option.value (get (fun o -> o.images)) ~default:true
   ; native_computer = None
   }
@@ -264,7 +269,7 @@ let cost_of_json ~what json =
   let%bind input = price "input" ~required:true in
   let%bind output = price "output" ~required:true in
   let%map cache_read = price "cache_read" ~required:false in
-  { Model.Cost.input; output; cache_read }
+  { Model.Cost.input; output; cache_read; long_prompt = None }
 ;;
 
 let override_known =

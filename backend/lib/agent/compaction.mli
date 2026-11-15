@@ -34,6 +34,7 @@ module Outcome : sig
   type t =
     { summary : string
     ; usage : Usage.t (** of the summarising requests *)
+    ; cost_usd : float (** each request at its own price *)
     }
   [@@deriving sexp_of]
 end

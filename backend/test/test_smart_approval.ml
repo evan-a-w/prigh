@@ -473,7 +473,7 @@ let%expect_test "the approval model setting: default, validation, use" =
     {|
     (Ok deepseek/deepseek-flash)
     (Error
-     "approval_model: unknown model \"no-such-model\"; did you mean: openai/gpt-5.3-codex (GPT-5.3 Codex), openai/gpt-5.6-sol (GPT-5.6 Sol), openai/gpt-6.1-sol (GPT-6.1 Sol)")
+     "approval_model: unknown model \"no-such-model\"; did you mean: openai/gpt-5.3-codex (GPT-5.3 Codex), openai/gpt-5.6-sol (GPT-5.6 Sol), openai/gpt-6-sol (GPT-6 Sol)")
     (Ok deepseek/deepseek-flash)
     (Ok ())
     (Ok anthropic/claude-haiku-4-5)

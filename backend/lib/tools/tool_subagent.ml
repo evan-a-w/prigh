@@ -367,6 +367,7 @@ module State = struct
     ; mutable messages : Message.t list
     ; mutable turns : int
     ; mutable local_usage : Usage.t (** its own replies' *)
+    ; mutable local_cost_usd : float
     ; mutable compaction_usage : Usage.t
     ; mutable compaction_cost_usd : float
     ; children : (Usage.t * float) String.Table.t
@@ -383,8 +384,7 @@ module State = struct
   let cost_usd t =
     Hashtbl.fold
       t.children
-      ~init:
-        (Model.cost_usd t.prepared.model t.local_usage +. t.compaction_cost_usd)
+      ~init:(t.local_cost_usd +. t.compaction_cost_usd)
       ~f:(fun ~key:_ ~data:(_, cost) acc -> acc +. cost)
   ;;
 end
@@ -538,7 +538,10 @@ let run_once
   in
   List.iter added ~f:(function
     | Message.Assistant assistant ->
-      state.local_usage <- Usage.add state.local_usage assistant.usage
+      state.local_usage <- Usage.add state.local_usage assistant.usage;
+      state.local_cost_usd
+      <- state.local_cost_usd
+         +. Model.cost_usd state.prepared.model assistant.usage
     | User _ | Tool_result _ -> ());
   let usage = State.usage state in
   let last_assistant =
@@ -728,6 +731,7 @@ let execute
     ; messages
     ; turns = 0
     ; local_usage = Usage.zero
+    ; local_cost_usd = 0.
     ; compaction_usage = Usage.zero
     ; compaction_cost_usd = 0.
     ; children = String.Table.create ()

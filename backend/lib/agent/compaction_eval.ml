@@ -547,7 +547,8 @@ module Sim = struct
                None
              | Ok (messages, outcome) ->
                live.summaries <- live.summaries + 1;
-               Live_run.add_usage live ~model:live.summariser outcome.usage;
+               live.usage <- Usage.add live.usage outcome.usage;
+               live.cost_usd <- live.cost_usd +. outcome.cost_usd;
                (* Pinned messages keep their place in the cache when unchanged. *)
                let items = Array.of_list t.context in
                let head =

@@ -1692,7 +1692,8 @@ The backend's own host never offers it.
   toolset, Claude Opus 4.5 to 5, Sonnet 4.6 and 5 and Fable and Mythos 5
   and 5.1 `computer_20251124` (with zoom), Sonnet and Haiku
   4.5 `computer_20250124` (with their beta headers), and the OpenAI API's
-  models with computer use (GPT-5.4 and later) the Responses API's
+  models with computer use (GPT-5.4 and later but GPT-5.4 nano and
+  GPT-5.5 Pro) the Responses API's
   `computer` tool. prigh translates their calls to its own actions (the
   session, the host and the frontends see those) and replays them to the
   same kind of model as written. An OpenAI `computer_call` is a batch:
@@ -1873,7 +1874,7 @@ The same is available inside the TUI as `/login [provider] [api_key|oauth]`,
 `ANTHROPIC_OAUTH_TOKEN`/`ANTHROPIC_API_KEY`, `OPENAI_API_KEY` and
 `DEEPSEEK_API_KEY` are used. OAuth tokens are refreshed automatically
 (under a cross-process lock) when they are within five minutes of expiry.
-Model ids can be qualified as `provider/id` (e.g. `openai-codex/gpt-5.5`).
+Model ids can be qualified as `provider/id` (e.g. `openai-codex/gpt-6.1-sol`).
 
 ### Custom OpenAI-compatible providers
 
@@ -2395,8 +2396,8 @@ Responses API's `web_search` (OpenAI and ChatGPT/Codex). The provider runs
 the searches; they show in the transcript as `web_search "query"` with the
 results folded underneath, and are replayed to the same provider as it sent
 them (to another provider as text). Models of other providers (DeepSeek,
-custom endpoints) and OpenAI's models without it (`gpt-4`, `gpt-4.1-nano`,
-`o1`, `o3-mini`, ...) do not get `web_search`; they can still `web_fetch` a
+custom endpoints) and OpenAI's model without it (`gpt-realtime-2.1`) do not
+get `web_search`; they can still `web_fetch` a
 search page. Neither tool is destructive, so neither asks for confirmation
 in the `ask` approval mode.
 
