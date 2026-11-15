@@ -26,6 +26,8 @@ module Input : sig
     ; arguments : Json.t
     ; host : string (** the tool host's name *)
     ; elsewhere : bool (** on a host other than the session's ([on_host]) *)
+    ; session_host : string (** the name of the session's own host *)
+    ; hosts : string list (** the connected hosts' names *)
     ; cwd : string
     ; requests : string list
       (** the user's messages, oldest first (see {!requests}) *)
@@ -38,11 +40,14 @@ module Input : sig
   [@@deriving sexp_of]
 end
 
-(** The user's own messages in [messages], as [Input.requests] wants them:
-    the text they wrote (and the goals, reviews and [/init]s they started),
-    without the harness's notes, attachments, compaction summaries, command
-    output or other sessions' questions; the last ten, each cut to 4000
-    bytes. *)
+(** The user's own messages in [messages], oldest first: the text they wrote
+    (and the goals, reviews and [/init]s they started), without the
+    harness's notes, attachments, compaction summaries, command output or
+    other sessions' questions. *)
+val user_messages : Message.t list -> string list
+
+(** {!user_messages} as [Input.requests] wants them: the last ten, each cut
+    to 4000 bytes. *)
 val requests : Message.t list -> string list
 
 (** The system prompt: the guidance the model judges by. *)

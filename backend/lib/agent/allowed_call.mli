@@ -6,7 +6,10 @@ open! Import
     held it. The session records it ([allowed_call] entries), and the exact
     same call (tool, arguments, host and directory) runs again without being
     judged for the rest of the session, while in [smart] mode; rules and
-    plan mode still come first ({!Approval.decide}). *)
+    plan mode still come first ({!Approval.decide}).
+
+    A call on another host ([on_host]) the user lets run is recorded too, in
+    any mode: it permits that host for the rest of the session. *)
 
 module Call : sig
   type t =

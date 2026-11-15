@@ -198,7 +198,9 @@ let%expect_test
     </user_requests>
 
     <environment>
-    host: <host>
+    session's own host: <host>
+    connected hosts: <host>
+    call runs on: <host> (the session's own host)
     working directory: $DIR
     </environment>
 
@@ -422,7 +424,9 @@ let%expect_test "a subagent's calls are judged, with its task as context" =
     </subagent_task>
 
     <environment>
-    host: <host>
+    session's own host: <host>
+    connected hosts: <host>
+    call runs on: <host> (the session's own host)
     working directory: $DIR
     </environment>
 
@@ -488,7 +492,9 @@ let%expect_test "the approval model setting: default, validation, use" =
     </user_requests>
 
     <environment>
-    host: <host>
+    session's own host: <host>
+    connected hosts: <host>
+    call runs on: <host> (the session's own host)
     working directory: $DIR
     </environment>
 

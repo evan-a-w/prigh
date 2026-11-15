@@ -1774,6 +1774,9 @@ module Check = struct
   type t =
     { decide : unit -> Approval.Decision.t
     ; elsewhere : bool
+    ; held : unit -> string option
+      (** why a call elsewhere asks whatever the mode: the user has not
+        permitted its host *)
     ; name : string (** as the user sees it: [on_host] for a call elsewhere *)
     ; summary : string
     ; input : Approval_judge.Input.t
@@ -1781,10 +1784,23 @@ module Check = struct
     }
 end
 
-(* A call [on_host] runs on another host ([context.host]) follows the mode,
-   but no allow rule: rules are written for the session's own host (its
-   paths, its commands), so none lets a call elsewhere through and the user
-   is not offered one to add; deny and ask rules still apply. *)
+(* Whether the user has let the agent work on host [id] (named [name]) in
+   this session: one of their messages names it, or they let a call there
+   run (any call elsewhere they allow is remembered, {!approve_on_host}). *)
+let host_permitted t ~id ~name =
+  List.exists
+    (Approval_judge.user_messages (Session.messages t.session))
+    ~f:(Approval.names_host ~names:[ name; id ])
+  || Hashtbl.exists t.allowed_calls ~f:(fun (a : Allowed_call.t) ->
+    String.equal a.call.host id && String.equal a.by Allowed_call.you)
+;;
+
+(* A call [on_host] runs on another host ([context.host]) asks (or, in smart
+   mode, is judged) until the user permits that host ([host_permitted]),
+   read-only or not and in every mode; then it follows the mode, but no
+   allow rule: rules are written for the session's own host (its paths, its
+   commands), so none lets a call elsewhere through and the user is not
+   offered one to add; deny and ask rules still apply. *)
 let check t (context : Tool.Context.t) tool args : Check.t =
   let name = Tool.name tool in
   let elsewhere =
@@ -1808,10 +1824,23 @@ let check t (context : Tool.Context.t) tool args : Check.t =
     | None -> t.config.permissions, t.session_rules, t.cwd
     | Some _ -> { t.config.permissions with allow = [] }, [], context.cwd
   in
+  let host_name =
+    Option.value_map host ~default:host_id ~f:(fun (h : Host.t) -> h.name)
+  in
+  let held () =
+    match elsewhere with
+    | Some id when not (host_permitted t ~id ~name:host_name) ->
+      Some
+        (sprintf
+           "runs on %s, which you haven't named in this session"
+           host_name)
+    | Some _ | None -> None
+  in
   let decide () =
     Approval.decide
       ~mode:t.approval_mode
       ~plan:t.plan_mode
+      ~host_permitted:(Option.is_none (held ()))
       ~rules
       ~session
       ~cwd
@@ -1819,9 +1848,6 @@ let check t (context : Tool.Context.t) tool args : Check.t =
       ~destructive:(Tool_spec.Destructive.call tool.spec.destructive args)
       ~changes_work:(Plan_mode.changes_work ~tool:name args)
       call
-  in
-  let host_name =
-    Option.value_map host ~default:host_id ~f:(fun (h : Host.t) -> h.name)
   in
   let shown_name, summary =
     match elsewhere with
@@ -1847,8 +1873,13 @@ let check t (context : Tool.Context.t) tool args : Check.t =
         | Assistant _ | Tool_result _ -> None)
     | _ -> None
   in
+  let name_of id =
+    Option.value_map (find_host t id) ~default:id ~f:(fun (h : Host.t) ->
+      h.name)
+  in
   { decide
   ; elsewhere = Option.is_some elsewhere
+  ; held
   ; name = shown_name
   ; summary
   ; input =
@@ -1856,6 +1887,8 @@ let check t (context : Tool.Context.t) tool args : Check.t =
       ; arguments = args
       ; host = host_name
       ; elsewhere = Option.is_some elsewhere
+      ; session_host = name_of t.active_host
+      ; hosts = List.map (hosts t) ~f:(fun (h : Host.t) -> h.name)
       ; cwd = context.cwd
       ; requests = Approval_judge.requests (Session.messages t.session)
       ; task
@@ -1904,10 +1937,15 @@ let judge_turn t (context : Tool.Context.t) ~model =
 
 let approve_on_host t : Tool.approver =
   fun context tool args ->
-  let ({ decide; elsewhere; name; summary; input; call } : Check.t) =
+  let ({ decide; elsewhere; held; name; summary; input; call } : Check.t) =
     check t context tool args
   in
   let ask ?(kind = Confirm_kind.Tool) rules =
+    let summary =
+      match kind, held () with
+      | Tool, Some why -> sprintf "%s (%s)" summary why
+      | (Tool | Judged _ | Computer_use _), _ -> summary
+    in
     let recheck () =
       match decide () with
       | Allow -> true
@@ -1922,7 +1960,11 @@ let approve_on_host t : Tool.approver =
       (* Plan mode may have started while the user was deciding. *)
       (match decide () with
        | Deny text -> Some (Tool.Result.error text)
-       | Allow | Ask _ | Judge _ -> None)
+       | Allow | Ask _ | Judge _ ->
+         (* which permits its host ([host_permitted]) *)
+         if elsewhere
+         then remember_allowed t { call; by = Allowed_call.you; reason = None };
+         None)
   in
   let allowed ~model ~reason =
     broadcast

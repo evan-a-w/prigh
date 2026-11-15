@@ -30,10 +30,11 @@ let spec =
   ; native = None
   ; destructive = Never (* the inner call is approved as itself *)
   ; description =
-      "Run one tool call on another tool host; only when the user names that \
-       machine or asks to run something on another one. Never routinely: your \
-       other tools already run on the session's own host, which is for normal \
-       work; this does not move the session. Without host: list the hosts."
+      "Run one tool call on another tool host; only when the user named that \
+       machine or asked to run something there in this conversation, never to \
+       get around a denied or failed call. Your other tools run on the \
+       session's own host; this does not move the session. Without host: list \
+       the hosts."
   ; parameters =
       Tool_args.schema
         [ "host", `String, "A connected tool host, by name or id"

@@ -243,11 +243,20 @@ older one takes over again if the newer one quits. A call the host lost
 model to run it again if it still needs it. When you ask for something on
 another connected machine ("check the disk on laptop"), the model can run
 one call there with the `on_host` tool (bash in the foreground, the file
-tools, ls, grep, find) without moving the session: it lists the hosts,
-refuses the session's own, and calls follow the approval mode, a
-confirmation reading `on HOST: ...`; approval rules you saved apply only on the session's own host (deny
-rules everywhere), and a file read on one host does not count as read on
-another. Several frontends can attach
+tools, ls, grep, find) without moving the session: it lists the hosts and
+refuses the session's own. It is told never to use `on_host` unless you
+named that machine or asked to run something there, never to get around a
+denied or failed call, and to ask you first otherwise; and prigh enforces
+it: until one of your messages in the session names the host (its name or
+id, as a word, in any case) or you let a call there run, every call there,
+reads included, waits for you in every approval mode (`auto` too), its
+confirmation reading `on HOST: ... (runs on HOST, which you haven't named
+in this session)`; in `smart` mode the approval model decides instead,
+told which host the session runs on and which one the call targets. Once
+the host is permitted, its calls follow the approval mode, confirmations
+reading `on HOST: ...`. Approval rules you saved apply only on the
+session's own host (deny rules everywhere, and they win), and a file read
+on one host does not count as read on another. Several frontends can attach
 to one session (`/sessions` marks live ones) and all see the same stream; a
 session keeps running when its frontends disconnect. `prigh serve` itself
 speaks plain TCP and HTTP with a shared token (it warns when `-listen` or
@@ -2843,7 +2852,7 @@ it.
 | `/plan [on\|off]` | toggle plan mode (read-only planning until you turn it off) |
 | `/chat [on\|off]` | toggle chat mode (a chat without the tool host until you turn it off) |
 | `/todos` | show the model's plan (its `update_plan` steps) |
-| `/permissions` | show the mode and the allow/ask/deny rules (config and this session), and the exact calls `smart` mode allowed this session |
+| `/permissions` | show the mode and the allow/ask/deny rules (config and this session), and the exact calls `smart` mode allowed this session (and the calls on other hosts you let run) |
 | `/compact [instructions]` | summarise older messages to free context, focusing on the instructions |
 | `/trim [after\|undo\|show\|hide]` | drop everything before a message from the model's context (a picker, then a confirmation); `after`: everything after a message instead; `undo` brings the latest trim back, `show`/`hide` (TUI) unfold or fold the trimmed messages; see [Trimming the context](#trimming-the-context) |
 | `/delete [undo]` | drop a message from the transcript and the model's context (a picker, newest first; a reply goes with its tool results); `undo` brings the latest deletion back; see [Trimming the context](#trimming-the-context) |
@@ -3246,7 +3255,13 @@ chat → ask):
 - `smart`: like Claude Code's auto mode. What `ask` would hold is judged
   by the approval model instead (below); file edits under the session's
   directory run unjudged unless the path has `.git` or `..`.
-- `auto`: nothing asks (the default, as before).
+- `auto`: nothing asks (the default, as before), except a call on another
+  machine you have not named in the session (`on_host`, above).
+
+In every mode a call on another machine (`on_host`) waits for you, even a
+read, until you name that machine in a message or let a call there run
+(which `/permissions` then lists among the allowed calls, and which lasts
+for the session); in `smart` mode the approval model decides it instead.
 
 A new session starts in the config's `approval_mode` (in chat mode over it
 with `default_chat_mode`: `/confirm chat` or Settings → New sessions →
@@ -3262,8 +3277,13 @@ read-only tools run. Any other call that `ask` would hold goes to the
 approval model (`approval_model` in `config.json`, `/approval-model MODEL|off`
 or prigh-web's Settings → Models → Approvals; default: the session's
 model, `off` goes back to it). It sees the user's own last ten messages, a
-subagent's task, the goal and plan, the host and directory and the call
-with its full arguments, never tool output, and answers with a `verdict`
+subagent's task, the goal and plan, the session's own host, the connected
+hosts, the host the call runs on and its directory, and the call with its
+full arguments, never tool output. It is told to allow a call on another
+host only if your messages name that host or clearly ask to work on that
+machine (otherwise it asks, even for reads), and to ask about calls that
+use another host, `on_host` or computer use to get around a denied or
+failed one. It answers with a `verdict`
 tool: `allow` (the call runs; its card carries "allowed by MODEL: reason")
 or `ask` (the confirmation shows "MODEL left this to you: reason"). It never
 denies on its own; an error, a timeout (60s) or a malformed reply asks you,
