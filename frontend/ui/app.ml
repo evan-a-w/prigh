@@ -3123,6 +3123,13 @@ let show_permissions m =
       | [] -> []
       | rules -> [ title ^ ": " ^ String.concat ~sep:", " rules ]
     in
+    let calls = function
+      | [] -> []
+      | calls ->
+        "exact calls allowed this session (smart mode does not judge them \
+         again):"
+        :: List.map calls ~f:(fun c -> "  " ^ c)
+    in
     let config =
       match m.config with
       | None -> []
@@ -3138,6 +3145,7 @@ let show_permissions m =
           (Session_mode.describe mode)
       ]
       @ rules "allowed this session" s.session_rules
+      @ calls s.allowed_calls
       @ config
       @ [ "rules: permissions in ~/.prigh/config.json, e.g. {\"allow\": \
            [\"bash(git status:*)\"], \"deny\": [\"bash(rm:*)\"]}; /mode or \

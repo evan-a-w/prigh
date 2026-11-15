@@ -1199,7 +1199,9 @@ let%expect_test
       , (last_user : string option)]
   in
   send "first";
-  Agent.set_model agent (Option.value_exn (Model.find "openai-codex/gpt-5.5"));
+  Agent.set_model
+    agent
+    (Option.value_exn (Model.find "openai-codex/gpt-6.1-sol"));
   Agent.set_model agent (Option.value_exn (Model.find "openai/gpt-5.4"));
   send "second";
   Agent.set_model agent (Option.value_exn (Model.find "deepseek-flash"));

@@ -56,6 +56,7 @@ module Entry = struct
                 [@jsonaf_drop_default.equal]
           }
       | Allow_rule of { rule : string }
+      | Allowed_call of Allowed_call.t
       | Archived of { archived : bool }
       | Pinned of { pinned : bool }
       | Spend of
@@ -201,6 +202,7 @@ let worth_saving (line : Line.t) =
           | Budget _
           | Approval _
           | Allow_rule _
+          | Allowed_call _
           | Archived _
           | Pinned _
           | Spend _
@@ -378,6 +380,7 @@ let add_entry t (entry : Entry.t) =
   | Budget _
   | Approval _
   | Allow_rule _
+  | Allowed_call _
   | Archived _
   | Spend _
   | Resume_at _
@@ -566,6 +569,7 @@ end
 
 let set_approval t ~mode ~plan ~chat = append t (Approval { mode; plan; chat })
 let add_allow_rule t ~rule = append t (Allow_rule { rule })
+let add_allowed_call t call = append t (Allowed_call call)
 
 let set_archived t ~archived =
   if archived && t.pinned
@@ -646,6 +650,7 @@ let name t =
     | Budget _
     | Approval _
     | Allow_rule _
+    | Allowed_call _
     | Archived _
     | Pinned _
     | Spend _
@@ -681,6 +686,7 @@ let description t =
     | Budget _
     | Approval _
     | Allow_rule _
+    | Allowed_call _
     | Archived _
     | Pinned _
     | Spend _
@@ -739,6 +745,13 @@ let allow_rules t =
   List.filter_map (active_path t) ~f:(fun (e : Entry.t) ->
     match e.payload with
     | Allow_rule { rule } -> Some rule
+    | _ -> None)
+;;
+
+let allowed_calls t =
+  List.filter_map (active_path t) ~f:(fun (e : Entry.t) ->
+    match e.payload with
+    | Allowed_call call -> Some call
     | _ -> None)
 ;;
 
@@ -992,6 +1005,7 @@ let fold t path : Folded.t =
       | Budget _
       | Approval _
       | Allow_rule _
+      | Allowed_call _
       | Archived _
       | Pinned _
       | Spend _
@@ -1263,6 +1277,7 @@ let context_cwds t =
       | Budget _
       | Approval _
       | Allow_rule _
+      | Allowed_call _
       | Archived _
       | Pinned _
       | Spend _
@@ -1336,6 +1351,7 @@ let system_prompt t =
     | Budget _
     | Approval _
     | Allow_rule _
+    | Allowed_call _
     | Archived _
     | Pinned _
     | Spend _
@@ -1371,6 +1387,7 @@ let goal t =
     | Budget _
     | Approval _
     | Allow_rule _
+    | Allowed_call _
     | Archived _
     | Pinned _
     | Spend _
@@ -1421,6 +1438,7 @@ let budget t =
     | Reminders _
     | Approval _
     | Allow_rule _
+    | Allowed_call _
     | Archived _
     | Pinned _
     | Spend _
@@ -1456,6 +1474,7 @@ let model t =
     | Budget _
     | Approval _
     | Allow_rule _
+    | Allowed_call _
     | Archived _
     | Pinned _
     | Spend _
@@ -1747,6 +1766,7 @@ let archived_and_activity t ~mtime =
         | Budget _
         | Approval _
         | Allow_rule _
+        | Allowed_call _
         | Pinned { pinned = true }
         | Spend _
         | Resume_at _
@@ -2065,6 +2085,7 @@ let to_markdown t =
     | Budget _
     | Approval _
     | Allow_rule _
+    | Allowed_call _
     | Archived _
     | Pinned _
     | Spend _

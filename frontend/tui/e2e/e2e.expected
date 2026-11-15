@@ -5,7 +5,7 @@
   ((id deepseek-flash) (provider deepseek) (key deepseek/deepseek-flash)
    (name "DeepSeek V4.1 Flash") (context_window 1000000) (max_output 384000)
    (supports_thinking true) (thinking_options (off default low high max))
-   (thinking_default high) (supports_images false)
+   (thinking_default high) (supports_images true)
    (image_limit ((max_bytes 3538944) (max_dimension 8000)))
    (cost ((input 0.3) (output 1.2) (cache_read 0.006)))))
  (thinking default) (running false) (message_count 0)
@@ -27,7 +27,7 @@
   event state running=false model=deepseek/deepseek-flash
 <- set_model: ()
   event state running=false model=anthropic/claude-fable-5-1
-<- set_model ERROR: "unknown model \"gpt-9\"; did you mean: openai/gpt-4 (GPT-4), openai/gpt-5 (GPT-5), openai/gpt-4o (GPT-4o)"
+<- set_model ERROR: "unknown model \"gpt-9\"; did you mean: openai/gpt-5 (GPT-5), openai/gpt-4o (GPT-4o), openai/gpt-4.1 (GPT-4.1)"
 <- set_thinking: ()
   event state running=false model=anthropic/claude-fable-5-1
 <- list_models: first anthropic/claude-fable-5
@@ -219,7 +219,7 @@ retry backend exited
   (snippets ()) (compact_at_tokens 200000) (compaction_model ())
   (mask_observations true) (generate_model ()) (naming_model ())
   (approval_model ()) (dictation_model ())))
-<- set_config ERROR: "fallback_models: unknown model \"gpt-9\"; did you mean: openai/gpt-4 (GPT-4), openai/gpt-5 (GPT-5), openai/gpt-4o (GPT-4o)"
+<- set_config ERROR: "fallback_models: unknown model \"gpt-9\"; did you mean: openai/gpt-5 (GPT-5), openai/gpt-4o (GPT-4o), openai/gpt-4.1 (GPT-4.1)"
 <- set_config: (Ok
  ((scoped_models ()) (approval_mode Auto) (default_chat_mode false)
   (permissions ((allow ()) (ask ()) (deny ()))) (default_model ())

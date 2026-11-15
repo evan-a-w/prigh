@@ -329,8 +329,8 @@ let%expect_test
 ;;
 
 let%expect_test
-    "a turn's calls are judged at once; the same call again is not judged \
-     again until the user says more"
+    "a turn's calls are judged at once; a call the judge allowed is not judged \
+     again, even after the user says more"
   =
   let in_flight = ref 0 in
   let most = ref 0 in
@@ -380,12 +380,12 @@ let%expect_test
     bash {"command":"make"} -> ERROR make: *** No targets specified and no makefile found.  Stop.
     allowed c2 by deepseek/deepseek-flash: checks
     bash {"command":"make check"} -> ERROR make: *** No rule to make target 'check'.  Stop.
-    allowed c3 by deepseek/deepseek-flash: builds
+    allowed c3 by deepseek/deepseek-flash: this exact call earlier (builds)
     bash {"command":"make"} -> ERROR make: *** No targets specified and no makefile found.  Stop.
     ((!most 2) (judged 2))
-    allowed c4 by deepseek/deepseek-flash: builds
+    allowed c4 by deepseek/deepseek-flash: this exact call earlier (builds)
     bash {"command":"make"} -> ERROR make: *** No targets specified and no makefile found.  Stop.
-    ((!most 2) (judged 3))
+    ((!most 2) (judged 2))
     |}]
 ;;
 
@@ -473,7 +473,7 @@ let%expect_test "the approval model setting: default, validation, use" =
     {|
     (Ok deepseek/deepseek-flash)
     (Error
-     "approval_model: unknown model \"no-such-model\"; did you mean: openai/gpt-5.3-codex (GPT-5.3 Codex), openai/gpt-5.6-sol (GPT-5.6 Sol), openai/gpt-6.1-sol (GPT-6.1 Sol)")
+     "approval_model: unknown model \"no-such-model\"; did you mean: openai/gpt-5.3-codex (GPT-5.3 Codex), openai/gpt-5.6-sol (GPT-5.6 Sol), openai/gpt-6-sol (GPT-6 Sol)")
     (Ok deepseek/deepseek-flash)
     (Ok ())
     (Ok anthropic/claude-haiku-4-5)
@@ -553,5 +553,246 @@ let%expect_test "requests: only what the user wrote, the last ten" =
     {|
     ("request 3" "request 4" "request 5" "request 6" "request 7" "request 8"
      "request 9" "request 10" "request 11" last)
+    |}]
+;;
+
+let show_allowed t agent =
+  List.iter (Agent.state agent).allowed_calls ~f:(fun line ->
+    print_endline
+      ("allowed call: "
+       ^ String.substr_replace_all
+           (mask t line)
+           ~pattern:(" on " ^ Core_unix.gethostname () ^ " ")
+           ~with_:" on <host> "))
+;;
+
+let set_rules agent ~deny ~ask =
+  let rules l =
+    List.map l ~f:(fun r -> Or_error.ok_exn (Approval_rule.of_string r))
+  in
+  Or_error.ok_exn
+    (Agent.set_config
+       agent
+       { (Agent.config agent) with
+         permissions =
+           { Approval.Rules.empty with deny = rules deny; ask = rules ask }
+       })
+;;
+
+let%expect_test
+    "a call the judge allowed runs again for the rest of the session without \
+     being judged; one that differs at all is judged"
+  =
+  with_agent
+    ~judge:[ allow "builds"; allow "builds in parallel" ]
+    [ bash ~id:"c1" "make"
+    ; Reply.text "ok"
+    ; Reply.tool_call
+        ~id:"c2"
+        ~name:"bash"
+        ~arguments:{|{ "command" : "make" }|}
+        ()
+    ; bash ~id:"c3" "make -j2"
+    ; Reply.text "ok"
+    ]
+  @@ fun t agent judged ->
+  run agent "build";
+  run agent "build again, in parallel too";
+  print_s [%message "" ~judged:(Queue.length judged : int)];
+  show_allowed t agent;
+  [%expect
+    {|
+    allowed c1 by deepseek/deepseek-flash: builds
+    bash {"command":"make"} -> ERROR make: *** No targets specified and no makefile found.  Stop.
+    allowed c2 by deepseek/deepseek-flash: this exact call earlier (builds)
+    bash { "command" : "make" } -> ERROR make: *** No targets specified and no makefile found.  Stop.
+    allowed c3 by deepseek/deepseek-flash: builds in parallel
+    bash {"command":"make -j2"} -> ERROR make: *** No targets specified and no makefile found.  Stop.
+    (judged 2)
+    allowed call: bash {"command":"make -j2"} on <host> in $DIR (by deepseek/deepseek-flash)
+    allowed call: bash {"command":"make"} on <host> in $DIR (by deepseek/deepseek-flash)
+    |}]
+;;
+
+let%expect_test
+    "a held call the user allowed once is not asked about again; rules and \
+     plan mode still come first"
+  =
+  let hook =
+    Reply.tool_call
+      ~name:"write"
+      ~arguments:{|{"path":".git/hooks/pre-commit","content":"x"}|}
+  in
+  with_agent
+    ~judge:[ ask "pushes"; ask "writes a git hook" ]
+    [ bash ~id:"c1" "git push"
+    ; Reply.text "ok"
+    ; bash ~id:"c2" "git push"
+    ; Reply.text "ok"
+    ; bash ~id:"c3" "git push"
+    ; Reply.text "ok"
+    ; bash ~id:"c4" "git push"
+    ; Reply.text "ok"
+    ; hook ~id:"c5" ()
+    ; Reply.text "ok"
+    ; hook ~id:"c6" ()
+    ; Reply.text "ok"
+    ]
+  @@ fun t agent judged ->
+  run agent "push it";
+  print_endline "--- a new message";
+  run agent "push again";
+  print_s [%message "" ~judged:(Queue.length judged : int)];
+  show_allowed t agent;
+  print_endline "--- a deny rule";
+  set_rules agent ~deny:[ "bash(git push:*)" ] ~ask:[];
+  run agent "and again";
+  print_endline "--- an ask rule";
+  set_rules agent ~deny:[] ~ask:[ "bash(git push:*)" ];
+  run agent "once more";
+  print_endline "--- plan mode";
+  run agent "add a hook";
+  Agent.set_mode agent ~plan:true;
+  run agent "add it again";
+  print_s [%message "" ~judged:(Queue.length judged : int)];
+  [%expect
+    {|
+    confirm c1 bash: git push [bash(git push:*)] (Judged(model deepseek/deepseek-flash)(reason pushes))
+    bash {"command":"git push"} -> ERROR fatal: not a git repository (or any of the parent directories): .git
+    --- a new message
+    allowed c2 by you: this exact call earlier
+    bash {"command":"git push"} -> ERROR fatal: not a git repository (or any of the parent directories): .git
+    (judged 1)
+    allowed call: bash {"command":"git push"} on <host> in $DIR (by you)
+    --- a deny rule
+    bash {"command":"git push"} -> ERROR [denied by the rule bash(git push:*) in permissions.deny; do not try to get around it: ask the user]
+    --- an ask rule
+    confirm c4 bash: git push [] Tool
+    bash {"command":"git push"} -> ERROR fatal: not a git repository (or any of the parent directories): .git
+    --- plan mode
+    confirm c5 write: .git/hooks/pre-commit [edit] (Judged(model deepseek/deepseek-flash)(reason"writes a git hook"))
+    write {"path":".git/hooks/pre-commit","content":"x"} -> wrote 1 line to $DIR/.git/hooks/pre-commit
+    write {"path":".git/hooks/pre-commit","content":"x"} -> ERROR [plan mode] Plan mode is on: you are planning, not implementing, so files, worktrees and pull requests cannot be changed. Only the user turns plan mode off; do not try to get around this or ask them to. Keep investigating with read-only tools, then present the plan in your reply and wait.
+    (judged 2)
+    |}]
+;;
+
+let%expect_test
+    "a judge's ask and the user's deny are not remembered: the call is asked \
+     about again"
+  =
+  with_agent
+    ~answer:(fun _ -> Deny None)
+    ~judge:[ ask "pushes"; ask "still pushes" ]
+    [ bash ~id:"c1" "git push"
+    ; bash ~id:"c2" "git push"
+    ; Reply.text "ok"
+    ; bash ~id:"c3" "git push"
+    ; Reply.text "ok"
+    ]
+  @@ fun t agent judged ->
+  run agent "push it";
+  print_endline "--- a new message";
+  run agent "push again";
+  print_s [%message "" ~judged:(Queue.length judged : int)];
+  show_allowed t agent;
+  [%expect
+    {|
+    confirm c1 bash: git push [bash(git push:*)] (Judged(model deepseek/deepseek-flash)(reason pushes))
+    bash {"command":"git push"} -> ERROR [denied by user]
+    confirm c2 bash: git push [bash(git push:*)] (Judged(model deepseek/deepseek-flash)(reason pushes))
+    bash {"command":"git push"} -> ERROR [denied by user]
+    --- a new message
+    confirm c3 bash: git push [bash(git push:*)] (Judged(model deepseek/deepseek-flash)(reason"still pushes"))
+    bash {"command":"git push"} -> ERROR [denied by user]
+    (judged 2)
+    |}]
+;;
+
+let%expect_test
+    "allowed calls are the session's: a new session judges again, switching \
+     back restores them, leaving smart mode keeps them"
+  =
+  with_agent
+    ~judge:[ allow "builds"; allow "builds here too" ]
+    [ bash ~id:"c1" "make"
+    ; Reply.text "ok"
+    ; bash ~id:"c2" "make"
+    ; Reply.text "ok"
+    ; bash ~id:"c3" "make"
+    ; Reply.text "ok"
+    ; bash ~id:"c4" "make"
+    ; Reply.text "ok"
+    ; bash ~id:"c5" "make"
+    ; Reply.text "ok"
+    ]
+  @@ fun t agent judged ->
+  run agent "build";
+  let first = Session.path (Agent.session agent) in
+  print_endline "--- a new session";
+  Agent.new_session agent;
+  Agent.set_mode agent ~approval:Smart;
+  show_allowed t agent;
+  run agent "build";
+  print_endline "--- back to the first";
+  Or_error.ok_exn (Agent.switch_session agent ~path:first);
+  print_s [%sexp ((Agent.state agent).approval_mode : Approval_mode.t)];
+  show_allowed t agent;
+  run agent "build";
+  print_endline "--- ask mode, then smart again";
+  Agent.set_mode agent ~approval:Ask;
+  run agent "build";
+  Agent.set_mode agent ~approval:Smart;
+  run agent "build";
+  print_s [%message "" ~judged:(Queue.length judged : int)];
+  [%expect
+    {|
+    allowed c1 by deepseek/deepseek-flash: builds
+    bash {"command":"make"} -> ERROR make: *** No targets specified and no makefile found.  Stop.
+    --- a new session
+    allowed c2 by deepseek/deepseek-flash: builds here too
+    bash {"command":"make"} -> ERROR make: *** No targets specified and no makefile found.  Stop.
+    --- back to the first
+    Smart
+    allowed call: bash {"command":"make"} on <host> in $DIR (by deepseek/deepseek-flash)
+    allowed c3 by deepseek/deepseek-flash: this exact call earlier (builds)
+    bash {"command":"make"} -> ERROR make: *** No targets specified and no makefile found.  Stop.
+    --- ask mode, then smart again
+    confirm c4 bash: make [bash(make:*)] Tool
+    bash {"command":"make"} -> ERROR make: *** No targets specified and no makefile found.  Stop.
+    allowed c5 by deepseek/deepseek-flash: this exact call earlier (builds)
+    bash {"command":"make"} -> ERROR make: *** No targets specified and no makefile found.  Stop.
+    (judged 2)
+    |}]
+;;
+
+let%expect_test "a subagent's call is covered by the same call allowed earlier" =
+  with_agent
+    ~judge:[ allow "builds" ]
+    ~sub_replies:[ bash ~id:"s1" "make"; Reply.text "built" ]
+    [ bash ~id:"c1" "make"
+    ; Reply.text "ok"
+    ; Reply.tool_call
+        ~id:"c2"
+        ~name:"subagent"
+        ~arguments:{|{"task":"build it"}|}
+        ()
+    ; Reply.text "started"
+    ; Reply.text "noted"
+    ]
+  @@ fun _t agent judged ->
+  run agent "build";
+  run agent "build in a subagent";
+  Agent.wait_idle agent;
+  print_s [%message "" ~judged:(Queue.length judged : int)];
+  [%expect
+    {|
+    allowed c1 by deepseek/deepseek-flash: builds
+    bash {"command":"make"} -> ERROR make: *** No targets specified and no makefile found.  Stop.
+    subagent {"task":"build it"} -> started agent a1 (build it); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
+    allowed a1/s1 by deepseek/deepseek-flash: this exact call earlier (builds)
+      [a1] bash -> ERROR make: *** No targets specified and no makefile found.  Stop.
+    [exit code 2]
+    (judged 1)
     |}]
 ;;

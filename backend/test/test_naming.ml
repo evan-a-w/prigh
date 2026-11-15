@@ -185,7 +185,7 @@ let%expect_test "the naming model titles the session; unknown ones are refused" 
   [%expect
     {|
     naming_model: deepseek/deepseek-v4-pro
-    naming_model: unknown model "no-such-model"; did you mean: openai/gpt-5.3-codex (GPT-5.3 Codex), openai/gpt-5.6-sol (GPT-5.6 Sol), openai/gpt-6.1-sol (GPT-6.1 Sol)
+    naming_model: unknown model "no-such-model"; did you mean: openai/gpt-5.3-codex (GPT-5.3 Codex), openai/gpt-5.6-sol (GPT-5.6 Sol), openai/gpt-6-sol (GPT-6 Sol)
     deepseek/deepseek-flash (the conversation)
     deepseek/deepseek-v4-pro You name the sessions of a coding agent
     ("Fix the parser's error messages")

@@ -44,12 +44,15 @@ type t =
   | Tool_allowed of
       { call_id : string
       ; agent_id : string option
-      ; model : string (** the approval model's key *)
+      ; model : string
+        (** the approval model's key, or [you] ({!Allowed_call.you}) when
+            the user let the same call through earlier *)
       ; reason : string
       }
   (** The approval model ([smart] mode, {!Approval_judge}) let the call run
-      without asking the user, for [reason]; frontends note it on the
-      call. *)
+      without asking the user, for [reason], or the exact call was let
+      through earlier in the session ({!Allowed_call}); frontends note it
+      on the call. *)
   | Ask_user of
       { call_id : string
       ; questions : User_question.t list

@@ -72,6 +72,7 @@ module Entry : sig
       (** the session's approval mode and whether it is in plan mode and in
           chat mode (which overrides both) *)
       | Allow_rule of { rule : string }
+      | Allowed_call of Allowed_call.t
       (** an [Approval_rule] the user allowed for the session *)
       | Archived of { archived : bool }
       (** archived or unarchived by hand (see {!Summary.is_archived}); not
@@ -425,6 +426,11 @@ val set_transcript_filter : t -> string option -> Entry.t
 val allow_rules : t -> string list
 
 val add_allow_rule : t -> rule:string -> Entry.t
+
+(** The [allowed_call] entries on the active path, oldest first. *)
+val allowed_calls : t -> Allowed_call.t list
+
+val add_allowed_call : t -> Allowed_call.t -> Entry.t
 
 (** [at] defaults to now. *)
 val append_message : t -> ?at:float -> Message.t -> Entry.t

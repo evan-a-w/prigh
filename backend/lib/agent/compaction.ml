@@ -51,6 +51,7 @@ module Outcome = struct
   type t =
     { summary : string
     ; usage : Usage.t
+    ; cost_usd : float
     }
   [@@deriving sexp_of]
 end
@@ -369,6 +370,8 @@ let summarise
             (String.strip (Message.Assistant.text reply))
             files
       ; usage = Usage.add usage reply.usage
+      ; cost_usd =
+          Model.cost_usd model usage +. Model.cost_usd model reply.usage
       }
 ;;
 

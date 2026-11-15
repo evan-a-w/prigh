@@ -364,7 +364,9 @@ the turn that launched them), `Background_tasks` (`job`, on track
   only knows the built-in names and custom ones are looked up in the
   `Model_registry`.
 - `Model` — the static model table (id, provider, context window, max output,
-  thinking support, prices). Ids may repeat across providers, so `Model.key`
+  thinking support, prices; some, like Claude Haiku 5.5 and the GPT Pro
+  models, price a request whose prompt is over a threshold higher, so
+  `Model.cost_usd` prices one request at a time). Ids may repeat across providers, so `Model.key`
   is `provider/id` and `Model.find` accepts either form.
 - `Custom_provider` — a user-defined endpoint from `config.json`'s
   `providers` (`base_url`, `api`: `chat`/`responses`/`anthropic`, extra
@@ -1225,7 +1227,20 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   {call_id, agent_id, model, reason}` and runs the call; `Ask` is a
   `Tool_confirm` with `Confirm_kind.Judged {model; reason}` (JSON `kind:
   "judged"`, `model`, `reason`). Its spend is a `Spend {purpose =
-  "approval"}`.
+  "approval"}`. A call that runs in smart mode (the judge allowed it, or
+  the user allowed it once after the judge held it) is remembered as an
+  `Allowed_call` (tool, canonical JSON arguments, host id, cwd, who
+  allowed it and the judge's reason): kept in `Agent`'s table, recorded
+  as an `allowed_call` session entry and restored with the session's
+  approvals, listed in the state's `allowed_calls` (omitted when empty;
+  `/permissions`). A `Judge` decision for a remembered call skips the judge
+  and emits `tool_allowed` with the earlier `model` (or `you`) and
+  `Allowed_call.note`; `Approval.decide` runs first, so rules and plan mode
+  still win. Judge `ask` verdicts and user denies are not remembered. It
+  lasts for the session (unlike the judgement cache, not just until the
+  user says more): an exact call allowed once stays allowed as the
+  conversation moves on, applies only in smart mode, and covers subagents
+  (approvals are per session, like `allow_rule`s).
 - `Plan` — `update_plan` (Codex's): steps with statuses, validated (several
   may be in progress, for parallel work), and `latest`, the plan as of the last successful call
   in a list of messages, which is how `Agent` keeps it as session state
@@ -1679,7 +1694,8 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   descriptions, cwds with the tool host they are on (so a reload restores
   where the session runs), the system prompt, the goal, the reminders
   (`Reminders`, the whole list), the approval mode with plan
-  mode (`approval`), rules the user allowed for the session (`allow_rule`),
+  mode (`approval`), rules the user allowed for the session (`allow_rule`), the exact
+  calls let through in smart mode (`allowed_call`, `Allowed_call`),
   `Archived {archived}` (archived or unarchived by hand; archiving appends
   `Pinned {pinned = false}` too), `Pinned {pinned}` (pinned to the top,
   never archived for being idle; pinning unarchives), `Spend {usage,

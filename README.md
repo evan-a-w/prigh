@@ -1693,7 +1693,8 @@ The backend's own host never offers it.
   toolset, Claude Opus 4.5 to 5, Sonnet 4.6 and 5 and Fable and Mythos 5
   and 5.1 `computer_20251124` (with zoom), Sonnet and Haiku
   4.5 `computer_20250124` (with their beta headers), and the OpenAI API's
-  models with computer use (GPT-5.4 and later) the Responses API's
+  models with computer use (GPT-5.4 and later but GPT-5.4 nano and
+  GPT-5.5 Pro) the Responses API's
   `computer` tool. prigh translates their calls to its own actions (the
   session, the host and the frontends see those) and replays them to the
   same kind of model as written. An OpenAI `computer_call` is a batch:
@@ -1874,7 +1875,7 @@ The same is available inside the TUI as `/login [provider] [api_key|oauth]`,
 `ANTHROPIC_OAUTH_TOKEN`/`ANTHROPIC_API_KEY`, `OPENAI_API_KEY` and
 `DEEPSEEK_API_KEY` are used. OAuth tokens are refreshed automatically
 (under a cross-process lock) when they are within five minutes of expiry.
-Model ids can be qualified as `provider/id` (e.g. `openai-codex/gpt-5.5`).
+Model ids can be qualified as `provider/id` (e.g. `openai-codex/gpt-6.1-sol`).
 
 ### Custom OpenAI-compatible providers
 
@@ -2396,8 +2397,8 @@ Responses API's `web_search` (OpenAI and ChatGPT/Codex). The provider runs
 the searches; they show in the transcript as `web_search "query"` with the
 results folded underneath, and are replayed to the same provider as it sent
 them (to another provider as text). Models of other providers (DeepSeek,
-custom endpoints) and OpenAI's models without it (`gpt-4`, `gpt-4.1-nano`,
-`o1`, `o3-mini`, ...) do not get `web_search`; they can still `web_fetch` a
+custom endpoints) and OpenAI's model without it (`gpt-realtime-2.1`) do not
+get `web_search`; they can still `web_fetch` a
 search page. Neither tool is destructive, so neither asks for confirmation
 in the `ask` approval mode.
 
@@ -2842,7 +2843,7 @@ it.
 | `/plan [on\|off]` | toggle plan mode (read-only planning until you turn it off) |
 | `/chat [on\|off]` | toggle chat mode (a chat without the tool host until you turn it off) |
 | `/todos` | show the model's plan (its `update_plan` steps) |
-| `/permissions` | show the mode and the allow/ask/deny rules (config and this session) |
+| `/permissions` | show the mode and the allow/ask/deny rules (config and this session), and the exact calls `smart` mode allowed this session |
 | `/compact [instructions]` | summarise older messages to free context, focusing on the instructions |
 | `/trim [after\|undo\|show\|hide]` | drop everything before a message from the model's context (a picker, then a confirmation); `after`: everything after a message instead; `undo` brings the latest trim back, `show`/`hide` (TUI) unfold or fold the trimmed messages; see [Trimming the context](#trimming-the-context) |
 | `/delete [undo]` | drop a message from the transcript and the model's context (a picker, newest first; a reply goes with its tool results); `undo` brings the latest deletion back; see [Trimming the context](#trimming-the-context) |
@@ -3267,7 +3268,19 @@ tool: `allow` (the call runs; its card carries "allowed by MODEL: reason")
 or `ask` (the confirmation shows "MODEL left this to you: reason"). It never
 denies on its own; an error, a timeout (60s) or a malformed reply asks you,
 saying why. A turn's calls are judged at once, and an identical call is
-judged once until you say more. What the judge spends counts in the
+judged once until you say more. A call that runs in `smart` mode, because
+the judge allowed it or because you allowed it once after the judge held it,
+is remembered for the rest of the session: the exact same call (tool,
+arguments, host and directory) runs again without being judged, its card
+saying "allowed by MODEL: this exact call earlier (reason)" or "allowed by
+you: this exact call earlier". This is the trade-off of an "always allow"
+for that one call: it stays allowed even if the conversation moves on to
+something else. Only an identical call is covered, only in `smart` mode,
+and rules and plan mode still come first; an `ask` verdict and a deny are
+not remembered, so such a call is asked about again. The remembered calls
+are kept in the session's file (a reload or switching back keeps them, a
+new session starts without), shared with its subagents like its rules, and
+`/permissions` lists them. What the judge spends counts in the
 session's cost (`/session` shows approvals judged and their cost).
 
 A confirmation offers: `y` allow once; `a` always allow, for the rest of the
