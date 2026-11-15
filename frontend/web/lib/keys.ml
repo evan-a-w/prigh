@@ -6,7 +6,6 @@ module Target = struct
     | Field
     | Multiline
     | Control
-    | Session_search
     | Session of string
     | Worktree of
         { session : string
@@ -74,8 +73,12 @@ let help =
        first; /trim undo brings it back)" )
   ; "PageUp / PageDown", "scroll the transcript"
   ; ( "Ctrl+K"
-    , "search sessions by words of their titles and messages (↓ ↑ through \
-       them, Enter opens, Delete deletes, Esc clears)" )
+    , "the control centre (also the sidebar's Search): search the sessions \
+       (their titles and messages), the settings, their values and the \
+       commands" )
+  ; ( "↑ ↓ / Enter / Backspace / Esc (the control centre)"
+    , "move / open the session or setting, or set the value / back from a \
+       setting's values to the list (in an empty filter) / close it" )
   ; ( "Alt+Enter / Alt+R / Delete (/worktree)"
     , "start a new session in the highlighted worktree / review its changes / \
        remove it" )
@@ -218,7 +221,6 @@ let on_control t =
   | Editor _
   | Field
   | Multiline
-  | Session_search
   | Session _
   | Worktree _
   | Terminal
@@ -293,6 +295,9 @@ let dialog_key (dialog : Dialog.t) t : App.Action.t option =
   | "End", Settings when plain t && on_settings_tab t ->
     Some (Settings_move Last)
   | " ", Filter _ when plain t -> Some (Filter_press None)
+  | "Backspace", Control { options = Some o; _ }
+    when plain t && String.is_empty (Picker.query o.picker) -> Some Control_back
+  | ("k" | "K"), Control _ when command t -> Some Close_dialog
   | ( "ArrowUp"
     , ( Picker _
       | Filter _
@@ -301,7 +306,8 @@ let dialog_key (dialog : Dialog.t) t : App.Action.t option =
       | Login _
       | Scoped_models _
       | Prompt _
-      | Pulls _ ) ) -> Some (Dialog_move (-1))
+      | Pulls _
+      | Control _ ) ) -> Some (Dialog_move (-1))
   | ( "ArrowDown"
     , ( Picker _
       | Filter _
@@ -310,11 +316,13 @@ let dialog_key (dialog : Dialog.t) t : App.Action.t option =
       | Login _
       | Scoped_models _
       | Prompt _
-      | Pulls _ ) ) -> Some (Dialog_move 1)
-  | "PageUp", (Picker _ | Popover _ | Review_pick _ | Scoped_models _ | Pulls _)
+      | Pulls _
+      | Control _ ) ) -> Some (Dialog_move 1)
+  | ( "PageUp"
+    , (Picker _ | Popover _ | Review_pick _ | Scoped_models _ | Pulls _ | Control _) )
     -> Some (Dialog_move (-8))
   | ( "PageDown"
-    , (Picker _ | Popover _ | Review_pick _ | Scoped_models _ | Pulls _) ) ->
+    , (Picker _ | Popover _ | Review_pick _ | Scoped_models _ | Pulls _ | Control _) ) ->
     Some (Dialog_move 8)
   (* In the model's filter ← → move the caret once something is typed. *)
   | ("ArrowLeft" | "ArrowRight"), Popover { picker; _ }
@@ -413,7 +421,6 @@ let agents_key (m : App.Model.t) t : App.Action.t option =
              | Multiline
              | Control
              | Settings_tab
-             | Session_search
              | Session _
              | Worktree _
              | Resize _
@@ -440,19 +447,6 @@ let resize_key h t : Resize.Action.t option =
     | _ -> None)
 ;;
 
-(* The sidebar is a picker: ↓ ↑ move from the search through the sessions,
-   Enter opens one (from the search, the best match), Esc clears the
-   search, then goes back to the editor. *)
-let session_search_key (m : App.Model.t) t : App.Action.t option =
-  match t.key with
-  | "Escape" when not (String.is_empty m.session_query) ->
-    Some (Set_session_query "")
-  | "ArrowDown" when plain t -> Some (Session_nav { from = None; by = 1 })
-  | "Enter" when plain t -> Some Open_first_session
-  | "Escape" -> Some Leave_sidebar
-  | _ -> None
-;;
-
 let session_key (m : App.Model.t) t id : App.Action.t option =
   let session f =
     List.find m.sessions ~f:(fun s -> String.equal s.id id) |> Option.map ~f
@@ -462,8 +456,8 @@ let session_key (m : App.Model.t) t id : App.Action.t option =
     session (fun s ->
       App.Action.Open_menu
         { target = Session s.path; anchor = Element (Session_list.dom_id s.id) })
-  | "ArrowDown" when plain t -> Some (Session_nav { from = Some id; by = 1 })
-  | "ArrowUp" when plain t -> Some (Session_nav { from = Some id; by = -1 })
+  | "ArrowDown" when plain t -> Some (Session_nav { from = id; by = 1 })
+  | "ArrowUp" when plain t -> Some (Session_nav { from = id; by = -1 })
   (* Space clicks the row's button, as Enter would. *)
   | "Enter" when m.marks.selecting && not (t.ctrl || t.alt || t.meta) ->
     session (fun s ->
@@ -496,9 +490,9 @@ let worktree_key (m : App.Model.t) t ~session ~path : App.Action.t option =
             ; anchor = Element (Context_menu.worktree_dom_id ~session path)
             })
      | "ArrowDown" when plain t ->
-       Some (Session_nav { from = Some session; by = 1 })
+       Some (Session_nav { from = session; by = 1 })
      | "ArrowUp" when plain t ->
-       Some (Session_nav { from = Some session; by = 0 })
+       Some (Session_nav { from = session; by = 0 })
      | ("Delete" | "Backspace") when plain t -> Some (Ask_remove_worktree path)
      | "Escape" -> Some Leave_sidebar
      | _ -> None)
@@ -545,7 +539,6 @@ let question_key t : Question_dialog.Action.t option =
     | Editor _
     | Control
     | Settings_tab
-    | Session_search
     | Session _
     | Worktree _
     | Terminal
@@ -581,7 +574,6 @@ let commenting (m : App.Model.t) t =
   | Multiline
   | Settings_tab
   | Control
-  | Session_search
   | Session _
   | Worktree _
   | Terminal
@@ -625,7 +617,7 @@ let handle (m : App.Model.t) t : App.Action.t option =
               ~alt:t.alt
               ~meta:t.meta -> Some (Review Toggle)
      | ("l" | "L") when command t -> Some (Open_chip Model)
-     | ("k" | "K") when command t -> Some Open_sessions
+     | ("k" | "K") when command t -> Some Open_control
      | ("b" | "B") when command t -> Some Toggle_sidebar
      | ("q" | "Q") when command t && m.desktop -> Some Quit_desktop
      | "," when ctrl_only t -> Some Open_settings
@@ -665,7 +657,6 @@ let handle (m : App.Model.t) t : App.Action.t option =
        (match agents_key m t, t.target with
         | Some action, _ -> Some action
         | None, Editor { cursor } -> editor_key m t ~cursor
-        | None, Session_search -> session_search_key m t
         | None, Session id -> session_key m t id
         | None, Worktree { session; path } -> worktree_key m t ~session ~path
         | None, Files ->

@@ -97,6 +97,9 @@ val text : ?selector:string -> t -> unit
     tooltip when that says more. *)
 val names : selector:string -> t -> unit
 
+(** The text of each element [selector] matches, on one line. *)
+val texts : selector:string -> t -> string list
+
 (** The tag and class of each element [selector] matches. *)
 val elements : selector:string -> t -> unit
 

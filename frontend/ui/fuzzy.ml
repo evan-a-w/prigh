@@ -25,15 +25,15 @@ let word_start s i =
   || Char.equal p '.'
 ;;
 
-(* How well [word] matches [s] as a subsequence, if it does: the best over
-   where its first letter is found, counting letters that follow each other
-   or start a word, less the gaps between them. *)
-let subsequence_quality ~word s =
+(* How well [word] matches [s] as a subsequence, if it does, and where: the
+   best over where its first letter is found, counting letters that follow
+   each other or start a word, less the gaps between them. *)
+let subsequence_match ~word s =
   let n = String.length word in
   let from start =
-    let rec go qi si prev quality =
+    let rec go qi si prev quality at =
       if qi >= n
-      then Some quality
+      then Some (quality, List.rev at)
       else if si >= String.length s
       then None
       else (
@@ -45,16 +45,22 @@ let subsequence_quality ~word s =
             + (if p = prev + 1 then 16 else -Int.min 8 (p - prev - 1))
             + if word_start s p then 12 else 0
           in
-          go (qi + 1) (p + 1) p quality)
+          go (qi + 1) (p + 1) p quality (p :: at))
     in
-    go 1 (start + 1) start (if word_start s start then 12 else 0)
+    go 1 (start + 1) start (if word_start s start then 12 else 0) [ start ]
   in
   if n = 0
-  then Some 0
+  then Some (0, [])
   else
     List.filter_mapi (String.to_list s) ~f:(fun i c ->
       if Char.equal c word.[0] then from i else None)
-    |> List.max_elt ~compare:Int.compare
+    |> List.max_elt ~compare:(fun (a, _) (b, _) -> Int.compare a b)
+;;
+
+let subsequence_quality ~word s = Option.map (subsequence_match ~word s) ~f:fst
+
+let query_words query =
+  String.split query ~on:' ' |> List.filter ~f:(Fn.non String.is_empty)
 ;;
 
 let score ~query candidate =
@@ -73,9 +79,7 @@ let score ~query candidate =
       | None ->
         (* Also try matching every whitespace-separated word as a subsequence so
            "fable 5.1" finds "Claude Fable 5.1". *)
-        let words =
-          String.split query ~on:' ' |> List.filter ~f:(Fn.non String.is_empty)
-        in
+        let words = query_words query in
         if List.for_all words ~f:(fun w -> is_subsequence ~query:w s)
         then (
           let quality =
@@ -94,4 +98,24 @@ let rank ~query items ~key =
     Option.map (score ~query (key item)) ~f:(fun s -> s, item))
   |> List.stable_sort ~compare:(fun (a, _) (b, _) -> Int.compare b a)
   |> List.map ~f:snd
+;;
+
+let positions ~query candidate =
+  let query = String.lowercase (String.strip query) in
+  let s = String.lowercase candidate in
+  let range start = List.init (String.length query) ~f:(fun i -> start + i) in
+  if String.is_empty query
+  then Some []
+  else (
+    match String.substr_index s ~pattern:query with
+    | Some i -> Some (range i)
+    | None ->
+      let words = query_words query in
+      if List.for_all words ~f:(fun w -> is_subsequence ~query:w s)
+      then
+        Some
+          (List.concat_map words ~f:(fun word ->
+             Option.value_map (subsequence_match ~word s) ~default:[] ~f:snd)
+           |> List.dedup_and_sort ~compare:Int.compare)
+      else None)
 ;;

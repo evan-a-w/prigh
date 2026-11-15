@@ -35,6 +35,8 @@ let picker_title : Dialog.Picker_kind.t -> string = function
   | Naming_models
   | Dictation_models -> "Models"
   | Defaults (Model | Fallback) -> "Models"
+  | Defaults Thinking -> "Levels"
+  | Defaults Mode -> "Modes"
   | Defaults Host -> "Hosts"
 ;;
 
@@ -666,6 +668,8 @@ let dialog (m : App.Model.t) ~inject =
     picker ~trimmable:(trimmable m) ~kind:Jump p ~inject
   | Some (Picker { kind; picker = p }) -> picker ~kind p ~inject
   | Some (Popover _) -> Chip_popover_view.backdrop ~inject
+  | Some (Control { root; options }) ->
+    Control_centre_view.view m ~root ~options ~inject
   | Some (Review_pick _) -> Chip_popover_view.backdrop ~inject
   | Some (Filter menu) -> Filter_view.menu m menu ~inject
   | Some Help -> help m ~inject

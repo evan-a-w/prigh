@@ -5,7 +5,6 @@ type t =
   | Host
   | Thinking
   | Mode
-  | Verbosity
   | Attach
 [@@deriving sexp_of, equal, enumerate]
 

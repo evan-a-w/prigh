@@ -483,14 +483,15 @@ module Action = struct
         { path : string
         ; pinned : bool
         }
-    | Set_session_query of string
     | Toggle_archived
-    | Open_sessions
+    | Open_control
+    | Control_query of string
+    | Control_back
+    | Control_choose of int
     | Session_nav of
-        { from : string option
+        { from : string
         ; by : int
         }
-    | Open_first_session
     | Leave_sidebar
     | Set_model of string
     | Set_thinking of string
@@ -793,7 +794,6 @@ module Model = struct
     ; review_drawer : bool
     ; status_tray : bool
     ; scrolled_up : bool
-    ; session_query : string
     ; session_hits : Session_hits.t option
     ; session_search : int
     ; archived_open : bool
@@ -1058,15 +1058,11 @@ module Model = struct
          session (filtered out, or archived and folded). *)
       let order =
         let shown =
-          Session_list.shown
-            ?content:t.session_hits
-            t.sessions
-            ~query:t.session_query
-            ~archived_open:t.archived_open
+          Session_list.shown t.sessions ~archived_open:t.archived_open
         in
         if List.exists shown ~f:is_current
         then shown
-        else Session_list.shown t.sessions ~query:"" ~archived_open:true
+        else Session_list.shown t.sessions ~archived_open:true
       in
       let index =
         Option.value_map
@@ -1132,7 +1128,6 @@ let init =
   ; status_tray = false
   ; review_drawer = false
   ; scrolled_up = false
-  ; session_query = ""
   ; session_hits = None
   ; session_search = 0
   ; archived_open = false
@@ -2472,11 +2467,14 @@ let edit_at_caret m ~cursor text =
   m, cmds @ [ Command.Set_caret cursor ]
 ;;
 
-let open_sessions (m : Model.t) =
-  ( (if Model.focused m
-     then { m with review_drawer = true }
-     else { m with sidebar_open = true })
-  , [ Command.Focus "session-search" ] )
+let open_control (m : Model.t) =
+  match m.dialog with
+  | Some (Control _) -> close_dialog m
+  | _ ->
+    open_dialog
+      { m with session_hits = None }
+      ~focus:"control-input"
+      (Control { root = Control_centre.empty; options = None })
 ;;
 
 let switch_session (m : Model.t) path =
@@ -2558,23 +2556,9 @@ let not_moving (m : Model.t) (switch_to : Switch_to.t) =
   if ours then { m with pending = { m.pending with session = None } } else m
 ;;
 
-(* Titles match at once; the messages, searched by the backend, once the
-   typing pauses. *)
-let set_session_query (m : Model.t) session_query =
-  let search = m.session_search + 1 in
-  let m = { m with session_query; session_search = search } in
-  if List.is_empty (Prigh_ui.Session_search.words session_query)
-  then { m with session_hits = None }, []
-  else m, [ Command.Search_sessions_later { search; after_ms = 150 } ]
-;;
-
 (* The sidebar's sessions in the order it shows them. *)
 let shown_sessions (m : Model.t) =
-  Session_list.shown
-    ?content:m.session_hits
-    m.sessions
-    ~query:m.session_query
-    ~archived_open:m.archived_open
+  Session_list.shown m.sessions ~archived_open:m.archived_open
 ;;
 
 (* What is known of the repositories' worktrees: the session's own
@@ -2702,17 +2686,14 @@ let starting (m : Model.t) =
 let session_nav (m : Model.t) ~from ~by =
   let ids = List.map (shown_sessions m) ~f:(fun s -> s.id) in
   let index =
-    match from with
-    | None -> -1
-    | Some id ->
-      Option.value_map
-        (List.findi ids ~f:(fun _ id' -> String.equal id id'))
-        ~default:(-1)
-        ~f:fst
+    Option.value_map
+      (List.findi ids ~f:(fun _ id -> String.equal id from))
+      ~default:(-1)
+      ~f:fst
   in
   let target = index + by in
   if target < 0
-  then m, [ Command.Focus "session-search" ]
+  then m, [ Command.Focus "control-open" ]
   else (
     match List.nth ids (Int.min target (List.length ids - 1)) with
     | Some id -> m, [ Command.Focus (Session_list.dom_id id) ]
@@ -3581,14 +3562,13 @@ let chip_kind : Chip.t -> Dialog.Picker_kind.t = function
   | Model -> Models
   | Thinking -> Thinking
   | Mode -> Modes
-  | Verbosity -> Verbosity
   | Host -> Hosts
   | Attach -> Attach
 ;;
 
 let chip_opens_nothing (state : State.t) : Chip.t -> bool = function
   | Thinking -> not state.model.supports_thinking
-  | Model | Mode | Verbosity | Host | Attach -> false
+  | Model | Mode | Host | Attach -> false
 ;;
 
 (* The composer's +: what can go with the message. *)
@@ -3609,10 +3589,10 @@ let attach_menu =
 ;;
 
 (* The chips that sit together, which ← → and Tab go along: the model, the
-   host, the thinking level, the mode and the verbosity in the composer's
-   row; the + stands alone. *)
+   host, the thinking level and the mode in the composer's row; the +
+   stands alone. *)
 let chip_row : Chip.t -> int = function
-  | Model | Host | Thinking | Mode | Verbosity -> 0
+  | Model | Host | Thinking | Mode -> 0
   | Attach -> 1
 ;;
 
@@ -3631,7 +3611,6 @@ let open_chip (m : Model.t) (chip : Chip.t) =
           | Model -> models_picker m
           | Thinking -> thinking_levels_picker m
           | Mode -> modes_picker state
-          | Verbosity -> verbosity_list m
           | Host -> hosts_list m state
           | Attach -> attach_menu
         in
@@ -3641,7 +3620,7 @@ let open_chip (m : Model.t) (chip : Chip.t) =
             ~focus:
               (match chip with
                | Model | Host -> "popover-filter"
-               | Thinking | Mode | Verbosity | Attach -> "popover-list")
+               | Thinking | Mode | Attach -> "popover-list")
             (Popover { chip; picker })
         in
         m, cmds @ [ Command.Place_popover ]))
@@ -3849,7 +3828,7 @@ let confirm_picker (m : Model.t) =
                ~id:(Default_mode.to_string mode)
                ~detail:(Default_mode.describe mode)
                ~marked:(Option.equal Default_mode.equal current (Some mode))
-               (String.capitalize (Default_mode.to_string mode))))
+               (Default_mode.to_string mode)))
     }
 ;;
 
@@ -4117,6 +4096,42 @@ let default_hosts_picker (m : Model.t) (config : Config.t) =
          h.name))
 ;;
 
+let default_thinking_picker (config : Config.t) =
+  let set = config.default_thinking in
+  let current =
+    Thinking.normalize (Option.value set ~default:New_default.builtin_thinking)
+  in
+  Picker.create
+    ~title:"New sessions' thinking"
+    (List.map Thinking.all ~f:(fun level ->
+       Picker.Item.create
+         ~id:level
+         ~detail:(Thinking.description level)
+         ~marked:(String.equal level current)
+         (Thinking.label level)))
+;;
+
+let default_modes_picker (config : Config.t) =
+  let current = Default_mode.of_config config in
+  Picker.create
+    ~title:"New sessions' mode"
+    (List.map Default_mode.all ~f:(fun mode ->
+       Picker.Item.create
+         ~id:(Default_mode.to_string mode)
+         ~detail:(Default_mode.describe mode)
+         ~marked:(Default_mode.equal mode current)
+         (String.capitalize (Default_mode.to_string mode))))
+;;
+
+let default_picker (m : Model.t) (config : Config.t) : New_default.Picker.t -> _
+  = function
+  | Model -> default_models_picker m config ~fallback:false
+  | Fallback -> default_models_picker m config ~fallback:true
+  | Host -> default_hosts_picker m config
+  | Thinking -> default_thinking_picker config
+  | Mode -> default_modes_picker config
+;;
+
 let pick_default (m : Model.t) (which : New_default.Picker.t) =
   with_config m ~f:(fun config ->
     let return_to_settings =
@@ -4124,12 +4139,7 @@ let pick_default (m : Model.t) (which : New_default.Picker.t) =
       | Some Settings -> true
       | _ -> m.return_to_settings
     in
-    let picker =
-      match which with
-      | Model -> default_models_picker m config ~fallback:false
-      | Fallback -> default_models_picker m config ~fallback:true
-      | Host -> default_hosts_picker m config
-    in
+    let picker = default_picker m config which in
     let m, cmds = open_picker m (Picker { kind = Defaults which; picker }) in
     { m with return_to_settings }, cmds)
 ;;
@@ -4139,6 +4149,11 @@ let default_picked (m : Model.t) (which : New_default.Picker.t) id =
   match which with
   | Model -> set_default m (Model (Option.some_if (not builtin) id))
   | Host -> set_default m (Host (Option.some_if (not builtin) id))
+  | Thinking -> set_default m (Thinking (Some id))
+  | Mode ->
+    (match Default_mode.of_string id with
+     | Some mode -> set_default m (Mode mode)
+     | None -> m, [])
   | Fallback ->
     with_config m ~f:(fun config ->
       if List.mem config.fallback_models id ~equal:String.equal
@@ -5049,7 +5064,6 @@ let user_switched (m : Model.t) (hello : Hello_reply.t) =
     ; trimmed = Trimmed.empty
     ; sessions = []
     ; marks = Session_marks.empty
-    ; session_query = ""
     ; session_hits = None
     ; confirms = []
     ; confirm_reason = None
@@ -6941,7 +6955,7 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
   | "session", _ ->
     loading m "Session" [ rpc "session_stats" [] ~tag:Session_stats ]
   | "trace", _ -> loading m "Trace" [ rpc "trace" [] ~tag:Trace ]
-  | "sessions", _ | "switch", "" -> open_sessions m
+  | "sessions", _ | "switch", "" -> open_control m
   | (("archive" | "unarchive" | "pin" | "unpin") as name), key ->
     let session =
       if String.is_empty key
@@ -10542,6 +10556,294 @@ let with_picker (m : Model.t) ~f =
   | _ -> m, []
 ;;
 
+(* The control centre (Ctrl+K): a setting opens what its own control opens
+   (a chip's menu, a default's picker, the settings page); a menu becomes
+   the control centre's own level, so that a choice there sets it just as
+   the menu would. *)
+let setting_opener (m : Model.t) (setting : Control_setting.t) =
+  let model_picker f = with_config m ~f:(fun _ -> f m) in
+  match setting with
+  | Model -> open_chip m Model
+  | Thinking -> open_chip m Thinking
+  | Verbosity -> open_picker m (verbosity_picker m)
+  | Host -> open_chip m Host
+  | Mode -> open_chip m Mode
+  | Context -> run_command m { name = "session"; rest = "" }
+  | Default_model -> pick_default m Model
+  | Default_thinking -> pick_default m Thinking
+  | Default_mode -> pick_default m Mode
+  | Default_host -> pick_default m Host
+  | Fallback_models -> pick_default m Fallback
+  | Theme -> open_picker m (theme_picker m)
+  | Accent -> open_picker m (accent_picker m)
+  | Summary_model -> model_picker compaction_models_picker
+  | Drafting_model -> model_picker generate_models_picker
+  | Approval_model -> model_picker approval_models_picker
+  | Naming_model -> model_picker naming_models_picker
+  | Dictation_model -> model_picker dictation_models_picker
+  | Default_directory
+  | Budget
+  | Worktree_hours
+  | Archive_after
+  | Notifications
+  | Providers
+  | Compact_at
+  | Mask
+  | Memory
+  | Memory_notes
+  | About_you
+  | Instructions_by_model
+  | Instructions
+  | Mcp
+  | Git_hosts
+  | Nix_store
+  | Account ->
+    (match Control_setting.page setting with
+     | Some (section, _) -> open_settings ~section m
+     | None -> m, [])
+;;
+
+(* The setting's values, when its control opens a menu of them. *)
+let setting_options (m : Model.t) setting =
+  let opened, cmds = setting_opener { m with dialog = None } setting in
+  let options =
+    match opened.dialog with
+    | Some (Picker { kind; picker }) -> Some { Dialog.Control_options.setting; kind; picker }
+    | Some (Popover { chip; picker }) ->
+      Some { setting; kind = chip_kind chip; picker }
+    | _ -> None
+  in
+  options, (opened, cmds)
+;;
+
+let session_value (m : Model.t) (setting : Control_setting.t) =
+  match m.state with
+  | None -> ""
+  | Some state ->
+    (match setting with
+     | Model -> state.model.name
+     | Thinking -> Thinking.label (Thinking.normalize state.thinking)
+     | Verbosity -> Prigh_ui.Verbosity.name m.verbosity
+     | Host ->
+       (match Active_host.of_state state with
+        | Connected { name; _ } -> name
+        | Disconnected { name; _ } -> name ^ " (offline)"
+        | Unset -> "none")
+     | Mode -> Session_mode.label (Session_mode.of_state state)
+     | Context ->
+       let cost = sprintf "$%.2f" state.cost_usd in
+       if state.model.context_window <= 0
+       then cost
+       else
+         sprintf
+           "%.0f%% · %s"
+           (100.
+            *. Float.of_int state.context_tokens
+            /. Float.of_int state.model.context_window)
+           cost
+     | _ -> "")
+;;
+
+let config_value (m : Model.t) (config : Config.t) (setting : Control_setting.t)
+  =
+  let model = Option.value_map ~f:(model_display m) in
+  match setting with
+  | Default_model -> Some (model config.default_model ~default:"the backend's")
+  | Default_thinking ->
+    Some
+      (Thinking.label
+         (Thinking.normalize
+            (Option.value
+               config.default_thinking
+               ~default:New_default.builtin_thinking)))
+  | Default_mode -> Some (Default_mode.summary config)
+  | Default_host -> Some (Option.value config.default_host ~default:"where you are")
+  | Default_directory -> Some (Option.value config.default_cwd ~default:"the host's")
+  | Fallback_models ->
+    Some
+      (match config.fallback_models with
+       | [] -> "none"
+       | models -> String.concat ~sep:", " (List.map models ~f:(model_display m)))
+  | Budget ->
+    Some (Option.value_map config.max_budget_usd ~default:"none" ~f:(sprintf "$%.2f"))
+  | Notifications -> Some config.notify
+  | Summary_model -> Some (model config.compaction_model ~default:"the conversation's")
+  | Drafting_model -> Some (model config.generate_model ~default:"the session's")
+  | Approval_model -> Some (model config.approval_model ~default:"the session's")
+  | Naming_model -> Some (model config.naming_model ~default:"the drafting one")
+  | Dictation_model ->
+    Some
+      (model
+         config.dictation_model
+         ~default:(model_display m Config.default_dictation_model))
+  | Compact_at -> Some (sprintf "%d tokens" config.compact_at_tokens)
+  | Mask -> Some (if config.mask_observations then "on" else "off")
+  | Archive_after ->
+    Some
+      (if Float.(config.archive_after_days <= 0.)
+       then "never"
+       else sprintf "%g days" config.archive_after_days)
+  | _ -> None
+;;
+
+let setting_value (m : Model.t) (setting : Control_setting.t) =
+  let value =
+    match setting with
+    | Theme -> Some (Theme.Name.to_string m.theme.name)
+    | Accent -> Some (Theme.Accent.to_string m.theme.accent)
+    | _ when Control_setting.session setting -> Some (session_value m setting)
+    | _ -> Option.bind m.config ~f:(fun c -> config_value m c setting)
+  in
+  match value, Control_setting.page setting with
+  | Some value, _ -> value
+  | None, Some (section, _) -> "Settings › " ^ Settings_section.name section
+  | None, None -> ""
+;;
+
+let control_settings (m : Model.t) =
+  List.filter_map Control_setting.all ~f:(fun setting ->
+    if Control_setting.superuser_only setting && not (superuser m)
+    then None
+    else
+      Some
+        { Control_centre.Setting_entry.setting
+        ; value = setting_value m setting
+        ; values =
+            (if Control_setting.direct setting
+             then (
+               match fst (setting_options m setting) with
+               | Some o -> o.picker |> Picker.visible
+               | None -> [])
+             else [])
+        })
+;;
+
+let describe_session (m : Model.t) (s : Session_summary.t) =
+  let where = Tilde.of_path ?host_home:(Tilde.session_host_home m.state s) s.cwd in
+  match m.now, Rel_time.parse (Option.value s.updated_at ~default:s.created_at) with
+  | Some now, Some time -> sprintf "%s · %s" where (Rel_time.ago ~now time)
+  | _ -> where
+;;
+
+let control_rows (m : Model.t) (root : Control_centre.t) =
+  Control_centre.rows
+    root
+    ~settings:(control_settings m)
+    ~sessions:m.sessions
+    ?content:
+      (Option.filter m.session_hits ~f:(fun h ->
+         String.equal h.query (String.strip root.query)))
+    ~current:(Option.map m.state ~f:(fun s -> s.session_path))
+    ~describe:(describe_session m)
+    ~commands:(Slash.all ~superuser:(superuser m))
+    ()
+;;
+
+let control_query (m : Model.t) query =
+  match m.dialog with
+  | Some (Control { root; options = Some o }) ->
+    ( { m with
+        dialog =
+          Some
+            (Control { root; options = Some { o with picker = Picker.set_query o.picker query } })
+      }
+    , [] )
+  | Some (Control { root; options = None }) ->
+    let m = { m with dialog = Some (Control { root = Control_centre.set_query root query; options = None }) } in
+    (* Titles match at once; the messages, searched by the backend, once the
+       typing pauses. *)
+    let search = m.session_search + 1 in
+    let m = { m with session_search = search } in
+    if List.is_empty (Prigh_ui.Session_search.words query)
+    then { m with session_hits = None }, []
+    else m, [ Command.Search_sessions_later { search; after_ms = 150 } ]
+  | _ -> m, []
+;;
+
+let control_move (m : Model.t) delta =
+  match m.dialog with
+  | Some (Control { root; options = Some o }) ->
+    ( { m with dialog = Some (Control { root; options = Some { o with picker = Picker.move o.picker delta } }) }
+    , [] )
+  | Some (Control { root; options = None }) ->
+    let count = List.length (control_rows m root) in
+    ( { m with
+        dialog = Some (Control { root = Control_centre.move root delta ~count; options = None })
+      }
+    , [] )
+  | _ -> m, []
+;;
+
+let control_back (m : Model.t) =
+  match m.dialog with
+  | Some (Control { root; options = Some _ }) ->
+    { m with dialog = Some (Control { root; options = None }) }, [ Command.Focus "control-input" ]
+  | _ -> m, []
+;;
+
+(* Done: the palette goes, and what the choice did says so itself (a
+   toast, the chip). *)
+let control_apply (m : Model.t) (options : Dialog.Control_options.t) (item : Picker.Item.t) =
+  let m = { m with dialog = Some (Picker { kind = options.kind; picker = options.picker }) } in
+  picker_accept m ~kind:options.kind item
+;;
+
+let control_open_setting (m : Model.t) ~root setting =
+  match setting_options m setting with
+  | Some options, _ ->
+    ( { m with dialog = Some (Control { root; options = Some options }) }
+    , [ Command.Focus "control-input" ] )
+  | None, (opened, cmds) -> opened, cmds
+;;
+
+let control_target (m : Model.t) ~root (target : Control_centre.Target.t) =
+  match target with
+  | Setting setting -> control_open_setting m ~root setting
+  | Value { setting; id } ->
+    (match setting_options m setting with
+     | Some options, _ ->
+       (match
+          List.find (Picker.visible options.picker) ~f:(fun i -> String.equal i.id id)
+        with
+        | Some item -> control_apply m options item
+        | None -> m, [])
+     | None, _ -> m, [])
+  | Session path ->
+    let m, cmds = close_dialog m in
+    let m, switch = switch_session m path in
+    m, cmds @ switch
+  | Command name ->
+    let m, cmds = close_dialog m in
+    (match Slash.find ~superuser:(superuser m) name with
+     | Some { args = ""; _ } ->
+       let m, run = run_command m { name; rest = "" } in
+       m, cmds @ run
+     | Some { args; _ } when String.is_prefix args ~prefix:"[" ->
+       let m, run = run_command m { name; rest = "" } in
+       m, cmds @ run
+     | Some _ | None ->
+       let m = set_draft m ("/" ^ name ^ " ") in
+       m, cmds @ [ focus_editor ])
+;;
+
+let control_accept ?index (m : Model.t) =
+  match m.dialog with
+  | Some (Control { options = Some o; _ }) ->
+    let item =
+      match index with
+      | Some i -> List.nth (Picker.visible o.picker) i
+      | None -> Picker.selected_item o.picker
+    in
+    (match item with
+     | Some item -> control_apply m o item
+     | None -> m, [])
+  | Some (Control { root; options = None }) ->
+    (match List.nth (control_rows m root) (Option.value index ~default:root.selected) with
+     | Some row -> control_target m ~root row.target
+     | None -> m, [])
+  | _ -> m, []
+;;
+
 let toggle_scoped (m : Model.t) key =
   match m.dialog with
   | Some (Scoped_models { picker; checked }) ->
@@ -10573,6 +10875,7 @@ let respond_login (m : Model.t) (flow : Login_flow.t) =
 let dialog_accept (m : Model.t) =
   match m.dialog with
   | None -> m, []
+  | Some (Control _) -> control_accept m
   | Some Temporary_menu -> keep_session m
   (* [update] has it *)
   | Some Leave_temporary -> m, []
@@ -10980,24 +11283,22 @@ let update_connected (m : Model.t) (action : Action.t) =
     (match find_session_by_path m path with
      | Some s -> set_pinned m s ~pinned
      | None -> m, [])
-  | Set_session_query session_query -> set_session_query m session_query
   | Search_sessions search ->
-    if search = m.session_search
-    then
-      ( m
-      , [ rpc
-            "search_sessions"
-            (Session_hits.params ~query:m.session_query ~limit:50)
-            ~tag:(Session_hits search)
-        ] )
-    else m, []
+    (match m.dialog with
+     | Some (Control { root; options = _ }) when search = m.session_search ->
+       ( m
+       , [ rpc
+             "search_sessions"
+             (Session_hits.params ~query:(String.strip root.query) ~limit:50)
+             ~tag:(Session_hits search)
+         ] )
+     | _ -> m, [])
   | Toggle_archived -> { m with archived_open = not m.archived_open }, []
-  | Open_sessions -> open_sessions m
+  | Open_control -> open_control m
+  | Control_query query -> control_query m query
+  | Control_back -> control_back m
+  | Control_choose index -> control_accept m ~index
   | Session_nav { from; by } -> session_nav m ~from ~by
-  | Open_first_session ->
-    (match shown_sessions m with
-     | [] -> m, []
-     | first :: _ -> switch_session m first.path)
   | Leave_sidebar ->
     ( { m with
         sidebar_open = m.sidebar_open && not m.narrow
@@ -11199,6 +11500,7 @@ let update_connected (m : Model.t) (action : Action.t) =
        { m with dialog = Some (Filter (Filter_menu.move menu delta)) }, []
      | Some (Picker _ | Popover _ | Scoped_models _ | Pulls _) ->
        with_picker m ~f:(fun p -> Picker.move p delta)
+     | Some (Control _) -> control_move m delta
      | Some (Prompt prompt) ->
        { m with dialog = Some (Prompt (Prompt.move prompt delta)) }, []
      | _ -> m, [])

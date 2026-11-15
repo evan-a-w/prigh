@@ -660,10 +660,6 @@ let user_footer (m : App.Model.t) ~inject =
 
 let view (m : App.Model.t) ~inject =
   let current = Option.map m.state ~f:(fun s -> s.session_id) in
-  let content = m.session_hits in
-  let sessions =
-    Session_list.filter ?content m.sessions ~query:m.session_query
-  in
   Node.aside
     ~attrs:[ Attr.class_ "sidebar"; Attr.id "sidebar" ]
     [ div
@@ -678,7 +674,9 @@ let view (m : App.Model.t) ~inject =
             ~on_click:(inject Action.Toggle_sidebar)
             [ icon Sidebar ]
         ]
-    ; (match m.pending.session with
+    ; div
+        ~cls:"sidebar-actions"
+        [ (match m.pending.session with
        | Some Starting ->
          button
            ~cls:"new-session opening"
@@ -692,55 +690,30 @@ let view (m : App.Model.t) ~inject =
            ~title:"Start a new session (/new)"
            ~on_click:(inject Action.New_session)
            [ icon Plus; Node.text "New session" ])
-    ; div
-        ~cls:"search"
-        [ icon Search
-        ; Node.input
-            ~attrs:
-              [ Attr.id "session-search"
-              ; Attr.type_ "search"
-              ; Attr.placeholder
-                  (if m.narrow
-                   then "Search sessions"
-                   else "Search sessions (Ctrl+K)")
-              ; Attr.create "aria-label" "Search sessions"
-              ; Attr.value m.session_query
-              ; Attr.create "autocomplete" "off"
-              ; Attr.on_input (fun _ text ->
-                  inject (Action.Set_session_query text))
-              ]
-            ()
+        ; button
+            ~cls:"control-open"
+            ~title:"Search sessions, settings and commands (Ctrl+K)"
+            ~attrs:[ Attr.id "control-open" ]
+            ~on_click:(inject Action.Open_control)
+            [ icon Search; Node.text "Search" ]
         ]
     ; (match m.sessions with
        | [] -> Node.none
        | _ -> toolbar m ~inject)
     ; div
         ~cls:"sessions"
-        (match sessions, m.sessions with
-         | [], [] ->
+        (match m.sessions with
+         | [] ->
            [ div
                ~cls:"sessions-empty"
                [ Node.text "No sessions yet: send a message to start one." ]
            ]
-         | [], _ ->
-           [ div
-               ~cls:"sessions-empty"
-               [ Node.textf
-                   "No sessions match “%s”. Search looks in titles and \
-                    messages."
-                   (String.strip m.session_query)
-               ]
-           ]
-         | _, _ ->
+         | _ ->
            let { Session_list.Sections.pinned; active; archived } =
-             Session_list.sections ?content m.sessions ~query:m.session_query
+             Session_list.sections m.sessions
            in
            let worktrees_shown = App.Model.worktrees_shown m in
-           let shown =
-             Session_list.archived_shown
-               ~query:m.session_query
-               ~archived_open:m.archived_open
-           in
+           let shown = m.archived_open in
            (match pinned with
             | [] ->
               List.map active ~f:(session m ~inject ~current ~worktrees_shown)

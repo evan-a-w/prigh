@@ -595,14 +595,19 @@ module Action : sig
         { path : string
         ; pinned : bool
         }
-    | Set_session_query of string
     | Toggle_archived (** fold or unfold the sidebar's archived sessions *)
-    | Open_sessions (** the sidebar, with its search focused *)
+    | Open_control
+    (** the control centre (Ctrl+K, the sidebar's Search): again closes it *)
+    | Control_query of string (** typed in the control centre's filter *)
+    | Control_back
+    (** from a setting's values back to the control centre's root (⌫ on an
+        empty filter, its breadcrumb) *)
+    | Control_choose of int (** a row of the control centre's, clicked *)
     | Session_nav of
-        { from : string option (** a session's id; [None]: the search *)
+        { from : string (** a session's id *)
         ; by : int
-        } (** the focus to another of the sidebar's sessions *)
-    | Open_first_session (** the search's best match *)
+        } (** the focus to another of the sidebar's sessions (above the
+            first: the Search button) *)
     | Leave_sidebar (** back to the editor *)
     | Set_model of string (** [provider/id] *)
     | Set_thinking of string
@@ -821,8 +826,8 @@ module Action : sig
         }
     | Dismiss_toast of int
     | Search_sessions of int
-    (** the sidebar's search [Search_sessions_later] scheduled: the backend
-        searches the messages unless the query changed since *)
+    (** the control centre's [Search_sessions_later] scheduled: the backend
+        searches the messages unless the filter changed since *)
     | Update_ready
     (** from the page: a new build's service worker is installed, waiting for
         the page to reload into it *)
@@ -1011,9 +1016,9 @@ module Model : sig
       (** on a phone, the chat's "more" menu is open (the panels' toggles
           and the settings: {!Action.Toggle_status_tray}) *)
     ; scrolled_up : bool (** the chat is not following new output *)
-    ; session_query : string
     ; session_hits : Session_hits.t option
-      (** the backend's search of the messages for [session_query] *)
+      (** the backend's search of the messages for the control centre's
+          filter *)
     ; session_search : int (** counts the searches typed *)
     ; archived_open : bool (** the sidebar shows the archived sessions *)
     ; agents : Agents.t (** the agents panel, per session *)
@@ -1209,3 +1214,6 @@ val update : Model.t -> Action.t -> Model.t * Command.t list
 (** The first clause of the state's [no_host], capitalised: "No tool host
     connected". *)
 val no_host_headline : string -> string
+
+(** The control centre's root rows for its filter, as it lists them. *)
+val control_rows : Model.t -> Control_centre.t -> Control_centre.Row.t list

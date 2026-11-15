@@ -48,7 +48,6 @@ let anchor (m : App.Model.t) chip button ~inject =
              | Model -> "model"
              | Thinking -> "thinking"
              | Mode -> "mode"
-             | Verbosity -> "verbosity"
              | Host -> "host"
              | Attach -> "attach-menu")
           ]
@@ -125,22 +124,6 @@ let mode_chip (m : App.Model.t) (state : State.t) ~inject =
       ]
 ;;
 
-(* How much of the transcript shows (Ctrl+O cycles): lines and the level;
-   lit when it is not the usual. *)
-let verbosity_chip (m : App.Model.t) ~inject =
-  let name = Prigh_ui.Verbosity.name m.verbosity in
-  button
-    ~cls:
-      (match m.verbosity with
-       | Normal -> "chip-button verbosity-chip"
-       | Quiet | Verbose -> "chip-button verbosity-chip unusual")
-    ~title:(sprintf "Transcript: %s (Ctrl+O cycles, /verbosity)" name)
-    ~label:(sprintf "Transcript %s" name)
-    ~attrs:(menu_attrs m Verbosity)
-    ~on_click:(inject (Action.Open_chip Verbosity))
-    [ icon Lines; span ~cls:"chip-label" name ]
-;;
-
 let view ?(cls = "") (m : App.Model.t) ~inject =
   match m.state with
   | None -> Node.none
@@ -149,12 +132,11 @@ let view ?(cls = "") (m : App.Model.t) ~inject =
       ~attrs:
         [ classes
             (List.filter [ "session-chips"; cls ] ~f:(Fn.non String.is_empty))
-            [ "menu-open", menu_open m [ Thinking; Mode; Verbosity ] ]
+            [ "menu-open", menu_open m [ Thinking; Mode ] ]
         ; Attr.role "group"
-        ; Attr.create "aria-label" "Thinking, mode and transcript"
+        ; Attr.create "aria-label" "Thinking and mode"
         ]
       [ anchor m Thinking (thinking_chip m state ~inject) ~inject
       ; anchor m Mode (mode_chip m state ~inject) ~inject
-      ; anchor m Verbosity (verbosity_chip m ~inject) ~inject
       ]
 ;;

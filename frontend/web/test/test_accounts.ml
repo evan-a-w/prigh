@@ -451,8 +451,11 @@ let%expect_test "switching user resets everything that was the old user's" =
        , Ok (Jsonaf.of_string @@ H.page {|[{"role":"user","text":"secret"}]|})
        ));
   H.act h (Run "/btw what was that?");
-  H.act h (Set_session_query "ali");
   H.act h (Run "/model");
+  H.act h Open_control;
+  H.act h (Control_query "ali");
+  H.act h (Search_sessions 1);
+  H.reply h "search_sessions" {|{"query":"ali","hits":[]}|};
   H.act h (Run "/setusr bob");
   H.reply h "set_user" {|{"client_id":"c1","namespace":"bob","user":"alice"}|};
   let m = H.model h in
@@ -462,7 +465,7 @@ let%expect_test "switching user resets everything that was the old user's" =
         ~state:(Option.is_some m.state : bool)
         ~entries:(List.length (Chat.entries m.chat) : int)
         ~sessions:(List.length m.sessions : int)
-        ~query:m.session_query
+        ~hits:(Option.is_some m.session_hits : bool)
         ~dialog:(Option.is_some m.dialog : bool)
         ~btw:(Option.is_some m.btw : bool)];
   [%expect

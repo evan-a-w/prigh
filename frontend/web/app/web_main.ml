@@ -902,8 +902,6 @@ let key_target (ev : Dom_html.keyboardEvent Js.t) : Prigh_web.Keys.Target.t =
                (Js.to_string t##.value)
                ~utf16:t##.selectionStart
          }
-     | Input i when String.equal (Js.to_string i##.id) "session-search" ->
-       Session_search
      | Textarea _ -> Multiline
      | Input _ | Select _ -> Field
      | Button _ | A _ -> Control

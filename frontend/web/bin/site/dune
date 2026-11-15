@@ -101,6 +101,12 @@
   (copy ../temporary.css temporary.css)))
 
 (rule
+ (target control.css)
+ (deps ../control.css)
+ (action
+  (copy ../control.css control.css)))
+
+(rule
  (target phone.css)
  (deps ../phone.css)
  (action
@@ -240,6 +246,7 @@
   forge.css
   status.css
   temporary.css
+  control.css
   ui.css
   ui-chart.css
   phone.css
@@ -286,6 +293,7 @@
   (forge.css as web/forge.css)
   (status.css as web/status.css)
   (temporary.css as web/temporary.css)
+  (control.css as web/control.css)
   (ui.css as web/ui.css)
   (ui-chart.css as web/ui-chart.css)
   (phone.css as web/phone.css)

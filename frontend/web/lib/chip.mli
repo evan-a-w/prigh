@@ -2,15 +2,15 @@ open! Core
 
 (** The composer's chips: each opens its menu over the composer (a popover,
     not the command's dialog), in the order they sit in its row: the model,
-    the host, the thinking level, the mode and the transcript's verbosity.
-    [Attach] is the composer's + button. *)
+    the host, the thinking level and the mode. [Attach] is the composer's +
+    button. (The verbosity has none: Ctrl+O, /verbosity, the control
+    centre.) *)
 
 type t =
   | Model
   | Host
   | Thinking
   | Mode
-  | Verbosity
   | Attach
 [@@deriving sexp_of, equal, enumerate]
 

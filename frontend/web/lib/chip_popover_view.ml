@@ -7,7 +7,6 @@ let title : Chip.t -> string = function
   | Model -> "Model"
   | Thinking -> "Thinking"
   | Mode -> "When tools ask first"
-  | Verbosity -> "Transcript"
   | Host -> "Where tools run"
   | Attach -> "Add to your message"
 ;;
@@ -16,7 +15,6 @@ let shortcut : Chip.t -> string = function
   | Model -> "Ctrl+L"
   | Thinking -> "Alt+T cycles"
   | Mode -> "Alt+M cycles"
-  | Verbosity -> "Ctrl+O cycles"
   | Host -> "/host"
   | Attach -> "or paste, or drop"
 ;;
@@ -78,7 +76,7 @@ let row
   let model =
     match (chip : Chip.t) with
     | Model -> List.find m.models ~f:(fun l -> String.equal l.key item.id)
-    | Thinking | Mode | Verbosity | Host | Attach -> None
+    | Thinking | Mode | Host | Attach -> None
   in
   let detail =
     match model with
@@ -130,7 +128,7 @@ let row
            ~attrs:[ Attr.title "Context window, in tokens" ]
            (App.compact_tokens l.context_window)
        | Thinking, _ -> meter m item.id
-       | (Model | Mode | Verbosity | Host | Attach), _ -> Node.none)
+       | (Model | Mode | Host | Attach), _ -> Node.none)
     ]
 ;;
 
@@ -339,7 +337,7 @@ let view (m : App.Model.t) ~(chip : Chip.t) (p : Picker.t) ~inject =
            @
            match chip with
            | Model | Host -> []
-           | Thinking | Mode | Verbosity | Attach -> [ Attr.tabindex 0; active ]
+           | Thinking | Mode | Attach -> [ Attr.tabindex 0; active ]
           )
         (rows m ~chip p ~inject)
   in
@@ -353,7 +351,6 @@ let view (m : App.Model.t) ~(chip : Chip.t) (p : Picker.t) ~inject =
            | Model -> "model"
            | Thinking -> "thinking"
            | Mode -> "mode"
-           | Verbosity -> "verbosity"
            | Host -> "host"
            | Attach -> "attach")
       ; Attr.role "dialog"
@@ -364,7 +361,7 @@ let view (m : App.Model.t) ~(chip : Chip.t) (p : Picker.t) ~inject =
           let what =
             match chip with
             | Host -> "hosts"
-            | Model | Thinking | Mode | Verbosity | Attach -> "models"
+            | Model | Thinking | Mode | Attach -> "models"
           in
           div
             ~cls:"popover-search"
@@ -389,7 +386,7 @@ let view (m : App.Model.t) ~(chip : Chip.t) (p : Picker.t) ~inject =
                 ()
             ; span ~cls:"popover-shortcut" (shortcut chip)
             ]
-        | Thinking | Mode | Verbosity | Attach ->
+        | Thinking | Mode | Attach ->
           div
             ~cls:"popover-head"
             [ span ~cls:"popover-title" (title chip)
@@ -400,13 +397,13 @@ let view (m : App.Model.t) ~(chip : Chip.t) (p : Picker.t) ~inject =
      @ Option.to_list
          (match chip with
           | Host -> host_note m
-          | Model | Thinking | Mode | Verbosity | Attach -> None)
+          | Model | Thinking | Mode | Attach -> None)
      @ [ div
            ~cls:"menu-keys"
            [ Node.text
                (match chip with
                 | Attach -> "Enter chooses, Esc closes"
-                | Model | Thinking | Mode | Verbosity | Host ->
+                | Model | Thinking | Mode | Host ->
                   "Enter chooses, ← → the next setting, Esc closes")
            ]
        ])

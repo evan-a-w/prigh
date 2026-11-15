@@ -194,18 +194,17 @@
 
 /* {1 The session's chips}
 
-   The thinking level, the mode and the verbosity: one family after the
-   host, an icon and a word each, quiet until pointed at. A mode where
-   nothing asks, plan, and a verbosity other than normal are lit. Their
-   menus open over them, above the backdrop like the model's. */
+   The thinking level and the mode: one family after the host, an icon and
+   a word each, quiet until pointed at. A mode where nothing asks, plan and
+   chat are lit. Their menus open over them, above the backdrop like the
+   model's. */
 
 .composer-controls:has(+ .row-chips) { flex: 0 1 auto; }
-.row-chips { margin-right: auto; min-width: 0; padding-left: 6px; margin-left: 2px; border-left: 1px solid var(--rule-2); }
+.row-chips { margin-right: auto; min-width: 0; padding-left: 0; margin-left: 0; }
 .row-chips.menu-open { z-index: var(--z-menu-anchor); }
 .row-chips .chip-button { height: 28px; padding: 0 7px; gap: 5px; font-size: 12.5px; color: var(--faint); }
 .row-chips .chip-button .icon { width: 14px; height: 14px; }
 .row-chips .chip-button:not(.awaiting):is(:hover, :focus-visible) { color: var(--chalk); }
-.row-chips .verbosity-chip.unusual { color: var(--sodium); }
 
 /* {1 The session's sections} (a phone's ⋯ sheet)
 
@@ -271,7 +270,7 @@
   .composer-controls .model-family { display: none; }
   .app:not(.narrow) .composer-row { flex-wrap: wrap; row-gap: 2px; }
   .app:not(.narrow) .composer-controls:has(+ .row-chips) { flex: 1 1 calc(100% - 36px); }
-  .app:not(.narrow) .row-chips { padding-left: 3px; margin-left: 0; border-left: 0; }
+  .app:not(.narrow) .row-chips { padding-left: 3px; }
 }
 
 /* {1 Still} */

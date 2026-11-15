@@ -33,5 +33,7 @@ module Picker : sig
     | Model (** the default model *)
     | Fallback (** a model to add to the fallback chain *)
     | Host (** the default tool host *)
+    | Thinking (** the default thinking level (the control centre) *)
+    | Mode (** the default mode (the control centre) *)
   [@@deriving sexp_of, equal]
 end

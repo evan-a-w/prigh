@@ -37,9 +37,10 @@ let%expect_test
      their passage"
   =
   let h = H.create ~sessions () in
-  H.act h (Set_session_query "port");
-  H.act h (Set_session_query "port config");
-  H.text h ~selector:".session-main";
+  H.quiet h (fun () -> H.act h Open_control);
+  H.act h (Control_query "port");
+  H.act h (Control_query "port config");
+  H.text h ~selector:".control-list";
   [%expect
     {|
     (Search_sessions_later (search 1) (after_ms 150))
@@ -56,8 +57,8 @@ let%expect_test
      (tag (Session_hits 2)))
     |}];
   H.reply h "search_sessions" (hits ~query:"port config");
-  H.text h ~selector:".session-main";
-  H.show h ~selector:".session-snippet";
+  H.text h ~selector:".control-list";
+  H.show h ~selector:".control-snippet";
   [%expect
     {|
     Make the port config urable
@@ -76,13 +77,14 @@ let%expect_test
     |}]
 ;;
 
-let%expect_test "a reply to an older search is ignored; Esc clears the search" =
+let%expect_test "a reply to an older search is ignored; Esc closes the control centre" =
   let h = H.create ~sessions () in
-  H.act h (Set_session_query "port");
+  H.quiet h (fun () -> H.act h Open_control);
+  H.act h (Control_query "port");
   H.act h (Search_sessions 1);
-  H.act h (Set_session_query "port config");
+  H.act h (Control_query "port config");
   H.reply h "search_sessions" (hits ~query:"port");
-  H.text h ~selector:".session-main";
+  H.text h ~selector:".control-list";
   [%expect
     {|
     (Search_sessions_later (search 1) (after_ms 150))
@@ -92,12 +94,11 @@ let%expect_test "a reply to an older search is ignored; Esc clears the search" =
     Make the port config urable
     1h ago /work
     |}];
-  H.key h "Escape" ~target:Session_search;
-  H.text h ~selector:".session-title";
-  H.key h "Escape" ~target:Session_search;
+  H.key h "Escape" ~target:Field;
+  print_s [%sexp (Option.is_some (H.model h).dialog : bool)];
   [%expect
     {|
-    (Set_session_query "")
+    (Control_query "")
     Make the port configurable
     fix the parser bug
     Release notes
@@ -111,10 +112,11 @@ let%expect_test
      still finds titles"
   =
   let h = H.create ~sessions () in
-  H.act h (Set_session_query "zzz");
+  H.quiet h (fun () -> H.act h Open_control);
+  H.act h (Control_query "zzz");
   H.act h (Search_sessions 1);
   H.fail h "search_sessions" "unknown method search_sessions";
-  H.text h ~selector:".sessions";
+  H.text h ~selector:"#control-centre";
   [%expect
     {|
     (Search_sessions_later (search 1) (after_ms 150))
@@ -131,8 +133,8 @@ let%expect_test
   let h = H.connecting () in
   H.quiet h (fun () ->
     H.act h (Set_narrow true);
-    H.act h Toggle_sidebar);
-  H.act h (Set_session_query "port config");
+    H.act h Open_control);
+  H.act h (Control_query "port config");
   H.act h (Search_sessions 1);
   [%expect
     {|
@@ -157,9 +159,9 @@ let%expect_test
   H.reply h "search_sessions" (hits ~query:"port config");
   print_s
     [%sexp
-      ((H.model h).session_query : string), ((H.model h).sidebar_open : bool)];
-  H.show h ~selector:"#session-search";
-  H.text h ~selector:".session-main";
+      (Option.is_some (H.model h).dialog : bool)];
+  H.show h ~selector:"#control-input";
+  H.text h ~selector:".control-list";
   [%expect
     {|
     ("port config" true)

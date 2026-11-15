@@ -781,6 +781,7 @@ let view (m : App.Model.t) (dialog : Dialog.t) ~inject =
   | Annotate _ -> None
   | Temporary_menu -> Some (Temporary_view.menu ~inject)
   | Leave_temporary -> Some (Temporary_view.leave m ~inject)
+  | Control _ -> None
   | Create_dir { target; path; busy; error } ->
     Some (create_dir m ~target ~path ~busy ~error ~inject)
   | Session stats -> Some (session m stats ~inject)

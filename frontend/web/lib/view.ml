@@ -44,7 +44,7 @@ let banner (m : Model.t) ~inject =
          ; button
              ~cls:"small"
              ~title:"Ctrl+K"
-             ~on_click:(inject Action.Open_sessions)
+             ~on_click:(inject Action.Open_control)
              [ Node.text "Sessions" ]
          ]
   | Reconnecting _, _ when App.Drops.gave_up m.drops ->
