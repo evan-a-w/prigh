@@ -502,25 +502,26 @@ let session t = t.session
 let messages t = Session.messages t.session
 let is_running t = Option.is_some t.run
 
-(* The model that wrote [a], for its price. *)
-let model_of t (a : Message.Assistant.t) =
-  if String.equal a.model t.model.id || String.equal a.model (Model.key t.model)
+(* The model named [name] (that wrote a reply), for its price. *)
+let model_of t name =
+  if String.equal name t.model.id || String.equal name (Model.key t.model)
   then t.model
-  else Option.value (Model_registry.find t.models a.model) ~default:t.model
+  else Option.value (Model_registry.find t.models name) ~default:t.model
 ;;
 
 (* Every response in the session file (all branches, also those a compaction
    summarised), each at its own model's price, and the recorded spend of
    everything else (subagents, compactions, [btw]). *)
 let session_spend t =
+  let models = String.Table.create () in
   List.fold
-    (Session.entries t.session)
+    (Session.replies t.session)
     ~init:(Session.spend t.session)
-    ~f:(fun ((usage, cost) as acc) (e : Session.Entry.t) ->
-      match e.payload with
-      | Message (Assistant a) ->
-        Usage.add usage a.usage, cost +. Model.cost_usd (model_of t a) a.usage
-      | _ -> acc)
+    ~f:(fun (usage, cost) (name, u) ->
+      let model =
+        Hashtbl.find_or_add models name ~default:(fun () -> model_of t name)
+      in
+      Usage.add usage u, cost +. Model.cost_usd model u)
 ;;
 
 let spent_usd t = snd (session_spend t)
@@ -2937,7 +2938,7 @@ let rec account t ?(nested = false) (event : Agent_event.t) =
   match event with
   | Subagent { event; _ } -> account t ~nested:true event
   | Message_end (Assistant a) when nested ->
-    add a.usage (Model.cost_usd (model_of t a) a.usage)
+    add a.usage (Model.cost_usd (model_of t a.model) a.usage)
   | Compacted { usage; cost_usd; _ } -> add usage cost_usd
   | _ -> ()
 ;;
@@ -5453,3 +5454,7 @@ let stop_everything t =
   shutdown t;
   wait_idle t
 ;;
+
+module For_testing = struct
+  let approve = approve
+end

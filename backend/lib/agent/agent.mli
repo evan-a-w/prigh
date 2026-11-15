@@ -1093,3 +1093,8 @@ val stop_everything : t -> unit
 (** [f] is called whenever {!note_upload} or {!note_leftovers} adds to
     {!leftovers}. *)
 val on_noted : t -> f:(unit -> unit) -> unit
+
+module For_testing : sig
+  (** The approver its runs give their tool calls. *)
+  val approve : t -> Tool.approver
+end
