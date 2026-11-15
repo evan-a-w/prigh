@@ -97,15 +97,7 @@ let show_config t response =
             (field config "default_host")
             (field config "default_cwd")
             (field config "approval_mode")))
-  | None, Some (`String e) ->
-    print_endline
-      (mask
-         t
-         ("error: "
-          ^ String.substr_replace_all
-              e
-              ~pattern:(Core_unix.gethostname ())
-              ~with_:"<host>"))
+  | None, Some (`String e) -> print_endline (mask t ("error: " ^ e))
   | None, _ -> print_endline (Json.to_string response)
 ;;
 

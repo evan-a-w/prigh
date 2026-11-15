@@ -216,8 +216,9 @@ frontends and switches between them (asking for the working directory to
 use on the new host, prefilled with the current one and checked there
 before switching), and the status line shows `tools:<name>` when tools run
 elsewhere or, in red, `tools:<name> ⊘ offline` when the active host has
-disconnected (hosts are always shown by their name, the hostname or
-`-name`, which the session keeps for when its host is away, never by their
+disconnected (hosts are always shown by their name: `-name`, else
+`$PRIGH_HOST_NAME` (the backend's own host goes by it too), else the
+hostname, which the session keeps for when its host is away, never by their
 `host-…` id unless the backend predates that). A
 session never leaves its host on its own: while the host is away the
 model's tool calls (a main agent's, subagents' and jobs') wait up to a
