@@ -252,7 +252,7 @@ try {
 
   // Chat by default: over the approval mode (Ask), which leaving it gives.
   await openSection(page);
-  await page.locator(".setting.default-mode .segment", { hasText: "Chat" }).click();
+  await page.locator(".setting.default-mode .segment", { hasText: exactly("Chat") }).click();
   await toast(page, "Chat mode");
   section("chat by default");
   console.log(normalise(await page.locator(".setting.default-mode").innerText()));
@@ -267,7 +267,7 @@ try {
   section("a new session, a chat");
   console.log(normalise(await chips(page)));
   await run(page, "/chat off");
-  await page.locator(".host-chip:not(.chatting)", { hasText: "laptop" }).waitFor();
+  await page.locator(".host-chip:not(.chatting) .chip-label", { hasText: laptopName }).waitFor();
   section("leaving the chat");
   console.log(normalise(await chips(page)));
 
