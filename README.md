@@ -2832,7 +2832,7 @@ it.
 | `/filter [all\|KIND...\|-KIND\|+KIND]` | show only some kinds in the transcript (`user`, `assistant`, `thinking`, `tools`, `subagents`, `notes`); bare: a checklist |
 | `/theme [original\|dark\|light]`, `/accent [name\|#rrggbb]` (prigh-web) | pick or set the theme and the accent colour, for you in every browser |
 | `/confirm [on\|off]` | ask before destructive tools: sets the approval mode `ask` or `auto`, here and for new sessions |
-| `/mode [ask\|auto-edit\|smart\|auto\|plan\|chat]` | pick or set this session's mode (Alt+M cycles) |
+| `/mode [mode]` | pick or set this session's mode, in Alt+M's order: `ask`, `auto-edit`, `smart`, `auto`, `plan` or `chat` (completion and the bare command's picker offer them all) |
 | `/plan [on\|off]` | toggle plan mode (read-only planning until you turn it off) |
 | `/chat [on\|off]` | toggle chat mode (a chat without the tool host until you turn it off) |
 | `/todos` | show the model's plan (its `update_plan` steps) |
