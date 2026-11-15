@@ -8288,6 +8288,17 @@ let ui_image_reply (m : Model.t) ~path result =
   { m with ui = Ui_state.set_image m.ui ~path image }, []
 ;;
 
+(* The sidebar's list is now [sessions]; what belonged to sessions no longer
+   in it goes. *)
+let sessions_listed (m : Model.t) sessions =
+  let paths = List.map sessions ~f:(fun (s : Session_summary.t) -> s.path) in
+  { m with
+    sessions
+  ; marks = Session_marks.prune m.marks ~paths
+  ; chat_cache = Chat_cache.retain m.chat_cache ~paths:(String.Set.of_list paths)
+  }
+;;
+
 let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
   match tag, result with
   | Reconnect generation, _ when generation <> m.generation -> m, []
@@ -9124,14 +9135,7 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
      | _ -> m, [])
   | Sessions, Ok json ->
     decode m json (decode_list Session_summary.of_json) ~f:(fun sessions ->
-      let paths = List.map sessions ~f:(fun s -> s.path) in
-      ( { m with
-          sessions
-        ; marks = Session_marks.prune m.marks ~paths
-        ; chat_cache =
-            Chat_cache.retain m.chat_cache ~paths:(String.Set.of_list paths)
-        }
-      , [] ))
+      sessions_listed m sessions, [])
   | Session_hits search, Ok json ->
     if search = m.session_search
     then
@@ -9681,7 +9685,9 @@ let main_event (m : Model.t) (event : Event.t) =
   | Tool_end { call; _ } ->
     (* An older backend's way to say a confirmation is no longer waited for. *)
     remove_confirm m ~call_id:call.id ~agent_id:None
-  | Sessions_changed -> m, [ rpc "list_sessions" [] ~tag:Sessions ]
+  | Sessions_changed None -> m, [ rpc "list_sessions" [] ~tag:Sessions ]
+  | Sessions_changed (Some change) ->
+    sessions_listed m (Session_summary.Change.apply change m.sessions), []
   | Temporary_ended { messages; kept; _ } ->
     let m, deleted =
       if messages > 0 then toast m "Temporary session deleted" else m, []
@@ -10719,7 +10725,7 @@ let update_connected (m : Model.t) (action : Action.t) =
     when Option.is_some m.session_gone
          &&
          match e with
-         | Sessions_changed | Nix_gc_progress _ -> false
+         | Sessions_changed _ | Nix_gc_progress _ -> false
          | _ -> true -> m, []
   | Event e ->
     let m, cmds = event m e in

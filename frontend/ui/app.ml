@@ -5874,6 +5874,17 @@ let sessions_picker_shown m =
   | _ -> false
 ;;
 
+(* The cached list and the open picker show [sessions]. *)
+let sessions_refreshed m sessions =
+  let m =
+    map_sessions_picker m ~f:(fun selection -> { selection with sessions })
+  in
+  let m = with_sessions m sessions in
+  match m.mode, m.autocomplete with
+  | Editing, Some _ -> refresh_autocomplete m
+  | _ -> m, []
+;;
+
 let worktree_in_picker m (listing : P.Worktree.Listing.t) picker ~f =
   match
     Option.bind (Picker.selected_item picker) ~f:(fun item ->
@@ -6845,10 +6856,14 @@ let event m (e : P.Event.t) =
      | Some _ -> { m with nix_gc = Some progress }, []
      | None -> m, [])
   | Temporary_ended _ -> m, []
-  | Sessions_changed ->
-    if sessions_picker_shown m || Option.is_some m.sessions
-    then m, [ rpc "list_sessions" ~tag:Sessions_refresh ]
-    else m, []
+  | Sessions_changed change ->
+    (match change, m.sessions with
+     | Some change, Some sessions ->
+       sessions_refreshed m (P.Session_summary.Change.apply change sessions)
+     | _ ->
+       if sessions_picker_shown m || Option.is_some m.sessions
+       then m, [ rpc "list_sessions" ~tag:Sessions_refresh ]
+       else m, [])
 ;;
 
 (* ---- rpc replies ------------------------------------------------------ *)
@@ -7594,15 +7609,7 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
        decode
          json
          ~f:(decode_list ~f:P.Session_summary.of_json)
-         (fun sessions ->
-            let m =
-              map_sessions_picker m ~f:(fun selection ->
-                { selection with sessions })
-            in
-            let m = with_sessions m sessions in
-            match m.mode, m.autocomplete with
-            | Editing, Some _ -> refresh_autocomplete m
-            | _ -> m, [])
+         (sessions_refreshed m)
      | Auth_refresh ->
        decode json ~f:(decode_list ~f:P.Auth_status.of_json) (fun auth ->
          { m with auth }, [])

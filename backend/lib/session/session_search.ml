@@ -284,6 +284,7 @@ type t =
   ; mutable free : int list (** [Doc.num]s given back by [remove] *)
   ; mutable indexing : unit Promise.t option (** [index] under way *)
   ; file : string option (** where it is kept between runs *)
+  ; mutable read : bool (** whether [file] was read *)
   ; mutable changed : bool (** since it was last read or written *)
   ; mutable saved_at : float
   }
@@ -421,11 +422,21 @@ let create ?file () =
     ; free = []
     ; indexing = None
     ; file
+    ; read = false
     ; changed = false
     ; saved_at = 0.
     }
   in
-  Option.iter (Option.bind file ~f:(fun path -> Stored.read ~path)) ~f:(fun stored ->
+  t
+;;
+
+(* On first use rather than in [create], which a server calls as it
+   starts. *)
+let read_file t =
+  if not t.read
+  then (
+    t.read <- true;
+    Option.iter (Option.bind t.file ~f:(fun path -> Stored.read ~path)) ~f:(fun stored ->
     Array.iter stored.docs ~f:(fun (d : Stored.Entry.t) ->
       add
         t
@@ -440,8 +451,7 @@ let create ?file () =
         ; weights = Array.map d.words ~f:(fun w -> w land 7)
         });
     Hashtbl.iter t.postings ~f:Posting.trim;
-    t.changed <- false);
-  t
+    t.changed <- false))
 ;;
 
 let file ~dir = Stored.file ~dir
@@ -461,6 +471,7 @@ let save t =
 let save_every = 60.
 
 let refresh ?(yield = ignore) t ~sessions ~load =
+  read_file t;
   let listed =
     String.Set.of_list
       (List.map sessions ~f:(fun (s : Session.Summary.t) -> s.path))

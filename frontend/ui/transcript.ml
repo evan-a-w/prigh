@@ -616,7 +616,7 @@ let apply t (event : P.Event.t) =
   | P.Event.Terminal_close _
   | P.Event.Terminal_kill _
   | P.Event.Btw_delta _
-  | P.Event.Sessions_changed
+  | P.Event.Sessions_changed _
   | P.Event.Nix_gc_progress _
   | P.Event.Prefs_changed _
   | P.Event.Memory_changed _

@@ -41,3 +41,24 @@ val blurb : t -> string
 val size_string : int -> string
 
 val total_bytes : t list -> int
+
+(** What a [sessions_changed] event says changed: the entries of the
+    sessions that changed, as [list_sessions] would show them now, and the
+    ids of those it no longer lists. *)
+module Change : sig
+  type summary := t
+
+  type t =
+    { changed : summary list
+    ; removed : string list
+    }
+  [@@deriving sexp_of, equal]
+
+  (** [None] for an event without either: refetch [list_sessions]. *)
+  val of_json : Json.t -> t option Or_error.t
+
+  (** The list with the change made: the changed entries replace those with
+      their ids, or are added, where [list_sessions] would put them (most
+      recently updated first); the removed ones go. *)
+  val apply : t -> summary list -> summary list
+end

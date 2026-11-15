@@ -843,9 +843,8 @@ let serve_command =
          in
          Rpc_server.serve_questions server questions;
          search := Rpc_server.search_hits server;
-         Rpc_server.restore_resumes server;
          Rpc_server.clean_leftovers server;
-         Rpc_server.start_indexing server;
+         Rpc_server.start_background server;
          server
        in
        let router =

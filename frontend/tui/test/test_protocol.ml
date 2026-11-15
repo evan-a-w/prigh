@@ -1530,6 +1530,9 @@ let%expect_test "archived sessions and deleting them" =
          (parse {|{"id":"e9","parent":"e8","kind":"archived","archived":true}|})
        : Entry.t Or_error.t)];
   decode {|{"type":"event","event":"sessions_changed"}|};
+  decode
+    {|{"type":"event","event":"sessions_changed","changed":[{"id":"a","path":"/p","cwd":"/c","created_at":"x","message_count":2}],"removed":["b"]}|};
+  decode {|{"type":"event","event":"sessions_changed","removed":[3]}|};
   let result =
     Delete_result.of_json
       (parse

@@ -208,10 +208,10 @@ let%expect_test "the listing follows the directory and resets with the session" 
 let%expect_test "sessions moving in or out list the worktrees again" =
   let h = listed () in
   (* The same sessions where they were: nothing. *)
-  H.act h (Event Sessions_changed);
+  H.act h (Event (Sessions_changed None));
   H.reply h "list_sessions" sessions;
   [%expect {| (Rpc (method_ list_sessions) (params ()) (tag Sessions)) |}];
-  H.act h (Event Sessions_changed);
+  H.act h (Event (Sessions_changed None));
   H.reply
     h
     "list_sessions"

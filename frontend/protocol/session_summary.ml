@@ -30,6 +30,8 @@ type t =
   }
 [@@deriving sexp_of, equal]
 
+type summary = t
+
 let of_json j =
   let open Or_error.Let_syntax in
   let%bind id = Json.string_field j "id" in
@@ -103,3 +105,48 @@ let size_string bytes =
 ;;
 
 let total_bytes ts = List.sum (module Int) ts ~f:(fun t -> t.bytes)
+
+module Change = struct
+  type nonrec t =
+    { changed : t list
+    ; removed : string list
+    }
+  [@@deriving sexp_of, equal]
+
+  let of_json j =
+    let open Or_error.Let_syntax in
+    match Json.field j "changed", Json.field j "removed" with
+    | None, None -> Ok None
+    | _ ->
+      let%bind changed = Json.optional_list_field j "changed" ~f:of_json in
+      let%map removed =
+        Json.optional_list_field j "removed" ~f:(function
+          | `String id -> Ok id
+          | _ -> Or_error.error_string "removed: expected session ids")
+      in
+      Some { changed; removed }
+  ;;
+
+  (* Newest first, as [list_sessions] orders them: [updated_at] is the
+     file's mtime in a fixed-width UTC format, so its order is time's. *)
+  let insert sessions (s : summary) =
+    let newer (o : summary) =
+      match o.updated_at, s.updated_at with
+      | Some o, Some s -> String.( >= ) o s
+      | None, Some _ -> true
+      | _, None -> false
+    in
+    let before, after = List.split_while sessions ~f:newer in
+    before @ (s :: after)
+  ;;
+
+  let apply { changed; removed } sessions =
+    let gone =
+      String.Set.of_list (removed @ List.map changed ~f:(fun (s : summary) -> s.id))
+    in
+    List.fold
+      changed
+      ~init:(List.filter sessions ~f:(fun (s : summary) -> not (Set.mem gone s.id)))
+      ~f:insert
+  ;;
+end

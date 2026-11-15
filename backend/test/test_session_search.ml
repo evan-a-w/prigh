@@ -417,7 +417,7 @@ let%expect_test "index: yields as it goes; a search meanwhile waits for it" =
     |}]
 ;;
 
-let%expect_test "start_indexing: the index is built without a search" =
+let%expect_test "start_background: the index is built without a search" =
   with_sandbox
   @@ fun t ->
   Eio.Switch.run
@@ -426,7 +426,7 @@ let%expect_test "start_indexing: the index is built without a search" =
     (saved t ~at:200. [ Message.user "make the port configurable" ] : Session.t);
   ignore (saved t ~at:100. [ Message.user "the phone layout" ] : Session.t);
   let server = server t ~sw in
-  Rpc_server.start_indexing server;
+  Rpc_server.start_background server;
   printf "at start: %d\n" (Rpc_server.indexed_sessions server);
   (* Waits for the indexing under way rather than starting another. *)
   Rpc_server.index_sessions server;

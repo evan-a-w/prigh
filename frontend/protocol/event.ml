@@ -158,7 +158,7 @@ type t =
       { gen_id : string
       ; delta : string
       } (** streamed text of our own [generate_text] request *)
-  | Sessions_changed
+  | Sessions_changed of Session_summary.Change.t option
   | Temporary_ended of
       { session : string
       ; messages : int
@@ -243,7 +243,8 @@ let rec of_json j =
   | "notice" -> Json.string_field j "text" >>| fun t -> Notice t
   | "review" ->
     Json.object_field j "review" >>= Review.of_json >>| fun r -> Review r
-  | "sessions_changed" -> Ok Sessions_changed
+  | "sessions_changed" ->
+    Session_summary.Change.of_json j >>| fun change -> Sessions_changed change
   | "temporary_ended" ->
     let%bind session = Json.string_field j "session" in
     let%bind messages = Json.int_field j "messages" in

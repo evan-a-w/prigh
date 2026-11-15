@@ -2307,13 +2307,13 @@ let%expect_test
   =
   (* Nothing shows sessions: nothing to fetch. *)
   let h = connected () in
-  H.event h Sessions_changed;
+  H.event h (Sessions_changed None);
   [%expect {| |}];
   (* The completion's list is kept current. *)
   H.keys h "/switch ";
   H.reply ~quiet:true h Sessions_cache sessions_json;
   H.key h (Key.ctrl 'u');
-  H.event h Sessions_changed;
+  H.event h (Sessions_changed None);
   [%expect
     {|
     (Rpc (method_ list_sessions) (params ()) (tag Sessions_cache))
@@ -2367,7 +2367,7 @@ let%expect_test
     >
     deepseek-flash  $0.01  1 marked (2.0 KB) · Enter switches · Tab marks · Ctrl+D deletes · Esc closes
     |}];
-  H.event h Sessions_changed;
+  H.event h (Sessions_changed None);
   [%expect
     {| (Rpc (method_ list_sessions) (params ()) (tag Sessions_refresh)) |}];
   (* 3a is gone, deploy finished its background work and a new one came

@@ -633,13 +633,193 @@ let maybe_evict t agent =
     then File_cache.set t.loaded (Session.path session) session)
 ;;
 
-(* Every client of the server, whichever session it is in: they refetch
-   [list_sessions]. *)
-let sessions_changed t =
-  let json =
-    `Object [ "type", `String "event"; "event", `String "sessions_changed" ]
+(* Parsing a large session file takes a while (a second for 80 MB): it
+   yields as it goes, so that every other client is served meanwhile, and
+   those who want the same file meanwhile wait for the same parse, which
+   finishes even if whoever started it goes (the next one finds it
+   cached). *)
+let load_session t path =
+  match Hashtbl.find t.loading path with
+  | Some loading -> Promise.await loading
+  | None ->
+    let loading, resolve = Promise.create () in
+    Hashtbl.set t.loading ~key:path ~data:loading;
+    let result =
+      match
+        Eio.Cancel.protect (fun () -> Session.load ~yield:Fiber.yield path)
+      with
+      | result -> result
+      | exception exn -> Or_error.of_exn exn
+    in
+    Hashtbl.remove t.loading path;
+    Promise.resolve resolve result;
+    result
+;;
+
+(* The live sessions by their files' paths. *)
+let live_sessions t =
+  let live = String.Table.create () in
+  Hashtbl.iter t.agents ~f:(fun agent ->
+    let session = Agent.session agent in
+    Hashtbl.set live ~key:(Session.path session) ~data:session);
+  Hashtbl.find live
+;;
+
+(* The saved sessions; the live ones' files are summed up from memory, as
+   they grow with every message. *)
+let saved_sessions t =
+  Session.list_with
+    ~live:(live_sessions t)
+    ~load:(load_session t)
+    ~dir:t.sessions_dir
+;;
+
+(* The file is reread so that a change made from another session counts. *)
+let archive_after_days t (client : Client.t) =
+  let config =
+    match Option.map t.home ~f:(fun home -> Config.load ~home) with
+    | Some (Ok config) -> config
+    | Some (Error _) | None -> Agent.config client.agent
   in
-  Hashtbl.iter t.clients ~f:(fun (c : Client.t) -> c.send json)
+  config.archive_after_days
+;;
+
+(* A saved session as [list_sessions] shows it. *)
+module Listing = struct
+  type t =
+    { summary : Session.Summary.t
+    ; agent : Agent.t option
+    ; active : bool (** a run, or background work *)
+    ; background : int
+    ; archived : bool
+    }
+end
+
+(* A saved session as [list_sessions] shows it to [client]. *)
+let listing t ~now ~archive_after_days summary =
+  let agent = Hashtbl.find t.agents summary.Session.Summary.id in
+  let background =
+    Option.value_map agent ~default:0 ~f:Agent.running_background
+  in
+  let active = background > 0 || Option.exists agent ~f:Agent.is_running in
+  { Listing.summary
+  ; agent
+  ; active
+  ; background
+  ; archived =
+      Session.Summary.is_archived summary ~now ~archive_after_days ~active
+  }
+;;
+
+let listings t client =
+  let now = t.now () in
+  let archive_after_days = archive_after_days t client in
+  List.map (saved_sessions t) ~f:(listing t ~now ~archive_after_days)
+;;
+
+(* Sessions from before repositories were recorded (or whose host could not
+   tell) on the backend's own host: their cwd is looked up here, once. *)
+let with_repo t (s : Session.Summary.t) =
+  match s.repo with
+  | Some _ -> s
+  | None ->
+    let on_backend =
+      Option.value_map
+        s.host
+        ~default:true
+        ~f:(String.equal Agent.Host.backend_id)
+    in
+    if t.backend_host && on_backend
+    then (
+      let repo =
+        Hashtbl.find_or_add t.repos s.cwd ~default:(fun () ->
+          Git_location.find ~cwd:s.cwd)
+      in
+      { s with repo = Some repo })
+    else s
+;;
+
+let listing_json t (l : Listing.t) =
+  let bool b = if b then `True else `False in
+  let int n = `Number (Int.to_string n) in
+  let live =
+         match l.agent with
+         | Some agent ->
+           [ "live", `True
+           ; "clients", int (List.length (clients_of t agent))
+           ; "waiting", int (waiting agent)
+           ]
+         | None -> [ "live", `False ]
+       in
+       match Rpc_json.session_summary (with_repo t l.summary) with
+       | `Object fields ->
+         `Object
+           (fields
+            @ live
+            @ [ "running", bool l.active
+              ; "background", int l.background
+              ; "archived", bool l.archived
+              ])
+       | other -> other
+;;
+
+let list_sessions t client =
+  `Array (List.map (listings t client) ~f:(listing_json t))
+;;
+
+
+(* Every client of the server, whichever session it is in. With [changed]
+   (sessions whose entries changed, in memory as they are now) or
+   [removed] (session ids), they get those sessions' [list_sessions]
+   entries as they would see them and the ids of those no longer listed;
+   without, they refetch [list_sessions]. *)
+let sessions_changed ?(changed = []) ?(removed = []) t =
+  let event fields =
+    `Object
+      ([ "type", `String "event"; "event", `String "sessions_changed" ]
+       @ fields)
+  in
+  if List.is_empty changed && List.is_empty removed
+  then (
+    let json = event [] in
+    Hashtbl.iter t.clients ~f:(fun (c : Client.t) -> c.send json))
+  else (
+    let live_now = live_sessions t in
+    let live path =
+      match
+        List.find changed ~f:(fun s -> String.equal (Session.path s) path)
+      with
+      | Some session -> Some session
+      | None -> live_now path
+    in
+    let summaries, gone =
+      List.partition_map changed ~f:(fun session ->
+        match
+          Session.summary_with ~live ~load:(load_session t) (Session.path session)
+        with
+        | Some summary -> First summary
+        | None -> Second (Session.id session))
+    in
+    let removed =
+      ( "removed"
+      , `Array
+          (List.map
+             (List.dedup_and_sort (removed @ gone) ~compare:String.compare)
+             ~f:(fun id -> `String id)) )
+    in
+    let now = t.now () in
+    Hashtbl.iter t.clients ~f:(fun (c : Client.t) ->
+      let archive_after_days = archive_after_days t c in
+      c.send
+        (event
+           [ ( "changed"
+             , `Array
+                 (List.map summaries ~f:(fun summary ->
+                    listing_json
+                      t
+                      (listing t ~now ~archive_after_days summary))) )
+           ; removed
+           ])))
 ;;
 
 (* Only for changes: what is shown at [register] is the baseline. *)
@@ -653,7 +833,7 @@ let note_listed t agent =
     if not (Listed.equal before listed)
     then (
       Hashtbl.set t.listed ~key:id ~data:listed;
-      sessions_changed t)
+      sessions_changed t ~changed:[ Agent.session agent ])
   | Some _ | None -> ()
 ;;
 
@@ -1001,7 +1181,8 @@ let create
     ; listed = String.Table.create ()
     ; on_session_deleted = []
     ; loading = String.Table.create ()
-    ; search = Session_search.create ()
+    ; search =
+        Session_search.create ~file:(Session_search.file ~dir:sessions_dir) ()
     ; repos = String.Table.create ()
     ; nix_store
     ; temporaries = String.Table.create ()
@@ -1159,42 +1340,6 @@ let fresh_agent t =
   agent
 ;;
 
-(* Parsing a large session file takes a while (a second for 80 MB): it
-   yields as it goes, so that every other client is served meanwhile, and
-   those who want the same file meanwhile wait for the same parse, which
-   finishes even if whoever started it goes (the next one finds it
-   cached). *)
-let load_session t path =
-  match Hashtbl.find t.loading path with
-  | Some loading -> Promise.await loading
-  | None ->
-    let loading, resolve = Promise.create () in
-    Hashtbl.set t.loading ~key:path ~data:loading;
-    let result =
-      match
-        Eio.Cancel.protect (fun () -> Session.load ~yield:Fiber.yield path)
-      with
-      | result -> result
-      | exception exn -> Or_error.of_exn exn
-    in
-    Hashtbl.remove t.loading path;
-    Promise.resolve resolve result;
-    result
-;;
-
-(* The saved sessions; the live ones' files are summed up from memory, as
-   they grow with every message. *)
-let saved_sessions t =
-  Session.list_with
-    ~live:(fun path ->
-      Hashtbl.data t.agents
-      |> List.find_map ~f:(fun agent ->
-        let session = Agent.session agent in
-        Option.some_if (String.equal (Session.path session) path) session))
-    ~load:(load_session t)
-    ~dir:t.sessions_dir
-;;
-
 (* Sessions waiting for a usage limit to reset when the backend last ran are
    loaded again, so that they resume on time with nobody attached. *)
 let restore_resumes t =
@@ -1203,8 +1348,11 @@ let restore_resumes t =
     match summary.resume_at with
     | Some at when Float.( > ) at now && not (Hashtbl.mem t.agents summary.id)
       ->
-      (match Session.load summary.path with
-       | Ok session -> ignore (start_agent t session None : Agent.t)
+      (match load_session t summary.path with
+       | Ok session ->
+         (* Someone may have opened it while it was read. *)
+         if not (Hashtbl.mem t.agents summary.id)
+         then ignore (start_agent t session None : Agent.t)
        | Error error ->
          eprintf
            "prigh: session %s will not resume: %s\n%!"
@@ -1920,45 +2068,6 @@ let config_saved t agent =
     if not (phys_equal other agent) then Agent.adopt_config other config)
 ;;
 
-(* The file is reread so that a change made from another session counts. *)
-let archive_after_days t (client : Client.t) =
-  let config =
-    match Option.map t.home ~f:(fun home -> Config.load ~home) with
-    | Some (Ok config) -> config
-    | Some (Error _) | None -> Agent.config client.agent
-  in
-  config.archive_after_days
-;;
-
-(* A saved session as [list_sessions] shows it. *)
-module Listing = struct
-  type t =
-    { summary : Session.Summary.t
-    ; agent : Agent.t option
-    ; active : bool (** a run, or background work *)
-    ; background : int
-    ; archived : bool
-    }
-end
-
-let listings t client =
-  let now = t.now () in
-  let archive_after_days = archive_after_days t client in
-  List.map (saved_sessions t) ~f:(fun summary ->
-    let agent = Hashtbl.find t.agents summary.id in
-    let background =
-      Option.value_map agent ~default:0 ~f:Agent.running_background
-    in
-    let active = background > 0 || Option.exists agent ~f:Agent.is_running in
-    { Listing.summary
-    ; agent
-    ; active
-    ; background
-    ; archived =
-        Session.Summary.is_archived summary ~now ~archive_after_days ~active
-    })
-;;
-
 (* What a client changing session needs first, saving it a [get_state]. *)
 let attached_state (client : Client.t) =
   `Object [ "state", Rpc_json.state (Agent.state client.agent) ]
@@ -2039,64 +2148,13 @@ let new_session t (client : Client.t) ~temporary =
   | state, _ -> state
 ;;
 
-(* Sessions from before repositories were recorded (or whose host could not
-   tell) on the backend's own host: their cwd is looked up here, once. *)
-let with_repo t (s : Session.Summary.t) =
-  match s.repo with
-  | Some _ -> s
-  | None ->
-    let on_backend =
-      Option.value_map
-        s.host
-        ~default:true
-        ~f:(String.equal Agent.Host.backend_id)
-    in
-    if t.backend_host && on_backend
-    then (
-      let repo =
-        Hashtbl.find_or_add t.repos s.cwd ~default:(fun () ->
-          Git_location.find ~cwd:s.cwd)
-      in
-      { s with repo = Some repo })
-    else s
-;;
-
-let list_sessions t client =
-  let bool b = if b then `True else `False in
-  let int n = `Number (Int.to_string n) in
-  `Array
-    (List.map (listings t client) ~f:(fun (l : Listing.t) ->
-       let live =
-         match l.agent with
-         | Some agent ->
-           [ "live", `True
-           ; "clients", int (List.length (clients_of t agent))
-           ; "waiting", int (waiting agent)
-           ]
-         | None -> [ "live", `False ]
-       in
-       match Rpc_json.session_summary (with_repo t l.summary) with
-       | `Object fields ->
-         `Object
-           (fields
-            @ live
-            @ [ "running", bool l.active
-              ; "background", int l.background
-              ; "archived", bool l.archived
-              ])
-       | other -> other))
-;;
-
 (* A session for [search_sessions]' index: the live one's from memory. *)
 let load_for_search t (s : Session.Summary.t) =
-  let live =
-    Hashtbl.data t.agents
-    |> List.find_map ~f:(fun agent ->
-      let session = Agent.session agent in
-      Option.some_if (String.equal (Session.path session) s.path) session)
-  in
-  match live with
-  | Some session -> Some session
+  match
+    Option.filter (Hashtbl.find t.agents s.id) ~f:(fun agent ->
+      String.equal (Session.path (Agent.session agent)) s.path)
+  with
+  | Some agent -> Some (Agent.session agent)
   | None -> Result.ok (load_session t s.path)
 ;;
 
@@ -2110,8 +2168,9 @@ let index_sessions t =
 
 let indexed_sessions t = Session_search.indexed t.search
 
-let start_indexing t =
+let start_background t =
   Fiber.fork_daemon ~sw:t.sw (fun () ->
+    restore_resumes t;
     (match index_sessions t with
      | () -> ()
      | exception (Eio.Cancel.Cancelled _ as exn) -> raise exn
@@ -2297,7 +2356,11 @@ let delete_many ?switch_to t client keys =
             delete_saved ~leaving:(Option.is_some switch_to) t client summary) ))
     in
     let deleted = List.filter_map results ~f:(fun (_, r) -> Result.ok r) in
-    if not (List.is_empty deleted) then sessions_changed t;
+    if not (List.is_empty deleted)
+    then
+      sessions_changed
+        t
+        ~removed:(List.map deleted ~f:(fun (d : Deleted.t) -> d.id));
     let state =
       match state with
       | Some (`Object fields) -> fields
@@ -2336,7 +2399,7 @@ let set_archived t ~key ~archived =
       in
       Or_error.map session ~f:(fun session ->
         ignore (Session.set_archived session ~archived : Session.Entry.t);
-        sessions_changed t)))
+        sessions_changed t ~changed:[ session ])))
 ;;
 
 let set_pinned t ~key ~pinned =
@@ -2348,7 +2411,7 @@ let set_pinned t ~key ~pinned =
     in
     Or_error.map session ~f:(fun session ->
       ignore (Session.set_pinned session ~pinned : Session.Entry.t);
-      sessions_changed t))
+      sessions_changed t ~changed:[ session ]))
 ;;
 
 let exec_param t params =
@@ -2611,8 +2674,9 @@ let list_worktrees t (client : Client.t) params =
 
 (* The client's session records a worktree that matters to it. *)
 let record_worktree t (client : Client.t) (w : Session_worktree.t) =
-  ignore (Session.add_worktree (Agent.session client.agent) w : Session.Entry.t);
-  sessions_changed t
+  let session = Agent.session client.agent in
+  ignore (Session.add_worktree session w : Session.Entry.t);
+  sessions_changed t ~changed:[ session ]
 ;;
 
 let create_worktree t (client : Client.t) params =
@@ -2668,17 +2732,21 @@ let checkout_pull t (client : Client.t) params =
 
 (* The sessions (saved or live) whose worktrees include [path] forget it. *)
 let forget_worktree t client ~path =
-  List.filter (listings t client) ~f:(fun (l : Listing.t) ->
-    List.exists l.summary.worktrees ~f:(fun w -> String.equal w.path path))
-  |> List.iter ~f:(fun (l : Listing.t) ->
-    let session =
-      match l.agent with
-      | Some agent -> Ok (Agent.session agent)
-      | None -> session_to_read t l.summary.path
-    in
-    Or_error.iter session ~f:(fun session ->
-      ignore (Session.worktree_removed session ~path : Session.Entry.t)));
-  sessions_changed t
+  let changed =
+    List.filter (listings t client) ~f:(fun (l : Listing.t) ->
+      List.exists l.summary.worktrees ~f:(fun w -> String.equal w.path path))
+    |> List.filter_map ~f:(fun (l : Listing.t) ->
+      let session =
+        match l.agent with
+        | Some agent -> Ok (Agent.session agent)
+        | None -> session_to_read t l.summary.path
+      in
+      Result.ok session
+      |> Option.map ~f:(fun session ->
+        ignore (Session.worktree_removed session ~path : Session.Entry.t);
+        session))
+  in
+  if not (List.is_empty changed) then sessions_changed t ~changed
 ;;
 
 let remove_worktree t (client : Client.t) params =
@@ -2968,7 +3036,7 @@ let keep_session t (client : Client.t) =
     Temporary_ledger.remove ~dir:t.ledger_dir ~id;
     Agent.keep agent;
     Hashtbl.set t.listed ~key:id ~data:(Listed.of_agent agent);
-    sessions_changed t;
+    sessions_changed t ~changed:[ Agent.session agent ];
     Ok (attached_state client))
 ;;
 
@@ -3131,12 +3199,12 @@ let dispatch_server t (client : Client.t) ~meth ~params
        let%bind key = string_param params "path" in
        let%bind switch_to = Switch_to.of_params params in
        let%bind state = leave_for_deletion t client ~switch_to [ key ] in
-       let%map (_ : Deleted.t) =
+       let%map (deleted : Deleted.t) =
          Or_error.bind
            (find_saved t key)
            ~f:(delete_saved ~leaving:(Option.is_some switch_to) t client)
        in
-       sessions_changed t;
+       sessions_changed t ~removed:[ deleted.id ];
        Option.value state ~default:(`Object []))
   | "delete_sessions" ->
     Some
@@ -3180,7 +3248,7 @@ let dispatch_server t (client : Client.t) ~meth ~params
                  else loaded_start t client session
                in
                start_agent t session start |> attach t client;
-               sessions_changed t;
+               sessions_changed t ~changed:[ session ];
                `Object [ "path", `String (Session.path session) ]))))
   | "fork" | "clone" ->
     let at =
@@ -3199,7 +3267,8 @@ let dispatch_server t (client : Client.t) ~meth ~params
              | Some _ | None -> start_location t client ~cwd:(own_cwd client)
            in
            start_agent t session start |> attach t client;
-           if Session.persisted session then sessions_changed t;
+           if Session.persisted session
+           then sessions_changed t ~changed:[ session ];
            attached_state client))
   | "login" ->
     (* The flow may emit its first event before it is started. *)

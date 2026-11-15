@@ -17,8 +17,87 @@ module Key = struct
   [@@deriving sexp, equal, compare, hash]
 end
 
-let cache : (Key.t, Image.Fitted.t) Hashtbl.t = Hashtbl.create (module Key)
-let reset () = Hashtbl.clear cache
+module Cache = struct
+  module Entry = struct
+    type t =
+      { fitted : Image.Fitted.t
+      ; bytes : int
+      ; mutable used : int
+      }
+  end
+
+  type t =
+    { entries : (Key.t, Entry.t) Hashtbl.t
+    ; mutable bytes : int
+    ; mutable clock : int
+    ; mutable max_bytes : int
+    }
+
+  let t =
+    { entries = Hashtbl.create (module Key)
+    ; bytes = 0
+    ; clock = 0
+    ; max_bytes = 64 * 1024 * 1024
+    }
+  ;;
+
+  let reset () =
+    Hashtbl.clear t.entries;
+    t.bytes <- 0
+  ;;
+
+  let find key =
+    Option.map (Hashtbl.find t.entries key) ~f:(fun (e : Entry.t) ->
+      t.clock <- t.clock + 1;
+      e.used <- t.clock;
+      e.fitted)
+  ;;
+
+  let remove key =
+    Option.iter (Hashtbl.find_and_remove t.entries key) ~f:(fun e ->
+      t.bytes <- t.bytes - e.bytes)
+  ;;
+
+  (* The least recently used go first; it is small, so a scan is cheap. *)
+  let rec shrink () =
+    if t.bytes > t.max_bytes
+    then (
+      match
+        Hashtbl.fold t.entries ~init:None ~f:(fun ~key ~data:(e : Entry.t) acc ->
+          match acc with
+          | Some (_, (o : Entry.t)) when o.used <= e.used -> acc
+          | _ -> Some (key, e))
+      with
+      | Some (key, _) ->
+        remove key;
+        shrink ()
+      | None -> ())
+  ;;
+
+  let add key (fitted : Image.Fitted.t) =
+    let bytes =
+      String.length key.Key.digest
+      +
+      match fitted with
+      | Downscaled image -> String.length image.data
+      | Fits | Cannot _ -> 0
+    in
+    remove key;
+    t.clock <- t.clock + 1;
+    Hashtbl.set t.entries ~key ~data:{ fitted; bytes; used = t.clock };
+    t.bytes <- t.bytes + bytes;
+    shrink ()
+  ;;
+end
+
+let reset () = Cache.reset ()
+
+let set_max_bytes bytes =
+  Cache.t.max_bytes <- bytes;
+  Cache.shrink ()
+;;
+
+let cached () = Hashtbl.length Cache.t.entries
 
 let count messages =
   List.sum
@@ -43,12 +122,12 @@ let messages ~env ?cancel ?search_path limit messages =
         }
       in
       let fitted =
-        match Hashtbl.find cache key with
+        match Cache.find key with
         | Some fitted -> fitted
         | None ->
           let fitted = Image.fit ~env ?cancel ?search_path limit image in
           (match fitted with
-           | Fits | Downscaled _ -> Hashtbl.set cache ~key ~data:fitted
+           | Fits | Downscaled _ -> Cache.add key fitted
            | Cannot _ -> ());
           fitted
       in
