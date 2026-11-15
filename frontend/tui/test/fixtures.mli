@@ -62,6 +62,9 @@ val messages_json : string
 val user : ?images:P.Image.t list -> ?origin:P.Origin.t -> string -> P.Message.t
 val assistant : ?stop:string -> string -> P.Message.t
 val partial : P.Message.Assistant.t
+
+(** A [message_update] as a backend without numbered streams sends it. *)
+val unnumbered : P.Delta.t -> P.Stream_update.t
 val tool_call : ?name:string -> ?arguments:string -> string -> P.Tool_call.t
 
 val tool_result

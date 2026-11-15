@@ -106,6 +106,13 @@ val set_running : t -> bool -> t
 
 val apply : t -> Event.t -> t
 
+(** [apply] found pieces of a streamed message (this transcript's or a
+    subagent's) missing: ask the backend to [resync], which sends the whole
+    message so far, and say so with [resync_asked]. *)
+val wants_resync : t -> bool
+
+val resync_asked : t -> t
+
 (** Whether [apply] left the entries and tool calls as they were. *)
 val same_transcript : t -> t -> bool
 

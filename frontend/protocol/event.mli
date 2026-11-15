@@ -29,10 +29,7 @@ type t =
       ; tool_results : Message.Tool_result.t list
       }
   | Message_start of Message.t
-  | Message_update of
-      { partial : Message.Assistant.t
-      ; delta : Delta.t
-      }
+  | Message_update of Stream_update.t
   | Message_end of Message.t
   | Retry of Retry.t
   | Tool_start of Tool_call.t

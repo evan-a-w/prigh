@@ -252,6 +252,13 @@ let refused_image message ~(model : Model.t) ~limit =
        (Image.Limit.describe limit))
 ;;
 
+let streams = ref 0
+
+let next_stream () =
+  incr streams;
+  !streams
+;;
+
 let run
       ~env
       ~(provider : Provider.t)
@@ -453,12 +460,14 @@ let run
           }
         in
         let builder = Assistant_builder.create ~model:config.model.id in
-        emit (Message_start (Assistant (Assistant_builder.snapshot builder)));
+        let stream = next_stream () in
+        let seq = ref 0 in
+        let partial () = Assistant_builder.snapshot builder in
+        emit (Message_start (Assistant (partial ())));
         Model_trace.stream provider request ~cancel ~on_event:(fun delta ->
-          Assistant_builder.apply builder delta;
-          emit
-            (Message_update
-               { partial = Assistant_builder.snapshot builder; delta }))
+          let block = Assistant_builder.apply_block builder delta in
+          incr seq;
+          emit (Message_update { delta; block; stream; seq = !seq; partial }))
       in
       (* An overflowing request is masked, if there is anything to mask, or
          else compacted, and sent again, compacting up to

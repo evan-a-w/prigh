@@ -127,11 +127,20 @@ end
 
 type t =
   { items_rev : Item.t list
-  ; stream : (Stream_kind.t * string) option
+  ; stream : (Stream_kind.t * Stream_text.t) option
+  ; at : P.Stream_update.Position.t option
+    (** the last piece of the streaming message applied *)
+  ; message_start : int option
+    (** how many items there were when the streaming message started *)
+  ; resync : bool (** pieces of the streaming message were missed *)
   }
 [@@deriving sexp_of]
 
-let empty = { items_rev = []; stream = None }
+let empty =
+  { items_rev = []; stream = None; at = None; message_start = None; resync = false }
+;;
+
+let wants_resync t = t.resync
 let items t = List.rev t.items_rev
 
 let add t (item : Item.t) =
@@ -153,7 +162,8 @@ let filter t filter =
     let shows item =
       Option.for_all (Item.kind item) ~f:(Transcript_filter.shows filter)
     in
-    { items_rev = List.filter t.items_rev ~f:shows
+    { t with
+      items_rev = List.filter t.items_rev ~f:shows
     ; stream =
         Option.filter t.stream ~f:(fun (kind, _) ->
           Transcript_filter.shows
@@ -182,6 +192,7 @@ let flush t =
   | None -> t
   | Some (kind, text) ->
     let t = { t with stream = None } in
+    let text = Stream_text.contents text in
     if String.is_empty (String.strip text)
     then t
     else (
@@ -193,8 +204,8 @@ let flush t =
 let append t kind text =
   match t.stream with
   | Some (k, existing) when Stream_kind.equal k kind ->
-    { t with stream = Some (kind, existing ^ text) }
-  | _ -> { (flush t) with stream = Some (kind, text) }
+    { t with stream = Some (kind, Stream_text.append existing text) }
+  | _ -> { (flush t) with stream = Some (kind, Stream_text.of_string text) }
 ;;
 
 let mark_final t =
@@ -363,9 +374,9 @@ let update_server_tool t ~id ~f =
     add (flush t) (Server_tool { tool = f created; ended = false })
 ;;
 
-let server_tool_delta t ~(partial : P.Message.Assistant.t) (delta : P.Delta.t) =
+let server_tool_delta t ~(partial : P.Message.Assistant.t option) (delta : P.Delta.t) =
   let in_partial id =
-    List.find_map partial.content ~f:(function
+    List.find_map (Option.value_map partial ~default:[] ~f:(fun p -> p.content)) ~f:(function
       | P.Content.Server_tool s when String.equal s.id id -> Some s
       | _ -> None)
   in
@@ -541,6 +552,69 @@ let finish_subagent
   { t with items_rev = go [] t.items_rev }
 ;;
 
+let apply_delta t ?partial (delta : P.Delta.t) =
+  match delta with
+  | Text_delta text -> append t Text text
+  | Thinking_delta text -> append t Thinking text
+  | Server_tool_use _ | Server_tool_result _ ->
+    server_tool_delta t ~partial delta
+  | Thinking_signature | Tool_call_start _ | Tool_call_delta _ -> t
+;;
+
+(* What the streaming message added is made again from the whole message so
+   far: the items since it started, or the text streaming when that is not
+   known (it started before this transcript followed the session). *)
+let resync_to t (partial : P.Message.Assistant.t) ~at =
+  let streamed =
+    match t.message_start with
+    | Some start -> List.length t.items_rev - start
+    | None -> 0
+  in
+  let rec drop items n =
+    match items with
+    | (Item.Assistant { final = false; _ } | Thinking _ | Server_tool _)
+      :: rest
+      when n > 0 -> drop rest (n - 1)
+    | _ -> items
+  in
+  let t = { t with items_rev = drop t.items_rev streamed; stream = None } in
+  let message_start =
+    Some (Option.value t.message_start ~default:(List.length t.items_rev))
+  in
+  let t =
+    List.fold partial.content ~init:t ~f:(fun t -> function
+      | P.Content.Text text -> append t Text text
+      | Thinking text -> append t Thinking text
+      | Server_tool s -> update_server_tool t ~id:s.id ~f:(fun _ -> s)
+      | Tool_call _ -> t)
+  in
+  { t with at = Some at; resync = false; message_start }
+;;
+
+let stream_update t (u : P.Stream_update.t) =
+  let at = { P.Stream_update.Position.stream = u.stream; seq = u.seq } in
+  match u.partial, t.at with
+  | _, _ when u.seq = 0 ->
+    (* An older backend's, whose updates are not numbered (and each has the
+       whole message). *)
+    apply_delta t ?partial:u.partial u.delta
+  | Some partial, _ -> resync_to t partial ~at
+  | None, _ when u.from = 1 ->
+    let t =
+      match t.at, t.message_start with
+      | None, Some _ -> t
+      | _ -> { (flush t) with message_start = None }
+    in
+    let message_start =
+      Some (Option.value t.message_start ~default:(List.length t.items_rev))
+    in
+    { (apply_delta t u.delta) with at = Some at; resync = false; message_start }
+  | None, Some last when last.stream = u.stream && u.seq <= last.seq -> t
+  | None, Some last when last.stream = u.stream && u.from = last.seq + 1 ->
+    { (apply_delta t u.delta) with at = Some at }
+  | None, (Some _ | None) -> { t with resync = true }
+;;
+
 (** The single event-to-transcript function shared by the main transcript and
     every subagent view. *)
 let apply t (event : P.Event.t) =
@@ -548,16 +622,19 @@ let apply t (event : P.Event.t) =
   | P.Event.State state -> if state.running then t else flush t
   | P.Event.Message_start (P.Message.User user) ->
     List.fold (user_items user) ~init:t ~f:add
+  | P.Event.Message_start (P.Message.Assistant _) ->
+    let t = flush t in
+    { t with
+      at = None
+    ; message_start = Some (List.length t.items_rev)
+    ; resync = false
+    }
   | P.Event.Message_start _ -> t
-  | P.Event.Message_update { delta = P.Delta.Text_delta text; _ } ->
-    append t Text text
-  | P.Event.Message_update { delta = P.Delta.Thinking_delta text; _ } ->
-    append t Thinking text
-  | P.Event.Message_update
-      { delta = (Server_tool_use _ | Server_tool_result _) as delta; partial }
-    -> server_tool_delta t ~partial delta
-  | P.Event.Message_update _ -> t
+  | P.Event.Message_update update -> stream_update t update
   | P.Event.Message_end (P.Message.Assistant a) ->
+    let t =
+      { t with at = None; message_start = None; resync = false }
+    in
     let t = settle_server_tools (flush t) a in
     let t =
       match a.stop_reason with
@@ -949,8 +1026,9 @@ let render_item
 let live_items t : Item.t list =
   match t.stream with
   | None -> []
-  | Some (Text, text) -> [ Item.Assistant { text; final = false } ]
-  | Some (Thinking, text) -> [ Item.Thinking text ]
+  | Some (Text, text) ->
+    [ Item.Assistant { text = Stream_text.contents text; final = false } ]
+  | Some (Thinking, text) -> [ Item.Thinking (Stream_text.contents text) ]
 ;;
 
 let all_items_rev t = List.rev_append (live_items t) t.items_rev
@@ -974,10 +1052,10 @@ let render_tail ?sessions t ~width ~rows ~skip ~verbosity : Content.t =
   List.take window (Int.max 0 (List.length window - skip))
 ;;
 
-let finished t =
-  List.count t.items_rev ~f:(function
-    | Item.Tool { result = None; _ } | Server_tool { ended = false; _ } -> false
-    | _ -> true)
+let finished item =
+  match (item : Item.t) with
+  | Tool { result = None; _ } | Server_tool { ended = false; _ } -> false
+  | _ -> true
 ;;
 
 let line_count ?sessions t ~width ~verbosity =
@@ -985,6 +1063,50 @@ let line_count ?sessions t ~width ~verbosity =
     (module Int)
     (all_items_rev t)
     ~f:(fun item -> List.length (render_item ?sessions item ~width ~verbosity))
+;;
+
+module Arrivals = struct
+  type t =
+    { lines : int
+    ; items : int
+    }
+  [@@deriving sexp_of]
+end
+
+let shown = filter
+
+let arrivals ?sessions ~before t ~filter ~width ~verbosity : Arrivals.t =
+  (* The older items [before] and [t] still share are left out. *)
+  let a = before.items_rev
+  and b = t.items_rev in
+  let la = List.length a
+  and lb = List.length b in
+  let rec common a b =
+    if phys_equal a b
+    then a
+    else (
+      match a, b with
+      | _ :: a, _ :: b -> common a b
+      | [], _ | _, [] -> [])
+  in
+  let shared =
+    List.length (common (List.drop a (la - lb)) (List.drop b (lb - la)))
+  in
+  let count t items =
+    let t =
+      shown
+        { t with items_rev = List.take items (List.length items - shared) }
+        filter
+    in
+    ( List.sum
+        (module Int)
+        (all_items_rev t)
+        ~f:(fun item -> List.length (render_item ?sessions item ~width ~verbosity))
+    , List.count t.items_rev ~f:finished )
+  in
+  let lines_before, items_before = count before a in
+  let lines, items = count t b in
+  { lines = lines - lines_before; items = items - items_before }
 ;;
 
 let render_all ?sessions t ~width ~verbosity : Content.t =

@@ -81,8 +81,11 @@ let%expect_test "anthropic: a search streams as a server tool between text" =
        (Option.value_exn
           (Json.member "content" (Rpc_json.message (Assistant message)))))
     ~f:(fun c -> print_endline (Json.to_string c));
+  let blocks = Assistant_builder.create ~model:"m" in
   List.iter events ~f:(fun e ->
-    print_endline (Json.to_string (Rpc_json.delta e)));
+    print_endline
+      (Json.to_string
+         (Rpc_json.delta e ~block:(Assistant_builder.apply_block blocks e))));
   [%expect
     {|
     {"type":"text","text":"Let me search."}

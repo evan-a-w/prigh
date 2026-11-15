@@ -478,22 +478,31 @@ let transcript_rows m =
 
 (* Counts what [change] appended beneath an anchored viewport. *)
 let counting_arrivals m ~change =
-  let lines = transcript_line_count m in
-  let items = Transcript.finished (focused_transcript m) in
-  let m = change m in
   match m.viewport with
-  | Viewport.Follow -> m
-  | Viewport.Anchored { top; new_lines; new_items } ->
-    { m with
-      viewport =
-        Viewport.Anchored
-          { top
-          ; new_lines = new_lines + Int.max 0 (transcript_line_count m - lines)
-          ; new_items =
-              new_items
-              + Int.max 0 (Transcript.finished (focused_transcript m) - items)
-          }
-    }
+  | Viewport.Follow -> change m
+  | Viewport.Anchored _ ->
+    let before = unfiltered_transcript m in
+    let m = change m in
+    (match m.viewport with
+     | Viewport.Follow -> m
+     | Viewport.Anchored { top; new_lines; new_items } ->
+       let added =
+         Transcript.arrivals
+           ~sessions:m.known_sessions
+           ~before
+           (unfiltered_transcript m)
+           ~filter:m.transcript_filter
+           ~width:(transcript_width m)
+           ~verbosity:m.verbosity
+       in
+       { m with
+         viewport =
+           Viewport.Anchored
+             { top
+             ; new_lines = new_lines + Int.max 0 added.lines
+             ; new_items = new_items + Int.max 0 added.items
+             }
+       })
 ;;
 
 (* The single place transcript edits go through so the anchored viewport can
@@ -6773,7 +6782,7 @@ let note_agent_message m ~agent_id (user : P.Message.User.t) =
            }))
 ;;
 
-let event m (e : P.Event.t) =
+let apply_event m (e : P.Event.t) =
   let m = with_transcript m ~f:(fun t -> Transcript.apply t e) in
   let m = { m with activity = Activity.apply m.activity e } in
   let m = update_agents m ~f:(fun agents -> Agent_view.apply_all agents e) in
@@ -6887,6 +6896,22 @@ let event m (e : P.Event.t) =
        if sessions_picker_shown m || Option.is_some m.sessions
        then m, [ rpc "list_sessions" ~tag:Sessions_refresh ]
        else m, [])
+;;
+
+(* A stream with pieces missed (the main agent's or a subagent's) is sent
+   again whole. *)
+let wants_resync m =
+  Transcript.wants_resync m.transcript
+  || List.exists m.agents ~f:(fun (a : Agent_view.t) ->
+    Transcript.wants_resync a.transcript)
+;;
+
+let event m e =
+  let wanted = wants_resync m in
+  let m, cmds = apply_event m e in
+  if (not wanted) && wants_resync m
+  then m, cmds @ [ rpc "resync" ~tag:Ignore ]
+  else m, cmds
 ;;
 
 (* ---- rpc replies ------------------------------------------------------ *)

@@ -154,6 +154,9 @@ val connect
   -> ?close:(string -> unit)
        (** ends the client's connection, with the reason (e.g. a newer
            connection from the same page, [hello]'s [tab], took over) *)
+  -> ?send_shared:(Json.t -> line:string Lazy.t -> unit)
+       (** [send] for an event sent to several clients: [line] is the JSON's
+           text, made once for them all *)
   -> t
   -> send:(Json.t -> unit)
   -> Client.t

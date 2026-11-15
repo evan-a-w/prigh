@@ -319,7 +319,7 @@ let%expect_test "no shift: queued messages while running" =
   H.event h (Message_start (user "go"));
   H.event
     h
-    (Message_update { partial; delta = Text_delta "Working on it, step one" });
+    (Message_update (unnumbered (Text_delta "Working on it, step one")));
   no_shift h ~f:(fun () ->
     H.keys h "and then this";
     H.key h (Key.alt Enter);
@@ -558,8 +558,7 @@ let%expect_test "screen: 100x30 and 160x40" =
            });
       H.event
         h
-        (Message_update
-           { partial; delta = Text_delta "Two files: a.ml and b.ml." });
+        (Message_update (unnumbered (Text_delta "Two files: a.ml and b.ml.")));
       H.show h;
       print_endline "";
       H.keys h "/mo";

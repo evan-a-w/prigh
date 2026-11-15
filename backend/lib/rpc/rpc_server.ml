@@ -3,6 +3,7 @@ open! Import
 
 let methods =
   [ "ping"
+  ; "resync"
   ; "hello"
   ; "list_users"
   ; "set_user"
@@ -230,6 +231,10 @@ let unit_result r = Or_error.map r ~f:(fun () -> `Object [])
 (* [hello]'s reply's [features]: what this backend takes beyond the basics
    ([pasted_text]: prompts' [pasted]). *)
 let backend_features = [ "pasted_text" ]
+
+(* A client's [hello] [features] with this takes [message_update]s as deltas
+   (see [Stream_sync]); without it each carries the whole message so far. *)
+let stream_deltas = "stream_deltas"
 let strings l = `Array (List.map l ~f:(fun s -> `String s))
 
 let pasted_field = function
@@ -349,6 +354,10 @@ module Client = struct
     ; signed_in : User_access.Signed_in.t option
       (** set when the router checked the credentials *)
     ; send : Json.t -> unit
+    ; send_shared : Json.t -> line:string Lazy.t -> unit
+      (** [send], given what [Json.to_string] makes of it, shared with the
+          other clients sent the same event *)
+    ; streams : Stream_sync.t (** what it was sent of streamed messages *)
     ; close : string -> unit
       (** ends the connection (the reason goes to stderr) *)
     ; mutable tab : string option
@@ -907,12 +916,38 @@ let exec_client t ~host exec_id =
 (* Hosts are global: every client that advertised tools, whichever session
    it is attached to. Execs are keyed by id (not by the answering client's
    session) so a host can run tools for other sessions. *)
-let route t agent (event : Agent.Event.t) =
-  let json =
-    Rpc_json.event
-      ~now:(Eio.Time.now (Eio.Stdenv.clock (Agent.env agent)))
-      event
+(* An event for every client of [agent], serialised once for all. A
+   [message_update] is sent as a delta to a client that has the stream so far,
+   or with the whole message to one that has not (a client that does not
+   take deltas: always). *)
+let send_to_clients t agent ~now (event : Agent.Event.t) json =
+  let line = lazy (Json.to_string json) in
+  let clients = clients_of t agent in
+  let update =
+    match event with
+    | Loop e -> Stream_sync.Update.of_event e
+    | _ -> None
   in
+  match update with
+  | None -> List.iter clients ~f:(fun c -> c.send_shared json ~line)
+  | Some update ->
+    let resync = lazy (Rpc_json.event ~now ~resync:true event) in
+    let resync_line = lazy (Json.to_string (force resync)) in
+    List.iter clients ~f:(fun c ->
+      let send : Stream_sync.Send.t =
+        if List.mem c.features stream_deltas ~equal:String.equal
+        then Stream_sync.send c.streams update
+        else Resync
+      in
+      match send with
+      | Skip -> ()
+      | Delta -> c.send_shared json ~line
+      | Resync -> c.send_shared (force resync) ~line:resync_line)
+;;
+
+let route t agent (event : Agent.Event.t) =
+  let now = Eio.Time.now (Eio.Stdenv.clock (Agent.env agent)) in
+  let json = Rpc_json.event ~now event in
   (match event with
    | Tool_exec { host; exec_id; _ } ->
      (match host_client t host with
@@ -934,7 +969,7 @@ let route t agent (event : Agent.Event.t) =
      Hashtbl.remove t.execs exec_id
    | Tool_exec_input { host; exec_id; _ } ->
      Option.iter (exec_client t ~host exec_id) ~f:(fun c -> c.send json)
-   | _ -> List.iter (clients_of t agent) ~f:(fun c -> c.send json));
+   | _ -> send_to_clients t agent ~now event json);
   (* A subagent's messages too: its tools may have made worktrees. *)
   let rec message_end : Agent_event.t -> bool = function
     | Message_end _ -> true
@@ -1366,7 +1401,7 @@ let restore_resumes t =
     | Some _ | None -> ())
 ;;
 
-let connect ?signed_in ?(close = fun _ -> ()) t ~send =
+let connect ?signed_in ?(close = fun _ -> ()) ?send_shared t ~send =
   t.client_seq <- t.client_seq + 1;
   let agent, placeholder =
     match t.default_agent with
@@ -1393,6 +1428,9 @@ let connect ?signed_in ?(close = fun _ -> ()) t ~send =
     ; authed = Option.is_none t.token || Option.is_some signed_in
     ; signed_in
     ; send
+    ; send_shared =
+        Option.value send_shared ~default:(fun json ~line:_ -> send json)
+    ; streams = Stream_sync.create ()
     ; close
     ; tab = None
     ; btws = String.Table.create ()
@@ -3384,6 +3422,9 @@ let ui_action_param params ~meth =
 let dispatch agent login ~(client : Client.t) ~meth ~params : Json.t Or_error.t =
   match meth with
   | "ping" -> ok (`String "pong")
+  | "resync" ->
+    Stream_sync.reset client.streams;
+    ok (`Object [])
   | ("prompt" | "steer" | "follow_up") as meth ->
     let open Or_error.Let_syntax in
     let%bind ui_action = ui_action_param params ~meth in
@@ -3956,13 +3997,17 @@ let serve_lines ?signed_in ?(finish_requests = false) t ~read_line ~write_line =
   Switch.run
   @@ fun sw ->
   let outbox = Outbox.create () in
-  let send = Update_coalescer.send (Update_coalescer.create outbox) in
+  let coalescer = Update_coalescer.create outbox in
+  let send json = Update_coalescer.send coalescer json in
+  let send_shared json ~line = Update_coalescer.send coalescer json ~line in
   (* A failed outbox also gives up on a write stuck on the peer. *)
   Fiber.fork ~sw (fun () ->
     Fiber.first
       (fun () -> Outbox.run outbox ~write:write_line)
       (fun () -> ignore (Promise.await (Outbox.failed outbox) : string)));
-  let client = connect ?signed_in t ~send ~close:(Outbox.fail outbox) in
+  let client =
+    connect ?signed_in t ~send ~send_shared ~close:(Outbox.fail outbox)
+  in
   Fiber.fork_daemon ~sw (fun () ->
     watch_heartbeats t client ~give_up:(Outbox.fail outbox);
     `Stop_daemon);

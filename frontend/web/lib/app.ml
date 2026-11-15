@@ -9772,6 +9772,11 @@ let event (m : Model.t) (e : Event.t) =
     | _ -> m.pending
   in
   let chat = Chat.apply m.chat e in
+  let chat, ask_resync =
+    if Chat.wants_resync chat
+    then Chat.resync_asked chat, [ rpc "resync" [] ~tag:Ignore ]
+    else chat, []
+  in
   let m =
     { m with
       chat
@@ -9806,7 +9811,8 @@ let event (m : Model.t) (e : Event.t) =
     else m, []
   in
   ( m
-  , resync
+  , ask_resync
+    @ resync
     @ cmds
     @ review
     @ if Agents.starts_or_ends e then [ list_subagents ] else [] )

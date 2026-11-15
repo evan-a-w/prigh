@@ -8,6 +8,12 @@ type t =
   ; activity : Prigh_ui.Activity.t
   ; first : int
   ; detached : detached String.Map.t [@sexp_drop_if Map.is_empty]
+  ; stream : Stream_update.Position.t option [@sexp.option]
+    (** where the streaming message (the newest entry) is *)
+  ; lost : bool [@sexp_drop_if not]
+    (** pieces of the streaming message were missed *)
+  ; ask_resync : bool [@sexp_drop_if not]
+    (** this transcript's or a subagent's stream newly lost pieces *)
   }
 
 and entry =
@@ -93,6 +99,9 @@ let empty =
   ; activity = Idle
   ; first = 0
   ; detached = String.Map.empty
+  ; stream = None
+  ; lost = false
+  ; ask_resync = false
   }
 ;;
 
@@ -320,6 +329,39 @@ let update_subagent t call_id ~f =
     }
 ;;
 
+let streaming t =
+  match t.rev_entries with
+  | Assistant { message; streaming = true } :: _ -> Some message
+  | _ -> None
+;;
+
+let stream_update t (update : Stream_update.t) =
+  let current = streaming t in
+  let message =
+    Option.value
+      current
+      ~default:
+        { Message.Assistant.content = []
+        ; stop_reason = End_turn
+        ; usage = Usage.zero
+        ; model = ""
+        ; at = None
+        }
+  in
+  let at = Option.bind current ~f:(fun _ -> t.stream) in
+  match Stream_update.apply update ~at message with
+  | Updated (at, message) ->
+    set_assistant
+      { t with stream = Some at; lost = false }
+      message
+      ~streaming:true
+  | Unchanged -> t
+  | Gap -> if t.lost then t else { t with lost = true; ask_resync = true }
+;;
+
+let wants_resync t = t.ask_resync
+let resync_asked t = if t.ask_resync then { t with ask_resync = false } else t
+
 let rec apply t (event : Event.t) =
   let t =
     match event with
@@ -342,10 +384,11 @@ let rec apply t (event : Event.t) =
               u.text
               ~prefix:(sprintf "$ %s\n" (shell_command call)) -> t
      | _ -> add t (User u))
-  | Message_start (Assistant a) -> set_assistant t a ~streaming:true
-  | Message_update { partial; delta = _ } ->
-    set_assistant t partial ~streaming:true
-  | Message_end (Assistant a) -> set_assistant t a ~streaming:false
+  | Message_start (Assistant a) ->
+    set_assistant { t with stream = None; lost = false } a ~streaming:true
+  | Message_update update -> stream_update t update
+  | Message_end (Assistant a) ->
+    set_assistant { t with stream = None; lost = false } a ~streaming:false
   | Message_end (Tool_result r) -> set_result t r
   | Message_start (Tool_result _) | Message_end (User _) -> t
   | Retry _ ->
@@ -392,13 +435,20 @@ let rec apply t (event : Event.t) =
                })
       })
   | Subagent { call_id; agent_id = _; event } ->
-    update_subagent t call_id ~f:(fun s ->
-      let turns =
-        match event with
-        | Turn_start -> s.turns + 1
-        | _ -> s.turns
-      in
-      { s with chat = apply s.chat event; turns })
+    (* A gap in the subagent's stream is asked about from here. *)
+    let ask = ref false in
+    let t =
+      update_subagent t call_id ~f:(fun s ->
+        let turns =
+          match event with
+          | Turn_start -> s.turns + 1
+          | _ -> s.turns
+        in
+        let chat = apply s.chat event in
+        ask := chat.ask_resync;
+        { s with chat = resync_asked chat; turns })
+    in
+    if !ask then { t with ask_resync = true } else t
   | Subagent_end { call_id; result; turns; cost_usd; _ } ->
     update_subagent t call_id ~f:(fun s ->
       { s with result = Some result; turns; cost_usd = Some cost_usd })
@@ -556,6 +606,9 @@ let reconcile ~old fresh =
       ; activity = old.activity
       ; first = old.first
       ; detached = old.detached
+      ; stream = old.stream
+      ; lost = old.lost
+      ; ask_resync = false
       }
 ;;
 

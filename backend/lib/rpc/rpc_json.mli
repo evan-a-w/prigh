@@ -9,7 +9,7 @@ val message : Message.t -> Json.t
 (** [message] with ["at"], milliseconds since the epoch, when known. *)
 val timed_message : Timed_message.t -> Json.t
 
-val delta : Assistant_event.t -> Json.t
+val delta : Assistant_event.t -> block:int -> Json.t
 val state : Agent.State.t -> Json.t
 
 (** What [trim] or [untrim] took out or brought back: [{messages, tokens}]. *)
@@ -71,8 +71,11 @@ val auth_status : Provider_auth.Status.t -> Json.t
     the messages of [message_start] and [message_end] events, also nested in
     [subagent] ones, carry it as their ["at"]: a [message_end] is sent as its
     message is appended to the session, so it agrees with [get_messages]
-    (and [get_subagent]) to within milliseconds. *)
-val event : ?now:float -> Agent.Event.t -> Json.t
+    (and [get_subagent]) to within milliseconds. A [message_update] carries
+    only its delta (and the stream's id and the delta's [seq]), unless
+    [resync]: then also the whole message so far ([partial]), for a client
+    that has not followed the stream from its start. *)
+val event : ?now:float -> ?resync:bool -> Agent.Event.t -> Json.t
 
 (** [("type", "event"); ("event", "auth"); ("kind", ...); ...fields]. *)
 val login_event : Login_manager.Event.t -> Json.t

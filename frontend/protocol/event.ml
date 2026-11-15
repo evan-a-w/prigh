@@ -42,10 +42,7 @@ type t =
       ; tool_results : Message.Tool_result.t list
       }
   | Message_start of Message.t
-  | Message_update of
-      { partial : Message.Assistant.t
-      ; delta : Delta.t
-      }
+  | Message_update of Stream_update.t
   | Message_end of Message.t
   | Retry of Retry.t
   | Tool_start of Tool_call.t
@@ -192,12 +189,7 @@ let rec of_json j =
     Json.object_field j "message"
     >>= Message.of_json
     >>| fun m -> Message_start m
-  | "message_update" ->
-    let%bind partial =
-      Json.object_field j "partial" >>= Message.Assistant.of_json
-    in
-    let%map delta = Json.object_field j "delta" >>= Delta.of_json in
-    Message_update { partial; delta }
+  | "message_update" -> Stream_update.of_json j >>| fun u -> Message_update u
   | "message_end" ->
     Json.object_field j "message" >>= Message.of_json >>| fun m -> Message_end m
   | "retry" -> Retry.of_json j >>| fun r -> Retry r

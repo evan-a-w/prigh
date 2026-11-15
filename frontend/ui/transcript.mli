@@ -110,6 +110,11 @@ val add_message : t -> P.Message.t -> t
     every subagent's transcript. *)
 val apply : t -> P.Event.t -> t
 
+(** Pieces of the streaming message were missed ([apply] drops what comes
+    after them): ask the backend to [resync], which sends the whole message
+    so far. *)
+val wants_resync : t -> bool
+
 val notice : ?severity:Severity.t -> t -> string -> t
 
 (** Unfolds ([Some messages]) or folds the [Trimmed] divider whose [after]
@@ -156,9 +161,6 @@ val render_tail
   -> verbosity:Verbosity.t
   -> Content.t
 
-(** How many items are complete: messages, notices, tools with their result
-    (a running tool and the text still streaming do not count). *)
-val finished : t -> int
 
 (** Total wrapped line count, for scroll clamping. *)
 val line_count
@@ -167,6 +169,28 @@ val line_count
   -> width:int
   -> verbosity:Verbosity.t
   -> int
+
+module Arrivals : sig
+  type t =
+    { lines : int
+    ; items : int (** complete ones *)
+    }
+  [@@deriving sexp_of]
+end
+
+(** What changed between [before] and [t] (both unfiltered), as [filter]
+    shows them: the lines added, and the complete items (messages, notices,
+    tools with their result; not a running tool or the text still
+    streaming). Only the items that are not physically shared by both (the
+    newest ones, from the first that changed) are rendered. *)
+val arrivals
+  :  ?sessions:Session_link.Known.t
+  -> before:t
+  -> t
+  -> filter:Transcript_filter.t
+  -> width:int
+  -> verbosity:Verbosity.t
+  -> Arrivals.t
 
 (** Every wrapped line, oldest first. *)
 val render_all

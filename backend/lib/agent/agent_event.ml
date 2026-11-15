@@ -11,8 +11,13 @@ type t =
       }
   | Message_start of Message.t
   | Message_update of
-      { partial : Message.Assistant.t
-      ; delta : Assistant_event.t
+      { delta : Assistant_event.t
+      ; block : int (** the index in the content of the block [delta] changed *)
+      ; stream : int (** the streamed message's id, unique in the process *)
+      ; seq : int (** [delta]'s number in the stream, from 1 *)
+      ; partial : (unit -> Message.Assistant.t) [@sexp.opaque]
+        (** the whole message so far (through [seq] only while the event is
+            emitted), for a frontend that has to catch up *)
       }
   | Message_end of Message.t
   | Retry of
