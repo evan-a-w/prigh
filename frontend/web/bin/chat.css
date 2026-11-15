@@ -1378,3 +1378,26 @@ dialog.viewer::backdrop { background: transparent; }
 .pasted-text { margin: 0; padding: 10px 12px; max-height: 50vh; overflow: auto; font: 12px/1.5 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
 @media (prefers-reduced-motion: reduce) { .pasted-head > .chev { transition: none; } }
 @media (pointer: coarse) { .pasted-head { min-height: 44px; align-items: center; align-content: center; } }
+
+/* A wrapped line continues under its own indent (--hang, set per line by
+   Diff_view.text_attrs: the indent plus 2ch), a faint rule down the
+   continuation's gutter saying it is the same line. The words that changed
+   in a pair of removed and added lines are marked on their own. */
+table.diff td.text {
+  --hang: 2ch;
+  padding-left: var(--hang);
+  text-indent: calc(-1 * var(--hang));
+  background-image: linear-gradient(var(--rule-2), var(--rule-2));
+  background-repeat: no-repeat;
+  background-position: calc(var(--hang) - 1ch) 1lh;
+  background-size: 1px calc(100% - 1lh);
+}
+table.diff tr.del .wd { background: color-mix(in srgb, var(--del-fg) 26%, transparent); border-radius: 2px; }
+table.diff tr.add .wd { background: color-mix(in srgb, var(--add-fg) 26%, transparent); border-radius: 2px; }
+
+/* The size of code in diffs (Code_size, + and -). */
+.app { --code-size: 12.5px; }
+.app.code-small { --code-size: 11px; }
+.app.code-large { --code-size: 14px; }
+.app.code-huge { --code-size: 16px; }
+.diff-view { font-size: var(--code-size); }

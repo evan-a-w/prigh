@@ -17,19 +17,19 @@ let key (row : Row.t) =
   match row with
   | Line { kind = `Removed; old_line = Some n; _ } -> Some (Side.Old, n)
   | Line { kind = `Same | `Added; new_line = Some n; _ } -> Some (Side.New, n)
-  | Line _ | Hunk _ -> None
+  | Line _ | Hunk _ | Gap _ -> None
 ;;
 
 let text (row : Row.t) =
   match row with
   | Line { text; _ } -> text
-  | Hunk _ -> ""
+  | Hunk _ | Gap _ -> ""
 ;;
 
 let removed (row : Row.t) =
   match row with
   | Line { kind = `Removed; _ } -> true
-  | Line _ | Hunk _ -> false
+  | Line _ | Hunk _ | Gap _ -> false
 ;;
 
 let resolve rows ~lines ~(start : Point.t) ~(end_ : Point.t) =
