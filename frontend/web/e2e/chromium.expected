@@ -4664,3 +4664,90 @@ audit: ok
 after Chat without a host: strip (none)
 === chromium: chat: errors ===
 (none)
+=== chromium: quiet desktop: a turn: two runs of steps, the first with a failed step ===
+prigh: ▢ Using prigh-web fix the bug (time)
+prigh: [run] Ran 2 commands, read a file 1 failed (took)
+prigh: Now the fix. [run] Wrote a file (took)
+prigh: Done: wrote fix.txt. (time)
+first run's line: false
+sideways: none
+=== chromium: quiet desktop: the first run opened: its steps ===
+Ran 2 commands, read a file 1 failed (took) Thinking Let me look around first. bash ls read notes.txt bash echo no such target >&2; exit 3 exit code 3 no such target
+sideways: none
+=== chromium: quiet desktop: a step opened: its output ===
+Ran 2 commands, read a file 1 failed (took) Thinking Let me look around first. bash ls read notes.txt the bug is in fix.txt bash echo no such target >&2; exit 3 exit code 3 no such target
+sideways: none
+=== chromium: quiet desktop: closed again ===
+first run's line: false
+=== chromium: quiet desktop: waiting for an approval ===
+last run: Running a command
+last run running: true
+approval inside a run: 0
+=== chromium: quiet desktop: approved ===
+prigh: ▢ Using prigh-web fix the bug (time)
+prigh: [run] Ran 2 commands, read a file 1 failed (took)
+prigh: Now the fix. [run] Wrote a file (took)
+prigh: Done: wrote fix.txt. (time)
+you: clean up (time)
+prigh: [run] Ran a command (took)
+prigh: Cleaned up. (time)
+=== chromium: quiet desktop: errors ===
+(none)
+=== chromium: quiet phone: a turn: two runs of steps, the first with a failed step ===
+prigh: ▢ Using prigh-web fix the bug (time)
+prigh: [run] Ran 2 commands, read a file 1 failed (took)
+prigh: Now the fix. [run] Wrote a file (took)
+prigh: Done: wrote fix.txt. (time)
+first run's line: false, 44px tall
+sideways: none
+=== chromium: quiet phone: the first run opened: its steps ===
+Ran 2 commands, read a file 1 failed (took) Thinking Let me look around first. bash ls read notes.txt bash echo no such target >&2; exit 3 exit code 3 no such target
+sideways: none
+=== chromium: quiet phone: a step opened: its output ===
+Ran 2 commands, read a file 1 failed (took) Thinking Let me look around first. bash ls read notes.txt the bug is in fix.txt bash echo no such target >&2; exit 3 exit code 3 no such target
+sideways: none
+=== chromium: quiet phone: closed again ===
+first run's line: false, 44px tall
+=== chromium: quiet phone: waiting for an approval ===
+last run: Running a command
+last run running: true
+approval inside a run: 0
+=== chromium: quiet phone: approved ===
+prigh: ▢ Using prigh-web fix the bug (time)
+prigh: [run] Ran 2 commands, read a file 1 failed (took)
+prigh: Now the fix. [run] Wrote a file (took)
+prigh: Done: wrote fix.txt. (time)
+you: clean up (time)
+prigh: [run] Ran a command (took)
+prigh: Cleaned up. (time)
+=== chromium: quiet phone: errors ===
+(none)
+=== chromium: quiet small: a turn: two runs of steps, the first with a failed step ===
+prigh: ▢ Using prigh-web fix the bug (time)
+prigh: [run] Ran 2 commands, read a file 1 failed (took)
+prigh: Now the fix. [run] Wrote a file (took)
+prigh: Done: wrote fix.txt. (time)
+first run's line: false, 44px tall
+sideways: none
+=== chromium: quiet small: the first run opened: its steps ===
+Ran 2 commands, read a file 1 failed (took) Thinking Let me look around first. bash ls read notes.txt bash echo no such target >&2; exit 3 exit code 3 no such target
+sideways: none
+=== chromium: quiet small: a step opened: its output ===
+Ran 2 commands, read a file 1 failed (took) Thinking Let me look around first. bash ls read notes.txt the bug is in fix.txt bash echo no such target >&2; exit 3 exit code 3 no such target
+sideways: none
+=== chromium: quiet small: closed again ===
+first run's line: false, 44px tall
+=== chromium: quiet small: waiting for an approval ===
+last run: Running a command
+last run running: true
+approval inside a run: 0
+=== chromium: quiet small: approved ===
+prigh: ▢ Using prigh-web fix the bug (time)
+prigh: [run] Ran 2 commands, read a file 1 failed (took)
+prigh: Now the fix. [run] Wrote a file (took)
+prigh: Done: wrote fix.txt. (time)
+you: clean up (time)
+prigh: [run] Ran a command (took)
+prigh: Cleaned up. (time)
+=== chromium: quiet small: errors ===
+(none)

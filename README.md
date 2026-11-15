@@ -434,7 +434,7 @@ where the error is), a file read or written, a listing or a diff cut
 short, faded where it goes on, each with a "Show all N lines" toggle that
 unfolds it in place (and "Fold to N lines", kept in view at its bottom, to
 fold it again). `/verbosity verbose`
-unfolds them all and `quiet` hides them; changing it, or the session,
+unfolds them all and `quiet` folds them into runs (below); changing it, or the session,
 starts the toggles afresh.
 
 Work in progress has one sign, a small sodium lamp that breathes (still
@@ -859,8 +859,8 @@ with completions from the backend and keep the dialog open, with the error,
 when the backend refuses it (a directory that doesn't exist yet opens a
 "Create folder?" dialog instead); `/agents` and `/jobs` open the agents panel
 (above); `/btw` answers in a panel above the composer (Esc closes it);
-`/verbosity` (Ctrl+O cycles) hides tool output and thinking (quiet) or
-unfolds everything (verbose); `/filter`, or the funnel button left of the
+`/verbosity` (Ctrl+O cycles) folds each run of steps into one line (quiet)
+or unfolds everything (verbose); `/filter`, or the funnel button left of the
 files', opens a menu under it that shows or hides whole kinds of the
 transcript (↑↓, Space or a click toggles at once, Enter or a click outside
 keeps, Esc puts back what it was; "Show all" resets): the button is accented
@@ -2197,6 +2197,18 @@ Ctrl+O cycles the transcript verbosity:
 
 `/verbosity [quiet|normal|verbose]` sets it directly; the status line shows
 `view:`.
+
+In prigh-web, quiet folds every run of steps between messages (thinking,
+tool calls and their output, subagents started, reports of background
+work) into one line, the way Claude's apps do: a lamp while it runs (✓
+when done, a red ✕ and "N failed" if a step failed), what it is doing in
+plain words while it runs ("Running a command", "Editing src/foo.ml",
+"Thinking") or what it did once done ("Ran 5 commands, edited 2 files,
+read 3 files"), how long it took, and a chevron. A click, a tap or Enter
+opens it: a list of its steps, each the line normal shows for it, which
+opens to its output, diff or thinking. Assistant text ends a run, and what
+waits on you (an approval, a question) or stops the turn (an error) is
+never inside one. The TUI's quiet still shows each call's line.
 
 `/filter` hides whole kinds of the transcript, for reading only: the model's
 context is unchanged. The kinds are your messages (`user`), the model's

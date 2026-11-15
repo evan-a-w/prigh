@@ -3260,8 +3260,13 @@ terminal frontend and `web/` prigh-web, the browser one.
       `run_command` has every command of `ui/`'s `Commands` (plus `/copy`;
       `/agents` and `/jobs` open, select and stop items in the agents
       panel); `Model` also holds the transcript `verbosity` (a class on
-      `#chat`: the CSS hides tool output in quiet and opens every
-      `<details>` in verbose), the `transcript_filter` (`ui/`'s
+      `#chat`, which opens every `<details>` in verbose; in quiet,
+      `Activity_runs` groups the runs of steps between messages, keyed by
+      their first step and memoised per list cell of `Chat.rev_entries`, so
+      a streamed chunk regroups only the newest entry, and `Chat_view`
+      renders each as one line (`Fold` keeps it open) whose steps, and
+      their bodies, are built only when opened; `ui/`'s `Tool_phrase` words
+      them), the `transcript_filter` (`ui/`'s
       `Transcript_filter`, carried in `Fold.t` so that `Chat_view` leaves
       out what it hides, in subagents' transcripts too, keeping an empty
       `.filtered` where a jump landmark was; `Filter_menu` is its menu's
