@@ -41,7 +41,14 @@ let spec =
         ; ( "cwd"
           , `String
           , "A directory in the repository (default: this agent's working \
-             directory)" )
+             directory; with host, that host's home, and a relative cwd is \
+             from there)" )
+        ; ( "host"
+          , `String
+          , "Another connected tool host (by name or id) whose repository's \
+             worktrees these are, e.g. for a subagent working there (default: \
+             where your tools run); only when the user asked for work on that \
+             machine" )
         ]
   }
 ;;
@@ -115,6 +122,11 @@ let list_text
      :: List.map listing.worktrees ~f:line)
 ;;
 
+(* The session records the worktrees of its active host only. *)
+let announce (context : Tool.Context.t) event =
+  if Option.is_none context.host then context.emit event
+;;
+
 let create_worktree (context : Tool.Context.t) ~cwd ~dir args =
   let branch = Tool_args.string args "branch" in
   let base = Tool_args.string_opt args "base" in
@@ -134,7 +146,8 @@ let create_worktree (context : Tool.Context.t) ~cwd ~dir args =
          (Error.to_string_hum e))
   | Ok created ->
     let w = created.worktree in
-    context.emit
+    announce
+      context
       (Agent_event.Worktrees_changed
          { added =
              [ { path = w.path
@@ -186,7 +199,8 @@ let remove_worktree (context : Tool.Context.t) ~cwd ~dir ~session args =
           (worktree action=list shows the worktrees)"
          (Error.to_string_hum e))
   | Ok removed ->
-    context.emit
+    announce
+      context
       (Agent_event.Worktrees_changed { added = []; removed = [ removed.path ] });
     Tool.Result.ok
       (sprintf
@@ -196,17 +210,48 @@ let remove_worktree (context : Tool.Context.t) ~cwd ~dir ~session args =
             sprintf " (the branch %s stays)" b)))
 ;;
 
+let or_invalid = function
+  | Ok x -> x
+  | Error message -> raise (Tool_args.Invalid message)
+;;
+
+(* With [host], the context and directory on that host. *)
+let on_host ~hosts (context : Tool.Context.t) args =
+  let given = Tool_args.string_opt args "cwd" in
+  let here () =
+    match given with
+    | None -> context.cwd
+    | Some cwd -> Tool.resolve_path context cwd
+  in
+  match Tool_args.string_opt args "host" with
+  | None -> context, here ()
+  | Some key ->
+    let host = or_invalid (Tool_on_host.find (hosts ()) key) in
+    let current =
+      match context.host with
+      | Some id -> String.equal id host.id
+      | None -> host.active
+    in
+    if current
+    then context, here ()
+    else
+      ( { context with
+          host = Option.some_if (not host.active) host.id
+        ; home = (fun () -> host.home)
+        }
+      , or_invalid (Tool_on_host.cwd_on host given) )
+;;
+
 let create
       ?(worktrees_dir = fun () -> "~/.prigh/worktrees")
       ?(session = fun () -> None)
+      ?(hosts = fun () -> [])
       ()
   =
   let run (context : Tool.Context.t) args =
-    let cwd =
-      match Tool_args.string_opt args "cwd" with
-      | None -> context.cwd
-      | Some cwd -> Tool.resolve_path context cwd
-    in
+    let context, cwd = on_host ~hosts context args in
+    (* The session's worktrees are those of its active host. *)
+    let session () = if Option.is_none context.host then session () else None in
     let dir = worktrees_dir () in
     match Tool_args.string args "action" with
     | "create" -> create_worktree context ~cwd ~dir args

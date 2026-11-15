@@ -32,6 +32,7 @@ module Agent = struct
     ; task : string
     ; name : string option
     ; model : string
+    ; host : string option
     ; status : Status.t
     ; started_at : Time_ns.t
     ; ended_at : Time_ns.t option
@@ -55,6 +56,7 @@ module Agent = struct
     let%bind task = Json.string_field json "task" in
     let%bind name = Json.string_opt_field json "name" in
     let%bind model = Json.string_field json "model" in
+    let%bind host = Json.string_opt_field json "host" in
     let%bind started_at = Json.float_field json "started_at_ms" >>| of_ms in
     let%bind ended_at = ms_opt "ended_at_ms" in
     let%bind turns = Json.int_field json "turns" in
@@ -73,6 +75,7 @@ module Agent = struct
       ; task
       ; name
       ; model
+      ; host
       ; status = Status.of_result result
       ; started_at
       ; ended_at
@@ -184,7 +187,8 @@ let update_agent t id ~f =
 
 let rec record_in t ~now ~parent (event : Event.t) =
   match event with
-  | Subagent_start { call_id; agent_id; task; name; model; continued; _ } ->
+  | Subagent_start { call_id; agent_id; task; name; model; host; continued; _ }
+    ->
     if Option.is_some (find_agent t agent_id)
     then
       if continued
@@ -208,6 +212,7 @@ let rec record_in t ~now ~parent (event : Event.t) =
               ; task
               ; name
               ; model
+              ; host
               ; status = Running
               ; started_at = now
               ; ended_at = None

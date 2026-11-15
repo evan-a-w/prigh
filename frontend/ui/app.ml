@@ -1678,7 +1678,13 @@ let agents_picker m =
       List.map m.agents ~f:(fun (a : Agent_view.t) ->
         Picker.Item.create
           ~id:a.id
-          ~detail:(sprintf "%s  %s  %s" a.id (agent_status_text a) a.model)
+          ~detail:
+            (sprintf
+               "%s  %s  %s%s"
+               a.id
+               (agent_status_text a)
+               a.model
+               (Option.value_map a.host ~default:"" ~f:(sprintf "  on %s")))
           ~marked:
             (match m.focus with
              | `Agent id -> String.equal id a.id
@@ -2118,6 +2124,7 @@ let set_state m (state : P.State.t) =
       let agent =
         Agent_view.create
           ?name:a.name
+          ?host:a.host
           ~call_id:""
           ~agent_id:a.id
           ~task:a.task

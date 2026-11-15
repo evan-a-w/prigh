@@ -57,7 +57,9 @@ val tool_summary : name:string -> Json.t -> string
     [approve] checks every tool call before it runs (default: all run);
     [ask_user] is how the [ask_user] tool reaches the user, [ui] what
     [render_ui] needs. They are passed on to the tools' contexts, so
-    [subagent] can hand [approve] down.
+    [subagent] can hand [approve] down. [host] is the tool host the tools
+    run on when it is not the session's active one ([Tool.Context.host]: a
+    subagent started there).
 
     Each tool call's context carries the {!Conversation.t} up to the
     assistant message that made it. [on_context] gets the context the run
@@ -92,6 +94,7 @@ val run
         -> User_question.Reply.t)
   -> ?ui:Ui_host.t
   -> ?chat:bool
+  -> ?host:string
   -> ?execute:Tool.executor
   -> ?background:Background_tasks.t
   -> ?sleep:(float -> unit)

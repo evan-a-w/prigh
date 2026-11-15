@@ -29,6 +29,18 @@ val runs : string list
 (** [hosts]: the session's connected tool hosts. *)
 val create : hosts:(unit -> Host.t list) -> unit -> Tool.t
 
+(** The host [key] names, by id or name; the error lists the connected
+    hosts, closest first. *)
+val find : Host.t list -> string -> (Host.t, string) result
+
+(** Where a call on [host] works: [cwd] (relative to its home), or its
+    home. *)
+val cwd_on : Host.t -> string option -> (string, string) result
+
+(** The host [context]'s host-bound tools run on: [context.host], or the
+    session's active one. *)
+val runs_on : Host.t list -> Tool.Context.t -> Host.t option
+
 (** The host, inner tool and its arguments (an object) an [on_host] call
     names. *)
 val inner : Json.t -> (string * string * Json.t) option

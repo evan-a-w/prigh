@@ -35,7 +35,9 @@ end
     how to link sessions ({!Session_link}), in a chat's too. [chat] (default
     false) builds a chat's prompt (chat mode, see {!Chat_mode}): it says
     there is no machine, and has no working directory, OS, project
-    instructions, skills or Nix. *)
+    instructions, skills or Nix. [host] names the tool host the tools run
+    on when it is not the session's own (a subagent started there), in
+    place of this machine's OS. *)
 val build
   :  ?date:string
   -> ?instructions:(string * string) list
@@ -47,6 +49,7 @@ val build
   -> ?session:string
   -> ?custom_instructions:Custom_instruction.t list
   -> ?chat:bool
+  -> ?host:string
   -> cwd:string
   -> home:string
   -> tools:Tool_spec.t list

@@ -418,6 +418,9 @@ let subscribe t ~f = t.subscribers <- f :: t.subscribers
 (* A subagent's worktree, at any depth. *)
 let rec started_worktree (e : Agent_event.t) =
   match e with
+  | Subagent_start { worktree = Some { host = Some _; _ }; _ } ->
+    (* on another host: the session's worktrees are its active host's *)
+    None
   | Subagent_start { worktree; _ } -> worktree
   | Subagent { event; _ } -> started_worktree event
   | _ -> None
@@ -2059,6 +2062,24 @@ let approve_on_host t : Tool.approver =
   else decided (decide ())
 ;;
 
+(* The other tool host a call would start work on ([subagent]'s and
+   [worktree]'s [host]), if any; an unknown one is the tool's to report. *)
+let other_host t tool args =
+  if
+    List.mem
+      [ Tool_subagent.name; Tool_worktree.name ]
+      (Tool.name tool)
+      ~equal:String.equal
+  then (
+    match Json.member "host" args with
+    | Some (`String key) ->
+      (match Tool_on_host.find (tool_hosts t) key with
+       | Ok host when not host.active -> Some host
+       | Ok _ | Error _ -> None)
+    | _ -> None)
+  else None
+;;
+
 (* Chat mode refuses what needs a machine before anything is asked. *)
 let approve t : Tool.approver =
   fun context tool args ->
@@ -2067,16 +2088,25 @@ let approve t : Tool.approver =
     t.chat_mode
     && ((not (Chat_mode.allowed name))
         || (String.equal name Tool_subagent.name
-            && Tool_subagent.wants_worktree args))
+            && (Tool_subagent.wants_worktree args
+                || Option.is_some (Json.member "host" args))))
   then
     Some
       (Tool.Result.error
          (if Chat_mode.allowed name
           then
-            "a subagent cannot have a worktree in chat mode, which has no \
-             machine: start it without one"
+            "a subagent cannot have a worktree or a tool host in chat mode, \
+             which has no machine: start it without them"
           else Chat_mode.refusal name))
-  else approve_on_host t context tool args
+  else (
+    (* Starting work on another host is approved as a call there: held
+       until the user permits the host, which approving it does. *)
+    let context =
+      match other_host t tool args with
+      | Some host -> { context with host = Some host.id }
+      | None -> context
+    in
+    approve_on_host t context tool args)
 ;;
 
 (* Where [path] would take the session on [host], creating it or asking

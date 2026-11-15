@@ -20,6 +20,9 @@ type t =
   ; task : string
   ; name : string option
   ; model : string
+  ; host : string option
+    (** the tool host it works on (its name), when not the session's
+        active one *)
   ; status : Status.t
   ; turns : int
   ; transcript : Transcript.t
@@ -29,6 +32,7 @@ type t =
 
 val create
   :  ?name:string
+  -> ?host:string
   -> call_id:string
   -> agent_id:string
   -> task:string
@@ -44,6 +48,7 @@ val replace : t list -> string -> (t -> t) -> t list
 
 val start
   :  ?name:string
+  -> ?host:string
   -> t list
   -> call_id:string
   -> agent_id:string

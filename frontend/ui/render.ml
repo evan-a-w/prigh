@@ -912,6 +912,9 @@ let subagent_header (m : App.Model.t) (a : Agent_view.t) : Content.Line.t =
       ~style:(Style.bold (Style.fg Cyan))
       (sprintf "◆ subagent %d/%d" index total)
   ; span ~style:dim (sprintf "  %s" a.model)
+  ; span
+      ~style:(Style.fg Yellow)
+      (Option.value_map a.host ~default:"" ~f:(sprintf "  on %s"))
   ; span ~style:gray (sprintf "  %s" status)
   ; span (sprintf "  \"%s\"" task)
   ]
@@ -1645,7 +1648,10 @@ let sidebar (m : App.Model.t) ~width ~rows : Content.t =
         ~dot:d
         ~name:(sprintf "%d %s" (i + 1) (first_line (Agent_view.title a)))
         ~state
-        ~meta)
+        ~meta:
+          (match a.host with
+           | Some host -> sprintf "on %s · %s" host meta
+           | None -> meta))
   in
   let jobs =
     Option.value_map m.state ~default:[] ~f:(fun s -> s.jobs)

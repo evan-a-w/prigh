@@ -32,6 +32,9 @@ module Summary : sig
     ; name : string option
       (** {!Subagent_name}; [None] in logs written before names *)
     ; model : string
+    ; host : string option
+      (** the tool host it ran on (its name), when not the session's active
+          one *)
     ; state : State.t
     ; started_at : float
     ; updated_at : float (** last event *)

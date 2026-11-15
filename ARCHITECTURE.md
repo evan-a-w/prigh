@@ -1008,6 +1008,30 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   which `Agent.broadcast` records in the session (`add_agent_worktree`),
   and the report ends with `Agent_worktree.report_line` (where the branch
   is, how to review, merge or remove it).
+  With `host` (a connected tool host, found by `Tool_on_host.find`: an
+  unknown one is an invalid argument listing the hosts, closest first) the
+  subagent works on that host: from `prepare` on, its `Tool.Context.host`
+  is that host's id (or [None] for the session's active one) and its
+  `home` that host's, so its worktree (`Worktree.create_tool` through
+  `execute_via`), its instructions (`Host_ops.instructions_tool`), and every
+  call of its loop (`Agent_loop.run ~host`, which puts it in each call's
+  context) run there, and nested subagents and `subagent_continue` (the
+  parked `State.context`) inherit it. Its `cwd` defaults to that host's
+  home (`Tool_on_host.cwd_on`); its system prompt's environment names the
+  host (`System_prompt.build ~host`) instead of the backend's OS;
+  `computer` is dropped from its tools; a fork moving host gets its own
+  tools and prompt rather than its caller's. `Subagent_start.host`,
+  `Agent_worktree.host`, the
+  `Background_tasks` task (`status_text`, `Summary.host`, the state's
+  `subagents`) and the `Subagent_log` entry (`list_subagents`) carry the
+  host's name, for the frontends. Approval: `Agent.approve` checks a
+  `subagent` or `worktree` call whose `host` is another than the active
+  one as if it ran there (`Agent.other_host`: the context's `host` set),
+  so it takes the `on_host` gate (held until the host is permitted;
+  allowing it records the `Allowed_call` that permits it); the subagent's
+  calls are then calls elsewhere, following the mode with no allow rules.
+  `Agent.broadcast` records only the active host's subagent worktrees in
+  the session. `on_host` inside such a subagent refuses its own host.
   With `fork` the child starts from its caller's conversation:
   `Agent_loop` puts a `Conversation.t` (model, thinking, system prompt and
   the messages up to the assistant message making the call) in every

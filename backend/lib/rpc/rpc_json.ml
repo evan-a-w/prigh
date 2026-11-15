@@ -333,6 +333,8 @@ let state (s : Agent.State.t) =
                 ([ "id", str a.id; "task", str a.label ]
                  @ Option.value_map a.name ~default:[] ~f:(fun n ->
                    [ "name", str n ])
+                 @ Option.value_map a.host ~default:[] ~f:(fun h ->
+                   [ "host", str h ])
                  @ [ "running", bool a.running ]))) )
      ; ( "jobs"
        , `Array
@@ -399,12 +401,14 @@ let job ~now task =
 
 let agent_worktree (w : Agent_worktree.t) =
   `Object
-    [ "agent", str w.agent
-    ; "task", str w.task
-    ; "path", str w.path
-    ; "branch", str w.branch
-    ; "root", str w.root
-    ]
+    ([ "agent", str w.agent
+     ; "task", str w.task
+     ; "path", str w.path
+     ; "branch", str w.branch
+     ; "root", str w.root
+     ]
+     @ Option.value_map w.host ~default:[] ~f:(fun host -> [ "host", str host ])
+    )
 ;;
 
 let session_worktree (w : Session_worktree.t) =
@@ -815,6 +819,7 @@ let rec event ?now (e : Agent.Event.t) =
            ; name
            ; model
            ; tools
+           ; host
            ; worktree
            ; forked
            ; continued
@@ -827,6 +832,7 @@ let rec event ?now (e : Agent.Event.t) =
       ; "model", str model
       ; "tools", `Array (List.map tools ~f:str)
       ]
+      @ Option.value_map host ~default:[] ~f:(fun host -> [ "host", str host ])
       @ Option.value_map worktree ~default:[] ~f:(fun w ->
         [ "worktree", agent_worktree w ])
       @ (if forked then [ "forked", `True ] else [])
@@ -912,24 +918,26 @@ let opt f = Option.value_map ~default:`Null ~f
 
 let subagent_summary (s : Subagent_log.Summary.t) =
   `Object
-    [ "id", str s.id
-    ; "call_id", str s.call_id
-    ; "parent", opt str s.parent
-    ; "task", str s.task
-    ; "name", opt str s.name
-    ; "model", str s.model
-    ; "state", str (Subagent_log.State.to_string s.state)
-    ; "started_at_ms", ms s.started_at
-    ; "updated_at_ms", ms s.updated_at
-    ; "ended_at_ms", opt ms s.ended_at
-    ; "turns", int s.turns
-    ; "tool_calls", int s.tool_calls
-    ; "current_tool", opt (fun (name, _) -> str name) s.current_tool
-    ; "current_tool_started_at_ms", opt (fun (_, at) -> ms at) s.current_tool
-    ; "message_count", int s.message_count
-    ; "stale", bool s.stale
-    ; "result", opt tool_result_value s.result
-    ]
+    ([ "id", str s.id
+     ; "call_id", str s.call_id
+     ; "parent", opt str s.parent
+     ; "task", str s.task
+     ; "name", opt str s.name
+     ; "model", str s.model
+     ]
+     @ Option.value_map s.host ~default:[] ~f:(fun host -> [ "host", str host ])
+     @ [ "state", str (Subagent_log.State.to_string s.state)
+       ; "started_at_ms", ms s.started_at
+       ; "updated_at_ms", ms s.updated_at
+       ; "ended_at_ms", opt ms s.ended_at
+       ; "turns", int s.turns
+       ; "tool_calls", int s.tool_calls
+       ; "current_tool", opt (fun (name, _) -> str name) s.current_tool
+       ; "current_tool_started_at_ms", opt (fun (_, at) -> ms at) s.current_tool
+       ; "message_count", int s.message_count
+       ; "stale", bool s.stale
+       ; "result", opt tool_result_value s.result
+       ])
 ;;
 
 let subagent ((s : Subagent_log.Summary.t), messages) =

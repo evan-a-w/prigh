@@ -83,6 +83,9 @@ type t =
       ; name : string (** {!Subagent_name} *)
       ; model : string
       ; tools : string list
+      ; host : string option
+        (** the tool host its tools run on (its name), when not the
+            session's active one ([subagent]'s [host]) *)
       ; worktree : Agent_worktree.t option
         (** the worktree it works in, made for it ([subagent]'s
             [worktree]) *)

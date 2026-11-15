@@ -99,6 +99,7 @@ type t =
         (** a few words saying what it does; [None] from older backends *)
       ; model : string
       ; tools : string list
+      ; host : string option
       ; worktree : Agent_worktree.t option
         (** a worktree made for it, which it works in *)
       ; forked : bool (** it started from its caller's conversation *)
@@ -280,6 +281,7 @@ let rec of_json j =
     let%bind name = Json.string_opt_field j "name" in
     let%bind model = Json.string_field j "model" in
     let%bind tools = Json.list_field j "tools" ~f:Json.to_string_or_error in
+    let%bind host = Json.string_opt_field j "host" in
     let%bind worktree =
       match Json.field j "worktree" with
       | None -> Ok None
@@ -294,6 +296,7 @@ let rec of_json j =
       ; name
       ; model
       ; tools
+      ; host
       ; worktree
       ; forked
       ; continued

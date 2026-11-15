@@ -12,6 +12,9 @@ type t =
   ; path : string
   ; branch : string
   ; root : string (** the repository's main checkout ({!Git_location}) *)
+  ; host : string option
+    (** the tool host it is on (its name), when not the session's own: a
+        subagent started on another host ([subagent]'s [host]) *)
   }
 [@@deriving sexp, jsonaf, equal]
 

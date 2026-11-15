@@ -105,6 +105,7 @@ let%expect_test "a subagent's allowed call: the note goes to its transcript" =
          ; name = None
          ; model = "m"
          ; tools = []
+         ; host = None
          ; worktree = None
          ; forked = false
          ; continued = false

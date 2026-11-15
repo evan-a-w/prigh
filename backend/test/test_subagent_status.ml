@@ -159,6 +159,7 @@ let start ~call_id agent_id : Agent_event.t =
     ; name = agent_id
     ; model = "faux"
     ; tools = []
+    ; host = None
     ; worktree = None
     ; forked = false
     ; continued = false

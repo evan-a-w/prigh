@@ -306,6 +306,7 @@ let%expect_test "Rpc_json encodes nested subagent events" =
       ; name = "Go"
       ; model = "m"
       ; tools = [ "read"; "ls" ]
+      ; host = None
       ; worktree = None
       ; forked = false
       ; continued = false
@@ -352,6 +353,7 @@ let%expect_test
        ; name = "Go"
        ; model = "m"
        ; tools = []
+       ; host = None
        ; worktree = None
        ; forked = false
        ; continued = false
