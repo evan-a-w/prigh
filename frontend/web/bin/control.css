@@ -117,6 +117,9 @@
 .app.narrow .control-list { flex: 1 1 auto; padding-left: max(6px, var(--safe-l)); padding-right: max(6px, var(--safe-r)); scrollbar-gutter: auto; }
 .app.narrow .control-row { min-height: var(--tap); }
 .app.narrow .control-detail { max-width: 40%; }
+/* A session's passage that matched goes under its title: there is no room beside it. */
+.app.narrow .control-main { flex-wrap: wrap; row-gap: 2px; padding: 4px 0; }
+.app.narrow .control-snippet { flex: 1 1 100%; }
 .app.narrow .control-keys, .app.narrow .control-foot { display: none; }
 .app.narrow .btn.control-open { min-height: var(--tap); }
 @media (pointer: coarse) {

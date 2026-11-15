@@ -156,7 +156,9 @@ const configurableTwice = (options = {}) =>
     null,
     options,
   );
-const fits = () => page.evaluate(() => {
+const fits = () => page.evaluate(async () => {
+  // Measured where it comes to rest, not while it slides in.
+  await Promise.all(document.querySelector("#control-centre").getAnimations().map(a => a.finished));
   const doc = document.documentElement;
   const box = document.querySelector("#control-centre").getBoundingClientRect();
   const input = document.querySelector("#control-input");
