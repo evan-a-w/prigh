@@ -186,7 +186,7 @@ let%expect_test "transcript detail, default mode, providers, shortcuts" =
     (Cache_prefs (((key web.verbosity) (value (quiet)))))
     (Rpc (method_ set_prefs) (params ((prefs ((web.verbosity quiet)))))
      (tag Show_error))
-    (Expire_toast (id 0) (after_ms 4660))
+    (Expire_toast (id 0) (after_ms 4420))
     <button class="on segment">
     <button class="segment">
     <button class="segment">

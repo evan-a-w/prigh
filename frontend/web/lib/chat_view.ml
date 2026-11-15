@@ -296,7 +296,7 @@ let thinking_step ~fold ~key ~live text =
         (present
            [ (if live then Html.lamp () else Html.mark ~cls:"done" ~label:"Done" Check)
            ; span "name" "Thinking"
-           ; (if String.is_empty preview then Node.none else span "arg" preview)
+           ; (if opened || String.is_empty preview then Node.none else span "arg" preview)
            ; span "chev" ""
            ])
     ; (if opened && not (String.is_empty (String.strip text))
