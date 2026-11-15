@@ -89,6 +89,9 @@ module State : sig
     ; plan : Plan.t option (** the model's [update_plan] *)
     ; session_rules : string list
       (** rules the user allowed for this session ("don't ask again") *)
+    ; allowed_calls : string list
+      (** the exact calls let through in smart mode, which are not judged
+          again ({!Allowed_call.describe}) *)
     ; home : Session.Home.t option
       (** where a worktree switch took it from ({!Session.home}): {!switch_back} goes there *)
     ; trim : Session.Trim.t option
@@ -543,8 +546,9 @@ val save_as_default : t -> unit Or_error.t
     the user's approval emits [Tool_confirm] and waits for
     {!respond_confirm} (or the run's cancellation). The mode and the
     session's rules are recorded in the session ([approval] and
-    [allow_rule] entries), so a reloaded session keeps them; a new session
-    starts in the config's [approval_mode].
+    [allow_rule] entries), as are the calls let through in smart mode
+    ([allowed_call], {!Allowed_call}), so a reloaded session keeps them; a
+    new session starts in the config's [approval_mode].
 
     In plan mode the calls {!Plan_mode.changes_work} names (file edits,
     worktrees, pull requests) are refused, and every other destructive tool

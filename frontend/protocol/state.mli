@@ -68,6 +68,9 @@ type t =
   ; plan : Plan.t option (** the model's [update_plan] *)
   ; session_rules : string list
     (** rules the user allowed for the session ("don't ask again") *)
+  ; allowed_calls : string list
+    (** the exact calls let through in smart mode, which run again without
+        being judged (empty when absent) *)
   ; trim : Trim.t option (** what is trimmed from the model's context *)
   ; hidden : Hidden.t list
     (** what trims and deletions keep out of the model's context, oldest

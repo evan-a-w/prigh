@@ -17,12 +17,21 @@ let status h =
 let modal h = H.text h ~selector:".modal"
 let toasts h = H.text h ~selector:".toast"
 
-let state ?(mode = "auto") ?(plan_mode = false) ?plan ?(rules = []) () =
+let state
+      ?(mode = "auto")
+      ?(plan_mode = false)
+      ?plan
+      ?(rules = [])
+      ?(allowed_calls = [])
+      ()
+  =
   H.state_json
     ~fields:
       ([ "approval_mode", `String mode
        ; ("plan_mode", if plan_mode then `True else `False)
        ; "session_rules", `Array (List.map rules ~f:(fun r -> `String r))
+       ; ( "allowed_calls"
+         , `Array (List.map allowed_calls ~f:(fun c -> `String c)) )
        ]
        @ Option.value_map plan ~default:[] ~f:(fun p ->
          [ "plan", Jsonaf.of_string p ]))
@@ -354,7 +363,15 @@ let%expect_test "the plan: its chip in the chrome, /todos" =
 
 let%expect_test "/permissions" =
   let h =
-    H.create ~state:(state ~mode:"auto-edit" ~rules:[ "bash(make:*)" ] ()) ()
+    H.create
+      ~state:
+        (state
+           ~mode:"auto-edit"
+           ~rules:[ "bash(make:*)" ]
+           ~allowed_calls:
+             [ {|bash {"command":"git push"} on laptop in /work (by you)|} ]
+           ())
+      ()
   in
   run h "/permissions";
   modal h;
@@ -381,6 +398,8 @@ let%expect_test "/permissions" =
     (Close (Esc))
     Mode: auto-edit (file edits run; bash, job_input and MCP tools ask first)
     Allowed this session: bash(make:*)
+    Exact calls allowed this session (smart mode does not judge them again):
+      bash {"command":"git push"} on laptop in /work (by you)
 
     Rules are permissions in ~/.prigh/config.json, e.g. {"allow": ["bash(git status:*)"], "deny": ["bash(rm:*)"]}.
     /mode or Alt+M switches the mode.
