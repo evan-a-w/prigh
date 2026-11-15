@@ -45,6 +45,7 @@ let%expect_test "every command does something (none is unknown)" =
          | Filter _ -> "transcript filter menu"
          | Prompt _ -> "path prompt"
          | Text { title; _ } -> "text: " ^ title
+         | Control _ -> "control centre"
          | (Loading _ | Pulls _) as d ->
            sprintf
              "%s: %s"
@@ -107,8 +108,8 @@ let%expect_test "every command does something (none is unknown)" =
     /name                      (Rename"")
     /session                   loading Session: rpc push_pref, rpc session_stats
     /trace                     loading Trace: rpc push_pref, rpc trace
-    /sessions                  sidebar
-    /switch                    sidebar
+    /sessions                  control centre
+    /switch                    control centre
     /archive                   toast: This session isn't saved yet: send a message first.
     /unarchive                 toast: This session isn't saved yet: send a message first.
     /pin                       toast: This session isn't saved yet: send a message first.
@@ -211,7 +212,8 @@ let%expect_test "/help <command> and /hotkeys" =
     Ctrl+J jump to one of your messages: a list to filter (or the marks at the transcript's right edge)
     Delete (in the jump list) trim the model's context before the highlighted message (confirmed first; /trim undo brings it back)
     PageUp / PageDown scroll the transcript
-    Ctrl+K search sessions by words of their titles and messages (↓ ↑ through them, Enter opens, Delete deletes, Esc clears)
+    Ctrl+K the control centre (also the sidebar's Search): search the sessions (their titles and messages), the settings, their values and the commands
+    ↑ ↓ / Enter / Backspace / Esc (the control centre) move / open the session or setting, or set the value / back from a setting's values to the list (in an empty filter) / close it
     Alt+Enter / Alt+R / Delete (/worktree) start a new session in the highlighted worktree / review its changes / remove it
     A (on a session) archive or unarchive it (archived sessions are listed last, muted)
     P (on a session) pin it to the top of the sidebar, or unpin it (pinned sessions are never archived for being idle)
@@ -741,14 +743,13 @@ let%expect_test "/switch" =
      (tag (Page (path /sessions/s2.jsonl) (before ()))))
     (Focus editor)
     |}];
-  H.act h Toggle_sidebar;
   run h "/switch";
-  print_s [%sexp ((H.model h).sidebar_open : bool)];
+  print_s [%sexp (Option.is_some (H.model h).dialog : bool)];
   [%expect
     {|
     (Rpc (method_ push_pref) (params ((key history) (value /switch) (max 500)))
      (tag Ignore))
-    (Focus session-search)
+    (Focus control-input)
     true
     |}]
 ;;

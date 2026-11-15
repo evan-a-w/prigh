@@ -65,7 +65,9 @@ val keys : t -> string option
     high"), each applied in one step. *)
 val direct : t -> bool
 
-(** Where the settings page has it, and the name of its row there. *)
+(** Where the settings page has it, and the name of its row there; the
+    section's own name for a section of rows that come and go (git hosts,
+    MCP servers), which it covers as a whole. *)
 val page : t -> (Settings_section.t * string) option
 
 (** Only superusers have it. *)

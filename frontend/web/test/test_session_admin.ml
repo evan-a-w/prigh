@@ -103,25 +103,36 @@ let%expect_test "active sessions first, then the archived ones under a divider" 
   H.text h ~selector:".sessions";
   [%expect
     {|
-    (Session_nav (from (s3)) (by 1))
+    (Session_nav (from s3) (by 1))
     (Focus session-s4)
-    (Session_nav (from (s3)) (by 1))
+    (Session_nav (from s3) (by 1))
     (Focus session-s3)
     (fix the parser bug 2m ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
     (Release notes 2m ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
     (Open elsewhere 2m ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
     (Archived 2)
     |}];
-  (* A search shows the archived sessions that match, folded or not. *)
-  H.act h (Set_session_query "old");
-  H.text h ~selector:".sessions";
+  (* The control centre finds the archived sessions too, folded or not. *)
+  H.act h Open_control;
+  H.act h (Control_query "old");
+  H.text h ~selector:".control-list";
   [%expect
     {|
+    (Focus control-input)
     (Search_sessions_later (search 1) (after_ms 150))
-    (Archived 2)
-    (Old lexer 2m ago /work) (More (right-click, Shift+F10)) (Unarchive) (Delete)
-    (Old er docs 2m ago /work) (More (right-click, Shift+F10)) (Unarchive) (Delete)
-    (Delete archived)
+    Settings
+    Mask old tool outputs
+    on
+    Sessions
+    Old lexer
+    /work · 2m ago
+    Old er docs
+    /work · 2m ago
+    Commands
+    /compact
+    summarise older messages to free context
+    /compaction
+    show when conversations are compacted and what summarises them; at TOKENS|off: also once the context exceeds TOKENS, not only at 80% of the window; model MODEL|off: the model that writes the summaries (off: the session's); mask on|off: replace old tool outputs with placeholders first
     |}]
 ;;
 

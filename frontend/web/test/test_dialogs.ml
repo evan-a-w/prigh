@@ -162,7 +162,8 @@ let%expect_test "help lists every key and command" =
     Ctrl+J jump to one of your messages: a list to filter (or the marks at the transcript's right edge)
     Delete (in the jump list) trim the model's context before the highlighted message (confirmed first; /trim undo brings it back)
     PageUp / PageDown scroll the transcript
-    Ctrl+K search sessions by words of their titles and messages (↓ ↑ through them, Enter opens, Delete deletes, Esc clears)
+    Ctrl+K the control centre (also the sidebar's Search): search the sessions (their titles and messages), the settings, their values and the commands
+    ↑ ↓ / Enter / Backspace / Esc (the control centre) move / open the session or setting, or set the value / back from a setting's values to the list (in an empty filter) / close it
     Alt+Enter / Alt+R / Delete (/worktree) start a new session in the highlighted worktree / review its changes / remove it
     A (on a session) archive or unarchive it (archived sessions are listed last, muted)
     P (on a session) pin it to the top of the sidebar, or unpin it (pinned sessions are never archived for being idle)

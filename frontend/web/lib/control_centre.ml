@@ -76,6 +76,17 @@ let ranges positions =
   |> List.rev
 ;;
 
+(* A close enough match: the letters typed in at most a run per word typed,
+   and one more (so "thnk" finds "thinking" but "old" not "approval
+   model"). *)
+let close ~query label =
+  match Fuzzy.positions ~query label with
+  | None -> false
+  | Some positions ->
+    List.length (ranges positions)
+    <= List.length (String.split query ~on:' ' |> List.filter ~f:(Fn.non String.is_empty)) + 1
+;;
+
 let common_commands = [ "new"; "settings"; "review"; "files"; "help" ]
 let recent = 5
 let most_settings = 12
@@ -128,15 +139,22 @@ let word_prefixes ~query text =
       List.exists text ~f:(fun w -> String.is_prefix w ~prefix:q))
 ;;
 
-(* The name by the fuzzy filter; the keywords only by their words' starts,
-   so that a long list of them does not match every few letters typed. *)
-let setting_score ~query (setting : Control_setting.t) ~label =
-  let by_keywords =
-    Option.some_if
-      (word_prefixes ~query (label ^ " " ^ Control_setting.keywords setting))
-      (1500 - String.length label)
+(* The name by the fuzzy filter, or each word typed starting one of its
+   words; the keywords only by their words' starts (so that a long list of
+   them does not match every few letters typed), and below the name. *)
+let setting_score ?(keywords = "") ~query label =
+  let by_words =
+    if word_prefixes ~query label
+    then Some (1500 - String.length label)
+    else
+      Option.some_if
+        (word_prefixes ~query (label ^ " " ^ keywords))
+        (1100 - String.length label)
   in
-  Option.merge (Fuzzy.score ~query label) by_keywords ~f:Int.max
+  Option.merge
+    (Option.filter (Fuzzy.score ~query label) ~f:(fun _ -> close ~query label))
+    by_words
+    ~f:Int.max
 ;;
 
 let settings_found ~query (settings : Setting_entry.t list) =
@@ -144,17 +162,25 @@ let settings_found ~query (settings : Setting_entry.t list) =
     List.concat_map settings ~f:(fun e ->
       let label = Control_setting.name e.setting in
       let own =
-        setting_score ~query e.setting ~label
+        setting_score
+          ~keywords:(Control_setting.keywords e.setting)
+          ~query
+          label
         |> Option.map ~f:(fun score ->
           score, setting_row ~group:Settings e ~query)
+      in
+      (* A value ranks under its setting when both match: Enter on "verbos"
+         opens the setting, "verbosity verbose" picks the value. *)
+      let below =
+        Option.map (setting_score ~query label) ~f:(fun score -> score - 1)
       in
       let values =
         if Control_setting.direct e.setting
         then
           List.filter_map e.values ~f:(fun (item : Picker.Item.t) ->
             let label = Control_setting.short e.setting ^ ": " ^ item.label in
-            Option.map (setting_score ~query e.setting ~label) ~f:(fun score ->
-              ( score - 1
+            Option.map (setting_score ~query label) ~f:(fun score ->
+              ( Option.value_map below ~default:score ~f:(Int.min score)
               , row
                   ~group:Settings
                   ~marked:item.marked
@@ -210,7 +236,15 @@ let rows t ~settings ~sessions ?content ~current ~describe ~commands () =
     @ (Session_search.sessions ?content ~query sessions
        |> Fn.flip List.take most_sessions
        |> List.map ~f:(session_row ~group:Sessions ~describe))
-    @ (Fuzzy.rank ~query commands ~key:(fun (c : Slash.Spec.t) -> "/" ^ c.name)
+    @ (let by_name =
+         Fuzzy.rank ~query commands ~key:(fun (c : Slash.Spec.t) -> "/" ^ c.name)
+         |> List.filter ~f:(fun (c : Slash.Spec.t) -> close ~query ("/" ^ c.name))
+       in
+       (* Then those whose description has the words: "rename" finds /name. *)
+       by_name
+       @ List.filter commands ~f:(fun (c : Slash.Spec.t) ->
+         word_prefixes ~query c.help
+         && not (List.mem by_name c ~equal:Slash.Spec.equal))
        |> Fn.flip List.take most_commands
        |> List.map ~f:(command_row ~query))
 ;;

@@ -422,12 +422,14 @@ let%expect_test "the hours: a setting, synced; 0 never shows them; bounds" =
 
 let%expect_test "search: by repository, branch and worktree" =
   let h = create () in
-  H.act h (Set_session_query "pr-7");
-  H.text h ~selector:".session-title";
-  H.act h (Set_session_query "redesign");
-  H.text h ~selector:".session-title";
+  H.act h Open_control;
+  H.act h (Control_query "pr-7");
+  H.text h ~selector:".control-row:not(.x) .control-label";
+  H.act h (Control_query "redesign");
+  H.text h ~selector:".control-row .control-label";
   [%expect
     {|
+    (Focus control-input)
     (Search_sessions_later (search 1) (after_ms 150))
     Main work
     (Search_sessions_later (search 2) (after_ms 150))

@@ -82,26 +82,39 @@ let%expect_test "the keyboard walks pinned, then recent, then archived" =
   H.key h "ArrowDown" ~target:(Session "s2");
   [%expect
     {|
-    (Session_nav (from (s3)) (by 1))
+    (Session_nav (from s3) (by 1))
     (Focus session-s1)
-    (Session_nav (from (s1)) (by 1))
+    (Session_nav (from s1) (by 1))
     (Focus session-s2)
-    (Session_nav (from (s2)) (by 1))
+    (Session_nav (from s2) (by 1))
     (Focus session-s4)
     |}]
 ;;
 
-let%expect_test "a search keeps the groups, best match first in each" =
+let%expect_test "the control centre finds pinned sessions too, best match first" =
   let h = H.create ~sessions () in
-  H.act h (Set_session_query "notes");
-  sidebar h;
+  H.act h Open_control;
+  H.act h (Control_query "notes");
+  H.text h ~selector:".control-list";
   [%expect
     {|
+    (Focus control-input)
     (Search_sessions_later (search 1) (after_ms 150))
-    Pinned 1
-    (Long-running notes 2m ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
-    Recent 1
-    (Release notes 2m ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
+    Settings
+    Memory notes
+    Settings › Memory
+    Use memory
+    Settings › Memory
+    Sessions
+    Release notes
+    /work · 2m ago
+    Long-running notes
+    /work · 2m ago
+    Commands
+    /filter
+    show only some kinds in the transcript (your messages, replies, thinking, tools, subagents, notes); the model's context is unchanged
+    /memory
+    your notes the model saves when you ask it to remember something, in Settings; on or off gives the model the memory tool or takes it away
     |}]
 ;;
 
@@ -137,21 +150,23 @@ let%expect_test
          ])
   in
   let h = H.create ~sessions () in
-  H.act h (Set_session_query "deploy");
+  H.act h Open_control;
+  H.act h (Control_query "deploy");
   H.act h (Search_sessions 1);
-  sidebar h;
+  H.text h ~selector:".control-list";
   [%expect
     {|
+    (Focus control-input)
     (Search_sessions_later (search 1) (after_ms 150))
     (Rpc (method_ search_sessions) (params ((query deploy) (limit 50)))
      (tag (Session_hits 1)))
-    Pinned 1
-    (Deploy checklist 1d ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
-    Recent 1
-    (Deploy the docs 1h ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (Archived 1)
-    (Old deploy 3d ago /work) (More (right-click, Shift+F10)) (Unarchive) (Delete)
-    (Delete archived)
+    Sessions
+    Deploy the docs
+    /work · 1h ago
+    Deploy checklist
+    /work · 1d ago
+    Old deploy
+    /work · 3d ago
     |}];
   (* The messages of a pinned and an unpinned session mention it too. *)
   H.reply
@@ -163,18 +178,20 @@ let%expect_test
       {"id":"s4","path":"/sessions/s4.jsonl","score":20,
        "snippet":{"text":"…deploy the lexer","ranges":[[3,6]]}},
       {"id":"s3","path":"/sessions/s3.jsonl","score":40,"snippet":null}]}|};
-  sidebar h;
+  H.text h ~selector:".control-list";
   [%expect
     {|
-    Pinned 2
-    (Deploy checklist 1d ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (Weekly notes …before we deploy on Friday 2h ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
-    Recent 2
-    (Deploy the docs 1h ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (Lexer … deploy the lexer 2d ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (Archived 1)
-    (Old deploy 3d ago /work) (More (right-click, Shift+F10)) (Unarchive) (Delete)
-    (Delete archived)
+    Sessions
+    Deploy the docs
+    /work · 1h ago
+    Deploy checklist
+    /work · 1d ago
+    Old deploy
+    /work · 3d ago
+    Weekly notes …before we deploy on Friday
+    /work · 2h ago
+    Lexer … deploy the lexer
+    /work · 2d ago
     |}];
   H.show h ~selector:"[data-session=s2] .session-main";
   H.show h ~selector:"[data-session=s3] .session-title";
@@ -187,11 +204,6 @@ let%expect_test
         </span>
         Weekly notes
       </span>
-      <span dir="auto" class="session-snippet">
-        …before we
-        <mark> deploy </mark>
-         on Friday
-      </span>
       <div class="session-meta">
         <span class="session-age"> 2h ago </span>
         <span title="/work" class="session-cwd"> /work </span>
@@ -203,8 +215,7 @@ let%expect_test
       <span role="img" aria-label="Pinned" title="Pinned to the top (P unpins)" class="session-pin">
         <icon class="pin"> </icon>
       </span>
-      <mark> Deploy </mark>
-       checklist
+      Deploy checklist
     </span>
     |}]
 ;;

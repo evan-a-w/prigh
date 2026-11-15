@@ -45,8 +45,9 @@ let%expect_test
     {|
     (Search_sessions_later (search 1) (after_ms 150))
     (Search_sessions_later (search 2) (after_ms 150))
+    Sessions
     Make the port config urable
-    1h ago /work
+    /work · 1h ago
     |}];
   (* The first pause came too soon: the query changed since. *)
   H.act h (Search_sessions 1);
@@ -61,11 +62,12 @@ let%expect_test
   H.show h ~selector:".control-snippet";
   [%expect
     {|
+    Sessions
     Make the port config urable
-    1h ago /work
+    /work · 1h ago
     fix the parser bug …then make the port config urable via the config file
-    2h ago /work
-    <span dir="auto" class="session-snippet">
+    /work · 2h ago
+    <span dir="auto" class="control-snippet">
       …then make the
       <mark> port </mark>
 
@@ -91,19 +93,17 @@ let%expect_test "a reply to an older search is ignored; Esc closes the control c
     (Rpc (method_ search_sessions) (params ((query port) (limit 50)))
      (tag (Session_hits 1)))
     (Search_sessions_later (search 2) (after_ms 150))
+    Sessions
     Make the port config urable
-    1h ago /work
+    /work · 1h ago
     |}];
   H.key h "Escape" ~target:Field;
   print_s [%sexp (Option.is_some (H.model h).dialog : bool)];
   [%expect
     {|
-    (Control_query "")
-    Make the port configurable
-    fix the parser bug
-    Release notes
-    Leave_sidebar
+    Close_dialog
     (Focus editor)
+    false
     |}]
 ;;
 
@@ -122,7 +122,9 @@ let%expect_test
     (Search_sessions_later (search 1) (after_ms 150))
     (Rpc (method_ search_sessions) (params ((query zzz) (limit 50)))
      (tag (Session_hits 1)))
-    No sessions match “zzz”. Search looks in titles and messages.
+    [zzz] (Close (Esc))
+    Nothing matches “zzz”: Backspace widens the search.
+    ↑↓ move ↵ open ⌫ back esc close
     |}]
 ;;
 
@@ -163,18 +165,5 @@ let%expect_test
   H.show h ~selector:"#control-input";
   H.text h ~selector:".control-list";
   [%expect
-    {|
-    ("port config" true)
-    <input id="session-search"
-           type="search"
-           placeholder="Search sessions"
-           aria-label="Search sessions"
-           autocomplete="off"
-           #value="port config"
-           @on_input/>
-    Make the port config urable
-    1h ago /work
-    fix the parser bug …then make the port config urable via the config file
-    2h ago /work
-    |}]
+    {| false |}]
 ;;

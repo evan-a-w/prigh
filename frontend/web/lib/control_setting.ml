@@ -180,8 +180,8 @@ let page t : (Settings_section.t * string) option =
     Some (Custom_instructions, "Let the model change them")
   | Instructions -> Some (Custom_instructions, "Your instructions")
   | Mcp -> Some (Mcp, "MCP servers")
-  | Git_hosts -> Some (Git_hosting, "Git hosts")
-  | Nix_store -> Some (Nix_store, "Disk usage")
+  | Git_hosts -> Some (Git_hosting, "Git hosting")
+  | Nix_store -> Some (Nix_store, "Nix store")
   | Account -> Some (Account, "Account")
 ;;
 

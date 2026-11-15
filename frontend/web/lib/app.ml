@@ -3828,7 +3828,7 @@ let confirm_picker (m : Model.t) =
                ~id:(Default_mode.to_string mode)
                ~detail:(Default_mode.describe mode)
                ~marked:(Option.equal Default_mode.equal current (Some mode))
-               (Default_mode.to_string mode)))
+               (String.capitalize (Default_mode.to_string mode))))
     }
 ;;
 

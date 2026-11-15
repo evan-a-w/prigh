@@ -473,8 +473,11 @@ let%expect_test "switching user resets everything that was the old user's" =
     Scroll_to_bottom
     (Rpc (method_ btw) (params ((question "what was that?") (btw_id btw-1)))
      (tag (Btw btw-1)))
-    (Search_sessions_later (search 1) (after_ms 150))
     (Focus picker-input)
+    (Focus control-input)
+    (Search_sessions_later (search 1) (after_ms 150))
+    (Rpc (method_ search_sessions) (params ((query ali) (limit 50)))
+     (tag (Session_hits 1)))
     (Rpc (method_ set_user) (params ((user bob))) (tag User_switched))
     (Rpc (method_ btw_cancel) (params ((btw_id btw-1))) (tag Ignore))
     (Expire_toast (id 0) (after_ms 2500))
@@ -484,7 +487,7 @@ let%expect_test "switching user resets everything that was the old user's" =
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
     (Rpc (method_ get_config) (params ()) (tag Config))
     (Rpc (method_ forge_status) (params ()) (tag (Forge Status)))
-    ((state false) (entries 0) (sessions 0) (query "") (dialog false)
+    ((state false) (entries 0) (sessions 0) (hits false) (dialog false)
      (btw false))
     |}]
 ;;

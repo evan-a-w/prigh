@@ -161,37 +161,37 @@ let%expect_test "fuzzy search over titles, prompts and directories" =
   H.key h "k" ~ctrl:true;
   [%expect
     {|
-    Open_sessions
-    (Focus session-search)
+    Open_control
+    (Focus control-input)
     |}];
-  H.act h (Set_session_query "lexr");
-  H.text h ~selector:".session-title";
+  H.act h (Control_query "lexr");
+  H.text h ~selector:".control-label";
   [%expect
     {|
     (Search_sessions_later (search 1) (after_ms 150))
     Refactor the lexe r
     |}];
-  H.act h (Set_session_query "docs");
-  H.text h ~selector:".session-title";
+  H.act h (Control_query "docs");
+  H.text h ~selector:".control-label";
   [%expect
     {|
     (Search_sessions_later (search 2) (after_ms 150))
     Release notes
     |}];
-  H.act h (Set_session_query "zzz");
-  H.text h ~selector:".sessions";
+  H.act h (Control_query "zzz");
+  H.text h ~selector:".control-empty";
   [%expect
     {|
     (Search_sessions_later (search 3) (after_ms 150))
-    No sessions match “zzz”. Search looks in titles and messages.
+    Nothing matches “zzz”: Backspace widens the search.
     |}];
-  H.act h (Set_session_query "");
-  H.text h ~selector:".session-title";
+  H.act h (Control_query "");
+  H.text h ~selector:".control-group";
   [%expect
     {|
-    fix the parser bug
-    Release notes
-    Refactor the lexer
+    This session
+    Recent sessions
+    Commands
     |}]
 ;;
 
@@ -553,12 +553,11 @@ let%expect_test
   (* Esc closes the drawer; choosing a session closes it too. *)
   H.key h "Escape" ~target:Page;
   [%expect {| Toggle_sidebar |}];
-  H.act h Open_sessions;
+  H.act h Toggle_sidebar;
   H.act h (Switch_session "/sessions/s3.jsonl");
   print_s [%sexp ((H.model h).sidebar_open : bool)];
   [%expect
     {|
-    (Focus session-search)
     (Rpc (method_ switch_session) (params ((path /sessions/s3.jsonl)))
      (tag Reload_state))
     (Rpc (method_ get_messages_page)
@@ -751,32 +750,23 @@ let%expect_test
      goes back to the editor"
   =
   let h = H.create ~sessions () in
-  H.key h "k" ~ctrl:true;
-  H.type_ h "";
-  H.act h (Set_session_query "re");
-  H.text h ~selector:".session-title";
-  H.key h "ArrowDown" ~target:Session_search;
+  H.key h "ArrowDown" ~target:(Session "s1");
   H.key h "ArrowDown" ~target:(Session "s2");
   H.key h "ArrowDown" ~target:(Session "s3");
   H.key h "ArrowUp" ~target:(Session "s2");
   H.key h "ArrowUp" ~target:(Session "s2");
   [%expect
     {|
-    Open_sessions
-    (Focus session-search)
-    (Search_sessions_later (search 1) (after_ms 150))
-    Re lease notes
-    Re factor the lexer
-    (Session_nav (from ()) (by 1))
+    (Session_nav (from s1) (by 1))
     (Focus session-s2)
-    (Session_nav (from (s2)) (by 1))
+    (Session_nav (from s2) (by 1))
     (Focus session-s3)
-    (Session_nav (from (s3)) (by 1))
+    (Session_nav (from s3) (by 1))
     (Focus session-s3)
-    (Session_nav (from (s2)) (by -1))
-    (Focus session-search)
-    (Session_nav (from (s2)) (by -1))
-    (Focus session-search)
+    (Session_nav (from s2) (by -1))
+    (Focus session-s1)
+    (Session_nav (from s2) (by -1))
+    (Focus session-s1)
     |}];
   H.key h "Enter" ~target:(Session "s3");
   H.key h "Delete" ~target:(Session "s3");
@@ -798,17 +788,8 @@ let%expect_test
     Leave_sidebar
     (Focus editor)
     |}];
-  H.key h "Enter" ~target:Session_search;
-  [%expect
-    {|
-    Open_first_session
-    (Rpc (method_ switch_session) (params ((path /sessions/s2.jsonl)))
-     (tag Reload_state))
-    (Rpc (method_ get_messages_page)
-     (params ((session /sessions/s2.jsonl) (limit 60)))
-     (tag (Page (path /sessions/s2.jsonl) (before ()))))
-    (Focus editor)
-    |}]
+  ();
+  [%expect {| |}]
 ;;
 
 let%expect_test
