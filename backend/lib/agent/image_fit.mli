@@ -3,8 +3,8 @@ open! Import
 
 (** Images sent within a model's limit ({!Image_limit}): those over it are
     downscaled for the request, the session keeping the original. Each
-    image is downscaled once per limit (remembered until the backend
-    restarts). *)
+    image is downscaled once per limit: the downscaled images are kept,
+    up to 64 MB of them (the least recently sent dropped first). *)
 
 module Outcome : sig
   type t =
@@ -27,3 +27,9 @@ val messages
 
 (** Forgets the downscaled images, for tests. *)
 val reset : unit -> unit
+
+(** How many images' outcomes are remembered, for tests. *)
+val cached : unit -> int
+
+(** Changes the bound on the downscaled images kept, for tests. *)
+val set_max_bytes : int -> unit

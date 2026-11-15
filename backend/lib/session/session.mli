@@ -181,6 +181,14 @@ val load : ?yield:(unit -> unit) -> string -> t Or_error.t
 (** Why [load] skipped lines, one warning each. *)
 val skipped : t -> string list
 
+(** Where the line of the entry [id] starts in the session's file, once it
+    is written there. *)
+val entry_offset : t -> string -> int option
+
+(** The entry whose line starts at [offset] in the session file [path]
+    ({!entry_offset}), if there is one. *)
+val read_entry_at : string -> offset:int -> Entry.t option
+
 (** Whether its file was written and has been deleted since. *)
 val gone : t -> bool
 
@@ -552,7 +560,9 @@ module Summary : sig
 end
 
 (** Most recently updated first. Files are only parsed again when their size
-    or mtime changed since the last call. *)
+    or mtime changed since they were last summed up, by this process or
+    another: the summaries are kept in [dir]'s [.cache] too, rewritten when
+    a listing parsed a file or found one gone. *)
 val list : dir:string -> Summary.t list
 
 (** [list], parsing with [load], except the files of [live] sessions (by
@@ -563,6 +573,26 @@ val list_with
   -> load:(string -> t Or_error.t)
   -> dir:string
   -> Summary.t list
+
+(** What {!list_with} lists of the one session file [path] ([None]: gone or
+    unreadable). *)
+val summary_with
+  :  live:(string -> t option)
+  -> load:(string -> t Or_error.t)
+  -> string
+  -> Summary.t option
+
+(** Forgets the summaries in memory, as a new process starts: the next
+    listing reads them from the [.cache] file. For tests. *)
+val forget_cached_summaries : unit -> unit
+
+(** The directory under [dir] where caches of what is in its session files
+    are kept ({!list}'s summaries, the search index). *)
+val cache_dir : dir:string -> string
+
+(** Writes [path] whole or not at all (a temporary file renamed over it);
+    errors are ignored: for caches. *)
+val write_atomically : string -> data:string -> unit
 
 (** A session's own directory next to its file, [<stamp>_<id>/] for
     [<stamp>_<id>.jsonl], for per-session data (it may not exist). *)

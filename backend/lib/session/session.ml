@@ -137,6 +137,8 @@ type t =
   ; mutable torn : bool (** the file does not end with a newline *)
   ; masked : Message.t String.Table.t
     (** messages as {!Observation_mask.mask} makes them, by entry id *)
+  ; offsets : int String.Table.t
+    (** where each entry's line starts in the file, by entry id *)
   }
 
 let id t = t.id
@@ -233,7 +235,12 @@ let create_file t =
   Out_channel.with_file t.path ~f:(fun oc ->
     output_line oc (header t);
     let entries = List.rev t.entries in
-    List.iter entries ~f:(fun e -> output_line oc (Entry e));
+    List.iter entries ~f:(fun e ->
+      Hashtbl.set
+        t.offsets
+        ~key:e.id
+        ~data:(Int64.to_int_exn (Out_channel.pos oc));
+      output_line oc (Entry e));
     match t.head, List.last entries with
     | Some head, Some last when not (String.equal head last.id) ->
       output_line oc (Head head)
@@ -256,6 +263,15 @@ let write_line t (line : Line.t) =
       let oc = Core_unix.out_channel_of_descr fd in
       Exn.protect
         ~f:(fun () ->
+          (match line with
+           | Entry e ->
+             (* The channel's position does not start at the end. *)
+             let at = Int64.to_int_exn (Out_channel.length oc) in
+             Hashtbl.set
+               t.offsets
+               ~key:e.id
+               ~data:(if t.torn then at + 1 else at)
+           | Header _ | Head _ -> ());
           if t.torn then Out_channel.newline oc;
           t.torn <- false;
           output_line oc line)
@@ -309,38 +325,40 @@ let next_created_at () =
       bump (Time_float.max now last))
 ;;
 
+let empty ~id ~path ~cwd ~created_at ~parent ~persisted ~temporary =
+  { id
+  ; path
+  ; initial_cwd = cwd
+  ; cwd
+  ; host = None
+  ; host_cwds = String.Table.create ()
+  ; repos = String.Table.create ()
+  ; worktrees = []
+  ; home = None
+  ; transcript_filter = None
+  ; pinned = false
+  ; created_at
+  ; parent
+  ; entries = []
+  ; head = None
+  ; by_id = String.Table.create ()
+  ; persisted
+  ; temporary
+  ; unreadable = String.Table.create ()
+  ; skipped = []
+  ; torn = false
+  ; masked = String.Table.create ()
+  ; offsets = String.Table.create ()
+  }
+;;
+
 let create ~dir ~cwd ?parent ?(temporary = false) () =
   let id = new_id () in
   let created_at = next_created_at () in
   last_created_at := Some created_at;
   let stamp = stamp_of created_at in
   let path = Filename.concat dir (sprintf "%s_%s.jsonl" stamp id) in
-  let t =
-    { id
-    ; path
-    ; initial_cwd = cwd
-    ; cwd
-    ; host = None
-    ; host_cwds = String.Table.create ()
-    ; repos = String.Table.create ()
-    ; worktrees = []
-    ; home = None
-    ; transcript_filter = None
-    ; pinned = false
-    ; created_at
-    ; parent
-    ; entries = []
-    ; head = None
-    ; by_id = String.Table.create ()
-    ; persisted = false
-    ; temporary
-    ; unreadable = String.Table.create ()
-    ; skipped = []
-    ; torn = false
-    ; masked = String.Table.create ()
-    }
-  in
-  t
+  empty ~id ~path ~cwd ~created_at ~parent ~persisted:false ~temporary
 ;;
 
 (* The first way it mattered stays; its branch follows. *)
@@ -438,103 +456,178 @@ let unreadable_entry (json : Json.t) =
   | _ -> None
 ;;
 
+(* Calls [f ~number ~offset line] for each line of [path], numbered from 1,
+   with the byte offset where it starts, without its newline; reads a chunk
+   at a time, so a large file is never in memory whole. [yield] every
+   256 KB. Returns whether the file ends without a newline. *)
+let iter_lines ?(yield = fun () -> ()) path ~f =
+  In_channel.with_file path ~f:(fun ic ->
+    let chunk = Bytes.create 65536 in
+    let partial = Buffer.create 1024 in
+    let partial_at = ref 0 in
+    let number = ref 0 in
+    let read = ref 0 in
+    let since_yield = ref 0 in
+    let rec go () =
+      let n = In_channel.input ic ~buf:chunk ~pos:0 ~len:(Bytes.length chunk) in
+      if n > 0
+      then (
+        let base = !read in
+        let pos = ref 0 in
+        while !pos < n do
+          match Stdlib.Bytes.index_from_opt chunk !pos '\n' with
+          | Some nl when nl < n ->
+            incr number;
+            let line, offset =
+              if Buffer.length partial = 0
+              then
+                ( Bytes.To_string.sub chunk ~pos:!pos ~len:(nl - !pos)
+                , base + !pos )
+              else (
+                Buffer.add_subbytes partial chunk ~pos:!pos ~len:(nl - !pos);
+                let line = Buffer.contents partial in
+                Buffer.clear partial;
+                line, !partial_at)
+            in
+            pos := nl + 1;
+            f ~number:!number ~offset (Utf8.sanitize line)
+          | Some _ | None ->
+            if Buffer.length partial = 0 then partial_at := base + !pos;
+            Buffer.add_subbytes partial chunk ~pos:!pos ~len:(n - !pos);
+            pos := n
+        done;
+        read := !read + n;
+        since_yield := !since_yield + n;
+        if !since_yield >= 256 * 1024
+        then (
+          since_yield := 0;
+          yield ());
+        go ())
+    in
+    go ();
+    if Buffer.length partial > 0
+    then (
+      incr number;
+      f
+        ~number:!number
+        ~offset:!partial_at
+        (Utf8.sanitize (Buffer.contents partial));
+      true)
+    else false)
+;;
+
+let is_blank l = String.for_all l ~f:Char.is_whitespace
+
+let skip t ~number reason =
+  t.skipped <- sprintf "line %d: %s" number reason :: t.skipped
+;;
+
+(* A line after the header. *)
+let read_json t ~number ~offset json =
+  match Line.t_of_jsonaf json with
+  | Header _ -> skip t ~number "skipped a second header"
+  | Entry e ->
+    Hashtbl.set t.offsets ~key:e.id ~data:offset;
+    add_entry t e
+  | Head id -> t.head <- Some id
+  | exception _ ->
+    (match unreadable_entry json with
+     | Some (id, parent, kind) ->
+       Hashtbl.set t.unreadable ~key:id ~data:parent;
+       t.head <- Some id;
+       skip
+         t
+         ~number
+         (sprintf
+            "skipped a %S entry this version of prigh cannot read (written by \
+             a newer one?)"
+            kind)
+     | None ->
+       skip
+         t
+         ~number
+         "skipped a line this version of prigh cannot read (written by a newer \
+          one?)")
+;;
+
 (* A line that cannot be read is skipped with a warning rather than making
    the whole session unreadable: a torn last line (prigh stopped while
-   writing it) or a kind of line from a newer prigh. *)
-let load ?(yield = fun () -> ()) path =
+   writing it) or a kind of line from a newer prigh. The file is read a
+   chunk at a time: what [load] holds beyond the session is one line. *)
+let load ?yield path =
   Or_error.try_with (fun () ->
-    let raw = In_channel.read_all path in
-    yield ();
-    let contents = Utf8.sanitize raw in
-    yield ();
-    let lines =
-      String.split_lines contents
-      |> List.mapi ~f:(fun i l -> i + 1, l)
-      |> List.filter ~f:(fun (_, l) -> not (String.is_empty (String.strip l)))
+    let session = ref None in
+    (* A line that is not JSON is only known to be the last one at the end;
+       the others wait one line. *)
+    let unparsed = ref None in
+    let flush_unparsed ~is_last =
+      Option.iter !unparsed ~f:(fun (t, number) ->
+        unparsed := None;
+        skip
+          t
+          ~number
+          (if is_last
+           then
+             "skipped an incomplete last line (prigh probably stopped while \
+              writing it)"
+           else "skipped a line that is not JSON"))
     in
-    let last = Option.value_map (List.last lines) ~default:0 ~f:fst in
-    match lines with
-    | [] -> failwith "session file is empty"
-    | (_, first) :: rest ->
-      (match Line.t_of_jsonaf (Json.of_string first) with
-       | exception _ -> failwith "session file does not start with a header"
-       | Entry _ | Head _ ->
-         failwith "session file does not start with a header"
-       | Header { id; cwd; created_at; parent } ->
-         let created_at =
-           match Time_float.of_string_with_utc_offset created_at with
-           | t -> t
-           | exception _ -> Time_float.epoch
-         in
-         let t =
-           { id
-           ; path
-           ; initial_cwd = cwd
-           ; cwd
-           ; host = None
-           ; host_cwds = String.Table.create ()
-           ; repos = String.Table.create ()
-           ; worktrees = []
-           ; home = None
-           ; transcript_filter = None
-           ; pinned = false
-           ; created_at
-           ; parent
-           ; entries = []
-           ; head = None
-           ; by_id = String.Table.create ()
-           ; persisted = true
-           ; temporary = false
-           ; unreadable = String.Table.create ()
-           ; skipped = []
-           ; torn =
-               (not (String.is_empty contents))
-               && not (String.is_suffix contents ~suffix:"\n")
-           ; masked = String.Table.create ()
-           }
-         in
-         let skip n reason =
-           t.skipped <- sprintf "line %d: %s" n reason :: t.skipped
-         in
-         let parsed = ref 0 in
-         List.iter rest ~f:(fun (n, l) ->
-           parsed := !parsed + String.length l;
-           if !parsed > 256 * 1024
-           then (
-             parsed := 0;
-             yield ());
-           match Json.of_string l with
-           | exception _ ->
-             skip
-               n
-               (if n = last
-                then
-                  "skipped an incomplete last line (prigh probably stopped \
-                   while writing it)"
-                else "skipped a line that is not JSON")
-           | json ->
-             (match Line.t_of_jsonaf json with
-              | Header _ -> skip n "skipped a second header"
-              | Entry e -> add_entry t e
-              | Head id -> t.head <- Some id
-              | exception _ ->
-                (match unreadable_entry json with
-                 | Some (id, parent, kind) ->
-                   Hashtbl.set t.unreadable ~key:id ~data:parent;
-                   t.head <- Some id;
-                   skip
-                     n
-                     (sprintf
-                        "skipped a %S entry this version of prigh cannot read \
-                         (written by a newer one?)"
-                        kind)
-                 | None ->
-                   skip
-                     n
-                     "skipped a line this version of prigh cannot read \
-                      (written by a newer one?)")));
-         t.skipped <- List.rev t.skipped;
-         t))
+    let torn =
+      iter_lines ?yield path ~f:(fun ~number ~offset l ->
+        if not (is_blank l)
+        then (
+          match !session with
+          | None ->
+            (match Line.t_of_jsonaf (Json.of_string l) with
+             | exception _ ->
+               failwith "session file does not start with a header"
+             | Entry _ | Head _ ->
+               failwith "session file does not start with a header"
+             | Header { id; cwd; created_at; parent } ->
+               let created_at =
+                 match Time_float.of_string_with_utc_offset created_at with
+                 | t -> t
+                 | exception _ -> Time_float.epoch
+               in
+               session
+               := Some
+                    (empty
+                       ~id
+                       ~path
+                       ~cwd
+                       ~created_at
+                       ~parent
+                       ~persisted:true
+                       ~temporary:false))
+          | Some t ->
+            flush_unparsed ~is_last:false;
+            (match Json.of_string l with
+             | exception _ -> unparsed := Some (t, number)
+             | json -> read_json t ~number ~offset json)))
+    in
+    match !session with
+    | None -> failwith "session file is empty"
+    | Some t ->
+      flush_unparsed ~is_last:true;
+      t.torn <- torn;
+      t.skipped <- List.rev t.skipped;
+      t)
+;;
+
+let entry_offset t id = Hashtbl.find t.offsets id
+
+let read_entry_at path ~offset =
+  match
+    In_channel.with_file path ~f:(fun ic ->
+      In_channel.seek ic (Int64.of_int offset);
+      In_channel.input_line ic)
+  with
+  | exception _ -> None
+  | None -> None
+  | Some l ->
+    (match Line.t_of_jsonaf (Json.of_string (Utf8.sanitize l)) with
+     | Entry e -> Some e
+     | Header _ | Head _ | (exception _) -> None)
 ;;
 
 let append_at t ~at payload =
@@ -1686,7 +1779,7 @@ module Summary = struct
     ; worktrees : Session_worktree.t list
     ; home : Home.t option
     }
-  [@@deriving sexp_of]
+  [@@deriving sexp]
 
   let seconds_per_day = 86400.
 
@@ -1728,6 +1821,35 @@ let rec usage path =
 ;;
 
 let disk_usage path = List.sum (module Int) (files path) ~f:usage
+
+(* What changes when [disk_usage] does, short of a walk: the sizes and
+   mtimes of the trace files and of the data directory and the directories
+   in it (where files are added). *)
+let usage_stamp path =
+  let stamp p =
+    match Core_unix.lstat p with
+    | exception _ -> None
+    | { st_size; st_mtime; st_kind; _ } ->
+      Some
+        (st_kind, sprintf "%s %Ld %.6f" (Filename.basename p) st_size st_mtime)
+  in
+  List.concat_map
+    (data_dir path :: Trace_file.paths ~session_path:path)
+    ~f:(fun p ->
+      match stamp p with
+      | None -> []
+      | Some (S_DIR, s) ->
+        s
+        :: List.filter_map
+             (try Sys_unix.ls_dir p with
+              | _ -> [])
+             ~f:(fun name ->
+               match stamp (Filename.concat p name) with
+               | Some (S_DIR, s) -> Some s
+               | Some _ | None -> None)
+      | Some (_, s) -> [ s ])
+  |> String.concat ~sep:"\n"
+;;
 
 let rec remove path =
   if is_directory path
@@ -1852,39 +1974,140 @@ let summarise t ~path ~mtime =
 ;;
 
 (* Summaries by path, valid while the file's size and mtime are unchanged,
-   so listing does not parse every session again. *)
+   so listing does not parse every session again; kept on disk too
+   ([Summary_file]), so that a new process need not either. *)
 module Cache_entry = struct
   type t =
-    { size : int64
+    { size : Int64.t
     ; mtime : float
-    ; summary : Summary.t option
+    ; usage : string (** {!usage_stamp} when [summary]'s bytes were counted *)
+    ; summary : Summary.t option (** [None]: the file could not be read *)
     }
+  [@@deriving sexp]
+
+  let fresh t ~size ~mtime =
+    Int64.equal t.size size && Float.equal t.mtime mtime
+  ;;
 end
 
 let summary_cache : Cache_entry.t String.Table.t = String.Table.create ()
 
+(* Directories whose [Summary_file] was read into [summary_cache]. *)
+let summary_files_read = String.Hash_set.create ()
+let cache_dir ~dir = Filename.concat dir ".cache"
+
+(* Writes [path] whole or not at all, so that a reader never sees part of
+   it; failing quietly (e.g. a read-only directory): it is only a cache. *)
+let write_atomically path ~data =
+  let tmp = sprintf "%s.%d.tmp" path (Core_unix.getpid () |> Pid.to_int) in
+  try
+    Core_unix.mkdir_p (Filename.dirname path);
+    Out_channel.write_all tmp ~data;
+    Core_unix.rename ~src:tmp ~dst:path
+  with
+  | _ ->
+    (try Core_unix.unlink tmp with
+     | _ -> ())
+;;
+
+(* The summaries of a directory's sessions by file name, as last listed.
+   Each is checked against its file's size and mtime when used, so the file
+   can only make listing faster: one that cannot be read (torn, corrupt or
+   from another version: the version is in its name too, so that two
+   versions sharing a directory keep apart) is ignored and written anew. *)
+module Summary_file = struct
+  let version = 1
+
+  type t =
+    { version : int
+    ; summaries : (string * Cache_entry.t) list
+    }
+  [@@deriving sexp]
+
+  let path ~dir =
+    Filename.concat (cache_dir ~dir) (sprintf "summaries-v%d" version)
+  ;;
+
+  let read ~dir =
+    match t_of_sexp (Sexp.load_sexp (path ~dir)) with
+    | { version = v; summaries } when v = version -> summaries
+    | { version = _; summaries = _ } | (exception _) -> []
+  ;;
+
+  let write ~dir summaries =
+    write_atomically
+      (path ~dir)
+      ~data:(Sexp.to_string (sexp_of_t { version; summaries }))
+  ;;
+end
+
+let read_summary_file ~dir =
+  if not (Hash_set.mem summary_files_read dir)
+  then (
+    Hash_set.add summary_files_read dir;
+    List.iter
+      (Summary_file.read ~dir)
+      ~f:(fun (name, (entry : Cache_entry.t)) ->
+        let path = Filename.concat dir name in
+        (* The directory may have moved since. *)
+        let entry =
+          { entry with
+            summary = Option.map entry.summary ~f:(fun s -> { s with path })
+          }
+        in
+        if not (Hashtbl.mem summary_cache path)
+        then Hashtbl.set summary_cache ~key:path ~data:entry))
+;;
+
+let write_summary_file ~dir =
+  Hashtbl.fold summary_cache ~init:[] ~f:(fun ~key:path ~data acc ->
+    if String.equal (Filename.dirname path) dir
+    then (Filename.basename path, data) :: acc
+    else acc)
+  |> List.sort ~compare:(fun (a, _) (b, _) -> String.compare a b)
+  |> Summary_file.write ~dir
+;;
+
+(* The file's summary, and whether the cache changed. Its disk usage is
+   cached with it, counted again when {!usage_stamp} changes. *)
 let cached_summary ~live ~load path =
   match Core_unix.stat path with
   | exception _ -> None
   | { st_size = size; st_mtime = mtime; _ } ->
-    let summary =
+    let live = live path in
+    let usage = usage_stamp path in
+    let summary, parsed =
       match Hashtbl.find summary_cache path with
-      | Some entry
-        when Int64.equal entry.size size && Float.equal entry.mtime mtime ->
-        entry.summary
+      | Some entry when Cache_entry.fresh entry ~size ~mtime ->
+        if String.equal entry.usage usage
+        then entry.summary, false
+        else (
+          let summary =
+            Option.map entry.summary ~f:(fun s ->
+              { s with bytes = disk_usage path })
+          in
+          Hashtbl.set
+            summary_cache
+            ~key:path
+            ~data:{ entry with usage; summary };
+          summary, Option.is_none live)
       | Some _ | None ->
         let summary =
           (* A live session's file grows with every message: summing up
              what is in memory spares parsing it all again. *)
-          (match live path with
+          (match live with
            | Some t -> Some t
            | None -> Result.ok (load path))
-          |> Option.map ~f:(fun t -> summarise t ~path ~mtime)
+          |> Option.map ~f:(fun t ->
+            { (summarise t ~path ~mtime) with bytes = disk_usage path })
         in
-        Hashtbl.set summary_cache ~key:path ~data:{ size; mtime; summary };
-        summary
+        Hashtbl.set
+          summary_cache
+          ~key:path
+          ~data:{ size; mtime; usage; summary };
+        summary, Option.is_none live
     in
-    Option.map summary ~f:(fun s -> mtime, { s with bytes = disk_usage path })
+    Some (parsed, Option.map summary ~f:(fun s -> mtime, s))
 ;;
 
 let is_session_file name =
@@ -1895,6 +2118,7 @@ let list_with ~live ~load ~dir =
   match Sys_unix.is_directory dir with
   | `No | `Unknown -> []
   | `Yes ->
+    read_summary_file ~dir;
     let paths =
       Sys_unix.ls_dir dir
       |> List.filter ~f:is_session_file
@@ -1902,14 +2126,33 @@ let list_with ~live ~load ~dir =
       |> List.map ~f:(Filename.concat dir)
     in
     let present = String.Set.of_list paths in
+    let before = Hashtbl.length summary_cache in
     Hashtbl.filter_keys_inplace summary_cache ~f:(fun path ->
       (not (String.equal (Filename.dirname path) dir)) || Set.mem present path);
-    List.filter_map paths ~f:(cached_summary ~live ~load)
+    let removed = Hashtbl.length summary_cache < before in
+    let summaries = List.filter_map paths ~f:(cached_summary ~live ~load) in
+    if removed || List.exists summaries ~f:fst then write_summary_file ~dir;
+    List.filter_map summaries ~f:snd
     |> List.stable_sort ~compare:(fun (a, _) (b, _) -> Float.compare b a)
     |> List.map ~f:snd
 ;;
 
+let summary_with ~live ~load path =
+  let dir = Filename.dirname path in
+  read_summary_file ~dir;
+  match cached_summary ~live ~load path with
+  | None -> None
+  | Some (parsed, summary) ->
+    if parsed then write_summary_file ~dir;
+    Option.map summary ~f:snd
+;;
+
 let list ~dir = list_with ~live:(fun _ -> None) ~load ~dir
+
+let forget_cached_summaries () =
+  Hashtbl.clear summary_cache;
+  Hash_set.clear summary_files_read
+;;
 
 let find_summary summaries key =
   let key = String.strip key in

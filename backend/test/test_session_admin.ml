@@ -485,8 +485,8 @@ let%expect_test "a session is active while its background work runs" =
   [%expect
     {|
     worker      background=0 clients=-
-    a: 3 sessions_changed
-    b: 2 sessions_changed
+    a: 4 sessions_changed
+    b: 3 sessions_changed
     |}]
 ;;
 
@@ -727,7 +727,7 @@ let%expect_test "deleting the session you are in moves you first" =
     other       background=0 clients=-
     shared     live background=0 clients=1
     next       live background=0 clients=1
-    b: 1 sessions_changed
+    b: 2 sessions_changed
     |}];
   print_s [%sexp (Sys_unix.file_exists_exn (Session.path mine) : bool)];
   [%expect {| false |}];
@@ -813,5 +813,109 @@ let%expect_test "the session you are in is kept while it runs" =
     reply's state: (a new session)
     deleted <id>
     a is in: (a new session)
+    |}]
+;;
+
+(* What the [sessions_changed] events [c] got since the last call carry:
+   the changed sessions' entries (name, and how they are listed) and the
+   removed ones, or a refetch. *)
+let print_changes ids (c : Client.t) =
+  let label id =
+    List.Assoc.find ids id ~equal:String.equal |> Option.value ~default:"?"
+  in
+  Queue.iter c.sent ~f:(fun json ->
+    match Json.member "event" json with
+    | Some (`String "sessions_changed") ->
+      let list name ~f =
+        match Json.member name json with
+        | Some (`Array items) -> List.map items ~f
+        | _ -> []
+      in
+      let str name j =
+        match Json.member name j with
+        | Some (`String s) -> s
+        | _ -> "-"
+      in
+      let flag name j =
+        match Json.member name j with
+        | Some `True -> " " ^ name
+        | _ -> ""
+      in
+      let changed =
+        list "changed" ~f:(fun s ->
+          sprintf
+            "%s%s%s%s"
+            (label (str "id" s))
+            (flag "archived" s)
+            (flag "pinned" s)
+            (flag "live" s))
+      in
+      let removed =
+        list "removed" ~f:(function
+          | `String id -> label id
+          | _ -> "?")
+      in
+      if Option.is_none (Json.member "changed" json)
+      then printf "%s: refetch\n" c.name
+      else
+        printf
+          "%s: changed [%s] removed [%s]\n"
+          c.name
+          (String.concat ~sep:"; " changed)
+          (String.concat ~sep:"; " removed)
+    | _ -> ());
+  Queue.clear c.sent
+;;
+
+let%expect_test
+    "sessions_changed carries the changed entries, as each client lists them"
+  =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let ancient = saved t "ancient" ~days_ago:30. in
+  let old = saved t "old" ~days_ago:10. in
+  let recent = saved t "recent" ~days_ago:0.1 in
+  let ids =
+    [ Session.id ancient, "ancient"
+    ; Session.id old, "old"
+    ; Session.id recent, "recent"
+    ]
+  in
+  let provider = Routed_provider.create ~main:[ Reply.text "hi" ] [] in
+  let server = Server.create t ~sw ~provider in
+  let a = Client.connect server "a" in
+  let b = Client.connect server "b" ~session:(Session.id old) in
+  Client.call t a "set_pinned" (path ancient @ [ "pinned", `True ]);
+  print_changes ids a;
+  print_changes ids b;
+  Client.call t a "set_archived" (path recent @ [ "archived", `True ]);
+  print_changes ids a;
+  print_changes ids b;
+  (* Opening one: b's session is no longer live once b leaves it. *)
+  Client.call t b "switch_session" (path recent);
+  print_changes ids a;
+  Client.call
+    t
+    a
+    "delete_sessions"
+    [ "paths", `Array [ `String (Session.path old) ] ];
+  print_changes ids a;
+  print_changes ids b;
+  [%expect
+    {|
+    {"type":"response","id":"r","ok":true,"result":{}}
+    a: changed [ancient pinned] removed []
+    b: changed [ancient pinned] removed []
+    {"type":"response","id":"r","ok":true,"result":{}}
+    a: changed [recent archived] removed []
+    b: changed [recent archived] removed []
+    {"type":"response","id":"r","ok":true,"result":{"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":"recent","session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"thinking_options":["off","default","low","high","max"],"thinking_default":"high","supports_images":true,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"default","running":false,"message_count":1,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","active_host_name":"<host>","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"chat_mode":false,"no_host":null,"computer_control":null,"plan":null,"session_rules":[]}}}
+    a: changed [old archived] removed []
+    {"type":"response","id":"r","ok":true,"result":{"deleted":[{"path":"$DIR/sessions/<stamp>_<id>.jsonl","id":"<id>","bytes":<n>}],"refused":[]}}
+    a: changed [] removed [old]
+    b: changed [old archived] removed []
+    b: changed [] removed [old]
     |}]
 ;;

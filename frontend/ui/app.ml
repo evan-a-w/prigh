@@ -308,6 +308,8 @@ module Model = struct
     ; mode : Mode.t
     ; autocomplete : Autocomplete.t option
     ; sessions : P.Session_summary.t list option
+    ; sessions_changes : int
+    ; sessions_asked : int
     ; known_sessions : (Session_link.Known.t[@sexp.opaque])
     ; skills : P.Skill.t list Location_cache.t
     ; worktrees : P.Worktree.Listing.t Location_cache.t
@@ -684,6 +686,8 @@ let init =
   ; mode = Editing
   ; autocomplete = None
   ; sessions = None
+  ; sessions_changes = 0
+  ; sessions_asked = 0
   ; known_sessions = Session_link.Known.empty
   ; skills = Location_cache.empty
   ; worktrees = Location_cache.empty
@@ -5874,6 +5878,34 @@ let sessions_picker_shown m =
   | _ -> false
 ;;
 
+(* What the open sessions picker lists. *)
+let picker_sessions m =
+  match m.mode with
+  | Picker { kind = Sessions selection; _ }
+  | Confirm
+      { action =
+          Delete_sessions { back = Some { kind = Sessions selection; _ }; _ }
+      ; _
+      } -> Some selection.Session_selection.sessions
+  | _ -> None
+;;
+
+(* Single-entry changes can reach us before the answer to a [list_sessions]
+   sent before them (the client hands answers on after events that came
+   after them): one applied since the last was sent may be missing from it. *)
+let sessions_stale m = m.sessions_changes > m.sessions_asked
+
+(* The cached list and the open picker show [sessions]. *)
+let sessions_refreshed m sessions =
+  let m =
+    map_sessions_picker m ~f:(fun selection -> { selection with sessions })
+  in
+  let m = with_sessions m sessions in
+  match m.mode, m.autocomplete with
+  | Editing, Some _ -> refresh_autocomplete m
+  | _ -> m, []
+;;
+
 let worktree_in_picker m (listing : P.Worktree.Listing.t) picker ~f =
   match
     Option.bind (Picker.selected_item picker) ~f:(fun item ->
@@ -6845,10 +6877,16 @@ let event m (e : P.Event.t) =
      | Some _ -> { m with nix_gc = Some progress }, []
      | None -> m, [])
   | Temporary_ended _ -> m, []
-  | Sessions_changed ->
-    if sessions_picker_shown m || Option.is_some m.sessions
-    then m, [ rpc "list_sessions" ~tag:Sessions_refresh ]
-    else m, []
+  | Sessions_changed change ->
+    (match change, Option.first_some m.sessions (picker_sessions m) with
+     | Some change, Some sessions ->
+       sessions_refreshed
+         { m with sessions_changes = m.sessions_changes + 1 }
+         (P.Session_summary.Change.apply change sessions)
+     | _ ->
+       if sessions_picker_shown m || Option.is_some m.sessions
+       then m, [ rpc "list_sessions" ~tag:Sessions_refresh ]
+       else m, [])
 ;;
 
 (* ---- rpc replies ------------------------------------------------------ *)
@@ -7590,19 +7628,13 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
          json
          ~f:(decode_list ~f:P.Session_summary.of_json)
          (pin_resolved m ~arg ~pinned)
+     | (Sessions_refresh | Sessions_cache) when sessions_stale m ->
+       m, [ rpc "list_sessions" ~tag:Sessions_refresh ]
      | Sessions_refresh ->
        decode
          json
          ~f:(decode_list ~f:P.Session_summary.of_json)
-         (fun sessions ->
-            let m =
-              map_sessions_picker m ~f:(fun selection ->
-                { selection with sessions })
-            in
-            let m = with_sessions m sessions in
-            match m.mode, m.autocomplete with
-            | Editing, Some _ -> refresh_autocomplete m
-            | _ -> m, [])
+         (sessions_refreshed m)
      | Auth_refresh ->
        decode json ~f:(decode_list ~f:P.Auth_status.of_json) (fun auth ->
          { m with auth }, [])
@@ -7787,7 +7819,11 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
        decode
          json
          ~f:(decode_list ~f:P.Session_summary.of_json)
-         (fun sessions -> sessions_picker m sessions, [])
+         (fun sessions ->
+            ( sessions_picker m sessions
+            , if sessions_stale m
+              then [ rpc "list_sessions" ~tag:Sessions_refresh ]
+              else [] ))
      | Session_hits ->
        decode json ~f:P.Session_hits.of_json (fun hits ->
          match m.mode with
@@ -7918,6 +7954,18 @@ let block_backend_rpc m cmds =
   else m, cmds
 ;;
 
+(* The last [list_sessions] sent was after this many changes. *)
+let note_sessions_asked m cmds =
+  if
+    List.exists cmds ~f:(function
+      | Command.Rpc
+          { tag = Sessions_cache | Sessions_refresh | Sessions_picker; _ } ->
+        true
+      | _ -> false)
+  then { m with sessions_asked = m.sessions_changes }, cmds
+  else m, cmds
+;;
+
 let update m (action : Action.t) =
   if m.quitting
   then m, []
@@ -7998,5 +8046,6 @@ let update m (action : Action.t) =
       | Resize { width; height } -> { m with width; height }, []
     in
     let m, cmds = block_backend_rpc m cmds in
+    let m, cmds = note_sessions_asked m cmds in
     maybe_open_pending m, cmds)
 ;;

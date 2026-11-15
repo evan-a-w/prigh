@@ -193,9 +193,17 @@ try {
   await page.reload();
   await composer(page).waitFor();
   age("Old work");
-  await ageVisits(page);
-  await page.reload();
-  await composer(page).waitFor();
+  // A save the page sent before (going into the session after the reload)
+  // can reach the backend after the aged visits: then they are aged again.
+  const aged = () => Object.values(JSON.parse(readFileSync(join(home, ".prigh/prefs.json"), "utf8"))["web.sidebar-opened"] ?? {})
+    .some(at => Date.now() - Date.parse(at.replace(" ", "T")) > 86400e3);
+  for (let i = 0; ; i++) {
+    await ageVisits(page);
+    await page.reload();
+    await composer(page).waitFor();
+    if (aged()) break;
+    if (i > 20) throw new Error("the visits stay unaged");
+  }
   await session(page, "Old work").locator(".session-fold.folded").waitFor();
   await page.mouse.move(1000, 400);
   section("used days ago: folded, used now: shown");

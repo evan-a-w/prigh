@@ -426,7 +426,7 @@ let rec apply t (event : Event.t) =
   | Btw_delta _
   | Generate_delta _
   | Review _
-  | Sessions_changed
+  | Sessions_changed _
   | Temporary_ended _
   | Agent_queues _
   | Nix_gc_progress _

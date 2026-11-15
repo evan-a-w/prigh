@@ -1530,6 +1530,9 @@ let%expect_test "archived sessions and deleting them" =
          (parse {|{"id":"e9","parent":"e8","kind":"archived","archived":true}|})
        : Entry.t Or_error.t)];
   decode {|{"type":"event","event":"sessions_changed"}|};
+  decode
+    {|{"type":"event","event":"sessions_changed","changed":[{"id":"a","path":"/p","cwd":"/c","created_at":"x","message_count":2}],"removed":["b"]}|};
+  decode {|{"type":"event","event":"sessions_changed","removed":[3]}|};
   let result =
     Delete_result.of_json
       (parse
@@ -1578,7 +1581,39 @@ let%expect_test "archived sessions and deleting them" =
       (worktrees ())
       (home      ())))
     (Ok ((id e9) (parent (e8)) (kind (Archived (archived true)))))
-    (Event Sessions_changed)
+    (Event (Sessions_changed ()))
+    (Event (
+      Sessions_changed ((
+        (changed ((
+          (id   a)
+          (path /p)
+          (name        ())
+          (description ())
+          (cwd        /c)
+          (created_at x)
+          (updated_at   ())
+          (first_prompt ())
+          (message_count 2)
+          (parent ())
+          (live       false)
+          (running    false)
+          (background 0)
+          (clients    0)
+          (waiting    0)
+          (failed     false)
+          (archived   false)
+          (pinned ())
+          (bytes 0)
+          (host      ())
+          (repo      ())
+          (worktrees ())
+          (home      ()))))
+        (removed (b))))))
+    (error (
+      e (
+        "while decoding"
+        "{\"type\":\"event\",\"event\":\"sessions_changed\",\"removed\":[3]}"
+        (in removed[0] "removed: expected session ids"))))
     ((deleted (
        ((path /s/a.jsonl) (id a) (bytes 1500))
        ((path /s/b.jsonl) (id b) (bytes 2000000))))

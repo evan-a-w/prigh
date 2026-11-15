@@ -154,8 +154,9 @@ type t =
       { gen_id : string
       ; delta : string
       } (** streamed text of our own [generate_text] request *)
-  | Sessions_changed
-  (** something [list_sessions] shows changed, in any session *)
+  | Sessions_changed of Session_summary.Change.t option
+  (** something [list_sessions] shows changed, in any session: what, or
+      [None] to refetch it *)
   | Temporary_ended of
       { session : string
       ; messages : int (** it had: none, and nothing was lost *)

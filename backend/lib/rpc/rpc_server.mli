@@ -127,13 +127,15 @@ val restore_resumes : t -> unit
     when they connect). *)
 val clean_leftovers : t -> unit
 
-(** Builds [search_sessions]' index of the saved sessions in a fiber of its
-    own that yields after each session, so that the backend serves its
-    clients meanwhile; a search meanwhile waits for it. *)
-val start_indexing : t -> unit
+(** In a fiber of its own, so that the backend serves its clients
+    meanwhile: {!restore_resumes}, then brings [search_sessions]' index of
+    the saved sessions up to date (from its file, reading the sessions that
+    changed since), yielding after each session; a search meanwhile waits
+    for it. *)
+val start_background : t -> unit
 
-(** [start_indexing]'s work, returning when it is done (or, if it is under
-    way, when it finishes). *)
+(** Brings the index up to date as {!start_background} does, returning when
+    it is done (or, if it is under way, when it finishes). *)
 val index_sessions : t -> unit
 
 (** [search_sessions]' hits: the best [limit] saved sessions for [query],
