@@ -69,7 +69,8 @@ end
 
 let connection_hello ?home hello ~host_id =
   match host_id with
-  | None -> hello @ [ "tools", `False; "features", `Array [ `String "stream_deltas" ] ]
+  | None ->
+    hello @ [ "tools", `False; "features", `Array [ `String "stream_deltas" ] ]
   | Some id ->
     hello
     @ Option.value_map home ~default:[] ~f:(fun home ->

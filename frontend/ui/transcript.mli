@@ -161,7 +161,6 @@ val render_tail
   -> verbosity:Verbosity.t
   -> Content.t
 
-
 (** Total wrapped line count, for scroll clamping. *)
 val line_count
   :  ?sessions:Session_link.Known.t

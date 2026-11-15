@@ -15,7 +15,7 @@ type t =
       ; block : int (** the index in the content of the block [delta] changed *)
       ; stream : int (** the streamed message's id, unique in the process *)
       ; seq : int (** [delta]'s number in the stream, from 1 *)
-      ; partial : (unit -> Message.Assistant.t) [@sexp.opaque]
+      ; partial : unit -> Message.Assistant.t [@sexp.opaque]
         (** the whole message so far (through [seq] only while the event is
             emitted), for a frontend that has to catch up *)
       }

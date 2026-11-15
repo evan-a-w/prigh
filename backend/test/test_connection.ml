@@ -274,14 +274,16 @@ let slow_peer_keeps_up ~takes_deltas =
 
 let%expect_test "a slow peer under a long streamed reply keeps up" =
   slow_peer_keeps_up ~takes_deltas:false;
-  [%expect {|
+  [%expect
+    {|
     ok
     ((ended false) (updates 2) (text_length 10000) (text_is_the_reply true)
      (thinking_length 2000) (last_partial_has_the_whole_text (true))
      (pieces ((1 2000) (2001 12000))) (final_content (12057)))
     |}];
   slow_peer_keeps_up ~takes_deltas:true;
-  [%expect {|
+  [%expect
+    {|
     ok
     ((ended false) (updates 2) (text_length 10000) (text_is_the_reply true)
      (thinking_length 2000) (last_partial_has_the_whole_text ())
@@ -328,7 +330,10 @@ let%expect_test "a peer joining mid-stream, or asking, gets the whole message" =
       c
       (sprintf
          {|{"id": 1, "method": "hello", "params": {%s"features": ["stream_deltas"]}}|}
-         (Option.value_map session ~default:"" ~f:(sprintf {|"session": "%s", |})))
+         (Option.value_map
+            session
+            ~default:""
+            ~f:(sprintf {|"session": "%s", |})))
   in
   let watcher = Conn.start server ~sw in
   hello watcher;
@@ -386,7 +391,8 @@ let%expect_test "a peer joining mid-stream, or asking, gets the whole message" =
   Conn.close watcher;
   Conn.close joiner;
   Rpc_server.shutdown server;
-  [%expect {|
+  [%expect
+    {|
     ok
     ok
     ok

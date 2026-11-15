@@ -157,9 +157,7 @@ let%expect_test
   H.event h (Message_start (user "list the files"));
   H.event h (Message_update (unnumbered (Thinking_delta "let me look")));
   H.event h (Message_update (unnumbered (Text_delta "Sure, here")));
-  H.event
-    h
-    (Message_update (unnumbered (Text_delta " they are:\nfirst li")));
+  H.event h (Message_update (unnumbered (Text_delta " they are:\nfirst li")));
   H.show h;
   [%expect
     {|
@@ -3526,7 +3524,9 @@ let%expect_test "resize mid-stream re-wraps without losing lines" =
   H.event h (State (state ~running:true ()));
   H.event
     h
-    (Message_update (unnumbered (Text_delta
+    (Message_update
+       (unnumbered
+          (Text_delta
              "The quick brown fox jumps over the lazy dog and keeps running.\n\
               second")));
   H.show h;
@@ -3812,8 +3812,7 @@ let%expect_test "scroll stays anchored while streaming" =
   let stream from count =
     List.iter
       (List.init count ~f:(fun i -> sprintf "line %d\n" (from + i)))
-      ~f:(fun text ->
-        H.event h (Message_update (unnumbered (Text_delta text))))
+      ~f:(fun text -> H.event h (Message_update (unnumbered (Text_delta text))))
   in
   stream 0 12;
   H.show h;
@@ -3897,8 +3896,7 @@ let%expect_test "page_down past the bottom returns to follow" =
   let stream =
     List.iter
       (List.init 20 ~f:(fun i -> sprintf "line %d\n" i))
-      ~f:(fun text ->
-        H.event h (Message_update (unnumbered (Text_delta text))))
+      ~f:(fun text -> H.event h (Message_update (unnumbered (Text_delta text))))
   in
   stream;
   H.key h (Key.plain Page_up);
@@ -3971,8 +3969,7 @@ let%expect_test
   let stream =
     List.iter
       (List.init 20 ~f:(fun i -> sprintf "line %d\n" i))
-      ~f:(fun text ->
-        H.event h (Message_update (unnumbered (Text_delta text))))
+      ~f:(fun text -> H.event h (Message_update (unnumbered (Text_delta text))))
   in
   stream;
   H.key h (Key.plain Page_up);
@@ -6882,7 +6879,9 @@ let%expect_test "resize 120->40 mid-stream keeps every line" =
   for i = 1 to 6 do
     H.event
       h
-      (Message_update (unnumbered (Text_delta
+      (Message_update
+         (unnumbered
+            (Text_delta
                (sprintf
                   "delta %d with several words that wrap at forty columns\n"
                   i))))

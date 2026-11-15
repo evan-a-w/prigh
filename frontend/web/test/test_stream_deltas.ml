@@ -50,7 +50,8 @@ let%expect_test "deltas build the reply the whole-message updates showed" =
   let from_whole = html whole in
   print_s [%message (String.equal from_deltas from_whole : bool)];
   print_endline from_deltas;
-  [%expect {|
+  [%expect
+    {|
     ("String.equal from_deltas from_whole" true)
     <div class="entries">
       <div class="assistant msg streaming">
@@ -110,7 +111,8 @@ let%expect_test "a gap asks the backend to resync, once" =
   Harness.event h (update ~seq:6 ~block:0 (text ", and on"));
   Harness.event h (update ~seq:6 ~block:0 (text ", and on"));
   Harness.show h ~selector:".assistant";
-  [%expect {|
+  [%expect
+    {|
     -- seq 3 after 1
     (Rpc (method_ resync) (params ()) (tag Ignore))
     -- seq 4: still lost, not asked again

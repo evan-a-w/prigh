@@ -46,11 +46,13 @@ let%expect_test "numbered deltas show what unnumbered updates showed" =
   screen (List.map pieces ~f:(fun d -> P.Event.Message_update (unnumbered d)));
   let unnumbered = Expect_test_helpers_core.expect_test_output () in
   screen
-    (List.mapi pieces ~f:(fun i d -> numbered ~seq:(i + 1) ~block:(block_of d) d));
+    (List.mapi pieces ~f:(fun i d ->
+       numbered ~seq:(i + 1) ~block:(block_of d) d));
   let numbered = Expect_test_helpers_core.expect_test_output () in
   print_s [%message (String.equal unnumbered numbered : bool)];
   print_endline numbered;
-  [%expect {|
+  [%expect
+    {|
     ("String.equal unnumbered numbered" true)
 
 
@@ -89,7 +91,8 @@ let%expect_test "a gap asks for a resync once; the whole message repairs it" =
   print_endline "-- one already had";
   H.event h (numbered ~seq:7 ~block:0 (Text_delta "and on"));
   H.show h;
-  [%expect {|
+  [%expect
+    {|
     -- seq 3 after 1: a gap
     (Rpc (method_ resync) (params ()) (tag Ignore))
     -- still missing: not asked again, nothing applied
@@ -135,7 +138,8 @@ let%expect_test "joining mid-stream: the first update has the message so far" =
        (Text_delta "way"));
   H.event h (numbered ~seq:41 ~block:1 (Text_delta " there"));
   H.show h;
-  [%expect {|
+  [%expect
+    {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question

@@ -137,7 +137,12 @@ type t =
 [@@deriving sexp_of]
 
 let empty =
-  { items_rev = []; stream = None; at = None; message_start = None; resync = false }
+  { items_rev = []
+  ; stream = None
+  ; at = None
+  ; message_start = None
+  ; resync = false
+  }
 ;;
 
 let wants_resync t = t.resync
@@ -374,11 +379,17 @@ let update_server_tool t ~id ~f =
     add (flush t) (Server_tool { tool = f created; ended = false })
 ;;
 
-let server_tool_delta t ~(partial : P.Message.Assistant.t option) (delta : P.Delta.t) =
+let server_tool_delta
+      t
+      ~(partial : P.Message.Assistant.t option)
+      (delta : P.Delta.t)
+  =
   let in_partial id =
-    List.find_map (Option.value_map partial ~default:[] ~f:(fun p -> p.content)) ~f:(function
-      | P.Content.Server_tool s when String.equal s.id id -> Some s
-      | _ -> None)
+    List.find_map
+      (Option.value_map partial ~default:[] ~f:(fun p -> p.content))
+      ~f:(function
+        | P.Content.Server_tool s when String.equal s.id id -> Some s
+        | _ -> None)
   in
   match delta with
   | Server_tool_use { id; name; input } ->
@@ -572,8 +583,7 @@ let resync_to t (partial : P.Message.Assistant.t) ~at =
   in
   let rec drop items n =
     match items with
-    | (Item.Assistant { final = false; _ } | Thinking _ | Server_tool _)
-      :: rest
+    | (Item.Assistant { final = false; _ } | Thinking _ | Server_tool _) :: rest
       when n > 0 -> drop rest (n - 1)
     | _ -> items
   in
@@ -632,9 +642,7 @@ let apply t (event : P.Event.t) =
   | P.Event.Message_start _ -> t
   | P.Event.Message_update update -> stream_update t update
   | P.Event.Message_end (P.Message.Assistant a) ->
-    let t =
-      { t with at = None; message_start = None; resync = false }
-    in
+    let t = { t with at = None; message_start = None; resync = false } in
     let t = settle_server_tools (flush t) a in
     let t =
       match a.stop_reason with
@@ -1101,7 +1109,8 @@ let arrivals ?sessions ~before t ~filter ~width ~verbosity : Arrivals.t =
     ( List.sum
         (module Int)
         (all_items_rev t)
-        ~f:(fun item -> List.length (render_item ?sessions item ~width ~verbosity))
+        ~f:(fun item ->
+          List.length (render_item ?sessions item ~width ~verbosity))
     , List.count t.items_rev ~f:finished )
   in
   let lines_before, items_before = count before a in

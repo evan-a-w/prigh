@@ -117,8 +117,7 @@ let apply t ~(at : Position.t option) (message : Message.Assistant.t)
     let base =
       match at with
       | _ when t.from = 1 -> Some { message with content = [] }
-      | Some at when at.stream = t.stream && t.from = at.seq + 1 ->
-        Some message
+      | Some at when at.stream = t.stream && t.from = at.seq + 1 -> Some message
       | Some _ | None -> None
     in
     (match at, base with

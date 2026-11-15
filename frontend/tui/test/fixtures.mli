@@ -65,6 +65,7 @@ val partial : P.Message.Assistant.t
 
 (** A [message_update] as a backend without numbered streams sends it. *)
 val unnumbered : P.Delta.t -> P.Stream_update.t
+
 val tool_call : ?name:string -> ?arguments:string -> string -> P.Tool_call.t
 
 val tool_result

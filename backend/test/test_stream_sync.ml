@@ -1,7 +1,8 @@
 open! Core
 open! Prigh
 
-let%expect_test "deltas while a client has the stream; a resync when it has not" =
+let%expect_test "deltas while a client has the stream; a resync when it has not"
+  =
   let t = Stream_sync.create () in
   let send ?(key = "") stream seq =
     let decision = Stream_sync.send t { key; stream; seq } in

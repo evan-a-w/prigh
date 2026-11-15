@@ -12,6 +12,7 @@ val apply : t -> Assistant_event.t -> unit
     (that of the last block when it changed none: a delta for a tool call
     that never started). *)
 val apply_block : t -> Assistant_event.t -> int
+
 val snapshot : t -> Message.Assistant.t
 
 val finish

@@ -317,9 +317,7 @@ let%expect_test "no shift: queued messages while running" =
   let h = Test_app.connected ~width:110 ~height:16 () in
   H.event h (State (state ~running:true ()));
   H.event h (Message_start (user "go"));
-  H.event
-    h
-    (Message_update (unnumbered (Text_delta "Working on it, step one")));
+  H.event h (Message_update (unnumbered (Text_delta "Working on it, step one")));
   no_shift h ~f:(fun () ->
     H.keys h "and then this";
     H.key h (Key.alt Enter);
