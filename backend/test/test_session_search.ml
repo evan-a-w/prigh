@@ -437,3 +437,107 @@ let%expect_test "start_background: the index is built without a search" =
     indexed: 2
     |}]
 ;;
+
+let%expect_test "the index is kept in a file: a new process reads only what \
+                 changed"
+  =
+  with_sandbox
+  @@ fun t ->
+  let port =
+    saved
+      t
+      ~name:"Make the port configurable"
+      ~at:100.
+      [ Message.user "prigh serve should take the listen port from the config"
+      ; assistant "I'll add a --port flag; the default stays 8080."
+      ]
+  in
+  ignore
+    (saved
+       t
+       ~at:200.
+       [ Message.user "why does the compaction summary lose the plan?"
+       ; assistant "The summary prompt drops the plan when it is long."
+       ]
+     : Session.t);
+  let dir = sessions_dir t in
+  let file = Session_search.file ~dir in
+  let reads = ref 0 in
+  let load (s : Session.Summary.t) =
+    incr reads;
+    Result.ok (Session.load s.path)
+  in
+  let labels = [ Session.id port, "port" ] in
+  (* A process: what it reads to bring the index up to date, and a
+     search's hits (their snippets read from the files). *)
+  let run what =
+    reads := 0;
+    let index = Session_search.create ~file () in
+    Session_search.index
+      index
+      ~sessions:(fun () -> Session.list ~dir)
+      ~load
+      ~yield:ignore;
+    printf "%s: %d indexed, %d read\n" what (Session_search.indexed index) !reads;
+    search index t ~labels "port 8080";
+    search index t ~labels "summary plan"
+  in
+  run "first run";
+  run "second run";
+  ignore
+    (Session.append_message port ~at:300. (Message.user "and the kubernetes port")
+     : Session.Entry.t);
+  run "after a message";
+  search (Session_search.create ~file ()) t ~labels "kubernetes";
+  (* A file that cannot be used is rebuilt from the sessions. *)
+  let good = In_channel.read_all file in
+  List.iter
+    [ "torn", String.prefix good (String.length good - 7)
+    ; "garbage", "prigh-search-index\n\255\255\255\255"
+    ; "not ours", "hello"
+    ; "another version", String.substr_replace_first good ~pattern:"\001" ~with_:"\009"
+    ]
+    ~f:(fun (what, data) ->
+      Out_channel.write_all file ~data;
+      let start () =
+        reads := 0;
+        let index = Session_search.create ~file () in
+        Session_search.index
+          index
+          ~sessions:(fun () -> Session.list ~dir)
+          ~load
+          ~yield:ignore;
+        Session_search.indexed index, !reads
+      in
+      let indexed, read = start () in
+      let _, read_next = start () in
+      printf
+        "%s: %d indexed, %d read; the next run reads %d\n"
+        what
+        indexed
+        read
+        read_next);
+  [%expect {|
+    first run: 2 indexed, 2 read
+    "port 8080" (read 0)
+      port      60  I'll add a --[port] flag; the default stays [8080].
+    "summary plan" (read 0)
+      ?         60  …does the compaction [summary] lose the [plan]?
+    second run: 2 indexed, 0 read
+    "port 8080" (read 0)
+      port      60  I'll add a --[port] flag; the default stays [8080].
+    "summary plan" (read 0)
+      ?         60  …does the compaction [summary] lose the [plan]?
+    after a message: 2 indexed, 1 read
+    "port 8080" (read 0)
+      port      60  I'll add a --[port] flag; the default stays [8080].
+    "summary plan" (read 0)
+      ?         60  …does the compaction [summary] lose the [plan]?
+    "kubernetes" (read 0)
+      port      20  and the [kubernetes] port
+    torn: 2 indexed, 2 read; the next run reads 0
+    garbage: 2 indexed, 2 read; the next run reads 0
+    not ours: 2 indexed, 2 read; the next run reads 0
+    another version: 2 indexed, 2 read; the next run reads 0
+    |}]
+;;
