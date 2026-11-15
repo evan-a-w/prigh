@@ -453,7 +453,7 @@ let%expect_test
     {|
     (Complete_accept (run true))
     <header class="review-head">
-    <button class="review-files-toggle">
+    <div class="review-file-bar">
     <div class="review-body">
     <div class="review-current">
     <button type="button"
@@ -481,7 +481,7 @@ let%expect_test
     {|
     (Review Toggle_files)
     <header class="review-head">
-    <button class="open review-files-toggle">
+    <div class="review-file-bar">
     <div class="review-target">
     <div class="review-body">
     <Vdom.Node.none-widget class="">
@@ -515,7 +515,7 @@ let%expect_test
     (Rpc (method_ git_diff) (params ()) (tag (Review Diff)))
     (Rpc (method_ git_status) (params ()) (tag (Git Status)))
     <header class="review-head">
-    <button class="review-files-toggle">
+    <div class="review-file-bar">
     <div class="review-body">
     <div class="review-current">
     <button type="button"
@@ -634,7 +634,9 @@ let%expect_test
     |}]
 ;;
 
-let%expect_test "Space approves and goes on, ← → step, Space again takes it back" =
+let%expect_test
+    "Space approves and goes on, ← → step, Space again takes it back"
+  =
   let h = opened () in
   let dock () =
     H.text h ~selector:".review-progress";
@@ -678,7 +680,8 @@ let%expect_test "Space approves and goes on, ← → step, Space again takes it 
   (* The last one: nothing left to go on to, so it stays and says so. *)
   H.key h " " ~target:Review;
   H.text h ~selector:".toast";
-  [%expect {|
+  [%expect
+    {|
     (Review (Toggle_approval src/util.ml))
     (Rpc (method_ review_approve)
      (params
@@ -688,36 +691,45 @@ let%expect_test "Space approves and goes on, ← → step, Space again takes it 
     (Expire_toast (id 0) (after_ms 4220))
     All 2 files are approved: send your comments (s) or commit them (C).
     |}];
-  H.reply h "review_approve" (approvals [ main; "src/util.ml", "1ccc6f9f4c595676b5f7c4edbcb27af1" ]);
+  H.reply
+    h
+    "review_approve"
+    (approvals [ main; "src/util.ml", "1ccc6f9f4c595676b5f7c4edbcb27af1" ]);
   [%expect {| |}];
   (* ← goes back; Space on an approved file takes it back, and stays. *)
   H.key h "ArrowLeft" ~target:Review;
   dock ();
-  [%expect {|
+  [%expect
+    {|
     (Review (Step -1))
     2/2 approved
     (✓ src/ main.ml +2 −1)
     (←) (Approved Space) (→) File 1 of 2
     |}];
   H.key h " " ~target:Review;
-  [%expect {|
+  [%expect
+    {|
     (Review (Toggle_approval src/main.ml))
     (Rpc (method_ review_unapprove) (params ((path src/main.ml)))
      (tag (Review (Changed ()))))
     |}];
   H.key h "ArrowRight" ~target:Review;
   H.text h ~selector:".review-file.current";
-  [%expect {|
+  [%expect
+    {|
     (Review (Step 1))
     (✓ src/ util.ml +2 −0)
     |}];
   (* Typing in a field, or with Ctrl or Alt, the keys are the field's. *)
-  List.iter [ Prigh_web.Keys.Target.Field; Multiline; Control ] ~f:(fun target ->
-    List.iter [ " "; "ArrowLeft"; "ArrowRight"; "x" ] ~f:(fun key ->
-      H.key h key ~target));
+  List.iter
+    [ Prigh_web.Keys.Target.Field; Multiline; Control ]
+    ~f:(fun target ->
+      List.iter [ " "; "ArrowLeft"; "ArrowRight"; "x" ] ~f:(fun key ->
+        H.key h key ~target));
   H.key h "ArrowLeft" ~ctrl:true ~target:Review;
   H.key h "ArrowRight" ~alt:true ~target:Review;
-  [%expect {|
+  [%expect
+    {|
     (browser default)
     (browser default)
     (browser default)
@@ -1352,7 +1364,9 @@ let%expect_test "help lists the review's keys" =
     c / e / v / s (reviewing): comment on the code selected (drag across it, in the review or a changed file's preview); edit or comment; the whole file or the changes; send the new comments to prigh
     r / b / d (reviewing): choose what to review (a worktree, or a branch read-only); what to compare it with (a branch, tag, commit or any revision typed); since the merge base or directly
     l / Shift+L (reviewing): what changed since your latest action on the file (or the hunks again); choose the action it compares with: Latest follows your newest
-    Esc (reviewing): drop the comment, the selected code, the selected files, then close the review
+    Shift+J / Shift+K (reviewing): the next / previous change, past the file's last or first: the next / previous file (on a phone, the bar's ↓ ↑)
+    w / + / - (reviewing): wrap the file's long lines (continuing under their indent) or scroll them sideways; code in diffs bigger / smaller (on a phone: the file's Aa)
+    Esc (reviewing): close the display options, drop the comment, the selected code, the selected files, then close the review
     Enter / Ctrl+S (reviewing): add the comment or reply (Shift+Enter: a new line); save the file being edited
     Ctrl+Enter / Esc (the review's commit message): commit the files listed above it; close the commit, keeping the message
     |}]

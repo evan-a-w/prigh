@@ -118,6 +118,11 @@ type t =
   ; marked : String.Set.t
   ; mark_from : string option
   ; files_open : bool
+  ; narrow : bool
+  ; gaps : Context_fold.t String.Map.t
+  ; scrolled : String.Set.t
+  ; display_open : bool
+  ; ask : bool
   }
 [@@deriving sexp_of]
 
@@ -155,6 +160,11 @@ let empty =
   ; marked = String.Set.empty
   ; mark_from = None
   ; files_open = false
+  ; narrow = false
+  ; gaps = String.Map.empty
+  ; scrolled = String.Set.empty
+  ; display_open = false
+  ; ask = false
   }
 ;;
 
@@ -192,6 +202,7 @@ module Out = struct
         }
     | Focus of string
     | Clear_text_selection
+    | Scroll_change of int
   [@@deriving sexp_of, equal]
 end
 
@@ -264,6 +275,20 @@ module Action = struct
     | Save
     | Reload
     | Refresh
+    | Step_change of int
+    | Reveal of
+        { path : string
+        ; gap : Diff_view.Gap.t
+        ; how : Context_fold.How.t
+        }
+    | Toggle_wrap of string
+    | Toggle_display
+    | Tap_line of
+        { path : string
+        ; side : Review_comment.Side.t
+        ; line : int
+        }
+    | Quick of Quick_ask.t
   [@@deriving sexp_of]
 end
 
@@ -552,6 +577,7 @@ let full_rows (hunk_rows : Diff_view.Row.t list) (lines : string array) =
   in
   List.iter hunk_rows ~f:(fun (row : Diff_view.Row.t) ->
     match row with
+    | Gap _ -> ()
     | Hunk header ->
       (match Diff_view.hunk_starts header with
        | Some (o, n) ->
@@ -598,6 +624,7 @@ module Rows = struct
     ; text : string option
     ; full : bool
     ; since : string option
+    ; fold : Context_fold.t option
     }
 
   let memo : (string, key * Diff_view.Row.t list) Hashtbl.t =
@@ -610,6 +637,7 @@ module Rows = struct
     && Option.equal phys_equal a.text b.text
     && Bool.equal a.full b.full
     && Option.equal String.equal a.since b.since
+    && Option.equal Context_fold.equal a.fold b.fold
   ;;
 
   let find key ~make =
@@ -641,12 +669,24 @@ let rows t ~path =
     | Since -> Option.is_none since && Layout.equal t.layout Full
     | Unified -> false
   in
+  (* On a phone the changes are the whole file folded to a few lines around
+     each change, the rest a tap away. *)
+  let fold =
+    match file, since, text with
+    | Some _, None, Some _ when t.narrow && not full ->
+      Some (Option.value (Map.find t.gaps path) ~default:Context_fold.empty)
+    | _ -> None
+  in
   Rows.find
     { path
     ; hash = Option.map file ~f:(fun f -> f.hash)
-    ; text = (if full || Option.is_none file then text else None)
+    ; text =
+        (if full || Option.is_none file || Option.is_some fold
+         then text
+         else None)
     ; full
     ; since
+    ; fold
     }
     ~make:(fun () ->
       let lines () =
@@ -662,9 +702,12 @@ let rows t ~path =
         let hunk_rows =
           Diff_view.unified_rows (String.concat ~sep:"\n" f.hunks)
         in
-        if full && Option.is_some text
-        then full_rows hunk_rows (lines ())
-        else hunk_rows)
+        (match fold with
+         | Some fold -> Context_fold.fold fold (full_rows hunk_rows (lines ()))
+         | None ->
+           if full && Option.is_some text
+           then full_rows hunk_rows (lines ())
+           else hunk_rows))
 ;;
 
 let lines t path =
@@ -1052,6 +1095,60 @@ let rec update t (action : Action.t) =
        let t, outs = refetch_content { t with editor = None } e.path in
        t, outs)
   | Refresh -> get_diff t
+  | Step_change by -> t, [ Out.Scroll_change by ]
+  | Reveal { path; gap; how } ->
+    let gaps =
+      Map.update t.gaps path ~f:(fun fold ->
+        Context_fold.reveal
+          (Option.value fold ~default:Context_fold.empty)
+          gap
+          how)
+    in
+    { t with gaps }, []
+  | Toggle_wrap path ->
+    ( { t with
+        scrolled =
+          (if Set.mem t.scrolled path
+           then Set.remove t.scrolled path
+           else Set.add t.scrolled path)
+      }
+    , [] )
+  | Toggle_display -> { t with display_open = not t.display_open }, []
+  | Tap_line { path; side; line } ->
+    (match t.selection, t.draft with
+     | _, Some _ -> t, []
+     | Some { path = p; from = Some _; range; _ }, None
+       when String.equal p path
+            && Review_comment.Side.equal range.side side
+            && range.first = line
+            && range.last = line -> update t Clear_selection
+     | Some { path = p; from = Some _; _ }, None when String.equal p path ->
+       update t (Select_line { path; side; line; extend = true })
+     | _ -> update t (Select_line { path; side; line; extend = false }))
+  | Quick q ->
+    let t, outs =
+      match t.draft with
+      | Some _ -> t, []
+      | None -> update t Start_comment
+    in
+    (match t.draft with
+     | None -> t, outs
+     | Some d ->
+       let t, sent =
+         update
+           { t with draft = Some { d with text = Quick_ask.text q } }
+           Draft_send
+       in
+       let asked =
+         List.exists sent ~f:(function
+           | Out.Rpc _ -> true
+           | _ -> false)
+       in
+       ( { t with ask = asked }
+       , List.filter outs ~f:(function
+           | Out.Focus _ -> false
+           | _ -> true)
+         @ sent ))
 ;;
 
 let set_review t review = with_all_since t review
@@ -1060,7 +1157,7 @@ let set_session t session ~watching =
   if Option.equal String.equal t.session session
   then t, []
   else (
-    let t = { empty with session; layout = t.layout } in
+    let t = { empty with session; layout = t.layout; narrow = t.narrow } in
     (* [empty]'s target: the session's own worktree. *)
     match session with
     | None -> t, []
@@ -1151,18 +1248,29 @@ let rec reply t (why : Reply.t) (result : (Json.t, string) Result.t) =
      | Ok review -> with_all_since t review
      | Error e -> t, [ toast ~error:true (Error.to_string_hum e) ])
   | Comment_added, Error e ->
-    ( { t with draft = Option.map t.draft ~f:(fun d -> { d with busy = false }) }
+    ( { t with
+        draft = Option.map t.draft ~f:(fun d -> { d with busy = false })
+      ; ask = false
+      }
     , [ toast ~error:true (error_text e) ] )
   | Comment_added, Ok json ->
-    let t = { t with draft = None; selection = None } in
-    (match Review_comment.of_json json with
-     | Ok c ->
-       ( map_comments (acted t c.path) ~f:(fun comments ->
-           if List.exists comments ~f:(fun o -> String.equal o.id c.id)
-           then comments
-           else comments @ [ c ])
-       , [] )
-     | Error _ -> t, [])
+    let ask = t.ask in
+    let t = { t with draft = None; selection = None; ask = false } in
+    let t, outs =
+      match Review_comment.of_json json with
+      | Ok c ->
+        ( map_comments (acted t c.path) ~f:(fun comments ->
+            if List.exists comments ~f:(fun o -> String.equal o.id c.id)
+            then comments
+            else comments @ [ c ])
+        , [] )
+      | Error _ -> t, []
+    in
+    if ask
+    then (
+      let t, more = update t Submit in
+      t, outs @ more)
+    else t, outs
   | (Decided id | Replied id), result ->
     let t =
       match result, comment_path t id with
@@ -1379,8 +1487,13 @@ let key t ~key ~shift ~ctrl ~alt : Action.t option =
                | layout -> layout))
        | Some (Unified | Full) | None -> Some (Set_layout Since))
     | "s" when not shift -> Some Submit
+    | "J" when shift -> Some (Step_change 1)
+    | "K" when shift -> Some (Step_change (-1))
+    | "w" -> Option.map t.current ~f:(fun p -> Action.Toggle_wrap p)
     | "Escape" ->
-      if Option.is_some t.draft
+      if t.display_open
+      then Some Toggle_display
+      else if Option.is_some t.draft
       then Some Draft_cancel
       else if Option.is_some t.selection
       then Some Clear_selection

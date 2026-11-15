@@ -27,3 +27,13 @@ val thread
   -> outdated:bool
   -> inject:(App.Action.t -> unit Effect.t)
   -> Node.t
+
+(** On a phone's review page, what takes the dock's place at the foot, over
+    the on-screen keyboard: the display options (wrapping, code size), the
+    comment being written, or the lines selected (quoted, with the quick
+    asks and Write a comment); [None]: the dock. *)
+val sheet
+  :  App.Model.t
+  -> path:string
+  -> inject:(App.Action.t -> unit Effect.t)
+  -> Node.t option

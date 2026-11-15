@@ -1122,6 +1122,28 @@ drops the comment, the selected code, the selected files, then closes. It follow
 write or command of the agent or its subagents, and every run's end,
 reads the changes again; the arrow button reads them now.
 
+Diffs everywhere (the review page, the chat's edits, `/diff`, a pull
+request's changes) wrap a long line under its own indent, a faint rule down
+the continuation, so nesting stays readable on a phone; in a removed line
+and the added line that replaced it, the words that changed are marked on
+their own. On the review page `+` and `-` (or Aa on a phone) make code in
+all diffs bigger or smaller, kept with your preferences; `w` (or Aa) makes the
+review page's file scroll sideways instead of wrapping.
+
+On a phone the review page shows each change with three lines around it,
+the unchanged lines between folded behind "N lines hidden" (show 20 more
+from either end, or all). The dock is ← ↑ Approve & next ↓ →: ↑ ↓ (or
+Shift+K / Shift+J) go to the previous and next change, past the last one
+to the next file; the file's head stays at the top with its place (3/12).
+Generated files (lock files, minified code, build output) and both halves
+of a pure rename (a file deleted and one added with the same text) are
+folded to a card, which approves them all at once. Tap a line (anywhere on
+it) to select it and another to select to it; a sheet from the bottom then
+quotes the lines and offers Write a comment and one-tap asks (Explain this,
+Why?, Revert this, Add a test: the comment is added and the review sent to
+the agent at once). The sheet stays above the keyboard while you write, and
+the dock steps aside.
+
 Select the code you want changed, as you would to copy it (drag across
 it, within a line or over several; on a phone, press and hold), here or in
 the file browser's preview of a changed file: a Comment button floats by

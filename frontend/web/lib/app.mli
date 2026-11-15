@@ -424,6 +424,9 @@ module Command : sig
     | Reveal of string list
     (** scroll the main chat to a subagent's card, opening the transcripts
         it is in: the [subagent] call ids from the top-level one down *)
+    | Scroll_change of int
+    (** the review page's next (1) or previous (-1) change from what is in
+        view; past the file's last (first), [Review (Step 1)] ([-1]) *)
     | Copy of
         { text : string
         ; copied : string (** the toast once it is there *)
@@ -515,6 +518,8 @@ module Action : sig
     | Set_browser_time_zone of string
     (** the browser's IANA time zone, offered in About you *)
     | Set_narrow of bool (** a phone-sized window: the sidebar is a drawer *)
+    | Code_size of int
+    (** code in diffs one size bigger (1) or smaller (-1): {!Code_size} *)
     | Set_desktop of bool (** the page runs under [prigh desktop] *)
     | Set_origin of string
     (** the page's [location.origin]: where MCP sign-ins come back to *)
@@ -1051,6 +1056,7 @@ module Model : sig
     ; review_memory : Review_memory.t
       (** what the review page compared last, per worktree (a
           preference) *)
+    ; code_size : Code_size.t (** how large code shows in diffs (a preference) *)
     ; layout : Resize.t (** the panels' sizes *)
     ; paging : Paging.t (** how much of the transcript is loaded *)
     ; transcript_events : int

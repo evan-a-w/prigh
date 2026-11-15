@@ -9,15 +9,18 @@ let review action = App.Action.Review action
 (* ---- rows *)
 
 module Tokens = struct
-  (* Highlighted once per rows value (see [Code_review.rows]). *)
-  let memo : (string, Row.t list * Highlight.Token.t list option list) Hashtbl.t
-    =
-    Hashtbl.create (module String)
-  ;;
+  (* Highlighted (and the changed words found) once per rows value (see
+     [Code_review.rows]). *)
+  type t =
+    { tokens : Highlight.Token.t list option list
+    ; changes : Word_diff.Range.t list list
+    }
+
+  let memo : (string, Row.t list * t) Hashtbl.t = Hashtbl.create (module String)
 
   let find ~path rows =
     match Hashtbl.find memo path with
-    | Some (r, tokens) when phys_equal r rows -> tokens
+    | Some (r, t) when phys_equal r rows -> t
     | Some _ | None ->
       let tokens =
         match Highlight.Lang.of_path path with
@@ -25,8 +28,9 @@ module Tokens = struct
           Diff_view.highlighted lang rows
         | Some _ | None -> List.map rows ~f:(fun _ -> None)
       in
-      Hashtbl.set memo ~key:path ~data:(rows, tokens);
-      tokens
+      let t = { tokens; changes = Diff_view.word_changes rows } in
+      Hashtbl.set memo ~key:path ~data:(rows, t);
+      t
   ;;
 end
 
@@ -50,55 +54,48 @@ module Deps = struct
     ; first : bool (** of the selection *)
     ; commented : bool
     ; marks : Mark.t list
+    ; changed : Word_diff.Range.t list
+    ; start : bool (** of a change: what Shift+J goes to *)
+    ; tap : bool (** on a phone: a tap anywhere on it selects it *)
     }
   [@@deriving equal]
 end
 
 let row_cache : (Row.t, Deps.t) View_cache.t = View_cache.create ()
 
-(* The tokens' text, split where marks start and end, the marked parts in
-   [<mark>]s. *)
-let marked tokens (marks : Mark.t list) ~inject =
+(* The tokens' text, split where marks and changed words start and end: the
+   changed words in [span.wd]s, the marked parts in [<mark>]s. *)
+let marked tokens (marks : Mark.t list) ~changed ~inject =
   match marks with
-  | [] -> Highlight_view.spans tokens
+  | [] -> Diff_view.changed_spans tokens ~changed
   | marks ->
     let cuts =
       List.concat_map marks ~f:(fun m -> [ m.start; m.end_ ])
+      @ List.concat_map changed ~f:(fun (r : Word_diff.Range.t) ->
+        [ r.start; r.end_ ])
       |> List.dedup_and_sort ~compare:Int.compare
     in
-    let pieces =
-      List.fold
-        tokens
-        ~init:(0, [])
-        ~f:(fun (pos, acc) ({ kind; text } : Highlight.Token.t) ->
-          let len = String.length text in
-          let inside =
-            List.filter cuts ~f:(fun c -> c > pos && c < pos + len)
-          in
-          let bounds = (pos :: inside) @ [ pos + len ] in
-          let rec split acc = function
-            | a :: (b :: _ as rest) ->
-              split
-                (( a
-                 , { Highlight.Token.kind
-                   ; text = String.sub text ~pos:(a - pos) ~len:(b - a)
-                   } )
-                 :: acc)
-                rest
-            | [ _ ] | [] -> acc
-          in
-          pos + len, split acc bounds)
-      |> snd
-      |> List.rev
-    in
+    let pieces = Diff_view.pieces tokens ~cuts in
     let covering at =
       List.filter marks ~f:(fun m -> m.start <= at && at < m.end_)
     in
+    (* A mark is one element, the changed words in it spans inside it. *)
     List.group pieces ~break:(fun (a, _) (b, _) ->
       not (List.equal Mark.equal (covering a) (covering b)))
     |> List.map ~f:(fun group ->
       let at = fst (List.hd_exn group) in
-      let spans = Highlight_view.spans (List.map group ~f:snd) in
+      let spans =
+        List.group group ~break:(fun (a, _) (b, _) ->
+          not
+            (Bool.equal
+               (Diff_view.in_change changed a)
+               (Diff_view.in_change changed b)))
+        |> List.concat_map ~f:(fun run ->
+          let spans = Highlight_view.spans (List.map run ~f:snd) in
+          if Diff_view.in_change changed (fst (List.hd_exn run))
+          then [ Node.span ~attrs:[ Attr.class_ "wd" ] spans ]
+          else spans)
+      in
       match covering at with
       | [] -> spans
       | m :: _ as ms ->
@@ -127,8 +124,62 @@ let marked tokens (marks : Mark.t list) ~inject =
     |> List.concat
 ;;
 
+(* Whether the page has text selected (a long press on a phone): a tap that
+   ends one is not a tap on a line. *)
+let text_selected () =
+  let open Js_of_ocaml in
+  let global = Js.Unsafe.global in
+  Js.Optdef.test (Js.Unsafe.get global "getSelection")
+  &&
+  let sel = Js.Unsafe.meth_call global "getSelection" [||] in
+  Js.Opt.test sel && not (Js.to_bool (Js.Unsafe.get sel "isCollapsed"))
+;;
+
+let gap_view ~path (g : Diff_view.Gap.t) ~inject =
+  let show how label title =
+    Node.button
+      ~attrs:
+        [ Attr.class_ "btn small ghost review-gap-show"
+        ; Attr.type_ "button"
+        ; Attr.title title
+        ; Attr.on_click (fun _ ->
+            inject (review (Reveal { path; gap = g; how })))
+        ]
+      [ Node.text label ]
+  in
+  let step = Int.min Context_fold.step g.hidden in
+  Node.tr
+    ~attrs:[ Attr.class_ "gap" ]
+    [ Node.td
+        ~attrs:[ Attr.create "colspan" "3" ]
+        [ div
+            ~cls:"review-gap"
+            ([ span ~cls:"review-gap-text" (Diff_view.gap_text g) ]
+             @ (if g.before && step < g.hidden
+                then
+                  [ show
+                      Down
+                      (sprintf "↓ %d" step)
+                      (sprintf "Show %d more lines under the ones above" step)
+                  ]
+                else [])
+             @ [ show All "Show all" "Show every hidden line here" ]
+             @
+             if g.after && step < g.hidden
+             then
+               [ show
+                   Up
+                   (sprintf "↑ %d" step)
+                   (sprintf "Show %d more lines over the ones below" step)
+               ]
+             else [])
+        ]
+    ]
+;;
+
 let row_view ~path (row : Row.t) tokens (deps : Deps.t) ~inject =
   match row with
+  | Gap g -> gap_view ~path g ~inject
   | Hunk text ->
     Node.tr
       ~attrs:[ Attr.class_ "hunk" ]
@@ -150,19 +201,24 @@ let row_view ~path (row : Row.t) tokens (deps : Deps.t) ~inject =
       | Some (side, line) ->
         Node.td
           ~attrs:
-            [ classes
-                [ "ln"; "pick" ]
-                [ "old", Review_comment.Side.equal side Old ]
-            ; Attr.on_click (fun ev ->
-                inject
-                  (review
-                     (Select_line
-                        { path
-                        ; side
-                        ; line
-                        ; extend = Js_of_ocaml.Js.to_bool ev##.shiftKey
-                        })))
-            ]
+            ([ classes
+                 [ "ln"; "pick" ]
+                 [ "old", Review_comment.Side.equal side Old ]
+             ]
+             @
+             if deps.tap
+             then []
+             else
+               [ Attr.on_click (fun ev ->
+                   inject
+                     (review
+                        (Select_line
+                           { path
+                           ; side
+                           ; line
+                           ; extend = Js_of_ocaml.Js.to_bool ev##.shiftKey
+                           })))
+               ])
           [ Node.text (Int.to_string line) ]
     in
     let tokens =
@@ -175,20 +231,31 @@ let row_view ~path (row : Row.t) tokens (deps : Deps.t) ~inject =
              [ "selected", deps.selected
              ; "sel-first", deps.first
              ; "commented", deps.commented
+             ; "change-start", deps.start
              ]
          ]
+         @ (match key with
+            | Some (side, n) ->
+              [ Attr.create "data-side" (Review_comment.Side.to_string side)
+              ; Attr.create "data-line" (Int.to_string n)
+              ]
+            | None -> [])
          @
          match key with
-         | Some (side, n) ->
-           [ Attr.create "data-side" (Review_comment.Side.to_string side)
-           ; Attr.create "data-line" (Int.to_string n)
+         | Some (side, line) when deps.tap ->
+           [ Attr.on_click (fun _ ->
+               if text_selected ()
+               then Effect.Ignore
+               else inject (review (Tap_line { path; side; line })))
            ]
-         | None -> [])
+         | Some _ | None -> [])
       [ line_cell
       ; Node.td
           ~attrs:[ Attr.class_ "sign"; Attr.create "aria-hidden" "true" ]
           [ Node.text sign ]
-      ; Node.td ~attrs:[ Attr.class_ "text" ] (marked tokens deps.marks ~inject)
+      ; Node.td
+          ~attrs:(Diff_view.text_attrs text)
+          (marked tokens deps.marks ~changed:deps.changed ~inject)
       ]
 ;;
 
@@ -646,11 +713,86 @@ let beside (m : App.Model.t) ~place =
 
 let plural n one many = if n = 1 then one else sprintf many n
 
+(* ---- files folded on a phone *)
+
+let folded_key path = "file:" ^ path
+
+(* The folded files not approved yet, as they are now. *)
+let folded_unapproved (t : Code_review.t) =
+  let folded = Folded_files.classify t.files in
+  List.filter_map t.files ~f:(fun f ->
+    Option.some_if
+      (Map.mem folded f.path
+       && not
+            (Prigh_ui.File_approval.Status.equal
+               (Code_review.approval t f)
+               Approved))
+      f.path)
+;;
+
+let folded_card (m : App.Model.t) ~path (why : Folded_files.Why.t) ~inject =
+  let t = m.review in
+  let text =
+    match why with
+    | Generated ->
+      "A generated file (a lock file, build output or minified code): its \
+       changes are folded."
+    | Renamed_from from -> sprintf "Renamed from %s, its text unchanged." from
+    | Renamed_to to_ -> sprintf "Renamed to %s, its text unchanged." to_
+  in
+  let unapproved = folded_unapproved t in
+  div
+    ~cls:"review-folded-file"
+    [ Node.p [ span ~cls:"chip" (Folded_files.Why.label why); Node.text text ]
+    ; div
+        ~cls:"review-folded-actions"
+        ([ button
+             ~cls:"small"
+             ~on_click:(inject (review (Unfold (folded_key path))))
+             [ Node.text "Show the changes" ]
+         ]
+         @
+         match unapproved with
+         | [] | [ _ ] -> []
+         | paths ->
+           [ button
+               ~cls:"small primary"
+               ~title:(String.concat ~sep:"\n" paths)
+               ~on_click:
+                 (inject (review (Approve_files { paths; approve = true })))
+               [ icon Check
+               ; Node.textf
+                   "Approve the %d generated and renamed"
+                   (List.length paths)
+               ]
+           ])
+    ]
+;;
+
 let view ?(place = `Page) (m : App.Model.t) ~path ~inject =
   let t = m.review in
   let file = Code_review.file t path in
   let rows = Code_review.rows t ~path in
-  let tokens = Tokens.find ~path rows in
+  let { Tokens.tokens; changes } = Tokens.find ~path rows in
+  (* On a phone the review page's sheet has the selection and the comment
+     being written, and a tap on a line selects it. *)
+  let sheet =
+    m.narrow
+    &&
+    match place with
+    | `Page -> true
+    | `Files -> false
+  in
+  let starts =
+    let changed (row : Row.t) =
+      match row with
+      | Line { kind = `Added | `Removed; _ } -> true
+      | Line { kind = `Same; _ } | Hunk _ | Gap _ -> false
+    in
+    List.folding_map rows ~init:false ~f:(fun before row ->
+      let now = changed row in
+      now, now && not before)
+  in
   let comments = Review.on t.review path in
   let lines_new = lazy (side_lines t ~path rows New) in
   let lines_old = lazy (side_lines t ~path rows Old) in
@@ -719,71 +861,81 @@ let view ?(place = `Page) (m : App.Model.t) ~path ~inject =
   in
   let body =
     List.concat
-      (List.map2_exn rows tokens ~f:(fun (row : Row.t) tok ->
-         let marks =
-           List.filter_map at_row ~f:(fun (c, r) ->
-             Option.map (Code_selection.covered r row) ~f:(fun (start, end_) ->
-               { Mark.start
-               ; end_
-               ; id = Some c.id
-               ; hot = Option.exists t.hover ~f:(String.equal c.id)
-               ; quiet = Review_comment.Status.equal c.status Resolved
-               }))
-           @ Option.to_list
-               (Option.bind draft ~f:(fun d ->
-                  Option.map
-                    (Code_selection.covered d.range row)
-                    ~f:(fun (start, end_) ->
-                      { Mark.start
-                      ; end_
-                      ; id = None
-                      ; hot = false
-                      ; quiet = false
-                      })))
-         in
-         let selected =
-           Option.bind line_selection ~f:(fun r -> Code_selection.covered r row)
-         in
-         let deps =
-           { Deps.selected = Option.is_some selected
-           ; first =
-               Option.is_some selected
-               && Option.exists line_selection ~f:(fun r ->
-                 Option.exists (Code_selection.key row) ~f:(fun (_, n) ->
-                   n = r.first))
-           ; commented = not (List.is_empty marks)
-           ; marks = List.filter marks ~f:(fun m -> m.end_ > m.start)
-           }
-         in
-         let node =
-           View_cache.find
-             ~inject
-             row_cache
-             row
-             ~deps
-             ~equal:Deps.equal
-             ~f:(fun () -> row_view ~path row tok deps ~inject)
-         in
-         let threads =
-           if beside
-           then []
-           else
+      (List.map2_exn
+         (List.zip_exn rows tokens)
+         (List.zip_exn changes starts)
+         ~f:(fun ((row : Row.t), tok) (changed, start) ->
+           let marks =
              List.filter_map at_row ~f:(fun (c, r) ->
-               Option.some_if (ends_at row r) (insert (shown_thread (c, r))))
-         in
-         let bar =
-           match selection, draft with
-           | Some ({ from = Some _; _ } as s), None when ends_at row s.range ->
-             [ comment_bar s ~inject ]
-           | _ -> []
-         in
-         let draft_row =
-           match draft with
-           | Some d when (not beside) && ends_at row d.range ->
-             [ insert (draft_view m d ~inject) ]
-           | Some _ | None -> []
-         in
-         (node :: threads) @ bar @ draft_row))
+               Option.map
+                 (Code_selection.covered r row)
+                 ~f:(fun (start, end_) ->
+                   { Mark.start
+                   ; end_
+                   ; id = Some c.id
+                   ; hot = Option.exists t.hover ~f:(String.equal c.id)
+                   ; quiet = Review_comment.Status.equal c.status Resolved
+                   }))
+             @ Option.to_list
+                 (Option.bind draft ~f:(fun d ->
+                    Option.map
+                      (Code_selection.covered d.range row)
+                      ~f:(fun (start, end_) ->
+                        { Mark.start
+                        ; end_
+                        ; id = None
+                        ; hot = false
+                        ; quiet = false
+                        })))
+           in
+           let selected =
+             Option.bind line_selection ~f:(fun r ->
+               Code_selection.covered r row)
+           in
+           let deps =
+             { Deps.selected = Option.is_some selected
+             ; first =
+                 Option.is_some selected
+                 && Option.exists line_selection ~f:(fun r ->
+                   Option.exists (Code_selection.key row) ~f:(fun (_, n) ->
+                     n = r.first))
+             ; commented = not (List.is_empty marks)
+             ; marks = List.filter marks ~f:(fun m -> m.end_ > m.start)
+             ; changed
+             ; start
+             ; tap = sheet
+             }
+           in
+           let node =
+             View_cache.find
+               ~inject
+               row_cache
+               row
+               ~deps
+               ~equal:Deps.equal
+               ~f:(fun () -> row_view ~path row tok deps ~inject)
+           in
+           let threads =
+             if beside
+             then []
+             else
+               List.filter_map at_row ~f:(fun (c, r) ->
+                 Option.some_if (ends_at row r) (insert (shown_thread (c, r))))
+           in
+           let bar =
+             match selection, draft with
+             | Some ({ from = Some _; _ } as s), None
+               when (not sheet) && ends_at row s.range ->
+               [ comment_bar s ~inject ]
+             | _ -> []
+           in
+           let draft_row =
+             match draft with
+             | Some d when (not (beside || sheet)) && ends_at row d.range ->
+               [ insert (draft_view m d ~inject) ]
+             | Some _ | None -> []
+           in
+           (node :: threads) @ bar @ draft_row))
   in
   (* Beside the code: each thread (and the draft) by the first of its lines
      shown; the page's glue (app/review_margin.ml) moves them down to their
@@ -897,29 +1049,185 @@ let view ?(place = `Page) (m : App.Model.t) ~path ~inject =
             ~inject
         ]
   in
+  let wrap = not (Set.mem t.scrolled path) in
   let table () =
-    Node.table ~attrs:[ Attr.class_ "diff review-diff" ] [ Node.tbody body ]
+    Node.table
+      ~attrs:[ classes [ "diff"; "review-diff" ] [ "nowrap", not wrap ] ]
+      [ Node.tbody body ]
+  in
+  let folded =
+    if sheet && not (Set.mem t.unfolded (folded_key path))
+    then Map.find (Folded_files.classify t.files) path
+    else None
   in
   div
     ~cls:"review-code"
     ~attrs:
       [ Attr.create "data-path" path
       ; (if beside then Attr.class_ "beside" else Attr.empty)
+      ; (if wrap then Attr.empty else Attr.class_ "scrolls")
       ]
     ([ (if since_view then Review_since_view.note m path else Node.none)
      ; aside
      ]
      @ full_hint
      @ empty
-     @ [ (match rows with
-          | [] -> Node.none
-          | _ when beside ->
+     @ [ (match rows, folded with
+          | _, Some why -> folded_card m ~path why ~inject
+          | [], None -> Node.none
+          | _, None when beside ->
             div
               ~cls:"review-code-grid"
               [ div ~cls:"review-code-main" [ table () ]; margin () ]
-          | _ -> table ())
+          | _, None -> table ())
        ; (match selection, draft with
-          | Some { pop = Some p; _ }, None -> pop p ~inject
+          | Some { pop = Some p; _ }, None when not sheet -> pop p ~inject
           | _ -> Node.none)
        ])
+;;
+
+(* ---- a phone's sheet *)
+
+let segmented ~label items =
+  Node.div
+    ~attrs:
+      [ Attr.class_ "segmented"
+      ; Attr.role "group"
+      ; Attr.create "aria-label" label
+      ]
+    (List.map items ~f:(fun (text, title, on, action) ->
+       Node.button
+         ~attrs:
+           [ classes [ "segment" ] [ "on", on ]
+           ; Attr.type_ "button"
+           ; Attr.create "aria-pressed" (Bool.to_string on)
+           ; Attr.title title
+           ; Attr.on_click (fun _ -> action)
+           ]
+         [ Node.text text ]))
+;;
+
+let quick_chips ~inject =
+  div
+    ~cls:"review-chips"
+    ~attrs:[ Attr.role "group"; Attr.create "aria-label" "Quick asks" ]
+    (List.map Quick_ask.all ~f:(fun q ->
+       button
+         ~cls:"small review-chip"
+         ~title:(Quick_ask.text q ^ " (sent to prigh at once)")
+         ~on_click:(inject (review (Quick q)))
+         [ Node.text (Quick_ask.label q) ]))
+;;
+
+let display_sheet (m : App.Model.t) ~path ~inject =
+  let t = m.review in
+  let wrap = not (Set.mem t.scrolled path) in
+  div
+    ~cls:"review-sheet display"
+    ~attrs:[ Attr.role "group"; Attr.create "aria-label" "Display" ]
+    [ div
+        ~cls:"review-sheet-head"
+        [ span ~cls:"review-sheet-title" "Display"
+        ; button
+            ~cls:"small"
+            ~title:"Esc"
+            ~on_click:(inject (review Toggle_display))
+            [ Node.text "Done" ]
+        ]
+    ; div
+        ~cls:"review-sheet-row"
+        [ span ~cls:"review-sheet-label" "Long lines"
+        ; segmented
+            ~label:"Long lines"
+            [ ( "Wrap"
+              , "Wrap them under their indent (w)"
+              , wrap
+              , if wrap
+                then Effect.Ignore
+                else inject (review (Toggle_wrap path)) )
+            ; ( "Scroll"
+              , "Keep them whole: the code scrolls sideways (w)"
+              , not wrap
+              , if wrap
+                then inject (review (Toggle_wrap path))
+                else Effect.Ignore )
+            ]
+        ]
+    ; div
+        ~cls:"review-sheet-row"
+        [ span ~cls:"review-sheet-label" "Code size"
+        ; div
+            ~cls:"review-size"
+            [ button
+                ~cls:"icon review-size-step"
+                ~title:"Smaller (-)"
+                ~label:"Smaller code"
+                ~disabled:(Code_size.equal m.code_size Small)
+                ~on_click:(inject (App.Action.Code_size (-1)))
+                [ Node.text "A−" ]
+            ; span ~cls:"review-size-name" (Code_size.name m.code_size)
+            ; button
+                ~cls:"icon review-size-step"
+                ~title:"Bigger (+)"
+                ~label:"Bigger code"
+                ~disabled:(Code_size.equal m.code_size Huge)
+                ~on_click:(inject (App.Action.Code_size 1))
+                [ Node.text "A+" ]
+            ]
+        ]
+    ]
+;;
+
+let sheet (m : App.Model.t) ~path ~inject =
+  let t = m.review in
+  if not m.narrow
+  then None
+  else if t.display_open
+  then Some (display_sheet m ~path ~inject)
+  else (
+    match
+      ( Option.filter t.draft ~f:(fun d -> String.equal d.path path)
+      , Option.filter t.selection ~f:(fun s -> String.equal s.path path) )
+    with
+    | Some d, _ ->
+      Some
+        (div
+           ~cls:"review-sheet comment"
+           ~attrs:[ Attr.role "group"; Attr.create "aria-label" "Comment" ]
+           [ draft_view m d ~inject
+           ; (if String.is_empty (String.strip d.text) && not d.busy
+              then quick_chips ~inject
+              else Node.none)
+           ])
+    | None, Some s ->
+      Some
+        (div
+           ~cls:"review-sheet selected"
+           ~attrs:
+             [ Attr.role "group"; Attr.create "aria-label" "Selected code" ]
+           [ div
+               ~cls:"review-sheet-head"
+               [ span ~cls:"review-sheet-title" (where s.range)
+               ; old_flag s.range
+               ; span
+                   ~cls:"review-sheet-hint"
+                   (match s.from with
+                    | Some _ -> "Tap another line to select to it"
+                    | None -> "")
+               ; button
+                   ~cls:"icon ghost review-sheet-close"
+                   ~title:"Clear the selection (Esc)"
+                   ~label:"Clear the selection"
+                   ~on_click:(inject (review Clear_selection))
+                   [ icon Close ]
+               ]
+           ; quote ~range:s.range ~anchor:s.anchor
+           ; quick_chips ~inject
+           ; button
+               ~cls:"primary review-sheet-comment"
+               ~title:"c"
+               ~on_click:(inject (review Start_comment))
+               [ icon Pencil; Node.text "Write a comment" ]
+           ])
+    | None, None -> None)
 ;;

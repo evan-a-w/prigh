@@ -3830,6 +3830,20 @@ terminal frontend and `web/` prigh-web, the browser one.
       snapshot's, so selections on them are refused), made once per file
       version and layout; a since-view with nothing changed since the
       action (`since_diff` is `None`) has the page layout's rows.
+      On a phone (`Code_review.narrow`) a file's rows are the whole file
+      folded by `Context_fold` (three lines of context around each change,
+      the rest in `Diff_view.Row.Gap`s the user opens a step or all at a
+      time, kept per file in `gaps`); `Folded_files` folds generated files
+      and pure renames; the page's bottom sheet
+      (`Review_code_view.sheet`: the selection, the draft, the display
+      options) takes the dock's place, and `Quick_ask` comments and
+      submits at once (`ask`). `Step_change` scrolls to the next
+      `tr.change-start` (`Out.Scroll_change`, done by the page's
+      `Review_changes`; none that way: the next file). Every diff table
+      (`Diff_view.table` and the review's rows) marks changed words
+      (`Word_diff`, an LCS of words over each removed/added pair) and
+      gives each line its hanging indent (`Diff_view.hang`, the CSS's
+      `--hang`); `Code_size` is the diffs' text size (a preference).
       Commenting, replying or deciding a proposal sets the file's view to
       `Since` its latest action (`Follow_latest`). `Review_action` names
       the actions (the comment acted on found by its post's time: "Comment

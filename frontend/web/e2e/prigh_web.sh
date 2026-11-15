@@ -29,7 +29,9 @@
 # then card.mjs, the
 # session's card in the sidebar in each state, then status.mjs, the six
 # status styles and the floating chrome, then mobile.mjs, phones by touch
-# and as an installed PWA, then terminal_keys.mjs, the terminal's extra keys on
+# and as an installed PWA, then review_phone.mjs, reviewing a realistic
+# change on phones (hanging indent, changed words, the dock, the comment
+# sheet), then terminal_keys.mjs, the terminal's extra keys on
 # phones, then pwa.mjs, then
 # compaction.mjs, the settings page's Compaction section, then
 # sessions_settings.mjs, the sidebar's worktrees by recency and the Sessions
@@ -87,7 +89,7 @@ test -x "$PRIGH_BACKEND" || { echo "no backend at $PRIGH_BACKEND: build it (cd b
 test -f "$SITE/main.bc.js" || { echo "no site at $SITE: build it (cd frontend && dune build ./web/bin/site)" >&2; exit 1; }
 if [ -n "${SHOTS:-}" ]; then mkdir -p "$SHOTS"; fi
 
-scripts="prigh_web temporary accounts reconnect paging resilience:slow resilience:drops stability themes worktrees review review_git remote cli_signin desktop desktop_signin steer subagent_paged trim filter search session_links viewer math clipboard field_menu desktop_links card status mobile terminal_keys long_press pwa compaction sessions_settings new_sessions memory user_info custom_instructions mcp_settings mcp_oauth images:desktop images:phone images:small pasted:desktop pasted:phone pasted:small computer:desktop computer:phone computer:small smart:desktop smart:phone smart:small ui chat quiet:desktop quiet:phone quiet:small"
+scripts="prigh_web temporary accounts reconnect paging resilience:slow resilience:drops stability themes worktrees review review_git remote cli_signin desktop desktop_signin steer subagent_paged trim filter search session_links viewer math clipboard field_menu desktop_links card status mobile review_phone terminal_keys long_press pwa compaction sessions_settings new_sessions memory user_info custom_instructions mcp_settings mcp_oauth images:desktop images:phone images:small pasted:desktop pasted:phone pasted:small computer:desktop computer:phone computer:small smart:desktop smart:phone smart:small ui chat quiet:desktop quiet:phone quiet:small"
 engines="${ENGINES:-chromium firefox webkit}"
 jobs="${JOBS:-$(nproc)}"
 # Measured peaks (PSS of the script, its backend and browser): 1.2 to 1.7 GiB,
