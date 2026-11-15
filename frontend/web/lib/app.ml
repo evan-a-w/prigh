@@ -3362,7 +3362,7 @@ let cycle_thinking (m : Model.t) =
 ;;
 
 let verbosity_detail : Prigh_ui.Verbosity.t -> string = function
-  | Quiet -> "tool calls without their output; no thinking"
+  | Quiet -> "each run of steps folded into one line"
   | Normal -> "tool output and thinking folded"
   | Verbose -> "everything unfolded"
 ;;

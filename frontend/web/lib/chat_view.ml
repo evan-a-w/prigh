@@ -691,31 +691,31 @@ and activity ~ui ~fold times chat runs (box : Activity_runs.Box.t) =
     Node.div
       ~attrs:
         [ Attr.classes
-            ([ "activity"
+            ([ "run"
              ; (if running then "running" else if failed > 0 then "error" else "ok")
              ]
              @ if opened then [ "open" ] else [])
         ]
       [ Node.button
           ~attrs:
-            [ Attr.class_ "activity-head"
+            [ Attr.class_ "run-head"
             ; Attr.type_ "button"
             ; Fold.toggle_attr fold key
             ; Attr.create "aria-expanded" (Bool.to_string opened)
             ]
           (present
              [ icon
-             ; span "activity-label" label
+             ; span "run-label" label
              ; (if failed > 0
-                then span "activity-failed" (sprintf "%d failed" failed)
+                then span "run-failed" (sprintf "%d failed" failed)
                 else Node.none)
-             ; Option.value_map took ~default:Node.none ~f:(span "activity-time")
+             ; Option.value_map took ~default:Node.none ~f:(span "run-time")
              ; span "chev" ""
              ])
       ; (if opened
          then
            div
-             "activity-steps"
+             "run-steps"
              (List.map steps ~f:(fun (step : Activity_runs.Step.t) ->
                 match step with
                 | Call { call; streaming; _ } ->

@@ -204,11 +204,11 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
 /* The spine: the agent's steps, and work handed back to it, hang off the
    left edge; consecutive steps join up. */
 
-.msg.assistant, .msg.shell, .msg:has(> .delivery) {
+.msg.assistant, .msg.shell, .msg.steps, .msg:has(> .delivery) {
   position: relative;
   padding-left: var(--gutter);
 }
-.msg.assistant::before, .msg.shell::before, .msg:has(> .delivery)::before {
+.msg.assistant::before, .msg.shell::before, .msg.steps::before, .msg:has(> .delivery)::before {
   content: "";
   position: absolute;
   left: 0;
@@ -778,6 +778,79 @@ button.tool-head:is(:hover, :focus-visible) > .chev, .tool.open > button.tool-he
 .tool.open > button.tool-head > .chev { transform: translateY(-1px) rotate(45deg); }
 .msg.assistant > .tool:not(.open) + .tool:not(.open) { margin-top: -8px; }
 .tool-body > .details { font: 11.5px var(--mono); color: var(--faint); }
+
+/* Quiet: a run of steps between messages is one line on the spine (what it
+   is doing, or what it did and how long it took) that opens the steps,
+   each a call's line. */
+.run { position: relative; min-width: 0; font-size: 13px; }
+.run-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  min-height: 28px;
+  margin: 0;
+  padding: 0 6px 0 0;
+  border: 0;
+  border-radius: var(--r-control, 6px);
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.run-head:hover { color: var(--fg); }
+.run-head:focus-visible { outline: 2px solid var(--sodium-line); outline-offset: 1px; }
+.run-label { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.run.running .run-label { color: var(--fg); }
+.run-failed { flex-shrink: 0; color: var(--brick); font: 11.5px var(--mono); white-space: nowrap; }
+.run-time { flex-shrink: 0; color: var(--faint); font: 11.5px var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.run-head > .chev {
+  flex-shrink: 0;
+  width: 5px;
+  height: 5px;
+  margin: 0 4px 1px 0;
+  border-right: 1.5px solid var(--faint);
+  border-bottom: 1.5px solid var(--faint);
+  transform: rotate(-45deg);
+  transition: transform 0.15s;
+}
+.run.open > .run-head > .chev { transform: translateY(-2px) rotate(45deg); }
+.run-head:is(:hover, :focus-visible) > .chev { border-color: var(--muted); }
+/* Its outcome on the spine, like a call's. */
+.msg > .run > .run-head > .mark {
+  position: absolute;
+  left: calc(-1 * var(--gutter) - 7px + var(--spine) / 2);
+  top: 7px;
+  margin: 0;
+  background: var(--graphite);
+  box-shadow: 0 0 0 3px var(--graphite);
+}
+.msg > .run > .run-head > .lamp {
+  --lamp-ring: 0 0 0 3px var(--graphite);
+  position: absolute;
+  left: calc(-1 * var(--gutter) - 3.5px + var(--spine) / 2);
+  top: 10.5px;
+  margin: 0;
+}
+.run.error > .run-head > .mark { color: var(--brick); }
+/* The steps: a call's line each, hung off a thread of their own. */
+.run-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 2px 0 4px 2px;
+  padding-left: 12px;
+  border-left: 1px solid var(--rule);
+  min-width: 0;
+}
+.run-steps .msg { padding-left: 0; }
+.run-steps .msg::before { display: none; }
+.run-steps .delivery-head .icon { position: static; background: none; }
+.tool-thinking > .tool-head .name { font-family: var(--sans); font-weight: 500; font-variation-settings: "CASL" 1; }
+.tool-thinking > .tool-head .arg { font-family: var(--sans); font-style: oblique 6deg; font-variation-settings: "CASL" 1; }
+@media (prefers-reduced-motion: reduce) { .run-head > .chev { transition: none; } }
 .tool-body > .tool-allowed { display: block; font-size: 12.5px; color: var(--muted); overflow-wrap: anywhere; }
 .tool-body > .url-link { font: 12px var(--mono); color: var(--muted); overflow-wrap: anywhere; text-underline-offset: 3px; text-decoration-color: var(--sodium-line); }
 .tool-head .arg.step { font-family: var(--sans); font-size: 13.5px; color: var(--fg); }
