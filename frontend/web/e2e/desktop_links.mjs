@@ -80,6 +80,7 @@ const newPage = async options => {
   context.on("page", async popup => {
     await popup.waitForLoadState("domcontentloaded").catch(() => {});
     opened.push(normalize(popup.url()));
+    for (const wake of windowWaiters.splice(0)) wake();
     await popup.close();
   });
   return { context, page, opened };
@@ -97,8 +98,16 @@ const handed = async page => {
   handedSeen = all.length;
   return fresh.join(" ");
 };
+// Each case opens a window: waits for it (a busy machine may take a while
+// to load it), up to a minute.
+const windowWaiters = [];
 const windowOpened = async (opened, before) => {
-  for (let i = 0; i < 200 && opened.length === before; i++) await new Promise(r => setTimeout(r, 50));
+  const deadline = Date.now() + 60000;
+  while (opened.length === before && Date.now() < deadline)
+    await new Promise(wake => {
+      const timer = setTimeout(wake, deadline - Date.now());
+      windowWaiters.push(() => { clearTimeout(timer); wake(); });
+    });
   return opened.slice(before).join(" ") || "none";
 };
 
