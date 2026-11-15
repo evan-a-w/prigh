@@ -389,9 +389,9 @@ once). A service worker keeps the app shell (the page, its script,
 stylesheets, fonts, KaTeX, the terminal's xterm.js and the icons), so the
 app opens with the backend down or the network gone and shows the
 reconnecting banner until it is back; the RPC, the terminal, file
-transfers and everything else always go to the backend. The page is
-fetched from the network first, so a new build arrives on the next load;
-one that arrives while the page is open waits, and a notice over the
+transfers and everything else always go to the backend. The page opens
+from that copy at once, without waiting for the network; a new build
+installs alongside and waits, and a notice over the
 composer says "A new version of prigh-web is ready" with Reload (the same
 session and draft, on the new build) or × (it applies at the next load).
 

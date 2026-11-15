@@ -3,7 +3,8 @@
 // back, then the backend restarts: each time the page reconnects in place
 // (same session, same scroll position, the draft and the image kept, the
 // transcript's DOM untouched, never the sign-in page). Then a reload returns
-// to the same session, scroll position and draft, also when the backend is
+// to the same session, scroll position and draft (with a key typed just
+// before it), also when the backend is
 // out of reach as it loads. Run by prigh_web.sh after
 // prigh_web.mjs; prints normalised results (the expected output is in
 // ENGINE.expected).
@@ -227,6 +228,11 @@ try {
   // 3. A reload (or the browser bringing a discarded tab back): the same
   //    session, at the same place.
   const before = await place();
+  // A key typed just before it: the draft is saved as the page goes, not
+  // only a moment later.
+  await composer().focus();
+  await page.keyboard.type("!");
+  await page.evaluate(() => new Promise(r => requestAnimationFrame(() => setTimeout(r))));
   await page.reload();
   await page.waitForSelector("#chat .msg");
   await page.waitForTimeout(1000);

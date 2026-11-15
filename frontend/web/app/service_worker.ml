@@ -23,6 +23,11 @@ let glue : Js.Unsafe.any Lazy.t =
       sw.addEventListener("controllerchange", () => {
         if (updating) window.location.reload();
       });
+      // The worker showed the page it keeps, and a proxy in front now wants
+      // its sign-in (sw.template.js): the next load goes to the network.
+      sw.addEventListener("message", event => {
+        if (event.data === "prigh-sw: reload") window.location.reload();
+      });
       sw.register("sw.js").then(r => {
         if (!r) return;
         registration = r;

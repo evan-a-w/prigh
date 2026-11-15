@@ -4,11 +4,13 @@ open! Import
 (** The web root's files over HTTP: [GET] and [HEAD] of plain relative paths
     ([/] is [/index.html]; no [..], no hidden files).
 
-    Every file is [Cache-Control: no-cache] (none of the names are
-    content-hashed) with an [ETag] (a content hash, cached per file
-    version) and [Last-Modified] (none for Nix's mtime 1), so a
-    reload revalidates with [If-None-Match] / [If-Modified-Since] and gets
-    [304 Not Modified].
+    Every file has an [ETag] (a content hash, cached per file version) and
+    [Last-Modified] (none for Nix's mtime 1), so a reload revalidates with
+    [If-None-Match] / [If-Modified-Since] and gets [304 Not Modified]. They
+    are [Cache-Control: no-cache] (the names are the same in every build),
+    except a versioned name, [NAME?v=VERSION] with VERSION the first 16 hex
+    digits of the file's MD5, which the frontend's build gives what
+    [index.html] loads: [immutable] for a year.
 
     A precompressed sibling ([file.br], [file.gz]) is served instead, with
     [Content-Encoding], when the request's [Accept-Encoding] allows it and the
@@ -31,10 +33,12 @@ module Response : sig
 end
 
 val respond
-  :  root:string
+  :  ?query:(string * string) list
+  -> root:string
   -> meth:string
   -> path:string
   -> headers:(string * string) list
+  -> unit
   -> Response.t
 
 module For_testing : sig

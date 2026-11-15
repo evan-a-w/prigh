@@ -13,6 +13,7 @@ yet.
 | A signal arriving while `caml_enter_blocking_section` releases the domain lock is only handled when the blocking section ends (upstream re-checks after the release) | runtime | event loops woken by signal handlers sleep forever: eio_posix never reaps an exited child (zombie, scheduler idle in `ppoll`); seen as backend tests hanging in `test_git_review.ml` | `iomux 0.4+prigh`; regression test "eio_posix reaps every child promptly" in `backend/test/test_process.ml` | `opam-repository/` below |
 | `eio 1.3+ox`'s `url` is a commit of `oxcaml/eio` on no branch | packaging | Nix `fetchGit` cannot fetch it | plain `eio 1.5` | `prigh-ox-pins.nix` below |
 | `zarith 1.12+ox3` lacks the `*_unsigned` conversions | packaging (old zarith) | `mirage-crypto-pk 2.x` does not compile | `mirage-crypto-pk 2.4.1+prigh` | `opam-repository/` below |
+| `virtual_dom`'s `Thunk.create` wraps its function in a new closure each time, and the JavaScript `VdomThunk` reuses a node only for the same function | library (`virtual_dom v0.18~preview`) | no `Node.lazy_` is ever reused: prigh-web re-renders and diffs every cached message on every frame | `frontend/web/app/vdom_thunk.js` compares the arguments only; `stability.mjs`'s "keys typed" checks it | the script's comment |
 
 To check the runtime one on a new OxCaml: run the backend tests with
 `EIO_BACKEND=posix` and the iomux patch removed; `test_process.ml` fails

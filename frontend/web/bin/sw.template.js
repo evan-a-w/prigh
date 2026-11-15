@@ -1,10 +1,12 @@
 // prigh-web's service worker: the app shell offline, nothing else.
 //
-// The build (sw_gen/, site/dune) fills in VERSION, a hash of the shell's
-// files, and SHELL, their names: a new build is a new worker, with a cache
-// of its own, which waits until the page reloads into it (the page offers
-// to). Only the shell's files are answered here; everything else (the RPC
-// and terminal WebSockets, file transfers, the sign-in link, anything
+// The build (site_gen/, site/dune) fills in VERSION, a hash of the shell's
+// files, and SHELL, their names as the page asks for them (NAME?v=VERSION
+// for those index.html and app.css name so; kept under that URL, so that
+// the browser's compiled code for a script kept here applies): a new build
+// is a new worker, with a cache of its own, which waits until the page
+// reloads into it (the page offers to). Only the shell's files are answered here; everything else (the
+// RPC and terminal WebSockets, file transfers, the sign-in link, anything
 // unknown) goes to the network untouched.
 const VERSION = "@@VERSION@@";
 const SHELL = @@SHELL@@;
@@ -47,18 +49,47 @@ self.addEventListener("message", event => {
   if (event.data === "skip-waiting") self.skipWaiting();
 });
 
-// The page from the network, so that a new build's arrives; this build's
-// when the network or the backend cannot be reached (an error page from a
-// proxy, or its sign-in, is the network's answer and goes through).
-const page = async request => {
+// The page: this build's at once, without waiting for the network (a phone
+// on a bad link would show nothing until it gave up). A new build arrives
+// as a new worker, which the page offers to reload into.
+//
+// It is still asked for, in the background, for a proxy in front that wants
+// its sign-in again: when it answers with a redirect or a refusal, the next
+// navigations go to the network (until one gets the page), and the page
+// reloads to show the proxy's answer (Service_worker in the app).
+const networkFirst = new URL("prigh-sw-network-first", scope).href;
+const refused = response =>
+  response.type === "opaqueredirect" || response.redirected || [401, 403, 407].includes(response.status);
+
+const fromNetwork = async request => {
   const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error("timed out")), 10000));
   try {
-    return await Promise.race([fetch(request), timeout]);
+    const response = await Promise.race([fetch(request), timeout]);
+    if (response.ok && !refused(response))
+      await (await caches.open(CACHE)).delete(networkFirst);
+    return response;
   } catch (e) {
     const cached = await caches.match(index, { cacheName: CACHE });
     if (cached) return cached;
     throw e;
   }
+};
+
+const revalidate = async request => {
+  let response;
+  try { response = await fetch(request); } catch (e) { return; }
+  if (!refused(response)) return;
+  await (await caches.open(CACHE)).put(networkFirst, new Response(""));
+  for (const client of await self.clients.matchAll({ type: "window" }))
+    if (pages.has(client.url.split(/[?#]/)[0])) client.postMessage("prigh-sw: reload");
+};
+
+const page = async event => {
+  const cache = await caches.open(CACHE);
+  const cached = !(await cache.match(networkFirst)) && await cache.match(index);
+  if (!cached) return fromNetwork(event.request);
+  event.waitUntil(revalidate(event.request));
+  return cached;
 };
 
 self.addEventListener("fetch", event => {
@@ -67,10 +98,10 @@ self.addEventListener("fetch", event => {
   const url = new URL(request.url);
   const bare = url.origin + url.pathname;
   if (request.mode === "navigate") {
-    if (pages.has(bare)) event.respondWith(page(request));
+    if (pages.has(bare)) event.respondWith(page(event));
     return;
   }
-  if (url.search === "" && shellUrls.has(bare))
+  if (shellUrls.has(url.origin + url.pathname + url.search))
     event.respondWith(
       caches.match(request, { cacheName: CACHE }).then(cached => cached ?? fetch(request)));
 });
