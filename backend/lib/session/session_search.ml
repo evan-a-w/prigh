@@ -108,6 +108,36 @@ module Weight = struct
   let message = 2
 end
 
+(* A message's text in the index: where to read it again for a snippet,
+   and which of its session's words it has, not the text itself. *)
+module Text = struct
+  type t =
+    { weight : int
+    ; offset : int (** of its entry's line in the file; [-1]: unknown *)
+    ; words : int array (** indices in [Doc.words] *)
+    }
+  [@@deriving bin_io]
+
+  let of_message ~weight (m : Message.t) =
+    match m with
+    | User u ->
+      let body = Message.User.body u in
+      Some (if weight = Weight.first_prompt then Skill.as_typed body else body)
+    | Assistant a -> Some (Message.Assistant.text a)
+    | Tool_result _ -> None
+  ;;
+
+  (* Its text again, from the file. *)
+  let read t ~path =
+    if t.offset < 0
+    then None
+    else (
+      match Session.read_entry_at path ~offset:t.offset with
+      | Some { payload = Message m; _ } -> of_message ~weight:t.weight m
+      | Some _ | None -> None)
+  ;;
+end
+
 module Doc = struct
   type t =
     { num : int
@@ -116,12 +146,13 @@ module Doc = struct
     ; size : Int64.t
     ; mtime : float
     ; name : string option
-    ; texts : (int * string) array (** weight, text; the name first, if any *)
+    ; texts : Text.t array (** the messages' *)
     ; mutable words : string array
       (** its distinct words, the postings' strings (set by [add]) *)
+    ; weights : int array (** each word's best weight in it *)
     }
 
-  let texts ~name session =
+  let texts session =
     let messages =
       List.filter_map
         (Session.active_path session)
@@ -129,46 +160,63 @@ module Doc = struct
           match e.payload with
           | Message m when Option.is_none (Session.summary_of_message m) ->
             (match m with
-             | User u -> Some (`User, Message.User.body u)
-             | Assistant a -> Some (`Assistant, Message.Assistant.text a)
+             | User u -> Some (e.id, `User, Message.User.body u)
+             | Assistant a -> Some (e.id, `Assistant, Message.Assistant.text a)
              | Tool_result _ -> None)
           | _ -> None)
-      |> List.filter ~f:(fun (_, text) ->
+      |> List.filter ~f:(fun (_, _, text) ->
         not (String.is_empty (String.strip text)))
     in
     let first_user = ref true in
-    let messages =
-      List.map messages ~f:(fun (who, text) ->
-        match who with
-        | `User when !first_user ->
-          first_user := false;
-          Weight.first_prompt, Skill.as_typed text
-        | `User | `Assistant -> Weight.message, text)
-    in
-    Array.of_list
-      (Option.value_map name ~default:[] ~f:(fun n -> [ Weight.name, n ])
-       @ messages)
+    List.map messages ~f:(fun (id, who, text) ->
+      let offset = Option.value (Session.entry_offset session id) ~default:(-1) in
+      match who with
+      | `User when !first_user ->
+        first_user := false;
+        Weight.first_prompt, offset, Skill.as_typed text
+      | `User | `Assistant -> Weight.message, offset, text)
   ;;
 
-  (* The document and each of its words' best weight. *)
   let create ~num ~(summary : Session.Summary.t) ~size ~mtime session =
-    let texts = texts ~name:summary.name session in
-    let weights = String.Table.create () in
-    Array.iter texts ~f:(fun (weight, text) ->
-      List.iter (words text) ~f:(fun w ->
-        Hashtbl.update weights w ~f:(function
-          | Some best -> Int.max best weight
-          | None -> weight)));
-    ( { num
-      ; id = summary.id
-      ; path = summary.path
-      ; size
-      ; mtime
-      ; name = summary.name
-      ; texts
-      ; words = [||]
-      }
-    , weights )
+    let local = String.Table.create () in
+    let distinct = ref [] in
+    let weights = ref [] in
+    let n = ref 0 in
+    let local_word w ~weight =
+      match Hashtbl.find local w with
+      | Some (i, best) ->
+        if weight > !best then best := weight;
+        i
+      | None ->
+        let i = !n in
+        incr n;
+        let best = ref weight in
+        Hashtbl.set local ~key:w ~data:(i, best);
+        distinct := w :: !distinct;
+        weights := best :: !weights;
+        i
+    in
+    Option.iter summary.name ~f:(fun name ->
+      List.iter (words name) ~f:(fun w ->
+        ignore (local_word w ~weight:Weight.name : int)));
+    let texts =
+      List.map (texts session) ~f:(fun (weight, offset, text) ->
+        let ids =
+          List.map (words text) ~f:(local_word ~weight)
+          |> List.dedup_and_sort ~compare:Int.compare
+        in
+        { Text.weight; offset; words = Array.of_list ids })
+    in
+    { num
+    ; id = summary.id
+    ; path = summary.path
+    ; size
+    ; mtime
+    ; name = summary.name
+    ; texts = Array.of_list texts
+    ; words = Array.of_list (List.rev !distinct)
+    ; weights = Array.of_list (List.rev_map !weights ~f:( ! ))
+    }
   ;;
 end
 
@@ -235,20 +283,15 @@ type t =
   ; mutable next : int (** the highest [Doc.num] given *)
   ; mutable free : int list (** [Doc.num]s given back by [remove] *)
   ; mutable indexing : unit Promise.t option (** [index] under way *)
+  ; file : string option (** where it is kept between runs *)
+  ; mutable changed : bool (** since it was last read or written *)
+  ; mutable saved_at : float
   }
-
-let create () =
-  { docs = String.Table.create ()
-  ; postings = String.Table.create ()
-  ; next = 0
-  ; free = []
-  ; indexing = None
-  }
-;;
 
 let remove t (doc : Doc.t) =
   Hashtbl.remove t.docs doc.path;
   t.free <- doc.num :: t.free;
+  t.changed <- true;
   Array.iter doc.words ~f:(fun w ->
     match Hashtbl.find t.postings w with
     | None -> ()
@@ -257,18 +300,165 @@ let remove t (doc : Doc.t) =
       if posting.len = 0 then Hashtbl.remove t.postings w)
 ;;
 
-let add t ((doc : Doc.t), weights) =
+let add t (doc : Doc.t) =
   Hashtbl.set t.docs ~key:doc.path ~data:doc;
+  t.changed <- true;
   doc.words
-  <- Array.of_list
-       (Hashtbl.fold weights ~init:[] ~f:(fun ~key:w ~data:weight words ->
-          let posting =
-            Hashtbl.find_or_add t.postings w ~default:(fun () ->
-              Posting.create w)
-          in
-          Posting.add posting ~num:doc.num ~weight;
-          posting.word :: words))
+  <- Array.mapi doc.words ~f:(fun i w ->
+       let posting =
+         Hashtbl.find_or_add t.postings w ~default:(fun () -> Posting.create w)
+       in
+       Posting.add posting ~num:doc.num ~weight:doc.weights.(i);
+       posting.word)
 ;;
+
+let fresh_num t =
+  match t.free with
+  | num :: rest ->
+    t.free <- rest;
+    num
+  | [] ->
+    t.next <- t.next + 1;
+    t.next
+;;
+
+(* What is kept between runs: the documents without their postings, which
+   reading them builds again, their words numbered across documents. *)
+type index = t
+
+module Stored = struct
+  let magic = "prigh-search-index\n"
+  let version = 1
+
+  module Entry = struct
+    type t =
+      { id : string
+      ; path : string
+      ; size : Int64.t
+      ; mtime : float
+      ; name : string option
+      ; texts : Text.t array
+      ; words : int array (** [word lsl 3 lor weight], [word] in [t.words] *)
+      }
+    [@@deriving bin_io]
+  end
+
+  type t =
+    { version : int
+    ; words : string array
+    ; docs : Entry.t array
+    }
+  [@@deriving bin_io]
+
+  let file ~dir =
+    Filename.concat (Session.cache_dir ~dir) (sprintf "search-v%d" version)
+  ;;
+
+  let of_index (index : index) =
+    let ids = String.Table.create () in
+    let words = ref [] in
+    let id w =
+      Hashtbl.find_or_add ids w ~default:(fun () ->
+        words := w :: !words;
+        Hashtbl.length ids)
+    in
+    let docs =
+      Hashtbl.data index.docs
+      |> List.sort ~compare:(fun (a : Doc.t) b -> Int.compare a.num b.num)
+      |> List.map ~f:(fun (d : Doc.t) : Entry.t ->
+        { id = d.id
+        ; path = d.path
+        ; size = d.size
+        ; mtime = d.mtime
+        ; name = d.name
+        ; texts = d.texts
+        ; words = Array.mapi d.words ~f:(fun i w -> (id w lsl 3) lor d.weights.(i))
+        })
+    in
+    { version; words = Array.of_list (List.rev !words); docs = Array.of_list docs }
+  ;;
+
+  let write t ~path =
+    let size = bin_size_t t in
+    let buf = Bin_prot.Common.create_buf (String.length magic + size) in
+    Bin_prot.Common.blit_string_buf magic buf ~len:(String.length magic);
+    ignore (bin_write_t buf ~pos:(String.length magic) t : int);
+    let data = Bigstring.to_string buf in
+    Session.write_atomically path ~data
+  ;;
+
+  (* [None] unless it is all there, of this version, and consistent. *)
+  let read ~path =
+    match In_channel.read_all path with
+    | exception _ -> None
+    | data when not (String.is_prefix data ~prefix:magic) -> None
+    | data ->
+      (match
+         let buf = Bigstring.of_string data in
+         let pos_ref = ref (String.length magic) in
+         let t = bin_read_t buf ~pos_ref in
+         if !pos_ref <> String.length data then failwith "trailing bytes";
+         let n = Array.length t.words in
+         Array.iter t.docs ~f:(fun d ->
+           let local = Array.length d.words in
+           Array.iter d.words ~f:(fun w ->
+             if w lsr 3 >= n || w land 7 = 0 then failwith "bad word");
+           Array.iter d.texts ~f:(fun text ->
+             Array.iter text.words ~f:(fun i ->
+               if i < 0 || i >= local then failwith "bad text")));
+         t
+       with
+       | { version = v; _ } as t when v = version -> Some t
+       | { version = _; _ } | (exception _) -> None)
+  ;;
+end
+
+let create ?file () =
+  let t =
+    { docs = String.Table.create ()
+    ; postings = String.Table.create ()
+    ; next = 0
+    ; free = []
+    ; indexing = None
+    ; file
+    ; changed = false
+    ; saved_at = 0.
+    }
+  in
+  Option.iter (Option.bind file ~f:(fun path -> Stored.read ~path)) ~f:(fun stored ->
+    Array.iter stored.docs ~f:(fun (d : Stored.Entry.t) ->
+      add
+        t
+        { num = fresh_num t
+        ; id = d.id
+        ; path = d.path
+        ; size = d.size
+        ; mtime = d.mtime
+        ; name = d.name
+        ; texts = d.texts
+        ; words = Array.map d.words ~f:(fun w -> stored.words.(w lsr 3))
+        ; weights = Array.map d.words ~f:(fun w -> w land 7)
+        });
+    Hashtbl.iter t.postings ~f:Posting.trim;
+    t.changed <- false);
+  t
+;;
+
+let file ~dir = Stored.file ~dir
+
+let save t =
+  Option.iter t.file ~f:(fun path ->
+    if t.changed
+    then (
+      t.changed <- false;
+      t.saved_at <- Core_unix.gettimeofday ();
+      Stored.write (Stored.of_index t) ~path))
+;;
+
+(* A search saves what it changed at most this often: the live sessions'
+   files change with every message, and the next run only needs to read
+   again what changed since the last save. *)
+let save_every = 60.
 
 let refresh ?(yield = ignore) t ~sessions ~load =
   let listed =
@@ -298,16 +488,7 @@ let refresh ?(yield = ignore) t ~sessions ~load =
          (* [load] may let another search index it meanwhile. *)
          drop ();
          Option.iter loaded ~f:(fun session ->
-           let num =
-             match t.free with
-             | num :: rest ->
-               t.free <- rest;
-               num
-             | [] ->
-               t.next <- t.next + 1;
-               t.next
-           in
-           add t (Doc.create ~num ~summary ~size ~mtime session))));
+           add t (Doc.create ~num:(fresh_num t) ~summary ~size ~mtime session))));
     yield ())
 ;;
 
@@ -321,7 +502,8 @@ let index t ~sessions ~load ~yield =
       ~f:(fun () ->
         refresh t ~sessions:(sessions ()) ~load ~yield;
         (* Growing them left up to half of each unused. *)
-        Hashtbl.iter t.postings ~f:Posting.trim)
+        Hashtbl.iter t.postings ~f:Posting.trim;
+        save t)
       ~finally:(fun () ->
         t.indexing <- None;
         Promise.resolve resolve ())
@@ -417,52 +599,58 @@ module Snippet = struct
     |> List.rev
   ;;
 
+  (* The text that matches the most query words, then the best: picked by
+     the words the index has of each, then only that one read again. *)
   let create ws (doc : Doc.t) =
+    let ws = Array.of_list ws in
+    (* For each of the session's words, its best match per query word. *)
+    let word_kinds =
+      Array.map doc.words ~f:(fun v ->
+        Array.map ws ~f:(fun w -> Option.value_map (kind ~w v) ~default:0 ~f:fst))
+    in
     let best =
-      Array.fold doc.texts ~init:None ~f:(fun best (weight, text) ->
-        if weight = Weight.name
+      Array.fold doc.texts ~init:None ~f:(fun best (text : Text.t) ->
+        let per_word = Array.create ~len:(Array.length ws) 0 in
+        Array.iter text.words ~f:(fun i ->
+          Array.iteri word_kinds.(i) ~f:(fun j k ->
+            per_word.(j) <- Int.max per_word.(j) (k * text.weight)));
+        let matched = Array.count per_word ~f:(fun s -> s > 0) in
+        if matched = 0
         then best
         else (
-          let text = collapse text in
-          match matches ws text with
-          | [] -> best
-          | ms ->
-            let per_word =
-              List.fold ms ~init:Int.Map.empty ~f:(fun acc (i, k, _, _) ->
-                Map.update acc i ~f:(function
-                  | Some b -> Int.max b (k * weight)
-                  | None -> k * weight))
-            in
-            let rank =
-              ( Map.length per_word
-              , List.sum (module Int) (Map.data per_word) ~f:Fn.id )
-            in
-            (match best with
-             | Some (best_rank, _, _)
-               when [%compare: int * int] rank best_rank <= 0 -> best
-             | _ -> Some (rank, text, ms))))
+          let rank = matched, Array.sum (module Int) per_word ~f:Fn.id in
+          match best with
+          | Some (best_rank, _) when [%compare: int * int] rank best_rank <= 0 ->
+            best
+          | _ -> Some (rank, text)))
     in
-    Option.map best ~f:(fun (_, text, ms) ->
-      let first =
-        List.fold ms ~init:Int.max_value ~f:(fun acc (_, _, s, _) ->
-          Int.min acc s)
-      in
-      let start, stop = window text ~first in
-      let ellipsis = "…" in
-      let shift = if start > 0 then String.length ellipsis else 0 in
-      let ranges =
-        List.filter_map ms ~f:(fun (_, _, s, l) ->
-          if s >= start && s < stop
-          then Some (s - start + shift, Int.min l (stop - s))
-          else None)
-        |> merge
-      in
-      { text =
-          ((if start > 0 then ellipsis else "")
-           ^ String.sub text ~pos:start ~len:(stop - start)
-           ^ if stop < String.length text then ellipsis else "")
-      ; ranges
-      })
+    Option.bind best ~f:(fun (_, text) ->
+      Option.bind (Text.read text ~path:doc.path) ~f:(fun text ->
+        let text = collapse text in
+        match matches (Array.to_list ws) text with
+        | [] -> None
+        | ms ->
+          let first =
+            List.fold ms ~init:Int.max_value ~f:(fun acc (_, _, s, _) ->
+              Int.min acc s)
+          in
+          let start, stop = window text ~first in
+          let ellipsis = "…" in
+          let shift = if start > 0 then String.length ellipsis else 0 in
+          let ranges =
+            List.filter_map ms ~f:(fun (_, _, s, l) ->
+              if s >= start && s < stop
+              then Some (s - start + shift, Int.min l (stop - s))
+              else None)
+            |> merge
+          in
+          Some
+            { text =
+                ((if start > 0 then ellipsis else "")
+                 ^ String.sub text ~pos:start ~len:(stop - start)
+                 ^ if stop < String.length text then ellipsis else "")
+            ; ranges
+            }))
   ;;
 end
 
@@ -502,6 +690,7 @@ let search t ~sessions ~load ~query ~limit =
   | ws ->
     Option.iter t.indexing ~f:Promise.await;
     refresh t ~sessions ~load;
+    if Float.(Core_unix.gettimeofday () - t.saved_at >= save_every) then save t;
     let tables = List.map ws ~f:(fun w -> scores t ~w) in
     let totals =
       List.filter_map

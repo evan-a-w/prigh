@@ -16,13 +16,27 @@ open! Core
     The index is kept in memory and brought up to date on each search: only
     the session files whose size, modification time or name changed are read
     again; an inverted index (word to sessions) means a query looks at each
-    distinct word once rather than at every text. The backend builds it in
+    distinct word once rather than at every text. It holds each message's
+    words, not its text: a snippet reads the one message it shows again from
+    the session file (by its offset). The backend brings it up to date in
     the background as it starts ({!index}), so that the first search does
-    not read every session. *)
+    not read every session, and keeps it in a file between runs, so that
+    starting reads only the sessions that changed since. *)
 
 type t
 
-val create : unit -> t
+(** Starts from what [file] holds, if it can be read (else empty: it is
+    only a cache); {!index} and searches write it back. *)
+val create : ?file:string -> unit -> t
+
+(** The index's file for the sessions in [dir], in its {!Session.cache_dir}
+    (the format's version in its name). *)
+val file : dir:string -> string
+
+(** Writes the index to its file if it changed since it was read or last
+    written. {!index} does when it finishes, and a search at most once a
+    minute. *)
+val save : t -> unit
 
 module Snippet : sig
   (** Part of a message around a match, whitespace collapsed, ["…"] where it
