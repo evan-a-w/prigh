@@ -756,6 +756,8 @@ module Model = struct
     ; state : State.t option
     ; chat : Chat.t
     ; sessions : Session_summary.t list
+    ; sessions_changes : int
+    ; sessions_asked : int
     ; models : Llm.t list
     ; auth : Auth_status.t list
     ; now : Time_ns.t option
@@ -1093,6 +1095,8 @@ let init =
   ; state = None
   ; chat = Chat.empty
   ; sessions = []
+  ; sessions_changes = 0
+  ; sessions_asked = 0
   ; models = []
   ; auth = []
   ; now = None
@@ -3147,6 +3151,16 @@ let unqueue (m : Model.t) (recipient : Recipient.t) q ~tag =
   | Agent agent ->
     ( without_queued m agent q
     , [ rpc "remove_agent_queued" (("agent_id", str agent) :: params) ~tag ] )
+;;
+
+(* The last [list_sessions] sent was after this many changes. *)
+let note_sessions_asked ((m : Model.t), cmds) =
+  if
+    List.exists cmds ~f:(function
+      | Command.Rpc { tag = Sessions; _ } -> true
+      | _ -> false)
+  then { m with sessions_asked = m.sessions_changes }, cmds
+  else m, cmds
 ;;
 
 (* A finished subagent takes no messages: the composer goes back to the main
@@ -9135,8 +9149,14 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
        with_agents m ~f:(fun a -> { a with output = Some (id, text) }), []
      | _ -> m, [])
   | Sessions, Ok json ->
-    decode m json (decode_list Session_summary.of_json) ~f:(fun sessions ->
-      sessions_listed m sessions, [])
+    if m.sessions_changes > m.sessions_asked
+    then
+      (* A change came after it was asked for, and may be missing from it:
+         the client hands answers on after events that came after them. *)
+      m, [ rpc "list_sessions" [] ~tag:Sessions ]
+    else
+      decode m json (decode_list Session_summary.of_json) ~f:(fun sessions ->
+        sessions_listed m sessions, [])
   | Session_hits search, Ok json ->
     if search = m.session_search
     then
@@ -9688,7 +9708,10 @@ let main_event (m : Model.t) (event : Event.t) =
     remove_confirm m ~call_id:call.id ~agent_id:None
   | Sessions_changed None -> m, [ rpc "list_sessions" [] ~tag:Sessions ]
   | Sessions_changed (Some change) ->
-    sessions_listed m (Session_summary.Change.apply change m.sessions), []
+    ( sessions_listed
+        { m with sessions_changes = m.sessions_changes + 1 }
+        (Session_summary.Change.apply change m.sessions)
+    , [] )
   | Temporary_ended { messages; kept; _ } ->
     let m, deleted =
       if messages > 0 then toast m "Temporary session deleted" else m, []
@@ -11622,6 +11645,7 @@ and update_unguarded (m : Model.t) (action : Action.t) =
   let m', cmds = follow_recipient (m', cmds) in
   let m', cmds = follow_ui_images m (m', cmds) in
   let m', cmds = settle m' cmds in
+  let m', cmds = note_sessions_asked (m', cmds) in
   let look = Model.look m' in
   if
     Theme.equal look (Model.look m)

@@ -2216,7 +2216,11 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   depends on its config) and `removed` (ids no longer listed), and the
   frontends apply that to their list (`Session_summary.Change.apply`:
   replace or insert by `updated_at`, drop the removed); without either
-  (a config change re-archiving by age) they refetch it. A session with running background subagents or jobs
+  (a config change re-archiving by age) they refetch it. The client hands
+  a reply on after events that came after it (they take separate paths),
+  so an answer to a `list_sessions` sent before a change was applied may
+  lack it: the frontends count the changes applied, and when one came
+  after the list was last asked for they keep theirs and ask again. A session with running background subagents or jobs
   is not evicted (it delivers their reports into its own session even with
   no client attached); `shutdown` cancels them (killing the jobs).
   `kill_job {job_id}`, `job_output {job_id, lines}` (`{text}`: a header line

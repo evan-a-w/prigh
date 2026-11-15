@@ -332,6 +332,11 @@ module Model : sig
     ; mode : Mode.t
     ; autocomplete : Autocomplete.t option
     ; sessions : P.Session_summary.t list option
+    ; sessions_changes : int
+      (** [sessions_changed] events with the changed entries applied *)
+    ; sessions_asked : int
+      (** [sessions_changes] when [list_sessions] was last sent: an answer
+          to it is stale if a change came after *)
     ; known_sessions : (Session_link.Known.t[@sexp.opaque])
       (** [sessions], whose ids the transcript highlights *)
     ; skills : P.Skill.t list Location_cache.t

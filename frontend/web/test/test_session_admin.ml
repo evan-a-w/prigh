@@ -200,6 +200,48 @@ let%expect_test
     |}]
 ;;
 
+let%expect_test
+    "a list asked for before a change is not shown over it: it is asked for \
+     again"
+  =
+  let h = H.create ~sessions () in
+  H.event h {|{"event":"sessions_changed"}|};
+  [%expect {| (Rpc (method_ list_sessions) (params ()) (tag Sessions)) |}];
+  (* The client hands the answer on after a change that came after it. *)
+  H.event
+    h
+    (sprintf
+       {|{"event":"sessions_changed","changed":[%s],"removed":[]}|}
+       (H.session_json
+          ~name:"Brand new"
+          ~updated_at:"2026-10-05 09:59:00Z"
+          "s6"));
+  H.reply h "list_sessions" sessions;
+  [%expect {| (Rpc (method_ list_sessions) (params ()) (tag Sessions)) |}];
+  sidebar h;
+  [%expect
+    {|
+    Sessions (Select)
+    (Brand new 1m ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (fix the parser bug 2m ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (Release notes 2m ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (Open elsewhere 2m ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (Archived 2)
+    |}];
+  (* Asked for after the change: shown. *)
+  H.reply h "list_sessions" sessions;
+  [%expect {| |}];
+  sidebar h;
+  [%expect
+    {|
+    Sessions (Select)
+    (fix the parser bug 2m ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (Release notes 2m ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (Open elsewhere 2m ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (Archived 2)
+    |}]
+;;
+
 let%expect_test "archiving and unarchiving: at once, and back if refused" =
   let h = H.create ~sessions () in
   H.act h (Set_archived { path = "/sessions/s1.jsonl"; archived = true });

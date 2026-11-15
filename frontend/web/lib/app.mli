@@ -951,6 +951,11 @@ module Model : sig
     ; state : State.t option
     ; chat : Chat.t
     ; sessions : Session_summary.t list
+    ; sessions_changes : int
+      (** [sessions_changed] events with the changed entries applied *)
+    ; sessions_asked : int
+      (** [sessions_changes] when [list_sessions] was last sent: an answer
+          to it is stale if a change came after *)
     ; models : Llm.t list
     ; auth : Auth_status.t list
     ; now : Time_ns.t option

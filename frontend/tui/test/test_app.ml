@@ -2338,6 +2338,57 @@ let%expect_test "sessions_changed with entries updates the open picker in place"
 ;;
 
 let%expect_test
+    "a list asked for before a change is not shown over it: it is asked for \
+     again"
+  =
+  let h = sessions_open () in
+  H.event h (Sessions_changed None);
+  [%expect
+    {|
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions_picker))
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions_refresh))
+    |}];
+  let changed =
+    P.Json.parse
+      {|{"id":"2","path":"/s/2.jsonl","name":"deploy v2","cwd":"/work","created_at":"2025-06-03T10:00:00Z","updated_at":"2025-06-06T10:00:00Z","first_prompt":"deploy it","message_count":8,"live":true,"bytes":4096}|}
+    |> Or_error.ok_exn
+    |> P.Session_summary.of_json
+    |> Or_error.ok_exn
+  in
+  (* The client hands the answer on after a change that came after it. *)
+  H.event h (Sessions_changed (Some { changed = [ changed ]; removed = [] }));
+  H.reply h Sessions_refresh archive_sessions_json;
+  [%expect
+    {| (Rpc (method_ list_sessions) (params ()) (tag Sessions_refresh)) |}];
+  picker_rows h;
+  [%expect
+    {|
+      [gray]prigh in /work · /help · Esc aborts · Ctrl+C twice quits[/]
+      earlier [bold]answer[/]
+       ● deploy v2 ∣ 2025-06-06T10:00 ∣ 8 msgs ∣ deploy it[dim]  /work[/]
+    [bold][invert]▸* ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build[/][dim][invert]  /work[/]
+       (unnamed) ∣ 2025-06-01T10:00 ∣ 0 msgs ∣ (empty)   [dim]  /tmp[/]
+    [dim]  ── archived ──[/]
+    [dim]   (unnamed) ∣ 2025-06-04T10:00 ∣ 4 msgs ∣ try a spike[/][dim]  /old[/]
+    [dim]   old spike ∣ 2025-04-02T10:00 ∣ 2 msgs ∣ another spike[/][dim]  /old[/]
+    |}];
+  (* Asked for after the change: shown. *)
+  H.reply h Sessions_refresh archive_sessions_json;
+  picker_rows h;
+  [%expect
+    {|
+      [gray]prigh in /work · /help · Esc aborts · Ctrl+C twice quits[/]
+      earlier [bold]answer[/]
+    [bold][invert]▸* ● build fix ∣ 2025-06-05T10:00 ∣ 12 msgs ∣ fix the build[/][dim][invert]  /work[/]
+       ▶ deploy ∣ 2025-06-03T10:00 ∣ 6 msgs ∣ 2 in background ∣ deploy it[dim]  /work[/]
+       (unnamed) ∣ 2025-06-01T10:00 ∣ 0 msgs ∣ (empty)   [dim]  /tmp[/]
+    [dim]  ── archived ──[/]
+    [dim]   (unnamed) ∣ 2025-06-04T10:00 ∣ 4 msgs ∣ try a spike[/][dim]  /old[/]
+    [dim]   old spike ∣ 2025-04-02T10:00 ∣ 2 msgs ∣ another spike[/][dim]  /old[/]
+    |}]
+;;
+
+let%expect_test
     "sessions_changed refetches the open picker and the cached list, keeping \
      the query, marks and highlight"
   =
