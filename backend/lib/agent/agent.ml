@@ -235,8 +235,6 @@ type t =
   ; allowed_calls : Allowed_call.t Allowed_call.Call.Table.t
     (** the session's, by call: see [remember_allowed] *)
   ; computer_consent : Computer_consent.t
-  ; host_grants : Host_grants.t
-    (** other tool hosts the user let the session work on *)
   ; mutable unattended : unit -> string option
     (** why nobody can answer a computer-use consent now, if so *)
   ; pending_questions :
@@ -335,7 +333,6 @@ let restore_approvals t =
      t.plan_mode <- false;
      t.chat_mode <- false);
   Hashtbl.clear t.allowed_calls;
-  Host_grants.clear t.host_grants;
   List.iter (Session.allowed_calls t.session) ~f:(fun (a : Allowed_call.t) ->
     Hashtbl.set t.allowed_calls ~key:a.call ~data:a);
   t.session_rules
@@ -2083,54 +2080,6 @@ let other_host t tool args =
   else None
 ;;
 
-(* Working on another host is the user's choice: one they named, or one
-   they approve now (for the rest of the session), whatever the mode. *)
-let host_permission t (context : Tool.Context.t) tool args =
-  match other_host t tool args with
-  | None -> None
-  | Some host ->
-    let allowed () =
-      Host_grants.allows
-        t.host_grants
-        ~host:host.id
-        ~name:host.name
-        ~requests:(Approval_judge.requests (Session.messages t.session))
-    in
-    if allowed ()
-    then None
-    else (
-      let name = Tool.name tool in
-      match
-        confirm
-          t
-          context
-          ~name
-          ~summary:
-            (sprintf
-               "work on the tool host %s, which you have not named in this \
-                session: %s"
-               host.name
-               (Agent_loop.tool_summary ~name args))
-          ~rules:[]
-          ~recheck:allowed
-      with
-      | None -> Some (Tool.Result.error "[cancelled]")
-      | Some (Error _) -> assert false (* no timeout *)
-      | Some (Ok (Deny reason)) ->
-        Some
-          (Tool.Result.error
-             (sprintf
-                "%s\n\
-                 The user did not let you work on %s: work on the session's \
-                 own host, or ask them first."
-                (denied_text reason)
-                host.name))
-      | Some (Ok (Allow | Always)) ->
-        Host_grants.grant t.host_grants ~host:host.id;
-        recheck_confirms t;
-        None)
-;;
-
 (* Chat mode refuses what needs a machine before anything is asked. *)
 let approve t : Tool.approver =
   fun context tool args ->
@@ -2150,9 +2099,14 @@ let approve t : Tool.approver =
              which has no machine: start it without them"
           else Chat_mode.refusal name))
   else (
-    match host_permission t context tool args with
-    | Some _ as refused -> refused
-    | None -> approve_on_host t context tool args)
+    (* Starting work on another host is approved as a call there: held
+       until the user permits the host, which approving it does. *)
+    let context =
+      match other_host t tool args with
+      | Some host -> { context with host = Some host.id }
+      | None -> context
+    in
+    approve_on_host t context tool args)
 ;;
 
 (* Where [path] would take the session on [host], creating it or asking
@@ -3917,7 +3871,6 @@ let create
     ; judgements = String.Table.create ()
     ; allowed_calls = Allowed_call.Call.Table.create ()
     ; computer_consent = Computer_consent.create ()
-    ; host_grants = Host_grants.create ()
     ; unattended = (fun () -> None)
     ; pending_questions = String.Table.create ()
     ; approval_mode = config.approval_mode
