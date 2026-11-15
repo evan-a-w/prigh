@@ -54,8 +54,9 @@ and context =
         [timeout_seconds]); only the main agent can *)
   ; ui : Ui_host.t (** for [render_ui]: the user's client, the host's files *)
   ; host : string option
-    (** the tool host (by id) this call's [on_host] tool runs on, when it is
-        not the session's active one ([on_host]'s inner call) *)
+    (** the tool host (by id) this call's [on_host] tools run on, when it is
+        not the session's active one: [on_host]'s inner call, or every call
+        of a subagent started there ([subagent]'s [host]) *)
   ; chat : bool
     (** the run is in chat mode: it has no tool host (a subagent it starts
         is a chat too) *)

@@ -39,6 +39,7 @@ module Task = struct
     ; kind : Kind.t
     ; label : string
     ; name : string option
+    ; host : string option
     ; started_at : float
     ; mutable cancel : Cancellation.t
     ; mutable finished : unit Promise.t
@@ -195,13 +196,25 @@ let next_id t (kind : Kind.t) =
   Kind.id_prefix kind ^ Int.to_string n
 ;;
 
-let make_task ?input ?inbox ?output ?name t ~kind ~label ~started_at ~cancel =
+let make_task
+      ?input
+      ?inbox
+      ?output
+      ?name
+      ?host
+      t
+      ~kind
+      ~label
+      ~started_at
+      ~cancel
+  =
   let finished, resolve = Promise.create () in
   let task =
     { Task.id = next_id t kind
     ; kind
     ; label
     ; name
+    ; host
     ; started_at
     ; cancel
     ; finished
@@ -308,12 +321,13 @@ let run_task t (task : Task.t) resolve ~run =
   t.on_change ()
 ;;
 
-let spawn ?input ?inbox ?name t ~kind ~label ~run =
+let spawn ?input ?inbox ?name ?host t ~kind ~label ~run =
   let task, resolve =
     make_task
       ?input
       ?inbox
       ?name
+      ?host
       t
       ~kind
       ~label
@@ -716,9 +730,10 @@ let status_text t ~kind =
                 |> short_task)
          in
          sprintf
-           "%s  %s  %.0fs  %s  (last: %s)"
+           "%s  %s%s  %.0fs  %s  (last: %s)"
            task.id
            state
+           (Option.value_map task.host ~default:"" ~f:(sprintf ", on %s"))
            elapsed
            (short_task task.label)
            last))

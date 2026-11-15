@@ -208,6 +208,10 @@ let base ?(chat = false) ~nix ~auto_background ~(role : Role.t) ~tools () =
              independent of your thinking (a reviewer, a second opinion, a \
              fresh investigation): then it sees only the task, so include \
              everything it needs."
+          ; "- Work on another machine: only when the user asks for work on \
+             that machine (a tool host they name), delegate it to a subagent \
+             with host set to it: all its tools (and its worktree) are there. \
+             Do not wrap each call in on_host for such work."
           ]
         else [])
      @ [ "" ]
@@ -304,6 +308,7 @@ let build
       ?session
       ?(custom_instructions = [])
       ?(chat = false)
+      ?host
       ~cwd
       ~home
       ~tools
@@ -327,13 +332,27 @@ let build
     in
     if chat
     then sprintf "Environment:\n- Date: %s%s" date link
-    else
+    else (
+      match host with
+      | Some host ->
+        sprintf
+          "Environment:\n\
+           - Tool host: %s, another machine than the session's own: all your \
+           tools run there, and paths are on it\n\
+           - Working directory: %s (on %s)\n\
+           - Date: %s%s"
+          host
+          cwd
+          host
+          date
+          link
+      | None ->
       sprintf
         "Environment:\n- Working directory: %s\n- Date: %s\n- OS: %s%s"
         cwd
         date
         (Core_unix.Utsname.sysname (Core_unix.uname ()))
-        link
+        link)
   in
   let instructions =
     match instructions with

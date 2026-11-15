@@ -125,6 +125,9 @@ val spawn
   :  ?input:Stdin_feed.t
   -> ?inbox:Subagent_inbox.t
   -> ?name:string
+  -> ?host:string
+       (** the tool host a subagent works on, when not the session's
+           active one (its name), which [status_text] shows *)
   -> t
   -> kind:Kind.t
   -> label:string

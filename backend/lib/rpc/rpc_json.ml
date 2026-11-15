@@ -399,12 +399,14 @@ let job ~now task =
 
 let agent_worktree (w : Agent_worktree.t) =
   `Object
-    [ "agent", str w.agent
+    ([ "agent", str w.agent
     ; "task", str w.task
     ; "path", str w.path
     ; "branch", str w.branch
     ; "root", str w.root
     ]
+    @ Option.value_map w.host ~default:[] ~f:(fun host -> [ "host", str host ])
+    )
 ;;
 
 let session_worktree (w : Session_worktree.t) =
@@ -815,6 +817,7 @@ let rec event ?now (e : Agent.Event.t) =
            ; name
            ; model
            ; tools
+           ; host
            ; worktree
            ; forked
            ; continued
@@ -827,6 +830,7 @@ let rec event ?now (e : Agent.Event.t) =
       ; "model", str model
       ; "tools", `Array (List.map tools ~f:str)
       ]
+      @ Option.value_map host ~default:[] ~f:(fun host -> [ "host", str host ])
       @ Option.value_map worktree ~default:[] ~f:(fun w ->
         [ "worktree", agent_worktree w ])
       @ (if forked then [ "forked", `True ] else [])
@@ -918,6 +922,7 @@ let subagent_summary (s : Subagent_log.Summary.t) =
     ; "task", str s.task
     ; "name", opt str s.name
     ; "model", str s.model
+    ; "host", opt str s.host
     ; "state", str (Subagent_log.State.to_string s.state)
     ; "started_at_ms", ms s.started_at
     ; "updated_at_ms", ms s.updated_at

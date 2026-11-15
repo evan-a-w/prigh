@@ -255,8 +255,12 @@ let common_params =
         Option.bind !agent_ref ~f:(fun agent ->
           Agent.name_subagent agent ~task ~siblings ~cancel)
       in
+      let tool_hosts () =
+        Option.value_map !agent_ref ~default:[] ~f:Agent.tool_hosts
+      in
       let subagent =
         Tool_subagent.create
+          ~hosts:tool_hosts
           ?name_task:(Option.some_if auto_describe name_task)
           ~models
           ~worktrees_dir
@@ -283,6 +287,7 @@ let common_params =
                @ (subagent :: Tool_subagent.control_tools)
                @ [ Tool_worktree.create
                      ~worktrees_dir
+                     ~hosts:tool_hosts
                      ~session:(fun () -> Option.map !agent_ref ~f:Agent.session)
                      ()
                  ; Tool_pull_request.create ~forges ~worktrees_dir ()
@@ -304,13 +309,7 @@ let common_params =
                      ()
                  ; Tool_memory.create ~memory ()
                  ; Tool_custom_instructions.create ~custom_instructions ()
-                 ; Tool_on_host.create
-                     ~hosts:(fun () ->
-                       Option.value_map
-                         !agent_ref
-                         ~default:[]
-                         ~f:Agent.tool_hosts)
-                     ()
+                 ; Tool_on_host.create ~hosts:tool_hosts ()
                  ]
                @ Tool_jobs.tools
                @ Tools.interaction)

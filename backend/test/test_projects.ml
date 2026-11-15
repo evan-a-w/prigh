@@ -198,6 +198,7 @@ let%expect_test
        ; path = "/t/c"
        ; branch = "agent/c"
        ; root = "/r"
+       ; host = None
        });
   (* Made, then moved into: still made. *)
   add (Session.set_repo session ~cwd:"/t/b" (location "/t/b" "feat/b"));
@@ -593,7 +594,7 @@ let%expect_test "over RPC: sessions by project, subagents' worktrees, removal" =
   ignore
     (Session.add_agent_worktree
        (Agent.session agent)
-       { agent = "9"; task = "t"; path = gone; branch = "gone"; root = repo }
+       { agent = "9"; task = "t"; path = gone; branch = "gone"; root = repo; host = None }
      : Session.Entry.t);
   print_endline
     (show

@@ -6,7 +6,11 @@ open! Import
     starts the agent in the background and returns its id; otherwise it blocks
     and returns the final reply. With [worktree] it works in a git worktree
     made for it on the tool host (under [worktrees_dir], default
-    [~/.prigh/worktrees]), whose branch its report names. *)
+    [~/.prigh/worktrees]), whose branch its report names. With [host] it
+    works on that tool host: every call of its tools runs there
+    ([Tool.Context.host]), from that host's home (or [cwd] there), its
+    worktree too; [computer] (the active host's screen) is dropped. A
+    subagent's own subagents stay on its host unless they name another. *)
 
 val max_turns : int
 val name : string
@@ -36,6 +40,8 @@ val create
   -> ?custom_instructions:(unit -> Custom_instruction.t list)
        (** the user's custom instructions when the tool runs, likewise
            (default: none) *)
+  -> ?hosts:(unit -> Tool_on_host.Host.t list)
+       (** the session's connected tool hosts, for [host] (default: none) *)
   -> provider:Provider.t
   -> current_model:(unit -> Model.t)
   -> current_thinking:(unit -> Thinking.t)

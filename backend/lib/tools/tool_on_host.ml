@@ -175,12 +175,15 @@ let run_on (context : Tool.Context.t) (host : Host.t) ~tool ~args ~cwd =
          tool
          (String.concat ~sep:", " (List.map mine ~f:Tool.name)))
   | None -> Tool.Result.error (not_run tool)
-  | Some _ when host.active ->
+  | Some _ when Option.is_none context.host && host.active ->
     Tool.Result.error
       (sprintf
          "%s is the session's active host: call %s directly"
          host.name
          tool)
+  | Some _ when [%equal: string option] context.host (Some host.id) ->
+    Tool.Result.error
+      (sprintf "%s is the host your tools run on: call %s directly" host.name tool)
   | Some _ when String.equal tool "bash" && starts_job args ->
     Tool.Result.error
       (sprintf
@@ -241,3 +244,10 @@ let run ~hosts (context : Tool.Context.t) call =
 ;;
 
 let create ~hosts () = { Tool.spec; run = run ~hosts }
+
+let runs_on hosts (context : Tool.Context.t) =
+  List.find hosts ~f:(fun (h : Host.t) ->
+    match context.host with
+    | Some id -> String.equal h.id id
+    | None -> h.active)
+;;

@@ -83,7 +83,15 @@ let spec =
           , "Thinking: off, default (the provider's) or an effort level the \
              model takes (minimal|low|medium|high|xhigh|max) (default: this \
              agent's)" )
-        ; "cwd", `String, "Working directory (default: this agent's)"
+        ; ( "host"
+          , `String
+          , "A connected tool host (by name or id) for it to work on: all its \
+             tools run there (default: where yours run). Only when the user \
+             asked for work on that machine" )
+        ; ( "cwd"
+          , `String
+          , "Working directory (default: this agent's; with host, that host's \
+             home, and a relative cwd is from there)" )
         ; ( "worktree"
           , `String
           , "Run it in a fresh git worktree of the working directory's \
@@ -123,6 +131,8 @@ module Prepared = struct
     ; extra_context : string option
     ; tools : Tool.t list
     ; depth : int
+    ; host : Tool_on_host.Host.t option
+      (** where its tools run, when not the session's active host *)
     ; worktree : [ `Auto | `Branch of string ] option (** asked for *)
     ; created : Worktree.Created.t option (** made, [cwd] is in it *)
     ; fork : Fork.t option
@@ -161,8 +171,32 @@ let auto_branch name =
   "agent/" ^ String.prefix slug 40 |> String.rstrip ~drop:(Char.equal '-')
 ;;
 
+let or_invalid = function
+  | Ok x -> x
+  | Error message -> raise (Tool_args.Invalid message)
+;;
+
+(* The host it works on ([None]: the session's active one), and whether that
+   is another host than its caller's. *)
+let host_of ~hosts (context : Tool.Context.t) args =
+  let current = context.host in
+  match Tool_args.string_opt args "host" with
+  | None ->
+    ( Option.map current ~f:(fun id -> or_invalid (Tool_on_host.find hosts id))
+    , false )
+  | Some key ->
+    let host = or_invalid (Tool_on_host.find hosts key) in
+    let moves =
+      match current with
+      | Some id -> not (String.equal id host.id)
+      | None -> not host.active
+    in
+    Option.some_if (not host.active) host, moves
+;;
+
 let prepare
       ~models
+      ~hosts
       ~current_model
       ~current_thinking
       (context : Tool.Context.t)
@@ -204,10 +238,19 @@ let prepare
        | Ok thinking -> thinking
        | Error e -> raise (Tool_args.Invalid (Error.to_string_hum e)))
   in
+  let host, moves = host_of ~hosts:(hosts ()) context args in
   let cwd =
-    match Tool_args.string_opt args "cwd" with
-    | None -> context.cwd
-    | Some cwd -> Tool.resolve_path context cwd
+    match Tool_args.string_opt args "cwd", host with
+    | cwd, Some host when moves -> or_invalid (Tool_on_host.cwd_on host cwd)
+    | cwd, None when moves ->
+      (* back to the session's active host *)
+      or_invalid
+        (Tool_on_host.cwd_on
+           (List.find_exn (hosts ()) ~f:(fun (h : Tool_on_host.Host.t) ->
+              h.active))
+           cwd)
+    | None, _ -> context.cwd
+    | Some cwd, _ -> Tool.resolve_path context cwd
   in
   let turn_limit =
     Option.value (Tool_args.int_opt args "max_turns") ~default:max_turns
@@ -217,6 +260,7 @@ let prepare
     match conversation with
     | Some conversation ->
       Option.is_none only
+      && (not moves)
       && String.equal (Model.key model) (Model.key conversation.model)
     | None -> false
   in
@@ -242,6 +286,14 @@ let prepare
         , [] )
       | Error e -> raise (Tool_args.Invalid (Error.to_string_hum e)))
   in
+  (* The computer is the active host's screen. *)
+  let tools =
+    match host with
+    | None -> tools
+    | Some _ ->
+      List.filter tools ~f:(fun t ->
+        not (String.equal (Tool.name t) Tool_computer.name))
+  in
   { Prepared.task
   ; name =
       Option.value_or_thunk given ~default:(fun () ->
@@ -254,6 +306,7 @@ let prepare
   ; extra_context = Tool_args.string_opt args "context"
   ; tools
   ; depth
+  ; host
   ; worktree = worktree_arg args
   ; created = None
   ; fork =
@@ -469,6 +522,7 @@ let run_once
        ; name = p.name
        ; model = p.model.id
        ; tools = List.map p.tools ~f:Tool.name
+       ; host = Option.map p.host ~f:(fun h -> h.name)
        ; worktree = state.worktree
        ; forked = Option.is_some p.fork
        ; continued
@@ -513,6 +567,7 @@ let run_once
         ~cwd:p.cwd
         ~cancel:context.cancel
         ~chat:context.chat
+        ?host:context.host
         ~execute:context.execute
         ~approve:context.approve
         ~depth:p.depth
@@ -645,7 +700,11 @@ let execute
       ; path = c.worktree.path
       ; branch = Option.value c.worktree.branch ~default:"HEAD"
       ; root = c.root
+      ; host = Option.map p.host ~f:(fun h -> h.name)
       })
+  in
+  let home =
+    Option.value (Option.bind p.host ~f:(fun h -> h.home)) ~default:home
   in
   let own_system () =
     let base =
@@ -674,6 +733,7 @@ let execute
            ~role:Subagent
            ?user_info:(user_info ())
            ~custom_instructions:(custom_instructions ())
+           ?host:(Option.map p.host ~f:(fun h -> h.name))
            ~cwd:p.cwd
            ~home
            ~tools:(Tools.specs p.tools)
@@ -847,6 +907,7 @@ let create
       ?(compaction = fun () -> Compaction_settings.window_only)
       ?(user_info = fun () -> None)
       ?(custom_instructions = fun () -> [])
+      ?(hosts = fun () -> [])
       ~provider
       ~current_model
       ~current_thinking
@@ -855,7 +916,14 @@ let create
   =
   let run (context : Tool.Context.t) args =
     let prepared =
-      prepare ~models ~current_model ~current_thinking context args
+      prepare ~models ~hosts ~current_model ~current_thinking context args
+    in
+    (* From here on, its host's: its worktree, instructions and tools. *)
+    let context =
+      match prepared.host with
+      | None -> { context with host = None }
+      | Some host ->
+        { context with host = Some host.id; home = (fun () -> host.home) }
     in
     let prepared =
       match name_task, prepared.named with
@@ -890,6 +958,7 @@ let create
              ~inbox
              ~kind:Subagent
              ~name:prepared.name
+             ?host:(Option.map prepared.host ~f:(fun h -> h.name))
              ~label:prepared.task
              ~run:(fun ~id ~cancel ~emit ~on_output:_ ->
                background_outcome
@@ -910,9 +979,11 @@ let create
          in
          Tool.Result.ok
            (sprintf
-              "started agent %s (%s%s); its result will be delivered to you \
-               when it finishes: keep working or end your turn meanwhile"
+              "started agent %s%s (%s%s); its result will be delivered to \
+               you when it finishes: keep working or end your turn meanwhile"
               id
+              (Option.value_map prepared.host ~default:"" ~f:(fun h ->
+                 " on " ^ h.name))
               (if Option.is_some prepared.fork then "forked: " else "")
               (Background_tasks.short_task prepared.task))
        | _, resumable ->
