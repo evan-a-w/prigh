@@ -248,7 +248,7 @@ let%expect_test "a cancelled call is cancelled on the other host" =
   Agent.subscribe agent ~f:(function
     | Loop (Tool_output _) -> ignore (Eio.Promise.try_resolve set () : bool)
     | _ -> ());
-  Or_error.ok_exn (Agent.prompt agent "go");
+  Or_error.ok_exn (Agent.prompt agent "go, on laptop");
   Eio.Promise.await started;
   ignore (Agent.abort agent : string list);
   Agent.wait_idle agent;
@@ -487,7 +487,7 @@ let%expect_test "summaries, ACP titles and what the model is told" =
     on laptop: read /srv/notes.txt      | On laptop: Read notes.txt
     on laptop: ls                       | On laptop: List .
     on laptop                           | On laptop
-    Run one tool call on another tool host; only when the user names that machine or
+    Run one tool call on another tool host; only when the user named that machine or
     |}]
 ;;
 
@@ -564,7 +564,7 @@ let%expect_test "a host the user named: calls follow the mode" =
     on_host -> sub/
     confirm on_host: on laptop: write n []
     host-laptop runs write in $DIR/laptop
-    on_host -> wrote 1 bytes to $DIR/laptop/n
+    on_host -> wrote 1 line to $DIR/laptop/n
     confirm on_host: on laptop: bash echo hi []
     host-laptop runs bash in $DIR/laptop
       output: "hi\n"
@@ -573,7 +573,7 @@ let%expect_test "a host the user named: calls follow the mode" =
     host-laptop runs ls in $DIR/laptop
     on_host -> sub/
     host-laptop runs write in $DIR/laptop
-    on_host -> wrote 1 bytes to $DIR/laptop/n
+    on_host -> wrote 1 line to $DIR/laptop/n
     confirm on_host: on laptop: bash echo hi []
     host-laptop runs bash in $DIR/laptop
       output: "hi\n"
@@ -582,7 +582,7 @@ let%expect_test "a host the user named: calls follow the mode" =
     host-laptop runs ls in $DIR/laptop
     on_host -> sub/
     host-laptop runs write in $DIR/laptop
-    on_host -> wrote 1 bytes to $DIR/laptop/n
+    on_host -> wrote 1 line to $DIR/laptop/n
     host-laptop runs bash in $DIR/laptop
       output: "hi\n"
     on_host -> hi
@@ -606,12 +606,14 @@ let%expect_test "an approval permits that host, not the others" =
   @@ fun t agent ->
   Agent.set_hosts agent [ laptop t; desktop t ];
   run ~text:"look around" agent;
-  List.iter (Session.allowed_calls (Agent.session agent)) ~f:(fun a ->
-    print_endline
-      (show
-         t
-         (Allowed_call.describe a ~host_name:(fun id ->
-            String.chop_prefix_if_exists id ~prefix:"host-"))));
+  List.iter
+    (Session.allowed_calls (Agent.session agent))
+    ~f:(fun a ->
+      print_endline
+        (show
+           t
+           (Allowed_call.describe a ~host_name:(fun id ->
+              String.chop_prefix_if_exists id ~prefix:"host-"))));
   [%expect
     {|
     confirm on_host: on laptop: ls (runs on laptop, which you haven't named in this session) []
@@ -621,6 +623,7 @@ let%expect_test "an approval permits that host, not the others" =
     on_host -> (empty directory)
     confirm on_host: on desktop: ls (runs on desktop, which you haven't named in this session) []
     on_host -> ERROR [denied by user]
+    ls {} on laptop in $DIR/laptop (by you)
     |}]
 ;;
 
@@ -632,7 +635,8 @@ let%expect_test "a deny rule wins over everything" =
     ]
   @@ fun _t agent ->
   run ~text:"tidy up" agent;
-  [%expect {| |}]
+  [%expect
+    {| on_host -> ERROR [denied by the rule bash(rm:*) in permissions.deny; do not try to get around it: ask the user] |}]
 ;;
 
 (* In smart mode the approval model decides about a host the user has not
@@ -648,7 +652,32 @@ let%expect_test "smart: the judge weighs the host" =
     ]
   @@ fun _t agent ->
   run ~text:"what do my notes say?" agent;
-  [%expect {| |}]
+  [%expect
+    {|
+    judge sees:
+    <user_requests>
+    <user_message>
+    what do my notes say?
+    </user_message>
+    </user_requests>
+
+    <environment>
+    session's own host: <host>
+    connected hosts: <host>, laptop
+    call runs on: laptop (not the session's own host: the agent reaches it with on_host)
+    working directory: $DIR/laptop
+    </environment>
+
+    <tool_call>
+    tool: read
+    arguments:
+    {
+      "path": "notes"
+    }
+    </tool_call>
+    confirm on_host: on laptop: read notes [] (deepseek/deepseek-flash left it: reads files on laptop, which you didn't mention)
+    on_host -> ERROR [denied by user]
+    |}]
 ;;
 
 (* Once the user named the host, reads there run unjudged as on the session's
@@ -656,7 +685,11 @@ let%expect_test "smart: the judge weighs the host" =
 let%expect_test "smart: a named host follows the mode" =
   with_agent
     ~mode:Smart
-    ~judge:[ verdict "allow" "prints a word on laptop, as asked" ]
+    ~answer:(fun _ -> Deny None)
+    ~judge:
+      [ verdict "allow" "prints a word on laptop, as asked"
+      ; verdict "ask" "runs on desktop, which you didn't mention"
+      ]
     [ on_host {|{"host":"laptop","tool":"ls","args":{}}|}
     ; on_host
         ~id:"c2"
@@ -672,5 +705,61 @@ let%expect_test "smart: a named host follows the mode" =
   @@ fun t agent ->
   Agent.set_hosts agent [ laptop t; desktop t ];
   run ~text:"say hi on laptop" agent;
-  [%expect {| |}]
+  [%expect
+    {|
+    host-laptop runs ls in $DIR/laptop
+    on_host -> sub/
+    judge sees:
+    <user_requests>
+    <user_message>
+    say hi on laptop
+    </user_message>
+    </user_requests>
+
+    <environment>
+    session's own host: <host>
+    connected hosts: <host>, laptop, desktop
+    call runs on: laptop (not the session's own host: the agent reaches it with on_host)
+    working directory: $DIR/laptop
+    </environment>
+
+    <tool_call>
+    tool: bash
+    arguments:
+    {
+      "command": "echo hi"
+    }
+    </tool_call>
+    allowed by deepseek/deepseek-flash: prints a word on laptop, as asked
+    host-laptop runs bash in $DIR/laptop
+      output: "hi\n"
+    on_host -> hi
+    allowed by deepseek/deepseek-flash: this exact call earlier (prints a word on laptop, as asked)
+    host-laptop runs bash in $DIR/laptop
+      output: "hi\n"
+    on_host -> hi
+    judge sees:
+    <user_requests>
+    <user_message>
+    say hi on laptop
+    </user_message>
+    </user_requests>
+
+    <environment>
+    session's own host: <host>
+    connected hosts: <host>, laptop, desktop
+    call runs on: desktop (not the session's own host: the agent reaches it with on_host)
+    working directory: $DIR/desktop
+    </environment>
+
+    <tool_call>
+    tool: bash
+    arguments:
+    {
+      "command": "echo hi"
+    }
+    </tool_call>
+    confirm on_host: on desktop: bash echo hi [] (deepseek/deepseek-flash left it: runs on desktop, which you didn't mention)
+    on_host -> ERROR [denied by user]
+    |}]
 ;;

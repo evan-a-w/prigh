@@ -846,14 +846,20 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   (subagents, jobs, `computer`, itself), missing `tool`/`args`, and `bash`
   with `background` (jobs belong to the active host). Approval: the outer
   call is never destructive by itself; plan mode judges it as its inner
-  call (`Plan_mode.changes_work`); the inner call follows the approval
-  mode and the deny and ask rules, but no allow rule (configured or
+  call (`Plan_mode.changes_work`); until the user permits the host (one
+  of their messages names it or its id as a whole word, ignoring case
+  (`Approval.names_host`), or they let a call there run, which is recorded
+  as an `Allowed_call` by `you` in any mode) the inner call asks in every
+  mode, read-only or not (`decide`'s `host_permitted`; `Smart` has the
+  judge decide; the confirmation's summary ends with why); then it
+  follows the approval mode. Deny and ask rules apply, but no allow rule (configured or
   session) applies off the active host, since rules are paths and
   commands on the session's machine, and its confirmation (`on_host`, `on
   HOST: TOOL SUMMARY`) offers none to add. In every agent's tool list
   (subagents' too: they share the hosts), for a stable prompt; the
   description and a system prompt line say to use it only when the user
-  names another machine.
+  named that machine, never to get around a denied or failed call, and to
+  ask the user first otherwise.
 - `Tool_web_fetch` / `Html_text` — `web_fetch` runs on the active host
   (`on_host`, so `localhost` is the host's; a host predating it answers
   `unknown host tool`), or in the backend in chat mode (`in_backend`: no
@@ -1210,12 +1216,15 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   segment, `edit`, the tool's name) and the command splitter) and
   `Approval` (`Rules`, config's `permissions` with its problems, and
   `decide`: deny rule → plan mode refuses edits → ask rule (no
-  suggestions) → allow rules, the config's and the session's → plan mode
+  suggestions) → a call on a host the user has not permitted asks (or
+  `Judge` in `Smart`) → allow rules, the config's and the session's → plan mode
   asks for other destructive tools → the mode; `Smart` lets edits under
   the cwd run (no `.git` or `..` in the path) and returns `Judge` for the
   rest). `Approval_judge` is the judge: the request (the user's last ten
-  typed messages, a subagent's task, the goal and plan, host, cwd and the
-  call with its full arguments, never tool output), its `verdict` tool
+  typed messages, a subagent's task, the goal and plan, the session's own
+  host, the connected hosts, the host the call runs on, cwd and the call
+  with its full arguments, never tool output; its system prompt allows a
+  call on another host only when the user named that host), its `verdict` tool
   (`{decision: allow|ask, reason}`) and parsing the reply (anything else is
   `Ask` with why), thinking off or the lowest level. `Agent.approve` turns
   `Judge` into a judgement on the approval model (`approval_model`, else

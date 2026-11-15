@@ -1775,7 +1775,7 @@ module Check = struct
     { decide : unit -> Approval.Decision.t
     ; elsewhere : bool
     ; held : unit -> string option
-    (** why a call elsewhere asks whatever the mode: the user has not
+      (** why a call elsewhere asks whatever the mode: the user has not
         permitted its host *)
     ; name : string (** as the user sees it: [on_host] for a call elsewhere *)
     ; summary : string
@@ -1831,7 +1831,9 @@ let check t (context : Tool.Context.t) tool args : Check.t =
     match elsewhere with
     | Some id when not (host_permitted t ~id ~name:host_name) ->
       Some
-        (sprintf "runs on %s, which you haven't named in this session" host_name)
+        (sprintf
+           "runs on %s, which you haven't named in this session"
+           host_name)
     | Some _ | None -> None
   in
   let decide () =

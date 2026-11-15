@@ -114,11 +114,11 @@ let base ?(chat = false) ~nix ~auto_background ~(role : Role.t) ~tools () =
      @ (if has Tool_computer.name then [ "- " ^ Tool_computer.guidance ] else [])
      @ (if has Tool_on_host.name
         then
-          [ "- Other machines: use on_host only when the user named that machine \
-              or asked to run something there in this conversation, never to \
-              work around a missing tool, a denied call or a failure on the \
-              session's own host. If the task seems to need another machine, \
-              ask the user first"
+          [ "- Other machines: use on_host only when the user named that \
+             machine or asked to run something there in this conversation, \
+             never to work around a missing tool, a denied call or a failure \
+             on the session's own host. If the task seems to need another \
+             machine, ask the user first"
             ^ (if has "ask_user" then " (ask_user)" else "")
             ^ " instead of trying."
           ]

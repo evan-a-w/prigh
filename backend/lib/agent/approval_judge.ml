@@ -129,8 +129,10 @@ let prompt (input : Input.t) =
         (section
            "environment"
            (sprintf
-              "session's own host: %s\nconnected hosts: %s\ncall runs on: \
-               %s%s\nworking directory: %s"
+              "session's own host: %s\n\
+               connected hosts: %s\n\
+               call runs on: %s%s\n\
+               working directory: %s"
               input.session_host
               (match input.hosts with
                | [] -> "(none)"
