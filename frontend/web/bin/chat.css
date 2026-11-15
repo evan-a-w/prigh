@@ -1270,7 +1270,8 @@ dialog.viewer::backdrop { background: transparent; }
 .pasted-head {
   display: flex;
   align-items: baseline;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 2px 8px;
   width: 100%;
   min-width: 0;
   padding: 6px 10px;
@@ -1296,9 +1297,11 @@ dialog.viewer::backdrop { background: transparent; }
 .pasted.open > .pasted-head > .chev { transform: translateY(-1px) rotate(45deg); }
 .pasted-name { color: var(--fg); white-space: nowrap; flex-shrink: 0; }
 .pasted-detail { color: var(--faint); font-size: 11.5px; white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.pasted-preview { color: var(--muted); flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Its own line under the name when fewer than 14 characters would fit
+   beside it (a phone). */
+.pasted-preview { color: var(--muted); flex: 1 1 14ch; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pasted-body { position: relative; border-top: 1px solid var(--rule); }
 .pasted-body > .copy { position: absolute; top: 4px; right: 6px; background: var(--well); }
 .pasted-text { margin: 0; padding: 10px 12px; max-height: 50vh; overflow: auto; font: 12px/1.5 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
 @media (prefers-reduced-motion: reduce) { .pasted-head > .chev { transition: none; } }
-@media (pointer: coarse) { .pasted-head { min-height: 44px; align-items: center; } }
+@media (pointer: coarse) { .pasted-head { min-height: 44px; align-items: center; align-content: center; } }
