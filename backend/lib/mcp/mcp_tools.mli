@@ -43,6 +43,12 @@ module Listing : sig
       OAuth client's configuration). *)
   val to_rpc_json : ?signed_in:(string -> bool) -> t -> Json.t
 
+  (** [t] with the tools [previous] listed for each server that has failed
+      or needs a sign-in now, so that the tools offered stay the same (and
+      the prompt cache valid) while it is down: calling one says that it is
+      down and what to do. *)
+  val keep_tools : t -> previous:t -> t
+
   (** One line per problem, failed server and server awaiting approval or a
       sign-in, each saying what to do. *)
   val notices : t -> string list
@@ -52,8 +58,10 @@ end
     and cut to 64 characters. *)
 val tool_name : server:string -> tool:string -> string
 
-(** The tools of the ready servers; [call] runs one on the host. Names that
-    collide after sanitising keep the first. *)
+(** The tools of the servers that are not awaiting approval (a failed one
+    lists none, unless {!Listing.keep_tools} kept them), in the listing's
+    order; [call] runs one on the host. Names that collide after sanitising
+    keep the first. *)
 val tools
   :  Listing.t
   -> call:

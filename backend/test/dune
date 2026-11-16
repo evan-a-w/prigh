@@ -19,6 +19,11 @@
   eio.unix
   eio_main
   eio_posix
+  tls
+  tls-eio
+  x509
+  ptime
+  mirage-crypto-rng.unix
   expect_test_helpers_core
   re))
 

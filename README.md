@@ -1721,8 +1721,9 @@ answers "computer use is off on this tool host: start it with -computer".
 The backend's own host never offers it.
 
 - The `computer` tool is offered only while the session's active host
-  runs it; switching to it (or away) tells the model the tool came (or
-  went), with the guidance below.
+  runs it (and while that host is briefly disconnected, so that its coming
+  back does not change the tools); switching to it (or away) tells the
+  model the tool came (or went), with the guidance below.
 - The system prompt says the screen is the user's real desktop, that
   what is on it is untrusted data (never instructions), and to ask before
   anything irreversible or sensitive.
@@ -3536,8 +3537,14 @@ came with the project, so they only start once you approve them in `/mcp`
 (the approval lasts until their definition changes; it is kept in
 `~/.prigh/mcp-approvals.json`). Problems, failed starts and servers awaiting
 approval are reported once each; `/mcp` shows every server with its status
-and tools, and `/mcp reconnect` restarts failed ones. `-no-tools` turns MCP
-off.
+and tools, and `/mcp reconnect` restarts failed ones. A server that fails
+after it was running keeps its tools offered (calling one says it is down
+and to reconnect it), so the tools the model sees, and with them the
+provider's prompt cache, stay the same while it is down. A prompt does not
+wait to ask the host for its servers: it uses the ones it knew and asks in
+the background, so an edit to an `mcp.json` reaches the prompt after the next
+one (or at once with `/mcp`); changed settings, sign-ins and another host
+are waited for. `-no-tools` turns MCP off.
 
 The servers in **Settings → MCP servers** are yours: the backend keeps them
 for your account (`~/.prigh/mcp-servers.json` in its home, readable by its

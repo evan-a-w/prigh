@@ -565,6 +565,45 @@ let%expect_test "the tool is offered only while the host runs it" =
     |}]
 ;;
 
+let%expect_test "while its host is away the tool stays offered" =
+  with_agent
+    ~show_tools:true
+    [ Reply.text "one"; Reply.text "two"; Reply.text "three" ]
+  @@ fun ~set_computer _fake agent ->
+  Or_error.ok_exn (Agent.prompt agent "a");
+  Agent.wait_idle agent;
+  (* The host drops off for a moment: the tools (which start every request,
+     and so its cached prefix) stay as they were. *)
+  Agent.set_hosts
+    agent
+    []
+    ~returning:
+      (String.Map.singleton
+         "h"
+         (Eio.Time.now (Eio.Stdenv.clock (Agent.env agent)) +. 3600.));
+  Or_error.ok_exn (Agent.prompt agent "b");
+  Agent.wait_idle agent;
+  (* It comes back without a screen: now the tool goes. *)
+  set_computer false;
+  Or_error.ok_exn (Agent.prompt agent "c");
+  Agent.wait_idle agent;
+  [%expect
+    {|
+    notice: tools now run on desk in $DIR
+    --- request
+    tools: bash read computer
+    assistant: one
+    notice: waiting for tool host "desk" to reconnect; /host picks another
+    --- request
+    tools: bash read computer
+    assistant: two
+    notice: tools run on desk again in $DIR
+    --- request
+    tools: bash read
+    assistant: three
+    |}]
+;;
+
 let%expect_test
     "a sequence of actions: real coordinates, every screenshot under the cap"
   =

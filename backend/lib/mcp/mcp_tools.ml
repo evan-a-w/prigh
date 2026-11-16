@@ -56,6 +56,22 @@ module Listing = struct
 
   let empty = { servers = []; problems = [] }
 
+  let keep_tools t ~previous =
+    let same (a : Server.t) (b : Server.t) =
+      String.equal a.name b.name && String.equal a.source b.source
+    in
+    { t with
+      servers =
+        List.map t.servers ~f:(fun (s : Server.t) ->
+          match s.status with
+          | (Failed _ | Needs_sign_in _) when List.is_empty s.tools ->
+            (match List.find previous.servers ~f:(same s) with
+             | Some p -> { s with tools = p.tools }
+             | None -> s)
+          | Ready | Failed _ | Needs_sign_in _ | Needs_approval -> s)
+    }
+  ;;
+
   let of_hub (statuses, problems) =
     { servers =
         List.map statuses ~f:(fun { Mcp_hub.Server_status.server; status } ->
@@ -248,8 +264,8 @@ end
 let tools (listing : Listing.t) ~call =
   List.concat_map listing.servers ~f:(fun (s : Server.t) ->
     match s.status with
-    | Failed _ | Needs_approval | Needs_sign_in _ -> []
-    | Ready ->
+    | Needs_approval -> []
+    | Ready | Failed _ | Needs_sign_in _ ->
       List.map s.tools ~f:(fun (tool : Mcp_client.Tool.t) ->
         { Tool.spec =
             { Tool_spec.name = tool_name ~server:s.name ~tool:tool.name
