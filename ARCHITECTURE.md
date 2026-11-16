@@ -165,7 +165,8 @@ adds the `computer` feature and `hello`'s `computer` (a `Computer_info`:
 backend, real size, scale, the screenshots' scaled size). `Rpc_server`
 keeps it only with the feature (`Agent.Host.computer`; `hosts[].computer`
 in the state), and `Agent` offers the `computer` tool while the active host
-has it (see Tools).
+has it, and while it is away if it had it when it went (`gone_computer`: a
+reconnect does not change the tools) (see Tools).
 A host whose connection drops keeps its in-flight calls for `host_grace`
 (60s, `Rpc_server.create`): its next `hello` lists the executions it still
 runs (`running_execs`), which carry on over the new connection; the others
@@ -267,7 +268,13 @@ The layers below cut across those groups.
   `ps`: what left the group, like `timeout` or `setsid`, dies too), then
   waits at most a second more for the output pipes, which a daemon that
   escaped to init may hold, so a cancelled `bash` always returns at once),
-  `Http_client` (cohttp-eio + ocaml-tls; `post` and streaming
+  `Http_client` (cohttp-eio + ocaml-tls on `Http_pool`'s kept-alive
+  connections, by scheme, host and port: 16 idle, 4 per server, 50 s; their
+  sockets belong to no switch, so they outlive a request, and one goes back
+  only once its response was read to the end with the server keeping it
+  open; a request that fails before any reply on a reused connection is sent
+  once more on a new one; every HTTP user (providers, OAuth, MCP, web fetch,
+  forges) shares the pool; `post` and streaming
   `post_stream`, whose `idle_timeout` gives up a response or body that
   sends nothing for that long: `Stalled`; a connection broken mid-body is
   `Connection_lost`), `Sse` (incremental `text/event-stream` parser),
@@ -825,9 +832,14 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   `mcp__<server>__<tool>` (`parallel_safe` when `readOnlyHint`, otherwise
   `destructive`), whose `run` sends `$mcp_call {source, server, tool}` to the
   session's active host. `Agent` asks the host for the listing at the start
-  of every run (so tools follow host and cwd changes), adds the tools to the
-  run's and its subagents' tool lists, and reports each problem once as a
-  `Notice`.
+  of every run (`Mcp_refresh`): with a listing for that host and the same
+  settings and sign-ins it starts at once and refreshes in the background
+  for the next run; otherwise it waits (so time to first token has no host
+  round trip but tools follow host and settings changes). It adds the tools
+  to the run's and its subagents' tool lists, keeping the tools of a server
+  that went down (`Mcp_tools.Listing.keep_tools`: the tools are the start of
+  the prompt cache's key; a call gets the hub's "not running" error), and
+  reports each problem once as a `Notice`.
 - `Seen_files` — the guard against clobbering: `write`, and
   `apply_patch`'s `*** Add File:`/`*** Move to:` over an existing file, are
   refused unless the file's current contents are what the agent last read
