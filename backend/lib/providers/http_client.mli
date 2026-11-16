@@ -1,7 +1,10 @@
 open! Core
 open! Import
 
-(** HTTP over cohttp-eio, with TLS via ocaml-tls. *)
+(** HTTP over cohttp-eio, with TLS via ocaml-tls, on kept-alive connections
+    from an {!Http_pool}: a request reuses an idle connection to the same
+    server, and one that fails before any reply on a reused connection is
+    sent again once on a new one. *)
 
 module Response : sig
   type t =
@@ -40,7 +43,8 @@ val with_default_port : Uri.t -> Uri.t
     [idle_timeout] bounds the wait for the response and then for each piece
     of its body ([Stalled]); [timeout], the whole request. *)
 val post_stream
-  :  env:Env.t
+  :  ?pool:Http_pool.t (** default: {!Http_pool.default} *)
+  -> env:Env.t
   -> ?cancel:Cancellation.t
   -> ?timeout:Time_ns.Span.t
   -> ?idle_timeout:Time_ns.Span.t
@@ -53,7 +57,8 @@ val post_stream
   -> (Response.t, Error.t) Result.t
 
 val post
-  :  env:Env.t
+  :  ?pool:Http_pool.t (** default: {!Http_pool.default} *)
+  -> env:Env.t
   -> ?cancel:Cancellation.t
   -> ?timeout:Time_ns.Span.t
   -> url:string
@@ -65,7 +70,8 @@ val post
 (** A GET whose body goes to [on_chunk] as it arrives; an exception raised
     by [on_chunk] ends the request and propagates. *)
 val get_stream
-  :  env:Env.t
+  :  ?pool:Http_pool.t (** default: {!Http_pool.default} *)
+  -> env:Env.t
   -> ?cancel:Cancellation.t
   -> ?timeout:Time_ns.Span.t
   -> ?on_response:(Response.t -> unit)
@@ -76,7 +82,8 @@ val get_stream
   -> (Response.t, Error.t) Result.t
 
 val get
-  :  env:Env.t
+  :  ?pool:Http_pool.t (** default: {!Http_pool.default} *)
+  -> env:Env.t
   -> ?cancel:Cancellation.t
   -> ?timeout:Time_ns.Span.t
   -> url:string
@@ -87,7 +94,8 @@ val get
 (** Any method, e.g. [`PATCH] or [`DELETE]; [body] is sent as is (none for
     a [GET]). Redirects are not followed: a 3xx is the response. *)
 val request
-  :  env:Env.t
+  :  ?pool:Http_pool.t (** default: {!Http_pool.default} *)
+  -> env:Env.t
   -> ?cancel:Cancellation.t
   -> ?timeout:Time_ns.Span.t
   -> meth:Http.Method.t
