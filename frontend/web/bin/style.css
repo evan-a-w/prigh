@@ -1557,6 +1557,16 @@ kbd {
   border-radius: var(--r-control); font: 12px/1.5 var(--mono); max-height: 40vh; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere;
 }
 .text-dialog { width: min(720px, 100%); }
+/* /permissions: each remembered call with its Forget button */
+.permissions-dialog .modal-body { display: flex; flex-direction: column; gap: 10px; }
+.permissions-dialog .dialog-note { margin: 0; color: var(--muted); }
+.allowed-calls ul { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.allowed-call {
+  display: flex; align-items: center; gap: 10px; padding: 6px 6px 6px 12px;
+  background: var(--well); border: 1px solid var(--rule); border-radius: var(--r-control);
+}
+.allowed-call-text { flex: 1 1 auto; min-width: 0; font: 12px/1.5 var(--mono); overflow-wrap: anywhere; }
+.allowed-call .forget { flex-shrink: 0; }
 
 /* /diff: the working tree's changes, file by file */
 .diff-dialog { width: min(980px, 100%); }

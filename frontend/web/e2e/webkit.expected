@@ -4199,6 +4199,9 @@ Pasted text #1
 420 lines · 12.5 KB
 Pasted text #2
 420 lines · 12.5 KB
+=== webkit: pasted (desktop): Ctrl+Z after removing a chip ===
+undone: 2 chips; box lines: 51
+redone: 1 chip
 === webkit: pasted (desktop): sent ===
 chips left: 0
 why does this fail?
@@ -4238,6 +4241,9 @@ Pasted text #1
 420 lines · 12.5 KB
 Pasted text #2
 420 lines · 12.5 KB
+=== webkit: pasted (phone): Ctrl+Z after removing a chip ===
+undone: 2 chips; box lines: 51
+redone: 1 chip
 === webkit: pasted (phone): sent ===
 chips left: 0
 why does this fail?
@@ -4277,6 +4283,9 @@ Pasted text #1
 420 lines · 12.5 KB
 Pasted text #2
 420 lines · 12.5 KB
+=== webkit: pasted (small): Ctrl+Z after removing a chip ===
+undone: 2 chips; box lines: 51
+redone: 1 chip
 === webkit: pasted (small): sent ===
 chips left: 0
 why does this fail?
@@ -4421,6 +4430,17 @@ head: bash echo tests passed judged
 chip's title: allowed by deepseek/deepseek-flash: runs the project's tests, which the user asked for
 note: allowed by deepseek/deepseek-flash: runs the project's tests, which the user asked for
 fits the width
+=== webkit: smart (desktop): /permissions: the remembered calls ===
+bash {"command":"echo tests passed"} on <host> in $CWD (by deepseek/deepseek-flash)
+bash {"command":"rm -rf ~/.cache/demo"} on <host> in $CWD (by you)
+forget: in view, tall enough
+forget all: in view, tall enough
+fits the width
+=== webkit: smart (desktop): /permissions: one forgotten ===
+bash {"command":"rm -rf ~/.cache/demo"} on <host> in $CWD (by you)
+Forgot the remembered call: smart mode judges it again
+=== webkit: smart (desktop): /permissions: all forgotten ===
+calls: 0, forget all: 0
 === webkit: smart (desktop): Settings → Models → Approvals ===
 Approvals In smart mode, lets a tool call run or asks you, saying why. Default: the session's model. Default
 choice: in view, tall enough
@@ -4443,6 +4463,17 @@ head: bash echo tests passed judged
 chip's title: allowed by deepseek/deepseek-flash: runs the project's tests, which the user asked for
 note: allowed by deepseek/deepseek-flash: runs the project's tests, which the user asked for
 fits the width
+=== webkit: smart (phone): /permissions: the remembered calls ===
+bash {"command":"echo tests passed"} on <host> in $CWD (by deepseek/deepseek-flash)
+bash {"command":"rm -rf ~/.cache/demo"} on <host> in $CWD (by you)
+forget: in view, tall enough
+forget all: in view, tall enough
+fits the width
+=== webkit: smart (phone): /permissions: one forgotten ===
+bash {"command":"rm -rf ~/.cache/demo"} on <host> in $CWD (by you)
+Forgot the remembered call: smart mode judges it again
+=== webkit: smart (phone): /permissions: all forgotten ===
+calls: 0, forget all: 0
 === webkit: smart (phone): Settings → Models → Approvals ===
 Approvals In smart mode, lets a tool call run or asks you, saying why. Default: the session's model. Default
 choice: in view, tall enough
@@ -4465,6 +4496,17 @@ head: bash echo tests passed judged
 chip's title: allowed by deepseek/deepseek-flash: runs the project's tests, which the user asked for
 note: allowed by deepseek/deepseek-flash: runs the project's tests, which the user asked for
 fits the width
+=== webkit: smart (small): /permissions: the remembered calls ===
+bash {"command":"echo tests passed"} on <host> in $CWD (by deepseek/deepseek-flash)
+bash {"command":"rm -rf ~/.cache/demo"} on <host> in $CWD (by you)
+forget: in view, tall enough
+forget all: in view, tall enough
+fits the width
+=== webkit: smart (small): /permissions: one forgotten ===
+bash {"command":"rm -rf ~/.cache/demo"} on <host> in $CWD (by you)
+Forgot the remembered call: smart mode judges it again
+=== webkit: smart (small): /permissions: all forgotten ===
+calls: 0, forget all: 0
 === webkit: smart (small): Settings → Models → Approvals ===
 Approvals In smart mode, lets a tool call run or asks you, saying why. Default: the session's model. Default
 choice: in view, tall enough

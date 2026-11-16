@@ -154,6 +154,79 @@ let%expect_test "each change, step by step" =
     |}]
 ;;
 
+let%expect_test "forgetting allowed calls, step by step" =
+  with_sandbox
+  @@ fun t ->
+  let session = ref (Session.create ~dir:t.dir ~cwd:t.dir ()) in
+  let call cwd =
+    Allowed_call.Call.create ~tool:"bash" ~arguments:(`Object []) ~host:"h" ~cwd
+  in
+  let allow cwd s =
+    ignore
+      (Session.add_allowed_call
+         s
+         { call = call cwd; by = Allowed_call.you; reason = None }
+       : Session.Entry.t)
+  in
+  let forget cwd s =
+    ignore
+      (Session.forget_allowed_call s (Option.map cwd ~f:call) : Session.Entry.t)
+  in
+  let step what f =
+    f !session;
+    check ~what !session;
+    printf
+      "%-26s allowed [%s] | since forget all: %s\n"
+      what
+      (String.concat
+         ~sep:" "
+         (List.map
+            (Session.allowed_calls !session)
+            ~f:(fun (a : Allowed_call.t) -> a.call.cwd)))
+      (String.concat
+         ~sep:" "
+         (List.map (Session.messages_since_forget_all !session) ~f:shape))
+  in
+  step "user" (fun s -> append s (Message.user "one"));
+  step "allow a, b, c" (fun s ->
+    allow "a" s;
+    allow "b" s;
+    allow "c" s);
+  step "forget b" (forget (Some "b"));
+  step "forget b again" (forget (Some "b"));
+  step "reply" (fun s -> append s (assistant ~input:100 "two"));
+  step "forget all" (forget None);
+  step "user" (fun s -> append s (Message.user "three"));
+  step "allow d" (allow "d");
+  step "reload" (fun s ->
+    session := Session.load (Session.path s) |> Or_error.ok_exn);
+  step "rewind to \"two\"" (fun s ->
+    Session.rewind s ~to_:(id_of_text s "two") |> Or_error.ok_exn);
+  step "forget a" (forget (Some "a"));
+  step "fork at \"two\"" (fun s ->
+    session
+    := Session.fork s ~at:(id_of_text s "two") ~dir:t.dir |> Or_error.ok_exn);
+  step "forget all in the fork" (forget None);
+  step "user" (fun s -> append s (Message.user "four"));
+  [%expect
+    {|
+    user                       allowed [] | since forget all: U(one)
+    allow a, b, c              allowed [a b c] | since forget all: U(one)
+    forget b                   allowed [a c] | since forget all: U(one)
+    forget b again             allowed [a c] | since forget all: U(one)
+    reply                      allowed [a c] | since forget all: U(one) A(two)
+    forget all                 allowed [] | since forget all:
+    user                       allowed [] | since forget all: U(three)
+    allow d                    allowed [d] | since forget all: U(three)
+    reload                     allowed [d] | since forget all: U(three)
+    rewind to "two"            allowed [a c] | since forget all: U(one) A(two)
+    forget a                   allowed [c] | since forget all: U(one) A(two)
+    fork at "two"              allowed [a c] | since forget all: U(one) A(two)
+    forget all in the fork     allowed [] | since forget all:
+    user                       allowed [] | since forget all: U(four)
+    |}]
+;;
+
 (* Random sequences of changes, the cache looked at (and so kept and
    advanced) after some of them and not others. *)
 module Op = struct
@@ -215,7 +288,7 @@ let%expect_test "cached = uncached after random changes" =
          append s (result id)
        | Setting ->
          let (_ : Session.Entry.t) =
-           match Random.State.int rand 9 with
+           match Random.State.int rand 10 with
            | 0 -> Session.set_system_prompt s ~text:(fresh ())
            | 1 ->
              Session.set_approval
@@ -240,7 +313,13 @@ let%expect_test "cached = uncached after random changes" =
                ; reason = None
                }
            | 7 -> Session.set_name s ~name:(fresh ())
-           | _ -> Session.set_description s ~text:(fresh ())
+           | 8 -> Session.set_description s ~text:(fresh ())
+           | _ ->
+             Session.forget_allowed_call
+               s
+               (Option.map
+                  (maybe_pick (Session.allowed_calls s))
+                  ~f:(fun (a : Allowed_call.t) -> a.call))
          in
          if Random.State.bool rand
          then Session.set_resume_at s (Some (Float.of_int !counter))
@@ -319,8 +398,8 @@ let%expect_test "cached = uncached after random changes" =
   [%expect
     {|
     (!differences 0)
-    ((Call 150) (Compact 184) (Delete 142) (Fork 171) (Mask 159) (Reload 176)
-     (Reply 159) (Rewind 159) (Setting 158) (Spend 155) (Trim 161)
-     (Trim_after 157) (Undelete 161) (Untrim 166) (User 142))
+    ((Call 160) (Compact 171) (Delete 146) (Fork 161) (Mask 175) (Reload 166)
+     (Reply 151) (Rewind 176) (Setting 158) (Spend 140) (Trim 162)
+     (Trim_after 170) (Undelete 168) (Untrim 149) (User 147))
     |}]
 ;;

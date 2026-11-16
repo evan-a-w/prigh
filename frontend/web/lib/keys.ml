@@ -122,6 +122,10 @@ let help =
        button in the agents panel; /agents steer N TEXT sends one)" )
   ; "Alt+↑ (steering a subagent)", "take its last queued message back"
   ; "Esc (steering a subagent)", "write to the main agent again"
+  ; ( "Ctrl+Z / ⌘+Z (in the message box)"
+    , "right after a long paste became a chip, or a chip was removed: undo \
+       that (otherwise the box's own undo); Ctrl+Shift+Z, ⌘+Shift+Z or Ctrl+Y \
+       redoes it" )
   ; ( "Ctrl+Shift+V / ⌘+Shift+V (in the message box)"
     , "paste a long text into the box as text; a plain paste of over 2,000 \
        characters or 40 lines becomes a Pasted text chip, sent whole with the \
@@ -386,8 +390,24 @@ let last_line text ~cursor =
   not (String.mem (String.drop_prefix text cursor) '\n')
 ;;
 
+(* Only right after a chip came or went: otherwise the textarea's own undo. *)
+let paste_step (m : App.Model.t) t : App.Action.t option =
+  let shortcut = (t.ctrl || t.meta) && not t.alt in
+  let can step =
+    Option.exists m.paste_undo ~f:(fun u ->
+      Option.is_some (step u ~pasted:m.pasted ~draft:m.draft))
+  in
+  match String.lowercase t.key with
+  | "z" when shortcut && (not t.shift) && can Paste_undo.undo -> Some Undo_paste
+  | "z" when shortcut && t.shift && can Paste_undo.redo -> Some Redo_paste
+  | "y" when t.ctrl && (not (t.shift || t.alt || t.meta)) && can Paste_undo.redo
+    -> Some Redo_paste
+  | _ -> None
+;;
+
 let editor_key (m : App.Model.t) t ~cursor : App.Action.t option =
   match t.key, App.Model.popup m with
+  | _ when Option.is_some (paste_step m t) -> paste_step m t
   | "ArrowUp", Some _ when plain t -> Some (Complete_move (-1))
   | "ArrowDown", Some _ when plain t -> Some (Complete_move 1)
   | "Tab", Some _ when plain t -> Some (Complete_accept { run = false })

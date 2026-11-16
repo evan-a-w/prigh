@@ -148,8 +148,10 @@ let every =
   ; c "todos" "" "show the model's plan (its update_plan steps)"
   ; c
       "permissions"
-      ""
-      "show the mode and the allow/ask/deny rules (config and this session)"
+      "[forget N|all]"
+      "show the mode, the allow/ask/deny rules and the calls smart mode \
+       remembered; forget N or all: judge them again (and ask again on the \
+       hosts they let the agent work on)"
   ; c
       ~argument:Argument.Notify
       "notify"

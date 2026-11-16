@@ -142,7 +142,9 @@ let every =
   ; c "todos" "show the model's plan (its update_plan steps)"
   ; c
       "permissions"
-      "show the mode and the allow/ask/deny rules (config and this session)"
+      "show the mode, the allow/ask/deny rules (config and this session) and \
+       the calls smart mode remembered, to forget (smart mode judges them \
+       again; the hosts they permitted ask again)"
   ; c
       ~argument:Notify
       ~args:"[on|off]"

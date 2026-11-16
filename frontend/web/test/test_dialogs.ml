@@ -182,6 +182,7 @@ let%expect_test "help lists every key and command" =
     Enter / Alt+Enter (steering a subagent) send it a message: at its next step / when it ends its turn (its Steer button in the agents panel; /agents steer N TEXT sends one)
     Alt+↑ (steering a subagent) take its last queued message back
     Esc (steering a subagent) write to the main agent again
+    Ctrl+Z / ⌘+Z (in the message box) right after a long paste became a chip, or a chip was removed: undo that (otherwise the box's own undo); Ctrl+Shift+Z, ⌘+Shift+Z or Ctrl+Y redoes it
     Ctrl+Shift+V / ⌘+Shift+V (in the message box) paste a long text into the box as text; a plain paste of over 2,000 characters or 40 lines becomes a Pasted text chip, sent whole with the message (its dialog: Insert as text, Remove)
     Ctrl+Shift+O a new temporary session (/temporary): not saved or listed, deleted when you leave it; on the new-session screen, its Temporary chip
     Ctrl+Shift+F open or close the file browser (/files): ↑↓ select, Enter opens, Backspace goes up, F2 renames, Delete deletes, Esc closes
@@ -228,7 +229,7 @@ let%expect_test "help lists every key and command" =
     /plan [on|off] toggle plan mode: the model investigates and plans, changing no files, until you turn it off
     /chat [on|off] toggle chat mode: talk without the tool host (no files, commands or project; the web and other host-free tools), until you turn it off
     /todos show the model's plan (its update_plan steps)
-    /permissions show the mode and the allow/ask/deny rules (config and this session)
+    /permissions show the mode, the allow/ask/deny rules (config and this session) and the calls smart mode remembered, to forget (smart mode judges them again; the hosts they permitted ask again)
     /notify [on|off] tell you when a turn ends or something waits for you while the tab is hidden
     /memory [on|off] your notes the model saves when you ask it to remember something, in Settings; on or off gives the model the memory tool or takes it away
     /instructions [on|off] your custom instructions, in the context of every session, in Settings; on or off lets the model add, edit and remove them or not

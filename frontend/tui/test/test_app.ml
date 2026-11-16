@@ -3094,7 +3094,7 @@ let%expect_test "/auth, /help, /state, /clear, unknown method errors" =
     │ Ctrl+P cycles through                                    │
     │ /change_default                    save the current      │
     │ model and thinking level as the default for new sessions │
-    └───────── 1–11 of 366 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
+    └───────── 1–11 of 370 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
     ────────────────────────────────────────────────────────────
     > ▏
     deepseek-flash  ctx:0.1%/1.0M  ↑↓ scroll · Esc closes
@@ -6307,7 +6307,7 @@ let%expect_test "/hotkeys prints the keys half of /help" =
     │ the current turn (a focused subagent's: before it        │
     │ reports)                                                 │
     │ Alt+S                   send exactly what is typed,      │
-    └────────── 1–7 of 108 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
+    └────────── 1–7 of 110 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
     ────────────────────────────────────────────────────────────
     > ▏
     deepseek-flash  ctx:0.1%/1.0M  ↑↓ scroll · Esc closes

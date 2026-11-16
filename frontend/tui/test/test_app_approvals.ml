@@ -294,8 +294,11 @@ let%expect_test "the plan in the status line, /todos and /permissions" =
     ┌─ Permissions ──────────────────────────────────────────────────────────────────────────┐
     │ mode: ask — bash, job_input, edits and MCP tools ask first                             │
     │ allowed this session: edit                                                             │
-    │ exact calls allowed this session (smart mode does not judge them again):               │
-    │   bash {"command":"make"} on laptop in /work (by deepseek/deepseek-flash)              │
+    │ exact calls allowed this session (smart mode does not judge them again; /permissions   │
+    │ forget N or all forgets them):                                                         │
+    │   1. bash {"command":"make"} on laptop in /work (by deepseek/deepseek-flash)           │
+    │   forgetting one you let run on another host takes that host back (its calls ask       │
+    │ again); forgetting all takes back every other host until you name it again             │
     │ allow (config): bash(git status:*)                                                     │
     │ deny (config): bash(rm:*)                                                              │
     │ rules: permissions in ~/.prigh/config.json, e.g. {"allow": ["bash(git status:*)"],     │
@@ -304,6 +307,81 @@ let%expect_test "the plan in the status line, /todos and /permissions" =
     ──────────────────────────────────────────────────────────────────────────────────────────
     > ▏
     deepseek-flash  ctx:0.1%/1.0M  $0.01  ↑↓ scroll · Esc closes · typing goes to the editor
+    |}]
+;;
+
+let%expect_test "/permissions forget N or all: smart mode judges them again" =
+  let h = Test_app.connected ~width:90 ~height:16 () in
+  let make =
+    {|bash {"command":"make"} on laptop in /work (by deepseek/deepseek-flash)|}
+  in
+  let ls = {|bash {"command":"ls"} on laptop in /work (by you)|} in
+  let run text =
+    print_endline ("--- " ^ text);
+    command h text;
+    Option.iter h.model.notice ~f:(fun n -> print_endline n.text)
+  in
+  run "/permissions forget 1";
+  H.event h (State { (with_mode Smart) with allowed_calls = [ ls; make ] });
+  command h "/permissions";
+  H.show h;
+  H.esc h;
+  run "/permissions forget 2";
+  run "/permissions forget 3";
+  run "/permissions forget x";
+  run "/permissions forget all";
+  run "/permissions forgot";
+  H.event h (State { (with_mode Smart) with allowed_calls = [ make ] });
+  run "/permissions forget all";
+  [%expect
+    {|
+    --- /permissions forget 1
+    no calls are remembered: smart mode remembers the calls it allows
+      earlier answer
+    ┌─ Permissions ──────────────────────────────────────────────────────────────────────────┐
+    │ mode: smart — edits in the project run; the approval model lets other calls run or     │
+    │ asks you, saying why (/approval-model)                                                 │
+    │ exact calls allowed this session (smart mode does not judge them again; /permissions   │
+    │ forget N or all forgets them):                                                         │
+    │   1. bash {"command":"ls"} on laptop in /work (by you)                                 │
+    │   2. bash {"command":"make"} on laptop in /work (by deepseek/deepseek-flash)           │
+    │   forgetting one you let run on another host takes that host back (its calls ask       │
+    │ again); forgetting all takes back every other host until you name it again             │
+    │ rules: permissions in ~/.prigh/config.json, e.g. {"allow": ["bash(git status:*)"],     │
+    │ "deny": ["bash(rm:*)"]}; /mode or Alt+M switches the mode                              │
+    └─────────────────────────────────────────────────────────────────────────── Esc closes ─┘
+    ──────────────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    deepseek-flash  ctx:0.1%/1.0M  $0.01  ↑↓ scroll · Esc closes · typing goes to the editor
+    --- /permissions forget 2
+    (Rpc
+      (method_ forget_allowed_call)
+      (params ((
+        call
+        "bash {\"command\":\"make\"} on laptop in /work (by deepseek/deepseek-flash)")))
+      (tag (
+        Notice_on_success
+        "forgot bash {\"command\":\"make\"} on laptop in /work (by deepseek/deepseek-flash): smart mode judges it again")))
+    --- /permissions forget 3
+    use /permissions forget N (1 to 2, as /permissions lists them) or /permissions forget all
+    --- /permissions forget x
+    use /permissions forget N (1 to 2, as /permissions lists them) or /permissions forget all
+    --- /permissions forget all
+    (Rpc
+      (method_ forget_allowed_call)
+      (params ((all true)))
+      (tag (
+        Notice_on_success
+        "forgot all 2 remembered calls: smart mode judges them again, and other hosts ask until you name them")))
+    --- /permissions forgot
+    unknown argument "forgot"; use /permissions, or /permissions forget N|all
+    --- /permissions forget all
+    (Rpc
+      (method_ forget_allowed_call)
+      (params ((all true)))
+      (tag (
+        Notice_on_success
+        "forgot the remembered call: smart mode judges it again, and other hosts ask until you name them")))
     |}]
 ;;
 

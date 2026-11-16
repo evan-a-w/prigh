@@ -655,6 +655,65 @@ let text ~title ~text ~inject =
     [ Node.pre ~attrs:[ Attr.class_ "text-block" ] [ Node.text text ] ]
 ;;
 
+(* [/permissions]: the remembered calls come from the state, so one forgotten
+   goes at once (with the backend's next state). *)
+let permissions (m : App.Model.t) ~rules ~hint ~inject =
+  let calls =
+    Option.value_map m.state ~default:[] ~f:(fun (s : State.t) ->
+      s.allowed_calls)
+  in
+  Modal.view
+    ~cls:"text-dialog permissions-dialog"
+    ~title:"Permissions"
+    ~on_close:(inject Action.Close_dialog)
+    ~footer:
+      ((match calls with
+        | [] -> []
+        | _ ->
+          [ button
+              ~cls:"danger forget-all"
+              ~title:
+                "Smart mode judges every one of these calls again, and other \
+                 hosts ask until you name them"
+              ~on_click:(inject (Action.Forget_allowed_call None))
+              [ Node.text "Forget all" ]
+          ])
+       @ [ done_button ~inject ])
+    [ Node.pre ~attrs:[ Attr.class_ "text-block" ] [ Node.text rules ]
+    ; (match calls with
+       | [] -> Node.none
+       | calls ->
+         Node.div
+           ~attrs:[ Attr.class_ "allowed-calls" ]
+           [ Node.p
+               ~attrs:[ Attr.class_ "dialog-note" ]
+               [ Node.text
+                   "Exact calls allowed this session: smart mode does not \
+                    judge them again until you forget them. Forgetting one you \
+                    let run on another host takes that host back: its calls \
+                    ask again. Forget all takes back every other host until \
+                    you name it again."
+               ]
+           ; Node.ul
+               (List.map calls ~f:(fun line ->
+                  Node.li
+                    ~attrs:[ Attr.class_ "allowed-call" ]
+                    [ span ~cls:"allowed-call-text" line
+                    ; button
+                        ~cls:"small forget"
+                        ~title:"Forget it: smart mode judges it again"
+                        ~label:("Forget " ^ line)
+                        ~on_click:
+                          (inject (Action.Forget_allowed_call (Some line)))
+                        [ Node.text "Forget" ]
+                    ]))
+           ])
+    ; Node.div
+        (List.map (String.split_lines hint) ~f:(fun line ->
+           Node.p ~attrs:[ Attr.class_ "dialog-note" ] [ Node.text line ]))
+    ]
+;;
+
 (* A long paste of the composer's, before it is sent: read it, put it in the
    box as text after all, or drop it. *)
 let pasted (m : App.Model.t) i ~inject =
@@ -786,6 +845,7 @@ let view (m : App.Model.t) (dialog : Dialog.t) ~inject =
     Some (create_dir m ~target ~path ~busy ~error ~inject)
   | Session stats -> Some (session m stats ~inject)
   | Text { title; text = t } -> Some (text ~title ~text:t ~inject)
+  | Permissions { rules; hint } -> Some (permissions m ~rules ~hint ~inject)
   | Pasted i -> pasted m i ~inject
   | Mcp_tools server -> Some (mcp_tools server ~inject)
   | Mcp_sign_in { server; url; error; source = _ } ->

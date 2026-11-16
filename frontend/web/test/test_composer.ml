@@ -416,7 +416,7 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /plan [on|off] toggle plan mode: the model investigates and plans, changing no files, until you turn it off
     /chat [on|off] toggle chat mode: talk without the tool host (no files, commands or project; the web and other host-free tools), until you turn it off
     /todos show the model's plan (its update_plan steps)
-    /permissions show the mode and the allow/ask/deny rules (config and this session)
+    /permissions show the mode, the allow/ask/deny rules (config and this session) and the calls smart mode remembered, to forget (smart mode judges them again; the hosts they permitted ask again)
     /notify [on|off] tell you when a turn ends or something waits for you while the tab is hidden
     /memory [on|off] your notes the model saves when you ask it to remember something, in Settings; on or off gives the model the memory tool or takes it away
     /instructions [on|off] your custom instructions, in the context of every session, in Settings; on or off lets the model add, edit and remove them or not

@@ -587,6 +587,13 @@ let no_host t =
          chat_hint)
 ;;
 
+let describe_allowed t =
+  Allowed_call.describe ~host_name:(fun id ->
+    match List.find (hosts t) ~f:(fun h -> String.equal h.id id) with
+    | Some host -> host.name
+    | None -> id)
+;;
+
 let state t =
   let messages = messages t in
   let assistant_usage, assistant_cost = session_spend t in
@@ -637,14 +644,7 @@ let state t =
   ; session_rules = List.map t.session_rules ~f:Approval_rule.to_string
   ; allowed_calls =
       Hashtbl.data t.allowed_calls
-      |> List.map
-           ~f:
-             (Allowed_call.describe ~host_name:(fun id ->
-                match
-                  List.find (hosts t) ~f:(fun h -> String.equal h.id id)
-                with
-                | Some host -> host.name
-                | None -> id))
+      |> List.map ~f:(describe_allowed t)
       |> List.sort ~compare:String.compare
   ; home = Session.home t.session
   ; trim = Session.trim t.session
@@ -1768,6 +1768,28 @@ let remember_allowed t (allowed : Allowed_call.t) =
     state_changed t)
 ;;
 
+let forget_allowed_calls t which =
+  let forget call =
+    ignore (Session.forget_allowed_call t.session call : Session.Entry.t);
+    state_changed t;
+    Ok ()
+  in
+  match which with
+  | None ->
+    Hashtbl.clear t.allowed_calls;
+    forget None
+  | Some line ->
+    (match
+       Hashtbl.data t.allowed_calls
+       |> List.find ~f:(fun a -> String.equal (describe_allowed t a) line)
+     with
+     | Some a ->
+       Hashtbl.remove t.allowed_calls a.call;
+       forget (Some a.call)
+     | None ->
+       Or_error.errorf "no remembered call is %S: /permissions lists them" line)
+;;
+
 let plan_text (p : Plan.t) =
   String.concat
     ~sep:"\n"
@@ -1805,10 +1827,12 @@ let rec mentions_home : Json.t -> bool = function
 
 (* Whether the user has let the agent work on host [id] (named [name]) in
    this session: one of their messages names it, or they let a call there
-   run (any call elsewhere they allow is remembered, {!approve_on_host}). *)
+   run (any call elsewhere they allow is remembered, {!approve_on_host}).
+   Forgetting such a call takes back what it permitted, and forgetting them
+   all also what the messages before it did. *)
 let host_permitted t ~id ~name =
   List.exists
-    (Approval_judge.user_messages (Session.messages t.session))
+    (Approval_judge.user_messages (Session.messages_since_forget_all t.session))
     ~f:(Approval.names_host ~names:[ name; id ])
   || Hashtbl.exists t.allowed_calls ~f:(fun (a : Allowed_call.t) ->
     String.equal a.call.host id && String.equal a.by Allowed_call.you)

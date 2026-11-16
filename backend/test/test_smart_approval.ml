@@ -857,3 +857,79 @@ let%expect_test "a [~] in a call's arguments, found without printing them" =
     {"text":"a \"quoted\" path"}                       false
     |}]
 ;;
+
+let%expect_test
+    "forgetting remembered calls: one or all, kept forgotten on reload, and \
+     judged again"
+  =
+  with_agent
+    ~judge:
+      [ allow "builds"
+      ; allow "builds in parallel"
+      ; allow "builds again"
+      ; allow "builds in parallel again"
+      ]
+    [ bash ~id:"c1" "make"
+    ; bash ~id:"c2" "make -j2"
+    ; Reply.text "ok"
+    ; bash ~id:"c3" "make"
+    ; Reply.text "ok"
+    ; bash ~id:"c4" "make -j2"
+    ; Reply.text "ok"
+    ]
+  @@ fun t agent judged ->
+  let reload () =
+    let path = Session.path (Agent.session agent) in
+    Agent.new_session agent;
+    Or_error.ok_exn (Agent.switch_session agent ~path);
+    print_endline "--- reloaded";
+    show_allowed t agent
+  in
+  let forget which =
+    match Agent.forget_allowed_calls agent which with
+    | Ok () -> ()
+    | Error e -> print_endline ("error: " ^ mask t (Error.to_string_hum e))
+  in
+  run agent "build";
+  show_allowed t agent;
+  let make =
+    List.find_exn (Agent.state agent).allowed_calls ~f:(fun line ->
+      String.is_prefix line ~prefix:{|bash {"command":"make"}|})
+  in
+  print_endline "--- forget make";
+  forget (Some make);
+  show_allowed t agent;
+  print_endline "--- forget it again";
+  forget (Some make);
+  reload ();
+  run agent "build";
+  print_endline "--- forget all";
+  forget None;
+  show_allowed t agent;
+  forget None;
+  reload ();
+  run agent "build in parallel";
+  print_s [%message "" ~judged:(Queue.length judged : int)];
+  [%expect
+    {|
+    allowed c1 by deepseek/deepseek-flash: builds
+    bash {"command":"make"} -> ERROR make: *** No targets specified and no makefile found.  Stop.
+    allowed c2 by deepseek/deepseek-flash: builds in parallel
+    bash {"command":"make -j2"} -> ERROR make: *** No targets specified and no makefile found.  Stop.
+    allowed call: bash {"command":"make -j2"} on <host> in $DIR (by deepseek/deepseek-flash)
+    allowed call: bash {"command":"make"} on <host> in $DIR (by deepseek/deepseek-flash)
+    --- forget make
+    allowed call: bash {"command":"make -j2"} on <host> in $DIR (by deepseek/deepseek-flash)
+    --- forget it again
+    error: no remembered call is "bash {\"command\":\"make\"} on <host> in $DIR (by deepseek/deepseek-flash)": /permissions lists them
+    --- reloaded
+    allowed call: bash {"command":"make -j2"} on <host> in $DIR (by deepseek/deepseek-flash)
+    allowed c3 by deepseek/deepseek-flash: builds again
+    bash {"command":"make"} -> ERROR make: *** No targets specified and no makefile found.  Stop.
+    --- forget all
+    --- reloaded
+    allowed c4 by deepseek/deepseek-flash: builds in parallel again
+    bash {"command":"make -j2"} -> ERROR make: *** No targets specified and no makefile found.  Stop.
+    (judged 4)
+    |}]
+;;

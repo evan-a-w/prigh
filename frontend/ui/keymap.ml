@@ -89,7 +89,10 @@ let bindings =
       [ Key.ctrl 'w'; Key.alt Backspace ]
       Kill_word
       "delete the word before the cursor"
-  ; b [ Key.ctrl 'y' ] Yank "paste the most recent kill"
+  ; b
+      [ Key.ctrl 'y' ]
+      Yank
+      "paste the most recent kill (right after Ctrl+Z undid a paste: redo it)"
   ; b [ Key.alt (Char "y") ] Yank_pop "replace the last yank with an older kill"
   ; b
       [ Key.ctrl '_' ]
@@ -139,7 +142,11 @@ let bindings =
       Review_highlighted
       "/worktree: review the highlighted worktree's changes"
   ; b [ Key.ctrl 'x' ] Copy_last "copy the last assistant message"
-  ; b [ Key.ctrl 'z' ] Suspend "suspend to the shell"
+  ; b
+      [ Key.ctrl 'z' ]
+      Suspend
+      "suspend to the shell (right after a long paste's token went in or out: \
+       undo that)"
   ; b
       [ Key.alt (Char "l") ]
       Toggle_sidebar

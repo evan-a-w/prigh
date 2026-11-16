@@ -128,6 +128,12 @@ type t =
       { title : string
       ; text : string
       }
+  | Permissions of
+      { rules : string (** the mode and the rules *)
+      ; hint : string
+      }
+  (** [/permissions]: the calls smart mode remembered, from the state, come
+      between the two, each with a way to forget it *)
   | Pasted of int (** the composer's pasted text: view, insert, remove *)
   | Mcp_tools of Mcp_server.t (** a ready server's tools *)
   | Mcp_sign_in of

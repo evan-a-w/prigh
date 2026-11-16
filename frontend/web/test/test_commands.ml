@@ -46,6 +46,7 @@ let%expect_test "every command does something (none is unknown)" =
          | Prompt _ -> "path prompt"
          | Text { title; _ } -> "text: " ^ title
          | Control _ -> "control centre"
+         | Permissions _ -> "permissions dialog"
          | (Loading _ | Pulls _) as d ->
            sprintf
              "%s: %s"
@@ -91,7 +92,7 @@ let%expect_test "every command does something (none is unknown)" =
     /plan                      rpc set_mode
     /chat                      rpc set_mode
     /todos                     toast: No plan: the model has not made one (it makes one with update_plan).
-    /permissions               text: Permissions
+    /permissions               permissions dialog
     /notify                    toast: Notifications are on, but the browser has not been asked yet: /notify on asks it
     /memory                    Settings
     /instructions              Settings
@@ -232,6 +233,7 @@ let%expect_test "/help <command> and /hotkeys" =
     Enter / Alt+Enter (steering a subagent) send it a message: at its next step / when it ends its turn (its Steer button in the agents panel; /agents steer N TEXT sends one)
     Alt+↑ (steering a subagent) take its last queued message back
     Esc (steering a subagent) write to the main agent again
+    Ctrl+Z / ⌘+Z (in the message box) right after a long paste became a chip, or a chip was removed: undo that (otherwise the box's own undo); Ctrl+Shift+Z, ⌘+Shift+Z or Ctrl+Y redoes it
     Ctrl+Shift+V / ⌘+Shift+V (in the message box) paste a long text into the box as text; a plain paste of over 2,000 characters or 40 lines becomes a Pasted text chip, sent whole with the message (its dialog: Insert as text, Remove)
     Ctrl+Shift+O a new temporary session (/temporary): not saved or listed, deleted when you leave it; on the new-session screen, its Temporary chip
     Ctrl+Shift+F open or close the file browser (/files): ↑↓ select, Enter opens, Backspace goes up, F2 renames, Delete deletes, Esc closes

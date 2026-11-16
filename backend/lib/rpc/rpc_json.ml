@@ -593,6 +593,13 @@ let entry (e : Session.Entry.t) =
       ; "arguments", str call.arguments
       ; "by", str by
       ]
+    | Forget_allowed_call { call } ->
+      [ "kind", str "forget_allowed_call" ]
+      @ Option.value_map
+          call
+          ~default:[]
+          ~f:(fun (call : Allowed_call.Call.t) ->
+            [ "tool", str call.tool; "arguments", str call.arguments ])
     | Archived { archived } ->
       [ "kind", str "archived"
       ; ("archived", if archived then `True else `False)

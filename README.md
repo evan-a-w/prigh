@@ -763,13 +763,17 @@ A long paste (over 2,000 characters or 40 lines: a log, a stack trace)
 does not fill the composer: it becomes a **Pasted text #1** chip with its
 lines and size (× removes it; clicking it shows the text, with Remove and
 Insert as text). Ctrl+Shift+V (⌘+Shift+V) pastes it into the box as text
-instead. It goes to the model whole with the message, after what you
-typed, as a `<pasted_text name="Pasted text #1" lines="420">` block (no
+instead. Right after a chip comes or goes (a paste, its ×, Remove),
+Ctrl+Z (⌘+Z) undoes that and Ctrl+Shift+Z, ⌘+Shift+Z or Ctrl+Y redoes it;
+otherwise those keys are the box's own undo. It goes to the model whole
+with the message, after what you typed, as a
+`<pasted_text name="Pasted text #1" lines="420">` block (no
 tool or host needed; up to 2 MiB each: attach a larger one as a file), and
 the transcript shows it as one folded line that opens to the text. Stop
 or a failed send puts the chips back. The TUI does the same with a
 bracketed paste: a `[Pasted text #1 +420 lines]` token in the editor,
-which Backspace or Delete removes whole.
+which Backspace or Delete removes whole; right after one goes in or out,
+Ctrl+Z undoes that (instead of suspending) and Ctrl+Y redoes it.
 
 Transfers go through the backend, so they work on any tool host: the page
 asks over its signed-in connection for a one-time link (a random ticket,
@@ -852,7 +856,9 @@ on a Mac) sends the composer's text exactly as typed instead, and Esc
 closes the popup.
 `/session` is a dialog of the
 session's details and statistics; `/fork`, `/rewind` (with a confirmation)
-and `/tree` (the whole tree, branches indented) pick a message;
+and `/tree` (the whole tree, branches indented) pick a message (`/fork`
+puts it back in the composer to edit and resend, its pasted texts as chips
+(tokens in the TUI));
 `/scoped-models` is a checklist (Tab or a click checks a model, Enter
 saves); `/cd`, `/mkdir`, `/host`'s directory, `/export` and `/import` ask for a path
 with completions from the backend and keep the dialog open, with the error,
@@ -2116,7 +2122,7 @@ that no longer exists.
 | Ctrl+N | picker: toggle the named-only / logged-in-only filter |
 | Tab / Alt+A / Alt+T / Alt+D | `/sessions`: mark a session / archive or unarchive it / pin or unpin it / delete every archived one |
 | Ctrl+X | copy the last assistant message |
-| Ctrl+Z | suspend to the shell |
+| Ctrl+Z | suspend to the shell (right after a `[Pasted text #N]` token went in or out: undo that; Ctrl+Y redoes it) |
 | Shift+Tab | cycle subagent focus: main → agent 1 → … → main |
 | Alt+1…9 | focus agent N |
 | Alt+L | show or hide the agents sidebar (off by default; 120 columns and more) |
@@ -2914,7 +2920,7 @@ it.
 | `/plan [on\|off]` | toggle plan mode (read-only planning until you turn it off) |
 | `/chat [on\|off]` | toggle chat mode (a chat without the tool host until you turn it off) |
 | `/todos` | show the model's plan (its `update_plan` steps) |
-| `/permissions` | show the mode and the allow/ask/deny rules (config and this session), and the exact calls `smart` mode allowed this session (and the calls on other hosts you let run) |
+| `/permissions [forget N\|all]` | show the mode and the allow/ask/deny rules (config and this session), and the exact calls `smart` mode allowed this session (and the calls on other hosts you let run); `forget N` or `forget all` has them asked or judged again, and takes back the hosts they permitted (`all`: every other host) |
 | `/compact [instructions]` | summarise older messages to free context, focusing on the instructions |
 | `/trim [after\|undo\|show\|hide]` | drop everything before a message from the model's context (a picker, then a confirmation); `after`: everything after a message instead; `undo` brings the latest trim back, `show`/`hide` (TUI) unfold or fold the trimmed messages; see [Trimming the context](#trimming-the-context) |
 | `/delete [undo]` | drop a message from the transcript and the model's context (a picker, newest first; a reply goes with its tool results); `undo` brings the latest deletion back; see [Trimming the context](#trimming-the-context) |
@@ -3324,6 +3330,11 @@ In every mode a call on another machine (`on_host`) waits for you, even a
 read, until you name that machine in a message or let a call there run
 (which `/permissions` then lists among the allowed calls, and which lasts
 for the session); in `smart` mode the approval model decides it instead.
+Forgetting such a call in `/permissions` takes the machine back (unless
+another call you let run there or a message of yours naming it still
+permits it), and forgetting all of them takes back every other machine,
+whatever your messages so far named, until a later message names it or you
+let a call there run.
 
 A new session starts in the config's `approval_mode` (in chat mode over it
 with `default_chat_mode`: `/confirm chat` or Settings → New sessions →
@@ -3362,8 +3373,12 @@ and rules and plan mode still come first; an `ask` verdict and a deny are
 not remembered, so such a call is asked about again. The remembered calls
 are kept in the session's file (a reload or switching back keeps them, a
 new session starts without), shared with its subagents like its rules, and
-`/permissions` lists them. What the judge spends counts in the
-session's cost (`/session` shows approvals judged and their cost).
+`/permissions` lists them. To have one judged again, forget it: its Forget
+button in prigh-web's `/permissions` (or "Forget all"), or `/permissions
+forget N` (`/permissions forget all`) in the terminal; forgetting a call
+you let run on another machine also takes that machine back (`on_host`,
+above). What the judge spends
+counts in the session's cost (`/session` shows approvals judged and their cost).
 
 A confirmation offers: `y` allow once; `a` always allow, for the rest of the
 session, the rule shown (for `bash`, the program, with its subcommand for
