@@ -208,16 +208,16 @@ module Listing = struct
                | _ -> [])
           ; url = string_field json "url"
           ; oauth =
-              Option.bind (field json "oauth") ~f:(fun oauth ->
-                Option.map (string_field oauth "clientId") ~f:(fun client_id ->
-                  { Mcp_config.Oauth.client_id
-                  ; client_secret = string_field oauth "clientSecret"
-                  ; scopes =
-                      (match field oauth "scopes" with
-                       | Some (`Array items) ->
-                         Some (List.filter_map items ~f:Json.string)
-                       | _ -> None)
-                  }))
+              Option.map (field json "oauth") ~f:(fun oauth ->
+                { Mcp_config.Oauth.client_id = string_field oauth "clientId"
+                ; client_secret = string_field oauth "clientSecret"
+                ; client_name = string_field oauth "clientName"
+                ; scopes =
+                    (match field oauth "scopes" with
+                     | Some (`Array items) ->
+                       Some (List.filter_map items ~f:Json.string)
+                     | _ -> None)
+                })
           }
       | _ -> None
     in

@@ -3590,7 +3590,27 @@ you registered with it, in the server's config:
 ```
 
 (`clientSecret` and `scopes` are optional; the secret is masked like
-headers.) In prigh-web, **Sign in** (Settings → MCP servers, or Enter on the
+headers.)
+
+Some servers register only the clients they know: Figma's remote server
+(`https://mcp.figma.com/mcp`) answers 403 to any `client_name` not on its
+list. When registering as `prigh` is refused with 403, prigh registers as
+`Claude Code` instead, so Figma works with nothing configured: add it with
+`/mcp add figma https://mcp.figma.com/mcp` and sign in. To register under
+another name, give it as `clientName` (no `clientId` needed); prigh then
+also gives it as the client's name in the MCP `initialize`, and a server
+that refuses it says to set one it accepts:
+
+```json
+"design": { "type": "http", "url": "https://design.example.com/mcp",
+            "oauth": { "clientName": "A Known Client" } }
+```
+
+A server that issues a secret to a client that registered as public
+(Figma's does) gets it back with Basic authentication at its token
+endpoint.
+
+In prigh-web, **Sign in** (Settings → MCP servers, or Enter on the
 server in `/mcp`) opens the server's sign-in page in a new tab; the page it
 comes back to says you can close the tab, and the server connects in every
 client at once, showing **Signed in** and **Sign out**. In the terminal,
@@ -3612,10 +3632,6 @@ token before it expires and when the server rejects it; when that fails,
 the server needs a sign-in again. A server's own `Authorization` in
 `headers` wins over the sign-in. Without OAuth metadata, a 401 still says
 to add an `Authorization` header.
-
-Figma's remote server (`https://mcp.figma.com/mcp`) is an example of a
-server using this flow; it has not been tried with prigh and may only
-accept clients it knows.
 
 ### Testing
 

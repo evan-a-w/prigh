@@ -278,3 +278,52 @@ let%expect_test "default ports make the address lookup numeric" =
     ftp://example.com/z
     |}]
 ;;
+
+let%expect_test "a GET has no content-length (CloudFront refuses one)" =
+  run
+  @@ fun ~env ~sw ->
+  let server =
+    Server.start ~sw ~env ~handler:(fun (r : Server.Request.t) ->
+      let headers =
+        List.filter r.headers ~f:(fun (k, _) -> not (String.equal k "host"))
+      in
+      print_s
+        [%sexp (r.request_line : string), (headers : (string * string) list)];
+      Server.Reply.simple 200 "ok")
+  in
+  let fetch () =
+    match
+      Http.get
+        ~env
+        ~url:(Server.url server "/meta")
+        ~headers:[ "Accept", "application/json" ]
+        ()
+    with
+    | Ok (r, body) -> printf "%d %s\n" r.status body
+    | Error e -> print_endline (Http.Error.to_string e)
+  in
+  (* Twice: the second request reuses the connection. *)
+  fetch ();
+  fetch ();
+  [%expect
+    {|
+    ("GET /meta HTTP/1.1"
+     ((Accept application/json) (user-agent ocaml-cohttp/v6.3.0)))
+    200 ok
+    ("GET /meta HTTP/1.1"
+     ((Accept application/json) (user-agent ocaml-cohttp/v6.3.0)))
+    200 ok
+    |}];
+  (* A POST keeps it: without it a server would wait for a body. *)
+  (match
+     Http.post ~env ~url:(Server.url server "/empty") ~headers:[] ~body:"" ()
+   with
+   | Ok (r, _) -> printf "%d\n" r.status
+   | Error e -> print_endline (Http.Error.to_string e));
+  [%expect
+    {|
+    ("POST /empty HTTP/1.1"
+     ((user-agent ocaml-cohttp/v6.3.0) (content-length 0)))
+    200
+    |}]
+;;

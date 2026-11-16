@@ -7,11 +7,12 @@ open! Core
     sexps hide those values. *)
 
 (** The OAuth client to sign in with, for a server whose authorization
-    server does not register clients itself. *)
+    server does not register clients itself, or the name to register as. *)
 module Oauth : sig
   type t =
-    { client_id : string
+    { client_id : string option
     ; client_secret : string option
+    ; client_name : string option
     ; scopes : string list option
     }
   [@@deriving equal]
