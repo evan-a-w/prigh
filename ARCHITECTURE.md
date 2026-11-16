@@ -1233,6 +1233,15 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   under the default 600 s) the call is sent with the jobs' "no timeout",
   since the limit always comes first. A call finishing in time leaves no
   task and uses no id.
+  Before anything runs, `Tool_bash.run` asks `Polling_wait.check`
+  (lexical: self-matching `pgrep -f`/`pkill -f`, sleeping loops not under
+  a `timeout` of at most 120 s) and returns its refusal instead. Each
+  foreground run sets `PRIGH_BASH_CALL` to a fresh `Stray_processes`
+  marker; once the command has exited by itself, the processes still
+  carrying it in `/proc/PID/environ` are listed after the output (and so in
+  a job's report). `Background_tasks` records a subagent's current tool
+  call's start and every task's last output time (`Tool_start`,
+  `Tool_output`, job output) for `status_text`'s stall note.
   `Tool_jobs` has `job_status`, `job_output` (`lines`, `offset` from the
   end), `job_input` and `job_kill`. Below depth 0 the subagent controls are
   dropped and `bash` is `Tool_bash.subagent_tool` (whose `background`

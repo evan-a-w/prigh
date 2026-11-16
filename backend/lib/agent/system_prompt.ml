@@ -39,6 +39,20 @@ let job_output_note ~has =
   else ""
 ;;
 
+let no_detached_or_loops ~has =
+  sprintf
+    "- Never start processes with &, nohup, setsid or disown inside a \
+     command: nothing tracks them or tells you when they exit%s. Never wait \
+     in a shell loop (while ...; do sleep ...; done, or pgrep -f, which \
+     matches its own shell): bash refuses such loops unless they are under a \
+     timeout of at most %s (e.g. timeout 60 bash -c 'until curl -sf URL; do \
+     sleep 1; done' for a server). Wait %son a pid with timeout N tail \
+     --pid=PID -f /dev/null."
+    (if has "job_output" then " (use bash with background: true)" else "")
+    (Background_tasks.seconds_text Polling_wait.max_bounded_seconds)
+    (if has "job_output" then "for a job's exit report instead, or " else "")
+;;
+
 let subagent_waiting ~has =
   if not (has "bash")
   then []
@@ -50,6 +64,7 @@ let subagent_waiting ~has =
        blocks until it finishes (give it a timeout long enough; the default is \
        10 minutes). To wait for something to become ready (a server, a file), \
        use one foreground command that blocks until it is, with a timeout."
+    ; no_detached_or_loops ~has
     ]
     @ (if has "job_output"
        then
@@ -225,6 +240,7 @@ let base ?(chat = false) ~nix ~auto_background ~(role : Role.t) ~tools () =
                   installs, image builds, deployments) or that keep running \
                   (servers, watchers) go in the background: bash with \
                   background: true. Stop servers with job_kill when done."
+               ; no_detached_or_loops ~has
                ]
                @ Option.value_map auto_background ~default:[] ~f:(fun s ->
                  [ sprintf

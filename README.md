@@ -2385,6 +2385,25 @@ tells it never to sleep or poll either, but to keep working or end its turn
 waits for the agent's jobs and subagents, and the turns their reports
 start, before it exits.
 
+`bash` refuses commands that wait by polling, saying what to do instead
+(a job and its report; `timeout N tail --pid=PID -f /dev/null` for a
+process that is not a job): `pgrep -f`/`pkill -f` whose pattern matches
+the command's own text (the shell running it always matches, so `pgrep`
+never stops finding a process and `pkill` kills the shell; it suggests
+`'[n]ix build'`), a `while`/`until` loop that sleeps a second or more, and a
+`for` loop whose sleeps add up to more than 120 s. A loop under a `timeout`
+of at most 120 s (`timeout 60 bash -c 'until curl -sf URL; do sleep 1;
+done'`), or in a call whose own `timeout` is that short, runs. Processes a
+command leaves running when it finishes (`&`, `nohup`, `setsid`,
+`disown`) are listed after its output (pid and command): they are not
+jobs, nothing reports their exit, and the note says to use `background:
+true` instead. They are found by a variable (`PRIGH_BASH_CALL`) unique to
+the call in its environment, which they inherit, on Linux only.
+`subagent_status` shows how long a subagent has been inside its current
+tool call once it is a minute or more (`in it for 52m, no output for 50m`,
+and after 10 minutes without output that it may be stuck), and
+`job_status` how long a running job has had no output.
+
 The main agent never stalls on a long command.
 `auto_background_seconds` in `config.json` (default 30; `0` turns it off)
 is how long a foreground `bash` call of the main agent may run: one still

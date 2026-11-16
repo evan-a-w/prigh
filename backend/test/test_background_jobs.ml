@@ -885,3 +885,37 @@ let%expect_test
     state: running=false subagents=[] jobs=[]
     |}]
 ;;
+
+let%expect_test "status: how long a subagent's tool call or a job has been quiet" =
+  let show kind ~in_call ~quiet =
+    let now = 10_000. in
+    printf
+      "%-8s in_call=%-5s quiet=%-5s -> %S\n"
+      (match (kind : Background_tasks.Kind.t) with
+       | Subagent -> "subagent"
+       | Job -> "job")
+      (Option.value_map in_call ~default:"-" ~f:(sprintf "%.0f"))
+      (sprintf "%.0f" quiet)
+      (Background_tasks.For_testing.stall_text
+         ~kind
+         ~now
+         ~in_call_since:(Option.map in_call ~f:(fun s -> now -. s))
+         ~output_at:(now -. quiet))
+  in
+  show Subagent ~in_call:None ~quiet:5000.;
+  show Subagent ~in_call:(Some 30.) ~quiet:30.;
+  show Subagent ~in_call:(Some 90.) ~quiet:5.;
+  show Subagent ~in_call:(Some 3120.) ~quiet:3000.;
+  show Subagent ~in_call:(Some 7500.) ~quiet:7500.;
+  show Job ~in_call:None ~quiet:30.;
+  show Job ~in_call:None ~quiet:900.;
+  [%expect {|
+    subagent in_call=-     quiet=5000  -> ""
+    subagent in_call=30    quiet=30    -> ""
+    subagent in_call=90    quiet=5     -> ", in it for 1m"
+    subagent in_call=3120  quiet=3000  -> ", in it for 52m, no output for 50m: it may be stuck (subagent_message or subagent_cancel it)"
+    subagent in_call=7500  quiet=7500  -> ", in it for 2h05m, no output for 2h05m: it may be stuck (subagent_message or subagent_cancel it)"
+    job      in_call=-     quiet=30    -> ""
+    job      in_call=-     quiet=900   -> ", no output for 15m"
+    |}]
+;;

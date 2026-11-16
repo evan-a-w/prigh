@@ -269,3 +269,16 @@ val wait_all : t -> unit
 (** A table of every task of [kind]: id, state, elapsed seconds, label, and
     the last activity (subagents) or output size and last line (jobs). *)
 val status_text : t -> kind:Kind.t -> string
+
+module For_testing : sig
+  (** What {!status_text} adds to a running task's last activity: for a
+      subagent inside a tool call for a minute or more, how long, how long
+      without output, and after 10 minutes without output that it may be
+      stuck; for a job, how long without output (a minute or more). *)
+  val stall_text
+    :  kind:Kind.t
+    -> now:float
+    -> in_call_since:float option
+    -> output_at:float
+    -> string
+end
