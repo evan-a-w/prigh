@@ -108,7 +108,8 @@ val set_code_prompt : t -> (Prigh_ui.Server_link.Code_prompt.t -> unit) -> unit
     nothing when none is under way. *)
 val signin_code : t -> string option -> unit
 
-(** Connects and sends [hello]. A sign-in proxy's login is
+(** Connects and sends [hello]; meanwhile, when tools run here, starts the
+    tool host's worker ({!Prigh_client_unix.Tool_host.start}). A sign-in proxy's login is
     [Signin_required]: [relink] with [Browser_signin] gets past it; the
     proxy's cookie is sent with every connection to its address from then on
     and saved with the connection. *)
