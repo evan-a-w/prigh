@@ -189,6 +189,79 @@ const report = async label => {
   await screenshot(label);
 };
 
+// The editor is as tall as its lines with no scrollbar, a line of text
+// typed, pasted or left after deleting the others (a line is 22.5px on a
+// desktop: its scrollHeight, a whole number, can be a fraction short, which
+// showed a scrollbar), and with its text wrapped anew when its width
+// changes; it scrolls only once at its max-height.
+const editorHeight = async label => {
+  const state = () => page.evaluate(() => {
+    const e = document.getElementById("editor");
+    const s = getComputedStyle(e);
+    const lines = Math.round((e.scrollHeight - parseFloat(s.paddingTop) - parseFloat(s.paddingBottom)) / parseFloat(s.lineHeight));
+    const fits = Math.abs(e.offsetHeight - (lines * parseFloat(s.lineHeight) + parseFloat(s.paddingTop) + parseFloat(s.paddingBottom))) <= 1;
+    const capped = Math.abs(e.offsetHeight - parseFloat(s.maxHeight)) <= 1;
+    const overflow = e.scrollHeight > e.clientHeight + 1;
+    const scrollbar = e.offsetWidth > e.clientWidth || (s.overflowY !== "hidden" && e.scrollHeight > e.clientHeight);
+    return `${lines} line${lines === 1 ? "" : "s"}, ${capped ? "at its max-height" : fits ? "as tall" : `${e.offsetHeight}px tall`}`
+      + `, ${overflow ? "overflows" : "no overflow"}, ${scrollbar ? "a scrollbar" : "no scrollbar"}`;
+  });
+  const settle = () => page.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
+  const clear = async () => {
+    await page.keyboard.press("ControlOrMeta+a");
+    await page.keyboard.press("Backspace");
+    await settle();
+  };
+  section(label);
+  await composer().click();
+  await clear();
+  console.log(`empty: ${await state()}`);
+  await page.keyboard.type("currently my attic is hosted with");
+  await settle();
+  console.log(`a line typed: ${await state()}`);
+  await screenshot(`${label} a line typed`);
+  await clear();
+  await page.keyboard.insertText("currently my attic is hosted with");
+  await settle();
+  console.log(`a line pasted: ${await state()}`);
+  await clear();
+  await page.keyboard.type("one");
+  for (const line of ["two", "three"]) {
+    await page.keyboard.press("Shift+Enter");
+    await page.keyboard.type(line);
+  }
+  await settle();
+  console.log(`three lines typed: ${await state()}`);
+  for (let i = 0; i < "\ntwo\nthree".length; i++) await page.keyboard.press("Backspace");
+  await settle();
+  console.log(`deleted back to one: ${await state()}`);
+  await screenshot(`${label} deleted back to one`);
+  await clear();
+  await page.keyboard.insertText("words ".repeat(30).trim());
+  await settle();
+  const wide = await state();
+  await page.evaluate(() => { document.querySelector(".composer-stack").style.width = "60%"; });
+  await settle();
+  console.log(`a paragraph, narrower: more lines: ${await state() !== wide}, ${(await state()).replace(/^\d+ lines?, /, "")}`);
+  await page.evaluate(() => { document.querySelector(".composer-stack").style.width = ""; });
+  await settle();
+  console.log(`and wide again: as before: ${await state() === wide}`);
+  await clear();
+  await page.keyboard.insertText(Array.from({ length: 100 }, (_, i) => `line ${i + 1}`).join("\n"));
+  await settle();
+  console.log(`a hundred lines: ${(await state()).replace(/^\d+ lines, /, "")}`);
+  const scrolled = await page.evaluate(() => {
+    const e = document.getElementById("editor");
+    e.scrollTop = 0;
+    e.scrollTop = 1e6;
+    return e.scrollTop > 0 && Math.abs(e.scrollTop + e.clientHeight - e.scrollHeight) <= 1;
+  });
+  console.log(`  scrolls to its last line: ${scrolled}`);
+  await screenshot(`${label} a hundred lines`);
+  await clear();
+  console.log(`cleared: ${await state()}`);
+};
+
 try {
   await page.goto(url);
   await page.waitForSelector("form input[type=password]");
@@ -304,10 +377,18 @@ try {
     await screenshot(label);
   };
   await turn("a turn starts and ends: the status at the composer", "Checked.");
+  await editorHeight("the editor's height");
+  // As in the desktop app zoomed out to 90% (its page zoom; CSS zoom here).
+  await page.evaluate(() => { document.documentElement.style.zoom = "0.9"; });
+  await editorHeight("the editor's height at 90%");
+  await page.evaluate(() => { document.documentElement.style.zoom = ""; });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.waitForFunction(() => document.querySelector(".app.narrow:not(.sidebar-open)"));
   await page.waitForTimeout(400);
   await turn("a turn starts and ends on a phone: the status at the composer", "Checked again.");
+  await page.setViewportSize({ width: 320, height: 640 });
+  await page.waitForFunction(() => innerWidth === 320);
+  await editorHeight("the editor's height on a small phone");
 
   section("errors");
   console.log(errors.length ? errors.join("\n") : "none");

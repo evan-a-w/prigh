@@ -1207,10 +1207,43 @@ frames empty but still tall: 0
 activities shown: several, ending Ready
 places of the status's items: one
 layout shift in the status: none
+=== chromium: stability: the editor's height ===
+empty: 1 line, as tall, no overflow, no scrollbar
+a line typed: 1 line, as tall, no overflow, no scrollbar
+a line pasted: 1 line, as tall, no overflow, no scrollbar
+three lines typed: 3 lines, as tall, no overflow, no scrollbar
+deleted back to one: 1 line, as tall, no overflow, no scrollbar
+a paragraph, narrower: more lines: true, as tall, no overflow, no scrollbar
+and wide again: as before: true
+a hundred lines: at its max-height, overflows, a scrollbar
+  scrolls to its last line: true
+cleared: 1 line, as tall, no overflow, no scrollbar
+=== chromium: stability: the editor's height at 90% ===
+empty: 1 line, as tall, no overflow, no scrollbar
+a line typed: 1 line, as tall, no overflow, no scrollbar
+a line pasted: 1 line, as tall, no overflow, no scrollbar
+three lines typed: 3 lines, as tall, no overflow, no scrollbar
+deleted back to one: 1 line, as tall, no overflow, no scrollbar
+a paragraph, narrower: more lines: true, as tall, no overflow, no scrollbar
+and wide again: as before: true
+a hundred lines: at its max-height, overflows, a scrollbar
+  scrolls to its last line: true
+cleared: 1 line, as tall, no overflow, no scrollbar
 === chromium: stability: a turn starts and ends on a phone: the status at the composer ===
 activities shown: several, ending Ready
 places of the status's items: one
 layout shift in the status: none
+=== chromium: stability: the editor's height on a small phone ===
+empty: 1 line, as tall, no overflow, no scrollbar
+a line typed: 1 line, as tall, no overflow, no scrollbar
+a line pasted: 1 line, as tall, no overflow, no scrollbar
+three lines typed: 3 lines, as tall, no overflow, no scrollbar
+deleted back to one: 1 line, as tall, no overflow, no scrollbar
+a paragraph, narrower: more lines: true, at its max-height, overflows, a scrollbar
+and wide again: as before: true
+a hundred lines: at its max-height, overflows, a scrollbar
+  scrolls to its last line: true
+cleared: 1 line, as tall, no overflow, no scrollbar
 === chromium: stability: errors ===
 none
 === chromium: themes: first paint before choosing ===

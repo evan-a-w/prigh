@@ -672,23 +672,6 @@ module Result_ = struct
   let incoming t action = t.inject action
 end
 
-(* The editor grows with its text, up to the CSS max-height. Measuring it
-   from scratch (height auto, then its scrollHeight) lays the page out twice
-   per key; text added at its end can only make it taller, which reading
-   [scrollHeight] alone tells. *)
-let autosize ~grown =
-  Browser.after_render (fun () ->
-    Option.iter
-      (Dom_html.getElementById_coerce "editor" Dom_html.CoerceTo.textarea)
-      ~f:(fun el ->
-        if not grown then el##.style##.height := Js.string "auto";
-        if (not grown) || el##.scrollHeight > el##.clientHeight
-        then (
-          let height = Js.string (sprintf "%dpx" el##.scrollHeight) in
-          if not (Js.equals el##.style##.height height)
-          then el##.style##.height := height)))
-;;
-
 (* When the first of the tool confirmations on show appeared: an Enter typed
    just before must not answer it. *)
 let confirm_shown = ref Time_ns.epoch
@@ -744,10 +727,10 @@ let component client settings ~init ~current (local_ graph) =
                (layout model)
                (layout model')
              && App.Connection.equal model.connection model'.connection)
-        then autosize ~grown:false
+        then Editor_size.fit ~grown:false
         else if not (String.equal model.draft model'.draft)
         then
-          autosize
+          Editor_size.fit
             ~grown:(String.is_prefix model'.draft ~prefix:model.draft);
         sync_title model';
         List.iter commands ~f:(perform client settings ctx model');
@@ -1096,9 +1079,10 @@ let install_listeners ~schedule ~current =
         reveal_selected ();
         Js._false));
   set_visual_height ();
+  Editor_size.install ();
   Browser.on_viewport_change (fun () ->
     set_visual_height ();
-    autosize ~grown:false;
+    Editor_size.fit ~grown:false;
     schedule (App.Action.Set_narrow (narrow ()));
     schedule (Resize_widget.viewport ()));
   (* Ctrl+Shift+V (Cmd+Shift+V), "paste as plain text": a long paste goes in
