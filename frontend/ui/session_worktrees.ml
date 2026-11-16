@@ -35,7 +35,8 @@ let home ?(tilde = Fn.id) home =
   Option.map home ~f:(fun h -> "from " ^ P.Session_home.label h ~tilde)
 ;;
 
-let of_session ?(listings = []) ?cwd (s : P.Session_summary.t) =
+let of_session ?(listings = []) ?(unsettled = []) ?cwd (s : P.Session_summary.t)
+  =
   let cwd = Option.value cwd ~default:s.cwd in
   List.filter_map s.worktrees ~f:(fun w ->
     let listing =
@@ -48,7 +49,8 @@ let of_session ?(listings = []) ?cwd (s : P.Session_summary.t) =
           String.equal lw.path w.path))
     in
     match listing, listed with
-    | Some _, None -> None
+    | Some l, None when not (List.mem unsettled l.root ~equal:String.equal) ->
+      None
     | _ ->
       let worktree =
         match listed with

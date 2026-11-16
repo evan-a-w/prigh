@@ -3603,10 +3603,19 @@ terminal frontend and `web/` prigh-web, the browser one.
       (`Sidebar_view.place`) or directory, and under it its
       `Prigh_ui.Session_worktrees` nodes (changes and sync from the
       listings: `Worktrees`' of the open session's repository, and
-      `Repo_listings`, the other repositories the sessions' worktrees
-      belong to, each `list_worktrees {cwd: root}` asked once
-      (`Repo_worktrees`) and again once stale: a turn's end, a session's
-      worktrees changing, a worktree made or removed);
+      `Repo_listings`, a cache by repository root of the listings of the
+      repositories the sessions' worktrees belong to. It belongs to the
+      user, not the open session: a session switch keeps it (a user
+      switch empties it), the open session's own listing goes in too, so
+      a session's worktrees stay under it, with their changes, when the
+      user leaves it, and only the repositories of the sessions listed are
+      kept. Each other repository is asked once (`list_worktrees {cwd:
+      root}`, `Repo_worktrees`) and again once stale: a turn's end, a
+      session's worktrees changing (which also checks the open session's
+      listing again), a worktree made or removed; a stale listing shows
+      until its new one comes, and while it is stale a worktree it lacks
+      still shows (`Session_worktrees.of_session ~unsettled`: it may be
+      newer than the listing) rather than being taken for removed);
       `Model.worktree_folds` (`Worktree_folds`) decides whether a
       session's worktrees show (`Model.worktrees_shown`): a fold or
       unfold by hand (session id → when, in the `web.sidebar-folded` and

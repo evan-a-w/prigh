@@ -157,8 +157,8 @@ let%expect_test "the listing follows the directory and resets with the session" 
     (feat/login here ● 3 ↑2 ↓1)
     (feat/login here ● 3 ↑2 ↓1)
     |}];
-  (* Another session: the old one's listing (its changes, sync) goes; the
-     tree keeps the sessions' worktrees. *)
+  (* Another session: the sessions' rows keep the repository's listing
+     (their changes, sync) while the new session's own comes. *)
   state_event h ~session:"s2" ~cwd:"/elsewhere" ();
   section h;
   [%expect
@@ -185,8 +185,8 @@ let%expect_test "the listing follows the directory and resets with the session" 
      (tag (Worktrees (place  "s2\
                             \nbackend\
                             \n/elsewhere") (purpose (Sidebar 3)))))
-    (feat/login) (docs) (old)
-    (feat/login)
+    (feat/login ● 3 ↑2 ↓1) (docs) (old gone)
+    (feat/login ● 3 ↑2 ↓1)
     |}];
   H.reply h "list_worktrees" (listing ());
   section h;

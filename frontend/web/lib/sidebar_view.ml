@@ -511,6 +511,7 @@ let session
           ~listings:
             (Option.to_list (Worktrees.listing m.worktrees)
              @ Repo_listings.listings m.repo_worktrees)
+          ~unsettled:(Repo_listings.unsettled m.repo_worktrees)
           ~cwd
           s
     ; folded = not (Set.mem worktrees_shown s.id)

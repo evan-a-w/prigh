@@ -5115,6 +5115,7 @@ let user_switched (m : Model.t) (hello : Hello_reply.t) =
     ; paste_undo = None
     ; skills = Skills.empty
     ; worktrees = Worktrees.reset m.worktrees
+    ; repo_worktrees = Repo_listings.empty
     ; pending = In_flight.none
     ; session_gone = None
     ; want_temporary = None
@@ -6174,12 +6175,33 @@ let follow_worktrees (before : Model.t) ((m : Model.t), cmds) =
   let m =
     if turn_ended
     then { m with worktrees = Worktrees.stale ~quiet:true m.worktrees }
+    else if worktrees_changed
+    then { m with worktrees = Worktrees.sessions_moved m.worktrees }
     else m
   in
   let m =
     if turn_ended || worktrees_changed
     then { m with repo_worktrees = Repo_listings.stale m.repo_worktrees }
     else m
+  in
+  let m =
+    if phys_equal before.sessions m.sessions
+    then m
+    else (
+      let own =
+        Option.value_map
+          (Worktrees.listing m.worktrees)
+          ~default:[]
+          ~f:(fun l -> [ l.root ])
+      in
+      { m with
+        repo_worktrees =
+          Repo_listings.keep
+            m.repo_worktrees
+            ~roots:
+              (String.Set.of_list
+                 (own @ Prigh_ui.Session_worktrees.roots m.sessions))
+      })
   in
   match m.connection, m.state with
   | Connected, Some state when Option.is_none m.session_gone ->
@@ -9471,6 +9493,16 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
       let m =
         { m with worktrees = Worktrees.loaded m.worktrees ~place ?seq listing }
       in
+      (* Kept for its repository's sessions' rows when the user leaves. *)
+      let m =
+        match Worktrees.listing m.worktrees with
+        | Some shown when phys_equal shown listing ->
+          { m with
+            repo_worktrees =
+              Repo_listings.loaded m.repo_worktrees ~root:listing.root listing
+          }
+        | Some _ | None -> m
+      in
       match purpose with
       | Sidebar _ ->
         if String.is_prefix m.draft ~prefix:"/worktree "
@@ -9525,7 +9557,7 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
   | Repo_worktrees root, Ok json ->
     decode m json Worktree.Listing.of_json ~f:(fun listing ->
       ( { m with
-          repo_worktrees = Repo_listings.loaded m.repo_worktrees ~root listing
+          repo_worktrees = Repo_listings.answered m.repo_worktrees ~root listing
         }
       , [] ))
   | Worktree_removed _, Ok json ->
