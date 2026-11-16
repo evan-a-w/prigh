@@ -653,8 +653,11 @@ proxy that keeps dead sockets open does not keep their work alive.
 Every push to `main` builds prigh and everything it is built from and
 pushes them to the Attic cache `prigh` (`.github/workflows/attic.yml`), so
 when `flake.lock`, `nix/` or the `*.opam`/`dune-project` files change, the
-new dependencies are cached once that run finishes. To push them by hand,
-from a machine with Nix, enough RAM and a push token (`attic login`):
+new dependencies are cached once that run finishes. Only the build fails a
+run: an upload that fails even after retries (atticd or its storage slow,
+a timeout) is a warning on the run, and the next run pushes what is
+missing. To push them by hand, from a machine with Nix, enough RAM and a
+push token (`attic login`):
 
 ```
 nix build --no-link --print-out-paths path:.#frontend.inputDerivation path:.#backend.inputDerivation \
