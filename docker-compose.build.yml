@@ -1,0 +1,19 @@
+# Builds the image from this checkout instead of pulling the published one:
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+# or COMPOSE_FILE=docker-compose.yml:docker-compose.build.yml in .env. See
+# DOCKER.md, "Building from source".
+services:
+  prigh:
+    build:
+      context: .
+      args:
+        EXTRA_APT_PACKAGES: ${PRIGH_EXTRA_APT_PACKAGES:-}
+        PRIGH_UID: ${PRIGH_UID:-1000}
+        PRIGH_GID: ${PRIGH_GID:-1000}
+        NIX_SUBSTITUTER: ${PRIGH_NIX_SUBSTITUTER-https://attic.caduc.co/prigh}
+        NIX_SUBSTITUTER_KEY: ${PRIGH_NIX_SUBSTITUTER_KEY:-prigh:n6wPXDyh+4CS5uoNgXQ3QvKjOSLE7ED87qIiTSvih1A=}
+        PREFETCH_DEPS: ${PRIGH_PREFETCH_DEPS:-0}
+    image: prigh:local
+    # The image is only ever built here, never pulled: without this, "docker
+    # compose pull" (Portainer's "Re-pull image and redeploy") fails on it.
+    pull_policy: build

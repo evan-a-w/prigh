@@ -356,6 +356,69 @@ EOF
 	pd PRIGH_TOKEN=tok PRIGH_MODE=,
 	ln -s /home/prigh "$r/home/default"
 	pd PRIGH_TOKEN=tok
+
+	fetch_tests
+}
+
+# A fake nix and nix-store for fetch-prigh.sh: they print what they are asked
+# to do. The binary caches have the paths in $FAKE_CACHED; $FAKE_CORRUPT
+# names a path whose download does not match its hash.
+fake_nix() {
+	mkdir -p "$work/bin"
+	cat >"$work/bin/nix" <<'EOF'
+#!/usr/bin/env bash
+echo "+ nix $*" >&2
+last=${*: -1}
+case "$1 $2" in
+eval\ --raw)
+	name=${last##*#}
+	printf '/nix/store/%s-%s' "${name%.outPath}" "${name%.outPath}" ;;
+store\ verify) [[ " $FAKE_CACHED " == *" $last "* ]] ;;
+path-info\ --store) printf '{"%s":{"narHash":"sha256-%s","narSize":3145728}}' "$last" "${last##*/}" ;;
+store\ dump-path)
+	if [ "$last" = "$FAKE_CORRUPT" ]; then echo garbage; else echo "${last##*/}"; fi ;;
+hash\ file) echo "sha256-$(cat "$last")" ;;
+build\ --dry-run)
+	echo "these $(($# - 2)) derivations will be built:"
+	for t in "${@:3}"; do echo "  /nix/store/drv-${t##*#}.drv"; done
+	echo "these 500 paths will be fetched (3.0 GiB download, 10.1 GiB unpacked):" ;;
+build\ --out-link) mkdir -p "$3" ;;
+esac
+EOF
+	cat >"$work/bin/nix-store" <<'EOF'
+#!/usr/bin/env bash
+echo "+ nix-store $* <$(cat)" >&2
+mkdir -p "$2"
+EOF
+	chmod +x "$work/bin/nix" "$work/bin/nix-store"
+}
+
+# fetch [VAR=VALUE]...: fetch-prigh.sh with the fake nix, then what it left in
+# its output directory.
+fetch() {
+	local out status
+	rm -rf "$work/out"
+	echo "\$ $* fetch-prigh.sh"
+	out=$(env -i PATH="$work/bin:$PATH" PRIGH_SRC=/src PRIGH_OUT="$work/out" \
+		NIX_SUBSTITUTER="https://cache.example https://attic.example" "$@" \
+		bash "$here/fetch-prigh.sh" 2>&1) && status=0 || status=$?
+	printf '%s\n' "$out" | sed -e "s|$work|WORK|g"
+	[ "$status" = 0 ] || echo "[exit $status]"
+	echo "--- out: $(cd "$work/out" && echo *)"
+}
+
+fetch_tests() {
+	fake_nix
+	section "image build: the binary cache has backend and frontend"
+	fetch FAKE_CACHED="/nix/store/backend-backend /nix/store/frontend-frontend"
+	section "image build: the cache lacks the frontend"
+	fetch FAKE_CACHED=/nix/store/backend-backend
+	section "image build: REQUIRE_CACHED=1 and the cache lacks both"
+	fetch REQUIRE_CACHED=1
+	section "image build: no binary cache"
+	fetch NIX_SUBSTITUTER=
+	section "image build: a download that does not match its hash"
+	fetch FAKE_CACHED=/nix/store/backend-backend FAKE_CORRUPT=/nix/store/backend-backend
 }
 
 actual="$work/actual"

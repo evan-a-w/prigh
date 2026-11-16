@@ -729,3 +729,78 @@ $ PRIGH_TOKEN=tok prigh-docker
 + chmod 700 /home/prigh
 prigh-docker: /home/default is a symlink
 [exit 2]
+
+=== image build: the binary cache has backend and frontend
+$ FAKE_CACHED=/nix/store/backend-backend /nix/store/frontend-frontend fetch-prigh.sh
++ nix eval --raw path:/src#backend.outPath
++ nix eval --raw path:/src#frontend.outPath
++ nix path-info --store https://cache.example --json --json-format 1 /nix/store/backend-backend
+prigh: fetching backend /nix/store/backend-backend (3 MiB) from https://cache.example, without its build closure
++ nix store dump-path --store https://cache.example /nix/store/backend-backend
++ nix hash file --sri --type sha256 WORK/out/backend.nar
++ nix-store --restore WORK/out/backend <backend-backend
++ nix path-info --store https://cache.example --json --json-format 1 /nix/store/frontend-frontend
+prigh: fetching frontend /nix/store/frontend-frontend (3 MiB) from https://cache.example, without its build closure
++ nix store dump-path --store https://cache.example /nix/store/frontend-frontend
++ nix hash file --sri --type sha256 WORK/out/frontend.nar
++ nix-store --restore WORK/out/frontend <frontend-frontend
+--- out: backend frontend
+
+=== image build: the cache lacks the frontend
+$ FAKE_CACHED=/nix/store/backend-backend fetch-prigh.sh
++ nix eval --raw path:/src#backend.outPath
++ nix eval --raw path:/src#frontend.outPath
++ nix path-info --store https://cache.example --json --json-format 1 /nix/store/backend-backend
+prigh: fetching backend /nix/store/backend-backend (3 MiB) from https://cache.example, without its build closure
++ nix store dump-path --store https://cache.example /nix/store/backend-backend
++ nix hash file --sri --type sha256 WORK/out/backend.nar
++ nix-store --restore WORK/out/backend <backend-backend
+prigh: WARNING: no binary cache (https://cache.example https://attic.example) has frontend (/nix/store/frontend-frontend): compiling it from source, and the toolchain too where the cache lacks it (an hour or more; PREFETCH_DEPS=1 keeps the toolchain in a layer of its own)
++ nix build --dry-run path:/src#frontend
+these 1 derivations will be built:
+  /nix/store/drv-frontend.drv
+these 500 paths will be fetched (3.0 GiB download, 10.1 GiB unpacked):
++ nix build --out-link WORK/out/frontend path:/src#frontend
+--- out: backend frontend
+
+=== image build: REQUIRE_CACHED=1 and the cache lacks both
+$ REQUIRE_CACHED=1 fetch-prigh.sh
++ nix eval --raw path:/src#backend.outPath
++ nix eval --raw path:/src#frontend.outPath
+prigh: WARNING: no binary cache (https://cache.example https://attic.example) has backend (/nix/store/backend-backend): compiling it from source, and the toolchain too where the cache lacks it (an hour or more; PREFETCH_DEPS=1 keeps the toolchain in a layer of its own)
+prigh: WARNING: no binary cache (https://cache.example https://attic.example) has frontend (/nix/store/frontend-frontend): compiling it from source, and the toolchain too where the cache lacks it (an hour or more; PREFETCH_DEPS=1 keeps the toolchain in a layer of its own)
++ nix build --dry-run path:/src#backend path:/src#frontend
+these 2 derivations will be built:
+  /nix/store/drv-backend.drv
+  /nix/store/drv-frontend.drv
+these 500 paths will be fetched (3.0 GiB download, 10.1 GiB unpacked):
+prigh: REQUIRE_CACHED=1: stopping instead of compiling
+[exit 1]
+--- out: *
+
+=== image build: no binary cache
+$ NIX_SUBSTITUTER= fetch-prigh.sh
++ nix eval --raw path:/src#backend.outPath
++ nix eval --raw path:/src#frontend.outPath
+prigh: WARNING: no binary cache (none) has backend (/nix/store/backend-backend): compiling it from source, and the toolchain too where the cache lacks it (an hour or more; PREFETCH_DEPS=1 keeps the toolchain in a layer of its own)
+prigh: WARNING: no binary cache (none) has frontend (/nix/store/frontend-frontend): compiling it from source, and the toolchain too where the cache lacks it (an hour or more; PREFETCH_DEPS=1 keeps the toolchain in a layer of its own)
++ nix build --dry-run path:/src#backend path:/src#frontend
+these 2 derivations will be built:
+  /nix/store/drv-backend.drv
+  /nix/store/drv-frontend.drv
+these 500 paths will be fetched (3.0 GiB download, 10.1 GiB unpacked):
++ nix build --out-link WORK/out/backend path:/src#backend
++ nix build --out-link WORK/out/frontend path:/src#frontend
+--- out: backend frontend
+
+=== image build: a download that does not match its hash
+$ FAKE_CACHED=/nix/store/backend-backend FAKE_CORRUPT=/nix/store/backend-backend fetch-prigh.sh
++ nix eval --raw path:/src#backend.outPath
++ nix eval --raw path:/src#frontend.outPath
++ nix path-info --store https://cache.example --json --json-format 1 /nix/store/backend-backend
+prigh: fetching backend /nix/store/backend-backend (3 MiB) from https://cache.example, without its build closure
++ nix store dump-path --store https://cache.example /nix/store/backend-backend
++ nix hash file --sri --type sha256 WORK/out/backend.nar
+prigh: /nix/store/backend-backend from https://cache.example has hash sha256-garbage, expected sha256-backend-backend
+[exit 1]
+--- out: backend.nar

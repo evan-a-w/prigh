@@ -13,40 +13,88 @@ after startup. Agents install the tools they need with Nix, into a store
 shared by all users. See [Users](#users), [Installing tools](#installing-tools)
 and [Isolation](#isolation).
 
-## Portainer
+## The image
 
-1. **Stacks → Add stack → Repository**. Fill in the repository URL, the
-   reference (e.g. `refs/heads/docker`) and the compose path
-   `docker-compose.yml`.
-2. Under **Environment variables**, set at least `PRIGH_TOKEN`, a long
-   random secret (`openssl rand -hex 32`), or `PRIGH_TOKENS` for several
-   users (see [Users](#users)).
-3. **Deploy the stack**. Portainer clones the repository and builds the
-   image.
-4. Open `http://<docker-host>:7790/`, sign in (with `PRIGH_TOKEN` the user
-   is `default` and the token is the password), and `/login` to a provider
-   (see [Logging in](#logging-in)).
+CI publishes the image for every commit of `main` to
+`ghcr.io/evan-a-w/prigh` (`.github/workflows/docker-image.yml`, once the
+[binary cache](#binary-cache) has that commit): the tags `main` and
+`latest` follow `main`, and each commit's short sha (`:e9c8b23`) pins it.
+`docker-compose.yml` runs `${PRIGH_IMAGE:-ghcr.io/evan-a-w/prigh:main}`
+with `pull_policy: always`, so every `docker compose up` (and Portainer's
+redeploy) checks for a newer image, and updating is a download of the
+layers that changed: usually one of a few hundred MB.
 
-**The first build downloads a few GB.** The OxCaml toolchain and packages,
-and prigh itself as built from `main`, come from the binary cache
-`attic.caduc.co/prigh` instead of being compiled: CI pushes them on every
-push to `main` (see [Binary cache](#binary-cache)), so building a commit of
-`main` compiles nothing. Without the cache, compiling them takes an hour or
-more and over 8 GB of RAM. Later builds reuse the cached dependency layer whenever
-`flake.nix`, `flake.lock`, `nix/` and the `*.opam`/`dune-project` files
-are unchanged. In that case only prigh itself is rebuilt, which takes a
-few minutes. Redeploying with "Re-pull image and redeploy" (or the
-GitOps auto-update) rebuilds from the new commit: the image `prigh:local`
-has `pull_policy: build`, so the pull step skips it instead of looking for
-it in a registry.
+The package must be public for anonymous pulls: whoever owns it makes it
+so once, on GitHub under **Packages → prigh → Package settings → Change
+visibility**. Until then, `docker login ghcr.io` (a personal access token
+with `read:packages`) on the Docker host.
+
+A compose file of your own that builds from the repository (`build:
+https://github.com/evan-a-w/prigh.git#main` with `pull_policy: build`)
+rebuilds at every `up`; replace its `build:` with `image:
+ghcr.io/evan-a-w/prigh:main` and `pull_policy: always` (or run `docker
+compose pull` before `up`) to update by pulling instead.
 
 ## Docker Compose
 
 ```
 export PRIGH_TOKEN=$(openssl rand -hex 32)   # or put these in a .env file next to docker-compose.yml
-docker compose up -d --build
+docker compose up -d
 docker compose logs -f
 ```
+
+To update:
+
+```
+docker compose pull && docker compose up -d
+```
+
+(with the default `PRIGH_PULL_POLICY=always`, `docker compose up -d` alone
+pulls too). The volumes, and so users, logins, sessions and installed
+tools, are kept.
+
+### Building from source
+
+`docker-compose.build.yml` builds the image from the checkout (tagged
+`prigh:local`, never pulled) instead, with the build arguments (`PRIGH_UID`,
+`PRIGH_EXTRA_APT_PACKAGES`, … marked "(build)" [below](#environment-variables)):
+
+```
+docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+# or once, in .env: COMPOSE_FILE=docker-compose.yml:docker-compose.build.yml
+```
+
+A build of a commit of `main` downloads prigh's backend and frontend from
+the binary cache `attic.caduc.co/prigh` (a few hundred MB, without the
+toolchain they were built with) and compiles nothing; the build prints
+what it fetches (`prigh: fetching backend ...`), and before compiling what
+the cache lacks (a branch, or `main` before its attic run finished) it
+warns (`prigh: WARNING: no binary cache ... has frontend ...`) and prints
+what that builds and fetches. Without the cache,
+compiling the OxCaml toolchain and packages takes an hour or more and over
+8 GB of RAM. When building a branch repeatedly, set `PRIGH_PREFETCH_DEPS=1`:
+the toolchain (several GB, from the cache when it has it) is then built in
+layers of its own from `flake.nix`, `flake.lock`, `nix/` and the
+`*.opam`/`dune-project` files, which later builds reuse while those are
+unchanged (and while Docker's build cache keeps them). By default that step
+is skipped, since prigh itself is cached and needs none of it.
+
+## Portainer
+
+1. **Stacks → Add stack → Repository**. Fill in the repository URL, the
+   reference (e.g. `refs/heads/main`) and the compose path
+   `docker-compose.yml` (add `docker-compose.build.yml` under additional
+   paths to build from source instead).
+2. Under **Environment variables**, set at least `PRIGH_TOKEN`, a long
+   random secret (`openssl rand -hex 32`), or `PRIGH_TOKENS` for several
+   users (see [Users](#users)).
+3. **Deploy the stack**. Portainer pulls the image.
+4. Open `http://<docker-host>:7790/`, sign in (with `PRIGH_TOKEN` the user
+   is `default` and the token is the password), and `/login` to a provider
+   (see [Logging in](#logging-in)).
+
+Redeploying with "Re-pull image and redeploy" (or the GitOps auto-update)
+pulls the new image.
 
 ## Modes
 
@@ -145,7 +193,7 @@ and `>_` terminal:
 ```
 prigh tool-host -connect <docker-host>:7790 -user <name> -token <their token> -cwd ~/proj
 # or, with the tools themselves in a throwaway container on that machine:
-docker run --rm -it -v "$PWD:/work" -w /work <image> prigh tool-host -connect <docker-host>:7790 -user <name> -token <their token> -cwd /work
+docker run --rm -it -v "$PWD:/work" -w /work ghcr.io/evan-a-w/prigh:main prigh tool-host -connect <docker-host>:7790 -user <name> -token <their token> -cwd /work
 ```
 
 Then `/host` in the web UI (or TUI) picks it. A TUI started with
@@ -180,6 +228,9 @@ user, `default`.
 | `PRIGH_GH_TOKENS` | – | per-user GitHub tokens, `name=token,...` |
 | `PRIGH_GITHUB_CLIENT_ID` | – | client id of your GitHub OAuth app (with Device Flow enabled), for `/login github` and prigh-web's Git hosting settings (README: Git hosting) |
 | `PRIGH_GIT_NAME`, `PRIGH_GIT_EMAIL` | – | commit author written to a user's `~/.gitconfig` at start if it has none yet |
+| `PRIGH_IMAGE` | `ghcr.io/evan-a-w/prigh:main` | the image to run (e.g. `:<short sha>` to pin a commit); not used when building from source |
+| `PRIGH_PULL_POLICY` | `always` | compose's `pull_policy` for it: `always` checks for a newer image at every `up`, `missing` only pulls with `docker compose pull` |
+| `PRIGH_PREFETCH_DEPS` | `0` | (build) `1`: build the OxCaml toolchain in layers of its own first (see [Building from source](#building-from-source)) |
 | `PRIGH_UID`, `PRIGH_GID` | 1000 | (build) uid/gid of the `prigh` service user. `/home/prigh` is chowned to it at start if it differs |
 | `PRIGH_NIX_SUBSTITUTER`, `PRIGH_NIX_SUBSTITUTER_KEY` | `https://attic.caduc.co/prigh` and its key | (build) the Nix binary caches, space-separated (the keys too). Set the substituter to an empty value to compile everything |
 | `PRIGH_EXTRA_APT_PACKAGES` | – | (build) extra Debian packages baked into the image, e.g. `python3 build-essential` |
@@ -665,13 +716,24 @@ nix build --no-link --print-out-paths path:.#frontend.inputDerivation path:.#bac
 ```
 
 Anything missing from the cache is compiled, so a stale cache makes the
-build slower but does not break it.
+build slower but does not break it. When that workflow succeeds on `main`,
+`.github/workflows/docker-image.yml` builds the image from the same commit
+(downloading prigh from the cache, with `REQUIRE_CACHED=1`) and pushes it
+to `ghcr.io/evan-a-w/prigh`; it can also be run by hand (Actions →
+docker-image → Run workflow) for main or a branch (a branch gets only its
+short sha tag).
 
 ## How the image is built
 
-1. A `nixos/nix` stage builds `.#backend` and `.#frontend` from the flake. It
-   first builds only their dependencies, from a copy of the files that
-   determine them, so that layer stays cached. It then keeps just the two
+1. A `nixos/nix` stage gets `.#backend` and `.#frontend` of the flake
+   (`docker/fetch-prigh.sh`): one the binary cache has (signed by a trusted
+   key) is downloaded as that store path alone, checked against its hash
+   and unpacked, without its closure (which holds the whole OxCaml
+   toolchain, ~3 GB to download); one it lacks is built, after a warning
+   and `nix build --dry-run`'s plan (`REQUIRE_CACHED=1`, as CI sets, fails
+   instead). With `PREFETCH_DEPS=1` it first builds only their
+   dependencies, from a copy of the files that determine them, so that
+   layer stays cached. It then keeps just the two
    binaries, prigh-web's site and, as the Nix seed, the few store paths the
    binaries link against (glibc, gmp) plus the `nix` of the `nixos/nix`
    image with its closure and their database registration (`nix-store

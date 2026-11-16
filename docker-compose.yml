@@ -1,22 +1,19 @@
 # prigh as a Docker Compose / Portainer stack. Configuration is through
 # environment variables (Portainer: "Environment variables" on the stack);
 # see DOCKER.md for all of them.
+#
+# This runs the image CI publishes for every commit of main. To build it from
+# source instead, add docker-compose.build.yml (COMPOSE_FILE in .env:
+# docker-compose.yml:docker-compose.build.yml).
 name: prigh
 
 services:
   prigh:
-    build:
-      context: .
-      args:
-        EXTRA_APT_PACKAGES: ${PRIGH_EXTRA_APT_PACKAGES:-}
-        PRIGH_UID: ${PRIGH_UID:-1000}
-        PRIGH_GID: ${PRIGH_GID:-1000}
-        NIX_SUBSTITUTER: ${PRIGH_NIX_SUBSTITUTER-https://attic.caduc.co/prigh}
-        NIX_SUBSTITUTER_KEY: ${PRIGH_NIX_SUBSTITUTER_KEY:-prigh:n6wPXDyh+4CS5uoNgXQ3QvKjOSLE7ED87qIiTSvih1A=}
-    image: prigh:local
-    # The image is only ever built here, never pulled: without this, "docker
-    # compose pull" (Portainer's "Re-pull image and redeploy") fails on it.
-    pull_policy: build
+    # :main (or :latest) follows main; a commit's short sha pins it.
+    image: ${PRIGH_IMAGE:-ghcr.io/evan-a-w/prigh:main}
+    # Every "up" checks for a newer image (a manifest lookup when there is
+    # none), so redeploying is updating.
+    pull_policy: ${PRIGH_PULL_POLICY:-always}
     restart: unless-stopped
     environment:
       PRIGH_MODE: ${PRIGH_MODE:-web}
