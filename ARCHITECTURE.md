@@ -160,7 +160,8 @@ update it". A tool an older host does not know (`unknown host tool`) gets
 the same advice appended.
 A tool host started with `-computer` (`prigh tool-host`, `prigh web`'s and
 `prigh desktop`'s through `Web_connect`) probes `prigh-computer --probe`
-once (`Computer_helper.enable`) and, when there is a screen it can drive,
+once, before its `hello` (`prigh desktop` in the background, so its page
+does not wait) (`Computer_helper.enable`) and, when there is a screen it can drive,
 adds the `computer` feature and `hello`'s `computer` (a `Computer_info`:
 backend, real size, scale, the screenshots' scaled size). `Rpc_server`
 keeps it only with the feature (`Agent.Host.computer`; `hosts[].computer`
@@ -1626,8 +1627,8 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   session (`Resume_at`; `None` when it runs or ends): an agent created for
   (or switched to) the session arms it again while its time is still to
   come, and drops it otherwise; `Rpc_server.restore_resumes` (run by
-  `start_background`, which `main` calls for each server at startup, once
-  the server serves) loads every session whose recorded resume is to
+  `start_background`, which `main` calls for each server at startup; it
+  starts once a request has been answered, or after a quiet second) loads every session whose recorded resume is to
   come, listing them from the cached summaries. When the timer fires on a session whose file was
   deleted meanwhile (`Session.gone`), a notice says so and nothing runs.
   `Rpc_server` keeps the agent loaded while one is scheduled.
@@ -2301,8 +2302,10 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   minute apart by searches, read lazily on first use; a file that is torn,
   corrupt or of another version is ignored and rebuilt). Each server
   brings it up to date as it starts (`start_background`: after resuming
-  the sessions due to resume, in a fiber that first lets the server serve,
-  then yields after each session; a new process reads only the sessions
+  the sessions due to resume, in a fiber that waits until the server has
+  answered a request (or a second has passed with none), so that a client
+  starting up waits for neither, then yields after each session (the
+  resumes' listing too); a new process reads only the sessions
   that changed since the file was written: 300 sessions, 8.1 s → 10 ms),
   and a search meanwhile waits for it), `set_session_name`,
   `delete_session`, `delete_sessions`, `delete_archived`, `set_archived`,
@@ -2606,7 +2609,10 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   JSON carrying the run's key (from the URL's `#desktop=KEY`; 403
   otherwise); `connect` runs `Web_connect.Check` and, when the backend
   accepts, saves the connection, starts the tool host
-  (`Web_connect.start_tool_host`) and switches the routes to `prigh web`'s
+  (`Web_connect.start_tool_host`, in a fiber of its own: the page never
+  waits for it, and picks the host up when it appears as it does any
+  host; under `-computer` it first waits for the screen probe, which the
+  CLI runs in the background as the site starts) and switches the routes to `prigh web`'s
   (`Web_proxy`, the handoff). An address without TLS to another machine
   is refused until the request confirms it (`"plaintext": true`, the
   form's "Connect without encryption"). `run` returns `Quit`,
@@ -2827,7 +2833,8 @@ terminal frontend and `web/` prigh-web, the browser one.
   certificates checked against the system's CAs via `ca-certs`) for
   `wss`; both over `Channel` (a TCP byte stream with keepalive). The
   tests' servers and throwaway CA are in `client/unix/testing/` — and
-  `Tool_host` (spawns `prigh tool-host` lazily and proxies
+  `Tool_host` (spawns `prigh tool-host` as the TUI connects, in the
+  background, else at the first use, and proxies
   `Tool_exec`/`Tool_exec_cancel` events to it and its `output`/`result`
   lines back as `tool_exec_*` requests, a result's `images` verbatim) and
   `Host_id` (the machine's tool host id in `~/.prigh/host-id`, sent in

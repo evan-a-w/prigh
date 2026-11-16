@@ -1443,7 +1443,11 @@ Without Home Manager, `nix profile install github:evan-a-w/prigh#prigh-desktop`
 The repository's CI builds installers too (the `desktop` workflow's
 artifacts: `.deb`/`.AppImage`, `.dmg`, `.msi`/`.exe`); those contain only
 the app, which then runs the `prigh` on the PATH (as the login shell sets
-it), so install prigh as well.
+it), so install prigh as well. The login shell's PATH is cached (in the
+app's cache directory, `login-env.json`): a launch uses the cache at once
+and runs the shell in the background for the next one, so after changing
+the PATH it takes one launch to apply, or start the app with
+`PRIGH_DESKTOP_REFRESH_ENV=1` to wait for the shell.
 
 - **The webview** (`webview`, or `auto` without a browser): WKWebView
   (Safari's engine) on macOS, WebView2 (Edge's Chromium) on Windows,
