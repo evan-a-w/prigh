@@ -802,3 +802,58 @@ let%expect_test "a subagent's call is covered by the same call allowed earlier" 
     (judged 1)
     |}]
 ;;
+
+let%expect_test
+    "calls the mode allows by itself build nothing for the approval model"
+  =
+  let call ~id name args =
+    Reply.tool_call ~id ~name ~arguments:(Jsonaf.to_string (`Object args)) ()
+  in
+  with_agent
+    ~judge:[ allow "runs the tests" ]
+    [ call ~id:"r1" "read" [ "path", `String "notes.txt" ]
+    ; call ~id:"r2" "read" [ "path", `String "notes~" ]
+    ; bash ~id:"c1" "make test"
+    ; Reply.text "done"
+    ]
+  @@ fun t agent judged ->
+  write t "notes.txt" "hello";
+  write t "notes~" "its backup";
+  run agent "look around, then run the tests";
+  print_s
+    [%message
+      ""
+        ~judge_requests:(Queue.length judged : int)
+        ~judge_inputs:(Agent.For_testing.judge_inputs agent : int)];
+  [%expect
+    {|
+    read {"path":"notes.txt"} -> hello
+    read {"path":"notes~"} -> its backup
+    allowed c1 by deepseek/deepseek-flash: runs the tests
+    bash {"command":"make test"} -> ERROR make: *** No rule to make target 'test'.  Stop.
+    ((judge_requests 1) (judge_inputs 1))
+    |}]
+;;
+
+let%expect_test "a [~] in a call's arguments, found without printing them" =
+  List.iter
+    [ {|{"path":"~/notes.txt"}|}
+    ; {|{"command":"ls","args":["-l",["deep","~x"]]}|}
+    ; {|{"~":1}|}
+    ; {|{"path":"notes.txt","n":3,"ok":true,"none":null}|}
+    ; {|{"text":"a \"quoted\" path"}|}
+    ]
+    ~f:(fun json ->
+      printf
+        "%-50s %b\n"
+        json
+        (Agent.For_testing.mentions_home (Jsonaf.of_string json)));
+  [%expect
+    {|
+    {"path":"~/notes.txt"}                             true
+    {"command":"ls","args":["-l",["deep","~x"]]}       true
+    {"~":1}                                            true
+    {"path":"notes.txt","n":3,"ok":true,"none":null}   false
+    {"text":"a \"quoted\" path"}                       false
+    |}]
+;;

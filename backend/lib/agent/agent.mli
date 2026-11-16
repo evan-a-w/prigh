@@ -1097,4 +1097,12 @@ val on_noted : t -> f:(unit -> unit) -> unit
 module For_testing : sig
   (** The approver its runs give their tool calls. *)
   val approve : t -> Tool.approver
+
+  (** How many times a call's input for the approval model was built:
+      only for calls the model judges. *)
+  val judge_inputs : t -> int
+
+  (** Whether a call's arguments have a [~] anywhere, keys too: as if
+      printed, without printing them. *)
+  val mentions_home : Json.t -> bool
 end

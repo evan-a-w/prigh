@@ -232,6 +232,8 @@ type t =
   ; pending_confirms : Waiting_confirm.t String.Table.t
   ; judgements : Judgement.t String.Table.t
     (** the approval model's verdicts by request (see [judge]) *)
+  ; mutable judge_inputs : int
+    (** how many calls' {!Approval_judge.Input.t} were built, for tests *)
   ; allowed_calls : Allowed_call.t Allowed_call.Call.Table.t
     (** the session's, by call: see [remember_allowed] *)
   ; computer_consent : Computer_consent.t
@@ -1784,10 +1786,22 @@ module Check = struct
         permitted its host *)
     ; name : string (** as the user sees it: [on_host] for a call elsewhere *)
     ; summary : string
-    ; input : Approval_judge.Input.t
-    ; call : Allowed_call.Call.t
+    ; input : Approval_judge.Input.t Lazy.t
+      (** only built when the approval model judges the call *)
+    ; call : Allowed_call.Call.t Lazy.t
     }
 end
+
+(* Whether [json] has a [~] anywhere (a path under a home), without
+   printing it. *)
+let rec mentions_home : Json.t -> bool = function
+  | `String s -> String.mem s '~'
+  | `Object fields ->
+    List.exists fields ~f:(fun (key, value) ->
+      String.mem key '~' || mentions_home value)
+  | `Array values -> List.exists values ~f:mentions_home
+  | `Null | `False | `True | `Number _ -> false
+;;
 
 (* Whether the user has let the agent work on host [id] (named [name]) in
    this session: one of their messages names it, or they let a call there
@@ -1818,9 +1832,7 @@ let check t (context : Tool.Context.t) tool args : Check.t =
      call; rules with [~] use what is known (else the backend's home). *)
   let home =
     Option.bind host ~f:(fun host ->
-      if String.is_substring (Json.to_string args) ~substring:"~"
-      then host_home t host
-      else known_home t host)
+      if mentions_home args then host_home t host else known_home t host)
     |> Option.value_or_thunk ~default:(fun () -> Tool.expand_home "~")
   in
   let call = Approval_rule.Call.create ~home ~cwd:context.cwd ~tool:name args in
@@ -1888,25 +1900,28 @@ let check t (context : Tool.Context.t) tool args : Check.t =
   ; name = shown_name
   ; summary
   ; input =
-      { tool = name
-      ; arguments = args
-      ; host = host_name
-      ; elsewhere = Option.is_some elsewhere
-      ; session_host = name_of t.active_host
-      ; hosts = List.map (hosts t) ~f:(fun (h : Host.t) -> h.name)
-      ; cwd = context.cwd
-      ; requests = Approval_judge.requests (Session.messages t.session)
-      ; task
-      ; goal = Option.map t.goal ~f:(fun g -> g.text)
-      ; plan = Option.map t.plan ~f:plan_text
-      ; plan_mode = t.plan_mode
-      }
+      lazy
+        (t.judge_inputs <- t.judge_inputs + 1;
+         { Approval_judge.Input.tool = name
+         ; arguments = args
+         ; host = host_name
+         ; elsewhere = Option.is_some elsewhere
+         ; session_host = name_of t.active_host
+         ; hosts = List.map (hosts t) ~f:(fun (h : Host.t) -> h.name)
+         ; cwd = context.cwd
+         ; requests = Approval_judge.requests (Session.messages t.session)
+         ; task
+         ; goal = Option.map t.goal ~f:(fun g -> g.text)
+         ; plan = Option.map t.plan ~f:plan_text
+         ; plan_mode = t.plan_mode
+         })
   ; call =
-      Allowed_call.Call.create
-        ~tool:name
-        ~arguments:args
-        ~host:host_id
-        ~cwd:context.cwd
+      lazy
+        (Allowed_call.Call.create
+           ~tool:name
+           ~arguments:args
+           ~host:host_id
+           ~cwd:context.cwd)
   }
 ;;
 
@@ -1933,8 +1948,9 @@ let judge_turn t (context : Tool.Context.t) ~model =
                  check t { context with call_id = call.id } tool args
                in
                (match check.decide () with
-                | Judge _ when not (Hashtbl.mem t.allowed_calls check.call) ->
-                  ignore (judge t ~model check.input : Judgement.t)
+                | Judge _
+                  when not (Hashtbl.mem t.allowed_calls (force check.call)) ->
+                  ignore (judge t ~model (force check.input) : Judgement.t)
                 | Allow | Ask _ | Judge _ | Deny _ -> ())
              | None, _ | _, Error _ -> ()))
      | Some (User _ | Tool_result _) | None -> ())
@@ -1968,7 +1984,10 @@ let approve_on_host t : Tool.approver =
        | Allow | Ask _ | Judge _ ->
          (* which permits its host ([host_permitted]) *)
          if elsewhere
-         then remember_allowed t { call; by = Allowed_call.you; reason = None };
+         then
+           remember_allowed
+             t
+             { call = force call; by = Allowed_call.you; reason = None };
          None)
   in
   let allowed ~model ~reason =
@@ -1988,7 +2007,9 @@ let approve_on_host t : Tool.approver =
     let answer = ask ~kind rules in
     (match answer, decide () with
      | None, Judge _ ->
-       remember_allowed t { call; by = Allowed_call.you; reason = None }
+       remember_allowed
+         t
+         { call = force call; by = Allowed_call.you; reason = None }
      | None, (Allow | Ask _ | Deny _) | Some _, _ -> ());
     answer
   in
@@ -1998,7 +2019,7 @@ let approve_on_host t : Tool.approver =
     | Deny text -> Some (Tool.Result.error text)
     | Ask { rules } -> ask rules
     | Judge { rules } ->
-      (match Hashtbl.find t.allowed_calls call with
+      (match Hashtbl.find t.allowed_calls (force call) with
        | Some earlier ->
          allowed ~model:earlier.by ~reason:(Allowed_call.note earlier);
          None
@@ -2016,7 +2037,7 @@ let approve_on_host t : Tool.approver =
     | Ok model ->
       let key = Model.key model in
       judge_turn t context ~model;
-      let judgement = judge t ~model input in
+      let judgement = judge t ~model (force input) in
       (match
          Trace.span "approval_judge" (fun () ->
            Cancellation.protect context.cancel ~f:(fun () ->
@@ -2029,7 +2050,9 @@ let approve_on_host t : Tool.approver =
           | Judge _ ->
             (match verdict with
              | Ok (Allow reason) ->
-               remember_allowed t { call; by = key; reason = Some reason };
+               remember_allowed
+                 t
+                 { call = force call; by = key; reason = Some reason };
                allowed ~model:key ~reason;
                None
              | Ok (Ask reason) ->
@@ -3949,6 +3972,7 @@ let create
     ; config
     ; pending_confirms = String.Table.create ()
     ; judgements = String.Table.create ()
+    ; judge_inputs = 0
     ; allowed_calls = Allowed_call.Call.Table.create ()
     ; computer_consent = Computer_consent.create ()
     ; unattended = (fun () -> None)
@@ -5457,4 +5481,6 @@ let stop_everything t =
 
 module For_testing = struct
   let approve = approve
+  let judge_inputs t = t.judge_inputs
+  let mentions_home = mentions_home
 end
