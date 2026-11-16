@@ -1464,6 +1464,88 @@ in: A todo list; the strip says: A todo list; the address names it: true
 ok
 === chromium: worktrees: errors ===
 none
+=== chromium: worktrees_switch: in the other session ===
+Tidy the docs in a worktree
+│ agent/tidy… [agent]
+A landing page [selected]
+=== chromium: worktrees_switch: on a phone, in the other session ===
+Tidy the docs in a worktree
+│ agent/tidy… [agent]
+A landing page [selected]
+=== chromium: worktrees_switch: on a phone: into the work session: Tidy the docs in a worktree's worktrees while switching ===
+counted: true; checks with fewer: 0; fewest: 1
+=== chromium: worktrees_switch: on a phone: into the work session ===
+Tidy the docs in a worktree [selected]
+│ agent/tidy… [agent]
+A landing page
+=== chromium: worktrees_switch: back in the work session: Tidy the docs in a worktree's worktrees while switching ===
+counted: true; checks with fewer: 0; fewest: 1
+=== chromium: worktrees_switch: back in the work session ===
+Tidy the docs in a worktree [selected]
+│ agent/tidy… [agent]
+A landing page
+=== chromium: worktrees_switch: more worktrees ===
+Tidy the docs in a worktree [selected]
+│ agent/tidy… [agent]
+│ agent/more… [agent]
+│ agent/more… [agent]
+A landing page
+=== chromium: worktrees_switch: on a phone: more worktrees ===
+Tidy the docs in a worktree [selected]
+│ agent/tidy… [agent]
+│ agent/more… [agent]
+│ agent/more… [agent]
+A landing page
+=== chromium: worktrees_switch: away again: Tidy the docs in a worktree's worktrees while switching ===
+counted: true; checks with fewer: 0; fewest: 3
+=== chromium: worktrees_switch: away again ===
+Tidy the docs in a worktree
+│ agent/tidy… [agent]
+│ agent/more… [agent]
+│ agent/more… [agent]
+A landing page [selected]
+=== chromium: worktrees_switch: and back: Tidy the docs in a worktree's worktrees while switching ===
+counted: true; checks with fewer: 0; fewest: 3
+=== chromium: worktrees_switch: and back ===
+Tidy the docs in a worktree [selected]
+│ agent/tidy… [agent]
+│ agent/more… [agent]
+│ agent/more… [agent]
+A landing page
+=== chromium: worktrees_switch: and away: Tidy the docs in a worktree's worktrees while switching ===
+counted: true; checks with fewer: 0; fewest: 3
+=== chromium: worktrees_switch: and away ===
+Tidy the docs in a worktree
+│ agent/tidy… [agent]
+│ agent/more… [agent]
+│ agent/more… [agent]
+A landing page [selected]
+=== chromium: worktrees_switch: on a phone: away: Tidy the docs in a worktree's worktrees while switching ===
+counted: true; checks with fewer: 0; fewest: 3
+=== chromium: worktrees_switch: on a phone: away ===
+Tidy the docs in a worktree
+│ agent/tidy… [agent]
+│ agent/more… [agent]
+│ agent/more… [agent]
+A landing page [selected]
+=== chromium: worktrees_switch: on a phone: and back: Tidy the docs in a worktree's worktrees while switching ===
+counted: true; checks with fewer: 0; fewest: 3
+=== chromium: worktrees_switch: on a phone: and back ===
+Tidy the docs in a worktree [selected]
+│ agent/tidy… [agent]
+│ agent/more… [agent]
+│ agent/more… [agent]
+A landing page
+=== chromium: worktrees_switch: on a phone: and away: Tidy the docs in a worktree's worktrees while switching ===
+counted: true; checks with fewer: 0; fewest: 3
+=== chromium: worktrees_switch: on a phone: and away ===
+Tidy the docs in a worktree
+│ agent/tidy… [agent]
+│ agent/more… [agent]
+│ agent/more… [agent]
+A landing page [selected]
+=== chromium: worktrees_switch: errors ===
+none
 === chromium: review: files: changes marked ===
 src (changed: 2)
 README.md

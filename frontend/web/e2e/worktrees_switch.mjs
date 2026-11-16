@@ -25,8 +25,9 @@ const home = join(dir, "home");
 const repo = join(dir, "prigh");
 const web = join(dir, "site");
 for (const d of [home, repo, web]) mkdirSync(d, { recursive: true });
-// Each prompt in the work session asks for subagents in worktrees of their
-// own: "Tidy" one, "More" two more. Everything else is answered "noted".
+// The work session's prompts ask for subagents in worktrees of their own:
+// the first for one, the second for two more. Everything else is answered
+// "noted".
 const subagents = (id, tasks) => ({
   text: "handing it over",
   tool_calls: tasks.map((task, i) => ({
@@ -73,10 +74,24 @@ const browser = await engine.launch({
 });
 const errors = [];
 const frames = [];
+// Each page's list_worktrees calls not answered yet, by id, and what waits
+// for none to be.
+const listing = new Map();
+const parse = payload => { try { return JSON.parse(payload); } catch { return {}; } };
 const watch = (page, tag) => {
+  const calls = { pending: new Set(), waiting: [] };
+  listing.set(page, calls);
   page.on("websocket", ws => {
-    ws.on("framesent", f => frames.push(`${tag} sent ${f.payload}`));
-    ws.on("framereceived", f => frames.push(`${tag} received ${f.payload}`));
+    ws.on("framesent", f => {
+      frames.push(`${tag} sent ${f.payload}`);
+      const call = parse(f.payload);
+      if (call.method === "list_worktrees") calls.pending.add(call.id);
+    });
+    ws.on("framereceived", f => {
+      frames.push(`${tag} received ${f.payload}`);
+      const reply = parse(f.payload);
+      if (calls.pending.delete(reply.id) && calls.pending.size === 0) calls.waiting.splice(0).forEach(go => go());
+    });
   });
   page.on("console", message => {
     if (message.type() === "error" && !/favicon\.ico|interactive-widget/.test(message.text())) errors.push(`${tag} console: ${message.text()}`);
@@ -193,7 +208,9 @@ const switchTo = async (p, title, watched, want, label, { phone = false } = {}) 
   if (phone) await row.tap(); else await row.click();
   await selected(p, title);
   await p.waitForFunction(() => !document.querySelector(".session.opening"));
-  // The listings asked for on the way are answered.
+  // The listings asked for on the way answered, and drawn.
+  const calls = listing.get(p);
+  if (calls.pending.size) await new Promise(go => calls.waiting.push(go));
   await p.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
   await worktreesUnder(p, watched, want);
   if (phone) await drawer(p);
