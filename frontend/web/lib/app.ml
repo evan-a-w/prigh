@@ -631,7 +631,10 @@ module Action = struct
     | Paste_text of string
     (** a long paste into the composer ({!Prigh_ui.Pasted_text.is_long}):
           a chip *)
+    | Forget_allowed_call of string option
     | Remove_pasted of int
+    | Undo_paste
+    | Redo_paste
     | Insert_pasted of int (** into [draft], as text *)
     | View_pasted of int
     | Downsize_image of int
@@ -777,6 +780,7 @@ module Model = struct
     ; history : History.t
     ; images : Image.t list
     ; pasted : string list
+    ; paste_undo : Paste_undo.t option
     ; downsizing : Image.t list
     ; dictation : Dictation.t
     ; dictation_engine : Dictation.Engine.t
@@ -1112,6 +1116,7 @@ let init =
   ; history = History.empty
   ; images = []
   ; pasted = []
+  ; paste_undo = None
   ; downsizing = []
   ; dictation = Idle
   ; dictation_engine = Server
@@ -3811,22 +3816,37 @@ let show_permissions (m : Model.t) =
               adds to it)"
            ]
          | r -> rules "Allowed this session" r)
-      @ (match s.allowed_calls with
-         | [] -> []
-         | calls ->
-           "Exact calls allowed this session (smart mode does not judge them \
-            again):"
-           :: List.map calls ~f:(fun c -> "  " ^ c))
       @ config
-      @ [ ""
-        ; "Rules are permissions in ~/.prigh/config.json, e.g. {\"allow\": \
-           [\"bash(git status:*)\"], \"deny\": [\"bash(rm:*)\"]}."
-        ; "/mode or Alt+M switches the mode."
-        ]
     in
     open_dialog
       m
-      (Text { title = "Permissions"; text = String.concat ~sep:"\n" lines }))
+      (Permissions
+         { rules = String.concat ~sep:"\n" lines
+         ; hint =
+             "Rules are permissions in ~/.prigh/config.json, e.g. {\"allow\": \
+              [\"bash(git status:*)\"], \"deny\": [\"bash(rm:*)\"]}.\n\
+              /mode or Alt+M switches the mode."
+         }))
+;;
+
+let forget_allowed_call (m : Model.t) which =
+  let calls =
+    Option.value_map m.state ~default:[] ~f:(fun (s : State.t) ->
+      s.allowed_calls)
+  in
+  let notice =
+    match which, calls with
+    | Some _, _ -> "Forgot the remembered call: smart mode judges it again"
+    | None, [ _ ] ->
+      "Forgot the remembered call: smart mode judges it again, and other hosts \
+       ask until you name them"
+    | None, _ ->
+      sprintf
+        "Forgot %d remembered calls: smart mode judges them again, and other \
+         hosts ask until you name them"
+        (List.length calls)
+  in
+  m, [ call (Forget_allowed_call { call = which }) ~tag:(Notice notice) ]
 ;;
 
 let confirm_picker (m : Model.t) =
@@ -5092,6 +5112,7 @@ let user_switched (m : Model.t) (hello : Hello_reply.t) =
     ; git_bar = Git_bar.empty
     ; images = []
     ; pasted = []
+    ; paste_undo = None
     ; skills = Skills.empty
     ; worktrees = Worktrees.reset m.worktrees
     ; pending = In_flight.none
@@ -9896,15 +9917,36 @@ let invokes_skill ({ name; _ } : Slash.Parsed.t) =
   | None -> false
 ;;
 
+(* Ctrl+Z puts them back. *)
+let set_pasted (m : Model.t) pasted =
+  { m with
+    pasted
+  ; paste_undo =
+      Some (Paste_undo.record ~before:m.pasted ~after:pasted ~draft:m.draft)
+  }
+;;
+
+let undo_paste (m : Model.t) ~redo =
+  match
+    Option.bind m.paste_undo ~f:(fun u ->
+      (if redo then Paste_undo.redo else Paste_undo.undo)
+        u
+        ~pasted:m.pasted
+        ~draft:m.draft)
+  with
+  | Some (pasted, u) -> { m with pasted; paste_undo = Some u }, [ focus_editor ]
+  | None -> m, []
+;;
+
 (* Long pastes are chips: the composer never holds them, so it stays quick. *)
 let paste_text (m : Model.t) text =
   match Prigh_ui.Pasted_text.too_large text with
   | Some e -> error m e
-  | None -> { m with pasted = m.pasted @ [ text ] }, [ focus_editor ]
+  | None -> set_pasted m (m.pasted @ [ text ]), [ focus_editor ]
 ;;
 
 let remove_pasted (m : Model.t) i =
-  let m = { m with pasted = List.filteri m.pasted ~f:(fun j _ -> j <> i) } in
+  let m = set_pasted m (List.filteri m.pasted ~f:(fun j _ -> j <> i)) in
   match m.dialog with
   | Some (Pasted _) -> close_dialog m
   | _ -> m, [ focus_editor ]
@@ -10029,7 +10071,7 @@ let send (m : Model.t) ~follow_up =
      | Agent agent ->
        (* A subagent takes text only: the pasted texts go in it. *)
        let full = Prigh_ui.Pasted_text.inline ~text m.pasted in
-       let m, save = sent { m with pasted = [] } in
+       let m, save = sent { m with pasted = []; paste_undo = None } in
        let m, cmds = message_agent m ~agent ~text:full ~follow_up ~draft:full in
        m, save @ cmds)
   | _ when Option.is_some (no_host m) && not (Model.running m) ->
@@ -10101,6 +10143,7 @@ let send (m : Model.t) ~follow_up =
       ( { m with
           images = []
         ; pasted = []
+        ; paste_undo = None
         ; agents
         ; pending
         ; files = Files.sent m.files
@@ -10445,7 +10488,12 @@ let picker_accepted (m : Model.t) ~kind (item : Picker.Item.t) =
     | Fork entries ->
       let m =
         match Session_tree.user_text entries item.id with
-        | Some text -> set_draft m text
+        | Some text ->
+          (* Its pasted texts are chips again, sent with it. *)
+          { (set_draft m text) with
+            pasted = Session_tree.user_pasted entries item.id
+          ; paste_undo = None
+          }
         | None -> m
       in
       let m, cmds =
@@ -11029,6 +11077,7 @@ let dialog_accept (m : Model.t) =
       | Auth _
       | Session _
       | Text _
+      | Permissions _
       | Mcp_tools _
       | Mcp_sign_in _
       | Diff _ ) -> close_dialog m
@@ -11291,8 +11340,12 @@ let update_connected (m : Model.t) (action : Action.t) =
     ( m
     , save_pref m Key.code_size (Some (`String (Code_size.name code_size)))
       @ cmds )
-  | Set_draft draft -> edit m draft
-  | Edit { text; cursor } -> edit m ~cursor text
+  | Set_draft draft -> edit { m with paste_undo = None } draft
+  | Edit { text; cursor } ->
+    let m =
+      if String.equal text m.draft then m else { m with paste_undo = None }
+    in
+    edit m ~cursor text
   | Send -> sent_to_bottom (send m ~follow_up:false)
   | Send_follow_up -> sent_to_bottom (send m ~follow_up:true)
   | Abort -> m, [ rpc "abort" [] ~tag:Restored ]
@@ -11813,7 +11866,10 @@ let update_connected (m : Model.t) (action : Action.t) =
   | Remove_image i ->
     { m with images = List.filteri m.images ~f:(fun j _ -> j <> i) }, []
   | Paste_text text -> paste_text m text
+  | Forget_allowed_call call -> forget_allowed_call m call
   | Remove_pasted i -> remove_pasted m i
+  | Undo_paste -> undo_paste m ~redo:false
+  | Redo_paste -> undo_paste m ~redo:true
   | Insert_pasted i -> insert_pasted m i
   | View_pasted i ->
     if i < List.length m.pasted then open_dialog m (Pasted i) else m, []

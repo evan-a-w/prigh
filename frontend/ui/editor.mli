@@ -69,6 +69,17 @@ val yank : t -> t
 val yank_pop : t -> t
 val undo : t -> t
 
+(** Whether the last edit put in or took out a long paste's token
+    ({!insert_paste}, Backspace or Delete on one), so Ctrl+Z undoes it
+    ({!undo}). *)
+val can_undo_token : t -> bool
+
+(** Whether the last thing done was {!undo} of such an edit. *)
+val can_redo_token : t -> bool
+
+(** Does the token edit {!undo} undid again; one undo step. *)
+val redo_token : t -> t
+
 (** Inserts a bracketed paste and chips blocks longer than three lines; a
     long one ({!Pasted_text.is_long}) is a token instead, which Backspace and
     Delete remove whole, standing for it ({!pasted}). *)

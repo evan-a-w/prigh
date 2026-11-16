@@ -3164,9 +3164,13 @@ let show_permissions m =
     let calls = function
       | [] -> []
       | calls ->
-        "exact calls allowed this session (smart mode does not judge them \
-         again):"
-        :: List.map calls ~f:(fun c -> "  " ^ c)
+        ("exact calls allowed this session (smart mode does not judge them \
+          again; /permissions forget N or all forgets them):"
+         :: List.mapi calls ~f:(fun i c -> sprintf "  %d. %s" (i + 1) c))
+        @ [ "  forgetting one you let run on another host takes that host back \
+             (its calls ask again); forgetting all takes back every other host \
+             until you name it again"
+          ]
     in
     let config =
       match m.config with
@@ -3195,6 +3199,57 @@ let show_permissions m =
         ~title:"Permissions"
         (Content.lines (String.concat ~sep:"\n" lines))
     , [] )
+;;
+
+(* [/permissions forget N|all]: N counts from 1 in [show_permissions]'s
+   list. *)
+let forget_allowed_call m args =
+  match m.state with
+  | None -> notice m "not connected", []
+  | Some s ->
+    let calls = s.allowed_calls in
+    let forget which ~says =
+      ( m
+      , [ call
+            (Forget_allowed_call { call = which })
+            ~tag:(Notice_on_success says)
+        ] )
+    in
+    (match args, calls with
+     | _, [] ->
+       ( notice
+           m
+           "no calls are remembered: smart mode remembers the calls it allows"
+       , [] )
+     | [ "all" ], _ ->
+       forget
+         None
+         ~says:
+           (match calls with
+            | [ _ ] ->
+              "forgot the remembered call: smart mode judges it again, and \
+               other hosts ask until you name them"
+            | _ ->
+              sprintf
+                "forgot all %d remembered calls: smart mode judges them again, \
+                 and other hosts ask until you name them"
+                (List.length calls))
+     | [ n ], _
+       when Option.is_some
+              (Option.bind (Int.of_string_opt n) ~f:(fun i ->
+                 List.nth calls (i - 1))) ->
+       let line = List.nth_exn calls (Int.of_string n - 1) in
+       forget
+         (Some line)
+         ~says:(sprintf "forgot %s: smart mode judges it again" line)
+     | _ ->
+       ( error
+           m
+           (sprintf
+              "use /permissions forget N (1 to %d, as /permissions lists them) \
+               or /permissions forget all"
+              (List.length calls))
+       , [] ))
 ;;
 
 let fallback_summary m (config : P.Config.t) =
@@ -4454,7 +4509,15 @@ let run_command m (cmd : Commands.Parsed.t) =
            other)
     , [] )
   | "todos", _ -> show_plan m
-  | "permissions", _ -> show_permissions m
+  | "permissions", [] -> show_permissions m
+  | "permissions", "forget" :: args -> forget_allowed_call m args
+  | "permissions", other :: _ ->
+    ( error
+        m
+        (sprintf
+           "unknown argument %S; use /permissions, or /permissions forget N|all"
+           other)
+    , [] )
   | "confirm", ("on" | "true") :: _ -> set_confirm m true
   | "confirm", ("off" | "false") :: _ -> set_confirm m false
   | "confirm", other :: _ ->
@@ -5418,8 +5481,11 @@ let editing_intent m (intent : Intent.t) =
 
 (* Autocomplete is a sub-state of editing: while it is open it owns a few keys,
    everything else edits the buffer and then recomputes the completion. *)
-let editing m (intent : Intent.t) =
+let rec editing m (intent : Intent.t) =
   match intent with
+  | Suspend when Editor.can_undo_token m.editor -> editing m Undo
+  | Yank when Editor.can_redo_token m.editor ->
+    refresh_autocomplete { m with editor = Editor.redo_token m.editor }
   | Cancel when Option.is_some m.commit_draft && Option.is_none m.autocomplete
     -> stop_commit_draft m
   | Cancel when Option.is_some m.btw -> dismiss_btw m
@@ -5560,7 +5626,13 @@ let picker_selected m (kind : Mode.Picker_kind.t) (item : Picker.Item.t) =
          String.equal entry.id item.id)
      with
      | Some { kind = P.Entry.Kind.Message (P.Message.User user); _ } ->
-       ( { m with editor = Editor.set_text m.editor (Injected_note.typed user) }
+       (* Its pasted texts come back as tokens, sent again with it. *)
+       let editor, text =
+         restore_pasted
+           m.editor
+           (Injected_note.typed user, Injected_note.pasted user)
+       in
+       ( { m with editor = Editor.set_text editor text }
        , [ rpc "fork" ~params:[ "at", str item.id ] ~tag:Reload_messages ] )
      | _ -> m, [])
   | Trim points ->

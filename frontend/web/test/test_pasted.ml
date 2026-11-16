@@ -404,3 +404,156 @@ let%expect_test "Stop gives queued pasted texts back as chips" =
     (Pasted text #1 2 lines · 15 B) (Remove Pasted text #1)
     |}]
 ;;
+
+let%expect_test "Ctrl+Z undoes a chip coming or going; typed text is the box's" =
+  let h = H.create () in
+  hello h;
+  H.type_ h "why?";
+  H.act h (Paste_text long);
+  chips h;
+  H.key h ~ctrl:true ~code:"KeyZ" "z";
+  chips h;
+  print_endline "--- redo: Ctrl+Shift+Z, then undo and Ctrl+Y, and ⌘ on a Mac";
+  H.key h ~ctrl:true ~shift:true ~code:"KeyZ" "Z";
+  chips h;
+  H.key h ~meta:true ~code:"KeyZ" "z";
+  H.key h ~ctrl:true ~code:"KeyY" "y";
+  H.key h ~meta:true ~shift:true ~code:"KeyZ" "z";
+  chips h;
+  print_endline "--- nothing more to redo: the box's own";
+  H.key h ~ctrl:true ~code:"KeyY" "y";
+  print_endline "--- removing a chip with its ×, then Ctrl+Z";
+  H.act h (Paste_text (String.make 3000 'y'));
+  H.click h ~selector:".pasted-chip .attach-chip-remove";
+  chips h;
+  H.key h ~ctrl:true ~code:"KeyZ" "z";
+  chips h;
+  print_endline "--- typed text after it: Ctrl+Z is the box's";
+  H.type_ h "why? and";
+  H.key h ~ctrl:true ~code:"KeyZ" "z";
+  H.key h ~ctrl:true ~shift:true ~code:"KeyZ" "z";
+  chips h;
+  [%expect
+    {|
+    (Focus editor)
+    (Pasted text #1 41 lines · 153 B) (Remove Pasted text #1)
+    Undo_paste
+    (Focus editor)
+    --- redo: Ctrl+Shift+Z, then undo and Ctrl+Y, and ⌘ on a Mac
+    Redo_paste
+    (Focus editor)
+    (Pasted text #1 41 lines · 153 B) (Remove Pasted text #1)
+    Undo_paste
+    (Focus editor)
+    Redo_paste
+    (Focus editor)
+    (browser default)
+    (Pasted text #1 41 lines · 153 B) (Remove Pasted text #1)
+    --- nothing more to redo: the box's own
+    (browser default)
+    --- removing a chip with its ×, then Ctrl+Z
+    (Focus editor)
+    (Remove_pasted 0)
+    (Focus editor)
+    (Pasted text #1 1 line · 2.9 KB) (Remove Pasted text #1)
+    Undo_paste
+    (Focus editor)
+    (Pasted text #1 41 lines · 153 B) (Remove Pasted text #1)
+    (Pasted text #2 1 line · 2.9 KB) (Remove Pasted text #2)
+    --- typed text after it: Ctrl+Z is the box's
+    (browser default)
+    (browser default)
+    (Pasted text #1 41 lines · 153 B) (Remove Pasted text #1)
+    (Pasted text #2 1 line · 2.9 KB) (Remove Pasted text #2)
+    |}]
+;;
+
+(* A user message as the backend has it: what was typed, then each pasted
+   text's block, with the origin saying where the texts are. *)
+let message_with_pasted ~id ~parent ~body pasted =
+  let text, spans =
+    List.foldi pasted ~init:(body, []) ~f:(fun i (text, spans) p ->
+      let lines = Prigh_ui.Pasted_text.count_lines p in
+      let header =
+        sprintf
+          "\n\n<pasted_text name=\"Pasted text #%d\" lines=\"%d\">\n"
+          (i + 1)
+          lines
+      in
+      let start = String.length text + String.length header in
+      ( text ^ header ^ p ^ "\n</pasted_text>"
+      , `Object
+          [ "name", `String (sprintf "Pasted text #%d" (i + 1))
+          ; "lines", `Number (Int.to_string lines)
+          ; "start", `Number (Int.to_string start)
+          ; "length", `Number (Int.to_string (String.length p))
+          ]
+        :: spans ))
+  in
+  `Object
+    [ "id", `String id
+    ; "parent", parent
+    ; "kind", `String "message"
+    ; ( "message"
+      , `Object
+          [ "role", `String "user"
+          ; "text", `String text
+          ; ( "origin"
+            , `Object
+                [ "body", `String body; "pasted", `Array (List.rev spans) ] )
+          ] )
+    ]
+;;
+
+let%expect_test "/fork gives a message's pasted texts back as chips" =
+  let h = H.create () in
+  hello h;
+  H.type_ h "/fork";
+  H.quiet h (fun () -> H.act h Send);
+  H.reply
+    h
+    "get_entries"
+    (Jsonaf.to_string
+       (`Object
+           [ "head", `String "u2"
+           ; ( "entries"
+             , `Array
+                 [ message_with_pasted
+                     ~id:"u1"
+                     ~parent:`Null
+                     ~body:"why?"
+                     [ "trace A" ]
+                 ; message_with_pasted
+                     ~id:"u2"
+                     ~parent:(`String "u1")
+                     ~body:"and these?"
+                     [ "trace B\nline 2"; "trace C" ]
+                 ] )
+           ]));
+  H.key h "Enter" ~target:Field;
+  print_s [%sexp ((H.model h).draft : string)];
+  chips h;
+  H.key h "Enter";
+  [%expect
+    {|
+    (Focus picker-input)
+    Dialog_accept
+    (Focus editor)
+    (Expire_toast (id 0) (after_ms 3700))
+    (Rpc (method_ fork) (params ((at u2))) (tag Reload_state))
+    "and these?"
+    (Pasted text #1 2 lines · 14 B) (Remove Pasted text #1)
+    (Pasted text #2 1 line · 7 B) (Remove Pasted text #2)
+    Send
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "and these?") (max 500))) (tag Ignore))
+    Scroll_to_bottom
+    (Rpc (method_ prompt)
+     (params ((text "and these?") (pasted ( "trace B\
+                                           \nline 2" "trace C"))))
+     (tag
+      (Sent_with_files (text "and these?") (images ()) (attachments ())
+       (pasted ( "trace B\
+                \nline 2" "trace C")))))
+    |}]
+;;

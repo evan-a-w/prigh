@@ -399,12 +399,11 @@ let%expect_test "/permissions" =
     (Close (Esc))
     Mode: auto-edit (file edits run; bash, job_input and MCP tools ask first)
     Allowed this session: bash(make:*)
-    Exact calls allowed this session (smart mode does not judge them again):
-      bash {"command":"git push"} on laptop in /work (by you)
-
+    Exact calls allowed this session: smart mode does not judge them again until you forget them. Forgetting one you let run on another host takes that host back: its calls ask again. Forget all takes back every other host until you name it again.
+    bash {"command":"git push"} on laptop in /work (by you) (Forget)
     Rules are permissions in ~/.prigh/config.json, e.g. {"allow": ["bash(git status:*)"], "deny": ["bash(rm:*)"]}.
     /mode or Alt+M switches the mode.
-    (Done)
+    (Forget all) (Done)
     (Focus editor)
     (Rpc (method_ push_pref)
      (params ((key history) (value /permissions) (max 500))) (tag Ignore))
@@ -415,7 +414,73 @@ let%expect_test "/permissions" =
     Allowed this session: nothing yet (a confirmation's "always" adds to it)
     allow (config): bash(git status:*)
     deny (config): bash(rm:*), write(/etc/**)
+    Rules are permissions in ~/.prigh/config.json, e.g. {"allow": ["bash(git status:*)"], "deny": ["bash(rm:*)"]}.
+    /mode or Alt+M switches the mode.
+    (Done)
+    |}]
+;;
 
+let%expect_test "/permissions: forget a remembered call, or all of them" =
+  let make =
+    {|bash {"command":"make"} on laptop in /work (by deepseek/deepseek-flash)|}
+  in
+  let push = {|bash {"command":"git push"} on laptop in /work (by you)|} in
+  let h =
+    H.create ~state:(state ~mode:"smart" ~allowed_calls:[ push; make ] ()) ()
+  in
+  run h "/permissions";
+  H.names h ~selector:".modal button";
+  H.click h ~selector:".allowed-call .forget" ~nth:1;
+  print_endline "--- the backend's state follows";
+  H.event
+    h
+    (sprintf
+       {|{"event":"state","state":%s}|}
+       (state ~mode:"smart" ~allowed_calls:[ push ] ()));
+  H.reply h "forget_allowed_call" "{}";
+  modal h;
+  toasts h;
+  H.click h ~selector:".modal .forget-all";
+  H.event h (sprintf {|{"event":"state","state":%s}|} (state ~mode:"smart" ()));
+  modal h;
+  [%expect
+    {|
+    (Rpc (method_ push_pref)
+     (params ((key history) (value /permissions) (max 500))) (tag Ignore))
+    (Focus dialog)
+    button "Close" -- Close (Esc)
+    button "Forget bash {\"command\":\"git push\"} on laptop in /work (by you)" -- Forget it: smart mode judges it again
+    button "Forget bash {\"command\":\"make\"} on laptop in /work (by deepseek/deepseek-flash)" -- Forget it: smart mode judges it again
+    button "Forget all" -- Smart mode judges every one of these calls again, and other hosts ask until you name them
+    button "Done"
+    (Forget_allowed_call
+     ("bash {\"command\":\"make\"} on laptop in /work (by deepseek/deepseek-flash)"))
+    (Rpc (method_ forget_allowed_call)
+     (params
+      ((call
+        "bash {\"command\":\"make\"} on laptop in /work (by deepseek/deepseek-flash)")))
+     (tag (Notice "Forgot the remembered call: smart mode judges it again")))
+    --- the backend's state follows
+    (Expire_toast (id 0) (after_ms 3660))
+    Permissions
+    (Close (Esc))
+    Mode: smart (edits in the project run; the approval model lets other calls run or asks you, saying why (/approval-model))
+    Allowed this session: nothing yet (a confirmation's "always" adds to it)
+    Exact calls allowed this session: smart mode does not judge them again until you forget them. Forgetting one you let run on another host takes that host back: its calls ask again. Forget all takes back every other host until you name it again.
+    bash {"command":"git push"} on laptop in /work (by you) (Forget)
+    Rules are permissions in ~/.prigh/config.json, e.g. {"allow": ["bash(git status:*)"], "deny": ["bash(rm:*)"]}.
+    /mode or Alt+M switches the mode.
+    (Forget all) (Done)
+    Forgot the remembered call: smart mode judges it again
+    (Forget_allowed_call ())
+    (Rpc (method_ forget_allowed_call) (params ((all true)))
+     (tag
+      (Notice
+       "Forgot the remembered call: smart mode judges it again, and other hosts ask until you name them")))
+    Permissions
+    (Close (Esc))
+    Mode: smart (edits in the project run; the approval model lets other calls run or asks you, saying why (/approval-model))
+    Allowed this session: nothing yet (a confirmation's "always" adds to it)
     Rules are permissions in ~/.prigh/config.json, e.g. {"allow": ["bash(git status:*)"], "deny": ["bash(rm:*)"]}.
     /mode or Alt+M switches the mode.
     (Done)

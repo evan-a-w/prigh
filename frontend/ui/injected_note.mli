@@ -18,6 +18,10 @@ val glyph : P.Origin.Kind.t -> string
     [/skill:NAME ARGS]; empty for a message of the harness's. *)
 val typed : P.Message.User.t -> string
 
+(** The texts the user pasted with it ([P.Origin.pasted]), in order: for
+    [Pasted text #1], ... in {!typed}. *)
+val pasted : P.Message.User.t -> string list
+
 (** A line for lists ([/fork], [/tree]): the glyph and title of a message of
     the harness's, else the first line of what the user typed (or its first
     image), else its first note's glyph and title (a message of notes

@@ -15,6 +15,10 @@ val user_items : Entry.t list -> Picker.Item.t list
     ([/skill:NAME ARGS]), as are labels. *)
 val user_text : Entry.t list -> string -> string option
 
+(** The texts pasted with a user message, by entry id
+    ({!Injected_note.pasted}). *)
+val user_pasted : Entry.t list -> string -> string list
+
 (** Messages in depth-first order ([>] user, [·] assistant, [⚙] tool result),
     each branch indented under its branch point; those on the path to [head]
     are marked. *)

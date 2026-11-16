@@ -57,6 +57,12 @@ let user_text entries id =
     Option.some_if (String.equal entry.id id) (Injected_note.typed user))
 ;;
 
+let user_pasted entries id =
+  List.find_map (users entries) ~f:(fun ((entry : Entry.t), user) ->
+    Option.some_if (String.equal entry.id id) (Injected_note.pasted user))
+  |> Option.value ~default:[]
+;;
+
 let tree_items entries ~head =
   let messages =
     List.filter_map entries ~f:(fun (e : Entry.t) ->

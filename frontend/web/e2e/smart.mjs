@@ -1,8 +1,8 @@
 // Smart approval mode: the mode chosen from the chip's menu (on a phone,
 // /mode, then the ⋯ sheet shows it), a call the approval model lets run
 // (its "allowed by" note on the card) and one it leaves to the user (its
-// reason on the approval card, answered); then Settings → Models →
-// Approvals. On a desktop and two phones (390x844, 320x640, touch, the
+// reason on the approval card, answered), both listed by /permissions and
+// forgotten there (one, then all); then Settings → Models → Approvals. On a desktop and two phones (390x844, 320x640, touch, the
 // larger as an installed PWA with the safe area's insets). Run by
 // prigh_web.sh; prints normalised snapshots (the expected output is in
 // ENGINE.expected) and, with SHOTS, screenshots.
@@ -176,6 +176,37 @@ try {
   console.log(await overflow());
   await allowed.scrollIntoViewIfNeeded();
   await screenshot("allowed");
+
+  // 2b. /permissions lists both calls, which run again without being judged;
+  //     one is forgotten, then the rest.
+  await send("/permissions");
+  const perms = page.locator(".permissions-dialog");
+  const calls = perms.locator(".allowed-call");
+  await calls.nth(1).waitFor();
+  const listed = async () =>
+    (await calls.locator(".allowed-call-text").allInnerTexts())
+      .map(t => flat(t).replaceAll(cwd, "$CWD").replace(/ on \S+ in /, " on <host> in "))
+      .join("\n");
+  section("/permissions: the remembered calls");
+  console.log(await listed());
+  console.log(`forget: ${await inView(".allowed-call .forget")}`);
+  console.log(`forget all: ${await inView(".permissions-dialog .forget-all")}`);
+  console.log(await overflow());
+  await screenshot("permissions");
+  await tap(calls.first().locator(".forget"));
+  await page.waitForFunction(() => document.querySelectorAll(".allowed-call").length === 1);
+  section("/permissions: one forgotten");
+  console.log(await listed());
+  const forgot = page.locator(".toast", { hasText: "Forgot" }).first();
+  await forgot.waitFor();
+  console.log(flat(await forgot.innerText()));
+  await tap(perms.locator(".forget-all"));
+  await calls.first().waitFor({ state: "detached" });
+  section("/permissions: all forgotten");
+  console.log(`calls: ${await calls.count()}, forget all: ${await perms.locator(".forget-all").count()}`);
+  await screenshot("permissions forgotten");
+  await page.keyboard.press("Escape");
+  await perms.waitFor({ state: "detached" });
 
   // 3. Settings → Models → Approvals.
   if (touch) {

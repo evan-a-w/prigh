@@ -789,7 +789,12 @@ module Action : sig
     | Paste_text of string
       (** a long paste into the composer ({!Prigh_ui.Pasted_text.is_long}):
           a chip *)
+    | Forget_allowed_call of string option
+    (** a line of the state's [allowed_calls], or all of them: smart mode
+        judges it again *)
     | Remove_pasted of int
+    | Undo_paste (** Ctrl+Z: the chips before the last came or went *)
+    | Redo_paste
     | Insert_pasted of int (** into [draft], as text *)
     | View_pasted of int
     | Downsize_image of int
@@ -988,6 +993,8 @@ module Model : sig
     ; pasted : string list
       (** long texts pasted, sent with the next prompt as pasted texts
           ({!Prigh_ui.Pasted_text}): chips, not in [draft] *)
+    ; paste_undo : Paste_undo.t option
+      (** Ctrl+Z after a chip came or went ({!Paste_undo}) *)
     ; downsizing : Image.t list (** of [images], being made smaller *)
     ; dictation : Dictation.t
     ; dictation_engine : Dictation.Engine.t

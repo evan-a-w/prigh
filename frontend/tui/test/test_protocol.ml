@@ -2410,3 +2410,26 @@ let%expect_test "MCP sign-ins: the listing, the event, an OAuth client" =
     {"type":"http","url":"https://x.example/mcp","oauth":{"clientId":"app","clientSecret":"s3cret","scopes":["a","b"]}}
     |}]
 ;;
+
+let%expect_test "remembered calls: in the state, and forgetting them" =
+  (match
+     Server_message.of_line
+       {|{"type":"event","event":"state","state":{"session_id":"s1","session_path":"/tmp/s1.jsonl","cwd":"/work","model":{"id":"m","provider":"p","key":"p/m","name":"M","context_window":1000,"max_output":100,"supports_thinking":false,"cost":{"input":1,"output":1,"cache_read":0}},"thinking":"off","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"approval_mode":"smart","allowed_calls":["bash {\"command\":\"make\"} on box in /work (by you)","read {\"path\":\"a\"} on box in /work (by m)"]}}|}
+   with
+   | Ok (Event (State s)) -> print_s [%sexp (s.allowed_calls : string list)]
+   | Ok m -> print_s (Server_message.sexp_of_t m)
+   | Error e -> print_s [%message "error" (e : Error.t)]);
+  List.iter
+    [ Request.Method.Forget_allowed_call
+        { call = Some {|bash {"command":"make"} on box in /work (by you)|} }
+    ; Forget_allowed_call { call = None }
+    ]
+    ~f:(fun m -> print_endline (Request.to_line (Request.create ~id:1 m)));
+  [%expect
+    {|
+    ("bash {\"command\":\"make\"} on box in /work (by you)"
+     "read {\"path\":\"a\"} on box in /work (by m)")
+    {"id":1,"method":"forget_allowed_call","params":{"call":"bash {\"command\":\"make\"} on box in /work (by you)"}}
+    {"id":1,"method":"forget_allowed_call","params":{"all":true}}
+    |}]
+;;

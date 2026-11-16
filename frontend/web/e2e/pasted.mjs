@@ -3,7 +3,8 @@
 //
 // 1. A paste of 420 lines never reaches the box (its default is prevented):
 //    a Pasted text chip instead, opening a dialog with the text.
-// 2. Ctrl+Shift+V pastes the same text into the box as text.
+// 2. Ctrl+Shift+V pastes the same text into the box as text. A chip removed
+//    with its × comes back with Ctrl+Z; Ctrl+Shift+Z removes it again.
 // 3. Sent with a question: the message shows the question and a folded
 //    chip; opened, the text; after a reload, the chip again.
 //
@@ -167,6 +168,18 @@ try {
   console.log(clean(await page.locator(".pasted-chips").innerText()));
   await tap(page.locator(".pasted-chip").nth(1).locator(".attach-chip-remove"));
   await page.waitForFunction(() => document.querySelectorAll(".pasted-chip").length === 1);
+
+  // 2b. Ctrl+Z brings the removed chip back, Ctrl+Shift+Z takes it out again.
+  section("Ctrl+Z after removing a chip");
+  const chipCount = n => page.waitForFunction(n => document.querySelectorAll(".pasted-chip").length === n, n);
+  await composer.focus();
+  await page.keyboard.press("Control+z");
+  await chipCount(2);
+  console.log(`undone: ${await page.locator(".pasted-chip").count()} chips; box lines: ${(await composer.inputValue()).split("\n").length}`);
+  await screenshot("undone");
+  await page.keyboard.press("Control+Shift+z");
+  await chipCount(1);
+  console.log(`redone: ${await page.locator(".pasted-chip").count()} chip`);
   await composer.fill("why does this fail?");
 
   // 3. Sent: the question and a folded chip.

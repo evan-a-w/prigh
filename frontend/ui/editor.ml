@@ -41,6 +41,15 @@ module Snapshot = struct
   [@@deriving sexp_of]
 end
 
+(* Whether the last edit put in or took out a long paste's token, which
+   Ctrl+Z undoes; once undone, the text to redo it with. *)
+module Token_step = struct
+  type t =
+    | Done
+    | Undone of Snapshot.t
+  [@@deriving sexp_of]
+end
+
 module Yank = struct
   type t =
     { before : Snapshot.t
@@ -61,6 +70,7 @@ type t =
   ; chips : Chip.t list
   ; last_yank : Yank.t option
   ; pasted : Pasted_text.Token.t list (* most recent first *)
+  ; token_step : Token_step.t option
   }
 [@@deriving sexp_of]
 
@@ -80,6 +90,7 @@ let empty =
   ; chips = []
   ; last_yank = None
   ; pasted = []
+  ; token_step = None
   }
 ;;
 
@@ -140,12 +151,13 @@ let snapshot t = { Snapshot.lines = t.lines; cursor = t.cursor }
 
 let push_undo t ~coalesce =
   if coalesce && t.undo_coalesce
-  then { t with last_yank = None }
+  then { t with last_yank = None; token_step = None }
   else
     { t with
       undo_stack = List.take (snapshot t :: t.undo_stack) max_undo
     ; undo_coalesce = coalesce
     ; last_yank = None
+    ; token_step = None
     }
 ;;
 
@@ -169,6 +181,7 @@ let set_text t text =
   ; cursor = { line = last; col = length (List.last_exn lines) }
   ; chips = []
   ; last_yank = None
+  ; token_step = None
   }
 ;;
 
@@ -262,7 +275,10 @@ let backspace t =
   | Some token ->
     let before = String.drop_suffix before (String.length token) in
     let t = set_line t t.cursor.line (before ^ after) in
-    { t with cursor = { t.cursor with col = length before } }
+    { t with
+      cursor = { t.cursor with col = length before }
+    ; token_step = Some Done
+    }
   | None when t.cursor.col > 0 ->
     let before, after = split_at (current t) t.cursor.col in
     let before = of_chars (List.drop_last_exn (chars before)) in
@@ -278,10 +294,13 @@ let delete t =
   let before, after = split_at line t.cursor.col in
   match token_starting after t.pasted with
   | Some token ->
-    set_line
-      t
-      t.cursor.line
-      (before ^ String.drop_prefix after (String.length token))
+    { (set_line
+         t
+         t.cursor.line
+         (before ^ String.drop_prefix after (String.length token)))
+      with
+      token_step = Some Done
+    }
   | None when t.cursor.col < length line ->
     let before, after = split_at line t.cursor.col in
     let after = of_chars (List.tl_exn (chars after)) in
@@ -451,7 +470,36 @@ let undo t =
     ; undo_coalesce = false
     ; last_yank = None
     ; chips = []
+    ; token_step =
+        (match t.token_step with
+         | Some Done -> Some (Undone (snapshot t))
+         | Some (Undone _) | None -> None)
     }
+;;
+
+let can_undo_token t =
+  match t.token_step with
+  | Some Done -> not (List.is_empty t.undo_stack)
+  | Some (Undone _) | None -> false
+;;
+
+let can_redo_token t =
+  match t.token_step with
+  | Some (Undone _) -> true
+  | Some Done | None -> false
+;;
+
+let redo_token t =
+  match t.token_step with
+  | Some (Undone s) ->
+    let t = push_undo t ~coalesce:false in
+    { t with
+      lines = s.lines
+    ; cursor = s.cursor
+    ; chips = []
+    ; token_step = Some Done
+    }
+  | Some Done | None -> t
 ;;
 
 let yank t =
@@ -493,7 +541,7 @@ let insert_paste t s =
   else if Pasted_text.is_long s
   then (
     let t, token = paste_token t s in
-    insert t token)
+    { (insert t token) with token_step = Some Done })
   else (
     let start = t.cursor in
     let t = dissolve_chip t t.cursor in

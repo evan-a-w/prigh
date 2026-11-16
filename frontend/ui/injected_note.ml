@@ -36,6 +36,12 @@ let typed (user : P.Message.User.t) =
      | None -> body)
 ;;
 
+let pasted (user : P.Message.User.t) =
+  match P.Message.User.source user, user.origin with
+  | None, Some { pasted; _ } -> List.map pasted ~f:(fun p -> p.text)
+  | Some _, _ | None, None -> []
+;;
+
 let first_line text =
   String.split_lines text
   |> List.find ~f:(fun l -> not (String.is_empty (String.strip l)))

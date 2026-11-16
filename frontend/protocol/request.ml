@@ -183,6 +183,7 @@ module Method = struct
         ; text : string
         }
     | Forget_memory of { id : string }
+    | Forget_allowed_call of { call : string option }
     | Set_memory_enabled of { enabled : bool }
     | Get_custom_instructions
     | Save_custom_instruction of
@@ -277,6 +278,7 @@ module Method = struct
     | Get_memory -> "get_memory"
     | Save_memory _ -> "save_memory"
     | Forget_memory _ -> "forget_memory"
+    | Forget_allowed_call _ -> "forget_allowed_call"
     | Set_memory_enabled _ -> "set_memory_enabled"
     | Get_custom_instructions -> "get_custom_instructions"
     | Save_custom_instruction _ -> "save_custom_instruction"
@@ -326,6 +328,8 @@ module Method = struct
     | Nix_store_gc { delete_generations = None } -> []
     | Save_memory { id; title; text } -> Memory.save_params ?id ?title text
     | Forget_memory { id } -> Memory.forget_params ~id
+    | Forget_allowed_call { call = Some call } -> [ "call", Json.str call ]
+    | Forget_allowed_call { call = None } -> [ "all", Json.bool true ]
     | Set_memory_enabled { enabled } -> Memory.set_enabled_params enabled
     | Save_custom_instruction { id; title; text } ->
       Custom_instructions.save_params ?id ?title text

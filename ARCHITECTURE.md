@@ -860,7 +860,9 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   call (`Plan_mode.changes_work`); until the user permits the host (one
   of their messages names it or its id as a whole word, ignoring case
   (`Approval.names_host`), or they let a call there run, which is recorded
-  as an `Allowed_call` by `you` in any mode) the inner call asks in every
+  as an `Allowed_call` by `you` in any mode; forgetting that call takes it
+  back, and forgetting all of them also takes back the messages before it:
+  `Session.messages_since_forget_all`) the inner call asks in every
   mode, read-only or not (`decide`'s `host_permitted`; `Smart` has the
   judge decide; the confirmation's summary ends with why); then it
   follows the approval mode. Deny and ask rules apply, but no allow rule (configured or
@@ -1286,7 +1288,12 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   lasts for the session (unlike the judgement cache, not just until the
   user says more): an exact call allowed once stays allowed as the
   conversation moves on, applies only in smart mode, and covers subagents
-  (approvals are per session, like `allow_rule`s).
+  (approvals are per session, like `allow_rule`s). `forget_allowed_call`
+  (`{call}`, a line of `allowed_calls`, or `{all: true}`) drops one or all
+  from the table and appends a `forget_allowed_call` entry (`{call?}`;
+  without a call, every earlier one), so a reload keeps them forgotten and
+  the next such call is judged again; with them goes the host permission
+  they and (for all) earlier user messages gave `on_host`.
 - `Plan` — `update_plan` (Codex's): steps with statuses, validated (several
   may be in progress, for parallel work), and `latest`, the plan as of the last successful call
   in a list of messages, which is how `Agent` keeps it as session state
@@ -1742,7 +1749,8 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   where the session runs), the system prompt, the goal, the reminders
   (`Reminders`, the whole list), the approval mode with plan
   mode (`approval`), rules the user allowed for the session (`allow_rule`), the exact
-  calls let through in smart mode (`allowed_call`, `Allowed_call`),
+  calls let through in smart mode (`allowed_call`, `Allowed_call`), calls
+  forgotten again (`forget_allowed_call`),
   `Archived {archived}` (archived or unarchived by hand; archiving appends
   `Pinned {pinned = false}` too), `Pinned {pinned}` (pinned to the top,
   never archived for being idle; pinning unarchives), `Spend {usage,
@@ -2295,6 +2303,8 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   `change_default`, `btw`, `btw_cancel`,
   `tool_confirm_respond` (`{call_id, agent_id?, allow, always?, reason?}`),
   `set_mode` (`{approval_mode?, plan_mode?}`, answered with the state),
+  `forget_allowed_call` (`{call}` or `{all: true}`: smart mode judges it
+  again),
   `ask_user_respond` (`{call_id, answers: [[string]]}` or `{call_id,
   decline: true}`; the `ask_user` event and `get_pending`'s questions carry
   `deadline_ms`, null when it never times out, and `ask_user_done` says
@@ -3742,6 +3752,9 @@ terminal frontend and `web/` prigh-web, the browser one.
       (`Model.confirms`, `questions`), close on `tool_confirm_done` /
       `ask_user_done` and come back from `get_pending` (`Pending`).
       `/mode`, `/plan`, `/todos`, `/permissions` and Alt+M as in the TUI.
+      `/permissions` is a dialog (`Dialog.Permissions`) whose remembered
+      calls come from the live state, each with Forget, and Forget all
+      (`Forget_allowed_call`).
     - Skills and MCP: `Skills` caches `list_skills` for `/skill:`'s
       completion, keyed by the session, its directory and tool host (a
       reply for another place is ignored; switching user empties it), and

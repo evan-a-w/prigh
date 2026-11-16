@@ -229,6 +229,10 @@ module Method : sig
         ; text : string
         } (** [{note}]: {!Memory.note_of_reply} *)
     | Forget_memory of { id : string }
+    | Forget_allowed_call of
+        { call : string option
+          (** a line of {!State.t.allowed_calls}; [None]: all of them *)
+        } (** smart mode judges it again *)
     | Set_memory_enabled of { enabled : bool }
     | Get_custom_instructions (** {!Custom_instructions} *)
     | Save_custom_instruction of

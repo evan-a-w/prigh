@@ -667,7 +667,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     Ctrl+K                  delete to the end of the line
     Ctrl+U                  delete to the start of the line
     Ctrl+W / Alt+Backspace  delete the word before the cursor
-    Ctrl+Y                  paste the most recent kill
+    Ctrl+Y                  paste the most recent kill (right after Ctrl+Z undid a paste: redo it)
     Alt+Y                   replace the last yank with an older kill
     Ctrl+_                  undo the last edit (the /pr new form: back to the text before the model's draft)
     Ctrl+O                  cycle transcript verbosity
@@ -685,7 +685,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     Alt+T                   /sessions: pin the highlighted session to the top, or unpin it
     Alt+R                   /worktree: review the highlighted worktree's changes
     Ctrl+X                  copy the last assistant message
-    Ctrl+Z                  suspend to the shell
+    Ctrl+Z                  suspend to the shell (right after a long paste's token went in or out: undo that)
     Alt+L                   show or hide the agents sidebar (terminals of 120 columns and more)
     Shift+Tab               cycle focus: main → agent 1 → … → main
     Alt+1                   focus agent N (Alt+1…9)
@@ -710,7 +710,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /plan [on|off]                     toggle plan mode: the model investigates and plans, changing no files, until you turn it off
     /chat [on|off]                     toggle chat mode: talk without the tool host (no files, commands or project; the web and other host-free tools), until you turn it off
     /todos                             show the model's plan (its update_plan steps)
-    /permissions                       show the mode and the allow/ask/deny rules (config and this session)
+    /permissions [forget N|all]        show the mode, the allow/ask/deny rules and the calls smart mode remembered; forget N or all: judge them again (and ask again on the hosts they let the agent work on)
     /notify [off|bell|desktop]         how to tell you that a turn ended or something waits for you while the terminal is not focused
     /auth                              show which providers and git hosts are configured
     /budget [dollars|off]              show or set the session's cost budget: no turn starts once it is spent

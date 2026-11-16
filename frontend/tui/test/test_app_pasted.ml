@@ -349,3 +349,146 @@ let%expect_test "the transcript names pasted texts rather than showing them" =
     /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
+
+let%expect_test
+    "Ctrl+Z undoes a long paste's token going in or out; Ctrl+Y redoes"
+  =
+  let h = connected () in
+  let ctrl c = H.key h (Key.ctrl c) in
+  H.keys h "why? ";
+  paste h long_text;
+  editor h;
+  ctrl 'z';
+  editor h;
+  ctrl 'y';
+  editor h;
+  print_endline "--- Backspace takes the token out; Ctrl+Z puts it back";
+  H.key h (Key.plain Backspace);
+  editor h;
+  ctrl 'z';
+  editor h;
+  ctrl 'y';
+  editor h;
+  ctrl 'z';
+  editor h;
+  print_endline "--- typed text: Ctrl+Z suspends, Ctrl+Y yanks as before";
+  H.keys h "ok";
+  ctrl 'z';
+  editor h;
+  ctrl 'w';
+  ctrl 'y';
+  editor h;
+  [%expect
+    {|
+    "why? [Pasted text #1 +41 lines]"
+    "why? "
+    "why? [Pasted text #1 +41 lines]"
+    --- Backspace takes the token out; Ctrl+Z puts it back
+    "why? "
+    "why? [Pasted text #1 +41 lines]"
+    "why? "
+    "why? [Pasted text #1 +41 lines]"
+    --- typed text: Ctrl+Z suspends, Ctrl+Y yanks as before
+    Suspend
+    "why? [Pasted text #1 +41 lines]ok"
+    "why? [Pasted text #1 +41 lines]ok"
+    |}]
+;;
+
+(* A user message as the backend has it: what was typed, then each pasted
+   text's block, with the origin saying where the texts are. *)
+let message_with_pasted ~id ~parent ~body pasted =
+  let text, spans =
+    List.foldi pasted ~init:(body, []) ~f:(fun i (text, spans) p ->
+      let header =
+        sprintf
+          "\n\n<pasted_text name=\"Pasted text #%d\" lines=\"%d\">\n"
+          (i + 1)
+          (Pasted_text.count_lines p)
+      in
+      let start = String.length text + String.length header in
+      ( text ^ header ^ p ^ "\n</pasted_text>"
+      , `Object
+          [ "name", `String (sprintf "Pasted text #%d" (i + 1))
+          ; "lines", `Number (Int.to_string (Pasted_text.count_lines p))
+          ; "start", `Number (Int.to_string start)
+          ; "length", `Number (Int.to_string (String.length p))
+          ]
+        :: spans ))
+  in
+  `Object
+    [ "id", `String id
+    ; "parent", parent
+    ; "kind", `String "message"
+    ; ( "message"
+      , `Object
+          [ "role", `String "user"
+          ; "text", `String text
+          ; ( "origin"
+            , `Object
+                [ "body", `String body; "pasted", `Array (List.rev spans) ] )
+          ] )
+    ]
+;;
+
+let%expect_test "/fork gives a message's pasted texts back as tokens" =
+  let h = connected () in
+  let entries =
+    `Object
+      [ ( "entries"
+        , `Array
+            [ message_with_pasted
+                ~id:"u1"
+                ~parent:`Null
+                ~body:"why? [Pasted text #1]"
+                [ long_text ]
+            ; message_with_pasted
+                ~id:"u2"
+                ~parent:(`String "u1")
+                ~body:"and these?"
+                [ long_text ^ "\nmore"; long_text ]
+            ] )
+      ]
+    |> Jsonaf.to_string
+  in
+  H.keys h "/fork";
+  H.enter h;
+  H.reply ~quiet:true h Entries_for_fork entries;
+  H.key h (Key.plain Up);
+  H.enter h;
+  editor h;
+  H.enter h;
+  [%expect
+    {|
+    (Rpc (method_ get_entries) (params ()) (tag Entries_for_fork))
+    (Rpc (method_ fork) (params ((at u1))) (tag Reload_messages))
+    "why? [Pasted text #1 +41 lines]"
+    (Rpc
+      (method_ prompt)
+      (params (
+        (text "why? [Pasted text #1]")
+        (pasted (
+          "0\n1\n2\n3\n4\n5\n6\n7\n8\n9\n0\n1\n2\n3\n4\n5\n6\n7\n8\n9\n0\n1\n2\n3\n4\n5\n6\n7\n8\n9\n0\n1\n2\n3\n4\n5\n6\n7\n8\n9\n0"))))
+      (tag Show_error))
+    (Append_history "why? [Pasted text #1 +41 lines]")
+    (Rpc
+      (method_ push_pref)
+      (params (
+        (key   history)
+        (value "why? [Pasted text #1 +41 lines]")
+        (max   500)))
+      (tag Ignore))
+    |}];
+  print_endline "--- the other: its texts after what was typed";
+  H.keys h "/fork";
+  H.enter h;
+  H.reply ~quiet:true h Entries_for_fork entries;
+  H.step ~quiet:true h (Key (Key.plain Enter));
+  editor h;
+  [%expect
+    {|
+    --- the other: its texts after what was typed
+    (Rpc (method_ get_entries) (params ()) (tag Entries_for_fork))
+    "and these? [Pasted text #2 +42 lines] [Pasted text #3 +41 lines]"
+    |}]
+;;

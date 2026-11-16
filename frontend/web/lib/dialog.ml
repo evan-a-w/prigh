@@ -102,6 +102,10 @@ type t =
       { title : string
       ; text : string
       }
+  | Permissions of
+      { rules : string
+      ; hint : string
+      }
   | Pasted of int
   | Mcp_tools of Mcp_server.t
   | Mcp_sign_in of
@@ -154,6 +158,7 @@ let per_session = function
   | Create_dir _
   | Session _
   | Text _
+  | Permissions _
   | Pasted _
   | Mcp_tools _
   | Mcp_sign_in _

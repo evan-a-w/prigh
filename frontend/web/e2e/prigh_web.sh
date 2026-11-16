@@ -50,7 +50,7 @@
 # the agent drives the screen, its consent dialog (allow, Stop, ask again,
 # deny), on a desktop and two phones, then smart.mjs, smart approval mode:
 # the mode, a call the approval model allows and one it leaves to the user,
-# Settings → Models → Approvals, on a desktop and two phones, then ui.mjs,
+# /permissions forgetting the calls it remembered, Settings → Models → Approvals, on a desktop and two phones, then ui.mjs,
 # then chat.mjs, chat mode on a backend with no tool host, on a desktop and
 # phones, then quiet.mjs, the quiet transcript's runs of steps, on a desktop
 # and two phones) in each browser and diffs the output with ENGINE.expected (chromium.expected,
