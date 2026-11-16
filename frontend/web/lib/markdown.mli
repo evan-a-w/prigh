@@ -92,3 +92,12 @@ val safe_href : string -> bool
     line, outside code, that cannot continue a list. Ascending. While a
     reply streams, the parts before the last one are complete. *)
 val block_starts : string -> int list
+
+(** [block_starts text] where [text] extends [prev] (a reply streaming)
+    whose block starts were [prev_starts]: scans only from the last block
+    whose first line [prev] had whole. *)
+val block_starts_extending
+  :  prev:string
+  -> prev_starts:int list
+  -> string
+  -> int list
