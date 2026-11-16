@@ -2073,7 +2073,7 @@ let is_session_file name =
   String.is_suffix name ~suffix:".jsonl" && not (Trace_file.is_trace_file name)
 ;;
 
-let list_with ~live ~load ~dir =
+let list_with ~yield ~live ~load ~dir =
   match Sys_unix.is_directory dir with
   | `No | `Unknown -> []
   | `Yes ->
@@ -2089,7 +2089,12 @@ let list_with ~live ~load ~dir =
     Hashtbl.filter_keys_inplace summary_cache ~f:(fun path ->
       (not (String.equal (Filename.dirname path) dir)) || Set.mem present path);
     let removed = Hashtbl.length summary_cache < before in
-    let summaries = List.filter_map paths ~f:(cached_summary ~live ~load) in
+    let summaries =
+      List.filter_map paths ~f:(fun path ->
+        let summary = cached_summary ~live ~load path in
+        yield ();
+        summary)
+    in
     if removed || List.exists summaries ~f:fst then write_summary_file ~dir;
     List.filter_map summaries ~f:snd
     |> List.stable_sort ~compare:(fun (a, _) (b, _) -> Float.compare b a)
@@ -2106,7 +2111,7 @@ let summary_with ~live ~load path =
     Option.map summary ~f:snd
 ;;
 
-let list ~dir = list_with ~live:(fun _ -> None) ~load ~dir
+let list ~dir = list_with ~yield:ignore ~live:(fun _ -> None) ~load ~dir
 
 let forget_cached_summaries () =
   Hashtbl.clear summary_cache;

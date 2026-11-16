@@ -663,6 +663,7 @@ let%expect_test "listing sums up live sessions from memory" =
     ignore (Session.append_message s (Message.user "hi") : Session.Entry.t));
   let list () =
     Session.list_with
+      ~yield:ignore
       ~live:(fun path ->
         Option.some_if (String.equal path (Session.path live)) live)
       ~load:(fun path ->
