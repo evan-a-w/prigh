@@ -166,25 +166,23 @@ jobs:
           fi
 
       # The image's build takes prigh from this runner's store (backend and
-      # frontend as just built, in a local binary cache given to it as the
-      # `prebuilt` build context: see docker/fetch-prigh.sh), so it does not
-      # wait for Attic. What this run did not build (Attic had it) comes from
-      # Attic. REQUIRE_CACHED=1: it never compiles.
+      # frontend as just built, as NARs in the `prebuilt` build context: see
+      # docker/fetch-prigh.sh), so it does not wait for Attic. What this run
+      # did not build (Attic had it) comes from Attic. REQUIRE_CACHED=1: it never compiles.
       - name: Stage prigh for the image
         id: stage
         if: env.PUBLISH_IMAGE == 'true'
         run: |
           dir=$RUNNER_TEMP/prebuilt
           mkdir -p "$dir"
-          paths=()
           for t in backend frontend; do
             p=$(nix eval --raw ".#$t.outPath")
-            if nix path-info "$p" >/dev/null 2>&1; then paths+=("$p"); fi
+            if nix path-info "$p" >/dev/null 2>&1; then
+              nix-store --dump "$p" >"$dir/${p##*/}.nar"
+              nix hash file --sri --type sha256 "$dir/${p##*/}.nar" >"$dir/${p##*/}.narhash"
+            fi
           done
-          if [ ${#paths[@]} -gt 0 ]; then
-            nix copy --no-recursive --to "file://$dir?compression=zstd" "${paths[@]}"
-          fi
-          du -sh "$dir"
+          ls -la "$dir"
           sha=$GITHUB_SHA
           tags="$IMAGE:${sha:0:7}"
           if [ "$GITHUB_REF" = refs/heads/main ]; then

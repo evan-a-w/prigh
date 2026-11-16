@@ -16,8 +16,8 @@ and [Isolation](#isolation).
 ## The image
 
 CI publishes the image for every commit of `main` to
-`ghcr.io/evan-a-w/prigh` (`.github/workflows/docker-image.yml`, once the
-[binary cache](#binary-cache) has that commit): the tags `main` and
+`ghcr.io/evan-a-w/prigh` (`.github/workflows/attic.yml`, as soon as it has
+built that commit: see [Binary cache](#binary-cache)): the tags `main` and
 `latest` follow `main`, and each commit's short sha (`:e9c8b23`) pins it.
 `docker-compose.yml` runs `${PRIGH_IMAGE:-ghcr.io/evan-a-w/prigh:main}`
 with `pull_policy: always`, so every `docker compose up` (and Portainer's
@@ -716,18 +716,28 @@ nix build --no-link --print-out-paths path:.#frontend.inputDerivation path:.#bac
 ```
 
 Anything missing from the cache is compiled, so a stale cache makes the
-build slower but does not break it. When that workflow succeeds on `main`,
-`.github/workflows/docker-image.yml` builds the image from the same commit
-(downloading prigh from the cache, with `REQUIRE_CACHED=1`) and pushes it
-to `ghcr.io/evan-a-w/prigh`; it can also be run by hand (Actions →
-docker-image → Run workflow) for main or a branch (a branch gets only its
-short sha tag).
+build slower but does not break it.
+
+The workflow runs two jobs side by side: `server` (backend, frontends, the
+default dev shell) and `desktop` (prigh-desktop, prigh-computer, the
+desktop dev shell). As soon as `server` has built prigh, it builds the
+image from its own store (the backend and frontend as NARs in the
+`prebuilt` build context, with `REQUIRE_CACHED=1`) and pushes it to
+`ghcr.io/evan-a-w/prigh`, before uploading anything to Attic, so a slow
+upload never delays the image, and an unreachable Attic API only skips
+the upload. Its last step, `Attic connection`, shows how the runner
+reaches the Attic peer (P2P or relayed, the latency) and the download
+rate of the same NAR over NetBird and over the internet, to tell a slow
+tunnel from slow storage. It can also be run by hand (Actions → attic →
+Run workflow) for main or a branch (a branch's image gets only its short
+sha tag; untick `publish_image` to skip it).
 
 ## How the image is built
 
 1. A `nixos/nix` stage gets `.#backend` and `.#frontend` of the flake
    (`docker/fetch-prigh.sh`): one the binary cache has (signed by a trusted
-   key) is downloaded as that store path alone, checked against its hash
+   key) is downloaded as that store path alone (CI passes the ones it just
+   built as NARs in the `prebuilt` build context, which come first), checked against its hash
    and unpacked, without its closure (which holds the whole OxCaml
    toolchain, ~3 GB to download); one it lacks is built, after a warning
    and `nix build --dry-run`'s plan (`REQUIRE_CACHED=1`, as CI sets, fails
