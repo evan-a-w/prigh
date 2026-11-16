@@ -1,5 +1,6 @@
 open! Core
 open! Import
+module Weak_map = Jsoo_weak_collections.Weak_map
 
 module Target = struct
   type t =
@@ -100,6 +101,46 @@ let entry_point n (entry : Chat.Entry.t) : Point.t option =
 
 let landmark entry = Option.is_some (entry_point 0 entry)
 
+(* The points are worked out again at each render of the rail: of the
+   outline and of each entry once. *)
+let last_outline : (Outline.t * int * Point.t list) option ref = ref None
+
+let outline_points outline ~older =
+  match !last_outline with
+  | Some (outline', older', points)
+    when phys_equal outline outline' && older = older' -> points
+  | _ ->
+    let points =
+      List.filter_map outline ~f:(fun (p : Outline.Point.t) ->
+        Option.some_if
+          (p.index < older)
+          { Point.target = Message p.index
+          ; kind = Kind.of_outline p.kind
+          ; text =
+              (match p.kind with
+               | User -> headline p.text
+               | Error -> first_line p.text
+               | Compaction -> "")
+          ; at = p.at
+          })
+    in
+    last_outline := Some (outline, older, points);
+    points
+;;
+
+let entry_points : (Chat.Entry.t, int * Point.t option) Weak_map.t =
+  Weak_map.create ()
+;;
+
+let cached_entry_point n entry =
+  match Weak_map.get entry_points entry with
+  | Some (n', point) when n = n' -> point
+  | _ ->
+    let point = entry_point n entry in
+    Weak_map.set entry_points entry (n, point);
+    point
+;;
+
 let points
       ?(deleting = Int.Set.empty)
       t
@@ -121,25 +162,14 @@ let points
     match t.outline, path with
     | Some (of_, outline), Some path
       when String.equal of_ path && paging.older > 0 ->
-      List.filter_map outline ~f:(fun (p : Outline.Point.t) ->
-        Option.some_if
-          (p.index < paging.older)
-          { Point.target = Message p.index
-          ; kind = Kind.of_outline p.kind
-          ; text =
-              (match p.kind with
-               | User -> headline p.text
-               | Error -> first_line p.text
-               | Compaction -> "")
-          ; at = p.at
-          })
+      outline_points outline ~older:paging.older
     | _ -> []
   in
   trimmed
   @ unloaded
   @ List.filter_mapi (Chat.entries chat) ~f:(fun i entry ->
     let n = Chat.first chat + i in
-    if Set.mem deleting n then None else entry_point n entry)
+    if Set.mem deleting n then None else cached_entry_point n entry)
 ;;
 
 (* Messages and entries go one for one, but tool results, which join their
