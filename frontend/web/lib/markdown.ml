@@ -993,7 +993,8 @@ let may_continue line =
   String.is_empty line || Char.is_whitespace line.[0] || item_or_quote line
 ;;
 
-let block_starts text =
+(* The starts from [pos] on, after [acc] (newest first). *)
+let scan_block_starts text ~pos ~after_blank acc =
   let n = String.length text in
   (* [listy]: the block has a list or quote, which a blank line may not end. *)
   let rec go pos ~fence ~after_blank ~listy acc =
@@ -1028,5 +1029,23 @@ let block_starts text =
           ~listy:(item_or_quote line || (listy && not start))
           (if start then pos :: acc else acc))
   in
-  go 0 ~fence:None ~after_blank:false ~listy:false []
+  go pos ~fence:None ~after_blank ~listy:false acc
+;;
+
+let block_starts text = scan_block_starts text ~pos:0 ~after_blank:false []
+
+(* A start whose line was whole in [prev] stays one, and the scan resumes
+   there as it would have reached it: outside code and math, after a blank
+   line (whether a list was open makes no difference to a line that starts
+   a block). *)
+let block_starts_extending ~prev ~prev_starts text =
+  if not (String.is_prefix text ~prefix:prev)
+  then block_starts text
+  else (
+    let whole s = Option.is_some (String.index_from prev s '\n') in
+    match List.rev prev_starts |> List.find ~f:whole with
+    | None -> block_starts text
+    | Some s ->
+      let before = List.rev (List.filter prev_starts ~f:(fun p -> p < s)) in
+      scan_block_starts text ~pos:s ~after_blank:true before)
 ;;

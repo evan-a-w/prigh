@@ -87,6 +87,15 @@ val change : ?nth:int -> t -> selector:string -> string -> unit
 (** The page as indented HTML; [selector] picks part of it. *)
 val show : ?selector:string -> t -> unit
 
+(** Renders the page with [inject] (by default a new one each time), and
+    the nodes [selector] matches (by default the page). *)
+val node
+  :  ?inject:(App.Action.t -> unit Virtual_dom.Vdom.Effect.t)
+  -> t
+  -> ?selector:string
+  -> unit
+  -> Virtual_dom_test_helpers.Node_helpers.t list
+
 (** The page's visible text: a line per block element, buttons and links in
     (parentheses; their title when they only have an icon), fields as
     [\[value\]], checkboxes as ☐/☑ and radio buttons as ○/◉. *)

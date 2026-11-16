@@ -19,12 +19,14 @@ let empty =
 
 let wanted t roots = List.filter roots ~f:(fun r -> not (Set.mem t.asked r))
 
-let requested t roots =
-  let roots = String.Set.of_list roots in
-  { t with
-    asked = Set.union t.asked roots
-  ; ever_asked = Set.union t.ever_asked roots
-  }
+let requested t = function
+  | [] -> t
+  | roots ->
+    let roots = String.Set.of_list roots in
+    { t with
+      asked = Set.union t.asked roots
+    ; ever_asked = Set.union t.ever_asked roots
+    }
 ;;
 
 let loaded t ~root listing =

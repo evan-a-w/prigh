@@ -279,6 +279,73 @@ let transcript (m : Model.t) ~inject =
        ])
 ;;
 
+(* The parts of the page, each made again only when what it shows may have
+   changed: a key typed remakes the composer alone, a streamed delta the
+   parts that show the transcript (not the sidebar, the review, the files or
+   the terminal). Each part's [inert] is inside it: a part is the same node
+   only if made by the same [View_memo]. *)
+module Part = struct
+  (* The time as a part shows it: what changes at most once a minute
+     ("3m ago", "14:32") by the minute, messages' times by the day ("Today",
+     "Yesterday"), the agents panel's running times by the second. *)
+  module Clock = struct
+    type t =
+      | Minute of Int63.t option
+      | Day of Message_time.t
+      | Exact of Time_ns.t option
+    [@@deriving equal]
+
+    let minute (m : Model.t) =
+      Minute
+        (Option.map m.now ~f:(fun now ->
+           Int63.( / )
+             (Time_ns.to_int63_ns_since_epoch now)
+             (Int63.of_int64_exn 60_000_000_000L)))
+    ;;
+  end
+
+  let same ~outside (m, clock, inject) (m', clock', inject') =
+    phys_equal inject inject' && Clock.equal clock clock' && outside m m'
+  ;;
+
+  (* What does not show the composer's text. *)
+  let outside_composer = same ~outside:Model.same_but_composer
+
+  (* What shows neither it nor the transcript. *)
+  let outside_transcript = same ~outside:Model.same_but_composer_and_transcript
+
+  let make ?(clock = Clock.minute) name ~equal =
+    let memo = View_memo.create name in
+    fun (m : Model.t) ~inject f ->
+      View_memo.find memo ~deps:(m, clock m, inject) ~equal ~f:(fun () -> f m)
+  ;;
+
+  let sidebar = make "sidebar" ~equal:outside_transcript
+  let review = make "review" ~equal:outside_transcript
+  let chrome = make "chrome" ~equal:outside_composer
+
+  (* The new-session screen lists sessions with their ages. *)
+  let chat =
+    make "chat" ~equal:outside_composer ~clock:(fun m ->
+      if List.is_empty (Chat.entries m.chat)
+      then Clock.minute m
+      else Day (Model.message_time m))
+  ;;
+
+  let btw = make "btw" ~equal:outside_transcript
+  let terminal = make "terminal" ~equal:outside_transcript
+  let files = make "files" ~equal:outside_transcript
+
+  let agents =
+    make "agents" ~equal:outside_composer ~clock:(fun m ->
+      if m.agents.open_ then Exact m.now else Clock.minute m)
+  ;;
+
+  let dialogs = make "dialogs" ~equal:outside_composer
+end
+
+(* The terminal's widget is one function of its target for the page's
+   life, so that it is not among what [Part.terminal] depends on. *)
 let view (m : Model.t) ~inject ~terminal =
   Session_link_view.set m.sessions;
   (* Each layer over a part makes it inert once: the attribute twice would
@@ -306,7 +373,7 @@ let view (m : Model.t) ~inject ~terminal =
   (* The panels beside the review are under its drawer; a phone's sheets
      are over its drawer. *)
   let panel = inert_if (modal || (Model.focused m && drawer)) in
-  let chat =
+  let chat (m : Model.t) =
     match loading m, Chat.entries m.chat, m.pending.prompts with
     | Some text, _, _ -> placeholder text
     | None, [], [] -> empty m
@@ -337,10 +404,11 @@ let view (m : Model.t) ~inject ~terminal =
       ; Resize_view.vars m
       ]
     [ (* A closed drawer is only out of sight. *)
-      (if (m.narrow || Model.focused m) && not (Model.sidebar_shown m)
-       then inert
-       else under_sheet)
-        (Sidebar_view.view m ~inject)
+      Part.sidebar m ~inject (fun m ->
+        (if (m.narrow || Model.focused m) && not (Model.sidebar_shown m)
+         then inert
+         else under_sheet)
+          (Sidebar_view.view m ~inject))
     ; (if Model.docked m
        then Resize_view.handle m ~inject Sidebar
        else Node.none)
@@ -360,11 +428,13 @@ let view (m : Model.t) ~inject ~terminal =
         ~cls:"desk"
         [ (* Its pickers are on the page, which keeps them live (the page
              makes the rest of itself inert). *)
-          (match m.dialog with
-           | Some (Review_pick _)
-             when not (Model.waiting m || Files.asking m.files) -> layered false
-           | _ -> under_drawer)
-            (Review_page_view.view m ~inject)
+          Part.review m ~inject (fun m ->
+            (match m.dialog with
+             | Some (Review_pick _)
+               when not (Model.waiting m || Files.asking m.files) ->
+               layered false
+             | _ -> under_drawer)
+              (Review_page_view.view m ~inject))
         ; (if m.review.open_
            then Resize_view.handle m ~inject Review_chat
            else Node.none)
@@ -377,11 +447,12 @@ let view (m : Model.t) ~inject ~terminal =
                   ; "landing", m.landing
                   ]
               ]
-            ([ layered modal_composer (Session_view.chrome m ~inject) ]
-             @ List.map
-                 ~f:under_drawer
-                 [ banner m ~inject
-                 ; div
+            [ Part.chrome m ~inject (fun m ->
+                layered modal_composer (Session_view.chrome m ~inject))
+            ; under_drawer (banner m ~inject)
+            ; Part.chat m ~inject (fun m ->
+                under_drawer
+                @@ div
                      ~cls:"chat-frame"
                      [ Node.div
                          ~attrs:
@@ -398,21 +469,22 @@ let view (m : Model.t) ~inject ~terminal =
                               then Attr.create "aria-busy" "true"
                               else Attr.empty)
                            ]
-                         [ chat; jump_to_bottom m ~inject ]
+                         [ chat m; jump_to_bottom m ~inject ]
                      ; (match loading m with
                         | Some _ -> Node.none
                         | None -> Jump_view.view m ~inject)
-                     ]
-                 ]
-             @ [ toasts m ~inject ]
-             @ [ under_drawer (Btw_view.view m ~inject)
-               ; layered modal_composer (Composer_view.view m ~inject)
-               ])
-        ; under_drawer (Terminal_view.view m ~inject ~widget:terminal)
+                     ])
+            ; toasts m ~inject
+            ; Part.btw m ~inject (fun m ->
+                under_drawer (Btw_view.view m ~inject))
+            ; layered modal_composer (Composer_view.view m ~inject)
+            ]
+        ; Part.terminal m ~inject (fun m ->
+            under_drawer (Terminal_view.view m ~inject ~widget:terminal))
         ]
-    ; panel (Files_view.view m ~inject)
-    ; panel (Agents_view.view m ~inject)
-    ; Dialog_view.view m ~inject
+    ; Part.files m ~inject (fun m -> panel (Files_view.view m ~inject))
+    ; Part.agents m ~inject (fun m -> panel (Agents_view.view m ~inject))
+    ; Part.dialogs m ~inject (fun m -> Dialog_view.view m ~inject)
     ; Files_view.dialog m ~inject
     ; Files_view.pickers
     ; Field_menu_view.view m ~inject

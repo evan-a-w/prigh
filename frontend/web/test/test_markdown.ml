@@ -409,6 +409,54 @@ let%expect_test "streaming: complete blocks are cut off, to be parsed once" =
   [%expect {| |}]
 ;;
 
+(* As a reply streams in chunks of any size, the starts found from the last
+   whole block on are the starts of the whole text. *)
+let%expect_test "block starts extend as the text grows" =
+  let text =
+    "First *this*\n\n\
+     - one\n\n\
+     - two\n\n\
+     ```\n\
+     code\n\n\
+     still\n\
+     ```\n\n\
+     $$\n\
+     x\n\n\
+     y\n\
+     $$\n\n\
+     > quote\n\n\
+     > again\n\n\
+     | a |\n\
+     |---|\n\n\
+     1. item\n\n\
+    \   more\n\n\
+     Last -\n\n\
+     -\n\n\
+     ~~~\n\
+     open fence"
+  in
+  List.iter [ 1; 2; 3; 5; 7; 11 ] ~f:(fun chunk ->
+    let rec grow ~prev ~prev_starts len =
+      if len <= String.length text
+      then (
+        let now = String.prefix text len in
+        let starts = Markdown.block_starts_extending ~prev ~prev_starts now in
+        if not ([%equal: int list] starts (Markdown.block_starts now))
+        then print_s [%message "differs" (chunk : int) (now : string)];
+        grow ~prev:now ~prev_starts:starts (len + chunk))
+    in
+    grow ~prev:"" ~prev_starts:[] 0);
+  (* Text that does not extend the last is scanned whole. *)
+  print_s
+    [%sexp
+      (Markdown.block_starts_extending
+         ~prev:"a\n\nb\n\nc"
+         ~prev_starts:[ 3; 6 ]
+         "x\n\ny"
+       : int list)];
+  [%expect {| (3) |}]
+;;
+
 let%expect_test "streaming: a part per complete block, then the rest" =
   let after =
     Markdown_view.render ~streaming:true "Para one.\n\nPara two.\n\nPara th"
@@ -470,6 +518,31 @@ let%expect_test
 
     ("String.equal streaming ended" true)
     |}]
+;;
+
+(* Rendered delta by delta (reusing the last render's parts), a streaming
+   reply looks as it does rendered afresh. *)
+let%expect_test "streaming: each delta renders as the whole text does" =
+  let html node =
+    Virtual_dom_test_helpers.Node_helpers.(
+      to_string_html (unsafe_convert_exn node))
+  in
+  let text =
+    "Para one.\n\n```\ncode\n\nmore\n```\n\n- a\n\n- b\n\nPara two\n\nend"
+  in
+  for len = 0 to String.length text do
+    let now = String.prefix text len in
+    let incremental = html (Markdown_view.render ~streaming:true now) in
+    ignore
+      (Markdown_view.render ~streaming:true "\000" : Virtual_dom.Vdom.Node.t);
+    let afresh = html (Markdown_view.render ~streaming:true now) in
+    ignore
+      (Markdown_view.render ~streaming:true (String.prefix text len)
+       : Virtual_dom.Vdom.Node.t);
+    if not (String.equal incremental afresh)
+    then print_s [%message "differs" (now : string)]
+  done;
+  [%expect {| |}]
 ;;
 
 let%expect_test "previews: the first line as plain text" =

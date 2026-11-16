@@ -1117,6 +1117,15 @@ module Model : sig
     }
   [@@deriving sexp_of]
 
+  (** Only the composer's text, caret and completion and the time ([now])
+      differ (each other field is the same value): the rest of the page
+      looks the same at the same time. *)
+  val same_but_composer : t -> t -> bool
+
+  (** Only those and the transcript ([chat], [transcript_events],
+      [chat_cache]) differ: what shows neither looks the same. *)
+  val same_but_composer_and_transcript : t -> t -> bool
+
   (** The session's turn runs. *)
   val running : t -> bool
 

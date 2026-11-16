@@ -161,20 +161,57 @@ let part text =
            Node.div ~attrs:(cls "md-part") (blocks ~streaming:false text)))))
 ;;
 
+(* The streaming reply last rendered: its text, block starts and finished
+   parts (with their bounds), which the next delta, extending the text,
+   keeps. *)
+module Streamed = struct
+  type t =
+    { text : string
+    ; links : int
+    ; starts : int list
+    ; settled : ((int * int) * Node.t) list
+    }
+end
+
+let streamed : Streamed.t option ref = ref None
+
 let render ?(streaming = false) text =
-  let rec split pos = function
-    | [] -> [ String.drop_prefix text pos ]
-    | start :: rest ->
-      String.sub text ~pos ~len:(start - pos) :: split start rest
+  let links = Session_link.Known.stamp (Session_link_view.known ()) in
+  let prev =
+    match !streamed with
+    | Some p
+      when streaming && p.links = links && String.is_prefix text ~prefix:p.text
+      -> Some p
+    | _ -> None
   in
-  let pieces = split 0 (Markdown.block_starts text) in
+  let starts =
+    match prev with
+    | Some p ->
+      Markdown.block_starts_extending ~prev:p.text ~prev_starts:p.starts text
+    | None -> Markdown.block_starts text
+  in
+  let bounds = List.zip_exn (0 :: starts) (starts @ [ String.length text ]) in
+  let settled_bounds = List.drop_last_exn bounds in
+  let prev_settled =
+    Option.value_map prev ~default:[] ~f:(fun p -> p.settled)
+  in
+  let rec settle bounds prev =
+    match bounds, prev with
+    | [], _ -> []
+    | b :: bounds, (b', node) :: prev when [%equal: int * int] b b' ->
+      (b, node) :: settle bounds prev
+    | ((pos, stop) as b) :: bounds, _ ->
+      (b, part (String.sub text ~pos ~len:(stop - pos))) :: settle bounds []
+  in
+  let settled = settle settled_bounds prev_settled in
+  if streaming then streamed := Some { text; links; starts; settled };
+  let last_pos, _ = List.last_exn bounds in
+  let last = String.drop_prefix text last_pos in
   Node.div
     ~attrs:(cls "markdown")
-    (if streaming
-     then (
-       let settled = List.drop_last_exn pieces in
-       let last = List.last_exn pieces in
-       List.map settled ~f:part
-       @ [ Node.div ~attrs:(cls "md-part") (blocks ~streaming:true last) ])
-     else List.map pieces ~f:part)
+    (List.map settled ~f:snd
+     @ [ (if streaming
+          then Node.div ~attrs:(cls "md-part") (blocks ~streaming:true last)
+          else part last)
+       ])
 ;;
