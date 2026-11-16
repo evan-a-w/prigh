@@ -1,36 +1,95 @@
 # Builds prigh, everything it is built from and the dev shells on every push
-# to main and pushes them to the Attic cache `prigh`, the flake's and the
-# Docker build's substituter. Its API is only reachable over NetBird, so the
-# runner joins the network first as an ephemeral peer. Pulls are public, from
-# https://attic.caduc.co/prigh (the Docker build's backend and frontend have
-# the same store paths as these).
+# to main, publishes the Docker image (Dockerfile, DOCKER.md) to
+# ghcr.io/evan-a-w/prigh, and pushes the builds to the Attic cache `prigh`,
+# the flake's and the Docker build's substituter.
+#
+# Two jobs run side by side on their own runners: `server` (the backend, the
+# frontends, the default dev shell, and the image) and `desktop`
+# (prigh-desktop and prigh-computer, which wrap prigh, so it builds those
+# too, and the desktop dev shell). The image is built from the server job's
+# own store as soon as prigh is built, so it never waits for the upload to
+# Attic, which runs after it and can be slow (the Attic API is only
+# reachable over NetBird).
+#
+# Pulls are public, from https://attic.caduc.co/prigh. Pushing needs the API:
+# the runner joins NetBird as an ephemeral peer. When it cannot reach it, the
+# build and the image go ahead and only the push is skipped (a warning; the
+# next run pushes what is missing).
 #
 # Secrets: NETBIRD_SETUP_KEY (reusable, ephemeral, auto-assigned to a group
 # allowed TCP to the Attic API), ATTIC_ENDPOINT (the API endpoint, e.g.
 # http://100.x.y.z:8765/), ATTIC_TOKEN (atticadm make-token --push prigh
 # --pull prigh). Variable: NETBIRD_MANAGEMENT_URL when NetBird is self-hosted.
+#
+# Image tags: main, latest and the commit's short sha for main; a branch run
+# by hand (Actions → attic → Run workflow) gets only its short sha, unless
+# publish_image is off.
 name: attic
 
 on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      publish_image:
+        description: Publish the Docker image of this ref to ghcr.io
+        type: boolean
+        default: true
 
+# A burst of merges cancels the older runs: the newest commit is built and
+# published, and its push uploads whatever the cancelled ones did not.
 concurrency:
-  group: attic
+  group: attic-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
-  push:
+  build:
+    name: ${{ matrix.name }}
     runs-on: ubuntu-24.04
     if: github.repository == 'evan-a-w/prigh'
     # Compiling the OxCaml toolchains from scratch (after a dependency change)
     # takes hours on a runner.
     timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: server
+            image: true
+            targets: >-
+              default backend frontend
+              backend.inputDerivation frontend.inputDerivation
+              devShells.x86_64-linux.default.inputDerivation
+          - name: desktop
+            image: false
+            targets: >-
+              prigh-desktop prigh-computer
+              prigh-desktop-unwrapped.inputDerivation prigh-computer.inputDerivation
+              devShells.x86_64-linux.desktop.inputDerivation
+    env:
+      IMAGE: ghcr.io/${{ github.repository }}
+      PUBLISH_IMAGE: ${{ matrix.image && (github.event_name == 'push' || inputs.publish_image) }}
     steps:
-      - uses: jlumbroso/free-disk-space@54081f138730dfa15788a46383842cd2f914a1be # v1.3.1
-        with:
-          tool-cache: true
+      # The OxCaml toolchain and its builds need more than the root disk has
+      # free. /nix goes on the runner's temporary disk (/mnt) when that is big
+      # enough; the unused SDKs are deleted in the background either way (the
+      # free-disk-space action took 5 minutes, mostly removing apt packages).
+      - name: Make room
+        run: |
+          avail=$(df --output=avail -k /mnt 2>/dev/null | tail -1 | tr -d ' ' || true)
+          if [ "${avail:-0}" -gt $((40 * 1024 * 1024)) ]; then
+            sudo mkdir -p /mnt/nix /nix
+            sudo mount --bind /mnt/nix /nix
+            echo "/nix is on /mnt"
+          fi
+          sudo nohup rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/.ghcup \
+            /opt/hostedtoolcache /usr/share/swift /usr/local/share/powershell \
+            /usr/local/share/chromium /usr/local/lib/node_modules >/dev/null 2>&1 &
+          df -h / /mnt || true
 
       - uses: actions/checkout@v4
 
@@ -40,54 +99,56 @@ jobs:
             accept-flake-config = true
 
       - name: Join NetBird
+        id: netbird
+        continue-on-error: true
         uses: ankurk91/netbird-action@a2bfe6fd69eed50daa9387dfb3d86e5092f25557 # v2
         with:
           setup-key: ${{ secrets.NETBIRD_SETUP_KEY }}
           management-url: ${{ vars.NETBIRD_MANAGEMENT_URL || 'https://api.netbird.io:443' }}
 
+      # Gives up in a minute or two, not after the build, when the API cannot
+      # be reached (the server or its NetBird peer down, its storage hung):
+      # then nothing is pushed, but the build and the image go ahead.
       - name: Log in to Attic
+        id: attic
+        if: steps.netbird.outcome == 'success'
+        continue-on-error: true
         env:
           ATTIC_ENDPOINT: ${{ secrets.ATTIC_ENDPOINT }}
           ATTIC_TOKEN: ${{ secrets.ATTIC_TOKEN }}
         run: |
           nix profile install nixpkgs#attic-client
           attic login ci "$ATTIC_ENDPOINT" "$ATTIC_TOKEN"
-
-      # Fails in a minute or two, not after the build, when the API cannot be
-      # reached (the server or its NetBird peer down, its storage hung).
-      - name: Check the Attic API
-        run: |
           for attempt in 1 2 3; do
             if timeout 30 attic cache info ci:prigh; then exit 0; fi
             echo "Attic API not answering (attempt $attempt of 3)" >&2
             sleep 15
           done
-          echo "::error::The Attic API at ATTIC_ENDPOINT does not answer: check atticd and its NetBird peer"
+          echo "::warning::The Attic API at ATTIC_ENDPOINT does not answer (check atticd and its NetBird peer): building without pushing"
           exit 1
 
-      # Everything a build or a dev shell needs: the packages, what they are
-      # built from (inputDerivation: the OxCaml toolchains and packages, the
-      # Rust crates) and the dev shells' inputs (a shell's own output is a stub
-      # that references none of them). The watcher starts before evaluation,
-      # which builds opam-nix's import-from-derivation results. Paths are
-      # pushed as they are built, so a failed or cancelled run still caches
-      # what it finished; paths on cache.nixos.org are skipped. Attic only
-      # uploads what it lacks (and of that, only the chunks it lacks); targets
-      # the cache already has are not built at all, so unchanged dependencies
-      # are not even downloaded. Only the build decides this step: an upload
-      # that fails (the watcher dies on a timed-out request) is a warning, and
-      # the next step pushes the targets' closures again.
+      # The targets: the packages, what they are built from (inputDerivation:
+      # the OxCaml toolchains and packages, the Rust crates) and the dev
+      # shells' inputs (a shell's own output is a stub that references none of
+      # them). The watcher starts before evaluation, which builds opam-nix's
+      # import-from-derivation results. Paths are pushed as they are built,
+      # so a failed or cancelled run still caches what it finished; paths on
+      # cache.nixos.org are skipped. Targets the cache already has are not
+      # built at all, so unchanged dependencies are not even downloaded.
+      # Only the build decides this step: a watcher that dies (a timed-out
+      # request) is a warning, and Push sends the targets' closures again.
       - name: Build
+        env:
+          TARGETS: ${{ matrix.targets }}
+          PUSH: ${{ steps.attic.outcome == 'success' }}
         run: |
-          attic watch-store ci:prigh &
-          watcher=$!
-          trap 'kill "$watcher" 2>/dev/null || true' EXIT
+          if [ "$PUSH" = true ]; then
+            attic watch-store ci:prigh &
+            watcher=$!
+            trap 'kill "$watcher" 2>/dev/null || true' EXIT
+          fi
           targets=()
-          for t in default prigh-desktop prigh-computer backend frontend \
-            backend.inputDerivation frontend.inputDerivation \
-            prigh-desktop-unwrapped.inputDerivation prigh-computer.inputDerivation \
-            devShells.x86_64-linux.default.inputDerivation \
-            devShells.x86_64-linux.desktop.inputDerivation; do
+          for t in $TARGETS; do
             out=$(nix eval --raw ".#$t.outPath")
             if nix path-info --store https://attic.caduc.co/prigh "$out" >/dev/null 2>&1; then
               echo "cached: $t"
@@ -98,19 +159,79 @@ jobs:
           if [ ${#targets[@]} -gt 0 ]; then
             nix build --print-build-logs "${targets[@]}"
           fi
-          if ! kill -0 "$watcher" 2>/dev/null; then
+          if [ "$PUSH" = true ] && ! kill -0 "$watcher" 2>/dev/null; then
             status=0
             wait "$watcher" || status=$?
-            echo "::warning::attic watch-store exited early (status $status): the paths built after that are pushed by the next step"
+            echo "::warning::attic watch-store exited early (status $status): the paths built after that are pushed by Push"
           fi
+
+      # The image's build takes prigh from this runner's store (backend and
+      # frontend as just built, in a local binary cache given to it as the
+      # `prebuilt` build context: see docker/fetch-prigh.sh), so it does not
+      # wait for Attic. What this run did not build (Attic had it) comes from
+      # Attic. REQUIRE_CACHED=1: it never compiles.
+      - name: Stage prigh for the image
+        id: stage
+        if: env.PUBLISH_IMAGE == 'true'
+        run: |
+          dir=$RUNNER_TEMP/prebuilt
+          mkdir -p "$dir"
+          paths=()
+          for t in backend frontend; do
+            p=$(nix eval --raw ".#$t.outPath")
+            if nix path-info "$p" >/dev/null 2>&1; then paths+=("$p"); fi
+          done
+          if [ ${#paths[@]} -gt 0 ]; then
+            nix copy --no-recursive --to "file://$dir?compression=zstd" "${paths[@]}"
+          fi
+          du -sh "$dir"
+          sha=$GITHUB_SHA
+          tags="$IMAGE:${sha:0:7}"
+          if [ "$GITHUB_REF" = refs/heads/main ]; then
+            tags="$tags,$IMAGE:main,$IMAGE:latest"
+          fi
+          {
+            echo "dir=$dir"
+            echo "tags=$tags"
+          } >>"$GITHUB_OUTPUT"
+          echo "Publishing $sha as $tags"
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+        if: env.PUBLISH_IMAGE == 'true'
+
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        if: env.PUBLISH_IMAGE == 'true'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # The registry cache (the buildcache tag) keeps the layers that did not
+      # change (Debian and its packages, the Nix stage's setup), so a new
+      # commit only redoes prigh's. linux/amd64 only: an arm64 image needs
+      # arm64 builds of backend and frontend (an aarch64 runner) first.
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        if: env.PUBLISH_IMAGE == 'true'
+        with:
+          context: .
+          build-contexts: prebuilt=${{ steps.stage.outputs.dir }}
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.stage.outputs.tags }}
+          build-args: |
+            REVISION=${{ github.sha }}
+            REQUIRE_CACHED=1
+          cache-from: type=registry,ref=${{ env.IMAGE }}:buildcache
+          cache-to: type=registry,ref=${{ env.IMAGE }}:buildcache,mode=max
 
       # The targets' closures (the ./result links), for what the watcher did
       # not push. A cache that cannot take them (atticd or its NetBird peer
-      # down, an upload timing out) does not fail the build: it is retried
-      # with backoff (Attic skips what it already has, so a retry only sends
-      # what is missing), then left as a warning, for the next run to push.
+      # down, an upload timing out) does not fail the run: it is retried with
+      # backoff (Attic skips what it already has, so a retry only sends what
+      # is missing), then left as a warning, for the next run to push.
       # continue-on-error covers the rest (the step's timeout, attic missing).
       - name: Push
+        if: steps.attic.outcome == 'success'
         continue-on-error: true
         timeout-minutes: 120
         run: |
@@ -122,10 +243,24 @@ jobs:
           fi
           delay=30
           for attempt in 1 2 3 4; do
-            if attic push ci:prigh "${results[@]}"; then exit 0; fi
+            start=$(date +%s)
+            if attic push ci:prigh "${results[@]}"; then
+              echo "pushed in $(($(date +%s) - start))s"
+              exit 0
+            fi
             if [ "$attempt" = 4 ]; then break; fi
             echo "attic push failed (attempt $attempt of 4), retrying in ${delay}s" >&2
             sleep "$delay"
             delay=$((delay * 2))
           done
           echo "::warning::attic push failed 4 times: the build passed, but the cache lacks some of it until the next run (check atticd and its storage)"
+
+      # Why pushes are slow (see the script).
+      - name: Attic connection
+        if: always() && steps.netbird.outcome == 'success'
+        continue-on-error: true
+        timeout-minutes: 5
+        env:
+          ATTIC_ENDPOINT: ${{ secrets.ATTIC_ENDPOINT }}
+          TARGETS: ${{ matrix.targets }}
+        run: bash .github/attic-connection.sh
