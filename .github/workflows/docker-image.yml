@@ -1,0 +1,89 @@
+# Publishes the Docker image (Dockerfile, DOCKER.md) to ghcr.io/evan-a-w/prigh
+# once the attic workflow has cached main's backend and frontend, so that the
+# image's build only downloads them (REQUIRE_CACHED=1: it fails rather than
+# compile). Tags: main, latest and the commit's short sha. The registry cache
+# (the buildcache tag) keeps the layers that did not change (Debian and its
+# packages, the Nix stage's setup), so a new commit only redoes prigh's.
+# workflow_dispatch builds the chosen ref (main: all three tags; another
+# branch: only its short sha, with REQUIRE_CACHED off if asked).
+#
+# linux/amd64 only: an arm64 image needs arm64 builds of backend and frontend
+# in the cache (an aarch64 runner in the attic workflow) first.
+name: docker-image
+
+on:
+  workflow_run:
+    workflows: [attic]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      require_cached:
+        description: Fail instead of compiling what the binary cache lacks
+        type: boolean
+        default: true
+
+concurrency:
+  group: docker-image-${{ github.event.workflow_run.head_branch || github.ref_name }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    if: >-
+      github.repository == 'evan-a-w/prigh' &&
+      (github.event_name == 'workflow_dispatch' ||
+       github.event.workflow_run.conclusion == 'success')
+    timeout-minutes: 90
+    env:
+      IMAGE: ghcr.io/${{ github.repository }}
+    steps:
+      - name: Choose the commit and tags
+        id: meta
+        env:
+          RUN_SHA: ${{ github.event.workflow_run.head_sha }}
+          RUN_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          REQUIRE_CACHED_INPUT: ${{ inputs.require_cached }}
+        run: |
+          sha=${RUN_SHA:-$GITHUB_SHA}
+          branch=${RUN_BRANCH:-$GITHUB_REF_NAME}
+          tags="$IMAGE:${sha:0:7}"
+          if [ "$branch" = main ]; then
+            tags="$tags,$IMAGE:main,$IMAGE:latest"
+          fi
+          require=1
+          if [ "$REQUIRE_CACHED_INPUT" = false ]; then require=0; fi
+          {
+            echo "sha=$sha"
+            echo "tags=$tags"
+            echo "require_cached=$require"
+          } >>"$GITHUB_OUTPUT"
+          echo "Publishing $sha of $branch as $tags"
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.meta.outputs.sha }}
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          build-args: |
+            REVISION=${{ steps.meta.outputs.sha }}
+            REQUIRE_CACHED=${{ steps.meta.outputs.require_cached }}
+          cache-from: type=registry,ref=${{ env.IMAGE }}:buildcache
+          cache-to: type=registry,ref=${{ env.IMAGE }}:buildcache,mode=max

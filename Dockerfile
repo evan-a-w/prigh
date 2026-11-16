@@ -25,25 +25,35 @@ RUN printf '%s\n' 'experimental-features = nix-command flakes' 'sandbox = false'
         "extra-trusted-public-keys = $NIX_SUBSTITUTER_KEY" >> /etc/nix/nix.conf; \
     fi
 
-# Dependencies first, from only the files that determine them, so that source
-# changes reuse these layers. The frontend's (OxCaml, very slow) come first so
-# that backend dependency changes don't rebuild them.
+# PREFETCH_DEPS=1: build the dependencies first (the OxCaml toolchain and
+# packages, several GB), from only the files that determine them, so that
+# source changes reuse these layers. Only worth it for a commit the binary
+# cache lacks (a branch): when it has prigh itself, fetch-prigh.sh downloads
+# just prigh, and this would download the whole toolchain for nothing. The
+# frontend's (OxCaml, very slow) come first so that backend dependency
+# changes don't rebuild them.
+ARG PREFETCH_DEPS=0
 COPY flake.nix flake.lock /deps/
 COPY nix /deps/nix
 COPY frontend/dune-project frontend/prigh_frontend.opam /deps/frontend/
-RUN nix build --no-link path:/deps#frontend.inputDerivation
+RUN if [ "$PREFETCH_DEPS" = 1 ]; then nix build --no-link path:/deps#frontend.inputDerivation; fi
 COPY backend/dune-project backend/prigh.opam /deps/backend/
-RUN nix build --no-link path:/deps#backend.inputDerivation
+RUN if [ "$PREFETCH_DEPS" = 1 ]; then nix build --no-link path:/deps#backend.inputDerivation; fi
 
+# The backend and frontend, from the binary cache when it has them (see
+# docker/fetch-prigh.sh); REQUIRE_CACHED=1 fails instead of compiling them
+# (CI, which publishes only what the cache has). Then the store paths they
+# refer to (glibc, gmp) are fetched, and the seed is made of those and nix.
+ARG REQUIRE_CACHED=0
 COPY . /src
-RUN nix build --out-link /out/backend path:/src#backend \
- && nix build --out-link /out/frontend path:/src#frontend \
+RUN bash /src/docker/fetch-prigh.sh \
  && mkdir -p /opt/prigh/bin /opt/prigh/share \
  && cp -L /out/backend/bin/prigh /out/frontend/bin/prigh-tui /opt/prigh/bin/ \
  && cp -rL --preserve=timestamps /out/frontend/share/prigh_frontend/web /opt/prigh/share/web \
  && chmod -R u+w /opt/prigh \
  && refs=$(grep -raoh '/nix/store/[a-z0-9]\{32\}-[-a-zA-Z0-9+._?=]*' /opt/prigh | sort -u) \
  && echo "runtime store paths: $refs" \
+ && nix-store --realise $refs >/dev/null \
  && nix_pkg=$(dirname "$(dirname "$(readlink -f "$(command -v nix)")")") \
  && closure=$(nix-store -qR $refs "$nix_pkg") \
  && mkdir -p /seed/store \
@@ -108,6 +118,14 @@ RUN mv /opt/nix-seed/flake-registry.json /etc/nix/ \
  && mkdir -p /home/prigh/.prigh /home/prigh/.config/prigh \
  && chown -R prigh:prigh /home/prigh \
  && chmod 700 /home/prigh
+
+# REVISION: the commit built (CI sets it).
+ARG REVISION=""
+LABEL org.opencontainers.image.title=prigh \
+      org.opencontainers.image.description="prigh, a coding agent, serving prigh-web" \
+      org.opencontainers.image.source=https://github.com/evan-a-w/prigh \
+      org.opencontainers.image.documentation=https://github.com/evan-a-w/prigh/blob/main/DOCKER.md \
+      org.opencontainers.image.revision="${REVISION}"
 
 ENV LANG=C.UTF-8 \
     PRIGH_BACKEND=/opt/prigh/bin/prigh \

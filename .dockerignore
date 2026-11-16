@@ -8,3 +8,4 @@ result-*
 Dockerfile
 docker-compose.yml
 docker/test-*
+docker-compose.build.yml
