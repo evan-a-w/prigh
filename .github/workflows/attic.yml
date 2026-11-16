@@ -168,7 +168,8 @@ jobs:
       # The image's build takes prigh from this runner's store (backend and
       # frontend as just built, as NARs in the `prebuilt` build context: see
       # docker/fetch-prigh.sh), so it does not wait for Attic. What this run
-      # did not build (Attic had it) comes from Attic. REQUIRE_CACHED=1: it never compiles.
+      # did not build (Attic had it) comes from Attic. REQUIRE_CACHED=1: it
+      # never compiles.
       - name: Stage prigh for the image
         id: stage
         if: env.PUBLISH_IMAGE == 'true'
