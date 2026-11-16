@@ -249,6 +249,8 @@ type t =
   ; mutable shell_seq : int
   ; mutable hosts : Host.t list
     (** every connected client able to run tools, set by the server *)
+  ; mutable gone_computer : (string * Computer_info.t) option
+    (** the active host's screen as it was last connected, by host id *)
   ; host_cwds : string String.Table.t
     (** where this session last was on each client host, connected or not,
         overriding [Host.cwd] *)
@@ -278,6 +280,10 @@ type t =
   ; mcp_auth : Mcp_auth.t option
     (** the backend's own servers; [None] turns MCP off on every host *)
   ; mutable mcp_tools : Tool.t list (** as of the latest run's start *)
+  ; mutable mcp_listing : Mcp_tools.Listing.t
+    (** [mcp_host]'s latest, with the tools of servers that went down kept *)
+  ; mutable mcp_host : string
+  ; mcp_refresh : Mcp_refresh.t
   ; mutable mcp_noticed : String.Set.t
     (** MCP problems already reported, so each is told once *)
   ; max_budget_usd : float option
@@ -389,11 +395,19 @@ let hosts t =
   if t.backend_host_enabled then backend_host t :: clients else clients
 ;;
 
-(* The screen the active host lets sessions drive ([-computer]), while it
-   is connected. *)
+(* The screen the active host lets sessions drive ([-computer]). While the
+   host is away it is still offered, so that the tools (the start of every
+   request, which the prompt cache keys on) do not change when it reconnects;
+   calls wait for it as other tools do. *)
 let active_computer t =
-  List.find_map t.hosts ~f:(fun (h : Host.t) ->
-    if String.equal h.id t.active_host then h.computer else None)
+  match
+    List.find t.hosts ~f:(fun (h : Host.t) -> String.equal h.id t.active_host)
+  with
+  | Some h -> h.computer
+  | None ->
+    (match t.gone_computer with
+     | Some (id, info) when String.equal id t.active_host -> Some info
+     | Some _ | None -> None)
 ;;
 
 (* The built-in tools, with [computer] while the active host runs it; in
@@ -1422,6 +1436,8 @@ let set_hosts ?(returning = String.Map.empty) t clients =
   if not (List.equal Host.equal t.hosts clients)
   then (
     let was_connected = active_host_connected t in
+    Option.iter (find_host t t.active_host) ~f:(fun (h : Host.t) ->
+      t.gone_computer <- Option.map h.computer ~f:(fun info -> h.id, info));
     t.hosts <- clients;
     match find_host t t.active_host, List.hd (hosts t) with
     | None, Some host when String.is_empty t.active_host ->
@@ -2532,7 +2548,14 @@ let mcp_call t (context : Tool.Context.t) ~source ~server ~tool arguments =
 ;;
 
 let use_listing t (listing : Mcp_tools.Listing.t) =
-  t.mcp_tools <- Mcp_tools.tools listing ~call:(mcp_call t);
+  let previous =
+    if String.equal t.mcp_host t.active_host
+    then t.mcp_listing
+    else Mcp_tools.Listing.empty
+  in
+  t.mcp_listing <- Mcp_tools.Listing.keep_tools listing ~previous;
+  t.mcp_host <- t.active_host;
+  t.mcp_tools <- Mcp_tools.tools t.mcp_listing ~call:(mcp_call t);
   List.iter (Mcp_tools.Listing.notices listing) ~f:(fun notice ->
     if not (Set.mem t.mcp_noticed notice)
     then (
@@ -2578,23 +2601,51 @@ let mcp_exec t ?(cancel = Cancellation.never) name args =
   | result, _ -> result
 ;;
 
-(* The host's MCP servers as of now. A host that cannot tell (an older
-   tool host, none connected) has none. *)
+(* The host's MCP servers as of now; whether the host answered. A host that
+   cannot tell (an older tool host, none connected) keeps the tools it
+   listed last (calls fail while it is away), another host's are dropped. *)
 let refresh_mcp t ~cancel =
+  let host = t.active_host in
+  match
+    mcp_exec
+      t
+      ~cancel
+      Host_ops.mcp_servers_op
+      (Host_ops.mcp_servers_args
+         ~home:t.home
+         ~settings:(mcp_settings t)
+         ~reconnect:false)
+  with
+  | Ok listing when String.equal host t.active_host ->
+    use_listing t listing;
+    true
+  | Ok _ | Error _ ->
+    if not (String.equal t.mcp_host t.active_host)
+    then (
+      t.mcp_listing <- Mcp_tools.Listing.empty;
+      t.mcp_tools <- []);
+    false
+;;
+
+(* What the backend sends the host about MCP: a listing for other settings
+   or sign-ins is out of date. *)
+let mcp_config t =
+  Md5.to_hex
+    (Md5.digest_string
+       (Json.to_string (`Array [ mcp_settings t; mcp_tokens t ])))
+;;
+
+(* Before a run: see [Mcp_refresh]. *)
+let refresh_mcp_for_run t ~cancel =
   if Option.is_some t.mcp
-  then (
-    match
-      mcp_exec
-        t
-        ~cancel
-        Host_ops.mcp_servers_op
-        (Host_ops.mcp_servers_args
-           ~home:t.home
-           ~settings:(mcp_settings t)
-           ~reconnect:false)
-    with
-    | Ok listing -> use_listing t listing
-    | Error _ -> t.mcp_tools <- [])
+  then
+    Mcp_refresh.before_run
+      t.mcp_refresh
+      ~sw:t.sw
+      ~host:t.active_host
+      ~config:(mcp_config t)
+      ~cancel
+      ~refresh:(refresh_mcp t)
 ;;
 
 let mcp_disabled = "MCP is off in this backend (it was started with -no-tools)"
@@ -2618,7 +2669,13 @@ let mcp_servers ?(reconnect = false) t =
 
 let mcp_settings_changed t =
   if Option.is_some t.mcp && not t.chat_mode
-  then Fiber.fork ~sw:t.sw (fun () -> refresh_mcp t ~cancel:Cancellation.never)
+  then
+    Mcp_refresh.start
+      t.mcp_refresh
+      ~sw:t.sw
+      ~host:t.active_host
+      ~config:(mcp_config t)
+      ~refresh:(refresh_mcp t)
 ;;
 
 let approve_mcp t ~source ~server =
@@ -3369,7 +3426,7 @@ let rec start_run
          Promise.resolve resolve ();
          if idle then state_changed t
        in
-       if not t.chat_mode then refresh_mcp t ~cancel;
+       if not t.chat_mode then refresh_mcp_for_run t ~cancel;
        let halted = ref None in
        (* The prompts are in the session (and its file made) before the
           system prompt is built: that asks the tool host, which may take
@@ -4008,6 +4065,7 @@ let create
     ; plan = None
     ; shell_seq = 0
     ; hosts = []
+    ; gone_computer = None
     ; host_cwds = String.Table.create ()
     ; host_homes = String.Table.create ()
     ; backend_cwd = cwd
@@ -4039,6 +4097,9 @@ let create
     ; subagent_log = Subagent_log.create ()
     ; mcp
     ; mcp_tools = []
+    ; mcp_listing = Mcp_tools.Listing.empty
+    ; mcp_host = ""
+    ; mcp_refresh = Mcp_refresh.create ()
     ; mcp_settings
     ; mcp_auth
     ; mcp_noticed = String.Set.empty
@@ -4241,6 +4302,7 @@ let rec wait_idle t =
     then (
       Background_tasks.wait_all t.background;
       wait_idle t)
+    else Mcp_refresh.wait t.mcp_refresh
 ;;
 
 let check_mail t = if (not (is_running t)) && has_mail t then start_run t []
@@ -4288,6 +4350,7 @@ let report_interrupted_subagents t =
 
 let shutdown t =
   Subagent_log.detach t.subagent_log;
+  Mcp_refresh.cancel t.mcp_refresh;
   cancel_background ~discard:true t;
   ignore (abort t : string list)
 ;;

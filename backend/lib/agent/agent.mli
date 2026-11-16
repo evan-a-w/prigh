@@ -429,8 +429,9 @@ val shell
 (** Whether the main loop is running (background subagents do not count). *)
 val is_running : t -> bool
 
-(** Blocks until no run is active, the queues are empty and no background
-    subagent or job is running (their deliveries included). *)
+(** Blocks until no run is active, the queues are empty, no background
+    subagent or job is running (their deliveries included) and the MCP
+    servers are not being listed in the background ({!Mcp_refresh}). *)
 val wait_idle : t -> unit
 
 (** {2 Background subagents and jobs}
