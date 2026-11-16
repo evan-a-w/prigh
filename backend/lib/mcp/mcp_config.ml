@@ -3,8 +3,9 @@ open! Import
 
 module Oauth = struct
   type t =
-    { client_id : string
+    { client_id : string option
     ; client_secret : string option
+    ; client_name : string option
     ; scopes : string list option
     }
   [@@deriving sexp_of, compare]
@@ -18,11 +19,14 @@ module Oauth = struct
       }
   ;;
 
-  let to_json { client_id; client_secret; scopes } =
+  let to_json { client_id; client_secret; client_name; scopes } =
+    let string name = Option.map ~f:(fun s -> name, `String s) in
     `Object
-      ([ "clientId", `String client_id ]
-       @ Option.value_map client_secret ~default:[] ~f:(fun s ->
-         [ "clientSecret", `String s ])
+      (List.filter_opt
+         [ string "clientId" client_id
+         ; string "clientSecret" client_secret
+         ; string "clientName" client_name
+         ]
        @ Option.value_map scopes ~default:[] ~f:(fun scopes ->
          [ "scopes", `Array (List.map scopes ~f:(fun s -> `String s)) ]))
   ;;
@@ -163,6 +167,7 @@ let oauth ~expand json ~what:_ =
   | `Object _ ->
     let%bind client_id = string "clientId" in
     let%bind client_secret = string "clientSecret" in
+    let%bind client_name = string "clientName" in
     let%bind scopes =
       match field json "scopes" with
       | None -> Ok None
@@ -172,16 +177,19 @@ let oauth ~expand json ~what:_ =
              (String.split s ~on:' ' |> List.filter ~f:(Fn.non String.is_empty)))
       | Some v -> strings v ~what:"oauth.scopes" >>| Option.some
     in
-    (match client_id with
-     | None | Some "" ->
+    let nonempty = Option.filter ~f:(Fn.non String.is_empty) in
+    let client_id = nonempty client_id in
+    let client_name = nonempty client_name in
+    (match client_id, client_secret with
+     | None, Some _ ->
        Or_error.error_string
-         "\"oauth\" needs the \"clientId\" of the OAuth client registered for \
-          prigh"
-     | Some client_id -> Ok (Some { Oauth.client_id; client_secret; scopes }))
+         "\"oauth\" has a \"clientSecret\" but no \"clientId\": give the id of \
+          the OAuth client registered for prigh"
+     | _ -> Ok (Some { Oauth.client_id; client_secret; client_name; scopes }))
   | _ ->
     Or_error.error_string
-      "\"oauth\" must be an object: {\"clientId\": ..., \"clientSecret\"?: \
-       ..., \"scopes\"?: [...]}"
+      "\"oauth\" must be an object: {\"clientId\"?: ..., \"clientSecret\"?: \
+       ..., \"clientName\"?: ..., \"scopes\"?: [...]}"
 ;;
 
 let transport ~getenv json =

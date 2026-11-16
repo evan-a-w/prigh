@@ -2,6 +2,8 @@ open! Core
 open! Import
 
 let timeout = Time_ns.Span.of_int_sec 15
+let default_client_name = "prigh"
+let fallback_client_name = "Claude Code"
 
 module Challenge = struct
   type t =
@@ -147,7 +149,27 @@ let server_metadata_of_json json =
   | _ -> None
 ;;
 
-let probe ~env ~url =
+let probe ~env ~url ~client_name =
+  let initialize =
+    `Object
+      [ "jsonrpc", `String "2.0"
+      ; "id", `Number "0"
+      ; "method", `String "initialize"
+      ; ( "params"
+        , `Object
+            [ "protocolVersion", `String "2025-06-18"
+            ; "capabilities", `Object []
+            ; ( "clientInfo"
+              , `Object
+                  [ ( "name"
+                    , `String
+                        (Option.value client_name ~default:default_client_name)
+                    )
+                  ; "version", `String Version.to_string
+                  ] )
+            ] )
+      ]
+  in
   match
     Http_client.post
       ~env
@@ -157,8 +179,7 @@ let probe ~env ~url =
         [ "Content-Type", "application/json"
         ; "Accept", "application/json, text/event-stream"
         ]
-      ~body:
-        {|{"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"prigh","version":"0"}}}|}
+      ~body:(Json.to_string initialize)
       ()
   with
   | Ok (response, _) when response.status = 401 ->
@@ -323,7 +344,7 @@ let post ~env ~what ~url ~headers ~body ~ok =
   | Ok (response, body) -> oauth_error ~what ~status:response.status body
 ;;
 
-let register ~env (server : Server_metadata.t) ~redirect_uri =
+let register ~env (server : Server_metadata.t) ~redirect_uri ~client_name =
   match server.registration_endpoint with
   | None ->
     Or_error.errorf
@@ -331,24 +352,72 @@ let register ~env (server : Server_metadata.t) ~redirect_uri =
        there and give its id in the server's \"oauth\": {\"clientId\": ...}"
       server.issuer
   | Some url ->
-    post
-      ~env
-      ~what:"client registration"
-      ~url
-      ~headers:
-        [ "Content-Type", "application/json"; "Accept", "application/json" ]
-      ~body:
-        (Json.to_string
-           (`Object
-               [ "client_name", `String "prigh"
-               ; "redirect_uris", `Array [ `String redirect_uri ]
-               ; ( "grant_types"
-                 , `Array
-                     [ `String "authorization_code"; `String "refresh_token" ] )
-               ; "response_types", `Array [ `String "code" ]
-               ; "token_endpoint_auth_method", `String "none"
-               ]))
-      ~ok:(fun body -> Or_error.bind (Json.parse body) ~f:Client.of_json)
+    let attempt name =
+      let what = sprintf "client registration as %S" name in
+      let body =
+        Json.to_string
+          (`Object
+              [ "client_name", `String name
+              ; "redirect_uris", `Array [ `String redirect_uri ]
+              ; ( "grant_types"
+                , `Array
+                    [ `String "authorization_code"; `String "refresh_token" ] )
+              ; "response_types", `Array [ `String "code" ]
+              ; "token_endpoint_auth_method", `String "none"
+              ])
+      in
+      match
+        Http_client.post
+          ~env
+          ~timeout
+          ~url
+          ~headers:
+            [ "Content-Type", "application/json"; "Accept", "application/json" ]
+          ~body
+          ()
+      with
+      | Error e ->
+        `Done
+          (Or_error.errorf
+             "%s failed: %s: %s"
+             what
+             url
+             (Http_client.Error.to_string e))
+      | Ok (response, body) when response.status >= 200 && response.status < 300
+        ->
+        `Done
+          (Or_error.map
+             (Or_error.bind (Json.parse body) ~f:Client.of_json)
+             ~f:(fun (client : Client.t) ->
+               (* A server that issues a secret to a public client anyway
+                  (Figma's) wants it back, the default way (Basic). *)
+               match client with
+               | { secret = Some _; auth_method = None_; _ } ->
+                 { client with auth_method = Basic }
+               | client -> client))
+      | Ok (response, body) ->
+        let error = oauth_error ~what ~status:response.status body in
+        if response.status = 403 then `Forbidden error else `Done error
+    in
+    let forbidden error =
+      Or_error.tag
+        error
+        ~tag:
+          "the server accepts only the clients it knows: set the name of one \
+           it accepts in the server's \"oauth\": {\"clientName\": ...}"
+    in
+    (match client_name with
+     | Some name ->
+       (match attempt name with
+        | `Done result -> result
+        | `Forbidden error -> forbidden error)
+     | None ->
+       (match attempt default_client_name with
+        | `Done result -> result
+        | `Forbidden _ ->
+          (match attempt fallback_client_name with
+           | `Done result -> result
+           | `Forbidden error -> forbidden error)))
 ;;
 
 let authorize_url

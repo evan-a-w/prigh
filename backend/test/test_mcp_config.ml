@@ -360,3 +360,55 @@ let%expect_test "names and definitions are checked, saying what to fix" =
      "a server is an object with a \"command\" (stdio) or a \"url\" (http)")
     |}]
 ;;
+
+let%expect_test "oauth: a configured client, or just the name to register as" =
+  in_dir
+  @@ fun ~dir ~home ->
+  write
+    (Mcp_config.user_file ~home)
+    {|{"mcpServers": {
+        "docs": {"type": "http", "url": "https://docs.example.com/mcp",
+                 "oauth": {"clientId": "app", "clientSecret": "${TOKEN}", "scopes": "a b"}},
+        "figma": {"type": "http", "url": "https://mcp.figma.com/mcp",
+                  "oauth": {"clientName": "Codex"}},
+        "empty": {"type": "http", "url": "https://e.example.com/mcp",
+                  "oauth": {"clientId": "", "clientName": ""}},
+        "secret-only": {"type": "http", "url": "https://s.example.com/mcp",
+                        "oauth": {"clientSecret": "x"}}}}|};
+  discover ~dir ~home ~cwd:dir;
+  [%expect
+    {|
+    ((name docs) (source $DIR/home/.prigh/mcp.json) (project false)
+     (dir $DIR/home)
+     (transport
+      (Http (url https://docs.example.com/mcp) (headers ())
+       (oauth
+        ((client_id (app)) (client_secret (<hidden>)) (client_name ())
+         (scopes ((a b))))))))
+    ((name figma) (source $DIR/home/.prigh/mcp.json) (project false)
+     (dir $DIR/home)
+     (transport
+      (Http (url https://mcp.figma.com/mcp) (headers ())
+       (oauth
+        ((client_id ()) (client_secret ()) (client_name (Codex)) (scopes ()))))))
+    ((name empty) (source $DIR/home/.prigh/mcp.json) (project false)
+     (dir $DIR/home)
+     (transport
+      (Http (url https://e.example.com/mcp) (headers ())
+       (oauth ((client_id ()) (client_secret ()) (client_name ()) (scopes ()))))))
+    problem: $DIR/home/.prigh/mcp.json: server "secret-only": "oauth" has a "clientSecret" but no "clientId": give the id of the OAuth client registered for prigh
+    |}];
+  List.iter
+    (Mcp_config.discover ~getenv ~cwd:dir ~home ()).servers
+    ~f:(fun server ->
+      match server.transport with
+      | Http { oauth = Some oauth; _ } ->
+        print_endline (Jsonaf.to_string (Mcp_config.Oauth.to_json oauth))
+      | Http { oauth = None; _ } | Stdio _ -> ());
+  [%expect
+    {|
+    {"clientId":"app","clientSecret":"s3cret","scopes":["a","b"]}
+    {"clientName":"Codex"}
+    {}
+    |}]
+;;

@@ -12,6 +12,9 @@ module Fake = struct
     ; mutable metadata : [ `Oauth | `Oidc | `None ]
     ; mutable resource_metadata : [ `Header | `Well_known | `None ]
     ; mutable registration : bool
+    ; mutable known_clients : string list option
+      (** like Figma's: registers only these names (403 otherwise), and
+          issues them a secret *)
     ; mutable revocation : bool
     ; mutable challenge : string option (** the browser's code_challenge *)
     ; mutable access_seq : int
@@ -25,6 +28,7 @@ module Fake = struct
     ; metadata = `Oauth
     ; resource_metadata = `Header
     ; registration = true
+    ; known_clients = None
     ; revocation = true
     ; challenge = None
     ; access_seq = 0
@@ -206,12 +210,32 @@ module Fake = struct
         json 200 (as_metadata t)
       | "POST", "/as/register", _, _ ->
         Queue.enqueue t.log ("register: " ^ request.body);
-        json
-          201
-          (`Object
-              [ "client_id", `String "client-1"
-              ; "token_endpoint_auth_method", `String "none"
-              ])
+        let name =
+          Option.bind
+            (Json.member
+               "client_name"
+               (Or_error.ok_exn (Json.parse request.body)))
+            ~f:Json.string
+        in
+        (match t.known_clients with
+         | None ->
+           json
+             201
+             (`Object
+                 [ "client_id", `String "client-1"
+                 ; "token_endpoint_auth_method", `String "none"
+                 ])
+         | Some known ->
+           if Option.exists name ~f:(List.mem known ~equal:String.equal)
+           then
+             json
+               201
+               (`Object
+                   [ "client_id", `String "client-2"
+                   ; "client_secret", `String "issued"
+                   ; "token_endpoint_auth_method", `String "none"
+                   ])
+           else Server.Reply.simple 403 "Forbidden")
       | "POST", "/as/token", _, _ -> token t request
       | "POST", "/as/revoke", _, _ ->
         Queue.enqueue
@@ -352,7 +376,7 @@ let%expect_test
   let mask = masker fake in
   let url = fake.base ^ "/mcp" in
   let discover () =
-    let challenge = Mcp_oauth.probe ~env:t.env ~url in
+    let challenge = Mcp_oauth.probe ~env:t.env ~url ~client_name:None in
     (match Mcp_oauth.discover ~env:t.env ~url ?challenge () with
      | Ok d ->
        print_endline
@@ -659,8 +683,9 @@ let%expect_test "sign out revokes; a configured client, no registration" =
   [%expect
     {| $BASE/as does not offer dynamic client registration: register an OAuth client there and give its id in the server's "oauth": {"clientId": ...} |}];
   let oauth =
-    { Mcp_config.Oauth.client_id = "my-app"
+    { Mcp_config.Oauth.client_id = Some "my-app"
     ; client_secret = Some "s3cret"
+    ; client_name = None
     ; scopes = Some [ "tools" ]
     }
   in
@@ -710,6 +735,117 @@ let%expect_test "sign out revokes; a configured client, no registration" =
     (mask_ports
        (Sexp.to_string [%sexp (Mcp_auth.sign_out auth ~url : unit Or_error.t)]));
   [%expect {| (Error"not signed in to $BASE/mcp") |}]
+;;
+
+let%expect_test "a server that registers only clients it knows (Figma's)" =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let fake = Fake.start ~sw ~env:t.env in
+  let mask line =
+    match String.chop_prefix line ~prefix:"register: " with
+    | None -> masker fake line
+    | Some body ->
+      Json.member "client_name" (Or_error.ok_exn (Json.parse body))
+      |> Option.value_exn
+      |> Json.to_string
+      |> sprintf "register: client_name=%s"
+  in
+  let url = fake.base ^ "/mcp" in
+  fake.known_clients <- Some [ "Claude Code"; "Codex" ];
+  let _now, _path, auth = auth_setup t ~sw () in
+  let sign_in ?client_name () =
+    let oauth =
+      Option.map client_name ~f:(fun name ->
+        { Mcp_config.Oauth.client_id = None
+        ; client_secret = None
+        ; client_name = Some name
+        ; scopes = None
+        })
+    in
+    match
+      Mcp_auth.sign_in
+        auth
+        ~url
+        ~oauth
+        ~redirect_base:(Some "https://p.example")
+    with
+    | Error e ->
+      Fake.print_log fake ~mask;
+      print_endline (masker fake (Error.to_string_hum e))
+    | Ok link ->
+      let state = authorize fake link in
+      ignore ([%expect.output] : string);
+      print_page (Mcp_auth.callback [ "code", "code-1"; "state", state ]);
+      Fake.print_log fake ~mask
+  in
+  (* By default prigh registers as itself, then as Claude Code; the secret
+     the server issues anyway goes back with Basic authentication. *)
+  sign_in ();
+  [%expect
+    {|
+    (sign-ins changed)
+    200 Signed in | Signed in  prigh is signed in to $BASE/mcp and reconnects to it. You can close this tab.
+    GET /meta/prm -> 200
+    GET /.well-known/oauth-authorization-server/as -> 200
+    register: client_name="prigh"
+    POST /as/register -> 403
+    register: client_name="Claude Code"
+    POST /as/register -> 201
+    token: authorization_code code=code-1 verifier matches redirect_uri=https://p.example/mcp/oauth/callback resource=$BASE/mcp basic client-2:issued
+    POST /as/token -> 200
+    |}];
+  (* A configured name is used as it is, and the client registered for it
+     is kept apart. *)
+  sign_in ~client_name:"Codex" ();
+  [%expect
+    {|
+    (sign-ins changed)
+    200 Signed in | Signed in  prigh is signed in to $BASE/mcp and reconnects to it. You can close this tab.
+    GET /meta/prm -> 200
+    GET /.well-known/oauth-authorization-server/as -> 200
+    register: client_name="Codex"
+    POST /as/register -> 201
+    token: authorization_code code=code-1 verifier matches redirect_uri=https://p.example/mcp/oauth/callback resource=$BASE/mcp basic client-2:issued
+    POST /as/token -> 200
+    |}];
+  (* A name the server refuses says what to do. *)
+  sign_in ~client_name:"opencode" ();
+  [%expect
+    {|
+    GET /meta/prm -> 200
+    GET /.well-known/oauth-authorization-server/as -> 200
+    register: client_name="opencode"
+    POST /as/register -> 403
+    ("the server accepts only the clients it knows: set the name of one it accepts in the server's \"oauth\": {\"clientName\": ...}"
+     "client registration as \"opencode\" failed: HTTP 403: Forbidden")
+    |}];
+  (* So does the fallback refused. *)
+  fake.known_clients <- Some [];
+  let _now, _path, auth = auth_setup t ~sw () in
+  (match
+     Mcp_auth.sign_in
+       auth
+       ~url
+       ~oauth:None
+       ~redirect_base:(Some "https://q.example")
+   with
+   | Ok _ -> print_endline "started"
+   | Error e ->
+     Fake.print_log fake ~mask;
+     print_endline (masker fake (Error.to_string_hum e)));
+  [%expect
+    {|
+    GET /meta/prm -> 200
+    GET /.well-known/oauth-authorization-server/as -> 200
+    register: client_name="prigh"
+    POST /as/register -> 403
+    register: client_name="Claude Code"
+    POST /as/register -> 403
+    ("the server accepts only the clients it knows: set the name of one it accepts in the server's \"oauth\": {\"clientName\": ...}"
+     "client registration as \"Claude Code\" failed: HTTP 403: Forbidden")
+    |}]
 ;;
 
 let%expect_test "sign in from a terminal: a one-shot loopback listener" =

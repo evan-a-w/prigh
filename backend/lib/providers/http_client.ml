@@ -107,6 +107,59 @@ let with_default_port uri =
   | None, _ -> uri
 ;;
 
+(* cohttp-eio sends "content-length: 0" with every request without a body,
+   GETs included, which some servers refuse (CloudFront answers 400, e.g.
+   Figma's MCP metadata). This flow drops that header from the request it
+   carries: cohttp writes a bodiless request in one piece. *)
+module Without_empty_length = struct
+  type t =
+    { flow : [ Eio.Flow.two_way_ty | Eio.Resource.close_ty ] Eio.Resource.t
+    ; mutable sent : bool
+    }
+
+  let header = "\r\ncontent-length: 0\r\n"
+
+  let single_write t bufs =
+    let length = Cstruct.lenv bufs in
+    if t.sent
+    then Eio.Flow.single_write t.flow bufs
+    else (
+      t.sent <- true;
+      let request = Cstruct.to_string (Cstruct.concat bufs) in
+      let request =
+        match String.substr_index request ~pattern:"\r\n\r\n" with
+        | None -> request
+        | Some end_ ->
+          let head = String.prefix request (end_ + 2) in
+          String.substr_replace_first head ~pattern:header ~with_:"\r\n"
+          ^ String.drop_prefix request (end_ + 2)
+      in
+      Eio.Flow.write t.flow [ Cstruct.of_string request ];
+      length)
+  ;;
+
+  let handler =
+    Eio.Resource.handler
+      (H (Eio.Resource.Close, fun t -> Eio.Resource.close t.flow)
+       :: Eio.Resource.bindings
+            (Eio.Flow.Pi.two_way
+               (module struct
+                 type nonrec t = t
+
+                 let single_read t buf = Eio.Flow.single_read t.flow buf
+                 let single_write = single_write
+                 let copy t ~src = Eio.Flow.Pi.simple_copy ~single_write t ~src
+                 let read_methods = []
+                 let shutdown t command = Eio.Flow.shutdown t.flow command
+               end)))
+  ;;
+
+  let wrap flow : [ Eio.Flow.two_way_ty | Eio.Resource.close_ty ] Eio.Resource.t
+    =
+    Eio.Resource.T ({ flow; sent = false }, handler)
+  ;;
+end
+
 let stream
       ?(meth = `GET)
       ?(pool = Http_pool.default)
@@ -139,7 +192,10 @@ let stream
   let send conn ~sw () =
     let client =
       Cohttp_eio.Client.make_generic (fun ~sw:_ _ ->
-        Http_pool.Connection.flow conn)
+        let flow = Http_pool.Connection.flow conn in
+        match meth, body with
+        | `GET, None -> Without_empty_length.wrap flow
+        | _ -> flow)
     in
     match meth, body with
     | `GET, None -> Cohttp_eio.Client.get client ~sw ~headers uri

@@ -24,11 +24,16 @@ open! Import
 
 (** A server's [oauth]: the OAuth client to sign in with when its
     authorization server offers no dynamic client registration
-    ({!Mcp_oauth}). *)
+    ({!Mcp_oauth}), or the name to register as. *)
 module Oauth : sig
   type t =
-    { client_id : string (** [clientId] *)
+    { client_id : string option
+      (** [clientId]: a client registered by hand, used instead of
+          registering one *)
     ; client_secret : string option (** [clientSecret] *)
+    ; client_name : string option
+      (** [clientName]: the name to register as (servers like Figma's
+          accept only the clients they know) and to give in [initialize] *)
     ; scopes : string list option (** [scopes]: a list, or a string *)
     }
   [@@deriving compare]

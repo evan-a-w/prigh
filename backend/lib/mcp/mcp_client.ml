@@ -649,6 +649,11 @@ let connect
       (server : Mcp_config.Server.t)
   =
   let state = State.create () in
+  let client_name =
+    match server.transport with
+    | Http { oauth = Some { client_name = Some name; _ }; _ } -> name
+    | Http _ | Stdio _ -> Mcp_oauth.default_client_name
+  in
   let transport =
     match server.transport with
     | Stdio { command; args; env = extra_env } ->
@@ -675,7 +680,7 @@ let connect
                 ; "capabilities", `Object []
                 ; ( "clientInfo"
                   , `Object
-                      [ "name", `String "prigh"
+                      [ "name", `String client_name
                       ; "version", `String Version.to_string
                       ] )
                 ])
