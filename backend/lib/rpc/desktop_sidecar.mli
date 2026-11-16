@@ -133,7 +133,9 @@ module Config : sig
     ; host_id : string
     ; cwd : string (** the tool host's *)
     ; listen : Web_connect.Listen.t
-    ; computer : Computer_helper.t option
+    ; computer : Computer_helper.t option Promise.t
+      (** the tool host waits for it (the screen probed meanwhile) before
+          connecting: computer use is there once it is known *)
     ; root : string (** the built site *)
     ; save : Saved_connection.t -> unit Or_error.t
     ; remember_signin :
@@ -156,13 +158,16 @@ end
 val path_prefix : string
 
 (** Serves the site, calls [on_page] with where the window should go once
-    listening (and again each time that changes), and runs until the page quits, [stdin] reaches its end (or fails) or
-    [stopped] returns; then stops the site and the tool host (killing the
-    tools' processes) and returns. The URL logged leaves the key out. Raises
-    what listening raises. *)
+    listening (and again each time that changes), and runs until the page
+    quits, [stdin] reaches its end (or fails) or [stopped] returns; then
+    stops the site and the tool host (killing the tools' processes) and
+    returns. The page never waits for this machine's tool host: it connects
+    in the background, and the page picks it up when it appears. The URL
+    logged leaves the key out. Raises what listening raises. *)
 val run
   :  env:Env.t
-  -> ?tool_host_wait:Time_ns.Span.t (** default 10s *)
+  -> ?tool_host_wait:Time_ns.Span.t
+       (** default 10s: when the log says the tool host is still connecting *)
   -> ?check_timeout:Time_ns.Span.t (** default 15s *)
   -> ?stopped:(unit -> unit) (** default: never *)
   -> log:(string -> unit)

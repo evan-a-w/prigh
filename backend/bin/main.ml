@@ -1739,7 +1739,16 @@ let desktop_command =
          @@ fun env ->
          Eio.Switch.run
          @@ fun sw ->
-         let computer = Computer_flag.enable ~env ~sw ~log computer in
+         (* Probed in the background: the tool host waits for it, the page
+            does not. *)
+         let computer =
+           let probed, set_probed = Eio.Promise.create () in
+           Eio.Fiber.fork ~sw (fun () ->
+             Eio.Promise.resolve
+               set_probed
+               (Computer_flag.enable ~env ~sw ~log computer));
+           probed
+         in
          listen_or_exit ~flag:"-listen" listen_addr (fun () ->
            Desktop_sidecar.run
              ~env

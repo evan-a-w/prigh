@@ -68,7 +68,7 @@ module Config = struct
     ; host_id : string
     ; cwd : string
     ; listen : Web_connect.Listen.t
-    ; computer : Computer_helper.t option
+    ; computer : Computer_helper.t option Promise.t
     ; root : string
     ; save : Saved_connection.t -> unit Or_error.t
     ; remember_signin :
@@ -195,8 +195,9 @@ let remote_page ?(here = false) t (remote : Backend_address.t) =
   }
 ;;
 
-(* The page continues signed in, the tool host connected (or given up on
-   after [tool_host_wait]); without [tool_host] (it would not get past the
+(* The page continues signed in at once; the tool host connects in a fiber
+   of its own, said in the log once it has (or after [tool_host_wait]), and
+   the page picks it up as any host that appears. Without [tool_host] (it would not get past the
    site's sign-in proxy) it is not started. *)
 let connected
       ?(tool_host = true)
@@ -219,27 +220,28 @@ let connected
            to %s too (sign in with the browser for that)"
           (site remote))
    | Local ->
-     (match
-        Web_connect.start_tool_host
-          ~env:t.env
-          ~sw:t.sw
-          ~log:t.log
-          ~wait:t.tool_host_wait
-          { remote
-          ; credentials
-          ; name = t.config.name
-          ; host_id = t.config.host_id
-          ; cwd = t.config.cwd
-          ; computer = t.config.computer
-          }
-      with
-      | `Connected ->
-        t.log (sprintf "tools run on this machine, in %s" t.config.cwd)
-      | `Connecting ->
-        t.log
-          "the tool host is still connecting: tools run on this machine once \
-           it is"
-      | `Refused _ -> ()));
+     Fiber.fork ~sw:t.sw (fun () ->
+       match
+         Web_connect.start_tool_host
+           ~env:t.env
+           ~sw:t.sw
+           ~log:t.log
+           ~wait:t.tool_host_wait
+           { remote
+           ; credentials
+           ; name = t.config.name
+           ; host_id = t.config.host_id
+           ; cwd = t.config.cwd
+           ; computer = t.config.computer
+           }
+       with
+       | `Connected ->
+         t.log (sprintf "tools run on this machine, in %s" t.config.cwd)
+       | `Connecting ->
+         t.log
+           "the tool host is still connecting: tools run on this machine once \
+            it is"
+       | `Refused _ -> ()));
   t.log (sprintf "connected to %s" (Backend_address.to_string remote));
   let relay =
     match t.config.ui with

@@ -312,7 +312,7 @@ module Tool_host_config = struct
     ; name : string
     ; host_id : string
     ; cwd : string
-    ; computer : Computer_helper.t option
+    ; computer : Computer_helper.t option Promise.t
     }
 end
 
@@ -322,12 +322,13 @@ let start_tool_host ~env ~sw ~log ~wait (config : Tool_host_config.t) =
     if not (Promise.is_resolved state) then Promise.resolve set_state value
   in
   Fiber.fork_daemon ~sw (fun () ->
+    let computer = Promise.await config.computer in
     let refused =
       Tool_host.connect
         ~env
         ~log:(fun line -> log ("tool host: " ^ line))
         ~on_connect:(fun () -> settle `Connected)
-        ?computer:config.computer
+        ?computer
         ~backend:config.remote
         ~token:config.credentials.token
         ?user:config.credentials.user
@@ -384,7 +385,7 @@ let start
          ; name = config.name
          ; host_id = config.host_id
          ; cwd = config.cwd
-         ; computer = config.computer
+         ; computer = Promise.create_resolved config.computer
          }
         :> [ `Connected | `Connecting | `Refused of string | `Off ])
   in

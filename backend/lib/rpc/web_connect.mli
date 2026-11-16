@@ -100,12 +100,14 @@ module Tool_host_config : sig
     ; name : string
     ; host_id : string
     ; cwd : string
-    ; computer : Computer_helper.t option
+    ; computer : Computer_helper.t option Promise.t
+      (** awaited before connecting: [prigh desktop] probes the screen
+          meanwhile *)
     }
 end
 
-(** Connects a {!Tool_host} to the backend in a daemon fiber of [sw] (until
-    it refuses the credentials) and says how it went once it connected or
+(** Connects a {!Tool_host} to the backend in a daemon fiber of [sw] (once
+    [computer] is resolved, until it refuses the credentials) and says how it went once it connected or
     [wait] passed. *)
 val start_tool_host
   :  env:Env.t
