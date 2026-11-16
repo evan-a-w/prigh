@@ -32,11 +32,13 @@ val home : ?tilde:(string -> string) -> P.Session_home.t option -> string option
 
 (** Its worktrees, by when they first mattered. [listings]: repositories'
     worktrees as [list_worktrees] gives them; one its repository's listing
-    does not have (removed outside prigh) is left out. [cwd]: where the
+    does not have (removed outside prigh) is left out, unless its root is
+    [unsettled] (the listing may be older than the worktree). [cwd]: where the
     session is now, when known better than its summary (the current one's
     state). *)
 val of_session
   :  ?listings:P.Worktree.Listing.t list
+  -> ?unsettled:string list
   -> ?cwd:string
   -> P.Session_summary.t
   -> Node.t list
