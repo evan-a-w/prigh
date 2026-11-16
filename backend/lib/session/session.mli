@@ -74,6 +74,9 @@ module Entry : sig
       | Allow_rule of { rule : string }
       | Allowed_call of Allowed_call.t
       (** an [Approval_rule] the user allowed for the session *)
+      | Forget_allowed_call of { call : Allowed_call.Call.t option }
+      (** the [allowed_call] entries for [call] no longer count; [None]: none
+          of those before it *)
       | Archived of { archived : bool }
       (** archived or unarchived by hand (see {!Summary.is_archived}); not
           copied by [fork] *)
@@ -240,6 +243,11 @@ val active_path : t -> Entry.t list
     ([timed_messages], [identified_messages]) are what the user sees: not
     masked. *)
 val messages : t -> Message.t list
+
+(** {!messages} that came after the latest [forget_allowed_call] forgetting
+    them all (all of them when there is none): those that still permit the
+    hosts they name ([on_host]). *)
+val messages_since_forget_all : t -> Message.t list
 
 module Trim : sig
   type t =
@@ -435,10 +443,14 @@ val allow_rules : t -> string list
 
 val add_allow_rule : t -> rule:string -> Entry.t
 
-(** The [allowed_call] entries on the active path, oldest first. *)
+(** The [allowed_call] entries on the active path, oldest first, without those a
+    later [forget_allowed_call] forgot. *)
 val allowed_calls : t -> Allowed_call.t list
 
 val add_allowed_call : t -> Allowed_call.t -> Entry.t
+
+(** [None] forgets them all. *)
+val forget_allowed_call : t -> Allowed_call.Call.t option -> Entry.t
 
 (** [at] defaults to now. *)
 val append_message : t -> ?at:float -> Message.t -> Entry.t

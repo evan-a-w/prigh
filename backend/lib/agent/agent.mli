@@ -612,6 +612,17 @@ val respond_confirm
   -> Confirm_answer.t
   -> unit Or_error.t
 
+(** Forgets a call smart mode remembered ([Some line], a line of the state's
+    [allowed_calls]) or all of them ([None]), recording it in the session:
+    smart mode judges such a call again. A call on another host the user let
+    run permitted that host ([on_host]): forgetting it takes that back, unless
+    another such call there or one of the user's messages naming the host
+    still permits it. Forgetting them all also takes back what the user's
+    messages so far permitted: every other host asks again until a later
+    message names it or the user lets a call there run. Fails, saying where
+    to look, when no remembered call is [line]. *)
+val forget_allowed_calls : t -> string option -> unit Or_error.t
+
 (** Switches the approval mode and/or plan mode, recording it in the
     session. Pending confirmations the new mode lets through are allowed;
     leaving plan mode, when idle, carries on an active goal (see

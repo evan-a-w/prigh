@@ -2080,3 +2080,73 @@ let%expect_test "a transient provider error: the retry event, then the reply" =
     {"type":"event","event":"message_end","message":{"role":"assistant","content":[{"type":"text","text":"ok"}],"stop_reason":{"type":"end_turn"},"usage":{"input":10,"output":5,"cache_read":0},"model":"deepseek-flash"}}
     |}]
 ;;
+
+let%expect_test "forget_allowed_call: one by its line, or all" =
+  with_agent [ Reply.text "Hi." ]
+  @@ fun t agent h ->
+  Or_error.ok_exn (Agent.prompt agent "hello");
+  Agent.wait_idle agent;
+  let session = Agent.session agent in
+  List.iter [ "make"; "ls" ] ~f:(fun command ->
+    ignore
+      (Session.add_allowed_call
+         session
+         { call =
+             Allowed_call.Call.create
+               ~tool:"bash"
+               ~arguments:(`Object [ "command", `String command ])
+               ~host:"backend"
+               ~cwd:t.dir
+         ; by = Allowed_call.you
+         ; reason = None
+         }
+       : Session.Entry.t));
+  let path = Session.path session in
+  Agent.new_session agent;
+  Or_error.ok_exn (Agent.switch_session agent ~path);
+  let show () =
+    List.iter (Agent.state agent).allowed_calls ~f:(fun line ->
+      print_endline ("allowed: " ^ mask t line))
+  in
+  show ();
+  let ls = List.hd_exn (Agent.state agent).allowed_calls in
+  Queue.clear h.sent;
+  call
+    t
+    h
+    ~params:(Json.to_string (`Object [ "call", `String ls ]))
+    "forget_allowed_call";
+  show ();
+  printf
+    "state events: %d\n"
+    (Queue.count h.sent ~f:(fun json ->
+       match Json.member "event" json with
+       | Some (`String "state") -> true
+       | _ -> false));
+  call
+    t
+    h
+    ~params:(Json.to_string (`Object [ "call", `String ls ]))
+    "forget_allowed_call";
+  call t h "forget_allowed_call";
+  call t h ~params:{|{"call": "x", "all": true}|} "forget_allowed_call";
+  call t h ~params:{|{"all": true}|} "forget_allowed_call";
+  show ();
+  print_endline "--- reloaded";
+  Agent.new_session agent;
+  Or_error.ok_exn (Agent.switch_session agent ~path);
+  show ();
+  [%expect
+    {|
+    allowed: bash {"command":"ls"} on <host> in $DIR (by you)
+    allowed: bash {"command":"make"} on <host> in $DIR (by you)
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    allowed: bash {"command":"make"} on <host> in $DIR (by you)
+    state events: 1
+    {"type":"response","id":"r1","ok":false,"error":"no remembered call is \"bash {\\\"command\\\":\\\"ls\\\"} on <host> in $DIR (by you)\": /permissions lists them"}
+    {"type":"response","id":"r1","ok":false,"error":"give \"call\" (a line of the state's allowed_calls) or \"all\": true"}
+    {"type":"response","id":"r1","ok":false,"error":"give \"call\" (a line of the state's allowed_calls) or \"all\": true"}
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    --- reloaded
+    |}]
+;;

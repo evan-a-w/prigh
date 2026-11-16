@@ -98,6 +98,7 @@ let methods =
   ; "change_default"
   ; "tool_confirm_respond"
   ; "set_mode"
+  ; "forget_allowed_call"
   ; "ask_user_respond"
   ; "btw"
   ; "btw_cancel"
@@ -3838,6 +3839,19 @@ let dispatch agent login ~(client : Client.t) ~meth ~params : Json.t Or_error.t 
     let%bind chat = flag "chat_mode" in
     Agent.set_mode ?approval ?plan ?chat agent;
     ok (Rpc_json.state (Agent.state agent))
+  | "forget_allowed_call" ->
+    let open Or_error.Let_syntax in
+    let%bind all = bool_param params "all" ~default:false in
+    let%bind call = string_param_opt params "call" in
+    let%bind which =
+      match call, all with
+      | Some line, false -> Ok (Some line)
+      | None, true -> Ok None
+      | Some _, true | None, false ->
+        Or_error.error_string
+          "give \"call\" (a line of the state's allowed_calls) or \"all\": true"
+    in
+    unit_result (Agent.forget_allowed_calls agent which)
   | "ask_user_respond" ->
     let open Or_error.Let_syntax in
     let%bind call_id = string_param params "call_id" in

@@ -57,6 +57,8 @@ module Entry = struct
           }
       | Allow_rule of { rule : string }
       | Allowed_call of Allowed_call.t
+      | Forget_allowed_call of
+          { call : Allowed_call.Call.t option [@jsonaf.option] [@sexp.option] }
       | Archived of { archived : bool }
       | Pinned of { pinned : bool }
       | Spend of
@@ -206,6 +208,8 @@ module Path_state = struct
     ; model : (string * Thinking.t) option
     ; rev_allow_rules : string list
     ; rev_allowed_calls : Allowed_call.t list
+    ; forgot_all : string option
+      (** the latest [Forget_allowed_call] of them all *)
     }
 
   let empty =
@@ -224,6 +228,7 @@ module Path_state = struct
     ; model = None
     ; rev_allow_rules = []
     ; rev_allowed_calls = []
+    ; forgot_all = None
     }
   ;;
 end
@@ -383,6 +388,7 @@ let worth_saving (line : Line.t) =
           | Approval _
           | Allow_rule _
           | Allowed_call _
+          | Forget_allowed_call _
           | Archived _
           | Pinned _
           | Spend _
@@ -799,6 +805,7 @@ let step ~find position (s : Path_state.t) (e : Entry.t) : Path_state.t =
     | Approval _
     | Allow_rule _
     | Allowed_call _
+    | Forget_allowed_call _
     | Archived _
     | Pinned _
     | Spend _
@@ -843,6 +850,14 @@ let step ~find position (s : Path_state.t) (e : Entry.t) : Path_state.t =
     { s with rev_allow_rules = rule :: s.rev_allow_rules }
   | Allowed_call call ->
     { s with rev_allowed_calls = call :: s.rev_allowed_calls }
+  | Forget_allowed_call { call = None } ->
+    { s with rev_allowed_calls = []; forgot_all = Some e.id }
+  | Forget_allowed_call { call = Some call } ->
+    { s with
+      rev_allowed_calls =
+        List.filter s.rev_allowed_calls ~f:(fun (a : Allowed_call.t) ->
+          not (Allowed_call.Call.equal a.call call))
+    }
   | Message _
   | Compaction _
   | Name _
@@ -991,6 +1006,7 @@ let add_entry t (entry : Entry.t) =
   | Approval _
   | Allow_rule _
   | Allowed_call _
+  | Forget_allowed_call _
   | Archived _
   | Spend _
   | Resume_at _
@@ -1245,6 +1261,7 @@ let set_budget t ~usd = append t (Budget { usd })
 let set_approval t ~mode ~plan ~chat = append t (Approval { mode; plan; chat })
 let add_allow_rule t ~rule = append t (Allow_rule { rule })
 let add_allowed_call t call = append t (Allowed_call call)
+let forget_allowed_call t call = append t (Forget_allowed_call { call })
 
 let set_archived t ~archived =
   if archived && t.pinned
@@ -1473,6 +1490,7 @@ let context_cwds t =
       | Approval _
       | Allow_rule _
       | Allowed_call _
+      | Forget_allowed_call _
       | Archived _
       | Pinned _
       | Spend _
@@ -1497,6 +1515,21 @@ let context_cwds t =
 
 let identified_messages = context
 let messages t = force (derived t).messages
+
+let messages_since_forget_all t =
+  let d = derived t in
+  let after =
+    Option.map d.state.forgot_all ~f:(fun id -> Hashtbl.find d.position id)
+  in
+  List.filter_map (force d.context) ~f:(fun (id, (m : Timed_message.t)) ->
+    match after with
+    | None -> Some m.message
+    | Some after ->
+      (match Option.bind id ~f:(Hashtbl.find d.position), after with
+       | Some p, Some after when p > after -> Some m.message
+       | (Some _ | None), _ -> None))
+;;
+
 let system_prompt t = (derived t).state.system_prompt
 let goal t = (derived t).state.goal
 let reminders t = (derived t).state.reminders
@@ -1814,6 +1847,7 @@ let archived_and_activity t ~mtime =
         | Approval _
         | Allow_rule _
         | Allowed_call _
+        | Forget_allowed_call _
         | Pinned { pinned = true }
         | Spend _
         | Resume_at _
@@ -2254,6 +2288,7 @@ let to_markdown t =
     | Approval _
     | Allow_rule _
     | Allowed_call _
+    | Forget_allowed_call _
     | Archived _
     | Pinned _
     | Spend _
@@ -2307,6 +2342,7 @@ module For_testing = struct
         ~path
         ~context
         ~messages
+        ~messages_since_forget_all
         ~hidden
         ~trim
         ~context_tokens
@@ -2331,6 +2367,7 @@ module For_testing = struct
         ~path:(ids path : string list)
         (context : (string option * Timed_message.t) list)
         (messages : Message.t list)
+        (messages_since_forget_all : Message.t list)
         (hidden : Hidden.t list)
         (trim : Trim.t option)
         (context_tokens : int)
@@ -2357,6 +2394,7 @@ module For_testing = struct
       ~path:(force d.path)
       ~context:(force d.context)
       ~messages:(force d.messages)
+      ~messages_since_forget_all:(messages_since_forget_all t)
       ~hidden:(force d.hidden)
       ~trim:(force d.trim)
       ~context_tokens:(force d.context_tokens)
@@ -2466,6 +2504,18 @@ module For_testing = struct
            | Some id, (Assistant _ | Tool_result _) when Set.mem masked id ->
              Observation_mask.mask m.message
            | (Some _ | None), (Assistant _ | Tool_result _) -> m.message))
+      ~messages_since_forget_all:
+        (let since =
+           List.fold path ~init:None ~f:(fun since (e : Entry.t) ->
+             match e.payload with
+             | Forget_allowed_call { call = None } -> Some String.Set.empty
+             | _ -> Option.map since ~f:(fun ids -> Set.add ids e.id))
+         in
+         List.filter_map folded.context ~f:(fun (id, (m : Timed_message.t)) ->
+           match since, id with
+           | None, _ -> Some m.message
+           | Some ids, Some id when Set.mem ids id -> Some m.message
+           | Some _, (Some _ | None) -> None))
       ~hidden:(List.rev_map folded.hidden ~f:(hidden_of_range folded))
       ~trim:(trim_of_folded folded)
       ~context_tokens:(context_tokens t path ~context:folded.context)
@@ -2506,10 +2556,15 @@ module For_testing = struct
            | Allow_rule { rule } -> Some rule
            | _ -> None))
       ~allowed_calls:
-        (List.filter_map path ~f:(fun (e : Entry.t) ->
+        (List.fold path ~init:[] ~f:(fun acc (e : Entry.t) ->
            match e.payload with
-           | Allowed_call call -> Some call
-           | _ -> None))
+           | Allowed_call call -> call :: acc
+           | Forget_allowed_call { call = None } -> []
+           | Forget_allowed_call { call = Some call } ->
+             List.filter acc ~f:(fun (a : Allowed_call.t) ->
+               not (Allowed_call.Call.equal a.call call))
+           | _ -> acc)
+         |> List.rev)
       ~spend:
         (List.fold
            spends

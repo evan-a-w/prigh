@@ -627,6 +627,84 @@ let%expect_test "an approval permits that host, not the others" =
     |}]
 ;;
 
+(* Forgetting a call the user let run on a host takes back that host, unless
+   another such call there still permits it; forgetting them all also takes
+   back what the user's messages so far permitted, until a later one names
+   the host again. Both last across a reload. *)
+let%expect_test "forgetting allowed calls takes back their hosts" =
+  let allow = ref true in
+  with_agent
+    ~answer:(fun _ -> if !allow then Allow else Deny None)
+    [ on_host {|{"host":"laptop","tool":"ls","args":{}}|}
+    ; on_host ~id:"c2" {|{"host":"desktop","tool":"ls","args":{}}|}
+    ; Reply.text "ok"
+    ; on_host ~id:"c3" {|{"host":"laptop","tool":"ls","args":{}}|}
+    ; on_host ~id:"c4" {|{"host":"desktop","tool":"ls","args":{}}|}
+    ; Reply.text "ok"
+    ; on_host ~id:"c5" {|{"host":"laptop","tool":"ls","args":{}}|}
+    ; on_host ~id:"c6" {|{"host":"desktop","tool":"ls","args":{}}|}
+    ; Reply.text "ok"
+    ; on_host ~id:"c7" {|{"host":"laptop","tool":"ls","args":{}}|}
+    ; on_host ~id:"c8" {|{"host":"desktop","tool":"ls","args":{}}|}
+    ; Reply.text "ok"
+    ; on_host ~id:"c9" {|{"host":"laptop","tool":"ls","args":{}}|}
+    ; on_host ~id:"c10" {|{"host":"desktop","tool":"ls","args":{}}|}
+    ; Reply.text "ok"
+    ]
+  @@ fun t agent ->
+  Agent.set_hosts agent [ laptop t; desktop t ];
+  let forget which =
+    Or_error.ok_exn (Agent.forget_allowed_calls agent which);
+    let path = Session.path (Agent.session agent) in
+    Agent.new_session agent;
+    Or_error.ok_exn (Agent.switch_session agent ~path);
+    Agent.set_hosts agent [ laptop t; desktop t ]
+  in
+  print_endline "--- both allowed";
+  run ~text:"look around" agent;
+  allow := false;
+  print_endline "--- laptop's call forgotten, reloaded";
+  forget
+    (List.find (Agent.state agent).allowed_calls ~f:(fun line ->
+       String.is_substring line ~substring:"laptop"));
+  run ~text:"look around again" agent;
+  print_endline "--- laptop named, then all forgotten, reloaded";
+  run ~text:"now on laptop" agent;
+  forget None;
+  run ~text:"once more" agent;
+  print_endline "--- laptop named again";
+  run ~text:"laptop, please" agent;
+  [%expect
+    {|
+    --- both allowed
+    confirm on_host: on laptop: ls (runs on laptop, which you haven't named in this session) []
+    host-laptop runs ls in $DIR/laptop
+    on_host -> sub/
+    confirm on_host: on desktop: ls (runs on desktop, which you haven't named in this session) []
+    host-desktop runs ls in $DIR/desktop
+    on_host -> (empty directory)
+    --- laptop's call forgotten, reloaded
+    confirm on_host: on laptop: ls (runs on laptop, which you haven't named in this session) []
+    on_host -> ERROR [denied by user]
+    host-desktop runs ls in $DIR/desktop
+    on_host -> (empty directory)
+    --- laptop named, then all forgotten, reloaded
+    host-laptop runs ls in $DIR/laptop
+    on_host -> sub/
+    host-desktop runs ls in $DIR/desktop
+    on_host -> (empty directory)
+    confirm on_host: on laptop: ls (runs on laptop, which you haven't named in this session) []
+    on_host -> ERROR [denied by user]
+    confirm on_host: on desktop: ls (runs on desktop, which you haven't named in this session) []
+    on_host -> ERROR [denied by user]
+    --- laptop named again
+    host-laptop runs ls in $DIR/laptop
+    on_host -> sub/
+    confirm on_host: on desktop: ls (runs on desktop, which you haven't named in this session) []
+    on_host -> ERROR [denied by user]
+    |}]
+;;
+
 let%expect_test "a deny rule wins over everything" =
   with_agent
     ~config:{|{"permissions": {"deny": ["bash(rm:*)"]}}|}
