@@ -115,6 +115,7 @@ let%expect_test "background guidance follows the tools" =
 
     Background work: never block on it.
     - Commands that may take long (builds, test suites, installs, image builds, deployments) or that keep running (servers, watchers) go in the background: bash with background: true. Stop servers with job_kill when done.
+    - Never start processes with &, nohup, setsid or disown inside a command: nothing tracks them or tells you when they exit (use bash with background: true). Never wait in a shell loop (while ...; do sleep ...; done, or pgrep -f, which matches its own shell): bash refuses such loops unless they are under a timeout of at most 120s (e.g. timeout 60 bash -c 'until curl -sf URL; do sleep 1; done' for a server). Wait for a job's exit report instead, or on a pid with timeout N tail --pid=PID -f /dev/null.
     - Subagents always run in the background: subagent returns at once with the agent id.
     - Each finished job or subagent reports automatically, in a message starting with "[job <id> exited <code>]" (or killed, failed) or "[subagent <id> finished]" (or failed, or out of turns: subagent_continue gives it more turns), sent by prigh, not typed by the user. You are woken by it even after you end your turn.
     - So while they run, keep working on whatever does not depend on them, or end your turn. Never sleep or poll to pass the time. To look at a running job's output without blocking, use job_output; job_kill stops it.
@@ -288,6 +289,7 @@ let%expect_test "a subagent is told to block on commands and jobs, not sleep" =
     Waiting: never sleep or poll.
     - Never run sleep to pass the time or to poll in separate calls (sleep, then check again).
     - When you need a command's result, run it in the foreground: the call blocks until it finishes (give it a timeout long enough; the default is 10 minutes). To wait for something to become ready (a server, a file), use one foreground command that blocks until it is, with a timeout.
+    - Never start processes with &, nohup, setsid or disown inside a command: nothing tracks them or tells you when they exit (use bash with background: true). Never wait in a shell loop (while ...; do sleep ...; done, or pgrep -f, which matches its own shell): bash refuses such loops unless they are under a timeout of at most 120s (e.g. timeout 60 bash -c 'until curl -sf URL; do sleep 1; done' for a server). Wait for a job's exit report instead, or on a pid with timeout N tail --pid=PID -f /dev/null.
     - To run commands side by side or keep a server running while you work, start them with bash background: true. Each job's report arrives in a message starting with "[job <id> exited <code>]" when it exits, even after you end your turn: keep working or end your turn meanwhile. To look at a running job's output without blocking, use job_output; job_kill stops it.
     - You finish when you end your turn with no jobs running: kill the ones you no longer need (servers) before your final report.
     |}];
@@ -298,6 +300,7 @@ let%expect_test "a subagent is told to block on commands and jobs, not sleep" =
     Waiting: never sleep or poll.
     - Never run sleep to pass the time or to poll in separate calls (sleep, then check again).
     - When you need a command's result, run it in the foreground: the call blocks until it finishes (give it a timeout long enough; the default is 10 minutes). To wait for something to become ready (a server, a file), use one foreground command that blocks until it is, with a timeout.
+    - Never start processes with &, nohup, setsid or disown inside a command: nothing tracks them or tells you when they exit. Never wait in a shell loop (while ...; do sleep ...; done, or pgrep -f, which matches its own shell): bash refuses such loops unless they are under a timeout of at most 120s (e.g. timeout 60 bash -c 'until curl -sf URL; do sleep 1; done' for a server). Wait on a pid with timeout N tail --pid=PID -f /dev/null.
     |}];
   (* Nothing to wait on without bash. *)
   section [];
