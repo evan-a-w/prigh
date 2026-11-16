@@ -469,6 +469,10 @@ val spend : t -> Usage.t * float
     cost. *)
 val spend_for : t -> purpose:string -> int * float
 
+(** Every reply's model and usage, on every branch, oldest first: for
+    pricing each at its model's price. *)
+val replies : t -> (string * Usage.t) list
+
 (** The last [Resume_at] entry's time, on any branch. *)
 val resume_at : t -> float option
 
@@ -607,6 +611,16 @@ val disk_usage : string -> int
 
 (** Removes {!files}. *)
 val delete_files : string -> unit
+
+module For_testing : sig
+  (** What the session answers about its active path ({!messages},
+      {!hidden}, {!context_tokens}, {!approval}, ...) and its totals
+      ({!spend}, {!name}, ...), as kept up to date entry by entry. *)
+  val cached : t -> Sexp.t
+
+  (** The same derived again from all the entries. *)
+  val uncached : t -> Sexp.t
+end
 
 (** The summary whose id is [key], else the only one whose id starts with
     it; errors say whether none or several matched. *)

@@ -252,6 +252,49 @@ let refused_image message ~(model : Model.t) ~limit =
        (Image.Limit.describe limit))
 ;;
 
+(* The run's context, appended to message by message: kept newest first,
+   the list in order made again only when asked for after an append. *)
+module Context = struct
+  type t =
+    { mutable rev : Message.t list
+    ; mutable length : int
+    ; mutable in_order : Message.t list option
+    }
+
+  let create messages =
+    { rev = List.rev messages
+    ; length = List.length messages
+    ; in_order = Some messages
+    }
+  ;;
+
+  let set t messages =
+    t.rev <- List.rev messages;
+    t.length <- List.length messages;
+    t.in_order <- Some messages
+  ;;
+
+  let append t m =
+    t.rev <- m :: t.rev;
+    t.length <- t.length + 1;
+    t.in_order <- None
+  ;;
+
+  let length t = t.length
+
+  let to_list t =
+    match t.in_order with
+    | Some messages -> messages
+    | None ->
+      let messages = List.rev t.rev in
+      t.in_order <- Some messages;
+      messages
+  ;;
+
+  (* Those after the first [n], newest first. *)
+  let rev_after t n = List.take t.rev (t.length - n)
+end
+
 let streams = ref 0
 
 let next_stream () =
@@ -287,10 +330,10 @@ let run
       ~prompts
       ()
   =
-  let messages = ref (List.rev_append (List.rev context) prompts) in
+  let messages = Context.create (context @ prompts) in
   let added = ref (List.rev prompts) in
   let append m =
-    messages := !messages @ [ m ];
+    Context.append messages m;
     added := m :: !added;
     emit (Agent_event.Message_start m);
     emit (Message_end m)
@@ -327,9 +370,14 @@ let run
       Compaction_settings.summary_model config.compaction config.model
     in
     Or_error.map
-      (compact ~model ~keep_recent_tokens ~overflowed ~cancel !messages)
+      (compact
+         ~model
+         ~keep_recent_tokens
+         ~overflowed
+         ~cancel
+         (Context.to_list messages))
       ~f:(fun (context, (outcome : Compaction.Outcome.t)) ->
-        messages := context;
+        Context.set messages context;
         last_tokens := None;
         emit
           (Compacted
@@ -350,7 +398,8 @@ let run
     if not config.compaction.mask_observations
     then None
     else (
-      match Observation_mask.plan !messages with
+      let context = Context.to_list messages in
+      match Observation_mask.plan context with
       | Some plan
         when Compaction_settings.worth_masking
                config.compaction
@@ -366,11 +415,11 @@ let run
                ; "tokens_saved", Int plan.tokens_saved
                ; "masked", Int plan.masked
                ]
-             (fun () -> mask ~through:plan.through !messages)
+             (fun () -> mask ~through:plan.through context)
          with
          | Error _ -> None
          | Ok context ->
-           messages := context;
+           Context.set messages context;
            last_tokens
            := Option.map !last_tokens ~f:(fun (tokens, since) ->
                 tokens - plan.tokens_saved, since);
@@ -384,7 +433,7 @@ let run
     match !last_tokens with
     | Some (tokens, since) ->
       let tokens =
-        tokens + Message.estimate_tokens (List.drop !messages since)
+        tokens + Message.estimate_tokens (Context.rev_after messages since)
       in
       let should_compact tokens =
         Compaction_settings.should_compact
@@ -427,7 +476,7 @@ let run
             ~drop_stale_thinking:(Model.binds_thinking_to_prefix config.model)
             ~min:config.compaction.computer_screenshots
             ~max:config.compaction.computer_screenshots_max
-            !messages
+            (Context.to_list messages)
         in
         let limit =
           Image_limit.for_request
@@ -564,7 +613,7 @@ let run
         | _ -> assistant
       in
       let assistant = attempt 1 ~overflows:0 in
-      messages := !messages @ [ Assistant assistant ];
+      Context.append messages (Assistant assistant);
       added := Assistant assistant :: !added;
       emit (Message_end (Assistant assistant));
       (match assistant.stop_reason with
@@ -573,13 +622,13 @@ let run
          last_tokens
          := Some
               ( assistant.usage.input + assistant.usage.output
-              , List.length !messages ));
+              , Context.length messages ));
       let calls = Message.Assistant.tool_calls assistant in
       let conversation =
         { Conversation.model = config.model
         ; thinking = config.thinking
         ; system = config.system
-        ; messages = !messages
+        ; messages = Context.to_list messages
         }
       in
       let execute call =
@@ -697,7 +746,7 @@ let run
         | (End_turn | Tool_use), _ :: _ -> List.iter (steer ()) ~f:append)
   done;
   let added = List.rev !added in
-  on_context !messages;
+  on_context (Context.to_list messages);
   emit (Agent_end added);
   added
 ;;

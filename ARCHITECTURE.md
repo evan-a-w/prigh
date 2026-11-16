@@ -1261,7 +1261,9 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   with its full arguments, never tool output; its system prompt allows a
   call on another host only when the user named that host), its `verdict` tool
   (`{decision: allow|ask, reason}`) and parsing the reply (anything else is
-  `Ask` with why), thinking off or the lowest level. `Agent.approve` turns
+  `Ask` with why), thinking off or the lowest level; its input (the
+  conversation's requests) is built only for a call that reaches the
+  judge, not for those the mode or a rule decides. `Agent.approve` turns
   `Judge` into a judgement on the approval model (`approval_model`, else
   the session's): shared promises keyed by the model and the judge's
   prompt (at most 256, cleared when full and on a session switch; failures
@@ -1838,7 +1840,17 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   context is the same on resume, on a branch and after a later compaction
   or trim (kept messages stay masked); the messages the frontends see
   (`identified_messages`, and `timed_messages`: each with its entry's time,
-  as a `Timed_message.t`, the summary has none) are never masked. Nothing is
+  as a `Timed_message.t`, the summary has none) are never masked. What the
+  active path folds to (`messages`, `hidden`, `trim`, `context_tokens`,
+  the last approval, system prompt, goal, model, rules and so on) is
+  worked out once per head (`Derived`): an entry appended to the head
+  advances it by that entry (`step`), any other move of the head
+  (`rewind`, a load's `Head` lines) drops it to be folded again from the
+  root when next asked; the totals of every branch (`spend`,
+  `spend_for`, `replies`, `name`, `description`, `resume_at`) are kept
+  as entries are added. `For_testing.cached`/`uncached` compare the two
+  after every kind of change (2000 turns: `Agent.state` 7.1 → 0.12 ms,
+  `Session.messages` 1.7 ms → nothing once worked out). Nothing is
   written to disk until the first message (or name): an abandoned empty
   session leaves no file. After that, entries are only appended to the
   existing file (no `O_CREAT`), so a session deleted while something still

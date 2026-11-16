@@ -109,6 +109,182 @@ module Line = struct
   [@@deriving sexp, jsonaf]
 end
 
+module Mode = struct
+  type t =
+    { approval : string
+    ; plan : bool
+    ; chat : bool
+    }
+  [@@deriving sexp_of, equal]
+end
+
+module Trim = struct
+  type t =
+    { before : string
+    ; messages : int
+    ; tokens : int
+    ; at : float option
+    }
+  [@@deriving sexp_of]
+end
+
+module Hidden = struct
+  module Kind = struct
+    type t =
+      | Trim_before of { before : string }
+      | Trim_after of
+          { after : string
+          ; through : string
+          }
+      | Deleted of { message : string }
+    [@@deriving sexp_of, equal]
+
+    let is_trim = function
+      | Trim_before _ | Trim_after _ -> true
+      | Deleted _ -> false
+    ;;
+  end
+
+  type t =
+    { entry : string
+    ; kind : Kind.t
+    ; messages : int
+    ; tokens : int
+    ; at : float option
+    ; divider : int option
+    }
+  [@@deriving sexp_of]
+end
+
+module Folded = struct
+  type item = string option * Timed_message.t
+
+  module Range = struct
+    type t =
+      { entry : Entry.t
+      ; kind : Hidden.Kind.t
+      ; items : item list (** what it took out of the context, oldest first *)
+      ; hides : item -> bool
+        (** whether it keeps the message out, when another range that took
+            it out is cancelled *)
+      }
+  end
+
+  type t =
+    { context : item list
+    ; hidden : Range.t list (** in effect, newest first *)
+    ; position : int String.Table.t (** of the path's entries *)
+    }
+end
+
+(* What a path says, folded entry by entry ([step]): the context and the
+   ranges in effect, and the last of each setting on it. *)
+module Path_state = struct
+  module Reply = struct
+    (* The latest reply: its request's input tokens, the context with it, and
+       whether a trim, a deletion or their undoing came since. *)
+    type t =
+      { input : int
+      ; rev_seen : Folded.item list
+      ; edited : bool
+      }
+  end
+
+  type t =
+    { length : int
+    ; rev_path : Entry.t list
+    ; rev_context : Folded.item list
+    ; hidden : Folded.Range.t list (** in effect, newest first *)
+    ; reply : Reply.t option
+    ; masked_through : string option
+    ; approval : Mode.t option
+    ; told_environment : Told_environment.t option
+    ; system_prompt : string option
+    ; goal : Goal.t option
+    ; reminders : Reminder.t list
+    ; budget : float option option
+    ; model : (string * Thinking.t) option
+    ; rev_allow_rules : string list
+    ; rev_allowed_calls : Allowed_call.t list
+    }
+
+  let empty =
+    { length = 0
+    ; rev_path = []
+    ; rev_context = []
+    ; hidden = []
+    ; reply = None
+    ; masked_through = None
+    ; approval = None
+    ; told_environment = None
+    ; system_prompt = None
+    ; goal = None
+    ; reminders = []
+    ; budget = None
+    ; model = None
+    ; rev_allow_rules = []
+    ; rev_allowed_calls = []
+    }
+  ;;
+end
+
+(* What the active path up to [head] makes of the conversation, worked out
+   once per head: appending to the head advances it by the new entry, any
+   other move of the head drops it. *)
+module Derived = struct
+  type t =
+    { head : string option
+    ; position : int String.Table.t
+      (** of the path's entries; advancing adds to it *)
+    ; state : Path_state.t
+    ; path : Entry.t list Lazy.t
+    ; context : Folded.item list Lazy.t
+    ; messages : Message.t list Lazy.t
+    ; hidden : Hidden.t list Lazy.t
+    ; trim : Trim.t option Lazy.t
+    ; context_tokens : int Lazy.t
+    }
+end
+
+(* Totals of every branch, kept as entries are added. *)
+module Totals = struct
+  type t =
+    { mutable spend : Usage.t * float
+    ; spend_for : (int * float) String.Table.t (** by purpose *)
+    ; mutable replies : (string * Usage.t) list
+      (** each reply's model and usage, newest first *)
+    ; mutable name : string option
+    ; mutable description : string option
+    ; mutable resume_at : float option
+    }
+
+  let create () =
+    { spend = Usage.zero, 0.
+    ; spend_for = String.Table.create ()
+    ; replies = []
+    ; name = None
+    ; description = None
+    ; resume_at = None
+    }
+  ;;
+
+  let add t (payload : Entry.Payload.t) =
+    match payload with
+    | Spend { usage; cost_usd; purpose } ->
+      let u, c = t.spend in
+      t.spend <- Usage.add u usage, c +. cost_usd;
+      Option.iter purpose ~f:(fun purpose ->
+        Hashtbl.update t.spend_for purpose ~f:(function
+          | None -> 1, cost_usd
+          | Some (n, c) -> n + 1, c +. cost_usd))
+    | Message (Assistant a) -> t.replies <- (a.model, a.usage) :: t.replies
+    | Name { name } -> t.name <- Some name
+    | Description { text } -> t.description <- Some text
+    | Resume_at { at } -> t.resume_at <- at
+    | _ -> ()
+  ;;
+end
+
 type t =
   { id : string
   ; path : string
@@ -139,6 +315,8 @@ type t =
     (** messages as {!Observation_mask.mask} makes them, by entry id *)
   ; offsets : int String.Table.t
     (** where each entry's line starts in the file, by entry id *)
+  ; mutable derived : Derived.t option (** for [head], when worked out *)
+  ; totals : Totals.t
   }
 
 let id t = t.id
@@ -349,6 +527,8 @@ let empty ~id ~path ~cwd ~created_at ~parent ~persisted ~temporary =
   ; torn = false
   ; masked = String.Table.create ()
   ; offsets = String.Table.create ()
+  ; derived = None
+  ; totals = Totals.create ()
   }
 ;;
 
@@ -376,10 +556,422 @@ let track_worktree t (w : Session_worktree.t) =
          else o)
 ;;
 
+let summary_prefix = "Summary of the conversation so far:\n"
+
+let summary_message summary =
+  Message.user
+    ~origin:{ Injected.empty with source = Some Summary }
+    (summary_prefix ^ summary)
+;;
+
+let summary_of_message : Message.t -> string option = function
+  | User { text; _ } -> String.chop_prefix text ~prefix:summary_prefix
+  | Assistant _ | Tool_result _ -> None
+;;
+
+let is_summary_message m = Option.is_some (summary_of_message m)
+
+(* A compaction's summary (an item without an id) sits where its [kept_from]
+   is: after the pinned messages, before those it kept. *)
+let summary_key = ""
+
+let item_position position ((id, _) : Folded.item) =
+  Hashtbl.find position (Option.value id ~default:summary_key)
+;;
+
+(* Before the first message that came after it on the path; at the end if
+   none did. *)
+let insert_by_position position context item =
+  match item_position position item with
+  | None -> item :: context
+  | Some p ->
+    let rec go = function
+      | [] -> [ item ]
+      | x :: rest ->
+        (match item_position position x with
+         | Some q when q > p -> item :: x :: rest
+         | Some _ | None -> x :: go rest)
+    in
+    go context
+;;
+
+(* The range's messages go back into [context], but for those another range
+   in effect hides, which go to it: in front for a trim before a message (a
+   compaction since summarised only what came after them), else where they
+   were. *)
+let cancel position ~context ~hidden (r : Folded.Range.t) =
+  let hidden =
+    List.filter hidden ~f:(fun (h : Folded.Range.t) ->
+      not (String.equal h.entry.id r.entry.id))
+  in
+  let by_position =
+    List.stable_sort ~compare:(fun a b ->
+      Option.compare
+        Int.compare
+        (item_position position a)
+        (item_position position b))
+  in
+  let hidden, back =
+    List.fold r.items ~init:(hidden, []) ~f:(fun (hidden, back) item ->
+      match List.find hidden ~f:(fun (h : Folded.Range.t) -> h.hides item) with
+      | Some h ->
+        ( List.map hidden ~f:(fun (h' : Folded.Range.t) ->
+            if String.equal h.entry.id h'.entry.id
+            then { h' with items = by_position (h'.items @ [ item ]) }
+            else h')
+        , back )
+      | None -> hidden, item :: back)
+  in
+  let back = List.rev back in
+  let context =
+    match r.kind with
+    | Trim_before _ -> back @ context
+    | Trim_after _ | Deleted _ ->
+      List.fold back ~init:context ~f:(insert_by_position position)
+  in
+  context, hidden
+;;
+
+(* Message by message, as [Trim_point] sums them. *)
+let estimate items =
+  List.sum
+    (module Int)
+    items
+    ~f:(fun (_, (m : Timed_message.t)) -> Message.estimate_tokens [ m.message ])
+;;
+
+let trim_of_folded ({ hidden; _ } : Folded.t) =
+  let trims =
+    List.filter hidden ~f:(fun (r : Folded.Range.t) ->
+      match r.kind with
+      | Trim_before _ -> true
+      | Trim_after _ | Deleted _ -> false)
+  in
+  match trims with
+  | [] -> None
+  | latest :: _ ->
+    let dropped = List.concat_map trims ~f:(fun r -> r.items) in
+    let before =
+      match latest.kind with
+      | Trim_before { before } -> before
+      | Trim_after _ | Deleted _ -> latest.entry.id
+    in
+    Some
+      { Trim.before
+      ; messages = List.length dropped
+      ; tokens = estimate dropped
+      ; at = latest.entry.at
+      }
+;;
+
+let hidden_of_range ({ context; position; _ } : Folded.t) (r : Folded.Range.t) =
+  let divider =
+    match r.kind with
+    | Trim_before _ | Deleted _ -> None
+    | Trim_after { after; _ } ->
+      let a = Option.value (Hashtbl.find position after) ~default:(-1) in
+      Some
+        (List.foldi context ~init:0 ~f:(fun i acc item ->
+           match item_position position item with
+           | Some p when p <= a -> i + 1
+           | Some _ | None -> acc))
+  in
+  { Hidden.entry = r.entry.id
+  ; kind = r.kind
+  ; messages = List.length r.items
+  ; tokens = estimate r.items
+  ; at = r.entry.at
+  ; divider
+  }
+;;
+
+(* Folds the entry [e] into [s], the state of the path before it: a
+   compaction's summary replaces what comes before its [kept_from] in the
+   context so far, preceded by the compaction's pinned messages; a trim
+   drops what comes before its message, a trim after a message what comes
+   after it up to its [through], a deletion its message with the results of
+   its calls; an untrim cancels the latest trim in effect, a restore the
+   entry it names. Records [e]'s position in [position], which must have
+   those of the entries before it. *)
+let step ~find position (s : Path_state.t) (e : Entry.t) : Path_state.t =
+  Hashtbl.set position ~key:e.id ~data:s.length;
+  let pos = Hashtbl.find position in
+  let message (e : Entry.t) =
+    match e.payload with
+    | Message message -> Some (Some e.id, { Timed_message.message; at = e.at })
+    | _ -> None
+  in
+  let take (e : Entry.t) kind ~hides (rev_context, hidden) =
+    let items, rest = List.partition_tf (List.rev rev_context) ~f:hides in
+    List.rev rest, { Folded.Range.entry = e; kind; items; hides } :: hidden
+  in
+  let cancel_where (rev_context, hidden) ~f =
+    match List.find hidden ~f with
+    | None -> rev_context, hidden
+    | Some r ->
+      let context, hidden =
+        cancel position ~context:(List.rev rev_context) ~hidden r
+      in
+      List.rev context, hidden
+  in
+  let rev_context, hidden =
+    let ((rev_context, hidden) as acc) = s.rev_context, s.hidden in
+    match e.payload with
+    | Message _ -> Option.to_list (message e) @ rev_context, hidden
+    | Compaction { summary; kept_from; pinned } ->
+      let from = pos kept_from in
+      Option.iter from ~f:(fun from ->
+        Hashtbl.set position ~key:summary_key ~data:from);
+      let kept =
+        List.filter (List.rev rev_context) ~f:(fun (id, _) ->
+          match Option.bind id ~f:pos, from with
+          | Some p, Some from -> p >= from
+          | _ -> false)
+      in
+      let pinned =
+        List.filter_map pinned ~f:(fun (pin : Pinned_messages.Pin.t) ->
+          Option.bind (find pin.id) ~f:message
+          |> Option.map ~f:(fun (id, (m : Timed_message.t)) ->
+            if pin.shortened
+            then id, { m with message = Pinned_messages.shorten m.message }
+            else id, m))
+        |> List.filter ~f:(fun item ->
+          not (List.exists hidden ~f:(fun (h : Folded.Range.t) -> h.hides item)))
+      in
+      let summary =
+        None, { Timed_message.message = summary_message summary; at = None }
+      in
+      List.rev (pinned @ (summary :: kept)), hidden
+    | Trim { before } ->
+      let context = List.rev rev_context in
+      let hides item =
+        match item_position position item, pos before with
+        | Some p, Some b -> p < b
+        | _ -> false
+      in
+      let dropped, kept =
+        match
+          List.findi context ~f:(fun _ (id, _) ->
+            Option.equal String.equal id (Some before))
+        with
+        | Some (i, _) -> List.take context i, List.drop context i
+        | None -> [], context
+      in
+      ( List.rev kept
+      , { Folded.Range.entry = e
+        ; kind = Trim_before { before }
+        ; items = dropped
+        ; hides
+        }
+        :: hidden )
+    | Trim_after { after; through } ->
+      take
+        e
+        (Trim_after { after; through })
+        ~hides:(fun item ->
+          match item_position position item, pos after, pos through with
+          | Some p, Some a, Some th -> a < p && p <= th
+          | _ -> false)
+        acc
+    | Delete { message } ->
+      let ids = Message_point.deleted_with (List.rev rev_context) ~message in
+      take
+        e
+        (Deleted { message })
+        ~hides:(fun (id, _) ->
+          Option.value_map id ~default:false ~f:(Set.mem ids))
+        acc
+    | Untrim ->
+      cancel_where acc ~f:(fun (r : Folded.Range.t) ->
+        Hidden.Kind.is_trim r.kind)
+    | Restore { entry } ->
+      cancel_where acc ~f:(fun (r : Folded.Range.t) ->
+        String.equal r.entry.id entry)
+    | Model _
+    | Masked _
+    | Name _
+    | Description _
+    | Cwd _
+    | System_prompt _
+    | Goal _
+    | Reminders _
+    | Budget _
+    | Approval _
+    | Allow_rule _
+    | Allowed_call _
+    | Archived _
+    | Pinned _
+    | Spend _
+    | Resume_at _
+    | Told_environment _
+    | Repo _
+    | Agent_worktree _
+    | Worktree _
+    | Worktree_removed _
+    | Home _
+    | Transcript_filter _
+    | Review _ -> acc
+  in
+  let reply : Path_state.Reply.t option =
+    match e.payload with
+    | Message (Assistant a) ->
+      Some { input = a.usage.input; rev_seen = rev_context; edited = false }
+    | Trim _ | Untrim | Trim_after _ | Delete _ | Restore _ ->
+      Option.map s.reply ~f:(fun r -> { r with edited = true })
+    | _ -> s.reply
+  in
+  let s =
+    { s with
+      length = s.length + 1
+    ; rev_path = e :: s.rev_path
+    ; rev_context
+    ; hidden
+    ; reply
+    }
+  in
+  match e.payload with
+  | Masked { through } -> { s with masked_through = Some through }
+  | Approval { mode; plan; chat } ->
+    { s with approval = Some { approval = mode; plan; chat } }
+  | Told_environment told -> { s with told_environment = Some told }
+  | System_prompt { text } -> { s with system_prompt = Some text }
+  | Goal { goal } -> { s with goal }
+  | Reminders { reminders } -> { s with reminders }
+  | Budget { usd } -> { s with budget = Some usd }
+  | Model { model; thinking } -> { s with model = Some (model, thinking) }
+  | Allow_rule { rule } ->
+    { s with rev_allow_rules = rule :: s.rev_allow_rules }
+  | Allowed_call call ->
+    { s with rev_allowed_calls = call :: s.rev_allowed_calls }
+  | Message _
+  | Compaction _
+  | Name _
+  | Description _
+  | Cwd _
+  | Archived _
+  | Pinned _
+  | Spend _
+  | Resume_at _
+  | Repo _
+  | Agent_worktree _
+  | Worktree _
+  | Worktree_removed _
+  | Home _
+  | Transcript_filter _
+  | Trim _
+  | Untrim
+  | Trim_after _
+  | Delete _
+  | Restore _
+  | Review _ -> s
+;;
+
+let derive_path ~find ~position path =
+  List.fold path ~init:Path_state.empty ~f:(step ~find position)
+;;
+
+(* The messages of [context] to send: those up to the path's last [Masked]
+   entry's [through] masked ({!Observation_mask.mask}, kept by id in
+   [masked]). *)
+let masked_messages ~masked ~position ~through context =
+  let through = Option.bind through ~f:(Hashtbl.find position) in
+  List.map context ~f:(fun (id, (m : Timed_message.t)) ->
+    match id, m.message, through with
+    (* Masking leaves the user's messages as they are; a pinned one may be
+       shortened, which the cache by id would not tell apart. *)
+    | _, User _, _ | None, _, _ | _, _, None -> m.message
+    | Some id, (Assistant _ | Tool_result _), Some through ->
+      (match Hashtbl.find position id with
+       | Some p when p <= through ->
+         Hashtbl.find_or_add masked id ~default:(fun () ->
+           Observation_mask.mask m.message)
+       | Some _ | None -> m.message))
+;;
+
+let make t ~head ~position (s : Path_state.t) : Derived.t =
+  let context = lazy (List.rev s.rev_context) in
+  let folded =
+    lazy { Folded.context = force context; hidden = s.hidden; position }
+  in
+  { head
+  ; position
+  ; state = s
+  ; path = lazy (List.rev s.rev_path)
+  ; context
+  ; messages =
+      lazy
+        (masked_messages
+           ~masked:t.masked
+           ~position
+           ~through:s.masked_through
+           (force context))
+  ; hidden =
+      lazy
+        (let folded = force folded in
+         List.rev_map folded.hidden ~f:(hidden_of_range folded))
+  ; trim = lazy (trim_of_folded (force folded))
+  ; context_tokens =
+      lazy
+        (match s.reply with
+         | None -> 0
+         | Some { input; edited = false; rev_seen = _ } -> input
+         | Some { input; edited = true; rev_seen } ->
+           Int.max 0 (input + estimate (force context) - estimate rev_seen))
+  }
+;;
+
+(* The path from the root to [head], following the parents. *)
+let walk t =
+  let rec go id acc =
+    match id with
+    | None -> acc
+    | Some id ->
+      (match Hashtbl.find t.by_id id with
+       | Some entry -> go entry.parent (entry :: acc)
+       | None ->
+         (match Hashtbl.find t.unreadable id with
+          | Some parent -> go parent acc
+          | None -> acc))
+  in
+  go t.head []
+;;
+
+let derived t =
+  match t.derived with
+  | Some d -> d
+  | None ->
+    let position = String.Table.create () in
+    let state = derive_path ~find:(Hashtbl.find t.by_id) ~position (walk t) in
+    let d = make t ~head:t.head ~position state in
+    t.derived <- Some d;
+    d
+;;
+
+(* The head moves other than by appending to it. *)
+let set_head t head =
+  t.head <- head;
+  t.derived <- None
+;;
+
+(* [entry] just became the head: what was derived for its parent advances
+   by it. *)
+let advance t (entry : Entry.t) =
+  t.derived
+  <- (match t.derived with
+      | Some d when Option.equal String.equal d.head entry.parent ->
+        let state =
+          step ~find:(Hashtbl.find t.by_id) d.position d.state entry
+        in
+        Some (make t ~head:(Some entry.id) ~position:d.position state)
+      | Some _ | None -> None)
+;;
+
 let add_entry t (entry : Entry.t) =
   t.entries <- entry :: t.entries;
   Hashtbl.set t.by_id ~key:entry.id ~data:entry;
+  advance t entry;
   t.head <- Some entry.id;
+  Totals.add t.totals entry.payload;
   match entry.payload with
   | Cwd { cwd; host } ->
     t.cwd <- cwd;
@@ -529,12 +1121,12 @@ let read_json t ~number ~offset json =
   | Entry e ->
     Hashtbl.set t.offsets ~key:e.id ~data:offset;
     add_entry t e
-  | Head id -> t.head <- Some id
+  | Head id -> set_head t (Some id)
   | exception _ ->
     (match unreadable_entry json with
      | Some (id, parent, kind) ->
        Hashtbl.set t.unreadable ~key:id ~data:parent;
-       t.head <- Some id;
+       set_head t (Some id);
        skip
          t
          ~number
@@ -650,16 +1242,6 @@ let set_system_prompt t ~text = append t (System_prompt { text })
 let set_goal t goal = append t (Goal { goal })
 let set_reminders t reminders = append t (Reminders { reminders })
 let set_budget t ~usd = append t (Budget { usd })
-
-module Mode = struct
-  type t =
-    { approval : string
-    ; plan : bool
-    ; chat : bool
-    }
-  [@@deriving sexp_of, equal]
-end
-
 let set_approval t ~mode ~plan ~chat = append t (Approval { mode; plan; chat })
 let add_allow_rule t ~rule = append t (Allow_rule { rule })
 let add_allowed_call t call = append t (Allowed_call call)
@@ -696,496 +1278,46 @@ let review t =
     | _ -> acc)
 ;;
 
-let spend t =
-  List.fold
-    t.entries
-    ~init:(Usage.zero, 0.)
-    ~f:(fun (usage, cost) (e : Entry.t) ->
-      match e.payload with
-      | Spend s -> Usage.add usage s.usage, cost +. s.cost_usd
-      | _ -> usage, cost)
-;;
+let spend t = t.totals.spend
 
 let spend_for t ~purpose =
-  List.fold t.entries ~init:(0, 0.) ~f:(fun (n, cost) (e : Entry.t) ->
-    match e.payload with
-    | Spend { cost_usd; purpose = Some p; usage = _ }
-      when String.equal p purpose -> n + 1, cost +. cost_usd
-    | _ -> n, cost)
+  Hashtbl.find t.totals.spend_for purpose |> Option.value ~default:(0, 0.)
 ;;
 
-let resume_at t =
-  List.find_map t.entries ~f:(fun (e : Entry.t) ->
-    match e.payload with
-    | Resume_at { at } -> Some at
-    | _ -> None)
-  |> Option.join
-;;
+let replies t = List.rev t.totals.replies
+let resume_at t = t.totals.resume_at
 
 let set_resume_at t at =
   if not (Option.equal Float.equal (resume_at t) at)
   then ignore (append t (Resume_at { at }) : Entry.t)
 ;;
 
-let name t =
-  List.find_map t.entries ~f:(fun (e : Entry.t) ->
-    match e.payload with
-    | Name { name } -> Some name
-    | Message _
-    | Model _
-    | Compaction _
-    | Masked _
-    | Description _
-    | Cwd _
-    | System_prompt _
-    | Goal _
-    | Reminders _
-    | Budget _
-    | Approval _
-    | Allow_rule _
-    | Allowed_call _
-    | Archived _
-    | Pinned _
-    | Spend _
-    | Resume_at _
-    | Told_environment _
-    | Repo _
-    | Agent_worktree _
-    | Worktree _
-    | Worktree_removed _
-    | Home _
-    | Transcript_filter _
-    | Trim _
-    | Untrim
-    | Trim_after _
-    | Delete _
-    | Restore _
-    | Review _ -> None)
-;;
-
-let description t =
-  List.find_map t.entries ~f:(fun (e : Entry.t) ->
-    match e.payload with
-    | Description { text } -> Some text
-    | Message _
-    | Model _
-    | Compaction _
-    | Masked _
-    | Name _
-    | Cwd _
-    | System_prompt _
-    | Goal _
-    | Reminders _
-    | Budget _
-    | Approval _
-    | Allow_rule _
-    | Allowed_call _
-    | Archived _
-    | Pinned _
-    | Spend _
-    | Resume_at _
-    | Told_environment _
-    | Repo _
-    | Agent_worktree _
-    | Worktree _
-    | Worktree_removed _
-    | Home _
-    | Transcript_filter _
-    | Trim _
-    | Untrim
-    | Trim_after _
-    | Delete _
-    | Restore _
-    | Review _ -> None)
-;;
+let name t = t.totals.name
+let description t = t.totals.description
 
 let append_compaction ?(pinned = []) t ~summary ~kept_from =
   append t (Compaction { summary; kept_from; pinned })
 ;;
 
 let append_masked t ~through = append t (Masked { through })
-
-let active_path t =
-  let rec go id acc =
-    match id with
-    | None -> acc
-    | Some id ->
-      (match Hashtbl.find t.by_id id with
-       | Some entry -> go entry.parent (entry :: acc)
-       | None ->
-         (match Hashtbl.find t.unreadable id with
-          | Some parent -> go parent acc
-          | None -> acc))
-  in
-  go t.head []
-;;
-
-let approval t =
-  List.fold (active_path t) ~init:None ~f:(fun acc (e : Entry.t) ->
-    match e.payload with
-    | Approval { mode; plan; chat } -> Some { Mode.approval = mode; plan; chat }
-    | _ -> acc)
-;;
-
-let told_environment t =
-  List.fold (active_path t) ~init:None ~f:(fun acc (e : Entry.t) ->
-    match e.payload with
-    | Told_environment told -> Some told
-    | _ -> acc)
-;;
-
-let allow_rules t =
-  List.filter_map (active_path t) ~f:(fun (e : Entry.t) ->
-    match e.payload with
-    | Allow_rule { rule } -> Some rule
-    | _ -> None)
-;;
-
-let allowed_calls t =
-  List.filter_map (active_path t) ~f:(fun (e : Entry.t) ->
-    match e.payload with
-    | Allowed_call call -> Some call
-    | _ -> None)
-;;
-
-let summary_prefix = "Summary of the conversation so far:\n"
-
-let summary_message summary =
-  Message.user
-    ~origin:{ Injected.empty with source = Some Summary }
-    (summary_prefix ^ summary)
-;;
-
-let summary_of_message : Message.t -> string option = function
-  | User { text; _ } -> String.chop_prefix text ~prefix:summary_prefix
-  | Assistant _ | Tool_result _ -> None
-;;
-
-let is_summary_message m = Option.is_some (summary_of_message m)
-
-module Trim = struct
-  type t =
-    { before : string
-    ; messages : int
-    ; tokens : int
-    ; at : float option
-    }
-  [@@deriving sexp_of]
-end
-
-module Hidden = struct
-  module Kind = struct
-    type t =
-      | Trim_before of { before : string }
-      | Trim_after of
-          { after : string
-          ; through : string
-          }
-      | Deleted of { message : string }
-    [@@deriving sexp_of, equal]
-
-    let is_trim = function
-      | Trim_before _ | Trim_after _ -> true
-      | Deleted _ -> false
-    ;;
-  end
-
-  type t =
-    { entry : string
-    ; kind : Kind.t
-    ; messages : int
-    ; tokens : int
-    ; at : float option
-    ; divider : int option
-    }
-  [@@deriving sexp_of]
-end
-
-module Folded = struct
-  type item = string option * Timed_message.t
-
-  module Range = struct
-    type t =
-      { entry : Entry.t
-      ; kind : Hidden.Kind.t
-      ; items : item list (** what it took out of the context, oldest first *)
-      ; hides : item -> bool
-        (** whether it keeps the message out, when another range that took
-            it out is cancelled *)
-      }
-  end
-
-  type t =
-    { context : item list
-    ; hidden : Range.t list (** in effect, newest first *)
-    ; position : int String.Table.t (** of the path's entries *)
-    }
-end
-
-(* A compaction's summary (an item without an id) sits where its [kept_from]
-   is: after the pinned messages, before those it kept. *)
-let summary_key = ""
-
-let item_position position ((id, _) : Folded.item) =
-  Hashtbl.find position (Option.value id ~default:summary_key)
-;;
-
-(* Before the first message that came after it on the path; at the end if
-   none did. *)
-let insert_by_position position context item =
-  match item_position position item with
-  | None -> item :: context
-  | Some p ->
-    let rec go = function
-      | [] -> [ item ]
-      | x :: rest ->
-        (match item_position position x with
-         | Some q when q > p -> item :: x :: rest
-         | Some _ | None -> x :: go rest)
-    in
-    go context
-;;
-
-(* The range's messages go back into [context], but for those another range
-   in effect hides, which go to it: in front for a trim before a message (a
-   compaction since summarised only what came after them), else where they
-   were. *)
-let cancel position ~context ~hidden (r : Folded.Range.t) =
-  let hidden =
-    List.filter hidden ~f:(fun (h : Folded.Range.t) ->
-      not (String.equal h.entry.id r.entry.id))
-  in
-  let by_position =
-    List.stable_sort ~compare:(fun a b ->
-      Option.compare
-        Int.compare
-        (item_position position a)
-        (item_position position b))
-  in
-  let hidden, back =
-    List.fold r.items ~init:(hidden, []) ~f:(fun (hidden, back) item ->
-      match List.find hidden ~f:(fun (h : Folded.Range.t) -> h.hides item) with
-      | Some h ->
-        ( List.map hidden ~f:(fun (h' : Folded.Range.t) ->
-            if String.equal h.entry.id h'.entry.id
-            then { h' with items = by_position (h'.items @ [ item ]) }
-            else h')
-        , back )
-      | None -> hidden, item :: back)
-  in
-  let back = List.rev back in
-  let context =
-    match r.kind with
-    | Trim_before _ -> back @ context
-    | Trim_after _ | Deleted _ ->
-      List.fold back ~init:context ~f:(insert_by_position position)
-  in
-  context, hidden
-;;
-
-(* The messages of the next request, each with the id of its entry (none for
-   a compaction's summary), folding the path: a compaction replaces what
-   comes before [kept_from] with its pinned messages and the summary; a trim
-   drops what comes before its message, a trim after a message what comes
-   after it up to its [through], a deletion its message with the results of
-   its calls; an untrim cancels the latest trim in effect, a restore the
-   entry it names. *)
-let fold t path : Folded.t =
-  let position = String.Table.create () in
-  List.iteri path ~f:(fun i (e : Entry.t) ->
-    Hashtbl.set position ~key:e.id ~data:i);
-  let pos = Hashtbl.find position in
-  let message (e : Entry.t) =
-    match e.payload with
-    | Message message -> Some (Some e.id, { Timed_message.message; at = e.at })
-    | _ -> None
-  in
-  let take (e : Entry.t) kind ~hides (rev_context, hidden) =
-    let items, rest = List.partition_tf (List.rev rev_context) ~f:hides in
-    List.rev rest, { Folded.Range.entry = e; kind; items; hides } :: hidden
-  in
-  let cancel_where (rev_context, hidden) ~f =
-    match List.find hidden ~f with
-    | None -> rev_context, hidden
-    | Some r ->
-      let context, hidden =
-        cancel position ~context:(List.rev rev_context) ~hidden r
-      in
-      List.rev context, hidden
-  in
-  let rev_context, hidden =
-    List.fold path ~init:([], []) ~f:(fun ((rev_context, hidden) as acc) e ->
-      match e.payload with
-      | Message _ -> Option.to_list (message e) @ rev_context, hidden
-      | Compaction { summary; kept_from; pinned } ->
-        let from = pos kept_from in
-        Option.iter from ~f:(fun from ->
-          Hashtbl.set position ~key:summary_key ~data:from);
-        let kept =
-          List.filter (List.rev rev_context) ~f:(fun (id, _) ->
-            match Option.bind id ~f:pos, from with
-            | Some p, Some from -> p >= from
-            | _ -> false)
-        in
-        let pinned =
-          List.filter_map pinned ~f:(fun (pin : Pinned_messages.Pin.t) ->
-            Option.bind (Hashtbl.find t.by_id pin.id) ~f:message
-            |> Option.map ~f:(fun (id, (m : Timed_message.t)) ->
-              if pin.shortened
-              then id, { m with message = Pinned_messages.shorten m.message }
-              else id, m))
-          |> List.filter ~f:(fun item ->
-            not
-              (List.exists hidden ~f:(fun (h : Folded.Range.t) -> h.hides item)))
-        in
-        let summary =
-          None, { Timed_message.message = summary_message summary; at = None }
-        in
-        List.rev (pinned @ (summary :: kept)), hidden
-      | Trim { before } ->
-        let context = List.rev rev_context in
-        let hides item =
-          match item_position position item, pos before with
-          | Some p, Some b -> p < b
-          | _ -> false
-        in
-        let dropped, kept =
-          match
-            List.findi context ~f:(fun _ (id, _) ->
-              Option.equal String.equal id (Some before))
-          with
-          | Some (i, _) -> List.take context i, List.drop context i
-          | None -> [], context
-        in
-        ( List.rev kept
-        , { Folded.Range.entry = e
-          ; kind = Trim_before { before }
-          ; items = dropped
-          ; hides
-          }
-          :: hidden )
-      | Trim_after { after; through } ->
-        take
-          e
-          (Trim_after { after; through })
-          ~hides:(fun item ->
-            match item_position position item, pos after, pos through with
-            | Some p, Some a, Some th -> a < p && p <= th
-            | _ -> false)
-          acc
-      | Delete { message } ->
-        let ids = Message_point.deleted_with (List.rev rev_context) ~message in
-        take
-          e
-          (Deleted { message })
-          ~hides:(fun (id, _) ->
-            Option.value_map id ~default:false ~f:(Set.mem ids))
-          acc
-      | Untrim ->
-        cancel_where acc ~f:(fun (r : Folded.Range.t) ->
-          Hidden.Kind.is_trim r.kind)
-      | Restore { entry } ->
-        cancel_where acc ~f:(fun (r : Folded.Range.t) ->
-          String.equal r.entry.id entry)
-      | Model _
-      | Masked _
-      | Name _
-      | Description _
-      | Cwd _
-      | System_prompt _
-      | Goal _
-      | Reminders _
-      | Budget _
-      | Approval _
-      | Allow_rule _
-      | Allowed_call _
-      | Archived _
-      | Pinned _
-      | Spend _
-      | Resume_at _
-      | Told_environment _
-      | Repo _
-      | Agent_worktree _
-      | Worktree _
-      | Worktree_removed _
-      | Home _
-      | Transcript_filter _
-      | Review _ -> acc)
-  in
-  { Folded.context = List.rev rev_context; hidden; position }
-;;
-
-let context t = (fold t (active_path t)).context
-
-(* Message by message, as [Trim_point] sums them. *)
-let estimate items =
-  List.sum
-    (module Int)
-    items
-    ~f:(fun (_, (m : Timed_message.t)) -> Message.estimate_tokens [ m.message ])
-;;
-
-let trim_of_folded ({ hidden; _ } : Folded.t) =
-  let trims =
-    List.filter hidden ~f:(fun (r : Folded.Range.t) ->
-      match r.kind with
-      | Trim_before _ -> true
-      | Trim_after _ | Deleted _ -> false)
-  in
-  match trims with
-  | [] -> None
-  | latest :: _ ->
-    let dropped = List.concat_map trims ~f:(fun r -> r.items) in
-    let before =
-      match latest.kind with
-      | Trim_before { before } -> before
-      | Trim_after _ | Deleted _ -> latest.entry.id
-    in
-    Some
-      { Trim.before
-      ; messages = List.length dropped
-      ; tokens = estimate dropped
-      ; at = latest.entry.at
-      }
-;;
-
-let hidden_of_range ({ context; position; _ } : Folded.t) (r : Folded.Range.t) =
-  let divider =
-    match r.kind with
-    | Trim_before _ | Deleted _ -> None
-    | Trim_after { after; _ } ->
-      let a = Option.value (Hashtbl.find position after) ~default:(-1) in
-      Some
-        (List.foldi context ~init:0 ~f:(fun i acc item ->
-           match item_position position item with
-           | Some p when p <= a -> i + 1
-           | Some _ | None -> acc))
-  in
-  { Hidden.entry = r.entry.id
-  ; kind = r.kind
-  ; messages = List.length r.items
-  ; tokens = estimate r.items
-  ; at = r.entry.at
-  ; divider
-  }
-;;
-
-let trim t = trim_of_folded (fold t (active_path t))
-
-let hidden t =
-  let folded = fold t (active_path t) in
-  List.rev_map folded.hidden ~f:(hidden_of_range folded)
-;;
+let active_path t = force (derived t).path
+let approval t = (derived t).state.approval
+let told_environment t = (derived t).state.told_environment
+let allow_rules t = List.rev (derived t).state.rev_allow_rules
+let allowed_calls t = List.rev (derived t).state.rev_allowed_calls
+let context t = force (derived t).context
+let trim t = force (derived t).trim
+let hidden t = force (derived t).hidden
 
 let trimmed_messages t =
-  List.concat_map (List.rev (fold t (active_path t)).hidden) ~f:(fun r ->
+  List.concat_map (List.rev (derived t).state.hidden) ~f:(fun r ->
     match r.kind with
     | Trim_before _ -> r.items
     | Trim_after _ | Deleted _ -> [])
 ;;
 
 let hidden_messages t ~entry =
-  List.find_map (fold t (active_path t)).hidden ~f:(fun r ->
+  List.find_map (derived t).state.hidden ~f:(fun r ->
     Option.some_if (String.equal r.entry.id entry) r.items)
   |> Option.value ~default:[]
 ;;
@@ -1316,37 +1448,7 @@ let append_undelete ?entry t =
     ~what:"the deletion"
 ;;
 
-let context_tokens t =
-  let path = active_path t in
-  let last_reply =
-    List.findi (List.rev path) ~f:(fun _ (e : Entry.t) ->
-      match e.payload with
-      | Message (Assistant _) -> true
-      | _ -> false)
-  in
-  match last_reply with
-  | None -> 0
-  | Some (from_end, reply) ->
-    let input =
-      match reply.payload with
-      | Message (Assistant a) -> a.usage.input
-      | _ -> 0
-    in
-    let since = List.drop path (List.length path - from_end) in
-    if
-      not
-        (List.exists since ~f:(fun (e : Entry.t) ->
-           match e.payload with
-           | Trim _ | Untrim | Trim_after _ | Delete _ | Restore _ -> true
-           | _ -> false))
-    then input
-    else (
-      let seen =
-        (fold t (List.take path (List.length path - from_end))).context
-      in
-      Int.max 0 (input + estimate (context t) - estimate seen))
-;;
-
+let context_tokens t = force (derived t).context_tokens
 let timed_messages t = List.map (context t) ~f:snd
 let context_ids t = List.map (context t) ~f:fst
 
@@ -1394,118 +1496,10 @@ let context_cwds t =
 ;;
 
 let identified_messages = context
-
-(* The entries up to the last [Masked] entry's [through] on [path]. *)
-let masked_ids path =
-  match
-    List.fold path ~init:None ~f:(fun acc (e : Entry.t) ->
-      match e.payload with
-      | Masked { through } -> Some through
-      | _ -> acc)
-  with
-  | None -> String.Set.empty
-  | Some through ->
-    let rec go acc = function
-      | [] -> String.Set.empty
-      | (e : Entry.t) :: rest ->
-        let acc = Set.add acc e.id in
-        if String.equal e.id through then acc else go acc rest
-    in
-    go String.Set.empty path
-;;
-
-let messages t =
-  let path = active_path t in
-  let masked = masked_ids path in
-  List.map (fold t path).context ~f:(fun (id, (m : Timed_message.t)) ->
-    match id, m.message with
-    (* Masking leaves the user's messages as they are; a pinned one may be
-       shortened, which the cache by id would not tell apart. *)
-    | _, User _ -> m.message
-    | Some id, (Assistant _ | Tool_result _) when Set.mem masked id ->
-      Hashtbl.find_or_add t.masked id ~default:(fun () ->
-        Observation_mask.mask m.message)
-    | (Some _ | None), (Assistant _ | Tool_result _) -> m.message)
-;;
-
-let system_prompt t =
-  List.fold (active_path t) ~init:None ~f:(fun acc (e : Entry.t) ->
-    match e.payload with
-    | System_prompt { text } -> Some text
-    | Message _
-    | Model _
-    | Compaction _
-    | Masked _
-    | Name _
-    | Description _
-    | Cwd _
-    | Goal _
-    | Reminders _
-    | Budget _
-    | Approval _
-    | Allow_rule _
-    | Allowed_call _
-    | Archived _
-    | Pinned _
-    | Spend _
-    | Resume_at _
-    | Told_environment _
-    | Repo _
-    | Agent_worktree _
-    | Worktree _
-    | Worktree_removed _
-    | Home _
-    | Transcript_filter _
-    | Trim _
-    | Untrim
-    | Trim_after _
-    | Delete _
-    | Restore _
-    | Review _ -> acc)
-;;
-
-let goal t =
-  List.fold (active_path t) ~init:None ~f:(fun acc (e : Entry.t) ->
-    match e.payload with
-    | Goal { goal } -> goal
-    | Message _
-    | Model _
-    | Compaction _
-    | Masked _
-    | Name _
-    | Description _
-    | Cwd _
-    | System_prompt _
-    | Reminders _
-    | Budget _
-    | Approval _
-    | Allow_rule _
-    | Allowed_call _
-    | Archived _
-    | Pinned _
-    | Spend _
-    | Resume_at _
-    | Told_environment _
-    | Repo _
-    | Agent_worktree _
-    | Worktree _
-    | Worktree_removed _
-    | Home _
-    | Transcript_filter _
-    | Trim _
-    | Untrim
-    | Trim_after _
-    | Delete _
-    | Restore _
-    | Review _ -> acc)
-;;
-
-let reminders t =
-  List.fold (active_path t) ~init:[] ~f:(fun acc (e : Entry.t) ->
-    match e.payload with
-    | Reminders { reminders } -> reminders
-    | _ -> acc)
-;;
+let messages t = force (derived t).messages
+let system_prompt t = (derived t).state.system_prompt
+let goal t = (derived t).state.goal
+let reminders t = (derived t).state.reminders
 
 let reminder_names t =
   List.concat_map t.entries ~f:(fun (e : Entry.t) ->
@@ -1515,77 +1509,8 @@ let reminder_names t =
     | _ -> [])
 ;;
 
-let budget t =
-  List.fold (active_path t) ~init:None ~f:(fun acc (e : Entry.t) ->
-    match e.payload with
-    | Budget { usd } -> Some usd
-    | Message _
-    | Model _
-    | Compaction _
-    | Masked _
-    | Name _
-    | Description _
-    | Cwd _
-    | System_prompt _
-    | Goal _
-    | Reminders _
-    | Approval _
-    | Allow_rule _
-    | Allowed_call _
-    | Archived _
-    | Pinned _
-    | Spend _
-    | Resume_at _
-    | Told_environment _
-    | Repo _
-    | Agent_worktree _
-    | Worktree _
-    | Worktree_removed _
-    | Home _
-    | Transcript_filter _
-    | Trim _
-    | Untrim
-    | Trim_after _
-    | Delete _
-    | Restore _
-    | Review _ -> acc)
-;;
-
-let model t =
-  List.fold (active_path t) ~init:None ~f:(fun acc (e : Entry.t) ->
-    match e.payload with
-    | Model { model; thinking } -> Some (model, thinking)
-    | Message _
-    | Compaction _
-    | Masked _
-    | Name _
-    | Description _
-    | Cwd _
-    | System_prompt _
-    | Goal _
-    | Reminders _
-    | Budget _
-    | Approval _
-    | Allow_rule _
-    | Allowed_call _
-    | Archived _
-    | Pinned _
-    | Spend _
-    | Resume_at _
-    | Told_environment _
-    | Repo _
-    | Agent_worktree _
-    | Worktree _
-    | Worktree_removed _
-    | Home _
-    | Transcript_filter _
-    | Trim _
-    | Untrim
-    | Trim_after _
-    | Delete _
-    | Restore _
-    | Review _ -> acc)
-;;
+let budget t = (derived t).state.budget
+let model t = (derived t).state.model
 
 let in_context t id =
   List.exists (context t) ~f:(fun (i, _) ->
@@ -1653,7 +1578,7 @@ let rewind t ~to_ =
   if Hashtbl.mem t.by_id to_
   then (
     let kinds = hidden_kinds t in
-    t.head <- Some to_;
+    set_head t (Some to_);
     write_line t (Head to_);
     keep_hidden t kinds;
     Ok ())
@@ -2374,3 +2299,248 @@ module Filter = struct
 end
 
 let delete (s : Summary.t) = delete_files s.path
+
+module For_testing = struct
+  let ids path = List.map path ~f:(fun (e : Entry.t) -> e.id)
+
+  let view
+        ~path
+        ~context
+        ~messages
+        ~hidden
+        ~trim
+        ~context_tokens
+        ~approval
+        ~told_environment
+        ~system_prompt
+        ~goal
+        ~reminders
+        ~budget
+        ~model
+        ~allow_rules
+        ~allowed_calls
+        ~spend
+        ~spend_for
+        ~replies
+        ~name
+        ~description
+        ~resume_at
+    =
+    [%message
+      ""
+        ~path:(ids path : string list)
+        (context : (string option * Timed_message.t) list)
+        (messages : Message.t list)
+        (hidden : Hidden.t list)
+        (trim : Trim.t option)
+        (context_tokens : int)
+        (approval : Mode.t option)
+        (told_environment : Told_environment.t option)
+        (system_prompt : string option)
+        (goal : Goal.t option)
+        (reminders : Reminder.t list)
+        (budget : float option option)
+        (model : (string * Thinking.t) option)
+        (allow_rules : string list)
+        (allowed_calls : Allowed_call.t list)
+        (spend : Usage.t * float)
+        (spend_for : (string * (int * float)) list)
+        (replies : (string * Usage.t) list)
+        (name : string option)
+        (description : string option)
+        (resume_at : float option)]
+  ;;
+
+  let cached t =
+    let d = derived t in
+    view
+      ~path:(force d.path)
+      ~context:(force d.context)
+      ~messages:(force d.messages)
+      ~hidden:(force d.hidden)
+      ~trim:(force d.trim)
+      ~context_tokens:(force d.context_tokens)
+      ~approval:(approval t)
+      ~told_environment:(told_environment t)
+      ~system_prompt:(system_prompt t)
+      ~goal:(goal t)
+      ~reminders:(reminders t)
+      ~budget:(budget t)
+      ~model:(model t)
+      ~allow_rules:(allow_rules t)
+      ~allowed_calls:(allowed_calls t)
+      ~spend:(spend t)
+      ~spend_for:
+        (Hashtbl.to_alist t.totals.spend_for
+         |> List.sort ~compare:(fun (a, _) (b, _) -> String.compare a b))
+      ~replies:(replies t)
+      ~name:(name t)
+      ~description:(description t)
+      ~resume_at:(resume_at t)
+  ;;
+
+  (* Everything again from the entries, the path folded with the positions
+     of all its entries known from the start. *)
+  let fold_path t path =
+    let position = String.Table.create () in
+    List.iteri path ~f:(fun i (e : Entry.t) ->
+      Hashtbl.set position ~key:e.id ~data:i);
+    let state = derive_path ~find:(Hashtbl.find t.by_id) ~position path in
+    { Folded.context = List.rev state.rev_context
+    ; hidden = state.hidden
+    ; position
+    }
+  ;;
+
+  let last path ~f =
+    List.fold path ~init:None ~f:(fun acc (e : Entry.t) ->
+      Option.first_some (f e.payload) acc)
+  ;;
+
+  let masked_ids path =
+    match
+      last path ~f:(function
+        | Masked { through } -> Some through
+        | _ -> None)
+    with
+    | None -> String.Set.empty
+    | Some through ->
+      let rec go acc = function
+        | [] -> String.Set.empty
+        | (e : Entry.t) :: rest ->
+          let acc = Set.add acc e.id in
+          if String.equal e.id through then acc else go acc rest
+      in
+      go String.Set.empty path
+  ;;
+
+  let context_tokens t path ~context =
+    let last_reply =
+      List.findi (List.rev path) ~f:(fun _ (e : Entry.t) ->
+        match e.payload with
+        | Message (Assistant _) -> true
+        | _ -> false)
+    in
+    match last_reply with
+    | None -> 0
+    | Some (from_end, reply) ->
+      let input =
+        match reply.payload with
+        | Message (Assistant a) -> a.usage.input
+        | _ -> 0
+      in
+      let since = List.drop path (List.length path - from_end) in
+      if
+        not
+          (List.exists since ~f:(fun (e : Entry.t) ->
+             match e.payload with
+             | Trim _ | Untrim | Trim_after _ | Delete _ | Restore _ -> true
+             | _ -> false))
+      then input
+      else (
+        let seen =
+          (fold_path t (List.take path (List.length path - from_end))).context
+        in
+        Int.max 0 (input + estimate context - estimate seen))
+  ;;
+
+  let uncached t =
+    let path = walk t in
+    let folded = fold_path t path in
+    let masked = masked_ids path in
+    let entries = entries t in
+    let spends =
+      List.filter_map entries ~f:(fun (e : Entry.t) ->
+        match e.payload with
+        | Spend { usage; cost_usd; purpose } -> Some (usage, cost_usd, purpose)
+        | _ -> None)
+    in
+    let path_last f = last path ~f in
+    view
+      ~path
+      ~context:folded.context
+      ~messages:
+        (List.map folded.context ~f:(fun (id, (m : Timed_message.t)) ->
+           match id, m.message with
+           | _, User _ -> m.message
+           | Some id, (Assistant _ | Tool_result _) when Set.mem masked id ->
+             Observation_mask.mask m.message
+           | (Some _ | None), (Assistant _ | Tool_result _) -> m.message))
+      ~hidden:(List.rev_map folded.hidden ~f:(hidden_of_range folded))
+      ~trim:(trim_of_folded folded)
+      ~context_tokens:(context_tokens t path ~context:folded.context)
+      ~approval:
+        (path_last (function
+           | Approval { mode; plan; chat } ->
+             Some { Mode.approval = mode; plan; chat }
+           | _ -> None))
+      ~told_environment:
+        (path_last (function
+           | Told_environment told -> Some told
+           | _ -> None))
+      ~system_prompt:
+        (path_last (function
+           | System_prompt { text } -> Some text
+           | _ -> None))
+      ~goal:
+        (path_last (function
+           | Goal { goal } -> Some goal
+           | _ -> None)
+         |> Option.join)
+      ~reminders:
+        (path_last (function
+           | Reminders { reminders } -> Some reminders
+           | _ -> None)
+         |> Option.value ~default:[])
+      ~budget:
+        (path_last (function
+           | Budget { usd } -> Some usd
+           | _ -> None))
+      ~model:
+        (path_last (function
+           | Model { model; thinking } -> Some (model, thinking)
+           | _ -> None))
+      ~allow_rules:
+        (List.filter_map path ~f:(fun (e : Entry.t) ->
+           match e.payload with
+           | Allow_rule { rule } -> Some rule
+           | _ -> None))
+      ~allowed_calls:
+        (List.filter_map path ~f:(fun (e : Entry.t) ->
+           match e.payload with
+           | Allowed_call call -> Some call
+           | _ -> None))
+      ~spend:
+        (List.fold
+           spends
+           ~init:(Usage.zero, 0.)
+           ~f:(fun (u, c) (usage, cost, _) -> Usage.add u usage, c +. cost))
+      ~spend_for:
+        (List.filter_map spends ~f:(fun (_, _, purpose) -> purpose)
+         |> List.dedup_and_sort ~compare:String.compare
+         |> List.map ~f:(fun purpose ->
+           ( purpose
+           , List.fold spends ~init:(0, 0.) ~f:(fun (n, c) (_, cost, p) ->
+               if Option.equal String.equal p (Some purpose)
+               then n + 1, c +. cost
+               else n, c) )))
+      ~replies:
+        (List.filter_map entries ~f:(fun (e : Entry.t) ->
+           match e.payload with
+           | Message (Assistant a) -> Some (a.model, a.usage)
+           | _ -> None))
+      ~name:
+        (last entries ~f:(function
+           | Name { name } -> Some name
+           | _ -> None))
+      ~description:
+        (last entries ~f:(function
+           | Description { text } -> Some text
+           | _ -> None))
+      ~resume_at:
+        (last entries ~f:(function
+           | Resume_at { at } -> Some at
+           | _ -> None)
+         |> Option.join)
+  ;;
+end
