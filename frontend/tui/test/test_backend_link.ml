@@ -166,6 +166,8 @@ let make
       ?(user = None)
       ?headers
       ?browser_signin
+      ?(spawn_worker =
+        fun () -> Deferred.Or_error.error_string "no worker here")
       ~home
       ~servers
       ~target
@@ -176,7 +178,7 @@ let make
     ~open_transport:(Servers.open_ servers ~home)
     ?browser_signin
     ~open_url:(printf "open the browser at %s\n")
-    ~spawn_worker:(fun () -> Deferred.Or_error.error_string "no worker here")
+    ~spawn_worker
     ?headers
     ~home
     ~backend:"/bin/prigh"
@@ -818,5 +820,59 @@ let%expect_test
   (* Nothing under way: a late code goes nowhere. *)
   Link.signin_code link (Some "prigh1:late");
   [%expect {| |}];
+  return ()
+;;
+
+let%expect_test
+    "the tool host's worker starts with the connection, without holding it up; \
+     not when tools run on the backend"
+  =
+  with_home
+  @@ fun home ->
+  let servers = servers () in
+  let make ~target ~tools =
+    make
+      ~home
+      ~servers
+      ~target
+      ~tools
+      ~saved:None
+      ~spawn_worker:(fun () ->
+        print_endline "spawn the worker";
+        (* Still starting when the hello is answered. *)
+        Deferred.never ())
+      ()
+  in
+  let link = make ~target:(Remote "srv:3") ~tools:None in
+  let%bind result = Link.start link in
+  print_s [%sexp (result : Prigh_ui.Server_link.Outcome.result)];
+  [%expect
+    {|
+    open (Tcp (host srv) (port 3))
+    spawn the worker
+    srv:3 hello {"name":"laptop","home":"<home>","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location","stream_deltas"]}
+    (Connected (
+      (client_id c)
+      (namespace null)
+      (user      null)))
+    |}];
+  (* A switch starts the new connection's. *)
+  let%bind o = Link.relink link (Connect (Some "srv:4")) in
+  outcome o;
+  [%expect
+    {|
+    open (Tcp (host srv) (port 4))
+    spawn the worker
+    srv:4 hello {"name":"laptop","home":"<home>","tools":true,"host_id":"<host-id>","features":["exec_input","terminal_kill","git_location","stream_deltas"]}
+    (connected "")
+    ((address (srv:4)) (user ()) (saved (srv:4)))
+    |}];
+  let link = make ~target:Spawn ~tools:None in
+  let%bind (_ : Prigh_ui.Server_link.Outcome.result) = Link.start link in
+  [%expect
+    {|
+    open (Process (prog /bin/prigh) (args (serve -cwd /w)))
+    spawned hello {"name":"laptop","tools":false,"features":["stream_deltas"]}
+    |}];
   return ()
 ;;

@@ -583,9 +583,11 @@ val list : dir:string -> Summary.t list
 
 (** [list], parsing with [load], except the files of [live] sessions (by
     path: the sessions open in memory, which write them), summed up from
-    memory instead. *)
+    memory instead. [yield] is called after each file, so that a listing in
+    the background lets other fibers run. *)
 val list_with
-  :  live:(string -> t option)
+  :  yield:(unit -> unit)
+  -> live:(string -> t option)
   -> load:(string -> t Or_error.t)
   -> dir:string
   -> Summary.t list

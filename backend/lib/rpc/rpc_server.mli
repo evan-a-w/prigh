@@ -119,19 +119,21 @@ val serve_questions : t -> Session_questions.t -> unit
 
 (** Loads the sessions that recorded a resume after a usage limit still to
     come ([Session.resume_at]), so that they resume on time with nobody
-    attached; one that cannot be loaded is skipped with a line on stderr. *)
-val restore_resumes : t -> unit
+    attached; one that cannot be loaded is skipped with a line on stderr.
+    [yield] goes to {!Session.list_with}. *)
+val restore_resumes : ?yield:(unit -> unit) -> t -> unit
 
 (** Deletes what temporary sessions made that a backend stopped before
     deleting ([Temporary_ledger]), on the hosts connected now (the others'
     when they connect). *)
 val clean_leftovers : t -> unit
 
-(** In a fiber of its own, so that the backend serves its clients
-    meanwhile: {!restore_resumes}, then brings [search_sessions]' index of
-    the saved sessions up to date (from its file, reading the sessions that
-    changed since), yielding after each session; a search meanwhile waits
-    for it. *)
+(** In a fiber of its own, once a request has been answered (or after a
+    second with none), so that a client starting up waits for none of it:
+    {!restore_resumes}, then brings [search_sessions]' index of the saved
+    sessions up to date (from its file, reading the sessions that changed
+    since); both yield after each session, so the backend serves its
+    clients meanwhile, and a search meanwhile waits for the index. *)
 val start_background : t -> unit
 
 (** Brings the index up to date as {!start_background} does, returning when

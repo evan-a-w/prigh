@@ -487,3 +487,80 @@ let%expect_test "a home where the id cannot be kept: a fresh one, and why" =
     |}];
   return ()
 ;;
+
+let%expect_test
+    "start spawns the worker in the background, once; the first call uses it"
+  =
+  let%bind client, requests = connected_client () in
+  let worker = Fake_worker.create () in
+  let spawned = Ivar.create () in
+  let spawns = ref 0 in
+  let host =
+    Tool_host.create
+      ~client
+      ~spawn:(fun () ->
+        incr spawns;
+        print_endline "spawn";
+        Ivar.read spawned)
+      ()
+  in
+  (* Returns at once, the process still starting. *)
+  Tool_host.start host;
+  Tool_host.start host;
+  print_s [%message (!spawns : int)];
+  [%expect
+    {|
+    spawn
+    (!spawns 1)
+    |}];
+  (* A call meanwhile waits for that worker rather than starting another. *)
+  Tool_host.handle host (exec "e1");
+  let%bind () = Scheduler.yield_until_no_jobs_remain () in
+  print_s [%message (!spawns : int)];
+  [%expect {| (!spawns 1) |}];
+  Ivar.fill_exn spawned (Ok worker.transport);
+  let%bind () = print_next worker.sent in
+  Fake_worker.print
+    worker
+    [ {|{"type":"result","exec_id":"e1","text":"ok","is_error":false}|} ];
+  let%bind () = print_next requests in
+  [%expect
+    {|
+    {"type":"exec","exec_id":"e1","name":"bash","arguments":{"command":"make"},"cwd":"/work"}
+    {"id":1,"method":"tool_exec_result","params":{"exec_id":"e1","text":"ok","is_error":false}}
+    |}];
+  (* Started already: nothing more. *)
+  Tool_host.start host;
+  print_s [%message (!spawns : int)];
+  [%expect {| (!spawns 1) |}];
+  Tool_host.close host;
+  Client.close client
+;;
+
+let%expect_test
+    "a worker that cannot start at start is tried again at the first call, \
+     which reports why"
+  =
+  let%bind client, requests = connected_client () in
+  let attempts = ref 0 in
+  let host =
+    Tool_host.create
+      ~client
+      ~spawn:(fun () ->
+        incr attempts;
+        printf "spawn %d\n" !attempts;
+        Deferred.Or_error.error_string "no such file")
+      ()
+  in
+  Tool_host.start host;
+  let%bind () = Scheduler.yield_until_no_jobs_remain () in
+  [%expect {| spawn 1 |}];
+  Tool_host.handle host (exec "e1");
+  let%bind () = print_next requests in
+  [%expect
+    {|
+    spawn 2
+    {"id":1,"method":"tool_exec_result","params":{"exec_id":"e1","text":"cannot start tool host: no such file","is_error":true}}
+    |}];
+  Client.close client
+;;

@@ -23,7 +23,7 @@ use prigh_desktop_core::tail::Tail;
 #[cfg(target_os = "linux")]
 use prigh_desktop_core::taskbar;
 use prigh_desktop_core::zoom::{self, Step};
-use prigh_desktop_core::{ready, search_path};
+use prigh_desktop_core::{login_env, ready, search_path};
 use shared_child::SharedChild;
 use tauri::webview::{Color, DownloadEvent, NewWindowResponse, PageLoadEvent, PermissionKind, PermissionResponse};
 use tauri::{AppHandle, Manager, RunEvent, Url, WebviewUrl, WebviewWindowBuilder};
@@ -606,10 +606,50 @@ fn window_choice(app: &AppHandle) -> Result<Option<Arc<BrowserWindow>>, Failure>
     }
 }
 
-/// The PATH for the sidecar on Linux and macOS: see [search_path].
-fn sidecar_path() -> String {
+/// The PATH for the sidecar on Linux and macOS: see [search_path], and
+/// [login_env] for the login shell's, cached in the app's cache directory.
+fn sidecar_path(app: &AppHandle) -> String {
     let shell = std::env::var("SHELL").ok().filter(|s| !s.is_empty()).unwrap_or_else(|| "/bin/sh".into());
-    let login = Command::new(&shell)
+    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_secs());
+    let login = match app.path().app_cache_dir() {
+        Err(e) => {
+            log(format!("no cache directory for the login PATH ({e}): running {shell} -l"));
+            login_shell_path(&shell)
+        }
+        Ok(dir) => {
+            let file = dir.join("login-env.json");
+            let force = env_flag("PRIGH_DESKTOP_REFRESH_ENV");
+            let r = login_env::resolve(&file, &shell, force, now, || login_shell_path(&shell));
+            r.notes.iter().for_each(log);
+            match r.source {
+                login_env::Source::Cache { age } => {
+                    log(format!("the login PATH from {} ({age} s old)", file.display()))
+                }
+                login_env::Source::Shell => {
+                    log(format!("the login PATH from {shell} -l, cached in {}", file.display()))
+                }
+                login_env::Source::Nothing => (),
+            }
+            if r.refresh {
+                thread::spawn(move || {
+                    let (_, note) = login_env::refresh(&file, &shell, now, || login_shell_path(&shell));
+                    note.iter().for_each(log);
+                });
+            }
+            r.login
+        }
+    };
+    search_path::compose(
+        login.as_deref(),
+        std::env::var("PATH").ok().as_deref(),
+        std::env::var("HOME").ok().as_deref(),
+        std::env::var("USER").ok().as_deref(),
+    )
+}
+
+/// The login shell's PATH (`$SHELL -l -c env`), if it gives one within 5 s.
+fn login_shell_path(shell: &str) -> Option<String> {
+    Command::new(shell)
         .args(["-l", "-c", "env"])
         .stdin(Stdio::null())
         .stderr(Stdio::null())
@@ -635,13 +675,7 @@ fn sidecar_path() -> String {
                 }
             }
         })
-        .and_then(|out| search_path::from_env_output(&out));
-    search_path::compose(
-        login.as_deref(),
-        std::env::var("PATH").ok().as_deref(),
-        std::env::var("HOME").ok().as_deref(),
-        std::env::var("USER").ok().as_deref(),
-    )
+        .and_then(|out| search_path::from_env_output(&out))
 }
 
 /// `prigh-computer.exe` next to the app (the Windows installers bundle
@@ -677,7 +711,7 @@ fn fail(app: &AppHandle, f: Failure, code: i32) {
 
 fn start_sidecar(app: AppHandle, sidecar: Arc<Sidecar>) {
     thread::spawn(move || {
-        let path = if OS == Os::Unix { Some(sidecar_path()) } else { None };
+        let path = if OS == Os::Unix { Some(sidecar_path(&app)) } else { None };
         let env = launch::Env {
             backend: std::env::var("PRIGH_DESKTOP_BACKEND").ok(),
             args: std::env::var("PRIGH_DESKTOP_ARGS").ok(),

@@ -675,9 +675,24 @@ module Desktop = struct
       (Desktop_sidecar.Page.to_json_line page)
   ;;
 
+  (* Logged lines, for [await_tools_here]. *)
+  let logged = Eio.Condition.create ()
+
+  (* Until the log says the tool host connected [n] times in all. *)
+  let await_tools_here ?(n = 1) logs =
+    Eio.Condition.loop_no_mutex logged (fun () ->
+      Option.some_if
+        (Queue.count
+           logs
+           ~f:(String.is_prefix ~prefix:"tools run on this machine")
+         >= n)
+        ())
+  ;;
+
   let start
         ?(ui = Desktop_sidecar.Ui.Local)
         ?(tools = Web_connect.Tools.Local)
+        ?(computer = Eio.Promise.create_resolved None)
         ?save
         t
         ~sw
@@ -691,7 +706,7 @@ module Desktop = struct
       ; tools
       ; name = "laptop"
       ; host_id = "host-laptop"
-      ; computer = None
+      ; computer
       ; cwd = t.dir ^/ "here"
       ; listen = At (Eio.Net.Ipaddr.V4.loopback, 0)
       ; root = site t
@@ -719,7 +734,9 @@ module Desktop = struct
           ~env:t.env
           ~tool_host_wait:(Time_ns.Span.of_sec 10.)
           ~check_timeout:(Time_ns.Span.of_sec 5.)
-          ~log:(Queue.enqueue logs)
+          ~log:(fun line ->
+            Queue.enqueue logs line;
+            Eio.Condition.broadcast logged)
           ~on_page:(fun page ->
             if not (Eio.Promise.try_resolve set_first page)
             then Eio.Stream.add pages page)
@@ -932,6 +949,7 @@ let%expect_test
   post_code t ~sw ~port:d.port (Option.value_exn code);
   post "status" [];
   submit [ "address", `String here; "token", `String "sekrit" ];
+  Desktop.await_tools_here logs;
   page_hello
     t
     ~sw
@@ -972,9 +990,9 @@ let%expect_test
     No password was given: enter the backend's token (its -token, or yours from its -tokens) as the password.
     127.0.0.1:PORT refused the login: unauthorised: bad user name or password
     Check the user name and password against the backend's -tokens NAME=TOKEN entries.
+    connected to 127.0.0.1:PORT
     tool host: connected to 127.0.0.1:PORT as client-N
     tools run on this machine, in $DIR/here
-    connected to 127.0.0.1:PORT
     quit from the page
     |}]
 ;;
@@ -1026,6 +1044,73 @@ let%expect_test
     tools run on the backend (-tools remote)
     connected to 127.0.0.1:PORT
     ()
+    |}]
+;;
+
+let%expect_test
+    "prigh desktop: the page is signed in before the tool host connects; the \
+     page picks the host up once it does"
+  =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let _h, backend_port = backend t ~sw in
+  Eio.Switch.run
+  @@ fun sw ->
+  let logs = Queue.create () in
+  (* The tool host waits for the screen's probe, which has not answered. *)
+  let probed, set_probed = Eio.Promise.create () in
+  let d =
+    Desktop.start
+      ~computer:probed
+      t
+      ~sw
+      ~logs
+      (Check
+         { remote = address (backend_spec backend_port)
+         ; credentials = { token = Some "sekrit"; user = None }
+         ; source = Saved "~/.prigh/tui-connection.sexp"
+         ; save = None
+         })
+  in
+  let hello () =
+    page_hello
+      t
+      ~sw
+      ~port:d.port
+      {|{"name": "prigh-web", "token": "sekrit", "prefer_host": "host-laptop"}|}
+  in
+  let code = Desktop.post t ~sw d "status" [] in
+  post_code t ~sw ~port:d.port (Option.value_exn code);
+  hello ();
+  print_string (unport backend_port [%expect.output]);
+  [%expect
+    {|
+    url: http://127.0.0.1:PORT/#desktop=<key>
+    status HTTP/1.1 200 OK: {"state":"connected","address":"127.0.0.1:PORT","code":"<code>"}
+    HTTP/1.1 200 OK
+      Cache-Control: no-cache
+      Connection: close
+      Content-Length: 58
+      Content-Type: application/json
+      body: {"user":null,"token":"sekrit","prefer_host":"host-laptop"}
+    hello: ok, active host backend; hosts: backend (<host>, $DIR)
+    |}];
+  Eio.Promise.resolve set_probed None;
+  Desktop.await_tools_here logs;
+  hello ();
+  d.close_stdin ();
+  print_s [%sexp (Eio.Promise.await_exn d.ended : Desktop_sidecar.Ended.t)];
+  List.iter (Queue.to_list logs) ~f:(show_log t ~port:backend_port);
+  [%expect
+    {|
+    hello: ok, active host host-laptop; hosts: backend (<host>, $DIR), host-laptop (laptop, $DIR/here)
+    Stdin_closed
+    prigh-web on http://127.0.0.1:SITE/
+    connected to 127.0.0.1:PORT
+    tool host: connected to 127.0.0.1:PORT as client-N
+    tools run on this machine, in $DIR/here
     |}]
 ;;
 
@@ -1099,6 +1184,7 @@ let%expect_test
   post_code t ~sw ~port:d.port "anything";
   page_hello t ~sw ~port:d.port {|{"name": "prigh-web", "token": "sekrit"}|};
   print_s [%sexp (Queue.to_list d.saved : Saved_connection.t list)];
+  Desktop.await_tools_here logs;
   d.close_stdin ();
   print_s [%sexp (Eio.Promise.await_exn d.ended : Desktop_sidecar.Ended.t)];
   List.iter (Queue.to_list logs) ~f:(show_log t ~port:backend_port);
@@ -1120,9 +1206,9 @@ let%expect_test
     (((connect ws://127.0.0.1:PORT/ws) (token sekrit)))
     Stdin_closed
     prigh-web on http://127.0.0.1:SITE/
+    connected to ws://127.0.0.1:PORT/ws
     tool host: connected to ws://127.0.0.1:PORT/ws as client-N
     tools run on this machine, in $DIR/here
-    connected to ws://127.0.0.1:PORT/ws
     |}]
 ;;
 
@@ -1154,6 +1240,9 @@ let%expect_test
            })
     in
     Desktop.show_pages d;
+    (match tools with
+     | Local -> Desktop.await_tools_here logs
+     | Remote -> ());
     d.close_stdin ();
     print_s [%sexp (Eio.Promise.await_exn d.ended : Desktop_sidecar.Ended.t)]
   in
@@ -1167,10 +1256,10 @@ let%expect_test
     Stdin_closed
     first page: {"url":"http://127.0.0.1:PORT/#app=desktop","remote":true,"signin":"http://127.0.0.1:SITE/#desktop=<key>&signin=1"}
     Stdin_closed
-    tool host: connected to 127.0.0.1:PORT as client-N
-    tools run on this machine, in $DIR/here
     connected to 127.0.0.1:PORT
     prigh-web on http://127.0.0.1:SITE/
+    tool host: connected to 127.0.0.1:PORT as client-N
+    tools run on this machine, in $DIR/here
     tools run on the backend (-tools remote)
     connected to ws://127.0.0.1:PORT/ws
     prigh-web on http://127.0.0.1:SITE/
@@ -1368,6 +1457,7 @@ let%expect_test
        (upgrade ~headers:(origin page) "/ws")
        ~pattern:"Host: 127.0.0.1"
        ~with_:(sprintf "Host: 127.0.0.1:%d" d.port));
+  Desktop.await_tools_here logs;
   page_hello t ~sw ~port:d.port {|{"name": "prigh-web", "token": "sekrit"}|};
   (* [/desktop/]: JSON only (so another page's needs a preflight), from the
      page itself. *)
@@ -1694,6 +1784,7 @@ let%expect_test
   signin "here";
   Desktop.show_pages d;
   post "status";
+  Desktop.await_tools_here logs;
   d.close_stdin ();
   print_s [%sexp (Eio.Promise.await_exn d.ended : Desktop_sidecar.Ended.t)];
   List.iter (Queue.to_list logs) ~f:(show_log t ~port:backend_port);
@@ -1707,8 +1798,6 @@ let%expect_test
     page: {"url":"http://127.0.0.1:PROXY/#app=desktop&host=host-laptop","remote":true,"signin":"http://127.0.0.1:SITE/#desktop=<key>&signin=1","here":true}
     status HTTP/1.1 200 OK: {"state":"remote","url":"http://127.0.0.1:PROXY/#app=desktop&host=host-laptop"}
     Stdin_closed
-    tool host: connected to ws://127.0.0.1:PROXY/ws as client-N
-    tools run on this machine, in $DIR/here
     connected to ws://127.0.0.1:PROXY/ws
     127.0.0.1:PROXY is behind a sign-in (login.example.com)
     prigh-web on http://127.0.0.1:SITE/
@@ -1716,6 +1805,8 @@ let%expect_test
     signed in through the browser
     the sign-in to 127.0.0.1:PROXY expired: signing in again
     signing in in the window
+    tool host: connected to ws://127.0.0.1:PROXY/ws as client-N
+    tools run on this machine, in $DIR/here
     ()
     |}]
 ;;
@@ -1848,6 +1939,7 @@ let%expect_test
   print_s [%sexp (Queue.to_list d.saved : Saved_connection.t list)];
   Desktop.show_pages d;
   post "status";
+  Desktop.await_tools_here logs;
   d.close_stdin ();
   print_s [%sexp (Eio.Promise.await_exn d.ended : Desktop_sidecar.Ended.t)];
   List.iter (Queue.to_list logs) ~f:(show_log t ~port:backend_port);
@@ -1869,9 +1961,9 @@ let%expect_test
     127.0.0.1:PROXY is behind a sign-in (login.example.com)
     signing in through the browser
     signed in through the browser
+    connected to ws://127.0.0.1:PROXY/ws
     tool host: connected to ws://127.0.0.1:PROXY/ws as client-N
     tools run on this machine, in $DIR/here
-    connected to ws://127.0.0.1:PROXY/ws
     |}]
 ;;
 

@@ -453,6 +453,9 @@ type t =
   ; loading : Session.t Or_error.t Promise.t String.Table.t
     (** session files being parsed, by path *)
   ; search : Session_search.t (** [search_sessions]' index *)
+  ; served : unit Promise.t * unit Promise.u
+    (** resolved once a request has been answered: {!start_background} waits
+        for it *)
   ; repos : Git_location.t option String.Table.t
     (** where the cwds of saved sessions that recorded none are in git, read
         from the backend's files once (see [with_repo]) *)
@@ -656,8 +659,9 @@ let live_sessions t =
 
 (* The saved sessions; the live ones' files are summed up from memory, as
    they grow with every message. *)
-let saved_sessions t =
+let saved_sessions ?(yield = ignore) t =
   Session.list_with
+    ~yield
     ~live:(live_sessions t)
     ~load:(load_session t)
     ~dir:t.sessions_dir
@@ -1224,6 +1228,7 @@ let create
     ; loading = String.Table.create ()
     ; search =
         Session_search.create ~file:(Session_search.file ~dir:sessions_dir) ()
+    ; served = Promise.create ()
     ; repos = String.Table.create ()
     ; nix_store
     ; temporaries = String.Table.create ()
@@ -1383,9 +1388,9 @@ let fresh_agent t =
 
 (* Sessions waiting for a usage limit to reset when the backend last ran are
    loaded again, so that they resume on time with nobody attached. *)
-let restore_resumes t =
+let restore_resumes ?yield t =
   let now = t.now () in
-  List.iter (saved_sessions t) ~f:(fun summary ->
+  List.iter (saved_sessions ?yield t) ~f:(fun summary ->
     match summary.resume_at with
     | Some at when Float.( > ) at now && not (Hashtbl.mem t.agents summary.id)
       ->
@@ -2205,7 +2210,7 @@ let load_for_search t (s : Session.Summary.t) =
 let index_sessions t =
   Session_search.index
     t.search
-    ~sessions:(fun () -> saved_sessions t)
+    ~sessions:(fun () -> saved_sessions ~yield:Fiber.yield t)
     ~load:(load_for_search t)
     ~yield:Fiber.yield
 ;;
@@ -2214,9 +2219,12 @@ let indexed_sessions t = Session_search.indexed t.search
 
 let start_background t =
   Fiber.fork_daemon ~sw:t.sw (fun () ->
-    (* The server serves first. *)
+    (* The server serves first: a client starting up waits for none of
+       this, which only starts once a request is answered (or after a
+       quiet second), and yields after each session. *)
+    Fiber.first (fun () -> Promise.await (fst t.served)) (fun () -> t.sleep 1.);
     Fiber.yield ();
-    restore_resumes t;
+    restore_resumes ~yield:Fiber.yield t;
     (match index_sessions t with
      | () -> ()
      | exception (Eio.Cancel.Cancelled _ as exn) -> raise exn
@@ -3967,6 +3975,7 @@ let handle t client (request : Json.t) : Json.t =
 let respond t (client : Client.t) request =
   let before = client.agent in
   client.send (handle t client request);
+  ignore (Promise.try_resolve (snd t.served) () : bool);
   if not (phys_equal before client.agent) then tell_skipped client
 ;;
 

@@ -219,6 +219,8 @@ let worker t =
     w
 ;;
 
+let start t = if not t.closing then ignore (worker t : _ Deferred.t)
+
 let send t json =
   don't_wait_for
   @@ Throttle.enqueue t.sends (fun () ->

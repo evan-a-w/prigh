@@ -26,6 +26,7 @@ let list_fresh ~dir =
   let parsed = ref [] in
   let summaries =
     Session.list_with
+      ~yield:ignore
       ~live:(fun _ -> None)
       ~load:(fun path ->
         parsed := Filename.basename path :: !parsed;

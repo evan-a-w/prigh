@@ -375,6 +375,7 @@ let create
 ;;
 
 let greet t connected : Server_link.Outcome.result Deferred.t =
+  Option.iter t.tool_host ~f:Tool_host.start;
   match%bind connected with
   | Error e
     when Option.is_some
