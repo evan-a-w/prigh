@@ -1199,6 +1199,10 @@ selection kept: true
 === chromium: stability: keys typed ===
 messages reused: true
 messages drawn again: 0
+sidebar, transcript and status touched: none
+=== chromium: stability: idle for 3 s ===
+renders: at most one
+changes to the page: 0
 === chromium: stability: the editor ===
 frames sampled: true
 frames with lines out of view: 0

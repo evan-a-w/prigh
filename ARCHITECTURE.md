@@ -3436,7 +3436,16 @@ terminal frontend and `web/` prigh-web, the browser one.
       handlers capture. virtual_dom only reuses a lazy node whose function
       is the same JavaScript closure, and its `Thunk.create` makes a new
       one every time: `app/vdom_thunk.js`, installed as the page starts,
-      reuses one on its argument alone, the cached lazy value.),
+      reuses one on its argument alone, the cached lazy value. Above
+      them, `View` makes the page of parts (sidebar, review, header,
+      transcript, side answer, terminal, files, agents, dialogs), each a
+      `View_memo` kept while the model's fields it may show are the same
+      values (`Model.same_but_composer`, `same_but_composer_and_transcript`)
+      and the time reads the same at its granularity (ages by the minute,
+      messages' times by the day, the open agents panel by the second): a
+      key typed remakes only the composer, a streamed delta only the parts
+      that show the transcript, and the page's 30 s `Tick` nothing within
+      the minute. `Jump.points` is cached on the chat value.),
       `Tool_view` (a card per tool: bash, read with images, write, edit
       with `Line_diff`/`Diff_view`, apply_patch file by file,
       ls/grep/find, subagents (marked with `data-call` and `data-agent`
@@ -3474,7 +3483,9 @@ terminal frontend and `web/` prigh-web, the browser one.
       text at `Markdown.block_starts` (top-level blocks after a blank line
       that cannot continue a list or quote) into `.md-part`s, each parsed
       once and reused as a lazy node: while a reply streams only the last is
-      parsed again per delta, and a reply that ends is drawn in the same
+      parsed again per delta (and its starts are found from the last block
+      the previous text had whole, `Markdown.block_starts_extending`, the
+      finished parts' nodes kept), and a reply that ends is drawn in the same
       parts, so its DOM is patched, not drawn again (the selection and
       everything else on it stay). TeX math (`$..$`, `\(..\)`, `$$..$$`,
       `\[..\]`, ```` ```math ````) is `Markdown`'s `Math` inline and block,

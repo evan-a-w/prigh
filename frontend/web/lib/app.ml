@@ -864,6 +864,217 @@ module Model = struct
     }
   [@@deriving sexp_of]
 
+  (* Every field but the time, so that a new one must be placed: by
+     identity, which a field nothing changed keeps. *)
+  let same_outside ~transcript a b =
+    let { connection
+        ; generation
+        ; drops
+        ; hello
+        ; saved_login
+        ; state
+        ; chat
+        ; sessions
+        ; sessions_changes
+        ; sessions_asked
+        ; models
+        ; auth
+        ; now = _
+        ; utc_offset
+        ; browser_time_zone
+        ; narrow
+        ; desktop
+        ; origin
+        ; browser_shell
+        ; field_menu
+        ; draft = _
+        ; cursor = _
+        ; completion = _
+        ; history
+        ; images
+        ; pasted
+        ; paste_undo = _
+        ; downsizing
+        ; dictation
+        ; dictation_engine
+        ; browser_speech
+        ; queue
+        ; agent_queues
+        ; recipient
+        ; confirms
+        ; confirm_reason
+        ; questions
+        ; dialog
+        ; cancelled_login
+        ; toasts
+        ; next_toast
+        ; update_ready
+        ; sidebar_open
+        ; review_drawer
+        ; status_tray
+        ; scrolled_up
+        ; session_hits
+        ; session_search
+        ; archived_open
+        ; agents
+        ; verbosity
+        ; folds
+        ; ui
+        ; transcript_filter
+        ; config
+        ; btw
+        ; btw_seq
+        ; accounts
+        ; account
+        ; users
+        ; terminal
+        ; skills
+        ; worktrees
+        ; repo_worktrees
+        ; worktree_folds
+        ; pending
+        ; marks
+        ; notifications
+        ; files
+        ; review
+        ; review_memory
+        ; code_size
+        ; layout
+        ; paging
+        ; transcript_events
+        ; chat_cache
+        ; jump
+        ; trimmed
+        ; outputs_loading
+        ; session_gone
+        ; want_temporary
+        ; leaving
+        ; leave_ok
+        ; landing
+        ; forges
+        ; nix_gc
+        ; memory
+        ; instructions
+        ; about_you
+        ; mcp
+        ; compact_at
+        ; sessions_fields
+        ; default_fields
+        ; switched_off
+        ; settings_section
+        ; settings_home
+        ; return_to_settings
+        ; theme
+        ; theme_preview
+        ; prefs
+        ; generate
+        ; git_bar
+        }
+      =
+      a
+    in
+    phys_equal connection b.connection
+    && phys_equal generation b.generation
+    && phys_equal drops b.drops
+    && phys_equal hello b.hello
+    && phys_equal saved_login b.saved_login
+    && phys_equal state b.state
+    && (transcript || phys_equal chat b.chat)
+    && phys_equal sessions b.sessions
+    && phys_equal sessions_changes b.sessions_changes
+    && phys_equal sessions_asked b.sessions_asked
+    && phys_equal models b.models
+    && phys_equal auth b.auth
+    && phys_equal utc_offset b.utc_offset
+    && phys_equal browser_time_zone b.browser_time_zone
+    && phys_equal narrow b.narrow
+    && phys_equal desktop b.desktop
+    && phys_equal origin b.origin
+    && phys_equal browser_shell b.browser_shell
+    && phys_equal field_menu b.field_menu
+    && phys_equal history b.history
+    && phys_equal images b.images
+    && phys_equal pasted b.pasted
+    && phys_equal downsizing b.downsizing
+    && phys_equal dictation b.dictation
+    && phys_equal dictation_engine b.dictation_engine
+    && phys_equal browser_speech b.browser_speech
+    && phys_equal queue b.queue
+    && phys_equal agent_queues b.agent_queues
+    && phys_equal recipient b.recipient
+    && phys_equal confirms b.confirms
+    && phys_equal confirm_reason b.confirm_reason
+    && phys_equal questions b.questions
+    && phys_equal dialog b.dialog
+    && phys_equal cancelled_login b.cancelled_login
+    && phys_equal toasts b.toasts
+    && phys_equal next_toast b.next_toast
+    && phys_equal update_ready b.update_ready
+    && phys_equal sidebar_open b.sidebar_open
+    && phys_equal review_drawer b.review_drawer
+    && phys_equal status_tray b.status_tray
+    && phys_equal scrolled_up b.scrolled_up
+    && phys_equal session_hits b.session_hits
+    && phys_equal session_search b.session_search
+    && phys_equal archived_open b.archived_open
+    && phys_equal agents b.agents
+    && phys_equal verbosity b.verbosity
+    && phys_equal folds b.folds
+    && phys_equal ui b.ui
+    && phys_equal transcript_filter b.transcript_filter
+    && phys_equal config b.config
+    && phys_equal btw b.btw
+    && phys_equal btw_seq b.btw_seq
+    && phys_equal accounts b.accounts
+    && phys_equal account b.account
+    && phys_equal users b.users
+    && phys_equal terminal b.terminal
+    && phys_equal skills b.skills
+    && phys_equal worktrees b.worktrees
+    && phys_equal repo_worktrees b.repo_worktrees
+    && phys_equal worktree_folds b.worktree_folds
+    && phys_equal pending b.pending
+    && phys_equal marks b.marks
+    && phys_equal notifications b.notifications
+    && phys_equal files b.files
+    && phys_equal review b.review
+    && phys_equal review_memory b.review_memory
+    && phys_equal code_size b.code_size
+    && phys_equal layout b.layout
+    && phys_equal paging b.paging
+    && (transcript || phys_equal transcript_events b.transcript_events)
+    && (transcript || phys_equal chat_cache b.chat_cache)
+    && phys_equal jump b.jump
+    && phys_equal trimmed b.trimmed
+    && phys_equal outputs_loading b.outputs_loading
+    && phys_equal session_gone b.session_gone
+    && phys_equal want_temporary b.want_temporary
+    && phys_equal leaving b.leaving
+    && phys_equal leave_ok b.leave_ok
+    && phys_equal landing b.landing
+    && phys_equal forges b.forges
+    && phys_equal nix_gc b.nix_gc
+    && phys_equal memory b.memory
+    && phys_equal instructions b.instructions
+    && phys_equal about_you b.about_you
+    && phys_equal mcp b.mcp
+    && phys_equal compact_at b.compact_at
+    && phys_equal sessions_fields b.sessions_fields
+    && phys_equal default_fields b.default_fields
+    && phys_equal switched_off b.switched_off
+    && phys_equal settings_section b.settings_section
+    && phys_equal settings_home b.settings_home
+    && phys_equal return_to_settings b.return_to_settings
+    && phys_equal theme b.theme
+    && phys_equal theme_preview b.theme_preview
+    && phys_equal prefs b.prefs
+    && phys_equal generate b.generate
+    && phys_equal git_bar b.git_bar
+  ;;
+
+  let same_but_composer a b = same_outside ~transcript:false a b
+  let same_but_composer_and_transcript a b = same_outside ~transcript:true a b
+
   let look t =
     match t.dialog with
     | Some (Picker { kind = Themes; picker }) ->

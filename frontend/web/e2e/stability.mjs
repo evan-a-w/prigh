@@ -319,6 +319,18 @@ try {
       return vnode;
     };
   });
+  // Nor is anything outside the composer: the sidebar, the transcript and
+  // the status are not touched (View's parts).
+  await page.evaluate(() => {
+    window.__touched = new Set();
+    for (const sel of ["#sidebar", ".entries", ".status-item"]) {
+      const els = document.querySelectorAll(sel);
+      if (!els.length) window.__touched.add(`${sel} missing`);
+      for (const el of els)
+        new MutationObserver(() => window.__touched.add(sel))
+          .observe(el, { subtree: true, childList: true, attributes: true, characterData: true });
+    }
+  });
   await composer().click();
   await page.keyboard.type("hello");
   await page.waitForFunction(() => window.__thunks.reused > 0);
@@ -327,7 +339,39 @@ try {
   const thunks = await page.evaluate(() => window.__thunks);
   console.log(`messages reused: ${thunks.reused > 0}`);
   console.log(`messages drawn again: ${thunks.drawn}`);
+  const touched = await page.evaluate(() => [...window.__touched]);
+  console.log(`sidebar, transcript and status touched: ${touched.length ? touched.join(", ") : "none"}`);
   await composer().fill("");
+
+  // Idle: the page renders at most once in a few seconds (its clock ticks
+  // every 30 s), and that render changes nothing on the page.
+  await page.evaluate(() => {
+    window.__renders = { count: 0, last: performance.now() };
+    let pending = false;
+    const render = VdomThunk.prototype.render;
+    VdomThunk.prototype.render = function (prev) {
+      window.__renders.last = performance.now();
+      if (!pending) {
+        pending = true;
+        window.__renders.count++;
+        queueMicrotask(() => { pending = false; });
+      }
+      return render.call(this, prev);
+    };
+  });
+  await page.waitForFunction(() => performance.now() - window.__renders.last > 500, null, { polling: 100 });
+  await page.evaluate(() => {
+    window.__renders.count = 0;
+    window.__idleChanges = 0;
+    new MutationObserver(r => { window.__idleChanges += r.length; })
+      .observe(document.body, { subtree: true, childList: true, attributes: true, characterData: true });
+  });
+  // The window watched: a fixed time is the point here.
+  await page.waitForTimeout(3000);
+  section("idle for 3 s");
+  const quiet = await page.evaluate(() => ({ renders: window.__renders.count, changes: window.__idleChanges }));
+  console.log(`renders: ${quiet.renders <= 1 ? "at most one" : quiet.renders}`);
+  console.log(`changes to the page: ${quiet.changes}`);
 
   // Lines typed and sent: the editor shows them all in every frame, and is
   // back to one line in the frame that clears it.
