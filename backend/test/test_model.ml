@@ -41,6 +41,31 @@ let%expect_test "GPT-6.1 Sol on the OpenAI API and Codex" =
     |}]
 ;;
 
+let%expect_test "GPT-6.2 Astra and Sol on the OpenAI API and Codex" =
+  show "openai/gpt-6.2-astra";
+  show "openai-codex/gpt-6.2-sol";
+  show "GPT-6.2 Sol";
+  [%expect
+    {|
+    (openai/gpt-6.2-astra
+     ((id gpt-6.2-astra) (provider Openai) (name "GPT-6.2 Astra")
+      (context_window 272000) (max_output 128000)
+      (thinking_levels (Low Medium High Xhigh Max)) (can_disable_thinking false)
+      (thinking_default ()) (thinking_style (Effort (off_is_none false)))
+      (cost ((input 8) (output 40) (cache_read 0.4))) (supports_images true)
+      (native_computer Openai)))
+    (openai-codex/gpt-6.2-sol
+     ((id gpt-6.2-sol) (provider Openai_codex) (name "GPT-6.2 Sol")
+      (context_window 272000) (max_output 128000)
+      (thinking_levels (Low Medium High Xhigh Max)) (can_disable_thinking false)
+      (thinking_default ((On (Medium))))
+      (thinking_style (Effort (off_is_none false)))
+      (cost ((input 2) (output 10) (cache_read 0.1))) (supports_images true)))
+    ("GPT-6.2 Sol"
+     "model \"GPT-6.2 Sol\" is ambiguous; one of: openai/gpt-6.2-sol, openai-codex/gpt-6.2-sol")
+    |}]
+;;
+
 let%expect_test "GPT-6.1 Sol cost: cached input is billed at the cache rate" =
   let m = Option.value_exn (Model.find "openai-codex/gpt-6.1-sol") in
   print_s
@@ -154,6 +179,8 @@ let%expect_test
     openai/gpt-6-sol                     off default low medium high xhigh max      medium   (Effort(off_is_none true))
     openai/gpt-6.1-sol                   default low medium high xhigh max          medium   (Effort(off_is_none false))
     openai/gpt-6.1-terra                 off default low medium high xhigh max      medium   (Effort(off_is_none true))
+    openai/gpt-6.2-astra                 default low medium high xhigh max          ?        (Effort(off_is_none false))
+    openai/gpt-6.2-sol                   default low medium high xhigh max          medium   (Effort(off_is_none false))
     openai/gpt-realtime-2.1              default minimal low medium high xhigh      low      (Effort(off_is_none false))
     openai/o3                            default low medium high                    medium   (Effort(off_is_none false))
     openai/o3-pro                        default low medium high                    medium   (Effort(off_is_none false))
@@ -165,6 +192,8 @@ let%expect_test
     openai-codex/gpt-6-sol               off default low medium high xhigh max      medium   (Effort(off_is_none true))
     openai-codex/gpt-6.1-sol             default low medium high xhigh max          medium   (Effort(off_is_none false))
     openai-codex/gpt-6.1-terra           off default low medium high xhigh max      medium   (Effort(off_is_none true))
+    openai-codex/gpt-6.2-astra           default low medium high xhigh max          ?        (Effort(off_is_none false))
+    openai-codex/gpt-6.2-sol             default low medium high xhigh max          medium   (Effort(off_is_none false))
     deepseek/deepseek-flash              off default low high max                   high     (Effort(off_is_none false))
     deepseek/deepseek-v4-pro             off default low high max                   high     (Effort(off_is_none false))
     |}]

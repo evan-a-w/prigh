@@ -675,6 +675,26 @@ let all =
       ~cache_read:0.05
   ; m
       Openai
+      "gpt-6.2-astra"
+      "GPT-6.2 Astra"
+      ~ctx:272000
+      ~max:128000
+      ~thinking:(openai ~default:None five)
+      ~input:8.
+      ~output:40.
+      ~cache_read:0.4
+  ; m
+      Openai
+      "gpt-6.2-sol"
+      "GPT-6.2 Sol"
+      ~ctx:272000
+      ~max:128000
+      ~thinking:(openai five)
+      ~input:2.
+      ~output:10.
+      ~cache_read:0.1
+  ; m
+      Openai
       "gpt-realtime-2.1"
       "GPT-Realtime-2.1"
       ~ctx:128000
@@ -784,6 +804,26 @@ let all =
       ~input:1.
       ~output:5.
       ~cache_read:0.05
+  ; m
+      Openai_codex
+      "gpt-6.2-astra"
+      "GPT-6.2 Astra"
+      ~ctx:272000
+      ~max:128000
+      ~thinking:(openai ~default:None five)
+      ~input:8.
+      ~output:40.
+      ~cache_read:0.4
+  ; m
+      Openai_codex
+      "gpt-6.2-sol"
+      "GPT-6.2 Sol"
+      ~ctx:272000
+      ~max:128000
+      ~thinking:(openai five)
+      ~input:2.
+      ~output:10.
+      ~cache_read:0.1
   ; m
       Deepseek
       "deepseek-flash"
