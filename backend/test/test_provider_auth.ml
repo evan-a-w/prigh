@@ -309,14 +309,14 @@ let%expect_test "provider router: unauthenticated request fails with a hint" =
   (* CR expect_test_collector: This test expectation appears to contain a backtrace.
      This is strongly discouraged as backtraces are fragile.
      Please change this test to not include a backtrace. *)
-  ("Option.value_exn None" test/test_provider_auth.ml:292:18)
+  ("Option.value_exn None" test/test_provider_auth.ml:295:18)
   Raised at Base__Error.raise in file "src/error.ml", line 15, characters 38-66
   Called from Base__Error.raise in file "src/error.ml" (inlined), line 23, characters 47-66
   Called from Base__Option.value_exn__bits64 in file "src/option.ml", line 89, characters 13-30
-  Called from Prigh_test__Test_provider_auth.(fun) in file "test/test_provider_auth.ml", line 292, characters 18-56
+  Called from Prigh_test__Test_provider_auth.(fun) in file "test/test_provider_auth.ml", line 295, characters 18-56
   Called from Base__List0.iter.iter_loop in file "src/list0.ml" (inlined), line 110, characters 6-9
   Called from Base__List0.iter in file "src/list0.ml" (inlined), line 113, characters 2-13
-  Called from Prigh_test__Test_provider_auth.(fun) in file "test/test_provider_auth.ml", lines 289-303, characters 2-446
+  Called from Prigh_test__Test_provider_auth.(fun) in file "test/test_provider_auth.ml", lines 292-306, characters 2-446
   Called from Eio_unix__Thread_pool.run in file "lib_eio/unix/thread_pool.ml", line 108, characters 8-13
   Re-raised at Eio_unix__Thread_pool.run in file "lib_eio/unix/thread_pool.ml", line 113, characters 4-39
   Called from Eio_linux__Sched.run.(fun) in file "lib_eio_linux/sched.ml", line 398, characters 22-90
