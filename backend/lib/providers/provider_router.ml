@@ -61,6 +61,13 @@ let builtin_provider
   =
   match provider with
   | Deepseek -> Ok (Deepseek.create ~env ?timeout ~api_key:auth.token ())
+  | Gemini ->
+    Ok
+      (Gemini.create
+         ~env
+         ?timeout
+         ~headers:[ "x-goog-api-key", auth.token ]
+         ())
   | Anthropic ->
     Ok
       (Anthropic.create
@@ -145,7 +152,7 @@ let create ~env ?timeout ?getenv ?(models = Model_registry.builtin ()) ~store ()
                in
                { message with stop_reason = Error (sprintf "%s (%s)" e hint) }
              | _ -> message)))
-    | Anthropic | Openai | Openai_codex | Deepseek ->
+    | Anthropic | Openai | Openai_codex | Deepseek | Gemini ->
       (match resolve () with
        | Error e -> fail ("auth: " ^ Error.to_string_hum e)
        | Ok None -> fail (not_configured_message provider)

@@ -157,6 +157,20 @@ let openai_pro_long_prompt =
 let gpt5 = openai [ Minimal; Low; Medium; High ]
 let o_series = openai [ Low; Medium; High ]
 
+let gemini ?long_prompt ~default levels id name ~input ~output ~cache_read =
+  m
+    ?long_prompt
+    Gemini
+    id
+    name
+    ~ctx:1048576
+    ~max:65536
+    ~thinking:(openai ~default:(level default) levels)
+    ~input
+    ~output
+    ~cache_read
+;;
+
 (* DeepSeek's thinking mode guide: [thinking.type] enabled or disabled, and
    [reasoning_effort] low, high or max (default high). *)
 let deepseek =
@@ -845,6 +859,88 @@ let all =
       ~input:1.32
       ~output:3.96
       ~cache_read:0.044
+  ; gemini
+      ~default:Medium
+      [ Low; Medium; High ]
+      "gemini-4-carbon"
+      "Gemini 4 Carbon"
+      ~input:2.
+      ~output:10.
+      ~cache_read:0.10
+  ; gemini
+      ~default:Medium
+      [ Low; Medium; High ]
+      "gemini-4-argon"
+      "Gemini 4 Argon"
+      ~input:2.
+      ~output:10.
+      ~cache_read:0.10
+  ; gemini
+      ~default:High
+      to_xhigh
+      "gemini-4-neon"
+      "Gemini 4 Neon"
+      ~input:3.
+      ~output:15.
+      ~cache_read:0.15
+  ; gemini
+      ~default:High
+      to_xhigh
+      "gemini-4-hydrogen"
+      "Gemini 4 Hydrogen"
+      ~input:1.5
+      ~output:7.5
+      ~cache_read:0.075
+  ; gemini
+      ~default:Medium
+      [ Low; Medium; High ]
+      "gemini-3.8-flash"
+      "Gemini 3.8 Flash"
+      ~input:0.75
+      ~output:3.75
+      ~cache_read:0.075
+  ; gemini
+      ~default:Medium
+      [ Minimal; Low; Medium; High ]
+      "gemini-3.6-flash"
+      "Gemini 3.6 Flash"
+      ~input:0.75
+      ~output:3.75
+      ~cache_read:0.075
+  ; gemini
+      ~default:Minimal
+      [ Minimal; Low; Medium; High ]
+      "gemini-3.5-flash-lite"
+      "Gemini 3.5 Flash-Lite"
+      ~input:0.30
+      ~output:2.50
+      ~cache_read:0.03
+  ; gemini
+      ~default:Minimal
+      [ Minimal; Low; Medium; High ]
+      "gemini-3.1-flash-lite"
+      "Gemini 3.1 Flash-Lite"
+      ~input:0.25
+      ~output:1.50
+      ~cache_read:0.025
+  ; gemini
+      ~long_prompt:
+        { above = 200000; input = 4.; output = 18.; cache_read = 0.4 }
+      ~default:High
+      [ Low; Medium; High ]
+      "gemini-3.1-pro-preview"
+      "Gemini 3.1 Pro Preview"
+      ~input:2.
+      ~output:12.
+      ~cache_read:0.2
+  ; gemini
+      ~default:High
+      [ Minimal; Low; Medium; High ]
+      "gemini-3-flash-preview"
+      "Gemini 3 Flash Preview"
+      ~input:0.50
+      ~output:3.
+      ~cache_read:0.05
   ]
 ;;
 
@@ -856,6 +952,7 @@ let default_for : Provider_id.t -> t option = function
   | Openai -> Some (find_exn "openai/gpt-5.5")
   | Openai_codex -> Some (find_exn "openai-codex/gpt-6.1-sol")
   | Deepseek -> Some default
+  | Gemini -> Some (find_exn "gemini/gemini-4-hydrogen")
   | Custom _ -> None
 ;;
 
@@ -981,7 +1078,7 @@ let binds_thinking_to_prefix t =
       ]
       ~f:(fun family ->
         String.equal t.id family || String.is_prefix t.id ~prefix:(family ^ "-"))
-  | Openai | Openai_codex | Deepseek | Custom _ -> false
+  | Openai | Openai_codex | Deepseek | Gemini | Custom _ -> false
 ;;
 
 let supports_thinking t = not (List.is_empty t.thinking_levels)

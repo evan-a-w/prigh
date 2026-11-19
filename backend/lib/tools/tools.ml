@@ -31,7 +31,7 @@ let uses_apply_patch (model : Model.t) =
           major >= 5 && not (String.is_substring rest ~substring:"-chat")
         | None -> false)
      | None -> false)
-  | Anthropic | Deepseek | Custom _ -> false
+  | Anthropic | Deepseek | Gemini | Custom _ -> false
 ;;
 
 let editors = [ Tool_edit.tool; Tool_apply_patch.tool ]

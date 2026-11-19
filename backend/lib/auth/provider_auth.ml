@@ -24,6 +24,8 @@ module Method = struct
     | Openai_codex, Api_key -> "OpenAI Codex API key"
     | Deepseek, Api_key -> "DeepSeek API key"
     | Deepseek, Oauth -> "DeepSeek OAuth"
+    | Gemini, Api_key -> "Google AI Studio API key"
+    | Gemini, Oauth -> "Google Gemini OAuth"
     | Custom name, Api_key -> name ^ " API key"
     | Custom name, Oauth -> name ^ " OAuth"
   ;;
@@ -33,7 +35,7 @@ let methods : Provider_id.t -> Method.t list = function
   | Anthropic -> [ Oauth; Api_key ]
   | Openai -> [ Api_key ]
   | Openai_codex -> [ Oauth ]
-  | Deepseek | Custom _ -> [ Api_key ]
+  | Deepseek | Gemini | Custom _ -> [ Api_key ]
 ;;
 
 let env_vars : Provider_id.t -> string list = function
@@ -41,6 +43,7 @@ let env_vars : Provider_id.t -> string list = function
   | Openai -> [ "OPENAI_API_KEY" ]
   | Openai_codex -> []
   | Deepseek -> [ "DEEPSEEK_API_KEY" ]
+  | Gemini -> [ "GEMINI_API_KEY"; "GOOGLE_API_KEY" ]
   | Custom name -> [ Custom_provider.env_var name ]
 ;;
 
@@ -76,7 +79,7 @@ let refresh_oauth ~env ~cancel provider ~refresh_token =
   match (provider : Provider_id.t) with
   | Anthropic -> Oauth_anthropic.refresh ~env ~cancel ~refresh_token ()
   | Openai_codex -> Oauth_openai_codex.refresh ~env ~cancel ~refresh_token ()
-  | Openai | Deepseek | Custom _ ->
+  | Openai | Deepseek | Gemini | Custom _ ->
     Or_error.error_s
       [%message "provider has no OAuth support" (provider : Provider_id.t)]
 ;;
@@ -225,7 +228,7 @@ let login ~env store provider (method_ : Method.t) interaction =
       | Api_key, _ -> login_api_key provider interaction
       | Oauth, Anthropic -> Oauth_anthropic.login ~env interaction
       | Oauth, Openai_codex -> Oauth_openai_codex.login ~env interaction
-      | Oauth, (Openai | Deepseek | Custom _) -> assert false)
+      | Oauth, (Openai | Deepseek | Gemini | Custom _) -> assert false)
   in
   Auth_store.set store provider credential
 ;;
