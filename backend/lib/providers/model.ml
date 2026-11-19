@@ -171,6 +171,18 @@ let gemini ?long_prompt ~default levels id name ~input ~output ~cache_read =
     ~cache_read
 ;;
 
+let gemini_31_pro id name =
+  gemini
+    ~long_prompt:{ above = 200000; input = 4.; output = 18.; cache_read = 0.4 }
+    ~default:High
+    [ Low; Medium; High ]
+    id
+    name
+    ~input:2.
+    ~output:12.
+    ~cache_read:0.2
+;;
+
 (* DeepSeek's thinking mode guide: [thinking.type] enabled or disabled, and
    [reasoning_effort] low, high or max (default high). *)
 let deepseek =
@@ -923,16 +935,10 @@ let all =
       ~input:0.25
       ~output:1.50
       ~cache_read:0.025
-  ; gemini
-      ~long_prompt:
-        { above = 200000; input = 4.; output = 18.; cache_read = 0.4 }
-      ~default:High
-      [ Low; Medium; High ]
-      "gemini-3.1-pro-preview"
-      "Gemini 3.1 Pro Preview"
-      ~input:2.
-      ~output:12.
-      ~cache_read:0.2
+  ; gemini_31_pro "gemini-3.1-pro-preview" "Gemini 3.1 Pro Preview"
+  ; gemini_31_pro
+      "gemini-3.1-pro-preview-customtools"
+      "Gemini 3.1 Pro Preview (Custom Tools)"
   ; gemini
       ~default:High
       [ Minimal; Low; Medium; High ]
