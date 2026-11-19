@@ -202,7 +202,7 @@ try {
   await page.locator("#default-dir").fill("~/proj");
   await page.locator("#default-dir").press("Enter");
   await toast(page, "~/proj");
-  await pick(page, ".fallback-add", "flash", "DeepSeek V4.1 Flash");
+  await pick(page, ".fallback-add", "v4.1 flash", "DeepSeek V4.1 Flash");
   await page.locator(".fallback-list li").first().waitFor();
   // The budget is off: its switch sets $5, typed over.
   await page.locator(".setting.default-budget .switch").click();
