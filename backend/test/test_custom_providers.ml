@@ -538,6 +538,7 @@ let%expect_test "auth: stored key, environment, keyless; status" =
     {"provider":"openai-codex","name":"OpenAI Codex (ChatGPT)","methods":[{"method":"oauth","label":"OpenAI (ChatGPT Plus/Pro)"}],"configured":null,"expires_ms":null}
     {"provider":"deepseek","name":"DeepSeek","methods":[{"method":"api_key","label":"DeepSeek API key"}],"configured":null,"expires_ms":null}
     {"provider":"gemini","name":"Google Gemini","methods":[{"method":"api_key","label":"Google AI Studio API key"}],"configured":null,"expires_ms":null}
+    {"provider":"google-vertex","name":"Google Cloud Vertex AI","methods":[{"method":"oauth","label":"Google Cloud Vertex AI (OAuth)"}],"configured":null,"expires_ms":null}
     {"provider":"aiproxy","name":"aiproxy","methods":[{"method":"api_key","label":"aiproxy API key"}],"configured":{"method":"api_key","source":"stored api key"},"expires_ms":null,"custom":{"base_url":"http://localhost:3000/v1","api":"chat","api_label":"OpenAI chat completions (/chat/completions)"}}
     {"provider":"ollama","name":"ollama","methods":[{"method":"api_key","label":"ollama API key"}],"configured":{"method":"api_key","source":"no key"},"expires_ms":null,"custom":{"base_url":"http://localhost:11434/v1","api":"chat","api_label":"OpenAI chat completions (/chat/completions)"}}
     |}]
@@ -1608,7 +1609,7 @@ let%expect_test
     {"type":"event","event":"auth","kind":"logged_out","provider":"aiproxy"}
     {"type":"response","id":"r1","ok":true,"result":{}}
     ()
-    {"type":"response","id":"r1","ok":false,"error":"unknown provider \"aiproxy\" (one of: anthropic, openai, openai-codex, deepseek, gemini; or custom to add an OpenAI-compatible endpoint)"}
+    {"type":"response","id":"r1","ok":false,"error":"unknown provider \"aiproxy\" (one of: anthropic, openai, openai-codex, deepseek, gemini, google-vertex; or custom to add an OpenAI-compatible endpoint)"}
     |}]
 ;;
 

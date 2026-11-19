@@ -383,6 +383,69 @@ let create ~env ?(base_url = default_base_url) ?timeout ~headers () =
   { Provider.name = "gemini"; stream = stream ~env ~base_url ~timeout ~headers }
 ;;
 
+let vertex
+      ~env
+      ?timeout
+      ?idle_timeout
+      ~config:(config : Oauth_gemini.Config.t)
+      ~access_token
+      ()
+  =
+  { Provider.name = "google-vertex"
+  ; stream =
+      (fun (request : Provider.Request.t) ~cancel ~on_event ->
+        let model = Model.key request.model in
+        let fresh_id () = local_id_prefix ^ Pkce.random_hex 12 in
+        response ~fresh_id model ~on_event (fun ~accept ~fail ->
+          let sse = Sse.create () in
+          let status = ref 0 in
+          let error_body = Buffer.create 256 in
+          let on_chunk chunk =
+            if !status / 100 = 2
+            then
+              List.iter (Sse.feed sse chunk) ~f:(fun (event : Sse.Event.t) ->
+                match Json.parse event.data with
+                | Ok json -> accept json
+                | Error e ->
+                  fail ("bad JSON in Vertex stream: " ^ Error.to_string_hum e))
+            else Buffer.add_string error_body chunk
+          in
+          match
+            Oauth_gemini.post_stream
+              ~env
+              ~cancel
+              ?timeout
+              ?idle_timeout
+              config
+              ~access_token
+              ~body:(Json.to_string (request_body request))
+              ~on_response:(fun r -> status := r.status)
+              ~on_chunk
+          with
+          | Error e -> Sse_request.Outcome.Failed (Error.to_string_hum e)
+          | Ok result ->
+            (match result with
+             | Error (Http_client.Error.Cancelled) ->
+               Sse_request.Outcome.Aborted
+             | Error e ->
+               Sse_request.Outcome.Failed (Http_client.Error.to_string e)
+             | Ok response ->
+               Option.iter (Sse.finish sse) ~f:(fun (event : Sse.Event.t) ->
+                 match Json.parse event.data with
+                 | Ok json -> accept json
+                 | Error e ->
+                   fail
+                     ("bad JSON in Vertex stream: " ^ Error.to_string_hum e));
+               if response.status / 100 <> 2
+               then
+                 Sse_request.Outcome.Failed
+                   (Sse_request.error_message_of_body
+                      ~status:response.status
+                      (Buffer.contents error_body))
+               else Sse_request.Outcome.Completed)))
+  }
+;;
+
 module For_testing = struct
   let request_body = request_body
 

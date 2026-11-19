@@ -55,6 +55,7 @@ let custom_provider ~env ?timeout (p : Custom_provider.t) ~key : Provider.t =
 let builtin_provider
       ~env
       ?timeout
+      ?getenv
       (provider : Provider_id.t)
       (auth : Provider_auth.Resolved.t)
   : Provider.t Or_error.t
@@ -68,6 +69,11 @@ let builtin_provider
          ?timeout
          ~headers:[ "x-goog-api-key", auth.token ]
          ())
+  | Gemini_vertex ->
+    (match Oauth_gemini.Config.of_env ?getenv () with
+     | Error e -> Error e
+     | Ok config ->
+       Ok (Gemini.vertex ~env ?timeout ~config ~access_token:auth.token ()))
   | Anthropic ->
     Ok
       (Anthropic.create
@@ -152,12 +158,12 @@ let create ~env ?timeout ?getenv ?(models = Model_registry.builtin ()) ~store ()
                in
                { message with stop_reason = Error (sprintf "%s (%s)" e hint) }
              | _ -> message)))
-    | Anthropic | Openai | Openai_codex | Deepseek | Gemini ->
+    | Anthropic | Openai | Openai_codex | Deepseek | Gemini | Gemini_vertex ->
       (match resolve () with
        | Error e -> fail ("auth: " ^ Error.to_string_hum e)
        | Ok None -> fail (not_configured_message provider)
        | Ok (Some auth) ->
-         (match builtin_provider ~env ?timeout provider auth with
+         (match builtin_provider ~env ?timeout ?getenv provider auth with
           | Error e -> fail (Error.to_string_hum e)
           | Ok p -> p.stream request ~cancel ~on_event))
   in
