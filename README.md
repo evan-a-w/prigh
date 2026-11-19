@@ -1928,6 +1928,7 @@ nix run .#backend -- login anthropic -method api_key
 nix run .#backend -- login openai-codex     # ChatGPT Plus/Pro (browser OAuth)
 nix run .#backend -- login openai           # OPENAI_API_KEY
 nix run .#backend -- login deepseek         # DEEPSEEK_API_KEY
+nix run .#backend -- login gemini           # Gemini Developer API key from Google AI Studio
 nix run .#backend -- login custom           # an OpenAI-compatible endpoint (below)
 nix run .#backend -- auth                   # status; logout <provider> to remove
 ```
@@ -1943,10 +1944,16 @@ protocol) and written back for the other side.
 
 The same is available inside the TUI as `/login [provider] [api_key|oauth]`,
 `/logout <provider>` and `/auth`. A stored credential wins; otherwise
-`ANTHROPIC_OAUTH_TOKEN`/`ANTHROPIC_API_KEY`, `OPENAI_API_KEY` and
-`DEEPSEEK_API_KEY` are used. OAuth tokens are refreshed automatically
+`ANTHROPIC_OAUTH_TOKEN`/`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`,
+`DEEPSEEK_API_KEY` and `GEMINI_API_KEY` (or `GOOGLE_API_KEY`) are used.
+OAuth tokens are refreshed automatically
 (under a cross-process lock) when they are within five minutes of expiry.
 Model ids can be qualified as `provider/id` (e.g. `openai-codex/gpt-6.1-sol`).
+
+The built-in Gemini provider uses the Google Gemini Developer API. It
+includes Gemini 4 Carbon, Argon, Neon and Hydrogen, plus current Gemini 3
+Flash and Pro options. These are chat models; the catalog does not include
+Live, image generation, TTS or embedding endpoints.
 
 ### Custom OpenAI-compatible providers
 

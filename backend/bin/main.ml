@@ -48,7 +48,7 @@ let default_model ~getenv ~models store =
   | Error _ -> Model.default
   | Ok statuses ->
     List.find_map
-      [ Provider_id.Anthropic; Openai_codex; Openai; Deepseek ]
+      [ Provider_id.Anthropic; Openai_codex; Openai; Deepseek; Gemini ]
       ~f:(fun provider ->
         List.find statuses ~f:(fun s ->
           Provider_id.equal s.provider provider && Option.is_some s.configured))
@@ -1987,7 +1987,7 @@ let with_registry ~store f =
 let login_command =
   Command.basic
     ~summary:
-      "Log in to a provider (anthropic, openai, openai-codex, deepseek, a \
+      "Log in to a provider (anthropic, openai, openai-codex, deepseek, gemini, a \
        custom one), or add a custom OpenAI-compatible provider (custom)"
     (let%map_open.Command store = auth_file_flag
      and provider = anon ("PROVIDER" %: string)

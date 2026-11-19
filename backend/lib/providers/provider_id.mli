@@ -9,6 +9,7 @@ type t =
   | Openai
   | Openai_codex
   | Deepseek
+  | Gemini
   | Custom of string
 [@@deriving sexp, equal, compare]
 
