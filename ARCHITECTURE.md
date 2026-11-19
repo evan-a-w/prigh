@@ -481,6 +481,25 @@ becomes a list):
 Modelled on pi's auth design; the credential file is the same shape so the
 two can share one.
 
+- `Oauth_gemini` implements Google's desktop OAuth flow for **Vertex AI**.
+  It is not registered as a provider yet. The backend operator supplies their
+  own Desktop OAuth client's `PRIGH_GEMINI_OAUTH_CLIENT_ID` and
+  `PRIGH_GEMINI_OAUTH_CLIENT_SECRET`, configures its consent screen/test
+  users, enables the Vertex AI API and billing on `PRIGH_GEMINI_OAUTH_PROJECT`,
+  and selects a global Google publisher model using its bare Vertex ID in
+  `PRIGH_GEMINI_OAUTH_VERTEX_MODEL`. Users need `aiplatform.endpoints.predict`
+  and quota-project use (`serviceusage.services.use`) on that project.
+  The module requests the `https://www.googleapis.com/auth/aiplatform` scope
+  and posts only to `aiplatform.googleapis.com`, under the configured
+  project's `locations/global/publishers/google/models/` path. Signing in
+  returns a credential to the caller; it does not read ADC, CLI tokens,
+  or a shared backend refresh token. Persist and refresh it only in the
+  requesting user's `Auth_store`, under a separate Vertex provider ID.
+  Google's [Developer API OAuth quickstart](https://ai.google.dev/gemini-api/docs/oauth)
+  demonstrates listing models, whereas Vertex's [v1 discovery document](https://aiplatform.googleapis.com/$discovery/rest?version=v1)
+  explicitly lists the scope for `streamGenerateContent`. See also the
+  [method permissions](https://docs.cloud.google.com/vertex-ai/generative-ai/docs/reference/rest/v1/projects.locations.publishers.models/streamGenerateContent)
+  and [global endpoint and model availability](https://docs.cloud.google.com/vertex-ai/generative-ai/docs/learn/locations).
 - `Credential` — `Api_key of string | Oauth {access; refresh; expires_ms;
   account_id}` with JSON in pi's format.
 - `Auth_store` — `~/.config/prigh/auth.json`, one entry per provider,

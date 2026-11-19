@@ -7,11 +7,20 @@ module Config : sig
   type t
 
   val of_env : ?getenv:(string -> string option) -> unit -> t Or_error.t
+  val model : t -> string
 end
 
-(** Headers for the native Generative Language API, never for an OpenAI
-    compatible endpoint or a user-supplied URL. *)
-val headers : Config.t -> access_token:string -> (string * string) list
+(** Stream only to the configured Vertex model at Google's fixed HTTPS origin.
+    No endpoint override, redirects or token in the URL. *)
+val post_stream
+  :  env:Env.t
+  -> cancel:Cancellation.t
+  -> Config.t
+  -> access_token:string
+  -> body:string
+  -> on_response:(Http_client.Response.t -> unit)
+  -> on_chunk:(string -> unit)
+  -> (Http_client.Response.t, Http_client.Error.t) Result.t Or_error.t
 
 val login
   :  env:Env.t
@@ -27,6 +36,8 @@ val refresh
   -> Credential.Oauth.t Or_error.t
 
 module For_testing : sig
+  val stream_url : Config.t -> string
+
   val authorize_url
     :  Config.t
     -> Pkce.Pair.t
