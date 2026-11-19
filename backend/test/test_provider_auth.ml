@@ -37,6 +37,7 @@ let%expect_test "methods, env vars and labels per provider" =
     openai        methods=api_key(OpenAI API key) env=OPENAI_API_KEY
     openai-codex  methods=oauth(OpenAI (ChatGPT Plus/Pro)) env=
     deepseek      methods=api_key(DeepSeek API key) env=DEEPSEEK_API_KEY
+    gemini        methods=api_key(Google AI Studio API key) env=GEMINI_API_KEY,GOOGLE_API_KEY
     |}]
 ;;
 
@@ -78,7 +79,7 @@ let%expect_test "resolve: stored credential wins over env; env only as fallback"
     {|
     (Ok
      ((Anthropic ((Api_key ANTHROPIC_API_KEY))) (Openai ()) (Openai_codex ())
-      (Deepseek ((Api_key "stored api key")))))
+      (Deepseek ((Api_key "stored api key"))) (Gemini ())))
     |}]
 ;;
 
@@ -275,7 +276,7 @@ let%expect_test
     {|
     {"type":"event","event":"auth","kind":"logged_out","provider":"deepseek"}
     (Ok ())
-    (Ok ((Anthropic ()) (Openai ()) (Openai_codex ()) (Deepseek ())))
+    (Ok ((Anthropic ()) (Openai ()) (Openai_codex ()) (Deepseek ()) (Gemini ())))
     |}]
 ;;
 
@@ -308,5 +309,7 @@ let%expect_test "provider router: unauthenticated request fails with a hint" =
     (Error "not logged in to OpenAI Codex (ChatGPT): use /login openai-codex")
     (Error
      "not logged in to DeepSeek: use /login deepseek or set DEEPSEEK_API_KEY")
+    (Error
+     "not logged in to Google Gemini: use /login gemini or set GEMINI_API_KEY/GOOGLE_API_KEY")
     |}]
 ;;

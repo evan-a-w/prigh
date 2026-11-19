@@ -4,6 +4,8 @@ open! Import
 let default_base_url = "https://generativelanguage.googleapis.com/v1beta"
 let local_id_prefix = "gemini_local_"
 let signature_prefix = "gemini:tool:"
+let text_signature_prefix = "gemini:text:"
+let thought_signature_prefix = "gemini:thought:"
 let member_string = Sse_request.member_string
 
 let member_array key json =
@@ -57,8 +59,8 @@ let assistant_parts ~model ~wire_ids (a : Message.Assistant.t) =
   let same_model = String.equal a.model (Model.key model) in
   let signatures = if same_model then tool_signatures a else String.Map.empty in
   let first_call = ref true in
-  List.filter_map a.content ~f:(function
-    | Text s -> if String.is_empty s then None else Some (text_part s)
+  let wire_part = function
+    | Content.Text s -> if String.is_empty s then None else Some (text_part s)
     | Server_tool s -> Some (text_part (Content.Server_tool.as_text s))
     | Thinking _ -> None
     | Tool_call c ->
@@ -86,7 +88,37 @@ let assistant_parts ~model ~wire_ids (a : Message.Assistant.t) =
              , `Object
                  ([ string_field "name" c.name; "args", arguments c ] @ wire_id)
              )
-             :: signature)))
+             :: signature))
+  in
+  (* The builder coalesces streamed text deltas. A signed delta is bracketed
+     by thinking blocks so it can be replayed as its own part, even if empty. *)
+  let rec encode = function
+    | Content.Text text :: Thinking { signature = Some s; _ } :: rest
+      when same_model && String.is_prefix s ~prefix:text_signature_prefix ->
+      `Object
+        [ string_field "text" text
+        ; string_field
+            "thoughtSignature"
+            (String.chop_prefix_exn s ~prefix:text_signature_prefix)
+        ]
+      :: encode rest
+    | Thinking { text; signature = Some s } :: rest
+      when same_model && String.is_prefix s ~prefix:thought_signature_prefix ->
+      `Object
+        [ string_field "text" text
+        ; "thought", `True
+        ; string_field
+            "thoughtSignature"
+            (String.chop_prefix_exn s ~prefix:thought_signature_prefix)
+        ]
+      :: encode rest
+    | block :: rest ->
+      (match wire_part block with
+       | Some part -> part :: encode rest
+       | None -> encode rest)
+    | [] -> []
+  in
+  encode a.content
 ;;
 
 let response_part ~wire_ids (r : Message.Tool_result.t) : Json.t =
@@ -254,13 +286,28 @@ let response ~fresh_id model jsons ~on_event =
               in the session without modifying tool ids or exposing it to UI. *)
              emit (Thinking_signature (signature_prefix ^ signature))))
     | None ->
-      Option.iter (member_string "text" json) ~f:(fun text ->
-        if not (String.is_empty text)
-        then
-          emit
-            (match Json.member "thought" json with
-             | Some `True -> Thinking_delta text
-             | _ -> Text_delta text))
+      let is_thought =
+        match Json.member "thought" json with
+        | Some `True -> true
+        | _ -> false
+      in
+      (match
+         member_string "text" json, member_string "thoughtSignature" json
+       with
+       | text, Some s ->
+         let text = Option.value text ~default:"" in
+         if is_thought
+         then (
+           emit (Text_delta "");
+           emit (Thinking_delta text);
+           emit (Thinking_signature (thought_signature_prefix ^ s)))
+         else (
+           emit (Thinking_delta "");
+           emit (Text_delta text);
+           emit (Thinking_signature (text_signature_prefix ^ s)))
+       | Some text, None when not (String.is_empty text) ->
+         emit (if is_thought then Thinking_delta text else Text_delta text)
+       | _ -> ())
   in
   let accept (json : Json.t) =
     Option.iter (Json.member "error" json) ~f:(fun error ->

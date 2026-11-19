@@ -196,6 +196,17 @@ let%expect_test
     openai-codex/gpt-6.2-sol             default low medium high xhigh max          medium   (Effort(off_is_none false))
     deepseek/deepseek-flash              off default low high max                   high     (Effort(off_is_none false))
     deepseek/deepseek-v4-pro             off default low high max                   high     (Effort(off_is_none false))
+    gemini/gemini-4-carbon               default low medium high                    medium   (Effort(off_is_none false))
+    gemini/gemini-4-argon                default low medium high                    medium   (Effort(off_is_none false))
+    gemini/gemini-4-neon                 default low medium high xhigh              high     (Effort(off_is_none false))
+    gemini/gemini-4-hydrogen             default low medium high xhigh              high     (Effort(off_is_none false))
+    gemini/gemini-3.8-flash              default low medium high                    medium   (Effort(off_is_none false))
+    gemini/gemini-3.6-flash              default minimal low medium high            medium   (Effort(off_is_none false))
+    gemini/gemini-3.5-flash-lite         default minimal low medium high            minimal  (Effort(off_is_none false))
+    gemini/gemini-3.1-flash-lite         default minimal low medium high            minimal  (Effort(off_is_none false))
+    gemini/gemini-3.1-pro-preview        default low medium high                    high     (Effort(off_is_none false))
+    gemini/gemini-3.1-pro-preview-customtools default low medium high                    high     (Effort(off_is_none false))
+    gemini/gemini-3-flash-preview        default minimal low medium high            high     (Effort(off_is_none false))
     |}]
 ;;
 
