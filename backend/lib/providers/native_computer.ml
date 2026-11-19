@@ -76,7 +76,7 @@ let of_model (provider : Provider_id.t) id =
       && not (family id ~prefixes:[ "gpt-5.4-nano"; "gpt-5.5-pro" ])
     then Some Openai
     else None
-  | Openai_codex | Deepseek | Gemini | Custom _ -> None
+  | Openai_codex | Deepseek | Gemini | Gemini_vertex | Custom _ -> None
 ;;
 
 let form = function

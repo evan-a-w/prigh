@@ -27,7 +27,7 @@ val create
   -> t
 
 (** Only the built-in models (tests, scripted runs). *)
-val builtin : unit -> t
+val builtin : ?getenv:(string -> string option) -> unit -> t
 
 val home : t -> string option
 
@@ -39,6 +39,7 @@ val reload : ?listed:string * Custom_provider.Listed_model.t list -> t -> unit
 val providers : t -> Custom_provider.t list
 val find_provider : t -> string -> Custom_provider.t option
 val models : t -> Model.t list
+val default_for : t -> Provider_id.t -> Model.t option
 
 (** Like {!Model.find_in}; a key naming a custom provider resolves even when
     the server did not list the id (sessions and config may name models that

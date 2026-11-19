@@ -66,25 +66,57 @@ let valid_access token =
     | _ -> false)
 ;;
 
-let post_stream ~env ~cancel config ~access_token ~body ~on_response ~on_chunk =
+module Post = struct
+  type t =
+    url:string
+    -> headers:(string * string) list
+    -> body:string
+    -> (Http_client.Response.t * string, Http_client.Error.t) Result.t
+
+  let key : t Fiber.key = Fiber.create_key ()
+end
+
+let post_stream
+      ~env
+      ~cancel
+      ?timeout
+      ?idle_timeout
+      config
+      ~access_token
+      ~body
+      ~on_response
+      ~on_chunk
+  =
   if not (valid_access access_token)
   then Or_error.error_string "Invalid Vertex access token; sign in again"
-  else
+  else (
+    let url = stream_url config in
+    let headers =
+      [ "Authorization", "Bearer " ^ access_token
+      ; "x-goog-user-project", config.project
+      ; "Content-Type", "application/json"
+      ; "Accept", "text/event-stream"
+      ]
+    in
     Ok
-      (Http_client.post_stream
-         ~env
-         ~cancel
-         ~url:(stream_url config)
-         ~headers:
-           [ "Authorization", "Bearer " ^ access_token
-           ; "x-goog-user-project", config.project
-           ; "Content-Type", "application/json"
-           ; "Accept", "text/event-stream"
-           ]
-         ~body
-         ~on_response
-         ~on_chunk
-         ())
+      (match Fiber.get Post.key with
+       | None ->
+         Http_client.post_stream
+           ~env
+           ~cancel
+           ?timeout
+           ?idle_timeout
+           ~url
+           ~headers
+           ~body
+           ~on_response
+           ~on_chunk
+           ()
+       | Some post ->
+         Result.map (post ~url ~headers ~body) ~f:(fun (response, data) ->
+           on_response response;
+           on_chunk data;
+           response)))
 ;;
 
 let authorize_url (config : Config.t) (pkce : Pkce.Pair.t) ~state ~redirect_uri =
@@ -166,11 +198,21 @@ let credential_of_body ?(now_ms = Credential.now_ms ()) ?previous_refresh body =
 ;;
 
 let request ~env ~cancel (config : Config.t) fields =
+  let post ~url ~headers ~body =
+    match Fiber.get Post.key with
+    | Some post -> post ~url ~headers ~body
+    | None ->
+      Http_client.post
+        ~env
+        ~cancel
+        ~timeout:(Time_ns.Span.of_sec 30.)
+        ~url
+        ~headers
+        ~body
+        ()
+  in
   match
-    Http_client.post
-      ~env
-      ~cancel
-      ~timeout:(Time_ns.Span.of_sec 30.)
+    post
       ~url:token_url
       ~headers:
         [ "Content-Type", "application/x-www-form-urlencoded"
@@ -181,7 +223,6 @@ let request ~env ~cancel (config : Config.t) fields =
            (("client_id", config.client_id)
             :: ("client_secret", config.client_secret)
             :: fields))
-      ()
   with
   | Error Cancelled -> Auth_interaction.cancelled ()
   | Error _ ->
@@ -258,6 +299,7 @@ let login ~env config (interaction : Auth_interaction.t) =
 ;;
 
 module For_testing = struct
+  let with_post post f = Fiber.with_binding Post.key post f
   let stream_url = stream_url
   let authorize_url = authorize_url
   let redirect_uri = redirect_uri

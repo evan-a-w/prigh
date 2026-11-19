@@ -15,6 +15,8 @@ end
 val post_stream
   :  env:Env.t
   -> cancel:Cancellation.t
+  -> ?timeout:Time_ns.Span.t
+  -> ?idle_timeout:Time_ns.Span.t
   -> Config.t
   -> access_token:string
   -> body:string
@@ -36,6 +38,16 @@ val refresh
   -> Credential.Oauth.t Or_error.t
 
 module For_testing : sig
+  (** Replace only the final HTTP exchange for this fiber and its children.
+      URL, headers and body are still constructed by production code. *)
+  val with_post
+    :  (url:string
+        -> headers:(string * string) list
+        -> body:string
+        -> (Http_client.Response.t * string, Http_client.Error.t) Result.t)
+    -> (unit -> 'a)
+    -> 'a
+
   val stream_url : Config.t -> string
 
   val authorize_url

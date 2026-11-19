@@ -26,6 +26,8 @@ module Method = struct
     | Deepseek, Oauth -> "DeepSeek OAuth"
     | Gemini, Api_key -> "Google AI Studio API key"
     | Gemini, Oauth -> "Google Gemini OAuth"
+    | Gemini_vertex, Oauth -> "Google Cloud Vertex AI (OAuth)"
+    | Gemini_vertex, Api_key -> "Vertex AI API key"
     | Custom name, Api_key -> name ^ " API key"
     | Custom name, Oauth -> name ^ " OAuth"
   ;;
@@ -34,14 +36,14 @@ end
 let methods : Provider_id.t -> Method.t list = function
   | Anthropic -> [ Oauth; Api_key ]
   | Openai -> [ Api_key ]
-  | Openai_codex -> [ Oauth ]
+  | Openai_codex | Gemini_vertex -> [ Oauth ]
   | Deepseek | Gemini | Custom _ -> [ Api_key ]
 ;;
 
 let env_vars : Provider_id.t -> string list = function
   | Anthropic -> [ "ANTHROPIC_OAUTH_TOKEN"; "ANTHROPIC_API_KEY" ]
   | Openai -> [ "OPENAI_API_KEY" ]
-  | Openai_codex -> []
+  | Openai_codex | Gemini_vertex -> []
   | Deepseek -> [ "DEEPSEEK_API_KEY" ]
   | Gemini -> [ "GEMINI_API_KEY"; "GOOGLE_API_KEY" ]
   | Custom name -> [ Custom_provider.env_var name ]
@@ -75,10 +77,13 @@ let env_value ~getenv provider =
     | _ -> None)
 ;;
 
-let refresh_oauth ~env ~cancel provider ~refresh_token =
+let refresh_oauth ~env ~cancel ~getenv provider ~refresh_token =
   match (provider : Provider_id.t) with
   | Anthropic -> Oauth_anthropic.refresh ~env ~cancel ~refresh_token ()
   | Openai_codex -> Oauth_openai_codex.refresh ~env ~cancel ~refresh_token ()
+  | Gemini_vertex ->
+    Or_error.bind (Oauth_gemini.Config.of_env ~getenv ()) ~f:(fun config ->
+      Oauth_gemini.refresh ~env ~cancel config ~refresh_token)
   | Openai | Deepseek | Gemini | Custom _ ->
     Or_error.error_s
       [%message "provider has no OAuth support" (provider : Provider_id.t)]
@@ -111,12 +116,21 @@ let resolve
       ~env
       ?(cancel = Cancellation.never)
       ?(getenv = Sys.getenv)
-      ?(refresh = refresh_oauth ~env ~cancel)
+      ?(refresh = refresh_oauth ~env ~cancel ~getenv)
       store
       provider
   =
   let open Or_error.Let_syntax in
   match%bind Auth_store.read store provider with
+  | Some (Api_key _) when Provider_id.equal provider Gemini_vertex ->
+    Or_error.error_string
+      "google-vertex requires a Google Cloud OAuth credential: /login \
+       google-vertex"
+  | Some (Oauth _) when Provider_id.equal provider Gemini ->
+    Or_error.errorf
+      "%s requires an AI Studio API key: /login %s"
+      (Provider_id.to_string provider)
+      (Provider_id.to_string provider)
   | Some (Api_key token) ->
     Ok
       (Some
@@ -157,6 +171,9 @@ let status ?(getenv = Sys.getenv) ?(custom = []) store =
     List.map Provider_id.builtins ~f:(fun provider ->
       let configured, expires_ms =
         match List.Assoc.find stored ~equal:Provider_id.equal provider with
+        | Some (Oauth _) when Provider_id.equal provider Gemini -> None, None
+        | Some (Api_key _) when Provider_id.equal provider Gemini_vertex ->
+          None, None
         | Some (Oauth o) -> Some (Method.Oauth, "oauth"), Some o.expires_ms
         | Some (Api_key _) -> Some (Method.Api_key, "stored api key"), None
         | None -> from_env provider, None
@@ -213,7 +230,14 @@ let login_api_key provider (interaction : Auth_interaction.t) =
         else Ok (Credential.Api_key key)))
 ;;
 
-let login ~env store provider (method_ : Method.t) interaction =
+let login
+      ~env
+      ?(getenv = Sys.getenv)
+      store
+      provider
+      (method_ : Method.t)
+      interaction
+  =
   let open Or_error.Let_syntax in
   let%bind credential =
     if not (List.mem (methods provider) method_ ~equal:Method.equal)
@@ -228,6 +252,9 @@ let login ~env store provider (method_ : Method.t) interaction =
       | Api_key, _ -> login_api_key provider interaction
       | Oauth, Anthropic -> Oauth_anthropic.login ~env interaction
       | Oauth, Openai_codex -> Oauth_openai_codex.login ~env interaction
+      | Oauth, Gemini_vertex ->
+        let%bind config = Oauth_gemini.Config.of_env ~getenv () in
+        Oauth_gemini.login ~env config interaction
       | Oauth, (Openai | Deepseek | Gemini | Custom _) -> assert false)
   in
   Auth_store.set store provider credential

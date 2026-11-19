@@ -9,7 +9,8 @@ let known (model : Model.t) : Image.Limit.t =
     { max_base64_bytes = 18 * mb
     ; max_dimension = Image.Limit.default.max_dimension
     }
-  | Anthropic | Deepseek | Gemini | Custom _ -> Image.Limit.default
+  | Anthropic | Deepseek | Gemini | Gemini_vertex | Custom _ ->
+    Image.Limit.default
 ;;
 
 let learned : Image.Limit.t String.Table.t = String.Table.create ()
@@ -31,7 +32,13 @@ let for_request (model : Model.t) ~images =
     { limit with
       max_dimension = Int.min limit.max_dimension many_image_dimension
     }
-  | Anthropic | Openai | Openai_codex | Deepseek | Gemini | Custom _ -> limit
+  | Anthropic
+  | Openai
+  | Openai_codex
+  | Deepseek
+  | Gemini
+  | Gemini_vertex
+  | Custom _ -> limit
 ;;
 
 let re s = Re.compile (Re.no_case (Re.Perl.re s))

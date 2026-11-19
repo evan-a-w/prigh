@@ -953,7 +953,30 @@ let default_for : Provider_id.t -> t option = function
   | Openai_codex -> Some (find_exn "openai-codex/gpt-6.1-sol")
   | Deepseek -> Some default
   | Gemini -> Some (find_exn "gemini/gemini-4-hydrogen")
-  | Custom _ -> None
+  | Gemini_vertex | Custom _ -> None
+;;
+
+let vertex id =
+  let name = id ^ " (Vertex AI)" in
+  let cost =
+    { Cost.input = 0.; output = 0.; cache_read = 0.; long_prompt = None }
+  in
+  match
+    List.find all ~f:(fun m ->
+      Provider_id.equal m.provider Gemini && String.equal m.id id)
+  with
+  | Some m -> { m with provider = Gemini_vertex; name; cost }
+  | None ->
+    m
+      Gemini_vertex
+      id
+      name
+      ~ctx:128000
+      ~max:8192
+      ~thinking:no_thinking
+      ~input:0.
+      ~output:0.
+      ~cache_read:0.
 ;;
 
 let key_provider key = Option.map (String.lsplit2 key ~on:'/') ~f:fst
@@ -1078,7 +1101,8 @@ let binds_thinking_to_prefix t =
       ]
       ~f:(fun family ->
         String.equal t.id family || String.is_prefix t.id ~prefix:(family ^ "-"))
-  | Openai | Openai_codex | Deepseek | Gemini | Custom _ -> false
+  | Openai | Openai_codex | Deepseek | Gemini | Gemini_vertex | Custom _ ->
+    false
 ;;
 
 let supports_thinking t = not (List.is_empty t.thinking_levels)

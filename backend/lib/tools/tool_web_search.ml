@@ -41,7 +41,7 @@ let supported (model : Model.t) =
       (List.exists openai_without_search ~f:(fun base ->
          String.equal model.id base
          || String.is_prefix model.id ~prefix:(base ^ "-")))
-  | Deepseek | Gemini | Custom _ -> false
+  | Deepseek | Gemini | Gemini_vertex | Custom _ -> false
 ;;
 
 let is_spec (spec : Tool_spec.t) = String.equal spec.name name

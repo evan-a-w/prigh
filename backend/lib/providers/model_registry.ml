@@ -22,6 +22,7 @@ end
 
 type t =
   { source : Source.t option
+  ; vertex_model : Model.t Or_error.t
   ; mutable providers : Custom_provider.t list
   ; mutable config_problems : string list
   ; listings : Listing.t String.Table.t
@@ -30,8 +31,11 @@ type t =
 
 let default_timeout = Time_ns.Span.of_int_sec 10
 
-let builtin () =
+let builtin ?getenv () =
   { source = None
+  ; vertex_model =
+      Or_error.map (Oauth_gemini.Config.of_env ?getenv ()) ~f:(fun c ->
+        Model.vertex (Oauth_gemini.Config.model c))
   ; providers = []
   ; config_problems = []
   ; listings = String.Table.create ()
@@ -61,8 +65,14 @@ let listed t name =
 
 let models t =
   Model.all
+  @ Option.to_list (Result.ok t.vertex_model)
   @ List.concat_map t.providers ~f:(fun p ->
     Custom_provider.models p ~listed:(listed t p.name))
+;;
+
+let default_for t = function
+  | Provider_id.Gemini_vertex -> Result.ok t.vertex_model
+  | provider -> Model.default_for provider
 ;;
 
 let custom_key t s =
@@ -82,6 +92,9 @@ let resolve t query =
   let query = String.strip query in
   match Model.resolve_in (models t) query with
   | Ok m -> Ok m
+  | Error _ when Option.equal String.equal (Model.key_provider query) (Some "google-vertex") ->
+    Or_error.bind t.vertex_model ~f:(fun m ->
+      Or_error.errorf "The configured Vertex model is %s; select that key" (Model.key m))
   | Error _ as error ->
     (match custom_key t query with
      | Some (p, id) when not (String.is_empty id) ->
@@ -391,7 +404,7 @@ let create
       ()
   =
   let t =
-    { (builtin ()) with
+    { (builtin ~getenv ()) with
       source = Some { env; sw; timeout; home; store; getenv; auto_fetch }
     }
   in
