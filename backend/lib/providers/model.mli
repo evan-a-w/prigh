@@ -69,8 +69,11 @@ val all : t list
 
 val default : t
 
-(** [None] for custom providers. *)
+(** [None] for providers whose models depend on the operator's config. *)
 val default_for : Provider_id.t -> t option
+
+(** The operator's configured Vertex publisher model. No local price estimate. *)
+val vertex : string -> t
 
 (** ["provider/id"]; the same id can exist under several providers. *)
 val key : t -> string

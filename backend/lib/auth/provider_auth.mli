@@ -64,6 +64,7 @@ val status
 
 val login
   :  env:Env.t
+  -> ?getenv:(string -> string option)
   -> Auth_store.t
   -> Provider_id.t
   -> Method.t

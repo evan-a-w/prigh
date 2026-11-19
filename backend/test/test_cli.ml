@@ -62,7 +62,7 @@ let%expect_test "flags: bad values name the flag and the fix" =
     -cwd /nonexistent: no such directory (mkdir -p it first)
     [exit 2]
     $ prigh models -provider anthropc
-    unknown provider anthropc; one of: anthropic, openai, openai-codex, deepseek (or custom, to add an OpenAI-compatible endpoint)
+    unknown provider anthropc; one of: anthropic, openai, openai-codex, deepseek, gemini, google-vertex (or custom, to add an OpenAI-compatible endpoint)
     [exit 2]
     $ prigh serve -listen 7777
     -listen must be HOST:PORT, got "7777"; did you mean 127.0.0.1:7777 (this machine only) or 0.0.0.0:7777 (all interfaces)?

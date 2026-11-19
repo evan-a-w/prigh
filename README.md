@@ -1928,6 +1928,7 @@ nix run .#backend -- login anthropic -method api_key
 nix run .#backend -- login openai-codex     # ChatGPT Plus/Pro (browser OAuth)
 nix run .#backend -- login openai           # OPENAI_API_KEY
 nix run .#backend -- login deepseek         # DEEPSEEK_API_KEY
+nix run .#backend -- login gemini           # Gemini Developer API key from Google AI Studio
 nix run .#backend -- login custom           # an OpenAI-compatible endpoint (below)
 nix run .#backend -- auth                   # status; logout <provider> to remove
 ```
@@ -1943,10 +1944,40 @@ protocol) and written back for the other side.
 
 The same is available inside the TUI as `/login [provider] [api_key|oauth]`,
 `/logout <provider>` and `/auth`. A stored credential wins; otherwise
-`ANTHROPIC_OAUTH_TOKEN`/`ANTHROPIC_API_KEY`, `OPENAI_API_KEY` and
-`DEEPSEEK_API_KEY` are used. OAuth tokens are refreshed automatically
+`ANTHROPIC_OAUTH_TOKEN`/`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`,
+`DEEPSEEK_API_KEY` and `GEMINI_API_KEY` (or `GOOGLE_API_KEY`) are used.
+OAuth tokens are refreshed automatically
 (under a cross-process lock) when they are within five minutes of expiry.
 Model ids can be qualified as `provider/id` (e.g. `openai-codex/gpt-6.1-sol`).
+
+For Gemini, get a key from [Google AI Studio](https://aistudio.google.com/apikey),
+run `/login gemini api_key` (or set an environment variable above), then
+select `/model gemini/gemini-4-hydrogen`. The built-in provider uses the
+Gemini Developer API, not Vertex AI. Its coding/chat catalogue, verified
+against [Google's model list](https://ai.google.dev/gemini-api/docs/models)
+on 19 November 2026, includes:
+
+- Gemini 4: `gemini-4-hydrogen` (prigh's Gemini default), `gemini-4-neon`,
+  `gemini-4-carbon`, `gemini-4-argon`.
+- Gemini 3 Flash: `gemini-3.8-flash`, `gemini-3.6-flash`,
+  `gemini-3.5-flash-lite`, `gemini-3.1-flash-lite`, `gemini-3-flash-preview`.
+- Gemini 3 Pro: `gemini-3.1-pro-preview` and Google's
+  [custom-tool variant](https://ai.google.dev/gemini-api/docs/models/gemini-3.1-pro-preview#gemini-31-pro-preview-customtools),
+  `gemini-3.1-pro-preview-customtools`.
+
+The list is not a probe of your key's quota or access. It excludes
+[legacy, restricted and redirected endpoints](https://ai.google.dev/gemini-api/docs/deprecations),
+along with specialised Live, media and embedding models. Thinking levels
+follow [Google's per-model table](https://ai.google.dev/gemini-api/docs/thinking).
+Cost estimates use [standard paid-tier prices](https://ai.google.dev/gemini-api/docs/pricing)
+as of the catalogue date, including promotional rates.
+
+For Google Cloud Vertex AI, sign in with `/login google-vertex` (a
+self-hosted deployment sets `PRIGH_GEMINI_OAUTH_CLIENT_ID`,
+`PRIGH_GEMINI_OAUTH_CLIENT_SECRET`, `PRIGH_GEMINI_OAUTH_PROJECT` and
+`PRIGH_GEMINI_OAUTH_VERTEX_MODEL`; see the deployment docs). Its model is
+listed under the `google-vertex` provider and bills through the configured
+Google Cloud project.
 
 ### Custom OpenAI-compatible providers
 
