@@ -19,7 +19,7 @@ let%expect_test
   [%expect
     {|
     (backend)
-    (Opus 5.5 Medium)
+    (Opus 5.5)
     <button type="button"
             title="Claude Opus 5.5, reasoning Medium: models, reasoning and access (Ctrl+L)"
             aria-label="Model: Claude Opus 5.5, Medium"
@@ -29,7 +29,6 @@ let%expect_test
             @on_click>
       <icon class="anthropic"> </icon>
       <span class="chip-label"> Opus 5.5 </span>
-      <span class="chip-level"> Medium </span>
     </button>
     |}];
   (* The menu's reasoning column: the current model's levels, the current
@@ -57,7 +56,7 @@ let%expect_test
     Close_dialog
     (Focus editor)
     (backend)
-    (Opus 5.5 Extra High)
+    (Opus 5.5)
     |}];
   H.reply h "set_thinking" "{}";
   H.event
@@ -72,12 +71,12 @@ let%expect_test
   [%expect
     {|
     (backend)
-    (Opus 5.5 High)
+    (Opus 5.5)
     Cycle_thinking
     (Expire_toast (id 0) (after_ms 2500))
     (Rpc (method_ set_thinking) (params ((thinking xhigh))) (tag Thinking_set))
     (backend)
-    (Opus 5.5 Extra High)
+    (Opus 5.5)
     |}]
 ;;
 
@@ -475,7 +474,7 @@ let%expect_test "with one host the chip still names it, and says how to add one"
   [%expect
     {|
     (container)
-    (Opus 5.5 Medium)
+    (Opus 5.5)
     (Open_chip Host)
     (Focus popover-filter)
     Place_popover
@@ -1190,7 +1189,6 @@ let%expect_test
             @on_click>
       <icon class="anthropic"> </icon>
       <span class="chip-label"> Opus 5.5 </span>
-      <span class="chip-level"> Medium </span>
     </button>
     <textarea id="editor"
               placeholder="Working in /work on main. Ask prigh anything…"

@@ -25,7 +25,7 @@ let%expect_test
     Branch main
     /compact to free context (Details)
     (backend)
-    (Opus 5.5 Medium)
+    (Opus 5.5)
     (Send (Enter))
     |}];
   H.show h ~selector:".send";

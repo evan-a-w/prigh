@@ -9,7 +9,7 @@ let%expect_test
   [%expect
     {|
     (backend)
-    (Opus 5.5 Medium)
+    (Opus 5.5)
     |}];
   H.act h (Run "/model");
   H.text h ~selector:".modal";
@@ -335,7 +335,7 @@ let%expect_test "aborting brings the queued prompts back into the editor" =
     Branch main
     (Compact) (Details)
     (laptop)
-    (Opus 5.5 Medium)
+    (Opus 5.5)
     (Stop (Esc))
     |}];
   H.type_ h "half-written";

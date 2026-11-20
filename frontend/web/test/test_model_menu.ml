@@ -34,13 +34,12 @@ let%expect_test "the model chip: the provider's mark, the short name, the level"
     {|
     <icon class="anthropic">
     <span class="chip-label">
-    <span class="chip-level">
-    (Opus 5.5 Medium)
+    (Opus 5.5)
     |}];
   (* The level dims beside the name; a pending one shows at once. *)
   H.quiet h (fun () -> H.act h (Set_thinking "high"));
   H.text h ~selector:".model-chip";
-  [%expect {| (Opus 5.5 High) |}]
+  [%expect {| (Opus 5.5) |}]
 ;;
 
 let menu h =

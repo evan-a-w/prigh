@@ -2290,7 +2290,6 @@ kbd {
 .composer-controls { flex: 0 1 auto; margin-left: auto; display: flex; align-items: center; gap: 2px; min-width: 0; }
 .composer-controls .model-chip { gap: 6px; font-weight: 400; }
 .model-chip .provider-mark { width: 14px; height: 14px; color: var(--muted); }
-.model-chip .chip-level { color: var(--faint); white-space: nowrap; flex-shrink: 0; }
 .provider-mark { stroke-width: 1.7; }
 
 /* The context ring, by the paperclip: a 30px ring in a 44px target, the accent filling it to

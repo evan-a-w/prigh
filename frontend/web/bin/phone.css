@@ -576,7 +576,6 @@
 @media (max-width: 359px) {
   .app.narrow .composer-box { padding-left: 4px; padding-right: 4px; }
   .app.narrow .composer .model-chip { padding-left: 6px; padding-right: 6px; }
-  .app.narrow .composer .model-chip .chip-level { display: none; }
   .session-choice { flex: 1 1 auto; min-width: var(--tap); padding: 0 2px; font-size: 13px; }
   /* The model keeps a target's width beside a long host chip. */
   .composer-controls .chip-anchor.model { min-width: 40px; }

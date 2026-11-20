@@ -154,22 +154,22 @@ let%expect_test "a model or thinking level chosen shows until confirmed" =
   [%expect
     {|
     (backend)
-    (Sonnet 5 Default)
+    (Sonnet 5)
     |}];
   H.elements h ~selector:".chip-button.awaiting";
   [%expect {| |}];
   (* A level the backend refuses: back to what it was, saying why. *)
   H.act h (Set_thinking "max");
-  H.text h ~selector:".model-chip .chip-level";
+  H.names h ~selector:".model-chip";
   H.fail h "set_thinking" "no such level";
   H.text h ~selector:".composer-controls";
   H.text h ~selector:".toast";
   [%expect
     {|
     (Rpc (method_ set_thinking) (params ((thinking max))) (tag Thinking_set))
-    Max
+    button "Model: Claude Sonnet 5, Max" -- Claude Sonnet 5, reasoning Max: models, reasoning and access (Ctrl+L)
     (backend)
-    (Sonnet 5 Default)
+    (Sonnet 5)
     No such level (Dismiss)
     |}]
 ;;

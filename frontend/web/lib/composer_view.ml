@@ -224,8 +224,8 @@ let images (m : App.Model.t) ~inject =
 let pending_chip = Session_chips_view.pending_chip
 let menu_attrs = Session_chips_view.menu_attrs
 
-(* The provider's mark, the model's short name ("6.2 Sol") and, dimmer,
-   how hard it reasons ("Low"); the tooltip and the menu have it whole. *)
+(* The provider's mark and the model's short name ("6.2 Sol"); the tooltip
+   and the menu have the reasoning level. *)
 let model_chip (m : App.Model.t) (state : State.t) ~inject =
   match m.pending.model with
   | Some key ->
@@ -253,9 +253,6 @@ let model_chip (m : App.Model.t) (state : State.t) ~inject =
       ~on_click:(inject (Action.Open_chip Model))
       [ Provider_mark.view state.model.provider
       ; span ~cls:"chip-label" (Model_menu.short_name state.model.name)
-      ; (match level with
-         | Some l -> span ~cls:"chip-level" l
-         | None -> Node.none)
       ]
 ;;
 

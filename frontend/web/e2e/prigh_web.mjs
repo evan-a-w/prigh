@@ -1058,14 +1058,14 @@ try {
   await page.waitForSelector("#chip-popover", { state: "detached" });
   console.log(`closed: ${await page.locator("#chip-popover").count() === 0}; focus: ${await page.evaluate(() => document.activeElement?.id)}`);
   // The model chip's menu has the reasoning levels beside the models: one
-  // picked, the chip says it (dimmer, after the name); Esc closes the menu.
+  // picked, the chip's tooltip says it; Esc closes the menu.
   await page.locator(".model-chip").click();
   await page.locator("#chip-popover .reasoning-row", { has: page.locator(".reasoning-label", { hasText: /^High$/ }) }).waitFor();
   await risen();
   await show("the model menu's reasoning", "#chip-popover .model-reasoning");
   console.log(await popoverPlace());
   await page.locator("#chip-popover .reasoning-row", { has: page.locator(".reasoning-label", { hasText: /^High$/ }) }).click();
-  await page.locator(".model-chip:not(.awaiting) .chip-level", { hasText: /^High$/ }).waitFor();
+  await page.locator(".model-chip:not(.awaiting)[title*='reasoning High']").waitFor();
   await page.keyboard.press("Escape");
   await page.waitForSelector("#chip-popover", { state: "detached" });
   console.log(`the chip: ${(await page.locator(".model-chip").innerText()).replace(/\s+/g, " ").trim()}; closed: ${await page.locator("#chip-popover").count() === 0}; focus: ${await page.evaluate(() => document.activeElement?.id)}`);

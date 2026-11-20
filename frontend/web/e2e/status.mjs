@@ -87,9 +87,9 @@ const shoot = async label => {
 
 const settle = () => page.waitForTimeout(250);
 const popoverGone = () => page.locator("#chip-popover").waitFor({ state: "detached", timeout: 5000 }).catch(() => {});
-// The model chip as it shows: its short name and its reasoning level.
+// The model chip as it shows: its short name.
 const modelChip = () => page.locator(".composer .model-chip").evaluate(b =>
-  [...b.querySelectorAll(".chip-label, .chip-level")].filter(e => getComputedStyle(e).display !== "none").map(e => e.textContent.trim()).join(" · "));
+  [...b.querySelectorAll(".chip-label")].filter(e => getComputedStyle(e).display !== "none").map(e => e.textContent.trim()).join(" · "));
 // The row's buttons left to right, and whether they are in the order wanted.
 // On a desktop the chips are apart from the ring (a phone's row is full).
 const rowOrder = ({ apart = false } = {}) => page.evaluate(apart => {
