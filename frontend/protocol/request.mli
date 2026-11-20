@@ -88,6 +88,7 @@ module Method : sig
     (** back to the session's home, or with [main] to its repository's main
         checkout; see {!Dir_change.Outcome} *)
     | Forge_status (** see {!Forge_account.list_of_json} *)
+    | Usage_limits (** {!Subscription_usage}: Claude's and ChatGPT's limits *)
     | Forge_login of
         { host : string
         ; kind : string option (** [github] or [forgejo]; [None]: guess *)
