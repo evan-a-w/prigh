@@ -1076,7 +1076,10 @@ try {
   console.log(await popoverPlace());
   await screenshot("the model chip's menu");
   await page.keyboard.type("v4.1 flash");
-  await page.waitForFunction(() => document.querySelectorAll("#chip-popover .model-row:not(.model-more)").length === 1);
+  // Searched: one row, naming its provider (with one provider signed in, the
+  // unfiltered menu may have one row too).
+  await page.waitForFunction(() => document.querySelectorAll("#chip-popover .model-row:not(.model-more)").length === 1
+    && document.querySelector("#chip-popover .model-row .model-provider"));
   await show("the model chip's menu, filtered", "#chip-popover .popover-items");
   // Esc closes it unchanged; Tab and Shift+Tab go along the chips (← →
   // along the model menu's providers).

@@ -812,7 +812,7 @@ centred: true
 controls: all in view
 === webkit: temporary: desktop: a chip's menu ===
 under the pointer on Off: the item (hovered: true)
-the chip: unchanged (Off chosen)
+the chip: changed (Off chosen)
 === webkit: temporary: desktop: Temporary on ===
 heading: Temporary session | Not saved and not listed. Deleted when you leave.
 listed: 0
@@ -853,7 +853,7 @@ composer at the foot: true
 controls: all in view
 === webkit: temporary: 390x844: a chip's menu ===
 under the pointer on Off: the item
-the chip: unchanged (Off chosen)
+the chip: changed (Off chosen)
 === webkit: temporary: 390x844: Temporary on ===
 heading: Temporary session | Not saved and not listed. Deleted when you leave.
 listed: 0
@@ -894,7 +894,7 @@ composer at the foot: true
 controls: all in view
 === webkit: temporary: 320x640: a chip's menu ===
 under the pointer on Off: the item
-the chip: unchanged (Off chosen)
+the chip: changed (Off chosen)
 === webkit: temporary: 320x640: Temporary on ===
 heading: Temporary session | Not saved and not listed. Deleted when you leave.
 listed: 0

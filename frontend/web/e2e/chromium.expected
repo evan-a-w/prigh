@@ -385,7 +385,7 @@ model's menu: over the composer, shifted inside the composer, inside the window;
 the chip: V4.1 Flash; closed: true; focus: editor
 model's menu: over the composer, shifted inside the composer, inside the window; focus in it: true
 === chromium: the model chip's menu, filtered ===
-DeepSeek V4.1 Flash
+DeepSeek V4.1 FlashDeepSeek
 Alt+1
 === chromium: the host chip's menu, from the model's with Shift+Tab ===
 /host
@@ -812,7 +812,7 @@ centred: true
 controls: all in view
 === chromium: temporary: desktop: a chip's menu ===
 under the pointer on Off: the item (hovered: true)
-the chip: unchanged (Off chosen)
+the chip: changed (Off chosen)
 === chromium: temporary: desktop: Temporary on ===
 heading: Temporary session | Not saved and not listed. Deleted when you leave.
 listed: 0
@@ -853,7 +853,7 @@ composer at the foot: true
 controls: all in view
 === chromium: temporary: 390x844: a chip's menu ===
 under the pointer on Off: the item
-the chip: unchanged (Off chosen)
+the chip: changed (Off chosen)
 === chromium: temporary: 390x844: Temporary on ===
 heading: Temporary session | Not saved and not listed. Deleted when you leave.
 listed: 0
@@ -894,7 +894,7 @@ composer at the foot: true
 controls: all in view
 === chromium: temporary: 320x640: a chip's menu ===
 under the pointer on Off: the item
-the chip: unchanged (Off chosen)
+the chip: changed (Off chosen)
 === chromium: temporary: 320x640: Temporary on ===
 heading: Temporary session | Not saved and not listed. Deleted when you leave.
 listed: 0
