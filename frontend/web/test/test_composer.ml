@@ -418,6 +418,7 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /todos show the model's plan (its update_plan steps)
     /permissions show the mode, the allow/ask/deny rules (config and this session) and the calls smart mode remembered, to forget (smart mode judges them again; the hosts they permitted ask again)
     /notify [on|off] tell you when a turn ends or something waits for you while the tab is hidden
+    /usage how much of your Claude and ChatGPT subscriptions' usage limits you have used, in Settings
     /memory [on|off] your notes the model saves when you ask it to remember something, in Settings; on or off gives the model the memory tool or takes it away
     /instructions [on|off] your custom instructions, in the context of every session, in Settings; on or off lets the model add, edit and remove them or not
     /user-info what you set about yourself for the model (name, country, units...), given to it in every session, in Settings

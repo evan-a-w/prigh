@@ -328,6 +328,7 @@ module Reply_tag : sig
     (** [nix_store_status]; [/nix-gc] opens Settings once it is in *)
     | Nix_collected (** [nix_store_gc] *)
     | Memory_loaded (** [get_memory] *)
+    | Usage_loaded (** [usage_limits] *)
     | Instructions_loaded (** [get_custom_instructions] *)
     | Instruction_saved
     (** [save_custom_instruction]: the draft closes, or says why not *)
@@ -626,6 +627,7 @@ module Action : sig
     (** Alt+N: pick a snippet to insert at this caret (else the last edit's) *)
     | Open_help
     | Open_settings (** the gear, Ctrl+, *)
+    | Usage_refresh (** Settings → Usage's Refresh *)
     | Settings_section of Settings_section.t
     | Settings_home
     (** a section of the settings page, from its list; opens the page there
@@ -1066,6 +1068,7 @@ module Model : sig
         goes down to its place *)
     ; forges : Forges.t (** the user's git hosts *)
     ; nix_gc : Nix_gc.t (** superusers': the Nix store *)
+    ; usage : Usage_page.t (** the settings page's Usage *)
     ; memory : Memory_notes.t (** the settings page's Memory *)
     ; instructions : Instruction_notes.t
     (** the settings page's Custom instructions *)

@@ -281,6 +281,7 @@ module Reply_tag = struct
     | Nix_status of { open_settings : bool }
     | Nix_collected
     | Memory_loaded
+    | Usage_loaded
     | Instructions_loaded
     | Instruction_saved
     | Instruction_removed
@@ -502,6 +503,7 @@ module Action = struct
     | Open_snippets of int option
     | Open_help
     | Open_settings
+    | Usage_refresh
     | Settings_section of Settings_section.t
     | Settings_home
     | Settings_move of Settings_section.Move.t
@@ -823,6 +825,7 @@ module Model = struct
     ; landing : bool
     ; forges : Forges.t
     ; nix_gc : Nix_gc.t
+    ; usage : Usage_page.t
     ; memory : Memory_notes.t
     ; instructions : Instruction_notes.t
     ; about_you : About_you.t
@@ -929,6 +932,7 @@ module Model = struct
         ; landing
         ; forges
         ; nix_gc
+        ; usage
         ; memory
         ; instructions
         ; about_you
@@ -1027,6 +1031,7 @@ module Model = struct
     && phys_equal landing b.landing
     && phys_equal forges b.forges
     && phys_equal nix_gc b.nix_gc
+    && phys_equal usage b.usage
     && phys_equal memory b.memory
     && phys_equal instructions b.instructions
     && phys_equal about_you b.about_you
@@ -1357,6 +1362,7 @@ let init =
   ; landing = false
   ; forges = Forges.empty
   ; nix_gc = Nix_gc.empty
+  ; usage = Usage_page.empty
   ; memory = Memory_notes.empty
   ; instructions = Instruction_notes.empty
   ; about_you = About_you.empty
@@ -2223,6 +2229,11 @@ let fetch_nix_status (m : Model.t) ~open_settings =
   , [ call Nix_store_status ~tag:(Nix_status { open_settings }) ] )
 ;;
 
+let fetch_usage (m : Model.t) =
+  ( { m with usage = Usage_page.loading m.usage }
+  , [ call Usage_limits ~tag:Usage_loaded ] )
+;;
+
 let fetch_memory (m : Model.t) =
   ( { m with memory = Memory_notes.loading m.memory }
   , [ call Get_memory ~tag:Memory_loaded ] )
@@ -2280,6 +2291,7 @@ let fetch_section (m : Model.t) : Settings_section.t -> _ = function
   | About_you -> fetch_about_you m
   | Mcp -> fetch_mcp m
   | Custom_instructions -> fetch_instructions m
+  | Usage -> fetch_usage m
   | Appearance
   | Sessions
   | New_sessions
@@ -5178,6 +5190,7 @@ let user_switched (m : Model.t) (hello : Hello_reply.t) =
     ; agents = { Agents.empty with open_ = m.agents.open_ }
     ; forges = Forges.empty
     ; nix_gc = { Nix_gc.empty with collecting = m.nix_gc.collecting }
+    ; usage = Usage_page.empty
     ; memory = Memory_notes.empty
     ; instructions = Instruction_notes.empty
     ; about_you = About_you.empty
@@ -6867,6 +6880,9 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
       m
       "/user-info takes no argument here: it opens Settings, About you, where \
        you fill in the form."
+  | "usage", "" -> open_settings ~section:Usage m
+  | "usage", _ ->
+    error m "/usage takes no argument: it opens Settings, Usage, with Refresh."
   | "memory", "" -> open_settings ~section:Memory m
   | "instructions", "" -> open_settings ~section:Custom_instructions m
   | "instructions", ("on" | "off") ->
@@ -9025,6 +9041,14 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
      | Nix_status { open_settings = true }, Error e ->
        error m (String.capitalize e)
      | _ -> m, [])
+  | Usage_loaded, result ->
+    let result =
+      Result.bind result ~f:(fun json ->
+        Result.map_error
+          (Subscription_usage.of_json json)
+          ~f:Error.to_string_hum)
+    in
+    { m with usage = Usage_page.loaded m.usage result }, []
   | Memory_loaded, result ->
     let result =
       Result.bind result ~f:(fun json ->
@@ -10709,6 +10733,7 @@ let setting_opener (m : Model.t) (setting : Control_setting.t) =
   | Instructions
   | Mcp
   | Git_hosts
+  | Usage
   | Nix_store
   | Account ->
     (match Control_setting.page setting with
@@ -11499,6 +11524,7 @@ let update_connected (m : Model.t) (action : Action.t) =
   | Open_snippets cursor -> open_snippets m ~cursor
   | Open_help -> open_dialog m Help
   | Open_settings -> open_settings m
+  | Usage_refresh -> fetch_usage m
   | Settings_section section ->
     (match m.dialog with
      | Some Settings ->
