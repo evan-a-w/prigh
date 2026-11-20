@@ -367,7 +367,7 @@ let%expect_test
     Model Claude Opus 5.5
     Branch main
     Click for the session’s details · /compact frees context
-    (Dictate (speak, then click again to stop)) (Send (Enter))
+    (Send (Enter))
     (/work work) (main) (Temporary)
     |}];
   H.quiet h (fun () -> H.act h (Set_draft ""));
@@ -399,7 +399,6 @@ let%expect_test "/diff, /review and /init are in the completions and /help" =
     {|
     Commands ↑↓ Tab Enter Esc   Ctrl+Enter as typed
     /diff [path] show the uncommitted changes where the tools run, untracked files too
-    /dictation [model MODEL|off] show which model transcribes dictation (speech to text); model MODEL|off: transcribe with MODEL, an OpenAI or OpenAI-compatible provider's (off: openai/gpt-4o-mini-transcribe)
     /default-dir [path|off] show or set the directory new sessions start in (on the default host), in Settings
     /mkdir [path] create a directory (and its parents) and change to it
     /downsize-images send the conversation's images smaller (after the model refused one as too large) and retry a failed reply
@@ -437,7 +436,6 @@ let%expect_test "/diff, /review and /init are in the completions and /help" =
     /sessions search the saved sessions
     /terminal [dir] open a shell where the tools run, in the session's directory (Ctrl+`), or a shell of its own in DIR (a worktree, say)
     /verbosity [quiet|normal|verbose] how much of tool calls and thinking the transcript shows
-    /dictation [model MODEL|off] show which model transcribes dictation (speech to text); model MODEL|off: transcribe with MODEL, an OpenAI or OpenAI-compatible provider's (off: openai/gpt-4o-mini-transcribe)
     /unarchive [session] unarchive a session (this one without an argument)
     /compaction [at|model|mask ...] show when conversations are compacted and what summarises them; at TOKENS|off: also once the context exceeds TOKENS, not only at 80% of the window; model MODEL|off: the model that writes the summaries (off: the session's); mask on|off: replace old tool outputs with placeholders first
     /permissions show the mode, the allow/ask/deny rules (config and this session) and the calls smart mode remembered, to forget (smart mode judges them again; the hosts they permitted ask again)

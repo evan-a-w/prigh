@@ -3,8 +3,7 @@
 // and their menus, on a desktop by mouse and keyboard and on phones by
 // touch, and the phone's drags. It prints, as stable lines:
 //
-// - desktop (1280 and 700 wide): the status shows and clears the mic and
-//   send; each of thinking, mode and transcript picked from its menu by the
+// - desktop (1280 and 700 wide): the status shows and clears send; each of thinking, mode and transcript picked from its menu by the
 //   mouse and by the keyboard (the chip says the choice); each menu (model,
 //   host, +, thinking, mode, transcript) closed by a click outside, which
 //   reaches nothing under it; the status's details on hover and on focus;
@@ -191,9 +190,8 @@ const desktop = async () => {
     await settle();
     section(`desktop ${w}: the status`);
     const status = await box(".composer-status");
-    const mic = await box(".composer .mic");
     const sendButton = await box(".composer .send");
-    say(`shows: ${!!status && status.width > 0}; clear of the mic and send: ${!overlaps(status, mic) && !overlaps(status, sendButton)}`);
+    say(`shows: ${!!status && status.width > 0}; clear of send: ${!overlaps(status, sendButton)}`);
     say(await rowFits());
     say(`it says: ${(await page.locator(".composer-status").innerText()).trim().split("\n")[0]}`);
     await shoot(`desktop-${w}`);
@@ -227,11 +225,14 @@ const desktop = async () => {
   await shoot("desktop-details");
   await page.mouse.move(640, 200);
   await settle();
-  // By the keyboard (focus that shows): back from the mic.
-  await page.locator(".composer .mic").focus();
+  // By the keyboard (focus that shows): back from send, which a draft
+  // enables.
+  await page.locator(".composer textarea").fill("x");
+  await page.locator(".composer .send:not(:disabled)").focus();
   await page.keyboard.press("Shift+Tab");
   await settle();
   say(`on keyboard focus (${await page.evaluate(() => document.activeElement?.getAttribute("aria-label")?.split(":")[0])}): ${await page.locator(".composer-status .status-details").isVisible()}`);
+  await page.locator(".composer textarea").fill("");
   await page.locator(".composer-status button.context").click();
   await page.locator(".modal").waitFor();
   say(`the context opens: ${(await page.locator(".modal h2").first().innerText()).trim()}`);

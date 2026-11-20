@@ -2886,7 +2886,7 @@ none
 === chromium: search: the sidebar's row and the composer's ===
 New session: wide, 34px high
 Search: narrow, 34px high
-composer: Add files or images, DeepSeek V4.1 Flash, server-laptop, Thinking, Auto, Context 0% full, Dictate, Send
+composer: Add files or images, DeepSeek V4.1 Flash, server-laptop, Thinking, Auto, Context 0% full, Send
 === chromium: search: Ctrl+K: the session's settings, recent sessions, commands ===
 focus in the filter: control-input
 -- This session --
@@ -3201,11 +3201,11 @@ build-runner-eu-west-a-long-hostname is offline: pick another host, or run prigh
 chips 1: V4.1 Flash | icon
 chip problems: none
 === chromium: status: desktop 1280: the status ===
-shows: true; clear of the mic and send: true
+shows: true; clear of send: true
 the row fits: true
 it says: 36%
 === chromium: status: desktop 700: the status ===
-shows: true; clear of the mic and send: true
+shows: true; clear of send: true
 the row fits: true
 it says: 36%
 === chromium: status: desktop: the chips' menus act ===
@@ -3225,7 +3225,7 @@ on keyboard focus (Context 36% full): true
 the context opens: Session
 === chromium: status: 390x844: the composer's row ===
 the row fits: true
-it shows: Add files or images, V4.1 Flash, <HOSTNAME>, Context 36% full: the session's details, Dictate, Send
+it shows: Add files or images, V4.1 Flash, <HOSTNAME>, Context 36% full: the session's details, Send
 === chromium: status: 390x844: the ⋯ sheet's choices act ===
 Thinking: high; reopened: high
 Mode: ask; reopened: ask
@@ -3247,7 +3247,7 @@ the viewer at fit, aside: 1 / 2 to 2 / 2
 down: closed: true
 === chromium: status: 320x640: the composer's row ===
 the row fits: true
-it shows: Add files or images, V4.1 Flash, <HOSTNAME>, Context 36% full: the session's details, Dictate, Send
+it shows: Add files or images, V4.1 Flash, <HOSTNAME>, Context 36% full: the session's details, Send
 === chromium: status: 320x640: the ⋯ sheet's choices act ===
 Thinking: high; reopened: high
 Mode: ask; reopened: ask

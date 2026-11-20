@@ -110,7 +110,7 @@ const choicesFit = page => page.evaluate(() => {
 });
 // Rows a phone keeps on screen with more in them than 44px targets leave
 // room for, whose targets are 40px: the composer's (+, the model, the host,
-// the status, the microphone, send).
+// the status, send).
 const dense = ".composer";
 const audit = page => page.evaluate(dense => {
   const out = [];

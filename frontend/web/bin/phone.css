@@ -405,8 +405,8 @@
 /* {1 The composer's row on a phone}
 
    + · the model (its name has the room) · the host's mark | the status's
-   ring and percent · the microphone · send. The thinking level, the mode
-   and the verbosity are in the ⋯ sheet's sections. */
+   ring and percent · send. The thinking level, the mode and the verbosity
+   are in the ⋯ sheet's sections. */
 .app.narrow .row-chips { display: none; }
 .app.narrow .composer-controls { flex: 1 1 auto; }
 .app.narrow .composer-status { margin-left: auto; }

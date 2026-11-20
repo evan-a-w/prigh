@@ -86,8 +86,6 @@ module Reply_tag : sig
     | Naming_saved of string (** like [Fallback_saved] *)
     | Auto_archive_shown (** [get_config] for [/auto-archive] *)
     | Auto_archive_saved of string (** like [Fallback_saved] *)
-    | Dictation_shown (** [get_config] for [/dictation] *)
-    | Dictation_saved of string (** like [Fallback_saved] *)
     | Default_host_shown (** [get_config] for [/default-host] *)
     | Default_host_saved of string (** like [Fallback_saved] *)
     | Default_budget_shown (** [get_config] for [/default-budget] *)

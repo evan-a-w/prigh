@@ -692,8 +692,7 @@ let%expect_test "without the docked sidebar, the chrome floats over the chat" =
 ;;
 
 let%expect_test
-    "the composer in two tiers: the box with + , the microphone and send; the \
-     chips under it"
+    "the composer in two tiers: the box with + and send; the chips under it"
   =
   let h = H.create () in
   H.elements h ~selector:".composer-stack > *";
@@ -715,7 +714,6 @@ let%expect_test
     button "backend" -- Tools run on the backend (/host switches)
     button "Thinking: provider's default" -- Thinking: provider's default: how much the model reasons before it answers (Alt+T cycles, /thinking)
     button "Auto: never asks" -- Tools run without asking (Alt+M cycles, /mode picks)
-    button "Dictate" -- Dictate (speak, then click again to stop)
     button "Send" -- Send (Enter)
     |}];
   (* The +: a menu of what can go with the message. *)
@@ -778,7 +776,6 @@ let%expect_test
     button "backend" -- Tools run on the backend (/host switches)
     button "Thinking: provider's default" -- Thinking: provider's default: how much the model reasons before it answers (Alt+T cycles, /thinking)
     button "Auto: never asks" -- Tools run without asking (Alt+M cycles, /mode picks)
-    button "Dictate" -- Dictate (speak, then click again to stop)
     button "Stop" -- Stop (Esc)
     button "Steer" -- Steer (Enter)
     |}];

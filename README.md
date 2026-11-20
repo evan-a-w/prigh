@@ -950,11 +950,11 @@ the mode's short name), each opening a small menu over itself (Alt+T and
 Alt+M cycle them; under a 600px column they are icons alone). The
 transcript's verbosity has no chip: Ctrl+O cycles it, and `/verbosity`, the
 control centre (Ctrl+K) and a phone's ⋯ sheet set it. At the row's right,
-before the microphone, the session's status: what the agent is doing while
+before send, the session's status: what the agent is doing while
 it works (`Thinking`, `Running tools`…; idle, nothing), how full the context
 is (a ring and the percent) and the cost, to the cent, or against the budget.
-On a phone the row keeps +, the model, the host's icon, the status, the
-microphone and send; the thinking level, mode, verbosity and usage are at
+On a phone the row keeps +, the model, the host's icon, the status and
+send; the thinking level, mode, verbosity and usage are at
 the top of the ⋯ sheet, as rows of choices.
 
 The status's details card opens on pointing at it or focusing it (the
@@ -1392,8 +1392,8 @@ Where it shows it (`PRIGH_DESKTOP_WINDOW`, `programs.prigh.desktop.window`):
   closed), Ctrl+H, Ctrl+J, Ctrl+U, settings and DevTools (F12; keep it with
   `PRIGH_DESKTOP_DEVTOOLS=1`) do nothing visible. Open in new window opens
   another app window on the page (the browser's popup, which has an address
-  bar, is closed). prigh's sites get the clipboard, notifications and the
-  microphone up front (no permission bubbles), and downloads go to your
+  bar, is closed). prigh's sites get the clipboard and notifications up
+  front (no permission bubbles), and downloads go to your
   downloads directory (`XDG_DOWNLOAD_DIR`, else `~/Downloads`) without a
   prompt. Before each launch the app merges its settings into the profile:
   the system's title bar rather than the browser's, no "Restore pages?"
@@ -1452,8 +1452,8 @@ the PATH it takes one launch to apply, or start the app with
 - **The webview** (`webview`, or `auto` without a browser): WKWebView
   (Safari's engine) on macOS, WebView2 (Edge's Chromium) on Windows,
   WebKitGTK on Linux (a library Nix provides, not your browser). Links to other sites open in
-  your browser; downloads go to the Downloads folder; prigh-web may use the
-  microphone (dictation), notifications and the clipboard without asking.
+  your browser; downloads go to the Downloads folder; prigh-web may use
+  notifications and the clipboard without asking.
 - **Like a browser**: Ctrl (⌘) with `+`/`=`, `-` and `0` zoom, as do
   Ctrl+scroll and a touchpad pinch; the zoom is remembered. F11 is
   fullscreen. Files dropped on the window reach the page (attachments,
@@ -2013,18 +2013,6 @@ list says (or add models it does not list); unlisted fields default to a
 - Ollama: `ollama serve`, then `/login custom` with name `ollama`, base URL
   `http://localhost:11434/v1`, chat completions and no key;
   `/model ollama/llama3.2`.
-- Free dictation with Groq: get a key at
-  [console.groq.com](https://console.groq.com) (free tier, no card;
-  rate-limited, about 20 requests a minute, 2,000 a day and 25 MB an
-  upload), then `/login custom` with name `groq`, base URL
-  `https://api.groq.com/openai/v1`, chat completions and the key, and
-  `/dictation model groq/whisper-large-v3-turbo` (or `groq/whisper-large-v3`,
-  slower and more accurate). Groq's chat models then show in `/model` too. A
-  self-hosted OpenAI-compatible Whisper server (such as
-  [speaches](https://github.com/speaches-ai/speaches)) works the same way,
-  with an empty key. Without a provider that can transcribe, prigh-web falls
-  back to the browser's own speech recognition (Chrome, Edge and Safari;
-  Chrome sends the audio to Google; Firefox has none).
 
 `api` is `chat` (default), `responses` or `anthropic`; `headers` are sent
 with every request; `cost` is in dollars per million tokens. A context
@@ -2644,11 +2632,6 @@ prigh-web's settings page, Models → Approvals),
 `naming_model` (the model that names sessions and subagents; default:
 the drafting model, else the session's; `/naming model` picks it, also on
 prigh-web's settings page),
-`dictation_model` (the speech-to-text model of the `transcribe` method,
-`provider/id` on OpenAI or an OpenAI-compatible custom provider; default
-`openai/gpt-4o-mini-transcribe`; `/dictation model` picks it, also on
-prigh-web's settings page; free with Groq, see "Free dictation with
-Groq" under custom providers),
 `mask_observations` (default `true`: replace old tool outputs with
 placeholders before summarising, see "Long runs" below),
 `computer_screenshots` and `computer_screenshots_max` (default 3 and 8:
@@ -2952,7 +2935,6 @@ it.
 | `/generate-model`, `/generate-model MODEL\|off` | show or set the drafting model, the one ✦ Generate drafts commit messages, pull requests and branch names with (`generate_model`; `off`: the session's); in the TUI `/generate-model ` completes `off` and the models, in prigh-web `/generate-model` alone opens a picker; also on prigh-web's settings page (Models → Drafting) |
 | `/approval-model`, `/approval-model MODEL\|off` | show or set the approval model, the one that judges tool calls in `smart` mode (`approval_model`; `off`: the session's); in the TUI `/approval-model ` completes `off` and the models, in prigh-web `/approval-model` alone opens a picker; also on prigh-web's settings page (Models → Approvals) |
 | `/naming`, `/naming model MODEL\|off` | show or set the model that names sessions and subagents (`naming_model`; `off`: the drafting model, else the session's); in the TUI `/naming model ` completes the models, in prigh-web `/naming model` alone opens a picker; also on prigh-web's settings page |
-| `/dictation`, `/dictation model MODEL\|off` | show or set the model that transcribes dictation (`dictation_model`: OpenAI's `gpt-4o-mini-transcribe`, `gpt-4o-transcribe`, `whisper-1`, or a custom OpenAI-compatible provider's model; `off`: `openai/gpt-4o-mini-transcribe`); the TUI completes them, prigh-web opens a picker that also takes a typed key; also on prigh-web's settings page |
 | `/commit [-a] [--amend] [-m MESSAGE \| --generate]` | commit what is staged in the session's worktree (`-a`: every change to tracked files first); `--generate` drafts the message with the model into the editor, see [Git hosting](#git-hosting) |
 | `/push` | push the worktree's branch to its upstream (set when it has none), with the tool host's git credentials |
 | `/diff [path]` | show the uncommitted changes where the tools run (`git diff` against `HEAD`, untracked files as new), optionally of one path |

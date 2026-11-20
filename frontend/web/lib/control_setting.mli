@@ -31,7 +31,6 @@ type t =
   | Approval_model
   | Naming_model
   | Summary_model
-  | Dictation_model
   | Compact_at
   | Mask
   | Memory

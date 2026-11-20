@@ -67,7 +67,7 @@ val gauge : ?cls:string -> App.Model.t -> State.t -> Node.t list -> Node.t
     usage limit, a Nix collection, transfers and the model's plan; each opens its command. *)
 val notes : App.Model.t -> inject:(App.Action.t -> unit Effect.t) -> Node.t
 
-(** The composer's status chip, at the right of its row by the microphone:
+(** The composer's status chip, at the right of its row by send:
     the activity's lamp (its word while the agent works), the context's ring
     and percent (a click opens the session's details, [/session]) and the
     cost, under the details' card while pointed at or focused. *)

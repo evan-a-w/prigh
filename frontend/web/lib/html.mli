@@ -90,7 +90,6 @@ module Icon : sig
     | Palette
     | Package
     | Book
-    | Mic
     | Image
     | Paperclip
     | Eraser

@@ -1122,12 +1122,12 @@ fn build_window(
             }
             true
         })
-        // Only prigh-web's own page asks: dictation needs the microphone,
-        // finished turns notify, paste reads the clipboard.
+        // Only prigh-web's own page asks: finished turns notify, paste reads
+        // the clipboard.
         .on_permission_request(move |webview, kind| {
             let ours = webview.url().ok().is_some_and(|u| perm_sidecar.is_ours(u.as_str()));
             match kind {
-                PermissionKind::Microphone | PermissionKind::Notifications | PermissionKind::ClipboardRead if ours => {
+                PermissionKind::Notifications | PermissionKind::ClipboardRead if ours => {
                     PermissionResponse::Allow
                 }
                 _ if ours => PermissionResponse::Default,

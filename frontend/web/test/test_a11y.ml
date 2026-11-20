@@ -42,7 +42,6 @@ let%expect_test "the names of the controls" =
     button "Thinking: provider's default" -- Thinking: provider's default: how much the model reasons before it answers (Alt+T cycles, /thinking)
     button "Auto: never asks" -- Tools run without asking (Alt+M cycles, /mode picks)
     button "Context 0% full: the session's details"
-    button "Dictate" -- Dictate (speak, then click again to stop)
     button "Send" -- Send (Enter)
     button "Folder: /work. Change it" -- Start in another folder (/cd)
     button "Branch: main. Change it" -- Work in another worktree (/worktree)
@@ -154,7 +153,6 @@ let%expect_test "the names in dialogs, pickers and the transcript" =
     button "Thinking: provider's default" -- Thinking: provider's default: how much the model reasons before it answers (Alt+T cycles, /thinking)
     button "Auto: never asks" -- Tools run without asking (Alt+M cycles, /mode picks)
     button "Context 0% full: the session's details"
-    button "Dictate" -- Dictate (speak, then click again to stop)
     button "Send" -- Send (Enter)
     textarea "Message" -- Working in /work on main. Ask prigh anything…
     [group] div "Model and host"
