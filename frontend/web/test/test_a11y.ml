@@ -41,7 +41,6 @@ let%expect_test "the names of the controls" =
     button "Details" -- The session's details (/session)
     button "backend" -- Tools run on the backend (/host switches)
     button "Model: Claude Opus 5.5, Medium" -- Claude Opus 5.5, reasoning Medium: models, reasoning and access (Ctrl+L)
-    button "Dictate" -- Dictate (speak, then click again to stop)
     button "Send" -- Send (Enter)
     button "Folder: /work. Change it" -- Start in another folder (/cd)
     button "Branch: main. Change it" -- Work in another worktree (/worktree)
@@ -150,7 +149,6 @@ let%expect_test "the names in dialogs, pickers and the transcript" =
     button "Details" -- The session's details (/session)
     button "backend" -- Tools run on the backend (/host switches)
     button "Model: Claude Opus 5.5, Medium" -- Claude Opus 5.5, reasoning Medium: models, reasoning and access (Ctrl+L)
-    button "Dictate" -- Dictate (speak, then click again to stop)
     button "Send" -- Send (Enter)
     textarea "Message" -- Working in /work on main. Ask prigh anything…
     [status] span "Ready"

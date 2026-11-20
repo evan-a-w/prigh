@@ -26,7 +26,7 @@ let%expect_test
     /compact to free context (Details)
     (backend)
     (Opus 5.5 Medium)
-    (Dictate (speak, then click again to stop)) (Send (Enter))
+    (Send (Enter))
     |}];
   H.show h ~selector:".send";
   [%expect
@@ -446,7 +446,6 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /rewind go back to an earlier message in this session
     /trim [after|undo] drop everything before a message from the model's context (the transcript keeps it folded); after: everything after a message instead (what you send later stays); undo brings back the last trim
     /tree show the session tree and move to any message in it
-    /cd [path] change the working directory (asks to create a missing one)
     |}];
   H.type_ h "/mod";
   H.key h "Tab";

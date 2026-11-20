@@ -336,7 +336,7 @@ let%expect_test "aborting brings the queued prompts back into the editor" =
     (Compact) (Details)
     (laptop)
     (Opus 5.5 Medium)
-    (Dictate (speak, then click again to stop)) (Stop (Esc))
+    (Stop (Esc))
     |}];
   H.type_ h "half-written";
   H.key h "Escape";

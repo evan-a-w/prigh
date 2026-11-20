@@ -366,7 +366,7 @@ let%expect_test
     /compact to free context (Details)
     (backend)
     (Opus 5.5 Medium)
-    (Dictate (speak, then click again to stop)) (Send (Enter))
+    (Send (Enter))
     (/work work) (main) (Temporary)
     |}];
   H.quiet h (fun () -> H.act h (Set_draft ""));

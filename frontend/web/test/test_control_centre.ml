@@ -655,7 +655,6 @@ let%expect_test
     button "Details" -- The session's details (/session)
     button "backend" -- Tools run on the backend (/host switches)
     button "Model: Claude Opus 5.5, Medium" -- Claude Opus 5.5, reasoning Medium: models, reasoning and access (Ctrl+L)
-    button "Dictate" -- Dictate (speak, then click again to stop)
     button "Send" -- Send (Enter)
     |}]
 ;;

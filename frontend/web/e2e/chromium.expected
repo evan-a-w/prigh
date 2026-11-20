@@ -396,7 +396,7 @@ Alt+1
 <CWD>/sub
 The only host: run prigh tool-host -connect SERVER on a machine, or a prigh TUI connected to this backend, to add one.
 Enter chooses, ← → the next setting, Esc closes
-host's menu: over the composer, at the chip's left edge, inside the window; focus in it: true
+host's menu: over the composer, shifted inside the composer, inside the window; focus in it: true
 === chromium: mode ask ===
 Context 0% full, $<COST>: details
 mode: Asks: edits & commands
@@ -2879,7 +2879,7 @@ none
 === chromium: search: the sidebar's row and the composer's ===
 New session: wide, 34px high
 Search: narrow, 34px high
-composer: Add files or images, Context 0% full, $0.00, server-laptop, Model, Dictate, Send
+composer: Add files or images, Context 0% full, $0.00, server-laptop, Model, Send
 === chromium: search: Ctrl+K: the session's settings, recent sessions, commands ===
 focus in the filter: control-input
 -- This session --
@@ -3194,15 +3194,15 @@ build-runner-eu-west-a-long-hostname is offline: pick another host, or run prigh
 chips 1: icon | V4.1 Flash
 chip problems: none
 === chromium: status: desktop 1280: the row ===
-the row: attach, ring, host, model, mic, send; in order: true; the chips at the right, apart from the ring: true
-the ring shows: true; clear of the mic and send: true
+the row: attach, ring, host, model, send; in order: true; the chips at the right, apart from the ring: true
+the ring shows: true; clear of send: true
 the row fits: true
 the model: V4.1 Flash · High; whole: true
 the ring says: Context 36% full, $0.03: details
 no glow around the focused composer: true
 === chromium: status: desktop 700: the row ===
-the row: attach, ring, host, model, mic, send; in order: true; the chips at the right, apart from the ring: true
-the ring shows: true; clear of the mic and send: true
+the row: attach, ring, host, model, send; in order: true; the chips at the right, apart from the ring: true
+the ring shows: true; clear of send: true
 the row fits: true
 the model: V4.1 Flash · High; whole: true
 the ring says: Context 36% full, $0.03: details
