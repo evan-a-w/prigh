@@ -500,6 +500,13 @@ module Action = struct
     | Filter_press of Filter_menu.Row.t option
     (** a row of the filter's menu (by click), or the one selected (Space) *)
     | Chip_step of int
+    | Model_menu_tab of Model_menu.Tab.t
+    | Model_menu_step of int (** the next provider along the rail (← →) *)
+    | Model_menu_more (** "Show more": the provider's older models *)
+    | Model_menu_access (** opens or closes the access menu in its foot *)
+    | Model_menu_nth of int (** Alt+1…9: the list's Nth model *)
+    | Toggle_favourite of string option
+    (** stars or unstars the model ([None]: the highlighted one) *)
     | Open_snippets of int option
     | Open_help
     | Open_settings
@@ -613,6 +620,9 @@ module Action = struct
     | Close_field_menu
     | Toggle_sidebar
     | Toggle_status_tray
+    | Toggle_context_card
+    (** the context ring's card: context, cost, compacting (tap; Esc
+        closes) *)
     | Answer_confirm of
         { call_id : string
         ; agent_id : string option
@@ -780,6 +790,7 @@ module Model = struct
     ; sidebar_open : bool
     ; review_drawer : bool
     ; status_tray : bool
+    ; context_card : bool (** tapped open: the context ring's card *)
     ; scrolled_up : bool
     ; session_hits : Session_hits.t option
     ; session_search : int
@@ -807,6 +818,10 @@ module Model = struct
     ; review : Code_review.t
     ; review_memory : Review_memory.t
     ; code_size : Code_size.t
+    ; model_menu : Model_menu.t
+      (** the model chip's menu: its tab, "Show more", the access menu *)
+    ; favourite_models : string list
+      (** starred in the model menu, oldest first (a preference) *)
     ; layout : Resize.t
     ; paging : Paging.t
     ; transcript_events : int
@@ -891,6 +906,7 @@ module Model = struct
         ; sidebar_open
         ; review_drawer
         ; status_tray
+        ; context_card
         ; scrolled_up
         ; session_hits
         ; session_search
@@ -918,6 +934,8 @@ module Model = struct
         ; review
         ; review_memory
         ; code_size
+        ; model_menu
+        ; favourite_models
         ; layout
         ; paging
         ; transcript_events
@@ -990,6 +1008,7 @@ module Model = struct
     && phys_equal sidebar_open b.sidebar_open
     && phys_equal review_drawer b.review_drawer
     && phys_equal status_tray b.status_tray
+    && phys_equal context_card b.context_card
     && phys_equal scrolled_up b.scrolled_up
     && phys_equal session_hits b.session_hits
     && phys_equal session_search b.session_search
@@ -1017,6 +1036,8 @@ module Model = struct
     && phys_equal review b.review
     && phys_equal review_memory b.review_memory
     && phys_equal code_size b.code_size
+    && phys_equal model_menu b.model_menu
+    && phys_equal favourite_models b.favourite_models
     && phys_equal layout b.layout
     && phys_equal paging b.paging
     && (transcript || phys_equal transcript_events b.transcript_events)
@@ -1320,6 +1341,7 @@ let init =
   ; update_ready = false
   ; sidebar_open = true
   ; status_tray = false
+  ; context_card = false
   ; review_drawer = false
   ; scrolled_up = false
   ; session_hits = None
@@ -1348,6 +1370,8 @@ let init =
   ; review = Code_review.empty
   ; review_memory = Review_memory.empty
   ; code_size = Code_size.default
+  ; model_menu = Model_menu.init
+  ; favourite_models = []
   ; layout = Resize.empty
   ; paging = Paging.all
   ; transcript_events = 0
@@ -2058,13 +2082,17 @@ let models_picker
   in
   let known = not (List.is_empty m.auth) in
   let usable (model : Llm.t) = (not known) || logged_in m model.provider in
+  let models =
+    List.filter m.models ~f:(fun (model : Llm.t) ->
+      (not model.legacy) || Option.equal String.equal current (Some model.key))
+  in
   let first (model : Llm.t) =
     List.findi m.models ~f:(fun _ (other : Llm.t) ->
       String.equal other.provider model.provider)
     |> Option.value_map ~default:0 ~f:fst
   in
   let models =
-    List.stable_sort m.models ~compare:(fun a b ->
+    List.stable_sort models ~compare:(fun a b ->
       match Bool.compare (usable b) (usable a) with
       | 0 -> Int.compare (first a) (first b)
       | c -> c)
@@ -3008,6 +3036,17 @@ let apply_pref (m : Model.t) ~startup ({ key; value } : Prefs.Change.t) =
           (Option.bind string ~f:Code_size.of_name)
           ~default:Code_size.default
     }
+  else if String.equal key Key.favourite_models
+  then (
+    let favourite_models =
+      match value with
+      | Some (`Array items) ->
+        List.filter_map items ~f:(function
+          | `String s -> Some s
+          | _ -> None)
+      | _ -> []
+    in
+    { m with favourite_models })
   else if String.equal key Key.terminal_open
   then
     if startup
@@ -3770,15 +3809,8 @@ let hosts_picker (m : Model.t) =
 
 let chip_kind : Chip.t -> Dialog.Picker_kind.t = function
   | Model -> Models
-  | Thinking -> Thinking
-  | Mode -> Modes
   | Host -> Hosts
   | Attach -> Attach
-;;
-
-let chip_opens_nothing (state : State.t) : Chip.t -> bool = function
-  | Thinking -> not state.model.supports_thinking
-  | Model | Mode | Host | Attach -> false
 ;;
 
 (* The composer's +: what can go with the message. *)
@@ -3798,12 +3830,109 @@ let attach_menu =
     ]
 ;;
 
-(* The chips that sit together, which ← → and Tab go along: the model, the
-   host, the thinking level and the mode in the composer's row; the +
-   stands alone. *)
+(* The chips that sit together, which Tab goes along: the host and the
+   model; the paperclip stands alone. *)
 let chip_row : Chip.t -> int = function
-  | Model | Host | Thinking | Mode -> 0
+  | Model | Host -> 0
   | Attach -> 1
+;;
+
+(* ---- the model chip's menu: a rail of providers, their models, the
+   reasoning levels and the access mode *)
+
+let more_id = "more:"
+
+(* The session's model, or the one it is switching to. *)
+let menu_model_key (m : Model.t) =
+  match m.pending.model with
+  | Some key -> Some key
+  | None -> Option.map m.state ~f:(fun (s : State.t) -> s.model.key)
+;;
+
+let offered_models (m : Model.t) =
+  Model_menu.offered m.models ~auth:m.auth ~current:(menu_model_key m)
+;;
+
+(* Unfiltered, the tab's rows (and "Show more"); filtered, every provider's
+   models on offer, best first. *)
+let model_menu_picker ?(query = "") (m : Model.t) =
+  let current = menu_model_key m in
+  let offered = offered_models m in
+  let item (model : Llm.t) =
+    Picker.Item.create
+      ~id:model.key
+      ~detail:model.provider
+      ~search:(model.name ^ " " ^ model.provider ^ " " ^ model.key)
+      ~marked:(Option.equal String.equal current (Some model.key))
+      model.name
+  in
+  if String.is_empty query
+  then (
+    let rows, more =
+      Model_menu.rows m.model_menu offered ~favourites:m.favourite_models
+    in
+    Picker.create
+      ~title:"Model"
+      (List.map rows ~f:item
+       @
+       if more > 0
+       then
+         [ Picker.Item.create
+             ~id:more_id
+             ~search:""
+             (sprintf "Show %d more" more)
+         ]
+       else []))
+  else
+    Picker.create
+      ~query
+      ~title:"Model"
+      (List.map (Model_menu.newest_first offered) ~f:item)
+;;
+
+let with_model_menu (m : Model.t) ?query model_menu =
+  match m.dialog with
+  | Some (Popover { chip = Model; picker }) ->
+    let m = { m with model_menu } in
+    let query = Option.value query ~default:(Picker.query picker) in
+    ( { m with
+        dialog =
+          Some (Popover { chip = Model; picker = model_menu_picker ~query m })
+      }
+    , [] )
+  | _ -> m, []
+;;
+
+let toggle_favourite (m : Model.t) key =
+  let favourite_models =
+    if List.mem m.favourite_models key ~equal:String.equal
+    then List.filter m.favourite_models ~f:(Fn.non (String.equal key))
+    else m.favourite_models @ [ key ]
+  in
+  let m = { m with favourite_models } in
+  let m, cmds = with_model_menu m m.model_menu in
+  ( m
+  , cmds
+    @ save_pref
+        m
+        Pref_sync.Key.favourite_models
+        (Some (`Array (List.map favourite_models ~f:(fun k -> `String k)))) )
+;;
+
+let model_menu_nth (m : Model.t) n =
+  match m.dialog with
+  | Some (Popover { chip = Model; picker }) ->
+    (match
+       List.filter (Picker.visible picker) ~f:(fun (i : Picker.Item.t) ->
+         not (String.equal i.id more_id))
+       |> Fn.flip List.nth (n - 1)
+     with
+     | Some item ->
+       let m, cmds = close_dialog m in
+       let m, set = set_model m item.id in
+       m, cmds @ set
+     | None -> m, [])
+  | _ -> m, []
 ;;
 
 (* A chip's menu, over it; the same chip again closes it. *)
@@ -3813,27 +3942,32 @@ let open_chip (m : Model.t) (chip : Chip.t) =
     close_dialog m
   | _ ->
     current_state m ~f:(fun state ->
-      if chip_opens_nothing state chip
-      then no_thinking m state
-      else (
-        let picker =
-          match chip with
-          | Model -> models_picker m
-          | Thinking -> thinking_levels_picker m
-          | Mode -> modes_picker state
-          | Host -> hosts_list m state
-          | Attach -> attach_menu
-        in
-        let m, cmds =
-          open_dialog
-            m
-            ~focus:
-              (match chip with
-               | Model | Host -> "popover-filter"
-               | Thinking | Mode | Attach -> "popover-list")
-            (Popover { chip; picker })
-        in
-        m, cmds @ [ Command.Place_popover ]))
+      let m =
+        match chip with
+        | Model ->
+          { m with
+            model_menu =
+              Model_menu.opening (offered_models m) ~current:(menu_model_key m)
+          ; context_card = false
+          }
+        | Host | Attach -> { m with context_card = false }
+      in
+      let picker =
+        match chip with
+        | Model -> model_menu_picker m
+        | Host -> hosts_list m state
+        | Attach -> attach_menu
+      in
+      let m, cmds =
+        open_dialog
+          m
+          ~focus:
+            (match chip with
+             | Model | Host -> "popover-filter"
+             | Attach -> "popover-list")
+          (Popover { chip; picker })
+      in
+      m, cmds @ [ Command.Place_popover ])
 ;;
 
 (* A choice made in the model's menu keeps the keyboard in it: Esc still
@@ -3850,12 +3984,9 @@ let hub_keeps_focus (before : Model.t) ((m : Model.t), cmds) =
 let step_chip (m : Model.t) delta =
   match m.dialog, m.state with
   | Some (Popover { chip = Attach; _ }), _ -> m, []
-  | Some (Popover { chip; _ }), Some state ->
+  | Some (Popover { chip; _ }), Some _ ->
     let row = chip_row chip in
-    open_chip
-      m
-      (Chip.step chip delta ~skip:(fun c ->
-         chip_opens_nothing state c || chip_row c <> row))
+    open_chip m (Chip.step chip delta ~skip:(fun c -> chip_row c <> row))
   | _ -> m, []
 ;;
 
@@ -10702,10 +10833,10 @@ let setting_opener (m : Model.t) (setting : Control_setting.t) =
   let model_picker f = with_config m ~f:(fun _ -> f m) in
   match setting with
   | Model -> open_chip m Model
-  | Thinking -> open_chip m Thinking
+  | Thinking -> open_thinking_picker m
   | Verbosity -> open_picker m (verbosity_picker m)
   | Host -> open_chip m Host
-  | Mode -> open_chip m Mode
+  | Mode -> mode_picker m
   | Context -> run_command m { name = "session"; rest = "" }
   | Default_model -> pick_default m Model
   | Default_thinking -> pick_default m Thinking
@@ -10748,6 +10879,10 @@ let setting_options (m : Model.t) setting =
     match opened.dialog with
     | Some (Picker { kind; picker }) ->
       Some { Dialog.Control_options.setting; kind; picker }
+    (* The model's menu is more than a list: the control centre lists them
+       all. *)
+    | Some (Popover { chip = Model; _ }) ->
+      Some { setting; kind = Models; picker = models_picker opened }
     | Some (Popover { chip; picker }) ->
       Some { setting; kind = chip_kind chip; picker }
     | _ -> None
@@ -11070,6 +11205,10 @@ let dialog_accept (m : Model.t) =
     (match Picker.selected_item picker with
      | Some item -> picker_accept m ~kind item
      | None -> m, [])
+  | Some (Popover { chip = Model; picker })
+    when Option.exists (Picker.selected_item picker) ~f:(fun i ->
+           String.equal i.id more_id) ->
+    with_model_menu m { m.model_menu with more = true }
   | Some (Popover { chip; picker }) ->
     (match Picker.selected_item picker with
      | Some item -> picker_accept m ~kind:(chip_kind chip) item
@@ -11521,6 +11660,33 @@ let update_connected (m : Model.t) (action : Action.t) =
   | Open_filter -> open_filter m
   | Filter_press row -> filter_press m row
   | Chip_step delta -> step_chip m delta
+  | Model_menu_tab tab ->
+    hub_keeps_focus
+      m
+      (with_model_menu m ~query:"" (Model_menu.set_tab m.model_menu tab))
+  | Model_menu_step delta ->
+    with_model_menu m (Model_menu.step m.model_menu (offered_models m) delta)
+  | Model_menu_more ->
+    hub_keeps_focus m (with_model_menu m { m.model_menu with more = true })
+  | Model_menu_access ->
+    ( { m with
+        model_menu =
+          { m.model_menu with access_open = not m.model_menu.access_open }
+      }
+    , [] )
+  | Model_menu_nth n -> model_menu_nth m n
+  | Toggle_favourite key ->
+    let key =
+      match key, m.dialog with
+      | Some key, _ -> Some key
+      | None, Some (Popover { chip = Model; picker }) ->
+        Option.map (Picker.selected_item picker) ~f:(fun i -> i.id)
+        |> Option.filter ~f:(Fn.non (String.equal more_id))
+      | None, _ -> None
+    in
+    (match key with
+     | Some key -> hub_keeps_focus m (toggle_favourite m key)
+     | None -> m, [])
   | Open_snippets cursor -> open_snippets m ~cursor
   | Open_help -> open_dialog m Help
   | Open_settings -> open_settings m
@@ -11656,7 +11822,11 @@ let update_connected (m : Model.t) (action : Action.t) =
      | None -> m, [])
   | Show_in_chat id -> show_in_chat m id
   | Clock now -> clock m now
-  | Picker_query query -> with_picker m ~f:(fun p -> Picker.set_query p query)
+  | Picker_query query ->
+    (match m.dialog with
+     | Some (Popover { chip = Model; _ }) ->
+       with_model_menu m ~query m.model_menu
+     | _ -> with_picker m ~f:(fun p -> Picker.set_query p query))
   | Picker_move delta -> with_picker m ~f:(fun p -> Picker.move p delta)
   | Picker_accept -> dialog_accept m
   | Picker_choose id ->
@@ -11687,6 +11857,8 @@ let update_connected (m : Model.t) (action : Action.t) =
      | Some (Rename _) -> { m with dialog = Some (Rename text) }, []
      | Some (Login flow) ->
        { m with dialog = Some (Login { flow with input = text }) }, []
+     | Some (Popover { chip = Model; _ }) ->
+       with_model_menu m ~query:text m.model_menu
      | Some (Picker _ | Popover _ | Scoped_models _) ->
        with_picker m ~f:(fun p -> Picker.set_query p text)
      | Some (Prompt prompt) -> prompt_input m (Prompt.set_input prompt text)
@@ -11731,6 +11903,8 @@ let update_connected (m : Model.t) (action : Action.t) =
        , [] )
      | Some Settings, _ when Option.is_some (Mcp_page.escape m.mcp) ->
        { m with mcp = Option.value_exn (Mcp_page.escape m.mcp) }, []
+     | Some (Popover { chip = Model; _ }), _ when m.model_menu.access_open ->
+       { m with model_menu = { m.model_menu with access_open = false } }, []
      | _ ->
        (match m.dialog with
         | Some (Login { failed = None; provider; _ }) ->
@@ -11838,6 +12012,7 @@ let update_connected (m : Model.t) (action : Action.t) =
     { m with review_drawer = not m.review_drawer }, []
   | Toggle_sidebar -> { m with sidebar_open = not m.sidebar_open }, []
   | Toggle_status_tray -> { m with status_tray = not m.status_tray }, []
+  | Toggle_context_card -> { m with context_card = not m.context_card }, []
   | Answer_confirm { call_id; agent_id; answer = Deny_with_reason } ->
     (match m.confirms with
      | first :: _

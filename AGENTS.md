@@ -140,14 +140,17 @@ The UX reference is pi (https://github.com/evan-a-w/pi). In every frontend:
 - Every error tells you what to do next (closest matches, the command to run).
 - State is always visible: the status line shows model, thinking, context,
   cost, user, queued messages, agents, and any mode the UI is in (prigh-web
-  has no header: the composer's row has the +, then the model, host,
-  thinking and mode chips, then the status (activity, context, cost) with
-  its details card and send; the verbosity has no chip (Ctrl+O, the
-  control centre); Ctrl+K and the sidebar's Search open the control
-  centre over sessions, settings and commands; on a phone the thinking, mode, verbosity and usage are at
-  the top of the ⋯ sheet, the top strip (under the safe area) has the
-  sidebar's ☰, the session's name and ⋯, and the user is at the foot of the
-  sidebar and on its settings page).
+  has no header: the composer's row has the paperclip and the context ring
+  (activity, context, cost: its card) at the left, then at the right the
+  host chip, the model chip (provider mark, short name, dim reasoning
+  level; its menu has the favourites and providers, the reasoning levels
+  and the access mode) and send; the verbosity has no chip (Ctrl+O,
+  the control centre); Ctrl+K and the sidebar's Search open the control
+  centre over sessions, settings and commands; on a phone the host chip is
+  its icon alone, the model's menu and the ring's card are sheets, the
+  verbosity and usage are at the top of the ⋯ sheet, the top strip (under
+  the safe area) has the sidebar's ☰, the session's name and ⋯, and the
+  user is at the foot of the sidebar and on its settings page).
 - Phones are first class (prigh-web is used as an installed PWA): one
   strip of chrome, never pieces floating over each other or the text; menus
   and the ⋯ are sheets from the bottom; settings fill the screen, a list of

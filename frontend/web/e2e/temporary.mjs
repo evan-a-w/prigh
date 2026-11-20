@@ -171,7 +171,7 @@ const screen = async (w, h, label) => {
   // The real pointer (not element.click()): a menu under its own backdrop
   // shows, and takes no hover or click.
   section(`${label}: a chip's menu`);
-  const chip = phone ? ".model-chip" : ".thinking-chip";
+  const chip = ".model-chip";
   const chipLabel = () => page.evaluate(sel => document.querySelector(sel).textContent.trim(), chip);
   const middle = sel => page.evaluate(sel => {
     const r = document.querySelector(sel).getBoundingClientRect();
@@ -187,22 +187,27 @@ const screen = async (w, h, label) => {
     await page.locator("#chip-popover").waitFor();
     await settled();
     const item = await page.evaluate(name => {
-      const list = document.querySelector("#chip-popover .popover-items").getBoundingClientRect();
-      const items = [...document.querySelectorAll("#chip-popover .popover-item")];
-      const named = i => i.querySelector(".menu-label").textContent.trim();
+      // A model, or else (one model signed in) a reasoning level.
+      const list = document.querySelector("#chip-popover").getBoundingClientRect();
+      const items = [...document.querySelectorAll("#chip-popover :is(.popover-item, .reasoning-row)")];
+      const named = i => i.querySelector(".menu-label, .reasoning-label").textContent.trim();
       const item = name ? items.find(i => named(i) === name)
-        : items.find(i => { const r = i.getBoundingClientRect(); return !i.matches(".marked") && r.top >= list.top && r.bottom <= list.bottom; });
+        : items.find(i => { const r = i.getBoundingClientRect(); return !i.matches(".marked, .on") && r.top >= list.top && r.bottom <= list.bottom; });
       item.scrollIntoView({ block: "nearest" });
       const r = item.getBoundingClientRect();
       const x = r.left + r.width / 2, y = r.top + r.height / 2;
-      const marked = items.find(i => i.classList.contains("marked"));
+      const marked = items.find(i => i.matches(".marked, .on"));
       return { name: named(item), marked: marked && named(marked), x, y,
-        under: document.elementFromPoint(x, y)?.closest(".popover-item") === item ? "the item"
-          : String(document.elementFromPoint(x, y)?.closest(".popover-item, .menu-backdrop")?.className) };
+        under: document.elementFromPoint(x, y)?.closest(".popover-item, .reasoning-row") === item ? "the item"
+          : String(document.elementFromPoint(x, y)?.closest(".popover-item, .reasoning-row, .menu-backdrop")?.className) };
     }, name);
     await page.mouse.move(item.x, item.y);
-    const hovered = await page.evaluate(({ x, y }) => !!document.elementFromPoint(x, y)?.closest(".popover-item:hover"), item);
+    const hovered = await page.evaluate(({ x, y }) => !!document.elementFromPoint(x, y)?.closest(":is(.popover-item, .reasoning-row):hover"), item);
     await page.mouse.click(item.x, item.y);
+    // A model closes the menu; a reasoning level leaves it open.
+    await page.waitForFunction(n => !document.querySelector("#chip-popover")
+      || [...document.querySelectorAll("#chip-popover .reasoning-row.on .reasoning-label")].some(e => e.textContent.trim() === n), item.name);
+    if (await page.locator("#chip-popover").count()) await page.keyboard.press("Escape");
     await page.waitForSelector("#chip-popover", { state: "detached" });
     // Until the backend has switched, the chip is disabled (it takes no
     // click).

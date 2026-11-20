@@ -642,8 +642,8 @@ let%expect_test "each setting has an entry" =
 ;;
 
 let%expect_test
-    "the composer's row: the model, host, thinking and mode chips, no \
-     verbosity, no divider"
+    "the composer's row: attach and the ring, then the host and model chips, \
+     no verbosity, no divider"
   =
   let h = H.create ~sessions () in
   H.names ~selector:".composer-row button" h;
@@ -651,13 +651,11 @@ let%expect_test
   [%expect
     {|
     button "Add files or images" -- Add files or images (or paste, or drop them here)
-    button "Claude Opus 5.5" -- Claude Opus 5.5: switch model (Ctrl+L)
+    button "Context 0% full, $0.00: details"
+    button "Details" -- The session's details (/session)
     button "backend" -- Tools run on the backend (/host switches)
-    button "Thinking: provider's default" -- Thinking: provider's default: how much the model reasons before it answers (Alt+T cycles, /thinking)
-    button "Auto: never asks" -- Tools run without asking (Alt+M cycles, /mode picks)
-    button "Context 0% full: the session's details"
+    button "Model: Claude Opus 5.5, Medium" -- Claude Opus 5.5, reasoning Medium: models, reasoning and access (Ctrl+L)
+    button "Dictate" -- Dictate (speak, then click again to stop)
     button "Send" -- Send (Enter)
-    <div class="chip-anchor thinking">
-    <div class="chip-anchor mode">
     |}]
 ;;

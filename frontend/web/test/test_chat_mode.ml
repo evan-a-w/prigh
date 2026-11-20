@@ -32,8 +32,11 @@ let state ?(mode = "auto") ?(plan_mode = false) ?(chat_mode = false) ?no_host ()
 
 let placeholder h = H.show h ~selector:"#editor"
 
+(* The mode, as the context card names it (the pending one at once). *)
+let mode_line h = H.text h ~selector:".context-card .mode-line"
+
 let chrome h =
-  H.show h ~selector:".mode-chip";
+  mode_line h;
   H.text h ~selector:".host-chip";
   placeholder h
 ;;
@@ -43,16 +46,7 @@ let%expect_test "in chat mode: the chip, the host chip and the placeholder" =
   chrome h;
   [%expect
     {|
-    <button type="button"
-            title="A chat without the tool host: no files, commands or project, only the web and other host-free tools, until you leave it (/chat off or Alt+M) (Alt+M cycles, /mode picks)"
-            aria-label="Chat: no tool host"
-            aria-haspopup="dialog"
-            aria-expanded="false"
-            class="btn chat-mode chip-button mode-chip"
-            @on_click>
-      <icon class="message"> </icon>
-      <span class="chip-label"> chat </span>
-    </button>
+    Mode Chat: no tool host
     (no host)
     <textarea id="editor"
               placeholder="Chat, without a tool host: no files or commands. Ask anything…"
@@ -65,21 +59,14 @@ let%expect_test "in chat mode: the chip, the host chip and the placeholder" =
               #value=""
               @on_input> </textarea>
     |}];
-  H.click h ~selector:".mode-chip";
-  H.text h ~selector:"#chip-popover";
+  H.quiet h (fun () -> H.click h ~selector:".model-chip");
+  H.click h ~selector:".model-access-button";
+  H.text h ~selector:".model-access-menu";
   [%expect
     {|
-    (Open_chip Mode)
-    (Focus popover-list)
-    Place_popover
-    When tools ask first Alt+M cycles
-    Asks: edits & commands bash, job_input, edits and MCP tools ask first
-    Asks: commands file edits run; bash, job_input and MCP tools ask first
-    Smart: a model decides edits in the project run; the approval model lets other calls run or asks you, saying why (/approval-model)
-    Auto: never asks tools run without asking
-    Plan mode read-only planning, until you leave it (/plan off or Alt+M): no file edits; bash, job_input and MCP tools ask first
-    ✓ Chat: no tool host a chat without the tool host: no files, commands or project, only the web and other host-free tools, until you leave it (/chat off or Alt+M)
-    Enter chooses, ← → the next setting, Esc closes
+    (Open_chip Model)
+    Model_menu_access
+    (Ask first Asks: edits & commands) (Auto-edit Asks: commands) (Smart Smart: a model decides) (Full access Auto: never asks) (Plan Plan mode) (Chat Chat: no tool host ✓)
     |}];
   H.key h "Escape" ~target:Field;
   H.quiet h (fun () -> H.act h (Set_narrow true));
@@ -87,7 +74,6 @@ let%expect_test "in chat mode: the chip, the host chip and the placeholder" =
   [%expect
     {|
     Close_dialog
-    (Focus editor)
     <textarea id="editor"
               placeholder="Chat: no files or commands…"
               aria-label="Message"
@@ -104,10 +90,10 @@ let%expect_test "in chat mode: the chip, the host chip and the placeholder" =
 let%expect_test "/chat toggles; leaving returns to the mode before; Alt+M" =
   let h = H.create ~state:(state ~mode:"auto-edit" ()) () in
   run h "/chat";
-  H.text h ~selector:".mode-chip";
+  mode_line h;
   H.reply h "set_mode" (state ~mode:"auto-edit" ~chat_mode:true ());
   run h "/chat";
-  H.text h ~selector:".mode-chip";
+  mode_line h;
   H.reply h "set_mode" (state ~mode:"auto-edit" ());
   run h "/chat maybe";
   toasts h;
@@ -120,7 +106,7 @@ let%expect_test "/chat toggles; leaving returns to the mode before; Alt+M" =
      (tag
       (Mode_set
        "Mode: chat (a chat without the tool host: no files, commands or project, only the web and other host-free tools, until you leave it (/chat off or Alt+M))")))
-    (chat)
+    Mode Chat: no tool host
     (Expire_toast (id 0) (after_ms 6000))
     (Rpc (method_ push_pref) (params ((key history) (value /chat) (max 500)))
      (tag Ignore))
@@ -129,7 +115,7 @@ let%expect_test "/chat toggles; leaving returns to the mode before; Alt+M" =
      (tag
       (Mode_set
        "Mode: auto-edit (file edits run; bash, job_input and MCP tools ask first)")))
-    (auto-edit)
+    Mode Asks: commands
     (Expire_toast (id 1) (after_ms 4420))
     (Rpc (method_ push_pref)
      (params ((key history) (value "/chat maybe") (max 500))) (tag Ignore))
@@ -141,7 +127,7 @@ let%expect_test "/chat toggles; leaving returns to the mode before; Alt+M" =
   H.key h "m" ~alt:true;
   H.reply h "set_mode" (state ~mode:"auto" ~plan_mode:true ());
   H.key h "m" ~alt:true;
-  H.text h ~selector:".mode-chip";
+  mode_line h;
   [%expect
     {|
     Cycle_mode
@@ -157,7 +143,7 @@ let%expect_test "/chat toggles; leaving returns to the mode before; Alt+M" =
      (tag
       (Mode_set
        "Mode: chat (a chat without the tool host: no files, commands or project, only the web and other host-free tools, until you leave it (/chat off or Alt+M))")))
-    (chat)
+    Mode Chat: no tool host
     |}]
 ;;
 

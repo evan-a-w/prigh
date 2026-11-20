@@ -13,6 +13,7 @@ module Key = struct
   let worktree_hours = "web.sidebar-worktree-hours"
   let review = "web.review"
   let code_size = "web.code-size"
+  let favourite_models = "favourite-models"
   let history = "history"
   let migrated = "web.migrated"
 
@@ -28,6 +29,7 @@ module Key = struct
     ; worktree_hours
     ; review
     ; code_size
+    ; favourite_models
     ; history
     ; migrated
     ]

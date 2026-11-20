@@ -8,8 +8,8 @@ let%expect_test
   H.text h ~selector:".composer-controls";
   [%expect
     {|
-    (Claude Opus 5.5)
     (backend)
+    (Opus 5.5 Medium)
     |}];
   H.act h (Run "/model");
   H.text h ~selector:".modal";
@@ -170,8 +170,8 @@ let%expect_test "thinking: a picker and /thinking, when the model supports it" =
   H.text h ~selector:".composer-controls";
   [%expect
     {|
-    (DeepSeek Chat)
     (backend)
+    (DeepSeek Chat)
     |}];
   H.type_ h "/thinking high";
   H.act h Send;
@@ -214,20 +214,20 @@ let%expect_test
      user"
   =
   let h = H.create () in
-  H.text h ~selector:".composer-status";
+  H.text h ~selector:".context-card";
   H.text h ~selector:".status-notes";
   [%expect
     {|
-    Ready (0%) $0.00
+    Context 0 / 200k
+    0% used · compacts at 160k (80%)
+    This session $0.00
+    Tokens 0 in · 0 out
     Status Ready
-    Context 0 / 200k · 0%
-    Tokens 0 in · 0 out · 0 cached
-    Cost $0.0000
-    Thinking provider's default
+    Reasoning Medium
     Mode Auto: never asks
     Model Claude Opus 5.5
     Branch main
-    Click for the session’s details · /compact frees context
+    /compact to free context (Details)
     |}];
   H.act
     h
@@ -242,7 +242,7 @@ let%expect_test
   H.event
     h
     {|{"event":"queue_update","steer":1,"follow_up":2,"steer_texts":["a"],"follow_up_texts":["b","c"]}|};
-  H.text h ~selector:".composer-status";
+  H.text h ~selector:".context-card";
   H.text h ~selector:".status-notes";
   H.text h ~selector:".card-where";
   [%expect
@@ -253,34 +253,20 @@ let%expect_test
      (tag (Worktrees (place  "s1\
                             \nc7\
                             \n/work") (purpose (Sidebar 2)))))
-    Working (75%) $1.23
+    Context 150k / 200k
+    75% used · compacts at 160k (80%)
+    This session $1.23
+    Cache hits 81%
+    Tokens 123k in · 7.9k out
     Status Working
-    Context 150k / 200k · 75%
-    Tokens 123k in · 7.9k out · 100k cached
-    Cost $1.2345
-    Thinking provider's default
+    Reasoning Medium
     Mode Auto: never asks
     Model Claude Opus 5.5
     Branch main
-    Click for the session’s details · /compact frees context
+    (Compact) (Details)
     |}];
   H.show h ~selector:".context";
-  [%expect
-    {|
-    <button type="button"
-            aria-label="Context 75% full: the session's details"
-            aria-describedby="status-details"
-            aria-haspopup="dialog"
-            class="context link status-item"
-            @on_click>
-      <span class="mini ring warm" custom-css-vars=((--pct 75.0))> </span>
-      <span class="percent"> 75% </span>
-    </button>
-    <div class="context status-detail warm">
-      <span class="status-detail-key"> Context </span>
-      <span class="status-detail-value"> 150k / 200k · 75% </span>
-    </div>
-    |}];
+  [%expect {| |}];
   (* The queued messages come back into the editor, last first. *)
   H.type_ h "draft";
   H.act h Dequeue;
@@ -326,7 +312,7 @@ let%expect_test
 let%expect_test "aborting brings the queued prompts back into the editor" =
   let h = H.create () in
   H.event h (sprintf {|{"event":"state","state":%s}|} busy_state);
-  H.text h ~selector:".composer-buttons";
+  H.text h ~selector:".composer-row";
   [%expect
     {|
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
@@ -335,17 +321,22 @@ let%expect_test "aborting brings the queued prompts back into the editor" =
      (tag (Worktrees (place  "s1\
                             \nc7\
                             \n/work") (purpose (Sidebar 2)))))
-    Working (75%) $1.23
+    (Add files or images (or paste, or drop them here))
+    () Working
+    Context 150k / 200k
+    75% used · compacts at 160k (80%)
+    This session $1.23
+    Cache hits 81%
+    Tokens 123k in · 7.9k out
     Status Working
-    Context 150k / 200k · 75%
-    Tokens 123k in · 7.9k out · 100k cached
-    Cost $1.2345
-    Thinking provider's default
+    Reasoning Medium
     Mode Auto: never asks
     Model Claude Opus 5.5
     Branch main
-    Click for the session’s details · /compact frees context
-    (Stop (Esc))
+    (Compact) (Details)
+    (laptop)
+    (Opus 5.5 Medium)
+    (Dictate (speak, then click again to stop)) (Stop (Esc))
     |}];
   H.type_ h "half-written";
   H.key h "Escape";

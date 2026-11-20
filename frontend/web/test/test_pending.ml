@@ -6,7 +6,7 @@ module H = Harness
 let%expect_test "connecting: the chat, the composer and the status say so" =
   let h = H.connecting () in
   H.text h ~selector:".chat";
-  H.text h ~selector:".composer-status";
+  H.text h ~selector:".context-card .status-line";
   H.show h ~selector:"button.send";
   [%expect
     {|
@@ -37,7 +37,6 @@ let%expect_test "connecting: the chat, the composer and the status say so" =
     {|
     Scroll_to_bottom
     What are we building?
-    Ready
     <footer class="composer">
     |}]
 ;;
@@ -45,7 +44,7 @@ let%expect_test "connecting: the chat, the composer and the status say so" =
 let%expect_test "reconnecting: the composer is marked and does not send" =
   let h = H.create () in
   H.act h Backend_closed;
-  H.text h ~selector:".composer-status";
+  H.text h ~selector:".context-card .status-line";
   H.elements h ~selector:".composer";
   H.type_ h "still here";
   H.act h Send;
@@ -54,16 +53,7 @@ let%expect_test "reconnecting: the composer is marked and does not send" =
   [%expect
     {|
     (Reconnect (generation 1) (delay_ms 0) (session (s1)))
-    Reconnecting… (0%) $0.00
     Status Reconnecting…
-    Context 0 / 200k · 0%
-    Tokens 0 in · 0 out · 0 cached
-    Cost $0.0000
-    Thinking provider's default
-    Mode Auto: never asks
-    Model Claude Opus 5.5
-    Branch main
-    Click for the session’s details · /compact frees context
     <footer class="composer offline">
     Not connected to the backend: your message stays here until it is back (/retry-backend-connection tries now). (Dismiss)
     [still here]
@@ -95,7 +85,6 @@ let%expect_test "a prompt shows at once, until the transcript has it" =
             @on_click>
       <span aria-hidden="true" class="lamp"> </span>
     </button>
-    Sending…
     |}];
   H.elements h ~selector:".msg.user";
   [%expect {| <div class="msg sending user"> |}];
@@ -139,13 +128,13 @@ let%expect_test "a model or thinking level chosen shows until confirmed" =
     (Rpc (method_ set_model) (params ((model anthropic/claude-sonnet-5)))
      (tag Model_set))
     <button type="button"
-            title="Switching to Claude Sonnet 5…"
+            title="Switching to Sonnet 5…"
             disabled=""
             aria-busy="true"
             class="awaiting btn chip-button model-chip"
             @on_click>
       <span aria-hidden="true" class="lamp"> </span>
-      <span class="chip-label"> Claude Sonnet 5 </span>
+      <span class="chip-label"> Sonnet 5 </span>
     </button>
     |}];
   let sonnet =
@@ -164,23 +153,23 @@ let%expect_test "a model or thinking level chosen shows until confirmed" =
   H.text h ~selector:".composer-controls";
   [%expect
     {|
-    (Claude Sonnet 5)
     (backend)
+    (Sonnet 5 Default)
     |}];
   H.elements h ~selector:".chip-button.awaiting";
   [%expect {| |}];
   (* A level the backend refuses: back to what it was, saying why. *)
   H.act h (Set_thinking "max");
-  H.text h ~selector:".thinking-chip";
+  H.text h ~selector:".model-chip .chip-level";
   H.fail h "set_thinking" "no such level";
   H.text h ~selector:".composer-controls";
   H.text h ~selector:".toast";
   [%expect
     {|
     (Rpc (method_ set_thinking) (params ((thinking max))) (tag Thinking_set))
-    (max)
-    (Claude Sonnet 5)
+    Max
     (backend)
+    (Sonnet 5 Default)
     No such level (Dismiss)
     |}]
 ;;

@@ -13,21 +13,20 @@ let%expect_test
     []
     Working in /work on main . Working in /work on main . Ask prigh anything…
     (Add files or images (or paste, or drop them here))
-    (Claude Opus 5.5)
-    (backend)
-    (provider's default)
-    (auto)
-    Ready (0%) $0.00
+    () Ready
+    Context 0 / 200k
+    0% used · compacts at 160k (80%)
+    This session $0.00
+    Tokens 0 in · 0 out
     Status Ready
-    Context 0 / 200k · 0%
-    Tokens 0 in · 0 out · 0 cached
-    Cost $0.0000
-    Thinking provider's default
+    Reasoning Medium
     Mode Auto: never asks
     Model Claude Opus 5.5
     Branch main
-    Click for the session’s details · /compact frees context
-    (Send (Enter))
+    /compact to free context (Details)
+    (backend)
+    (Opus 5.5 Medium)
+    (Dictate (speak, then click again to stop)) (Send (Enter))
     |}];
   H.show h ~selector:".send";
   [%expect

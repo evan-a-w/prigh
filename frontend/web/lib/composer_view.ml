@@ -224,22 +224,8 @@ let images (m : App.Model.t) ~inject =
 let pending_chip = Session_chips_view.pending_chip
 let menu_attrs = Session_chips_view.menu_attrs
 
-(* Short of room (a phone, a narrow composer), a model's name goes
-   without its first word (the family: "DeepSeek", "Claude"), rather than
-   cut short: "V4.1 Flash", "Opus 4.5". Only in names of three words or
-   more, so that what is left still says which; the tooltip and the menu
-   have it whole. The style sheet hides the family. *)
-let model_label name =
-  let label = Node.span ~attrs:[ Attr.class_ "chip-label" ] in
-  match String.split name ~on:' ' with
-  | family :: (_ :: _ :: _ as rest) ->
-    label
-      [ span ~cls:"model-family" (family ^ " ")
-      ; Node.text (String.concat ~sep:" " rest)
-      ]
-  | _ -> label [ Node.text name ]
-;;
-
+(* The provider's mark, the model's short name ("6.2 Sol") and, dimmer,
+   how hard it reasons ("Low"); the tooltip and the menu have it whole. *)
 let model_chip (m : App.Model.t) (state : State.t) ~inject =
   match m.pending.model with
   | Some key ->
@@ -247,14 +233,30 @@ let model_chip (m : App.Model.t) (state : State.t) ~inject =
       List.find m.models ~f:(fun model -> String.equal model.key key)
       |> Option.value_map ~default:key ~f:(fun model -> model.name)
     in
-    pending_chip ~cls:"model-chip" name
+    pending_chip ~cls:"model-chip" (Model_menu.short_name name)
   | None ->
+    let thinking = Option.value m.pending.thinking ~default:state.thinking in
+    let level = Reasoning.chip_label state.model ~current:thinking in
     button
       ~cls:"chip-button model-chip"
-      ~title:(sprintf "%s: switch model (Ctrl+L)" state.model.name)
+      ~title:
+        (sprintf
+           "%s%s: models, reasoning and access (Ctrl+L)"
+           state.model.name
+           (Option.value_map level ~default:"" ~f:(fun l -> ", reasoning " ^ l)))
+      ~label:
+        (sprintf
+           "Model: %s%s"
+           state.model.name
+           (Option.value_map level ~default:"" ~f:(fun l -> ", " ^ l)))
       ~attrs:(menu_attrs m Model)
       ~on_click:(inject (Action.Open_chip Model))
-      [ model_label state.model.name; icon ~cls:"chevron" Chevron ]
+      [ Provider_mark.view state.model.provider
+      ; span ~cls:"chip-label" (Model_menu.short_name state.model.name)
+      ; (match level with
+         | Some l -> span ~cls:"chip-level" l
+         | None -> Node.none)
+      ]
 ;;
 
 (* Where tools run, always named, also while that host is disconnected (its
@@ -303,9 +305,9 @@ let host_chip (m : App.Model.t) (state : State.t) ~inject =
     (content @ [ icon ~cls:"chevron" Chevron ])
 ;;
 
-(* What the message goes to, in the row under the text beside the +, each
-   chip opening its menu over itself (the command's choices). The thinking
-   level, the mode and the verbosity follow ({!Session_chips_view}). *)
+(* Where tools run and the model, at the right of the row under the text,
+   each opening its menu over itself; the model's has the reasoning level
+   and the mode too. *)
 let chips (m : App.Model.t) ~inject =
   match m.state with
   | None -> Node.none
@@ -316,14 +318,14 @@ let chips (m : App.Model.t) ~inject =
             [ "composer-controls" ]
             [ "menu-open", Session_chips_view.menu_open m [ Model; Host ] ]
         ; Attr.role "group"
-        ; Attr.create "aria-label" "Model and host"
+        ; Attr.create "aria-label" "Host and model"
         ]
-      [ Session_chips_view.anchor m Model (model_chip m state ~inject) ~inject
-      ; Session_chips_view.anchor m Host (host_chip m state ~inject) ~inject
+      [ Session_chips_view.anchor m Host (host_chip m state ~inject) ~inject
+      ; Session_chips_view.anchor m Model (model_chip m state ~inject) ~inject
       ]
 ;;
 
-(* The +: a menu of what can go with the message. *)
+(* The paperclip: a menu of what can go with the message. *)
 let plus (m : App.Model.t) ~inject =
   Node.div
     ~attrs:
@@ -335,7 +337,7 @@ let plus (m : App.Model.t) ~inject =
         m
         Attach
         (button
-           ~cls:"icon ghost round plus"
+           ~cls:"icon ghost round plus attach"
            ~title:"Add files or images (or paste, or drop them here)"
            ~label:"Add files or images"
            ~attrs:
@@ -345,7 +347,7 @@ let plus (m : App.Model.t) ~inject =
                  (Bool.to_string (Session_chips_view.menu_open m [ Attach ]))
              ]
            ~on_click:(inject (Action.Open_chip Attach))
-           [ icon Plus ])
+           [ icon Paperclip ])
         ~inject
     ]
 ;;
@@ -548,22 +550,25 @@ let view (m : App.Model.t) ~inject =
             ; div
                 ~cls:"composer-row"
                 [ plus m ~inject
+                ; rest (Context_ring_view.view m ~inject)
+                ; (* Stop while there is something to steer with: at the
+                     left, so that nothing at the right moves as a turn
+                     starts and ends. *)
+                  (if running && not stops
+                   then
+                     rest
+                       (button
+                          ~cls:"icon ghost round stop"
+                          ~title:"Stop (Esc)"
+                          ~label:"Stop"
+                          ~on_click:(inject Action.Abort)
+                          [ icon Stop ])
+                   else Node.none)
                 ; chips m ~inject
-                ; Session_chips_view.view ~cls:"row-chips" m ~inject
                 ; rest
                   @@ div
                        ~cls:"composer-buttons"
-                       [ Status_view.composer_status m ~inject
-                       ; (if running && not stops
-                          then
-                            button
-                              ~cls:"icon ghost round stop"
-                              ~title:"Stop (Esc)"
-                              ~label:"Stop"
-                              ~on_click:(inject Action.Abort)
-                              [ icon Stop ]
-                          else Node.none)
-                       ; (if sending
+                       [ (if sending
                           then
                             button
                               ~cls:"primary round send busy"

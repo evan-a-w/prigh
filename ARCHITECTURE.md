@@ -3706,16 +3706,26 @@ terminal frontend and `web/` prigh-web, the browser one.
       the sidebar's toggle, the title, the extras, the status, the panel
       toggles and the gear — its
       steps are container queries on the bar in `style.css`),
-      `Composer_view` (one box: the editor, then the model, tool host,
-      thinking and approval mode chips (the verbosity has none), plain text until pointed at, and attach, stop
-      and send along its bottom; the composer's container queries shorten
-      the chips). A chip (`Chip`, `Open_chip`; Ctrl+L for the model's)
-      opens `Dialog.Popover`: its command's `Picker` (the same items as
-      `/model`, `/thinking`, `/mode`, `/host`), drawn by `Chip_popover_view`
-      inside the chip's anchor rather than as a `Modal` — the models under
-      their providers, filtered in its own field; the thinking levels with a
-      meter; the hosts (`hosts_list`, the `/host` picker's items, rebuilt by
-      `set_state` when the hosts change, keeping the filter), filtered too,
+      `Composer_view` (one box: the editor, then one row: attach and
+      `Context_ring_view` at the left; at the right the tool host and
+      model chips, plain text until pointed at, and stop and send; the
+      ring (the context as a ring against
+      `compacts_at`, the window's percentage at which the backend
+      compacts: `compact_at_tokens` or 80%, whichever is less; its card
+      with the cost, activity, reasoning, mode and model); the verbosity has no chip; the composer's container queries
+      shorten the chips). A chip (`Chip`, `Open_chip`; Ctrl+L for the
+      model's) opens `Dialog.Popover`: its command's `Picker` (the same
+      items as `/model`, `/host`), drawn inside the chip's anchor rather
+      than as a `Modal`. The model's is `Model_menu_view` over
+      `Model_menu` (its rail of tabs: the favourites, the `favourite-models`
+      pref via `Pref_sync`, and each signed-in provider; the tab's models
+      newest first, the first `shown` with Alt+N, `more` for the rest; the
+      models whose `legacy` flag the backend's `Model` sets left out),
+      `Reasoning` (the current model's levels) and the access mode in its
+      foot (`access_open`), `Provider_mark` the providers' marks; the
+      host's (`Chip_popover_view`) lists `hosts_list`, the `/host`
+      picker's items, rebuilt by `set_state` when the hosts change, keeping
+      the filter,
       with how to add one when there is no other. It is a dialog like the others (it owns the keys, Esc closes
       it, choosing goes through `picker_accept`), except that the composer
       keeps its chips live (the rest of it inert), so that a click on

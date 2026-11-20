@@ -155,6 +155,7 @@ let model (m : Model.t) =
     ; ( "thinking_default"
       , Option.value_map m.thinking_default ~default:`Null ~f:thinking )
     ; "supports_images", bool m.supports_images
+    ; "legacy", bool m.legacy
     ; ( "image_limit"
       , let limit = Image_limit.for_model m in
         `Object
