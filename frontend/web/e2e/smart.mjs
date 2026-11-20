@@ -1,5 +1,5 @@
-// Smart approval mode: the mode chosen from the chip's menu (on a phone,
-// /mode, then the ⋯ sheet shows it), a call the approval model lets run
+// Smart approval mode: the mode chosen from the model menu's access (on a
+// phone, /mode, then the model sheet shows it), a call the approval model lets run
 // (its "allowed by" note on the card) and one it leaves to the user (its
 // reason on the approval card, answered), both listed by /permissions and
 // forgotten there (one, then all); then Settings → Models → Approvals. On a desktop and two phones (390x844, 320x640, touch, the
@@ -128,26 +128,28 @@ try {
   if (touch) {
     await send("/mode smart");
     await page.locator(".toast", { hasText: "Mode: smart" }).waitFor();
-    await tap(page.getByRole("button", { name: "Panels and settings" }));
-    await page.locator(".chrome-menu").waitFor();
-    section("the ⋯ sheet");
-    const sheet = flat(await page.locator(".chrome-menu").innerText());
-    console.log(`shows smart: ${/smart/i.test(sheet)}`);
+    await tap(page.locator(".composer .model-chip"));
+    await page.locator("#chip-popover.model-menu").waitFor();
+    section("the model sheet");
+    console.log(`shows smart: ${flat(await page.locator("#chip-popover .model-access-button").innerText()) === "Smart"}`);
     console.log(await overflow());
     await screenshot("sheet");
     await page.keyboard.press("Escape");
-    await page.locator(".chrome-menu").waitFor({ state: "detached" });
+    await page.locator("#chip-popover").waitFor({ state: "detached" });
   } else {
-    await page.locator(".mode-chip").click();
-    await page.locator("#chip-popover").waitFor();
-    section("the mode chip's menu");
-    console.log((await page.locator("#chip-popover .popover-item").allInnerTexts()).map(flat).join("\n"));
+    await page.locator(".composer .model-chip").click();
+    await page.locator("#chip-popover .model-access-button").click();
+    await page.locator("#chip-popover .model-access-menu").waitFor();
+    section("the model menu's access");
+    console.log((await page.locator("#chip-popover .model-access-item").evaluateAll(es => es.map(e => `${e.innerText} ${e.title}`))).map(flat).join("\n"));
     await screenshot("mode menu");
-    await page.locator("#chip-popover .popover-item", { hasText: "Smart" }).click();
+    await page.locator("#chip-popover .model-access-item", { has: page.locator(".menu-label", { hasText: /^Smart$/ }) }).click();
+    const access = page.locator("#chip-popover .model-access-button");
+    await access.locator(".chip-label", { hasText: /^Smart$/ }).waitFor();
+    section("the access mode");
+    console.log(`${flat(await access.innerText())}: ${await access.getAttribute("title")}`);
+    await page.keyboard.press("Escape");
     await page.waitForSelector("#chip-popover", { state: "detached" });
-    await page.locator(".mode-chip:not(.awaiting) .chip-label", { hasText: /^smart$/ }).waitFor();
-    section("the mode chip");
-    console.log(`${flat(await page.locator(".mode-chip").innerText())}: ${await page.locator(".mode-chip").getAttribute("title")}`);
   }
 
   // 2. One call allowed, one left to the user.

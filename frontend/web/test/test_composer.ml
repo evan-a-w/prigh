@@ -13,20 +13,19 @@ let%expect_test
     []
     Working in /work on main . Working in /work on main . Ask prigh anything…
     (Add files or images (or paste, or drop them here))
-    (Claude Opus 5.5)
-    (backend)
-    (provider's default)
-    (auto)
-    Ready (0%) $0.00
+    () Ready
+    Context 0 / 200k
+    0% used · compacts at 160k (80%)
+    This session $0.00
+    Tokens 0 in · 0 out
     Status Ready
-    Context 0 / 200k · 0%
-    Tokens 0 in · 0 out · 0 cached
-    Cost $0.0000
-    Thinking provider's default
+    Reasoning Medium
     Mode Auto: never asks
     Model Claude Opus 5.5
     Branch main
-    Click for the session’s details · /compact frees context
+    /compact to free context (Details)
+    (backend)
+    (Opus 5.5)
     (Send (Enter))
     |}];
   H.show h ~selector:".send";
@@ -447,7 +446,6 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /rewind go back to an earlier message in this session
     /trim [after|undo] drop everything before a message from the model's context (the transcript keeps it folded); after: everything after a message instead (what you send later stays); undo brings back the last trim
     /tree show the session tree and move to any message in it
-    /cd [path] change the working directory (asks to create a missing one)
     |}];
   H.type_ h "/mod";
   H.key h "Tab";

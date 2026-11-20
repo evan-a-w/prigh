@@ -502,6 +502,7 @@ let%expect_test "model matching" =
     ; thinking_default = None
     ; cost = { input = 1.; output = 2.; cache_read = 0.1 }
     ; image_limit = None
+    ; legacy = false
     }
   in
   let models =

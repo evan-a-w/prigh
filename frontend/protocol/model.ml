@@ -44,6 +44,7 @@ type t =
   ; thinking_default : string option
   ; cost : Cost.t
   ; image_limit : Image_limit.t option [@sexp.option]
+  ; legacy : bool [@sexp.bool]
   }
 [@@deriving sexp_of, equal]
 
@@ -63,6 +64,7 @@ let of_json j =
   in
   let%bind thinking_default = Json.string_opt_field j "thinking_default" in
   let%bind cost = Json.object_field j "cost" >>= Cost.of_json in
+  let%bind legacy = Json.bool_default_field j "legacy" ~default:false in
   let%map image_limit =
     match Json.field j "image_limit" with
     | None -> Ok None
@@ -79,5 +81,6 @@ let of_json j =
   ; thinking_default
   ; cost
   ; image_limit
+  ; legacy
   }
 ;;

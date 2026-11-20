@@ -21,14 +21,15 @@ let%expect_test "GPT-6.1 Sol on the OpenAI API and Codex" =
       (thinking_default ((On (Medium))))
       (thinking_style (Effort (off_is_none false)))
       (cost ((input 2) (output 10) (cache_read 0.1))) (supports_images true)
-      (native_computer Openai)))
+      (native_computer Openai) (legacy false)))
     (openai-codex/gpt-6.1-sol
      ((id gpt-6.1-sol) (provider Openai_codex) (name "GPT-6.1 Sol")
       (context_window 272000) (max_output 128000)
       (thinking_levels (Low Medium High Xhigh Max)) (can_disable_thinking false)
       (thinking_default ((On (Medium))))
       (thinking_style (Effort (off_is_none false)))
-      (cost ((input 2) (output 10) (cache_read 0.1))) (supports_images true)))
+      (cost ((input 2) (output 10) (cache_read 0.1))) (supports_images true)
+      (legacy false)))
     ("GPT-6.1 Sol"
      "model \"GPT-6.1 Sol\" is ambiguous; one of: openai/gpt-6.1-sol, openai-codex/gpt-6.1-sol")
     (gpt-6-sol
@@ -37,7 +38,7 @@ let%expect_test "GPT-6.1 Sol on the OpenAI API and Codex" =
       (can_disable_thinking true) (thinking_default ((On (Medium))))
       (thinking_style (Effort (off_is_none true)))
       (cost ((input 2) (output 10) (cache_read 0.2))) (supports_images true)
-      (native_computer Openai)))
+      (native_computer Openai) (legacy false)))
     |}]
 ;;
 
@@ -53,14 +54,15 @@ let%expect_test "GPT-6.2 Astra and Sol on the OpenAI API and Codex" =
       (thinking_levels (Low Medium High Xhigh Max)) (can_disable_thinking false)
       (thinking_default ()) (thinking_style (Effort (off_is_none false)))
       (cost ((input 8) (output 40) (cache_read 0.4))) (supports_images true)
-      (native_computer Openai)))
+      (native_computer Openai) (legacy false)))
     (openai-codex/gpt-6.2-sol
      ((id gpt-6.2-sol) (provider Openai_codex) (name "GPT-6.2 Sol")
       (context_window 272000) (max_output 128000)
       (thinking_levels (Low Medium High Xhigh Max)) (can_disable_thinking false)
       (thinking_default ((On (Medium))))
       (thinking_style (Effort (off_is_none false)))
-      (cost ((input 2) (output 10) (cache_read 0.1))) (supports_images true)))
+      (cost ((input 2) (output 10) (cache_read 0.1))) (supports_images true)
+      (legacy false)))
     ("GPT-6.2 Sol"
      "model \"GPT-6.2 Sol\" is ambiguous; one of: openai/gpt-6.2-sol, openai-codex/gpt-6.2-sol")
     |}]
@@ -253,5 +255,59 @@ let%expect_test "check_thinking: an explicit setting the model lacks is refused"
     (Error
      "Claude Opus 4.6 does not take thinking xhigh; it takes: off, default, low, medium, high, max")
     (Ok (On (Max)))
+    |}]
+;;
+
+let%expect_test "legacy models: out of the pickers, still resolvable" =
+  let keys ~legacy =
+    List.filter Model.all ~f:(fun m -> Bool.equal m.legacy legacy)
+    |> List.map ~f:Model.key
+  in
+  print_s [%sexp "shown", (keys ~legacy:false : string list)];
+  print_s [%sexp "legacy", (keys ~legacy:true : string list)];
+  (* Old sessions and [/model <id>] still find them. *)
+  List.iter
+    [ "anthropic/claude-opus-4-6"; "gpt-5.5"; "openai-codex/gpt-5.6-sol" ]
+    ~f:(fun q ->
+      match Model.resolve q with
+      | Ok m -> print_s [%sexp (q : string), (Model.key m : string), (m.legacy : bool)]
+      | Error e -> print_s [%sexp (e : Error.t)]);
+  let json = Rpc_json.model (Option.value_exn (Model.find "claude-opus-4-6")) in
+  print_s
+    [%sexp
+      (Jsonaf.member "legacy" json |> Option.map ~f:Jsonaf.to_string
+       : string option)];
+  [%expect {|
+    (shown
+     (anthropic/claude-fable-5 anthropic/claude-fable-5-1
+      anthropic/claude-fable-5-2 anthropic/claude-haiku-5-5
+      anthropic/claude-mythos-5 anthropic/claude-mythos-5-1
+      anthropic/claude-mythos-5-2 anthropic/claude-opus-5
+      anthropic/claude-opus-5-5 anthropic/claude-sonnet-5
+      anthropic/claude-sonnet-5-5 openai/chat-latest openai/gpt-6-astra
+      openai/gpt-6-luna openai/gpt-6-sol openai/gpt-6.1-sol openai/gpt-6.1-terra
+      openai/gpt-6.2-astra openai/gpt-6.2-sol openai/gpt-realtime-2.1 openai/o3
+      openai/o3-pro openai-codex/gpt-6-astra openai-codex/gpt-6-luna
+      openai-codex/gpt-6-sol openai-codex/gpt-6.1-sol openai-codex/gpt-6.1-terra
+      openai-codex/gpt-6.2-astra openai-codex/gpt-6.2-sol deepseek/deepseek-flash
+      deepseek/deepseek-v4-pro))
+    (legacy
+     (anthropic/claude-haiku-4-5 anthropic/claude-haiku-4-5-20251001
+      anthropic/claude-opus-4-5 anthropic/claude-opus-4-5-20251101
+      anthropic/claude-opus-4-6 anthropic/claude-opus-4-7
+      anthropic/claude-opus-4-8 anthropic/claude-sonnet-4-5
+      anthropic/claude-sonnet-4-5-20250929 anthropic/claude-sonnet-4-6
+      openai/gpt-4.1 openai/gpt-4.1-mini openai/gpt-4o openai/gpt-4o-2024-08-06
+      openai/gpt-4o-2024-11-20 openai/gpt-4o-mini openai/gpt-5 openai/gpt-5-mini
+      openai/gpt-5-nano openai/gpt-5-pro openai/gpt-5.1 openai/gpt-5.2
+      openai/gpt-5.2-pro openai/gpt-5.3-codex openai/gpt-5.4 openai/gpt-5.4-mini
+      openai/gpt-5.4-nano openai/gpt-5.4-pro openai/gpt-5.5 openai/gpt-5.5-pro
+      openai/gpt-5.6-luna openai/gpt-5.6-sol openai/gpt-5.6-terra
+      openai-codex/gpt-5.6-luna openai-codex/gpt-5.6-sol
+      openai-codex/gpt-5.6-terra))
+    (anthropic/claude-opus-4-6 anthropic/claude-opus-4-6 true)
+    (gpt-5.5 openai/gpt-5.5 true)
+    (openai-codex/gpt-5.6-sol openai-codex/gpt-5.6-sol true)
+    (true)
     |}]
 ;;

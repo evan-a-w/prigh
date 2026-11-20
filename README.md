@@ -905,32 +905,36 @@ account menu control browser notifications while the tab is hidden, and the
 title (`(2) prigh`) and favicon count what happened meanwhile.
 
 The composer is one box: the editor on top and, along its bottom edge
-in the box's own quiet text, chips: the model and, in short lower-case
-words, the thinking level (a brain and "high", or "none" for a model
-without levels), the approval mode (a shield and "ask", "auto-edit",
-"smart", "auto" or "plan", lit where nothing asks; a speech bubble
-and "chat" in chat mode) and where tools run (a server icon and the
-tool host's name, always shown; a disconnected host keeps its name,
-its server struck through in red and "offline" beside it, with how to
-bring it back in its tooltip; lit as "no host" when none runs them or
-in chat mode), each lit with a chevron when pointed at, then attach,
-stop and send on the right. A chip opens a small menu standing on it,
-above the composer (below it only when there is no room above), with its
-command's choices (`/model`, `/thinking`, `/mode`, `/host`), the current
-one checked: the models under their providers with their context windows
-and a filter field to type in (the list scrolls; filtered, best match
-first), the thinking levels with how hard each thinks, the modes with
-what each asks first, the hosts with their directories and a filter too
-(choosing one asks for the directory there, as `/host` does; with only
-one host, or none, it says how to add one: `prigh tool-host -connect
-SERVER`, or a TUI). The hosts' menu follows hosts as they connect and
-leave. ↑↓ move, Enter or a click takes the choice, Esc or a click
-beside the menu closes it unchanged and gives the editor back the focus;
-← →, Tab and a click on another chip open the next chip's menu, one
-at a time. On a phone the menu is as wide as the composer. The commands
-themselves open the larger picker dialog. Ctrl+L opens the model's menu,
-Alt+T and Alt+M cycle the other two; in a narrow composer the model's
-and the host's names are cut short with an ellipsis, the host's first.
+in the box's own quiet text, one row: the paperclip (attach) and the
+context ring at the left, then at the right where tools run, the model
+and send (and Stop by the ring while a turn can be steered).
+Where tools run is a server icon and the tool host's name, always shown
+(a disconnected host keeps its name, its server struck through in red and
+"offline" beside it, with how to bring it back in its tooltip; lit as "no
+host" when none runs them or in chat mode). The model is its provider's
+mark, its short name ("Opus 5.5", "6.2 Sol") and, dimmer, its reasoning
+level ("High"). Each chip opens a small menu standing on it, above the
+composer (below it only when there is no room above), fully drawn from
+its first frame; Esc or a click beside it closes it unchanged and gives
+the editor back the focus; Tab and a click on the other chip open that
+one's menu. The host's menu lists the hosts with their directories and a
+filter (choosing one asks for the directory there, as `/host` does; with
+only one host, or none, it says how to add one: `prigh tool-host -connect
+SERVER`, or a TUI), and follows hosts as they connect and leave.
+
+The model's menu (Ctrl+L) has a rail of tabs: your favourites (a star on
+a model's row, or Alt+F, adds it), then each signed-in provider; ← → go
+along it. The list shows the tab's models newest first, the first six
+with Alt+1…6 to switch at once and "Show N more" for the rest; older
+models (marked legacy by prigh) are left out, though `/model` still takes
+them. "Search models…" filters across every provider. Beside the list,
+the current model's reasoning levels (Off, Low…Max, its default marked),
+and in the menu's foot the access mode ("Full access", "Ask first",
+"Auto-edit", "Smart", "Plan", "Chat"), a menu of its own. ↑↓ move,
+Enter switches. The commands themselves (`/model`, `/thinking`, `/mode`,
+`/host`) open the larger picker dialog; Alt+T and Alt+M still cycle the
+reasoning level and the mode. In a narrow composer the host is its icon
+alone and the model's name is cut short with an ellipsis last.
 
 There is no bar over the chat. The session's title is in the sidebar's tree
 (its row has the cwd as it is now, relative to its project or worktree, and
@@ -944,25 +948,24 @@ button in the top left and the settings gear after the toggles. On a phone
 the top right is a single ⋯ that opens all of these in a small menu. The
 chat starts under them and fades out beneath them as it scrolls.
 
-The composer's row has, after the + and the model and host chips, the
-session's thinking level (a brain and the level) and its mode (a shield and
-the mode's short name), each opening a small menu over itself (Alt+T and
-Alt+M cycle them; under a 600px column they are icons alone). The
-transcript's verbosity has no chip: Ctrl+O cycles it, and `/verbosity`, the
-control centre (Ctrl+K) and a phone's ⋯ sheet set it. At the row's right,
-before send, the session's status: what the agent is doing while
-it works (`Thinking`, `Running tools`…; idle, nothing), how full the context
-is (a ring and the percent) and the cost, to the cent, or against the budget.
-On a phone the row keeps +, the model, the host's icon, the status and
-send; the thinking level, mode, verbosity and usage are at
-the top of the ⋯ sheet, as rows of choices.
-
-The status's details card opens on pointing at it or focusing it (the
-tokens in and out, the cost, the thinking, the mode, the model and the git
-branch), and a click on the context opens `/session`'s details. The context
-is in the accent colour from 60%, brick from 85%; so is a cost near or over
-its budget. The figures keep their place as a turn starts and ends; the
-animations stop with the system's reduced motion.
+The transcript's verbosity has no chip: Ctrl+O cycles it, and
+`/verbosity`, the control centre (Ctrl+K) and a phone's ⋯ sheet set it.
+Beside the paperclip, the context ring: how full the context is,
+in the accent colour, amber within 15 points of where it compacts and
+brick from there; a short arc turns round it while the agent works.
+Pointed at, focused or tapped, it opens its card: the context against the
+window and where it compacts (in tokens and as a percentage of the
+window: `compact_at_tokens`, 200k by default, or 80% of the window if
+less, so a 1M window compacts at 20%), the session's cost (against the
+budget when there is one), the last turn's, the cache's hit rate, the
+tokens in and out, the activity, reasoning, mode, model and git branch,
+a Compact button once the context is past 70% and Details (`/session`).
+Esc closes it. The animations stop with the system's reduced motion.
+On a phone the row keeps the paperclip, the ring, the host's icon, the
+model and send; the model's menu is a sheet from the bottom (the rail
+along its top, the reasoning levels under the list, the access mode at
+its foot), as is the ring's card; the verbosity and the usage are at the
+top of the ⋯ sheet.
 
 On a phone, by touch: a swipe in from the left edge brings the drawer out
 with your finger (drag it left to put it back); a session's row swiped left

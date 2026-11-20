@@ -34,12 +34,12 @@ let%expect_test
      resume; each opens its command"
   =
   let h = H.create () in
-  H.text h ~selector:".composer-status";
+  H.text h ~selector:".context-card .cost";
   H.text h ~selector:".status-notes";
   H.event h (state [ "budget_usd", `Number "5"; "cost_usd", `Number "4.2" ]);
-  H.text h ~selector:".composer-status";
+  H.text h ~selector:".context-card .cost";
   H.text h ~selector:".status-notes";
-  H.elements h ~selector:".composer-status .budget";
+  H.elements h ~selector:".context-card .cost";
   H.event
     h
     (state
@@ -48,52 +48,21 @@ let%expect_test
        ; "goal", goal "all tests pass"
        ; "resume_at_ms", `Number "1791295500000"
        ]);
-  H.text h ~selector:".composer-status";
+  H.text h ~selector:".context-card .cost";
   H.text h ~selector:".status-notes";
   List.iter
-    [ ".composer-status .budget"
-    ; ".status-notes .goal"
-    ; ".status-notes .resume"
-    ]
+    [ ".context-card .cost"; ".status-notes .goal"; ".status-notes .resume" ]
     ~f:(fun selector -> H.elements h ~selector);
   (* In the page's time zone. *)
   H.act h (Set_utc_offset (Time_ns.Span.of_hr 2.));
   H.text h ~selector:".status-notes .resume";
   [%expect
     {|
-    Ready (0%) $0.00
-    Status Ready
-    Context 0 / 200k · 0%
-    Tokens 0 in · 0 out · 0 cached
-    Cost $0.0000
-    Thinking provider's default
-    Mode Auto: never asks
-    Model Claude Opus 5.5
-    Branch main
-    Click for the session’s details · /compact frees context
-    Ready (0%) ($4.20/$5.00)
-    Status Ready
-    Context 0 / 200k · 0%
-    Tokens 0 in · 0 out · 0 cached
-    Cost $4.2000 · $4.20/$5.00
-    Thinking provider's default
-    Mode Auto: never asks
-    Model Claude Opus 5.5
-    Branch main
-    Click for the session’s details · /compact frees context
-    <button class="budget cost link status-item warm">
-    Ready (0%) ($5.50/$5.00)
-    Status Ready
-    Context 0 / 200k · 0%
-    Tokens 0 in · 0 out · 0 cached
-    Cost $5.5000 · $5.50/$5.00
-    Thinking provider's default
-    Mode Auto: never asks
-    Model Claude Opus 5.5
-    Branch main
-    Click for the session’s details · /compact frees context
+    This session $4.20 · $4.20/$5.00
+    <div class="cost status-detail warm">
+    This session $5.50 · $5.50/$5.00
     (Goal 3/20) (Resumes 14:05)
-    <button class="budget cost hot link status-item">
+    <div class="cost hot status-detail">
     <button class="goal link status-item warm">
     <button class="link resume status-item warm">
     (Resumes 16:05)

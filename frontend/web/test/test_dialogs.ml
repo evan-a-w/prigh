@@ -148,9 +148,12 @@ let%expect_test "help lists every key and command" =
     Alt+↑ take the last queued message back into the editor
     Tab complete a /command, its argument, an @path or a #snippet
     !cmd run a shell command (!!cmd: not added to the context; !&cmd: as a background job)
-    Ctrl+L switch model: the model chip's menu
+    Ctrl+L the model chip's menu: models by provider, their reasoning and the access mode
+    ← → / ↑ ↓ (in the model menu) ← → the previous or next provider (or the favourites); ↑ ↓ the models; Enter switches, Esc closes
+    Alt+1…9 (in the model menu) switch to the list's Nth model
+    Alt+F (in the model menu) star or unstar the highlighted model
     ↑ ↓ / Enter / Esc (a chip's menu) move / choose / close it; type to filter the models or hosts
-    ← → / Tab (a chip's menu) the next chip's menu (model, thinking, mode, host)
+    Tab (a chip's menu; ← → in the host's) the next chip's menu (host, model)
     Ctrl+P / Alt+P next / previous scoped model (/scoped-models)
     Alt+T cycle the thinking level
     Alt+M cycle the mode: ask → auto-edit → smart → auto → plan (/mode, /plan)
@@ -176,6 +179,7 @@ let%expect_test "help lists every key and command" =
     Ctrl+B show or hide the sidebar (while reviewing, over the review)
     Ctrl+, settings: notifications, transcript detail, your account (/settings)
     ← → / ↑ ↓ (on a panel's edge) resize the panel (Shift: faster; Home / End: smallest / largest; Enter: the default size); or drag the edge, double-click to reset
+    Esc (the context ring's card open) close the card (the ring by the paperclip: context, cost, Compact)
     Alt+1…9 follow subagent or job N in the agents panel
     Alt+] Alt+[ the next or previous subagent or job
     Alt+0 close the agents panel
@@ -619,10 +623,10 @@ let%expect_test
       ((keys
         (web.theme web.accent web.notify web.verbosity web.terminal-open
          web.sidebar-folded web.sidebar-unfolded web.sidebar-opened
-         web.sidebar-worktree-hours web.review web.code-size history web.migrated
-         web.sidebar-width web.files-width web.files-preview-width
-         web.agents-width web.terminal-height web.review-chat-width
-         web.review-files-width web.review-margin-width))))
+         web.sidebar-worktree-hours web.review web.code-size favourite-models
+         history web.migrated web.sidebar-width web.files-width
+         web.files-preview-width web.agents-width web.terminal-height
+         web.review-chat-width web.review-files-width web.review-margin-width))))
      (tag Prefs))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s1.jsonl) (limit 1000000)))

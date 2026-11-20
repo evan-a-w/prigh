@@ -3,8 +3,9 @@
 // messages, the session's card or bar and the composer are not redrawn, the transcript
 // does not shift, a streamed reply keeps the nodes (and the selection) it
 // was drawn with, a key typed draws no message again, and the editor grows
-// with its text in the frame that shows the text, and the session's status keeps its place in every frame as turns
-// start and end, in the sidebar on a desktop and in the bar on a phone. Run by prigh_web.sh; prints normalised results (the expected
+// with its text in the frame that shows the text, and the composer's host,
+// model and context ring keep their places in every frame as turns start
+// and end, on a desktop and on a phone. Run by prigh_web.sh; prints normalised results (the expected
 // output is in ENGINE.expected).
 //
 // Environment: PLAYWRIGHT_MODULE, PRIGH_BACKEND, SITE, TEST_DIR, TOKEN, and
@@ -98,7 +99,7 @@ await page.addInitScript(() => {
       for (const entry of list.getEntries()) {
         const where = (entry.sources || []).map(s => s.node).filter(n => n && n.nodeType === 1);
         if (where.some(n => n.closest("#chat, .chat-chrome"))) window.__shifts.push(entry.value);
-        if (where.some(n => n.closest(".composer-status"))) window.__statusShifts?.push(entry.value);
+        if (where.some(n => n.closest(".composer-controls, .context-ring-anchor"))) window.__statusShifts?.push(entry.value);
       }
     }).observe({ type: "layout-shift" });
   } catch {}
@@ -111,20 +112,19 @@ await page.addInitScript(() => {
         overflow: editor.scrollHeight - editor.clientHeight,
         height: editor.offsetHeight,
       });
-    // Where the status's items are, at the composer's right (from its right
-    // edge: the activity comes and goes at its left).
-    const status = document.querySelector(".composer-status > .status-gauge");
-    const right = status?.closest(".composer-status").getBoundingClientRect().right ?? 0;
-    if (status && window.__status)
+    // Where the status's items are (the context ring from the composer's
+    // left edge; the host and the model from its right edge), and what the
+    // agent is doing (the ring's status for screen readers).
+    const ring = document.querySelector(".context-ring-anchor");
+    const boxRect = document.querySelector(".composer-box")?.getBoundingClientRect();
+    const left = boxRect?.left ?? 0, right = boxRect?.right ?? 0;
+    if (ring && window.__status)
       window.__status.push({
-        activity: status.querySelector(".activity")?.textContent.trim(),
-        // The context and the cost: the activity comes and goes before them.
-        at: [...status.querySelectorAll(":scope > :is(.context, .cost)")]
-          .filter(e => getComputedStyle(e).display !== "none")
-          .map(e => {
-            const r = e.getBoundingClientRect();
-            const name = ["context", "tokens", "cost"].find(c => e.classList.contains(c)) ?? "activity";
-            return `${name}@${Math.round(right - r.right)}`;
+        activity: ring.querySelector("[role=status]")?.textContent.trim(),
+        at: [["ring", ".composer .context-ring", true], ["host", ".composer .host-chip"], ["model", ".composer .model-chip"]]
+          .map(([name, sel, fromLeft]) => {
+            const e = document.querySelector(sel)?.getBoundingClientRect();
+            return e ? `${name}@${Math.round(fromLeft ? e.left - left : right - e.right)}` : `${name} missing`;
           })
           .join(" "),
       });
@@ -323,7 +323,7 @@ try {
   // the status are not touched (View's parts).
   await page.evaluate(() => {
     window.__touched = new Set();
-    for (const sel of ["#sidebar", ".entries", ".status-item"]) {
+    for (const sel of ["#sidebar", ".entries", ".context-ring-anchor"]) {
       const els = document.querySelectorAll(sel);
       if (!els.length) window.__touched.add(`${sel} missing`);
       for (const el of els)
@@ -396,12 +396,12 @@ try {
   console.log(`frames empty but still tall: ${frames.filter(f => f.value === "" && f.height > oneLine).length}`);
 
   // A turn starts, runs a tool, has a steer queued, and ends: what the agent
-  // is doing changes and what applies comes and goes, but the items of the
-  // status start where they did in every frame.
+  // is doing changes (the ring turns), but the host, the model and the ring
+  // stay where they were in every frame.
   const turn = async (label, reply) => {
     await page.evaluate(() => { window.__status = []; window.__statusShifts = []; });
     await send("check it");
-    await page.locator(".composer-status .activity", { hasText: "Running tools" }).waitFor();
+    await page.locator(".context-ring-anchor [role=status]", { hasText: "Running tools" }).waitFor({ state: "attached" });
     await send("and the rest");
     await page.locator(".queued-tag").first().waitFor();
     await bodyHas(reply);

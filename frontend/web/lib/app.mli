@@ -622,6 +622,13 @@ module Action : sig
     (** a row of the filter's menu (by click), or the one selected (Space) *)
     (** its menu over the composer (Ctrl+L: the model's); again closes it *)
     | Chip_step of int
+    | Model_menu_tab of Model_menu.Tab.t
+    | Model_menu_step of int (** the next provider along the rail (← →) *)
+    | Model_menu_more (** "Show more": the provider's older models *)
+    | Model_menu_access (** opens or closes the access menu in its foot *)
+    | Model_menu_nth of int (** Alt+1…9: the list's Nth model *)
+    | Toggle_favourite of string option
+    (** stars or unstars the model ([None]: the highlighted one) *)
     (** the next ([1]) or previous ([-1]) chip's menu, from the open one *)
     | Open_snippets of int option
     (** Alt+N: pick a snippet to insert at this caret (else the last edit's) *)
@@ -769,6 +776,9 @@ module Action : sig
     | Close_field_menu (** Esc, or a click outside: nothing done *)
     | Toggle_sidebar
     | Toggle_status_tray
+    | Toggle_context_card
+    (** the context ring's card: context, cost, compacting (tap; Esc
+        closes) *)
     (** a phone's header: the tray with the thinking level, the mode, the
         status and the panels' toggles, under the header *)
     | Answer_confirm of
@@ -1004,6 +1014,7 @@ module Model : sig
       (** while reviewing on a wide page, the sessions sidebar shows as a
           drawer over the page (Ctrl+B); it goes when the review closes *)
     ; status_tray : bool
+    ; context_card : bool (** tapped open: the context ring's card *)
       (** on a phone, the chat's "more" menu is open (the panels' toggles
           and the settings: {!Action.Toggle_status_tray}) *)
     ; scrolled_up : bool (** the chat is not following new output *)
@@ -1043,6 +1054,10 @@ module Model : sig
       (** what the review page compared last, per worktree (a
           preference) *)
     ; code_size : Code_size.t (** how large code shows in diffs (a preference) *)
+    ; model_menu : Model_menu.t
+      (** the model chip's menu: its tab, "Show more", the access menu *)
+    ; favourite_models : string list
+      (** starred in the model menu, oldest first (a preference) *)
     ; layout : Resize.t (** the panels' sizes *)
     ; paging : Paging.t (** how much of the transcript is loaded *)
     ; transcript_events : int
@@ -1196,6 +1211,12 @@ val thinking_detail : Llm.t option -> string -> string
 
 (** A token count in a few characters: [200k], [1.2M]. *)
 val compact_tokens : int -> string
+
+(** The model menu's "Show more" row's id. *)
+val more_id : string
+
+(** The models the model menu offers ({!Model_menu.offered}). *)
+val offered_models : Model.t -> Llm.t list
 
 (** Whether the user signed in as a superuser. *)
 val superuser : Model.t -> bool

@@ -1,21 +1,26 @@
-// The session's one status (at the composer's right: activity, context,
-// cost), the chips beside the model and host (thinking, mode, transcript)
-// and their menus, on a desktop by mouse and keyboard and on phones by
-// touch, and the phone's drags. It prints, as stable lines:
+// The composer's row (attach and the context ring at the left; the host,
+// the model and send at the right), the model's menu (opaque from its first
+// frame; its reasoning and access mode) and the ring's card, on a desktop
+// by mouse and keyboard and on phones by touch, and the phone's drags. It
+// prints, as stable lines:
 //
-// - desktop (1280 and 700 wide): the status shows and clears send; each of thinking, mode and transcript picked from its menu by the
-//   mouse and by the keyboard (the chip says the choice); each menu (model,
-//   host, +, thinking, mode, transcript) closed by a click outside, which
-//   reaches nothing under it; the status's details on hover and on focus;
-//   the context opening the session's details;
-// - phones (390x844, 320x640): the composer's row fits; the ⋯ sheet's
-//   thinking, mode and transcript picked by tap, still so when reopened;
-//   the model, host and + sheets closed by a tap outside, which reaches
-//   nothing under it; the drags: the drawer from the edge and back, a
-//   session's row to its Archive and Delete (put back by a tap), a sheet
-//   down by its grip (the model's, the ⋯), a settings section back from
-//   the edge, a pending image's tile up (removed), the viewer at fit aside
-//   (the next image) and down (closed);
+// - desktop (1280 and 700 wide): the row's buttons in order, the chips
+//   apart from the ring, the model's name whole; the model's menu opaque as
+//   it opens; the reasoning and the mode picked in it by the mouse and by
+//   the keyboard (Alt+T, Alt+M: the chip and the ring's card say the
+//   choice); each menu (model, host, +) closed by a click outside, which
+//   reaches nothing under it; the ring's card on hover, on focus and on a
+//   click; its Details opening the session's details;
+// - phones (390x844, 320x640): the composer's row fits, in order, the
+//   model's name whole, no button under 40px (the composer's dense row, as
+//   in mobile.mjs); the model sheet's reasoning and access picked by tap,
+//   and the ⋯ sheet's transcript, still so when reopened; the ring's card
+//   as a sheet; the model, host and + sheets closed by a tap outside, which
+//   reaches nothing under it; the drags: the drawer from the edge and back,
+//   a session's row to its Archive and Delete (put back by a tap), a sheet
+//   down by its grip (the model's, the ⋯), a settings section back from the
+//   edge, a pending image's tile up (removed), the viewer at fit aside (the
+//   next image) and down (closed);
 // - an installed PWA on a notched phone (Chromium): the strip under the
 //   notch, the composer over the home indicator.
 //
@@ -81,7 +86,38 @@ const shoot = async label => {
 };
 
 const settle = () => page.waitForTimeout(250);
-const chipText = chip => page.locator(`.composer .chip-anchor.${chip} > button`).innerText().then(t => t.trim().replace(/\s+/g, " "));
+const popoverGone = () => page.locator("#chip-popover").waitFor({ state: "detached", timeout: 5000 }).catch(() => {});
+// The model chip as it shows: its short name.
+const modelChip = () => page.locator(".composer .model-chip").evaluate(b =>
+  [...b.querySelectorAll(".chip-label")].filter(e => getComputedStyle(e).display !== "none").map(e => e.textContent.trim()).join(" · "));
+// The row's buttons left to right, and whether they are in the order wanted.
+// On a desktop the chips are apart from the ring (a phone's row is full).
+const rowOrder = ({ apart = false } = {}) => page.evaluate(apart => {
+  const bs = [...document.querySelectorAll(".composer-row button")]
+    .filter(b => b.getBoundingClientRect().width > 0 && !b.closest("#chip-popover, .context-card"))
+    .sort((a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left);
+  const kind = b => b.matches(".plus") ? "attach" : b.matches(".host-chip") ? "host"
+    : b.matches(".model-chip") ? "model" : b.matches(".context-ring") ? "ring" : b.matches(".send, .stop") ? "send"
+    : (b.getAttribute("aria-label") || b.className.split(" ")[0]);
+  const kinds = bs.map(kind);
+  const want = ["attach", "ring", "host", "model", "send"];
+  const inOrder = want.every(k => kinds.includes(k)) && want.every((k, i) => i === 0 || kinds.indexOf(want[i - 1]) < kinds.indexOf(k));
+  const at = k => bs[kinds.indexOf(k)]?.getBoundingClientRect();
+  const gap = at("ring") && at("host") ? at("host").left - at("ring").right : 0;
+  return `the row: ${kinds.join(", ")}; in order: ${inOrder}${apart ? `; the chips at the right, apart from the ring: ${gap > 24}` : ""}`;
+}, apart);
+// The model's name whole: its label not cut.
+const nameWhole = () => page.locator(".composer .model-chip .chip-label").evaluate(e => e.scrollWidth <= e.clientWidth + 0.5);
+// The menu's opacity (with its ancestors') at the first frame it is there:
+// no fade in.
+const openOpacity = () => page.waitForFunction(() => {
+  const e = document.querySelector("#chip-popover");
+  if (!e) return false;
+  let o = 1;
+  for (let n = e; n; n = n.parentElement) o *= Number(getComputedStyle(n).opacity);
+  return String(o);
+}, null, { polling: "raf" }).then(h => h.jsonValue());
+const cardLine = cls => page.locator(`.context-card .${cls} .status-detail-value`).textContent().then(t => t.trim());
 const popoverOpen = () => page.locator("#chip-popover").count().then(n => n > 0);
 
 // A finger from (x0, y0) to (x1, y1), as touch events on what is under it
@@ -128,7 +164,7 @@ const overlaps = (a, b) => !!a && !!b && a.x < b.x + b.width - 0.5 && b.x < a.x 
 const rowFits = () => page.evaluate(() => {
   const c = document.querySelector(".composer-box").getBoundingClientRect();
   const leaves = [...document.querySelectorAll(".composer-row button")]
-    .filter(e => e.getBoundingClientRect().width > 0 && !e.closest("#chip-popover, .status-details"));
+    .filter(e => e.getBoundingClientRect().width > 0 && !e.closest("#chip-popover, .context-card"));
   const name = e => (e.getAttribute("aria-label") || e.className.split(" ")[0]).slice(0, 30);
   const past = leaves.filter(e => e.getBoundingClientRect().right > c.right + 0.5 || e.getBoundingClientRect().left < c.left - 0.5).map(name);
   const sideways = document.scrollingElement.scrollWidth > innerWidth + 1;
@@ -159,23 +195,32 @@ const send = async text => {
   await page.waitForFunction(() => !document.querySelector(".composer.busy"));
 };
 
-const pick = async (chip, option, how) => {
-  const button = page.locator(`.composer .chip-anchor.${chip} > button`);
+// The reasoning or the mode picked in the model's menu by the mouse, or by
+// the keyboard (Alt+T cycles the reasoning, Alt+M the mode).
+const pick = async (what, option, how) => {
   if (how === "mouse") {
-    await button.click();
-    await page.locator("#chip-popover").waitFor();
-    if (chip === "thinking") await shoot("desktop-thinking-menu");
-    await page.locator("#chip-popover .popover-item").filter({ hasText: new RegExp(`^\\s*${option}`, "i") }).first().click();
+    await page.locator(".composer .model-chip").click();
+    await page.locator("#chip-popover.model-menu").waitFor();
+    if (what === "reasoning") {
+      await shoot("desktop-model-menu");
+      await page.locator("#chip-popover .reasoning-row", { has: page.locator(".reasoning-label", { hasText: new RegExp(`^${option}$`, "i") }) }).click();
+      await page.locator("#chip-popover .reasoning-row.on .reasoning-label", { hasText: new RegExp(`^${option}$`, "i") }).waitFor();
+    } else {
+      await page.locator("#chip-popover .model-access-button").click();
+      await page.locator("#chip-popover .model-access-menu").waitFor();
+      await shoot("desktop-access-menu");
+      await page.locator("#chip-popover .model-access-item", { has: page.locator(".menu-label", { hasText: new RegExp(`^${option}$`) }) }).click();
+      await page.locator("#chip-popover .model-access-button .chip-label", { hasText: new RegExp(`^${option}$`) }).waitFor();
+    }
+    await page.keyboard.press("Escape");
+    await popoverGone();
   } else {
-    await button.focus();
-    await page.keyboard.press("Enter");
-    await page.locator("#chip-popover").waitFor();
-    await page.keyboard.press("ArrowDown");
-    await page.keyboard.press("Enter");
+    await page.locator(".composer textarea").focus();
+    await page.keyboard.press(what === "reasoning" ? "Alt+T" : "Alt+M");
   }
-  await page.locator("#chip-popover").waitFor({ state: "detached", timeout: 5000 }).catch(() => {});
+  await page.waitForFunction(() => !document.querySelector(".composer .awaiting, .composer .model-chip.pending"));
   await settle();
-  say(`${chip} by ${how}: ${await chipText(chip)}; menu closed: ${!(await popoverOpen())}`);
+  say(`${what} by ${how}: the chip: ${await modelChip()}; the card: ${await cardLine(what === "reasoning" ? "reasoning-line" : "mode-line")}; menu closed: ${!(await popoverOpen())}`);
 };
 
 const desktop = async () => {
@@ -188,26 +233,38 @@ const desktop = async () => {
   for (const w of [1280, 700]) {
     await page.setViewportSize({ width: w, height: 800 });
     await settle();
-    section(`desktop ${w}: the status`);
-    const status = await box(".composer-status");
+    section(`desktop ${w}: the row`);
+    say(await rowOrder({ apart: true }));
+    const ring = await box(".composer .context-ring");
     const sendButton = await box(".composer .send");
-    say(`shows: ${!!status && status.width > 0}; clear of send: ${!overlaps(status, sendButton)}`);
+    say(`the ring shows: ${!!ring && ring.width > 0}; clear of send: ${!overlaps(ring, sendButton)}`);
     say(await rowFits());
-    say(`it says: ${(await page.locator(".composer-status").innerText()).trim().split("\n")[0]}`);
+    say(`the model: ${await modelChip()}; whole: ${await nameWhole()}`);
+    say(`the ring says: ${await page.locator(".composer .context-ring").getAttribute("aria-label")}`);
+    await page.locator(".composer textarea").focus();
+    say(`no glow around the focused composer: ${await page.locator(".composer-box").evaluate(e => getComputedStyle(e).boxShadow === "none")}`);
     await shoot(`desktop-${w}`);
   }
   await page.setViewportSize({ width: 1280, height: 800 });
   await settle();
 
-  section("desktop: the chips' menus act");
-  await pick("thinking", "high", "mouse");
-  await pick("mode", "ask", "mouse");
-  await pick("thinking", "", "keyboard");
+  section("desktop: the model's menu opens opaque");
+  await page.locator(".composer .model-chip").click();
+  say(`opacity as it appears: ${await openOpacity()}`);
+  await page.locator("#chip-popover.model-menu").waitFor();
+  say(`the reasoning column: ${await page.locator("#chip-popover .model-reasoning-title").count() > 0}; the access mode: ${(await page.locator("#chip-popover .model-access-button .chip-label").innerText()).trim()}`);
+  await page.keyboard.press("Escape");
+  await popoverGone();
+
+  section("desktop: the model's menu acts");
+  await pick("reasoning", "low", "mouse");
+  await pick("mode", "Ask first", "mouse");
+  await pick("reasoning", "", "keyboard");
   await pick("mode", "", "keyboard");
   await shoot("desktop-chips");
 
   section("desktop: a click outside closes, and goes no further");
-  for (const [chip, sel] of [["model", ".model-chip"], ["host", ".host-chip"], ["+", ".composer-plus .plus"], ["thinking", ".chip-anchor.thinking > button"], ["mode", ".chip-anchor.mode > button"]]) {
+  for (const [chip, sel] of [["model", ".model-chip"], ["host", ".host-chip"], ["+", ".composer-plus .plus"]]) {
     await page.locator(`.composer ${sel}`).first().click();
     await page.locator("#chip-popover").waitFor();
     // On the filter's button: had the click gone through, its menu would open.
@@ -218,24 +275,26 @@ const desktop = async () => {
     if (await page.locator(".filter-menu").count()) await page.keyboard.press("Escape");
   }
 
-  section("desktop: the status's details");
-  await page.locator(".composer-status .status-gauge").hover();
-  await settle();
-  say(`on hover: ${await page.locator(".composer-status .status-details").isVisible()}`);
+  section("desktop: the ring's card");
+  const cardShown = () => page.locator(".context-card").isVisible();
+  await page.locator(".composer .context-ring").hover();
+  await page.locator(".context-card").waitFor({ state: "visible" });
+  say(`on hover: ${await cardShown()}; it says: ${(await page.locator(".context-card-sub").innerText()).trim()}`);
+  say(`status: ${await cardLine("status-line")}; reasoning: ${await cardLine("reasoning-line")}; mode: ${await cardLine("mode-line")}`);
   await shoot("desktop-details");
   await page.mouse.move(640, 200);
-  await settle();
-  // By the keyboard (focus that shows): back from send, which a draft
-  // enables.
-  await page.locator(".composer textarea").fill("x");
-  await page.locator(".composer .send:not(:disabled)").focus();
-  await page.keyboard.press("Shift+Tab");
-  await settle();
-  say(`on keyboard focus (${await page.evaluate(() => document.activeElement?.getAttribute("aria-label")?.split(":")[0])}): ${await page.locator(".composer-status .status-details").isVisible()}`);
-  await page.locator(".composer textarea").fill("");
-  await page.locator(".composer-status button.context").click();
+  await page.locator(".context-card").waitFor({ state: "hidden" });
+  // By the keyboard (focus that shows): on from the paperclip.
+  await page.locator(".composer .composer-plus .plus").focus();
+  await page.keyboard.press("Tab");
+  await page.locator(".context-card").waitFor({ state: "visible" });
+  say(`on keyboard focus (${await page.evaluate(() => document.activeElement?.getAttribute("aria-label")?.split(":")[0])}): ${await cardShown()}`);
+  await page.locator(".composer .context-ring").click();
+  await page.locator(".context-ring-anchor.open").waitFor();
+  say(`a click keeps it open: ${await cardShown()}`);
+  await page.locator(".context-card .context-details").click();
   await page.locator(".modal").waitFor();
-  say(`the context opens: ${(await page.locator(".modal h2").first().innerText()).trim()}`);
+  say(`its Details open: ${(await page.locator(".modal h2").first().innerText()).trim()}`);
   await page.keyboard.press("Escape");
   await page.waitForSelector(".modal", { state: "detached" });
   await context.close();
@@ -243,6 +302,10 @@ const desktop = async () => {
 
 const tap = (x, y) => page.touchscreen.tap(x, y);
 const more = () => page.getByRole("button", { name: "Panels and settings" }).tap();
+const closeChipSheet = async () => {
+  await page.locator(".popover-backdrop").tap({ position: { x: 10, y: 10 }, force: true });
+  await popoverGone();
+};
 const closeSheet = async () => {
   if (await page.locator(".chrome-backdrop").count()) await page.locator(".chrome-backdrop").tap({ position: { x: 10, y: 10 }, force: true });
   await settle();
@@ -278,24 +341,59 @@ const phone = async (w, h, { pwa = false } = {}) => {
 
   section(`${tag}: the composer's row`);
   say(await rowFits());
-  say(`it shows: ${(await page.locator(".composer-row button:visible").evaluateAll(bs => bs.map(b => (b.getAttribute("aria-label") || b.innerText).trim().split("\n")[0]).join(", "))).replaceAll(hostname(), "<HOSTNAME>")}`);
+  say(await rowOrder());
+  say(`the model: ${await modelChip()}; whole: ${await nameWhole()}`);
+  const small = await page.locator(".composer-row button:visible").evaluateAll(bs => bs
+    .filter(b => !b.closest("#chip-popover, .context-card"))
+    .filter(b => Math.min(b.getBoundingClientRect().width, b.getBoundingClientRect().height) < 39.5)
+    .map(b => b.getAttribute("aria-label") || b.className));
+  say(`under 40px: ${small.join(", ") || "none"}`);
   await shoot(`${tag}-composer`);
 
-  section(`${tag}: the ⋯ sheet's choices act`);
-  for (const [name, option] of [["Thinking", "high"], ["Mode", "ask"], ["Transcript", "verbose"]]) {
+  section(`${tag}: the sheets' choices act`);
+  for (const [name, option] of [["Reasoning", "low"], ["Access", "Auto-edit"]]) {
+    await page.locator(".composer .model-chip").tap();
+    await page.locator("#chip-popover.model-menu").waitFor();
+    if (name === "Reasoning") {
+      await page.locator("#chip-popover .reasoning-row", { has: page.locator(".reasoning-label", { hasText: new RegExp(`^${option}$`, "i") }) }).tap();
+      await page.locator("#chip-popover .reasoning-row.on .reasoning-label", { hasText: new RegExp(`^${option}$`, "i") }).waitFor();
+      await shoot(`${tag}-sheet-reasoning`);
+    } else {
+      await page.locator("#chip-popover .model-access-button").tap();
+      await page.locator("#chip-popover .model-access-item", { has: page.locator(".menu-label", { hasText: new RegExp(`^${option}$`) }) }).tap();
+      await page.locator("#chip-popover .model-access-button .chip-label", { hasText: new RegExp(`^${option}$`) }).waitFor();
+      await shoot(`${tag}-sheet-access`);
+    }
+    await closeChipSheet();
+    await page.waitForFunction(() => !document.querySelector(".composer .model-chip.pending"));
+    await page.locator(".composer .model-chip").tap();
+    await page.locator("#chip-popover.model-menu").waitFor();
+    const again = name === "Reasoning"
+      ? await page.locator("#chip-popover .reasoning-row.on .reasoning-label").innerText()
+      : await page.locator("#chip-popover .model-access-button .chip-label").innerText();
+    say(`${name}: reopened: ${again.trim()}; the chip: ${await modelChip()}`);
+    await closeChipSheet();
+  }
+  {
     await more();
-    const sec = page.locator(".chrome-menu .session-section", { has: page.locator(".session-section-title", { hasText: name }) });
-    await sec.locator(".session-choice", { hasText: new RegExp(`^${option}$`) }).tap();
-    await settle();
-    const now = await sec.locator(".session-choice.on").innerText().catch(() => "none");
-    // Closed and opened again: the session has it.
+    const sec = page.locator(".chrome-menu .session-section", { has: page.locator(".session-section-title", { hasText: "Transcript" }) });
+    await sec.locator(".session-choice", { hasText: /^verbose$/ }).tap();
+    await sec.locator(".session-choice.on", { hasText: /^verbose$/ }).waitFor();
     await closeSheet();
     await more();
-    const again = await sec.locator(".session-choice.on").innerText().catch(() => "none");
-    say(`${name}: ${now}; reopened: ${again}`);
-    if (name === "Thinking" || name === "Mode") await shoot(`${tag}-sheet-${name.toLowerCase()}`);
+    say(`Transcript: reopened: ${await sec.locator(".session-choice.on").innerText().catch(() => "none")}`);
     await closeSheet();
   }
+
+  section(`${tag}: the ring's card`);
+  await page.locator(".composer .context-ring").tap();
+  await page.locator(".context-ring-anchor.open .context-card").waitFor({ state: "visible" });
+  const card = await box(".context-card");
+  say(`a sheet at the foot, the screen's width: ${Math.abs(card.y + card.height - h) < 2 && card.width >= w - 1}; mode: ${await cardLine("mode-line")}`);
+  await shoot(`${tag}-ring-card`);
+  await page.locator(".context-backdrop").tap({ position: { x: 10, y: 10 }, force: true });
+  await page.locator(".context-ring-anchor.open").waitFor({ state: "detached" });
+  say(`a tap outside closes it: ${!(await page.locator(".context-card").isVisible())}`);
 
   section(`${tag}: a tap outside closes, and goes no further`);
   const menu = await box(".chat-chrome .toggle-sidebar");

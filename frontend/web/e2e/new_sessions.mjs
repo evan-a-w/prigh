@@ -129,14 +129,16 @@ const pick = async (p, opener, query, label) => {
   await p.locator(".picker-dialog #picker-input").press("Enter");
   await p.locator(".setting.default-model").waitFor();
 };
-// The session's chips (model, host, thinking, mode) and where it is.
+// The session's model (its chip, with the reasoning), mode (the ring's
+// card) and host, and where it is.
 const chips = p =>
   p.evaluate(() => {
     const t = s => document.querySelector(s)?.getAttribute("title") ?? document.querySelector(s)?.innerText.trim() ?? "-";
+    const v = s => document.querySelector(`.context-card .${s} .status-detail-value`)?.textContent.trim() ?? "-";
     return [
       `model: ${t(".model-chip")}`,
-      `thinking: ${t(".thinking-chip")}`,
-      `mode: ${t(".mode-chip")}`,
+      `thinking: ${v("reasoning-line")}`,
+      `mode: ${v("mode-line")}`,
       `host: ${t(".host-chip")}`,
     ].join("\n");
   });
@@ -268,7 +270,7 @@ try {
   console.log(normalise(await chips(page)));
   await run(page, "/chat off");
   await page.locator(".host-chip:not(.chatting) .chip-label", { hasText: laptopName }).waitFor();
-  await page.waitForFunction(() => !/Switching/.test(document.querySelector(".mode-chip")?.getAttribute("title") ?? "Switching"));
+  await page.waitForFunction(() => !/Chat/.test(document.querySelector(".context-card .mode-line .status-detail-value")?.textContent ?? "Chat"));
   section("leaving the chat");
   console.log(normalise(await chips(page)));
 

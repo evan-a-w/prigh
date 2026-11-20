@@ -21,7 +21,7 @@ let update delta content =
 ;;
 
 let show h =
-  H.text h ~selector:".composer-status .activity.running";
+  H.text h ~selector:".context-ring-anchor.busy .sr-only";
   H.show h ~selector:".msg.assistant.streaming";
   print_endline "---"
 ;;
@@ -64,7 +64,7 @@ let%expect_test
     (update
        {|{"type":"text_delta","text":"Hello"}|}
        [ {|{"type":"text","text":"Hello"}|} ]);
-  H.text h ~selector:".composer-status .activity.running";
+  H.text h ~selector:".context-ring-anchor.busy .sr-only";
   [%expect
     {|
     Waiting for the model

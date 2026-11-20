@@ -46,11 +46,18 @@ let help =
   ; ( "!cmd"
     , "run a shell command (!!cmd: not added to the context; !&cmd: as a \
        background job)" )
-  ; "Ctrl+L", "switch model: the model chip's menu"
+  ; ( "Ctrl+L"
+    , "the model chip's menu: models by provider, their reasoning and the \
+       access mode" )
+  ; ( "← → / ↑ ↓ (in the model menu)"
+    , "← → the previous or next provider (or the favourites); ↑ ↓ the models; \
+       Enter switches, Esc closes" )
+  ; "Alt+1…9 (in the model menu)", "switch to the list's Nth model"
+  ; "Alt+F (in the model menu)", "star or unstar the highlighted model"
   ; ( "↑ ↓ / Enter / Esc (a chip's menu)"
     , "move / choose / close it; type to filter the models or hosts" )
-  ; ( "← → / Tab (a chip's menu)"
-    , "the next chip's menu (model, thinking, mode, host)" )
+  ; ( "Tab (a chip's menu; ← → in the host's)"
+    , "the next chip's menu (host, model)" )
   ; "Ctrl+P / Alt+P", "next / previous scoped model (/scoped-models)"
   ; "Alt+T", "cycle the thinking level"
   ; ( "Alt+M"
@@ -114,6 +121,8 @@ let help =
   ; ( "← → / ↑ ↓ (on a panel's edge)"
     , "resize the panel (Shift: faster; Home / End: smallest / largest; Enter: \
        the default size); or drag the edge, double-click to reset" )
+  ; ( "Esc (the context ring's card open)"
+    , "close the card (the ring by the paperclip: context, cost, Compact)" )
   ; "Alt+1…9", "follow subagent or job N in the agents panel"
   ; "Alt+] Alt+[", "the next or previous subagent or job"
   ; "Alt+0", "close the agents panel"
@@ -345,6 +354,21 @@ let dialog_key (dialog : Dialog.t) t : App.Action.t option =
       | Scoped_models _
       | Pulls _
       | Control _ ) ) -> Some (Dialog_move 8)
+  (* In the model's menu ← → go along the rail of providers, Alt+1…9 picks
+     the list's Nth, Alt+F stars the highlighted; Option+digit types a
+     symbol on a Mac, so the physical key. *)
+  | ("ArrowLeft" | "ArrowRight"), Popover { chip = Model; picker }
+    when plain t && String.is_empty (Picker.query picker) ->
+    Some (Model_menu_step (if String.equal t.key "ArrowLeft" then -1 else 1))
+  | _, Popover { chip = Model; _ }
+    when alt_only t
+         && String.is_prefix t.code ~prefix:"Digit"
+         && not (String.equal t.code "Digit0") ->
+    Option.map
+      (Int.of_string_opt (String.drop_prefix t.code 5))
+      ~f:(fun n -> App.Action.Model_menu_nth n)
+  | _, Popover { chip = Model; _ } when alt_letter t "f" ->
+    Some (Toggle_favourite None)
   (* In the model's filter ← → move the caret once something is typed. *)
   | ("ArrowLeft" | "ArrowRight"), Popover { picker; _ }
     when plain t && String.is_empty (Picker.query picker) ->
@@ -417,6 +441,7 @@ let editor_key (m : App.Model.t) t ~cursor : App.Action.t option =
   | "Enter", _ when t.shift || t.ctrl || t.meta -> None
   | "Enter", _ when t.alt -> Some Send_follow_up
   | "Enter", _ -> Some Send
+  | "Escape", _ when m.context_card -> Some Toggle_context_card
   | "Escape", _ when Option.is_some m.btw -> Some Close_btw
   | "Escape", _ when not (Recipient.equal m.recipient Recipient.Main) ->
     Some (Set_recipient Main)
@@ -682,6 +707,8 @@ let handle (m : App.Model.t) t : App.Action.t option =
      | "Escape" when App.Model.drawer m -> Some Toggle_sidebar
      | "Escape" when m.narrow && m.status_tray && Option.is_none m.dialog ->
        Some Toggle_status_tray
+     | "Escape" when m.context_card && Option.is_none m.dialog ->
+       Some Toggle_context_card
      (* On a phone the file browser is a sheet: Esc closes it from anywhere. *)
      | "Escape" when m.narrow && m.files.open_ && not (Files.asking m.files) ->
        Some (Files Close)

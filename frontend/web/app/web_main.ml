@@ -244,7 +244,8 @@ let place_popover () =
           set "--popover-shift" (-.Float.min over room));
         (* The current choice in the middle of a long list. *)
         Js.Opt.iter
-          (el##querySelector (Js.string ".popover-item.selected"))
+          (el##querySelector
+             (Js.string ".popover-item.selected, .model-row.selected"))
           (fun item ->
              (Js.Unsafe.coerce item)##scrollIntoView
                (Js.Unsafe.obj
