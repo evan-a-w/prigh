@@ -151,6 +151,10 @@ let every =
       "tell you when a turn ends or something waits for you while the tab is \
        hidden"
   ; c
+      "usage"
+      "how much of your Claude and ChatGPT subscriptions' usage limits you \
+       have used, in Settings"
+  ; c
       ~argument:Memory
       ~args:"[on|off]"
       "memory"

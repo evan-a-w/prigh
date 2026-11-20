@@ -33,6 +33,7 @@ type t =
   | Instructions
   | Mcp
   | Git_hosts
+  | Usage
   | Nix_store
   | Account
 [@@deriving sexp_of, equal, enumerate]
@@ -70,6 +71,7 @@ let name = function
   | Instructions -> "Custom instructions"
   | Mcp -> "MCP servers"
   | Git_hosts -> "Git hosts"
+  | Usage -> "Usage limits"
   | Nix_store -> "Nix store"
   | Account -> "Account"
 ;;
@@ -124,6 +126,7 @@ let keywords = function
   | Instructions -> "standing preferences"
   | Mcp -> "tools servers"
   | Git_hosts -> "github forgejo forge git hosting sign in"
+  | Usage -> "subscription quota rate limits claude chatgpt codex"
   | Nix_store -> "garbage collect disk"
   | Account -> "sign out user"
 ;;
@@ -178,6 +181,7 @@ let page t : (Settings_section.t * string) option =
   | Instructions -> Some (Custom_instructions, "Your instructions")
   | Mcp -> Some (Mcp, "MCP servers")
   | Git_hosts -> Some (Git_hosting, "Git hosting")
+  | Usage -> Some (Usage, "Usage")
   | Nix_store -> Some (Nix_store, "Nix store")
   | Account -> Some (Account, "Account")
 ;;

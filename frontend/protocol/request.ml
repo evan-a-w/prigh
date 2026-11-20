@@ -66,6 +66,7 @@ module Method = struct
     | Enter_worktree of string
     | Worktree_back of { main : bool }
     | Forge_status
+    | Usage_limits
     | Forge_login of
         { host : string
         ; kind : string option
@@ -238,6 +239,7 @@ module Method = struct
     | Enter_worktree _ -> "set_cwd"
     | Worktree_back _ -> "worktree_back"
     | Forge_status -> "forge_status"
+    | Usage_limits -> "usage_limits"
     | Forge_login _ -> "forge_login"
     | Forge_logout _ -> "forge_logout"
     | Pr_list _ -> "pr_list"
@@ -309,6 +311,7 @@ module Method = struct
     | List_skills
     | List_mcp { reconnect = false }
     | Forge_status
+    | Usage_limits
     | Get_review
     | Nix_store_status
     | Get_memory

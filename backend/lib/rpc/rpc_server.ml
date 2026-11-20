@@ -109,6 +109,7 @@ let methods =
   ; "auth_respond"
   ; "auth_cancel"
   ; "logout"
+  ; "usage_limits"
   ; "forge_status"
   ; "forge_login"
   ; "forge_logout"
@@ -458,6 +459,7 @@ type t =
     (** where the cwds of saved sessions that recorded none are in git, read
         from the backend's files once (see [with_repo]) *)
   ; nix_store : Nix_store.t option
+  ; usage_http : Subscription_usage.Http.t
   ; temporaries : Temporary.t String.Table.t (** by session id *)
   ; temporary_grace : float
   ; ledger_dir : string
@@ -1142,6 +1144,7 @@ let create
       ?mcp_settings
       ?mcp_auth
       ?nix_store
+      ?usage_http
       ~login
       ~sessions_dir
       ~cwd
@@ -1225,6 +1228,9 @@ let create
     ; served = Promise.create ()
     ; repos = String.Table.create ()
     ; nix_store
+    ; usage_http =
+        Option.value_or_thunk usage_http ~default:(fun () ->
+          Subscription_usage.Http.real ~env)
     ; temporaries = String.Table.create ()
     ; temporary_grace
     ; ledger_dir = Temporary_ledger.dir ~sessions_dir
@@ -3320,6 +3326,16 @@ let dispatch_server t (client : Client.t) ~meth ~params
       if Result.is_error result || not (Login_manager.in_progress t.login)
       then t.login_owner <- previous;
       unit_result result)
+  | "usage_limits" ->
+    Some
+      (ok
+         (Subscription_usage.to_json
+            (Subscription_usage.fetch
+               ~env:(Agent.env agent)
+               ~getenv:(Login_manager.getenv t.login)
+               ~http:t.usage_http
+               ~now:t.now
+               (Login_manager.store t.login))))
   | "forge_status" ->
     Some
       (Or_error.map (Forges.accounts t.forges) ~f:(fun accounts ->

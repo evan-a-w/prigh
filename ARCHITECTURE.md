@@ -514,6 +514,20 @@ two can share one.
 - `Oauth_openai_codex` — auth.openai.com authorization with a random state,
   callback on port 1455, form-encoded exchange/refresh, ChatGPT account id
   extracted from the access token's JWT claims.
+- `Subscription_usage` — the `usage_limits` RPC (prigh-web's Settings →
+  Usage, `/usage`): with the stored logins (refreshed as for model
+  requests by `Provider_auth.resolve`), Claude's `GET
+  api.anthropic.com/api/oauth/usage` (beta `oauth-2025-04-20`, a
+  `claude-code/VERSION` user agent; named windows `five_hour`, `seven_day`,
+  `seven_day_opus`… as `{utilization, resets_at}`, or the newer `limits`
+  rows, preferred when present) and ChatGPT's `GET
+  chatgpt.com/backend-api/wham/usage` (`chatgpt-account-id`; `plan_type`,
+  `rate_limit.primary_window`/`secondary_window` and
+  `additional_rate_limits`), both at once. Unknown windows keep their
+  names; every failure is a per-provider `error` saying what to do (sign in
+  again, Refresh later). `PRIGH_USAGE_ORIGIN` replaces both origins for
+  prigh-web's e2e. Asked only when the page opens or on Refresh: Anthropic
+  rate-limits the endpoint hard.
 - `Login_manager` — runs at most one flow at a time in a background fiber and
   turns its prompts and notices into `auth` events; the client answers
   prompts by id (`auth_respond`) or cancels (`auth_cancel`). A prompt that the
@@ -3765,7 +3779,9 @@ terminal frontend and `web/` prigh-web, the browser one.
       status's extras; Prigh_ui's `Nix_gc_command` parses `/nix-gc` and
       words it for both frontends, and `Slash`/`Commands.all ~superuser`
       leave it out for everyone else: no completion, `/help` or "did you
-      mean"), the account; its controls are
+      mean"), the subscriptions' usage limits (`Usage_page`, `Usage_view`:
+      `usage_limits` asked as it opens and on Refresh, never polled), the
+      account; its controls are
       `Action.Run` commands, which leave it open),
       `Toast` (at most two, the newest, over the bottom of the chat
       column, beside the jump-to-the-end button rather than over it; a

@@ -760,6 +760,7 @@ Appearance
 Sessions
 New sessions
 Models
+Usage
 Memory
 About you
 Custom instructions
@@ -984,6 +985,7 @@ Appearance
 Sessions
 New sessions
 Models
+Usage
 Memory
 About you
 Custom instructions
@@ -3267,7 +3269,7 @@ Jump to a message, Filter the transcript, Files, Terminal, Settings
 === firefox: mobile: 390x844: the settings' list ===
 ok
 === firefox: mobile: 390x844: the settings ===
-Appearance, Sessions, New sessions, Models, Memory, About you, Custom instructions, MCP servers, Git hosting, Account
+Appearance, Sessions, New sessions, Models, Usage, Memory, About you, Custom instructions, MCP servers, Git hosting, Account
 === firefox: mobile: 390x844: settings: appearance ===
 ok
 title: Appearance; back: Settings
@@ -3312,7 +3314,7 @@ Jump to a message, Filter the transcript, Files, Terminal, Settings
 === firefox: mobile: 320x640: the settings' list ===
 ok
 === firefox: mobile: 320x640: the settings ===
-Appearance, Sessions, New sessions, Models, Memory, About you, Custom instructions, MCP servers, Git hosting, Account
+Appearance, Sessions, New sessions, Models, Usage, Memory, About you, Custom instructions, MCP servers, Git hosting, Account
 === firefox: mobile: 320x640: settings: appearance ===
 ok
 title: Appearance; back: Settings
@@ -3919,6 +3921,62 @@ deleting fits: yes; targets: all ok
 editing fits: yes; targets: all ok
 back: Memory | What you asked the model to remember, for later sessions. Kept on the backend, for your account.
 === firefox: memory: errors ===
+(none)
+=== firefox: usage: opened ===
+Usage
+How much of your Claude and ChatGPT subscriptions' usage limits you have used, as the providers report it. Read when you open this page.
+Subscription limits
+Read TIME (just now). Updated when you open this page or press Refresh.
+Refresh
+CLAUDE
+5-hour session
+Resets in 2h 15m · TIME
+33% used
+Weekly · all models
+Resets in 3d 4h · TIME
+91% used
+Weekly · Opus
+Reset time not reported
+4% used
+CHATGPT
+Plus
+5-hour session
+Resets in 43m · TIME
+72% used
+Weekly
+Resets in 6d · TIME
+12% used
+bars: 5-hour session used=33, Weekly · all models used=91, Weekly · Opus used=4, 5-hour session used=72, Weekly used=12
+asked: Claude 1, ChatGPT 1
+=== firefox: usage: refreshed ===
+asked: Claude 2, ChatGPT 2; ChatGPT's session: 75% used
+=== firefox: usage: Claude rate limited ===
+Usage
+How much of your Claude and ChatGPT subscriptions' usage limits you have used, as the providers report it. Read when you open this page.
+Subscription limits
+Read TIME (just now). Updated when you open this page or press Refresh.
+Refresh
+CLAUDE
+Could not read the limits
+Claude is limiting how often usage is read (HTTP 429): Refresh in a minute
+CHATGPT
+Plus
+5-hour session
+Resets in 43m · TIME
+75% used
+Weekly
+Resets in 6d · TIME
+12% used
+bars: 5-hour session used=75, Weekly used=12
+=== firefox: usage: reopened ===
+asked again: 2
+=== firefox: usage: phone 390x844 ===
+fits: yes; targets: all ok
+back: Usage | How much of your Claude and ChatGPT subscriptions' usage limits you have used, as the providers report it. Read when you open this page.
+=== firefox: usage: phone 320x640 ===
+fits: yes; targets: all ok
+back: Usage | How much of your Claude and ChatGPT subscriptions' usage limits you have used, as the providers report it. Read when you open this page.
+=== firefox: usage: errors ===
 (none)
 === firefox: user info: moved from user_info.md ===
 About you

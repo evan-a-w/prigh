@@ -94,6 +94,7 @@ let%expect_test "every command does something (none is unknown)" =
     /todos                     toast: No plan: the model has not made one (it makes one with update_plan).
     /permissions               permissions dialog
     /notify                    toast: Notifications are on, but the browser has not been asked yet: /notify on asks it
+    /usage                     Settings
     /memory                    Settings
     /instructions              Settings
     /user-info                 Settings

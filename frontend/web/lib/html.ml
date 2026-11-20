@@ -129,6 +129,7 @@ module Icon = struct
     | Keep
     | Clipboard
     | Plug
+    | Gauge
   [@@deriving sexp_of]
 
   (* Paths in the style of Lucide (24x24, stroked). *)
@@ -257,6 +258,8 @@ module Icon = struct
       {|<rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>|}
     | Plug ->
       {|<path d="M12 22v-5M9 8V2M15 8V2M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8z"/>|}
+    | Gauge ->
+      {|<path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/>|}
   ;;
 
   let name t = String.lowercase (Sexp.to_string (sexp_of_t t))

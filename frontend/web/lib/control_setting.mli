@@ -40,6 +40,7 @@ type t =
   | Instructions
   | Mcp
   | Git_hosts
+  | Usage
   | Nix_store
   | Account
 [@@deriving sexp_of, equal, enumerate]

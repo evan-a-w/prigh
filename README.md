@@ -999,7 +999,10 @@ and the limits every session without its own follows: the fallback models
 from the next new session, open sessions keep their own (the fallback chain
 and the budget, which open sessions follow too, aside), and every client's
 settings follow it at once), **Models** (the providers
-(`/auth`) and compaction), **Memory** (the model's notes and the switch
+(`/auth`) and compaction), **Usage** (how much of your Claude and
+ChatGPT subscriptions' limits you have used: each window, e.g. the 5-hour
+session and the week, as a bar with when it resets; read when it opens and
+on Refresh; `/usage`), **Memory** (the model's notes and the switch
 that turns memory off), **About you** (a form about yourself for the
 model, `/user-info`), **Git hosting**, **Nix store** (superusers) and
 **Account** (who you are signed in, and acting, as, with Switch account and
@@ -2943,6 +2946,7 @@ it.
 | `/notify [off\|bell\|desktop]` (TUI), `/notify [on\|off]` (prigh-web) | how to tell you that a turn ended, a tool waits for confirmation or background work finished while you look elsewhere |
 | `/budget [dollars\|off]` | show or set the session's cost budget: no turn starts once it is spent |
 | `/goal [text\|off\|resume]` | set a goal the agent keeps working toward until it is met; show, clear or resume it |
+| `/usage` (prigh-web) | open Settings → Usage: your Claude and ChatGPT subscriptions' usage limits (5-hour session, weekly, per-model), each with the share used and when it resets |
 | `/memory [on\|off]` | pick among the notes the model saved (Ctrl+D forgets one; prigh-web opens Settings → Memory); `on`/`off` gives the model the memory tool or takes it away |
 | `/user-info [FIELD VALUE\|clear]` | what you set about yourself for the model (name, country, time zone, units…), in the context of every session: show it, set one field (no VALUE clears it) or clear them all (prigh-web opens Settings → About you) |
 | `/remind [stop [N] TEXT\|every N TEXT\|rm NAME\|off]` | remind the agent when it ends its turn (at most N times in a row, default 3) or every N turns; without arguments, pick among the session's (Ctrl+D / Delete removes one); `rm` removes one, `off` all |
