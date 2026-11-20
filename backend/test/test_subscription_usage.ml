@@ -488,3 +488,33 @@ let%expect_test "rpc: usage_limits" =
     {"provider":"openai-codex","name":"ChatGPT","status":"not_signed_in"}
     |}]
 ;;
+
+let%expect_test "PRIGH_USAGE_ORIGIN stands in for both origins" =
+  fetch
+    ~env_vars:[ "PRIGH_USAGE_ORIGIN", "http://127.0.0.1:9" ]
+    ~answers:
+      [ "http://127.0.0.1:9/api/oauth/usage", Ok (200, [], "{}")
+      ; "http://127.0.0.1:9/backend-api/wham/usage", Ok (200, [], "{}")
+      ]
+    ~store_with:
+      [ Anthropic, oauth "claude-token"
+      ; Openai_codex, oauth "codex-token" ~account_id:"a"
+      ]
+    ();
+  [%expect
+    {|
+    GET http://127.0.0.1:9/api/oauth/usage
+      Authorization: Bearer claude-token
+      anthropic-beta: oauth-2025-04-20
+      Content-Type: application/json
+      User-Agent: claude-code/2.1.322
+    GET http://127.0.0.1:9/backend-api/wham/usage
+      Authorization: Bearer codex-token
+      chatgpt-account-id: a
+      originator: prigh
+      User-Agent: prigh/0.1.0
+    fetched at 2026-11-26T05:13:20.000000Z
+    Claude: plan: -
+    ChatGPT: plan: -
+    |}]
+;;

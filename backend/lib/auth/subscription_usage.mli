@@ -88,7 +88,8 @@ val parse_anthropic : string -> Status.t
 
 val parse_codex : now:float -> string -> Status.t
 
-(** The signed-in providers' usage, asked for at once. *)
+(** The signed-in providers' usage, asked for at once. [PRIGH_USAGE_ORIGIN]
+    (from [getenv]) replaces both providers' origins, for prigh-web's e2e. *)
 val fetch
   :  env:Env.t
   -> ?getenv:(string -> string option)

@@ -353,8 +353,14 @@ let parse_codex ~now body =
     Limits { plan = string_field json "plan_type"; windows = main @ additional }
 ;;
 
-let anthropic_url = "https://api.anthropic.com/api/oauth/usage"
-let codex_url = "https://chatgpt.com/backend-api/wham/usage"
+let anthropic_origin = "https://api.anthropic.com"
+let codex_origin = "https://chatgpt.com"
+
+(* [PRIGH_USAGE_ORIGIN] stands in for both providers' (prigh-web's e2e). *)
+let url ?getenv origin path =
+  let getenv = Option.value getenv ~default:Sys.getenv in
+  Option.value (getenv "PRIGH_USAGE_ORIGIN") ~default:origin ^ path
+;;
 
 let retry_after headers =
   List.find_map headers ~f:(fun (k, v) ->
@@ -436,7 +442,7 @@ let fetch_one ~env ?getenv ?refresh ~(http : Http.t) ~now store provider =
             provider
             ~parse:parse_anthropic
             (http
-               ~url:anthropic_url
+               ~url:(url ?getenv anthropic_origin "/api/oauth/usage")
                ~headers:
                  [ "Authorization", "Bearer " ^ token
                  ; "anthropic-beta", "oauth-2025-04-20"
@@ -457,7 +463,7 @@ let fetch_one ~env ?getenv ?refresh ~(http : Http.t) ~now store provider =
             provider
             ~parse:(parse_codex ~now:(now ()))
             (http
-               ~url:codex_url
+               ~url:(url ?getenv codex_origin "/backend-api/wham/usage")
                ~headers:
                  [ "Authorization", "Bearer " ^ resolved.token
                  ; "chatgpt-account-id", account_id
