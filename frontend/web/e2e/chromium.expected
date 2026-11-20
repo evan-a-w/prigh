@@ -21,7 +21,6 @@ What are we building?
 === chromium: signed in: the session's card ===
 <HOSTNAME>
 V4.1 Flash
-High
 === chromium: a dialog keeps the focus ===
 Tab: dialog: Close (Esc)
 Tab: dialog: Keys
@@ -105,7 +104,6 @@ three lines
 === chromium: the session's card after a run ===
 <HOSTNAME>
 V4.1 Flash
-High
 === chromium: a budget in the ring's card ===
 This session
 $<COST> · $<COST>/$<COST>
@@ -360,7 +358,6 @@ anything new?
 === chromium: the model and host controls ===
 <HOSTNAME>
 V4.1 Flash
-High
 === chromium: the host picker ===
 Where tools run
 <HOSTNAME>
@@ -385,10 +382,10 @@ High
 Default
 Max
 model's menu: over the composer, shifted inside the composer, inside the window; focus in it: true
-the chip: V4.1 Flash High; closed: true; focus: editor
+the chip: V4.1 Flash; closed: true; focus: editor
 model's menu: over the composer, shifted inside the composer, inside the window; focus in it: true
 === chromium: the model chip's menu, filtered ===
-DeepSeek V4.1 FlashDeepSeek
+DeepSeek V4.1 Flash
 Alt+1
 === chromium: the host chip's menu, from the model's with Shift+Tab ===
 /host
@@ -402,7 +399,6 @@ Context 0% full, $<COST>: details
 mode: Asks: edits & commands
 <HOSTNAME>
 V4.1 Flash
-High
 === chromium: a confirmation ===
 Confirm
 Run bash: echo built-ok?
@@ -445,7 +441,6 @@ Context 0% full, $<COST>: details
 mode: Plan mode
 <HOSTNAME>
 V4.1 Flash
-High
 === chromium: plan mode: the composer's placeholder ===
 Plan mode: discuss the plan, or leave it to implement (/plan off or Alt+M)…
 === chromium: the plan, in plan mode ===
@@ -466,7 +461,6 @@ mode: Auto: never asks
 plan 0/2: Write the schema
 <HOSTNAME>
 V4.1 Flash
-High
 === chromium: implementing ===
 ◇
 Plan mode off: the model was told it can change files
@@ -731,17 +725,17 @@ on a phone: 0 handles
 hl-kw:let hl-kw:rec hl-kw:if hl-num:2 hl-kw:then hl-kw:else hl-num:1 hl-num:2 hl-com:(* slow *)
 hl-prop:"name" hl-str:"prigh" hl-prop:"ok" hl-con:true hl-prop:"n" hl-num:3
 === chromium: the session: a 700px chat column ===
-chat 700; chips: <HOSTNAME>, V4.1 Flash High; status: Context 0% full, $<COST>: details; .chat-chrome 44px high
+chat 700; chips: <HOSTNAME>, V4.1 Flash; status: Context 0% full, $<COST>: details; .chat-chrome 44px high
 .chat-chrome: fits
 .composer: fits
 the panels' toggles: 3 buttons 10px from the top, 14px from the right, clear of the jump list: true, open: Files
 === chromium: the session: a 520px chat column ===
-chat 520; chips: icon, V4.1 Flash High; status: Context 0% full, $<COST>: details; .chat-chrome 44px high
+chat 520; chips: icon, V4.1 Flash; status: Context 0% full, $<COST>: details; .chat-chrome 44px high
 .chat-chrome: fits
 .composer: fits
 the panels' toggles: 3 buttons 10px from the top, 14px from the right, clear of the jump list: true, open: Files
 === chromium: the session: a 400px chat column ===
-chat 400; chips: icon, V4.1 Flash High; status: Context 0% full, $<COST>: details; .chat-chrome 44px high
+chat 400; chips: icon, V4.1 Flash; status: Context 0% full, $<COST>: details; .chat-chrome 44px high
 .chat-chrome: fits
 .composer: fits
 the panels' toggles: 3 buttons 10px from the top, 14px from the right, clear of the jump list: true, open: Files
@@ -792,17 +786,17 @@ desktop: dialog 940x704, in the window: true; sections down the side; panel fits
 phone: dialog 390x844, the screen: true; back: Settings; panel fits: true
 Esc closes it, the editor has the focus: true
 === chromium: the session's bar: a 900px chat column without the sidebar ===
-chat 900; chips: <HOSTNAME>, V4.1 Flash High; status: Context 0% full, $<COST>: details; .chat-chrome 44px high
+chat 900; chips: <HOSTNAME>, V4.1 Flash; status: Context 0% full, $<COST>: details; .chat-chrome 44px high
 .chat-chrome: fits
 .composer: fits
 the panels' toggles: 4 buttons 10px from the top, 14px from the right, clear of the jump list: true, open: Files
 === chromium: the session's bar: a 600px chat column without the sidebar ===
-chat 600; chips: icon, V4.1 Flash High; status: Context 0% full, $<COST>: details; .chat-chrome 44px high
+chat 600; chips: icon, V4.1 Flash; status: Context 0% full, $<COST>: details; .chat-chrome 44px high
 .chat-chrome: fits
 .composer: fits
 the panels' toggles: 4 buttons 10px from the top, 14px from the right, clear of the jump list: true, open: Files
 === chromium: the session's bar: a 400px chat column without the sidebar ===
-chat 400; chips: icon, V4.1 Flash High; status: Context 0% full, $<COST>: details; .chat-chrome 44px high
+chat 400; chips: icon, V4.1 Flash; status: Context 0% full, $<COST>: details; .chat-chrome 44px high
 .chat-chrome: fits
 .composer: fits
 the panels' toggles: 4 buttons 10px from the top, 14px from the right, clear of the jump list: true, open: Files
@@ -818,7 +812,7 @@ centred: true
 controls: all in view
 === chromium: temporary: desktop: a chip's menu ===
 under the pointer on Off: the item (hovered: true)
-the chip: changed (Off chosen)
+the chip: unchanged (Off chosen)
 === chromium: temporary: desktop: Temporary on ===
 heading: Temporary session | Not saved and not listed. Deleted when you leave.
 listed: 0
@@ -859,7 +853,7 @@ composer at the foot: true
 controls: all in view
 === chromium: temporary: 390x844: a chip's menu ===
 under the pointer on Off: the item
-the chip: changed (Off chosen)
+the chip: unchanged (Off chosen)
 === chromium: temporary: 390x844: Temporary on ===
 heading: Temporary session | Not saved and not listed. Deleted when you leave.
 listed: 0
@@ -900,7 +894,7 @@ composer at the foot: true
 controls: all in view
 === chromium: temporary: 320x640: a chip's menu ===
 under the pointer on Off: the item
-the chip: changed (Off chosen)
+the chip: unchanged (Off chosen)
 === chromium: temporary: 320x640: Temporary on ===
 heading: Temporary session | Not saved and not listed. Deleted when you leave.
 listed: 0
@@ -3161,7 +3155,7 @@ ring: Context 0% full, $<COST>: details; Ready; turning: false; calm
 mode: Plan mode; over the chat: nothing
 fits
 === chromium: card: the composer's chips ===
-chips 1: <HOSTNAME> | V4.1 Flash High
+chips 1: <HOSTNAME> | V4.1 Flash
 chip problems: none
 === chromium: card: another host to choose ===
 ✓ <HOSTNAME>
@@ -3170,7 +3164,7 @@ build-runner-eu-west-a-long-hostname (in <SESSION>)
 ring: Context 0% full, $<COST>: details; Ready; turning: false; calm
 mode: Plan mode; over the chat: nothing
 fits
-chips 1: build-runner-eu-west-a-long-hostname | V4.1 Flash High
+chips 1: build-runner-eu-west-a-long-hostname | V4.1 Flash
 chip problems: none (host name truncated)
 === chromium: card: the ring's card's Details open the session's details ===
 Session
@@ -3182,10 +3176,10 @@ fits
 ring: Context 0% full, $<COST>: details; Ready; turning: false; calm
 mode: Plan mode; over the chat: nothing
 fits
-chips 1: icon | V4.1 Flash High
+chips 1: icon | V4.1 Flash
 chip problems: none
 === chromium: card: the host stopped answering ===
-chips 1: icon | V4.1 Flash High
+chips 1: icon | V4.1 Flash
 chip problems: none
 <HOSTNAME> <CWD>
 ✓ (dimmed) build-runner-eu-west-a-long-hostname offline: waiting for it to reconnect
@@ -3197,24 +3191,24 @@ chip problems: none
 the row: attach, ring, host, model, send; in order: true; the chips at the right, apart from the ring: true
 the ring shows: true; clear of send: true
 the row fits: true
-the model: V4.1 Flash · High; whole: true
+the model: V4.1 Flash; whole: true
 the ring says: Context 36% full, $0.03: details
 no glow around the focused composer: true
 === chromium: status: desktop 700: the row ===
 the row: attach, ring, host, model, send; in order: true; the chips at the right, apart from the ring: true
 the ring shows: true; clear of send: true
 the row fits: true
-the model: V4.1 Flash · High; whole: true
+the model: V4.1 Flash; whole: true
 the ring says: Context 36% full, $0.03: details
 no glow around the focused composer: true
 === chromium: status: desktop: the model's menu opens opaque ===
 opacity as it appears: 1
 the reasoning column: true; the access mode: Full access
 === chromium: status: desktop: the model's menu acts ===
-reasoning by mouse: the chip: V4.1 Flash · Low; the card: Low; menu closed: true
-mode by mouse: the chip: V4.1 Flash · Low; the card: Asks: edits & commands; menu closed: true
-reasoning by keyboard: the chip: V4.1 Flash · High; the card: High; menu closed: true
-mode by keyboard: the chip: V4.1 Flash · High; the card: Asks: commands; menu closed: true
+reasoning by mouse: the chip: V4.1 Flash; the card: Low; menu closed: true
+mode by mouse: the chip: V4.1 Flash; the card: Asks: edits & commands; menu closed: true
+reasoning by keyboard: the chip: V4.1 Flash; the card: High; menu closed: true
+mode by keyboard: the chip: V4.1 Flash; the card: Asks: commands; menu closed: true
 === chromium: status: desktop: a click outside closes, and goes no further ===
 model: closed: true; the filter's menu opened: false
 host: closed: true; the filter's menu opened: false
@@ -3228,11 +3222,11 @@ its Details open: Session
 === chromium: status: 390x844: the composer's row ===
 the row fits: true
 the row: attach, ring, host, model, send; in order: true
-the model: V4.1 Flash · High; whole: true
+the model: V4.1 Flash; whole: true
 under 40px: none
 === chromium: status: 390x844: the sheets' choices act ===
-Reasoning: reopened: Low; the chip: V4.1 Flash · Low
-Access: reopened: Auto-edit; the chip: V4.1 Flash · Low
+Reasoning: reopened: Low; the chip: V4.1 Flash
+Access: reopened: Auto-edit; the chip: V4.1 Flash
 Transcript: reopened: verbose
 === chromium: status: 390x844: the ring's card ===
 a sheet at the foot, the screen's width: true; mode: Asks: commands

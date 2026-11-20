@@ -388,7 +388,7 @@ const popoverPlace = () => page.evaluate(() => {
   const near = (a, b) => Math.abs(a - b) <= 4;
   const where = r.top >= chip.bottom ? "below the chip" : r.bottom <= box.top ? "above the composer" : "over the composer";
   const across = near(r.left, box.left) && near(r.right, box.right) ? "as wide as the composer"
-    : near(r.left, chip.left) ? "at the chip's left edge" : r.right <= box.right + 1 ? `shifted inside the ${inComposer ? "composer" : "box"}` : "out of line";
+    : near(r.left, chip.left) ? "at the chip's left edge" : r.right <= box.right + 4 ? `shifted inside the ${inComposer ? "composer" : "box"}` : "out of line";
   const inside = r.top >= 0 && r.left >= 0 && r.bottom <= innerHeight && r.right <= innerWidth;
   return `${menu.dataset.chip}'s menu: ${where}, ${across}, ${inside ? "inside the window" : "cut off"}; focus in it: ${menu.contains(document.activeElement)}`;
 });

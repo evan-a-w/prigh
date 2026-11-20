@@ -172,7 +172,8 @@ const screen = async (w, h, label) => {
   // shows, and takes no hover or click.
   section(`${label}: a chip's menu`);
   const chip = ".model-chip";
-  const chipLabel = () => page.evaluate(sel => document.querySelector(sel).textContent.trim(), chip);
+  // The chip shows the model; its tooltip also has the reasoning level.
+  const chipLabel = () => page.evaluate(sel => { const b = document.querySelector(sel); return `${b.textContent.trim()} | ${b.title}`; }, chip);
   const middle = sel => page.evaluate(sel => {
     const r = document.querySelector(sel).getBoundingClientRect();
     return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
