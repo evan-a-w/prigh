@@ -102,6 +102,8 @@ val create
   -> ?nix_store:Nix_store.t
        (** for superusers' [nix_store_status] and [nix_store_gc] (without
            it they fail) *)
+  -> ?usage_http:Subscription_usage.Http.t
+       (** where [usage_limits] asks the providers (default: real HTTP) *)
   -> login:Login_manager.t
   -> sessions_dir:string
   -> cwd:string
