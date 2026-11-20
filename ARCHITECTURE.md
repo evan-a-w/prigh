@@ -1678,13 +1678,14 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   `goal_max_continuations`, `resume_on_limit_reset`, `ask_user_timeout_seconds` (default
   300, 0 = never), `generate_model` (the drafting model, `/generate-model`),
   `approval_model` (smart mode's judge, `/approval-model`; an unknown
-  one is a startup warning), `naming_model`, `dictation_model`, `mask_observations` (default true),
+  one is a startup warning), `naming_model`, `mask_observations` (default true),
   `compact_at_tokens` (default 200000,
   0 = 80% of the window only), `compaction_model` and `snippets`, the
   frontends' `/snippet` texts, validated by `Snippet`), loaded at agent
   creation, read/written through `get_config`/`set_config`; unknown fields
   are ignored by `load` but reported by `problems` (with wrong-typed ones;
-  a leftover `reminders` says reminders are per session now),
+  a leftover `reminders` says reminders are per session now; a retired
+  setting, `dictation_model`, is ignored quietly and dropped by `save`),
   which `Model_registry` adds to its problems along with an unknown
   `default_model`. Each namespace has its own file, so each has its own
   defaults; `archive_after_days` (default 7, 0 = never) is when an
@@ -1697,8 +1698,7 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   resolves `fallback_models`, `generate_model`, `compaction_model` and
   `naming_model`
   like `set_model` (stored as keys; an unknown name is refused with the
-  closest matches). `dictation_model` is kept as written, refused
-  only when its provider cannot transcribe (`Transcription.check_model`).
+  closest matches).
   `default_host` is resolved like `/host` (an id, else a name, among the
   connected hosts) and stored as the id; one kept as it was is not checked
   again (it may be away). `default_cwd` must be absolute or start with
@@ -2488,17 +2488,7 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   text cleaned (`Generate_text.clean`: fences and quotes dropped, a branch
   name made valid, a PR split into title and body).
   `generate_cancel {gen_id}` (or disconnecting) cancels it.
-  `transcribe {mime_type, data}` (data: base64 audio, at most 25 MB) is
-  `{text}` from `Transcription` on `Config.dictation_model` (default
-  `openai/gpt-4o-mini-transcribe`): a hand-built multipart/form-data
-  `POST {base}/audio/transcriptions` (`model`, `response_format=json`,
-  `file` named by the MIME type, e.g. `speech.webm`), to OpenAI with its
-  API key (`OPENAI_API_KEY` or `auth.json`) or to a custom provider's
-  `base_url` with its key; other providers cannot transcribe. Errors say
-  what to do (`No transcription provider: ...` when the key is missing,
-  `/dictation model` to choose another). The HTTP is a
-  `Transcription.Http.t` that `Rpc_server.create ~transcription_http`
-  replaces in tests. The review's
+  The review's
   git (`Git_rpc`, on the active tool host): `git_status {dir?}`,
   `git_stage {dir?, paths, tracked?}`, `git_unstage {dir?, paths}` (each
   answering the status), `git_commit {dir?, message, amend?, paths?}`

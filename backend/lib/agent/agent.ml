@@ -1063,16 +1063,6 @@ let set_config ?(session_mode = true) t (config : Config.t) =
       |> Result.map_error ~f:(fun e ->
         Error.createf "approval_model: %s" (Error.to_string_hum e))
   in
-  let%bind () =
-    match config.dictation_model with
-    | None -> Ok ()
-    | Some name ->
-      Transcription.check_model
-        ~providers:(Model_registry.providers t.models)
-        name
-      |> Result.map_error ~f:(fun e ->
-        Error.createf "dictation_model: %s" (Error.to_string_hum e))
-  in
   let%bind default_host =
     match config.default_host with
     | None -> Ok None

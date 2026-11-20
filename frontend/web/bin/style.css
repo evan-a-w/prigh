@@ -778,8 +778,8 @@ kbd {
   --composer-inset: 14px; /* one left edge: the text, the +, the chips */
 }
 /* One card, one surface: what you write, then one row right under it: the
-   + and where the message goes (model, host) on the left, the microphone
-   and send on the right. The accent is spent on send alone; focus brightens
+   + and where the message goes (model, host) on the left, the status and
+   send on the right. The accent is spent on send alone; focus brightens
    the edge rather than painting it. */
 .composer-stack {
   position: relative;
@@ -859,8 +859,8 @@ kbd {
 .composer-row { display: flex; align-items: center; gap: 4px; min-height: 32px; min-width: 0; }
 .composer-plus { position: relative; display: flex; flex-shrink: 0; }
 .composer-plus.menu-open { z-index: var(--z-menu-anchor); }
-/* One size of control: 32px circles, 18px icons of one weight. + and the
-   microphone are quiet until pointed at; send is filled. */
+/* One size of control: 32px circles, 18px icons of one weight. + is quiet
+   until pointed at; send is filled. */
 .round.btn {
   width: 32px;
   height: 32px;
@@ -891,40 +891,7 @@ kbd {
 .composer-buttons .stop.ghost { background: var(--brick-wash); border-color: transparent; color: var(--brick); }
 .composer-buttons .stop.primary { background: var(--sodium); border-color: var(--sodium); color: var(--sodium-ink); }
 .composer-buttons .stop.primary .icon { color: var(--sodium-ink); fill: currentColor; }
-/* Listening: the microphone is a brick disc; the row says how long and how
-   loud, at the buttons' height, on no surface of its own. */
-.btn.mic.on { background: var(--brick); border-color: var(--brick); }
-.btn.mic.on .icon { color: var(--graphite); }
-.btn.mic:disabled { opacity: 0.6; }
-.dictation {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-  flex: 1 1 auto;
-  height: 32px;
-  padding: 0 4px 0 6px;
-  color: var(--muted);
-  font-size: 13px;
-  animation: popover-rise 0.12s ease-out;
-}
-.dictation-dot {
-  --level: 0;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--brick);
-  flex-shrink: 0;
-  box-shadow: 0 0 0 calc(var(--level) * 7px) var(--brick-line);
-  transition: box-shadow 0.1s linear;
-}
-.dictation-time { font-variant-numeric: tabular-nums; color: var(--chalk); }
-.dictation-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.dictation .lamp { flex-shrink: 0; }
-.dictation-cancel.btn { width: 28px; height: 28px; padding: 0; border-radius: 50%; color: var(--faint); margin-left: auto; }
-.dictation-cancel .icon { width: 12px; height: 12px; }
 @media (prefers-reduced-motion: reduce) {
-  .dictation-dot { transition: none; box-shadow: none; }
   .btn.plus .icon { transition: none; }
   .composer-stack { transition: none; }
 }

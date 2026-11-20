@@ -343,7 +343,6 @@ let%expect_test "the names of the settings' controls" =
     button "Approval model: Default" -- Choose the model (/approval-model)
     button "Naming model: Default" -- Choose the model (/naming model)
     button "Summary model: The conversation's model" -- Choose the model (/compaction model)
-    button "Dictation model: openai/gpt-4o-mini-transcribe" -- Choose the model (/dictation model)
     [switch] button "Compact at" -- Only at 80% of the model's window (/compaction at off)
     [switch] button "Mask old tool outputs" -- Keep old tool outputs (/compaction mask off)
     [group] div "Compact at"

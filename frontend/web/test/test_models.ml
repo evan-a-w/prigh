@@ -345,7 +345,7 @@ let%expect_test "aborting brings the queued prompts back into the editor" =
     Model Claude Opus 5.5
     Branch main
     Click for the session’s details · /compact frees context
-    (Dictate (speak, then click again to stop)) (Stop (Esc))
+    (Stop (Esc))
     |}];
   H.type_ h "half-written";
   H.key h "Escape";

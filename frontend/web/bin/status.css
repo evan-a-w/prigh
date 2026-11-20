@@ -3,8 +3,8 @@
    No bar over the chat: the sidebar's toggle and the panels' toggles float
    over the top of the transcript, which leaves them room (a phone has a
    strip, phone.css). The session's status is one chip in the composer's
-   row, by the microphone: the activity's lamp, the context's ring and
-   percent and the cost, with one details card over it (status_view.ml).
+   row, by send: the activity's lamp, the context's ring and percent and
+   the cost, with one details card over it (status_view.ml).
    The thinking level, the mode and the verbosity are chips beside the host
    (session_chips_view.ml). */
 
@@ -145,9 +145,9 @@
 .status-item.context .percent { font-variant-numeric: tabular-nums; }
 
 
-/* Quiet figures at the right of the composer's row, clear of the
-   microphone: a lamp (its word while the agent works), the context's ring
-   and percent, the cost. One pill, lit while the agent works; the details
+/* Quiet figures at the right of the composer's row, clear of send: a lamp
+   (its word while the agent works), the context's ring and percent, the
+   cost. One pill, lit while the agent works; the details
    card stands over it on hover and focus (a tap opens the session's
    details: a phone has no hover). */
 .composer-status { display: flex; align-items: center; min-width: 0; flex-shrink: 0; }

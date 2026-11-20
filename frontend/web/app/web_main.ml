@@ -571,9 +571,6 @@ let perform client settings ctx (model : App.Model.t) (command : App.Command.t) 
     | Pick_images -> Effect.of_sync_fun pick_images ()
     | Downsize_image { image; target } ->
       Effect.of_sync_fun (fun () -> Downsize.run image target) ()
-    | Start_dictation engine -> Effect.of_sync_fun Dictation_widget.start engine
-    | Stop_dictation -> Effect.of_sync_fun Dictation_widget.stop ()
-    | Cancel_dictation -> Effect.of_sync_fun Dictation_widget.cancel ()
     | Annotate_setup ->
       Effect.of_sync_fun (fun () -> Browser.after_render Annotate_widget.setup) ()
     | Annotate_undo -> Effect.of_sync_fun Annotate_widget.undo ()
@@ -1154,7 +1151,6 @@ let install_listeners ~schedule ~current =
   Chat_listeners.install ~schedule;
   Session_link_listeners.install ~schedule;
   Gesture_listeners.install ~schedule;
-  Dictation_widget.install ~schedule;
   Annotate_widget.install ~schedule;
   Downsize.install ~schedule;
   Viewer_widget.install ~schedule;

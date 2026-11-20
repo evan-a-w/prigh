@@ -36,9 +36,9 @@
 //!   downloads, settings, view-source:, DevTools unless kept) and every page
 //!   of another browser context (an incognito window: Ctrl+Shift+N) are
 //!   closed, and prigh's window, which they took the focus from, activated;
-//! - prigh's sites get their permissions (the clipboard, notifications, the
-//!   microphone) up front, so the browser asks nothing, and downloads go to
-//!   the downloads directory without a prompt.
+//! - prigh's sites get their permissions (the clipboard, notifications) up
+//!   front, so the browser asks nothing, and downloads go to the downloads
+//!   directory without a prompt.
 //!
 //! `about:blank` (a popup before it loads), `chrome-error:` (a page that
 //! failed to load) and what the window would refuse are left alone.
@@ -60,7 +60,7 @@ pub const ROUND_WINDOW: Duration = Duration::from_secs(10);
 pub const BINDING: &str = "prighOpenExternal";
 
 /// What prigh's sites may do without the browser asking.
-pub const PERMISSIONS: &[&str] = &["clipboardReadWrite", "clipboardSanitizedWrite", "notifications", "audioCapture"];
+pub const PERMISSIONS: &[&str] = &["clipboardReadWrite", "clipboardSanitizedWrite", "notifications"];
 
 /// What the shell does about a message.
 #[derive(Debug, PartialEq, Eq)]
@@ -705,7 +705,7 @@ mod tests {
         );
         let grant = |id: u64, origin: &str| {
             json!({ "id": id, "method": "Browser.grantPermissions", "params": { "origin": origin,
-                    "permissions": ["clipboardReadWrite", "clipboardSanitizedWrite", "notifications", "audioCapture"] } })
+                    "permissions": ["clipboardReadWrite", "clipboardSanitizedWrite", "notifications"] } })
         };
         // On the first message, each origin once; a new one when it comes.
         let mut out = run_raw(&mut links, &[json!({ "id": 1, "result": {} }).to_string(), "{}".to_string()], 0);

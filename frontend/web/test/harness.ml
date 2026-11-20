@@ -21,9 +21,6 @@ let rec act t action =
      | Place_popover
      | Pick_images
      | Downsize_image _
-     | Start_dictation _
-     | Stop_dictation
-     | Cancel_dictation
      | Annotate_setup
      | Annotate_undo
      | Annotate_clear

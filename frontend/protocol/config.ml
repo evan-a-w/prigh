@@ -49,7 +49,6 @@ type t =
   ; generate_model : string option
   ; naming_model : string option
   ; approval_model : string option
-  ; dictation_model : string option
   }
 [@@deriving sexp_of, equal]
 
@@ -74,11 +73,8 @@ let default =
   ; generate_model = None
   ; naming_model = None
   ; approval_model = None
-  ; dictation_model = None
   }
 ;;
-
-let default_dictation_model = "openai/gpt-4o-mini-transcribe"
 
 let of_json j =
   let open Or_error.Let_syntax in
@@ -158,7 +154,6 @@ let of_json j =
   let%bind generate_model = optional_string "generate_model" in
   let%bind naming_model = optional_string "naming_model" in
   let%bind approval_model = optional_string "approval_model" in
-  let%bind dictation_model = optional_string "dictation_model" in
   let%map snippets = Json.optional_list_field j "snippets" ~f:Snippet.of_json in
   { scoped_models
   ; approval_mode
@@ -180,7 +175,6 @@ let of_json j =
   ; generate_model
   ; naming_model
   ; approval_model
-  ; dictation_model
   }
 ;;
 
@@ -212,6 +206,5 @@ let to_json t =
        ; "generate_model", optional t.generate_model
        ; "naming_model", optional t.naming_model
        ; "approval_model", optional t.approval_model
-       ; "dictation_model", optional t.dictation_model
        ])
 ;;

@@ -34,7 +34,6 @@ let popup (m : App.Model.t) ~inject =
       | Argument Generate_model -> "Drafting model"
       | Argument Approval_model -> "Approval model"
       | Argument Naming -> "Naming"
-      | Argument Dictation -> "Dictation"
       | Argument Worktree -> "Worktrees"
       | Argument Review -> "Review"
       | Argument Resume -> "Automatic resume"
@@ -351,68 +350,6 @@ let plus (m : App.Model.t) ~inject =
     ]
 ;;
 
-(* While dictating: how long, how loud, and a way out. *)
-let dictation (m : App.Model.t) ~inject =
-  let status ~cls children =
-    Node.div
-      ~attrs:
-        [ Attr.class_ ("dictation " ^ cls)
-        ; Attr.role "status"
-        ; Attr.create "aria-live" "polite"
-        ]
-      (children
-       @ [ button
-             ~cls:"ghost dictation-cancel"
-             ~title:"Discard the recording (Esc)"
-             ~label:"Discard the recording"
-             ~on_click:(inject Action.Dictation_cancel)
-             [ icon Close ]
-         ])
-  in
-  match m.dictation with
-  | Idle -> Node.none
-  | Starting _ ->
-    status
-      ~cls:"starting"
-      [ Html.lamp (); span ~cls:"dictation-label" "Listening…" ]
-  | Recording { engine; elapsed_ms; level } ->
-    status
-      ~cls:"recording"
-      [ Node.span
-          ~attrs:
-            [ Attr.class_ "dictation-dot"
-            ; Attr.css_var ~name:"level" (sprintf "%.2f" level)
-            ]
-          []
-      ; span ~cls:"dictation-time" (Dictation.elapsed elapsed_ms)
-      ; span
-          ~cls:"dictation-label"
-          (match engine with
-           | Server -> "Recording"
-           | Browser -> "Listening (browser)")
-      ]
-  | Transcribing ->
-    status
-      ~cls:"transcribing"
-      [ Html.lamp (); span ~cls:"dictation-label" "Transcribing…" ]
-;;
-
-let mic (m : App.Model.t) ~inject =
-  let active = Dictation.active m.dictation in
-  button
-    ~cls:(if active then "icon round mic on" else "icon ghost round mic")
-    ~title:
-      (match m.dictation with
-       | Idle -> "Dictate (speak, then click again to stop)"
-       | Starting _ | Recording _ -> "Stop and put the words in"
-       | Transcribing -> "Transcribing…")
-    ~label:(if active then "Stop dictating" else "Dictate")
-    ~disabled:(Dictation.equal m.dictation Transcribing)
-    ~attrs:[ Attr.create "aria-pressed" (Bool.to_string active) ]
-    ~on_click:(inject Action.Dictate)
-    [ icon Mic ]
-;;
-
 let steered (m : App.Model.t) =
   match m.recipient with
   | Main -> None
@@ -611,20 +548,12 @@ let view (m : App.Model.t) ~inject =
             ; div
                 ~cls:"composer-row"
                 [ plus m ~inject
-                ; (* While dictating, the recording takes the chips' place. *)
-                  (match m.dictation with
-                   | Idle ->
-                     Node.fragment
-                       [ chips m ~inject
-                       ; Session_chips_view.view ~cls:"row-chips" m ~inject
-                       ]
-                   | Starting _ | Recording _ | Transcribing ->
-                     rest (dictation m ~inject))
+                ; chips m ~inject
+                ; Session_chips_view.view ~cls:"row-chips" m ~inject
                 ; rest
                   @@ div
                        ~cls:"composer-buttons"
                        [ Status_view.composer_status m ~inject
-                       ; mic m ~inject
                        ; (if running && not stops
                           then
                             button

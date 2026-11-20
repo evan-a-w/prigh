@@ -194,8 +194,6 @@ module Reply_tag = struct
     | Approval_model_saved
     | Naming_saved
     | Auto_archive_saved
-    | Dictation_saved
-    | Transcribed
     | Default_saved
     | Session_stats
     | Trace
@@ -336,9 +334,6 @@ module Command = struct
         { image : Image.t
         ; target : Image_size.Target.t
         }
-    | Start_dictation of Dictation.Engine.t
-    | Stop_dictation
-    | Cancel_dictation
     | Annotate_setup
     | Annotate_undo
     | Annotate_clear
@@ -646,19 +641,6 @@ module Action = struct
         { original : Image.t
         ; reason : string
         }
-    | Dictate
-    | Dictation_cancel
-    | Dictation_progress of
-        { elapsed_ms : int
-        ; level : float
-        }
-    | Dictation_audio of
-        { mime_type : string
-        ; data : string
-        }
-    | Dictation_text of string
-    | Dictation_failed of string
-    | Browser_speech of bool
     | Annotate of
         { image : Image.t
         ; target : Annotate.Target.t
@@ -782,9 +764,6 @@ module Model = struct
     ; pasted : string list
     ; paste_undo : Paste_undo.t option
     ; downsizing : Image.t list
-    ; dictation : Dictation.t
-    ; dictation_engine : Dictation.Engine.t
-    ; browser_speech : bool
     ; queue : Queued.t
     ; agent_queues : Agent_queue.t list
     ; recipient : Recipient.t
@@ -895,9 +874,6 @@ module Model = struct
         ; pasted
         ; paste_undo = _
         ; downsizing
-        ; dictation
-        ; dictation_engine
-        ; browser_speech
         ; queue
         ; agent_queues
         ; recipient
@@ -996,9 +972,6 @@ module Model = struct
     && phys_equal images b.images
     && phys_equal pasted b.pasted
     && phys_equal downsizing b.downsizing
-    && phys_equal dictation b.dictation
-    && phys_equal dictation_engine b.dictation_engine
-    && phys_equal browser_speech b.browser_speech
     && phys_equal queue b.queue
     && phys_equal agent_queues b.agent_queues
     && phys_equal recipient b.recipient
@@ -1329,9 +1302,6 @@ let init =
   ; pasted = []
   ; paste_undo = None
   ; downsizing = []
-  ; dictation = Idle
-  ; dictation_engine = Server
-  ; browser_speech = false
   ; queue = Queued.empty
   ; agent_queues = []
   ; recipient = Main
@@ -1536,7 +1506,6 @@ let close_dialog (m : Model.t) =
                 | Generate_models
                 | Approval_models
                 | Naming_models
-                | Dictation_models
                 | Defaults _ )
             ; _
             } ) ) ->
@@ -3878,50 +3847,6 @@ let step_chip (m : Model.t) delta =
   | _ -> m, []
 ;;
 
-(* Dictation: the microphone records (or the browser listens) until pressed
-   again, then the text goes in at the caret. *)
-let no_dictation_model =
-  "Dictation needs a transcription model: pick one in Settings → Models (an \
-   OpenAI key, or a custom provider with /audio/transcriptions)."
-;;
-
-let dictate (m : Model.t) =
-  match m.dictation with
-  | Idle ->
-    let engine = m.dictation_engine in
-    { m with dictation = Starting engine }, [ Command.Start_dictation engine ]
-  | Starting _ -> { m with dictation = Idle }, [ Command.Cancel_dictation ]
-  | Recording _ ->
-    { m with dictation = Transcribing }, [ Command.Stop_dictation ]
-  | Transcribing -> m, []
-;;
-
-let dictated (m : Model.t) text =
-  let m = { m with dictation = Idle } in
-  if String.is_empty (String.strip text)
-  then toast m "Nothing was heard."
-  else (
-    let draft, cursor = Dictation.insert ~draft:m.draft ~cursor:m.cursor text in
-    edit_at_caret m ~cursor draft)
-;;
-
-(* The backend cannot transcribe: the browser's recognition, where there is
-   one, listens from the next press. *)
-let dictation_failed (m : Model.t) e =
-  let m = { m with dictation = Idle } in
-  if Dictation.no_provider e
-  then
-    if m.browser_speech
-    then
-      toast
-        { m with dictation_engine = Browser }
-        "No transcription model is set up, so the browser's speech recognition \
-         listens instead: press the microphone again (Settings → Models sets \
-         one up)."
-    else error m no_dictation_model
-  else error m (String.capitalize e)
-;;
-
 let annotate_dialog (m : Model.t) ~f =
   match m.dialog with
   | Some (Annotate a) ->
@@ -4695,91 +4620,6 @@ let auto_archive_command (m : Model.t) rest =
   | Show -> with_config m ~f:(fun c -> toast m (auto_archive_summary c))
   | Error e -> error m (String.capitalize e)
   | Set _ as action -> set_auto_archive m action
-;;
-
-let dictation_summary config =
-  String.capitalize (Prigh_ui.Dictation_command.summary config)
-;;
-
-(* The backend says when the model's provider cannot transcribe. *)
-let set_dictation (m : Model.t) action =
-  with_config m ~f:(fun config ->
-    let config = Prigh_ui.Dictation_command.apply action config in
-    ( { m with config = Some config }
-    , [ set_config
-          config
-          ~fields:(List.map (Prigh_ui.Dictation_command.fields action) ~f:fst)
-          ~tag:Dictation_saved
-      ] ))
-;;
-
-(* OpenAI's transcription models, and the configured one if it is another
-   (a custom provider's, set with /dictation model PROVIDER/ID). Groq's
-   free Whisper is suggested once a custom provider named groq exists (never
-   a model nothing could run). *)
-let groq_dictation = "groq/whisper-large-v3-turbo"
-
-let has_groq (m : Model.t) =
-  List.exists m.auth ~f:(fun s ->
-    String.equal s.provider "groq" && Option.is_some s.custom)
-;;
-
-let dictation_models_picker (m : Model.t) =
-  with_config m ~f:(fun config ->
-    let current = config.dictation_model in
-    let suggestions =
-      Prigh_ui.Dictation_command.suggestions
-      @
-      if has_groq m
-      then [ groq_dictation, "Groq's Whisper, free (rate-limited)" ]
-      else []
-    in
-    let suggested =
-      List.map suggestions ~f:(fun (key, detail) ->
-        Picker.Item.create
-          ~id:key
-          ~detail
-          ~search:(key ^ " " ^ detail)
-          ~marked:(Option.equal String.equal current (Some key))
-          key)
-    in
-    let configured =
-      match current with
-      | Some key when not (List.Assoc.mem suggestions ~equal:String.equal key)
-        ->
-        [ Picker.Item.create
-            ~id:key
-            ~detail:"configured"
-            ~search:key
-            ~marked:true
-            key
-        ]
-      | Some _ | None -> []
-    in
-    open_picker
-      m
-      (Picker
-         { kind = Dictation_models
-         ; picker =
-             Picker.create
-               ~title:"Dictation model"
-               (Picker.Item.create
-                  ~id:"off"
-                  ~detail:Config.default_dictation_model
-                  ~search:"off default"
-                  ~marked:(Option.is_none current)
-                  "Default"
-                :: (configured @ suggested))
-         }))
-;;
-
-let dictation_command (m : Model.t) rest =
-  match Prigh_ui.Dictation_command.parse rest with
-  | Error _ when String.equal (String.strip rest) "model" ->
-    dictation_models_picker m
-  | Show -> with_config m ~f:(fun c -> toast m (dictation_summary c))
-  | Error e -> error m (String.capitalize e)
-  | Set_model _ as action -> set_dictation m action
 ;;
 
 let save_about_you (m : Model.t) =
@@ -7322,7 +7162,6 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
   | "approval-model", rest -> approval_model_command m rest
   | "naming", rest -> naming_command m rest
   | "auto-archive", rest -> auto_archive_command m rest
-  | "dictation", rest -> dictation_command m rest
   | "host", "" -> hosts_picker m
   | "host", arg -> switch_host m arg
   | "export", "" -> open_prompt m (Prompt.create Export)
@@ -8848,9 +8687,6 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
            e)
     in
     m, cmds @ [ rpc "get_config" [] ~tag:Config ]
-  | Dictation_saved, Error e ->
-    let m, cmds = error m (sprintf "Couldn't set the dictation model: %s" e) in
-    m, cmds @ [ rpc "get_config" [] ~tag:Config ]
   | Auto_archive_saved, Error e ->
     let m, cmds =
       error m (sprintf "Couldn't set when sessions are archived: %s" e)
@@ -8890,10 +8726,6 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
      | Some (Login flow) ->
        { m with dialog = Some (Login { flow with failed = Some e }) }, []
      | _ -> error m e)
-  | Transcribed, Error e ->
-    (match m.dictation with
-     | Transcribing -> dictation_failed m e
-     | Idle | Starting _ | Recording _ -> m, [])
   | (Dequeued | Unqueued _), Error e ->
     (* Shown removed at once: the backend's queue is the truth. *)
     let m, cmds = error m (String.capitalize e) in
@@ -9596,17 +9428,6 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
   | Auto_archive_saved, Ok json ->
     decode m json Config.of_json ~f:(fun config ->
       toast { m with config = Some config } (auto_archive_summary config))
-  | Dictation_saved, Ok json ->
-    decode m json Config.of_json ~f:(fun config ->
-      (* The backend may transcribe now: it is asked again. *)
-      toast
-        { m with config = Some config; dictation_engine = Server }
-        (dictation_summary config))
-  | Transcribed, Ok json ->
-    (match m.dictation, field json "text" with
-     | Transcribing, Some (`String text) -> dictated m text
-     | Transcribing, _ -> dictated m ""
-     | (Idle | Starting _ | Recording _), _ -> m, [])
   | Compaction_saved, Ok json ->
     decode m json Config.of_json ~f:(fun config ->
       toast { m with config = Some config } (compaction_summary config))
@@ -10676,17 +10497,6 @@ let picker_accepted (m : Model.t) ~kind (item : Picker.Item.t) =
         ( { m with dialog = Some Settings; return_to_settings = false }
         , Command.Focus "dialog" :: cmds )
       else m, cmds
-    | Dictation_models ->
-      let m, cmds =
-        set_dictation
-          m
-          (Set_model (Option.some_if (not (String.equal item.id "off")) item.id))
-      in
-      if m.return_to_settings
-      then
-        ( { m with dialog = Some Settings; return_to_settings = false }
-        , Command.Focus "dialog" :: cmds )
-      else m, cmds
     | Generate_models ->
       let m, cmds =
         set_generate_model
@@ -10884,7 +10694,6 @@ let setting_opener (m : Model.t) (setting : Control_setting.t) =
   | Drafting_model -> model_picker generate_models_picker
   | Approval_model -> model_picker approval_models_picker
   | Naming_model -> model_picker naming_models_picker
-  | Dictation_model -> model_picker dictation_models_picker
   | Default_directory
   | Budget
   | Worktree_hours
@@ -10986,11 +10795,6 @@ let config_value (m : Model.t) (config : Config.t) (setting : Control_setting.t)
   | Approval_model ->
     Some (model config.approval_model ~default:"the session's")
   | Naming_model -> Some (model config.naming_model ~default:"the drafting one")
-  | Dictation_model ->
-    Some
-      (model
-         config.dictation_model
-         ~default:(model_display m Config.default_dictation_model))
   | Compact_at -> Some (sprintf "%d tokens" config.compact_at_tokens)
   | Mask -> Some (if config.mask_observations then "on" else "off")
   | Archive_after ->
@@ -12036,31 +11840,6 @@ let update_connected (m : Model.t) (action : Action.t) =
   | Question action -> question m action
   | Cycle_mode -> cycle_mode m
   | Add_image image -> { m with images = m.images @ [ image ] }, []
-  | Dictate -> dictate m
-  | Dictation_cancel ->
-    (match m.dictation with
-     | Idle -> m, []
-     | Starting _ | Recording _ | Transcribing ->
-       { m with dictation = Idle }, [ Command.Cancel_dictation ])
-  | Dictation_progress { elapsed_ms; level } ->
-    (match m.dictation with
-     | Starting engine | Recording { engine; _ } ->
-       { m with dictation = Recording { engine; elapsed_ms; level } }, []
-     | Idle | Transcribing -> m, [])
-  | Dictation_audio { mime_type; data } ->
-    (match m.dictation with
-     | Transcribing ->
-       m, [ call (Transcribe { mime_type; data }) ~tag:Transcribed ]
-     | Idle | Starting _ | Recording _ -> m, [])
-  | Dictation_text text ->
-    (match m.dictation with
-     | Idle -> m, []
-     | Starting _ | Recording _ | Transcribing -> dictated m text)
-  | Dictation_failed e ->
-    (match m.dictation with
-     | Idle -> m, []
-     | Starting _ | Recording _ | Transcribing -> dictation_failed m e)
-  | Browser_speech b -> { m with browser_speech = b }, []
   | Annotate { image; target } ->
     let m, cmds = open_dialog m (Annotate (Annotate.create image target)) in
     m, cmds @ [ Command.Annotate_setup ]
@@ -12201,7 +11980,6 @@ let update_connected (m : Model.t) (action : Action.t) =
                       | Generate_models
                       | Approval_models
                       | Naming_models
-                      | Dictation_models
                       | Defaults _ )
                   ; _
                   } ) ) -> { m' with return_to_settings = true }, cmds

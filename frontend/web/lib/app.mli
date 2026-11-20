@@ -220,8 +220,6 @@ module Reply_tag : sig
     | Approval_model_saved (** the new config; the approval model is shown *)
     | Naming_saved (** the new config; the naming model is shown *)
     | Auto_archive_saved (** the new config; the age is shown *)
-    | Dictation_saved (** the new config; the dictation model is shown *)
-    | Transcribed (** a dictation's text, put in at the caret *)
     | Default_saved
     | Session_stats
     | Trace (** [trace]: its summary in a dialog *)
@@ -394,9 +392,6 @@ module Command : sig
         }
     (** re-encoded smaller on a canvas, as {!Action.Downsized} (or
         [Downsize_failed]) *)
-    | Start_dictation of Dictation.Engine.t
-    | Stop_dictation (** and transcribe what was said *)
-    | Cancel_dictation
     | Annotate_setup (** the drawing's canvas, once rendered *)
     | Annotate_undo
     | Annotate_clear
@@ -806,19 +801,6 @@ module Action : sig
         { original : Image.t
         ; reason : string
         }
-    | Dictate (** the microphone: start, or stop and transcribe *)
-    | Dictation_cancel
-    | Dictation_progress of
-        { elapsed_ms : int
-        ; level : float
-        }
-    | Dictation_audio of
-        { mime_type : string
-        ; data : string (** base64 *)
-        }
-    | Dictation_text of string (** the browser's recognition heard this *)
-    | Dictation_failed of string
-    | Browser_speech of bool
     | Annotate of
         { image : Image.t
         ; target : Annotate.Target.t
@@ -996,11 +978,6 @@ module Model : sig
     ; paste_undo : Paste_undo.t option
       (** Ctrl+Z after a chip came or went ({!Paste_undo}) *)
     ; downsizing : Image.t list (** of [images], being made smaller *)
-    ; dictation : Dictation.t
-    ; dictation_engine : Dictation.Engine.t
-    (** what the next dictation uses: the backend's, until it says it
-        cannot transcribe *)
-    ; browser_speech : bool (** the browser has SpeechRecognition *)
     ; queue : Queued.t
     ; agent_queues : Agent_queue.t list
       (** the background subagents' queues, those not empty *)

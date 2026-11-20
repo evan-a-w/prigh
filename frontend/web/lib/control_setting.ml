@@ -24,7 +24,6 @@ type t =
   | Approval_model
   | Naming_model
   | Summary_model
-  | Dictation_model
   | Compact_at
   | Mask
   | Memory
@@ -62,7 +61,6 @@ let name = function
   | Approval_model -> "Approval model"
   | Naming_model -> "Naming model"
   | Summary_model -> "Summary model"
-  | Dictation_model -> "Dictation model"
   | Compact_at -> "Compact at"
   | Mask -> "Mask old tool outputs"
   | Memory -> "Use memory"
@@ -117,7 +115,6 @@ let keywords = function
   | Approval_model -> "smart mode judge"
   | Naming_model -> "titles names"
   | Summary_model -> "compaction summaries"
-  | Dictation_model -> "speech microphone transcription"
   | Compact_at -> "compaction tokens"
   | Mask -> "compaction observations"
   | Memory -> "remember notes"
@@ -171,7 +168,6 @@ let page t : (Settings_section.t * string) option =
   | Approval_model -> Some (Models, "Approvals")
   | Naming_model -> Some (Models, "Naming")
   | Summary_model -> Some (Models, "Summaries")
-  | Dictation_model -> Some (Models, "Dictation")
   | Compact_at -> Some (Models, "Compact at")
   | Mask -> Some (Models, "Mask old tool outputs")
   | Memory -> Some (Memory, "Use memory")
