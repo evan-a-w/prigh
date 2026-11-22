@@ -405,11 +405,10 @@ let chatting (m : App.Model.t) =
   Option.value_map m.state ~default:false ~f:(fun (s : State.t) -> s.chat_mode)
 ;;
 
-(* The text, and where the session works when that is what it shows. *)
 let placeholder (m : App.Model.t) =
   (* A phone, or the chat beside a side panel. *)
   let cramped = m.narrow || m.agents.open_ || m.files.open_ in
-  let text s = s, None in
+  let text s = s in
   if Option.is_some m.session_gone
   then text "Session gone: /new starts one"
   else if not (connected m)
@@ -442,10 +441,9 @@ let placeholder (m : App.Model.t) =
            "Plan mode: discuss the plan, or leave it to implement (%s)…"
            Session_mode.leave)
     | None ->
-      (match Cwd_placeholder.of_model m with
-       | Some where -> Cwd_placeholder.sentence where, Some where
-       | None when cramped -> text "Ask prigh…  / commands"
-       | None -> text "Ask prigh anything…  / commands, @ files"))
+      if cramped
+      then text "Ask prigh…  / commands"
+      else text "Ask prigh anything…  / commands, @ files")
 ;;
 
 let view (m : App.Model.t) ~inject =
@@ -462,7 +460,7 @@ let view (m : App.Model.t) ~inject =
      subagent being steered keeps its steer). *)
   let stops = running && (not has_input) && Option.is_none (steered m) in
   let connected = connected m in
-  let placeholder, where = placeholder m in
+  let placeholder = placeholder m in
   (* A chip's menu leaves only the chips live. *)
   let rest =
     match m.dialog with
@@ -503,16 +501,9 @@ let view (m : App.Model.t) ~inject =
                    ~cls:"editor-wrap"
                    [ Node.textarea
                        ~attrs:
-                         [ classes
-                             [ "editor" ]
-                             [ "cwd-placeholder", Option.is_some where ]
+                         [ Attr.class_ "editor"
                          ; Attr.id "editor"
                          ; Attr.placeholder placeholder
-                         ; (match where with
-                            | Some _
-                              when String.is_empty m.draft && not m.narrow ->
-                              Attr.title placeholder
-                            | Some _ | None -> Attr.empty)
                          ; Attr.create "aria-label" "Message"
                          ; Attr.create "dir" "auto"
                          ; (match App.Model.popup m with
@@ -542,10 +533,6 @@ let view (m : App.Model.t) ~inject =
                              inject (Action.Edit { text; cursor }))
                          ]
                        []
-                   ; (match where with
-                      | Some where when String.is_empty m.draft ->
-                        Cwd_placeholder.view where
-                      | Some _ | None -> Node.none)
                    ]
             ; div
                 ~cls:"composer-row"
@@ -608,6 +595,12 @@ let view (m : App.Model.t) ~inject =
                 ]
             ]
         ]
-    ; (if App.fresh m then rest (Temporary_view.tray m ~inject) else Node.none)
+    ; (if App.fresh m
+       then rest (Temporary_view.tray m ~inject)
+       else
+         Option.value_map
+           (Composer_where.of_model m)
+           ~default:Node.none
+           ~f:(fun where -> rest (Composer_where.view where ~inject)))
     ]
 ;;

@@ -673,13 +673,13 @@ let%expect_test "plan mode: the composer says how to leave it" =
               #value=""
               @on_input> </textarea>
     <textarea id="editor"
-              placeholder="Working in /work on main. Ask prigh anything…"
+              placeholder="Ask prigh…  / commands"
               aria-label="Message"
               dir="auto"
               rows="1"
               autocomplete="off"
               enterkeyhint="send"
-              class="cwd-placeholder editor"
+              class="editor"
               #value=""
               @on_input> </textarea>
     |}]

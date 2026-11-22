@@ -1233,13 +1233,13 @@ let%expect_test
       <span class="chip-label"> Opus 5.5 </span>
     </button>
     <textarea id="editor"
-              placeholder="Working in /work on main. Ask prigh anything…"
+              placeholder="Ask prigh…  / commands"
               aria-label="Message"
               dir="auto"
               rows="1"
               autocomplete="off"
               enterkeyhint="send"
-              class="cwd-placeholder editor"
+              class="editor"
               #value=""
               @on_input> </textarea>
     |}]

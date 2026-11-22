@@ -47,7 +47,7 @@ let%expect_test "the names of the controls" =
     button "Folder: /work. Change it" -- Start in another folder (/cd)
     button "Branch: main. Change it" -- Work in another worktree (/worktree)
     [switch] button "Temporary" -- Make it temporary: not saved or listed (Ctrl+Shift+O)
-    textarea "Message" -- Working in /work on main. Ask prigh anything…
+    textarea "Message"
     [separator] div "Resize the sessions sidebar" -- Drag to resize, double-click for the default size
     [link] span "New session"
     [region] div "Transcript"
@@ -154,7 +154,9 @@ let%expect_test "the names in dialogs, pickers and the transcript" =
     button "backend" -- Tools run on the backend (/host switches)
     button "Model: Claude Opus 5.5, Medium" -- Claude Opus 5.5, reasoning Medium: models, reasoning and access (Ctrl+L)
     button "Send" -- Send (Enter)
-    textarea "Message" -- Working in /work on main. Ask prigh anything…
+    button "Folder: /work. Change it" -- /work. Start in another folder (/cd)
+    button "Branch: main. Change it" -- Work in another worktree (/worktree)
+    textarea "Message"
     [status] span "Ready"
     [dialog] div "Context and cost"
     [group] div "Host and model"

@@ -11,7 +11,6 @@ let%expect_test
   [%expect
     {|
     []
-    Working in /work on main . Working in /work on main . Ask prigh anything…
     (Add files or images (or paste, or drop them here))
     () Ready
     Context 0 / 200k

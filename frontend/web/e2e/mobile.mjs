@@ -184,31 +184,25 @@ const chrome = page => page.evaluate(() => {
   ].join("\n");
 });
 
-// The empty composer's line saying where the session works: the layer
-// shown (the longest that fits on its line, else the last, cut), whether it
-// is one line, and whether the editor (its caret, its taps) is over it.
+// The line under the composer saying where the session works: the folder
+// on the left (cut from its start when it does not fit), the branch on the
+// right, on one line inside the composer's width; and the editor's own
+// placeholder.
 const where = page => page.evaluate(() => {
   const editor = document.querySelector("#editor");
-  const hint = document.querySelector(".cwd-hint");
-  if (!hint || getComputedStyle(hint).display === "none")
-    return editor.value ? "no placeholder: the editor has text" : `placeholder: ${editor.placeholder} (the editor's own)`;
-  const text = e => e.innerText.replace(/\s+/g, " ").trim();
-  const fits = [...hint.querySelectorAll(".cwd-hint-fit")].filter(f =>
-    f.querySelector(".cwd-hint-line").getBoundingClientRect().top - f.getBoundingClientRect().top < 1);
-  const last = hint.querySelector(".cwd-hint-cut");
-  const shown = fits.length ? text(fits[fits.length - 1]) : `${text(last)}${last.scrollWidth > last.clientWidth + 1 ? " (cut)" : ""}`;
-  const h = hint.getBoundingClientRect(), e = editor.getBoundingClientRect();
-  const top = document.elementFromPoint(h.left + 8, h.top + h.height / 2);
-  const mono = getComputedStyle(hint.querySelector(".cwd-path")).fontFamily.includes("Mono");
-  const room = hint.clientWidth - 12, stack = hint.querySelector(".cwd-hint-stack").getBoundingClientRect().width;
-  const share = Math.abs(stack - room * 0.58) < 1.5 ? "58% of the editor"
-    : stack > room * 0.58 && stack < room - 1 ? "more than 58%: what the shortest line needs"
-    : stack >= room - 1 ? "all of the editor" : `${Math.round(100 * stack / room)}% of the editor`;
+  const line = document.querySelector(".composer-where");
+  if (!line) return `no line; placeholder: ${editor.placeholder}`;
+  const path = line.querySelector(".where-path"), branch = line.querySelector(".where-branch");
+  const cut = e => { const t = e.querySelector(".truncate"); return t.scrollWidth > t.clientWidth + 1 ? " (cut)" : ""; };
+  const l = line.getBoundingClientRect(), box = document.querySelector(".composer-box").getBoundingClientRect();
+  const parts = [path, branch].filter(Boolean).map(e => e.getBoundingClientRect());
+  const oneLine = parts.every(r => Math.abs(r.top - parts[0].top) < 2);
+  const mono = getComputedStyle(line).fontFamily.includes("Mono");
   return [
-    `placeholder: ${shown}`,
-    `its width: ${share}`,
-    `one line: ${h.height <= e.height + 1 && hint.scrollWidth <= hint.clientWidth + 1}; the path in mono: ${mono}; the editor on top: ${top === editor}`,
-    `for screen readers: ${editor.placeholder}`,
+    `folder: ${path.innerText.trim()}${cut(path)}`,
+    `branch: ${branch ? `${branch.innerText.trim()}${cut(branch)}` : "none"}`,
+    `one line: ${oneLine}; inside the composer: ${l.left >= box.left - 1 && l.right <= box.right + 1}; mono: ${mono}`,
+    `placeholder: ${editor.placeholder}`,
   ].join("\n");
 });
 
@@ -376,7 +370,6 @@ const desktop = async () => {
     await page.waitForTimeout(150);
     section(`desktop ${width}: where the session works`);
     console.log(await where(page));
-    console.log(`tooltip: ${await page.locator("#editor").getAttribute("title")}`);
     if (process.env.SHOTS)
       await page.locator(".composer").screenshot({ path: join(process.env.SHOTS, `mobile-${engineName}-desktop-${width}-composer.png`) });
   }
