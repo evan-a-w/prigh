@@ -13,4 +13,4 @@
   (modes js)
   (flags
    (-source-tree-root .)))
- (libraries core prigh_protocol prigh_web))
+ (libraries core prigh_protocol prigh_web prigh_web_test_harness))
