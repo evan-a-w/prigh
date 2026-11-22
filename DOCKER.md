@@ -224,6 +224,7 @@ user, `default`.
 | `PRIGH_NIX_GC_KEEP_DAYS` | `7` | the scheduled collection first deletes users' profile generations older than this many days; `0`: all but the current ones; `off`: keeps them all |
 | `PRIGH_NIX_MIN_FREE` | `15%` | Nix's `min-free`: while it builds or fetches, Nix collects garbage when less than this is free on `/nix`'s filesystem. Bytes as `nix.conf` takes them (`20G`, `512M`, `1T`, `10737418240`) or a percentage of the filesystem (`20%`); `0`: never |
 | `PRIGH_NIX_MAX_FREE` | `30%` | Nix's `max-free`: such a collection stops once this much is free; same forms, more than `PRIGH_NIX_MIN_FREE` |
+| `PRIGH_VOLUME_WAIT` | `2m` | how long the start waits for `/home` and `/nix` to be writable (a disk the host mounts late, or read-only for a while) before it gives up: a number with `s`, `m`, `h` or `d`; `0`: not at all (see [Data](#data)) |
 | `GH_TOKEN` | – | GitHub token for `git` over HTTPS, for users without one in `PRIGH_GH_TOKENS` (shared by all of them; see [Git and SSH](#git-and-ssh)) |
 | `PRIGH_GH_TOKENS` | – | per-user GitHub tokens, `name=token,...` |
 | `PRIGH_GITHUB_CLIENT_ID` | – | client id of your GitHub OAuth app (with Device Flow enabled), for `/login github` and prigh-web's Git hosting settings (README: Git hosting) |
@@ -599,6 +600,12 @@ scope is the directory it is served from.
 | `/home/<name>` | `prigh-home` | user `<name>`'s home and working directory: its projects (clone them here; `/cd` switches between them), `~/.ssh`, `~/.gitconfig`, shell history |
 | `/nix` | `prigh-nix` | the Nix store: what users installed (see [Installing tools](#installing-tools)), and prigh's own runtime, copied in from the image at start |
 | `/run/prigh` | tmpfs | the users (`extrausers/passwd`, `group`, `shadow`), rebuilt at each start |
+
+The start first waits, up to `PRIGH_VOLUME_WAIT` (2 minutes), for `/home`
+and `/nix` to be writable, logging once what it waits for; if they never
+are, it exits saying which and what to check. With bind mounts on a disk
+of their own, make sure the host mounts it read-write before Docker starts
+(systemd: `RequiresMountsFor=` on `docker.service`).
 
 Removing the stack keeps named volumes unless they are removed
 explicitly (`docker compose down -v` deletes them, logins and sessions

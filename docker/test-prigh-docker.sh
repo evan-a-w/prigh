@@ -172,6 +172,19 @@ run_tests() {
 	pd prigh sessions list
 	pd PRIGH_DOCKER_UID=1000 prigh sessions list
 
+	section "volumes not writable: wait (without sleeping in a dry run), then say what to check"
+	fake_root
+	owned /home/prigh 1000
+	mkdir -p "$r/nix"
+	chmod a-w "$r/nix"
+	pd PRIGH_TOKEN=tok PRIGH_VOLUME_WAIT=0
+	pd PRIGH_TOKEN=tok PRIGH_VOLUME_WAIT=4s
+	pd PRIGH_MODE=tui PRIGH_VOLUME_WAIT=0
+	pd PRIGH_VOLUME_WAIT=0 prigh sessions list
+	pd PRIGH_TOKEN=tok PRIGH_VOLUME_WAIT=soon
+	chmod u+w "$r/nix"
+	pd PRIGH_TOKEN=tok PRIGH_VOLUME_WAIT=0 | grep -E 'writable|mode='
+
 	section "Nix garbage collection: limits sized from the volume, the schedule"
 	fake_root
 	owned /home/prigh 1000
