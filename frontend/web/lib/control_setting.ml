@@ -16,6 +16,9 @@ type t =
   | Budget
   | Theme
   | Accent
+  | Corners
+  | Font
+  | Code_font
   | Worktree_hours
   | Archive_after
   | Notifications
@@ -54,6 +57,9 @@ let name = function
   | Budget -> "Budget for new sessions"
   | Theme -> "Theme"
   | Accent -> "Accent colour"
+  | Corners -> "Corners"
+  | Font -> "Font"
+  | Code_font -> "Code font"
   | Worktree_hours -> "Show worktrees"
   | Archive_after -> "Archive sessions after"
   | Notifications -> "Notifications"
@@ -109,6 +115,9 @@ let keywords = function
   | Budget -> "default cost dollars limit"
   | Theme -> "appearance dark light"
   | Accent -> "appearance color colour"
+  | Corners -> "appearance radius rounded roundness"
+  | Font -> "appearance typeface sans text"
+  | Code_font -> "appearance typeface monospace mono"
   | Worktree_hours -> "sidebar session list fold"
   | Archive_after -> "auto-archive session list days"
   | Notifications -> "notify alerts"
@@ -156,6 +165,9 @@ let page t : (Settings_section.t * string) option =
   | Verbosity -> Some (Appearance, "Transcript detail")
   | Theme -> Some (Appearance, "Theme")
   | Accent -> Some (Appearance, "Accent")
+  | Corners -> Some (Appearance, "Corners")
+  | Font -> Some (Appearance, "Font")
+  | Code_font -> Some (Appearance, "Code font")
   | Worktree_hours -> Some (Sessions, "Show worktrees")
   | Archive_after -> Some (Sessions, "Archive after")
   | Notifications -> Some (Sessions, "Notifications")

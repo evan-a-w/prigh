@@ -1,5 +1,6 @@
-// Themes and accents, and the user's preferences on the backend: the
-// settings page and /theme and /accent change the page at once; the choice
+// Themes, accents, corners and fonts, and the user's preferences on the
+// backend: the settings page and /theme and /accent change the page at
+// once, and the components (loon's, shadcn's variables) follow; the choice
 // is in ~/.prigh/prefs.json, comes back before the first paint of a reload,
 // reaches a browser that signs in afresh, and changes another open browser
 // live, as does the prompt history. Run by prigh_web.sh; prints normalised
@@ -110,6 +111,23 @@ const look = p => p.evaluate(() => {
   const css = getComputedStyle(root);
   return `${root.dataset.theme} ${root.dataset.accent} ${css.getPropertyValue("--sodium").trim()} on ${css.getPropertyValue("--graphite").trim()}`;
 });
+// The components' variables (bin/loon_bridge.css), the corners and fonts,
+// and a component's computed colours and corners: the settings' Corners
+// toggle group, its pressed item.
+const bridged = p => p.evaluate(() => {
+  const css = getComputedStyle(document.documentElement);
+  const v = n => css.getPropertyValue(n).trim();
+  const on = document.querySelector(".settings-panel .corners [aria-checked=true]");
+  const item = on && getComputedStyle(on);
+  const modal = document.querySelector(".settings-dialog");
+  const first = f => f.split(",")[0].replace(/"/g, "");
+  return [
+    `background ${v("--background")} foreground ${v("--foreground")} primary ${v("--primary")} on ${v("--primary-foreground")}`,
+    `radius ${v("--radius")}: the dialog ${modal && getComputedStyle(modal).borderTopLeftRadius}`,
+    `fonts: ${first(getComputedStyle(document.body).fontFamily)}, ${first(getComputedStyle(document.querySelector(".composer textarea") ?? document.body).fontFamily)}`,
+    on ? `pressed ${on.innerText}: ${item.backgroundColor} ${item.color}, corners ${item.borderTopLeftRadius}, ${item.height}` : "no pressed item",
+  ].join("\n");
+});
 const lookIs = (p, theme, accent) => p.waitForFunction(([t, a]) =>
   document.documentElement.dataset.theme === t && document.documentElement.dataset.accent === a, [theme, accent]);
 const composer = p => p.locator(".composer textarea");
@@ -185,6 +203,19 @@ try {
   await page.locator(".accent-choice[aria-label=Blue]").click();
   await lookIs(page, "dark", "blue");
   await dialogShot("settings dark blue");
+  section("the components in dark blue");
+  console.log(await bridged(page));
+  await page.locator(".settings-panel .corners [role=radio]", { hasText: "Round" }).click();
+  await page.waitForFunction(() => getComputedStyle(document.documentElement).getPropertyValue("--radius").trim() === "16px");
+  await page.locator(".settings-panel .font [role=radio]", { hasText: "Inter" }).click();
+  await page.waitForFunction(() => /^"?Inter/.test(getComputedStyle(document.body).fontFamily));
+  section("round corners, Inter");
+  console.log(await bridged(page));
+  await dialogShot("settings round inter");
+  await page.locator(".settings-panel .corners [role=radio]", { hasText: "Default" }).click();
+  await page.locator(".settings-panel .font [role=radio]", { hasText: "Recursive" }).click();
+  await page.waitForFunction(() => getComputedStyle(document.documentElement).getPropertyValue("--radius").trim() === "10px"
+    && getComputedStyle(document.body).fontFamily.includes("Recursive"));
   await page.keyboard.press("Escape");
   await showcase("dark blue");
   section("saved on the backend");
@@ -210,6 +241,8 @@ try {
   await lookIs(other, "light", "custom");
   section("changed live in the other");
   console.log(await look(other));
+  section("the components there, light with a custom accent");
+  console.log(await bridged(other));
   await composer(other).click();
   await composer(other).press("ArrowUp");
   await other.waitForFunction(() => document.querySelector(".composer textarea").value !== "");

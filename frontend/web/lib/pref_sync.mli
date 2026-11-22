@@ -4,9 +4,10 @@ open! Import
 (** The user's preferences and data that prigh-web keeps on the backend
     ([get_prefs], [set_prefs], [push_pref], [prefs_changed]), so that they
     follow the user from browser to browser and change live in the others:
-    the theme and accent, notifications, the transcript's verbosity, the
-    prompt history (shared with the TUI), the panels' sizes, whether the
-    terminal is open and which sessions' worktrees show in the sidebar. The
+    the theme, accent, corners and fonts, notifications, the transcript's
+    verbosity, the prompt history (shared with the TUI), the panels' sizes,
+    whether the terminal is open and which sessions' worktrees show in the
+    sidebar. The
     browser caches them ([Command.Cache_prefs]) for the first paint and for
     backends that keep none.
 
@@ -18,6 +19,14 @@ open! Import
 module Key : sig
   val theme : string
   val accent : string
+
+  (** The corners' radius ({!Theme.Radius}). *)
+  val radius : string
+
+  (** The fonts ({!Theme.Sans}, {!Theme.Mono}). *)
+  val sans : string
+
+  val mono : string
   val notify : string
   val verbosity : string
   val terminal_open : string

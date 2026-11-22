@@ -23,6 +23,9 @@ type t =
   | Budget
   | Theme
   | Accent
+  | Corners
+  | Font
+  | Code_font
   | Worktree_hours
   | Archive_after
   | Notifications

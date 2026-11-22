@@ -210,7 +210,9 @@ let%expect_test "prompt history: Up and Down at the first and last line" =
   print_s [%sexp ((H.model h).draft : string)];
   [%expect
     {|
-    (Apply_theme ((name Original) (accent (Preset Orange))))
+    (Apply_theme
+     ((name Original) (accent (Preset Orange)) (radius Default) (sans Recursive)
+      (mono Recursive)))
     (browser default)
     History_older
     newest
@@ -411,6 +413,9 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /filter [all|KIND...|-KIND|+KIND] show only some kinds in the transcript (your messages, replies, thinking, tools, subagents, notes); the model's context is unchanged
     /theme [original|dark|light] pick or set the theme, for you in every browser
     /accent [name|#rrggbb] pick or set the accent colour: orange, blue, green, purple, pink, teal, yellow or any #rrggbb
+    /corners [sharp|small|default|round] how round the page's corners are, for you in every browser
+    /font [recursive|inter|system] the font of prose and the interface
+    /code-font [recursive|system] the font of code, commands and output
     /confirm [on|off|mode] the mode this session and new ones start in: on (ask), off (auto), ask, auto-edit, smart, auto or chat
     /mode [mode] pick or set the mode, in Alt+M's order: ask, auto-edit, smart or auto (what asks first), plan (read-only planning) or chat (without the tool host)
     /plan [on|off] toggle plan mode: the model investigates and plans, changing no files, until you turn it off
@@ -444,9 +449,6 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /auto-archive [DAYS|off] show how long a session goes without activity before it is archived; DAYS|off: archive after DAYS days (off: never, only by hand), in Settings
     /clone copy this session into a new one
     /fork start a new session from an earlier message
-    /rewind go back to an earlier message in this session
-    /trim [after|undo] drop everything before a message from the model's context (the transcript keeps it folded); after: everything after a message instead (what you send later stays); undo brings back the last trim
-    /tree show the session tree and move to any message in it
     |}];
   H.type_ h "/mod";
   H.key h "Tab";

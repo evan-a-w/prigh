@@ -28,6 +28,15 @@ let%expect_test "the gear, /settings and Ctrl+, open it; Esc closes it" =
     Your turns, the selection, focus and work in progress.
     (Orange (/accent orange)) (Blue (/accent blue)) (Green (/accent green)) (Purple (/accent purple)) (Pink (/accent pink)) (Teal (/accent teal)) (Yellow (/accent yellow))
     [#f0b44c] Custom
+    Corners
+    How round buttons, cards and dialogs are.
+    (Sharp) (Small) (Default) (Round)
+    Font
+    Prose and the interface.
+    (Recursive) (Inter) (System)
+    Code font
+    Code, commands and their output.
+    (Recursive) (System)
     Layout
     Transcript detail This browser
     How much of tool calls and thinking the transcript shows (Ctrl+O) .
@@ -288,6 +297,15 @@ let%expect_test "the names of the settings' controls" =
     [radio] button "Pink" -- Pink (/accent pink)
     [radio] button "Teal" -- Teal (/accent teal)
     [radio] button "Yellow" -- Yellow (/accent yellow)
+    [radio] button "Sharp" -- square corners (/corners sharp)
+    [radio] button "Small" -- slightly rounded (/corners small)
+    [radio] button "Default" -- rounded, as prigh-web has been (/corners default)
+    [radio] button "Round" -- softer, rounder (/corners round)
+    [radio] button "Recursive" -- Recursive Sans, prigh-web's own (/font recursive)
+    [radio] button "Inter" -- Inter, neutral and compact (/font inter)
+    [radio] button "System" -- this device's interface font (/font system)
+    [radio] button "Recursive" -- Recursive Mono, prigh-web's own (/code-font recursive)
+    [radio] button "System" -- this device's monospace font (/code-font system)
     button "Quiet" -- /verbosity quiet
     button "Normal" -- /verbosity normal
     button "Verbose" -- /verbosity verbose
@@ -303,6 +321,18 @@ let%expect_test "the names of the settings' controls" =
     [radio] button "Pink" -- Pink (/accent pink)
     [radio] button "Teal" -- Teal (/accent teal)
     [radio] button "Yellow" -- Yellow (/accent yellow)
+    [radiogroup] div "Corners"
+    [radio] button "Sharp" -- square corners (/corners sharp)
+    [radio] button "Small" -- slightly rounded (/corners small)
+    [radio] button "Default" -- rounded, as prigh-web has been (/corners default)
+    [radio] button "Round" -- softer, rounder (/corners round)
+    [radiogroup] div "Font"
+    [radio] button "Recursive" -- Recursive Sans, prigh-web's own (/font recursive)
+    [radio] button "Inter" -- Inter, neutral and compact (/font inter)
+    [radio] button "System" -- this device's interface font (/font system)
+    [radiogroup] div "Code font"
+    [radio] button "Recursive" -- Recursive Mono, prigh-web's own (/code-font recursive)
+    [radio] button "System" -- this device's monospace font (/code-font system)
     [group] div "Transcript detail"
     -- Sessions
     [switch] button "Show worktrees for sessions used in the last" -- Fold every session's worktrees

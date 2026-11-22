@@ -550,7 +550,9 @@ let%expect_test
   H.text h ~selector:".toast";
   [%expect
     {|
-    (Apply_theme ((name Original) (accent (Preset Orange))))
+    (Apply_theme
+     ((name Original) (accent (Preset Orange)) (radius Default) (sans Recursive)
+      (mono Recursive)))
     (Focus dialog)
     (Focus editor)
     (Focus editor)

@@ -13,6 +13,9 @@ module Argument = struct
     | Filter
     | Theme
     | Accent
+    | Corners
+    | Font
+    | Code_font
     | Confirm
     | Mode
     | Plan
@@ -114,6 +117,21 @@ let every =
       "accent"
       "pick or set the accent colour: orange, blue, green, purple, pink, teal, \
        yellow or any #rrggbb"
+  ; c
+      ~argument:Corners
+      ~args:"[sharp|small|default|round]"
+      "corners"
+      "how round the page's corners are, for you in every browser"
+  ; c
+      ~argument:Font
+      ~args:"[recursive|inter|system]"
+      "font"
+      "the font of prose and the interface"
+  ; c
+      ~argument:Code_font
+      ~args:"[recursive|system]"
+      "code-font"
+      "the font of code, commands and output"
   ; c
       ~argument:Confirm
       ~args:"[on|off|mode]"

@@ -17,3 +17,4 @@ module Transcript_filter = Prigh_ui.Transcript_filter
 module Active_host = Prigh_ui.Active_host
 module Computer_action = Prigh_ui.Computer_action
 module Session_link = Prigh_ui.Session_link
+module Loon = Loon_ui

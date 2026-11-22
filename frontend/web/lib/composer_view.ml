@@ -45,6 +45,8 @@ let popup (m : App.Model.t) ~inject =
       | Argument Pr -> "Pull requests"
       | Argument Theme -> "Themes"
       | Argument Accent -> "Accent colours"
+      | Argument Corners -> "Corners"
+      | Argument (Font | Code_font) -> "Fonts"
       | Argument Trim -> "Trim"
       | Argument Filter -> "Show only"
       | Argument Delete -> "Delete"

@@ -226,7 +226,14 @@ let%expect_test
     ];
   load "ws://h/ws alice";
   load "ws://h/ws bob";
-  Pref_cache.save_theme storage { name = Light; accent = Custom "#123456" };
+  Pref_cache.save_theme
+    storage
+    { Prigh_web.Theme.default with
+      name = Light
+    ; accent = Custom "#123456"
+    ; radius = Round
+    ; sans = System
+    };
   print_endline (Hashtbl.find_exn items Pref_cache.theme_key);
   [%expect
     {|
@@ -236,6 +243,6 @@ let%expect_test
       ((key web.theme)         (value (dark))))
      false)
     (() false)
-    {"attrs":{"data-theme":"light","data-accent":"custom"},"vars":{"--sodium":"#123456","--sodium-ink":"#ffffff"}}
+    {"attrs":{"data-theme":"light","data-accent":"custom"},"vars":{"--sodium":"#123456","--sodium-ink":"#ffffff","--radius":"16px","--sans":"system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif"}}
     |}]
 ;;

@@ -87,6 +87,9 @@ let%expect_test "every command does something (none is unknown)" =
     /filter                    transcript filter menu
     /theme                     picker: Theme
     /accent                    picker: Accent colour (or type #rrggbb)
+    /corners                   Settings
+    /font                      Settings
+    /code-font                 Settings
     /confirm                   picker: Mode, also for new sessions
     /mode                      picker: When tools ask first (Alt+M cycles)
     /plan                      rpc set_mode
@@ -1850,12 +1853,12 @@ let%expect_test "/setusr: a superuser acts as another user, and back" =
     (Rpc (method_ get_prefs)
      (params
       ((keys
-        (web.theme web.accent web.notify web.verbosity web.terminal-open
-         web.sidebar-folded web.sidebar-unfolded web.sidebar-opened
-         web.sidebar-worktree-hours web.review web.code-size history web.migrated
-         web.sidebar-width web.files-width web.files-preview-width
-         web.agents-width web.terminal-height web.review-chat-width
-         web.review-files-width web.review-margin-width))))
+        (web.theme web.accent web.radius web.font web.code-font web.notify
+         web.verbosity web.terminal-open web.sidebar-folded web.sidebar-unfolded
+         web.sidebar-opened web.sidebar-worktree-hours web.review web.code-size
+         history web.migrated web.sidebar-width web.files-width
+         web.files-preview-width web.agents-width web.terminal-height
+         web.review-chat-width web.review-files-width web.review-margin-width))))
      (tag Prefs))
     Acting as bob
     Back to alice
@@ -1906,12 +1909,12 @@ let%expect_test "/retry-backend-connection, /state, /clear, /quit" =
     (Rpc (method_ get_prefs)
      (params
       ((keys
-        (web.theme web.accent web.notify web.verbosity web.terminal-open
-         web.sidebar-folded web.sidebar-unfolded web.sidebar-opened
-         web.sidebar-worktree-hours web.review web.code-size history web.migrated
-         web.sidebar-width web.files-width web.files-preview-width
-         web.agents-width web.terminal-height web.review-chat-width
-         web.review-files-width web.review-margin-width))))
+        (web.theme web.accent web.radius web.font web.code-font web.notify
+         web.verbosity web.terminal-open web.sidebar-folded web.sidebar-unfolded
+         web.sidebar-opened web.sidebar-worktree-hours web.review web.code-size
+         history web.migrated web.sidebar-width web.files-width
+         web.files-preview-width web.agents-width web.terminal-height
+         web.review-chat-width web.review-files-width web.review-margin-width))))
      (tag Prefs))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s1.jsonl) (limit 1000000)))

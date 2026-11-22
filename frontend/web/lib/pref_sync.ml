@@ -4,6 +4,9 @@ open! Import
 module Key = struct
   let theme = "web.theme"
   let accent = "web.accent"
+  let radius = "web.radius"
+  let sans = "web.font"
+  let mono = "web.code-font"
   let notify = "web.notify"
   let verbosity = "web.verbosity"
   let terminal_open = "web.terminal-open"
@@ -19,6 +22,9 @@ module Key = struct
   let all =
     [ theme
     ; accent
+    ; radius
+    ; sans
+    ; mono
     ; notify
     ; verbosity
     ; terminal_open

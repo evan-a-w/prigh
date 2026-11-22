@@ -11,5 +11,6 @@ val swatch : Theme.Accent.t -> Node.t
 val sample : Theme.Name.t -> Node.t
 
 (** The settings' rows: the themes as a choice of three samples, the accent
-    as swatches and a colour input for any other. *)
+    as swatches and a colour input for any other, and the corners and fonts
+    as toggle groups. *)
 val rows : App.Model.t -> inject:(App.Action.t -> unit Effect.t) -> Node.t list

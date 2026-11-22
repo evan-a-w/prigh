@@ -224,6 +224,9 @@ let%expect_test "help lists every key and command" =
     /filter [all|KIND...|-KIND|+KIND] show only some kinds in the transcript (your messages, replies, thinking, tools, subagents, notes); the model's context is unchanged
     /theme [original|dark|light] pick or set the theme, for you in every browser
     /accent [name|#rrggbb] pick or set the accent colour: orange, blue, green, purple, pink, teal, yellow or any #rrggbb
+    /corners [sharp|small|default|round] how round the page's corners are, for you in every browser
+    /font [recursive|inter|system] the font of prose and the interface
+    /code-font [recursive|system] the font of code, commands and output
     /confirm [on|off|mode] the mode this session and new ones start in: on (ask), off (auto), ask, auto-edit, smart, auto or chat
     /mode [mode] pick or set the mode, in Alt+M's order: ask, auto-edit, smart or auto (what asks first), plan (read-only planning) or chat (without the tool host)
     /plan [on|off] toggle plan mode: the model investigates and plans, changing no files, until you turn it off
@@ -617,12 +620,12 @@ let%expect_test
     (Rpc (method_ get_prefs)
      (params
       ((keys
-        (web.theme web.accent web.notify web.verbosity web.terminal-open
-         web.sidebar-folded web.sidebar-unfolded web.sidebar-opened
-         web.sidebar-worktree-hours web.review web.code-size history web.migrated
-         web.sidebar-width web.files-width web.files-preview-width
-         web.agents-width web.terminal-height web.review-chat-width
-         web.review-files-width web.review-margin-width))))
+        (web.theme web.accent web.radius web.font web.code-font web.notify
+         web.verbosity web.terminal-open web.sidebar-folded web.sidebar-unfolded
+         web.sidebar-opened web.sidebar-worktree-hours web.review web.code-size
+         history web.migrated web.sidebar-width web.files-width
+         web.files-preview-width web.agents-width web.terminal-height
+         web.review-chat-width web.review-files-width web.review-margin-width))))
      (tag Prefs))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s1.jsonl) (limit 1000000)))

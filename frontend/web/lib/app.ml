@@ -2966,6 +2966,39 @@ let apply_pref (m : Model.t) ~startup ({ key; value } : Prefs.Change.t) =
               ~default:Theme.default.accent
         }
     }
+  else if String.equal key Key.radius
+  then
+    { m with
+      theme =
+        { m.theme with
+          radius =
+            Option.value
+              (Option.bind string ~f:Theme.Radius.of_string)
+              ~default:Theme.default.radius
+        }
+    }
+  else if String.equal key Key.sans
+  then
+    { m with
+      theme =
+        { m.theme with
+          sans =
+            Option.value
+              (Option.bind string ~f:Theme.Sans.of_string)
+              ~default:Theme.default.sans
+        }
+    }
+  else if String.equal key Key.mono
+  then
+    { m with
+      theme =
+        { m.theme with
+          mono =
+            Option.value
+              (Option.bind string ~f:Theme.Mono.of_string)
+              ~default:Theme.default.mono
+        }
+    }
   else if String.equal key Key.verbosity
   then (
     let verbosity =
@@ -3089,6 +3122,11 @@ let theme_changes (theme : Theme.t) =
   ; { key = Key.accent
     ; value = Some (`String (Theme.Accent.to_string theme.accent))
     }
+  ; { key = Key.radius
+    ; value = Some (`String (Theme.Radius.to_string theme.radius))
+    }
+  ; { key = Key.sans; value = Some (`String (Theme.Sans.to_string theme.sans)) }
+  ; { key = Key.mono; value = Some (`String (Theme.Mono.to_string theme.mono)) }
   ]
 ;;
 
@@ -3170,6 +3208,82 @@ let accent_named (m : Model.t) name =
          "Unknown accent “%s”: use orange, blue, green, purple, pink, teal, \
           yellow or a colour like #3b82f6 (/accent picks one)."
          name)
+;;
+
+(* [/corners], [/font], [/code-font]: [name] among [all]'s, or the
+   settings' appearance section to see them. *)
+let look_named
+      (m : Model.t)
+      name
+      ~command
+      ~what
+      ~all
+      ~to_string
+      ~of_string
+      ~describe
+      ~set
+  =
+  if String.is_empty (String.strip name)
+  then open_settings ~section:Settings_section.Appearance m
+  else (
+    match of_string name with
+    | Some v ->
+      set_theme
+        m
+        (set m.theme v)
+        ~replaces:[ what ^ ": " ]
+        ~notice:(sprintf "%s: %s, %s" what (to_string v) (describe v))
+    | None ->
+      error
+        m
+        (sprintf
+           "Unknown %s “%s”: use %s (/%s alone shows them in the settings)."
+           (String.lowercase what)
+           name
+           (match List.rev_map all ~f:to_string with
+            | last :: (_ :: _ as rest) ->
+              String.concat ~sep:", " (List.rev rest) ^ " or " ^ last
+            | names -> String.concat names)
+           command))
+;;
+
+let corners_named m name =
+  look_named
+    m
+    name
+    ~command:"corners"
+    ~what:"Corners"
+    ~all:Theme.Radius.all
+    ~to_string:Theme.Radius.to_string
+    ~of_string:Theme.Radius.of_string
+    ~describe:Theme.Radius.describe
+    ~set:(fun t radius -> { t with radius })
+;;
+
+let font_named m name =
+  look_named
+    m
+    name
+    ~command:"font"
+    ~what:"Font"
+    ~all:Theme.Sans.all
+    ~to_string:Theme.Sans.to_string
+    ~of_string:Theme.Sans.of_string
+    ~describe:Theme.Sans.describe
+    ~set:(fun t sans -> { t with sans })
+;;
+
+let code_font_named m name =
+  look_named
+    m
+    name
+    ~command:"code-font"
+    ~what:"Code font"
+    ~all:Theme.Mono.all
+    ~to_string:Theme.Mono.to_string
+    ~of_string:Theme.Mono.of_string
+    ~describe:Theme.Mono.describe
+    ~set:(fun t mono -> { t with mono })
 ;;
 
 (* ---- the terminal panel *)
@@ -7082,6 +7196,9 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
   | "theme", name -> theme_named m name
   | "accent", "" -> open_picker m (accent_picker m)
   | "accent", name -> accent_named m name
+  | "corners", name -> corners_named m name
+  | "font", name -> font_named m name
+  | "code-font", name -> code_font_named m name
   | "filter", "" -> open_filter m
   | "filter", args ->
     (match Transcript_filter.parse m.transcript_filter args with
@@ -10885,6 +11002,9 @@ let setting_opener (m : Model.t) (setting : Control_setting.t) =
   | Approval_model -> model_picker approval_models_picker
   | Naming_model -> model_picker naming_models_picker
   | Dictation_model -> model_picker dictation_models_picker
+  | Corners
+  | Font
+  | Code_font
   | Default_directory
   | Budget
   | Worktree_hours
@@ -11006,6 +11126,9 @@ let setting_value (m : Model.t) (setting : Control_setting.t) =
     match setting with
     | Theme -> Some (Theme.Name.to_string m.theme.name)
     | Accent -> Some (Theme.Accent.to_string m.theme.accent)
+    | Corners -> Some (Theme.Radius.to_string m.theme.radius)
+    | Font -> Some (Theme.Sans.to_string m.theme.sans)
+    | Code_font -> Some (Theme.Mono.to_string m.theme.mono)
     | _ when Control_setting.session setting -> Some (session_value m setting)
     | _ -> Option.bind m.config ~f:(fun c -> config_value m c setting)
   in

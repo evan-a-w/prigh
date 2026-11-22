@@ -494,12 +494,12 @@ let%expect_test "reconnecting with older pages loaded" =
     (Rpc (method_ get_prefs)
      (params
       ((keys
-        (web.theme web.accent web.notify web.verbosity web.terminal-open
-         web.sidebar-folded web.sidebar-unfolded web.sidebar-opened
-         web.sidebar-worktree-hours web.review web.code-size history web.migrated
-         web.sidebar-width web.files-width web.files-preview-width
-         web.agents-width web.terminal-height web.review-chat-width
-         web.review-files-width web.review-margin-width))))
+        (web.theme web.accent web.radius web.font web.code-font web.notify
+         web.verbosity web.terminal-open web.sidebar-folded web.sidebar-unfolded
+         web.sidebar-opened web.sidebar-worktree-hours web.review web.code-size
+         history web.migrated web.sidebar-width web.files-width
+         web.files-preview-width web.agents-width web.terminal-height
+         web.review-chat-width web.review-files-width web.review-margin-width))))
      (tag Prefs))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s2.jsonl) (from e3) (limit 60)))
@@ -571,12 +571,12 @@ let%expect_test "reconnecting when what was on show has gone from the session" =
     (Rpc (method_ get_prefs)
      (params
       ((keys
-        (web.theme web.accent web.notify web.verbosity web.terminal-open
-         web.sidebar-folded web.sidebar-unfolded web.sidebar-opened
-         web.sidebar-worktree-hours web.review web.code-size history web.migrated
-         web.sidebar-width web.files-width web.files-preview-width
-         web.agents-width web.terminal-height web.review-chat-width
-         web.review-files-width web.review-margin-width))))
+        (web.theme web.accent web.radius web.font web.code-font web.notify
+         web.verbosity web.terminal-open web.sidebar-folded web.sidebar-unfolded
+         web.sidebar-opened web.sidebar-worktree-hours web.review web.code-size
+         history web.migrated web.sidebar-width web.files-width
+         web.files-preview-width web.agents-width web.terminal-height
+         web.review-chat-width web.review-files-width web.review-margin-width))))
      (tag Prefs))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s2.jsonl) (from e5) (limit 60)))

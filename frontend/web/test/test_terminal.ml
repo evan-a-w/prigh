@@ -221,12 +221,12 @@ let%expect_test "the panel follows the session, the host and the user" =
     (Rpc (method_ get_prefs)
      (params
       ((keys
-        (web.theme web.accent web.notify web.verbosity web.terminal-open
-         web.sidebar-folded web.sidebar-unfolded web.sidebar-opened
-         web.sidebar-worktree-hours web.review web.code-size history web.migrated
-         web.sidebar-width web.files-width web.files-preview-width
-         web.agents-width web.terminal-height web.review-chat-width
-         web.review-files-width web.review-margin-width))))
+        (web.theme web.accent web.radius web.font web.code-font web.notify
+         web.verbosity web.terminal-open web.sidebar-folded web.sidebar-unfolded
+         web.sidebar-opened web.sidebar-worktree-hours web.review web.code-size
+         history web.migrated web.sidebar-width web.files-width
+         web.files-preview-width web.agents-width web.terminal-height
+         web.review-chat-width web.review-files-width web.review-margin-width))))
      (tag Prefs))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s2.jsonl) (limit 1000000)))
@@ -474,7 +474,9 @@ let%expect_test "after a reload the panel reopens without taking the keyboard" =
   H.text h ~selector:".terminal-panel";
   [%expect
     {|
-    (Apply_theme ((name Original) (accent (Preset Orange))))
+    (Apply_theme
+     ((name Original) (accent (Preset Orange)) (radius Default) (sans Recursive)
+      (mono Recursive)))
     backend /work connecting… (Close (Ctrl+`): the shell keeps running for 10 minutes)
     ((session s1)(host backend)(online true)(as_user())(generation 0)(dir()))
     |}]

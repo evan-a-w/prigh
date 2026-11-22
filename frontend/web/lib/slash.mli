@@ -16,6 +16,9 @@ module Argument : sig
     | Filter (** [all] and the transcript's kinds *)
     | Theme (** [original], [dark] or [light] *)
     | Accent (** the presets' names, or a colour *)
+    | Corners (** {!Theme.Radius}'s names *)
+    | Font (** {!Theme.Sans}'s names *)
+    | Code_font (** {!Theme.Mono}'s names *)
     | Confirm
     | Mode
     | Plan
