@@ -235,6 +235,8 @@ let%expect_test "help lists every key and command" =
     its menu: cut, copy, paste, select all (also right-click; ↑ ↓ move, Enter chooses, Esc closes); the browser's own menus are hidden there
     Shift+F10 or ContextMenu (in the terminal, the desktop app's browser window)
     its menu: copy the selection, paste, select all (also right-click)
+    Ctrl+click or ⌘+click, Shift+click (a session)
+    select it, or the range from the last one (from the session on show at first); the bar under the list archives or deletes them; a middle click opens it in a new window
     Space (selecting)
     mark a session (Shift: the range from the last one); Delete deletes the marked ones, Esc stops selecting
     Ctrl+Q or ⌘+Q (desktop app)
@@ -305,7 +307,7 @@ let%expect_test "help lists every key and command" =
     check or uncheck the highlighted model
     ↑↓ ←→ Home End (settings' sections)
     show the previous / next section, or the first / last (/settings SECTION opens at one)
-    Ctrl+click or ⌘-click or middle click (a session in the sidebar)
+    Middle click (a session in the sidebar)
     open it in a new window (its menu's Open in new window)
     Delete (in /remind's list)
     remove the highlighted reminder
@@ -866,12 +868,12 @@ let%expect_test "signing out" =
   let h = H.create () in
   H.text h ~selector:".sidebar-footer";
   [%expect
-    {| (Settings (Ctrl+, or /settings)) (Pull requests (/pr)) (Commands and keys (/help)) |}];
+    {| (Settings (Ctrl+, or /settings)) (Usage and limits (/usage)) (Commands and keys (/help)) |}];
   H.act h Saved_login;
   H.text h ~selector:".sidebar-footer";
   [%expect
     {|
-    (Settings (Ctrl+, or /settings)) (Pull requests (/pr)) (Commands and keys (/help))
+    (Settings (Ctrl+, or /settings)) (Usage and limits (/usage)) (Commands and keys (/help))
     (Sign out)
     |}];
   H.act
@@ -885,7 +887,7 @@ let%expect_test "signing out" =
        });
   H.text h ~selector:".sidebar-footer";
   [%expect
-    {| (Settings (Ctrl+, or /settings)) (Pull requests (/pr)) (Commands and keys (/help)) (acting as bob A) |}];
+    {| (Settings (Ctrl+, or /settings)) (Usage and limits (/usage)) (Commands and keys (/help)) (acting as bob A) |}];
   H.act h Sign_out;
   H.type_ h "/signout";
   H.act h Send;
