@@ -38,7 +38,9 @@
 # sheet), then terminal_keys.mjs, the terminal's extra keys on
 # phones, then pwa.mjs, then
 # compaction.mjs, the settings page's Compaction section, then
-# sessions_settings.mjs, the Sessions section's Archive after, then new_sessions.mjs, the
+# sessions_settings.mjs, the Sessions section's Archive after, then
+# sidebar_select.mjs, selecting sessions with Ctrl/Shift clicks and the
+# Archive row's menu, then new_sessions.mjs, the
 # New sessions section's defaults and a new session that starts with them,
 # then memory.mjs,
 # its Memory section, on a desktop and phones, then usage.mjs, its Usage
@@ -105,7 +107,7 @@ test -x "$PRIGH_BACKEND" || { echo "no backend at $PRIGH_BACKEND: build it (cd b
 test -f "$SITE/main.bc.js" || { echo "no site at $SITE: build it (cd frontend && dune build ./web/bin/site)" >&2; exit 1; }
 if [ -n "${SHOTS:-}" ]; then mkdir -p "$SHOTS"; fi
 
-scripts="prigh_web temporary accounts reconnect paging resilience:slow resilience:drops stability themes worktrees worktrees_switch session_card review review_git remote cli_signin desktop desktop_signin steer subagent_paged trim filter search session_links viewer math clipboard field_menu desktop_links card status mobile review_phone terminal_keys long_press pwa compaction sessions_settings new_sessions memory usage user_info custom_instructions mcp_settings mcp_oauth images:desktop images:phone images:small pasted:desktop pasted:phone pasted:small computer:desktop computer:phone computer:small smart:desktop smart:phone smart:small ui chat quiet:desktop quiet:phone quiet:small editor:desktop editor:phone editor:small"
+scripts="prigh_web temporary accounts reconnect paging resilience:slow resilience:drops stability themes worktrees worktrees_switch session_card review review_git remote cli_signin desktop desktop_signin steer subagent_paged trim filter search session_links viewer math clipboard field_menu desktop_links card status mobile review_phone terminal_keys long_press pwa compaction sessions_settings sidebar_select new_sessions memory usage user_info custom_instructions mcp_settings mcp_oauth images:desktop images:phone images:small pasted:desktop pasted:phone pasted:small computer:desktop computer:phone computer:small smart:desktop smart:phone smart:small ui chat quiet:desktop quiet:phone quiet:small editor:desktop editor:phone editor:small"
 engines="${ENGINES:-chromium firefox webkit}"
 jobs="${JOBS:-$(nproc)}"
 # Measured peaks (PSS of the script, its backend and browser): 1.2 to 1.7 GiB,

@@ -304,7 +304,7 @@ let%expect_test "Ctrl or Cmd, and Shift, click sessions into a selection" =
   in
   let marked () =
     H.text h ~selector:".sessions-toolbar";
-    H.text h ~selector:".session[aria-checked=true] .session-title";
+    H.text h ~selector:".session-open[aria-checked=true] .session-title";
     H.names h ~selector:".selection-bar button"
   in
   print_endline "-- Ctrl+click the third:";
