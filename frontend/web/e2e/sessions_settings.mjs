@@ -14,6 +14,8 @@ import { mkdirSync, readFileSync, readdirSync, realpathSync, utimesSync, writeFi
 import { join } from "node:path";
 import { end } from "./end.mjs";
 
+// ./test's core suite (SUITE=core) checks one phone size; --full both.
+const phoneSizes = process.env.SUITE === "core" ? [[390, 844]] : [[390, 844], [320, 640]];
 const { chromium, firefox, webkit } = await import(process.env.PLAYWRIGHT_MODULE);
 
 const [engineName] = process.argv.slice(2);
@@ -271,7 +273,7 @@ try {
   await page.locator("#auto-archive").fill("7");
   await page.locator("#auto-archive").press("Enter");
   await toast(page, "after 7 days");
-  for (const [width, height] of [[390, 844], [320, 640]]) {
+  for (const [width, height] of phoneSizes) {
     const phone = await open({ width, height }, true);
     await signIn(phone);
     await phone.locator(".chat-chrome .toggle-sidebar").click();
@@ -280,7 +282,8 @@ try {
     section(`phone ${width}x${height}: sidebar`);
     await sidebar(phone);
     await screenshot(phone, `phone-${width}-sidebar`);
-    await phone.locator(".chat-chrome .toggle-sidebar, .sidebar-close").first().click().catch(() => {});
+    await phone.locator(".scrim").tap({ position: { x: width - 10, y: height / 2 } });
+    await phone.locator(".scrim").waitFor({ state: "detached" });
     await phone.evaluate(() => document.activeElement?.blur());
     await openSettings(phone);
     section(`phone ${width}x${height}: settings`);

@@ -13,7 +13,7 @@
 // optionally SHOTS.
 import { spawn } from "node:child_process";
 import { mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
-import { hostname } from "node:os";
+import { hostName } from "./host_name.mjs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { end } from "./end.mjs";
@@ -107,8 +107,8 @@ const tidy = text =>
     .replaceAll(node, "NODE")
     .replaceAll(home, "HOME")
     .replaceAll(cwd, "CWD")
-    .replaceAll(hostname(), "HOST")
-    .replaceAll(hostname().toUpperCase(), "HOST");
+    .replaceAll(hostName(), "HOST")
+    .replaceAll(hostName().toUpperCase(), "HOST");
 const row = (p, name) => p.locator(`.mcp-server[data-server="${name}"]`).first();
 const mine = (p, name) => p.locator(`.mcp-server:not(.mcp-host-server)[data-server="${name}"]`);
 const openMcp = async p => {

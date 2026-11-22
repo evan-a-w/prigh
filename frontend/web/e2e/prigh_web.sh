@@ -70,6 +70,10 @@
 #   PRIGH_BACKEND        the backend binary (default: the dune build)
 #   PRIGH_WEB_ROOT       the built site (default: the dune build)
 #   ENGINES              browsers to run (default: chromium firefox webkit)
+#   SUITE                full (default: every script, each at every size)
+#                        or core (./test's: the scripts in $core, at one phone
+#                        size where a script checks two; diffed with
+#                        ENGINE.core.expected)
 #   SHOTS                a directory to save screenshots of each step in
 #   JOBS                 how many scripts run at once (at most)
 #   MEM_PER_JOB          MiB a script (backend, browser, node) may need (default 1536)
@@ -81,6 +85,8 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export PRIGH_BACKEND="${PRIGH_BACKEND:-$here/../../../backend/_build/default/bin/main.exe}"
 export SITE="${PRIGH_WEB_ROOT:-$here/../../_build/default/web/bin/site}"
 export TOKEN='sekrit&x=y'
+# The same output on every machine (scripts print it as <HOSTNAME>).
+export PRIGH_HOST_NAME=e2e-host
 tmp="$(mktemp -d)"
 cleanup() {
 	status=$?
@@ -91,8 +97,35 @@ trap cleanup EXIT
 test -x "$PRIGH_BACKEND" || { echo "no backend at $PRIGH_BACKEND: build it (cd backend && dune build)" >&2; exit 1; }
 test -f "$SITE/main.bc.js" || { echo "no site at $SITE: build it (cd frontend && dune build ./web/bin/site)" >&2; exit 1; }
 if [ -n "${SHOTS:-}" ]; then mkdir -p "$SHOTS"; fi
+# The dev build's main.bc.js carries an inline source map, half its 64 MB:
+# every page load (about 150 a run) would parse it. The scripts get a copy
+# of the site without it (a release build has none: nothing to strip).
+if grep -q '^//# sourceMappingURL=data:' "$SITE/main.bc.js"; then
+	cp -rL "$SITE" "$tmp/site"
+	chmod -R u+w "$tmp/site"
+	grep -v '^//# sourceMappingURL=data:' "$SITE/main.bc.js" >"$tmp/site/main.bc.js"
+	export SITE="$tmp/site"
+fi
 
 scripts="prigh_web temporary accounts reconnect paging resilience:slow resilience:drops stability themes worktrees worktrees_switch review review_git remote cli_signin desktop desktop_signin steer subagent_paged trim filter search session_links viewer math clipboard field_menu desktop_links card status mobile review_phone terminal_keys long_press pwa compaction sessions_settings new_sessions memory usage user_info custom_instructions mcp_settings mcp_oauth images:desktop images:phone images:small pasted:desktop pasted:phone pasted:small computer:desktop computer:phone computer:small smart:desktop smart:phone smart:small ui chat quiet:desktop quiet:phone quiet:small"
+# The core suite, ./test's: the main page's flows (chat, composer, sidebar,
+# sessions, settings, the status line, Ctrl+K, phones by touch, a lost
+# connection), small enough to take well under a minute on a busy machine.
+# ./test --full runs every script.
+core="prigh_web temporary sessions_settings search status mobile reconnect card"
+suite="${SUITE:-full}"
+case "$suite" in
+core)
+	scripts="$core"
+	expected_suffix=.core.expected
+	;;
+full) expected_suffix=.expected ;;
+*)
+	echo "SUITE is core or full, not $suite" >&2
+	exit 2
+	;;
+esac
+export SUITE="$suite"
 engines="${ENGINES:-chromium firefox webkit}"
 jobs="${JOBS:-$(nproc)}"
 # Measured peaks (PSS of the script, its backend and browser): 1.2 to 1.7 GiB,
@@ -166,10 +199,10 @@ for engine in $engines; do
 		fi
 	done
 	if [ "${UPDATE:-}" = 1 ] && [ -n "$ok" ]; then
-		cp "$tmp/$engine.actual" "$here/$engine.expected"
-		echo "updated $here/$engine.expected"
+		cp "$tmp/$engine.actual" "$here/$engine$expected_suffix"
+		echo "updated $here/$engine$expected_suffix"
 	else
-		diff -u "$here/$engine.expected" "$tmp/$engine.actual" || failed="$failed $engine/diff"
+		diff -u "$here/$engine$expected_suffix" "$tmp/$engine.actual" || failed="$failed $engine/diff"
 	fi
 done
 if [ -n "$failed" ]; then

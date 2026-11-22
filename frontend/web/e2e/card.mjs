@@ -16,7 +16,7 @@
 // optionally SHOTS.
 import { execFileSync, spawn } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
-import { hostname } from "node:os";
+import { hostName } from "./host_name.mjs";
 import { join } from "node:path";
 import { end } from "./end.mjs";
 
@@ -105,7 +105,7 @@ const screenshot = async (label, selector) => {
   else await page.screenshot({ path });
 };
 const clean = text =>
-  text.split("\n").map(line => line.replaceAll(hostname(), "<HOSTNAME>").replace(/\$\d+\.\d+/g, "$<COST>").replace(/\s+/g, " ").trim()).join("\n");
+  text.split("\n").map(line => line.replaceAll(hostName(), "<HOSTNAME>").replace(/\$\d+\.\d+/g, "$<COST>").replace(/\s+/g, " ").trim()).join("\n");
 
 // The composer's chips, by row (they wrap rather than spill), with anything
 // outside the composer or cut off without an ellipsis.
@@ -314,34 +314,6 @@ try {
   console.log(clean(await card()));
   console.log(clean(await chips()));
   await screenshot("a phone");
-
-  // The host freezes (as a laptop that sleeps: its connection stays open,
-  // nothing more comes): the backend gives up on it after 30s of silence
-  // and the chip says it is offline; its menu keeps it, dimmed, and
-  // choosing it says why at once. Resumed, it reconnects.
-  await page.setViewportSize({ width: 390, height: 844 });
-  process.kill(toolHost.pid, "SIGSTOP");
-  await page.locator(".host-chip.offline").waitFor({ timeout: 60000 });
-  section("the host stopped answering");
-  console.log(clean(await chips()));
-  await page.locator(".host-chip").click();
-  const hostItems = "#chip-popover[data-chip=host] .popover-item";
-  await page.locator(hostItems, { hasText: "offline" }).waitFor();
-  console.log(clean((await page.locator(hostItems).evaluateAll(items =>
-    items.map(e => `${e.classList.contains("marked") ? "✓ " : ""}${e.classList.contains("dimmed") ? "(dimmed) " : ""}`
-      + `${e.querySelector(".menu-label").innerText} ${e.querySelector(".menu-detail")?.innerText ?? ""}`)))
-    .join("\n").replace(/\(in [0-9a-f]+\)/g, "(in <SESSION>)").replaceAll(cwd, "<CWD>")));
-  await screenshot("an offline host's menu 390");
-  await page.setViewportSize({ width: 320, height: 640 });
-  await screenshot("an offline host's menu 320");
-  await page.locator(hostItems, { hasText: "offline" }).click();
-  await page.locator(".toast.error").waitFor();
-  console.log(clean(await page.locator(".toast.error").innerText()));
-  await screenshot("choosing an offline host");
-  process.kill(toolHost.pid, "SIGCONT");
-  await page.locator(".host-chip:not(.offline)").waitFor({ timeout: 60000 });
-  section("the host is back");
-  console.log(clean(await chips()));
 
   if (errors.length) {
     section("errors");

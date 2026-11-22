@@ -12,7 +12,7 @@
 // optionally SHOTS.
 import { spawn } from "node:child_process";
 import { mkdirSync, readFileSync, realpathSync } from "node:fs";
-import { hostname } from "node:os";
+import { hostName } from "./host_name.mjs";
 import { join } from "node:path";
 import { end } from "./end.mjs";
 
@@ -107,7 +107,7 @@ const openSection = async p => {
 };
 const normalise = text =>
   text.replace(/\n+/g, "\n").replaceAll(cwd, "<cwd>").replaceAll(dir, "<dir>")
-    .replace(new RegExp(`\\b${hostname().replace(/\W/g, "\\$&")}\\b`, "g"), "<host>");
+    .replace(new RegExp(`\\b${hostName().replace(/\W/g, "\\$&")}\\b`, "g"), "<host>");
 const show = async p => console.log(normalise(await panel(p).innerText()));
 const configFile = () => {
   const c = JSON.parse(readFileSync(join(home, ".prigh/config.json"), "utf8"));

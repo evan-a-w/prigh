@@ -368,7 +368,7 @@ const pwa = async () => {
 try {
   await screen(1280, 800, "desktop");
   await screen(390, 844, "390x844");
-  await screen(320, 640, "320x640");
+  if (process.env.SUITE !== "core") await screen(320, 640, "320x640"); // --full only
   if (process.env.SHOTS && engineName === "chromium") await pwa();
   section("errors");
   console.log(errors.length ? errors.join("\n") : "none");

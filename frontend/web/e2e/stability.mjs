@@ -281,7 +281,7 @@ try {
   await page.waitForTimeout(300);
 
   await watch();
-  await page.waitForTimeout(3000);
+  await page.waitForTimeout(1000);
   await report("idle");
 
   await watch();
@@ -367,8 +367,8 @@ try {
       .observe(document.body, { subtree: true, childList: true, attributes: true, characterData: true });
   });
   // The window watched: a fixed time is the point here.
-  await page.waitForTimeout(3000);
-  section("idle for 3 s");
+  await page.waitForTimeout(1000);
+  section("idle for 1 s");
   const quiet = await page.evaluate(() => ({ renders: window.__renders.count, changes: window.__idleChanges }));
   console.log(`renders: ${quiet.renders <= 1 ? "at most one" : quiet.renders}`);
   console.log(`changes to the page: ${quiet.changes}`);

@@ -14,7 +14,7 @@
 import { spawn } from "node:child_process";
 import { createServer } from "node:http";
 import { mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
-import { hostname } from "node:os";
+import { hostName } from "./host_name.mjs";
 import { join } from "node:path";
 import { end } from "./end.mjs";
 
@@ -166,8 +166,8 @@ const tidy = text =>
     .replace(/\n+/g, "\n")
     .replaceAll(base, "FAKE")
     .replaceAll(home, "HOME")
-    .replaceAll(hostname(), "HOST")
-    .replaceAll(hostname().toUpperCase(), "HOST");
+    .replaceAll(hostName(), "HOST")
+    .replaceAll(hostName().toUpperCase(), "HOST");
 const mine = p => p.locator(`.mcp-server:not(.mcp-host-server)[data-server="designs"]`);
 const openMcp = async p => {
   await run(p, "/settings mcp");

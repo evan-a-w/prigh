@@ -4,10 +4,13 @@
 # e2e and tmux tests) one project after the other, while prigh-web's browser
 # e2e runs alongside.
 #
-#   ./test           the quick run, before pushing: the browser e2e in Chromium
-#   ./test --full    everything, before merging: every dune test run again,
-#                    even those dune has a result for, and the browser e2e in
-#                    Chromium, Firefox and WebKit (what the flake's checks run)
+#   ./test           THE test suite, before pushing and before merging: the
+#                    browser e2e's core scripts in Chromium (SUITE=core in
+#                    frontend/web/e2e/prigh_web.sh)
+#   ./test --full    only when asked for: every dune test run again, even
+#                    those dune has a result for, and every browser e2e script
+#                    at every size in Chromium, Firefox and WebKit (what the
+#                    flake's checks run)
 #
 # Outside the dev shell it re-runs itself in it (`nix develop`). Playwright
 # comes from PLAYWRIGHT_MODULE and PLAYWRIGHT_BROWSERS_PATH, or else from
@@ -19,11 +22,13 @@ set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 engines=chromium
+suite=core
 force=()
 case "${1:-}" in
 "") ;;
 --full)
 	engines="chromium firefox webkit"
+	suite=full
 	force=(--force)
 	;;
 *)
@@ -36,8 +41,11 @@ if ! command -v dune >/dev/null; then
 	exec nix develop --accept-flake-config "$root" -c "$0" "$@"
 fi
 
+logs="$(mktemp -d /tmp/prigh-test.XXXXXX)"
+
+# Out-links in $logs keep what the run uses from a garbage collection meanwhile.
 if [ -z "${PLAYWRIGHT_MODULE:-}" ] || [ -z "${PLAYWRIGHT_BROWSERS_PATH:-}" ]; then
-	mapfile -t playwright < <(nix build --accept-flake-config --no-link --print-out-paths \
+	mapfile -t playwright < <(nix build --accept-flake-config --out-link "$logs/playwright" --print-out-paths \
 		--inputs-from "$root" nixpkgs#playwright-test nixpkgs#playwright-driver.browsers)
 	export PLAYWRIGHT_MODULE="${playwright[0]}/lib/node_modules/playwright/index.mjs"
 	export PLAYWRIGHT_BROWSERS_PATH="${playwright[1]}"
@@ -45,21 +53,19 @@ fi
 # WebKit (WPE) renders through EGL: without a system OpenGL driver
 # (/run/opengl-driver on NixOS) glvnd finds no EGL vendor and WebKit aborts.
 if [[ $engines == *webkit* ]] && [ "$(uname)" = Linux ] && [ -z "${__EGL_VENDOR_LIBRARY_DIRS:-}" ]; then
-	mesa="$(nix build --accept-flake-config --no-link --print-out-paths \
+	mesa="$(nix build --accept-flake-config --out-link "$logs/mesa" --print-out-paths \
 		--inputs-from "$root" nixpkgs#mesa)"
 	export __EGL_VENDOR_LIBRARY_DIRS="$mesa/share/glvnd/egl_vendor.d"
 fi
 export PRIGH_BACKEND="$root/backend/_build/default/bin/main.exe"
 unset PRIGH_WEB_ROOT
 
-logs="$(mktemp -d /tmp/prigh-test.XXXXXX)"
-
 # The fonts the flake's web-e2e check gives the browsers: without a fontconfig
 # configuration, Chromium's headless shell fails to load prigh-web's web fonts
 # (from the network the first time, from the service worker every time) and
 # renders no text.
 if [ -z "${FONTCONFIG_FILE:-}" ]; then
-	dejavu="$(nix build --accept-flake-config --no-link --print-out-paths \
+	dejavu="$(nix build --accept-flake-config --out-link "$logs/dejavu" --print-out-paths \
 		--inputs-from "$root" nixpkgs#dejavu_fonts)"
 	cat >"$logs/fonts.conf" <<EOF
 <?xml version="1.0"?>
@@ -97,7 +103,7 @@ fi
 # The browser e2e only needs what was built: it runs while dune runs the
 # rest (one dune at a time).
 web_start=$EPOCHREALTIME
-ENGINES="$engines" bash "$root/frontend/web/e2e/prigh_web.sh" >"$logs/web e2e.log" 2>&1 &
+SUITE="$suite" ENGINES="$engines" bash "$root/frontend/web/e2e/prigh_web.sh" >"$logs/web e2e.log" 2>&1 &
 web=$!
 
 # Dune does not know that the frontend's e2e and tmux tests use the backend:
@@ -113,9 +119,9 @@ step "desktop tests" nix develop --accept-flake-config "$root#desktop" \
 	-c cargo test --locked --manifest-path "$root/desktop/Cargo.toml" -p prigh-desktop-core -p prigh-computer
 
 if wait "$web"; then
-	echo "ok    web e2e: $engines ($(elapsed "$web_start"))"
+	echo "ok    web e2e: $suite, $engines ($(elapsed "$web_start"))"
 else
-	echo "FAIL  web e2e: $engines ($(elapsed "$web_start")): $logs/web e2e.log"
+	echo "FAIL  web e2e: $suite, $engines ($(elapsed "$web_start")): $logs/web e2e.log"
 	cat "$logs/web e2e.log"
 	failed="$failed web-e2e"
 fi
