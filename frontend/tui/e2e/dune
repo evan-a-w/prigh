@@ -34,10 +34,12 @@
     (run %{exe:e2e.exe}))
    (diff e2e.expected e2e.actual))))
 
-; The same backend's -web port over ws://, and wss:// through a TLS proxy.
+; The same backend's -web port over ws://, and wss:// through a TLS proxy: in
+; @runtest-full (./test --full), as relinking it on every change to the UI
+; libraries cost more than running it; the browser smoke test uses ws://.
 
 (rule
- (aliases e2e runtest)
+ (aliases e2e runtest-full)
  (deps
   e2e_websocket.expected
   (env_var PRIGH_BACKEND_DIGEST))
