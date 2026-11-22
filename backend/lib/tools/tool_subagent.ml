@@ -1160,7 +1160,8 @@ let continue_tool =
       let outcome =
         resume
           ~max_turns
-          ~message:(Option.map message ~f:(fun m -> Subagent_inbox.From.Caller, m))
+          ~message:
+            (Option.map message ~f:(fun m -> Subagent_inbox.From.Caller, m))
           ~inbox:None
           ~call_id:(Some context.call_id)
           ~cancel:context.cancel

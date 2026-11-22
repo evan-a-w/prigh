@@ -63,7 +63,8 @@ let%expect_test
   let h = H.create () in
   survey h;
   where h;
-  [%expect {|
+  [%expect
+    {|
     crumbs:
     New session
     card:
@@ -74,7 +75,8 @@ let%expect_test
     |}];
   H.click h ~selector:".session-card-agent";
   where h;
-  [%expect {|
+  [%expect
+    {|
     (Open_subagent_chat a1)
     (Focus editor)
     crumbs:
@@ -93,7 +95,8 @@ let%expect_test
   (* Its own subagent: the chain up to the session, and back up it. *)
   H.click h ~selector:".session-card-agent";
   where h;
-  [%expect {|
+  [%expect
+    {|
     (Open_subagent_chat a1/n1)
     (Focus editor)
     crumbs:
@@ -112,7 +115,8 @@ let%expect_test
   H.act h Subagent_back;
   H.text h ~selector:".chrome-center";
   H.text h ~selector:".session-card";
-  [%expect {|
+  [%expect
+    {|
     (Focus editor)
     (New session)
     /
@@ -124,7 +128,8 @@ let%expect_test
     |}];
   H.key h "Escape";
   where h;
-  [%expect {|
+  [%expect
+    {|
     Subagent_back
     (Focus editor)
     crumbs:
@@ -148,7 +153,8 @@ let%expect_test
   H.key h "Enter";
   H.type_ h "then summarise";
   H.key h ~alt:true "Enter";
-  [%expect {|
+  [%expect
+    {|
     Send
     (Rpc (method_ push_pref)
      (params ((key history) (value "use the tests") (max 500))) (tag Ignore))
@@ -174,7 +180,8 @@ let%expect_test
   H.names h ~selector:".composer .stop";
   H.type_ h "now the docs";
   H.key h "Enter";
-  [%expect {|
+  [%expect
+    {|
     button "Sending" -- Sending…
     Send
     (Rpc (method_ push_pref)
@@ -188,20 +195,23 @@ let%expect_test
   H.key h "Enter";
   H.text h ~selector:".toast";
   print_endline ("draft: " ^ (H.model h).draft);
-  [%expect {|
+  [%expect
+    {|
     Send
     a1/n1 runs inside a1 (a subagent's own subagent) and takes no messages: write to a1 instead. (Dismiss)
     draft: hello
     |}]
 ;;
 
-let%expect_test "the composer's stop stops the subagent on show, not the session"
+let%expect_test
+    "the composer's stop stops the subagent on show, not the session"
   =
   let h = H.create () in
   survey h;
   H.quiet h (fun () -> H.act h (Open_subagent_chat "a1"));
   H.click h ~selector:".composer .stop";
-  [%expect {|
+  [%expect
+    {|
     (Cancel_subagent a1)
     (Rpc (method_ cancel_subagent) (params ((agent_id a1))) (tag Show_error))
     |}]
@@ -220,7 +230,8 @@ let%expect_test "its line in the transcript, Alt+N and /agents N open it" =
   H.key h "Enter";
   H.text h ~selector:".chrome-center";
   H.act h (Open_subagent_n 9);
-  [%expect {|
+  [%expect
+    {|
     (Focus editor)
     (New session)
     /
@@ -249,7 +260,6 @@ let%expect_test "switching sessions leaves the subagent's chat" =
   survey h;
   H.quiet h (fun () -> H.act h (Open_subagent_chat "a1"));
   H.quiet h (fun () -> H.act h New_session);
-  print_s
-    [%sexp ((H.model h).subagent_chat : string option)];
+  print_s [%sexp ((H.model h).subagent_chat : string option)];
   [%expect {| (a1) |}]
 ;;

@@ -184,9 +184,7 @@ let%expect_test "a subagent finishes: how long ago, then failed" =
     |}]
 ;;
 
-let%expect_test
-    "a subagent's chat in the session's place; Esc goes back"
-  =
+let%expect_test "a subagent's chat in the session's place; Esc goes back" =
   let h = H.create () in
   two_agents h;
   H.click h ~selector:".session-card-agent";

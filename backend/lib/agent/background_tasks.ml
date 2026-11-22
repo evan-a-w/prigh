@@ -50,9 +50,9 @@ module Task = struct
     ; mutable finished_at : float option
     ; mutable activity : string
     ; mutable in_call_since : float option
-    (* a subagent's: since when its latest tool call has run *)
+      (* a subagent's: since when its latest tool call has run *)
     ; mutable output_at : float
-    (* when it last had output (a job's or its tool call's), or started *)
+      (* when it last had output (a job's or its tool call's), or started *)
     ; mutable delivered : bool
     }
 
@@ -359,13 +359,9 @@ let run_task t (task : Task.t) resolve ~run =
     let outcome =
       match
         Trace.within job (fun () ->
-          run
-            ~id:task.id
-            ~cancel:task.cancel
-            ~emit
-            ~on_output:(fun chunk ->
-              task.output_at <- now t;
-              Output_tail.add task.output chunk))
+          run ~id:task.id ~cancel:task.cancel ~emit ~on_output:(fun chunk ->
+            task.output_at <- now t;
+            Output_tail.add task.output chunk))
       with
       | outcome -> outcome
       | exception (Eio.Cancel.Cancelled _ as exn) ->
@@ -718,7 +714,9 @@ let continue_ t id ~max_turns ~message =
       Some resume
     | _, (Some { out_of_turns = false; _ } | None) -> None
   in
-  let message = Option.map message ~f:(fun m -> Subagent_inbox.From.Caller, m) in
+  let message =
+    Option.map message ~f:(fun m -> Subagent_inbox.From.Caller, m)
+  in
   match task, parked with
   | Some task, Some resume ->
     restart t task resume ~max_turns ~message ~report:true;
@@ -732,10 +730,16 @@ let continue_ t id ~max_turns ~message =
    reporting to the main agent again. *)
 let reopen t ~id ~from text =
   match find t ~kind:Subagent id, Hashtbl.find t.parked id with
-  | Ok task, Some { resume; _ }
-    when (not (Task.running task)) && task.delivered ->
+  | Ok task, Some { resume; _ } when (not (Task.running task)) && task.delivered
+    ->
     Hashtbl.remove t.parked id;
-    restart t task resume ~max_turns:None ~message:(Some (from, text)) ~report:false;
+    restart
+      t
+      task
+      resume
+      ~max_turns:None
+      ~message:(Some (from, text))
+      ~report:false;
     Some ()
   | _ -> None
 ;;

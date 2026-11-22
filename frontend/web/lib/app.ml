@@ -1619,8 +1619,7 @@ let review_out (m : Model.t) (outs : Code_review.Out.t list) =
 let with_review (m : Model.t) ((review : Code_review.t), outs) =
   let m =
     if m.narrow && review.open_ && not m.review.open_
-    then
-      { m with files = fst (Files.update m.files Close) }
+    then { m with files = fst (Files.update m.files Close) }
     else m
   in
   review_out { m with review } outs
@@ -1928,7 +1927,7 @@ let set_state_without_files (m : Model.t) (state : State.t) =
       ; questions = []
       ; queue = Queued.empty
       ; agent_queues = []
-          ; dialog = Option.filter m.dialog ~f:(Fn.non Dialog.per_session)
+      ; dialog = Option.filter m.dialog ~f:(Fn.non Dialog.per_session)
       ; agents = Agents.empty
       ; btw = None
       ; generate = Generate.empty
@@ -3507,7 +3506,8 @@ let clock (m : Model.t) now =
       Time_ns.Span.( >= ) (Time_ns.diff now at) poll_interval)
   in
   if due && Agents.running_jobs a > 0
-  then with_agents m ~f:(fun a -> { a with polled_at = Some now }), [ list_jobs ]
+  then
+    with_agents m ~f:(fun a -> { a with polled_at = Some now }), [ list_jobs ]
   else m, []
 ;;
 
@@ -5353,7 +5353,7 @@ let user_switched (m : Model.t) (hello : Hello_reply.t) =
     ; questions = []
     ; queue = Queued.empty
     ; agent_queues = []
-      ; dialog = None
+    ; dialog = None
     ; completion = None
     ; btw = None
     ; generate = Generate.empty
@@ -8152,7 +8152,7 @@ module Rejoin = struct
         ; questions = []
         ; queue = Queued.empty
         ; agent_queues = []
-              ; dialog = Option.filter m.dialog ~f:(Fn.non Dialog.per_session)
+        ; dialog = Option.filter m.dialog ~f:(Fn.non Dialog.per_session)
         ; btw = None
         ; agents = Agents.empty
         ; subagent_chat = None

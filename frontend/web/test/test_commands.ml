@@ -1706,7 +1706,8 @@ let%expect_test "/jobs [id|kill <id>]: jobs in the agents panel" =
       run h c;
       toasts h);
   [%expect.unreachable]
-[@@expect.uncaught_exn {|
+[@@expect.uncaught_exn
+  {|
   ("no pending request" job_output)
   Trailing output
   ---------------

@@ -169,9 +169,9 @@ let parent_row ~inject ~label ~title (target : string option) =
     ~attrs:
       [ Attr.type_ "button"
       ; Attr.class_
-          "session-card-parent flex h-7 w-full items-center gap-1.5 \
-           rounded-md px-2 text-left text-[12px] text-foreground/85 \
-           hover:bg-accent hover:text-foreground narrow:h-11"
+          "session-card-parent flex h-7 w-full items-center gap-1.5 rounded-md \
+           px-2 text-left text-[12px] text-foreground/85 hover:bg-accent \
+           hover:text-foreground narrow:h-11"
       ; Attr.title title
       ; Attr.on_click (fun _ ->
           inject

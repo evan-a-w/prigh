@@ -344,7 +344,6 @@ module Part = struct
   let btw = make "btw" ~equal:outside_transcript
   let terminal = make "terminal" ~equal:outside_transcript
   let files = make "files" ~equal:outside_transcript
-
   let dialogs = make "dialogs" ~equal:outside_composer
   let session_card = make "session_card" ~equal:outside_composer
 end

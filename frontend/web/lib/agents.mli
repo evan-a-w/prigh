@@ -126,7 +126,6 @@ val earlier : t -> (Item.t * int) list
 (** A number from [listed], an agent's or job's id, or a call id. *)
 val resolve : t -> string -> Item.t option
 
-
 val agent_elapsed : Agent.t -> now:Time_ns.t -> Time_ns.Span.t
 val job_elapsed : Job.t -> now:Time_ns.t -> Time_ns.Span.t
 

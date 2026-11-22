@@ -328,7 +328,8 @@ let%expect_test
   with_agent
     ~on_request:print_requests
     ~main:[ spawn "work"; Reply.text "spawned"; Reply.text "got it" ]
-    [ "work", [ Reply.text "done"; Reply.text "carried on"; Reply.text "again" ] ]
+    [ "work", [ Reply.text "done"; Reply.text "carried on"; Reply.text "again" ]
+    ]
   @@ fun _t agent ->
   Or_error.ok_exn (Agent.prompt agent "go");
   Agent.wait_idle agent;
@@ -345,7 +346,8 @@ let%expect_test
        : unit Or_error.t)];
   print_s [%sexp (Agent.is_running agent : bool)];
   transcript agent "a1";
-  [%expect {|
+  [%expect
+    {|
     state: running=true subagents=[]
     agent_start
     user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
@@ -410,7 +412,8 @@ let%expect_test
   @@ fun _t agent ->
   Or_error.ok_exn (Agent.prompt agent "go");
   Agent.wait_idle agent;
-  [%expect {|
+  [%expect
+    {|
     state: running=true subagents=[]
     agent_start
     user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go

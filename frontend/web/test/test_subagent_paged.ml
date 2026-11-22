@@ -168,8 +168,7 @@ let%expect_test "a subagent not loaded follows its events" =
     h
     (E.inner ~call:"s2" ~agent:"a2" (E.text_reply "The build is green."));
   show h;
-  [%expect
-    {| |}];
+  [%expect {| |}];
   H.quiet h (fun () ->
     H.event h (E.end_ ~call:"s2" ~agent:"a2" ~turns:1 "green"));
   let s =
@@ -204,7 +203,8 @@ let%expect_test "a transcript that does not come says so, with a retry" =
   H.reply h "get_subagent" a1_detail;
   H.text h ~selector:".agents-transcript .user";
   [%expect.unreachable]
-[@@expect.uncaught_exn {|
+[@@expect.uncaught_exn
+  {|
   ("nothing matches" ".agents-note button" (nth 0))
   Trailing output
   ---------------

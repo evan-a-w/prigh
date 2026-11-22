@@ -708,4 +708,3 @@ let%expect_test "signing out" =
     Sign_out
     |}]
 ;;
-

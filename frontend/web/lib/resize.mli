@@ -99,6 +99,7 @@ val review_min : int
 (** Below this width the file browser floats over the chat (as in the
     CSS). *)
 val files_floats_below : int
+
 val viewport : t -> Viewport.t
 
 (** The preference, if the user set one. *)
