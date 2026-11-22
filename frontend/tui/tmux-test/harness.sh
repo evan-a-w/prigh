@@ -651,21 +651,29 @@ scenario_reconnect_dialog() {
 # From a spawned backend to `prigh serve -listen -token`: refused without
 # the token, signed in through the dialog (saved), signed out, and back to a
 # local backend.
-setup_connect_signin() {
-	port=$((20000 + RANDOM % 20000))
+# A -token server on a port of its choosing (-listen or -web), in $port
+# once it says it listens. (Not a port picked here and probed until it
+# answers: some hosts, WSL2 for one, drop connections to closed ports
+# instead of refusing them, and a probe then hangs.)
+start_server() {
 	mkdir -p "$tmp/server-home" "$tmp/server-cwd"
-	HOME="$tmp/server-home" "$backend" serve -faux -listen "127.0.0.1:$port" \
+	HOME="$tmp/server-home" "$backend" serve -faux "$1" 127.0.0.1:0 \
 		-token s3cret -cwd "$tmp/server-cwd" \
 		-auth-file "$tmp/server-home/auth.json" >"$tmp/server.log" 2>&1 &
 	server_pid=$!
 	local i
 	for i in $(seq 1 100); do
-		if (echo >"/dev/tcp/127.0.0.1/$port") 2>/dev/null; then return 0; fi
+		port="$(sed -nE 's#^prigh: (listening on tcp:|prigh-web on http://)127\.0\.0\.1:([0-9]+).*#\2#p' "$tmp/server.log" | head -1)"
+		if [ -n "$port" ]; then return 0; fi
 		sleep 0.1
 	done
 	echo "  the server did not start:"
 	cat "$tmp/server.log"
 	return 1
+}
+
+setup_connect_signin() {
+	start_server -listen
 }
 
 saved_connection() {
@@ -732,17 +740,7 @@ scenario_startup_signin() {
 # prigh-tui -connect URL: the same backend's -web port over a WebSocket,
 # as through an HTTPS proxy (here plain ws://, on localhost).
 setup_connect_websocket() {
-	port=$((20000 + RANDOM % 20000))
-	mkdir -p "$tmp/server-home" "$tmp/server-cwd"
-	HOME="$tmp/server-home" "$backend" serve -faux -web "127.0.0.1:$port" \
-		-token s3cret -cwd "$tmp/server-cwd" \
-		-auth-file "$tmp/server-home/auth.json" >"$tmp/server.log" 2>&1 &
-	server_pid=$!
-	local i
-	for i in $(seq 1 100); do
-		if (echo >"/dev/tcp/127.0.0.1/$port") 2>/dev/null; then break; fi
-		sleep 0.1
-	done
+	start_server -web
 	tui_args="-connect http://127.0.0.1:$port/"
 }
 
