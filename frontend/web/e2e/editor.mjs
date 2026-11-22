@@ -289,7 +289,7 @@ try {
   if (touch) console.log(`peek: ${(await page.locator(".code-peek").innerText()).replace(/\s+/g, " ")}`);
   await step("the agent's change");
   const sent = await page.evaluate(() => [...document.querySelectorAll("#chat .user")].map(u => u.innerText).join("\n"));
-  console.log(`sent: ${sent.replace(/\s+/g, " ").slice(0, 160)}`);
+  console.log(`sent: ${sent.replace(/\b\d\d:\d\d\b/g, "HH:MM").replace(/\s+/g, " ").trim().slice(0, 160)}`);
   await tap(page.locator(".code-notice.agent .btn", { hasText: "Undo" }));
   await page.locator(".code-notice.agent").waitFor({ state: "detached" });
   await page.waitForFunction(() => !document.querySelector(".code-dirty"));
