@@ -335,7 +335,7 @@
 .code-editor-host .cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground { background: color-mix(in srgb, var(--sodium) 24%, transparent); }
 .code-editor-host .cm-selectionMatch { background: color-mix(in srgb, var(--sodium) 12%, transparent); }
 .code-editor-host .cm-matchingBracket { background: none; outline: 1px solid var(--rule-2); color: inherit; }
-.code-editor-host .cm-agent-gutter .cm-gutterElement { width: 3px; padding: 0; }
+.code-editor-host .cm-agent-gutter .cm-gutterElement { min-width: 3px; padding: 0; }
 .cm-agent-bar { display: block; width: 2px; height: 100%; margin-left: 1px; background: var(--sage); border-radius: 1px; }
 .code-editor-host .cm-agent-added { background: color-mix(in srgb, var(--sage) 12%, transparent); }
 .cm-agent-removed {
@@ -498,3 +498,100 @@
 
 /* A fresh session's folder and branch tray: the strip names the file. */
 .app.narrow.editing .tray { display: none; }
+
+/* {1 The agent's changes in the text, kept ones' badges} */
+
+.cm-agent-change { margin: 4px 0 0; border-top: 1px solid var(--sage-line); }
+.cm-agent-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px 3px calc(2ch + 4px);
+  background: color-mix(in srgb, var(--sage) 9%, var(--graphite));
+  font: 500 12px var(--sans);
+  color: var(--muted);
+}
+.cm-agent-label { flex: 1; min-width: 0; font-variant-numeric: tabular-nums; }
+.cm-agent-act {
+  min-height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--rule-2);
+  border-radius: 6px;
+  background: var(--slate);
+  color: var(--chalk);
+  font: 500 12.5px var(--sans);
+  cursor: pointer;
+}
+.cm-agent-act.primary { background: var(--sage); border-color: var(--sage); color: var(--graphite); }
+.cm-agent-badge {
+  display: block;
+  width: 16px;
+  height: 16px;
+  margin: 2px 2px 0 1px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--sage);
+  color: var(--graphite);
+  font: 700 10px/16px var(--sans);
+  text-align: center;
+  cursor: pointer;
+}
+
+/* {1 The ask box, under the lines it is about} */
+
+.cm-ask {
+  margin: 4px 8px 6px calc(2ch + 4px);
+  padding: 8px;
+  border: 1px solid color-mix(in srgb, var(--sodium) 45%, var(--rule));
+  border-radius: 10px;
+  background: var(--slate);
+  font: 14px var(--sans);
+  white-space: normal;
+}
+.cm-ask-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.cm-ask-chip {
+  flex: 1;
+  min-width: 0;
+  color: var(--sodium);
+  font: 500 12px var(--mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cm-ask-row { display: flex; align-items: flex-end; gap: 8px; }
+.cm-ask-input {
+  flex: 1;
+  min-width: 0;
+  min-height: 36px;
+  padding: 8px 10px;
+  border: 1px solid var(--rule-2);
+  border-radius: 8px;
+  background: var(--well);
+  color: var(--chalk);
+  font: 14px/1.4 var(--sans);
+  resize: none;
+}
+.cm-ask-input:focus { outline: none; border-color: var(--sodium); }
+.cm-ask .cm-agent-act.primary { background: var(--sodium); border-color: var(--sodium); color: var(--sodium-ink); min-height: 36px; }
+.app.narrow .cm-agent-act { min-height: 44px; padding: 0 16px; font-size: 14px; }
+.app.narrow .cm-ask-input { font-size: 16px; min-height: 44px; }
+.app.narrow .cm-ask .cm-agent-act.primary { min-height: 44px; }
+/* A phone: a 40px target (the gutter's rows are dense), the badge 22px in it. */
+.app.narrow .cm-agent-badge {
+  width: 40px;
+  height: 40px;
+  margin: -9px 0;
+  background: radial-gradient(circle, var(--sage) 10.5px, transparent 11px);
+  font-size: 12px;
+  line-height: 40px;
+}
+.app.narrow .code-editor-host .cm-scroller { touch-action: pan-y pinch-zoom; }
+
+/* {1 Go to file's matches: a list as tall as all of them, the rows near
+   the scroll position placed in it} */
+
+.code-matches { position: relative; }
+.code-matches .code-row { position: absolute; left: 0; right: 0; height: 30px; }
+.app.narrow .code-matches .code-row { height: 44px; }
+.code-path mark { background: none; color: var(--sodium); font-weight: 700; }

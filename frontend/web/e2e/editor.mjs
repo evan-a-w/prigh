@@ -77,6 +77,9 @@ writeFileSync(join(dir, "script.json"), JSON.stringify([
       arguments: {
         path: "src/compact.ml",
         edits: [{
+          old_text: "  let limit = budget.window - budget.reserve in\n",
+          new_text: "  let limit = Budget.usable budget in\n",
+        }, {
           old_text: "  go [] 0 (List.rev turns)\n",
           new_text: "  match turns with\n  | system :: rest -> system :: go [] (Turn.tokens system) (List.rev rest)\n  | [] -> []\n",
         }],
@@ -110,7 +113,8 @@ const section = label => console.log(`=== ${engineName}: editor ${part}: ${label
 
 // What is wrong on the screen (as mobile.mjs checks): sideways overflow,
 // controls off screen, covered or small (44px; 40px for the keys over the
-// keyboard and the drawer's rows, dense rows), inputs that zoom.
+// keyboard, the drawer's rows and the gutter's badges, dense rows), inputs
+// that zoom.
 const audit = page => page.evaluate(touch => {
   const out = [];
   const W = innerWidth, H = innerHeight;
@@ -154,7 +158,7 @@ const audit = page => page.evaluate(touch => {
     const hit = document.elementFromPoint(cx, cy);
     if (hit && !e.contains(hit) && !hit.contains(e)) covered.push(`${name(e)} under ${name(hit)}`);
     const isText = e.matches("textarea, input");
-    const least = e.matches(".code-key, .code-tree.drawer .code-row") ? 39.5 : 43.5;
+    const least = e.matches(".code-key, .code-tree.drawer .code-row, .cm-agent-badge") ? 39.5 : 43.5;
     if (touch && !isText && Math.min(r.width, r.height) < least && !e.closest(".composer"))
       small.push(`${name(e)} ${Math.round(r.width)}x${Math.round(r.height)}`);
     if (touch && isText && parseFloat(getComputedStyle(e).fontSize) < 16) zoom.push(`${name(e)} ${getComputedStyle(e).fontSize}`);
@@ -270,18 +274,28 @@ try {
   await tap(page.locator(".cm-content .cm-line", { hasText: "let fit" }));
   await page.keyboard.press("Home");
   for (let i = 0; i < 3; i++) await page.keyboard.press("Shift+ArrowDown");
-  if (touch) await tap(page.locator(".code-key.code-ask"));
-  else await page.keyboard.press(`${mod}+l`);
-  await page.locator(".composer .code-chip").waitFor();
-  console.log(`chip: ${(await page.locator(".composer .code-chip").innerText()).replace(/\s+/g, " ")}`);
-  await page.locator(".composer textarea").fill("Pin the system turn");
-  await step("asking about lines");
-  await page.locator(".composer textarea").press("Enter");
-  await page.locator(".composer .code-chip").waitFor({ state: "detached" });
+  if (touch) {
+    // On a phone, Ask opens the box under the lines.
+    await tap(page.locator(".code-key.code-ask"));
+    await page.locator(".cm-ask .cm-ask-input").waitFor();
+    console.log(`ask box: ${(await page.locator(".cm-ask-head").innerText()).replace(/\s+/g, " ")}`);
+    await page.locator(".cm-ask .cm-ask-input").fill("Pin the system turn");
+    await step("the ask box under the lines");
+    await page.locator(".cm-ask .cm-ask-input").press("Enter");
+    await page.locator(".cm-ask").waitFor({ state: "detached" });
+  } else {
+    await page.keyboard.press(`${mod}+l`);
+    await page.locator(".composer .code-chip").waitFor();
+    console.log(`chip: ${(await page.locator(".composer .code-chip").innerText()).replace(/\s+/g, " ")}`);
+    await page.locator(".composer textarea").fill("Pin the system turn");
+    await step("asking about lines");
+    await page.locator(".composer textarea").press("Enter");
+    await page.locator(".composer .code-chip").waitFor({ state: "detached" });
+  }
 
-  // The agent's edit, shown in the file, then undone.
+  // The agent's two changes, shown in the file: one kept, one undone.
   await page.locator(".code-notice.agent").waitFor();
-  await page.locator(".cm-agent-removed").waitFor();
+  await page.waitForFunction(() => document.querySelectorAll(".cm-agent-change").length === 2);
   await page.waitForFunction(() => !document.querySelector(".app .running, .code-peek.running"));
   console.log(`agent: ${(await page.locator(".code-notice.agent").innerText()).replace(/\s+/g, " ")}`);
   console.log(`removed: ${(await page.locator(".cm-agent-removed").allInnerTexts()).join(" | ")}`);
@@ -290,10 +304,21 @@ try {
   await step("the agent's change");
   const sent = await page.evaluate(() => [...document.querySelectorAll("#chat .user")].map(u => u.innerText).join("\n"));
   console.log(`sent: ${sent.replace(/\b\d\d:\d\d\b/g, "HH:MM").replace(/\s+/g, " ").trim().slice(0, 160)}`);
-  await tap(page.locator(".code-notice.agent .btn", { hasText: "Undo" }));
+  console.log(`changes: ${(await page.locator(".cm-agent-head").allInnerTexts()).map(t => t.replace(/\s+/g, " ")).join(" | ")}`);
+  await tap(page.locator(".cm-agent-change").first().locator(".cm-agent-act", { hasText: "Keep" }));
+  await page.waitForFunction(() => document.querySelectorAll(".cm-agent-change").length === 1);
+  await page.locator(".cm-agent-badge").waitFor();
+  await tap(page.locator(".cm-agent-change .cm-agent-act", { hasText: "Undo" }));
+  await page.waitForFunction(() => !document.querySelector(".cm-agent-change") && !document.querySelector(".code-dirty"));
   await page.locator(".code-notice.agent").waitFor({ state: "detached" });
-  await page.waitForFunction(() => !document.querySelector(".code-dirty"));
-  console.log(`undone: ${disk().includes("go [] 0 (List.rev turns)") && !disk().includes("match turns with")}`);
+  console.log(`first kept, second undone: ${disk().includes("Budget.usable budget") && disk().includes("go [] 0 (List.rev turns)") && !disk().includes("match turns with")}`);
+  await step("a kept change's badge");
+  await tap(page.locator(".cm-agent-badge"));
+  await page.locator(".cm-agent-change").waitFor();
+  console.log(`reopened: ${(await page.locator(".cm-agent-head").innerText()).replace(/\s+/g, " ")}`);
+  await step("a kept change shown again");
+  await tap(page.locator(".cm-agent-change .cm-agent-act", { hasText: "Keep" }));
+  await page.locator(".cm-agent-change").waitFor({ state: "detached" });
 
   // The files, and the chat.
   if (touch) {
@@ -306,11 +331,31 @@ try {
     await page.locator(".code-tree.drawer").waitFor();
     await step("the files drawer");
     console.log(`drawer: ${(await page.locator(".code-tree.drawer .code-row").allInnerTexts()).map(t => t.replace(/\s+/g, "")).join(" | ")}`);
-    await tap(page.locator(".code-tree.drawer .code-row", { hasText: "src/" }).last());
-    await tap(page.locator(".code-tree.drawer .code-row.file", { hasText: "turn.mli" }));
+    // Go to file, at the drawer's foot: fuzzy over every file.
+    await tap(page.locator("#code-filter"));
+    await page.keyboard.type("tmli");
+    await page.locator(".code-matches .code-row", { hasText: "turn" }).waitFor();
+    console.log(`found: ${(await page.locator(".code-matches .code-row").allInnerTexts()).map(t => t.replace(/\s+/g, "")).join(" | ")}`);
+    await step("go to file");
+    await tap(page.locator(".code-matches .code-row", { hasText: "turn" }));
     await page.locator(".cm-content .cm-line", { hasText: "val tokens" }).waitFor();
     console.log(`drawer gone: ${await page.locator(".code-tree.drawer").count() === 0}`);
     console.log(`strip: ${await strip()}`);
+    // A swipe sideways over the text: the other open file.
+    // (Pointer events as a touch screen sends them: Playwright has taps but
+    // no swipes.)
+    await page.locator(".cm-content").evaluate(content => {
+      const r = content.getBoundingClientRect();
+      const y = r.top + 120;
+      const fire = (type, x) => content.dispatchEvent(new PointerEvent(type, {
+        bubbles: true, cancelable: true, pointerId: 7, pointerType: "touch", isPrimary: true, clientX: x, clientY: y,
+      }));
+      fire("pointerdown", 320);
+      for (const x of [290, 240, 190, 140]) fire("pointermove", x);
+      fire("pointerup", 140);
+    });
+    await page.locator(".cm-content .cm-line", { hasText: "let fit" }).waitFor();
+    console.log(`swiped: ${await strip()}`);
   } else {
     // Sending opened the chat beside the code; Alt+C hides and shows it.
     console.log(`chat after sending: ${await page.locator(".app.code-chat").count() ? "beside" : "hidden"}`);
@@ -340,6 +385,7 @@ try {
   }
 } catch (e) {
   console.log(`FAILED: ${e.stack}\n${errors.join("\n")}`);
+  await shoot("FAILED").catch(() => {});
   process.exitCode = 1;
 } finally {
   await end(() => browser.close(), () => server.kill());

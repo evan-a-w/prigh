@@ -676,6 +676,9 @@ let editor (m : App.Model.t) ~inject ~widget =
   | Some b ->
     div
       ~cls:"code-file"
+      ~attrs:
+        (* The drawer is over it: out of reach, as it is out of sight. *)
+        (if m.narrow && t.drawer then [ Attr.create "inert" "" ] else [])
       (notices t b ~inject
        @ [ goto t ~inject
          ; widget
