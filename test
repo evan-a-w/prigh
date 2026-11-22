@@ -8,7 +8,8 @@
 #                    browser e2e's core scripts in Chromium (SUITE=core in
 #                    frontend/web/e2e/prigh_web.sh)
 #   ./test --full    only when asked for: every dune test run again, even
-#                    those dune has a result for, and every browser e2e script
+#                    those dune has a result for, with the slow ones only
+#                    @runtest-full has, and every browser e2e script
 #                    at every size in Chromium, Firefox and WebKit (what the
 #                    flake's checks run)
 #
@@ -29,12 +30,14 @@ root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 engines=chromium
 suite=core
 force=()
+aliases=(@runtest)
 case "${1:-}" in
 "") ;;
 --full)
 	engines="chromium firefox webkit"
 	suite=full
 	force=(--force)
+	aliases=(@runtest @runtest-full)
 	;;
 *)
 	echo "usage: ./test [--full]" >&2
@@ -171,8 +174,8 @@ else
 	web=$!
 fi
 
-step "backend tests" dune build --root "$root/backend" @runtest "${force[@]}"
-step "frontend tests" dune build --root "$root/frontend" @runtest "${force[@]}"
+step "backend tests" dune build --root "$root/backend" "${aliases[@]}" "${force[@]}"
+step "frontend tests" dune build --root "$root/frontend" "${aliases[@]}" "${force[@]}"
 # The desktop app's logic and the computer-use helper (their windows and
 # desktops run in the flake's desktop-window and computer-use checks), in the
 # desktop dev shell: the helper's portal backend links PipeWire.
