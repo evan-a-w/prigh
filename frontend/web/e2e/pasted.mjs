@@ -112,12 +112,13 @@ const paste = (text, plain = false) => page.evaluate(([text, plain]) => {
   box.dispatchEvent(new Event("input", { bubbles: true }));
   return event.defaultPrevented ? "kept from the box" : "into the box";
 }, [text, plain]);
-// Within the screen, and big enough for a finger.
+// Within the screen, and big enough for a finger (44px, give or take the
+// subpixel a narrow screen's layout rounds to).
 const fits = async selector => {
   const box = await page.locator(selector).first().boundingBox();
   const inside = box.x >= 0 && box.x + box.width <= viewport.width + 0.5;
   return `${inside ? "on screen" : `off screen: x ${box.x} w ${box.width}`}` +
-    (touch ? `, ${box.height >= 44 || selector.includes("remove") ? "tappable" : `${box.height}px high`}` : "");
+    (touch ? `, ${box.height >= 43.5 || selector.includes("remove") ? "tappable" : `${box.height}px high`}` : "");
 };
 
 const log = Array.from({ length: 420 }, (_, i) =>
