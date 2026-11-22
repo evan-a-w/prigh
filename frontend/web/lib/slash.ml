@@ -23,6 +23,7 @@ module Argument = struct
     | Settings
     | Session
     | Path
+    | File (** any file under the cwd, by fuzzy search *)
     | Host
     | User
     | Skill
@@ -386,7 +387,7 @@ let every =
       "browse, preview, upload and download files where the tools run \
        (Ctrl+Shift+F)"
   ; c
-      ~argument:Path
+      ~argument:File
       ~args:"[path]"
       "edit"
       "the editor mode: edit the session's files (PATH, or the last one) \

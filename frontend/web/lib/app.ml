@@ -1652,7 +1652,8 @@ let code_out (m : Model.t) (outs : Code_editor.Out.t list) =
     | Focus_composer -> m, cmds @ [ focus_editor ]
     | Refresh_changes ->
       let m, more = with_review m (Code_review.refresh m.review) in
-      m, cmds @ more)
+      m, cmds @ more
+    | Send _ -> m, cmds)
 ;;
 
 (* The editor mode takes the place of the review page and the file
@@ -2719,6 +2720,20 @@ let complete_draft (m : Model.t) ~skills =
       ()
   with
   | None -> { m with completion = None }, []
+  | Some c
+    when Completion.Source.equal (Completion.source c) (Argument File) ->
+    (* [/edit]'s files are matched here, over the editor's list of them. *)
+    let code, outs = Code_editor.load_index m.code in
+    let top =
+      let all =
+        Prigh_ui.Fuzzy_path.rank ~query:(Completion.prefix c) code.index.files
+      in
+      Array.to_list (Array.sub all ~pos:0 ~len:(Int.min 50 (Array.length all)))
+      |> List.map ~f:(fun (mt : Prigh_ui.Fuzzy_path.Match.t) -> mt.path)
+    in
+    code_out
+      { m with completion = Some (Completion.set_files c top); code }
+      outs
   | Some c ->
     (match m.completion with
      | Some old when Completion.same old c -> m, []
@@ -8687,7 +8702,14 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
     in
     with_files m (Files.reply m.files reply result)
   | Files reply, result -> with_files m (Files.reply m.files reply result)
-  | Code reply, result -> with_code m (Code_editor.reply m.code reply result)
+  | Code reply, result ->
+    let m, cmds = with_code m (Code_editor.reply m.code reply result) in
+    (match reply, m.completion with
+     | Files _, Some c
+       when Completion.Source.equal (Completion.source c) (Argument File) ->
+       let m, more = refresh_completion m in
+       m, cmds @ more
+     | _ -> m, cmds)
   | Review reply, result ->
     let m, cmds = with_review m (Code_review.reply m.review reply result) in
     (match reply with
@@ -12312,7 +12334,21 @@ let update_connected (m : Model.t) (action : Action.t) =
   | Terminal_status { key; status } ->
     with_terminal m ~f:(fun t -> { t with status = Some (key, status) }), []
   | Files action -> with_files m (Files.update m.files action)
-  | Code action -> with_code m (Code_editor.update m.code action)
+  | Code action ->
+    let code, outs = Code_editor.update m.code action in
+    let m, cmds = with_code m (code, outs) in
+    (* The ask box's prompt goes as the composer's would, with its lines
+       as the chip; what the composer held stays there. *)
+    List.fold outs ~init:(m, cmds) ~f:(fun (m, cmds) -> function
+      | Send { chip; text } ->
+        let draft = m.draft in
+        let m, more =
+          send
+            { (set_draft m text) with code = { m.code with chip = Some chip } }
+            ~follow_up:false
+        in
+        set_draft m draft, cmds @ more
+      | _ -> m, cmds)
   | Review action -> review_update m action
   | Review_pick which -> open_review_pick m which
   | Review_direct direct -> review_direct m direct

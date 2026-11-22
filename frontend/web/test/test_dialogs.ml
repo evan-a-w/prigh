@@ -171,10 +171,12 @@ let%expect_test "help lists every key and command" =
     A (on a session) archive or unarchive it (archived sessions are listed last, muted)
     Alt+E the editor mode: edit the session's files beside the chat (also /edit [path], the file browser's Edit)
     Ctrl+S / ⌘+S (editor) save the file
-    Ctrl+P / ⌘+P (editor) go to file: filter the file tree
+    Ctrl+P / ⌘+P (editor) go to file: fuzzy search over every file under the session's directory
     Ctrl+F / ⌘+F (editor) find (and replace) in the file
     Ctrl+G (editor) go to line
     Ctrl+L / ⌘+L (in the editor's text) ask about the selection: attach it to the composer as path:L1–L2
+    Ctrl+I / ⌘+I (in the editor's text) ask about the selection in a box under its lines (Enter sends, Esc closes)
+    Swipe left / right (editor, a phone) the next or previous open file
     Ctrl+B / ⌘+B (editor, wide window) show or hide the file tree
     Alt+C (editor, wide window) show or hide the chat beside the editor
     Alt+PageDown / Alt+PageUp (editor) the next or previous open file

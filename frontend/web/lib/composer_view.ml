@@ -16,7 +16,7 @@ let popup (m : App.Model.t) ~inject =
       | Argument (Login | Logout) -> "Providers"
       | Argument Directory -> "Directories"
       | Argument Backend_directory -> "Directories on the backend"
-      | Argument Path | Path -> "Files"
+      | Argument (Path | File) | Path -> "Files"
       | Argument Verbosity -> "Verbosity"
       | Argument Confirm -> "Mode, also for new sessions"
       | Argument Mode -> "Modes"

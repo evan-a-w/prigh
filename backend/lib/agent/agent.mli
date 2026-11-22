@@ -974,6 +974,10 @@ val switch_back : ?main:bool -> t -> Dir_change.Outcome.t Or_error.t
     host (for [@] completion). *)
 val list_paths : t -> prefix:string -> Json.t Or_error.t
 
+(** Every file under the session cwd on the active tool host
+    ({!File_index}): [{"root", "files" (one per line), "truncated"}]. *)
+val list_files : t -> Json.t Or_error.t
+
 (** Runs the host operation [name] (see {!Host_files}) on the active tool
     host, in the session cwd; [stdin] and [on_output] stream to and from
     it. *)

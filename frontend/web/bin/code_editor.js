@@ -56,24 +56,100 @@
     { tag: t.deleted, color: "var(--brick)" },
   ]);
 
-  // The agent's change: its removed lines as a block above where they were,
-  // its added lines tinted.
-  class Removed extends WidgetType {
-    constructor(lines) { super(); this.lines = lines; }
-    eq(other) { return other.lines.join("\n") === this.lines.join("\n"); }
+  const el = (tag, cls, text) => {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text !== undefined) e.textContent = text;
+    return e;
+  };
+  const action = (label, cls, run) => {
+    const b = el("button", "cm-agent-act " + cls, label);
+    b.type = "button";
+    b.addEventListener("mousedown", (ev) => ev.preventDefault());
+    b.addEventListener("click", (ev) => { ev.preventDefault(); run(); });
+    return b;
+  };
+
+  // One of the agent's changes: a head with its Keep and Undo, its removed
+  // lines struck through above where they were; its added lines tinted.
+  class Change extends WidgetType {
+    constructor(h, index, total, on) {
+      super(); this.h = h; this.index = index; this.total = total; this.on = on;
+    }
+    eq(o) {
+      return o.index === this.index && o.total === this.total
+        && o.h.removed.join("\n") === this.h.removed.join("\n")
+        && o.h.added.length === this.h.added.length;
+    }
     toDOM() {
-      const box = document.createElement("div");
-      box.className = "cm-agent-removed";
-      box.setAttribute("aria-label", "Removed by the agent");
-      for (const line of this.lines) {
-        const row = document.createElement("div");
-        row.textContent = line === "" ? "\u200b" : line;
-        box.appendChild(row);
+      const box = el("div", "cm-agent-change");
+      box.setAttribute("role", "group");
+      box.setAttribute("aria-label", `The agent's change ${this.index + 1} of ${this.total}`);
+      const head = el("div", "cm-agent-head");
+      const n = this.h.added.length, r = this.h.removed.length;
+      head.appendChild(el("span", "cm-agent-label",
+        (this.total > 1 ? `${this.index + 1}/${this.total} · ` : "") + `+${n} −${r}`));
+      head.appendChild(action("Undo", "", () => this.on(this.index, "undo")));
+      head.appendChild(action("Keep", "primary", () => this.on(this.index, "keep")));
+      box.appendChild(head);
+      if (r) {
+        const removed = el("div", "cm-agent-removed");
+        removed.setAttribute("aria-label", "Removed by the agent");
+        for (const line of this.h.removed)
+          removed.appendChild(el("div", "", line === "" ? "\u200b" : line));
+        box.appendChild(removed);
       }
       return box;
     }
-    ignoreEvent() { return false; }
+    ignoreEvent() { return true; }
   }
+
+  // The ask box: a prompt about the lines above it.
+  class Ask extends WidgetType {
+    constructor(label, state) { super(); this.label = label; this.state = state; }
+    eq(o) { return o.label === this.label; }
+    toDOM() {
+      const st = this.state;
+      const box = el("form", "cm-ask");
+      box.setAttribute("aria-label", "Ask about " + this.label);
+      const head = el("div", "cm-ask-head");
+      head.appendChild(el("span", "cm-ask-chip", this.label));
+      head.appendChild(action("Cancel", "", () => st.on({ cancel: true })));
+      box.appendChild(head);
+      const row = el("div", "cm-ask-row");
+      const input = el("textarea", "cm-ask-input");
+      input.rows = 1;
+      input.placeholder = "Ask or instruct about these lines";
+      input.setAttribute("aria-label", "Ask about " + this.label);
+      input.setAttribute("enterkeyhint", "send");
+      input.value = st.draft;
+      const grow = () => {
+        input.style.height = "auto";
+        input.style.height = Math.min(input.scrollHeight, 160) + "px";
+      };
+      input.addEventListener("input", () => { st.draft = input.value; grow(); });
+      input.addEventListener("keydown", (ev) => {
+        if (ev.key === "Enter" && !ev.shiftKey && !ev.isComposing) {
+          ev.preventDefault(); ev.stopPropagation();
+          st.on({ send: input.value });
+        } else if (ev.key === "Escape") {
+          ev.preventDefault(); ev.stopPropagation();
+          st.on({ cancel: true });
+        }
+      });
+      row.appendChild(input);
+      const send = action("Send", "primary cm-ask-send", () => st.on({ send: input.value }));
+      send.setAttribute("aria-label", "Send");
+      row.appendChild(send);
+      box.appendChild(row);
+      box.addEventListener("submit", (ev) => { ev.preventDefault(); st.on({ send: input.value }); });
+      requestAnimationFrame(() => { input.focus({ preventScroll: true }); grow();
+        box.scrollIntoView({ block: "nearest" }); });
+      return box;
+    }
+    ignoreEvent() { return true; }
+  }
+
   const setHunks = StateEffect.define();
   const hunksField = StateField.define({
     create: () => Decoration.none,
@@ -83,40 +159,61 @@
     },
     provide: (f) => EditorView.decorations.from(f),
   });
-  const hunkDecorations = (doc, hunks) => {
+  const lineStart = (doc, line) =>
+    line > doc.lines ? doc.length : doc.line(Math.max(1, line)).from;
+  const hunkDecorations = (doc, hunks, on, ask) => {
     const ranges = [];
-    for (const h of hunks) {
-      const at = Math.min(h.line, doc.lines);
-      const pos = h.line > doc.lines ? doc.length : doc.line(at).from;
-      if (h.removed.length)
-        ranges.push(Decoration.widget({
-          widget: new Removed(h.removed), block: true,
-          side: h.line > doc.lines ? 1 : -1,
-        }).range(pos));
-      for (let i = 0; i < h.added && h.line + i <= doc.lines; i++)
+    hunks.forEach((h, i) => {
+      ranges.push(Decoration.widget({
+        widget: new Change(h, i, hunks.length, on), block: true,
+        side: h.line > doc.lines ? 1 : -1,
+      }).range(lineStart(doc, h.line)));
+      for (let k = 0; k < h.added.length && h.line + k <= doc.lines; k++)
         ranges.push(Decoration.line({ class: "cm-agent-added" })
-          .range(doc.line(h.line + i).from));
+          .range(doc.line(h.line + k).from));
+    });
+    if (ask) {
+      const line = doc.line(Math.max(1, Math.min(ask.last, doc.lines)));
+      ranges.push(Decoration.widget({
+        widget: new Ask(ask.label, ask.state), block: true, side: 1,
+      }).range(line.to));
     }
     return Decoration.set(ranges, true);
   };
 
-  // Lines the agent changed: a bar in the gutter.
+  // Lines the agent changed: a bar in the gutter; a change kept, a badge
+  // that shows it again.
   const bar = new (class extends GutterMarker {
-    toDOM() { const s = document.createElement("span"); s.className = "cm-agent-bar"; return s; }
+    toDOM() { return el("span", "cm-agent-bar"); }
   })();
+  class Badge extends GutterMarker {
+    constructor(index, on) { super(); this.index = index; this.on = on; }
+    eq(o) { return o.index === this.index; }
+    toDOM() {
+      const b = el("button", "cm-agent-badge", String(this.index + 1));
+      b.type = "button";
+      b.title = "The agent's change, kept: show it again";
+      b.setAttribute("aria-label", `Show the agent's change ${this.index + 1} again`);
+      b.addEventListener("mousedown", (ev) => ev.preventDefault());
+      b.addEventListener("click", (ev) => { ev.preventDefault(); this.on(this.index, "reopen"); });
+      return b;
+    }
+  }
   const setMarks = StateEffect.define();
+  const mapLine = (tr, l) => {
+    const doc = tr.startState.doc;
+    if (l > doc.lines) return l;
+    return tr.state.doc.lineAt(tr.changes.mapPos(doc.line(l).from)).number;
+  };
   const marksField = StateField.define({
-    create: () => [],
+    create: () => ({ bars: [], badges: [] }),
     update(marks, tr) {
       for (const e of tr.effects) if (e.is(setMarks)) return e.value;
       if (!tr.docChanged) return marks;
-      return marks.map(([a, b]) => {
-        const doc = tr.startState.doc;
-        if (a > doc.lines) return [a, b];
-        const from = tr.changes.mapPos(doc.line(a).from);
-        const to = tr.changes.mapPos(doc.line(Math.min(b, doc.lines)).from);
-        return [tr.state.doc.lineAt(from).number, tr.state.doc.lineAt(to).number];
-      });
+      return {
+        bars: marks.bars.map(([a, b]) => [mapLine(tr, a), mapLine(tr, b)]),
+        badges: marks.badges.map((b) => ({ ...b, line: mapLine(tr, b.line) })),
+      };
     },
   });
   const marksGutter = gutter({
@@ -124,11 +221,14 @@
     markers(view) {
       const builder = new RangeSetBuilder();
       const doc = view.state.doc;
-      const lines = new Set();
-      for (const [a, b] of view.state.field(marksField))
-        for (let l = a; l <= b && l <= doc.lines; l++) lines.add(l);
-      for (const l of [...lines].sort((x, y) => x - y))
-        builder.add(doc.line(l).from, doc.line(l).from, bar);
+      const { bars, badges } = view.state.field(marksField);
+      const at = new Map();
+      for (const [a, b] of bars)
+        for (let l = a; l <= b && l <= doc.lines; l++) at.set(l, bar);
+      for (const b of badges)
+        if (b.line <= doc.lines) at.set(b.line, b.marker);
+      for (const l of [...at.keys()].sort((x, y) => x - y))
+        builder.add(doc.line(l).from, doc.line(l).from, at.get(l));
       return builder.finish();
     },
   });
@@ -188,7 +288,9 @@
       EditorState.tabSize.of(2),
       EditorView.lineWrapping, hanging, hunksField, marksField, marksGutter,
       syntaxHighlighting(style), language.of([]),
-      keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap,
+      // Mod-l and Mod-i are the page's: ask in the chat, ask here.
+      keymap.of([...defaultKeymap.filter((b) => b.key !== "Mod-l" && b.key !== "Mod-i"),
+                 ...historyKeymap, ...searchKeymap,
                  { key: "Tab", run: indentMore }]),
       EditorView.contentAttributes.of({
         "aria-label": "File text", autocapitalize: "off",
@@ -206,6 +308,47 @@
       parent: host,
       state: EditorState.create({ doc: "", extensions }),
     });
+    const onHunk = (i, what) => o.onHunk(i, what);
+    const askState = {
+      label: null, draft: "",
+      on: (r) => {
+        if (r.cancel) { askState.draft = ""; o.onAsk(false, ""); }
+        else { o.onAsk(true, r.send); }
+      },
+    };
+
+    // A quick sideways swipe on a touch screen: the next or previous file.
+    // The text stays where the finger is until it is clearly sideways.
+    let swipe = null;
+    host.addEventListener("pointerdown", (ev) => {
+      if (ev.pointerType !== "touch" || !ev.isPrimary) return;
+      if (ev.target.closest && ev.target.closest(".cm-ask, .cm-agent-change, .cm-panels")) return;
+      swipe = { x: ev.clientX, y: ev.clientY, t: ev.timeStamp, dx: 0, sideways: false };
+    }, { passive: true });
+    host.addEventListener("pointermove", (ev) => {
+      if (!swipe || ev.pointerType !== "touch") return;
+      const dx = ev.clientX - swipe.x, dy = ev.clientY - swipe.y;
+      if (!swipe.sideways && Math.abs(dx) > 16 && Math.abs(dx) > 2 * Math.abs(dy))
+        swipe.sideways = true;
+      else if (!swipe.sideways && Math.abs(dy) > 16) { swipe = null; return; }
+      if (swipe.sideways) {
+        swipe.dx = dx;
+        view.dom.style.transform = `translateX(${dx * 0.35}px)`;
+        view.dom.style.opacity = String(1 - Math.min(Math.abs(dx) / 600, 0.4));
+      }
+    }, { passive: true });
+    const endSwipe = (ev) => {
+      if (!swipe) return;
+      const s = swipe;
+      swipe = null;
+      view.dom.style.transform = "";
+      view.dom.style.opacity = "";
+      if (ev.type === "pointerup" && s.sideways && Math.abs(s.dx) > 64
+          && ev.timeStamp - s.t < 800 && view.state.selection.main.empty)
+        o.onSwipe(s.dx < 0 ? 1 : -1);
+    };
+    host.addEventListener("pointerup", endSwipe, { passive: true });
+    host.addEventListener("pointercancel", endSwipe, { passive: true });
     let lastTop = 0;
     view.scrollDOM.addEventListener("scroll", () => {
       const top = view.scrollDOM.scrollTop;
@@ -228,7 +371,7 @@
           changes: { from: 0, to: view.state.doc.length, insert: text },
           selection: EditorSelection.cursor(Math.min(view.state.selection.main.head, text.length)),
           effects: [language.reconfigure((languages[lang] || (() => []))()),
-                    setHunks.of(Decoration.none), setMarks.of([])],
+                    setHunks.of(Decoration.none), setMarks.of({ bars: [], badges: [] })],
         });
         quiet = false;
       },
@@ -239,10 +382,19 @@
         this.setDoc(text, lang);
         view.scrollDOM.scrollTop = 0;
       },
-      setChange(hunks, marks) {
+      // The agent's changes on show, those kept, and the ask box.
+      setChange(hunks, kept, ask) {
+        if (ask) {
+          if (askState.label !== ask.label) askState.draft = "";
+          askState.label = ask.label;
+        }
+        const bars = [...hunks, ...kept].filter((h) => h.added.length)
+          .map((h) => [h.line, h.line + h.added.length - 1]);
+        const badges = kept.map((h, i) => ({ line: h.line, marker: new Badge(i, onHunk) }));
         view.dispatch({
-          effects: [setHunks.of(hunkDecorations(view.state.doc, hunks)),
-                    setMarks.of(marks)],
+          effects: [setHunks.of(hunkDecorations(view.state.doc, hunks, onHunk,
+                      ask && { ...ask, state: askState })),
+                    setMarks.of({ bars, badges })],
         });
       },
       text: () => view.state.doc.toString(),

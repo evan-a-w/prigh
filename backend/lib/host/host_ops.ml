@@ -25,6 +25,13 @@ let list_paths ~env ~cwd prefix =
               `String p))))
 ;;
 
+let list_files_op = "$list_files"
+
+let list_files ~env ~cwd =
+  Tool.Result.ok
+    (Json.to_string (File_index.to_json ~root:cwd (File_index.list ~env ~root:cwd ())))
+;;
+
 let list_dirs_op = "$list_dirs"
 
 (* Completions for a directory being typed: [prefix] is what the user has
@@ -419,6 +426,8 @@ let execute
     match string_arg "prefix" with
     | Ok prefix -> list_paths ~env ~cwd prefix
     | Error e -> Tool.Result.error (Error.to_string_hum e))
+  else if String.equal name list_files_op
+  then list_files ~env ~cwd
   else if String.equal name skill_op
   then (
     match string_arg "name" with

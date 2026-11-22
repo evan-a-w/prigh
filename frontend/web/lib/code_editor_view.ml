@@ -11,10 +11,14 @@ module Input = struct
     ; text : string
     ; revision : int
     ; hunks : E.Hunk.t list
-    ; marks : (int * int) list
+    ; kept : E.Hunk.t list
+    ; ask : E.Chip.t option
     ; on_change : path:string -> string -> unit Effect.t
     ; on_select : E.Selection.t -> unit Effect.t
     ; on_scroll : [ `Down | `Up ] -> unit Effect.t
+    ; on_hunk : int -> [ `Keep | `Undo | `Reopen ] -> unit Effect.t
+    ; on_ask : [ `Send of string | `Cancel ] -> unit Effect.t
+    ; on_swipe : int -> unit Effect.t
     }
 
   let sexp_of_t t =
@@ -24,7 +28,8 @@ module Input = struct
       ; revision : int = t.revision
       ; lines : int = List.length (String.split_lines t.text)
       ; hunks : E.Hunk.t list = t.hunks
-      ; marks : (int * int) list = t.marks
+      ; kept : E.Hunk.t list = t.kept
+      ; ask : E.Chip.t option = t.ask
       }]
   ;;
 end
@@ -85,7 +90,8 @@ let menu (_ : E.t) (b : E.Buffer.t option) ~inject =
     ; item ~disabled:no_file "Reload from disk" "" Reload
     ; item ~disabled:no_file "Go to line" "Ctrl+G" Goto_open
     ; item ~disabled:no_file "Find" "Ctrl+F" (Command Find)
-    ; item ~disabled:no_file "Ask about the selection" "Ctrl+L" Ask
+    ; item ~disabled:no_file "Ask here, under the lines" "Ctrl+I" Ask_inline
+    ; item ~disabled:no_file "Ask in the chat" "Ctrl+L" Ask
     ; item
         ~disabled:no_file
         ~cls:"danger"
@@ -257,27 +263,83 @@ let row ?(cls = "") ~title ~on_click children =
     children
 ;;
 
-let found (t : E.t) =
-  let query = String.strip t.filter in
-  let open_paths =
-    List.map t.buffers ~f:(fun (b : E.Buffer.t) -> E.relative t b.path)
+(* [path] with the letters the query matched marked. *)
+let match_view path (positions : int array) =
+  let marked = Int.Hash_set.of_list (Array.to_list positions) in
+  let pieces ~pos ~len =
+    let out = ref [] in
+    let run = Buffer.create 16 in
+    let in_mark = ref false in
+    let flush () =
+      if Buffer.length run > 0
+      then (
+        let text = Buffer.contents run in
+        out := (if !in_mark then Node.create "mark" [ Node.text text ] else Node.text text) :: !out;
+        Buffer.clear run)
+    in
+    for i = pos to pos + len - 1 do
+      let m = Hash_set.mem marked i in
+      if Bool.( <> ) m !in_mark then (flush (); in_mark := m);
+      Buffer.add_char run path.[i]
+    done;
+    flush ();
+    List.rev !out
   in
-  let listed =
-    match t.dir with
-    | None -> []
-    | Some l ->
-      List.filter_map l.entries ~f:(fun e ->
-        if File_listing.Kind.is_dir e.kind
-        then None
-        else Some (E.relative t (Filename.concat l.path e.name)))
+  let base = match String.rindex path '/' with Some i -> i + 1 | None -> 0 in
+  Node.span
+    ~attrs:[ Attr.class_ "code-path"; Attr.title path ]
+    [ Node.span
+        ~attrs:[ Attr.class_ "code-path-dir" ]
+        [ Node.create "bdi" (pieces ~pos:0 ~len:base) ]
+    ; Node.span
+        ~attrs:[ Attr.class_ "code-path-name" ]
+        (pieces ~pos:base ~len:(String.length path - base))
+    ]
+;;
+
+(* The matches are a list as tall as all of them, with only the rows near
+   the scroll position in it. *)
+let row_height (m : App.Model.t) = if m.narrow then 44 else 30
+let rows_around = 40
+
+let matches_view (m : App.Model.t) ~inject =
+  let t = m.code in
+  let h = row_height m in
+  let n = Array.length t.matches in
+  let first = Int.max 0 (t.list_top - (rows_around / 2)) in
+  let last = Int.min n (first + rows_around + (rows_around / 2)) in
+  let rows =
+    List.range first last
+    |> List.map ~f:(fun i ->
+      let (mt : Prigh_ui.Fuzzy_path.Match.t) = t.matches.(i) in
+      Node.button
+        ~key:mt.path
+        ~attrs:
+          [ Attr.class_ "code-row file"
+          ; Attr.type_ "button"
+          ; Attr.title mt.path
+          ; Attr.style
+              (Css_gen.create ~field:"top" ~value:(sprintf "%dpx" (i * h)))
+          ; Attr.on_click (fun _ -> inject (code (Open (E.absolute t mt.path))))
+          ]
+        [ match_view mt.path mt.positions ])
   in
-  Prigh_ui.Fuzzy.rank
-    ~query
-    (List.dedup_and_sort
-       ~compare:String.compare
-       (open_paths @ listed @ t.paths))
-    ~key:Fn.id
-  |> Fn.flip List.take 50
+  Node.div
+    ~attrs:
+      [ Attr.class_ "code-matches"
+      ; Attr.style (Css_gen.create ~field:"height" ~value:(sprintf "%dpx" (n * h)))
+      ]
+    rows
+;;
+
+let found_label (t : E.t) =
+  let n = Array.length t.matches in
+  let of_ = Array.length t.index.files in
+  sprintf
+    "%s of %s%s"
+    (if n = 1 then "1 file" else sprintf "%d files" n)
+    (Int.to_string_hum ~delimiter:',' of_)
+    (if t.index.truncated then "+ (the host stopped listing)" else "")
 ;;
 
 let tree (m : App.Model.t) ~inject =
@@ -302,9 +364,9 @@ let tree (m : App.Model.t) ~inject =
             ; Attr.on_keydown (fun ev ->
                 match key ev with
                 | "Enter" ->
-                  (match found t with
-                   | first :: _ -> inject (code (Open (E.absolute t first)))
-                   | [] -> Effect.Ignore)
+                  if Array.is_empty t.matches
+                  then Effect.Ignore
+                  else inject (code (Open (E.absolute t t.matches.(0).path)))
                 | _ -> Effect.Ignore)
             ]
           ()
@@ -370,18 +432,19 @@ let tree (m : App.Model.t) ~inject =
   let body =
     if filtering
     then
-      [ section
-          "Files"
-          (match found t with
-           | [] ->
-             [ span ~cls:"code-empty" "No file matches: try fewer letters" ]
-           | paths ->
-             List.map paths ~f:(fun p ->
-               row
-                 ~cls:"file"
-                 ~title:p
-                 ~on_click:(inject (code (Open (E.absolute t p))))
-                 [ path_view p ]))
+      [ Node.div
+          ~attrs:[ Attr.class_ "code-section" ]
+          [ Node.h3
+              ~attrs:[ Attr.class_ "code-section-title" ]
+              [ Node.text
+                  (if not t.index.loaded
+                   then "Listing the files…"
+                   else found_label t)
+              ]
+          ; (if t.index.loaded && Array.is_empty t.matches
+             then span ~cls:"code-empty" "No file matches: try fewer letters"
+             else matches_view m ~inject)
+          ]
       ]
     else
       [ open_files
@@ -399,9 +462,25 @@ let tree (m : App.Model.t) ~inject =
       [ classes [ "code-tree" ] [ "drawer", m.narrow ]
       ; Attr.create "aria-label" "Files"
       ]
-    (if m.narrow
-     then [ div ~cls:"code-tree-scroll" body; filter ]
-     else [ filter; div ~cls:"code-tree-scroll" body ])
+    (let scroll =
+       Node.div
+         ~attrs:
+           [ Attr.class_ "code-tree-scroll"
+           ; Attr.on_scroll (fun ev ->
+               if not filtering
+               then Effect.Ignore
+               else
+                 Js_of_ocaml.Js.Opt.case ev##.target (fun () -> Effect.Ignore) (fun el ->
+                   (* The rows' top: the section title above them. *)
+                   let top = Js_of_ocaml.Js.to_float el##.scrollTop in
+                   let row = Float.iround_down_exn (top /. Float.of_int (row_height m)) in
+                   if abs (row - t.list_top) < rows_around / 4
+                   then Effect.Ignore
+                   else inject (code (List_scrolled row))))
+           ]
+         body
+     in
+     if m.narrow then [ scroll; filter ] else [ filter; scroll ])
 ;;
 
 let notices (t : E.t) (b : E.Buffer.t) ~inject =
@@ -426,18 +505,27 @@ let notices (t : E.t) (b : E.Buffer.t) ~inject =
      | Some (Save_refused e) ->
        bar ~cls:"conflict" (sprintf "Not saved: %s" e) [ act "Try again" Save ]
      | None -> Node.none)
-  ; (match b.agent with
-     | None -> Node.none
-     | Some _ ->
-       let hunks = b.hunks in
-       let added = List.sum (module Int) hunks ~f:(fun h -> h.added) in
+  ; (match b.hunks with
+     | [] -> Node.none
+     | hunks ->
+       let added = List.sum (module Int) hunks ~f:(fun h -> List.length h.added) in
        let removed =
          List.sum (module Int) hunks ~f:(fun h -> List.length h.removed)
        in
+       let n = List.length hunks in
        bar
          ~cls:"agent"
-         (sprintf "The agent changed this file: +%d −%d" added removed)
-         [ act ~cls:"small primary" "Keep" Keep; act "Undo" Undo_agent ])
+         (sprintf
+            "The agent changed this file: %s, +%d −%d"
+            (if n = 1 then "1 change" else sprintf "%d changes" n)
+            added
+            removed)
+         (if n = 1
+          then [ act ~cls:"small primary" "Keep" (Keep 0); act "Undo" (Undo 0) ]
+          else
+            [ act ~cls:"small primary" "Keep all" Keep_all
+            ; act "Undo all" Undo_all
+            ]))
   ]
 ;;
 
@@ -535,7 +623,11 @@ let keys (m : App.Model.t) ~inject =
             [ Attr.class_ "code-key code-ask"
             ; Attr.type_ "button"
             ; Attr.title "Ask about the selection"
-            ; Attr.on_click (fun _ -> inject (code Ask))
+            ; (* The box opens under the lines, the keyboard stays up. *)
+              Attr.on_mousedown (fun ev ->
+                Js_of_ocaml.Dom.preventDefault ev;
+                Effect.Ignore)
+            ; Attr.on_click (fun _ -> inject (code Ask_inline))
             ]
           [ icon Message; Node.text "Ask" ]
       ; div
@@ -592,11 +684,22 @@ let editor (m : App.Model.t) ~inject ~widget =
              ; text = b.text
              ; revision = b.revision
              ; hunks = b.hunks
-             ; marks = b.marks
+             ; kept = b.kept
+             ; ask = t.asking
              ; on_change =
                  (fun ~path text -> inject (code (Edited { path; text })))
              ; on_select = (fun s -> inject (code (Selected (Some s))))
              ; on_scroll = (fun d -> inject (code (Scrolled d)))
+             ; on_hunk =
+                 (fun i -> function
+                    | `Keep -> inject (code (Keep i))
+                    | `Undo -> inject (code (Undo i))
+                    | `Reopen -> inject (code (Reopen i)))
+             ; on_ask =
+                 (function
+                   | `Send text -> inject (code (Ask_send text))
+                   | `Cancel -> inject (code Ask_cancel))
+             ; on_swipe = (fun n -> inject (code (Swiped n)))
              }
          ])
 ;;

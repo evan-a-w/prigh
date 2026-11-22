@@ -63,36 +63,146 @@ module Hunk = struct
   type t =
     { line : int
     ; removed : string list
-    ; added : int
+    ; added : string list
     }
   [@@deriving sexp_of, equal]
 
+  let lines text =
+    if String.is_empty text then [||] else Array.of_list (String.split_lines text)
+  ;;
+
+  (* The lines both texts start and end with are not diffed: an agent's
+     edit of a long file is a short diff in its middle. *)
   let of_texts ~before ~after =
-    let lines = Line_diff.diff ~old:before ~new_:after in
-    (* [line]: the next line of [after]; [open_]: the hunk being built. *)
+    let a = lines before in
+    let b = lines after in
+    let n = Array.length a in
+    let m = Array.length b in
+    let prefix = ref 0 in
+    while !prefix < n && !prefix < m && String.equal a.(!prefix) b.(!prefix) do
+      incr prefix
+    done;
+    let suffix = ref 0 in
+    while
+      !suffix < n - !prefix
+      && !suffix < m - !prefix
+      && String.equal a.(n - 1 - !suffix) b.(m - 1 - !suffix)
+    do
+      incr suffix
+    done;
+    let middle x len =
+      String.concat ~sep:"\n" (Array.to_list (Array.sub x ~pos:!prefix ~len))
+    in
+    let lines =
+      Line_diff.diff
+        ~old:(middle a (n - !prefix - !suffix))
+        ~new_:(middle b (m - !prefix - !suffix))
+    in
     let close open_ acc =
       match open_ with
-      | Some h -> { h with removed = List.rev h.removed } :: acc
+      | Some h ->
+        { h with removed = List.rev h.removed; added = List.rev h.added } :: acc
       | None -> acc
     in
     let _, open_, acc =
       List.fold
         lines
-        ~init:(1, None, [])
+        ~init:(!prefix + 1, None, [])
         ~f:(fun (line, open_, acc) (l : Line_diff.Line.t) ->
           let start () =
-            Option.value open_ ~default:{ line; removed = []; added = 0 }
+            Option.value open_ ~default:{ line; removed = []; added = [] }
           in
           match l with
           | Same _ -> line + 1, None, close open_ acc
           | Removed s ->
             let h = start () in
             line, Some { h with removed = s :: h.removed }, acc
-          | Added _ ->
+          | Added s ->
             let h = start () in
-            line + 1, Some { h with added = h.added + 1 }, acc)
+            line + 1, Some { h with added = s :: h.added }, acc)
     in
     List.rev (close open_ acc)
+  ;;
+
+  (* Where the hunk's added lines are in [text]: at [line] if they are still
+     there, else the nearest place they are. *)
+  let locate t (text : string array) =
+    let len = List.length t.added in
+    let added = Array.of_list t.added in
+    let at i =
+      i >= 0
+      && i + len <= Array.length text
+      && Array.for_alli added ~f:(fun k l -> String.equal text.(i + k) l)
+    in
+    let start = t.line - 1 in
+    if at start
+    then Some start
+    else if len = 0
+    then None
+    else
+      List.find
+        (List.concat_map (List.range 1 (Array.length text + 1)) ~f:(fun d ->
+           [ start - d; start + d ]))
+        ~f:at
+  ;;
+
+  (* [text] with the hunk taken back: its added lines replaced by the
+     removed ones, and how many lines that adds. *)
+  let revert t text =
+    let a = lines text in
+    match locate t a with
+    | None -> None
+    | Some i ->
+      let len = List.length t.added in
+      let out =
+        Array.to_list (Array.sub a ~pos:0 ~len:i)
+        @ t.removed
+        @ Array.to_list (Array.sub a ~pos:(i + len) ~len:(Array.length a - i - len))
+      in
+      let joined = String.concat ~sep:"\n" out in
+      let joined =
+        if String.is_suffix text ~suffix:"\n" && not (List.is_empty out)
+        then joined ^ "\n"
+        else joined
+      in
+      Some (joined, i + 1, List.length t.removed - len)
+  ;;
+
+  (* A line number after an edit that kept [prefix] lines at the start and
+     [suffix] at the end of [old_len] lines, now [new_len]. *)
+  let shift_line line ~prefix ~suffix ~old_len ~new_len =
+    if line <= prefix
+    then line
+    else if line > old_len - suffix
+    then line + new_len - old_len
+    else prefix + 1
+  ;;
+
+  let remap hunks ~before ~after =
+    if List.is_empty hunks
+    then hunks
+    else (
+      let a = lines before in
+      let b = lines after in
+      let n = Array.length a in
+      let m = Array.length b in
+      let prefix = ref 0 in
+      while !prefix < n && !prefix < m && String.equal a.(!prefix) b.(!prefix) do
+        incr prefix
+      done;
+      let suffix = ref 0 in
+      while
+        !suffix < n - !prefix
+        && !suffix < m - !prefix
+        && String.equal a.(n - 1 - !suffix) b.(m - 1 - !suffix)
+      do
+        incr suffix
+      done;
+      List.map hunks ~f:(fun h ->
+        { h with
+          line =
+            shift_line h.line ~prefix:!prefix ~suffix:!suffix ~old_len:n ~new_len:m
+        }))
   ;;
 end
 
@@ -112,17 +222,19 @@ module Buffer = struct
     ; revision : int
     ; saving : bool
     ; conflict : Conflict.t option
-    ; agent : string option
     ; hunks : Hunk.t list
-    ; marks : (int * int) list
+    ; kept : Hunk.t list
     }
   [@@deriving sexp_of, equal]
 
   let dirty t = not (String.equal t.text t.disk)
 
-  let marks_of hunks =
-    List.filter_map hunks ~f:(fun (h : Hunk.t) ->
-      if h.added = 0 then None else Some (h.line, h.line + h.added - 1))
+  let marks t =
+    List.filter_map (t.hunks @ t.kept) ~f:(fun (h : Hunk.t) ->
+      match h.added with
+      | [] -> None
+      | added -> Some (h.line, h.line + List.length added - 1))
+    |> List.sort ~compare:[%compare: int * int]
   ;;
 end
 
@@ -187,8 +299,37 @@ module Reply = struct
     | Checked of string
     | Saved of string
     | Listed
-    | Paths of string
+    | Files of string (** the cwd it was asked for *)
   [@@deriving sexp_of, equal]
+end
+
+module Index = struct
+  type t =
+    { files : string array
+    ; truncated : bool
+    ; loading : bool
+    ; loaded : bool
+    }
+  [@@deriving sexp_of]
+
+  let empty = { files = [||]; truncated = false; loading = false; loaded = false }
+
+  let of_json json =
+    match
+      Json.string_field json "files", Json.bool_field json "truncated"
+    with
+    | Ok files, truncated ->
+      Ok
+        { files =
+            Array.of_list
+              (List.filter (String.split files ~on:'\n') ~f:(fun f ->
+                 not (String.is_empty f)))
+        ; truncated = Result.ok truncated |> Option.value ~default:false
+        ; loading = false
+        ; loaded = true
+        }
+    | Error e, _ -> Error (Error.to_string_hum e)
+  ;;
 end
 
 module Out = struct
@@ -206,6 +347,10 @@ module Out = struct
     | Focus of string
     | Focus_composer
     | Refresh_changes
+    | Send of
+        { chip : Chip.t
+        ; text : string
+        }
   [@@deriving sexp_of]
 end
 
@@ -216,11 +361,15 @@ type t =
   ; current : string option
   ; selection : Selection.t option
   ; chip : Chip.t option
+  ; asking : Chip.t option
   ; tree : bool
   ; drawer : bool
   ; dir : File_listing.t option
   ; filter : string
-  ; paths : string list
+  ; index : Index.t
+  ; matches : Prigh_ui.Fuzzy_path.Match.t array
+  ; matched : string
+  ; list_top : int
   ; chat : bool
   ; sheet : bool
   ; menu : bool
@@ -237,11 +386,15 @@ let empty =
   ; current = None
   ; selection = None
   ; chip = None
+  ; asking = None
   ; tree = true
   ; drawer = false
   ; dir = None
   ; filter = ""
-  ; paths = []
+  ; index = Index.empty
+  ; matches = [||]
+  ; matched = ""
+  ; list_top = 0
   ; chat = true
   ; sheet = false
   ; menu = false
@@ -281,6 +434,36 @@ let toast ?(error = false) text = Out.Toast { text; error }
 let rpc method_ params reply = Out.Rpc { method_; params; reply }
 let preview path reply = rpc "fs_preview" [ "path", `String path ] reply
 
+(* The matches for [t.filter], from the last ones when the query only grew. *)
+let rematch t =
+  let query = String.strip t.filter in
+  if String.is_empty query || not t.index.loaded
+  then { t with matches = [||]; matched = query; list_top = 0 }
+  else (
+    let from =
+      if
+        (not (String.is_empty t.matched))
+        && Prigh_ui.Fuzzy_path.narrows ~query:t.matched ~query':query
+      then Array.map t.matches ~f:(fun (m : Prigh_ui.Fuzzy_path.Match.t) -> m.path)
+      else t.index.files
+    in
+    { t with
+      matches = Prigh_ui.Fuzzy_path.rank ~query from
+    ; matched = query
+    ; list_top = 0
+    })
+;;
+
+let index_files t =
+  if t.index.loading
+  then t, []
+  else
+    ( { t with index = { t.index with loading = true } }
+    , [ rpc "list_files" [] (Files t.cwd) ] )
+;;
+
+let load_index t = if t.index.loaded then t, [] else index_files t
+
 let list t path =
   ( { t with filter = "" }
   , [ rpc
@@ -293,7 +476,7 @@ let list t path =
 
 let open_ t path =
   match find t path with
-  | Some _ -> { t with current = Some path; selection = None }, []
+  | Some _ -> { t with current = Some path; selection = None; asking = None }, []
   | None -> { t with loading = Some path }, [ preview path (Opened path) ]
 ;;
 
@@ -324,6 +507,75 @@ let save t ~force =
              | c -> c)
         })
     , [ write b ~force ] )
+;;
+
+let keep t ~f =
+  match current t with
+  | None -> t
+  | Some b ->
+    map_buffer t b.path ~f:(fun b ->
+      let kept, hunks = List.partition_tf (List.mapi b.hunks ~f:(fun i h -> i, h)) ~f:(fun (i, h) -> f i h) in
+      { b with
+        hunks = List.map hunks ~f:snd
+      ; kept =
+          List.sort (b.kept @ List.map kept ~f:snd) ~compare:(fun (a : Hunk.t) b ->
+            Int.compare a.line b.line)
+      })
+;;
+
+(* Takes back the changes [f] picks, last first so that the earlier ones'
+   lines stay put, and saves the file. *)
+let undo t ~f =
+  match current t with
+  | None -> t, []
+  | Some b ->
+    let picked = List.filteri b.hunks ~f:(fun i h -> f i h) in
+    if List.is_empty picked
+    then t, []
+    else (
+      let rest = List.filteri b.hunks ~f:(fun i h -> not (f i h)) in
+      let text, rest, kept, failed =
+        List.fold
+          (List.rev picked)
+          ~init:(b.text, rest, b.kept, 0)
+          ~f:(fun (text, rest, kept, failed) h ->
+            match Hunk.revert h text with
+            | Some (text', _, _) ->
+              let shift = Hunk.remap ~before:text ~after:text' in
+              text', shift rest, shift kept, failed
+            | None -> text, rest, kept, failed + 1)
+      in
+      let b =
+        { b with
+          text
+        ; hunks = rest
+        ; kept
+        ; revision = b.revision + 1
+        ; saving = Option.is_some b.md5
+        }
+      in
+      ( map_buffer t b.path ~f:(Fn.const b)
+      , (if Option.is_some b.md5 then [ write b ~force:false ] else [])
+        @
+        if failed > 0
+        then
+          [ toast
+              ~error:true
+              "Some of the change was edited since: undo those lines by hand"
+          ]
+        else [] ))
+;;
+
+let selected_chip t =
+  Option.map (current t) ~f:(fun b ->
+    let selection =
+      Option.value t.selection ~default:{ Selection.first = 1; last = 1; text = "" }
+    in
+    { Chip.path = relative t b.path
+    ; first = selection.first
+    ; last = selection.last
+    ; text = selection.text
+    })
 ;;
 
 let ask t =
@@ -370,6 +622,7 @@ let close t path =
     buffers = List.filter t.buffers ~f:(fun b -> not (String.equal b.path path))
   ; current
   ; selection = None
+  ; asking = None
   }
 ;;
 
@@ -385,7 +638,7 @@ let step t n =
         ~f:fst
     in
     let b = List.nth_exn buffers ((((i + n) % len) + len) % len) in
-    { t with current = Some b.path; selection = None }
+    { t with current = Some b.path; selection = None; asking = None }
 ;;
 
 module Action = struct
@@ -395,6 +648,7 @@ module Action = struct
     | Open of string
     | Switch of string
     | Step of int
+    | Swiped of int
     | Close of string
     | Edited of
         { path : string
@@ -404,14 +658,21 @@ module Action = struct
     | Save
     | Overwrite
     | Reload
-    | Keep
-    | Undo_agent
+    | Keep of int (** the agent's change at that index *)
+    | Undo of int
+    | Keep_all
+    | Undo_all
+    | Reopen of int (** a kept change, by its index *)
     | Ask
+    | Ask_inline
+    | Ask_send of string
+    | Ask_cancel
     | Drop_chip
     | Toggle_tree
     | Toggle_drawer
     | List of string option
     | Filter of string
+    | List_scrolled of int (** the first row of the matches on screen *)
     | Find_file (** the Go to file field *)
     | Toggle_chat
     | Toggle_sheet
@@ -430,6 +691,8 @@ let update t (action : Action.t) =
   | Enter path ->
     let t = { t with open_ = true; menu = false } in
     let t, listing = if Option.is_none t.dir then list t None else t, [] in
+    let t, index = if t.index.loaded then t, [] else index_files t in
+    let listing = listing @ index in
     (match path with
      | Some p when not (String.is_empty (String.strip p)) ->
        let t, outs = open_ t (absolute t (String.strip p)) in
@@ -455,9 +718,13 @@ let update t (action : Action.t) =
     open_ { t with drawer = false; filter = "" } path
   | Switch path ->
     if Option.is_some (find t path)
-    then { t with current = Some path; selection = None; menu = false }, []
+    then { t with current = Some path; selection = None; asking = None; menu = false }, []
     else t, []
   | Step n -> step t n, []
+  | Swiped n ->
+    (match t.buffers with
+     | [] | [ _ ] -> t, []
+     | _ :: _ :: _ -> { (step t n) with asking = None }, [])
   | Close path ->
     (match find t path with
      | Some b when Buffer.dirty b ->
@@ -473,7 +740,14 @@ let update t (action : Action.t) =
      | None -> t, [])
   | Edited { path; text } ->
     ( map_buffer t path ~f:(fun b ->
-        if String.equal b.text text then b else { b with text })
+        if String.equal b.text text
+        then b
+        else
+          { b with
+            text
+          ; hunks = Hunk.remap b.hunks ~before:b.text ~after:text
+          ; kept = Hunk.remap b.kept ~before:b.text ~after:text
+          })
     , [] )
   | Selected selection -> { t with selection }, []
   | Save -> save { t with menu = false } ~force:false
@@ -482,50 +756,47 @@ let update t (action : Action.t) =
     (match current t with
      | None -> t, []
      | Some b -> { t with menu = false }, [ preview b.path (Opened b.path) ])
-  | Keep ->
+  | Keep i -> keep t ~f:(fun k _ -> k = i), []
+  | Keep_all -> keep t ~f:(fun _ _ -> true), []
+  | Undo i -> undo t ~f:(fun k _ -> k = i)
+  | Undo_all -> undo t ~f:(fun _ _ -> true)
+  | Reopen i ->
     (match current t with
      | None -> t, []
      | Some b ->
-       map_buffer t b.path ~f:(fun b -> { b with agent = None; hunks = [] }), [])
-  | Undo_agent ->
-    (match current t with
-     | Some ({ agent = Some before; _ } as b) ->
-       let b =
-         { b with
-           text = before
-         ; agent = None
-         ; hunks = []
-         ; marks = []
-         ; revision = b.revision + 1
-         ; saving = true
-         }
-       in
-       map_buffer t b.path ~f:(Fn.const b), [ write b ~force:false ]
-     | Some _ | None -> t, [])
-  | Ask -> ask { t with menu = false }
+       ( map_buffer t b.path ~f:(fun b ->
+           let reopened = List.filteri b.kept ~f:(fun k _ -> k = i) in
+           let kept = List.filteri b.kept ~f:(fun k _ -> k <> i) in
+           { b with
+             hunks =
+               List.sort (b.hunks @ reopened) ~compare:(fun (a : Hunk.t) b ->
+                 Int.compare a.line b.line)
+           ; kept
+           })
+       , [] ))
+  | Ask -> ask { t with menu = false; asking = None }
+  | Ask_inline ->
+    (match selected_chip t with
+     | None -> t, []
+     | Some chip -> { t with asking = Some chip; menu = false; chip = None }, [])
+  | Ask_send text ->
+    (match t.asking with
+     | Some chip when not (String.is_empty (String.strip text)) ->
+       { t with asking = None }, [ Send { chip; text = String.strip text } ]
+     | Some _ -> t, [ toast ~error:true "Type a question or an instruction first" ]
+     | None -> t, [])
+  | Ask_cancel -> { t with asking = None }, [ Command Focus ]
   | Drop_chip -> { t with chip = None }, []
   | Toggle_tree -> { t with tree = not t.tree; menu = false }, []
   | List path -> list t path
   | Filter filter ->
-    (* The host matches a substring: the paths with the query's first
-       letter are the fuzzy matches' superset (up to the host's limit), the
-       query itself its closest. *)
-    let filter_q = String.strip filter in
-    let first = String.prefix filter_q 1 in
-    let same_first =
-      String.equal first (String.prefix (String.strip t.filter) 1)
-    in
-    let paths q = rpc "list_paths" [ "prefix", `String q ] (Paths q) in
-    ( { t with filter; paths = (if same_first then t.paths else []) }
-    , if String.is_empty filter_q
-      then []
-      else if same_first
-      then [ paths filter_q ]
-      else
-        List.dedup_and_sort ~compare:String.compare [ first; filter_q ]
-        |> List.map ~f:paths )
+    let t = rematch { t with filter } in
+    if t.index.loaded then t, [] else index_files t
+  | List_scrolled top -> { t with list_top = Int.max 0 top }, []
   | Find_file ->
-    { t with tree = true; drawer = true; menu = false }, [ Focus "code-filter" ]
+    let t, index = index_files t in
+    ( { t with tree = true; drawer = true; menu = false }
+    , index @ [ Focus "code-filter" ] )
   | Toggle_chat -> { t with chat = not t.chat; menu = false }, []
   | Toggle_sheet -> { t with sheet = not t.sheet; menu = false }, []
   | Toggle_drawer -> { t with drawer = not t.drawer; menu = false }, []
@@ -586,9 +857,8 @@ let reply t (reply : Reply.t) (result : (Json.t, string) Result.t) =
              ; md5
              ; revision = b.revision + 1
              ; conflict = None
-             ; agent = None
              ; hunks = []
-             ; marks = []
+             ; kept = []
              })
          | None ->
            { t with
@@ -601,14 +871,13 @@ let reply t (reply : Reply.t) (result : (Json.t, string) Result.t) =
                    ; revision = 0
                    ; saving = false
                    ; conflict = None
-                   ; agent = None
                    ; hunks = []
-                   ; marks = []
+                   ; kept = []
                    }
                  ]
            }
        in
-       { t with current = Some path; selection = None }, [])
+       { t with current = Some path; selection = None; asking = None }, [])
   | Checked path, Ok json ->
     (match find t path, of_preview json with
      | None, _ | _, Error _ -> t, []
@@ -627,17 +896,20 @@ let reply t (reply : Reply.t) (result : (Json.t, string) Result.t) =
                   (relative t path))
            ] )
        else (
-         let before = Option.value b.agent ~default:b.disk in
-         let hunks = Hunk.of_texts ~before ~after:text in
+         let shift = Hunk.remap ~before:b.text ~after:text in
+         let hunks =
+           List.sort
+             (shift b.hunks @ Hunk.of_texts ~before:b.text ~after:text)
+             ~compare:(fun (a : Hunk.t) b -> Int.compare a.line b.line)
+         in
          ( map_buffer t path ~f:(fun b ->
              { b with
                text
              ; disk = text
              ; md5
              ; revision = b.revision + 1
-             ; agent = Some before
              ; hunks
-             ; marks = Buffer.marks_of hunks
+             ; kept = shift b.kept
              ; conflict = None
              })
          , [] )))
@@ -671,21 +943,15 @@ let reply t (reply : Reply.t) (result : (Json.t, string) Result.t) =
      | Ok listing -> { t with dir = Some listing }, []
      | Error e -> t, [ toast ~error:true (Error.to_string_hum e) ])
   | Listed, Error e -> t, [ toast ~error:true e ]
-  | Paths query, Ok (`Array items) ->
-    if String.is_prefix (String.strip t.filter) ~prefix:query
-    then
-      ( { t with
-          paths =
-            List.dedup_and_sort
-              ~compare:String.compare
-              (t.paths
-               @ List.filter_map items ~f:(function
-                 | `String p when not (String.is_suffix p ~suffix:"/") -> Some p
-                 | _ -> None))
-        }
-      , [] )
-    else t, []
-  | Paths _, (Ok _ | Error _) -> t, []
+  | Files cwd, result when String.equal cwd t.cwd ->
+    (match Result.bind result ~f:Index.of_json with
+     | Ok index ->
+       (* A refresh starts afresh: the paths may have gone. *)
+       rematch { t with index; matched = "" }, []
+     | Error e ->
+       ( { t with index = { t.index with loading = false } }
+       , [ toast ~error:true (sprintf "Go to file: could not list the files: %s" e) ] ))
+  | Files _, _ -> t, []
 ;;
 
 let set_where t ~session_changed ~cwd =
@@ -695,8 +961,10 @@ let set_where t ~session_changed ~cwd =
 ;;
 
 let changed t =
+  let t, index = if t.index.loaded then index_files t else t, [] in
   ( t
-  , List.map t.buffers ~f:(fun (b : Buffer.t) ->
+  , index
+    @ List.map t.buffers ~f:(fun (b : Buffer.t) ->
       preview b.path (Checked b.path)) )
 ;;
 

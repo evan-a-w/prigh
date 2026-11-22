@@ -14,7 +14,7 @@ module Handle = struct
   type t =
     < load : Js.js_string Js.t -> Js.js_string Js.t -> unit Js.meth
     ; setDoc : Js.js_string Js.t -> Js.js_string Js.t -> unit Js.meth
-    ; setChange : Js.Unsafe.any -> Js.Unsafe.any -> unit Js.meth
+    ; setChange : Js.Unsafe.any -> Js.Unsafe.any -> Js.Unsafe.any -> unit Js.meth
     ; exec : Js.js_string Js.t -> Js.Unsafe.any -> unit Js.meth
     ; focus : unit Js.meth
     ; dispose : unit Js.meth >
@@ -27,7 +27,9 @@ module Mounted = struct
     ; mutable disposed : bool
     ; mutable input : Input.t
     ; mutable shown : (string * int) option (** the path and revision *)
-    ; mutable change : (Code_editor.Hunk.t list * (int * int) list) option
+    ; mutable change :
+        (Code_editor.Hunk.t list * Code_editor.Hunk.t list * Code_editor.Chip.t option)
+          option
     ; mutable owed : Code_editor.Command.t list (** before it loaded *)
     }
 end
@@ -55,15 +57,21 @@ let hunks_js (hunks : Code_editor.Hunk.t list) =
              ; ( "removed"
                , Js.Unsafe.inject
                    (Js.array (Array.of_list_map h.removed ~f:Js.string)) )
-             ; "added", Js.Unsafe.inject h.added
+             ; ( "added"
+               , Js.Unsafe.inject
+                   (Js.array (Array.of_list_map h.added ~f:Js.string)) )
             |])))
 ;;
 
-let marks_js marks =
-  Js.Unsafe.inject
-    (Js.array
-       (Array.of_list_map marks ~f:(fun (a, b) ->
-          Js.array [| Js.Unsafe.inject a; Js.Unsafe.inject b |])))
+let ask_js (ask : Code_editor.Chip.t option) =
+  match ask with
+  | None -> Js.Unsafe.inject Js.null
+  | Some chip ->
+    Js.Unsafe.inject
+      (Js.Unsafe.obj
+         [| "label", js_string (Code_editor.Chip.label chip)
+          ; "last", Js.Unsafe.inject chip.last
+         |])
 ;;
 
 let exec (handle : Handle.t) (c : Code_editor.Command.t) =
@@ -99,16 +107,19 @@ let sync (m : Mounted.t) =
        m.change <- None
      | Some _ -> ());
     m.shown <- Some (i.path, i.revision);
-    let change = i.hunks, i.marks in
+    let change = i.hunks, i.kept, i.ask in
     if
       not
         (Option.equal
-           [%equal: Code_editor.Hunk.t list * (int * int) list]
+           [%equal:
+             Code_editor.Hunk.t list
+             * Code_editor.Hunk.t list
+             * Code_editor.Chip.t option]
            m.change
            (Some change))
     then (
       m.change <- Some change;
-      handle##setChange (hunks_js i.hunks) (marks_js i.marks))
+      handle##setChange (hunks_js i.hunks) (hunks_js i.kept) (ask_js i.ask))
 ;;
 
 let mount (m : Mounted.t) host =
@@ -152,6 +163,32 @@ let mount (m : Mounted.t) host =
                            (match Js.to_string dir with
                             | "down" -> `Down
                             | _ -> `Up)))) )
+           ; ( "onHunk"
+             , Js.Unsafe.inject
+                 (Js.wrap_callback (fun index what ->
+                    if not m.disposed
+                    then
+                      fire
+                        (m.input.on_hunk
+                           index
+                           (match Js.to_string what with
+                            | "keep" -> `Keep
+                            | "undo" -> `Undo
+                            | _ -> `Reopen)))) )
+           ; ( "onAsk"
+             , Js.Unsafe.inject
+                 (Js.wrap_callback (fun send text ->
+                    if not m.disposed
+                    then
+                      fire
+                        (m.input.on_ask
+                           (if Js.to_bool send
+                            then `Send (Js.to_string text)
+                            else `Cancel)))) )
+           ; ( "onSwipe"
+             , Js.Unsafe.inject
+                 (Js.wrap_callback (fun n ->
+                    if not m.disposed then fire (m.input.on_swipe n))) )
           |]
       in
       let api = Js.Unsafe.get Dom_html.window (Js.string "prighCodeEditor") in

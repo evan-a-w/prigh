@@ -273,6 +273,7 @@ let argument_items
   | Directory
   | Backend_directory
   | Path
+  | File
   | Remind
   | Compaction
   | Generate_model
@@ -369,7 +370,7 @@ let compute
               String.length text - String.length (String.lstrip rest)
             in
             (match kind with
-             | Directory | Backend_directory | Path ->
+             | Directory | Backend_directory | Path | File ->
                Option.some_if
                  (not (Prigh_ui.Commands.argument_finished rest))
                  (make (Argument kind) ~prefix ~start [])
@@ -541,6 +542,8 @@ let request t =
     Some ("list_dirs", [ prefix; "host", `String Host.backend_id ])
   | Command | Argument _ | Snippet -> None
 ;;
+
+let set_files t matches = { t with items = List.map matches ~f:(fun path -> Picker.Item.create ~id:path path); selected = 0 }
 
 let set_results t ~prefix results =
   if not (String.equal prefix t.prefix)

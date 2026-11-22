@@ -51,9 +51,9 @@ let print_buffer h =
         ; dirty = (Prigh_web.Code_editor.Buffer.dirty b : bool)
         ; saving = (b.saving : bool)
         ; conflict = (b.conflict : Prigh_web.Code_editor.Conflict.t option)
-        ; agent = (Option.is_some b.agent : bool)
         ; hunks = (b.hunks : Prigh_web.Code_editor.Hunk.t list)
-        ; marks = (b.marks : (int * int) list)
+        ; kept = (b.kept : Prigh_web.Code_editor.Hunk.t list)
+        ; marks = (Prigh_web.Code_editor.Buffer.marks b : (int * int) list)
         }]
 ;;
 
@@ -63,8 +63,7 @@ let%expect_test "/edit opens the mode on the file, Esc leaves it" =
   H.key h "Enter";
   [%expect
     {|
-    (Rpc (method_ list_paths) (params ((prefix src/a.ml)))
-     (tag (Paths src/a.ml)))
+    (Rpc (method_ list_files) (params ()) (tag (Code (Files /home/me/proj))))
     Send
     (Rpc (method_ push_pref)
      (params ((key history) (value "/edit src/a.ml") (max 500))) (tag Ignore))
@@ -126,7 +125,7 @@ let%expect_test "typing makes it dirty; Ctrl+S saves with the md5 it read" =
     {|
     (Expire_toast (id 0) (after_ms 2500))
     ((path /home/me/proj/src/a.ml) (dirty false) (saving false) (conflict ())
-     (agent false) (hunks ()) (marks ()))
+     (hunks ()) (kept ()) (marks ()))
     |}]
 ;;
 
@@ -141,7 +140,7 @@ let%expect_test "a save the host refuses (changed there): reload or overwrite" =
   [%expect
     {|
     ((path /home/me/proj/src/a.ml) (dirty true) (saving false)
-     (conflict (Changed_on_disk)) (agent false) (hunks ()) (marks ()))
+     (conflict (Changed_on_disk)) (hunks ()) (kept ()) (marks ()))
     |}];
   H.text h ~selector:".code-notice";
   [%expect
@@ -168,15 +167,16 @@ let%expect_test "the agent's edit of a clean file: shown, then undone" =
   [%expect
     {|
     ((path /home/me/proj/src/a.ml) (dirty false) (saving false) (conflict ())
-     (agent true) (hunks (((line 2) (removed ("let y = 2")) (added 2))))
-     (marks ((2 3))))
+     (hunks
+      (((line 2) (removed ("let y = 2")) (added ("let y = 20" "let w = 0")))))
+     (kept ()) (marks ((2 3))))
     |}];
   H.text h ~selector:".code-notice";
-  [%expect {| The agent changed this file: +2 −1 (Keep) (Undo) |}];
+  [%expect {| The agent changed this file: 1 change, +2 −1 (Keep) (Undo) |}];
   H.click h ~selector:".code-notice .btn:not(.primary)";
   [%expect
     {|
-    (Code Undo_agent)
+    (Code (Undo 0))
     (Rpc (method_ fs_write)
      (params
       ((path /home/me/proj/src/a.ml)
@@ -191,8 +191,110 @@ let%expect_test "the agent's edit of a clean file: shown, then undone" =
   [%expect
     {|
     ((path /home/me/proj/src/a.ml) (dirty true) (saving true) (conflict ())
-     (agent false) (hunks ()) (marks ()))
+     (hunks ()) (kept ()) (marks ()))
     |}]
+;;
+
+let long = String.concat (List.init 12 ~f:(fun i -> sprintf "line %d\n" (i + 1)))
+
+let%expect_test "several changes: each kept or undone on its own, a kept one reopened" =
+  let h = entered () in
+  H.quiet h (fun () ->
+    H.act h (Code Reload);
+    H.reply h "fs_preview" (preview ~md5:"m1" long);
+    H.event h (Agent_events.tool_end ~id:"e1" ~name:"edit" "Edited src/a.ml"));
+  let after =
+    String.substr_replace_all long ~pattern:"line 2\n" ~with_:"line two\n"
+    |> String.substr_replace_all ~pattern:"line 6\n" ~with_:"line six\nline 6b\n"
+    |> String.substr_replace_all ~pattern:"line 10\n" ~with_:""
+  in
+  H.reply h "fs_preview" (preview ~md5:"m2" after);
+  print_buffer h;
+  H.text h ~selector:".code-notice";
+  [%expect
+    {|
+    ((path /home/me/proj/src/a.ml) (dirty false) (saving false) (conflict ())
+     (hunks
+      (((line 2) (removed ("line 2")) (added ("line two")))
+       ((line 6) (removed ("line 6")) (added ("line six" "line 6b")))
+       ((line 11) (removed ("line 10")) (added ()))))
+     (kept ()) (marks ((2 2) (6 7))))
+    The agent changed this file: 3 changes, +3 −3 (Keep all) (Undo all)
+    |}];
+  (* Keep the first: a badge in the gutter now. *)
+  H.act h (Code (Keep 0));
+  print_buffer h;
+  [%expect
+    {|
+    ((path /home/me/proj/src/a.ml) (dirty false) (saving false) (conflict ())
+     (hunks
+      (((line 6) (removed ("line 6")) (added ("line six" "line 6b")))
+       ((line 11) (removed ("line 10")) (added ()))))
+     (kept (((line 2) (removed ("line 2")) (added ("line two")))))
+     (marks ((2 2) (6 7))))
+    |}];
+  (* Undo the (now) first, the one in the middle: the last moves up. *)
+  H.act h (Code (Undo 0));
+  print_buffer h;
+  [%expect
+    {|
+    (Rpc (method_ fs_write)
+     (params
+      ((path /home/me/proj/src/a.ml)
+       (text
+         "line 1\
+        \nline two\
+        \nline 3\
+        \nline 4\
+        \nline 5\
+        \nline 6\
+        \nline 7\
+        \nline 8\
+        \nline 9\
+        \nline 11\
+        \nline 12\
+        \n")
+       (expected m2)))
+     (tag (Code (Saved /home/me/proj/src/a.ml))))
+    ((path /home/me/proj/src/a.ml) (dirty true) (saving true) (conflict ())
+     (hunks (((line 10) (removed ("line 10")) (added ()))))
+     (kept (((line 2) (removed ("line 2")) (added ("line two")))))
+     (marks ((2 2))))
+    |}];
+  H.quiet h (fun () -> H.reply h "fs_write" {|{"md5":"m3"}|});
+  (* The kept one's badge shows it again, with its Undo. *)
+  H.act h (Code (Reopen 0));
+  H.text h ~selector:".code-widget";
+  [%expect
+    {|
+    ((path /home/me/proj/src/a.ml) (lang Ocaml) (revision 3) (lines 11)
+     (hunks
+      (((line 2) (removed ("line 2")) (added ("line two")))
+       ((line 10) (removed ("line 10")) (added ()))))
+     (kept ()) (ask ()))
+    |}];
+  H.act h (Code Keep_all);
+  print_buffer h;
+  [%expect
+    {|
+    ((path /home/me/proj/src/a.ml) (dirty false) (saving false) (conflict ())
+     (hunks ())
+     (kept
+      (((line 2) (removed ("line 2")) (added ("line two")))
+       ((line 10) (removed ("line 10")) (added ()))))
+     (marks ((2 2))))
+    |}];
+  (* Typing above a change moves it down with its lines. *)
+  let b = Option.value_exn (Prigh_web.Code_editor.current (code h)) in
+  H.act
+    h
+    (Code (Edited { path = b.path; text = "new first line\n" ^ b.text }));
+  print_s
+    [%sexp
+      (List.map (Option.value_exn (Prigh_web.Code_editor.current (code h))).kept
+         ~f:(fun h -> h.line)
+       : int list)];
+  [%expect {| (3 11) |}]
 ;;
 
 let%expect_test
@@ -208,7 +310,7 @@ let%expect_test
   [%expect
     {|
     ((path /home/me/proj/src/a.ml) (dirty true) (saving false)
-     (conflict (Changed_on_disk)) (agent false) (hunks ()) (marks ()))
+     (conflict (Changed_on_disk)) (hunks ()) (kept ()) (marks ()))
     |}];
   print_s
     [%sexp
@@ -246,7 +348,11 @@ let%expect_test "Ctrl+L asks about the selection: a chip, then the prompt" =
   [%expect {| () |}]
 ;;
 
-let%expect_test "Go to file: fuzzy over what the host finds" =
+let files =
+  {|{"root":"/home/me/proj","files":"README.md\nlib/main.ml\nsrc/a.ml\nsrc/compact.ml\nsrc/compact.mli\ntest/test_compact.ml\nalpha.txt","truncated":false}|}
+;;
+
+let%expect_test "Go to file: fuzzy over every file, listed once" =
   let h = entered () in
   H.key h "p" ~ctrl:true ~target:Code;
   [%expect
@@ -254,21 +360,75 @@ let%expect_test "Go to file: fuzzy over what the host finds" =
     (Code Find_file)
     (Focus code-filter)
     |}];
-  H.input h ~selector:"#code-filter" "am";
-  [%expect
-    {|
-    (Code (Filter am))
-    (Rpc (method_ list_paths) (params ((prefix a))) (tag (Code (Paths a))))
-    (Rpc (method_ list_paths) (params ((prefix am))) (tag (Code (Paths am))))
-    |}];
-  H.reply h "list_paths" {|["src/a.ml","src/","lib/main.ml","alpha.txt"]|};
-  H.reply h "list_paths" {|[]|};
+  H.input h ~selector:"#code-filter" "cmpml";
+  [%expect {| (Code (Filter cmpml)) |}];
+  H.text h ~selector:".code-tree-scroll";
+  [%expect {| Listing the files… |}];
+  H.reply h "list_files" files;
   H.text h ~selector:".code-tree-scroll";
   [%expect
     {|
-    Files
-    (src/ a.ml) (lib/ main.ml) (README.md)
-    |}]
+    3 files of 7
+    (src/ c o mp act. ml) (src/ c o mp act. ml i) (test/ test_ c o mp act. ml)
+    |}];
+  (* The letters matched are marked. *)
+  H.show h ~selector:".code-matches .code-row:first-child .code-path-name";
+  [%expect
+    {|
+    <span class="code-path-name">
+      <mark> c </mark>
+      o
+      <mark> mp </mark>
+      act.
+      <mark> ml </mark>
+    </span>
+    |}];
+  (* Typing on narrows the last matches; Enter opens the best. *)
+  H.input h ~selector:"#code-filter" "cmpmli";
+  H.text h ~selector:".code-tree-scroll";
+  [%expect
+    {|
+    (Code (Filter cmpmli))
+    1 file of 7
+    (src/ c o mp act. mli)
+    |}];
+  H.key h "Enter" ~target:Field;
+  [%expect
+    {| (browser default) |}]
+;;
+
+let%expect_test "Go to file: a big repository, every match, a window of rows" =
+  let h = entered () in
+  H.quiet h (fun () -> H.act h (Code Find_file));
+  let paths =
+    List.init 3_000 ~f:(fun i -> sprintf "pkg%02d/src/file_%04d.ml" (i / 100) i)
+  in
+  H.reply
+    h
+    "list_files"
+    (Jsonaf.to_string
+       (`Object
+           [ "root", `String "/home/me/proj"
+           ; "files", `String (String.concat ~sep:"\n" paths)
+           ; "truncated", `False
+           ]));
+  H.quiet h (fun () -> H.act h (Code (Filter "file")));
+  let rows () =
+    let t = code h in
+    printf
+      "%d matches, %d rows in the page\n"
+      (Array.length t.matches)
+      (List.length (H.node h ~selector:".code-matches .code-row" ()))
+  in
+  rows ();
+  H.text h ~selector:".code-section-title";
+  [%expect.unreachable];
+  (* Scrolled far down: the rows there, not the first ones. *)
+  H.quiet h (fun () -> H.act h (Code (List_scrolled 50_000)));
+  rows ();
+  H.text h ~selector:".code-matches .code-row:first-child";
+  [%expect.unreachable]
+[@@expect.uncaught_exn {| ("Stack overflow") |}]
 ;;
 
 let%expect_test "a phone: the drawer, the keys, the peek" =
@@ -279,7 +439,7 @@ let%expect_test "a phone: the drawer, the keys, the peek" =
     (Files) src/ a.ml
     (More)
     ((path /home/me/proj/src/a.ml) (lang Ocaml) (revision 0) (lines 3) (hunks ())
-     (marks ()))
+     (kept ()) (ask ()))
     (Ask)
     (⇥) ({) (}) (() ()) ([) (]) (;) (=) (|) (->) (←) (→) (↶)
     |}];
@@ -342,5 +502,123 @@ let%expect_test
     ((open_ false) (chat false) (tree false))
     (Code (Enter ()))
     ((open_ true) (chat false) (tree false))
+    |}]
+;;
+
+let%expect_test "Ctrl+I: the ask box under the lines, sent as a prompt about them" =
+  let h = entered () in
+  H.quiet h (fun () ->
+    H.type_ h "a draft I was writing";
+    H.act
+      h
+      (Code
+         (Selected (Some { first = 2; last = 3; text = "let y = 2\nlet z = 3" }))));
+  H.key h "i" ~ctrl:true ~target:Code;
+  H.text h ~selector:".code-widget";
+  [%expect
+    {|
+    (Code Ask_inline)
+    ((path /home/me/proj/src/a.ml) (lang Ocaml) (revision 0) (lines 3) (hunks ())
+     (kept ())
+     (ask (((path src/a.ml) (first 2) (last 3) (text  "let y = 2\
+                                                     \nlet z = 3")))))
+    |}];
+  (* Empty: says what to do. *)
+  H.act h (Code (Ask_send "  "));
+  [%expect
+    {| |}];
+  H.text h ~selector:".toast";
+  [%expect {| Type a question or an instruction first (Dismiss) |}];
+  H.act h (Code (Ask_send "rename y to why"));
+  H.text h ~selector:"#chat .user";
+  [%expect
+    {|
+    (Rpc (method_ push_pref)
+     (params
+      ((key history) (value "[src/a.ml:2\226\128\1473] rename y to why")
+       (max 500)))
+     (tag Ignore))
+    Scroll_to_bottom
+    (Rpc (method_ prompt)
+     (params
+      ((text
+         "[src/a.ml:2\226\128\1473] rename y to why\
+        \n\
+        \n<pasted_text name=\"Pasted text #1\" lines=\"3\">\
+        \nsrc/a.ml, lines 2\226\128\1473:\
+        \nlet y = 2\
+        \nlet z = 3\
+        \n</pasted_text>")))
+     (tag
+      (Sent_with_files (text "[src/a.ml:2\226\128\1473] rename y to why")
+       (images ()) (attachments ())
+       (pasted ( "src/a.ml, lines 2\226\128\1473:\
+                \nlet y = 2\
+                \nlet z = 3")))))
+    [src/a.ml:2–3] rename y to why
+    Sending…
+    |}];
+  (* The box is gone; the composer kept its draft. *)
+  print_s
+    [%sexp
+      { asking = ((code h).asking : Prigh_web.Code_editor.Chip.t option)
+      ; draft = ((H.model h).draft : string)
+      }];
+  [%expect {| ((asking ()) (draft "a draft I was writing")) |}]
+;;
+
+let%expect_test "the ask box: Esc (Cancel) closes it, back in the text" =
+  let h = entered ~narrow:true () in
+  H.click h ~selector:".code-ask";
+  print_s [%sexp (Option.is_some (code h).asking : bool)];
+  H.act h (Code Ask_cancel);
+  print_s [%sexp (Option.is_some (code h).asking : bool)];
+  [%expect
+    {|
+    (Code Ask_inline)
+    true
+    (Code_editor Focus)
+    false
+    |}]
+;;
+
+let%expect_test "a phone: swiping goes through the open files" =
+  let h = entered ~narrow:true () in
+  H.quiet h (fun () ->
+    H.act h (Code (Open "/home/me/proj/README.md"));
+    H.reply h "fs_preview" (preview ~path:"/home/me/proj/README.md" "# hi\n"));
+  let current () = print_s [%sexp ((code h).current : string option)] in
+  current ();
+  H.act h (Code (Swiped 1));
+  current ();
+  H.act h (Code (Swiped (-1)));
+  current ();
+  H.text h ~selector:".code-dots";
+  [%expect
+    {|
+    (/home/me/proj/README.md)
+    (/home/me/proj/src/a.ml)
+    (/home/me/proj/README.md)
+    |}]
+;;
+
+let%expect_test "/edit completes any file, fuzzily, from the same list" =
+  let h = H.create ~state:(state ()) () in
+  H.type_ h "/edit cmpml";
+  [%expect
+    {| (Rpc (method_ list_files) (params ()) (tag (Code (Files /home/me/proj)))) |}];
+  H.reply h "list_files" files;
+  H.text h ~selector:".completion";
+  [%expect {| |}];
+  H.key h "Enter";
+  [%expect {|
+    (Complete_accept (run true))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/edit src/compact.ml") (max 500)))
+     (tag Ignore))
+    (Rpc (method_ fs_list) (params ((hidden false))) (tag (Code Listed)))
+    (Rpc (method_ fs_preview) (params ((path /home/me/proj/src/compact.ml)))
+     (tag (Code (Opened /home/me/proj/src/compact.ml))))
+    (Rpc (method_ git_diff) (params ()) (tag (Review Diff)))
     |}]
 ;;
