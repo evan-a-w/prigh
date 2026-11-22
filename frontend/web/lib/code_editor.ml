@@ -500,12 +500,19 @@ let update t (action : Action.t) =
   | Toggle_tree -> { t with tree = not t.tree; menu = false }, []
   | List path -> list t path
   | Filter filter ->
+    (* The host matches a substring: the paths with the query's first
+       letter are the fuzzy matches' superset (up to the host's limit), the
+       query itself its closest. *)
     let filter_q = String.strip filter in
-    ( { t with filter }
+    let first = String.prefix filter_q 1 in
+    let same_first = String.equal first (String.prefix (String.strip t.filter) 1) in
+    let paths q = rpc "list_paths" [ "prefix", `String q ] (Paths q) in
+    ( { t with filter; paths = (if same_first then t.paths else []) }
     , if String.is_empty filter_q
       then []
-      else
-        [ rpc "list_paths" [ "prefix", `String filter_q ] (Paths filter_q) ]
+      else if same_first
+      then [ paths filter_q ]
+      else List.dedup_and_sort ~compare:String.compare [ first; filter_q ] |> List.map ~f:paths
     )
   | Find_file ->
     { t with tree = true; drawer = true; menu = false }, [ Focus "code-filter" ]
@@ -648,13 +655,16 @@ let reply t (reply : Reply.t) (result : (Json.t, string) Result.t) =
      | Error e -> t, [ toast ~error:true (Error.to_string_hum e) ])
   | Listed, Error e -> t, [ toast ~error:true e ]
   | Paths query, Ok (`Array items) ->
-    if String.equal query (String.strip t.filter)
+    if String.is_prefix (String.strip t.filter) ~prefix:query
     then
       ( { t with
           paths =
-            List.filter_map items ~f:(function
-              | `String p when not (String.is_suffix p ~suffix:"/") -> Some p
-              | _ -> None)
+            List.dedup_and_sort
+              ~compare:String.compare
+              (t.paths
+               @ List.filter_map items ~f:(function
+                 | `String p when not (String.is_suffix p ~suffix:"/") -> Some p
+                 | _ -> None))
         }
       , [] )
     else t, []

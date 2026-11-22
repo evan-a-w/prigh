@@ -45,7 +45,11 @@ let path_view ?(cls = "") path =
   let dir, name = dir_and_name path in
   Node.span
     ~attrs:[ Attr.class_ (String.strip ("code-path " ^ cls)); Attr.title path ]
-    [ span ~cls:"code-path-dir" dir; span ~cls:"code-path-name" name ]
+    [ Node.span
+        ~attrs:[ Attr.class_ "code-path-dir" ]
+        [ Node.create "bdi" [ Node.text dir ] ]
+    ; span ~cls:"code-path-name" name
+    ]
 ;;
 
 let dirty_dot (b : E.Buffer.t) =
@@ -167,6 +171,15 @@ let strip (m : App.Model.t) ~inject =
                   ]
                 ~on_click:(inject (code Toggle_menu))
                 [ icon More ]
+            ; (if t.menu
+               then
+                 Node.div
+                   ~attrs:
+                     [ Attr.class_ "code-menu-backdrop"
+                     ; Attr.on_click (fun _ -> inject (code Toggle_menu))
+                     ]
+                   []
+               else Node.none)
             ; (if t.menu then menu t b ~inject else Node.none)
             ]
         ; (if m.narrow
@@ -372,6 +385,7 @@ let tree (m : App.Model.t) ~inject =
       [ open_files
       ; section
           (match t.dir with
+           | Some l when String.equal l.path t.cwd -> Filename.basename l.path ^ "/"
            | Some l -> E.relative t l.path ^ "/"
            | None -> "Files")
           listing

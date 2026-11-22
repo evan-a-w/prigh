@@ -214,6 +214,11 @@
       lastTop = top;
     }, { passive: true });
 
+    // Whatever the page does next (a shortcut, a tap on Save or Ask) sees
+    // the text as typed: edits still waiting for their frame go first.
+    const before = () => flush();
+    document.addEventListener("keydown", before, true);
+    document.addEventListener("pointerdown", before, true);
     const run = (cmd) => cmd(view);
     return {
       setDoc(text, lang) {
@@ -262,7 +267,11 @@
         if (name !== "find") view.focus();
       },
       focus: () => view.focus(),
-      dispose: () => view.destroy(),
+      dispose: () => {
+        document.removeEventListener("keydown", before, true);
+        document.removeEventListener("pointerdown", before, true);
+        view.destroy();
+      },
     };
   }
   window.prighCodeEditor = { mount };
