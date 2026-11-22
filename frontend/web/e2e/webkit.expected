@@ -5028,3 +5028,49 @@ drawer gone: true
 strip: src/ turn.mli
 swiped: src/ compact.ml
 left: the chat
+=== webkit: smoke: sign in ===
+prigh
+web
+Sign in
+to the prigh backend at ws://127.0.0.1:<PORT>/ws
+User name
+Password
+Backend
+Sign in
+signed in: the composer and the sidebar: true
+=== webkit: smoke: a run with a tool call ===
+▢
+Using prigh-web
+count some lines
+<TIME>
+let me look
+bash
+printf 'one\ntwo\nthree\n'
+three lines
+<TIME>
+the session in the address: true
+=== webkit: smoke: sessions ===
+the sidebar: hello again | count some lines
+a new session in the address: true
+back to the first: true
+=== webkit: smoke: Ctrl+K ===
+focus in its filter: true
+"verbosity" selects: Set verbosity
+Esc: closed, the focus back in the editor
+=== webkit: smoke: the backend restarts ===
+Connection lost: reconnecting…
+Reconnecting…
+the same session after reconnecting: true
+=== webkit: smoke: after reconnecting ===
+still there?
+<TIME>
+back again
+<TIME>
+=== webkit: smoke: a phone: the chat ===
+narrow: true
+ok
+=== webkit: smoke: a phone: the drawer ===
+ok
+its sessions: count some lines | hello again
+=== webkit: smoke: errors ===
+none

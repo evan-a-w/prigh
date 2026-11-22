@@ -14,8 +14,7 @@ import { mkdirSync, readFileSync, readdirSync, realpathSync, utimesSync, writeFi
 import { join } from "node:path";
 import { end } from "./end.mjs";
 
-// ./test's core suite (SUITE=core) checks one phone size; --full both.
-const phoneSizes = process.env.SUITE === "core" ? [[390, 844]] : [[390, 844], [320, 640]];
+const phoneSizes = [[390, 844], [320, 640]];
 const { chromium, firefox, webkit } = await import(process.env.PLAYWRIGHT_MODULE);
 
 const [engineName] = process.argv.slice(2);

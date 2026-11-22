@@ -471,11 +471,8 @@ const phone = async (w, h, { pwa = false } = {}) => {
 try {
   await desktop();
   await phone(390, 844);
-  // ./test's core suite (SUITE=core) stops at one phone.
-  if (process.env.SUITE !== "core") {
-    await phone(320, 640);
-    if (engineName === "chromium") await phone(390, 844, { pwa: true });
-  }
+  await phone(320, 640);
+  if (engineName === "chromium") await phone(390, 844, { pwa: true });
   if (errors.length) {
     section("errors");
     say(errors.join("\n"));

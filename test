@@ -5,8 +5,8 @@
 # e2e runs alongside.
 #
 #   ./test           THE test suite, before pushing and before merging: the
-#                    browser e2e's core scripts in Chromium (SUITE=core in
-#                    frontend/web/e2e/prigh_web.sh)
+#                    dune tests in @runtest and the browser e2e's smoke
+#                    (frontend/web/e2e/smoke.mjs, SUITE=core) in Chromium
 #   ./test --full    only when asked for: every dune test run again, even
 #                    those dune has a result for, with the slow ones only
 #                    @runtest-full has, and every browser e2e script
