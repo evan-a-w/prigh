@@ -7,6 +7,9 @@ type t =
   ; mutable pending : (string * App.Reply_tag.t) list
   ; mutable quiet : bool
   ; mutable clipboard : bool
+  ; mutable rendered : (App.Model.t * Node_helpers.t) option
+      (* The page for the model it was rendered from: queries between two
+         actions share one rendering. *)
   }
 
 let model t = t.model
@@ -337,7 +340,7 @@ let key
 let type_ t text = act t (Edit { text; cursor = String.length text })
 
 let connecting () =
-  let t = { model = App.init; pending = []; quiet = true; clipboard = true } in
+  let t = { model = App.init; pending = []; quiet = true; clipboard = true; rendered = None } in
   act t Start;
   t.quiet <- false;
   t
@@ -362,7 +365,12 @@ let newest s : App.Reply_tag.t =
 
 let create ?(verbose = false) ?(sessions = "[]") ?(state = state_json ()) () =
   let t =
-    { model = App.init; pending = []; quiet = not verbose; clipboard = true }
+    { model = App.init
+    ; pending = []
+    ; quiet = not verbose
+    ; clipboard = true
+    ; rendered = None
+    }
   in
   act t Start;
   reply t "get_state" state;
@@ -395,24 +403,36 @@ let restore_history t entries =
        })
 ;;
 
-let node ?(inject = fun _ -> Virtual_dom.Vdom.Effect.Ignore) t ?selector () =
+let render_page t ~inject =
+  Node_helpers.unsafe_convert_exn
+    (View.view
+       t.model
+       ~inject
+       ~terminal:(fun target ->
+         Virtual_dom.Vdom.Node.div
+           ~attrs:[ Virtual_dom.Vdom.Attr.class_ "xterm-widget" ]
+           [ Virtual_dom.Vdom.Node.text
+               (Sexp.to_string (Terminal.Target.sexp_of_t target))
+           ])
+       ~code_editor:(fun input ->
+         Virtual_dom.Vdom.Node.div
+           ~attrs:[ Virtual_dom.Vdom.Attr.class_ "code-widget" ]
+           [ Virtual_dom.Vdom.Node.text
+               (Sexp.to_string_hum (Code_editor_view.Input.sexp_of_t input))
+           ]))
+;;
+
+let node ?inject t ?selector () =
   let node =
-    Node_helpers.unsafe_convert_exn
-      (View.view
-         t.model
-         ~inject
-         ~terminal:(fun target ->
-           Virtual_dom.Vdom.Node.div
-             ~attrs:[ Virtual_dom.Vdom.Attr.class_ "xterm-widget" ]
-             [ Virtual_dom.Vdom.Node.text
-                 (Sexp.to_string (Terminal.Target.sexp_of_t target))
-             ])
-         ~code_editor:(fun input ->
-           Virtual_dom.Vdom.Node.div
-             ~attrs:[ Virtual_dom.Vdom.Attr.class_ "code-widget" ]
-             [ Virtual_dom.Vdom.Node.text
-                 (Sexp.to_string_hum (Code_editor_view.Input.sexp_of_t input))
-             ]))
+    match inject, t.rendered with
+    | Some inject, _ -> render_page t ~inject
+    | None, Some (model, node) when phys_equal model t.model -> node
+    | None, _ ->
+      let node =
+        render_page t ~inject:(fun _ -> Virtual_dom.Vdom.Effect.Ignore)
+      in
+      t.rendered <- Some (t.model, node);
+      node
   in
   match selector with
   | None -> [ node ]
