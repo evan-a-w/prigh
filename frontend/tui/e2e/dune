@@ -18,11 +18,15 @@
   prigh_tui))
 
 ; Runs the real backend (`main.exe serve -faux`, built in the vanilla switch)
-; through the real client and compares the normalised transcript.
+; through the real client and compares the normalised transcript. The backend
+; is built in another dune project: PRIGH_BACKEND_DIGEST (./test sets it to
+; the binary's hash) runs these again when it changes, and only then.
 
 (rule
  (aliases e2e runtest)
- (deps e2e.expected)
+ (deps
+  e2e.expected
+  (env_var PRIGH_BACKEND_DIGEST))
  (action
   (progn
    (with-stdout-to
@@ -34,7 +38,9 @@
 
 (rule
  (aliases e2e runtest)
- (deps e2e_websocket.expected)
+ (deps
+  e2e_websocket.expected
+  (env_var PRIGH_BACKEND_DIGEST))
  (action
   (progn
    (with-stdout-to

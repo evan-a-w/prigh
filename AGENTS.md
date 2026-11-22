@@ -39,12 +39,11 @@ while iterating.
   OxCaml.
 - `frontend/`'s `@runtest` includes the TUI's e2e and tmux tests, which run
   `backend/_build/default/bin/main.exe`: build the backend first (`dune
-  build`, not just `@runtest`, which does not rebuild `main.exe`). Dune does
-  not see the backend binary as a dependency, so after changing only the
-  backend, clear the stale results (`rm -rf
-  frontend/_build/default/tui/e2e/e2e.actual
-  frontend/_build/default/tui/tmux-test/.cram.*`; `./test` does) or they
-  report the old run. The tmux tests need a terminal multiplexer (`tmux`);
+  build`, not just `@runtest`, which does not rebuild `main.exe`). They
+  depend on it through `$PRIGH_BACKEND_DIGEST`, which `./test` sets to its
+  hash: by hand, set it too (`export PRIGH_BACKEND_DIGEST=$(sha256sum
+  backend/_build/default/bin/main.exe)`) or a backend change does not run
+  them again. The tmux tests need a terminal multiplexer (`tmux`);
   each `.t` file in `tmux-test/` is a group of scenarios, and dune runs the
   groups in parallel. `dune build @tui/test/runtest` runs only the TUI's
   unit tests. `$PRIGH_BACKEND` overrides that path: unset it
@@ -61,7 +60,11 @@ while iterating.
   with its own backend, browser and directory (as many at a time as the
   CPUs and the available memory allow: `JOBS`, `MEM_PER_JOB` MiB each),
   and print what they see;
-  `ENGINE.expected` is each browser's output. Wait for a condition, not a
+  `ENGINE.expected` is each browser's output. They load Playwright through
+  `playwright.mjs`, whose contexts block service workers unless a script
+  asks for them (`pwa.mjs` allows the worker it tests). `./test` skips them when the backend, the site and the scripts
+  are what they were at its last green run (`PRIGH_TEST_E2E=always` runs
+  them anyway). Wait for a condition, not a
   time (`waitForFunction`, `waitFor`): a fixed wait is either slow or flaky
   on a busy machine, and a wait that is meant to time out costs its whole
   timeout.
@@ -69,6 +72,10 @@ while iterating.
   self-hosted build host fills from every push to `main` (DOCKER.md,
   "Binary cache"); pass
   `--accept-flake-config` to Nix in non-interactive use.
+- The dev shell and `./test` turn on dune's shared cache (`DUNE_CACHE=enabled`,
+  in `~/.cache/dune`): a new worktree builds in seconds from what the others
+  built, rather than minutes. `dune cache trim --size=4GB` keeps it in
+  bounds; `DUNE_CACHE=disabled` turns it off.
 - Only have one dune process running at a time, otherwise it hangs. E.g. if
   you are running tests, don't also `dune exec`.
 - Every new RPC field or method must be mirrored by the frontends that use it

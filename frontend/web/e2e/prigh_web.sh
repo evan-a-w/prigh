@@ -88,6 +88,12 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export PRIGH_BACKEND="${PRIGH_BACKEND:-$here/../../../backend/_build/default/bin/main.exe}"
 export SITE="${PRIGH_WEB_ROOT:-$here/../../_build/default/web/bin/site}"
 export TOKEN='sekrit&x=y'
+# The scripts' Playwright: the real one with service workers blocked by
+# default (playwright.mjs).
+if [ -z "${PRIGH_E2E_PLAYWRIGHT:-}" ]; then
+	export PRIGH_E2E_PLAYWRIGHT="$PLAYWRIGHT_MODULE"
+	export PLAYWRIGHT_MODULE="$here/playwright.mjs"
+fi
 # The backends' own host by a fixed name, the one ENGINE.expected was
 # recorded with (the build host's): the pages show it, and its length moves
 # the host chip.

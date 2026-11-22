@@ -12,6 +12,11 @@
 #                    at every size in Chromium, Firefox and WebKit (what the
 #                    flake's checks run)
 #
+# Like dune, ./test does not repeat what it has a result for: the browser e2e
+# is skipped when the backend, the site, the e2e scripts and their expected
+# output are what they were at the last green run (PRIGH_TEST_E2E=always runs
+# it anyway; --full always does).
+#
 # Outside the dev shell it re-runs itself in it (`nix develop`). Playwright
 # comes from PLAYWRIGHT_MODULE and PLAYWRIGHT_BROWSERS_PATH, or else from
 # the flake's nixpkgs. It tests what it builds: PRIGH_BACKEND and
@@ -90,6 +95,9 @@ if [ -z "${PRIGH_E2E_SHELL:-}" ]; then
 fi
 export PRIGH_BACKEND="$root/backend/_build/default/bin/main.exe"
 unset PRIGH_WEB_ROOT
+# Dune's shared cache: a new worktree builds from what the others built (the
+# dev shell sets it too; this dune's default stores nothing).
+export DUNE_CACHE="${DUNE_CACHE:-enabled}"
 
 # The fonts the flake's web-e2e check gives the browsers: without a fontconfig
 # configuration, Chromium's headless shell fails to load prigh-web's web fonts
@@ -131,26 +139,54 @@ if [ -n "$failed" ]; then
 	exit 1
 fi
 
-# The browser e2e only needs what was built: it runs while dune runs the
-# rest (one dune at a time).
-web_start=$EPOCHREALTIME
-SUITE="$suite" ENGINES="$engines" bash "$root/frontend/web/e2e/prigh_web.sh" >"$logs/web e2e.log" 2>&1 &
-web=$!
+# The frontend's TUI e2e and tmux tests run the backend, which another dune
+# project builds: they depend on its hash, so that they run again when it
+# changes (and only then).
+PRIGH_BACKEND_DIGEST="$(sha256sum "$PRIGH_BACKEND" | cut -c1-64)"
+export PRIGH_BACKEND_DIGEST
 
-# Dune does not know that the frontend's e2e and tmux tests use the backend:
-# they run again every time.
-rm -rf "$root"/frontend/_build/default/tui/e2e/e2e.actual \
-	"$root"/frontend/_build/default/tui/tmux-test/.cram.*
+# The browser e2e's inputs: what it runs (the backend, the built site, the
+# scripts and their expected output) and with what. The same as at the last
+# green run: nothing to run.
+site="$root/frontend/_build/default/web/bin/site"
+web_stamp="$root/frontend/_build/.prigh-web-e2e-green"
+web_digest="$(
+	{
+		echo "$suite $engines ${PRIGH_E2E_PLAYWRIGHT:-$PLAYWRIGHT_MODULE} $PLAYWRIGHT_BROWSERS_PATH ${PRIGH_E2E_SHELL:-}"
+		echo "$PRIGH_BACKEND_DIGEST"
+		cd "$site" && find -L . -type f | LC_ALL=C sort | xargs -d '\n' sha256sum
+		cd "$root/frontend/web/e2e" && find . -type f | LC_ALL=C sort | xargs -d '\n' sha256sum
+	} | sha256sum | cut -c1-64
+)"
+web=""
+web_start=$EPOCHREALTIME
+if [ "${PRIGH_TEST_E2E:-}" != always ] && [ "$suite" = core ] &&
+	[ "$(cat "$web_stamp" 2>/dev/null)" = "$web_digest" ]; then
+	echo "ok    web e2e: $suite, $engines: skipped (unchanged since the last green run)"
+else
+	rm -f "$web_stamp"
+	# It only needs what was built: it runs while dune runs the rest (one
+	# dune at a time).
+	SUITE="$suite" ENGINES="$engines" bash "$root/frontend/web/e2e/prigh_web.sh" >"$logs/web e2e.log" 2>&1 &
+	web=$!
+fi
+
 step "backend tests" dune build --root "$root/backend" @runtest "${force[@]}"
 step "frontend tests" dune build --root "$root/frontend" @runtest "${force[@]}"
 # The desktop app's logic and the computer-use helper (their windows and
 # desktops run in the flake's desktop-window and computer-use checks), in the
 # desktop dev shell: the helper's portal backend links PipeWire.
-step "desktop tests" nix develop "$(shell desktop desktop flake.nix flake.lock desktop/Cargo.lock)" \
+# A test that hangs fails the step (with what it printed) rather than the
+# run: 10 minutes covers compiling them from nothing on a busy machine.
+step "desktop tests" timeout -k 10 "${DESKTOP_TEST_TIMEOUT:-600}" \
+	nix develop "$(shell desktop desktop flake.nix flake.lock desktop/Cargo.lock)" \
 	-c cargo test --locked --manifest-path "$root/desktop/Cargo.toml" -p prigh-desktop-core -p prigh-computer
 
-if wait "$web"; then
+if [ -z "$web" ]; then
+	:
+elif wait "$web"; then
 	echo "ok    web e2e: $suite, $engines ($(elapsed "$web_start"))"
+	echo "$web_digest" >"$web_stamp"
 else
 	echo "FAIL  web e2e: $suite, $engines ($(elapsed "$web_start")): $logs/web e2e.log"
 	cat "$logs/web e2e.log"
