@@ -102,7 +102,7 @@ let with_agent ?(extra_tools = []) ?before ?on_request ~main children f =
 let rec wait_turn agent =
   if Agent.is_running agent
   then (
-    Eio.Fiber.yield ();
+    Eio_unix.sleep 0.002;
     wait_turn agent)
 ;;
 

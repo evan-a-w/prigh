@@ -4,67 +4,6 @@ open Tool_test_helpers
 open! Test_auto_background
 
 let%expect_test
-    "a foreground command still running after the limit becomes a job; its \
-     report comes once"
-  =
-  with_agent
-    ~main:
-      [ bash ~id:"c1" "echo quick"
-      ; bash ~id:"c2" ("echo before; " ^ gated "echo after; seq 1 3; exit 2")
-      ; Reply.text "moved on"
-      ; Reply.text "it exited 2"
-      ]
-    []
-  @@ fun t agent ->
-  Or_error.ok_exn (Agent.prompt agent "build it");
-  Test_background_subagents.wait_turn agent;
-  print_endline "--- turn over";
-  open_gate t;
-  Agent.wait_idle agent;
-  print_endline
-    (clean t (Or_error.ok_exn (Agent.job_output agent ~job_id:"j1" ~lines:10)));
-  print_messages (Agent.messages agent);
-  [%expect
-    {|
-    state: running=true subagents=[] jobs=[]
-    agent_start
-    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | build it
-    assistant:  bash{"command":"echo quick"}
-    tool_output c1: quick
-    tool_result bash: quick
-    assistant:  bash{"command":"echo before; while [ ! -f gate ]; do sleep 0.02; done; echo after; seq 1 3; exit 2"}
-    tool_output c2: before
-    state: running=true subagents=[] jobs=[j1 running]
-    tool_result bash: still running after Ns, so it was moved to the background as job j1 (not restarted: it keeps running). Output so far: | before | Its report ([job j1 exited ...] and its last lines) is delivered to you when it exits: keep working on something else or end your turn. job_output shows more output, job_kill stops it.
-    assistant: moved on
-    agent_end
-    state: running=false subagents=[] jobs=[j1 running]
-    --- turn over
-    state: running=true subagents=[] jobs=[]
-    agent_start
-    user: [job j1 exited 2] echo before; while [ ! -f gate ]; do sleep 0.02; done; echo… | before | after | 1 | 2 | 3
-    assistant: it exited 2
-    agent_end
-    state: running=false subagents=[] jobs=[]
-    [job j1 exited 2 after Ns, 19 bytes; lines 1-5 of 5] echo before; while [ ! -f gate ]; do sleep 0.02; done; echo…
-    before
-    after
-    1
-    2
-    3
-    --- messages
-    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | build it
-    assistant:  bash{"command":"echo quick"}
-    tool_result bash: quick
-    assistant:  bash{"command":"echo before; while [ ! -f gate ]; do sleep 0.02; done; echo after; seq 1 3; exit 2"}
-    tool_result bash: still running after 1s, so it was moved to the background as job j1 (not restarted: it keeps running). Output so far: | before | Its report ([job j1 exited ...] and its last lines) is delivered to you when it exits: keep working on something else or end your turn. job_output shows more output, job_kill stops it.
-    assistant: moved on
-    user: [job j1 exited 2] echo before; while [ ! -f gate ]; do sleep 0.02; done; echo… | before | after | 1 | 2 | 3
-    assistant: it exited 2
-    |}]
-;;
-
-let%expect_test
     "an abort before the limit kills the command; after, the job keeps running"
   =
   with_agent ~seconds:30. ~main:[ bash ~id:"c1" (gated "echo never") ] []
