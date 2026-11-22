@@ -1615,6 +1615,89 @@ Tidy the docs in a worktree
 A landing page [selected]
 === chromium: worktrees_switch: errors ===
 none
+=== chromium: session card: the card ===
+Subagents
+1
+Count the modules
+<age>
+Worktrees
+2
+=== chromium: session card: the worktrees unfolded ===
+Subagents
+1
+Count the modules
+<age>
+Worktrees
+2
+main
+feat/ui
+1 changed
+main (here)
+feat/ui 1 changed
+=== chromium: session card: beside the chat, 1600px wide ===
+pane 1320px, the column centred
+card 208px wide, 12px from the pane's edge
+the column clears it (40px or more)
+the composer's left edge lines up with the column's: true
+the column keeps its left margin
+=== chromium: session card: beside the chat, 1440px wide ===
+pane 1160px, the column moved left
+card 208px wide, 12px from the pane's edge
+the column clears it (12px or more)
+the composer's left edge lines up with the column's: true
+the column keeps its left margin
+=== chromium: session card: beside the chat, 1100px wide ===
+pane 820px, the column moved left
+card 208px wide, 12px from the pane's edge
+the column clears it (12px or more)
+the composer's left edge lines up with the column's: true
+the column keeps its left margin
+=== chromium: session card: beside the chat, 900px wide ===
+pane 620px, the column centred
+card 208px wide, 12px from the pane's edge
+the card covers the column's corner
+the composer's left edge lines up with the column's: true
+the column keeps its left margin
+=== chromium: session card: hidden from the chrome, 1440px wide ===
+pane 1160px, the column centred
+no card
+=== chromium: session card: a subagent's transcript ===
+Count the modules with a subagent
+/
+Count the modules
+<age>
+Count the modules
+<time>
+There are 42 modules.
+<time>
+composer: 0, footer: A subagent's transcript: read-only. Back (Esc), focus in the transcript: true
+its task as a filled prompt: true; the footer at the pane's foot: true
+=== chromium: session card: Esc: back to the session ===
+the session's transcript: true, focus in the editor: true
+=== chromium: session card: a phone, 390x844 ===
+card beside the chat: 0
+This session
+Subagents
+1
+Count the modules
+<age>
+Worktrees
+2
+inside the screen: true; rows 44px or more: true (3)
+Esc closes it
+=== chromium: session card: a phone, 320x640 ===
+card beside the chat: 0
+This session
+Subagents
+1
+Count the modules
+<age>
+Worktrees
+2
+inside the screen: true; rows 44px or more: true (3)
+Esc closes it
+=== chromium: session card: errors ===
+none
 === chromium: review: files: changes marked ===
 src (changed: 2)
 README.md
@@ -3335,7 +3418,7 @@ the composer ends at 0px from the bottom
 === chromium: mobile: 390x844: the ⋯ sheet ===
 ok
 === chromium: mobile: 390x844: the sheet's rows ===
-Jump to a message, Filter the transcript, Files, Terminal, Settings
+Jump to a message, Filter the transcript, Files, Terminal, Subagents and worktrees, Settings
 === chromium: mobile: 390x844: the settings' list ===
 ok
 === chromium: mobile: 390x844: the settings ===
@@ -3390,7 +3473,7 @@ the composer ends at 0px from the bottom
 === chromium: mobile: 320x640: the ⋯ sheet ===
 ok
 === chromium: mobile: 320x640: the sheet's rows ===
-Jump to a message, Filter the transcript, Files, Terminal, Settings
+Jump to a message, Filter the transcript, Files, Terminal, Subagents and worktrees, Settings
 === chromium: mobile: 320x640: the settings' list ===
 ok
 === chromium: mobile: 320x640: the settings ===
@@ -3445,7 +3528,7 @@ the composer ends at 0px from the bottom
 === chromium: mobile: 390x844-pwa: the ⋯ sheet ===
 ok
 === chromium: mobile: 390x844-pwa: the sheet's rows ===
-Jump to a message, Filter the transcript, Files, Terminal, Settings
+Jump to a message, Filter the transcript, Files, Terminal, Subagents and worktrees, Settings
 === chromium: mobile: 390x844-pwa: the settings' list ===
 ok
 === chromium: mobile: 390x844-pwa: the settings ===

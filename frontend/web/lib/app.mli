@@ -781,6 +781,12 @@ module Action : sig
         closes) *)
     (** a phone's header: the tray with the thinking level, the mode, the
         status and the panels' toggles, under the header *)
+    | Toggle_session_card
+    (** the session card beside the chat; on a phone, its sheet *)
+    | Session_card of Session_card.Action.t
+    | Open_subagent_chat of string
+    (** a subagent's transcript (by agent id) in the chat's place *)
+    | Close_subagent_chat (** back to the session's own *)
     | Answer_confirm of
         { call_id : string
         ; agent_id : string option
@@ -1109,6 +1115,13 @@ module Model : sig
     ; prefs : Pref_sync.t
     ; generate : Generate.t (** the field being drafted by the model *)
     ; git_bar : Git_bar.t (** the review page's *)
+    ; session_card_open : bool
+      (** the session card (subagents, worktrees) shows in the chat's
+          top-right corner; on a phone it is [session_card.sheet] *)
+    ; session_card : Session_card.t
+    ; subagent_chat : string option
+      (** a subagent's transcript (its agent id) shows in the chat's place,
+          read-only; per session *)
     }
   [@@deriving sexp_of]
 

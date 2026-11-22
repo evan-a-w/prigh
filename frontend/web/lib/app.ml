@@ -623,6 +623,10 @@ module Action = struct
     | Toggle_context_card
     (** the context ring's card: context, cost, compacting (tap; Esc
         closes) *)
+    | Toggle_session_card
+    | Session_card of Session_card.Action.t
+    | Open_subagent_chat of string
+    | Close_subagent_chat
     | Answer_confirm of
         { call_id : string
         ; agent_id : string option
@@ -858,6 +862,9 @@ module Model = struct
     ; prefs : Pref_sync.t
     ; generate : Generate.t
     ; git_bar : Git_bar.t
+    ; session_card_open : bool
+    ; session_card : Session_card.t
+    ; subagent_chat : string option
     }
   [@@deriving sexp_of]
 
@@ -967,6 +974,9 @@ module Model = struct
         ; prefs
         ; generate
         ; git_bar
+        ; session_card_open
+        ; session_card
+        ; subagent_chat
         }
       =
       a
@@ -1069,6 +1079,9 @@ module Model = struct
     && phys_equal prefs b.prefs
     && phys_equal generate b.generate
     && phys_equal git_bar b.git_bar
+    && Bool.equal session_card_open b.session_card_open
+    && phys_equal session_card b.session_card
+    && phys_equal subagent_chat b.subagent_chat
   ;;
 
   let same_but_composer a b = same_outside ~transcript:false a b
@@ -1403,6 +1416,9 @@ let init =
   ; prefs = Pref_sync.init
   ; generate = Generate.empty
   ; git_bar = Git_bar.empty
+  ; session_card_open = true
+  ; session_card = Session_card.default
+  ; subagent_chat = None
   }
 ;;
 
@@ -1920,6 +1936,8 @@ let set_state_without_files (m : Model.t) (state : State.t) =
       ; btw = None
       ; generate = Generate.empty
       ; git_bar = Git_bar.empty
+      ; session_card = { m.session_card with sheet = false }
+      ; subagent_chat = None
       ; completion = None
       ; scrolled_up = false
       ; skills = Skills.empty
@@ -3435,6 +3453,39 @@ let agents_back (m : Model.t) =
   match m.agents.selected with
   | Some _ -> with_agents m ~f:(fun a -> { a with selected = None }), []
   | None -> close_agents m
+;;
+
+(* ---- the session card, and a subagent's transcript in the chat's place *)
+
+(* On a phone the card is a sheet, closed until asked for. *)
+let toggle_session_card (m : Model.t) =
+  if m.narrow
+  then
+    ( { m with
+        session_card = { m.session_card with sheet = not m.session_card.sheet }
+      ; status_tray = false
+      }
+    , [] )
+  else { m with session_card_open = not m.session_card_open }, []
+;;
+
+let open_subagent_chat (m : Model.t) id =
+  match Agents.find_agent m.agents id with
+  | None -> error m (sprintf "No subagent %s in this session." id)
+  | Some _ ->
+    let m, fetch = fetch_transcript m id in
+    ( { m with
+        subagent_chat = Some id
+      ; session_card = { m.session_card with sheet = false }
+      ; status_tray = false
+      }
+    , fetch @ [ Command.Focus "chat" ] )
+;;
+
+let close_subagent_chat (m : Model.t) =
+  match m.subagent_chat with
+  | None -> m, []
+  | Some _ -> { m with subagent_chat = None }, [ focus_editor ]
 ;;
 
 (* ---- steering a subagent *)
@@ -5455,6 +5506,7 @@ let user_switched (m : Model.t) (hello : Hello_reply.t) =
     ; generate = Generate.empty
     ; downsizing = []
     ; git_bar = Git_bar.empty
+    ; subagent_chat = None
     ; images = []
     ; pasted = []
     ; paste_undo = None
@@ -8236,6 +8288,7 @@ module Rejoin = struct
         ; dialog = Option.filter m.dialog ~f:(Fn.non Dialog.per_session)
         ; btw = None
         ; agents = { Agents.empty with open_ = m.agents.open_ }
+        ; subagent_chat = None
         ; pending = { m.pending with prompts = []; sending = 0 }
         }
       , restored
@@ -12155,6 +12208,11 @@ let update_connected (m : Model.t) (action : Action.t) =
   | Toggle_sidebar -> { m with sidebar_open = not m.sidebar_open }, []
   | Toggle_status_tray -> { m with status_tray = not m.status_tray }, []
   | Toggle_context_card -> { m with context_card = not m.context_card }, []
+  | Toggle_session_card -> toggle_session_card m
+  | Session_card action ->
+    { m with session_card = Session_card.apply m.session_card action }, []
+  | Open_subagent_chat id -> open_subagent_chat m id
+  | Close_subagent_chat -> close_subagent_chat m
   | Answer_confirm { call_id; agent_id; answer = Deny_with_reason } ->
     (match m.confirms with
      | first :: _

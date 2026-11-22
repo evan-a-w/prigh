@@ -38,6 +38,7 @@ let panel_toggles (m : App.Model.t) ~inject =
     ; Files_view.toggle m ~inject:opening
     ; Terminal_view.toggle m ~inject:opening
     ; Agents_view.toggle m ~inject:opening
+    ; Session_card_view.toggle m ~inject
     ]
 ;;
 
@@ -129,6 +130,17 @@ let sheet (m : App.Model.t) ~inject =
            ~on_click:(go Action.Toggle_subagents)
            ()
          ])
+    @ (if Session_card_view.something m
+       then
+         [ sheet_row
+             ~cls:"session-card-row"
+             ~name:"Subagents and worktrees"
+             ~on:m.session_card.sheet
+             ~glyph:Branch
+             ~on_click:(inject Action.Toggle_session_card)
+             ()
+         ]
+       else [])
     @ [ sheet_row
           ~cls:"settings-row"
           ~name:"Settings"
