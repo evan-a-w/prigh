@@ -192,11 +192,17 @@ let pasted_texts ~fold (u : Message.User.t) (pasted : Origin.Pasted.t list) =
            ]))
 ;;
 
+(* Which client the user is on matters to the model, not to the user. *)
+let shown_notes (o : Origin.t) =
+  List.filter o.notes ~f:(fun (n : Origin.Note.t) ->
+    not (Origin.Kind.equal n.kind Client))
+;;
+
 let user ?skill ~fold times (u : Message.User.t) =
   let notes, pasted, attachments =
     match u.origin with
     | None -> [], [], []
-    | Some origin -> origin.notes, origin.pasted, origin.attachments
+    | Some origin -> shown_notes origin, origin.pasted, origin.attachments
   in
   let text =
     Option.value_map
@@ -780,10 +786,7 @@ and render_entry ?quiet ~ui ~fold times chat ~n (entry : Chat.Entry.t) =
      | Shell _ when not (Fold.shows fold Tools) -> Node.none
      | Compaction _ when not (Fold.shows fold Notes) -> Node.none
      | User u ->
-       let notes =
-         Option.value_map u.origin ~default:[] ~f:(fun (o : Origin.t) ->
-           o.notes)
-       in
+       let notes = Option.value_map u.origin ~default:[] ~f:shown_notes in
        (* Notes before a message of the harness's: plan mode turned on or off
        with a goal's message. *)
        let noted main =
