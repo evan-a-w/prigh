@@ -630,7 +630,13 @@ kbd {
 .composer-buttons { display: flex; align-items: center; gap: 4px; flex-shrink: 0; margin-left: auto; }
 /* Send: a sodium disc; with nothing to send, an empty ring. Running with
    nothing typed, the disc stops. */
-.composer-buttons .send .icon { color: var(--sodium-ink); stroke-width: 2.4; }
+/* In the composer's row: quieter and smaller than the page's round buttons.
+   Send is a small neutral disc, not the accent. */
+.composer-row .round.btn .icon { width: 16px; height: 16px; stroke-width: 1.8; }
+.composer-row :is(.send, .stop).round.btn { width: 28px; height: 28px; }
+.composer-buttons :is(.send, .stop.primary) { background: var(--rule-2); border-color: transparent; color: var(--chalk); font-weight: 400; }
+.composer-buttons :is(.send, .stop.primary):hover:not(:disabled) { filter: none; background: var(--muted-text); color: var(--graphite); }
+.composer-buttons .send .icon { width: 14px; height: 14px; color: currentColor; stroke-width: 2.2; }
 .composer-buttons .send:disabled {
   background: transparent;
   border: 1.5px solid var(--rule-2);
@@ -639,8 +645,7 @@ kbd {
 .composer-buttons .send:disabled .icon { color: var(--faint); }
 .composer-row .stop .icon { width: 12px; height: 12px; }
 .composer-row > .stop.ghost { background: var(--brick-wash); border-color: transparent; color: var(--brick); }
-.composer-buttons .stop.primary { background: var(--sodium); border-color: var(--sodium); color: var(--sodium-ink); }
-.composer-buttons .stop.primary .icon { color: var(--sodium-ink); fill: currentColor; }
+.composer-buttons .stop.primary .icon { color: currentColor; fill: currentColor; }
 @media (prefers-reduced-motion: reduce) {
   .btn.plus .icon { transition: none; }
   .composer-stack { transition: none; }
@@ -1401,7 +1406,7 @@ kbd {
 /* Choices and actions the backend has still to confirm. */
 .chip-button.awaiting { opacity: 1; color: var(--muted-text); border: 1px dashed var(--rule-2); }
 
-.composer-buttons .send.busy:disabled { background: var(--sodium-wash); border-color: var(--sodium-line); }
+.composer-buttons .send.busy:disabled { background: var(--slate-2); border-color: transparent; }
 
 .composer.offline .composer-stack { border-style: dashed; }
 .status-item.connecting { color: var(--muted-text); }
