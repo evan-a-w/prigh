@@ -1,12 +1,12 @@
 // Sessions and the worktrees that matter to them, against real git
-// repositories: a flat list of sessions, each with its repository and
-// branch, its worktrees under it (one made for a subagent, one made from the
+// repositories: the sidebar's sessions, and the session card's worktrees
+// of the session we are in (one made for a subagent, one made from the
 // session's menu, one moved into that has uncommitted changes, one shared
 // with another session), their context menus (right-click, Shift+F10, a
 // long press on a phone) and what they do (a new worktree, a new session
 // there, a terminal there, switching back where the session came from,
 // removal: refused with changes, then forced),
-// folding, searching, /worktree's picker, the list on a phone, and deleting
+// folding, searching, /worktree's picker, the card on a phone, and deleting
 // the session we are in (on a desktop and on phones). Run by
 // prigh_web.sh; prints normalised snapshots (the expected output is in
 // ENGINE.expected).
@@ -93,6 +93,8 @@ page.on("pageerror", error => errors.push(`page: ${error.message}`));
 const clean = text => text
   .split(dir).join("<DIR>")
   .replace(/\b(just now|\d+[smhd] ago)\b/g, "<age>")
+  // The sidebar's rows: the project, how long ago, the title.
+  .replace(/^(\S+) \| (now|\d+[smhd]) \| /gm, "$1 | <age> | ")
   .split("\n")
   .map(line => line.trim())
   .filter(line => line !== "")
@@ -112,19 +114,27 @@ const show = async (label, selector) => {
   await page.waitForTimeout(200); // its fade in
   await screenshot(label);
 };
-// The list, a line per row: its text (worktrees indented under their
-// session) and its state.
-const tree = async (label, target = page) => {
+// The sidebar's sessions, a line per row with its state, then the session
+// card's worktrees (the session's own: where it works, its subagents').
+const tree = async (label, target = page, { sessions = true } = {}) => {
   section(label);
-  const rows = await target.locator(".sessions").evaluate(list =>
-    [...list.querySelectorAll(".session, .worktree")].map(row => {
-      const worktree = row.classList.contains("worktree");
-      const text = row.innerText.split("\n").map(s => s.trim()).filter(s => s).join(" | ");
-      const marks = [...row.classList].filter(c =>
-        ["here", "selected", "dirty", "agent", "running", "gone"].includes(c));
-      if (!worktree && row.parentElement.querySelector(".session-fold.folded")) marks.push("folded");
-      return `${worktree ? "│ " : ""}${text}${marks.length ? ` [${marks.sort().join(" ")}]` : ""}`;
-    }));
+  const rows = await target.evaluate(sessions => {
+    const line = row => row.innerText.split("\n").map(s => s.trim()).filter(s => s).join(" | ");
+    const marked = (row, text, names) => {
+      const marks = [...row.classList].filter(c => names.includes(c));
+      return `${text}${marks.length ? ` [${marks.sort().join(" ")}]` : ""}`;
+    };
+    const out = sessions
+      ? [...document.querySelectorAll(".sessions .session")].map(row => marked(row, line(row), ["selected", "running"]))
+      : [];
+    const card = document.querySelector(".session-card");
+    const fold = card?.querySelector("[aria-controls=session-card-worktrees-content]");
+    if (!fold) return [...out, "the card: no worktrees"];
+    out.push(`the card: ${line(fold)}${fold.getAttribute("aria-expanded") === "true" ? "" : " [folded]"}`);
+    for (const row of card.querySelectorAll(".session-card-worktree"))
+      out.push(`│ ${marked(row, line(row), ["current", "opening"])}`);
+    return out;
+  }, sessions);
   console.log(clean(rows.join("\n")));
   await target.waitForTimeout(200);
   await screenshot(label, target);
@@ -156,8 +166,18 @@ const run = async command => {
   await editor().press("Control+Enter");
 };
 const session = title => page.locator(".session-item", { has: page.locator(".session-title", { hasText: title }) });
-const worktree = (branch, within = page) =>
-  within.locator(".worktree", { has: page.locator(".worktree-branch", { hasText: new RegExp(`^${branch}$`) }) });
+// A worktree's row in the session card (the current session's).
+const worktree = (branch, target = page) =>
+  target.locator(".session-card .session-card-worktree", { has: target.locator("span", { hasText: new RegExp(`^${branch}$`) }) });
+// The card's worktrees, unfolded (they start folded).
+const unfoldWorktrees = async (target = page) => {
+  const fold = target.locator(".session-card [aria-controls=session-card-worktrees-content]");
+  await fold.waitFor();
+  if (await fold.getAttribute("aria-expanded") !== "true") await fold.click();
+  await target.locator(".session-card .session-card-worktree").first().waitFor();
+};
+const here = branch => page.waitForFunction(b =>
+  document.querySelector(".session-card .session-card-worktree[aria-current=true]")?.innerText.includes(b), branch);
 const choose = async item => {
   await page.locator(`.context-menu.placed [data-item=${item}]`).click();
   await page.waitForSelector(".context-menu", { state: "detached" });
@@ -181,6 +201,7 @@ try {
 
   // A subagent asked to work in a worktree of its own.
   await send("Tidy the docs in a worktree");
+  await unfoldWorktrees();
   await worktree("agent/tidy-the-docs").waitFor();
   await page.locator(".chat", { hasText: "agent/tidy-the-docs" }).first().waitFor();
   const first = session("Tidy the docs");
@@ -195,12 +216,10 @@ try {
   await page.locator("#worktree-branch").fill("feat/login");
   await page.keyboard.press("Enter");
   await page.waitForSelector(".worktree-dialog", { state: "detached" });
-  await page.waitForFunction(() =>
-    document.querySelector(".session-item.selected .worktree.here")?.innerText.includes("feat/login"));
+  await here("feat/login");
   // Into another worktree of the repository, which has changes.
   await run("/worktree open docs");
-  await page.waitForFunction(() =>
-    document.querySelector(".session-item.selected .worktree.here")?.innerText.includes("docs"));
+  await here("docs");
 
   // Another repository, and a plain folder.
   await newSession(web);
@@ -208,18 +227,23 @@ try {
   await newSession(notes);
   await send("Shopping list");
 
-  // From a worktree's menu: a new session there, which shares it.
-  await worktree("feat/login", first).click();
+  // From a worktree's menu, back in the first session: a new session there,
+  // which shares it.
+  await first.locator(".session-open").click();
+  await page.locator(".session.selected", { hasText: "Tidy the docs" }).waitFor();
+  await worktree("feat/login").click();
   await menuText("a worktree's menu");
   await choose("new_session_here");
   await toastHas("New session in");
   await send("The login form");
-  await worktree("feat/login", session("The login form")).waitFor();
+  await page.locator(".session.selected", { hasText: "The login form" }).waitFor();
+  await worktree("feat/login").waitFor();
 
   // Back to the first session.
   await first.locator(".session-open").click();
   await page.locator(".session.selected", { hasText: "Tidy the docs" }).waitFor();
-  await page.waitForFunction(() => document.querySelector(".worktree-changes"));
+  await page.waitForFunction(() =>
+    /\d+ changed/.test(document.querySelector(".session-card")?.innerText ?? ""));
   await page.mouse.move(1000, 400);
   await tree("sessions and their worktrees");
   // How it looks, the menus open, in the dark and light themes
@@ -237,7 +261,7 @@ try {
     await page.waitForTimeout(200);
     await screenshot(`sessions, ${look}, a session's menu`);
     await closeMenu();
-    await worktree("agent/tidy-the-docs", first).click({ button: "right" });
+    await worktree("agent/tidy-the-docs").click({ button: "right" });
     await page.locator(".context-menu.placed").waitFor();
     await page.waitForTimeout(200);
     await screenshot(`sessions, ${look}, a subagent's worktree's menu`);
@@ -260,7 +284,7 @@ try {
   console.log(await page.locator(".session.selected .session-title").textContent());
 
   // A terminal in a worktree: a shell of its own there.
-  await worktree("feat/login", first).click({ button: "right" });
+  await worktree("feat/login").click({ button: "right" });
   await choose("terminal");
   // Connected, the shell drawn: closing earlier would cut the connection.
   const shellUp = () => page.waitForFunction(() =>
@@ -277,12 +301,13 @@ try {
   await page.keyboard.press("Control+`");
   await page.locator(".terminal-panel").waitFor({ state: "detached" });
 
-  // Folding a session's worktrees: their count stays on its row.
-  await first.locator(".session-fold").click();
-  await first.locator(".session-fold.folded").waitFor();
+  // Folding the card's worktrees: their count stays on its heading.
+  const fold = page.locator(".session-card [aria-controls=session-card-worktrees-content]");
+  await fold.click();
+  await page.locator(".session-card .session-card-worktree").first().waitFor({ state: "detached" });
   await page.mouse.move(1000, 400);
   await tree("folded");
-  await first.locator(".session-fold").click();
+  await unfoldWorktrees();
 
   // The control centre finds sessions by their worktrees' branches.
   await page.locator("#control-open").click();
@@ -301,14 +326,13 @@ try {
   await menuText("a switched session's menu");
   await choose("switch_back");
   await toastHas("Back in main");
-  await page.waitForFunction(() => !document.querySelector(".session-item.selected .worktree.here"));
-  await first.locator(".session-home").waitFor({ state: "detached" });
+  await page.waitForFunction(() => !document.querySelector(".session-card .session-card-worktree[aria-current=true]"));
   await page.mouse.move(1000, 400);
   await tree("switched back");
 
   // Removing the one with changes, from its menu: refused, then forced
   // (once the session has moved out of it).
-  await worktree("docs", first).click({ button: "right" });
+  await worktree("docs").click({ button: "right" });
   await choose("remove");
   await page.locator(".remove-worktree-dialog").waitFor();
   await page.waitForTimeout(300); // its fade in
@@ -320,7 +344,7 @@ try {
   await toastHas("Removed the worktree docs");
   await worktree("docs").waitFor({ state: "detached" });
   // The subagent's, with Delete on its row: its session forgets it.
-  await worktree("agent/tidy-the-docs", first).focus();
+  await worktree("agent/tidy-the-docs").focus();
   await page.keyboard.press("Delete");
   await page.locator(".remove-worktree-dialog").waitFor();
   await page.keyboard.press("Enter");
@@ -360,8 +384,8 @@ try {
   await page.mouse.move(1000, 400);
   await tree("the session we were in deleted");
 
-  // On a phone: the sidebar over the chat; a long press opens a row's menu,
-  // a sheet at the foot of the screen.
+  // On a phone: the session card is a sheet from ⋯; a long press on a
+  // worktree's row opens its menu, a sheet at the foot of the screen.
   const phone = await (await browser.newContext({
     viewport: { width: 390, height: 844 },
     isMobile: engineName !== "firefox",
@@ -372,11 +396,13 @@ try {
   await phone.locator("form input[type=password]").fill(token);
   await phone.locator("form button[type=submit]").click();
   await phone.locator(".composer textarea").waitFor();
-  await phone.locator(".chat-chrome .toggle-sidebar").click();
-  await phone.locator(".sidebar .worktree").first().waitFor();
-  await phone.waitForTimeout(400); // the sidebar slides in
-  await tree("on a phone", phone);
-  const row = phone.locator(".sidebar .worktree").first();
+  await phone.locator(".more-toggle").tap();
+  await phone.locator(".session-card-row").tap();
+  await phone.locator(".session-card.sheet").waitFor();
+  await unfoldWorktrees(phone);
+  await phone.waitForFunction(() => document.getAnimations().every(a => a.playState !== "running"));
+  await tree("on a phone", phone, { sessions: false });
+  const row = phone.locator(".session-card.sheet .session-card-worktree").first();
   const box = await row.boundingBox();
   await row.dispatchEvent("pointerdown", {
     pointerType: "touch", isPrimary: true, clientX: box.x + 30, clientY: box.y + 10, bubbles: true,

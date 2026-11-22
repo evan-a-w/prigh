@@ -138,6 +138,10 @@ try {
   await page.locator(".chat", { hasText: "There are 42 modules." }).first().waitFor();
   await idle();
   await page.locator(".session-card-agent").waitFor();
+  // Into the repository's other worktree: the session's own, so the card
+  // lists it.
+  await editor().fill("/worktree open feat/ui");
+  await editor().press("Control+Enter");
   await page.locator("[aria-controls=session-card-worktrees-content]").waitFor();
   section("the card");
   console.log(clean(await page.locator(".session-card").innerText()));

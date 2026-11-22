@@ -1,8 +1,8 @@
-// A session's worktrees stay under it in the sidebar while the user is in
-// another session (in another repository) and when they come back, with no
-// frame where they are gone: subagents of a pinned session make worktrees,
-// the user goes to a session in another repository and back, more are made,
-// and away and back again; on a desktop and on a 390x844 phone. Run by
+// A session's worktrees are in the session card as soon as the user is back
+// in it from another session (in another repository), with no frame where
+// they are gone: subagents of a pinned session make worktrees, the user goes
+// to a session in another repository and back, more are made, and away and
+// back again; on a desktop and on a 390x844 phone (the card a sheet there). Run by
 // prigh_web.sh; prints normalised snapshots (the expected output is in
 // ENGINE.expected).
 //
@@ -116,18 +116,19 @@ const screenshot = async (label, target) => {
     path: join(process.env.SHOTS, `${engineName}-worktrees-switch-${String(shot).padStart(2, "0")}-${label.replace(/\W+/g, "-")}.png`),
   });
 };
-// The list, a line per row: its text (worktrees indented under their
-// session), and which session is open.
+// The sessions, a line each (which is open marked), then the session
+// card's worktrees.
 const tree = async (label, target) => {
   section(label);
-  const rows = await target.locator(".sessions").evaluate(list =>
-    [...list.querySelectorAll(".session, .worktree")].map(row => {
-      const worktree = row.classList.contains("worktree");
-      const text = row.querySelector(worktree ? ".worktree-branch" : ".session-title")?.innerText.trim();
-      const marks = [...row.classList].filter(c => ["here", "selected", "agent", "gone"].includes(c));
-      if (!worktree && row.parentElement.querySelector(".session-fold.folded")) marks.push("folded");
-      return `${worktree ? "│ " : ""}${text}${marks.length ? ` [${marks.sort().join(" ")}]` : ""}`;
-    }));
+  const rows = await target.evaluate(() => {
+    const out = [...document.querySelectorAll(".sessions .session")].map(row =>
+      `${row.querySelector(".session-title")?.innerText.trim()}${row.classList.contains("selected") ? " [selected]" : ""}`);
+    const rows = [...document.querySelectorAll(".session-card .session-card-worktree")];
+    out.push(`the card: ${rows.length ? "" : "no worktrees"}`);
+    for (const r of rows)
+      out.push(`│ ${r.innerText.split("\n")[0].trim()}${r.getAttribute("aria-current") ? " [current]" : ""}`);
+    return out;
+  });
   console.log(clean(rows.join("\n")));
   await screenshot(label, target);
 };
@@ -138,14 +139,16 @@ const other = "A landing page";
 const titled = (target, title) =>
   target.locator(".session-item", { has: target.locator(".session-title", { hasText: title }) });
 
-// Every frame from now until [stop], the worktrees under the session
-// [title]: how many fewer than [want] there ever were.
+// Every frame from now until [stop] in which the session [title] is open
+// (its row selected, done opening), the worktrees in the session card: how
+// many fewer than [want] there ever were.
 const startCounting = (target, title, want) => target.evaluate(([title, want]) => {
   const seen = window.__worktreesSeen = { frames: 0, short: 0, least: Infinity };
   const count = () => {
-    const item = [...document.querySelectorAll(".session-item")]
-      .find(i => i.querySelector(".session-title")?.innerText.trim() === title);
-    const n = item ? item.querySelectorAll(".worktree").length : 0;
+    const open = document.querySelector(".session.selected .session-title")?.innerText.trim() === title
+      && !document.querySelector(".session.opening");
+    if (!open) return;
+    const n = document.querySelectorAll(".session-card .session-card-worktree").length;
     seen.frames++;
     seen.least = Math.min(seen.least, n);
     if (n < want) seen.short++;
@@ -164,7 +167,9 @@ const stopCounting = async target => {
     s.stop();
     return { short: s.short, least: s.least, counted: s.frames > 0 };
   });
-  return `counted: ${seen.counted}; checks with fewer: ${seen.short}; fewest: ${seen.least}`;
+  return seen.counted
+    ? `counted: true; checks with fewer: ${seen.short}; fewest: ${seen.least}`
+    : "counted: false (not in it)";
 };
 
 const desktop = await (await browser.newContext({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 2 })).newPage();
@@ -187,11 +192,29 @@ const signIn = async p => {
   await p.locator("form button[type=submit]").click();
   await editor(p).waitFor();
 };
-const worktreesUnder = (p, title, n) => p.waitForFunction(([title, n]) => {
-  const item = [...document.querySelectorAll(".session-item")]
-    .find(i => i.querySelector(".session-title")?.innerText.trim() === title);
-  return item && item.querySelectorAll(".worktree").length === n;
-}, [title, n]);
+// The session card's worktrees: [n] of them (with the session they belong
+// to open).
+const worktreesInCard = (p, n) => p.waitForFunction(n =>
+  document.querySelectorAll(".session-card .session-card-worktree").length === n, n);
+// The card's worktrees unfolded (they start folded; it stays so after).
+const unfold = async p => {
+  const fold = p.locator(".session-card [aria-controls=session-card-worktrees-content]");
+  await fold.waitFor();
+  if (await fold.getAttribute("aria-expanded") !== "true") await fold.click();
+};
+// A phone's session card: a sheet from ⋯, its worktrees unfolded.
+const sheet = async p => {
+  await p.locator(".more-toggle").tap();
+  await p.locator(".session-card-row").tap();
+  await p.locator(".session-card.sheet").waitFor();
+  await unfold(p);
+  await p.waitForFunction(() =>
+    document.getAnimations().every(a => a.playState !== "running" || a.effect?.getComputedTiming().iterations === Infinity));
+};
+const closeSheet = async p => {
+  await p.keyboard.press("Escape");
+  await p.waitForSelector(".session-card.sheet", { state: "detached" });
+};
 // A phone's sidebar, open and slid in.
 const drawer = async p => {
   if (!(await p.locator(".sidebar-drawer").count())) await p.locator(".chat-chrome .toggle-sidebar").tap();
@@ -199,11 +222,13 @@ const drawer = async p => {
   await p.waitForFunction(() =>
     document.getAnimations().every(a => a.playState !== "running" || a.effect?.getComputedTiming().iterations === Infinity));
 };
-// Into the session [title] by its row, counting [watched]'s worktrees all
-// the while, until the list has settled (the listings answered).
+// Into the session [title] by its row, counting [watched]'s worktrees in
+// the card while it is open, until the list has settled (the listings
+// answered). On a phone the card is a sheet, closed while switching: its
+// worktrees are looked at once it opens.
 const switchTo = async (p, title, watched, want, label, { phone = false } = {}) => {
   if (phone) await drawer(p);
-  await startCounting(p, watched, want);
+  if (!phone) await startCounting(p, watched, want);
   const row = titled(p, title).locator(".session-open");
   if (phone) await row.tap(); else await row.click();
   await selected(p, title);
@@ -212,12 +237,17 @@ const switchTo = async (p, title, watched, want, label, { phone = false } = {}) 
   const calls = listing.get(p);
   if (calls.pending.size) await new Promise(go => calls.waiting.push(go));
   await p.evaluate(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))));
-  await worktreesUnder(p, watched, want);
-  if (phone) await drawer(p);
-  section(`${label}: ${watched}'s worktrees while switching`);
-  console.log(await stopCounting(p));
+  if (title === watched) {
+    if (phone) await sheet(p);
+    await worktreesInCard(p, want);
+  }
+  if (!phone) {
+    section(`${label}: ${watched}'s worktrees while switching`);
+    console.log(await stopCounting(p));
+  }
   await p.mouse.move(1000, 400).catch(() => {});
   await tree(label, p);
+  if (phone && title === watched) await closeSheet(p);
 };
 
 try {
@@ -226,7 +256,8 @@ try {
 
   // The work session, pinned: a subagent makes a worktree.
   await send(desktop, work);
-  await titled(desktop, work).locator(".worktree").first().waitFor();
+  await unfold(desktop);
+  await worktreesInCard(desktop, 1);
   await run(desktop, "/pin");
   await desktop.locator(".sessions", { hasText: "Pinned" }).waitFor();
 
@@ -236,7 +267,7 @@ try {
   await run(desktop, `/cd ${web}`);
   await desktop.waitForFunction(d => document.body.innerText.includes(d), "site");
   await send(desktop, "A landing page");
-  await worktreesUnder(desktop, work, 1);
+  await worktreesInCard(desktop, 0);
   await desktop.mouse.move(1000, 400);
   await tree("in the other session", desktop);
 
@@ -249,17 +280,18 @@ try {
   await phone.goto(desktop.url());
   await signIn(phone);
   await drawer(phone);
-  await worktreesUnder(phone, work, 1);
   await tree("on a phone, in the other session", phone);
   await switchTo(phone, work, work, 1, "on a phone: into the work session", { phone: true });
   await switchTo(desktop, work, work, 1, "back in the work session");
 
   // Two more subagents, two more worktrees, while both are in it.
   await send(desktop, "More subagents");
-  await worktreesUnder(desktop, work, 3);
-  await worktreesUnder(phone, work, 3);
+  await worktreesInCard(desktop, 3);
   await tree("more worktrees", desktop);
+  await sheet(phone);
+  await worktreesInCard(phone, 3);
   await tree("on a phone: more worktrees", phone);
+  await closeSheet(phone);
 
   // Away and back, and away again: they stay throughout.
   await switchTo(desktop, other, work, 3, "away again");

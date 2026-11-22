@@ -6,9 +6,10 @@
 # session loaded a page at a time, then resilience.mjs, a long session on a
 # connection that cannot keep up, then stability.mjs, nothing redrawn or
 # shifted that did not change, then themes.mjs, the themes and the user's
-# preferences on the backend, then worktrees.mjs, the sidebar's worktrees and
+# preferences on the backend, then worktrees.mjs, the session card's worktrees and
 # /worktree in a git repository, then worktrees_switch.mjs, a session's
-# worktrees staying under it while the user is in another, then
+# worktrees in its card again, with no frame without them, when the user
+# comes back from another, then
 # session_card.mjs, the session card beside the chat and a subagent's
 # transcript in its place, then review.mjs, the review page and the
 # file browser's diffs and comments, then remote.mjs, the page `prigh web
@@ -37,8 +38,7 @@
 # sheet), then terminal_keys.mjs, the terminal's extra keys on
 # phones, then pwa.mjs, then
 # compaction.mjs, the settings page's Compaction section, then
-# sessions_settings.mjs, the sidebar's worktrees by recency and the Sessions
-# section's Show worktrees and Archive after, then new_sessions.mjs, the
+# sessions_settings.mjs, the Sessions section's Archive after, then new_sessions.mjs, the
 # New sessions section's defaults and a new session that starts with them,
 # then memory.mjs,
 # its Memory section, on a desktop and phones, then usage.mjs, its Usage
