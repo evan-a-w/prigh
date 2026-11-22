@@ -2,31 +2,7 @@ open! Core
 open! Prigh
 open Tool_test_helpers
 
-let sh ?(dir = "repo") (t : Tool_test_helpers.t) script =
-  let command =
-    sprintf
-      "mkdir -p %s && cd %s && export GIT_CONFIG_GLOBAL=/dev/null \
-       GIT_CONFIG_NOSYSTEM=1 GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t \
-       GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t && (%s) > /dev/null 2>&1"
-      (Filename.quote (Filename.concat t.dir dir))
-      (Filename.quote (Filename.concat t.dir dir))
-      script
-  in
-  match Sys_unix.command command with
-  | 0 -> ()
-  | n -> raise_s [%message "setup failed" (script : string) (n : int)]
-;;
-
-let init_repo ?(dir = "repo") t =
-  sh
-    ~dir
-    t
-    "git init -q -b main . && echo one > a.txt && git add -A && git commit -q \
-     -m init"
-;;
-
-let sha_re = Re.compile (Re.Perl.re "[0-9a-f]{40}")
-let show t s = mask t (Re.replace_string sha_re ~by:"<sha>" s)
+include Git_test_helpers
 
 let print_worktree t (w : Worktree.t) =
   printf
