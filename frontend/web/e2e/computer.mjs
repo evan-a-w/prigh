@@ -22,6 +22,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { end } from "./end.mjs";
 import { png } from "./png.mjs";
+import { normalVerbosity } from "./verbose_prefs.mjs";
 
 const { chromium, firefox, webkit } = await import(process.env.PLAYWRIGHT_MODULE);
 
@@ -112,7 +113,6 @@ writeFileSync(
 const helper = join(dir, "computer-helper.mjs");
 writeFileSync(helper, `
 import { createInterface } from "node:readline";
-import { normalVerbosity } from "./verbose_prefs.mjs";
 const info = { backend: "fake", platform: "linux", width: 1280, height: 800, scale: 1, scaled_width: 1280, scaled_height: 800 };
 if (process.argv.includes("--probe")) { console.log(JSON.stringify(info)); process.exit(0); }
 const shot = ${JSON.stringify(b64(screen()))};

@@ -1206,7 +1206,9 @@ try {
   //     archived away (a click unfolds them, muted); selecting several (a
   //     shift-click takes the range, across the divider) and deleting them
   //     asks first with their count and size, then removes their files.
-  const sizes = text => clean(text).replace(/\d+(\.\d+)? (B|KB|MB)\b/g, "<SIZE>");
+  // Sizes, and the rows' ages ("now", "1m", ...: how long the run took).
+  const sizes = text => clean(text).replace(/\d+(\.\d+)? (B|KB|MB)\b/g, "<SIZE>")
+    .replace(/^(now|\d+[mhd])$/gm, "<AGE>");
   const sessionFiles = () =>
     readdirSync(join(home, ".prigh", "sessions")).filter(f => f.endsWith(".jsonl") && !f.includes(".trace.")).length;
   await page.locator(".sidebar").getByRole("button", { name: "New session", exact: true }).click();
