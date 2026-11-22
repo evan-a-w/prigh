@@ -610,6 +610,8 @@ let%expect_test "prigh web: the first free port from the default" =
 let%expect_test "prigh web: what is wrong with the backend, and what to do" =
   with_sandbox
   @@ fun t ->
+  Closed_port.with_
+  @@ fun closed ->
   Eio.Switch.run
   @@ fun sw ->
   let _h, port = backend t ~sw in
@@ -621,7 +623,8 @@ let%expect_test "prigh web: what is wrong with the backend, and what to do" =
     | Error error ->
       print_endline
         (String.substr_replace_all
-           (Web_connect.Check.explain error remote ~source credentials)
+           (Closed_port.mask
+              (Web_connect.Check.explain error remote ~source credentials))
            ~pattern:(sprintf ":%d" port)
            ~with_:":PORT")
   in
@@ -632,8 +635,10 @@ let%expect_test "prigh web: what is wrong with the backend, and what to do" =
   check ~token:"wrong" here;
   check ~token:"wrong" ~user:"me" here;
   check ~token:"sekrit" (sprintf "ws://%s/elsewhere/ws" here);
-  check ~source:(Saved "~/.prigh/tui-connection.sexp") "127.0.0.1:1";
-  check ~source:Env "127.0.0.1:1";
+  check
+    ~source:(Saved "~/.prigh/tui-connection.sexp")
+    (sprintf "127.0.0.1:%d" closed);
+  check ~source:Env (sprintf "127.0.0.1:%d" closed);
   [%expect
     {|
     ok
@@ -646,9 +651,9 @@ let%expect_test "prigh web: what is wrong with the backend, and what to do" =
     Check -user and -token (or $PRIGH_USER and $PRIGH_TOKEN) against the backend's -tokens NAME=TOKEN entries.
     the backend at ws://127.0.0.1:PORT/elsewhere/ws did not accept prigh web: 127.0.0.1:PORT did not open the WebSocket at /elsewhere/ws: it answered HTTP 404 Not Found
     Is the URL's path where its prigh-web is (the page's address, without index.html)?
-    cannot reach the backend at 127.0.0.1:1: connection refused
+    cannot reach the backend at 127.0.0.1:CLOSED: connection refused
     Is it running there (prigh serve -web HOST:PORT, or -listen)? The address is the saved connection (~/.prigh/tui-connection.sexp): pass -connect HOST:PORT to replace it.
-    cannot reach the backend at 127.0.0.1:1: connection refused
+    cannot reach the backend at 127.0.0.1:CLOSED: connection refused
     Is it running there (prigh serve -web HOST:PORT, or -listen)? Check $PRIGH_CONNECT, or pass -connect HOST:PORT.
     |}]
 ;;
@@ -794,8 +799,10 @@ module Desktop = struct
   ;;
 
   (* A [POST] of [fields] (and the key, unless [key] says otherwise) to
-     [/desktop/what]; prints the answer with the codes masked. *)
+     [/desktop/what]; prints the answer with the codes masked, or gives it
+     to [out] (for answers that come back in no set order). *)
   let post
+        ?(out : string -> unit = print_endline)
         ?key
         ?(headers = "Host: 127.0.0.1\r\nContent-Type: application/json\r\n")
         t
@@ -837,7 +844,7 @@ module Desktop = struct
         String.substr_replace_all body ~pattern:code ~with_:"<code>"
       | None -> body
     in
-    printf "%s %s: %s\n" what status (String.strip (mask t shown));
+    out (sprintf "%s %s: %s" what status (String.strip (mask t shown)));
     code
   ;;
 end
@@ -859,6 +866,18 @@ let show_log t ~port line =
   match String.substr_index line ~pattern:" as client-" with
   | Some i -> print_endline (String.prefix line i ^ " as client-N")
   | None -> print_endline line
+;;
+
+(* The log with the tool host's lines last: for a tool host that connects
+   while the page signs in (its /ws needs no sign-in), so that when it does
+   is up to the scheduler. *)
+let show_log_tool_host_last t ~port logs =
+  let tool_host, rest =
+    List.partition_tf (Queue.to_list logs) ~f:(fun line ->
+      String.is_prefix line ~prefix:"tool host: "
+      || String.is_prefix line ~prefix:"tools run on this machine")
+  in
+  List.iter (rest @ tool_host) ~f:(show_log t ~port)
 ;;
 
 let%expect_test
@@ -1119,6 +1138,8 @@ let%expect_test
   =
   with_sandbox
   @@ fun t ->
+  Closed_port.with_
+  @@ fun closed ->
   Eio.Switch.run
   @@ fun sw ->
   let logs = Queue.create () in
@@ -1128,7 +1149,7 @@ let%expect_test
       ~sw
       ~logs
       (Check
-         { remote = address "127.0.0.1:1"
+         { remote = address (sprintf "127.0.0.1:%d" closed)
          ; credentials = { token = Some "sekrit"; user = Some "me" }
          ; source = Saved "~/.prigh/tui-connection.sexp"
          ; save = None
@@ -1140,7 +1161,7 @@ let%expect_test
   [%expect
     {|
     url: http://127.0.0.1:PORT/#desktop=<key>
-    status HTTP/1.1 200 OK: {"state":"connect","address":"127.0.0.1:1","user":"me","error":"The saved connection (~/.prigh/tui-connection.sexp) did not work: cannot reach the backend at 127.0.0.1:1: connection refused\nIs it running there (prigh serve -web HOST:PORT, or -listen)? Check the address: HOST:PORT (its -web or -listen port), or a prigh-web URL such as wss://host/ws."}
+    status HTTP/1.1 200 OK: {"state":"connect","address":"127.0.0.1:CLOSED","user":"me","error":"The saved connection (~/.prigh/tui-connection.sexp) did not work: cannot reach the backend at 127.0.0.1:CLOSED: connection refused\nIs it running there (prigh serve -web HOST:PORT, or -listen)? Check the address: HOST:PORT (its -web or -listen port), or a prigh-web URL such as wss://host/ws."}
     Stdin_closed
     |}]
 ;;
@@ -1271,6 +1292,8 @@ let%expect_test
   =
   with_sandbox
   @@ fun t ->
+  Closed_port.with_
+  @@ fun closed ->
   Eio.Switch.run
   @@ fun sw ->
   let logs = Queue.create () in
@@ -1281,7 +1304,7 @@ let%expect_test
       ~sw
       ~logs
       (Check
-         { remote = address "127.0.0.1:1"
+         { remote = address (sprintf "127.0.0.1:%d" closed)
          ; credentials = { token = Some "sekrit"; user = None }
          ; source = Flag
          ; save = None
@@ -1293,7 +1316,7 @@ let%expect_test
   [%expect
     {|
     url: http://127.0.0.1:PORT/#desktop=<key>
-    status HTTP/1.1 200 OK: {"state":"connect","address":"127.0.0.1:1","user":null,"error":"-connect did not work: cannot reach the backend at 127.0.0.1:1: connection refused\nIs it running there (prigh serve -web HOST:PORT, or -listen)? Check the address: HOST:PORT (its -web or -listen port), or a prigh-web URL such as wss://host/ws."}
+    status HTTP/1.1 200 OK: {"state":"connect","address":"127.0.0.1:CLOSED","user":null,"error":"-connect did not work: cannot reach the backend at 127.0.0.1:CLOSED: connection refused\nIs it running there (prigh serve -web HOST:PORT, or -listen)? Check the address: HOST:PORT (its -web or -listen port), or a prigh-web URL such as wss://host/ws."}
     Stdin_closed
     |}]
 ;;
@@ -1520,6 +1543,8 @@ let%expect_test
   =
   with_sandbox
   @@ fun t ->
+  Closed_port.with_
+  @@ fun closed ->
   Eio.Switch.run
   @@ fun sw ->
   let logs = Queue.create () in
@@ -1535,32 +1560,44 @@ let%expect_test
   in
   (* 0.0.0.0 is not loopback to the check, but connecting to it reaches
      this machine, so the confirmed attempt fails at once. *)
-  submit [ "address", `String "0.0.0.0:1"; "token", `String "sekrit" ];
-  submit [ "address", `String "ws://0.0.0.0:1/ws"; "token", `String "sekrit" ];
   submit
-    [ "address", `String "0.0.0.0:1"
+    [ "address", `String (sprintf "0.0.0.0:%d" closed)
+    ; "token", `String "sekrit"
+    ];
+  submit
+    [ "address", `String (sprintf "ws://0.0.0.0:%d/ws" closed)
+    ; "token", `String "sekrit"
+    ];
+  submit
+    [ "address", `String (sprintf "0.0.0.0:%d" closed)
     ; "token", `String "sekrit"
     ; "plaintext", `False
     ];
   submit
-    [ "address", `String "0.0.0.0:1"
+    [ "address", `String (sprintf "0.0.0.0:%d" closed)
     ; "token", `String "sekrit"
     ; "plaintext", `True
     ];
   (* Loopback (an SSH tunnel) and TLS need no confirming. *)
-  submit [ "address", `String "127.0.0.1:1"; "token", `String "sekrit" ];
-  submit [ "address", `String "localhost:1"; "token", `String "sekrit" ];
+  submit
+    [ "address", `String (sprintf "127.0.0.1:%d" closed)
+    ; "token", `String "sekrit"
+    ];
+  submit
+    [ "address", `String (sprintf "localhost:%d" closed)
+    ; "token", `String "sekrit"
+    ];
   d.close_stdin ();
   print_s [%sexp (Eio.Promise.await_exn d.ended : Desktop_sidecar.Ended.t)];
   [%expect
     {|
     url: http://127.0.0.1:PORT/#desktop=<key>
-    connect HTTP/1.1 200 OK: {"ok":false,"error":"0.0.0.0:1 is not encrypted: the password and everything prigh sends would cross the network in the clear, and anyone on the way could run commands on this computer. Use the backend's HTTPS address (wss://host/ws, behind a TLS reverse proxy), or an SSH tunnel (ssh -L 7790:localhost:7790 host, then 127.0.0.1:7790). Connect anyway only on a network you trust.","plaintext":true}
-    connect HTTP/1.1 200 OK: {"ok":false,"error":"ws://0.0.0.0:1/ws is not encrypted: the password and everything prigh sends would cross the network in the clear, and anyone on the way could run commands on this computer. Use the backend's HTTPS address (wss://host/ws, behind a TLS reverse proxy), or an SSH tunnel (ssh -L 7790:localhost:7790 host, then 127.0.0.1:7790). Connect anyway only on a network you trust.","plaintext":true}
-    connect HTTP/1.1 200 OK: {"ok":false,"error":"0.0.0.0:1 is not encrypted: the password and everything prigh sends would cross the network in the clear, and anyone on the way could run commands on this computer. Use the backend's HTTPS address (wss://host/ws, behind a TLS reverse proxy), or an SSH tunnel (ssh -L 7790:localhost:7790 host, then 127.0.0.1:7790). Connect anyway only on a network you trust.","plaintext":true}
-    connect HTTP/1.1 200 OK: {"ok":false,"error":"cannot reach the backend at 0.0.0.0:1: connection refused\nIs it running there (prigh serve -web HOST:PORT, or -listen)? Check the address: HOST:PORT (its -web or -listen port), or a prigh-web URL such as wss://host/ws."}
-    connect HTTP/1.1 200 OK: {"ok":false,"error":"cannot reach the backend at 127.0.0.1:1: connection refused\nIs it running there (prigh serve -web HOST:PORT, or -listen)? Check the address: HOST:PORT (its -web or -listen port), or a prigh-web URL such as wss://host/ws."}
-    connect HTTP/1.1 200 OK: {"ok":false,"error":"cannot reach the backend at localhost:1: connection refused\nIs it running there (prigh serve -web HOST:PORT, or -listen)? Check the address: HOST:PORT (its -web or -listen port), or a prigh-web URL such as wss://host/ws."}
+    connect HTTP/1.1 200 OK: {"ok":false,"error":"0.0.0.0:CLOSED is not encrypted: the password and everything prigh sends would cross the network in the clear, and anyone on the way could run commands on this computer. Use the backend's HTTPS address (wss://host/ws, behind a TLS reverse proxy), or an SSH tunnel (ssh -L 7790:localhost:7790 host, then 127.0.0.1:7790). Connect anyway only on a network you trust.","plaintext":true}
+    connect HTTP/1.1 200 OK: {"ok":false,"error":"ws://0.0.0.0:CLOSED/ws is not encrypted: the password and everything prigh sends would cross the network in the clear, and anyone on the way could run commands on this computer. Use the backend's HTTPS address (wss://host/ws, behind a TLS reverse proxy), or an SSH tunnel (ssh -L 7790:localhost:7790 host, then 127.0.0.1:7790). Connect anyway only on a network you trust.","plaintext":true}
+    connect HTTP/1.1 200 OK: {"ok":false,"error":"0.0.0.0:CLOSED is not encrypted: the password and everything prigh sends would cross the network in the clear, and anyone on the way could run commands on this computer. Use the backend's HTTPS address (wss://host/ws, behind a TLS reverse proxy), or an SSH tunnel (ssh -L 7790:localhost:7790 host, then 127.0.0.1:7790). Connect anyway only on a network you trust.","plaintext":true}
+    connect HTTP/1.1 200 OK: {"ok":false,"error":"cannot reach the backend at 0.0.0.0:CLOSED: connection refused\nIs it running there (prigh serve -web HOST:PORT, or -listen)? Check the address: HOST:PORT (its -web or -listen port), or a prigh-web URL such as wss://host/ws."}
+    connect HTTP/1.1 200 OK: {"ok":false,"error":"cannot reach the backend at 127.0.0.1:CLOSED: connection refused\nIs it running there (prigh serve -web HOST:PORT, or -listen)? Check the address: HOST:PORT (its -web or -listen port), or a prigh-web URL such as wss://host/ws."}
+    connect HTTP/1.1 200 OK: {"ok":false,"error":"cannot reach the backend at localhost:CLOSED: connection refused\nIs it running there (prigh serve -web HOST:PORT, or -listen)? Check the address: HOST:PORT (its -web or -listen port), or a prigh-web URL such as wss://host/ws."}
     Stdin_closed
     |}]
 ;;
@@ -1675,6 +1712,8 @@ end
 let%expect_test "the site probe: a sign-in proxy's login, or not" =
   with_sandbox
   @@ fun t ->
+  Closed_port.with_
+  @@ fun closed ->
   Eio.Switch.run
   @@ fun sw ->
   let _h, backend_port = backend t ~sw in
@@ -1693,7 +1732,7 @@ let%expect_test "the site probe: a sign-in proxy's login, or not" =
     (Backend_address.with_proxy_cookie p.remote (Some Fake_signin_proxy.cookie));
   probe (address (sprintf "ws://127.0.0.1:%d/ws" backend_port));
   probe (address (sprintf "127.0.0.1:%d" p.proxy));
-  probe (address "ws://127.0.0.1:1/ws");
+  probe (address (sprintf "ws://127.0.0.1:%d/ws" closed));
   [%expect
     {|
     (Signin_required
@@ -1713,6 +1752,8 @@ let%expect_test
   =
   with_sandbox
   @@ fun t ->
+  Closed_port.with_
+  @@ fun closed ->
   Eio.Switch.run
   @@ fun sw ->
   let _h, backend_port = backend t ~sw in
@@ -1741,7 +1782,7 @@ let%expect_test
   (* Nothing is under way to open again or cancel. *)
   signin "again";
   signin "nonsense";
-  post "connect" ~fields:[ "address", `String "127.0.0.1:1" ];
+  post "connect" ~fields:[ "address", `String (sprintf "127.0.0.1:%d" closed) ];
   (* Through the browser: the shell is told to open it there; the page
      shows it is waiting, and can open it again. *)
   let grant = ref "" in
@@ -1787,7 +1828,7 @@ let%expect_test
   Desktop.await_tools_here logs;
   d.close_stdin ();
   print_s [%sexp (Eio.Promise.await_exn d.ended : Desktop_sidecar.Ended.t)];
-  List.iter (Queue.to_list logs) ~f:(show_log t ~port:backend_port);
+  show_log_tool_host_last t ~port:backend_port logs;
   print_s [%sexp (Queue.to_list d.saved : Saved_connection.t list)];
   print_string (Proxied.clean t ~backend_port p [%expect.output]);
   [%expect
@@ -1838,23 +1879,27 @@ let%expect_test
          ; save = None
          })
   in
-  let post ?(fields = []) what =
-    ignore (Desktop.post t ~sw d what fields : string option)
+  let post ?out ?(fields = []) what =
+    ignore (Desktop.post ?out t ~sw d what fields : string option)
   in
-  let signin how = post "signin" ~fields:[ "how", `String how ] in
+  let signin ?out how = post ?out "signin" ~fields:[ "how", `String how ] in
   (* Cancelled here; a second click while one is under way joins it
-     without opening the browser again. *)
+     without opening the browser again. The clicks' answers and the
+     cancel's are on connections of their own: they are shown in the order
+     of the clicks. *)
+  let answers = Array.create ~len:3 "" in
   Eio.Fiber.all
-    [ (fun () -> signin "browser")
+    [ (fun () -> signin "browser" ~out:(fun a -> answers.(0) <- a))
     ; (fun () ->
         let (_ : Desktop_sidecar.Page.t) = Eio.Stream.take d.pages in
         print_endline "the browser is to open";
         Eio.Fiber.both
-          (fun () -> signin "browser")
+          (fun () -> signin "browser" ~out:(fun a -> answers.(1) <- a))
           (fun () ->
              post "status";
-             signin "cancel"))
+             signin "cancel" ~out:(fun a -> answers.(2) <- a)))
     ];
+  Array.iter answers ~f:print_endline;
   Desktop.show_pages d;
   post "status";
   (* Cancelled in the browser. *)
@@ -1877,9 +1922,9 @@ let%expect_test
     url: http://127.0.0.1:PORT/#desktop=<key>
     the browser is to open
     status HTTP/1.1 200 OK: {"state":"signin","site":"127.0.0.1:PROXY","login":"login.example.com","waiting":"http://127.0.0.1:PROXY/#cli-signin=LISTENER.STATE&program=desktop","error":null,"expired":false}
+    signin HTTP/1.1 200 OK: {"ok":false,"cancelled":true}
+    signin HTTP/1.1 200 OK: {"ok":false,"cancelled":true}
     signin HTTP/1.1 200 OK: {"ok":true}
-    signin HTTP/1.1 200 OK: {"ok":false,"cancelled":true}
-    signin HTTP/1.1 200 OK: {"ok":false,"cancelled":true}
     status HTTP/1.1 200 OK: {"state":"signin","site":"127.0.0.1:PROXY","login":"login.example.com","waiting":null,"error":null,"expired":false}
     signin HTTP/1.1 200 OK: {"ok":false,"error":"Signing in through the browser did not work: the sign-in was cancelled in the browser. Try again, or sign in here."}
     HTTP/1.1 200 OK

@@ -332,6 +332,8 @@ let%expect_test
   =
   with_sandbox
   @@ fun t ->
+  Closed_port.with_
+  @@ fun closed ->
   Eio.Switch.run
   @@ fun sw ->
   let alice, alice_hub = backend t ~sw ~home:(Filename.concat t.dir "alice") in
@@ -399,7 +401,7 @@ let%expect_test
   Mcp_test_helpers.wait_until ~env:t.env (fun () -> started () = 2);
   ignore ([%expect.output] : string);
   (* Pasted text, an update and a removal; errors say what to fix. (The
-     HTTP servers' address has nothing listening: they fail at once.) *)
+     HTTP servers' address refuses connections: they fail at once.) *)
   call
     t
     alice
@@ -408,7 +410,9 @@ let%expect_test
     (`Object
         [ ( "text"
           , `String
-              {|"remote": {"type": "http", "url": "http://127.0.0.1:9/mcp"}|} )
+              (sprintf
+                 {|"remote": {"type": "http", "url": "http://127.0.0.1:%d/mcp"}|}
+                 closed) )
         ]);
   call
     t
@@ -421,7 +425,7 @@ let%expect_test
         ; ( "config"
           , `Object
               [ "type", `String "http"
-              ; "url", `String "http://127.0.0.1:9/other"
+              ; "url", `String (sprintf "http://127.0.0.1:%d/other" closed)
               ] )
         ]);
   call t alice a "remove_mcp_server" (`Object [ "name", `String "fake" ]);
@@ -438,15 +442,15 @@ let%expect_test
   call t alice a "set_mcp_server_enabled" (`Object [ "name", `String "web" ]);
   [%expect
     {|
-    alice hears {"type":"event","event":"mcp_settings_changed","servers":[{"name":"fake","enabled":true,"config":{"command":"$FAKE_SERVER","env":{"FAKE_MCP_LOG":"$DIR/fake.log","TOKEN":"s3cret"}}},{"name":"remote","enabled":true,"config":{"type":"http","url":"http://127.0.0.1:9/mcp"}}]}
-    alice's phone hears {"type":"event","event":"mcp_settings_changed","servers":[{"name":"fake","enabled":true,"config":{"command":"$FAKE_SERVER","env":{"FAKE_MCP_LOG":"$DIR/fake.log","TOKEN":"s3cret"}}},{"name":"remote","enabled":true,"config":{"type":"http","url":"http://127.0.0.1:9/mcp"}}]}
-    {"servers":[{"name":"fake","enabled":true,"config":{"command":"$FAKE_SERVER","env":{"FAKE_MCP_LOG":"$DIR/fake.log","TOKEN":"s3cret"}}},{"name":"remote","enabled":true,"config":{"type":"http","url":"http://127.0.0.1:9/mcp"}}]}
-    alice hears {"type":"event","event":"mcp_settings_changed","servers":[{"name":"fake","enabled":true,"config":{"command":"$FAKE_SERVER","env":{"FAKE_MCP_LOG":"$DIR/fake.log","TOKEN":"s3cret"}}},{"name":"web","enabled":true,"config":{"type":"http","url":"http://127.0.0.1:9/other"}}]}
-    alice's phone hears {"type":"event","event":"mcp_settings_changed","servers":[{"name":"fake","enabled":true,"config":{"command":"$FAKE_SERVER","env":{"FAKE_MCP_LOG":"$DIR/fake.log","TOKEN":"s3cret"}}},{"name":"web","enabled":true,"config":{"type":"http","url":"http://127.0.0.1:9/other"}}]}
-    {"servers":[{"name":"fake","enabled":true,"config":{"command":"$FAKE_SERVER","env":{"FAKE_MCP_LOG":"$DIR/fake.log","TOKEN":"s3cret"}}},{"name":"web","enabled":true,"config":{"type":"http","url":"http://127.0.0.1:9/other"}}]}
-    alice hears {"type":"event","event":"mcp_settings_changed","servers":[{"name":"web","enabled":true,"config":{"type":"http","url":"http://127.0.0.1:9/other"}}]}
-    alice's phone hears {"type":"event","event":"mcp_settings_changed","servers":[{"name":"web","enabled":true,"config":{"type":"http","url":"http://127.0.0.1:9/other"}}]}
-    {"servers":[{"name":"web","enabled":true,"config":{"type":"http","url":"http://127.0.0.1:9/other"}}]}
+    alice hears {"type":"event","event":"mcp_settings_changed","servers":[{"name":"fake","enabled":true,"config":{"command":"$FAKE_SERVER","env":{"FAKE_MCP_LOG":"$DIR/fake.log","TOKEN":"s3cret"}}},{"name":"remote","enabled":true,"config":{"type":"http","url":"http://127.0.0.1:CLOSED/mcp"}}]}
+    alice's phone hears {"type":"event","event":"mcp_settings_changed","servers":[{"name":"fake","enabled":true,"config":{"command":"$FAKE_SERVER","env":{"FAKE_MCP_LOG":"$DIR/fake.log","TOKEN":"s3cret"}}},{"name":"remote","enabled":true,"config":{"type":"http","url":"http://127.0.0.1:CLOSED/mcp"}}]}
+    {"servers":[{"name":"fake","enabled":true,"config":{"command":"$FAKE_SERVER","env":{"FAKE_MCP_LOG":"$DIR/fake.log","TOKEN":"s3cret"}}},{"name":"remote","enabled":true,"config":{"type":"http","url":"http://127.0.0.1:CLOSED/mcp"}}]}
+    alice hears {"type":"event","event":"mcp_settings_changed","servers":[{"name":"fake","enabled":true,"config":{"command":"$FAKE_SERVER","env":{"FAKE_MCP_LOG":"$DIR/fake.log","TOKEN":"s3cret"}}},{"name":"web","enabled":true,"config":{"type":"http","url":"http://127.0.0.1:CLOSED/other"}}]}
+    alice's phone hears {"type":"event","event":"mcp_settings_changed","servers":[{"name":"fake","enabled":true,"config":{"command":"$FAKE_SERVER","env":{"FAKE_MCP_LOG":"$DIR/fake.log","TOKEN":"s3cret"}}},{"name":"web","enabled":true,"config":{"type":"http","url":"http://127.0.0.1:CLOSED/other"}}]}
+    {"servers":[{"name":"fake","enabled":true,"config":{"command":"$FAKE_SERVER","env":{"FAKE_MCP_LOG":"$DIR/fake.log","TOKEN":"s3cret"}}},{"name":"web","enabled":true,"config":{"type":"http","url":"http://127.0.0.1:CLOSED/other"}}]}
+    alice hears {"type":"event","event":"mcp_settings_changed","servers":[{"name":"web","enabled":true,"config":{"type":"http","url":"http://127.0.0.1:CLOSED/other"}}]}
+    alice's phone hears {"type":"event","event":"mcp_settings_changed","servers":[{"name":"web","enabled":true,"config":{"type":"http","url":"http://127.0.0.1:CLOSED/other"}}]}
+    {"servers":[{"name":"web","enabled":true,"config":{"type":"http","url":"http://127.0.0.1:CLOSED/other"}}]}
     "there is already an MCP server \"web\" in the settings: choose another name, or edit that one"
     "give \"servers\" (an mcpServers object) or \"text\" (pasted JSON)"
     "missing param \"config\""
