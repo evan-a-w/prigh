@@ -163,6 +163,8 @@ try {
 
   // A subagent's chat in the session's place: the composer writes to it;
   // the breadcrumb and the card say where it is.
+  const composerBox = () => page.evaluate(() => JSON.stringify(document.querySelector(".composer-box").getBoundingClientRect()));
+  const sessionComposer = await composerBox();
   await page.locator(".session-card-agent").click();
   await page.locator(".subagent-chat").waitFor();
   await page.locator(".subagent-chat", { hasText: "There are 42 modules." }).first().waitFor();
@@ -172,15 +174,14 @@ try {
   console.log(`breadcrumb: ${clean(await page.locator(".session-crumbs").innerText()).replace(/\n/g, " ")}`);
   console.log(`card: ${clean(await page.locator(".session-card").innerText()).replace(/\n/g, " | ")}`);
   console.log(`composer: ${await page.locator(".composer textarea").count()}, ` +
-    `focus in the transcript: ${await page.evaluate(() => document.activeElement?.id === "chat")}`);
+    `focus in the editor: ${await page.evaluate(() => document.activeElement?.matches(".composer textarea"))}`);
   console.log(await page.evaluate(() => {
     const prompt = document.querySelector(".subagent-chat .msg.user");
     const bubble = prompt && [prompt, ...prompt.querySelectorAll("*")].find(e =>
       getComputedStyle(e).backgroundColor !== "rgba(0, 0, 0, 0)");
-    const main = document.querySelector(".main").getBoundingClientRect();
-    const composer = document.querySelector(".composer-box").getBoundingClientRect();
-    return `its task as a filled prompt: ${!!bubble}; the composer at the pane's foot: ${main.bottom - composer.bottom < 40}`;
+    return `its task as a filled prompt: ${!!bubble}`;
   }));
+  console.log(`the composer where it is in the session's chat: ${await composerBox() === sessionComposer}`);
   await screenshot("a subagent's chat");
   await page.keyboard.press("Escape");
   await page.waitForSelector(".subagent-chat", { state: "detached" });

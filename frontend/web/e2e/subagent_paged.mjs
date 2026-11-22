@@ -122,7 +122,7 @@ try {
 
   await composer.fill("/agents 1");
   await composer.press("Enter");
-  await page.waitForFunction(() => document.querySelector(".subagent-chat")?.innerText.includes("3 files"));
+  await page.waitForFunction(() => document.querySelector(".subagent-chat .entries")?.innerText.includes("3 files"));
   section("its transcript");
   console.log(clean(await page.locator(".subagent-chat").innerText()));
   await screenshot("its transcript");
