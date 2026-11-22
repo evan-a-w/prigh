@@ -236,7 +236,7 @@ let row ~inject (s : Session_summary.t) (row : Row.t) =
                   "session-open flex w-full min-w-0 items-start gap-2 \
                    rounded-md px-2.5 py-1.5 text-left outline-none \
                    focus-visible:ring-2 focus-visible:ring-sidebar-ring \
-                   narrow:py-2"
+                   narrow:py-2 [@media(hover:none)]:pr-12"
               ; Attr.type_ "button"
               ; Attr.id dom_id
               ; Attr.create "data-session" s.id
@@ -325,9 +325,12 @@ let row ~inject (s : Session_summary.t) (row : Row.t) =
                ~attrs:
                  [ Attr.class_
                      "session-actions absolute right-1 bottom-1 rounded-md \
-                      bg-sidebar-accent opacity-0 group-hover/session:opacity-100 \
+                      bg-sidebar-accent opacity-0 \
+                      group-hover/session:opacity-100 \
                       group-focus-within/session:opacity-100 \
-                      [@media(hover:none)]:static \
+                      [@media(hover:none)]:top-1/2 \
+                      [@media(hover:none)]:bottom-auto \
+                      [@media(hover:none)]:-translate-y-1/2 \
                       [@media(hover:none)]:bg-transparent \
                       [@media(hover:none)]:opacity-70"
                  ]
@@ -338,7 +341,11 @@ let row ~inject (s : Session_summary.t) (row : Row.t) =
     ]
 ;;
 
-let session (m : App.Model.t) ~inject ~current (found : Prigh_ui.Session_search.Result.t)
+let session
+      (m : App.Model.t)
+      ~inject
+      ~current
+      (found : Prigh_ui.Session_search.Result.t)
   =
   let s = found.session in
   let selected = Option.equal String.equal current (Some s.id) in
@@ -389,7 +396,9 @@ let toolbar (m : App.Model.t) ~inject =
   then
     div
       ~cls:("sessions-toolbar selecting " ^ heading_cls)
-      [ span ~cls:"sessions-label flex-1 text-sidebar-foreground" "Select sessions"
+      [ span
+          ~cls:"sessions-label flex-1 text-sidebar-foreground"
+          "Select sessions"
       ; Node.span
           ~attrs:[ Attr.class_ "sessions-hint keyboard font-normal" ]
           [ Kbd.view [ Node.text "Shift" ]; Node.text " for a range" ]
@@ -415,7 +424,8 @@ let selection_bar (m : App.Model.t) ~inject =
   let marked = Session_marks.marked m.marks m.sessions in
   let count = List.length marked in
   div
-    ~cls:"selection-bar flex items-center gap-2 border-t border-sidebar-border p-2"
+    ~cls:
+      "selection-bar flex items-center gap-2 border-t border-sidebar-border p-2"
     [ Button.view
         ~variant:Ghost
         ~size:Sm
@@ -452,7 +462,9 @@ let group_heading label sessions =
       ; Attr.create "aria-level" "3"
       ]
     [ span ~cls:"divider-label" label
-    ; span ~cls:"divider-count ml-auto tabular-nums" (Int.to_string (List.length sessions))
+    ; span
+        ~cls:"divider-count ml-auto tabular-nums"
+        (Int.to_string (List.length sessions))
     ]
 ;;
 
@@ -517,7 +529,9 @@ let archive_toggle ~inject ~shown archived =
     ~on_click:(inject Action.Toggle_archived)
     [ icon Archive
     ; span ~cls:"divider-label" "Archive"
-    ; span ~cls:"divider-count ml-auto text-xs tabular-nums" (Int.to_string (List.length archived))
+    ; span
+        ~cls:"divider-count ml-auto text-xs tabular-nums"
+        (Int.to_string (List.length archived))
     ; icon
         ~cls:
           (if shown
@@ -532,9 +546,10 @@ let account (m : App.Model.t) ~inject =
     Node.button
       ~attrs:
         [ Attr.class_
-            "account-button ml-auto flex min-w-0 items-center gap-2 rounded-full \
-             p-0.5 text-xs text-muted-foreground outline-none hover:text-foreground \
-             focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+            "account-button ml-auto flex min-w-0 items-center gap-2 \
+             rounded-full p-0.5 text-xs text-muted-foreground outline-none \
+             hover:text-foreground focus-visible:ring-2 \
+             focus-visible:ring-sidebar-ring"
         ; Attr.type_ "button"
         ; Attr.title (name ^ ": switch, add, act as, sign out")
         ; Attr.create "aria-label" ("Accounts: " ^ name)
@@ -542,7 +557,8 @@ let account (m : App.Model.t) ~inject =
         ; Attr.on_click (fun _ -> inject Action.Open_accounts)
         ]
       [ (match acting_as with
-         | Some ns -> span ~cls:"user-acting truncate text-primary" ("acting as " ^ ns)
+         | Some ns ->
+           span ~cls:"user-acting truncate text-primary" ("acting as " ^ ns)
          | None -> Node.none)
       ; span
           ~cls:
@@ -624,12 +640,12 @@ let view (m : App.Model.t) ~inject =
   in
   Node.aside
     ~attrs:
-      [ Attr.class_
-          "sidebar loon bg-sidebar text-sm text-sidebar-foreground"
+      [ Attr.class_ "sidebar loon bg-sidebar text-sm text-sidebar-foreground"
       ; Attr.id "sidebar"
       ]
     [ div
-        ~cls:"sidebar-head flex h-12 shrink-0 items-center gap-1 px-2 narrow:h-14"
+        ~cls:
+          "sidebar-head flex h-12 shrink-0 items-center gap-1 px-2 narrow:h-14"
         [ Button.view
             ~variant:Ghost
             ~size:Icon_sm
@@ -648,8 +664,9 @@ let view (m : App.Model.t) ~inject =
             ~variant:Ghost
             ~size:Sm
             ~class_:
-              "control-open min-w-0 flex-1 justify-start gap-2 px-2 font-normal \
-               text-muted-foreground hover:text-foreground narrow:h-11"
+              "control-open min-w-0 flex-1 justify-start gap-2 px-2 \
+               font-normal text-muted-foreground hover:text-foreground \
+               narrow:h-11"
             ~attrs:
               [ Attr.id "control-open"
               ; Attr.title "Search sessions, settings and commands (Ctrl+K)"
@@ -666,7 +683,9 @@ let view (m : App.Model.t) ~inject =
        | [] -> Node.none
        | _ -> toolbar m ~inject)
     ; div
-        ~cls:"sessions flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-2 pb-2"
+        ~cls:
+          "sessions flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-2 \
+           pb-2"
         (match m.sessions with
          | [] ->
            [ div
@@ -689,7 +708,8 @@ let view (m : App.Model.t) ~inject =
              | archived ->
                if m.archived_open
                then
-                 (group_heading "Archived" archived :: List.map archived ~f:session)
+                 (group_heading "Archived" archived
+                  :: List.map archived ~f:session)
                  @
                  if m.marks.selecting
                  then []

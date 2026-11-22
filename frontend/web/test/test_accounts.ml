@@ -216,7 +216,8 @@ let%expect_test "the settings page: the account, switching it, signing out" =
 let%expect_test "the account menu: who we are, the other accounts, actions" =
   let h = signed_in_as "alice" in
   H.text h ~selector:".sidebar-footer";
-  [%expect {| (Settings (Ctrl+, or /settings)) (Pull requests (/pr)) (Commands and keys (/help)) (A) |}];
+  [%expect
+    {| (Settings (Ctrl+, or /settings)) (Pull requests (/pr)) (Commands and keys (/help)) (A) |}];
   H.act h Open_accounts;
   H.text h ~selector:".account-menu";
   [%expect
@@ -504,5 +505,6 @@ let%expect_test "token-only backends show the account too" =
            Some { backend; user = None; token = Some "t"; session = None }
        });
   H.text h ~selector:".sidebar-footer";
-  [%expect {| (Settings (Ctrl+, or /settings)) (Pull requests (/pr)) (Commands and keys (/help)) (T) |}]
+  [%expect
+    {| (Settings (Ctrl+, or /settings)) (Pull requests (/pr)) (Commands and keys (/help)) (T) |}]
 ;;

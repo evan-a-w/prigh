@@ -330,6 +330,7 @@ module Part = struct
            (Sidebar_view.current_activity m)
            (Sidebar_view.current_activity m'))
   ;;
+
   let review = make "review" ~equal:outside_transcript
   let chrome = make "chrome" ~equal:outside_composer
 

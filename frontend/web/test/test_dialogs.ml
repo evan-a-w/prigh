@@ -666,10 +666,12 @@ let%expect_test "the reconnect delay doubles up to ten seconds" =
 let%expect_test "signing out" =
   let h = H.create () in
   H.text h ~selector:".sidebar-footer";
-  [%expect {| (Settings (Ctrl+, or /settings)) (Pull requests (/pr)) (Commands and keys (/help)) |}];
+  [%expect
+    {| (Settings (Ctrl+, or /settings)) (Pull requests (/pr)) (Commands and keys (/help)) |}];
   H.act h Saved_login;
   H.text h ~selector:".sidebar-footer";
-  [%expect {|
+  [%expect
+    {|
     (Settings (Ctrl+, or /settings)) (Pull requests (/pr)) (Commands and keys (/help))
     (Sign out)
     |}];
@@ -683,7 +685,8 @@ let%expect_test "signing out" =
        ; features = []
        });
   H.text h ~selector:".sidebar-footer";
-  [%expect {| (Settings (Ctrl+, or /settings)) (Pull requests (/pr)) (Commands and keys (/help)) (acting as bob A) |}];
+  [%expect
+    {| (Settings (Ctrl+, or /settings)) (Pull requests (/pr)) (Commands and keys (/help)) (acting as bob A) |}];
   H.act h Sign_out;
   H.type_ h "/signout";
   H.act h Send;
@@ -713,5 +716,6 @@ let%expect_test "on a phone the agents panel is a sheet with the keyboard" =
     |}];
   H.act h Toggle_subagents;
   inert ();
-  [%expect {| <aside class="bg-sidebar loon sidebar text-sidebar-foreground text-sm"> |}]
+  [%expect
+    {| <aside class="bg-sidebar loon sidebar text-sidebar-foreground text-sm"> |}]
 ;;

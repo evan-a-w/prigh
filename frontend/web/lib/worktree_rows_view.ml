@@ -130,7 +130,6 @@ let row
     ]
 ;;
 
-
 let rows (m : App.Model.t) ~inject (s : Session_summary.t) =
   let cwd =
     match m.state with

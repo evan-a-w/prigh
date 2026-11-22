@@ -52,7 +52,7 @@ let%expect_test
               data-session="s1"
               title="/sessions/s1.jsonl"
               aria-current="true"
-              class="flex focus-visible:ring-2 focus-visible:ring-sidebar-ring gap-2 items-start min-w-0 narrow:py-2 outline-none px-2.5 py-1.5 rounded-md session-open text-left w-full"
+              class="[@media(hover:none)]:pr-12 flex focus-visible:ring-2 focus-visible:ring-sidebar-ring gap-2 items-start min-w-0 narrow:py-2 outline-none px-2.5 py-1.5 rounded-md session-open text-left w-full"
               @on_click
               @on_focus
               @on_mousedown
@@ -67,7 +67,7 @@ let%expect_test
           <span dir="auto" class="session-title text-[13px] truncate"> fix the parser bug </span>
         </div>
       </button>
-      <span class="[@media(hover:none)]:bg-transparent [@media(hover:none)]:opacity-70 [@media(hover:none)]:static absolute bg-sidebar-accent bottom-1 group-focus-within/session:opacity-100 group-hover/session:opacity-100 opacity-0 right-1 rounded-md session-actions">
+      <span class="[@media(hover:none)]:-translate-y-1/2 [@media(hover:none)]:bg-transparent [@media(hover:none)]:bottom-auto [@media(hover:none)]:opacity-70 [@media(hover:none)]:top-1/2 absolute bg-sidebar-accent bottom-1 group-focus-within/session:opacity-100 group-hover/session:opacity-100 opacity-0 right-1 rounded-md session-actions">
         <button type="button"
                 data-slot="button"
                 data-variant="ghost"
@@ -94,8 +94,7 @@ let%expect_test
     </div>
     |}];
   H.show h ~selector:".session.running .lamp";
-  [%expect
-    {| |}];
+  [%expect {| |}];
   (* The current session's row has its cwd as it is now: [/cd] moves it. *)
   H.event
     h
@@ -113,7 +112,8 @@ let%expect_test
        (purpose (Sidebar 2)))))
     |}];
   H.text h ~selector:".session.selected .session-meta";
-  [%expect {|
+  [%expect
+    {|
     parser
     now
     |}];
@@ -898,6 +898,5 @@ let%expect_test "~ in places is the home of the tool host they are on" =
   let h = H.create ~sessions ~state () in
   H.names h ~selector:".session-cwd";
   H.text h ~selector:".tray-folder";
-  [%expect
-    {| ~/src |}]
+  [%expect {| ~/src |}]
 ;;

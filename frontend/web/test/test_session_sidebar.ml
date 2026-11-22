@@ -93,11 +93,14 @@ let worktree_menu h ~owner path =
   H.act
     h
     (Open_menu
-       { target = Worktree { session = sprintf "/sessions/%s.jsonl" owner; path }
+       { target =
+           Worktree { session = sprintf "/sessions/%s.jsonl" owner; path }
        ; anchor =
            Element
-             (String.map ("worktree-" ^ owner ^ "-" ^ path) ~f:(fun c ->
-                if Char.is_alphanum c || Char.equal c '-' then c else '-'))
+             (String.map
+                ("worktree-" ^ owner ^ "-" ^ path)
+                ~f:(fun c ->
+                  if Char.is_alphanum c || Char.equal c '-' then c else '-'))
        })
 ;;
 

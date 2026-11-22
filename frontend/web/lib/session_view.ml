@@ -66,75 +66,78 @@ let sheet (m : App.Model.t) ~inject =
      ; Chip_popover_view.session_sections m ~inject
      ; Status_view.notes m ~inject
      ; sheet_row
-        ~cls:"jump-row"
-        ~name:"Jump to a message"
-        ~glyph:Toc
-        ~on_click:(go Action.Open_jump_list)
-        ()
-    ; sheet_row
-        ~cls:"filter-row"
-        ~id:Filter_menu.anchor
-        ~name:"Filter the transcript"
-        ?detail:
-          (if hidden > 0
-           then Some ("Hiding " ^ Filter_view.hidden_names m.transcript_filter)
-           else None)
-        ~on:(hidden > 0)
-        ~glyph:Filter
-        ~on_click:(go Action.Open_filter)
-        ()
-    ; sheet_row
-        ~cls:"files-sheet-row files-toggle"
-        ~name:"Files"
-        ~on:m.files.open_
-        ~glyph:Folder
-        ~on_click:(go (Action.Files Toggle))
-        ()
-    ; sheet_row
-        ~cls:"terminal-row terminal-toggle"
-        ~name:"Terminal"
-        ~on:m.terminal.open_
-        ~glyph:Terminal
-        ~on_click:(go Action.Toggle_terminal)
-        ()
-    ; sheet_row
-        ~cls:"review-row review-toggle"
-        ~name:"Review changes"
-        ~on:m.review.open_
-        ~glyph:Review
-        ~on_click:(go (Action.Review Toggle))
-        ()
-    ; sheet_row
-        ~cls:"session-card-row session-card-toggle"
-        ~name:"Subagents and worktrees"
-        ~on:m.session_card_open
-        ~glyph:Panel_right
-        ~on_click:(go Action.Toggle_session_card)
-        ()
-    ]
-    @ (if (not a.open_) && List.is_empty a.agents && List.is_empty a.jobs
-       then []
-       else
-         [ sheet_row
-           ~cls:"agents-row"
-           ~name:"Subagents and jobs"
-           ?detail:
-             (if running > 0 then Some (sprintf "%d running" running) else None)
-           ?badge:(if running > 0 then Some (Int.to_string running) else None)
-           ~on:a.open_
-           ~glyph:Bot
-           ~on_click:(go Action.Toggle_subagents)
+         ~cls:"jump-row"
+         ~name:"Jump to a message"
+         ~glyph:Toc
+         ~on_click:(go Action.Open_jump_list)
+         ()
+     ; sheet_row
+         ~cls:"filter-row"
+         ~id:Filter_menu.anchor
+         ~name:"Filter the transcript"
+         ?detail:
+           (if hidden > 0
+            then Some ("Hiding " ^ Filter_view.hidden_names m.transcript_filter)
+            else None)
+         ~on:(hidden > 0)
+         ~glyph:Filter
+         ~on_click:(go Action.Open_filter)
+         ()
+     ; sheet_row
+         ~cls:"files-sheet-row files-toggle"
+         ~name:"Files"
+         ~on:m.files.open_
+         ~glyph:Folder
+         ~on_click:(go (Action.Files Toggle))
+         ()
+     ; sheet_row
+         ~cls:"terminal-row terminal-toggle"
+         ~name:"Terminal"
+         ~on:m.terminal.open_
+         ~glyph:Terminal
+         ~on_click:(go Action.Toggle_terminal)
+         ()
+     ; sheet_row
+         ~cls:"review-row review-toggle"
+         ~name:"Review changes"
+         ~on:m.review.open_
+         ~glyph:Review
+         ~on_click:(go (Action.Review Toggle))
+         ()
+     ; sheet_row
+         ~cls:"session-card-row session-card-toggle"
+         ~name:"Subagents and worktrees"
+         ~on:m.session_card_open
+         ~glyph:Panel_right
+         ~on_click:(go Action.Toggle_session_card)
+         ()
+     ]
+     @ (if (not a.open_) && List.is_empty a.agents && List.is_empty a.jobs
+        then []
+        else
+          [ sheet_row
+              ~cls:"agents-row"
+              ~name:"Subagents and jobs"
+              ?detail:
+                (if running > 0
+                 then Some (sprintf "%d running" running)
+                 else None)
+              ?badge:
+                (if running > 0 then Some (Int.to_string running) else None)
+              ~on:a.open_
+              ~glyph:Bot
+              ~on_click:(go Action.Toggle_subagents)
+              ()
+          ])
+     @ [ sheet_row
+           ~cls:"settings-row"
+           ~name:"Settings"
+           ~glyph:Gear
+           ~on_click:(go Action.Open_settings)
            ()
-         ])
-    @ [ sheet_row
-          ~cls:"settings-row"
-          ~name:"Settings"
-          ~glyph:Gear
-          ~on_click:(go Action.Open_settings)
-          ()
-      ]
-    @
-    (if m.desktop
+       ]
+     @
+     if m.desktop
      then
        [ sheet_row
            ~cls:"quit-row"
@@ -143,7 +146,7 @@ let sheet (m : App.Model.t) ~inject =
            ~on_click:(go Action.Quit_desktop)
            ()
        ]
-     else []))
+     else [])
 ;;
 
 let more (m : App.Model.t) ~inject =

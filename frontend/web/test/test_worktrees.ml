@@ -908,7 +908,8 @@ let%expect_test "a turn's end checks them again, in the background" =
     |}];
   H.reply h "list_worktrees" (listing ~current:"" ());
   section h;
-  [%expect {|
+  [%expect
+    {|
     (feat/login ● 3 ↑2 ↓1) (docs) (old gone)
     (feat/login here ● 3 ↑2 ↓1)
     |}]
