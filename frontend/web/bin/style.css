@@ -607,7 +607,7 @@ kbd {
 .editor::placeholder { color: var(--faint); }
 /* The placeholder is one line, cut rather than wrapped. */
 .editor:placeholder-shown { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.editor-wrap { min-width: 0; }
+.editor-wrap { display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; }
 .composer-row { display: flex; align-items: center; gap: 4px; min-height: 32px; min-width: 0; }
 .composer-plus { position: relative; display: flex; flex-shrink: 0; }
 .composer-plus.menu-open { z-index: var(--z-menu-anchor); }

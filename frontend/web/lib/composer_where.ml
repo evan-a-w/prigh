@@ -56,8 +56,8 @@ let of_model (m : App.Model.t) =
       }
 ;;
 
-(* A button of the line: its icon, then its text cut short (a path from its
-   start, so that its end shows). *)
+(* A button of the line: its icon, then its text, cut short with an ellipsis
+   when the line is too narrow. *)
 let item ~cls ~title ~label ~on_click ~glyph text =
   Node.button
     ~attrs:
@@ -93,9 +93,7 @@ let view t ~inject =
         ~label:(sprintf "Folder: %s. Change it" where)
         ~on_click:(inject (App.Action.Run "/cd"))
         ~glyph:Folder
-        (Node.span
-           ~attrs:[ Attr.class_ "truncate [direction:rtl]" ]
-           [ Node.span ~attrs:[ Attr.create "dir" "ltr" ] [ Node.text where ] ])
+        (Node.span ~attrs:[ Attr.class_ "truncate" ] [ Node.text where ])
     ; (match t.branch with
        | None -> Node.none
        | Some branch ->

@@ -50,9 +50,7 @@ let%expect_test "a repository with a branch: the path under ~, the branch" =
               class="flex focus-visible:outline-1 focus-visible:outline-ring gap-1.5 hover:text-foreground items-center min-w-0 narrow:min-h-11 px-1 py-0.5 rounded-sm where-path"
               @on_click>
         <icon class="folder"> </icon>
-        <span class="[direction:rtl] truncate">
-          <span dir="ltr"> ~/projects/prigh </span>
-        </span>
+        <span class="truncate"> ~/projects/prigh </span>
       </button>
       <button type="button"
               title="Work in another worktree (/worktree)"
