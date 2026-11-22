@@ -46,8 +46,10 @@ start() {
 		echo "stty -a | tr ' ;' '\\n\\n' | grep -E '^-?(icanon|echo|iexten|isig|ixon)\$' | tr '\\n' ' '; echo"
 	} >"$tmp/run.sh"
 	if [ "${interactive:-}" = 1 ]; then
-		# Job control (Ctrl+Z / fg) needs an interactive shell.
-		tmux new-session -d -s "$session" -x "$W" -y "$H" "env -i PATH=$PATH TERM=xterm-256color bash --norc --noprofile -i"
+		# Job control (Ctrl+Z / fg) needs an interactive shell. tmux runs the
+		# command with sh -c: PATH is quoted, as it may hold spaces and
+		# parentheses (WSL appends Windows' "Program Files (x86)").
+		tmux new-session -d -s "$session" -x "$W" -y "$H" "env -i PATH=$(printf %q "$PATH") TERM=xterm-256color bash --norc --noprofile -i"
 		sleep 0.5
 		tmux send-keys -t "$session" -l "clear; sh $tmp/run.sh"
 		tmux send-keys -t "$session" Enter
