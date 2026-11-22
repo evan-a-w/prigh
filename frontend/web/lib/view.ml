@@ -342,6 +342,7 @@ module Part = struct
   ;;
 
   let dialogs = make "dialogs" ~equal:outside_composer
+  let session_card = make "session_card" ~equal:outside_composer
 end
 
 (* The terminal's widget is one function of its target for the page's
@@ -364,7 +365,9 @@ let view (m : Model.t) ~inject ~terminal =
   in
   (* On a phone the agents panel is a sheet over the page: it has the
      keyboard while open. *)
-  let sheet = m.narrow && (m.agents.open_ || m.files.open_) in
+  let sheet =
+    m.narrow && (m.agents.open_ || m.files.open_ || m.session_card.sheet)
+  in
   (* So is the drawer, over the page. *)
   let drawer = Model.drawer m in
   let layered covered = inert_if (covered || sheet || drawer) in
@@ -380,6 +383,11 @@ let view (m : Model.t) ~inject ~terminal =
     | None, [], _ -> echoes m
     | None, _, [] -> transcript m ~inject
     | None, _, _ -> Node.fragment [ transcript m ~inject; echoes m ]
+  in
+  let chat (m : Model.t) =
+    match m.subagent_chat with
+    | Some id -> Subagent_chat_view.view m ~inject id
+    | None -> chat m
   in
   Node.div
     ~attrs:
@@ -446,9 +454,15 @@ let view (m : Model.t) ~inject ~terminal =
                   ; "temporary", App.temporary_shown m
                   ; "landing", m.landing
                   ]
+              ; Session_card_view.main_attr m
               ]
             [ Part.chrome m ~inject (fun m ->
                 layered modal_composer (Session_view.chrome m ~inject))
+            ; (if m.narrow
+               then Node.none
+               else
+                 Part.session_card m ~inject (fun m ->
+                   layered modal_composer (Session_card_view.view m ~inject)))
             ; under_drawer (banner m ~inject)
             ; Part.chat m ~inject (fun m ->
                 under_drawer
@@ -470,20 +484,30 @@ let view (m : Model.t) ~inject ~terminal =
                               else Attr.empty)
                            ]
                          [ chat m; jump_to_bottom m ~inject ]
-                     ; (match loading m with
-                        | Some _ -> Node.none
-                        | None -> Jump_view.view m ~inject)
+                     ; (match loading m, m.subagent_chat with
+                        | Some _, _ | _, Some _ -> Node.none
+                        | None, None -> Jump_view.view m ~inject)
                      ])
             ; toasts m ~inject
-            ; Part.btw m ~inject (fun m ->
-                under_drawer (Btw_view.view m ~inject))
-            ; layered modal_composer (Composer_view.view m ~inject)
+            ; (match m.subagent_chat with
+               | Some _ -> under_drawer (Subagent_chat_view.footer ~inject)
+               | None ->
+                 Node.fragment
+                   [ Part.btw m ~inject (fun m ->
+                       under_drawer (Btw_view.view m ~inject))
+                   ; layered modal_composer (Composer_view.view m ~inject)
+                   ])
             ]
         ; Part.terminal m ~inject (fun m ->
             under_drawer (Terminal_view.view m ~inject ~widget:terminal))
         ]
     ; Part.files m ~inject (fun m -> panel (Files_view.view m ~inject))
     ; Part.agents m ~inject (fun m -> panel (Agents_view.view m ~inject))
+    ; (if m.narrow
+       then
+         Part.session_card m ~inject (fun m ->
+           inert_if modal (Session_card_view.view m ~inject))
+       else Node.none)
     ; Part.dialogs m ~inject (fun m -> Dialog_view.view m ~inject)
     ; Files_view.dialog m ~inject
     ; Files_view.pickers

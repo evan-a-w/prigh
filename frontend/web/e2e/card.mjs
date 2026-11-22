@@ -230,7 +230,10 @@ try {
   await page.waitForFunction(() => document.querySelector(".chat")?.innerText.includes("The survey is in."));
   await page.locator(".composer-status .activity.idle").waitFor({ state: "attached" });
   const before = await page.locator(".composer .chip-anchor.mode").innerText();
+  console.error("DEBUG before:", before, "| active:", await page.evaluate(() => { const a = document.activeElement; return a.tagName + "." + a.className + "#" + a.id; }));
   await page.keyboard.press("Alt+m");
+  await page.waitForTimeout(1500);
+  console.error("DEBUG after:", await page.evaluate(() => document.querySelector(".composer .chip-anchor.mode")?.innerText + " | active: " + document.activeElement.tagName + "." + document.activeElement.className + " | card: " + (document.querySelector(".session-card")?.innerText ?? "none").replace(/\n/g, " / ") + " | dialog: " + (document.querySelector(".modal, [role=dialog]")?.className ?? "none")));
   await page.waitForFunction(b => document.querySelector(".composer .chip-anchor.mode")?.innerText !== b, before);
   await both("idle, a mode on");
 

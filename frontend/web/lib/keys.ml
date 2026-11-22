@@ -686,6 +686,12 @@ let handle (m : App.Model.t) t : App.Action.t option =
      (* On a phone the file browser is a sheet: Esc closes it from anywhere. *)
      | "Escape" when m.narrow && m.files.open_ && not (Files.asking m.files) ->
        Some (Files Close)
+     | "Escape" when m.narrow && m.session_card.sheet ->
+       Some (Session_card (Sheet false))
+     (* A subagent's transcript in the chat's place: back to the session's,
+        unless the agents panel beside it takes Esc. *)
+     | "Escape" when Option.is_some m.subagent_chat && not m.agents.open_ ->
+       Some Close_subagent_chat
      (* Code selected in the review or a preview: comment on it. *)
      | "c" when plain t && commenting m t -> Some (Review Start_comment)
      | _ ->

@@ -227,6 +227,7 @@ let%expect_test
     <div class="sidebar-footer">
     <div class="chrome-anchor">
     <Vdom.Node.none-widget class="">
+    <Vdom.Node.none-widget class="">
     <div class="chat-frame">
     <div class="toast-anchor">
     <Vdom.Node.none-widget class="">
@@ -589,6 +590,7 @@ let%expect_test "without the docked sidebar, the chrome floats over the chat" =
     Toggle_sidebar
     <div class="chrome-anchor">
     <Vdom.Node.none-widget class="">
+    <Vdom.Node.none-widget class="">
     <div class="chat-frame">
     <div class="toast-anchor">
     <Vdom.Node.none-widget class="">
@@ -643,6 +645,7 @@ let%expect_test "without the docked sidebar, the chrome floats over the chat" =
                     @on_click>
               <icon class="terminal"> </icon>
             </button>
+            <Vdom.Node.none-widget> </Vdom.Node.none-widget>
             <Vdom.Node.none-widget> </Vdom.Node.none-widget>
           </div>
           <button type="button"

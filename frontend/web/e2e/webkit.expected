@@ -1565,6 +1565,88 @@ Tidy the docs in a worktree
 A landing page [selected]
 === webkit: worktrees_switch: errors ===
 none
+=== webkit: session card: the card ===
+Subagents
+1
+Count the modules
+<age>
+Worktrees
+2
+=== webkit: session card: the worktrees unfolded ===
+Subagents
+1
+Count the modules
+<age>
+Worktrees
+2
+main
+feat/ui
+1 changed
+main (here)
+feat/ui 1 changed
+=== webkit: session card: beside the chat, 1600px wide ===
+pane 1320px, the chat padded 0px on the right
+card 208px wide, 12px from the pane's edge
+the column clears it (12px or more)
+the composer's right edge lines up with the column's: true
+the column keeps its left margin
+=== webkit: session card: beside the chat, 1440px wide ===
+pane 1160px, the chat padded 124px on the right
+card 208px wide, 12px from the pane's edge
+the column clears it (12px or more)
+the composer's right edge lines up with the column's: true
+the column keeps its left margin
+=== webkit: session card: beside the chat, 1100px wide ===
+pane 820px, the chat padded 216px on the right
+card 208px wide, 12px from the pane's edge
+the column clears it (12px or more)
+the composer's right edge lines up with the column's: true
+the column keeps its left margin
+=== webkit: session card: beside the chat, 900px wide ===
+pane 620px, the chat padded 0px on the right
+card 208px wide, 12px from the pane's edge
+the card covers the column's corner
+the composer's right edge lines up with the column's: true
+the column keeps its left margin
+=== webkit: session card: hidden from the chrome, 1440px wide ===
+pane 1160px, the chat padded 0px on the right
+no card
+=== webkit: session card: a subagent's transcript ===
+Count the modules with a subagent
+/
+Count the modules
+<age>
+Count the modules
+<time>
+There are 42 modules.
+<time>
+composer: 0, footer: A subagent's transcript: read-only. Back (Esc), focus in the transcript: true
+=== webkit: session card: Esc: back to the session ===
+the session's transcript: true, focus in the editor: true
+=== webkit: session card: a phone, 390x844 ===
+card beside the chat: 0
+This session
+Subagents
+1
+Count the modules
+<age>
+Worktrees
+2
+inside the screen: true; rows 44px or more: true (3)
+Esc closes it
+=== webkit: session card: a phone, 320x640 ===
+card beside the chat: 0
+This session
+Subagents
+1
+Count the modules
+<age>
+Worktrees
+2
+inside the screen: true; rows 44px or more: true (3)
+Esc closes it
+=== webkit: session card: errors ===
+none
 === webkit: review: files: changes marked ===
 src (changed: 2)
 README.md
