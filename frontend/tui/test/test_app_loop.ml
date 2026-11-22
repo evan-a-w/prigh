@@ -221,16 +221,16 @@ let%expect_test "/resume shows, runs now or cancels the automatic resume" =
       (method_ cancel_resume)
       (params ())
       (tag (Notice_on_success "automatic resume cancelled")))
-
-
-
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
-
     ▌ earlier question
       earlier answer
-    ──────────────────────────────────────────────────────────────────── usage: /resume [now|cancel] ───
-    > ▏
-    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01  resumes 14:05
+    ┌─ Error ──────────────────────────────────────────────────────────────────────────────────────────┐
+    │ unknown /resume argument "later": now retries at once, cancel stays stopped, on|off turns the    │
+    │ automatic resume after a usage limit on or off; usage: /resume [now|cancel|on|off]               │
+    └────────────────────────────────────────────────────────────────────────────────── Esc dismisses ─┘
+    ▸ off  never resume by themselves after a usage limit
+    ────────────────────────────────────────────────────────────────────────────────────────────────────
+    > /resume later▏
+    deepseek-flash  think:off  ctx:0.1%/1.0M  $0.01  resumes 14:05  Tab/Enter accept · Alt+S as typed
     |}]
 ;;
 
@@ -278,12 +278,12 @@ let%expect_test "completion offers the keywords, but not over a goal's text" =
     > /goal refactor▏
     /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
 
-      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
-
     ▌ earlier question
       earlier answer
     ▸ now     retry the run at once
       cancel  stay stopped until you send a message
+      on      resume runs by themselves when a usage limit resets
+      off     never resume by themselves after a usage limit
     ────────────────────────────────────────────────────────────────────────────────────────────────────
     > /resume ▏
     deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  Tab accepts · Enter as typed · Esc hides

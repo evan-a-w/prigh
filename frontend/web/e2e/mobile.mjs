@@ -2,11 +2,12 @@
 // mobile browser, Firefox, which has no isMobile, with the viewport and
 // touch), and as an installed PWA on a notched phone (Chromium: the safe
 // area's insets emulated). On each screen (the chat, the ⋯ sheet, the
-// drawer, the composer's menus, the settings' list and a section of it, the
-// files, a picker, the review page and its files) it prints whether the
-// page overflows sideways, any control that is off screen, covered by
-// another or smaller than a thumb (44px on its shorter side, 40px in the
-// rows in [dense]), and inputs that iOS would zoom into (under 16px). Then:
+// drawer, the composer's menus, the settings' list and sections of it
+// (scrolled to their switches), the files, a picker, the review page and
+// its files) it prints whether the page overflows sideways, any control
+// that is off screen, covered by another or smaller than a thumb (44px on
+// its shorter side, 40px in the rows in [dense]), and inputs that iOS would
+// zoom into (under 16px). Then:
 // the one strip of chrome is under the notch and the composer over the home
 // indicator, the settings go a level down and back by tap, and the keyboard
 // (a shorter visual viewport) keeps the composer in view. The empty
@@ -110,7 +111,7 @@ const choicesFit = page => page.evaluate(() => {
 });
 // Rows a phone keeps on screen with more in them than 44px targets leave
 // room for, whose targets are 40px: the composer's (+, the model, the host,
-// the status, the microphone, send).
+// the status, send).
 const dense = ".composer";
 const audit = page => page.evaluate(dense => {
   const out = [];
@@ -283,6 +284,14 @@ const visit = async (w, h, { safe = false } = {}) => {
   await page.locator(".settings-home-row[data-settings-tab=models]").tap();
   await step("settings: models");
   console.log(await choicesFit(page));
+  // Its switches, further down: the audit measures what is on screen.
+  await step("settings: models, at its switches", () => page.locator(".setting.mask .switch").scrollIntoViewIfNeeded());
+  await page.locator(".modal-back").tap();
+  await page.locator(".settings-home").waitFor();
+  await step("settings: usage", async () => {
+    await page.locator(".settings-home-row[data-settings-tab=usage]").tap();
+    await page.locator(".setting.auto-resume .switch").waitFor();
+  });
   await page.getByRole("button", { name: "Close" }).first().tap();
   await page.waitForSelector(".modal", { state: "detached" });
 

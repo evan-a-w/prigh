@@ -73,11 +73,6 @@
   text-align: center;
 }
 
-/* No hover on a phone: the details card would stick after a tap. Tapping
-   the context opens the session's details, which has it all. */
-@media (hover: none) {
-  .status-details { display: none !important; }
-}
 
 /* The jump list is in the ⋯ sheet; the marks are a desktop's. */
 .app.narrow .chat-frame > .jump-nav { display: none; }
@@ -112,7 +107,7 @@
   box-shadow: 0 -12px 40px -12px var(--edge-shadow);
 }
 .app.narrow .chip-popover { display: flex; }
-@keyframes sheet-up { from { transform: translateY(24px); opacity: 0.6; } }
+@keyframes sheet-up { from { transform: translateY(24px); } }
 @media (prefers-reduced-motion: reduce) {
   .app.narrow :is(.chrome-menu, .chip-popover, .context-menu, .account-menu, .filter-menu, .review-popover) { animation: none; }
 }
@@ -310,11 +305,16 @@
 .app.narrow .setting .segmented > * { min-height: var(--tap); font-size: 14px; justify-content: center; text-align: center; white-space: normal; line-height: 1.2; }
 .app.narrow .setting :is(.btn, select, .chip-button) { min-height: var(--tap); }
 .app.narrow .setting input[type="text"], .app.narrow .setting input:not([type]) { width: 100%; }
-.app.narrow .switch { width: 46px; height: 28px; border-radius: 14px; }
-.app.narrow .switch-knob { top: 3px; left: 3px; width: 20px; height: 20px; }
+/* The button a thumb's 46x44, its track the 28px drawn in it; the margin
+   keeps the row as tall as the track. */
+.app.narrow .switch { width: 46px; height: 44px; margin-block: -8px; border: 0; border-radius: 0; background: none; }
+.app.narrow .switch::before { content: ""; position: absolute; inset: 8px 0; border-radius: 14px; border: 1px solid var(--rule-2); background: var(--well); transition: background 0.12s, border-color 0.12s; }
+.app.narrow .switch.on::before { background: var(--sodium); border-color: var(--sodium); }
+@media (prefers-reduced-motion: reduce) { .app.narrow .switch::before { transition: none; } }
+.app.narrow .switch:focus-visible { outline: none; }
+.app.narrow .switch:focus-visible::before { outline: 2px solid var(--sodium); outline-offset: 2px; }
+.app.narrow .switch-knob { top: 12px; left: 4px; width: 20px; height: 20px; }
 .app.narrow .switch.on .switch-knob { transform: translateX(18px); }
-/* Its hit area a thumb's, past the 28px it shows. */
-.app.narrow .switch::after { content: ""; position: absolute; inset: -9px -2px; }
 .app.narrow .settings-group h4 { font-size: 12px; }
 /* A wide row is the words, then the control: neither grows into a gap. */
 .app.narrow .setting-wide { flex-wrap: nowrap; }
@@ -404,17 +404,84 @@
 
 /* {1 The composer's row on a phone}
 
-   + · the model (its name has the room) · the host's mark | the status's
-   ring and percent · the microphone · send. The thinking level, the mode
-   and the verbosity are in the ⋯ sheet's sections. */
-.app.narrow .row-chips { display: none; }
-.app.narrow .composer-controls { flex: 1 1 auto; }
-.app.narrow .composer-status { margin-left: auto; }
-.app.narrow .composer-status .status-item.cost,
-.app.narrow .composer-status:is(.busy, *) .status-item.activity > .label { display: none; }
-.app.narrow .composer-status > .status-gauge { height: 40px; padding: 0 2px 0 10px; font-size: 12px; }
-.app.narrow .composer-status .status-item.link { height: 40px; min-width: 40px; justify-content: center; padding: 0 8px 0 4px; }
-.app.narrow .composer-status .ring.mini { width: 15px; height: 15px; }
+   The paperclip · the context ring | the host's mark · the model (its
+   name has the room) · send, in one row. The reasoning
+   level and the mode are in the model's sheet; the verbosity in the ⋯
+   sheet. */
+.app.narrow .composer-controls { flex: 0 1 auto; }
+/* Dense, so that Stop by the ring (steering) leaves the model's name whole. */
+.app.narrow :is(.composer-row, .composer-buttons) { gap: 2px; }
+.app.narrow .context-ring { width: var(--tap); height: var(--tap); margin: -6px -2px; }
+.app.narrow .composer-plus .btn.plus { width: 40px; height: 40px; }
+/* The ring's card is a sheet: the whole width, over the home indicator. */
+.app.narrow .context-card {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: auto;
+  max-width: none;
+  padding: 14px max(16px, var(--safe-r)) max(14px, var(--safe-b)) max(16px, var(--safe-l));
+  border-radius: 16px 16px 0 0;
+  border-width: 1px 0 0;
+  font-size: 13.5px;
+  gap: 10px 16px;
+}
+.app.narrow .context-card .status-detail-value { font-size: 13px; }
+.app.narrow .context-card-foot .btn { min-height: var(--tap); padding: 0 16px; font-size: 14px; }
+.app.narrow .context-ring-anchor:not(.open) > .context-card { display: none; }
+.app.narrow .context-backdrop { background: var(--scrim); }
+
+/* The model's sheet: the rail along the top, the list, then the reasoning
+   levels as a row of choices under it; the access mode at its foot. */
+.app.narrow .chip-popover.model-menu { padding-left: 0 !important; padding-right: 0 !important; overflow: visible; }
+.app.narrow .model-menu-body { flex-direction: column; overflow-y: auto; overscroll-behavior: contain; }
+.app.narrow .model-rail {
+  flex-direction: row;
+  width: auto;
+  padding: 0 max(8px, var(--safe-l)) 4px;
+  border-right: 0;
+  border-bottom: 1px solid var(--rule);
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+.app.narrow .model-rail-tab { width: var(--tap); height: var(--tap); flex: none; }
+.app.narrow .model-rail-tab.on::before { left: 10px; right: 10px; top: auto; bottom: -4px; width: auto; height: 3px; border-radius: 2px 2px 0 0; }
+.app.narrow .model-rail-rule { width: 0; height: 22px; border-top: 0; border-left: 1px solid var(--rule); margin: 0 4px; }
+.app.narrow .model-menu-main { padding: 0 max(4px, var(--safe-l)); }
+.app.narrow .model-menu-main .popover-search { padding: 4px 8px; }
+.app.narrow .model-row { min-height: var(--tap); }
+.app.narrow .model-key { display: none; }
+.app.narrow .model-star { width: var(--tap); height: var(--tap); }
+.app.narrow .model-reasoning {
+  width: auto;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px max(12px, var(--safe-l)) 10px;
+  border-left: 0;
+  border-top: 1px solid var(--rule);
+  overflow: visible;
+}
+.app.narrow .model-reasoning-head { width: 100%; padding: 0 2px; }
+.app.narrow .reasoning-row {
+  flex: 1 1 auto;
+  justify-content: center;
+  min-height: var(--tap);
+  min-width: var(--tap);
+  padding: 0 10px;
+  border: 1px solid var(--rule-2);
+  border-radius: var(--r-control);
+}
+.app.narrow .reasoning-row.on { border-color: var(--sodium); background: var(--sodium-wash); }
+.app.narrow .reasoning-row .reasoning-check { display: none; }
+.app.narrow .reasoning-label { flex: none; }
+.app.narrow .model-menu-foot { padding: 4px max(8px, var(--safe-r)) 0 max(12px, var(--safe-l)); }
+.app.narrow .model-menu-foot > .menu-keys { display: none; }
+.app.narrow .model-menu-foot { justify-content: flex-end; }
+.app.narrow .model-access-button { min-height: var(--tap); }
+.app.narrow .model-access-item { min-height: var(--tap); }
+.app.narrow .model-access-menu { width: min(300px, calc(100vw - 24px)); }
 /* A tool's line is the toggle for its output: a thumb's height. */
 .app.narrow .tool-head { min-height: var(--tap); }
 /* So is a run's line in quiet. */
@@ -423,7 +490,7 @@
 .app.narrow .msg > .run > .run-head > .lamp { top: 18.5px; }
 
 /* {1 Thumb-sized, the rest of the way} */
-.app.narrow .composer-buttons .send { width: 40px; height: 40px; }
+.app.narrow .composer-row :is(.send, .stop) { width: 40px; height: 40px; }
 .app.narrow .chip-anchor.host > .host-chip { min-width: 40px; }
 .app.narrow .code-head { padding-top: 0; }
 .app.narrow button.copy { min-height: var(--tap); padding: 0 12px; }
@@ -509,25 +576,14 @@
   background: var(--rule-2);
 }
 .app.narrow .session:is(.swiping, .swiped) > :is(.session-actions, .fold) { visibility: hidden; }
-/* The narrowest phones: the percent says it, the ring goes; the model's
-   name gets the room. */
+/* The narrowest phones: the model's mark and name, its level in its sheet
+   (and the chip's name, for readers). */
 @media (max-width: 359px) {
-  .app.narrow .composer-status .ring.mini { display: none; }
-  .app.narrow .composer-status > .status-gauge { padding: 0 4px; }
-  .app.narrow .composer-status .status-item.link { padding: 0 4px; }
   .app.narrow .composer-box { padding-left: 4px; padding-right: 4px; }
-  .app.narrow :is(.composer-row, .composer-buttons) { gap: 2px; }
   .app.narrow .composer .model-chip { padding-left: 6px; padding-right: 6px; }
-  /* "auto-edit" whole: a longer word gets the room it needs. */
   .session-choice { flex: 1 1 auto; min-width: var(--tap); padding: 0 2px; font-size: 13px; }
-  .mode-choices > .session-choice { padding: 0 2px; }
   /* The model keeps a target's width beside a long host chip. */
   .composer-controls .chip-anchor.model { min-width: 40px; }
-}
-/* A phone on its side has the room: the chips are back in the row (the ⋯
-   sheet keeps them too). */
-@container composer (min-width: 640px) {
-  .app.narrow .row-chips { display: flex; }
 }
 
 /* Long press (Menu_listeners): a touch held on a message or row opens its
@@ -552,10 +608,6 @@
   }
 }
 
-/* The narrowest phones: the model's chip without its chevron. */
-@media (max-width: 359px) {
-  .composer-controls .model-chip > .chevron { display: none; }
-}
 .app.narrow .computer-banner .btn.computer-banner-stop { height: var(--tap); min-width: var(--tap); }
 .app.narrow .no-host-banner .btn.no-host-banner-chat { height: var(--tap); }
 /* Memory: notes over their buttons' column; the editor's buttons a thumb's. */

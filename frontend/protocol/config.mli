@@ -34,6 +34,9 @@ type t =
         connected; [None]: where the session you are on is *)
   ; max_budget_usd : float option
     (** the cost budget of sessions that set none with [/budget] *)
+  ; resume_on_limit_reset : bool
+    (** a run stopped by a usage limit resumes by itself when the limit
+        resets (default true) *)
   ; worktrees_dir : string option
     (** where worktrees are created on the tool host; [None] from backends
         before worktrees *)
@@ -61,16 +64,9 @@ type t =
   ; approval_model : string option
     (** the model that judges tool calls in the [smart] approval mode;
         [None]: the session's *)
-  ; dictation_model : string option
-    (** the speech-to-text model of [transcribe] ([provider/id]); [None]:
-        {!default_dictation_model} *)
   }
 [@@deriving sexp_of, equal]
 
 val default : t
-
-(** ["openai/gpt-4o-mini-transcribe"], the backend's default. *)
-val default_dictation_model : string
-
 val of_json : Json.t -> t Or_error.t
 val to_json : t -> Json.t

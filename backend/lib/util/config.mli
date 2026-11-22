@@ -93,10 +93,6 @@ type t =
   ; approval_model : string option
     (** the model that judges tool calls in the [smart] approval mode
         ({!Approval_judge}); [None]: the session's *)
-  ; dictation_model : string option
-    (** the speech-to-text model of the [transcribe] method
-        ({!Transcription}), [provider/id]; [None]:
-        {!default_dictation_model} *)
   ; trace : Trace.Level.t
     (** what sessions record in their trace ({!Trace_file}; default
         [Default]); [PRIGH_TRACE] overrides it *)
@@ -105,12 +101,6 @@ type t =
 
 val default : t
 val default_worktrees_dir : string
-
-(** ["openai/gpt-4o-mini-transcribe"] *)
-val default_dictation_model : string
-
-(** [dictation_model], else {!default_dictation_model}. *)
-val dictation_model : t -> string
 
 (** [auto_background_seconds], [None] when off. *)
 val auto_background : t -> float option

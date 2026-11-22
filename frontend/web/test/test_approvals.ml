@@ -10,7 +10,7 @@ let run h command =
 ;;
 
 let status h =
-  H.text h ~selector:".composer-status";
+  H.text h ~selector:".context-card .mode-line";
   H.text h ~selector:".status-notes"
 ;;
 
@@ -42,28 +42,17 @@ let plan =
   {|{"explanation":"first pass","steps":[{"step":"read the code","status":"completed"},{"step":"change it","status":"in_progress"},{"step":"test","status":"pending"}]}|}
 ;;
 
-let mode_chip h = H.text h ~selector:".mode-chip"
+(* The mode, as the context card names it (the pending one at once). *)
+let mode_line h = H.text h ~selector:".context-card .mode-line"
 
 let%expect_test "the mode chip, Alt+M, and set_mode's reply or failure" =
   let h = H.create () in
   (* Always shown beside the model, [auto] too, saying what asks first. *)
-  H.show h ~selector:".mode-chip";
-  [%expect
-    {|
-    <button type="button"
-            title="Tools run without asking (Alt+M cycles, /mode picks)"
-            aria-label="Auto: never asks"
-            aria-haspopup="dialog"
-            aria-expanded="false"
-            class="btn chip-button mode-chip never-asks"
-            @on_click>
-      <icon class="shield"> </icon>
-      <span class="chip-label"> auto </span>
-    </button>
-    |}];
+  mode_line h;
+  [%expect {| Mode Auto: never asks |}];
   (* Shown at once, waiting on the backend. *)
   H.key h "m" ~alt:true;
-  H.show h ~selector:".mode-chip";
+  mode_line h;
   [%expect
     {|
     Cycle_mode
@@ -72,37 +61,20 @@ let%expect_test "the mode chip, Alt+M, and set_mode's reply or failure" =
      (tag
       (Mode_set
        "Mode: plan (read-only planning, until you leave it (/plan off or Alt+M): no file edits; bash, job_input and MCP tools ask first)")))
-    <button type="button"
-            title="Switching to plan…"
-            disabled=""
-            aria-busy="true"
-            class="awaiting btn chip-button mode-chip"
-            @on_click>
-      <span aria-hidden="true" class="lamp"> </span>
-      <span class="chip-label"> plan </span>
-    </button>
+    Mode Plan mode
     |}];
   H.reply h "set_mode" (state ~mode:"auto" ~plan_mode:true ());
-  H.show h ~selector:".mode-chip";
+  mode_line h;
   toasts h;
   [%expect
     {|
     (Expire_toast (id 0) (after_ms 6000))
-    <button type="button"
-            title="Read-only planning, until you leave it (/plan off or Alt+M): no file edits; bash, job_input and MCP tools ask first (Alt+M cycles, /mode picks)"
-            aria-label="Plan mode"
-            aria-haspopup="dialog"
-            aria-expanded="false"
-            class="btn chip-button mode-chip plan-mode"
-            @on_click>
-      <icon class="shield"> </icon>
-      <span class="chip-label"> plan </span>
-    </button>
+    Mode Plan mode
     Mode: plan (read-only planning, until you leave it (/plan off or Alt+M): no file edits; bash, job_input and MCP tools ask first)
     |}];
   (* Option+M types a symbol on a Mac: the physical key counts. *)
   H.key h "µ" ~alt:true ~code:"KeyM";
-  mode_chip h;
+  mode_line h;
   toasts h;
   [%expect
     {|
@@ -112,77 +84,54 @@ let%expect_test "the mode chip, Alt+M, and set_mode's reply or failure" =
      (tag
       (Mode_set
        "Mode: chat (a chat without the tool host: no files, commands or project, only the web and other host-free tools, until you leave it (/chat off or Alt+M))")))
-    (chat)
+    Mode Chat: no tool host
     Mode: plan (read-only planning, until you leave it (/plan off or Alt+M): no file edits; bash, job_input and MCP tools ask first)
     |}];
   (* Not taken: said, and the backend's state shown again. *)
   H.fail h "set_mode" "no session";
   H.reply h "get_state" (state ~mode:"auto" ~plan_mode:true ());
-  mode_chip h;
+  mode_line h;
   toasts h;
   [%expect
     {|
     (Rpc (method_ get_state) (params ()) (tag State))
-    (plan)
+    Mode Plan mode
     Mode: plan (read-only planning, until you leave it (/plan off or Alt+M): no file edits; bash, job_input and MCP tools ask first)
     Couldn't set the mode: no session (Dismiss)
     |}];
-  (* Clicking the chip opens its menu over it: what each asks first. *)
-  H.click h ~selector:".mode-chip";
-  H.text h ~selector:"#chip-popover";
+  (* The model menu's foot opens the modes: what each asks first. *)
+  H.quiet h (fun () -> H.click h ~selector:".model-chip");
+  H.click h ~selector:".model-access-button";
+  H.text h ~selector:".model-access-menu";
   [%expect
     {|
-    (Open_chip Mode)
-    (Focus popover-list)
-    Place_popover
-    When tools ask first Alt+M cycles
-    Asks: edits & commands bash, job_input, edits and MCP tools ask first
-    Asks: commands file edits run; bash, job_input and MCP tools ask first
-    Smart: a model decides edits in the project run; the approval model lets other calls run or asks you, saying why (/approval-model)
-    Auto: never asks tools run without asking
-    ✓ Plan mode read-only planning, until you leave it (/plan off or Alt+M): no file edits; bash, job_input and MCP tools ask first
-    Chat: no tool host a chat without the tool host: no files, commands or project, only the web and other host-free tools, until you leave it (/chat off or Alt+M)
-    Enter chooses, ← → the next setting, Esc closes
+    (Open_chip Model)
+    Model_menu_access
+    (Ask first Asks: edits & commands) (Auto-edit Asks: commands) (Smart Smart: a model decides) (Full access Auto: never asks) (Plan Plan mode ✓) (Chat Chat: no tool host)
     |}];
-  (* The filter knows the short names too. *)
-  H.act h (Picker_query "auto-e");
-  H.text h ~selector:".popover-items";
-  [%expect
-    {| Asks: commands file edits run; bash, job_input and MCP tools ask first |}];
-  H.key h "Enter" ~target:Field;
-  mode_chip h;
+  H.click h ~selector:".model-access-item" ~nth:1;
+  mode_line h;
   [%expect
     {|
-    Dialog_accept
-    (Focus editor)
+    Model_menu_access
+    (Set_mode ((approval Auto_edit) (plan false) (chat false)))
     (Rpc (method_ set_mode)
      (params ((approval_mode auto-edit) (plan_mode false) (chat_mode false)))
      (tag
       (Mode_set
        "Mode: auto-edit (file edits run; bash, job_input and MCP tools ask first)")))
-    (auto-edit)
-    |}];
-  (* The status line leaves the mode to the chip. *)
-  status h;
-  [%expect
-    {|
-    Ready (0%) $0.00
-    Status Ready
-    Context 0 / 200k · 0%
-    Tokens 0 in · 0 out · 0 cached
-    Cost $0.0000
-    Thinking provider's default
+    (Focus popover-filter)
     Mode Asks: commands
-    Model Claude Opus 5.5
-    Branch main
-    Click for the session’s details · /compact frees context
-    |}]
+    |}];
+  (* The card names the mode too. *)
+  status h;
+  [%expect {| Mode Asks: commands |}]
 ;;
 
 let%expect_test "/mode NAME, /plan, /confirm" =
   let h = H.create ~state:(state ~mode:"ask" ()) () in
-  mode_chip h;
-  [%expect {| (ask) |}];
+  mode_line h;
+  [%expect {| Mode Asks: edits & commands |}];
   run h "/mode bogus";
   toasts h;
   print_s [%sexp ((H.model h).draft : string)];
@@ -194,7 +143,7 @@ let%expect_test "/mode NAME, /plan, /confirm" =
     "/mode bogus"
     |}];
   run h "/mode auto";
-  mode_chip h;
+  mode_line h;
   [%expect
     {|
     (Rpc (method_ push_pref)
@@ -202,13 +151,13 @@ let%expect_test "/mode NAME, /plan, /confirm" =
     (Rpc (method_ set_mode)
      (params ((approval_mode auto) (plan_mode false) (chat_mode false)))
      (tag (Mode_set "Mode: auto (tools run without asking)")))
-    (auto)
+    Mode Auto: never asks
     |}];
   (* /plan toggles, keeping the approval mode to go back to. *)
   run h "/plan";
-  mode_chip h;
+  mode_line h;
   run h "/plan";
-  mode_chip h;
+  mode_line h;
   run h "/plan on";
   run h "/plan off";
   run h "/plan maybe";
@@ -222,13 +171,13 @@ let%expect_test "/mode NAME, /plan, /confirm" =
      (tag
       (Mode_set
        "Mode: plan (read-only planning, until you leave it (/plan off or Alt+M): no file edits; bash, job_input and MCP tools ask first)")))
-    (plan)
+    Mode Plan mode
     (Rpc (method_ push_pref) (params ((key history) (value /plan) (max 500)))
      (tag Ignore))
     (Rpc (method_ set_mode)
      (params ((approval_mode auto) (plan_mode false) (chat_mode false)))
      (tag (Mode_set "Mode: auto (tools run without asking)")))
-    (auto)
+    Mode Auto: never asks
     (Rpc (method_ push_pref)
      (params ((key history) (value "/plan on") (max 500))) (tag Ignore))
     (Rpc (method_ set_mode)
@@ -247,7 +196,7 @@ let%expect_test "/mode NAME, /plan, /confirm" =
     |}];
   (* /confirm sets the default for new sessions, which is this one's too. *)
   run h "/confirm on";
-  mode_chip h;
+  mode_line h;
   [%expect
     {|
     (Rpc (method_ push_pref)
@@ -257,7 +206,7 @@ let%expect_test "/mode NAME, /plan, /confirm" =
      (tag
       (Config_saved
        "Mode ask, also for new sessions: bash, job_input, edits and MCP tools ask first")))
-    (auto)
+    Mode Auto: never asks
     |}];
   (* The arguments complete. *)
   H.type_ h "/mode ";
@@ -299,16 +248,7 @@ let%expect_test "the plan: its chip in the chrome, /todos" =
   status h;
   [%expect
     {|
-    Ready (0%) $0.00
-    Status Ready
-    Context 0 / 200k · 0%
-    Tokens 0 in · 0 out · 0 cached
-    Cost $0.0000
-    Thinking provider's default
     Mode Auto: never asks
-    Model Claude Opus 5.5
-    Branch main
-    Click for the session’s details · /compact frees context
     (plan 1/3: change it)
     |}];
   H.click h ~selector:".status-notes .plan";
@@ -341,16 +281,7 @@ let%expect_test "the plan: its chip in the chrome, /todos" =
   [%expect
     {|
     (Focus editor)
-    Ready (0%) $0.00
-    Status Ready
-    Context 0 / 200k · 0%
-    Tokens 0 in · 0 out · 0 cached
-    Cost $0.0000
-    Thinking provider's default
     Mode Auto: never asks
-    Model Claude Opus 5.5
-    Branch main
-    Click for the session’s details · /compact frees context
     (Rpc (method_ push_pref) (params ((key history) (value /todos) (max 500)))
      (tag Ignore))
     (Focus dialog)
@@ -1132,9 +1063,9 @@ let%expect_test
     (Rpc (method_ get_prefs)
      (params
       ((keys
-        (web.theme web.accent web.radius web.font web.code-font web.notify
-         web.verbosity web.terminal-open web.sidebar-folded web.sidebar-unfolded
-         web.sidebar-opened web.sidebar-worktree-hours web.review web.code-size
+        (web.theme web.accent web.notify web.verbosity web.terminal-open
+         web.sidebar-folded web.sidebar-unfolded web.sidebar-opened
+         web.sidebar-worktree-hours web.review web.code-size favourite-models
          history web.migrated web.sidebar-width web.files-width
          web.files-preview-width web.agents-width web.terminal-height
          web.review-chat-width web.review-files-width web.review-margin-width))))
@@ -1151,16 +1082,7 @@ let%expect_test
     Run bash: make?
     (y Allow once) (a Always allow bash(make:*) this session) (n Deny) (r Deny, saying why)
     1 more waiting
-    Ready (0%) $0.00
-    Status Ready
-    Context 0 / 200k · 0%
-    Tokens 0 in · 0 out · 0 cached
-    Cost $0.0000
-    Thinking provider's default
     Mode Auto: never asks
-    Model Claude Opus 5.5
-    Branch main
-    Click for the session’s details · /compact frees context
     |}];
   (* Already shown ones are not added twice. *)
   H.event h (confirm ~rules:[ "bash(make:*)" ] "c1" "make");

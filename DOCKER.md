@@ -15,10 +15,10 @@ and [Isolation](#isolation).
 
 ## The image
 
-CI publishes the image for every commit of `main` to
-`ghcr.io/evan-a-w/prigh` (`.github/workflows/attic.yml`, as soon as it has
-built that commit: see [Binary cache](#binary-cache)): the tags `main` and
-`latest` follow `main`, and each commit's short sha (`:e9c8b23`) pins it.
+The image is published for every commit of `main` to
+`ghcr.io/evan-a-w/prigh` by the build host, once it has built that commit
+(see [Binary cache](#binary-cache)): the tags `main` and `latest` follow
+`main`, and each commit's short sha (`:e9c8b23`) pins it.
 `docker-compose.yml` runs `${PRIGH_IMAGE:-ghcr.io/evan-a-w/prigh:main}`
 with `pull_policy: always`, so every `docker compose up` (and Portainer's
 redeploy) checks for a newer image, and updating is a download of the
@@ -224,6 +224,7 @@ user, `default`.
 | `PRIGH_NIX_GC_KEEP_DAYS` | `7` | the scheduled collection first deletes users' profile generations older than this many days; `0`: all but the current ones; `off`: keeps them all |
 | `PRIGH_NIX_MIN_FREE` | `15%` | Nix's `min-free`: while it builds or fetches, Nix collects garbage when less than this is free on `/nix`'s filesystem. Bytes as `nix.conf` takes them (`20G`, `512M`, `1T`, `10737418240`) or a percentage of the filesystem (`20%`); `0`: never |
 | `PRIGH_NIX_MAX_FREE` | `30%` | Nix's `max-free`: such a collection stops once this much is free; same forms, more than `PRIGH_NIX_MIN_FREE` |
+| `PRIGH_VOLUME_WAIT` | `2m` | how long the start waits for `/home` and `/nix` to be writable (a disk the host mounts late, or read-only for a while) before it gives up: a number with `s`, `m`, `h` or `d`; `0`: not at all (see [Data](#data)) |
 | `GH_TOKEN` | – | GitHub token for `git` over HTTPS, for users without one in `PRIGH_GH_TOKENS` (shared by all of them; see [Git and SSH](#git-and-ssh)) |
 | `PRIGH_GH_TOKENS` | – | per-user GitHub tokens, `name=token,...` |
 | `PRIGH_GITHUB_CLIENT_ID` | – | client id of your GitHub OAuth app (with Device Flow enabled), for `/login github` and prigh-web's Git hosting settings (README: Git hosting) |
@@ -237,8 +238,9 @@ user, `default`.
 
 ## Installing tools
 
-The image ships `bash git ripgrep tmux curl jq less openssh-client procps`
-and Nix. The agents run as unprivileged users on a read-only root
+The image ships `bash git ripgrep tmux curl jq less openssh-client procps`,
+ImageMagick's `magick` (which the backend downscales images too large for a
+model with) and Nix. The agents run as unprivileged users on a read-only root
 filesystem, so apt and sudo are out; any user (agent or `>_` shell) gets
 other tools from nixpkgs instead, as itself:
 
@@ -277,11 +279,12 @@ How it fits together:
   substituters or keys or change the sandbox settings, so everything they
   substitute is signed by `cache.nixos.org`. Packages not in the cache are
   built locally, as the `nixbld1`…`nixbld8` users.
-- **Seeding.** prigh itself links against store paths (glibc), and nix is a
-  store path too. Since the volume hides the image's `/nix`, the image keeps
-  them in `/opt/nix-seed`, and the entrypoint copies any that are missing
-  into `/nix/store` and registers them at every start (the first start
-  copies about 160 MB). `/usr/local/bin/nix*` link to the seeded nix.
+- **Seeding.** prigh itself links against store paths (glibc), and nix and
+  ImageMagick are store paths too. Since the volume hides the image's
+  `/nix`, the image keeps them in `/opt/nix-seed`, and the entrypoint copies
+  any that are missing into `/nix/store` and registers them at every start
+  (the first start copies a few hundred MB). `/usr/local/bin/nix*` and
+  `/usr/local/bin/magick` link to the seeded ones.
 - **Garbage collection**: see [below](#garbage-collection).
 - **Upgrades.** A new image brings its seed; the entrypoint adds what is new
   and moves the GC roots to it, so the old image's paths become garbage.
@@ -600,6 +603,12 @@ scope is the directory it is served from.
 | `/nix` | `prigh-nix` | the Nix store: what users installed (see [Installing tools](#installing-tools)), and prigh's own runtime, copied in from the image at start |
 | `/run/prigh` | tmpfs | the users (`extrausers/passwd`, `group`, `shadow`), rebuilt at each start |
 
+The start first waits, up to `PRIGH_VOLUME_WAIT` (2 minutes), for `/home`
+and `/nix` to be writable, logging once what it waits for; if they never
+are, it exits saying which and what to check. With bind mounts on a disk
+of their own, make sure the host mounts it read-write before Docker starts
+(systemd: `RequiresMountsFor=` on `docker.service`).
+
 Removing the stack keeps named volumes unless they are removed
 explicitly (`docker compose down -v` deletes them, logins and sessions
 included).
@@ -701,14 +710,18 @@ proxy that keeps dead sockets open does not keep their work alive.
 
 ## Binary cache
 
-Every push to `main` builds prigh and everything it is built from and
-pushes them to the Attic cache `prigh` (`.github/workflows/attic.yml`), so
-when `flake.lock`, `nix/` or the `*.opam`/`dune-project` files change, the
-new dependencies are cached once that run finishes. Only the build fails a
-run: an upload that fails even after retries (atticd or its storage slow,
-a timeout) is a warning on the run, and the next run pushes what is
-missing. To push them by hand, from a machine with Nix, enough RAM and a
-push token (`attic login`):
+A self-hosted build host ([Komodo](https://komo.do), outside this
+repository) picks up every push to `main` within a few minutes. It builds
+prigh, prigh-desktop, prigh-computer, everything they are built from and
+the dev shells' inputs, and pushes them to the Attic cache `prigh`. So when
+`flake.lock`, `nix/` or the `*.opam`/`dune-project` files change, the new
+dependencies are cached once that run finishes. Its Nix store persists
+between runs, so a commit only builds what changed. Then it builds the
+image from its own store (the backend and frontend as NARs in the
+`prebuilt` build context, with `REQUIRE_CACHED=1`) and pushes it to
+`ghcr.io/evan-a-w/prigh`. Only merged code reaches it: pull requests run
+nothing there. To push to the cache by hand, from a machine with Nix,
+enough RAM and a push token (`attic login`):
 
 ```
 nix build --no-link --print-out-paths path:.#frontend.inputDerivation path:.#backend.inputDerivation \
@@ -718,36 +731,25 @@ nix build --no-link --print-out-paths path:.#frontend.inputDerivation path:.#bac
 Anything missing from the cache is compiled, so a stale cache makes the
 build slower but does not break it.
 
-The workflow runs two jobs side by side: `server` (backend, frontends, the
-default dev shell) and `desktop` (prigh-desktop, prigh-computer, the
-desktop dev shell). As soon as `server` has built prigh, it builds the
-image from its own store (the backend and frontend as NARs in the
-`prebuilt` build context, with `REQUIRE_CACHED=1`) and pushes it to
-`ghcr.io/evan-a-w/prigh`, before uploading anything to Attic, so a slow
-upload never delays the image, and an unreachable Attic API only skips
-the upload. Its last step, `Attic connection`, shows how the runner
-reaches the Attic peer (P2P or relayed, the latency) and the download
-rate of the same NAR over NetBird and over the internet, to tell a slow
-tunnel from slow storage. It can also be run by hand (Actions → attic →
-Run workflow) for main or a branch (a branch's image gets only its short
-sha tag; untick `publish_image` to skip it).
-
 ## How the image is built
 
 1. A `nixos/nix` stage gets `.#backend` and `.#frontend` of the flake
    (`docker/fetch-prigh.sh`): one the binary cache has (signed by a trusted
-   key) is downloaded as that store path alone (CI passes the ones it just
-   built as NARs in the `prebuilt` build context, which come first), checked against its hash
+   key) is downloaded as that store path alone (the build host passes the
+   ones it just built as NARs in the `prebuilt` build context, which come first), checked against its hash
    and unpacked, without its closure (which holds the whole OxCaml
    toolchain, ~3 GB to download); one it lacks is built, after a warning
-   and `nix build --dry-run`'s plan (`REQUIRE_CACHED=1`, as CI sets, fails
-   instead). With `PREFETCH_DEPS=1` it first builds only their
+   and `nix build --dry-run`'s plan (`REQUIRE_CACHED=1`, as the build host
+   sets, fails instead). With `PREFETCH_DEPS=1` it first builds only their
    dependencies, from a copy of the files that determine them, so that
    layer stays cached. It then keeps just the two
    binaries, prigh-web's site and, as the Nix seed, the few store paths the
    binaries link against (glibc, gmp) plus the `nix` of the `nixos/nix`
-   image with its closure and their database registration (`nix-store
-   --dump-db`), about 160 MB instead of the ~10 GB build closure. It also
+   image and nixpkgs' `imagemagick` (the one the flake's `prigh` wrapper
+   puts on PATH; the build checks that it downscales a PNG to PNG and
+   JPEG) with their closures and database registration (`nix-store
+   --dump-db`), a few hundred MB instead of the ~10 GB build closure.
+   The runtime stage links `nix*` and `magick` into `/usr/local/bin`. It also
    writes the flake registry that pins `nixpkgs` to `flake.lock`.
 2. The runtime stage is `debian:bookworm-slim`. `tini -g` is PID 1, so
    signals reach the backend and tool hosts and child processes are

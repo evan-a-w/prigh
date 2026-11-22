@@ -148,9 +148,12 @@ let%expect_test "help lists every key and command" =
     Alt+↑ take the last queued message back into the editor
     Tab complete a /command, its argument, an @path or a #snippet
     !cmd run a shell command (!!cmd: not added to the context; !&cmd: as a background job)
-    Ctrl+L switch model: the model chip's menu
+    Ctrl+L the model chip's menu: models by provider, their reasoning and the access mode
+    ← → / ↑ ↓ (in the model menu) ← → the previous or next provider (or the favourites); ↑ ↓ the models; Enter switches, Esc closes
+    Alt+1…9 (in the model menu) switch to the list's Nth model
+    Alt+F (in the model menu) star or unstar the highlighted model
     ↑ ↓ / Enter / Esc (a chip's menu) move / choose / close it; type to filter the models or hosts
-    ← → / Tab (a chip's menu) the next chip's menu (model, thinking, mode, host)
+    Tab (a chip's menu; ← → in the host's) the next chip's menu (host, model)
     Ctrl+P / Alt+P next / previous scoped model (/scoped-models)
     Alt+T cycle the thinking level
     Alt+M cycle the mode: ask → auto-edit → smart → auto → plan (/mode, /plan)
@@ -176,6 +179,7 @@ let%expect_test "help lists every key and command" =
     Ctrl+B show or hide the sidebar (while reviewing, over the review)
     Ctrl+, settings: notifications, transcript detail, your account (/settings)
     ← → / ↑ ↓ (on a panel's edge) resize the panel (Shift: faster; Home / End: smallest / largest; Enter: the default size); or drag the edge, double-click to reset
+    Esc (the context ring's card open) close the card (the ring by the paperclip: context, cost, Compact)
     Alt+1…9 follow subagent or job N in the agents panel
     Alt+] Alt+[ the next or previous subagent or job
     Alt+0 close the agents panel
@@ -234,6 +238,7 @@ let%expect_test "help lists every key and command" =
     /todos show the model's plan (its update_plan steps)
     /permissions show the mode, the allow/ask/deny rules (config and this session) and the calls smart mode remembered, to forget (smart mode judges them again; the hosts they permitted ask again)
     /notify [on|off] tell you when a turn ends or something waits for you while the tab is hidden
+    /usage how much of your Claude and ChatGPT subscriptions' usage limits you have used, in Settings
     /memory [on|off] your notes the model saves when you ask it to remember something, in Settings; on or off gives the model the memory tool or takes it away
     /instructions [on|off] your custom instructions, in the context of every session, in Settings; on or off lets the model add, edit and remove them or not
     /user-info what you set about yourself for the model (name, country, units...), given to it in every session, in Settings
@@ -241,7 +246,6 @@ let%expect_test "help lists every key and command" =
     /generate-model [MODEL|off] pick the model that drafts commit messages, pull requests and branch names (✦ Generate); MODEL|off: draft them with MODEL (off: the session's)
     /approval-model [MODEL|off] pick the model that judges tool calls in smart mode; MODEL|off: judge them with MODEL (off: the session's)
     /naming [model MODEL|off] show which model names sessions and subagents; model MODEL|off: name them with MODEL (off: the drafting model, else the session's)
-    /dictation [model MODEL|off] show which model transcribes dictation (speech to text); model MODEL|off: transcribe with MODEL, an OpenAI or OpenAI-compatible provider's (off: openai/gpt-4o-mini-transcribe)
     /compaction [at|model|mask ...] show when conversations are compacted and what summarises them; at TOKENS|off: also once the context exceeds TOKENS, not only at 80% of the window; model MODEL|off: the model that writes the summaries (off: the session's); mask on|off: replace old tool outputs with placeholders first
     /diff [path] show the uncommitted changes where the tools run, untracked files too
     /review [worktree] [--base REV] the review page, the changes file by file to approve, comment on and edit (Alt+R): of the session's worktree or another (its branch, path or name), against its base or REV; /review BASE [instructions] (HEAD: the uncommitted changes) has the model review them for prioritised findings
@@ -279,7 +283,7 @@ let%expect_test "help lists every key and command" =
     /budget [dollars|off] show or set the session's cost budget: no turn starts once it is spent
     /goal [text|off|resume] set a goal the agent keeps working toward until it is met; show, clear or resume it
     /remind [stop|every|rm|off ...] stop [N] TEXT: remind the agent when it ends its turn (at most N times in a row, default 3); every N TEXT: every N turns; rm NAME, off: remove one or all; none: list the session's (Delete removes one)
-    /resume [now|cancel] show, run now or cancel the automatic resume after a usage limit
+    /resume [now|cancel|on|off] show, run now or cancel the automatic resume after a usage limit, or turn it on or off
     /downsize-images send the conversation's images smaller (after the model refused one as too large) and retry a failed reply
     /copy copy the last reply to the clipboard
     /btw <question> ask a side question without interrupting the run (not added to the conversation)
@@ -620,9 +624,9 @@ let%expect_test
     (Rpc (method_ get_prefs)
      (params
       ((keys
-        (web.theme web.accent web.radius web.font web.code-font web.notify
-         web.verbosity web.terminal-open web.sidebar-folded web.sidebar-unfolded
-         web.sidebar-opened web.sidebar-worktree-hours web.review web.code-size
+        (web.theme web.accent web.notify web.verbosity web.terminal-open
+         web.sidebar-folded web.sidebar-unfolded web.sidebar-opened
+         web.sidebar-worktree-hours web.review web.code-size favourite-models
          history web.migrated web.sidebar-width web.files-width
          web.files-preview-width web.agents-width web.terminal-height
          web.review-chat-width web.review-files-width web.review-margin-width))))

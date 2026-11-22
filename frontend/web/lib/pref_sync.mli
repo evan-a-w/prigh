@@ -5,10 +5,10 @@ open! Import
     ([get_prefs], [set_prefs], [push_pref], [prefs_changed]), so that they
     follow the user from browser to browser and change live in the others:
     the theme, accent, corners and fonts, notifications, the transcript's
-    verbosity, the prompt history (shared with the TUI), the panels' sizes,
-    whether the terminal is open and which sessions' worktrees show in the
-    sidebar. The
-    browser caches them ([Command.Cache_prefs]) for the first paint and for
+    verbosity, the prompt history (shared with the TUI), the starred models,
+    the panels' sizes, whether the terminal is open and which sessions'
+    worktrees show in the sidebar. The browser caches them
+    ([Command.Cache_prefs]) for the first paint and for
     backends that keep none.
 
     What stays in the browser only: the sign-ins (needed before there is a
@@ -50,6 +50,9 @@ module Key : sig
 
   (** How large code shows in diffs ({!Code_size}). *)
   val code_size : string
+
+  (** The model menu's starred models: their keys, in the order starred. *)
+  val favourite_models : string
 
   (** ["history"]: the prompts sent, newest first, shared with the TUI. *)
   val history : string

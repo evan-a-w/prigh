@@ -19,10 +19,8 @@ token
 What are we building?
 / for commands, @ for files
 === webkit: signed in: the session's card ===
-provider's default
-auto
-0%
-$<COST>
+<HOSTNAME>
+V4.1 Flash
 === webkit: a dialog keeps the focus ===
 Tab: dialog: Close (Esc)
 Tab: dialog: Keys
@@ -104,13 +102,11 @@ printf 'one\ntwo\nthree\n'
 three lines
 <TIME>
 === webkit: the session's card after a run ===
-provider's default
-auto
-0%
-$<COST>
-=== webkit: a budget in the status line ===
-0%
-$<COST>/$<COST>
+<HOSTNAME>
+V4.1 Flash
+=== webkit: a budget in the ring's card ===
+This session
+$<COST> · $<COST>/$<COST>
 === webkit: long output, at rest ===
 bash
 seq 1 30
@@ -139,16 +135,16 @@ a red flag with a blue stripe
 === webkit: the read tool's image ===
 data:image/png;base64, 24x16
 === webkit: an image open: the chips ===
-model: under dialog.viewer
 host: under dialog.viewer
+model: under dialog.viewer
 === webkit: drawing on the read tool's image ===
 viewer closed: true
 Saving attaches the drawing to your next message.
 Cancel
 Attach
 === webkit: a chip's menu open: the chips ===
-model: the chip, on top
 host: the chip, on top
+model: the chip, on top
 === webkit: attached in the composer ===
 data:image/png;base64, 20x10
 data:image/png;base64, 12x30
@@ -360,8 +356,8 @@ anything new?
 [Environment: the working directory is now <CWD>/sub. Project instructions for it may differ from the ones above. Re-reading AGENTS.md/CLAUDE.md there is at your discretion: they are often unchanged, and missing an update is not serious.]
 anything new?
 === webkit: the model and host controls ===
-DeepSeek V4.1 Flash
 <HOSTNAME>
+V4.1 Flash
 === webkit: the host picker ===
 Where tools run
 <HOSTNAME>
@@ -377,37 +373,32 @@ shown to the model; draw on it before sending
 Enter chooses, Esc closes
 attach's menu: over the composer, at the chip's left edge, inside the window; focus in it: true
 closed: true; focus: editor
-=== webkit: the thinking chip's menu ===
-Thinking
-Alt+T cycles
+=== webkit: the model menu's reasoning ===
+Reasoning
+V4.1 Flash
 Off
-answer straight away
-Provider's default
-the provider picks: high
 Low
-a little
 High
-more
+Default
 Max
-as much as the model allows
-Enter chooses, ← → the next setting, Esc closes
-thinking's menu: over the composer, at the chip's left edge, inside the window; focus in it: true
-closed: true; focus: editor
-model's menu: over the composer, at the chip's left edge, inside the window; focus in it: true
+model's menu: over the composer, shifted inside the composer, inside the window; focus in it: true
+the chip: V4.1 Flash; closed: true; focus: editor
+model's menu: over the composer, shifted inside the composer, inside the window; focus in it: true
 === webkit: the model chip's menu, filtered ===
-DeepSeek V4.1 Flash
-DeepSeek, not logged in
-1M
-=== webkit: the host chip's menu, from the model's with → ===
+DeepSeek V4.1 FlashDeepSeek
+Alt+1
+=== webkit: the host chip's menu, from the model's with Shift+Tab ===
 /host
 <HOSTNAME>
 <CWD>/sub
 The only host: run prigh tool-host -connect SERVER on a machine, or a prigh TUI connected to this backend, to add one.
 Enter chooses, ← → the next setting, Esc closes
-host's menu: over the composer, at the chip's left edge, inside the window; focus in it: true
+host's menu: over the composer, shifted inside the composer, inside the window; focus in it: true
 === webkit: mode ask ===
-high
-ask
+Context 0% full, $<COST>: details
+mode: Asks: edits & commands
+<HOSTNAME>
+V4.1 Flash
 === webkit: a confirmation ===
 Confirm
 Run bash: echo built-ok?
@@ -446,13 +437,10 @@ answered
 SQLite it is.
 <TIME>
 === webkit: plan mode (Alt+M) ===
-high
-plan
-=== webkit: plan mode: the status line ===
-high
-plan
-0%
-$<COST>
+Context 0% full, $<COST>: details
+mode: Plan mode
+<HOSTNAME>
+V4.1 Flash
 === webkit: plan mode: the composer's placeholder ===
 Plan mode: discuss the plan, or leave it to implement (/plan off or Alt+M)…
 === webkit: the plan, in plan mode ===
@@ -468,14 +456,11 @@ Write the schema
 Test it
 <TIME>
 === webkit: plan mode off ===
-high
-auto
-=== webkit: plan mode off: the status line ===
+Context 0% full, $<COST>: details
+mode: Auto: never asks
 plan 0/2: Write the schema
-high
-auto
-0%
-$<COST>
+<HOSTNAME>
+V4.1 Flash
 === webkit: implementing ===
 ◇
 Plan mode off: the model was told it can change files
@@ -509,8 +494,8 @@ also check the docs
 Done waiting.
 <TIME>
 === webkit: phone: the drawer open: the chips ===
-model: under .sidebar, .scrim
 host: under .sidebar, .scrim
+model: under .sidebar, .scrim
 === webkit: phone: a chip's menu ===
 attach's menu: a sheet across the bottom; focus in it: true
 === webkit: pinned ===
@@ -740,17 +725,17 @@ on a phone: 0 handles
 hl-kw:let hl-kw:rec hl-kw:if hl-num:2 hl-kw:then hl-kw:else hl-num:1 hl-num:2 hl-com:(* slow *)
 hl-prop:"name" hl-str:"prigh" hl-prop:"ok" hl-con:true hl-prop:"n" hl-num:3
 === webkit: the session: a 700px chat column ===
-chat 700; chips: DeepSeek V4.1 Flash, <HOSTNAME>, icon, icon; status: 0%, $<COST>; .chat-chrome 44px high
+chat 700; chips: <HOSTNAME>, V4.1 Flash; status: Context 0% full, $<COST>: details; .chat-chrome 44px high
 .chat-chrome: fits
 .composer: fits
 the panels' toggles: 3 buttons 10px from the top, 14px from the right, clear of the jump list: true, open: Files
 === webkit: the session: a 520px chat column ===
-chat 520; chips: DeepSeek V4.1 Flash, icon, icon, icon; status: 0%; .chat-chrome 44px high
+chat 520; chips: icon, V4.1 Flash; status: Context 0% full, $<COST>: details; .chat-chrome 44px high
 .chat-chrome: fits
 .composer: fits
 the panels' toggles: 3 buttons 10px from the top, 14px from the right, clear of the jump list: true, open: Files
 === webkit: the session: a 400px chat column ===
-chat 400; chips: V4.1 Flash, icon, icon, icon; status: 0%; .chat-chrome 44px high
+chat 400; chips: icon, V4.1 Flash; status: Context 0% full, $<COST>: details; .chat-chrome 44px high
 .chat-chrome: fits
 .composer: fits
 the panels' toggles: 3 buttons 10px from the top, 14px from the right, clear of the jump list: true, open: Files
@@ -760,6 +745,7 @@ Appearance
 Sessions
 New sessions
 Models
+Usage
 Memory
 About you
 Custom instructions
@@ -788,8 +774,8 @@ Verbose
 Keyboard shortcuts
 Done
 === webkit: a dialog open: the chips ===
-model: under .modal-backdrop
 host: under .modal-backdrop
+model: under .modal-backdrop
 a choice keeps it open: true
 === webkit: settings: the sections ===
 clicked Sessions: tab Sessions, focus Sessions, showing Sessions (labelled by settings-tab-sessions)
@@ -800,17 +786,17 @@ desktop: dialog 940x704, in the window: true; sections down the side; panel fits
 phone: dialog 390x844, the screen: true; back: Settings; panel fits: true
 Esc closes it, the editor has the focus: true
 === webkit: the session's bar: a 900px chat column without the sidebar ===
-chat 900; chips: DeepSeek V4.1 Flash, <HOSTNAME>, provider's default, auto; status: 0%, $<COST>; .chat-chrome 44px high
+chat 900; chips: <HOSTNAME>, V4.1 Flash; status: Context 0% full, $<COST>: details; .chat-chrome 44px high
 .chat-chrome: fits
 .composer: fits
 the panels' toggles: 4 buttons 10px from the top, 14px from the right, clear of the jump list: true, open: Files
 === webkit: the session's bar: a 600px chat column without the sidebar ===
-chat 600; chips: DeepSeek V4.1 Flash, icon, icon, icon; status: 0%; .chat-chrome 44px high
+chat 600; chips: icon, V4.1 Flash; status: Context 0% full, $<COST>: details; .chat-chrome 44px high
 .chat-chrome: fits
 .composer: fits
 the panels' toggles: 4 buttons 10px from the top, 14px from the right, clear of the jump list: true, open: Files
 === webkit: the session's bar: a 400px chat column without the sidebar ===
-chat 400; chips: V4.1 Flash, icon, icon, icon; status: 0%; .chat-chrome 44px high
+chat 400; chips: icon, V4.1 Flash; status: Context 0% full, $<COST>: details; .chat-chrome 44px high
 .chat-chrome: fits
 .composer: fits
 the panels' toggles: 4 buttons 10px from the top, 14px from the right, clear of the jump list: true, open: Files
@@ -825,8 +811,8 @@ tray: under the composer
 centred: true
 controls: all in view
 === webkit: temporary: desktop: a chip's menu ===
-under the pointer on off: the item (hovered: true)
-the chip: changed (off chosen)
+under the pointer on Off: the item (hovered: true)
+the chip: changed (Off chosen)
 === webkit: temporary: desktop: Temporary on ===
 heading: Temporary session | Not saved and not listed. Deleted when you leave.
 listed: 0
@@ -866,8 +852,8 @@ tray: over the composer
 composer at the foot: true
 controls: all in view
 === webkit: temporary: 390x844: a chip's menu ===
-under the pointer on o3-pro: the item
-the chip: changed (o3-pro chosen)
+under the pointer on Off: the item
+the chip: changed (Off chosen)
 === webkit: temporary: 390x844: Temporary on ===
 heading: Temporary session | Not saved and not listed. Deleted when you leave.
 listed: 0
@@ -907,8 +893,8 @@ tray: over the composer
 composer at the foot: true
 controls: all in view
 === webkit: temporary: 320x640: a chip's menu ===
-under the pointer on GPT-5.6 Terra: the item
-the chip: changed (GPT-5.6 Terra chosen)
+under the pointer on Off: the item
+the chip: changed (Off chosen)
 === webkit: temporary: 320x640: Temporary on ===
 heading: Temporary session | Not saved and not listed. Deleted when you leave.
 listed: 0
@@ -984,6 +970,7 @@ Appearance
 Sessions
 New sessions
 Models
+Usage
 Memory
 About you
 Custom instructions
@@ -2868,7 +2855,7 @@ none
 === webkit: search: the sidebar's row and the composer's ===
 New session: wide, 34px high
 Search: narrow, 34px high
-composer: Add files or images, DeepSeek V4.1 Flash, server-laptop, Thinking, Auto, Context 0% full, Dictate, Send
+composer: Add files or images, Context 0% full, $0.00, server-laptop, Model, Send
 === webkit: search: Ctrl+K: the session's settings, recent sessions, commands ===
 focus in the filter: control-input
 -- This session --
@@ -3130,88 +3117,102 @@ a tap: handed over {"url":"https://example.com/docs","newWindow":true}; the brow
 === webkit: desktop_links: errors ===
 none
 === webkit: card: idle ===
-row 1: 0% | $<COST>
-lamps: 0; accented: nothing; 28px high
+ring: Context 0% full, $<COST>: details; Ready; turning: false; calm
+mode: Auto: never asks; over the chat: nothing
 fits
 === webkit: card: working, a subagent running ===
-row 1: Running tools | 0% | $<COST>
-lamps: 1; accented: Running tools; 28px high
+ring: Context 0% full, $<COST>: details; Running tools; turning: true; calm
+mode: Auto: never asks; over the chat: nothing
 fits
 === webkit: card: ready, a subagent running ===
-row 1: 0% | $<COST>
-lamps: 0; accented: nothing; 28px high
+ring: Context 0% full, $<COST>: details; Ready; turning: false; calm
+mode: Auto: never asks; over the chat: nothing
 fits
 === webkit: card: idle, a mode on ===
-row 1: 0% | $<COST>
-lamps: 0; accented: nothing; 28px high
+ring: Context 0% full, $<COST>: details; Ready; turning: false; calm
+mode: Plan mode; over the chat: nothing
 fits
 === webkit: card: the sidebar at its narrowest ===
-row 1: 0% | $<COST>
-lamps: 0; accented: nothing; 28px high
+ring: Context 0% full, $<COST>: details; Ready; turning: false; calm
+mode: Plan mode; over the chat: nothing
 fits
 === webkit: card: the composer's chips ===
-chips 1: DeepSeek V4.1 Flash | <HOSTNAME> | provider's default | plan
+chips 1: <HOSTNAME> | V4.1 Flash
 chip problems: none
 === webkit: card: another host to choose ===
 ✓ <HOSTNAME>
 build-runner-eu-west-a-long-hostname (in <SESSION>)
 === webkit: card: on a host with a long name ===
-row 1: 0% | $<COST>
-lamps: 0; accented: nothing; 28px high
+ring: Context 0% full, $<COST>: details; Ready; turning: false; calm
+mode: Plan mode; over the chat: nothing
 fits
-chips 1: DeepSeek V4.1 Flash | build-runner-eu-west-a-long-hostname | provider's default | plan
+chips 1: build-runner-eu-west-a-long-hostname | V4.1 Flash
 chip problems: none (host name truncated)
-=== webkit: card: the context opens the session's details ===
+=== webkit: card: the ring's card's Details open the session's details ===
 Session
 === webkit: card: the sidebar closed ===
-row 1: 0% | $<COST>
-lamps: 0; accented: nothing; 28px high
+ring: Context 0% full, $<COST>: details; Ready; turning: false; calm
+mode: Plan mode; over the chat: nothing
 fits
 === webkit: card: a phone ===
-row 1: 0%
-lamps: 0; accented: nothing; 40px high
+ring: Context 0% full, $<COST>: details; Ready; turning: false; calm
+mode: Plan mode; over the chat: nothing
 fits
-chips 1: V4.1 Flash | icon
+chips 1: icon | V4.1 Flash
 chip problems: none
 === webkit: card: the host stopped answering ===
-chips 1: V4.1 Flash | icon
+chips 1: icon | V4.1 Flash
 chip problems: none
 <HOSTNAME> <CWD>
 ✓ (dimmed) build-runner-eu-west-a-long-hostname offline: waiting for it to reconnect
 build-runner-eu-west-a-long-hostname is offline: pick another host, or run prigh tool-host -connect there to bring it back.
 === webkit: card: the host is back ===
-chips 1: V4.1 Flash | icon
+chips 1: icon | V4.1 Flash
 chip problems: none
-=== webkit: status: desktop 1280: the status ===
-shows: true; clear of the mic and send: true
+=== webkit: status: desktop 1280: the row ===
+the row: attach, ring, host, model, send; in order: true; the chips at the right, apart from the ring: true
+the ring shows: true; clear of send: true
 the row fits: true
-it says: 36%
-=== webkit: status: desktop 700: the status ===
-shows: true; clear of the mic and send: true
+the model: V4.1 Flash; whole: true
+the ring says: Context 36% full, $0.03: details
+no glow around the focused composer: true
+=== webkit: status: desktop 700: the row ===
+the row: attach, ring, host, model, send; in order: true; the chips at the right, apart from the ring: true
+the ring shows: true; clear of send: true
 the row fits: true
-it says: 36%
-=== webkit: status: desktop: the chips' menus act ===
-thinking by mouse: high; menu closed: true
-mode by mouse: ask; menu closed: true
-thinking by keyboard: max; menu closed: true
-mode by keyboard: auto-edit; menu closed: true
+the model: V4.1 Flash; whole: true
+the ring says: Context 36% full, $0.03: details
+no glow around the focused composer: true
+=== webkit: status: desktop: the model's menu opens opaque ===
+opacity as it appears: 1
+the reasoning column: true; the access mode: Full access
+=== webkit: status: desktop: the model's menu acts ===
+reasoning by mouse: the chip: V4.1 Flash; the card: Low; menu closed: true
+mode by mouse: the chip: V4.1 Flash; the card: Asks: edits & commands; menu closed: true
+reasoning by keyboard: the chip: V4.1 Flash; the card: High; menu closed: true
+mode by keyboard: the chip: V4.1 Flash; the card: Asks: commands; menu closed: true
 === webkit: status: desktop: a click outside closes, and goes no further ===
 model: closed: true; the filter's menu opened: false
 host: closed: true; the filter's menu opened: false
 +: closed: true; the filter's menu opened: false
-thinking: closed: true; the filter's menu opened: false
-mode: closed: true; the filter's menu opened: false
-=== webkit: status: desktop: the status's details ===
-on hover: true
-on keyboard focus (Context 36% full): true
-the context opens: Session
+=== webkit: status: desktop: the ring's card ===
+on hover: true; it says: 36% used · compacts at 200k (20%)
+status: Ready; reasoning: High; mode: Asks: commands
+on keyboard focus (Context 36% full, $0.03): true
+a click keeps it open: true
+its Details open: Session
 === webkit: status: 390x844: the composer's row ===
 the row fits: true
-it shows: Add files or images, V4.1 Flash, <HOSTNAME>, Context 36% full: the session's details, Dictate, Send
-=== webkit: status: 390x844: the ⋯ sheet's choices act ===
-Thinking: high; reopened: high
-Mode: ask; reopened: ask
-Transcript: verbose; reopened: verbose
+the row: attach, ring, host, model, send; in order: true
+the model: V4.1 Flash; whole: true
+under 40px: none
+=== webkit: status: 390x844: the sheets' choices act ===
+Reasoning: reopened: Low; the chip: V4.1 Flash
+Access: reopened: Auto-edit; the chip: V4.1 Flash
+Transcript: reopened: verbose
+=== webkit: status: 390x844: the ring's card ===
+a sheet at the foot, the screen's width: true; mode: Asks: commands
+a tap outside closes it: true
 === webkit: status: 390x844: a tap outside closes, and goes no further ===
 model: closed: true; the drawer opened: false
 host: closed: true; the drawer opened: false
@@ -3229,11 +3230,16 @@ the viewer at fit, aside: 1 / 2 to 2 / 2
 down: closed: true
 === webkit: status: 320x640: the composer's row ===
 the row fits: true
-it shows: Add files or images, V4.1 Flash, <HOSTNAME>, Context 36% full: the session's details, Dictate, Send
-=== webkit: status: 320x640: the ⋯ sheet's choices act ===
-Thinking: high; reopened: high
-Mode: ask; reopened: ask
-Transcript: verbose; reopened: verbose
+the row: attach, ring, host, model, send; in order: true
+the model: V4.1 Flash; whole: true
+under 40px: none
+=== webkit: status: 320x640: the sheets' choices act ===
+Reasoning: reopened: Low; the chip: V4.1 Flash
+Access: reopened: Auto-edit; the chip: V4.1 Flash
+Transcript: reopened: verbose
+=== webkit: status: 320x640: the ring's card ===
+a sheet at the foot, the screen's width: true; mode: Asks: commands
+a tap outside closes it: true
 === webkit: status: 320x640: a tap outside closes, and goes no further ===
 model: closed: true; the drawer opened: false
 host: closed: true; the drawer opened: false
@@ -3267,7 +3273,7 @@ Jump to a message, Filter the transcript, Files, Terminal, Settings
 === webkit: mobile: 390x844: the settings' list ===
 ok
 === webkit: mobile: 390x844: the settings ===
-Appearance, Sessions, New sessions, Models, Memory, About you, Custom instructions, MCP servers, Git hosting, Account
+Appearance, Sessions, New sessions, Models, Usage, Memory, About you, Custom instructions, MCP servers, Git hosting, Account
 === webkit: mobile: 390x844: settings: appearance ===
 ok
 title: Appearance; back: Settings
@@ -3276,6 +3282,10 @@ back to the list: true
 === webkit: mobile: 390x844: settings: models ===
 ok
 choice controls fit: true
+=== webkit: mobile: 390x844: settings: models, at its switches ===
+ok
+=== webkit: mobile: 390x844: settings: usage ===
+ok
 === webkit: mobile: 390x844: the drawer ===
 ok
 === webkit: mobile: 390x844: the control centre ===
@@ -3318,7 +3328,7 @@ Jump to a message, Filter the transcript, Files, Terminal, Settings
 === webkit: mobile: 320x640: the settings' list ===
 ok
 === webkit: mobile: 320x640: the settings ===
-Appearance, Sessions, New sessions, Models, Memory, About you, Custom instructions, MCP servers, Git hosting, Account
+Appearance, Sessions, New sessions, Models, Usage, Memory, About you, Custom instructions, MCP servers, Git hosting, Account
 === webkit: mobile: 320x640: settings: appearance ===
 ok
 title: Appearance; back: Settings
@@ -3327,6 +3337,10 @@ back to the list: true
 === webkit: mobile: 320x640: settings: models ===
 ok
 choice controls fit: true
+=== webkit: mobile: 320x640: settings: models, at its switches ===
+ok
+=== webkit: mobile: 320x640: settings: usage ===
+ok
 === webkit: mobile: 320x640: the drawer ===
 ok
 === webkit: mobile: 320x640: the control centre ===
@@ -3662,9 +3676,9 @@ fits: true
 === webkit: sessions settings: errors ===
 (none)
 === webkit: new sessions: the session open, before ===
-model: DeepSeek V4.1 Flash: switch model (Ctrl+L)
-thinking: Thinking: provider's default: how much the model reasons before it answers (Alt+T cycles, /thinking)
-mode: Tools run without asking (Alt+M cycles, /mode picks)
+model: DeepSeek V4.1 Flash, reasoning High: models, reasoning and access (Ctrl+L)
+thinking: High
+mode: Auto: never asks
 host: Tools run on <host>, in <cwd> (/host switches)
 === webkit: new sessions: the built-ins ===
 New sessions
@@ -3795,14 +3809,14 @@ Sessions without their own /budget start no turn once they have cost this much, 
 “lots” isn't an amount of dollars: type one like 5 or 2.50, or clear the field for no budget.
 USD
 === webkit: new sessions: the session open keeps its own ===
-model: DeepSeek V4.1 Flash: switch model (Ctrl+L)
-thinking: Thinking: provider's default: how much the model reasons before it answers (Alt+T cycles, /thinking)
-mode: Tools run without asking (Alt+M cycles, /mode picks)
+model: DeepSeek V4.1 Flash, reasoning High: models, reasoning and access (Ctrl+L)
+thinking: High
+mode: Auto: never asks
 host: Tools run on <host>, in <cwd> (/host switches)
 === webkit: new sessions: a new session ===
-model: Claude Fable 5: switch model (Ctrl+L)
-thinking: Thinking: high: how much the model reasons before it answers (Alt+T cycles, /thinking)
-mode: Bash, job_input, edits and MCP tools ask first (Alt+M cycles, /mode picks)
+model: Claude Fable 5, reasoning High: models, reasoning and access (Ctrl+L)
+thinking: High
+mode: Asks: edits & commands
 host: Tools run on laptop, in <dir>/laptop-home/proj (/host switches)
 Budget $2.50, $0.00 spent: /budget DOLLARS changes it, /budget off removes it
 Fallback: deepseek/deepseek-flash (now on anthropic/claude-fable-5)
@@ -3816,14 +3830,14 @@ Auto
 Chat
 default_model="anthropic/claude-fable-5" default_thinking="high" approval_mode="ask" default_chat_mode=true default_host="host-laptop" default_cwd="~/proj" fallback_models=["deepseek/deepseek-flash"] max_budget_usd=2.5
 === webkit: new sessions: a new session, a chat ===
-model: Claude Fable 5: switch model (Ctrl+L)
-thinking: Thinking: high: how much the model reasons before it answers (Alt+T cycles, /thinking)
-mode: A chat without the tool host: no files, commands or project, only the web and other host-free tools, until you leave it (/chat off or Alt+M) (Alt+M cycles, /mode picks)
+model: Claude Fable 5, reasoning High: models, reasoning and access (Ctrl+L)
+thinking: High
+mode: Chat: no tool host
 host: Chat mode uses no tool host (/chat off or Alt+M to work on one)
 === webkit: new sessions: leaving the chat ===
-model: Claude Fable 5: switch model (Ctrl+L)
-thinking: Thinking: high: how much the model reasons before it answers (Alt+T cycles, /thinking)
-mode: Bash, job_input, edits and MCP tools ask first (Alt+M cycles, /mode picks)
+model: Claude Fable 5, reasoning High: models, reasoning and access (Ctrl+L)
+thinking: High
+mode: Asks: edits & commands
 host: Tools run on laptop, in <dir>/laptop-home/proj (/host switches)
 === webkit: new sessions: phone 390x844 ===
 fits: yes; targets: all ok
@@ -3931,6 +3945,68 @@ deleting fits: yes; targets: all ok
 editing fits: yes; targets: all ok
 back: Memory | What you asked the model to remember, for later sessions. Kept on the backend, for your account.
 === webkit: memory: errors ===
+(none)
+=== webkit: usage: opened ===
+Usage
+How much of your Claude and ChatGPT subscriptions' usage limits you have used, as the providers report it (read when you open this page), and whether a run stopped by one carries on when it resets.
+AT A LIMIT
+Resume after a usage limit
+A run stopped by a provider's usage limit carries on by itself when the limit resets, if the provider says when. Off: it stays stopped until you send a message.
+Subscription limits
+Read TIME (just now). Updated when you open this page or press Refresh.
+Refresh
+CLAUDE
+5-hour session
+Resets in 2h 15m · TIME
+33% used
+Weekly · all models
+Resets in 3d 4h · TIME
+91% used
+Weekly · Opus
+Reset time not reported
+4% used
+CHATGPT
+Plus
+5-hour session
+Resets in 43m · TIME
+72% used
+Weekly
+Resets in 6d · TIME
+12% used
+bars: 5-hour session used=33, Weekly · all models used=91, Weekly · Opus used=4, 5-hour session used=72, Weekly used=12
+asked: Claude 1, ChatGPT 1
+=== webkit: usage: refreshed ===
+asked: Claude 2, ChatGPT 2; ChatGPT's session: 75% used
+=== webkit: usage: Claude rate limited ===
+Usage
+How much of your Claude and ChatGPT subscriptions' usage limits you have used, as the providers report it (read when you open this page), and whether a run stopped by one carries on when it resets.
+AT A LIMIT
+Resume after a usage limit
+A run stopped by a provider's usage limit carries on by itself when the limit resets, if the provider says when. Off: it stays stopped until you send a message.
+Subscription limits
+Read TIME (just now). Updated when you open this page or press Refresh.
+Refresh
+CLAUDE
+Could not read the limits
+Claude is limiting how often usage is read (HTTP 429): Refresh in a minute
+CHATGPT
+Plus
+5-hour session
+Resets in 43m · TIME
+75% used
+Weekly
+Resets in 6d · TIME
+12% used
+bars: 5-hour session used=75, Weekly used=12
+=== webkit: usage: reopened ===
+asked again: 2
+=== webkit: usage: phone 390x844 ===
+fits: yes; targets: all ok
+back: Usage | How much of your Claude and ChatGPT subscriptions' usage limits you have used, as the providers report it (read when you open this page), and whether a run stopped by one carries on when it resets.
+=== webkit: usage: phone 320x640 ===
+fits: yes; targets: all ok
+back: Usage | How much of your Claude and ChatGPT subscriptions' usage limits you have used, as the providers report it (read when you open this page), and whether a run stopped by one carries on when it resets.
+=== webkit: usage: errors ===
 (none)
 === webkit: user info: moved from user_info.md ===
 About you
@@ -4529,15 +4605,15 @@ the model was told: true
 banner: 0
 === webkit: computer (small): errors ===
 none
-=== webkit: smart (desktop): the mode chip's menu ===
-Asks: edits & commands bash, job_input, edits and MCP tools ask first
-Asks: commands file edits run; bash, job_input and MCP tools ask first
-Smart: a model decides edits in the project run; the approval model lets other calls run or asks you, saying why (/approval-model)
-Auto: never asks tools run without asking
-Plan mode read-only planning, until you leave it (/plan off or Alt+M): no file edits; bash, job_input and MCP tools ask first
-Chat: no tool host a chat without the tool host: no files, commands or project, only the web and other host-free tools, until you leave it (/chat off or Alt+M)
-=== webkit: smart (desktop): the mode chip ===
-smart: Edits in the project run; the approval model lets other calls run or asks you, saying why (/approval-model) (Alt+M cycles, /mode picks)
+=== webkit: smart (desktop): the model menu's access ===
+Ask first Asks: edits & commands bash, job_input, edits and MCP tools ask first
+Auto-edit Asks: commands file edits run; bash, job_input and MCP tools ask first
+Smart Smart: a model decides edits in the project run; the approval model lets other calls run or asks you, saying why (/approval-model)
+Full access Auto: never asks tools run without asking
+Plan Plan mode read-only planning, until you leave it (/plan off or Alt+M): no file edits; bash, job_input and MCP tools ask first
+Chat Chat: no tool host a chat without the tool host: no files, commands or project, only the web and other host-free tools, until you leave it (/chat off or Alt+M)
+=== webkit: smart (desktop): the access mode ===
+Smart: Edits in the project run; the approval model lets other calls run or asks you, saying why (/approval-model) (Alt+M cycles, /mode picks)
 === webkit: smart (desktop): left to the user ===
 Confirm (smart) Run bash: rm -rf ~/.cache/demo? deepseek/deepseek-flash left this to you: deletes files outside the project y Allow once a Always allow bash(rm:*) this session n Deny r Deny, saying why
 allow: in view, tall enough
@@ -4568,7 +4644,7 @@ Approval model; first: Default the session's model
 chosen: Claude Haiku
 === webkit: smart (desktop): errors ===
 none
-=== webkit: smart (phone): the ⋯ sheet ===
+=== webkit: smart (phone): the model sheet ===
 shows smart: true
 fits the width
 === webkit: smart (phone): left to the user ===
@@ -4601,7 +4677,7 @@ Approval model; first: Default the session's model
 chosen: Claude Haiku
 === webkit: smart (phone): errors ===
 none
-=== webkit: smart (small): the ⋯ sheet ===
+=== webkit: smart (small): the model sheet ===
 shows smart: true
 fits the width
 === webkit: smart (small): left to the user ===
@@ -4681,31 +4757,23 @@ page fits: true; overflowing: 0
 === webkit: ui: errors ===
 none
 === webkit: chat: a new session with no tool host ===
-mode chip: chat
+mode: Chat: no tool host
 host chip: no host
 placeholder: Chat, without a tool host: no files or commands. Ask anything…
 strip: (none)
 === webkit: chat: a reply, with no tool host ===
 you: what is a monad? (time)
 prigh: faux reply deepseek-flash 10 in 5 out (time)
-=== webkit: chat: the mode menu ===
-When tools ask first
-Alt+M cycles
-Asks: edits & commands
-bash, job_input, edits and MCP tools ask first
-Asks: commands
-file edits run; bash, job_input and MCP tools ask first
-Smart: a model decides
-edits in the project run; the approval model lets other calls run or asks you, saying why (/approval-model)
-Auto: never asks
-tools run without asking
-Plan mode
-read-only planning, until you leave it (/plan off or Alt+M): no file edits; bash, job_input and MCP tools ask first
-Chat: no tool host
-a chat without the tool host: no files, commands or project, only the web and other host-free tools, until you leave it (/chat off or Alt+M)
-Enter chooses, ← → the next setting, Esc closes
+=== webkit: chat: the model menu's access ===
+A chat without the tool host: no files, commands or project, only the web and other host-free tools, until you leave it (/chat off or Alt+M) (Alt+M cycles, /mode picks)
+Ask first Asks: edits & commands: bash, job_input, edits and MCP tools ask first
+Auto-edit Asks: commands: file edits run; bash, job_input and MCP tools ask first
+Smart Smart: a model decides: edits in the project run; the approval model lets other calls run or asks you, saying why (/approval-model)
+Full access Auto: never asks: tools run without asking
+Plan Plan mode: read-only planning, until you leave it (/plan off or Alt+M): no file edits; bash, job_input and MCP tools ask first
+✓ Chat Chat: no tool host: a chat without the tool host: no files, commands or project, only the web and other host-free tools, until you leave it (/chat off or Alt+M)
 === webkit: chat: mode ask, no tool host ===
-mode chip: ask
+mode: Asks: edits & commands
 host chip: no host
 placeholder: Working in $CWD. Ask prigh anything…
 strip: No tool host connected Chat without a host
@@ -4713,7 +4781,7 @@ toast: No tool host connected: your message stays here. Chat without a host (ove
 draft: and a functor?
 messages: 1
 === webkit: chat: chat without a host: sent ===
-mode chip: chat
+mode: Chat: no tool host
 host chip: no host
 placeholder: Chat, without a tool host: no files or commands. Ask anything…
 strip: (none)
@@ -4721,32 +4789,32 @@ draft: ""
 you: what is a monad? (time) | and a functor? (time)
 replies: 2
 === webkit: chat: phone 390x844: chat ===
-mode chip: (in the ⋯ sheet)
+mode: Chat: no tool host
 host chip: no host
 placeholder: Chat: no files or commands…
 strip: (none)
 audit: ok
-=== webkit: chat: phone 390x844: the ⋯ sheet's mode ===
-Mode ask auto-edit smart auto plan [chat]
+=== webkit: chat: phone 390x844: the model sheet's access ===
+Ask first | Auto-edit | Smart | Full access | Plan | [Chat]
 audit: ok
 === webkit: chat: phone 390x844: mode ask, no tool host ===
-mode chip: (in the ⋯ sheet)
+mode: Asks: edits & commands
 host chip: no host
 placeholder: Working in $CWD. Ask prigh anything…
 strip: No tool host connected Chat without a host
 audit: ok
 after Chat without a host: strip (none)
 === webkit: chat: phone 320x640: chat ===
-mode chip: (in the ⋯ sheet)
+mode: Chat: no tool host
 host chip: no host
 placeholder: Chat: no files or commands…
 strip: (none)
 audit: ok
-=== webkit: chat: phone 320x640: the ⋯ sheet's mode ===
-Mode ask auto-edit smart auto plan [chat]
+=== webkit: chat: phone 320x640: the model sheet's access ===
+Ask first | Auto-edit | Smart | Full access | Plan | [Chat]
 audit: ok
 === webkit: chat: phone 320x640: mode ask, no tool host ===
-mode chip: (in the ⋯ sheet)
+mode: Asks: edits & commands
 host chip: no host
 placeholder: Working in $CWD. Ask prigh anything…
 strip: No tool host connected Chat anyway

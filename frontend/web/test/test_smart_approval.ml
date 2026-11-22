@@ -24,9 +24,10 @@ let%expect_test "the mode chip in smart mode, and Alt+M on from it" =
   let h = H.create ~state:(state "auto-edit") () in
   H.key h "m" ~alt:true;
   H.reply h "set_mode" (state "smart");
-  H.show h ~selector:".mode-chip";
-  H.quiet h (fun () -> H.click h ~selector:".mode-chip");
-  H.text h ~selector:".popover-items";
+  H.quiet h (fun () -> H.click h ~selector:".model-chip");
+  H.text h ~selector:".model-access-button";
+  H.quiet h (fun () -> H.click h ~selector:".model-access-button");
+  H.text h ~selector:".model-access-menu";
   [%expect
     {|
     Cycle_mode
@@ -36,28 +37,17 @@ let%expect_test "the mode chip in smart mode, and Alt+M on from it" =
       (Mode_set
        "Mode: smart (edits in the project run; the approval model lets other calls run or asks you, saying why (/approval-model))")))
     (Expire_toast (id 0) (after_ms 6000))
-    <button type="button"
-            title="Edits in the project run; the approval model lets other calls run or asks you, saying why (/approval-model) (Alt+M cycles, /mode picks)"
-            aria-label="Smart: a model decides"
-            aria-haspopup="dialog"
-            aria-expanded="false"
-            class="btn chip-button mode-chip"
-            @on_click>
-      <icon class="shield"> </icon>
-      <span class="chip-label"> smart </span>
-    </button>
-    (Open_chip Mode)
-    Asks: edits & commands bash, job_input, edits and MCP tools ask first
-    Asks: commands file edits run; bash, job_input and MCP tools ask first
-    ✓ Smart: a model decides edits in the project run; the approval model lets other calls run or asks you, saying why (/approval-model)
-    Auto: never asks tools run without asking
-    Plan mode read-only planning, until you leave it (/plan off or Alt+M): no file edits; bash, job_input and MCP tools ask first
-    Chat: no tool host a chat without the tool host: no files, commands or project, only the web and other host-free tools, until you leave it (/chat off or Alt+M)
+    (Open_chip Model)
+    (Smart)
+    Model_menu_access
+    (Ask first Asks: edits & commands) (Auto-edit Asks: commands) (Smart Smart: a model decides ✓) (Full access Auto: never asks) (Plan Plan mode) (Chat Chat: no tool host)
     |}];
+  H.quiet h (fun () -> H.key h "Escape" ~target:Field);
   H.quiet h (fun () -> H.key h "Escape" ~target:Field);
   H.key h "m" ~alt:true;
   [%expect
     {|
+    Close_dialog
     Close_dialog
     Cycle_mode
     (Rpc (method_ set_mode)

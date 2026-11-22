@@ -2,18 +2,7 @@ open! Core
 open! Import
 
 (** The chips that open a menu over themselves ({!Chip}, a
-    [Dialog.Popover]): the composer's (model, host) and the session's
-    thinking level and mode beside them. *)
-
-(** The session's thinking level and mode, one family of chips (an icon and
-    a word: a brain and the level, a shield and the mode's short name) that
-    open their menus over them (Alt+T, Alt+M cycle; /thinking, /mode). [cls]
-    says where they are (CSS styles them by it). *)
-val view
-  :  ?cls:string
-  -> App.Model.t
-  -> inject:(App.Action.t -> unit Effect.t)
-  -> Node.t
+    [Dialog.Popover]): the composer's host, model and paperclip. *)
 
 (** [chip]'s button with its menu, when open, positioned over or under it. *)
 val anchor

@@ -502,6 +502,7 @@ let%expect_test "model matching" =
     ; thinking_default = None
     ; cost = { input = 1.; output = 2.; cache_read = 0.1 }
     ; image_limit = None
+    ; legacy = false
     }
   in
   let models =
@@ -719,14 +720,13 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /memory [on|off]                   the notes the model saved when you asked it to remember something (Ctrl+D forgets one); on or off gives the model the memory tool or takes it away
     /instructions [add TEXT|on|off]    your custom instructions, in the context of every session (Enter shows one, Ctrl+D removes it): add TEXT adds one; on or off lets the model add, edit and remove them or not; prigh-web's Settings edits them
     /user-info [FIELD VALUE|clear]     what you set about yourself for the model (name, country, time zone, units...), in the context of every session (unlike memory, which it looks up): show it, set a field (an empty VALUE clears it), or clear them all
-    /resume [now|cancel]               show, run now or cancel the automatic resume after a usage limit
+    /resume [now|cancel|on|off]        show, run now or cancel the automatic resume after a usage limit, or turn it on or off
     /downsize-images                   send the conversation's images smaller (after the model refused one as too large) and retry a failed reply
     /compact [instructions]            summarise older messages to free context
     /compaction [at|model|mask ...]    show when conversations are compacted and what summarises them; at TOKENS|off: also once the context exceeds TOKENS, not only at 80% of the window; model MODEL|off: the model that writes the summaries (off: the session's); mask on|off: replace old tool outputs with placeholders first
     /generate-model [MODEL|off]        show which model drafts commit messages, pull requests and branch names (✦ Generate); MODEL|off: draft them with MODEL (off: the session's)
     /approval-model [MODEL|off]        show which model judges tool calls in smart mode (Alt+M, /mode smart); MODEL|off: judge them with MODEL (off: the session's)
     /naming [model MODEL|off]          show which model names sessions and subagents; model MODEL|off: name them with MODEL (off: the drafting model, else the session's)
-    /dictation [model MODEL|off]       show which model transcribes dictation (speech to text); model MODEL|off: transcribe with MODEL, an OpenAI or OpenAI-compatible provider's (off: openai/gpt-4o-mini-transcribe)
     /trim [after|undo|show|hide]       drop everything before a message from the model's context: pick the message (newest first, with what it frees), confirm; after: everything after a message instead (what you send later stays); undo brings the latest trim back, show/hide unfolds the trimmed messages
     /delete [undo|session...]          drop a message from the transcript and the model's context (a reply with its tool results): pick it, newest first; undo brings the latest deletion back; with sessions: delete them, after a confirmation
     /diff [path]                       show the uncommitted changes where the tools run (git diff, untracked files too)

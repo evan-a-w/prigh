@@ -222,6 +222,25 @@ exec setpriv --reuid=1000 --regid=1000 --init-groups env -i HOME=/home/prigh USE
 $ PRIGH_DOCKER_UID=1000 prigh-docker prigh sessions list
 exec prigh sessions list
 
+=== volumes not writable: wait (without sleeping in a dry run), then say what to check
+$ PRIGH_TOKEN=tok PRIGH_VOLUME_WAIT=0 prigh-docker 
+prigh-docker: not writable after 0s: /nix (Permission denied). Check the volumes' filesystems on the host (docker inspect prigh --format '{{json .Mounts}}'): mounted read-write, no disk errors in dmesg that remounted them read-only, and a disk mounted at boot mounted before Docker starts (systemd: RequiresMountsFor= on docker.service). PRIGH_VOLUME_WAIT=0 is how long the start waits for them.
+[exit 2]
+$ PRIGH_TOKEN=tok PRIGH_VOLUME_WAIT=4s prigh-docker 
+prigh-docker: waiting up to 4s for /nix (Permission denied) to be writable
+prigh-docker: not writable after 4s: /nix (Permission denied). Check the volumes' filesystems on the host (docker inspect prigh --format '{{json .Mounts}}'): mounted read-write, no disk errors in dmesg that remounted them read-only, and a disk mounted at boot mounted before Docker starts (systemd: RequiresMountsFor= on docker.service). PRIGH_VOLUME_WAIT=4s is how long the start waits for them.
+[exit 2]
+$ PRIGH_MODE=tui PRIGH_VOLUME_WAIT=0 prigh-docker 
+prigh-docker: not writable after 0s: /nix (Permission denied). Check the volumes' filesystems on the host (docker inspect prigh --format '{{json .Mounts}}'): mounted read-write, no disk errors in dmesg that remounted them read-only, and a disk mounted at boot mounted before Docker starts (systemd: RequiresMountsFor= on docker.service). PRIGH_VOLUME_WAIT=0 is how long the start waits for them.
+[exit 2]
+$ PRIGH_VOLUME_WAIT=0 prigh-docker prigh sessions list
+prigh-docker: not writable after 0s: /nix (Permission denied). Check the volumes' filesystems on the host (docker inspect prigh --format '{{json .Mounts}}'): mounted read-write, no disk errors in dmesg that remounted them read-only, and a disk mounted at boot mounted before Docker starts (systemd: RequiresMountsFor= on docker.service). PRIGH_VOLUME_WAIT=0 is how long the start waits for them.
+[exit 2]
+$ PRIGH_TOKEN=tok PRIGH_VOLUME_WAIT=soon prigh-docker 
+prigh-docker: PRIGH_VOLUME_WAIT='soon': use a number with s, m, h or d (e.g. 2m), or 0 not to wait
+[exit 2]
+prigh-docker: mode=web users: default(10000); tool hosts: one per user, as that user; nix: daemon started; garbage: collects while Nix builds below 15.0 GiB free, up to 30.0 GiB, and every 12h deleting profile generations older than 7 days
+
 === Nix garbage collection: limits sized from the volume, the schedule
 prigh-docker: mode=web users: default(10000); tool hosts: one per user, as that user; nix: daemon started; garbage: collects while Nix builds below 1.2 GiB free, up to 3.0 GiB, and every 12h deleting profile generations older than 7 days
 --- /run/prigh/nix.conf

@@ -514,6 +514,20 @@ two can share one.
 - `Oauth_openai_codex` — auth.openai.com authorization with a random state,
   callback on port 1455, form-encoded exchange/refresh, ChatGPT account id
   extracted from the access token's JWT claims.
+- `Subscription_usage` — the `usage_limits` RPC (prigh-web's Settings →
+  Usage, `/usage`): with the stored logins (refreshed as for model
+  requests by `Provider_auth.resolve`), Claude's `GET
+  api.anthropic.com/api/oauth/usage` (beta `oauth-2025-04-20`, a
+  `claude-code/VERSION` user agent; named windows `five_hour`, `seven_day`,
+  `seven_day_opus`… as `{utilization, resets_at}`, or the newer `limits`
+  rows, preferred when present) and ChatGPT's `GET
+  chatgpt.com/backend-api/wham/usage` (`chatgpt-account-id`; `plan_type`,
+  `rate_limit.primary_window`/`secondary_window` and
+  `additional_rate_limits`), both at once. Unknown windows keep their
+  names; every failure is a per-provider `error` saying what to do (sign in
+  again, Refresh later). `PRIGH_USAGE_ORIGIN` replaces both origins for
+  prigh-web's e2e. Asked only when the page opens or on Refresh: Anthropic
+  rate-limits the endpoint hard.
 - `Login_manager` — runs at most one flow at a time in a background fiber and
   turns its prompts and notices into `auth` events; the client answers
   prompts by id (`auth_respond`) or cancels (`auth_cancel`). A prompt that the
@@ -1678,13 +1692,14 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   `goal_max_continuations`, `resume_on_limit_reset`, `ask_user_timeout_seconds` (default
   300, 0 = never), `generate_model` (the drafting model, `/generate-model`),
   `approval_model` (smart mode's judge, `/approval-model`; an unknown
-  one is a startup warning), `naming_model`, `dictation_model`, `mask_observations` (default true),
+  one is a startup warning), `naming_model`, `mask_observations` (default true),
   `compact_at_tokens` (default 200000,
   0 = 80% of the window only), `compaction_model` and `snippets`, the
   frontends' `/snippet` texts, validated by `Snippet`), loaded at agent
   creation, read/written through `get_config`/`set_config`; unknown fields
   are ignored by `load` but reported by `problems` (with wrong-typed ones;
-  a leftover `reminders` says reminders are per session now),
+  a leftover `reminders` says reminders are per session now; a retired
+  setting, `dictation_model`, is ignored quietly and dropped by `save`),
   which `Model_registry` adds to its problems along with an unknown
   `default_model`. Each namespace has its own file, so each has its own
   defaults; `archive_after_days` (default 7, 0 = never) is when an
@@ -1697,8 +1712,7 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   resolves `fallback_models`, `generate_model`, `compaction_model` and
   `naming_model`
   like `set_model` (stored as keys; an unknown name is refused with the
-  closest matches). `dictation_model` is kept as written, refused
-  only when its provider cannot transcribe (`Transcription.check_model`).
+  closest matches).
   `default_host` is resolved like `/host` (an id, else a name, among the
   connected hosts) and stored as the id; one kept as it was is not checked
   again (it may be away). `default_cwd` must be absolute or start with
@@ -2488,17 +2502,7 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   text cleaned (`Generate_text.clean`: fences and quotes dropped, a branch
   name made valid, a PR split into title and body).
   `generate_cancel {gen_id}` (or disconnecting) cancels it.
-  `transcribe {mime_type, data}` (data: base64 audio, at most 25 MB) is
-  `{text}` from `Transcription` on `Config.dictation_model` (default
-  `openai/gpt-4o-mini-transcribe`): a hand-built multipart/form-data
-  `POST {base}/audio/transcriptions` (`model`, `response_format=json`,
-  `file` named by the MIME type, e.g. `speech.webm`), to OpenAI with its
-  API key (`OPENAI_API_KEY` or `auth.json`) or to a custom provider's
-  `base_url` with its key; other providers cannot transcribe. Errors say
-  what to do (`No transcription provider: ...` when the key is missing,
-  `/dictation model` to choose another). The HTTP is a
-  `Transcription.Http.t` that `Rpc_server.create ~transcription_http`
-  replaces in tests. The review's
+  The review's
   git (`Git_rpc`, on the active tool host): `git_status {dir?}`,
   `git_stage {dir?, paths, tracked?}`, `git_unstage {dir?, paths}` (each
   answering the status), `git_commit {dir?, message, amend?, paths?}`
@@ -3702,16 +3706,26 @@ terminal frontend and `web/` prigh-web, the browser one.
       the sidebar's toggle, the title, the extras, the status, the panel
       toggles and the gear — its
       steps are container queries on the bar in `style.css`),
-      `Composer_view` (one box: the editor, then the model, tool host,
-      thinking and approval mode chips (the verbosity has none), plain text until pointed at, and attach, stop
-      and send along its bottom; the composer's container queries shorten
-      the chips). A chip (`Chip`, `Open_chip`; Ctrl+L for the model's)
-      opens `Dialog.Popover`: its command's `Picker` (the same items as
-      `/model`, `/thinking`, `/mode`, `/host`), drawn by `Chip_popover_view`
-      inside the chip's anchor rather than as a `Modal` — the models under
-      their providers, filtered in its own field; the thinking levels with a
-      meter; the hosts (`hosts_list`, the `/host` picker's items, rebuilt by
-      `set_state` when the hosts change, keeping the filter), filtered too,
+      `Composer_view` (one box: the editor, then one row: attach and
+      `Context_ring_view` at the left; at the right the tool host and
+      model chips, plain text until pointed at, and stop and send; the
+      ring (the context as a ring against
+      `compacts_at`, the window's percentage at which the backend
+      compacts: `compact_at_tokens` or 80%, whichever is less; its card
+      with the cost, activity, reasoning, mode and model); the verbosity has no chip; the composer's container queries
+      shorten the chips). A chip (`Chip`, `Open_chip`; Ctrl+L for the
+      model's) opens `Dialog.Popover`: its command's `Picker` (the same
+      items as `/model`, `/host`), drawn inside the chip's anchor rather
+      than as a `Modal`. The model's is `Model_menu_view` over
+      `Model_menu` (its rail of tabs: the favourites, the `favourite-models`
+      pref via `Pref_sync`, and each signed-in provider; the tab's models
+      newest first, the first `shown` with Alt+N, `more` for the rest; the
+      models whose `legacy` flag the backend's `Model` sets left out),
+      `Reasoning` (the current model's levels) and the access mode in its
+      foot (`access_open`), `Provider_mark` the providers' marks; the
+      host's (`Chip_popover_view`) lists `hosts_list`, the `/host`
+      picker's items, rebuilt by `set_state` when the hosts change, keeping
+      the filter,
       with how to add one when there is no other. It is a dialog like the others (it owns the keys, Esc closes
       it, choosing goes through `picker_accept`), except that the composer
       keeps its chips live (the rest of it inert), so that a click on
@@ -3775,7 +3789,9 @@ terminal frontend and `web/` prigh-web, the browser one.
       status's extras; Prigh_ui's `Nix_gc_command` parses `/nix-gc` and
       words it for both frontends, and `Slash`/`Commands.all ~superuser`
       leave it out for everyone else: no completion, `/help` or "did you
-      mean"), the account; its controls are
+      mean"), the subscriptions' usage limits (`Usage_page`, `Usage_view`:
+      `usage_limits` asked as it opens and on Refresh, never polled), the
+      account; its controls are
       `Action.Run` commands, which leave it open),
       `Toast` (at most two, the newest, over the bottom of the chat
       column, beside the jump-to-the-end button rather than over it; a

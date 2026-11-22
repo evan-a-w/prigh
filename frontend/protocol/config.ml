@@ -39,6 +39,7 @@ type t =
   ; default_cwd : string option
   ; default_host : string option
   ; max_budget_usd : float option
+  ; resume_on_limit_reset : bool
   ; worktrees_dir : string option
   ; archive_after_days : float
   ; notify : string
@@ -49,7 +50,6 @@ type t =
   ; generate_model : string option
   ; naming_model : string option
   ; approval_model : string option
-  ; dictation_model : string option
   }
 [@@deriving sexp_of, equal]
 
@@ -64,6 +64,7 @@ let default =
   ; default_cwd = None
   ; default_host = None
   ; max_budget_usd = None
+  ; resume_on_limit_reset = true
   ; worktrees_dir = None
   ; archive_after_days = 7.
   ; notify = "bell"
@@ -74,11 +75,8 @@ let default =
   ; generate_model = None
   ; naming_model = None
   ; approval_model = None
-  ; dictation_model = None
   }
 ;;
-
-let default_dictation_model = "openai/gpt-4o-mini-transcribe"
 
 let of_json j =
   let open Or_error.Let_syntax in
@@ -129,6 +127,13 @@ let of_json j =
       |> Or_error.tag ~tag:"max_budget_usd must be a number"
     | Some _ -> Or_error.error_string "max_budget_usd must be a number"
   in
+  let%bind resume_on_limit_reset =
+    match Json.field j "resume_on_limit_reset" with
+    | None | Some `Null -> Ok default.resume_on_limit_reset
+    | Some `True -> Ok true
+    | Some `False -> Ok false
+    | Some _ -> Or_error.error_string "resume_on_limit_reset must be a boolean"
+  in
   let%bind worktrees_dir = optional_string "worktrees_dir" in
   let%bind archive_after_days =
     match Json.field j "archive_after_days" with
@@ -158,7 +163,6 @@ let of_json j =
   let%bind generate_model = optional_string "generate_model" in
   let%bind naming_model = optional_string "naming_model" in
   let%bind approval_model = optional_string "approval_model" in
-  let%bind dictation_model = optional_string "dictation_model" in
   let%map snippets = Json.optional_list_field j "snippets" ~f:Snippet.of_json in
   { scoped_models
   ; approval_mode
@@ -170,6 +174,7 @@ let of_json j =
   ; default_cwd
   ; default_host
   ; max_budget_usd
+  ; resume_on_limit_reset
   ; worktrees_dir
   ; archive_after_days
   ; notify = Option.value notify ~default:"bell"
@@ -180,7 +185,6 @@ let of_json j =
   ; generate_model
   ; naming_model
   ; approval_model
-  ; dictation_model
   }
 ;;
 
@@ -200,6 +204,8 @@ let to_json t =
      ; ( "max_budget_usd"
        , Option.value_map t.max_budget_usd ~default:`Null ~f:(fun usd ->
            `Number (sprintf "%g" usd)) )
+     ; ( "resume_on_limit_reset"
+       , if t.resume_on_limit_reset then `True else `False )
      ]
      @ Option.value_map t.worktrees_dir ~default:[] ~f:(fun dir ->
        [ "worktrees_dir", `String dir ])
@@ -212,6 +218,5 @@ let to_json t =
        ; "generate_model", optional t.generate_model
        ; "naming_model", optional t.naming_model
        ; "approval_model", optional t.approval_model
-       ; "dictation_model", optional t.dictation_model
        ])
 ;;

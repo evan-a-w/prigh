@@ -2,13 +2,12 @@ open! Core
 module H = Harness
 open Agent_events
 
-(* The session's status at the composer's right (activity, context, cost):
-   what the agent is doing (a dot alone while idle), the context's ring
-   (its details under it) and the cost; what applies at the right of the
-   chrome, when anything does; the branch in the details. Where tools run
-   is the composer's chip. Each [card] prints the lines as the user reads
-   them, then what is lit: the lamps, and what is in the accent colour (by
-   its class). *)
+(* The session's status at the composer's right: the context ring (what
+   the agent is doing, for screen readers; turning while it works) and its
+   card (the context, the cost, the activity, the branch); what applies at
+   the right of the chrome, when anything does. Where tools run is the
+   composer's chip. Each [card] prints the lines as the user reads them,
+   then what is lit (by its class). *)
 
 let plan =
   {|{"steps":[{"step":"Look","status":"completed"},{"step":"Final nix GC","status":"in_progress"}]}|}
@@ -60,17 +59,17 @@ let thinking h =
 (* The status as it stands. *)
 let card h =
   print_endline "now:";
-  H.text h ~selector:".composer-status";
+  H.text h ~selector:".context-ring-anchor .sr-only";
   print_endline "applies:";
   H.text h ~selector:".chrome-tools .status-notes";
   print_endline "context:";
-  H.text h ~selector:".composer-status .context";
+  H.names h ~selector:".context-ring";
+  H.text h ~selector:".context-card .context-card-sub";
   print_endline "where:";
-  H.text h ~selector:".composer-status .status-details .branch-line";
+  H.text h ~selector:".context-card .branch-line";
   print_endline "lit:";
-  List.iter
-    [ "lamp"; "running"; "mode-chip.never-asks"; "warm"; "hot" ]
-    ~f:(fun cls -> H.elements h ~selector:(".composer ." ^ cls))
+  List.iter [ "lamp"; "context-ring-anchor.busy"; "warm"; "hot" ] ~f:(fun cls ->
+    H.elements h ~selector:(".composer ." ^ cls))
 ;;
 
 let%expect_test
@@ -82,35 +81,28 @@ let%expect_test
   [%expect
     {|
     now:
-    Ready (5%) $1.30
-    Status Ready
-    Context 10k / 200k · 5%
-    Tokens 1.6M in · 21k out · 0 cached
-    Cost $1.3021
-    Thinking provider's default
-    Mode Auto: never asks
-    Model Claude Opus 5.5
-    Click for the session’s details · /compact frees context
+    Ready
     applies:
     context:
-    (5%)
-    Context 10k / 200k · 5%
+    button "Context 5% full, $1.30: details"
+    5% used · compacts at 160k (80%)
     where:
     lit:
-    <button class="btn chip-button mode-chip never-asks">
     |}];
-  (* The cost to the cent, its title has it exactly; the context's title has
-     the tokens. *)
-  H.names h ~selector:".composer-status .status-gauge > *";
-  H.names h ~selector:".composer-status .context";
+  (* The card: the context, the cost to the cent, the tokens. *)
+  H.text h ~selector:".context-card";
   [%expect
     {|
-    [status] span "Ready"
-    button "Context 5% full: the session's details"
-    span "$1.30" -- Session cost: $1.3021
-    [tooltip] div "Status Ready Context 10k / 200k \194\183 5% Tokens 1.6M in \194\183 21k out \194\183 0 cached Cost $1.3021 Thinking provider's default Mode Auto: never asks Model Claude Opus 5.5 Click for the session\226\128\153s details \194\183 /compact frees context"
-    button "Context 5% full: the session's details"
-    div "Context 10k / 200k \194\183 5%"
+    Context 10k / 200k
+    5% used · compacts at 160k (80%)
+    This session $1.30
+    Cache hits 0%
+    Tokens 1.6M in · 21k out
+    Status Ready
+    Reasoning Medium
+    Mode Auto: never asks
+    Model Claude Opus 5.5
+    /compact to free context (Details)
     |}];
   (* Thinking: the activity is the one thing lit. *)
   state h ~running:true ();
@@ -119,24 +111,14 @@ let%expect_test
   [%expect
     {|
     now:
-    Thinking (5%) $1.30
-    Status Thinking
-    Context 10k / 200k · 5%
-    Tokens 1.6M in · 21k out · 0 cached
-    Cost $1.3021
-    Thinking provider's default
-    Mode Auto: never asks
-    Model Claude Opus 5.5
-    Click for the session’s details · /compact frees context
+    Thinking
     applies:
     context:
-    (5%)
-    Context 10k / 200k · 5%
+    button "Context 5% full, $1.30: details"
+    5% used · compacts at 160k (80%)
     where:
     lit:
-    <span class="lamp">
-    <span class="activity running status-item">
-    <button class="btn chip-button mode-chip never-asks">
+    <div class="busy context-ring-anchor">
     |}];
   (* The agent runs a subagent in the background (the agents' toggle
      counts it; the status does not), and the transcript is quiet: a note. *)
@@ -154,24 +136,14 @@ let%expect_test
     {|
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     now:
-    Running tools (5%) $1.30
-    Status Running tools
-    Context 10k / 200k · 5%
-    Tokens 1.6M in · 21k out · 0 cached
-    Cost $1.3021
-    Thinking provider's default
-    Mode Auto: never asks
-    Model Claude Opus 5.5
-    Click for the session’s details · /compact frees context
+    Running tools
     applies:
     context:
-    (5%)
-    Context 10k / 200k · 5%
+    button "Context 5% full, $1.30: details"
+    5% used · compacts at 160k (80%)
     where:
     lit:
-    <span class="lamp">
-    <span class="activity running status-item">
-    <button class="btn chip-button mode-chip never-asks">
+    <div class="busy context-ring-anchor">
     |}];
   (* The agent done: nothing is lit but the note. *)
   state h ();
@@ -183,27 +155,23 @@ let%expect_test
                             \nbackend\
                             \n/work") (purpose (Sidebar 2)))))
     now:
-    Ready (5%) $1.30
-    Status Ready
-    Context 10k / 200k · 5%
-    Tokens 1.6M in · 21k out · 0 cached
-    Cost $1.3021
-    Thinking provider's default
-    Mode Auto: never asks
-    Model Claude Opus 5.5
-    Click for the session’s details · /compact frees context
+    Ready
     applies:
     context:
-    (5%)
-    Context 10k / 200k · 5%
+    button "Context 5% full, $1.30: details"
+    5% used · compacts at 160k (80%)
     where:
     lit:
-    <button class="btn chip-button mode-chip never-asks">
     |}];
-  (* Clicking the context opens the session's details. *)
-  H.click h ~selector:".composer-status .context";
+  (* Clicking the ring opens its card; Details there, the session's. *)
+  H.click h ~selector:".context-ring";
+  H.elements h ~selector:".context-ring-anchor";
+  H.click h ~selector:".context-card .context-details";
   [%expect
     {|
+    Toggle_context_card
+    <div class="context-ring-anchor open">
+    Toggle_context_card
     (Run /session)
     (Focus dialog)
     (Rpc (method_ session_stats) (params ()) (tag Session_stats))
@@ -224,10 +192,10 @@ let%expect_test
      note at the right of the chrome. *)
   H.elements h ~selector:".chat-chrome > *";
   H.elements h ~selector:".chrome-tools > *";
-  H.text h ~selector:".status-details .branch-line";
+  H.text h ~selector:".context-card .branch-line";
   H.elements h ~selector:".status-notes .plan";
   state h ~branch ~plan ~hosts:others ~active_host:"c7" ();
-  H.text h ~selector:".status-details .branch-line";
+  H.text h ~selector:".context-card .branch-line";
   H.names h ~selector:".composer .host-chip";
   [%expect
     {|
@@ -257,28 +225,19 @@ let%expect_test
                             \n\
                             \n/work") (purpose (Sidebar 3)))))
     now:
-    Ready (5%) $1.30
-    Status Ready
-    Context 10k / 200k · 5%
-    Tokens 1.6M in · 21k out · 0 cached
-    Cost $1.3021
-    Thinking provider's default
-    Mode Auto: never asks
-    Model Claude Opus 5.5
-    Click for the session’s details · /compact frees context
+    Ready
     applies:
     context:
-    (5%)
-    Context 10k / 200k · 5%
+    button "Context 5% full, $1.30: details"
+    5% used · compacts at 160k (80%)
     where:
     lit:
-    <button class="btn chip-button mode-chip never-asks">
     <button class="btn chip-button host-chip warm">
     <button class="btn chip-button host-chip warm">
     |}];
   (* Out of git: no branch line. *)
   state h ();
-  H.elements h ~selector:".status-details .branch-line";
+  H.elements h ~selector:".context-card .branch-line";
   [%expect
     {|
     (Rpc (method_ list_worktrees) (params ())

@@ -269,6 +269,8 @@ let argument_items
     simple
       [ "now", "retry the run at once"
       ; "cancel", "stay stopped until you send a message"
+      ; "on", "resume runs by themselves when a usage limit resets"
+      ; "off", "never resume by themselves after a usage limit"
       ]
   | Pr ->
     simple
@@ -288,7 +290,6 @@ let argument_items
   | Generate_model
   | Approval_model
   | Naming
-  | Dictation
   | Worktree
   | Review -> []
 ;;
@@ -419,7 +420,6 @@ let compute
                | Generate_model
                | Approval_model
                | Naming
-               | Dictation
                | Worktree
                | Review ) as kind ->
                let rest = String.lstrip rest in
@@ -432,7 +432,6 @@ let compute
                   | Approval_model ->
                     Prigh_ui.Approval_model_command.complete ~models rest
                   | Naming -> Prigh_ui.Naming_command.complete ~models rest
-                  | Dictation -> Prigh_ui.Dictation_command.complete rest
                   | Worktree ->
                     Prigh_ui.Worktree_command.complete ~worktrees rest
                     |> Option.map ~f:(fun (offset, candidates) ->

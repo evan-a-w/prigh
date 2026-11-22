@@ -34,7 +34,6 @@ type t =
   | Approval_model
   | Naming_model
   | Summary_model
-  | Dictation_model
   | Compact_at
   | Mask
   | Memory
@@ -44,6 +43,8 @@ type t =
   | Instructions
   | Mcp
   | Git_hosts
+  | Usage
+  | Auto_resume
   | Nix_store
   | Account
 [@@deriving sexp_of, equal, enumerate]

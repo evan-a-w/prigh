@@ -60,6 +60,10 @@ type t =
     (** otherwise each image is replaced by a note saying it was left out *)
   ; native_computer : Native_computer.t option [@sexp.option]
     (** its built-in computer-use tool, if it has one *)
+  ; legacy : bool
+    (** superseded by a newer model of its family: left out of the
+        frontends' model pickers, still resolvable by name (sessions and
+        [/model <id>] that name it keep working) *)
   }
 [@@deriving sexp_of]
 

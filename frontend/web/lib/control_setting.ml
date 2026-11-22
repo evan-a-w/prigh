@@ -27,7 +27,6 @@ type t =
   | Approval_model
   | Naming_model
   | Summary_model
-  | Dictation_model
   | Compact_at
   | Mask
   | Memory
@@ -37,6 +36,8 @@ type t =
   | Instructions
   | Mcp
   | Git_hosts
+  | Usage
+  | Auto_resume
   | Nix_store
   | Account
 [@@deriving sexp_of, equal, enumerate]
@@ -68,9 +69,9 @@ let name = function
   | Approval_model -> "Approval model"
   | Naming_model -> "Naming model"
   | Summary_model -> "Summary model"
-  | Dictation_model -> "Dictation model"
   | Compact_at -> "Compact at"
   | Mask -> "Mask old tool outputs"
+  | Auto_resume -> "Resume after a usage limit"
   | Memory -> "Use memory"
   | Memory_notes -> "Memory notes"
   | About_you -> "About you"
@@ -78,6 +79,7 @@ let name = function
   | Instructions -> "Custom instructions"
   | Mcp -> "MCP servers"
   | Git_hosts -> "Git hosts"
+  | Usage -> "Usage limits"
   | Nix_store -> "Nix store"
   | Account -> "Account"
 ;;
@@ -126,9 +128,9 @@ let keywords = function
   | Approval_model -> "smart mode judge"
   | Naming_model -> "titles names"
   | Summary_model -> "compaction summaries"
-  | Dictation_model -> "speech microphone transcription"
   | Compact_at -> "compaction tokens"
   | Mask -> "compaction observations"
+  | Auto_resume -> "usage limit reset automatic continue rate quota"
   | Memory -> "remember notes"
   | Memory_notes -> "remember"
   | About_you -> "user info name country units"
@@ -136,6 +138,7 @@ let keywords = function
   | Instructions -> "standing preferences"
   | Mcp -> "tools servers"
   | Git_hosts -> "github forgejo forge git hosting sign in"
+  | Usage -> "subscription quota rate limits claude chatgpt codex"
   | Nix_store -> "garbage collect disk"
   | Account -> "sign out user"
 ;;
@@ -183,9 +186,9 @@ let page t : (Settings_section.t * string) option =
   | Approval_model -> Some (Models, "Approvals")
   | Naming_model -> Some (Models, "Naming")
   | Summary_model -> Some (Models, "Summaries")
-  | Dictation_model -> Some (Models, "Dictation")
   | Compact_at -> Some (Models, "Compact at")
   | Mask -> Some (Models, "Mask old tool outputs")
+  | Auto_resume -> Some (Usage, "Resume after a usage limit")
   | Memory -> Some (Memory, "Use memory")
   | Memory_notes -> Some (Memory, "Your notes")
   | About_you -> Some (About_you, "About you")
@@ -194,6 +197,7 @@ let page t : (Settings_section.t * string) option =
   | Instructions -> Some (Custom_instructions, "Your instructions")
   | Mcp -> Some (Mcp, "MCP servers")
   | Git_hosts -> Some (Git_hosting, "Git hosting")
+  | Usage -> Some (Usage, "Usage")
   | Nix_store -> Some (Nix_store, "Nix store")
   | Account -> Some (Account, "Account")
 ;;

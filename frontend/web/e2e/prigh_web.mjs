@@ -221,13 +221,15 @@ const show = async (label, selector) => {
   await screenshot(label);
 };
 
-// The status, and what applies after it.
+// The context ring, the composer's chips, and what applies over the chat.
 const showStatus = async label => {
   section(label);
   console.log(clean(await page.evaluate(() =>
-    [...document.querySelectorAll(".composer-status .status-gauge > .status-item, .composer-row .row-chips .chip-button, .chat-chrome .status-notes:not(:empty)")]
-      .filter(e => getComputedStyle(e).display !== "none")
-      .map(e => e.innerText).join("\n"))));
+    [document.querySelector(".composer .context-ring")?.getAttribute("aria-label") ?? "(no ring)",
+      `mode: ${document.querySelector(".context-card .mode-line .status-detail-value")?.textContent.trim()}`,
+      ...[...document.querySelectorAll(".composer-row .chip-button, .chat-chrome .status-notes:not(:empty)")]
+        .filter(e => getComputedStyle(e).display !== "none" && !e.closest("#chip-popover, .context-card"))
+        .map(e => e.innerText)].join("\n"))));
   await screenshot(label);
 };
 
@@ -236,10 +238,10 @@ const showStatus = async label => {
 const showSession = async label => {
   section(label);
   console.log(clean(await page.evaluate(() =>
-    [...document.querySelectorAll(".chat-chrome *, .composer-status *, .composer-row .row-chips *")]
+    [...document.querySelectorAll(".chat-chrome *, .composer-row .composer-controls *")]
       .filter(e => e.getClientRects().length > 0)
       .filter(e => e.tagName === "SELECT" || e.matches(".where")
-        || (e.children.length === 0 && e.tagName !== "OPTION" && !e.closest(".where, .status-details")))
+        || (e.children.length === 0 && e.tagName !== "OPTION" && !e.closest(".where, .context-card, #chip-popover")))
       .map(e => (e.tagName === "SELECT" ? `[${e.selectedOptions[0]?.text ?? ""}]` : e.textContent))
       .join("\n"))));
 };
@@ -319,7 +321,7 @@ const layoutProblems = selector => page.evaluate(selector => {
   const problems = [];
   // The empty composer's line of where the session works lies under the
   // editor in layers, each cut by design (mobile.mjs checks what it shows).
-  const all = [root, ...root.querySelectorAll("*")].filter(e => (e instanceof HTMLElement || e.tagName === "svg") && shown(e) && !e.closest(":popover-open, .cwd-hint"));
+  const all = [root, ...root.querySelectorAll("*")].filter(e => (e instanceof HTMLElement || e.tagName === "svg") && shown(e) && !e.closest(":popover-open, .cwd-hint, .sr-only"));
   // A box without one of its own (display: contents) lays its children out
   // in its parent's.
   const contents = e => getComputedStyle(e).display === "contents";
@@ -363,6 +365,13 @@ const controlsShown = () => page.evaluate(() => {
   }).join(", ");
 });
 
+// A chip's menu at rest: it is opaque from its first frame, but rises into
+// place (and where it stands is measured).
+const risen = () => page.waitForFunction(() => {
+  const e = document.querySelector("#chip-popover");
+  return e && e.getAnimations().every(a => a.playState !== "running");
+});
+
 // Where a chip's menu stands: below its chip, above the composer's box or
 // over it, at the chip's left edge (or as wide as the box it is placed in:
 // the composer), inside the window.
@@ -379,7 +388,7 @@ const popoverPlace = () => page.evaluate(() => {
   const near = (a, b) => Math.abs(a - b) <= 4;
   const where = r.top >= chip.bottom ? "below the chip" : r.bottom <= box.top ? "above the composer" : "over the composer";
   const across = near(r.left, box.left) && near(r.right, box.right) ? "as wide as the composer"
-    : near(r.left, chip.left) ? "at the chip's left edge" : r.right <= box.right + 1 ? `shifted inside the ${inComposer ? "composer" : "box"}` : "out of line";
+    : near(r.left, chip.left) ? "at the chip's left edge" : r.right <= box.right + 4 ? `shifted inside the ${inComposer ? "composer" : "box"}` : "out of line";
   const inside = r.top >= 0 && r.left >= 0 && r.bottom <= innerHeight && r.right <= innerWidth;
   return `${menu.dataset.chip}'s menu: ${where}, ${across}, ${inside ? "inside the window" : "cut off"}; focus in it: ${menu.contains(document.activeElement)}`;
 });
@@ -643,12 +652,16 @@ try {
   await showTurn("bash run");
   await showSession("the session's card after a run");
 
-  // A budget shows in the status line as spend against it.
+  // A budget shows in the ring's card as spend against it.
   await send("/budget 5");
-  await page.locator(".composer-status .budget").waitFor({ state: "attached" });
-  await show("a budget in the status line", ".composer-status");
+  await page.locator(".context-card .status-detail.cost").waitFor({ state: "attached" });
+  await page.locator(".composer .context-ring").click();
+  await page.locator(".context-ring-anchor.open .context-card").waitFor({ state: "visible" });
+  await show("a budget in the ring's card", ".context-card .status-detail.cost");
+  await page.keyboard.press("Escape");
+  await page.locator(".context-ring-anchor.open").waitFor({ state: "detached" });
   await send("/budget off");
-  await page.locator(".composer-status .budget").waitFor({ state: "detached" });
+  await page.locator(".context-card .status-detail.cost").waitFor({ state: "detached" });
   // 2b. Long output folds to its first and last lines; its toggle shows it
   //     all, and folds it again.
   await send("count to thirty");
@@ -1038,53 +1051,54 @@ try {
   // box, from its left edge, inside the window, the keyboard in it.
   await page.locator(".composer-plus .plus").click();
   await page.locator("#chip-popover .popover-item", { hasText: "Images" }).waitFor();
-  await page.waitForTimeout(300); // its rise
+  await risen();
   await show("the + menu", "#chip-popover");
   console.log(await popoverPlace());
   await page.keyboard.press("Escape");
   await page.waitForSelector("#chip-popover", { state: "detached" });
   console.log(`closed: ${await page.locator("#chip-popover").count() === 0}; focus: ${await page.evaluate(() => document.activeElement?.id)}`);
-  // The header's thinking chip opens its menu under it; → goes to the
-  // mode's beside it.
-  await page.locator(".thinking-chip").click();
-  await page.locator("#chip-popover .popover-item", { has: page.locator(".menu-label", { hasText: /^high$/ }) }).waitFor();
-  await page.waitForTimeout(300); // its rise
-  await show("the thinking chip's menu", "#chip-popover");
+  // The model chip's menu has the reasoning levels beside the models: one
+  // picked, the chip's tooltip says it; Esc closes the menu.
+  await page.locator(".model-chip").click();
+  await page.locator("#chip-popover .reasoning-row", { has: page.locator(".reasoning-label", { hasText: /^High$/ }) }).waitFor();
+  await risen();
+  await show("the model menu's reasoning", "#chip-popover .model-reasoning");
   console.log(await popoverPlace());
-  await page.keyboard.press("ArrowRight");
-  await page.locator("#chip-popover[data-chip=mode]").waitFor();
-  await page.keyboard.press("ArrowLeft");
-  await page.locator("#chip-popover[data-chip=thinking]").waitFor();
-  await page.locator("#chip-popover .popover-item", { has: page.locator(".menu-label", { hasText: /^high$/ }) }).click();
-  await page.locator(".thinking-chip:not(.awaiting) .chip-label", { hasText: "high" }).waitFor();
-  console.log(`closed: ${await page.locator("#chip-popover").count() === 0}; focus: ${await page.evaluate(() => document.activeElement?.id)}`);
+  await page.locator("#chip-popover .reasoning-row", { has: page.locator(".reasoning-label", { hasText: /^High$/ }) }).click();
+  await page.locator(".model-chip:not(.awaiting)[title*='reasoning High']").waitFor();
+  await page.keyboard.press("Escape");
+  await page.waitForSelector("#chip-popover", { state: "detached" });
+  console.log(`the chip: ${(await page.locator(".model-chip").innerText()).replace(/\s+/g, " ").trim()}; closed: ${await page.locator("#chip-popover").count() === 0}; focus: ${await page.evaluate(() => document.activeElement?.id)}`);
   // The model's: a filter, the models under their providers.
   await page.keyboard.press("Control+l");
   await page.locator("#chip-popover[data-chip=model]").waitFor();
-  await page.waitForTimeout(300);
+  await risen();
   console.log(await popoverPlace());
   await screenshot("the model chip's menu");
   await page.keyboard.type("v4.1 flash");
-  await page.waitForFunction(() => document.querySelectorAll("#chip-popover .popover-item").length === 1);
+  // Searched: one row, naming its provider (with one provider signed in, the
+  // unfiltered menu may have one row too).
+  await page.waitForFunction(() => document.querySelectorAll("#chip-popover .model-row:not(.model-more)").length === 1
+    && document.querySelector("#chip-popover .model-row .model-provider"));
   await show("the model chip's menu, filtered", "#chip-popover .popover-items");
-  // Esc closes it unchanged; ← → go along the chips.
+  // Esc closes it unchanged; Tab and Shift+Tab go along the chips (← →
+  // along the model menu's providers).
   await page.keyboard.press("Escape");
   await page.waitForSelector("#chip-popover", { state: "detached" });
   await page.locator(".model-chip").click();
   await page.locator("#chip-popover[data-chip=model]").waitFor();
-  await page.waitForTimeout(100);
-  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("Shift+Tab");
   await page.locator("#chip-popover[data-chip=host]").waitFor();
-  await page.waitForTimeout(300); // its rise
-  await show("the host chip's menu, from the model's with →", "#chip-popover");
+  await risen();
+  await show("the host chip's menu, from the model's with Shift+Tab", "#chip-popover");
   console.log(await popoverPlace());
   // A click beside it closes it.
   await page.mouse.click(700, 200);
   await page.waitForSelector("#chip-popover", { state: "detached" });
   await send("/mode ask");
   await page.locator(".toast", { hasText: "Mode: ask" }).waitFor();
-  await page.locator(".mode-chip:not(.awaiting) .chip-label", { hasText: /^ask$/ }).waitFor();
-  await show("mode ask", ".session-chips");
+  await page.locator(".context-card .mode-line .status-detail-value", { hasText: "Asks: edits & commands" }).waitFor({ state: "attached" });
+  await showStatus("mode ask");
   await send("build it");
   await page.locator("#confirm").waitFor();
   await show("a confirmation", "#confirm");
@@ -1108,9 +1122,9 @@ try {
   await page.keyboard.press("Alt+M");
   // Each step is shown at once; the backend's replies settle on the last.
   await page.locator(".toast", { hasText: "Mode: plan" }).waitFor();
-  await page.waitForSelector(".mode-chip.plan-mode:not(.awaiting)");
-  await show("plan mode (Alt+M)", ".session-chips");
-  await showStatus("plan mode: the status line");
+  await page.locator(".context-card .mode-line .status-detail-value", { hasText: "Plan mode" }).waitFor({ state: "attached" });
+  await page.waitForFunction(() => !document.querySelector(".composer .awaiting"));
+  await showStatus("plan mode (Alt+M)");
   section("plan mode: the composer's placeholder");
   console.log(await page.locator("#editor").getAttribute("placeholder"));
   await send("plan it");
@@ -1122,8 +1136,7 @@ try {
   await send("go ahead");
   await bodyHas("Implementing.");
   await idle();
-  await show("plan mode off", ".session-chips");
-  await showStatus("plan mode off: the status line");
+  await showStatus("plan mode off");
   await showTurn("implementing");
   await send("/permissions");
   await page.locator(".modal").waitFor();
@@ -1602,9 +1615,10 @@ try {
     const where = await page.evaluate(() => {
       const at = ".chat-chrome";
       const r = s => document.querySelector(s).getBoundingClientRect();
-      const status = [...document.querySelectorAll(".composer-status .status-gauge > .status-item, .chat-chrome .status-notes > .status-item")]
-        .filter(e => getComputedStyle(e).display !== "none")
-        .map(e => e.innerText.trim().replace(/\s+/g, " ") || "icon");
+      const status = [document.querySelector(".composer .context-ring")?.getAttribute("aria-label") ?? "(no ring)",
+        ...[...document.querySelectorAll(".chat-chrome .status-notes > .status-item")]
+          .filter(e => getComputedStyle(e).display !== "none")
+          .map(e => e.innerText.trim().replace(/\s+/g, " ") || "icon")];
       return { at, status: status.join(", "), height: Math.round(r(at).height) };
     });
     console.log(`chat ${await chatWidth()}; chips: ${clean(await controlsShown())}; status: ${clean(where.status)}; ${where.at} ${where.height}px high`);

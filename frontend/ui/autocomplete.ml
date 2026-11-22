@@ -353,8 +353,7 @@ let argument_items
   | Compaction
   | Generate_model
   | Approval_model
-  | Naming
-  | Dictation -> None
+  | Naming -> None
   | Server -> Some (server_items server)
   | Budget ->
     Some
@@ -378,6 +377,14 @@ let argument_items
           ~id:"cancel"
           ~detail:"stay stopped until you send a message"
           "cancel"
+      ; Picker.Item.create
+          ~id:"on"
+          ~detail:"resume runs by themselves when a usage limit resets"
+          "on"
+      ; Picker.Item.create
+          ~id:"off"
+          ~detail:"never resume by themselves after a usage limit"
+          "off"
       ]
   | Trim ->
     Some
@@ -548,8 +555,7 @@ let compute_argument
                 | Compaction
                 | Generate_model
                 | Approval_model
-                | Naming
-                | Dictation ) as kind ->
+                | Naming ) as kind ->
                 let rest = String.drop_prefix line start in
                 Option.bind
                   (match kind with
@@ -561,7 +567,6 @@ let compute_argument
                    | Approval_model ->
                      Approval_model_command.complete ~models rest
                    | Naming -> Naming_command.complete ~models rest
-                   | Dictation -> Dictation_command.complete rest
                    | _ -> Remind_command.complete ~reminders rest)
                   ~f:(fun (offset, candidates) ->
                     let prefix = String.drop_prefix rest offset in

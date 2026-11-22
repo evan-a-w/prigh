@@ -220,8 +220,6 @@ module Reply_tag : sig
     | Approval_model_saved (** the new config; the approval model is shown *)
     | Naming_saved (** the new config; the naming model is shown *)
     | Auto_archive_saved (** the new config; the age is shown *)
-    | Dictation_saved (** the new config; the dictation model is shown *)
-    | Transcribed (** a dictation's text, put in at the caret *)
     | Default_saved
     | Session_stats
     | Trace (** [trace]: its summary in a dialog *)
@@ -330,6 +328,7 @@ module Reply_tag : sig
     (** [nix_store_status]; [/nix-gc] opens Settings once it is in *)
     | Nix_collected (** [nix_store_gc] *)
     | Memory_loaded (** [get_memory] *)
+    | Usage_loaded (** [usage_limits] *)
     | Instructions_loaded (** [get_custom_instructions] *)
     | Instruction_saved
     (** [save_custom_instruction]: the draft closes, or says why not *)
@@ -394,9 +393,6 @@ module Command : sig
         }
     (** re-encoded smaller on a canvas, as {!Action.Downsized} (or
         [Downsize_failed]) *)
-    | Start_dictation of Dictation.Engine.t
-    | Stop_dictation (** and transcribe what was said *)
-    | Cancel_dictation
     | Annotate_setup (** the drawing's canvas, once rendered *)
     | Annotate_undo
     | Annotate_clear
@@ -626,11 +622,19 @@ module Action : sig
     (** a row of the filter's menu (by click), or the one selected (Space) *)
     (** its menu over the composer (Ctrl+L: the model's); again closes it *)
     | Chip_step of int
+    | Model_menu_tab of Model_menu.Tab.t
+    | Model_menu_step of int (** the next provider along the rail (← →) *)
+    | Model_menu_more (** "Show more": the provider's older models *)
+    | Model_menu_access (** opens or closes the access menu in its foot *)
+    | Model_menu_nth of int (** Alt+1…9: the list's Nth model *)
+    | Toggle_favourite of string option
+    (** stars or unstars the model ([None]: the highlighted one) *)
     (** the next ([1]) or previous ([-1]) chip's menu, from the open one *)
     | Open_snippets of int option
     (** Alt+N: pick a snippet to insert at this caret (else the last edit's) *)
     | Open_help
     | Open_settings (** the gear, Ctrl+, *)
+    | Usage_refresh (** Settings → Usage's Refresh *)
     | Settings_section of Settings_section.t
     | Settings_home
     (** a section of the settings page, from its list; opens the page there
@@ -772,6 +776,9 @@ module Action : sig
     | Close_field_menu (** Esc, or a click outside: nothing done *)
     | Toggle_sidebar
     | Toggle_status_tray
+    | Toggle_context_card
+    (** the context ring's card: context, cost, compacting (tap; Esc
+        closes) *)
     (** a phone's header: the tray with the thinking level, the mode, the
         status and the panels' toggles, under the header *)
     | Answer_confirm of
@@ -806,19 +813,6 @@ module Action : sig
         { original : Image.t
         ; reason : string
         }
-    | Dictate (** the microphone: start, or stop and transcribe *)
-    | Dictation_cancel
-    | Dictation_progress of
-        { elapsed_ms : int
-        ; level : float
-        }
-    | Dictation_audio of
-        { mime_type : string
-        ; data : string (** base64 *)
-        }
-    | Dictation_text of string (** the browser's recognition heard this *)
-    | Dictation_failed of string
-    | Browser_speech of bool
     | Annotate of
         { image : Image.t
         ; target : Annotate.Target.t
@@ -996,11 +990,6 @@ module Model : sig
     ; paste_undo : Paste_undo.t option
       (** Ctrl+Z after a chip came or went ({!Paste_undo}) *)
     ; downsizing : Image.t list (** of [images], being made smaller *)
-    ; dictation : Dictation.t
-    ; dictation_engine : Dictation.Engine.t
-    (** what the next dictation uses: the backend's, until it says it
-        cannot transcribe *)
-    ; browser_speech : bool (** the browser has SpeechRecognition *)
     ; queue : Queued.t
     ; agent_queues : Agent_queue.t list
       (** the background subagents' queues, those not empty *)
@@ -1025,6 +1014,7 @@ module Model : sig
       (** while reviewing on a wide page, the sessions sidebar shows as a
           drawer over the page (Ctrl+B); it goes when the review closes *)
     ; status_tray : bool
+    ; context_card : bool (** tapped open: the context ring's card *)
       (** on a phone, the chat's "more" menu is open (the panels' toggles
           and the settings: {!Action.Toggle_status_tray}) *)
     ; scrolled_up : bool (** the chat is not following new output *)
@@ -1064,6 +1054,10 @@ module Model : sig
       (** what the review page compared last, per worktree (a
           preference) *)
     ; code_size : Code_size.t (** how large code shows in diffs (a preference) *)
+    ; model_menu : Model_menu.t
+      (** the model chip's menu: its tab, "Show more", the access menu *)
+    ; favourite_models : string list
+      (** starred in the model menu, oldest first (a preference) *)
     ; layout : Resize.t (** the panels' sizes *)
     ; paging : Paging.t (** how much of the transcript is loaded *)
     ; transcript_events : int
@@ -1089,6 +1083,7 @@ module Model : sig
         goes down to its place *)
     ; forges : Forges.t (** the user's git hosts *)
     ; nix_gc : Nix_gc.t (** superusers': the Nix store *)
+    ; usage : Usage_page.t (** the settings page's Usage *)
     ; memory : Memory_notes.t (** the settings page's Memory *)
     ; instructions : Instruction_notes.t
     (** the settings page's Custom instructions *)
@@ -1216,6 +1211,12 @@ val thinking_detail : Llm.t option -> string -> string
 
 (** A token count in a few characters: [200k], [1.2M]. *)
 val compact_tokens : int -> string
+
+(** The model menu's "Show more" row's id. *)
+val more_id : string
+
+(** The models the model menu offers ({!Model_menu.offered}). *)
+val offered_models : Model.t -> Llm.t list
 
 (** Whether the user signed in as a superuser. *)
 val superuser : Model.t -> bool

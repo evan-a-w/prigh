@@ -927,7 +927,6 @@ let%expect_test
       "compaction_model": null,
       "naming_model": null,
       "approval_model": null,
-      "dictation_model": null,
       "trace": "default"
     }
     |}]

@@ -52,7 +52,6 @@ type t =
   ; compaction_model : string option
   ; naming_model : string option
   ; approval_model : string option
-  ; dictation_model : string option
   ; trace : Trace.Level.t
   }
 [@@deriving sexp_of]
@@ -87,7 +86,6 @@ let default =
   ; compaction_model = None
   ; naming_model = None
   ; approval_model = None
-  ; dictation_model = None
   ; trace = Default
   }
 ;;
@@ -102,12 +100,6 @@ let ask_user_timeout t =
   Option.some_if
     Float.(t.ask_user_timeout_seconds > 0.)
     t.ask_user_timeout_seconds
-;;
-
-let default_dictation_model = "openai/gpt-4o-mini-transcribe"
-
-let dictation_model t =
-  Option.value t.dictation_model ~default:default_dictation_model
 ;;
 
 let compact_at t = Option.some_if (t.compact_at_tokens > 0) t.compact_at_tokens
@@ -159,7 +151,6 @@ let to_json t =
     ; "compaction_model", option (fun s -> `String s) t.compaction_model
     ; "naming_model", option (fun s -> `String s) t.naming_model
     ; "approval_model", option (fun s -> `String s) t.approval_model
-    ; "dictation_model", option (fun s -> `String s) t.dictation_model
     ; "trace", `String (Trace.Level.to_string t.trace)
     ]
 ;;
@@ -318,15 +309,6 @@ let of_json json =
           "config.approval_model must be a model's name (or null: the \
            session's model)"
     in
-    let%bind dictation_model =
-      match find "dictation_model" with
-      | None | Some `Null | Some (`String "") -> Ok None
-      | Some (`String s) -> Ok (Some s)
-      | Some _ ->
-        Or_error.errorf
-          "config.dictation_model must be a model's provider/id (or null: %s)"
-          default_dictation_model
-    in
     let%bind compact_at_tokens =
       let error () =
         Or_error.error_string
@@ -481,7 +463,6 @@ let of_json json =
     ; compaction_model
     ; naming_model
     ; approval_model
-    ; dictation_model
     ; trace
     }
   | _ -> Or_error.error_string "config must be a JSON object"
@@ -531,6 +512,10 @@ let known_fields =
    | _ -> [])
 ;;
 
+(* Settings of features since removed: ignored without a word, and dropped
+   when the file is next saved. *)
+let retired_fields = [ "dictation_model" ]
+
 let problems ~home =
   match read_fields ~home with
   | Error _ -> []
@@ -547,7 +532,9 @@ let problems ~home =
     in
     let unknown =
       List.filter_map fields ~f:(fun (name, _) ->
-        if List.mem known_fields name ~equal:String.equal
+        if
+          List.mem known_fields name ~equal:String.equal
+          || List.mem retired_fields name ~equal:String.equal
         then None
         else if String.equal name "reminders"
         then
@@ -594,10 +581,12 @@ let save ~home t =
           not (String.equal name "permissions"))
       | _ -> assert false
     in
-    (* [approval_mode] replaces it. *)
+    (* [approval_mode] replaces [confirm_tools]. *)
     let existing =
       List.filter existing ~f:(fun (name, _) ->
-        not (String.equal name "confirm_tools"))
+        not
+          (String.equal name "confirm_tools"
+           || List.mem retired_fields name ~equal:String.equal))
     in
     let replaced =
       List.map existing ~f:(fun (name, value) ->

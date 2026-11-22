@@ -104,12 +104,12 @@ let methods =
   ; "btw_cancel"
   ; "generate_text"
   ; "generate_cancel"
-  ; "transcribe"
   ; "auth_status"
   ; "login"
   ; "auth_respond"
   ; "auth_cancel"
   ; "logout"
+  ; "usage_limits"
   ; "forge_status"
   ; "forge_login"
   ; "forge_logout"
@@ -409,7 +409,6 @@ end
 type t =
   { login : Login_manager.t
   ; forges : Forges.t
-  ; transcription_http : Transcription.Http.t
   ; token : string option (** required in [hello] before anything else *)
   ; namespace : string option
   ; backend_host : bool
@@ -460,6 +459,7 @@ type t =
     (** where the cwds of saved sessions that recorded none are in git, read
         from the backend's files once (see [with_repo]) *)
   ; nix_store : Nix_store.t option
+  ; usage_http : Subscription_usage.Http.t
   ; temporaries : Temporary.t String.Table.t (** by session id *)
   ; temporary_grace : float
   ; ledger_dir : string
@@ -1143,8 +1143,8 @@ let create
       ?custom_instructions
       ?mcp_settings
       ?mcp_auth
-      ?transcription_http
       ?nix_store
+      ?usage_http
       ~login
       ~sessions_dir
       ~cwd
@@ -1166,9 +1166,6 @@ let create
   in
   let t =
     { login
-    ; transcription_http =
-        Option.value_or_thunk transcription_http ~default:(fun () ->
-          Transcription.Http.real ~env)
     ; forges
     ; token
     ; namespace
@@ -1231,6 +1228,9 @@ let create
     ; served = Promise.create ()
     ; repos = String.Table.create ()
     ; nix_store
+    ; usage_http =
+        Option.value_or_thunk usage_http ~default:(fun () ->
+          Subscription_usage.Http.real ~env)
     ; temporaries = String.Table.create ()
     ; temporary_grace
     ; ledger_dir = Temporary_ledger.dir ~sessions_dir
@@ -2515,38 +2515,6 @@ let btw t (client : Client.t) params =
             ]))))
 ;;
 
-(* The audio arrives as base64 and goes to the config's [dictation_model];
-   only the calling client hears the text. *)
-let transcribe t (client : Client.t) params =
-  let open Or_error.Let_syntax in
-  let%bind mime_type = string_param params "mime_type" in
-  let%bind base64 = string_param params "data" in
-  (* Too large is said before decoding it. *)
-  let%bind () =
-    let decoded = String.length base64 / 4 * 3 in
-    if decoded > Transcription.Audio.max_bytes + 3
-    then Transcription.Audio.check_size decoded
-    else Ok ()
-  in
-  let%bind data =
-    Base64.decode base64
-    |> Result.map_error ~f:(fun (`Msg m) ->
-      Error.createf "param \"data\" must be base64: %s" m)
-  in
-  let agent = client.agent in
-  let%map text =
-    Transcription.transcribe
-      ~env:(Agent.env agent)
-      ~getenv:(Login_manager.getenv t.login)
-      ~http:t.transcription_http
-      ~store:(Login_manager.store t.login)
-      ~providers:(Model_registry.providers (Login_manager.models t.login))
-      ~model:(Config.dictation_model (Agent.config agent))
-      { mime_type; data }
-  in
-  `Object [ "text", `String text ]
-;;
-
 (* Like [btw]: the draft streams to the asking client only. *)
 let generate_text t (client : Client.t) params =
   let open Or_error.Let_syntax in
@@ -3195,7 +3163,6 @@ let dispatch_server t (client : Client.t) ~meth ~params
       ~params
   | "btw" -> Some (btw t client params)
   | "generate_text" -> Some (generate_text t client params)
-  | "transcribe" -> Some (transcribe t client params)
   | "generate_cancel" ->
     Some
       (Or_error.map (string_param params "gen_id") ~f:(fun gen_id ->
@@ -3359,6 +3326,16 @@ let dispatch_server t (client : Client.t) ~meth ~params
       if Result.is_error result || not (Login_manager.in_progress t.login)
       then t.login_owner <- previous;
       unit_result result)
+  | "usage_limits" ->
+    Some
+      (ok
+         (Subscription_usage.to_json
+            (Subscription_usage.fetch
+               ~env:(Agent.env agent)
+               ~getenv:(Login_manager.getenv t.login)
+               ~http:t.usage_http
+               ~now:t.now
+               (Login_manager.store t.login))))
   | "forge_status" ->
     Some
       (Or_error.map (Forges.accounts t.forges) ~f:(fun accounts ->

@@ -1,12 +1,12 @@
 // Chat mode on a backend with no tool host (`prigh serve -no-backend-host`,
-// none connected): a new session starts in chat mode (the mode chip says
-// chat, the host chip "no host", the composer no working directory) and a
-// message gets the model's reply; the mode chip's menu; another mode can't
-// send (the strip over the composer says why, the message stays) until
-// "Chat without a host" switches back and sends it. On a desktop, then on
-// phones (390x844, 320x640; touch, and Chromium as an installed PWA with
-// the notch's insets): the ⋯ sheet's mode row, the strip, nothing sideways
-// or under 40px in the composer. Run by prigh_web.sh; prints normalised
+// none connected): a new session starts in chat mode (the ring's card says
+// so, the host chip "no host", the composer no working directory) and a
+// message gets the model's reply; the model menu's access modes; another
+// mode can't send (the strip over the composer says why, the message
+// stays) until "Chat without a host" switches back and sends it. On a
+// desktop, then on phones (390x844, 320x640; touch, and Chromium as an
+// installed PWA with the notch's insets): the model sheet's access modes,
+// the strip, nothing sideways or under 40px in the composer. Run by prigh_web.sh; prints normalised
 // snapshots (the expected output is in ENGINE.expected) and, with SHOTS,
 // screenshots.
 //
@@ -93,10 +93,10 @@ const run = async (p, command) => {
 const plain = s => s.replace(/\b\d\d:\d\d\b/g, "(time)").replace(/\s+/g, " ").trim();
 const text = async (p, selector) =>
   (await p.locator(selector).count()) ? plain(await p.locator(selector).first().innerText()) : "(none)";
-// What says where the session is: the mode, the host, the composer, the strip.
+// What says where the session is: the mode (in the ring's card, and in the
+// model's menu), the host, the composer, the strip.
 const where = async p => {
-  const chip = p.locator(".mode-chip");
-  console.log(`mode chip: ${(await chip.count()) && (await chip.first().isVisible()) ? await text(p, ".mode-chip") : "(in the ⋯ sheet)"}`);
+  console.log(`mode: ${plain(await p.locator(".context-card .mode-line .status-detail-value").textContent())}`);
   const host = p.locator(".host-chip");
   console.log(`host chip: ${(await host.count()) && (await host.first().isVisible()) ? await text(p, ".host-chip") : "(hidden)"}`);
   console.log(`placeholder: ${(await composer(p).getAttribute("placeholder")).replace(cwd, "$CWD")}`);
@@ -143,7 +143,8 @@ const audit = page => page.evaluate(dense => {
     if (!inBox) continue;
     const cx = Math.min(Math.max(r.left + r.width / 2, 0), W - 1), cy = Math.min(Math.max(r.top + r.height / 2, 0), H - 1);
     const hit = document.elementFromPoint(cx, cy);
-    if (hit && !e.contains(hit) && !hit.contains(e) && !e.closest("label")?.contains(hit)) covered.push(`${name(e)} under ${name(hit)}`);
+    // (The access menu stands over the model sheet's list by design.)
+    if (hit && !e.contains(hit) && !hit.contains(e) && !e.closest("label")?.contains(hit) && !hit.closest(".model-access-menu")) covered.push(`${name(e)} under ${name(hit)}`);
     const isText = e.matches("textarea, input:not([type=checkbox]):not([type=radio]):not([type=color]):not([type=range]), select");
     const min = e.closest(dense) ? 40 : 44;
     if (!isText && !e.matches("a") && Math.min(r.width, r.height) < min - 0.5 && !e.closest(".message, .md, .tool-body, .status-details"))
@@ -160,7 +161,7 @@ const audit = page => page.evaluate(dense => {
 const page = await open({ width: 1280, height: 800 });
 try {
   await signIn(page);
-  await page.locator(".mode-chip.chat-mode").waitFor();
+  await page.locator(".host-chip.chatting").waitFor();
   section("a new session with no tool host");
   await where(page);
   await screenshot(page, "new");
@@ -175,11 +176,17 @@ try {
   console.log(`prigh: ${await text(page, "#chat .msg.assistant")}`);
   await screenshot(page, "replied");
 
-  await page.locator(".mode-chip").click();
-  await page.locator("#chip-popover").waitFor();
-  section("the mode menu");
-  console.log((await page.locator("#chip-popover").innerText()).replace(/\n+/g, "\n"));
+  await page.locator(".model-chip").click();
+  await page.locator("#chip-popover .model-access-button").click();
+  await page.locator("#chip-popover .model-access-menu").waitFor();
+  section("the model menu's access");
+  console.log(`${(await page.locator("#chip-popover .model-access-button").getAttribute("title"))}`);
+  console.log(await page.locator("#chip-popover .model-access-item").evaluateAll(es => es.map(e =>
+    `${e.classList.contains("on") ? "✓ " : ""}${e.innerText.replace(/\s+/g, " ").trim()}: ${e.title}`).join("\n")));
   await screenshot(page, "menu");
+  // Esc closes the access menu, then the model menu.
+  await page.keyboard.press("Escape");
+  await page.locator("#chip-popover .model-access-menu").waitFor({ state: "detached" });
   await page.keyboard.press("Escape");
   await page.locator("#chip-popover").waitFor({ state: "detached" });
 
@@ -217,17 +224,19 @@ try {
     await where(phone);
     console.log(`audit: ${await audit(phone)}`);
     await screenshot(phone, `phone-${tag}`);
-    await phone.getByRole("button", { name: "Panels and settings" }).tap();
-    await phone.locator(".chrome-menu").waitFor();
-    section(`phone ${tag}: the ⋯ sheet's mode`);
-    console.log(await phone.locator(".chrome-menu .session-section").filter({ has: phone.locator(".session-section-title", { hasText: /^Mode$/ }) }).evaluate(e => [...e.querySelectorAll(".session-section-title, .session-choice")].map(c => c.classList.contains("on") ? `[${c.innerText}]` : c.innerText).join(" ")));
+    await phone.locator(".composer .model-chip").tap();
+    await phone.locator("#chip-popover .model-access-button").tap();
+    await phone.locator("#chip-popover .model-access-menu").waitFor();
+    section(`phone ${tag}: the model sheet's access`);
+    console.log(await phone.locator("#chip-popover .model-access-item .menu-label").evaluateAll(es => es.map(e =>
+      e.closest(".model-access-item").classList.contains("on") ? `[${e.innerText}]` : e.innerText).join(" | ")));
     console.log(`audit: ${await audit(phone)}`);
     await screenshot(phone, `phone-${tag}-sheet`);
-    await phone.locator(".chrome-menu").getByRole("button", { name: "ask", exact: true }).tap();
+    await phone.locator("#chip-popover .model-access-item", { has: phone.locator(".menu-label", { hasText: /^Ask first$/ }) }).tap();
     await phone.locator(".no-host-banner").waitFor({ state: "attached" });
-    if (await phone.locator(".chrome-menu").count()) {
+    if (await phone.locator("#chip-popover").count()) {
       await phone.keyboard.press("Escape");
-      await phone.locator(".chrome-menu").waitFor({ state: "detached" });
+      await phone.locator("#chip-popover").waitFor({ state: "detached" });
     }
     await phone.locator(".no-host-banner").waitFor();
     section(`phone ${tag}: mode ask, no tool host`);

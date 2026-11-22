@@ -18,6 +18,9 @@ end
 
 val default_base_url : string
 
+(** The Claude Code release whose requests OAuth ones look like. *)
+val claude_code_version : string
+
 (** Tokens containing ["sk-ant-oat"] are OAuth tokens even when they arrive
     via [ANTHROPIC_API_KEY]/[ANTHROPIC_OAUTH_TOKEN]. *)
 val auth_of_token : method_:Provider_auth.Method.t -> string -> Auth.t

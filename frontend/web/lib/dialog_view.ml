@@ -29,11 +29,8 @@ let picker_title : Dialog.Picker_kind.t -> string = function
   | Themes -> "Themes"
   | Accents -> "Colours"
   | Attach -> "Attach"
-  | Compaction_models
-  | Generate_models
-  | Approval_models
-  | Naming_models
-  | Dictation_models -> "Models"
+  | Compaction_models | Generate_models | Approval_models | Naming_models ->
+    "Models"
   | Defaults (Model | Fallback) -> "Models"
   | Defaults Thinking -> "Levels"
   | Defaults Mode -> "Modes"

@@ -38,7 +38,6 @@ module Argument = struct
     | Generate_model
     | Approval_model
     | Naming
-    | Dictation
     | Pr
     | Worktree
     | Review
@@ -170,6 +169,10 @@ let every =
       "tell you when a turn ends or something waits for you while the tab is \
        hidden"
   ; c
+      "usage"
+      "how much of your Claude and ChatGPT subscriptions' usage limits you \
+       have used, in Settings"
+  ; c
       ~argument:Memory
       ~args:"[on|off]"
       "memory"
@@ -208,13 +211,6 @@ let every =
       "naming"
       "show which model names sessions and subagents; model MODEL|off: name \
        them with MODEL (off: the drafting model, else the session's)"
-  ; c
-      ~argument:Dictation
-      ~args:"[model MODEL|off]"
-      "dictation"
-      "show which model transcribes dictation (speech to text); model \
-       MODEL|off: transcribe with MODEL, an OpenAI or OpenAI-compatible \
-       provider's (off: openai/gpt-4o-mini-transcribe)"
   ; c
       ~argument:Compaction
       ~args:"[at|model|mask ...]"
@@ -380,9 +376,10 @@ let every =
        one or all; none: list the session's (Delete removes one)"
   ; c
       ~argument:Resume
-      ~args:"[now|cancel]"
+      ~args:"[now|cancel|on|off]"
       "resume"
-      "show, run now or cancel the automatic resume after a usage limit"
+      "show, run now or cancel the automatic resume after a usage limit, or \
+       turn it on or off"
   ; c
       "downsize-images"
       "send the conversation's images smaller (after the model refused one as \

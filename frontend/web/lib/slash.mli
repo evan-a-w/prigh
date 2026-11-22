@@ -41,7 +41,6 @@ module Argument : sig
     | Generate_model (** [off] or a model *)
     | Approval_model (** [off] or a model *)
     | Naming (** [model], then [off] or a model *)
-    | Dictation (** [model], then [off] or a transcription model *)
     | Pr (** [/pr]'s subcommands *)
     | Worktree
     (** a [/worktree] subcommand, then a worktree, flag or base branch *)

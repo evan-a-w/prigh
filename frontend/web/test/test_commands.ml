@@ -97,6 +97,7 @@ let%expect_test "every command does something (none is unknown)" =
     /todos                     toast: No plan: the model has not made one (it makes one with update_plan).
     /permissions               permissions dialog
     /notify                    toast: Notifications are on, but the browser has not been asked yet: /notify on asks it
+    /usage                     Settings
     /memory                    Settings
     /instructions              Settings
     /user-info                 Settings
@@ -104,7 +105,6 @@ let%expect_test "every command does something (none is unknown)" =
     /generate-model            picker: Drafting model
     /approval-model            picker: Approval model
     /naming                    toast: Sessions and subagents are named by the drafting model, else the session's model (/naming model MODEL|off)
-    /dictation                 toast: Dictation is transcribed by openai/gpt-4o-mini-transcribe, the default (/dictation model MODEL|off)
     /compaction                toast: Compaction: at 200k tokens, or 80% of the model's window if that is less; summaries by the session's model; observation masking on (/compaction at TOKENS|off, /compaction model MODEL|off, /compaction mask on|off)
     /diff                      toast: Reading the changes…
     /review                    rpc git_diff, rpc git_status
@@ -142,7 +142,7 @@ let%expect_test "every command does something (none is unknown)" =
     /budget                    toast: No budget ($0.00 spent): /budget DOLLARS stops the agent starting turns once the session has cost that much
     /goal                      toast: No goal: /goal TEXT sets one, and the agent keeps working until it judges it met
     /remind                    toast: No reminders yet: /remind stop TEXT or /remind every N TEXT adds one
-    /resume                    toast: No resume is scheduled: one is when a run stops at a usage limit whose reset time the provider gives
+    /resume                    toast: No resume is scheduled: one is when a run stops at a usage limit whose reset time the provider gives; runs stopped by a usage limit resume by themselves when it resets (/resume off keeps them stopped)
     /downsize-images           rpc downsize_images
     /copy                      toast: Nothing to copy yet: no reply in this session.
     /btw                       toast: Usage: /btw <question> (asked aside; the run goes on)
@@ -202,9 +202,12 @@ let%expect_test "/help <command> and /hotkeys" =
     Alt+↑ take the last queued message back into the editor
     Tab complete a /command, its argument, an @path or a #snippet
     !cmd run a shell command (!!cmd: not added to the context; !&cmd: as a background job)
-    Ctrl+L switch model: the model chip's menu
+    Ctrl+L the model chip's menu: models by provider, their reasoning and the access mode
+    ← → / ↑ ↓ (in the model menu) ← → the previous or next provider (or the favourites); ↑ ↓ the models; Enter switches, Esc closes
+    Alt+1…9 (in the model menu) switch to the list's Nth model
+    Alt+F (in the model menu) star or unstar the highlighted model
     ↑ ↓ / Enter / Esc (a chip's menu) move / choose / close it; type to filter the models or hosts
-    ← → / Tab (a chip's menu) the next chip's menu (model, thinking, mode, host)
+    Tab (a chip's menu; ← → in the host's) the next chip's menu (host, model)
     Ctrl+P / Alt+P next / previous scoped model (/scoped-models)
     Alt+T cycle the thinking level
     Alt+M cycle the mode: ask → auto-edit → smart → auto → plan (/mode, /plan)
@@ -230,6 +233,7 @@ let%expect_test "/help <command> and /hotkeys" =
     Ctrl+B show or hide the sidebar (while reviewing, over the review)
     Ctrl+, settings: notifications, transcript detail, your account (/settings)
     ← → / ↑ ↓ (on a panel's edge) resize the panel (Shift: faster; Home / End: smallest / largest; Enter: the default size); or drag the edge, double-click to reset
+    Esc (the context ring's card open) close the card (the ring by the paperclip: context, cost, Compact)
     Alt+1…9 follow subagent or job N in the agents panel
     Alt+] Alt+[ the next or previous subagent or job
     Alt+0 close the agents panel
@@ -382,11 +386,10 @@ let%expect_test "/scoped-models, Ctrl+P and Alt+P" =
       (approval_mode Auto) (default_chat_mode false)
       (permissions ((allow ()) (ask ()) (deny ()))) (default_model ())
       (default_thinking ()) (fallback_models ()) (default_cwd ())
-      (default_host ()) (max_budget_usd ()) (worktrees_dir ())
-      (archive_after_days 7) (notify bell) (snippets ())
+      (default_host ()) (max_budget_usd ()) (resume_on_limit_reset true)
+      (worktrees_dir ()) (archive_after_days 7) (notify bell) (snippets ())
       (compact_at_tokens 200000) (compaction_model ()) (mask_observations true)
-      (generate_model ()) (naming_model ()) (approval_model ())
-      (dictation_model ())))
+      (generate_model ()) (naming_model ()) (approval_model ())))
     |}]
 ;;
 
@@ -468,7 +471,6 @@ let%expect_test "/verbosity and Ctrl+O" =
   H.key h "ArrowUp" ~target:Field;
   H.key h "Enter" ~target:Field;
   H.show h ~selector:"#chat";
-  H.text h ~selector:".composer-status";
   H.text h ~selector:".status-notes";
   [%expect
     {|
@@ -504,16 +506,6 @@ let%expect_test "/verbosity and Ctrl+O" =
       </div>
       <Vdom.Node.none-widget> </Vdom.Node.none-widget>
     </div>
-    Ready (0%) $0.00
-    Status Ready
-    Context 0 / 200k · 0%
-    Tokens 0 in · 0 out · 0 cached
-    Cost $0.0000
-    Thinking provider's default
-    Mode Auto: never asks
-    Model Claude Opus 5.5
-    Branch main
-    Click for the session’s details · /compact frees context
     |}];
   H.key h "o" ~ctrl:true;
   H.key h "o" ~ctrl:true;
@@ -536,21 +528,8 @@ let%expect_test "/verbosity and Ctrl+O" =
     Transcript: verbose, everything unfolded (Ctrl+O cycles)
     Unknown verbosity “loud”: use quiet, normal or verbose. (Dismiss)
     |}];
-  H.text h ~selector:".composer-status";
   H.text h ~selector:".status-notes";
-  [%expect
-    {|
-    Ready (0%) $0.00
-    Status Ready
-    Context 0 / 200k · 0%
-    Tokens 0 in · 0 out · 0 cached
-    Cost $0.0000
-    Thinking provider's default
-    Mode Auto: never asks
-    Model Claude Opus 5.5
-    Branch main
-    Click for the session’s details · /compact frees context
-    |}]
+  [%expect {| |}]
 ;;
 
 let%expect_test "/confirm" =
@@ -573,7 +552,7 @@ let%expect_test "/confirm" =
     h
     "set_config"
     {|{"scoped_models":[],"confirm_tools":true,"default_model":null,"default_thinking":null}|};
-  H.text h ~selector:".mode-chip";
+  H.text h ~selector:".context-card .mode-line";
   run h "/confirm off";
   run h "/confirm maybe";
   toasts h;
@@ -586,7 +565,7 @@ let%expect_test "/confirm" =
       (Config_saved
        "Mode ask, also for new sessions: bash, job_input, edits and MCP tools ask first")))
     (Expire_toast (id 0) (after_ms 4660))
-    (ask)
+    Mode Asks: edits & commands
     (Rpc (method_ push_pref)
      (params ((key history) (value "/confirm off") (max 500))) (tag Ignore))
     (Rpc (method_ set_config)
@@ -601,7 +580,7 @@ let%expect_test "/confirm" =
   (* Chat sends only its flag: the approval mode under it stays, and leaving
      the chat gives it. *)
   run h "/confirm chat";
-  H.text h ~selector:".mode-chip";
+  H.text h ~selector:".context-card .mode-line";
   H.reply
     h
     "set_config"
@@ -609,7 +588,7 @@ let%expect_test "/confirm" =
   run h "/confirm";
   H.text h ~selector:".picker-items";
   H.act h (Picker_choose "smart");
-  H.text h ~selector:".mode-chip";
+  H.text h ~selector:".context-card .mode-line";
   [%expect
     {|
     (Rpc (method_ push_pref)
@@ -618,7 +597,7 @@ let%expect_test "/confirm" =
      (tag
       (Config_saved
        "Mode chat (leaving it: auto), also for new sessions: a chat without the tool host: no files, commands or project, only the web and other host-free tools, until you leave it (/chat off or Alt+M)")))
-    (chat)
+    Mode Chat: no tool host
     (Expire_toast (id 2) (after_ms 3820))
     (Rpc (method_ push_pref) (params ((key history) (value /confirm) (max 500)))
      (tag Ignore))
@@ -634,7 +613,7 @@ let%expect_test "/confirm" =
      (tag
       (Config_saved
        "Mode smart, also for new sessions: edits in the project run; the approval model lets other calls run or asks you, saying why (/approval-model)")))
-    (smart)
+    Mode Smart: a model decides
     |}]
 ;;
 
@@ -1853,9 +1832,9 @@ let%expect_test "/setusr: a superuser acts as another user, and back" =
     (Rpc (method_ get_prefs)
      (params
       ((keys
-        (web.theme web.accent web.radius web.font web.code-font web.notify
-         web.verbosity web.terminal-open web.sidebar-folded web.sidebar-unfolded
-         web.sidebar-opened web.sidebar-worktree-hours web.review web.code-size
+        (web.theme web.accent web.notify web.verbosity web.terminal-open
+         web.sidebar-folded web.sidebar-unfolded web.sidebar-opened
+         web.sidebar-worktree-hours web.review web.code-size favourite-models
          history web.migrated web.sidebar-width web.files-width
          web.files-preview-width web.agents-width web.terminal-height
          web.review-chat-width web.review-files-width web.review-margin-width))))
@@ -1909,9 +1888,9 @@ let%expect_test "/retry-backend-connection, /state, /clear, /quit" =
     (Rpc (method_ get_prefs)
      (params
       ((keys
-        (web.theme web.accent web.radius web.font web.code-font web.notify
-         web.verbosity web.terminal-open web.sidebar-folded web.sidebar-unfolded
-         web.sidebar-opened web.sidebar-worktree-hours web.review web.code-size
+        (web.theme web.accent web.notify web.verbosity web.terminal-open
+         web.sidebar-folded web.sidebar-unfolded web.sidebar-opened
+         web.sidebar-worktree-hours web.review web.code-size favourite-models
          history web.migrated web.sidebar-width web.files-width
          web.files-preview-width web.agents-width web.terminal-height
          web.review-chat-width web.review-files-width web.review-margin-width))))

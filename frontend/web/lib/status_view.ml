@@ -74,27 +74,6 @@ let activity_word m =
   | Working w | Retrying w | Connecting w | Offline w -> w
 ;;
 
-let activity (m : App.Model.t) =
-  let word = activity_word m in
-  let cls, light =
-    match doing m with
-    | Idle -> "idle", Node.span ~attrs:[ Attr.class_ "idle-dot" ] []
-    | Working _ -> "running", lamp ()
-    | Retrying _ -> "running retrying", lamp ()
-    | Connecting _ -> "connecting", lamp ()
-    | Offline "Stopped reconnecting" -> "offline", Node.none
-    | Offline _ -> "connecting offline", lamp ()
-  in
-  Node.span
-    ~attrs:
-      [ Attr.class_ ("status-item activity " ^ cls)
-      ; Attr.title word
-      ; Attr.role "status"
-      ; Attr.create "aria-atomic" "true"
-      ]
-    [ light; span ~cls:"label" word ]
-;;
-
 let level_class : Prigh_ui.Loop_status.Level.t -> string = function
   | Normal -> ""
   | Warn -> "warm"
@@ -138,101 +117,6 @@ let meter percent =
         ~attrs:[ Attr.class_ "meter-fill"; Attr.style (fill percent) ]
         []
     ]
-;;
-
-let ring ?(cls = "") percent children =
-  Node.span
-    ~attrs:
-      [ Attr.class_
-          (String.concat
-             ~sep:" "
-             (List.filter
-                [ "ring"; cls; context_level percent ]
-                ~f:(Fn.non String.is_empty)))
-      ; Attr.css_var
-          ~name:"pct"
-          (sprintf "%.1f" (Float.clamp_exn percent ~min:0. ~max:100.))
-      ]
-    children
-;;
-
-let details_id = "status-details"
-
-let details (m : App.Model.t) (state : State.t) =
-  let line ?(cls = "") k v =
-    div
-      ~cls:(String.strip ("status-detail " ^ cls))
-      [ span ~cls:"status-detail-key" k; span ~cls:"status-detail-value" v ]
-  in
-  let mode = Session_mode.of_state state in
-  Node.div
-    ~attrs:
-      [ Attr.class_ "status-details"; Attr.role "tooltip"; Attr.id details_id ]
-    [ line "Status" (activity_word m)
-    ; (match context_percent state with
-       | Some percent ->
-         line
-           ~cls:("context " ^ context_level percent)
-           "Context"
-           (sprintf
-              "%s / %s · %.0f%%"
-              (tokens state.context_tokens)
-              (tokens state.model.context_window)
-              percent)
-       | None -> Node.none)
-    ; line
-        "Tokens"
-        (sprintf
-           "%s in · %s out · %s cached"
-           (tokens state.usage.input)
-           (tokens state.usage.output)
-           (tokens state.usage.cache_read))
-    ; (match Prigh_ui.Loop_status.budget_part state with
-       | None -> line "Cost" (sprintf "$%.4f" state.cost_usd)
-       | Some (text, level) ->
-         line
-           ~cls:("cost " ^ level_class level)
-           "Cost"
-           (sprintf "$%.4f · %s" state.cost_usd text))
-    ; line
-        "Thinking"
-        (if state.model.supports_thinking
-         then Thinking.label state.thinking
-         else "none")
-    ; line "Mode" (Session_mode.title mode)
-    ; line "Model" state.model.name
-    ; (match state.git_branch with
-       | Some branch -> line ~cls:"branch-line" "Branch" branch
-       | None -> Node.none)
-    ; div
-        ~cls:"status-detail-hint"
-        [ Node.text "Click for the session’s details · /compact frees context" ]
-    ]
-;;
-
-let context_button ?(cls = "") (state : State.t) ~inject children =
-  let label =
-    match context_percent state with
-    | Some percent ->
-      sprintf "Context %.0f%% full: the session's details" percent
-    | None -> "The session's details"
-  in
-  Node.button
-    ~attrs:
-      [ Attr.class_ (String.strip ("status-item link context " ^ cls))
-      ; Attr.type_ "button"
-      ; Attr.create "aria-label" label
-      ; Attr.create "aria-describedby" details_id
-      ; Attr.create "aria-haspopup" "dialog"
-      ; Attr.on_click (fun _ -> inject (Action.Run "/session"))
-      ]
-    children
-;;
-
-let gauge ?(cls = "") m state children =
-  Node.span
-    ~attrs:[ Attr.class_ (String.strip ("status-gauge " ^ cls)) ]
-    (children @ [ details m state ])
 ;;
 
 (* {2 Notes: what applies, shown only while it does} *)
@@ -372,31 +256,3 @@ let notes (m : App.Model.t) ~inject =
 
 (* {2 In the composer's row} *)
 
-let composer_status (m : App.Model.t) ~inject =
-  match m.state with
-  | None -> Node.none
-  | Some state ->
-    Node.div
-      ~attrs:
-        [ classes [ "composer-status" ] [ "busy", busy m ]
-        ; Attr.role "group"
-        ; Attr.create "aria-label" "Session status"
-        ]
-      [ gauge
-          ~cls:"above"
-          m
-          state
-          [ activity m
-          ; (match context_percent state with
-             | Some p ->
-               context_button
-                 state
-                 ~inject
-                 [ ring ~cls:"mini" p []
-                 ; span ~cls:"percent" (sprintf "%.0f%%" p)
-                 ]
-             | None -> context_button state ~inject [ ring ~cls:"mini" 0. [] ])
-          ; cost state ~inject
-          ]
-      ]
-;;

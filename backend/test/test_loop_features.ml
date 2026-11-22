@@ -916,6 +916,53 @@ let%expect_test
 ;;
 
 let%expect_test
+    "turning resume_on_limit_reset off cancels a scheduled resume, and a \
+     session loaded while it is off drops the one it recorded"
+  =
+  let sleep_until, fire = manual_clock () in
+  let resets_at = Core_unix.gettimeofday () +. 600. in
+  with_agent ~sleep_until [ Reply.usage_limit ~resets_at (); text "never" ]
+  @@ fun t agent make ->
+  Or_error.ok_exn (Agent.prompt agent "work");
+  Agent.wait_idle agent;
+  let path = Session.path (Agent.session agent) in
+  let snapshot = In_channel.read_all path in
+  let off = { (Agent.config agent) with resume_on_limit_reset = false } in
+  Or_error.ok_exn (Agent.set_config agent off);
+  show_state agent;
+  fire ();
+  Eio.Time.sleep (Eio.Stdenv.clock t.env) 0.05;
+  Agent.wait_idle agent;
+  show_state agent;
+  print_s
+    [%sexp
+      (Session.resume_at (Or_error.ok_exn (Session.load path)) : float option)];
+  (* As the backend left it before the change: loaded with the saved config
+     off, it does not arm the resume again. *)
+  Out_channel.write_all path ~data:snapshot;
+  let reloaded = make ~session:(Or_error.ok_exn (Session.load path)) () in
+  show_state reloaded;
+  print_s
+    [%sexp
+      (Session.resume_at (Or_error.ok_exn (Session.load path)) : float option)];
+  [%expect
+    {|
+    request: 1 messages, last user "[Client: the user is on another client, which cannot display"
+    assistant:  ERROR HTTP 429: The usage limit has been reached (usage limit reached) (resets at <time>)
+    notice: deepseek/deepseek-flash: the usage limit is reached; the run resumes when it resets at <time> (in 10m): /resume now retries at once, /resume cancel stays stopped
+    notice: automatic resume after a usage limit is off (/resume on): the run stays stopped; send a message to carry on
+    ((running false) (cost_usd 0) (budget_usd ()) (goal ())
+     (resume_scheduled false))
+    ((running false) (cost_usd 0) (budget_usd ()) (goal ())
+     (resume_scheduled false))
+    ()
+    ((running false) (cost_usd 0) (budget_usd ()) (goal ())
+     (resume_scheduled false))
+    ()
+    |}]
+;;
+
+let%expect_test
     "no resume without a reset time, or with resume_on_limit_reset off; a goal \
      waits for the resume"
   =

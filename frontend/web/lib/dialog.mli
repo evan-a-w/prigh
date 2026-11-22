@@ -44,9 +44,6 @@ module Picker_kind : sig
     (** [/approval-model]: model keys, or [off] (the session's) *)
     | Naming_models
     (** [/naming model]: model keys, or [off] (the drafting model's) *)
-    | Dictation_models
-    (** [/dictation model]: transcription model keys, or [off] (the
-        default); other keys are typed in the filter *)
     | Defaults of New_default.Picker.t
     (** the settings' New sessions: model keys, or host ids; the first item
         ([builtin]) goes back to the built-in *)
