@@ -109,9 +109,10 @@ both OCaml toolchains plus their package sets (about an hour on a small
 machine); both are cached afterwards.
 
 The flake names the binary cache `https://attic.caduc.co/prigh`, so that
-all of that is downloaded instead. CI fills it from every push to `main`
-(`.github/workflows/attic.yml`): prigh, prigh-desktop, everything they are
-built from (the OxCaml toolchain and packages) and the dev shells.
+all of that is downloaded instead. A self-hosted build host fills it from
+every push to `main` (DOCKER.md, "Binary cache"): prigh, prigh-desktop,
+everything they are built from (the OxCaml toolchain and packages) and the
+dev shells.
 Nix asks before using a flake's settings: answer `y` (and save it), or pass
 `--accept-flake-config`. With a multi-user Nix install it is only used if you
 are in `trusted-users`, or if `https://attic.caduc.co/prigh` and its key are

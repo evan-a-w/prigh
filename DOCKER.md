@@ -15,10 +15,10 @@ and [Isolation](#isolation).
 
 ## The image
 
-CI publishes the image for every commit of `main` to
-`ghcr.io/evan-a-w/prigh` (`.github/workflows/attic.yml`, as soon as it has
-built that commit: see [Binary cache](#binary-cache)): the tags `main` and
-`latest` follow `main`, and each commit's short sha (`:e9c8b23`) pins it.
+The image is published for every commit of `main` to
+`ghcr.io/evan-a-w/prigh` by the build host, once it has built that commit
+(see [Binary cache](#binary-cache)): the tags `main` and `latest` follow
+`main`, and each commit's short sha (`:e9c8b23`) pins it.
 `docker-compose.yml` runs `${PRIGH_IMAGE:-ghcr.io/evan-a-w/prigh:main}`
 with `pull_policy: always`, so every `docker compose up` (and Portainer's
 redeploy) checks for a newer image, and updating is a download of the
@@ -708,14 +708,18 @@ proxy that keeps dead sockets open does not keep their work alive.
 
 ## Binary cache
 
-Every push to `main` builds prigh and everything it is built from and
-pushes them to the Attic cache `prigh` (`.github/workflows/attic.yml`), so
-when `flake.lock`, `nix/` or the `*.opam`/`dune-project` files change, the
-new dependencies are cached once that run finishes. Only the build fails a
-run: an upload that fails even after retries (atticd or its storage slow,
-a timeout) is a warning on the run, and the next run pushes what is
-missing. To push them by hand, from a machine with Nix, enough RAM and a
-push token (`attic login`):
+A self-hosted build host ([Komodo](https://komo.do), outside this
+repository) picks up every push to `main` within a few minutes. It builds
+prigh, prigh-desktop, prigh-computer, everything they are built from and
+the dev shells' inputs, and pushes them to the Attic cache `prigh`. So when
+`flake.lock`, `nix/` or the `*.opam`/`dune-project` files change, the new
+dependencies are cached once that run finishes. Its Nix store persists
+between runs, so a commit only builds what changed. Then it builds the
+image from its own store (the backend and frontend as NARs in the
+`prebuilt` build context, with `REQUIRE_CACHED=1`) and pushes it to
+`ghcr.io/evan-a-w/prigh`. Only merged code reaches it: pull requests run
+nothing there. To push to the cache by hand, from a machine with Nix,
+enough RAM and a push token (`attic login`):
 
 ```
 nix build --no-link --print-out-paths path:.#frontend.inputDerivation path:.#backend.inputDerivation \
@@ -725,30 +729,16 @@ nix build --no-link --print-out-paths path:.#frontend.inputDerivation path:.#bac
 Anything missing from the cache is compiled, so a stale cache makes the
 build slower but does not break it.
 
-The workflow runs two jobs side by side: `server` (backend, frontends, the
-default dev shell) and `desktop` (prigh-desktop, prigh-computer, the
-desktop dev shell). As soon as `server` has built prigh, it builds the
-image from its own store (the backend and frontend as NARs in the
-`prebuilt` build context, with `REQUIRE_CACHED=1`) and pushes it to
-`ghcr.io/evan-a-w/prigh`, before uploading anything to Attic, so a slow
-upload never delays the image, and an unreachable Attic API only skips
-the upload. Its last step, `Attic connection`, shows how the runner
-reaches the Attic peer (P2P or relayed, the latency) and the download
-rate of the same NAR over NetBird and over the internet, to tell a slow
-tunnel from slow storage. It can also be run by hand (Actions → attic →
-Run workflow) for main or a branch (a branch's image gets only its short
-sha tag; untick `publish_image` to skip it).
-
 ## How the image is built
 
 1. A `nixos/nix` stage gets `.#backend` and `.#frontend` of the flake
    (`docker/fetch-prigh.sh`): one the binary cache has (signed by a trusted
-   key) is downloaded as that store path alone (CI passes the ones it just
-   built as NARs in the `prebuilt` build context, which come first), checked against its hash
+   key) is downloaded as that store path alone (the build host passes the
+   ones it just built as NARs in the `prebuilt` build context, which come first), checked against its hash
    and unpacked, without its closure (which holds the whole OxCaml
    toolchain, ~3 GB to download); one it lacks is built, after a warning
-   and `nix build --dry-run`'s plan (`REQUIRE_CACHED=1`, as CI sets, fails
-   instead). With `PREFETCH_DEPS=1` it first builds only their
+   and `nix build --dry-run`'s plan (`REQUIRE_CACHED=1`, as the build host
+   sets, fails instead). With `PREFETCH_DEPS=1` it first builds only their
    dependencies, from a copy of the files that determine them, so that
    layer stays cached. It then keeps just the two
    binaries, prigh-web's site and, as the Nix seed, the few store paths the

@@ -2,7 +2,7 @@
 # environment variables (Portainer: "Environment variables" on the stack);
 # see DOCKER.md for all of them.
 #
-# This runs the image CI publishes for every commit of main. To build it from
+# This runs the image published for every commit of main. To build it from
 # source instead, add docker-compose.build.yml (COMPOSE_FILE in .env:
 # docker-compose.yml:docker-compose.build.yml).
 name: prigh
