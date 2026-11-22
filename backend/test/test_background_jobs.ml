@@ -742,7 +742,7 @@ let%expect_test "jobs on a client tool host: output, list, kill, disconnect" =
   print_tail t agent 2;
   [%expect
     {|
-    {"type":"response","id":"r","ok":true,"result":{"client_id":"client-1","host_id":"client-1","namespace":null,"user":null,"superuser":false,"features":["pasted_text"],"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"thinking_options":["off","default","low","high","max"],"thinking_default":"high","supports_images":true,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"default","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","active_host_name":"<host>","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"chat_mode":false,"no_host":null,"computer_control":null,"plan":null,"session_rules":[]}}}
+    {"type":"response","id":"r","ok":true,"result":{"client_id":"client-1","host_id":"client-1","namespace":null,"user":null,"superuser":false,"features":["pasted_text"],"state":{"session_id":"<id>","session_path":"$DIR/sessions/<stamp>_<id>.jsonl","session_name":null,"session_description":null,"cwd":"$DIR","git_branch":null,"model":{"id":"deepseek-flash","provider":"deepseek","key":"deepseek/deepseek-flash","name":"DeepSeek V4.1 Flash","context_window":1000000,"max_output":384000,"supports_thinking":true,"thinking_options":["off","default","low","high","max"],"thinking_default":"high","supports_images":true,"legacy":false,"image_limit":{"max_bytes":3538944,"max_dimension":8000},"cost":{"input":0.3,"output":1.2,"cache_read":0.006}},"thinking":"default","running":false,"message_count":0,"usage":{"input":0,"output":0,"cache_read":0},"cost_usd":0,"context_tokens":0,"active_host":"backend","active_host_name":"<host>","hosts":[{"id":"backend","name":"<host>","cwd":"$DIR","session_id":null,"session_name":null,"home":"$HOME"}],"subagents":[],"jobs":[],"budget_usd":null,"goal":null,"reminders":[],"resume_at_ms":null,"approval_mode":"auto","plan_mode":false,"chat_mode":false,"no_host":null,"computer_control":null,"plan":null,"session_rules":[]}}}
     connected to 127.0.0.1:PORT as client-2
     {"type":"response","id":"r","ok":true,"result":{"cwd":"$DIR/host","created":false}}
     {"type":"response","id":"r","ok":true,"result":{}}
@@ -883,5 +883,39 @@ let%expect_test
     assistant: a1 built it
     agent_end
     state: running=false subagents=[] jobs=[]
+    |}]
+;;
+
+let%expect_test "status: how long a subagent's tool call or a job has been quiet" =
+  let show kind ~in_call ~quiet =
+    let now = 10_000. in
+    printf
+      "%-8s in_call=%-5s quiet=%-5s -> %S\n"
+      (match (kind : Background_tasks.Kind.t) with
+       | Subagent -> "subagent"
+       | Job -> "job")
+      (Option.value_map in_call ~default:"-" ~f:(sprintf "%.0f"))
+      (sprintf "%.0f" quiet)
+      (Background_tasks.For_testing.stall_text
+         ~kind
+         ~now
+         ~in_call_since:(Option.map in_call ~f:(fun s -> now -. s))
+         ~output_at:(now -. quiet))
+  in
+  show Subagent ~in_call:None ~quiet:5000.;
+  show Subagent ~in_call:(Some 30.) ~quiet:30.;
+  show Subagent ~in_call:(Some 90.) ~quiet:5.;
+  show Subagent ~in_call:(Some 3120.) ~quiet:3000.;
+  show Subagent ~in_call:(Some 7500.) ~quiet:7500.;
+  show Job ~in_call:None ~quiet:30.;
+  show Job ~in_call:None ~quiet:900.;
+  [%expect {|
+    subagent in_call=-     quiet=5000  -> ""
+    subagent in_call=30    quiet=30    -> ""
+    subagent in_call=90    quiet=5     -> ", in it for 1m"
+    subagent in_call=3120  quiet=3000  -> ", in it for 52m, no output for 50m: it may be stuck (subagent_message or subagent_cancel it)"
+    subagent in_call=7500  quiet=7500  -> ", in it for 2h05m, no output for 2h05m: it may be stuck (subagent_message or subagent_cancel it)"
+    job      in_call=-     quiet=30    -> ""
+    job      in_call=-     quiet=900   -> ", no output for 15m"
     |}]
 ;;

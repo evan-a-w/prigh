@@ -997,7 +997,6 @@ let%expect_test "config round trip and config_changed event" =
          ; generate_model = None
          ; naming_model = None
          ; approval_model = Some "anthropic/claude-haiku-4-5"
-         ; dictation_model = Some "openai/whisper-1"
          }
        : Json.t)];
   decode
@@ -1025,10 +1024,9 @@ let%expect_test "config round trip and config_changed event" =
      (compact_at_tokens 200000)
      (compaction_model ())
      (mask_observations true)
-     (generate_model  ())
-     (naming_model    ())
-     (approval_model  ())
-     (dictation_model ()))
+     (generate_model ())
+     (naming_model   ())
+     (approval_model ()))
     ((scoped_models ())
      (approval_mode     Auto)
      (default_chat_mode false)
@@ -1050,10 +1048,9 @@ let%expect_test "config round trip and config_changed event" =
      (compact_at_tokens 200000)
      (compaction_model ())
      (mask_observations true)
-     (generate_model  ())
-     (naming_model    ())
-     (approval_model  ())
-     (dictation_model ()))
+     (generate_model ())
+     (naming_model   ())
+     (approval_model ()))
     ((scoped_models ())
      (approval_mode     Auto)
      (default_chat_mode false)
@@ -1075,10 +1072,9 @@ let%expect_test "config round trip and config_changed event" =
      (compact_at_tokens 200000)
      (compaction_model ())
      (mask_observations true)
-     (generate_model  ())
-     (naming_model    ())
-     (approval_model  ())
-     (dictation_model ()))
+     (generate_model ())
+     (naming_model   ())
+     (approval_model ()))
     (decode (e "default_model must be a string"))
     ((scoped_models ())
      (approval_mode     Auto)
@@ -1101,10 +1097,9 @@ let%expect_test "config round trip and config_changed event" =
      (compact_at_tokens 200000)
      (compaction_model ())
      (mask_observations true)
-     (generate_model  ())
-     (naming_model    ())
-     (approval_model  ())
-     (dictation_model ()))
+     (generate_model ())
+     (naming_model   ())
+     (approval_model ()))
     (decode (e "fallback_models must be an array of strings"))
     (decode (e "default_cwd must be a string"))
     ((scoped_models ())
@@ -1130,10 +1125,9 @@ let%expect_test "config round trip and config_changed event" =
      (compact_at_tokens 200000)
      (compaction_model ())
      (mask_observations true)
-     (generate_model  ())
-     (naming_model    ())
-     (approval_model  ())
-     (dictation_model ()))
+     (generate_model ())
+     (naming_model   ())
+     (approval_model ()))
     (decode (e (in snippets[0] "missing field \"text\"")))
     ((scoped_models ())
      (approval_mode     Auto)
@@ -1156,10 +1150,9 @@ let%expect_test "config round trip and config_changed event" =
      (compact_at_tokens 0)
      (compaction_model (claude-haiku-4-5))
      (mask_observations true)
-     (generate_model  ())
-     (naming_model    ())
-     (approval_model  ())
-     (dictation_model ()))
+     (generate_model ())
+     (naming_model   ())
+     (approval_model ()))
     (decode (e "compact_at_tokens must be a whole number"))
     ((scoped_models ())
      (approval_mode     Auto)
@@ -1182,10 +1175,9 @@ let%expect_test "config round trip and config_changed event" =
      (compact_at_tokens 200000)
      (compaction_model ())
      (mask_observations false)
-     (generate_model  ())
-     (naming_model    ())
-     (approval_model  ())
-     (dictation_model ()))
+     (generate_model ())
+     (naming_model   ())
+     (approval_model ()))
     (decode (e "mask_observations must be a boolean"))
     ((scoped_models ())
      (approval_mode     Auto)
@@ -1210,8 +1202,7 @@ let%expect_test "config round trip and config_changed event" =
      (mask_observations true)
      (generate_model ())
      (naming_model   ())
-     (approval_model ())
-     (dictation_model (aiproxy/whisper)))
+     (approval_model ()))
     ((scoped_models ())
      (approval_mode     Auto)
      (default_chat_mode false)
@@ -1234,9 +1225,8 @@ let%expect_test "config round trip and config_changed event" =
      (compaction_model ())
      (mask_observations true)
      (generate_model (deepseek/deepseek-flash))
-     (naming_model    ())
-     (approval_model  ())
-     (dictation_model ()))
+     (naming_model   ())
+     (approval_model ()))
     (decode (e "generate_model must be a string"))
     ((scoped_models ())
      (approval_mode     Smart)
@@ -1259,10 +1249,9 @@ let%expect_test "config round trip and config_changed event" =
      (compact_at_tokens 200000)
      (compaction_model ())
      (mask_observations true)
-     (generate_model  ())
-     (naming_model    ())
-     (approval_model  ())
-     (dictation_model ()))
+     (generate_model ())
+     (naming_model   ())
+     (approval_model ()))
     (decode (e "default_chat_mode must be a boolean"))
     ("round trip"
       (generate_model    (deepseek/deepseek-flash))
@@ -1293,8 +1282,7 @@ let%expect_test "config round trip and config_changed event" =
      (mask_observations false)
      (generate_model    null)
      (naming_model      null)
-     (approval_model    anthropic/claude-haiku-4-5)
-     (dictation_model   openai/whisper-1))
+     (approval_model    anthropic/claude-haiku-4-5))
     (Event (
       Config_changed (
         (scoped_models (a))
@@ -1318,10 +1306,9 @@ let%expect_test "config round trip and config_changed event" =
         (compact_at_tokens 200000)
         (compaction_model ())
         (mask_observations true)
-        (generate_model  ())
-        (naming_model    ())
-        (approval_model  ())
-        (dictation_model ()))))
+        (generate_model ())
+        (naming_model   ())
+        (approval_model ()))))
     |}]
 ;;
 
@@ -2405,22 +2392,41 @@ let%expect_test "MCP sign-ins: the listing, the event, an OAuth client" =
     |}];
   decode {|{"type":"event","event":"mcp_auth_changed"}|};
   [%expect {| (Event Mcp_auth_changed) |}];
-  let config =
-    {|{"type":"http","url":"https://x.example/mcp","oauth":{"clientId":"app","clientSecret":"s3cret","scopes":["a","b"]}}|}
+  let round_trip config =
+    let transport =
+      Or_error.ok_exn
+        (Or_error.bind (Json.parse config) ~f:Mcp_settings.Transport.of_json)
+    in
+    print_s (Mcp_settings.Transport.sexp_of_t transport);
+    print_endline (Json.to_string (Mcp_settings.Transport.to_json transport))
   in
-  let transport =
-    Or_error.ok_exn
-      (Or_error.bind (Json.parse config) ~f:Mcp_settings.Transport.of_json)
-  in
-  print_s (Mcp_settings.Transport.sexp_of_t transport);
-  print_endline (Json.to_string (Mcp_settings.Transport.to_json transport));
-  [%expect
-    {|
+  round_trip
+    {|{"type":"http","url":"https://x.example/mcp","oauth":{"clientId":"app","clientSecret":"s3cret","scopes":["a","b"]}}|};
+  [%expect {|
     (Http
       (url https://x.example/mcp)
       (headers ())
-      (oauth ((client_id app) (client_secret (<hidden>)) (scopes ((a b))))))
+      (oauth (
+        (client_id     (app))
+        (client_secret (<hidden>))
+        (client_name ())
+        (scopes ((a b))))))
     {"type":"http","url":"https://x.example/mcp","oauth":{"clientId":"app","clientSecret":"s3cret","scopes":["a","b"]}}
+    |}];
+  (* Only the name to register as. *)
+  round_trip
+    {|{"type":"http","url":"https://mcp.figma.com/mcp","oauth":{"clientName":"Codex"}}|};
+  [%expect
+    {|
+    (Http
+      (url https://mcp.figma.com/mcp)
+      (headers ())
+      (oauth (
+        (client_id     ())
+        (client_secret ())
+        (client_name (Codex))
+        (scopes ()))))
+    {"type":"http","url":"https://mcp.figma.com/mcp","oauth":{"clientName":"Codex"}}
     |}]
 ;;
 

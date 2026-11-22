@@ -9,6 +9,11 @@
 ARG NIX_IMAGE=nixos/nix:2.35.2
 ARG RUNTIME_IMAGE=debian:bookworm-slim
 
+# prigh as built by whoever builds the image, as NARs (see
+# docker/fetch-prigh.sh): CI passes its own build with --build-context
+# prebuilt=DIR. Empty otherwise.
+FROM scratch AS prebuilt
+
 FROM ${NIX_IMAGE} AS nix-build
 # Binary caches, space-separated (the keys too), holding prigh as built from
 # main and the OxCaml toolchain and packages, so they are downloaded instead
@@ -46,7 +51,8 @@ RUN if [ "$PREFETCH_DEPS" = 1 ]; then nix build --no-link path:/deps#backend.inp
 # refer to (glibc, gmp) are fetched, and the seed is made of those and nix.
 ARG REQUIRE_CACHED=0
 COPY . /src
-RUN bash /src/docker/fetch-prigh.sh \
+RUN --mount=type=bind,from=prebuilt,target=/prebuilt \
+    bash /src/docker/fetch-prigh.sh \
  && mkdir -p /opt/prigh/bin /opt/prigh/share \
  && cp -L /out/backend/bin/prigh /out/frontend/bin/prigh-tui /opt/prigh/bin/ \
  && cp -rL --preserve=timestamps /out/frontend/share/prigh_frontend/web /opt/prigh/share/web \

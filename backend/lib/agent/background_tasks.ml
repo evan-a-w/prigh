@@ -49,6 +49,10 @@ module Task = struct
     ; mutable outcome : Outcome.t option
     ; mutable finished_at : float option
     ; mutable activity : string
+    ; mutable in_call_since : float option
+    (* a subagent's: since when its latest tool call has run *)
+    ; mutable output_at : float
+    (* when it last had output (a job's or its tool call's), or started *)
     ; mutable delivered : bool
     }
 
@@ -173,6 +177,54 @@ let rec activity (event : Agent_event.t) =
   | _ -> None
 ;;
 
+let rec track_call t (task : Task.t) (event : Agent_event.t) =
+  match event with
+  | Subagent { event; _ } -> track_call t task event
+  | Tool_start _ ->
+    let now = now t in
+    task.in_call_since <- Some now;
+    task.output_at <- now
+  | Tool_output _ -> task.output_at <- now t
+  | Tool_end _ | Message_start _ -> task.in_call_since <- None
+  | _ -> ()
+;;
+
+let span_text s =
+  let s = Float.iround_down_exn s in
+  if s < 60
+  then sprintf "%ds" s
+  else if s < 3600
+  then sprintf "%dm" (s / 60)
+  else sprintf "%dh%02dm" (s / 3600) (s / 60 % 60)
+;;
+
+let long_after = 60.
+let stuck_after = 600.
+
+let stall_text ~kind ~now ~in_call_since ~output_at =
+  let quiet = now -. output_at in
+  let no_output =
+    if Float.( >= ) quiet long_after
+    then sprintf ", no output for %s" (span_text quiet)
+    else ""
+  in
+  match (kind : Kind.t), in_call_since with
+  | Job, _ -> no_output
+  | Subagent, None -> ""
+  | Subagent, Some since ->
+    let in_call = now -. since in
+    if Float.( < ) in_call long_after
+    then ""
+    else
+      sprintf
+        ", in it for %s%s%s"
+        (span_text in_call)
+        no_output
+        (if Float.( >= ) quiet stuck_after
+         then ": it may be stuck (subagent_message or subagent_cancel it)"
+         else "")
+;;
+
 let avoid_subagent_ids t ids =
   List.iter ids ~f:(fun id ->
     Option.iter
@@ -225,6 +277,8 @@ let make_task
     ; outcome = None
     ; finished_at = None
     ; activity = "starting"
+    ; in_call_since = None
+    ; output_at = started_at
     ; delivered = false
     }
   in
@@ -290,6 +344,7 @@ let run_task t (task : Task.t) resolve ~run =
     Subagent_inbox.set_on_change inbox (fun () -> t.on_queue_change ()));
   let emit event =
     Option.iter (activity event) ~f:(fun a -> task.activity <- a);
+    track_call t task event;
     t.emit event
   in
   let job = start_job task in
@@ -301,7 +356,9 @@ let run_task t (task : Task.t) resolve ~run =
             ~id:task.id
             ~cancel:task.cancel
             ~emit
-            ~on_output:(Output_tail.add task.output))
+            ~on_output:(fun chunk ->
+              task.output_at <- now t;
+              Output_tail.add task.output chunk))
       with
       | outcome -> outcome
       | exception (Eio.Cancel.Cancelled _ as exn) ->
@@ -352,10 +409,14 @@ let run_foreground ?input t ~kind ~label ~after ~cancel ~on_output ~run ~outcome
   let work_cancel = Cancellation.create () in
   let output = Output_tail.create () in
   let moved = ref None in
+  let output_at = ref started_at in
   let result, resolve_result = Promise.create () in
   let sink chunk =
     Output_tail.add output chunk;
-    if Option.is_none !moved then on_output chunk
+    output_at := now t;
+    match !moved with
+    | None -> on_output chunk
+    | Some ((task : Task.t), _, _) -> task.output_at <- !output_at
   in
   (* The work runs in the tasks' switch, not the caller's fiber, so that it
      can outlive the call once it is moved. *)
@@ -413,6 +474,7 @@ let run_foreground ?input t ~kind ~label ~after ~cancel ~on_output ~run ~outcome
          make_task ?input ~output t ~kind ~label ~started_at ~cancel:work_cancel
        in
        task.activity <- "running";
+       task.output_at <- !output_at;
        (* Moved: from its start, it outlives the call. *)
        moved := Some (task, start_job ?at:started_mono task, resolve);
        t.on_change ();
@@ -719,17 +781,28 @@ let status_text t ~kind =
          let elapsed =
            Option.value task.finished_at ~default:now -. task.started_at
          in
+         let stall =
+           if Task.running task
+           then
+             stall_text
+               ~kind
+               ~now
+               ~in_call_since:task.in_call_since
+               ~output_at:task.output_at
+           else ""
+         in
          let last =
            match kind with
-           | Subagent -> task.activity
+           | Subagent -> task.activity ^ stall
            | Job ->
              sprintf
-               "%s, %s"
+               "%s, %s%s"
                (bytes_text (Output_tail.total_bytes task.output))
                (Option.value
                   (Output_tail.last_line task.output)
                   ~default:"no output"
                 |> short_task)
+               stall
          in
          sprintf
            "%s  %s%s  %.0fs  %s  (last: %s)"
@@ -740,3 +813,7 @@ let status_text t ~kind =
            (short_task task.label)
            last))
 ;;
+
+module For_testing = struct
+  let stall_text = stall_text
+end

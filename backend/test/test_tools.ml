@@ -990,3 +990,53 @@ let%expect_test "bash outputs are saved in a private per-user directory" =
       "$TMP/prigh-output-<uid> is not a directory: remove it or set TMPDIR")
     |}]
 ;;
+
+let%expect_test "bash: refuses to wait by polling" =
+  with_sandbox
+  @@ fun t ->
+  run
+    t
+    Tool_bash.tool
+    {|{"command": "while true; do echo tick; sleep 60; done; echo never"}|};
+  run t Tool_bash.tool {|{"command": "pkill -f my-server; echo never"}|};
+  [%expect
+    {|
+    ERROR: Not run: this command waits by polling (a while loop that sleeps), which blocks you for as long as it waits and spins until its timeout if what it waits for never comes. To wait for a command that takes long (a build, tests, an install), start it with bash and background: true, then keep working or end your turn: its report ([job ID exited N] and its last lines) arrives when it exits. For a process already running that is not a job, wait on its pid: timeout 600 tail --pid=PID -f /dev/null. To wait for a server to come up, bound the loop with a short timeout: timeout 60 bash -c 'until curl -sf URL; do sleep 1; done' (loops under a timeout of at most 120s run).
+    ERROR: Not run: pkill -f 'my-server' matches this command's own command line (the shell running it is bash -c with this text, which contains the pattern), so it would kill this very shell. Bracket a character so the pattern cannot match itself: pkill -f '[m]y-server'. To wait for a command that takes long (a build, tests, an install), start it with bash and background: true, then keep working or end your turn: its report ([job ID exited N] and its last lines) arrives when it exits. For a process already running that is not a job, wait on its pid: timeout 600 tail --pid=PID -f /dev/null.
+    |}]
+;;
+
+let%expect_test "bash: processes left running are reported" =
+  with_sandbox
+  @@ fun t ->
+  let pids_re = Re.compile (Re.Perl.re ~opts:[ `Multiline ] {|^  [0-9]+ |}) in
+  let left = ref [] in
+  let context = Tool.Context.create ~env:t.env ~cwd:t.dir () in
+  let bash command =
+    let result =
+      Tool.execute Tool_bash.tool context (`Object [ "command", `String command ])
+    in
+    left
+    := !left
+       @ List.filter_map (Re.all pids_re result.text) ~f:(fun g ->
+         Int.of_string_opt (String.strip (Re.Group.get g 0)));
+    print_string (Re.replace_string pids_re ~by:"  <pid> " result.text)
+  in
+  (* Escaping the process group (setsid) or not (&, nohup): all found. *)
+  bash
+    "setsid sleep 301 </dev/null >/dev/null 2>&1 & a=$!; nohup sleep 302 \
+     >/dev/null 2>&1 & b=$!; for p in $a $b; do until grep -qa '^sleep' \
+     /proc/$p/cmdline; do :; done; done; echo started";
+  [%expect {|
+    started
+    [the command left 2 processes running, detached from this call:
+      <pid> sleep 301
+      <pid> sleep 302
+    They are not jobs: nothing reports when they exit, so do not poll for them. To run something long or lasting, use bash with background: true instead, and you are notified when it exits. Stop these with kill PID if they are not needed.]
+    |}];
+  (* Children that finish with the command are not. *)
+  bash "sleep 0.1 & wait; echo done";
+  [%expect {| done |}];
+  List.iter !left ~f:(fun pid ->
+    Signal_unix.send_i Signal.kill (`Pid (Pid.of_int pid)))
+;;

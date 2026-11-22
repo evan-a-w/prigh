@@ -207,6 +207,7 @@ let model t ?listed id =
           }
   ; supports_images = Option.value (get (fun o -> o.images)) ~default:true
   ; native_computer = None
+  ; legacy = false
   }
 ;;
 

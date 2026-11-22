@@ -2,8 +2,9 @@ open! Core
 
 module Oauth = struct
   type t =
-    { client_id : string
+    { client_id : string option
     ; client_secret : string option
+    ; client_name : string option
     ; scopes : string list option
     }
   [@@deriving sexp_of, equal]
@@ -15,19 +16,23 @@ module Oauth = struct
       }
   ;;
 
-  let to_json { client_id; client_secret; scopes } =
+  let to_json { client_id; client_secret; client_name; scopes } =
+    let string name = Option.map ~f:(fun s -> name, Json.str s) in
     Json.obj
-      ([ "clientId", Json.str client_id ]
-       @ Option.value_map client_secret ~default:[] ~f:(fun s ->
-         [ "clientSecret", Json.str s ])
+      (List.filter_opt
+         [ string "clientId" client_id
+         ; string "clientSecret" client_secret
+         ; string "clientName" client_name
+         ]
        @ Option.value_map scopes ~default:[] ~f:(fun s ->
          [ "scopes", `Array (List.map s ~f:Json.str) ]))
   ;;
 
   let of_json j =
     let open Or_error.Let_syntax in
-    let%bind client_id = Json.string_field j "clientId" in
+    let%bind client_id = Json.string_opt_field j "clientId" in
     let%bind client_secret = Json.string_opt_field j "clientSecret" in
+    let%bind client_name = Json.string_opt_field j "clientName" in
     let%map scopes =
       match Json.field j "scopes" with
       | None | Some `Null -> Ok None
@@ -37,7 +42,7 @@ module Oauth = struct
           | _ -> Or_error.error_string "oauth.scopes must be strings")
         |> Or_error.map ~f:Option.some
     in
-    { client_id; client_secret; scopes }
+    { client_id; client_secret; client_name; scopes }
   ;;
 end
 

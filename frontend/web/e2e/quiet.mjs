@@ -168,7 +168,7 @@ try {
 
   // An approval: asked outside the run, which says what is waiting.
   await run("/mode ask");
-  await page.locator(".mode-chip, .session-choice").first().waitFor({ state: "attached" });
+  await page.locator(".context-card .mode-line .status-detail-value", { hasText: "Asks: edits & commands" }).waitFor({ state: "attached" });
   await composer.fill("clean up");
   await composer.press("Enter");
   await page.locator("#confirm").waitFor();

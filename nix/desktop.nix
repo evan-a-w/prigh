@@ -18,9 +18,9 @@ let
     pkgs.libsoup_3
     pkgs.glib-networking
     pkgs.openssl
-    # WebKitGTK's media, WebAudio and the microphone (dictation): without
-    # them it says "GStreamer element appsink not found". wrapGAppsHook3
-    # puts them on GST_PLUGIN_SYSTEM_PATH_1_0.
+    # WebKitGTK's media and WebAudio: without them it says "GStreamer
+    # element appsink not found". wrapGAppsHook3 puts them on
+    # GST_PLUGIN_SYSTEM_PATH_1_0.
     pkgs.gst_all_1.gstreamer
     pkgs.gst_all_1.gst-plugins-base
     pkgs.gst_all_1.gst-plugins-good

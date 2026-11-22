@@ -90,7 +90,6 @@ module Icon : sig
     | Palette
     | Package
     | Book
-    | Mic
     | Image
     | Paperclip
     | Eraser
@@ -104,6 +103,13 @@ module Icon : sig
     | Keep (** a ticked circle: keeping a temporary session *)
     | Clipboard (** Paste *)
     | Plug (** MCP servers *)
+    | Gauge (** usage limits *)
+    | Star (** a favourite (filled by the style sheet when it is one) *)
+    | Openai
+    | Anthropic
+    | Deepseek
+    | Spark (** a provider without a mark of its own *)
+    | Monitor (** a tool host *)
 
   (** An inline SVG; tests show [<icon name>]. *)
   val view : ?cls:string -> t -> Node.t

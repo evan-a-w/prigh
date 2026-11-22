@@ -491,6 +491,33 @@ supervise() {
 	) &
 }
 
+# wait_writable DIR...: waits until the volumes are writable. A volume on a
+# disk the host mounts late or read-only for a while (an fsck, a remount
+# after an error) would otherwise fail the start halfway, and the restart
+# policy loop it with a screenful of errors each time.
+wait_writable() {
+	local wait="${PRIGH_VOLUME_WAIT:-2m}" limit waited=0 d err bad
+	[[ $wait =~ ^(0|off|[0-9]{1,6}[smhd])$ ]] ||
+		die "PRIGH_VOLUME_WAIT='$wait': use a number with s, m, h or d (e.g. 2m), or 0 not to wait"
+	limit=$(parse_interval "$wait")
+	while :; do
+		bad=()
+		for d in "$@"; do
+			if ! err=$( (mkdir -p "$root$d" && : >"$root$d/.prigh-write-test" && rm -f "$root$d/.prigh-write-test") 2>&1); then
+				bad+=("$d (${err##*: })")
+			fi
+		done
+		[ ${#bad[@]} -gt 0 ] || break
+		if [ "$waited" -ge "$limit" ]; then
+			die "not writable after ${waited}s: ${bad[*]}. Check the volumes' filesystems on the host (docker inspect prigh --format '{{json .Mounts}}'): mounted read-write, no disk errors in dmesg that remounted them read-only, and a disk mounted at boot mounted before Docker starts (systemd: RequiresMountsFor= on docker.service). PRIGH_VOLUME_WAIT=$wait is how long the start waits for them."
+		fi
+		[ "$waited" -gt 0 ] || log "waiting up to $wait for ${bad[*]} to be writable"
+		[ -n "$dry_run" ] || sleep 2
+		waited=$((waited + 2))
+	done
+	[ "$waited" = 0 ] || log "$* writable after ${waited}s"
+}
+
 # --- Nix ----------------------------------------------------------------------
 
 # nix_root_env: the environment of root's Nix processes, into nix_root_vars:
@@ -586,7 +613,10 @@ seed_nix() {
 # the first to use the volume.
 ensure_seeded() {
 	[ "$my_uid" = 0 ] || return 0
-	cmp -s "$root$nix_seed/id" "$root$nix_seed_stamp" || seed_nix
+	cmp -s "$root$nix_seed/id" "$root$nix_seed_stamp" || {
+		wait_writable /nix
+		seed_nix
+	}
 }
 
 # nix-daemon as root in the background, restarted unless it keeps failing. A
@@ -940,6 +970,7 @@ start_nix_gc_helper() {
 start_tui_mode() {
 	local cwd="${PRIGH_CWD:-/home/$service_user}"
 	load_gc_settings
+	wait_writable /home /nix
 	setup_service_home
 	warn_old_workspace "$service_user"
 	seed_nix
@@ -973,6 +1004,7 @@ start() {
 	[ ${#flags[@]} -gt 0 ] || die "PRIGH_MODE='$mode' enables nothing"
 	load_gc_settings
 	load_users
+	wait_writable /home /nix
 	setup_service_home
 	allocate_uids
 	write_accounts

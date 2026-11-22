@@ -7,6 +7,7 @@ type t =
   | Sessions
   | New_sessions (** what new sessions start with *)
   | Models
+  | Usage (** the subscriptions' usage limits *)
   | Memory
   | About_you
   | Custom_instructions

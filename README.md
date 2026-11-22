@@ -905,32 +905,36 @@ account menu control browser notifications while the tab is hidden, and the
 title (`(2) prigh`) and favicon count what happened meanwhile.
 
 The composer is one box: the editor on top and, along its bottom edge
-in the box's own quiet text, chips: the model and, in short lower-case
-words, the thinking level (a brain and "high", or "none" for a model
-without levels), the approval mode (a shield and "ask", "auto-edit",
-"smart", "auto" or "plan", lit where nothing asks; a speech bubble
-and "chat" in chat mode) and where tools run (a server icon and the
-tool host's name, always shown; a disconnected host keeps its name,
-its server struck through in red and "offline" beside it, with how to
-bring it back in its tooltip; lit as "no host" when none runs them or
-in chat mode), each lit with a chevron when pointed at, then attach,
-stop and send on the right. A chip opens a small menu standing on it,
-above the composer (below it only when there is no room above), with its
-command's choices (`/model`, `/thinking`, `/mode`, `/host`), the current
-one checked: the models under their providers with their context windows
-and a filter field to type in (the list scrolls; filtered, best match
-first), the thinking levels with how hard each thinks, the modes with
-what each asks first, the hosts with their directories and a filter too
-(choosing one asks for the directory there, as `/host` does; with only
-one host, or none, it says how to add one: `prigh tool-host -connect
-SERVER`, or a TUI). The hosts' menu follows hosts as they connect and
-leave. ↑↓ move, Enter or a click takes the choice, Esc or a click
-beside the menu closes it unchanged and gives the editor back the focus;
-← →, Tab and a click on another chip open the next chip's menu, one
-at a time. On a phone the menu is as wide as the composer. The commands
-themselves open the larger picker dialog. Ctrl+L opens the model's menu,
-Alt+T and Alt+M cycle the other two; in a narrow composer the model's
-and the host's names are cut short with an ellipsis, the host's first.
+in the box's own quiet text, one row: the paperclip (attach) and the
+context ring at the left, then at the right where tools run, the model
+and send (and Stop by the ring while a turn can be steered).
+Where tools run is a server icon and the tool host's name, always shown
+(a disconnected host keeps its name, its server struck through in red and
+"offline" beside it, with how to bring it back in its tooltip; lit as "no
+host" when none runs them or in chat mode). The model is its provider's
+mark, its short name ("Opus 5.5", "6.2 Sol") and, dimmer, its reasoning
+level ("High"). Each chip opens a small menu standing on it, above the
+composer (below it only when there is no room above), fully drawn from
+its first frame; Esc or a click beside it closes it unchanged and gives
+the editor back the focus; Tab and a click on the other chip open that
+one's menu. The host's menu lists the hosts with their directories and a
+filter (choosing one asks for the directory there, as `/host` does; with
+only one host, or none, it says how to add one: `prigh tool-host -connect
+SERVER`, or a TUI), and follows hosts as they connect and leave.
+
+The model's menu (Ctrl+L) has a rail of tabs: your favourites (a star on
+a model's row, or Alt+F, adds it), then each signed-in provider; ← → go
+along it. The list shows the tab's models newest first, the first six
+with Alt+1…6 to switch at once and "Show N more" for the rest; older
+models (marked legacy by prigh) are left out, though `/model` still takes
+them. "Search models…" filters across every provider. Beside the list,
+the current model's reasoning levels (Off, Low…Max, its default marked),
+and in the menu's foot the access mode ("Full access", "Ask first",
+"Auto-edit", "Smart", "Plan", "Chat"), a menu of its own. ↑↓ move,
+Enter switches. The commands themselves (`/model`, `/thinking`, `/mode`,
+`/host`) open the larger picker dialog; Alt+T and Alt+M still cycle the
+reasoning level and the mode. In a narrow composer the host is its icon
+alone and the model's name is cut short with an ellipsis last.
 
 There is no bar over the chat. The session's title is in the sidebar's tree
 (its row has the cwd as it is now, relative to its project or worktree, and
@@ -944,25 +948,24 @@ button in the top left and the settings gear after the toggles. On a phone
 the top right is a single ⋯ that opens all of these in a small menu. The
 chat starts under them and fades out beneath them as it scrolls.
 
-The composer's row has, after the + and the model and host chips, the
-session's thinking level (a brain and the level) and its mode (a shield and
-the mode's short name), each opening a small menu over itself (Alt+T and
-Alt+M cycle them; under a 600px column they are icons alone). The
-transcript's verbosity has no chip: Ctrl+O cycles it, and `/verbosity`, the
-control centre (Ctrl+K) and a phone's ⋯ sheet set it. At the row's right,
-before the microphone, the session's status: what the agent is doing while
-it works (`Thinking`, `Running tools`…; idle, nothing), how full the context
-is (a ring and the percent) and the cost, to the cent, or against the budget.
-On a phone the row keeps +, the model, the host's icon, the status, the
-microphone and send; the thinking level, mode, verbosity and usage are at
-the top of the ⋯ sheet, as rows of choices.
-
-The status's details card opens on pointing at it or focusing it (the
-tokens in and out, the cost, the thinking, the mode, the model and the git
-branch), and a click on the context opens `/session`'s details. The context
-is in the accent colour from 60%, brick from 85%; so is a cost near or over
-its budget. The figures keep their place as a turn starts and ends; the
-animations stop with the system's reduced motion.
+The transcript's verbosity has no chip: Ctrl+O cycles it, and
+`/verbosity`, the control centre (Ctrl+K) and a phone's ⋯ sheet set it.
+Beside the paperclip, the context ring: how full the context is,
+in the accent colour, amber within 15 points of where it compacts and
+brick from there; a short arc turns round it while the agent works.
+Pointed at, focused or tapped, it opens its card: the context against the
+window and where it compacts (in tokens and as a percentage of the
+window: `compact_at_tokens`, 200k by default, or 80% of the window if
+less, so a 1M window compacts at 20%), the session's cost (against the
+budget when there is one), the last turn's, the cache's hit rate, the
+tokens in and out, the activity, reasoning, mode, model and git branch,
+a Compact button once the context is past 70% and Details (`/session`).
+Esc closes it. The animations stop with the system's reduced motion.
+On a phone the row keeps the paperclip, the ring, the host's icon, the
+model and send; the model's menu is a sheet from the bottom (the rail
+along its top, the reasoning levels under the list, the access mode at
+its foot), as is the ring's card; the verbosity and the usage are at the
+top of the ⋯ sheet.
 
 On a phone, by touch: a swipe in from the left edge brings the drawer out
 with your finger (drag it left to put it back); a session's row swiped left
@@ -999,7 +1002,10 @@ and the limits every session without its own follows: the fallback models
 from the next new session, open sessions keep their own (the fallback chain
 and the budget, which open sessions follow too, aside), and every client's
 settings follow it at once), **Models** (the providers
-(`/auth`) and compaction), **Memory** (the model's notes and the switch
+(`/auth`) and compaction), **Usage** (how much of your Claude and
+ChatGPT subscriptions' limits you have used: each window, e.g. the 5-hour
+session and the week, as a bar with when it resets; read when it opens and
+on Refresh; `/usage`), **Memory** (the model's notes and the switch
 that turns memory off), **About you** (a form about yourself for the
 model, `/user-info`), **Git hosting**, **Nix store** (superusers) and
 **Account** (who you are signed in, and acting, as, with Switch account and
@@ -1392,8 +1398,8 @@ Where it shows it (`PRIGH_DESKTOP_WINDOW`, `programs.prigh.desktop.window`):
   closed), Ctrl+H, Ctrl+J, Ctrl+U, settings and DevTools (F12; keep it with
   `PRIGH_DESKTOP_DEVTOOLS=1`) do nothing visible. Open in new window opens
   another app window on the page (the browser's popup, which has an address
-  bar, is closed). prigh's sites get the clipboard, notifications and the
-  microphone up front (no permission bubbles), and downloads go to your
+  bar, is closed). prigh's sites get the clipboard and notifications up
+  front (no permission bubbles), and downloads go to your
   downloads directory (`XDG_DOWNLOAD_DIR`, else `~/Downloads`) without a
   prompt. Before each launch the app merges its settings into the profile:
   the system's title bar rather than the browser's, no "Restore pages?"
@@ -1452,8 +1458,8 @@ the PATH it takes one launch to apply, or start the app with
 - **The webview** (`webview`, or `auto` without a browser): WKWebView
   (Safari's engine) on macOS, WebView2 (Edge's Chromium) on Windows,
   WebKitGTK on Linux (a library Nix provides, not your browser). Links to other sites open in
-  your browser; downloads go to the Downloads folder; prigh-web may use the
-  microphone (dictation), notifications and the clipboard without asking.
+  your browser; downloads go to the Downloads folder; prigh-web may use
+  notifications and the clipboard without asking.
 - **Like a browser**: Ctrl (⌘) with `+`/`=`, `-` and `0` zoom, as do
   Ctrl+scroll and a touchpad pinch; the zoom is remembered. F11 is
   fullscreen. Files dropped on the window reach the page (attachments,
@@ -2013,18 +2019,6 @@ list says (or add models it does not list); unlisted fields default to a
 - Ollama: `ollama serve`, then `/login custom` with name `ollama`, base URL
   `http://localhost:11434/v1`, chat completions and no key;
   `/model ollama/llama3.2`.
-- Free dictation with Groq: get a key at
-  [console.groq.com](https://console.groq.com) (free tier, no card;
-  rate-limited, about 20 requests a minute, 2,000 a day and 25 MB an
-  upload), then `/login custom` with name `groq`, base URL
-  `https://api.groq.com/openai/v1`, chat completions and the key, and
-  `/dictation model groq/whisper-large-v3-turbo` (or `groq/whisper-large-v3`,
-  slower and more accurate). Groq's chat models then show in `/model` too. A
-  self-hosted OpenAI-compatible Whisper server (such as
-  [speaches](https://github.com/speaches-ai/speaches)) works the same way,
-  with an empty key. Without a provider that can transcribe, prigh-web falls
-  back to the browser's own speech recognition (Chrome, Edge and Safari;
-  Chrome sends the audio to Google; Firefox has none).
 
 `api` is `chat` (default), `responses` or `anthropic`; `headers` are sent
 with every request; `cost` is in dollars per million tokens. A context
@@ -2385,6 +2379,25 @@ tells it never to sleep or poll either, but to keep working or end its turn
 waits for the agent's jobs and subagents, and the turns their reports
 start, before it exits.
 
+`bash` refuses commands that wait by polling, saying what to do instead
+(a job and its report; `timeout N tail --pid=PID -f /dev/null` for a
+process that is not a job): `pgrep -f`/`pkill -f` whose pattern matches
+the command's own text (the shell running it always matches, so `pgrep`
+never stops finding a process and `pkill` kills the shell; it suggests
+`'[n]ix build'`), a `while`/`until` loop that sleeps a second or more, and a
+`for` loop whose sleeps add up to more than 120 s. A loop under a `timeout`
+of at most 120 s (`timeout 60 bash -c 'until curl -sf URL; do sleep 1;
+done'`), or in a call whose own `timeout` is that short, runs. Processes a
+command leaves running when it finishes (`&`, `nohup`, `setsid`,
+`disown`) are listed after its output (pid and command): they are not
+jobs, nothing reports their exit, and the note says to use `background:
+true` instead. They are found by a variable (`PRIGH_BASH_CALL`) unique to
+the call in its environment, which they inherit, on Linux only.
+`subagent_status` shows how long a subagent has been inside its current
+tool call once it is a minute or more (`in it for 52m, no output for 50m`,
+and after 10 minutes without output that it may be stuck), and
+`job_status` how long a running job has had no output.
+
 The main agent never stalls on a long command.
 `auto_background_seconds` in `config.json` (default 30; `0` turns it off)
 is how long a foreground `bash` call of the main agent may run: one still
@@ -2625,11 +2638,6 @@ prigh-web's settings page, Models → Approvals),
 `naming_model` (the model that names sessions and subagents; default:
 the drafting model, else the session's; `/naming model` picks it, also on
 prigh-web's settings page),
-`dictation_model` (the speech-to-text model of the `transcribe` method,
-`provider/id` on OpenAI or an OpenAI-compatible custom provider; default
-`openai/gpt-4o-mini-transcribe`; `/dictation model` picks it, also on
-prigh-web's settings page; free with Groq, see "Free dictation with
-Groq" under custom providers),
 `mask_observations` (default `true`: replace old tool outputs with
 placeholders before summarising, see "Long runs" below),
 `computer_screenshots` and `computer_screenshots_max` (default 3 and 8:
@@ -2890,7 +2898,7 @@ the status line shows `resumes 14:05`. `/resume now` retries at once,
 provider does not say, a note says so and nothing is scheduled; when the
 time it gives has already passed, the retry backs off (1 minute, doubling up
 to an hour) instead of retrying at once.
-`/resume off` (or Settings → Models → Usage limits in prigh-web, or
+`/resume off` (or Settings → Usage in prigh-web, or
 `resume_on_limit_reset: false` in `config.json`) turns this off, and cancels
 a resume already scheduled; `/resume on` turns it back on. A scheduled
 resume is recorded in the session: a backend that restarts before the reset
@@ -2935,7 +2943,6 @@ it.
 | `/generate-model`, `/generate-model MODEL\|off` | show or set the drafting model, the one ✦ Generate drafts commit messages, pull requests and branch names with (`generate_model`; `off`: the session's); in the TUI `/generate-model ` completes `off` and the models, in prigh-web `/generate-model` alone opens a picker; also on prigh-web's settings page (Models → Drafting) |
 | `/approval-model`, `/approval-model MODEL\|off` | show or set the approval model, the one that judges tool calls in `smart` mode (`approval_model`; `off`: the session's); in the TUI `/approval-model ` completes `off` and the models, in prigh-web `/approval-model` alone opens a picker; also on prigh-web's settings page (Models → Approvals) |
 | `/naming`, `/naming model MODEL\|off` | show or set the model that names sessions and subagents (`naming_model`; `off`: the drafting model, else the session's); in the TUI `/naming model ` completes the models, in prigh-web `/naming model` alone opens a picker; also on prigh-web's settings page |
-| `/dictation`, `/dictation model MODEL\|off` | show or set the model that transcribes dictation (`dictation_model`: OpenAI's `gpt-4o-mini-transcribe`, `gpt-4o-transcribe`, `whisper-1`, or a custom OpenAI-compatible provider's model; `off`: `openai/gpt-4o-mini-transcribe`); the TUI completes them, prigh-web opens a picker that also takes a typed key; also on prigh-web's settings page |
 | `/commit [-a] [--amend] [-m MESSAGE \| --generate]` | commit what is staged in the session's worktree (`-a`: every change to tracked files first); `--generate` drafts the message with the model into the editor, see [Git hosting](#git-hosting) |
 | `/push` | push the worktree's branch to its upstream (set when it has none), with the tool host's git credentials |
 | `/diff [path]` | show the uncommitted changes where the tools run (`git diff` against `HEAD`, untracked files as new), optionally of one path |
@@ -2944,6 +2951,7 @@ it.
 | `/notify [off\|bell\|desktop]` (TUI), `/notify [on\|off]` (prigh-web) | how to tell you that a turn ended, a tool waits for confirmation or background work finished while you look elsewhere |
 | `/budget [dollars\|off]` | show or set the session's cost budget: no turn starts once it is spent |
 | `/goal [text\|off\|resume]` | set a goal the agent keeps working toward until it is met; show, clear or resume it |
+| `/usage` (prigh-web) | open Settings → Usage: your Claude and ChatGPT subscriptions' usage limits (5-hour session, weekly, per-model), each with the share used and when it resets |
 | `/memory [on\|off]` | pick among the notes the model saved (Ctrl+D forgets one; prigh-web opens Settings → Memory); `on`/`off` gives the model the memory tool or takes it away |
 | `/user-info [FIELD VALUE\|clear]` | what you set about yourself for the model (name, country, time zone, units…), in the context of every session: show it, set one field (no VALUE clears it) or clear them all (prigh-web opens Settings → About you) |
 | `/remind [stop [N] TEXT\|every N TEXT\|rm NAME\|off]` | remind the agent when it ends its turn (at most N times in a row, default 3) or every N turns; without arguments, pick among the session's (Ctrl+D / Delete removes one); `rm` removes one, `off` all |
@@ -3592,7 +3600,27 @@ you registered with it, in the server's config:
 ```
 
 (`clientSecret` and `scopes` are optional; the secret is masked like
-headers.) In prigh-web, **Sign in** (Settings → MCP servers, or Enter on the
+headers.)
+
+Some servers register only the clients they know: Figma's remote server
+(`https://mcp.figma.com/mcp`) answers 403 to any `client_name` not on its
+list. When registering as `prigh` is refused with 403, prigh registers as
+`Claude Code` instead, so Figma works with nothing configured: add it with
+`/mcp add figma https://mcp.figma.com/mcp` and sign in. To register under
+another name, give it as `clientName` (no `clientId` needed); prigh then
+also gives it as the client's name in the MCP `initialize`, and a server
+that refuses it says to set one it accepts:
+
+```json
+"design": { "type": "http", "url": "https://design.example.com/mcp",
+            "oauth": { "clientName": "A Known Client" } }
+```
+
+A server that issues a secret to a client that registered as public
+(Figma's does) gets it back with Basic authentication at its token
+endpoint.
+
+In prigh-web, **Sign in** (Settings → MCP servers, or Enter on the
 server in `/mcp`) opens the server's sign-in page in a new tab; the page it
 comes back to says you can close the tab, and the server connects in every
 client at once, showing **Signed in** and **Sign out**. In the terminal,
@@ -3614,10 +3642,6 @@ token before it expires and when the server rejects it; when that fails,
 the server needs a sign-in again. A server's own `Authorization` in
 `headers` wins over the sign-in. Without OAuth metadata, a 401 still says
 to add an `Authorization` header.
-
-Figma's remote server (`https://mcp.figma.com/mcp`) is an example of a
-server using this flow; it has not been tried with prigh and may only
-accept clients it knows.
 
 ### Testing
 

@@ -88,6 +88,7 @@ module Method : sig
     (** back to the session's home, or with [main] to its repository's main
         checkout; see {!Dir_change.Outcome} *)
     | Forge_status (** see {!Forge_account.list_of_json} *)
+    | Usage_limits (** {!Subscription_usage}: Claude's and ChatGPT's limits *)
     | Forge_login of
         { host : string
         ; kind : string option (** [github] or [forgejo]; [None]: guess *)
@@ -214,10 +215,6 @@ module Method : sig
         ; task : string option (** [Branch_name]: what the branch is for *)
         } (** {!Generated} *)
     | Generate_cancel of { gen_id : string }
-    | Transcribe of
-        { mime_type : string (** e.g. [audio/webm;codecs=opus] *)
-        ; data : string (** base64; at most 25 MB decoded *)
-        } (** the [dictation_model]'s text for the recording: [{"text": ...}] *)
     | Nix_store_status (** superusers: {!Nix_store_status} *)
     | Nix_store_gc of { delete_generations : Nix_generations.t option }
     (** superusers: {!Nix_gc_progress} events, then a {!Nix_gc_report}; can

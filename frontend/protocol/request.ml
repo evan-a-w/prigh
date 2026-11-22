@@ -66,6 +66,7 @@ module Method = struct
     | Enter_worktree of string
     | Worktree_back of { main : bool }
     | Forge_status
+    | Usage_limits
     | Forge_login of
         { host : string
         ; kind : string option
@@ -170,10 +171,6 @@ module Method = struct
         ; task : string option
         }
     | Generate_cancel of { gen_id : string }
-    | Transcribe of
-        { mime_type : string
-        ; data : string
-        }
     | Nix_store_status
     | Nix_store_gc of { delete_generations : Nix_generations.t option }
     | Get_memory
@@ -242,6 +239,7 @@ module Method = struct
     | Enter_worktree _ -> "set_cwd"
     | Worktree_back _ -> "worktree_back"
     | Forge_status -> "forge_status"
+    | Usage_limits -> "usage_limits"
     | Forge_login _ -> "forge_login"
     | Forge_logout _ -> "forge_logout"
     | Pr_list _ -> "pr_list"
@@ -272,7 +270,6 @@ module Method = struct
     | Git_push _ -> "git_push"
     | Generate_text _ -> "generate_text"
     | Generate_cancel _ -> "generate_cancel"
-    | Transcribe _ -> "transcribe"
     | Nix_store_status -> "nix_store_status"
     | Nix_store_gc _ -> "nix_store_gc"
     | Get_memory -> "get_memory"
@@ -314,6 +311,7 @@ module Method = struct
     | List_skills
     | List_mcp { reconnect = false }
     | Forge_status
+    | Usage_limits
     | Get_review
     | Nix_store_status
     | Get_memory
@@ -482,8 +480,6 @@ module Method = struct
       @ Option.value_map base ~default:[] ~f:(fun b -> [ "base", Json.str b ])
       @ Option.value_map task ~default:[] ~f:(fun t -> [ "task", Json.str t ])
     | Generate_cancel { gen_id } -> [ "gen_id", Json.str gen_id ]
-    | Transcribe { mime_type; data } ->
-      [ "mime_type", Json.str mime_type; "data", Json.str data ]
   ;;
 end
 

@@ -82,8 +82,6 @@ module Reply_tag = struct
     | Auto_archive_shown
     | Auto_archive_saved of string
     | Resume_saved of string
-    | Dictation_shown
-    | Dictation_saved of string
     | Default_host_shown
     | Default_host_saved of string
     | Default_budget_shown
@@ -3447,20 +3445,6 @@ let default_budget_command m (cmd : Commands.Parsed.t) =
       ] )
 ;;
 
-let dictation_command m (cmd : Commands.Parsed.t) =
-  match Dictation_command.parse cmd.rest with
-  | Show ->
-    show_config m ~tag:Dictation_shown ~summary:Dictation_command.summary
-  | Error e ->
-    error (restore_command m (String.strip ("/dictation " ^ cmd.rest))) e, []
-  | Set_model _ as action ->
-    ( m
-    , [ set_config
-          ~tag:(Dictation_saved ("/dictation " ^ cmd.rest))
-          (Dictation_command.fields action)
-      ] )
-;;
-
 (* ---- snippets ---------------------------------------------------------- *)
 
 let snippets m = Option.map m.config ~f:(fun (c : P.Config.t) -> c.snippets)
@@ -4579,7 +4563,6 @@ let run_command m (cmd : Commands.Parsed.t) =
   | "default-host", _ -> default_host_command m cmd
   | "default-budget", _ -> default_budget_command m cmd
   | "compaction", _ -> compaction_command m cmd
-  | "dictation", _ -> dictation_command m cmd
   | "generate-model", _ -> generate_model_command m cmd
   | "approval-model", _ -> approval_model_command m cmd
   | "naming", _ -> naming_command m cmd
@@ -7883,12 +7866,6 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
      | Resume_saved _ ->
        decode json ~f:P.Config.of_json (fun config ->
          ( notice { m with config = Some config } (Resume_command.summary config)
-         , [] ))
-     | Dictation_shown | Dictation_saved _ ->
-       decode json ~f:P.Config.of_json (fun config ->
-         ( notice
-             { m with config = Some config }
-             (Dictation_command.summary config)
          , [] ))
      | Models_catalog ->
        decode json ~f:(decode_list ~f:P.Model.of_json) (fun models ->

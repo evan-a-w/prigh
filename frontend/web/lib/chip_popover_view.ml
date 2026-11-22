@@ -5,93 +5,19 @@ module Action = App.Action
 
 let title : Chip.t -> string = function
   | Model -> "Model"
-  | Thinking -> "Thinking"
-  | Mode -> "When tools ask first"
   | Host -> "Where tools run"
   | Attach -> "Add to your message"
 ;;
 
 let shortcut : Chip.t -> string = function
   | Model -> "Ctrl+L"
-  | Thinking -> "Alt+T cycles"
-  | Mode -> "Alt+M cycles"
   | Host -> "/host"
   | Attach -> "or paste, or drop"
 ;;
 
 let option_id i = sprintf "popover-option-%d" i
 
-(* How hard the model thinks at each setting: a bar per effort level it
-   takes, as many lit as the setting's (the provider's default lights its
-   level when the model says which, else none). *)
-let meter (m : App.Model.t) level =
-  let llm = Option.map m.state ~f:(fun s -> s.model) in
-  let levels =
-    List.filter (App.thinking_options m) ~f:(fun l ->
-      not (List.mem [ "off"; "default" ] l ~equal:String.equal))
-  in
-  let level =
-    match
-      Thinking.normalize level, Option.bind llm ~f:(fun l -> l.thinking_default)
-    with
-    | "default", Some known -> Thinking.normalize known
-    | level, _ -> level
-  in
-  let on =
-    List.findi levels ~f:(fun _ l -> String.equal l level)
-    |> Option.value_map ~default:0 ~f:(fun (i, _) -> i + 1)
-  in
-  let steps = List.length levels in
-  Node.span
-    ~attrs:[ Attr.class_ "thinking-meter"; Attr.create "aria-hidden" "true" ]
-    (List.init steps ~f:(fun i ->
-       Node.span
-         ~attrs:
-           [ classes [ "bar" ] [ "on", i < on ]
-           ; Attr.style
-               (Css_gen.height
-                  (`Px_float
-                      (4.
-                       +. (8.
-                           *. Float.of_int i
-                           /. Float.of_int (max 1 (steps - 1))))))
-           ]
-         []))
-;;
-
-let provider_name (m : App.Model.t) id =
-  List.find m.auth ~f:(fun (s : Auth_status.t) -> String.equal s.provider id)
-  |> Option.value_map ~default:id ~f:(fun s -> s.name)
-;;
-
-let row
-      (m : App.Model.t)
-      ~chip
-      ~filtering
-      ~selected
-      ~inject
-      i
-      (item : Picker.Item.t)
-  =
-  let model =
-    match (chip : Chip.t) with
-    | Model -> List.find m.models ~f:(fun l -> String.equal l.key item.id)
-    | Thinking | Mode | Host | Attach -> None
-  in
-  let detail =
-    match model with
-    | Some l ->
-      if filtering
-      then
-        String.concat
-          ~sep:", "
-          (List.filter_opt
-             [ Some (provider_name m l.provider)
-             ; Option.some_if item.dimmed "not logged in"
-             ])
-      else ""
-    | None -> item.detail
-  in
+let row ~chip ~selected ~inject i (item : Picker.Item.t) =
   Node.div
     ~attrs:
       [ classes
@@ -117,60 +43,17 @@ let row
     ; Node.span
         ~attrs:[ Attr.class_ "menu-text" ]
         [ span ~cls:"menu-label" item.label
-        ; (if String.is_empty detail
+        ; (if String.is_empty item.detail
            then Node.none
-           else span ~cls:"menu-detail" detail)
+           else span ~cls:"menu-detail" item.detail)
         ]
-    ; (match chip, model with
-       | Model, Some l ->
-         span
-           ~cls:"popover-aside"
-           ~attrs:[ Attr.title "Context window, in tokens" ]
-           (App.compact_tokens l.context_window)
-       | Thinking, _ -> meter m item.id
-       | (Model | Mode | Host | Attach), _ -> Node.none)
     ]
 ;;
 
-(* Each provider's models under its name, unless filtered (best first). *)
-let rows (m : App.Model.t) ~chip (p : Picker.t) ~inject =
-  let filtering = not (String.is_empty (Picker.query p)) in
-  let selected = Picker.selected p in
-  let row = row m ~chip ~filtering ~selected ~inject in
-  let provider (item : Picker.Item.t) =
-    List.find m.models ~f:(fun l -> String.equal l.key item.id)
-    |> Option.map ~f:(fun l -> l.provider)
-  in
-  match (chip : Chip.t) with
-  | Model when not filtering ->
-    List.mapi (Picker.visible p) ~f:(fun i item -> i, item)
-    |> List.group ~break:(fun (_, a) (_, b) ->
-      not (Option.equal String.equal (provider a) (provider b)))
-    |> List.map ~f:(fun group ->
-      let name =
-        match
-          Option.bind (List.hd group) ~f:(fun (_, item) -> provider item)
-        with
-        | None -> "Other"
-        | Some id -> provider_name m id
-      in
-      Node.div
-        ~attrs:
-          [ Attr.class_ "popover-group"
-          ; Attr.role "group"
-          ; Attr.create "aria-label" name
-          ]
-        (div
-           ~cls:"menu-heading"
-           [ Node.text name
-           ; (if
-                List.for_all group ~f:(fun (_, (item : Picker.Item.t)) ->
-                  item.dimmed)
-              then span ~cls:"popover-note" "not logged in: /login"
-              else Node.none)
-           ]
-         :: List.map group ~f:(fun (i, item) -> row i item)))
-  | _ -> List.mapi (Picker.visible p) ~f:row
+let rows ~chip (p : Picker.t) ~inject =
+  List.mapi
+    (Picker.visible p)
+    ~f:(row ~chip ~selected:(Picker.selected p) ~inject)
 ;;
 
 (* With nowhere else for tools to run, how to add somewhere. *)
@@ -193,10 +76,8 @@ let host_note (m : App.Model.t) =
   | _ -> None
 ;;
 
-(* The session's settings as rows of choices, each leaving the rest open:
-   the thinking level, the mode, the transcript's verbosity, and the usage.
-   On a phone they are in the ⋯ sheet (the composer's row has no room for
-   their chips). *)
+(* The transcript's verbosity as a row of choices, and the usage: on a
+   phone, in the ⋯ sheet. *)
 let session_sections (m : App.Model.t) ~inject =
   match m.state with
   | None -> Node.none
@@ -227,45 +108,6 @@ let session_sections (m : App.Model.t) ~inject =
           ; Attr.on_click (fun _ -> on_click)
           ]
         [ Node.text label ]
-    in
-    let thinking =
-      if not state.model.supports_thinking
-      then Node.none
-      else (
-        let level =
-          Thinking.normalize
-            (Option.value m.pending.thinking ~default:state.thinking)
-        in
-        section
-          "Thinking"
-          ~glyph:Brain
-          ~note:(Thinking.label level)
-          (div
-             ~cls:"session-choices thinking-choices"
-             (List.map (App.thinking_options m) ~f:(fun l ->
-                choice
-                  ~current:(String.equal l level)
-                  ~label:l
-                  ~title:
-                    (sprintf "Thinking: %s (/thinking %s)" (Thinking.label l) l)
-                  ~on_click:(inject (Action.Set_thinking l))))))
-    in
-    let mode =
-      let current =
-        Option.value m.pending.mode ~default:(Session_mode.of_state state)
-      in
-      section
-        "Mode"
-        ~glyph:(if current.chat then Message else Shield)
-        ~note:(Session_mode.describe current)
-        (div
-           ~cls:"session-choices mode-choices"
-           (List.map (Session_mode.choices ~current) ~f:(fun mode ->
-              choice
-                ~current:(Session_mode.equal mode current)
-                ~label:(Session_mode.label mode)
-                ~title:(Session_mode.describe mode)
-                ~on_click:(inject (Action.Set_mode mode)))))
     in
     let verbosity =
       section
@@ -304,10 +146,10 @@ let session_sections (m : App.Model.t) ~inject =
            ; Status_view.cost state ~inject
            ])
     in
-    div ~cls:"session-sections" [ thinking; mode; verbosity; usage ]
+    div ~cls:"session-sections" [ verbosity; usage ]
 ;;
 
-let view (m : App.Model.t) ~(chip : Chip.t) (p : Picker.t) ~inject =
+let other (m : App.Model.t) ~(chip : Chip.t) (p : Picker.t) ~inject =
   let visible = Picker.visible p in
   let active =
     if List.is_empty visible
@@ -337,8 +179,8 @@ let view (m : App.Model.t) ~(chip : Chip.t) (p : Picker.t) ~inject =
            @
            match chip with
            | Model | Host -> []
-           | Thinking | Mode | Attach -> [ Attr.tabindex 0; active ])
-        (rows m ~chip p ~inject)
+           | Attach -> [ Attr.tabindex 0; active ])
+        (rows ~chip p ~inject)
   in
   Node.div
     ~attrs:
@@ -348,8 +190,6 @@ let view (m : App.Model.t) ~(chip : Chip.t) (p : Picker.t) ~inject =
           "data-chip"
           (match chip with
            | Model -> "model"
-           | Thinking -> "thinking"
-           | Mode -> "mode"
            | Host -> "host"
            | Attach -> "attach")
       ; Attr.role "dialog"
@@ -360,7 +200,7 @@ let view (m : App.Model.t) ~(chip : Chip.t) (p : Picker.t) ~inject =
           let what =
             match chip with
             | Host -> "hosts"
-            | Model | Thinking | Mode | Attach -> "models"
+            | Model | Attach -> "models"
           in
           div
             ~cls:"popover-search"
@@ -385,7 +225,7 @@ let view (m : App.Model.t) ~(chip : Chip.t) (p : Picker.t) ~inject =
                 ()
             ; span ~cls:"popover-shortcut" (shortcut chip)
             ]
-        | Thinking | Mode | Attach ->
+        | Attach ->
           div
             ~cls:"popover-head"
             [ span ~cls:"popover-title" (title chip)
@@ -396,16 +236,22 @@ let view (m : App.Model.t) ~(chip : Chip.t) (p : Picker.t) ~inject =
      @ Option.to_list
          (match chip with
           | Host -> host_note m
-          | Model | Thinking | Mode | Attach -> None)
+          | Model | Attach -> None)
      @ [ div
            ~cls:"menu-keys"
            [ Node.text
                (match chip with
                 | Attach -> "Enter chooses, Esc closes"
-                | Model | Thinking | Mode | Host ->
+                | Model | Host ->
                   "Enter chooses, ← → the next setting, Esc closes")
            ]
        ])
+;;
+
+let view (m : App.Model.t) ~(chip : Chip.t) (p : Picker.t) ~inject =
+  match chip with
+  | Model -> Model_menu_view.view m p ~inject
+  | Host | Attach -> other m ~chip p ~inject
 ;;
 
 (* Over the page, under the composer's chips: a click elsewhere closes the

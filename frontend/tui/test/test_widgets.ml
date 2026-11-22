@@ -502,6 +502,7 @@ let%expect_test "model matching" =
     ; thinking_default = None
     ; cost = { input = 1.; output = 2.; cache_read = 0.1 }
     ; image_limit = None
+    ; legacy = false
     }
   in
   let models =
@@ -726,7 +727,6 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /generate-model [MODEL|off]        show which model drafts commit messages, pull requests and branch names (✦ Generate); MODEL|off: draft them with MODEL (off: the session's)
     /approval-model [MODEL|off]        show which model judges tool calls in smart mode (Alt+M, /mode smart); MODEL|off: judge them with MODEL (off: the session's)
     /naming [model MODEL|off]          show which model names sessions and subagents; model MODEL|off: name them with MODEL (off: the drafting model, else the session's)
-    /dictation [model MODEL|off]       show which model transcribes dictation (speech to text); model MODEL|off: transcribe with MODEL, an OpenAI or OpenAI-compatible provider's (off: openai/gpt-4o-mini-transcribe)
     /trim [after|undo|show|hide]       drop everything before a message from the model's context: pick the message (newest first, with what it frees), confirm; after: everything after a message instead (what you send later stays); undo brings the latest trim back, show/hide unfolds the trimmed messages
     /delete [undo|session...]          drop a message from the transcript and the model's context (a reply with its tool results): pick it, newest first; undo brings the latest deletion back; with sessions: delete them, after a confirmation
     /diff [path]                       show the uncommitted changes where the tools run (git diff, untracked files too)

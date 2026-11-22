@@ -43,6 +43,7 @@ type t =
   ; cost : Cost.t
   ; supports_images : bool
   ; native_computer : Native_computer.t option [@sexp.option]
+  ; legacy : bool
   }
 [@@deriving sexp_of]
 
@@ -59,6 +60,7 @@ end
 
 let m
       ?(images = true)
+      ?(legacy = false)
       ?long_prompt
       provider
       id
@@ -82,6 +84,7 @@ let m
   ; cost = { input; output; cache_read; long_prompt }
   ; supports_images = images
   ; native_computer = Native_computer.of_model provider id
+  ; legacy
   }
 ;;
 
@@ -200,6 +203,7 @@ let all =
       ~output:40.
       ~cache_read:0.2
   ; m
+      ~legacy:true
       Anthropic
       "claude-haiku-4-5"
       "Claude Haiku 4.5 (latest)"
@@ -210,6 +214,7 @@ let all =
       ~output:5.
       ~cache_read:0.1
   ; m
+      ~legacy:true
       Anthropic
       "claude-haiku-4-5-20251001"
       "Claude Haiku 4.5"
@@ -262,6 +267,7 @@ let all =
       ~output:40.
       ~cache_read:0.2
   ; m
+      ~legacy:true
       Anthropic
       "claude-opus-4-5"
       "Claude Opus 4.5 (latest)"
@@ -272,6 +278,7 @@ let all =
       ~output:25.
       ~cache_read:0.5
   ; m
+      ~legacy:true
       Anthropic
       "claude-opus-4-5-20251101"
       "Claude Opus 4.5"
@@ -282,6 +289,7 @@ let all =
       ~output:25.
       ~cache_read:0.5
   ; m
+      ~legacy:true
       Anthropic
       "claude-opus-4-6"
       "Claude Opus 4.6"
@@ -292,6 +300,7 @@ let all =
       ~output:25.
       ~cache_read:0.5
   ; m
+      ~legacy:true
       Anthropic
       "claude-opus-4-7"
       "Claude Opus 4.7"
@@ -302,6 +311,7 @@ let all =
       ~output:25.
       ~cache_read:0.5
   ; m
+      ~legacy:true
       Anthropic
       "claude-opus-4-8"
       "Claude Opus 4.8"
@@ -332,6 +342,7 @@ let all =
       ~output:20.
       ~cache_read:0.2
   ; m
+      ~legacy:true
       Anthropic
       "claude-sonnet-4-5"
       "Claude Sonnet 4.5 (latest)"
@@ -342,6 +353,7 @@ let all =
       ~output:15.
       ~cache_read:0.3
   ; m
+      ~legacy:true
       Anthropic
       "claude-sonnet-4-5-20250929"
       "Claude Sonnet 4.5"
@@ -352,6 +364,7 @@ let all =
       ~output:15.
       ~cache_read:0.3
   ; m
+      ~legacy:true
       Anthropic
       "claude-sonnet-4-6"
       "Claude Sonnet 4.6"
@@ -392,6 +405,7 @@ let all =
       ~output:30.
       ~cache_read:0.5
   ; m
+      ~legacy:true
       Openai
       "gpt-4.1"
       "GPT-4.1"
@@ -402,6 +416,7 @@ let all =
       ~output:8.
       ~cache_read:0.5
   ; m
+      ~legacy:true
       Openai
       "gpt-4.1-mini"
       "GPT-4.1 mini"
@@ -412,6 +427,7 @@ let all =
       ~output:1.6
       ~cache_read:0.1
   ; m
+      ~legacy:true
       Openai
       "gpt-4o"
       "GPT-4o"
@@ -422,6 +438,7 @@ let all =
       ~output:10.
       ~cache_read:1.25
   ; m
+      ~legacy:true
       Openai
       "gpt-4o-2024-08-06"
       "GPT-4o (2024-08-06)"
@@ -432,6 +449,7 @@ let all =
       ~output:10.
       ~cache_read:1.25
   ; m
+      ~legacy:true
       Openai
       "gpt-4o-2024-11-20"
       "GPT-4o (2024-11-20)"
@@ -442,6 +460,7 @@ let all =
       ~output:10.
       ~cache_read:1.25
   ; m
+      ~legacy:true
       Openai
       "gpt-4o-mini"
       "GPT-4o mini"
@@ -452,6 +471,7 @@ let all =
       ~output:0.6
       ~cache_read:0.075
   ; m
+      ~legacy:true
       Openai
       "gpt-5"
       "GPT-5"
@@ -462,6 +482,7 @@ let all =
       ~output:10.
       ~cache_read:0.125
   ; m
+      ~legacy:true
       Openai
       "gpt-5-mini"
       "GPT-5 Mini"
@@ -472,6 +493,7 @@ let all =
       ~output:2.
       ~cache_read:0.025
   ; m
+      ~legacy:true
       Openai
       "gpt-5-nano"
       "GPT-5 Nano"
@@ -482,6 +504,7 @@ let all =
       ~output:0.4
       ~cache_read:0.005
   ; m
+      ~legacy:true
       Openai
       "gpt-5-pro"
       "GPT-5 Pro"
@@ -492,6 +515,7 @@ let all =
       ~output:120.
       ~cache_read:0.
   ; m
+      ~legacy:true
       Openai
       "gpt-5.1"
       "GPT-5.1"
@@ -502,6 +526,7 @@ let all =
       ~output:10.
       ~cache_read:0.125
   ; m
+      ~legacy:true
       Openai
       "gpt-5.2"
       "GPT-5.2"
@@ -512,6 +537,7 @@ let all =
       ~output:14.
       ~cache_read:0.175
   ; m
+      ~legacy:true
       Openai
       "gpt-5.2-pro"
       "GPT-5.2 Pro"
@@ -522,6 +548,7 @@ let all =
       ~output:168.
       ~cache_read:0.
   ; m
+      ~legacy:true
       Openai
       "gpt-5.3-codex"
       "GPT-5.3 Codex"
@@ -532,6 +559,7 @@ let all =
       ~output:14.
       ~cache_read:0.175
   ; m
+      ~legacy:true
       Openai
       "gpt-5.4"
       "GPT-5.4"
@@ -542,6 +570,7 @@ let all =
       ~output:15.
       ~cache_read:0.25
   ; m
+      ~legacy:true
       Openai
       "gpt-5.4-mini"
       "GPT-5.4 mini"
@@ -552,6 +581,7 @@ let all =
       ~output:4.5
       ~cache_read:0.075
   ; m
+      ~legacy:true
       Openai
       "gpt-5.4-nano"
       "GPT-5.4 nano"
@@ -562,6 +592,7 @@ let all =
       ~output:1.25
       ~cache_read:0.02
   ; m
+      ~legacy:true
       Openai
       "gpt-5.4-pro"
       "GPT-5.4 Pro"
@@ -573,6 +604,7 @@ let all =
       ~cache_read:0.
       ~long_prompt:openai_pro_long_prompt
   ; m
+      ~legacy:true
       Openai
       "gpt-5.5"
       "GPT-5.5"
@@ -583,6 +615,7 @@ let all =
       ~output:30.
       ~cache_read:0.5
   ; m
+      ~legacy:true
       Openai
       "gpt-5.5-pro"
       "GPT-5.5 Pro"
@@ -594,6 +627,7 @@ let all =
       ~cache_read:0.
       ~long_prompt:openai_pro_long_prompt
   ; m
+      ~legacy:true
       Openai
       "gpt-5.6-luna"
       "GPT-5.6 Luna"
@@ -604,6 +638,7 @@ let all =
       ~output:1.2
       ~cache_read:0.02
   ; m
+      ~legacy:true
       Openai
       "gpt-5.6-sol"
       "GPT-5.6 Sol"
@@ -614,6 +649,7 @@ let all =
       ~output:20.
       ~cache_read:0.4
   ; m
+      ~legacy:true
       Openai
       "gpt-5.6-terra"
       "GPT-5.6 Terra"
@@ -673,6 +709,26 @@ let all =
       ~input:1.
       ~output:5.
       ~cache_read:0.05
+  ; m
+      Openai
+      "gpt-6.2-astra"
+      "GPT-6.2 Astra"
+      ~ctx:272000
+      ~max:128000
+      ~thinking:(openai ~default:None five)
+      ~input:8.
+      ~output:40.
+      ~cache_read:0.4
+  ; m
+      Openai
+      "gpt-6.2-sol"
+      "GPT-6.2 Sol"
+      ~ctx:272000
+      ~max:128000
+      ~thinking:(openai five)
+      ~input:2.
+      ~output:10.
+      ~cache_read:0.1
   ; m
       Openai
       "gpt-realtime-2.1"
@@ -705,6 +761,7 @@ let all =
       ~output:80.
       ~cache_read:0.
   ; m
+      ~legacy:true
       Openai_codex
       "gpt-5.6-luna"
       "GPT-5.6 Luna"
@@ -715,6 +772,7 @@ let all =
       ~output:1.2
       ~cache_read:0.02
   ; m
+      ~legacy:true
       Openai_codex
       "gpt-5.6-sol"
       "GPT-5.6 Sol"
@@ -725,6 +783,7 @@ let all =
       ~output:20.
       ~cache_read:0.4
   ; m
+      ~legacy:true
       Openai_codex
       "gpt-5.6-terra"
       "GPT-5.6 Terra"
@@ -784,6 +843,26 @@ let all =
       ~input:1.
       ~output:5.
       ~cache_read:0.05
+  ; m
+      Openai_codex
+      "gpt-6.2-astra"
+      "GPT-6.2 Astra"
+      ~ctx:272000
+      ~max:128000
+      ~thinking:(openai ~default:None five)
+      ~input:8.
+      ~output:40.
+      ~cache_read:0.4
+  ; m
+      Openai_codex
+      "gpt-6.2-sol"
+      "GPT-6.2 Sol"
+      ~ctx:272000
+      ~max:128000
+      ~thinking:(openai five)
+      ~input:2.
+      ~output:10.
+      ~cache_read:0.1
   ; m
       Deepseek
       "deepseek-flash"

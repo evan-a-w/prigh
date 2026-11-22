@@ -169,6 +169,7 @@ let%expect_test "toasts are not under a dialog's inert page" =
     <aside class="sidebar">
     <div class="chat-frame">
     <div class="editor-wrap">
+    <div class="context-ring-anchor">
     <div class="composer-buttons">
     <div class="tray">
     <div class="toast">

@@ -5,6 +5,7 @@ type t =
   | Sessions
   | New_sessions
   | Models
+  | Usage
   | Memory
   | About_you
   | Custom_instructions
@@ -21,6 +22,7 @@ let available ~superuser =
     | Sessions
     | New_sessions
     | Models
+    | Usage
     | Memory
     | About_you
     | Custom_instructions
@@ -38,6 +40,7 @@ let name = function
   | Sessions -> "Sessions"
   | New_sessions -> "New sessions"
   | Models -> "Models"
+  | Usage -> "Usage"
   | Memory -> "Memory"
   | About_you -> "About you"
   | Custom_instructions -> "Custom instructions"
@@ -59,8 +62,11 @@ let about = function
      session: open ones keep theirs. Kept on the backend."
   | Models ->
     "The providers whose models you use, the models prigh uses for its own \
-     work, when long conversations are summarised, and what happens at a usage \
-     limit. Kept on the backend."
+     work, and when long conversations are summarised. Kept on the backend."
+  | Usage ->
+    "How much of your Claude and ChatGPT subscriptions' usage limits you have \
+     used, as the providers report it (read when you open this page), and whether a \
+     run stopped by one carries on when it resets."
   | Memory ->
     "What you asked the model to remember, for later sessions. Kept on the \
      backend, for your account."
@@ -87,6 +93,7 @@ let arg = function
   | Sessions -> "sessions"
   | New_sessions -> "new-sessions"
   | Models -> "models"
+  | Usage -> "usage"
   | Memory -> "memory"
   | About_you -> "user-info"
   | Custom_instructions -> "instructions"

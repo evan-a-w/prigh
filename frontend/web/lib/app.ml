@@ -194,8 +194,6 @@ module Reply_tag = struct
     | Approval_model_saved
     | Naming_saved
     | Auto_archive_saved
-    | Dictation_saved
-    | Transcribed
     | Default_saved
     | Session_stats
     | Trace
@@ -283,6 +281,7 @@ module Reply_tag = struct
     | Nix_status of { open_settings : bool }
     | Nix_collected
     | Memory_loaded
+    | Usage_loaded
     | Instructions_loaded
     | Instruction_saved
     | Instruction_removed
@@ -336,9 +335,6 @@ module Command = struct
         { image : Image.t
         ; target : Image_size.Target.t
         }
-    | Start_dictation of Dictation.Engine.t
-    | Stop_dictation
-    | Cancel_dictation
     | Annotate_setup
     | Annotate_undo
     | Annotate_clear
@@ -504,9 +500,17 @@ module Action = struct
     | Filter_press of Filter_menu.Row.t option
     (** a row of the filter's menu (by click), or the one selected (Space) *)
     | Chip_step of int
+    | Model_menu_tab of Model_menu.Tab.t
+    | Model_menu_step of int (** the next provider along the rail (← →) *)
+    | Model_menu_more (** "Show more": the provider's older models *)
+    | Model_menu_access (** opens or closes the access menu in its foot *)
+    | Model_menu_nth of int (** Alt+1…9: the list's Nth model *)
+    | Toggle_favourite of string option
+    (** stars or unstars the model ([None]: the highlighted one) *)
     | Open_snippets of int option
     | Open_help
     | Open_settings
+    | Usage_refresh
     | Settings_section of Settings_section.t
     | Settings_home
     | Settings_move of Settings_section.Move.t
@@ -616,6 +620,9 @@ module Action = struct
     | Close_field_menu
     | Toggle_sidebar
     | Toggle_status_tray
+    | Toggle_context_card
+    (** the context ring's card: context, cost, compacting (tap; Esc
+        closes) *)
     | Answer_confirm of
         { call_id : string
         ; agent_id : string option
@@ -646,19 +653,6 @@ module Action = struct
         { original : Image.t
         ; reason : string
         }
-    | Dictate
-    | Dictation_cancel
-    | Dictation_progress of
-        { elapsed_ms : int
-        ; level : float
-        }
-    | Dictation_audio of
-        { mime_type : string
-        ; data : string
-        }
-    | Dictation_text of string
-    | Dictation_failed of string
-    | Browser_speech of bool
     | Annotate of
         { image : Image.t
         ; target : Annotate.Target.t
@@ -782,9 +776,6 @@ module Model = struct
     ; pasted : string list
     ; paste_undo : Paste_undo.t option
     ; downsizing : Image.t list
-    ; dictation : Dictation.t
-    ; dictation_engine : Dictation.Engine.t
-    ; browser_speech : bool
     ; queue : Queued.t
     ; agent_queues : Agent_queue.t list
     ; recipient : Recipient.t
@@ -799,6 +790,7 @@ module Model = struct
     ; sidebar_open : bool
     ; review_drawer : bool
     ; status_tray : bool
+    ; context_card : bool (** tapped open: the context ring's card *)
     ; scrolled_up : bool
     ; session_hits : Session_hits.t option
     ; session_search : int
@@ -826,6 +818,10 @@ module Model = struct
     ; review : Code_review.t
     ; review_memory : Review_memory.t
     ; code_size : Code_size.t
+    ; model_menu : Model_menu.t
+      (** the model chip's menu: its tab, "Show more", the access menu *)
+    ; favourite_models : string list
+      (** starred in the model menu, oldest first (a preference) *)
     ; layout : Resize.t
     ; paging : Paging.t
     ; transcript_events : int
@@ -844,6 +840,7 @@ module Model = struct
     ; landing : bool
     ; forges : Forges.t
     ; nix_gc : Nix_gc.t
+    ; usage : Usage_page.t
     ; memory : Memory_notes.t
     ; instructions : Instruction_notes.t
     ; about_you : About_you.t
@@ -895,9 +892,6 @@ module Model = struct
         ; pasted
         ; paste_undo = _
         ; downsizing
-        ; dictation
-        ; dictation_engine
-        ; browser_speech
         ; queue
         ; agent_queues
         ; recipient
@@ -912,6 +906,7 @@ module Model = struct
         ; sidebar_open
         ; review_drawer
         ; status_tray
+        ; context_card
         ; scrolled_up
         ; session_hits
         ; session_search
@@ -939,6 +934,8 @@ module Model = struct
         ; review
         ; review_memory
         ; code_size
+        ; model_menu
+        ; favourite_models
         ; layout
         ; paging
         ; transcript_events
@@ -953,6 +950,7 @@ module Model = struct
         ; landing
         ; forges
         ; nix_gc
+        ; usage
         ; memory
         ; instructions
         ; about_you
@@ -996,9 +994,6 @@ module Model = struct
     && phys_equal images b.images
     && phys_equal pasted b.pasted
     && phys_equal downsizing b.downsizing
-    && phys_equal dictation b.dictation
-    && phys_equal dictation_engine b.dictation_engine
-    && phys_equal browser_speech b.browser_speech
     && phys_equal queue b.queue
     && phys_equal agent_queues b.agent_queues
     && phys_equal recipient b.recipient
@@ -1013,6 +1008,7 @@ module Model = struct
     && phys_equal sidebar_open b.sidebar_open
     && phys_equal review_drawer b.review_drawer
     && phys_equal status_tray b.status_tray
+    && phys_equal context_card b.context_card
     && phys_equal scrolled_up b.scrolled_up
     && phys_equal session_hits b.session_hits
     && phys_equal session_search b.session_search
@@ -1040,6 +1036,8 @@ module Model = struct
     && phys_equal review b.review
     && phys_equal review_memory b.review_memory
     && phys_equal code_size b.code_size
+    && phys_equal model_menu b.model_menu
+    && phys_equal favourite_models b.favourite_models
     && phys_equal layout b.layout
     && phys_equal paging b.paging
     && (transcript || phys_equal transcript_events b.transcript_events)
@@ -1054,6 +1052,7 @@ module Model = struct
     && phys_equal landing b.landing
     && phys_equal forges b.forges
     && phys_equal nix_gc b.nix_gc
+    && phys_equal usage b.usage
     && phys_equal memory b.memory
     && phys_equal instructions b.instructions
     && phys_equal about_you b.about_you
@@ -1329,9 +1328,6 @@ let init =
   ; pasted = []
   ; paste_undo = None
   ; downsizing = []
-  ; dictation = Idle
-  ; dictation_engine = Server
-  ; browser_speech = false
   ; queue = Queued.empty
   ; agent_queues = []
   ; recipient = Main
@@ -1345,6 +1341,7 @@ let init =
   ; update_ready = false
   ; sidebar_open = true
   ; status_tray = false
+  ; context_card = false
   ; review_drawer = false
   ; scrolled_up = false
   ; session_hits = None
@@ -1373,6 +1370,8 @@ let init =
   ; review = Code_review.empty
   ; review_memory = Review_memory.empty
   ; code_size = Code_size.default
+  ; model_menu = Model_menu.init
+  ; favourite_models = []
   ; layout = Resize.empty
   ; paging = Paging.all
   ; transcript_events = 0
@@ -1387,6 +1386,7 @@ let init =
   ; landing = false
   ; forges = Forges.empty
   ; nix_gc = Nix_gc.empty
+  ; usage = Usage_page.empty
   ; memory = Memory_notes.empty
   ; instructions = Instruction_notes.empty
   ; about_you = About_you.empty
@@ -1536,7 +1536,6 @@ let close_dialog (m : Model.t) =
                 | Generate_models
                 | Approval_models
                 | Naming_models
-                | Dictation_models
                 | Defaults _ )
             ; _
             } ) ) ->
@@ -2083,13 +2082,17 @@ let models_picker
   in
   let known = not (List.is_empty m.auth) in
   let usable (model : Llm.t) = (not known) || logged_in m model.provider in
+  let models =
+    List.filter m.models ~f:(fun (model : Llm.t) ->
+      (not model.legacy) || Option.equal String.equal current (Some model.key))
+  in
   let first (model : Llm.t) =
     List.findi m.models ~f:(fun _ (other : Llm.t) ->
       String.equal other.provider model.provider)
     |> Option.value_map ~default:0 ~f:fst
   in
   let models =
-    List.stable_sort m.models ~compare:(fun a b ->
+    List.stable_sort models ~compare:(fun a b ->
       match Bool.compare (usable b) (usable a) with
       | 0 -> Int.compare (first a) (first b)
       | c -> c)
@@ -2254,6 +2257,11 @@ let fetch_nix_status (m : Model.t) ~open_settings =
   , [ call Nix_store_status ~tag:(Nix_status { open_settings }) ] )
 ;;
 
+let fetch_usage (m : Model.t) =
+  ( { m with usage = Usage_page.loading m.usage }
+  , [ call Usage_limits ~tag:Usage_loaded ] )
+;;
+
 let fetch_memory (m : Model.t) =
   ( { m with memory = Memory_notes.loading m.memory }
   , [ call Get_memory ~tag:Memory_loaded ] )
@@ -2311,6 +2319,7 @@ let fetch_section (m : Model.t) : Settings_section.t -> _ = function
   | About_you -> fetch_about_you m
   | Mcp -> fetch_mcp m
   | Custom_instructions -> fetch_instructions m
+  | Usage -> fetch_usage m
   | Appearance
   | Sessions
   | New_sessions
@@ -3027,6 +3036,17 @@ let apply_pref (m : Model.t) ~startup ({ key; value } : Prefs.Change.t) =
           (Option.bind string ~f:Code_size.of_name)
           ~default:Code_size.default
     }
+  else if String.equal key Key.favourite_models
+  then (
+    let favourite_models =
+      match value with
+      | Some (`Array items) ->
+        List.filter_map items ~f:(function
+          | `String s -> Some s
+          | _ -> None)
+      | _ -> []
+    in
+    { m with favourite_models })
   else if String.equal key Key.terminal_open
   then
     if startup
@@ -3789,15 +3809,8 @@ let hosts_picker (m : Model.t) =
 
 let chip_kind : Chip.t -> Dialog.Picker_kind.t = function
   | Model -> Models
-  | Thinking -> Thinking
-  | Mode -> Modes
   | Host -> Hosts
   | Attach -> Attach
-;;
-
-let chip_opens_nothing (state : State.t) : Chip.t -> bool = function
-  | Thinking -> not state.model.supports_thinking
-  | Model | Mode | Host | Attach -> false
 ;;
 
 (* The composer's +: what can go with the message. *)
@@ -3817,12 +3830,109 @@ let attach_menu =
     ]
 ;;
 
-(* The chips that sit together, which ← → and Tab go along: the model, the
-   host, the thinking level and the mode in the composer's row; the +
-   stands alone. *)
+(* The chips that sit together, which Tab goes along: the host and the
+   model; the paperclip stands alone. *)
 let chip_row : Chip.t -> int = function
-  | Model | Host | Thinking | Mode -> 0
+  | Model | Host -> 0
   | Attach -> 1
+;;
+
+(* ---- the model chip's menu: a rail of providers, their models, the
+   reasoning levels and the access mode *)
+
+let more_id = "more:"
+
+(* The session's model, or the one it is switching to. *)
+let menu_model_key (m : Model.t) =
+  match m.pending.model with
+  | Some key -> Some key
+  | None -> Option.map m.state ~f:(fun (s : State.t) -> s.model.key)
+;;
+
+let offered_models (m : Model.t) =
+  Model_menu.offered m.models ~auth:m.auth ~current:(menu_model_key m)
+;;
+
+(* Unfiltered, the tab's rows (and "Show more"); filtered, every provider's
+   models on offer, best first. *)
+let model_menu_picker ?(query = "") (m : Model.t) =
+  let current = menu_model_key m in
+  let offered = offered_models m in
+  let item (model : Llm.t) =
+    Picker.Item.create
+      ~id:model.key
+      ~detail:model.provider
+      ~search:(model.name ^ " " ^ model.provider ^ " " ^ model.key)
+      ~marked:(Option.equal String.equal current (Some model.key))
+      model.name
+  in
+  if String.is_empty query
+  then (
+    let rows, more =
+      Model_menu.rows m.model_menu offered ~favourites:m.favourite_models
+    in
+    Picker.create
+      ~title:"Model"
+      (List.map rows ~f:item
+       @
+       if more > 0
+       then
+         [ Picker.Item.create
+             ~id:more_id
+             ~search:""
+             (sprintf "Show %d more" more)
+         ]
+       else []))
+  else
+    Picker.create
+      ~query
+      ~title:"Model"
+      (List.map (Model_menu.newest_first offered) ~f:item)
+;;
+
+let with_model_menu (m : Model.t) ?query model_menu =
+  match m.dialog with
+  | Some (Popover { chip = Model; picker }) ->
+    let m = { m with model_menu } in
+    let query = Option.value query ~default:(Picker.query picker) in
+    ( { m with
+        dialog =
+          Some (Popover { chip = Model; picker = model_menu_picker ~query m })
+      }
+    , [] )
+  | _ -> m, []
+;;
+
+let toggle_favourite (m : Model.t) key =
+  let favourite_models =
+    if List.mem m.favourite_models key ~equal:String.equal
+    then List.filter m.favourite_models ~f:(Fn.non (String.equal key))
+    else m.favourite_models @ [ key ]
+  in
+  let m = { m with favourite_models } in
+  let m, cmds = with_model_menu m m.model_menu in
+  ( m
+  , cmds
+    @ save_pref
+        m
+        Pref_sync.Key.favourite_models
+        (Some (`Array (List.map favourite_models ~f:(fun k -> `String k)))) )
+;;
+
+let model_menu_nth (m : Model.t) n =
+  match m.dialog with
+  | Some (Popover { chip = Model; picker }) ->
+    (match
+       List.filter (Picker.visible picker) ~f:(fun (i : Picker.Item.t) ->
+         not (String.equal i.id more_id))
+       |> Fn.flip List.nth (n - 1)
+     with
+     | Some item ->
+       let m, cmds = close_dialog m in
+       let m, set = set_model m item.id in
+       m, cmds @ set
+     | None -> m, [])
+  | _ -> m, []
 ;;
 
 (* A chip's menu, over it; the same chip again closes it. *)
@@ -3832,27 +3942,32 @@ let open_chip (m : Model.t) (chip : Chip.t) =
     close_dialog m
   | _ ->
     current_state m ~f:(fun state ->
-      if chip_opens_nothing state chip
-      then no_thinking m state
-      else (
-        let picker =
-          match chip with
-          | Model -> models_picker m
-          | Thinking -> thinking_levels_picker m
-          | Mode -> modes_picker state
-          | Host -> hosts_list m state
-          | Attach -> attach_menu
-        in
-        let m, cmds =
-          open_dialog
-            m
-            ~focus:
-              (match chip with
-               | Model | Host -> "popover-filter"
-               | Thinking | Mode | Attach -> "popover-list")
-            (Popover { chip; picker })
-        in
-        m, cmds @ [ Command.Place_popover ]))
+      let m =
+        match chip with
+        | Model ->
+          { m with
+            model_menu =
+              Model_menu.opening (offered_models m) ~current:(menu_model_key m)
+          ; context_card = false
+          }
+        | Host | Attach -> { m with context_card = false }
+      in
+      let picker =
+        match chip with
+        | Model -> model_menu_picker m
+        | Host -> hosts_list m state
+        | Attach -> attach_menu
+      in
+      let m, cmds =
+        open_dialog
+          m
+          ~focus:
+            (match chip with
+             | Model | Host -> "popover-filter"
+             | Attach -> "popover-list")
+          (Popover { chip; picker })
+      in
+      m, cmds @ [ Command.Place_popover ])
 ;;
 
 (* A choice made in the model's menu keeps the keyboard in it: Esc still
@@ -3869,57 +3984,10 @@ let hub_keeps_focus (before : Model.t) ((m : Model.t), cmds) =
 let step_chip (m : Model.t) delta =
   match m.dialog, m.state with
   | Some (Popover { chip = Attach; _ }), _ -> m, []
-  | Some (Popover { chip; _ }), Some state ->
+  | Some (Popover { chip; _ }), Some _ ->
     let row = chip_row chip in
-    open_chip
-      m
-      (Chip.step chip delta ~skip:(fun c ->
-         chip_opens_nothing state c || chip_row c <> row))
+    open_chip m (Chip.step chip delta ~skip:(fun c -> chip_row c <> row))
   | _ -> m, []
-;;
-
-(* Dictation: the microphone records (or the browser listens) until pressed
-   again, then the text goes in at the caret. *)
-let no_dictation_model =
-  "Dictation needs a transcription model: pick one in Settings → Models (an \
-   OpenAI key, or a custom provider with /audio/transcriptions)."
-;;
-
-let dictate (m : Model.t) =
-  match m.dictation with
-  | Idle ->
-    let engine = m.dictation_engine in
-    { m with dictation = Starting engine }, [ Command.Start_dictation engine ]
-  | Starting _ -> { m with dictation = Idle }, [ Command.Cancel_dictation ]
-  | Recording _ ->
-    { m with dictation = Transcribing }, [ Command.Stop_dictation ]
-  | Transcribing -> m, []
-;;
-
-let dictated (m : Model.t) text =
-  let m = { m with dictation = Idle } in
-  if String.is_empty (String.strip text)
-  then toast m "Nothing was heard."
-  else (
-    let draft, cursor = Dictation.insert ~draft:m.draft ~cursor:m.cursor text in
-    edit_at_caret m ~cursor draft)
-;;
-
-(* The backend cannot transcribe: the browser's recognition, where there is
-   one, listens from the next press. *)
-let dictation_failed (m : Model.t) e =
-  let m = { m with dictation = Idle } in
-  if Dictation.no_provider e
-  then
-    if m.browser_speech
-    then
-      toast
-        { m with dictation_engine = Browser }
-        "No transcription model is set up, so the browser's speech recognition \
-         listens instead: press the microphone again (Settings → Models sets \
-         one up)."
-    else error m no_dictation_model
-  else error m (String.capitalize e)
 ;;
 
 let annotate_dialog (m : Model.t) ~f =
@@ -4734,91 +4802,6 @@ let resume_command (m : Model.t) rest =
   | Set _ as action -> set_resume m action
 ;;
 
-let dictation_summary config =
-  String.capitalize (Prigh_ui.Dictation_command.summary config)
-;;
-
-(* The backend says when the model's provider cannot transcribe. *)
-let set_dictation (m : Model.t) action =
-  with_config m ~f:(fun config ->
-    let config = Prigh_ui.Dictation_command.apply action config in
-    ( { m with config = Some config }
-    , [ set_config
-          config
-          ~fields:(List.map (Prigh_ui.Dictation_command.fields action) ~f:fst)
-          ~tag:Dictation_saved
-      ] ))
-;;
-
-(* OpenAI's transcription models, and the configured one if it is another
-   (a custom provider's, set with /dictation model PROVIDER/ID). Groq's
-   free Whisper is suggested once a custom provider named groq exists (never
-   a model nothing could run). *)
-let groq_dictation = "groq/whisper-large-v3-turbo"
-
-let has_groq (m : Model.t) =
-  List.exists m.auth ~f:(fun s ->
-    String.equal s.provider "groq" && Option.is_some s.custom)
-;;
-
-let dictation_models_picker (m : Model.t) =
-  with_config m ~f:(fun config ->
-    let current = config.dictation_model in
-    let suggestions =
-      Prigh_ui.Dictation_command.suggestions
-      @
-      if has_groq m
-      then [ groq_dictation, "Groq's Whisper, free (rate-limited)" ]
-      else []
-    in
-    let suggested =
-      List.map suggestions ~f:(fun (key, detail) ->
-        Picker.Item.create
-          ~id:key
-          ~detail
-          ~search:(key ^ " " ^ detail)
-          ~marked:(Option.equal String.equal current (Some key))
-          key)
-    in
-    let configured =
-      match current with
-      | Some key when not (List.Assoc.mem suggestions ~equal:String.equal key)
-        ->
-        [ Picker.Item.create
-            ~id:key
-            ~detail:"configured"
-            ~search:key
-            ~marked:true
-            key
-        ]
-      | Some _ | None -> []
-    in
-    open_picker
-      m
-      (Picker
-         { kind = Dictation_models
-         ; picker =
-             Picker.create
-               ~title:"Dictation model"
-               (Picker.Item.create
-                  ~id:"off"
-                  ~detail:Config.default_dictation_model
-                  ~search:"off default"
-                  ~marked:(Option.is_none current)
-                  "Default"
-                :: (configured @ suggested))
-         }))
-;;
-
-let dictation_command (m : Model.t) rest =
-  match Prigh_ui.Dictation_command.parse rest with
-  | Error _ when String.equal (String.strip rest) "model" ->
-    dictation_models_picker m
-  | Show -> with_config m ~f:(fun c -> toast m (dictation_summary c))
-  | Error e -> error m (String.capitalize e)
-  | Set_model _ as action -> set_dictation m action
-;;
-
 let save_about_you (m : Model.t) =
   match About_you.save m.about_you with
   | about_you, Some request ->
@@ -5375,6 +5358,7 @@ let user_switched (m : Model.t) (hello : Hello_reply.t) =
     ; agents = { Agents.empty with open_ = m.agents.open_ }
     ; forges = Forges.empty
     ; nix_gc = { Nix_gc.empty with collecting = m.nix_gc.collecting }
+    ; usage = Usage_page.empty
     ; memory = Memory_notes.empty
     ; instructions = Instruction_notes.empty
     ; about_you = About_you.empty
@@ -7064,6 +7048,9 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
       m
       "/user-info takes no argument here: it opens Settings, About you, where \
        you fill in the form."
+  | "usage", "" -> open_settings ~section:Usage m
+  | "usage", _ ->
+    error m "/usage takes no argument: it opens Settings, Usage, with Refresh."
   | "memory", "" -> open_settings ~section:Memory m
   | "instructions", "" -> open_settings ~section:Custom_instructions m
   | "instructions", ("on" | "off") ->
@@ -7339,7 +7326,6 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
   | "approval-model", rest -> approval_model_command m rest
   | "naming", rest -> naming_command m rest
   | "auto-archive", rest -> auto_archive_command m rest
-  | "dictation", rest -> dictation_command m rest
   | "host", "" -> hosts_picker m
   | "host", arg -> switch_host m arg
   | "export", "" -> open_prompt m (Prompt.create Export)
@@ -8865,9 +8851,6 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
            e)
     in
     m, cmds @ [ rpc "get_config" [] ~tag:Config ]
-  | Dictation_saved, Error e ->
-    let m, cmds = error m (sprintf "Couldn't set the dictation model: %s" e) in
-    m, cmds @ [ rpc "get_config" [] ~tag:Config ]
   | Auto_archive_saved, Error e ->
     let m, cmds =
       error m (sprintf "Couldn't set when sessions are archived: %s" e)
@@ -8907,10 +8890,6 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
      | Some (Login flow) ->
        { m with dialog = Some (Login { flow with failed = Some e }) }, []
      | _ -> error m e)
-  | Transcribed, Error e ->
-    (match m.dictation with
-     | Transcribing -> dictation_failed m e
-     | Idle | Starting _ | Recording _ -> m, [])
   | (Dequeued | Unqueued _), Error e ->
     (* Shown removed at once: the backend's queue is the truth. *)
     let m, cmds = error m (String.capitalize e) in
@@ -9210,6 +9189,14 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
      | Nix_status { open_settings = true }, Error e ->
        error m (String.capitalize e)
      | _ -> m, [])
+  | Usage_loaded, result ->
+    let result =
+      Result.bind result ~f:(fun json ->
+        Result.map_error
+          (Subscription_usage.of_json json)
+          ~f:Error.to_string_hum)
+    in
+    { m with usage = Usage_page.loaded m.usage result }, []
   | Memory_loaded, result ->
     let result =
       Result.bind result ~f:(fun json ->
@@ -9613,17 +9600,6 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
   | Auto_archive_saved, Ok json ->
     decode m json Config.of_json ~f:(fun config ->
       toast { m with config = Some config } (auto_archive_summary config))
-  | Dictation_saved, Ok json ->
-    decode m json Config.of_json ~f:(fun config ->
-      (* The backend may transcribe now: it is asked again. *)
-      toast
-        { m with config = Some config; dictation_engine = Server }
-        (dictation_summary config))
-  | Transcribed, Ok json ->
-    (match m.dictation, field json "text" with
-     | Transcribing, Some (`String text) -> dictated m text
-     | Transcribing, _ -> dictated m ""
-     | (Idle | Starting _ | Recording _), _ -> m, [])
   | Compaction_saved, Ok json ->
     decode m json Config.of_json ~f:(fun config ->
       toast { m with config = Some config } (compaction_summary config))
@@ -10693,17 +10669,6 @@ let picker_accepted (m : Model.t) ~kind (item : Picker.Item.t) =
         ( { m with dialog = Some Settings; return_to_settings = false }
         , Command.Focus "dialog" :: cmds )
       else m, cmds
-    | Dictation_models ->
-      let m, cmds =
-        set_dictation
-          m
-          (Set_model (Option.some_if (not (String.equal item.id "off")) item.id))
-      in
-      if m.return_to_settings
-      then
-        ( { m with dialog = Some Settings; return_to_settings = false }
-        , Command.Focus "dialog" :: cmds )
-      else m, cmds
     | Generate_models ->
       let m, cmds =
         set_generate_model
@@ -10885,10 +10850,10 @@ let setting_opener (m : Model.t) (setting : Control_setting.t) =
   let model_picker f = with_config m ~f:(fun _ -> f m) in
   match setting with
   | Model -> open_chip m Model
-  | Thinking -> open_chip m Thinking
+  | Thinking -> open_thinking_picker m
   | Verbosity -> open_picker m (verbosity_picker m)
   | Host -> open_chip m Host
-  | Mode -> open_chip m Mode
+  | Mode -> mode_picker m
   | Context -> run_command m { name = "session"; rest = "" }
   | Default_model -> pick_default m Model
   | Default_thinking -> pick_default m Thinking
@@ -10901,7 +10866,6 @@ let setting_opener (m : Model.t) (setting : Control_setting.t) =
   | Drafting_model -> model_picker generate_models_picker
   | Approval_model -> model_picker approval_models_picker
   | Naming_model -> model_picker naming_models_picker
-  | Dictation_model -> model_picker dictation_models_picker
   | Default_directory
   | Budget
   | Worktree_hours
@@ -10918,6 +10882,7 @@ let setting_opener (m : Model.t) (setting : Control_setting.t) =
   | Instructions
   | Mcp
   | Git_hosts
+  | Usage
   | Nix_store
   | Account ->
     (match Control_setting.page setting with
@@ -10932,6 +10897,10 @@ let setting_options (m : Model.t) setting =
     match opened.dialog with
     | Some (Picker { kind; picker }) ->
       Some { Dialog.Control_options.setting; kind; picker }
+    (* The model's menu is more than a list: the control centre lists them
+       all. *)
+    | Some (Popover { chip = Model; _ }) ->
+      Some { setting; kind = Models; picker = models_picker opened }
     | Some (Popover { chip; picker }) ->
       Some { setting; kind = chip_kind chip; picker }
     | _ -> None
@@ -11004,11 +10973,6 @@ let config_value (m : Model.t) (config : Config.t) (setting : Control_setting.t)
   | Approval_model ->
     Some (model config.approval_model ~default:"the session's")
   | Naming_model -> Some (model config.naming_model ~default:"the drafting one")
-  | Dictation_model ->
-    Some
-      (model
-         config.dictation_model
-         ~default:(model_display m Config.default_dictation_model))
   | Compact_at -> Some (sprintf "%d tokens" config.compact_at_tokens)
   | Mask -> Some (if config.mask_observations then "on" else "off")
   | Auto_resume -> Some (if config.resume_on_limit_reset then "on" else "off")
@@ -11260,6 +11224,10 @@ let dialog_accept (m : Model.t) =
     (match Picker.selected_item picker with
      | Some item -> picker_accept m ~kind item
      | None -> m, [])
+  | Some (Popover { chip = Model; picker })
+    when Option.exists (Picker.selected_item picker) ~f:(fun i ->
+           String.equal i.id more_id) ->
+    with_model_menu m { m.model_menu with more = true }
   | Some (Popover { chip; picker }) ->
     (match Picker.selected_item picker with
      | Some item -> picker_accept m ~kind:(chip_kind chip) item
@@ -11711,9 +11679,37 @@ let update_connected (m : Model.t) (action : Action.t) =
   | Open_filter -> open_filter m
   | Filter_press row -> filter_press m row
   | Chip_step delta -> step_chip m delta
+  | Model_menu_tab tab ->
+    hub_keeps_focus
+      m
+      (with_model_menu m ~query:"" (Model_menu.set_tab m.model_menu tab))
+  | Model_menu_step delta ->
+    with_model_menu m (Model_menu.step m.model_menu (offered_models m) delta)
+  | Model_menu_more ->
+    hub_keeps_focus m (with_model_menu m { m.model_menu with more = true })
+  | Model_menu_access ->
+    ( { m with
+        model_menu =
+          { m.model_menu with access_open = not m.model_menu.access_open }
+      }
+    , [] )
+  | Model_menu_nth n -> model_menu_nth m n
+  | Toggle_favourite key ->
+    let key =
+      match key, m.dialog with
+      | Some key, _ -> Some key
+      | None, Some (Popover { chip = Model; picker }) ->
+        Option.map (Picker.selected_item picker) ~f:(fun i -> i.id)
+        |> Option.filter ~f:(Fn.non (String.equal more_id))
+      | None, _ -> None
+    in
+    (match key with
+     | Some key -> hub_keeps_focus m (toggle_favourite m key)
+     | None -> m, [])
   | Open_snippets cursor -> open_snippets m ~cursor
   | Open_help -> open_dialog m Help
   | Open_settings -> open_settings m
+  | Usage_refresh -> fetch_usage m
   | Settings_section section ->
     (match m.dialog with
      | Some Settings ->
@@ -11845,7 +11841,11 @@ let update_connected (m : Model.t) (action : Action.t) =
      | None -> m, [])
   | Show_in_chat id -> show_in_chat m id
   | Clock now -> clock m now
-  | Picker_query query -> with_picker m ~f:(fun p -> Picker.set_query p query)
+  | Picker_query query ->
+    (match m.dialog with
+     | Some (Popover { chip = Model; _ }) ->
+       with_model_menu m ~query m.model_menu
+     | _ -> with_picker m ~f:(fun p -> Picker.set_query p query))
   | Picker_move delta -> with_picker m ~f:(fun p -> Picker.move p delta)
   | Picker_accept -> dialog_accept m
   | Picker_choose id ->
@@ -11876,6 +11876,8 @@ let update_connected (m : Model.t) (action : Action.t) =
      | Some (Rename _) -> { m with dialog = Some (Rename text) }, []
      | Some (Login flow) ->
        { m with dialog = Some (Login { flow with input = text }) }, []
+     | Some (Popover { chip = Model; _ }) ->
+       with_model_menu m ~query:text m.model_menu
      | Some (Picker _ | Popover _ | Scoped_models _) ->
        with_picker m ~f:(fun p -> Picker.set_query p text)
      | Some (Prompt prompt) -> prompt_input m (Prompt.set_input prompt text)
@@ -11920,6 +11922,8 @@ let update_connected (m : Model.t) (action : Action.t) =
        , [] )
      | Some Settings, _ when Option.is_some (Mcp_page.escape m.mcp) ->
        { m with mcp = Option.value_exn (Mcp_page.escape m.mcp) }, []
+     | Some (Popover { chip = Model; _ }), _ when m.model_menu.access_open ->
+       { m with model_menu = { m.model_menu with access_open = false } }, []
      | _ ->
        (match m.dialog with
         | Some (Login { failed = None; provider; _ }) ->
@@ -12027,6 +12031,7 @@ let update_connected (m : Model.t) (action : Action.t) =
     { m with review_drawer = not m.review_drawer }, []
   | Toggle_sidebar -> { m with sidebar_open = not m.sidebar_open }, []
   | Toggle_status_tray -> { m with status_tray = not m.status_tray }, []
+  | Toggle_context_card -> { m with context_card = not m.context_card }, []
   | Answer_confirm { call_id; agent_id; answer = Deny_with_reason } ->
     (match m.confirms with
      | first :: _
@@ -12055,31 +12060,6 @@ let update_connected (m : Model.t) (action : Action.t) =
   | Question action -> question m action
   | Cycle_mode -> cycle_mode m
   | Add_image image -> { m with images = m.images @ [ image ] }, []
-  | Dictate -> dictate m
-  | Dictation_cancel ->
-    (match m.dictation with
-     | Idle -> m, []
-     | Starting _ | Recording _ | Transcribing ->
-       { m with dictation = Idle }, [ Command.Cancel_dictation ])
-  | Dictation_progress { elapsed_ms; level } ->
-    (match m.dictation with
-     | Starting engine | Recording { engine; _ } ->
-       { m with dictation = Recording { engine; elapsed_ms; level } }, []
-     | Idle | Transcribing -> m, [])
-  | Dictation_audio { mime_type; data } ->
-    (match m.dictation with
-     | Transcribing ->
-       m, [ call (Transcribe { mime_type; data }) ~tag:Transcribed ]
-     | Idle | Starting _ | Recording _ -> m, [])
-  | Dictation_text text ->
-    (match m.dictation with
-     | Idle -> m, []
-     | Starting _ | Recording _ | Transcribing -> dictated m text)
-  | Dictation_failed e ->
-    (match m.dictation with
-     | Idle -> m, []
-     | Starting _ | Recording _ | Transcribing -> dictation_failed m e)
-  | Browser_speech b -> { m with browser_speech = b }, []
   | Annotate { image; target } ->
     let m, cmds = open_dialog m (Annotate (Annotate.create image target)) in
     m, cmds @ [ Command.Annotate_setup ]
@@ -12220,7 +12200,6 @@ let update_connected (m : Model.t) (action : Action.t) =
                       | Generate_models
                       | Approval_models
                       | Naming_models
-                      | Dictation_models
                       | Defaults _ )
                   ; _
                   } ) ) -> { m' with return_to_settings = true }, cmds

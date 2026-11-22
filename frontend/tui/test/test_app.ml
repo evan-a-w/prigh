@@ -780,7 +780,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /fallback [off|model...]      show or set the models that…
       /default-dir [off|path]       show or set the directory n…
       /default-host [off|name]      show or set the tool host p…
-      ↕ 1–8 of 83
+      ↕ 1–8 of 82
     ────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  think:off  Tab/Enter accept · Alt+S as typed
@@ -797,7 +797,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /fallback [off|model...]      show or set the models that…
       /default-dir [off|path]       show or set the directory n…
       /default-host [off|name]      show or set the tool host p…
-      ↕ 1–8 of 83
+      ↕ 1–8 of 82
     ────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  think:off  Tab/Enter accept · Alt+S as typed
@@ -814,7 +814,7 @@ let%expect_test "typing / lists commands, Down twice + Tab fills /login " =
       /fallback [off|model...]      show or set the models that…
       /default-dir [off|path]       show or set the directory n…
       /default-host [off|name]      show or set the tool host p…
-      ↕ 1–8 of 83
+      ↕ 1–8 of 82
     ────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  think:off  Tab/Enter accept · Alt+S as typed
@@ -3094,7 +3094,7 @@ let%expect_test "/auth, /help, /state, /clear, unknown method errors" =
     │ Ctrl+P cycles through                                    │
     │ /change_default                    save the current      │
     │ model and thinking level as the default for new sessions │
-    └───────── 1–11 of 371 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
+    └───────── 1–11 of 367 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
     ────────────────────────────────────────────────────────────
     > ▏
     deepseek-flash  ctx:0.1%/1.0M  ↑↓ scroll · Esc closes
@@ -5566,10 +5566,9 @@ let%expect_test
       (compact_at_tokens 200000)
       (compaction_model ())
       (mask_observations true)
-      (generate_model  ())
-      (naming_model    ())
-      (approval_model  ())
-      (dictation_model ())))
+      (generate_model ())
+      (naming_model   ())
+      (approval_model ())))
     ((
       (scoped_models (deepseek/deepseek-flash))
       (approval_mode     Auto)
@@ -5592,10 +5591,9 @@ let%expect_test
       (compact_at_tokens 200000)
       (compaction_model ())
       (mask_observations true)
-      (generate_model  ())
-      (naming_model    ())
-      (approval_model  ())
-      (dictation_model ())))
+      (generate_model ())
+      (naming_model   ())
+      (approval_model ())))
     |}]
 ;;
 
@@ -6636,10 +6634,9 @@ let%expect_test "/change_default saves the model and thinking level" =
       (compact_at_tokens 200000)
       (compaction_model ())
       (mask_observations true)
-      (generate_model  ())
-      (naming_model    ())
-      (approval_model  ())
-      (dictation_model ())))
+      (generate_model ())
+      (naming_model   ())
+      (approval_model ())))
 
 
 
@@ -8739,7 +8736,7 @@ let%expect_test
       /fallback [off|model...]      show or set the models that…
       /default-dir [off|path]       show or set the directory n…
       /default-host [off|name]      show or set the tool host p…
-      ↕ 1–8 of 83
+      ↕ 1–8 of 82
     ────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  think:off  Tab/Enter accept · Alt+S as typed
@@ -8756,7 +8753,7 @@ let%expect_test
       /fallback [off|model...]      show or set the models that…
       /default-dir [off|path]       show or set the directory n…
       /default-host [off|name]      show or set the tool host p…
-      ↕ 1–8 of 83
+      ↕ 1–8 of 82
     ────────────────────────────────────────────────────────────
     > /▏
     deepseek-flash  think:off  Tab/Enter accept · Alt+S as typed
@@ -9041,7 +9038,7 @@ let%expect_test
                                 │   /fallback [off|model...]      show or set the models that take over, in order, when a model's usa…
                                 │   /default-dir [off|path]       show or set the directory new sessions start in (on the default hos…
                                 │   /default-host [off|name]      show or set the tool host prigh-web's new sessions start on (a term…
-     Alt+L hides · ⇧Tab focuses │   ↕ 1–8 of 83
+     Alt+L hides · ⇧Tab focuses │   ↕ 1–8 of 82
     ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
     > /▏
     /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01  Tab/Enter accept · Alt+S as typed

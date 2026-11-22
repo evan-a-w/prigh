@@ -116,7 +116,6 @@ module Icon = struct
     | Palette
     | Package
     | Book
-    | Mic
     | Image
     | Paperclip
     | Eraser
@@ -130,6 +129,13 @@ module Icon = struct
     | Keep
     | Clipboard
     | Plug
+    | Gauge
+    | Star
+    | Openai
+    | Anthropic
+    | Deepseek
+    | Spark
+    | Monitor
   [@@deriving sexp_of]
 
   (* Paths in the style of Lucide (24x24, stroked). *)
@@ -236,8 +242,6 @@ module Icon = struct
       {|<path d="M21 8a2 2 0 0 0-1-1.7l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.7l7 4a2 2 0 0 0 2 0l7-4a2 2 0 0 0 1-1.7zM3.3 7 12 12l8.7-5M12 22V12M7.5 4.3l9 5.1"/>|}
     | Book ->
       {|<path d="M10 2v8l3-3 3 3V2"/><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20"/>|}
-    | Mic ->
-      {|<rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v1a7 7 0 0 0 14 0v-1M12 18v4M8 22h8"/>|}
     | Image ->
       {|<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/>|}
     | Paperclip ->
@@ -260,6 +264,22 @@ module Icon = struct
       {|<rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>|}
     | Plug ->
       {|<path d="M12 22v-5M9 8V2M15 8V2M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8z"/>|}
+    | Gauge ->
+      {|<path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/>|}
+    | Star ->
+      {|<path d="M12 3.2l2.7 5.5 6 .9-4.35 4.25 1 6L12 17l-5.35 2.85 1-6L3.3 9.6l6-.9z"/>|}
+    (* The providers' marks, drawn in the icons' own line: a knot of three
+       links (OpenAI), the slanted A and stroke (Anthropic), a whale
+       (DeepSeek); a spark for any other. *)
+    | Openai ->
+      {|<g stroke-width="1.7"><rect x="8.6" y="3.2" width="6.8" height="13.6" rx="3.4" transform="rotate(0 12 12) translate(1.7 2)"/><rect x="8.6" y="3.2" width="6.8" height="13.6" rx="3.4" transform="rotate(60 12 12) translate(1.7 2)"/><rect x="8.6" y="3.2" width="6.8" height="13.6" rx="3.4" transform="rotate(120 12 12) translate(1.7 2)"/></g>|}
+    | Anthropic -> {|<path d="M3.5 20 9 4h1.6l5.5 16M5.6 14.2h8.6M14 4l6.5 16"/>|}
+    | Deepseek ->
+      {|<path d="M2.5 11.5c1.2 5 6 8 11 6.5 3.2-1 5-3.6 5.4-6.2.9.6 2 .6 2.6-.3-1.1-.2-1.8-.9-2.1-2-.5-1.6-2.3-2.4-3.8-1.6-1.3.7-1.6 2.3-3.2 2.9-2.2.8-5.7-.2-9.9.7z"/><circle cx="14.6" cy="10.4" r=".6" fill="currentColor"/>|}
+    | Spark ->
+      {|<path d="M12 3c.6 4.6 2.4 6.4 7 7-4.6.6-6.4 2.4-7 7-.6-4.6-2.4-6.4-7-7 4.6-.6 6.4-2.4 7-7z"/>|}
+    | Monitor ->
+      {|<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>|}
   ;;
 
   let name t = String.lowercase (Sexp.to_string (sexp_of_t t))

@@ -16,8 +16,8 @@ and [Isolation](#isolation).
 ## The image
 
 CI publishes the image for every commit of `main` to
-`ghcr.io/evan-a-w/prigh` (`.github/workflows/docker-image.yml`, once the
-[binary cache](#binary-cache) has that commit): the tags `main` and
+`ghcr.io/evan-a-w/prigh` (`.github/workflows/attic.yml`, as soon as it has
+built that commit: see [Binary cache](#binary-cache)): the tags `main` and
 `latest` follow `main`, and each commit's short sha (`:e9c8b23`) pins it.
 `docker-compose.yml` runs `${PRIGH_IMAGE:-ghcr.io/evan-a-w/prigh:main}`
 with `pull_policy: always`, so every `docker compose up` (and Portainer's
@@ -224,6 +224,7 @@ user, `default`.
 | `PRIGH_NIX_GC_KEEP_DAYS` | `7` | the scheduled collection first deletes users' profile generations older than this many days; `0`: all but the current ones; `off`: keeps them all |
 | `PRIGH_NIX_MIN_FREE` | `15%` | Nix's `min-free`: while it builds or fetches, Nix collects garbage when less than this is free on `/nix`'s filesystem. Bytes as `nix.conf` takes them (`20G`, `512M`, `1T`, `10737418240`) or a percentage of the filesystem (`20%`); `0`: never |
 | `PRIGH_NIX_MAX_FREE` | `30%` | Nix's `max-free`: such a collection stops once this much is free; same forms, more than `PRIGH_NIX_MIN_FREE` |
+| `PRIGH_VOLUME_WAIT` | `2m` | how long the start waits for `/home` and `/nix` to be writable (a disk the host mounts late, or read-only for a while) before it gives up: a number with `s`, `m`, `h` or `d`; `0`: not at all (see [Data](#data)) |
 | `GH_TOKEN` | – | GitHub token for `git` over HTTPS, for users without one in `PRIGH_GH_TOKENS` (shared by all of them; see [Git and SSH](#git-and-ssh)) |
 | `PRIGH_GH_TOKENS` | – | per-user GitHub tokens, `name=token,...` |
 | `PRIGH_GITHUB_CLIENT_ID` | – | client id of your GitHub OAuth app (with Device Flow enabled), for `/login github` and prigh-web's Git hosting settings (README: Git hosting) |
@@ -600,6 +601,12 @@ scope is the directory it is served from.
 | `/nix` | `prigh-nix` | the Nix store: what users installed (see [Installing tools](#installing-tools)), and prigh's own runtime, copied in from the image at start |
 | `/run/prigh` | tmpfs | the users (`extrausers/passwd`, `group`, `shadow`), rebuilt at each start |
 
+The start first waits, up to `PRIGH_VOLUME_WAIT` (2 minutes), for `/home`
+and `/nix` to be writable, logging once what it waits for; if they never
+are, it exits saying which and what to check. With bind mounts on a disk
+of their own, make sure the host mounts it read-write before Docker starts
+(systemd: `RequiresMountsFor=` on `docker.service`).
+
 Removing the stack keeps named volumes unless they are removed
 explicitly (`docker compose down -v` deletes them, logins and sessions
 included).
@@ -716,18 +723,28 @@ nix build --no-link --print-out-paths path:.#frontend.inputDerivation path:.#bac
 ```
 
 Anything missing from the cache is compiled, so a stale cache makes the
-build slower but does not break it. When that workflow succeeds on `main`,
-`.github/workflows/docker-image.yml` builds the image from the same commit
-(downloading prigh from the cache, with `REQUIRE_CACHED=1`) and pushes it
-to `ghcr.io/evan-a-w/prigh`; it can also be run by hand (Actions →
-docker-image → Run workflow) for main or a branch (a branch gets only its
-short sha tag).
+build slower but does not break it.
+
+The workflow runs two jobs side by side: `server` (backend, frontends, the
+default dev shell) and `desktop` (prigh-desktop, prigh-computer, the
+desktop dev shell). As soon as `server` has built prigh, it builds the
+image from its own store (the backend and frontend as NARs in the
+`prebuilt` build context, with `REQUIRE_CACHED=1`) and pushes it to
+`ghcr.io/evan-a-w/prigh`, before uploading anything to Attic, so a slow
+upload never delays the image, and an unreachable Attic API only skips
+the upload. Its last step, `Attic connection`, shows how the runner
+reaches the Attic peer (P2P or relayed, the latency) and the download
+rate of the same NAR over NetBird and over the internet, to tell a slow
+tunnel from slow storage. It can also be run by hand (Actions → attic →
+Run workflow) for main or a branch (a branch's image gets only its short
+sha tag; untick `publish_image` to skip it).
 
 ## How the image is built
 
 1. A `nixos/nix` stage gets `.#backend` and `.#frontend` of the flake
    (`docker/fetch-prigh.sh`): one the binary cache has (signed by a trusted
-   key) is downloaded as that store path alone, checked against its hash
+   key) is downloaded as that store path alone (CI passes the ones it just
+   built as NARs in the `prebuilt` build context, which come first), checked against its hash
    and unpacked, without its closure (which holds the whole OxCaml
    toolchain, ~3 GB to download); one it lacks is built, after a warning
    and `nix build --dry-run`'s plan (`REQUIRE_CACHED=1`, as CI sets, fails

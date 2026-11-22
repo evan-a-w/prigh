@@ -59,7 +59,7 @@ type t =
   ; now_ms : unit -> int
   ; listen : (sw:Switch.t -> int) option
   ; clients : Mcp_oauth.Client.t String.Table.t
-    (** registered clients, by issuer and redirect URI *)
+    (** registered clients, by issuer, redirect URI and configured name *)
   ; mutable subscribers : (unit -> unit) list
   }
 
@@ -371,12 +371,15 @@ let loopback t =
 let sign_in t ~url ~oauth ~redirect_base =
   let open Or_error.Let_syntax in
   expire (t.now_ms ());
+  let client_name =
+    Option.bind oauth ~f:(fun (o : Mcp_config.Oauth.t) -> o.client_name)
+  in
   let%bind discovery =
     Or_error.tag
       (Mcp_oauth.discover
          ~env:t.env
          ~url
-         ?challenge:(Mcp_oauth.probe ~env:t.env ~url)
+         ?challenge:(Mcp_oauth.probe ~env:t.env ~url ~client_name)
          ())
       ~tag:"cannot sign in"
   in
@@ -388,19 +391,30 @@ let sign_in t ~url ~oauth ~redirect_base =
   let redirect_uri = base ^ callback_path in
   let client =
     match (oauth : Mcp_config.Oauth.t option) with
-    | Some { client_id; client_secret; scopes = _ } ->
+    | Some { client_id = Some client_id; client_secret; _ } ->
       Ok
         { Mcp_oauth.Client.id = client_id
         ; secret = client_secret
         ; auth_method = (if Option.is_some client_secret then Basic else None_)
         }
-    | None ->
-      let cache = discovery.server.issuer ^ " " ^ redirect_uri in
+    | Some { client_id = None; _ } | None ->
+      let cache =
+        String.concat
+          ~sep:" "
+          [ discovery.server.issuer
+          ; redirect_uri
+          ; Option.value client_name ~default:""
+          ]
+      in
       (match Hashtbl.find t.clients cache with
        | Some client -> Ok client
        | None ->
          let%map client =
-           Mcp_oauth.register ~env:t.env discovery.server ~redirect_uri
+           Mcp_oauth.register
+             ~env:t.env
+             discovery.server
+             ~redirect_uri
+             ~client_name
          in
          Hashtbl.set t.clients ~key:cache ~data:client;
          client)

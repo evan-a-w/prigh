@@ -3,8 +3,8 @@
    No bar over the chat: the sidebar's toggle and the panels' toggles float
    over the top of the transcript, which leaves them room (a phone has a
    strip, phone.css). The session's status is one chip in the composer's
-   row, by the microphone: the activity's lamp, the context's ring and
-   percent and the cost, with one details card over it (status_view.ml).
+   row, by send: the activity's lamp, the context's ring and percent and
+   the cost, with one details card over it (status_view.ml).
    The thinking level, the mode and the verbosity are chips beside the host
    (session_chips_view.ml). */
 
@@ -145,9 +145,9 @@
 .status-item.context .percent { font-variant-numeric: tabular-nums; }
 
 
-/* Quiet figures at the right of the composer's row, clear of the
-   microphone: a lamp (its word while the agent works), the context's ring
-   and percent, the cost. One pill, lit while the agent works; the details
+/* Quiet figures at the right of the composer's row, clear of send: a lamp
+   (its word while the agent works), the context's ring and percent, the
+   cost. One pill, lit while the agent works; the details
    card stands over it on hover and focus (a tap opens the session's
    details: a phone has no hover). */
 .composer-status { display: flex; align-items: center; min-width: 0; flex-shrink: 0; }
@@ -235,14 +235,6 @@
 }
 .session-choice.on { background: var(--slate-2); color: var(--chalk); box-shadow: 0 1px 0 var(--rule-2) inset, 0 1px 3px -1px var(--edge-shadow); }
 .session-choice:focus-visible { outline: 2px solid var(--sodium); outline-offset: -2px; }
-/* A model can take up to eight thinking settings: they wrap, four or so to
-   a row, rather than shrink past their words. */
-.thinking-choices { flex-wrap: wrap; }
-.thinking-choices > .session-choice { flex: 1 0 64px; }
-/* The modes keep their words ("auto-edit" whole): each as wide as its
-   name, wrapping to a second row rather than cutting one short. */
-.mode-choices { flex-wrap: wrap; }
-.mode-choices > .session-choice { flex: 1 0 auto; min-width: 44px; padding: 0 6px; }
 .session-usage { display: flex; align-items: center; gap: 12px; padding: 0 2px; font-size: 13px; color: var(--muted); }
 .session-context { flex: 1; display: flex; align-items: center; gap: 8px; min-width: 0; }
 .session-context .meter { flex: 1; height: 5px; }

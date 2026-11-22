@@ -35,6 +35,10 @@ type t =
   ; cost : Cost.t
   ; image_limit : Image_limit.t option
     (** [None] from a backend from before it sent one *)
+  ; legacy : bool
+    (** superseded by a newer model of its family: left out of the model
+        pickers (still taken by name: [/model <id>]); [false] from a backend
+        from before it said *)
   }
 [@@deriving sexp_of, equal]
 

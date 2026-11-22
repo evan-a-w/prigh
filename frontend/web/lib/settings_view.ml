@@ -261,44 +261,6 @@ let naming_model (m : App.Model.t) ~inject =
     ]
 ;;
 
-let dictation_model (m : App.Model.t) ~inject =
-  let current =
-    Option.bind m.config ~f:(fun c -> c.dictation_model)
-    |> Option.value ~default:Config.default_dictation_model
-  in
-  let groq =
-    List.exists m.auth ~f:(fun s ->
-      String.equal s.provider "groq" && Option.is_some s.custom)
-  in
-  let note =
-    if String.is_prefix current ~prefix:"groq/"
-    then None
-    else if groq
-    then Some ("muted", "Free: groq/whisper-large-v3-turbo, in the list")
-    else
-      Some
-        ( "muted"
-        , "Free: Groq's whisper-large-v3-turbo. Add Groq with /login custom \
-           (README: Free dictation with Groq)" )
-  in
-  row
-    ?note
-    ~cls:"dictation-model"
-    ~name:"Dictation"
-    ~about:
-      "Turns what you say into text (the composer's microphone): an OpenAI or \
-       OpenAI-compatible transcription model. Without one, the browser's own \
-       speech recognition, where it has one."
-    [ select
-        ~cls:"dictation-model-choice"
-        ~title:"Choose the model (/dictation model)"
-        ~label:("Dictation model: " ^ current)
-        ~disabled:(Option.is_none m.config)
-        ~on_click:(inject (Action.Run "/dictation model"))
-        current
-    ]
-;;
-
 (* One of the session list's numbers, behind its switch. *)
 let sessions_number
       (m : App.Model.t)
@@ -1416,10 +1378,8 @@ let content (m : App.Model.t) (section : Section.t) ~inject =
         ; approval_model m ~inject
         ; naming_model m ~inject
         ; summary_model m m.config ~inject
-        ; dictation_model m ~inject
         ]
     ; group ~title:"Compaction" (compaction m ~inject)
-    ; group ~title:"Usage limits" [ auto_resume m.config ~inject ]
     ]
   | Memory ->
     group [ memory_switch m ~inject ]
@@ -1455,6 +1415,9 @@ let content (m : App.Model.t) (section : Section.t) ~inject =
   | Mcp -> Mcp_settings_view.groups m ~inject
   | Git_hosting -> [ group ~title:"Hosts" (git_hosts m ~inject) ]
   | Nix_store -> [ group (nix_store m ~inject) ]
+  | Usage ->
+    group ~title:"At a limit" [ auto_resume m.config ~inject ]
+    :: Usage_view.groups m ~inject
   | Account -> [ group (account m ~inject) ]
 ;;
 
@@ -1469,6 +1432,7 @@ let section_icon : Section.t -> Icon.t = function
   | Mcp -> Plug
   | Git_hosting -> Repo
   | Nix_store -> Package
+  | Usage -> Gauge
   | Account -> User
 ;;
 

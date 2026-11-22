@@ -407,7 +407,7 @@
                 grep -qx 'Name=prigh' ${prighDesktop}/share/applications/prigh.desktop
                 grep -qx 'Icon=prigh-desktop' ${prighDesktop}/share/applications/prigh.desktop
                 test -f ${prighDesktop}/share/icons/hicolor/128x128/apps/prigh-desktop.png
-                # WebKitGTK's GStreamer plugins (media, the microphone)
+                # WebKitGTK's GStreamer plugins (media)
                 # (a binary wrapper: the paths are among its strings)
                 grep -aq GST_PLUGIN_SYSTEM_PATH_1_0 ${prighDesktop.unwrapped}/bin/prigh-desktop
                 for plugins in gst-plugins-base gst-plugins-good; do

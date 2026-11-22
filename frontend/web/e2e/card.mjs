@@ -1,10 +1,11 @@
-// The status at the composer's right (the activity, the context, the
-// cost) and what applies over the chat: its rows as they stand idle, while the agent works with a subagent running,
-// with only the subagent left, and with a mode on (then in the narrowest
-// sidebar), in the dark and light themes, on a long branch; then with the
-// sidebar closed and on a phone. For each it prints the rows (what sits on
-// each line), how many lamps glow and what is in the accent colour, and
-// whether anything spills out. Run by prigh_web.sh; prints normalised
+// The context ring at the composer's right (the activity, the context, the
+// cost: its card) and what applies over the chat: as they stand idle, while
+// the agent works with a subagent running, with only the subagent left, and
+// with a mode on (then in the narrowest sidebar), in the dark and light
+// themes, on a long branch; then with the sidebar closed and on a phone.
+// For each it prints what the ring says (its name and its status for
+// screen readers), whether it turns, its card's mode, the notes over the
+// chat, and whether anything spills out. Run by prigh_web.sh; prints normalised
 // results (the expected output is in ENGINE.expected) and, with SHOTS,
 // screenshots of the card and the page.
 //
@@ -121,7 +122,8 @@ const chips = () => page.evaluate(() => {
     row.items.push({ left: r.left, text: e.innerText.trim().replace(/\s+/g, " ") || "icon" });
   }
   rows.sort((a, b) => a.top - b.top);
-  const problems = [...root.querySelectorAll("*")].filter(e => !e.closest(".status-details, #chip-popover")).flatMap(e => {
+  // (Not the ring's card, its menus, or what only screen readers read.)
+  const problems = [...root.querySelectorAll("*")].filter(e => !e.closest(".context-card, #chip-popover, .sr-only")).flatMap(e => {
     const r = e.getBoundingClientRect();
     if (r.width === 0) return [];
     const out = r.left < box.left - 1 || r.right > box.right + 1 ? ["outside"] : [];
@@ -138,50 +140,37 @@ const chips = () => page.evaluate(() => {
   ].join("\n");
 });
 
-// The card's rows, top to bottom: the items on each line (the context's
-// meter as [meter]), then the lamps lit, what is in the accent colour, and
-// anything outside the card or cut off without an ellipsis.
+// The ring: what it says (its name, its status for screen readers),
+// whether it turns and its level; its card's mode; the notes over the chat;
+// and whether the ring is outside the composer or on a neighbour.
 const card = () => page.evaluate(() => {
-  const root = document.querySelector(".composer-status");
-  if (!root) return "(no card)";
-  const notes = document.querySelector(".chat-chrome .status-notes");
+  const anchor = document.querySelector(".context-ring-anchor");
+  if (!anchor) return "(no ring)";
+  const ring = anchor.querySelector(".context-ring");
   const shown = e => {
     const r = e.getBoundingClientRect();
     return r.width > 0 && r.height > 0 && getComputedStyle(e).visibility !== "hidden";
   };
-  const items = [root, notes].filter(Boolean).flatMap(r => [...r.querySelectorAll(".status-item")]).filter(shown)
-    .filter(e => !e.parentElement.closest(".status-item") && !e.closest(".status-details"));
-  const box = root.getBoundingClientRect();
-  const rows = [];
-  for (const e of items) {
-    const r = e.getBoundingClientRect();
-    const mid = (r.top + r.bottom) / 2;
-    let row = rows.find(row => Math.abs(row.mid - mid) < 6);
-    if (!row) rows.push((row = { mid, items: [] }));
-    const meter = e.querySelector(".meter") && shown(e.querySelector(".meter")) ? "[meter] " : "";
-    row.items.push({ left: r.left, text: meter + (e.innerText.trim().replace(/\s+/g, " ") || "icon") });
+  const level = ring.className.replace("context-ring", "").trim() || "calm";
+  const status = anchor.querySelector("[role=status]")?.textContent.trim();
+  const mode = anchor.querySelector(".context-card .mode-line .status-detail-value")?.textContent.trim();
+  const notes = [...document.querySelectorAll(".chat-chrome .status-notes .status-item")].filter(shown)
+    .filter(e => !e.parentElement.closest(".status-item")).map(e => e.innerText.trim().replace(/\s+/g, " ") || "icon");
+  const r = ring.getBoundingClientRect();
+  const box = document.querySelector(".composer-box").getBoundingClientRect();
+  const problems = [];
+  if (!shown(ring)) problems.push("hidden");
+  if (r.left < box.left - 1 || r.right > box.right + 1) problems.push("outside the composer");
+  for (const e of document.querySelectorAll(".composer-row button")) {
+    if (e === ring || !shown(e) || e.closest(".context-card, #chip-popover")) continue;
+    const o = e.getBoundingClientRect();
+    if (r.left < o.right - 0.5 && o.left < r.right - 0.5 && r.top < o.bottom - 0.5 && o.top < r.bottom - 0.5)
+      problems.push(`on ${e.getAttribute("aria-label") || e.className}`);
   }
-  rows.sort((a, b) => a.mid - b.mid);
-  const sodium = getComputedStyle(document.documentElement).getPropertyValue("--sodium").trim();
-  const probe = document.createElement("span");
-  probe.style.color = sodium;
-  document.body.append(probe);
-  const accent = getComputedStyle(probe).color;
-  probe.remove();
-  const accented = items.filter(e => getComputedStyle(e).color === accent).map(e => e.innerText.trim());
-  const lamps = [...root.querySelectorAll(".lamp")].filter(shown).length;
-  const problems = [...root.querySelectorAll("*")].filter(shown).filter(e => !e.closest(".status-details")).flatMap(e => {
-    const r = e.getBoundingClientRect();
-    const out = r.left < box.left - 1 || r.right > box.right + 1 ? ["outside"] : [];
-    const cs = getComputedStyle(e);
-    const cut = e.children.length === 0 && e.scrollWidth > e.clientWidth + 1 && cs.textOverflow !== "ellipsis"
-      && cs.overflow !== "visible" ? ["cut off"] : [];
-    return [...out, ...cut].map(p => `${e.className || e.tagName}: ${p}`);
-  });
   return [
-    ...rows.map((row, i) => `row ${i + 1}: ${row.items.sort((a, b) => a.left - b.left).map(i => i.text).join(" | ")}`),
-    `lamps: ${lamps}; accented: ${accented.join(", ") || "nothing"}; ${Math.round(box.height)}px high`,
-    problems.length ? `problems: ${[...new Set(problems)].join("; ")}` : "fits",
+    `ring: ${ring.getAttribute("aria-label")}; ${status}; turning: ${anchor.classList.contains("busy")}; ${level}`,
+    `mode: ${mode}; over the chat: ${notes.join(" | ") || "nothing"}`,
+    problems.length ? `problems: ${problems.join("; ")}` : "fits",
   ].join("\n");
 });
 const command = async text => {
@@ -209,29 +198,30 @@ try {
   await page.locator("form input[type=password]").fill(token);
   await page.locator("form button[type=submit]").click();
   await page.locator(".composer textarea").waitFor();
-  await page.locator(".composer-status .activity.idle").waitFor({ state: "attached" });
+  await page.locator(".context-ring-anchor:not(.busy)").waitFor({ state: "attached" });
   await both("idle");
 
   // The agent at work, its subagent too.
   await command("survey the project");
   // The subagent tool at work (its call written), as the card had it.
-  await page.locator(".composer-status .activity", { hasText: "Running tools" }).waitFor();
+  await page.locator(".context-ring-anchor.busy [role=status]", { hasText: "Running tools" }).waitFor({ state: "attached" });
   await page.waitForFunction(() => document.querySelector(".chat")?.innerText.includes("main-go"));
   await both("working, a subagent running");
 
   // The agent done, its subagent still running.
   open("main-go");
-  await page.locator(".composer-status .activity.idle").waitFor({ state: "attached" });
+  await page.locator(".context-ring-anchor:not(.busy)").waitFor({ state: "attached" });
   await both("ready, a subagent running");
 
   // All done, and a mode on (Alt+M: ask).
   open("sub-go");
   // The agent answers its subagent's report: wait for that turn to end.
   await page.waitForFunction(() => document.querySelector(".chat")?.innerText.includes("The survey is in."));
-  await page.locator(".composer-status .activity.idle").waitFor({ state: "attached" });
-  const before = await page.locator(".composer .chip-anchor.mode").innerText();
+  await page.locator(".context-ring-anchor:not(.busy)").waitFor({ state: "attached" });
+  const mode = () => document.querySelector(".context-card .mode-line .status-detail-value")?.textContent;
+  const before = await page.evaluate(mode);
   await page.keyboard.press("Alt+m");
-  await page.waitForFunction(b => document.querySelector(".composer .chip-anchor.mode")?.innerText !== b, before);
+  await page.waitForFunction(([b, f]) => new Function(`return (${f})()`)() !== b, [before, mode.toString()]);
   await both("idle, a mode on");
 
   // The sidebar at its narrowest: still one line for the activity and the
@@ -280,10 +270,11 @@ try {
   await both("on a host with a long name");
   console.log(clean(await chips()));
 
-  // The context opens the session's details.
-  await page.locator(".composer-status button.context").click();
+  // The ring's card's Details open the session's details.
+  await page.locator(".composer .context-ring").click();
+  await page.locator(".context-card .context-details").click();
   await page.locator(".modal").waitFor();
-  section("the context opens the session's details");
+  section("the ring's card's Details open the session's details");
   console.log(clean(await page.locator(".modal h2, .modal .dialog-title").first().innerText()));
   await page.keyboard.press("Escape");
   await page.waitForSelector(".modal", { state: "detached" });
@@ -307,7 +298,7 @@ try {
     return window.innerWidth === 390 && box && box.right <= 390 && box.width > 0;
   });
   await page.evaluate(async () => {
-    const sizes = () => [".composer", ".composer-status", ".composer-row"]
+    const sizes = () => [".composer", ".context-ring", ".composer-row"]
       .map(s => document.querySelector(s)?.getBoundingClientRect())
       .map(r => r && `${r.left},${r.top},${r.width},${r.height}`).join(";");
     const frame = () => new Promise(requestAnimationFrame);

@@ -13,21 +13,20 @@ let%expect_test
     []
     Working in /work on main . Working in /work on main . Ask prigh anything…
     (Add files or images (or paste, or drop them here))
-    (Claude Opus 5.5)
-    (backend)
-    (provider's default)
-    (auto)
-    Ready (0%) $0.00
+    () Ready
+    Context 0 / 200k
+    0% used · compacts at 160k (80%)
+    This session $0.00
+    Tokens 0 in · 0 out
     Status Ready
-    Context 0 / 200k · 0%
-    Tokens 0 in · 0 out · 0 cached
-    Cost $0.0000
-    Thinking provider's default
+    Reasoning Medium
     Mode Auto: never asks
     Model Claude Opus 5.5
     Branch main
-    Click for the session’s details · /compact frees context
-    (Dictate (speak, then click again to stop)) (Send (Enter))
+    /compact to free context (Details)
+    (backend)
+    (Opus 5.5)
+    (Send (Enter))
     |}];
   H.show h ~selector:".send";
   [%expect
@@ -418,6 +417,7 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /todos show the model's plan (its update_plan steps)
     /permissions show the mode, the allow/ask/deny rules (config and this session) and the calls smart mode remembered, to forget (smart mode judges them again; the hosts they permitted ask again)
     /notify [on|off] tell you when a turn ends or something waits for you while the tab is hidden
+    /usage how much of your Claude and ChatGPT subscriptions' usage limits you have used, in Settings
     /memory [on|off] your notes the model saves when you ask it to remember something, in Settings; on or off gives the model the memory tool or takes it away
     /instructions [on|off] your custom instructions, in the context of every session, in Settings; on or off lets the model add, edit and remove them or not
     /user-info what you set about yourself for the model (name, country, units...), given to it in every session, in Settings
@@ -425,7 +425,6 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /generate-model [MODEL|off] pick the model that drafts commit messages, pull requests and branch names (✦ Generate); MODEL|off: draft them with MODEL (off: the session's)
     /approval-model [MODEL|off] pick the model that judges tool calls in smart mode; MODEL|off: judge them with MODEL (off: the session's)
     /naming [model MODEL|off] show which model names sessions and subagents; model MODEL|off: name them with MODEL (off: the drafting model, else the session's)
-    /dictation [model MODEL|off] show which model transcribes dictation (speech to text); model MODEL|off: transcribe with MODEL, an OpenAI or OpenAI-compatible provider's (off: openai/gpt-4o-mini-transcribe)
     /compaction [at|model|mask ...] show when conversations are compacted and what summarises them; at TOKENS|off: also once the context exceeds TOKENS, not only at 80% of the window; model MODEL|off: the model that writes the summaries (off: the session's); mask on|off: replace old tool outputs with placeholders first
     /diff [path] show the uncommitted changes where the tools run, untracked files too
     /review [worktree] [--base REV] the review page, the changes file by file to approve, comment on and edit (Alt+R): of the session's worktree or another (its branch, path or name), against its base or REV; /review BASE [instructions] (HEAD: the uncommitted changes) has the model review them for prioritised findings

@@ -194,10 +194,12 @@ let run_foreground (context : Tool.Context.t) args =
     if not (String.is_empty complete)
     then context.on_output (Utf8.sanitize complete)
   in
+  let marker = Stray_processes.marker () in
   let exit =
     Process.run
       ~env:context.env
       ~cwd:context.cwd
+      ~extra_env:[ Stray_processes.variable, marker ]
       ?input:context.stdin
       ~timeout
       ~cancel:context.cancel
@@ -209,6 +211,19 @@ let run_foreground (context : Tool.Context.t) args =
   in
   if not (String.is_empty !pending)
   then context.on_output (Utf8.sanitize !pending);
+  (* A killed command's tree may still be dying: only one that finished
+     by itself is looked at. *)
+  let strays =
+    match exit with
+    | Exited _ | Signaled _ -> Stray_processes.find ~marker
+    | Timed_out | Cancelled -> []
+  in
+  Option.iter (Stray_processes.note strays) ~f:(fun note ->
+      let so_far = Buffer.contents output in
+      on_data
+        (if String.is_empty so_far || String.is_suffix so_far ~suffix:"\n"
+         then note ^ "\n"
+         else "\n" ^ note ^ "\n"));
   let full = Buffer.contents output in
   let truncated = Truncate.head_and_tail full in
   let text =
@@ -496,7 +511,7 @@ let run_auto (context : Tool.Context.t) background args ~after =
          ~output:(Background_tasks.Task.output task))
 ;;
 
-let run (context : Tool.Context.t) args =
+let run_checked (context : Tool.Context.t) args =
   match context.background with
   | Some background when Option.is_some (auto_background context args) ->
     run_auto
@@ -531,6 +546,16 @@ let run (context : Tool.Context.t) args =
     Tool.Result.ok
       (started_message ~subagent:(context.depth > 0) ~id ~command ())
   | _ -> run_foreground context args
+;;
+
+let run context args =
+  match
+    Polling_wait.check
+      ?timeout:(Tool_args.int_opt args "timeout")
+      (Tool_args.string args "command")
+  with
+  | Some refusal -> Tool.Result.error refusal
+  | None -> run_checked context args
 ;;
 
 let tool = { Tool.spec; run }

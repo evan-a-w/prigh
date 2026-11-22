@@ -58,9 +58,18 @@ val resource_metadata_urls : url:string -> Challenge.t option -> string list
     inserted, then appended). *)
 val server_metadata_urls : issuer:string -> string list
 
+(** The name prigh gives itself, as an OAuth client and an MCP client,
+    unless configured otherwise: ["prigh"]. *)
+val default_client_name : string
+
 (** The challenge of the server at [url] to a request without a token
-    (an [initialize]), if it answers 401 with one. *)
-val probe : env:Env.t -> url:string -> Challenge.t option
+    (an [initialize] from [client_name], by default
+    {!default_client_name}), if it answers 401 with one. *)
+val probe
+  :  env:Env.t
+  -> url:string
+  -> client_name:string option
+  -> Challenge.t option
 
 (** Finds the authorization server of the MCP server at [url] (which
     answered 401 with [challenge]). The error says what is missing. *)
@@ -94,13 +103,19 @@ module Client : sig
   val of_json : Json.t -> t Or_error.t
 end
 
-(** Dynamic Client Registration of a public client ("prigh") with
-    [redirect_uri]. Errors when the server has no registration endpoint,
-    saying to configure a client id. *)
+(** Dynamic Client Registration of a public client named [client_name]
+    with [redirect_uri]. Without a name it registers as
+    {!default_client_name} and, when the server refuses that with 403 (as
+    Figma's does every client it does not know), as ["Claude Code"]. A
+    secret the server issues anyway is sent back with Basic
+    authentication. Errors when the server has no registration endpoint,
+    saying to configure a client id, or refuses the name, saying to
+    configure one it accepts. *)
 val register
   :  env:Env.t
   -> Server_metadata.t
   -> redirect_uri:string
+  -> client_name:string option
   -> Client.t Or_error.t
 
 (** The authorization request (code, S256 PKCE, [state], [resource]). *)

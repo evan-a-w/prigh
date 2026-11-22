@@ -604,32 +604,10 @@ kbd {
 .scrim { display: none; }
 
 
-/* The thinking level, the mode and the verbosity: quiet words, not buttons,
-   until pointed at; their menus open over them. A mode where nothing asks
-   is lit, as is plan. */
-.session-chips { display: flex; align-items: center; gap: 2px; flex-shrink: 0; position: relative; }
-.session-chips .chip-button {
-  height: 26px;
-  padding: 0 7px;
-  gap: 6px;
-  border-color: transparent;
-  background: none;
-  color: var(--muted);
-  font: 12px var(--sans);
-}
-.session-chips .chip-button:not(.awaiting):is(:hover, :focus-visible),
-.session-chips .chip-anchor.open > .chip-button { background: var(--slate-2); color: var(--chalk); }
-.session-chips .chip-button .icon { width: 12px; height: 12px; }
-.session-chips .thinking-chip.unsupported { color: var(--faint); }
-.session-chips .mode-chip.never-asks, .session-chips .mode-chip.plan-mode, .session-chips .mode-chip.chat-mode { color: var(--sodium); }
 
-/* The context's gauge and its details, over it on hover (to the keyboard
-   they are its description): what the
-   header has no room for, in two columns, figures in mono. */
-.status-gauge { position: relative; display: inline-flex; }
 .status-details {
   position: absolute;
-  top: calc(100% + 10px);
+  bottom: calc(100% + 10px);
   right: -8px;
   z-index: var(--z-menu-surface);
   display: grid;
@@ -651,12 +629,6 @@ kbd {
   transition: opacity 0.12s ease-out, transform 0.12s ease-out, visibility 0s 0.12s;
   pointer-events: none;
 }
-.status-gauge:is(:hover, :focus-within) > .status-details {
-  visibility: visible;
-  opacity: 1;
-  transform: none;
-  transition-delay: 0.15s, 0.15s, 0s;
-}
 .status-detail { display: contents; }
 .status-detail-key { color: var(--faint); }
 .status-detail-value { color: var(--chalk); font: 11.5px var(--mono); text-align: right; overflow: hidden; text-overflow: ellipsis; }
@@ -664,7 +636,6 @@ kbd {
 .status-detail:is(.context, .cost).hot .status-detail-value { color: var(--brick); }
 .status-detail-hint { grid-column: 1 / -1; padding-top: 6px; border-top: 1px solid var(--rule); color: var(--faint); font-size: 11.5px; }
 @media (prefers-reduced-motion: reduce) { .status-details { transition: none; } }
-@media (hover: none) { .status-gauge:not(:focus-within) > .status-details { display: none; } }
 
 .session-name {
   display: inline-flex;
@@ -778,8 +749,8 @@ kbd {
   --composer-inset: 14px; /* one left edge: the text, the +, the chips */
 }
 /* One card, one surface: what you write, then one row right under it: the
-   + and where the message goes (model, host) on the left, the microphone
-   and send on the right. The accent is spent on send alone; focus brightens
+   + and where the message goes (model, host) on the left, the status and
+   send on the right. The accent is spent on send alone; focus brightens
    the edge rather than painting it. */
 .composer-stack {
   position: relative;
@@ -791,10 +762,8 @@ kbd {
   box-shadow: 0 8px 24px -14px var(--edge-shadow);
   transition: border-color 0.15s, box-shadow 0.15s;
 }
-.composer-stack:focus-within {
-  border-color: color-mix(in srgb, var(--sodium) 45%, var(--rule-2));
-  box-shadow: 0 0 0 3px var(--sodium-wash), 0 8px 24px -14px var(--edge-shadow);
-}
+/* Typing in it: the border a shade lighter, no glow. */
+.composer-stack:focus-within { border-color: var(--faint-line); }
 .composer-box {
   position: relative;
   padding: 10px calc(var(--composer-inset) - 6px) 6px;
@@ -859,8 +828,8 @@ kbd {
 .composer-row { display: flex; align-items: center; gap: 4px; min-height: 32px; min-width: 0; }
 .composer-plus { position: relative; display: flex; flex-shrink: 0; }
 .composer-plus.menu-open { z-index: var(--z-menu-anchor); }
-/* One size of control: 32px circles, 18px icons of one weight. + and the
-   microphone are quiet until pointed at; send is filled. */
+/* One size of control: 32px circles, 18px icons of one weight. + is quiet
+   until pointed at; send is filled. */
 .round.btn {
   width: 32px;
   height: 32px;
@@ -875,8 +844,6 @@ kbd {
   .btn.ghost.round:not(:disabled):hover { background: var(--slate-2); color: var(--chalk); }
 }
 .chip-anchor.open > .btn.plus { background: var(--slate-2); color: var(--chalk); }
-.chip-anchor.open > .btn.plus .icon { transform: rotate(45deg); }
-.btn.plus .icon { transition: transform 0.15s ease-out; }
 .composer-buttons { display: flex; align-items: center; gap: 4px; flex-shrink: 0; margin-left: auto; }
 /* Send: a sodium disc; with nothing to send, an empty ring. Running with
    nothing typed, the disc stops. */
@@ -887,52 +854,18 @@ kbd {
   opacity: 1;
 }
 .composer-buttons .send:disabled .icon { color: var(--faint); }
-.composer-buttons .stop .icon { width: 12px; height: 12px; }
-.composer-buttons .stop.ghost { background: var(--brick-wash); border-color: transparent; color: var(--brick); }
+.composer-row .stop .icon { width: 12px; height: 12px; }
+.composer-row > .stop.ghost { background: var(--brick-wash); border-color: transparent; color: var(--brick); }
 .composer-buttons .stop.primary { background: var(--sodium); border-color: var(--sodium); color: var(--sodium-ink); }
 .composer-buttons .stop.primary .icon { color: var(--sodium-ink); fill: currentColor; }
-/* Listening: the microphone is a brick disc; the row says how long and how
-   loud, at the buttons' height, on no surface of its own. */
-.btn.mic.on { background: var(--brick); border-color: var(--brick); }
-.btn.mic.on .icon { color: var(--graphite); }
-.btn.mic:disabled { opacity: 0.6; }
-.dictation {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-  flex: 1 1 auto;
-  height: 32px;
-  padding: 0 4px 0 6px;
-  color: var(--muted);
-  font-size: 13px;
-  animation: popover-rise 0.12s ease-out;
-}
-.dictation-dot {
-  --level: 0;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--brick);
-  flex-shrink: 0;
-  box-shadow: 0 0 0 calc(var(--level) * 7px) var(--brick-line);
-  transition: box-shadow 0.1s linear;
-}
-.dictation-time { font-variant-numeric: tabular-nums; color: var(--chalk); }
-.dictation-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.dictation .lamp { flex-shrink: 0; }
-.dictation-cancel.btn { width: 28px; height: 28px; padding: 0; border-radius: 50%; color: var(--faint); margin-left: auto; }
-.dictation-cancel .icon { width: 12px; height: 12px; }
 @media (prefers-reduced-motion: reduce) {
-  .dictation-dot { transition: none; box-shadow: none; }
   .btn.plus .icon { transition: none; }
   .composer-stack { transition: none; }
 }
 
-/* Where the message goes: beside the +, on the card's own surface, taking
-   what the buttons leave (names are cut with an ellipsis; a narrow
-   composer shows the host as its server alone). */
-.composer-controls { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 0; }
+/* Where the message goes: at the right, before the ring and send, on the
+   card's own surface (names are cut with an ellipsis; a narrow composer
+   shows the host as its server alone). */
 /* Settings of the message, quiet words until pointed at. Their chevrons
    (and a hover's wash) say they open something; the pickers are the
    commands' own. */
@@ -958,7 +891,6 @@ kbd {
 }
 .chip-button:focus-visible { outline-offset: 0; }
 .chip-button .icon { width: 13px; height: 13px; color: currentColor; flex-shrink: 0; }
-.composer-controls .chip-button > .icon:first-child { display: none; }
 .chip-button .chevron { width: 11px; height: 11px; opacity: 0.6; transition: opacity 0.12s, transform 0.15s; }
 .chip-button:is(:hover, :focus-visible) .chevron { opacity: 1; }
 .model-chip { color: var(--muted); }
@@ -968,8 +900,6 @@ kbd {
 .chip-anchor { position: relative; display: flex; min-width: 0; flex-shrink: 0; }
 .chip-anchor.model, .chip-anchor.model > .model-chip { flex-shrink: 1; }
 .chip-anchor.model .chip-label { min-width: 4ch; }
-/* Short of room, the model without its family (Composer_view.model_label). */
-.app.narrow .model-family { display: none; }
 /* Where tools run: its server icon always, the name cut before the model's. */
 .composer-controls .host-chip > .icon:first-child { display: inline-block; }
 .chip-anchor.host, .chip-anchor.host > .host-chip { flex-shrink: 6; min-width: 52px; }
@@ -1085,7 +1015,7 @@ kbd {
 }
 .composer-stack.completing { border-top-left-radius: 0; border-top-right-radius: 0; }
 .composer-stack.completing > .composer-box { border-top: 1px solid var(--rule); border-radius: 0; }
-.composer-stack.completing:focus-within > .popup { border-color: color-mix(in srgb, var(--sodium) 45%, var(--rule-2)); }
+.composer-stack.completing:focus-within > .popup { border-color: var(--faint-line); }
 .popup-title {
   display: flex;
   justify-content: space-between;
@@ -1711,11 +1641,6 @@ kbd {
 .panel-toggles > .btn.icon { width: 28px; height: 28px; color: var(--faint); }
 .panel-toggles > .btn.icon:hover { color: var(--chalk); }
 
-/* The thinking level and what asks first, beside the model: always shown,
-   each opening its picker. Plan mode holds the agent back, so it is lit. */
-.chip-key { opacity: 0.75; }
-.thinking-chip.unsupported { color: var(--faint); }
-.mode-chip.plan-mode, .composer-box:focus-within .mode-chip.plan-mode:not(:hover), .mode-chip.chat-mode, .composer-box:focus-within .mode-chip.chat-mode:not(:hover) { color: var(--sodium); background: var(--sodium-wash); }
 
 /* Queued steers and follow-ups, above the composer while they wait. */
 .queue {
@@ -1800,8 +1725,6 @@ kbd {
 @container composer (width < 600px) {
   .composer-controls .chip-key, .composer-controls .chevron { display: none; }
   .composer-controls .chip-button > .icon:first-child { display: inline-block; }
-  .composer-controls .mode-chip:not(.awaiting) .chip-label { display: none; }
-  .composer-controls .mode-chip:not(.awaiting)::after { content: attr(data-short); }
   .composer-controls .chip-button { padding: 0 7px; gap: 5px; }
   /* The host is its server alone (its name in the tooltip and its menu),
      so the model keeps its name. */
@@ -2129,7 +2052,7 @@ kbd {
   display: flex;
   flex-direction: column;
   border-bottom-left-radius: 4px;
-  animation: popover-rise 0.12s ease-out;
+  animation: popover-lift 0.1s ease-out;
   overflow: hidden;
 }
 .chip-popover[data-placement="below"] {
@@ -2138,9 +2061,9 @@ kbd {
   border-bottom-left-radius: var(--r-surface);
   border-top-left-radius: 4px;
 }
-.chip-popover[data-chip="model"] { width: 340px; }
-.chip-popover[data-chip="mode"] { width: 360px; }
 @keyframes popover-rise { from { opacity: 0; transform: translateY(4px); } }
+/* A menu is opaque from its first frame: only its place moves. */
+@keyframes popover-lift { from { transform: translateY(4px); } }
 .popover-head, .popover-search {
   display: flex;
   align-items: center;
@@ -2172,28 +2095,16 @@ kbd {
   outline: none;
   scrollbar-width: thin;
 }
-.popover-group + .popover-group { border-top: 1px solid var(--rule); margin-top: 4px; padding-top: 4px; }
-.popover-group > .menu-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 4px 10px 3px 32px; }
-.popover-note { color: var(--faint); font-size: 11.5px; font-weight: 400; }
 .popover-item { gap: 8px; padding: 6px 10px 6px 8px; border-radius: 0 var(--r-control) var(--r-control) 0; }
 .popover-item.selected { box-shadow: inset 2px 0 0 var(--sodium); }
 .popover-item.dimmed .menu-text { opacity: 0.55; }
 .popover-item .menu-text { flex: 1; }
 .popover-item .menu-label { font-size: 13.5px; }
-.chip-popover[data-chip="thinking"] .menu-label { display: inline-block; }
-.chip-popover[data-chip="thinking"] .menu-label::first-letter { text-transform: uppercase; }
-.chip-popover[data-chip="mode"] .menu-detail { white-space: normal; }
 .popover-check { --mark-size: 14px; width: 16px; }
-.popover-aside { color: var(--faint); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .popover-empty { padding: 14px 12px; color: var(--muted); font-size: 12.5px; }
 .popover-hint { flex-shrink: 0; padding: 8px 12px; border-top: 1px solid var(--rule); color: var(--muted); font-size: 12px; line-height: 1.45; }
 .popover-hint code { font: 11.5px var(--mono); color: var(--chalk); }
 .chip-popover > .menu-keys { flex-shrink: 0; padding: 6px 12px 7px; }
-/* Thinking's effort, as rising bars: lit up to the level. */
-.thinking-meter { display: inline-flex; align-items: flex-end; gap: 2px; height: 12px; flex-shrink: 0; }
-.thinking-meter > .bar { width: 3px; border-radius: 1px; background: var(--rule-2); }
-.thinking-meter > .bar.on { background: var(--muted); }
-.popover-item.marked .thinking-meter > .bar.on { background: var(--sodium); }
 @media (prefers-reduced-motion: reduce) {
   .chip-popover { animation: none; }
   .chip-anchor.open > .chip-button .chevron { transition: none; }
@@ -2350,3 +2261,295 @@ kbd {
    nothing runs its tools. */
 .chip-anchor.host:has(> .host-chip:is(.chatting, .warm)),
 .composer-controls .host-chip:is(.chatting, .warm) { flex-shrink: 0; }
+
+/* Settings → Usage (lib/usage_view.ml): a window's share used as a bar the
+   row's width, the figure after it in the mono face so the rows line up.
+   Sodium as it fills up, brick near the limit. */
+.usage-window.setting-wide { gap: 8px; }
+.usage-meter { display: flex; align-items: center; gap: 12px; width: 100%; }
+.usage-track {
+  flex: 1; min-width: 0; height: 6px; border-radius: 3px;
+  background: var(--well); box-shadow: inset 0 0 0 1px var(--rule); overflow: hidden;
+}
+.usage-fill { height: 100%; border-radius: 3px; background: var(--muted); transition: width 0.3s ease-out; }
+.usage-meter.high .usage-fill { background: var(--sodium); }
+.usage-meter.full .usage-fill { background: var(--brick); }
+.usage-percent {
+  flex: none; min-width: 8ch; text-align: right;
+  font: 12px var(--mono); font-variant-numeric: tabular-nums; color: var(--muted);
+}
+.usage-meter.full .usage-percent { color: var(--brick); }
+@media (prefers-reduced-motion: reduce) { .usage-fill { transition: none; } }
+
+/* {1 The composer's row}
+
+   The paperclip and the context ring at the left; at the right the host,
+   the model (its provider's mark, its short name, the reasoning level
+   quieter) and send. */
+.composer-row > .composer-buttons { margin-left: 0; }
+.composer-controls { flex: 0 1 auto; margin-left: auto; display: flex; align-items: center; gap: 2px; min-width: 0; }
+.composer-controls .model-chip { gap: 6px; font-weight: 400; }
+.model-chip .provider-mark { width: 14px; height: 14px; color: var(--muted); }
+.provider-mark { stroke-width: 1.7; }
+
+/* The context ring, by the paperclip: a 30px ring in a 44px target, the accent filling it to
+   the context used, amber near where it compacts and brick from there. A
+   short arc turns round it while the agent works. */
+.context-ring-anchor { position: relative; display: flex; flex-shrink: 0; }
+.context-ring-anchor.open { z-index: var(--z-menu-anchor); }
+.context-ring {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  margin: -4px 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--sodium);
+  cursor: pointer;
+}
+.context-ring::before { content: ""; position: absolute; inset: -4px; border-radius: 50%; }
+.context-ring.warm { color: var(--accent-orange); }
+.context-ring.hot { color: var(--brick); }
+.context-ring:focus-visible { outline: 2px solid var(--sodium-line); outline-offset: -2px; }
+@media (hover: hover) { .context-ring:hover { background: var(--slate-2); } }
+.context-ring-anchor.open > .context-ring { background: var(--slate-2); }
+.context-ring-svg { width: 26px; height: 26px; overflow: visible; }
+.context-ring-svg circle { fill: none; stroke-width: 3; }
+.context-ring-track { stroke: var(--rule-2); }
+.context-ring-fill { stroke: currentColor; stroke-linecap: round; transition: stroke-dasharray 0.3s ease-out; }
+.context-ring-spin { stroke: var(--chalk); stroke-linecap: round; opacity: 0; transform-origin: 15px 15px; }
+.context-ring-anchor.busy .context-ring-spin { opacity: 0.55; animation: ring-spin 1.1s linear infinite; }
+@keyframes ring-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .context-ring-anchor.busy .context-ring-spin { animation: none; opacity: 0; }
+  .context-ring-anchor.busy .context-ring-track { stroke: var(--sodium-line); }
+}
+
+/* Its card, above it: pointed at or focused (with a moment's delay), or
+   tapped open. */
+/* By the paperclip, it opens rightward. */
+.context-card {
+  left: -8px;
+  right: auto;
+  grid-template-columns: 1fr auto;
+  width: 260px;
+  white-space: normal;
+  pointer-events: auto;
+}
+@media (hover: hover) {
+  .context-ring-anchor:is(:hover, :focus-within) > .context-card {
+    visibility: visible;
+    opacity: 1;
+    transform: none;
+    transition-delay: 0.15s, 0.15s, 0s;
+  }
+}
+.context-ring-anchor.open > .context-card { visibility: visible; opacity: 1; transform: none; transition-delay: 0s; }
+.context-card-head { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.context-card-title { color: var(--chalk); font-weight: 600; font-size: 12.5px; }
+.context-card-of { color: var(--chalk); font: 12px var(--mono); }
+.context-bar { grid-column: 1 / -1; position: relative; height: 6px; border-radius: 3px; background: var(--rule); }
+.context-bar-fill { position: absolute; inset: 0 auto 0 0; border-radius: 3px; background: var(--sodium); }
+.context-bar.warm .context-bar-fill { background: var(--accent-orange); }
+.context-bar.hot .context-bar-fill { background: var(--brick); }
+.context-bar-mark { position: absolute; top: -2px; bottom: -2px; width: 2px; margin-left: -1px; background: var(--faint); border-radius: 1px; }
+.context-card-sub { grid-column: 1 / -1; color: var(--faint); font-size: 11.5px; margin-top: -2px; }
+.context-card-rule { grid-column: 1 / -1; border-top: 1px solid var(--rule); }
+.context-card-foot { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 6px; border-top: 1px solid var(--rule); }
+.context-card-foot > .status-detail-hint { border: 0; padding: 0; font: 11.5px var(--mono); }
+.context-card-foot .btn { height: 28px; padding: 0 10px; font-size: 12px; }
+.context-card-foot .context-details { color: var(--muted); }
+
+/* {1 The model menu}
+
+   A rail of the favourites and the providers; the search over the tab's
+   models; the current model's reasoning levels; the access mode in its
+   foot. */
+/* Not clipped: the access mode's menu rises out of its foot, over the rest
+   (and past its top when the list is short); the body clips its own. */
+.chip-popover.model-menu {
+  width: 600px;
+  max-height: min(30rem, var(--popover-room, 70vh));
+  overflow: visible;
+}
+.model-menu-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  overflow: hidden;
+  border-top-left-radius: inherit;
+  border-top-right-radius: inherit;
+}
+.model-rail {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 48px;
+  padding: 6px 0;
+  border-right: 1px solid var(--rule);
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.model-rail-tab {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-control);
+  background: none;
+  color: var(--faint);
+  cursor: pointer;
+}
+.model-rail-tab .icon { width: 18px; height: 18px; }
+@media (hover: hover) { .model-rail-tab:hover { background: var(--slate-2); color: var(--chalk); } }
+.model-rail-tab.on { color: var(--chalk); background: var(--slate-2); }
+.model-rail-tab.on::before { content: ""; position: absolute; left: -6px; top: 8px; bottom: 8px; width: 3px; border-radius: 0 2px 2px 0; background: var(--sodium); }
+.model-rail-tab.favourites.on .icon { fill: currentColor; }
+.model-rail-rule { width: 22px; border-top: 1px solid var(--rule); margin: 4px 0; }
+.model-menu-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+.model-list-head { padding: 8px 14px 2px; color: var(--faint); font-size: 11.5px; font-weight: 600; }
+.model-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 34px;
+  padding: 0 6px 0 10px;
+  border-radius: var(--r-control);
+  color: var(--chalk);
+  font-size: 13.5px;
+  cursor: pointer;
+}
+.model-row.selected { background: var(--slate-2); }
+@media (hover: hover) { .model-row:hover { background: var(--slate-2); } }
+.model-row .provider-mark { width: 15px; height: 15px; color: var(--muted); flex: none; }
+.model-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.model-provider { margin-left: 8px; color: var(--faint); font-size: 12px; }
+.model-key {
+  flex: none;
+  padding: 1px 5px;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-chip);
+  color: var(--faint);
+  font: 10.5px var(--mono);
+}
+.model-star {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-control);
+  background: none;
+  color: var(--faint);
+  cursor: pointer;
+  opacity: 0;
+}
+.model-star .icon { width: 14px; height: 14px; }
+.model-star.on { opacity: 1; color: var(--sodium); }
+.model-star.on .icon { fill: currentColor; }
+.model-row:is(:hover, .selected) .model-star, .model-star:focus-visible { opacity: 1; }
+@media (hover: none) { .model-star { opacity: 1; } }
+@media (hover: hover) { .model-star:hover { color: var(--chalk); background: var(--slate); } }
+.model-check { --mark-size: 14px; width: 16px; flex: none; color: var(--sodium); }
+.model-more { color: var(--muted); font-size: 12.5px; }
+.model-more-icon { width: 13px; height: 13px; }
+
+.model-reasoning {
+  flex: none;
+  width: 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 6px;
+  border-left: 1px solid var(--rule);
+  overflow-y: auto;
+}
+.model-reasoning-head { display: flex; align-items: baseline; gap: 6px; padding: 6px 8px 6px; }
+.model-reasoning-title { color: var(--chalk); font-weight: 600; font-size: 12.5px; }
+.model-reasoning-model { color: var(--faint); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.model-reasoning-note { padding: 4px 8px; color: var(--faint); font-size: 12px; }
+.reasoning-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--r-control);
+  background: none;
+  color: var(--chalk);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+@media (hover: hover) { .reasoning-row:hover { background: var(--slate-2); } }
+.reasoning-label { flex: 1; }
+.reasoning-default { color: var(--faint); font-size: 11.5px; }
+.reasoning-check { --mark-size: 14px; width: 16px; flex: none; color: var(--sodium); }
+
+.model-menu-foot {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 6px 4px 12px;
+  border-top: 1px solid var(--rule);
+}
+.model-menu-foot > .menu-keys { padding: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.model-access { position: relative; flex: none; }
+.model-access-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--r-control);
+  background: none;
+  color: var(--muted);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.model-access-button .icon { width: 14px; height: 14px; }
+.model-access-button .chevron { width: 11px; height: 11px; transform: rotate(180deg); }
+.model-access.open .model-access-button .chevron { transform: none; }
+.model-access-button.never-asks { color: var(--sodium); }
+@media (hover: hover) { .model-access-button:hover { background: var(--slate-2); color: var(--chalk); } }
+.model-access.open .model-access-button { background: var(--slate-2); color: var(--chalk); }
+.model-access-menu {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 6px);
+  width: 260px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  z-index: 1;
+}
+.model-access-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: var(--r-control);
+  background: none;
+  color: var(--chalk);
+  text-align: left;
+  cursor: pointer;
+}
+.model-access-item > .icon { width: 14px; height: 14px; color: var(--muted); flex: none; }
+.model-access-item .menu-text { flex: 1; min-width: 0; }
+@media (hover: hover) { .model-access-item:hover { background: var(--slate-2); } }

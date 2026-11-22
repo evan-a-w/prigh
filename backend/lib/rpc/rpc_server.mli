@@ -99,11 +99,11 @@ val create
   -> ?mcp_auth:Mcp_auth.t
        (** the user's MCP sign-ins (the sessions' own), whose changes every
            client hears as [mcp_auth_changed] *)
-  -> ?transcription_http:Transcription.Http.t
-       (** where [transcribe] posts the audio (default: real HTTP) *)
   -> ?nix_store:Nix_store.t
        (** for superusers' [nix_store_status] and [nix_store_gc] (without
            it they fail) *)
+  -> ?usage_http:Subscription_usage.Http.t
+       (** where [usage_limits] asks the providers (default: real HTTP) *)
   -> login:Login_manager.t
   -> sessions_dir:string
   -> cwd:string
