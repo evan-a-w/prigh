@@ -1457,32 +1457,6 @@ kbd {
 .panel-toggles > .btn.icon:hover { color: var(--chalk); }
 
 
-/* Queued steers and follow-ups, above the composer while they wait. */
-.queue {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  max-height: 30vh;
-  overflow-y: auto;
-}
-.queue > .queued {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  align-items: start;
-  gap: 2px 12px;
-  padding: 5px 5px 5px 12px;
-  background: var(--well);
-  border-left: 2px solid var(--rule-2);
-  border-radius: var(--r-control);
-  animation: rise 0.12s ease-out;
-}
-.queued.steer { border-left-color: var(--sodium); }
-.queued-tag { font-size: 12px; line-height: 26px; color: var(--muted-text); white-space: nowrap; }
-.queued.steer .queued-tag { color: var(--sodium); }
-
 /* Steering a subagent: whom the composer writes to, over the editor. */
 .steer-chip {
   display: flex;
@@ -1507,34 +1481,6 @@ kbd {
 .steer-chip-close.btn.icon { width: 20px; height: 20px; flex-shrink: 0; color: var(--muted-text); }
 .steer-chip-close .icon { width: 11px; height: 11px; }
 .steer-chip-close:hover { color: var(--fg); }
-.queued-text {
-  padding: 3px 0;
-  font-size: 14px;
-  line-height: 1.45;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  overflow: hidden;
-}
-.queued-actions { display: flex; gap: 2px; }
-.queued-actions .btn { height: 26px; font-size: 12.5px; }
-.queued-edit { padding: 0 8px; }
-.queued-remove.btn.icon { width: 26px; height: 26px; }
-.queued-actions .btn > .icon { width: 13px; height: 13px; }
-.queued-remove:hover { color: var(--brick); }
-
-@media (max-width: 760px) {
-  .queued { grid-template-columns: minmax(0, 1fr) auto; padding-left: 10px; }
-  .queued-tag { grid-column: 1; line-height: 1.4; padding-top: 3px; }
-  .queued-text { grid-column: 1; padding-top: 0; }
-  .queued-actions { grid-column: 2; grid-row: 1 / span 2; }
-  .queued-action-label { display: none; }
-  .queued-edit.btn { width: 26px; padding: 0; }
-}
-
 /* The composer's steps, by its width. Short labels: the level alone, the
    mode's name. */
 @container composer (width < 600px) {
@@ -1840,7 +1786,6 @@ kbd {
   .copy { min-height: 32px; padding: 6px 12px; }
   .fold { min-height: 40px; }
   .tool-head .open-agent { min-height: 32px; padding: 0 10px; }
-  .queued-remove.btn.icon, .queued-edit.btn { min-width: 40px; min-height: 40px; }
   .btn.icon { min-width: 36px; min-height: 36px; }
 }
 
@@ -2131,7 +2076,7 @@ kbd {
 .context-ring:focus-visible { outline: 2px solid var(--sodium-line); outline-offset: -2px; }
 @media (hover: hover) { .context-ring:hover { background: var(--slate-2); } }
 .context-ring-anchor.open > .context-ring { background: var(--slate-2); }
-.context-ring-svg { width: 26px; height: 26px; overflow: visible; }
+.context-ring-svg { width: 20px; height: 20px; overflow: visible; }
 .context-ring-svg circle { fill: none; stroke-width: 3; }
 .context-ring-track { stroke: var(--rule-2); }
 .context-ring-fill { stroke: currentColor; stroke-linecap: round; transition: stroke-dasharray 0.3s ease-out; }

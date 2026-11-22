@@ -531,7 +531,7 @@ let%expect_test "with one host the chip still names it, and says how to add one"
     <button class="btn chip-button host-chip">
     (Sessions (Ctrl+B))
     New session
-    (Filter the transcript (/filter)) (Files (Ctrl+Shift+F)) (Terminal (Ctrl+`)) (Review changes (Alt+R)) (Subagents and worktrees)
+    (Filter the transcript (/filter)) (Files (Ctrl+Shift+F)) (Terminal (Ctrl+`)) (Review changes (Alt+R))
     (Settings (Ctrl+, or /settings))
     |}]
 ;;
@@ -642,17 +642,7 @@ let%expect_test "without the docked sidebar, the chrome floats over the chat" =
                   @on_click>
             <icon class="review"> </icon>
           </button>
-          <button type="button"
-                  data-slot="button"
-                  data-variant="ghost"
-                  data-size="icon-sm"
-                  title="Subagents and worktrees"
-                  aria-label="Session card"
-                  aria-pressed="true"
-                  class="[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0 active:not-aria-[haspopup]:translate-y-px aria-expanded:bg-muted aria-expanded:text-foreground aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-accent bg-clip-padding border border-transparent dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:hover:bg-muted/50 disabled:opacity-50 disabled:pointer-events-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 font-medium group/button hover:bg-muted hover:text-foreground in-data-[slot=button-group]:rounded-lg inline-flex items-center justify-center open outline-none rounded-[min(var(--radius-md),12px)] rounded-lg select-none session-card-toggle shrink-0 size-7 text-foreground text-sm transition-all whitespace-nowrap"
-                  @on_click>
-            <icon class="panel_right"> </icon>
-          </button>
+          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
         </div>
         <button type="button"
                 data-slot="button"
@@ -673,7 +663,7 @@ let%expect_test "without the docked sidebar, the chrome floats over the chat" =
     {|
     (Sessions (Ctrl+B))
     New session
-    (Filter the transcript (/filter)) (Files (Ctrl+Shift+F)) (Terminal (Ctrl+`)) (Review changes (Alt+R)) (Subagents and worktrees)
+    (Filter the transcript (/filter)) (Files (Ctrl+Shift+F)) (Terminal (Ctrl+`)) (Review changes (Alt+R))
     (Settings (Ctrl+, or /settings))
     |}];
   (* Its toggle brings the sidebar back, and the card with it. *)
@@ -1213,7 +1203,7 @@ let%expect_test "the context ring: idle, running, and what applies" =
   [%expect
     {|
     (Sessions (Ctrl+B))
-    (Filter the transcript (/filter)) (Files (Ctrl+Shift+F)) (Terminal (Ctrl+`)) (Review changes (Alt+R)) (Subagents and worktrees)
+    (Filter the transcript (/filter)) (Files (Ctrl+Shift+F)) (Terminal (Ctrl+`)) (Review changes (Alt+R))
     (Settings (Ctrl+, or /settings))
     |}]
 ;;

@@ -265,30 +265,71 @@ let%expect_test
   H.show h ~selector:".queue li:nth-child(2)";
   [%expect
     {|
-    Steers this turn main steer
+    Steer main steer
     (Edit) (Remove from the queue)
-    To a1, next step use the tests
+    To a1 use the tests
     (Edit) (Remove from the queue)
-    To a1, next step and the docs
+    To a1 and the docs
     (Edit) (Remove from the queue)
-    To a1, after its turn then summarise
+    To a1, after then summarise
     (Edit) (Remove from the queue)
-    <li class="queued steer to-agent">
-      <span title="Reaches subagent a1 after its current tool calls" class="queued-tag"> To a1, next step </span>
-      <span dir="auto" class="queued-text"> use the tests </span>
-      <div class="queued-actions">
+    <li class="bg-card border border-border flex gap-2 h-9 items-center max-w-[min(100%,36rem)] min-w-0 narrow:h-11 pl-3 pr-1 queued rounded-full shadow-xs steer text-[13px] to-agent">
+      <svg xmlns="http://www.w3.org/2000/svg"
+           width="24"
+           height="24"
+           viewBox="0 0 24 24"
+           fill="none"
+           stroke="currentColor"
+           stroke-width="2"
+           stroke-linecap="round"
+           stroke-linejoin="round"
+           class="lucide lucide-clock shrink-0 size-3.5 text-muted-foreground">
+        <circle cx="12" cy="12" r="10"> </circle>
+        <polyline points="12 6 12 12 16 14"> </polyline>
+      </svg>
+      <span title="Reaches subagent a1 after its current tool calls"
+            class="font-medium in-[.steer]:text-primary queued-tag shrink-0 text-foreground"> To a1 </span>
+      <span dir="auto"
+            title="use the tests"
+            class="min-w-0 queued-text text-muted-foreground truncate"> use the tests </span>
+      <div class="flex items-center queued-actions shrink-0">
         <button type="button"
                 title="Edit: take it back into the editor"
-                class="btn ghost queued-edit"
+                class="flex hover:bg-accent hover:text-foreground items-center justify-center narrow:size-11 queued-edit rounded-full shrink-0 size-7 text-muted-foreground"
                 @on_click>
-          <icon class="pencil"> </icon>
-          <span class="queued-action-label"> Edit </span>
+          <svg xmlns="http://www.w3.org/2000/svg"
+               width="24"
+               height="24"
+               viewBox="0 0 24 24"
+               fill="none"
+               stroke="currentColor"
+               stroke-width="2"
+               stroke-linecap="round"
+               stroke-linejoin="round"
+               class="lucide lucide-pencil size-3.5">
+            <path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"> </path>
+            <path d="m15 5 4 4"> </path>
+          </svg>
+          <span class="sr-only"> Edit </span>
         </button>
         <button type="button"
                 title="Remove from the queue"
-                class="btn ghost icon queued-remove"
+                class="flex hover:bg-accent hover:text-destructive items-center justify-center narrow:size-11 queued-remove rounded-full shrink-0 size-7 text-muted-foreground"
                 @on_click>
-          <icon class="close"> </icon>
+          <svg xmlns="http://www.w3.org/2000/svg"
+               width="24"
+               height="24"
+               viewBox="0 0 24 24"
+               fill="none"
+               stroke="currentColor"
+               stroke-width="2"
+               stroke-linecap="round"
+               stroke-linejoin="round"
+               class="lucide lucide-x size-3.5">
+            <path d="M18 6 6 18"> </path>
+            <path d="m6 6 12 12"> </path>
+          </svg>
+          <span class="sr-only"> Remove from the queue </span>
         </button>
       </div>
     </li>
@@ -311,11 +352,11 @@ let%expect_test
     (Rpc (method_ remove_agent_queued)
      (params ((agent_id a1) (queue steer) (index 1) (text "and the docs")))
      (tag (Unqueued "and the docs")))
-    Steers this turn main steer
+    Steer main steer
     (Edit) (Remove from the queue)
-    To a1, next step use the tests
+    To a1 use the tests
     (Edit) (Remove from the queue)
-    To a1, after its turn then summarise
+    To a1, after then summarise
     (Edit) (Remove from the queue)
     |}];
   H.reply h "remove_agent_queued" {|{"text":"and the docs"}|};
@@ -383,7 +424,7 @@ let%expect_test
      (params ((agent_id a1) (queue steer) (index 0) (text x)))
      (tag (Unqueued x)))
     (Rpc (method_ get_pending) (params ()) (tag Pending))
-    To a1, next step y
+    To a1 y
     (Edit) (Remove from the queue)
     |}]
 ;;
@@ -588,7 +629,7 @@ let%expect_test "switching sessions forgets the steering and the queues" =
   [%expect
     {|
     (Agent a1)
-    <ul class="queue">
+    <ul class="flex flex-col gap-1.5 items-end loon max-h-[30vh] overflow-y-auto queue">
     <div class="steer-chip">
     |}];
   H.quiet h (fun () ->

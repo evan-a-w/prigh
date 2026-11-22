@@ -345,11 +345,11 @@ let%expect_test
     (Close (Esc))
     Run bash: rm -rf build?
     (y Allow once) (n Deny) (r Deny, saying why)
-    Steers this turn a
+    Steer a
     (Edit) (Remove from the queue)
-    After this turn b
+    Queued b
     (Edit) (Remove from the queue)
-    After this turn c
+    Queued c
     (Edit) (Remove from the queue)
     |}];
   H.reply

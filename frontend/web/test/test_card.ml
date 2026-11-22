@@ -261,7 +261,7 @@ let%expect_test
     (Sessions (Ctrl+B))
     New session
     (plan 1/2: Final nix GC)
-    (Filter the transcript (/filter)) (Files (Ctrl+Shift+F)) (Terminal (Ctrl+`)) (Review changes (Alt+R)) (Subagents and worktrees)
+    (Filter the transcript (/filter)) (Files (Ctrl+Shift+F)) (Terminal (Ctrl+`)) (Review changes (Alt+R))
     (Settings (Ctrl+, or /settings))
     (Run /todos)
     (Focus dialog)
@@ -311,7 +311,6 @@ let%expect_test "a phone's chrome: the ⋯ opens the menu" =
     <button class="files-sheet-row files-toggle sheet-row">
     <button class="sheet-row terminal-row terminal-toggle">
     <button class="review-row review-toggle sheet-row">
-    <button class="on session-card-row session-card-toggle sheet-row">
     <button class="settings-row sheet-row">
     button "Panels and settings"
     Toggle_status_tray

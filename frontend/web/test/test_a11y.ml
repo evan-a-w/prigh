@@ -38,7 +38,6 @@ let%expect_test "the names of the controls" =
     button "Files" -- Files (Ctrl+Shift+F)
     button "Terminal" -- Terminal (Ctrl+`)
     button "Review changes" -- Review changes (Alt+R)
-    button "Session card" -- Subagents and worktrees
     button "Add files or images" -- Add files or images (or paste, or drop them here)
     button "Context 0% full, $0.00: details"
     button "Details" -- The session's details (/session)

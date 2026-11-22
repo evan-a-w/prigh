@@ -4,53 +4,83 @@ open Html
 module Action = App.Action
 module Message = Queued.Message
 
+(* What it waits for: a word in the pill (lit for a steer), the rest in the
+   tooltip. *)
 let tag (recipient : Recipient.t) (kind : Message.Kind.t) =
   let text, title =
     match recipient, kind with
     | Main, Steer ->
-      ( "Steers this turn"
-      , "Reaches the agent after its current tool calls, in this turn" )
-    | Main, Follow_up ->
-      "After this turn", "Sent as the next prompt once the run ends"
+      "Steer", "Reaches the agent after its current tool calls, in this turn"
+    | Main, Follow_up -> "Queued", "Sent as the next prompt once the run ends"
     | Agent id, Steer ->
-      ( sprintf "To %s, next step" id
+      ( sprintf "To %s" id
       , sprintf "Reaches subagent %s after its current tool calls" id )
     | Agent id, Follow_up ->
-      ( sprintf "To %s, after its turn" id
+      ( sprintf "To %s, after" id
       , sprintf
           "Reaches subagent %s when it ends its turn, before it reports"
           id )
   in
   Node.span
-    ~attrs:[ Attr.class_ "queued-tag"; Attr.title title ]
+    ~attrs:
+      [ Attr.class_
+          "queued-tag shrink-0 font-medium text-foreground \
+           in-[.steer]:text-primary"
+      ; Attr.title title
+      ]
     [ Node.text text ]
+;;
+
+let action ~cls ~title ~label ~on_click glyph =
+  Node.button
+    ~attrs:
+      [ Attr.type_ "button"
+      ; Attr.class_
+          (cls
+           ^ " flex size-7 shrink-0 items-center justify-center rounded-full \
+              text-muted-foreground hover:bg-accent narrow:size-11")
+      ; Attr.title title
+      ; Attr.on_click (fun _ -> on_click)
+      ]
+    [ Loon.Icon.view ~class_:"size-3.5" glyph; span ~cls:"sr-only" label ]
 ;;
 
 let item ~inject (recipient : Recipient.t) (q : Message.t) =
   Node.li
     ~attrs:
       [ classes
-          [ "queued" ]
+          [ "queued"
+          ; "flex h-9 max-w-[min(100%,36rem)] min-w-0 items-center gap-2 \
+             rounded-full border border-border bg-card pr-1 pl-3 text-[13px] \
+             shadow-xs narrow:h-11"
+          ]
           [ "steer", Message.Kind.equal q.kind Steer
           ; "to-agent", not (Recipient.equal recipient Main)
           ]
       ]
-    [ tag recipient q.kind
+    [ Loon.Icon.view ~class_:"size-3.5 shrink-0 text-muted-foreground" Clock
+    ; tag recipient q.kind
     ; Node.span
-        ~attrs:[ Attr.class_ "queued-text"; Attr.create "dir" "auto" ]
+        ~attrs:
+          [ Attr.class_ "queued-text min-w-0 truncate text-muted-foreground"
+          ; Attr.create "dir" "auto"
+          ; Attr.title q.text
+          ]
         [ Node.text q.text ]
     ; div
-        ~cls:"queued-actions"
-        [ button
-            ~cls:"ghost queued-edit"
+        ~cls:"queued-actions flex shrink-0 items-center"
+        [ action
+            ~cls:"queued-edit hover:text-foreground"
             ~title:"Edit: take it back into the editor"
+            ~label:"Edit"
             ~on_click:(inject (Action.Edit_queued (recipient, q)))
-            [ icon Pencil; span ~cls:"queued-action-label" "Edit" ]
-        ; button
-            ~cls:"icon ghost queued-remove"
+            Pencil
+        ; action
+            ~cls:"queued-remove hover:text-destructive"
             ~title:"Remove from the queue"
+            ~label:"Remove from the queue"
             ~on_click:(inject (Action.Remove_queued (recipient, q)))
-            [ icon Close ]
+            X
         ]
     ]
 ;;
@@ -67,6 +97,11 @@ let view (m : App.Model.t) ~inject =
   | [] -> Node.none
   | items ->
     Node.ul
-      ~attrs:[ Attr.class_ "queue"; Attr.create "aria-label" "Queued messages" ]
+      ~attrs:
+        [ Attr.class_
+            "queue loon flex max-h-[30vh] flex-col items-end gap-1.5 \
+             overflow-y-auto"
+        ; Attr.create "aria-label" "Queued messages"
+        ]
       (List.map items ~f:(fun (recipient, q) -> item ~inject recipient q))
 ;;
