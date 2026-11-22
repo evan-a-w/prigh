@@ -808,13 +808,17 @@ let execute
       ~turn_limit:p.turn_limit
       ~prompts:[ prompt ]
   in
-  result, Option.some_if out_of_turns state
+  result, state, out_of_turns
 ;;
 
 (* What it is told when continued with a message: like a [subagent_message]
-   steer. *)
-let caller_message text =
-  let note = Injected.Note.steer ~from_user:false ~follow_up:false in
+   steer, or the user's. *)
+let continue_message ((from : Subagent_inbox.From.t), text) =
+  let note =
+    Injected.Note.steer
+      ~from_user:(Subagent_inbox.From.equal from User)
+      ~follow_up:false
+  in
   Message.user
     ~origin:{ Injected.empty with notes = [ note ] }
     (Injected.prefix_notes [ note ] text)
@@ -838,9 +842,9 @@ let continue_run
       state
       context
       ~turn_limit:(Option.value max_turns ~default:state.prepared.turn_limit)
-      ~prompts:(Option.to_list (Option.map message ~f:caller_message))
+      ~prompts:(Option.to_list (Option.map message ~f:continue_message))
   in
-  result, Option.some_if out_of_turns state
+  result, state, out_of_turns
 ;;
 
 let outcome_of (result : Tool.Result.t) ~parked =
@@ -855,27 +859,29 @@ let outcome_of (result : Tool.Result.t) ~parked =
   }
 ;;
 
-(* Parks a background subagent that ran out of turns under its task's
-   id. *)
-let rec background_outcome ~provider background ~id (result, state) =
-  Option.iter state ~f:(fun state ->
-    Background_tasks.park
-      background
-      id
-      (fun ~max_turns ~message ~inbox ~call_id:_ ~cancel ~emit ->
-         background_outcome
-           ~provider
-           background
-           ~id
-           (continue_run
-              ?inbox
-              ~provider
-              ~resumable:Background
-              state
-              { state.context with cancel; emit; on_output = ignore }
-              ~max_turns
-              ~message)));
-  outcome_of result ~parked:(Option.is_some state)
+(* Parks a background subagent under its task's id when it ends: out of
+   turns, for [subagent_continue]; otherwise for the user to carry on
+   with. *)
+let rec background_outcome ~provider background ~id (result, state, out_of_turns)
+  =
+  Background_tasks.park
+    background
+    id
+    ~out_of_turns
+    (fun ~max_turns ~message ~inbox ~call_id:_ ~cancel ~emit ->
+       background_outcome
+         ~provider
+         background
+         ~id
+         (continue_run
+            ?inbox
+            ~provider
+            ~resumable:Background
+            state
+            { state.context with cancel; emit; on_output = ignore }
+            ~max_turns
+            ~message));
+  outcome_of result ~parked:out_of_turns
 ;;
 
 (* A synchronous one is parked in its caller's tasks, which run it again
@@ -885,9 +891,10 @@ let rec park_sync ~provider tasks (state : State.t) =
   Background_tasks.park
     tasks
     state.agent_id
+    ~out_of_turns:true
     (fun ~max_turns ~message ~inbox:_ ~call_id ~cancel ~emit ->
        let call_id = Option.value call_id ~default:state.context.call_id in
-       let result, state =
+       let result, state, out_of_turns =
          continue_run
            ~provider
            ~resumable:(Sync tasks)
@@ -896,8 +903,8 @@ let rec park_sync ~provider tasks (state : State.t) =
            ~max_turns
            ~message
        in
-       Option.iter state ~f:(park_sync ~provider tasks);
-       outcome_of result ~parked:(Option.is_some state))
+       if out_of_turns then park_sync ~provider tasks state;
+       outcome_of result ~parked:out_of_turns)
 ;;
 
 let create
@@ -992,7 +999,7 @@ let create
            | None -> context.call_id
            | Some parent -> parent ^ "/" ^ context.call_id
          in
-         let result, state =
+         let result, state, out_of_turns =
            execute
              ~provider
              ~compaction
@@ -1004,9 +1011,9 @@ let create
              prepared
              ~agent_id
          in
-         (match resumable, state with
-          | Sync tasks, Some state -> park_sync ~provider tasks state
-          | (Background | Sync _ | No), _ -> ());
+         (match resumable with
+          | Sync tasks when out_of_turns -> park_sync ~provider tasks state
+          | Background | Sync _ | No -> ());
          result)
   in
   { Tool.spec; run }
@@ -1153,7 +1160,7 @@ let continue_tool =
       let outcome =
         resume
           ~max_turns
-          ~message
+          ~message:(Option.map message ~f:(fun m -> Subagent_inbox.From.Caller, m))
           ~inbox:None
           ~call_id:(Some context.call_id)
           ~cancel:context.cancel

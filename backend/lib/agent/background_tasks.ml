@@ -86,12 +86,19 @@ end
 module Resume = struct
   type t =
     max_turns:int option
-    -> message:string option
+    -> message:(Subagent_inbox.From.t * string) option
     -> inbox:Subagent_inbox.t option
     -> call_id:string option
     -> cancel:Cancellation.t
     -> emit:(Agent_event.t -> unit)
     -> Outcome.t
+end
+
+module Parked = struct
+  type t =
+    { resume : Resume.t
+    ; out_of_turns : bool
+    }
 end
 
 module Summary = struct
@@ -116,7 +123,7 @@ type t =
   ; mutable on_change : unit -> unit
   ; mutable on_queue_change : unit -> unit
   ; mutable auto_background : unit -> float option
-  ; parked : Resume.t String.Table.t
+  ; parked : Parked.t String.Table.t
   }
 
 let create ~env ~sw ~first_subagent_id ~first_job_id () =
@@ -593,14 +600,6 @@ let inbox_of t id =
             id)
 ;;
 
-let send t ~id kind ~from text =
-  if String.is_empty (String.strip text)
-  then Or_error.error_string "the message is empty: type what to tell the agent"
-  else
-    Or_error.bind (inbox_of t id) ~f:(fun inbox ->
-      Subagent_inbox.push inbox kind ~from text)
-;;
-
 let queues t =
   List.filter_map (tasks t ~kind:Subagent) ~f:(fun task ->
     Option.bind task.inbox ~f:(fun inbox ->
@@ -641,12 +640,24 @@ let rec take_next ?interrupt t ~cancel =
         | Some `Finished -> take_next ?interrupt t ~cancel))
 ;;
 
-let park t id resume = Hashtbl.set t.parked ~key:id ~data:resume
+let park t id ~out_of_turns resume =
+  Hashtbl.set t.parked ~key:id ~data:{ Parked.resume; out_of_turns }
+;;
+
 let unpark t id = Option.is_some (Hashtbl.find_and_remove t.parked id)
-let is_parked t id = Hashtbl.mem t.parked id
+
+let is_parked t id =
+  match Hashtbl.find t.parked id with
+  | Some { out_of_turns; _ } -> out_of_turns
+  | None -> false
+;;
 
 let parked_text t =
-  match List.sort (Hashtbl.keys t.parked) ~compare:String.compare with
+  match
+    Hashtbl.filter t.parked ~f:(fun (p : Parked.t) -> p.out_of_turns)
+    |> Hashtbl.keys
+    |> List.sort ~compare:String.compare
+  with
   | [] -> "none"
   | ids -> String.concat ~sep:", " ids
 ;;
@@ -683,29 +694,62 @@ let not_parked t id ~(task : Task.t option) =
          can)
 ;;
 
+let restart t (task : Task.t) (resume : Resume.t) ~max_turns ~message ~report =
+  let finished, resolve = Promise.create () in
+  let inbox = Option.map task.inbox ~f:(fun _ -> Subagent_inbox.create ()) in
+  task.cancel <- Cancellation.create ();
+  task.finished <- finished;
+  task.inbox <- inbox;
+  task.outcome <- None;
+  task.finished_at <- None;
+  task.delivered <- not report;
+  task.activity <- "starting";
+  run_task t task resolve ~run:(fun ~id:_ ~cancel ~emit ~on_output:_ ->
+    resume ~max_turns ~message ~inbox ~call_id:None ~cancel ~emit)
+;;
+
 let continue_ t id ~max_turns ~message =
   let task = Result.ok (find t ~kind:Subagent id) in
-  let resume =
-    match task with
-    | Some task when Task.running task -> None
-    | Some _ | None -> Hashtbl.find_and_remove t.parked id
+  let parked =
+    match task, Hashtbl.find t.parked id with
+    | Some task, _ when Task.running task -> None
+    | _, Some { out_of_turns = true; resume } ->
+      Hashtbl.remove t.parked id;
+      Some resume
+    | _, (Some { out_of_turns = false; _ } | None) -> None
   in
-  match task, resume with
+  let message = Option.map message ~f:(fun m -> Subagent_inbox.From.Caller, m) in
+  match task, parked with
   | Some task, Some resume ->
-    let finished, resolve = Promise.create () in
-    let inbox = Option.map task.inbox ~f:(fun _ -> Subagent_inbox.create ()) in
-    task.cancel <- Cancellation.create ();
-    task.finished <- finished;
-    task.inbox <- inbox;
-    task.outcome <- None;
-    task.finished_at <- None;
-    task.delivered <- false;
-    task.activity <- "starting";
-    run_task t task resolve ~run:(fun ~id:_ ~cancel ~emit ~on_output:_ ->
-      resume ~max_turns ~message ~inbox ~call_id:None ~cancel ~emit);
+    restart t task resume ~max_turns ~message ~report:true;
     Ok `Restarted
   | None, Some resume -> Ok (`Run_here resume)
   | task, None -> not_parked t id ~task
+;;
+
+(* The user writing to a background subagent that finished (its report
+   delivered): it carries on with the message, as a chat would, without
+   reporting to the main agent again. *)
+let reopen t ~id ~from text =
+  match find t ~kind:Subagent id, Hashtbl.find t.parked id with
+  | Ok task, Some { resume; _ }
+    when (not (Task.running task)) && task.delivered ->
+    Hashtbl.remove t.parked id;
+    restart t task resume ~max_turns:None ~message:(Some (from, text)) ~report:false;
+    Some ()
+  | _ -> None
+;;
+
+let send t ~id kind ~from text =
+  if String.is_empty (String.strip text)
+  then Or_error.error_string "the message is empty: type what to tell the agent"
+  else (
+    match inbox_of t id with
+    | Ok inbox -> Subagent_inbox.push inbox kind ~from text
+    | Error _ as error ->
+      (match from, reopen t ~id ~from text with
+       | User, Some () -> Ok ()
+       | (User | Caller), _ -> Or_error.map error ~f:ignore))
 ;;
 
 let cancel t ~kind id =
@@ -714,8 +758,8 @@ let cancel t ~kind id =
     then (
       Cancellation.cancel task.cancel;
       Ok ())
-    else if unpark t id
-    then Ok ()
+    else if is_parked t id
+    then Ok (ignore (unpark t id : bool))
     else Or_error.errorf "%s %s already finished" (Kind.word kind) id)
 ;;
 
