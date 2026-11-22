@@ -404,18 +404,21 @@ let%expect_test "Go to file: a big repository, every match, a window of rows" =
   let h = entered () in
   H.quiet h (fun () -> H.act h (Code Find_file));
   let paths =
-    List.init 3_000 ~f:(fun i -> sprintf "pkg%02d/src/file_%04d.ml" (i / 100) i)
+    List.init 100_000 ~f:(fun i -> sprintf "pkg%03d/src/file_%05d.ml" (i / 100) i)
   in
-  H.reply
-    h
-    "list_files"
-    (Jsonaf.to_string
-       (`Object
-           [ "root", `String "/home/me/proj"
-           ; "files", `String (String.concat ~sep:"\n" paths)
-           ; "truncated", `False
-           ]));
-  H.quiet h (fun () -> H.act h (Code (Filter "file")));
+  (* Given as parsed: the harness's JSON parser is not the page's. *)
+  H.quiet h (fun () ->
+    H.act
+      h
+      (Reply
+         ( Code (Files "/home/me/proj")
+         , Ok
+             (`Object
+                 [ "root", `String "/home/me/proj"
+                 ; "files", `String (String.concat ~sep:"\n" paths)
+                 ; "truncated", `False
+                 ]) ));
+    H.act h (Code (Filter "file")));
   let rows () =
     let t = code h in
     printf
@@ -425,13 +428,18 @@ let%expect_test "Go to file: a big repository, every match, a window of rows" =
   in
   rows ();
   H.text h ~selector:".code-section-title";
-  [%expect.unreachable];
+  [%expect {|
+    100000 matches, 60 rows in the page
+    100,000 files of 100,000
+    |}];
   (* Scrolled far down: the rows there, not the first ones. *)
-  H.quiet h (fun () -> H.act h (Code (List_scrolled 2_000)));
+  H.quiet h (fun () -> H.act h (Code (List_scrolled 80_000)));
   rows ();
   H.text h ~selector:".code-matches .code-row:first-child";
-  [%expect.unreachable]
-[@@expect.uncaught_exn {| ("Stack overflow") |}]
+  [%expect {|
+    100000 matches, 60 rows in the page
+    (pkg799/src/ file _79980.ml)
+    |}]
 ;;
 
 let%expect_test "a phone: the drawer, the keys, the peek" =
