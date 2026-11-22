@@ -186,7 +186,13 @@ let%expect_test
   H.quiet h (fun () -> H.act h (Open_subagent_chat "a1/n1"));
   H.type_ h "hello";
   H.key h "Enter";
-  [%expect {| Send |}]
+  H.text h ~selector:".toast";
+  print_endline ("draft: " ^ (H.model h).draft);
+  [%expect {|
+    Send
+    a1/n1 runs inside a1 (a subagent's own subagent) and takes no messages: write to a1 instead. (Dismiss)
+    draft: hello
+    |}]
 ;;
 
 let%expect_test "the composer's stop stops the subagent on show, not the session"
