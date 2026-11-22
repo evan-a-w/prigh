@@ -373,8 +373,9 @@ const risen = () => page.waitForFunction(() => {
 });
 
 // Where a chip's menu stands: below its chip, above the composer's box or
-// over it, at the chip's left edge (or as wide as the box it is placed in:
-// the composer), inside the window.
+// over it, at the chip's left edge (exactly: one shifted by a few pixels is
+// shifted, however close the chip's width brings it) or as wide as the box
+// it is placed in (the composer), inside the window.
 const popoverPlace = () => page.evaluate(() => {
   const menu = document.querySelector("#chip-popover");
   const r = menu.getBoundingClientRect();
@@ -388,7 +389,7 @@ const popoverPlace = () => page.evaluate(() => {
   const near = (a, b) => Math.abs(a - b) <= 4;
   const where = r.top >= chip.bottom ? "below the chip" : r.bottom <= box.top ? "above the composer" : "over the composer";
   const across = near(r.left, box.left) && near(r.right, box.right) ? "as wide as the composer"
-    : near(r.left, chip.left) ? "at the chip's left edge" : r.right <= box.right + 4 ? `shifted inside the ${inComposer ? "composer" : "box"}` : "out of line";
+    : Math.abs(r.left - chip.left) <= 1 ? "at the chip's left edge" : r.right <= box.right + 4 ? `shifted inside the ${inComposer ? "composer" : "box"}` : "out of line";
   const inside = r.top >= 0 && r.left >= 0 && r.bottom <= innerHeight && r.right <= innerWidth;
   return `${menu.dataset.chip}'s menu: ${where}, ${across}, ${inside ? "inside the window" : "cut off"}; focus in it: ${menu.contains(document.activeElement)}`;
 });
