@@ -26,8 +26,6 @@ let row ?(class_ = "") ?right ?on_click icon label =
     ]
 ;;
 
-let chevron = Icon.view ~class_:"size-3.5!" Chevron_down
-
 let counts ~added ~removed =
   span
     "shrink-0 font-mono text-[11px] tabular-nums"
@@ -98,26 +96,7 @@ let view ?(class_ = "") ~subagents_open ~worktrees_open ~toggle_subagents ~toggl
              ; class_
              ])
       ]
-    [ div
-        "flex h-7 items-center gap-2 px-2 text-[13px] text-muted-foreground"
-        [ Icon.view ~class_:"size-3.5 shrink-0" Monitor
-        ; span "text-foreground/90" [ t Fake.User.host ]
-        ; span "min-w-0 truncate font-mono text-[11px]" [ t "~/projects/prigh" ]
-        ; Button.view
-            ~variant:Ghost
-            ~size:Icon_xs
-            ~class_:"ml-auto -mr-1 text-muted-foreground"
-            ~attrs:[ Attr.create "aria-label" "Open folder" ]
-            [ Icon.view Folder ]
-        ]
-    ; row (Icon.view Folder) "Open in Files" ~right:chevron
-    ; row (Icon.view Plus) "Add project script"
-    ; Separator.view ~class_:"my-1" ()
-    ; row (Icon.view Git_branch) Fake.User.branch ~class_:"font-mono text-[12px]" ~right:chevron
-    ; row (Icon.view Git_commit_vertical) "Commit" ~right:chevron
-    ; row (Icons.view File_diff) "Changes" ~right:(counts ~added:12 ~removed:3)
-    ; Separator.view ~class_:"my-1" ()
-    ; section
+    [ section
         ~open_:subagents_open
         ~toggle:toggle_subagents
         ~count:(List.length Fake.Subagent.all)

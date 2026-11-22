@@ -57,7 +57,7 @@ let chip ?(class_ = "") ?(wrap = fun _ -> None) ~tip ~id label icon text =
 
 let queued_pill text =
   div
-    "mx-auto mb-2 flex w-fit max-w-full items-center gap-2 rounded-full border \
+    "ml-auto mb-2 flex w-fit max-w-full items-center gap-2 rounded-full border \
      bg-card py-1 pr-1 pl-3 text-xs text-muted-foreground"
     [ Icon.view ~class_:"size-3.5" Clock
     ; span "font-medium text-foreground" [ Node.text "Queued" ]

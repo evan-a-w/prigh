@@ -54,8 +54,6 @@ let header ~tip sidebar =
         "flex h-8 items-center gap-1"
         [ Sidebar.trigger ~class_:"text-muted-foreground" sidebar
         ; span "px-1 text-sm font-semibold tracking-tight" [ Node.text "prigh" ]
-        ; icon_button tip ~id:"back" "Back" (Icon.view Arrow_left)
-        ; icon_button tip ~id:"forward" "Forward" (Icon.view Arrow_right)
         ]
     ; div
         "flex items-center gap-0.5"
@@ -67,8 +65,6 @@ let header ~tip sidebar =
             ; Node.text "Search"
             ; Kbd.view ~class_:"ml-auto max-md:hidden" [ Node.text "Ctrl K" ]
             ]
-        ; icon_button tip ~id:"filter" "Filter sessions" (Icon.view List_filter)
-        ; icon_button tip ~id:"new-project" "Open a project" (Icons.view Folder_plus)
         ; icon_button tip ~id:"new-session" "New session" (Icons.view Square_pen)
         ]
     ]
@@ -83,7 +79,7 @@ let footer ~tip =
                 ~size:Sm
                 ~class_:"text-muted-foreground"
                 [ Icon.view Archive
-                ; span "" [ Node.text "Settled" ]
+                ; span "" [ Node.text "Archive" ]
                 ; span
                     "ml-auto flex items-center gap-1 text-xs tabular-nums"
                     [ Node.textf "%d" Fake.Session.settled
