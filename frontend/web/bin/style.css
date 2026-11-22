@@ -2044,13 +2044,6 @@ kbd {
 .context-ring-svg circle { fill: none; stroke-width: 3; }
 .context-ring-track { stroke: var(--rule-2); }
 .context-ring-fill { stroke: currentColor; stroke-linecap: round; transition: stroke-dasharray 0.3s ease-out; }
-.context-ring-spin { stroke: var(--chalk); stroke-linecap: round; opacity: 0; transform-origin: 15px 15px; }
-.context-ring-anchor.busy .context-ring-spin { opacity: 0.55; animation: ring-spin 1.1s linear infinite; }
-@keyframes ring-spin { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) {
-  .context-ring-anchor.busy .context-ring-spin { animation: none; opacity: 0; }
-  .context-ring-anchor.busy .context-ring-track { stroke: var(--sodium-line); }
-}
 
 /* Its card, above it: pointed at or focused (with a moment's delay), or
    tapped open. */

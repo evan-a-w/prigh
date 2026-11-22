@@ -3,7 +3,7 @@ open! Import
 
 (** The composer's context ring, beside the paperclip: how full
     the context is, amber as it nears the point where it compacts and red
-    from there; it turns while the agent works. Pointed at, focused or
+    from there. It is not a working indicator. Pointed at, focused or
     tapped, it shows the session's card above it: the context against its
     window and where it compacts, the cost (the session's, the last turn's,
     the cache's hit rate), the activity, thinking, mode, model and branch,

@@ -3218,23 +3218,23 @@ a tap: handed over {"url":"https://example.com/docs","newWindow":true}; the brow
 === webkit: desktop_links: errors ===
 none
 === webkit: card: idle ===
-ring: Context 0% full, $<COST>: details; Ready; turning: false; calm
+ring: Context 0% full, $<COST>: details; Ready; calm
 mode: Auto: never asks; over the chat: nothing
 fits
 === webkit: card: working, a subagent running ===
-ring: Context 0% full, $<COST>: details; Running tools; turning: true; calm
+ring: Context 0% full, $<COST>: details; Running tools; calm
 mode: Auto: never asks; over the chat: nothing
 fits
 === webkit: card: ready, a subagent running ===
-ring: Context 0% full, $<COST>: details; Ready; turning: false; calm
+ring: Context 0% full, $<COST>: details; Ready; calm
 mode: Auto: never asks; over the chat: nothing
 fits
 === webkit: card: idle, a mode on ===
-ring: Context 0% full, $<COST>: details; Ready; turning: false; calm
+ring: Context 0% full, $<COST>: details; Ready; calm
 mode: Plan mode; over the chat: nothing
 fits
 === webkit: card: the sidebar at its narrowest ===
-ring: Context 0% full, $<COST>: details; Ready; turning: false; calm
+ring: Context 0% full, $<COST>: details; Ready; calm
 mode: Plan mode; over the chat: nothing
 fits
 === webkit: card: the composer's chips ===
@@ -3244,7 +3244,7 @@ chip problems: none
 ✓ <HOSTNAME>
 build-runner-eu-west-a-long-hostname (in <SESSION>)
 === webkit: card: on a host with a long name ===
-ring: Context 0% full, $<COST>: details; Ready; turning: false; calm
+ring: Context 0% full, $<COST>: details; Ready; calm
 mode: Plan mode; over the chat: nothing
 fits
 chips 1: build-runner-eu-west-a-long-hostname | V4.1 Flash
@@ -3252,11 +3252,11 @@ chip problems: none (host name truncated)
 === webkit: card: the ring's card's Details open the session's details ===
 Session
 === webkit: card: the sidebar closed ===
-ring: Context 0% full, $<COST>: details; Ready; turning: false; calm
+ring: Context 0% full, $<COST>: details; Ready; calm
 mode: Plan mode; over the chat: nothing
 fits
 === webkit: card: a phone ===
-ring: Context 0% full, $<COST>: details; Ready; turning: false; calm
+ring: Context 0% full, $<COST>: details; Ready; calm
 mode: Plan mode; over the chat: nothing
 fits
 chips 1: icon | V4.1 Flash

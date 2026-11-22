@@ -1165,7 +1165,7 @@ let%expect_test "the context ring: idle, running, and what applies" =
   [%expect
     {|
     button "Context 90% full, $0.00: details"
-    <div class="busy context-ring-anchor">
+    <div class="context-ring-anchor">
     <button class="context-ring hot">
     Working
     (Goal 2/20)
@@ -1190,7 +1190,7 @@ let%expect_test "the context ring: idle, running, and what applies" =
     Branch main
     (Compact) (Details)
     Toggle_context_card
-    <div class="busy context-ring-anchor">
+    <div class="context-ring-anchor">
     Toggle_context_card
     (Run /session)
     (Focus dialog)

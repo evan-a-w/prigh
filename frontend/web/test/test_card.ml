@@ -68,7 +68,7 @@ let card h =
   print_endline "where:";
   H.text h ~selector:".context-card .branch-line";
   print_endline "lit:";
-  List.iter [ "lamp"; "context-ring-anchor.busy"; "warm"; "hot" ] ~f:(fun cls ->
+  List.iter [ "lamp"; "warm"; "hot" ] ~f:(fun cls ->
     H.elements h ~selector:(".composer ." ^ cls))
 ;;
 
@@ -118,7 +118,6 @@ let%expect_test
     5% used · compacts at 160k (80%)
     where:
     lit:
-    <div class="busy context-ring-anchor">
     |}];
   (* The agent runs a subagent in the background (the agents' toggle
      counts it; the status does not), and the transcript is quiet: a note. *)
@@ -143,7 +142,6 @@ let%expect_test
     5% used · compacts at 160k (80%)
     where:
     lit:
-    <div class="busy context-ring-anchor">
     |}];
   (* The agent done: nothing is lit but the note. *)
   state h ();

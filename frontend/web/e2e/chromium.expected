@@ -3236,23 +3236,23 @@ a tap: handed over {"url":"https://example.com/docs","newWindow":true}; the brow
 === chromium: desktop_links: errors ===
 none
 === chromium: card: idle ===
-ring: Context 0% full, $<COST>: details; Ready; turning: false; calm
+ring: Context 0% full, $<COST>: details; Ready; calm
 mode: Auto: never asks; over the chat: nothing
 fits
 === chromium: card: working, a subagent running ===
-ring: Context 0% full, $<COST>: details; Running tools; turning: true; calm
+ring: Context 0% full, $<COST>: details; Running tools; calm
 mode: Auto: never asks; over the chat: nothing
 fits
 === chromium: card: ready, a subagent running ===
-ring: Context 0% full, $<COST>: details; Ready; turning: false; calm
+ring: Context 0% full, $<COST>: details; Ready; calm
 mode: Auto: never asks; over the chat: nothing
 fits
 === chromium: card: idle, a mode on ===
-ring: Context 0% full, $<COST>: details; Ready; turning: false; calm
+ring: Context 0% full, $<COST>: details; Ready; calm
 mode: Plan mode; over the chat: nothing
 fits
 === chromium: card: the sidebar at its narrowest ===
-ring: Context 0% full, $<COST>: details; Ready; turning: false; calm
+ring: Context 0% full, $<COST>: details; Ready; calm
 mode: Plan mode; over the chat: nothing
 fits
 === chromium: card: the composer's chips ===
@@ -3262,7 +3262,7 @@ chip problems: none
 ✓ <HOSTNAME>
 build-runner-eu-west-a-long-hostname (in <SESSION>)
 === chromium: card: on a host with a long name ===
-ring: Context 0% full, $<COST>: details; Ready; turning: false; calm
+ring: Context 0% full, $<COST>: details; Ready; calm
 mode: Plan mode; over the chat: nothing
 fits
 chips 1: build-runner-eu-west-a-long-hostname | V4.1 Flash
@@ -3270,11 +3270,11 @@ chip problems: none (host name truncated)
 === chromium: card: the ring's card's Details open the session's details ===
 Session
 === chromium: card: the sidebar closed ===
-ring: Context 0% full, $<COST>: details; Ready; turning: false; calm
+ring: Context 0% full, $<COST>: details; Ready; calm
 mode: Plan mode; over the chat: nothing
 fits
 === chromium: card: a phone ===
-ring: Context 0% full, $<COST>: details; Ready; turning: false; calm
+ring: Context 0% full, $<COST>: details; Ready; calm
 mode: Plan mode; over the chat: nothing
 fits
 chips 1: icon | V4.1 Flash
