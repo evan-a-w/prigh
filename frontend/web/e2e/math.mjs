@@ -197,7 +197,9 @@ try {
   section("loaded once");
   console.log(await page.evaluate(() =>
     ["katex.min.js", "copy-tex.min.js", "katex.min.css"].map(f =>
-      `${f}: ${document.querySelectorAll(`script[src="${f}"], link[href="${f}"]`).length}`).join(", ")));
+      // A stylesheet is an @import into the layer vendor (Page_assets).
+      `${f}: ${document.querySelectorAll(`script[src="${f}"]`).length
+        + [...document.querySelectorAll("style")].filter(s => s.textContent.includes(`url("${f}")`)).length}`).join(", ")));
   section("original");
   console.log(await colours());
   await replyShot("original inline", ".msg.assistant .math-inline");

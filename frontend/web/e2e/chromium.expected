@@ -778,6 +778,21 @@ Light
 Accent
 Your turns, the selection, focus and work in progress.
 Custom
+Corners
+How round buttons, cards and dialogs are.
+Sharp
+Small
+Default
+Round
+Font
+Prose and the interface.
+Recursive
+Inter
+System
+Code font
+Code, commands and their output.
+Recursive
+System
 LAYOUT
 Transcript detail
 This browser
@@ -1266,6 +1281,21 @@ Light
 Accent
 Your turns, the selection, focus and work in progress.
 Custom
+Corners
+How round buttons, cards and dialogs are.
+Sharp
+Small
+Default
+Round
+Font
+Prose and the interface.
+Recursive
+Inter
+System
+Code font
+Code, commands and their output.
+Recursive
+System
 LAYOUT
 Transcript detail
 This browser
@@ -1275,17 +1305,32 @@ Normal
 Verbose
 === chromium: themes: dark from the settings ===
 dark orange #f0b44c on #1d1d1d; checked: Dark
+=== chromium: themes: the components in dark blue ===
+background #1d1d1d foreground #e6e6e6 primary #6aa6f8 on #1b1608
+radius 10px: the dialog 10px
+fonts: Recursive Sans, Recursive Sans
+pressed Default: rgb(45, 45, 45) rgb(230, 230, 230), corners 10px, 28px
+=== chromium: themes: round corners, Inter ===
+background #1d1d1d foreground #e6e6e6 primary #6aa6f8 on #1b1608
+radius 16px: the dialog 16px
+fonts: Inter, Inter
+pressed Round: rgb(45, 45, 45) rgb(230, 230, 230), corners 16px, 28px
 === chromium: themes: saved on the backend ===
-web.migrated=true web.terminal-open=true web.theme="dark" web.accent="blue"
+web.migrated=true web.terminal-open=true web.theme="dark" web.accent="blue" web.radius="default" web.font="recursive" web.code-font="recursive"
 === chromium: themes: reloaded ===
 first paint: dark blue; dark blue #6aa6f8 on #1d1d1d
 === chromium: themes: another browser ===
 first paint: - -; dark blue #6aa6f8 on #1d1d1d
 === chromium: themes: changed live in the other ===
 light custom #c2410c on #f4f5f7
+=== chromium: themes: the components there, light with a custom accent ===
+background #f4f5f7 foreground #1c2026 primary #c2410c on #ffffff
+radius 10px: the dialog null
+fonts: Recursive Sans, Recursive Sans
+no pressed item
 its history: /accent #c2410c
 === chromium: themes: picker ===
-Esc: light custom #c2410c on #f4f5f7; saved: web.migrated=true web.terminal-open=true web.theme="light" web.accent="#c2410c"
+Esc: light custom #c2410c on #f4f5f7; saved: web.migrated=true web.terminal-open=true web.theme="light" web.accent="#c2410c" web.radius="default" web.font="recursive" web.code-font="recursive"
 === chromium: themes: back ===
 original orange #f0b44c on #1b1e23; the other: original orange #f0b44c on #1b1e23
 === chromium: themes: errors ===

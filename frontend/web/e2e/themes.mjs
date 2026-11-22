@@ -114,7 +114,8 @@ const look = p => p.evaluate(() => {
 // The components' variables (bin/loon_bridge.css), the corners and fonts,
 // and a component's computed colours and corners: the settings' Corners
 // toggle group, its pressed item.
-const bridged = p => p.evaluate(() => {
+const bridged = p => p.evaluate(async () => {
+  await Promise.all(document.getAnimations().map(a => a.finished.catch(() => {})));
   const css = getComputedStyle(document.documentElement);
   const v = n => css.getPropertyValue(n).trim();
   const on = document.querySelector(".settings-panel .corners [aria-checked=true]");
