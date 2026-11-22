@@ -795,7 +795,6 @@ let%expect_test
   Gates.release gates "work";
   Agent.wait_idle agent;
   print_endline "--- finished";
-  send agent "too late";
   print_s
     [%sexp
       (Agent.dequeue_subagent agent ~agent_id:"a1" : string option Or_error.t)];
@@ -850,8 +849,6 @@ let%expect_test
     agent_end
     state: running=false subagents=[]
     --- finished
-    (Error
-     "a1 has finished and its report was delivered to the main agent: tell the main agent instead, or have it start a new subagent")
     (Error
      "a1 has finished and its report was delivered to the main agent: tell the main agent instead, or have it start a new subagent")
     --- a1's transcript

@@ -345,7 +345,50 @@ let%expect_test
        : unit Or_error.t)];
   print_s [%sexp (Agent.is_running agent : bool)];
   transcript agent "a1";
-  [%expect {| |}]
+  [%expect {|
+    state: running=true subagents=[]
+    agent_start
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
+    assistant:  subagent{"task":"work"}
+    subagent_start a1: work
+    request work: u(work)
+    state: running=true subagents=[a1 running]
+    tool_result subagent: started agent a1 (work); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
+    subagent_end a1: ok done | [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
+    state: running=true subagents=[a1 done]
+    assistant: spawned
+    agent_end
+    state: running=true subagents=[]
+    agent_start
+    user: [subagent a1 finished] work | done | [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
+    assistant: got it
+    agent_end
+    state: running=false subagents=[]
+    --- after its report was delivered
+    subagent_start a1: work
+      [a1] user: [The user sends you this while you work: take it into account and carry on.] |  | and another thing
+    request work: u(work) a u([The user sends you this)
+    (Ok ())
+      [a1] assistant: carried on
+    subagent_end a1: ok carried on | [subagent: 2 turns, 20 in / 10 out tokens, $0.0000]
+    --- a follow-up once it is done again
+    subagent_start a1: work
+      [a1] user: [The user sends you this while you work: take it into account and carry on.] |  | one more
+    request work: u(work) a u([The user sends you this) a u([The user sends you this)
+    (Ok ())
+      [a1] assistant: again
+    subagent_end a1: ok again | [subagent: 3 turns, 30 in / 15 out tokens, $0.0000]
+    (Error "unknown subagent \"a7\"; known: a1")
+    false
+    --- a1's transcript
+    user: work
+    assistant: done
+    user: [The user sends you this while you work: take it into account and carry on.] |  | and another thing
+    assistant: carried on
+    user: [The user sends you this while you work: take it into account and carry on.] |  | one more
+    assistant: again
+    (complete, 6 messages)
+    |}]
 ;;
 
 let%expect_test
@@ -367,7 +410,27 @@ let%expect_test
   @@ fun _t agent ->
   Or_error.ok_exn (Agent.prompt agent "go");
   Agent.wait_idle agent;
-  [%expect {| |}]
+  [%expect {|
+    state: running=true subagents=[]
+    agent_start
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
+    assistant:  subagent{"task":"work"}
+    subagent_start a1: work
+    state: running=true subagents=[a1 running]
+    tool_result subagent: started agent a1 (work); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
+    subagent_end a1: ok done | [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
+    state: running=true subagents=[a1 done]
+    assistant: spawned
+    agent_end
+    state: running=true subagents=[]
+    agent_start
+    user: [subagent a1 finished] work | done | [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
+    assistant:  subagent_continue{"id":"a1","message":"more"}
+    tool_result subagent_continue: invalid arguments: a1 finished and cannot be continued: only a subagent that ran out of turns can (those that can: none); start a new subagent for more work
+    assistant: ok
+    agent_end
+    state: running=false subagents=[]
+    |}]
 ;;
 
 let%expect_test "two steers and a follow-up queued while a tool runs" =
