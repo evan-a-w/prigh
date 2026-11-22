@@ -569,7 +569,7 @@ copy_store_path() {
 	mv "$tmp" "$root/nix/store/$1"
 }
 
-# The image's store paths (prigh's runtime and nix) go into the /nix volume,
+# The image's store paths (prigh's runtime, nix and ImageMagick) go into the /nix volume,
 # which hides the image's /nix: those missing are copied and registered, and
 # GC roots keep them. Roots of an older image are dropped, so that the garbage
 # collector can reclaim what only it used.
