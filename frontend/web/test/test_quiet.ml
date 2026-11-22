@@ -126,7 +126,7 @@ let%expect_test "a run of steps is one line: what it did and how long it took" =
   let chat = Chat_harness.chat fixed in
   text chat;
   [%expect
-    {| fix the bug 15:00 ✕ Ran a command, read a file, edited a file 1 failed 12s Fixed it. 15:00 |}];
+    {| fix the bug 15:00 ✕ Worked for 12s · ran a command, read a file, edited a file 1 failed Fixed it. 15:00 |}];
   show ~selector:".run" chat;
   [%expect
     {|
@@ -135,9 +135,10 @@ let%expect_test "a run of steps is one line: what it did and how long it took" =
         <span title="A step failed" role="img" aria-label="A step failed" class="failed mark">
           <icon class="cross"> </icon>
         </span>
-        <span class="run-label"> Ran a command, read a file, edited a file </span>
-        <span class="run-failed"> 1 failed </span>
+        <span class="run-label"> Worked for </span>
         <span class="run-time"> 12s </span>
+        <span class="run-did"> · ran a command, read a file, edited a file </span>
+        <span class="run-failed"> 1 failed </span>
         <span class="chev">  </span>
       </button>
       <Vdom.Node.none-widget> </Vdom.Node.none-widget>
@@ -153,10 +154,10 @@ let%expect_test "opened, it lists the steps; a step opens its detail" =
   let chat = Chat_harness.chat fixed in
   text ~toggled:[ box ] ~selector:".run" chat;
   [%expect
-    {| ✕ Ran a command, read a file, edited a file 1 failed 12s ✓ Thinking Let me build it first. ✕ bash make exit code 2 Error: a is not b ✓ read src/a.ml ✓ edit src/a.ml ✓ edit src/a.ml |}];
+    {| ✕ Worked for 12s · ran a command, read a file, edited a file 1 failed ✓ Thinking Let me build it first. ✕ bash make exit code 2 Error: a is not b ✓ read src/a.ml ✓ edit src/a.ml ✓ edit src/a.ml |}];
   text ~toggled:[ box; "c1#open"; "think:1:0" ] ~selector:".run" chat;
   [%expect
-    {| ✕ Ran a command, read a file, edited a file 1 failed 12s ✓ Thinking Let me build it first. ✕ bash make exit code 2 ✓ read src/a.ml ✓ edit src/a.ml ✓ edit src/a.ml |}]
+    {| ✕ Worked for 12s · ran a command, read a file, edited a file 1 failed ✓ Thinking Let me build it first. ✕ bash make exit code 2 ✓ read src/a.ml ✓ edit src/a.ml ✓ edit src/a.ml |}]
 ;;
 
 let%expect_test "messages break runs; a failed step marks its run" =
@@ -176,7 +177,7 @@ let%expect_test "messages break runs; a failed step marks its run" =
   in
   text chat;
   [%expect
-    {| look around 15:00 ✓ Listed a directory 2s Now the tests. ✓ Ran a command 6s All good. 15:00 |}]
+    {| look around 15:00 ✓ Worked for 2s · listed a directory Now the tests. ✓ Worked for 6s · ran a command All good. 15:00 |}]
 ;;
 
 let%expect_test "while it runs, the line says what it is doing" =
@@ -211,7 +212,7 @@ let%expect_test "while it runs, the line says what it is doing" =
       (streaming [ sprintf {|{"type":"text","text":"Done"}|} ])
   in
   text chat;
-  [%expect {| fix the bug 15:00 ✓ Ran a command 3s Done |}]
+  [%expect {| fix the bug 15:00 ✓ Worked for 3s · ran a command Done |}]
 ;;
 
 let%expect_test "reports of background work join the run; errors stay out" =
@@ -237,7 +238,7 @@ let%expect_test "reports of background work join the run; errors stay out" =
   in
   text chat;
   [%expect
-    {| build it in the background 15:00 ✓ Ran a command 1s Started. 15:00 ✓ Got a report, read a job's output 9s The model returned an error overloaded Send a message to retry, or switch model. 15:00 |}];
+    {| build it in the background 15:00 ✓ Worked for 1s · ran a command Started. 15:00 ✓ Worked for 9s · got a report, read a job's output The model returned an error overloaded Send a message to retry, or switch model. 15:00 |}];
   text ~toggled:[ "run:report:4" ] ~selector:".run-steps" chat;
   [%expect {| |}]
 ;;

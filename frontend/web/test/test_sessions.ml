@@ -366,6 +366,9 @@ let%expect_test
     <div class="open running tool tool-bash">
       <button type="button" data-fold="c1#open" aria-expanded="true" class="tool-head">
         <span aria-hidden="true" class="lamp"> </span>
+        <span aria-hidden="true" class="tool-icon">
+          <icon class="terminal"> </icon>
+        </span>
         <span class="name"> bash </span>
         <span class="arg command"> rm -rf build </span>
         <span class="chev">  </span>
