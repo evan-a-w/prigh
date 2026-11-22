@@ -33,7 +33,7 @@ let tool_row ~open_ids ~toggle i (call : Fake.Tool_call.t) =
   let running = String.equal call.duration "running" in
   let status =
     if running
-    then Spinner.view ~class_:"size-3.5 text-sky-400" ()
+    then Node.span ~attrs:[ Attr.class_ "thinking-shimmer" ] [ Node.text "working…" ]
     else if call.ok
     then Icon.view ~class_:"size-3.5 text-emerald-400/80" Check
     else Icon.view ~class_:"size-3.5 text-red-400" X
@@ -46,8 +46,13 @@ let tool_row ~open_ids ~toggle i (call : Fake.Tool_call.t) =
     [ span "flex size-4 items-center justify-center [&_svg]:size-3.5" [ tool_icon call.tool ]
     ; span "w-16 shrink-0 font-medium text-foreground/90" [ Node.text call.tool ]
     ; span "min-w-0 flex-1 truncate font-mono text-[11.5px]" [ Node.text call.summary ]
-    ; span "shrink-0 tabular-nums" [ Node.text (if running then "" else call.duration) ]
-    ; span "flex size-4 shrink-0 items-center justify-center" [ status ]
+    ; (if running
+       then span "shrink-0" [ status ]
+       else
+         Node.fragment
+           [ span "shrink-0 tabular-nums" [ Node.text call.duration ]
+           ; span "flex size-4 shrink-0 items-center justify-center" [ status ]
+           ])
     ]
     @ extra
   in
@@ -159,8 +164,7 @@ let assistant_answer =
 let thinking =
   div
     "flex items-center gap-2 text-sm text-muted-foreground"
-    [ Spinner.view ~class_:"size-3.5" ()
-    ; span "thinking-shimmer font-medium" [ Node.text "Thinking…" ]
+    [ span "thinking-shimmer font-medium" [ Node.text "Thinking…" ]
     ; span "text-xs tabular-nums text-muted-foreground/70" [ Node.text "12s · Esc to interrupt" ]
     ]
 ;;

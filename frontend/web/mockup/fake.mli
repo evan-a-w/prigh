@@ -1,11 +1,8 @@
 (** The mockups' made-up data. *)
 
 module Project : sig
-  type t =
-    { name : string
-    ; tag : string
-    ; tag_class : string (** the tag's colours, as Tailwind classes *)
-    }
+  (** [name]: one word, from the git repository or the directory. *)
+  type t = { name : string }
 
   val prigh : t
   val loon : t
@@ -14,9 +11,8 @@ end
 
 module Status : sig
   type t =
-    | Running
-    | Waiting (** waiting for the user: a confirmation or a question *)
-    | Unread
+    | Thinking
+    | Working (** running tools, or only a subagent is *)
     | Idle
 end
 
@@ -24,17 +20,36 @@ module Session : sig
   type t =
     { project : Project.t
     ; title : string
-    ; age : string
+    ; age : string (** since it last worked: "now", "12m" *)
     ; status : Status.t
     }
 
   val current : t
   val recent : t list
-
-  (** The worktree group's branch and its sessions. *)
-  val worktree : string * t list
-
   val settled : int
+end
+
+module Subagent : sig
+  type t =
+    { name : string
+    ; task : string
+    ; status : Status.t
+    ; age : string
+    }
+
+  val all : t list
+end
+
+module Worktree : sig
+  type t =
+    { branch : string
+    ; path : string
+    ; sessions : int
+    ; added : int
+    ; removed : int
+    }
+
+  val all : t list
 end
 
 module Tool_call : sig

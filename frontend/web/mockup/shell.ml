@@ -8,28 +8,6 @@ module Attr = Vdom.Attr
 let div cls children = Node.div ~attrs:[ Attr.class_ cls ] children
 let span cls children = Node.span ~attrs:[ Attr.class_ cls ] children
 
-let project_tag (p : Fake.Project.t) =
-  span
-    (Cn.cn
-       [ "inline-flex h-4 min-w-5 shrink-0 items-center justify-center rounded-[4px] \
-          px-1 text-[9px] font-semibold tracking-wide"
-       ; p.tag_class
-       ])
-    [ Node.text p.tag ]
-;;
-
-let status_icon : Fake.Status.t -> Node.t = function
-  | Running -> Spinner.view ~class_:"size-3.5 text-sky-400" ()
-  | Waiting ->
-    span
-      "relative flex size-2"
-      [ span "absolute inline-flex size-full animate-ping rounded-full bg-amber-400/60" []
-      ; span "relative inline-flex size-2 rounded-full bg-amber-400" []
-      ]
-  | Unread -> span "size-2 rounded-full bg-primary" []
-  | Idle -> Node.none
-;;
-
 let icon_button ?(class_ = "") ?on_click ?(active = false) tip ~id label icon =
   Tip.wrap
     tip
@@ -56,20 +34,15 @@ let session_item ~active (s : Fake.Session.t) =
     [ Sidebar.menu_button
         ~is_active:active
         ~size:Lg
-        ~class_:"h-auto flex-col items-stretch gap-1 px-2.5 py-2 data-active:font-normal"
+        ~class_:"h-auto flex-col items-stretch gap-0.5 px-2.5 py-1.5 data-active:font-normal"
         [ div
-            "flex items-center gap-1.5 text-xs text-muted-foreground"
-            [ project_tag s.project
-            ; span "truncate" [ Node.text s.project.name ]
-            ; span "ml-auto tabular-nums" [ Node.text s.age ]
+            "flex items-center gap-2 text-xs text-muted-foreground"
+            [ span "truncate" [ Node.text s.project.name ]
+            ; Activity.view ~class_:"ml-auto" s.status ~age:s.age
             ]
-        ; div
-            "flex items-center gap-2"
-            [ span
-                (if active then "truncate text-foreground" else "truncate")
-                [ Node.text s.title ]
-            ; div "ml-auto flex size-4 items-center justify-center" [ status_icon s.status ]
-            ]
+        ; span
+            (if active then "truncate text-[13px] text-foreground" else "truncate text-[13px]")
+            [ Node.text s.title ]
         ]
     ]
 ;;
@@ -99,33 +72,6 @@ let header ~tip sidebar =
         ; icon_button tip ~id:"new-session" "New session" (Icons.view Square_pen)
         ]
     ]
-;;
-
-let worktree_group ~open_ ~set_open =
-  let branch, sessions = Fake.Session.worktree in
-  Collapsible.view ~id:"worktree" ~open_ ~on_change:set_open (fun c ->
-    [ Sidebar.group
-        ~class_:"py-1"
-        [ Collapsible.trigger
-            c
-            ~class_:
-              (Sidebar.group_label_classes
-                 ~class_:
-                   "w-full gap-1.5 hover:text-sidebar-foreground [&[data-state=open]>svg:last-child]:rotate-90"
-                 ())
-            [ Icon.view Git_branch
-            ; span "truncate font-mono" [ Node.text branch ]
-            ; span "ml-auto text-[11px] tabular-nums" [ Node.textf "%d" (List.length sessions) ]
-            ; Icon.view ~class_:"transition-transform" Chevron_right
-            ]
-        ; Collapsible.content
-            c
-            [ Sidebar.menu
-                ~class_:"ml-3 border-l border-sidebar-border pl-1.5"
-                (List.map sessions ~f:(session_item ~active:false))
-            ]
-        ]
-    ])
 ;;
 
 let footer ~tip =
@@ -194,7 +140,7 @@ let top_bar ?more ~tip ~sidebar ~pressed ~has_right ~right_open ~set_right_open 
                 [ Breadcrumb.link
                     ~href:"#"
                     ~class_:"flex items-center gap-1.5"
-                    [ project_tag current.project; Node.text current.project.name ]
+                    [ Node.text current.project.name ]
                 ]
             ; Breadcrumb.separator
                 ~class_:"text-muted-foreground/50 max-md:hidden"
@@ -266,7 +212,7 @@ let mobile_sheet ~close ~title content =
 let component
   ?right
   ?right_size
-  ?(right_title = "Panel")
+  ?(right_title = "Session")
   ?bottom
   ?(bottom_size = 38.)
   ?overlay
@@ -277,11 +223,11 @@ let component
   (local_ graph)
   =
   let sidebar = Sidebar.component ~persist:false graph in
-  let worktree_open, set_worktree_open = Bonsai.state true graph in
-  let right_open, set_right_open = Bonsai.state true graph in
+  (* None: as the width suits, open on desktop and closed on phones. *)
+  let right_choice, set_right_choice = Bonsai.state (None : bool option) graph in
   let right =
     match right with
-    | None -> Bonsai.return None
+    | None -> Bonsai.return (Some (Session_panel.view ()))
     | Some r -> r >>| Option.some
   in
   let bottom =
@@ -304,16 +250,16 @@ let component
   and right
   and bottom
   and overlay
-  and worktree_open
-  and set_worktree_open
-  and right_open
-  and set_right_open
+  and right_choice
+  and set_right_choice
   and right_layout
   and set_right_layout
   and bottom_layout
   and set_bottom_layout in
   let current = Fake.Session.current in
   let mobile = Sidebar.is_mobile sidebar in
+  let right_open = Option.value right_choice ~default:(not mobile) in
+  let set_right_open b = set_right_choice (Some b) in
   let main_column = div "flex h-full min-w-0 flex-1 flex-col" [ main ] in
   let main_and_bottom =
     match bottom with
@@ -367,7 +313,6 @@ let component
                         (List.map Fake.Session.recent ~f:(fun s ->
                            session_item ~active:(phys_equal s current) s))
                     ]
-                ; worktree_group ~open_:worktree_open ~set_open:set_worktree_open
                 ]
             ; footer ~tip
             ]

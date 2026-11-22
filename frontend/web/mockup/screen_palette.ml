@@ -55,8 +55,7 @@ let parts ~query =
              Command.item
                ~value:title
                ~keywords:[ p.name ]
-               [ Shell.project_tag p
-               ; span "truncate" (Overlay_parts.highlight ~query title)
+               [ span "truncate" (Overlay_parts.highlight ~query title)
                ; span "truncate text-xs text-muted-foreground" [ Node.text p.name ]
                ; Command.shortcut ~class_:"tabular-nums tracking-normal" [ Node.text age ]
                ]))

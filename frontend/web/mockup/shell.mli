@@ -24,9 +24,3 @@ val component
   -> main:Vdom.Node.t Bonsai.t
   -> local_ Bonsai.graph
   -> Vdom.Node.t Bonsai.t
-
-(** A project's coloured two-letter tag. *)
-val project_tag : Fake.Project.t -> Vdom.Node.t
-
-(** A session's status: a spinner, a dot, or nothing when idle. *)
-val status_icon : Fake.Status.t -> Vdom.Node.t

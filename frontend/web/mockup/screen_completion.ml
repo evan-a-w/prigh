@@ -39,8 +39,7 @@ let menu (kind : Kind.t) ~state ~set_state =
       , List.map commands ~f:(fun (name, description) ->
           Command.item
             ~value:name
-            [ Icon.view Slash
-            ; span "font-mono" (Overlay_parts.highlight ~query:"/re" name)
+            [ span "font-mono" (Overlay_parts.highlight ~query:"/re" name)
             ; span "truncate text-muted-foreground" [ Node.text description ]
             ]) )
     | Files ->
@@ -49,8 +48,7 @@ let menu (kind : Kind.t) ~state ~set_state =
       , List.map files ~f:(fun (name, dir) ->
           Command.item
             ~value:(dir ^ name)
-            [ Icon.view File_code
-            ; span "" (Overlay_parts.highlight ~query:"comp" name)
+            [ span "" (Overlay_parts.highlight ~query:"comp" name)
             ; span "truncate font-mono text-xs text-muted-foreground" [ Node.text dir ]
             ]) )
   in

@@ -1,37 +1,15 @@
 module Project = struct
-  type t =
-    { name : string
-    ; tag : string
-    ; tag_class : string
-    }
+  type t = { name : string }
 
-  let prigh =
-    { name = "prigh"
-    ; tag = "PR"
-    ; tag_class = "bg-sky-400/15 text-sky-700 dark:text-sky-300"
-    }
-  ;;
-
-  let loon =
-    { name = "loon"
-    ; tag = "LN"
-    ; tag_class = "bg-teal-400/15 text-teal-700 dark:text-teal-300"
-    }
-  ;;
-
-  let co =
-    { name = "co"
-    ; tag = "CO"
-    ; tag_class = "bg-amber-400/15 text-amber-700 dark:text-amber-300"
-    }
-  ;;
+  let prigh = { name = "prigh" }
+  let loon = { name = "loon" }
+  let co = { name = "co" }
 end
 
 module Status = struct
   type t =
-    | Running
-    | Waiting
-    | Unread
+    | Thinking
+    | Working
     | Idle
 end
 
@@ -47,7 +25,7 @@ module Session = struct
     { project = Project.prigh
     ; title = "Rebuild prigh-web on loon"
     ; age = "now"
-    ; status = Running
+    ; status = Thinking
     }
   ;;
 
@@ -56,12 +34,12 @@ module Session = struct
     ; { project = Project.loon
       ; title = "Port shadcn's Resizable"
       ; age = "12m"
-      ; status = Waiting
+      ; status = Working
       }
     ; { project = Project.prigh
       ; title = "Flaky tmux-test on posix backend"
       ; age = "1h"
-      ; status = Unread
+      ; status = Idle
       }
     ; { project = Project.co
       ; title = "Weekly report draft"
@@ -73,25 +51,80 @@ module Session = struct
       ; age = "1d"
       ; status = Idle
       }
+    ; { project = Project.prigh
+      ; title = "Composer chips as a toggle group"
+      ; age = "2d"
+      ; status = Idle
+      }
     ]
   ;;
 
-  let worktree =
-    ( "feat/composer-chips"
-    , [ { project = Project.prigh
-        ; title = "Composer chips as a toggle group"
-        ; age = "2h"
-        ; status = Idle
-        }
-      ; { project = Project.prigh
-        ; title = "Review: chips on 320px"
-        ; age = "2h"
-        ; status = Unread
-        }
-      ] )
-  ;;
-
   let settled = 4
+end
+
+module Subagent = struct
+  type t =
+    { name : string
+    ; task : string
+    ; status : Status.t
+    ; age : string
+    }
+
+  let all =
+    [ { name = "Touch targets"
+      ; task = "Fix the chips' touch targets"
+      ; status = Working
+      ; age = "now"
+      }
+    ; { name = "Phone review"
+      ; task = "Check the ⋯ sheet on 320px"
+      ; status = Thinking
+      ; age = "now"
+      }
+    ; { name = "Inventory"
+      ; task = "List prigh-web's UI surfaces"
+      ; status = Idle
+      ; age = "2m"
+      }
+    ; { name = "Overlays"
+      ; task = "Mock the palette and popovers"
+      ; status = Idle
+      ; age = "1h"
+      }
+    ]
+  ;;
+end
+
+module Worktree = struct
+  type t =
+    { branch : string
+    ; path : string
+    ; sessions : int
+    ; added : int
+    ; removed : int
+    }
+
+  let all =
+    [ { branch = "feat/new-ui"
+      ; path = "~/.prigh/worktrees/prigh/feat-new-ui"
+      ; sessions = 1
+      ; added = 12
+      ; removed = 3
+      }
+    ; { branch = "feat/composer-chips"
+      ; path = "~/.prigh/worktrees/prigh/composer-chips"
+      ; sessions = 2
+      ; added = 95
+      ; removed = 60
+      }
+    ; { branch = "fix/posix-hang"
+      ; path = "~/.prigh/worktrees/prigh/posix-hang"
+      ; sessions = 1
+      ; added = 4
+      ; removed = 1
+      }
+    ]
+  ;;
 end
 
 module Tool_call = struct
@@ -147,7 +180,7 @@ module User = struct
   let host = "desktop"
   let model = "Opus 4.5"
   let thinking = "High"
-  let mode = "Auto"
+  let mode = "Full access"
   let cwd = "~/.prigh/worktrees/prigh/feat-new-ui"
   let branch = "feat/new-ui"
 end

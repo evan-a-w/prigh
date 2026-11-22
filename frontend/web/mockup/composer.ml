@@ -7,33 +7,31 @@ module Attr = Vdom.Attr
 let div cls children = Node.div ~attrs:[ Attr.class_ cls ] children
 let span cls children = Node.span ~attrs:[ Attr.class_ cls ] children
 
+(* A pie, not a ring: a ring reads as a spinner. *)
 let ring fraction =
-  let c = 2. *. Float.pi *. 7. in
-  let circle extra =
-    Node.create_svg
-      "circle"
-      ~attrs:
-        ([ Attr.create "cx" "9"
-         ; Attr.create "cy" "9"
-         ; Attr.create "r" "7"
-         ; Attr.create "fill" "none"
-         ; Attr.create "stroke" "currentColor"
-         ; Attr.create "stroke-width" "2.25"
-         ]
-         @ extra)
-      []
-  in
+  let svg name attrs = Node.create_svg name ~attrs [] in
+  let pie_c = 2. *. Float.pi *. 3.5 in
   Node.create_svg
     "svg"
-    ~attrs:
-      [ Attr.create "viewBox" "0 0 18 18"; Attr.class_ "size-3.5 -rotate-90" ]
-    [ circle [ Attr.create "opacity" "0.25" ]
-    ; circle
-        [ Attr.create "stroke-dasharray" (Float.to_string c)
-        ; Attr.create
-            "stroke-dashoffset"
-            (Float.to_string (c *. (1. -. fraction)))
-        ; Attr.create "stroke-linecap" "round"
+    ~attrs:[ Attr.create "viewBox" "0 0 18 18"; Attr.class_ "size-4 -rotate-90" ]
+    [ svg
+        "circle"
+        [ Attr.create "cx" "9"
+        ; Attr.create "cy" "9"
+        ; Attr.create "r" "8"
+        ; Attr.create "fill" "none"
+        ; Attr.create "stroke" "currentColor"
+        ; Attr.create "stroke-width" "1.5"
+        ]
+    ; svg
+        "circle"
+        [ Attr.create "cx" "9"
+        ; Attr.create "cy" "9"
+        ; Attr.create "r" "3.5"
+        ; Attr.create "fill" "none"
+        ; Attr.create "stroke" "currentColor"
+        ; Attr.create "stroke-width" "7"
+        ; Attr.create "stroke-dasharray" (sprintf "%.2f %.2f" (pie_c *. fraction) pie_c)
         ]
     ]
 ;;
@@ -86,7 +84,7 @@ let view ?(queued = []) ?wrap_chip ?draft ?above ~tip () =
            dark:bg-card has-[textarea:focus-visible]:ring-0 \
            has-[textarea:focus-visible]:border-ring/70"
         [ Input_group.textarea
-            ~class_:"min-h-14 px-4 pt-3.5 text-base md:text-sm"
+            ~class_:"min-h-12 px-4 pt-3 text-base md:text-[13.5px]"
             ~rows:2
             ?value:draft
             ~placeholder:"Ask anything. @ files, $ skills, / commands"
@@ -105,28 +103,6 @@ let view ?(queued = []) ?wrap_chip ?draft ?above ~tip () =
                    ~class_:"text-muted-foreground"
                    ~attrs:[ Attr.create "aria-label" "Attach" ]
                    [ Icon.view Plus ])
-            ; chip ~tip ~id:"model" "Model" (Icon.view Sparkles) Fake.User.model
-            ; chip
-                ~tip
-                ~id:"thinking"
-                "Thinking"
-                (Icon.view Brain)
-                Fake.User.thinking
-            ; chip
-                ~class_:"max-sm:hidden"
-                ~tip
-                ~id:"mode"
-                "Mode: confirm risky tools"
-                (Icon.view Shield)
-                Fake.User.mode
-            ; chip
-                ~class_:"max-sm:hidden"
-                ~tip
-                ~id:"host"
-                "Tool host"
-                (Icon.view Server)
-                Fake.User.host
-            ; div "ml-auto" []
             ; Tip.wrap
                 ~side:Top
                 tip
@@ -134,25 +110,13 @@ let view ?(queued = []) ?wrap_chip ?draft ?above ~tip () =
                 "Context 42% of 200k · $1.84 this session"
                 (Input_group.button
                    ~variant:Ghost
-                   ~size:Xs
-                   ~class_:
-                     "gap-1.5 px-1.5 font-normal tabular-nums \
-                      text-muted-foreground"
-                   [ ring 0.42
-                   ; span "max-sm:hidden" [ Node.text "42%" ]
-                   ; span "" [ Node.text "$1.84" ]
-                   ])
-            ; Tip.wrap
-                ~side:Top
-                tip
-                ~id:"mic"
-                "Dictate"
-                (Input_group.button
-                   ~variant:Ghost
                    ~size:Icon_xs
                    ~class_:"text-muted-foreground"
-                   ~attrs:[ Attr.create "aria-label" "Dictate" ]
-                   [ Icons.view Mic ])
+                   ~attrs:[ Attr.create "aria-label" "Context and cost" ]
+                   [ ring 0.42 ])
+            ; div "ml-auto" []
+            ; chip ~tip ~id:"model" "Model, reasoning and mode" (Icon.view Sparkles) Fake.User.model
+            ; chip ~tip ~id:"host" "Tool host" (Icon.view Server) Fake.User.host
             ; Tip.wrap
                 ~side:Top
                 tip
@@ -161,7 +125,7 @@ let view ?(queued = []) ?wrap_chip ?draft ?above ~tip () =
                 (Input_group.button
                    ~variant:Default
                    ~size:Icon_xs
-                   ~class_:"ml-1 size-7 rounded-full"
+                   ~class_:"ml-1.5 size-7 rounded-full"
                    ~attrs:[ Attr.create "aria-label" "Send" ]
                    [ Icon.view Arrow_up ])
             ]
