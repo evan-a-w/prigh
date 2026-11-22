@@ -40,7 +40,8 @@ let%expect_test "a repository with a branch: the path under ~, the branch" =
   let h = create ~fields:[ "cwd", `String "/home/prigh/projects/prigh" ] () in
   show h;
   H.show h ~selector:".composer-where";
-  [%expect {|
+  [%expect
+    {|
     button "Folder: ~/projects/prigh. Change it" -- ~/projects/prigh. Start in another folder (/cd)
     button "Branch: main. Change it" -- Work in another worktree (/worktree)
     <div class="composer-where flex font-mono gap-4 items-center loon min-w-0 pt-1.5 px-2 text-muted-foreground text-xs">
@@ -68,7 +69,8 @@ let%expect_test "its buttons run /cd and /worktree" =
   let h = create ~fields:[ "cwd", `String "/home/prigh/projects/prigh" ] () in
   H.click h ~selector:".where-path";
   H.click h ~selector:".where-branch";
-  [%expect {|
+  [%expect
+    {|
     (Run /cd)
     (Focus dialog-input)
     (Rpc (method_ list_dirs)
@@ -92,7 +94,8 @@ let%expect_test "no repository (or a detached head): no branch" =
       ()
   in
   show h;
-  [%expect {| button "Folder: ~/notes. Change it" -- ~/notes. Start in another folder (/cd) |}]
+  [%expect
+    {| button "Folder: ~/notes. Change it" -- ~/notes. Start in another folder (/cd) |}]
 ;;
 
 let%expect_test "the home directory itself, and a path outside it" =
@@ -107,7 +110,8 @@ let%expect_test "the home directory itself, and a path outside it" =
             ~fields:[ "hosts", hosts; "cwd", `String "/srv/data/a/b/c" ]
             ())));
   show h;
-  [%expect {|
+  [%expect
+    {|
     button "Folder: ~. Change it" -- ~. Start in another folder (/cd)
     button "Branch: main. Change it" -- Work in another worktree (/worktree)
     |}]
@@ -167,7 +171,8 @@ let%expect_test "another host: named first; its branch from the session list" =
          ( Config
          , Ok (Jsonaf.of_string {|{"scoped_models":[],"default_host":"c7"}|}) )));
   show h;
-  [%expect {|
+  [%expect
+    {|
     button "Folder: laptop: ~/projects/prigh. Change it" -- On laptop, in ~/projects/prigh. Start in another folder (/cd)
     button "Folder: laptop: ~/projects/prigh. Change it" -- On laptop, in ~/projects/prigh. Start in another folder (/cd)
     button "Branch: feat/x. Change it" -- Work in another worktree (/worktree)
@@ -188,7 +193,8 @@ let%expect_test "narrow: the same line, its buttons a thumb's height" =
   in
   H.quiet h (fun () -> H.act h (Set_narrow true));
   show h;
-  [%expect {|
+  [%expect
+    {|
     button "Folder: ~/src/github.com/evan-a-w/prigh-worktrees/a. Change it" -- ~/src/github.com/evan-a-w/prigh-worktrees/a. Start in another folder (/cd)
     button "Branch: main. Change it" -- Work in another worktree (/worktree)
     |}]
@@ -210,7 +216,8 @@ let%expect_test "typing keeps it; no cwd yet, temporary, new: no line" =
   line (H.connecting ());
   line (create ~fields:[ "running", `True ] ());
   line (H.create ~state:(H.state_json ~fields:[ "hosts", hosts ] ()) ());
-  [%expect {|
+  [%expect
+    {|
     textarea "Message"
     <div class="composer-where flex font-mono gap-4 items-center loon min-w-0 pt-1.5 px-2 text-muted-foreground text-xs">
     textarea "Message"

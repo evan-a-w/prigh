@@ -1002,14 +1002,14 @@ let card
     (* The page opens the agent from a click on [data-agent]: this button is
        the head's way in from the keyboard. *)
     let open_button =
-        Node.button
-          ~attrs:
-            [ Attr.class_ "open-agent"
-            ; Attr.type_ "button"
-            ; Attr.create "aria-label" "Open in the agents panel"
-            ; Attr.title "Open in the agents panel"
-            ]
-          [ Html.icon External ]
+      Node.button
+        ~attrs:
+          [ Attr.class_ "open-agent"
+          ; Attr.type_ "button"
+          ; Attr.create "aria-label" "Open in the agents panel"
+          ; Attr.title "Open in the agents panel"
+          ]
+        [ Html.icon External ]
     in
     let head =
       [ Status.icon status

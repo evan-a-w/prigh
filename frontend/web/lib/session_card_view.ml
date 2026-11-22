@@ -24,7 +24,8 @@ let worktrees (m : Model.t) =
        List.find m.sessions ~f:(fun s -> String.equal s.id state.session_id)
      with
      | None -> []
-     | Some s -> List.map (Session_worktree_nodes.of_session m s) ~f:(fun n -> s, n))
+     | Some s ->
+       List.map (Session_worktree_nodes.of_session m s) ~f:(fun n -> s, n))
 ;;
 
 let something (m : Model.t) =
@@ -196,7 +197,8 @@ let worktree_row
       ; Attr.create "data-worktree" w.path
       ; Attr.create "data-owner" s.id
       ; Attr.create "aria-haspopup" "menu"
-      ; Attr.title (Tilde.of_path ?host_home:(Tilde.session_host_home m.state s) w.path)
+      ; Attr.title
+          (Tilde.of_path ?host_home:(Tilde.session_host_home m.state s) w.path)
       ; (if n.here then Attr.create "aria-current" "true" else Attr.empty)
       ; Attr.on_click (fun _ ->
           inject (Action.Open_menu { target; anchor = Element id }))

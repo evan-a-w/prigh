@@ -241,8 +241,7 @@ let toggles (m : App.Model.t) ~inject =
            ~title:"Subagents and worktrees"
            ~label:"Subagents and worktrees"
            ~panel:false
-           ~on:
-             (if m.narrow then m.session_card.sheet else m.session_card_open)
+           ~on:(if m.narrow then m.session_card.sheet else m.session_card_open)
            ~on_click:(inject Action.Toggle_session_card)
            Panel_right
        else Node.none)

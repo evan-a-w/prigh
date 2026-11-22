@@ -276,7 +276,8 @@ module Icon = struct
        (DeepSeek); a spark for any other. *)
     | Openai ->
       {|<g stroke-width="1.7"><rect x="8.6" y="3.2" width="6.8" height="13.6" rx="3.4" transform="rotate(0 12 12) translate(1.7 2)"/><rect x="8.6" y="3.2" width="6.8" height="13.6" rx="3.4" transform="rotate(60 12 12) translate(1.7 2)"/><rect x="8.6" y="3.2" width="6.8" height="13.6" rx="3.4" transform="rotate(120 12 12) translate(1.7 2)"/></g>|}
-    | Anthropic -> {|<path d="M3.5 20 9 4h1.6l5.5 16M5.6 14.2h8.6M14 4l6.5 16"/>|}
+    | Anthropic ->
+      {|<path d="M3.5 20 9 4h1.6l5.5 16M5.6 14.2h8.6M14 4l6.5 16"/>|}
     | Deepseek ->
       {|<path d="M2.5 11.5c1.2 5 6 8 11 6.5 3.2-1 5-3.6 5.4-6.2.9.6 2 .6 2.6-.3-1.1-.2-1.8-.9-2.1-2-.5-1.6-2.3-2.4-3.8-1.6-1.3.7-1.6 2.3-3.2 2.9-2.2.8-5.7-.2-9.9.7z"/><circle cx="14.6" cy="10.4" r=".6" fill="currentColor"/>|}
     | Spark ->

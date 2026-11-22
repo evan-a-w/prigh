@@ -1695,7 +1695,8 @@ let%expect_test "sessions and ask_session: what they look into" =
     |}]
 ;;
 
-let%expect_test "a finished call shows how long it took, from its message's end" =
+let%expect_test "a finished call shows how long it took, from its message's end"
+  =
   let call id command =
     sprintf
       {|{"type":"tool_call","id":"%s","name":"bash","arguments":"{\"command\":\"%s\"}"}|}
@@ -1732,7 +1733,8 @@ let%expect_test "a finished call shows how long it took, from its message's end"
       ]
   in
   Chat_harness.show ~selector:".tool-head" chat;
-  [%expect {|
+  [%expect
+    {|
     <button type="button" data-fold="a#open" aria-expanded="true" class="tool-head">
       <span title="Done" role="img" aria-label="Done" class="done mark">
         <icon class="check"> </icon>
@@ -1788,11 +1790,13 @@ let%expect_test "a subagent's row: its name, a way into it, then its task" =
             (String.substr_replace_all
                ~pattern:{|{\"task\":|}
                ~with_:{|{\"name\":\"Line count\",\"task\":|})));
-  [%expect {| subagent Line count Count the lines in src/app.ml and report back. … |}];
+  [%expect
+    {| subagent Line count Count the lines in src/app.ml and report back. … |}];
   Chat_harness.show
     ~selector:".tool-subagent > .tool-head"
     (Chat_harness.chat ~running:true subagent_running);
-  [%expect {|
+  [%expect
+    {|
     <div data-agent="a1"
          title="agent a1 · deepseek-flash · 1 turn · follow it in the agents panel"
          class="tool-head">

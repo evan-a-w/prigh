@@ -580,7 +580,8 @@ let%expect_test "an image the model refused as too large: downsize and retry" =
              {|{"type":"error","message":"HTTP 400: invalid_request_error: messages.12.content.0: image exceeds 5 MB maximum"}|}
            []
        ]);
-  [%expect {|
+  [%expect
+    {|
     <div class="entries">
       <div data-entry="0" class="assistant msg">
         <div class="error stop">

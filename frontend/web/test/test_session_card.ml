@@ -62,19 +62,19 @@ let with_worktrees () =
       (sprintf
          "[%s]"
          (H.session_json
-             ~cwd:"/work"
-             ~repo:("/work", "/work", Some "main")
-             ~worktrees:
-               [ ( "/home/ada/.prigh/worktrees/work/feat-ui"
-                 , Some "feat/ui"
-                 , "/work"
-                 , "created" )
-               ; ( "/home/ada/.prigh/worktrees/work/fix-chips"
-                 , Some "fix/chips"
-                 , "/work"
-                 , "agent:a1:Fix the touch targets" )
-               ]
-             "s1"))
+            ~cwd:"/work"
+            ~repo:("/work", "/work", Some "main")
+            ~worktrees:
+              [ ( "/home/ada/.prigh/worktrees/work/feat-ui"
+                , Some "feat/ui"
+                , "/work"
+                , "created" )
+              ; ( "/home/ada/.prigh/worktrees/work/fix-chips"
+                , Some "fix/chips"
+                , "/work"
+                , "agent:a1:Fix the touch targets" )
+              ]
+            "s1"))
     ~state:
       (H.state_json
          ~fields:[ "session_id", `String "s1"; "cwd", `String "/work" ]

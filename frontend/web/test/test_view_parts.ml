@@ -128,5 +128,6 @@ let%expect_test "another inject remakes every part" =
   print_s
     [%sexp
       (List.sort (View_memo.made ()) ~compare:String.compare : string list)];
-  [%expect {| (agents btw chat chrome dialogs files review session_card sidebar terminal) |}]
+  [%expect
+    {| (agents btw chat chrome dialogs files review session_card sidebar terminal) |}]
 ;;
