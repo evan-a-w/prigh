@@ -287,7 +287,8 @@ try {
   }
 
   section("through the proxy");
-  console.log([...new Set(proxied.filter(r => /cli-signin|upgrade/.test(r)))].join("\n"));
+  // Sorted: the page's WebSocket and the grant are under way together.
+  console.log([...new Set(proxied.filter(r => /cli-signin|upgrade/.test(r)))].sort().join("\n"));
   section("errors");
   console.log(errors.length ? errors.join("\n") : "none");
 } catch (error) {

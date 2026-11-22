@@ -2513,8 +2513,8 @@ Or paste the code the page shows after Allow:
 prigh browser-signin: that code is not for this sign-in (from an earlier one, or changed on the way): paste the code the page shows for this link, or open the link again. Paste the code:
 prigh browser-signin: signed in; saved for ws://127.0.0.1:<PORT>/ws in $DIR/laptop-home/.prigh/tui-connection.sexp
 === chromium: cli_signin: through the proxy ===
-upgrade /ws
 POST /cli-signin/grant
+upgrade /ws
 === chromium: cli_signin: errors ===
 none
 === chromium: desktop: its stdout ===
