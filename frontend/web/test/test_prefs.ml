@@ -91,7 +91,8 @@ let%expect_test "the cache first, then the backend's, which win" =
       ((key web.agents-width) (value ())) ((key web.terminal-height) (value ()))
       ((key web.review-chat-width) (value ()))
       ((key web.review-files-width) (value ()))
-      ((key web.review-margin-width) (value ()))))
+      ((key web.review-margin-width) (value ()))
+      ((key web.editor-tree-width) (value ()))))
     ((theme
       ((name Light) (accent (Custom #3366ff)) (radius Default) (sans Recursive)
        (mono Recursive)))
@@ -140,7 +141,8 @@ let%expect_test "a page from before uploads the browser's once" =
       ((key web.agents-width) (value ())) ((key web.terminal-height) (value ()))
       ((key web.review-chat-width) (value ()))
       ((key web.review-files-width) (value ()))
-      ((key web.review-margin-width) (value ()))))
+      ((key web.review-margin-width) (value ()))
+      ((key web.editor-tree-width) (value ()))))
     (Rpc (method_ set_prefs)
      (params ((prefs ((web.notify false) (web.migrated true)))))
      (tag Show_error))
@@ -181,7 +183,8 @@ let%expect_test "a page from before uploads the browser's once" =
       ((key web.agents-width) (value ())) ((key web.terminal-height) (value ()))
       ((key web.review-chat-width) (value ()))
       ((key web.review-files-width) (value ()))
-      ((key web.review-margin-width) (value ()))))
+      ((key web.review-margin-width) (value ()))
+      ((key web.editor-tree-width) (value ()))))
     true
     |}]
 ;;
@@ -334,7 +337,8 @@ let%expect_test
          web.sidebar-opened web.sidebar-worktree-hours web.review web.code-size
          favourite-models history web.migrated web.sidebar-width web.files-width
          web.files-preview-width web.agents-width web.terminal-height
-         web.review-chat-width web.review-files-width web.review-margin-width))))
+         web.review-chat-width web.review-files-width web.review-margin-width
+         web.editor-tree-width))))
      (tag Prefs))
     ("Accent: green" "Back to alice")
     |}];

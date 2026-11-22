@@ -199,6 +199,7 @@ module Out : sig
         ; copied : string (** the toast once it is there *)
         }
     | Insert of string (** into the composer, at its end *)
+    | Edit of string (** the file, in the editor mode *)
     | Focus_editor
   [@@deriving sexp_of]
 end
@@ -242,6 +243,7 @@ module Action : sig
     | Ask_cancel
     | Copy_path of string
     | Insert_path of string
+    | Edit of string (** open the file in the editor mode *)
     | Attach of string (** an entry's name *)
     | Remove_attachment of int (** by its place in the list *)
   [@@deriving sexp_of]

@@ -12,7 +12,7 @@ import { mkdirSync, readFileSync } from "node:fs";
 import http from "node:http";
 import net from "node:net";
 import { join } from "node:path";
-import { hostname } from "node:os";
+import { hostName } from "./host_name.mjs";
 import { end } from "./end.mjs";
 import { inputs, sealSource, vector } from "./paste_vector.mjs";
 
@@ -125,7 +125,7 @@ const watch = p => {
 };
 const clean = text => text
   .replaceAll(dir, "$DIR")
-  .replaceAll(hostname(), "<HOST>")
+  .replaceAll(hostName(), "<HOST>")
   .replace(/127\.0\.0\.1:\d+/g, "127.0.0.1:<PORT>")
   .replace(/-L \d+:/g, "-L <PORT>:")
   .replace(/cli-signin=\d+\.[0-9a-f]+/g, "cli-signin=<PORT>.<STATE>")
@@ -287,7 +287,8 @@ try {
   }
 
   section("through the proxy");
-  console.log([...new Set(proxied.filter(r => /cli-signin|upgrade/.test(r)))].join("\n"));
+  // Sorted: the page's WebSocket and the grant are under way together.
+  console.log([...new Set(proxied.filter(r => /cli-signin|upgrade/.test(r)))].sort().join("\n"));
   section("errors");
   console.log(errors.length ? errors.join("\n") : "none");
 } catch (error) {

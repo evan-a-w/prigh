@@ -8,3 +8,7 @@ val to_string_hum : exn -> string
 
 (** The system error behind an Eio or Unix exception, if any. *)
 val unix_error : exn -> Core_unix.Error.t option
+
+(** The other end closed the connection (reset, or a write to a closed
+    socket): nothing went wrong on this side. *)
+val peer_gone : exn -> bool

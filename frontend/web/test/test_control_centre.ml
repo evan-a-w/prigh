@@ -65,6 +65,8 @@ let%expect_test
     the review page, the changes file by file to approve, comment on and edit (Alt+R): of the session's worktree or another (its branch, path or name), against its base or REV; /review BASE [instructions] (HEAD: the uncommitted changes) has the model review them for prioritised findings
     /files
     browse, preview, upload and download files where the tools run (Ctrl+Shift+F)
+    /edit
+    the editor mode: edit the session's files (PATH, or the last one) beside the chat, and ask about a selection (Alt+E toggles it)
     /help
     show commands and keys, or a command's usage
     ↑↓ move ↵ open ⌫ back esc close
@@ -602,6 +604,8 @@ let%expect_test "switching sessions resets it" =
     the review page, the changes file by file to approve, comment on and edit (Alt+R): of the session's worktree or another (its branch, path or name), against its base or REV; /review BASE [instructions] (HEAD: the uncommitted changes) has the model review them for prioritised findings
     /files
     browse, preview, upload and download files where the tools run (Ctrl+Shift+F)
+    /edit
+    the editor mode: edit the session's files (PATH, or the last one) beside the chat, and ask about a selection (Alt+E toggles it)
     /help
     show commands and keys, or a command's usage
     ↑↓ move ↵ open ⌫ back esc close

@@ -28,6 +28,8 @@ module Handle : sig
     (** the review's column of comments right of the code, from its left
         edge: [--review-margin-width]; place it on that column with
         [Resize_view.handle m ~inject Review_margin] *)
+    | Editor_tree
+    (** the editor mode's file list, from its right edge: [--editor-tree-width] *)
   [@@deriving sexp_of, equal, compare, enumerate]
 
   (** As in [data-resize]: ["sidebar"], ["files-preview"]... *)

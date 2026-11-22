@@ -2578,8 +2578,8 @@ Or paste the code the page shows after Allow:
 prigh browser-signin: that code is not for this sign-in (from an earlier one, or changed on the way): paste the code the page shows for this link, or open the link again. Paste the code:
 prigh browser-signin: signed in; saved for ws://127.0.0.1:<PORT>/ws in $DIR/laptop-home/.prigh/tui-connection.sexp
 === webkit: cli_signin: through the proxy ===
-upgrade /ws
 POST /cli-signin/grant
+upgrade /ws
 === webkit: cli_signin: errors ===
 none
 === webkit: desktop: its stdout ===
@@ -2596,10 +2596,10 @@ Password
 Connect
 Quit prigh
 === webkit: desktop: unencrypted ===
-0.0.0.0:1 is not encrypted: the password and everything prigh sends would cross the network in the clear, and anyone on the way could run commands on this computer. Use the backend's HTTPS address (wss://host/ws, behind a TLS reverse proxy), or an SSH tunnel (ssh -L 7790:localhost:7790 host, then 127.0.0.1:<PORT>). Connect anyway only on a network you trust.
+0.0.0.0:<CLOSED> is not encrypted: the password and everything prigh sends would cross the network in the clear, and anyone on the way could run commands on this computer. Use the backend's HTTPS address (wss://host/ws, behind a TLS reverse proxy), or an SSH tunnel (ssh -L 7790:localhost:7790 host, then 127.0.0.1:<PORT>). Connect anyway only on a network you trust.
 button: Connect without encryption
 === webkit: desktop: unencrypted, confirmed ===
-cannot reach the backend at 0.0.0.0:1: connection refused
+cannot reach the backend at 0.0.0.0:<CLOSED>: connection refused
 Is it running there (prigh serve -web HOST:PORT, or -listen)? Check the address: HOST:PORT (its -web or -listen port), or a prigh-web URL such as wss://host/ws.
 button: Connect
 === webkit: desktop: a wrong password ===
@@ -2957,6 +2957,7 @@ focus in the filter: control-input
   /settings | appearance, sessions, new sessions' defaults, models, git hosting and your account; a section opens at it (Ctrl+,)
   /review | the review page, the changes file by file to approve, comment on and edit (Alt+R): of the session's worktree or another (its branch, path or name), against its base or REV; /review BASE [instructions] (HEAD: the uncommitted changes) has the model review them for prioritised findings
   /files | browse, preview, upload and download files where the tools run (Ctrl+Shift+F)
+  /edit | the editor mode: edit the session's files (PATH, or the last one) beside the chat, and ask about a selection (Alt+E toggles it)
   /help | show commands and keys, or a command's usage
 ↑↓ move
 ↵ open
@@ -4992,3 +4993,104 @@ prigh: [run] Ran a command (took)
 prigh: Cleaned up. (time)
 === webkit: quiet small: errors ===
 (none)
+found: src/compact.ml
+=== webkit: editor desktop: a file open ===
+ok
+strip: src/ compact.ml
+lines: 16
+the long comment: wrapped
+dirty: src/ compact.ml Save
+saved: open! Import (* edited *)
+=== webkit: editor desktop: a conflict ===
+ok
+notice: src/compact.ml changed on the host since you opened it: reload it (losing your edits) or keep yours and overwrite it. Reload Overwrite
+overwritten: ["open! Import (* edited *)","(* mine *)"]
+chip: src/compact.ml:4–6 3 lines
+=== webkit: editor desktop: asking about lines ===
+ok
+agent: The agent changed this file: +3 −1 Keep Undo
+removed:   go [] 0 (List.rev turns)
+added:   match turns with |   | system :: rest -> system :: go [] (Turn.tokens system) (List.rev rest) |   | [] -> []
+=== webkit: editor desktop: the agent's change ===
+ok
+sent: [src/compact.ml:4–6] Pin the system turn Pasted text #1 4 lines · 162 B src/compact.ml, lines 4–6: HH:MM
+undone: true
+chat after sending: beside
+=== webkit: editor desktop: the chat beside ===
+ok
+tabs: compact.ml | turn.mli
+=== webkit: editor desktop: find ===
+ok
+left: the chat
+=== webkit: editor phone: a file open ===
+ok
+strip: src/ compact.ml
+lines: 16
+the long comment: wrapped
+dirty: src/ compact.ml
+=== webkit: editor phone: typing, the keys over the keyboard ===
+ok
+keys: Ask ⇥ { } ( ) [ ] ; = | -> ← → ↶
+composer while typing: hidden
+=== webkit: editor phone: the menu ===
+ok
+saved: open! Import (* edited *)
+=== webkit: editor phone: a conflict ===
+ok
+notice: src/compact.ml changed on the host since you opened it: reload it (losing your edits) or keep yours and overwrite it. Reload Overwrite
+overwritten: ["open! Import (* edited *)","(* mine *)"]
+chip: src/compact.ml:4–6 3 lines
+=== webkit: editor phone: asking about lines ===
+ok
+agent: The agent changed this file: +3 −1 Keep Undo
+removed:   go [] 0 (List.rev turns)
+added:   match turns with |   | system :: rest -> system :: go [] (Turn.tokens system) (List.rev rest) |   | [] -> []
+peek: The system turn is now pinned: go starts after it and never drops it.
+=== webkit: editor phone: the agent's change ===
+ok
+sent: [src/compact.ml:4–6] Pin the system turnPasted text #14 lines · 87 Bsrc/compact.ml, lines 4–6:HH:MM
+undone: true
+=== webkit: editor phone: the chat pulled up ===
+ok
+=== webkit: editor phone: the files drawer ===
+ok
+drawer: src/compact.ml | .. | README.md | src/1
+drawer gone: true
+strip: src/ turn.mli
+left: the chat
+=== webkit: editor small: a file open ===
+ok
+strip: src/ compact.ml
+lines: 16
+the long comment: wrapped
+dirty: src/ compact.ml
+=== webkit: editor small: typing, the keys over the keyboard ===
+ok
+keys: Ask ⇥ { } ( ) [ ] ; = | -> ← → ↶
+composer while typing: hidden
+=== webkit: editor small: the menu ===
+ok
+saved: open! Import (* edited *)
+=== webkit: editor small: a conflict ===
+ok
+notice: src/compact.ml changed on the host since you opened it: reload it (losing your edits) or keep yours and overwrite it. Reload Overwrite
+overwritten: ["open! Import (* edited *)","(* mine *)"]
+chip: src/compact.ml:4–6 3 lines
+=== webkit: editor small: asking about lines ===
+ok
+agent: The agent changed this file: +3 −1 Keep Undo
+removed:   go [] 0 (List.rev turns)
+added:   match turns with |   | system :: rest -> system :: go [] (Turn.tokens system) (List.rev rest) |   | [] -> []
+peek: The system turn is now pinned: go starts after it and never drops it.
+=== webkit: editor small: the agent's change ===
+ok
+sent: [src/compact.ml:4–6] Pin the system turnPasted text #14 lines · 96 Bsrc/compact.ml, lines 4–6:HH:MM
+undone: true
+=== webkit: editor small: the chat pulled up ===
+ok
+=== webkit: editor small: the files drawer ===
+ok
+drawer: src/compact.ml | .. | README.md | src/1
+drawer gone: true
+strip: src/ turn.mli
+left: the chat

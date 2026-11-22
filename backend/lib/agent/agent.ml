@@ -5250,6 +5250,21 @@ let list_paths t ~prefix =
   | { is_error = false; text; _ } -> Json.parse text
 ;;
 
+let list_files t =
+  match
+    host_exec
+      t
+      ~cancel:Cancellation.never
+      ~on_output:ignore
+      ~call_id:"list_files"
+      ~cwd:t.cwd
+      ~name:Host_ops.list_files_op
+      ~arguments:(`Object [])
+  with
+  | { is_error = true; text; _ } -> Or_error.error_string text
+  | { is_error = false; text; _ } -> Json.parse text
+;;
+
 let list_dirs ?host t ~prefix =
   let host =
     match host with

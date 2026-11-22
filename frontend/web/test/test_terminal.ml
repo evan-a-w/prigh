@@ -226,7 +226,8 @@ let%expect_test "the panel follows the session, the host and the user" =
          web.sidebar-opened web.sidebar-worktree-hours web.review web.code-size
          favourite-models history web.migrated web.sidebar-width web.files-width
          web.files-preview-width web.agents-width web.terminal-height
-         web.review-chat-width web.review-files-width web.review-margin-width))))
+         web.review-chat-width web.review-files-width web.review-margin-width
+         web.editor-tree-width))))
      (tag Prefs))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s2.jsonl) (limit 1000000)))

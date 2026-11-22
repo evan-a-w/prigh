@@ -58,7 +58,8 @@
 # /permissions forgetting the calls it remembered, Settings → Models → Approvals, on a desktop and two phones, then ui.mjs,
 # then chat.mjs, chat mode on a backend with no tool host, on a desktop and
 # phones, then quiet.mjs, the quiet transcript's runs of steps, on a desktop
-# and two phones) in each browser and diffs the output with ENGINE.expected (chromium.expected,
+# and two phones, then editor.mjs, the editor mode, on a desktop and two
+# phones) in each browser and diffs the output with ENGINE.expected (chromium.expected,
 # firefox.expected, webkit.expected). The scripts all run at once (JOBS at a
 # time, default: the number of CPUs, fewer if the memory available would not
 # hold them; and on Linux none starts while less than MEM_PER_JOB is
@@ -71,6 +72,8 @@
 # terminal panel, plus:
 #   PRIGH_BACKEND        the backend binary (default: the dune build)
 #   PRIGH_WEB_ROOT       the built site (default: the dune build)
+#   PRIGH_E2E_SHELL      the terminal panel's shell, an interactive bash
+#                        (default: bash on the PATH)
 #   ENGINES              browsers to run (default: chromium firefox webkit)
 #   SHOTS                a directory to save screenshots of each step in
 #   JOBS                 how many scripts run at once (at most)
@@ -83,6 +86,14 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export PRIGH_BACKEND="${PRIGH_BACKEND:-$here/../../../backend/_build/default/bin/main.exe}"
 export SITE="${PRIGH_WEB_ROOT:-$here/../../_build/default/web/bin/site}"
 export TOKEN='sekrit&x=y'
+# The backends' own host by a fixed name, the one ENGINE.expected was
+# recorded with (the build host's): the pages show it, and its length moves
+# the host chip.
+export PRIGH_HOST_NAME=server-laptop
+# The terminal panel's shell needs readline (↑ recalls, Tab completes):
+# /bin/sh may have none (dash, or a non-interactive bash in the Nix sandbox).
+PRIGH_E2E_SHELL="${PRIGH_E2E_SHELL:-$(command -v bash || true)}"
+export PRIGH_E2E_SHELL
 tmp="$(mktemp -d)"
 cleanup() {
 	status=$?
@@ -94,7 +105,7 @@ test -x "$PRIGH_BACKEND" || { echo "no backend at $PRIGH_BACKEND: build it (cd b
 test -f "$SITE/main.bc.js" || { echo "no site at $SITE: build it (cd frontend && dune build ./web/bin/site)" >&2; exit 1; }
 if [ -n "${SHOTS:-}" ]; then mkdir -p "$SHOTS"; fi
 
-scripts="prigh_web temporary accounts reconnect paging resilience:slow resilience:drops stability themes worktrees worktrees_switch session_card review review_git remote cli_signin desktop desktop_signin steer subagent_paged trim filter search session_links viewer math clipboard field_menu desktop_links card status mobile review_phone terminal_keys long_press pwa compaction sessions_settings new_sessions memory usage user_info custom_instructions mcp_settings mcp_oauth images:desktop images:phone images:small pasted:desktop pasted:phone pasted:small computer:desktop computer:phone computer:small smart:desktop smart:phone smart:small ui chat quiet:desktop quiet:phone quiet:small"
+scripts="prigh_web temporary accounts reconnect paging resilience:slow resilience:drops stability themes worktrees worktrees_switch session_card review review_git remote cli_signin desktop desktop_signin steer subagent_paged trim filter search session_links viewer math clipboard field_menu desktop_links card status mobile review_phone terminal_keys long_press pwa compaction sessions_settings new_sessions memory usage user_info custom_instructions mcp_settings mcp_oauth images:desktop images:phone images:small pasted:desktop pasted:phone pasted:small computer:desktop computer:phone computer:small smart:desktop smart:phone smart:small ui chat quiet:desktop quiet:phone quiet:small editor:desktop editor:phone editor:small"
 engines="${ENGINES:-chromium firefox webkit}"
 jobs="${JOBS:-$(nproc)}"
 # Measured peaks (PSS of the script, its backend and browser): 1.2 to 1.7 GiB,

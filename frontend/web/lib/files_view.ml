@@ -363,6 +363,15 @@ let actions (t : Files.t) ~inject =
              "Attach"
              (glyph Attach)
              (Attach e.name))
+      ; (if dir
+         then Node.none
+         else
+           act
+             ~cls:"edit"
+             ~title:"Open in the editor (/edit)"
+             "Edit"
+             (icon Pencil)
+             (Edit path))
       ; act
           ~title:
             (if dir

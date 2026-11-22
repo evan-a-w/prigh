@@ -308,6 +308,8 @@
           test -f ${prighWebRoot}/xterm.js
           test -f ${prighWebRoot}/xterm.css
           test -f ${prighWebRoot}/addon-fit.js
+          test -f ${prighWebRoot}/code_editor.js
+          test -f ${prighWebRoot}/codemirror.js
           test -f ${prighWebRoot}/katex.min.js
           test -f ${prighWebRoot}/katex.min.css
           test -f ${prighWebRoot}/copy-tex.min.js

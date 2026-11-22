@@ -26,6 +26,7 @@ module Argument = struct
     | Settings
     | Session
     | Path
+    | File (** any file under the cwd, by fuzzy search *)
     | Host
     | User
     | Skill
@@ -403,6 +404,12 @@ let every =
       "files"
       "browse, preview, upload and download files where the tools run \
        (Ctrl+Shift+F)"
+  ; c
+      ~argument:File
+      ~args:"[path]"
+      "edit"
+      "the editor mode: edit the session's files (PATH, or the last one) \
+       beside the chat, and ask about a selection (Alt+E toggles it)"
   ; c
       ~args:"[n|id|cancel <n|id>|steer <n|id> <text>|follow-up <n|id> <text>]"
       "agents"

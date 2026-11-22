@@ -169,6 +169,19 @@ let%expect_test "help lists every key and command" =
     ↑ ↓ / Enter / Backspace / Esc (the control centre) move / open the session or setting, or set the value / back from a setting's values to the list (in an empty filter) / close it
     Alt+Enter / Alt+R / Delete (/worktree) start a new session in the highlighted worktree / review its changes / remove it
     A (on a session) archive or unarchive it (archived sessions are listed last, muted)
+    Alt+E the editor mode: edit the session's files beside the chat (also /edit [path], the file browser's Edit)
+    Ctrl+S / ⌘+S (editor) save the file
+    Ctrl+P / ⌘+P (editor) go to file: fuzzy search over every file under the session's directory
+    Ctrl+F / ⌘+F (editor) find (and replace) in the file
+    Ctrl+G (editor) go to line
+    Ctrl+L / ⌘+L (in the editor's text) ask about the selection: attach it to the composer as path:L1–L2
+    Ctrl+I / ⌘+I (in the editor's text) ask about the selection in a box under its lines (Enter sends, Esc closes)
+    Swipe left / right (editor, a phone) the next or previous open file
+    Ctrl+B / ⌘+B (editor, wide window) show or hide the file tree
+    Alt+C (editor, wide window) show or hide the chat beside the editor
+    Alt+PageDown / Alt+PageUp (editor) the next or previous open file
+    Alt+W (editor) close the file
+    Esc (editor, outside the text) back to the chat
     P (on a session) pin it to the top of the sidebar, or unpin it (pinned sessions are never archived for being idle)
     Shift+F10 / ContextMenu (on a session or worktree) its menu: open, rename, fork, new worktree, review, files, terminal, pull request, copy, delete or remove (also right-click, a long press or its ⋯)
     Shift+F10 / ContextMenu (on a message) its menu: copy, trim everything before or after it, delete it (also right-click or a long press, at the pointer; with text selected, right-click is the browser's, to copy it; on a phone, its Select text selects its words)
@@ -290,6 +303,7 @@ let%expect_test "help lists every key and command" =
     /abort stop the current run
     /terminal [dir] open a shell where the tools run, in the session's directory (Ctrl+`), or a shell of its own in DIR (a worktree, say)
     /files [path] browse, preview, upload and download files where the tools run (Ctrl+Shift+F)
+    /edit [path] the editor mode: edit the session's files (PATH, or the last one) beside the chat, and ask about a selection (Alt+E toggles it)
     /agents [n|id|cancel <n|id>|steer <n|id> <text>|follow-up <n|id> <text>] follow subagents and background jobs in the agents panel, cancel one, or send a running subagent a message (steer: at its next step; follow-up: when it ends its turn)
     /jobs [id|kill <id>] background jobs in the agents panel: list them, show or kill one
     /login [provider|github [HOST]|forgejo HOST|HOST] [token] log in to a model provider (or /login custom), or sign in to GitHub or a Forgejo or Gitea host (token: paste one instead of OAuth)
@@ -629,7 +643,8 @@ let%expect_test
          web.sidebar-opened web.sidebar-worktree-hours web.review web.code-size
          favourite-models history web.migrated web.sidebar-width web.files-width
          web.files-preview-width web.agents-width web.terminal-height
-         web.review-chat-width web.review-files-width web.review-margin-width))))
+         web.review-chat-width web.review-files-width web.review-margin-width
+         web.editor-tree-width))))
      (tag Prefs))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s1.jsonl) (limit 1000000)))

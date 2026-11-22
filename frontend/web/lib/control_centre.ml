@@ -89,7 +89,7 @@ let close ~query label =
        + 1
 ;;
 
-let common_commands = [ "new"; "settings"; "review"; "files"; "help" ]
+let common_commands = [ "new"; "settings"; "review"; "files"; "edit"; "help" ]
 let recent = 5
 let most_settings = 12
 let most_sessions = 30

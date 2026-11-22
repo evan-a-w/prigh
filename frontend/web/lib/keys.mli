@@ -19,6 +19,7 @@ module Target : sig
     | Terminal (** the terminal panel: its keys are the shell's but Ctrl+` *)
     | Files (** the file browser's list (not its fields) *)
     | Review (** the review page (not its fields or buttons) *)
+    | Code (** the editor mode's editor *)
     | Resize of Resize.Handle.t (** a panel's resize handle *)
     | Settings_tab (** a section's tab down the settings page's side *)
     | Message of int

@@ -16,7 +16,7 @@ let popup (m : App.Model.t) ~inject =
       | Argument (Login | Logout) -> "Providers"
       | Argument Directory -> "Directories"
       | Argument Backend_directory -> "Directories on the backend"
-      | Argument Path | Path -> "Files"
+      | Argument (Path | File) | Path -> "Files"
       | Argument Verbosity -> "Verbosity"
       | Argument Confirm -> "Mode, also for new sessions"
       | Argument Mode -> "Modes"
@@ -497,6 +497,7 @@ let view (m : App.Model.t) ~inject =
             ; rest (images m ~inject)
             ; rest (pasted m ~inject)
             ; rest (Files_view.chips m ~inject)
+            ; rest (Code_editor_view.chip m ~inject)
             ; rest
               @@ div
                    ~cls:"editor-wrap"

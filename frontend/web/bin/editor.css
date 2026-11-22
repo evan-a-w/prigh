@@ -1,0 +1,597 @@
+/* The editor mode (code_editor_view.ml): the session's files in CodeMirror,
+   in the chat's place. The code has the room: one strip over it, the
+   composer under it (the chat's own, without the transcript) and, on a
+   wide window, the files down the left and the chat in a column on the
+   right. On a phone the strip is 40px and slides away as the code scrolls
+   down; the reply peeks over the composer and pulls the chat up under the
+   code; with the keyboard up, the composer gives way to a bar of the keys
+   a phone keyboard buries. */
+
+/* {1 Where it sits} */
+
+.code-page {
+  grid-area: code;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--graphite);
+  position: relative;
+}
+
+/* The code over the composer; the transcript and the chat's strip wait
+   until the chat is asked for. */
+.app.editing .desk {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto auto;
+  grid-template-areas: "code" "main" "terminal";
+}
+.app.editing:not(.code-chat) .main > :is(.chrome-anchor, .chat-frame, .banner-anchor) { display: none; }
+.app.editing:not(.code-chat) .main { border-top: 1px solid var(--rule); }
+
+/* A wide window's chat: a column right of the code, as beside a review. */
+.app.editing.code-chat:not(.narrow) .desk {
+  grid-template-columns: minmax(0, 1fr) 0 var(--review-chat-width, 400px);
+  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-areas: "code handle main" "terminal terminal terminal";
+}
+.app.editing.code-chat:not(.narrow) .main { border-left: 1px solid var(--rule); }
+.app.editing:not(.narrow) .resizer-sidebar { display: none; }
+.app.editing:not(.narrow):not(.sidebar-drawer) .sidebar { display: none; }
+.app.editing.sidebar-drawer:not(.narrow) .sidebar {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  max-width: 86vw;
+  z-index: var(--z-drawer);
+  box-shadow: var(--float-shadow);
+}
+.app.editing.sidebar-drawer:not(.narrow) .scrim {
+  display: block;
+  position: fixed;
+  inset: 0;
+  background: var(--scrim);
+  z-index: var(--z-scrim);
+}
+
+/* A phone's chat: pulled up under the code, which keeps a third of the
+   screen. */
+.app.narrow.editing.code-chat .desk { grid-template-rows: minmax(120px, 34%) minmax(0, 1fr) auto; }
+.app.narrow.editing.code-chat .main > .chrome-anchor { display: none; }
+.app.narrow.editing .main .chat { padding-top: 8px; }
+
+/* {1 The strip} */
+
+.code-strip {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 44px;
+  padding: 0 6px;
+  border-bottom: 1px solid var(--rule);
+  background: var(--graphite);
+  min-width: 0;
+}
+.code-strip .btn.icon { width: 36px; height: 36px; flex: none; }
+/* The directory gives way (from its start) before the name. */
+.code-path {
+  flex: 0 1 auto;
+  min-width: 0;
+  display: flex;
+  font: 13.5px var(--mono);
+  white-space: nowrap;
+}
+.code-path-dir {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  direction: rtl;
+  color: var(--faint);
+}
+.code-path-dir > bdi { direction: ltr; unicode-bidi: isolate; }
+.code-path-name { flex: none; color: var(--chalk); font-weight: 550; }
+.code-path-none { color: var(--faint); font-family: var(--sans); direction: ltr; }
+.code-strip > .code-path { margin-left: 4px; }
+.code-dirty {
+  display: inline-block;
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--sodium);
+  margin-left: 7px;
+}
+.code-strip-end { margin-left: auto; display: flex; align-items: center; gap: 2px; flex: none; }
+.code-save { margin-right: 6px; }
+.code-chat-toggle[aria-pressed="true"] { color: var(--chalk); background: var(--slate-2); }
+.code-dots { display: flex; gap: 5px; padding: 0 8px; flex: none; }
+.code-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--rule-2); }
+.code-dot.on { background: var(--chalk); }
+
+.code-menu-anchor { position: relative; }
+.code-menu-backdrop { position: fixed; inset: 0; z-index: var(--z-menu-surface); }
+.app.narrow .code-menu-backdrop { background: var(--scrim); }
+.code-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: var(--z-menu-surface);
+  min-width: 240px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  background: var(--slate);
+  border: 1px solid var(--rule-2);
+  border-radius: var(--r-surface);
+  box-shadow: var(--float-shadow);
+}
+.code-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--r-control);
+  background: none;
+  color: var(--chalk);
+  font: 14px var(--sans);
+  text-align: left;
+  cursor: pointer;
+}
+.code-menu-item:hover:not(:disabled), .code-menu-item:focus-visible { background: var(--slate-2); }
+.code-menu-item:disabled { color: var(--faint-line); cursor: default; }
+.code-menu-item.danger:not(:disabled) { color: var(--brick); }
+.code-menu-label { flex: 1; }
+.code-menu-hint { color: var(--faint); font: 12px var(--mono); }
+
+/* A wide window's open files, as tabs under the strip. */
+.code-tabs {
+  flex: none;
+  display: flex;
+  overflow-x: auto;
+  scrollbar-width: none;
+  border-bottom: 1px solid var(--rule);
+  background: var(--well);
+}
+.code-tab {
+  display: flex;
+  align-items: center;
+  flex: none;
+  max-width: 240px;
+  border-right: 1px solid var(--rule);
+  color: var(--muted);
+}
+.code-tab.on { background: var(--graphite); color: var(--chalk); box-shadow: inset 0 2px var(--sodium); }
+.code-tab-open {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  height: 34px;
+  padding: 0 4px 0 12px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: 13px var(--mono);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.code-tab-close.btn.icon { width: 26px; height: 26px; margin-right: 4px; opacity: 0.6; }
+.code-tab:hover .code-tab-close, .code-tab.on .code-tab-close { opacity: 1; }
+.code-tab-close .icon { width: 12px; height: 12px; }
+
+/* {1 The files} */
+
+.code-body { flex: 1; min-height: 0; display: flex; position: relative; }
+.code-tree {
+  width: var(--editor-tree-width, 240px);
+  flex: none;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--slate);
+  border-right: 1px solid var(--rule);
+}
+.code-body > .resizer { margin-left: -4px; }
+.code-tree-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 0 12px; }
+.code-section-title {
+  margin: 0;
+  padding: 10px 14px 4px;
+  font: 500 12.5px var(--sans);
+  color: var(--faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.code-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 30px;
+  padding: 0 12px 0 14px;
+  border: 0;
+  background: none;
+  color: var(--chalk);
+  font: 13px var(--mono);
+  text-align: left;
+  cursor: pointer;
+}
+.code-row:hover { background: var(--slate-2); }
+.code-row:focus-visible { outline: 2px solid var(--sodium); outline-offset: -2px; }
+.code-row .icon { width: 15px; height: 15px; color: var(--faint); flex: none; }
+.code-row.dir { color: var(--muted); }
+.code-row.on { background: color-mix(in srgb, var(--sodium) 14%, transparent); box-shadow: inset 3px 0 var(--sodium); }
+.code-row-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.code-row .code-path { flex: 1; }
+.code-git { margin-left: auto; font: 600 11px var(--mono); color: var(--sodium); flex: none; }
+.code-empty { display: block; padding: 8px 14px; color: var(--faint); font-size: 13px; }
+.code-goto-file {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px;
+  padding: 0 10px;
+  height: 34px;
+  border-radius: var(--r-control);
+  border: 1px solid var(--rule-2);
+  background: var(--well);
+  color: var(--faint);
+}
+.code-goto-file:focus-within { border-color: var(--sodium); }
+.code-goto-file .icon { width: 15px; height: 15px; flex: none; }
+.code-goto-file input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: none;
+  color: var(--chalk);
+  font: 14px var(--sans);
+  outline: none;
+}
+
+/* {1 The code} */
+
+.code-file { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.code-editor-host { flex: 1; min-height: 0; display: flex; position: relative; }
+.code-none {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 24px;
+  color: var(--muted);
+  text-align: center;
+}
+.code-none p { margin: 0; max-width: 36ch; }
+
+.code-notice {
+  flex: none;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 10px 8px 14px;
+  border-bottom: 1px solid var(--rule);
+  font-size: 13.5px;
+  line-height: 1.4;
+}
+.code-notice-text { flex: 1 1 220px; min-width: 0; }
+/* Two buttons after a short line: they stay beside it. */
+.code-notice.agent { flex-wrap: nowrap; }
+.code-notice.agent .code-notice-text { flex-basis: 0; }
+.code-notice.conflict { background: var(--brick-wash); border-bottom-color: var(--brick-line); }
+.code-notice.agent { background: color-mix(in srgb, var(--sage) 9%, var(--graphite)); border-bottom-color: var(--sage-line); }
+.code-goto {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px 6px 14px;
+  border-bottom: 1px solid var(--rule);
+  background: var(--slate);
+  font-size: 13.5px;
+  color: var(--muted);
+}
+.code-goto input {
+  width: 9ch;
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--rule-2);
+  border-radius: var(--r-control);
+  background: var(--well);
+  color: var(--chalk);
+  font: 14px var(--mono);
+}
+
+/* CodeMirror, in prigh-web's colours. Long lines wrap with a hanging
+   indent: the rest of a line sits two columns past its indentation
+   (--indent, from code_editor.js). */
+/* CodeMirror makes its editor position: relative !important: it fills the
+   host as a flex item. */
+.code-editor-host .cm-editor { flex: 1; min-width: 0; min-height: 0; color: var(--chalk); background: var(--graphite); }
+.code-editor-host .cm-editor.cm-focused { outline: none; }
+.code-editor-host .cm-scroller { font: var(--code-font-size, 13px)/1.55 var(--mono); overscroll-behavior: contain; }
+.code-editor-host .cm-content { padding: 6px 0 40vh; caret-color: var(--sodium); }
+.code-editor-host .cm-line {
+  padding-left: calc(var(--indent, 0ch) + 2ch + 4px);
+  text-indent: calc(-1 * (var(--indent, 0ch) + 2ch));
+  padding-right: 10px;
+}
+.code-editor-host .cm-gutters { background: var(--graphite); border-right: 0; color: var(--faint-line); }
+.code-editor-host .cm-lineNumbers .cm-gutterElement { min-width: 3ch; padding: 0 6px 0 8px; font-size: 0.85em; }
+.code-editor-host .cm-activeLine { background: #ffffff07; }
+.code-editor-host .cm-activeLineGutter { background: none; color: var(--chalk); }
+.code-editor-host .cm-cursor { border-left: 2px solid var(--sodium); }
+.code-editor-host .cm-selectionBackground,
+.code-editor-host .cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground { background: color-mix(in srgb, var(--sodium) 24%, transparent); }
+.code-editor-host .cm-selectionMatch { background: color-mix(in srgb, var(--sodium) 12%, transparent); }
+.code-editor-host .cm-matchingBracket { background: none; outline: 1px solid var(--rule-2); color: inherit; }
+.code-editor-host .cm-agent-gutter .cm-gutterElement { min-width: 3px; padding: 0; }
+.cm-agent-bar { display: block; width: 2px; height: 100%; margin-left: 1px; background: var(--sage); border-radius: 1px; }
+.code-editor-host .cm-agent-added { background: color-mix(in srgb, var(--sage) 12%, transparent); }
+.cm-agent-removed {
+  padding: 0 10px 0 calc(2ch + 4px);
+  background: color-mix(in srgb, var(--brick) 11%, transparent);
+  color: color-mix(in srgb, var(--brick) 60%, var(--muted));
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  text-decoration: line-through;
+  text-decoration-color: color-mix(in srgb, var(--brick) 40%, transparent);
+}
+.code-editor-host .cm-panels { background: var(--slate); color: var(--chalk); border-color: var(--rule); }
+.code-editor-host .cm-panels-bottom { border-top: 1px solid var(--rule); }
+.code-editor-host .cm-search { font: 13px var(--sans); padding: 6px 8px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.code-editor-host .cm-search br { display: none; }
+.code-editor-host .cm-textfield {
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--rule-2);
+  border-radius: var(--r-control);
+  background: var(--well);
+  color: var(--chalk);
+  font: 14px var(--mono);
+}
+.code-editor-host .cm-button {
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--rule-2);
+  border-radius: var(--r-control);
+  background: var(--slate-2);
+  background-image: none;
+  color: var(--chalk);
+  font: 13px var(--sans);
+}
+.code-editor-host .cm-search label { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); }
+.code-editor-host .cm-search button[name="close"] { color: var(--muted); font-size: 20px; padding: 0 6px; }
+.code-editor-host .cm-searchMatch { background: color-mix(in srgb, var(--sodium) 22%, transparent); }
+.code-editor-host .cm-searchMatch-selected { background: color-mix(in srgb, var(--sodium) 45%, transparent); }
+
+/* {1 The composer's chip} */
+
+.code-chip { border-color: color-mix(in srgb, var(--sodium) 55%, transparent); }
+.code-chip .attach-chip-name { color: var(--sodium); font-family: var(--mono); }
+
+/* {1 A phone} */
+
+.app.narrow .code-page { padding-top: var(--safe-t); padding-left: var(--safe-l); padding-right: var(--safe-r); }
+.app.narrow .code-strip { height: 44px; padding: 0 0 0 0; transition: margin-top 0.16s ease-out; }
+.app.narrow .code-strip .btn.icon { width: var(--tap); height: var(--tap); }
+.app.narrow .code-strip.hidden { margin-top: -45px; }
+.app.narrow .code-menu {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: auto;
+  bottom: 0;
+  min-width: 0;
+  padding: 8px 8px max(8px, var(--safe-b));
+  border-radius: 16px 16px 0 0;
+}
+.app.narrow .code-menu-item { min-height: var(--tap); font-size: 16px; }
+.app.narrow .code-menu-hint { display: none; }
+
+/* The files: a drawer from the left, the filter at the thumb. */
+.code-tree.drawer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: min(330px, 86vw);
+  z-index: var(--z-drawer);
+  box-shadow: 20px 0 40px #0006;
+  animation: code-drawer-in 0.16s ease-out;
+}
+@keyframes code-drawer-in { from { transform: translateX(-24px); opacity: 0; } }
+.code-scrim { position: absolute; inset: 0; z-index: var(--z-scrim); background: var(--scrim); }
+.code-tree.drawer .code-row { min-height: 40px; font-size: 14px; }
+.code-tree.drawer .code-goto-file { height: var(--tap); margin: 8px 10px max(10px, var(--safe-b)); border-radius: 12px; }
+.code-tree.drawer .code-goto-file input { font-size: 16px; }
+.app.narrow .code-notice .btn, .app.narrow .code-goto .btn { min-height: var(--tap); }
+.app.narrow .code-goto input { height: var(--tap); font-size: 16px; }
+.app.narrow .code-editor-host .cm-textfield { height: 40px; font-size: 16px; }
+.app.narrow .code-editor-host .cm-button { height: 40px; }
+
+/* The reply, a line over the composer: a tap pulls the chat up. */
+.code-peek {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: var(--tap);
+  padding: 0 12px 0 14px;
+  border: 0;
+  border-top: 1px solid var(--rule);
+  background: var(--slate);
+  color: var(--chalk);
+  font: 14px var(--sans);
+  text-align: left;
+  cursor: pointer;
+}
+.code-peek .icon { width: 16px; height: 16px; color: var(--muted); flex: none; }
+.code-peek .lamp { flex: none; }
+.code-peek-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.code-peek > .icon:last-child { transform: rotate(-90deg); transition: transform 0.16s; }
+.code-peek[aria-expanded="true"] > .icon:last-child { transform: rotate(90deg); }
+
+/* With the keyboard up (the code focused), the composer and the peek make
+   way for the keys. */
+.code-keys {
+  display: none;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  height: 48px;
+  padding: 0 6px;
+  border-top: 1px solid var(--rule);
+  background: var(--slate);
+}
+.app.narrow .code-page:has(.cm-focused) .code-keys { display: flex; }
+.app.narrow.editing:has(.code-page .cm-focused) .main { display: none; }
+.app.narrow .code-page:has(.cm-focused) .code-peek { display: none; }
+.code-keys-scroll {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-mask: linear-gradient(90deg, #000 88%, transparent);
+  mask: linear-gradient(90deg, #000 88%, transparent);
+}
+.code-keys-scroll::-webkit-scrollbar { display: none; }
+.code-key {
+  flex: none;
+  min-width: 40px;
+  height: 40px;
+  padding: 0 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--slate-2);
+  color: var(--chalk);
+  font: 16px var(--mono);
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.code-key:active { background: var(--rule-2); }
+.code-key.code-ask { background: var(--sodium); color: var(--sodium-ink); font: 600 14px var(--sans); padding: 0 12px; }
+.code-key.code-ask .icon { width: 16px; height: 16px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .code-tree.drawer { animation: none; }
+  .app.narrow .code-strip, .code-peek > .icon:last-child { transition: none; }
+}
+
+/* A fresh session's folder and branch tray: the strip names the file. */
+.app.narrow.editing .tray { display: none; }
+
+/* {1 The agent's changes in the text, kept ones' badges} */
+
+.cm-agent-change { margin: 4px 0 0; border-top: 1px solid var(--sage-line); }
+.cm-agent-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px 3px calc(2ch + 4px);
+  background: color-mix(in srgb, var(--sage) 9%, var(--graphite));
+  font: 500 12px var(--sans);
+  color: var(--muted);
+}
+.cm-agent-label { flex: 1; min-width: 0; font-variant-numeric: tabular-nums; }
+.cm-agent-act {
+  min-height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--rule-2);
+  border-radius: 6px;
+  background: var(--slate);
+  color: var(--chalk);
+  font: 500 12.5px var(--sans);
+  cursor: pointer;
+}
+.cm-agent-act.primary { background: var(--sage); border-color: var(--sage); color: var(--graphite); }
+.cm-agent-badge {
+  display: block;
+  width: 16px;
+  height: 16px;
+  margin: 2px 2px 0 1px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--sage);
+  color: var(--graphite);
+  font: 700 10px/16px var(--sans);
+  text-align: center;
+  cursor: pointer;
+}
+
+/* {1 The ask box, under the lines it is about} */
+
+.cm-ask {
+  margin: 4px 8px 6px calc(2ch + 4px);
+  padding: 8px;
+  border: 1px solid color-mix(in srgb, var(--sodium) 45%, var(--rule));
+  border-radius: 10px;
+  background: var(--slate);
+  font: 14px var(--sans);
+  white-space: normal;
+}
+.cm-ask-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.cm-ask-chip {
+  flex: 1;
+  min-width: 0;
+  color: var(--sodium);
+  font: 500 12px var(--mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cm-ask-row { display: flex; align-items: flex-end; gap: 8px; }
+.cm-ask-input {
+  flex: 1;
+  min-width: 0;
+  min-height: 36px;
+  padding: 8px 10px;
+  border: 1px solid var(--rule-2);
+  border-radius: 8px;
+  background: var(--well);
+  color: var(--chalk);
+  font: 14px/1.4 var(--sans);
+  resize: none;
+}
+.cm-ask-input:focus { outline: none; border-color: var(--sodium); }
+.cm-ask .cm-agent-act.primary { background: var(--sodium); border-color: var(--sodium); color: var(--sodium-ink); min-height: 36px; }
+.app.narrow .cm-agent-act { min-height: 44px; padding: 0 16px; font-size: 14px; }
+.app.narrow .cm-ask-input { font-size: 16px; min-height: 44px; }
+.app.narrow .cm-ask .cm-agent-act.primary { min-height: 44px; }
+/* A phone: a 40px target (the gutter's rows are dense), the badge 22px in it. */
+.app.narrow .cm-agent-badge {
+  width: 40px;
+  height: 40px;
+  margin: -9px 0;
+  background: radial-gradient(circle, var(--sage) 10.5px, transparent 11px);
+  font-size: 12px;
+  line-height: 40px;
+}
+.app.narrow .code-editor-host .cm-scroller { touch-action: pan-y pinch-zoom; }
+
+/* {1 Go to file's matches: a list as tall as all of them, the rows near
+   the scroll position placed in it} */
+
+.code-matches { position: relative; }
+.code-matches .code-row { position: absolute; left: 0; right: 0; height: 30px; }
+.app.narrow .code-matches .code-row { height: 44px; }
+.code-path mark { background: none; color: var(--sodium); font-weight: 700; }

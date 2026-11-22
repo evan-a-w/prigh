@@ -645,6 +645,7 @@ let perform client settings ctx (model : App.Model.t) (command : App.Command.t) 
       inject (App.Action.Notification_permission permission)
     | Set_title _ -> Effect.of_sync_fun sync_title model
     | Files page -> Effect.of_sync_fun Files_widget.perform page
+    | Code_editor c -> Effect.of_sync_fun Code_editor_widget.command c
     | Cache_prefs changes ->
       Effect.of_sync_fun
         (Pref_cache.save Login.Storage.browser ~owner:(Settings.owner settings))
@@ -747,7 +748,11 @@ let component client settings ~init ~current (local_ graph) =
   let%arr model
   and inject in
   { Result_.view =
-      Prigh_web.View.view model ~inject ~terminal:(terminal settings ~inject)
+      Prigh_web.View.view
+        model
+        ~inject
+        ~terminal:(terminal settings ~inject)
+        ~code_editor:Code_editor_widget.view
   ; inject
   }
 ;;
@@ -836,6 +841,7 @@ let key_target (ev : Dom_html.keyboardEvent Js.t) : Prigh_web.Keys.Target.t =
   match Js.Opt.to_option ev##.target with
   | None -> Page
   | Some el when Terminal_widget.contains el -> Terminal
+  | Some el when Code_editor_widget.contains el -> Code
   | Some el when Option.is_some (resize_handle el) ->
     Resize (Option.value_exn (resize_handle el))
   | Some el

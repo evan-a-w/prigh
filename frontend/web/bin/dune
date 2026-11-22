@@ -64,6 +64,7 @@
   terminal.css
   files.css
   review.css
+  editor.css
   highlight.css
   resize.css
   paging.css
@@ -88,6 +89,7 @@
     (cat terminal.css)
     (cat files.css)
     (cat review.css)
+    (cat editor.css)
     (cat highlight.css)
     (cat resize.css)
     (cat paging.css)

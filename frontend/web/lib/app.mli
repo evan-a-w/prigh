@@ -280,6 +280,7 @@ module Reply_tag : sig
     | Git_diff
     | Command_prompt of string (** [/review] or [/init] as typed *)
     | Files of Files.Reply.t
+    | Code of Code_editor.Reply.t
     | Review of Code_review.Reply.t
     | Sent_with_files of
         { text : string
@@ -455,6 +456,8 @@ module Command : sig
     (** answered by [Notification_permission] *)
     | Set_title of string (** the tab's, with the count of unseen events *)
     | Files of Files.Page.t
+    | Code_editor of Code_editor.Command.t
+    (** done to the editor mode's editor, once it has loaded *)
     | Cache_prefs of Prefs.Change.t list
     (** the user's preferences ({!Pref_sync}) as they are now, kept in the
         browser for the next page load (its first paint, or a backend that
@@ -909,6 +912,7 @@ module Action : sig
         ; status : Terminal.Status.t
         } (** from the page's widget *)
     | Files of Files.Action.t (** the file browser and the attachments *)
+    | Code of Code_editor.Action.t (** the editor mode *)
     | Review of Code_review.Action.t
     (** the review page, comments and approvals *)
     | Review_pick of Review_picker.Which.t
@@ -1055,6 +1059,7 @@ module Model : sig
     ; marks : Session_marks.t (** the sidebar's selection *)
     ; notifications : Page_notify.t
     ; files : Files.t
+    ; code : Code_editor.t
     ; review : Code_review.t
     ; review_memory : Review_memory.t
       (** what the review page compared last, per worktree (a
