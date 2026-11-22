@@ -175,7 +175,7 @@ let footer ~tip =
     ]
 ;;
 
-let top_bar ~tip ~sidebar ~has_right ~right_open ~set_right_open =
+let top_bar ~tip ~sidebar ~pressed ~has_right ~right_open ~set_right_open =
   let current = Fake.Session.current in
   Node.header
     ~attrs:
@@ -207,8 +207,18 @@ let top_bar ~tip ~sidebar ~has_right ~right_open ~set_right_open =
         ]
     ; div
         "ml-auto flex items-center gap-0.5"
-        [ icon_button tip ~id:"terminal" "Terminal" (Icons.view Panel_bottom)
-        ; icon_button tip ~id:"review" "Review changes" (Icons.view Git_compare)
+        [ icon_button
+            tip
+            ~id:"terminal"
+            ~active:(List.mem pressed "terminal" ~equal:String.equal)
+            "Terminal"
+            (Icons.view Panel_bottom)
+        ; icon_button
+            tip
+            ~id:"review"
+            ~active:(List.mem pressed "review" ~equal:String.equal)
+            "Review changes"
+            (Icons.view Git_compare)
         ; (if has_right
            then
              icon_button
@@ -224,7 +234,36 @@ let top_bar ~tip ~sidebar ~has_right ~right_open ~set_right_open =
     ]
 ;;
 
-let component ?right ?overlay ~tip ~main (local_ graph) =
+let mobile_sheet ~close ~title content =
+  div
+    "fixed inset-0 z-40 flex flex-col bg-background pt-[env(safe-area-inset-top)] \
+     pb-[env(safe-area-inset-bottom)]"
+    [ div
+        "flex h-12 shrink-0 items-center gap-1 border-b px-2"
+        [ Button.view
+            ~variant:Ghost
+            ~size:Sm
+            ~class_:"h-11 gap-1 px-2 text-muted-foreground"
+            ~on_click:close
+            [ Icon.view Chevron_left; Node.text "Chat" ]
+        ; span "truncate text-sm font-medium" [ Node.text title ]
+        ]
+    ; div "flex min-h-0 flex-1 flex-col" [ content ]
+    ]
+;;
+
+let component
+  ?right
+  ?right_size
+  ?(right_title = "Panel")
+  ?bottom
+  ?(bottom_size = 38.)
+  ?overlay
+  ?(pressed = [])
+  ~tip
+  ~main
+  (local_ graph)
+  =
   let sidebar = Sidebar.component ~persist:false graph in
   let worktree_open, set_worktree_open = Bonsai.state true graph in
   let right_open, set_right_open = Bonsai.state true graph in
@@ -233,17 +272,65 @@ let component ?right ?overlay ~tip ~main (local_ graph) =
     | None -> Bonsai.return None
     | Some r -> r >>| Option.some
   in
+  let bottom =
+    match bottom with
+    | None -> Bonsai.return None
+    | Some b -> b >>| Option.some
+  in
+  let right_layout, set_right_layout = Bonsai.state ([] : float list) graph in
+  let bottom_layout, set_bottom_layout = Bonsai.state ([] : float list) graph in
   let overlay = Option.value overlay ~default:(Bonsai.return Node.none) in
   let%arr sidebar
   and tip
   and main
   and right
+  and bottom
   and overlay
   and worktree_open
   and set_worktree_open
   and right_open
-  and set_right_open in
+  and set_right_open
+  and right_layout
+  and set_right_layout
+  and bottom_layout
+  and set_bottom_layout in
   let current = Fake.Session.current in
+  let mobile = Sidebar.is_mobile sidebar in
+  let main_column = div "flex h-full min-w-0 flex-1 flex-col" [ main ] in
+  let main_and_bottom =
+    match bottom with
+    | Some b when not mobile ->
+      Resizable.view
+        ~id:"bottom-split"
+        ~orientation:Vertical
+        ~layout:bottom_layout
+        ~on_layout_change:set_bottom_layout
+        [ Resizable.panel ~min_size:25. [ main_column ]
+        ; Resizable.handle ~class_:"bg-border" ()
+        ; Resizable.panel ~default_size:bottom_size ~min_size:15. [ b ]
+        ]
+    | _ -> main_column
+  in
+  let body =
+    match right, right_size with
+    | Some r, _ when right_open && mobile ->
+      [ main_and_bottom
+      ; mobile_sheet ~close:(set_right_open false) ~title:right_title r
+      ]
+    | Some r, Some size when right_open ->
+      [ Resizable.view
+          ~id:"right-split"
+          ~orientation:Horizontal
+          ~layout:right_layout
+          ~on_layout_change:set_right_layout
+          [ Resizable.panel ~min_size:30. [ main_and_bottom ]
+          ; Resizable.handle ~class_:"bg-border" ()
+          ; Resizable.panel ~default_size:size ~min_size:22. [ r ]
+          ]
+      ]
+    | Some r, None when right_open -> [ main_and_bottom; r ]
+    | _ -> [ main_and_bottom ]
+  in
   Node.div
     ~attrs:[ Attr.class_ "bg-background text-foreground font-sans antialiased" ]
     [ Sidebar.provider
@@ -271,16 +358,11 @@ let component ?right ?overlay ~tip ~main (local_ graph) =
             [ top_bar
                 ~tip
                 ~sidebar
+                ~pressed
                 ~has_right:(Option.is_some right)
                 ~right_open
                 ~set_right_open
-            ; div
-                "relative flex min-h-0 flex-1"
-                [ div "flex min-w-0 flex-1 flex-col" [ main ]
-                ; (match right with
-                   | Some r when right_open -> r
-                   | _ -> Node.none)
-                ]
+            ; div "relative flex min-h-0 flex-1" body
             ]
         ]
     ; overlay

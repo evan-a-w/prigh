@@ -11,6 +11,12 @@ let screens =
   ; "settings-mcp", Screen_settings_mcp.component
   ; "settings-keys", Screen_settings_keys.component
   ; "login", Screen_login.component
+  ; ("review", fun ~tip (local_ graph) -> Screen_review.component ~tip graph)
+  ; ("terminal", fun ~tip (local_ graph) -> Screen_terminal.component ~tip graph)
+  ; ("agents", fun ~tip (local_ graph) -> Screen_agents.component ~tip graph)
+  ; ("files", fun ~tip (local_ graph) -> Screen_files.component ~tip graph)
+  ; ("confirm", fun ~tip (local_ graph) -> Screen_confirm.component ~tip graph)
+  ; ("question", fun ~tip (local_ graph) -> Screen_confirm.question ~tip graph)
   ]
 ;;
 
