@@ -170,7 +170,13 @@ else
 	rm -f "$web_stamp"
 	# It only needs what was built: it runs while dune runs the rest (one
 	# dune at a time).
-	SUITE="$suite" ENGINES="$engines" bash "$root/frontend/web/e2e/prigh_web.sh" >"$logs/web e2e.log" 2>&1 &
+	# Its own time, taken when it ends, not when it is waited for.
+	{
+		status=0
+		SUITE="$suite" ENGINES="$engines" bash "$root/frontend/web/e2e/prigh_web.sh" >"$logs/web e2e.log" 2>&1 || status=$?
+		elapsed "$web_start" >"$logs/web e2e.time"
+		exit "$status"
+	} &
 	web=$!
 fi
 
@@ -188,10 +194,10 @@ step "desktop tests" timeout -k 10 "${DESKTOP_TEST_TIMEOUT:-600}" \
 if [ -z "$web" ]; then
 	:
 elif wait "$web"; then
-	echo "ok    web e2e: $suite, $engines ($(elapsed "$web_start"))"
+	echo "ok    web e2e: $suite, $engines ($(cat "$logs/web e2e.time"))"
 	echo "$web_digest" >"$web_stamp"
 else
-	echo "FAIL  web e2e: $suite, $engines ($(elapsed "$web_start")): $logs/web e2e.log"
+	echo "FAIL  web e2e: $suite, $engines ($(cat "$logs/web e2e.time")): $logs/web e2e.log"
 	cat "$logs/web e2e.log"
 	failed="$failed web-e2e"
 fi
