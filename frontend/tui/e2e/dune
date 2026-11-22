@@ -1,5 +1,26 @@
-(executables
- (names e2e e2e_websocket)
+; e2e needs only the client: in a stanza of its own it does not relink when
+; the UI libraries change.
+
+(executable
+ (name e2e)
+ (modules e2e)
+ (preprocess
+  (pps ppx_jane))
+ (libraries
+  core
+  core_unix
+  core_unix.command_unix
+  core_unix.filename_unix
+  core_unix.signal_unix
+  re
+  async
+  prigh_protocol
+  prigh_client
+  prigh_client_unix))
+
+(executable
+ (name e2e_websocket)
+ (modules e2e_websocket)
  (preprocess
   (pps ppx_jane))
  (libraries
