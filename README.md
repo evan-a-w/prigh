@@ -683,8 +683,9 @@ without it the backend looks next to its dune build and in
 installs the release build of the page (whole-program js_of_ocaml, about
 2 MB of JavaScript, sent as a 500 KB brotli or 590 KB gzip file it
 ships precompressed); reloads revalidate with `ETag`/`Last-Modified` and
-cost a `304` per file. A dune build in the dev profile makes a ~50 MB one
-with inline source maps, uncompressed, quicker to relink but slow to load. The page keeps `?session=` in the address bar
+cost a `304` per file. A dune build in the dev profile makes an ~11 MB one
+without source maps, uncompressed, quicker to relink but slower to load
+(`dune build --profile debug-js` adds inline source maps). The page keeps `?session=` in the address bar
 and the chat's scroll position and draft in the tab's sessionStorage (a
 reload, or a phone bringing back a discarded tab, returns to the same place,
 waiting for the backend if it is out of reach), reconnects when the

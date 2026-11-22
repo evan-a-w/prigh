@@ -1,0 +1,14 @@
+; The dev profile's JavaScript without source maps or pretty-printing: they
+; made each library's JavaScript a third slower to compile, the dev
+; main.bc.js twice as large (64 MB), and every page load and test parse it.
+; To debug in a browser with them: dune build --profile debug-js.
+
+(env
+ (dev
+  (js_of_ocaml
+   (sourcemap no)
+   (flags
+    (:standard \ --pretty))))
+ (debug-js
+  (js_of_ocaml
+   (sourcemap inline))))

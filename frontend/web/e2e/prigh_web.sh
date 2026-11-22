@@ -106,15 +106,6 @@ trap cleanup EXIT
 test -x "$PRIGH_BACKEND" || { echo "no backend at $PRIGH_BACKEND: build it (cd backend && dune build)" >&2; exit 1; }
 test -f "$SITE/main.bc.js" || { echo "no site at $SITE: build it (cd frontend && dune build ./web/bin/site)" >&2; exit 1; }
 if [ -n "${SHOTS:-}" ]; then mkdir -p "$SHOTS"; fi
-# The dev build's main.bc.js carries an inline source map, half its 64 MB:
-# every page load (about 150 a run) would parse it. The scripts get a copy
-# of the site without it (a release build has none: nothing to strip).
-if grep -q '^//# sourceMappingURL=data:' "$SITE/main.bc.js"; then
-	cp -rL "$SITE" "$tmp/site"
-	chmod -R u+w "$tmp/site"
-	grep -v '^//# sourceMappingURL=data:' "$SITE/main.bc.js" >"$tmp/site/main.bc.js"
-	export SITE="$tmp/site"
-fi
 
 scripts="prigh_web temporary accounts reconnect paging resilience:slow resilience:drops stability themes worktrees worktrees_switch review review_git remote cli_signin desktop desktop_signin steer subagent_paged trim filter search session_links viewer math clipboard field_menu desktop_links card status mobile review_phone terminal_keys long_press pwa compaction sessions_settings new_sessions memory usage user_info custom_instructions mcp_settings mcp_oauth images:desktop images:phone images:small pasted:desktop pasted:phone pasted:small computer:desktop computer:phone computer:small smart:desktop smart:phone smart:small ui chat quiet:desktop quiet:phone quiet:small editor:desktop editor:phone editor:small"
 # The core suite, ./test's: the main page's flows (chat, composer, sidebar,
