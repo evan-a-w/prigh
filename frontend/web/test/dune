@@ -1,16 +1,19 @@
-; Runs under node (virtual_dom needs a JavaScript runtime): the state machine
+; Run under node (virtual_dom needs a JavaScript runtime): the state machine
 ; driven by actions, the page it renders as HTML, and the page glue's pure
 ; parts (prigh_web_app).
+;
+; The test files are split between four libraries, each run by one node: a
+; node of its own per file (dune's partitions) paid the runner's start, mostly
+; parsing it, a hundred times over. The shards are balanced by the tests'
+; cost; the last takes every file not listed, so a new file needs no entry.
 
 (library
- (name prigh_web_test)
+ (name prigh_web_test_harness)
+ (wrapped false)
  (enabled_if %{bin-available:node})
+ (modules agent_events chat_harness harness render)
  (preprocess
   (pps ppx_jane js_of_ocaml-ppx))
- (inline_tests
-  (modes js)
-  (flags
-   (-source-tree-root .)))
  (libraries
   core
   expect_test_helpers_core
@@ -22,16 +25,280 @@
   virtual_dom.vdom_test_helpers
   re))
 
-; Every test file runs in a node of its own (dune's partitions), so the
-; runner's start, which is mostly parsing it, is paid a hundred times: no
-; source map (node only reads one with --enable-source-maps: nearly half
-; the runner), and node's compile cache, which the run listing the
-; partitions fills before the partitions start. A cache it cannot write is
-; skipped.
+; ppx_inline_test's backend without partitions: one node runs a library's tests.
+
+(library
+ (name prigh_web_test_backend)
+ (modules ())
+ (inline_tests.backend
+  (runner_libraries ppx_inline_test.runner.lib)
+  (flags
+   inline-test-runner
+   %{library-name}
+   -source-tree-root
+   %{workspace_root}
+   -diff-cmd
+   -)
+  (generate_runner
+   (echo "let () = Ppx_inline_test_lib.exit ();;"))))
+
+(library
+ (name prigh_web_test_a)
+ (enabled_if %{bin-available:node})
+ (modules
+  test_accounts
+  test_auto_archive
+  test_card
+  test_commands
+  test_computer
+  test_control_centre
+  test_custom_providers
+  test_drops
+  test_external_link
+  test_image_size
+  test_jump
+  test_markdown
+  test_memory
+  test_model_menu
+  test_page
+  test_paging
+  test_queue
+  test_review_worktrees
+  test_session_pin
+  test_sessions
+  test_shell
+  test_skills_mcp
+  test_units
+  test_worktree_switch
+  test_worktrees)
+ (preprocess
+  (pps ppx_jane js_of_ocaml-ppx))
+ (inline_tests
+  (backend prigh_web_test_backend)
+  (modes js)
+  (flags
+   (-source-tree-root .)))
+ (libraries
+  prigh_web_test_harness
+  core
+  expect_test_helpers_core
+  js_of_ocaml
+  prigh_protocol
+  prigh_web
+  prigh_web_app
+  virtual_dom
+  virtual_dom.vdom_test_helpers
+  re))
+
+(library
+ (name prigh_web_test_b)
+ (enabled_if %{bin-available:node})
+ (modules
+  test_about_you
+  test_chat_view
+  test_cli_signin
+  test_code_editor
+  test_compaction
+  test_compaction_settings
+  test_cwd_placeholder
+  test_dialogs
+  test_filter
+  test_highlight
+  test_mcp_settings
+  test_models
+  test_pasted
+  test_prefs
+  test_pull_requests
+  test_signin_link
+  test_smart_approval
+  test_steer_agents
+  test_subagent_paged
+  test_temporary
+  test_tool_view
+  test_trim
+  test_ui
+  test_ui_chart
+  test_update_notice
+  test_worktree_use
+  test_zoom)
+ (preprocess
+  (pps ppx_jane js_of_ocaml-ppx))
+ (inline_tests
+  (backend prigh_web_test_backend)
+  (modes js)
+  (flags
+   (-source-tree-root .)))
+ (libraries
+  prigh_web_test_harness
+  core
+  expect_test_helpers_core
+  js_of_ocaml
+  prigh_protocol
+  prigh_web
+  prigh_web_app
+  virtual_dom
+  virtual_dom.vdom_test_helpers
+  re))
+
+(library
+ (name prigh_web_test_c)
+ (enabled_if %{bin-available:node})
+ (modules
+  test_activity
+  test_approvals
+  test_chat_mode
+  test_composer
+  test_controls
+  test_custom_instructions
+  test_fallback
+  test_files
+  test_git_hosts
+  test_loop
+  test_naming_settings
+  test_new_sessions
+  test_notes
+  test_quiet
+  test_reconnect
+  test_resize
+  test_review
+  test_review_compare
+  test_review_since
+  test_scroll
+  test_session_links
+  test_snippets
+  test_stream_deltas
+  test_subagent_reload
+  test_ui_expr
+  test_usage)
+ (preprocess
+  (pps ppx_jane js_of_ocaml-ppx))
+ (inline_tests
+  (backend prigh_web_test_backend)
+  (modes js)
+  (flags
+   (-source-tree-root .)))
+ (libraries
+  prigh_web_test_harness
+  core
+  expect_test_helpers_core
+  js_of_ocaml
+  prigh_protocol
+  prigh_web
+  prigh_web_app
+  virtual_dom
+  virtual_dom.vdom_test_helpers
+  re))
+
+(library
+ (name prigh_web_test_d)
+ (enabled_if %{bin-available:node})
+ (modules
+  (:standard
+   \
+   agent_events
+   chat_harness
+   harness
+   render
+   test_accounts
+   test_auto_archive
+   test_card
+   test_commands
+   test_computer
+   test_control_centre
+   test_custom_providers
+   test_drops
+   test_external_link
+   test_image_size
+   test_jump
+   test_markdown
+   test_memory
+   test_model_menu
+   test_page
+   test_paging
+   test_queue
+   test_review_worktrees
+   test_session_pin
+   test_sessions
+   test_shell
+   test_skills_mcp
+   test_units
+   test_worktree_switch
+   test_worktrees
+   test_about_you
+   test_chat_view
+   test_cli_signin
+   test_code_editor
+   test_compaction
+   test_compaction_settings
+   test_cwd_placeholder
+   test_dialogs
+   test_filter
+   test_highlight
+   test_mcp_settings
+   test_models
+   test_pasted
+   test_prefs
+   test_pull_requests
+   test_signin_link
+   test_smart_approval
+   test_steer_agents
+   test_subagent_paged
+   test_temporary
+   test_tool_view
+   test_trim
+   test_ui
+   test_ui_chart
+   test_update_notice
+   test_worktree_use
+   test_zoom
+   test_activity
+   test_approvals
+   test_chat_mode
+   test_composer
+   test_controls
+   test_custom_instructions
+   test_fallback
+   test_files
+   test_git_hosts
+   test_loop
+   test_naming_settings
+   test_new_sessions
+   test_notes
+   test_quiet
+   test_reconnect
+   test_resize
+   test_review
+   test_review_compare
+   test_review_since
+   test_scroll
+   test_session_links
+   test_snippets
+   test_stream_deltas
+   test_subagent_reload
+   test_ui_expr
+   test_usage))
+ (preprocess
+  (pps ppx_jane js_of_ocaml-ppx))
+ (inline_tests
+  (backend prigh_web_test_backend)
+  (modes js)
+  (flags
+   (-source-tree-root .)))
+ (libraries
+  prigh_web_test_harness
+  core
+  expect_test_helpers_core
+  js_of_ocaml
+  prigh_protocol
+  prigh_web
+  prigh_web_app
+  virtual_dom
+  virtual_dom.vdom_test_helpers
+  re))
+
+; No source map: node only reads one with --enable-source-maps.
 
 (env
  (_
   (js_of_ocaml
-   (sourcemap no))
-  (env-vars
-   (NODE_COMPILE_CACHE /tmp/prigh-node-compile-cache))))
+   (sourcemap no))))
