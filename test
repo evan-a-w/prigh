@@ -37,8 +37,32 @@ case "${1:-}" in
 	;;
 esac
 
+# shell NAME FLAKE_ATTR FILE...: a saved profile of a dev shell (a GC root),
+# named by the files it is made from, made when there is none: entering
+# it skips evaluating the flake, which takes seconds. Profiles unused for a
+# week are dropped.
+shell() {
+	local name=$1 attr=$2 key dir profile
+	shift 2
+	key="$(cd "$root" && cat "$@" $(find nix -type f | LC_ALL=C sort) | sha256sum | cut -c1-16)"
+	dir="${XDG_CACHE_HOME:-$HOME/.cache}/prigh/test-shell"
+	mkdir -p "$dir"
+	for profile in "$dir"/*; do
+		case $profile in *-link) continue ;; esac
+		if [ -n "$(find "$profile" -maxdepth 0 -mtime +7)" ]; then
+			rm -f "$profile" "$profile"-*-link
+		fi
+	done
+	profile="$dir/$name-$key"
+	if [ ! -e "$profile" ]; then
+		nix develop --accept-flake-config --profile "$profile" "$root#$attr" -c true >&2
+	fi
+	touch -h "$profile"
+	echo "$profile"
+}
+
 if ! command -v dune >/dev/null; then
-	exec nix develop --accept-flake-config "$root" -c "$0" "$@"
+	exec nix develop "$(shell dev default flake.nix flake.lock backend/*.opam frontend/*.opam)" -c "$0" "$@"
 fi
 
 logs="$(mktemp -d /tmp/prigh-test.XXXXXX)"
@@ -122,7 +146,7 @@ step "frontend tests" dune build --root "$root/frontend" @runtest "${force[@]}"
 # The desktop app's logic and the computer-use helper (their windows and
 # desktops run in the flake's desktop-window and computer-use checks), in the
 # desktop dev shell: the helper's portal backend links PipeWire.
-step "desktop tests" nix develop --accept-flake-config "$root#desktop" \
+step "desktop tests" nix develop "$(shell desktop desktop flake.nix flake.lock desktop/Cargo.lock)" \
 	-c cargo test --locked --manifest-path "$root/desktop/Cargo.toml" -p prigh-desktop-core -p prigh-computer
 
 if wait "$web"; then

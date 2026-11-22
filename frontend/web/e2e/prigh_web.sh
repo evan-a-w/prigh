@@ -97,8 +97,16 @@ export PRIGH_HOST_NAME=server-laptop
 PRIGH_E2E_SHELL="${PRIGH_E2E_SHELL:-$(command -v bash || true)}"
 export PRIGH_E2E_SHELL
 tmp="$(mktemp -d)"
+# The terminal panels' tmux servers outlive the backends that started them,
+# and one can start while a script ends: every one left goes with the run.
+kill_tmux_servers() {
+	find "$1" -type s -path '*/tmux-*/*' 2>/dev/null | while read -r socket; do
+		"${PRIGH_TMUX:-tmux}" -S "$socket" kill-server 2>/dev/null || true
+	done
+}
 cleanup() {
 	status=$?
+	kill_tmux_servers "$tmp"
 	rm -rf "$tmp"
 	exit "$status"
 }
@@ -163,10 +171,7 @@ run_one() {
 	TEST_DIR="$tmp/$engine/$script" timeout -k 10 "${SCRIPT_TIMEOUT:-300}" \
 		node "$here/$file.mjs" "$engine" $part \
 		>"$tmp/$engine-$script.out" 2>"$tmp/$engine-$script.err" || status=$?
-	# The terminal panel's tmux server outlives a backend that was killed.
-	find "$tmp/$engine/$script" -type s -path '*/tmux-*/*' 2>/dev/null | while read -r socket; do
-		"${PRIGH_TMUX:-tmux}" -S "$socket" kill-server 2>/dev/null || true
-	done
+	kill_tmux_servers "$tmp/$engine/$script"
 	if [ -n "${TIMES:-}" ]; then
 		printf '%-9s %-11s %6.1fs\n' "$engine" "$script" "$(awk "BEGIN { print $EPOCHREALTIME - $start }")" >&2
 	fi
