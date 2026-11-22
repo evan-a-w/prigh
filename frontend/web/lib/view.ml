@@ -287,7 +287,7 @@ let transcript (m : Model.t) ~inject =
 module Part = struct
   (* The time as a part shows it: what changes at most once a minute
      ("3m ago", "14:32") by the minute, messages' times by the day ("Today",
-     "Yesterday"), the agents panel's running times by the second. *)
+     "Yesterday"), running times by the second. *)
   module Clock = struct
     type t =
       | Minute of Int63.t option
@@ -346,11 +346,6 @@ module Part = struct
   let terminal = make "terminal" ~equal:outside_transcript
   let files = make "files" ~equal:outside_transcript
 
-  let agents =
-    make "agents" ~equal:outside_composer ~clock:(fun m ->
-      if m.agents.open_ then Exact m.now else Clock.minute m)
-  ;;
-
   let dialogs = make "dialogs" ~equal:outside_composer
   let session_card = make "session_card" ~equal:outside_composer
 end
@@ -373,11 +368,9 @@ let view (m : Model.t) ~inject ~terminal ~code_editor =
       false
     | _ -> modal
   in
-  (* On a phone the agents panel is a sheet over the page: it has the
-     keyboard while open. *)
-  let sheet =
-    m.narrow && (m.agents.open_ || m.files.open_ || m.session_card.sheet)
-  in
+  (* On a phone the file browser and the session card are sheets over the
+     page: they have the keyboard while open. *)
+  let sheet = m.narrow && (m.files.open_ || m.session_card.sheet) in
   (* So is the drawer, over the page. *)
   let drawer = Model.drawer m in
   let layered covered = inert_if (covered || sheet || drawer) in
@@ -406,7 +399,6 @@ let view (m : Model.t) ~inject ~terminal ~code_editor =
           ([ "sidebar-open", Model.sidebar_shown m
            ; "sidebar-drawer", drawer
            ; "narrow", m.narrow
-           ; "agents-open", m.agents.open_
            ; "terminal-open", m.terminal.open_
            ; ( "offline"
              , match m.connection with
@@ -510,19 +502,16 @@ let view (m : Model.t) ~inject ~terminal ~code_editor =
                      ])
             ; toasts m ~inject
             ; (match m.subagent_chat with
-               | Some _ -> under_drawer (Subagent_chat_view.footer ~inject)
+               | Some _ -> Node.none
                | None ->
-                 Node.fragment
-                   [ Part.btw m ~inject (fun m ->
-                       under_drawer (Btw_view.view m ~inject))
-                   ; layered modal_composer (Composer_view.view m ~inject)
-                   ])
+                 Part.btw m ~inject (fun m ->
+                   under_drawer (Btw_view.view m ~inject)))
+            ; layered modal_composer (Composer_view.view m ~inject)
             ]
         ; Part.terminal m ~inject (fun m ->
             under_drawer (Terminal_view.view m ~inject ~widget:terminal))
         ]
     ; Part.files m ~inject (fun m -> panel (Files_view.view m ~inject))
-    ; Part.agents m ~inject (fun m -> panel (Agents_view.view m ~inject))
     ; (if m.narrow
        then
          Part.session_card m ~inject (fun m ->

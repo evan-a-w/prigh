@@ -348,9 +348,6 @@ module Command = struct
         (and focused): after text was put in at the caret *)
     | Sign_out
     | Quit_desktop
-    | Reveal of string list
-    (** scroll the main chat to a subagent's card: the call ids from the
-        top-level one down *)
     | Scroll_change of int
     | Copy of
         { text : string

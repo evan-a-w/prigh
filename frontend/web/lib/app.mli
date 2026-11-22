@@ -417,9 +417,6 @@ module Command : sig
     | Quit_desktop
     (** stop [prigh desktop] (the desktop app: its window, site and tool
         host) *)
-    | Reveal of string list
-    (** scroll the main chat to a subagent's card, opening the transcripts
-        it is in: the [subagent] call ids from the top-level one down *)
     | Scroll_change of int
     (** the review page's next (1) or previous (-1) change from what is in
         view; past the file's last (first), [Review (Step 1)] ([-1]) *)
