@@ -4,15 +4,19 @@ prigh is a coding agent. Read `README.md` for what it does and
 ## Layout and builds
 
 `./test` is the test suite: run it, and only it, before pushing and before
-merging. It builds both projects, runs their dune tests and prigh-web's core
-browser e2e in Chromium, in parallel: 45-55s after a change to either
-project, on a 16-core machine busy with other work (load average 10-20);
-much more load than that slows the browser e2e most. It enters the dev
+merging. It builds both projects, then runs the dune tests (`@runtest` in
+each) and, alongside them, prigh-web's browser smoke (`smoke.mjs`, one
+script, about 3 CPU-seconds) in Chromium; the desktop's `cargo test` too. It
+is meant to take under a minute after a change, also on a machine busy with
+other work, and repeats nothing it has a result for: dune keeps its test
+results, and the browser smoke is skipped when the backend, the site and the
+e2e scripts are what they were at its last green run. It enters the dev
 shells through saved profiles (`~/.cache/prigh/test-shell`), so it does not
-evaluate the flake each time. `./test --full` runs every browser e2e script
-at every size in Chromium, Firefox and WebKit (the desktop app's engine on
-Linux and macOS) and every dune test again, the whole matrix the flake
-checks run: run it only when the user asks for it. Both work from any shell (outside the dev
+evaluate the flake each time. `./test --full` runs everything again: every
+dune test, also those in the slower `@runtest-full` tier, and every browser
+e2e script at every size in Chromium, Firefox and WebKit (the desktop app's
+engine on Linux and macOS), the whole matrix the flake checks run: run it
+only when the user asks for it. Both work from any shell (outside the dev
 shell they enter it) and test what they build. Run single suites as below
 while iterating.
 
@@ -60,11 +64,13 @@ while iterating.
   with its own backend, browser and directory (as many at a time as the
   CPUs and the available memory allow: `JOBS`, `MEM_PER_JOB` MiB each),
   and print what they see;
-  `ENGINE.expected` is each browser's output. They load Playwright through
+  `ENGINE.expected` is each browser's output (`ENGINE.core.expected`:
+  `SUITE=core`'s, the smoke alone). They load Playwright through
   `playwright.mjs`, whose contexts block service workers unless a script
-  asks for them (`pwa.mjs` allows the worker it tests). `./test` skips them when the backend, the site and the scripts
-  are what they were at its last green run (`PRIGH_TEST_E2E=always` runs
-  them anyway). Wait for a condition, not a
+  asks for them (`pwa.mjs` allows the worker it tests). `./test` runs only
+  `smoke.mjs` (`SUITE=core`), and skips it when the backend, the site and
+  the scripts are what they were at its last green run
+  (`PRIGH_TEST_E2E=always` runs it anyway). Wait for a condition, not a
   time (`waitForFunction`, `waitFor`): a fixed wait is either slow or flaky
   on a busy machine, and a wait that is meant to time out costs its whole
   timeout.
@@ -123,14 +129,24 @@ hand-written value (e.g. don't just [assert_true] some condition). Look at the
 output of `dune build @runtest`, and if the diffs are right, `dune promote`.
 
 Run `./test` before pushing and before merging; `./test --full` only when
-the user asks (see "Layout and builds"). Keep `./test` under a minute on a
-busy machine (the dev profile's JavaScript has no source maps for that:
-`--profile debug-js` adds them): a new browser e2e script joins the core suite (`core` in
-`frontend/web/e2e/prigh_web.sh`) only if it covers a main flow nothing else
-does, and core scripts check one phone size (SUITE=core) where they check
-two. Keep them fast: tests wait for what they expect rather than
-sleeping, and output does not depend on timing (a test that passes only on an
-idle machine is broken).
+the user asks (see "Layout and builds"). Keep `./test` minimal and under a
+minute on a busy machine; `--full` is where depth goes:
+
+- Dune tests: `@runtest` is for unit and expect tests and a cheap check of
+  each real binary. A slow, integration-style test whose behaviour cheaper
+  tests already pin goes in the `@runtest-full` alias instead (`(alias
+  runtest-full)` in place of `runtest`), which only `./test --full` runs.
+- Browser e2e: `./test` runs `smoke.mjs` alone, the main flows once each,
+  one backend, one browser and few page loads. Add a check to it only for a
+  main flow that nothing else catches and only a real browser can; anything
+  else is a new script or a step in one, in the full suite (`scripts` in
+  `frontend/web/e2e/prigh_web.sh`, at every size it needs).
+- The dev profile's JavaScript has no source maps, to keep builds and page
+  loads cheap (`--profile debug-js` adds them).
+
+Keep tests fast: they wait for what they expect rather than sleeping, and
+output does not depend on timing (a test that passes only on an idle
+machine is broken).
 
 - Backend: drive the agent with `Faux_provider` and print event streams; no
   network.
@@ -148,7 +164,8 @@ idle machine is broken).
   apply). Consider the on-screen keyboard (the visual viewport shrinks) and
   touch (no hover: whatever a hover shows has a tap). `e2e/mobile.mjs` checks
   no page overflows sideways and no control is off screen, covered or
-  under 44px (40px in the few dense rows it lists).
+  under 44px (40px in the few dense rows it lists), with the audit in
+  `e2e/phone_audit.mjs`, which `smoke.mjs` runs on the main page too.
 
 ## UI principles
 

@@ -30,8 +30,8 @@ nix develop -c sh -c 'cd frontend && dune build @runtest'
 
 nix build               # result/bin/prigh wrapper (includes backend + TUI)
 
-./test                  # THE suite: builds both, runs the dune tests and the core browser e2e in Chromium (~1 min)
-./test --full           # every browser e2e script, in Firefox and WebKit too: the full matrix, when asked for
+./test                  # THE suite: builds both, runs the dune tests and a browser smoke in Chromium (under a minute)
+./test --full           # everything: the slower @runtest-full dune tests, every browser e2e script in Chromium, Firefox and WebKit
 ```
 
 Without Nix, an OxCaml opam switch with the same packages works too
