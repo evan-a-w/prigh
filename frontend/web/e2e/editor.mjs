@@ -15,6 +15,7 @@ import { execFileSync, spawn } from "node:child_process";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { end } from "./end.mjs";
+import { normalVerbosity } from "./verbose_prefs.mjs";
 
 const { chromium, firefox, webkit } = await import(process.env.PLAYWRIGHT_MODULE);
 
@@ -32,6 +33,7 @@ const pwa = part === "phone" && engineName === "chromium";
 const { PRIGH_BACKEND: backend, SITE: site, TOKEN: token } = process.env;
 const dir = join(process.env.TEST_DIR, `editor-${part}`);
 const home = join(dir, "home");
+normalVerbosity(home);
 const cwd = join(dir, "repo");
 mkdirSync(home, { recursive: true });
 mkdirSync(join(cwd, "src"), { recursive: true });

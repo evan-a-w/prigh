@@ -12,6 +12,7 @@ import { hostName } from "./host_name.mjs";
 import { join } from "node:path";
 import { png, pngSize } from "./png.mjs";
 import { end } from "./end.mjs";
+import { normalVerbosity } from "./verbose_prefs.mjs";
 
 const { chromium, firefox, webkit } = await import(process.env.PLAYWRIGHT_MODULE);
 
@@ -20,6 +21,7 @@ const engine = { chromium, firefox, webkit }[engineName];
 if (!engine) throw new Error("usage: prigh_web.mjs chromium|firefox|webkit");
 const { PRIGH_BACKEND: backend, SITE: site, TEST_DIR: dir, TOKEN: token } = process.env;
 const home = join(dir, "home");
+normalVerbosity(home);
 const cwd = join(dir, "cwd");
 mkdirSync(home, { recursive: true });
 mkdirSync(cwd, { recursive: true });

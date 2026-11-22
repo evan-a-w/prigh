@@ -17,6 +17,7 @@ import { mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { hostName } from "./host_name.mjs";
 import { join } from "node:path";
 import { end } from "./end.mjs";
+import { normalVerbosity } from "./verbose_prefs.mjs";
 
 const { chromium, firefox, webkit } = await import(process.env.PLAYWRIGHT_MODULE);
 
@@ -26,6 +27,7 @@ if (!engine) throw new Error("usage: mcp_oauth.mjs chromium|firefox|webkit");
 const { PRIGH_BACKEND: backend, SITE: site, TOKEN: token } = process.env;
 const dir = join(process.env.TEST_DIR, "mcp_oauth");
 const home = join(dir, "home");
+normalVerbosity(home);
 const cwd = join(dir, "cwd");
 mkdirSync(join(home, ".prigh"), { recursive: true });
 mkdirSync(cwd, { recursive: true });
