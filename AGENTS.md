@@ -4,19 +4,22 @@ prigh is a coding agent. Read `README.md` for what it does and
 ## Layout and builds
 
 `./test` is the test suite: run it, and only it, before pushing and before
-merging. It builds both projects, then runs the dune tests (`@runtest` in
-each) and, alongside them, prigh-web's browser smoke (`smoke.mjs`, one
-script, about 3 CPU-seconds) in Chromium; the desktop's `cargo test` too. It
-is meant to take under a minute after a change, also on a machine busy with
-other work, and repeats nothing it has a result for: dune keeps its test
-results, and the browser smoke is skipped when the backend, the site and the
-e2e scripts are what they were at its last green run. It enters the dev
-shells through saved profiles (`~/.cache/prigh/test-shell`), so it does not
-evaluate the flake each time. `./test --full` runs everything again: every
-dune test, also those in the slower `@runtest-full` tier, and every browser
-e2e script at every size in Chromium, Firefox and WebKit (the desktop app's
-engine on Linux and macOS), the whole matrix the flake checks run: run it
-only when the user asks for it. Both work from any shell (outside the dev
+merging. It builds and tests each project in one dune call (`dune build
+@default @runtest`), then runs prigh-web's browser smoke (`smoke.mjs`, one
+script, about 3 CPU-seconds) in Chromium alongside the desktop's `cargo
+test`. It is meant to take under a minute after a change, also on a machine
+busy with other work, and about 4 CPU-seconds when nothing changed: it
+repeats nothing it has a result for. Dune keeps its test results; the browser
+smoke is skipped when the backend, the site and the e2e scripts are what they
+were at its last green run, and `cargo test` when its test executables are
+(`PRIGH_TEST_E2E=always`, `PRIGH_TEST_DESKTOP=always` or `SHOTS` run them
+anyway). It enters the dev shells through saved profiles
+(`~/.cache/prigh/test-shell`), so it does not evaluate the flake each time.
+`./test --full` runs everything again: every dune test, also the slow tier
+(`PRIGH_TEST_TIER=full`), and every browser e2e script at every size in
+Chromium, Firefox and WebKit (the desktop app's engine on Linux and macOS):
+run it only when the user asks for it. No CI job runs it (the flake's
+`web-e2e` check runs the browser e2e alone). Both work from any shell (outside the dev
 shell they enter it) and test what they build. Run single suites as below
 while iterating.
 
@@ -44,10 +47,9 @@ while iterating.
 - `frontend/`'s `@runtest` includes the TUI's e2e and tmux tests, which run
   `backend/_build/default/bin/main.exe`: build the backend first (`dune
   build`, not just `@runtest`, which does not rebuild `main.exe`). They
-  depend on it through `$PRIGH_BACKEND_DIGEST`, which `./test` sets to its
-  hash: by hand, set it too (`export PRIGH_BACKEND_DIGEST=$(sha256sum
-  backend/_build/default/bin/main.exe)`) or a backend change does not run
-  them again. The tmux tests need a terminal multiplexer (`tmux`);
+  depend on `tui/e2e/backend.digest`, its hash (of `$PRIGH_BACKEND` if
+  set), which dune computes on every build: they run again when the backend
+  changes, and only then. The tmux tests need a terminal multiplexer (`tmux`);
   each `.t` file in `tmux-test/` is a group of scenarios, and dune runs the
   groups in parallel. `dune build @tui/test/runtest` runs only the TUI's
   unit tests. `$PRIGH_BACKEND` overrides that path: unset it
@@ -134,15 +136,16 @@ minute on a busy machine; `--full` is where depth goes:
 
 - Dune tests: `@runtest` is for unit and expect tests and a cheap check of
   each real binary. A slow, integration-style test whose behaviour cheaper
-  tests already pin goes in the `@runtest-full` alias instead (`(alias
-  runtest-full)` in place of `runtest`), which only `./test --full` runs.
-  Where the slow ones live:
+  tests already pin goes in the slow tier instead: its stanza (inline_tests,
+  cram or rule) gets `(enabled_if (= %{env:PRIGH_TEST_TIER=default} full))`,
+  so only `PRIGH_TEST_TIER=full dune build @runtest` (`./test --full`) runs
+  it. Its code still builds, warnings and all, in every run, so it never falls
+  behind. Where the slow ones live:
   - Backend: a test taking 100 ms of CPU or 1 s of wall or more goes in
     `backend/test/full/test_x_full.ml` (opening `Test_x` for its helpers),
     and `test_x.ml` keeps the cheap ones, so every area stays in the default
-    run. `test/full` and `test/terminal` are vendored directories:
-    `@runtest` skips them, `@runtest-full` runs them. ppx_expect rejects
-    custom tags, so the tiers are split by directory. To time one test:
+    run. `test/full` and `test/terminal` are the slow tier's directories
+    (ppx_expect rejects custom tags, so the tiers are split by directory). To time one test:
     `inline-test-runner.exe inline-test-runner <lib> -source-tree-root .
     -only-test file.ml:LINE`.
   - prigh-web: scale tests (huge replies, trees, file lists) go in
@@ -151,7 +154,9 @@ minute on a busy machine; `--full` is where depth goes:
     test file needs no entry. `Harness` reuses the last rendering until the
     model changes: change state only through `App.update`.
   - TUI: the default runs the e2e transcript and the tmux group `smoke.t`;
-    the other tmux groups and the websocket e2e are `@runtest-full`.
+    the other tmux groups and the websocket e2e (`tui/e2e/websocket`, a
+    library every build compiles; its executable exists only in the slow
+    tier, as linking it cost more than running it) are in the slow tier.
 - Browser e2e: `./test` runs `smoke.mjs` alone, the main flows once each,
   one backend, one browser and few page loads. Add a check to it only for a
   main flow that nothing else catches and only a real browser can; anything

@@ -30,8 +30,8 @@ nix develop -c sh -c 'cd frontend && dune build @runtest'
 
 nix build               # result/bin/prigh wrapper (includes backend + TUI)
 
-./test                  # THE suite: builds both, runs the dune tests and a browser smoke in Chromium (under a minute)
-./test --full           # everything: the slower @runtest-full dune tests, every browser e2e script in Chromium, Firefox and WebKit
+./test                  # THE suite: builds both, runs the dune tests, the desktop's cargo tests and a browser smoke in Chromium (under a minute; seconds when nothing changed)
+./test --full           # everything again: the slow tier of dune tests (PRIGH_TEST_TIER=full), every browser e2e script in Chromium, Firefox and WebKit
 ```
 
 Without Nix, an OxCaml opam switch with the same packages works too
@@ -3693,15 +3693,25 @@ to add an `Authorization` header.
 
 ### Testing
 
-`./test` runs everything below (the dune tests one project after the other,
-prigh-web's core browser e2e in Chromium alongside); it is the suite to run
-before pushing and before merging. `./test --full` runs every browser e2e
-script at every size in Firefox and WebKit as well, like the flake's checks,
-and is run only when asked for.
+`./test` is the suite to run before pushing and before merging: one `dune
+build @default @runtest` per project, then prigh-web's browser smoke
+(`smoke.mjs`) in Chromium alongside the desktop's `cargo test`. It repeats
+nothing it has a result for (dune's results; the browser smoke and the cargo
+tests are skipped when what they test is unchanged since their last green
+run), so with nothing changed it takes a few seconds.
 
-Four layers, cheapest first; `dune build @runtest` in each project runs all
-of them (the last two need the backend binary built first), and `dune
-promote` accepts new output everywhere:
+The tests come in two tiers. The default one is unit and expect tests and a
+cheap check of each real binary. The slow tier (integration-style tests whose
+behaviour cheaper ones pin: `backend/test/full`, `backend/test/terminal`,
+`frontend/web/test/full`, the TUI's websocket e2e and most tmux groups) is
+built in every run but run only with `PRIGH_TEST_TIER=full`: `./test --full`
+sets it, and also runs every browser e2e script at every size in Chromium,
+Firefox and WebKit. It is run only when asked for; no CI job runs it (the
+flake's `web-e2e` check runs the browser e2e alone).
+
+Four layers, cheapest first; `dune build @runtest` in each project runs those
+of them in the tier (the last two need the backend binary built first), and
+`dune promote` accepts new output everywhere:
 
 1. **Pure expect tests** — `cd backend && dune build @runtest` drives the
    agent loop, tools and RPC with `Faux_provider` and the providers/HTTP/OAuth
