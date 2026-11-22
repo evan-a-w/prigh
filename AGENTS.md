@@ -58,7 +58,9 @@ while iterating.
   `ENGINE.expected` is each browser's output. Wait for a condition, not a
   time (`waitForFunction`, `waitFor`): a fixed wait is either slow or flaky
   on a busy machine, and a wait that is meant to time out costs its whole
-  timeout.
+  timeout. A script that orders agents with gates (bash calls waiting for a
+  file, `e2e/gates.mjs`) calls `holdGates(home)`, or a gate held past 30s
+  moves to the background and the faux script's replies go out of turn.
 - The flake uses the binary cache `attic.caduc.co/prigh`, which a
   self-hosted build host fills from every push to `main` (DOCKER.md,
   "Binary cache"); pass

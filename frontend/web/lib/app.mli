@@ -1147,8 +1147,9 @@ module Model : sig
   (** The turn or background subagents or jobs run: the session is busy. *)
   val active : t -> bool
 
-  (** A subagent or job is running, or a transcript is being fetched: the
-      page sends [Clock] every second. *)
+  (** A subagent or job is running, a transcript is being fetched, or a
+      session still loading waits to ask for its transcript again: the page
+      sends [Clock] every second. *)
   val ticking : t -> bool
 
   (** Who the composer writes to: the subagent whose chat is on show, else

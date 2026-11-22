@@ -1161,6 +1161,7 @@ module Model = struct
   let ticking t =
     Agents.running_agents t.agents + Agents.running_jobs t.agents > 0
     || Agents.fetching t.agents
+    || (t.pending.messages && t.pending.resync_at_end)
   ;;
 
   let recipient t : Recipient.t =
@@ -3506,10 +3507,20 @@ let clock (m : Model.t) now =
     Option.value_map a.polled_at ~default:true ~f:(fun at ->
       Time_ns.Span.( >= ) (Time_ns.diff now at) poll_interval)
   in
-  if due && Agents.running_jobs a > 0
-  then
-    with_agents m ~f:(fun a -> { a with polled_at = Some now }), [ list_jobs ]
-  else m, []
+  let m, jobs =
+    if due && Agents.running_jobs a > 0
+    then
+      with_agents m ~f:(fun a -> { a with polled_at = Some now }), [ list_jobs ]
+    else m, []
+  in
+  (* A session still loading whose transcript came older than the events
+     since (its run goes on): asked for again each second rather than at the
+     end of the run, which may be long, all that time on "Loading". *)
+  match m.state with
+  | Some state when m.pending.messages && m.pending.resync_at_end ->
+    ( { m with pending = { m.pending with resync_at_end = false } }
+    , jobs @ [ resync_rpc m state ] )
+  | Some _ | None -> m, jobs
 ;;
 
 let stop (m : Model.t) (item : Agents.Item.t) =

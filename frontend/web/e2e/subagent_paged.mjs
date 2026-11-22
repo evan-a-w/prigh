@@ -12,6 +12,7 @@ import { spawn } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { end } from "./end.mjs";
+import { holdGates, waitFor } from "./gates.mjs";
 import { normalVerbosity } from "./verbose_prefs.mjs";
 
 const { chromium, firefox, webkit } = await import(process.env.PLAYWRIGHT_MODULE);
@@ -23,6 +24,7 @@ const { PRIGH_BACKEND: backend, SITE: site, TOKEN: token } = process.env;
 const dir = join(process.env.TEST_DIR, "subagent_paged");
 const home = join(dir, "home");
 normalVerbosity(home);
+holdGates(home);
 const cwd = join(dir, "cwd");
 mkdirSync(home, { recursive: true });
 mkdirSync(cwd, { recursive: true });
@@ -30,9 +32,6 @@ setTimeout(() => { console.error("subagent_paged.mjs: timed out"); process.exit(
 
 // The main agent and the subagent share the faux script's replies, in
 // order: the main agent waits in its bash call while the subagent works.
-// Each waits at most as long as the script may run, and every gate is
-// opened at teardown, so no shell is left polling (#67).
-const waitFor = file => `timeout 300 sh -c 'until [ -f ${file} ]; do sleep 0.1; done'; echo ${file}`;
 const gates = ["main-go", "end"];
 
 const steps = 35;
