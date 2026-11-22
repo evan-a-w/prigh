@@ -131,9 +131,12 @@ let%expect_test
   =
   let gates = Gates.create () in
   Gates.hold gates "inner";
+  let inner_requested = ref false in
   with_agent
     ~before:(Gates.before gates)
-    ~on_request:print_requests
+    ~on_request:(fun ~key request ->
+      if String.equal key "inner" then inner_requested := true;
+      print_requests ~key request)
     ~main:[ spawn "outer"; Reply.text "spawned"; Reply.text "got it" ]
     [ "outer", [ spawn ~id:"n1" "inner"; Reply.text "outer steered" ]
     ; "inner", [ Reply.text "inner done" ]
@@ -141,6 +144,9 @@ let%expect_test
   @@ fun _t agent ->
   Or_error.ok_exn (Agent.prompt agent "go");
   wait_turn agent;
+  while not !inner_requested do
+    Eio_unix.sleep 0.002
+  done;
   log_subagent agent;
   print_endline "--- steer while inner runs";
   send agent "mind the docs";
@@ -165,13 +171,12 @@ let%expect_test
     assistant: spawned
     agent_end
     state: running=false subagents=[a1 running]
+    request inner: u(inner)
     --- steer while inner runs
     queue: a1 steer=[mind the docs] follow_up=[]
     (Ok ())
     (Error
      "a1/n1 runs inside a1 (a subagent's own subagent) and takes no messages: send it to a1")
-      [a1] assistant:  subagent{"task":"inner"}
-    request inner: u(inner)
       [a1] tool_result subagent: inner done | [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
     queue:
       [a1] user: [The user sends you this while you work: take it into account and carry on.] |  | mind the docs
