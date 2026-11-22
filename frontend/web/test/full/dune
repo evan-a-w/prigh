@@ -9,7 +9,7 @@
  (preprocess
   (pps ppx_jane js_of_ocaml-ppx))
  (inline_tests
-  (backend prigh_web_test_backend)
+  (backend prigh_inline_test_backend)
   (modes js)
   (flags
    (-source-tree-root .)))

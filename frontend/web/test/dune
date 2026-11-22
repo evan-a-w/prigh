@@ -27,23 +27,6 @@
   virtual_dom.vdom_test_helpers
   re))
 
-; ppx_inline_test's backend without partitions: one node runs a library's tests.
-
-(library
- (name prigh_web_test_backend)
- (modules ())
- (inline_tests.backend
-  (runner_libraries ppx_inline_test.runner.lib)
-  (flags
-   inline-test-runner
-   %{library-name}
-   -source-tree-root
-   %{workspace_root}
-   -diff-cmd
-   -)
-  (generate_runner
-   (echo "let () = Ppx_inline_test_lib.exit ();;"))))
-
 (library
  (name prigh_web_test_a)
  (enabled_if %{bin-available:node})
@@ -103,7 +86,7 @@
  (preprocess
   (pps ppx_jane js_of_ocaml-ppx))
  (inline_tests
-  (backend prigh_web_test_backend)
+  (backend prigh_inline_test_backend)
   (modes js)
   (flags
    (-source-tree-root .)))
@@ -184,7 +167,7 @@
  (preprocess
   (pps ppx_jane js_of_ocaml-ppx))
  (inline_tests
-  (backend prigh_web_test_backend)
+  (backend prigh_inline_test_backend)
   (modes js)
   (flags
    (-source-tree-root .)))
