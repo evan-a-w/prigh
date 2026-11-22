@@ -28,7 +28,7 @@ Shift+Tab: dialog: Keys
 Shift+Tab: dialog: Close (Esc)
 Shift+Tab: dialog: Done
 Shift+Tab: dialog: Keys
-after Esc: editor cwd-placeholder
+after Esc: editor
 === chromium: a mistyped command ===
 Unknown command /modle. Did you mean /mode? (/help lists them)
 editor: /modle
@@ -713,17 +713,17 @@ hl-prop:"name" hl-str:"prigh" hl-prop:"ok" hl-con:true hl-prop:"n" hl-num:3
 chat 700; chips: <HOSTNAME>, V4.1 Flash; status: Context 0% full, $<COST>: details; .chat-chrome 48px high
 .chat-chrome: fits
 .composer: fits
-the panels' toggles: 1 buttons 10px from the top, 12px from the right, clear of the jump list: true, open: none
+the panels' toggles: 4 buttons 10px from the top, 12px from the right, clear of the jump list: true, open: Files
 === chromium: the session: a 520px chat column ===
 chat 520; chips: icon, V4.1 Flash; status: Context 0% full, $<COST>: details; .chat-chrome 48px high
 .chat-chrome: fits
 .composer: fits
-the panels' toggles: 1 buttons 10px from the top, 12px from the right, clear of the jump list: true, open: none
+the panels' toggles: 4 buttons 10px from the top, 12px from the right, clear of the jump list: true, open: Files
 === chromium: the session: a 400px chat column ===
 chat 400; chips: icon, V4.1 Flash; status: Context 0% full, $<COST>: details; .chat-chrome 48px high
 .chat-chrome: fits
 .composer: fits
-the panels' toggles: 1 buttons 10px from the top, 12px from the right, clear of the jump list: true, open: none
+the panels' toggles: 4 buttons 10px from the top, 12px from the right, clear of the jump list: true, open: Files
 === chromium: settings ===
 Settings
 Appearance
@@ -789,17 +789,17 @@ Esc closes it, the editor has the focus: true
 chat 900; chips: <HOSTNAME>, V4.1 Flash; status: Context 0% full, $<COST>: details; .chat-chrome 48px high
 .chat-chrome: fits
 .composer: fits
-the panels' toggles: 1 buttons 10px from the top, 12px from the right, clear of the jump list: true, open: none
+the panels' toggles: 5 buttons 10px from the top, 12px from the right, clear of the jump list: true, open: Files
 === chromium: the session's bar: a 600px chat column without the sidebar ===
 chat 600; chips: icon, V4.1 Flash; status: Context 0% full, $<COST>: details; .chat-chrome 48px high
 .chat-chrome: fits
 .composer: fits
-the panels' toggles: 1 buttons 10px from the top, 12px from the right, clear of the jump list: true, open: none
+the panels' toggles: 5 buttons 10px from the top, 12px from the right, clear of the jump list: true, open: Files
 === chromium: the session's bar: a 400px chat column without the sidebar ===
 chat 400; chips: icon, V4.1 Flash; status: Context 0% full, $<COST>: details; .chat-chrome 48px high
 .chat-chrome: fits
 .composer: fits
-the panels' toggles: 1 buttons 10px from the top, 12px from the right, clear of the jump list: true, open: none
+the panels' toggles: 5 buttons 10px from the top, 12px from the right, clear of the jump list: true, open: Files
 === chromium: errors ===
 none
 === chromium: temporary: desktop: the new-session screen ===
@@ -829,7 +829,7 @@ still there: true
 saved: 0
 === chromium: temporary: desktop: its menu ===
 menu: This session isn't saved. It's deleted, with its subagents, when you leave it. | Keep this session | Delete it now
-menu: under the pill: false
+menu: under the pill: true
 controls: all in view
 === chromium: temporary: desktop: left ===
 toast: Temporary session deleted
@@ -2971,9 +2971,8 @@ after Show all: user 2, replies 3, thinking 1, tools 1, subagents 1, stopped 1
 === chromium: filter: errors ===
 none
 === chromium: search: the sidebar's row and the composer's ===
-Search
-Ctrl K: wide, 28px high
-: narrow, 28px high
+Search: wide, 28px high
+New session: narrow, 28px high
 composer: Add files or images, Context 0% full, $0.00, server-laptop, Model, Send
 === chromium: search: Ctrl+K: the session's settings, recent sessions, commands ===
 focus in the filter: control-input
@@ -3381,10 +3380,10 @@ the row fits: true
 === chromium: mobile: 390x844: the chat ===
 ok
 === chromium: mobile: 390x844: where the session works ===
-placeholder: Working in …/demo on main.
-its width: more than 58%: what the shortest line needs
-one line: true; the path in mono: true; the editor on top: true
-for screen readers: Working in ~/projects/demo on main. Ask prigh anything…
+folder: ~/projects/demo
+branch: main
+one line: true; inside the composer: true; mono: true
+placeholder: Ask prigh…  / commands
 === chromium: mobile: 390x844: the chrome ===
 strip: 0 to 48; its pieces overlap: false
 the transcript starts under it: true
@@ -3429,17 +3428,17 @@ ok
 ok
 === chromium: mobile: 390x844: the keyboard ===
 the composer in view: true
-placeholder: Working in …/demo on main.
-its width: more than 58%: what the shortest line needs
-one line: true; the path in mono: true; the editor on top: true
-for screen readers: Working in ~/projects/demo on main. Ask prigh anything…
+folder: ~/projects/demo
+branch: main
+one line: true; inside the composer: true; mono: true
+placeholder: Ask prigh…  / commands
 === chromium: mobile: 320x640: the chat ===
 ok
 === chromium: mobile: 320x640: where the session works ===
-placeholder: Working in …/demo on main.
-its width: more than 58%: what the shortest line needs
-one line: true; the path in mono: true; the editor on top: true
-for screen readers: Working in ~/projects/demo on main. Ask prigh anything…
+folder: ~/projects/demo
+branch: main
+one line: true; inside the composer: true; mono: true
+placeholder: Ask prigh…  / commands
 === chromium: mobile: 320x640: the chrome ===
 strip: 0 to 48; its pieces overlap: false
 the transcript starts under it: true
@@ -3484,17 +3483,17 @@ ok
 ok
 === chromium: mobile: 320x640: the keyboard ===
 the composer in view: true
-placeholder: Working in …/demo on main.
-its width: more than 58%: what the shortest line needs
-one line: true; the path in mono: true; the editor on top: true
-for screen readers: Working in ~/projects/demo on main. Ask prigh anything…
+folder: ~/projects/demo
+branch: main
+one line: true; inside the composer: true; mono: true
+placeholder: Ask prigh…  / commands
 === chromium: mobile: 390x844-pwa: the chat ===
 ok
 === chromium: mobile: 390x844-pwa: where the session works ===
-placeholder: Working in …/demo on main.
-its width: more than 58%: what the shortest line needs
-one line: true; the path in mono: true; the editor on top: true
-for screen readers: Working in ~/projects/demo on main. Ask prigh anything…
+folder: ~/projects/demo
+branch: main
+one line: true; inside the composer: true; mono: true
+placeholder: Ask prigh…  / commands
 === chromium: mobile: 390x844-pwa: the chrome ===
 strip: 0 to 95; its pieces overlap: false
 the transcript starts under it: true
@@ -3539,24 +3538,25 @@ ok
 ok
 === chromium: mobile: 390x844-pwa: the keyboard ===
 the composer in view: true
-placeholder: Working in …/demo on main.
-its width: more than 58%: what the shortest line needs
-one line: true; the path in mono: true; the editor on top: true
-for screen readers: Working in ~/projects/demo on main. Ask prigh anything…
+folder: ~/projects/demo
+branch: main
+one line: true; inside the composer: true; mono: true
+placeholder: Ask prigh…  / commands
 === chromium: mobile: desktop 1280: where the session works ===
-placeholder: Working in …/demo on main. Ask prigh anything…
-its width: 58% of the editor
-one line: true; the path in mono: true; the editor on top: true
-for screen readers: Working in ~/projects/demo on main. Ask prigh anything…
-tooltip: Working in ~/projects/demo on main. Ask prigh anything…
+folder: ~/projects/demo
+branch: main
+one line: true; inside the composer: true; mono: true
+placeholder: Ask prigh anything…  / commands, @ files
 === chromium: mobile: desktop 760: where the session works ===
-placeholder: Working in …/demo on main.
-its width: 58% of the editor
-one line: true; the path in mono: true; the editor on top: true
-for screen readers: Working in ~/projects/demo on main. Ask prigh anything…
-tooltip: Working in ~/projects/demo on main. Ask prigh anything…
+folder: ~/projects/demo
+branch: main
+one line: true; inside the composer: true; mono: true
+placeholder: Ask prigh anything…  / commands, @ files
 === chromium: mobile: desktop: typing ===
-no placeholder: the editor has text
+folder: ~/projects/demo
+branch: main
+one line: true; inside the composer: true; mono: true
+placeholder: Ask prigh anything…  / commands, @ files
 === chromium: review_phone: 390x844: the renamed file, folded ===
 ok
 head: docs/ guide.md new 1/5
@@ -3747,8 +3747,8 @@ no menu
 your messages: make the port configurable
 === chromium: long press: a session in the drawer ===
 menu: open_window, rename, fork, new_worktree, review, files, terminal, copy_path, copy_id, pin, archive, delete; a sheet at the bottom: true
-=== chromium: long press: a worktree in the drawer ===
-no worktree row
+=== chromium: long press: a worktree in the session card ===
+menu: switch_here, new_session_here, review, files, terminal, create_pr, copy_path, remove; a sheet at the bottom: true
 === chromium: long press: a file of the review ===
 menu: approve_files, unapprove_files, stage_files, unstage_files, commit_files, select_files, copy_paths; a sheet at the bottom: true
 === chromium: pwa: manifest ===
@@ -5014,7 +5014,7 @@ Plan Plan mode: read-only planning, until you leave it (/plan off or Alt+M): no 
 === chromium: chat: mode ask, no tool host ===
 mode: Asks: edits & commands
 host chip: no host
-placeholder: Working in $CWD. Ask prigh anything…
+placeholder: Ask prigh anything…  / commands, @ files
 strip: No tool host connected Chat without a host
 toast: No tool host connected: your message stays here. Chat without a host (over it) sends it as a chat, or connect a tool host and pick it (/host).
 draft: and a functor?
@@ -5039,7 +5039,7 @@ audit: ok
 === chromium: chat: phone 390x844: mode ask, no tool host ===
 mode: Asks: edits & commands
 host chip: no host
-placeholder: Working in $CWD. Ask prigh anything…
+placeholder: Ask prigh…  / commands
 strip: No tool host connected Chat without a host
 audit: ok
 after Chat without a host: strip (none)
@@ -5055,7 +5055,7 @@ audit: ok
 === chromium: chat: phone 320x640: mode ask, no tool host ===
 mode: Asks: edits & commands
 host chip: no host
-placeholder: Working in $CWD. Ask prigh anything…
+placeholder: Ask prigh…  / commands
 strip: No tool host connected Chat anyway
 audit: ok
 after Chat without a host: strip (none)
@@ -5071,7 +5071,7 @@ audit: ok
 === chromium: chat: phone 390x844-pwa: mode ask, no tool host ===
 mode: Asks: edits & commands
 host chip: no host
-placeholder: Working in $CWD. Ask prigh anything…
+placeholder: Ask prigh…  / commands
 strip: No tool host connected Chat without a host
 audit: ok
 after Chat without a host: strip (none)

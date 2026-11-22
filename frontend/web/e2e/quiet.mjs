@@ -179,6 +179,9 @@ try {
   await screenshot("approval");
   await page.keyboard.press("y");
   await page.locator("#chat .msg.assistant", { hasText: "Cleaned up." }).waitFor();
+  // Its time shows once the message has ended.
+  await page.waitForFunction(() => [...document.querySelectorAll("#chat .msg.assistant")]
+    .some(m => m.innerText.includes("Cleaned up.") && /\b\d\d:\d\d\b/.test(m.innerText)));
   section("approved");
   await transcript();
   await screenshot("approved");
