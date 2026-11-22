@@ -3,13 +3,6 @@ open! Import
 open Html
 module Model = App.Model
 module Action = App.Action
-module Icon = Loon.Icon
-
-let back_label (m : Model.t) =
-  match m.state with
-  | Some state -> Session_view.session_title m state
-  | None -> "the session"
-;;
 
 let note ?(failed = false) children =
   Node.div
@@ -81,77 +74,10 @@ let view (m : Model.t) ~inject id =
       ; button
           ~cls:"ghost small"
           ~on_click:(inject Action.Close_subagent_chat)
-          [ Node.text "Back" ]
+          [ Node.text "Back to the session" ]
       ]
   | Some a ->
-    let now = Option.value m.now ~default:Time_ns.epoch in
-    let activity = Session_card.Activity.of_agent a ~now in
     Node.div
-      ~attrs:[ Attr.class_ "subagent-chat"; Attr.create "data-agent" a.id ]
-      [ Node.div
-          ~attrs:
-            [ Attr.class_
-                "loon subagent-chat-head mb-4 flex max-w-(--column) \
-                 items-center gap-2 border-b pb-3"
-            ]
-          [ Node.button
-              ~attrs:
-                [ Attr.type_ "button"
-                ; Attr.class_
-                    "subagent-chat-back -ml-2 inline-flex h-8 min-w-0 shrink \
-                     items-center gap-1.5 rounded-md px-2 text-sm \
-                     text-muted-foreground hover:bg-accent \
-                     hover:text-foreground narrow:h-11"
-                ; Attr.title "Back to the session (Esc)"
-                ; Attr.on_click (fun _ -> inject Action.Close_subagent_chat)
-                ]
-              [ Icon.view ~class_:"size-4 shrink-0" Arrow_left
-              ; Node.span
-                  ~attrs:[ Attr.class_ "truncate" ]
-                  [ Node.text (back_label m) ]
-              ]
-          ; Node.span
-              ~attrs:[ Attr.class_ "text-muted-foreground" ]
-              [ Node.text "/" ]
-          ; Node.h2
-              ~attrs:
-                [ Attr.class_
-                    "subagent-chat-title min-w-0 truncate text-sm font-medium"
-                ; Attr.title (String.strip a.task)
-                ]
-              [ Node.text (Agents.Agent.title a) ]
-          ; Node.span
-              ~attrs:
-                [ Attr.class_
-                    "subagent-chat-status ml-auto shrink-0 text-xs \
-                     text-muted-foreground"
-                ]
-              [ Node.text (Session_card.Activity.to_string activity) ]
-          ]
-      ; transcript m ~inject a
-      ; ending m a
-      ]
-;;
-
-let footer ~inject =
-  Node.div
-    ~attrs:
-      [ Attr.class_
-          "loon subagent-chat-footer mx-auto flex w-full \
-           max-w-[calc(var(--column)+2*var(--edge))] items-center \
-           justify-between gap-2 px-(--edge) pt-2 \
-           pb-[max(12px,env(safe-area-inset-bottom))] text-xs \
-           text-muted-foreground"
-      ]
-    [ Node.span [ Node.text "A subagent's transcript: read-only." ]
-    ; Node.button
-        ~attrs:
-          [ Attr.type_ "button"
-          ; Attr.class_
-              "inline-flex h-8 items-center gap-1.5 rounded-md px-2 \
-               hover:bg-accent hover:text-foreground narrow:h-11"
-          ; Attr.on_click (fun _ -> inject Action.Close_subagent_chat)
-          ]
-        [ Icon.view ~class_:"size-3.5" Arrow_left; Node.text "Back (Esc)" ]
-    ]
+      ~attrs:[ Attr.class_ "subagent-chat"; Attr.create "data-subagent" a.id ]
+      [ transcript m ~inject a; ending m a ]
 ;;
