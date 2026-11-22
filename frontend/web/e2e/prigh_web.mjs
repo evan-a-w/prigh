@@ -304,10 +304,11 @@ const showChips = async (label, cover) => {
 const showSubagent = async label => {
   section(label);
   const times = t => clean(t).replace(/\b\d+(m \d\d)?s\b/g, "<T>");
+  const ages = t => clean(t).replace(/\b(now|\d+[smhd])$/gm, "<age>");
   console.log(`on show: ${await page.locator(".subagent-chat").getAttribute("data-subagent")}`);
   console.log(times(await page.locator(".subagent-chat").innerText()));
   console.log(`breadcrumb: ${times(await page.locator(".session-crumbs").innerText()).replace(/\n/g, " ")}`);
-  console.log(`card: ${times(await page.locator(".session-card").innerText()).replace(/\n/g, " | ")}`);
+  console.log(`card: ${ages(await page.locator(".session-card").innerText()).replace(/\n/g, " | ")}`);
   console.log(`composer: ${await page.locator(".composer textarea").getAttribute("placeholder")}`);
   await screenshot(label);
 };
@@ -843,7 +844,7 @@ try {
   await page.waitForFunction(() => document.querySelector(".session-card-agent")
     && !document.querySelector(".session-card-agent.running"));
   section("the session's card lists its subagent");
-  console.log(clean(await page.locator(".session-card").innerText()).replace(/\b\d+(m \d\d)?s\b/g, "<T>"));
+  console.log(clean(await page.locator(".session-card").innerText()).replace(/\b(now|\d+[smhd])$/gm, "<age>"));
   await page.locator("#chat .tool-subagent .tool-head[data-agent=a1]").click();
   await page.waitForSelector(".subagent-chat[data-subagent=a1] .entries");
   await page.locator(".session-card-parent").first().waitFor();
