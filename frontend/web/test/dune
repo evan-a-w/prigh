@@ -302,3 +302,14 @@
  (_
   (js_of_ocaml
    (sourcemap no))))
+
+; full/: the slow tier, out of @runtest (see full/dune).
+
+(vendored_dirs full)
+
+(rule
+ (alias runtest-full)
+ (enabled_if %{bin-available:node})
+ (deps
+  (alias full/runtest))
+ (action (progn)))

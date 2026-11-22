@@ -1,0 +1,16 @@
+; The slow tier of prigh-web's tests, run only by `dune build @runtest-full`
+; (./test --full, through ../dune): scale tests (long sessions, big replies,
+; where js_of_ocaml's small stack would show) that cost more than the rest of
+; a shard. A vendored directory, so @runtest leaves it out.
+
+(library
+ (name prigh_web_test_full)
+ (enabled_if %{bin-available:node})
+ (preprocess
+  (pps ppx_jane js_of_ocaml-ppx))
+ (inline_tests
+  (backend prigh_web_test_backend)
+  (modes js)
+  (flags
+   (-source-tree-root .)))
+ (libraries core prigh_protocol prigh_web))
