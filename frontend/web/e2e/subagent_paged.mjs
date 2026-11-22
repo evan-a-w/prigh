@@ -112,7 +112,12 @@ try {
   // A subagent's whole run: longer than a step on a busy machine.
   await page.waitForFunction(() => document.querySelector("#chat .tool-subagent.ok"), null, { timeout: 90000 });
   writeFileSync(join(cwd, "main-go"), "");
-  await page.waitForFunction(() => document.getElementById("chat").innerText.includes("Waiting."));
+  // 35 steps: as long as the subagent's run on a busy machine.
+  await page.waitForFunction(() => document.getElementById("chat").innerText.includes("Waiting."), null, { timeout: 90000 })
+    .catch(async error => {
+      console.error(`the chat's end: ${(await page.locator("#chat").innerText()).slice(-600)}`);
+      throw error;
+    });
 
   await page.reload();
   await page.waitForFunction(() => document.getElementById("chat")?.innerText.includes("Waiting."));
