@@ -325,7 +325,8 @@ let%expect_test "a superuser acts as another user from the account menu" =
          web.sidebar-worktree-hours web.review web.code-size favourite-models
          history web.migrated web.sidebar-width web.files-width
          web.files-preview-width web.agents-width web.terminal-height
-         web.review-chat-width web.review-files-width web.review-margin-width))))
+         web.review-chat-width web.review-files-width web.review-margin-width
+         web.editor-tree-width))))
      (tag Prefs))
     (Rpc (method_ list_users) (params ()) (tag (Users Probe)))
     |}];
@@ -419,7 +420,8 @@ let%expect_test "a superuser acts as another user from the account menu" =
          web.sidebar-worktree-hours web.review web.code-size favourite-models
          history web.migrated web.sidebar-width web.files-width
          web.files-preview-width web.agents-width web.terminal-height
-         web.review-chat-width web.review-files-width web.review-margin-width))))
+         web.review-chat-width web.review-files-width web.review-margin-width
+         web.editor-tree-width))))
      (tag Prefs))
     (Rpc (method_ list_users) (params ()) (tag (Users Probe)))
     (Focus dialog)

@@ -11,6 +11,7 @@ module Handle = struct
       | Review_chat
       | Review_files
       | Review_margin
+      | Editor_tree
     [@@deriving sexp_of, equal, compare, enumerate]
   end
 
@@ -26,6 +27,7 @@ module Handle = struct
     | Review_chat -> "--review-chat-width"
     | Review_files -> "--review-files-width"
     | Review_margin -> "--review-margin-width"
+    | Editor_tree -> "--editor-tree-width"
   ;;
 
   let name = function
@@ -37,6 +39,7 @@ module Handle = struct
     | Review_chat -> "review-chat"
     | Review_files -> "review-files"
     | Review_margin -> "review-margin"
+    | Editor_tree -> "editor-tree"
   ;;
 
   let of_name s = List.find all ~f:(fun t -> String.equal (name t) s)
@@ -51,6 +54,7 @@ module Handle = struct
     | Review_chat -> "Resize the chat beside the review"
     | Review_files -> "Resize the review's file list"
     | Review_margin -> "Resize the review's comments"
+    | Editor_tree -> "Resize the editor's file list"
   ;;
 
   let vertical = function
@@ -61,11 +65,12 @@ module Handle = struct
     | Agents
     | Review_chat
     | Review_files
-    | Review_margin -> true
+    | Review_margin
+    | Editor_tree -> true
   ;;
 
   let grows = function
-    | Sidebar | Review_files -> 1
+    | Sidebar | Review_files | Editor_tree -> 1
     | Files | Files_preview | Agents | Terminal | Review_chat | Review_margin ->
       -1
   ;;
@@ -139,6 +144,7 @@ let limits t (h : Handle.t) =
   | Review_chat -> 300, 1200, 400
   | Review_files -> 160, 520, 260
   | Review_margin -> 240, 640, 340
+  | Editor_tree -> 160, 520, 240
   | Terminal ->
     let max = Int.max 120 (t.viewport.height - terminal_room) in
     120, max, clamp (t.viewport.height * 38 / 100) ~min:120 ~max
@@ -216,7 +222,7 @@ let rec bounds t (shown : Shown.t) (h : Handle.t) : Bounds.t =
   let within cap = Int.max min (Int.min max cap) in
   match h with
   | Terminal -> { min; max; value = preferred t h }
-  | Review_files | Review_margin ->
+  | Review_files | Review_margin | Editor_tree ->
     let shown = { shown with reviewing = true } in
     let widths = docked_widths t shown in
     let page =

@@ -495,6 +495,7 @@ let view (m : App.Model.t) ~inject =
             ; rest (images m ~inject)
             ; rest (pasted m ~inject)
             ; rest (Files_view.chips m ~inject)
+            ; rest (Code_editor_view.chip m ~inject)
             ; rest
               @@ div
                    ~cls:"editor-wrap"

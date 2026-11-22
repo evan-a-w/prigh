@@ -386,6 +386,12 @@ let every =
       "browse, preview, upload and download files where the tools run \
        (Ctrl+Shift+F)"
   ; c
+      ~argument:Path
+      ~args:"[path]"
+      "edit"
+      "the editor mode: edit the session's files (PATH, or the last one) \
+       beside the chat, and ask about a selection (Alt+E; Esc goes back)"
+  ; c
       ~args:"[n|id|cancel <n|id>|steer <n|id> <text>|follow-up <n|id> <text>]"
       "agents"
       "follow subagents and background jobs in the agents panel, cancel one, \

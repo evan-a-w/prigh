@@ -399,6 +399,7 @@ let%expect_test "/diff, /review and /init are in the completions and /help" =
     Commands ↑↓ Tab Enter Esc   Ctrl+Enter as typed
     /diff [path] show the uncommitted changes where the tools run, untracked files too
     /default-dir [path|off] show or set the directory new sessions start in (on the default host), in Settings
+    /edit [path] the editor mode: edit the session's files (PATH, or the last one) beside the chat, and ask about a selection (Alt+E; Esc goes back)
     /mkdir [path] create a directory (and its parents) and change to it
     /downsize-images send the conversation's images smaller (after the model refused one as too large) and retry a failed reply
     /delete-archived delete every archived session, after a confirmation
@@ -411,6 +412,7 @@ let%expect_test "/diff, /review and /init are in the completions and /help" =
     /pin [session] pin a session to the top of the sidebar (this one without an argument): pinned sessions are never archived for being idle
     /diff [path] show the uncommitted changes where the tools run, untracked files too
     /trim [after|undo] drop everything before a message from the model's context (the transcript keeps it folded); after: everything after a message instead (what you send later stays); undo brings back the last trim
+    /edit [path] the editor mode: edit the session's files (PATH, or the last one) beside the chat, and ask about a selection (Alt+E; Esc goes back)
     /quit leave: quit the desktop app (Ctrl+Q); in a browser, close the tab (/signout signs out)
     /unpin [session] unpin a session (this one without an argument)
     /mkdir [path] create a directory (and its parents) and change to it

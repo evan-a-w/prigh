@@ -77,6 +77,21 @@
  (action
   (copy ../vendor/addon-fit.js addon-fit.js)))
 
+; The editor mode's CodeMirror (vendored, see ../vendor/README.md) and its
+; glue, loaded the first time the editor opens.
+
+(rule
+ (target code_editor.js)
+ (deps ../code_editor.js)
+ (action
+  (copy ../code_editor.js code_editor.js)))
+
+(rule
+ (target codemirror.js)
+ (deps ../vendor/codemirror.js)
+ (action
+  (copy ../vendor/codemirror.js codemirror.js)))
+
 ; Temporal for browsers without it (index.html loads it only then): Core's
 ; time zones need it, and Bonsai_web's start asks for the local one.
 
@@ -150,6 +165,8 @@
   xterm.js
   xterm.css
   addon-fit.js
+  code_editor.js
+  codemirror.js
   temporal-polyfill.js
   katex.min.js
   katex.min.css
@@ -181,6 +198,8 @@
   (xterm.js as web/xterm.js)
   (xterm.css as web/xterm.css)
   (addon-fit.js as web/addon-fit.js)
+  (code_editor.js as web/code_editor.js)
+  (codemirror.js as web/codemirror.js)
   (temporal-polyfill.js as web/temporal-polyfill.js)
   (katex.min.js as web/katex.min.js)
   (katex.min.css as web/katex.min.css)
