@@ -7,6 +7,12 @@ let screens =
   [ ( "chat"
     , fun ~tip (local_ graph) ->
         Shell.component ~tip ~main:(Screen_chat.component ~tip graph) graph )
+  ; ("review", fun ~tip (local_ graph) -> Screen_review.component ~tip graph)
+  ; ("terminal", fun ~tip (local_ graph) -> Screen_terminal.component ~tip graph)
+  ; ("agents", fun ~tip (local_ graph) -> Screen_agents.component ~tip graph)
+  ; ("files", fun ~tip (local_ graph) -> Screen_files.component ~tip graph)
+  ; ("confirm", fun ~tip (local_ graph) -> Screen_confirm.component ~tip graph)
+  ; ("question", fun ~tip (local_ graph) -> Screen_confirm.question ~tip graph)
   ]
 ;;
 

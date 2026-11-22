@@ -165,16 +165,23 @@ let thinking =
     ]
 ;;
 
-let component ~tip (local_ graph) =
+let component
+  ?(banner = Bonsai.return Node.none)
+  ?(above_composer = Bonsai.return Node.none)
+  ?(queued = [ "also check the ⋯ sheet on 320px" ])
+  ~tip
+  (local_ graph)
+  =
   let open_ids, set_open_ids =
     Bonsai.state (String.Set.of_list [ "turn-2"; "bash-2" ]) graph
   in
-  let%arr open_ids and set_open_ids and tip in
+  let%arr open_ids and set_open_ids and tip and banner and above_composer in
   let toggle id =
     set_open_ids (if Set.mem open_ids id then Set.remove open_ids id else Set.add open_ids id)
   in
   Node.fragment
-    [ (* column-reverse keeps the view at the bottom, as a chat opens. *)
+    [ banner
+    ; (* column-reverse keeps the view at the bottom, as a chat opens. *)
       div
         "flex min-h-0 flex-1 flex-col-reverse overflow-y-auto"
         [ div
@@ -206,6 +213,7 @@ let component ~tip (local_ graph) =
             ; thinking
             ]
         ]
-    ; Composer.view ~queued:[ "also check the ⋯ sheet on 320px" ] ~tip ()
+    ; above_composer
+    ; Composer.view ~queued ~tip ()
     ]
 ;;
