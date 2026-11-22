@@ -5,7 +5,7 @@ let select ?selector node =
   let node = Node_helpers.unsafe_convert_exn node in
   match selector with
   | None -> [ node ]
-  | Some selector -> Node_helpers.select node ~selector
+  | Some selector -> Page_soup.select (Page_soup.of_node node) ~selector
 ;;
 
 let html ?selector node =

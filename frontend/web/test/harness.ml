@@ -7,7 +7,7 @@ type t =
   ; mutable pending : (string * App.Reply_tag.t) list
   ; mutable quiet : bool
   ; mutable clipboard : bool
-  ; mutable rendered : (App.Model.t * Node_helpers.t) option
+  ; mutable rendered : (App.Model.t * Page_soup.t) option
       (* The page for the model it was rendered from: queries between two
          actions share one rendering. *)
   }
@@ -423,20 +423,21 @@ let render_page t ~inject =
 ;;
 
 let node ?inject t ?selector () =
-  let node =
+  let page =
     match inject, t.rendered with
-    | Some inject, _ -> render_page t ~inject
-    | None, Some (model, node) when phys_equal model t.model -> node
+    | Some inject, _ -> Page_soup.of_node (render_page t ~inject)
+    | None, Some (model, page) when phys_equal model t.model -> page
     | None, _ ->
-      let node =
-        render_page t ~inject:(fun _ -> Virtual_dom.Vdom.Effect.Ignore)
+      let page =
+        Page_soup.of_node
+          (render_page t ~inject:(fun _ -> Virtual_dom.Vdom.Effect.Ignore))
       in
-      t.rendered <- Some (t.model, node);
-      node
+      t.rendered <- Some (t.model, page);
+      page
   in
   match selector with
-  | None -> [ node ]
-  | Some selector -> Node_helpers.select node ~selector
+  | None -> [ Page_soup.root page ]
+  | Some selector -> Page_soup.select page ~selector
 ;;
 
 let show ?selector t =
