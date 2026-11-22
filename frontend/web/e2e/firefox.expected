@@ -2495,8 +2495,8 @@ Or paste the code the page shows after Allow:
 prigh browser-signin: that code is not for this sign-in (from an earlier one, or changed on the way): paste the code the page shows for this link, or open the link again. Paste the code:
 prigh browser-signin: signed in; saved for ws://127.0.0.1:<PORT>/ws in $DIR/laptop-home/.prigh/tui-connection.sexp
 === firefox: cli_signin: through the proxy ===
-upgrade /ws
 POST /cli-signin/grant
+upgrade /ws
 === firefox: cli_signin: errors ===
 none
 === firefox: desktop: its stdout ===
@@ -2513,10 +2513,10 @@ Password
 Connect
 Quit prigh
 === firefox: desktop: unencrypted ===
-0.0.0.0:1 is not encrypted: the password and everything prigh sends would cross the network in the clear, and anyone on the way could run commands on this computer. Use the backend's HTTPS address (wss://host/ws, behind a TLS reverse proxy), or an SSH tunnel (ssh -L 7790:localhost:7790 host, then 127.0.0.1:<PORT>). Connect anyway only on a network you trust.
+0.0.0.0:<CLOSED> is not encrypted: the password and everything prigh sends would cross the network in the clear, and anyone on the way could run commands on this computer. Use the backend's HTTPS address (wss://host/ws, behind a TLS reverse proxy), or an SSH tunnel (ssh -L 7790:localhost:7790 host, then 127.0.0.1:<PORT>). Connect anyway only on a network you trust.
 button: Connect without encryption
 === firefox: desktop: unencrypted, confirmed ===
-cannot reach the backend at 0.0.0.0:1: connection refused
+cannot reach the backend at 0.0.0.0:<CLOSED>: connection refused
 Is it running there (prigh serve -web HOST:PORT, or -listen)? Check the address: HOST:PORT (its -web or -listen port), or a prigh-web URL such as wss://host/ws.
 button: Connect
 === firefox: desktop: a wrong password ===

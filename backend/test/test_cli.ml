@@ -83,30 +83,24 @@ let%expect_test "flags: bad values name the flag and the fix" =
 let%expect_test "web: no backend, a bad address, an unreachable one" =
   with_sandbox
   @@ fun t ->
+  Closed_port.with_
+  @@ fun port ->
+  let closed = sprintf "127.0.0.1:%d" port in
   write t "site/index.html" "";
   let site = Filename.concat t.dir "site" in
   prigh t [ "web" ];
   prigh t [ "web"; "-connect"; "server" ];
-  prigh t [ "web"; "-connect"; "127.0.0.1:1"; "-tools"; "elsewhere" ];
+  prigh t [ "web"; "-connect"; closed; "-tools"; "elsewhere" ];
   prigh
     t
-    [ "web"
-    ; "-connect"
-    ; "127.0.0.1:1"
-    ; "-web-root"
-    ; site
-    ; "-cwd"
-    ; "/nonexistent"
-    ];
-  prigh
-    t
-    [ "web"; "-connect"; "127.0.0.1:1"; "-token"; "sekrit"; "-web-root"; site ];
+    [ "web"; "-connect"; closed; "-web-root"; site; "-cwd"; "/nonexistent" ];
+  prigh t [ "web"; "-connect"; closed; "-token"; "sekrit"; "-web-root"; site ];
   printf
     "saved: %b\n"
     (Sys_unix.file_exists_exn (Saved_connection.file ~home:t.dir));
-  write t ".prigh/tui-connection.sexp" "((connect 127.0.0.1:1)";
+  write t ".prigh/tui-connection.sexp" (sprintf "((connect %s)" closed);
   prigh t [ "web"; "-web-root"; site ];
-  write t ".prigh/tui-connection.sexp" "((connect 127.0.0.1:1))";
+  write t ".prigh/tui-connection.sexp" (sprintf "((connect %s))" closed);
   prigh t [ "web"; "-remote"; "-web-root"; site ];
   [%expect
     {|
@@ -117,14 +111,14 @@ let%expect_test "web: no backend, a bad address, an unreachable one" =
     $ prigh web -connect server
     prigh web: -connect: "server" is not HOST:PORT (the backend's -listen or -web port, e.g. server:7790) or a prigh-web URL (e.g. wss://server/ws or https://server/prigh/)
     [exit 2]
-    $ prigh web -connect 127.0.0.1:1 -tools elsewhere
+    $ prigh web -connect 127.0.0.1:CLOSED -tools elsewhere
     prigh web: -tools elsewhere: local (run tools on this machine) or remote (on the backend)
     [exit 2]
-    $ prigh web -connect 127.0.0.1:1 -web-root $DIR/site -cwd /nonexistent
+    $ prigh web -connect 127.0.0.1:CLOSED -web-root $DIR/site -cwd /nonexistent
     prigh web: -cwd /nonexistent: no such directory (mkdir -p it first)
     [exit 2]
-    $ prigh web -connect 127.0.0.1:1 -token sekrit -web-root $DIR/site
-    prigh web: cannot reach the backend at 127.0.0.1:1: connection refused
+    $ prigh web -connect 127.0.0.1:CLOSED -token sekrit -web-root $DIR/site
+    prigh web: cannot reach the backend at 127.0.0.1:CLOSED: connection refused
     Is it running there (prigh serve -web HOST:PORT, or -listen)? Check the address given to -connect: HOST:PORT, or a prigh-web URL such as wss://host/ws.
     [exit 1]
     saved: false
@@ -135,7 +129,7 @@ let%expect_test "web: no backend, a bad address, an unreachable one" =
     Fix or delete $DIR/.prigh/tui-connection.sexp, or pass -connect HOST:PORT.
     [exit 2]
     $ prigh web -remote -web-root $DIR/site
-    prigh web: cannot reach the backend at 127.0.0.1:1: connection refused
+    prigh web: cannot reach the backend at 127.0.0.1:CLOSED: connection refused
     Is it running there (prigh serve -web HOST:PORT, or -listen)? The address is the saved connection ($DIR/.prigh/tui-connection.sexp): pass -connect HOST:PORT to replace it.
     [exit 1]
     |}]

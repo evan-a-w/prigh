@@ -56,9 +56,11 @@ let mask_home s =
 
 (* Replaces the sandbox dir, the home in [hosts], session ids, file stamps,
    timestamps (also messages' and entries' ["at"]), durations and session
-   sizes (["bytes"]: they depend on the sandbox path). *)
+   sizes (["bytes"]: they depend on the sandbox path), and the ports
+   [Closed_port] holds. *)
 let mask t s =
   String.substr_replace_all s ~pattern:t.dir ~with_:"$DIR"
+  |> Closed_port.mask
   |> mask_home
   |> Re.replace_string time_re ~by:"<time>"
   |> Re.replace_string duration_re ~by:{|"duration_seconds":<t>|}

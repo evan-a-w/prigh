@@ -115,7 +115,13 @@ let%expect_test "connection refused" =
   run
   @@ fun ~env ~sw:_ ->
   let result =
-    Http.post ~env ~url:"http://127.0.0.1:1/" ~headers:[] ~body:"" ()
+    Closed_port.with_ (fun port ->
+      Http.post
+        ~env
+        ~url:(sprintf "http://127.0.0.1:%d/" port)
+        ~headers:[]
+        ~body:""
+        ())
   in
   (match result with
    | Error (Connection_failed msg) ->
