@@ -8,7 +8,7 @@ open! Core
 val place : ?id:string -> Prigh_web.Context_menu.Anchor.t -> unit
 
 (** A long press (a touch held still for about half a second) on a session
-    or worktree row, a review's file, or a message with a menu, is a
+    or worktree row, the Archive row, a review's file, or a message with a menu, is a
     right-click there, with [long_press_field] set on the event: from a
     timer (Safari fires no [contextmenu] for a touch), or from the browser's
     own long press, which is cancelled (Chrome on Android would select the

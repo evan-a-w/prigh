@@ -72,7 +72,8 @@ let selectable_attribute = "data-selectable"
 (* What a long press opens the menu of: the rows and messages with one. *)
 let rows =
   sprintf
-    "[data-session], [data-worktree], .review-file-row, [%s][tabindex]"
+    "[data-session], [data-worktree], .review-file-row, .archive-toggle, \
+     [%s][tabindex]"
     Prigh_web.Chat_view.message_attribute
 ;;
 

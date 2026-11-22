@@ -65,7 +65,7 @@
   color: var(--muted-text);
   font: 12.5px/1.5 var(--sans);
 }
-.trim-divider > .scissors { order: 0; color: var(--muted-text); font-size: 15px; line-height: 1; }
+.trim-divider > .scissors { order: 0; color: var(--muted-text); width: 14px; height: 14px; flex: none; }
 .trim-divider::before,
 .trim-divider::after {
   content: "";

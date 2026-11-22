@@ -474,6 +474,7 @@ module Action = struct
         ; range : bool
         }
     | Delete_marked
+    | Archive_marked of bool
     | Ask_delete_archived
     | Set_archived of
         { path : string
@@ -10651,7 +10652,10 @@ let message_chosen (m : Model.t) n (item : Context_menu.Item.t) =
       | Commit_files
       | Select_files
       | Unselect_files
-      | Copy_paths )
+      | Copy_paths
+      | Show_archived
+      | Hide_archived
+      | Delete_archived )
     , Some _ ) -> m, []
 ;;
 
@@ -10704,7 +10708,10 @@ let review_files_chosen (m : Model.t) paths (item : Context_menu.Item.t) =
     | Copy_message
     | Select_text
     | Trim_before
-    | Trim_after -> m, []
+    | Trim_after
+    | Show_archived
+    | Hide_archived
+    | Delete_archived -> m, []
   in
   m, cmds @ [ Command.Focus "review-page" ]
 ;;
@@ -10718,6 +10725,10 @@ let menu_chosen (m : Model.t) (menu : Context_menu.t) id =
     , Context_menu.Item.of_id id )
   with
   | _, _, None -> m, []
+  | Archive, _, Some Show_archived -> { m with archived_open = true }, []
+  | Archive, _, Some Hide_archived -> { m with archived_open = false }, []
+  | Archive, _, Some Delete_archived -> ask_delete_archived m
+  | Archive, _, Some _ -> m, []
   | Message n, _, Some item -> message_chosen m n item
   | Review_files paths, _, Some item -> review_files_chosen m paths item
   | (Session _ | Worktree _), None, _ ->
@@ -10784,7 +10795,10 @@ let menu_chosen (m : Model.t) (menu : Context_menu.t) id =
      | Commit_files
      | Select_files
      | Unselect_files
-     | Copy_paths -> m, [])
+     | Copy_paths
+     | Show_archived
+     | Hide_archived
+     | Delete_archived -> m, [])
 ;;
 
 let picker_accepted (m : Model.t) ~kind (item : Picker.Item.t) =
@@ -11790,11 +11804,30 @@ let update_connected (m : Model.t) (action : Action.t) =
       }
     , [] )
   | Mark_session { path; range } ->
+    (* Starting with a range: from the session on show. *)
+    let marks =
+      if m.marks.selecting
+      then m.marks
+      else
+        { Session_marks.start with
+          anchor = Option.map m.state ~f:(fun st -> st.session_path)
+        }
+    in
     ( { m with
-        marks =
-          Session_marks.click m.marks ~path ~range ~order:(session_order m)
+        marks = Session_marks.click marks ~path ~range ~order:(session_order m)
       }
     , [] )
+  | Archive_marked archived ->
+    let marked = Session_marks.marked m.marks m.sessions in
+    let m, cmds =
+      List.fold marked ~init:(m, []) ~f:(fun (m, cmds) s ->
+        if Bool.equal s.archived archived
+        then m, cmds
+        else (
+          let m, more = set_archived m s ~archived in
+          m, cmds @ more))
+    in
+    { m with marks = Session_marks.empty }, cmds
   | Delete_marked ->
     ask_delete
       m
@@ -12160,6 +12193,19 @@ let update_connected (m : Model.t) (action : Action.t) =
            (Picker { kind = Menu menu; picker = Context_menu.files_picker info })
        in
        m, cmds @ [ Command.Place_menu menu.anchor ])
+  | Open_menu ({ target = Archive; _ } as menu) ->
+    let m, cmds =
+      open_dialog
+        m
+        (Picker
+           { kind = Menu menu
+           ; picker =
+               Context_menu.archive_picker
+                 ~count:(List.count m.sessions ~f:(fun s -> s.archived))
+                 ~shown:m.archived_open
+           })
+    in
+    m, cmds @ [ Command.Place_menu menu.anchor ]
   | Open_menu menu ->
     (match
        Option.bind (Context_menu.session menu) ~f:(find_session_by_path m)

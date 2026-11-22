@@ -136,16 +136,8 @@
 .ui-acc-head:hover { background: var(--slate-2); }
 .ui-acc-head:focus-visible { outline: 2px solid var(--sodium); outline-offset: -2px; }
 .ui-acc-title { flex: 1; min-width: 0; overflow-wrap: anywhere; }
-.ui-acc-head .chev {
-  width: 7px;
-  height: 7px;
-  border-right: 1.5px solid var(--faint);
-  border-bottom: 1.5px solid var(--faint);
-  transform: translateY(-2px) rotate(45deg);
-  transition: transform 0.15s;
-  flex-shrink: 0;
-}
-.ui-acc-item.open .chev { transform: translateY(1px) rotate(225deg); }
+.ui-acc-head .chev { color: var(--faint); transform: rotate(90deg); }
+.ui-acc-item.open .chev { transform: rotate(-90deg); }
 .ui-acc-body { padding: 2px 16px 14px; }
 
 /* ---- text and status */

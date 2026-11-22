@@ -33,6 +33,9 @@ let item_icon : Context_menu.Item.t -> Icon.t = function
   | Select_files -> Square
   | Unselect_files -> Cross
   | Copy_paths -> Copy
+  | Show_archived -> Archive
+  | Hide_archived -> Archive
+  | Delete_archived -> Trash
 ;;
 
 (* What the menu is about, above its items. *)
@@ -71,10 +74,22 @@ let heading (m : App.Model.t) (menu : Context_menu.t) =
               span ~cls:"context-menu-sub preview" (String.strip line)
             | None -> Node.none)
          ])
+  | Archive, _ ->
+    let count = List.count m.sessions ~f:(fun s -> s.archived) in
+    div
+      ~cls:"context-menu-head"
+      [ span ~cls:"context-menu-title" "Archived sessions"
+      ; span
+          ~cls:"context-menu-sub"
+          (match count with
+           | 0 -> "none"
+           | 1 -> "1 session"
+           | n -> sprintf "%d sessions" n)
+      ]
   | _, None -> Node.none
   | (Session _ | Worktree _), Some s ->
     (match menu.target with
-     | Session _ | Message _ | Review_files _ ->
+     | Session _ | Message _ | Review_files _ | Archive ->
        div
          ~cls:"context-menu-head"
          [ span ~cls:"context-menu-title" (Session_list.title s)
@@ -153,6 +168,8 @@ let view (m : App.Model.t) (menu : Context_menu.t) picker ~inject =
     | Stage_files | Unstage_files | Commit_files -> 1
     | Select_files | Unselect_files -> 2
     | Copy_paths -> 3
+    | Show_archived | Hide_archived -> 0
+    | Delete_archived -> 4
   in
   let sections =
     List.mapi items ~f:(fun i item -> i, item)

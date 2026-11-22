@@ -121,6 +121,11 @@ module Icon : sig
     | Groq
     | Qwen
     | Moonshot (** the providers' logos, filled *)
+    | File_text (** read *)
+    | File_pen (** write, edit *)
+    | Folder_search (** ls, find *)
+    | Text_search (** grep *)
+    | Globe (** the web *)
 
   (** An inline SVG; tests show [<icon name>]. *)
   val view : ?cls:string -> t -> Node.t

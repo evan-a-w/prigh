@@ -590,6 +590,9 @@ module Action : sig
         ; range : bool (** shift-click: from the last one clicked *)
         }
     | Delete_marked
+    | Archive_marked of bool
+    (** the marked sessions archived ([true]) or unarchived, then the
+        selection ends *)
     | Ask_delete_archived
     | Set_archived of
         { path : string
