@@ -89,7 +89,6 @@
     (cat terminal.css)
     (cat files.css)
     (cat review.css)
-    (cat editor.css)
     (cat highlight.css)
     (cat resize.css)
     (cat paging.css)
@@ -101,4 +100,7 @@
     (cat ui.css)
     (cat ui-chart.css)
     (cat phone.css)
-    (echo "\n}\n")))))
+    (echo "\n}\n")
+    ; Unlayered: it overrides CodeMirror's own theme, which CodeMirror
+    ; injects unlayered and which would beat any layer.
+    (cat editor.css)))))
