@@ -13,7 +13,7 @@
  (name prigh_web_test_harness)
  (wrapped false)
  (enabled_if %{bin-available:node})
- (modules agent_events chat_harness harness render)
+ (modules agent_events chat_harness harness page_soup render)
  (preprocess
   (pps ppx_jane js_of_ocaml-ppx))
  (libraries
@@ -25,24 +25,8 @@
   prigh_web_app
   virtual_dom
   virtual_dom.vdom_test_helpers
+  lambdasoup
   re))
-
-; ppx_inline_test's backend without partitions: one node runs a library's tests.
-
-(library
- (name prigh_web_test_backend)
- (modules ())
- (inline_tests.backend
-  (runner_libraries ppx_inline_test.runner.lib)
-  (flags
-   inline-test-runner
-   %{library-name}
-   -source-tree-root
-   %{workspace_root}
-   -diff-cmd
-   -)
-  (generate_runner
-   (echo "let () = Ppx_inline_test_lib.exit ();;"))))
 
 (library
  (name prigh_web_test_a)
@@ -103,7 +87,7 @@
  (preprocess
   (pps ppx_jane js_of_ocaml-ppx))
  (inline_tests
-  (backend prigh_web_test_backend)
+  (backend prigh_inline_test_backend)
   (modes js)
   (flags
    (-source-tree-root .)))
@@ -128,6 +112,7 @@
    agent_events
    chat_harness
    harness
+   page_soup
    render
    test_about_you
    test_accounts
@@ -184,7 +169,7 @@
  (preprocess
   (pps ppx_jane js_of_ocaml-ppx))
  (inline_tests
-  (backend prigh_web_test_backend)
+  (backend prigh_inline_test_backend)
   (modes js)
   (flags
    (-source-tree-root .)))

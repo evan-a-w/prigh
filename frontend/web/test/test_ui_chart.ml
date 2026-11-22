@@ -25,10 +25,7 @@ let count selector c =
   printf
     "%d %s\n"
     (List.length
-       (Virtual_dom_test_helpers.Node_helpers.select
-          (Virtual_dom_test_helpers.Node_helpers.unsafe_convert_exn
-             (Ui_chart.view ctx ~path:"0" c))
-          ~selector))
+       (Render.select ~selector (Ui_chart.view ctx ~path:"0" c)))
     selector
 ;;
 
