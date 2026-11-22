@@ -541,7 +541,6 @@ hello again
 Delete archived
 muted: 1
 === chromium: selected ===
-Cancel
 Archive
 Delete 2
 === chromium: delete confirmation ===
@@ -3896,7 +3895,7 @@ Fourth
 Third
 [x] Second
 [x] First
-bar: Cancel Archive Delete 2
+bar: Archive Delete 2
 still on show: Fourth
 === chromium: sidebar select: Esc ===
 Fourth
@@ -3908,7 +3907,7 @@ First
 [x] Third
 [x] Second
 First
-bar: Cancel Archive Delete 3
+bar: Archive Delete 3
 === chromium: sidebar select: two archived from the bar ===
 Fourth
 First

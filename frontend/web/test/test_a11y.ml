@@ -62,8 +62,8 @@ let%expect_test "the names of the controls" =
     button "Hide sidebar" -- Hide sidebar (Ctrl+B)
     button "Search" -- Search sessions, settings and commands (Ctrl+K)
     button "New session" -- Start a new session (/new)
-    [checkbox] button "work 0 B Fix the build" -- /sessions/s1.jsonl
     button "Cancel" -- Stop selecting (Esc)
+    [checkbox] button "work 0 B Fix the build" -- /sessions/s1.jsonl
     button "Archive" -- Archive the selected sessions
     button "Delete" -- Delete the selected sessions, 0 B (Delete)
     button "Archive 1" -- Show the archived sessions (right-click: more)

@@ -347,14 +347,14 @@ let%expect_test "selecting sessions: click, shift-click a range, delete them" =
   sidebar h;
   [%expect
     {|
-    Select sessions Shift for a range 0 selected
+    0 selected (Cancel)
     (☐ work 3.9 KB fix the parser bug)
     (☐ work 11.7 KB Release notes)
     (☐ work 2.9 KB Open elsewhere)
     Archived 2
     (☐ work 195.3 KB Old lexer)
     (☐ work 1.2 MB Older docs)
-    (Cancel) (Archive) (Delete)
+    (Archive) (Delete)
     |}];
   H.elements h ~selector:".selection-bar button[disabled]";
   [%expect
@@ -373,7 +373,7 @@ let%expect_test "selecting sessions: click, shift-click a range, delete them" =
     <div class="bg-primary/15 group/session hover:bg-sidebar-accent marked relative rounded-md running session text-sidebar-foreground">
     <div class="bg-primary/15 group/session hover:bg-sidebar-accent marked relative rounded-md session text-sidebar-foreground">
     <div class="archived bg-primary/15 group/session hover:bg-sidebar-accent marked relative rounded-md session text-sidebar-foreground">
-    (Cancel) (Archive) (Delete 3)
+    (Archive) (Delete 3)
     |}];
   (* Enter does what a click does (unmarking s3), Shift+Enter what a
      shift-click does (marking from s3, the last one, to s5); Space clicks
@@ -442,11 +442,11 @@ let%expect_test "selecting sessions: click, shift-click a range, delete them" =
   sidebar h;
   [%expect
     {|
-    Select sessions Shift for a range 2 selected
+    2 selected (Cancel)
     (☐ work 3.9 KB fix the parser bug)
     (☑ work 11.7 KB Release notes)
     (☑ work 2.9 KB Open elsewhere)
-    (Cancel) (Archive) (Delete 2)
+    (Archive) (Delete 2)
     |}];
   H.key h "Escape" ~target:(Session "s2");
   sidebar h;

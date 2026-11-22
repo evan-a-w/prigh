@@ -328,24 +328,21 @@ let%expect_test "Ctrl or Cmd, and Shift, click sessions into a selection" =
     {|
     -- Ctrl+click the third:
     (Mark_session (path /sessions/s3.jsonl) (range false))
-    Select sessions Shift for a range 1 selected
+    1 selected (Cancel)
     Three
-    button "Cancel" -- Stop selecting (Esc)
     button "Archive" -- Archive the selected sessions
     button "Delete 1" -- Delete the selected sessions, 0 B (Delete)
     -- Cmd+click the second:
     (Mark_session (path /sessions/s2.jsonl) (range false))
-    Select sessions Shift for a range 2 selected
+    2 selected (Cancel)
     Two
     Three
-    button "Cancel" -- Stop selecting (Esc)
     button "Archive" -- Archive the selected sessions
     button "Delete 2" -- Delete the selected sessions, 0 B (Delete)
     -- Ctrl+click the second again:
     (Mark_session (path /sessions/s2.jsonl) (range false))
-    Select sessions Shift for a range 1 selected
+    1 selected (Cancel)
     Three
-    button "Cancel" -- Stop selecting (Esc)
     button "Archive" -- Archive the selected sessions
     button "Delete 1" -- Delete the selected sessions, 0 B (Delete)
     -- Archive:
@@ -355,10 +352,9 @@ let%expect_test "Ctrl or Cmd, and Shift, click sessions into a selection" =
      (tag (Archived_set (title Three) (archived true))))
     -- Shift+click from the session on show:
     (Mark_session (path /sessions/s2.jsonl) (range true))
-    Select sessions Shift for a range 2 selected
+    2 selected (Cancel)
     One
     Two
-    button "Cancel" -- Stop selecting (Esc)
     button "Archive" -- Archive the selected sessions
     button "Delete 2" -- Delete the selected sessions, 0 B (Delete)
     -- Esc:

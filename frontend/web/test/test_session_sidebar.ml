@@ -781,7 +781,7 @@ let%expect_test "selecting: no menus, ranges in list order" =
     {|
     (Mark_session (path /sessions/s1.jsonl) (range false))
     (Mark_session (path /sessions/s3.jsonl) (range false))
-    (Cancel) (Archive) (Delete 2)
+    (Archive) (Delete 2)
     <div class="bg-primary/15 bg-sidebar-accent group/session hover:bg-sidebar-accent marked relative rounded-md selected session text-sidebar-foreground">
     <div class="bg-primary/15 group/session hover:bg-sidebar-accent marked relative rounded-md session text-sidebar-foreground">
     |}]

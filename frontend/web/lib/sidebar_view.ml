@@ -390,26 +390,34 @@ let heading_cls =
    text-muted-foreground"
 ;;
 
-(* Above the list: its name and how to select several sessions, or how
-   selecting works. *)
+(* Above the list: its name and Select, or while selecting how many are
+   selected and Cancel. *)
 let toolbar (m : App.Model.t) ~inject =
   if m.marks.selecting
   then
     div
       ~cls:("sessions-toolbar selecting " ^ heading_cls)
-      [ span
-          ~cls:"sessions-label flex-1 text-sidebar-foreground"
-          "Select sessions"
-      ; Node.span
-          ~attrs:[ Attr.class_ "sessions-hint keyboard font-normal" ]
-          [ Kbd.view [ Node.text "Shift" ]; Node.text " for a range" ]
-      ; Node.span
-          ~attrs:[ Attr.class_ "sessions-count tabular-nums" ]
+      [ Node.span
+          ~attrs:
+            [ Attr.class_
+                "sessions-count flex-1 tabular-nums text-sidebar-foreground"
+            ; Attr.title
+                "Ctrl/⌘-click a session to add it, Shift-click for a range"
+            ]
           [ Node.text
               (sprintf
                  "%d selected"
                  (List.length (Session_marks.marked m.marks m.sessions)))
           ]
+      ; Button.view
+          ~variant:Ghost
+          ~size:Xs
+          ~class_:
+            "h-6 px-1.5 font-normal text-muted-foreground \
+             hover:text-foreground narrow:h-11"
+          ~attrs:[ Attr.title "Stop selecting (Esc)" ]
+          ~on_click:(inject (Action.Select_sessions false))
+          [ Node.text "Cancel" ]
       ]
   else
     div
@@ -438,14 +446,7 @@ let selection_bar (m : App.Model.t) ~inject =
   div
     ~cls:
       "selection-bar flex items-center gap-2 border-t border-sidebar-border p-2"
-    [ Button.view
-        ~variant:Ghost
-        ~size:Sm
-        ~class_:"narrow:h-11"
-        ~attrs:[ Attr.title "Stop selecting (Esc)" ]
-        ~on_click:(inject (Action.Select_sessions false))
-        [ Node.text "Cancel" ]
-    ; (let unarchive =
+    [ (let unarchive =
          count > 0 && List.for_all marked ~f:(fun s -> s.archived)
        in
        Button.view
