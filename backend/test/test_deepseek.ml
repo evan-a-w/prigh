@@ -456,14 +456,19 @@ let%expect_test "stream: HTTP error status" =
 let%expect_test "stream: connection failure" =
   Eio_main.run
   @@ fun env ->
-  let provider =
-    Deepseek.create ~env ~base_url:"http://127.0.0.1:1" ~api_key:"k" ()
-  in
   let message =
-    provider.stream
-      (request [ Message.user "hi" ])
-      ~cancel:Cancellation.never
-      ~on_event:ignore
+    Closed_port.with_ (fun port ->
+      let provider =
+        Deepseek.create
+          ~env
+          ~base_url:(sprintf "http://127.0.0.1:%d" port)
+          ~api_key:"k"
+          ()
+      in
+      provider.stream
+        (request [ Message.user "hi" ])
+        ~cancel:Cancellation.never
+        ~on_event:ignore)
   in
   (match message.stop_reason with
    | Error e -> print_endline (String.prefix e 18)

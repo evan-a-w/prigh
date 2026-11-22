@@ -17,6 +17,15 @@ let unix_error = function
   | _ -> None
 ;;
 
+let peer_gone exn =
+  match exn with
+  | Eio.Io (Eio.Net.E (Connection_reset _), _) -> true
+  | exn ->
+    (match unix_error exn with
+     | Some (EPIPE | ECONNRESET) -> true
+     | Some _ | None -> false)
+;;
+
 let to_string_hum exn =
   match unix_error exn with
   | Some error -> String.lowercase (Core_unix.Error.message error)

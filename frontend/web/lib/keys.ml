@@ -14,6 +14,7 @@ module Target = struct
     | Terminal
     | Files
     | Review
+    | Code
     | Resize of Resize.Handle.t
     | Settings_tab
     | Message of int
@@ -91,6 +92,25 @@ let help =
        remove it" )
   ; ( "A (on a session)"
     , "archive or unarchive it (archived sessions are listed last, muted)" )
+  ; ( "Alt+E"
+    , "the editor mode: edit the session's files beside the chat (also /edit \
+       [path], the file browser's Edit)" )
+  ; "Ctrl+S / ⌘+S (editor)", "save the file"
+  ; ( "Ctrl+P / ⌘+P (editor)"
+    , "go to file: fuzzy search over every file under the session's directory" )
+  ; "Ctrl+F / ⌘+F (editor)", "find (and replace) in the file"
+  ; "Ctrl+G (editor)", "go to line"
+  ; ( "Ctrl+L / ⌘+L (in the editor's text)"
+    , "ask about the selection: attach it to the composer as path:L1–L2" )
+  ; ( "Ctrl+I / ⌘+I (in the editor's text)"
+    , "ask about the selection in a box under its lines (Enter sends, Esc \
+       closes)" )
+  ; "Swipe left / right (editor, a phone)", "the next or previous open file"
+  ; "Ctrl+B / ⌘+B (editor, wide window)", "show or hide the file tree"
+  ; "Alt+C (editor, wide window)", "show or hide the chat beside the editor"
+  ; "Alt+PageDown / Alt+PageUp (editor)", "the next or previous open file"
+  ; "Alt+W (editor)", "close the file"
+  ; "Esc (editor, outside the text)", "back to the chat"
   ; ( "P (on a session)"
     , "pin it to the top of the sidebar, or unpin it (pinned sessions are \
        never archived for being idle)" )
@@ -246,6 +266,7 @@ let on_control t =
   | Terminal
   | Files
   | Review
+  | Code
   | Resize _
   | Message _
   | Page -> false
@@ -477,7 +498,7 @@ let agents_key (m : App.Model.t) t : App.Action.t option =
          && (m.narrow
              ||
              match t.target with
-             | Editor _ | Terminal | Files | Review -> false
+             | Editor _ | Terminal | Files | Review | Code -> false
              | Field
              | Multiline
              | Control
@@ -603,6 +624,7 @@ let question_key t : Question_dialog.Action.t option =
     | Terminal
     | Files
     | Review
+    | Code
     | Resize _
     | Message _
     | Page -> false
@@ -636,7 +658,40 @@ let commenting (m : App.Model.t) t =
   | Session _
   | Worktree _
   | Terminal
+  | Code
   | Resize _ -> false
+;;
+
+(* The editor mode's keys, from anywhere on its page (the editor's own keys
+   are CodeMirror's). *)
+let code_key (m : App.Model.t) t : App.Action.t option =
+  let code a = Some (App.Action.Code a) in
+  match t.key with
+  | ("s" | "S") when command t -> code Save
+  | ("p" | "P") when command t -> code Find_file
+  | ("g" | "G") when ctrl_only t -> code Goto_open
+  | ("l" | "L") when command t && not t.shift ->
+    (match t.target with
+     | Code -> code Ask
+     | _ -> None)
+  | ("i" | "I") when command t && not t.shift ->
+    (match t.target with
+     | Code -> code Ask_inline
+     | _ -> None)
+  | ("b" | "B") when command t && not m.narrow -> code Toggle_tree
+  | _ when alt_letter t "c" && not m.narrow -> code Toggle_chat
+  | _ when alt_letter t "w" ->
+    Option.bind m.code.current ~f:(fun p -> code (Close p))
+  | "PageDown" when alt_only t -> code (Step 1)
+  | "PageUp" when alt_only t -> code (Step (-1))
+  | "Escape" when m.code.menu -> code Toggle_menu
+  | "Escape" when Option.is_some m.code.goto -> code Goto_cancel
+  | "Escape" when m.narrow && m.code.drawer -> code Toggle_drawer
+  | "Escape" when m.narrow && m.code.sheet -> code Toggle_sheet
+  | ("f" | "F") when command t && Poly.equal t.target Page ->
+    code (Command Find)
+  | "Escape" when Poly.equal t.target Page -> code Leave
+  | _ -> None
 ;;
 
 let handle (m : App.Model.t) t : App.Action.t option =
@@ -656,6 +711,9 @@ let handle (m : App.Model.t) t : App.Action.t option =
   | _, [], [], None ->
     (match t.key with
      | _ when terminal_toggle t -> Some Toggle_terminal
+     | _ when alt_letter t "e" ->
+       Some (Code (if m.code.open_ then Leave else Enter None))
+     | _ when m.code.open_ && Option.is_some (code_key m t) -> code_key m t
      | _
        when Files.toggle_key
               ~code:t.code
@@ -737,6 +795,7 @@ let handle (m : App.Model.t) t : App.Action.t option =
             | Control
             | Settings_tab
             | Terminal
+            | Code
             | Page
             | Message _ ) ) -> None))
 ;;

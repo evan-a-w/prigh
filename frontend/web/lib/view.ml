@@ -346,7 +346,7 @@ end
 
 (* The terminal's widget is one function of its target for the page's
    life, so that it is not among what [Part.terminal] depends on. *)
-let view (m : Model.t) ~inject ~terminal =
+let view (m : Model.t) ~inject ~terminal ~code_editor =
   Session_link_view.set m.sessions;
   (* Each layer over a part makes it inert once: the attribute twice would
      not combine. *)
@@ -396,6 +396,9 @@ let view (m : Model.t) ~inject ~terminal =
                | Connected -> false )
            ; "files-open", m.files.open_
            ; "reviewing", m.review.open_
+           ; "editing", m.code.open_
+           ; ( "code-chat"
+             , m.code.open_ && if m.narrow then m.code.sheet else m.code.chat )
            ]
            @ List.map Code_size.all ~f:(fun s ->
              ( "code-" ^ Code_size.name s
@@ -435,7 +438,11 @@ let view (m : Model.t) ~inject ~terminal =
                layered false
              | _ -> under_drawer)
               (Review_page_view.view m ~inject))
-        ; (if m.review.open_
+        ; (if m.code.open_
+           then
+             under_drawer (Code_editor_view.view m ~inject ~widget:code_editor)
+           else Node.none)
+        ; (if m.review.open_ || (m.code.open_ && m.code.chat)
            then Resize_view.handle m ~inject Review_chat
            else Node.none)
         ; Node.main

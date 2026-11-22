@@ -3900,6 +3900,29 @@ terminal frontend and `web/` prigh-web, the browser one.
       card (`Session_view`) runs `/pr`. `Keys.Target.Multiline` (a dialog's textarea): Enter is a
       new line, Ctrl/⌘+Enter accepts.
       its counts, and a button to the review page).
+    - The editor mode: `Code_editor` (pure: the open buffers, each with
+      its text, the text on the host and its md5, the agent's changes on
+      show and those kept as `Hunk`s, moved with the lines around them as
+      the text changes (`Hunk.remap`), each undone by `Hunk.revert`; the
+      file tree; Go to file's index, every file under the cwd from the
+      `list_files` RPC (`File_index` on the tool host: `git ls-files`, or
+      a walk; one newline-separated string), ranked in the browser by
+      `Prigh_ui.Fuzzy_path` (narrowing from the last matches as the query
+      grows) and drawn as a virtual list; the chip for the next prompt and
+      the ask box's) and `Code_editor_view` (the strip, the tree or drawer, the
+      notices, the phone's keys). Files are read with `fs_preview` and
+      written with `fs_write` (`expected`: the md5 read, so a file changed
+      on the host is refused); after a tool that may touch files
+      (`App.touches_files`) the open ones are read again
+      (`Code_editor.changed`). The text itself is CodeMirror 6, vendored as
+      one bundle (`bin/vendor/codemirror.js`, built from
+      `codemirror-entry.mjs`, see `bin/vendor/README.md`) and driven by
+      `bin/code_editor.js` through `app/code_editor_widget.ml` (a vdom
+      widget, like the terminal's): the model's text goes in when its
+      `revision` changes, edits come back once a frame (and before any key
+      or tap the page handles, so Save sees them), commands
+      (`Code_editor.Command`: the phone's keys, find, go to line) go to it
+      as `Out.Command`.
     - The review: `Code_review` (pure, like `Files`: the session's
       `Review`, kept by the `review` event and read with `get_review` when
       the session changes; the diff, read again with `git_diff` while the

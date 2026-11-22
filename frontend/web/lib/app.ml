@@ -243,6 +243,7 @@ module Reply_tag = struct
     | Git_diff
     | Command_prompt of string (** [/review] or [/init] as typed *)
     | Files of Files.Reply.t
+    | Code of Code_editor.Reply.t
     | Review of Code_review.Reply.t
     | Sent_with_files of
         { text : string
@@ -371,6 +372,7 @@ module Command = struct
     | Request_notification_permission
     | Set_title of string
     | Files of Files.Page.t
+    | Code_editor of Code_editor.Command.t
     | Cache_prefs of Prefs.Change.t list
     | Apply_theme of Theme.t
     | Keep_scroll_position
@@ -719,6 +721,7 @@ module Action = struct
         ; status : Terminal.Status.t
         }
     | Files of Files.Action.t
+    | Code of Code_editor.Action.t
     | Review of Code_review.Action.t
     | Review_pick of Review_picker.Which.t
     | Review_direct of bool
@@ -815,6 +818,7 @@ module Model = struct
     ; marks : Session_marks.t
     ; notifications : Page_notify.t
     ; files : Files.t
+    ; code : Code_editor.t
     ; review : Code_review.t
     ; review_memory : Review_memory.t
     ; code_size : Code_size.t
@@ -967,6 +971,7 @@ module Model = struct
         ; prefs
         ; generate
         ; git_bar
+        ; code
         }
       =
       a
@@ -993,6 +998,7 @@ module Model = struct
     && phys_equal history b.history
     && phys_equal images b.images
     && phys_equal pasted b.pasted
+    && phys_equal code b.code
     && phys_equal downsizing b.downsizing
     && phys_equal queue b.queue
     && phys_equal agent_queues b.agent_queues
@@ -1099,7 +1105,7 @@ module Model = struct
     | _ -> Option.value t.theme_preview ~default:t.theme
   ;;
 
-  let focused t = t.review.open_ && not t.narrow
+  let focused t = (t.review.open_ || t.code.open_) && not t.narrow
   let docked t = t.sidebar_open && not (t.narrow || focused t)
 
   let drawer t =
@@ -1113,7 +1119,7 @@ module Model = struct
     ; files = t.files.open_
     ; preview = Option.is_some t.files.preview
     ; agents = t.agents.open_
-    ; reviewing = t.review.open_
+    ; reviewing = t.review.open_ || (t.code.open_ && t.code.chat)
     ; narrow = t.narrow
     }
   ;;
@@ -1367,6 +1373,7 @@ let init =
   ; marks = Session_marks.empty
   ; notifications = Page_notify.init
   ; files = Files.closed
+  ; code = Code_editor.empty
   ; review = Code_review.empty
   ; review_memory = Review_memory.empty
   ; code_size = Code_size.default
@@ -1586,28 +1593,6 @@ let cancel_generate (m : Model.t) =
 (* A new session (switched, new, forked) starts from its own messages. *)
 (* ---- the file browser and the attachments *)
 
-let files_out (m : Model.t) (outs : Files.Out.t list) =
-  List.fold outs ~init:(m, []) ~f:(fun (m, cmds) (out : Files.Out.t) ->
-    match out with
-    | Rpc { method_; params; reply } ->
-      m, cmds @ [ rpc method_ params ~tag:(Files reply) ]
-    | Page page -> m, cmds @ [ Command.Files page ]
-    | Toast { text; error } ->
-      let m, more = toast m ~error text in
-      m, cmds @ more
-    | Copy { text; copied } -> m, cmds @ [ Command.Copy { text; copied } ]
-    | Insert text ->
-      let draft =
-        if
-          String.is_empty m.draft
-          || Char.is_whitespace (String.get m.draft (String.length m.draft - 1))
-        then m.draft ^ text ^ " "
-        else m.draft ^ " " ^ text ^ " "
-      in
-      { m with draft; cursor = String.length draft }, cmds @ [ focus_editor ]
-    | Focus_editor -> m, cmds @ [ focus_editor ])
-;;
-
 let review_out (m : Model.t) (outs : Code_review.Out.t list) =
   List.fold outs ~init:(m, []) ~f:(fun (m, cmds) (out : Code_review.Out.t) ->
     match out with
@@ -1652,6 +1637,72 @@ let with_review (m : Model.t) ((review : Code_review.t), outs) =
     else m
   in
   review_out { m with review } outs
+;;
+
+let code_out (m : Model.t) (outs : Code_editor.Out.t list) =
+  List.fold outs ~init:(m, []) ~f:(fun (m, cmds) (out : Code_editor.Out.t) ->
+    match out with
+    | Rpc { method_; params; reply } ->
+      m, cmds @ [ rpc method_ params ~tag:(Code reply) ]
+    | Command c -> m, cmds @ [ Command.Code_editor c ]
+    | Toast { text; error } ->
+      let m, more = toast m ~error text in
+      m, cmds @ more
+    | Focus id -> m, cmds @ [ Command.Focus id ]
+    | Focus_composer -> m, cmds @ [ focus_editor ]
+    | Refresh_changes ->
+      let m, more = with_review m (Code_review.refresh m.review) in
+      m, cmds @ more
+    | Send _ -> m, cmds)
+;;
+
+(* The editor mode takes the place of the review page and the file
+   browser. *)
+let with_code (m : Model.t) ((code : Code_editor.t), outs) =
+  let m =
+    if code.open_ && not m.code.open_
+    then
+      { m with
+        files = fst (Files.update m.files Close)
+      ; review =
+          (if m.review.open_
+           then fst (Code_review.update m.review Close)
+           else m.review)
+      ; agents =
+          (if m.narrow then { m.agents with open_ = false } else m.agents)
+      }
+    else m
+  in
+  code_out { m with code } outs
+;;
+
+let files_out (m : Model.t) (outs : Files.Out.t list) =
+  List.fold outs ~init:(m, []) ~f:(fun (m, cmds) (out : Files.Out.t) ->
+    match out with
+    | Rpc { method_; params; reply } ->
+      m, cmds @ [ rpc method_ params ~tag:(Files reply) ]
+    | Page page -> m, cmds @ [ Command.Files page ]
+    | Toast { text; error } ->
+      let m, more = toast m ~error text in
+      m, cmds @ more
+    | Copy { text; copied } -> m, cmds @ [ Command.Copy { text; copied } ]
+    | Insert text ->
+      let draft =
+        if
+          String.is_empty m.draft
+          || Char.is_whitespace (String.get m.draft (String.length m.draft - 1))
+        then m.draft ^ text ^ " "
+        else m.draft ^ " " ^ text ^ " "
+      in
+      { m with draft; cursor = String.length draft }, cmds @ [ focus_editor ]
+    | Focus_editor -> m, cmds @ [ focus_editor ]
+    | Edit path ->
+      let m, more =
+        with_code
+          { m with files = fst (Files.update m.files Close) }
+          (Code_editor.update m.code (Enter (Some path)))
+      in
+      m, cmds @ more)
 ;;
 
 (* What the agent may have changed in the working tree: an edit, a write, a
@@ -2025,6 +2076,7 @@ let refresh_hosts (m : Model.t) =
 ;;
 
 let set_state (m : Model.t) (state : State.t) =
+  let old_state = m.state in
   let hosts_changed =
     Option.for_all m.state ~f:(fun (old : State.t) ->
       not
@@ -2040,6 +2092,18 @@ let set_state (m : Model.t) (state : State.t) =
   let cmds = cmds @ opened in
   let m = if hosts_changed then refresh_hosts m else m in
   let m, more = with_files m (Files.set_where m.files (files_where m)) in
+  let m =
+    { m with
+      code =
+        Code_editor.set_where
+          m.code
+          ~session_changed:
+            (entered
+             || Option.exists old_state ~f:(fun (old : State.t) ->
+               not (String.equal old.active_host state.active_host)))
+          ~cwd:state.cwd
+    }
+  in
   let m, review =
     with_review
       m
@@ -2656,6 +2720,20 @@ let complete_draft (m : Model.t) ~skills =
       ()
   with
   | None -> { m with completion = None }, []
+  | Some c
+    when Completion.Source.equal (Completion.source c) (Argument File) ->
+    (* [/edit]'s files are matched here, over the editor's list of them. *)
+    let code, outs = Code_editor.load_index m.code in
+    let top =
+      let all =
+        Prigh_ui.Fuzzy_path.rank ~query:(Completion.prefix c) code.index.files
+      in
+      Array.to_list (Array.sub all ~pos:0 ~len:(Int.min 50 (Array.length all)))
+      |> List.map ~f:(fun (mt : Prigh_ui.Fuzzy_path.Match.t) -> mt.path)
+    in
+    code_out
+      { m with completion = Some (Completion.set_files c top); code }
+      outs
   | Some c ->
     (match m.completion with
      | Some old when Completion.same old c -> m, []
@@ -7385,6 +7463,12 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
   | "abort", _ -> m, [ rpc "abort" [] ~tag:Restored ]
   | "files", "" -> with_files m (Files.update m.files (Open None))
   | "files", path -> with_files m (Files.update m.files (Open (Some path)))
+  | "edit", path ->
+    with_code
+      m
+      (Code_editor.update
+         m.code
+         (Enter (if String.is_empty path then None else Some path)))
   | "terminal", "" -> open_terminal (with_terminal_dir m None)
   | "terminal", dir -> open_terminal (with_terminal_dir m (Some dir))
   | "agents", "" -> open_agents m None
@@ -8618,6 +8702,14 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
     in
     with_files m (Files.reply m.files reply result)
   | Files reply, result -> with_files m (Files.reply m.files reply result)
+  | Code reply, result ->
+    let m, cmds = with_code m (Code_editor.reply m.code reply result) in
+    (match reply, m.completion with
+     | Files _, Some c
+       when Completion.Source.equal (Completion.source c) (Argument File) ->
+       let m, more = refresh_completion m in
+       m, cmds @ more
+     | _ -> m, cmds)
   | Review reply, result ->
     let m, cmds = with_review m (Code_review.reply m.review reply result) in
     (match reply with
@@ -10094,7 +10186,16 @@ let event (m : Model.t) (e : Event.t) =
   let m, cmds = main_event m e in
   let m, review =
     if touches_files e
-    then with_review m (Code_review.changed m.review ~watching:m.files.open_)
+    then (
+      let m, review =
+        with_review
+          m
+          (Code_review.changed
+             m.review
+             ~watching:(m.files.open_ || m.code.open_))
+      in
+      let m, code = with_code m (Code_editor.changed m.code) in
+      m, review @ code)
     else m, []
   in
   ( m
@@ -10216,7 +10317,7 @@ let no_host (m : Model.t) =
   | Some _ | None -> None
 ;;
 
-let send (m : Model.t) ~follow_up =
+let send_draft (m : Model.t) ~follow_up =
   let text = String.strip m.draft in
   (* The errors were about what was sent before. *)
   let m = { m with toasts = List.filter m.toasts ~f:(fun t -> not t.error) } in
@@ -10388,6 +10489,27 @@ let send (m : Model.t) ~follow_up =
         @ [ Command.Scroll_to_bottom
           ; rpc method_ ((text_params @ images) @ attachments) ~tag
           ] ))
+;;
+
+(* The editor's chip goes with a prompt: its place in the text, the code as
+   a pasted text. *)
+let send (m : Model.t) ~follow_up =
+  let text = String.strip m.draft in
+  match m.code.chip with
+  | Some chip
+    when (not (String.is_empty text))
+         && not
+              (String.is_prefix text ~prefix:"/"
+               || String.is_prefix text ~prefix:"!") ->
+    let text, pasted = Code_editor.Chip.prompt chip text in
+    send_draft
+      { m with
+        draft = text
+      ; pasted = pasted @ m.pasted
+      ; code = Code_editor.sent m.code
+      }
+      ~follow_up
+  | Some _ | None -> send_draft m ~follow_up
 ;;
 
 let accept_completion (m : Model.t) ~run =
@@ -12212,6 +12334,21 @@ let update_connected (m : Model.t) (action : Action.t) =
   | Terminal_status { key; status } ->
     with_terminal m ~f:(fun t -> { t with status = Some (key, status) }), []
   | Files action -> with_files m (Files.update m.files action)
+  | Code action ->
+    let code, outs = Code_editor.update m.code action in
+    let m, cmds = with_code m (code, outs) in
+    (* The ask box's prompt goes as the composer's would, with its lines
+       as the chip; what the composer held stays there. *)
+    List.fold outs ~init:(m, cmds) ~f:(fun (m, cmds) -> function
+      | Send { chip; text } ->
+        let draft = m.draft in
+        let m, more =
+          send
+            { (set_draft m text) with code = { m.code with chip = Some chip } }
+            ~follow_up:false
+        in
+        set_draft m draft, cmds @ more
+      | _ -> m, cmds)
   | Review action -> review_update m action
   | Review_pick which -> open_review_pick m which
   | Review_direct direct -> review_direct m direct

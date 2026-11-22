@@ -34,7 +34,11 @@ val received : t -> int
 val waiting : t -> int
 
 (** Closes the transport (if any) as if the backend had: pending calls fail
-    and [Closed] is delivered; [connect] opens a new one. *)
+    and [Closed] is delivered; [connect] opens a new one. An attempt to
+    connect still under way is abandoned (one that hangs, e.g. on a network
+    that drops packets, would otherwise be shared by every later
+    [connect]): its callers get an error, and a transport it opens after all
+    is closed. *)
 val disconnect : t -> unit
 
 (** Determined once there is no transport: [Closed] has been delivered for

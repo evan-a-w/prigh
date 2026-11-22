@@ -165,6 +165,7 @@ let with_server f =
         ~pattern:(Server.url server "")
         ~with_:"http://SERVER"
       |> String.substr_replace_all ~pattern:Filename.temp_dir_name ~with_:"$TMP"
+      |> Closed_port.mask
     in
     let text =
       match String.split_lines (mask result.text) with
@@ -344,7 +345,7 @@ let%expect_test
         ; chunks = [ 0., "start"; 3., "late" ]
         };
     fetch ~timeout:1 (url "/slow");
-    fetch "http://127.0.0.1:1/";
+    Closed_port.with_ (fun port -> fetch (sprintf "http://127.0.0.1:%d/" port));
     let big =
       String.concat (List.init 3000 ~f:(fun i -> sprintf "line %d\n" i))
     in
@@ -370,7 +371,7 @@ let%expect_test
       ERROR invalid arguments: timeout must be between 1 and 120 seconds
       ERROR invalid arguments: timeout must be between 1 and 120 seconds
       ERROR fetching http://SERVER/slow timed out after 1s; try again with a larger timeout (at most 120)
-      ERROR cannot fetch http://127.0.0.1:1/: connection refused; check the URL, and that its host is reachable from the machine the tools run on
+      ERROR cannot fetch http://127.0.0.1:CLOSED/: connection refused; check the URL, and that its host is reachable from the machine the tools run on
       http://SERVER/long (HTTP 200, text/plain, 28.2 KB)
 
       line 0

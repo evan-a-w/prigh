@@ -201,6 +201,7 @@ module Out = struct
         ; copied : string
         }
     | Insert of string
+    | Edit of string
     | Focus_editor
   [@@deriving sexp_of]
 end
@@ -244,6 +245,7 @@ module Action = struct
     | Ask_cancel
     | Copy_path of string
     | Insert_path of string
+    | Edit of string
     | Attach of string
     | Remove_attachment of int
   [@@deriving sexp_of]
@@ -955,6 +957,7 @@ let update t (action : Action.t) =
           }
       ] )
   | Insert_path path -> t, [ Out.Insert ("@" ^ mention t path) ]
+  | Edit path -> t, [ Out.Edit path ]
   | Attach name -> attach t name
   | Remove_attachment i -> remove_attachment t i
 ;;

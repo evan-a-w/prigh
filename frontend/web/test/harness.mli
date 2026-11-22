@@ -61,6 +61,9 @@ val fail : t -> string -> string -> unit
     actions its handler produced, and applies them. *)
 val click : ?nth:int -> t -> selector:string -> unit
 
+(** A keydown of [key] on the element, to its own handler. *)
+val keydown : ?nth:int -> t -> selector:string -> string -> unit
+
 (** Clicks it with Ctrl or Cmd ([meta]) held. *)
 val modified_click
   :  ?nth:int

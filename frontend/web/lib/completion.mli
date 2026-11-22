@@ -55,6 +55,9 @@ val request : t -> (string * (string * Json.t) list) option
 (** The backend's listing for [prefix]; stale ones are ignored. *)
 val set_results : t -> prefix:string -> string list -> t
 
+(** [/edit]'s files, best first, as matched here. *)
+val set_files : t -> string list -> t
+
 val move : t -> int -> t
 
 (** The highlighted item is followed by more words ([/worktree open], say):

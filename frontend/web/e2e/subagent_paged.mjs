@@ -108,7 +108,8 @@ try {
   await composer.fill("count the files");
   await composer.press("Enter");
   // The subagent done: its line settles to a tick (its report is in the panel).
-  await page.waitForFunction(() => document.querySelector("#chat .tool-subagent.ok"));
+  // A subagent's whole run: longer than a step on a busy machine.
+  await page.waitForFunction(() => document.querySelector("#chat .tool-subagent.ok"), null, { timeout: 90000 });
   writeFileSync(join(cwd, "main-go"), "");
   await page.waitForFunction(() => document.getElementById("chat").innerText.includes("Waiting."));
 

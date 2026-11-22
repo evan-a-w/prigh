@@ -16,7 +16,7 @@
 // optionally SHOTS.
 import { execFileSync, spawn } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
-import { hostname } from "node:os";
+import { hostName } from "./host_name.mjs";
 import { join } from "node:path";
 import { end } from "./end.mjs";
 
@@ -105,7 +105,7 @@ const screenshot = async (label, selector) => {
   else await page.screenshot({ path });
 };
 const clean = text =>
-  text.split("\n").map(line => line.replaceAll(hostname(), "<HOSTNAME>").replace(/\$\d+\.\d+/g, "$<COST>").replace(/\s+/g, " ").trim()).join("\n");
+  text.split("\n").map(line => line.replaceAll(hostName(), "<HOSTNAME>").replace(/\$\d+\.\d+/g, "$<COST>").replace(/\s+/g, " ").trim()).join("\n");
 
 // The composer's chips, by row (they wrap rather than spill), with anything
 // outside the composer or cut off without an ellipsis.

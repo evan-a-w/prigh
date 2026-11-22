@@ -240,7 +240,7 @@ let%expect_test
     3
     # proj hello
     Showing the first 14 B of 293.0 KB: download it for the rest.
-    (Attach) (Download) (Mention) (Copy path) (Rename) (Delete)
+    (Attach) (Edit) (Download) (Mention) (Copy path) (Rename) (Delete)
     |}];
   H.key h "ArrowUp" ~target:Files;
   H.reply
@@ -553,8 +553,8 @@ let%expect_test
 let%expect_test "paths into the composer, files attached from the browser" =
   let h = opened () in
   H.act h (Files (Select "README.md"));
-  H.quiet h (fun () -> H.click h ~selector:".files-act:nth-child(3)");
   H.quiet h (fun () -> H.click h ~selector:".files-act:nth-child(4)");
+  H.quiet h (fun () -> H.click h ~selector:".files-act:nth-child(5)");
   H.click h ~selector:".files-act.attach";
   print_endline (H.model h).draft;
   H.text h ~selector:".attach-chips";
