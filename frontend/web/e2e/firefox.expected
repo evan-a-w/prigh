@@ -212,64 +212,36 @@ still there?
 <TIME>
 back again
 <TIME>
-=== firefox: agents panel ===
-Agents
+=== firefox: the session's card lists its subagent ===
 Subagents
-2
-Done
-Survey the project
-The survey: 3 files.
-Done
-Count the files
-There are 3 files.
-Jobs
 1
-Done
-sleep 1; echo built
-<T>
-built
-=== firefox: a nested subagent ===
-Subagent a1/n1
-There are 3 files.
+Survey the project
+<age>
+=== firefox: its line opens its chat ===
+on show: a1
+Survey the project
 <TIME>
-Survey the project
-›
-Count the files
-Show in chat
-Done
-deepseek-flash  1 turn  $<COST>
-its top-level card is in view in the chat
-=== firefox: a background job ===
-Job j1
-built
-Output, lines 1-1 of 1
-sleep 1; echo built
-Done
-<T>
-6 B
-=== firefox: a card opens its agent ===
-Subagent a1
-Its subagents
-1
-Done
-Count the files
-There are 3 files.
 asking a helper
 subagent
 Count the files
 The survey: 3 files.
 <TIME>
-Survey the project
-Show in chat
-Done
-deepseek-flash  2 turns  1 tool call  $<COST>
-=== firefox: the agent's footer stays in sight ===
-at the top: scrolls true, footer at the panel's foot true, under the transcript true
-at the end: scrolls true, footer at the panel's foot true, under the transcript true
-Survey the project
-Show in chat
-Done
-deepseek-flash  2 turns  1 tool call  $<COST>
+breadcrumb: cwd / count some lines / Survey the project
+card: Parents | 1 | The session | Subagents | 1 | Count the files | <age>
+composer: Message Survey the project…
+=== firefox: Alt+1: its own subagent's chat ===
+on show: a1/n1
+Count the files
+<TIME>
+There are 3 files.
+<TIME>
+breadcrumb: cwd / count some lines / Survey the project / Count the files
+card: Parents | 2 | The session | Survey the project
+composer: A subagent's own subagent: write to its parent
+Esc: back to a1
+Esc: back to the session's chat: true
+Alt+1 from the session: a1
+the breadcrumb's session: back to its chat: true
 === firefox: a shell in the terminal panel ===
 <HOSTNAME>
 <CWD>
@@ -1613,17 +1585,16 @@ the column keeps its left margin
 === firefox: session card: hidden from the chrome, 1440px wide ===
 pane 1160px, the column centred
 no card
-=== firefox: session card: a subagent's transcript ===
-Count the modules with a subagent
-/
-Count the modules
-<age>
+=== firefox: session card: a subagent's chat ===
 Count the modules
 <time>
 There are 42 modules.
 <time>
-composer: 0, footer: A subagent's transcript: read-only. Back (Esc), focus in the transcript: true
-its task as a filled prompt: true; the footer at the pane's foot: true
+breadcrumb: prigh / Count the modules with a subagent / Count the modules
+card: Parents | 1 | The session
+composer: 1, focus in the editor: true
+its task as a filled prompt: true
+the composer where it is in the session's chat: true
 === firefox: session card: Esc: back to the session ===
 the session's transcript: true, focus in the editor: true
 === firefox: session card: a phone, 390x844 ===
@@ -2294,7 +2265,7 @@ review from the left edge: true
 chat beside the review: true, at least 300px: true
 review at least 480px: true
 files beside: true
-=== firefox: review: focus: the terminal, the agents and the files open ===
+=== firefox: review: focus: the terminal and the files open ===
 sidebar: hidden
 the chrome over the chat: true
 review from the left edge: true
@@ -2303,7 +2274,6 @@ review at least 480px: true
 terminal from the review's left to the chat's right: true
 terminal under them: true
 files beside: true
-agents beside: true
 === firefox: review: focus: a wider window ===
 sidebar: hidden
 the chrome over the chat: true
@@ -2313,14 +2283,12 @@ review at least 480px: true
 terminal from the review's left to the chat's right: true
 terminal under them: true
 files beside: true
-agents beside: true
 === firefox: review: focus: the review closed ===
 sidebar: shown
 the chrome over the chat: true
 terminal from the chat's left to the chat's right: true
 terminal under them: true
 files beside: true
-agents beside: true
 the same terminal: true
 === firefox: review: focus: reviewing again ===
 the same terminal: true
@@ -2742,47 +2710,29 @@ prigh desktop: signing in in the window
 prigh desktop: stdin closed: the window is gone
 === firefox: desktop_signin: errors ===
 none
-=== firefox: steer: showing it leaves the composer on the main agent ===
-(no chip); Steer the agent…
-Survey the project
-Steer
-Cancel
-Show in chat
-Running
-<T>
-deepseek-flash  1 turn  1 tool call
-=== firefox: steer: Steer ===
-Steering a1 Survey the project; Steer a1 (Alt+Enter: after its turn)…
-editor focused: true
-Survey the project
-Steering
-Cancel
-Show in chat
-Running
-<T>
-deepseek-flash  1 turn  1 tool call
+=== firefox: steer: its line opens its chat: the composer writes to it ===
+a1's chat (cwd / survey the project / Survey the project); Steer Survey the project (Enter) or queue a follow-up (Alt+Enter)…
+stop button: 1
 === firefox: steer: Esc ===
-(no chip); Steer the agent…
+the session's chat (cwd / survey the project); Steer (Enter) or queue a follow-up (Alt+Enter)…
 still running: true
-Steer: Steering a1 Survey the project; Steer a1 (Alt+Enter: after its turn)…
+Alt+1: a1's chat (cwd / survey the project / Survey the project); Steer Survey the project (Enter) or queue a follow-up (Alt+Enter)…
 === firefox: steer: queued for it ===
-To a1
+Steer
 use the tests
 Edit
 Remove from the queue
-To a1, after
+Queued
 then summarise
 Edit
 Remove from the queue
-=== firefox: steer: its row says so ===
-2 queued  deepseek-flash  1 turn  1 tool call
 === firefox: steer: edited ===
 in the editor: then summarise
 === firefox: steer: delivered, it finished ===
-a1 has finished: you are writing to the main agent again
-=== firefox: steer: the composer is the main agent's again ===
-(no chip); Steer the agent…
+a1's chat (cwd / survey the project / Survey the project); Message Survey the project…
 === firefox: steer: its transcript ===
+Survey the project
+<TIME>
 Looking around.
 bash
 timeout 300 sh -c 'until [ -f sub-go ]; do sleep 0.1; done'; echo sub-go
@@ -2800,17 +2750,50 @@ then summarise
 <TIME>
 Summary: 3 files, all tested.
 <TIME>
-=== firefox: steer: too late ===
+=== firefox: steer: its report on its way ===
 Couldn't send it to a1: a1 has finished and its report is on its way to the main agent: tell the main agent instead, or have it start a new subagent. Your message is back in the editor.
-in the editor: /agents steer a1 one more thing
+in the editor: check the docs too
 === firefox: steer: the main agent got the report ===
-The survey is in.
+in the editor: check the docs too
+=== firefox: steer: carried on ===
+in the editor: ""
+=== firefox: steer: its transcript ===
+Survey the project
+<TIME>
+Looking around.
+bash
+timeout 300 sh -c 'until [ -f sub-go ]; do sleep 0.1; done'; echo sub-go
+→
+You (steer)
+[The user sends you this while you work: take it into account and carry on.]
+use the tests
+<TIME>
+Using the tests, as asked.
+<TIME>
+→
+You (follow-up)
+[The user sends you this as you finish: deal with it before you report.]
+then summarise
+<TIME>
+Summary: 3 files, all tested.
+<TIME>
+→
+You (steer)
+[The user sends you this while you work: take it into account and carry on.]
+check the docs too
+<TIME>
+Carrying on: the docs are fine too.
+<TIME>
+=== firefox: steer: the session's chat ===
+the main agent's replies after the report: 1; running: 0
 === firefox: steer: errors ===
 none
 === firefox: subagent_paged: reloaded ===
 the call is loaded: false
 older messages to load: true
 === firefox: subagent_paged: its transcript ===
+Count the files
+<TIME>
 There are 3 files.
 <TIME>
 === firefox: subagent_paged: errors ===
