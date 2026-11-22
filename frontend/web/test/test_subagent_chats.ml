@@ -1,5 +1,4 @@
 open! Core
-open Prigh_web
 open Agent_events
 module H = Harness
 

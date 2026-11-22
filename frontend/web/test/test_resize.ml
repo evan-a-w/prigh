@@ -726,8 +726,8 @@ let%expect_test
 
 let%expect_test "keys and /help" =
   let h = H.create () in
-  H.key h ~target:(Resize Agents) "ArrowLeft" ~ctrl:true;
-  H.key h ~target:(Resize Agents) "Escape";
+  H.key h ~target:(Resize Files) "ArrowLeft" ~ctrl:true;
+  H.key h ~target:(Resize Files) "Escape";
   [%expect
     {|
     (browser default)
