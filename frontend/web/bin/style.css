@@ -1603,7 +1603,7 @@ kbd {
 }
 
 /* Jump back to the end of the chat while it is scrolled up */
-.jump-anchor { position: sticky; bottom: 0; height: 0; max-width: var(--column); z-index: var(--z-float); }
+.jump-anchor { position: sticky; bottom: 0; height: 0; max-width: var(--log-column); z-index: var(--z-float); }
 .jump-to-bottom {
   position: absolute;
   bottom: 12px;

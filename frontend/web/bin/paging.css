@@ -2,7 +2,7 @@
    a fold's toggle, that loads them (as does scrolling near the top). */
 
 .older {
-  max-width: var(--column);
+  max-width: var(--log-column);
   margin: 0 0 14px;
   display: flex;
   align-items: center;
@@ -57,7 +57,7 @@
    above it, dimmed: kept in the transcript, no longer seen by the model. */
 
 .trim-divider {
-  max-width: var(--column);
+  max-width: var(--log-column);
   margin: 0 0 26px;
   display: flex;
   align-items: center;
@@ -92,7 +92,7 @@
 #chat .trim-divider.jumped { border-radius: var(--r-control); }
 
 .trimmed-messages {
-  max-width: var(--column);
+  max-width: var(--log-column);
   margin: 0 0 22px;
   padding: 0 0 0 14px;
   border-left: 1px dashed var(--rule-2);

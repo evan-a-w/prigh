@@ -61,6 +61,9 @@ let%expect_test
         <span title="Done" role="img" aria-label="Done" class="done mark">
           <icon class="check"> </icon>
         </span>
+        <span aria-hidden="true" class="tool-icon">
+          <icon class="target"> </icon>
+        </span>
         <span class="name"> computer </span>
         <span class="arg"> click (640, 312) </span>
         <span class="chip"> 1280×800 </span>
@@ -88,6 +91,9 @@ let%expect_test
         <span title="Done" role="img" aria-label="Done" class="done mark">
           <icon class="check"> </icon>
         </span>
+        <span aria-hidden="true" class="tool-icon">
+          <icon class="target"> </icon>
+        </span>
         <span class="name"> computer </span>
         <span class="arg"> type “hello” </span>
         <span class="chip"> 1280×800 </span>
@@ -114,6 +120,9 @@ let%expect_test
         <span title="Done" role="img" aria-label="Done" class="done mark">
           <icon class="check"> </icon>
         </span>
+        <span aria-hidden="true" class="tool-icon">
+          <icon class="target"> </icon>
+        </span>
         <span class="name"> computer </span>
         <span class="arg"> wait 2s </span>
         <span class="chev">  </span>
@@ -126,6 +135,9 @@ let%expect_test
       <button type="button" data-fold="c4#open" aria-expanded="true" class="tool-head">
         <span title="Failed" role="img" aria-label="Failed" class="failed mark">
           <icon class="cross"> </icon>
+        </span>
+        <span aria-hidden="true" class="tool-icon">
+          <icon class="target"> </icon>
         </span>
         <span class="name"> computer </span>
         <span class="arg"> key ctrl+t </span>
@@ -154,6 +166,9 @@ let%expect_test "while streaming: the action so far, running" =
     <div class="running tool tool-computer">
       <div class="tool-head">
         <span aria-hidden="true" class="lamp"> </span>
+        <span aria-hidden="true" class="tool-icon">
+          <icon class="target"> </icon>
+        </span>
         <span class="name"> computer </span>
         <span class="arg"> scroll ↓3 at (10, 20) </span>
       </div>

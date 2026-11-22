@@ -1,35 +1,39 @@
-/* The transcript, set as a work log: each of the user's turns is a prompt
-   with a sodium bar, and the agent's work hangs below it on a spine, with
-   every tool call's outcome marked on the spine itself. */
+/* The transcript, set as a conversation: the user's turns are bubbles on
+   the right, the agent's words plain text on the left, and its work between
+   them folded into quiet lines ("Worked for 1m 48s"), each step a row with
+   its tool, what it acts on and its outcome at the right. Colours, corners
+   and fonts are the components' (loon_bridge.css), so every theme, accent,
+   corner and font setting restyles it. */
 
 :root {
   --code-bg: var(--well);
   --err-bg: var(--brick-wash);
   --err-border: var(--brick-line);
-  /* The spine sits at the left edge of the log; the agent's work is set
-     this far in from it. */
-  --gutter: 30px;
-  --spine: 1px;
   /* One column for the log and the composer under it: both are --column
      wide at most, centred in the main pane and at least --edge from its
-     sides, so the spine and the prompts' bars meet the composer's left
-     edge. The log's column is placed from the left, so that neither its
+     sides. The log's column is placed from the left, so that neither its
      scrollbar nor the jump rail on its right moves it. */
   --column: 820px;
+  /* The log's own column, narrower than the composer's for now. */
+  --log-column: 760px;
   --edge: 16px;
+  /* What a step's row, a fold's line and a run's line are set in. */
+  --step-size: 13px;
 }
 
 .chat {
   flex: 1;
   overflow-y: auto;
   scrollbar-gutter: stable;
-  padding: 28px var(--edge) 8px max(var(--edge), (100% - var(--column)) / 2);
+  /* [--push], set by an ancestor (the session's card beside the column),
+     moves the column left by that much, never past --edge. */
+  padding: 28px var(--edge) 8px max(var(--edge), (100% - var(--log-column)) / 2 - var(--push, 0px));
 }
 /* Focusable to scroll it with the keys; a click there shows no ring. */
 .chat:focus { outline: none; }
-.chat:focus-visible { outline: 2px solid var(--sodium-line); outline-offset: -2px; }
+.chat:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
 .entries, .empty {
-  max-width: var(--column);
+  max-width: var(--log-column);
   margin: 0;
   display: flex;
   flex-direction: column;
@@ -65,11 +69,12 @@
 .msg { min-width: 0; }
 
 /* Vertical rhythm: a turn starts with room above it; the steps of one turn
-   sit close together on the spine. */
-.entries > .msg { margin-top: 16px; }
+   sit close together. */
+.entries > .msg { margin-top: 14px; }
 .entries > .msg:first-child { margin-top: 0; }
-.entries > .msg.user { margin-top: 34px; }
+.entries > .msg.user { margin-top: 32px; }
 .entries > .msg.user:first-child, .entries > .day-sep + .msg.user { margin-top: 0; }
+.entries > .msg.user + .msg:not(.user) { margin-top: 24px; }
 .entries > .day-sep { margin: 34px 0 18px; }
 .entries > .day-sep:first-child { margin-top: 0; }
 
@@ -86,8 +91,8 @@
   align-items: baseline;
   gap: 8px;
   min-width: 0;
-  color: var(--muted-text);
-  font-size: 13px;
+  color: var(--muted-foreground);
+  font-size: var(--step-size);
 }
 summary > .label { flex-shrink: 0; font-weight: 500; }
 summary > .label::before {
@@ -113,30 +118,33 @@ summary > .preview {
 }
 details[open] > summary > .preview { visibility: hidden; }
 summary:hover > .label { color: var(--fg); }
-summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; border-radius: 2px; }
+summary:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; border-radius: 2px; }
 
-/* The user's turn: a prompt, not a bubble */
+/* The user's turn: a bubble on the right, what came with it (images,
+   pasted texts, files, a skill) above it, when it was sent under it. */
 
 .msg.user {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: baseline;
-  gap: 8px 16px;
-  background: var(--slate);
-  border-left: 2px solid var(--sodium);
-  border-radius: 0 var(--r-control) var(--r-control) 0;
-  padding: 11px 16px 12px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  margin-left: auto;
+  max-width: 85%;
 }
-.msg.user > :not(.bubble):not(.time) { grid-column: 1 / -1; }
 .msg.user .bubble {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  font-size: 15px;
+  font-size: 14px;
   line-height: 1.55;
-  font-weight: 500;
-  max-width: 72ch;
+  max-width: 100%;
+  padding: 8px 14px;
+  background: var(--bubble);
+  color: var(--bubble-foreground);
+  border-radius: calc(var(--radius) + 6px) calc(var(--radius) + 6px) calc(var(--radius) * 0.5) calc(var(--radius) + 6px);
 }
-.msg.user .time { grid-column: 2; }
+.msg.user .time { opacity: 0; transition: opacity 0.15s; }
+.msg.user:is(:hover, :focus-within, .menu-open) .time { opacity: 1; }
+@media (pointer: coarse) { .msg.user .time { opacity: 1; } }
 
 /* A message with a context menu (copy, trim, delete): right-click it,
    long-press it on a phone, or Shift+F10 on it. While its menu is open it is
@@ -144,8 +152,8 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
    where a trim would cut, the message faded for a delete. */
 .entries > .msg { position: relative; }
 .msg:focus-visible { outline: none; }
-.msg[tabindex]:focus-visible, .msg.menu-open { box-shadow: inset 0 0 0 1px var(--sodium-line); }
-/* ::after, as ::before is a reply's spine. */
+.msg[tabindex]:focus-visible, .msg.menu-open { box-shadow: 0 0 0 1px var(--ring); border-radius: var(--radius); }
+/* Where a trim would cut. */
 .msg:is(.preview-trim-before, .preview-trim-after)::after {
   content: "";
   position: absolute;
@@ -161,14 +169,17 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
   transition: opacity 0.12s ease-out;
 }
 @media (prefers-reduced-motion: reduce) { .msg.preview-delete > * { transition: none; } }
-.msg.user:not(:has(.bubble)) .time { grid-column: 1 / -1; justify-self: end; }
 
-/* A subagent's task is a prompt too, but not the user's. */
-.transcript .msg.user, .agents-panel .msg.user {
-  border-left-color: var(--muted-text);
-  background: var(--slate);
+/* A subagent's task is a prompt too, but not the user's: across the
+   column, outlined. */
+.transcript .msg.user, .agents-panel .msg.user { margin-left: 0; max-width: none; align-items: stretch; }
+.transcript .msg.user .bubble, .agents-panel .msg.user .bubble {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--muted-foreground);
+  font-size: var(--step-size);
 }
-.transcript .msg.user .bubble, .agents-panel .msg.user .bubble { font-weight: 400; font-size: 14px; }
 
 /* A skill invoked with /skill:name: its instructions folded above the text */
 .skill-card { font-size: 13px; }
@@ -201,52 +212,11 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
   border-top: 1px solid var(--rule);
 }
 
-/* The spine: the agent's steps, and work handed back to it, hang off the
-   left edge; consecutive steps join up. */
+/* The agent's turn: its words plain, its steps as rows. */
 
-.msg.assistant, .msg.shell, .msg.steps, .msg:has(> .delivery) {
-  position: relative;
-  padding-left: var(--gutter);
-}
-.msg.assistant::before, .msg.shell::before, .msg.steps::before, .msg:has(> .delivery)::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: -16px;
-  bottom: 0;
-  border-left: var(--spine) solid var(--rule-2);
-}
-.msg.assistant.streaming::before { border-left-color: var(--sodium-line); }
-
-/* Marks on the spine, centred on it. */
 .msg.assistant > .markdown, .msg.assistant > .thinking, .msg.assistant > .tool,
 .msg.shell > .tool, .delivery-section, .msg.assistant > .pending {
   position: relative;
-}
-.msg.assistant > .markdown::before {
-  content: "";
-  position: absolute;
-  left: calc(-1 * var(--gutter) - 3px + var(--spine) / 2);
-  top: 0.62em;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--chalk);
-  box-shadow: 0 0 0 4px var(--graphite);
-}
-/* Thinking is a hollow mark: not something the agent said. */
-.msg.assistant > .thinking::before {
-  content: "";
-  position: absolute;
-  left: calc(-1 * var(--gutter) - 3px + var(--spine) / 2);
-  top: 0.55em;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  border: 1px solid var(--muted-text);
-  box-sizing: border-box;
-  background: var(--graphite);
-  box-shadow: 0 0 0 4px var(--graphite);
 }
 
 /* Background work handed back to the agent */
@@ -260,15 +230,13 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
 }
 .delivery-head { display: flex; align-items: center; gap: 8px; min-width: 0; min-height: 26px; }
 .delivery-head .icon {
-  position: absolute;
-  left: calc(-1 * var(--gutter) - 8px + var(--spine) / 2);
   width: 16px;
+  flex-shrink: 0;
   text-align: center;
   font: 12px/1.6 var(--mono);
   color: var(--faint);
-  background: var(--graphite);
 }
-.delivery-head .kind { font-size: 13px; flex-shrink: 0; color: var(--muted-text); white-space: nowrap; }
+.delivery-head .kind { font-size: var(--step-size); flex-shrink: 0; color: var(--muted-foreground); white-space: nowrap; }
 .delivery-head .task {
   color: var(--fg);
   flex: 1;
@@ -280,11 +248,12 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
 .delivery-head .stats { color: var(--faint); font: 11.5px var(--mono); flex-shrink: 0; white-space: nowrap; }
 .delivery-section > details { padding-left: 2px; }
 .delivery-body .markdown, .delivery-body .output { margin-top: 6px; }
-.tool-body .delivery-section .delivery-head .icon { position: static; background: none; }
 
 /* The agent's steps */
 
 .msg.assistant { display: flex; flex-direction: column; gap: 12px; }
+/* Calls in a row pack tighter than prose. */
+.msg.assistant > .tool + .tool { margin-top: -10px; }
 .meta {
   display: flex;
   flex-wrap: wrap;
@@ -294,8 +263,8 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
   font-variant-numeric: tabular-nums;
   margin-top: -2px;
 }
-/* Waiting for the model's first words: the lamp on the spine. */
-.pending { position: relative; display: flex; align-items: center; min-height: 26px; color: var(--muted-text); font-size: 13px; }
+/* Waiting for the model's first words: the label shimmers. */
+.pending { position: relative; display: flex; align-items: center; gap: 8px; min-height: 26px; color: var(--muted-foreground); font-size: var(--step-size); }
 /* A retry: what failed, under the label. */
 .pending:has(> .detail) { flex-wrap: wrap; column-gap: 8px; }
 .pending > .detail {
@@ -304,11 +273,24 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
   font: 12px var(--mono);
   overflow-wrap: anywhere;
 }
-.msg.assistant > .pending > .lamp {
-  --lamp-ring: 0 0 0 3px var(--graphite);
-  position: absolute;
-  left: calc(-1 * var(--gutter) - 3.5px + var(--spine) / 2);
+/* Busy: the words themselves shimmer, no lamp. */
+.chat :is(.pending, .thinking-head, .run-head, .tool-subagent > .tool-head) > .lamp { display: none; }
+.pending > .label, .thinking-head > .label, .run.running .run-label, .tool-subagent.running .tool-head::after {
+  background: linear-gradient(90deg, var(--muted-foreground) 0%, var(--muted-foreground) 40%, var(--foreground) 50%, var(--muted-foreground) 60%, var(--muted-foreground) 100%);
+  background-size: 250% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shimmer 2.2s linear infinite;
 }
+@keyframes shimmer { from { background-position: 100% 0; } to { background-position: -150% 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .pending > .label, .thinking-head > .label, .run.running .run-label, .tool-subagent.running .tool-head::after { animation: none; color: var(--foreground); background: none; }
+}
+/* How to stop it, on a keyboard. */
+.interrupt-hint { color: var(--muted-foreground); opacity: 0.7; font-size: 12px; white-space: nowrap; }
+.app.narrow .interrupt-hint { display: none; }
+@media (pointer: coarse) { .interrupt-hint { display: none; } }
 
 .msg.assistant.streaming > .markdown:last-child > .md-part:last-child > :is(p, h1, h2, h3, h4, h5, h6):last-child::after,
 .msg.assistant.streaming > .markdown:last-child > .md-part:last-child > :is(ul, ol):last-child > li:last-child::after {
@@ -324,8 +306,8 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
 
 .stop.error {
   background: var(--err-bg);
-  border-left: 2px solid var(--brick);
-  border-radius: 0 var(--r-control) var(--r-control) 0;
+  border: 1px solid var(--err-border);
+  border-radius: var(--radius);
   padding: 10px 14px;
   display: flex;
   flex-direction: column;
@@ -360,13 +342,12 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
 .stop.aborted > .mark, .stop.length > .mark { --mark-line: 18px; }
 
 /* The harness's notes (tools moved, another directory, plan mode, a
-   hand-over, a goal's continuation, /review, ...): a glyph on the spine and a quiet line,
+   hand-over, a goal's continuation, /review, ...): a glyph and a quiet line,
    unfolding to exactly what the model saw. Not the user's words, so no
    bubble. */
 .note {
   position: relative;
-  padding-left: var(--gutter);
-  color: var(--muted-text);
+  color: var(--muted-foreground);
   font-size: 12.5px;
   min-width: 0;
 }
@@ -377,13 +358,11 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
   min-width: 0;
 }
 .note .glyph {
-  position: absolute;
-  left: calc(var(--spine) / 2 - 8px);
   width: 16px;
+  flex-shrink: 0;
   text-align: center;
   font: 12px var(--mono);
   color: var(--faint);
-  background: var(--graphite);
   line-height: 1.6;
 }
 .note[data-kind="plan_mode"] .glyph { color: var(--sodium); }
@@ -442,7 +421,7 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
 
 /* Markdown */
 
-.markdown { font-size: 15px; line-height: 1.6; overflow-wrap: anywhere; min-width: 0; }
+.markdown { font-size: 14px; line-height: 1.65; overflow-wrap: anywhere; min-width: 0; }
 .msg.assistant > .markdown > .md-part > :is(p, ul, ol, blockquote, h1, h2, h3, h4, h5, h6) { max-width: 72ch; }
 .markdown > .md-part:first-child > :first-child { margin-top: 0; }
 .markdown > .md-part:last-child > :last-child { margin-bottom: 0; }
@@ -450,10 +429,10 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
 .md-part { display: contents; }
 .markdown p { margin: 0 0 10px; }
 .markdown :is(h1, h2, h3, h4, h5, h6) { margin: 22px 0 8px; line-height: 1.3; font-weight: 650; }
-.markdown h1 { font-size: 22px; font-weight: 700; }
-.markdown h2 { font-size: 18px; }
-.markdown h3 { font-size: 15px; }
-.markdown :is(h4, h5, h6) { font-size: 15px; font-weight: 600; color: var(--muted-text); }
+.markdown h1 { font-size: 20px; font-weight: 700; }
+.markdown h2 { font-size: 16.5px; }
+.markdown h3 { font-size: 14.5px; }
+.markdown :is(h4, h5, h6) { font-size: 14px; font-weight: 600; color: var(--muted-foreground); }
 .markdown :is(ul, ol) { margin: 0 0 10px; padding-left: 1.5em; }
 .markdown li { margin: 3px 0; }
 .markdown li::marker { color: var(--faint); }
@@ -574,17 +553,20 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
 
 .code {
   margin: 0 0 12px;
-  border-radius: var(--r-control);
-  background: var(--well);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--muted) 40%, transparent);
   overflow: hidden;
 }
 .code-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 4px 4px 0 14px;
+  min-height: 30px;
+  padding: 0 4px 0 12px;
+  border-bottom: 1px solid var(--border);
   font-size: 11.5px;
-  color: var(--faint);
+  color: var(--muted-foreground);
 }
 .code-lang { font-family: var(--mono); }
 .code-title { color: var(--muted-text); font-weight: 600; }
@@ -592,20 +574,20 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
 .copy {
   border: 0;
   background: transparent;
-  color: var(--muted-text);
+  color: var(--muted-foreground);
   font-size: 12px;
   padding: 2px 8px;
-  border-radius: var(--r-chip);
+  border-radius: calc(var(--radius) * 0.6);
   cursor: pointer;
 }
-.copy:hover { background: var(--slate-2); color: var(--fg); }
-.copy:focus-visible { outline: 2px solid var(--sodium); outline-offset: 1px; }
+.copy:hover { background: var(--accent); color: var(--foreground); }
+.copy:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
 .copy.copied { color: var(--sage); }
 .code pre {
   margin: 0;
-  padding: 8px 14px 12px;
+  padding: 10px 12px;
   overflow-x: auto;
-  font: 13px/1.6 var(--mono);
+  font: 12.5px/1.6 var(--mono);
   tab-size: 4;
 }
 .code pre code { font: inherit; }
@@ -626,8 +608,8 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
   display: flex;
   align-items: center;
   gap: 8px;
-  color: var(--muted-text);
-  font-size: 13px;
+  color: var(--muted-foreground);
+  font-size: 14px;
   font-variation-settings: "CASL" 1;
 }
 .thinking.live .thinking-text {
@@ -643,10 +625,13 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
   -webkit-mask-image: linear-gradient(to bottom, transparent, black 2.6em);
 }
 
-/* Tool calls: a line on the spine, the output in a well below it */
+/* Tool calls: a row each (its tool's icon and name, what it acts on, how
+   long it took and its outcome at the right), opening its output in a
+   bordered well below. The DOM keeps the outcome first (what a screen
+   reader says first); [order] sets it at the row's end. */
 
 .tool {
-  font-size: 13px;
+  font-size: var(--step-size);
   min-width: 0;
 }
 .tool-head {
@@ -654,18 +639,30 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
   align-items: center;
   gap: 8px;
   min-width: 0;
-  min-height: 26px;
+  min-height: 28px;
+  padding: 0 8px;
+  border-radius: calc(var(--radius) * 0.8);
+  color: var(--muted-foreground);
 }
-.tool-head .name {
-  font-family: var(--mono);
-  font-size: 13px;
-  font-weight: 600;
+.tool-head > .tool-icon {
   flex-shrink: 0;
+  display: flex;
+  width: 16px;
+  justify-content: center;
+  color: var(--muted-foreground);
+}
+.tool-head > .tool-icon > .icon { width: 14px; height: 14px; }
+.tool-head .name {
+  font-size: var(--step-size);
+  font-weight: 500;
+  color: var(--foreground);
+  flex-shrink: 0;
+  min-width: 56px;
 }
 /* on_host's: the machine the call ran on */
 .tool-head .host {
   font-size: 12px;
-  color: var(--muted-text);
+  color: var(--muted-foreground);
   flex-shrink: 1;
   min-width: 0;
   max-width: 40%;
@@ -675,24 +672,22 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
 }
 .tool-head .arg {
   font-family: var(--mono);
-  font-size: 13px;
-  color: var(--muted-text);
+  font-size: 12px;
+  color: var(--muted-foreground);
   flex: 1;
   min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.tool-head .arg.command { color: var(--fg); }
 .tool-head .arg.command::before { content: "$ "; color: var(--faint); }
-.tool-head .arg.task { font-family: var(--sans); font-size: 13.5px; color: var(--fg); }
-.tool-head .arg.query { color: var(--fg); }
+.tool-head .arg.task { font-family: var(--sans); font-size: var(--step-size); }
 .tool-head a.arg.url {
   text-decoration: underline;
-  text-decoration-color: var(--sodium-line);
+  text-decoration-color: color-mix(in srgb, var(--primary) 40%, transparent);
   text-underline-offset: 3px;
 }
-.tool-head a.arg.url:hover { color: var(--fg); text-decoration-color: var(--sodium); }
+.tool-head a.arg.url:hover { color: var(--foreground); text-decoration-color: var(--primary); }
 /* A web search's results: a title linking to its page, then the address. */
 ol.results {
   margin: 6px 0 0;
@@ -700,74 +695,62 @@ ol.results {
   display: flex;
   flex-direction: column;
   gap: 3px;
-  font-size: 13px;
+  font-size: var(--step-size);
 }
 ol.results > li::marker { color: var(--faint); font: 12px var(--mono); }
 ol.results > li { min-width: 0; overflow-wrap: anywhere; }
-ol.results .title { color: var(--fg); text-decoration: none; }
-ol.results a.title:hover { text-decoration: underline; text-decoration-color: var(--sodium); text-underline-offset: 3px; }
+ol.results .title { color: var(--foreground); text-decoration: none; }
+ol.results a.title:hover { text-decoration: underline; text-decoration-color: var(--primary); text-underline-offset: 3px; }
 ol.results .url { margin-left: 8px; font: 11.5px var(--mono); color: var(--faint); }
-.tool-head > .mark { margin: 0 1px; }
-/* On the spine: the outcome of each call, centred on the head's line. */
-:is(.msg.assistant, .msg.shell) > .tool > .tool-head > .mark {
-  position: absolute;
-  left: calc(-1 * var(--gutter) - 7px + var(--spine) / 2);
-  top: 6px;
-  margin: 0;
-  background: var(--graphite);
-  box-shadow: 0 0 0 3px var(--graphite);
+/* At the row's end: the chips, how long it took, its outcome, the chevron. */
+.tool-head > .chip, .tool-head > .took { order: 1; }
+.tool-head > :is(.mark, .lamp) { order: 2; flex-shrink: 0; margin: 0; }
+.tool-head > .chev, .tool-head > .open-agent { order: 3; }
+.tool-head > .mark:not(.failed) { color: color-mix(in srgb, var(--sage) 85%, transparent); }
+.tool-head > .mark.failed { color: var(--brick); }
+.took {
+  flex-shrink: 0;
+  color: var(--muted-foreground);
+  font: 11.5px var(--mono);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
-/* A running call's lamp, on the spine where its outcome will be; a
-   subagent's nested log has its own. */
-.tool-head > .lamp { margin: 0 4.5px; }
-:is(.msg.assistant, .msg.shell) > .tool > .tool-head > .lamp {
-  --lamp-ring: 0 0 0 3px var(--graphite);
-  position: absolute;
-  left: calc(-1 * var(--gutter) - 3.5px + var(--spine) / 2);
-  top: 9.5px;
-  margin: 0;
-}
-.msg.assistant > .thinking.live > .thinking-head > .lamp {
-  --lamp-ring: 0 0 0 3px var(--graphite);
-  position: absolute;
-  left: calc(-1 * var(--gutter) - 3.5px + var(--spine) / 2);
-}
+/* Shown, not read: it would change the text of every row with the timing
+   (the tests compare the text). Its title says it to the pointer. */
+.took::after { content: attr(data-took); }
 .tool.error .tool-head .name { color: var(--brick); }
 .tool .chip {
   font: 11.5px var(--mono);
-  color: var(--muted-text);
+  color: var(--muted-foreground);
   flex-shrink: 0;
   white-space: nowrap;
   line-height: 18px;
 }
 .chip.bad, .chip.del { color: var(--brick); }
 .chip.ok, .chip.add { color: var(--sage); }
-.chip.job { color: var(--muted-text); }
-.chip.waiting { color: var(--sodium); }
+.chip.job { color: var(--muted-foreground); }
+.chip.waiting { color: var(--primary); }
 .chip.judged { color: var(--sage); }
 
-/* A call at rest is one line, and the line opens it: a button, reset to
-   look like the line it was, with a chevron that shows on hover, focus and
-   while open. Calls in a row pack tighter than prose. */
+/* A call at rest is one row, and the row opens it: a button, reset to look
+   like the row it was, with a chevron that shows on hover, focus and while
+   open. */
 button.tool-head {
   width: 100%;
   margin: 0;
-  padding: 0 4px 0 0;
   border: 0;
-  border-radius: var(--r-control, 6px);
   background: none;
-  color: inherit;
   font: inherit;
   text-align: left;
   cursor: pointer;
 }
-button.tool-head:hover { background: var(--slate-2); }
-button.tool-head:focus-visible { outline: 2px solid var(--sodium-line); outline-offset: 1px; }
+:is(button.tool-head, .tool-head[data-agent]):hover { background: color-mix(in srgb, var(--accent) 60%, transparent); color: var(--foreground); }
+button.tool-head:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
 button.tool-head > .chev {
   flex-shrink: 0;
   width: 5px;
   height: 5px;
-  margin: 0 4px 2px 2px;
+  margin: 0 2px 2px 0;
   border-right: 1.5px solid var(--faint);
   border-bottom: 1.5px solid var(--faint);
   transform: rotate(-45deg);
@@ -776,88 +759,102 @@ button.tool-head > .chev {
 }
 button.tool-head:is(:hover, :focus-visible) > .chev, .tool.open > button.tool-head > .chev { opacity: 1; }
 .tool.open > button.tool-head > .chev { transform: translateY(-1px) rotate(45deg); }
-.msg.assistant > .tool:not(.open) + .tool:not(.open) { margin-top: -8px; }
 .tool-body > .details { font: 11.5px var(--mono); color: var(--faint); }
 
-/* Quiet: a run of steps between messages is one line on the spine (what it
-   is doing, or what it did and how long it took) that opens the steps,
-   each a call's line. */
-.run { position: relative; min-width: 0; font-size: 13px; }
+/* Quiet: a run of steps between messages is one line ("Worked for 1m 48s ·
+   ran 3 commands" or, while it runs, what it is doing) over a rule; it opens
+   the steps, each a call's row. */
+.run { position: relative; min-width: 0; font-size: 14px; }
 .run-head {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   width: 100%;
   min-width: 0;
-  min-height: 28px;
+  min-height: 32px;
   margin: 0;
-  padding: 0 6px 0 0;
+  padding: 0 0 6px;
   border: 0;
-  border-radius: var(--r-control, 6px);
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
   background: none;
-  color: var(--muted-text);
+  color: var(--muted-foreground);
   font: inherit;
   text-align: left;
   cursor: pointer;
 }
-.run-head:hover { color: var(--fg); }
-.run-head:focus-visible { outline: 2px solid var(--sodium-line); outline-offset: 1px; }
+.run-head:hover { color: var(--foreground); }
+.run-head:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; border-radius: 2px; }
 .run-label { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.run.running .run-label { color: var(--fg); }
+.run-label:has(+ .run-time) { flex-shrink: 0; }
+.run-did { min-width: 0; flex-shrink: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12px; opacity: 0.75; }
 .run-failed { flex-shrink: 0; color: var(--brick); font: 11.5px var(--mono); white-space: nowrap; }
-.run-time { flex-shrink: 0; color: var(--faint); font: 11.5px var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.run-time { flex-shrink: 0; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .run-head > .chev {
   flex-shrink: 0;
+  order: 1;
   width: 5px;
   height: 5px;
-  margin: 0 4px 1px 0;
-  border-right: 1.5px solid var(--faint);
-  border-bottom: 1.5px solid var(--faint);
+  margin: 0 0 1px 2px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
   transform: rotate(-45deg);
   transition: transform 0.15s;
 }
 .run.open > .run-head > .chev { transform: translateY(-2px) rotate(45deg); }
-.run-head:is(:hover, :focus-visible) > .chev { border-color: var(--muted-text); }
-/* Its outcome on the spine, like a call's. */
-.msg > .run > .run-head > .mark {
-  position: absolute;
-  left: calc(-1 * var(--gutter) - 7px + var(--spine) / 2);
-  top: 7px;
-  margin: 0;
-  background: var(--graphite);
-  box-shadow: 0 0 0 3px var(--graphite);
-}
-.msg > .run > .run-head > .lamp {
-  --lamp-ring: 0 0 0 3px var(--graphite);
-  position: absolute;
-  left: calc(-1 * var(--gutter) - 3.5px + var(--spine) / 2);
-  top: 10.5px;
-  margin: 0;
-}
-.run.error > .run-head > .mark { color: var(--brick); }
-/* The steps: a call's line each, hung off a thread of their own. */
+/* Its outcome is in its words ("1 failed"). */
+.run-head > .mark { display: none; }
+/* The steps: a call's row each. */
 .run-steps {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  margin: 2px 0 4px 2px;
-  padding-left: 12px;
-  border-left: 1px solid var(--rule);
+  gap: 0;
+  margin: 6px 0 2px;
   min-width: 0;
 }
 .run-steps .msg { padding-left: 0; }
-.run-steps .msg::before { display: none; }
-.run-steps .delivery-head .icon { position: static; background: none; }
 .tool-thinking > .tool-head .name { font-family: var(--sans); font-weight: 500; font-variation-settings: "CASL" 1; }
 .tool-thinking > .tool-head .arg { font-family: var(--sans); font-style: oblique 6deg; font-variation-settings: "CASL" 1; }
 @media (prefers-reduced-motion: reduce) { .run-head > .chev { transition: none; } }
-.tool-body > .tool-allowed { display: block; font-size: 12.5px; color: var(--muted-text); overflow-wrap: anywhere; }
-.tool-body > .url-link { font: 12px var(--mono); color: var(--muted-text); overflow-wrap: anywhere; text-underline-offset: 3px; text-decoration-color: var(--sodium-line); }
-.tool-head .arg.step { font-family: var(--sans); font-size: 13.5px; color: var(--fg); }
-/* A subagent: its lamp or outcome, its name and the way in. */
-.tool-subagent > .tool-head .arg.task { font-weight: 500; }
-/* "Subagent:" before the name: it stays, the name gives way. */
-.tool-subagent > .tool-head .kind { font-size: 13px; color: var(--muted-text); flex-shrink: 0; white-space: nowrap; }
+.tool-body > .tool-allowed { display: block; font-size: 12.5px; color: var(--muted-foreground); overflow-wrap: anywhere; }
+.tool-body > .url-link { font: 12px var(--mono); color: var(--muted-foreground); overflow-wrap: anywhere; text-underline-offset: 3px; text-decoration-color: color-mix(in srgb, var(--primary) 40%, transparent); }
+.tool-head .arg.step { font-family: var(--sans); font-size: var(--step-size); color: var(--foreground); }
+/* A subagent: a link into it ("Touch targets ↗ the task"), "working…" while
+   it works, its outcome when done. */
+.tool-subagent > .tool-head { cursor: pointer; }
+.tool-subagent > .tool-head .kind { font-size: var(--step-size); font-weight: 500; color: var(--foreground); flex-shrink: 0; white-space: nowrap; min-width: 56px; }
+.tool-subagent > .tool-head .agent-name {
+  flex-shrink: 0;
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--foreground);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--muted-foreground) 45%, transparent);
+  text-underline-offset: 3px;
+}
+.tool-subagent > .tool-head:hover .agent-name { text-decoration-color: var(--foreground); }
+.tool-subagent > .tool-head .arg.task { font-family: var(--mono); font-size: 12px; }
+.tool-subagent.running > .tool-head::after { content: "working…"; order: 2; flex-shrink: 0; font-size: 12px; }
+.tool-head .open-agent {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: calc(var(--radius) * 0.6);
+  background: none;
+  color: var(--muted-foreground);
+  cursor: pointer;
+}
+.tool-head .open-agent > .icon { width: 13px; height: 13px; }
+.tool-head .open-agent:hover { color: var(--foreground); background: var(--accent); }
+.tool-head .open-agent:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
+.app.narrow .tool-head .open-agent { width: var(--tap, 44px); height: var(--tap, 44px); }
 
 /* update_plan's checklist */
 .tool-body .plan { padding: 4px 0; }
@@ -871,7 +868,7 @@ button.tool-head:is(:hover, :focus-visible) > .chev, .tool.open > button.tool-he
 
 
 .tool-body {
-  padding: 6px 0 2px;
+  padding: 4px 8px 6px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -906,11 +903,10 @@ button.tool-head:is(:hover, :focus-visible) > .chev, .tool.open > button.tool-he
   overflow: hidden;
   text-overflow: ellipsis;
 }
-/* A subagent's own log, nested: the same spine, tighter. */
+/* A subagent's own log, nested: the same, tighter. */
 .transcript > .entries {
   margin: 10px 0 0;
   max-width: none;
-  --gutter: 22px;
 }
 .transcript > .entries > .msg.user { margin-top: 18px; }
 .transcript > .entries > .msg.user:first-child { margin-top: 0; }
@@ -920,8 +916,9 @@ button.tool-head:is(:hover, :focus-visible) > .chev, .tool.open > button.tool-he
    on, with a control to show it all. */
 
 .output {
-  background: var(--well);
-  border-radius: var(--r-control);
+  background: color-mix(in srgb, var(--muted) 40%, transparent);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
   font: 12.5px/1.55 var(--mono);
   min-width: 0;
 }
@@ -943,7 +940,7 @@ button.tool-head:is(:hover, :focus-visible) > .chev, .tool.open > button.tool-he
 .output :is(.earlier, .missed) + pre { padding-top: 0; }
 .output pre:has(+ .fold) { padding-bottom: 2px; }
 .output pre a.session-link { padding: 0; text-underline-offset: 2px; }
-.output.error { background: var(--err-bg); box-shadow: inset 2px 0 0 var(--brick); border-radius: 0 var(--r-control) var(--r-control) 0; }
+.output.error { background: var(--err-bg); border-color: var(--err-border); }
 .output.error pre { color: var(--del-fg); }
 /* Unfolding grows the well once, from the lines it showed. */
 .output.expanded > pre { overflow: hidden; animation: unfold 0.24s ease-out; }
@@ -968,8 +965,8 @@ button.tool-head:is(:hover, :focus-visible) > .chev, .tool.open > button.tool-he
 .fold[aria-expanded="true"] {
   position: sticky;
   bottom: 0;
-  background: var(--well);
-  border-radius: 0 0 var(--r-control) var(--r-control);
+  background: var(--background);
+  border-radius: 0 0 var(--radius) var(--radius);
 }
 .output.error .fold[aria-expanded="true"] { background: var(--err-bg); }
 .output :is(.earlier, .missed) { padding: 6px 12px 0; gap: 6px; }
@@ -1192,9 +1189,8 @@ dialog.viewer::backdrop { background: transparent; }
 }
 
 @media (max-width: 760px) {
-  :root { --gutter: 20px; --edge: 12px; }
+  :root { --edge: 12px; }
   .chat { padding-top: 18px; }
-  .msg.user { padding: 9px 12px 10px; }
   .markdown { font-size: 15px; }
   .tool-head { gap: 7px; }
   .tool-head .chip.waiting { display: none; }
@@ -1205,7 +1201,7 @@ dialog.viewer::backdrop { background: transparent; }
 /* Waiting on the backend: the chat before its transcript arrives, prompts
    on their way. */
 .chat-loading {
-  max-width: var(--column);
+  max-width: var(--log-column);
   margin: 0;
   display: flex;
   flex-direction: column;
@@ -1225,12 +1221,12 @@ dialog.viewer::backdrop { background: transparent; }
   border-radius: var(--r-chip);
   background: var(--slate);
 }
-.bone.user { height: 42px; margin-top: 16px; border-left: 2px solid var(--sodium-line); border-radius: 0 var(--r-control) var(--r-control) 0; }
+.bone.user { height: 38px; width: 45%; margin: 16px 0 0 auto; background: var(--bubble); border-radius: calc(var(--radius) + 6px); }
 .bone.user:first-child { margin-top: 0; }
-.bone.line { margin-left: 30px; width: 70%; }
+.bone.line { width: 70%; }
 .bone.line.short { width: 40%; }
 .entries + .entries.echoes { margin-top: 34px; }
-.msg.user.sending { opacity: 0.7; border-left-color: var(--sodium-line); }
+.msg.user.sending { opacity: 0.7; }
 
 
 /* The transcript filter (/filter): its button left of the files', accented
@@ -1273,7 +1269,7 @@ dialog.viewer::backdrop { background: transparent; }
 }
 @media (prefers-reduced-motion: reduce) { .filter-menu { animation: none; } }
 .filter-note {
-  max-width: var(--column);
+  max-width: var(--log-column);
   margin: 0 0 14px;
   display: flex;
   align-items: center;
@@ -1401,3 +1397,8 @@ table.diff tr.add .wd { background: color-mix(in srgb, var(--add-fg) 26%, transp
 .app.code-large { --code-size: 14px; }
 .app.code-huge { --code-size: 16px; }
 .diff-view { font-size: var(--code-size); }
+
+/* The way to stop it, where there is a keyboard. */
+.pending > .stop-hint { font-size: 12px; color: var(--muted-foreground); opacity: 0.8; }
+.pending > .stop-hint::before { content: "· "; }
+.app.narrow .pending > .stop-hint { display: none; }

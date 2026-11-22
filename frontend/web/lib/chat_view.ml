@@ -192,11 +192,17 @@ let pasted_texts ~fold (u : Message.User.t) (pasted : Origin.Pasted.t list) =
            ]))
 ;;
 
+(* Which client the user is on matters to the model, not to the user. *)
+let shown_notes (o : Origin.t) =
+  List.filter o.notes ~f:(fun (n : Origin.Note.t) ->
+    not (Origin.Kind.equal n.kind Client))
+;;
+
 let user ?skill ~fold times (u : Message.User.t) =
   let notes, pasted, attachments =
     match u.origin with
     | None -> [], [], []
-    | Some origin -> origin.notes, origin.pasted, origin.attachments
+    | Some origin -> shown_notes origin, origin.pasted, origin.attachments
   in
   let text =
     Option.value_map
@@ -533,6 +539,7 @@ and assistant
     | Tool_call call ->
       Tool_view.view
         ~ui
+        ?started:message.at
         ~nested:(nested ~ui ~fold times)
         ~fold
         ~streaming:(streaming && last)
@@ -583,6 +590,7 @@ and assistant
         "pending"
         [ Html.lamp ()
         ; span "label" label
+        ; span "stop-hint" "Esc to stop"
         ; (match detail with
            | Some error -> div "detail" [ Node.text ("after: " ^ error) ]
            | None -> Node.none)
@@ -714,23 +722,30 @@ and activity ~ui ~fold times chat runs (box : Activity_runs.Box.t) =
             ; Attr.create "aria-expanded" (Bool.to_string opened)
             ]
           (present
-             [ icon
-             ; span "run-label" label
-             ; (if failed > 0
-                then span "run-failed" (sprintf "%d failed" failed)
-                else Node.none)
-             ; Option.value_map took ~default:Node.none ~f:(span "run-time")
-             ; span "chev" ""
-             ])
+             ([ icon ]
+              @ (match took with
+                 (* Done: how long it took, then what it did. *)
+                 | Some took ->
+                   [ span "run-label" "Worked for"
+                   ; span "run-time" took
+                   ; span "run-did" ("· " ^ String.uncapitalize label)
+                   ]
+                 | None -> [ span "run-label" label ])
+              @ [ (if failed > 0
+                   then span "run-failed" (sprintf "%d failed" failed)
+                   else Node.none)
+                ; span "chev" ""
+                ]))
       ; (if opened
          then
            div
              "run-steps"
              (List.map steps ~f:(fun (step : Activity_runs.Step.t) ->
                 match step with
-                | Call { call; streaming; _ } ->
+                | Call { call; streaming; at; _ } ->
                   Tool_view.view
                     ~ui
+                    ?started:at
                     ~nested:(nested ~ui ~fold times)
                     ~fold
                     ~streaming
@@ -771,10 +786,7 @@ and render_entry ?quiet ~ui ~fold times chat ~n (entry : Chat.Entry.t) =
      | Shell _ when not (Fold.shows fold Tools) -> Node.none
      | Compaction _ when not (Fold.shows fold Notes) -> Node.none
      | User u ->
-       let notes =
-         Option.value_map u.origin ~default:[] ~f:(fun (o : Origin.t) ->
-           o.notes)
-       in
+       let notes = Option.value_map u.origin ~default:[] ~f:shown_notes in
        (* Notes before a message of the harness's: plan mode turned on or off
        with a goal's message. *)
        let noted main =

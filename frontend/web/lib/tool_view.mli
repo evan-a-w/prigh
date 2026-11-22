@@ -12,6 +12,9 @@ open! Import
     (default none). *)
 val view
   :  ?ui:Ui_context.Page.t
+  -> ?started:Time_ns.t
+       (** when its message ended: its row shows how long it took from
+           then to its result *)
   -> nested:(Chat.Subagent.t -> Node.t)
   -> fold:Fold.t
   -> streaming:bool

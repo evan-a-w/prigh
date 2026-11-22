@@ -246,15 +246,8 @@ const screen = async (w, h, label) => {
   await page.locator(".temporary-pill").waitFor();
   say("pill:", await text(".temporary-pill"));
   say("layout:", await page.evaluate(() => document.querySelector(".main").className));
-  say("prompt's edge:", await page.evaluate(() => {
-    const edge = getComputedStyle(document.querySelector(".msg.user")).borderLeftColor;
-    const probe = document.createElement("i");
-    probe.style.color = "var(--sodium)";
-    document.body.append(probe);
-    const sodium = getComputedStyle(probe).color;
-    probe.remove();
-    return edge === sodium ? "sodium" : "grey";
-  }));
+  // Not kept: the prompts are outlined, not filled.
+  say("prompt's edge:", await page.evaluate(() => getComputedStyle(document.querySelector(".msg.user")).borderLeftStyle));
   say("tray gone:", (await page.locator(".tray").count()) === 0);
   say("saved:", files(), "listed:", await sidebarSessions());
   say("pill:", await reachable(".temporary-pill"));

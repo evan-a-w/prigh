@@ -72,6 +72,7 @@ let%expect_test
       <div class="pending">
         <span aria-hidden="true" class="lamp"> </span>
         <span class="label"> Waiting for the model… </span>
+        <span class="stop-hint"> Esc to stop </span>
       </div>
     </div>
     ---
@@ -90,6 +91,7 @@ let%expect_test
       <div class="pending">
         <span aria-hidden="true" class="lamp"> </span>
         <span class="label"> Retrying in 2s (attempt 2 of 6)… </span>
+        <span class="stop-hint"> Esc to stop </span>
         <div class="detail"> after: overloaded_error: Overloaded </div>
       </div>
     </div>
@@ -99,6 +101,7 @@ let%expect_test
       <div class="pending">
         <span aria-hidden="true" class="lamp"> </span>
         <span class="label"> Waiting for the model (attempt 2 of 6)… </span>
+        <span class="stop-hint"> Esc to stop </span>
         <div class="detail"> after: overloaded_error: Overloaded </div>
       </div>
     </div>

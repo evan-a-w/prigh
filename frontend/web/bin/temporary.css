@@ -122,7 +122,7 @@
 
 /* {1 The sodium goes out} */
 
-.main.temporary .msg.user { border-left-color: var(--rule-2); }
+.main.temporary .msg.user { background: transparent; border: 1px dashed var(--border); }
 .main.temporary .composer-stack:focus-within {
   border-color: color-mix(in srgb, var(--chalk) 45%, var(--rule-2));
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--chalk) 7%, transparent), 0 8px 24px -14px var(--edge-shadow);
