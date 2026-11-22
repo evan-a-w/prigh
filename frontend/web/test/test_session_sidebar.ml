@@ -781,7 +781,7 @@ let%expect_test "selecting: no menus, ranges in list order" =
     {|
     (Mark_session (path /sessions/s1.jsonl) (range false))
     (Mark_session (path /sessions/s3.jsonl) (range false))
-    (Cancel) (Delete 2 sessions (0 B))
+    (Cancel) (Archive) (Delete 2)
     <div class="bg-primary/15 bg-sidebar-accent group/session hover:bg-sidebar-accent marked relative rounded-md selected session text-sidebar-foreground">
     <div class="bg-primary/15 group/session hover:bg-sidebar-accent marked relative rounded-md session text-sidebar-foreground">
     |}]
@@ -1055,16 +1055,13 @@ let%expect_test "/worktree back: without a home, or when it fails" =
     |}]
 ;;
 
-(* A session in a new window: its menu's Open in new window, a Ctrl or Cmd
-   click, a middle click; a plain click switches to it. *)
+(* A session in a new window: its menu's Open in new window, a middle click
+   (a Ctrl or Cmd click selects it: test_sidebar_rows); a plain click switches
+   to it. *)
 let%expect_test "a session in a new window" =
   let h = create () in
   H.right_click h ~selector:".session" ~nth:1;
   choose h "open_window";
-  print_endline "-- Ctrl+click:";
-  H.modified_click h ~ctrl:true ~selector:".session-open" ~nth:1;
-  print_endline "-- Cmd+click:";
-  H.modified_click h ~meta:true ~selector:".session-open" ~nth:1;
   print_endline "-- middle click:";
   H.middle_click h ~selector:".session-open" ~nth:1;
   print_endline "-- a plain click:";
@@ -1077,12 +1074,6 @@ let%expect_test "a session in a new window" =
     (Place_menu (Element session-s2))
     (Picker_choose open_window)
     (Focus editor)
-    (Open_window s2)
-    -- Ctrl+click:
-    (Open_session_window s2)
-    (Open_window s2)
-    -- Cmd+click:
-    (Open_session_window s2)
     (Open_window s2)
     -- middle click:
     (Open_session_window s2)

@@ -130,6 +130,10 @@ let help =
   ; ( "Shift+F10 / ContextMenu (in the terminal, the desktop app's browser \
        window)"
     , "its menu: copy the selection, paste, select all (also right-click)" )
+  ; ( "Ctrl+click / ⌘+click, Shift+click (a session)"
+    , "select it, or the range from the last one (from the session on show at \
+       first); the bar under the list archives or deletes them; a middle click \
+       opens it in a new window" )
   ; ( "Space (selecting)"
     , "mark a session (Shift: the range from the last one); Delete deletes the \
        marked ones, Esc stops selecting" )
@@ -222,7 +226,7 @@ let help =
   ; ( "↑↓ ←→ Home End (settings' sections)"
     , "show the previous / next section, or the first / last (/settings \
        SECTION opens at one)" )
-  ; ( "Ctrl+click / ⌘-click / middle click (a session in the sidebar)"
+  ; ( "Middle click (a session in the sidebar)"
     , "open it in a new window (its menu's Open in new window)" )
   ; "Delete (in /remind's list)", "remove the highlighted reminder"
   ; ( "y / a / n / r (confirmation)"
@@ -767,6 +771,10 @@ let handle (m : App.Model.t) t : App.Action.t option =
        Some Toggle_status_tray
      | "Escape" when m.context_card && Option.is_none m.dialog ->
        Some Toggle_context_card
+     (* Sessions selected (a Ctrl or Shift click leaves the focus where it
+        was): Esc ends it from anywhere. *)
+     | "Escape" when m.marks.selecting && Option.is_none m.dialog ->
+       Some (Select_sessions false)
      (* On a phone the file browser is a sheet: Esc closes it from anywhere. *)
      | "Escape" when m.narrow && m.files.open_ && not (Files.asking m.files) ->
        Some (Files Close)

@@ -476,8 +476,7 @@ let selection_bar (m : App.Model.t) ~inject =
                     (Session_summary.total_bytes marked)))
           ]
         ~on_click:(inject Action.Delete_marked)
-        [ Node.text
-            (if count = 0 then "Delete" else sprintf "Delete %d" count)
+        [ Node.text (if count = 0 then "Delete" else sprintf "Delete %d" count)
         ]
     ]
 ;;
@@ -619,7 +618,7 @@ let footer (m : App.Model.t) ~inject ~archived =
         [ settings ~inject
         ; foot_button
             ~cls:"usage-button"
-            ~title:"Usage: your plans' limits and what they reset to (/usage)"
+            ~title:"Usage and limits (/usage)"
             ~attrs:[ Attr.create "aria-haspopup" "dialog" ]
             ~on_click:(inject (Action.Run "/usage"))
             Usage

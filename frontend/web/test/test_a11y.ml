@@ -25,14 +25,14 @@ let%expect_test "the names of the controls" =
     button "Hide sidebar" -- Hide sidebar (Ctrl+B)
     button "Search" -- Search sessions, settings and commands (Ctrl+K)
     button "New session" -- Start a new session (/new)
-    button "Select" -- Select sessions to delete (/delete)
+    button "Select" -- Select sessions to archive or delete (or Ctrl/⌘- or Shift-click them)
     button "work 2m Fix the build" -- /sessions/s1.jsonl
     button "More for Fix the build" -- More (right-click, Shift+F10)
     button "Archive"
     button "Delete"
-    button "Archive 1" -- Show the archived sessions
+    button "Archive 1" -- Show the archived sessions (right-click: more)
     button "Settings" -- Settings (Ctrl+, or /settings)
-    button "Pull requests" -- Pull requests (/pr)
+    button "Usage and limits" -- Usage and limits (/usage)
     button "Commands and keys" -- Commands and keys (/help)
     button "Filter the transcript" -- Filter the transcript (/filter)
     button "Files" -- Files (Ctrl+Shift+F)
@@ -65,10 +65,11 @@ let%expect_test "the names of the controls" =
     button "New session" -- Start a new session (/new)
     [checkbox] button "work 0 B Fix the build" -- /sessions/s1.jsonl
     button "Cancel" -- Stop selecting (Esc)
-    button "Delete sessions" -- Delete the selected sessions (Delete)
-    button "Archive 1" -- Show the archived sessions
+    button "Archive" -- Archive the selected sessions
+    button "Delete" -- Delete the selected sessions, 0 B (Delete)
+    button "Archive 1" -- Show the archived sessions (right-click: more)
     button "Settings" -- Settings (Ctrl+, or /settings)
-    button "Pull requests" -- Pull requests (/pr)
+    button "Usage and limits" -- Usage and limits (/usage)
     button "Commands and keys" -- Commands and keys (/help)
     [checkbox] button "work 0 B Fix the build" -- /sessions/s1.jsonl
     |}]

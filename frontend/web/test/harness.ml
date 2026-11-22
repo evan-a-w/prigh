@@ -652,14 +652,21 @@ let keydown ?nth t ~selector key =
     [ "key", Js_of_ocaml.Js.Unsafe.inject (Js_of_ocaml.Js.string key) ]
 ;;
 
-let modified_click ?nth ?(ctrl = false) ?(meta = false) t ~selector =
+let modified_click
+      ?nth
+      ?(ctrl = false)
+      ?(meta = false)
+      ?(shift = false)
+      t
+      ~selector
+  =
   let bool b = Js_of_ocaml.Js.Unsafe.inject (Js_of_ocaml.Js.bool b) in
   mouse_event
     ?nth
     t
     ~selector
     ~event_name:"onclick"
-    [ "ctrlKey", bool ctrl; "metaKey", bool meta; "shiftKey", bool false ]
+    [ "ctrlKey", bool ctrl; "metaKey", bool meta; "shiftKey", bool shift ]
 ;;
 
 let middle_click ?nth t ~selector =

@@ -318,8 +318,16 @@ let archive_picker ~count ~shown =
   Picker.create
     ~title:"Archive"
     [ (if shown
-       then Picker.Item.create ~id:(Item.id Hide_archived) ~detail:"" "Hide archived"
-       else Picker.Item.create ~id:(Item.id Show_archived) ~detail:"" "Show archived")
+       then
+         Picker.Item.create
+           ~id:(Item.id Hide_archived)
+           ~detail:""
+           "Hide archived"
+       else
+         Picker.Item.create
+           ~id:(Item.id Show_archived)
+           ~detail:""
+           "Show archived")
     ; Picker.Item.create
         ~id:(Item.id Delete_archived)
         ~detail:(if count = 0 then "There are none" else "/delete-archived")
