@@ -225,11 +225,14 @@ let component
   let sidebar = Sidebar.component ~persist:false graph in
   (* None: as the width suits, open on desktop and closed on phones. *)
   let right_choice, set_right_choice = Bonsai.state (None : bool option) graph in
+  let use_card = Option.is_none right in
   let right =
     match right with
-    | None -> Bonsai.return (Some (Session_panel.view ()))
+    | None -> Bonsai.return None
     | Some r -> r >>| Option.some
   in
+  let subagents_open, set_subagents_open = Bonsai.state true graph in
+  let worktrees_open, set_worktrees_open = Bonsai.state false graph in
   let bottom =
     match bottom with
     | None -> Bonsai.return None
@@ -252,6 +255,10 @@ let component
   and overlay
   and right_choice
   and set_right_choice
+  and subagents_open
+  and set_subagents_open
+  and worktrees_open
+  and set_worktrees_open
   and right_layout
   and set_right_layout
   and bottom_layout
@@ -275,8 +282,42 @@ let component
         ]
     | _ -> main_column
   in
+  let card ?class_ () =
+    Session_panel.view
+      ?class_
+      ~subagents_open
+      ~worktrees_open
+      ~toggle_subagents:(set_subagents_open (not subagents_open))
+      ~toggle_worktrees:(set_worktrees_open (not worktrees_open))
+      ()
+  in
   let body =
     match right, right_size with
+    | _ when use_card && mobile ->
+      [ main_and_bottom
+      ; Drawer.view
+          ~id:"session-drawer"
+          ~open_:right_open
+          ~on_open_change:set_right_open
+          (fun d ->
+            [ Drawer.content
+                d
+                ~class_:"pb-[env(safe-area-inset-bottom)]"
+                [ Drawer.header
+                    ~class_:"sr-only"
+                    [ Drawer.title d [ Node.text "Session" ] ]
+                ; card
+                    ~class_:
+                      "w-full border-0 bg-transparent px-2 pb-3 [&_a]:h-11 \
+                       [&_button]:h-11 [&_button]:text-sm"
+                    ()
+                ]
+            ])
+      ]
+    | _ when use_card ->
+      [ main_and_bottom
+      ; (if right_open then div "shrink-0 self-start pt-1 pr-3" [ card () ] else Node.none)
+      ]
     | Some r, _ when right_open && mobile ->
       [ main_and_bottom
       ; mobile_sheet ~close:(set_right_open false) ~title:right_title r
@@ -323,7 +364,7 @@ let component
                 ~tip
                 ~sidebar
                 ~pressed
-                ~has_right:(Option.is_some right)
+                ~has_right:(use_card || Option.is_some right)
                 ~right_open
                 ~set_right_open
                 ()

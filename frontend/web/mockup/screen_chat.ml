@@ -57,6 +57,27 @@ let tool_row ~open_ids ~toggle i (call : Fake.Tool_call.t) =
     @ extra
   in
   match call.output with
+  | _ when String.equal call.tool "subagent" ->
+    let name =
+      match List.hd Fake.Subagent.all with
+      | Some a -> a.name
+      | None -> call.summary
+    in
+    Node.a
+      ~attrs:[ Attr.href "#"; Attr.title "Open the subagent's chat"; Attr.class_ row_classes ]
+      [ span "flex size-4 items-center justify-center [&_svg]:size-3.5" [ tool_icon call.tool ]
+      ; span "w-16 shrink-0 font-medium text-foreground/90" [ Node.text call.tool ]
+      ; span
+          "min-w-0 flex-1 truncate"
+          [ span
+              "text-foreground/90 underline decoration-muted-foreground/40 \
+               underline-offset-2 group-hover/tool:decoration-foreground"
+              [ Node.text name ]
+          ; Icons.view ~class_:"mx-1 inline size-3 align-[-1px]" Arrow_up_right
+          ; span "font-mono text-[11.5px]" [ Node.text call.summary ]
+          ]
+      ; span "shrink-0" [ status ]
+      ]
   | None -> div row_classes (row [])
   | Some output ->
     Collapsible.view
