@@ -213,7 +213,7 @@ try {
     await page.keyboard.press(`${mod}+p`);
     await page.waitForFunction(() => document.activeElement?.id === "code-filter");
     await page.keyboard.type("compml");
-    await page.locator(".code-tree .code-section-title", { hasText: /^Files$/ }).waitFor();
+    await page.locator(".code-tree .code-section-title", { hasText: / of [0-9]/ }).waitFor();
     await page.locator(".code-tree .code-row.file", { hasText: "compact" }).waitFor();
     console.log(`found: ${(await page.locator(".code-tree .code-row.file").allInnerTexts()).map(t => t.replace(/\s+/g, "")).join(" | ")}`);
     await page.keyboard.press("Enter");

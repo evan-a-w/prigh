@@ -3,6 +3,13 @@ open! Prigh
 open Tool_test_helpers
 module Reply = Faux_provider.Reply
 
+(* A job's age in job_status depends on the machine's speed. *)
+let elapsed name text =
+  if String.equal name "job_status"
+  then Re.replace_string (Re.Perl.compile_pat {|\b[0-9]+s\b|}) ~by:"Ns" text
+  else text
+;;
+
 (* An agent with the interaction tools and a background-capable subagent;
    [answer] answers confirmations and [reply] questions as they come, and
    everything worth seeing is printed in order. *)
@@ -107,7 +114,7 @@ let with_agent
         call.name
         (String.prefix (mask t call.arguments) 60)
         (if result.is_error then "ERROR " else "")
-        (mask t (String.strip result.text))
+        (elapsed call.name (mask t (String.strip result.text)))
     | Loop (Subagent { event = Tool_end { call; result }; agent_id; _ }) ->
       printf
         "  [%s] %s -> %s%s\n"
@@ -970,7 +977,7 @@ let%expect_test
       -> Allow
     job_input {"id":"j1","input":"hi\n","close":true,"wait_ms":10000} -> sent 3 bytes to job j1 and closed its stdin; it then exited 0
     hi
-    job_status {} -> j1  exited 0, delivered  0s  cat  (last: 3 B, hi)
+    job_status {} -> j1  exited 0, delivered  Ns  cat  (last: 3 B, hi)
     web_fetch {"url":"not a url"} -> ERROR "not a url" is not a URL: it must start with http:// or https://, e.g. https://not a url
     |}]
 ;;
