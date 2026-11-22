@@ -1,9 +1,10 @@
 open! Core
 open! Import
 
-(** The session card: the session's subagents (each opens its transcript in
-    the chat's place) and its repository's worktrees, in two folding
-    sections. Beside the chat it sits in the main pane's top-right corner,
+(** The session card: the lineage of the chat on show (in a subagent's
+    chat, the chats above it), its own subagents (each opens its chat in the
+    session's place) and, on the session's own chat, its worktrees, in
+    folding sections. Beside the chat it sits in the main pane's top-right corner,
     in the chat's right margin, and {!main_attr} moves the chat's column left
     by what that margin lacks; on a phone it is a sheet from the bottom. *)
 

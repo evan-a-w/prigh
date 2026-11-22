@@ -1097,6 +1097,9 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   (`Run_here`). The continued run emits `Subagent_start {continued =
   true}` with the same ids and a `Subagent_end` with totals over its runs;
   frontends reopen the card, row and transcript they have.
+  A background run that finishes otherwise is parked too, flagged at
+  `park` as not `out_of_turns`: `subagent_continue` takes only one out of
+  turns, but the user's message carries either on (`send`, below).
   `subagent_cancel` and `cancel_all`/`forget_finished` (session reset)
   drop parked state.
 - `Tool_worktree` — the model's `worktree` tool (`action` create, list or
@@ -1208,9 +1211,13 @@ GitHub and Forgejo/Gitea over their REST APIs from the backend (no `gh` or
   `cancel_and_wait` (`job_kill`/`subagent_cancel` results). Events and changes
   go to the hooks `Agent` installs with `connect` (`on_queue_change` for the
   subagents' inboxes). `send`/`inbox_of` reach a running subagent's inbox,
-  refusing a finished one (its report is on its way or delivered: tell the
-  main agent instead), a nested one (`a1/a1`: send it to `a1`) or an
-  unknown id.
+  refusing a nested one (`a1/a1`: send it to `a1`) or an unknown id. `send`
+  to a finished one that is parked carries it on (the prigh-web chat with
+  it): its `Resume` runs with `message:(From.User, text)`, tagged as the
+  user's ("[The user sends you this…]"), and its new outcome is not
+  delivered to the main agent, which already had its report; one not
+  parked is refused (its report is on its way: tell the main agent
+  instead).
 - `Steer_queue` — a steer queue and a follow-up queue (push, take the
   steers, take one follow-up, `steers_first`, take back the last, remove by
   index if it still matches): the main agent's queue of `Queued.t` and each
@@ -3438,7 +3445,7 @@ terminal frontend and `web/` prigh-web, the browser one.
       has their reports; one whose call is not loaded (in an older page, or
       under a parent not fetched yet) is kept detached, found and updated by
       its events all the same, until the page with its call comes; the
-      agents panel's fetches (`Agents.fetches`) fail with what went wrong,
+      transcripts it fetches (`Agents.fetches`) fail with what went wrong,
       or after 20s without an answer, and offer a retry; `!cmd` runs as
       `Shell` entries), `Chat_view` (each
       entry, and the whole transcript, a `Node.lazy_` cached by `View_cache`
@@ -3451,18 +3458,18 @@ terminal frontend and `web/` prigh-web, the browser one.
       one every time: `app/vdom_thunk.js`, installed as the page starts,
       reuses one on its argument alone, the cached lazy value. Above
       them, `View` makes the page of parts (sidebar, review, header,
-      transcript, side answer, terminal, files, agents, dialogs), each a
+      transcript, side answer, terminal, files, session card, dialogs), each a
       `View_memo` kept while the model's fields it may show are the same
       values (`Model.same_but_composer`, `same_but_composer_and_transcript`)
       and the time reads the same at its granularity (ages by the minute,
-      messages' times by the day, the open agents panel by the second): a
+      messages' times by the day): a
       key typed remakes only the composer, a streamed delta only the parts
       that show the transcript, and the page's 30 s `Tick` nothing within
       the minute. `Jump.points` is cached on the chat value.),
       `Tool_view` (a card per tool: bash, read with images, write, edit
       with `Line_diff`/`Diff_view`, apply_patch file by file,
-      ls/grep/find, subagents (marked with `data-call` and `data-agent`
-      for the agents panel), jobs and `job_input`, `web_fetch` with its URL
+      ls/grep/find, subagents (marked with `data-call` and `data-agent`,
+      which opens its chat), jobs and `job_input`, `web_fetch` with its URL
       as a link and the page folded, `computer` (`Computer_action`, shared with
       the TUI, says what it did; the screenshot with the point marked as a
       percentage of its size, in the image viewer), and `server_tool`, the card a
@@ -3520,34 +3527,35 @@ terminal frontend and `web/` prigh-web, the browser one.
       changes) relative to today (`Model.now`): `14:32`, `Yesterday
       14:32`, `3 Oct 14:32`, `3 Oct 2025 14:32`, the full date in the
       `title`; `Chat_view` puts a day separator where consecutive messages'
-      days differ, and nested and agents-panel transcripts get the same.
-    - The agents panel: `Agents` (per session: `list_subagents` and
+      days differ, and nested transcripts and subagents' chats get the same.
+    - Subagents: `Agents` (per session: `list_subagents` and
       `list_jobs`, kept live by `subagent_start`/`subagent`/`subagent_end`
       at any depth and by the state's `subagents`/`jobs` changing; nested
-      ids `<parent>/<call>` make a tree; finished items fold under
-      "earlier" at the next prompt; the selection, cancels and kills in
-      flight, a job's polled `job_output`) and `Agents_view` (the list as
-      a tree of buttons, `aria-keyshortcuts` for Alt+N; outcomes from the
-      report's prefix: `[cancelled]`/`[interrupted]`/a killed job are
-      "stopped", not failed; a subagent in full — its transcript is the one in `Chat`, found by
-      agent id at any depth, fetched with `get_subagent` when nested ones
-      are missing after a reload — or a job's output, with what it is
-      (crumbs, task, state, data, Cancel/Kill, "Show in chat") in a footer
-      pinned under the scrolling body; the status line's
-      summary and the toggle in the chat's corner or the bar). Steering:
-      `Model.recipient` (`Recipient`: `Main` or a subagent's id) is who the
-      composer sends to, set only by `Set_recipient` (the Steer button, the
-      chip's ×, Esc), not by what the panel shows; `follow_recipient`, after
-      every update, makes it `Main` when that subagent finishes, with a
-      toast. `send` then calls `steer_agent`
-      (`mode: follow_up` for Alt+Enter, `Steered` puts the text back if it
-      fails), `Dequeue` `dequeue_agent`; `Composer_view` shows the chip,
-      `Agents_view` the Steer button (disabled, saying why, for nested
-      ones). Elapsed times tick with `Clock`,
-      which the page sends every second only while the panel is open with
-      something running (`Model.ticking`); running jobs are then polled
-      every 2s. `Reveal` scrolls the chat to a subagent's card through the
-      `subagent` call ids from the top-level one down.
+      ids `<parent>/<call>` make a tree, `lineage` a subagent's ancestors;
+      cancels and kills in flight; running jobs polled for the session
+      card). A subagent is a chat: `Open_subagent_chat` (its line in the
+      transcript, its row in the session card, Alt+1…9 for the Nth of the
+      chat on show, `/agents N`) sets `Model.subagent_chat` (per session),
+      and `Subagent_chat_view` shows its transcript in the session's place
+      (the one in `Chat`, found by agent id at any depth, fetched with
+      `get_subagent` when missing after a reload); `Subagent_back` (Esc,
+      Back) goes to its parent's chat, a top-level one's to the session's
+      (`Close_subagent_chat`). `Session_view`'s breadcrumb is project /
+      session / its ancestors / the subagent, each a link.
+      `Session_card` and `Session_card_view` (the chat's top-right corner,
+      a sheet on a phone; `/agents` and `/jobs` open it) list, in a
+      subagent's chat, its Parents (the session's chat, then its ancestors)
+      and Subagents (its own), else the session's subagents and worktrees,
+      each row with its `Session_card.Activity`. Background jobs have no
+      view. Steering: `Model.recipient` (`Recipient`: `Main` or a
+      subagent's id) is the subagent on show; `send` then calls
+      `steer_agent` (`mode: follow_up` for Alt+Enter, `Steered` puts the
+      text back if it fails; a finished one carries on with the message),
+      `Dequeue` `dequeue_agent`, and the stop button `cancel_subagent`;
+      `Recipient.refusal` refuses a nested one, saying to write to its
+      parent. Elapsed times tick with `Clock`, which the page sends every
+      second while something runs or a transcript is being fetched
+      (`Model.ticking`).
     - The terminal panel: `Terminal` (open, a
       generation that "New shell"/"Retry" bump, and the widget's last
       `Status` with the key of the target it is about) and
@@ -3588,13 +3596,13 @@ terminal frontend and `web/` prigh-web, the browser one.
       its dialog open, Enter and Esc.
     - Panel sizes: `Resize` (pure: per `Handle` — the sidebar, the file
       browser's list and its preview (left of it, or in its place when
-      `preview_alone`), the agents panel, the terminal, the chat beside
+      `preview_alone`), the terminal, the chat beside
       the review page, the review's file list and its comments' column —
       the user's preference (`web.<var>`, see below), and the window's
       `Viewport`; `bounds` gives a handle's size, minimum and maximum in
       that window given what is open (`App.Model.shown`): the side panels
       docked beside the chat (the file browser floats over it below
-      1100px, the agents panel below 1180px, as in the CSS) share its
+      1100px, as in the CSS) share its
       width less `chat_min` (400px; while reviewing, the chat is one of
       them and the review page keeps `review_min`), shrinking in proportion to what they
       have above their minimums when they would not fit, while the
@@ -4187,10 +4195,8 @@ terminal frontend and `web/` prigh-web, the browser one.
     (phone) layout, a clock for ages and toasts, and the chat following new
     output unless scrolled up. `Selection_listeners` reports text
     selected in a review's code (above). `Chat_listeners` copies code blocks and
-    closes an open image with Esc; `Agents_listeners` opens a subagent's
-    card (`data-agent`) in the agents panel, keeps a
-    shown transcript or job output at its end unless scrolled up, and
-    performs `Reveal` (opening the folds the card is in).
+    closes an open image with Esc; `Agents_listeners` opens the chat of a
+    subagent whose card (`data-agent`) is clicked.
     `Terminal_widget` is the terminal panel's xterm.js: a
     `Vdom.Node.widget_of_module` around `bin/terminal.js` (loaded with
     the xterm.js, its fit addon and `xterm.css` vendored in `bin/vendor/`
@@ -4213,7 +4219,7 @@ terminal frontend and `web/` prigh-web, the browser one.
     held repeats, and `pointerdown` is prevented so the shell keeps the
     focus and the phone its keyboard. The document listeners leave keys (a capture
     listener takes only Ctrl+`, before xterm.js), pastes and drops inside
-    the panel to it, and the chat's and agents panel's mutation observers
+    the panel to it, and the chat's mutation observers
     ignore xterm.js redrawing. `Files_widget` keeps the browser's `File`s
     by id, `PUT`s one to its upload link with `XMLHttpRequest` (its upload
     progress becomes `Upload_progress`), saves a download through a link
@@ -4695,11 +4701,10 @@ session and switching back from the sidebar (with the backend's messages
 held back by a wrapped `WebSocket`, so that the prompt being sent and the
 session loading show), the backend dying (the
 banner) and restarting on the same port (the page reconnects to the same
-session and runs another prompt), and the agents panel (a background
-subagent running a synchronous one and a background job: the list, the
-nested one in full via Alt+2 and its card revealed in the chat, the job's
-output, a card in the chat opening its agent, its footer staying at the
-panel's foot as a short window's transcript scrolls), and the terminal panel (a
+session and runs another prompt), and subagent chats (a background
+subagent running a synchronous one: the session card listing it, the nested
+one's chat with its lineage, Esc back to the parent and then the session,
+Alt+1 from the session, the breadcrumb's links), and the terminal panel (a
 real shell through tmux, on a private tmux server via `TMUX_TMPDIR` with
 `SHELL=/bin/sh` and a fixed prompt: typed output, Esc reaching `cat -v`,
 `stty size` matching xterm.js's rows before and after dragging the panel

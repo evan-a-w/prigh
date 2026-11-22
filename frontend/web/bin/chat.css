@@ -172,8 +172,8 @@ summary:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; bor
 
 /* A subagent's task is a prompt too, but not the user's: across the
    column, outlined. */
-.transcript .msg.user, .agents-panel .msg.user { margin-left: 0; max-width: none; align-items: stretch; }
-.transcript .msg.user .bubble, .agents-panel .msg.user .bubble {
+.transcript .msg.user { margin-left: 0; max-width: none; align-items: stretch; }
+.transcript .msg.user .bubble {
   background: transparent;
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -1362,3 +1362,10 @@ table.diff tr.add .wd { background: color-mix(in srgb, var(--add-fg) 26%, transp
 .pending > .stop-hint { font-size: 12px; color: var(--muted-foreground); opacity: 0.8; }
 .pending > .stop-hint::before { content: "· "; }
 .app.narrow .pending > .stop-hint { display: none; }
+
+/* A subagent's line in the transcript: a way into its chat. */
+.tool-subagent > .tool-head[data-agent] { cursor: pointer; border-radius: var(--r-control); }
+.tool-subagent > .tool-head[data-agent]:hover { background: var(--slate-2); }
+.tool-head .open-agent { margin-left: auto; padding: 0 4px; border: 0; border-radius: var(--r-chip); background: none; color: var(--muted-text); font: inherit; font-size: 12.5px; white-space: nowrap; cursor: pointer; }
+.tool-head .open-agent:focus-visible { outline: 2px solid var(--sodium); outline-offset: 1px; }
+.tool-head[data-agent]:hover .open-agent { color: var(--chalk); }

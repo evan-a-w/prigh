@@ -60,7 +60,6 @@
   theme.css
   style.css
   chat.css
-  agents.css
   terminal.css
   files.css
   review.css
@@ -85,7 +84,6 @@
     (cat theme.css)
     (cat style.css)
     (cat chat.css)
-    (cat agents.css)
     (cat terminal.css)
     (cat files.css)
     (cat review.css)

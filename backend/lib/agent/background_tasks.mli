@@ -66,7 +66,7 @@ end
 module Resume : sig
   type t =
     max_turns:int option
-    -> message:string option
+    -> message:(Subagent_inbox.From.t * string) option
     -> inbox:Subagent_inbox.t option
     -> call_id:string option
     -> cancel:Cancellation.t
@@ -209,7 +209,10 @@ val take_next
     finished, it is unknown, it is a subagent's own). *)
 val inbox_of : t -> string -> Subagent_inbox.t Or_error.t
 
-(** Queues a message for a running subagent ({!inbox_of}). *)
+(** Queues a message for a running subagent ({!inbox_of}). The user's
+    message to a background subagent that finished, its report delivered,
+    runs it again with the message instead (a chat with it): it does not
+    report to the main agent again. *)
 val send
   :  t
   -> id:string
@@ -227,9 +230,15 @@ val queues : t -> Subagent_inbox.Listing.t list
     to carry on: [subagent_continue] runs it again. A background one keeps
     its task (and id), which runs again and reports again; a synchronous
     one (a subagent's own, parked in its caller's tasks) is run by its
-    caller. Cancelling it, {!cancel_all} and {!forget_finished} free it. *)
+    caller. Cancelling it, {!cancel_all} and {!forget_finished} free it.
 
-val park : t -> string -> Resume.t -> unit
+    A background subagent that finished is parked too ([out_of_turns]
+    false), for the user to carry on with ({!send}); [subagent_continue]
+    takes only those out of turns. *)
+
+val park : t -> string -> out_of_turns:bool -> Resume.t -> unit
+
+(** Parked out of turns: [subagent_continue] can continue it. *)
 val is_parked : t -> string -> bool
 
 (** Unparks [id]: a background subagent's task runs it again ([`Restarted]:

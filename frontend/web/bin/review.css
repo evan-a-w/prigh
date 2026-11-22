@@ -6,7 +6,7 @@
 
 /* Focused: the review and the chat, the sessions sidebar hidden (Ctrl+B
    shows it as a drawer over the page, as on a phone); the terminal spans
-   both, the file browser and the agents panel open beside them. */
+   both, and the file browser open beside them. */
 .app.reviewing:not(.narrow) .desk {
   grid-template-columns: minmax(0, 1fr) 0 var(--review-chat-width, 400px);
   grid-template-areas: "review handle main" "terminal terminal terminal";

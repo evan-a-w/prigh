@@ -136,26 +136,20 @@ module Fetch = struct
 end
 
 type t =
-  { open_ : bool
-  ; selected : Item.t option
-  ; agents : Agent.t list
+  { agents : Agent.t list
   ; jobs : Job.t list
   ; earlier : Item.Set.t
   ; stopping : Item.Set.t
-  ; output : (string * string) option
   ; polled_at : Time_ns.t option
   ; fetches : Fetch.t String.Map.t [@sexp_drop_if Map.is_empty]
   }
 [@@deriving sexp_of]
 
 let empty =
-  { open_ = false
-  ; selected = None
-  ; agents = []
+  { agents = []
   ; jobs = []
   ; earlier = Item.Set.empty
   ; stopping = Item.Set.empty
-  ; output = None
   ; polled_at = None
   ; fetches = String.Map.empty
   }
@@ -361,24 +355,6 @@ let resolve t arg =
      | None, None ->
        List.find t.agents ~f:(fun a -> String.equal a.call_id arg)
        |> Option.map ~f:(fun a -> Item.Agent a.id))
-;;
-
-let cycle t delta =
-  let items = List.map (listed t) ~f:fst in
-  let n = List.length items in
-  if n = 0
-  then None
-  else (
-    let current =
-      Option.bind t.selected ~f:(fun s ->
-        List.findi items ~f:(fun _ i -> Item.equal i s) |> Option.map ~f:fst)
-    in
-    let next =
-      match current with
-      | None -> if delta > 0 then 0 else n - 1
-      | Some i -> (i + delta) % n
-    in
-    List.nth items next)
 ;;
 
 let span_between a b = Time_ns.Span.max Time_ns.Span.zero (Time_ns.diff b a)

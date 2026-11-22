@@ -53,8 +53,6 @@ let sheet_row ?(on = false) ?id ?detail ?badge ~cls ~name ~glyph ~on_click () =
 let sheet (m : App.Model.t) ~inject =
   let go a = Effect.Many [ inject Action.Toggle_status_tray; inject a ] in
   let hidden = List.length (Transcript_filter.hidden m.transcript_filter) in
-  let a = m.agents in
-  let running = Agents.running_agents a + Agents.running_jobs a in
   Node.div
     ~attrs:
       [ Attr.class_ "chrome-menu menu-surface sheet"
@@ -116,23 +114,6 @@ let sheet (m : App.Model.t) ~inject =
               ()
           ]
         else [])
-     @ (if (not a.open_) && List.is_empty a.agents && List.is_empty a.jobs
-        then []
-        else
-          [ sheet_row
-              ~cls:"agents-row"
-              ~name:"Subagents and jobs"
-              ?detail:
-                (if running > 0
-                 then Some (sprintf "%d running" running)
-                 else None)
-              ?badge:
-                (if running > 0 then Some (Int.to_string running) else None)
-              ~on:a.open_
-              ~glyph:Bot
-              ~on_click:(go Action.Toggle_subagents)
-              ()
-          ])
      @ [ sheet_row
            ~cls:"settings-row"
            ~name:"Settings"
@@ -206,9 +187,7 @@ let toggle ~cls ~title ~label ~on ~on_click ?(panel = true) glyph =
 ;;
 
 (* The top bar's toggles (the transcript filter's menu hangs under them):
-   the files, the terminal,
-   the subagents and jobs (while there are any), the review and the session
-   card. *)
+   the files, the terminal, the review and the session card. *)
 let toggles (m : App.Model.t) ~inject =
   div
     ~cls:"panel-toggles flex items-center gap-0.5"
@@ -227,7 +206,6 @@ let toggles (m : App.Model.t) ~inject =
         ~on:m.terminal.open_
         ~on_click:(inject Action.Toggle_terminal)
         Panel_bottom
-    ; Agents_view.toggle m ~inject
     ; toggle
         ~cls:"review-toggle"
         ~title:"Review changes (Alt+R)"
@@ -249,8 +227,15 @@ let toggles (m : App.Model.t) ~inject =
     ]
 ;;
 
-(* Where the session is and what it is: its project, then its name. *)
-let breadcrumb (m : App.Model.t) (state : State.t) =
+(* The subagent whose chat is on show, after its ancestors. *)
+let lineage (m : App.Model.t) =
+  Option.value_map m.subagent_chat ~default:[] ~f:(Agents.lineage m.agents)
+;;
+
+(* Where the session is and what it is: its project, then its name; in a
+   subagent's chat, then the subagents from the top-level one down, each
+   before the last a way back to its chat. *)
+let breadcrumb (m : App.Model.t) ~inject (state : State.t) =
   let module B = Loon.Breadcrumb in
   let project =
     match
@@ -264,6 +249,58 @@ let breadcrumb (m : App.Model.t) (state : State.t) =
            ~cwd:state.cwd)
     | None -> None
   in
+  let separator =
+    B.separator
+      ~class_:"text-muted-foreground/60"
+      ~children:[ Node.text "/" ]
+      ()
+  in
+  let link ~cls ~title action text =
+    Node.button
+      ~attrs:
+        [ Attr.type_ "button"
+        ; Attr.class_
+            (B.link_classes ~class_:(cls ^ " truncate cursor-pointer") ())
+        ; Attr.title title
+        ; Attr.on_click (fun _ -> inject action)
+        ]
+      [ Node.text text ]
+  in
+  let lineage = lineage m in
+  let session =
+    match lineage with
+    | [] ->
+      B.page
+        ~class_:"chrome-title-text truncate"
+        [ Node.text (session_title m state) ]
+    | _ :: _ ->
+      link
+        ~cls:"chrome-title-text"
+        ~title:"Back to the session's chat"
+        Action.Close_subagent_chat
+        (session_title m state)
+  in
+  let agents =
+    List.concat_mapi lineage ~f:(fun i (a : Agents.Agent.t) ->
+      let last = i = List.length lineage - 1 in
+      [ separator
+      ; B.item
+          ~class_:(if last then "min-w-0" else "min-w-0 max-w-[12rem]")
+          [ (if last
+             then
+               B.page
+                 ~class_:"chrome-subagent truncate"
+                 ~attrs:[ Attr.title (String.strip a.task) ]
+                 [ Node.text (Agents.Agent.title a) ]
+             else
+               link
+                 ~cls:"chrome-subagent"
+                 ~title:(String.strip a.task)
+                 (Action.Open_subagent_chat a.id)
+                 (Agents.Agent.title a))
+          ]
+      ])
+  in
   B.root
     ~class_:"session-crumbs min-w-0"
     [ B.list
@@ -271,19 +308,17 @@ let breadcrumb (m : App.Model.t) (state : State.t) =
         ((match project with
           | Some project ->
             [ B.item ~class_:"chrome-project shrink-0" [ Node.text project ]
-            ; B.separator
-                ~class_:"text-muted-foreground/60"
-                ~children:[ Node.text "/" ]
-                ()
+            ; separator
             ]
           | None -> [])
          @ [ B.item
-               ~class_:"min-w-0"
-               [ B.page
-                   ~class_:"chrome-title-text truncate"
-                   [ Node.text (session_title m state) ]
-               ]
-           ])
+               ~class_:
+                 (if List.is_empty lineage
+                  then "min-w-0"
+                  else "min-w-0 max-w-[14rem] shrink")
+               [ session ]
+           ]
+         @ agents)
     ]
 ;;
 
@@ -296,14 +331,19 @@ let chrome (m : App.Model.t) ~inject =
   let temporary = App.temporary m && not (App.fresh m) in
   if m.narrow
   then (
+    let shown = List.last (lineage m) in
     let title =
-      match m.state with
-      | Some _ when temporary -> Temporary_view.pill m ~inject
-      | Some state ->
+      match m.state, shown with
+      | Some _, Some a ->
+        Node.h1
+          ~attrs:[ Attr.class_ "chrome-title chrome-subagent" ]
+          [ Node.text (Agents.Agent.title a) ]
+      | Some _, None when temporary -> Temporary_view.pill m ~inject
+      | Some state, None ->
         Node.h1
           ~attrs:[ Attr.class_ "chrome-title" ]
           [ Node.text (session_title m state) ]
-      | None -> Node.none
+      | None, _ -> Node.none
     in
     div
       ~cls:"chrome-anchor"
@@ -311,9 +351,16 @@ let chrome (m : App.Model.t) ~inject =
           ~attrs:[ Attr.class_ "chat-chrome strip" ]
           [ div
               ~cls:"chrome-left"
-              [ (if docked
-                 then Node.none
-                 else
+              [ (match shown with
+                 | Some _ ->
+                   button
+                     ~cls:"icon ghost round chrome-button subagent-back"
+                     ~title:"Back to its parent's chat (Esc)"
+                     ~label:"Back"
+                     ~on_click:(inject Action.Subagent_back)
+                     [ icon Back ]
+                 | None when docked -> Node.none
+                 | None ->
                    button
                      ~cls:"icon ghost round chrome-button toggle-sidebar"
                      ~title:"Sessions (Ctrl+B)"
@@ -355,7 +402,7 @@ let chrome (m : App.Model.t) ~inject =
               ~cls:"chrome-center flex min-w-0 items-center"
               [ (match m.state with
                  | Some _ when temporary -> Temporary_view.pill m ~inject
-                 | Some state -> breadcrumb m state
+                 | Some state -> breadcrumb m ~inject state
                  | None -> Node.none)
               ]
           ; div

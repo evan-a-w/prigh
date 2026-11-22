@@ -24,7 +24,7 @@
   --z-panel: 20;  /* a side panel over the chat in a narrower window */
   --z-scrim: 25;  /* behind the sidebar's drawer */
   --z-drawer: 30; /* the sidebar as a drawer: a phone's, or over the review */
-  --z-sheet: 40;  /* a phone's full-screen sheet: files, agents, review */
+  --z-sheet: 40;  /* a phone's full-screen sheet: files, review */
   --z-menu: 50;   /* a menu's backdrop: account, context, chip, picker */
   --z-menu-anchor: 51;  /* live over that backdrop: the chips, only while
                            their menu is open; the review page's pickers */
@@ -1003,20 +1003,8 @@ kbd {
    the bottom of the page. */
 .app:has(.modal-backdrop) .toasts,
 .app.narrow.files-open .toasts,
-.app.narrow.agents-open .toasts {
-  position: fixed;
-  left: 50%;
-  right: auto;
-  bottom: 12px;
-  width: max-content;
-  max-width: min(460px, calc(100vw - 24px));
-  transform: translateX(-50%);
-  align-items: center;
-  z-index: var(--z-toast);
-}
 .app:has(.modal-backdrop) .toast:not(:last-child),
 .app.narrow.files-open .toast:not(:last-child),
-.app.narrow.agents-open .toast:not(:last-child) { display: none; }
 .app:has(.modal-backdrop) .toast { max-width: 100%; }
 
 /* Sign in */
@@ -1419,29 +1407,6 @@ kbd {
 
 
 /* Steering a subagent: whom the composer writes to, over the editor. */
-.steer-chip {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  min-width: 0;
-  max-width: 100%;
-  align-self: flex-start;
-  padding: 2px 2px 2px 8px;
-  color: var(--sodium);
-  background: var(--sodium-wash);
-  border: 1px solid var(--sodium-line);
-  border-radius: var(--r-chip);
-  font-size: 12.5px;
-  animation: rise 0.12s ease-out;
-}
-.steer-chip-icon { width: 13px; height: 13px; flex-shrink: 0; }
-.steer-chip-label { white-space: nowrap; font-weight: 500; }
-.steer-chip-id { font: 500 12px var(--mono); }
-.steer-chip-task { color: var(--muted-text); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.steer-chip-task::before { content: "· "; color: var(--faint); }
-.steer-chip-close.btn.icon { width: 20px; height: 20px; flex-shrink: 0; color: var(--muted-text); }
-.steer-chip-close .icon { width: 11px; height: 11px; }
-.steer-chip-close:hover { color: var(--fg); }
 /* The composer's steps, by its width. Short labels: the level alone, the
    mode's name. */
 @container composer (width < 600px) {

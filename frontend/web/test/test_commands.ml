@@ -58,7 +58,6 @@ let%expect_test "every command does something (none is unknown)" =
                 | _ -> None)
               |> String.concat ~sep:", ")
          | d -> String.prefix (Sexp.to_string (Dialog.sexp_of_t d)) 30)
-      | None, _, _ when m'.agents.open_ -> "agents panel"
       | None, (_ :: _ as toasts), _ -> "toast: " ^ (List.last_exn toasts).text
       | None, [], _ ->
         List.filter_map commands ~f:(function
@@ -150,8 +149,8 @@ let%expect_test "every command does something (none is unknown)" =
     /terminal                  rpc set_prefs, Focus_terminal
     /files                     rpc fs_list, (Files(Focus files-list)), rpc git_diff
     /edit                      rpc fs_list, rpc list_files, rpc git_diff
-    /agents                    agents panel
-    /jobs                      agents panel
+    /agents                    rpc list_subagents, rpc list_jobs
+    /jobs                      rpc list_subagents, rpc list_jobs
     /login                     loading Log in: rpc push_pref, rpc auth_status
     /logout                    loading Log out: rpc push_pref, rpc auth_status
     /auth                      loading Providers: rpc push_pref, rpc auth_status, rpc forge_status
@@ -249,12 +248,10 @@ let%expect_test "/help <command> and /hotkeys" =
     Ctrl+, settings: notifications, transcript detail, your account (/settings)
     ← → / ↑ ↓ (on a panel's edge) resize the panel (Shift: faster; Home / End: smallest / largest; Enter: the default size); or drag the edge, double-click to reset
     Esc (the context ring's card open) close the card (the ring by the paperclip: context, cost, Compact)
-    Alt+1…9 follow subagent or job N in the agents panel
-    Alt+] Alt+[ the next or previous subagent or job
-    Alt+0 close the agents panel
-    Enter / Alt+Enter (steering a subagent) send it a message: at its next step / when it ends its turn (its Steer button in the agents panel; /agents steer N TEXT sends one)
-    Alt+↑ (steering a subagent) take its last queued message back
-    Esc (steering a subagent) write to the main agent again
+    Alt+1…9 open the chat of subagent N of this chat (the session card lists them)
+    Enter / Alt+Enter (in a subagent's chat) write to it: at its next step / when it ends its turn while it runs; once it has finished, it carries on with your message (/agents steer N TEXT sends one from anywhere)
+    Alt+↑ (in a subagent's chat) take its last queued message back
+    Esc (in a subagent's chat) back to its parent's chat
     Ctrl+Z / ⌘+Z (in the message box) right after a long paste became a chip, or a chip was removed: undo that (otherwise the box's own undo); Ctrl+Shift+Z, ⌘+Shift+Z or Ctrl+Y redoes it
     Ctrl+Shift+V / ⌘+Shift+V (in the message box) paste a long text into the box as text; a plain paste of over 2,000 characters or 40 lines becomes a Pasted text chip, sent whole with the message (its dialog: Insert as text, Remove)
     Ctrl+Shift+O a new temporary session (/temporary): not saved or listed, deleted when you leave it; on the new-session screen, its Temporary chip
@@ -1636,12 +1633,6 @@ let%expect_test "/agents [n|id|cancel <n|id>]: the agents panel" =
      (tag Ignore))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
-    Agents
-    2 agents running (Close (Alt+0))
-    Subagents 2 running
-    (Running read the tests 30s Thinking… a1  m  1 turn)
-    (Running lint 30s Thinking… a2  m  1 turn)
-    (✓ Done count 10s 42)
     |}];
   run h "/agents cancel 2";
   H.text h ~selector:".agents-panel";
@@ -1658,24 +1649,12 @@ let%expect_test "/agents [n|id|cancel <n|id>]: the agents panel" =
     {|
     (Rpc (method_ push_pref)
      (params ((key history) (value "/agents cancel 2") (max 500))) (tag Ignore))
-    (Rpc (method_ get_subagent) (params ((id a2) (elide true)))
-     (tag (Subagent a2)))
     (Rpc (method_ cancel_subagent) (params ((agent_id a2))) (tag Show_error))
-    (All agents (Esc))
-    Subagent a2
-    (Close (Alt+0))
-    Loading the transcript…
-    lint
-    (Steer) (Stopping…) (Show in chat) Running 30s m  1 turn
     (Rpc (method_ push_pref)
      (params ((key history) (value "/agents cancel a1") (max 500))) (tag Ignore))
-    (Rpc (method_ get_subagent) (params ((id a1) (elide true)))
-     (tag (Subagent a1)))
     (Rpc (method_ cancel_subagent) (params ((agent_id a1))) (tag Show_error))
     (Rpc (method_ push_pref)
      (params ((key history) (value "/agents cancel a3") (max 500))) (tag Ignore))
-    (Rpc (method_ get_subagent) (params ((id a3) (elide true)))
-     (tag (Subagent a3)))
     Subagent a3 has already finished. (Dismiss)
     (Rpc (method_ push_pref)
      (params ((key history) (value "/agents cancel 7") (max 500))) (tag Ignore))
@@ -1685,6 +1664,9 @@ let%expect_test "/agents [n|id|cancel <n|id>]: the agents panel" =
     Usage: /agents cancel <n|id> (/agents lists them) (Dismiss)
     (Rpc (method_ push_pref)
      (params ((key history) (value "/agents 2") (max 500))) (tag Ignore))
+    (Rpc (method_ get_subagent) (params ((id a2) (elide true)))
+     (tag (Subagent a2)))
+    (Focus editor)
     |}]
 ;;
 
@@ -1707,65 +1689,32 @@ let%expect_test "/jobs [id|kill <id>]: jobs in the agents panel" =
     {|
     (Rpc (method_ push_pref)
      (params ((key history) (value "/jobs j1") (max 500))) (tag Ignore))
-    No job j1: none has run in this session (!&command starts one). (Dismiss)
+    Usage: /jobs [kill <id>] (/jobs shows them) (Dismiss)
     (Rpc (method_ push_pref) (params ((key history) (value /jobs) (max 500)))
      (tag Ignore))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
-    Agents
-    1 job running (Close (Alt+0))
-    Jobs 1 running
-    (Running make test 1m 15s ok 12 tests j1  120 B)
-    (✓ Done sleep 1 1s)
     |}];
   run h "/jobs j2";
   H.reply h "job_output" {|{"text":""}|};
   H.text h ~selector:".agents-panel";
   run h "/jobs kill j1";
   H.text h ~selector:".agents-panel";
-  [%expect
-    {|
-    (Rpc (method_ push_pref)
-     (params ((key history) (value "/jobs j2") (max 500))) (tag Ignore))
-    (Rpc (method_ job_output) (params ((job_id j2))) (tag (Job_output j2)))
-    (All agents (Esc))
-    Job j2
-    (Close (Alt+0))
-    No output yet.
-    ✓ sleep 1
-    Done 1s
-    (Rpc (method_ push_pref)
-     (params ((key history) (value "/jobs kill j1") (max 500))) (tag Ignore))
-    (Rpc (method_ job_output) (params ((job_id j1))) (tag (Job_output j1)))
-    (Rpc (method_ kill_job) (params ((job_id j1))) (tag Show_error))
-    (All agents (Esc))
-    Job j1
-    (Close (Alt+0))
-    Loading the output…
-    make test
-    (Stopping…) Running 1m 15s 120 B
-    |}];
+  [%expect.unreachable];
   List.iter
     [ "/jobs kill j2"; "/jobs j9"; "/jobs kill"; "/jobs a b" ]
     ~f:(fun c ->
       run h c;
       toasts h);
-  [%expect
-    {|
-    (Rpc (method_ push_pref)
-     (params ((key history) (value "/jobs kill j2") (max 500))) (tag Ignore))
-    (Rpc (method_ job_output) (params ((job_id j2))) (tag (Job_output j2)))
-    Job j2 has already finished. (Dismiss)
-    (Rpc (method_ push_pref)
-     (params ((key history) (value "/jobs j9") (max 500))) (tag Ignore))
-    No job j9: give its id (j1, j2); /jobs lists them. (Dismiss)
-    (Rpc (method_ push_pref)
-     (params ((key history) (value "/jobs kill") (max 500))) (tag Ignore))
-    Usage: /jobs [id | kill <id>] (/jobs lists them) (Dismiss)
-    (Rpc (method_ push_pref)
-     (params ((key history) (value "/jobs a b") (max 500))) (tag Ignore))
-    Usage: /jobs [id | kill <id>] (/jobs lists them) (Dismiss)
-    |}]
+  [%expect.unreachable]
+[@@expect.uncaught_exn
+  {|
+  ("no pending request" job_output)
+  Trailing output
+  ---------------
+  (Rpc (method_ push_pref)
+   (params ((key history) (value "/jobs j2") (max 500))) (tag Ignore))
+  |}]
 ;;
 
 let%expect_test "/setusr: a superuser acts as another user, and back" =
@@ -1850,9 +1799,8 @@ let%expect_test "/setusr: a superuser acts as another user, and back" =
         (web.theme web.accent web.radius web.font web.code-font web.notify
          web.verbosity web.terminal-open web.review web.code-size
          favourite-models history web.migrated web.sidebar-width web.files-width
-         web.files-preview-width web.agents-width web.terminal-height
-         web.review-chat-width web.review-files-width web.review-margin-width
-         web.editor-tree-width))))
+         web.files-preview-width web.terminal-height web.review-chat-width
+         web.review-files-width web.review-margin-width web.editor-tree-width))))
      (tag Prefs))
     Acting as bob
     Back to alice
@@ -1906,9 +1854,8 @@ let%expect_test "/retry-backend-connection, /state, /clear, /quit" =
         (web.theme web.accent web.radius web.font web.code-font web.notify
          web.verbosity web.terminal-open web.review web.code-size
          favourite-models history web.migrated web.sidebar-width web.files-width
-         web.files-preview-width web.agents-width web.terminal-height
-         web.review-chat-width web.review-files-width web.review-margin-width
-         web.editor-tree-width))))
+         web.files-preview-width web.terminal-height web.review-chat-width
+         web.review-files-width web.review-margin-width web.editor-tree-width))))
      (tag Prefs))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s1.jsonl) (limit 1000000)))

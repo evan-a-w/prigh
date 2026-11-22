@@ -321,23 +321,29 @@ let%expect_test "steering a subagent on its last allowed turn" =
     |}]
 ;;
 
-let%expect_test "steering a finished subagent is refused; nothing runs again" =
+let%expect_test
+    "the user writing to a finished subagent carries it on, as a chat: the \
+     main agent is not told again"
+  =
   with_agent
     ~on_request:print_requests
     ~main:[ spawn "work"; Reply.text "spawned"; Reply.text "got it" ]
-    [ "work", [ Reply.text "done" ] ]
+    [ "work", [ Reply.text "done"; Reply.text "carried on"; Reply.text "again" ]
+    ]
   @@ fun _t agent ->
   Or_error.ok_exn (Agent.prompt agent "go");
   Agent.wait_idle agent;
   log_subagent agent;
   print_endline "--- after its report was delivered";
   send agent "and another thing";
-  send agent ~kind:Follow_up "and another thing";
+  Agent.wait_idle agent;
+  print_endline "--- a follow-up once it is done again";
+  send agent ~kind:Follow_up "one more";
+  Agent.wait_idle agent;
   print_s
     [%sexp
       (Agent.steer_subagent agent ~agent_id:"a7" ~kind:Steer "hello"
        : unit Or_error.t)];
-  Agent.wait_idle agent;
   print_s [%sexp (Agent.is_running agent : bool)];
   transcript agent "a1";
   [%expect
@@ -361,16 +367,72 @@ let%expect_test "steering a finished subagent is refused; nothing runs again" =
     agent_end
     state: running=false subagents=[]
     --- after its report was delivered
-    (Error
-     "a1 has finished and its report was delivered to the main agent: tell the main agent instead, or have it start a new subagent")
-    (Error
-     "a1 has finished and its report was delivered to the main agent: tell the main agent instead, or have it start a new subagent")
+    subagent_start a1: work
+      [a1] user: [The user sends you this while you work: take it into account and carry on.] |  | and another thing
+    request work: u(work) a u([The user sends you this)
+    (Ok ())
+      [a1] assistant: carried on
+    subagent_end a1: ok carried on | [subagent: 2 turns, 20 in / 10 out tokens, $0.0000]
+    --- a follow-up once it is done again
+    subagent_start a1: work
+      [a1] user: [The user sends you this while you work: take it into account and carry on.] |  | one more
+    request work: u(work) a u([The user sends you this) a u([The user sends you this)
+    (Ok ())
+      [a1] assistant: again
+    subagent_end a1: ok again | [subagent: 3 turns, 30 in / 15 out tokens, $0.0000]
     (Error "unknown subagent \"a7\"; known: a1")
     false
     --- a1's transcript
     user: work
     assistant: done
-    (complete, 2 messages)
+    user: [The user sends you this while you work: take it into account and carry on.] |  | and another thing
+    assistant: carried on
+    user: [The user sends you this while you work: take it into account and carry on.] |  | one more
+    assistant: again
+    (complete, 6 messages)
+    |}]
+;;
+
+let%expect_test
+    "subagent_continue still takes only a subagent out of turns, not one that \
+     finished"
+  =
+  with_agent
+    ~main:
+      [ spawn "work"
+      ; Reply.text "spawned"
+      ; Reply.tool_call
+          ~id:"k1"
+          ~name:"subagent_continue"
+          ~arguments:{|{"id":"a1","message":"more"}|}
+          ()
+      ; Reply.text "ok"
+      ]
+    [ "work", [ Reply.text "done" ] ]
+  @@ fun _t agent ->
+  Or_error.ok_exn (Agent.prompt agent "go");
+  Agent.wait_idle agent;
+  [%expect
+    {|
+    state: running=true subagents=[]
+    agent_start
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
+    assistant:  subagent{"task":"work"}
+    subagent_start a1: work
+    state: running=true subagents=[a1 running]
+    tool_result subagent: started agent a1 (work); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
+    subagent_end a1: ok done | [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
+    state: running=true subagents=[a1 done]
+    assistant: spawned
+    agent_end
+    state: running=true subagents=[]
+    agent_start
+    user: [subagent a1 finished] work | done | [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
+    assistant:  subagent_continue{"id":"a1","message":"more"}
+    tool_result subagent_continue: invalid arguments: a1 finished and cannot be continued: only a subagent that ran out of turns can (those that can: none); start a new subagent for more work
+    assistant: ok
+    agent_end
+    state: running=false subagents=[]
     |}]
 ;;
 

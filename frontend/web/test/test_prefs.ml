@@ -85,7 +85,7 @@ let%expect_test "the cache first, then the backend's, which win" =
       ((key web.migrated) (value (true))) ((key web.sidebar-width) (value ()))
       ((key web.files-width) (value ()))
       ((key web.files-preview-width) (value ()))
-      ((key web.agents-width) (value ())) ((key web.terminal-height) (value ()))
+      ((key web.terminal-height) (value ()))
       ((key web.review-chat-width) (value ()))
       ((key web.review-files-width) (value ()))
       ((key web.review-margin-width) (value ()))
@@ -132,7 +132,7 @@ let%expect_test "a page from before uploads the browser's once" =
       ((key web.migrated) (value (true))) ((key web.sidebar-width) (value ()))
       ((key web.files-width) (value ()))
       ((key web.files-preview-width) (value ()))
-      ((key web.agents-width) (value ())) ((key web.terminal-height) (value ()))
+      ((key web.terminal-height) (value ()))
       ((key web.review-chat-width) (value ()))
       ((key web.review-files-width) (value ()))
       ((key web.review-margin-width) (value ()))
@@ -171,7 +171,7 @@ let%expect_test "a page from before uploads the browser's once" =
       ((key web.migrated) (value (true))) ((key web.sidebar-width) (value ()))
       ((key web.files-width) (value ()))
       ((key web.files-preview-width) (value ()))
-      ((key web.agents-width) (value ())) ((key web.terminal-height) (value ()))
+      ((key web.terminal-height) (value ()))
       ((key web.review-chat-width) (value ()))
       ((key web.review-files-width) (value ()))
       ((key web.review-margin-width) (value ()))
@@ -326,9 +326,8 @@ let%expect_test
         (web.theme web.accent web.radius web.font web.code-font web.notify
          web.verbosity web.terminal-open web.review web.code-size
          favourite-models history web.migrated web.sidebar-width web.files-width
-         web.files-preview-width web.agents-width web.terminal-height
-         web.review-chat-width web.review-files-width web.review-margin-width
-         web.editor-tree-width))))
+         web.files-preview-width web.terminal-height web.review-chat-width
+         web.review-files-width web.review-margin-width web.editor-tree-width))))
      (tag Prefs))
     ("Accent: green" "Back to alice")
     |}];
@@ -746,7 +745,7 @@ let%expect_test "preferences of earlier versions are ignored" =
       ((key web.migrated) (value (true))) ((key web.sidebar-width) (value ()))
       ((key web.files-width) (value ()))
       ((key web.files-preview-width) (value ()))
-      ((key web.agents-width) (value ())) ((key web.terminal-height) (value ()))
+      ((key web.terminal-height) (value ()))
       ((key web.review-chat-width) (value ()))
       ((key web.review-files-width) (value ()))
       ((key web.review-margin-width) (value ()))

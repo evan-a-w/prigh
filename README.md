@@ -270,8 +270,8 @@ Starting it follows the same gate as an `on_host` call (asked about, in
 every mode, until you named the host or let a call there run; letting the
 start run permits the host), and the subagent's own calls then follow the
 approval mode, with your saved allow rules still only for the session's
-own host. `subagent_continue` keeps it on its host; the agents panel,
-`/agents`, the subagent's view and `subagent_status` say `on HOST`.
+own host. `subagent_continue` keeps it on its host; `/agents`, the
+subagent's view and `subagent_status` say `on HOST`.
 Several frontends can attach
 to one session (`/sessions` marks live ones) and all see the same stream; a
 session keeps running when its frontends disconnect. `prigh serve` itself
@@ -626,44 +626,35 @@ changes and to drop removed ones) when the session, its directory or its
 tool host changes, when a session's worktrees change, when a turn ends
 and after creating or removing one.
 
-Subagents and background jobs have their own panel, a resizable column
-right of the chat (drag its left edge; a full-screen sheet on a phone):
-the session's subagents as a tree (nested ones under the background agent
-that started them), running first: each row is its task, the lamp while it
-runs (with its live elapsed time, current tool, model and turns) or how it
-ended (done, failed with the error, or cancelled, interrupted by a restart
-or killed, shown quietly), and the background jobs the same way with their
-last line. Selecting one shows a subagent's live transcript at the panel's
-width or a job's output, with what it is pinned under it however far you
-scroll: its task (and who started it), how it stands or ended, its model,
-turns and time, Cancel while it runs (Kill for a job) and "Show in chat",
-which scrolls to its card. It opens from the status ("2 agents running"), the
-robot button at the chat's top right, a subagent's card in the chat, `/agents [n|id]` and `/jobs
-[id]`, and Alt+1…9 (the Nth listed; Alt+] and Alt+[ step through them, Alt+0 closes
-it, Esc goes back from outside the editor). Unlike the TUI, Shift+Tab is
-left to the browser (it moves the focus back), and on macOS Option+digit
-types its character instead. What finished before your latest prompt
-folds under "Earlier"; switching sessions empties the panel. `/agents cancel
-<n|id>` and `/jobs kill <id>` open the item there and stop it.
+A subagent is a chat. Clicking its line in the transcript or its row in
+the session card, Alt+1…9 (subagent N of the chat on show) or `/agents
+<n|id>` opens its chat in the session's place: its transcript, live, and
+the normal composer, which writes to it. While it runs, Enter steers it (it
+reads the message at its next step) and Alt+Enter queues a follow-up (when
+it ends its turn, before it reports). Once it has finished, a message
+carries it on: it runs again with the message, in the background, and its
+new report is not delivered to the main agent (that one already had its
+report). A subagent's own subagent (nested, `a1/n1`) takes no messages: the
+composer says to write to its parent. The composer's stop button stops the
+subagent on show. Unlike the TUI, Shift+Tab is left to the browser (it
+moves the focus back), and on macOS Option+digit types its character
+instead.
 
-A running background subagent can be steered like the main agent. Showing
-it in the panel leaves the composer on the main agent; its Steer button (in
-the panel's footer, next to Cancel) makes it who the composer writes to: a
-"Steering a1 · task" chip over the editor says so, Enter sends a steer (it
-reaches the subagent after its current tool calls) and Alt+Enter a
-follow-up (when it ends its turn, before it reports). That lasts while you
-browse the panel or close it, until Esc in the editor, the chip's × or the
-button again ("Steering") write to the main agent again. Unlike the TUI,
-where focusing a subagent is itself the mode that steers it, viewing one in
-prigh-web only reads it.
-What waits for a subagent is listed above the composer with the main
-agent's ("To a1, next step"), with Edit and remove, and Alt+↑ takes back the
-last message for whoever the composer writes to. Delivered messages show in
-its transcript as "You (steer)" / "You (follow-up)". A subagent that has
-finished, or one nested in another, takes no messages: refusals say what to
-do and keep your text in the editor, and when the subagent being steered
-finishes the composer goes back to the main agent. `/agents steer <n|id>
-TEXT` and `/agents follow-up <n|id> TEXT` send one without switching.
+In a subagent's chat the session card shows its lineage: Parents (the
+session's chat, then its ancestors, nearest last, each a link) and
+Subagents (that chat's own); on the session's own chat it shows its
+subagents and its worktrees. The top bar's breadcrumb is project / session
+/ ancestors… / the subagent, each a link. Esc (or Back) goes to the
+parent's chat; from a top-level subagent, to the session's. `/agents` and
+`/jobs` with no argument show the session card (the sheet on a phone).
+Background jobs have no view in prigh-web: their result reaches the agent,
+and `/jobs kill <id>` stops one; `/agents cancel <n|id>` stops a subagent.
+What waits for a subagent is listed above the composer in its
+chat, with Edit and remove, and Alt+↑ takes back the last message for
+it. Delivered messages show in its transcript as "You (steer)" / "You
+(follow-up)". Refusals say what to do and keep your text in the editor.
+`/agents steer <n|id> TEXT` and `/agents follow-up <n|id> TEXT` send one
+without switching.
 
 `-web-root DIR` (`$PRIGH_WEB_ROOT`) points at the site;
 without it the backend looks next to its dune build and in
@@ -794,8 +785,8 @@ worked. Errors are the backend's, saying what to do (`/login github`, `git
 remote add`…).
 
 Every panel resizes from a handle on its inner edge: the sessions
-sidebar's right edge; the left edges of the file browser's list, of its
-preview and of the agents panel; the terminal's top edge; on the review
+sidebar's right edge; the left edges of the file browser's list and of
+its preview; the terminal's top edge; on the review
 page, the edge between it and the chat beside it and the right edge of
 its list of changed files. The handle shows as a faint line under the pointer and turns
 sodium while it is dragged or focused; double-click it (or press Enter on
@@ -804,10 +795,11 @@ the arrow keys move it (Shift: four times as far), Home and End make the
 panel as small or as large as it goes. The chat always keeps 400px (while
 reviewing, the review page keeps 480px beside the chat, and its code
 320px beside its file list, and the sessions sidebar steps aside, so the
-file browser and the agents panel share what is left with them; the
+file browser shares what is left with them; the
 terminal then spans the review and the chat): when the window narrows,
 the side panels beside it shrink in proportion (down to their minimums) and grow back to
-the sizes you chose when it widens again. The sizes are kept with your preferences on the backend (below), so
+the sizes you chose when it widens again; below 1100px the file browser
+floats instead. The sizes are kept with your preferences on the backend (below), so
 every browser you sign in on has them. On a phone the panels are sheets,
 without handles.
 
@@ -852,8 +844,8 @@ puts it back in the composer to edit and resend, its pasted texts as chips
 saves); `/cd`, `/mkdir`, `/host`'s directory, `/export` and `/import` ask for a path
 with completions from the backend and keep the dialog open, with the error,
 when the backend refuses it (a directory that doesn't exist yet opens a
-"Create folder?" dialog instead); `/agents` and `/jobs` open the agents panel
-(above); `/btw` answers in a panel above the composer (Esc closes it);
+"Create folder?" dialog instead); `/agents` and `/jobs` show the session
+card (above); `/btw` answers in a panel above the composer (Esc closes it);
 `/verbosity` (Ctrl+O cycles) folds each run of steps into one line (quiet,
 prigh-web's default) or unfolds everything (verbose); `/filter` (also in
 Ctrl+K and a phone's ⋯ sheet) opens a menu under the top bar's toggles that
@@ -925,23 +917,20 @@ Enter switches. The commands themselves (`/model`, `/thinking`, `/mode`,
 reasoning level and the mode. In a narrow composer the host is its icon
 alone and the model's name is cut short with an ellipsis last.
 
-There is no bar over the chat. The session's title is in the sidebar's tree
-(its row has the cwd as it is now, relative to its project or worktree, and
-a rename button) and in the browser tab's title. A few round, translucent
-buttons float over the chat's top corners: in the top right the
-files, terminal and agents toggles (lit while their panel is open), with,
-before them, what applies, only when it does (the goal, reminders, a
-scheduled resume, transfers, the plan
-chip `plan 2/5: step` that runs `/todos`); with the sidebar closed, its
-button in the top left and the settings gear after the toggles. On a phone
-the top right is a single ⋯ that opens all of these in a small menu. The
-chat starts under them and fades out beneath them as it scrolls.
+A bar over the chat holds the session's breadcrumb: its project, then its
+title (for a subagent's chat, the session and each parent before it, each a
+link). With the sidebar closed, the sidebar's button comes first. On the
+right, what applies, only when it does (the goal, reminders, a scheduled
+resume, transfers, the plan chip `plan 2/5: step` that runs `/todos`), then
+the files, terminal, review and session card toggles (lit while theirs is
+open). On a phone the bar is the sidebar's ☰, the session's name and a
+single ⋯ that opens all of these in a sheet from the bottom.
 
 The transcript's verbosity has no chip: Ctrl+O cycles it, and
 `/verbosity`, the control centre (Ctrl+K) and a phone's ⋯ sheet set it.
 Beside the paperclip, the context ring: how full the context is,
 in the accent colour, amber within 15 points of where it compacts and
-brick from there; a short arc turns round it while the agent works.
+brick from there. It is not a working indicator.
 Pointed at, focused or tapped, it opens its card: the context against the
 window and where it compacts (in tokens and as a percentage of the
 window: `compact_at_tokens`, 200k by default, or 80% of the window if
@@ -1144,8 +1133,8 @@ the width differently). Reviewing is a focused mode: the sessions sidebar
 steps aside (Ctrl+B shows it as a drawer over the page, Esc or a click
 beside it hides it again) and the session's status moves to the bar over
 the chat. The terminal (Ctrl+`) spans the bottom under both the review
-and the chat, and the file browser and the agents panel open beside them
-as usual. Closing the review brings the sidebar back as it was.
+and the chat, and the file browser opens beside them as usual. Closing
+the review brings the sidebar back as it was.
 
 Down the review page's left are the changed files,
 each with its approval; the strip in its head shows them all at a glance
@@ -2477,7 +2466,7 @@ Stopping the backend (killed, restarted, or the TUI that spawned it quitting)
 kills running jobs and stops running subagents; nothing is resumed. When the
 session is next opened, the agent is told about each background subagent
 that never finished (`[subagent a1 interrupted]`, with its last message), as
-if it had reported, and the agents panel shows it failed. A tool call that
+if it had reported, and it shows as failed. A tool call that
 was running then gets an `[interrupted: ...]` result when the session next
 runs, telling the model to check what it did, so the conversation stays
 valid for every provider (old sessions broken this way are repaired the

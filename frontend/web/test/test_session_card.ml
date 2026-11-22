@@ -184,40 +184,34 @@ let%expect_test "a subagent finishes: how long ago, then failed" =
     |}]
 ;;
 
-let%expect_test
-    "a subagent's transcript in the chat's place, read-only; Esc goes back"
-  =
+let%expect_test "a subagent's chat in the session's place; Esc goes back" =
   let h = H.create () in
   two_agents h;
   H.click h ~selector:".session-card-agent";
   [%expect
     {|
     (Open_subagent_chat a1)
-    (Focus chat)
+    (Focus editor)
     |}];
   H.text h ~selector:"#chat";
   H.elements h ~selector:".main > *";
   [%expect
     {|
-    (New session) /
-    Fix the touch targets
-    working…
     bash dune build
     <div class="chrome-anchor loon">
     <div class="h-0 loon relative session-card-anchor z-[5]">
     <Vdom.Node.none-widget class="">
     <div class="chat-frame">
     <div class="toast-anchor">
-    <div class="flex gap-2 items-center justify-between loon max-w-[calc(var(--column)+2*var(--edge))] mx-auto pb-[max(12px,env(safe-area-inset-bottom))] pt-2 px-(--edge) subagent-chat-footer text-muted-foreground text-xs w-full">
+    <Vdom.Node.none-widget class="">
+    <footer class="composer">
     |}];
-  H.text h ~selector:".subagent-chat-footer";
-  [%expect {| A subagent's transcript: read-only. (Back (Esc)) |}];
   H.key h "Escape" ~target:Page;
   H.elements h ~selector:".subagent-chat";
   H.elements h ~selector:".main > footer";
   [%expect
     {|
-    Close_subagent_chat
+    Subagent_back
     (Focus editor)
     <footer class="composer">
     |}]
@@ -246,10 +240,7 @@ let%expect_test "a transcript not loaded is fetched, and can be asked for again"
     {|
     (Rpc (method_ get_subagent) (params ((id a1) (elide true)))
      (tag (Subagent a1)))
-    (Focus chat)
-    (New session) /
-    Count the modules
-    1h
+    (Focus editor)
     Loading the transcript…
     Report
     42 modules
@@ -257,14 +248,11 @@ let%expect_test "a transcript not loaded is fetched, and can be asked for again"
     (Open_subagent_chat a1)
     (Rpc (method_ get_subagent) (params ((id a1) (elide true)))
      (tag (Subagent a1)))
-    (Focus chat)
-    (New session) /
-    Count the modules
-    1h
+    (Focus editor)
     Count the modules
     There are 42 modules.
     |}];
-  H.click h ~selector:".subagent-chat-back";
+  H.click h ~selector:".session-crumbs button.chrome-title-text";
   print_s [%sexp ((H.model h).subagent_chat : string option)];
   [%expect
     {|

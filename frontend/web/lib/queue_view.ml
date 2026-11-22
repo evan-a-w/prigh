@@ -12,14 +12,10 @@ let tag (recipient : Recipient.t) (kind : Message.Kind.t) =
     | Main, Steer ->
       "Steer", "Reaches the agent after its current tool calls, in this turn"
     | Main, Follow_up -> "Queued", "Sent as the next prompt once the run ends"
-    | Agent id, Steer ->
-      ( sprintf "To %s" id
-      , sprintf "Reaches subagent %s after its current tool calls" id )
-    | Agent id, Follow_up ->
-      ( sprintf "To %s, after" id
-      , sprintf
-          "Reaches subagent %s when it ends its turn, before it reports"
-          id )
+    | Agent _, Steer ->
+      "Steer", "Reaches the subagent after its current tool calls"
+    | Agent _, Follow_up ->
+      "Queued", "Reaches the subagent when it ends its turn, before it reports"
   in
   Node.span
     ~attrs:
@@ -86,12 +82,18 @@ let item ~inject (recipient : Recipient.t) (q : Message.t) =
 ;;
 
 let view (m : App.Model.t) ~inject =
+  (* The queue of the chat on show: the main agent's, or the subagent's. *)
   let items =
-    List.map (Queued.items m.queue) ~f:(fun q -> Recipient.Main, q)
-    @ List.concat_map m.agent_queues ~f:(fun (a : Agent_queue.t) ->
-      List.map
-        (Message.of_queues ~steer:a.steer ~follow_up:a.follow_up)
-        ~f:(fun q -> Recipient.Agent a.agent_id, q))
+    match App.Model.recipient m with
+    | Main -> List.map (Queued.items m.queue) ~f:(fun q -> Recipient.Main, q)
+    | Agent id ->
+      List.concat_map m.agent_queues ~f:(fun (a : Agent_queue.t) ->
+        if String.equal a.agent_id id
+        then
+          List.map
+            (Message.of_queues ~steer:a.steer ~follow_up:a.follow_up)
+            ~f:(fun q -> Recipient.Agent a.agent_id, q)
+        else [])
   in
   match items with
   | [] -> Node.none
