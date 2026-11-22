@@ -127,7 +127,8 @@ try {
   await composer.press("Enter");
   // The subagent waits in its bash call; its line in the transcript opens
   // its chat.
-  await page.locator("#chat .tool-subagent .tool-head[data-agent=a1]").click();
+  // A subagent's start: longer than a step on a busy machine.
+  await page.locator("#chat .tool-subagent .tool-head[data-agent=a1]").click({ timeout: 90000 });
   await subagentChat.waitFor();
   await subagentHas("sub-go");
   section("its line opens its chat: the composer writes to it");

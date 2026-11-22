@@ -77,6 +77,8 @@
 #   PRIGH_E2E_SHELL      the terminal panel's shell, an interactive bash
 #                        (default: bash on the PATH)
 #   ENGINES              browsers to run (default: chromium firefox webkit)
+#   SCRIPTS              which scripts to run (default: all); their output is
+#                        printed, not diffed against ENGINE.expected
 #   SHOTS                a directory to save screenshots of each step in
 #   JOBS                 how many scripts run at once (at most)
 #   MEM_PER_JOB          MiB a script (backend, browser, node) may need (default 1536)
@@ -108,6 +110,7 @@ test -f "$SITE/main.bc.js" || { echo "no site at $SITE: build it (cd frontend &&
 if [ -n "${SHOTS:-}" ]; then mkdir -p "$SHOTS"; fi
 
 scripts="prigh_web temporary accounts reconnect paging resilience:slow resilience:drops stability themes worktrees worktrees_switch session_card review review_git remote cli_signin desktop desktop_signin steer subagent_paged trim filter search session_links viewer math clipboard field_menu desktop_links card status mobile review_phone terminal_keys long_press pwa compaction sessions_settings sidebar_select new_sessions memory usage user_info custom_instructions mcp_settings mcp_oauth images:desktop images:phone images:small pasted:desktop pasted:phone pasted:small computer:desktop computer:phone computer:small smart:desktop smart:phone smart:small ui chat quiet:desktop quiet:phone quiet:small editor:desktop editor:phone editor:small"
+scripts="${SCRIPTS:-$scripts}"
 engines="${ENGINES:-chromium firefox webkit}"
 jobs="${JOBS:-$(nproc)}"
 # Measured peaks (PSS of the script, its backend and browser): 1.2 to 1.7 GiB,
@@ -180,7 +183,9 @@ for engine in $engines; do
 			sed -n "s|^e2e: |$engine $script: |p" "$tmp/$engine-$script.err" >&2
 		fi
 	done
-	if [ "${UPDATE:-}" = 1 ] && [ -n "$ok" ]; then
+	if [ -n "${SCRIPTS:-}" ]; then
+		cat "$tmp/$engine.actual"
+	elif [ "${UPDATE:-}" = 1 ] && [ -n "$ok" ]; then
 		cp "$tmp/$engine.actual" "$here/$engine.expected"
 		echo "updated $here/$engine.expected"
 	else

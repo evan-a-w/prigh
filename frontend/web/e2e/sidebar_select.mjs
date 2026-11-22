@@ -169,8 +169,13 @@ try {
   await page.locator(".context-menu.placed [data-item=delete_archived]").click();
   await page.locator(".modal").waitFor();
   section("delete all archived: asked");
-  console.log((await page.locator(".modal").innerText())
-    .replace(/\d+(\.\d+)? ([KMG]?B)\b/g, "<SIZE>").replace(/\n+/g, " | "));
+  // The sessions archived together are listed in the backend's order: sorted.
+  const asked = (await page.locator(".modal").innerText())
+    .replace(/\d+(\.\d+)? ([KMG]?B)\b/g, "<SIZE>").split(/\n+/);
+  const named = asked.flatMap((l, i) => ["Second", "Third"].includes(l) ? [[l, asked[i + 1]]] : []);
+  const rest = asked.filter((l, i) => !["Second", "Third"].includes(l) && !["Second", "Third"].includes(asked[i - 1]));
+  named.sort(([a], [b]) => a.localeCompare(b));
+  console.log([...rest.slice(0, 2), ...named.flat(), ...rest.slice(2)].join(" | "));
   await screenshot(page, "delete-archived");
   await page.keyboard.press("Escape");
   await page.locator(".modal").waitFor({ state: "detached" });
