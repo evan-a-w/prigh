@@ -175,7 +175,7 @@ let footer ~tip =
     ]
 ;;
 
-let top_bar ~tip ~sidebar ~has_right ~right_open ~set_right_open =
+let top_bar ?more ~tip ~sidebar ~has_right ~right_open ~set_right_open () =
   let current = Fake.Session.current in
   Node.header
     ~attrs:
@@ -219,12 +219,23 @@ let top_bar ~tip ~sidebar ~has_right ~right_open ~set_right_open =
                ~on_click:(set_right_open (not right_open))
                (Icons.view Panel_right)
            else Node.none)
-        ; icon_button tip ~id:"more" "More" ~class_:"md:hidden" (Icon.view Ellipsis)
+        ; (match more with
+           | None -> icon_button tip ~id:"more" "More" ~class_:"md:hidden" (Icon.view Ellipsis)
+           | Some wrap ->
+             wrap
+               (Button.view
+                  ~variant:Ghost
+                  ~size:Icon_sm
+                  ~attrs:[ Attr.create "aria-label" "Session" ]
+                  ~class_:
+                    "text-muted-foreground hover:text-foreground \
+                     aria-expanded:bg-accent aria-expanded:text-accent-foreground"
+                  [ Icon.view Ellipsis ]))
         ]
     ]
 ;;
 
-let component ?right ?overlay ~tip ~main (local_ graph) =
+let component ?right ?overlay ?more ~tip ~main (local_ graph) =
   let sidebar = Sidebar.component ~persist:false graph in
   let worktree_open, set_worktree_open = Bonsai.state true graph in
   let right_open, set_right_open = Bonsai.state true graph in
@@ -234,7 +245,13 @@ let component ?right ?overlay ~tip ~main (local_ graph) =
     | Some r -> r >>| Option.some
   in
   let overlay = Option.value overlay ~default:(Bonsai.return Node.none) in
+  let more =
+    match more with
+    | None -> Bonsai.return None
+    | Some m -> m >>| Option.some
+  in
   let%arr sidebar
+  and more
   and tip
   and main
   and right
@@ -269,11 +286,13 @@ let component ?right ?overlay ~tip ~main (local_ graph) =
         ; Sidebar.inset
             ~class_:"min-h-0 overflow-hidden"
             [ top_bar
+                ?more
                 ~tip
                 ~sidebar
                 ~has_right:(Option.is_some right)
                 ~right_open
                 ~set_right_open
+                ()
             ; div
                 "relative flex min-h-0 flex-1"
                 [ div "flex min-w-0 flex-1 flex-col" [ main ]
