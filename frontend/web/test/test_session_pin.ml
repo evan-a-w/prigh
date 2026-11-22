@@ -36,16 +36,18 @@ let%expect_test "pinned sessions first, under Pinned and Recent headings" =
   [%expect
     {|
     Pinned 1
-    (Long-running notes 2m ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (work 2m Long-running notes) (More (right-click, Shift+F10)) (Archive) (Delete)
     Recent 2
-    (fix the parser bug 2m ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (Release notes 2m ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (Archived 1)
-    <span role="img" aria-label="Pinned" title="Pinned to the top (P unpins)" class="session-pin">
+    (work 2m fix the parser bug) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (work 2m Release notes) (More (right-click, Shift+F10)) (Archive) (Delete)
+    <span role="img"
+          aria-label="Pinned"
+          title="Pinned to the top (P unpins)"
+          class="align-[-1px] inline-flex mr-1 session-pin text-primary">
       <icon class="pin"> </icon>
     </span>
-    <div class="sessions-divider sessions-group">
-    <div class="sessions-divider sessions-group">
+    <div class="flex font-medium gap-2 items-center min-h-7 pt-2 px-2.5 sessions-divider sessions-group text-muted-foreground text-xs">
+    <div class="flex font-medium gap-2 items-center min-h-7 pt-2 px-2.5 sessions-divider sessions-group text-muted-foreground text-xs">
     |}];
   (* Nothing pinned: no headings. *)
   H.act h (Set_pinned { path = "/sessions/s3.jsonl"; pinned = false });
@@ -54,10 +56,9 @@ let%expect_test "pinned sessions first, under Pinned and Recent headings" =
     {|
     (Rpc (method_ set_pinned) (params ((path /sessions/s3.jsonl) (pinned false)))
      (tag (Pinned_set (title "Long-running notes") (pinned false))))
-    (fix the parser bug 2m ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (Release notes 2m ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (Long-running notes 2m ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (Archived 1)
+    (work 2m fix the parser bug) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (work 2m Release notes) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (work 2m Long-running notes) (More (right-click, Shift+F10)) (Archive) (Delete)
     |}];
   (* Only pinned sessions: no Recent heading. *)
   let h =
@@ -70,7 +71,7 @@ let%expect_test "pinned sessions first, under Pinned and Recent headings" =
   [%expect
     {|
     Pinned 1
-    (Only one 2m ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (work 2m Only one) (More (right-click, Shift+F10)) (Archive) (Delete)
     |}]
 ;;
 
@@ -198,22 +199,27 @@ let%expect_test
   H.show h ~selector:"[data-session=s3] .session-title";
   [%expect
     {|
-    <div class="session-main">
-      <span dir="auto" class="session-title">
-        <span role="img" aria-label="Pinned" title="Pinned to the top (P unpins)" class="session-pin">
+    <div class="flex flex-1 flex-col gap-0.5 min-w-0 session-main">
+      <div class="flex gap-2 items-center min-w-0 session-meta text-muted-foreground text-xs">
+        <span class="min-w-0 session-project truncate"> work </span>
+        <div class="ml-auto"> </div>
+        <span class="session-age shrink-0 tabular-nums"> 2h </span>
+      </div>
+      <span dir="auto" class="session-title text-[13px] truncate">
+        <span role="img"
+              aria-label="Pinned"
+              title="Pinned to the top (P unpins)"
+              class="align-[-1px] inline-flex mr-1 session-pin text-primary">
           <icon class="pin"> </icon>
         </span>
         Weekly notes
       </span>
-      <div class="session-meta">
-        <span class="session-age"> 2h ago </span>
-        <span title="/work" class="session-cwd"> /work </span>
-        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-      </div>
     </div>
-    <span dir="auto" class="session-title">
-      <span role="img" aria-label="Pinned" title="Pinned to the top (P unpins)" class="session-pin">
+    <span dir="auto" class="session-title text-[13px] truncate">
+      <span role="img"
+            aria-label="Pinned"
+            title="Pinned to the top (P unpins)"
+            class="align-[-1px] inline-flex mr-1 session-pin text-primary">
         <icon class="pin"> </icon>
       </span>
       Deploy checklist
@@ -276,11 +282,11 @@ let%expect_test "pinning and unpinning: at once, and back if refused" =
     (Rpc (method_ set_archived)
      (params ((path /sessions/s3.jsonl) (archived true)))
      (tag (Archived_set (title "Long-running notes") (archived true))))
-    (fix the parser bug 2m ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (Release notes 2m ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (Archived 2)
-    (Long-running notes 2m ago /work) (More (right-click, Shift+F10)) (Unarchive) (Delete)
-    (Old lexer 2m ago /work) (More (right-click, Shift+F10)) (Unarchive) (Delete)
+    (work 2m fix the parser bug) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (work 2m Release notes) (More (right-click, Shift+F10)) (Archive) (Delete)
+    Archived 2
+    (work 2m Long-running notes) (More (right-click, Shift+F10)) (Unarchive) (Delete)
+    (work 2m Old lexer) (More (right-click, Shift+F10)) (Unarchive) (Delete)
     (Delete archived)
     |}]
 ;;

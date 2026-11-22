@@ -110,6 +110,9 @@ module Icon : sig
     | Deepseek
     | Spark (** a provider without a mark of its own *)
     | Monitor (** a tool host *)
+    | Square_pen (** a new session *)
+    | Panel_right (** the session card *)
+    | Panel_bottom (** the terminal *)
 
   (** An inline SVG; tests show [<icon name>]. *)
   val view : ?cls:string -> t -> Node.t

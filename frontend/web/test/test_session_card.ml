@@ -3,8 +3,8 @@ module H = Harness
 open Agent_events
 
 (* The session card in the chat's top-right corner: the session's subagents
-   (each opens its transcript in the chat's place) and its repository's
-   worktrees; on a phone a sheet from the bottom. *)
+   (each opens its transcript in the chat's place) and its worktrees (each
+   opens its menu); on a phone a sheet from the bottom. *)
 
 let events h = List.iter ~f:(H.event h)
 
@@ -54,10 +54,38 @@ let%expect_test "nothing to show, no card and no push" =
   [%expect {| <main class="fresh main"> |}]
 ;;
 
+(* Session s1, in /work, with two worktrees of its own: one it made, one a
+   subagent's. *)
+let with_worktrees () =
+  H.create
+    ~sessions:
+      (sprintf
+         "[%s]"
+         (H.session_json
+             ~cwd:"/work"
+             ~repo:("/work", "/work", Some "main")
+             ~worktrees:
+               [ ( "/home/ada/.prigh/worktrees/work/feat-ui"
+                 , Some "feat/ui"
+                 , "/work"
+                 , "created" )
+               ; ( "/home/ada/.prigh/worktrees/work/fix-chips"
+                 , Some "fix/chips"
+                 , "/work"
+                 , "agent:a1:Fix the touch targets" )
+               ]
+             "s1"))
+    ~state:
+      (H.state_json
+         ~fields:[ "session_id", `String "s1"; "cwd", `String "/work" ]
+         ())
+    ()
+;;
+
 let%expect_test
     "the card: subagents unfolded, worktrees folded; the chat keeps its margin"
   =
-  let h = H.create () in
+  let h = with_worktrees () in
   two_agents h;
   H.reply h "list_worktrees" worktrees;
   H.text h ~selector:".session-card";
@@ -65,10 +93,10 @@ let%expect_test
     {|
     (Subagents 2)
     (Fix the touch targets working…) (Review the phone layout thinking…)
-    (Worktrees 3)
+    (Worktrees 2)
     |}];
-  (* Unfolding the worktrees: each opens in this session, but the current
-     one. *)
+  (* Unfolding the worktrees, the session's own (the sidebar no longer
+     lists them): each opens its menu. *)
   H.click h ~selector:"[aria-controls=session-card-worktrees-content]";
   H.text h ~selector:".session-card";
   H.names h ~selector:".session-card-worktree";
@@ -77,23 +105,21 @@ let%expect_test
     (Session_card (Fold Worktrees))
     (Subagents 2)
     (Fix the touch targets working…) (Review the phone layout thinking…)
-    (Worktrees 3)
-    (main) (feat/ui 3 changed) (fix/chips)
-    button "main" -- /work
-    button "feat/ui 3 changed" -- /home/ada/.prigh/worktrees/work/feat-ui
-    button "fix/chips" -- /home/ada/.prigh/worktrees/work/fix-chips
+    (Worktrees 2)
+    (feat/ui 3 changed) (fix/chips)
+    button "feat/ui 3 changed" -- ~/.prigh/worktrees/work/feat-ui
+    button "fix/chips" -- ~/.prigh/worktrees/work/fix-chips
     |}];
   H.click h ~nth:1 ~selector:".session-card-worktree";
   [%expect
     {|
-    (Open_worktree (path /home/ada/.prigh/worktrees/work/feat-ui)
-     (new_session false))
-    (Focus editor)
-    (Rpc (method_ set_cwd)
-     (params ((path /home/ada/.prigh/worktrees/work/feat-ui) (worktree true)))
-     (tag
-      (Worktree_entered
-       "Working in the worktree feat/ui (/home/ada/.prigh/worktrees/work/feat-ui)")))
+    (Open_menu
+     ((target
+       (Worktree (session /sessions/s1.jsonl)
+        (path /home/ada/.prigh/worktrees/work/fix-chips)))
+      (anchor (Element worktree-s1--home-ada--prigh-worktrees-work-fix-chips))))
+    (Focus dialog)
+    (Place_menu (Element worktree-s1--home-ada--prigh-worktrees-work-fix-chips))
     |}];
   (* Folding the subagents away. *)
   H.click h ~selector:"[aria-controls=session-card-subagents-content]";
@@ -102,14 +128,14 @@ let%expect_test
     {|
     (Session_card (Fold Subagents))
     (Subagents 2)
-    (Worktrees 3)
-    (main) (feat/ui 3 changed) (fix/chips)
+    (Worktrees 2)
+    (feat/ui 3 changed) (fix/chips)
     |}];
   (* The main pane is a size container that pads the chat clear of the
      card by what its margin lacks. *)
   H.elements h ~selector:".main";
   [%expect
-    {| <main class="*:[--push:max(0px,calc(var(--log-column)/2+232px-50cqw))] @container @max-[820px]:*:[--push:0px] @max-[820px]:[&_.chat]:pr-(--edge) [&>.composer]:ml-[max(0px,calc((100%-var(--column))/2-var(--edge)-var(--push)))] [&>.composer]:mr-auto [&_.chat]:pr-[232px] main session-card-push"> |}];
+    {| <main class="*:[--push:max(0px,calc(var(--column)/2+232px-50cqw))] @container @max-[820px]:*:[--push:0px] @max-[820px]:[&_.chat]:pr-(--edge) [&>.composer]:ml-[max(0px,calc((100%-var(--column))/2-var(--edge)-var(--push)))] [&>.composer]:mr-auto [&_.chat]:pr-[232px] main session-card-push"> |}];
   (* The chrome's button hides it, and the padding goes with it. *)
   H.click h ~selector:".session-card-toggle";
   H.elements h ~selector:".session-card";
@@ -123,24 +149,15 @@ let%expect_test
   [%expect
     {|
     <button type="button"
+            data-slot="button"
+            data-variant="ghost"
+            data-size="icon-sm"
             title="Subagents and worktrees"
             aria-label="Subagents and worktrees"
             aria-pressed="false"
-            class="btn ghost icon session-card-toggle"
+            class="[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0 active:not-aria-[haspopup]:translate-y-px aria-expanded:bg-muted aria-expanded:text-foreground aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-clip-padding border border-transparent dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:hover:bg-muted/50 disabled:opacity-50 disabled:pointer-events-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 font-medium group/button hover:bg-muted hover:text-foreground in-data-[slot=button-group]:rounded-lg inline-flex items-center justify-center outline-none rounded-[min(var(--radius-md),12px)] rounded-lg select-none session-card-toggle shrink-0 size-7 text-muted-foreground text-sm transition-all whitespace-nowrap"
             @on_click>
-      <svg xmlns="http://www.w3.org/2000/svg"
-           width="24"
-           height="24"
-           viewBox="0 0 24 24"
-           fill="none"
-           stroke="currentColor"
-           stroke-width="2"
-           stroke-linecap="round"
-           stroke-linejoin="round"
-           class="-scale-x-100 lucide lucide-panel-left size-4">
-        <rect width="18" height="18" x="3" y="3" rx="2"> </rect>
-        <path d="M9 3v18"> </path>
-      </svg>
+      <icon class="panel_right"> </icon>
     </button>
     |}]
 ;;
@@ -186,12 +203,12 @@ let%expect_test
     Fix the touch targets
     working…
     bash dune build
-    <div class="chrome-anchor">
+    <div class="chrome-anchor loon">
     <div class="h-0 loon relative session-card-anchor z-[5]">
     <Vdom.Node.none-widget class="">
     <div class="chat-frame">
     <div class="toast-anchor">
-    <div class="flex gap-2 items-center justify-between loon max-w-[calc(var(--log-column)+2*var(--edge))] mx-auto pb-[max(12px,env(safe-area-inset-bottom))] pt-2 px-(--edge) subagent-chat-footer text-muted-foreground text-xs w-full">
+    <div class="flex gap-2 items-center justify-between loon max-w-[calc(var(--column)+2*var(--edge))] mx-auto pb-[max(12px,env(safe-area-inset-bottom))] pt-2 px-(--edge) subagent-chat-footer text-muted-foreground text-xs w-full">
     |}];
   H.text h ~selector:".subagent-chat-footer";
   [%expect {| A subagent's transcript: read-only. (Back (Esc)) |}];
@@ -293,6 +310,7 @@ let%expect_test
   [%expect
     {|
     <main class="main">
+    Toggle_status_tray
     Toggle_session_card
     This session
     (Subagents 2)

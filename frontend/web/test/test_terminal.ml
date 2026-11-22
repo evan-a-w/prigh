@@ -328,12 +328,15 @@ let%expect_test "/terminal, the chrome's button and the height" =
   [%expect
     {|
     <button type="button"
+            data-slot="button"
+            data-variant="ghost"
+            data-size="icon-sm"
             title="Terminal (Ctrl+`)"
             aria-label="Terminal"
             aria-expanded="true"
-            class="btn ghost icon open terminal-toggle"
+            class="[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0 active:not-aria-[haspopup]:translate-y-px aria-expanded:bg-muted aria-expanded:text-foreground aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-accent bg-clip-padding border border-transparent dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:hover:bg-muted/50 disabled:opacity-50 disabled:pointer-events-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 font-medium group/button hover:bg-muted hover:text-foreground in-data-[slot=button-group]:rounded-lg inline-flex items-center justify-center open outline-none rounded-[min(var(--radius-md),12px)] rounded-lg select-none shrink-0 size-7 terminal-toggle text-foreground text-sm transition-all whitespace-nowrap"
             @on_click>
-      <icon class="terminal"> </icon>
+      <icon class="panel_bottom"> </icon>
     </button>
     |}];
   (* Its top edge resizes it: no lower than 120px. *)

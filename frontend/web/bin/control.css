@@ -2,14 +2,6 @@
    sessions, the settings and the commands. A centred box under the top of
    the window; on a phone, the whole screen. */
 
-/* The sidebar's row: New session takes the room, Search its own width, a
-   sibling button at rest. */
-.sidebar-actions { display: flex; gap: 6px; min-width: 0; }
-.sidebar-actions > .new-session { flex: 1 1 auto; min-width: 0; width: auto; }
-.btn.control-open { flex: 0 0 auto; gap: 6px; padding: 5px 10px; color: var(--muted-text); font-weight: 400; }
-.btn.control-open .icon { width: 14px; height: 14px; }
-.btn.control-open:hover { color: var(--chalk); }
-
 .control-backdrop { padding-top: 12vh; }
 .control-centre {
   background: var(--slate);

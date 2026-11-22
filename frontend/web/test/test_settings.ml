@@ -87,7 +87,7 @@ let%expect_test "the gear, /settings and Ctrl+, open it; Esc closes it" =
   H.elements h ~selector:".composer[inert]";
   [%expect
     {|
-    <aside class="sidebar">
+    <aside class="bg-sidebar loon sidebar text-sidebar-foreground text-sm">
     <footer class="composer">
     |}]
 ;;

@@ -20,6 +20,3 @@ val main_attr : App.Model.t -> Attr.t
 
 (** The card, in the main pane, or a phone's sheet. *)
 val view : App.Model.t -> inject:(App.Action.t -> unit Effect.t) -> Node.t
-
-(** The chrome's button that shows and hides it (none with nothing to show). *)
-val toggle : App.Model.t -> inject:(App.Action.t -> unit Effect.t) -> Node.t

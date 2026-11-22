@@ -91,7 +91,7 @@ let view (m : Model.t) ~inject id =
       [ Node.div
           ~attrs:
             [ Attr.class_
-                "loon subagent-chat-head mb-4 flex max-w-(--log-column) \
+                "loon subagent-chat-head mb-4 flex max-w-(--column) \
                  items-center gap-2 border-b pb-3"
             ]
           [ Node.button
@@ -138,7 +138,7 @@ let footer ~inject =
     ~attrs:
       [ Attr.class_
           "loon subagent-chat-footer mx-auto flex w-full \
-           max-w-[calc(var(--log-column)+2*var(--edge))] items-center \
+           max-w-[calc(var(--column)+2*var(--edge))] items-center \
            justify-between gap-2 px-(--edge) pt-2 \
            pb-[max(12px,env(safe-area-inset-bottom))] text-xs \
            text-muted-foreground"

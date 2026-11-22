@@ -88,8 +88,20 @@ let list h = H.text h ~selector:".sessions"
 let menu h = H.text h ~selector:".context-menu"
 let dialog h = H.text h ~selector:".modal"
 
-let worktree ~owner path =
-  sprintf "[data-owner=%s][data-worktree='%s']" owner path
+(* A worktree's menu, as its row in the session card opens it. *)
+let worktree_menu h ~owner path =
+  H.act
+    h
+    (Open_menu
+       { target =
+           Worktree { session = sprintf "/sessions/%s.jsonl" owner; path }
+       ; anchor =
+           Element
+             (String.map
+                ("worktree-" ^ owner ^ "-" ^ path)
+                ~f:(fun c ->
+                  if Char.is_alphanum c || Char.equal c '-' then c else '-'))
+       })
 ;;
 
 (* "New hero", three days old, has its worktrees folded by default. *)
@@ -125,36 +137,32 @@ let%expect_test "a flat list of sessions, each with its worktrees under it" =
   list h;
   [%expect
     {|
-    (Main work 2m ago prigh main) (3) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (prigh 2m Main work) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (prigh working… Login form) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (site 2h Landing page) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (notes 2d Shopping list) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (site 3d New hero) (More (right-click, Shift+F10)) (Archive) (Delete)
+    |}];
+  H.elements h ~selector:".session";
+  Worktree_lines.print h;
+  [%expect
+    {|
+    <div class="bg-sidebar-accent group/session hover:bg-sidebar-accent relative rounded-md selected session text-sidebar-foreground">
+    <div class="group/session hover:bg-sidebar-accent relative rounded-md running session text-sidebar-foreground">
+    <div class="group/session hover:bg-sidebar-accent relative rounded-md session text-sidebar-foreground">
+    <div class="group/session hover:bg-sidebar-accent relative rounded-md session text-sidebar-foreground">
+    <div class="group/session hover:bg-sidebar-accent relative rounded-md session text-sidebar-foreground">
     (feat/login) (agent/fix-the-parser subagent) (pr-7 #7)
-    (Login form 20m ago prigh feat/login) (1) (More (right-click, Shift+F10)) (Archive) (Delete)
     (feat/login here)
-    (Landing page 2h ago site trunk) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (Shopping list 2d ago ~/notes) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (New hero 3d ago site redesign) (1) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (Archived 1)
     |}];
-  H.elements h ~selector:".session-item";
-  H.elements h ~selector:".worktree";
+  H.names h ~selector:".session";
   [%expect
     {|
-    <div class="has-worktrees selected session-item">
-    <div class="has-worktrees session-item">
-    <div class="session-item">
-    <div class="session-item">
-    <div class="has-worktrees session-item">
-    <button class="worktree">
-    <button class="agent worktree">
-    <button class="worktree">
-    <button class="here worktree">
-    |}];
-  H.names h ~selector:".worktree";
-  [%expect
-    {|
-    button "feat/login" -- ~/.prigh/worktrees/prigh/feat-login
-    button "agent/fix-the-parser subagent" -- ~/.prigh/worktrees/prigh/agent-fix-the-parser
-    button "pr-7 #7" -- ~/.prigh/worktrees/prigh/pr-7
-    button "feat/login here" -- ~/.prigh/worktrees/prigh/feat-login
+    div "prigh 2m Main work Archive Delete"
+    div "prigh working\226\128\166 Login form Archive Delete"
+    div "site 2h Landing page Archive Delete"
+    div "notes 2d Shopping list Archive Delete"
+    div "site 3d New hero Archive Delete"
     |}]
 ;;
 
@@ -171,7 +179,7 @@ let%expect_test
        ; worktree_json ~changes:2 ~ahead:1 login "feat/login"
        ; worktree_json agent_wt "agent/fix-the-parser"
        ]);
-  H.text h ~selector:".session-worktrees";
+  Worktree_lines.print h;
   [%expect
     {|
     (feat/login ● 2 ↑1) (agent/fix-the-parser subagent)
@@ -182,12 +190,11 @@ let%expect_test
     "list_worktrees"
     (listing site [ worktree_json ~main:true site "trunk" ]);
   (* redesign is not listed any more: removed outside prigh. *)
-  H.elements h ~selector:".worktree";
+  Worktree_lines.print h;
   [%expect
     {|
-    <button class="dirty worktree">
-    <button class="agent worktree">
-    <button class="dirty here worktree">
+    (feat/login ● 2 ↑1) (agent/fix-the-parser subagent)
+    (feat/login here ● 2 ↑1)
     |}]
 ;;
 
@@ -208,7 +215,6 @@ let%expect_test "worktrees show for sessions used in the last 12 hours" =
   (* Main work 2m, Login form 20m, Landing page 2h: shown; New hero, three
      days old: folded behind its ⑂ 1. *)
   folds h;
-  H.elements h ~selector:".session-fold";
   [%expect
     {|
     + Main work
@@ -216,9 +222,6 @@ let%expect_test "worktrees show for sessions used in the last 12 hours" =
     + Landing page
     - Shopping list
     - New hero
-    <button class="session-fold">
-    <button class="session-fold">
-    <button class="folded session-fold">
     |}];
   (* Hours later Landing page is old too; Main work (open here) and Login
      form (running) are still in use. *)
@@ -238,12 +241,11 @@ let%expect_test "worktrees show for sessions used in the last 12 hours" =
 let%expect_test "folding a session's worktrees: the user's choice wins" =
   let h = create () in
   (* A recent one folded, an old one unfolded: both kept. *)
-  H.click h ~selector:".session-fold" ~nth:0;
-  H.click h ~selector:".session-fold" ~nth:2;
+  H.act h (Toggle_folded "s1");
+  H.act h (Toggle_folded "s6");
   list h;
   [%expect
     {|
-    (Toggle_folded s1)
     (Cache_prefs
      (((key web.sidebar-folded) (value (((s1 "2026-10-05 10:00:00Z")))))
       ((key web.sidebar-unfolded) (value ()))))
@@ -253,7 +255,6 @@ let%expect_test "folding a session's worktrees: the user's choice wins" =
         ((web.sidebar-folded ((s1 "2026-10-05 10:00:00Z")))
          (web.sidebar-unfolded null)))))
      (tag Show_error))
-    (Toggle_folded s6)
     (Cache_prefs
      (((key web.sidebar-folded) (value (((s1 "2026-10-05 10:00:00Z")))))
       ((key web.sidebar-unfolded) (value (((s6 "2026-10-05 10:00:00Z")))))))
@@ -263,14 +264,11 @@ let%expect_test "folding a session's worktrees: the user's choice wins" =
         ((web.sidebar-folded ((s1 "2026-10-05 10:00:00Z")))
          (web.sidebar-unfolded ((s6 "2026-10-05 10:00:00Z")))))))
      (tag Show_error))
-    (Main work 2m ago prigh main) (3) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (Login form 20m ago prigh feat/login) (1) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (feat/login here)
-    (Landing page 2h ago site trunk) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (Shopping list 2d ago ~/notes) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (New hero 3d ago site redesign) (1) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (redesign here)
-    (Archived 1)
+    (prigh 2m Main work) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (prigh working… Login form) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (site 2h Landing page) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (notes 2d Shopping list) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (site 3d New hero) (More (right-click, Shift+F10)) (Archive) (Delete)
     |}];
   (* Whatever the setting says. *)
   H.quiet h (fun () ->
@@ -286,10 +284,9 @@ let%expect_test "folding a session's worktrees: the user's choice wins" =
     + New hero
     |}];
   (* Clicking again flips the choice; it stays the user's. *)
-  H.click h ~selector:".session-fold" ~nth:0;
+  H.act h (Toggle_folded "s1");
   [%expect
     {|
-    (Toggle_folded s1)
     (Cache_prefs
      (((key web.sidebar-folded) (value ()))
       ((key web.sidebar-unfolded)
@@ -307,15 +304,17 @@ let%expect_test "folding a session's worktrees: the user's choice wins" =
   H.event
     h
     {|{"event":"prefs_changed","prefs":{"web.sidebar-folded":{"s1":"2026-10-05 10:00:00Z"},"web.sidebar-unfolded":{"s6":"2026-10-05 10:00:00Z"}}}|};
-  H.elements h ~selector:".session-fold";
+  folds h;
   [%expect
     {|
     (Cache_prefs
      (((key web.sidebar-folded) (value (((s1 "2026-10-05 10:00:00Z")))))
       ((key web.sidebar-unfolded) (value (((s6 "2026-10-05 10:00:00Z")))))))
-    <button class="folded session-fold">
-    <button class="session-fold">
-    <button class="session-fold">
+    - Main work
+    + Login form
+    + Landing page
+    - Shopping list
+    + New hero
     |}]
 ;;
 
@@ -831,18 +830,13 @@ let%expect_test "a session's items on the current session" =
 let%expect_test "a worktree's menu and its items" =
   let h = create () in
   let on_login id =
-    H.right_click h ~selector:(worktree ~owner:"s1" login);
+    worktree_menu h ~owner:"s1" login;
     choose h id
   in
-  H.click h ~selector:(worktree ~owner:"s1" login);
+  worktree_menu h ~owner:"s1" login;
   menu h;
   [%expect
     {|
-    (Open_menu
-     ((target
-       (Worktree (session /sessions/s1.jsonl)
-        (path /home/u/.prigh/worktrees/prigh/feat-login)))
-      (anchor (Element worktree-s1--home-u--prigh-worktrees-prigh-feat-login))))
     (Focus dialog)
     (Place_menu (Element worktree-s1--home-u--prigh-worktrees-prigh-feat-login))
     feat/login in Main work
@@ -864,11 +858,6 @@ let%expect_test "a worktree's menu and its items" =
     {|
     Close_dialog
     (Focus editor)
-    (Open_menu
-     ((target
-       (Worktree (session /sessions/s1.jsonl)
-        (path /home/u/.prigh/worktrees/prigh/feat-login)))
-      (anchor (Element worktree-s1--home-u--prigh-worktrees-prigh-feat-login))))
     (Focus dialog)
     (Place_menu (Element worktree-s1--home-u--prigh-worktrees-prigh-feat-login))
     (Picker_choose review)
@@ -880,11 +869,6 @@ let%expect_test "a worktree's menu and its items" =
      (params ((dir /home/u/.prigh/worktrees/prigh/feat-login)))
      (tag (Git Status)))
     (Focus review-page)
-    (Open_menu
-     ((target
-       (Worktree (session /sessions/s1.jsonl)
-        (path /home/u/.prigh/worktrees/prigh/feat-login)))
-      (anchor (Element worktree-s1--home-u--prigh-worktrees-prigh-feat-login))))
     (Focus dialog)
     (Place_menu (Element worktree-s1--home-u--prigh-worktrees-prigh-feat-login))
     (Picker_choose files)
@@ -893,11 +877,6 @@ let%expect_test "a worktree's menu and its items" =
      (params ((path /home/u/.prigh/worktrees/prigh/feat-login) (hidden false)))
      (tag (Files (Listed /home/u/.prigh/worktrees/prigh/feat-login))))
     (Files (Focus files-list))
-    (Open_menu
-     ((target
-       (Worktree (session /sessions/s1.jsonl)
-        (path /home/u/.prigh/worktrees/prigh/feat-login)))
-      (anchor (Element worktree-s1--home-u--prigh-worktrees-prigh-feat-login))))
     (Focus dialog)
     (Place_menu (Element worktree-s1--home-u--prigh-worktrees-prigh-feat-login))
     (Picker_choose terminal)
@@ -906,11 +885,6 @@ let%expect_test "a worktree's menu and its items" =
     (Rpc (method_ set_prefs) (params ((prefs ((web.terminal-open true)))))
      (tag Show_error))
     Focus_terminal
-    (Open_menu
-     ((target
-       (Worktree (session /sessions/s1.jsonl)
-        (path /home/u/.prigh/worktrees/prigh/feat-login)))
-      (anchor (Element worktree-s1--home-u--prigh-worktrees-prigh-feat-login))))
     (Focus dialog)
     (Place_menu (Element worktree-s1--home-u--prigh-worktrees-prigh-feat-login))
     (Picker_choose copy_path)
@@ -922,11 +896,6 @@ let%expect_test "a worktree's menu and its items" =
   on_login "switch_here";
   [%expect
     {|
-    (Open_menu
-     ((target
-       (Worktree (session /sessions/s1.jsonl)
-        (path /home/u/.prigh/worktrees/prigh/feat-login)))
-      (anchor (Element worktree-s1--home-u--prigh-worktrees-prigh-feat-login))))
     (Focus dialog)
     (Place_menu (Element worktree-s1--home-u--prigh-worktrees-prigh-feat-login))
     (Picker_choose switch_here)
@@ -942,11 +911,6 @@ let%expect_test "a worktree's menu and its items" =
   on_login "new_session_here";
   [%expect
     {|
-    (Open_menu
-     ((target
-       (Worktree (session /sessions/s1.jsonl)
-        (path /home/u/.prigh/worktrees/prigh/feat-login)))
-      (anchor (Element worktree-s1--home-u--prigh-worktrees-prigh-feat-login))))
     (Focus dialog)
     (Place_menu (Element worktree-s1--home-u--prigh-worktrees-prigh-feat-login))
     (Picker_choose new_session_here)
@@ -961,15 +925,10 @@ let%expect_test "a worktree's menu and its items" =
 let%expect_test "a worktree's items on another session's worktree" =
   let h = create () in
   unfold_s6 h;
-  H.right_click h ~selector:(worktree ~owner:"s6" redesign);
+  worktree_menu h ~owner:"s6" redesign;
   choose h "create_pr";
   [%expect
     {|
-    (Open_menu
-     ((target
-       (Worktree (session /sessions/s6.jsonl)
-        (path /home/u/.prigh/worktrees/site/redesign)))
-      (anchor (Element worktree-s6--home-u--prigh-worktrees-site-redesign))))
     (Focus dialog)
     (Place_menu (Element worktree-s6--home-u--prigh-worktrees-site-redesign))
     (Picker_choose create_pr)
@@ -989,16 +948,11 @@ let%expect_test "a worktree's items on another session's worktree" =
 let%expect_test "removing a worktree from its menu, or Delete on its row" =
   let h = create () in
   unfold_s6 h;
-  H.right_click h ~selector:(worktree ~owner:"s6" redesign);
+  worktree_menu h ~owner:"s6" redesign;
   choose h "remove";
   dialog h;
   [%expect
     {|
-    (Open_menu
-     ((target
-       (Worktree (session /sessions/s6.jsonl)
-        (path /home/u/.prigh/worktrees/site/redesign)))
-      (anchor (Element worktree-s6--home-u--prigh-worktrees-site-redesign))))
     (Focus dialog)
     (Place_menu (Element worktree-s6--home-u--prigh-worktrees-site-redesign))
     (Picker_choose remove)
@@ -1056,15 +1010,14 @@ let%expect_test "selecting: no menus, ranges in list order" =
   H.click h ~selector:".session-open" ~nth:2;
   H.text h ~selector:".selection-bar";
   H.elements h ~selector:".session.marked";
-  H.elements h ~selector:".worktree";
   H.elements h ~selector:".more";
   [%expect
     {|
     (Mark_session (path /sessions/s1.jsonl) (range false))
     (Mark_session (path /sessions/s3.jsonl) (range false))
     (Cancel) (Delete 2 sessions (0 B))
-    <div class="marked selected session">
-    <div class="marked session">
+    <div class="bg-primary/15 bg-sidebar-accent group/session hover:bg-sidebar-accent marked relative rounded-md selected session text-sidebar-foreground">
+    <div class="bg-primary/15 group/session hover:bg-sidebar-accent marked relative rounded-md session text-sidebar-foreground">
     |}]
 ;;
 
@@ -1125,13 +1078,9 @@ let%expect_test
   H.elements h ~selector:".session-home";
   [%expect
     {|
-    (Login form 2m ago prigh feat/login from main) (1) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (feat/login here)
-    (Notes 2m ago site redesign from ~/notes) (1) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (redesign here)
-    (Landing page 2m ago site trunk) (More (right-click, Shift+F10)) (Archive) (Delete)
-    <span class="session-home">
-    <span class="session-home">
+    (prigh 2m Login form) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (site 2m Notes) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (site 2m Landing page) (More (right-click, Shift+F10)) (Archive) (Delete)
     |}];
   H.right_click h ~selector:".session" ~nth:0;
   menu h;
@@ -1248,8 +1197,6 @@ let%expect_test
   H.text h ~selector:".context-menu [data-item=switch_back]";
   [%expect
     {|
-    from ~/notes
-    from /home/bob/notes
     (Open_menu
      ((target (Session /sessions/s1.jsonl)) (anchor (Element session-s1))))
     (Focus dialog)
@@ -1296,11 +1243,9 @@ let%expect_test "Switch back runs /worktree back; the session's home goes" =
              (branch (main)) (main true))))))))))
     (Expire_toast (id 0) (after_ms 2540))
     Back in main (~/src/prigh)
-    (Login form 2m ago prigh feat/login) (1) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (feat/login here)
-    (Notes 2m ago site redesign from ~/notes) (1) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (redesign here)
-    (Landing page 2m ago site trunk) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (prigh 2m Login form) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (site 2m Notes) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (site 2m Landing page) (More (right-click, Shift+F10)) (Archive) (Delete)
     |}]
 ;;
 

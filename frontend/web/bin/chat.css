@@ -13,9 +13,7 @@
      wide at most, centred in the main pane and at least --edge from its
      sides. The log's column is placed from the left, so that neither its
      scrollbar nor the jump rail on its right moves it. */
-  --column: 820px;
-  /* The log's own column, narrower than the composer's for now. */
-  --log-column: 760px;
+  --column: 760px;
   --edge: 16px;
   /* What a step's row, a fold's line and a run's line are set in. */
   --step-size: 13px;
@@ -27,13 +25,13 @@
   scrollbar-gutter: stable;
   /* [--push], set by an ancestor (the session's card beside the column),
      moves the column left by that much, never past --edge. */
-  padding: 28px var(--edge) 8px max(var(--edge), (100% - var(--log-column)) / 2 - var(--push, 0px));
+  padding: 28px var(--edge) 8px max(var(--edge), (100% - var(--column)) / 2 - var(--push, 0px));
 }
 /* Focusable to scroll it with the keys; a click there shows no ring. */
 .chat:focus { outline: none; }
 .chat:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
 .entries, .empty {
-  max-width: var(--log-column);
+  max-width: var(--column);
   margin: 0;
   display: flex;
   flex-direction: column;
@@ -1201,7 +1199,7 @@ dialog.viewer::backdrop { background: transparent; }
 /* Waiting on the backend: the chat before its transcript arrives, prompts
    on their way. */
 .chat-loading {
-  max-width: var(--log-column);
+  max-width: var(--column);
   margin: 0;
   display: flex;
   flex-direction: column;
@@ -1269,7 +1267,7 @@ dialog.viewer::backdrop { background: transparent; }
 }
 @media (prefers-reduced-motion: reduce) { .filter-menu { animation: none; } }
 .filter-note {
-  max-width: var(--log-column);
+  max-width: var(--column);
   margin: 0 0 14px;
   display: flex;
   align-items: center;

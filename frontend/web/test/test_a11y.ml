@@ -23,19 +23,22 @@ let%expect_test "the names of the controls" =
   [%expect
     {|
     button "Hide sidebar" -- Hide sidebar (Ctrl+B)
-    button "New session" -- Start a new session (/new)
     button "Search" -- Search sessions, settings and commands (Ctrl+K)
+    button "New session" -- Start a new session (/new)
     button "Select" -- Select sessions to delete (/delete)
-    button "Fix the build 2m ago /work" -- /sessions/s1.jsonl
+    button "work 2m Fix the build" -- /sessions/s1.jsonl
     button "More for Fix the build" -- More (right-click, Shift+F10)
     button "Archive"
     button "Delete"
-    button "Archived 1" -- Show the archived sessions
-    button "Commands & keys" -- Commands and keys (/help)
+    button "Archive 1" -- Show the archived sessions
     button "Settings" -- Settings (Ctrl+, or /settings)
+    button "Pull requests" -- Pull requests (/pr)
+    button "Commands and keys" -- Commands and keys (/help)
     button "Filter the transcript" -- Filter the transcript (/filter)
     button "Files" -- Files (Ctrl+Shift+F)
     button "Terminal" -- Terminal (Ctrl+`)
+    button "Review changes" -- Review changes (Alt+R)
+    button "Session card" -- Subagents and worktrees
     button "Add files or images" -- Add files or images (or paste, or drop them here)
     button "Context 0% full, $0.00: details"
     button "Details" -- The session's details (/session)
@@ -47,6 +50,7 @@ let%expect_test "the names of the controls" =
     [switch] button "Temporary" -- Make it temporary: not saved or listed (Ctrl+Shift+O)
     textarea "Message" -- Working in /work on main. Ask prigh anything…
     [separator] div "Resize the sessions sidebar" -- Drag to resize, double-click for the default size
+    [link] span "New session"
     [region] div "Transcript"
     [status] span "Ready"
     [dialog] div "Context and cost"
@@ -58,15 +62,16 @@ let%expect_test "the names of the controls" =
   [%expect
     {|
     button "Hide sidebar" -- Hide sidebar (Ctrl+B)
-    button "New session" -- Start a new session (/new)
     button "Search" -- Search sessions, settings and commands (Ctrl+K)
-    [checkbox] button "Fix the build 2m ago /work 0 B" -- /sessions/s1.jsonl
-    button "Archived 1" -- Show the archived sessions
+    button "New session" -- Start a new session (/new)
+    [checkbox] button "work 0 B Fix the build" -- /sessions/s1.jsonl
     button "Cancel" -- Stop selecting (Esc)
     button "Delete sessions" -- Delete the selected sessions (Delete)
-    button "Commands & keys" -- Commands and keys (/help)
+    button "Archive 1" -- Show the archived sessions
     button "Settings" -- Settings (Ctrl+, or /settings)
-    [checkbox] button "Fix the build 2m ago /work 0 B" -- /sessions/s1.jsonl
+    button "Pull requests" -- Pull requests (/pr)
+    button "Commands and keys" -- Commands and keys (/help)
+    [checkbox] button "work 0 B Fix the build" -- /sessions/s1.jsonl
     |}]
 ;;
 
@@ -199,7 +204,7 @@ let%expect_test "the closed drawer on a phone is inert" =
   H.elements h ~selector:".main > [inert]";
   [%expect
     {|
-    <aside class="sidebar">
+    <aside class="bg-sidebar loon sidebar text-sidebar-foreground text-sm">
     <div class="chrome-anchor">
     <div class="chat-frame">
     <footer class="composer">

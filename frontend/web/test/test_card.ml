@@ -199,11 +199,11 @@ let%expect_test
   H.names h ~selector:".composer .host-chip";
   [%expect
     {|
-    <div class="chrome-left">
-    <div class="chrome-center">
-    <div class="chrome-right">
+    <Vdom.Node.none-widget class="">
+    <div class="chrome-center flex items-center min-w-0">
+    <div class="chrome-tools flex gap-2 items-center ml-auto">
     <div class="status-notes">
-    <div class="panel-toggles">
+    <div class="flex gap-0.5 items-center panel-toggles">
     <Vdom.Node.none-widget class="">
     Branch feature/a-rather-long-branch-for-the-sidebar-card
     <button class="link mode plan status-item">
@@ -259,8 +259,9 @@ let%expect_test
                             \nc7\
                             \n/work") (purpose (Sidebar 5)))))
     (Sessions (Ctrl+B))
+    New session
     (plan 1/2: Final nix GC)
-    (Filter the transcript (/filter)) (Files (Ctrl+Shift+F)) (Terminal (Ctrl+`))
+    (Filter the transcript (/filter)) (Files (Ctrl+Shift+F)) (Terminal (Ctrl+`)) (Review changes (Alt+R)) (Subagents and worktrees)
     (Settings (Ctrl+, or /settings))
     (Run /todos)
     (Focus dialog)
@@ -288,7 +289,7 @@ let%expect_test "a phone's chrome: the ⋯ opens the menu" =
   H.elements h ~selector:".chrome-backdrop";
   [%expect
     {|
-    <div class="chrome-tools">
+    <div class="chrome-tools flex gap-2 items-center ml-auto">
     <button class="btn chrome-button ghost icon round toggle-sidebar">
     <h1 class="chrome-title">
     <div class="chrome-more">
@@ -309,6 +310,8 @@ let%expect_test "a phone's chrome: the ⋯ opens the menu" =
     <button class="filter-row sheet-row">
     <button class="files-sheet-row files-toggle sheet-row">
     <button class="sheet-row terminal-row terminal-toggle">
+    <button class="review-row review-toggle sheet-row">
+    <button class="on session-card-row session-card-toggle sheet-row">
     <button class="settings-row sheet-row">
     button "Panels and settings"
     Toggle_status_tray

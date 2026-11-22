@@ -223,13 +223,13 @@ let%expect_test
   [%expect
     {|
     <div class="app sidebar-open">
-    <aside class="sidebar">
+    <aside class="bg-sidebar loon sidebar text-sidebar-foreground text-sm">
     <div class="resizer resizer-sidebar">
     <div class="desk">
     -- the desk:
     <main class="fresh main">
     -- the chat column:
-    <div class="chrome-anchor">
+    <div class="chrome-anchor loon">
     <div class="chat-frame">
     <div class="toast-anchor">
     <footer class="composer">
@@ -246,14 +246,14 @@ let%expect_test
     {|
     (Review Toggle)
     <div class="app reviewing">
-    <aside class="sidebar">
+    <aside class="bg-sidebar loon sidebar text-sidebar-foreground text-sm">
     <div class="desk">
     -- the desk:
     <section class="review-page">
     <div class="resizer resizer-review-chat">
     <main class="fresh main">
     -- the chat column:
-    <div class="chrome-anchor">
+    <div class="chrome-anchor loon">
     <div class="chat-frame">
     <div class="toast-anchor">
     <footer class="composer">
@@ -268,7 +268,8 @@ let%expect_test
   [%expect
     {|
     (Sessions (Ctrl+B))
-    (Filter the transcript (/filter)) (Files (Ctrl+Shift+F)) (Terminal (Ctrl+`))
+    New session
+    (Filter the transcript (/filter)) (Files (Ctrl+Shift+F)) (Terminal (Ctrl+`)) (Review changes (Alt+R)) (Subagents and worktrees)
     (Settings (Ctrl+, or /settings))
     |}];
   (* The terminal, the file browser and the agents panel open as usual. *)
@@ -280,7 +281,7 @@ let%expect_test
   [%expect
     {|
     <div class="agents-open app files-open reviewing terminal-open">
-    <aside class="sidebar">
+    <aside class="bg-sidebar loon sidebar text-sidebar-foreground text-sm">
     <div class="desk">
     <aside class="files-panel">
     <aside class="agents-panel">
@@ -290,7 +291,7 @@ let%expect_test
     <main class="fresh main">
     <section class="terminal-panel">
     -- the chat column:
-    <div class="chrome-anchor">
+    <div class="chrome-anchor loon">
     <div class="chat-frame">
     <div class="toast-anchor">
     <footer class="composer">
@@ -312,7 +313,7 @@ let%expect_test
     {|
     Toggle_sidebar
     <div class="agents-open app files-open reviewing sidebar-drawer sidebar-open terminal-open">
-    <aside class="sidebar">
+    <aside class="bg-sidebar loon sidebar text-sidebar-foreground text-sm">
     <div class="scrim">
     <div class="desk">
     <aside class="files-panel">
@@ -323,7 +324,7 @@ let%expect_test
     <main class="fresh main">
     <section class="terminal-panel">
     -- the chat column:
-    <div class="chrome-anchor">
+    <div class="chrome-anchor loon">
     <div class="chat-frame">
     <div class="toast-anchor">
     <footer class="composer">
@@ -338,7 +339,7 @@ let%expect_test
     <aside class="agents-panel">
     <section class="review-page">
     <section class="terminal-panel">
-    <div class="chrome-anchor">
+    <div class="chrome-anchor loon">
     <div class="chat-frame">
     <footer class="composer">
     |}];
@@ -359,7 +360,7 @@ let%expect_test
     Toggle_sidebar
     (Review Toggle)
     <div class="agents-open app files-open sidebar-open terminal-open">
-    <aside class="sidebar">
+    <aside class="bg-sidebar loon sidebar text-sidebar-foreground text-sm">
     <div class="resizer resizer-sidebar">
     <div class="desk">
     <aside class="files-panel">
@@ -368,7 +369,7 @@ let%expect_test
     <main class="fresh main">
     <section class="terminal-panel">
     -- the chat column:
-    <div class="chrome-anchor">
+    <div class="chrome-anchor loon">
     <div class="chat-frame">
     <div class="toast-anchor">
     <footer class="composer">
@@ -403,7 +404,7 @@ let%expect_test "on a phone the review is a sheet, the sidebar its drawer" =
     {|
     (Complete_accept (run true))
     <div class="app narrow reviewing">
-    <aside class="sidebar">
+    <aside class="bg-sidebar loon sidebar text-sidebar-foreground text-sm">
     <div class="desk">
     <section class="review-page">
     <main class="fresh landing main">

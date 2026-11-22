@@ -761,8 +761,8 @@ let%expect_test "a question dialog: keys" =
     Other:
     []
     Space or a click picks, ↑↓ choose, Enter accepts, Esc declines (Decline) (Next)
-    <aside class="sidebar">
-    <div class="chrome-anchor">
+    <aside class="bg-sidebar loon sidebar text-sidebar-foreground text-sm">
+    <div class="chrome-anchor loon">
     <div class="chat-frame">
     <footer class="composer">
     |}];

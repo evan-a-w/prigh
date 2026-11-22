@@ -136,6 +136,9 @@ module Icon = struct
     | Deepseek
     | Spark
     | Monitor
+    | Square_pen
+    | Panel_right
+    | Panel_bottom
   [@@deriving sexp_of]
 
   (* Paths in the style of Lucide (24x24, stroked). *)
@@ -280,6 +283,12 @@ module Icon = struct
       {|<path d="M12 3c.6 4.6 2.4 6.4 7 7-4.6.6-6.4 2.4-7 7-.6-4.6-2.4-6.4-7-7 4.6-.6 6.4-2.4 7-7z"/>|}
     | Monitor ->
       {|<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/>|}
+    | Square_pen ->
+      {|<path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z"/>|}
+    | Panel_right ->
+      {|<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M15 3v18"/>|}
+    | Panel_bottom ->
+      {|<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 15h18"/>|}
   ;;
 
   let name t = String.lowercase (Sexp.to_string (sexp_of_t t))

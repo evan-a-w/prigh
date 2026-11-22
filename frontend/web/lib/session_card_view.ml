@@ -14,10 +14,17 @@ let agents (m : Model.t) =
     | Job _ -> None)
 ;;
 
+(* The worktrees that matter to the session (the ones the sidebar showed
+   under it): where it works, its subagents', its pull requests'. *)
 let worktrees (m : Model.t) =
-  match Worktrees.listing m.worktrees with
-  | Some l -> l.worktrees
+  match m.state with
   | None -> []
+  | Some state ->
+    (match
+       List.find m.sessions ~f:(fun s -> String.equal s.id state.session_id)
+     with
+     | None -> []
+     | Some s -> List.map (Session_worktree_nodes.of_session m s) ~f:(fun n -> s, n))
 ;;
 
 let something (m : Model.t) =
@@ -28,12 +35,12 @@ let inline (m : Model.t) = m.session_card_open && (not m.narrow) && something m
 
 (* The card is 208px wide, 12px in from the pane's right edge, with 12px
    between it and the log's column: the column clears it when its right edge
-   is 232px in. Centred ([--log-column] wide), it does from a pane of
-   [--log-column] + 464px; in a narrower one [--push] (which chat.css takes
+   is 232px in. Centred ([--column] wide), it does from a pane of
+   [--column] + 464px; in a narrower one [--push] (which chat.css takes
    off the column's left padding) moves it left by what the margin lacks, and
    the log's right padding keeps it out from under the card once it has
-   reached the left edge. The composer moves left with it but stays as
-   wide (narrower, its chips would lose their labels; the card is above it).
+   reached the left edge. The composer moves left with it but keeps its
+   width (the card is above it).
    Below an 820px pane the chat would get too narrow: the card covers its
    corner instead. The
    variables are set on the pane's children, so that [cqw] is the pane's. *)
@@ -42,7 +49,7 @@ let main_attr (m : Model.t) =
   then
     Attr.class_
       "session-card-push @container \
-       *:[--push:max(0px,calc(var(--log-column)/2+232px-50cqw))] \
+       *:[--push:max(0px,calc(var(--column)/2+232px-50cqw))] \
        [&_.chat]:pr-[232px] @max-[820px]:*:[--push:0px] \
        @max-[820px]:[&_.chat]:pr-(--edge) [&>.composer]:mr-auto \
        [&>.composer]:ml-[max(0px,calc((100%-var(--column))/2-var(--edge)-var(--push)))]"
@@ -146,7 +153,35 @@ let subagent_row (m : Model.t) ~inject ((a : Agents.Agent.t), depth) =
     ]
 ;;
 
-let worktree_row ~inject (w : Worktree.t) =
+(* A click (or a right-click) opens the worktree's menu: open it here or in
+   a new session, its pull request, remove it. *)
+let worktree_row
+      (m : Model.t)
+      ~inject
+      ((s : Session_summary.t), (n : Prigh_ui.Session_worktrees.Node.t))
+  =
+  let w = n.worktree in
+  let id = Context_menu.worktree_dom_id ~session:s.id w.path in
+  let target =
+    Context_menu.Target.Worktree { session = s.path; path = w.path }
+  in
+  let opening =
+    Option.equal String.equal (Worktrees.entering m.worktrees) (Some w.path)
+  in
+  let menu_at (ev : Js_of_ocaml.Dom_html.mouseEvent Js_of_ocaml.Js.t) =
+    let x = Float.to_int (Js_of_ocaml.Js.to_float ev##.clientX)
+    and y = Float.to_int (Js_of_ocaml.Js.to_float ev##.clientY) in
+    let anchor : Context_menu.Anchor.t =
+      if x = 0 && y = 0 then Element id else Point { x; y }
+    in
+    Js_of_ocaml.Dom.preventDefault ev;
+    Effect.Many
+      [ Effect.Stop_propagation; inject (Action.Open_menu { target; anchor }) ]
+  in
+  let changes =
+    Option.bind n.listed ~f:(fun l -> l.changes)
+    |> Option.filter ~f:(fun c -> c > 0)
+  in
   Node.button
     ~attrs:
       [ Attr.type_ "button"
@@ -155,35 +190,38 @@ let worktree_row ~inject (w : Worktree.t) =
            ; "flex h-7 w-full items-center gap-2 rounded-md px-2 text-left \
               text-[12px] hover:bg-accent narrow:h-11"
            ]
-           @ if w.current then [ "current" ] else [])
-      ; Attr.title w.path
-      ; (if w.current then Attr.create "aria-current" "true" else Attr.empty)
+           @ (if n.here then [ "current" ] else [])
+           @ if opening then [ "opening" ] else [])
+      ; Attr.id id
+      ; Attr.create "data-worktree" w.path
+      ; Attr.create "data-owner" s.id
+      ; Attr.create "aria-haspopup" "menu"
+      ; Attr.title (Tilde.of_path ?host_home:(Tilde.session_host_home m.state s) w.path)
+      ; (if n.here then Attr.create "aria-current" "true" else Attr.empty)
       ; Attr.on_click (fun _ ->
-          if w.current
-          then Effect.Ignore
-          else
-            inject (Action.Open_worktree { path = w.path; new_session = false }))
+          inject (Action.Open_menu { target; anchor = Element id }))
+      ; Attr.on_contextmenu menu_at
       ]
     [ Node.span
         ~attrs:
           [ Attr.class_
-              (if w.current
+              (if n.here
                then "min-w-0 truncate font-mono text-foreground"
                else "min-w-0 truncate font-mono text-foreground/85")
           ]
-        [ Node.text (Worktree.label w) ]
-    ; (match w.changes with
-       | Some n when n > 0 ->
+        [ Node.text (Prigh_ui.Session_worktrees.Node.label n) ]
+    ; (match changes with
+       | Some c ->
          Node.span
            ~attrs:
              [ Attr.class_
                  "ml-auto shrink-0 text-[11px] tabular-nums \
                   text-muted-foreground"
              ; Attr.title
-                 (sprintf "%d changed file%s" n (if n = 1 then "" else "s"))
+                 (sprintf "%d changed file%s" c (if c = 1 then "" else "s"))
              ]
-           [ Node.text (sprintf "%d changed" n) ]
-       | _ -> Node.none)
+           [ Node.text (sprintf "%d changed" c) ]
+       | None -> Node.none)
     ]
 ;;
 
@@ -209,7 +247,7 @@ let sections (m : Model.t) ~inject =
          ~which:Worktrees
          ~glyph:Git_branch
          ~name:"Worktrees"
-         (List.map worktrees ~f:(worktree_row ~inject)))
+         (List.map worktrees ~f:(worktree_row m ~inject)))
   ]
 ;;
 
@@ -249,21 +287,4 @@ let view (m : Model.t) ~inject =
             ]
           (sections m ~inject)
       ]
-;;
-
-let toggle (m : Model.t) ~inject =
-  if not (something m)
-  then Node.none
-  else (
-    let on = if m.narrow then m.session_card.sheet else m.session_card_open in
-    button
-      ~cls:
-        (if on
-         then "icon ghost session-card-toggle open"
-         else "icon ghost session-card-toggle")
-      ~title:"Subagents and worktrees"
-      ~label:"Subagents and worktrees"
-      ~attrs:[ Attr.create "aria-pressed" (Bool.to_string on) ]
-      ~on_click:(inject Action.Toggle_session_card)
-      [ Icon.view ~class_:"size-4 -scale-x-100" Panel_left ])
 ;;

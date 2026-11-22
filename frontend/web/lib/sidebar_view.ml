@@ -15,8 +15,20 @@ let age (m : App.Model.t) (s : Session_summary.t) =
   match
     m.now, Rel_time.parse (Option.value s.updated_at ~default:s.created_at)
   with
-  | Some now, Some time -> Rel_time.ago ~now time
+  | Some now, Some time -> Rel_time.short ~now time
   | _ -> ""
+;;
+
+let current_activity (m : App.Model.t) =
+  match m.state with
+  | Some state when state.running ->
+    (match Chat.activity m.chat with
+     | Thinking | Waiting _ -> Some "thinking…"
+     | Retrying _ -> Some "retrying…"
+     | Idle | Working | Writing | Running_tools -> Some "working…")
+  | Some _ when m.pending.sending > 0 || Agents.running_agents m.agents > 0 ->
+    Some "working…"
+  | Some _ | None -> None
 ;;
 
 let shift_click ev = Js_of_ocaml.Js.to_bool ev##.shiftKey
@@ -27,6 +39,8 @@ let new_window_click ev =
 ;;
 
 module Session_worktrees = Prigh_ui.Session_worktrees
+module Button = Loon.Button
+module Kbd = Loon.Kbd
 
 (* A context menu's event: at the pointer, or (from the keyboard, which
    gives no position) under the row. *)
@@ -44,133 +58,6 @@ let open_menu
   Js_of_ocaml.Dom.preventDefault ev;
   Effect.Many
     [ Effect.Stop_propagation; inject (Action.Open_menu { target; anchor }) ]
-;;
-
-(* The row's ⋯: its menu, under the button. *)
-let more_button ~inject ~id ~label target =
-  Node.button
-    ~attrs:
-      [ Attr.class_ "btn icon ghost more"
-      ; Attr.type_ "button"
-      ; Attr.id id
-      ; Attr.title "More (right-click, Shift+F10)"
-      ; Attr.create "aria-label" ("More for " ^ label)
-      ; Attr.create "aria-haspopup" "menu"
-      ; Attr.on_click (fun _ ->
-          Effect.Many
-            [ Effect.Stop_propagation
-            ; inject (Action.Open_menu { target; anchor = Element id })
-            ])
-      ]
-    [ icon More ]
-;;
-
-let changes (w : Worktree.t) =
-  match w.changes with
-  | Some n when n > 0 ->
-    Node.span
-      ~attrs:
-        [ Attr.class_ "worktree-changes"
-        ; Attr.title
-            (sprintf
-               "%d file%s with uncommitted changes"
-               n
-               (if n = 1 then "" else "s"))
-        ]
-      [ Node.textf "● %d" n ]
-  | _ -> Node.none
-;;
-
-let sync (w : Worktree.t) =
-  match
-    List.filter_opt
-      [ Option.some_if (w.ahead > 0) (sprintf "↑%d" w.ahead)
-      ; Option.some_if (w.behind > 0) (sprintf "↓%d" w.behind)
-      ]
-  with
-  | [] -> Node.none
-  | parts ->
-    Node.span
-      ~attrs:
-        [ Attr.class_ "worktree-sync"
-        ; Attr.title
-            (sprintf
-               "%d ahead of and %d behind %s"
-               w.ahead
-               w.behind
-               (Option.value w.upstream ~default:"its upstream"))
-        ]
-      [ Node.text (String.concat ~sep:" " parts) ]
-;;
-
-let tag ?(cls = "") text ~title =
-  Node.span
-    ~attrs:[ Attr.class_ ("worktree-tag " ^ cls); Attr.title title ]
-    [ Node.text text ]
-;;
-
-(* A worktree under its session: its branch, what is in it, why it is
-   there. Clicking (or right-clicking) opens its menu. *)
-let worktree_row
-      ?host_home
-      ~inject
-      ~entering
-      (s : Session_summary.t)
-      (n : Session_worktrees.Node.t)
-  =
-  let w = n.worktree in
-  let label = Session_worktrees.Node.label n in
-  let id = Context_menu.worktree_dom_id ~session:s.id w.path in
-  let target =
-    Context_menu.Target.Worktree { session = s.path; path = w.path }
-  in
-  let gone = Option.exists n.listed ~f:(fun l -> l.prunable) in
-  let opening = Option.equal String.equal entering (Some w.path) in
-  Node.button
-    ~attrs:
-      [ classes
-          [ "worktree" ]
-          [ "here", n.here
-          ; "agent", Session_worktrees.Node.agent n
-          ; "dirty", Option.exists n.listed ~f:Worktree.dirty
-          ; "gone", gone
-          ; "opening", opening
-          ]
-      ; Attr.type_ "button"
-      ; Attr.id id
-      ; Attr.create "data-worktree" w.path
-      ; Attr.create "data-owner" s.id
-      ; Attr.create "aria-haspopup" "menu"
-      ; Attr.title (home_relative ?host_home w.path)
-      ; Attr.on_click (fun _ ->
-          inject (Action.Open_menu { target; anchor = Element id }))
-      ; Attr.on_contextmenu (open_menu ~inject target ~row:id)
-      ]
-    [ (if opening
-       then lamp ~title:"Opening…" ()
-       else icon ~cls:"worktree-icon" Branch)
-    ; span ~cls:"worktree-branch" label
-    ; (match w.source with
-       | Agent { agent; task } ->
-         tag
-           ~cls:"agent"
-           "subagent"
-           ~title:(sprintf "Made for subagent %s: %s" agent task)
-       | Pull_request number ->
-         tag
-           (sprintf "#%d" number)
-           ~title:(sprintf "Pull request #%d, checked out" number)
-       | Created | Entered -> Node.none)
-    ; (if n.here
-       then tag ~cls:"here" "here" ~title:"The session works in it"
-       else Node.none)
-    ; Option.value_map n.listed ~default:Node.none ~f:changes
-    ; Option.value_map n.listed ~default:Node.none ~f:sync
-    ; (if Option.exists n.listed ~f:(fun l -> l.locked)
-       then tag "locked" ~title:"git worktree unlock to remove it"
-       else Node.none)
-    ; (if gone then tag "gone" ~title:"Its directory was deleted" else Node.none)
-    ]
 ;;
 
 let place ?cls ?host_home (s : Session_summary.t) ~cwd =
@@ -199,18 +86,12 @@ let place ?cls ?host_home (s : Session_summary.t) ~cwd =
 module Row = struct
   type t =
     { selected : bool
-    ; running : bool
-    ; background : bool (** only its subagents or jobs run *)
+    ; status : string option (** working…, thinking…: else its age *)
     ; selecting : bool
     ; marked : bool
     ; loading : bool
     ; age : string
-    ; cwd : string
-    ; host_home : string option (** of the tool host its cwd is on *)
-    ; home : Session_home.t option
-    ; worktrees : Session_worktrees.Node.t list
-    ; folded : bool (** its worktrees *)
-    ; entering : string option
+    ; project : string
     ; matched : (int * int) list (** in the title, by the search *)
     ; snippet : Session_hits.Snippet.t option (** of its messages, likewise *)
     }
@@ -263,92 +144,82 @@ let marked_text ?(before = []) ~cls text ranges =
     (before
      @ List.map (Prigh_ui.Session_search.pieces text ranges) ~f:(function
        | `Plain, s -> Node.text s
-       | `Match, s -> Node.create "mark" [ Node.text s ]))
+       | `Match, s ->
+         Node.create
+           "mark"
+           ~attrs:[ Attr.class_ "rounded-sm bg-primary/25 text-foreground" ]
+           [ Node.text s ]))
+;;
+
+(* The row's ⋯: its menu, under the button. *)
+let more_button ~inject ~id ~label target =
+  Button.view
+    ~variant:Ghost
+    ~size:Icon_xs
+    ~class_:
+      "more text-muted-foreground hover:bg-transparent hover:text-foreground \
+       narrow:size-11"
+    ~attrs:
+      [ Attr.id id
+      ; Attr.title "More (right-click, Shift+F10)"
+      ; Attr.create "aria-label" ("More for " ^ label)
+      ; Attr.create "aria-haspopup" "menu"
+      ; Attr.on_click (fun _ ->
+          Effect.Many
+            [ Effect.Stop_propagation
+            ; inject (Action.Open_menu { target; anchor = Element id })
+            ])
+      ]
+    [ icon More ]
 ;;
 
 let row ~inject (s : Session_summary.t) (row : Row.t) =
   let { Row.selected
-      ; running
-      ; background
+      ; status
       ; selecting
       ; marked
       ; loading
       ; age
-      ; cwd
-      ; host_home
-      ; home
-      ; worktrees
-      ; folded
-      ; entering
+      ; project
       ; matched
       ; snippet
       }
     =
     row
   in
-  (* The lamp: work in progress here (its turn, or only its subagents and
-     jobs), or the row being opened. Archived sessions never run. *)
-  let mark =
-    if loading
-    then lamp ~title:"Opening…" ()
-    else if running
-    then
-      lamp
-        ~title:
-          (if background
-           then
-             sprintf
-               "Running: %d subagent%s or job%s in the background"
-               s.background
-               (if s.background = 1 then "" else "s")
-               (if s.background = 1 then "" else "s")
-           else "Running")
-        ()
-    else if s.live && not s.archived
-    then span ~cls:"live" ~attrs:[ Attr.title "Open in the backend" ] ""
-    else Node.none
-  in
   let title = Session_list.title s in
   let dom_id = Session_list.dom_id s.id in
   let target = Context_menu.Target.Session s.path in
-  let fold =
-    match worktrees with
-    | [] -> Node.none
-    | nodes ->
-      Node.button
-        ~attrs:
-          [ classes [ "session-fold" ] [ "folded", folded ]
-          ; Attr.type_ "button"
-          ; Attr.create "aria-expanded" (Bool.to_string (not folded))
-          ; Attr.title
-              (sprintf
-                 "%s its worktree%s"
-                 (if folded then "Show" else "Hide")
-                 (if List.length nodes = 1 then "" else "s"))
-          ; Attr.on_click (fun _ -> inject (Action.Toggle_folded s.id))
-          ]
-        [ icon ~cls:"fold-icon" Branch
-        ; Node.text (Int.to_string (List.length nodes))
-        ; Node.span ~attrs:[ Attr.class_ "chev" ] []
-        ]
+  let right =
+    if selecting
+    then
+      span
+        ~cls:"session-size shrink-0 tabular-nums"
+        (Session_summary.size_string s.bytes)
+    else if loading
+    then span ~cls:"session-status shrink-0" "opening…"
+    else (
+      match status with
+      | Some word ->
+        span ~cls:"session-status working shrink-0 text-sidebar-foreground" word
+      | None -> span ~cls:"session-age shrink-0 tabular-nums" age)
   in
   Node.div
-    ~attrs:
-      [ classes
-          [ "session-item" ]
-          [ "selected", selected
-          ; "has-worktrees", not (List.is_empty worktrees)
-          ]
-      ]
+    ~attrs:[ classes [ "session-item" ] [ "selected", selected ] ]
     [ Node.div
         ~attrs:
           [ classes
-              [ "session" ]
+              [ "session"
+              ; "group/session relative rounded-md text-sidebar-foreground \
+                 hover:bg-sidebar-accent"
+              ]
               [ "selected", selected
-              ; "running", running
+              ; "bg-sidebar-accent", selected || loading
+              ; "running", Option.is_some status
               ; "opening", loading
               ; "archived", s.archived
               ; "marked", marked
+              ; "bg-primary/15", marked
               ]
             (* Its transcript is fetched ahead while the pointer rests on it
                (or a finger or the keyboard is on it), so that the click shows
@@ -361,7 +232,11 @@ let row ~inject (s : Session_summary.t) (row : Row.t) =
           ]
         [ Node.button
             ~attrs:
-              [ Attr.class_ "session-open"
+              [ Attr.class_
+                  "session-open flex w-full min-w-0 items-start gap-2 \
+                   rounded-md px-2.5 py-1.5 text-left outline-none \
+                   focus-visible:ring-2 focus-visible:ring-sidebar-ring \
+                   narrow:py-2 [@media(hover:none)]:pr-12"
               ; Attr.type_ "button"
               ; Attr.id dom_id
               ; Attr.create "data-session" s.id
@@ -399,76 +274,70 @@ let row ~inject (s : Session_summary.t) (row : Row.t) =
               ; Attr.on_focus (fun _ -> inject (Action.Prefetch_session s.path))
               ]
             [ (if selecting then check marked else Node.none)
-            ; div ~cls:"session-mark" [ mark ]
             ; div
-                ~cls:"session-main"
-                ((marked_text
-                    ~cls:"session-title"
-                    ~before:
-                      (if Session_list.is_pinned s
-                       then
-                         [ Node.span
-                             ~attrs:
-                               [ Attr.class_ "session-pin"
-                               ; Attr.role "img"
-                               ; Attr.create "aria-label" "Pinned"
-                               ; Attr.title "Pinned to the top (P unpins)"
-                               ]
-                             [ icon Pin ]
-                         ]
-                       else [])
-                    title
-                    matched
-                  :: Option.to_list
-                       (Option.map snippet ~f:(fun s ->
-                          marked_text ~cls:"session-snippet" s.text s.ranges)))
-                 @ [ div
-                       ~cls:"session-meta"
-                       [ span ~cls:"session-age" age
-                       ; place ?host_home s ~cwd
-                       ; Option.value_map home ~default:Node.none ~f:(fun h ->
-                           span
-                             ~cls:"session-home"
-                             ~attrs:
-                               [ Attr.title
-                                   (sprintf
-                                      "Switched into worktrees from %s: Switch \
-                                       back (/worktree back) returns"
-                                      (home_relative ?host_home h.cwd))
-                               ]
-                             (Option.value_exn
-                                (Session_worktrees.home
-                                   ~tilde:(home_relative ?host_home)
-                                   (Some h))))
-                       ; (if selecting
-                          then
-                            span
-                              ~cls:"session-size"
-                              (Session_summary.size_string s.bytes)
-                          else Node.none)
-                       ]
-                   ])
+                ~cls:"session-main flex min-w-0 flex-1 flex-col gap-0.5"
+                ([ div
+                     ~cls:
+                       "session-meta flex min-w-0 items-center gap-2 text-xs \
+                        text-muted-foreground"
+                     [ span ~cls:"session-project min-w-0 truncate" project
+                     ; div ~cls:"ml-auto" []
+                     ; right
+                     ]
+                 ; marked_text
+                     ~cls:
+                       (if s.archived
+                        then
+                          "session-title truncate text-[13px] \
+                           text-muted-foreground"
+                        else "session-title truncate text-[13px]")
+                     ~before:
+                       (if Session_list.is_pinned s
+                        then
+                          [ Node.span
+                              ~attrs:
+                                [ Attr.class_
+                                    "session-pin mr-1 inline-flex align-[-1px] \
+                                     text-primary"
+                                ; Attr.role "img"
+                                ; Attr.create "aria-label" "Pinned"
+                                ; Attr.title "Pinned to the top (P unpins)"
+                                ]
+                              [ icon ~cls:"size-3" Pin ]
+                          ]
+                        else [])
+                     title
+                     matched
+                 ]
+                 @ Option.to_list
+                     (Option.map snippet ~f:(fun s ->
+                        marked_text
+                          ~cls:
+                            "session-snippet line-clamp-2 text-xs \
+                             text-muted-foreground"
+                          s.text
+                          s.ranges)))
             ]
-        ; (if selecting then Node.none else fold)
         ; (if selecting
            then Node.none
            else
              Node.span
-               ~attrs:[ Attr.class_ "session-actions" ]
+               ~attrs:
+                 [ Attr.class_
+                     "session-actions absolute right-1 bottom-1 rounded-md \
+                      bg-sidebar-accent opacity-0 \
+                      group-hover/session:opacity-100 \
+                      group-focus-within/session:opacity-100 \
+                      [@media(hover:none)]:top-1/2 \
+                      [@media(hover:none)]:bottom-auto \
+                      [@media(hover:none)]:-translate-y-1/2 \
+                      [@media(hover:none)]:bg-transparent \
+                      [@media(hover:none)]:opacity-70"
+                 ]
                [ more_button ~inject ~id:("more-" ^ dom_id) ~label:title target
                ])
         ; (if selecting then Node.none else swipe_actions ~inject s)
         ]
-    ; (if folded || selecting || List.is_empty worktrees
-       then Node.none
-       else
-         Node.div
-           ~attrs:
-             [ Attr.class_ "session-worktrees"
-             ; Attr.role "group"
-             ; Attr.create "aria-label" ("Worktrees of " ^ title)
-             ]
-           (List.map worktrees ~f:(worktree_row ?host_home ~inject ~entering s)))
     ]
 ;;
 
@@ -476,7 +345,6 @@ let session
       (m : App.Model.t)
       ~inject
       ~current
-      ~worktrees_shown
       (found : Prigh_ui.Session_search.Result.t)
   =
   let s = found.session in
@@ -487,15 +355,19 @@ let session
     | Some state when selected -> state.cwd
     | _ -> s.cwd
   in
-  let home =
-    match m.state with
-    | Some state when selected -> state.home
-    | _ -> s.home
+  let status =
+    (* Only the current session says what its agent is doing; another
+       works (its turn, or only its subagents and jobs) or not. *)
+    match selected, current_activity m with
+    | true, Some word -> Some word
+    | _ ->
+      if (s.running || s.background > 0) && not s.archived
+      then Some "working…"
+      else None
   in
   let deps =
     { Row.selected
-    ; running = s.running || (selected && App.Model.active m)
-    ; background = s.background > 0 && not (selected && App.Model.running m)
+    ; status
     ; selecting = m.marks.selecting
     ; marked = Set.mem m.marks.marked s.path
     ; loading =
@@ -503,19 +375,7 @@ let session
          | Some (Switching path) -> String.equal path s.path
          | Some Starting | None -> false)
     ; age = age m s
-    ; cwd
-    ; host_home = session_host_home m s
-    ; home
-    ; worktrees =
-        Session_worktrees.of_session
-          ~listings:
-            (Option.to_list (Worktrees.listing m.worktrees)
-             @ Repo_listings.listings m.repo_worktrees)
-          ~unsettled:(Repo_listings.unsettled m.repo_worktrees)
-          ~cwd
-          s
-    ; folded = not (Set.mem worktrees_shown s.id)
-    ; entering = Worktrees.entering m.worktrees
+    ; project = Session_project.name ?host_home:(session_host_home m s) s ~cwd
     ; matched = found.title
     ; snippet = found.snippet
     }
@@ -524,25 +384,36 @@ let session
     row ~inject s deps)
 ;;
 
+let heading_cls =
+  "flex min-h-7 items-center gap-2 px-2.5 pt-2 text-xs font-medium \
+   text-muted-foreground"
+;;
+
 (* Above the list: its name and how to select several sessions, or how
    selecting works. *)
 let toolbar (m : App.Model.t) ~inject =
   if m.marks.selecting
   then
     div
-      ~cls:"sessions-toolbar selecting"
-      [ span ~cls:"sessions-label" "Select sessions"
+      ~cls:("sessions-toolbar selecting " ^ heading_cls)
+      [ span
+          ~cls:"sessions-label flex-1 text-sidebar-foreground"
+          "Select sessions"
       ; Node.span
-          ~attrs:[ Attr.class_ "sessions-hint keyboard" ]
-          [ Node.kbd [ Node.text "Shift" ]; Node.text " for a range" ]
+          ~attrs:[ Attr.class_ "sessions-hint keyboard font-normal" ]
+          [ Kbd.view [ Node.text "Shift" ]; Node.text " for a range" ]
       ]
   else
     div
-      ~cls:"sessions-toolbar"
-      [ span ~cls:"sessions-label" "Sessions"
-      ; button
-          ~cls:"small ghost"
-          ~title:"Select sessions to delete (/delete)"
+      ~cls:("sessions-toolbar " ^ heading_cls)
+      [ span ~cls:"sessions-label flex-1" "Sessions"
+      ; Button.view
+          ~variant:Ghost
+          ~size:Xs
+          ~class_:
+            "h-6 px-1.5 font-normal text-muted-foreground \
+             hover:text-foreground narrow:h-11"
+          ~attrs:[ Attr.title "Select sessions to delete (/delete)" ]
           ~on_click:(inject (Action.Select_sessions true))
           [ Node.text "Select" ]
       ]
@@ -553,16 +424,21 @@ let selection_bar (m : App.Model.t) ~inject =
   let marked = Session_marks.marked m.marks m.sessions in
   let count = List.length marked in
   div
-    ~cls:"selection-bar"
-    [ button
-        ~cls:"small ghost"
-        ~title:"Stop selecting (Esc)"
+    ~cls:
+      "selection-bar flex items-center gap-2 border-t border-sidebar-border p-2"
+    [ Button.view
+        ~variant:Ghost
+        ~size:Sm
+        ~class_:"narrow:h-11"
+        ~attrs:[ Attr.title "Stop selecting (Esc)" ]
         ~on_click:(inject (Action.Select_sessions false))
         [ Node.text "Cancel" ]
-    ; button
-        ~cls:"small danger"
-        ~title:"Delete the selected sessions (Delete)"
+    ; Button.view
+        ~variant:Destructive
+        ~size:Sm
+        ~class_:"danger min-w-0 flex-1 truncate narrow:h-11"
         ~disabled:(count = 0)
+        ~attrs:[ Attr.title "Delete the selected sessions (Delete)" ]
         ~on_click:(inject Action.Delete_marked)
         [ Node.text
             (if count = 0
@@ -577,181 +453,273 @@ let selection_bar (m : App.Model.t) ~inject =
     ]
 ;;
 
-(* A faint rule naming a group of sessions, with its count. *)
+(* A quiet heading naming a group of sessions, with its count. *)
 let group_heading label sessions =
   Node.div
     ~attrs:
-      [ Attr.class_ "sessions-divider sessions-group"
+      [ Attr.class_ ("sessions-divider sessions-group " ^ heading_cls)
       ; Attr.role "heading"
       ; Attr.create "aria-level" "3"
       ]
     [ span ~cls:"divider-label" label
-    ; span ~cls:"divider-count" (Int.to_string (List.length sessions))
-    ; Node.span ~attrs:[ Attr.class_ "divider-rule" ] []
-    ]
-;;
-
-(* A faint rule with the count, folding the archived sessions away. *)
-let archived_divider ~inject ~shown archived =
-  Node.button
-    ~attrs:
-      [ Attr.class_ "sessions-divider"
-      ; Attr.type_ "button"
-      ; Attr.create "aria-expanded" (Bool.to_string shown)
-      ; Attr.title
-          (if shown
-           then "Hide the archived sessions"
-           else "Show the archived sessions")
-      ; Attr.on_click (fun _ -> inject Action.Toggle_archived)
-      ]
-    [ span ~cls:"divider-label" "Archived"
-    ; span ~cls:"divider-count" (Int.to_string (List.length archived))
-    ; Node.span ~attrs:[ Attr.class_ "divider-rule" ] []
-    ; Node.span ~attrs:[ Attr.class_ "chev" ] []
+    ; span
+        ~cls:"divider-count ml-auto tabular-nums"
+        (Int.to_string (List.length sessions))
     ]
 ;;
 
 let delete_archived ~inject archived =
-  Node.button
+  Button.view
+    ~variant:Ghost
+    ~size:Xs
+    ~class_:
+      "delete-archived mx-1 justify-start font-normal text-muted-foreground \
+       hover:text-destructive narrow:h-11"
     ~attrs:
-      [ Attr.class_ "delete-archived"
-      ; Attr.type_ "button"
-      ; Attr.title
+      [ Attr.title
           (sprintf
              "Delete every archived session, %s (/delete-archived)"
              (Session_summary.size_string
                 (Session_summary.total_bytes archived)))
-      ; Attr.on_click (fun _ -> inject Action.Ask_delete_archived)
       ]
+    ~on_click:(inject Action.Ask_delete_archived)
     [ Node.text "Delete archived" ]
 ;;
 
-let settings ~inject =
-  button
-    ~cls:"icon ghost settings-toggle"
-    ~title:"Settings (Ctrl+, or /settings)"
-    ~label:"Settings"
-    ~attrs:[ Attr.create "aria-haspopup" "dialog" ]
-    ~on_click:(inject Action.Open_settings)
-    [ icon Gear ]
+let foot_button ?(attrs = []) ~cls ~title ~on_click glyph =
+  Button.view
+    ~variant:Ghost
+    ~size:Icon_sm
+    ~class_:(cls ^ " text-muted-foreground hover:text-foreground narrow:size-11")
+    ~attrs:
+      ([ Attr.title title
+       ; Attr.create
+           "aria-label"
+           (String.strip (List.hd_exn (String.split title ~on:'(')))
+       ]
+       @ attrs)
+    ~on_click
+    [ icon glyph ]
 ;;
 
-let user_footer (m : App.Model.t) ~inject =
+let settings ~inject =
+  foot_button
+    ~cls:"settings-toggle"
+    ~title:"Settings (Ctrl+, or /settings)"
+    ~attrs:[ Attr.create "aria-haspopup" "dialog" ]
+    ~on_click:(inject Action.Open_settings)
+    Gear
+;;
+
+(* Folds the archived sessions in or out of the list, with their count. *)
+let archive_toggle ~inject ~shown archived =
+  Button.view
+    ~variant:Ghost
+    ~size:Sm
+    ~class_:
+      "sessions-divider archive-toggle w-full justify-start gap-2 px-2.5 \
+       font-normal text-muted-foreground hover:text-foreground narrow:h-11"
+    ~attrs:
+      [ Attr.create "aria-expanded" (Bool.to_string shown)
+      ; Attr.title
+          (if shown
+           then "Hide the archived sessions"
+           else "Show the archived sessions")
+      ]
+    ~on_click:(inject Action.Toggle_archived)
+    [ icon Archive
+    ; span ~cls:"divider-label" "Archive"
+    ; span
+        ~cls:"divider-count ml-auto text-xs tabular-nums"
+        (Int.to_string (List.length archived))
+    ; icon
+        ~cls:
+          (if shown
+           then "chev size-3.5 rotate-90 transition-transform"
+           else "chev size-3.5 transition-transform")
+        Chevron
+    ]
+;;
+
+let account (m : App.Model.t) ~inject =
+  Option.map (Account_view.who m) ~f:(fun { name; acting_as; _ } ->
+    Node.button
+      ~attrs:
+        [ Attr.class_
+            "account-button ml-auto flex min-w-0 items-center gap-2 \
+             rounded-full p-0.5 text-xs text-muted-foreground outline-none \
+             hover:text-foreground focus-visible:ring-2 \
+             focus-visible:ring-sidebar-ring"
+        ; Attr.type_ "button"
+        ; Attr.title (name ^ ": switch, add, act as, sign out")
+        ; Attr.create "aria-label" ("Accounts: " ^ name)
+        ; Attr.create "aria-haspopup" "dialog"
+        ; Attr.on_click (fun _ -> inject Action.Open_accounts)
+        ]
+      [ (match acting_as with
+         | Some ns ->
+           span ~cls:"user-acting truncate text-primary" ("acting as " ^ ns)
+         | None -> Node.none)
+      ; span
+          ~cls:
+            "avatar flex size-7 shrink-0 items-center justify-center \
+             rounded-full bg-sidebar-accent text-[11px] font-medium \
+             text-sidebar-foreground narrow:size-11"
+          (Account_view.initial name)
+      ])
+;;
+
+let footer (m : App.Model.t) ~inject ~archived =
   let sign_out =
-    button
-      ~cls:"icon ghost"
+    foot_button
+      ~cls:"sign-out"
       ~title:"Sign out"
       ~on_click:(inject Action.Sign_out)
-      [ icon Logout ]
+      Logout
   in
-  match Account_view.trigger m ~inject with
-  | Some account -> div ~cls:"sidebar-footer" [ account; settings ~inject ]
-  | None ->
-    div
-      ~cls:"sidebar-footer"
-      [ button
-          ~cls:"ghost help-button"
-          ~title:"Commands and keys (/help)"
-          ~on_click:(inject Action.Open_help)
-          [ icon Help; Node.text "Commands & keys" ]
-      ; settings ~inject
-      ; (if m.saved_login then sign_out else Node.none)
-      ]
+  div
+    ~cls:"sidebar-footer flex flex-col gap-1 px-2 pb-2"
+    [ (match archived with
+       | [] -> Node.none
+       | archived -> archive_toggle ~inject ~shown:m.archived_open archived)
+    ; div
+        ~cls:"flex items-center gap-0.5"
+        [ settings ~inject
+        ; foot_button
+            ~cls:"pull-requests-button"
+            ~title:"Pull requests (/pr)"
+            ~on_click:(inject (Action.Run "/pr"))
+            Pull_request
+        ; foot_button
+            ~cls:"help-button"
+            ~title:"Commands and keys (/help)"
+            ~on_click:(inject Action.Open_help)
+            Help
+        ; (match account m ~inject with
+           | Some account -> account
+           | None ->
+             if m.saved_login
+             then div ~cls:"ml-auto" [ sign_out ]
+             else Node.none)
+        ]
+    ]
 ;;
 
 let view (m : App.Model.t) ~inject =
   let current = Option.map m.state ~f:(fun s -> s.session_id) in
+  let { Session_list.Sections.pinned; active; archived } =
+    Session_list.sections m.sessions
+  in
+  let session = session m ~inject ~current in
+  let new_session =
+    let starting =
+      match m.pending.session with
+      | Some Starting -> true
+      | Some (Switching _) | None -> false
+    in
+    Button.view
+      ~variant:Ghost
+      ~size:Icon_sm
+      ~class_:
+        (if starting
+         then "new-session opening text-muted-foreground narrow:size-11"
+         else
+           "new-session text-muted-foreground hover:text-foreground \
+            narrow:size-11")
+      ~disabled:starting
+      ~attrs:
+        ([ Attr.title
+             (if starting
+              then "Starting a session…"
+              else "Start a new session (/new)")
+         ; Attr.create "aria-label" "New session"
+         ]
+         @ if starting then [ Attr.create "aria-busy" "true" ] else [])
+      ~on_click:(inject Action.New_session)
+      [ icon Square_pen ]
+  in
   Node.aside
-    ~attrs:[ Attr.class_ "sidebar"; Attr.id "sidebar" ]
+    ~attrs:
+      [ Attr.class_ "sidebar loon bg-sidebar text-sm text-sidebar-foreground"
+      ; Attr.id "sidebar"
+      ]
     [ div
-        ~cls:"sidebar-head"
-        [ div
-            ~cls:"brand"
-            [ span ~cls:"logo" "prigh"; span ~cls:"brand-sub" "web" ]
-        ; button
-            ~cls:"icon ghost"
-            ~title:"Hide sidebar (Ctrl+B)"
-            ~label:"Hide sidebar"
+        ~cls:
+          "sidebar-head flex h-12 shrink-0 items-center gap-1 px-2 narrow:h-14"
+        [ Button.view
+            ~variant:Ghost
+            ~size:Icon_sm
+            ~class_:"text-muted-foreground hover:text-foreground narrow:size-11"
+            ~attrs:
+              [ Attr.title "Hide sidebar (Ctrl+B)"
+              ; Attr.create "aria-label" "Hide sidebar"
+              ]
             ~on_click:(inject Action.Toggle_sidebar)
             [ icon Sidebar ]
+        ; span ~cls:"brand logo px-1 font-semibold tracking-tight" "prigh"
         ]
     ; div
-        ~cls:"sidebar-actions"
-        [ (match m.pending.session with
-           | Some Starting ->
-             button
-               ~cls:"new-session opening"
-               ~title:"Starting a session…"
-               ~disabled:true
-               ~on_click:Effect.Ignore
-               [ lamp (); Node.text "Starting…" ]
-           | Some (Switching _) | None ->
-             button
-               ~cls:"new-session"
-               ~title:"Start a new session (/new)"
-               ~on_click:(inject Action.New_session)
-               [ icon Plus; Node.text "New session" ])
-        ; button
-            ~cls:"control-open"
-            ~title:"Search sessions, settings and commands (Ctrl+K)"
-            ~attrs:[ Attr.id "control-open" ]
+        ~cls:"sidebar-actions flex shrink-0 items-center gap-0.5 px-2"
+        [ Button.view
+            ~variant:Ghost
+            ~size:Sm
+            ~class_:
+              "control-open min-w-0 flex-1 justify-start gap-2 px-2 \
+               font-normal text-muted-foreground hover:text-foreground \
+               narrow:h-11"
+            ~attrs:
+              [ Attr.id "control-open"
+              ; Attr.title "Search sessions, settings and commands (Ctrl+K)"
+              ; Attr.create "aria-label" "Search"
+              ]
             ~on_click:(inject Action.Open_control)
-            [ icon Search; Node.text "Search" ]
+            [ icon Search
+            ; Node.text "Search"
+            ; Kbd.view ~class_:"ml-auto narrow:hidden" [ Node.text "Ctrl K" ]
+            ]
+        ; new_session
         ]
     ; (match m.sessions with
        | [] -> Node.none
        | _ -> toolbar m ~inject)
     ; div
-        ~cls:"sessions"
+        ~cls:
+          "sessions flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-2 \
+           pb-2"
         (match m.sessions with
          | [] ->
            [ div
-               ~cls:"sessions-empty"
+               ~cls:"sessions-empty px-2.5 py-3 text-xs text-muted-foreground"
                [ Node.text "No sessions yet: send a message to start one." ]
            ]
          | _ ->
-           let { Session_list.Sections.pinned; active; archived } =
-             Session_list.sections m.sessions
-           in
-           let worktrees_shown = App.Model.worktrees_shown m in
-           let shown = m.archived_open in
            (match pinned with
-            | [] ->
-              List.map active ~f:(session m ~inject ~current ~worktrees_shown)
+            | [] -> List.map active ~f:session
             | pinned ->
-              (group_heading "Pinned" pinned
-               :: List.map
-                    pinned
-                    ~f:(session m ~inject ~current ~worktrees_shown))
+              (group_heading "Pinned" pinned :: List.map pinned ~f:session)
               @
                 (match active with
                 | [] -> []
                 | active ->
-                  group_heading "Recent" active
-                  :: List.map
-                       active
-                       ~f:(session m ~inject ~current ~worktrees_shown)))
+                  group_heading "Recent" active :: List.map active ~f:session))
            @
              (match archived with
              | [] -> []
              | archived ->
-               archived_divider ~inject ~shown archived
-               ::
-               (if shown
-                then
-                  List.map
-                    archived
-                    ~f:(session m ~inject ~current ~worktrees_shown)
-                  @
-                  if m.marks.selecting
-                  then []
-                  else
-                    [ delete_archived
-                        ~inject
-                        (List.map archived ~f:(fun r -> r.session))
-                    ]
-                else [])))
+               if m.archived_open
+               then
+                 (group_heading "Archived" archived
+                  :: List.map archived ~f:session)
+                 @
+                 if m.marks.selecting
+                 then []
+                 else
+                   [ delete_archived
+                       ~inject
+                       (List.map archived ~f:(fun r -> r.session))
+                   ]
+               else []))
     ; (if m.marks.selecting then selection_bar m ~inject else Node.none)
-    ; user_footer m ~inject
+    ; footer m ~inject ~archived
     ]
 ;;
