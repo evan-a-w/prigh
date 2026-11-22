@@ -1303,6 +1303,9 @@ let%expect_test "update_plan and ask_user in the transcript" =
         <span title="Done" role="img" aria-label="Done" class="done mark">
           <icon class="check"> </icon>
         </span>
+        <span aria-hidden="true" class="tool-icon">
+          <icon class="toc"> </icon>
+        </span>
         <span class="name"> update_plan </span>
         <span class="arg step"> test </span>
         <span class="chip"> 1/3 done </span>

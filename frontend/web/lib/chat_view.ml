@@ -533,6 +533,7 @@ and assistant
     | Tool_call call ->
       Tool_view.view
         ~ui
+        ?started:message.at
         ~nested:(nested ~ui ~fold times)
         ~fold
         ~streaming:(streaming && last)
@@ -583,6 +584,7 @@ and assistant
         "pending"
         [ Html.lamp ()
         ; span "label" label
+        ; span "stop-hint" "Esc to stop"
         ; (match detail with
            | Some error -> div "detail" [ Node.text ("after: " ^ error) ]
            | None -> Node.none)
@@ -714,23 +716,30 @@ and activity ~ui ~fold times chat runs (box : Activity_runs.Box.t) =
             ; Attr.create "aria-expanded" (Bool.to_string opened)
             ]
           (present
-             [ icon
-             ; span "run-label" label
-             ; (if failed > 0
-                then span "run-failed" (sprintf "%d failed" failed)
-                else Node.none)
-             ; Option.value_map took ~default:Node.none ~f:(span "run-time")
-             ; span "chev" ""
-             ])
+             ([ icon ]
+              @ (match took with
+                 (* Done: how long it took, then what it did. *)
+                 | Some took ->
+                   [ span "run-label" "Worked for"
+                   ; span "run-time" took
+                   ; span "run-did" ("· " ^ String.uncapitalize label)
+                   ]
+                 | None -> [ span "run-label" label ])
+              @ [ (if failed > 0
+                   then span "run-failed" (sprintf "%d failed" failed)
+                   else Node.none)
+                ; span "chev" ""
+                ]))
       ; (if opened
          then
            div
              "run-steps"
              (List.map steps ~f:(fun (step : Activity_runs.Step.t) ->
                 match step with
-                | Call { call; streaming; _ } ->
+                | Call { call; streaming; at; _ } ->
                   Tool_view.view
                     ~ui
+                    ?started:at
                     ~nested:(nested ~ui ~fold times)
                     ~fold
                     ~streaming

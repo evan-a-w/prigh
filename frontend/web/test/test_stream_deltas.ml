@@ -83,6 +83,9 @@ let%expect_test "deltas build the reply the whole-message updates showed" =
         <div class="running tool tool-bash">
           <div class="tool-head">
             <span aria-hidden="true" class="lamp"> </span>
+            <span aria-hidden="true" class="tool-icon">
+              <icon class="terminal"> </icon>
+            </span>
             <span class="name"> bash </span>
             <span class="arg command"> ls </span>
           </div>

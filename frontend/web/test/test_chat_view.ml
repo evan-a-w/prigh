@@ -70,6 +70,7 @@ let%expect_test
         <div class="pending">
           <span aria-hidden="true" class="lamp"> </span>
           <span class="label"> Waiting for the model… </span>
+          <span class="stop-hint"> Esc to stop </span>
         </div>
       </div>
     </div>

@@ -200,6 +200,9 @@ let%expect_test
       <span title="Done" role="img" aria-label="Done" class="done mark">
         <icon class="check"> </icon>
       </span>
+      <span aria-hidden="true" class="tool-icon">
+        <icon class="terminal"> </icon>
+      </span>
       <span class="name"> bash </span>
       <span class="arg command"> make test </span>
       <span title="allowed by anthropic/claude-haiku-4-5: runs the project's tests"
