@@ -105,7 +105,7 @@ let help =
   ; "Alt+C (editor, wide window)", "show or hide the chat beside the editor"
   ; "Alt+PageDown / Alt+PageUp (editor)", "the next or previous open file"
   ; "Alt+W (editor)", "close the file"
-  ; "Esc (editor)", "back to the chat"
+  ; "Esc (editor, outside the text)", "back to the chat"
   ; ( "P (on a session)"
     , "pin it to the top of the sidebar, or unpin it (pinned sessions are \
        never archived for being idle)" )
@@ -680,8 +680,7 @@ let code_key (m : App.Model.t) t : App.Action.t option =
   | "Escape" when m.narrow && m.code.drawer -> code Toggle_drawer
   | "Escape" when m.narrow && m.code.sheet -> code Toggle_sheet
   | ("f" | "F") when command t && Poly.equal t.target Page -> code (Command Find)
-  | "Escape" when Poly.equal t.target Page || Poly.equal t.target Code ->
-    code Leave
+  | "Escape" when Poly.equal t.target Page -> code Leave
   | _ -> None
 ;;
 

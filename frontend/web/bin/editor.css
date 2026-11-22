@@ -285,6 +285,9 @@
   line-height: 1.4;
 }
 .code-notice-text { flex: 1 1 220px; min-width: 0; }
+/* Two buttons after a short line: they stay beside it. */
+.code-notice.agent { flex-wrap: nowrap; }
+.code-notice.agent .code-notice-text { flex-basis: 0; }
 .code-notice.conflict { background: var(--brick-wash); border-bottom-color: var(--brick-line); }
 .code-notice.agent { background: color-mix(in srgb, var(--sage) 9%, var(--graphite)); border-bottom-color: var(--sage-line); }
 .code-goto {

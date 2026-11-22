@@ -491,9 +491,10 @@ let update t (action : Action.t) =
          ; hunks = []
          ; marks = []
          ; revision = b.revision + 1
+         ; saving = true
          }
        in
-       map_buffer t b.path ~f:(Fn.const b), [ write { b with saving = true } ~force:false ]
+       map_buffer t b.path ~f:(Fn.const b), [ write b ~force:false ]
      | Some _ | None -> t, [])
   | Ask -> ask { t with menu = false }
   | Drop_chip -> { t with chip = None }, []

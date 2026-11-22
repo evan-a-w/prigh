@@ -179,7 +179,7 @@ let%expect_test "help lists every key and command" =
     Alt+C (editor, wide window) show or hide the chat beside the editor
     Alt+PageDown / Alt+PageUp (editor) the next or previous open file
     Alt+W (editor) close the file
-    Esc (editor) back to the chat
+    Esc (editor, outside the text) back to the chat
     P (on a session) pin it to the top of the sidebar, or unpin it (pinned sessions are never archived for being idle)
     Shift+F10 / ContextMenu (on a session or worktree) its menu: open, rename, fork, new worktree, review, files, terminal, pull request, copy, delete or remove (also right-click, a long press or its ⋯)
     Shift+F10 / ContextMenu (on a message) its menu: copy, trim everything before or after it, delete it (also right-click or a long press, at the pointer; with text selected, right-click is the browser's, to copy it; on a phone, its Select text selects its words)
