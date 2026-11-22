@@ -518,8 +518,8 @@ module Action = struct
     | Settings_move of Settings_section.Move.t
     | Compact_at_input of string
     | Compact_at_commit
-    | Sessions_field_input of Sessions_fields.Which.t * string
-    | Sessions_field_commit of Sessions_fields.Which.t
+    | Archive_after_input of string
+    | Archive_after_commit
     | Set_default of New_default.t
     | Pick_default of New_default.Picker.t
     | Default_field_input of Default_fields.Which.t * string
@@ -598,7 +598,6 @@ module Action = struct
     | Remove_queued of Recipient.t * Queued.Message.t
     | Set_recipient of Recipient.t
     | Remove_reminder of string
-    | Toggle_folded of string
     | New_session_in of string
     | New_worktree
     | New_worktree_input of
@@ -817,7 +816,6 @@ module Model = struct
     ; skills : Skills.t
     ; worktrees : Worktrees.t
     ; repo_worktrees : Repo_listings.t
-    ; worktree_folds : Worktree_folds.t
     ; pending : In_flight.t
     ; marks : Session_marks.t
     ; notifications : Page_notify.t
@@ -854,7 +852,7 @@ module Model = struct
     ; about_you : About_you.t
     ; mcp : Mcp_page.t
     ; compact_at : Compact_at.t
-    ; sessions_fields : Sessions_fields.t
+    ; archive_after : Archive_after.t
     ; default_fields : Default_fields.t
     ; switched_off : Switched_off.t
     ; settings_section : Settings_section.t
@@ -937,7 +935,6 @@ module Model = struct
         ; skills
         ; worktrees
         ; repo_worktrees
-        ; worktree_folds
         ; pending
         ; marks
         ; notifications
@@ -967,7 +964,7 @@ module Model = struct
         ; about_you
         ; mcp
         ; compact_at
-        ; sessions_fields
+        ; archive_after
         ; default_fields
         ; switched_off
         ; settings_section
@@ -1044,7 +1041,6 @@ module Model = struct
     && phys_equal skills b.skills
     && phys_equal worktrees b.worktrees
     && phys_equal repo_worktrees b.repo_worktrees
-    && phys_equal worktree_folds b.worktree_folds
     && phys_equal pending b.pending
     && phys_equal marks b.marks
     && phys_equal notifications b.notifications
@@ -1074,7 +1070,7 @@ module Model = struct
     && phys_equal about_you b.about_you
     && phys_equal mcp b.mcp
     && phys_equal compact_at b.compact_at
-    && phys_equal sessions_fields b.sessions_fields
+    && phys_equal archive_after b.archive_after
     && phys_equal default_fields b.default_fields
     && phys_equal switched_off b.switched_off
     && phys_equal settings_section b.settings_section
@@ -1152,16 +1148,6 @@ module Model = struct
       || List.exists s.subagents ~f:(fun a -> a.running)
       || List.exists s.jobs ~f:(fun j -> j.running)
     | None -> false
-  ;;
-
-  let worktrees_shown t =
-    Worktree_folds.shown
-      t.worktree_folds
-      ~now:t.now
-      ~current:
-        (Option.map t.state ~f:(fun (s : State.t) ->
-           { Worktree_folds.Current.id = s.session_id; cwd = s.cwd }))
-      t.sessions
   ;;
 
   let image_limit t =
@@ -1381,7 +1367,6 @@ let init =
   ; skills = Skills.empty
   ; worktrees = Worktrees.empty
   ; repo_worktrees = Repo_listings.empty
-  ; worktree_folds = Worktree_folds.empty
   ; pending = In_flight.none
   ; marks = Session_marks.empty
   ; notifications = Page_notify.init
@@ -1412,7 +1397,7 @@ let init =
   ; about_you = About_you.empty
   ; mcp = Mcp_page.empty
   ; compact_at = Compact_at.empty
-  ; sessions_fields = Sessions_fields.empty
+  ; archive_after = Archive_after.empty
   ; default_fields = Default_fields.empty
   ; switched_off = Switched_off.empty
   ; settings_section = Appearance
@@ -1881,28 +1866,6 @@ let save_prefs (m : Model.t) (changes : Prefs.Change.t list) =
 
 let save_pref m key value = save_prefs m [ { Prefs.Change.key; value } ]
 
-let listed_ids (m : Model.t) =
-  String.Set.of_list (List.map m.sessions ~f:(fun s -> s.id))
-;;
-
-(* The user is in the session now: it was used, and its worktrees' hand
-   folds have had their day. Not another user's sessions, when acting as
-   them. *)
-let note_opened (m : Model.t) =
-  match m.now, m.state with
-  | Some now, Some state when Option.is_none (acting_as m) ->
-    let worktree_folds =
-      Worktree_folds.open_
-        m.worktree_folds
-        ~now
-        ~listed:(listed_ids m)
-        state.session_id
-    in
-    ( { m with worktree_folds }
-    , save_pref m Key.opened (Worktree_folds.opened_pref worktree_folds) )
-  | _ -> m, []
-;;
-
 let set_state_without_files (m : Model.t) (state : State.t) =
   let chat_cache = keep_chat m in
   let changed =
@@ -2106,8 +2069,6 @@ let set_state (m : Model.t) (state : State.t) =
       not (String.equal old.session_id state.session_id))
   in
   let m, cmds = set_state_without_files m state in
-  let m, opened = if entered then note_opened m else m, [] in
-  let cmds = cmds @ opened in
   let m = if hosts_changed then refresh_hosts m else m in
   let m, more = with_files m (Files.set_where m.files (files_where m)) in
   let m =
@@ -2418,7 +2379,7 @@ let open_settings ?(fetch = true) ?section (m : Model.t) =
     open_dialog
       { m with
         compact_at = Compact_at.empty
-      ; sessions_fields = Sessions_fields.empty
+      ; archive_after = Archive_after.empty
       ; default_fields = Default_fields.empty
       ; settings_section
       ; settings_home = Option.is_none section
@@ -2738,8 +2699,7 @@ let complete_draft (m : Model.t) ~skills =
       ()
   with
   | None -> { m with completion = None }, []
-  | Some c
-    when Completion.Source.equal (Completion.source c) (Argument File) ->
+  | Some c when Completion.Source.equal (Completion.source c) (Argument File) ->
     (* [/edit]'s files are matched here, over the editor's list of them. *)
     let code, outs = Code_editor.load_index m.code in
     let top =
@@ -3137,24 +3097,6 @@ let apply_pref (m : Model.t) ~startup ({ key; value } : Prefs.Change.t) =
         | _ -> []
       in
       { m with history = History.of_list entries })
-  else if String.equal key Key.folded
-  then
-    { m with worktree_folds = Worktree_folds.set_folded m.worktree_folds value }
-  else if String.equal key Key.unfolded
-  then
-    { m with
-      worktree_folds = Worktree_folds.set_unfolded m.worktree_folds value
-    }
-  else if String.equal key Key.opened
-  then
-    { m with
-      worktree_folds = Worktree_folds.merge_opened m.worktree_folds value
-    }
-  else if String.equal key Key.worktree_hours
-  then
-    { m with
-      worktree_folds = Worktree_folds.set_hours_pref m.worktree_folds value
-    }
   else if String.equal key Key.review
   then { m with review_memory = Review_memory.of_json value }
   else if String.equal key Key.code_size
@@ -3209,26 +3151,14 @@ let prefs_loaded (m : Model.t) changes =
   let startup = Pref_sync.Remote.equal m.prefs.remote Unknown in
   let prefs, applied, upload = Pref_sync.loaded m.prefs changes in
   let m = apply_prefs { m with prefs } ~startup applied in
-  (* Going into a session before they came. *)
-  let opened =
-    let theirs =
-      List.find_map applied ~f:(fun (c : Prefs.Change.t) ->
-        Option.some_if (String.equal c.key Key.opened) c.value)
-      |> Option.join
-    in
-    if Worktree_folds.opened_ahead m.worktree_folds theirs
-    then save_pref m Key.opened (Worktree_folds.opened_pref m.worktree_folds)
-    else []
-  in
   (* The page may show another account's, from the browser's cache. *)
   ( m
-  , (Command.Apply_theme (Model.look m)
-     :: Command.Cache_prefs applied
-     ::
-     (if List.is_empty upload
-      then []
-      else [ rpc "set_prefs" (Prefs.set_params upload) ]))
-    @ opened )
+  , Command.Apply_theme (Model.look m)
+    :: Command.Cache_prefs applied
+    ::
+    (if List.is_empty upload
+     then []
+     else [ rpc "set_prefs" (Prefs.set_params upload) ]) )
 ;;
 
 let theme_changes (theme : Theme.t) =
@@ -5070,8 +5000,6 @@ let save_memory (m : Model.t) =
    backend's settings not loaded yet). *)
 let number (m : Model.t) (key : Switched_off.Key.t) =
   match key with
-  | Worktree_hours ->
-    Some (Float.of_int (Worktree_folds.hours m.worktree_folds))
   | Archive_days -> Option.map m.config ~f:(fun c -> c.archive_after_days)
   | Compact_at ->
     Option.map m.config ~f:(fun c -> Float.of_int c.compact_at_tokens)
@@ -5082,20 +5010,6 @@ let number (m : Model.t) (key : Switched_off.Key.t) =
 (* Sets one ([0]: off). *)
 let set_number (m : Model.t) (key : Switched_off.Key.t) value =
   match key with
-  | Worktree_hours ->
-    let m =
-      remember_on
-        m
-        Worktree_hours
-        ~was:(Float.of_int (Worktree_folds.hours m.worktree_folds))
-        ~now:value
-    in
-    let worktree_folds =
-      Worktree_folds.set_hours m.worktree_folds (Float.iround_nearest_exn value)
-    in
-    ( { m with worktree_folds }
-    , save_pref m Key.worktree_hours (Worktree_folds.hours_pref worktree_folds)
-    )
   | Archive_days ->
     set_auto_archive m (Prigh_ui.Auto_archive_command.Action.Set value)
   | Compact_at -> set_compaction m (Set_at (Float.iround_nearest_exn value))
@@ -5109,17 +5023,11 @@ let commit_compact_at (m : Model.t) =
   | compact_at, None -> { m with compact_at }, []
 ;;
 
-let sessions_key : Sessions_fields.Which.t -> Switched_off.Key.t = function
-  | Worktree_hours -> Worktree_hours
-  | Archive_days -> Archive_days
-;;
-
-let commit_sessions_field (m : Model.t) (which : Sessions_fields.Which.t) =
-  let sessions_fields, value = Sessions_fields.commit m.sessions_fields which in
-  let m = { m with sessions_fields } in
-  match value with
-  | None -> m, []
-  | Some value -> set_number m (sessions_key which) value
+let commit_archive_after (m : Model.t) =
+  match Archive_after.commit m.archive_after with
+  | archive_after, Some days ->
+    set_number { m with archive_after } Archive_days days
+  | archive_after, None -> { m with archive_after }, []
 ;;
 
 (* On: what it was before it was switched off, else its default. Whatever
@@ -5131,22 +5039,13 @@ let switch_number (m : Model.t) (key : Switched_off.Key.t) on =
   | Some _ ->
     let m =
       match key with
-      | Worktree_hours ->
-        { m with
-          sessions_fields =
-            Sessions_fields.clear m.sessions_fields Worktree_hours
-        }
-      | Archive_days ->
-        { m with
-          sessions_fields = Sessions_fields.clear m.sessions_fields Archive_days
-        }
+      | Archive_days -> { m with archive_after = Archive_after.empty }
       | Compact_at -> { m with compact_at = Compact_at.empty }
       | Budget ->
         { m with default_fields = Default_fields.clear m.default_fields Budget }
     in
     let default =
       match key with
-      | Worktree_hours -> Float.of_int Worktree_folds.default_hours
       | Archive_days -> Config.default.archive_after_days
       | Compact_at -> Float.of_int Config.default.compact_at_tokens
       | Budget -> New_default.budget_usd
@@ -5155,32 +5054,6 @@ let switch_number (m : Model.t) (key : Switched_off.Key.t) on =
       m
       key
       (if on then Switched_off.value m.switched_off key ~default else 0.)
-;;
-
-(* What the click changes is kept, against the session's age, until the
-   session is next opened. *)
-let toggle_folded (m : Model.t) id =
-  if not (List.exists m.sessions ~f:(fun s -> String.equal s.id id))
-  then m, []
-  else (
-    let worktree_folds =
-      Worktree_folds.toggle
-        m.worktree_folds
-        ~now:m.now
-        ~listed:(listed_ids m)
-        ~shown:(Set.mem (Model.worktrees_shown m) id)
-        id
-    in
-    ( { m with worktree_folds }
-    , save_prefs
-        m
-        [ { key = Key.folded
-          ; value = Worktree_folds.folded_pref worktree_folds
-          }
-        ; { key = Key.unfolded
-          ; value = Worktree_folds.unfolded_pref worktree_folds
-          }
-        ] ))
 ;;
 
 let last_reply (m : Model.t) =
@@ -5609,7 +5482,7 @@ let user_switched (m : Model.t) (hello : Hello_reply.t) =
     ; mcp = Mcp_page.empty
     ; config = None
     ; compact_at = Compact_at.empty
-    ; sessions_fields = Sessions_fields.empty
+    ; archive_after = Archive_after.empty
     ; default_fields = Default_fields.empty
     ; switched_off = Switched_off.empty
     }
@@ -11163,7 +11036,6 @@ let setting_opener (m : Model.t) (setting : Control_setting.t) =
   | Code_font
   | Default_directory
   | Budget
-  | Worktree_hours
   | Archive_after
   | Notifications
   | Providers
@@ -11590,14 +11462,8 @@ let dialog_accept (m : Model.t) =
       ~f:(fun (m, cmds) which ->
         let m, more = commit_default_field m which in
         m, cmds @ more)
-  | Some Settings
-    when not (List.is_empty (Sessions_fields.drafted m.sessions_fields)) ->
-    List.fold
-      (Sessions_fields.drafted m.sessions_fields)
-      ~init:(m, [])
-      ~f:(fun (m, cmds) which ->
-        let m, more = commit_sessions_field m which in
-        m, cmds @ more)
+  | Some Settings when Option.is_some (Archive_after.draft m.archive_after) ->
+    commit_archive_after m
   | Some
       ( Help
       | Hotkeys
@@ -11808,10 +11674,7 @@ let update_connected (m : Model.t) (action : Action.t) =
     m, cmds @ sent
   | Reply (tag, result) -> reply m tag result
   (* The ages in the sidebar; the list itself follows [sessions_changed]. *)
-  | Tick now ->
-    let first = Option.is_none m.now in
-    let m = { m with now = Some now } in
-    if first then note_opened m else m, []
+  | Tick now -> { m with now = Some now }, []
   | Set_utc_offset utc_offset -> { m with utc_offset }, []
   | Set_browser_time_zone zone -> { m with browser_time_zone = Some zone }, []
   | Set_desktop desktop -> { m with desktop }, []
@@ -12028,12 +11891,9 @@ let update_connected (m : Model.t) (action : Action.t) =
   | Compact_at_input text ->
     { m with compact_at = Compact_at.input m.compact_at text }, []
   | Compact_at_commit -> commit_compact_at m
-  | Sessions_field_input (which, text) ->
-    ( { m with
-        sessions_fields = Sessions_fields.input m.sessions_fields which text
-      }
-    , [] )
-  | Sessions_field_commit which -> commit_sessions_field m which
+  | Archive_after_input text ->
+    { m with archive_after = Archive_after.input m.archive_after text }, []
+  | Archive_after_commit -> commit_archive_after m
   | Set_default change -> set_default m change
   | Pick_default which -> pick_default m which
   | Default_field_input (which, text) ->
@@ -12259,7 +12119,6 @@ let update_connected (m : Model.t) (action : Action.t) =
       m
       ~command:("/remind rm " ^ name)
       (Prigh_ui.Remind_command.Action.Remove name)
-  | Toggle_folded id -> toggle_folded m id
   | New_session_in path -> new_session_in m path
   | Generate Commit_message -> git_action m Draft
   | Generate target -> start_generate m target

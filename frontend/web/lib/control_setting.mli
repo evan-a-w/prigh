@@ -26,7 +26,6 @@ type t =
   | Corners
   | Font
   | Code_font
-  | Worktree_hours
   | Archive_after
   | Notifications
   | Providers

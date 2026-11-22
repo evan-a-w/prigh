@@ -38,8 +38,8 @@ let%expect_test "archive after: shown, typed, off, refused" =
   row h;
   [%expect
     {|
-    (Sessions_field_input Archive_days 14)
-    (Sessions_field_commit Archive_days)
+    (Archive_after_input 14)
+    Archive_after_commit
     (Rpc (method_ set_config) (params ((config ((archive_after_days 14)))))
      (tag Auto_archive_saved))
     (Expire_toast (id 0) (after_ms 4580))
@@ -83,14 +83,14 @@ let%expect_test "archive after: shown, typed, off, refused" =
   row h;
   [%expect
     {|
-    (Sessions_field_input Archive_days "a fortnight")
-    (Sessions_field_commit Archive_days)
+    (Archive_after_input "a fortnight")
+    Archive_after_commit
     Archive after
     Sessions without activity for 14 days move to Archived (pinned and running ones never do). “a fortnight” isn't a number of days from 0 to 365: type one like 7, or off to archive only by hand.
     [a fortnight] days
     (Archive only by hand (/auto-archive off))
-    (Sessions_field_input Archive_days 400)
-    (Sessions_field_commit Archive_days)
+    (Archive_after_input 400)
+    Archive_after_commit
     Dialog_accept
     Archive after
     Sessions without activity for 14 days move to Archived (pinned and running ones never do). “400” isn't a number of days from 0 to 365: type one like 7, or off to archive only by hand.

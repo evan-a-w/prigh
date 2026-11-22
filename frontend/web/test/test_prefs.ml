@@ -79,11 +79,8 @@ let%expect_test "the cache first, then the backend's, which win" =
       ((key web.radius) (value ())) ((key web.font) (value ()))
       ((key web.code-font) (value ())) ((key web.notify) (value ()))
       ((key web.verbosity) (value (quiet))) ((key web.terminal-open) (value ()))
-      ((key web.sidebar-folded) (value ()))
-      ((key web.sidebar-unfolded) (value ()))
-      ((key web.sidebar-opened) (value ()))
-      ((key web.sidebar-worktree-hours) (value ())) ((key web.review) (value ()))
-      ((key web.code-size) (value ())) ((key favourite-models) (value ()))
+      ((key web.review) (value ())) ((key web.code-size) (value ()))
+      ((key favourite-models) (value ()))
       ((key history) (value (("from the tui"))))
       ((key web.migrated) (value (true))) ((key web.sidebar-width) (value ()))
       ((key web.files-width) (value ()))
@@ -129,11 +126,8 @@ let%expect_test "a page from before uploads the browser's once" =
       ((key web.radius) (value ())) ((key web.font) (value ()))
       ((key web.code-font) (value ())) ((key web.notify) (value (false)))
       ((key web.verbosity) (value ())) ((key web.terminal-open) (value ()))
-      ((key web.sidebar-folded) (value ()))
-      ((key web.sidebar-unfolded) (value ()))
-      ((key web.sidebar-opened) (value ()))
-      ((key web.sidebar-worktree-hours) (value ())) ((key web.review) (value ()))
-      ((key web.code-size) (value ())) ((key favourite-models) (value ()))
+      ((key web.review) (value ())) ((key web.code-size) (value ()))
+      ((key favourite-models) (value ()))
       ((key history) (value (("tui prompt"))))
       ((key web.migrated) (value (true))) ((key web.sidebar-width) (value ()))
       ((key web.files-width) (value ()))
@@ -172,13 +166,10 @@ let%expect_test "a page from before uploads the browser's once" =
       ((key web.radius) (value ())) ((key web.font) (value ()))
       ((key web.code-font) (value ())) ((key web.notify) (value ()))
       ((key web.verbosity) (value ())) ((key web.terminal-open) (value ()))
-      ((key web.sidebar-folded) (value ()))
-      ((key web.sidebar-unfolded) (value ()))
-      ((key web.sidebar-opened) (value ()))
-      ((key web.sidebar-worktree-hours) (value ())) ((key web.review) (value ()))
-      ((key web.code-size) (value ())) ((key favourite-models) (value ()))
-      ((key history) (value ())) ((key web.migrated) (value (true)))
-      ((key web.sidebar-width) (value ())) ((key web.files-width) (value ()))
+      ((key web.review) (value ())) ((key web.code-size) (value ()))
+      ((key favourite-models) (value ())) ((key history) (value ()))
+      ((key web.migrated) (value (true))) ((key web.sidebar-width) (value ()))
+      ((key web.files-width) (value ()))
       ((key web.files-preview-width) (value ()))
       ((key web.agents-width) (value ())) ((key web.terminal-height) (value ()))
       ((key web.review-chat-width) (value ()))
@@ -333,8 +324,7 @@ let%expect_test
      (params
       ((keys
         (web.theme web.accent web.radius web.font web.code-font web.notify
-         web.verbosity web.terminal-open web.sidebar-folded web.sidebar-unfolded
-         web.sidebar-opened web.sidebar-worktree-hours web.review web.code-size
+         web.verbosity web.terminal-open web.review web.code-size
          favourite-models history web.migrated web.sidebar-width web.files-width
          web.files-preview-width web.agents-width web.terminal-height
          web.review-chat-width web.review-files-width web.review-margin-width
@@ -718,5 +708,68 @@ let%expect_test "corners and fonts: their variables, saved like the theme" =
      ((name Original) (accent (Preset Orange)) (radius Round) (sans Inter)
       (mono System)))
     [radio] button "Round" -- softer, rounder (/corners round)
+    |}]
+;;
+
+(* The sidebar's worktree folds and their hours (worktrees are in the
+   session card now): whatever is stored of them is ignored, quietly. *)
+let%expect_test "preferences of earlier versions are ignored" =
+  let old =
+    [ change "web.sidebar-folded" (`Object [ "s1", str "2026-10-05 10:00:00Z" ])
+    ; change "web.sidebar-unfolded" (`Array [ str "s2" ])
+    ; change "web.sidebar-opened" (`Object [ "s1", str "2026-10-05 10:00:00Z" ])
+    ; change "web.sidebar-worktree-hours" (`Number "0")
+    ]
+  in
+  (* From the browser's cache, then the backend's. *)
+  let h = H.connecting () in
+  H.quiet h (fun () -> H.act h Start);
+  H.quiet h (fun () -> restore h old);
+  H.reply
+    h
+    "get_prefs"
+    {|{"prefs":{"web.migrated":true,"web.sidebar-folded":{"s1":"2026-10-05 10:00:00Z"},"web.sidebar-unfolded":["s2"],"web.sidebar-opened":{"s1":"2026-10-05 10:00:00Z"},"web.sidebar-worktree-hours":0}}|};
+  let m = H.model h in
+  print_s [%sexp (List.is_empty m.toasts : bool)];
+  [%expect
+    {|
+    (Apply_theme
+     ((name Original) (accent (Preset Orange)) (radius Default) (sans Recursive)
+      (mono Recursive)))
+    (Cache_prefs
+     (((key web.theme) (value ())) ((key web.accent) (value ()))
+      ((key web.radius) (value ())) ((key web.font) (value ()))
+      ((key web.code-font) (value ())) ((key web.notify) (value ()))
+      ((key web.verbosity) (value ())) ((key web.terminal-open) (value ()))
+      ((key web.review) (value ())) ((key web.code-size) (value ()))
+      ((key favourite-models) (value ())) ((key history) (value ()))
+      ((key web.migrated) (value (true))) ((key web.sidebar-width) (value ()))
+      ((key web.files-width) (value ()))
+      ((key web.files-preview-width) (value ()))
+      ((key web.agents-width) (value ())) ((key web.terminal-height) (value ()))
+      ((key web.review-chat-width) (value ()))
+      ((key web.review-files-width) (value ()))
+      ((key web.review-margin-width) (value ()))
+      ((key web.editor-tree-width) (value ()))))
+    true
+    |}];
+  (* Another browser of an earlier version: the page stays as it was. *)
+  let h = H.create () in
+  let page () = H.texts h ~selector:".app" in
+  let before = page () in
+  H.event
+    h
+    {|{"event":"prefs_changed","prefs":{"web.sidebar-worktree-hours":12,"web.sidebar-opened":{"s1":"2026-10-05 10:00:00Z"}}}|};
+  print_s
+    [%sexp
+      (List.is_empty before : bool)
+    , ([%equal: string list] before (page ()) : bool)
+    , (List.is_empty (H.model h).toasts : bool)];
+  [%expect
+    {|
+    (Cache_prefs
+     (((key web.sidebar-worktree-hours) (value (12)))
+      ((key web.sidebar-opened) (value (((s1 "2026-10-05 10:00:00Z")))))))
+    (false true true)
     |}]
 ;;

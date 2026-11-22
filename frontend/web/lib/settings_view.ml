@@ -261,96 +261,16 @@ let naming_model (m : App.Model.t) ~inject =
     ]
 ;;
 
-(* One of the session list's numbers, behind its switch. *)
-let sessions_number
-      (m : App.Model.t)
-      (which : Sessions_fields.Which.t)
-      ~id
-      ~label
-      ~unit
-      ~placeholder
-      ~title
-      ~switch_title
-      ~current
-      ~inject
-  =
-  let on = Option.exists current ~f:(fun n -> Float.(n > 0.)) in
+let auto_archive (m : App.Model.t) ~inject =
+  let days = Option.map m.config ~f:(fun c -> c.archive_after_days) in
+  let on = Option.exists days ~f:(fun d -> Float.(d > 0.)) in
+  let error = Archive_after.error m.archive_after in
   let value =
-    match Sessions_fields.draft m.sessions_fields which, current with
+    match Archive_after.draft m.archive_after, days with
     | Some draft, _ -> draft
-    | None, Some n when Float.(n > 0.) -> sprintf "%g" n
+    | None, Some d when Float.(d > 0.) -> sprintf "%g" d
     | None, _ -> ""
   in
-  let key : Switched_off.Key.t =
-    match which with
-    | Worktree_hours -> Worktree_hours
-    | Archive_days -> Archive_days
-  in
-  number_switch
-    ~disabled:(Option.is_none current)
-    ~id
-    ~label
-    ~unit
-    ~value
-    ~placeholder
-    ~title
-    ~switch_title:(switch_title on)
-    ~invalid:(Option.is_some (Sessions_fields.error m.sessions_fields which))
-    ~on
-    ~on_input:(fun text ->
-      inject (App.Action.Sessions_field_input (which, text)))
-    ~on_commit:(inject (App.Action.Sessions_field_commit which))
-    ~on_switch:(fun on -> inject (App.Action.Switch_number (key, on)))
-    ()
-;;
-
-(* A display preference, the user's on every browser: the TUI's list has no
-   folds. *)
-let worktree_hours (m : App.Model.t) ~inject =
-  let hours = Worktree_folds.hours m.worktree_folds in
-  let which = Sessions_fields.Which.Worktree_hours in
-  row
-    ~cls:"worktree-hours"
-    ~scope:Account
-    ~name:"Show worktrees"
-    ~about:
-      (sprintf
-         "Show worktrees for pinned sessions and those used %s (changed, \
-          running, opened or worked in); others fold them behind their count. \
-          Your own fold or unfold of a session holds until you next open it."
-         (if hours = 0
-          then "recently"
-          else "in the last " ^ Worktree_folds.hours_string hours))
-    ?note:
-      (match Sessions_fields.error m.sessions_fields which with
-       | Some e -> Some ("warm", e)
-       | None when hours = 0 ->
-         Some ("muted", "Off: every session's worktrees fold, pinned ones too.")
-       | None -> None)
-    [ sessions_number
-        m
-        which
-        ~id:"worktree-hours"
-        ~label:"Show worktrees for sessions used in the last"
-        ~unit:"hours"
-        ~placeholder:(Int.to_string Worktree_folds.default_hours)
-        ~title:
-          (sprintf
-             "Hours, 1 to %d (default %d)"
-             Worktree_folds.max_hours
-             Worktree_folds.default_hours)
-        ~switch_title:(fun on ->
-          if on
-          then "Fold every session's worktrees"
-          else "Show recent sessions' worktrees")
-        ~current:(Some (Float.of_int hours))
-        ~inject
-    ]
-;;
-
-let auto_archive (m : App.Model.t) ~inject =
-  let which = Sessions_fields.Which.Archive_days in
-  let days = Option.map m.config ~f:(fun c -> c.archive_after_days) in
   row
     ~cls:"auto-archive"
     ~name:"Archive after"
@@ -365,29 +285,33 @@ let auto_archive (m : App.Model.t) ~inject =
          "Sessions without activity this many days move to Archived (pinned \
           and running ones never do).")
     ?note:
-      (match Sessions_fields.error m.sessions_fields which, days with
+      (match error, days with
        | Some e, _ -> Some ("warm", e)
        | None, None -> Some waiting
-       | None, Some d when Float.(d <= 0.) ->
+       | None, Some _ when not on ->
          Some ("muted", "Off: sessions are archived only by hand.")
        | None, Some _ -> None)
-    [ sessions_number
-        m
-        which
+    [ number_switch
+        ~disabled:(Option.is_none days)
         ~id:"auto-archive"
         ~label:"Archive sessions after"
         ~unit:"days"
+        ~value
         ~placeholder:"7"
         ~title:
           (sprintf
              "/auto-archive DAYS: up to %g days"
              Prigh_ui.Auto_archive_command.max_days)
-        ~switch_title:(fun on ->
-          if on
-          then "Archive only by hand (/auto-archive off)"
-          else "Archive sessions without activity (/auto-archive DAYS)")
-        ~current:days
-        ~inject
+        ~switch_title:
+          (if on
+           then "Archive only by hand (/auto-archive off)"
+           else "Archive sessions without activity (/auto-archive DAYS)")
+        ~invalid:(Option.is_some error)
+        ~on
+        ~on_input:(fun text -> inject (Action.Archive_after_input text))
+        ~on_commit:(inject Action.Archive_after_commit)
+        ~on_switch:(fun on -> inject (Action.Switch_number (Archive_days, on)))
+        ()
     ]
 ;;
 
@@ -1363,9 +1287,7 @@ let content (m : App.Model.t) (section : Section.t) ~inject =
     ; group ~title:"Layout" [ verbosity m ~inject ]
     ]
   | Sessions ->
-    [ group
-        ~title:"Session list"
-        [ worktree_hours m ~inject; auto_archive m ~inject ]
+    [ group ~title:"Session list" [ auto_archive m ~inject ]
     ; group ~title:"Notifications" [ notifications m ~inject ]
     ]
   | New_sessions -> New_sessions_view.groups m ~inject

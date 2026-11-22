@@ -81,15 +81,6 @@ let%expect_test "the next one down: asked, moved, then deleted" =
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
-    (Cache_prefs
-     (((key web.sidebar-opened)
-       (value (((s1 "2026-10-05 10:00:00Z") (s2 "2026-10-05 10:00:00Z")))))))
-    (Rpc (method_ set_prefs)
-     (params
-      ((prefs
-        ((web.sidebar-opened
-          ((s1 "2026-10-05 10:00:00Z") (s2 "2026-10-05 10:00:00Z")))))))
-     (tag Show_error))
     (Rpc (method_ get_review) (params ()) (tag (Review Review)))
     (Expire_toast (id 0) (after_ms 2500))
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
@@ -153,15 +144,6 @@ let%expect_test "the last one: the one above; the only one: a new session" =
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
-    (Cache_prefs
-     (((key web.sidebar-opened)
-       (value (((s1 "2026-10-05 10:00:00Z") (s9 "2026-10-05 10:00:00Z")))))))
-    (Rpc (method_ set_prefs)
-     (params
-      ((prefs
-        ((web.sidebar-opened
-          ((s1 "2026-10-05 10:00:00Z") (s9 "2026-10-05 10:00:00Z")))))))
-     (tag Show_error))
     (Rpc (method_ get_review) (params ()) (tag (Review Review)))
     (Expire_toast (id 0) (after_ms 2500))
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))

@@ -1,11 +1,10 @@
 open! Core
-open Prigh_web
 module H = Harness
 
 (* The sidebar: a flat list of sessions, each saying where it works (its
-   repository and branch) with the worktrees that matter to it under it
-   (made by it, moved into, a pull request's, a subagent's), and their
-   context menus. *)
+   repository and branch); the worktrees that matter to a session (made by
+   it, moved into, a pull request's, a subagent's) are in its card, with
+   their context menus. *)
 
 let prigh = "/home/u/src/prigh"
 let site = "/home/u/src/site"
@@ -104,9 +103,6 @@ let worktree_menu h ~owner path =
        })
 ;;
 
-(* "New hero", three days old, has its worktrees folded by default. *)
-let unfold_s6 h = H.quiet h (fun () -> H.act h (Toggle_folded "s6"))
-
 let choose h id =
   H.click h ~selector:(sprintf ".context-menu [data-item=%s]" id)
 ;;
@@ -132,7 +128,7 @@ let listing root worktrees =
     (String.concat ~sep:"," worktrees)
 ;;
 
-let%expect_test "a flat list of sessions, each with its worktrees under it" =
+let%expect_test "a flat list of sessions; their cards list their worktrees" =
   let h = create () in
   list h;
   [%expect
@@ -154,6 +150,7 @@ let%expect_test "a flat list of sessions, each with its worktrees under it" =
     <div class="group/session hover:bg-sidebar-accent relative rounded-md session text-sidebar-foreground">
     (feat/login) (agent/fix-the-parser subagent) (pr-7 #7)
     (feat/login here)
+    (redesign here)
     |}];
   H.names h ~selector:".session";
   [%expect
@@ -184,6 +181,7 @@ let%expect_test
     {|
     (feat/login ● 2 ↑1) (agent/fix-the-parser subagent)
     (feat/login here ● 2 ↑1)
+    (redesign here)
     |}];
   H.reply
     h
@@ -195,227 +193,6 @@ let%expect_test
     {|
     (feat/login ● 2 ↑1) (agent/fix-the-parser subagent)
     (feat/login here ● 2 ↑1)
-    |}]
-;;
-
-(* Which sessions' worktrees show, one line each: [-] folded, [+] shown. *)
-let folds h =
-  let m = H.model h in
-  List.iter m.sessions ~f:(fun s ->
-    if not s.archived
-    then
-      printf
-        "%s %s\n"
-        (if Set.mem (App.Model.worktrees_shown m) s.id then "+" else "-")
-        (Option.value s.name ~default:s.id))
-;;
-
-let%expect_test "worktrees show for sessions used in the last 12 hours" =
-  let h = create () in
-  (* Main work 2m, Login form 20m, Landing page 2h: shown; New hero, three
-     days old: folded behind its ⑂ 1. *)
-  folds h;
-  [%expect
-    {|
-    + Main work
-    + Login form
-    + Landing page
-    - Shopping list
-    - New hero
-    |}];
-  (* Hours later Landing page is old too; Main work (open here) and Login
-     form (running) are still in use. *)
-  H.quiet h (fun () ->
-    H.act h (Tick (Time_ns.add H.now (Time_ns.Span.of_hr 12.01))));
-  folds h;
-  [%expect
-    {|
-    + Main work
-    + Login form
-    - Landing page
-    - Shopping list
-    - New hero
-    |}]
-;;
-
-let%expect_test "folding a session's worktrees: the user's choice wins" =
-  let h = create () in
-  (* A recent one folded, an old one unfolded: both kept. *)
-  H.act h (Toggle_folded "s1");
-  H.act h (Toggle_folded "s6");
-  list h;
-  [%expect
-    {|
-    (Cache_prefs
-     (((key web.sidebar-folded) (value (((s1 "2026-10-05 10:00:00Z")))))
-      ((key web.sidebar-unfolded) (value ()))))
-    (Rpc (method_ set_prefs)
-     (params
-      ((prefs
-        ((web.sidebar-folded ((s1 "2026-10-05 10:00:00Z")))
-         (web.sidebar-unfolded null)))))
-     (tag Show_error))
-    (Cache_prefs
-     (((key web.sidebar-folded) (value (((s1 "2026-10-05 10:00:00Z")))))
-      ((key web.sidebar-unfolded) (value (((s6 "2026-10-05 10:00:00Z")))))))
-    (Rpc (method_ set_prefs)
-     (params
-      ((prefs
-        ((web.sidebar-folded ((s1 "2026-10-05 10:00:00Z")))
-         (web.sidebar-unfolded ((s6 "2026-10-05 10:00:00Z")))))))
-     (tag Show_error))
-    (prigh 2m Main work) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (prigh working… Login form) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (site 2h Landing page) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (notes 2d Shopping list) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (site 3d New hero) (More (right-click, Shift+F10)) (Archive) (Delete)
-    |}];
-  (* Whatever the setting says. *)
-  H.quiet h (fun () ->
-    H.act h (Sessions_field_input (Worktree_hours, "0"));
-    H.act h (Sessions_field_commit Worktree_hours));
-  folds h;
-  [%expect
-    {|
-    - Main work
-    - Login form
-    - Landing page
-    - Shopping list
-    + New hero
-    |}];
-  (* Clicking again flips the choice; it stays the user's. *)
-  H.act h (Toggle_folded "s1");
-  [%expect
-    {|
-    (Cache_prefs
-     (((key web.sidebar-folded) (value ()))
-      ((key web.sidebar-unfolded)
-       (value (((s1 "2026-10-05 10:00:00Z") (s6 "2026-10-05 10:00:00Z")))))))
-    (Rpc (method_ set_prefs)
-     (params
-      ((prefs
-        ((web.sidebar-folded null)
-         (web.sidebar-unfolded
-          ((s1 "2026-10-05 10:00:00Z") (s6 "2026-10-05 10:00:00Z")))))))
-     (tag Show_error))
-    |}];
-  (* Another of the user's browsers. *)
-  let h = quiet () in
-  H.event
-    h
-    {|{"event":"prefs_changed","prefs":{"web.sidebar-folded":{"s1":"2026-10-05 10:00:00Z"},"web.sidebar-unfolded":{"s6":"2026-10-05 10:00:00Z"}}}|};
-  folds h;
-  [%expect
-    {|
-    (Cache_prefs
-     (((key web.sidebar-folded) (value (((s1 "2026-10-05 10:00:00Z")))))
-      ((key web.sidebar-unfolded) (value (((s6 "2026-10-05 10:00:00Z")))))))
-    - Main work
-    + Login form
-    + Landing page
-    - Shopping list
-    + New hero
-    |}]
-;;
-
-let%expect_test "the hours: a setting, synced; 0 never shows them; bounds" =
-  let h = create () in
-  H.act h Open_settings;
-  H.quiet h (fun () -> H.act h (Settings_section Sessions));
-  let field text = H.input h ~selector:"#worktree-hours" text in
-  (* New hero, 74 hours old, still folds. *)
-  field "72h";
-  folds h;
-  H.text h ~selector:".setting.worktree-hours";
-  [%expect
-    {|
-    (Focus dialog)
-    (Sessions_field_input Worktree_hours 72h)
-    (Sessions_field_commit Worktree_hours)
-    (Cache_prefs (((key web.sidebar-worktree-hours) (value (72)))))
-    (Rpc (method_ set_prefs) (params ((prefs ((web.sidebar-worktree-hours 72)))))
-     (tag Show_error))
-    + Main work
-    + Login form
-    + Landing page
-    + Shopping list
-    - New hero
-    Show worktrees Your account
-    Show worktrees for pinned sessions and those used in the last 72 hours (changed, running, opened or worked in); others fold them behind their count. Your own fold or unfold of a session holds until you next open it.
-    [72] hours
-    (Fold every session's worktrees)
-    |}];
-  H.click h ~selector:".setting.worktree-hours .switch";
-  folds h;
-  H.text h ~selector:".setting.worktree-hours .setting-control";
-  [%expect
-    {|
-    (Switch_number Worktree_hours false)
-    (Cache_prefs (((key web.sidebar-worktree-hours) (value (0)))))
-    (Rpc (method_ set_prefs) (params ((prefs ((web.sidebar-worktree-hours 0)))))
-     (tag Show_error))
-    - Main work
-    - Login form
-    - Landing page
-    - Shopping list
-    - New hero
-    (Show recent sessions' worktrees)
-    |}];
-  (* On again: the 72 hours it was. *)
-  H.click h ~selector:".setting.worktree-hours .switch";
-  folds h;
-  [%expect
-    {|
-    (Switch_number Worktree_hours true)
-    (Cache_prefs (((key web.sidebar-worktree-hours) (value (72)))))
-    (Rpc (method_ set_prefs) (params ((prefs ((web.sidebar-worktree-hours 72)))))
-     (tag Show_error))
-    + Main work
-    + Login form
-    + Landing page
-    + Shopping list
-    - New hero
-    |}];
-  field "721";
-  H.text h ~selector:".setting.worktree-hours";
-  field "12";
-  [%expect
-    {|
-    (Sessions_field_input Worktree_hours 721)
-    (Sessions_field_commit Worktree_hours)
-    Show worktrees Your account
-    Show worktrees for pinned sessions and those used in the last 72 hours (changed, running, opened or worked in); others fold them behind their count. Your own fold or unfold of a session holds until you next open it. “721” isn't a number of hours from 0 to 720: type one like 12, or off to fold every session's worktrees.
-    [721] hours
-    (Fold every session's worktrees)
-    (Sessions_field_input Worktree_hours 12)
-    (Sessions_field_commit Worktree_hours)
-    (Cache_prefs (((key web.sidebar-worktree-hours) (value ()))))
-    (Rpc (method_ set_prefs)
-     (params ((prefs ((web.sidebar-worktree-hours null))))) (tag Show_error))
-    |}];
-  (* Set in another browser; unset is the default. *)
-  H.event
-    h
-    {|{"event":"prefs_changed","prefs":{"web.sidebar-worktree-hours":1}}|};
-  folds h;
-  H.event
-    h
-    {|{"event":"prefs_changed","prefs":{"web.sidebar-worktree-hours":null}}|};
-  folds h;
-  [%expect
-    {|
-    (Cache_prefs (((key web.sidebar-worktree-hours) (value (1)))))
-    + Main work
-    + Login form
-    - Landing page
-    - Shopping list
-    - New hero
-    (Cache_prefs (((key web.sidebar-worktree-hours) (value ()))))
-    + Main work
-    + Login form
-    + Landing page
-    - Shopping list
-    - New hero
     |}]
 ;;
 
@@ -698,15 +475,6 @@ let%expect_test "a session's items on another session: switch there first" =
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
-    (Cache_prefs
-     (((key web.sidebar-opened)
-       (value (((s1 "2026-10-05 10:00:00Z") (s3 "2026-10-05 10:00:00Z")))))))
-    (Rpc (method_ set_prefs)
-     (params
-      ((prefs
-        ((web.sidebar-opened
-          ((s1 "2026-10-05 10:00:00Z") (s3 "2026-10-05 10:00:00Z")))))))
-     (tag Show_error))
     (Rpc (method_ get_review) (params ()) (tag (Review Review)))
     (Focus dialog)
     (Rpc (method_ get_entries) (params ()) (tag (Entries Fork)))
@@ -924,7 +692,6 @@ let%expect_test "a worktree's menu and its items" =
 
 let%expect_test "a worktree's items on another session's worktree" =
   let h = create () in
-  unfold_s6 h;
   worktree_menu h ~owner:"s6" redesign;
   choose h "create_pr";
   [%expect
@@ -947,7 +714,6 @@ let%expect_test "a worktree's items on another session's worktree" =
 
 let%expect_test "removing a worktree from its menu, or Delete on its row" =
   let h = create () in
-  unfold_s6 h;
   worktree_menu h ~owner:"s6" redesign;
   choose h "remove";
   dialog h;

@@ -150,8 +150,8 @@ const prefsFile = () => {
   try {
     const prefs = JSON.parse(readFileSync(join(home, ".prigh/prefs.json"), "utf8"));
     return Object.entries(prefs)
-      // Not the history, nor the sessions gone into (ids and times).
-      .filter(([k]) => k !== "history" && k !== "web.sidebar-opened")
+      // Not the history.
+      .filter(([k]) => k !== "history")
       .map(([k, v]) => `${k}=${JSON.stringify(v)}`)
       .join(" ");
   } catch {

@@ -19,7 +19,6 @@ type t =
   | Corners
   | Font
   | Code_font
-  | Worktree_hours
   | Archive_after
   | Notifications
   | Providers
@@ -61,7 +60,6 @@ let name = function
   | Corners -> "Corners"
   | Font -> "Font"
   | Code_font -> "Code font"
-  | Worktree_hours -> "Show worktrees"
   | Archive_after -> "Archive sessions after"
   | Notifications -> "Notifications"
   | Providers -> "Model providers"
@@ -120,7 +118,6 @@ let keywords = function
   | Corners -> "appearance radius rounded roundness"
   | Font -> "appearance typeface sans text"
   | Code_font -> "appearance typeface monospace mono"
-  | Worktree_hours -> "sidebar session list fold"
   | Archive_after -> "auto-archive session list days"
   | Notifications -> "notify alerts"
   | Providers -> "login logout keys auth"
@@ -171,7 +168,6 @@ let page t : (Settings_section.t * string) option =
   | Corners -> Some (Appearance, "Corners")
   | Font -> Some (Appearance, "Font")
   | Code_font -> Some (Appearance, "Code font")
-  | Worktree_hours -> Some (Sessions, "Show worktrees")
   | Archive_after -> Some (Sessions, "Archive after")
   | Notifications -> Some (Sessions, "Notifications")
   | Default_model -> Some (New_sessions, "Model")

@@ -647,11 +647,9 @@ module Action : sig
         section and focuses its tab *)
     | Compact_at_input of string (** the settings page's "Compact at" *)
     | Compact_at_commit (** applies it (leaving the field; Enter accepts) *)
-    | Sessions_field_input of Sessions_fields.Which.t * string
-    (** the settings page's session list fields: worktrees' hours, archive's
-        days *)
-    | Sessions_field_commit of Sessions_fields.Which.t
-    (** applies one (leaving the field; Enter accepts) *)
+    | Archive_after_input of string (** the settings page's "Archive after" *)
+    | Archive_after_commit
+    (** applies it (leaving the field; Enter accepts) *)
     | Set_default of New_default.t
     (** the settings' New sessions: saves a default, for new sessions only *)
     | Pick_default of New_default.Picker.t
@@ -747,9 +745,6 @@ module Action : sig
     | Set_recipient of Recipient.t
     (** the composer sends to the main agent or steers a running subagent *)
     | Remove_reminder of string (** by name, from the [/remind] picker *)
-    | Toggle_folded of string
-    (** fold or unfold the worktrees under a session of the sidebar (by its
-        id), whatever its age ({!Worktree_folds}) *)
     | New_session_in of string
     (** a new session working in this directory (a worktree) *)
     | New_worktree (** its dialog: the session moves into the worktree *)
@@ -1052,9 +1047,6 @@ module Model : sig
     ; worktrees : Worktrees.t (** the session's, [/worktree]'s completion *)
     ; repo_worktrees : Repo_listings.t
       (** the repositories of the worktrees under the sidebar's sessions *)
-    ; worktree_folds : Worktree_folds.t
-      (** which of the sidebar's sessions show their worktrees (the user's
-          preferences) *)
     ; pending : In_flight.t (** what we wait on the backend for, on show *)
     ; marks : Session_marks.t (** the sidebar's selection *)
     ; notifications : Page_notify.t
@@ -1101,8 +1093,7 @@ module Model : sig
     ; about_you : About_you.t (** the settings page's About you *)
     ; mcp : Mcp_page.t (** the settings page's MCP servers *)
     ; compact_at : Compact_at.t (** the settings page's "Compact at" *)
-    ; sessions_fields : Sessions_fields.t
-      (** the settings page's session list fields *)
+    ; archive_after : Archive_after.t (** the settings page's "Archive after" *)
     ; default_fields : Default_fields.t
       (** the settings page's New sessions fields *)
     ; switched_off : Switched_off.t
@@ -1162,9 +1153,6 @@ module Model : sig
   val waiting : t -> bool
   (** The turn or background subagents or jobs run: the session is busy. *)
   val active : t -> bool
-
-  (** The sessions whose worktrees the sidebar shows ({!Worktree_folds}). *)
-  val worktrees_shown : t -> String.Set.t
 
   (** The agents panel is open with something running: the page sends
       [Clock] every second. *)

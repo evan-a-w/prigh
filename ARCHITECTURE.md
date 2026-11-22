@@ -3624,36 +3624,24 @@ terminal frontend and `web/` prigh-web, the browser one.
       repository, branch and the worktrees' branches, ages from
       `Rel_time`): a flat list of the active sessions in the backend's
       order (most recent first), each row with its repository and branch
-      (`Sidebar_view.place`) or directory, and under it its
-      `Prigh_ui.Session_worktrees` nodes (changes and sync from the
-      listings: `Worktrees`' of the open session's repository, and
-      `Repo_listings`, a cache by repository root of the listings of the
-      repositories the sessions' worktrees belong to. It belongs to the
-      user, not the open session: a session switch keeps it (a user
-      switch empties it), the open session's own listing goes in too, so
-      a session's worktrees stay under it, with their changes, when the
-      user leaves it, and only the repositories of the sessions listed are
-      kept. Each other repository is asked once (`list_worktrees {cwd:
-      root}`, `Repo_worktrees`) and again once stale: a turn's end, a
-      session's worktrees changing (which also checks the open session's
-      listing again), a worktree made or removed; a stale listing shows
-      until its new one comes, and while it is stale a worktree it lacks
-      still shows (`Session_worktrees.of_session ~unsettled`: it may be
-      newer than the listing) rather than being taken for removed);
-      `Model.worktree_folds` (`Worktree_folds`) decides whether a
-      session's worktrees show (`Model.worktrees_shown`): a fold or
-      unfold by hand (session id → when, in the `web.sidebar-folded` and
-      `web.sidebar-unfolded` preferences) made since the session was last
-      opened wins; else pinned sessions show, and the rest when last used
-      within the window (`web.sidebar-worktree-hours`, default 12, 0 =
-      fold all) of `Model.now`. Used is the latest of `updated_at`, the
-      last time the user went into it (`web.sidebar-opened`, written by
-      `note_opened` on a session change and the first `Tick`, merged
-      across browsers by the later time, and uploaded when this browser's
-      cache is ahead once the preferences load), and now while it runs or
-      is open; a session whose cwd is inside another's worktree lends that
-      one its use and openings. A per-user preference rather than config.json: it is
-      a display choice of the person, not of the backend's namespace. Context menus (`Context_menu`, also messages', drawn by
+      (`Sidebar_view.place`) or directory. The open session's worktrees
+      are in its session card (`Session_card`, `Session_card_view`), its
+      `Session_worktree_nodes` (`Prigh_ui.Session_worktrees` nodes, with
+      changes and sync from the listings: `Worktrees`' of the open
+      session's repository, and `Repo_listings`, a cache by repository
+      root of the listings of the repositories the sessions' worktrees
+      belong to. It belongs to the user, not the open session: a session
+      switch keeps it (a user switch empties it), the open session's own
+      listing goes in too, so a session's worktrees keep their changes
+      when the user leaves it and comes back, and only the repositories of
+      the sessions listed are kept. Each other repository is asked once
+      (`list_worktrees {cwd: root}`, `Repo_worktrees`) and again once
+      stale: a turn's end, a session's worktrees changing (which also
+      checks the open session's listing again), a worktree made or
+      removed; a stale listing shows until its new one comes, and while it
+      is stale a worktree it lacks still shows
+      (`Session_worktrees.of_session ~unsettled`: it may be newer than the
+      listing) rather than being taken for removed). Context menus (`Context_menu`, also messages', drawn by
       `Context_menu_view` as a `Dialog.Picker` of kind `Menu`, so it owns
       the keyboard like any picker; `Command.Place_menu` has
       `Menu_listeners` put it at the pointer or under the row and keep it

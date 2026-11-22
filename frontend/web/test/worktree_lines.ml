@@ -2,15 +2,12 @@ open! Core
 module H = Harness
 open Prigh_web
 
-(* The worktrees each session shows (those its fold leaves open), one line
-   a session, as the sidebar listed them. *)
 let print h =
   let m = H.model h in
-  let shown = App.Model.worktrees_shown m in
   List.iter m.sessions ~f:(fun s ->
     match Session_worktree_nodes.of_session m s with
     | [] -> ()
-    | _ when s.archived || not (Set.mem shown s.id) -> ()
+    | _ when s.archived -> ()
     | nodes ->
       List.map nodes ~f:(fun (n : Prigh_ui.Session_worktrees.Node.t) ->
         let w = n.worktree in

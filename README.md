@@ -536,29 +536,17 @@ has its lamp (lit while its turn or its background subagents and jobs
 run), its age and where it works: its repository and branch (`prigh ⎇
 main`), or its directory outside a repository. A session has a repository
 attached rather than living in one: sessions are not grouped by
-repository. Under each session hang the worktrees that matter to it, each
-a branch off a rail: those it made (`/worktree new`, the New worktree
-dialog), moved into (`/cd`, `/worktree open`), checked a pull request out
-in (`/pr checkout`, tagged `#7`) or made for its subagents (tagged
-`subagent`), with `● 3` when one has uncommitted changes and ↑↓ commits
-against its upstream; the one it works in says `here`. A worktree two
-sessions use is under both; one removed (from any session, or outside
-prigh) goes. On disk worktrees still go by repository
+repository. The worktrees that matter to the open session are in its
+session card (the chat's top-right corner; a sheet on a phone), under
+Worktrees: those it made (`/worktree new`, the New worktree dialog), moved
+into (`/cd`, `/worktree open`), checked a pull request out in (`/pr
+checkout`, tagged `#7`) or made for its subagents (tagged `subagent`),
+with `● 3` when one has uncommitted changes and ↑↓ commits against its
+upstream; the one it works in says `here`. A worktree two sessions use is
+in both cards; one removed (from any session, or outside prigh) goes. On
+disk worktrees still go by repository
 (`<worktrees_dir>/<project>/<branch>`), and `/worktree` lists all of the
-repository's. A session used in the last 12 hours shows its worktrees,
-and so does a pinned one; others fold them behind the count at the right
-of its second line (`⑂ 3`). Used means changed (its age on the card),
-running, open in front of you, or gone into (in any of your browsers);
-a session working in one of another's worktrees uses that one too.
-Settings → Sessions → Show worktrees sets the window in hours (up to
-720; its switch off, or 0: every session's worktrees fold, pinned and open ones
-too; on again: the hours it had). Clicking the count folds or unfolds a
-session's worktrees whatever its age, and that choice holds until you
-next go into the session (or into one working in its worktrees); the
-window, the choices and when you last went into each session are kept
-with your preferences (`web.sidebar-worktree-hours`,
-`web.sidebar-folded`, `web.sidebar-unfolded`, `web.sidebar-opened`), so
-they follow you to other browsers.
+repository's.
 
 A session that switched into a worktree (`/worktree open`, `/worktree
 new`, `/pr checkout`, Switch session here) remembers where it came from,
@@ -986,9 +974,8 @@ The settings page (the gear beside your account at the foot of the
 sidebar, Settings in the account menu, `/settings` or Ctrl+,) holds what is not
 about the session, in sections listed down its side (across its top on a
 phone): **Appearance** (the theme and accent, transcript detail
-(`/verbosity`)), **Sessions** (the session list: Show worktrees, the hours a session's worktrees stay
-unfolded in the sidebar after it was used, and Archive after, the days
-without activity that archive it (`/auto-archive`), each a number with
+(`/verbosity`)), **Sessions** (the session list: Archive after, the days
+without activity that archive it (`/auto-archive`), a number with
 a switch that turns it off and back on to what it was; notifications, on or
 off, and what to do when the browser has not been asked, blocks them or
 cannot show them), **New sessions** (what a new session starts with, each

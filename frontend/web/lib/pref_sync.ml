@@ -10,10 +10,6 @@ module Key = struct
   let notify = "web.notify"
   let verbosity = "web.verbosity"
   let terminal_open = "web.terminal-open"
-  let folded = "web.sidebar-folded"
-  let unfolded = "web.sidebar-unfolded"
-  let opened = "web.sidebar-opened"
-  let worktree_hours = "web.sidebar-worktree-hours"
   let review = "web.review"
   let code_size = "web.code-size"
   let favourite_models = "favourite-models"
@@ -29,10 +25,6 @@ module Key = struct
     ; notify
     ; verbosity
     ; terminal_open
-    ; folded
-    ; unfolded
-    ; opened
-    ; worktree_hours
     ; review
     ; code_size
     ; favourite_models
