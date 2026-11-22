@@ -50,10 +50,10 @@ writeFileSync(
     { text: "Looking around.", tool_calls: [{ id: "b1", name: "bash", arguments: { command: waitFor("sub-go") } }] },
     { text: "Using the tests, as asked." },
     { text: "Summary: **3** files, all tested." },
-    // Carried on after it finished, by a message in its chat.
-    { text: "Carrying on: the docs are fine too." },
     // The main agent again, the report delivered meanwhile.
     { text: "The survey is in." },
+    // The subagent, carried on after it finished by a message in its chat.
+    { text: "Carrying on: the docs are fine too." },
   ]),
 );
 
@@ -107,16 +107,13 @@ const show = async (label, selector) => {
 };
 const composer = page.locator(".composer textarea");
 const recipient = async () => {
-  const shown = await page.locator(".subagent-chat").getAttribute("data-subagent").catch(() => null);
+  const shown = await page.evaluate(() => document.querySelector(".subagent-chat")?.dataset.subagent);
   const crumbs = clean(await page.locator(".session-crumbs").innerText()).replace(/\n/g, " ");
   return `${shown ? `${shown}'s chat` : "the session's chat"} (${crumbs}); ${await composer.getAttribute("placeholder")}`;
 };
 const subagentChat = page.locator(".subagent-chat[data-subagent=a1]");
 const subagentHas = text => page.waitForFunction(t =>
   document.querySelector(".subagent-chat[data-subagent=a1]")?.innerText.includes(t), text);
-const toasts = () => page.locator(".toast").allInnerTexts();
-const waitToast = text => page.waitForFunction(t =>
-  [...document.querySelectorAll(".toast")].some(e => e.innerText.includes(t)), text);
 
 try {
   await page.goto(url);
@@ -167,12 +164,10 @@ try {
 
   // It carries on: the steer, then the follow-up, reach it.
   writeFileSync(join(cwd, "sub-go"), "");
-  await waitToast("a1 has finished");
   await page.waitForFunction(() => !document.querySelector(".queued"));
   await page.waitForFunction(() => !document.querySelector(".composer .stop"));
   await subagentHas("all tested");
   section("delivered, it finished");
-  console.log((await toasts()).filter(t => t.includes("has finished")).join("\n"));
   console.log(await recipient());
   const openNotes = () => page.evaluate(() => {
     document.querySelectorAll(".subagent-chat details.note").forEach(d => { d.open = true; });
@@ -181,8 +176,30 @@ try {
   await show("its transcript", ".subagent-chat .entries");
   await screenshot("a1 steered and finished");
 
-  // Finished, a message carries it on: it runs again.
+  // Its report not yet with the main agent (busy in its own call), it
+  // takes no message: what to do instead, the draft kept.
   await composer.fill("check the docs too");
+  await composer.press("Enter");
+  await page.waitForFunction(() =>
+    [...document.querySelectorAll(".toast")].some(e => e.innerText.includes("Couldn't send it to a1")));
+  section("its report on its way");
+  console.log((await page.locator(".toast").allInnerTexts()).filter(t => t.includes("Couldn't")).join("\n"));
+  console.log(`in the editor: ${await composer.inputValue()}`);
+  await screenshot("report on its way");
+
+  // The main agent gets the report.
+  await page.keyboard.press("Escape");
+  await subagentChat.waitFor({ state: "detached" });
+  writeFileSync(join(cwd, "main-go"), "");
+  await page.waitForFunction(() => document.getElementById("chat").innerText.includes("The survey is in."));
+  await page.waitForFunction(() => !document.querySelector(".composer .stop"));
+  section("the main agent got the report");
+  console.log(`in the editor: ${await composer.inputValue()}`);
+
+  // Then a message in its chat carries it on: it runs again, and does not
+  // report to the main agent again.
+  await page.keyboard.press("Alt+1");
+  await subagentChat.waitFor();
   await composer.press("Enter");
   await subagentHas("Carrying on");
   await page.waitForFunction(() => !document.querySelector(".composer .stop"));
@@ -191,14 +208,11 @@ try {
   await openNotes();
   await show("its transcript", ".subagent-chat .entries");
   await screenshot("a1 carried on");
-
   await page.keyboard.press("Escape");
   await subagentChat.waitFor({ state: "detached" });
-  writeFileSync(join(cwd, "main-go"), "");
-  await page.waitForFunction(() => document.getElementById("chat").innerText.includes("The survey is in."));
-  await page.waitForFunction(() => !document.querySelector(".composer .btn.stop"));
-  section("the main agent got the report");
-  console.log("The survey is in.");
+  section("the session's chat");
+  const turns = await page.evaluate(() => document.getElementById("chat").innerText.split("The survey is in.").length - 1);
+  console.log(`the main agent's replies after the report: ${turns}; running: ${await page.locator(".composer .stop").count()}`);
 
   section("errors");
   console.log(errors.length ? errors.join("\n") : "none");
