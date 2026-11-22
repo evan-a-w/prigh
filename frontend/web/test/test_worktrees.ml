@@ -11,7 +11,7 @@ let run h command =
 
 let toasts h = H.text h ~selector:".toast"
 let dialog h = H.text h ~selector:".modal"
-let section h = H.text h ~selector:".session-worktrees"
+let section = Worktree_lines.print
 
 let worktree
       ?(branch = Some "main")
@@ -140,9 +140,9 @@ let%expect_test "the listing follows the directory and resets with the session" 
   (* Another directory of this session: listed again, the old one showing
      meanwhile with the lamp. *)
   state_event h ~cwd:login_path ~branch:"feat/login" ();
-  H.elements h ~selector:".worktree.here";
+  section h;
   H.reply h "list_worktrees" (listing ~current:login_path ());
-  H.text h ~selector:".worktree.here";
+  section h;
   [%expect
     {|
     (Rpc (method_ list_worktrees) (params ())
@@ -152,9 +152,9 @@ let%expect_test "the listing follows the directory and resets with the session" 
               \nbackend\
               \n/home/u/.prigh/worktrees/work/feat-login")
        (purpose (Sidebar 2)))))
-    <button class="dirty here worktree">
-    <button class="dirty here worktree">
+    (feat/login here ● 3 ↑2 ↓1) (docs) (old gone)
     (feat/login here ● 3 ↑2 ↓1)
+    (feat/login here ● 3 ↑2 ↓1) (docs) (old gone)
     (feat/login here ● 3 ↑2 ↓1)
     |}];
   (* Another session: the sessions' rows keep the repository's listing
@@ -194,14 +194,6 @@ let%expect_test "the listing follows the directory and resets with the session" 
     {|
     (feat/login ● 3 ↑2 ↓1) (docs) (old gone)
     (feat/login ● 3 ↑2 ↓1)
-    |}];
-  H.elements h ~selector:".worktree";
-  [%expect
-    {|
-    <button class="dirty worktree">
-    <button class="worktree">
-    <button class="gone worktree">
-    <button class="dirty worktree">
     |}]
 ;;
 
@@ -915,6 +907,9 @@ let%expect_test "a turn's end checks them again, in the background" =
                             \n/work") (purpose (Sidebar 2)))))
     |}];
   H.reply h "list_worktrees" (listing ~current:"" ());
-  H.elements h ~selector:".worktree.here";
-  [%expect {| <button class="dirty here worktree"> |}]
+  section h;
+  [%expect {|
+    (feat/login ● 3 ↑2 ↓1) (docs) (old gone)
+    (feat/login here ● 3 ↑2 ↓1)
+    |}]
 ;;

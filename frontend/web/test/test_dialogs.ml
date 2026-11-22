@@ -69,8 +69,8 @@ let%expect_test "a dialog makes the page behind it inert: Tab stays in it" =
   [%expect
     {|
     (Focus dialog)
-    <aside class="sidebar">
-    <div class="chrome-anchor">
+    <aside class="bg-sidebar loon sidebar text-sidebar-foreground text-sm">
+    <div class="chrome-anchor loon">
     <div class="chat-frame">
     <footer class="composer">
     |}];
@@ -90,8 +90,8 @@ let%expect_test "a dialog makes the page behind it inert: Tab stays in it" =
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
     (Focus confirm)
-    <aside class="sidebar">
-    <div class="chrome-anchor">
+    <aside class="bg-sidebar loon sidebar text-sidebar-foreground text-sm">
+    <div class="chrome-anchor loon">
     <div class="chat-frame">
     <footer class="composer">
     <aside class="agents-panel">
@@ -666,10 +666,13 @@ let%expect_test "the reconnect delay doubles up to ten seconds" =
 let%expect_test "signing out" =
   let h = H.create () in
   H.text h ~selector:".sidebar-footer";
-  [%expect {| (Commands & keys) (Settings (Ctrl+, or /settings)) |}];
+  [%expect {| (Settings (Ctrl+, or /settings)) (Pull requests (/pr)) (Commands and keys (/help)) |}];
   H.act h Saved_login;
   H.text h ~selector:".sidebar-footer";
-  [%expect {| (Commands & keys) (Settings (Ctrl+, or /settings)) (Sign out) |}];
+  [%expect {|
+    (Settings (Ctrl+, or /settings)) (Pull requests (/pr)) (Commands and keys (/help))
+    (Sign out)
+    |}];
   H.act
     h
     (Hello
@@ -680,7 +683,7 @@ let%expect_test "signing out" =
        ; features = []
        });
   H.text h ~selector:".sidebar-footer";
-  [%expect {| (A ann acting as bob) (Settings (Ctrl+, or /settings)) |}];
+  [%expect {| (Settings (Ctrl+, or /settings)) (Pull requests (/pr)) (Commands and keys (/help)) (acting as bob A) |}];
   H.act h Sign_out;
   H.type_ h "/signout";
   H.act h Send;
@@ -703,12 +706,12 @@ let%expect_test "on a phone the agents panel is a sheet with the keyboard" =
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
     (Focus agents-panel)
-    <aside class="sidebar">
+    <aside class="bg-sidebar loon sidebar text-sidebar-foreground text-sm">
     <div class="chrome-anchor">
     <div class="chat-frame">
     <footer class="composer">
     |}];
   H.act h Toggle_subagents;
   inert ();
-  [%expect {| <aside class="sidebar"> |}]
+  [%expect {| <aside class="bg-sidebar loon sidebar text-sidebar-foreground text-sm"> |}]
 ;;

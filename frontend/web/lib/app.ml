@@ -616,6 +616,7 @@ module Action = struct
     | Close_field_menu
     | Toggle_sidebar
     | Toggle_status_tray
+    | Toggle_session_card
     | Answer_confirm of
         { call_id : string
         ; agent_id : string option
@@ -799,6 +800,7 @@ module Model = struct
     ; sidebar_open : bool
     ; review_drawer : bool
     ; status_tray : bool
+    ; session_card_open : bool
     ; scrolled_up : bool
     ; session_hits : Session_hits.t option
     ; session_search : int
@@ -912,6 +914,7 @@ module Model = struct
         ; sidebar_open
         ; review_drawer
         ; status_tray
+        ; session_card_open
         ; scrolled_up
         ; session_hits
         ; session_search
@@ -1013,6 +1016,7 @@ module Model = struct
     && phys_equal sidebar_open b.sidebar_open
     && phys_equal review_drawer b.review_drawer
     && phys_equal status_tray b.status_tray
+    && phys_equal session_card_open b.session_card_open
     && phys_equal scrolled_up b.scrolled_up
     && phys_equal session_hits b.session_hits
     && phys_equal session_search b.session_search
@@ -1345,6 +1349,7 @@ let init =
   ; update_ready = false
   ; sidebar_open = true
   ; status_tray = false
+  ; session_card_open = true
   ; review_drawer = false
   ; scrolled_up = false
   ; session_hits = None
@@ -12131,6 +12136,8 @@ let update_connected (m : Model.t) (action : Action.t) =
     { m with review_drawer = not m.review_drawer }, []
   | Toggle_sidebar -> { m with sidebar_open = not m.sidebar_open }, []
   | Toggle_status_tray -> { m with status_tray = not m.status_tray }, []
+  | Toggle_session_card ->
+    { m with session_card_open = not m.session_card_open }, []
   | Answer_confirm { call_id; agent_id; answer = Deny_with_reason } ->
     (match m.confirms with
      | first :: _

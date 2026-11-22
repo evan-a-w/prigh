@@ -774,6 +774,8 @@ module Action : sig
     | Toggle_status_tray
     (** a phone's header: the tray with the thinking level, the mode, the
         status and the panels' toggles, under the header *)
+    | Toggle_session_card
+    (** the session card (its subagents and worktrees), from the top bar *)
     | Answer_confirm of
         { call_id : string
         ; agent_id : string option
@@ -1027,6 +1029,9 @@ module Model : sig
     ; status_tray : bool
       (** on a phone, the chat's "more" menu is open (the panels' toggles
           and the settings: {!Action.Toggle_status_tray}) *)
+    ; session_card_open : bool
+      (** the session card shows over the chat's top right (a sheet on a
+          phone): {!Action.Toggle_session_card} *)
     ; scrolled_up : bool (** the chat is not following new output *)
     ; session_hits : Session_hits.t option
       (** the backend's search of the messages for the control centre's

@@ -45,27 +45,22 @@ let%expect_test "active sessions first, then the archived ones under a divider" 
   [%expect
     {|
     Sessions (Select)
-    (fix the parser bug 2m ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (Release notes 2m ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (Open elsewhere 2m ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (Archived 2)
+    (work 2m fix the parser bug) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (work working… Release notes) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (work 2m Open elsewhere) (More (right-click, Shift+F10)) (Archive) (Delete)
     |}];
   H.elements h ~selector:".session";
   [%expect
     {|
-    <div class="selected session">
-    <div class="running session">
-    <div class="session">
+    <div class="bg-sidebar-accent group/session hover:bg-sidebar-accent relative rounded-md selected session text-sidebar-foreground">
+    <div class="group/session hover:bg-sidebar-accent relative rounded-md running session text-sidebar-foreground">
+    <div class="group/session hover:bg-sidebar-accent relative rounded-md session text-sidebar-foreground">
     |}];
   (* A session whose turn has ended but whose background work runs is
      running. *)
   H.elements h ~selector:".session-mark > *";
   [%expect
-    {|
-    <span class="live">
-    <span class="lamp">
-    <span class="live">
-    |}];
+    {| |}];
   (* The archived sessions are folded under their divider: a click unfolds
      them (ending with a way to delete them all) and the keyboard reaches
      them; folded, it skips them. *)
@@ -78,24 +73,27 @@ let%expect_test "active sessions first, then the archived ones under a divider" 
   [%expect
     {|
     <button type="button"
+            data-slot="button"
+            data-variant="ghost"
+            data-size="sm"
             aria-expanded="false"
             title="Show the archived sessions"
-            class="sessions-divider"
+            class="[&_svg:not([class*='size-'])]:size-3.5 [&_svg]:pointer-events-none [&_svg]:shrink-0 active:not-aria-[haspopup]:translate-y-px archive-toggle aria-expanded:bg-muted aria-expanded:text-foreground aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-clip-padding border border-transparent dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:hover:bg-muted/50 disabled:opacity-50 disabled:pointer-events-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 font-normal gap-2 group/button h-7 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 hover:bg-muted hover:text-foreground in-data-[slot=button-group]:rounded-lg inline-flex items-center justify-start narrow:h-11 outline-none px-2.5 rounded-[min(var(--radius-md),12px)] rounded-lg select-none sessions-divider shrink-0 text-[0.8rem] text-muted-foreground transition-all w-full whitespace-nowrap"
             @on_click>
-      <span class="divider-label"> Archived </span>
-      <span class="divider-count"> 2 </span>
-      <span class="divider-rule"> </span>
-      <span class="chev"> </span>
+      <icon class="archive"> </icon>
+      <span class="divider-label"> Archive </span>
+      <span class="divider-count ml-auto tabular-nums text-xs"> 2 </span>
+      <icon class="chevron"> </icon>
     </button>
     Sessions (Select)
-    (fix the parser bug 2m ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (Release notes 2m ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (Open elsewhere 2m ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (Archived 2)
-    (Old lexer 2m ago /work) (More (right-click, Shift+F10)) (Unarchive) (Delete)
-    (Older docs 2m ago /work) (More (right-click, Shift+F10)) (Unarchive) (Delete)
+    (work 2m fix the parser bug) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (work working… Release notes) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (work 2m Open elsewhere) (More (right-click, Shift+F10)) (Archive) (Delete)
+    Archived 2
+    (work 2m Old lexer) (More (right-click, Shift+F10)) (Unarchive) (Delete)
+    (work 2m Older docs) (More (right-click, Shift+F10)) (Unarchive) (Delete)
     (Delete archived)
-    <button class="sessions-divider">
+    <button class="[&_svg:not([class*='size-'])]:size-3.5 [&_svg]:pointer-events-none [&_svg]:shrink-0 active:not-aria-[haspopup]:translate-y-px archive-toggle aria-expanded:bg-muted aria-expanded:text-foreground aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-clip-padding border border-transparent dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:hover:bg-muted/50 disabled:opacity-50 disabled:pointer-events-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 font-normal gap-2 group/button h-7 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 hover:bg-muted hover:text-foreground in-data-[slot=button-group]:rounded-lg inline-flex items-center justify-start narrow:h-11 outline-none px-2.5 rounded-[min(var(--radius-md),12px)] rounded-lg select-none sessions-divider shrink-0 text-[0.8rem] text-muted-foreground transition-all w-full whitespace-nowrap">
     |}];
   H.key h "ArrowDown" ~target:(Session "s3");
   H.act h Toggle_archived;
@@ -107,10 +105,9 @@ let%expect_test "active sessions first, then the archived ones under a divider" 
     (Focus session-s4)
     (Session_nav (from s3) (by 1))
     (Focus session-s3)
-    (fix the parser bug 2m ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (Release notes 2m ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (Open elsewhere 2m ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (Archived 2)
+    (work 2m fix the parser bug) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (work working… Release notes) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (work 2m Open elsewhere) (More (right-click, Shift+F10)) (Archive) (Delete)
     |}];
   (* The control centre finds the archived sessions too, folded or not. *)
   H.act h Open_control;
@@ -149,20 +146,14 @@ let%expect_test "the current session is active while its subagents or jobs run" 
     ];
   H.elements h ~selector:"#session-s1 .session-mark > *";
   [%expect
-    {|
-    (Rpc (method_ list_subagents) (params ()) (tag Subagents))
-    <span class="lamp">
-    |}];
+    {| (Rpc (method_ list_subagents) (params ()) (tag Subagents)) |}];
   state
     [ ( "subagents"
       , Jsonaf.of_string {|[{"id":"a1","task":"survey","running":false}]|} )
     ];
   H.elements h ~selector:"#session-s1 .session-mark > *";
   [%expect
-    {|
-    (Rpc (method_ list_subagents) (params ()) (tag Subagents))
-    <span class="live">
-    |}];
+    {| (Rpc (method_ list_subagents) (params ()) (tag Subagents)) |}];
   state
     [ ( "jobs"
       , Jsonaf.of_string
@@ -173,7 +164,6 @@ let%expect_test "the current session is active while its subagents or jobs run" 
     {|
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
-    <span class="lamp">
     |}]
 ;;
 
@@ -204,10 +194,9 @@ let%expect_test
   [%expect
     {|
     Sessions (Select)
-    (Brand new 1m ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (fix the parser bug 2m ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (Release notes, renamed 2m ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (Archived 2)
+    (work 1m Brand new) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (work 2m fix the parser bug) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (work 2m Release notes, renamed) (More (right-click, Shift+F10)) (Archive) (Delete)
     |}]
 ;;
 
@@ -233,11 +222,10 @@ let%expect_test
   [%expect
     {|
     Sessions (Select)
-    (Brand new 1m ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (fix the parser bug 2m ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (Release notes 2m ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (Open elsewhere 2m ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (Archived 2)
+    (work 1m Brand new) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (work 2m fix the parser bug) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (work working… Release notes) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (work 2m Open elsewhere) (More (right-click, Shift+F10)) (Archive) (Delete)
     |}];
   (* Asked for after the change: shown. *)
   H.reply h "list_sessions" sessions;
@@ -246,10 +234,9 @@ let%expect_test
   [%expect
     {|
     Sessions (Select)
-    (fix the parser bug 2m ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (Release notes 2m ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (Open elsewhere 2m ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (Archived 2)
+    (work 2m fix the parser bug) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (work working… Release notes) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (work 2m Open elsewhere) (More (right-click, Shift+F10)) (Archive) (Delete)
     |}]
 ;;
 
@@ -266,9 +253,8 @@ let%expect_test "archiving and unarchiving: at once, and back if refused" =
   [%expect
     {|
     Sessions (Select)
-    (Release notes 2m ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (Open elsewhere 2m ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (Archived 3)
+    (work working… Release notes) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (work 2m Open elsewhere) (More (right-click, Shift+F10)) (Archive) (Delete)
     |}];
   H.reply h "set_archived" "{}";
   H.text h ~selector:".toast";
@@ -363,16 +349,16 @@ let%expect_test "selecting sessions: click, shift-click a range, delete them" =
   [%expect
     {|
     Select sessions Shift for a range
-    (☐ fix the parser bug 2m ago /work 3.9 KB)
-    (☐ Release notes 2m ago /work 11.7 KB)
-    (☐ Open elsewhere 2m ago /work 2.9 KB)
-    (Archived 2)
-    (☐ Old lexer 2m ago /work 195.3 KB)
-    (☐ Older docs 2m ago /work 1.2 MB)
+    (☐ work 3.9 KB fix the parser bug)
+    (☐ work 11.7 KB Release notes)
+    (☐ work 2.9 KB Open elsewhere)
+    Archived 2
+    (☐ work 195.3 KB Old lexer)
+    (☐ work 1.2 MB Older docs)
     (Cancel) (Delete sessions)
     |}];
   H.elements h ~selector:".selection-bar button[disabled]";
-  [%expect {| <button class="btn danger small"> |}];
+  [%expect {| <button class="[&_svg:not([class*='size-'])]:size-3.5 [&_svg]:pointer-events-none [&_svg]:shrink-0 active:not-aria-[haspopup]:translate-y-px aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-clip-padding bg-destructive/10 border border-transparent danger dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:bg-destructive/20 dark:focus-visible:ring-destructive/40 dark:hover:bg-destructive/30 disabled:opacity-50 disabled:pointer-events-none flex-1 focus-visible:border-destructive/40 focus-visible:ring-3 focus-visible:ring-destructive/20 font-medium gap-1 group/button h-7 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 hover:bg-destructive/20 in-data-[slot=button-group]:rounded-lg inline-flex items-center justify-center min-w-0 narrow:h-11 outline-none px-2.5 rounded-[min(var(--radius-md),12px)] rounded-lg select-none shrink-0 text-[0.8rem] text-destructive transition-all truncate whitespace-nowrap"> |}];
   (* A click marks; a shift-click marks everything from the last click,
      across the divider. *)
   H.act h (Mark_session { path = "/sessions/s2.jsonl"; range = false });
@@ -381,9 +367,9 @@ let%expect_test "selecting sessions: click, shift-click a range, delete them" =
   H.text h ~selector:".selection-bar";
   [%expect
     {|
-    <div class="marked running session">
-    <div class="marked session">
-    <div class="archived marked session">
+    <div class="bg-primary/15 group/session hover:bg-sidebar-accent marked relative rounded-md running session text-sidebar-foreground">
+    <div class="bg-primary/15 group/session hover:bg-sidebar-accent marked relative rounded-md session text-sidebar-foreground">
+    <div class="archived bg-primary/15 group/session hover:bg-sidebar-accent marked relative rounded-md session text-sidebar-foreground">
     (Cancel) (Delete 3 sessions (210.0 KB))
     |}];
   (* Enter does what a click does (unmarking s3), Shift+Enter what a
@@ -398,18 +384,18 @@ let%expect_test "selecting sessions: click, shift-click a range, delete them" =
     (Mark_session (path /sessions/s3.jsonl) (range false))
     (Mark_session (path /sessions/s5.jsonl) (range true))
     (browser default)
-    <div class="marked running session">
-    <div class="marked session">
-    <div class="archived marked session">
-    <div class="archived marked session">
+    <div class="bg-primary/15 group/session hover:bg-sidebar-accent marked relative rounded-md running session text-sidebar-foreground">
+    <div class="bg-primary/15 group/session hover:bg-sidebar-accent marked relative rounded-md session text-sidebar-foreground">
+    <div class="archived bg-primary/15 group/session hover:bg-sidebar-accent marked relative rounded-md session text-sidebar-foreground">
+    <div class="archived bg-primary/15 group/session hover:bg-sidebar-accent marked relative rounded-md session text-sidebar-foreground">
     |}];
   H.elements h ~selector:".session-open[aria-checked=true]";
   [%expect
     {|
-    <button class="session-open">
-    <button class="session-open">
-    <button class="session-open">
-    <button class="session-open">
+    <button class="flex focus-visible:ring-2 focus-visible:ring-sidebar-ring gap-2 items-start min-w-0 narrow:py-2 outline-none px-2.5 py-1.5 rounded-md session-open text-left w-full">
+    <button class="flex focus-visible:ring-2 focus-visible:ring-sidebar-ring gap-2 items-start min-w-0 narrow:py-2 outline-none px-2.5 py-1.5 rounded-md session-open text-left w-full">
+    <button class="flex focus-visible:ring-2 focus-visible:ring-sidebar-ring gap-2 items-start min-w-0 narrow:py-2 outline-none px-2.5 py-1.5 rounded-md session-open text-left w-full">
+    <button class="flex focus-visible:ring-2 focus-visible:ring-sidebar-ring gap-2 items-start min-w-0 narrow:py-2 outline-none px-2.5 py-1.5 rounded-md session-open text-left w-full">
     |}];
   (* The confirmation says how many, how much disk, and which will be kept
      (those are not asked for). *)
@@ -454,9 +440,9 @@ let%expect_test "selecting sessions: click, shift-click a range, delete them" =
   [%expect
     {|
     Select sessions Shift for a range
-    (☐ fix the parser bug 2m ago /work 3.9 KB)
-    (☑ Release notes 2m ago /work 11.7 KB)
-    (☑ Open elsewhere 2m ago /work 2.9 KB)
+    (☐ work 3.9 KB fix the parser bug)
+    (☑ work 11.7 KB Release notes)
+    (☑ work 2.9 KB Open elsewhere)
     (Cancel) (Delete 2 sessions (14.6 KB))
     |}];
   H.key h "Escape" ~target:(Session "s2");
@@ -465,9 +451,9 @@ let%expect_test "selecting sessions: click, shift-click a range, delete them" =
     {|
     (Select_sessions false)
     Sessions (Select)
-    (fix the parser bug 2m ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (Release notes 2m ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (Open elsewhere 2m ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (work 2m fix the parser bug) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (work working… Release notes) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (work 2m Open elsewhere) (More (right-click, Shift+F10)) (Archive) (Delete)
     |}]
 ;;
 

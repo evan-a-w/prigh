@@ -37,46 +37,46 @@ let%expect_test
   H.text h ~selector:".sessions";
   [%expect
     {|
-    (fix the parser bug just now /work) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (Release notes 3h ago ~/docs) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (Refactor the lexer 15d ago ~/src/compiler) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (work now fix the parser bug) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (docs working… Release notes) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (compiler 15d Refactor the lexer) (More (right-click, Shift+F10)) (Archive) (Delete)
     |}];
   H.show h ~selector:".session.selected";
   [%expect
     {|
-    <div class="selected session" @on_contextmenu @on_pointerenter>
+    <div class="bg-sidebar-accent group/session hover:bg-sidebar-accent relative rounded-md selected session text-sidebar-foreground"
+         @on_contextmenu
+         @on_pointerenter>
       <button type="button"
               id="session-s1"
               data-session="s1"
               title="/sessions/s1.jsonl"
               aria-current="true"
-              class="session-open"
+              class="flex focus-visible:ring-2 focus-visible:ring-sidebar-ring gap-2 items-start min-w-0 narrow:py-2 outline-none px-2.5 py-1.5 rounded-md session-open text-left w-full"
               @on_click
               @on_focus
               @on_mousedown
               @on_pointerdown>
         <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-        <div class="session-mark">
-          <span title="Open in the backend" class="live">  </span>
-        </div>
-        <div class="session-main">
-          <span dir="auto" class="session-title"> fix the parser bug </span>
-          <div class="session-meta">
-            <span class="session-age"> just now </span>
-            <span title="/work" class="session-cwd"> /work </span>
-            <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-            <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+        <div class="flex flex-1 flex-col gap-0.5 min-w-0 session-main">
+          <div class="flex gap-2 items-center min-w-0 session-meta text-muted-foreground text-xs">
+            <span class="min-w-0 session-project truncate"> work </span>
+            <div class="ml-auto"> </div>
+            <span class="session-age shrink-0 tabular-nums"> now </span>
           </div>
+          <span dir="auto" class="session-title text-[13px] truncate"> fix the parser bug </span>
         </div>
       </button>
-      <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-      <span class="session-actions">
+      <span class="[@media(hover:none)]:bg-transparent [@media(hover:none)]:opacity-70 [@media(hover:none)]:static absolute bg-sidebar-accent bottom-1 group-focus-within/session:opacity-100 group-hover/session:opacity-100 opacity-0 right-1 rounded-md session-actions">
         <button type="button"
+                data-slot="button"
+                data-variant="ghost"
+                data-size="icon-xs"
                 id="more-session-s1"
                 title="More (right-click, Shift+F10)"
                 aria-label="More for fix the parser bug"
                 aria-haspopup="menu"
-                class="btn ghost icon more"
+                class="[&_svg:not([class*='size-'])]:size-3 [&_svg]:pointer-events-none [&_svg]:shrink-0 active:not-aria-[haspopup]:translate-y-px aria-expanded:bg-muted aria-expanded:text-foreground aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-clip-padding border border-transparent dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:hover:bg-muted/50 disabled:opacity-50 disabled:pointer-events-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 font-medium group/button hover:bg-transparent hover:text-foreground in-data-[slot=button-group]:rounded-lg inline-flex items-center justify-center more narrow:size-11 outline-none rounded-[min(var(--radius-md),10px)] rounded-lg select-none shrink-0 size-6 text-muted-foreground text-sm transition-all whitespace-nowrap"
                 @on_click>
           <icon class="more"> </icon>
         </button>
@@ -95,7 +95,7 @@ let%expect_test
     |}];
   H.show h ~selector:".session.running .lamp";
   [%expect
-    {| <span title="Running" role="img" aria-label="Running" class="lamp"> </span> |}];
+    {| |}];
   (* The current session's row has its cwd as it is now: [/cd] moves it. *)
   H.event
     h
@@ -111,12 +111,12 @@ let%expect_test
                         \nbackend\
                         \n/home/ann/src/parser")
        (purpose (Sidebar 2)))))
-    span "~/src/parser" -- /home/ann/src/parser
-    span "~/docs" -- /home/ann/docs
-    span "~/src/compiler" -- /home/ann/src/compiler
     |}];
   H.text h ~selector:".session.selected .session-meta";
-  [%expect {| just now ~/src/parser |}];
+  [%expect {|
+    parser
+    now
+    |}];
   (* Its menu's Rename opens what /name opens. *)
   H.right_click h ~selector:".session.selected";
   H.click h ~selector:".context-menu [data-item=rename]";
@@ -150,9 +150,8 @@ let%expect_test
   H.text h ~selector:".session-age";
   [%expect
     {|
-    5m ago
-    3h ago
-    15d ago
+    5m
+    15d
     |}]
 ;;
 
@@ -477,8 +476,8 @@ let%expect_test
   H.text h ~selector:".sessions";
   [%expect
     {|
-    (fix the parser bug just now /work) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (Release notes 3h ago ~/docs) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (work now fix the parser bug) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (docs working… Release notes) (More (right-click, Shift+F10)) (Archive) (Delete)
     |}]
 ;;
 
@@ -593,7 +592,7 @@ let%expect_test "new session and switching session reload the state" =
     {|
     (Rpc (method_ new_session) (params ()) (tag Reload_state))
     (Focus editor)
-    (Starting…)
+    (Starting a session…)
     Starting a session…
     |}];
   Harness.reply h "new_session" "{}";
@@ -633,7 +632,7 @@ let%expect_test "new session and switching session reload the state" =
      (tag (Worktrees (place  "s2\
                             \nbackend\
                             \n/work") (purpose (Sidebar 2)))))
-    (New session)
+    (Start a new session (/new))
     What are we building?
     / for commands, @ for files
     |}];
@@ -657,9 +656,6 @@ let%expect_test "new session and switching session reload the state" =
      (params ((session /sessions/s3.jsonl) (limit 60)))
      (tag (Page (path /sessions/s3.jsonl) (before ()))))
     (Focus editor)
-    <div class="session-mark">
-      <span title="Opening…" role="img" aria-label="Opening…" class="lamp"> </span>
-    </div>
     Loading the session…
     |}];
   Harness.reply h "switch_session" "{}";
@@ -903,12 +899,5 @@ let%expect_test "~ in places is the home of the tool host they are on" =
   H.names h ~selector:".session-cwd";
   H.text h ~selector:".tray-folder";
   [%expect
-    {|
-    span "~/src" -- /Users/ann/src
-    span "~/docs" -- /Users/ann/docs
-    span "/home/ann/notes"
-    span "~/x" -- /home/prigh/x
-    span "~/y" -- /home/bob/y
-    ~/src
-    |}]
+    {| ~/src |}]
 ;;

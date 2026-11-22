@@ -111,7 +111,7 @@ let%expect_test
 let%expect_test "the sidebar's Search opens it; Esc closes it, nothing changed" =
   let h = H.create ~sessions () in
   H.text h ~selector:".sidebar-actions";
-  [%expect {| (New session) (Search) |}];
+  [%expect {| (Search Ctrl K) (Start a new session (/new)) |}];
   H.click h ~selector:"#control-open";
   H.input h ~selector:"#control-input" "verbos";
   H.key h "Escape" ~target:Field;

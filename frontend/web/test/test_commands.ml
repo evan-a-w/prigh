@@ -1834,7 +1834,7 @@ let%expect_test "/setusr: a superuser acts as another user, and back" =
      (tag (Worktrees (place  "b1\
                             \nbackend\
                             \n/work") (purpose (Sidebar 2)))))
-    (A alice acting as bob) (Settings (Ctrl+, or /settings))
+    (Settings (Ctrl+, or /settings)) (Pull requests (/pr)) (Commands and keys (/help)) (acting as bob A)
     |}];
   run h "/setusr alice";
   H.reply h "set_user" {|{"client_id":"c1","namespace":"alice","user":"alice"}|};

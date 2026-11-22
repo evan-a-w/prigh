@@ -130,6 +130,9 @@ module Icon = struct
     | Keep
     | Clipboard
     | Plug
+    | Square_pen
+    | Panel_right
+    | Panel_bottom
   [@@deriving sexp_of]
 
   (* Paths in the style of Lucide (24x24, stroked). *)
@@ -260,6 +263,12 @@ module Icon = struct
       {|<rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>|}
     | Plug ->
       {|<path d="M12 22v-5M9 8V2M15 8V2M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8z"/>|}
+    | Square_pen ->
+      {|<path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z"/>|}
+    | Panel_right ->
+      {|<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M15 3v18"/>|}
+    | Panel_bottom ->
+      {|<rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 15h18"/>|}
   ;;
 
   let name t = String.lowercase (Sexp.to_string (sexp_of_t t))

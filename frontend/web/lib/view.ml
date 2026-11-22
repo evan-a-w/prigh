@@ -320,7 +320,16 @@ module Part = struct
       View_memo.find memo ~deps:(m, clock m, inject) ~equal ~f:(fun () -> f m)
   ;;
 
-  let sidebar = make "sidebar" ~equal:outside_transcript
+  (* The current session's row says what its agent is doing, which its
+     transcript's events tell. *)
+  let sidebar =
+    make "sidebar" ~equal:(fun ((m, _, _) as a) ((m', _, _) as b) ->
+      outside_transcript a b
+      && Option.equal
+           String.equal
+           (Sidebar_view.current_activity m)
+           (Sidebar_view.current_activity m'))
+  ;;
   let review = make "review" ~equal:outside_transcript
   let chrome = make "chrome" ~equal:outside_composer
 

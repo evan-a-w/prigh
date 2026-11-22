@@ -166,7 +166,7 @@ let%expect_test "toasts are not under a dialog's inert page" =
     (Open_chip Model)
     (Focus popover-filter)
     Place_popover
-    <aside class="sidebar">
+    <aside class="bg-sidebar loon sidebar text-sidebar-foreground text-sm">
     <div class="chat-frame">
     <div class="editor-wrap">
     <div class="composer-buttons">

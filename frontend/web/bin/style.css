@@ -251,80 +251,19 @@ kbd {
 .sidebar {
   width: var(--sidebar-width, 280px);
   flex-shrink: 0;
-  background: var(--slate);
   border-right: 1px solid var(--rule);
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 12px 10px 0;
   min-height: 0;
-  container-type: inline-size;
 }
 .app:not(.sidebar-open) .sidebar { display: none; }
 
-.sidebar-head { display: flex; align-items: center; justify-content: space-between; padding-left: 8px; min-height: 32px; }
 .brand { display: flex; align-items: baseline; gap: 5px; }
 .logo { font: 700 18px/1 var(--mono); letter-spacing: -0.03em; color: var(--chalk); }
 .brand-sub { font: 400 12.5px/1 var(--mono); color: var(--faint); }
 
-.new-session { width: 100%; justify-content: flex-start; }
 
-.sessions {
-  flex: 1;
-  overflow-y: auto;
-  scrollbar-gutter: stable;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  /* The gutter sits in the sidebar's padding. */
-  margin: 0 -10px 0 -4px;
-  padding: 0 0 8px 4px;
-}
-/* The rows end where the search field does (the sidebar's content box,
-   100cqw) whatever room the scrollbar takes: none when it is an overlay
-   (Firefox, WebKit on Linux, a touch screen), up to the padding's 10px. */
-.sessions > * { width: min(100%, 100cqw); }
-.sessions-empty { color: var(--muted-text); font-size: 12.5px; padding: 12px 10px; }
-.session {
-  position: relative;
-  display: flex;
-  align-items: flex-start;
-  border-radius: var(--r-control);
-}
-/* The row's button: all of it but its fold and ⋯. */
-.session-open {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  align-items: flex-start;
-  padding: 5px 8px 5px 0;
-  margin: 0;
-  border: 0;
-  border-radius: inherit;
-  background: none;
-  color: inherit;
-  font: inherit;
-  text-align: start;
-  cursor: pointer;
-}
-.session:hover { background: var(--slate-2); }
-.session.selected { background: var(--slate-2); box-shadow: inset 2px 0 0 var(--sodium); border-radius: 0 var(--r-control) var(--r-control) 0; }
-.session-open:focus-visible { outline: 2px solid var(--sodium); outline-offset: -2px; }
-/* The lamp's column, left of the title. */
-.session-mark { width: 20px; height: 21px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
-.session .live { width: 5px; height: 5px; border-radius: 50%; border: 1px solid var(--faint-line); }
-.session-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.session-title { min-width: 0; line-height: 21px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.session.selected .session-title { font-weight: 600; }
-/* Under the title while searching: the passage of its messages that matched. */
-.session-snippet { font-size: 12.5px; line-height: 17px; color: var(--muted-text); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; margin: 1px 0 2px; }
-.session-title mark, .session-snippet mark { background: var(--sodium-glow); color: var(--chalk); border-radius: 2px; }
-/* On the lighter row the faint meta would fall under 4.5:1. */
-.session.selected .session-meta { color: var(--muted-text); }
-.session-meta { display: flex; gap: 10px; min-width: 0; font: 11.5px/18px var(--mono); color: var(--faint); font-variant-numeric: tabular-nums; }
-.session-age { flex-shrink: 0; white-space: nowrap; }
 .session-cwd { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.session-size { flex-shrink: 0; white-space: nowrap; }
 /* Its repository, then its branch: the branch gives way first. */
 .session-place { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; white-space: nowrap; overflow: hidden; }
 .session-repo { flex-shrink: 0; max-width: 60%; overflow: hidden; text-overflow: ellipsis; }
@@ -334,88 +273,7 @@ kbd {
    place keeps its share. */
 .session-home { flex: 0 1000 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-style: italic; }
 .session-place:has(+ .session-home) { flex: 0 1 auto; }
-/* Its ⋯ menu, over the right end of the title line while the row is
-   pointed at: the worktrees' fold is on the line below. */
-.session-actions {
-  position: absolute;
-  top: 1px;
-  height: 27px;
-  right: 2px;
-  display: flex;
-  align-items: center;
-  padding-left: 18px;
-  border-radius: var(--r-control);
-  background: linear-gradient(to right, transparent, var(--slate-2) 16px);
-  opacity: 0;
-}
-.session-actions .btn { width: 26px; height: 26px; }
-.session-actions .btn .icon { width: 14px; height: 14px; }
-.session:hover .session-actions, .session:focus-within .session-actions { opacity: 1; }
-.session-actions .btn:hover { background: transparent; color: var(--chalk); }
-@media (hover: none) {
-  .session-actions { position: static; padding: 0; background: none; opacity: 0.7; align-self: center; }
-  .session-actions .btn { width: 36px; height: 36px; }
-  .sessions-divider, .delete-archived { min-height: 36px; }
-}
 
-/* Archived sessions: folded under a faint rule with their count; quiet
-   rows, no lamp, no lift. */
-.session.archived .session-title { color: var(--faint); }
-.session.archived:hover { background: none; }
-.session.archived .session-actions { background: linear-gradient(to right, transparent, var(--slate) 16px); }
-.session.archived.selected .session-actions { background: linear-gradient(to right, transparent, var(--slate-2) 16px); }
-.session.archived:hover .session-title, .session.archived.selected .session-title { color: var(--muted-text); }
-.session.archived.selected { background: var(--slate-2); }
-.sessions-divider {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  margin: 10px 0 2px;
-  padding: 3px 6px 3px 20px;
-  border: 0;
-  border-radius: var(--r-control);
-  background: none;
-  color: var(--faint);
-  font-size: 12px;
-  text-align: left;
-  cursor: pointer;
-}
-.sessions-divider .divider-count { font: 11.5px var(--mono); font-variant-numeric: tabular-nums; }
-.sessions-divider .divider-rule { flex: 1; height: 1px; background: var(--rule); }
-.sessions-divider .chev { margin: 0 3px 0 0; }
-.sessions-divider:hover { color: var(--muted-text); }
-.sessions-divider:hover .divider-rule { background: var(--rule-2); }
-.sessions-divider:focus-visible { outline: 2px solid var(--sodium); outline-offset: -2px; }
-/* Pinned and Recent: the same rule, as headings, not buttons. */
-.sessions-group { cursor: default; padding-right: 9px; }
-.sessions-group:first-child { margin-top: 2px; }
-.sessions-group:hover { color: var(--faint); }
-.sessions-group:hover .divider-rule { background: var(--rule); }
-.session-pin { display: inline-flex; vertical-align: -1px; margin-right: 5px; color: var(--sodium); }
-.session-pin .icon { width: 12px; height: 12px; }
-.delete-archived {
-  align-self: flex-start;
-  margin: 2px 0 0 14px;
-  padding: 4px 6px;
-  border: 0;
-  border-radius: var(--r-chip);
-  background: none;
-  color: var(--faint);
-  font-size: 12.5px;
-  cursor: pointer;
-}
-.delete-archived:hover { color: var(--brick); }
-.delete-archived:focus-visible { outline: 2px solid var(--sodium); outline-offset: 1px; }
-
-/* Selecting sessions to delete several at once: checkboxes slide in at the
-   rows' left edge, the action sits at the foot of the list. */
-.sessions-toolbar { display: flex; align-items: center; gap: 8px; min-height: 26px; padding: 0 2px 0 20px; margin: -2px 0 2px; }
-.sessions-toolbar .sessions-label { flex: 1; min-width: 0; color: var(--muted-text); font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.sessions-toolbar.selecting .sessions-label { color: var(--chalk); font-weight: 500; }
-.sessions-hint { color: var(--faint); font-size: 11.5px; white-space: nowrap; }
-.sessions-hint kbd { font-size: 10.5px; }
-.sessions-toolbar .btn.small { padding: 2px 8px; }
 /* Every checkbox (and radio button) of the page. */
 .check { width: 14px; height: 14px; flex-shrink: 0; border: 1.5px solid var(--rule-2); border-radius: var(--r-chip); display: inline-flex; align-items: center; justify-content: center; }
 .check.on { background: var(--sodium); border-color: var(--sodium); color: var(--sodium-ink); }
@@ -424,55 +282,13 @@ kbd {
 .check-item .check, .question-choice .check { align-self: center; }
 .check.radio.on { background: none; }
 .check.radio.on::after { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--sodium); }
-.session-open > .check { margin: 4px 0 0 8px; animation: check-in 0.16s ease-out; }
+.session-open > .check { margin-top: 3px; animation: check-in 0.16s ease-out; }
 @keyframes check-in { from { margin-left: -14px; opacity: 0; } }
-.session.marked { background: var(--sodium-wash); }
 .session-open[role="checkbox"] { user-select: none; }
-.selection-bar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0 -10px;
-  padding: 8px 10px;
-  border-top: 1px solid var(--rule);
-  animation: rise 0.14s ease-out;
-}
-.selection-bar .btn { height: 30px; }
-.selection-bar .btn.danger { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 
 /* A session's worktrees hang under it from a rail dropping out of its
    lamp's column, each branching off like a branch off a commit graph's
    line. The one the session works in takes the accent. */
-.session-item { display: flex; flex-direction: column; }
-.session-item.has-worktrees > .session .session-meta { padding-right: 40px; }
-.session-fold {
-  position: absolute;
-  right: 6px;
-  bottom: 4px;
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  height: 18px;
-  padding: 0 2px 0 5px;
-  border: 0;
-  border-radius: var(--r-chip);
-  background: none;
-  color: var(--faint);
-  font: 11px var(--mono);
-  font-variant-numeric: tabular-nums;
-  cursor: pointer;
-}
-.session-fold .fold-icon { width: 11px; height: 11px; }
-.session-fold .chev { width: 4px; height: 4px; margin: 0 3px 0 2px; }
-.session-fold:hover { color: var(--chalk); background: var(--rule); }
-.session-fold:focus-visible { outline: 2px solid var(--sodium); outline-offset: 0; }
-.session-item.selected .session-fold { color: var(--muted-text); }
-.session-worktrees {
-  display: flex;
-  flex-direction: column;
-  margin: 0 0 4px 10px;
-  padding-left: 10px;
-}
 .worktree {
   position: relative;
   display: flex;
@@ -521,8 +337,6 @@ kbd {
 .worktree-tag.here { border-color: transparent; padding: 0; color: var(--sodium); }
 @media (hover: none) {
   .worktree { min-height: 36px; }
-  /* Left of the ⋯, which has a column of its own. */
-  .session-fold { right: 40px; height: 24px; padding: 0 6px; }
 }
 
 /* A session's, worktree's or message's context menu: at the pointer (or under its
@@ -590,14 +404,6 @@ kbd {
 .delete-more { padding: 3px 8px; }
 .delete-warnings { margin: 10px 0 0; padding: 8px 10px 8px 26px; border: 1px solid var(--brick-line); background: var(--brick-wash); border-radius: var(--r-control); color: var(--chalk); font-size: 13px; }
 
-.sidebar-footer {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  border-top: 1px solid var(--rule);
-  margin: 0 -10px;
-  padding: 8px 10px;
-}
 .avatar {
   width: 28px;
   height: 28px;
@@ -613,7 +419,6 @@ kbd {
 .user { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.3; }
 .user-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; }
 .user-acting { color: var(--sodium); font-size: 12px; }
-.help-button { flex: 1; justify-content: flex-start; }
 
 .scrim { display: none; }
 
@@ -1702,10 +1507,6 @@ kbd {
 /* Choices and actions the backend has still to confirm. */
 .chip-button.awaiting { opacity: 1; color: var(--muted-text); border: 1px dashed var(--rule-2); }
 
-.new-session.opening:disabled { opacity: 1; color: var(--muted-text); }
-.new-session .lamp { margin: 0 4px; }
-.session.opening { background: var(--slate-2); }
-.session.opening .session-title { color: var(--muted-text); }
 .composer-buttons .send.busy:disabled { background: var(--sodium-wash); border-color: var(--sodium-line); }
 
 .composer.offline .composer-stack { border-style: dashed; }

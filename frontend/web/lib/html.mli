@@ -104,6 +104,9 @@ module Icon : sig
     | Keep (** a ticked circle: keeping a temporary session *)
     | Clipboard (** Paste *)
     | Plug (** MCP servers *)
+    | Square_pen (** a new session *)
+    | Panel_right (** the session card *)
+    | Panel_bottom (** the terminal *)
 
   (** An inline SVG; tests show [<icon name>]. *)
   val view : ?cls:string -> t -> Node.t

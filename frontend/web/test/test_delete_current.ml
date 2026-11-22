@@ -98,9 +98,9 @@ let%expect_test "the next one down: asked, moved, then deleted" =
                             \nbackend\
                             \n/work") (purpose (Sidebar 2)))))
     ((in_ (s2)) (pending ()))
-    (Before 2m ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (Below 2m ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (Further 2m ago /work) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (work 2m Before) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (work 2m Below) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (work 2m Further) (More (right-click, Shift+F10)) (Archive) (Delete)
     Deleted 1 session (0 B)
     |}]
 ;;

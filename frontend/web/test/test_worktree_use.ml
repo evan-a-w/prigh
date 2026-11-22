@@ -52,7 +52,11 @@ let create ?(sessions = base) ?(current = "here") () =
 
 (* What the user sees: each row, and the worktrees under it when they
    show. *)
-let sidebar h = H.text h ~selector:".sessions"
+(* The sessions, then the worktrees each shows. *)
+let sidebar h =
+  H.text h ~selector:".sessions";
+  Worktree_lines.print h
+;;
 
 let switch ?cwd h id =
   H.quiet h (fun () ->
@@ -66,12 +70,12 @@ let%expect_test "a pinned session's worktrees show, however old" =
   [%expect
     {|
     Pinned 1
-    (Pinned 3d ago prigh main) (1) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (feat/pinned)
+    (prigh 3d Pinned) (More (right-click, Shift+F10)) (Archive) (Delete)
     Recent 2
-    (Here 2m ago prigh main) (1) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (prigh 2m Here) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (prigh 3d Old) (More (right-click, Shift+F10)) (Archive) (Delete)
     (feat/here)
-    (Old 3d ago prigh main) (1) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (feat/pinned)
     |}]
 ;;
 
@@ -83,13 +87,13 @@ let%expect_test "opening a session is using it" =
   [%expect
     {|
     Pinned 1
-    (Pinned 3d ago prigh main) (1) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (feat/pinned)
+    (prigh 3d Pinned) (More (right-click, Shift+F10)) (Archive) (Delete)
     Recent 2
-    (Here 2m ago prigh main) (1) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (prigh 2m Here) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (prigh 3d Old) (More (right-click, Shift+F10)) (Archive) (Delete)
     (feat/here)
-    (Old 3d ago prigh main) (1) (More (right-click, Shift+F10)) (Archive) (Delete)
     (feat/old)
+    (feat/pinned)
     |}]
 ;;
 
@@ -99,13 +103,13 @@ let%expect_test "the session the user is in shows its worktrees" =
   [%expect
     {|
     Pinned 1
-    (Pinned 3d ago prigh main) (1) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (feat/pinned)
+    (prigh 3d Pinned) (More (right-click, Shift+F10)) (Archive) (Delete)
     Recent 2
-    (Here 2m ago prigh main) (1) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (prigh 2m Here) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (prigh 3d Old) (More (right-click, Shift+F10)) (Archive) (Delete)
     (feat/here)
-    (Old 3d ago prigh main) (1) (More (right-click, Shift+F10)) (Archive) (Delete)
     (feat/old)
+    (feat/pinned)
     |}]
 ;;
 
@@ -127,15 +131,15 @@ let%expect_test "a session working in another's worktree uses it" =
   [%expect
     {|
     Pinned 1
-    (Pinned 3d ago prigh main) (1) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (feat/pinned)
+    (prigh 3d Pinned) (More (right-click, Shift+F10)) (Archive) (Delete)
     Recent 4
-    (Here 2m ago prigh main) (1) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (prigh 2m Here) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (prigh 3d Old) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (prigh 3d Owner) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (src 30m Parser fix) (More (right-click, Shift+F10)) (Archive) (Delete)
     (feat/here)
-    (Old 3d ago prigh main) (1) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (Owner 3d ago prigh main) (1) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (feat/pinned)
     (feat/owner)
-    (Parser fix 30m ago ~/.prigh/worktrees/prigh/owner/src) (More (right-click, Shift+F10)) (Archive) (Delete)
     |}]
 ;;
 
@@ -158,13 +162,13 @@ let%expect_test "a running session stays used while the page is open" =
   [%expect
     {|
     Pinned 1
-    (Pinned 3d ago prigh main) (1) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (feat/pinned)
+    (prigh 3d Pinned) (More (right-click, Shift+F10)) (Archive) (Delete)
     Recent 3
-    (Here 13h ago prigh main) (1) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (prigh 13h Here) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (prigh 3d Old) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (prigh working… Long run) (More (right-click, Shift+F10)) (Archive) (Delete)
     (feat/here)
-    (Old 3d ago prigh main) (1) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (Long run 13h ago prigh main) (1) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (feat/pinned)
     (feat/busy)
     |}]
 ;;
@@ -179,12 +183,12 @@ let%expect_test "a fold from before (the old preference) does not stick" =
     {|
     (Cache_prefs (((key web.sidebar-folded) (value ((here))))))
     Pinned 1
-    (Pinned 3d ago prigh main) (1) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (feat/pinned)
+    (prigh 3d Pinned) (More (right-click, Shift+F10)) (Archive) (Delete)
     Recent 2
-    (Here 2m ago prigh main) (1) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (prigh 2m Here) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (prigh 3d Old) (More (right-click, Shift+F10)) (Archive) (Delete)
     (feat/here)
-    (Old 3d ago prigh main) (1) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (feat/pinned)
     |}]
 ;;
 

@@ -34,6 +34,7 @@
 .app.narrow .chrome-anchor:has(.menu-open, .chrome-more.open) { z-index: var(--z-menu-anchor); }
 .app.narrow .chat-chrome.strip {
   position: relative;
+  display: grid;
   grid-template-columns: var(--tap) minmax(0, 1fr) var(--tap);
   align-items: center;
   gap: 4px;
@@ -42,7 +43,6 @@
   background: var(--bg);
   border-bottom: 1px solid var(--rule);
 }
-.app.narrow .chat-chrome.strip::before { display: none; }
 .app.narrow .main:has(.chat-chrome) .chat { padding-top: 12px; }
 /* Flat in the strip: no bubbles. */
 .app.narrow .chat-chrome.strip .chrome-button.round {
@@ -56,6 +56,9 @@
   border-radius: var(--r-control);
 }
 .app.narrow .chat-chrome.strip .chrome-button.round .icon { width: 20px; height: 20px; }
+.app.narrow .chat-chrome.strip > * { display: flex; align-items: center; min-width: 0; }
+.app.narrow .chat-chrome.strip .chrome-center { justify-content: center; }
+.app.narrow .chat-chrome.strip .chrome-right { justify-content: flex-end; }
 .app.narrow .chat-chrome.strip .chrome-left:empty { visibility: hidden; }
 
 /* The session's name, between the strip's buttons. */

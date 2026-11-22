@@ -1,14 +1,17 @@
 open! Core
 open! Import
 
-(** Sessions: search, new, the sessions (current highlighted, live and
-    running marked, age, repository and branch, size), each with the
-    worktrees that matter to it under it (folding; changes, sync, a
-    subagent's or a pull request's), context menus on both (right-click,
-    Shift+F10, a long press, ⋯), the archived ones, delete; then the
-    signed-in user, help, the settings and sign out. (The current session's
-    status is the chat header's: {!Session_view.bar}.) *)
+(** Sessions: search, new, the sessions (each its project in a word over its
+    title; at the right what its agent is doing, else how long ago it
+    worked), context menus (right-click, Shift+F10, a long press, ⋯),
+    selecting several to delete; at the foot the archived ones (folded into
+    the list), the settings, pull requests, help and the signed-in user. *)
 val view : App.Model.t -> inject:(App.Action.t -> unit Effect.t) -> Node.t
+
+(** What the current session's agent is doing, for its row: ["thinking…"]
+    (or waiting for the model), ["retrying…"] or ["working…"] (also while
+    only its subagents run); [None] when nothing runs. *)
+val current_activity : App.Model.t -> string option
 
 (** The gear opening the settings ([/settings]). *)
 val settings : inject:(App.Action.t -> unit Effect.t) -> Node.t
