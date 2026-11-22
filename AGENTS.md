@@ -5,11 +5,14 @@ prigh is a coding agent. Read `README.md` for what it does and
 
 `./test` is the test suite: run it, and only it, before pushing and before
 merging. It builds both projects, runs their dune tests and prigh-web's core
-browser e2e in Chromium, in parallel, in about a minute even on a busy
-machine. `./test --full` runs every browser e2e script at every size in
-Chromium, Firefox and WebKit (the desktop app's engine on Linux and macOS)
-and every dune test again, the whole matrix the flake checks run: run it
-only when the user asks for it. Both work from any shell (outside the dev
+browser e2e in Chromium, in parallel: 45-55s after a change to either
+project, on a 16-core machine busy with other work (load average 10-20);
+much more load than that slows the browser e2e most. It enters the dev
+shells through saved profiles (`~/.cache/prigh/test-shell`), so it does not
+evaluate the flake each time. `./test --full` runs every browser e2e script
+at every size in Chromium, Firefox and WebKit (the desktop app's engine on
+Linux and macOS) and every dune test again, the whole matrix the flake
+checks run: run it only when the user asks for it. Both work from any shell (outside the dev
 shell they enter it) and test what they build. Run single suites as below
 while iterating.
 
@@ -114,7 +117,8 @@ output of `dune build @runtest`, and if the diffs are right, `dune promote`.
 
 Run `./test` before pushing and before merging; `./test --full` only when
 the user asks (see "Layout and builds"). Keep `./test` under a minute on a
-busy machine: a new browser e2e script joins the core suite (`core` in
+busy machine (the dev profile's JavaScript has no source maps for that:
+`--profile debug-js` adds them): a new browser e2e script joins the core suite (`core` in
 `frontend/web/e2e/prigh_web.sh`) only if it covers a main flow nothing else
 does, and core scripts check one phone size (SUITE=core) where they check
 two. Keep them fast: tests wait for what they expect rather than
