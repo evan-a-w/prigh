@@ -12,6 +12,7 @@ import { execFileSync, spawn } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { end } from "./end.mjs";
+import { normalVerbosity } from "./verbose_prefs.mjs";
 
 const { chromium, firefox, webkit } = await import(process.env.PLAYWRIGHT_MODULE);
 
@@ -21,6 +22,7 @@ if (!engine) throw new Error("usage: review_git.mjs chromium|firefox|webkit");
 const { PRIGH_BACKEND: backend, SITE: site, TOKEN: token } = process.env;
 const dir = join(process.env.TEST_DIR, "review_git");
 const home = join(dir, "home");
+normalVerbosity(home);
 const cwd = join(dir, "repo");
 const origin = join(dir, "origin.git");
 mkdirSync(home, { recursive: true });

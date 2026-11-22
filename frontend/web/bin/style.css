@@ -935,13 +935,7 @@ kbd {
 .modal .picker-item:hover { background: var(--slate-2); }
 .modal .picker-item.selected { background: var(--slate-2); box-shadow: inset 2px 0 0 var(--sodium); }
 
-.help-dialog { width: min(640px, 100%); }
-.help-dialog h3 { font-size: 12.5px; font-weight: 600; color: var(--muted-text); margin: 14px 0 4px; }
-.help-dialog h3:first-child { margin-top: 0; }
-.help-table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
-.help-table td { padding: 4px 0; vertical-align: top; }
-.help-table td:first-child { width: 1%; padding-right: 16px; white-space: nowrap; }
-.help-table tr + tr td { border-top: 1px solid var(--rule); }
+.help-dialog { width: min(720px, 100%); }
 
 
 .login-url { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin-bottom: 12px; }
@@ -1123,7 +1117,6 @@ kbd {
   .main:has(.jump-to-bottom) .toasts { bottom: 56px; }
   .main:has(.jump-to-bottom) .toast { max-width: none; }
   .modal-backdrop { padding-top: 8vh; }
-  .help-table td:first-child { white-space: normal; }
   /* No room beside the name: the detail goes under it, whole. */
   .modal .picker-item { flex-wrap: wrap; row-gap: 0; }
   .modal .picker-detail { flex-basis: 100%; margin-left: 0; white-space: normal; }
@@ -1371,7 +1364,6 @@ kbd {
   .signin-page { padding-left: 20px; padding-right: 20px; }
   .signin { width: 100%; }
   .menu-backdrop { background: var(--backdrop); }
-  .help-table kbd { white-space: normal; }
   .account-menu { left: 8px; right: 8px; bottom: 8px; width: auto; }
   .stats-grid { grid-template-columns: repeat(2, 1fr); }
 }

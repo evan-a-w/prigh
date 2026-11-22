@@ -1,11 +1,11 @@
-/* Jumping around a long transcript (Jump_view): along the chat's right edge
+/* Jumping around a long transcript (Jump_view): along the chat's left edge
    a rail of marks, one per landmark, evenly spaced like the turns of a log
    rather than by height, so every one is as easy to hit. The user's turns
    are short sodium strokes (sodium is their colour in the transcript), the
    one in view drawn out in full sodium; a reply that failed a brick dot; a
    compaction a longer faint rule; what is trimmed from the context a dashed
-   cut line at the top; turns not loaded yet are faint. Above
-   them, the jump list's button. On a phone only the button, floating. */
+   cut line at the top; turns not loaded yet are faint. On a phone, no
+   rail (the ⋯ sheet's "Jump to a message"). */
 
 .chat-frame {
   position: relative;
@@ -14,31 +14,29 @@
   display: flex;
   flex-direction: column;
 }
-.chat-frame:has(.rail) > .chat { padding-right: 52px; }
+.chat-frame:has(.rail) > .chat { --rail-room: 44px; }
 
 .jump-nav {
   position: absolute;
   top: 10px;
-  right: 14px;
+  left: 10px;
   bottom: 60px;
   width: 28px;
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  align-items: flex-start;
+  justify-content: center;
   gap: 6px;
   z-index: var(--z-inset);
   pointer-events: none;
 }
 .jump-nav > * { pointer-events: auto; }
-.jump-nav .jump-list { width: 28px; height: 28px; color: var(--faint); flex-shrink: 0; }
-.jump-nav .jump-list .icon { width: 16px; height: 16px; }
-.jump-nav .jump-list:hover { color: var(--chalk); }
 
 .rail {
   min-height: 0;
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  align-items: flex-start;
   padding: 2px 0;
 }
 .tick {
@@ -52,7 +50,7 @@
   cursor: pointer;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: flex-start;
 }
 .tick::before {
   content: "";
@@ -67,7 +65,7 @@
 /* What is trimmed from the context: a cut line, at the top. */
 .tick.trimmed::before { width: 20px; height: 0; border-radius: 0; background: none; border-top: 2px dashed var(--muted-text); opacity: 0.8; }
 .tick.trimmed:hover::before { border-top-color: var(--chalk); opacity: 1; }
-.tick.error::before { width: 5px; height: 5px; border-radius: 50%; background: var(--brick); margin-right: 2px; }
+.tick.error::before { width: 5px; height: 5px; border-radius: 50%; background: var(--brick); margin-left: 2px; }
 .tick.user[aria-current]::before { width: 16px; background: var(--sodium); opacity: 1; }
 .tick.user:hover::before,
 .tick.user:focus-visible::before { width: 20px; background: var(--sodium); opacity: 1; }
@@ -78,7 +76,7 @@
 .tick .tip {
   display: none;
   position: absolute;
-  right: calc(100% + 4px);
+  left: calc(100% + 4px);
   top: 50%;
   transform: translateY(-50%);
   width: max-content;
@@ -108,17 +106,6 @@
 .tick.error .tip-what { color: var(--brick); }
 .tip-time { font: 11.5px var(--mono); color: var(--faint); }
 
-/* Phones: no rail, the button over the chat's corner. */
-.app.narrow .chat-frame > .jump-nav { top: 8px; right: 10px; bottom: auto; width: auto; }
-.app.narrow .jump-nav .jump-list {
-  width: 36px;
-  height: 36px;
-  border: 1px solid var(--rule-2);
-  border-radius: var(--r-control);
-  background: var(--slate-2);
-  color: var(--muted-text);
-  box-shadow: var(--float-shadow);
-}
 
 /* Where a jump landed, for a moment. */
 #chat .jumped { animation: jumped 1.6s ease-out; }

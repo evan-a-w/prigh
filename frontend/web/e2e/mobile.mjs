@@ -22,6 +22,7 @@ import { execFileSync, spawn } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { end } from "./end.mjs";
+import { normalVerbosity } from "./verbose_prefs.mjs";
 
 const { chromium, firefox, webkit } = await import(process.env.PLAYWRIGHT_MODULE);
 
@@ -31,6 +32,7 @@ if (!engine) throw new Error("usage: mobile.mjs chromium|firefox|webkit");
 const { PRIGH_BACKEND: backend, SITE: site, TOKEN: token } = process.env;
 const dir = join(process.env.TEST_DIR, "mobile");
 const home = join(dir, "home");
+normalVerbosity(home);
 // Under the home directory, for the composer's "Working in ~/projects/demo".
 const cwd = join(home, "projects", "demo");
 mkdirSync(home, { recursive: true });

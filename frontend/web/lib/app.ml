@@ -1353,7 +1353,7 @@ let init =
   ; session_search = 0
   ; archived_open = false
   ; agents = Agents.empty
-  ; verbosity = Normal
+  ; verbosity = Quiet
   ; folds = String.Set.empty
   ; ui = Ui_state.empty
   ; transcript_filter = Transcript_filter.all
@@ -3070,7 +3070,7 @@ let apply_pref (m : Model.t) ~startup ({ key; value } : Prefs.Change.t) =
       Option.value
         (List.find Prigh_ui.Verbosity.all ~f:(fun v ->
            Option.equal String.equal string (Some (Prigh_ui.Verbosity.name v))))
-        ~default:Normal
+        ~default:Quiet
     in
     if Prigh_ui.Verbosity.equal verbosity m.verbosity
     then m

@@ -10,6 +10,7 @@ import { execFileSync, spawn } from "node:child_process";
 import { mkdirSync, readFileSync, readdirSync, realpathSync, utimesSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { end } from "./end.mjs";
+import { normalVerbosity } from "./verbose_prefs.mjs";
 
 const { chromium, firefox, webkit } = await import(process.env.PLAYWRIGHT_MODULE);
 
@@ -20,6 +21,7 @@ const { PRIGH_BACKEND: backend, SITE: site, TOKEN: token } = process.env;
 mkdirSync(join(process.env.TEST_DIR, "sessions_settings"), { recursive: true });
 const dir = realpathSync(join(process.env.TEST_DIR, "sessions_settings"));
 const home = join(dir, "home");
+normalVerbosity(home);
 const repo = join(dir, "repo");
 for (const d of [home, repo]) mkdirSync(d, { recursive: true });
 

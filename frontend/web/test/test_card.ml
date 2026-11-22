@@ -259,7 +259,7 @@ let%expect_test
     (Sessions (Ctrl+B))
     New session
     (plan 1/2: Final nix GC)
-    (Filter the transcript (/filter)) (Files (Ctrl+Shift+F)) (Terminal (Ctrl+`)) (Review changes (Alt+R))
+    (Files (Ctrl+Shift+F)) (Terminal (Ctrl+`)) (Review changes (Alt+R))
     (Settings (Ctrl+, or /settings))
     (Run /todos)
     (Focus dialog)

@@ -24,8 +24,9 @@
   overflow-y: auto;
   scrollbar-gutter: stable;
   /* [--push], set by an ancestor (the session's card beside the column),
-     moves the column left by that much, never past --edge. */
-  padding: 28px var(--edge) 8px max(var(--edge), (100% - var(--column)) / 2 - var(--push, 0px));
+     moves the column left by that much, never past the left edge's room
+     ([--rail-room] beside the jump rail, else --edge). */
+  padding: 28px var(--edge) 8px max(var(--rail-room, var(--edge)), (100% - var(--column)) / 2 - var(--push, 0px));
 }
 /* Focusable to scroll it with the keys; a click there shows no ring. */
 .chat:focus { outline: none; }
@@ -1232,21 +1233,6 @@ dialog.viewer::backdrop { background: transparent; }
    a quiet line saying what it hides, with "Show all". A hidden landmark or
    message keeps an empty .filtered for the jump rail and scrolling to land
    on. */
-.filter-toggle { position: relative; }
-.filter-toggle.open { color: var(--sodium); background: var(--sodium-wash); }
-.panel-toggles > .btn.icon.filter-toggle.active { color: var(--sodium); }
-.filter-toggle .badge {
-  position: absolute;
-  top: -2px;
-  right: -3px;
-  min-width: 15px;
-  height: 15px;
-  padding: 0 3px;
-  border-radius: var(--r-chip);
-  background: var(--sodium);
-  color: var(--sodium-ink);
-  font: 600 10px/15px var(--mono);
-}
 .filter-menu {
   position: fixed;
   width: min(340px, calc(100vw - 16px));

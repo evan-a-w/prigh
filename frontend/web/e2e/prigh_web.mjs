@@ -12,6 +12,7 @@ import { hostName } from "./host_name.mjs";
 import { join } from "node:path";
 import { png, pngSize } from "./png.mjs";
 import { end } from "./end.mjs";
+import { normalVerbosity } from "./verbose_prefs.mjs";
 
 const { chromium, firefox, webkit } = await import(process.env.PLAYWRIGHT_MODULE);
 
@@ -20,6 +21,7 @@ const engine = { chromium, firefox, webkit }[engineName];
 if (!engine) throw new Error("usage: prigh_web.mjs chromium|firefox|webkit");
 const { PRIGH_BACKEND: backend, SITE: site, TEST_DIR: dir, TOKEN: token } = process.env;
 const home = join(dir, "home");
+normalVerbosity(home);
 const cwd = join(dir, "cwd");
 mkdirSync(home, { recursive: true });
 mkdirSync(cwd, { recursive: true });
@@ -1204,7 +1206,9 @@ try {
   //     archived away (a click unfolds them, muted); selecting several (a
   //     shift-click takes the range, across the divider) and deleting them
   //     asks first with their count and size, then removes their files.
-  const sizes = text => clean(text).replace(/\d+(\.\d+)? (B|KB|MB)\b/g, "<SIZE>");
+  // Sizes, and the rows' ages ("now", "1m", ...: how long the run took).
+  const sizes = text => clean(text).replace(/\d+(\.\d+)? (B|KB|MB)\b/g, "<SIZE>")
+    .replace(/^(now|\d+[mhd])$/gm, "<AGE>");
   const sessionFiles = () =>
     readdirSync(join(home, ".prigh", "sessions")).filter(f => f.endsWith(".jsonl") && !f.includes(".trace.")).length;
   await page.locator(".sidebar").getByRole("button", { name: "New session", exact: true }).click();

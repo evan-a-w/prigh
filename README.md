@@ -473,14 +473,14 @@ streamed before and goes on from where it is now; its card says the output
 from meanwhile shows with its result.
 
 To get around a long session without scrolling, a rail along the chat's
-right edge has a mark for each of your messages (and a brick dot for a
+left edge has a mark for each of your messages (and a brick dot for a
 reply that failed, a longer rule where the context was compacted): the
 one you are reading is drawn out in sodium, hovering a mark shows the
 message's first line and time, and a click goes there, marking it for a
 moment. Messages not loaded yet have faint marks, and jumping to one loads
-the pages down to it first. The button above the rail, Ctrl+J, opens the
-same messages as a list to filter (newest first; on a phone, where there
-is no rail, the button floats over the chat's corner), and Ctrl+↑/↓ step
+the pages down to it first. Ctrl+J opens the same messages as a list to
+filter (newest first; on a phone, where there is no rail, "Jump to a
+message" in the ⋯ sheet), and Ctrl+↑/↓ step
 to your previous or next message, loading earlier ones past the first
 loaded.
 
@@ -854,13 +854,13 @@ with completions from the backend and keep the dialog open, with the error,
 when the backend refuses it (a directory that doesn't exist yet opens a
 "Create folder?" dialog instead); `/agents` and `/jobs` open the agents panel
 (above); `/btw` answers in a panel above the composer (Esc closes it);
-`/verbosity` (Ctrl+O cycles) folds each run of steps into one line (quiet)
-or unfolds everything (verbose); `/filter`, or the funnel button left of the
-files', opens a menu under it that shows or hides whole kinds of the
-transcript (↑↓, Space or a click toggles at once, Enter or a click outside
-keeps, Esc puts back what it was; "Show all" resets): the button is accented
-with how many kinds are hidden, and a line over the transcript says what is
-hidden, how many items, with "Show all". Each session has its own, kept
+`/verbosity` (Ctrl+O cycles) folds each run of steps into one line (quiet,
+prigh-web's default) or unfolds everything (verbose); `/filter` (also in
+Ctrl+K and a phone's ⋯ sheet) opens a menu under the top bar's toggles that
+shows or hides whole kinds of the transcript (↑↓, Space or a click toggles
+at once, Enter or a click outside keeps, Esc puts back what it was; "Show
+all" resets), and while a filter is on a line over the transcript says what
+is hidden, how many items, with "Show all". Each session has its own, kept
 in the session, so switching sessions switches the filter, and it stays
 across reloads, browsers and forks of the session; the jump rail and
 Ctrl+J still list your messages when they are hidden, and land where they
@@ -928,7 +928,7 @@ alone and the model's name is cut short with an ellipsis last.
 There is no bar over the chat. The session's title is in the sidebar's tree
 (its row has the cwd as it is now, relative to its project or worktree, and
 a rename button) and in the browser tab's title. A few round, translucent
-buttons float over the chat's top corners: in the top right the filter,
+buttons float over the chat's top corners: in the top right the
 files, terminal and agents toggles (lit while their panel is open), with,
 before them, what applies, only when it does (the goal, reminders, a
 scheduled resume, transfers, the plan

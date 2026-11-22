@@ -95,12 +95,11 @@ let%expect_test "everything shows at first; the button is left of the files'" =
 
 let%expect_test "the menu: a row per kind, checked when shown, then Show all" =
   let h = session () in
-  H.click h ~selector:"#filter-toggle";
+  H.act h Open_filter;
   [%expect
     {|
-    Open_filter
     (Focus dialog)
-    (Place_menu (Element filter-toggle))
+    (Place_menu (Element filter-anchor))
     |}];
   H.text h ~selector:".filter-menu";
   H.names h ~selector:".filter-menu [role^=menuitem]";
@@ -138,12 +137,10 @@ let%expect_test "each kind toggled from the menu, alone" =
       H.act h Open_filter;
       H.act h (Filter_press (Some (Kind kind))));
     printf "== without %s\n" (Prigh_ui.Transcript_filter.Kind.name kind);
-    H.names h ~selector:"#filter-toggle";
     transcript h);
   [%expect
     {|
     == without user
-    button "Filter the transcript: 1 kind hidden" -- Filter: hiding your messages (/filter)
     Hiding your messages · 2 items hidden (Show all)
     Thought Let me look first.
     Let me look first.
@@ -155,7 +152,6 @@ let%expect_test "each kind toggled from the menu, alone" =
     Looking
     ■ Interrupted
     == without assistant
-    button "Filter the transcript: 1 kind hidden" -- Filter: hiding replies (/filter)
     Hiding replies · 2 items hidden (Show all)
     Survey the repository
     Thought Let me look first.
@@ -167,7 +163,6 @@ let%expect_test "each kind toggled from the menu, alone" =
     And the tests?
     ■ Interrupted
     == without thinking
-    button "Filter the transcript: 1 kind hidden" -- Filter: hiding thinking (/filter)
     Hiding thinking · 1 item hidden (Show all)
     Survey the repository
     (✓ bash ls)
@@ -179,7 +174,6 @@ let%expect_test "each kind toggled from the menu, alone" =
     Looking
     ■ Interrupted
     == without tools
-    button "Filter the transcript: 1 kind hidden" -- Filter: hiding tool calls (/filter)
     Hiding tool calls · 1 item hidden (Show all)
     Survey the repository
     Thought Let me look first.
@@ -192,7 +186,6 @@ let%expect_test "each kind toggled from the menu, alone" =
     Looking
     ■ Interrupted
     == without subagents
-    button "Filter the transcript: 1 kind hidden" -- Filter: hiding subagents (/filter)
     Hiding subagents · 1 item hidden (Show all)
     Survey the repository
     Thought Let me look first.
@@ -203,7 +196,6 @@ let%expect_test "each kind toggled from the menu, alone" =
     Looking
     ■ Interrupted
     == without notes
-    button "Filter the transcript: 1 kind hidden" -- Filter: hiding notices (/filter)
     Hiding notices · 1 item hidden (Show all)
     Survey the repository
     Thought Let me look first.
@@ -241,12 +233,10 @@ let%expect_test
   (* Esc puts back the filter it opened with. *)
   H.key h ~target "Escape";
   H.text h ~selector:".filter-note";
-  H.names h ~selector:"#filter-toggle";
   [%expect
     {|
     Close_dialog
     (Focus editor)
-    button "Filter the transcript" -- Filter the transcript (/filter)
     |}];
   H.quiet h (fun () -> H.act h Open_filter);
   H.key h ~target "ArrowDown";
@@ -254,7 +244,6 @@ let%expect_test
   H.key h ~target " ";
   H.key h ~target "Enter";
   H.text h ~selector:".filter-note";
-  H.names h ~selector:"#filter-toggle";
   [%expect
     {|
     (Dialog_move 1)
@@ -265,7 +254,6 @@ let%expect_test
      (tag (Filter_saved s2)))
     (Focus editor)
     Hiding thinking · 1 item hidden (Show all)
-    button "Filter the transcript: 1 kind hidden" -- Filter: hiding thinking (/filter)
     |}];
   (* Show all, from the menu's last row. *)
   H.quiet h (fun () -> H.act h Open_filter);
@@ -286,14 +274,12 @@ let%expect_test
     |}];
   H.key h ~target "Enter";
   H.text h ~selector:".filter-note";
-  H.names h ~selector:"#filter-toggle";
   [%expect
     {|
     Dialog_accept
     (Rpc (method_ set_transcript_filter) (params ((filter null)))
      (tag (Filter_saved s2)))
     (Focus editor)
-    button "Filter the transcript" -- Filter the transcript (/filter)
     |}]
 ;;
 
@@ -331,14 +317,12 @@ let%expect_test "/filter: arguments, an error that says what to type, Show all" 
     |}];
   H.click h ~selector:".filter-show-all";
   H.text h ~selector:".filter-note";
-  H.names h ~selector:"#filter-toggle";
   [%expect
     {|
     (Run "/filter all")
     (Rpc (method_ set_transcript_filter) (params ((filter null)))
      (tag (Filter_saved s2)))
     (Expire_toast (id 2) (after_ms 2980))
-    button "Filter the transcript" -- Filter the transcript (/filter)
     |}]
 ;;
 
@@ -353,7 +337,6 @@ let%expect_test
     {|
     <div class="filtered">
     <div class="filtered">
-    button "Jump to a message" -- Jump to a message (Ctrl+J)
     button "Your message 1, Survey the repository"
     button "Your message 2, And the tests?"
     |}]
@@ -380,10 +363,7 @@ let switch h ?filter id =
     H.reply h "get_messages_page" (H.page ("[" ^ user "hello" ^ "]")))
 ;;
 
-let shown h =
-  H.names h ~selector:"#filter-toggle";
-  H.text h ~selector:".filter-note"
-;;
+let shown h = H.text h ~selector:".filter-note"
 
 let%expect_test "each session has its own filter, kept in the session" =
   let h = session () in
@@ -397,42 +377,25 @@ let%expect_test "each session has its own filter, kept in the session" =
   (* The backend's echo. *)
   state_event ~filter:"thinking" h "s2";
   shown h;
-  [%expect
-    {|
-    button "Filter the transcript: 1 kind hidden" -- Filter: hiding thinking (/filter)
-    Hiding thinking · 1 item hidden (Show all)
-    |}];
+  [%expect {| Hiding thinking · 1 item hidden (Show all) |}];
   (* Another session shows everything, or what it keeps. *)
   switch h "s3";
   shown h;
-  [%expect
-    {| button "Filter the transcript" -- Filter the transcript (/filter) |}];
+  [%expect {| |}];
   switch h ~filter:"tools,notes" "s4";
   shown h;
   [%expect
-    {|
-    button "Filter the transcript: 2 kinds hidden" -- Filter: hiding tool calls, notices (/filter)
-    Hiding tool calls, notices: nothing loaded is hidden (Show all)
-    |}];
+    {| Hiding tool calls, notices: nothing loaded is hidden (Show all) |}];
   switch h ~filter:"thinking" "s2";
   shown h;
-  [%expect
-    {|
-    button "Filter the transcript: 1 kind hidden" -- Filter: hiding thinking (/filter)
-    Hiding thinking · 1 item hidden (Show all)
-    |}];
+  [%expect {| Hiding thinking · 1 item hidden (Show all) |}];
   (* Changed in another browser. *)
   state_event ~filter:"user" h "s2";
   shown h;
-  [%expect
-    {|
-    button "Filter the transcript: 1 kind hidden" -- Filter: hiding your messages (/filter)
-    Hiding your messages · 2 items hidden (Show all)
-    |}];
+  [%expect {| Hiding your messages · 2 items hidden (Show all) |}];
   state_event h "s2";
   shown h;
-  [%expect
-    {| button "Filter the transcript" -- Filter the transcript (/filter) |}]
+  [%expect {| |}]
 ;;
 
 let%expect_test "state while the menu is open keeps what it toggled" =
@@ -443,27 +406,15 @@ let%expect_test "state while the menu is open keeps what it toggled" =
     H.act h (Filter_press (Some (Kind Thinking)));
     state_event h "s2");
   shown h;
-  [%expect
-    {|
-    button "Filter the transcript: 1 kind hidden" -- Filter: hiding thinking (/filter)
-    Hiding thinking · 1 item hidden (Show all)
-    |}];
+  [%expect {| Hiding thinking · 1 item hidden (Show all) |}];
   (* Another browser's change: what was toggled stays, Esc puts back the
      session's. *)
   state_event ~filter:"tools" h "s2";
   shown h;
-  [%expect
-    {|
-    button "Filter the transcript: 1 kind hidden" -- Filter: hiding thinking (/filter)
-    Hiding thinking · 1 item hidden (Show all)
-    |}];
+  [%expect {| Hiding thinking · 1 item hidden (Show all) |}];
   H.quiet h (fun () -> H.act h Close_dialog);
   shown h;
-  [%expect
-    {|
-    button "Filter the transcript: 1 kind hidden" -- Filter: hiding tool calls (/filter)
-    Hiding tool calls · 1 item hidden (Show all)
-    |}];
+  [%expect {| Hiding tool calls · 1 item hidden (Show all) |}];
   (* Untouched, the menu follows it; closing it saves nothing. *)
   H.quiet h (fun () -> H.act h Open_filter);
   state_event ~filter:"notes" h "s2";
@@ -472,7 +423,6 @@ let%expect_test "state while the menu is open keeps what it toggled" =
   [%expect
     {|
     (Focus editor)
-    button "Filter the transcript: 1 kind hidden" -- Filter: hiding notices (/filter)
     Hiding notices · 1 item hidden (Show all)
     |}];
   (* Switching sessions closes it, with the new session's filter. *)
@@ -482,8 +432,7 @@ let%expect_test "state while the menu is open keeps what it toggled" =
   switch h "s3";
   H.elements h ~selector:".filter-menu";
   shown h;
-  [%expect
-    {| button "Filter the transcript" -- Filter the transcript (/filter) |}]
+  [%expect {| |}]
 ;;
 
 let%expect_test "the echoes of saves still in flight do not flicker" =
@@ -495,28 +444,16 @@ let%expect_test "the echoes of saves still in flight do not flicker" =
   state_event ~filter:"thinking" h "s2";
   H.reply h "set_transcript_filter" "{}";
   shown h;
-  [%expect
-    {|
-    button "Filter the transcript: 2 kinds hidden" -- Filter: hiding thinking, tool calls (/filter)
-    Hiding thinking, tool calls · 2 items hidden (Show all)
-    |}];
+  [%expect {| Hiding thinking, tool calls · 2 items hidden (Show all) |}];
   (* Another browser's change as ours is answered: it is the session's. *)
   state_event ~filter:"thinking,tools" h "s2";
   state_event ~filter:"notes" h "s2";
   H.reply h "set_transcript_filter" "{}";
   shown h;
-  [%expect
-    {|
-    button "Filter the transcript: 1 kind hidden" -- Filter: hiding notices (/filter)
-    Hiding notices · 1 item hidden (Show all)
-    |}];
+  [%expect {| Hiding notices · 1 item hidden (Show all) |}];
   (* A save that fails puts back what the session keeps. *)
   H.quiet h (fun () -> H.act h (Run "/filter all"));
   H.fail h "set_transcript_filter" "no session";
   shown h;
-  [%expect
-    {|
-    button "Filter the transcript: 1 kind hidden" -- Filter: hiding notices (/filter)
-    Hiding notices · 1 item hidden (Show all)
-    |}]
+  [%expect {| Hiding notices · 1 item hidden (Show all) |}]
 ;;

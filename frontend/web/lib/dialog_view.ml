@@ -208,15 +208,65 @@ let picker ?(trimmable = String.Set.empty) ~kind (p : Picker.t) ~inject =
     ]
 ;;
 
+(* A key of the help: alternatives ("Ctrl+Enter / ⌘+Enter") as keys side by
+   side, and what is said of one in brackets ("Esc (the review's ...)") as
+   text after it. *)
+let help_keys key =
+  String.Search_pattern.split_on (String.Search_pattern.create " / ") key
+  |> List.concat_mapi ~f:(fun i alt ->
+    let key, note =
+      match String.substr_index alt ~pattern:" (" with
+      | Some at -> String.prefix alt at, Some (String.drop_prefix alt (at + 1))
+      | None -> alt, None
+    in
+    List.filter_opt
+      [ (if i > 0
+         then
+           Some
+             (Node.span
+                ~attrs:[ Attr.class_ "text-muted-foreground" ]
+                [ Node.text "or" ])
+         else None)
+      ; Some
+          (Loon.Kbd.view
+             ~class_:"h-auto min-h-5 whitespace-normal break-all py-0.5"
+             [ Node.text key ])
+      ; Option.map note ~f:(fun note ->
+          Node.span
+            ~attrs:[ Attr.class_ "text-muted-foreground" ]
+            [ Node.text note ])
+      ])
+;;
+
 let help (m : App.Model.t) ~inject =
-  let table rows =
-    Node.table
-      ~attrs:[ Attr.class_ "help-table" ]
-      [ Node.tbody
+  let section title rows =
+    Node.section
+      ~attrs:[ Attr.class_ "help-section mb-4 last:mb-0" ]
+      [ Node.h3
+          ~attrs:
+            [ Attr.class_
+                "mb-1 text-xs font-medium uppercase tracking-wide \
+                 text-muted-foreground"
+            ]
+          [ Node.text title ]
+      ; Node.div
+          ~attrs:[ Attr.class_ "help-rows" ]
           (List.map rows ~f:(fun (key, what) ->
-             Node.tr
-               [ Node.td [ Node.kbd [ Node.text key ] ]
-               ; Node.td [ Node.text what ]
+             Node.div
+               ~attrs:
+                 [ Attr.class_
+                     "help-row grid grid-cols-[minmax(0,12rem)_minmax(0,1fr)] \
+                      items-baseline gap-x-4 gap-y-1 border-t border-border \
+                      py-1.5 text-[13px] first:border-t-0 narrow:grid-cols-1"
+                 ]
+               [ Node.div
+                   ~attrs:
+                     [ Attr.class_ "help-key flex flex-wrap items-center gap-1"
+                     ]
+                   (help_keys key)
+               ; Node.div
+                   ~attrs:[ Attr.class_ "help-what min-w-0 break-words" ]
+                   [ Node.text what ]
                ]))
       ]
   in
@@ -230,15 +280,16 @@ let help (m : App.Model.t) ~inject =
           ~on_click:(inject Action.Close_dialog)
           [ Node.text "Done" ]
       ]
-    [ Node.h3 [ Node.text "Keys" ]
-    ; table Keys.help
-    ; Node.h3 [ Node.text "Commands" ]
-    ; table
-        (List.map
-           (Slash.all ~superuser:(App.superuser m))
-           ~f:(fun (s : Slash.Spec.t) -> Slash.Spec.usage s, s.help))
-    ; Node.h3 [ Node.text "Left to the browser" ]
-    ; table Keys.browser
+    [ Node.div
+        ~attrs:[ Attr.class_ "loon help-list" ]
+        [ section "Keys" Keys.help
+        ; section
+            "Commands"
+            (List.map
+               (Slash.all ~superuser:(App.superuser m))
+               ~f:(fun (s : Slash.Spec.t) -> Slash.Spec.usage s, s.help))
+        ; section "Left to the browser" Keys.browser
+        ]
     ]
 ;;
 

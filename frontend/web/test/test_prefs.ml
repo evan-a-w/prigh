@@ -59,7 +59,7 @@ let%expect_test "the cache first, then the backend's, which win" =
      (look
       ((name Dark) (accent (Preset Blue)) (radius Default) (sans Recursive)
        (mono Recursive)))
-     (notify true) (verbosity Normal) (history (newest oldest)) (sidebar (320))
+     (notify true) (verbosity Quiet) (history (newest oldest)) (sidebar (320))
      (terminal_open true) (remote Unknown))
     |}];
   (* Another browser changed the theme meanwhile and closed the terminal;
@@ -146,7 +146,7 @@ let%expect_test "a page from before uploads the browser's once" =
      (look
       ((name Original) (accent (Preset Orange)) (radius Default) (sans Recursive)
        (mono Recursive)))
-     (notify false) (verbosity Normal) (history ("tui prompt")) (sidebar ())
+     (notify false) (verbosity Quiet) (history ("tui prompt")) (sidebar ())
      (terminal_open false) (remote Kept))
     |}];
   (* Once done, the backend's win: a second browser with a page from before

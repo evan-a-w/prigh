@@ -122,7 +122,6 @@ let%expect_test
   H.elements h ~selector:".rail .tick";
   [%expect
     {|
-    button "Jump to a message" -- Jump to a message (Ctrl+J)
     button "Your message 1, question 1, 10:00"
     button "Your message 2, question 2, 10:01"
     button "Your message 3, question 3, 10:02"
@@ -388,16 +387,17 @@ let%expect_test
   [%expect {| true |}]
 ;;
 
-let%expect_test "on a phone: no rail, the button opens the list" =
+let%expect_test "on a phone: no rail; the ⋯ sheet's row opens the list" =
   let h = long_session () in
   H.quiet h (fun () -> H.act h (Set_narrow true));
-  H.elements h ~selector:".jump-nav > *";
-  H.click h ~selector:".jump-list";
+  H.elements h ~selector:".jump-nav";
+  H.click h ~selector:".chrome-more .more-toggle";
+  H.click h ~selector:".sheet-row.jump-row";
   H.elements h ~selector:".picker-dialog";
   [%expect
     {|
-    <button class="btn ghost icon jump-list">
-    <Vdom.Node.none-widget class="">
+    Toggle_status_tray
+    Toggle_status_tray
     Open_jump_list
     (Focus picker-input)
     <div class="modal picker-dialog">

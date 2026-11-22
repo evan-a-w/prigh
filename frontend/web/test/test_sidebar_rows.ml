@@ -220,7 +220,6 @@ let%expect_test "the top bar: project / name, the toggles, the card's" =
     prigh
     /
     Rebuild prigh-web
-    button "Filter the transcript" -- Filter the transcript (/filter)
     button "Files" -- Files (Ctrl+Shift+F)
     button "Terminal" -- Terminal (Ctrl+`)
     button "Review changes" -- Review changes (Alt+R)

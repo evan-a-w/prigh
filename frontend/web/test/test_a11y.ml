@@ -34,7 +34,6 @@ let%expect_test "the names of the controls" =
     button "Settings" -- Settings (Ctrl+, or /settings)
     button "Pull requests" -- Pull requests (/pr)
     button "Commands and keys" -- Commands and keys (/help)
-    button "Filter the transcript" -- Filter the transcript (/filter)
     button "Files" -- Files (Ctrl+Shift+F)
     button "Terminal" -- Terminal (Ctrl+`)
     button "Review changes" -- Review changes (Alt+R)

@@ -6,11 +6,8 @@ open! Import
 (** The kinds the filter hides, lowercase and comma separated. *)
 val hidden_names : Transcript_filter.t -> string
 
-(** Left of the file browser's toggle: opens the menu; accented, with how
-    many kinds are hidden, while a filter is on. *)
-val button : App.Model.t -> inject:(App.Action.t -> unit Effect.t) -> Node.t
-
-(** The menu, under the button. *)
+(** The menu, under the top bar's toggles ([/filter], Ctrl+K, the phone's
+    sheet). *)
 val menu
   :  App.Model.t
   -> Filter_menu.t

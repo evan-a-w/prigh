@@ -15,6 +15,7 @@ import { mkdirSync, readFileSync, realpathSync } from "node:fs";
 import { hostName } from "./host_name.mjs";
 import { join } from "node:path";
 import { end } from "./end.mjs";
+import { normalVerbosity } from "./verbose_prefs.mjs";
 
 const { chromium, firefox, webkit } = await import(process.env.PLAYWRIGHT_MODULE);
 
@@ -25,8 +26,10 @@ const { PRIGH_BACKEND: backend, SITE: site, TOKEN: token } = process.env;
 mkdirSync(join(process.env.TEST_DIR, "new_sessions"), { recursive: true });
 const dir = realpathSync(join(process.env.TEST_DIR, "new_sessions"));
 const home = join(dir, "home");
+normalVerbosity(home);
 const cwd = join(dir, "cwd");
 const laptopHome = join(dir, "laptop-home");
+normalVerbosity(laptopHome);
 for (const d of [home, cwd, laptopHome, join(laptopHome, "proj")]) mkdirSync(d, { recursive: true });
 
 const waitForLine = (proc, pattern, what) => new Promise((resolve, reject) => {

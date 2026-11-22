@@ -66,16 +66,15 @@ let help =
   ; "Alt+N", "insert a snippet at the caret: a list to filter (/snippet)"
   ; "Ctrl+O", "cycle the transcript verbosity"
   ; ( "↑ ↓ / Space / Enter / Esc (transcript filter)"
-    , "the filter's menu (/filter, its button left of the files'): choose a \
-       kind, show or hide it, keep the filter, or put back the one it opened \
-       with" )
+    , "the filter's menu (/filter, Ctrl+K, a phone's ⋯): choose a kind, show \
+       or hide it, keep the filter, or put back the one it opened with" )
   ; "Ctrl+X", "copy the last reply (when nothing is selected)"
   ; ( "Ctrl+↑ / Ctrl+↓"
     , "previous / next of your messages in the transcript (loading earlier \
        ones)" )
   ; ( "Ctrl+J"
     , "jump to one of your messages: a list to filter (or the marks at the \
-       transcript's right edge)" )
+       transcript's left edge)" )
   ; ( "Delete (in the jump list)"
     , "trim the model's context before the highlighted message (confirmed \
        first; /trim undo brings it back)" )

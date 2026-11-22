@@ -22,12 +22,12 @@ New session
 V4.1 Flash
 === chromium: a dialog keeps the focus ===
 Tab: dialog: Close (Esc)
-Tab: dialog: Keys
+Tab: dialog: KEYS
 Tab: dialog: Done
-Shift+Tab: dialog: Keys
+Shift+Tab: dialog: KEYS
 Shift+Tab: dialog: Close (Esc)
 Shift+Tab: dialog: Done
-Shift+Tab: dialog: Keys
+Shift+Tab: dialog: KEYS
 after Esc: editor
 === chromium: a mistyped command ===
 Unknown command /modle. Did you mean /mode? (/help lists them)
@@ -498,45 +498,45 @@ attach's menu: a sheet across the bottom; focus in it: true
 Pinned
 1
 cwd
-now
+<AGE>
 one more
 Recent
 2
 cwd
-now
+<AGE>
 count some lines
 cwd
-now
+<AGE>
 hello again
 pin: Pinned
 === chromium: unpinned ===
 cwd
-now
+<AGE>
 one more
 cwd
-now
+<AGE>
 count some lines
 cwd
-now
+<AGE>
 hello again
 === chromium: archived, folded ===
 cwd
-now
+<AGE>
 one more
 cwd
-now
+<AGE>
 count some lines
 === chromium: archived ===
 cwd
-now
+<AGE>
 one more
 cwd
-now
+<AGE>
 count some lines
 Archived
 1
 cwd
-now
+<AGE>
 hello again
 Delete archived
 muted: 1
@@ -556,7 +556,7 @@ session files before: 3
 === chromium: deleted ===
 Deleted 2 sessions (<SIZE>)
 cwd
-now
+<AGE>
 one more
 session files after: 1
 === chromium: /cd: the directory popup ===
@@ -713,17 +713,17 @@ hl-prop:"name" hl-str:"prigh" hl-prop:"ok" hl-con:true hl-prop:"n" hl-num:3
 chat 700; chips: <HOSTNAME>, V4.1 Flash; status: Context 0% full, $<COST>: details; .chat-chrome 48px high
 .chat-chrome: fits
 .composer: fits
-the panels' toggles: 4 buttons 10px from the top, 12px from the right, clear of the jump list: true, open: Files
+the panels' toggles: 3 buttons 10px from the top, 12px from the right, clear of the jump list: true, open: Files
 === chromium: the session: a 520px chat column ===
 chat 520; chips: icon, V4.1 Flash; status: Context 0% full, $<COST>: details; .chat-chrome 48px high
 .chat-chrome: fits
 .composer: fits
-the panels' toggles: 4 buttons 10px from the top, 12px from the right, clear of the jump list: true, open: Files
+the panels' toggles: 3 buttons 10px from the top, 12px from the right, clear of the jump list: true, open: Files
 === chromium: the session: a 400px chat column ===
 chat 400; chips: icon, V4.1 Flash; status: Context 0% full, $<COST>: details; .chat-chrome 48px high
 .chat-chrome: fits
 .composer: fits
-the panels' toggles: 4 buttons 10px from the top, 12px from the right, clear of the jump list: true, open: Files
+the panels' toggles: 3 buttons 10px from the top, 12px from the right, clear of the jump list: true, open: Files
 === chromium: settings ===
 Settings
 Appearance
@@ -789,17 +789,17 @@ Esc closes it, the editor has the focus: true
 chat 900; chips: <HOSTNAME>, V4.1 Flash; status: Context 0% full, $<COST>: details; .chat-chrome 48px high
 .chat-chrome: fits
 .composer: fits
-the panels' toggles: 5 buttons 10px from the top, 12px from the right, clear of the jump list: true, open: Files
+the panels' toggles: 4 buttons 10px from the top, 12px from the right, clear of the jump list: true, open: Files
 === chromium: the session's bar: a 600px chat column without the sidebar ===
 chat 600; chips: icon, V4.1 Flash; status: Context 0% full, $<COST>: details; .chat-chrome 48px high
 .chat-chrome: fits
 .composer: fits
-the panels' toggles: 5 buttons 10px from the top, 12px from the right, clear of the jump list: true, open: Files
+the panels' toggles: 4 buttons 10px from the top, 12px from the right, clear of the jump list: true, open: Files
 === chromium: the session's bar: a 400px chat column without the sidebar ===
 chat 400; chips: icon, V4.1 Flash; status: Context 0% full, $<COST>: details; .chat-chrome 48px high
 .chat-chrome: fits
 .composer: fits
-the panels' toggles: 5 buttons 10px from the top, 12px from the right, clear of the jump list: true, open: Files
+the panels' toggles: 4 buttons 10px from the top, 12px from the right, clear of the jump list: true, open: Files
 === chromium: errors ===
 none
 === chromium: temporary: desktop: the new-session screen ===
@@ -1123,9 +1123,9 @@ step 5 at the same place: true
 === chromium: paging: jump: the rail ===
 steps 26 to 40 (15)
 marks: 40, not loaded: 25
-button: Jump to a message
+the jump list's button: none (Ctrl+J)
 the one in view: Step 39
-along the chat's right edge: true
+along the chat's left edge: true; left of the messages: true
 === chromium: paging: jump: a mark's tooltip ===
 Step 30: look at module 30. | <TIME>
 === chromium: paging: jump: to a loaded message ===
@@ -1286,7 +1286,7 @@ radius 16px: the dialog 16px
 fonts: Inter, Inter
 pressed Round: rgb(45, 45, 45) rgb(230, 230, 230), corners 16px, 28px
 === chromium: themes: saved on the backend ===
-web.migrated=true web.terminal-open=true web.theme="dark" web.accent="blue" web.radius="default" web.font="recursive" web.code-font="recursive"
+web.verbosity="normal" web.migrated=true web.terminal-open=true web.theme="dark" web.accent="blue" web.radius="default" web.font="recursive" web.code-font="recursive"
 === chromium: themes: reloaded ===
 first paint: dark blue; dark blue #6aa6f8 on #1d1d1d
 === chromium: themes: another browser ===
@@ -1300,7 +1300,7 @@ fonts: Recursive Sans, Recursive Sans
 no pressed item
 its history: /accent #c2410c
 === chromium: themes: picker ===
-Esc: light custom #c2410c on #f4f5f7; saved: web.migrated=true web.terminal-open=true web.theme="light" web.accent="#c2410c" web.radius="default" web.font="recursive" web.code-font="recursive"
+Esc: light custom #c2410c on #f4f5f7; saved: web.verbosity="normal" web.migrated=true web.terminal-open=true web.theme="light" web.accent="#c2410c" web.radius="default" web.font="recursive" web.code-font="recursive"
 === chromium: themes: back ===
 original orange #f0b44c on #1b1e23; the other: original orange #f0b44c on #1b1e23
 === chromium: themes: errors ===
@@ -2914,7 +2914,7 @@ Trim the context here? | Trim 5 messages (~202 tokens) before this reply? | Modu
 none
 === chromium: filter: opened ===
 user 2, replies 3, thinking 1, tools 1, subagents 1, stopped 1
-Filter the transcript; plain; badge none; next: Files
+button: none; toggles: Files, Terminal, Review changes
 note: none
 === chromium: filter: menu ===
 > [x] Your messages
@@ -2924,7 +2924,7 @@ note: none
   [x] Subagents
   [x] Notices
       Show all
-below the button: true; inside the window: true; focused: true
+below the toggles: true; inside the window: true; focused: true
 === chromium: filter: thinking and tools hidden ===
   [x] Your messages
   [x] Replies
@@ -2934,17 +2934,17 @@ below the button: true; inside the window: true; focused: true
   [x] Notices
       Show all
 user 2, replies 3, thinking 0, tools 0, subagents 1, stopped 1
-Filter the transcript: 2 kinds hidden; accented; badge 2; next: Files
+button: none; toggles: Files, Terminal, Review changes
 note: Hiding thinking, tool calls · 2 items hidden | Show all
 === chromium: filter: Esc ===
 user 2, replies 3, thinking 0, tools 0, subagents 1, stopped 1
-Filter the transcript: 2 kinds hidden; accented; badge 2; next: Files
+button: none; toggles: Files, Terminal, Review changes
 === chromium: filter: clicked outside ===
 user 2, replies 3, thinking 0, tools 0, subagents 0, stopped 1
-Filter the transcript: 3 kinds hidden; accented; badge 3; next: Files
+button: none; toggles: Files, Terminal, Review changes
 === chromium: filter: reloaded ===
 user 2, replies 3, thinking 0, tools 0, subagents 0, stopped 1
-Filter the transcript: 3 kinds hidden; accented; badge 3; next: Files
+button: none; toggles: Files, Terminal, Review changes
 === chromium: filter: another session ===
 user 1, replies 1, thinking 1, tools 0, subagents 0, stopped 0
 note: none
@@ -2958,9 +2958,9 @@ the rail's first mark: jumped to where the message is
 Ctrl+J lists: 2 messages
 === chromium: filter: show all ===
 user 2, replies 3, thinking 1, tools 1, subagents 1, stopped 1
-Filter the transcript; plain; badge none; next: Files
+button: none; toggles: Files, Terminal, Review changes
 === chromium: filter: image viewer ===
-#filter-toggle: under the image; .composer-controls .chip-button: under the image
+.panel-toggles .files-toggle: under the image; .composer-controls .chip-button: under the image
 === chromium: filter: phone ===
 a sheet across the bottom: true; inside the window: true; focused: true
 user 2, replies 3, thinking 0, tools 0, subagents 1, stopped 1
@@ -3311,9 +3311,9 @@ mode by mouse: the chip: V4.1 Flash; the card: Asks: edits & commands; menu clos
 reasoning by keyboard: the chip: V4.1 Flash; the card: High; menu closed: true
 mode by keyboard: the chip: V4.1 Flash; the card: Asks: commands; menu closed: true
 === chromium: status: desktop: a click outside closes, and goes no further ===
-model: closed: true; the filter's menu opened: false
-host: closed: true; the filter's menu opened: false
-+: closed: true; the filter's menu opened: false
+model: closed: true; the files opened: false
+host: closed: true; the files opened: false
++: closed: true; the files opened: false
 === chromium: status: desktop: the ring's card ===
 on hover: true; it says: 36% used · compacts at 200k (20%)
 status: Ready; reasoning: High; mode: Asks: commands
