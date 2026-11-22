@@ -1,6 +1,5 @@
 open! Core
 open! Prigh
-open Tool_test_helpers
 open! Test_review_compare
 
 let%expect_test "a branch that is not checked out, read-only" =

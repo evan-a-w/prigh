@@ -1,6 +1,5 @@
 open! Core
 open! Prigh
-open Tool_test_helpers
 open! Test_git_actions
 
 let%expect_test "refusals: a rejected push, detached HEAD, no remote" =
