@@ -1111,16 +1111,31 @@ session's files, on its tool host, in CodeMirror (loaded only when the
 editor opens). Long lines wrap under their indent; saving (Ctrl/⌘+S, or ⋯
 → Save on a phone) writes the file and refuses when it changed on the host
 since it was read, offering Reload or Overwrite. Prompts go to the
-session's chat as usual: Ctrl/⌘+L (or Ask, on a phone) attaches the
-selected lines (or the caret's line) to the next message as a chip,
-`src/compact.ml:48–58`, sent with the prompt as a pasted text. When the
-agent changes an open file it is read again: a file without unsaved edits
-shows the change inline (removed lines struck through, added ones tinted,
-marks in the gutter) with Keep and Undo (which writes the old text back);
-one with unsaved edits keeps them and says the host's copy changed.
+session's chat as usual: Ctrl/⌘+L attaches the selected lines (or the
+caret's line) to the next message as a chip, `src/compact.ml:48–58`, sent
+with the prompt as a pasted text; Ctrl/⌘+I (or Ask, on a phone) opens a
+box under those lines instead, whose prompt goes the same way and leaves
+the composer's draft alone. When the agent changes an open file it is
+read again: a file without unsaved edits shows each change inline
+(removed lines struck through, added ones tinted, a bar in the gutter),
+each with its own Keep and Undo (Undo writes that change's old text back
+and leaves the others), and Keep all / Undo all over the file. A change
+kept leaves a numbered badge in the gutter that shows it again, Undo and
+all. A file with unsaved edits keeps them and says the host's copy
+changed.
+
+Go to file (Ctrl/⌘+P, or the field at the foot of the phone's drawer, and
+`/edit`'s completion) is fuzzy over every file under the session's
+directory: in a git repository the tracked and untracked-but-not-ignored
+ones, elsewhere a walk that skips dot directories, `_build`, `_opam` and
+`node_modules`. The list is read once from the tool host (again after the
+agent's tools touch files) and matched in the browser as you type, the
+file's name and the start of words first, the letters matched in bold;
+there is no cap on the matches (only the rows in sight are drawn), and the
+host stops listing at a million files.
 
 On a wide window the files are a list down the left (Ctrl/⌘+B; drag its
-edge to resize), Ctrl/⌘+P goes to a file (fuzzy, over the host's paths),
+edge to resize), Ctrl/⌘+P goes to a file,
 open files are tabs (Alt+PageDown/PageUp, Alt+W closes), Ctrl/⌘+F finds
 and replaces, Ctrl+G goes to a line, and the chat is a column on the right
 (Alt+C; it opens when you send). On a phone the code has the screen: a
@@ -1129,7 +1144,8 @@ thumb, the path, ⋯ for the rest) that slides away as you scroll down, the
 composer under the code, and the reply's last line over the composer (a
 tap pulls the chat up). With the keyboard up the composer gives way to a
 bar of the keys a phone keyboard buries (Ask, ⇥, brackets, `;`, `=`, `|`,
-`->`, ← →, undo). Esc outside the text, Alt+E or ⋯ → Leave the editor go
+`->`, ← →, undo); a quick swipe sideways over the text goes to the next
+or previous open file (the dots in the strip). Esc outside the text, Alt+E or ⋯ → Leave the editor go
 back to the chat.
 
 ### Reviewing the changes

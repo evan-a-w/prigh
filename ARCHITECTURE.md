@@ -3901,9 +3901,15 @@ terminal frontend and `web/` prigh-web, the browser one.
       new line, Ctrl/⌘+Enter accepts.
       its counts, and a button to the review page).
     - The editor mode: `Code_editor` (pure: the open buffers, each with
-      its text, the text on the host and its md5, the agent's change on
-      show as `Hunk`s; the file tree, Go to file, the chip for the next
-      prompt) and `Code_editor_view` (the strip, the tree or drawer, the
+      its text, the text on the host and its md5, the agent's changes on
+      show and those kept as `Hunk`s, moved with the lines around them as
+      the text changes (`Hunk.remap`), each undone by `Hunk.revert`; the
+      file tree; Go to file's index, every file under the cwd from the
+      `list_files` RPC (`File_index` on the tool host: `git ls-files`, or
+      a walk; one newline-separated string), ranked in the browser by
+      `Prigh_ui.Fuzzy_path` (narrowing from the last matches as the query
+      grows) and drawn as a virtual list; the chip for the next prompt and
+      the ask box's) and `Code_editor_view` (the strip, the tree or drawer, the
       notices, the phone's keys). Files are read with `fs_preview` and
       written with `fs_write` (`expected`: the md5 read, so a file changed
       on the host is refused); after a tool that may touch files
