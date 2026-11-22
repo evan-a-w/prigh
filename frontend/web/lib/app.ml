@@ -1620,10 +1620,7 @@ let with_review (m : Model.t) ((review : Code_review.t), outs) =
   let m =
     if m.narrow && review.open_ && not m.review.open_
     then
-      { m with
-        files = fst (Files.update m.files Close)
-      ; agents = { m.agents with open_ = false }
-      }
+      { m with files = fst (Files.update m.files Close) }
     else m
   in
   review_out { m with review } outs
@@ -1658,8 +1655,6 @@ let with_code (m : Model.t) ((code : Code_editor.t), outs) =
           (if m.review.open_
            then fst (Code_review.update m.review Close)
            else m.review)
-      ; agents =
-          (if m.narrow then { m.agents with open_ = false } else m.agents)
       }
     else m
   in

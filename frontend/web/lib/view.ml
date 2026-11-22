@@ -287,12 +287,11 @@ let transcript (m : Model.t) ~inject =
 module Part = struct
   (* The time as a part shows it: what changes at most once a minute
      ("3m ago", "14:32") by the minute, messages' times by the day ("Today",
-     "Yesterday"), running times by the second. *)
+     "Yesterday"). *)
   module Clock = struct
     type t =
       | Minute of Int63.t option
       | Day of Message_time.t
-      | Exact of Time_ns.t option
     [@@deriving equal]
 
     let minute (m : Model.t) =
