@@ -9,16 +9,15 @@ Backend
 Sign in
 === firefox: signed in: sidebar ===
 prigh
-web
-New session
 Search
+Ctrl K
 No sessions yet: send a message to start one.
 T
-token
 === firefox: signed in: chat ===
 What are we building?
 / for commands, @ for files
 === firefox: signed in: the session's card ===
+New session
 <HOSTNAME>
 V4.1 Flash
 === firefox: a dialog keeps the focus ===
@@ -29,7 +28,7 @@ Shift+Tab: dialog: Keys
 Shift+Tab: dialog: Close (Esc)
 Shift+Tab: dialog: Done
 Shift+Tab: dialog: Keys
-after Esc: editor cwd-placeholder
+after Esc: editor
 === firefox: a mistyped command ===
 Unknown command /modle. Did you mean /mode? (/help lists them)
 editor: /modle
@@ -92,8 +91,6 @@ Reminder r1 removed
 Reminder r2 removed
 status: no reminders
 === firefox: bash run ===
-▢
-Using prigh-web
 count some lines
 <TIME>
 let me look
@@ -102,6 +99,9 @@ printf 'one\ntwo\nthree\n'
 three lines
 <TIME>
 === firefox: the session's card after a run ===
+cwd
+/
+count some lines
 <HOSTNAME>
 V4.1 Flash
 === firefox: a budget in the ring's card ===
@@ -165,16 +165,14 @@ url has the session: true
 same session after reload: true
 === firefox: sidebar after reload ===
 prigh
-web
-New session
 Search
+Ctrl K
 Sessions
 Select
+cwd
+now
 count some lines
-<AGE>
-<CWD>
 T
-token
 === firefox: new session ===
 What are we building?
 / for commands, @ for files
@@ -185,24 +183,22 @@ send button: Sending…
 new session in the url: true
 === firefox: two sessions ===
 prigh
-web
-New session
 Search
+Ctrl K
 Sessions
 Select
+cwd
+now
 hello again
-<AGE>
-<CWD>
+cwd
+now
 count some lines
-<AGE>
-<CWD>
 T
-token
 === firefox: switching ===
 Loading the session…
-marked in the sidebar: count some lines
-<AGE>
-<CWD>
+marked in the sidebar: cwd
+opening…
+count some lines
 switched back: true
 === firefox: switched back ===
 count some lines
@@ -259,9 +255,8 @@ Done
 Count the files
 There are 3 files.
 asking a helper
-Subagent:
+subagent
 Count the files
-Open ›
 The survey: 3 files.
 <TIME>
 Survey the project
@@ -343,8 +338,6 @@ Cancel
 Create folder and switch
 created on the host: true
 === firefox: an environment note above the prompt ===
-client closed: ▢
-Using prigh-web
 cwd closed: ⌂
 Working directory is now <CWD>/sub
 === firefox: the prompt shows only what was typed ===
@@ -476,16 +469,19 @@ Rules are permissions in ~/.prigh/config.json, e.g. {"allow": ["bash(git status:
 /mode or Alt+M switches the mode.
 Done
 === firefox: two queued messages ===
-Steers this turn
+Steer
 also check the docs
 Edit
-After this turn
+Remove from the queue
+Queued
 then write the changelog
 Edit
+Remove from the queue
 === firefox: one removed ===
-Steers this turn
+Steer
 also check the docs
 Edit
+Remove from the queue
 === firefox: the steer delivered ===
 Steer delivered: also check the docs
 === firefox: the steer in the transcript ===
@@ -501,57 +497,47 @@ attach's menu: a sheet across the bottom; focus in it: true
 === firefox: pinned ===
 Pinned
 1
-one more
-<AGE>
 cwd
-main
+now
+one more
 Recent
 2
-count some lines
-<AGE>
 cwd
-main
+now
+count some lines
+cwd
+now
 hello again
-<AGE>
-<CWD>
 pin: Pinned
 === firefox: unpinned ===
+cwd
+now
 one more
-<AGE>
 cwd
-main
+now
 count some lines
-<AGE>
 cwd
-main
+now
 hello again
-<AGE>
-<CWD>
 === firefox: archived, folded ===
+cwd
+now
 one more
-<AGE>
 cwd
-main
+now
 count some lines
-<AGE>
-cwd
-main
-Archived
-1
 === firefox: archived ===
+cwd
+now
 one more
-<AGE>
 cwd
-main
+now
 count some lines
-<AGE>
-cwd
-main
 Archived
 1
+cwd
+now
 hello again
-<AGE>
-<CWD>
 Delete archived
 muted: 1
 === firefox: selected ===
@@ -569,10 +555,9 @@ Delete 2
 session files before: 3
 === firefox: deleted ===
 Deleted 2 sessions (<SIZE>)
-one more
-<AGE>
 cwd
-main
+now
+one more
 session files after: 1
 === firefox: /cd: the directory popup ===
 Directories
@@ -725,20 +710,20 @@ on a phone: 0 handles
 hl-kw:let hl-kw:rec hl-kw:if hl-num:2 hl-kw:then hl-kw:else hl-num:1 hl-num:2 hl-com:(* slow *)
 hl-prop:"name" hl-str:"prigh" hl-prop:"ok" hl-con:true hl-prop:"n" hl-num:3
 === firefox: the session: a 700px chat column ===
-chat 700; chips: <HOSTNAME>, V4.1 Flash; status: Context 0% full, $<COST>: details; .chat-chrome 44px high
+chat 700; chips: <HOSTNAME>, V4.1 Flash; status: Context 0% full, $<COST>: details; .chat-chrome 48px high
 .chat-chrome: fits
 .composer: fits
-the panels' toggles: 3 buttons 10px from the top, 14px from the right, clear of the jump list: true, open: Files
+the panels' toggles: 4 buttons 10px from the top, 12px from the right, clear of the jump list: true, open: Files
 === firefox: the session: a 520px chat column ===
-chat 520; chips: icon, V4.1 Flash; status: Context 0% full, $<COST>: details; .chat-chrome 44px high
+chat 520; chips: icon, V4.1 Flash; status: Context 0% full, $<COST>: details; .chat-chrome 48px high
 .chat-chrome: fits
 .composer: fits
-the panels' toggles: 3 buttons 10px from the top, 14px from the right, clear of the jump list: true, open: Files
+the panels' toggles: 4 buttons 10px from the top, 12px from the right, clear of the jump list: true, open: Files
 === firefox: the session: a 400px chat column ===
-chat 400; chips: icon, V4.1 Flash; status: Context 0% full, $<COST>: details; .chat-chrome 44px high
+chat 400; chips: icon, V4.1 Flash; status: Context 0% full, $<COST>: details; .chat-chrome 48px high
 .chat-chrome: fits
 .composer: fits
-the panels' toggles: 3 buttons 10px from the top, 14px from the right, clear of the jump list: true, open: Files
+the panels' toggles: 4 buttons 10px from the top, 12px from the right, clear of the jump list: true, open: Files
 === firefox: settings ===
 Settings
 Appearance
@@ -764,6 +749,21 @@ Light
 Accent
 Your turns, the selection, focus and work in progress.
 Custom
+Corners
+How round buttons, cards and dialogs are.
+Sharp
+Small
+Default
+Round
+Font
+Prose and the interface.
+Recursive
+Inter
+System
+Code font
+Code, commands and their output.
+Recursive
+System
 LAYOUT
 Transcript detail
 This browser
@@ -786,20 +786,20 @@ desktop: dialog 940x704, in the window: true; sections down the side; panel fits
 phone: dialog 390x844, the screen: true; back: Settings; panel fits: true
 Esc closes it, the editor has the focus: true
 === firefox: the session's bar: a 900px chat column without the sidebar ===
-chat 900; chips: <HOSTNAME>, V4.1 Flash; status: Context 0% full, $<COST>: details; .chat-chrome 44px high
+chat 900; chips: <HOSTNAME>, V4.1 Flash; status: Context 0% full, $<COST>: details; .chat-chrome 48px high
 .chat-chrome: fits
 .composer: fits
-the panels' toggles: 4 buttons 10px from the top, 14px from the right, clear of the jump list: true, open: Files
+the panels' toggles: 5 buttons 10px from the top, 12px from the right, clear of the jump list: true, open: Files
 === firefox: the session's bar: a 600px chat column without the sidebar ===
-chat 600; chips: icon, V4.1 Flash; status: Context 0% full, $<COST>: details; .chat-chrome 44px high
+chat 600; chips: icon, V4.1 Flash; status: Context 0% full, $<COST>: details; .chat-chrome 48px high
 .chat-chrome: fits
 .composer: fits
-the panels' toggles: 4 buttons 10px from the top, 14px from the right, clear of the jump list: true, open: Files
+the panels' toggles: 5 buttons 10px from the top, 12px from the right, clear of the jump list: true, open: Files
 === firefox: the session's bar: a 400px chat column without the sidebar ===
-chat 400; chips: icon, V4.1 Flash; status: Context 0% full, $<COST>: details; .chat-chrome 44px high
+chat 400; chips: icon, V4.1 Flash; status: Context 0% full, $<COST>: details; .chat-chrome 48px high
 .chat-chrome: fits
 .composer: fits
-the panels' toggles: 4 buttons 10px from the top, 14px from the right, clear of the jump list: true, open: Files
+the panels' toggles: 5 buttons 10px from the top, 12px from the right, clear of the jump list: true, open: Files
 === firefox: errors ===
 none
 === firefox: temporary: desktop: the new-session screen ===
@@ -820,7 +820,7 @@ controls: all in view
 === firefox: temporary: desktop: the first message ===
 pill: Temporary
 layout: main temporary landing
-prompt's edge: grey
+prompt's edge: dashed
 tray gone: true
 saved: 0 listed: 0
 pill: all in view
@@ -836,7 +836,7 @@ toast: Temporary session deleted
 saved: 0 listed: 0
 === firefox: temporary: desktop: kept ===
 saved: 1 listed: 1
-prompt's edge: solid
+prompt's edge: none
 === firefox: temporary: desktop: leaving while it works ===
 dialog: Delete this temporary session? | It's still working (its turn). Leaving deletes the transcript and stops it. | Keep it instead | Stay | Delete and leave
 controls: all in view
@@ -861,7 +861,7 @@ controls: all in view
 === firefox: temporary: 390x844: the first message ===
 pill: Temporary session
 layout: main temporary landing
-prompt's edge: grey
+prompt's edge: dashed
 tray gone: true
 saved: 0 listed: 0
 pill: all in view
@@ -877,7 +877,7 @@ toast: Temporary session deleted
 saved: 0 listed: 0
 === firefox: temporary: 390x844: kept ===
 saved: 1 listed: 1
-prompt's edge: solid
+prompt's edge: none
 === firefox: temporary: 390x844: leaving while it works ===
 dialog: Delete this temporary session? | It's still working (its turn). Leaving deletes the transcript and stops it. | Keep it instead | Stay | Delete and leave
 controls: all in view
@@ -902,7 +902,7 @@ controls: all in view
 === firefox: temporary: 320x640: the first message ===
 pill: Temporary session
 layout: main temporary landing
-prompt's edge: grey
+prompt's edge: dashed
 tray gone: true
 saved: 0 listed: 0
 pill: all in view
@@ -918,7 +918,7 @@ toast: Temporary session deleted
 saved: 0 listed: 0
 === firefox: temporary: 320x640: kept ===
 saved: 1 listed: 1
-prompt's edge: solid
+prompt's edge: none
 === firefox: temporary: 320x640: leaving while it works ===
 dialog: Delete this temporary session? | It's still working (its turn). Leaving deletes the transcript and stops it. | Keep it instead | Stay | Delete and leave
 controls: all in view
@@ -1035,9 +1035,8 @@ bob
 === firefox: accounts: sessions ===
 I am bob
 === firefox: accounts: acting as bob ===
-A
-alice
 acting as bob
+A
 === firefox: accounts: sessions ===
 I am alice
 === firefox: accounts: signed out ===
@@ -1058,7 +1057,6 @@ Backend
 Sign in
 === firefox: accounts: alice again ===
 A
-alice
 === firefox: accounts: saved accounts ===
 alice
 === firefox: accounts: errors ===
@@ -1253,6 +1251,21 @@ Light
 Accent
 Your turns, the selection, focus and work in progress.
 Custom
+Corners
+How round buttons, cards and dialogs are.
+Sharp
+Small
+Default
+Round
+Font
+Prose and the interface.
+Recursive
+Inter
+System
+Code font
+Code, commands and their output.
+Recursive
+System
 LAYOUT
 Transcript detail
 This browser
@@ -1262,17 +1275,32 @@ Normal
 Verbose
 === firefox: themes: dark from the settings ===
 dark orange #f0b44c on #1d1d1d; checked: Dark
+=== firefox: themes: the components in dark blue ===
+background #1d1d1d foreground #e6e6e6 primary #6aa6f8 on #1b1608
+radius 10px: the dialog 10px
+fonts: Recursive Sans, Recursive Sans
+pressed Default: rgb(45, 45, 45) rgb(230, 230, 230), corners 10px, 28px
+=== firefox: themes: round corners, Inter ===
+background #1d1d1d foreground #e6e6e6 primary #6aa6f8 on #1b1608
+radius 16px: the dialog 16px
+fonts: Inter, Inter
+pressed Round: rgb(45, 45, 45) rgb(230, 230, 230), corners 16px, 28px
 === firefox: themes: saved on the backend ===
-web.migrated=true web.terminal-open=true web.theme="dark" web.accent="blue"
+web.migrated=true web.terminal-open=true web.theme="dark" web.accent="blue" web.radius="default" web.font="recursive" web.code-font="recursive"
 === firefox: themes: reloaded ===
 first paint: dark blue; dark blue #6aa6f8 on #1d1d1d
 === firefox: themes: another browser ===
 first paint: - -; dark blue #6aa6f8 on #1d1d1d
 === firefox: themes: changed live in the other ===
 light custom #c2410c on #f4f5f7
+=== firefox: themes: the components there, light with a custom accent ===
+background #f4f5f7 foreground #1c2026 primary #c2410c on #ffffff
+radius 10px: the dialog null
+fonts: Recursive Sans, Recursive Sans
+no pressed item
 its history: /accent #c2410c
 === firefox: themes: picker ===
-Esc: light custom #c2410c on #f4f5f7; saved: web.migrated=true web.terminal-open=true web.theme="light" web.accent="#c2410c"
+Esc: light custom #c2410c on #f4f5f7; saved: web.migrated=true web.terminal-open=true web.theme="light" web.accent="#c2410c" web.radius="default" web.font="recursive" web.code-font="recursive"
 === firefox: themes: back ===
 original orange #f0b44c on #1b1e23; the other: original orange #f0b44c on #1b1e23
 === firefox: themes: errors ===
@@ -1314,14 +1342,14 @@ Create pull request…  /pr new
 Copy path
 Remove worktree…  /worktree rm feat/login
 === firefox: worktrees: sessions and their worktrees ===
-The login form | <age> | prigh | feat/login | 1
-│ feat/login | here [here]
-Shopping list | <age> | <DIR>/notes
-A landing page | <age> | site | trunk
-Tidy the docs in a worktree | <age> | prigh | docs | from main | 3 [selected]
-│ agent/tidy-the-docs | subagent [agent]
+prigh | <age> | The login form
+notes | <age> | Shopping list
+site | <age> | A landing page
+prigh | <age> | Tidy the docs in a worktree [selected]
+the card: Worktrees | 3
+│ agent/tidy-the-docs
 │ feat/login
-│ docs | here | ● 2 [dirty here]
+│ docs | 2 changed [current]
 === firefox: worktrees: from the keyboard ===
 A landing page — site — trunk
 Open  Enter
@@ -1342,11 +1370,11 @@ Tidy the docs in a worktree
 === firefox: worktrees: a terminal in the worktree ===
 ~/.prigh/worktrees/prigh/feat-login
 === firefox: worktrees: folded ===
-The login form | <age> | prigh | feat/login | 1
-│ feat/login | here [here]
-Shopping list | <age> | <DIR>/notes
-A landing page | <age> | site | trunk
-Tidy the docs in a worktree | <age> | prigh | docs | from main | 3 [folded selected]
+prigh | <age> | The login form
+notes | <age> | Shopping list
+site | <age> | A landing page
+prigh | <age> | Tidy the docs in a worktree [selected]
+the card: Worktrees | 3 [folded]
 === firefox: worktrees: searching ===
 Tidy the docs in a worktree
 === firefox: worktrees: a switched session's menu ===
@@ -1365,14 +1393,14 @@ Pin to top  P
 Archive  A
 Delete…  Delete
 === firefox: worktrees: switched back ===
-Tidy the docs in a worktree | <age> | prigh | main | 3 [selected]
-│ agent/tidy-the-docs | subagent [agent]
+prigh | <age> | Tidy the docs in a worktree [selected]
+prigh | <age> | The login form
+notes | <age> | Shopping list
+site | <age> | A landing page
+the card: Worktrees | 3
+│ agent/tidy-the-docs
 │ feat/login
-│ docs | ● 2 [dirty]
-The login form | <age> | prigh | feat/login | 1
-│ feat/login | here [here]
-Shopping list | <age> | <DIR>/notes
-A landing page | <age> | site | trunk
+│ docs | 2 changed
 === firefox: worktrees: remove: asked first ===
 Remove worktree with changes?
 Remove the worktree docs at <DIR>/prigh-docs; it has 2 uncommitted changes? (the branch stays)
@@ -1389,12 +1417,12 @@ Cancel
 Discard changes and remove
 Remove
 === firefox: worktrees: removed ===
-Tidy the docs in a worktree | <age> | prigh | main | 1 [selected]
+prigh | <age> | Tidy the docs in a worktree [selected]
+prigh | <age> | The login form
+notes | <age> | Shopping list
+site | <age> | A landing page
+the card: Worktrees | 1
 │ feat/login
-The login form | <age> | prigh | feat/login | 1
-│ feat/login | here [here]
-Shopping list | <age> | <DIR>/notes
-A landing page | <age> | site | trunk
 === firefox: worktrees: the /worktree picker ===
 Worktrees of <DIR>/prigh
 main
@@ -1413,15 +1441,14 @@ Delete
 === firefox: worktrees: deleting the session we are in: where we land ===
 in: The login form; the address names it: true
 === firefox: worktrees: the session we were in deleted ===
-The login form | <age> | prigh | feat/login | 1 [selected]
-│ feat/login | here [here]
-Shopping list | <age> | <DIR>/notes
-A landing page | <age> | site | trunk
+prigh | <age> | The login form [selected]
+notes | <age> | Shopping list
+site | <age> | A landing page
+the card: Worktrees | 1
+│ feat/login [current]
 === firefox: worktrees: on a phone ===
-The login form | <age> | prigh | feat/login | 1 [selected]
-│ feat/login | here [here]
-Shopping list | <age> | <DIR>/notes
-A landing page | <age> | site | trunk
+the card: Worktrees | 1
+│ feat/login [current]
 === firefox: worktrees: a long press on a phone ===
 feat/login — in The login form
 ▸ Switch session here  /worktree open feat/login
@@ -1472,84 +1499,74 @@ ok
 none
 === firefox: worktrees_switch: in the other session ===
 Tidy the docs in a worktree
-│ agent/tidy… [agent]
 A landing page [selected]
+the card: no worktrees
 === firefox: worktrees_switch: on a phone, in the other session ===
 Tidy the docs in a worktree
-│ agent/tidy… [agent]
 A landing page [selected]
-=== firefox: worktrees_switch: on a phone: into the work session: Tidy the docs in a worktree's worktrees while switching ===
-counted: true; checks with fewer: 0; fewest: 1
+the card: no worktrees
 === firefox: worktrees_switch: on a phone: into the work session ===
 Tidy the docs in a worktree [selected]
-│ agent/tidy… [agent]
 A landing page
+the card:
+│ agent/tidy…
 === firefox: worktrees_switch: back in the work session: Tidy the docs in a worktree's worktrees while switching ===
 counted: true; checks with fewer: 0; fewest: 1
 === firefox: worktrees_switch: back in the work session ===
 Tidy the docs in a worktree [selected]
-│ agent/tidy… [agent]
 A landing page
+the card:
+│ agent/tidy…
 === firefox: worktrees_switch: more worktrees ===
 Tidy the docs in a worktree [selected]
-│ agent/tidy… [agent]
-│ agent/more… [agent]
-│ agent/more… [agent]
 A landing page
+the card:
+│ agent/tidy…
+│ agent/more…
+│ agent/more…
 === firefox: worktrees_switch: on a phone: more worktrees ===
 Tidy the docs in a worktree [selected]
-│ agent/tidy… [agent]
-│ agent/more… [agent]
-│ agent/more… [agent]
 A landing page
+the card:
+│ agent/tidy…
+│ agent/more…
+│ agent/more…
 === firefox: worktrees_switch: away again: Tidy the docs in a worktree's worktrees while switching ===
 counted: true; checks with fewer: 0; fewest: 3
 === firefox: worktrees_switch: away again ===
 Tidy the docs in a worktree
-│ agent/tidy… [agent]
-│ agent/more… [agent]
-│ agent/more… [agent]
 A landing page [selected]
+the card: no worktrees
 === firefox: worktrees_switch: and back: Tidy the docs in a worktree's worktrees while switching ===
 counted: true; checks with fewer: 0; fewest: 3
 === firefox: worktrees_switch: and back ===
 Tidy the docs in a worktree [selected]
-│ agent/tidy… [agent]
-│ agent/more… [agent]
-│ agent/more… [agent]
 A landing page
+the card:
+│ agent/tidy…
+│ agent/more…
+│ agent/more…
 === firefox: worktrees_switch: and away: Tidy the docs in a worktree's worktrees while switching ===
 counted: true; checks with fewer: 0; fewest: 3
 === firefox: worktrees_switch: and away ===
 Tidy the docs in a worktree
-│ agent/tidy… [agent]
-│ agent/more… [agent]
-│ agent/more… [agent]
 A landing page [selected]
-=== firefox: worktrees_switch: on a phone: away: Tidy the docs in a worktree's worktrees while switching ===
-counted: true; checks with fewer: 0; fewest: 3
+the card: no worktrees
 === firefox: worktrees_switch: on a phone: away ===
 Tidy the docs in a worktree
-│ agent/tidy… [agent]
-│ agent/more… [agent]
-│ agent/more… [agent]
 A landing page [selected]
-=== firefox: worktrees_switch: on a phone: and back: Tidy the docs in a worktree's worktrees while switching ===
-counted: true; checks with fewer: 0; fewest: 3
+the card: no worktrees
 === firefox: worktrees_switch: on a phone: and back ===
 Tidy the docs in a worktree [selected]
-│ agent/tidy… [agent]
-│ agent/more… [agent]
-│ agent/more… [agent]
 A landing page
-=== firefox: worktrees_switch: on a phone: and away: Tidy the docs in a worktree's worktrees while switching ===
-counted: true; checks with fewer: 0; fewest: 3
+the card:
+│ agent/tidy…
+│ agent/more…
+│ agent/more…
 === firefox: worktrees_switch: on a phone: and away ===
 Tidy the docs in a worktree
-│ agent/tidy… [agent]
-│ agent/more… [agent]
-│ agent/more… [agent]
 A landing page [selected]
+the card: no worktrees
 === firefox: worktrees_switch: errors ===
 none
 === firefox: session card: the card ===
@@ -1558,19 +1575,17 @@ Subagents
 Count the modules
 <age>
 Worktrees
-2
+1
 === firefox: session card: the worktrees unfolded ===
 Subagents
 1
 Count the modules
 <age>
 Worktrees
-2
-main
+1
 feat/ui
 1 changed
-main (here)
-feat/ui 1 changed
+feat/ui 1 changed (here)
 === firefox: session card: beside the chat, 1600px wide ===
 pane 1320px, the column centred
 card 208px wide, 12px from the pane's edge
@@ -1619,7 +1634,7 @@ Subagents
 Count the modules
 <age>
 Worktrees
-2
+1
 inside the screen: true; rows 44px or more: true (3)
 Esc closes it
 === firefox: session card: a phone, 320x640 ===
@@ -1630,7 +1645,7 @@ Subagents
 Count the modules
 <age>
 Worktrees
-2
+1
 inside the screen: true; rows 44px or more: true (3)
 Esc closes it
 === firefox: session card: errors ===
@@ -2751,12 +2766,14 @@ deepseek-flash  1 turn  1 tool call
 still running: true
 Steer: Steering a1 Survey the project; Steer a1 (Alt+Enter: after its turn)…
 === firefox: steer: queued for it ===
-To a1, next step
+To a1
 use the tests
 Edit
-To a1, after its turn
+Remove from the queue
+To a1, after
 then summarise
 Edit
+Remove from the queue
 === firefox: steer: its row says so ===
 2 queued  deepseek-flash  1 turn  1 tool call
 === firefox: steer: edited ===
@@ -2808,7 +2825,7 @@ Your message — Step 1: look at module 1. | Copy | (disabled) Trim everything b
 Reply — Module 3 is fixed. | Copy | Trim everything before this — /trim | Trim everything after this — /trim after | Delete — /delete
 === firefox: trim: a message's menu ===
 Your message — Step 3: look at module 3. | Copy | Trim everything before this — /trim | Trim everything after this — /trim after | Delete — /delete
-at the pointer: 2,-201
+at the pointer: -40,0
 marked: true
 cut line: dashed
 after Esc: 1 2 3 4 5; preview: 0
@@ -2821,7 +2838,7 @@ copied: Module 3 is fixed. | Its handler returns the error now instead of droppi
 Trim the context here? | Trim 4 messages (~196 tokens) before this message? | Step 3: look at module 3. | <TIME> | They leave the model's context; the transcript keeps them folded, and Undo brings them back. | Enter trims, Esc cancels | Cancel | Trim
 after Esc, steps: 1 2 3 4 5; divider: 0
 === firefox: trim: keyboard ===
-under the message: 0,-199
+under the message: 0,2
 highlighted: Trim everything before this
 === firefox: trim: trimmed ===
 divider: ✂ | 4 messages trimmed · ~196 tokens | Show | · | Undo
@@ -2936,8 +2953,8 @@ after Show all: user 2, replies 3, thinking 1, tools 1, subagents 1, stopped 1
 === firefox: filter: errors ===
 none
 === firefox: search: the sidebar's row and the composer's ===
-New session: wide, 34px high
-Search: narrow, 34px high
+Search: wide, 28px high
+New session: narrow, 28px high
 composer: Add files or images, Context 0% full, $0.00, server-laptop, Model, Send
 === firefox: search: Ctrl+K: the session's settings, recent sessions, commands ===
 focus in the filter: control-input
@@ -3342,10 +3359,10 @@ down: closed: true
 === firefox: mobile: 390x844: the chat ===
 ok
 === firefox: mobile: 390x844: where the session works ===
-placeholder: Working in …/demo on main.
-its width: more than 58%: what the shortest line needs
-one line: true; the path in mono: true; the editor on top: true
-for screen readers: Working in ~/projects/demo on main. Ask prigh anything…
+folder: ~/projects/demo
+branch: main
+one line: true; inside the composer: true; mono: true
+placeholder: Ask prigh…  / commands
 === firefox: mobile: 390x844: the chrome ===
 strip: 0 to 48; its pieces overlap: false
 the transcript starts under it: true
@@ -3353,7 +3370,7 @@ the composer ends at 0px from the bottom
 === firefox: mobile: 390x844: the ⋯ sheet ===
 ok
 === firefox: mobile: 390x844: the sheet's rows ===
-Jump to a message, Filter the transcript, Files, Terminal, Subagents and worktrees, Settings
+Jump to a message, Filter the transcript, Files, Terminal, Review changes, Settings
 === firefox: mobile: 390x844: the settings' list ===
 ok
 === firefox: mobile: 390x844: the settings ===
@@ -3391,10 +3408,10 @@ ok
 === firefox: mobile: 320x640: the chat ===
 ok
 === firefox: mobile: 320x640: where the session works ===
-placeholder: Working in …/demo on main.
-its width: more than 58%: what the shortest line needs
-one line: true; the path in mono: true; the editor on top: true
-for screen readers: Working in ~/projects/demo on main. Ask prigh anything…
+folder: ~/projects/demo
+branch: main
+one line: true; inside the composer: true; mono: true
+placeholder: Ask prigh…  / commands
 === firefox: mobile: 320x640: the chrome ===
 strip: 0 to 48; its pieces overlap: false
 the transcript starts under it: true
@@ -3402,7 +3419,7 @@ the composer ends at 0px from the bottom
 === firefox: mobile: 320x640: the ⋯ sheet ===
 ok
 === firefox: mobile: 320x640: the sheet's rows ===
-Jump to a message, Filter the transcript, Files, Terminal, Subagents and worktrees, Settings
+Jump to a message, Filter the transcript, Files, Terminal, Review changes, Settings
 === firefox: mobile: 320x640: the settings' list ===
 ok
 === firefox: mobile: 320x640: the settings ===
@@ -3438,19 +3455,20 @@ ok
 === firefox: mobile: 320x640: the review's files ===
 ok
 === firefox: mobile: desktop 1280: where the session works ===
-placeholder: Working in ~/projects/demo on main. Ask prigh anything…
-its width: 58% of the editor
-one line: true; the path in mono: true; the editor on top: true
-for screen readers: Working in ~/projects/demo on main. Ask prigh anything…
-tooltip: Working in ~/projects/demo on main. Ask prigh anything…
+folder: ~/projects/demo
+branch: main
+one line: true; inside the composer: true; mono: true
+placeholder: Ask prigh anything…  / commands, @ files
 === firefox: mobile: desktop 760: where the session works ===
-placeholder: Working in …/demo on main.
-its width: 58% of the editor
-one line: true; the path in mono: true; the editor on top: true
-for screen readers: Working in ~/projects/demo on main. Ask prigh anything…
-tooltip: Working in ~/projects/demo on main. Ask prigh anything…
+folder: ~/projects/demo
+branch: main
+one line: true; inside the composer: true; mono: true
+placeholder: Ask prigh anything…  / commands, @ files
 === firefox: mobile: desktop: typing ===
-no placeholder: the editor has text
+folder: ~/projects/demo
+branch: main
+one line: true; inside the composer: true; mono: true
+placeholder: Ask prigh anything…  / commands, @ files
 === firefox: review_phone: 390x844: the renamed file, folded ===
 ok
 head: docs/ guide.md new 1/5
@@ -3588,7 +3606,7 @@ no menu
 your messages: make the port configurable
 === firefox: long press: a session in the drawer ===
 menu: open_window, rename, fork, new_worktree, review, files, terminal, copy_path, copy_id, pin, archive, delete; a sheet at the bottom: true
-=== firefox: long press: a worktree in the drawer ===
+=== firefox: long press: a worktree in the session card ===
 menu: switch_here, new_session_here, review, files, terminal, create_pr, copy_path, remove; a sheet at the bottom: true
 === firefox: long press: a file of the review ===
 menu: approve_files, unapprove_files, stage_files, unstage_files, commit_files, select_files, copy_paths; a sheet at the bottom: true
@@ -3706,43 +3724,22 @@ compact_at_tokens=150000 compaction_model=null mask_observations=false
 fits: true
 === firefox: compaction: errors ===
 (none)
-=== firefox: sessions settings: used days ago: folded, used now: shown ===
-+ Fresh work: fix/fresh
-- Old work
+=== firefox: sessions settings: two sessions, one used days ago ===
+Fresh work
+Old work
 === firefox: sessions settings: the settings ===
-Show worktrees | Your account | Show worktrees for pinned sessions and those used in the last 12 hours (changed, running, opened or worked in); others fold them behind their count. Your own fold or unfold of a session holds until you next open it. | hours
 Archive after | Sessions without activity for 7 days move to Archived (pinned and running ones never do). | days
-fields: "12" hours, "7" days
-=== firefox: sessions settings: 100 hours ===
-+ Fresh work: fix/fresh
-+ Old work: feat/old-a, feat/old-b
-=== firefox: sessions settings: off ===
-- Fresh work
-- Old work
-=== firefox: sessions settings: off, Old work unfolded by hand ===
-- Fresh work
-+ Old work: feat/old-a, feat/old-b
+field: "7" days
 === firefox: sessions settings: refused ===
 “a fortnight” isn't a number of days from 0 to 365: type one like 7, or off to archive only by hand.
 === firefox: sessions settings: archive after 2 days ===
-Show worktrees | Your account | Show worktrees for pinned sessions and those used recently (changed, running, opened or worked in); others fold them behind their count. Your own fold or unfold of a session holds until you next open it. | Off: every session's worktrees fold, pinned ones too.
 Archive after | Sessions without activity for 2 days move to Archived (pinned and running ones never do). | days
-fields: hidden hours, "2" days
+field: "2" days
 archive_after_days=2
-- Fresh work
-archived: Archived 1
-=== firefox: sessions settings: switched on again ===
-Show worktrees | Your account | Show worktrees for pinned sessions and those used in the last 100 hours (changed, running, opened or worked in); others fold them behind their count. Your own fold or unfold of a session holds until you next open it. | hours
-Archive after | Sessions without activity for 2 days move to Archived (pinned and running ones never do). | days
-fields: "100" hours, "2" days
-=== firefox: sessions settings: phone 390x844: sidebar ===
-+ Fresh work: fix/fresh
-+ Old work: feat/old-a, feat/old-b
+Fresh work
+archived: Archive 1
 === firefox: sessions settings: phone 390x844: settings ===
 fits: true
-=== firefox: sessions settings: phone 320x640: sidebar ===
-+ Fresh work: fix/fresh
-+ Old work: feat/old-a, feat/old-b
 === firefox: sessions settings: phone 320x640: settings ===
 fits: true
 === firefox: sessions settings: errors ===
@@ -4847,7 +4844,7 @@ Plan Plan mode: read-only planning, until you leave it (/plan off or Alt+M): no 
 === firefox: chat: mode ask, no tool host ===
 mode: Asks: edits & commands
 host chip: no host
-placeholder: Working in $CWD. Ask prigh anything…
+placeholder: Ask prigh anything…  / commands, @ files
 strip: No tool host connected Chat without a host
 toast: No tool host connected: your message stays here. Chat without a host (over it) sends it as a chat, or connect a tool host and pick it (/host).
 draft: and a functor?
@@ -4872,7 +4869,7 @@ audit: ok
 === firefox: chat: phone 390x844: mode ask, no tool host ===
 mode: Asks: edits & commands
 host chip: no host
-placeholder: Working in $CWD. Ask prigh anything…
+placeholder: Ask prigh…  / commands
 strip: No tool host connected Chat without a host
 audit: ok
 after Chat without a host: strip (none)
@@ -4888,24 +4885,24 @@ audit: ok
 === firefox: chat: phone 320x640: mode ask, no tool host ===
 mode: Asks: edits & commands
 host chip: no host
-placeholder: Working in $CWD. Ask prigh anything…
+placeholder: Ask prigh…  / commands
 strip: No tool host connected Chat anyway
 audit: ok
 after Chat without a host: strip (none)
 === firefox: chat: errors ===
 (none)
 === firefox: quiet desktop: a turn: two runs of steps, the first with a failed step ===
-prigh: ▢ Using prigh-web fix the bug (time)
-prigh: [run] Ran 2 commands, read a file 1 failed (took)
-prigh: Now the fix. [run] Wrote a file (took)
+you: fix the bug (time)
+prigh: [run] Worked for (took) · ran 2 commands, read a file 1 failed
+prigh: Now the fix. [run] Worked for (took) · wrote a file
 prigh: Done: wrote fix.txt. (time)
 first run's line: false
 sideways: none
 === firefox: quiet desktop: the first run opened: its steps ===
-Ran 2 commands, read a file 1 failed (took) Thinking Let me look around first. bash ls read notes.txt bash echo no such target >&2; exit 3 exit code 3 no such target
+Worked for (took) · ran 2 commands, read a file 1 failed Thinking Let me look around first. bash ls read notes.txt bash echo no such target >&2; exit 3 exit code 3 no such target
 sideways: none
 === firefox: quiet desktop: a step opened: its output ===
-Ran 2 commands, read a file 1 failed (took) Thinking Let me look around first. bash ls read notes.txt the bug is in fix.txt bash echo no such target >&2; exit 3 exit code 3 no such target
+Worked for (took) · ran 2 commands, read a file 1 failed Thinking Let me look around first. bash ls read notes.txt the bug is in fix.txt bash echo no such target >&2; exit 3 exit code 3 no such target
 sideways: none
 === firefox: quiet desktop: closed again ===
 first run's line: false
@@ -4914,27 +4911,27 @@ last run: Running a command
 last run running: true
 approval inside a run: 0
 === firefox: quiet desktop: approved ===
-prigh: ▢ Using prigh-web fix the bug (time)
-prigh: [run] Ran 2 commands, read a file 1 failed (took)
-prigh: Now the fix. [run] Wrote a file (took)
+you: fix the bug (time)
+prigh: [run] Worked for (took) · ran 2 commands, read a file 1 failed
+prigh: Now the fix. [run] Worked for (took) · wrote a file
 prigh: Done: wrote fix.txt. (time)
 you: clean up (time)
-prigh: [run] Ran a command (took)
+prigh: [run] Worked for (took) · ran a command
 prigh: Cleaned up. (time)
 === firefox: quiet desktop: errors ===
 (none)
 === firefox: quiet phone: a turn: two runs of steps, the first with a failed step ===
-prigh: ▢ Using prigh-web fix the bug (time)
-prigh: [run] Ran 2 commands, read a file 1 failed (took)
-prigh: Now the fix. [run] Wrote a file (took)
+you: fix the bug (time)
+prigh: [run] Worked for (took) · ran 2 commands, read a file 1 failed
+prigh: Now the fix. [run] Worked for (took) · wrote a file
 prigh: Done: wrote fix.txt. (time)
 first run's line: false, 44px tall
 sideways: none
 === firefox: quiet phone: the first run opened: its steps ===
-Ran 2 commands, read a file 1 failed (took) Thinking Let me look around first. bash ls read notes.txt bash echo no such target >&2; exit 3 exit code 3 no such target
+Worked for (took) · ran 2 commands, read a file 1 failed Thinking Let me look around first. bash ls read notes.txt bash echo no such target >&2; exit 3 exit code 3 no such target
 sideways: none
 === firefox: quiet phone: a step opened: its output ===
-Ran 2 commands, read a file 1 failed (took) Thinking Let me look around first. bash ls read notes.txt the bug is in fix.txt bash echo no such target >&2; exit 3 exit code 3 no such target
+Worked for (took) · ran 2 commands, read a file 1 failed Thinking Let me look around first. bash ls read notes.txt the bug is in fix.txt bash echo no such target >&2; exit 3 exit code 3 no such target
 sideways: none
 === firefox: quiet phone: closed again ===
 first run's line: false, 44px tall
@@ -4943,27 +4940,27 @@ last run: Running a command
 last run running: true
 approval inside a run: 0
 === firefox: quiet phone: approved ===
-prigh: ▢ Using prigh-web fix the bug (time)
-prigh: [run] Ran 2 commands, read a file 1 failed (took)
-prigh: Now the fix. [run] Wrote a file (took)
+you: fix the bug (time)
+prigh: [run] Worked for (took) · ran 2 commands, read a file 1 failed
+prigh: Now the fix. [run] Worked for (took) · wrote a file
 prigh: Done: wrote fix.txt. (time)
 you: clean up (time)
-prigh: [run] Ran a command (took)
+prigh: [run] Worked for (took) · ran a command
 prigh: Cleaned up. (time)
 === firefox: quiet phone: errors ===
 (none)
 === firefox: quiet small: a turn: two runs of steps, the first with a failed step ===
-prigh: ▢ Using prigh-web fix the bug (time)
-prigh: [run] Ran 2 commands, read a file 1 failed (took)
-prigh: Now the fix. [run] Wrote a file (took)
+you: fix the bug (time)
+prigh: [run] Worked for (took) · ran 2 commands, read a file 1 failed
+prigh: Now the fix. [run] Worked for (took) · wrote a file
 prigh: Done: wrote fix.txt. (time)
 first run's line: false, 44px tall
 sideways: none
 === firefox: quiet small: the first run opened: its steps ===
-Ran 2 commands, read a file 1 failed (took) Thinking Let me look around first. bash ls read notes.txt bash echo no such target >&2; exit 3 exit code 3 no such target
+Worked for (took) · ran 2 commands, read a file 1 failed Thinking Let me look around first. bash ls read notes.txt bash echo no such target >&2; exit 3 exit code 3 no such target
 sideways: none
 === firefox: quiet small: a step opened: its output ===
-Ran 2 commands, read a file 1 failed (took) Thinking Let me look around first. bash ls read notes.txt the bug is in fix.txt bash echo no such target >&2; exit 3 exit code 3 no such target
+Worked for (took) · ran 2 commands, read a file 1 failed Thinking Let me look around first. bash ls read notes.txt the bug is in fix.txt bash echo no such target >&2; exit 3 exit code 3 no such target
 sideways: none
 === firefox: quiet small: closed again ===
 first run's line: false, 44px tall
@@ -4972,12 +4969,12 @@ last run: Running a command
 last run running: true
 approval inside a run: 0
 === firefox: quiet small: approved ===
-prigh: ▢ Using prigh-web fix the bug (time)
-prigh: [run] Ran 2 commands, read a file 1 failed (took)
-prigh: Now the fix. [run] Wrote a file (took)
+you: fix the bug (time)
+prigh: [run] Worked for (took) · ran 2 commands, read a file 1 failed
+prigh: Now the fix. [run] Worked for (took) · wrote a file
 prigh: Done: wrote fix.txt. (time)
 you: clean up (time)
-prigh: [run] Ran a command (took)
+prigh: [run] Worked for (took) · ran a command
 prigh: Cleaned up. (time)
 === firefox: quiet small: errors ===
 (none)
@@ -4996,13 +4993,19 @@ overwritten: ["open! Import (* edited *)","(* mine *)"]
 chip: src/compact.ml:4–6 3 lines
 === firefox: editor desktop: asking about lines ===
 ok
-agent: The agent changed this file: +3 −1 Keep Undo
-removed:   go [] 0 (List.rev turns)
-added:   match turns with |   | system :: rest -> system :: go [] (Turn.tokens system) (List.rev rest) |   | [] -> []
+agent: The agent changed this file: 2 changes, +4 −2 Keep all Undo all
+removed:   let limit = budget.window - budget.reserve in |   go [] 0 (List.rev turns)
+added:   let limit = Budget.usable budget in |   match turns with |   | system :: rest -> system :: go [] (Turn.tokens system) (List.rev rest) |   | [] -> []
 === firefox: editor desktop: the agent's change ===
 ok
 sent: [src/compact.ml:4–6] Pin the system turn Pasted text #1 4 lines · 162 B src/compact.ml, lines 4–6: HH:MM
-undone: true
+changes: 1/2 · +1 −1 Undo Keep | 2/2 · +3 −1 Undo Keep
+first kept, second undone: true
+=== firefox: editor desktop: a kept change's badge ===
+ok
+reopened: +1 −1 Undo Keep
+=== firefox: editor desktop: a kept change shown again ===
+ok
 chat after sending: beside
 === firefox: editor desktop: the chat beside ===
 ok
@@ -5027,24 +5030,34 @@ saved: open! Import (* edited *)
 ok
 notice: src/compact.ml changed on the host since you opened it: reload it (losing your edits) or keep yours and overwrite it. Reload Overwrite
 overwritten: ["open! Import (* edited *)","(* mine *)"]
-chip: src/compact.ml:4–5 2 lines
-=== firefox: editor phone: asking about lines ===
+ask box: src/compact.ml:4–5 Cancel
+=== firefox: editor phone: the ask box under the lines ===
 ok
-agent: The agent changed this file: +3 −1 Keep Undo
-removed:   go [] 0 (List.rev turns)
-added:   match turns with |   | system :: rest -> system :: go [] (Turn.tokens system) (List.rev rest) |   | [] -> []
+agent: The agent changed this file: 2 changes, +4 −2 Keep all Undo all
+removed:   let limit = budget.window - budget.reserve in |   go [] 0 (List.rev turns)
+added:   let limit = Budget.usable budget in |   match turns with |   | system :: rest -> system :: go [] (Turn.tokens system) (List.rev rest) |   | [] -> []
 peek: The system turn is now pinned: go starts after it and never drops it.
 === firefox: editor phone: the agent's change ===
 ok
 sent: [src/compact.ml:4–5] Pin the system turnPasted text #13 lines · 111 Bsrc/compact.ml, lines 4–5:HH:MM
-undone: true
+changes: 1/2 · +1 −1 Undo Keep | 2/2 · +3 −1 Undo Keep
+first kept, second undone: true
+=== firefox: editor phone: a kept change's badge ===
+ok
+reopened: +1 −1 Undo Keep
+=== firefox: editor phone: a kept change shown again ===
+ok
 === firefox: editor phone: the chat pulled up ===
 ok
 === firefox: editor phone: the files drawer ===
 ok
 drawer: src/compact.ml | .. | README.md | src/1
+found: src/turn.mli | src/compact.ml
+=== firefox: editor phone: go to file ===
+ok
 drawer gone: true
 strip: src/ turn.mli
+swiped: src/ compact.ml
 left: the chat
 === firefox: editor small: a file open ===
 ok
@@ -5063,22 +5076,32 @@ saved: open! Import (* edited *)
 ok
 notice: src/compact.ml changed on the host since you opened it: reload it (losing your edits) or keep yours and overwrite it. Reload Overwrite
 overwritten: ["open! Import (* edited *)","(* mine *)"]
-chip: src/compact.ml:4–5 2 lines
-=== firefox: editor small: asking about lines ===
-ok
-agent: The agent changed this file: +3 −1 Keep Undo
-removed:   go [] 0 (List.rev turns)
-added:   match turns with |   | system :: rest -> system :: go [] (Turn.tokens system) (List.rev rest) |   | [] -> []
+ask box: src/compact.ml:4–5 Cancel
+=== firefox: editor small: the ask box under the lines ===
+the code scrolls sideways
+agent: The agent changed this file: 2 changes, +4 −2 Keep all Undo all
+removed:   let limit = budget.window - budget.reserve in |   go [] 0 (List.rev turns)
+added:   let limit = Budget.usable budget in |   match turns with |   | system :: rest -> system :: go [] (Turn.tokens system) (List.rev rest) |   | [] -> []
 peek: The system turn is now pinned: go starts after it and never drops it.
 === firefox: editor small: the agent's change ===
 ok
 sent: [src/compact.ml:4–5] Pin the system turnPasted text #13 lines · 111 Bsrc/compact.ml, lines 4–5:HH:MM
-undone: true
+changes: 1/2 · +1 −1 Undo Keep | 2/2 · +3 −1 Undo Keep
+first kept, second undone: true
+=== firefox: editor small: a kept change's badge ===
+ok
+reopened: +1 −1 Undo Keep
+=== firefox: editor small: a kept change shown again ===
+ok
 === firefox: editor small: the chat pulled up ===
 ok
 === firefox: editor small: the files drawer ===
 ok
 drawer: src/compact.ml | .. | README.md | src/1
+found: src/turn.mli | src/compact.ml
+=== firefox: editor small: go to file ===
+ok
 drawer gone: true
 strip: src/ turn.mli
+swiped: src/ compact.ml
 left: the chat
