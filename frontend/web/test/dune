@@ -21,3 +21,17 @@
   virtual_dom
   virtual_dom.vdom_test_helpers
   re))
+
+; Every test file runs in a node of its own (dune's partitions), so the
+; runner's start, which is mostly parsing it, is paid a hundred times: no
+; source map (node only reads one with --enable-source-maps: nearly half
+; the runner), and node's compile cache, which the run listing the
+; partitions fills before the partitions start. A cache it cannot write is
+; skipped.
+
+(env
+ (_
+  (js_of_ocaml
+   (sourcemap no))
+  (env-vars
+   (NODE_COMPILE_CACHE /tmp/prigh-node-compile-cache))))

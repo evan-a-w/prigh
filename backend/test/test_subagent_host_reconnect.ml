@@ -203,16 +203,17 @@ let%expect_test "a subagent's tool calls wait while its host reconnects" =
     |}]
 ;;
 
-let%expect_test "cancelling a subagent whose call waits for its host" =
+let%expect_test "cancelling a subagent that waits for its host" =
   with_session
     ~main:[ spawn "run the tests"; Reply.text "started"; Reply.text "noted" ]
     [ "run the tests", [ bash "s1"; Reply.text "unreachable" ] ]
   @@ fun t ~sw agent h ->
   let laptop = connect_laptop ~sw h agent in
   Fake_host.disconnect h laptop;
-  let started = subagent_tool_started agent in
-  Test_rpc.call t h ~params:{|{"text": "go"}|} "prompt";
-  Eio.Promise.await started;
+  (* A subagent's fiber runs as soon as it is spawned, up to its first wait:
+     reading its instructions on its host. So by the end of the turn that
+     spawned it, it is waiting for the host. *)
+  start t h agent;
   Test_rpc.call t h ~params:{|{"agent_id": "a1"}|} "cancel_subagent";
   Agent.wait_idle agent;
   Test_background_subagents.print_messages (Agent.messages agent);
@@ -226,7 +227,7 @@ let%expect_test "cancelling a subagent whose call waits for its host" =
     assistant:  subagent{"task":"run the tests"}
     tool_result subagent: started agent a1 (run the tests); its result will be delivered to you when it finishes: keep working or end your turn meanwhile
     assistant: started
-    user: [subagent a1 failed] run the tests | [cancelled] | [subagent: 2 turns, 30 in / 13 out tokens, $0.0000]
+    user: [subagent a1 failed] run the tests | [cancelled] | [subagent: 1 turns, 20 in / 8 out tokens, $0.0000]
     assistant: noted
     |}]
 ;;
