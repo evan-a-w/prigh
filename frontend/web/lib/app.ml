@@ -3350,7 +3350,7 @@ let new_shell (m : Model.t) =
   , [ Command.Focus_terminal ] )
 ;;
 
-(* ---- the agents panel *)
+(* ---- subagents and jobs *)
 
 let now_of (m : Model.t) = Option.value m.now ~default:Time_ns.epoch
 let with_agents (m : Model.t) ~f = { m with agents = f m.agents }
@@ -7625,7 +7625,7 @@ let question (m : Model.t) (action : Question_dialog.Action.t) =
   | _ -> m, []
 ;;
 
-(* The agents panel says so, with a retry. *)
+(* The subagent's chat says so, with a retry. *)
 let transcript_failed (m : Model.t) id e =
   if Map.mem m.agents.fetches id
   then

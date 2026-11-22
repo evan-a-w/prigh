@@ -46,7 +46,7 @@ let section
                 ~attrs:
                   [ Attr.class_ "open-agent"
                   ; Attr.type_ "button"
-                  ; Attr.create "aria-label" "Open in the agents panel"
+                  ; Attr.create "aria-label" "Open its chat"
                   ]
                 [ Node.text "Open ›" ])
          ])

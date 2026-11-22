@@ -164,7 +164,7 @@ module Reply_tag : sig
     | Reload_state (** the client's session changed: fetch its state *)
     | Subagent of string
     (** [get_subagent] for this [subagent] call or agent id *)
-    | Subagents (** [list_subagents], for the agents panel *)
+    | Subagents (** [list_subagents], for the session card and subagent chats *)
     | Jobs (** [list_jobs] *)
     | Job_started (** [!&command]: the job's id *)
     | Auth_status of Auth_purpose.t
@@ -1021,7 +1021,7 @@ module Model : sig
           filter *)
     ; session_search : int (** counts the searches typed *)
     ; archived_open : bool (** the sidebar shows the archived sessions *)
-    ; agents : Agents.t (** the agents panel, per session *)
+    ; agents : Agents.t (** the subagents and jobs, per session *)
     ; verbosity : Prigh_ui.Verbosity.t
     ; folds : String.Set.t
       (** tool outputs ([Fold.key]s) toggled from how [verbosity] shows them *)

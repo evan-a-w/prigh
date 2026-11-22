@@ -692,8 +692,8 @@ let present
       | Some { is_error = false; text; _ } -> Subagent_report.started text
       | _ -> None
     in
-    (* Its name, how it stands and the way into the agents panel: the task,
-       its log and its report are there. *)
+    (* Its name, how it stands and the way into its chat: the task, its log
+       and its report are there. *)
     let name = subagent_title call in
     let agent_id =
       Option.first_some
@@ -967,8 +967,8 @@ let card
        | None -> body
        | Some note -> span "tool-allowed" note :: body)
   in
-  (* A subagent's card opens it in the agents panel (the page listens for
-     clicks on [data-agent]); [data-call] finds the card from the panel. *)
+  (* A subagent's card opens its chat (the page listens for clicks on
+     [data-agent]); [data-call] finds the card. *)
   let agent =
     match subagent, result with
     | Some s, _ -> Some s.agent_id
@@ -1006,8 +1006,8 @@ let card
         ~attrs:
           [ Attr.class_ "open-agent"
           ; Attr.type_ "button"
-          ; Attr.create "aria-label" "Open in the agents panel"
-          ; Attr.title "Open in the agents panel"
+          ; Attr.create "aria-label" "Open its chat"
+          ; Attr.title "Open its chat"
           ]
         [ Html.icon External ]
     in
@@ -1035,7 +1035,7 @@ let card
                ([ Attr.class_ "tool-head"; Attr.create "data-agent" id ]
                 @ Option.to_list
                     (Option.map tooltip ~f:(fun t ->
-                       Attr.title (t ^ " · follow it in the agents panel"))))
+                       Attr.title (t ^ " · open its chat"))))
              head
          | None -> div "tool-head" head)
       ; (match body with

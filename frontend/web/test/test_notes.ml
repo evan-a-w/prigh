@@ -627,3 +627,43 @@ let%expect_test "the note that the user changed client is the model's alone" =
     </div>
     |}]
 ;;
+
+let%expect_test
+    "in a subagent's transcript, what the user sent it is a plain prompt; the \
+     main agent's message keeps its note"
+  =
+  let message ~title body =
+    sprintf
+      {|{"type":"event","event":"message_start","message":{"role":"user","text":%s,"origin":{"body":%s,"notes":[{"kind":"steer","title":"%s","text":"[A message for you.]"}]}}}|}
+      (Jsonaf.to_string (`String ("[A message for you.]\n\n" ^ body)))
+      (Jsonaf.to_string (`String body))
+      title
+  in
+  let chat =
+    Chat_harness.chat
+      [ message ~title:"Main agent (steer)" "count to three"
+      ; message ~title:"You (steer)" "now count to five"
+      ]
+  in
+  Chat_harness.show chat;
+  [%expect
+    {|
+    <div class="entries">
+      <div data-entry="0" class="msg noted">
+        <details data-kind="steer" class="note">
+          <summary>
+            <span aria-hidden="true" class="glyph"> → </span>
+            <span class="title"> Main agent (steer) </span>
+          </summary>
+          <pre class="note-text"> [A message for you.] </pre>
+        </details>
+        <div class="msg user">
+          <div dir="auto" class="bubble"> count to three </div>
+        </div>
+      </div>
+      <div data-entry="1" class="msg user">
+        <div dir="auto" class="bubble"> now count to five </div>
+      </div>
+    </div>
+    |}]
+;;

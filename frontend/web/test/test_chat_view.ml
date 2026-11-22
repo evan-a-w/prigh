@@ -383,7 +383,7 @@ let%expect_test "deliveries of background work: compact cards" =
               <span class="kind"> Subagent: </span>
               <span class="task"> Count the lines in src/app.ml and report back. </span>
               <span class="chip ok"> finished </span>
-              <button type="button" aria-label="Open in the agents panel" class="open-agent"> Open › </button>
+              <button type="button" aria-label="Open its chat" class="open-agent"> Open › </button>
             </div>
             <details class="delivery-body">
               <summary>
@@ -435,7 +435,7 @@ let%expect_test "deliveries of background work: compact cards" =
               <span class="kind"> Subagent: </span>
               <span class="task"> Fix the tests </span>
               <span class="bad chip"> failed </span>
-              <button type="button" aria-label="Open in the agents panel" class="open-agent"> Open › </button>
+              <button type="button" aria-label="Open its chat" class="open-agent"> Open › </button>
             </div>
             <details class="delivery-body">
               <summary>

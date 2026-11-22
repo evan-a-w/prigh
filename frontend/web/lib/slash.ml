@@ -413,13 +413,13 @@ let every =
   ; c
       ~args:"[n|id|cancel <n|id>|steer <n|id> <text>|follow-up <n|id> <text>]"
       "agents"
-      "follow subagents and background jobs in the agents panel, cancel one, \
-       or send a running subagent a message (steer: at its next step; \
-       follow-up: when it ends its turn)"
+      "open a subagent's chat (none: the session card), cancel one, or send a \
+       running subagent a message (steer: at its next step; follow-up: when it \
+       ends its turn)"
   ; c
-      ~args:"[id|kill <id>]"
+      ~args:"[kill <id>]"
       "jobs"
-      "background jobs in the agents panel: list them, show or kill one"
+      "background jobs: the session card, or kill one"
   ; c
       ~argument:Login
       ~args:"[provider|github [HOST]|forgejo HOST|HOST] [token]"

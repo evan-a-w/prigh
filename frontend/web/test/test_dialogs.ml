@@ -81,20 +81,16 @@ let%expect_test "a dialog makes the page behind it inert: Tab stays in it" =
     Close_dialog
     (Focus editor)
     |}];
-  (* The agents panel too, and under a tool's confirmation. *)
-  H.act h Toggle_subagents;
+  (* Under a tool's confirmation too. *)
   H.event h (confirm "c1" "rm -rf build");
   inert ();
   [%expect
     {|
-    (Rpc (method_ list_subagents) (params ()) (tag Subagents))
-    (Rpc (method_ list_jobs) (params ()) (tag Jobs))
     (Focus confirm)
     <aside class="bg-sidebar loon sidebar text-sidebar-foreground text-sm">
     <div class="chrome-anchor loon">
     <div class="chat-frame">
     <footer class="composer">
-    <aside class="agents-panel">
     |}];
   H.key h "Escape" ~target:Page;
   inert ();
@@ -250,17 +246,13 @@ let%expect_test "help lists every key and command" =
     Esc (the context ring's card open)
     close the card (the ring by the paperclip: context, cost, Compact)
     Alt+1…9
-    follow subagent or job N in the agents panel
-    Alt+] Alt+[
-    the next or previous subagent or job
-    Alt+0
-    close the agents panel
-    Enter or Alt+Enter (steering a subagent)
-    send it a message: at its next step / when it ends its turn (its Steer button in the agents panel; /agents steer N TEXT sends one)
-    Alt+↑ (steering a subagent)
+    open the chat of subagent N of this chat (the session card lists them)
+    Enter or Alt+Enter (in a subagent's chat)
+    write to it: at its next step / when it ends its turn while it runs; once it has finished, it carries on with your message (/agents steer N TEXT sends one from anywhere)
+    Alt+↑ (in a subagent's chat)
     take its last queued message back
-    Esc (steering a subagent)
-    write to the main agent again
+    Esc (in a subagent's chat)
+    back to its parent's chat
     Ctrl+Z or ⌘+Z (in the message box)
     right after a long paste became a chip, or a chip was removed: undo that (otherwise the box's own undo); Ctrl+Shift+Z, ⌘+Shift+Z or Ctrl+Y redoes it
     Ctrl+Shift+V or ⌘+Shift+V (in the message box)
@@ -471,9 +463,9 @@ let%expect_test "help lists every key and command" =
     /edit [path]
     the editor mode: edit the session's files (PATH, or the last one) beside the chat, and ask about a selection (Alt+E toggles it)
     /agents [n|id|cancel <n|id>|steer <n|id> <text>|follow-up <n|id> <text>]
-    follow subagents and background jobs in the agents panel, cancel one, or send a running subagent a message (steer: at its next step; follow-up: when it ends its turn)
-    /jobs [id|kill <id>]
-    background jobs in the agents panel: list them, show or kill one
+    open a subagent's chat (none: the session card), cancel one, or send a running subagent a message (steer: at its next step; follow-up: when it ends its turn)
+    /jobs [kill <id>]
+    background jobs: the session card, or kill one
     /login [provider|github [HOST]|forgejo HOST|HOST] [token]
     log in to a model provider (or /login custom), or sign in to GitHub or a Forgejo or Gitea host (token: paste one instead of OAuth)
     /logout [provider|HOST]
@@ -824,9 +816,8 @@ let%expect_test
         (web.theme web.accent web.radius web.font web.code-font web.notify
          web.verbosity web.terminal-open web.review web.code-size
          favourite-models history web.migrated web.sidebar-width web.files-width
-         web.files-preview-width web.agents-width web.terminal-height
-         web.review-chat-width web.review-files-width web.review-margin-width
-         web.editor-tree-width))))
+         web.files-preview-width web.terminal-height web.review-chat-width
+         web.review-files-width web.review-margin-width web.editor-tree-width))))
      (tag Prefs))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s1.jsonl) (limit 1000000)))
@@ -897,26 +888,4 @@ let%expect_test "signing out" =
     (Cache_prefs (((key history) (value ((/signout))))))
     Sign_out
     |}]
-;;
-
-let%expect_test "on a phone the agents panel is a sheet with the keyboard" =
-  let h = H.create () in
-  let inert () = H.elements h ~selector:"[inert]" in
-  H.act h (Set_narrow true);
-  H.act h Toggle_subagents;
-  inert ();
-  [%expect
-    {|
-    (Rpc (method_ list_subagents) (params ()) (tag Subagents))
-    (Rpc (method_ list_jobs) (params ()) (tag Jobs))
-    (Focus agents-panel)
-    <aside class="bg-sidebar loon sidebar text-sidebar-foreground text-sm">
-    <div class="chrome-anchor">
-    <div class="chat-frame">
-    <footer class="composer">
-    |}];
-  H.act h Toggle_subagents;
-  inert ();
-  [%expect
-    {| <aside class="bg-sidebar loon sidebar text-sidebar-foreground text-sm"> |}]
 ;;

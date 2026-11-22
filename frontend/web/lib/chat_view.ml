@@ -192,10 +192,15 @@ let pasted_texts ~fold (u : Message.User.t) (pasted : Origin.Pasted.t list) =
            ]))
 ;;
 
-(* Which client the user is on matters to the model, not to the user. *)
+(* Which client the user is on matters to the model, not to the user; in a
+   subagent's chat, what the user sent it is theirs like any prompt (only
+   the main agent's messages to it keep their note). *)
 let shown_notes (o : Origin.t) =
   List.filter o.notes ~f:(fun (n : Origin.Note.t) ->
-    not (Origin.Kind.equal n.kind Client))
+    match n.kind with
+    | Client -> false
+    | Other "steer" -> not (String.is_prefix n.title ~prefix:"You")
+    | _ -> true)
 ;;
 
 let user ?skill ~fold times (u : Message.User.t) =

@@ -872,7 +872,7 @@ let%expect_test "subagent: running shows its latest step" =
     {|
     <div data-call="c12" class="running tool tool-subagent">
       <div data-agent="a1"
-           title="agent a1 · deepseek-flash · 1 turn · follow it in the agents panel"
+           title="agent a1 · deepseek-flash · 1 turn · open its chat"
            class="tool-head">
         <span aria-hidden="true" class="lamp"> </span>
         <span aria-hidden="true" class="tool-icon">
@@ -880,10 +880,7 @@ let%expect_test "subagent: running shows its latest step" =
         </span>
         <span class="kind"> subagent </span>
         <span class="agent-name"> Count the lines in src/app.ml and report back. … </span>
-        <button type="button"
-                aria-label="Open in the agents panel"
-                title="Open in the agents panel"
-                class="open-agent">
+        <button type="button" aria-label="Open its chat" title="Open its chat" class="open-agent">
           <icon class="external"> </icon>
         </button>
       </div>
@@ -900,7 +897,7 @@ let%expect_test "subagent: done, with its report and its transcript folded" =
   [%expect
     {|
     <div data-agent="a1"
-         title="agent a1 · deepseek-flash · 2 turns · $0.01 · follow it in the agents panel"
+         title="agent a1 · deepseek-flash · 2 turns · $0.01 · open its chat"
          class="tool-head">
       <span title="Done" role="img" aria-label="Done" class="done mark">
         <icon class="check"> </icon>
@@ -910,10 +907,7 @@ let%expect_test "subagent: done, with its report and its transcript folded" =
       </span>
       <span class="kind"> subagent </span>
       <span class="agent-name"> Count the lines in src/app.ml and report back. … </span>
-      <button type="button"
-              aria-label="Open in the agents panel"
-              title="Open in the agents panel"
-              class="open-agent">
+      <button type="button" aria-label="Open its chat" title="Open its chat" class="open-agent">
         <icon class="external"> </icon>
       </button>
     </div>
@@ -934,7 +928,7 @@ let%expect_test
     {|
     <div data-call="c12" class="running tool tool-subagent">
       <div data-agent="a1"
-           title="agent a1 · deepseek-flash · 1 turn · follow it in the agents panel"
+           title="agent a1 · deepseek-flash · 1 turn · open its chat"
            class="tool-head">
         <span aria-hidden="true" class="lamp"> </span>
         <span aria-hidden="true" class="tool-icon">
@@ -942,10 +936,7 @@ let%expect_test
         </span>
         <span class="kind"> subagent </span>
         <span class="agent-name"> Count the lines in src/app.ml and report back. … </span>
-        <button type="button"
-                aria-label="Open in the agents panel"
-                title="Open in the agents panel"
-                class="open-agent">
+        <button type="button" aria-label="Open its chat" title="Open its chat" class="open-agent">
           <icon class="external"> </icon>
         </button>
       </div>
@@ -964,7 +955,7 @@ let%expect_test "subagent: failed" =
     {|
     <div data-call="c12" class="error tool tool-subagent">
       <div data-agent="a1"
-           title="agent a1 · deepseek-flash · 1 turn · $0.00 · follow it in the agents panel"
+           title="agent a1 · deepseek-flash · 1 turn · $0.00 · open its chat"
            class="tool-head">
         <span title="Failed" role="img" aria-label="Failed" class="failed mark">
           <icon class="cross"> </icon>
@@ -974,10 +965,7 @@ let%expect_test "subagent: failed" =
         </span>
         <span class="kind"> subagent </span>
         <span class="agent-name"> Count the lines in src/app.ml and report back. … </span>
-        <button type="button"
-                aria-label="Open in the agents panel"
-                title="Open in the agents panel"
-                class="open-agent">
+        <button type="button" aria-label="Open its chat" title="Open its chat" class="open-agent">
           <icon class="external"> </icon>
         </button>
       </div>
@@ -1798,7 +1786,7 @@ let%expect_test "a subagent's row: its name, a way into it, then its task" =
   [%expect
     {|
     <div data-agent="a1"
-         title="agent a1 · deepseek-flash · 1 turn · follow it in the agents panel"
+         title="agent a1 · deepseek-flash · 1 turn · open its chat"
          class="tool-head">
       <span aria-hidden="true" class="lamp"> </span>
       <span aria-hidden="true" class="tool-icon">
@@ -1806,10 +1794,7 @@ let%expect_test "a subagent's row: its name, a way into it, then its task" =
       </span>
       <span class="kind"> subagent </span>
       <span class="agent-name"> Count the lines in src/app.ml and report back. … </span>
-      <button type="button"
-              aria-label="Open in the agents panel"
-              title="Open in the agents panel"
-              class="open-agent">
+      <button type="button" aria-label="Open its chat" title="Open its chat" class="open-agent">
         <icon class="external"> </icon>
       </button>
     </div>
