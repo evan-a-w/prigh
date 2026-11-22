@@ -39,7 +39,6 @@ let rec act t action =
      | Apply_theme _
      | Sign_out
      | Quit_desktop
-     | Reveal _
      | Copy _
      | Select_message _
      | Switch_account _

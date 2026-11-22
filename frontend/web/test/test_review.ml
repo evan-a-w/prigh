@@ -272,11 +272,10 @@ let%expect_test
     (Filter the transcript (/filter)) (Files (Ctrl+Shift+F)) (Terminal (Ctrl+`)) (Review changes (Alt+R))
     (Settings (Ctrl+, or /settings))
     |}];
-  (* The terminal, the file browser and the agents panel open as usual. *)
+  (* The terminal and the file browser open as usual. *)
   H.quiet h (fun () ->
     H.act h Toggle_terminal;
-    H.act h (Files Toggle);
-    H.act h Toggle_subagents);
+    H.act h (Files Toggle));
   layout h;
   [%expect
     {|

@@ -123,13 +123,13 @@ let n1_detail =
 ;;
 
 let show h =
-  H.text h ~selector:".agents-transcript";
-  H.text h ~selector:".agents-note"
+  H.text h ~selector:".subagent-chat .transcript";
+  H.text h ~selector:".subagent-chat-note"
 ;;
 
 let%expect_test "a subagent whose call is in a page not loaded" =
   let h = paged () in
-  H.act h (Select_item (Agent "a1"));
+  H.act h (Open_subagent_chat "a1");
   show h;
   H.reply h "get_subagent" a1_detail;
   show h;
@@ -145,7 +145,7 @@ let%expect_test "a subagent whose call is in a page not loaded" =
     There are 3 files.
     |}];
   (* Its own subagent, fetched before or after it. *)
-  H.act h (Select_item (Agent "a1/n1"));
+  H.act h (Open_subagent_chat "a1/n1");
   H.reply h "get_subagent" n1_detail;
   show h;
   [%expect
@@ -159,7 +159,7 @@ let%expect_test "a subagent whose call is in a page not loaded" =
 
 let%expect_test "a subagent not loaded follows its events" =
   let h = paged () in
-  H.quiet h (fun () -> H.act h (Select_item (Agent "a2")));
+  H.quiet h (fun () -> H.act h (Open_subagent_chat "a2"));
   H.reply
     h
     "get_subagent"
@@ -194,7 +194,7 @@ let%expect_test "a subagent not loaded follows its events" =
 
 let%expect_test "a transcript that does not come says so, with a retry" =
   let h = paged () in
-  H.act h (Select_item (Agent "a1"));
+  H.act h (Open_subagent_chat "a1");
   H.fail h "get_subagent" "unknown subagent \"a1\"";
   show h;
   H.click h ~selector:".agents-note button";
@@ -229,7 +229,7 @@ let%expect_test "a transcript that does not come says so, with a retry" =
 
 let%expect_test "the older page with the call: the transcript moves onto it" =
   let h = paged () in
-  H.quiet h (fun () -> H.act h (Select_item (Agent "a1/n1")));
+  H.quiet h (fun () -> H.act h (Open_subagent_chat "a1/n1"));
   (* The nested one first: it waits beside the chat for its parent. *)
   H.act h (Reply (Subagent "a1/n1", Ok (Jsonaf.of_string n1_detail)));
   H.reply h "get_subagent" a1_detail;
@@ -277,7 +277,7 @@ let%expect_test "the older page with the call: the transcript moves onto it" =
     |}]
 ;;
 
-let%expect_test "a transcript the panel did not ask for is not kept" =
+let%expect_test "a transcript not asked for is not kept" =
   (* E.g. asked for in the session shown before: its ids mean other
      agents here. *)
   let h = paged () in

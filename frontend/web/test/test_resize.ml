@@ -168,7 +168,6 @@ let%expect_test "the kept sizes come back; dragging commits once, clamped" =
        (Restore
           [ Sidebar, Some 333
           ; Files, Some 5000
-          ; Agents, Some 10
           ; Terminal, Some 2000
           ; Files_preview, Some 5000
           ; Review_chat, Some 100
@@ -216,10 +215,8 @@ let%expect_test "the kept sizes come back; dragging commits once, clamped" =
 let%expect_test "docked panels shrink with the window, keeping the chat usable" =
   let h = H.create ~state () in
   viewport h 1600 900;
-  H.quiet h (fun () ->
-    H.act h (Files Toggle);
-    H.act h Toggle_subagents);
-  H.act h (Resize (Restore [ Files, Some 600; Agents, Some 500 ]));
+  H.quiet h (fun () -> H.act h (Files Toggle));
+  H.act h (Resize (Restore [ Files, Some 600 ]));
   sizes h;
   [%expect
     {|
@@ -257,8 +254,8 @@ let%expect_test "docked panels shrink with the window, keeping the chat usable" 
     review-margin 240 [240, 240]
     editor-tree 160 [160, 160]
     |}];
-  (* The agents panel floats over the chat below 1180px, the file browser
-     below 1100px: at most 86% of the window. *)
+  (* The file browser floats over the chat below 1100px: at most 86% of the
+     window. *)
   viewport h 1150 700;
   sizes h;
   [%expect
@@ -431,11 +428,10 @@ let%expect_test
 ;;
 
 let%expect_test "without room for both, the preview takes the list's place" =
-  let h = files_listed () in
-  H.quiet h (fun () -> H.act h Toggle_subagents);
+  let h = files_listed ~viewport:(1180, 900) () in
   open_main h;
-  (* The sidebar, the agents panel, the list and the preview at their least
-     leave the chat less than 400px. *)
+  (* The sidebar, the list and the preview at their least leave the chat
+     less than 400px. *)
   columns h;
   H.text h ~selector:".files-preview-head";
   [%expect
@@ -481,7 +477,6 @@ let%expect_test "without room for both, the preview takes the list's place" =
     <div class="resizer resizer-files">
     |}];
   (* Floating over the chat, likewise. *)
-  H.quiet h (fun () -> H.act h Toggle_subagents);
   viewport h 1050 800;
   open_main h;
   columns h;

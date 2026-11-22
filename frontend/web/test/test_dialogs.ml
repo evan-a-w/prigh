@@ -81,8 +81,7 @@ let%expect_test "a dialog makes the page behind it inert: Tab stays in it" =
     Close_dialog
     (Focus editor)
     |}];
-  (* The agents panel too, and under a tool's confirmation. *)
-  H.act h Toggle_subagents;
+  (* Under a tool's confirmation too. *)
   H.event h (confirm "c1" "rm -rf build");
   inert ();
   [%expect
@@ -716,24 +715,3 @@ let%expect_test "signing out" =
     |}]
 ;;
 
-let%expect_test "on a phone the agents panel is a sheet with the keyboard" =
-  let h = H.create () in
-  let inert () = H.elements h ~selector:"[inert]" in
-  H.act h (Set_narrow true);
-  H.act h Toggle_subagents;
-  inert ();
-  [%expect
-    {|
-    (Rpc (method_ list_subagents) (params ()) (tag Subagents))
-    (Rpc (method_ list_jobs) (params ()) (tag Jobs))
-    (Focus agents-panel)
-    <aside class="bg-sidebar loon sidebar text-sidebar-foreground text-sm">
-    <div class="chrome-anchor">
-    <div class="chat-frame">
-    <footer class="composer">
-    |}];
-  H.act h Toggle_subagents;
-  inert ();
-  [%expect
-    {| <aside class="bg-sidebar loon sidebar text-sidebar-foreground text-sm"> |}]
-;;

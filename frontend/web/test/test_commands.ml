@@ -58,7 +58,6 @@ let%expect_test "every command does something (none is unknown)" =
                 | _ -> None)
               |> String.concat ~sep:", ")
          | d -> String.prefix (Sexp.to_string (Dialog.sexp_of_t d)) 30)
-      | None, _, _ when m'.agents.open_ -> "agents panel"
       | None, (_ :: _ as toasts), _ -> "toast: " ^ (List.last_exn toasts).text
       | None, [], _ ->
         List.filter_map commands ~f:(function

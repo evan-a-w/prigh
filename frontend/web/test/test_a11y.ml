@@ -83,10 +83,8 @@ let%expect_test "the names of the panels' controls" =
       h
       "fs_list"
       {|{"path":"/work","entries":[{"name":"src","kind":"dir","mtime":0},{"name":"README.md","kind":"file","size":2048,"mtime":0}],"parent":"/","home":"/work","total":2,"hidden":0}|};
-    H.act h Toggle_subagents;
     H.act h Toggle_terminal);
   names ~within:".files-panel " h;
-  names ~within:".agents-panel " h;
   names ~within:".terminal-panel " h;
   [%expect
     {|
