@@ -179,7 +179,7 @@ const placement = () => page.evaluate(async () => {
 });
 const openMenu = async () => {
   await page.locator(".composer textarea").fill("/filter");
-  await page.locator(".composer textarea").press("Enter");
+  await page.locator(".composer textarea").press("Control+Enter");
   await page.locator(".filter-menu.placed").waitFor();
 };
 const closed = () => page.locator(".filter-menu").waitFor({ state: "detached" });
