@@ -10,17 +10,12 @@
   (js_of_ocaml
    (sourcemap no)
    (flags
-    ((:standard \ --pretty) --no-source-map))))
+    ((:standard \ --pretty)
+     --no-source-map))))
  (debug-js
   (js_of_ocaml
    (sourcemap inline))))
 
-; Tests that only `./test --full` runs (`dune build @runtest-full`): slow,
-; integration-style tests whose behaviour the default @runtest also covers
-; more cheaply. Attach a test to it with (alias runtest-full) instead of
-; runtest; this empty rule keeps the alias defined when none is.
-
-(rule
- (alias runtest-full)
- (action
-  (progn)))
+; The slow tier: tests that run only with PRIGH_TEST_TIER=full (`./test
+; --full`), by (enabled_if (= %{env:PRIGH_TEST_TIER=default} full)) on their
+; inline_tests, cram or rule stanzas. Their code builds in every run.

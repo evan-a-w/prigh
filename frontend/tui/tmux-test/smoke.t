@@ -1,6 +1,6 @@
 The default run's real-terminal smoke test: the built TUI starts against the
 real backend, sends a prompt and gets the reply, and quits, leaving the
-terminal as it found it. The other groups run in `dune build @runtest-full`.
+terminal as it found it. The other groups run only in the slow tier (`PRIGH_TEST_TIER=full`).
 
   $ bash ./harness.sh startup
   === initial screen

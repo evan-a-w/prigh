@@ -1,8 +1,11 @@
 (library
  (name prigh_test)
+ (modules
+  (:standard \ inline_test_shards))
  (preprocess
   (pps ppx_jane ppx_jsonaf_conv))
  (inline_tests
+  (backend prigh_test_backend)
   (deps fake_mcp_server/fake_mcp_server.exe ../bin/main.exe)
   (flags
    (-source-tree-root .)))
@@ -27,6 +30,28 @@
   expect_test_helpers_core
   re))
 
+; ppx_inline_test's backend with a dozen shards of files as its partitions
+; (see inline_test_shards.mli) rather than one per file.
+
+(library
+ (name prigh_test_backend)
+ (modules inline_test_shards)
+ (libraries ppx_inline_test.runtime-lib unix)
+ (inline_tests.backend
+  (runner_libraries ppx_inline_test.runner.lib prigh_test_backend)
+  (flags
+   inline-test-runner
+   %{library-name}
+   -partition
+   %{partition}
+   -source-tree-root
+   %{workspace_root}
+   -diff-cmd
+   -)
+  (list_partitions_flags inline-test-runner %{library-name} -list-partitions)
+  (generate_runner
+   (echo "let () = Prigh_test_backend.Inline_test_shards.run ();;"))))
+
 ; The backend's own host by a fixed name, the same on every machine: never
 ; one of the tests' tool hosts ("laptop", "desktop", ...).
 
@@ -34,8 +59,3 @@
  (_
   (env-vars
    (PRIGH_HOST_NAME <host>))))
-
-; The slow tier, out of `dune build @runtest`: ../dune's @runtest-full runs
-; them (./test --full). terminal/ runs a real tmux.
-
-(vendored_dirs full terminal)

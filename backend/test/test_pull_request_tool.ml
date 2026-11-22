@@ -149,3 +149,74 @@ let with_agent ~answer replies ~sub_replies f =
     | _ -> ());
   f t agent ~fake
 ;;
+
+let%expect_test "list, view, checks and diff" =
+  with_repo
+  @@ fun _ ~repo:_ ~fake ~store ~tool:_ ~run ->
+  sign_in store ~token:"ghp_mine";
+  run {|{"action":"list"}|};
+  run {|{"action":"list","state":"merged"}|};
+  run {|{"action":"view","number":7}|};
+  run {|{"action":"checks","number":7}|};
+  run {|{"action":"diff","number":7}|};
+  run {|{"action":"view","number":99}|};
+  run {|{"action":"view"}|};
+  run {|{"action":"frobnicate","number":7}|};
+  Fake_forge.print_requests fake;
+  [%expect
+    {|
+    open pull requests in o/r on github.com:
+    #7 From a contributor (open; alice, fork:feat/x -> main) https://github.com/o/r/pull/7
+    #5 Old one (open, draft; alice, feat/x -> main) https://github.com/o/r/pull/5
+    ERROR: pull_request list: unknown state "merged": open, closed or all
+    #7 From a contributor (open) in o/r on github.com
+    https://github.com/o/r/pull/7
+    alice wants to merge fork:feat/x into main
+    created 2026-10-20T10:00:00Z, updated 2026-10-21T10:00:00Z
+    checks: success
+    - build: success https://ci/1
+
+    Does x.
+    #7 From a contributor (head abc123)
+    checks: success
+    - build: success https://ci/1
+    diff of #7 From a contributor (fork:feat/x -> main):
+    diff --git a/b b/b
+    new file mode 100644
+    --- /dev/null
+    +++ b/b
+    @@ -0,0 +1 @@
+    +b
+
+    ERROR: pull_request view: github.com: pull request #99 of o/r not found (HTTP 404): action=list lists the open ones; the closest: #7 From a contributor (open), #5 Old one (open, draft)
+    ERROR: invalid arguments: missing "number": the pull request's number (action=list shows them)
+    ERROR: invalid arguments: unknown action "frobnicate": use list, view, checks, diff, comments, create, checkout, comment, edit, merge, close, reopen, ready, draft, review, reply or request_reviewers
+    GET https://api.github.com/repos/o/r/pulls?state=open&per_page=100&sort=updated&direction=desc
+      Authorization: Bearer ghp_mine
+    GET https://api.github.com/repos/o/r/pulls/7
+      Authorization: Bearer ghp_mine
+    GET https://api.github.com/repos/o/r/commits/abc123/check-runs?per_page=100
+      Authorization: Bearer ghp_mine
+    GET https://api.github.com/repos/o/r/commits/abc123/status
+      Authorization: Bearer ghp_mine
+    GET https://api.github.com/repos/o/r/pulls/7
+      Authorization: Bearer ghp_mine
+    GET https://api.github.com/repos/o/r/commits/abc123/check-runs?per_page=100
+      Authorization: Bearer ghp_mine
+    GET https://api.github.com/repos/o/r/commits/abc123/status
+      Authorization: Bearer ghp_mine
+    GET https://api.github.com/repos/o/r/pulls/7
+      Authorization: Bearer ghp_mine
+    GET https://api.github.com/repos/o/r/pulls/7
+      Authorization: Bearer ghp_mine
+      Accept: application/vnd.github.diff
+    GET https://api.github.com/repos/o/r/commits/abc123/check-runs?per_page=100
+      Authorization: Bearer ghp_mine
+    GET https://api.github.com/repos/o/r/commits/abc123/status
+      Authorization: Bearer ghp_mine
+    GET https://api.github.com/repos/o/r/pulls/99
+      Authorization: Bearer ghp_mine
+    GET https://api.github.com/repos/o/r/pulls?state=all&per_page=100&sort=updated&direction=desc
+      Authorization: Bearer ghp_mine
+    |}]
+;;

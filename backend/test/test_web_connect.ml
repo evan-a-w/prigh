@@ -603,8 +603,9 @@ let%expect_test "prigh web: the first free port from the default" =
     }
   in
   let started = Web_connect.start ~env:t.env ~sw ~log:ignore config in
-  printf "port: first + %d\n" (started.port - backend_port);
-  [%expect {| port: first + 1 |}]
+  (* Not necessarily the next: any process may hold it. *)
+  printf "port: after the backend's: %b\n" (started.port > backend_port);
+  [%expect {| port: after the backend's: true |}]
 ;;
 
 let%expect_test "prigh web: what is wrong with the backend, and what to do" =

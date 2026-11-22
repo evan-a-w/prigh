@@ -334,7 +334,9 @@ let%expect_test "the trace file keeps the newest spans within its cap" =
   let exists = ref false in
   let clock = Virtual_clock.create () in
   (* Each process (here: each tracer) has its own file writer. *)
+  let tracers = ref 0 in
   let make_tracer () =
+    incr tracers;
     let file =
       Trace_file.create
         ~max_bytes:1000
@@ -342,6 +344,7 @@ let%expect_test "the trace file keeps the newest spans within its cap" =
         ()
     in
     Trace.create
+      ~id_prefix:(sprintf "t%d." !tracers)
       ~clock:(Virtual_clock.trace_clock clock)
       ~level:Default
       ~write:(Trace_file.write file)
@@ -375,12 +378,12 @@ let%expect_test "the trace file keeps the newest spans within its cap" =
   exists := true;
   span "c";
   show ();
-  [%expect {| (((.trace.old.jsonl -) (.trace.jsonl 402)) (a b c) (bad 0)) |}];
+  [%expect {| (((.trace.old.jsonl -) (.trace.jsonl 369)) (a b c) (bad 0)) |}];
   List.iter (List.init 30 ~f:(sprintf "span%02d")) ~f:span;
   show ();
   [%expect
     {|
-    (((.trace.old.jsonl 980) (.trace.jsonl 700))
+    (((.trace.old.jsonl 903) (.trace.jsonl 645))
      (span18 span19 span20 span21 span22 span23 span24 span25 span26 span27
       span28 span29)
      (bad 0))
@@ -396,7 +399,7 @@ let%expect_test "the trace file keeps the newest spans within its cap" =
   show ();
   [%expect
     {|
-    (((.trace.old.jsonl 980) (.trace.jsonl 855))
+    (((.trace.old.jsonl 903) (.trace.jsonl 789))
      (span18 span19 span20 span21 span22 span23 span24 span25 span26 span27
       span28 span29 after_crash)
      (bad 1))

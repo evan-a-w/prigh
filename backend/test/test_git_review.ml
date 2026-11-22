@@ -125,3 +125,78 @@ let%expect_test "/review and /init wait for a running turn like a follow-up" =
     assistant: wrote AGENTS.md
     |}]
 ;;
+
+let%expect_test "/diff: tracked changes, untracked files, a path, no repository"
+  =
+  with_agent []
+  @@ fun t agent ->
+  print_diff t (Agent.git_diff agent);
+  [%expect
+    {| error: not a git repository: $DIR (git init starts one, or /cd into one) |}];
+  sh t "git init -q -b main . && echo .sessions > .gitignore";
+  (* Before the first commit everything is new. *)
+  write t "a.txt" "one\n";
+  print_diff t (Agent.git_diff agent);
+  [%expect
+    {|
+    root=$DIR against=<sha> truncated=false files=2 +2 -0
+    diff --git a/.gitignore b/.gitignore
+    new file mode 100644
+    index <ids>
+    --- /dev/null
+    +++ b/.gitignore
+    @@ -0,0 +1 @@
+    +.sessions
+    diff --git a/a.txt b/a.txt
+    new file mode 100644
+    index <ids>
+    --- /dev/null
+    +++ b/a.txt
+    @@ -0,0 +1 @@
+    +one
+    |}];
+  sh t "git add -A && git commit -q -m init";
+  print_diff t (Agent.git_diff agent);
+  [%expect {| root=$DIR against=HEAD truncated=false files=0 +0 -0 |}];
+  write t "a.txt" "one\ntwo\n";
+  write t "sub/new.ml" "let x = 1\n";
+  print_diff t (Agent.git_diff agent);
+  [%expect
+    {|
+    root=$DIR against=HEAD truncated=false files=2 +2 -0
+    diff --git a/a.txt b/a.txt
+    index <ids> 100644
+    --- a/a.txt
+    +++ b/a.txt
+    @@ -1 +1,2 @@
+     one
+    +two
+    diff --git a/sub/new.ml b/sub/new.ml
+    new file mode 100644
+    index <ids>
+    --- /dev/null
+    +++ b/sub/new.ml
+    @@ -0,0 +1 @@
+    +let x = 1
+    |}];
+  (* A path, relative to the session's directory; paths stay relative to the
+     repository. *)
+  ignore
+    (Or_error.ok_exn (Agent.set_cwd agent ~path:(Filename.concat t.dir "sub"))
+     : Dir_change.Outcome.t);
+  print_diff t (Agent.git_diff agent ~path:".");
+  [%expect
+    {|
+    root=$DIR against=HEAD truncated=false files=1 +1 -0
+    diff --git a/sub/new.ml b/sub/new.ml
+    new file mode 100644
+    index <ids>
+    --- /dev/null
+    +++ b/sub/new.ml
+    @@ -0,0 +1 @@
+    +let x = 1
+    |}];
+  print_diff t (Agent.git_diff agent ~base:"nope");
+  [%expect
+    {| error: unknown revision "nope": name a branch, tag or commit (closest: main) |}]
+;;
