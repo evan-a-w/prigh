@@ -175,7 +175,7 @@ let footer ~tip =
     ]
 ;;
 
-let top_bar ~tip ~sidebar ~pressed ~has_right ~right_open ~set_right_open =
+let top_bar ?more ~tip ~sidebar ~pressed ~has_right ~right_open ~set_right_open () =
   let current = Fake.Session.current in
   Node.header
     ~attrs:
@@ -229,7 +229,18 @@ let top_bar ~tip ~sidebar ~pressed ~has_right ~right_open ~set_right_open =
                ~on_click:(set_right_open (not right_open))
                (Icons.view Panel_right)
            else Node.none)
-        ; icon_button tip ~id:"more" "More" ~class_:"md:hidden" (Icon.view Ellipsis)
+        ; (match more with
+           | None -> icon_button tip ~id:"more" "More" ~class_:"md:hidden" (Icon.view Ellipsis)
+           | Some wrap ->
+             wrap
+               (Button.view
+                  ~variant:Ghost
+                  ~size:Icon_sm
+                  ~attrs:[ Attr.create "aria-label" "Session" ]
+                  ~class_:
+                    "text-muted-foreground hover:text-foreground \
+                     aria-expanded:bg-accent aria-expanded:text-accent-foreground"
+                  [ Icon.view Ellipsis ]))
         ]
     ]
 ;;
@@ -260,6 +271,7 @@ let component
   ?(bottom_size = 38.)
   ?overlay
   ?(pressed = [])
+  ?more
   ~tip
   ~main
   (local_ graph)
@@ -280,7 +292,13 @@ let component
   let right_layout, set_right_layout = Bonsai.state ([] : float list) graph in
   let bottom_layout, set_bottom_layout = Bonsai.state ([] : float list) graph in
   let overlay = Option.value overlay ~default:(Bonsai.return Node.none) in
+  let more =
+    match more with
+    | None -> Bonsai.return None
+    | Some m -> m >>| Option.some
+  in
   let%arr sidebar
+  and more
   and tip
   and main
   and right
@@ -356,12 +374,14 @@ let component
         ; Sidebar.inset
             ~class_:"min-h-0 overflow-hidden"
             [ top_bar
+                ?more
                 ~tip
                 ~sidebar
                 ~pressed
                 ~has_right:(Option.is_some right)
                 ~right_open
                 ~set_right_open
+                ()
             ; div "relative flex min-h-0 flex-1" body
             ]
         ]

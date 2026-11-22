@@ -38,12 +38,13 @@ let ring fraction =
     ]
 ;;
 
-let chip ?(class_ = "") ~tip ~id label icon text =
-  Tip.wrap
-    ~side:Top
-    tip
-    ~id
-    label
+let chip ?(class_ = "") ?(wrap = fun _ -> None) ~tip ~id label icon text =
+  let with_tip button =
+    match wrap id with
+    | Some f -> f button
+    | None -> Tip.wrap ~side:Top tip ~id label button
+  in
+  with_tip
     (Input_group.button
        ~variant:Ghost
        ~size:Xs
@@ -72,11 +73,13 @@ let queued_pill text =
     ]
 ;;
 
-let view ?(queued = []) ~tip () =
+let view ?(queued = []) ?wrap_chip ?draft ?above ~tip () =
+  let chip = chip ?wrap:wrap_chip in
   div
-    "mx-auto w-full max-w-[760px] px-4 \
+    "relative mx-auto w-full max-w-[760px] px-4 \
      pb-[max(0.75rem,env(safe-area-inset-bottom))]"
     [ div "" (List.map queued ~f:queued_pill)
+    ; Option.value above ~default:Node.none
     ; Input_group.root
         ~class_:
           "h-auto flex-col rounded-2xl border-border bg-card shadow-none \
@@ -85,6 +88,7 @@ let view ?(queued = []) ~tip () =
         [ Input_group.textarea
             ~class_:"min-h-14 px-4 pt-3.5 text-base md:text-sm"
             ~rows:2
+            ?value:draft
             ~placeholder:"Ask anything. @ files, $ skills, / commands"
             ()
         ; Input_group.addon

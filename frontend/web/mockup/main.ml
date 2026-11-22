@@ -17,6 +17,12 @@ let screens =
   ; ("files", fun ~tip (local_ graph) -> Screen_files.component ~tip graph)
   ; ("confirm", fun ~tip (local_ graph) -> Screen_confirm.component ~tip graph)
   ; ("question", fun ~tip (local_ graph) -> Screen_confirm.question ~tip graph)
+  ; ("palette", fun ~tip (local_ graph) -> Screen_palette.component ~tip graph)
+  ; ("model", fun ~tip (local_ graph) -> Screen_model.component ~tip graph)
+  ; ("session-panel", fun ~tip (local_ graph) -> Screen_session_panel.component ~tip graph)
+  ; ("completion", fun ~tip (local_ graph) -> Screen_completion.component Commands ~tip graph)
+  ; ( "completion-files"
+    , fun ~tip (local_ graph) -> Screen_completion.component Files ~tip graph )
   ]
 ;;
 

@@ -1,6 +1,7 @@
 (** The page around every mockup screen: the session sidebar, the top bar
     (breadcrumb and panel toggles) and the main area, with an optional
-    right panel, bottom panel and an overlay (dialogs, sheets) on top. *)
+    right panel, bottom panel and an overlay (dialogs, sheets) on top. [more]
+    wraps the top bar's ⋯ button (e.g. in a menu) and shows it on every width. *)
 
 open! Core
 open Bonsai_web
@@ -18,6 +19,7 @@ val component
   -> ?bottom_size:float
   -> ?overlay:Vdom.Node.t Bonsai.t
   -> ?pressed:string list
+  -> ?more:(Vdom.Node.t -> Vdom.Node.t) Bonsai.t
   -> tip:Tip.t Bonsai.t
   -> main:Vdom.Node.t Bonsai.t
   -> local_ Bonsai.graph
