@@ -7,6 +7,10 @@ let screens =
   [ ( "chat"
     , fun ~tip (local_ graph) ->
         Shell.component ~tip ~main:(Screen_chat.component ~tip graph) graph )
+  ; "settings", Screen_settings.component
+  ; "settings-mcp", Screen_settings_mcp.component
+  ; "settings-keys", Screen_settings_keys.component
+  ; "login", Screen_login.component
   ]
 ;;
 
