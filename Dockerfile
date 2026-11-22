@@ -48,7 +48,10 @@ RUN if [ "$PREFETCH_DEPS" = 1 ]; then nix build --no-link path:/deps#backend.inp
 # The backend and frontend, from the binary cache when it has them (see
 # docker/fetch-prigh.sh); REQUIRE_CACHED=1 fails instead of compiling them
 # (CI, which publishes only what the cache has). Then the store paths they
-# refer to (glibc, gmp) are fetched, and the seed is made of those and nix.
+# refer to (glibc, gmp) are fetched, and the seed is made of those, nix and
+# ImageMagick: the backend downscales images too large for a model with it,
+# and the flake's wrapper puts the same package on PATH (flake.nix). It is
+# checked here, since a missing one only shows when someone sends an image.
 ARG REQUIRE_CACHED=0
 COPY . /src
 RUN --mount=type=bind,from=prebuilt,target=/prebuilt \
@@ -61,12 +64,20 @@ RUN --mount=type=bind,from=prebuilt,target=/prebuilt \
  && echo "runtime store paths: $refs" \
  && nix-store --realise $refs >/dev/null \
  && nix_pkg=$(dirname "$(dirname "$(readlink -f "$(command -v nix)")")") \
- && closure=$(nix-store -qR $refs "$nix_pkg") \
+ && magick_pkg=$(nix build --no-link --print-out-paths --inputs-from path:/src nixpkgs#imagemagick) \
+ && echo "imagemagick: $magick_pkg" \
+ && "$magick_pkg/bin/magick" -size 3000x2000 xc:red /tmp/big.png \
+ && "$magick_pkg/bin/magick" '/tmp/big.png[0]' -auto-orient -resize '2000x2000>' -strip /tmp/small.png \
+ && "$magick_pkg/bin/magick" '/tmp/big.png[0]' -resize '1000x1000>' -quality 85 /tmp/small.jpg \
+ && [ "$("$magick_pkg/bin/magick" identify -format '%m %wx%h,' /tmp/small.png /tmp/small.jpg)" = 'PNG 2000x1333,JPEG 1000x667,' ] \
+ && rm /tmp/big.png /tmp/small.png /tmp/small.jpg \
+ && closure=$(nix-store -qR $refs "$nix_pkg" "$magick_pkg") \
  && mkdir -p /seed/store \
  && cp -a $closure /seed/store/ \
  && nix-store --dump-db $closure >/seed/registration \
- && printf '%s\n' $refs "$nix_pkg" >/seed/roots \
+ && printf '%s\n' $refs "$nix_pkg" "$magick_pkg" >/seed/roots \
  && echo "$nix_pkg" >/seed/nix \
+ && echo "$magick_pkg" >/seed/magick \
  && sha256sum /seed/registration | cut -c1-32 >/seed/id \
  && nix eval --raw --impure --expr 'let lock = builtins.fromJSON (builtins.readFile /src/flake.lock); \
       locked = lock.nodes.${lock.nodes.root.inputs.nixpkgs}.locked; \
@@ -113,6 +124,10 @@ RUN mv /opt/nix-seed/flake-registry.json /etc/nix/ \
  && ln -s /opt/prigh/bin/prigh /opt/prigh/bin/prigh-tui /usr/local/bin/ \
  && nix_pkg=$(cat /opt/nix-seed/nix) \
  && for b in /opt/nix-seed/store/"${nix_pkg##*/}"/bin/*; do ln -s "$nix_pkg/bin/${b##*/}" /usr/local/bin/; done \
+ && magick_pkg=$(cat /opt/nix-seed/magick) \
+ && [ -x "/opt/nix-seed/store/${magick_pkg##*/}/bin/magick" ] \
+ && grep -qxF "$magick_pkg" /opt/nix-seed/roots \
+ && ln -s "$magick_pkg/bin/magick" /usr/local/bin/magick \
  && groupadd -r -g 30000 nixbld \
  && for i in 1 2 3 4 5 6 7 8; do \
       useradd -r -M -N -u $((30000 + i)) -g nixbld -G nixbld -d /var/empty -s /usr/sbin/nologin \

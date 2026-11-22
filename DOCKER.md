@@ -237,8 +237,9 @@ user, `default`.
 
 ## Installing tools
 
-The image ships `bash git ripgrep tmux curl jq less openssh-client procps`
-and Nix. The agents run as unprivileged users on a read-only root
+The image ships `bash git ripgrep tmux curl jq less openssh-client procps`,
+ImageMagick's `magick` (which the backend downscales images too large for a
+model with) and Nix. The agents run as unprivileged users on a read-only root
 filesystem, so apt and sudo are out; any user (agent or `>_` shell) gets
 other tools from nixpkgs instead, as itself:
 
@@ -277,11 +278,12 @@ How it fits together:
   substituters or keys or change the sandbox settings, so everything they
   substitute is signed by `cache.nixos.org`. Packages not in the cache are
   built locally, as the `nixbld1`…`nixbld8` users.
-- **Seeding.** prigh itself links against store paths (glibc), and nix is a
-  store path too. Since the volume hides the image's `/nix`, the image keeps
-  them in `/opt/nix-seed`, and the entrypoint copies any that are missing
-  into `/nix/store` and registers them at every start (the first start
-  copies about 160 MB). `/usr/local/bin/nix*` link to the seeded nix.
+- **Seeding.** prigh itself links against store paths (glibc), and nix and
+  ImageMagick are store paths too. Since the volume hides the image's
+  `/nix`, the image keeps them in `/opt/nix-seed`, and the entrypoint copies
+  any that are missing into `/nix/store` and registers them at every start
+  (the first start copies a few hundred MB). `/usr/local/bin/nix*` and
+  `/usr/local/bin/magick` link to the seeded ones.
 - **Garbage collection**: see [below](#garbage-collection).
 - **Upgrades.** A new image brings its seed; the entrypoint adds what is new
   and moves the GC roots to it, so the old image's paths become garbage.
@@ -746,8 +748,11 @@ sha tag; untick `publish_image` to skip it).
    layer stays cached. It then keeps just the two
    binaries, prigh-web's site and, as the Nix seed, the few store paths the
    binaries link against (glibc, gmp) plus the `nix` of the `nixos/nix`
-   image with its closure and their database registration (`nix-store
-   --dump-db`), about 160 MB instead of the ~10 GB build closure. It also
+   image and nixpkgs' `imagemagick` (the one the flake's `prigh` wrapper
+   puts on PATH; the build checks that it downscales a PNG to PNG and
+   JPEG) with their closures and database registration (`nix-store
+   --dump-db`), a few hundred MB instead of the ~10 GB build closure.
+   The runtime stage links `nix*` and `magick` into `/usr/local/bin`. It also
    writes the flake registry that pins `nixpkgs` to `flake.lock`.
 2. The runtime stage is `debian:bookworm-slim`. `tini -g` is PID 1, so
    signals reach the backend and tool hosts and child processes are
