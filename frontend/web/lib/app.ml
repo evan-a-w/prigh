@@ -144,7 +144,6 @@ module Reply_tag = struct
     | Subagent of string (** the [subagent] call or agent id *)
     | Subagents
     | Jobs
-    | Job_output of string
     | Job_started
     | Auth_status of Auth_purpose.t
     | Paths of string
@@ -571,14 +570,7 @@ module Action = struct
         ; server : string
         }
     | Open_rename
-    | Open_subagents of string option
-    (** the agents panel; with a number, an agent's or a job's id *)
-    | Toggle_subagents
-    | Select_item of Agents.Item.t
-    | Agents_back
-    | Focus_agent of int
-    | Cycle_agent of int
-    | Show_in_chat of string
+    | Open_subagent_n of int
     | Clock of Time_ns.t
     | Picker_query of string
     | Picker_move of int
@@ -596,7 +588,6 @@ module Action = struct
     | Dequeue
     | Edit_queued of Recipient.t * Queued.Message.t
     | Remove_queued of Recipient.t * Queued.Message.t
-    | Set_recipient of Recipient.t
     | Remove_reminder of string
     | New_session_in of string
     | New_worktree
@@ -628,6 +619,7 @@ module Action = struct
     | Session_card of Session_card.Action.t
     | Open_subagent_chat of string
     | Close_subagent_chat
+    | Subagent_back
     | Answer_confirm of
         { call_id : string
         ; agent_id : string option
@@ -784,7 +776,6 @@ module Model = struct
     ; downsizing : Image.t list
     ; queue : Queued.t
     ; agent_queues : Agent_queue.t list
-    ; recipient : Recipient.t
     ; confirms : Pending.Confirm.t list
     ; confirm_reason : string option
     ; questions : Question_dialog.t list
@@ -903,7 +894,6 @@ module Model = struct
         ; downsizing
         ; queue
         ; agent_queues
-        ; recipient
         ; confirms
         ; confirm_reason
         ; questions
@@ -1009,7 +999,6 @@ module Model = struct
     && phys_equal downsizing b.downsizing
     && phys_equal queue b.queue
     && phys_equal agent_queues b.agent_queues
-    && phys_equal recipient b.recipient
     && phys_equal confirms b.confirms
     && phys_equal confirm_reason b.confirm_reason
     && phys_equal questions b.questions
@@ -1127,7 +1116,6 @@ module Model = struct
     { Resize.Shown.sidebar = docked t
     ; files = t.files.open_
     ; preview = Option.is_some t.files.preview
-    ; agents = t.agents.open_
     ; reviewing = t.review.open_ || (t.code.open_ && t.code.chat)
     ; narrow = t.narrow
     }
@@ -1173,9 +1161,14 @@ module Model = struct
   ;;
 
   let ticking t =
-    t.agents.open_
-    && (Agents.running_agents t.agents + Agents.running_jobs t.agents > 0
-        || Agents.fetching t.agents)
+    Agents.running_agents t.agents + Agents.running_jobs t.agents > 0
+    || Agents.fetching t.agents
+  ;;
+
+  let recipient t : Recipient.t =
+    match t.subagent_chat with
+    | Some id -> Agent id
+    | None -> Main
   ;;
 
   let fold t =
@@ -1335,7 +1328,6 @@ let init =
   ; downsizing = []
   ; queue = Queued.empty
   ; agent_queues = []
-  ; recipient = Main
   ; confirms = []
   ; confirm_reason = None
   ; questions = []
@@ -1944,9 +1936,8 @@ let set_state_without_files (m : Model.t) (state : State.t) =
       ; questions = []
       ; queue = Queued.empty
       ; agent_queues = []
-      ; recipient = Main
-      ; dialog = Option.filter m.dialog ~f:(Fn.non Dialog.per_session)
-      ; agents = { Agents.empty with open_ = m.agents.open_ && not m.narrow }
+          ; dialog = Option.filter m.dialog ~f:(Fn.non Dialog.per_session)
+      ; agents = Agents.empty
       ; btw = None
       ; generate = Generate.empty
       ; git_bar = Git_bar.empty
@@ -3371,7 +3362,6 @@ let new_shell (m : Model.t) =
 
 let now_of (m : Model.t) = Option.value m.now ~default:Time_ns.epoch
 let with_agents (m : Model.t) ~f = { m with agents = f m.agents }
-let job_output id = rpc "job_output" [ "job_id", str id ] ~tag:(Job_output id)
 
 (* Subagents' transcripts come with their calls (events, or [get_subagent]
    after a reload); those of calls not loaded, and nested ones, are fetched
@@ -3397,73 +3387,12 @@ let fetch_transcript (m : Model.t) id =
 
 (* After a new chat: the transcript on show, if it went with the old one. *)
 let refetch_shown (m : Model.t) =
-  match m.agents.selected with
-  | Some (Agent id) -> fetch_transcript m id
-  | Some (Job _) | None -> m, []
+  match m.subagent_chat with
+  | Some id -> fetch_transcript m id
+  | None -> m, []
 ;;
 
-let select (m : Model.t) (item : Agents.Item.t) =
-  let m =
-    with_agents m ~f:(fun a ->
-      { a with
-        open_ = true
-      ; selected = Some item
-      ; output =
-          (match item, a.output with
-           | Job id, Some (shown, _) when String.equal id shown -> a.output
-           | _ -> None)
-      })
-  in
-  match item with
-  | Agent id -> fetch_transcript m id
-  | Job id -> m, [ job_output id ]
-;;
-
-let with_item (m : Model.t) arg ~f =
-  match Agents.resolve m.agents arg with
-  | Some item -> f m item
-  | None ->
-    error
-      m
-      (match Agents.listed m.agents with
-       | [] ->
-         sprintf "No subagent or job %s: none has run in this session." arg
-       | listed ->
-         sprintf
-           "No subagent or job %s: give its number (1-%d) or id; /agents lists \
-            them."
-           arg
-           (List.length listed))
-;;
-
-(* On a phone the panel covers the page, so it takes the focus from the
-   editor behind it. *)
-let open_agents (m : Model.t) arg =
-  let m, commands =
-    match arg with
-    | None ->
-      ( with_agents m ~f:(fun a -> { a with open_ = true; selected = None })
-      , [ list_subagents; list_jobs ] )
-    | Some arg -> with_item m arg ~f:select
-  in
-  ( m
-  , if m.narrow && m.agents.open_
-    then commands @ [ Command.Focus "agents-panel" ]
-    else commands )
-;;
-
-let close_agents (m : Model.t) =
-  ( with_agents m ~f:(fun a -> { a with open_ = false })
-  , if m.narrow then [] else [ focus_editor ] )
-;;
-
-let agents_back (m : Model.t) =
-  match m.agents.selected with
-  | Some _ -> with_agents m ~f:(fun a -> { a with selected = None }), []
-  | None -> close_agents m
-;;
-
-(* ---- the session card, and a subagent's transcript in the chat's place *)
+(* ---- the session card, and a subagent's chat in the session's place *)
 
 (* On a phone the card is a sheet, closed until asked for. *)
 let toggle_session_card (m : Model.t) =
@@ -3477,6 +3406,8 @@ let toggle_session_card (m : Model.t) =
   else { m with session_card_open = not m.session_card_open }, []
 ;;
 
+(* The composer writes to the subagent on show ([Model.recipient]); its
+   draft is the session's. *)
 let open_subagent_chat (m : Model.t) id =
   match Agents.find_agent m.agents id with
   | None -> error m (sprintf "No subagent %s in this session." id)
@@ -3487,7 +3418,7 @@ let open_subagent_chat (m : Model.t) id =
       ; session_card = { m.session_card with sheet = false }
       ; status_tray = false
       }
-    , fetch @ [ Command.Focus "chat" ] )
+    , fetch @ [ focus_editor ] )
 ;;
 
 let close_subagent_chat (m : Model.t) =
@@ -3496,23 +3427,24 @@ let close_subagent_chat (m : Model.t) =
   | Some _ -> { m with subagent_chat = None }, [ focus_editor ]
 ;;
 
-(* ---- steering a subagent *)
-
-let set_recipient (m : Model.t) (recipient : Recipient.t) =
-  match recipient with
-  | Main -> { m with recipient }, [ focus_editor ]
-  | Agent id ->
-    (match Recipient.refusal m.agents id with
-     | Some why -> error m why
-     | None ->
-       (* On a phone the panel covers the composer. *)
-       let m =
-         if m.narrow
-         then with_agents m ~f:(fun a -> { a with open_ = false })
-         else m
-       in
-       { m with recipient }, [ focus_editor ])
+let subagent_back (m : Model.t) =
+  match
+    Option.bind m.subagent_chat ~f:(fun id ->
+      Option.bind (Agents.find_agent m.agents id) ~f:(fun a -> a.parent))
+  with
+  | Some parent -> open_subagent_chat m parent
+  | None -> close_subagent_chat m
 ;;
+
+(* The subagents of the chat on show: the session's top-level ones, or the
+   subagent's own. *)
+let open_subagent_n (m : Model.t) n =
+  match List.nth (Agents.children m.agents m.subagent_chat) (n - 1) with
+  | Some a -> open_subagent_chat m a.id
+  | None -> m, []
+;;
+
+(* ---- writing to a subagent *)
 
 (* [steer_agent]: [draft] (what was typed) goes back into the editor if it
    fails. *)
@@ -3566,40 +3498,7 @@ let note_sessions_asked ((m : Model.t), cmds) =
   else m, cmds
 ;;
 
-(* A finished subagent takes no messages: the composer goes back to the main
-   agent. Showing a subagent in the panel does not steer it: only its Steer
-   button does. *)
-let follow_recipient ((m : Model.t), cmds) =
-  match m.recipient with
-  | Main -> m, cmds
-  | Agent id ->
-    (match Agents.find_agent m.agents id with
-     | None -> { m with recipient = Main }, cmds
-     | Some { status = Agents.Status.Running; _ } -> m, cmds
-     | Some { status = Complete | Failed; _ } ->
-       let m, toast_cmds =
-         toast
-           { m with recipient = Main }
-           (sprintf
-              "%s has finished: you are writing to the main agent again"
-              id)
-       in
-       m, cmds @ toast_cmds)
-;;
-
-let show_in_chat (m : Model.t) id =
-  let path =
-    List.map (Agents.lineage m.agents id) ~f:(fun (a : Agents.Agent.t) ->
-      a.call_id)
-  in
-  let m =
-    if m.narrow then with_agents m ~f:(fun a -> { a with open_ = false }) else m
-  in
-  m, [ Command.Reveal path ]
-;;
-
-(* While the panel is open, running jobs' last lines and the shown job's
-   output are polled. *)
+(* While a job runs, the jobs are polled for the session card. *)
 let poll_interval = Time_ns.Span.of_sec 2.
 let transcript_timeout = Time_ns.Span.of_sec 20.
 
@@ -3615,14 +3514,8 @@ let clock (m : Model.t) now =
     Option.value_map a.polled_at ~default:true ~f:(fun at ->
       Time_ns.Span.( >= ) (Time_ns.diff now at) poll_interval)
   in
-  if a.open_ && due && Agents.running_jobs a > 0
-  then
-    ( with_agents m ~f:(fun a -> { a with polled_at = Some now })
-    , list_jobs
-      ::
-      (match a.selected with
-       | Some (Job id) when Agents.running a (Job id) -> [ job_output id ]
-       | _ -> []) )
+  if due && Agents.running_jobs a > 0
+  then with_agents m ~f:(fun a -> { a with polled_at = Some now }), [ list_jobs ]
   else m, []
 ;;
 
@@ -3635,24 +3528,42 @@ let stop (m : Model.t) (item : Agents.Item.t) =
   | Job id -> m, [ rpc "kill_job" [ "job_id", str id ] ]
 ;;
 
-(* [/agents cancel] and [/jobs kill]: open the item in the panel, which
-   shows it stopping. *)
+let with_item (m : Model.t) arg ~f =
+  match Agents.resolve m.agents arg with
+  | Some item -> f m item
+  | None ->
+    error
+      m
+      (match Agents.listed m.agents with
+       | [] ->
+         sprintf "No subagent or job %s: none has run in this session." arg
+       | listed ->
+         sprintf
+           "No subagent or job %s: give its number (1-%d) or id; /agents lists \
+            them."
+           arg
+           (List.length listed))
+;;
+
+(* [/agents] and [/jobs]: the session card, which lists them. *)
+let show_session_card (m : Model.t) =
+  if m.narrow
+  then
+    ( { m with session_card = { m.session_card with sheet = true } }
+    , [ list_subagents; list_jobs ] )
+  else { m with session_card_open = true }, [ list_subagents; list_jobs ]
+;;
+
+(* [/agents cancel] and [/jobs kill]. *)
 let stop_command (m : Model.t) item =
   if Agents.running m.agents item
-  then (
-    let m, select_cmds = select m item in
-    let m, stop_cmds = stop m item in
-    m, select_cmds @ stop_cmds)
-  else (
-    let m, cmds = select m item in
-    let m, toast_cmds =
-      error
-        m
-        (match item with
-         | Agent id -> sprintf "Subagent %s has already finished." id
-         | Job id -> sprintf "Job %s has already finished." id)
-    in
-    m, cmds @ toast_cmds)
+  then stop m item
+  else
+    error
+      m
+      (match item with
+       | Agent id -> sprintf "Subagent %s has already finished." id
+       | Job id -> sprintf "Job %s has already finished." id)
 ;;
 
 let no_job (m : Model.t) arg =
@@ -3672,7 +3583,7 @@ let no_job (m : Model.t) arg =
             (List.map jobs ~f:(fun (j : Agents.Job.t) -> j.info.id))))
 ;;
 
-(* [/jobs id] and [/jobs kill id]: a job's id, or its number in the panel. *)
+(* [/jobs kill id]: a job's id, or its number in [/agents]'s list. *)
 let with_job (m : Model.t) arg ~f =
   match Agents.resolve m.agents arg with
   | Some (Job _ as item) -> f m item
@@ -5450,8 +5361,7 @@ let user_switched (m : Model.t) (hello : Hello_reply.t) =
     ; questions = []
     ; queue = Queued.empty
     ; agent_queues = []
-    ; recipient = Main
-    ; dialog = None
+      ; dialog = None
     ; completion = None
     ; btw = None
     ; generate = Generate.empty
@@ -5472,7 +5382,7 @@ let user_switched (m : Model.t) (hello : Hello_reply.t) =
     ; outputs_loading = String.Set.empty
     ; folds = String.Set.empty
     ; ui = Ui_state.empty
-    ; agents = { Agents.empty with open_ = m.agents.open_ }
+    ; agents = Agents.empty
     ; forges = Forges.empty
     ; nix_gc = { Nix_gc.empty with collecting = m.nix_gc.collecting }
     ; usage = Usage_page.empty
@@ -7513,20 +7423,29 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
          (Enter (if String.is_empty path then None else Some path)))
   | "terminal", "" -> open_terminal (with_terminal_dir m None)
   | "terminal", dir -> open_terminal (with_terminal_dir m (Some dir))
-  | "agents", "" -> open_agents m None
+  | "agents", "" -> show_session_card m
   | "agents", _ ->
     (match words with
      | ("steer" | "follow-up") :: _ -> agents_message m rest
      | [ "cancel"; arg ] -> with_item m arg ~f:stop_command
      | [ "cancel" ] ->
        error m "Usage: /agents cancel <n|id> (/agents lists them)"
-     | _ -> open_agents m (Some rest))
-  | "jobs", "" -> open_agents m None
+     | _ ->
+       with_item m rest ~f:(fun m -> function
+         | Agent id -> open_subagent_chat m id
+         | Job id ->
+           error
+             m
+             (sprintf
+                "%s is a background job: the session card lists it (/jobs), \
+                 /jobs kill %s stops it."
+                id
+                id)))
+  | "jobs", "" -> show_session_card m
   | "jobs", _ ->
     (match words with
      | [ "kill"; arg ] -> with_job m arg ~f:stop_command
-     | [ arg ] when not (String.equal arg "kill") -> with_job m arg ~f:select
-     | _ -> error m "Usage: /jobs [id | kill <id>] (/jobs lists them)")
+     | _ -> error m "Usage: /jobs [kill <id>] (/jobs shows them)")
   | "login", "" ->
     loading m "Log in" [ rpc "auth_status" [] ~tag:(Auth_status Login_picker) ]
   | "login", _ ->
@@ -8241,10 +8160,9 @@ module Rejoin = struct
         ; questions = []
         ; queue = Queued.empty
         ; agent_queues = []
-        ; recipient = Main
-        ; dialog = Option.filter m.dialog ~f:(Fn.non Dialog.per_session)
+              ; dialog = Option.filter m.dialog ~f:(Fn.non Dialog.per_session)
         ; btw = None
-        ; agents = { Agents.empty with open_ = m.agents.open_ }
+        ; agents = Agents.empty
         ; subagent_chat = None
         ; pending = { m.pending with prompts = []; sending = 0 }
         }
@@ -8888,7 +8806,7 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
   (* Subagents from before the backend restarted are gone: the report stays. *)
   | ( ( Ignore | Paths _
       | Auth_status Refresh
-      | Subagent _ | Subagents | Jobs | Job_output _ | Config | Prompt_paths _
+      | Subagent _ | Subagents | Jobs | Config | Prompt_paths _
       | Users Probe )
     , Error _ ) -> m, []
   | Btw id, Error e -> update_btw m id ~f:(fun b -> Btw.fail b e), []
@@ -9555,22 +9473,7 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
       with_agents m ~f:(fun a -> Agents.set_agents a agents), [])
   | Jobs, Ok json ->
     decode m json (decode_list Job_info.of_json) ~f:(fun jobs ->
-      let before = m.agents in
-      let m =
-        with_agents m ~f:(fun a -> Agents.set_jobs a ~now:(now_of m) jobs)
-      in
-      (* The shown job's last lines, once it has exited. *)
-      ( m
-      , match m.agents.selected with
-        | Some (Job id as job)
-          when Agents.running before job && not (Agents.running m.agents job) ->
-          [ job_output id ]
-        | _ -> [] ))
-  | Job_output id, Ok json ->
-    (match field json "text", m.agents.selected with
-     | Some (`String text), Some (Job shown) when String.equal id shown ->
-       with_agents m ~f:(fun a -> { a with output = Some (id, text) }), []
-     | _ -> m, [])
+      with_agents m ~f:(fun a -> Agents.set_jobs a ~now:(now_of m) jobs), [])
   | Sessions, Ok json ->
     if m.sessions_changes > m.sessions_asked
     then
@@ -10437,8 +10340,8 @@ let send_draft (m : Model.t) ~follow_up =
       m
       "Not connected to the backend: your message stays here until it is back \
        (/retry-backend-connection tries now)."
-  | _ when not (Recipient.equal m.recipient Recipient.Main) ->
-    (match m.recipient with
+  | _ when not (Recipient.equal (Model.recipient m) Recipient.Main) ->
+    (match Model.recipient m with
      | Main -> m, []
      | Agent agent when attached || not (List.is_empty m.images) ->
        error
@@ -10448,6 +10351,8 @@ let send_draft (m : Model.t) ~follow_up =
              them to the main agent."
             agent)
      | Agent _ when String.is_empty text && not pasted -> m, []
+     | Agent agent when Option.is_some (Recipient.refusal m.agents agent) ->
+       error m (Option.value_exn (Recipient.refusal m.agents agent))
      | Agent agent ->
        (* A subagent takes text only: the pasted texts go in it. *)
        let full = Prigh_ui.Pasted_text.inline ~text m.pasted in
@@ -11984,20 +11889,7 @@ let update_connected (m : Model.t) (action : Action.t) =
     ( { m with about_you = About_you.revert m.about_you }
     , [ Command.Focus "about-you-name" ] )
   | Open_rename -> open_rename m
-  | Open_subagents arg -> open_agents m arg
-  | Toggle_subagents ->
-    if m.agents.open_ then close_agents m else open_agents m None
-  | Select_item item -> select m item
-  | Agents_back -> agents_back m
-  | Focus_agent n ->
-    (match List.nth (Agents.listed m.agents) (n - 1) with
-     | Some (item, _) -> select m item
-     | None -> m, [])
-  | Cycle_agent delta ->
-    (match Agents.cycle m.agents delta with
-     | Some item -> select m item
-     | None -> m, [])
-  | Show_in_chat id -> show_in_chat m id
+  | Open_subagent_n n -> open_subagent_n m n
   | Clock now -> clock m now
   | Picker_query query ->
     (match m.dialog with
@@ -12107,13 +11999,12 @@ let update_connected (m : Model.t) (action : Action.t) =
   | Kill_job id -> stop m (Job id)
   | Dequeue ->
     ( m
-    , [ (match m.recipient with
+    , [ (match Model.recipient m with
          | Main -> rpc "dequeue" [] ~tag:Dequeued
          | Agent agent ->
            rpc "dequeue_agent" [ "agent_id", str agent ] ~tag:Dequeued)
       ] )
   | Edit_queued (recipient, q) -> unqueue m recipient q ~tag:Dequeued
-  | Set_recipient recipient -> set_recipient m recipient
   | Remove_reminder name ->
     remind_action
       m
@@ -12194,6 +12085,7 @@ let update_connected (m : Model.t) (action : Action.t) =
     { m with session_card = Session_card.apply m.session_card action }, []
   | Open_subagent_chat id -> open_subagent_chat m id
   | Close_subagent_chat -> close_subagent_chat m
+  | Subagent_back -> subagent_back m
   | Answer_confirm { call_id; agent_id; answer = Deny_with_reason } ->
     (match m.confirms with
      | first :: _
@@ -12508,7 +12400,6 @@ and update_unguarded (m : Model.t) (action : Action.t) =
     else m'
   in
   let m', cmds = follow_worktrees m (m', cmds) in
-  let m', cmds = follow_recipient (m', cmds) in
   let m', cmds = follow_ui_images m (m', cmds) in
   let m', cmds = settle m' cmds in
   let m', cmds = note_sessions_asked (m', cmds) in

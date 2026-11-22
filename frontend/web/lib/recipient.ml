@@ -17,15 +17,9 @@ let refusal (agents : Agents.t) id =
     Some
       (sprintf
          "%s runs inside %s (a subagent's own subagent) and takes no messages: \
-          steer %s instead."
+          write to %s instead."
          id
          parent
          parent)
-  | Some { status = Agents.Status.(Complete | Failed); _ } ->
-    Some
-      (sprintf
-         "%s has finished and takes no more messages: tell the main agent \
-          instead."
-         id)
   | Some _ -> None
 ;;

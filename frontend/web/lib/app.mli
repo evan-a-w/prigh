@@ -166,7 +166,6 @@ module Reply_tag : sig
     (** [get_subagent] for this [subagent] call or agent id *)
     | Subagents (** [list_subagents], for the agents panel *)
     | Jobs (** [list_jobs] *)
-    | Job_output of string (** the job's id *)
     | Job_started (** [!&command]: the job's id *)
     | Auth_status of Auth_purpose.t
     | Paths of string (** the completion prefix listed *)
@@ -713,15 +712,9 @@ module Action : sig
         ; server : string
         }
     | Open_rename
-    | Open_subagents of string option
-    (** the agents panel: its list, or the agent or job with this number
-        (in the list), id or call id *)
-    | Toggle_subagents
-    | Select_item of Agents.Item.t (** shown in full in the panel *)
-    | Agents_back (** from an agent to the list; from the list, closed *)
-    | Focus_agent of int (** the [n]th listed, from 1 *)
-    | Cycle_agent of int (** the next (1) or previous (-1) listed *)
-    | Show_in_chat of string (** a subagent's card in the main chat *)
+    | Open_subagent_n of int
+    (** Alt+1…9: the chat of the [n]th subagent (from 1) of the chat on
+        show *)
     | Clock of Time_ns.t
     (** every second while [Model.ticking]: elapsed times, polling jobs *)
     | Picker_query of string
@@ -742,8 +735,6 @@ module Action : sig
         editor *)
     | Edit_queued of Recipient.t * Queued.Message.t (** back into the editor *)
     | Remove_queued of Recipient.t * Queued.Message.t
-    | Set_recipient of Recipient.t
-    (** the composer sends to the main agent or steers a running subagent *)
     | Remove_reminder of string (** by name, from the [/remind] picker *)
     | New_session_in of string
     (** a new session working in this directory (a worktree) *)
@@ -783,8 +774,12 @@ module Action : sig
     (** the session card beside the chat; on a phone, its sheet *)
     | Session_card of Session_card.Action.t
     | Open_subagent_chat of string
-    (** a subagent's transcript (by agent id) in the chat's place *)
-    | Close_subagent_chat (** back to the session's own *)
+    (** a subagent's chat (by agent id) in the session's place: its
+        transcript, live, and the composer writes to it *)
+    | Close_subagent_chat (** back to the session's own chat *)
+    | Subagent_back
+    (** from a subagent's chat to its parent's (the session's for a
+        top-level one) *)
     | Answer_confirm of
         { call_id : string
         ; agent_id : string option
@@ -998,8 +993,6 @@ module Model : sig
     ; queue : Queued.t
     ; agent_queues : Agent_queue.t list
       (** the background subagents' queues, those not empty *)
-    ; recipient : Recipient.t
-      (** who the composer sends to: a subagent while steering it *)
     ; confirms : Pending.Confirm.t list
     ; confirm_reason : string option
       (** the oldest confirmation's reason, while typing it ([r]) *)
@@ -1154,9 +1147,13 @@ module Model : sig
   (** The turn or background subagents or jobs run: the session is busy. *)
   val active : t -> bool
 
-  (** The agents panel is open with something running: the page sends
-      [Clock] every second. *)
+  (** A subagent or job is running, or a transcript is being fetched: the
+      page sends [Clock] every second. *)
   val ticking : t -> bool
+
+  (** Who the composer writes to: the subagent whose chat is on show, else
+      the main agent. *)
+  val recipient : t -> Recipient.t
 
   (** How messages' times read: in [utc_offset], relative to [now]'s day. *)
   val message_time : t -> Message_time.t
