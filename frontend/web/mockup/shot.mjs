@@ -47,7 +47,7 @@ for (const spec of specs) {
   const light = flags.includes("light");
   const context = await browser.newContext({
     viewport: { width, height },
-    deviceScaleFactor: 2,
+    deviceScaleFactor: 1,
     isMobile: mobile,
     hasTouch: mobile,
   });

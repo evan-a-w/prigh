@@ -311,8 +311,20 @@ let component
             ])
       ]
     | _ when use_card ->
-      [ main_and_bottom
-      ; (if right_open then div "shrink-0 self-start pt-1 pr-3" [ card () ] else Node.none)
+      (* The card sits in the chat's right margin; [--push] shifts the chat left
+         only by what the margin lacks: the column is 760px with 24px of padding,
+         the card 208px with 12px either side of it. Below an 820px main area it
+         overlaps instead, rather than squeezing the chat. *)
+      [ div
+          "@container relative flex min-w-0 flex-1"
+          [ div
+              (if right_open
+               then "flex min-w-0 flex-1 [--push:max(0px,calc(1176px-100cqw))] \
+                     @max-[820px]:[--push:0px]"
+               else "flex min-w-0 flex-1")
+              [ main_and_bottom ]
+          ; (if right_open then div "absolute top-1 right-3 z-10" [ card () ] else Node.none)
+          ]
       ]
     | Some r, _ when right_open && mobile ->
       [ main_and_bottom

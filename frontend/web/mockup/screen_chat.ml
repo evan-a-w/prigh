@@ -214,7 +214,7 @@ let component
     [ banner
     ; (* column-reverse keeps the view at the bottom, as a chat opens. *)
       div
-        "flex min-h-0 flex-1 flex-col-reverse overflow-y-auto"
+        "flex min-h-0 flex-1 flex-col-reverse overflow-y-auto pr-[var(--push,0px)]"
         [ div
             "mx-auto flex w-full max-w-[760px] flex-col gap-6 px-6 pt-6 pb-10 text-sm"
             [ user_message
@@ -245,6 +245,6 @@ let component
             ]
         ]
     ; above_composer
-    ; composer tip
+    ; div "pr-[var(--push,0px)]" [ composer tip ]
     ]
 ;;

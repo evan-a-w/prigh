@@ -14,7 +14,7 @@ let row ?(class_ = "") ?right ?on_click icon label =
       ([ Attr.class_
            (Cn.cn
               [ "group/row flex h-7 w-full items-center gap-2 rounded-md px-2 text-left \
-                 text-[13px] text-foreground/90 hover:bg-accent [&_svg]:size-3.5 \
+                 text-[12.5px] text-foreground/90 hover:bg-accent [&_svg]:size-3.5 \
                  [&_svg]:shrink-0 [&_svg]:text-muted-foreground"
               ; class_
               ])
@@ -62,7 +62,7 @@ let subagent (a : Fake.Subagent.t) =
       [ Attr.href "#"
       ; Attr.title a.task
       ; Attr.class_
-          "group/sub flex h-7 items-center gap-1.5 rounded-md px-2 text-[12.5px] \
+          "group/sub flex h-7 items-center gap-1.5 rounded-md px-2 text-[12px] \
            text-foreground/85 hover:bg-accent hover:text-foreground"
       ]
     [ span "min-w-0 truncate" [ t a.name ]
@@ -91,7 +91,7 @@ let view ?(class_ = "") ~subagents_open ~worktrees_open ~toggle_subagents ~toggl
     ~attrs:
       [ Attr.class_
           (Cn.cn
-             [ "flex w-[260px] shrink-0 flex-col rounded-xl border bg-card p-1.5 \
+             [ "flex w-[208px] shrink-0 flex-col rounded-xl border bg-card p-1.5 \
                 text-card-foreground"
              ; class_
              ])
