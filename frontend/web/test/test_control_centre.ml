@@ -66,7 +66,7 @@ let%expect_test
     /files
     browse, preview, upload and download files where the tools run (Ctrl+Shift+F)
     /edit
-    the editor mode: edit the session's files (PATH, or the last one) beside the chat, and ask about a selection (Alt+E; Esc goes back)
+    the editor mode: edit the session's files (PATH, or the last one) beside the chat, and ask about a selection (Alt+E toggles it)
     /help
     show commands and keys, or a command's usage
     ↑↓ move ↵ open ⌫ back esc close
@@ -605,7 +605,7 @@ let%expect_test "switching sessions resets it" =
     /files
     browse, preview, upload and download files where the tools run (Ctrl+Shift+F)
     /edit
-    the editor mode: edit the session's files (PATH, or the last one) beside the chat, and ask about a selection (Alt+E; Esc goes back)
+    the editor mode: edit the session's files (PATH, or the last one) beside the chat, and ask about a selection (Alt+E toggles it)
     /help
     show commands and keys, or a command's usage
     ↑↓ move ↵ open ⌫ back esc close

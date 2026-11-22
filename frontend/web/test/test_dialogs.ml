@@ -298,7 +298,7 @@ let%expect_test "help lists every key and command" =
     /abort stop the current run
     /terminal [dir] open a shell where the tools run, in the session's directory (Ctrl+`), or a shell of its own in DIR (a worktree, say)
     /files [path] browse, preview, upload and download files where the tools run (Ctrl+Shift+F)
-    /edit [path] the editor mode: edit the session's files (PATH, or the last one) beside the chat, and ask about a selection (Alt+E; Esc goes back)
+    /edit [path] the editor mode: edit the session's files (PATH, or the last one) beside the chat, and ask about a selection (Alt+E toggles it)
     /agents [n|id|cancel <n|id>|steer <n|id> <text>|follow-up <n|id> <text>] follow subagents and background jobs in the agents panel, cancel one, or send a running subagent a message (steer: at its next step; follow-up: when it ends its turn)
     /jobs [id|kill <id>] background jobs in the agents panel: list them, show or kill one
     /login [provider|github [HOST]|forgejo HOST|HOST] [token] log in to a model provider (or /login custom), or sign in to GitHub or a Forgejo or Gitea host (token: paste one instead of OAuth)
