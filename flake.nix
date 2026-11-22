@@ -122,6 +122,8 @@
           nativeBuildInputs = (oa.nativeBuildInputs or [ ]) ++ [
             pkgs.zopfli
             pkgs.brotli
+            # prigh-web's components (loon, shadcn's Tailwind classes)
+            pkgs.tailwindcss_4
           ];
           postInstall = (oa.postInstall or "") + ''
             for f in "$out"/share/prigh_frontend/web/*.{js,css,html,svg,map,txt,webmanifest}; do

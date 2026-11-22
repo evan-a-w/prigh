@@ -1,0 +1,101 @@
+/* prigh's theme over shadcn's variables: T3 Code-like navy slate. */
+
+@theme inline {
+  --font-sans: "Geist", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono", "JetBrains Mono", ui-monospace, monospace;
+}
+
+:root {
+  --radius: 0.625rem;
+  --background: #f7f9fb;
+  --foreground: #18212b;
+  --card: #ffffff;
+  --card-foreground: #18212b;
+  --popover: #ffffff;
+  --popover-foreground: #18212b;
+  --primary: #2b3f53;
+  --primary-foreground: #f2f5f8;
+  --secondary: #e9eef3;
+  --secondary-foreground: #18212b;
+  --muted: #edf1f5;
+  --muted-foreground: #66727f;
+  --accent: #e3eaf1;
+  --accent-foreground: #18212b;
+  --border: #dde4eb;
+  --input: #d5dde5;
+  --ring: #8aa2b9;
+  --sidebar: #eef2f6;
+  --sidebar-foreground: #18212b;
+  --sidebar-primary: #2b3f53;
+  --sidebar-primary-foreground: #f2f5f8;
+  --sidebar-accent: #dfe7ef;
+  --sidebar-accent-foreground: #18212b;
+  --sidebar-border: #dde4eb;
+  --sidebar-ring: #8aa2b9;
+  --bubble: #dfe8f1;
+  --bubble-foreground: #18212b;
+}
+
+.dark {
+  --background: #131a22;
+  --foreground: #d7dee5;
+  --card: #1b242e;
+  --card-foreground: #d7dee5;
+  --popover: #1b242e;
+  --popover-foreground: #d7dee5;
+  --primary: #a9bccf;
+  --primary-foreground: #131a22;
+  --secondary: #222c37;
+  --secondary-foreground: #d7dee5;
+  --muted: #1e2731;
+  --muted-foreground: #8794a1;
+  --accent: #253242;
+  --accent-foreground: #e4eaf0;
+  --destructive: #e5675c;
+  --border: #26313d;
+  --input: #2c3846;
+  --ring: #4f6377;
+  --sidebar: #18202a;
+  --sidebar-foreground: #c9d2db;
+  --sidebar-primary: #a9bccf;
+  --sidebar-primary-foreground: #131a22;
+  --sidebar-accent: #253242;
+  --sidebar-accent-foreground: #e4eaf0;
+  --sidebar-border: #222c37;
+  --sidebar-ring: #4f6377;
+  --bubble: #2b3f53;
+  --bubble-foreground: #e4eaf0;
+}
+
+@theme inline {
+  --color-bubble: var(--bubble);
+  --color-bubble-foreground: var(--bubble-foreground);
+}
+
+html {
+  color-scheme: light;
+}
+html.dark {
+  color-scheme: dark;
+}
+
+/* "Thinking…": a light sweeping over muted text. */
+.thinking-shimmer {
+  background: linear-gradient(
+      90deg,
+      var(--muted-foreground) 0%,
+      var(--muted-foreground) 40%,
+      var(--foreground) 50%,
+      var(--muted-foreground) 60%,
+      var(--muted-foreground) 100%
+    )
+    0 0 / 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: thinking-shimmer 2.2s linear infinite;
+}
+@keyframes thinking-shimmer {
+  from { background-position: 100% 0; }
+  to { background-position: 0% 0; }
+}

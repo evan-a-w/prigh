@@ -1,0 +1,44 @@
+; Mockups of prigh-web's new UI on loon's components (../loon_ui): fake
+; data, no backend, one screen per URL hash. `dune build ./web/mockup`,
+; then serve _build/default/web/mockup/ (index.html).
+
+(executable
+ (name main)
+ (modes js)
+ (preprocess
+  (pps ppx_jane js_of_ocaml-ppx bonsai.ppx_bonsai))
+ (libraries core bonsai bonsai_web virtual_dom js_of_ocaml loon_ui))
+
+(rule
+ (target mockup.input.css)
+ (deps
+  ../loon_ui/loon.css
+  mockup.css)
+ (action
+  (with-stdout-to
+   mockup.input.css
+   (progn
+    (cat ../loon_ui/loon.css)
+    (echo "\n@source \"../loon_ui/*.ml\";\n@source \"./*.ml\";\n")
+    (cat mockup.css)))))
+
+(rule
+ (target app.css)
+ (deps
+  mockup.input.css
+  (glob_files ../loon_ui/*.ml)
+  (glob_files *.ml))
+ (action
+  (run
+   tailwindcss
+   --silent
+   --optimize
+   --input
+   mockup.input.css
+   --output
+   app.css)))
+
+(rule
+ (alias default)
+ (deps index.html app.css main.bc.js)
+ (action (progn)))
