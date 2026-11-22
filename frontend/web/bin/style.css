@@ -2132,7 +2132,7 @@ kbd {
    (and past its top when the list is short); the body clips its own. */
 .chip-popover.model-menu {
   width: 600px;
-  max-height: min(30rem, var(--popover-room, 70vh));
+  max-height: min(420px, var(--popover-room, 70vh));
   overflow: visible;
 }
 .model-menu-body {
