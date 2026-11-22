@@ -392,9 +392,12 @@ let%expect_test "Go to file: fuzzy over every file, listed once" =
     1 file of 7
     (src/ c o mp act. mli)
     |}];
-  H.key h "Enter" ~target:Field;
-  [%expect
-    {| (browser default) |}]
+  H.keydown h ~selector:"#code-filter" "Enter";
+  [%expect {|
+    (Code (Open /home/me/proj/src/compact.mli))
+    (Rpc (method_ fs_preview) (params ((path /home/me/proj/src/compact.mli)))
+     (tag (Code (Opened /home/me/proj/src/compact.mli))))
+    |}]
 ;;
 
 let%expect_test "Go to file: a big repository, every match, a window of rows" =
@@ -424,7 +427,7 @@ let%expect_test "Go to file: a big repository, every match, a window of rows" =
   H.text h ~selector:".code-section-title";
   [%expect.unreachable];
   (* Scrolled far down: the rows there, not the first ones. *)
-  H.quiet h (fun () -> H.act h (Code (List_scrolled 50_000)));
+  H.quiet h (fun () -> H.act h (Code (List_scrolled 2_000)));
   rows ();
   H.text h ~selector:".code-matches .code-row:first-child";
   [%expect.unreachable]
@@ -608,8 +611,12 @@ let%expect_test "/edit completes any file, fuzzily, from the same list" =
   [%expect
     {| (Rpc (method_ list_files) (params ()) (tag (Code (Files /home/me/proj)))) |}];
   H.reply h "list_files" files;
-  H.text h ~selector:".completion";
-  [%expect {| |}];
+  H.text h ~selector:".popup-items";
+  [%expect {|
+    src/compact.ml
+    src/compact.mli
+    test/test_compact.ml
+    |}];
   H.key h "Enter";
   [%expect {|
     (Complete_accept (run true))

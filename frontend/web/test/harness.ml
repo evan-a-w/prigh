@@ -643,6 +643,15 @@ let mouse_event ?nth t ~selector ~event_name fields =
         (fields @ [ "preventDefault", noop; "stopPropagation", noop ]))
 ;;
 
+let keydown ?nth t ~selector key =
+  mouse_event
+    ?nth
+    t
+    ~selector
+    ~event_name:"onkeydown"
+    [ "key", Js_of_ocaml.Js.Unsafe.inject (Js_of_ocaml.Js.string key) ]
+;;
+
 let modified_click ?nth ?(ctrl = false) ?(meta = false) t ~selector =
   let bool b = Js_of_ocaml.Js.Unsafe.inject (Js_of_ocaml.Js.bool b) in
   mouse_event

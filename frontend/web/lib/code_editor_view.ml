@@ -337,7 +337,7 @@ let found_label (t : E.t) =
   let of_ = Array.length t.index.files in
   sprintf
     "%s of %s%s"
-    (if n = 1 then "1 file" else sprintf "%d files" n)
+    (if n = 1 then "1 file" else Int.to_string_hum ~delimiter:',' n ^ " files")
     (Int.to_string_hum ~delimiter:',' of_)
     (if t.index.truncated then "+ (the host stopped listing)" else "")
 ;;
