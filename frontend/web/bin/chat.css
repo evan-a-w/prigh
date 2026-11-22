@@ -39,7 +39,7 @@
 .empty {
   padding-top: 18vh;
   gap: 6px;
-  color: var(--muted);
+  color: var(--muted-text);
 }
 .empty h2 {
   margin: 0;
@@ -86,7 +86,7 @@
   align-items: baseline;
   gap: 8px;
   min-width: 0;
-  color: var(--muted);
+  color: var(--muted-text);
   font-size: 13px;
 }
 summary > .label { flex-shrink: 0; font-weight: 500; }
@@ -165,7 +165,7 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
 
 /* A subagent's task is a prompt too, but not the user's. */
 .transcript .msg.user, .agents-panel .msg.user {
-  border-left-color: var(--muted);
+  border-left-color: var(--muted-text);
   background: var(--slate);
 }
 .transcript .msg.user .bubble, .agents-panel .msg.user .bubble { font-weight: 400; font-size: 14px; }
@@ -191,7 +191,7 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
   display: flex;
   align-items: center;
   gap: 12px;
-  color: var(--muted);
+  color: var(--muted-text);
   font-size: 12.5px;
   font-weight: 600;
 }
@@ -243,7 +243,7 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  border: 1px solid var(--muted);
+  border: 1px solid var(--muted-text);
   box-sizing: border-box;
   background: var(--graphite);
   box-shadow: 0 0 0 4px var(--graphite);
@@ -268,7 +268,7 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
   color: var(--faint);
   background: var(--graphite);
 }
-.delivery-head .kind { font-size: 13px; flex-shrink: 0; color: var(--muted); white-space: nowrap; }
+.delivery-head .kind { font-size: 13px; flex-shrink: 0; color: var(--muted-text); white-space: nowrap; }
 .delivery-head .task {
   color: var(--fg);
   flex: 1;
@@ -295,7 +295,7 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
   margin-top: -2px;
 }
 /* Waiting for the model's first words: the lamp on the spine. */
-.pending { position: relative; display: flex; align-items: center; min-height: 26px; color: var(--muted); font-size: 13px; }
+.pending { position: relative; display: flex; align-items: center; min-height: 26px; color: var(--muted-text); font-size: 13px; }
 /* A retry: what failed, under the label. */
 .pending:has(> .detail) { flex-wrap: wrap; column-gap: 8px; }
 .pending > .detail {
@@ -338,7 +338,7 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-.stop.error .hint { color: var(--muted); font-size: 12.5px; }
+.stop.error .hint { color: var(--muted-text); font-size: 12.5px; }
 .stop.error .stop-action {
   align-self: flex-start;
   margin-top: 4px;
@@ -356,7 +356,7 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
 .stop.error .stop-action:hover { background: var(--brick-wash); }
 .stop.error .stop-action:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; }
 @media (pointer: coarse) { .stop.error .stop-action { min-height: 44px; } }
-.stop.aborted, .stop.length { display: flex; align-items: flex-start; gap: 6px; color: var(--muted); font-size: 12.5px; line-height: 18px; }
+.stop.aborted, .stop.length { display: flex; align-items: flex-start; gap: 6px; color: var(--muted-text); font-size: 12.5px; line-height: 18px; }
 .stop.aborted > .mark, .stop.length > .mark { --mark-line: 18px; }
 
 /* The harness's notes (tools moved, another directory, plan mode, a
@@ -366,7 +366,7 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
 .note {
   position: relative;
   padding-left: var(--gutter);
-  color: var(--muted);
+  color: var(--muted-text);
   font-size: 12.5px;
   min-width: 0;
 }
@@ -422,7 +422,7 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
 .msg.user .attachments { display: flex; flex-wrap: wrap; gap: 6px; }
 .msg.user .attachment {
   font: 12px var(--mono);
-  color: var(--muted);
+  color: var(--muted-text);
   background: var(--well);
   border-radius: var(--r-chip);
   padding: 1px 6px;
@@ -438,7 +438,7 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
   align-self: center;
 }
 .msg.compaction > summary > .preview { display: none; }
-.msg.compaction > .markdown { margin-top: 10px; color: var(--muted); font-size: 14px; }
+.msg.compaction > .markdown { margin-top: 10px; color: var(--muted-text); font-size: 14px; }
 
 /* Markdown */
 
@@ -453,7 +453,7 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
 .markdown h1 { font-size: 22px; font-weight: 700; }
 .markdown h2 { font-size: 18px; }
 .markdown h3 { font-size: 15px; }
-.markdown :is(h4, h5, h6) { font-size: 15px; font-weight: 600; color: var(--muted); }
+.markdown :is(h4, h5, h6) { font-size: 15px; font-weight: 600; color: var(--muted-text); }
 .markdown :is(ul, ol) { margin: 0 0 10px; padding-left: 1.5em; }
 .markdown li { margin: 3px 0; }
 .markdown li::marker { color: var(--faint); }
@@ -470,7 +470,7 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
   margin: 0 0 10px;
   padding: 2px 0 2px 14px;
   border-left: 2px solid var(--rule-2);
-  color: var(--muted);
+  color: var(--muted-text);
 }
 .markdown hr { border: 0; border-top: 1px solid var(--rule); margin: 18px 0; }
 .markdown a {
@@ -511,7 +511,7 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
   }
 }
 .markdown strong { font-weight: 650; }
-.markdown del { color: var(--muted); }
+.markdown del { color: var(--muted-text); }
 .markdown :not(pre) > code {
   font-family: var(--mono);
   font-size: 0.87em;
@@ -587,12 +587,12 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
   color: var(--faint);
 }
 .code-lang { font-family: var(--mono); }
-.code-title { color: var(--muted); font-weight: 600; }
+.code-title { color: var(--muted-text); font-weight: 600; }
 .code-title + .code-lang { margin: 0 auto 0 8px; }
 .copy {
   border: 0;
   background: transparent;
-  color: var(--muted);
+  color: var(--muted-text);
   font-size: 12px;
   padding: 2px 8px;
   border-radius: var(--r-chip);
@@ -614,7 +614,7 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
 
 .thinking-text {
   margin-top: 6px;
-  color: var(--muted);
+  color: var(--muted-text);
   font-variation-settings: "CASL" 1;
   font-style: oblique 6deg;
 }
@@ -626,7 +626,7 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
   display: flex;
   align-items: center;
   gap: 8px;
-  color: var(--muted);
+  color: var(--muted-text);
   font-size: 13px;
   font-variation-settings: "CASL" 1;
 }
@@ -665,7 +665,7 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
 /* on_host's: the machine the call ran on */
 .tool-head .host {
   font-size: 12px;
-  color: var(--muted);
+  color: var(--muted-text);
   flex-shrink: 1;
   min-width: 0;
   max-width: 40%;
@@ -676,7 +676,7 @@ summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; b
 .tool-head .arg {
   font-family: var(--mono);
   font-size: 13px;
-  color: var(--muted);
+  color: var(--muted-text);
   flex: 1;
   min-width: 0;
   white-space: nowrap;
@@ -735,14 +735,14 @@ ol.results .url { margin-left: 8px; font: 11.5px var(--mono); color: var(--faint
 .tool.error .tool-head .name { color: var(--brick); }
 .tool .chip {
   font: 11.5px var(--mono);
-  color: var(--muted);
+  color: var(--muted-text);
   flex-shrink: 0;
   white-space: nowrap;
   line-height: 18px;
 }
 .chip.bad, .chip.del { color: var(--brick); }
 .chip.ok, .chip.add { color: var(--sage); }
-.chip.job { color: var(--muted); }
+.chip.job { color: var(--muted-text); }
 .chip.waiting { color: var(--sodium); }
 .chip.judged { color: var(--sage); }
 
@@ -795,7 +795,7 @@ button.tool-head:is(:hover, :focus-visible) > .chev, .tool.open > button.tool-he
   border: 0;
   border-radius: var(--r-control, 6px);
   background: none;
-  color: var(--muted);
+  color: var(--muted-text);
   font: inherit;
   text-align: left;
   cursor: pointer;
@@ -817,7 +817,7 @@ button.tool-head:is(:hover, :focus-visible) > .chev, .tool.open > button.tool-he
   transition: transform 0.15s;
 }
 .run.open > .run-head > .chev { transform: translateY(-2px) rotate(45deg); }
-.run-head:is(:hover, :focus-visible) > .chev { border-color: var(--muted); }
+.run-head:is(:hover, :focus-visible) > .chev { border-color: var(--muted-text); }
 /* Its outcome on the spine, like a call's. */
 .msg > .run > .run-head > .mark {
   position: absolute;
@@ -851,21 +851,21 @@ button.tool-head:is(:hover, :focus-visible) > .chev, .tool.open > button.tool-he
 .tool-thinking > .tool-head .name { font-family: var(--sans); font-weight: 500; font-variation-settings: "CASL" 1; }
 .tool-thinking > .tool-head .arg { font-family: var(--sans); font-style: oblique 6deg; font-variation-settings: "CASL" 1; }
 @media (prefers-reduced-motion: reduce) { .run-head > .chev { transition: none; } }
-.tool-body > .tool-allowed { display: block; font-size: 12.5px; color: var(--muted); overflow-wrap: anywhere; }
-.tool-body > .url-link { font: 12px var(--mono); color: var(--muted); overflow-wrap: anywhere; text-underline-offset: 3px; text-decoration-color: var(--sodium-line); }
+.tool-body > .tool-allowed { display: block; font-size: 12.5px; color: var(--muted-text); overflow-wrap: anywhere; }
+.tool-body > .url-link { font: 12px var(--mono); color: var(--muted-text); overflow-wrap: anywhere; text-underline-offset: 3px; text-decoration-color: var(--sodium-line); }
 .tool-head .arg.step { font-family: var(--sans); font-size: 13.5px; color: var(--fg); }
 /* A subagent: its lamp or outcome, its name and the way in. */
 .tool-subagent > .tool-head .arg.task { font-weight: 500; }
 /* "Subagent:" before the name: it stays, the name gives way. */
-.tool-subagent > .tool-head .kind { font-size: 13px; color: var(--muted); flex-shrink: 0; white-space: nowrap; }
+.tool-subagent > .tool-head .kind { font-size: 13px; color: var(--muted-text); flex-shrink: 0; white-space: nowrap; }
 
 /* update_plan's checklist */
 .tool-body .plan { padding: 4px 0; }
-.plan-explanation { margin: 0 0 4px; color: var(--muted); font-size: 12.5px; }
+.plan-explanation { margin: 0 0 4px; color: var(--muted-text); font-size: 12.5px; }
 .plan-steps { list-style: none; margin: 0; padding: 0; font-size: 13px; }
 .plan-step { display: flex; align-items: flex-start; gap: 6px; line-height: 20px; }
 .plan-step > .mark { --mark-line: 20px; }
-.plan-step.step-done { color: var(--muted); }
+.plan-step.step-done { color: var(--muted-text); }
 .plan-step.step-todo .mark { color: var(--faint); }
 .tool-body .questions { margin: 2px 0; padding-left: 18px; font-size: 13px; }
 
@@ -884,7 +884,7 @@ button.tool-head:is(:hover, :focus-visible) > .chev, .tool.open > button.tool-he
   overflow-wrap: anywhere;
   color: var(--fg);
 }
-.tool-body .caption { color: var(--muted); font-size: 12.5px; }
+.tool-body .caption { color: var(--muted-text); font-size: 12.5px; }
 .tool-body .task-text { white-space: pre-wrap; margin-top: 4px; font-size: 13.5px; }
 .tool-body .report > .markdown {
   margin-top: 6px;
@@ -895,7 +895,7 @@ button.tool-head:is(:hover, :focus-visible) > .chev, .tool.open > button.tool-he
 .activity {
   display: flex;
   gap: 6px;
-  color: var(--muted);
+  color: var(--muted-text);
   font-size: 12.5px;
   min-width: 0;
 }
@@ -1017,7 +1017,7 @@ table.diff tr.hunk td {
   user-select: none;
 }
 table.diff tr.hunk .hunk-range { color: var(--faint); }
-table.diff tr.hunk .hunk-context { color: var(--muted); margin-left: 0.5ch; }
+table.diff tr.hunk .hunk-context { color: var(--muted-text); margin-left: 0.5ch; }
 .diff-view .fold { margin-top: 2px; }
 .diff-view .fold[aria-expanded="true"] { border-radius: 0; }
 
@@ -1216,7 +1216,7 @@ dialog.viewer::backdrop { background: transparent; }
   display: flex;
   align-items: center;
   gap: 8px;
-  color: var(--muted);
+  color: var(--muted-text);
   font-size: 13px;
 }
 .skeleton { display: flex; flex-direction: column; gap: 12px; }
@@ -1278,7 +1278,7 @@ dialog.viewer::backdrop { background: transparent; }
   display: flex;
   align-items: center;
   gap: 8px;
-  color: var(--muted);
+  color: var(--muted-text);
   font: 12px/1.5 var(--sans);
 }
 /* A phone's jump button floats over the transcript's top right corner. */
@@ -1306,7 +1306,7 @@ dialog.viewer::backdrop { background: transparent; }
 .delivery-head[data-agent]:hover { background: var(--slate-2); }
 .delivery-head .open-agent {
   margin-left: 0; padding: 0 4px; border: 0; border-radius: var(--r-chip);
-  background: none; color: var(--muted); font: inherit; font-size: 12.5px;
+  background: none; color: var(--muted-text); font: inherit; font-size: 12.5px;
   white-space: nowrap; cursor: pointer;
 }
 .delivery-head[data-agent]:hover .open-agent { color: var(--chalk); }
@@ -1372,7 +1372,7 @@ dialog.viewer::backdrop { background: transparent; }
 .pasted-detail { color: var(--faint); font-size: 11.5px; white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 /* Its own line under the name when fewer than 14 characters would fit
    beside it (a phone). */
-.pasted-preview { color: var(--muted); flex: 1 1 14ch; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pasted-preview { color: var(--muted-text); flex: 1 1 14ch; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pasted-body { position: relative; border-top: 1px solid var(--rule); }
 .pasted-body > .copy { position: absolute; top: 4px; right: 6px; background: var(--well); }
 .pasted-text { margin: 0; padding: 10px 12px; max-height: 50vh; overflow: auto; font: 12px/1.5 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }

@@ -55,7 +55,7 @@
   border: 1px solid color-mix(in srgb, var(--rule-2) 70%, transparent);
   box-shadow: 0 8px 22px -14px var(--edge-shadow);
 }
-.chrome-button.round { width: 34px; height: 34px; border-radius: 50%; color: var(--muted); }
+.chrome-button.round { width: 34px; height: 34px; border-radius: 50%; color: var(--muted-text); }
 .chrome-button.round:hover, .chrome-button.round[aria-expanded="true"] { color: var(--chalk); background: var(--slate-2); }
 .chrome-button.round .icon { width: 17px; height: 17px; }
 
@@ -75,7 +75,7 @@
 .chrome-tools .btn.icon .icon { width: 16px; height: 16px; }
 
 /* What applies (a goal, reminders, a resume, a transfer, the plan). */
-.status-notes { display: flex; align-items: center; gap: 12px; min-width: 0; font-size: 12px; color: var(--muted); }
+.status-notes { display: flex; align-items: center; gap: 12px; min-width: 0; font-size: 12px; color: var(--muted-text); }
 .status-notes:empty { display: none; }
 .status-notes .status-item.mode.plan { max-width: 22ch; }
 
@@ -160,7 +160,7 @@
   font: 11.5px/1 var(--mono);
   transition: color 0.15s, background-color 0.15s;
 }
-.composer-status > .status-gauge:hover { background: var(--slate-2); color: var(--muted); }
+.composer-status > .status-gauge:hover { background: var(--slate-2); color: var(--muted-text); }
 .composer-status .status-item { display: inline-flex; align-items: center; gap: 6px; font: inherit; color: inherit; white-space: nowrap; }
 .composer-status .status-item.activity { padding-right: 6px; }
 .composer-status .status-item.activity > .label { display: none; }
@@ -181,7 +181,7 @@
 .composer-status .status-item.cost.warm { color: var(--sodium); }
 .composer-status .status-item.cost.hot { color: var(--brick); }
 /* Working: the lamp's word, in sodium; the figures stay where they were. */
-.composer-status.busy > .status-gauge { color: var(--muted); background: var(--sodium-wash); }
+.composer-status.busy > .status-gauge { color: var(--muted-text); background: var(--sodium-wash); }
 .composer-status.busy .status-item.activity { color: var(--sodium); }
 .composer-status.busy .status-item.activity > .label { display: inline; max-width: 16ch; overflow: hidden; text-overflow: ellipsis; }
 /* Offline, the status says so too (the banner says more). */
@@ -213,7 +213,7 @@
 
 .session-sections { display: flex; flex-direction: column; gap: 4px; padding: 2px 4px 10px; margin-bottom: 6px; border-bottom: 1px solid var(--rule); }
 .session-section { display: flex; flex-direction: column; gap: 6px; padding: 6px 8px 4px; }
-.session-section-head { display: flex; align-items: center; gap: 8px; min-width: 0; color: var(--muted); font-size: 13px; }
+.session-section-head { display: flex; align-items: center; gap: 8px; min-width: 0; color: var(--muted-text); font-size: 13px; }
 .session-section-head > .icon { width: 16px; height: 16px; flex: none; color: var(--faint); }
 .session-section-title { font-weight: 600; color: var(--chalk); }
 .session-section-note { margin-left: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--faint); font-size: 12px; }
@@ -226,7 +226,7 @@
   border: 0;
   border-radius: 8px;
   background: none;
-  color: var(--muted);
+  color: var(--muted-text);
   font: 500 14px var(--sans);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -243,7 +243,7 @@
    name, wrapping to a second row rather than cutting one short. */
 .mode-choices { flex-wrap: wrap; }
 .mode-choices > .session-choice { flex: 1 0 auto; min-width: 44px; padding: 0 6px; }
-.session-usage { display: flex; align-items: center; gap: 12px; padding: 0 2px; font-size: 13px; color: var(--muted); }
+.session-usage { display: flex; align-items: center; gap: 12px; padding: 0 2px; font-size: 13px; color: var(--muted-text); }
 .session-context { flex: 1; display: flex; align-items: center; gap: 8px; min-width: 0; }
 .session-context .meter { flex: 1; height: 5px; }
 .session-context .percent { color: var(--chalk); font: 12.5px var(--mono); font-variant-numeric: tabular-nums; }

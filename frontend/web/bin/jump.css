@@ -65,13 +65,13 @@
 .tick.unloaded::before { background: var(--faint-line); opacity: 0.55; }
 .tick.compaction::before { width: 20px; height: 1px; background: var(--faint-line); }
 /* What is trimmed from the context: a cut line, at the top. */
-.tick.trimmed::before { width: 20px; height: 0; border-radius: 0; background: none; border-top: 2px dashed var(--muted); opacity: 0.8; }
+.tick.trimmed::before { width: 20px; height: 0; border-radius: 0; background: none; border-top: 2px dashed var(--muted-text); opacity: 0.8; }
 .tick.trimmed:hover::before { border-top-color: var(--chalk); opacity: 1; }
 .tick.error::before { width: 5px; height: 5px; border-radius: 50%; background: var(--brick); margin-right: 2px; }
 .tick.user[aria-current]::before { width: 16px; background: var(--sodium); opacity: 1; }
 .tick.user:hover::before,
 .tick.user:focus-visible::before { width: 20px; background: var(--sodium); opacity: 1; }
-.tick.compaction:hover::before { background: var(--muted); }
+.tick.compaction:hover::before { background: var(--muted-text); }
 .tick:focus-visible { outline: none; }
 
 /* What the mark stands for, beside it. */
@@ -104,7 +104,7 @@
   line-clamp: 2;
   overflow: hidden;
 }
-.tip-what { font-size: 12px; font-weight: 600; color: var(--muted); }
+.tip-what { font-size: 12px; font-weight: 600; color: var(--muted-text); }
 .tick.error .tip-what { color: var(--brick); }
 .tip-time { font: 11.5px var(--mono); color: var(--faint); }
 
@@ -116,7 +116,7 @@
   border: 1px solid var(--rule-2);
   border-radius: var(--r-control);
   background: var(--slate-2);
-  color: var(--muted);
+  color: var(--muted-text);
   box-shadow: var(--float-shadow);
 }
 

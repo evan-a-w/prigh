@@ -24,9 +24,9 @@
   border-bottom: 1px solid var(--rule);
 }
 .agents-head > .btn.icon:first-child { margin-left: -8px; }
-.agents-head-icon { color: var(--muted); }
+.agents-head-icon { color: var(--muted-text); }
 .agents-title { margin: 0; font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.agents-id { font: 500 12.5px var(--mono); color: var(--muted); }
+.agents-id { font: 500 12.5px var(--mono); color: var(--muted-text); }
 .agents-running { color: var(--sodium); font-size: 12.5px; white-space: nowrap; }
 .agents-close { margin-left: auto; }
 .agents-locate { white-space: nowrap; }
@@ -62,7 +62,7 @@
   gap: 8px;
   margin: 0;
   padding: 0 10px 4px;
-  color: var(--muted);
+  color: var(--muted-text);
   font-size: 12.5px;
   font-weight: 600;
 }
@@ -101,7 +101,7 @@
 .row-time { grid-column: 3; grid-row: 1; font: 11.5px var(--mono); color: var(--faint); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .agents-row.running .row-time { color: var(--sodium); }
 .row-line, .row-meta { grid-column: 2 / -1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.row-line { margin-top: 2px; font-size: 12.5px; line-height: 18px; color: var(--muted); }
+.row-line { margin-top: 2px; font-size: 12.5px; line-height: 18px; color: var(--muted-text); }
 .agents-row.running .row-line, .job .row-line { font: 12px/18px var(--mono); }
 .agents-row.failed .row-line { color: var(--brick); }
 .row-meta { font: 11.5px/17px var(--mono); color: var(--faint); white-space: pre; }
@@ -109,7 +109,7 @@
 /* Outcome marks (Html.mark: sage done, brick failed, faint for work
    stopped on purpose or by a restart), a little smaller than the title. */
 .agents-panel .row-mark { --mark-size: 13px; }
-.agents-row.stopped .row-title { color: var(--muted); }
+.agents-row.stopped .row-title { color: var(--muted-text); }
 
 /* The tree: a nested agent hangs off a guide down its parent's mark column
    (the row's padding plus half the column: --axis), which starts a gap
@@ -155,7 +155,7 @@
   pointer-events: none;
 }
 
-.agents-empty { color: var(--muted); font-size: 14px; padding: 8px 10px; }
+.agents-empty { color: var(--muted-text); font-size: 14px; padding: 8px 10px; }
 .agents-empty p { margin: 0 0 8px; }
 .agents-empty .hint { color: var(--faint); font-size: 12.5px; }
 
@@ -183,14 +183,14 @@
   transform: rotate(-45deg);
 }
 .agents-earlier[open] > summary::before { transform: translateY(-1px) rotate(45deg); }
-.agents-earlier .agents-row:not(:hover):not(.selected) .row-title { color: var(--muted); }
+.agents-earlier .agents-row:not(:hover):not(.selected) .row-title { color: var(--muted-text); }
 
 /* One agent or job in full: aligned with the list's columns (mark, then
    text 24px in), the transcript's spine running down the mark column. */
 
 .agents-detail { display: flex; flex-direction: column; gap: 16px; min-width: 0; padding: 0 10px; }
 .agents-crumbs { margin-bottom: -8px; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding-left: 24px; font-size: 12.5px; color: var(--faint); }
-.crumb { background: none; border: 0; padding: 0; color: var(--muted); cursor: pointer; max-width: 90%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12.5px; text-decoration: underline; text-decoration-color: var(--rule-2); text-underline-offset: 3px; }
+.crumb { background: none; border: 0; padding: 0; color: var(--muted-text); cursor: pointer; max-width: 90%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12.5px; text-decoration: underline; text-decoration-color: var(--rule-2); text-underline-offset: 3px; }
 .crumb:hover { color: var(--chalk); text-decoration-color: currentColor; }
 .crumb:focus-visible { outline: 2px solid var(--sodium); outline-offset: 1px; border-radius: var(--r-chip); }
 
@@ -211,7 +211,7 @@
 .detail-command::before { content: "$ "; color: var(--faint); }
 .detail-meta { padding-left: 24px; line-height: 20px; }
 .detail-meta > span { margin-right: 8px; }
-.detail-state { font-size: 12.5px; font-weight: 600; color: var(--muted); }
+.detail-state { font-size: 12.5px; font-weight: 600; color: var(--muted-text); }
 .running > .detail-meta .detail-state { color: var(--sodium); }
 .complete > .detail-meta .detail-state { color: var(--sage); }
 .failed > .detail-meta .detail-state { color: var(--brick); }
@@ -256,7 +256,7 @@
 
 .agents-children { margin: 0 -10px; }
 
-.agents-note { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 14px; padding: 4px 0 4px 24px; }
+.agents-note { display: flex; align-items: center; gap: 8px; color: var(--muted-text); font-size: 14px; padding: 4px 0 4px 24px; }
 .agents-note.failed { color: var(--brick); }
 .agents-note.small { font-size: 12px; color: var(--faint); padding: 0; }
 
@@ -275,10 +275,10 @@
 /* How it ended, when the transcript does not say: on the same columns. */
 .agents-ending { display: grid; grid-template-columns: 14px minmax(0, 1fr); column-gap: 10px; row-gap: 4px; align-items: start; }
 .agents-ending > .row-mark { height: 18px; --mark-line: 18px; }
-.agents-ending-head { grid-column: 2; font-size: 12.5px; line-height: 18px; font-weight: 600; color: var(--muted); }
+.agents-ending-head { grid-column: 2; font-size: 12.5px; line-height: 18px; font-weight: 600; color: var(--muted-text); }
 .agents-ending.failed .agents-ending-head { color: var(--brick); }
 .agents-ending > pre, .agents-ending > .markdown { grid-column: 2; margin: 0; }
-.agents-ending > pre { white-space: pre-wrap; overflow-wrap: anywhere; font: 12.5px/1.5 var(--mono); color: var(--muted); }
+.agents-ending > pre { white-space: pre-wrap; overflow-wrap: anywhere; font: 12.5px/1.5 var(--mono); color: var(--muted-text); }
 .agents-ending.complete > .agents-ending-head { grid-column: 2; }
 
 .job-output-block { display: flex; flex-direction: column; gap: 6px; padding-left: 24px; }
@@ -310,7 +310,7 @@
 }
 .tool-subagent > .tool-head[data-agent] { cursor: pointer; border-radius: var(--r-control); }
 .tool-subagent > .tool-head[data-agent]:hover { background: var(--slate-2); }
-.tool-head .open-agent { margin-left: auto; padding: 0 4px; border: 0; border-radius: var(--r-chip); background: none; color: var(--muted); font: inherit; font-size: 12.5px; white-space: nowrap; cursor: pointer; }
+.tool-head .open-agent { margin-left: auto; padding: 0 4px; border: 0; border-radius: var(--r-chip); background: none; color: var(--muted-text); font: inherit; font-size: 12.5px; white-space: nowrap; cursor: pointer; }
 .tool-head .open-agent:focus-visible { outline: 2px solid var(--sodium); outline-offset: 1px; }
 .tool-head[data-agent]:hover .open-agent { color: var(--chalk); }
 .tool.flash { animation: flash 1.6s ease-out; }

@@ -8,20 +8,6 @@
  (preprocess
   (pps ppx_jane js_of_ocaml-ppx bonsai.ppx_bonsai)))
 
-; The stylesheet: Tailwind v4 (`tailwindcss`, e.g. nixpkgs' tailwindcss_4)
-; compiles loon.css, scanning these components' sources for the classes
-; they use. Add @source lines to loon.css for your own sources' classes.
-
-(rule
- (targets loon_ui.css loon_ui.input.css)
- (deps
-  loon.css
-  (glob_files *.ml))
- (action
-  (progn
-   (with-stdout-to
-    loon_ui.input.css
-    (progn
-     (cat loon.css)
-     (echo "\n@source \"./*.ml\";\n")))
-   (run tailwindcss --silent --optimize --input loon_ui.input.css --output loon_ui.css))))
+; The components' classes are Tailwind v4's: loon.css (with palette.css for
+; shadcn's own palette) is the stylesheet's input; the pages that use the
+; components compile it (../bin/dune for prigh-web, ../mockup/dune).

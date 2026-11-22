@@ -1,0 +1,60 @@
+/* The components' colours (shadcn/ui's variables, which loon.css's tokens
+   read) from prigh-web's (theme.css), so that every theme, accent preset
+   and custom accent restyles them too. Declared wherever a theme is (on
+   <html>, and on a theme's sample in the settings), so they take that
+   theme's values there. shadcn's [accent] is the ground of what the pointer
+   or the keyboard is on, not prigh's accent: that is [primary]. */
+:root,
+[data-theme] {
+  --background: var(--graphite);
+  --foreground: var(--chalk);
+  --card: var(--slate);
+  --card-foreground: var(--chalk);
+  --popover: var(--slate);
+  --popover-foreground: var(--chalk);
+  --primary: var(--sodium);
+  --primary-foreground: var(--sodium-ink);
+  --secondary: var(--slate-2);
+  --secondary-foreground: var(--chalk);
+  --muted: var(--slate-2);
+  --muted-foreground: var(--muted-text);
+  --accent: var(--slate-2);
+  --accent-foreground: var(--chalk);
+  --destructive: var(--brick);
+  --destructive-foreground: var(--chalk);
+  --border: var(--rule);
+  --input: var(--rule-2);
+  --ring: var(--sodium);
+  --chart-1: var(--series-1);
+  --chart-2: var(--series-2);
+  --chart-3: var(--series-3);
+  --chart-4: var(--series-4);
+  --chart-5: var(--series-5);
+  --sidebar: var(--slate);
+  --sidebar-foreground: var(--chalk);
+  --sidebar-primary: var(--sodium);
+  --sidebar-primary-foreground: var(--sodium-ink);
+  --sidebar-accent: var(--slate-2);
+  --sidebar-accent-foreground: var(--chalk);
+  --sidebar-border: var(--rule);
+  --sidebar-ring: var(--sodium);
+  /* The user's turns in the transcript. */
+  --bubble: var(--slate-2);
+  --bubble-foreground: var(--chalk);
+}
+
+@theme inline {
+  --color-bubble: var(--bubble);
+  --color-bubble-foreground: var(--bubble-foreground);
+  --color-destructive-foreground: var(--destructive-foreground);
+}
+
+/* shadcn's base styles, for the components only (see loon_preflight.css). */
+@layer base {
+  :where(.loon, .loon *) {
+    @apply border-border outline-ring/50;
+  }
+  .cn-font-heading {
+    @apply font-heading;
+  }
+}

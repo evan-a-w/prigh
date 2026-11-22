@@ -16,12 +16,12 @@
   border-top: 1px solid var(--rule);
 }
 .older .count { font: 11.5px var(--mono); }
-.older.busy { gap: 8px; color: var(--muted); }
+.older.busy { gap: 8px; color: var(--muted-text); }
 .load-older, .load-output {
   border: 0;
   padding: 2px 0;
   background: none;
-  color: var(--muted);
+  color: var(--muted-text);
   font: inherit;
   cursor: pointer;
 }
@@ -62,10 +62,10 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  color: var(--muted);
+  color: var(--muted-text);
   font: 12.5px/1.5 var(--sans);
 }
-.trim-divider > .scissors { order: 0; color: var(--muted); font-size: 15px; line-height: 1; }
+.trim-divider > .scissors { order: 0; color: var(--muted-text); font-size: 15px; line-height: 1; }
 .trim-divider::before,
 .trim-divider::after {
   content: "";
@@ -82,13 +82,13 @@
   border: 0;
   padding: 2px 0;
   background: none;
-  color: var(--muted);
+  color: var(--muted-text);
   font: inherit;
   cursor: pointer;
 }
 .trim-action:hover { color: var(--fg); }
 .trim-action:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; border-radius: 3px; }
-.trim-busy { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); }
+.trim-busy { display: inline-flex; align-items: center; gap: 7px; color: var(--muted-text); }
 #chat .trim-divider.jumped { border-radius: var(--r-control); }
 
 .trimmed-messages {
@@ -105,7 +105,7 @@
   margin-bottom: 18px;
   font: 12.5px/1.5 var(--sans);
 }
-.trimmed-title { color: var(--muted); font-weight: 600; }
+.trimmed-title { color: var(--muted-text); font-weight: 600; }
 .trimmed-note { color: var(--faint); }
 .trimmed-messages > .entries { opacity: 0.55; filter: saturate(0.35); }
 .trimmed-messages .msg.user { border-left-color: var(--faint-line); background: transparent; box-shadow: inset 0 0 0 1px var(--rule); }

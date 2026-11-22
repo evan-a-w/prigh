@@ -37,7 +37,7 @@
   padding: 8px 8px 8px 14px;
   border-bottom: 1px solid var(--rule);
 }
-.files-head-icon { width: 16px; height: 16px; color: var(--muted); flex-shrink: 0; }
+.files-head-icon { width: 16px; height: 16px; color: var(--muted-text); flex-shrink: 0; }
 .files-machine { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .files-tools { margin-left: auto; display: flex; gap: 2px; }
 .files-tool .icon, .files-close .icon { width: 16px; height: 16px; }
@@ -52,7 +52,7 @@
   gap: 0 2px;
   padding: 8px 8px 8px 14px;
   font: 12.5px/1.6 var(--mono);
-  color: var(--muted);
+  color: var(--muted-text);
   border-bottom: 1px solid var(--rule);
 }
 .files-crumb {
@@ -61,7 +61,7 @@
   padding: 0 3px;
   border-radius: var(--r-chip);
   font: inherit;
-  color: var(--muted);
+  color: var(--muted-text);
   cursor: pointer;
 }
 .files-crumb:hover { color: var(--chalk); background: var(--slate-2); }
@@ -100,7 +100,7 @@
   cursor: pointer;
 }
 .files-sort.col-size, .files-sort.col-modified { text-align: right; }
-.files-sort:hover, .files-sort.active { color: var(--muted); }
+.files-sort:hover, .files-sort.active { color: var(--muted-text); }
 .files-sort:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; }
 .files-arrow { margin-left: 3px; color: var(--sodium); }
 
@@ -123,10 +123,10 @@
 }
 .files-row:hover { background: var(--slate-2); }
 .files-row.selected { background: var(--sodium-wash); box-shadow: inset 2px 0 0 var(--sodium); }
-.files-row.dot .files-name { color: var(--muted); }
+.files-row.dot .files-name { color: var(--muted-text); }
 .files-row.missing .files-name { color: var(--faint); text-decoration: line-through; }
 .files-kind { width: 15px; height: 15px; color: var(--faint); }
-.files-kind.dir { color: var(--muted); }
+.files-kind.dir { color: var(--muted-text); }
 .files-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .files-size, .files-mtime { font-size: 12px; color: var(--faint); text-align: right; white-space: nowrap; }
 .files-row .files-size { grid-column: 4; }
@@ -136,7 +136,7 @@
 .files-empty, .files-wait, .files-error {
   padding: 18px 14px;
   font-size: 13.5px;
-  color: var(--muted);
+  color: var(--muted-text);
 }
 .files-wait { display: flex; align-items: center; gap: 8px; }
 .files-error { color: var(--brick); display: flex; flex-direction: column; align-items: flex-start; gap: 8px; overflow-wrap: anywhere; }
@@ -201,7 +201,7 @@
   /* Transparency shows as a checkerboard. */
   background: repeating-conic-gradient(var(--slate) 0 25%, var(--slate-2) 0 50%) 0 0 / 16px 16px;
 }
-.files-note { padding: 10px 14px; color: var(--muted); font-size: 13px; }
+.files-note { padding: 10px 14px; color: var(--muted-text); font-size: 13px; }
 
 /* Transfers: the work lamp and a thin bar. */
 .files-transfers { border-top: 1px solid var(--rule); padding: 6px 14px 8px; display: flex; flex-direction: column; gap: 6px; }
@@ -211,7 +211,7 @@
   align-items: center;
   gap: 3px 8px;
   font-size: 12.5px;
-  color: var(--muted);
+  color: var(--muted-text);
 }
 .files-transfer-name { font-family: var(--mono); color: var(--chalk); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .files-transfer-meta { font: 11.5px var(--mono); color: var(--faint); }
@@ -242,7 +242,7 @@ body.dropping-chat .composer-box { position: relative; }
 body.dropping-chat .composer-box::after { content: "Drop to attach to your message"; inset: -1px; }
 
 /* The dialogs. */
-.files-ask-where { font: 12.5px var(--mono); color: var(--muted); margin-bottom: 8px; }
+.files-ask-where { font: 12.5px var(--mono); color: var(--muted-text); margin-bottom: 8px; }
 .files-ask .text-input { width: 100%; font-family: var(--mono); }
 .files-ask-text { color: var(--chalk); line-height: 1.5; overflow-wrap: anywhere; }
 .files-ask-error { margin-top: 8px; color: var(--brick); font-size: 13px; }
@@ -274,7 +274,7 @@ body.dropping-chat .composer-box::after { content: "Drop to attach to your messa
   transition: width 0.2s linear;
 }
 .attach-chip.failed { border-color: var(--brick-line); background: var(--brick-wash); }
-.attach-chip-icon { width: 13px; height: 13px; color: var(--muted); flex-shrink: 0; }
+.attach-chip-icon { width: 13px; height: 13px; color: var(--muted-text); flex-shrink: 0; }
 .attach-chip-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .attach-chip-detail { color: var(--faint); font-size: 11.5px; white-space: nowrap; }
 .attach-chip.failed .attach-chip-detail { color: var(--brick); overflow: hidden; text-overflow: ellipsis; max-width: 140px; }

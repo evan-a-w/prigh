@@ -12,12 +12,14 @@
 (rule
  (target mockup.input.css)
  (deps
+  ../loon_ui/palette.css
   ../loon_ui/loon.css
   mockup.css)
  (action
   (with-stdout-to
    mockup.input.css
    (progn
+    (cat ../loon_ui/palette.css)
     (cat ../loon_ui/loon.css)
     (echo "\n@source \"../loon_ui/*.ml\";\n@source \"./*.ml\";\n")
     (cat mockup.css)))))

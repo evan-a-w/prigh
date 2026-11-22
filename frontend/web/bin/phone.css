@@ -174,10 +174,10 @@
 }
 .sheet-row:active, .sheet-row:hover { background: var(--slate-2); }
 .sheet-row:focus-visible { outline: 2px solid var(--sodium); outline-offset: -2px; }
-.sheet-row > .icon { width: 20px; height: 20px; flex: none; color: var(--muted); }
+.sheet-row > .icon { width: 20px; height: 20px; flex: none; color: var(--muted-text); }
 .sheet-row.on > .icon { color: var(--sodium); }
 .sheet-row-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.sheet-row-detail { font-size: 12.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sheet-row-detail { font-size: 12.5px; color: var(--muted-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sheet-row .badge { min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; background: var(--sodium); color: var(--on-sodium, #000); font-size: 12px; font-weight: 600; display: inline-grid; place-items: center; }
 .sheet-row.settings-row { border-top: 1px solid var(--rule); border-radius: 0; margin-top: 6px; padding-top: 2px; }
 
@@ -298,7 +298,7 @@
 .settings-home-icon .avatar { width: 34px; height: 34px; font-size: 15px; }
 .settings-home-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .settings-home-name { font-size: 16px; font-weight: 600; }
-.settings-home-about { font-size: 13px; color: var(--muted); line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.settings-home-about { font-size: 13px; color: var(--muted-text); line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .settings-home-chevron { width: 18px; height: 18px; flex: none; color: var(--faint); transform: rotate(-90deg); }
 
 /* Rows: the words over the control, the control the full width. */
@@ -358,7 +358,7 @@
 }
 .app.narrow .segmented.choice-list > .segment.on::before { border: 5px solid var(--sodium); }
 .app.narrow .choice-list .segment-name { font-size: 15px; font-weight: 600; color: var(--chalk); }
-.app.narrow .choice-list .segment-about { display: block; grid-column: 2; font-size: 13px; line-height: 1.35; color: var(--muted); }
+.app.narrow .choice-list .segment-about { display: block; grid-column: 2; font-size: 13px; line-height: 1.35; color: var(--muted-text); }
 .app.narrow .choice-list .segment:not(.on) .segment-name { font-weight: 500; }
 /* Compaction's threshold field: one line, the number and its unit centred. */
 .app.narrow .number-switch { gap: 16px; }
