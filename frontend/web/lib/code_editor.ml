@@ -331,7 +331,9 @@ let ask t =
   | None -> t, []
   | Some b ->
     let selection =
-      Option.value t.selection ~default:{ Selection.first = 1; last = 1; text = "" }
+      Option.value
+        t.selection
+        ~default:{ Selection.first = 1; last = 1; text = "" }
     in
     ( { t with
         chip =
@@ -382,17 +384,17 @@ let step t n =
         ~default:0
         ~f:fst
     in
-    let b = List.nth_exn buffers (((i + n) % len + len) % len) in
+    let b = List.nth_exn buffers ((((i + n) % len) + len) % len) in
     { t with current = Some b.path; selection = None }
 ;;
 
 module Action = struct
   type t =
-    | Enter of string option 
+    | Enter of string option
     | Leave
-    | Open of string 
+    | Open of string
     | Switch of string
-    | Step of int 
+    | Step of int
     | Close of string
     | Edited of
         { path : string
@@ -400,15 +402,15 @@ module Action = struct
         }
     | Selected of Selection.t option
     | Save
-    | Overwrite 
-    | Reload 
-    | Keep 
-    | Undo_agent 
-    | Ask 
+    | Overwrite
+    | Reload
+    | Keep
+    | Undo_agent
+    | Ask
     | Drop_chip
     | Toggle_tree
     | Toggle_drawer
-    | List of string option 
+    | List of string option
     | Filter of string
     | Find_file (** the Go to file field *)
     | Toggle_chat
@@ -427,9 +429,7 @@ let update t (action : Action.t) =
   match action with
   | Enter path ->
     let t = { t with open_ = true; menu = false } in
-    let t, listing =
-      if Option.is_none t.dir then list t None else t, []
-    in
+    let t, listing = if Option.is_none t.dir then list t None else t, [] in
     (match path with
      | Some p when not (String.is_empty (String.strip p)) ->
        let t, outs = open_ t (absolute t (String.strip p)) in
@@ -442,7 +442,13 @@ let update t (action : Action.t) =
        in
        t, listing @ [ Out.Refresh_changes ])
   | Leave ->
-    ( { t with open_ = false; menu = false; goto = None; drawer = false; sheet = false }
+    ( { t with
+        open_ = false
+      ; menu = false
+      ; goto = None
+      ; drawer = false
+      ; sheet = false
+      }
     , [] )
   | Open path ->
     (* On a phone the drawer gives way to the file. *)
@@ -506,15 +512,18 @@ let update t (action : Action.t) =
        query itself its closest. *)
     let filter_q = String.strip filter in
     let first = String.prefix filter_q 1 in
-    let same_first = String.equal first (String.prefix (String.strip t.filter) 1) in
+    let same_first =
+      String.equal first (String.prefix (String.strip t.filter) 1)
+    in
     let paths q = rpc "list_paths" [ "prefix", `String q ] (Paths q) in
     ( { t with filter; paths = (if same_first then t.paths else []) }
     , if String.is_empty filter_q
       then []
       else if same_first
       then [ paths filter_q ]
-      else List.dedup_and_sort ~compare:String.compare [ first; filter_q ] |> List.map ~f:paths
-    )
+      else
+        List.dedup_and_sort ~compare:String.compare [ first; filter_q ]
+        |> List.map ~f:paths )
   | Find_file ->
     { t with tree = true; drawer = true; menu = false }, [ Focus "code-filter" ]
   | Toggle_chat -> { t with chat = not t.chat; menu = false }, []
@@ -524,14 +533,21 @@ let update t (action : Action.t) =
   | Goto_open -> { t with goto = Some ""; menu = false }, [ Focus "code-goto" ]
   | Goto_input s -> { t with goto = Some s }, []
   | Goto_line ->
-    (match Option.bind t.goto ~f:(fun s -> Int.of_string_opt (String.strip s)) with
+    (match
+       Option.bind t.goto ~f:(fun s -> Int.of_string_opt (String.strip s))
+     with
      | Some n when n > 0 -> { t with goto = None }, [ Command (Goto_line n) ]
      | Some _ | None ->
-       ( t
-       , [ toast ~error:true "Go to line: type a line number (1 or more)" ] ))
+       t, [ toast ~error:true "Go to line: type a line number (1 or more)" ])
   | Goto_cancel -> { t with goto = None }, [ Command Focus ]
   | Scrolled dir ->
-    { t with strip_hidden = (match dir with `Down -> true | `Up -> false) }, []
+    ( { t with
+        strip_hidden =
+          (match dir with
+           | `Down -> true
+           | `Up -> false)
+      }
+    , [] )
   | Command c -> t, [ Command c ]
 ;;
 
@@ -606,8 +622,8 @@ let reply t (reply : Reply.t) (result : (Json.t, string) Result.t) =
          , [ toast
                ~error:true
                (sprintf
-                  "%s changed on the host while you were editing it: reload \
-                   it or overwrite it (⋯)"
+                  "%s changed on the host while you were editing it: reload it \
+                   or overwrite it (⋯)"
                   (relative t path))
            ] )
        else (

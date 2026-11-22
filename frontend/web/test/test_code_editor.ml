@@ -29,7 +29,10 @@ let entered ?(narrow = false) () =
   if narrow then H.act h (Set_narrow true);
   H.quiet h (fun () ->
     H.act h (Code (Enter (Some "src/a.ml")));
-    H.reply h "fs_list" {|{"path":"/home/me/proj","parent":"/home/me","home":"/home/me","entries":[
+    H.reply
+      h
+      "fs_list"
+      {|{"path":"/home/me/proj","parent":"/home/me","home":"/home/me","entries":[
       {"name":"src","kind":"dir","mtime":1791190000000},
       {"name":"README.md","kind":"file","size":20,"mtime":1791190000000}],"total":2,"hidden":0}|};
     H.reply h "fs_preview" (preview source));
@@ -71,7 +74,8 @@ let%expect_test "/edit opens the mode on the file, Esc leaves it" =
     (Rpc (method_ git_diff) (params ()) (tag (Review Diff)))
     |}];
   H.text h ~selector:".code-strip";
-  [%expect {|
+  [%expect
+    {|
     (Show or hide the files (Ctrl+B)) No file open
     (Show or hide the chat (Alt+C))
     (More)
@@ -81,7 +85,8 @@ let%expect_test "/edit opens the mode on the file, Esc leaves it" =
   [%expect {| Opening src/a.ml… |}];
   H.quiet h (fun () -> H.reply h "fs_preview" (preview source));
   H.text h ~selector:".code-strip";
-  [%expect {|
+  [%expect
+    {|
     (Show or hide the files (Ctrl+B)) src/ a.ml
     (Show or hide the chat (Alt+C))
     (More)
@@ -95,7 +100,9 @@ let%expect_test "/edit opens the mode on the file, Esc leaves it" =
 
 let%expect_test "typing makes it dirty; Ctrl+S saves with the md5 it read" =
   let h = entered () in
-  H.act h (Code (Edited { path = "/home/me/proj/src/a.ml"; text = "let x = 10\n" }));
+  H.act
+    h
+    (Code (Edited { path = "/home/me/proj/src/a.ml"; text = "let x = 10\n" }));
   [%expect {| |}];
   H.text h ~selector:".code-strip";
   [%expect
@@ -153,7 +160,10 @@ let%expect_test "the agent's edit of a clean file: shown, then undone" =
   let h = entered () in
   H.quiet h (fun () ->
     H.event h (Agent_events.tool_end ~id:"e1" ~name:"edit" "Edited src/a.ml"));
-  H.reply h "fs_preview" (preview ~md5:"m2" "let x = 1\nlet y = 20\nlet w = 0\nlet z = 3\n");
+  H.reply
+    h
+    "fs_preview"
+    (preview ~md5:"m2" "let x = 1\nlet y = 20\nlet w = 0\nlet z = 3\n");
   print_buffer h;
   [%expect
     {|
@@ -185,8 +195,8 @@ let%expect_test "the agent's edit of a clean file: shown, then undone" =
     |}]
 ;;
 
-let%expect_test "the agent's edit of a file with unsaved edits: a conflict, \
-                 nothing lost"
+let%expect_test
+    "the agent's edit of a file with unsaved edits: a conflict, nothing lost"
   =
   let h = entered () in
   H.quiet h (fun () ->
@@ -200,16 +210,23 @@ let%expect_test "the agent's edit of a file with unsaved edits: a conflict, \
     ((path /home/me/proj/src/a.ml) (dirty true) (saving false)
      (conflict (Changed_on_disk)) (agent false) (hunks ()) (marks ()))
     |}];
-  print_s [%sexp ((Option.value_exn (Prigh_web.Code_editor.current (code h))).text : string)];
+  print_s
+    [%sexp
+      ((Option.value_exn (Prigh_web.Code_editor.current (code h))).text
+       : string)];
   [%expect {| "mine\n" |}]
 ;;
 
 let%expect_test "Ctrl+L asks about the selection: a chip, then the prompt" =
   let h = entered () in
   H.quiet h (fun () ->
-    H.act h (Code (Selected (Some { first = 2; last = 3; text = "let y = 2\nlet z = 3" }))));
+    H.act
+      h
+      (Code
+         (Selected (Some { first = 2; last = 3; text = "let y = 2\nlet z = 3" }))));
   H.key h "l" ~ctrl:true ~target:Code;
-  [%expect {|
+  [%expect
+    {|
     (Code Ask)
     (Focus editor)
     |}];
@@ -219,7 +236,8 @@ let%expect_test "Ctrl+L asks about the selection: a chip, then the prompt" =
     H.type_ h "why 2?";
     H.key h "Enter");
   H.text h ~selector:"#chat .user";
-  [%expect {|
+  [%expect
+    {|
     Send
     [src/a.ml:2–3] why 2?
     Sending…
@@ -246,7 +264,8 @@ let%expect_test "Go to file: fuzzy over what the host finds" =
   H.reply h "list_paths" {|["src/a.ml","src/","lib/main.ml","alpha.txt"]|};
   H.reply h "list_paths" {|[]|};
   H.text h ~selector:".code-tree-scroll";
-  [%expect {|
+  [%expect
+    {|
     Files
     (src/ a.ml) (lib/ main.ml) (README.md)
     |}]
@@ -255,7 +274,8 @@ let%expect_test "Go to file: fuzzy over what the host finds" =
 let%expect_test "a phone: the drawer, the keys, the peek" =
   let h = entered ~narrow:true () in
   H.text h ~selector:".code-page";
-  [%expect {|
+  [%expect
+    {|
     (Files) src/ a.ml
     (More)
     ((path /home/me/proj/src/a.ml) (lang Ocaml) (revision 0) (lines 3) (hunks ())
@@ -265,7 +285,8 @@ let%expect_test "a phone: the drawer, the keys, the peek" =
     |}];
   H.click h ~selector:".code-tree-toggle";
   H.text h ~selector:".code-tree";
-  [%expect {|
+  [%expect
+    {|
     (Code Toggle_drawer)
     Open
     (src/ a.ml)
@@ -275,26 +296,33 @@ let%expect_test "a phone: the drawer, the keys, the peek" =
     |}];
   H.click h ~selector:".code-tree .code-row.file";
   print_s [%sexp ((code h).drawer : bool)];
-  [%expect {|
+  [%expect
+    {|
     (Code (Open /home/me/proj/README.md))
     (Rpc (method_ fs_preview) (params ((path /home/me/proj/README.md)))
      (tag (Code (Opened /home/me/proj/README.md))))
     false
     |}];
   H.click h ~selector:".code-key[aria-label=Indent]";
-  [%expect {|
+  [%expect
+    {|
     (Code (Command Indent))
     (Code_editor Indent)
     |}]
 ;;
 
-let%expect_test "a wide window: Alt+C the chat beside, Ctrl+B the files, \
-                 Alt+E out and back"
+let%expect_test
+    "a wide window: Alt+C the chat beside, Ctrl+B the files, Alt+E out and back"
   =
   let h = entered () in
   let show () =
     let t = code h in
-    print_s [%sexp { open_ = (t.open_ : bool); chat = (t.chat : bool); tree = (t.tree : bool) }]
+    print_s
+      [%sexp
+        { open_ = (t.open_ : bool)
+        ; chat = (t.chat : bool)
+        ; tree = (t.tree : bool)
+        }]
   in
   show ();
   H.key h "c" ~alt:true ~code:"KeyC" ~target:Code;
@@ -304,7 +332,8 @@ let%expect_test "a wide window: Alt+C the chat beside, Ctrl+B the files, \
   show ();
   H.key h "e" ~alt:true ~code:"KeyE";
   show ();
-  [%expect {|
+  [%expect
+    {|
     ((open_ true) (chat true) (tree true))
     (Code Toggle_chat)
     (Code Toggle_tree)

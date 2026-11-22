@@ -397,7 +397,8 @@ let view (m : Model.t) ~inject ~terminal ~code_editor =
            ; "files-open", m.files.open_
            ; "reviewing", m.review.open_
            ; "editing", m.code.open_
-           ; "code-chat", m.code.open_ && (if m.narrow then m.code.sheet else m.code.chat)
+           ; ( "code-chat"
+             , m.code.open_ && if m.narrow then m.code.sheet else m.code.chat )
            ]
            @ List.map Code_size.all ~f:(fun s ->
              ( "code-" ^ Code_size.name s
@@ -438,7 +439,8 @@ let view (m : Model.t) ~inject ~terminal ~code_editor =
              | _ -> under_drawer)
               (Review_page_view.view m ~inject))
         ; (if m.code.open_
-           then under_drawer (Code_editor_view.view m ~inject ~widget:code_editor)
+           then
+             under_drawer (Code_editor_view.view m ~inject ~widget:code_editor)
            else Node.none)
         ; (if m.review.open_ || (m.code.open_ && m.code.chat)
            then Resize_view.handle m ~inject Review_chat

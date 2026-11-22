@@ -1667,7 +1667,8 @@ let with_code (m : Model.t) ((code : Code_editor.t), outs) =
           (if m.review.open_
            then fst (Code_review.update m.review Close)
            else m.review)
-      ; agents = (if m.narrow then { m.agents with open_ = false } else m.agents)
+      ; agents =
+          (if m.narrow then { m.agents with open_ = false } else m.agents)
       }
     else m
   in
@@ -10475,11 +10476,16 @@ let send (m : Model.t) ~follow_up =
   match m.code.chip with
   | Some chip
     when (not (String.is_empty text))
-         && not (String.is_prefix text ~prefix:"/" || String.is_prefix text ~prefix:"!")
-    ->
+         && not
+              (String.is_prefix text ~prefix:"/"
+               || String.is_prefix text ~prefix:"!") ->
     let text, pasted = Code_editor.Chip.prompt chip text in
     send_draft
-      { m with draft = text; pasted = pasted @ m.pasted; code = Code_editor.sent m.code }
+      { m with
+        draft = text
+      ; pasted = pasted @ m.pasted
+      ; code = Code_editor.sent m.code
+      }
       ~follow_up
   | Some _ | None -> send_draft m ~follow_up
 ;;

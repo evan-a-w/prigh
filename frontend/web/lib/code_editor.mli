@@ -60,15 +60,15 @@ module Buffer : sig
     ; disk : string (** as last read or written *)
     ; md5 : string option (** of [disk]; [None]: too large to save *)
     ; revision : int
-    (** bumped when [text] is replaced here (read, reloaded, undone): the
+      (** bumped when [text] is replaced here (read, reloaded, undone): the
         page then puts it in the editor *)
     ; saving : bool
     ; conflict : Conflict.t option
     ; agent : string option
-    (** the text before the agent's change on show (Keep / Undo) *)
+      (** the text before the agent's change on show (Keep / Undo) *)
     ; hunks : Hunk.t list (** the agent's change on show, from [agent] *)
     ; marks : (int * int) list
-    (** lines the agent changed (first, last), for the gutter *)
+      (** lines the agent changed (first, last), for the gutter *)
     }
   [@@deriving sexp_of, equal]
 

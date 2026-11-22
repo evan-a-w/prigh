@@ -398,12 +398,15 @@ let restore_history t entries =
 let node ?(inject = fun _ -> Virtual_dom.Vdom.Effect.Ignore) t ?selector () =
   let node =
     Node_helpers.unsafe_convert_exn
-      (View.view t.model ~inject ~terminal:(fun target ->
-         Virtual_dom.Vdom.Node.div
-           ~attrs:[ Virtual_dom.Vdom.Attr.class_ "xterm-widget" ]
-           [ Virtual_dom.Vdom.Node.text
-               (Sexp.to_string (Terminal.Target.sexp_of_t target))
-           ])
+      (View.view
+         t.model
+         ~inject
+         ~terminal:(fun target ->
+           Virtual_dom.Vdom.Node.div
+             ~attrs:[ Virtual_dom.Vdom.Attr.class_ "xterm-widget" ]
+             [ Virtual_dom.Vdom.Node.text
+                 (Sexp.to_string (Terminal.Target.sexp_of_t target))
+             ])
          ~code_editor:(fun input ->
            Virtual_dom.Vdom.Node.div
              ~attrs:[ Virtual_dom.Vdom.Attr.class_ "code-widget" ]

@@ -80,8 +80,7 @@ let menu (_ : E.t) (b : E.Buffer.t option) ~inject =
   in
   let no_file = Option.is_none b in
   Node.div
-    ~attrs:
-      [ Attr.class_ "code-menu"; Attr.role "menu"; Attr.id "code-menu" ]
+    ~attrs:[ Attr.class_ "code-menu"; Attr.role "menu"; Attr.id "code-menu" ]
     [ item ~disabled:no_file "Save" "Ctrl+S" Save
     ; item ~disabled:no_file "Reload from disk" "" Reload
     ; item ~disabled:no_file "Go to line" "Ctrl+G" Goto_open
@@ -120,8 +119,7 @@ let strip (m : App.Model.t) ~inject =
              []))
   in
   Node.header
-    ~attrs:
-      [ classes [ "code-strip" ] [ "hidden", t.strip_hidden && m.narrow ] ]
+    ~attrs:[ classes [ "code-strip" ] [ "hidden", t.strip_hidden && m.narrow ] ]
     [ button
         ~cls:"icon ghost code-tree-toggle"
         ~title:(if m.narrow then "Files" else "Show or hide the files (Ctrl+B)")
@@ -131,7 +129,8 @@ let strip (m : App.Model.t) ~inject =
               "aria-expanded"
               (Bool.to_string (if m.narrow then t.drawer else t.tree))
           ]
-        ~on_click:(inject (code (if m.narrow then Toggle_drawer else Toggle_tree)))
+        ~on_click:
+          (inject (code (if m.narrow then Toggle_drawer else Toggle_tree)))
         [ icon Menu ]
     ; (match b with
        | None -> span ~cls:"code-path code-path-none" "No file open"
@@ -274,7 +273,9 @@ let found (t : E.t) =
   in
   Prigh_ui.Fuzzy.rank
     ~query
-    (List.dedup_and_sort ~compare:String.compare (open_paths @ listed @ t.paths))
+    (List.dedup_and_sort
+       ~compare:String.compare
+       (open_paths @ listed @ t.paths))
     ~key:Fn.id
   |> Fn.flip List.take 50
 ;;
@@ -372,7 +373,8 @@ let tree (m : App.Model.t) ~inject =
       [ section
           "Files"
           (match found t with
-           | [] -> [ span ~cls:"code-empty" "No file matches: try fewer letters" ]
+           | [] ->
+             [ span ~cls:"code-empty" "No file matches: try fewer letters" ]
            | paths ->
              List.map paths ~f:(fun p ->
                row
@@ -385,7 +387,8 @@ let tree (m : App.Model.t) ~inject =
       [ open_files
       ; section
           (match t.dir with
-           | Some l when String.equal l.path t.cwd -> Filename.basename l.path ^ "/"
+           | Some l when String.equal l.path t.cwd ->
+             Filename.basename l.path ^ "/"
            | Some l -> E.relative t l.path ^ "/"
            | None -> "Files")
           listing
@@ -449,9 +452,7 @@ let goto (t : E.t) ~inject =
             Js_of_ocaml.Dom.preventDefault ev;
             inject (code Goto_line))
         ]
-      [ Node.label
-          ~attrs:[ Attr.for_ "code-goto" ]
-          [ Node.text "Go to line" ]
+      [ Node.label ~attrs:[ Attr.for_ "code-goto" ] [ Node.text "Go to line" ]
       ; Node.input
           ~attrs:
             [ Attr.id "code-goto"
@@ -466,7 +467,10 @@ let goto (t : E.t) ~inject =
                 | _ -> Effect.Ignore)
             ]
           ()
-      ; button ~cls:"small" ~on_click:(inject (code Goto_line)) [ Node.text "Go" ]
+      ; button
+          ~cls:"small"
+          ~on_click:(inject (code Goto_line))
+          [ Node.text "Go" ]
       ]
 ;;
 
@@ -603,7 +607,7 @@ let view (m : App.Model.t) ~inject ~widget =
     ~attrs:
       [ classes
           [ "code-page" ]
-          [ "tree-shown", (if m.narrow then t.drawer else t.tree)
+          [ ("tree-shown", if m.narrow then t.drawer else t.tree)
           ; "menu-open", t.menu
           ]
       ; Attr.id "code-page"
@@ -645,14 +649,16 @@ let chip (m : App.Model.t) ~inject =
       ~cls:"attach-chips code-chips"
       ~attrs:[ Attr.create "aria-label" "Code to ask about" ]
       [ Node.div
-          ~attrs:[ Attr.class_ "attach-chip ready code-chip"; Attr.title (E.Chip.label c) ]
+          ~attrs:
+            [ Attr.class_ "attach-chip ready code-chip"
+            ; Attr.title (E.Chip.label c)
+            ]
           [ span ~cls:"attach-chip-name" (E.Chip.label c)
           ; span
               ~cls:"attach-chip-detail"
               (if String.is_empty c.text
                then "line"
-               else
-                 sprintf "%d lines" (List.length (String.split_lines c.text)))
+               else sprintf "%d lines" (List.length (String.split_lines c.text)))
           ; button
               ~cls:"icon ghost attach-chip-remove"
               ~title:"Remove"

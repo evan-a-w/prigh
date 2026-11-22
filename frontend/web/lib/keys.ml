@@ -93,8 +93,8 @@ let help =
   ; ( "A (on a session)"
     , "archive or unarchive it (archived sessions are listed last, muted)" )
   ; ( "Alt+E"
-    , "the editor mode: edit the session's files beside the chat (also \
-       /edit [path], the file browser's Edit)" )
+    , "the editor mode: edit the session's files beside the chat (also /edit \
+       [path], the file browser's Edit)" )
   ; "Ctrl+S / ⌘+S (editor)", "save the file"
   ; "Ctrl+P / ⌘+P (editor)", "go to file: filter the file tree"
   ; "Ctrl+F / ⌘+F (editor)", "find (and replace) in the file"
@@ -665,10 +665,10 @@ let code_key (m : App.Model.t) t : App.Action.t option =
   | ("s" | "S") when command t -> code Save
   | ("p" | "P") when command t -> code Find_file
   | ("g" | "G") when ctrl_only t -> code Goto_open
-  | ("l" | "L") when command t && not t.shift -> (
-    match t.target with
-    | Code -> code Ask
-    | _ -> None)
+  | ("l" | "L") when command t && not t.shift ->
+    (match t.target with
+     | Code -> code Ask
+     | _ -> None)
   | ("b" | "B") when command t && not m.narrow -> code Toggle_tree
   | _ when alt_letter t "c" && not m.narrow -> code Toggle_chat
   | _ when alt_letter t "w" ->
@@ -679,7 +679,8 @@ let code_key (m : App.Model.t) t : App.Action.t option =
   | "Escape" when Option.is_some m.code.goto -> code Goto_cancel
   | "Escape" when m.narrow && m.code.drawer -> code Toggle_drawer
   | "Escape" when m.narrow && m.code.sheet -> code Toggle_sheet
-  | ("f" | "F") when command t && Poly.equal t.target Page -> code (Command Find)
+  | ("f" | "F") when command t && Poly.equal t.target Page ->
+    code (Command Find)
   | "Escape" when Poly.equal t.target Page -> code Leave
   | _ -> None
 ;;
