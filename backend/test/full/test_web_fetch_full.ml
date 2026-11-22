@@ -1,6 +1,5 @@
 open! Core
 open! Prigh
-open Eio.Std
 open! Test_web_fetch
 
 let%expect_test

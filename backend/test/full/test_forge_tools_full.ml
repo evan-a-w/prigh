@@ -1,6 +1,5 @@
 open! Core
 open! Prigh
-open Tool_test_helpers
 open! Test_forge_tools
 
 let%expect_test "issue changes on GitHub" =

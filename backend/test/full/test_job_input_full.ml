@@ -1,6 +1,5 @@
 open! Core
 open! Prigh
-open Tool_test_helpers
 open! Test_job_input
 
 let%expect_test "job_input on a tool host that predates it" =

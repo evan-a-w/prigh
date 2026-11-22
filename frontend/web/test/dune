@@ -207,13 +207,11 @@
   (js_of_ocaml
    (sourcemap no))))
 
-; full/: the slow tier, out of @runtest (see full/dune).
-
-(vendored_dirs full)
+; full/: the slow tier, run only with PRIGH_TEST_TIER=full (see full/dune).
 
 (rule
- (alias runtest-full)
+ (alias runtest)
  (enabled_if %{bin-available:node})
  (deps
-  (alias full/runtest))
+  (alias full/check))
  (action (progn)))

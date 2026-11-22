@@ -1,6 +1,5 @@
 open! Core
 open! Prigh
-open Tool_test_helpers
 open! Test_review_since
 
 let%expect_test "a session keeps at most max_kept_bytes of texts" =

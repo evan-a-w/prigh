@@ -1,6 +1,5 @@
 open! Core
 open! Prigh
-open Tool_test_helpers
 open! Test_agent
 
 let%expect_test "Anthropic requests keep a stable, cached prefix across turns" =

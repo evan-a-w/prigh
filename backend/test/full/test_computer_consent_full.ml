@@ -1,6 +1,5 @@
 open! Core
 open! Prigh
-open Tool_test_helpers
 open! Test_computer_consent
 
 let%expect_test

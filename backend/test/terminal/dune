@@ -1,4 +1,5 @@
-; Runs a real tmux; skipped where there is none.
+; Runs a real tmux; skipped where there is none. In the slow tier: run only
+; with PRIGH_TEST_TIER=full (`./test --full`).
 
 (library
  (name prigh_terminal_test)
@@ -6,6 +7,8 @@
  (preprocess
   (pps ppx_jane))
  (inline_tests
+  (enabled_if
+   (= %{env:PRIGH_TEST_TIER=default} full))
   (flags
    (-source-tree-root .)))
  (libraries core core_unix prigh prigh_test eio eio.unix eio_main))

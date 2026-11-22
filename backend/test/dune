@@ -34,8 +34,3 @@
  (_
   (env-vars
    (PRIGH_HOST_NAME <host>))))
-
-; The slow tier, out of `dune build @runtest`: ../dune's @runtest-full runs
-; them (./test --full). terminal/ runs a real tmux.
-
-(vendored_dirs full terminal)

@@ -1,7 +1,6 @@
-; The slow tier (../../dune's @runtest-full, `./test --full`): each
-; test_x_full.ml has the slow tests of ../test_x.ml, whose helpers it opens.
-; A vendored directory, so `dune build @runtest` leaves it out (which also
-; silences warnings here).
+; The slow tier: each test_x_full.ml has the slow tests of ../test_x.ml,
+; whose helpers it opens. Built (and warned about) like the rest, but run only
+; with PRIGH_TEST_TIER=full (`./test --full`).
 
 (library
  (name prigh_test_full)
@@ -10,6 +9,8 @@
  (flags
   (:standard -open Prigh_test))
  (inline_tests
+  (enabled_if
+   (= %{env:PRIGH_TEST_TIER=default} full))
   (deps ../../bin/main.exe)
   (flags
    (-source-tree-root .)))
