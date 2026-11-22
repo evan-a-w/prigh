@@ -108,11 +108,19 @@ module Icon : sig
     | Openai
     | Anthropic
     | Deepseek
-    | Spark (** a provider without a mark of its own *)
     | Monitor (** a tool host *)
     | Square_pen (** a new session *)
     | Panel_right (** the session card *)
     | Panel_bottom (** the terminal *)
+    | Usage (** a bar chart: usage and cost *)
+    | Gemini
+    | Openrouter
+    | Ollama
+    | Xai
+    | Mistral
+    | Groq
+    | Qwen
+    | Moonshot (** the providers' logos, filled *)
 
   (** An inline SVG; tests show [<icon name>]. *)
   val view : ?cls:string -> t -> Node.t

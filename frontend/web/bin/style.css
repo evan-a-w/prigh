@@ -2014,7 +2014,9 @@ kbd {
 .composer-controls { flex: 0 1 auto; margin-left: auto; display: flex; align-items: center; gap: 2px; min-width: 0; }
 .composer-controls .model-chip { gap: 6px; font-weight: 400; }
 .model-chip .provider-mark { width: 14px; height: 14px; color: var(--muted-text); }
-.provider-mark { stroke-width: 1.7; }
+.provider-mark { flex: none; }
+/* A provider without a logo: its initial, in the logo's square. */
+.provider-letter { display: inline-flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 600; line-height: 1; border-radius: 3px; box-shadow: inset 0 0 0 1.25px currentColor; }
 
 /* The context ring, by the paperclip: a 30px ring in a 44px target, the accent filling it to
    the context used, amber near where it compacts and brick from there. A
@@ -2125,7 +2127,8 @@ kbd {
   color: var(--faint);
   cursor: pointer;
 }
-.model-rail-tab .icon { width: 18px; height: 18px; }
+.model-rail-tab .icon, .model-rail-tab .provider-letter { width: 18px; height: 18px; }
+.model-rail-tab .provider-letter { font-size: 11px; }
 @media (hover: hover) { .model-rail-tab:hover { background: var(--slate-2); color: var(--chalk); } }
 .model-rail-tab.on { color: var(--chalk); background: var(--slate-2); }
 .model-rail-tab.on::before { content: ""; position: absolute; left: -6px; top: 8px; bottom: 8px; width: 3px; border-radius: 0 2px 2px 0; background: var(--sodium); }
