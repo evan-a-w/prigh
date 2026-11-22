@@ -473,14 +473,14 @@ streamed before and goes on from where it is now; its card says the output
 from meanwhile shows with its result.
 
 To get around a long session without scrolling, a rail along the chat's
-right edge has a mark for each of your messages (and a brick dot for a
+left edge has a mark for each of your messages (and a brick dot for a
 reply that failed, a longer rule where the context was compacted): the
 one you are reading is drawn out in sodium, hovering a mark shows the
 message's first line and time, and a click goes there, marking it for a
 moment. Messages not loaded yet have faint marks, and jumping to one loads
-the pages down to it first. The button above the rail, Ctrl+J, opens the
-same messages as a list to filter (newest first; on a phone, where there
-is no rail, the button floats over the chat's corner), and Ctrl+↑/↓ step
+the pages down to it first. Ctrl+J opens the same messages as a list to
+filter (newest first; on a phone, where there is no rail, "Jump to a
+message" in the ⋯ sheet), and Ctrl+↑/↓ step
 to your previous or next message, loading earlier ones past the first
 loaded.
 

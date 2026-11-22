@@ -3388,8 +3388,8 @@ terminal frontend and `web/` prigh-web, the browser one.
       index`, tagged `Page` like `Load_older`; while another page is on its
       way, once it is in) and `Jump.entry_of_index` finds its entry in the
       page added, for `Command.Scroll_to_entry`. `Jump_view` (beside the
-      chat, in `.chat-frame`, once the user has sent two messages) is the
-      jump list's button and, but on a phone, the rail: a mark per landmark
+      chat, in `.chat-frame`, once the user has sent two messages, but not
+      on a phone) is the rail at the chat's left edge: a mark per landmark
       (at most ~120, picked evenly), evenly spaced rather than by height so
       that each is as easy to hit and the marks not loaded have a place,
       each a button with the message's first line and time as its label and
