@@ -1,11 +1,11 @@
-// Steering a background subagent from the composer: showing it in the agents
-// panel leaves the composer on the main agent; its Steer button makes the
-// composer write to it (a chip over the editor says so), Enter
-// steers it and Alt+Enter queues a follow-up, both listed above the
-// composer until they reach it; its transcript then has them; once it
-// finishes the composer is the main agent's again. Run by prigh_web.sh;
-// prints normalised snapshots (the expected output is in ENGINE.expected)
-// and, with SHOTS, screenshots.
+// Steering a background subagent from its chat: opening it (its line in
+// the transcript) puts it in the session's place, and the composer writes
+// to it; Esc goes back to the session's chat, where the composer is the
+// main agent's, and Alt+1 opens it again. Enter steers it and Alt+Enter
+// queues a follow-up, both listed above the composer until they reach it;
+// its transcript then has them; once it has finished, a message carries it
+// on. Run by prigh_web.sh; prints normalised snapshots (the expected output
+// is in ENGINE.expected) and, with SHOTS, screenshots.
 //
 // The subagent's bash call, and the main agent's, wait for a file the
 // script creates, so that what runs when is fixed (the two share the faux
@@ -50,6 +50,8 @@ writeFileSync(
     { text: "Looking around.", tool_calls: [{ id: "b1", name: "bash", arguments: { command: waitFor("sub-go") } }] },
     { text: "Using the tests, as asked." },
     { text: "Summary: **3** files, all tested." },
+    // Carried on after it finished, by a message in its chat.
+    { text: "Carrying on: the docs are fine too." },
     // The main agent again, the report delivered meanwhile.
     { text: "The survey is in." },
   ]),
@@ -105,10 +107,13 @@ const show = async (label, selector) => {
 };
 const composer = page.locator(".composer textarea");
 const recipient = async () => {
-  const chip = page.locator(".steer-chip");
-  const placeholder = await composer.getAttribute("placeholder");
-  return `${(await chip.count()) ? clean(await chip.innerText()).replace(/\n/g, " ") : "(no chip)"}; ${placeholder}`;
+  const shown = await page.locator(".subagent-chat").getAttribute("data-subagent").catch(() => null);
+  const crumbs = clean(await page.locator(".session-crumbs").innerText()).replace(/\n/g, " ");
+  return `${shown ? `${shown}'s chat` : "the session's chat"} (${crumbs}); ${await composer.getAttribute("placeholder")}`;
 };
+const subagentChat = page.locator(".subagent-chat[data-subagent=a1]");
+const subagentHas = text => page.waitForFunction(t =>
+  document.querySelector(".subagent-chat[data-subagent=a1]")?.innerText.includes(t), text);
 const toasts = () => page.locator(".toast").allInnerTexts();
 const waitToast = text => page.waitForFunction(t =>
   [...document.querySelectorAll(".toast")].some(e => e.innerText.includes(t)), text);
@@ -121,37 +126,26 @@ try {
 
   await composer.fill("survey the project");
   await composer.press("Enter");
-  // The subagent waits in its bash call.
-  await page.locator(".agents-toggle").waitFor();
-  await page.locator(".agents-toggle").click();
-  await page.locator(".agents-row.running").first().waitFor();
-  await page.locator(".agents-row.running").first().click();
-  await page.waitForSelector(".agents-detail .agents-transcript .entries");
-  await page.waitForFunction(() => document.querySelector(".agents-transcript")?.innerText.includes("sub-go"));
-  section("showing it leaves the composer on the main agent");
+  // The subagent waits in its bash call; its line in the transcript opens
+  // its chat.
+  await page.locator("#chat .tool-subagent .tool-head[data-agent=a1]").click();
+  await subagentChat.waitFor();
+  await subagentHas("sub-go");
+  section("its line opens its chat: the composer writes to it");
   console.log(await recipient());
-  console.log(clean(await page.locator(".agents-foot").innerText()));
-  await screenshot("showing a1");
+  console.log(`stop button: ${await page.locator(".composer .stop").count()}`);
+  await screenshot("a1's chat");
 
-  // Its Steer button writes to it; the editor has the focus.
-  await page.locator(".agents-steer").click();
-  await page.locator(".steer-chip").waitFor();
-  section("Steer");
-  console.log(await recipient());
-  console.log(`editor focused: ${await composer.evaluate(e => e === document.activeElement)}`);
-  console.log(clean(await page.locator(".agents-foot").innerText()));
-  await screenshot("steering a1");
-
-  // Esc goes back to the main agent; Steer again writes to it.
+  // Esc goes back to the session's chat; Alt+1 opens it again.
   await composer.click();
   await page.keyboard.press("Escape");
-  await page.locator(".steer-chip").waitFor({ state: "detached" });
+  await subagentChat.waitFor({ state: "detached" });
   section("Esc");
   console.log(await recipient());
-  console.log(`still running: ${await page.locator(".composer .btn.stop").count() === 1}`);
-  await page.locator(".agents-steer").click();
-  await page.locator(".steer-chip").waitFor();
-  console.log(`Steer: ${await recipient()}`);
+  console.log(`still running: ${await page.locator(".composer .stop").count() === 1}`);
+  await page.keyboard.press("Alt+1");
+  await subagentChat.waitFor();
+  console.log(`Alt+1: ${await recipient()}`);
 
   // A steer and a follow-up, queued while it waits.
   await composer.fill("use the tests");
@@ -160,7 +154,6 @@ try {
   await composer.press("Alt+Enter");
   await page.waitForFunction(() => document.querySelectorAll(".queued.to-agent").length === 2);
   await show("queued for it", ".queue");
-  await show("its row says so", ".agents-foot .detail-more");
   await screenshot("queued for a1");
 
   // Edit takes the follow-up back; sent again.
@@ -176,26 +169,31 @@ try {
   writeFileSync(join(cwd, "sub-go"), "");
   await waitToast("a1 has finished");
   await page.waitForFunction(() => !document.querySelector(".queued"));
+  await page.waitForFunction(() => !document.querySelector(".composer .stop"));
+  await subagentHas("all tested");
   section("delivered, it finished");
   console.log((await toasts()).filter(t => t.includes("has finished")).join("\n"));
-  section("the composer is the main agent's again");
   console.log(await recipient());
-  await page.evaluate(() => {
-    document.querySelectorAll(".agents-transcript details.note").forEach(d => { d.open = true; });
+  const openNotes = () => page.evaluate(() => {
+    document.querySelectorAll(".subagent-chat details.note").forEach(d => { d.open = true; });
   });
-  await show("its transcript", ".agents-transcript .entries");
+  await openNotes();
+  await show("its transcript", ".subagent-chat .entries");
   await screenshot("a1 steered and finished");
 
-  // A finished subagent takes no messages: what to do instead.
-  await composer.fill("/agents steer a1 one more thing");
+  // Finished, a message carries it on: it runs again.
+  await composer.fill("check the docs too");
   await composer.press("Enter");
-  await waitToast("Couldn't send it to a1");
-  section("too late");
-  console.log((await toasts()).filter(t => t.includes("Couldn't")).join("\n"));
-  console.log(`in the editor: ${await composer.inputValue()}`);
-  await screenshot("too late");
-  await composer.fill("");
+  await subagentHas("Carrying on");
+  await page.waitForFunction(() => !document.querySelector(".composer .stop"));
+  section("carried on");
+  console.log(`in the editor: ${JSON.stringify(await composer.inputValue())}`);
+  await openNotes();
+  await show("its transcript", ".subagent-chat .entries");
+  await screenshot("a1 carried on");
 
+  await page.keyboard.press("Escape");
+  await subagentChat.waitFor({ state: "detached" });
   writeFileSync(join(cwd, "main-go"), "");
   await page.waitForFunction(() => document.getElementById("chat").innerText.includes("The survey is in."));
   await page.waitForFunction(() => !document.querySelector(".composer .btn.stop"));

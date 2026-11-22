@@ -2,7 +2,7 @@
 // repository and a subagent: what it lists, where it sits against the
 // transcript's column as the window narrows (the column moves left only by
 // what the margin lacks; below an 820px pane the card covers its corner),
-// hiding it, a subagent's transcript in the chat's place and back (Esc), and
+// hiding it, a subagent's chat in the session's place and back (Esc), and
 // on phones a sheet from the bottom, opened from the ⋯ sheet. Run by
 // prigh_web.sh; prints normalised snapshots (the expected output is in
 // ENGINE.expected).
@@ -161,24 +161,27 @@ try {
   await page.locator(".session-card-toggle").click();
   await page.locator(".session-card").waitFor();
 
-  // A subagent's transcript in the chat's place, read-only.
+  // A subagent's chat in the session's place: the composer writes to it;
+  // the breadcrumb and the card say where it is.
   await page.locator(".session-card-agent").click();
   await page.locator(".subagent-chat").waitFor();
   await page.locator(".subagent-chat", { hasText: "There are 42 modules." }).first().waitFor();
-  section("a subagent's transcript");
+  await page.locator(".session-card-parent").first().waitFor();
+  section("a subagent's chat");
   console.log(clean(await page.locator("#chat").innerText()));
+  console.log(`breadcrumb: ${clean(await page.locator(".session-crumbs").innerText()).replace(/\n/g, " ")}`);
+  console.log(`card: ${clean(await page.locator(".session-card").innerText()).replace(/\n/g, " | ")}`);
   console.log(`composer: ${await page.locator(".composer textarea").count()}, ` +
-    `footer: ${clean(await page.locator(".subagent-chat-footer").innerText()).replace(/\n/g, " ")}, ` +
     `focus in the transcript: ${await page.evaluate(() => document.activeElement?.id === "chat")}`);
   console.log(await page.evaluate(() => {
     const prompt = document.querySelector(".subagent-chat .msg.user");
     const bubble = prompt && [prompt, ...prompt.querySelectorAll("*")].find(e =>
       getComputedStyle(e).backgroundColor !== "rgba(0, 0, 0, 0)");
     const main = document.querySelector(".main").getBoundingClientRect();
-    const footer = document.querySelector(".subagent-chat-footer").getBoundingClientRect();
-    return `its task as a filled prompt: ${!!bubble}; the footer at the pane's foot: ${main.bottom - footer.bottom < 4}`;
+    const composer = document.querySelector(".composer-box").getBoundingClientRect();
+    return `its task as a filled prompt: ${!!bubble}; the composer at the pane's foot: ${main.bottom - composer.bottom < 40}`;
   }));
-  await screenshot("a subagent's transcript");
+  await screenshot("a subagent's chat");
   await page.keyboard.press("Escape");
   await page.waitForSelector(".subagent-chat", { state: "detached" });
   await editor().waitFor();

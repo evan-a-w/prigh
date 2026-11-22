@@ -1,7 +1,8 @@
 // A subagent whose call is in a page not loaded: the main agent delegates,
 // then works on for more messages than a page holds; reloaded, the page has
-// only the newest of them, and the subagent opened in the agents panel
-// shows its transcript all the same (fetched on its own). Run by
+// only the newest of them, and the subagent's chat (opened with /agents 1,
+// its line not being loaded) shows its transcript all the same (fetched on
+// its own). Run by
 // prigh_web.sh; prints normalised results (the expected output is in
 // ENGINE.expected).
 //
@@ -107,7 +108,7 @@ try {
 
   await composer.fill("count the files");
   await composer.press("Enter");
-  // The subagent done: its line settles to a tick (its report is in the panel).
+  // The subagent done: its line settles to a tick (its report is in its chat).
   // A subagent's whole run: longer than a step on a busy machine.
   await page.waitForFunction(() => document.querySelector("#chat .tool-subagent.ok"), null, { timeout: 90000 });
   writeFileSync(join(cwd, "main-go"), "");
@@ -119,12 +120,14 @@ try {
   console.log(`the call is loaded: ${await chatHas("Delegating the count.")}`);
   console.log(`older messages to load: ${await page.locator("#chat [data-older]").count() > 0}`);
 
-  await page.locator(".agents-toggle").click();
-  await page.locator(".agents-row", { hasText: "Count the files" }).click();
-  await page.waitForFunction(() => document.querySelector(".agents-transcript")?.innerText.includes("3 files"));
+  await composer.fill("/agents 1");
+  await composer.press("Enter");
+  await page.waitForFunction(() => document.querySelector(".subagent-chat")?.innerText.includes("3 files"));
   section("its transcript");
-  console.log(clean(await page.locator(".agents-transcript").innerText()));
+  console.log(clean(await page.locator(".subagent-chat").innerText()));
   await screenshot("its transcript");
+  await page.keyboard.press("Escape");
+  await page.locator(".subagent-chat").waitFor({ state: "detached" });
 
   writeFileSync(join(cwd, "end"), "");
   await page.waitForFunction(() => document.getElementById("chat").innerText.includes("All done."));

@@ -299,11 +299,16 @@ const showChips = async (label, cover) => {
   await screenshot(label);
 };
 
-// The agents panel, with its elapsed times replaced.
-const showPanel = async label => {
+// A subagent's chat in the session's place: which, its transcript, the
+// breadcrumb, the session card and the composer, elapsed times replaced.
+const showSubagent = async label => {
   section(label);
-  console.log(clean(await page.locator(".agents-panel").innerText()).replace(/\b\d+(m \d\d)?s\b/g, "<T>"));
-  await page.waitForTimeout(200); // its slide in
+  const times = t => clean(t).replace(/\b\d+(m \d\d)?s\b/g, "<T>");
+  console.log(`on show: ${await page.locator(".subagent-chat").getAttribute("data-subagent")}`);
+  console.log(times(await page.locator(".subagent-chat").innerText()));
+  console.log(`breadcrumb: ${times(await page.locator(".session-crumbs").innerText()).replace(/\n/g, " ")}`);
+  console.log(`card: ${times(await page.locator(".session-card").innerText()).replace(/\n/g, " | ")}`);
+  console.log(`composer: ${await page.locator(".composer textarea").getAttribute("placeholder")}`);
   await screenshot(label);
 };
 
@@ -828,62 +833,37 @@ try {
   await idle();
   await showTurn("after reconnecting");
 
-  // 8. Subagents (one nested in a background one) and a background job in
-  //    the agents panel: the list, one in full, its card in the chat, the
-  //    job's output; a card in the chat opens its agent.
+  // 8. Subagents (one nested in a background one) are chats: a line in the
+  //    transcript opens its chat in the session's place, Alt+N its Nth
+  //    subagent's; the breadcrumb and the session card show its lineage;
+  //    Esc goes to the parent's chat.
   await send("survey it");
   await bodyHas("Started a survey and a job.");
   await idle();
-  await page.locator(".chat-chrome .agents-toggle").click();
-  await page.waitForFunction(() =>
-    document.querySelectorAll(".agents-row").length === 3 && !document.querySelector(".agents-row.running"));
-  await showPanel("agents panel");
-  await page.keyboard.press("Alt+2");
-  await page.waitForSelector(".agents-detail .agents-transcript .entries");
-  await showPanel("a nested subagent");
-  await page.locator(".agents-foot .btn", { hasText: "Show in chat" }).click();
-  await page.waitForFunction(() => {
-    // A nested subagent's card is in its agent's view, not the chat: the
-    // chat shows the line of the subagent it is under.
-    const card = document.querySelector("#chat [data-call=s1]");
-    const chat = document.getElementById("chat").getBoundingClientRect();
-    const box = card?.getBoundingClientRect();
-    return box && box.top >= chat.top && box.bottom <= chat.bottom;
-  });
-  console.log("its top-level card is in view in the chat");
-  await page.keyboard.press("Alt+3");
-  await page.waitForSelector(".job-output");
-  await showPanel("a background job");
-  await page.keyboard.press("Alt+0");
-  await page.waitForSelector(".agents-panel", { state: "detached" });
-  await page.locator("#chat .tool-head[data-agent=a1]").click();
-  await page.waitForSelector(".agents-detail .agents-transcript .entries");
-  await showPanel("a card opens its agent");
-  // What it is stays pinned under its transcript, scrolled either way (in a
-  // short window, so that it scrolls).
-  await page.setViewportSize({ width: 1280, height: 300 });
-  await page.waitForTimeout(200);
-  const pinned = () => page.evaluate(() => {
-    const panel = document.querySelector(".agents-panel").getBoundingClientRect();
-    const body = document.getElementById("agents-body");
-    const foot = document.querySelector(".agents-foot").getBoundingClientRect();
-    return `scrolls ${body.scrollHeight > body.clientHeight}, `
-      + `footer at the panel's foot ${Math.abs(foot.bottom - panel.bottom) < 2}, `
-      + `under the transcript ${body.getBoundingClientRect().bottom <= foot.top + 1}`;
-  });
-  section("the agent's footer stays in sight");
-  await page.evaluate(() => { document.getElementById("agents-body").scrollTop = 0; });
-  console.log(`at the top: ${await pinned()}`);
-  await page.evaluate(() => {
-    const body = document.getElementById("agents-body");
-    body.scrollTop = body.scrollHeight;
-  });
-  await page.waitForTimeout(100);
-  console.log(`at the end: ${await pinned()}`);
-  console.log(clean(await page.locator(".agents-foot").innerText()).replace(/\b\d+(m \d\d)?s\b/g, "<T>"));
-  await screenshot("agent footer pinned");
-  await page.setViewportSize({ width: 1280, height: 800 });
-  await page.locator(".agents-close").click();
+  await page.waitForFunction(() => document.querySelector(".session-card-agent")
+    && !document.querySelector(".session-card-agent.running"));
+  section("the session's card lists its subagent");
+  console.log(clean(await page.locator(".session-card").innerText()).replace(/\b\d+(m \d\d)?s\b/g, "<T>"));
+  await page.locator("#chat .tool-subagent .tool-head[data-agent=a1]").click();
+  await page.waitForSelector(".subagent-chat[data-subagent=a1] .entries");
+  await page.locator(".session-card-parent").first().waitFor();
+  await showSubagent("its line opens its chat");
+  await page.keyboard.press("Alt+1");
+  await page.waitForSelector(".subagent-chat[data-subagent='a1/n1'] .entries");
+  await page.waitForFunction(() => document.querySelectorAll(".session-card-parent").length === 2);
+  await showSubagent("Alt+1: its own subagent's chat");
+  await page.keyboard.press("Escape");
+  await page.waitForSelector(".subagent-chat[data-subagent=a1]");
+  console.log(`Esc: back to ${await page.locator(".subagent-chat").getAttribute("data-subagent")}`);
+  await page.keyboard.press("Escape");
+  await page.waitForSelector(".subagent-chat", { state: "detached" });
+  console.log(`Esc: back to the session's chat: ${await page.locator("#chat", { hasText: "Started a survey and a job." }).count() === 1}`);
+  await page.keyboard.press("Alt+1");
+  await page.waitForSelector(".subagent-chat[data-subagent=a1] .entries");
+  console.log(`Alt+1 from the session: ${await page.locator(".subagent-chat").getAttribute("data-subagent")}`);
+  await page.locator(".session-crumbs button.chrome-title-text").click();
+  await page.waitForSelector(".subagent-chat", { state: "detached" });
+  console.log(`the breadcrumb's session: back to its chat: ${await page.locator("#chat", { hasText: "Started a survey and a job." }).count() === 1}`);
 
   // 9. The terminal: a shell on the backend, in the session's directory.
   //    Its keys are the shell's (Esc too); closing and reopening it, or
