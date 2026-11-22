@@ -3442,8 +3442,7 @@ let toggle_session_card (m : Model.t) =
   if m.narrow
   then
     ( { m with
-        session_card =
-          { m.session_card with sheet = not m.session_card.sheet }
+        session_card = { m.session_card with sheet = not m.session_card.sheet }
       ; status_tray = false
       }
     , [] )

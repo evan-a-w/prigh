@@ -26,22 +26,26 @@ let something (m : Model.t) =
 
 let inline (m : Model.t) = m.session_card_open && (not m.narrow) && something m
 
-(* The card is 208px wide and 12px in from the pane's edge, with 12px
-   between it and the column: 232px. The column ([--column] wide and
-   centred in what the transcript leaves) clears it when the pane's right
-   margin is that wide; [--push], the padding right of the transcript and the
-   composer, makes up what it lacks. Once the column has shrunk to fit, the
-   padding is the card less the composer's own edge. Below an 820px pane the
-   chat would be too narrow: the card covers its corner instead. *)
+(* The card is 208px wide, 12px in from the pane's right edge, with 12px
+   between it and the log's column: the column clears it when its right edge
+   is 232px in. Centred ([--log-column] wide), it does from a pane of
+   [--log-column] + 464px; in a narrower one [--push] (which chat.css takes
+   off the column's left padding) moves it left by what the margin lacks, and
+   the log's right padding keeps it out from under the card once it has
+   reached the left edge. The composer moves left with it but stays as
+   wide (narrower, its chips would lose their labels; the card is above it).
+   Below an 820px pane the chat would get too narrow: the card covers its
+   corner instead. The
+   variables are set on the pane's children, so that [cqw] is the pane's. *)
 let main_attr (m : Model.t) =
   if inline m
   then
     Attr.class_
-      "@container \
-       [--push:clamp(0px,calc(464px+var(--column)-100cqw),calc(232px-var(--edge)))] \
-       @max-[820px]:*:[--push:0px] [&>.chat-frame]:pr-[var(--push)] \
-       [&>.composer]:pr-[calc(var(--edge)+var(--push))] \
-       [&>.composer]:max-w-[calc(var(--column)+2*var(--edge)+var(--push))]"
+      "session-card-push @container \
+       *:[--push:max(0px,calc(var(--log-column)/2+232px-50cqw))] \
+       [&_.chat]:pr-[232px] @max-[820px]:*:[--push:0px] \
+       @max-[820px]:[&_.chat]:pr-(--edge) [&>.composer]:mr-auto \
+       [&>.composer]:ml-[max(0px,calc((100%-var(--column))/2-var(--edge)-var(--push)))]"
   else Attr.empty
 ;;
 

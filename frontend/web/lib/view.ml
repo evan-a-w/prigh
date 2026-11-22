@@ -450,7 +450,10 @@ let view (m : Model.t) ~inject ~terminal =
             ~attrs:
               [ classes
                   [ "main" ]
-                  [ "fresh", App.fresh m && Option.is_none (loading m)
+                  [ ( "fresh"
+                    , App.fresh m
+                      && Option.is_none (loading m)
+                      && Option.is_none m.subagent_chat )
                   ; "temporary", App.temporary_shown m
                   ; "landing", m.landing
                   ]

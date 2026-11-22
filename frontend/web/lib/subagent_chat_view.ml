@@ -87,12 +87,12 @@ let view (m : Model.t) ~inject id =
     let now = Option.value m.now ~default:Time_ns.epoch in
     let activity = Session_card.Activity.of_agent a ~now in
     Node.div
-      ~attrs:[ Attr.class_ "loon subagent-chat"; Attr.create "data-agent" a.id ]
+      ~attrs:[ Attr.class_ "subagent-chat"; Attr.create "data-agent" a.id ]
       [ Node.div
           ~attrs:
             [ Attr.class_
-                "subagent-chat-head mb-4 flex max-w-(--column) items-center \
-                 gap-2 border-b pb-3"
+                "loon subagent-chat-head mb-4 flex max-w-(--log-column) \
+                 items-center gap-2 border-b pb-3"
             ]
           [ Node.button
               ~attrs:
@@ -137,8 +137,11 @@ let footer ~inject =
   Node.div
     ~attrs:
       [ Attr.class_
-          "loon composer subagent-chat-footer flex items-center \
-           justify-between gap-2 text-xs text-muted-foreground"
+          "loon subagent-chat-footer mx-auto flex w-full \
+           max-w-[calc(var(--log-column)+2*var(--edge))] items-center \
+           justify-between gap-2 px-(--edge) pt-2 \
+           pb-[max(12px,env(safe-area-inset-bottom))] text-xs \
+           text-muted-foreground"
       ]
     [ Node.span [ Node.text "A subagent's transcript: read-only." ]
     ; Node.button

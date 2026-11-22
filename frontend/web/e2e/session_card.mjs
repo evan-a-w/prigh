@@ -108,16 +108,19 @@ const layout = async (label, width) => {
     const box = e => e?.getBoundingClientRect();
     const main = box(document.querySelector(".main"));
     const card = box(document.querySelector(".session-card"));
-    const frame = document.querySelector(".chat-frame");
+    const chat = document.querySelector(".chat");
     const entries = box(document.querySelector(".chat .entries"));
     const composer = box(document.querySelector(".composer-box"));
-    const push = Math.round(parseFloat(getComputedStyle(frame).paddingRight) || 0);
-    const lines = [`pane ${Math.round(main.width)}px, the chat padded ${push}px on the right`];
+    // Where the column would be, centred in the log, against where it is.
+    const column = parseFloat(getComputedStyle(document.querySelector(".chat .entries")).maxWidth);
+    const centred = Math.max(16, (chat.clientWidth - column) / 2);
+    const moved = centred - (entries.left - box(chat).left) > 4;
+    const lines = [`pane ${Math.round(main.width)}px, the column ${moved ? "moved left" : "centred"}`];
     if (!card) return [...lines, "no card"].join("\n");
     lines.push(`card ${Math.round(card.width)}px wide, ${Math.round(main.right - card.right)}px from the pane's edge`);
     const gap = Math.round(card.left - entries.right);
     lines.push(gap >= 12 ? `the column clears it (${gap >= 40 ? "40px or more" : "12px or more"})` : "the card covers the column's corner");
-    lines.push(`the composer's right edge lines up with the column's: ${Math.abs(composer.right - entries.right) < 40}`);
+    lines.push(`the composer's left edge lines up with the column's: ${Math.abs(composer.left - entries.left) < 40}`);
     lines.push(`the column keeps ${entries.left - main.left >= 12 ? "its left margin" : "no left margin"}`);
     return lines.join("\n");
   }));
@@ -163,6 +166,14 @@ try {
   console.log(`composer: ${await page.locator(".composer textarea").count()}, ` +
     `footer: ${clean(await page.locator(".subagent-chat-footer").innerText()).replace(/\n/g, " ")}, ` +
     `focus in the transcript: ${await page.evaluate(() => document.activeElement?.id === "chat")}`);
+  console.log(await page.evaluate(() => {
+    const prompt = document.querySelector(".subagent-chat .msg.user");
+    const bubble = prompt && [prompt, ...prompt.querySelectorAll("*")].find(e =>
+      getComputedStyle(e).backgroundColor !== "rgba(0, 0, 0, 0)");
+    const main = document.querySelector(".main").getBoundingClientRect();
+    const footer = document.querySelector(".subagent-chat-footer").getBoundingClientRect();
+    return `its task as a filled prompt: ${!!bubble}; the footer at the pane's foot: ${main.bottom - footer.bottom < 4}`;
+  }));
   await screenshot("a subagent's transcript");
   await page.keyboard.press("Escape");
   await page.waitForSelector(".subagent-chat", { state: "detached" });

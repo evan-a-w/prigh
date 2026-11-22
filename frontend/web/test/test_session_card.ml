@@ -109,7 +109,7 @@ let%expect_test
      card by what its margin lacks. *)
   H.elements h ~selector:".main";
   [%expect
-    {| <main class="@container @max-[820px]:*:[--push:0px] [&>.chat-frame]:pr-[var(--push)] [&>.composer]:max-w-[calc(var(--column)+2*var(--edge)+var(--push))] [&>.composer]:pr-[calc(var(--edge)+var(--push))] [--push:clamp(0px,calc(464px+var(--column)-100cqw),calc(232px-var(--edge)))] main"> |}];
+    {| <main class="*:[--push:max(0px,calc(var(--log-column)/2+232px-50cqw))] @container @max-[820px]:*:[--push:0px] @max-[820px]:[&_.chat]:pr-(--edge) [&>.composer]:ml-[max(0px,calc((100%-var(--column))/2-var(--edge)-var(--push)))] [&>.composer]:mr-auto [&_.chat]:pr-[232px] main session-card-push"> |}];
   (* The chrome's button hides it, and the padding goes with it. *)
   H.click h ~selector:".session-card-toggle";
   H.elements h ~selector:".session-card";
@@ -191,7 +191,7 @@ let%expect_test
     <Vdom.Node.none-widget class="">
     <div class="chat-frame">
     <div class="toast-anchor">
-    <div class="composer flex gap-2 items-center justify-between loon subagent-chat-footer text-muted-foreground text-xs">
+    <div class="flex gap-2 items-center justify-between loon max-w-[calc(var(--log-column)+2*var(--edge))] mx-auto pb-[max(12px,env(safe-area-inset-bottom))] pt-2 px-(--edge) subagent-chat-footer text-muted-foreground text-xs w-full">
     |}];
   H.text h ~selector:".subagent-chat-footer";
   [%expect {| A subagent's transcript: read-only. (Back (Esc)) |}];
