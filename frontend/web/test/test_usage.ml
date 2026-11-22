@@ -59,12 +59,20 @@ let%expect_test "Opening Usage asks once; loading, then each provider's windows"
     (Focus dialog)
     (Rpc (method_ usage_limits) (params ()) (tag Usage_loaded))
     Usage
-    How much of your Claude and ChatGPT subscriptions' usage limits you have used, as the providers report it. Read when you open this page.
+    How much of your Claude and ChatGPT subscriptions' usage limits you have used, as the providers report it (read when you open this page), and whether a run stopped by one carries on when it resets.
+    At a limit
+    Resume after a usage limit
+    A run stopped by a provider's usage limit carries on by itself when the limit resets, if the provider says when. Off: it stays stopped until you send a message.
+    (Stay stopped at a usage limit (/resume off))
     Subscription limits
     Reading your usage from the providers…
     (Reading…)
     Usage
-    How much of your Claude and ChatGPT subscriptions' usage limits you have used, as the providers report it. Read when you open this page.
+    How much of your Claude and ChatGPT subscriptions' usage limits you have used, as the providers report it (read when you open this page), and whether a run stopped by one carries on when it resets.
+    At a limit
+    Resume after a usage limit
+    A run stopped by a provider's usage limit carries on by itself when the limit resets, if the provider says when. Off: it stays stopped until you send a message.
+    (Stay stopped at a usage limit (/resume off))
     Subscription limits
     Read 10:00 (just now). Updated when you open this page or press Refresh.
     (Refresh)
@@ -141,7 +149,11 @@ let%expect_test "Not signed in and API keys say how to sign in" =
     (Focus dialog)
     (Rpc (method_ usage_limits) (params ()) (tag Usage_loaded))
     Usage
-    How much of your Claude and ChatGPT subscriptions' usage limits you have used, as the providers report it. Read when you open this page.
+    How much of your Claude and ChatGPT subscriptions' usage limits you have used, as the providers report it (read when you open this page), and whether a run stopped by one carries on when it resets.
+    At a limit
+    Resume after a usage limit
+    A run stopped by a provider's usage limit carries on by itself when the limit resets, if the provider says when. Off: it stays stopped until you send a message.
+    (Stay stopped at a usage limit (/resume off))
     Subscription limits
     Read 10:00 (just now). Updated when you open this page or press Refresh.
     (Refresh)
@@ -171,7 +183,11 @@ let%expect_test "A provider's error, a plan without windows, a failed call" =
     (Focus dialog)
     (Rpc (method_ usage_limits) (params ()) (tag Usage_loaded))
     Usage
-    How much of your Claude and ChatGPT subscriptions' usage limits you have used, as the providers report it. Read when you open this page.
+    How much of your Claude and ChatGPT subscriptions' usage limits you have used, as the providers report it (read when you open this page), and whether a run stopped by one carries on when it resets.
+    At a limit
+    Resume after a usage limit
+    A run stopped by a provider's usage limit carries on by itself when the limit resets, if the provider says when. Off: it stays stopped until you send a message.
+    (Stay stopped at a usage limit (/resume off))
     Subscription limits
     Read 10:00 (just now). Updated when you open this page or press Refresh.
     (Refresh)
@@ -184,7 +200,11 @@ let%expect_test "A provider's error, a plan without windows, a failed call" =
     (Focus dialog)
     (Rpc (method_ usage_limits) (params ()) (tag Usage_loaded))
     Usage
-    How much of your Claude and ChatGPT subscriptions' usage limits you have used, as the providers report it. Read when you open this page.
+    How much of your Claude and ChatGPT subscriptions' usage limits you have used, as the providers report it (read when you open this page), and whether a run stopped by one carries on when it resets.
+    At a limit
+    Resume after a usage limit
+    A run stopped by a provider's usage limit carries on by itself when the limit resets, if the provider says when. Off: it stays stopped until you send a message.
+    (Stay stopped at a usage limit (/resume off))
     Subscription limits
     Could not read your usage. Unknown method usage_limits: try Refresh.
     (Refresh)

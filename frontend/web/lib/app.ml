@@ -4765,6 +4765,43 @@ let auto_archive_command (m : Model.t) rest =
   | Set _ as action -> set_auto_archive m action
 ;;
 
+let resume_summary config =
+  String.capitalize (Prigh_ui.Resume_command.summary config)
+;;
+
+(* The backend cancels a scheduled resume when it is turned off. *)
+let set_resume (m : Model.t) action =
+  with_config m ~f:(fun was ->
+    let config = Prigh_ui.Resume_command.apply action was in
+    save_config
+      m
+      config
+      ~fields:(List.map (Prigh_ui.Resume_command.fields action) ~f:fst)
+      ~notice:(resume_summary config))
+;;
+
+let resume_command (m : Model.t) rest =
+  match Prigh_ui.Resume_command.parse rest with
+  | Show ->
+    current_state m ~f:(fun s ->
+      toast
+        m
+        (String.capitalize
+           (Prigh_ui.Loop_status.describe_resume s ~utc_offset:m.utc_offset
+            ^ Option.value_map m.config ~default:"" ~f:(fun c ->
+              "; " ^ Prigh_ui.Resume_command.summary c))))
+  | Now -> m, [ rpc "resume_now" [] ~tag:(Notice "Resuming now") ]
+  | Cancel ->
+    ( m
+    , [ rpc
+          "cancel_resume"
+          []
+          ~tag:(Notice "Automatic resume cancelled: send a message to retry")
+      ] )
+  | Error e -> error m (String.capitalize e)
+  | Set _ as action -> set_resume m action
+;;
+
 let save_about_you (m : Model.t) =
   match About_you.save m.about_you with
   | about_you, Some request ->
@@ -7138,12 +7175,7 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
           [ "text", str text ]
           ~tag:(Sent { text = "/goal " ^ text; images = [] })
       ] )
-  | "resume", "" ->
-    current_state m ~f:(fun s ->
-      toast
-        m
-        (String.capitalize
-           (Prigh_ui.Loop_status.describe_resume s ~utc_offset:m.utc_offset)))
+  | "resume", rest -> resume_command m rest
   | "downsize-images", _ ->
     ( m
     , [ rpc
@@ -7151,21 +7183,6 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
           []
           ~tag:(Notice "Images will be sent smaller; retrying a failed reply")
       ] )
-  | "resume", "now" -> m, [ rpc "resume_now" [] ~tag:(Notice "Resuming now") ]
-  | "resume", "cancel" ->
-    ( m
-    , [ rpc
-          "cancel_resume"
-          []
-          ~tag:(Notice "Automatic resume cancelled: send a message to retry")
-      ] )
-  | "resume", other ->
-    error
-      m
-      (sprintf
-         "Unknown /resume argument “%s”: /resume now retries at once, /resume \
-          cancel stays stopped."
-         other)
   | "compact", instructions ->
     let m, cmds = toast m "Compacting the conversation…" in
     ( m
@@ -10857,6 +10874,7 @@ let setting_opener (m : Model.t) (setting : Control_setting.t) =
   | Providers
   | Compact_at
   | Mask
+  | Auto_resume
   | Memory
   | Memory_notes
   | About_you
@@ -10957,6 +10975,7 @@ let config_value (m : Model.t) (config : Config.t) (setting : Control_setting.t)
   | Naming_model -> Some (model config.naming_model ~default:"the drafting one")
   | Compact_at -> Some (sprintf "%d tokens" config.compact_at_tokens)
   | Mask -> Some (if config.mask_observations then "on" else "off")
+  | Auto_resume -> Some (if config.resume_on_limit_reset then "on" else "off")
   | Archive_after ->
     Some
       (if Float.(config.archive_after_days <= 0.)

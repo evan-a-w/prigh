@@ -377,6 +377,14 @@ let argument_items
           ~id:"cancel"
           ~detail:"stay stopped until you send a message"
           "cancel"
+      ; Picker.Item.create
+          ~id:"on"
+          ~detail:"resume runs by themselves when a usage limit resets"
+          "on"
+      ; Picker.Item.create
+          ~id:"off"
+          ~detail:"never resume by themselves after a usage limit"
+          "off"
       ]
   | Trim ->
     Some

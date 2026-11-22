@@ -81,6 +81,7 @@ module Reply_tag = struct
     | Naming_saved of string
     | Auto_archive_shown
     | Auto_archive_saved of string
+    | Resume_saved of string
     | Default_host_shown
     | Default_host_saved of string
     | Default_budget_shown
@@ -3383,6 +3384,30 @@ let auto_archive_command m (cmd : Commands.Parsed.t) =
       ] )
 ;;
 
+let resume_command m (cmd : Commands.Parsed.t) =
+  match Resume_command.parse cmd.rest with
+  | Show ->
+    with_state m ~f:(fun s ->
+      Loop_status.describe_resume s ~utc_offset:m.utc_offset
+      ^ Option.value_map m.config ~default:"" ~f:(fun c ->
+        "; " ^ Resume_command.summary c))
+  | Now -> m, [ rpc "resume_now" ~tag:(Notice_on_success "resuming now") ]
+  | Cancel ->
+    ( m
+    , [ rpc
+          "cancel_resume"
+          ~tag:(Notice_on_success "automatic resume cancelled")
+      ] )
+  | Error e ->
+    error (restore_command m (String.strip ("/resume " ^ cmd.rest))) e, []
+  | Set _ as action ->
+    ( m
+    , [ set_config
+          ~tag:(Resume_saved ("/resume " ^ cmd.rest))
+          (Resume_command.fields action)
+      ] )
+;;
+
 let state_hosts m = Option.value_map m.state ~default:[] ~f:(fun s -> s.hosts)
 
 let default_host_command m (cmd : Commands.Parsed.t) =
@@ -4580,8 +4605,7 @@ let run_command m (cmd : Commands.Parsed.t) =
                    Notice_on_success "goal set: the agent works until it is met"
                })
       ] )
-  | "resume", [] ->
-    with_state m ~f:(Loop_status.describe_resume ~utc_offset:m.utc_offset)
+  | "resume", _ -> resume_command m cmd
   | "downsize-images", [] ->
     ( m
     , [ rpc
@@ -4591,15 +4615,6 @@ let run_command m (cmd : Commands.Parsed.t) =
                "images will be sent smaller; retrying a failed reply")
       ] )
   | "downsize-images", _ -> error m "usage: /downsize-images", []
-  | "resume", [ "now" ] ->
-    m, [ rpc "resume_now" ~tag:(Notice_on_success "resuming now") ]
-  | "resume", [ "cancel" ] ->
-    ( m
-    , [ rpc
-          "cancel_resume"
-          ~tag:(Notice_on_success "automatic resume cancelled")
-      ] )
-  | "resume", _ -> error m "usage: /resume [now|cancel]", []
   | "login", [] ->
     ( m
     , [ rpc "auth_status" ~tag:Auth_login_picker
@@ -7151,7 +7166,8 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
      | Naming_saved text
      | Default_host_saved text
      | Default_budget_saved text
-     | Auto_archive_saved text ->
+     | Auto_archive_saved text
+     | Resume_saved text ->
        (* Back in the editor, to correct rather than retype. *)
        let editor =
          if Editor.is_empty m.editor
@@ -7846,6 +7862,10 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
          ( notice
              { m with config = Some config }
              (Auto_archive_command.summary config)
+         , [] ))
+     | Resume_saved _ ->
+       decode json ~f:P.Config.of_json (fun config ->
+         ( notice { m with config = Some config } (Resume_command.summary config)
          , [] ))
      | Models_catalog ->
        decode json ~f:(decode_list ~f:P.Model.of_json) (fun models ->

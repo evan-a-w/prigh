@@ -2898,7 +2898,9 @@ the status line shows `resumes 14:05`. `/resume now` retries at once,
 provider does not say, a note says so and nothing is scheduled; when the
 time it gives has already passed, the retry backs off (1 minute, doubling up
 to an hour) instead of retrying at once.
-`resume_on_limit_reset: false` in `config.json` turns this off. A scheduled
+`/resume off` (or Settings → Usage in prigh-web, or
+`resume_on_limit_reset: false` in `config.json`) turns this off, and cancels
+a resume already scheduled; `/resume on` turns it back on. A scheduled
 resume is recorded in the session: a backend that restarts before the reset
 loads the session and resumes it on time (one whose reset passed while the
 backend was down is dropped; send a message to carry on), and a session
@@ -2953,7 +2955,7 @@ it.
 | `/memory [on\|off]` | pick among the notes the model saved (Ctrl+D forgets one; prigh-web opens Settings → Memory); `on`/`off` gives the model the memory tool or takes it away |
 | `/user-info [FIELD VALUE\|clear]` | what you set about yourself for the model (name, country, time zone, units…), in the context of every session: show it, set one field (no VALUE clears it) or clear them all (prigh-web opens Settings → About you) |
 | `/remind [stop [N] TEXT\|every N TEXT\|rm NAME\|off]` | remind the agent when it ends its turn (at most N times in a row, default 3) or every N turns; without arguments, pick among the session's (Ctrl+D / Delete removes one); `rm` removes one, `off` all |
-| `/resume [now\|cancel]` | show, run now or cancel the automatic resume after a usage limit |
+| `/resume [now\|cancel\|on\|off]` | show, run now or cancel the automatic resume after a usage limit, or turn it on or off |
 | `/new`, `/clear`, `/quit` | new session / clear transcript / exit |
 | `/temporary` (prigh-web) | a temporary session (Ctrl+Shift+O): not saved or listed, deleted when you leave it; in one, its menu (keep it, delete it) |
 | `/name [text]` | set the session name |

@@ -3303,6 +3303,10 @@ back to the list: true
 === chromium: mobile: 390x844: settings: models ===
 ok
 choice controls fit: true
+=== chromium: mobile: 390x844: settings: models, at its switches ===
+ok
+=== chromium: mobile: 390x844: settings: usage ===
+ok
 === chromium: mobile: 390x844: the drawer ===
 ok
 === chromium: mobile: 390x844: the control centre ===
@@ -3354,6 +3358,10 @@ back to the list: true
 === chromium: mobile: 320x640: settings: models ===
 ok
 choice controls fit: true
+=== chromium: mobile: 320x640: settings: models, at its switches ===
+ok
+=== chromium: mobile: 320x640: settings: usage ===
+ok
 === chromium: mobile: 320x640: the drawer ===
 ok
 === chromium: mobile: 320x640: the control centre ===
@@ -3405,6 +3413,10 @@ back to the list: true
 === chromium: mobile: 390x844-pwa: settings: models ===
 ok
 choice controls fit: true
+=== chromium: mobile: 390x844-pwa: settings: models, at its switches ===
+ok
+=== chromium: mobile: 390x844-pwa: settings: usage ===
+ok
 === chromium: mobile: 390x844-pwa: the drawer ===
 ok
 === chromium: mobile: 390x844-pwa: the control centre ===
@@ -4074,7 +4086,10 @@ back: Memory | What you asked the model to remember, for later sessions. Kept on
 (none)
 === chromium: usage: opened ===
 Usage
-How much of your Claude and ChatGPT subscriptions' usage limits you have used, as the providers report it. Read when you open this page.
+How much of your Claude and ChatGPT subscriptions' usage limits you have used, as the providers report it (read when you open this page), and whether a run stopped by one carries on when it resets.
+AT A LIMIT
+Resume after a usage limit
+A run stopped by a provider's usage limit carries on by itself when the limit resets, if the provider says when. Off: it stays stopped until you send a message.
 Subscription limits
 Read TIME (just now). Updated when you open this page or press Refresh.
 Refresh
@@ -4102,7 +4117,10 @@ asked: Claude 1, ChatGPT 1
 asked: Claude 2, ChatGPT 2; ChatGPT's session: 75% used
 === chromium: usage: Claude rate limited ===
 Usage
-How much of your Claude and ChatGPT subscriptions' usage limits you have used, as the providers report it. Read when you open this page.
+How much of your Claude and ChatGPT subscriptions' usage limits you have used, as the providers report it (read when you open this page), and whether a run stopped by one carries on when it resets.
+AT A LIMIT
+Resume after a usage limit
+A run stopped by a provider's usage limit carries on by itself when the limit resets, if the provider says when. Off: it stays stopped until you send a message.
 Subscription limits
 Read TIME (just now). Updated when you open this page or press Refresh.
 Refresh
@@ -4122,13 +4140,13 @@ bars: 5-hour session used=75, Weekly used=12
 asked again: 2
 === chromium: usage: phone 390x844 ===
 fits: yes; targets: all ok
-back: Usage | How much of your Claude and ChatGPT subscriptions' usage limits you have used, as the providers report it. Read when you open this page.
+back: Usage | How much of your Claude and ChatGPT subscriptions' usage limits you have used, as the providers report it (read when you open this page), and whether a run stopped by one carries on when it resets.
 === chromium: usage: phone 320x640 ===
 fits: yes; targets: all ok
-back: Usage | How much of your Claude and ChatGPT subscriptions' usage limits you have used, as the providers report it. Read when you open this page.
+back: Usage | How much of your Claude and ChatGPT subscriptions' usage limits you have used, as the providers report it (read when you open this page), and whether a run stopped by one carries on when it resets.
 === chromium: usage: phone 390x844-pwa ===
 fits: yes; targets: all ok
-back: Usage | How much of your Claude and ChatGPT subscriptions' usage limits you have used, as the providers report it. Read when you open this page.
+back: Usage | How much of your Claude and ChatGPT subscriptions' usage limits you have used, as the providers report it (read when you open this page), and whether a run stopped by one carries on when it resets.
 === chromium: usage: errors ===
 (none)
 === chromium: user info: moved from user_info.md ===

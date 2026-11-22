@@ -39,6 +39,7 @@ type t =
   ; default_cwd : string option
   ; default_host : string option
   ; max_budget_usd : float option
+  ; resume_on_limit_reset : bool
   ; worktrees_dir : string option
   ; archive_after_days : float
   ; notify : string
@@ -63,6 +64,7 @@ let default =
   ; default_cwd = None
   ; default_host = None
   ; max_budget_usd = None
+  ; resume_on_limit_reset = true
   ; worktrees_dir = None
   ; archive_after_days = 7.
   ; notify = "bell"
@@ -125,6 +127,13 @@ let of_json j =
       |> Or_error.tag ~tag:"max_budget_usd must be a number"
     | Some _ -> Or_error.error_string "max_budget_usd must be a number"
   in
+  let%bind resume_on_limit_reset =
+    match Json.field j "resume_on_limit_reset" with
+    | None | Some `Null -> Ok default.resume_on_limit_reset
+    | Some `True -> Ok true
+    | Some `False -> Ok false
+    | Some _ -> Or_error.error_string "resume_on_limit_reset must be a boolean"
+  in
   let%bind worktrees_dir = optional_string "worktrees_dir" in
   let%bind archive_after_days =
     match Json.field j "archive_after_days" with
@@ -165,6 +174,7 @@ let of_json j =
   ; default_cwd
   ; default_host
   ; max_budget_usd
+  ; resume_on_limit_reset
   ; worktrees_dir
   ; archive_after_days
   ; notify = Option.value notify ~default:"bell"
@@ -194,6 +204,8 @@ let to_json t =
      ; ( "max_budget_usd"
        , Option.value_map t.max_budget_usd ~default:`Null ~f:(fun usd ->
            `Number (sprintf "%g" usd)) )
+     ; ( "resume_on_limit_reset"
+       , if t.resume_on_limit_reset then `True else `False )
      ]
      @ Option.value_map t.worktrees_dir ~default:[] ~f:(fun dir ->
        [ "worktrees_dir", `String dir ])

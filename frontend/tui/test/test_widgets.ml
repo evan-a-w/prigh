@@ -720,7 +720,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /memory [on|off]                   the notes the model saved when you asked it to remember something (Ctrl+D forgets one); on or off gives the model the memory tool or takes it away
     /instructions [add TEXT|on|off]    your custom instructions, in the context of every session (Enter shows one, Ctrl+D removes it): add TEXT adds one; on or off lets the model add, edit and remove them or not; prigh-web's Settings edits them
     /user-info [FIELD VALUE|clear]     what you set about yourself for the model (name, country, time zone, units...), in the context of every session (unlike memory, which it looks up): show it, set a field (an empty VALUE clears it), or clear them all
-    /resume [now|cancel]               show, run now or cancel the automatic resume after a usage limit
+    /resume [now|cancel|on|off]        show, run now or cancel the automatic resume after a usage limit, or turn it on or off
     /downsize-images                   send the conversation's images smaller (after the model refused one as too large) and retry a failed reply
     /compact [instructions]            summarise older messages to free context
     /compaction [at|model|mask ...]    show when conversations are compacted and what summarises them; at TOKENS|off: also once the context exceeds TOKENS, not only at 80% of the window; model MODEL|off: the model that writes the summaries (off: the session's); mask on|off: replace old tool outputs with placeholders first

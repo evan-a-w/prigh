@@ -41,6 +41,7 @@ type t =
   | Mcp
   | Git_hosts
   | Usage
+  | Auto_resume
   | Nix_store
   | Account
 [@@deriving sexp_of, equal, enumerate]

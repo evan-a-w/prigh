@@ -34,6 +34,7 @@ type t =
   | Mcp
   | Git_hosts
   | Usage
+  | Auto_resume
   | Nix_store
   | Account
 [@@deriving sexp_of, equal, enumerate]
@@ -64,6 +65,7 @@ let name = function
   | Summary_model -> "Summary model"
   | Compact_at -> "Compact at"
   | Mask -> "Mask old tool outputs"
+  | Auto_resume -> "Resume after a usage limit"
   | Memory -> "Use memory"
   | Memory_notes -> "Memory notes"
   | About_you -> "About you"
@@ -119,6 +121,7 @@ let keywords = function
   | Summary_model -> "compaction summaries"
   | Compact_at -> "compaction tokens"
   | Mask -> "compaction observations"
+  | Auto_resume -> "usage limit reset automatic continue rate quota"
   | Memory -> "remember notes"
   | Memory_notes -> "remember"
   | About_you -> "user info name country units"
@@ -173,6 +176,7 @@ let page t : (Settings_section.t * string) option =
   | Summary_model -> Some (Models, "Summaries")
   | Compact_at -> Some (Models, "Compact at")
   | Mask -> Some (Models, "Mask old tool outputs")
+  | Auto_resume -> Some (Usage, "Resume after a usage limit")
   | Memory -> Some (Memory, "Use memory")
   | Memory_notes -> Some (Memory, "Your notes")
   | About_you -> Some (About_you, "About you")

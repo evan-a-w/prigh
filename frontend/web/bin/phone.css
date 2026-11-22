@@ -305,11 +305,16 @@
 .app.narrow .setting .segmented > * { min-height: var(--tap); font-size: 14px; justify-content: center; text-align: center; white-space: normal; line-height: 1.2; }
 .app.narrow .setting :is(.btn, select, .chip-button) { min-height: var(--tap); }
 .app.narrow .setting input[type="text"], .app.narrow .setting input:not([type]) { width: 100%; }
-.app.narrow .switch { width: 46px; height: 28px; border-radius: 14px; }
-.app.narrow .switch-knob { top: 3px; left: 3px; width: 20px; height: 20px; }
+/* The button a thumb's 46x44, its track the 28px drawn in it; the margin
+   keeps the row as tall as the track. */
+.app.narrow .switch { width: 46px; height: 44px; margin-block: -8px; border: 0; border-radius: 0; background: none; }
+.app.narrow .switch::before { content: ""; position: absolute; inset: 8px 0; border-radius: 14px; border: 1px solid var(--rule-2); background: var(--well); transition: background 0.12s, border-color 0.12s; }
+.app.narrow .switch.on::before { background: var(--sodium); border-color: var(--sodium); }
+@media (prefers-reduced-motion: reduce) { .app.narrow .switch::before { transition: none; } }
+.app.narrow .switch:focus-visible { outline: none; }
+.app.narrow .switch:focus-visible::before { outline: 2px solid var(--sodium); outline-offset: 2px; }
+.app.narrow .switch-knob { top: 12px; left: 4px; width: 20px; height: 20px; }
 .app.narrow .switch.on .switch-knob { transform: translateX(18px); }
-/* Its hit area a thumb's, past the 28px it shows. */
-.app.narrow .switch::after { content: ""; position: absolute; inset: -9px -2px; }
 .app.narrow .settings-group h4 { font-size: 12px; }
 /* A wide row is the words, then the control: neither grows into a gap. */
 .app.narrow .setting-wide { flex-wrap: nowrap; }

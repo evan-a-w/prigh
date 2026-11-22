@@ -171,6 +171,29 @@ let mask (config : Config.t option) ~inject =
     ]
 ;;
 
+let auto_resume (config : Config.t option) ~inject =
+  let on = Option.exists config ~f:(fun c -> c.resume_on_limit_reset) in
+  row
+    ~cls:"auto-resume"
+    ~name:"Resume after a usage limit"
+    ~about:
+      "A run stopped by a provider's usage limit carries on by itself when the \
+       limit resets, if the provider says when. Off: it stays stopped until \
+       you send a message."
+    [ switch
+        ~disabled:(Option.is_none config)
+        ~label:"Resume after a usage limit"
+        ~title:
+          (if on
+           then "Stay stopped at a usage limit (/resume off)"
+           else "Resume when a usage limit resets (/resume on)")
+        ~on
+        ~on_click:
+          (inject (Action.Run (if on then "/resume off" else "/resume on")))
+        ()
+    ]
+;;
+
 let generate_model (m : App.Model.t) ~inject =
   let current =
     match Option.bind m.config ~f:(fun c -> c.generate_model) with
@@ -1392,7 +1415,9 @@ let content (m : App.Model.t) (section : Section.t) ~inject =
   | Mcp -> Mcp_settings_view.groups m ~inject
   | Git_hosting -> [ group ~title:"Hosts" (git_hosts m ~inject) ]
   | Nix_store -> [ group (nix_store m ~inject) ]
-  | Usage -> Usage_view.groups m ~inject
+  | Usage ->
+    group ~title:"At a limit" [ auto_resume m.config ~inject ]
+    :: Usage_view.groups m ~inject
   | Account -> [ group (account m ~inject) ]
 ;;
 
