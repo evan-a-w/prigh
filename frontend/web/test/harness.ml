@@ -376,7 +376,12 @@ let create ?(verbose = false) ?(sessions = "[]") ?(state = state_json ()) () =
     "get_pending"
     {|{"steer_texts":[],"follow_up_texts":[],"confirms":[],"questions":[]}|};
   reply t "list_sessions" sessions;
-  reply t "get_prefs" {|{"prefs":{"web.migrated":true}}|};
+  (* prigh-web's default is quiet; the tests read the transcript unfolded,
+     as a user who chose normal would (test_prefs checks the default). *)
+  reply
+    t
+    "get_prefs"
+    {|{"prefs":{"web.migrated":true,"web.verbosity":"normal"}}|};
   act t (Tick now);
   t.quiet <- false;
   t

@@ -10,46 +10,6 @@ let hidden_names filter =
   |> String.concat ~sep:", "
 ;;
 
-let button (m : App.Model.t) ~inject =
-  let hidden = List.length (Transcript_filter.hidden m.transcript_filter) in
-  let open_ =
-    match m.dialog with
-    | Some (Filter _) -> true
-    | _ -> false
-  in
-  Html.button
-    ~cls:
-      (String.concat
-         ~sep:" "
-         ([ "icon ghost filter-toggle" ]
-          @ (if hidden > 0 then [ "active" ] else [])
-          @ if open_ then [ "open" ] else []))
-    ~title:
-      (if hidden > 0
-       then
-         sprintf
-           "Filter: hiding %s (/filter)"
-           (hidden_names m.transcript_filter)
-       else "Filter the transcript (/filter)")
-    ~label:
-      (if hidden > 0
-       then
-         sprintf
-           "Filter the transcript: %d %s hidden"
-           hidden
-           (if hidden = 1 then "kind" else "kinds")
-       else "Filter the transcript")
-    ~attrs:
-      [ Attr.id Filter_menu.anchor
-      ; Attr.create "aria-haspopup" "menu"
-      ; Attr.create "aria-expanded" (Bool.to_string open_)
-      ]
-    ~on_click:(inject Action.Open_filter)
-    (icon Filter
-     ::
-     (if hidden > 0 then [ span ~cls:"badge" (Int.to_string hidden) ] else []))
-;;
-
 let menu (m : App.Model.t) (menu : Filter_menu.t) ~inject =
   let filter = m.transcript_filter in
   let selected = Filter_menu.selected menu in

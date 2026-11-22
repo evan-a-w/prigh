@@ -531,7 +531,7 @@ let%expect_test "with one host the chip still names it, and says how to add one"
     <button class="btn chip-button host-chip">
     (Sessions (Ctrl+B))
     New session
-    (Filter the transcript (/filter)) (Files (Ctrl+Shift+F)) (Terminal (Ctrl+`)) (Review changes (Alt+R))
+    (Files (Ctrl+Shift+F)) (Terminal (Ctrl+`)) (Review changes (Alt+R))
     (Settings (Ctrl+, or /settings))
     |}]
 ;;
@@ -597,17 +597,7 @@ let%expect_test "without the docked sidebar, the chrome floats over the chat" =
           <Vdom.Node.none-widget> </Vdom.Node.none-widget>
           <Vdom.Node.none-widget> </Vdom.Node.none-widget>
         </div>
-        <div class="flex gap-0.5 items-center panel-toggles">
-          <button type="button"
-                  title="Filter the transcript (/filter)"
-                  aria-label="Filter the transcript"
-                  id="filter-toggle"
-                  aria-haspopup="menu"
-                  aria-expanded="false"
-                  class="btn filter-toggle ghost icon"
-                  @on_click>
-            <icon class="filter"> </icon>
-          </button>
+        <div id="filter-anchor" class="flex gap-0.5 items-center panel-toggles">
           <button type="button"
                   data-slot="button"
                   data-variant="ghost"
@@ -663,7 +653,7 @@ let%expect_test "without the docked sidebar, the chrome floats over the chat" =
     {|
     (Sessions (Ctrl+B))
     New session
-    (Filter the transcript (/filter)) (Files (Ctrl+Shift+F)) (Terminal (Ctrl+`)) (Review changes (Alt+R))
+    (Files (Ctrl+Shift+F)) (Terminal (Ctrl+`)) (Review changes (Alt+R))
     (Settings (Ctrl+, or /settings))
     |}];
   (* Its toggle brings the sidebar back, and the card with it. *)
@@ -1204,7 +1194,7 @@ let%expect_test "the context ring: idle, running, and what applies" =
   [%expect
     {|
     (Sessions (Ctrl+B))
-    (Filter the transcript (/filter)) (Files (Ctrl+Shift+F)) (Terminal (Ctrl+`)) (Review changes (Alt+R))
+    (Files (Ctrl+Shift+F)) (Terminal (Ctrl+`)) (Review changes (Alt+R))
     (Settings (Ctrl+, or /settings))
     |}]
 ;;

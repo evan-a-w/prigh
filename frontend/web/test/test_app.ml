@@ -41,7 +41,7 @@ let%expect_test "startup, a prompt and its streamed reply" =
      (((key web.theme) (value ())) ((key web.accent) (value ()))
       ((key web.radius) (value ())) ((key web.font) (value ()))
       ((key web.code-font) (value ())) ((key web.notify) (value ()))
-      ((key web.verbosity) (value ())) ((key web.terminal-open) (value ()))
+      ((key web.verbosity) (value (normal))) ((key web.terminal-open) (value ()))
       ((key web.review) (value ())) ((key web.code-size) (value ()))
       ((key favourite-models) (value ())) ((key history) (value ()))
       ((key web.migrated) (value (true))) ((key web.sidebar-width) (value ()))

@@ -269,7 +269,7 @@ let%expect_test
     {|
     (Sessions (Ctrl+B))
     New session
-    (Filter the transcript (/filter)) (Files (Ctrl+Shift+F)) (Terminal (Ctrl+`)) (Review changes (Alt+R))
+    (Files (Ctrl+Shift+F)) (Terminal (Ctrl+`)) (Review changes (Alt+R))
     (Settings (Ctrl+, or /settings))
     |}];
   (* The terminal, the file browser and the agents panel open as usual. *)

@@ -40,4 +40,4 @@ let press (row : Row.t) filter =
   | Show_all -> Filter.all
 ;;
 
-let anchor = "filter-toggle"
+let anchor = "filter-anchor"

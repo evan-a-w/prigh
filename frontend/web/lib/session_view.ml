@@ -205,14 +205,15 @@ let toggle ~cls ~title ~label ~on ~on_click ?(panel = true) glyph =
     [ icon glyph ]
 ;;
 
-(* The top bar's toggles: the transcript's filter, the files, the terminal,
+(* The top bar's toggles (the transcript filter's menu hangs under them):
+   the files, the terminal,
    the subagents and jobs (while there are any), the review and the session
    card. *)
 let toggles (m : App.Model.t) ~inject =
   div
     ~cls:"panel-toggles flex items-center gap-0.5"
-    [ Filter_view.button m ~inject
-    ; toggle
+    ~attrs:[ Attr.id Filter_menu.anchor ]
+    [ toggle
         ~cls:"files-toggle"
         ~title:"Files (Ctrl+Shift+F)"
         ~label:"Files"

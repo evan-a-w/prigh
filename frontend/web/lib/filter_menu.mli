@@ -30,5 +30,5 @@ val select : t -> Row.t -> t
 (** What pressing [row] (a click, Space) makes of the filter. *)
 val press : Row.t -> Transcript_filter.t -> Transcript_filter.t
 
-(** The id of the button it opens under. *)
+(** The id of what it opens under: the top bar's toggles, or the phone sheet's row. *)
 val anchor : string
