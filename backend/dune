@@ -1,9 +1,14 @@
-; Tests that only `./test --full` runs (`dune build @runtest-full`): slow,
-; integration-style tests whose behaviour the default @runtest also covers
-; more cheaply. Attach a test to it with (alias runtest-full) instead of
-; runtest; this empty rule keeps the alias defined when none is.
+; Tests that only `./test --full` runs (`dune build @runtest-full`): the
+; slow ones (git, subprocesses, servers, timers: about 100ms of CPU or 1s
+; or more each), in test/full/ and test/terminal/, vendored directories that
+; @runtest leaves out. test/full/test_x_full.ml holds test/test_x.ml's slow
+; tests and opens Test_x for its helpers; test_x.ml keeps the cheap ones, so
+; every area still has tests in the default run.
 
 (rule
  (alias runtest-full)
+ (deps
+  (alias test/full/runtest)
+  (alias test/terminal/runtest))
  (action
   (progn)))
