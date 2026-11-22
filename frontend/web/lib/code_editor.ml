@@ -68,7 +68,9 @@ module Hunk = struct
   [@@deriving sexp_of, equal]
 
   let lines text =
-    if String.is_empty text then [||] else Array.of_list (String.split_lines text)
+    if String.is_empty text
+    then [||]
+    else Array.of_list (String.split_lines text)
   ;;
 
   (* The lines both texts start and end with are not diffed: an agent's
@@ -141,8 +143,9 @@ module Hunk = struct
     then None
     else
       List.find
-        (List.concat_map (List.range 1 (Array.length text + 1)) ~f:(fun d ->
-           [ start - d; start + d ]))
+        (List.concat_map
+           (List.range 1 (Array.length text + 1))
+           ~f:(fun d -> [ start - d; start + d ]))
         ~f:at
   ;;
 
@@ -157,7 +160,8 @@ module Hunk = struct
       let out =
         Array.to_list (Array.sub a ~pos:0 ~len:i)
         @ t.removed
-        @ Array.to_list (Array.sub a ~pos:(i + len) ~len:(Array.length a - i - len))
+        @ Array.to_list
+            (Array.sub a ~pos:(i + len) ~len:(Array.length a - i - len))
       in
       let joined = String.concat ~sep:"\n" out in
       let joined =
@@ -187,7 +191,9 @@ module Hunk = struct
       let n = Array.length a in
       let m = Array.length b in
       let prefix = ref 0 in
-      while !prefix < n && !prefix < m && String.equal a.(!prefix) b.(!prefix) do
+      while
+        !prefix < n && !prefix < m && String.equal a.(!prefix) b.(!prefix)
+      do
         incr prefix
       done;
       let suffix = ref 0 in
@@ -201,7 +207,12 @@ module Hunk = struct
       List.map hunks ~f:(fun h ->
         { h with
           line =
-            shift_line h.line ~prefix:!prefix ~suffix:!suffix ~old_len:n ~new_len:m
+            shift_line
+              h.line
+              ~prefix:!prefix
+              ~suffix:!suffix
+              ~old_len:n
+              ~new_len:m
         }))
   ;;
 end
@@ -312,12 +323,12 @@ module Index = struct
     }
   [@@deriving sexp_of]
 
-  let empty = { files = [||]; truncated = false; loading = false; loaded = false }
+  let empty =
+    { files = [||]; truncated = false; loading = false; loaded = false }
+  ;;
 
   let of_json json =
-    match
-      Json.string_field json "files", Json.bool_field json "truncated"
-    with
+    match Json.string_field json "files", Json.bool_field json "truncated" with
     | Ok files, truncated ->
       Ok
         { files =
@@ -444,7 +455,8 @@ let rematch t =
       if
         (not (String.is_empty t.matched))
         && Prigh_ui.Fuzzy_path.narrows ~query:t.matched ~query':query
-      then Array.map t.matches ~f:(fun (m : Prigh_ui.Fuzzy_path.Match.t) -> m.path)
+      then
+        Array.map t.matches ~f:(fun (m : Prigh_ui.Fuzzy_path.Match.t) -> m.path)
       else t.index.files
     in
     { t with
@@ -476,7 +488,8 @@ let list t path =
 
 let open_ t path =
   match find t path with
-  | Some _ -> { t with current = Some path; selection = None; asking = None }, []
+  | Some _ ->
+    { t with current = Some path; selection = None; asking = None }, []
   | None -> { t with loading = Some path }, [ preview path (Opened path) ]
 ;;
 
@@ -514,12 +527,17 @@ let keep t ~f =
   | None -> t
   | Some b ->
     map_buffer t b.path ~f:(fun b ->
-      let kept, hunks = List.partition_tf (List.mapi b.hunks ~f:(fun i h -> i, h)) ~f:(fun (i, h) -> f i h) in
+      let kept, hunks =
+        List.partition_tf
+          (List.mapi b.hunks ~f:(fun i h -> i, h))
+          ~f:(fun (i, h) -> f i h)
+      in
       { b with
         hunks = List.map hunks ~f:snd
       ; kept =
-          List.sort (b.kept @ List.map kept ~f:snd) ~compare:(fun (a : Hunk.t) b ->
-            Int.compare a.line b.line)
+          List.sort
+            (b.kept @ List.map kept ~f:snd)
+            ~compare:(fun (a : Hunk.t) b -> Int.compare a.line b.line)
       })
 ;;
 
@@ -569,7 +587,9 @@ let undo t ~f =
 let selected_chip t =
   Option.map (current t) ~f:(fun b ->
     let selection =
-      Option.value t.selection ~default:{ Selection.first = 1; last = 1; text = "" }
+      Option.value
+        t.selection
+        ~default:{ Selection.first = 1; last = 1; text = "" }
     in
     { Chip.path = relative t b.path
     ; first = selection.first
@@ -718,7 +738,14 @@ let update t (action : Action.t) =
     open_ { t with drawer = false; filter = "" } path
   | Switch path ->
     if Option.is_some (find t path)
-    then { t with current = Some path; selection = None; asking = None; menu = false }, []
+    then
+      ( { t with
+          current = Some path
+        ; selection = None
+        ; asking = None
+        ; menu = false
+        }
+      , [] )
     else t, []
   | Step n -> step t n, []
   | Swiped n ->
@@ -783,7 +810,8 @@ let update t (action : Action.t) =
     (match t.asking with
      | Some chip when not (String.is_empty (String.strip text)) ->
        { t with asking = None }, [ Send { chip; text = String.strip text } ]
-     | Some _ -> t, [ toast ~error:true "Type a question or an instruction first" ]
+     | Some _ ->
+       t, [ toast ~error:true "Type a question or an instruction first" ]
      | None -> t, [])
   | Ask_cancel -> { t with asking = None }, [ Command Focus ]
   | Drop_chip -> { t with chip = None }, []
@@ -950,7 +978,10 @@ let reply t (reply : Reply.t) (result : (Json.t, string) Result.t) =
        rematch { t with index; matched = "" }, []
      | Error e ->
        ( { t with index = { t.index with loading = false } }
-       , [ toast ~error:true (sprintf "Go to file: could not list the files: %s" e) ] ))
+       , [ toast
+             ~error:true
+             (sprintf "Go to file: could not list the files: %s" e)
+         ] ))
   | Files _, _ -> t, []
 ;;
 

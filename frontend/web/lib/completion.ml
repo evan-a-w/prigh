@@ -543,7 +543,12 @@ let request t =
   | Command | Argument _ | Snippet -> None
 ;;
 
-let set_files t matches = { t with items = List.map matches ~f:(fun path -> Picker.Item.create ~id:path path); selected = 0 }
+let set_files t matches =
+  { t with
+    items = List.map matches ~f:(fun path -> Picker.Item.create ~id:path path)
+  ; selected = 0
+  }
+;;
 
 let set_results t ~prefix results =
   if not (String.equal prefix t.prefix)

@@ -31,7 +31,10 @@ let positions q s ~from =
   let j = ref (m - 1) in
   let i = ref (n - 1) in
   while !j >= 0 && !i >= from do
-    if Char.equal (Char.lowercase (String.unsafe_get s !i)) (String.unsafe_get q !j)
+    if
+      Char.equal
+        (Char.lowercase (String.unsafe_get s !i))
+        (String.unsafe_get q !j)
     then decr j;
     decr i
   done;
@@ -43,7 +46,10 @@ let positions q s ~from =
     let j = ref 0 in
     let i = ref start in
     while !j < m do
-      if Char.equal (Char.lowercase (String.unsafe_get s !i)) (String.unsafe_get q !j)
+      if
+        Char.equal
+          (Char.lowercase (String.unsafe_get s !i))
+          (String.unsafe_get q !j)
       then (
         out.(!j) <- !i;
         incr j);
@@ -84,11 +90,11 @@ let rate ~query s (ps : int array) ~base =
   let in_base = Array.length ps > 0 && ps.(0) >= base in
   if in_base then score := !score + 40;
   (* The whole of the name before its extension. *)
-  (if in_base && ps.(0) = base
-   then
-     let last = ps.(Array.length ps - 1) in
-     if last + 1 = n || Char.equal (String.get s (last + 1)) '.'
-     then score := !score + 30);
+  if in_base && ps.(0) = base
+  then (
+    let last = ps.(Array.length ps - 1) in
+    if last + 1 = n || Char.equal (String.get s (last + 1)) '.'
+    then score := !score + 30);
   let depth = String.count s ~f:(Char.equal '/') in
   !score - (n / 6) - (depth * 2)
 ;;
@@ -110,9 +116,7 @@ let score ~query s =
 ;;
 
 let rank ~query paths =
-  let found =
-    Array.filter_map paths ~f:(fun p -> score ~query p)
-  in
+  let found = Array.filter_map paths ~f:(fun p -> score ~query p) in
   Array.stable_sort found ~compare:(fun (a : Match.t) (b : Match.t) ->
     match Int.compare b.score a.score with
     | 0 ->

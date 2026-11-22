@@ -97,8 +97,7 @@ let help =
        [path], the file browser's Edit)" )
   ; "Ctrl+S / ⌘+S (editor)", "save the file"
   ; ( "Ctrl+P / ⌘+P (editor)"
-    , "go to file: fuzzy search over every file under the session's \
-       directory" )
+    , "go to file: fuzzy search over every file under the session's directory" )
   ; "Ctrl+F / ⌘+F (editor)", "find (and replace) in the file"
   ; "Ctrl+G (editor)", "go to line"
   ; ( "Ctrl+L / ⌘+L (in the editor's text)"
@@ -106,8 +105,7 @@ let help =
   ; ( "Ctrl+I / ⌘+I (in the editor's text)"
     , "ask about the selection in a box under its lines (Enter sends, Esc \
        closes)" )
-  ; ( "Swipe left / right (editor, a phone)"
-    , "the next or previous open file" )
+  ; "Swipe left / right (editor, a phone)", "the next or previous open file"
   ; "Ctrl+B / ⌘+B (editor, wide window)", "show or hide the file tree"
   ; "Alt+C (editor, wide window)", "show or hide the chat beside the editor"
   ; "Alt+PageDown / Alt+PageUp (editor)", "the next or previous open file"

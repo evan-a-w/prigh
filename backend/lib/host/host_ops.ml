@@ -29,7 +29,8 @@ let list_files_op = "$list_files"
 
 let list_files ~env ~cwd =
   Tool.Result.ok
-    (Json.to_string (File_index.to_json ~root:cwd (File_index.list ~env ~root:cwd ())))
+    (Json.to_string
+       (File_index.to_json ~root:cwd (File_index.list ~env ~root:cwd ())))
 ;;
 
 let list_dirs_op = "$list_dirs"

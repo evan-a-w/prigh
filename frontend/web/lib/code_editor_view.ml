@@ -274,18 +274,29 @@ let match_view path (positions : int array) =
       if Buffer.length run > 0
       then (
         let text = Buffer.contents run in
-        out := (if !in_mark then Node.create "mark" [ Node.text text ] else Node.text text) :: !out;
+        out
+        := (if !in_mark
+            then Node.create "mark" [ Node.text text ]
+            else Node.text text)
+           :: !out;
         Buffer.clear run)
     in
     for i = pos to pos + len - 1 do
       let m = Hash_set.mem marked i in
-      if Bool.( <> ) m !in_mark then (flush (); in_mark := m);
+      if Bool.( <> ) m !in_mark
+      then (
+        flush ();
+        in_mark := m);
       Buffer.add_char run path.[i]
     done;
     flush ();
     List.rev !out
   in
-  let base = match String.rindex path '/' with Some i -> i + 1 | None -> 0 in
+  let base =
+    match String.rindex path '/' with
+    | Some i -> i + 1
+    | None -> 0
+  in
   Node.span
     ~attrs:[ Attr.class_ "code-path"; Attr.title path ]
     [ Node.span
@@ -327,7 +338,8 @@ let matches_view (m : App.Model.t) ~inject =
   Node.div
     ~attrs:
       [ Attr.class_ "code-matches"
-      ; Attr.style (Css_gen.create ~field:"height" ~value:(sprintf "%dpx" (n * h)))
+      ; Attr.style
+          (Css_gen.create ~field:"height" ~value:(sprintf "%dpx" (n * h)))
       ]
     rows
 ;;
@@ -470,13 +482,19 @@ let tree (m : App.Model.t) ~inject =
                if not filtering
                then Effect.Ignore
                else
-                 Js_of_ocaml.Js.Opt.case ev##.target (fun () -> Effect.Ignore) (fun el ->
-                   (* The rows' top: the section title above them. *)
-                   let top = Js_of_ocaml.Js.to_float el##.scrollTop in
-                   let row = Float.iround_down_exn (top /. Float.of_int (row_height m)) in
-                   if abs (row - t.list_top) < rows_around / 4
-                   then Effect.Ignore
-                   else inject (code (List_scrolled row))))
+                 Js_of_ocaml.Js.Opt.case
+                   ev##.target
+                   (fun () -> Effect.Ignore)
+                   (fun el ->
+                      (* The rows' top: the section title above them. *)
+                      let top = Js_of_ocaml.Js.to_float el##.scrollTop in
+                      let row =
+                        Float.iround_down_exn
+                          (top /. Float.of_int (row_height m))
+                      in
+                      if abs (row - t.list_top) < rows_around / 4
+                      then Effect.Ignore
+                      else inject (code (List_scrolled row))))
            ]
          body
      in
@@ -508,7 +526,9 @@ let notices (t : E.t) (b : E.Buffer.t) ~inject =
   ; (match b.hunks with
      | [] -> Node.none
      | hunks ->
-       let added = List.sum (module Int) hunks ~f:(fun h -> List.length h.added) in
+       let added =
+         List.sum (module Int) hunks ~f:(fun h -> List.length h.added)
+       in
        let removed =
          List.sum (module Int) hunks ~f:(fun h -> List.length h.removed)
        in

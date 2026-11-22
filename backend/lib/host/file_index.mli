@@ -15,7 +15,6 @@ type t =
 [@@deriving sexp_of]
 
 val limit : int
-
 val list : ?limit:int -> env:Env.t -> root:string -> unit -> t
 
 (** The walk alone, as used outside a git repository. *)

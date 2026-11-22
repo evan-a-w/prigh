@@ -63,18 +63,24 @@ let git ~env ~root args =
     if Process.Exit.is_success exit
     then
       Some
-        (String.split stdout ~on:'\000' |> List.filter ~f:(Fn.non String.is_empty))
+        (String.split stdout ~on:'\000'
+         |> List.filter ~f:(Fn.non String.is_empty))
     else None
 ;;
 
 let list ?(limit = limit) ~env ~root () =
   match
-    git ~env ~root [ "ls-files"; "-z"; "--cached"; "--others"; "--exclude-standard" ]
+    git
+      ~env
+      ~root
+      [ "ls-files"; "-z"; "--cached"; "--others"; "--exclude-standard" ]
   with
   | None -> walk ~limit ~root ()
   | Some files ->
     let deleted =
-      Option.value ~default:[] (git ~env ~root [ "ls-files"; "-z"; "--deleted" ])
+      Option.value
+        ~default:[]
+        (git ~env ~root [ "ls-files"; "-z"; "--deleted" ])
       |> String.Set.of_list
     in
     let files =
@@ -89,6 +95,6 @@ let to_json ~root t =
   `Object
     [ "root", `String root
     ; "files", `String (String.concat ~sep:"\n" t.files)
-    ; "truncated", (if t.truncated then `True else `False)
+    ; ("truncated", if t.truncated then `True else `False)
     ]
 ;;

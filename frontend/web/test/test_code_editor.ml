@@ -195,9 +195,13 @@ let%expect_test "the agent's edit of a clean file: shown, then undone" =
     |}]
 ;;
 
-let long = String.concat (List.init 12 ~f:(fun i -> sprintf "line %d\n" (i + 1)))
+let long =
+  String.concat (List.init 12 ~f:(fun i -> sprintf "line %d\n" (i + 1)))
+;;
 
-let%expect_test "several changes: each kept or undone on its own, a kept one reopened" =
+let%expect_test
+    "several changes: each kept or undone on its own, a kept one reopened"
+  =
   let h = entered () in
   H.quiet h (fun () ->
     H.act h (Code Reload);
@@ -205,7 +209,9 @@ let%expect_test "several changes: each kept or undone on its own, a kept one reo
     H.event h (Agent_events.tool_end ~id:"e1" ~name:"edit" "Edited src/a.ml"));
   let after =
     String.substr_replace_all long ~pattern:"line 2\n" ~with_:"line two\n"
-    |> String.substr_replace_all ~pattern:"line 6\n" ~with_:"line six\nline 6b\n"
+    |> String.substr_replace_all
+         ~pattern:"line 6\n"
+         ~with_:"line six\nline 6b\n"
     |> String.substr_replace_all ~pattern:"line 10\n" ~with_:""
   in
   H.reply h "fs_preview" (preview ~md5:"m2" after);
@@ -286,12 +292,11 @@ let%expect_test "several changes: each kept or undone on its own, a kept one reo
     |}];
   (* Typing above a change moves it down with its lines. *)
   let b = Option.value_exn (Prigh_web.Code_editor.current (code h)) in
-  H.act
-    h
-    (Code (Edited { path = b.path; text = "new first line\n" ^ b.text }));
+  H.act h (Code (Edited { path = b.path; text = "new first line\n" ^ b.text }));
   print_s
     [%sexp
-      (List.map (Option.value_exn (Prigh_web.Code_editor.current (code h))).kept
+      (List.map
+         (Option.value_exn (Prigh_web.Code_editor.current (code h))).kept
          ~f:(fun h -> h.line)
        : int list)];
   [%expect {| (3 11) |}]
@@ -393,7 +398,8 @@ let%expect_test "Go to file: fuzzy over every file, listed once" =
     (src/ c o mp act. mli)
     |}];
   H.keydown h ~selector:"#code-filter" "Enter";
-  [%expect {|
+  [%expect
+    {|
     (Code (Open /home/me/proj/src/compact.mli))
     (Rpc (method_ fs_preview) (params ((path /home/me/proj/src/compact.mli)))
      (tag (Code (Opened /home/me/proj/src/compact.mli))))
@@ -404,7 +410,8 @@ let%expect_test "Go to file: a big repository, every match, a window of rows" =
   let h = entered () in
   H.quiet h (fun () -> H.act h (Code Find_file));
   let paths =
-    List.init 100_000 ~f:(fun i -> sprintf "pkg%03d/src/file_%05d.ml" (i / 100) i)
+    List.init 100_000 ~f:(fun i ->
+      sprintf "pkg%03d/src/file_%05d.ml" (i / 100) i)
   in
   (* Given as parsed: the harness's JSON parser is not the page's. *)
   H.quiet h (fun () ->
@@ -428,7 +435,8 @@ let%expect_test "Go to file: a big repository, every match, a window of rows" =
   in
   rows ();
   H.text h ~selector:".code-section-title";
-  [%expect {|
+  [%expect
+    {|
     100000 matches, 60 rows in the page
     100,000 files of 100,000
     |}];
@@ -436,7 +444,8 @@ let%expect_test "Go to file: a big repository, every match, a window of rows" =
   H.quiet h (fun () -> H.act h (Code (List_scrolled 80_000)));
   rows ();
   H.text h ~selector:".code-matches .code-row:first-child";
-  [%expect {|
+  [%expect
+    {|
     100000 matches, 60 rows in the page
     (pkg799/src/ file _79980.ml)
     |}]
@@ -516,7 +525,9 @@ let%expect_test
     |}]
 ;;
 
-let%expect_test "Ctrl+I: the ask box under the lines, sent as a prompt about them" =
+let%expect_test
+    "Ctrl+I: the ask box under the lines, sent as a prompt about them"
+  =
   let h = entered () in
   H.quiet h (fun () ->
     H.type_ h "a draft I was writing";
@@ -536,8 +547,7 @@ let%expect_test "Ctrl+I: the ask box under the lines, sent as a prompt about the
     |}];
   (* Empty: says what to do. *)
   H.act h (Code (Ask_send "  "));
-  [%expect
-    {| |}];
+  [%expect {| |}];
   H.text h ~selector:".toast";
   [%expect {| Type a question or an instruction first (Dismiss) |}];
   H.act h (Code (Ask_send "rename y to why"));
@@ -620,13 +630,15 @@ let%expect_test "/edit completes any file, fuzzily, from the same list" =
     {| (Rpc (method_ list_files) (params ()) (tag (Code (Files /home/me/proj)))) |}];
   H.reply h "list_files" files;
   H.text h ~selector:".popup-items";
-  [%expect {|
+  [%expect
+    {|
     src/compact.ml
     src/compact.mli
     test/test_compact.ml
     |}];
   H.key h "Enter";
-  [%expect {|
+  [%expect
+    {|
     (Complete_accept (run true))
     (Rpc (method_ push_pref)
      (params ((key history) (value "/edit src/compact.ml") (max 500)))

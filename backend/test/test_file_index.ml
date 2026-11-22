@@ -4,7 +4,12 @@ open Tool_test_helpers
 
 let tree t =
   List.iter
-    [ "src/sub"; "docs"; ".git-like/objects"; "_build/default"; "node_modules/x" ]
+    [ "src/sub"
+    ; "docs"
+    ; ".git-like/objects"
+    ; "_build/default"
+    ; "node_modules/x"
+    ]
     ~f:(fun d -> Core_unix.mkdir_p (Filename.concat t.dir d));
   List.iter
     [ "src/app.ml"
@@ -45,7 +50,9 @@ let%expect_test "outside git: a walk that skips dot and build directories" =
     {| {"root":"/r","files":"docs/README.md\nsrc/app.ml","truncated":true} |}]
 ;;
 
-let%expect_test "in git: tracked and untracked files, not ignored or deleted ones" =
+let%expect_test
+    "in git: tracked and untracked files, not ignored or deleted ones"
+  =
   with_sandbox
   @@ fun t ->
   tree t;
@@ -56,15 +63,7 @@ let%expect_test "in git: tracked and untracked files, not ignored or deleted one
   git' t [ "add"; "-A" ];
   git'
     t
-    [ "-c"
-    ; "user.name=t"
-    ; "-c"
-    ; "user.email=t@t"
-    ; "commit"
-    ; "-q"
-    ; "-m"
-    ; "x"
-    ];
+    [ "-c"; "user.name=t"; "-c"; "user.email=t@t"; "commit"; "-q"; "-m"; "x" ];
   Core_unix.unlink (Filename.concat t.dir "gone.ml");
   write t "new file é.ml" "";
   show (File_index.list ~env:t.env ~root:t.dir ());
@@ -87,7 +86,9 @@ let%expect_test "a large tree: every file, quickly" =
     let dir = sprintf "d%02d" d in
     Core_unix.mkdir_p (Filename.concat t.dir dir);
     for f = 0 to 199 do
-      Out_channel.write_all (Filename.concat t.dir (sprintf "%s/f%03d.ml" dir f)) ~data:""
+      Out_channel.write_all
+        (Filename.concat t.dir (sprintf "%s/f%03d.ml" dir f))
+        ~data:""
     done
   done;
   let r = File_index.list ~env:t.env ~root:t.dir () in
@@ -97,7 +98,8 @@ let%expect_test "a large tree: every file, quickly" =
     r.truncated
     (List.hd_exn r.files)
     (List.last_exn r.files);
-  [%expect {| 20000 files, truncated false, first d00/f000.ml, last d99/f199.ml |}];
+  [%expect
+    {| 20000 files, truncated false, first d00/f000.ml, last d99/f199.ml |}];
   git' t [ "init"; "-q" ];
   let r = File_index.list ~env:t.env ~root:t.dir () in
   printf "in git: %d files\n" (List.length r.files);
