@@ -226,6 +226,8 @@ try {
   await send("A landing page");
   await newSession(notes);
   await send("Shopping list");
+  // Listed before a click on another row: its row coming in moves the rest.
+  await session("Shopping list").waitFor();
 
   // From a worktree's menu, back in the first session: a new session there,
   // which shares it.
