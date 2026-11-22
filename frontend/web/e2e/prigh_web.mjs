@@ -8,7 +8,7 @@
 // SHOTS (a directory for screenshots of each step).
 import { execFileSync, spawn } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
-import { hostname } from "node:os";
+import { hostName } from "./host_name.mjs";
 import { join } from "node:path";
 import { png, pngSize } from "./png.mjs";
 import { end } from "./end.mjs";
@@ -196,7 +196,7 @@ const clean = text => text
   .replace(/\d+% ctx/g, "<CTX>% ctx")
   // Messages' times, and the day separator a run past midnight would add.
   .replace(/(Yesterday )?\b\d\d:\d\d\b/g, "<TIME>")
-  .replaceAll(hostname(), "<HOSTNAME>")
+  .replaceAll(hostName(), "<HOSTNAME>")
   .split("\n")
   .map(line => line.trim())
   .filter(line => line !== "" && line !== "Today")

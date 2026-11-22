@@ -69,6 +69,8 @@
 # terminal panel, plus:
 #   PRIGH_BACKEND        the backend binary (default: the dune build)
 #   PRIGH_WEB_ROOT       the built site (default: the dune build)
+#   PRIGH_E2E_SHELL      the terminal panel's shell, an interactive bash
+#                        (default: bash on the PATH)
 #   ENGINES              browsers to run (default: chromium firefox webkit)
 #   SHOTS                a directory to save screenshots of each step in
 #   JOBS                 how many scripts run at once (at most)
@@ -81,6 +83,14 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export PRIGH_BACKEND="${PRIGH_BACKEND:-$here/../../../backend/_build/default/bin/main.exe}"
 export SITE="${PRIGH_WEB_ROOT:-$here/../../_build/default/web/bin/site}"
 export TOKEN='sekrit&x=y'
+# The backends' own host by a fixed name (the one ENGINE.expected was
+# recorded with), as in the backend's dune tests: the pages show it, and its
+# length moves what is next to the host chip.
+export PRIGH_HOST_NAME=server-laptop
+# The terminal panel's shell needs readline (↑ recalls, Tab completes):
+# /bin/sh may have none (dash, or a non-interactive bash in the Nix sandbox).
+PRIGH_E2E_SHELL="${PRIGH_E2E_SHELL:-$(command -v bash || true)}"
+export PRIGH_E2E_SHELL
 tmp="$(mktemp -d)"
 cleanup() {
 	status=$?
