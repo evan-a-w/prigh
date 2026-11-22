@@ -221,11 +221,20 @@ let help_keys key =
     in
     List.filter_opt
       [ (if i > 0
-         then Some (Node.span ~attrs:[ Attr.class_ "text-muted-foreground" ] [ Node.text "or" ])
+         then
+           Some
+             (Node.span
+                ~attrs:[ Attr.class_ "text-muted-foreground" ]
+                [ Node.text "or" ])
          else None)
-      ; Some (Loon.Kbd.view ~class_:"h-auto min-h-5 whitespace-normal break-all py-0.5" [ Node.text key ])
+      ; Some
+          (Loon.Kbd.view
+             ~class_:"h-auto min-h-5 whitespace-normal break-all py-0.5"
+             [ Node.text key ])
       ; Option.map note ~f:(fun note ->
-          Node.span ~attrs:[ Attr.class_ "text-muted-foreground" ] [ Node.text note ])
+          Node.span
+            ~attrs:[ Attr.class_ "text-muted-foreground" ]
+            [ Node.text note ])
       ])
 ;;
 
@@ -248,11 +257,12 @@ let help (m : App.Model.t) ~inject =
                  [ Attr.class_
                      "help-row grid grid-cols-[minmax(0,12rem)_minmax(0,1fr)] \
                       items-baseline gap-x-4 gap-y-1 border-t border-border \
-                      py-1.5 text-[13px] first:border-t-0 \
-                      narrow:grid-cols-1"
+                      py-1.5 text-[13px] first:border-t-0 narrow:grid-cols-1"
                  ]
                [ Node.div
-                   ~attrs:[ Attr.class_ "help-key flex flex-wrap items-center gap-1" ]
+                   ~attrs:
+                     [ Attr.class_ "help-key flex flex-wrap items-center gap-1"
+                     ]
                    (help_keys key)
                ; Node.div
                    ~attrs:[ Attr.class_ "help-what min-w-0 break-words" ]

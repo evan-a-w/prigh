@@ -214,10 +214,10 @@ let%expect_test "/help <command> and /hotkeys" =
     Alt+M cycle the mode: ask → auto-edit → smart → auto → plan (/mode, /plan)
     Alt+N insert a snippet at the caret: a list to filter (/snippet)
     Ctrl+O cycle the transcript verbosity
-    ↑ ↓ / Space / Enter / Esc (transcript filter) the filter's menu (/filter, its button left of the files'): choose a kind, show or hide it, keep the filter, or put back the one it opened with
+    ↑ ↓ / Space / Enter / Esc (transcript filter) the filter's menu (/filter, Ctrl+K, a phone's ⋯): choose a kind, show or hide it, keep the filter, or put back the one it opened with
     Ctrl+X copy the last reply (when nothing is selected)
     Ctrl+↑ / Ctrl+↓ previous / next of your messages in the transcript (loading earlier ones)
-    Ctrl+J jump to one of your messages: a list to filter (or the marks at the transcript's right edge)
+    Ctrl+J jump to one of your messages: a list to filter (or the marks at the transcript's left edge)
     Delete (in the jump list) trim the model's context before the highlighted message (confirmed first; /trim undo brings it back)
     PageUp / PageDown scroll the transcript
     Ctrl+K the control centre (also the sidebar's Search): search the sessions (their titles and messages), the settings, their values and the commands

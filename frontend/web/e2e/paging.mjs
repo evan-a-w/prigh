@@ -266,11 +266,12 @@ try {
   section("jump: the rail");
   console.log(await loaded());
   console.log(`marks: ${await page.locator(".rail .tick").count()}, not loaded: ${await page.locator(".rail .tick.unloaded").count()}`);
-  console.log(`button: ${await page.locator(".jump-list").getAttribute("aria-label")}`);
+  console.log(`the jump list's button: ${await page.locator(".jump-list").count() ? "shown" : "none (Ctrl+J)"}`);
   console.log(`the one in view: ${await current()}`);
   const box = await page.locator(".rail").boundingBox();
   const chatBox = await page.locator("#chat").boundingBox();
-  console.log(`along the chat's right edge: ${box.x > chatBox.x + chatBox.width - 60 && box.y >= chatBox.y}`);
+  const column = await page.evaluate(() => document.querySelector("#chat .entries")?.getBoundingClientRect().left);
+  console.log(`along the chat's left edge: ${box.x < chatBox.x + 60 && box.y >= chatBox.y}; left of the messages: ${box.x + box.width <= column}`);
   await screenshot("jump rail");
 
   // 7. A mark names its message on hover; a click goes there, marked.

@@ -337,7 +337,6 @@ let%expect_test
     {|
     <div class="filtered">
     <div class="filtered">
-    button "Jump to a message" -- Jump to a message (Ctrl+J)
     button "Your message 1, Survey the repository"
     button "Your message 2, And the tests?"
     |}]

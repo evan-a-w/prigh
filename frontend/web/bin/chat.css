@@ -24,8 +24,9 @@
   overflow-y: auto;
   scrollbar-gutter: stable;
   /* [--push], set by an ancestor (the session's card beside the column),
-     moves the column left by that much, never past --edge. */
-  padding: 28px var(--edge) 8px max(var(--edge), (100% - var(--column)) / 2 - var(--push, 0px));
+     moves the column left by that much, never past the left edge's room
+     ([--rail-room] beside the jump rail, else --edge). */
+  padding: 28px var(--edge) 8px max(var(--rail-room, var(--edge)), (100% - var(--column)) / 2 - var(--push, 0px));
 }
 /* Focusable to scroll it with the keys; a click there shows no ring. */
 .chat:focus { outline: none; }
