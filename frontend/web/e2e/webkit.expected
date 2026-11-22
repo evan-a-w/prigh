@@ -4916,13 +4916,19 @@ overwritten: ["open! Import (* edited *)","(* mine *)"]
 chip: src/compact.ml:4–6 3 lines
 === webkit: editor desktop: asking about lines ===
 ok
-agent: The agent changed this file: +3 −1 Keep Undo
-removed:   go [] 0 (List.rev turns)
-added:   match turns with |   | system :: rest -> system :: go [] (Turn.tokens system) (List.rev rest) |   | [] -> []
+agent: The agent changed this file: 2 changes, +4 −2 Keep all Undo all
+removed:   let limit = budget.window - budget.reserve in |   go [] 0 (List.rev turns)
+added:   let limit = Budget.usable budget in |   match turns with |   | system :: rest -> system :: go [] (Turn.tokens system) (List.rev rest) |   | [] -> []
 === webkit: editor desktop: the agent's change ===
 ok
 sent: [src/compact.ml:4–6] Pin the system turn Pasted text #1 4 lines · 162 B src/compact.ml, lines 4–6: HH:MM
-undone: true
+changes: 1/2 · +1 −1 Undo Keep | 2/2 · +3 −1 Undo Keep
+first kept, second undone: true
+=== webkit: editor desktop: a kept change's badge ===
+ok
+reopened: +1 −1 Undo Keep
+=== webkit: editor desktop: a kept change shown again ===
+ok
 chat after sending: beside
 === webkit: editor desktop: the chat beside ===
 ok
@@ -4947,24 +4953,34 @@ saved: open! Import (* edited *)
 ok
 notice: src/compact.ml changed on the host since you opened it: reload it (losing your edits) or keep yours and overwrite it. Reload Overwrite
 overwritten: ["open! Import (* edited *)","(* mine *)"]
-chip: src/compact.ml:4–6 3 lines
-=== webkit: editor phone: asking about lines ===
+ask box: src/compact.ml:4–6 Cancel
+=== webkit: editor phone: the ask box under the lines ===
 ok
-agent: The agent changed this file: +3 −1 Keep Undo
-removed:   go [] 0 (List.rev turns)
-added:   match turns with |   | system :: rest -> system :: go [] (Turn.tokens system) (List.rev rest) |   | [] -> []
+agent: The agent changed this file: 2 changes, +4 −2 Keep all Undo all
+removed:   let limit = budget.window - budget.reserve in |   go [] 0 (List.rev turns)
+added:   let limit = Budget.usable budget in |   match turns with |   | system :: rest -> system :: go [] (Turn.tokens system) (List.rev rest) |   | [] -> []
 peek: The system turn is now pinned: go starts after it and never drops it.
 === webkit: editor phone: the agent's change ===
 ok
 sent: [src/compact.ml:4–6] Pin the system turnPasted text #14 lines · 87 Bsrc/compact.ml, lines 4–6:HH:MM
-undone: true
+changes: 1/2 · +1 −1 Undo Keep | 2/2 · +3 −1 Undo Keep
+first kept, second undone: true
+=== webkit: editor phone: a kept change's badge ===
+ok
+reopened: +1 −1 Undo Keep
+=== webkit: editor phone: a kept change shown again ===
+ok
 === webkit: editor phone: the chat pulled up ===
 ok
 === webkit: editor phone: the files drawer ===
 ok
 drawer: src/compact.ml | .. | README.md | src/1
+found: src/turn.mli
+=== webkit: editor phone: go to file ===
+ok
 drawer gone: true
 strip: src/ turn.mli
+swiped: src/ compact.ml
 left: the chat
 === webkit: editor small: a file open ===
 ok
@@ -4983,22 +4999,32 @@ saved: open! Import (* edited *)
 ok
 notice: src/compact.ml changed on the host since you opened it: reload it (losing your edits) or keep yours and overwrite it. Reload Overwrite
 overwritten: ["open! Import (* edited *)","(* mine *)"]
-chip: src/compact.ml:4–6 3 lines
-=== webkit: editor small: asking about lines ===
-ok
-agent: The agent changed this file: +3 −1 Keep Undo
-removed:   go [] 0 (List.rev turns)
-added:   match turns with |   | system :: rest -> system :: go [] (Turn.tokens system) (List.rev rest) |   | [] -> []
+ask box: src/compact.ml:4–6 Cancel
+=== webkit: editor small: the ask box under the lines ===
+the code scrolls sideways
+agent: The agent changed this file: 2 changes, +4 −2 Keep all Undo all
+removed:   let limit = budget.window - budget.reserve in |   go [] 0 (List.rev turns)
+added:   let limit = Budget.usable budget in |   match turns with |   | system :: rest -> system :: go [] (Turn.tokens system) (List.rev rest) |   | [] -> []
 peek: The system turn is now pinned: go starts after it and never drops it.
 === webkit: editor small: the agent's change ===
 ok
 sent: [src/compact.ml:4–6] Pin the system turnPasted text #14 lines · 96 Bsrc/compact.ml, lines 4–6:HH:MM
-undone: true
+changes: 1/2 · +1 −1 Undo Keep | 2/2 · +3 −1 Undo Keep
+first kept, second undone: true
+=== webkit: editor small: a kept change's badge ===
+ok
+reopened: +1 −1 Undo Keep
+=== webkit: editor small: a kept change shown again ===
+ok
 === webkit: editor small: the chat pulled up ===
 ok
 === webkit: editor small: the files drawer ===
 ok
 drawer: src/compact.ml | .. | README.md | src/1
+found: src/turn.mli
+=== webkit: editor small: go to file ===
+ok
 drawer gone: true
 strip: src/ turn.mli
+swiped: src/ compact.ml
 left: the chat
