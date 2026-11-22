@@ -18,7 +18,6 @@ module Handle : sig
         preview alone, the preview's) *)
     | Files_preview
     (** the file browser's preview beside its list, from its left edge *)
-    | Agents (** the agents panel's width, from its left edge *)
     | Terminal (** the terminal panel's height, from its top edge *)
     | Review_chat
     (** the chat's width beside the review page, from its left edge *)
@@ -72,7 +71,6 @@ module Shown : sig
     { sidebar : bool (** docked beside the chat, not a drawer *)
     ; files : bool
     ; preview : bool
-    ; agents : bool
     ; reviewing : bool
     ; narrow : bool
     }
@@ -98,11 +96,9 @@ val chat_min : int
 (** What the review page keeps beside the chat docked by it. *)
 val review_min : int
 
-(** Below this width the file browser floats over the chat; below
-    [agents_floats_below], the agents panel (as in the CSS). *)
+(** Below this width the file browser floats over the chat (as in the
+    CSS). *)
 val files_floats_below : int
-
-val agents_floats_below : int
 val viewport : t -> Viewport.t
 
 (** The preference, if the user set one. *)
