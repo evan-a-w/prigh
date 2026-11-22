@@ -630,7 +630,6 @@ let%expect_test "without the docked sidebar, the chrome floats over the chat" =
                   @on_click>
             <icon class="panel_bottom"> </icon>
           </button>
-          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
           <button type="button"
                   data-slot="button"
                   data-variant="ghost"
@@ -705,7 +704,6 @@ let%expect_test
     {|
     <Vdom.Node.none-widget class="">
     <div class="composer-box">
-    <Vdom.Node.none-widget class="">
     <Vdom.Node.none-widget class="">
     <Vdom.Node.none-widget class="">
     <Vdom.Node.none-widget class="">

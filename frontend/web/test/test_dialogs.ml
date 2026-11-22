@@ -86,14 +86,11 @@ let%expect_test "a dialog makes the page behind it inert: Tab stays in it" =
   inert ();
   [%expect
     {|
-    (Rpc (method_ list_subagents) (params ()) (tag Subagents))
-    (Rpc (method_ list_jobs) (params ()) (tag Jobs))
     (Focus confirm)
     <aside class="bg-sidebar loon sidebar text-sidebar-foreground text-sm">
     <div class="chrome-anchor loon">
     <div class="chat-frame">
     <footer class="composer">
-    <aside class="agents-panel">
     |}];
   H.key h "Escape" ~target:Page;
   inert ();
@@ -192,12 +189,10 @@ let%expect_test "help lists every key and command" =
     Ctrl+, settings: notifications, transcript detail, your account (/settings)
     ← → / ↑ ↓ (on a panel's edge) resize the panel (Shift: faster; Home / End: smallest / largest; Enter: the default size); or drag the edge, double-click to reset
     Esc (the context ring's card open) close the card (the ring by the paperclip: context, cost, Compact)
-    Alt+1…9 follow subagent or job N in the agents panel
-    Alt+] Alt+[ the next or previous subagent or job
-    Alt+0 close the agents panel
-    Enter / Alt+Enter (steering a subagent) send it a message: at its next step / when it ends its turn (its Steer button in the agents panel; /agents steer N TEXT sends one)
-    Alt+↑ (steering a subagent) take its last queued message back
-    Esc (steering a subagent) write to the main agent again
+    Alt+1…9 open the chat of subagent N of this chat (the session card lists them)
+    Enter / Alt+Enter (in a subagent's chat) write to it: at its next step / when it ends its turn while it runs; once it has finished, it carries on with your message (/agents steer N TEXT sends one from anywhere)
+    Alt+↑ (in a subagent's chat) take its last queued message back
+    Esc (in a subagent's chat) back to its parent's chat
     Ctrl+Z / ⌘+Z (in the message box) right after a long paste became a chip, or a chip was removed: undo that (otherwise the box's own undo); Ctrl+Shift+Z, ⌘+Shift+Z or Ctrl+Y redoes it
     Ctrl+Shift+V / ⌘+Shift+V (in the message box) paste a long text into the box as text; a plain paste of over 2,000 characters or 40 lines becomes a Pasted text chip, sent whole with the message (its dialog: Insert as text, Remove)
     Ctrl+Shift+O a new temporary session (/temporary): not saved or listed, deleted when you leave it; on the new-session screen, its Temporary chip
@@ -640,9 +635,8 @@ let%expect_test
         (web.theme web.accent web.radius web.font web.code-font web.notify
          web.verbosity web.terminal-open web.review web.code-size
          favourite-models history web.migrated web.sidebar-width web.files-width
-         web.files-preview-width web.agents-width web.terminal-height
-         web.review-chat-width web.review-files-width web.review-margin-width
-         web.editor-tree-width))))
+         web.files-preview-width web.terminal-height web.review-chat-width
+         web.review-files-width web.review-margin-width web.editor-tree-width))))
      (tag Prefs))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s1.jsonl) (limit 1000000)))

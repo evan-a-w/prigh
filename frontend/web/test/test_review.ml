@@ -233,7 +233,7 @@ let%expect_test
     <div class="chat-frame">
     <div class="toast-anchor">
     <footer class="composer">
-    sidebar-width=280px files-width=400px agents-width=420px review-chat-width=400px
+    sidebar-width=280px files-width=400px review-chat-width=400px
     <div class="resizer resizer-sidebar">
     |}];
   H.quiet h (fun () ->
@@ -257,7 +257,7 @@ let%expect_test
     <div class="chat-frame">
     <div class="toast-anchor">
     <footer class="composer">
-    sidebar-width=280px files-width=400px agents-width=420px review-chat-width=400px
+    sidebar-width=280px files-width=400px review-chat-width=400px
     <div class="resizer resizer-review-files">
     <div class="resizer resizer-review-chat">
     |}];
@@ -279,11 +279,10 @@ let%expect_test
   layout h;
   [%expect
     {|
-    <div class="agents-open app files-open reviewing terminal-open">
+    <div class="app files-open reviewing terminal-open">
     <aside class="bg-sidebar loon sidebar text-sidebar-foreground text-sm">
     <div class="desk">
     <aside class="files-panel">
-    <aside class="agents-panel">
     -- the desk:
     <section class="review-page">
     <div class="resizer resizer-review-chat">
@@ -294,12 +293,11 @@ let%expect_test
     <div class="chat-frame">
     <div class="toast-anchor">
     <footer class="composer">
-    sidebar-width=280px files-width=308px agents-width=328px review-chat-width=323px
+    sidebar-width=280px files-width=400px review-chat-width=400px
     <div class="resizer resizer-review-files">
     <div class="resizer resizer-review-chat">
     <div class="resizer resizer-terminal">
     <div class="resizer resizer-files">
-    <div class="resizer resizer-agents">
     |}];
   (* Ctrl+B shows the sessions as a drawer over the page, Esc hides it. *)
   H.key h ~ctrl:true "b";
@@ -311,12 +309,11 @@ let%expect_test
   [%expect
     {|
     Toggle_sidebar
-    <div class="agents-open app files-open reviewing sidebar-drawer sidebar-open terminal-open">
+    <div class="app files-open reviewing sidebar-drawer sidebar-open terminal-open">
     <aside class="bg-sidebar loon sidebar text-sidebar-foreground text-sm">
     <div class="scrim">
     <div class="desk">
     <aside class="files-panel">
-    <aside class="agents-panel">
     -- the desk:
     <section class="review-page">
     <div class="resizer resizer-review-chat">
@@ -327,15 +324,13 @@ let%expect_test
     <div class="chat-frame">
     <div class="toast-anchor">
     <footer class="composer">
-    sidebar-width=280px files-width=308px agents-width=328px review-chat-width=323px
+    sidebar-width=280px files-width=400px review-chat-width=400px
     <div class="resizer resizer-review-files">
     <div class="resizer resizer-review-chat">
     <div class="resizer resizer-terminal">
     <div class="resizer resizer-files">
-    <div class="resizer resizer-agents">
     -- inert:
     <aside class="files-panel">
-    <aside class="agents-panel">
     <section class="review-page">
     <section class="terminal-panel">
     <div class="chrome-anchor loon">
@@ -347,7 +342,7 @@ let%expect_test
   [%expect
     {|
     Toggle_sidebar
-    <div class="agents-open app files-open reviewing terminal-open">
+    <div class="app files-open reviewing terminal-open">
     |}];
   (* Closing the review brings the sidebar back as it was, the panels
      staying open. *)
@@ -358,12 +353,11 @@ let%expect_test
     {|
     Toggle_sidebar
     (Review Toggle)
-    <div class="agents-open app files-open sidebar-open terminal-open">
+    <div class="app files-open sidebar-open terminal-open">
     <aside class="bg-sidebar loon sidebar text-sidebar-foreground text-sm">
     <div class="resizer resizer-sidebar">
     <div class="desk">
     <aside class="files-panel">
-    <aside class="agents-panel">
     -- the desk:
     <main class="fresh main">
     <section class="terminal-panel">
@@ -372,11 +366,10 @@ let%expect_test
     <div class="chat-frame">
     <div class="toast-anchor">
     <footer class="composer">
-    sidebar-width=265px files-width=377px agents-width=397px review-chat-width=400px
+    sidebar-width=280px files-width=400px review-chat-width=400px
     <div class="resizer resizer-sidebar">
     <div class="resizer resizer-terminal">
     <div class="resizer resizer-files">
-    <div class="resizer resizer-agents">
     |}];
   (* Hidden before the review, the sidebar stays hidden after it. *)
   H.quiet h (fun () ->
@@ -389,7 +382,7 @@ let%expect_test
     Toggle_sidebar
     (Review Toggle)
     (Review Toggle)
-    <div class="agents-open app files-open terminal-open">
+    <div class="app files-open terminal-open">
     |}]
 ;;
 

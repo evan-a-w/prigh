@@ -8,6 +8,7 @@ open! Import
 
 module Section : sig
   type t =
+    | Parents
     | Subagents
     | Worktrees
   [@@deriving sexp_of, equal]

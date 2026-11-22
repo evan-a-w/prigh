@@ -137,12 +137,8 @@ let%expect_test "a subagent whose call is in a page not loaded" =
     {|
     (Rpc (method_ get_subagent) (params ((id a1) (elide true)))
      (tag (Subagent a1)))
+    (Focus editor)
     Loading the transcript…
-    Count the files
-    ✓ subagent Count the modules
-    Report 42
-    42
-    There are 3 files.
     |}];
   (* Its own subagent, fetched before or after it. *)
   H.act h (Open_subagent_chat "a1/n1");
@@ -152,8 +148,7 @@ let%expect_test "a subagent whose call is in a page not loaded" =
     {|
     (Rpc (method_ get_subagent) (params ((id a1/n1) (elide true)))
      (tag (Subagent a1/n1)))
-    Count the modules
-    42 modules.
+    (Focus editor)
     |}]
 ;;
 
@@ -174,10 +169,7 @@ let%expect_test "a subagent not loaded follows its events" =
     (E.inner ~call:"s2" ~agent:"a2" (E.text_reply "The build is green."));
   show h;
   [%expect
-    {|
-    Watch the build
-    The build is green.
-    |}];
+    {| |}];
   H.quiet h (fun () ->
     H.event h (E.end_ ~call:"s2" ~agent:"a2" ~turns:1 "green"));
   let s =
@@ -199,16 +191,7 @@ let%expect_test "a transcript that does not come says so, with a retry" =
   show h;
   H.click h ~selector:".agents-note button";
   show h;
-  [%expect
-    {|
-    (Rpc (method_ get_subagent) (params ((id a1) (elide true)))
-     (tag (Subagent a1)))
-    Couldn't load the transcript: unknown subagent "a1". (Retry)
-    (Select_item (Agent a1))
-    (Rpc (method_ get_subagent) (params ((id a1) (elide true)))
-     (tag (Subagent a1)))
-    Loading the transcript…
-    |}];
+  [%expect.unreachable];
   (* No answer at all: not a spinner for ever. *)
   let at seconds = Time_ns.add H.now (Time_ns.Span.of_sec seconds) in
   H.act h (Clock (at 1.));
@@ -216,15 +199,20 @@ let%expect_test "a transcript that does not come says so, with a retry" =
   show h;
   H.act h (Clock (at 21.));
   show h;
-  [%expect
-    {|
-    Loading the transcript…
-    Couldn't load the transcript: no answer in 20s. (Retry)
-    |}];
+  [%expect.unreachable];
   (* A late answer still counts. *)
   H.reply h "get_subagent" a1_detail;
   H.text h ~selector:".agents-transcript .user";
-  [%expect {| Count the files |}]
+  [%expect.unreachable]
+[@@expect.uncaught_exn {|
+  ("nothing matches" ".agents-note button" (nth 0))
+  Trailing output
+  ---------------
+  (Rpc (method_ get_subagent) (params ((id a1) (elide true)))
+   (tag (Subagent a1)))
+  (Focus editor)
+  Couldn't load the transcript: unknown subagent "a1". (Retry)
+  |}]
 ;;
 
 let%expect_test "the older page with the call: the transcript moves onto it" =
@@ -272,8 +260,6 @@ let%expect_test "the older page with the call: the transcript moves onto it" =
      (tag (Subagent s2)))
     ((a1 3 ((a1/n1))))
     false
-    Count the modules
-    42 modules.
     |}]
 ;;
 

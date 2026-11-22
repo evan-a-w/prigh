@@ -5,13 +5,20 @@ module Model = App.Model
 module Action = App.Action
 module Icon = Loon.Icon
 
+(* The chat on show's own subagents: the session's, or the subagent's. *)
 let agents (m : Model.t) =
-  Agents.listed m.agents @ Agents.earlier m.agents
-  |> List.filter_map ~f:(fun ((item : Agents.Item.t), depth) ->
-    match item with
-    | Agent id ->
-      Agents.find_agent m.agents id |> Option.map ~f:(fun a -> a, depth)
-    | Job _ -> None)
+  Agents.children m.agents m.subagent_chat |> List.map ~f:(fun a -> a, 0)
+;;
+
+(* In a subagent's chat, the chats above it: the session's, then its
+   ancestors, the nearest last. *)
+let parents (m : Model.t) =
+  match m.subagent_chat with
+  | None -> []
+  | Some id ->
+    (match List.rev (Agents.lineage m.agents id) with
+     | [] | [ _ ] -> []
+     | _ :: ancestors -> List.rev ancestors)
 ;;
 
 (* The worktrees that matter to the session (the ones the sidebar showed
@@ -29,7 +36,8 @@ let worktrees (m : Model.t) =
 ;;
 
 let something (m : Model.t) =
-  not (List.is_empty (agents m) && List.is_empty (worktrees m))
+  Option.is_some m.subagent_chat
+  || not (List.is_empty (agents m) && List.is_empty (worktrees m))
 ;;
 
 let inline (m : Model.t) = m.session_card_open && (not m.narrow) && something m
@@ -68,6 +76,7 @@ let section
   let open_ = Session_card.is_open m.session_card which in
   let id =
     match which with
+    | Parents -> "session-card-parents"
     | Subagents -> "session-card-subagents"
     | Worktrees -> "session-card-worktrees"
   in
@@ -154,6 +163,27 @@ let subagent_row (m : Model.t) ~inject ((a : Agents.Agent.t), depth) =
     ]
 ;;
 
+(* A chat above the one on show: the session's ([None]) or a subagent's. *)
+let parent_row ~inject ~label ~title (target : string option) =
+  Node.button
+    ~attrs:
+      [ Attr.type_ "button"
+      ; Attr.class_
+          "session-card-parent flex h-7 w-full items-center gap-1.5 \
+           rounded-md px-2 text-left text-[12px] text-foreground/85 \
+           hover:bg-accent hover:text-foreground narrow:h-11"
+      ; Attr.title title
+      ; Attr.on_click (fun _ ->
+          inject
+            (match target with
+             | None -> Action.Close_subagent_chat
+             | Some id -> Action.Open_subagent_chat id))
+      ]
+    [ Icon.view ~class_:"size-3! shrink-0 text-muted-foreground" Arrow_up
+    ; Node.span ~attrs:[ Attr.class_ "min-w-0 truncate" ] [ Node.text label ]
+    ]
+;;
+
 (* A click (or a right-click) opens the worktree's menu: open it here or in
    a new session, its pull request, remove it. *)
 let worktree_row
@@ -230,7 +260,28 @@ let worktree_row
 let sections (m : Model.t) ~inject =
   let agents = agents m in
   let worktrees = worktrees m in
-  [ (if List.is_empty agents
+  let in_subagent = Option.is_some m.subagent_chat in
+  [ (if not in_subagent
+     then Node.none
+     else
+       section
+         m
+         ~inject
+         ~which:Parents
+         ~glyph:Arrow_up
+         ~name:"Parents"
+         (parent_row
+            ~inject
+            ~label:"The session"
+            ~title:"The session's own chat"
+            None
+          :: List.map (parents m) ~f:(fun (a : Agents.Agent.t) ->
+            parent_row
+              ~inject
+              ~label:(Agents.Agent.title a)
+              ~title:(String.strip a.task)
+              (Some a.id))))
+  ; (if List.is_empty agents
      then Node.none
      else
        section
@@ -240,7 +291,7 @@ let sections (m : Model.t) ~inject =
          ~glyph:Bot
          ~name:"Subagents"
          (List.map agents ~f:(subagent_row m ~inject)))
-  ; (if List.is_empty worktrees
+  ; (if List.is_empty worktrees || in_subagent
      then Node.none
      else
        section
