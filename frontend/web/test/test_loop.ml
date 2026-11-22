@@ -223,17 +223,17 @@ let%expect_test "/resume shows, runs now or cancels the automatic resume" =
     {|
     (Rpc (method_ push_pref) (params ((key history) (value /resume) (max 500)))
      (tag Ignore))
-    (Expire_toast (id 0) (after_ms 5500))
+    (Expire_toast (id 0) (after_ms 6000))
     (Rpc (method_ push_pref) (params ((key history) (value /resume) (max 500)))
      (tag Ignore))
-    (Expire_toast (id 1) (after_ms 5980))
-    No resume is scheduled: one is when a run stops at a usage limit whose reset time the provider gives
-    The run stopped at a usage limit and resumes at 14:05: /resume now retries at once, /resume cancel stays stopped
+    (Expire_toast (id 1) (after_ms 6000))
+    No resume is scheduled: one is when a run stops at a usage limit whose reset time the provider gives; runs stopped by a usage limit resume by themselves when it resets (/resume off keeps them stopped)
+    The run stopped at a usage limit and resumes at 14:05: /resume now retries at once, /resume cancel stays stopped; runs stopped by a usage limit resume by themselves when it resets (/resume off keeps them stopped)
     (Rpc (method_ push_pref)
      (params ((key history) (value "/resume now") (max 500))) (tag Ignore))
     (Rpc (method_ resume_now) (params ()) (tag (Notice "Resuming now")))
     (Expire_toast (id 2) (after_ms 2500))
-    The run stopped at a usage limit and resumes at 14:05: /resume now retries at once, /resume cancel stays stopped
+    The run stopped at a usage limit and resumes at 14:05: /resume now retries at once, /resume cancel stays stopped; runs stopped by a usage limit resume by themselves when it resets (/resume off keeps them stopped)
     Resuming now
     (Rpc (method_ push_pref)
      (params ((key history) (value "/resume cancel") (max 500))) (tag Ignore))
@@ -243,7 +243,7 @@ let%expect_test "/resume shows, runs now or cancels the automatic resume" =
     (Rpc (method_ push_pref)
      (params ((key history) (value "/resume later") (max 500))) (tag Ignore))
     Automatic resume cancelled: send a message to retry
-    Unknown /resume argument “later”: /resume now retries at once, /resume cancel stays stopped. (Dismiss)
+    Unknown /resume argument "later": now retries at once, cancel stays stopped, on|off turns the automatic resume after a usage limit on or off; usage: /resume [now|cancel|on|off] (Dismiss)
     |}]
 ;;
 
@@ -268,6 +268,8 @@ let%expect_test "completion offers the keywords, but not over a goal's text" =
     Automatic resume ↑↓ Tab Enter Esc   Ctrl+Enter as typed
     now retry the run at once
     cancel stay stopped until you send a message
+    on resume runs by themselves when a usage limit resets
+    off never resume by themselves after a usage limit
     Budget ↑↓ Tab Enter Esc   Ctrl+Enter as typed
     off no budget: turns start whatever it costs
     |}]

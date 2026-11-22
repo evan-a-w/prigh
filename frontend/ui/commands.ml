@@ -202,8 +202,9 @@ let every =
   ; c
       ~argument:Argument.Resume
       "resume"
-      "[now|cancel]"
-      "show, run now or cancel the automatic resume after a usage limit"
+      "[now|cancel|on|off]"
+      "show, run now or cancel the automatic resume after a usage limit, or \
+       turn it on or off"
   ; c
       "downsize-images"
       ""

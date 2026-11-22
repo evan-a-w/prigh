@@ -171,6 +171,29 @@ let mask (config : Config.t option) ~inject =
     ]
 ;;
 
+let auto_resume (config : Config.t option) ~inject =
+  let on = Option.exists config ~f:(fun c -> c.resume_on_limit_reset) in
+  row
+    ~cls:"auto-resume"
+    ~name:"Resume after a usage limit"
+    ~about:
+      "A run stopped by a provider's usage limit carries on by itself when the \
+       limit resets, if the provider says when. Off: it stays stopped until \
+       you send a message."
+    [ switch
+        ~disabled:(Option.is_none config)
+        ~label:"Resume after a usage limit"
+        ~title:
+          (if on
+           then "Stay stopped at a usage limit (/resume off)"
+           else "Resume when a usage limit resets (/resume on)")
+        ~on
+        ~on_click:
+          (inject (Action.Run (if on then "/resume off" else "/resume on")))
+        ()
+    ]
+;;
+
 let generate_model (m : App.Model.t) ~inject =
   let current =
     match Option.bind m.config ~f:(fun c -> c.generate_model) with
@@ -1396,6 +1419,7 @@ let content (m : App.Model.t) (section : Section.t) ~inject =
         ; dictation_model m ~inject
         ]
     ; group ~title:"Compaction" (compaction m ~inject)
+    ; group ~title:"Usage limits" [ auto_resume m.config ~inject ]
     ]
   | Memory ->
     group [ memory_switch m ~inject ]

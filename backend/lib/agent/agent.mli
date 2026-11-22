@@ -547,7 +547,8 @@ val config : t -> Config.t
 val set_config : ?session_mode:bool -> t -> Config.t -> unit Or_error.t
 
 (** Takes a configuration another session saved: emits
-    [Event.Config_changed], changes no session setting. *)
+    [Event.Config_changed], changes no session setting. A
+    [resume_on_limit_reset] turned off cancels a scheduled resume. *)
 val adopt_config : t -> Config.t -> unit
 
 (** When conversations (the session's and its subagents') are masked and
@@ -843,8 +844,8 @@ val clear_reminders : t -> unit Or_error.t
 
 (** When a run stops at a usage limit with no fallback model left, and the
     config's [resume_on_limit_reset] is on, it resumes by itself once the
-    limit resets, if the provider said when ([State.resume_at]); an abort or
-    a new run cancels that. These fail when nothing is scheduled. *)
+    limit resets, if the provider said when ([State.resume_at]); an abort, a
+    new run or turning [resume_on_limit_reset] off cancels that. These fail when nothing is scheduled. *)
 val cancel_resume : t -> unit Or_error.t
 
 (** Whether a resume is scheduled (the agent must stay loaded for it). *)

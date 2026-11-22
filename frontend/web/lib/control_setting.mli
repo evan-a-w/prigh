@@ -34,6 +34,7 @@ type t =
   | Dictation_model
   | Compact_at
   | Mask
+  | Auto_resume
   | Memory
   | Memory_notes
   | About_you

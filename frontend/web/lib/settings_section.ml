@@ -59,7 +59,8 @@ let about = function
      session: open ones keep theirs. Kept on the backend."
   | Models ->
     "The providers whose models you use, the models prigh uses for its own \
-     work, and when long conversations are summarised. Kept on the backend."
+     work, when long conversations are summarised, and what happens at a usage \
+     limit. Kept on the backend."
   | Memory ->
     "What you asked the model to remember, for later sessions. Kept on the \
      backend, for your account."

@@ -257,6 +257,8 @@ let argument_items
     simple
       [ "now", "retry the run at once"
       ; "cancel", "stay stopped until you send a message"
+      ; "on", "resume runs by themselves when a usage limit resets"
+      ; "off", "never resume by themselves after a usage limit"
       ]
   | Pr ->
     simple

@@ -983,10 +983,26 @@ let track_plan t (event : Agent_event.t) =
 
 let config t = t.config
 
-let adopt_config t config =
+let cancel_resume_timer t =
+  Option.iter t.resume ~f:(fun r ->
+    t.resume <- None;
+    Session.set_resume_at t.session None;
+    Cancellation.cancel r.cancel)
+;;
+
+let adopt_config t (config : Config.t) =
   t.config <- config;
   Trace.set_level t.tracer (Trace.Level.effective ~configured:config.trace);
-  broadcast t (Config_changed config)
+  broadcast t (Config_changed config);
+  if (not config.resume_on_limit_reset) && Option.is_some t.resume
+  then (
+    cancel_resume_timer t;
+    broadcast
+      t
+      (Notice
+         "automatic resume after a usage limit is off (/resume on): the run \
+          stays stopped; send a message to carry on");
+    state_changed t)
 ;;
 
 (* Fallback models are stored as keys, so a name or prefix that resolves
@@ -3263,13 +3279,6 @@ let resume_message =
      where it left off.]"
 ;;
 
-let cancel_resume_timer t =
-  Option.iter t.resume ~f:(fun r ->
-    t.resume <- None;
-    Session.set_resume_at t.session None;
-    Cancellation.cancel r.cancel)
-;;
-
 let duration_hum seconds =
   let minutes = Float.iround_up_exn (Float.max 0. seconds /. 60.) in
   if minutes < 60
@@ -3951,7 +3960,9 @@ let restore_resume t =
   match Session.resume_at t.session with
   | None -> ()
   | Some at ->
-    if Float.( > ) at (Eio.Time.now (Eio.Stdenv.clock t.env))
+    if
+      t.config.resume_on_limit_reset
+      && Float.( > ) at (Eio.Time.now (Eio.Stdenv.clock t.env))
     then arm_resume t ~at
     else Session.set_resume_at t.session None
 ;;

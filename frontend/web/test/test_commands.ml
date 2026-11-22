@@ -139,7 +139,7 @@ let%expect_test "every command does something (none is unknown)" =
     /budget                    toast: No budget ($0.00 spent): /budget DOLLARS stops the agent starting turns once the session has cost that much
     /goal                      toast: No goal: /goal TEXT sets one, and the agent keeps working until it judges it met
     /remind                    toast: No reminders yet: /remind stop TEXT or /remind every N TEXT adds one
-    /resume                    toast: No resume is scheduled: one is when a run stops at a usage limit whose reset time the provider gives
+    /resume                    toast: No resume is scheduled: one is when a run stops at a usage limit whose reset time the provider gives; runs stopped by a usage limit resume by themselves when it resets (/resume off keeps them stopped)
     /downsize-images           rpc downsize_images
     /copy                      toast: Nothing to copy yet: no reply in this session.
     /btw                       toast: Usage: /btw <question> (asked aside; the run goes on)
@@ -379,8 +379,8 @@ let%expect_test "/scoped-models, Ctrl+P and Alt+P" =
       (approval_mode Auto) (default_chat_mode false)
       (permissions ((allow ()) (ask ()) (deny ()))) (default_model ())
       (default_thinking ()) (fallback_models ()) (default_cwd ())
-      (default_host ()) (max_budget_usd ()) (worktrees_dir ())
-      (archive_after_days 7) (notify bell) (snippets ())
+      (default_host ()) (max_budget_usd ()) (resume_on_limit_reset true)
+      (worktrees_dir ()) (archive_after_days 7) (notify bell) (snippets ())
       (compact_at_tokens 200000) (compaction_model ()) (mask_observations true)
       (generate_model ()) (naming_model ()) (approval_model ())
       (dictation_model ())))

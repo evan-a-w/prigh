@@ -27,6 +27,7 @@ type t =
   | Dictation_model
   | Compact_at
   | Mask
+  | Auto_resume
   | Memory
   | Memory_notes
   | About_you
@@ -65,6 +66,7 @@ let name = function
   | Dictation_model -> "Dictation model"
   | Compact_at -> "Compact at"
   | Mask -> "Mask old tool outputs"
+  | Auto_resume -> "Resume after a usage limit"
   | Memory -> "Use memory"
   | Memory_notes -> "Memory notes"
   | About_you -> "About you"
@@ -120,6 +122,7 @@ let keywords = function
   | Dictation_model -> "speech microphone transcription"
   | Compact_at -> "compaction tokens"
   | Mask -> "compaction observations"
+  | Auto_resume -> "usage limit reset automatic continue rate quota"
   | Memory -> "remember notes"
   | Memory_notes -> "remember"
   | About_you -> "user info name country units"
@@ -174,6 +177,7 @@ let page t : (Settings_section.t * string) option =
   | Dictation_model -> Some (Models, "Dictation")
   | Compact_at -> Some (Models, "Compact at")
   | Mask -> Some (Models, "Mask old tool outputs")
+  | Auto_resume -> Some (Models, "Resume after a usage limit")
   | Memory -> Some (Memory, "Use memory")
   | Memory_notes -> Some (Memory, "Your notes")
   | About_you -> Some (About_you, "About you")

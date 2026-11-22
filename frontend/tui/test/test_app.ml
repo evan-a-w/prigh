@@ -3094,7 +3094,7 @@ let%expect_test "/auth, /help, /state, /clear, unknown method errors" =
     │ Ctrl+P cycles through                                    │
     │ /change_default                    save the current      │
     │ model and thinking level as the default for new sessions │
-    └───────── 1–11 of 370 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
+    └───────── 1–11 of 371 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
     ────────────────────────────────────────────────────────────
     > ▏
     deepseek-flash  ctx:0.1%/1.0M  ↑↓ scroll · Esc closes
@@ -5558,7 +5558,8 @@ let%expect_test
       (default_cwd      ())
       (default_host     ())
       (max_budget_usd   ())
-      (worktrees_dir    ())
+      (resume_on_limit_reset true)
+      (worktrees_dir ())
       (archive_after_days 7)
       (notify             bell)
       (snippets ())
@@ -5583,7 +5584,8 @@ let%expect_test
       (default_cwd      ())
       (default_host     ())
       (max_budget_usd   ())
-      (worktrees_dir    ())
+      (resume_on_limit_reset true)
+      (worktrees_dir ())
       (archive_after_days 7)
       (notify             bell)
       (snippets ())
@@ -6626,7 +6628,8 @@ let%expect_test "/change_default saves the model and thinking level" =
       (default_cwd     ())
       (default_host    ())
       (max_budget_usd  ())
-      (worktrees_dir   ())
+      (resume_on_limit_reset true)
+      (worktrees_dir ())
       (archive_after_days 7)
       (notify             bell)
       (snippets ())

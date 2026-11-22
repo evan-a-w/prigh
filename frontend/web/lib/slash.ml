@@ -362,9 +362,10 @@ let every =
        one or all; none: list the session's (Delete removes one)"
   ; c
       ~argument:Resume
-      ~args:"[now|cancel]"
+      ~args:"[now|cancel|on|off]"
       "resume"
-      "show, run now or cancel the automatic resume after a usage limit"
+      "show, run now or cancel the automatic resume after a usage limit, or \
+       turn it on or off"
   ; c
       "downsize-images"
       "send the conversation's images smaller (after the model refused one as \

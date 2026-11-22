@@ -34,6 +34,9 @@ type t =
         connected; [None]: where the session you are on is *)
   ; max_budget_usd : float option
     (** the cost budget of sessions that set none with [/budget] *)
+  ; resume_on_limit_reset : bool
+    (** a run stopped by a usage limit resumes by itself when the limit
+        resets (default true) *)
   ; worktrees_dir : string option
     (** where worktrees are created on the tool host; [None] from backends
         before worktrees *)
