@@ -2099,10 +2099,13 @@ kbd {
   border-top-left-radius: inherit;
   border-top-right-radius: inherit;
 }
+/* The menu rises from the composer, so its foot stays put as the list's
+   length changes: the rail stacks up from there (favourites at the foot),
+   and a tab stays under the pointer as the providers are clicked through. */
 .model-rail {
   flex: none;
   display: flex;
-  flex-direction: column;
+  flex-direction: column-reverse;
   align-items: center;
   gap: 2px;
   width: 48px;
@@ -2111,6 +2114,8 @@ kbd {
   overflow-y: auto;
   scrollbar-width: none;
 }
+/* Opened downward (little room above), its top is what stays put. */
+.chip-popover.model-menu[data-placement="below"] .model-rail { flex-direction: column; }
 .model-rail-tab {
   position: relative;
   display: grid;
