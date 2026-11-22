@@ -1,0 +1,43 @@
+; The same backend's -web port over ws://, and wss:// through a TLS proxy, in
+; the slow tier (PRIGH_TEST_TIER=full, ./test --full): linking it, redone on
+; every change to the UI libraries, cost more than running it (the browser
+; smoke test uses ws://). The test is a library, so every build compiles it;
+; main.exe, which links it, exists only in the slow tier.
+
+(library
+ (name e2e_websocket)
+ (modules e2e_websocket)
+ (preprocess
+  (pps ppx_jane))
+ (libraries
+  core
+  core_unix
+  core_unix.filename_unix
+  core_unix.signal_unix
+  re
+  async
+  prigh_protocol
+  prigh_client
+  prigh_client_unix
+  prigh_client_unix_testing
+  prigh_ui
+  prigh_tui))
+
+(executable
+ (name main)
+ (modules main)
+ (enabled_if
+  (= %{env:PRIGH_TEST_TIER=default} full))
+ (libraries core_unix.command_unix e2e_websocket))
+
+(rule
+ (aliases e2e runtest)
+ (enabled_if
+  (= %{env:PRIGH_TEST_TIER=default} full))
+ (deps e2e_websocket.expected ../backend.digest)
+ (action
+  (progn
+   (with-stdout-to
+    e2e_websocket.actual
+    (run %{exe:main.exe}))
+   (diff e2e_websocket.expected e2e_websocket.actual))))

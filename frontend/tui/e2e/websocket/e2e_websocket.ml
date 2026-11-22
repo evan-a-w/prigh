@@ -179,9 +179,8 @@ let main () =
     print_endline "backend stopped"
 ;;
 
-let () =
-  Command_unix.run
-    (Command.async
-       ~summary:"the TUI's WebSocket transport against the real backend"
-       (Command.Param.return main))
+let command =
+  Command.async
+    ~summary:"the TUI's WebSocket transport against the real backend"
+    (Command.Param.return main)
 ;;
