@@ -30,8 +30,8 @@ nix develop -c sh -c 'cd frontend && dune build @runtest'
 
 nix build               # result/bin/prigh wrapper (includes backend + TUI)
 
-./test                  # builds both, runs every suite, the browser e2e in Chromium (~1 min)
-./test --full           # ... and in Firefox and WebKit: the full matrix, before merging
+./test                  # THE suite: builds both, runs the dune tests and the core browser e2e in Chromium (~1 min)
+./test --full           # every browser e2e script, in Firefox and WebKit too: the full matrix, when asked for
 ```
 
 Without Nix, an OxCaml opam switch with the same packages works too
@@ -3647,9 +3647,10 @@ to add an `Authorization` header.
 ### Testing
 
 `./test` runs everything below (the dune tests one project after the other,
-prigh-web's browser e2e in Chromium alongside); `./test --full` runs the
-browser e2e in Firefox and WebKit as well, like the flake's checks. Run the quick one
-before pushing and the full one before merging.
+prigh-web's core browser e2e in Chromium alongside); it is the suite to run
+before pushing and before merging. `./test --full` runs every browser e2e
+script at every size in Firefox and WebKit as well, like the flake's checks,
+and is run only when asked for.
 
 Four layers, cheapest first; `dune build @runtest` in each project runs all
 of them (the last two need the backend binary built first), and `dune

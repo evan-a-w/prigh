@@ -3,10 +3,13 @@ prigh is a coding agent. Read `README.md` for what it does and
 
 ## Layout and builds
 
-Run every suite with `./test` (about a minute warm: it builds both projects,
-runs their dune tests and prigh-web's browser e2e in Chromium, in parallel);
-`./test --full` adds the browser e2e in Firefox and WebKit (the desktop
-app's engine on Linux and macOS), the whole matrix the flake checks run: run it before merging. Both work from any shell (outside the dev
+`./test` is the test suite: run it, and only it, before pushing and before
+merging. It builds both projects, runs their dune tests and prigh-web's core
+browser e2e in Chromium, in parallel, in about a minute even on a busy
+machine. `./test --full` runs every browser e2e script at every size in
+Chromium, Firefox and WebKit (the desktop app's engine on Linux and macOS)
+and every dune test again, the whole matrix the flake checks run: run it
+only when the user asks for it. Both work from any shell (outside the dev
 shell they enter it) and test what they build. Run single suites as below
 while iterating.
 
@@ -109,8 +112,12 @@ sexps or screens demonstrating state rather than asserting equality with a
 hand-written value (e.g. don't just [assert_true] some condition). Look at the
 output of `dune build @runtest`, and if the diffs are right, `dune promote`.
 
-Run `./test` before pushing and `./test --full` before merging (see "Layout
-and builds"). Keep them fast: tests wait for what they expect rather than
+Run `./test` before pushing and before merging; `./test --full` only when
+the user asks (see "Layout and builds"). Keep `./test` under a minute on a
+busy machine: a new browser e2e script joins the core suite (`core` in
+`frontend/web/e2e/prigh_web.sh`) only if it covers a main flow nothing else
+does, and core scripts check one phone size (SUITE=core) where they check
+two. Keep them fast: tests wait for what they expect rather than
 sleeping, and output does not depend on timing (a test that passes only on an
 idle machine is broken).
 
