@@ -144,3 +144,72 @@ let%expect_test "reconnect: a fresh transport per attempt, shared attempts, \
   let%bind () = Client.close client in
   return ()
 ;;
+
+let%expect_test
+    "disconnect abandons an attempt that hangs: the next one is fresh, and \
+     what the old one opens late is closed"
+  =
+  let hung = Ivar.create () in
+  let backends = Queue.create () in
+  let attempts = ref 0 in
+  let connect () =
+    incr attempts;
+    if !attempts = 1
+    then Ivar.read hung
+    else (
+      let transport, backend = Transport.In_memory.create () in
+      Queue.enqueue backends backend;
+      Deferred.Or_error.return transport)
+  in
+  let client = Client.create ~connect in
+  let first = Client.connect client in
+  let joined = Client.connect client in
+  printf "attempts=%d\n" !attempts;
+  [%expect {| attempts=1 |}];
+  (* The page gives up on it (its timeout) and tries again. *)
+  Client.disconnect client;
+  let%bind second = Client.connect client in
+  printf
+    "attempts=%d second=%s connected=%b\n"
+    !attempts
+    (Sexp.to_string [%sexp (second : unit Or_error.t)])
+    (Client.is_connected client);
+  [%expect {| attempts=2 second=(Ok()) connected=true |}];
+  (* The hung attempt connects after all: its transport is closed, the
+     client keeps the second. *)
+  let late, late_backend = Transport.In_memory.create () in
+  Ivar.fill_exn hung (Ok late);
+  let%bind first
+  and joined
+  and () = late.closed in
+  print_s
+    [%message
+      (first : unit Or_error.t)
+        (joined : unit Or_error.t)
+        (Client.is_connected client : bool)];
+  [%expect
+    {|
+    ((first  (Error abandoned))
+     (joined (Error abandoned))
+     ("Client.is_connected client" true))
+    |}];
+  ignore (late_backend : Transport.In_memory.Backend.t);
+  let reply = Client.call client "ping" [] in
+  let second_backend = Queue.dequeue_exn backends in
+  let%bind request =
+    Pipe.read_exn (Transport.In_memory.Backend.requests second_backend)
+  in
+  print_endline request;
+  Transport.In_memory.Backend.send
+    second_backend
+    {|{"type":"response","id":1,"ok":true,"result":"pong"}|};
+  let%bind reply in
+  print_s [%sexp (reply : Prigh_protocol.Json.t Or_error.t)];
+  [%expect
+    {|
+    {"id":1,"method":"ping","params":{}}
+    (Ok pong)
+    |}];
+  let%bind () = Client.close client in
+  return ()
+;;

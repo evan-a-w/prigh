@@ -427,7 +427,12 @@ let reconnect t ~delay_ms ~session ~as_user =
   | Some error -> return error
   | None ->
     (match%bind Client.connect t.client with
-     | Error e -> return (Error (Error.to_string_hum e))
+     | Error e ->
+       (* A switch abandons the attempt under way. *)
+       return
+         (Option.value
+            (superseded ())
+            ~default:(Error (Error.to_string_hum e)))
      | Ok () ->
        (match superseded () with
         | Some error -> return error

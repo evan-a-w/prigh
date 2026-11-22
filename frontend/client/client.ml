@@ -15,6 +15,7 @@ type t =
   { connect : unit -> Transport.t Deferred.Or_error.t
   ; mutable transport : Transport.t option
   ; mutable connecting : unit Deferred.Or_error.t option
+  ; mutable attempts : int (** so that an abandoned attempt can tell *)
   ; mutable detached : unit Ivar.t (** filled once [transport] is gone *)
   ; pending : Json.t Or_error.t Ivar.t Int.Table.t
   ; mutable next_id : int
@@ -82,8 +83,14 @@ let connect t =
   | Some _, _ -> Deferred.Or_error.ok_unit
   | None, Some in_flight -> in_flight
   | None, None ->
+    t.attempts <- t.attempts + 1;
+    let attempt = t.attempts in
     let result =
       match%map t.connect () with
+      | result when attempt <> t.attempts ->
+        Result.iter result ~f:(fun (transport : Transport.t) ->
+          transport.close ());
+        Or_error.error_string "abandoned"
       | Error _ as e ->
         t.connecting <- None;
         e
@@ -101,6 +108,7 @@ let create ~connect =
   { connect
   ; transport = None
   ; connecting = None
+  ; attempts = 0
   ; detached = Ivar.create_full ()
   ; pending = Int.Table.create ()
   ; next_id = 1
@@ -127,6 +135,10 @@ let received t = t.received
 let waiting t = Hashtbl.length t.pending
 
 let disconnect t =
+  if Option.is_some t.connecting
+  then (
+    t.connecting <- None;
+    t.attempts <- t.attempts + 1);
   Option.iter t.transport ~f:(fun transport -> transport.close ())
 ;;
 
