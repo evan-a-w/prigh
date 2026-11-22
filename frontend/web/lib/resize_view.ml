@@ -11,6 +11,7 @@ let target : Handle.t -> string = function
   | Review_chat -> ".desk"
   | Review_files -> ".review-body"
   | Review_margin -> "#review-page"
+  | Editor_tree -> "#code-page"
 ;;
 
 let handle (m : App.Model.t) ~inject h =

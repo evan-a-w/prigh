@@ -192,10 +192,18 @@ try {
   await screenshot("scrolled up");
 
   // 3. Up to the first message.
-  for (let i = 0; i < 10 && (await older()) !== "none"; i++) {
-    await page.evaluate(() => { document.getElementById("chat").scrollTop = 0; });
-    await page.waitForFunction(() => !document.querySelector("#chat .older.busy"));
-    await page.waitForTimeout(200);
+  // While a page loads its marker is busy, not [data-older]: wait for each
+  // page to come rather than reading "none" from a busy one.
+  for (let i = 0; i < 10 && await page.evaluate(() => !!document.querySelector("#chat .older")); i++) {
+    const before = Math.min(...await steps());
+    await page.evaluate(() => {
+      const chat = document.getElementById("chat");
+      chat.scrollTop = 0;
+      chat.dispatchEvent(new Event("scroll"));
+    });
+    await page.waitForFunction(n => !document.querySelector("#chat .older.busy")
+      && Math.min(...[...document.querySelectorAll("#chat .msg.user")]
+        .map(el => Number(el.innerText.match(/Step (\d+)/)?.[1]))) < n, before);
   }
   section("at the start");
   console.log(await loaded());

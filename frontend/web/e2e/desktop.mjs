@@ -11,6 +11,7 @@
 // optionally SHOTS.
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { createServer } from "node:net";
 import { join } from "node:path";
 import { end } from "./end.mjs";
 
@@ -100,8 +101,19 @@ const phone = (width, height) => {
   return options;
 };
 
+// A port nothing listens on, one the kernel just gave out: not a fixed low
+// one such as 1, to which some hosts (WSL2 for one) drop the packets, so
+// that connecting hangs instead of being refused.
+const closedPort = await new Promise(resolve => {
+  const server = createServer().listen(0, "127.0.0.1", () => {
+    const { port } = server.address();
+    server.close(() => resolve(port));
+  });
+});
+
 const clean = text => text
   .replaceAll(dir, "$DIR")
+  .replace(new RegExp(`:${closedPort}(?!\\d)`, "g"), ":<CLOSED>")
   .replace(/127\.0\.0\.1:\d+/g, "127.0.0.1:<PORT>")
   .replace(/#desktop=[0-9a-f]+/g, "#desktop=<key>")
   .replace(/session=[0-9a-f]+/g, "session=<id>")
@@ -149,7 +161,7 @@ try {
 
   // Unencrypted to another machine: the risk, the alternatives, and a
   // second, explicit step (0.0.0.0 reaches nothing here, at once).
-  await page.locator("#address").fill("0.0.0.0:1");
+  await page.locator("#address").fill(`0.0.0.0:${closedPort}`);
   await page.locator("#password").fill("sekrit");
   await page.locator("#desktop-connect").click();
   await page.locator("#desktop-connect.danger").waitFor();

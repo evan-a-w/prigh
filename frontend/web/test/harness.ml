@@ -63,6 +63,7 @@ let rec act t action =
      | Auth_failed _
      | Remember_temporary _
      | Scroll_change _
+     | Code_editor _
      | Apply_update -> ());
     if not t.quiet then print_s [%sexp (command : App.Command.t)]);
   List.iter commands ~f:(function
@@ -397,12 +398,21 @@ let restore_history t entries =
 let node ?(inject = fun _ -> Virtual_dom.Vdom.Effect.Ignore) t ?selector () =
   let node =
     Node_helpers.unsafe_convert_exn
-      (View.view t.model ~inject ~terminal:(fun target ->
-         Virtual_dom.Vdom.Node.div
-           ~attrs:[ Virtual_dom.Vdom.Attr.class_ "xterm-widget" ]
-           [ Virtual_dom.Vdom.Node.text
-               (Sexp.to_string (Terminal.Target.sexp_of_t target))
-           ]))
+      (View.view
+         t.model
+         ~inject
+         ~terminal:(fun target ->
+           Virtual_dom.Vdom.Node.div
+             ~attrs:[ Virtual_dom.Vdom.Attr.class_ "xterm-widget" ]
+             [ Virtual_dom.Vdom.Node.text
+                 (Sexp.to_string (Terminal.Target.sexp_of_t target))
+             ])
+         ~code_editor:(fun input ->
+           Virtual_dom.Vdom.Node.div
+             ~attrs:[ Virtual_dom.Vdom.Attr.class_ "code-widget" ]
+             [ Virtual_dom.Vdom.Node.text
+                 (Sexp.to_string_hum (Code_editor_view.Input.sexp_of_t input))
+             ]))
   in
   match selector with
   | None -> [ node ]
@@ -631,6 +641,15 @@ let mouse_event ?nth t ~selector ~event_name fields =
       ~event_name
       ~extra_fields:
         (fields @ [ "preventDefault", noop; "stopPropagation", noop ]))
+;;
+
+let keydown ?nth t ~selector key =
+  mouse_event
+    ?nth
+    t
+    ~selector
+    ~event_name:"onkeydown"
+    [ "key", Js_of_ocaml.Js.Unsafe.inject (Js_of_ocaml.Js.string key) ]
 ;;
 
 let modified_click ?nth ?(ctrl = false) ?(meta = false) t ~selector =

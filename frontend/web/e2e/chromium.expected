@@ -2513,8 +2513,8 @@ Or paste the code the page shows after Allow:
 prigh browser-signin: that code is not for this sign-in (from an earlier one, or changed on the way): paste the code the page shows for this link, or open the link again. Paste the code:
 prigh browser-signin: signed in; saved for ws://127.0.0.1:<PORT>/ws in $DIR/laptop-home/.prigh/tui-connection.sexp
 === chromium: cli_signin: through the proxy ===
-upgrade /ws
 POST /cli-signin/grant
+upgrade /ws
 === chromium: cli_signin: errors ===
 none
 === chromium: desktop: its stdout ===
@@ -2531,10 +2531,10 @@ Password
 Connect
 Quit prigh
 === chromium: desktop: unencrypted ===
-0.0.0.0:1 is not encrypted: the password and everything prigh sends would cross the network in the clear, and anyone on the way could run commands on this computer. Use the backend's HTTPS address (wss://host/ws, behind a TLS reverse proxy), or an SSH tunnel (ssh -L 7790:localhost:7790 host, then 127.0.0.1:<PORT>). Connect anyway only on a network you trust.
+0.0.0.0:<CLOSED> is not encrypted: the password and everything prigh sends would cross the network in the clear, and anyone on the way could run commands on this computer. Use the backend's HTTPS address (wss://host/ws, behind a TLS reverse proxy), or an SSH tunnel (ssh -L 7790:localhost:7790 host, then 127.0.0.1:<PORT>). Connect anyway only on a network you trust.
 button: Connect without encryption
 === chromium: desktop: unencrypted, confirmed ===
-cannot reach the backend at 0.0.0.0:1: connection refused
+cannot reach the backend at 0.0.0.0:<CLOSED>: connection refused
 Is it running there (prigh serve -web HOST:PORT, or -listen)? Check the address: HOST:PORT (its -web or -listen port), or a prigh-web URL such as wss://host/ws.
 button: Connect
 === chromium: desktop: a wrong password ===
@@ -2892,6 +2892,7 @@ focus in the filter: control-input
   /settings | appearance, sessions, new sessions' defaults, models, git hosting and your account; a section opens at it (Ctrl+,)
   /review | the review page, the changes file by file to approve, comment on and edit (Alt+R): of the session's worktree or another (its branch, path or name), against its base or REV; /review BASE [instructions] (HEAD: the uncommitted changes) has the model review them for prioritised findings
   /files | browse, preview, upload and download files where the tools run (Ctrl+Shift+F)
+  /edit | the editor mode: edit the session's files (PATH, or the last one) beside the chat, and ask about a selection (Alt+E toggles it)
   /help | show commands and keys, or a command's usage
 ↑↓ move
 ↵ open
@@ -5074,3 +5075,130 @@ prigh: [run] Ran a command (took)
 prigh: Cleaned up. (time)
 === chromium: quiet small: errors ===
 (none)
+found: src/compact.ml
+=== chromium: editor desktop: a file open ===
+ok
+strip: src/ compact.ml
+lines: 16
+the long comment: wrapped
+dirty: src/ compact.ml Save
+saved: open! Import (* edited *)
+=== chromium: editor desktop: a conflict ===
+ok
+notice: src/compact.ml changed on the host since you opened it: reload it (losing your edits) or keep yours and overwrite it. Reload Overwrite
+overwritten: ["open! Import (* edited *)","(* mine *)"]
+chip: src/compact.ml:4–6 3 lines
+=== chromium: editor desktop: asking about lines ===
+ok
+agent: The agent changed this file: 2 changes, +4 −2 Keep all Undo all
+removed:   let limit = budget.window - budget.reserve in |   go [] 0 (List.rev turns)
+added:   let limit = Budget.usable budget in |   match turns with |   | system :: rest -> system :: go [] (Turn.tokens system) (List.rev rest) |   | [] -> []
+=== chromium: editor desktop: the agent's change ===
+ok
+sent: [src/compact.ml:4–6] Pin the system turn Pasted text #1 4 lines · 162 B src/compact.ml, lines 4–6: HH:MM
+changes: 1/2 · +1 −1 Undo Keep | 2/2 · +3 −1 Undo Keep
+first kept, second undone: true
+=== chromium: editor desktop: a kept change's badge ===
+ok
+reopened: +1 −1 Undo Keep
+=== chromium: editor desktop: a kept change shown again ===
+ok
+chat after sending: beside
+=== chromium: editor desktop: the chat beside ===
+ok
+tabs: compact.ml | turn.mli
+=== chromium: editor desktop: find ===
+ok
+left: the chat
+=== chromium: editor phone: a file open ===
+ok
+strip: src/ compact.ml
+lines: 16
+the long comment: wrapped
+dirty: src/ compact.ml
+=== chromium: editor phone: typing, the keys over the keyboard ===
+ok
+keys: Ask ⇥ { } ( ) [ ] ; = | -> ← → ↶
+composer while typing: hidden
+=== chromium: editor phone: the menu ===
+ok
+saved: open! Import (* edited *)
+=== chromium: editor phone: a conflict ===
+ok
+notice: src/compact.ml changed on the host since you opened it: reload it (losing your edits) or keep yours and overwrite it. Reload Overwrite
+overwritten: ["open! Import (* edited *)","(* mine *)"]
+ask box: src/compact.ml:4–6 Cancel
+=== chromium: editor phone: the ask box under the lines ===
+ok
+agent: The agent changed this file: 2 changes, +4 −2 Keep all Undo all
+removed:   let limit = budget.window - budget.reserve in |   go [] 0 (List.rev turns)
+added:   let limit = Budget.usable budget in |   match turns with |   | system :: rest -> system :: go [] (Turn.tokens system) (List.rev rest) |   | [] -> []
+peek: The system turn is now pinned: go starts after it and never drops it.
+=== chromium: editor phone: the agent's change ===
+ok
+sent: [src/compact.ml:4–6] Pin the system turnPasted text #14 lines · 94 Bsrc/compact.ml, lines 4–6:HH:MM
+changes: 1/2 · +1 −1 Undo Keep | 2/2 · +3 −1 Undo Keep
+first kept, second undone: true
+=== chromium: editor phone: a kept change's badge ===
+ok
+reopened: +1 −1 Undo Keep
+=== chromium: editor phone: a kept change shown again ===
+ok
+=== chromium: editor phone: the chat pulled up ===
+ok
+=== chromium: editor phone: the files drawer ===
+ok
+drawer: src/compact.ml | .. | README.md | src/1
+found: src/turn.mli
+=== chromium: editor phone: go to file ===
+ok
+drawer gone: true
+strip: src/ turn.mli
+swiped: src/ compact.ml
+left: the chat
+=== chromium: editor small: a file open ===
+ok
+strip: src/ compact.ml
+lines: 16
+the long comment: wrapped
+dirty: src/ compact.ml
+=== chromium: editor small: typing, the keys over the keyboard ===
+ok
+keys: Ask ⇥ { } ( ) [ ] ; = | -> ← → ↶
+composer while typing: hidden
+=== chromium: editor small: the menu ===
+ok
+saved: open! Import (* edited *)
+=== chromium: editor small: a conflict ===
+ok
+notice: src/compact.ml changed on the host since you opened it: reload it (losing your edits) or keep yours and overwrite it. Reload Overwrite
+overwritten: ["open! Import (* edited *)","(* mine *)"]
+ask box: src/compact.ml:4–5 Cancel
+=== chromium: editor small: the ask box under the lines ===
+the code scrolls sideways
+agent: The agent changed this file: 2 changes, +4 −2 Keep all Undo all
+removed:   let limit = budget.window - budget.reserve in |   go [] 0 (List.rev turns)
+added:   let limit = Budget.usable budget in |   match turns with |   | system :: rest -> system :: go [] (Turn.tokens system) (List.rev rest) |   | [] -> []
+peek: The system turn is now pinned: go starts after it and never drops it.
+=== chromium: editor small: the agent's change ===
+ok
+sent: [src/compact.ml:4–5] Pin the system turnPasted text #13 lines · 111 Bsrc/compact.ml, lines 4–5:HH:MM
+changes: 1/2 · +1 −1 Undo Keep | 2/2 · +3 −1 Undo Keep
+first kept, second undone: true
+=== chromium: editor small: a kept change's badge ===
+ok
+reopened: +1 −1 Undo Keep
+=== chromium: editor small: a kept change shown again ===
+ok
+=== chromium: editor small: the chat pulled up ===
+ok
+=== chromium: editor small: the files drawer ===
+ok
+drawer: src/compact.ml | .. | README.md | src/1
+found: src/turn.mli
+=== chromium: editor small: go to file ===
+ok
+drawer gone: true
+strip: src/ turn.mli
+swiped: src/ compact.ml
+left: the chat

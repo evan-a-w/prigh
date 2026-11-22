@@ -674,6 +674,7 @@ let%expect_test
     <Vdom.Node.none-widget class="">
     <Vdom.Node.none-widget class="">
     <Vdom.Node.none-widget class="">
+    <Vdom.Node.none-widget class="">
     <div class="editor-wrap">
     <div class="composer-row">
     button "Add files or images" -- Add files or images (or paste, or drop them here)

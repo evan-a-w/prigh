@@ -57,6 +57,13 @@ if [[ $engines == *webkit* ]] && [ "$(uname)" = Linux ] && [ -z "${__EGL_VENDOR_
 		--inputs-from "$root" nixpkgs#mesa)"
 	export __EGL_VENDOR_LIBRARY_DIRS="$mesa/share/glvnd/egl_vendor.d"
 fi
+# The terminal panel's shell, as in the flake's web-e2e check: an
+# interactive bash (readline). /bin/sh and the dev shell's bash have none.
+if [ -z "${PRIGH_E2E_SHELL:-}" ]; then
+	bash_interactive="$(nix build --accept-flake-config --no-link --print-out-paths \
+		--inputs-from "$root" 'nixpkgs#bashInteractive^out')"
+	export PRIGH_E2E_SHELL="$bash_interactive/bin/bash"
+fi
 export PRIGH_BACKEND="$root/backend/_build/default/bin/main.exe"
 unset PRIGH_WEB_ROOT
 

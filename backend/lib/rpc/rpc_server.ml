@@ -92,6 +92,7 @@ let methods =
   ; "set_cwd"
   ; "worktree_back"
   ; "list_paths"
+  ; "list_files"
   ; "list_dirs"
   ; "get_config"
   ; "set_config"
@@ -3774,6 +3775,7 @@ let dispatch agent login ~(client : Client.t) ~meth ~params : Json.t Or_error.t 
       | _ -> ""
     in
     Agent.list_paths agent ~prefix
+  | "list_files" -> Agent.list_files agent
   | "list_dirs" ->
     let prefix =
       match param params "prefix" with

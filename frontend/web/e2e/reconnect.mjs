@@ -13,6 +13,7 @@
 // optionally SHOTS.
 import { spawn } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
+import { createServer } from "node:net";
 import { join } from "node:path";
 import { png } from "./png.mjs";
 import { end } from "./end.mjs";
@@ -75,16 +76,21 @@ const browser = await engine.launch({
 const context = await browser.newContext({ viewport: { width: 390, height: 760 } });
 context.setDefaultTimeout(20000);
 const page = await context.newPage();
-// While the tab's [e2e-ws-down] is set, the backend is out of reach (port 2:
-// closed, and not one of the ports WebKit refuses with an exception).
-await page.addInitScript(() => {
+// While the tab's [e2e-ws-down] is set, the backend is out of reach: its
+// WebSockets go to a port that drops every connection at once. (Not a fixed
+// closed port such as 2: some hosts, WSL2 for one, drop the packets to
+// those, and the connection hangs instead of failing.)
+const down = createServer(socket => socket.destroy());
+await new Promise(resolve => down.listen(0, "127.0.0.1", resolve));
+down.unref();
+await page.addInitScript(port => {
   const Real = window.WebSocket;
   window.WebSocket = class extends Real {
     constructor(url, protocols) {
-      super(sessionStorage.getItem("e2e-ws-down") ? "ws://127.0.0.1:2/" : url, protocols);
+      super(sessionStorage.getItem("e2e-ws-down") ? `ws://127.0.0.1:${port}/` : url, protocols);
     }
   };
-});
+}, down.address().port);
 const errors = [];
 page.on("console", message => {
   if (message.type() === "error"

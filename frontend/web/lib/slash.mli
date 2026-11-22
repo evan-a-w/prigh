@@ -26,6 +26,7 @@ module Argument : sig
     | Settings (** a section of the settings page *)
     | Session (** saved sessions' paths *)
     | Path (** [list_paths] *)
+    | File (** any file under the cwd, by fuzzy search *)
     | Host
     | User (** the users a superuser can act as *)
     | Skill (** right after [/skill:], from [list_skills] *)

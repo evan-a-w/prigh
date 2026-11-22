@@ -31,7 +31,6 @@
 // optionally SHOTS.
 import { spawn } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
-import { hostname } from "node:os";
 import { join } from "node:path";
 import { end } from "./end.mjs";
 import { png } from "./png.mjs";
