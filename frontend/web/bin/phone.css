@@ -518,11 +518,6 @@
 .app.narrow .files-sort { min-height: var(--tap); }
 
 /* Help: the keys over what they do, not a 1%-wide column broken a letter a line. */
-.app.narrow :is(.help-table, .help-table tbody, .help-table tr) { display: block; width: auto; }
-.app.narrow .help-table td { display: block; width: auto; padding: 0; overflow-wrap: normal; }
-.app.narrow .help-table td:first-child { width: auto; padding: 8px 0 2px; white-space: normal; }
-.app.narrow .help-table td + td { padding-bottom: 8px; border-top: 0; }
-.app.narrow .help-table kbd { white-space: normal; overflow-wrap: normal; }
 
 /* {1 Drags}
 
