@@ -66,7 +66,8 @@ const browser = await engine.launch({
   args: engineName === "chromium" ? ["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"] : [],
 });
 // A phone.
-const context = await browser.newContext({ viewport: { width: 390, height: 760 } });
+// The service worker is what this script tests: allowed, unlike in the others.
+const context = await browser.newContext({ viewport: { width: 390, height: 760 }, serviceWorkers: "allow" });
 context.setDefaultTimeout(20000);
 const page = await context.newPage();
 const errors = [];
