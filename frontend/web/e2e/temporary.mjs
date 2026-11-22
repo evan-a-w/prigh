@@ -269,7 +269,7 @@ const screen = async (w, h, label) => {
     const m = document.querySelector(".temporary-menu").getBoundingClientRect();
     if (phone) return `a sheet across the bottom: ${m.left <= 1 && m.right >= innerWidth - 1 && Math.abs(m.bottom - innerHeight) <= 1}`;
     const p = document.querySelector(".temporary-pill").getBoundingClientRect();
-    return `under the pill: ${m.top >= p.bottom - 1 && Math.abs((m.left + m.right) / 2 - (p.left + p.right) / 2) < 2}`;
+    return `under the pill: ${m.top >= p.bottom - 1 && m.top - p.bottom <= 8 && Math.abs(m.left - p.left) < 2}`;
   }, phone));
   say("controls:", await reachable(".temporary-actions .btn"));
   await shoot("4-menu");

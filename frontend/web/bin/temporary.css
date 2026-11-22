@@ -160,7 +160,9 @@
 .app.narrow .temporary-pill .pill-label { overflow: hidden; text-overflow: ellipsis; }
 
 /* Its menu hangs from it: under the top of the chat, in its middle. */
-.app:not(.narrow) .modal-backdrop:has(> .temporary-menu) { padding-top: 50px; background: transparent; }
+/* Under the pill, at the top bar's left: after the sidebar's toggle (12px
+   of padding, 28px, an 8px gap), or after the docked sidebar. */
+.app:not(.narrow) .modal-backdrop:has(> .temporary-menu) { padding: 44px 12px 12px 48px; justify-content: flex-start; background: transparent; }
 .app:not(.narrow).sidebar-open:not(.sidebar-drawer) .modal-backdrop:has(> .temporary-menu) { padding-left: calc(var(--sidebar-width, 280px) + 12px); }
 .app:not(.narrow) .temporary-menu { width: 300px; background: var(--slate-2); }
 .app:not(.narrow) .temporary-menu .modal-head { display: none; }

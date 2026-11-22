@@ -188,7 +188,8 @@ try {
   await editor.evaluate(e => e.blur());
   console.log(await page.locator(".sidebar-actions > *").evaluateAll(es => es.map(e => {
     const r = e.getBoundingClientRect();
-    return `${e.innerText.trim()}: ${r.width < 120 ? "narrow" : "wide"}, ${Math.round(r.height)}px high`;
+    const label = (e.getAttribute("aria-label") || e.innerText).trim().split("\n")[0];
+    return `${label}: ${r.width < 120 ? "narrow" : "wide"}, ${Math.round(r.height)}px high`;
   }).join("\n")));
   console.log(`composer: ${await page.locator(".composer-row button:visible").evaluateAll(bs => bs.map(b => (b.getAttribute("aria-label") || b.innerText).trim().split("\n")[0].split(":")[0]).join(", "))}`);
   await screenshot("desktop composer unfocused");

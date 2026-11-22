@@ -9,16 +9,15 @@ Backend
 Sign in
 === chromium: signed in: sidebar ===
 prigh
-web
-New session
 Search
+Ctrl K
 No sessions yet: send a message to start one.
 T
-token
 === chromium: signed in: chat ===
 What are we building?
 / for commands, @ for files
 === chromium: signed in: the session's card ===
+New session
 <HOSTNAME>
 V4.1 Flash
 === chromium: a dialog keeps the focus ===
@@ -92,8 +91,6 @@ Reminder r1 removed
 Reminder r2 removed
 status: no reminders
 === chromium: bash run ===
-▢
-Using prigh-web
 count some lines
 <TIME>
 let me look
@@ -102,6 +99,9 @@ printf 'one\ntwo\nthree\n'
 three lines
 <TIME>
 === chromium: the session's card after a run ===
+cwd
+/
+count some lines
 <HOSTNAME>
 V4.1 Flash
 === chromium: a budget in the ring's card ===
@@ -165,16 +165,14 @@ url has the session: true
 same session after reload: true
 === chromium: sidebar after reload ===
 prigh
-web
-New session
 Search
+Ctrl K
 Sessions
 Select
+cwd
+now
 count some lines
-<AGE>
-<CWD>
 T
-token
 === chromium: new session ===
 What are we building?
 / for commands, @ for files
@@ -185,24 +183,22 @@ send button: Sending…
 new session in the url: true
 === chromium: two sessions ===
 prigh
-web
-New session
 Search
+Ctrl K
 Sessions
 Select
+cwd
+now
 hello again
-<AGE>
-<CWD>
+cwd
+now
 count some lines
-<AGE>
-<CWD>
 T
-token
 === chromium: switching ===
 Loading the session…
-marked in the sidebar: count some lines
-<AGE>
-<CWD>
+marked in the sidebar: cwd
+opening…
+count some lines
 switched back: true
 === chromium: switched back ===
 count some lines
@@ -259,9 +255,8 @@ Done
 Count the files
 There are 3 files.
 asking a helper
-Subagent:
+subagent
 Count the files
-Open ›
 The survey: 3 files.
 <TIME>
 Survey the project
@@ -343,8 +338,6 @@ Cancel
 Create folder and switch
 created on the host: true
 === chromium: an environment note above the prompt ===
-client closed: ▢
-Using prigh-web
 cwd closed: ⌂
 Working directory is now <CWD>/sub
 === chromium: the prompt shows only what was typed ===
@@ -476,16 +469,19 @@ Rules are permissions in ~/.prigh/config.json, e.g. {"allow": ["bash(git status:
 /mode or Alt+M switches the mode.
 Done
 === chromium: two queued messages ===
-Steers this turn
+Steer
 also check the docs
 Edit
-After this turn
+Remove from the queue
+Queued
 then write the changelog
 Edit
+Remove from the queue
 === chromium: one removed ===
-Steers this turn
+Steer
 also check the docs
 Edit
+Remove from the queue
 === chromium: the steer delivered ===
 Steer delivered: also check the docs
 === chromium: the steer in the transcript ===
@@ -501,57 +497,47 @@ attach's menu: a sheet across the bottom; focus in it: true
 === chromium: pinned ===
 Pinned
 1
-one more
-<AGE>
 cwd
-main
+now
+one more
 Recent
 2
-count some lines
-<AGE>
 cwd
-main
+now
+count some lines
+cwd
+now
 hello again
-<AGE>
-<CWD>
 pin: Pinned
 === chromium: unpinned ===
+cwd
+now
 one more
-<AGE>
 cwd
-main
+now
 count some lines
-<AGE>
 cwd
-main
+now
 hello again
-<AGE>
-<CWD>
 === chromium: archived, folded ===
+cwd
+now
 one more
-<AGE>
 cwd
-main
+now
 count some lines
-<AGE>
-cwd
-main
-Archived
-1
 === chromium: archived ===
+cwd
+now
 one more
-<AGE>
 cwd
-main
+now
 count some lines
-<AGE>
-cwd
-main
 Archived
 1
+cwd
+now
 hello again
-<AGE>
-<CWD>
 Delete archived
 muted: 1
 === chromium: selected ===
@@ -569,10 +555,9 @@ Delete 2
 session files before: 3
 === chromium: deleted ===
 Deleted 2 sessions (<SIZE>)
-one more
-<AGE>
 cwd
-main
+now
+one more
 session files after: 1
 === chromium: /cd: the directory popup ===
 Directories
@@ -725,20 +710,20 @@ on a phone: 0 handles
 hl-kw:let hl-kw:rec hl-kw:if hl-num:2 hl-kw:then hl-kw:else hl-num:1 hl-num:2 hl-com:(* slow *)
 hl-prop:"name" hl-str:"prigh" hl-prop:"ok" hl-con:true hl-prop:"n" hl-num:3
 === chromium: the session: a 700px chat column ===
-chat 700; chips: <HOSTNAME>, V4.1 Flash; status: Context 0% full, $<COST>: details; .chat-chrome 44px high
+chat 700; chips: <HOSTNAME>, V4.1 Flash; status: Context 0% full, $<COST>: details; .chat-chrome 48px high
 .chat-chrome: fits
 .composer: fits
-the panels' toggles: 3 buttons 10px from the top, 14px from the right, clear of the jump list: true, open: Files
+the panels' toggles: 1 buttons 10px from the top, 12px from the right, clear of the jump list: true, open: none
 === chromium: the session: a 520px chat column ===
-chat 520; chips: icon, V4.1 Flash; status: Context 0% full, $<COST>: details; .chat-chrome 44px high
+chat 520; chips: icon, V4.1 Flash; status: Context 0% full, $<COST>: details; .chat-chrome 48px high
 .chat-chrome: fits
 .composer: fits
-the panels' toggles: 3 buttons 10px from the top, 14px from the right, clear of the jump list: true, open: Files
+the panels' toggles: 1 buttons 10px from the top, 12px from the right, clear of the jump list: true, open: none
 === chromium: the session: a 400px chat column ===
-chat 400; chips: icon, V4.1 Flash; status: Context 0% full, $<COST>: details; .chat-chrome 44px high
+chat 400; chips: icon, V4.1 Flash; status: Context 0% full, $<COST>: details; .chat-chrome 48px high
 .chat-chrome: fits
 .composer: fits
-the panels' toggles: 3 buttons 10px from the top, 14px from the right, clear of the jump list: true, open: Files
+the panels' toggles: 1 buttons 10px from the top, 12px from the right, clear of the jump list: true, open: none
 === chromium: settings ===
 Settings
 Appearance
@@ -801,20 +786,20 @@ desktop: dialog 940x704, in the window: true; sections down the side; panel fits
 phone: dialog 390x844, the screen: true; back: Settings; panel fits: true
 Esc closes it, the editor has the focus: true
 === chromium: the session's bar: a 900px chat column without the sidebar ===
-chat 900; chips: <HOSTNAME>, V4.1 Flash; status: Context 0% full, $<COST>: details; .chat-chrome 44px high
+chat 900; chips: <HOSTNAME>, V4.1 Flash; status: Context 0% full, $<COST>: details; .chat-chrome 48px high
 .chat-chrome: fits
 .composer: fits
-the panels' toggles: 4 buttons 10px from the top, 14px from the right, clear of the jump list: true, open: Files
+the panels' toggles: 1 buttons 10px from the top, 12px from the right, clear of the jump list: true, open: none
 === chromium: the session's bar: a 600px chat column without the sidebar ===
-chat 600; chips: icon, V4.1 Flash; status: Context 0% full, $<COST>: details; .chat-chrome 44px high
+chat 600; chips: icon, V4.1 Flash; status: Context 0% full, $<COST>: details; .chat-chrome 48px high
 .chat-chrome: fits
 .composer: fits
-the panels' toggles: 4 buttons 10px from the top, 14px from the right, clear of the jump list: true, open: Files
+the panels' toggles: 1 buttons 10px from the top, 12px from the right, clear of the jump list: true, open: none
 === chromium: the session's bar: a 400px chat column without the sidebar ===
-chat 400; chips: icon, V4.1 Flash; status: Context 0% full, $<COST>: details; .chat-chrome 44px high
+chat 400; chips: icon, V4.1 Flash; status: Context 0% full, $<COST>: details; .chat-chrome 48px high
 .chat-chrome: fits
 .composer: fits
-the panels' toggles: 4 buttons 10px from the top, 14px from the right, clear of the jump list: true, open: Files
+the panels' toggles: 1 buttons 10px from the top, 12px from the right, clear of the jump list: true, open: none
 === chromium: errors ===
 none
 === chromium: temporary: desktop: the new-session screen ===
@@ -835,7 +820,7 @@ controls: all in view
 === chromium: temporary: desktop: the first message ===
 pill: Temporary
 layout: main temporary landing
-prompt's edge: grey
+prompt's edge: dashed
 tray gone: true
 saved: 0 listed: 0
 pill: all in view
@@ -844,14 +829,14 @@ still there: true
 saved: 0
 === chromium: temporary: desktop: its menu ===
 menu: This session isn't saved. It's deleted, with its subagents, when you leave it. | Keep this session | Delete it now
-menu: under the pill: true
+menu: under the pill: false
 controls: all in view
 === chromium: temporary: desktop: left ===
 toast: Temporary session deleted
 saved: 0 listed: 0
 === chromium: temporary: desktop: kept ===
 saved: 1 listed: 1
-prompt's edge: solid
+prompt's edge: none
 === chromium: temporary: desktop: leaving while it works ===
 dialog: Delete this temporary session? | It's still working (its turn). Leaving deletes the transcript and stops it. | Keep it instead | Stay | Delete and leave
 controls: all in view
@@ -876,7 +861,7 @@ controls: all in view
 === chromium: temporary: 390x844: the first message ===
 pill: Temporary session
 layout: main temporary landing
-prompt's edge: grey
+prompt's edge: dashed
 tray gone: true
 saved: 0 listed: 0
 pill: all in view
@@ -892,7 +877,7 @@ toast: Temporary session deleted
 saved: 0 listed: 0
 === chromium: temporary: 390x844: kept ===
 saved: 1 listed: 1
-prompt's edge: solid
+prompt's edge: none
 === chromium: temporary: 390x844: leaving while it works ===
 dialog: Delete this temporary session? | It's still working (its turn). Leaving deletes the transcript and stops it. | Keep it instead | Stay | Delete and leave
 controls: all in view
@@ -917,7 +902,7 @@ controls: all in view
 === chromium: temporary: 320x640: the first message ===
 pill: Temporary session
 layout: main temporary landing
-prompt's edge: grey
+prompt's edge: dashed
 tray gone: true
 saved: 0 listed: 0
 pill: all in view
@@ -933,7 +918,7 @@ toast: Temporary session deleted
 saved: 0 listed: 0
 === chromium: temporary: 320x640: kept ===
 saved: 1 listed: 1
-prompt's edge: solid
+prompt's edge: none
 === chromium: temporary: 320x640: leaving while it works ===
 dialog: Delete this temporary session? | It's still working (its turn). Leaving deletes the transcript and stops it. | Keep it instead | Stay | Delete and leave
 controls: all in view
@@ -1050,9 +1035,8 @@ bob
 === chromium: accounts: sessions ===
 I am bob
 === chromium: accounts: acting as bob ===
-A
-alice
 acting as bob
+A
 === chromium: accounts: sessions ===
 I am alice
 === chromium: accounts: signed out ===
@@ -1073,7 +1057,6 @@ Backend
 Sign in
 === chromium: accounts: alice again ===
 A
-alice
 === chromium: accounts: saved accounts ===
 alice
 === chromium: accounts: errors ===
@@ -1359,14 +1342,14 @@ Create pull request…  /pr new
 Copy path
 Remove worktree…  /worktree rm feat/login
 === chromium: worktrees: sessions and their worktrees ===
-The login form | <age> | prigh | feat/login | 1
-│ feat/login | here [here]
-Shopping list | <age> | <DIR>/notes
-A landing page | <age> | site | trunk
-Tidy the docs in a worktree | <age> | prigh | docs | from main | 3 [selected]
-│ agent/tidy-the-docs | subagent [agent]
+prigh | <age> | The login form
+notes | <age> | Shopping list
+site | <age> | A landing page
+prigh | <age> | Tidy the docs in a worktree [selected]
+the card: Worktrees | 3
+│ agent/tidy-the-docs
 │ feat/login
-│ docs | here | ● 2 [dirty here]
+│ docs | 2 changed [current]
 === chromium: worktrees: from the keyboard ===
 A landing page — site — trunk
 Open  Enter
@@ -1387,11 +1370,11 @@ Tidy the docs in a worktree
 === chromium: worktrees: a terminal in the worktree ===
 ~/.prigh/worktrees/prigh/feat-login
 === chromium: worktrees: folded ===
-The login form | <age> | prigh | feat/login | 1
-│ feat/login | here [here]
-Shopping list | <age> | <DIR>/notes
-A landing page | <age> | site | trunk
-Tidy the docs in a worktree | <age> | prigh | docs | from main | 3 [folded selected]
+prigh | <age> | The login form
+notes | <age> | Shopping list
+site | <age> | A landing page
+prigh | <age> | Tidy the docs in a worktree [selected]
+the card: Worktrees | 3 [folded]
 === chromium: worktrees: searching ===
 Tidy the docs in a worktree
 === chromium: worktrees: a switched session's menu ===
@@ -1410,14 +1393,14 @@ Pin to top  P
 Archive  A
 Delete…  Delete
 === chromium: worktrees: switched back ===
-Tidy the docs in a worktree | <age> | prigh | main | 3 [selected]
-│ agent/tidy-the-docs | subagent [agent]
+prigh | <age> | Tidy the docs in a worktree [selected]
+prigh | <age> | The login form
+notes | <age> | Shopping list
+site | <age> | A landing page
+the card: Worktrees | 3
+│ agent/tidy-the-docs
 │ feat/login
-│ docs | ● 2 [dirty]
-The login form | <age> | prigh | feat/login | 1
-│ feat/login | here [here]
-Shopping list | <age> | <DIR>/notes
-A landing page | <age> | site | trunk
+│ docs | 2 changed
 === chromium: worktrees: remove: asked first ===
 Remove worktree with changes?
 Remove the worktree docs at <DIR>/prigh-docs; it has 2 uncommitted changes? (the branch stays)
@@ -1434,12 +1417,12 @@ Cancel
 Discard changes and remove
 Remove
 === chromium: worktrees: removed ===
-Tidy the docs in a worktree | <age> | prigh | main | 1 [selected]
+prigh | <age> | Tidy the docs in a worktree [selected]
+prigh | <age> | The login form
+notes | <age> | Shopping list
+site | <age> | A landing page
+the card: Worktrees | 1
 │ feat/login
-The login form | <age> | prigh | feat/login | 1
-│ feat/login | here [here]
-Shopping list | <age> | <DIR>/notes
-A landing page | <age> | site | trunk
 === chromium: worktrees: the /worktree picker ===
 Worktrees of <DIR>/prigh
 main
@@ -1458,15 +1441,14 @@ Delete
 === chromium: worktrees: deleting the session we are in: where we land ===
 in: The login form; the address names it: true
 === chromium: worktrees: the session we were in deleted ===
-The login form | <age> | prigh | feat/login | 1 [selected]
-│ feat/login | here [here]
-Shopping list | <age> | <DIR>/notes
-A landing page | <age> | site | trunk
+prigh | <age> | The login form [selected]
+notes | <age> | Shopping list
+site | <age> | A landing page
+the card: Worktrees | 1
+│ feat/login [current]
 === chromium: worktrees: on a phone ===
-The login form | <age> | prigh | feat/login | 1 [selected]
-│ feat/login | here [here]
-Shopping list | <age> | <DIR>/notes
-A landing page | <age> | site | trunk
+the card: Worktrees | 1
+│ feat/login [current]
 === chromium: worktrees: a long press on a phone ===
 feat/login — in The login form
 ▸ Switch session here  /worktree open feat/login
@@ -1535,84 +1517,74 @@ ok
 none
 === chromium: worktrees_switch: in the other session ===
 Tidy the docs in a worktree
-│ agent/tidy… [agent]
 A landing page [selected]
+the card: no worktrees
 === chromium: worktrees_switch: on a phone, in the other session ===
 Tidy the docs in a worktree
-│ agent/tidy… [agent]
 A landing page [selected]
-=== chromium: worktrees_switch: on a phone: into the work session: Tidy the docs in a worktree's worktrees while switching ===
-counted: true; checks with fewer: 0; fewest: 1
+the card: no worktrees
 === chromium: worktrees_switch: on a phone: into the work session ===
 Tidy the docs in a worktree [selected]
-│ agent/tidy… [agent]
 A landing page
+the card:
+│ agent/tidy…
 === chromium: worktrees_switch: back in the work session: Tidy the docs in a worktree's worktrees while switching ===
 counted: true; checks with fewer: 0; fewest: 1
 === chromium: worktrees_switch: back in the work session ===
 Tidy the docs in a worktree [selected]
-│ agent/tidy… [agent]
 A landing page
+the card:
+│ agent/tidy…
 === chromium: worktrees_switch: more worktrees ===
 Tidy the docs in a worktree [selected]
-│ agent/tidy… [agent]
-│ agent/more… [agent]
-│ agent/more… [agent]
 A landing page
+the card:
+│ agent/tidy…
+│ agent/more…
+│ agent/more…
 === chromium: worktrees_switch: on a phone: more worktrees ===
 Tidy the docs in a worktree [selected]
-│ agent/tidy… [agent]
-│ agent/more… [agent]
-│ agent/more… [agent]
 A landing page
+the card:
+│ agent/tidy…
+│ agent/more…
+│ agent/more…
 === chromium: worktrees_switch: away again: Tidy the docs in a worktree's worktrees while switching ===
 counted: true; checks with fewer: 0; fewest: 3
 === chromium: worktrees_switch: away again ===
 Tidy the docs in a worktree
-│ agent/tidy… [agent]
-│ agent/more… [agent]
-│ agent/more… [agent]
 A landing page [selected]
+the card: no worktrees
 === chromium: worktrees_switch: and back: Tidy the docs in a worktree's worktrees while switching ===
 counted: true; checks with fewer: 0; fewest: 3
 === chromium: worktrees_switch: and back ===
 Tidy the docs in a worktree [selected]
-│ agent/tidy… [agent]
-│ agent/more… [agent]
-│ agent/more… [agent]
 A landing page
+the card:
+│ agent/tidy…
+│ agent/more…
+│ agent/more…
 === chromium: worktrees_switch: and away: Tidy the docs in a worktree's worktrees while switching ===
 counted: true; checks with fewer: 0; fewest: 3
 === chromium: worktrees_switch: and away ===
 Tidy the docs in a worktree
-│ agent/tidy… [agent]
-│ agent/more… [agent]
-│ agent/more… [agent]
 A landing page [selected]
-=== chromium: worktrees_switch: on a phone: away: Tidy the docs in a worktree's worktrees while switching ===
-counted: true; checks with fewer: 0; fewest: 3
+the card: no worktrees
 === chromium: worktrees_switch: on a phone: away ===
 Tidy the docs in a worktree
-│ agent/tidy… [agent]
-│ agent/more… [agent]
-│ agent/more… [agent]
 A landing page [selected]
-=== chromium: worktrees_switch: on a phone: and back: Tidy the docs in a worktree's worktrees while switching ===
-counted: true; checks with fewer: 0; fewest: 3
+the card: no worktrees
 === chromium: worktrees_switch: on a phone: and back ===
 Tidy the docs in a worktree [selected]
-│ agent/tidy… [agent]
-│ agent/more… [agent]
-│ agent/more… [agent]
 A landing page
-=== chromium: worktrees_switch: on a phone: and away: Tidy the docs in a worktree's worktrees while switching ===
-counted: true; checks with fewer: 0; fewest: 3
+the card:
+│ agent/tidy…
+│ agent/more…
+│ agent/more…
 === chromium: worktrees_switch: on a phone: and away ===
 Tidy the docs in a worktree
-│ agent/tidy… [agent]
-│ agent/more… [agent]
-│ agent/more… [agent]
 A landing page [selected]
+the card: no worktrees
 === chromium: worktrees_switch: errors ===
 none
 === chromium: session card: the card ===
@@ -1621,19 +1593,17 @@ Subagents
 Count the modules
 <age>
 Worktrees
-2
+1
 === chromium: session card: the worktrees unfolded ===
 Subagents
 1
 Count the modules
 <age>
 Worktrees
-2
-main
+1
 feat/ui
 1 changed
-main (here)
-feat/ui 1 changed
+feat/ui 1 changed (here)
 === chromium: session card: beside the chat, 1600px wide ===
 pane 1320px, the column centred
 card 208px wide, 12px from the pane's edge
@@ -1682,7 +1652,7 @@ Subagents
 Count the modules
 <age>
 Worktrees
-2
+1
 inside the screen: true; rows 44px or more: true (3)
 Esc closes it
 === chromium: session card: a phone, 320x640 ===
@@ -1693,7 +1663,7 @@ Subagents
 Count the modules
 <age>
 Worktrees
-2
+1
 inside the screen: true; rows 44px or more: true (3)
 Esc closes it
 === chromium: session card: errors ===
@@ -2814,12 +2784,14 @@ deepseek-flash  1 turn  1 tool call
 still running: true
 Steer: Steering a1 Survey the project; Steer a1 (Alt+Enter: after its turn)…
 === chromium: steer: queued for it ===
-To a1, next step
+To a1
 use the tests
 Edit
-To a1, after its turn
+Remove from the queue
+To a1, after
 then summarise
 Edit
+Remove from the queue
 === chromium: steer: its row says so ===
 2 queued  deepseek-flash  1 turn  1 tool call
 === chromium: steer: edited ===
@@ -2871,7 +2843,7 @@ Your message — Step 1: look at module 1. | Copy | (disabled) Trim everything b
 Reply — Module 3 is fixed. | Copy | Trim everything before this — /trim | Trim everything after this — /trim after | Delete — /delete
 === chromium: trim: a message's menu ===
 Your message — Step 3: look at module 3. | Copy | Trim everything before this — /trim | Trim everything after this — /trim after | Delete — /delete
-at the pointer: 2,0
+at the pointer: -42,0
 marked: true
 cut line: dashed
 after Esc: 1 2 3 4 5; preview: 0
@@ -2884,7 +2856,7 @@ copied: Module 3 is fixed. | Its handler returns the error now instead of droppi
 Trim the context here? | Trim 4 messages (~196 tokens) before this message? | Step 3: look at module 3. | <TIME> | They leave the model's context; the transcript keeps them folded, and Undo brings them back. | Enter trims, Esc cancels | Cancel | Trim
 after Esc, steps: 1 2 3 4 5; divider: 0
 === chromium: trim: keyboard ===
-under the message: 0,2
+under the message: -2,2
 highlighted: Trim everything before this
 === chromium: trim: trimmed ===
 divider: ✂ | 4 messages trimmed · ~196 tokens | Show | · | Undo
@@ -2999,8 +2971,9 @@ after Show all: user 2, replies 3, thinking 1, tools 1, subagents 1, stopped 1
 === chromium: filter: errors ===
 none
 === chromium: search: the sidebar's row and the composer's ===
-New session: wide, 34px high
-Search: narrow, 34px high
+Search
+Ctrl K: wide, 28px high
+: narrow, 28px high
 composer: Add files or images, Context 0% full, $0.00, server-laptop, Model, Send
 === chromium: search: Ctrl+K: the session's settings, recent sessions, commands ===
 focus in the filter: control-input
@@ -3418,7 +3391,7 @@ the composer ends at 0px from the bottom
 === chromium: mobile: 390x844: the ⋯ sheet ===
 ok
 === chromium: mobile: 390x844: the sheet's rows ===
-Jump to a message, Filter the transcript, Files, Terminal, Subagents and worktrees, Settings
+Jump to a message, Filter the transcript, Files, Terminal, Review changes, Settings
 === chromium: mobile: 390x844: the settings' list ===
 ok
 === chromium: mobile: 390x844: the settings ===
@@ -3473,7 +3446,7 @@ the composer ends at 0px from the bottom
 === chromium: mobile: 320x640: the ⋯ sheet ===
 ok
 === chromium: mobile: 320x640: the sheet's rows ===
-Jump to a message, Filter the transcript, Files, Terminal, Subagents and worktrees, Settings
+Jump to a message, Filter the transcript, Files, Terminal, Review changes, Settings
 === chromium: mobile: 320x640: the settings' list ===
 ok
 === chromium: mobile: 320x640: the settings ===
@@ -3528,7 +3501,7 @@ the composer ends at 0px from the bottom
 === chromium: mobile: 390x844-pwa: the ⋯ sheet ===
 ok
 === chromium: mobile: 390x844-pwa: the sheet's rows ===
-Jump to a message, Filter the transcript, Files, Terminal, Subagents and worktrees, Settings
+Jump to a message, Filter the transcript, Files, Terminal, Review changes, Settings
 === chromium: mobile: 390x844-pwa: the settings' list ===
 ok
 === chromium: mobile: 390x844-pwa: the settings ===
@@ -3570,7 +3543,7 @@ its width: more than 58%: what the shortest line needs
 one line: true; the path in mono: true; the editor on top: true
 for screen readers: Working in ~/projects/demo on main. Ask prigh anything…
 === chromium: mobile: desktop 1280: where the session works ===
-placeholder: Working in ~/projects/demo on main. Ask prigh anything…
+placeholder: Working in …/demo on main. Ask prigh anything…
 its width: 58% of the editor
 one line: true; the path in mono: true; the editor on top: true
 for screen readers: Working in ~/projects/demo on main. Ask prigh anything…
@@ -3774,7 +3747,7 @@ your messages: make the port configurable
 === chromium: long press: a session in the drawer ===
 menu: open_window, rename, fork, new_worktree, review, files, terminal, copy_path, copy_id, pin, archive, delete; a sheet at the bottom: true
 === chromium: long press: a worktree in the drawer ===
-menu: switch_here, new_session_here, review, files, terminal, create_pr, copy_path, remove; a sheet at the bottom: true
+no worktree row
 === chromium: long press: a file of the review ===
 menu: approve_files, unapprove_files, stage_files, unstage_files, commit_files, select_files, copy_paths; a sheet at the bottom: true
 === chromium: pwa: manifest ===
@@ -3891,43 +3864,22 @@ compact_at_tokens=150000 compaction_model=null mask_observations=false
 fits: true
 === chromium: compaction: errors ===
 (none)
-=== chromium: sessions settings: used days ago: folded, used now: shown ===
-+ Fresh work: fix/fresh
-- Old work
+=== chromium: sessions settings: two sessions, one used days ago ===
+Fresh work
+Old work
 === chromium: sessions settings: the settings ===
-Show worktrees | Your account | Show worktrees for pinned sessions and those used in the last 12 hours (changed, running, opened or worked in); others fold them behind their count. Your own fold or unfold of a session holds until you next open it. | hours
 Archive after | Sessions without activity for 7 days move to Archived (pinned and running ones never do). | days
-fields: "12" hours, "7" days
-=== chromium: sessions settings: 100 hours ===
-+ Fresh work: fix/fresh
-+ Old work: feat/old-a, feat/old-b
-=== chromium: sessions settings: off ===
-- Fresh work
-- Old work
-=== chromium: sessions settings: off, Old work unfolded by hand ===
-- Fresh work
-+ Old work: feat/old-a, feat/old-b
+field: "7" days
 === chromium: sessions settings: refused ===
 “a fortnight” isn't a number of days from 0 to 365: type one like 7, or off to archive only by hand.
 === chromium: sessions settings: archive after 2 days ===
-Show worktrees | Your account | Show worktrees for pinned sessions and those used recently (changed, running, opened or worked in); others fold them behind their count. Your own fold or unfold of a session holds until you next open it. | Off: every session's worktrees fold, pinned ones too.
 Archive after | Sessions without activity for 2 days move to Archived (pinned and running ones never do). | days
-fields: hidden hours, "2" days
+field: "2" days
 archive_after_days=2
-- Fresh work
-archived: Archived 1
-=== chromium: sessions settings: switched on again ===
-Show worktrees | Your account | Show worktrees for pinned sessions and those used in the last 100 hours (changed, running, opened or worked in); others fold them behind their count. Your own fold or unfold of a session holds until you next open it. | hours
-Archive after | Sessions without activity for 2 days move to Archived (pinned and running ones never do). | days
-fields: "100" hours, "2" days
-=== chromium: sessions settings: phone 390x844: sidebar ===
-+ Fresh work: fix/fresh
-+ Old work: feat/old-a, feat/old-b
+Fresh work
+archived: Archive 1
 === chromium: sessions settings: phone 390x844: settings ===
 fits: true
-=== chromium: sessions settings: phone 320x640: sidebar ===
-+ Fresh work: fix/fresh
-+ Old work: feat/old-a, feat/old-b
 === chromium: sessions settings: phone 320x640: settings ===
 fits: true
 === chromium: sessions settings: errors ===
@@ -5125,17 +5077,17 @@ after Chat without a host: strip (none)
 === chromium: chat: errors ===
 (none)
 === chromium: quiet desktop: a turn: two runs of steps, the first with a failed step ===
-prigh: ▢ Using prigh-web fix the bug (time)
-prigh: [run] Ran 2 commands, read a file 1 failed (took)
-prigh: Now the fix. [run] Wrote a file (took)
+you: fix the bug (time)
+prigh: [run] Worked for (took) · ran 2 commands, read a file 1 failed
+prigh: Now the fix. [run] Worked for (took) · wrote a file
 prigh: Done: wrote fix.txt. (time)
 first run's line: false
 sideways: none
 === chromium: quiet desktop: the first run opened: its steps ===
-Ran 2 commands, read a file 1 failed (took) Thinking Let me look around first. bash ls read notes.txt bash echo no such target >&2; exit 3 exit code 3 no such target
+Worked for (took) · ran 2 commands, read a file 1 failed Thinking Let me look around first. bash ls read notes.txt bash echo no such target >&2; exit 3 exit code 3 no such target
 sideways: none
 === chromium: quiet desktop: a step opened: its output ===
-Ran 2 commands, read a file 1 failed (took) Thinking Let me look around first. bash ls read notes.txt the bug is in fix.txt bash echo no such target >&2; exit 3 exit code 3 no such target
+Worked for (took) · ran 2 commands, read a file 1 failed Thinking Let me look around first. bash ls read notes.txt the bug is in fix.txt bash echo no such target >&2; exit 3 exit code 3 no such target
 sideways: none
 === chromium: quiet desktop: closed again ===
 first run's line: false
@@ -5144,27 +5096,27 @@ last run: Running a command
 last run running: true
 approval inside a run: 0
 === chromium: quiet desktop: approved ===
-prigh: ▢ Using prigh-web fix the bug (time)
-prigh: [run] Ran 2 commands, read a file 1 failed (took)
-prigh: Now the fix. [run] Wrote a file (took)
+you: fix the bug (time)
+prigh: [run] Worked for (took) · ran 2 commands, read a file 1 failed
+prigh: Now the fix. [run] Worked for (took) · wrote a file
 prigh: Done: wrote fix.txt. (time)
 you: clean up (time)
-prigh: [run] Ran a command (took)
+prigh: [run] Worked for (took) · ran a command
 prigh: Cleaned up. (time)
 === chromium: quiet desktop: errors ===
 (none)
 === chromium: quiet phone: a turn: two runs of steps, the first with a failed step ===
-prigh: ▢ Using prigh-web fix the bug (time)
-prigh: [run] Ran 2 commands, read a file 1 failed (took)
-prigh: Now the fix. [run] Wrote a file (took)
+you: fix the bug (time)
+prigh: [run] Worked for (took) · ran 2 commands, read a file 1 failed
+prigh: Now the fix. [run] Worked for (took) · wrote a file
 prigh: Done: wrote fix.txt. (time)
 first run's line: false, 44px tall
 sideways: none
 === chromium: quiet phone: the first run opened: its steps ===
-Ran 2 commands, read a file 1 failed (took) Thinking Let me look around first. bash ls read notes.txt bash echo no such target >&2; exit 3 exit code 3 no such target
+Worked for (took) · ran 2 commands, read a file 1 failed Thinking Let me look around first. bash ls read notes.txt bash echo no such target >&2; exit 3 exit code 3 no such target
 sideways: none
 === chromium: quiet phone: a step opened: its output ===
-Ran 2 commands, read a file 1 failed (took) Thinking Let me look around first. bash ls read notes.txt the bug is in fix.txt bash echo no such target >&2; exit 3 exit code 3 no such target
+Worked for (took) · ran 2 commands, read a file 1 failed Thinking Let me look around first. bash ls read notes.txt the bug is in fix.txt bash echo no such target >&2; exit 3 exit code 3 no such target
 sideways: none
 === chromium: quiet phone: closed again ===
 first run's line: false, 44px tall
@@ -5173,27 +5125,27 @@ last run: Running a command
 last run running: true
 approval inside a run: 0
 === chromium: quiet phone: approved ===
-prigh: ▢ Using prigh-web fix the bug (time)
-prigh: [run] Ran 2 commands, read a file 1 failed (took)
-prigh: Now the fix. [run] Wrote a file (took)
+you: fix the bug (time)
+prigh: [run] Worked for (took) · ran 2 commands, read a file 1 failed
+prigh: Now the fix. [run] Worked for (took) · wrote a file
 prigh: Done: wrote fix.txt. (time)
 you: clean up (time)
-prigh: [run] Ran a command (took)
+prigh: [run] Worked for (took) · ran a command
 prigh: Cleaned up. (time)
 === chromium: quiet phone: errors ===
 (none)
 === chromium: quiet small: a turn: two runs of steps, the first with a failed step ===
-prigh: ▢ Using prigh-web fix the bug (time)
-prigh: [run] Ran 2 commands, read a file 1 failed (took)
-prigh: Now the fix. [run] Wrote a file (took)
+you: fix the bug (time)
+prigh: [run] Worked for (took) · ran 2 commands, read a file 1 failed
+prigh: Now the fix. [run] Worked for (took) · wrote a file
 prigh: Done: wrote fix.txt. (time)
 first run's line: false, 44px tall
 sideways: none
 === chromium: quiet small: the first run opened: its steps ===
-Ran 2 commands, read a file 1 failed (took) Thinking Let me look around first. bash ls read notes.txt bash echo no such target >&2; exit 3 exit code 3 no such target
+Worked for (took) · ran 2 commands, read a file 1 failed Thinking Let me look around first. bash ls read notes.txt bash echo no such target >&2; exit 3 exit code 3 no such target
 sideways: none
 === chromium: quiet small: a step opened: its output ===
-Ran 2 commands, read a file 1 failed (took) Thinking Let me look around first. bash ls read notes.txt the bug is in fix.txt bash echo no such target >&2; exit 3 exit code 3 no such target
+Worked for (took) · ran 2 commands, read a file 1 failed Thinking Let me look around first. bash ls read notes.txt the bug is in fix.txt bash echo no such target >&2; exit 3 exit code 3 no such target
 sideways: none
 === chromium: quiet small: closed again ===
 first run's line: false, 44px tall
@@ -5202,12 +5154,12 @@ last run: Running a command
 last run running: true
 approval inside a run: 0
 === chromium: quiet small: approved ===
-prigh: ▢ Using prigh-web fix the bug (time)
-prigh: [run] Ran 2 commands, read a file 1 failed (took)
-prigh: Now the fix. [run] Wrote a file (took)
+you: fix the bug (time)
+prigh: [run] Worked for (took) · ran 2 commands, read a file 1 failed
+prigh: Now the fix. [run] Worked for (took) · wrote a file
 prigh: Done: wrote fix.txt. (time)
 you: clean up (time)
-prigh: [run] Ran a command (took)
+prigh: [run] Worked for (took) · ran a command
 prigh: Cleaned up. (time)
 === chromium: quiet small: errors ===
 (none)

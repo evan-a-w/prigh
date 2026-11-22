@@ -1626,16 +1626,16 @@ try {
       const problems = await layoutProblems(s);
       console.log(`${s}: ${problems.length ? problems.join("; ") : "fits"}`);
     }
-    // The panels' toggles float in the chat's top right corner, clear of
-    // the jump list's button.
+    // The panels' toggles at the top bar's right, clear of the jump list's
+    // button.
     const tools = await page.evaluate(() => {
       const t = document.querySelector(".chrome-tools");
       if (!t) return null;
       const r = t.getBoundingClientRect(), main = document.querySelector(".main").getBoundingClientRect();
       const list = document.querySelector(".jump-list")?.getBoundingClientRect();
       const clear = !list || list.top >= r.bottom || list.right <= r.left;
-      const open = [...t.querySelectorAll(".btn.open")].map(b => b.getAttribute("aria-label"));
-      return `${t.querySelectorAll(".btn").length} buttons ${Math.round(r.top - main.top)}px from the top, ${Math.round(main.right - r.right)}px from the right, clear of the jump list: ${clear}, open: ${open.join(", ") || "none"}`;
+      const open = [...t.querySelectorAll("button.open")].map(b => b.getAttribute("aria-label"));
+      return `${t.querySelectorAll("button").length} buttons ${Math.round(r.top - main.top)}px from the top, ${Math.round(main.right - r.right)}px from the right, clear of the jump list: ${clear}, open: ${open.join(", ") || "none"}`;
     });
     if (tools) console.log(`the panels' toggles: ${tools}`);
     await screenshot(label);
