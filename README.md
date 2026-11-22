@@ -1103,6 +1103,35 @@ back. A backend that stops mid-session deletes what is left when it next
 starts. The model provider's own retention, and the effects of what it ran
 (edits, commits, pull requests), are not prigh's to delete.
 
+### The editor
+
+`/edit [path]` (or Alt+E, `edit` in the control centre (Ctrl+K), or Edit
+on a file in the file browser) puts an editor in the chat's place: the
+session's files, on its tool host, in CodeMirror (loaded only when the
+editor opens). Long lines wrap under their indent; saving (Ctrl/⌘+S, or ⋯
+→ Save on a phone) writes the file and refuses when it changed on the host
+since it was read, offering Reload or Overwrite. Prompts go to the
+session's chat as usual: Ctrl/⌘+L (or Ask, on a phone) attaches the
+selected lines (or the caret's line) to the next message as a chip,
+`src/compact.ml:48–58`, sent with the prompt as a pasted text. When the
+agent changes an open file it is read again: a file without unsaved edits
+shows the change inline (removed lines struck through, added ones tinted,
+marks in the gutter) with Keep and Undo (which writes the old text back);
+one with unsaved edits keeps them and says the host's copy changed.
+
+On a wide window the files are a list down the left (Ctrl/⌘+B; drag its
+edge to resize), Ctrl/⌘+P goes to a file (fuzzy, over the host's paths),
+open files are tabs (Alt+PageDown/PageUp, Alt+W closes), Ctrl/⌘+F finds
+and replaces, Ctrl+G goes to a line, and the chat is a column on the right
+(Alt+C; it opens when you send). On a phone the code has the screen: a
+strip at the top (☰ for the files as a drawer, with Go to file at the
+thumb, the path, ⋯ for the rest) that slides away as you scroll down, the
+composer under the code, and the reply's last line over the composer (a
+tap pulls the chat up). With the keyboard up the composer gives way to a
+bar of the keys a phone keyboard buries (Ask, ⇥, brackets, `;`, `=`, `|`,
+`->`, ← →, undo). Esc outside the text, Alt+E or ⋯ → Leave the editor go
+back to the chat.
+
 ### Reviewing the changes
 
 `/review` (or Alt+R, or the Review button of the file browser and of
@@ -2946,6 +2975,7 @@ it.
 | `/naming`, `/naming model MODEL\|off` | show or set the model that names sessions and subagents (`naming_model`; `off`: the drafting model, else the session's); in the TUI `/naming model ` completes the models, in prigh-web `/naming model` alone opens a picker; also on prigh-web's settings page |
 | `/commit [-a] [--amend] [-m MESSAGE \| --generate]` | commit what is staged in the session's worktree (`-a`: every change to tracked files first); `--generate` drafts the message with the model into the editor, see [Git hosting](#git-hosting) |
 | `/push` | push the worktree's branch to its upstream (set when it has none), with the tool host's git credentials |
+| `/edit [path]` | prigh-web: the editor mode over the session's files, opening `path` (relative to the cwd) if given; see [The editor](#the-editor) |
 | `/diff [path]` | show the uncommitted changes where the tools run (`git diff` against `HEAD`, untracked files as new), optionally of one path |
 | `/review [WORKTREE\|BRANCH] [--base REV] [--direct]`, `/review [base] [instructions]` | alone or with a worktree (path, branch or name), a branch not checked out (read-only), `--base` and `--direct`: the review page (prigh-web) or the files' approvals and the comments (TUI) of that worktree or branch against its base (since the merge base, or directly), see [Reviewing the changes](#reviewing-the-changes); with a base (`HEAD`: the uncommitted changes) or instructions, have the model review the changes against `base`'s merge base for prioritised findings with file and line |
 | `/init` | have the model write `AGENTS.md` for the project, or improve the existing one |

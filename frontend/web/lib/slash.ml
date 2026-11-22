@@ -390,7 +390,7 @@ let every =
       ~args:"[path]"
       "edit"
       "the editor mode: edit the session's files (PATH, or the last one) \
-       beside the chat, and ask about a selection (Alt+E; Esc goes back)"
+       beside the chat, and ask about a selection (Alt+E toggles it)"
   ; c
       ~args:"[n|id|cancel <n|id>|steer <n|id> <text>|follow-up <n|id> <text>]"
       "agents"
