@@ -359,7 +359,8 @@ let listen
       ~sw
       ~clock:(Eio.Stdenv.clock env)
       ~on_error:(fun exn ->
-        eprintf "prigh: web connection failed: %s\n%!" (Exn.to_string exn))
+        if not (Net_error.peer_gone exn)
+        then eprintf "prigh: web connection failed: %s\n%!" (Exn.to_string exn))
       socket
       (fun flow _addr ->
          no_delay flow;
