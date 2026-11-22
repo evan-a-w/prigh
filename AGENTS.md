@@ -136,6 +136,22 @@ minute on a busy machine; `--full` is where depth goes:
   each real binary. A slow, integration-style test whose behaviour cheaper
   tests already pin goes in the `@runtest-full` alias instead (`(alias
   runtest-full)` in place of `runtest`), which only `./test --full` runs.
+  Where the slow ones live:
+  - Backend: a test taking 100 ms of CPU or 1 s of wall or more goes in
+    `backend/test/full/test_x_full.ml` (opening `Test_x` for its helpers),
+    and `test_x.ml` keeps the cheap ones, so every area stays in the default
+    run. `test/full` and `test/terminal` are vendored directories:
+    `@runtest` skips them, `@runtest-full` runs them. ppx_expect rejects
+    custom tags, so the tiers are split by directory. To time one test:
+    `inline-test-runner.exe inline-test-runner <lib> -source-tree-root .
+    -only-test file.ml:LINE`.
+  - prigh-web: scale tests (huge replies, trees, file lists) go in
+    `frontend/web/test/full/`. The rest run in two node processes: shard a
+    lists its modules in `web/test/dune`, shard b takes the others, so a new
+    test file needs no entry. `Harness` reuses the last rendering until the
+    model changes: change state only through `App.update`.
+  - TUI: the default runs the e2e transcript and the tmux group `smoke.t`;
+    the other tmux groups and the websocket e2e are `@runtest-full`.
 - Browser e2e: `./test` runs `smoke.mjs` alone, the main flows once each,
   one backend, one browser and few page loads. Add a check to it only for a
   main flow that nothing else catches and only a real browser can; anything
