@@ -70,12 +70,17 @@ type_text() { tmux send-keys -t "$session" -l "$1"; }
 paste() { printf '%s' "$1" | tmux load-buffer -; tmux paste-buffer -p -t "$session"; }
 resize() { tmux resize-window -t "$session" -x "$1" -y "$2"; }
 
-# Waits (up to 10s) until the pane contains the pattern.
+# Waits (up to 10s) until the pane contains the pattern: soon after it does
+# (the first looks are 25ms apart), without capturing ten panes a second
+# through a long wait (the gaps grow to 0.25s).
 wait_for() {
-	local pattern=$1 i
-	for i in $(seq 1 100); do
+	local pattern=$1 gap=0.025
+	local deadline=$((${EPOCHREALTIME//[.,]/} + 10000000))
+	while :; do
 		if tmux capture-pane -p -t "$session" | grep -q -- "$pattern"; then return 0; fi
-		sleep 0.1
+		[ "${EPOCHREALTIME//[.,]/}" -lt "$deadline" ] || break
+		sleep "$gap"
+		case $gap in 0.025) gap=0.05 ;; 0.05) gap=0.1 ;; 0.1) gap=0.25 ;; esac
 	done
 	echo "  timeout waiting for: $pattern"
 	tmux capture-pane -p -t "$session"

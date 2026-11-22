@@ -574,8 +574,12 @@
           # opam-nix puts a fake `opam` of every package on PATH (~250 of
           # them); keep one. Otherwise PATH outgrows tmux's 16 KB command
           # limit, and frontend/tui/tmux-test passes it in a tmux command.
+          # Dune's shared cache (~/.cache/dune), so that a new worktree builds
+          # from what the others built (seconds, not minutes). This dune's
+          # default stores nothing, not even OCaml's own rules.
           shellHook = ''
             PATH=$(printf '%s' "$PATH" | tr : '\n' | awk '!/-opam\/bin$/ || !seen++' | paste -sd : -)
+            export DUNE_CACHE=''${DUNE_CACHE:-enabled}
           '';
         };
         devShells.backend = self.devShells.${system}.default;
