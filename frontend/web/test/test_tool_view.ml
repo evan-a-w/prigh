@@ -285,7 +285,7 @@ let%expect_test "read: text folded, images as thumbnails, ranges, errors" =
           <icon class="check"> </icon>
         </span>
         <span aria-hidden="true" class="tool-icon">
-          <icon class="book"> </icon>
+          <icon class="file_text"> </icon>
         </span>
         <span class="name"> read </span>
         <span class="arg path"> notes.md </span>
@@ -310,7 +310,7 @@ let%expect_test "read: text folded, images as thumbnails, ranges, errors" =
           <icon class="check"> </icon>
         </span>
         <span aria-hidden="true" class="tool-icon">
-          <icon class="book"> </icon>
+          <icon class="file_text"> </icon>
         </span>
         <span class="name"> read </span>
         <span class="arg path"> pic.png </span>
@@ -340,7 +340,7 @@ let%expect_test "read: text folded, images as thumbnails, ranges, errors" =
           <icon class="check"> </icon>
         </span>
         <span aria-hidden="true" class="tool-icon">
-          <icon class="book"> </icon>
+          <icon class="file_text"> </icon>
         </span>
         <span class="name"> read </span>
         <span class="arg path"> big.ml </span>
@@ -359,7 +359,7 @@ let%expect_test "read: text folded, images as thumbnails, ranges, errors" =
           <icon class="cross"> </icon>
         </span>
         <span aria-hidden="true" class="tool-icon">
-          <icon class="book"> </icon>
+          <icon class="file_text"> </icon>
         </span>
         <span class="name"> read </span>
         <span class="arg path"> nope.txt </span>
@@ -387,7 +387,7 @@ let%expect_test "write: the path, a preview, whether it replaced a file" =
           <icon class="check"> </icon>
         </span>
         <span aria-hidden="true" class="tool-icon">
-          <icon class="pencil"> </icon>
+          <icon class="file_pen"> </icon>
         </span>
         <span class="name"> write </span>
         <span class="arg path"> hello.py </span>
@@ -412,7 +412,7 @@ let%expect_test "write: the path, a preview, whether it replaced a file" =
           <icon class="check"> </icon>
         </span>
         <span aria-hidden="true" class="tool-icon">
-          <icon class="pencil"> </icon>
+          <icon class="file_pen"> </icon>
         </span>
         <span class="name"> write </span>
         <span class="arg path"> a.txt </span>
@@ -440,7 +440,7 @@ let%expect_test "write: content shown as it streams" =
       <button type="button" data-fold="c1#open" aria-expanded="true" class="tool-head">
         <span aria-hidden="true" class="lamp"> </span>
         <span aria-hidden="true" class="tool-icon">
-          <icon class="pencil"> </icon>
+          <icon class="file_pen"> </icon>
         </span>
         <span class="name"> write </span>
         <span class="arg path"> notes.txt </span>
@@ -469,7 +469,7 @@ let%expect_test "edit: the diff it returned, or its edits before it has run" =
       <button type="button" data-fold="c5#open" aria-expanded="true" class="tool-head">
         <span aria-hidden="true" class="lamp"> </span>
         <span aria-hidden="true" class="tool-icon">
-          <icon class="pencil"> </icon>
+          <icon class="file_pen"> </icon>
         </span>
         <span class="name"> edit </span>
         <span class="arg path"> src/app.ml </span>
@@ -556,7 +556,7 @@ let%expect_test "edit: the diff it returned, or its edits before it has run" =
           <icon class="check"> </icon>
         </span>
         <span aria-hidden="true" class="tool-icon">
-          <icon class="pencil"> </icon>
+          <icon class="file_pen"> </icon>
         </span>
         <span class="name"> edit </span>
         <span class="arg path"> src/app.ml </span>
@@ -667,7 +667,7 @@ let%expect_test "edit: the diff it returned, or its edits before it has run" =
           <icon class="cross"> </icon>
         </span>
         <span aria-hidden="true" class="tool-icon">
-          <icon class="pencil"> </icon>
+          <icon class="file_pen"> </icon>
         </span>
         <span class="name"> edit </span>
         <span class="arg path"> src/app.ml </span>
@@ -760,7 +760,7 @@ let%expect_test "ls, grep, find" =
           <icon class="check"> </icon>
         </span>
         <span aria-hidden="true" class="tool-icon">
-          <icon class="folder"> </icon>
+          <icon class="folder_search"> </icon>
         </span>
         <span class="name"> ls </span>
         <span class="arg path"> . </span>
@@ -783,7 +783,7 @@ let%expect_test "ls, grep, find" =
           <icon class="check"> </icon>
         </span>
         <span aria-hidden="true" class="tool-icon">
-          <icon class="search"> </icon>
+          <icon class="text_search"> </icon>
         </span>
         <span class="name"> grep </span>
         <span class="arg pattern"> salute </span>
@@ -805,7 +805,7 @@ let%expect_test "ls, grep, find" =
           <icon class="check"> </icon>
         </span>
         <span aria-hidden="true" class="tool-icon">
-          <icon class="folder"> </icon>
+          <icon class="folder_search"> </icon>
         </span>
         <span class="name"> find </span>
         <span class="arg pattern"> *.ml </span>
@@ -1222,7 +1222,7 @@ let%expect_test "cancelled calls: what they did, not as errors" =
           <icon class="square"> </icon>
         </span>
         <span aria-hidden="true" class="tool-icon">
-          <icon class="search"> </icon>
+          <icon class="text_search"> </icon>
         </span>
         <span class="name"> grep </span>
         <span class="arg pattern"> x </span>
@@ -1244,7 +1244,7 @@ let%expect_test "other tools: their main argument and output" =
           <icon class="check"> </icon>
         </span>
         <span aria-hidden="true" class="tool-icon">
-          <icon class="external"> </icon>
+          <icon class="globe"> </icon>
         </span>
         <span class="name"> web_fetch </span>
         <span class="arg url"> https://x </span>
@@ -1322,7 +1322,7 @@ let%expect_test "apply_patch: one file's diff, like edit" =
           <icon class="check"> </icon>
         </span>
         <span aria-hidden="true" class="tool-icon">
-          <icon class="pencil"> </icon>
+          <icon class="file_pen"> </icon>
         </span>
         <span class="name"> apply_patch </span>
         <span class="arg path"> src/retry.ml </span>
@@ -1406,7 +1406,7 @@ let%expect_test "apply_patch: several files, each named above its diff" =
           <icon class="check"> </icon>
         </span>
         <span aria-hidden="true" class="tool-icon">
-          <icon class="pencil"> </icon>
+          <icon class="file_pen"> </icon>
         </span>
         <span class="name"> apply_patch </span>
         <span class="arg path"> src/new.ml </span>
@@ -1509,7 +1509,7 @@ let%expect_test "apply_patch: an error, with the patch it tried" =
           <icon class="cross"> </icon>
         </span>
         <span aria-hidden="true" class="tool-icon">
-          <icon class="pencil"> </icon>
+          <icon class="file_pen"> </icon>
         </span>
         <span class="name"> apply_patch </span>
         <span class="arg path"> src/new.ml </span>
@@ -1598,7 +1598,7 @@ let%expect_test "apply_patch: the files streamed so far" =
       <button type="button" data-fold="p1#open" aria-expanded="true" class="tool-head">
         <span aria-hidden="true" class="lamp"> </span>
         <span aria-hidden="true" class="tool-icon">
-          <icon class="pencil"> </icon>
+          <icon class="file_pen"> </icon>
         </span>
         <span class="name"> apply_patch </span>
         <span class="arg path"> src/new.ml </span>

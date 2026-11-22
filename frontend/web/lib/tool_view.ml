@@ -163,11 +163,11 @@ let last_activity chat =
 let tool_icon name : Html.Icon.t =
   match name with
   | "bash" | "job_input" | "job_output" | "job_kill" -> Terminal
-  | "read" -> Book
-  | "write" | "edit" | "apply_patch" -> Pencil
-  | "ls" | "find" -> Folder
-  | "grep" | "web_search" -> Search
-  | "web_fetch" -> External
+  | "read" -> File_text
+  | "write" | "edit" | "apply_patch" -> File_pen
+  | "ls" | "find" -> Folder_search
+  | "grep" -> Text_search
+  | "web_search" | "web_fetch" -> Globe
   | "subagent" | "subagent_status" | "subagent_cancel" -> Bot
   | "update_plan" -> Toc
   | "ask_user" -> Help

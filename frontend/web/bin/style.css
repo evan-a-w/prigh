@@ -102,20 +102,20 @@
   50% { opacity: 1; box-shadow: var(--lamp-ring), 0 0 8px 2px var(--sodium-glow-bright); }
 }
 
-/* A chevron drawn, not a glyph: it turns about its own centre. Closed it
-   points right; [aria-expanded=true] or an open details turns it down. */
+/* A chevron (Lucide's chevron-right, as a mask so it takes the text's
+   colour): closed it points right; [aria-expanded=true] or an open fold
+   turns it down. */
 .chev {
   display: inline-block;
   flex-shrink: 0;
-  width: 5px;
-  height: 5px;
-  margin: 0 5px 0 2px;
-  border-right: 1.5px solid currentColor;
-  border-bottom: 1.5px solid currentColor;
-  transform: translateY(-1px) rotate(-45deg);
+  width: 14px;
+  height: 14px;
+  background: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 18 6-6-6-6'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 18 6-6-6-6'/%3E%3C/svg%3E") center / contain no-repeat;
   transition: transform 0.15s;
 }
-[aria-expanded="true"] > .chev { transform: translateY(-2px) rotate(45deg); }
+[aria-expanded="true"] > .chev { transform: rotate(90deg); }
 
 html, body {
   margin: 0;
@@ -1298,17 +1298,17 @@ kbd {
 .diff-file > summary::-webkit-details-marker { display: none; }
 .diff-file > summary::before {
   content: "";
-  align-self: center;
+  display: inline-block;
   flex-shrink: 0;
-  width: 5px;
-  height: 5px;
-  margin: 0 2px 0 2px;
-  border-right: 1.5px solid var(--faint);
-  border-bottom: 1.5px solid var(--faint);
-  transform: rotate(-45deg);
+  width: 14px;
+  height: 14px;
+  align-self: center;
+  background: var(--faint);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 18 6-6-6-6'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 18 6-6-6-6'/%3E%3C/svg%3E") center / contain no-repeat;
   transition: transform 0.15s;
 }
-.diff-file[open] > summary::before { transform: translateY(-2px) rotate(45deg); }
+.diff-file[open] > summary::before { transform: rotate(90deg); }
 .diff-file .path { font: 12.5px var(--mono); color: var(--fg); overflow-wrap: anywhere; min-width: 0; }
 .diff-file .chip {
   font: 11px var(--mono);
@@ -1328,7 +1328,7 @@ kbd {
    steps into one line each (chat.css). */
 .chat.verbosity-verbose details::details-content { content-visibility: visible; display: block; }
 .chat.verbosity-verbose details > summary > .preview { visibility: hidden; }
-.chat.verbosity-verbose details > summary > .label::before { transform: translateY(-1px) rotate(45deg); }
+.chat.verbosity-verbose details > summary > .label::before { transform: rotate(90deg); }
 
 .saved-accounts { display: flex; flex-direction: column; gap: 6px; }
 .saved-title { margin: 0; color: var(--muted-text); font-size: 12.5px; font-weight: 600; }
@@ -2011,7 +2011,9 @@ kbd {
 .composer-controls { flex: 0 1 auto; margin-left: auto; display: flex; align-items: center; gap: 2px; min-width: 0; }
 .composer-controls .model-chip { gap: 6px; font-weight: 400; }
 .model-chip .provider-mark { width: 14px; height: 14px; color: var(--muted-text); }
-.provider-mark { stroke-width: 1.7; }
+.provider-mark { flex: none; }
+/* A provider without a logo: its initial, in the logo's square. */
+.provider-letter { display: inline-flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 600; line-height: 1; border-radius: 3px; box-shadow: inset 0 0 0 1.25px currentColor; }
 
 /* The context ring, by the paperclip: a 30px ring in a 44px target, the accent filling it to
    the context used, amber near where it compacts and brick from there. A
@@ -2122,7 +2124,8 @@ kbd {
   color: var(--faint);
   cursor: pointer;
 }
-.model-rail-tab .icon { width: 18px; height: 18px; }
+.model-rail-tab .icon, .model-rail-tab .provider-letter { width: 18px; height: 18px; }
+.model-rail-tab .provider-letter { font-size: 11px; }
 @media (hover: hover) { .model-rail-tab:hover { background: var(--slate-2); color: var(--chalk); } }
 .model-rail-tab.on { color: var(--chalk); background: var(--slate-2); }
 .model-rail-tab.on::before { content: ""; position: absolute; left: -6px; top: 8px; bottom: 8px; width: 3px; border-radius: 0 2px 2px 0; background: var(--sodium); }

@@ -64,11 +64,12 @@ val click : ?nth:int -> t -> selector:string -> unit
 (** A keydown of [key] on the element, to its own handler. *)
 val keydown : ?nth:int -> t -> selector:string -> string -> unit
 
-(** Clicks it with Ctrl or Cmd ([meta]) held. *)
+(** Clicks it with Ctrl, Cmd ([meta]) or Shift held. *)
 val modified_click
   :  ?nth:int
   -> ?ctrl:bool
   -> ?meta:bool
+  -> ?shift:bool
   -> t
   -> selector:string
   -> unit

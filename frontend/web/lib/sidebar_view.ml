@@ -33,8 +33,7 @@ let current_activity (m : App.Model.t) =
 
 let shift_click ev = Js_of_ocaml.Js.to_bool ev##.shiftKey
 
-(* Ctrl or Cmd: open in a new window, as a browser does with a link. *)
-let new_window_click ev =
+let toggle_click ev =
   Js_of_ocaml.Js.to_bool ev##.ctrlKey || Js_of_ocaml.Js.to_bool ev##.metaKey
 ;;
 
@@ -252,13 +251,15 @@ let row ~inject (s : Session_summary.t) (row : Row.t) =
                  else Attr.empty)
               ; (if loading then Attr.create "aria-busy" "true" else Attr.empty)
               ; Attr.on_click (fun ev ->
-                  if selecting
-                  then
+                  (* Ctrl/Cmd toggles the session into the selection, Shift
+                     selects a range (from the session on show when none
+                     is selected yet); a middle click opens a new window. *)
+                  if selecting || toggle_click ev || shift_click ev
+                  then (
+                    Js_of_ocaml.Dom.preventDefault ev;
                     inject
                       (Action.Mark_session
-                         { path = s.path; range = shift_click ev })
-                  else if new_window_click ev
-                  then inject (Action.Open_session_window s.id)
+                         { path = s.path; range = shift_click ev }))
                   else inject (Action.Switch_session s.path))
               ; (if selecting
                  then Attr.empty
@@ -402,6 +403,13 @@ let toolbar (m : App.Model.t) ~inject =
       ; Node.span
           ~attrs:[ Attr.class_ "sessions-hint keyboard font-normal" ]
           [ Kbd.view [ Node.text "Shift" ]; Node.text " for a range" ]
+      ; Node.span
+          ~attrs:[ Attr.class_ "sessions-count tabular-nums" ]
+          [ Node.text
+              (sprintf
+                 "%d selected"
+                 (List.length (Session_marks.marked m.marks m.sessions)))
+          ]
       ]
   else
     div
@@ -413,7 +421,11 @@ let toolbar (m : App.Model.t) ~inject =
           ~class_:
             "h-6 px-1.5 font-normal text-muted-foreground \
              hover:text-foreground narrow:h-11"
-          ~attrs:[ Attr.title "Select sessions to delete (/delete)" ]
+          ~attrs:
+            [ Attr.title
+                "Select sessions to archive or delete (or Ctrl/⌘- or \
+                 Shift-click them)"
+            ]
           ~on_click:(inject (Action.Select_sessions true))
           [ Node.text "Select" ]
       ]
@@ -433,22 +445,38 @@ let selection_bar (m : App.Model.t) ~inject =
         ~attrs:[ Attr.title "Stop selecting (Esc)" ]
         ~on_click:(inject (Action.Select_sessions false))
         [ Node.text "Cancel" ]
+    ; (let unarchive =
+         count > 0 && List.for_all marked ~f:(fun s -> s.archived)
+       in
+       Button.view
+         ~variant:Outline
+         ~size:Sm
+         ~class_:"archive-marked narrow:h-11"
+         ~disabled:(count = 0)
+         ~attrs:
+           [ Attr.title
+               (if unarchive
+                then "Unarchive the selected sessions"
+                else "Archive the selected sessions")
+           ]
+         ~on_click:(inject (Action.Archive_marked (not unarchive)))
+         [ icon (if unarchive then Unarchive else Archive)
+         ; Node.text (if unarchive then "Unarchive" else "Archive")
+         ])
     ; Button.view
         ~variant:Destructive
         ~size:Sm
         ~class_:"danger min-w-0 flex-1 truncate narrow:h-11"
         ~disabled:(count = 0)
-        ~attrs:[ Attr.title "Delete the selected sessions (Delete)" ]
-        ~on_click:(inject Action.Delete_marked)
-        [ Node.text
-            (if count = 0
-             then "Delete sessions"
-             else
-               sprintf
-                 "Delete %s (%s)"
-                 (if count = 1 then "1 session" else sprintf "%d sessions" count)
+        ~attrs:
+          [ Attr.title
+              (sprintf
+                 "Delete the selected sessions, %s (Delete)"
                  (Session_summary.size_string
                     (Session_summary.total_bytes marked)))
+          ]
+        ~on_click:(inject Action.Delete_marked)
+        [ Node.text (if count = 0 then "Delete" else sprintf "Delete %d" count)
         ]
     ]
 ;;
@@ -520,11 +548,14 @@ let archive_toggle ~inject ~shown archived =
       "sessions-divider archive-toggle w-full justify-start gap-2 px-2.5 \
        font-normal text-muted-foreground hover:text-foreground narrow:h-11"
     ~attrs:
-      [ Attr.create "aria-expanded" (Bool.to_string shown)
+      [ Attr.id "archive-toggle"
+      ; Attr.create "aria-expanded" (Bool.to_string shown)
       ; Attr.title
           (if shown
-           then "Hide the archived sessions"
-           else "Show the archived sessions")
+           then "Hide the archived sessions (right-click: more)"
+           else "Show the archived sessions (right-click: more)")
+      ; Attr.on_contextmenu
+          (open_menu ~inject Context_menu.Target.Archive ~row:"archive-toggle")
       ]
     ~on_click:(inject Action.Toggle_archived)
     [ icon Archive
@@ -537,7 +568,7 @@ let archive_toggle ~inject ~shown archived =
           (if shown
            then "chev size-3.5 rotate-90 transition-transform"
            else "chev size-3.5 transition-transform")
-        Chevron
+        Next
     ]
 ;;
 
@@ -586,10 +617,11 @@ let footer (m : App.Model.t) ~inject ~archived =
         ~cls:"flex items-center gap-0.5"
         [ settings ~inject
         ; foot_button
-            ~cls:"pull-requests-button"
-            ~title:"Pull requests (/pr)"
-            ~on_click:(inject (Action.Run "/pr"))
-            Pull_request
+            ~cls:"usage-button"
+            ~title:"Usage and limits (/usage)"
+            ~attrs:[ Attr.create "aria-haspopup" "dialog" ]
+            ~on_click:(inject (Action.Run "/usage"))
+            Usage
         ; foot_button
             ~cls:"help-button"
             ~title:"Commands and keys (/help)"

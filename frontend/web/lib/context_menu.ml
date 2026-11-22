@@ -10,6 +10,7 @@ module Target = struct
         }
     | Message of int
     | Review_files of string list
+    | Archive
   [@@deriving sexp_of, equal]
 end
 
@@ -63,13 +64,16 @@ module Item = struct
     | Select_files
     | Unselect_files
     | Copy_paths
+    | Show_archived
+    | Hide_archived
+    | Delete_archived
   [@@deriving sexp_of, equal, enumerate]
 
   let id t = String.lowercase (Sexp.to_string (sexp_of_t t))
   let of_id s = List.find all ~f:(fun t -> String.equal (id t) s)
 
   let danger = function
-    | Delete | Remove -> true
+    | Delete | Remove | Delete_archived -> true
     | Open
     | Open_window
     | Rename
@@ -99,7 +103,9 @@ module Item = struct
     | Commit_files
     | Select_files
     | Unselect_files
-    | Copy_paths -> false
+    | Copy_paths
+    | Show_archived
+    | Hide_archived -> false
   ;;
 end
 
@@ -156,7 +162,7 @@ let worktree_items (s : Session_summary.t) ~path
 
 let items ?host_home (target : Target.t) s ~current =
   match target with
-  | Session _ | Message _ | Review_files _ ->
+  | Session _ | Message _ | Review_files _ | Archive ->
     session_items ?host_home s ~current
   | Worktree { path; _ } -> worktree_items s ~path
 ;;
@@ -164,7 +170,7 @@ let items ?host_home (target : Target.t) s ~current =
 let picker ?host_home target (s : Session_summary.t) ~current =
   let title =
     match target with
-    | Target.Session _ | Message _ | Review_files _ -> "Session"
+    | Target.Session _ | Message _ | Review_files _ | Archive -> "Session"
     | Worktree { path; _ } ->
       (match List.find s.worktrees ~f:(fun w -> String.equal w.path path) with
        | Some w -> "Worktree " ^ Session_worktree.label w
@@ -308,16 +314,40 @@ let files_picker (f : Files.t) =
     ]
 ;;
 
+let archive_picker ~count ~shown =
+  Picker.create
+    ~title:"Archive"
+    [ (if shown
+       then
+         Picker.Item.create
+           ~id:(Item.id Hide_archived)
+           ~detail:""
+           "Hide archived"
+       else
+         Picker.Item.create
+           ~id:(Item.id Show_archived)
+           ~detail:""
+           "Show archived")
+    ; Picker.Item.create
+        ~id:(Item.id Delete_archived)
+        ~detail:(if count = 0 then "There are none" else "/delete-archived")
+        ~dimmed:(count = 0)
+        (if count = 1
+         then "Delete 1 archived session…"
+         else sprintf "Delete all %d archived sessions…" count)
+    ]
+;;
+
 let worktree t =
   match t.target with
-  | Session _ | Message _ | Review_files _ -> None
+  | Session _ | Message _ | Review_files _ | Archive -> None
   | Worktree { path; _ } -> Some path
 ;;
 
 let session t =
   match t.target with
   | Session path | Worktree { session = path; _ } -> Some path
-  | Message _ | Review_files _ -> None
+  | Message _ | Review_files _ | Archive -> None
 ;;
 
 let worktree_dom_id ~session path =

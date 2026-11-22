@@ -75,14 +75,16 @@ let%expect_test "active sessions first, then the archived ones under a divider" 
             data-slot="button"
             data-variant="ghost"
             data-size="sm"
+            id="archive-toggle"
             aria-expanded="false"
-            title="Show the archived sessions"
+            title="Show the archived sessions (right-click: more)"
             class="[&_svg:not([class*='size-'])]:size-3.5 [&_svg]:pointer-events-none [&_svg]:shrink-0 active:not-aria-[haspopup]:translate-y-px archive-toggle aria-expanded:bg-muted aria-expanded:text-foreground aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-clip-padding border border-transparent dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:hover:bg-muted/50 disabled:opacity-50 disabled:pointer-events-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 font-normal gap-2 group/button h-7 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 hover:bg-muted hover:text-foreground in-data-[slot=button-group]:rounded-lg inline-flex items-center justify-start narrow:h-11 outline-none px-2.5 rounded-[min(var(--radius-md),12px)] rounded-lg select-none sessions-divider shrink-0 text-[0.8rem] text-muted-foreground transition-all w-full whitespace-nowrap"
-            @on_click>
+            @on_click
+            @on_contextmenu>
       <icon class="archive"> </icon>
       <span class="divider-label"> Archive </span>
       <span class="divider-count ml-auto tabular-nums text-xs"> 2 </span>
-      <icon class="chevron"> </icon>
+      <icon class="next"> </icon>
     </button>
     Sessions (Select)
     (work 2m fix the parser bug) (More (right-click, Shift+F10)) (Archive) (Delete)
@@ -345,18 +347,21 @@ let%expect_test "selecting sessions: click, shift-click a range, delete them" =
   sidebar h;
   [%expect
     {|
-    Select sessions Shift for a range
+    Select sessions Shift for a range 0 selected
     (☐ work 3.9 KB fix the parser bug)
     (☐ work 11.7 KB Release notes)
     (☐ work 2.9 KB Open elsewhere)
     Archived 2
     (☐ work 195.3 KB Old lexer)
     (☐ work 1.2 MB Older docs)
-    (Cancel) (Delete sessions)
+    (Cancel) (Archive) (Delete)
     |}];
   H.elements h ~selector:".selection-bar button[disabled]";
   [%expect
-    {| <button class="[&_svg:not([class*='size-'])]:size-3.5 [&_svg]:pointer-events-none [&_svg]:shrink-0 active:not-aria-[haspopup]:translate-y-px aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-clip-padding bg-destructive/10 border border-transparent danger dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:bg-destructive/20 dark:focus-visible:ring-destructive/40 dark:hover:bg-destructive/30 disabled:opacity-50 disabled:pointer-events-none flex-1 focus-visible:border-destructive/40 focus-visible:ring-3 focus-visible:ring-destructive/20 font-medium gap-1 group/button h-7 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 hover:bg-destructive/20 in-data-[slot=button-group]:rounded-lg inline-flex items-center justify-center min-w-0 narrow:h-11 outline-none px-2.5 rounded-[min(var(--radius-md),12px)] rounded-lg select-none shrink-0 text-[0.8rem] text-destructive transition-all truncate whitespace-nowrap"> |}];
+    {|
+    <button class="[&_svg:not([class*='size-'])]:size-3.5 [&_svg]:pointer-events-none [&_svg]:shrink-0 active:not-aria-[haspopup]:translate-y-px archive-marked aria-expanded:bg-muted aria-expanded:text-foreground aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-background bg-clip-padding border border-border dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:bg-input/30 dark:border-input dark:hover:bg-input/50 disabled:opacity-50 disabled:pointer-events-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 font-medium gap-1 group/button h-7 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 hover:bg-muted hover:text-foreground in-data-[slot=button-group]:rounded-lg inline-flex items-center justify-center narrow:h-11 outline-none px-2.5 rounded-[min(var(--radius-md),12px)] rounded-lg select-none shrink-0 text-[0.8rem] transition-all whitespace-nowrap">
+    <button class="[&_svg:not([class*='size-'])]:size-3.5 [&_svg]:pointer-events-none [&_svg]:shrink-0 active:not-aria-[haspopup]:translate-y-px aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-clip-padding bg-destructive/10 border border-transparent danger dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:bg-destructive/20 dark:focus-visible:ring-destructive/40 dark:hover:bg-destructive/30 disabled:opacity-50 disabled:pointer-events-none flex-1 focus-visible:border-destructive/40 focus-visible:ring-3 focus-visible:ring-destructive/20 font-medium gap-1 group/button h-7 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 hover:bg-destructive/20 in-data-[slot=button-group]:rounded-lg inline-flex items-center justify-center min-w-0 narrow:h-11 outline-none px-2.5 rounded-[min(var(--radius-md),12px)] rounded-lg select-none shrink-0 text-[0.8rem] text-destructive transition-all truncate whitespace-nowrap">
+    |}];
   (* A click marks; a shift-click marks everything from the last click,
      across the divider. *)
   H.act h (Mark_session { path = "/sessions/s2.jsonl"; range = false });
@@ -368,7 +373,7 @@ let%expect_test "selecting sessions: click, shift-click a range, delete them" =
     <div class="bg-primary/15 group/session hover:bg-sidebar-accent marked relative rounded-md running session text-sidebar-foreground">
     <div class="bg-primary/15 group/session hover:bg-sidebar-accent marked relative rounded-md session text-sidebar-foreground">
     <div class="archived bg-primary/15 group/session hover:bg-sidebar-accent marked relative rounded-md session text-sidebar-foreground">
-    (Cancel) (Delete 3 sessions (210.0 KB))
+    (Cancel) (Archive) (Delete 3)
     |}];
   (* Enter does what a click does (unmarking s3), Shift+Enter what a
      shift-click does (marking from s3, the last one, to s5); Space clicks
@@ -437,11 +442,11 @@ let%expect_test "selecting sessions: click, shift-click a range, delete them" =
   sidebar h;
   [%expect
     {|
-    Select sessions Shift for a range
+    Select sessions Shift for a range 2 selected
     (☐ work 3.9 KB fix the parser bug)
     (☑ work 11.7 KB Release notes)
     (☑ work 2.9 KB Open elsewhere)
-    (Cancel) (Delete 2 sessions (14.6 KB))
+    (Cancel) (Archive) (Delete 2)
     |}];
   H.key h "Escape" ~target:(Session "s2");
   sidebar h;

@@ -1070,9 +1070,7 @@ and divider ~ui ~fold times (d : Divider.t) =
           ; Attr.create "aria-label" label
           ; Attr.create hidden_attribute h.entry
           ]
-        [ Node.span
-            ~attrs:[ Attr.class_ "scissors"; Attr.create "aria-hidden" "true" ]
-            [ Node.text "✂" ]
+        [ Html.icon ~cls:"scissors" Scissors
         ; span "trim-label" label
         ; Node.span
             ~attrs:[ Attr.class_ "trim-actions" ]

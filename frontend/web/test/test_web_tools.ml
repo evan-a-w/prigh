@@ -105,7 +105,7 @@ let%expect_test "web search streamed between text: running, then its results" =
         <div class="tool-head">
           <span aria-hidden="true" class="lamp"> </span>
           <span aria-hidden="true" class="tool-icon">
-            <icon class="search"> </icon>
+            <icon class="globe"> </icon>
           </span>
           <span class="name"> web_search </span>
           <span class="arg query"> "ocaml eio" </span>
@@ -140,7 +140,7 @@ let%expect_test "web search streamed between text: running, then its results" =
             <icon class="check"> </icon>
           </span>
           <span aria-hidden="true" class="tool-icon">
-            <icon class="search"> </icon>
+            <icon class="globe"> </icon>
           </span>
           <span class="name"> web_search </span>
           <span class="arg query"> "ocaml eio" </span>
@@ -221,7 +221,7 @@ let%expect_test
           <icon class="check"> </icon>
         </span>
         <span aria-hidden="true" class="tool-icon">
-          <icon class="search"> </icon>
+          <icon class="globe"> </icon>
         </span>
         <span class="name"> web_search </span>
         <span class="arg query"> "ocaml eio" </span>
@@ -239,7 +239,7 @@ let%expect_test
           <icon class="cross"> </icon>
         </span>
         <span aria-hidden="true" class="tool-icon">
-          <icon class="search"> </icon>
+          <icon class="globe"> </icon>
         </span>
         <span class="name"> web_search </span>
         <span class="arg query"> "rate me" </span>
@@ -257,7 +257,7 @@ let%expect_test
           <icon class="square"> </icon>
         </span>
         <span aria-hidden="true" class="tool-icon">
-          <icon class="search"> </icon>
+          <icon class="globe"> </icon>
         </span>
         <span class="name"> web_search </span>
         <span class="arg query"> "never answered" </span>
@@ -345,7 +345,7 @@ let%expect_test "web_fetch: the URL as a link, the page folded" =
       <div class="tool-head">
         <span aria-hidden="true" class="lamp"> </span>
         <span aria-hidden="true" class="tool-icon">
-          <icon class="external"> </icon>
+          <icon class="globe"> </icon>
         </span>
         <span class="name"> web_fetch </span>
         <span class="arg url"> https://ocaml.org/p/eio </span>
@@ -379,7 +379,7 @@ let%expect_test "web_fetch: the URL as a link, the page folded" =
           <icon class="check"> </icon>
         </span>
         <span aria-hidden="true" class="tool-icon">
-          <icon class="external"> </icon>
+          <icon class="globe"> </icon>
         </span>
         <span class="name"> web_fetch </span>
         <span class="arg url"> https://ocaml.org/p/eio </span>
@@ -424,7 +424,7 @@ let%expect_test "web_fetch: the URL as a link, the page folded" =
           <icon class="cross"> </icon>
         </span>
         <span aria-hidden="true" class="tool-icon">
-          <icon class="external"> </icon>
+          <icon class="globe"> </icon>
         </span>
         <span class="name"> web_fetch </span>
         <span class="arg url"> https://ocaml.org/p/eio </span>
@@ -708,7 +708,7 @@ let%expect_test "on_host: the call it ran, on its host" =
         <icon class="check"> </icon>
       </span>
       <span aria-hidden="true" class="tool-icon">
-        <icon class="book"> </icon>
+        <icon class="file_text"> </icon>
       </span>
       <span class="host"> on laptop: </span>
       <span class="name"> read </span>

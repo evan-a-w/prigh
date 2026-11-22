@@ -62,6 +62,12 @@
   (copy ../inter-OFL.txt inter-OFL.txt)))
 
 (rule
+ (target icons-LICENSES.txt)
+ (deps ../icons-LICENSES.txt)
+ (action
+  (copy ../icons-LICENSES.txt icons-LICENSES.txt)))
+
+(rule
  (target recursive-OFL.txt)
  (deps ../recursive-OFL.txt)
  (action
@@ -223,6 +229,7 @@
   (katex.min.css as web/katex.min.css)
   (copy-tex.min.js as web/copy-tex.min.js)
   (LICENSE-katex as web/LICENSE-katex)
+  (icons-LICENSES.txt as web/icons-LICENSES.txt)
   (manifest.webmanifest as web/manifest.webmanifest)
   (icon.svg as web/icon.svg)
   (icon-maskable.svg as web/icon-maskable.svg)

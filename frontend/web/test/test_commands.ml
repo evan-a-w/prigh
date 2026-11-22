@@ -242,6 +242,7 @@ let%expect_test "/help <command> and /hotkeys" =
     Shift+F10 / ContextMenu (on a message) its menu: copy, trim everything before or after it, delete it (also right-click or a long press, at the pointer; with text selected, right-click is the browser's, to copy it; on a phone, its Select text selects its words)
     Shift+F10 / ContextMenu (in a text field, the desktop app's browser window) its menu: cut, copy, paste, select all (also right-click; ↑ ↓ move, Enter chooses, Esc closes); the browser's own menus are hidden there
     Shift+F10 / ContextMenu (in the terminal, the desktop app's browser window) its menu: copy the selection, paste, select all (also right-click)
+    Ctrl+click / ⌘+click, Shift+click (a session) select it, or the range from the last one (from the session on show at first); the bar under the list archives or deletes them; a middle click opens it in a new window
     Space (selecting) mark a session (Shift: the range from the last one); Delete deletes the marked ones, Esc stops selecting
     Ctrl+Q / ⌘+Q (desktop app) quit prigh: its window and this machine's tool host (/quit)
     Ctrl+B show or hide the sidebar (while reviewing, over the review)
@@ -277,7 +278,7 @@ let%expect_test "/help <command> and /hotkeys" =
     Ctrl+Enter (in a dialog's text box) accept the dialog, e.g. create the pull request (Enter is a new line)
     Tab (in /scoped-models) check or uncheck the highlighted model
     ↑↓ ←→ Home End (settings' sections) show the previous / next section, or the first / last (/settings SECTION opens at one)
-    Ctrl+click / ⌘-click / middle click (a session in the sidebar) open it in a new window (its menu's Open in new window)
+    Middle click (a session in the sidebar) open it in a new window (its menu's Open in new window)
     Delete (in /remind's list) remove the highlighted reminder
     y / a / n / r (confirmation) allow once, always allow (its rules, this session), deny, deny saying why; Enter allows, Esc denies
     ↑↓ Space ←→ (question) choose, pick, previous / next question; type for your own answer; Enter accepts, Esc declines
@@ -1827,7 +1828,7 @@ let%expect_test "/setusr: a superuser acts as another user, and back" =
      (tag (Worktrees (place  "b1\
                             \nbackend\
                             \n/work") (purpose (Sidebar 2)))))
-    (Settings (Ctrl+, or /settings)) (Pull requests (/pr)) (Commands and keys (/help)) (acting as bob A)
+    (Settings (Ctrl+, or /settings)) (Usage and limits (/usage)) (Commands and keys (/help)) (acting as bob A)
     |}];
   run h "/setusr alice";
   H.reply h "set_user" {|{"client_id":"c1","namespace":"alice","user":"alice"}|};
