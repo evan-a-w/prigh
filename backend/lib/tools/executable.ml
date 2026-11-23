@@ -30,7 +30,9 @@ let resolve ~environment ~dir command =
   if String.mem command '/'
   then (
     let path =
-      if Filename.is_relative command then Filename.concat dir command else command
+      if Filename.is_relative command
+      then Filename.concat dir command
+      else command
     in
     if is_executable path then Ok path else Error (Missing.Not_executable path))
   else (

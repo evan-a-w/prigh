@@ -165,17 +165,17 @@ module Stdio = struct
     Result.map_error
       (Executable.resolve ~environment ~dir:server.dir command)
       ~f:(function
-        | Not_executable path ->
-          sprintf
-            "%s does not exist or is not executable; fix \"command\" in %s"
-            path
-            server.source
-        | Not_on_path ->
-          sprintf
-            "the command %S was not found on PATH; install it, or fix \
-             \"command\" in %s"
-            command
-            server.source)
+      | Not_executable path ->
+        sprintf
+          "%s does not exist or is not executable; fix \"command\" in %s"
+          path
+          server.source
+      | Not_on_path ->
+        sprintf
+          "the command %S was not found on PATH; install it, or fix \
+           \"command\" in %s"
+          command
+          server.source)
   ;;
 
   let tail output =

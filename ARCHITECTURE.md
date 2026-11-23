@@ -161,7 +161,13 @@ switches the cwd, and `~` means the host's home.
   are unacknowledged, so a slow backend blocks the program on its own pipe.
   Cancelling the exec closes its stdin and sends SIGTERM, then kills the
   tree after `term_grace`. The result says how it ended and the end of its
-  stderr. `Host_stream` is the backend's end: lines in and out, `stop`,
+  stderr. With `mcp`, the host also listens on a Unix socket in a private
+  directory (`$PRIGH_MCP_SOCKET` in the program's environment) and relays
+  each connection, a `prigh mcp-bridge` the program started as an MCP
+  server, as `mcp`/`mcp_in` frames, outside the window; `{{prigh}}` and
+  `{{mcp_socket}}` in the arguments become the host's prigh and the
+  socket, so the program's MCP configuration can name the bridge.
+  `Host_stream` is the backend's end: lines in and out, `stop`,
   `interrupt` and an `ended` that says why (exited, not installed or only
   on a login shell's `PATH`, an older host, the host gone). `$probe_programs`
   (`Host_probe`) checks without side effects which programs a host has,

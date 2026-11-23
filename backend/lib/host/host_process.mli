@@ -19,8 +19,20 @@ open! Import
     (bytes, default 32 MiB; a longer line kills the program),
     [stderr_rate] (bytes of stderr forwarded per minute, default 64 KiB),
     [term_grace_ms] (how long a cancelled program has after SIGTERM,
-    default 3000) and [path] (the program's path, instead of looking
-    [argv]'s first element up on [PATH]). It runs in the exec's cwd. *)
+    default 3000), [path] (the program's path, instead of looking
+    [argv]'s first element up on [PATH]) and [mcp]. It runs in the exec's
+    cwd.
+
+    With [mcp], the host also listens on a Unix socket in a private (0700)
+    directory, for as long as the program runs, and sets
+    [$PRIGH_MCP_SOCKET] to it in the program's environment: each connection
+    (a [prigh mcp-bridge] the program started as an MCP server) is relayed
+    line by line as [Mcp] frames up and [Mcp_in] frames down, numbered by
+    [conn]. These are not counted in the window. In [argv]'s arguments and
+    [env]'s values, {!Placeholder.prigh} becomes the host's own prigh
+    executable and {!Placeholder.mcp_socket} the socket, so that the
+    program's MCP configuration can name the bridge. [Started] reports
+    both. *)
 
 val op : string
 
@@ -29,6 +41,8 @@ module Up : sig
     | Started of
         { pid : int
         ; path : string
+        ; prigh : string (** this host's prigh executable *)
+        ; mcp_socket : string option
         }
     | Out of
         { seq : int
@@ -36,6 +50,11 @@ module Up : sig
         }
     | Err of string
     | Err_dropped of int (** bytes of stderr not forwarded *)
+    | Mcp of
+        { conn : int
+        ; line : string
+        } (** a line from an MCP connection *)
+    | Mcp_closed of int (** the connection's bridge closed it *)
   [@@deriving sexp_of, equal]
 
   val to_line : t -> string
@@ -48,10 +67,23 @@ module Down : sig
     | Ack of int (** the consumer took every line up to this one *)
     | Close (** the end of the program's stdin *)
     | Signal of Signal.t (** to the program's process group *)
+    | Mcp_in of
+        { conn : int
+        ; line : string
+        } (** a line for an MCP connection, without its [\n] *)
+    | Mcp_close of int (** the end of what the connection is sent *)
   [@@deriving sexp_of, equal]
 
   val to_line : t -> string
   val of_line : string -> t Or_error.t
+end
+
+module Placeholder : sig
+  (** ["{{prigh}}"] *)
+  val prigh : string
+
+  (** ["{{mcp_socket}}"] *)
+  val mcp_socket : string
 end
 
 module Outcome : sig
@@ -85,6 +117,7 @@ module Arguments : sig
     ; stderr_rate : int
     ; term_grace : Time_ns.Span.t
     ; path : string option
+    ; mcp : bool
     }
 
   (** The defaults for everything but [argv]. *)
@@ -94,9 +127,11 @@ module Arguments : sig
 end
 
 (** Runs [$process] on this machine; [stdin] is the exec's input, carrying
-    {!Down} frames. *)
+    {!Down} frames. [self] is this host's prigh executable (default: this
+    process's). *)
 val execute
   :  env:Env.t
+  -> ?self:string
   -> stdin:Stdin_feed.t option
   -> cancel:Cancellation.t
   -> on_output:(string -> unit)

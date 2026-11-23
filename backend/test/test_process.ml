@@ -376,7 +376,8 @@ let%expect_test "term_grace: SIGTERM and the end of input first, then SIGKILL" =
         ~term_grace:(Time_ns.Span.of_int_ms 200)
         ~on_stdout:(fun s ->
           Buffer.add_string out s;
-          if String.is_substring s ~substring:"ready" then Cancellation.cancel cancel)
+          if String.is_substring s ~substring:"ready"
+          then Cancellation.cancel cancel)
         ~prog:"sh"
         ~args:[ "-c"; script ]
         ()

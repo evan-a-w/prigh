@@ -18,9 +18,11 @@ let peer () =
 ;;
 
 let pid_re = Re.compile (Re.Perl.re {|"pid":[0-9]+|})
+let prigh_re = Re.compile (Re.Perl.re {|"prigh":"[^"]*"|})
 
 let mask_frame t line =
   Re.replace_string pid_re ~by:{|"pid":PID|} line
+  |> Re.replace_string prigh_re ~by:{|"prigh":"$PRIGH"|}
   |> String.substr_replace_all ~pattern:(peer ()) ~with_:"$PEER"
   |> mask t
 ;;
@@ -40,8 +42,7 @@ let exec (t : Tool_test_helpers.t) : Host_stream.Exec.t =
     ()
 ;;
 
-let args ?(window = 64) ?(stderr_rate = 64 * 1024) ?max_line ?term_grace argv
-  =
+let args ?(window = 64) ?(stderr_rate = 64 * 1024) ?max_line ?term_grace argv =
   let a = Host_process.Arguments.create ~argv in
   { a with
     window
@@ -121,7 +122,8 @@ module Raw = struct
     rest t;
     let result = Eio.Promise.await_exn t.result in
     print_s
-      [%sexp (Host_process.Outcome.of_result result : Host_process.Outcome.t option)]
+      [%sexp
+        (Host_process.Outcome.of_result result : Host_process.Outcome.t option)]
   ;;
 end
 
@@ -144,7 +146,7 @@ let%expect_test "frames: no more than the window beyond the acks" =
   Raw.result p;
   [%expect
     {|
-    <- {"t":"started","pid":PID,"path":"$PEER"}
+    <- {"t":"started","pid":PID,"path":"$PEER","prigh":"$PRIGH"}
     <- {"t":"out","s":1,"line":"flood 1"}
     {"t":"out","s":2,"line":"flood 2"}
     -> {"t":"ack","s":2}
@@ -174,7 +176,7 @@ let%expect_test "frames: stderr over its rate is counted, not sent" =
   Raw.result p;
   [%expect
     {|
-    <- {"t":"started","pid":PID,"path":"$PEER"}
+    <- {"t":"started","pid":PID,"path":"$PEER","prigh":"$PRIGH"}
     -> {"t":"close"}
     <- {"t":"err","text":"eeeeeeeeee"}
     <- {"t":"err_dropped","bytes":19}
@@ -194,7 +196,7 @@ let%expect_test "frames: a character split across reads stays whole" =
   Raw.result p;
   [%expect
     {|
-    <- {"t":"started","pid":PID,"path":"$PEER"}
+    <- {"t":"started","pid":PID,"path":"$PEER","prigh":"$PRIGH"}
     <- {"t":"out","s":1,"line":"é"}
     -> {"t":"close"}
     <- {"t":"err","text":"bye\n"}
@@ -254,7 +256,7 @@ let%expect_test "stream: lines both ways, then the end of input" =
       (args ~window:2 [ peer (); "--flood"; "10" ])
   in
   (match Eio.Promise.await (Host_stream.started s) with
-   | Ok (_ : int) -> print_endline "started"
+   | Ok (_ : Host_stream.Started.t) -> print_endline "started"
    | Error ended -> print_s [%sexp (ended : Host_stream.Ended.t)]);
   for _ = 1 to 10 do
     ignore (Host_stream.read_line s : string option)
@@ -315,8 +317,8 @@ let alive pid =
   | `No_such_process -> false
 ;;
 
-let%expect_test "stream: stop ends a program that ignores SIGTERM after the \
-                 grace"
+let%expect_test
+    "stream: stop ends a program that ignores SIGTERM after the grace"
   =
   with_sandbox
   @@ fun t ->
@@ -331,7 +333,12 @@ let%expect_test "stream: stop ends a program that ignores SIGTERM after the \
          ~term_grace:(Time_ns.Span.of_int_ms 50)
          [ peer (); "--ignore-term"; "--hang-at-eof"; "--flood"; "1" ])
   in
-  let pid = Eio.Promise.await (Host_stream.started s) |> Result.ok |> Option.value_exn in
+  let pid =
+    Eio.Promise.await (Host_stream.started s)
+    |> Result.ok
+    |> Option.value_exn
+    |> fun (s : Host_stream.Started.t) -> s.pid
+  in
   print_s [%sexp (Host_stream.read_line s : string option)];
   Host_stream.stop s;
   print_ended s;
@@ -396,13 +403,16 @@ let%expect_test "stream: not installed, or only on a login shell's PATH" =
   Eio.Switch.run
   @@ fun sw ->
   let run argv =
-    let s =
-      Host_stream.start ~sw ~exec:(exec t) ~host:"laptop" (args argv)
-    in
+    let s = Host_stream.start ~sw ~exec:(exec t) ~host:"laptop" (args argv) in
     (match Eio.Promise.await (Host_stream.started s) with
      | Ok _ -> print_endline "started?"
-     | Error ended -> print_endline (mask_sexp t [%sexp (ended : Host_stream.Ended.t)]));
-    print_endline (mask t (Host_stream.Ended.to_message (Eio.Promise.await (Host_stream.ended s))))
+     | Error ended ->
+       print_endline (mask_sexp t [%sexp (ended : Host_stream.Ended.t)]));
+    print_endline
+      (mask
+         t
+         (Host_stream.Ended.to_message
+            (Eio.Promise.await (Host_stream.ended s))))
   in
   run [ "prigh-test-no-such-cli" ];
   write t "home/.bash_profile" {|export PATH="$HOME/cli-bin:$PATH"|};
@@ -459,13 +469,20 @@ let%expect_test "stream: lost lines, old hosts and hosts that went away" =
   in
   run
     ~frames:
-      [ Started { pid = 1; path = "/bin/codex" }
+      [ Started
+          { pid = 1
+          ; path = "/bin/codex"
+          ; prigh = "/bin/prigh"
+          ; mcp_socket = None
+          }
       ; Out { seq = 1; line = "one" }
       ; Out { seq = 3; line = "three" }
       ]
     (Tool.Result.ok "");
   run ~frames:[] (Tool.Result.error {|unknown host tool "$process"|});
-  run ~frames:[] (Tool.Result.error "[the tool host disconnected during this call]");
+  run
+    ~frames:[]
+    (Tool.Result.error "[the tool host disconnected during this call]");
   run ~frames:[] (Tool.Result.error "[cancelled]");
   [%expect
     {|
@@ -484,10 +501,7 @@ let%expect_test "stream: lost lines, old hosts and hosts that went away" =
 let%expect_test "probe: programs, files and variables, never their contents" =
   with_sandbox
   @@ fun t ->
-  write
-    t
-    "bin/fakecli"
-    (sprintf "#!/bin/sh\nexec %s \"$@\"\n" (peer ()));
+  write t "bin/fakecli" (sprintf "#!/bin/sh\nexec %s \"$@\"\n" (peer ()));
   Core_unix.chmod (Filename.concat t.dir "bin/fakecli") ~perm:0o755;
   write t "home/.fakecli/auth.json" {|{"secret":"never shown"}|};
   Core_unix.chmod (Filename.concat t.dir "home/.fakecli/auth.json") ~perm:0o600;
@@ -500,8 +514,14 @@ let%expect_test "probe: programs, files and variables, never their contents" =
   Core_unix.putenv ~key:"PRIGH_TEST_PROBE_SET" ~data:"secret value";
   let request =
     { Host_probe.Request.programs =
-        [ { name = "fakecli"; version = [ "--version" ]; status = [ "login"; "status" ] }
-        ; { name = "prigh-test-no-such-cli"; version = [ "--version" ]; status = [] }
+        [ { name = "fakecli"
+          ; version = [ "--version" ]
+          ; status = [ "login"; "status" ]
+          }
+        ; { name = "prigh-test-no-such-cli"
+          ; version = [ "--version" ]
+          ; status = []
+          }
         ]
     ; paths = [ "~/.fakecli/auth.json"; "~/.fakecli/missing.json" ]
     ; env = [ "PRIGH_TEST_PROBE_SET"; "PRIGH_TEST_PROBE_UNSET" ]
@@ -525,8 +545,13 @@ let%expect_test "probe: programs, files and variables, never their contents" =
         Option.iter old_home ~f:(fun data -> Core_unix.putenv ~key:"HOME" ~data))
   in
   print_endline (mask t result.text);
-  print_endline (mask_sexp t [%sexp (Host_probe.Reply.of_result result : Host_probe.Reply.t Or_error.t)]);
-  [%expect {|
+  print_endline
+    (mask_sexp
+       t
+       [%sexp
+         (Host_probe.Reply.of_result result : Host_probe.Reply.t Or_error.t)]);
+  [%expect
+    {|
     {"programs":[{"name":"fakecli","path":"$DIR/bin/fakecli","login_shell_path":null,"version":{"exit":0,"stdout":"fake 1.2.3\n","stderr":""},"status":{"exit":1,"stdout":"","stderr":"Not logged in\n"}},{"name":"prigh-test-no-such-cli","path":null,"login_shell_path":null,"version":null,"status":null}],"paths":[{"path":"$DIR/home/.fakecli/auth.json","exists":true,"size":24,"mode":384},{"path":"$DIR/home/.fakecli/missing.json","exists":false,"size":null,"mode":null}],"env":{"PRIGH_TEST_PROBE_SET":true,"PRIGH_TEST_PROBE_UNSET":false}}
     (Ok
      ((programs
@@ -541,5 +566,87 @@ let%expect_test "probe: programs, files and variables, never their contents" =
         ((path $DIR/home/.fakecli/missing.json) (exists false) (size ())
          (mode ()))))
       (env ((PRIGH_TEST_PROBE_SET true) (PRIGH_TEST_PROBE_UNSET false)))))
+    |}]
+;;
+
+let prigh_exe () = Filename.concat (Sys_unix.getcwd ()) "../bin/main.exe"
+
+let%expect_test "stream: the MCP side channel, through prigh mcp-bridge" =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let exec : Host_stream.Exec.t =
+    fun ~stdin ~cancel ~on_output ~name:_ arguments ->
+    Host_process.execute
+      ~env:t.env
+      ~self:(prigh_exe ())
+      ~stdin:(Some stdin)
+      ~cancel
+      ~on_output
+      ~cwd:t.dir
+      ~arguments
+      ()
+  in
+  let stream = ref None in
+  let on_mcp (event : Host_stream.Mcp_event.t) =
+    print_s [%sexp (event : Host_stream.Mcp_event.t)];
+    match event, !stream with
+    | Line { conn; line = _ }, Some s ->
+      Host_stream.mcp_write s ~conn {|{"pong":1}|} |> ok_exn;
+      Host_stream.mcp_close s ~conn
+    | (Line _ | Closed _), _ -> ()
+  in
+  let s =
+    Host_stream.start
+      ~sw
+      ~exec
+      ~host:"laptop"
+      ~on_mcp
+      { (Host_process.Arguments.create
+           ~argv:
+             [ "sh"
+             ; "-c"
+             ; {|[ "$PRIGH_MCP_SOCKET" = "$2" ] && echo same socket; echo '{"ping":1}' | "$1" mcp-bridge; echo done|}
+             ; "sh"
+             ; Host_process.Placeholder.prigh
+             ; Host_process.Placeholder.mcp_socket
+             ])
+        with
+        mcp = true
+      }
+  in
+  stream := Some s;
+  let started =
+    Eio.Promise.await (Host_stream.started s) |> Result.ok |> Option.value_exn
+  in
+  let socket = Option.value_exn started.mcp_socket in
+  let perm = sprintf "%o" (Core_unix.stat (Filename.dirname socket)).st_perm in
+  print_s
+    [%sexp
+      (String.equal started.prigh (prigh_exe ()) : bool)
+    , (Filename.basename socket : string)
+    , (perm : string)];
+  let rec lines () =
+    match Host_stream.read_line s with
+    | Some line ->
+      print_endline line;
+      lines ()
+    | None -> ()
+  in
+  lines ();
+  print_ended s;
+  print_s [%sexp (Sys_unix.file_exists_exn (Filename.dirname socket) : bool)];
+  [%expect
+    {|
+    (true mcp.sock 700)
+    same socket
+    (Line (conn 1) (line "{\"ping\":1}"))
+    (Closed 1)
+    {"pong":1}
+    done
+    (Exited (program sh) (exit (Exited 0)) (stderr_tail ""))
+    sh exited (code 0)
+    false
     |}]
 ;;

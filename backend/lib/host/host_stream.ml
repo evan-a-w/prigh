@@ -69,6 +69,25 @@ module Ended = struct
   ;;
 end
 
+module Started = struct
+  type t =
+    { pid : int
+    ; prigh : string
+    ; mcp_socket : string option
+    }
+  [@@deriving sexp_of]
+end
+
+module Mcp_event = struct
+  type t =
+    | Line of
+        { conn : int
+        ; line : string
+        }
+    | Closed of int
+  [@@deriving sexp_of]
+end
+
 module Item = struct
   type t =
     | Line of string
@@ -80,7 +99,7 @@ type t =
   ; cancel : Cancellation.t
   ; items : Item.t Eio.Stream.t
   ; ack_every : int
-  ; started : (int, Ended.t) Result.t Promise.t
+  ; started : (Started.t, Ended.t) Result.t Promise.t
   ; ended : Ended.t Promise.t
   ; mutable taken : int
   ; mutable acked : int
@@ -90,7 +109,10 @@ type t =
 
 let started t = t.started
 let ended t = t.ended
-let send t frame = Stdin_feed.write t.feed (Host_process.Down.to_line frame) ~close:false
+
+let send t frame =
+  Stdin_feed.write t.feed (Host_process.Down.to_line frame) ~close:false
+;;
 
 let write_line t line =
   if t.finished
@@ -99,6 +121,14 @@ let write_line t line =
 ;;
 
 let close_stdin t = ignore (send t Close : unit Or_error.t)
+
+let mcp_write t ~conn line =
+  if t.finished
+  then Or_error.error_string "the program has ended"
+  else send t (Mcp_in { conn; line })
+;;
+
+let mcp_close t ~conn = ignore (send t (Mcp_close conn) : unit Or_error.t)
 let interrupt t = ignore (send t (Signal Signal.int) : unit Or_error.t)
 
 let stop t =
@@ -128,9 +158,10 @@ let ended_of_result ~program ~host (result : Tool.Result.t) : Ended.t =
   | Some (Failed message) -> Broken message
   | None ->
     let text = String.strip result.text in
-    if String.is_prefix
-         text
-         ~prefix:(sprintf "unknown host tool %S" Host_process.op)
+    if
+      String.is_prefix
+        text
+        ~prefix:(sprintf "unknown host tool %S" Host_process.op)
     then Old_host host
     else if String.equal text "[cancelled]"
     then Stopped
@@ -139,7 +170,13 @@ let ended_of_result ~program ~host (result : Tool.Result.t) : Ended.t =
     else Broken text
 ;;
 
-let start ~sw ~(exec : Exec.t) ~host ?(on_stderr = ignore) (args : Host_process.Arguments.t)
+let start
+      ~sw
+      ~(exec : Exec.t)
+      ~host
+      ?(on_stderr = ignore)
+      ?(on_mcp = ignore)
+      (args : Host_process.Arguments.t)
   =
   let program = Filename.basename (List.hd_exn args.argv) in
   let started, started_resolver = Promise.create () in
@@ -167,9 +204,12 @@ let start ~sw ~(exec : Exec.t) ~host ?(on_stderr = ignore) (args : Host_process.
   let frame line =
     match Host_process.Up.of_line line with
     | Error e -> break (Error.to_string_hum e)
-    | Ok (Started { pid; path = _ }) ->
+    | Ok (Started { pid; path = _; prigh; mcp_socket }) ->
       if not (Promise.is_resolved started)
-      then Promise.resolve started_resolver (Ok pid)
+      then
+        Promise.resolve started_resolver (Ok { Started.pid; prigh; mcp_socket })
+    | Ok (Mcp { conn; line }) -> on_mcp (Mcp_event.Line { conn; line })
+    | Ok (Mcp_closed conn) -> on_mcp (Mcp_event.Closed conn)
     | Ok (Out { seq; line }) ->
       if seq <> !expected
       then break (sprintf "expected line %d but got line %d" !expected seq)
@@ -191,7 +231,8 @@ let start ~sw ~(exec : Exec.t) ~host ?(on_stderr = ignore) (args : Host_process.
       | Some (complete, rest) ->
         Buffer.add_string partial rest;
         List.iter (String.split complete ~on:'\n') ~f:(fun line ->
-          if Option.is_none !broken && not (String.is_empty line) then frame line))
+          if Option.is_none !broken && not (String.is_empty line)
+          then frame line))
   in
   let finish (ended : Ended.t) =
     t.finished <- true;
@@ -216,8 +257,9 @@ let start ~sw ~(exec : Exec.t) ~host ?(on_stderr = ignore) (args : Host_process.
          | Some why -> Broken why
          | None when t.stopped -> Stopped
          | None -> ended_of_result ~program ~host result)
-    | exception exn ->
+    | exception (Eio.Cancel.Cancelled _ as exn) ->
       finish Stopped;
-      raise exn);
+      raise exn
+    | exception exn -> finish (Broken (Exn.to_string exn)));
   t
 ;;

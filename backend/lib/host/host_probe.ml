@@ -204,8 +204,8 @@ module Reply = struct
       ; "paths", `Array (List.map t.paths ~f:File.to_json)
       ; ( "env"
         , `Object
-            (List.map t.env ~f:(fun (k, set) -> k, if set then `True else `False))
-        )
+            (List.map t.env ~f:(fun (k, set) ->
+               k, if set then `True else `False)) )
       ]
   ;;
 
@@ -217,7 +217,8 @@ module Reply = struct
       | Error _ -> Or_error.error_string "bad reply from the tool host"
       | Ok json ->
         Ok
-          { programs = List.filter_map (list_field json "programs") ~f:Found.of_json
+          { programs =
+              List.filter_map (list_field json "programs") ~f:Found.of_json
           ; paths = List.filter_map (list_field json "paths") ~f:File.of_json
           ; env =
               (match field json "env" with
@@ -277,7 +278,12 @@ let program ~env ~cancel ~cwd ~environment (p : Program.t) =
         (fun () -> command ~env ~cancel ~cwd ~path p.version)
         (fun () -> command ~env ~cancel ~cwd ~path p.status)
     in
-    { name = p.name; path = Some path; login_shell_path = None; version; status }
+    { name = p.name
+    ; path = Some path
+    ; login_shell_path = None
+    ; version
+    ; status
+    }
 ;;
 
 let file path =

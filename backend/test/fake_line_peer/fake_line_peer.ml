@@ -82,6 +82,10 @@ let () =
    with
    | End_of_file -> ());
   if !no_newline then print_string "last";
-  if !hang then (flush stdout; Unix.sleep 3600);
+  if !hang
+  then (
+    flush stdout;
+    Unix.sleep 3600);
   prerr_endline "bye";
   exit 0
+;;
