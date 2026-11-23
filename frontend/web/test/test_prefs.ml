@@ -529,11 +529,17 @@ let%expect_test
          (web.font recursive) (web.code-font recursive)))))
      (tag Show_error))
     (Expire_toast (id 2) (after_ms 2500))
-    <label title="Any colour (/accent #rrggbb)" class="accent-choice accent-custom on">
-      <span aria-hidden="true" class="swatch" style={ --sodium: #123456; }> </span>
+    <label title="Any colour (/accent #rrggbb)"
+           class="[&>.swatch]:motion-safe:transition-transform [&>.swatch]:shadow-[0_0_0_2px_var(--background),0_0_0_4px_var(--foreground)] accent-choice accent-custom bg-transparent border border-solid cursor-pointer focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-within:ring-[3px] focus-within:ring-ring/50 gap-2 group/accent hover:[&>.swatch]:scale-[1.08] hover:text-foreground inline-flex items-center narrow:justify-center narrow:px-3 narrow:size-11 narrow:w-auto on outline-none p-[3px] pr-2.5 relative rounded-full text-[13px] text-foreground">
+      <span aria-hidden="true"
+            class="[.picker-item_&]:size-3 bg-[var(--sodium)] block rounded-full shadow-[inset_0_0_0_1px_#0000001f] shrink-0 size-[22px] swatch"
+            style={
+              --sodium: #123456;
+            }> </span>
       <input type="color"
              id="accent-input"
              aria-label="Custom accent colour"
+             class="absolute border-0 cursor-pointer inset-0 opacity-0 p-0 size-full"
              #value="#123456"
              @on_change
              @on_input/>

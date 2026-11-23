@@ -102,138 +102,270 @@ let%expect_test "opening reads it; the form's fields; what it is for" =
     Anything else
     []
     0 of 5000 bytes Ctrl+Enter saves (Save)
-    <div class="about-you-form">
-      <div id="about-you-name-field" class="about-you-field">
-        <label for="about-you-name" class="about-you-label"> Name </label>
+    <div class="about-you-form flex flex-wrap gap-x-4 gap-y-3 items-start">
+      <div id="about-you-name-field"
+           class="about-you-field flex flex-[1_1_220px] flex-col gap-1.5 min-w-0">
+        <label for="about-you-name"
+               class="about-you-label font-medium text-[13px] text-muted-foreground"> Name </label>
         <input id="about-you-name"
                maxlength="100"
                type="text"
                placeholder="What to call you"
                autocomplete="off"
-               class="about-you-line text-input"
+               class="about-you-line aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-transparent border border-input dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:bg-input/30 dark:disabled:bg-input/80 disabled:bg-input/50 disabled:cursor-not-allowed disabled:opacity-50 disabled:pointer-events-none file:bg-transparent file:border-0 file:font-medium file:h-6 file:inline-flex file:text-foreground file:text-sm flex-1 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 h-8 md:text-sm min-w-0 narrow:h-11 narrow:text-base outline-none placeholder:text-muted-foreground px-2.5 py-1 rounded-lg text-base transition-colors w-full"
                #value=""
                @on_input/>
       </div>
-      <div id="about-you-country-field" class="about-you-field">
-        <label for="about-you-country" class="about-you-label"> Country or region </label>
+      <div id="about-you-country-field"
+           class="about-you-field flex flex-[1_1_220px] flex-col gap-1.5 min-w-0">
+        <label for="about-you-country"
+               class="about-you-label font-medium text-[13px] text-muted-foreground"> Country or region </label>
         <input id="about-you-country"
                maxlength="100"
                type="text"
                placeholder="Australia"
                autocomplete="off"
-               class="about-you-line text-input"
+               class="about-you-line aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-transparent border border-input dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:bg-input/30 dark:disabled:bg-input/80 disabled:bg-input/50 disabled:cursor-not-allowed disabled:opacity-50 disabled:pointer-events-none file:bg-transparent file:border-0 file:font-medium file:h-6 file:inline-flex file:text-foreground file:text-sm flex-1 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 h-8 md:text-sm min-w-0 narrow:h-11 narrow:text-base outline-none placeholder:text-muted-foreground px-2.5 py-1 rounded-lg text-base transition-colors w-full"
                #value=""
                @on_input/>
       </div>
-      <div id="about-you-time-zone-field" class="about-you-field">
-        <label for="about-you-time-zone" class="about-you-label"> Time zone </label>
+      <div id="about-you-time-zone-field"
+           class="about-you-field flex flex-[1_1_220px] flex-col gap-1.5 min-w-0">
+        <label for="about-you-time-zone"
+               class="about-you-label font-medium text-[13px] text-muted-foreground"> Time zone </label>
         <input id="about-you-time-zone"
                maxlength="100"
                type="text"
                placeholder="Australia/Sydney"
                autocomplete="off"
-               class="about-you-line text-input"
+               class="about-you-line aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-transparent border border-input dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:bg-input/30 dark:disabled:bg-input/80 disabled:bg-input/50 disabled:cursor-not-allowed disabled:opacity-50 disabled:pointer-events-none file:bg-transparent file:border-0 file:font-medium file:h-6 file:inline-flex file:text-foreground file:text-sm flex-1 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 h-8 md:text-sm min-w-0 narrow:h-11 narrow:text-base outline-none placeholder:text-muted-foreground px-2.5 py-1 rounded-lg text-base transition-colors w-full"
                #value=""
                @on_input/>
       </div>
-      <div id="about-you-language-field" class="about-you-field">
-        <label for="about-you-language" class="about-you-label"> Language and spelling </label>
+      <div id="about-you-language-field"
+           class="about-you-field flex flex-[1_1_220px] flex-col gap-1.5 min-w-0">
+        <label for="about-you-language"
+               class="about-you-label font-medium text-[13px] text-muted-foreground"> Language and spelling </label>
         <input id="about-you-language"
                maxlength="100"
                type="text"
                placeholder="English, Australian spelling"
                autocomplete="off"
-               class="about-you-line text-input"
+               class="about-you-line aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-transparent border border-input dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:bg-input/30 dark:disabled:bg-input/80 disabled:bg-input/50 disabled:cursor-not-allowed disabled:opacity-50 disabled:pointer-events-none file:bg-transparent file:border-0 file:font-medium file:h-6 file:inline-flex file:text-foreground file:text-sm flex-1 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 h-8 md:text-sm min-w-0 narrow:h-11 narrow:text-base outline-none placeholder:text-muted-foreground px-2.5 py-1 rounded-lg text-base transition-colors w-full"
                #value=""
                @on_input/>
       </div>
-      <div id="about-you-units-field" class="about-you-field">
-        <label class="about-you-label"> Units </label>
-        <div id="about-you-units" class="about-you-choice">
-          <div role="group" aria-label="Units" class="segmented">
-            <button type="button"
-                    aria-pressed="true"
-                    title="Leave it out"
-                    class="on segment"
-                    @on_click> Not set </button>
-            <button type="button"
-                    aria-pressed="false"
-                    title="Metric (°C, km, kg)"
-                    class="segment"
-                    @on_click> Metric </button>
-            <button type="button"
-                    aria-pressed="false"
-                    title="Imperial (miles, stone; °C)"
-                    class="segment"
-                    @on_click> Imperial </button>
-            <button type="button"
-                    aria-pressed="false"
-                    title="US customary (°F, miles, lb)"
-                    class="segment"
-                    @on_click> US </button>
+      <div id="about-you-units-field"
+           class="about-you-field flex flex-[1_1_220px] flex-col gap-1.5 min-w-0">
+        <label class="about-you-label font-medium text-[13px] text-muted-foreground"> Units </label>
+        <div id="about-you-units" class="about-you-choice min-w-0">
+          <div class="loon max-w-full min-w-0 setting-segments">
+            <div role="radiogroup"
+                 dir="ltr"
+                 data-slot="toggle-group"
+                 tabindex="0"
+                 data-variant="outline"
+                 data-size="sm"
+                 data-spacing="2"
+                 data-orientation="horizontal"
+                 aria-label="Units"
+                 class="data-[size=sm]:rounded-[min(var(--radius-md),10px)] data-vertical:flex-col data-vertical:items-stretch flex flex-row flex-wrap gap-[--spacing(var(--gap))] group/toggle-group items-center max-w-full narrow:w-full rounded-lg w-fit"
+                 custom-css-vars=((--gap 2))
+                 @on_focusout
+                 @on_focus>
+              <button type="button"
+                      data-state="on"
+                      role="radio"
+                      aria-checked="true"
+                      tabindex="-1"
+                      data-slot="toggle-group-item"
+                      data-variant="outline"
+                      data-size="sm"
+                      data-spacing="2"
+                      aria-label="Not set"
+                      title="Leave it out"
+                      class="[&_svg:not([class*='size-'])]:size-3.5 [&_svg]:pointer-events-none [&_svg]:shrink-0 aria-invalid:border-destructive aria-invalid:ring-destructive/20 aria-pressed:bg-muted bg-transparent border border-input dark:aria-invalid:ring-destructive/40 data-[state=on]:bg-muted disabled:opacity-50 disabled:pointer-events-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:z-10 focus:z-10 font-medium gap-1 group-data-[spacing=0]/toggle-group:has-data-[icon=inline-end]:pr-1.5 group-data-[spacing=0]/toggle-group:has-data-[icon=inline-start]:pl-1.5 group-data-[spacing=0]/toggle-group:px-2 group-data-[spacing=0]/toggle-group:rounded-none group-data-horizontal/toggle-group:data-[spacing=0]:data-[variant=outline]:border-l-0 group-data-horizontal/toggle-group:data-[spacing=0]:data-[variant=outline]:first:border-l group-data-horizontal/toggle-group:data-[spacing=0]:first:rounded-l-lg group-data-horizontal/toggle-group:data-[spacing=0]:last:rounded-r-lg group-data-vertical/toggle-group:data-[spacing=0]:data-[variant=outline]:border-t-0 group-data-vertical/toggle-group:data-[spacing=0]:data-[variant=outline]:first:border-t group-data-vertical/toggle-group:data-[spacing=0]:first:rounded-t-lg group-data-vertical/toggle-group:data-[spacing=0]:last:rounded-b-lg group/toggle h-7 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 hover:bg-muted hover:text-foreground inline-flex items-center justify-center min-w-7 narrow:flex-1 narrow:h-11 narrow:px-3 on outline-none px-2.5 rounded-[min(var(--radius-md),12px)] rounded-lg segment shrink-0 text-[0.8rem] transition-all whitespace-nowrap"
+                      @on_click
+                      @on_focus
+                      @on_keydown> Not set </button>
+              <button type="button"
+                      data-state="off"
+                      role="radio"
+                      aria-checked="false"
+                      tabindex="-1"
+                      data-slot="toggle-group-item"
+                      data-variant="outline"
+                      data-size="sm"
+                      data-spacing="2"
+                      aria-label="Metric"
+                      title="Metric (°C, km, kg)"
+                      class="[&_svg:not([class*='size-'])]:size-3.5 [&_svg]:pointer-events-none [&_svg]:shrink-0 aria-invalid:border-destructive aria-invalid:ring-destructive/20 aria-pressed:bg-muted bg-transparent border border-input dark:aria-invalid:ring-destructive/40 data-[state=on]:bg-muted disabled:opacity-50 disabled:pointer-events-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:z-10 focus:z-10 font-medium gap-1 group-data-[spacing=0]/toggle-group:has-data-[icon=inline-end]:pr-1.5 group-data-[spacing=0]/toggle-group:has-data-[icon=inline-start]:pl-1.5 group-data-[spacing=0]/toggle-group:px-2 group-data-[spacing=0]/toggle-group:rounded-none group-data-horizontal/toggle-group:data-[spacing=0]:data-[variant=outline]:border-l-0 group-data-horizontal/toggle-group:data-[spacing=0]:data-[variant=outline]:first:border-l group-data-horizontal/toggle-group:data-[spacing=0]:first:rounded-l-lg group-data-horizontal/toggle-group:data-[spacing=0]:last:rounded-r-lg group-data-vertical/toggle-group:data-[spacing=0]:data-[variant=outline]:border-t-0 group-data-vertical/toggle-group:data-[spacing=0]:data-[variant=outline]:first:border-t group-data-vertical/toggle-group:data-[spacing=0]:first:rounded-t-lg group-data-vertical/toggle-group:data-[spacing=0]:last:rounded-b-lg group/toggle h-7 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 hover:bg-muted hover:text-foreground inline-flex items-center justify-center min-w-7 narrow:flex-1 narrow:h-11 narrow:px-3 outline-none px-2.5 rounded-[min(var(--radius-md),12px)] rounded-lg segment shrink-0 text-[0.8rem] transition-all whitespace-nowrap"
+                      @on_click
+                      @on_focus
+                      @on_keydown> Metric </button>
+              <button type="button"
+                      data-state="off"
+                      role="radio"
+                      aria-checked="false"
+                      tabindex="-1"
+                      data-slot="toggle-group-item"
+                      data-variant="outline"
+                      data-size="sm"
+                      data-spacing="2"
+                      aria-label="Imperial"
+                      title="Imperial (miles, stone; °C)"
+                      class="[&_svg:not([class*='size-'])]:size-3.5 [&_svg]:pointer-events-none [&_svg]:shrink-0 aria-invalid:border-destructive aria-invalid:ring-destructive/20 aria-pressed:bg-muted bg-transparent border border-input dark:aria-invalid:ring-destructive/40 data-[state=on]:bg-muted disabled:opacity-50 disabled:pointer-events-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:z-10 focus:z-10 font-medium gap-1 group-data-[spacing=0]/toggle-group:has-data-[icon=inline-end]:pr-1.5 group-data-[spacing=0]/toggle-group:has-data-[icon=inline-start]:pl-1.5 group-data-[spacing=0]/toggle-group:px-2 group-data-[spacing=0]/toggle-group:rounded-none group-data-horizontal/toggle-group:data-[spacing=0]:data-[variant=outline]:border-l-0 group-data-horizontal/toggle-group:data-[spacing=0]:data-[variant=outline]:first:border-l group-data-horizontal/toggle-group:data-[spacing=0]:first:rounded-l-lg group-data-horizontal/toggle-group:data-[spacing=0]:last:rounded-r-lg group-data-vertical/toggle-group:data-[spacing=0]:data-[variant=outline]:border-t-0 group-data-vertical/toggle-group:data-[spacing=0]:data-[variant=outline]:first:border-t group-data-vertical/toggle-group:data-[spacing=0]:first:rounded-t-lg group-data-vertical/toggle-group:data-[spacing=0]:last:rounded-b-lg group/toggle h-7 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 hover:bg-muted hover:text-foreground inline-flex items-center justify-center min-w-7 narrow:flex-1 narrow:h-11 narrow:px-3 outline-none px-2.5 rounded-[min(var(--radius-md),12px)] rounded-lg segment shrink-0 text-[0.8rem] transition-all whitespace-nowrap"
+                      @on_click
+                      @on_focus
+                      @on_keydown> Imperial </button>
+              <button type="button"
+                      data-state="off"
+                      role="radio"
+                      aria-checked="false"
+                      tabindex="-1"
+                      data-slot="toggle-group-item"
+                      data-variant="outline"
+                      data-size="sm"
+                      data-spacing="2"
+                      aria-label="US"
+                      title="US customary (°F, miles, lb)"
+                      class="[&_svg:not([class*='size-'])]:size-3.5 [&_svg]:pointer-events-none [&_svg]:shrink-0 aria-invalid:border-destructive aria-invalid:ring-destructive/20 aria-pressed:bg-muted bg-transparent border border-input dark:aria-invalid:ring-destructive/40 data-[state=on]:bg-muted disabled:opacity-50 disabled:pointer-events-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:z-10 focus:z-10 font-medium gap-1 group-data-[spacing=0]/toggle-group:has-data-[icon=inline-end]:pr-1.5 group-data-[spacing=0]/toggle-group:has-data-[icon=inline-start]:pl-1.5 group-data-[spacing=0]/toggle-group:px-2 group-data-[spacing=0]/toggle-group:rounded-none group-data-horizontal/toggle-group:data-[spacing=0]:data-[variant=outline]:border-l-0 group-data-horizontal/toggle-group:data-[spacing=0]:data-[variant=outline]:first:border-l group-data-horizontal/toggle-group:data-[spacing=0]:first:rounded-l-lg group-data-horizontal/toggle-group:data-[spacing=0]:last:rounded-r-lg group-data-vertical/toggle-group:data-[spacing=0]:data-[variant=outline]:border-t-0 group-data-vertical/toggle-group:data-[spacing=0]:data-[variant=outline]:first:border-t group-data-vertical/toggle-group:data-[spacing=0]:first:rounded-t-lg group-data-vertical/toggle-group:data-[spacing=0]:last:rounded-b-lg group/toggle h-7 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 hover:bg-muted hover:text-foreground inline-flex items-center justify-center min-w-7 narrow:flex-1 narrow:h-11 narrow:px-3 outline-none px-2.5 rounded-[min(var(--radius-md),12px)] rounded-lg segment shrink-0 text-[0.8rem] transition-all whitespace-nowrap"
+                      @on_click
+                      @on_focus
+                      @on_keydown> US </button>
+            </div>
           </div>
         </div>
       </div>
-      <div id="about-you-date-format-field" class="about-you-field">
-        <label class="about-you-label"> Date format </label>
-        <div id="about-you-date-format" class="about-you-choice">
-          <div role="group" aria-label="Date format" class="segmented">
-            <button type="button"
-                    aria-pressed="true"
-                    title="Leave it out"
-                    class="on segment"
-                    @on_click> Not set </button>
-            <button type="button"
-                    aria-pressed="false"
-                    title="D/M/Y (25/12/2026)"
-                    class="segment"
-                    @on_click> D/M/Y </button>
-            <button type="button"
-                    aria-pressed="false"
-                    title="M/D/Y (12/25/2026)"
-                    class="segment"
-                    @on_click> M/D/Y </button>
-            <button type="button"
-                    aria-pressed="false"
-                    title="ISO (2026-12-25)"
-                    class="segment"
-                    @on_click> ISO </button>
+      <div id="about-you-date-format-field"
+           class="about-you-field flex flex-[1_1_220px] flex-col gap-1.5 min-w-0">
+        <label class="about-you-label font-medium text-[13px] text-muted-foreground"> Date format </label>
+        <div id="about-you-date-format" class="about-you-choice min-w-0">
+          <div class="loon max-w-full min-w-0 setting-segments">
+            <div role="radiogroup"
+                 dir="ltr"
+                 data-slot="toggle-group"
+                 tabindex="0"
+                 data-variant="outline"
+                 data-size="sm"
+                 data-spacing="2"
+                 data-orientation="horizontal"
+                 aria-label="Date format"
+                 class="data-[size=sm]:rounded-[min(var(--radius-md),10px)] data-vertical:flex-col data-vertical:items-stretch flex flex-row flex-wrap gap-[--spacing(var(--gap))] group/toggle-group items-center max-w-full narrow:w-full rounded-lg w-fit"
+                 custom-css-vars=((--gap 2))
+                 @on_focusout
+                 @on_focus>
+              <button type="button"
+                      data-state="on"
+                      role="radio"
+                      aria-checked="true"
+                      tabindex="-1"
+                      data-slot="toggle-group-item"
+                      data-variant="outline"
+                      data-size="sm"
+                      data-spacing="2"
+                      aria-label="Not set"
+                      title="Leave it out"
+                      class="[&_svg:not([class*='size-'])]:size-3.5 [&_svg]:pointer-events-none [&_svg]:shrink-0 aria-invalid:border-destructive aria-invalid:ring-destructive/20 aria-pressed:bg-muted bg-transparent border border-input dark:aria-invalid:ring-destructive/40 data-[state=on]:bg-muted disabled:opacity-50 disabled:pointer-events-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:z-10 focus:z-10 font-medium gap-1 group-data-[spacing=0]/toggle-group:has-data-[icon=inline-end]:pr-1.5 group-data-[spacing=0]/toggle-group:has-data-[icon=inline-start]:pl-1.5 group-data-[spacing=0]/toggle-group:px-2 group-data-[spacing=0]/toggle-group:rounded-none group-data-horizontal/toggle-group:data-[spacing=0]:data-[variant=outline]:border-l-0 group-data-horizontal/toggle-group:data-[spacing=0]:data-[variant=outline]:first:border-l group-data-horizontal/toggle-group:data-[spacing=0]:first:rounded-l-lg group-data-horizontal/toggle-group:data-[spacing=0]:last:rounded-r-lg group-data-vertical/toggle-group:data-[spacing=0]:data-[variant=outline]:border-t-0 group-data-vertical/toggle-group:data-[spacing=0]:data-[variant=outline]:first:border-t group-data-vertical/toggle-group:data-[spacing=0]:first:rounded-t-lg group-data-vertical/toggle-group:data-[spacing=0]:last:rounded-b-lg group/toggle h-7 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 hover:bg-muted hover:text-foreground inline-flex items-center justify-center min-w-7 narrow:flex-1 narrow:h-11 narrow:px-3 on outline-none px-2.5 rounded-[min(var(--radius-md),12px)] rounded-lg segment shrink-0 text-[0.8rem] transition-all whitespace-nowrap"
+                      @on_click
+                      @on_focus
+                      @on_keydown> Not set </button>
+              <button type="button"
+                      data-state="off"
+                      role="radio"
+                      aria-checked="false"
+                      tabindex="-1"
+                      data-slot="toggle-group-item"
+                      data-variant="outline"
+                      data-size="sm"
+                      data-spacing="2"
+                      aria-label="D/M/Y"
+                      title="D/M/Y (25/12/2026)"
+                      class="[&_svg:not([class*='size-'])]:size-3.5 [&_svg]:pointer-events-none [&_svg]:shrink-0 aria-invalid:border-destructive aria-invalid:ring-destructive/20 aria-pressed:bg-muted bg-transparent border border-input dark:aria-invalid:ring-destructive/40 data-[state=on]:bg-muted disabled:opacity-50 disabled:pointer-events-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:z-10 focus:z-10 font-medium gap-1 group-data-[spacing=0]/toggle-group:has-data-[icon=inline-end]:pr-1.5 group-data-[spacing=0]/toggle-group:has-data-[icon=inline-start]:pl-1.5 group-data-[spacing=0]/toggle-group:px-2 group-data-[spacing=0]/toggle-group:rounded-none group-data-horizontal/toggle-group:data-[spacing=0]:data-[variant=outline]:border-l-0 group-data-horizontal/toggle-group:data-[spacing=0]:data-[variant=outline]:first:border-l group-data-horizontal/toggle-group:data-[spacing=0]:first:rounded-l-lg group-data-horizontal/toggle-group:data-[spacing=0]:last:rounded-r-lg group-data-vertical/toggle-group:data-[spacing=0]:data-[variant=outline]:border-t-0 group-data-vertical/toggle-group:data-[spacing=0]:data-[variant=outline]:first:border-t group-data-vertical/toggle-group:data-[spacing=0]:first:rounded-t-lg group-data-vertical/toggle-group:data-[spacing=0]:last:rounded-b-lg group/toggle h-7 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 hover:bg-muted hover:text-foreground inline-flex items-center justify-center min-w-7 narrow:flex-1 narrow:h-11 narrow:px-3 outline-none px-2.5 rounded-[min(var(--radius-md),12px)] rounded-lg segment shrink-0 text-[0.8rem] transition-all whitespace-nowrap"
+                      @on_click
+                      @on_focus
+                      @on_keydown> D/M/Y </button>
+              <button type="button"
+                      data-state="off"
+                      role="radio"
+                      aria-checked="false"
+                      tabindex="-1"
+                      data-slot="toggle-group-item"
+                      data-variant="outline"
+                      data-size="sm"
+                      data-spacing="2"
+                      aria-label="M/D/Y"
+                      title="M/D/Y (12/25/2026)"
+                      class="[&_svg:not([class*='size-'])]:size-3.5 [&_svg]:pointer-events-none [&_svg]:shrink-0 aria-invalid:border-destructive aria-invalid:ring-destructive/20 aria-pressed:bg-muted bg-transparent border border-input dark:aria-invalid:ring-destructive/40 data-[state=on]:bg-muted disabled:opacity-50 disabled:pointer-events-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:z-10 focus:z-10 font-medium gap-1 group-data-[spacing=0]/toggle-group:has-data-[icon=inline-end]:pr-1.5 group-data-[spacing=0]/toggle-group:has-data-[icon=inline-start]:pl-1.5 group-data-[spacing=0]/toggle-group:px-2 group-data-[spacing=0]/toggle-group:rounded-none group-data-horizontal/toggle-group:data-[spacing=0]:data-[variant=outline]:border-l-0 group-data-horizontal/toggle-group:data-[spacing=0]:data-[variant=outline]:first:border-l group-data-horizontal/toggle-group:data-[spacing=0]:first:rounded-l-lg group-data-horizontal/toggle-group:data-[spacing=0]:last:rounded-r-lg group-data-vertical/toggle-group:data-[spacing=0]:data-[variant=outline]:border-t-0 group-data-vertical/toggle-group:data-[spacing=0]:data-[variant=outline]:first:border-t group-data-vertical/toggle-group:data-[spacing=0]:first:rounded-t-lg group-data-vertical/toggle-group:data-[spacing=0]:last:rounded-b-lg group/toggle h-7 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 hover:bg-muted hover:text-foreground inline-flex items-center justify-center min-w-7 narrow:flex-1 narrow:h-11 narrow:px-3 outline-none px-2.5 rounded-[min(var(--radius-md),12px)] rounded-lg segment shrink-0 text-[0.8rem] transition-all whitespace-nowrap"
+                      @on_click
+                      @on_focus
+                      @on_keydown> M/D/Y </button>
+              <button type="button"
+                      data-state="off"
+                      role="radio"
+                      aria-checked="false"
+                      tabindex="-1"
+                      data-slot="toggle-group-item"
+                      data-variant="outline"
+                      data-size="sm"
+                      data-spacing="2"
+                      aria-label="ISO"
+                      title="ISO (2026-12-25)"
+                      class="[&_svg:not([class*='size-'])]:size-3.5 [&_svg]:pointer-events-none [&_svg]:shrink-0 aria-invalid:border-destructive aria-invalid:ring-destructive/20 aria-pressed:bg-muted bg-transparent border border-input dark:aria-invalid:ring-destructive/40 data-[state=on]:bg-muted disabled:opacity-50 disabled:pointer-events-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:z-10 focus:z-10 font-medium gap-1 group-data-[spacing=0]/toggle-group:has-data-[icon=inline-end]:pr-1.5 group-data-[spacing=0]/toggle-group:has-data-[icon=inline-start]:pl-1.5 group-data-[spacing=0]/toggle-group:px-2 group-data-[spacing=0]/toggle-group:rounded-none group-data-horizontal/toggle-group:data-[spacing=0]:data-[variant=outline]:border-l-0 group-data-horizontal/toggle-group:data-[spacing=0]:data-[variant=outline]:first:border-l group-data-horizontal/toggle-group:data-[spacing=0]:first:rounded-l-lg group-data-horizontal/toggle-group:data-[spacing=0]:last:rounded-r-lg group-data-vertical/toggle-group:data-[spacing=0]:data-[variant=outline]:border-t-0 group-data-vertical/toggle-group:data-[spacing=0]:data-[variant=outline]:first:border-t group-data-vertical/toggle-group:data-[spacing=0]:first:rounded-t-lg group-data-vertical/toggle-group:data-[spacing=0]:last:rounded-b-lg group/toggle h-7 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 hover:bg-muted hover:text-foreground inline-flex items-center justify-center min-w-7 narrow:flex-1 narrow:h-11 narrow:px-3 outline-none px-2.5 rounded-[min(var(--radius-md),12px)] rounded-lg segment shrink-0 text-[0.8rem] transition-all whitespace-nowrap"
+                      @on_click
+                      @on_focus
+                      @on_keydown> ISO </button>
+            </div>
           </div>
         </div>
       </div>
-      <div id="about-you-occupation-field" class="about-you-field">
-        <label for="about-you-occupation" class="about-you-label"> Occupation or role </label>
+      <div id="about-you-occupation-field"
+           class="about-you-field flex flex-[1_1_220px] flex-col gap-1.5 min-w-0">
+        <label for="about-you-occupation"
+               class="about-you-label font-medium text-[13px] text-muted-foreground"> Occupation or role </label>
         <input id="about-you-occupation"
                maxlength="100"
                type="text"
                placeholder="Backend engineer"
                autocomplete="off"
-               class="about-you-line text-input"
+               class="about-you-line aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-transparent border border-input dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:bg-input/30 dark:disabled:bg-input/80 disabled:bg-input/50 disabled:cursor-not-allowed disabled:opacity-50 disabled:pointer-events-none file:bg-transparent file:border-0 file:font-medium file:h-6 file:inline-flex file:text-foreground file:text-sm flex-1 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 h-8 md:text-sm min-w-0 narrow:h-11 narrow:text-base outline-none placeholder:text-muted-foreground px-2.5 py-1 rounded-lg text-base transition-colors w-full"
                #value=""
                @on_input/>
       </div>
-      <div id="about-you-background-field" class="about-you-field wide">
-        <label for="about-you-background" class="about-you-label"> Background and expertise </label>
+      <div id="about-you-background-field"
+           class="about-you-field basis-full flex flex-col gap-1.5 min-w-0 wide">
+        <label for="about-you-background"
+               class="about-you-label font-medium text-[13px] text-muted-foreground"> Background and expertise </label>
         <textarea id="about-you-background"
                   maxlength="1000"
                   placeholder="Undergrad pure maths and CS; years of OCaml"
                   rows="3"
-                  class="about-you-input text-input"
+                  class="about-you-input aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-transparent border border-input dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:bg-input/30 dark:disabled:bg-input/80 disabled:bg-input/50 disabled:cursor-not-allowed disabled:opacity-50 field-sizing-content flex focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 md:text-sm min-h-[4.5em] narrow:text-base outline-none placeholder:text-muted-foreground px-2.5 py-2 resize-y rounded-lg text-base transition-colors w-full"
                   #value=""
                   @on_input> </textarea>
       </div>
-      <div id="about-you-anything-else-field" class="about-you-field wide">
-        <label for="about-you-anything-else" class="about-you-label"> Anything else </label>
+      <div id="about-you-anything-else-field"
+           class="about-you-field basis-full flex flex-col gap-1.5 min-w-0 wide">
+        <label for="about-you-anything-else"
+               class="about-you-label font-medium text-[13px] text-muted-foreground"> Anything else </label>
         <textarea id="about-you-anything-else"
                   maxlength="4000"
                   placeholder="Keep answers short, and ask before adding a dependency."
                   rows="5"
-                  class="about-you-input text-input"
+                  class="about-you-input aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-transparent border border-input dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:bg-input/30 dark:disabled:bg-input/80 disabled:bg-input/50 disabled:cursor-not-allowed disabled:opacity-50 field-sizing-content flex focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 md:text-sm min-h-[4.5em] narrow:text-base outline-none placeholder:text-muted-foreground px-2.5 py-2 resize-y rounded-lg text-base transition-colors w-full"
                   #value=""
                   @on_input> </textarea>
       </div>
     </div>
-    (Appearance) (Sessions) (New sessions) (Models) (Usage) (Memory) (About you) (Custom instructions) (MCP servers) (Git hosting) (Account)
+    General
+    (Appearance) (Sessions) (New sessions)
+    Models
+    (Models) (Usage)
+    You
+    (Memory) (About you) (Custom instructions)
+    Integrations
+    (MCP servers) (Git hosting)
+    (Account)
     |}]
 ;;
 
@@ -254,7 +386,7 @@ let%expect_test "the browser's time zone is a tap away" =
            type="text"
            placeholder="Australia/Sydney"
            autocomplete="off"
-           class="about-you-line text-input"
+           class="about-you-line aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-transparent border border-input dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:bg-input/30 dark:disabled:bg-input/80 disabled:bg-input/50 disabled:cursor-not-allowed disabled:opacity-50 disabled:pointer-events-none file:bg-transparent file:border-0 file:font-medium file:h-6 file:inline-flex file:text-foreground file:text-sm flex-1 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 h-8 md:text-sm min-w-0 narrow:h-11 narrow:text-base outline-none placeholder:text-muted-foreground px-2.5 py-1 rounded-lg text-base transition-colors w-full"
            #value="Australia/Sydney"
            @on_input/>
     Time zone
@@ -336,27 +468,85 @@ let%expect_test "editing makes it dirty: Save and Revert; Ctrl+Enter saves" =
            type="text"
            placeholder="What to call you"
            autocomplete="off"
-           class="about-you-line text-input"
+           class="about-you-line aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-transparent border border-input dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:bg-input/30 dark:disabled:bg-input/80 disabled:bg-input/50 disabled:cursor-not-allowed disabled:opacity-50 disabled:pointer-events-none file:bg-transparent file:border-0 file:font-medium file:h-6 file:inline-flex file:text-foreground file:text-sm flex-1 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 h-8 md:text-sm min-w-0 narrow:h-11 narrow:text-base outline-none placeholder:text-muted-foreground px-2.5 py-1 rounded-lg text-base transition-colors w-full"
            #value="Lloyd"
            @on_input/>
-    <div id="about-you-units" class="about-you-choice">
-      <div role="group" aria-label="Units" class="segmented">
-        <button type="button" aria-pressed="false" title="Leave it out" class="segment" @on_click> Not set </button>
-        <button type="button"
-                aria-pressed="true"
-                title="Metric (°C, km, kg)"
-                class="on segment"
-                @on_click> Metric </button>
-        <button type="button"
-                aria-pressed="false"
-                title="Imperial (miles, stone; °C)"
-                class="segment"
-                @on_click> Imperial </button>
-        <button type="button"
-                aria-pressed="false"
-                title="US customary (°F, miles, lb)"
-                class="segment"
-                @on_click> US </button>
+    <div id="about-you-units" class="about-you-choice min-w-0">
+      <div class="loon max-w-full min-w-0 setting-segments">
+        <div role="radiogroup"
+             dir="ltr"
+             data-slot="toggle-group"
+             tabindex="0"
+             data-variant="outline"
+             data-size="sm"
+             data-spacing="2"
+             data-orientation="horizontal"
+             aria-label="Units"
+             class="data-[size=sm]:rounded-[min(var(--radius-md),10px)] data-vertical:flex-col data-vertical:items-stretch flex flex-row flex-wrap gap-[--spacing(var(--gap))] group/toggle-group items-center max-w-full narrow:w-full rounded-lg w-fit"
+             custom-css-vars=((--gap 2))
+             @on_focusout
+             @on_focus>
+          <button type="button"
+                  data-state="off"
+                  role="radio"
+                  aria-checked="false"
+                  tabindex="-1"
+                  data-slot="toggle-group-item"
+                  data-variant="outline"
+                  data-size="sm"
+                  data-spacing="2"
+                  aria-label="Not set"
+                  title="Leave it out"
+                  class="[&_svg:not([class*='size-'])]:size-3.5 [&_svg]:pointer-events-none [&_svg]:shrink-0 aria-invalid:border-destructive aria-invalid:ring-destructive/20 aria-pressed:bg-muted bg-transparent border border-input dark:aria-invalid:ring-destructive/40 data-[state=on]:bg-muted disabled:opacity-50 disabled:pointer-events-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:z-10 focus:z-10 font-medium gap-1 group-data-[spacing=0]/toggle-group:has-data-[icon=inline-end]:pr-1.5 group-data-[spacing=0]/toggle-group:has-data-[icon=inline-start]:pl-1.5 group-data-[spacing=0]/toggle-group:px-2 group-data-[spacing=0]/toggle-group:rounded-none group-data-horizontal/toggle-group:data-[spacing=0]:data-[variant=outline]:border-l-0 group-data-horizontal/toggle-group:data-[spacing=0]:data-[variant=outline]:first:border-l group-data-horizontal/toggle-group:data-[spacing=0]:first:rounded-l-lg group-data-horizontal/toggle-group:data-[spacing=0]:last:rounded-r-lg group-data-vertical/toggle-group:data-[spacing=0]:data-[variant=outline]:border-t-0 group-data-vertical/toggle-group:data-[spacing=0]:data-[variant=outline]:first:border-t group-data-vertical/toggle-group:data-[spacing=0]:first:rounded-t-lg group-data-vertical/toggle-group:data-[spacing=0]:last:rounded-b-lg group/toggle h-7 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 hover:bg-muted hover:text-foreground inline-flex items-center justify-center min-w-7 narrow:flex-1 narrow:h-11 narrow:px-3 outline-none px-2.5 rounded-[min(var(--radius-md),12px)] rounded-lg segment shrink-0 text-[0.8rem] transition-all whitespace-nowrap"
+                  @on_click
+                  @on_focus
+                  @on_keydown> Not set </button>
+          <button type="button"
+                  data-state="on"
+                  role="radio"
+                  aria-checked="true"
+                  tabindex="-1"
+                  data-slot="toggle-group-item"
+                  data-variant="outline"
+                  data-size="sm"
+                  data-spacing="2"
+                  aria-label="Metric"
+                  title="Metric (°C, km, kg)"
+                  class="[&_svg:not([class*='size-'])]:size-3.5 [&_svg]:pointer-events-none [&_svg]:shrink-0 aria-invalid:border-destructive aria-invalid:ring-destructive/20 aria-pressed:bg-muted bg-transparent border border-input dark:aria-invalid:ring-destructive/40 data-[state=on]:bg-muted disabled:opacity-50 disabled:pointer-events-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:z-10 focus:z-10 font-medium gap-1 group-data-[spacing=0]/toggle-group:has-data-[icon=inline-end]:pr-1.5 group-data-[spacing=0]/toggle-group:has-data-[icon=inline-start]:pl-1.5 group-data-[spacing=0]/toggle-group:px-2 group-data-[spacing=0]/toggle-group:rounded-none group-data-horizontal/toggle-group:data-[spacing=0]:data-[variant=outline]:border-l-0 group-data-horizontal/toggle-group:data-[spacing=0]:data-[variant=outline]:first:border-l group-data-horizontal/toggle-group:data-[spacing=0]:first:rounded-l-lg group-data-horizontal/toggle-group:data-[spacing=0]:last:rounded-r-lg group-data-vertical/toggle-group:data-[spacing=0]:data-[variant=outline]:border-t-0 group-data-vertical/toggle-group:data-[spacing=0]:data-[variant=outline]:first:border-t group-data-vertical/toggle-group:data-[spacing=0]:first:rounded-t-lg group-data-vertical/toggle-group:data-[spacing=0]:last:rounded-b-lg group/toggle h-7 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 hover:bg-muted hover:text-foreground inline-flex items-center justify-center min-w-7 narrow:flex-1 narrow:h-11 narrow:px-3 on outline-none px-2.5 rounded-[min(var(--radius-md),12px)] rounded-lg segment shrink-0 text-[0.8rem] transition-all whitespace-nowrap"
+                  @on_click
+                  @on_focus
+                  @on_keydown> Metric </button>
+          <button type="button"
+                  data-state="off"
+                  role="radio"
+                  aria-checked="false"
+                  tabindex="-1"
+                  data-slot="toggle-group-item"
+                  data-variant="outline"
+                  data-size="sm"
+                  data-spacing="2"
+                  aria-label="Imperial"
+                  title="Imperial (miles, stone; °C)"
+                  class="[&_svg:not([class*='size-'])]:size-3.5 [&_svg]:pointer-events-none [&_svg]:shrink-0 aria-invalid:border-destructive aria-invalid:ring-destructive/20 aria-pressed:bg-muted bg-transparent border border-input dark:aria-invalid:ring-destructive/40 data-[state=on]:bg-muted disabled:opacity-50 disabled:pointer-events-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:z-10 focus:z-10 font-medium gap-1 group-data-[spacing=0]/toggle-group:has-data-[icon=inline-end]:pr-1.5 group-data-[spacing=0]/toggle-group:has-data-[icon=inline-start]:pl-1.5 group-data-[spacing=0]/toggle-group:px-2 group-data-[spacing=0]/toggle-group:rounded-none group-data-horizontal/toggle-group:data-[spacing=0]:data-[variant=outline]:border-l-0 group-data-horizontal/toggle-group:data-[spacing=0]:data-[variant=outline]:first:border-l group-data-horizontal/toggle-group:data-[spacing=0]:first:rounded-l-lg group-data-horizontal/toggle-group:data-[spacing=0]:last:rounded-r-lg group-data-vertical/toggle-group:data-[spacing=0]:data-[variant=outline]:border-t-0 group-data-vertical/toggle-group:data-[spacing=0]:data-[variant=outline]:first:border-t group-data-vertical/toggle-group:data-[spacing=0]:first:rounded-t-lg group-data-vertical/toggle-group:data-[spacing=0]:last:rounded-b-lg group/toggle h-7 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 hover:bg-muted hover:text-foreground inline-flex items-center justify-center min-w-7 narrow:flex-1 narrow:h-11 narrow:px-3 outline-none px-2.5 rounded-[min(var(--radius-md),12px)] rounded-lg segment shrink-0 text-[0.8rem] transition-all whitespace-nowrap"
+                  @on_click
+                  @on_focus
+                  @on_keydown> Imperial </button>
+          <button type="button"
+                  data-state="off"
+                  role="radio"
+                  aria-checked="false"
+                  tabindex="-1"
+                  data-slot="toggle-group-item"
+                  data-variant="outline"
+                  data-size="sm"
+                  data-spacing="2"
+                  aria-label="US"
+                  title="US customary (°F, miles, lb)"
+                  class="[&_svg:not([class*='size-'])]:size-3.5 [&_svg]:pointer-events-none [&_svg]:shrink-0 aria-invalid:border-destructive aria-invalid:ring-destructive/20 aria-pressed:bg-muted bg-transparent border border-input dark:aria-invalid:ring-destructive/40 data-[state=on]:bg-muted disabled:opacity-50 disabled:pointer-events-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:z-10 focus:z-10 font-medium gap-1 group-data-[spacing=0]/toggle-group:has-data-[icon=inline-end]:pr-1.5 group-data-[spacing=0]/toggle-group:has-data-[icon=inline-start]:pl-1.5 group-data-[spacing=0]/toggle-group:px-2 group-data-[spacing=0]/toggle-group:rounded-none group-data-horizontal/toggle-group:data-[spacing=0]:data-[variant=outline]:border-l-0 group-data-horizontal/toggle-group:data-[spacing=0]:data-[variant=outline]:first:border-l group-data-horizontal/toggle-group:data-[spacing=0]:first:rounded-l-lg group-data-horizontal/toggle-group:data-[spacing=0]:last:rounded-r-lg group-data-vertical/toggle-group:data-[spacing=0]:data-[variant=outline]:border-t-0 group-data-vertical/toggle-group:data-[spacing=0]:data-[variant=outline]:first:border-t group-data-vertical/toggle-group:data-[spacing=0]:first:rounded-t-lg group-data-vertical/toggle-group:data-[spacing=0]:last:rounded-b-lg group/toggle h-7 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 hover:bg-muted hover:text-foreground inline-flex items-center justify-center min-w-7 narrow:flex-1 narrow:h-11 narrow:px-3 outline-none px-2.5 rounded-[min(var(--radius-md),12px)] rounded-lg segment shrink-0 text-[0.8rem] transition-all whitespace-nowrap"
+                  @on_click
+                  @on_focus
+                  @on_keydown> US </button>
+        </div>
       </div>
     </div>
     32 of 5000 bytes Ctrl+Enter saves (Save)
@@ -441,7 +631,7 @@ let%expect_test "changed elsewhere: shown at once, unless something is typed" =
            type="text"
            placeholder="What to call you"
            autocomplete="off"
-           class="about-you-line text-input"
+           class="about-you-line aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-transparent border border-input dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:bg-input/30 dark:disabled:bg-input/80 disabled:bg-input/50 disabled:cursor-not-allowed disabled:opacity-50 disabled:pointer-events-none file:bg-transparent file:border-0 file:font-medium file:h-6 file:inline-flex file:text-foreground file:text-sm flex-1 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 h-8 md:text-sm min-w-0 narrow:h-11 narrow:text-base outline-none placeholder:text-muted-foreground px-2.5 py-1 rounded-lg text-base transition-colors w-full"
            #value="Elsewhere"
            @on_input/>
     (About_you_field Name "Typed here")
@@ -453,7 +643,7 @@ let%expect_test "changed elsewhere: shown at once, unless something is typed" =
            type="text"
            placeholder="What to call you"
            autocomplete="off"
-           class="about-you-line text-input"
+           class="about-you-line aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-transparent border border-input dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:bg-input/30 dark:disabled:bg-input/80 disabled:bg-input/50 disabled:cursor-not-allowed disabled:opacity-50 disabled:pointer-events-none file:bg-transparent file:border-0 file:font-medium file:h-6 file:inline-flex file:text-foreground file:text-sm flex-1 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 h-8 md:text-sm min-w-0 narrow:h-11 narrow:text-base outline-none placeholder:text-muted-foreground px-2.5 py-1 rounded-lg text-base transition-colors w-full"
            #value="Third"
            @on_input/>
     |}]

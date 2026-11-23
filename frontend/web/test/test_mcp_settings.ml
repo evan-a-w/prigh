@@ -112,7 +112,7 @@ let%expect_test "secrets are password fields until shown" =
            autocomplete="off"
            autocapitalize="off"
            spellcheck="false"
-           class="mcp-pair-value text-input"
+           class="aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-transparent border border-input dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:bg-input/30 dark:disabled:bg-input/80 disabled:bg-input/50 disabled:cursor-not-allowed disabled:opacity-50 disabled:pointer-events-none file:bg-transparent file:border-0 file:font-medium file:h-6 file:inline-flex file:text-foreground file:text-sm focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 font-mono h-8 mcp-pair-value md:text-sm min-w-0 narrow:h-11 narrow:text-base outline-none placeholder:text-muted-foreground px-2.5 py-1 rounded-lg text-xs transition-colors w-full"
            #value="s3cret"
            @on_input/>
     (Mcp_field (Pair_shown 0))
@@ -122,7 +122,7 @@ let%expect_test "secrets are password fields until shown" =
            autocomplete="off"
            autocapitalize="off"
            spellcheck="false"
-           class="mcp-pair-value text-input"
+           class="aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-transparent border border-input dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:bg-input/30 dark:disabled:bg-input/80 disabled:bg-input/50 disabled:cursor-not-allowed disabled:opacity-50 disabled:pointer-events-none file:bg-transparent file:border-0 file:font-medium file:h-6 file:inline-flex file:text-foreground file:text-sm focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 font-mono h-8 mcp-pair-value md:text-sm min-w-0 narrow:h-11 narrow:text-base outline-none placeholder:text-muted-foreground px-2.5 py-1 rounded-lg text-xs transition-colors w-full"
            #value="s3cret"
            @on_input/>
     |}]
@@ -195,7 +195,8 @@ let%expect_test
     []
     Arguments
     [] One per line, as they are: no quoting needed.
-    Environment (Add variable) Values are kept on the backend and hidden here until shown; ${VAR} takes VAR from the tool host's environment.
+    Environment
+    (Add variable) Values are kept on the backend and hidden here until shown; ${VAR} takes VAR from the tool host's environment.
     Ctrl+Enter saves, Esc cancels (Cancel) (Add server)
     (Mcp_field (Name search))
     (Mcp_field (Command uvx))
@@ -272,7 +273,8 @@ let%expect_test "add a URL server; a refusal stays in the form with the error" =
     (Command) (URL)
     URL
     [https://example.com/mcp]
-    Headers (Add header) Values are kept on the backend and hidden here until shown; ${VAR} takes VAR from the tool host's environment.
+    Headers
+    (Add header) Values are kept on the backend and hidden here until shown; ${VAR} takes VAR from the tool host's environment.
     There is already an MCP server "github" in the settings: choose another name, or edit that one
     Ctrl+Enter saves, Esc cancels (Cancel) (Add server)
     |}]
@@ -296,7 +298,8 @@ let%expect_test "an empty name or command is caught before sending" =
     []
     Arguments
     [] One per line, as they are: no quoting needed.
-    Environment (Add variable) Values are kept on the backend and hidden here until shown; ${VAR} takes VAR from the tool host's environment.
+    Environment
+    (Add variable) Values are kept on the backend and hidden here until shown; ${VAR} takes VAR from the tool host's environment.
     Give the server a name: its tools are called mcp__NAME__TOOL
     Ctrl+Enter saves, Esc cancels (Cancel) (Add server)
     |}]
@@ -634,7 +637,7 @@ let%expect_test "sign in to a remote server, then sign out" =
        target="_blank"
        rel="noopener noreferrer"
        title="Opens the server's sign-in page in a new tab"
-       class="btn link-button mcp-sign-in-open primary small">
+       class="[&_svg:not([class*='size-'])]:size-3.5 [&_svg]:pointer-events-none [&_svg]:shrink-0 active:not-aria-[haspopup]:translate-y-px aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-clip-padding bg-primary border border-transparent dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 disabled:opacity-50 disabled:pointer-events-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 font-medium gap-1 group/button h-7 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 hover:bg-primary/80 in-data-[slot=button-group]:rounded-lg inline-flex items-center justify-center link-button mcp-sign-in-open no-underline outline-none px-2.5 rounded-[min(var(--radius-md),12px)] rounded-lg select-none shrink-0 text-[0.8rem] text-primary-foreground transition-all whitespace-nowrap">
       Open sign-in page
       <icon class="external"> </icon>
     </a>

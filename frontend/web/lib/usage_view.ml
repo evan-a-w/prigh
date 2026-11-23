@@ -43,41 +43,43 @@ let percent p =
   else sprintf "%.0f%%" p
 ;;
 
+(* loon's Progress: the bar is the muted text's colour until 70% used,
+   then the accent, then from 90% the destructive colour. *)
 let meter (w : U.Window.t) =
   let used = Float.clamp_exn w.used_percent ~min:0. ~max:100. in
-  let level =
+  let level, bar =
     if Float.( >= ) used 90.
-    then "full"
+    then "full", "[&>[data-slot=progress-indicator]]:bg-destructive"
     else if Float.( >= ) used 70.
-    then "high"
-    else "ok"
+    then "high", "[&>[data-slot=progress-indicator]]:bg-primary"
+    else "ok", "[&>[data-slot=progress-indicator]]:bg-muted-foreground"
   in
   div
-    ~cls:("usage-meter " ^ level)
-    [ Node.div
-        ~attrs:
-          [ Attr.class_ "usage-track"
-          ; Attr.create "role" "progressbar"
-          ; Attr.create "aria-label" (w.label ^ " used")
-          ; Attr.create "aria-valuemin" "0"
-          ; Attr.create "aria-valuemax" "100"
-          ; Attr.create "aria-valuenow" (sprintf "%.0f" used)
-          ]
-        [ Node.div
-            ~attrs:
-              [ Attr.class_ "usage-fill"
-              ; Attr.style
-                  (Css_gen.width (`Percent (Percent.of_percentage used)))
-              ]
-            []
-        ]
-    ; span ~cls:"usage-percent" (percent w.used_percent ^ " used")
+    ~cls:("usage-meter flex w-full items-center gap-3 " ^ level)
+    [ Loon.Progress.view
+        ~class_:
+          ("usage-track h-1.5 flex-1 \
+            [&>[data-slot=progress-indicator]]:motion-reduce:transition-none "
+           ^ bar)
+        ~attrs:[ Attr.create "aria-label" (w.label ^ " used") ]
+        ~value:used
+        ()
+    ; span
+        ~cls:
+          (if String.equal level "full"
+           then
+             "usage-percent min-w-[8ch] text-right text-[13px] tabular-nums \
+              text-destructive"
+           else
+             "usage-percent min-w-[8ch] text-right text-[13px] tabular-nums \
+              text-muted-foreground")
+        (percent w.used_percent ^ " used")
     ]
 ;;
 
 let window m ~now (w : U.Window.t) =
   row
-    ~cls:"usage-window"
+    ~cls:"usage-window gap-2"
     ~wide:true
     ~name:w.label
     ~about:(resets m ~now w)

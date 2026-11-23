@@ -93,11 +93,11 @@ let%expect_test "Opening Usage asks once; loading, then each provider's windows"
     Weekly
     Resets in 6d · 11 Oct 10:00
     0% used
-    <div class="usage-track">
-    <div class="usage-track">
-    <div class="usage-track">
-    <div class="usage-track">
-    <div class="usage-track">
+    <div class="[&>[data-slot=progress-indicator]]:bg-muted-foreground [&>[data-slot=progress-indicator]]:motion-reduce:transition-none bg-muted flex flex-1 h-1.5 items-center overflow-x-hidden relative rounded-full usage-track w-full">
+    <div class="[&>[data-slot=progress-indicator]]:bg-destructive [&>[data-slot=progress-indicator]]:motion-reduce:transition-none bg-muted flex flex-1 h-1.5 items-center overflow-x-hidden relative rounded-full usage-track w-full">
+    <div class="[&>[data-slot=progress-indicator]]:bg-muted-foreground [&>[data-slot=progress-indicator]]:motion-reduce:transition-none bg-muted flex flex-1 h-1.5 items-center overflow-x-hidden relative rounded-full usage-track w-full">
+    <div class="[&>[data-slot=progress-indicator]]:bg-primary [&>[data-slot=progress-indicator]]:motion-reduce:transition-none bg-muted flex flex-1 h-1.5 items-center overflow-x-hidden relative rounded-full usage-track w-full">
+    <div class="[&>[data-slot=progress-indicator]]:bg-muted-foreground [&>[data-slot=progress-indicator]]:motion-reduce:transition-none bg-muted flex flex-1 h-1.5 items-center overflow-x-hidden relative rounded-full usage-track w-full">
     |}]
 ;;
 

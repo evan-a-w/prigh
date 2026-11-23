@@ -48,7 +48,15 @@ let%expect_test "opening reads the memory; empty, it says what memory is" =
     No notes yet
     Tell the model “remember that…” and it saves a note here. In a later session, ask about it (“what did I say about deploys?”) and it looks it up. It saves nothing you did not ask it to.
     (Add note)
-    (Appearance) (Sessions) (New sessions) (Models) (Usage) (Memory) (About you) (Custom instructions) (MCP servers) (Git hosting) (Account)
+    General
+    (Appearance) (Sessions) (New sessions)
+    Models
+    (Models) (Usage)
+    You
+    (Memory) (About you) (Custom instructions)
+    Integrations
+    (MCP servers) (Git hosting)
+    (Account)
     |}]
 ;;
 
@@ -107,14 +115,14 @@ let%expect_test "edit a note: Enter in the title saves, the reply replaces it" =
     {|
     (Memory_edit (m1))
     (Focus memory-text)
-    <div class="memory-draft setting">
+    <div class="border-border border-t first:border-t-0 flex flex-col flex-nowrap gap-x-4 gap-y-2.5 items-stretch memory-draft narrow:[&_.btn.icon]:size-11 narrow:[&_:is(.btn,select,.chip-button,.memory-filter,.memory-title-input)]:min-h-11 narrow:px-3.5 narrow:py-3.5 px-4 py-3 setting">
       <input id="memory-title"
              type="text"
              aria-label="Title"
              placeholder="Title (optional): a few words"
              maxlength="80"
              autocomplete="off"
-             class="memory-title-input text-input"
+             class="aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-transparent border border-input dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:bg-input/30 dark:disabled:bg-input/80 disabled:bg-input/50 disabled:cursor-not-allowed disabled:opacity-50 disabled:pointer-events-none file:bg-transparent file:border-0 file:font-medium file:h-6 file:inline-flex file:text-foreground file:text-sm focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 h-8 md:text-sm memory-title-input min-w-0 narrow:h-11 narrow:text-base outline-none placeholder:text-muted-foreground px-2.5 py-1 rounded-lg text-base transition-colors w-full"
              #value="editor"
              @on_input/>
       <textarea id="memory-text"
@@ -122,12 +130,12 @@ let%expect_test "edit a note: Enter in the title saves, the reply replaces it" =
                 placeholder="What the model should remember"
                 rows="3"
                 maxlength="2000"
-                class="memory-text-input text-input"
+                class="aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-transparent border border-input dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:bg-input/30 dark:disabled:bg-input/80 disabled:bg-input/50 disabled:cursor-not-allowed disabled:opacity-50 field-sizing-content flex focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 md:text-sm memory-text-input min-h-[4.5em] narrow:text-base outline-none placeholder:text-muted-foreground px-2.5 py-2 resize-y rounded-lg text-base transition-colors w-full"
                 #value="helix, with the default keymap"
                 @on_input> </textarea>
       <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-      <div class="memory-draft-buttons">
-        <span class="memory-draft-keys"> Ctrl+Enter saves, Esc cancels </span>
+      <div class="flex flex-wrap gap-2 items-center justify-end memory-draft-buttons">
+        <span class="keyboard memory-draft-keys mr-auto text-muted-foreground/80 text-xs"> Ctrl+Enter saves, Esc cancels </span>
         <button type="button" title="Esc" class="btn ghost small" @on_click> Cancel </button>
         <button type="button"
                 title="Ctrl+Enter (Enter in the title)"
@@ -165,7 +173,7 @@ let%expect_test "add a note; Esc cancels one, leaving Settings open" =
     (Focus memory-text)
     (Memory_text "half written")
     Close_dialog
-    <div class="modal settings-dialog">
+    <div class="[&>.modal-body]:flex-auto [&>.modal-body]:grid [&>.modal-body]:grid-cols-[208px_minmax(0,1fr)] [&>.modal-body]:overflow-hidden [&>.modal-body]:p-0 [&>.modal-buttons]:border-border [&>.modal-buttons]:border-t [&>.modal-head]:border-b [&>.modal-head]:border-border h-[min(720px,88vh)] max-h-none modal settings-dialog w-[min(940px,100%)]">
     (Memory_edit ())
     (Focus memory-text)
     (Memory_title pager)
