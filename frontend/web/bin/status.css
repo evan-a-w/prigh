@@ -150,42 +150,6 @@
 .row-chips .chip-button .icon { width: 14px; height: 14px; }
 .row-chips .chip-button:not(.awaiting):is(:hover, :focus-visible) { color: var(--chalk); }
 
-/* {1 The session's sections} (a phone's ⋯ sheet)
-
-   A title with its icon and the current value, then the choices as one
-   segmented row, each a full thumb's height. */
-
-.session-sections { display: flex; flex-direction: column; gap: 4px; padding: 2px 4px 10px; margin-bottom: 6px; border-bottom: 1px solid var(--rule); }
-.session-section { display: flex; flex-direction: column; gap: 6px; padding: 6px 8px 4px; }
-.session-section-head { display: flex; align-items: center; gap: 8px; min-width: 0; color: var(--muted-text); font-size: 13px; }
-.session-section-head > .icon { width: 16px; height: 16px; flex: none; color: var(--faint); }
-.session-section-title { font-weight: 600; color: var(--chalk); }
-.session-section-note { margin-left: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--faint); font-size: 12px; }
-.session-choices { display: flex; gap: 2px; padding: 3px; background: var(--well); border-radius: 10px; }
-.session-choice {
-  flex: 1 1 0;
-  min-width: 0;
-  min-height: 44px;
-  padding: 0 4px;
-  border: 0;
-  border-radius: 8px;
-  background: none;
-  color: var(--muted-text);
-  font: 500 14px var(--sans);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  cursor: pointer;
-}
-.session-choice.on { background: var(--slate-2); color: var(--chalk); box-shadow: 0 1px 0 var(--rule-2) inset, 0 1px 3px -1px var(--edge-shadow); }
-.session-choice:focus-visible { outline: 2px solid var(--sodium); outline-offset: -2px; }
-.session-usage { display: flex; align-items: center; gap: 12px; padding: 0 2px; font-size: 13px; color: var(--muted-text); }
-.session-context { flex: 1; display: flex; align-items: center; gap: 8px; min-width: 0; }
-.session-context .meter { flex: 1; height: 5px; }
-.session-context .percent { color: var(--chalk); font: 12.5px var(--mono); font-variant-numeric: tabular-nums; }
-.session-of { color: var(--faint); font: 12px var(--mono); }
-.session-usage > .status-item.cost { font: 12.5px var(--mono); color: var(--chalk); }
-
 /* {1 A narrow composer} (a small window, or the sidebar and a panel beside
    it): the session's chips keep their icons, the status its ring and
    percent, before the model's and the host's names are cut. */

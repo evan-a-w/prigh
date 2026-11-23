@@ -518,41 +518,45 @@ let%expect_test "a confirmation: allow once, always, deny, deny with a reason" =
   H.show h ~selector:".confirm-answers";
   [%expect
     {|
-    <div class="confirm-answers">
+    <div class="confirm-answers flex flex-col gap-1.5">
       <button type="button"
               title="y or Enter"
               aria-label="Allow once"
               aria-keyshortcuts="y"
-              class="allow btn confirm-answer primary"
+              class="[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0 active:not-aria-[haspopup]:translate-y-px allow aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-clip-padding bg-primary border border-transparent break-words confirm-answer dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 disabled:opacity-50 disabled:pointer-events-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 font-medium gap-2.5 group/button h-auto has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 hover:bg-primary/80 inline-flex items-center justify-start min-h-8 narrow:min-h-11 narrow:text-[15px] outline-none px-2.5 py-1.5 rounded-lg select-none shrink-0 text-left text-primary-foreground text-sm transition-all whitespace-normal"
               @on_click>
-        <kbd> y </kbd>
+        <kbd data-slot="kbd"
+             class="[&_svg:not([class*='size-'])]:size-3 bg-muted dark:in-data-[slot=tooltip-content]:bg-background/10 font-medium font-sans gap-1 h-5 in-[.allow]:bg-primary-foreground/20 in-[.allow]:text-primary-foreground in-data-[slot=tooltip-content]:bg-background/20 in-data-[slot=tooltip-content]:text-background inline-flex items-center justify-center min-w-5 pointer-events-none px-1 rounded-sm select-none shrink-0 text-muted-foreground text-xs w-fit"> y </kbd>
         Allow once
       </button>
       <button type="button"
               title="a"
               aria-label="Always allow bash(make:*) this session"
               aria-keyshortcuts="a"
-              class="always btn confirm-answer"
+              class="[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0 active:not-aria-[haspopup]:translate-y-px always aria-expanded:bg-muted aria-expanded:text-foreground aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-background bg-clip-padding border border-primary/40 break-words confirm-answer dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:bg-input/30 dark:border-input dark:hover:bg-input/50 disabled:opacity-50 disabled:pointer-events-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 font-medium gap-2.5 group/button h-auto has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 hover:bg-muted hover:text-foreground inline-flex items-center justify-start min-h-8 narrow:min-h-11 narrow:text-[15px] outline-none px-2.5 py-1.5 rounded-lg select-none shrink-0 text-left text-sm transition-all whitespace-normal"
               @on_click>
-        <kbd> a </kbd>
+        <kbd data-slot="kbd"
+             class="[&_svg:not([class*='size-'])]:size-3 bg-muted dark:in-data-[slot=tooltip-content]:bg-background/10 font-medium font-sans gap-1 h-5 in-[.allow]:bg-primary-foreground/20 in-[.allow]:text-primary-foreground in-data-[slot=tooltip-content]:bg-background/20 in-data-[slot=tooltip-content]:text-background inline-flex items-center justify-center min-w-5 pointer-events-none px-1 rounded-sm select-none shrink-0 text-muted-foreground text-xs w-fit"> a </kbd>
         Always allow bash(make:*) this session
       </button>
       <button type="button"
               title="n or Esc"
               aria-label="Deny"
               aria-keyshortcuts="n"
-              class="btn confirm-answer deny"
+              class="[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0 active:not-aria-[haspopup]:translate-y-px aria-expanded:bg-muted aria-expanded:text-foreground aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-background bg-clip-padding border border-border break-words confirm-answer dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:bg-input/30 dark:border-input dark:hover:bg-input/50 deny disabled:opacity-50 disabled:pointer-events-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 font-medium gap-2.5 group/button h-auto has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 hover:bg-muted hover:text-foreground inline-flex items-center justify-start min-h-8 narrow:min-h-11 narrow:text-[15px] outline-none px-2.5 py-1.5 rounded-lg select-none shrink-0 text-left text-sm transition-all whitespace-normal"
               @on_click>
-        <kbd> n </kbd>
+        <kbd data-slot="kbd"
+             class="[&_svg:not([class*='size-'])]:size-3 bg-muted dark:in-data-[slot=tooltip-content]:bg-background/10 font-medium font-sans gap-1 h-5 in-[.allow]:bg-primary-foreground/20 in-[.allow]:text-primary-foreground in-data-[slot=tooltip-content]:bg-background/20 in-data-[slot=tooltip-content]:text-background inline-flex items-center justify-center min-w-5 pointer-events-none px-1 rounded-sm select-none shrink-0 text-muted-foreground text-xs w-fit"> n </kbd>
         Deny
       </button>
       <button type="button"
               title="r"
               aria-label="Deny, saying why"
               aria-keyshortcuts="r"
-              class="btn confirm-answer reason"
+              class="[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0 active:not-aria-[haspopup]:translate-y-px aria-expanded:bg-muted aria-expanded:text-foreground aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-background bg-clip-padding border border-border break-words confirm-answer dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:bg-input/30 dark:border-input dark:hover:bg-input/50 disabled:opacity-50 disabled:pointer-events-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 font-medium gap-2.5 group/button h-auto has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 hover:bg-muted hover:text-foreground inline-flex items-center justify-start min-h-8 narrow:min-h-11 narrow:text-[15px] outline-none px-2.5 py-1.5 reason rounded-lg select-none shrink-0 text-left text-sm transition-all whitespace-normal"
               @on_click>
-        <kbd> r </kbd>
+        <kbd data-slot="kbd"
+             class="[&_svg:not([class*='size-'])]:size-3 bg-muted dark:in-data-[slot=tooltip-content]:bg-background/10 font-medium font-sans gap-1 h-5 in-[.allow]:bg-primary-foreground/20 in-[.allow]:text-primary-foreground in-data-[slot=tooltip-content]:bg-background/20 in-data-[slot=tooltip-content]:text-background inline-flex items-center justify-center min-w-5 pointer-events-none px-1 rounded-sm select-none shrink-0 text-muted-foreground text-xs w-fit"> r </kbd>
         Deny, saying why
       </button>
     </div>
@@ -769,17 +773,23 @@ let%expect_test "a question dialog: keys" =
   H.show h ~selector:".question-choices";
   [%expect
     {|
-    <div role="radiogroup" class="question-choices">
-      <div role="radio" aria-checked="false" class="question-choice selected" @on_click>
+    <div role="radiogroup" class="flex flex-col gap-0.5 mb-2 question-choices">
+      <div role="radio"
+           aria-checked="false"
+           class="[&>.check]:self-center bg-accent cursor-pointer flex gap-2 hover:bg-accent items-baseline narrow:items-center narrow:min-h-11 px-2.5 py-1.5 question-choice rounded-md selected shadow-[inset_2px_0_0_var(--primary)]"
+           @on_click>
         <span aria-hidden="true"
               class="border border-input check dark:bg-input/30 flex items-center justify-center radio rounded-full shrink-0 size-4"> </span>
-        <span class="question-label"> Postgres </span>
-        <span class="question-detail"> the one in prod </span>
+        <span class="min-w-0 question-label"> Postgres </span>
+        <span class="question-detail text-muted-foreground text-xs"> the one in prod </span>
       </div>
-      <div role="radio" aria-checked="false" class="question-choice" @on_click>
+      <div role="radio"
+           aria-checked="false"
+           class="[&>.check]:self-center cursor-pointer flex gap-2 hover:bg-accent items-baseline narrow:items-center narrow:min-h-11 px-2.5 py-1.5 question-choice rounded-md"
+           @on_click>
         <span aria-hidden="true"
               class="border border-input check dark:bg-input/30 flex items-center justify-center radio rounded-full shrink-0 size-4"> </span>
-        <span class="question-label"> SQLite </span>
+        <span class="min-w-0 question-label"> SQLite </span>
         <Vdom.Node.none-widget> </Vdom.Node.none-widget>
       </div>
     </div>
@@ -906,25 +916,34 @@ let%expect_test "a question dialog: clicks" =
     (Question (Choose 0))
     (Question (Choose 2))
     (Question (Choose 0))
-    <div role="group" class="question-choices">
-      <div role="checkbox" aria-checked="false" class="question-choice selected" @on_click>
+    <div role="group" class="flex flex-col gap-0.5 mb-2 question-choices">
+      <div role="checkbox"
+           aria-checked="false"
+           class="[&>.check]:self-center bg-accent cursor-pointer flex gap-2 hover:bg-accent items-baseline narrow:items-center narrow:min-h-11 px-2.5 py-1.5 question-choice rounded-md selected shadow-[inset_2px_0_0_var(--primary)]"
+           @on_click>
         <span aria-hidden="true"
               class="border border-input check dark:bg-input/30 flex items-center justify-center rounded-[4px] shrink-0 size-4"> </span>
-        <span class="question-label"> lint </span>
+        <span class="min-w-0 question-label"> lint </span>
         <Vdom.Node.none-widget> </Vdom.Node.none-widget>
       </div>
-      <div role="checkbox" aria-checked="false" class="question-choice" @on_click>
+      <div role="checkbox"
+           aria-checked="false"
+           class="[&>.check]:self-center cursor-pointer flex gap-2 hover:bg-accent items-baseline narrow:items-center narrow:min-h-11 px-2.5 py-1.5 question-choice rounded-md"
+           @on_click>
         <span aria-hidden="true"
               class="border border-input check dark:bg-input/30 flex items-center justify-center rounded-[4px] shrink-0 size-4"> </span>
-        <span class="question-label"> tests </span>
+        <span class="min-w-0 question-label"> tests </span>
         <Vdom.Node.none-widget> </Vdom.Node.none-widget>
       </div>
-      <div role="checkbox" aria-checked="true" class="picked question-choice" @on_click>
+      <div role="checkbox"
+           aria-checked="true"
+           class="[&>.check]:self-center [&>.question-label]:font-semibold cursor-pointer flex gap-2 hover:bg-accent items-baseline narrow:items-center narrow:min-h-11 picked px-2.5 py-1.5 question-choice rounded-md"
+           @on_click>
         <span aria-hidden="true"
               class="bg-primary border border-primary check flex items-center justify-center on rounded-[4px] shrink-0 size-4 text-primary-foreground">
           <icon class="check"> </icon>
         </span>
-        <span class="question-label"> bench </span>
+        <span class="min-w-0 question-label"> bench </span>
         <Vdom.Node.none-widget> </Vdom.Node.none-widget>
       </div>
     </div>
@@ -1370,7 +1389,7 @@ let%expect_test
     []
     unanswered, the agent carries on by itself at 16:05
     type your answer, ↑↓ choose, Enter accepts, Esc declines (Decline) (Send)
-    <p class="question-deadline"> unanswered, the agent carries on by itself at 16:05 </p>
+    <p class="mt-2 question-deadline text-muted-foreground text-xs"> unanswered, the agent carries on by itself at 16:05 </p>
     |}];
   H.event h {|{"event":"ask_user_done","call_id":"q1","timed_out":true}|};
   H.event

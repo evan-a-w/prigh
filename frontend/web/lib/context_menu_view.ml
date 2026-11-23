@@ -38,7 +38,33 @@ let item_icon : Context_menu.Item.t -> Icon.t = function
   | Delete_archived -> Trash
 ;;
 
+(* Where the page put it (data-x, data-y or data-anchor; hidden until it is
+   placed); on a narrow window, along the bottom. *)
+let surface_cls =
+  "context-menu fixed min-w-[248px] max-w-[min(360px,calc(100vw-16px))] \
+   max-h-[calc(100vh-16px)] [&:not(.placed)]:opacity-0 \
+   [&:not(.placed)]:pointer-events-none [&_.menu-label]:shrink-0 \
+   motion-reduce:animate-none max-[760px]:top-auto! max-[760px]:right-2 \
+   max-[760px]:bottom-2 max-[760px]:left-2! max-[760px]:max-w-none \
+   max-[760px]:[&_.menu-item]:min-h-10 narrow:[&_.menu-item]:min-h-11! \
+   max-[760px]:[&_.menu-item]:text-[15px]"
+;;
+
 (* What the menu is about, above its items. *)
+let head_cls =
+  "context-menu-head -mx-1 mb-1 flex flex-col gap-px border-b border-border \
+   px-2.5 pt-1 pb-1.5 [&_.session-place]:flex-none"
+;;
+
+let title_cls =
+  "context-menu-title flex items-center gap-1.5 truncate text-[13px] \
+   font-medium text-foreground"
+;;
+
+let sub_cls =
+  "context-menu-sub truncate font-mono text-xs text-muted-foreground"
+;;
+
 let heading (m : App.Model.t) (menu : Context_menu.t) =
   match
     ( menu.target
@@ -47,14 +73,14 @@ let heading (m : App.Model.t) (menu : Context_menu.t) =
   with
   | Review_files paths, _ ->
     div
-      ~cls:"context-menu-head"
+      ~cls:head_cls
       [ span
-          ~cls:"context-menu-title"
+          ~cls:title_cls
           (match paths with
            | [ path ] -> Filename.basename path
            | _ -> sprintf "%d selected files" (List.length paths))
       ; span
-          ~cls:"context-menu-sub"
+          ~cls:sub_cls
           (match paths with
            | [ path ] -> Filename.dirname path
            | _ -> String.concat ~sep:", " (List.map paths ~f:Filename.basename))
@@ -64,23 +90,23 @@ let heading (m : App.Model.t) (menu : Context_menu.t) =
      | None -> Node.none
      | Some msg ->
        div
-         ~cls:"context-menu-head"
-         [ span ~cls:"context-menu-title" (Context_menu.Message.title msg)
+         ~cls:head_cls
+         [ span ~cls:title_cls (Context_menu.Message.title msg)
          ; (match
               String.split_lines msg.text
               |> List.find ~f:(fun l -> not (String.is_empty (String.strip l)))
             with
             | Some line ->
-              span ~cls:"context-menu-sub preview" (String.strip line)
+              span ~cls:(sub_cls ^ " preview font-sans") (String.strip line)
             | None -> Node.none)
          ])
   | Archive, _ ->
     let count = List.count m.sessions ~f:(fun s -> s.archived) in
     div
-      ~cls:"context-menu-head"
-      [ span ~cls:"context-menu-title" "Archived sessions"
+      ~cls:head_cls
+      [ span ~cls:title_cls "Archived sessions"
       ; span
-          ~cls:"context-menu-sub"
+          ~cls:sub_cls
           (match count with
            | 0 -> "none"
            | 1 -> "1 session"
@@ -91,10 +117,10 @@ let heading (m : App.Model.t) (menu : Context_menu.t) =
     (match menu.target with
      | Session _ | Message _ | Review_files _ | Archive ->
        div
-         ~cls:"context-menu-head"
-         [ span ~cls:"context-menu-title" (Session_list.title s)
+         ~cls:head_cls
+         [ span ~cls:title_cls (Session_list.title s)
          ; Sidebar_view.place
-             ~cls:"context-menu-sub"
+             ~cls:sub_cls
              ?host_home:(Sidebar_view.session_host_home m s)
              s
              ~cwd:s.cwd
@@ -107,11 +133,13 @@ let heading (m : App.Model.t) (menu : Context_menu.t) =
               ~f:Session_worktree.label
        in
        div
-         ~cls:"context-menu-head"
+         ~cls:head_cls
          [ Node.span
-             ~attrs:[ Attr.class_ "context-menu-title" ]
-             [ icon ~cls:"place-icon" Branch; Node.text label ]
-         ; span ~cls:"context-menu-sub" ("in " ^ Session_list.title s)
+             ~attrs:[ Attr.class_ title_cls ]
+             [ icon ~cls:"place-icon size-3.5 text-primary" Branch
+             ; Node.text label
+             ]
+         ; span ~cls:sub_cls ("in " ^ Session_list.title s)
          ])
 ;;
 
@@ -131,7 +159,9 @@ let view (m : App.Model.t) (menu : Context_menu.t) picker ~inject =
       ?icon:(Option.map kind ~f:item_icon)
       ?hint:(if disabled then Some item.detail else None)
       ?shortcut:
-        (if String.is_empty item.detail || disabled then None else Some item.detail)
+        (if String.is_empty item.detail || disabled
+         then None
+         else Some item.detail)
       ~attrs:
         [ Attr.create "data-item" item.id
         ; Attr.on_click (fun _ -> inject (Action.Picker_choose item.id))
@@ -169,7 +199,7 @@ let view (m : App.Model.t) (menu : Context_menu.t) picker ~inject =
     ~cls:"context-menu-backdrop"
     ~on_close:close
     [ Menu_view.surface
-        ~cls:"context-menu"
+        ~cls:surface_cls
         ~label:(Picker.title picker)
         ~attrs:
           [ Attr.id "dialog"
@@ -183,6 +213,7 @@ let view (m : App.Model.t) (menu : Context_menu.t) picker ~inject =
           ]
         (heading m menu
          :: List.map sections ~f:(fun section ->
-           Menu_view.section (List.map section ~f:(fun (i, item) -> row i item))))
+           Menu_view.section (List.map section ~f:(fun (i, item) -> row i item)))
+        )
     ]
 ;;

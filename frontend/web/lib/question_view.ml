@@ -18,16 +18,22 @@ let choice form (q : Question.t) ~question ~inject i (c : Question.Choice.t) =
   Node.div
     ~attrs:
       [ classes
-          [ "question-choice" ]
-          [ "selected", Form.cursor form = i; "picked", picked ]
+          [ "question-choice flex cursor-pointer items-baseline gap-2 \
+             rounded-md px-2.5 py-1.5 hover:bg-accent [&>.check]:self-center \
+             narrow:min-h-11 narrow:items-center"
+          ]
+          [ ( "selected bg-accent shadow-[inset_2px_0_0_var(--primary)]"
+            , Form.cursor form = i )
+          ; "picked [&>.question-label]:font-semibold", picked
+          ]
       ; Attr.role (if q.multiple then "checkbox" else "radio")
       ; Attr.create "aria-checked" (Bool.to_string picked)
       ; Attr.on_click (fun _ -> inject (Question_dialog.Action.Choose i))
       ]
     [ Html.check ~radio:(not q.multiple) picked
-    ; span ~cls:"question-label" c.label
+    ; span ~cls:"question-label min-w-0" c.label
     ; Option.value_map c.description ~default:Node.none ~f:(fun d ->
-        span ~cls:"question-detail" d)
+        span ~cls:"question-detail text-xs text-muted-foreground" d)
     ]
 ;;
 
@@ -35,18 +41,28 @@ let own form (q : Question.t) ~question ~inject =
   let row = List.length q.choices in
   div
     ~attrs:
-      [ classes [ "question-own" ] [ "selected", Form.on_own_answer form ] ]
+      [ classes
+          [ "question-own flex items-center gap-2 rounded-md px-2.5 py-1" ]
+          [ ( "selected shadow-[inset_2px_0_0_var(--primary)]"
+            , Form.on_own_answer form )
+          ]
+      ]
     [ (if List.is_empty q.choices
        then Node.none
        else
-         Node.label ~attrs:[ Attr.for_ "question-own" ] [ Node.text "Other:" ])
+         Node.label
+           ~attrs:
+             [ Attr.for_ "question-own"
+             ; Attr.class_ "shrink-0 text-xs text-muted-foreground"
+             ]
+           [ Node.text "Other:" ])
     ; Node.input
         ~attrs:
           [ Attr.id "question-own"
           ; Attr.create
               "aria-label"
               (if List.is_empty q.choices then "Your answer" else "Other")
-          ; Attr.class_ "text-input"
+          ; Attr.class_ "text-input min-w-0 flex-1"
           ; Attr.type_ "text"
           ; Attr.placeholder
               (if List.is_empty q.choices
@@ -105,18 +121,29 @@ let view (questions : Question_dialog.t list) ~utc_offset ~inject =
             ~on_click:(inject Accept)
             [ Node.text (if last then "Send" else "Next") ]
         ]
-      [ Node.p ~attrs:[ Attr.class_ "question-text" ] [ Node.text q.question ]
+      [ Node.p
+          ~attrs:
+            [ Attr.class_
+                "question-text mb-2.5 font-semibold break-words \
+                 whitespace-pre-wrap"
+            ]
+          [ Node.text q.question ]
       ; (match q.choices with
          | [] -> Node.none
          | choices ->
            div
-             ~cls:"question-choices"
+             ~cls:"question-choices mb-2 flex flex-col gap-0.5"
              ~attrs:[ Attr.role (if q.multiple then "group" else "radiogroup") ]
              (List.mapi choices ~f:(choice form q ~question ~inject)))
       ; own form q ~question ~inject
       ; (match Form.deadline_note form ~utc_offset with
          | None -> Node.none
          | Some note ->
-           Node.p ~attrs:[ Attr.class_ "question-deadline" ] [ Node.text note ])
+           Node.p
+             ~attrs:
+               [ Attr.class_
+                   "question-deadline mt-2 text-xs text-muted-foreground"
+               ]
+             [ Node.text note ])
       ]
 ;;

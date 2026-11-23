@@ -41,7 +41,11 @@ let picker_title : Dialog.Picker_kind.t -> string = function
 let mcp_problems : Dialog.Picker_kind.t -> Node.t = function
   | Mcp { problems = _ :: _ as problems; _ } ->
     div
-      ~cls:"mcp-problems"
+      ~cls:
+        "mcp-problems mt-2.5 rounded-md border border-destructive/30 \
+         bg-destructive/10 px-3 py-2 text-xs text-foreground [&_h3]:mb-1 \
+         [&_h3]:text-xs [&_h3]:font-semibold [&_h3]:text-destructive \
+         [&_ul]:pl-[18px] [&_li]:break-words"
       [ Node.h3 [ Node.text "Configuration problems" ]
       ; Node.ul (List.map problems ~f:(fun p -> Node.li [ Node.text p ]))
       ]
@@ -106,7 +110,7 @@ let picker ?(trimmable = String.Set.empty) ~kind (p : Picker.t) ~inject =
          match kind with
          | Reminders ->
            [ button
-               ~cls:"small picker-remove"
+               ~cls:"small picker-remove shrink-0 self-center"
                ~title:"Delete"
                ~label:("Remove reminder " ^ item.id)
                ~on_click:
@@ -120,12 +124,16 @@ let picker ?(trimmable = String.Set.empty) ~kind (p : Picker.t) ~inject =
            (match Jump.Target.of_string item.id with
             | Some target ->
               [ button
-                  ~cls:"small picker-trim"
+                  ~cls:
+                    "small picker-trim shrink-0 self-center \
+                     in-[.picker-item:not(.selected):not(:hover)]:invisible"
                   ~title:"Trim everything before this (Delete)"
                   ~label:("Trim the context before " ^ item.label)
                   ~on_click:
                     (Effect.Many
-                       [ Effect.Stop_propagation; inject (Action.Ask_trim target) ])
+                       [ Effect.Stop_propagation
+                       ; inject (Action.Ask_trim target)
+                       ])
                   [ Node.text "Trim before" ]
               ]
             | None -> [])
@@ -198,7 +206,7 @@ let help (m : App.Model.t) ~inject =
       ]
   in
   Modal.view
-    ~cls:"help-dialog"
+    ~cls:"help-dialog w-[min(720px,100%)]"
     ~title:"Commands and keys"
     ~on_close:(inject Action.Close_dialog)
     ~footer:
@@ -251,7 +259,8 @@ let rename (m : App.Model.t) name ~inject =
     ~on_close:(inject Action.Close_dialog)
     ~footer:(cancel_accept ~inject "Rename")
     [ div
-        ~cls:"generate-field"
+        ~cls:
+          "generate-field relative flex flex-col gap-1.5 [&>.generate]:self-end"
         [ text_input
             ~placeholder:"Session name"
             ~label:"Session name"
@@ -308,12 +317,20 @@ let delete (m : App.Model.t) (target : Dialog.Delete_target.t) ~inject =
   let shown = 6 in
   let row (s : Session_summary.t) =
     Node.li
-      ~attrs:[ classes [ "delete-row" ] [ "kept", Option.is_some (kept m s) ] ]
-      [ span ~cls:"delete-title" (Session_list.title s)
+      ~attrs:
+        [ classes
+            [ "delete-row flex gap-2.5 rounded-sm bg-muted px-2 py-0.5 \
+               [&.kept]:opacity-60"
+            ]
+            [ "kept", Option.is_some (kept m s) ]
+        ]
+      [ span ~cls:"delete-title min-w-0 flex-1 truncate" (Session_list.title s)
       ; (if Session_list.is_pinned s
-         then span ~cls:"delete-pinned" "pinned"
+         then span ~cls:"delete-pinned text-xs text-primary" "pinned"
          else Node.none)
-      ; span ~cls:"delete-size" (Session_summary.size_string s.bytes)
+      ; span
+          ~cls:"delete-size text-xs text-muted-foreground tabular-nums"
+          (Session_summary.size_string s.bytes)
       ]
   in
   let warnings =
@@ -364,19 +381,33 @@ let delete (m : App.Model.t) (target : Dialog.Delete_target.t) ~inject =
                size
            ])
     ; Node.ul
-        ~attrs:[ Attr.class_ "delete-list" ]
+        ~attrs:
+          [ Attr.class_ "delete-list mt-2.5 flex list-none flex-col gap-0.5 p-0"
+          ]
         (List.map (List.take sessions shown) ~f:row
          @
          if count > shown
          then
            [ Node.li
-               ~attrs:[ Attr.class_ "delete-more" ]
+               ~attrs:
+                 [ Attr.class_
+                     "delete-more px-2 py-0.5 text-xs text-muted-foreground \
+                      tabular-nums"
+                 ]
                [ Node.textf "and %d more" (count - shown) ]
            ]
          else [])
     ; (match warnings with
        | [] -> Node.none
-       | warnings -> Node.ul ~attrs:[ Attr.class_ "delete-warnings" ] warnings)
+       | warnings ->
+         Node.ul
+           ~attrs:
+             [ Attr.class_
+                 "delete-warnings mt-2.5 rounded-md border \
+                  border-destructive/30 bg-destructive/10 py-2 pr-2.5 pl-6 \
+                  text-[13px] text-foreground"
+             ]
+           warnings)
     ]
 ;;
 
@@ -406,7 +437,7 @@ let login (m : App.Model.t) (flow : Login_flow.t) ~inject =
     | None -> Node.none
     | Some (url, instructions) ->
       div
-        ~cls:"login-url"
+        ~cls:"login-url mb-3 flex flex-col items-start gap-2 [&_p]:m-0"
         [ (if String.is_empty instructions
            then Node.none
            else Node.p [ Node.text instructions ])
@@ -437,7 +468,11 @@ let login (m : App.Model.t) (flow : Login_flow.t) ~inject =
               ; Attr.class_ "btn primary link-button"
               ]
             [ Node.text "Open the login page"; icon External ]
-        ; div ~cls:"login-url-text" [ Node.text url ]
+        ; div
+            ~cls:
+              "login-url-text font-mono text-[11.5px] break-all \
+               text-muted-foreground"
+            [ Node.text url ]
         ]
   in
   let progress =
@@ -445,7 +480,10 @@ let login (m : App.Model.t) (flow : Login_flow.t) ~inject =
     | [] -> Node.none
     | lines ->
       Node.ul
-        ~attrs:[ Attr.class_ "login-progress" ]
+        ~attrs:
+          [ Attr.class_
+              "login-progress mb-3 pl-[18px] text-xs text-muted-foreground"
+          ]
         (List.map lines ~f:(fun l -> Node.li [ Node.text l ]))
   in
   let prompt =
@@ -453,9 +491,11 @@ let login (m : App.Model.t) (flow : Login_flow.t) ~inject =
     | None -> Node.none
     | Some (_, prompt) ->
       div
-        ~cls:"login-prompt"
+        ~cls:"login-prompt flex flex-col gap-2"
         [ div
-            ~cls:"login-message"
+            ~cls:
+              "login-message [&_p]:m-0 [&_p]:text-xs [&_p]:break-words \
+               [&_p]:text-muted-foreground"
             (List.map
                (String.split_lines (Auth_event.Prompt.message prompt))
                ~f:(fun line -> Node.p [ Node.text line ]))
@@ -497,7 +537,9 @@ let login (m : App.Model.t) (flow : Login_flow.t) ~inject =
     match flow.failed, flow.prompt with
     | Some error, _ ->
       ( div
-          ~cls:"login-failed"
+          ~cls:
+            "login-failed rounded-md border border-destructive/30 \
+             bg-destructive/10 px-3 py-2 text-destructive"
           [ (match flow.purpose, flow.forge with
              | Login, Some again ->
                Node.textf
@@ -518,7 +560,7 @@ let login (m : App.Model.t) (flow : Login_flow.t) ~inject =
     | None, Some _ -> Node.none, cancel_accept ~inject "Continue"
     | None, None ->
       ( div
-          ~cls:"login-waiting"
+          ~cls:"login-waiting flex items-center gap-2 text-muted-foreground"
           [ Html.lamp ()
           ; Node.text
               (match flow.forge with
@@ -579,12 +621,15 @@ let auth (m : App.Model.t) (statuses : Auth_status.t list) ~inject =
          div ~cls:"picker-empty" [ Node.text "The backend knows no providers." ]
        | statuses ->
          div
-           ~cls:"auth-list"
+           ~cls:"auth-list flex flex-col divide-y divide-border"
            (List.map statuses ~f:(fun s ->
               div
-                ~cls:"auth-row"
+                ~cls:"auth-row flex items-center justify-between gap-3 py-2"
                 [ div
-                    ~cls:"auth-name"
+                    ~cls:
+                      "auth-name flex min-w-0 flex-col [&_.picker-detail]:m-0 \
+                       [&_.picker-detail]:break-words \
+                       [&_.picker-detail]:whitespace-normal"
                     [ span ~cls:"picker-label" s.name
                     ; span
                         ~cls:"picker-detail"
@@ -604,7 +649,7 @@ let auth (m : App.Model.t) (statuses : Auth_status.t list) ~inject =
                 ; (match s.custom, s.configured with
                    | Some _, _ ->
                      div
-                       ~cls:"auth-buttons"
+                       ~cls:"auth-buttons flex shrink-0 gap-1.5"
                        [ button
                            ~cls:"small"
                            ~on_click:(inject (Action.Start_login s.provider))
@@ -682,24 +727,47 @@ let confirm (m : App.Model.t) ~inject =
       match m.confirm_reason with
       | None ->
         ( [ Node.p
-              ~attrs:[ Attr.class_ "confirm-question" ]
+              ~attrs:
+                [ Attr.class_
+                    "confirm-question mb-2.5 max-h-[30vh] overflow-auto \
+                     rounded-md bg-muted px-3 py-2.5 font-mono text-[12.5px] \
+                     break-words whitespace-pre-wrap \
+                     in-[.computer-consent]:bg-transparent \
+                     in-[.computer-consent]:p-0 in-[.computer-consent]:mb-1.5 \
+                     in-[.computer-consent]:font-sans \
+                     in-[.computer-consent]:text-sm \
+                     in-[.computer-consent]:font-semibold"
+                ]
               [ Node.text (Confirm_prompt.title c) ]
           ; (match Confirm_prompt.detail c with
              | None -> Node.none
              | Some text ->
-               Node.p ~attrs:[ Attr.class_ "confirm-detail" ] [ Node.text text ])
+               Node.p
+                 ~attrs:
+                   [ Attr.class_
+                       "confirm-detail mb-3 text-xs text-muted-foreground"
+                   ]
+                 [ Node.text text ])
           ; div
-              ~cls:"confirm-answers"
+              ~cls:"confirm-answers flex flex-col gap-1.5"
               (List.map (Confirm_prompt.answers c) ~f:(fun (a, key, label) ->
                  let cls =
                    match a with
-                   | Allow -> "primary allow"
-                   | Always -> "always"
+                   | Allow -> "allow"
+                   | Always -> "always border-primary/40"
                    | Deny -> "deny"
                    | Deny_with_reason -> "reason"
                  in
                  button
-                   ~cls:("confirm-answer " ^ cls)
+                   ~variant:
+                     (match a with
+                      | Allow -> Default
+                      | Always | Deny | Deny_with_reason -> Outline)
+                   ~cls:
+                     ("confirm-answer h-auto min-h-8 justify-start gap-2.5 \
+                       px-2.5 py-1.5 text-left whitespace-normal break-words \
+                       narrow:min-h-11 narrow:text-[15px] "
+                      ^ cls)
                    ~title:
                      (match a with
                       | Allow -> key ^ " or Enter"
@@ -708,7 +776,11 @@ let confirm (m : App.Model.t) ~inject =
                    ~label:(String.capitalize label)
                    ~attrs:[ Attr.create "aria-keyshortcuts" key ]
                    ~on_click:(answer a)
-                   [ Node.kbd [ Node.text key ]
+                   [ Loon.Kbd.view
+                       ~class_:
+                         "shrink-0 in-[.allow]:bg-primary-foreground/20 \
+                          in-[.allow]:text-primary-foreground"
+                       [ Node.text key ]
                    ; Node.text (String.capitalize label)
                    ]))
           ]
@@ -717,18 +789,30 @@ let confirm (m : App.Model.t) ~inject =
       | Some reason ->
         let back = inject Action.Cancel_confirm_reason in
         ( [ Node.p
-              ~attrs:[ Attr.class_ "confirm-question" ]
+              ~attrs:
+                [ Attr.class_
+                    "confirm-question mb-2.5 max-h-[30vh] overflow-auto \
+                     rounded-md bg-muted px-3 py-2.5 font-mono text-[12.5px] \
+                     break-words whitespace-pre-wrap \
+                     in-[.computer-consent]:bg-transparent \
+                     in-[.computer-consent]:p-0 in-[.computer-consent]:mb-1.5 \
+                     in-[.computer-consent]:font-sans \
+                     in-[.computer-consent]:text-sm \
+                     in-[.computer-consent]:font-semibold"
+                ]
               [ Node.text (Confirm_prompt.title c) ]
           ; Node.label
               ~attrs:
-                [ Attr.class_ "confirm-reason-label"
+                [ Attr.class_
+                    "confirm-reason-label mb-1.5 block text-xs \
+                     text-muted-foreground"
                 ; Attr.for_ "confirm-reason"
                 ]
               [ Node.text Confirm_prompt.reason_question ]
           ; Node.input
               ~attrs:
                 [ Attr.id "confirm-reason"
-                ; Attr.class_ "text-input"
+                ; Attr.class_ "text-input w-full"
                 ; Attr.type_ "text"
                 ; Attr.value reason
                 ; Attr.create "autocomplete" "off"
