@@ -223,9 +223,9 @@ let%expect_test "the top bar: project / name, the toggles, the card's" =
     button "Files" -- Files (Ctrl+Shift+F)
     button "Terminal" -- Terminal (Ctrl+`)
     button "Review changes" -- Review changes (Alt+R)
-    button "Subagents and worktrees"
+    button "Subagents, jobs and worktrees"
     Toggle_session_card
-    button "Subagents and worktrees"
+    button "Subagents, jobs and worktrees"
     false
     Toggle_session_card
     true
