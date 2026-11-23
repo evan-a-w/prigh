@@ -269,6 +269,8 @@ try {
   await run(desktop, `/cd ${web}`);
   await desktop.waitForFunction(d => document.body.innerText.includes(d), "site");
   await send(desktop, "A landing page");
+  // Its row is listed once the backend has the session: wait for it.
+  await desktop.locator(".sessions .session.selected", { hasText: "A landing page" }).waitFor();
   await worktreesInCard(desktop, 0);
   await desktop.mouse.move(1000, 400);
   await tree("in the other session", desktop);

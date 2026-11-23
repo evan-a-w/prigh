@@ -38,8 +38,12 @@ let%expect_test "bash: arguments streaming, then running with live output" =
   Chat_harness.show ~selector:".tool" chat;
   [%expect
     {|
-    <div class="open running tool tool-bash">
-      <button type="button" data-fold="c1#open" aria-expanded="true" class="tool-head">
+    <div data-slot="collapsible" data-state="open" class="open running tool tool-bash">
+      <button data-slot="collapsible-trigger"
+              type="button"
+              data-fold="c1#open"
+              aria-expanded="true"
+              class="tool-head">
         <span aria-hidden="true" class="lamp"> </span>
         <span aria-hidden="true" class="tool-icon">
           <icon class="terminal"> </icon>
@@ -48,7 +52,7 @@ let%expect_test "bash: arguments streaming, then running with live output" =
         <span class="arg command"> ls && echo done </span>
         <span class="chev">  </span>
       </button>
-      <div class="tool-body">
+      <div data-slot="collapsible-content" class="tool-body">
         <div class="clipped from-end live output">
           <div class="earlier"> 6 earlier lines </div>
           <pre> script-stream.json
@@ -68,8 +72,12 @@ let%expect_test "bash: arguments streaming, then running with live output" =
        {|{"type":"event","event":"tool_end","call":{"id":"c1","name":"bash","arguments":"{\"command\":\"ls && echo done\"}"},"result":{"role":"tool_result","tool_call_id":"c1","tool_name":"bash","text":"app.ml.orig\nhome\nnotes.md\npic.png\npw\nscript.json\nscript-stream.json\nserver.log\nserve.sh\nshoot.sh\nshots\nsrc\ndone\n","is_error":false}}|});
   [%expect
     {|
-    <div class="ok open tool tool-bash">
-      <button type="button" data-fold="c1#open" aria-expanded="true" class="tool-head">
+    <div data-slot="collapsible" data-state="open" class="ok open tool tool-bash">
+      <button data-slot="collapsible-trigger"
+              type="button"
+              data-fold="c1#open"
+              aria-expanded="true"
+              class="tool-head">
         <span title="Done" role="img" aria-label="Done" class="done mark">
           <icon class="check"> </icon>
         </span>
@@ -80,7 +88,7 @@ let%expect_test "bash: arguments streaming, then running with live output" =
         <span class="arg command"> ls && echo done </span>
         <span class="chev">  </span>
       </button>
-      <div class="tool-body">
+      <div data-slot="collapsible-content" class="tool-body">
         <div class="clipped from-start output">
           <pre> app.ml.orig
     home
@@ -111,8 +119,12 @@ let%expect_test
     ];
   [%expect
     {|
-    <div class="error open tool tool-bash">
-      <button type="button" data-fold="c9#open" aria-expanded="true" class="tool-head">
+    <div data-slot="collapsible" data-state="open" class="error open tool tool-bash">
+      <button data-slot="collapsible-trigger"
+              type="button"
+              data-fold="c9#open"
+              aria-expanded="true"
+              class="tool-head">
         <span title="Failed" role="img" aria-label="Failed" class="failed mark">
           <icon class="cross"> </icon>
         </span>
@@ -124,14 +136,18 @@ let%expect_test
         <span class="bad chip"> exit code 1 </span>
         <span class="chev">  </span>
       </button>
-      <div class="tool-body">
+      <div data-slot="collapsible-content" class="tool-body">
         <div class="error output">
           <pre> cat: missing.txt: No such file or directory </pre>
         </div>
       </div>
     </div>
-    <div class="error open tool tool-bash">
-      <button type="button" data-fold="c2#open" aria-expanded="true" class="tool-head">
+    <div data-slot="collapsible" data-state="open" class="error open tool tool-bash">
+      <button data-slot="collapsible-trigger"
+              type="button"
+              data-fold="c2#open"
+              aria-expanded="true"
+              class="tool-head">
         <span title="Failed" role="img" aria-label="Failed" class="failed mark">
           <icon class="cross"> </icon>
         </span>
@@ -143,7 +159,7 @@ let%expect_test
         <span class="bad chip"> timed out after 5s </span>
         <span class="chev">  </span>
       </button>
-      <div class="tool-body">
+      <div data-slot="collapsible-content" class="tool-body">
         <pre class="command"> cd src
     make </pre>
         <div class="error output">
@@ -199,8 +215,9 @@ let%expect_test "a foreground bash moved to the background: its job and output" 
     ];
   [%expect
     {|
-    <div class="ok open tool tool-bash">
-      <button type="button"
+    <div data-slot="collapsible" data-state="open" class="ok open tool tool-bash">
+      <button data-slot="collapsible-trigger"
+              type="button"
               data-fold="c11#open"
               aria-expanded="true"
               title="moved to the background after 30s"
@@ -216,7 +233,7 @@ let%expect_test "a foreground bash moved to the background: its job and output" 
         <span class="chip job"> job j3 </span>
         <span class="chev">  </span>
       </button>
-      <div class="tool-body">
+      <div data-slot="collapsible-content" class="tool-body">
         <span class="details"> moved to the background after 30s </span>
         <div class="output">
           <pre> building 39
@@ -236,8 +253,12 @@ let%expect_test "long output: the middle folds behind \"N more lines\"" =
     ];
   [%expect
     {|
-    <div class="ok open tool tool-bash">
-      <button type="button" data-fold="c1#open" aria-expanded="true" class="tool-head">
+    <div data-slot="collapsible" data-state="open" class="ok open tool tool-bash">
+      <button data-slot="collapsible-trigger"
+              type="button"
+              data-fold="c1#open"
+              aria-expanded="true"
+              class="tool-head">
         <span title="Done" role="img" aria-label="Done" class="done mark">
           <icon class="check"> </icon>
         </span>
@@ -248,7 +269,7 @@ let%expect_test "long output: the middle folds behind \"N more lines\"" =
         <span class="arg command"> seq </span>
         <span class="chev">  </span>
       </button>
-      <div class="tool-body">
+      <div data-slot="collapsible-content" class="tool-body">
         <div class="clipped from-start output">
           <pre> line 0
     line 1
@@ -279,8 +300,12 @@ let%expect_test "read: text folded, images as thumbnails, ranges, errors" =
     ];
   [%expect
     {|
-    <div class="ok open tool tool-read">
-      <button type="button" data-fold="c2#open" aria-expanded="true" class="tool-head">
+    <div data-slot="collapsible" data-state="open" class="ok open tool tool-read">
+      <button data-slot="collapsible-trigger"
+              type="button"
+              data-fold="c2#open"
+              aria-expanded="true"
+              class="tool-head">
         <span title="Done" role="img" aria-label="Done" class="done mark">
           <icon class="check"> </icon>
         </span>
@@ -291,7 +316,7 @@ let%expect_test "read: text folded, images as thumbnails, ranges, errors" =
         <span class="arg path"> notes.md </span>
         <span class="chev">  </span>
       </button>
-      <div class="tool-body">
+      <div data-slot="collapsible-content" class="tool-body">
         <div class="clipped from-start output">
           <button type="button" data-fold="c2" aria-expanded="false" class="fold">
             <span class="chev"> </span>
@@ -304,8 +329,12 @@ let%expect_test "read: text folded, images as thumbnails, ranges, errors" =
         </div>
       </div>
     </div>
-    <div class="ok open tool tool-read">
-      <button type="button" data-fold="c3#open" aria-expanded="true" class="tool-head">
+    <div data-slot="collapsible" data-state="open" class="ok open tool tool-read">
+      <button data-slot="collapsible-trigger"
+              type="button"
+              data-fold="c3#open"
+              aria-expanded="true"
+              class="tool-head">
         <span title="Done" role="img" aria-label="Done" class="done mark">
           <icon class="check"> </icon>
         </span>
@@ -316,7 +345,7 @@ let%expect_test "read: text folded, images as thumbnails, ranges, errors" =
         <span class="arg path"> pic.png </span>
         <span class="chev">  </span>
       </button>
-      <div class="tool-body">
+      <div data-slot="collapsible-content" class="tool-body">
         <div data-viewer-group="" class="images">
           <button type="button"
                   title="[image: image/png, 8 B]"
@@ -330,8 +359,9 @@ let%expect_test "read: text folded, images as thumbnails, ranges, errors" =
         <span class="caption"> Read image file [image/png, 320x200] </span>
       </div>
     </div>
-    <div class="ok open tool tool-read">
-      <button type="button"
+    <div data-slot="collapsible" data-state="open" class="ok open tool tool-read">
+      <button data-slot="collapsible-trigger"
+              type="button"
               data-fold="c4#open"
               aria-expanded="true"
               title="lines 10–29"
@@ -346,15 +376,19 @@ let%expect_test "read: text folded, images as thumbnails, ranges, errors" =
         <span class="arg path"> big.ml </span>
         <span class="chev">  </span>
       </button>
-      <div class="tool-body">
+      <div data-slot="collapsible-content" class="tool-body">
         <span class="details"> lines 10–29 </span>
         <div class="output">
           <pre> x </pre>
         </div>
       </div>
     </div>
-    <div class="error open tool tool-read">
-      <button type="button" data-fold="c5#open" aria-expanded="true" class="tool-head">
+    <div data-slot="collapsible" data-state="open" class="error open tool tool-read">
+      <button data-slot="collapsible-trigger"
+              type="button"
+              data-fold="c5#open"
+              aria-expanded="true"
+              class="tool-head">
         <span title="Failed" role="img" aria-label="Failed" class="failed mark">
           <icon class="cross"> </icon>
         </span>
@@ -365,7 +399,7 @@ let%expect_test "read: text folded, images as thumbnails, ranges, errors" =
         <span class="arg path"> nope.txt </span>
         <span class="chev">  </span>
       </button>
-      <div class="tool-body">
+      <div data-slot="collapsible-content" class="tool-body">
         <div class="error output">
           <pre> file not found: nope.txt </pre>
         </div>
@@ -381,8 +415,12 @@ let%expect_test "write: the path, a preview, whether it replaced a file" =
     ];
   [%expect
     {|
-    <div class="ok open tool tool-write">
-      <button type="button" data-fold="c4#open" aria-expanded="true" class="tool-head">
+    <div data-slot="collapsible" data-state="open" class="ok open tool tool-write">
+      <button data-slot="collapsible-trigger"
+              type="button"
+              data-fold="c4#open"
+              aria-expanded="true"
+              class="tool-head">
         <span title="Done" role="img" aria-label="Done" class="done mark">
           <icon class="check"> </icon>
         </span>
@@ -394,7 +432,7 @@ let%expect_test "write: the path, a preview, whether it replaced a file" =
         <span class="chip"> 3 lines </span>
         <span class="chev">  </span>
       </button>
-      <div class="tool-body">
+      <div data-slot="collapsible-content" class="tool-body">
         <div class="output">
           <pre> import sys
 
@@ -402,8 +440,9 @@ let%expect_test "write: the path, a preview, whether it replaced a file" =
         </div>
       </div>
     </div>
-    <div class="ok open tool tool-write">
-      <button type="button"
+    <div data-slot="collapsible" data-state="open" class="ok open tool tool-write">
+      <button data-slot="collapsible-trigger"
+              type="button"
               data-fold="c5#open"
               aria-expanded="true"
               title="overwrote the file"
@@ -419,7 +458,7 @@ let%expect_test "write: the path, a preview, whether it replaced a file" =
         <span class="chip"> 1 line </span>
         <span class="chev">  </span>
       </button>
-      <div class="tool-body">
+      <div data-slot="collapsible-content" class="tool-body">
         <span class="details"> overwrote the file </span>
         <div class="output">
           <pre> x </pre>
@@ -436,8 +475,12 @@ let%expect_test "write: content shown as it streams" =
     ];
   [%expect
     {|
-    <div class="open running tool tool-write">
-      <button type="button" data-fold="c1#open" aria-expanded="true" class="tool-head">
+    <div data-slot="collapsible" data-state="open" class="open running tool tool-write">
+      <button data-slot="collapsible-trigger"
+              type="button"
+              data-fold="c1#open"
+              aria-expanded="true"
+              class="tool-head">
         <span aria-hidden="true" class="lamp"> </span>
         <span aria-hidden="true" class="tool-icon">
           <icon class="file_pen"> </icon>
@@ -447,7 +490,7 @@ let%expect_test "write: content shown as it streams" =
         <span class="chip"> 3 lines </span>
         <span class="chev">  </span>
       </button>
-      <div class="tool-body">
+      <div data-slot="collapsible-content" class="tool-body">
         <div class="live output">
           <pre> one
     two
@@ -465,8 +508,12 @@ let%expect_test "edit: the diff it returned, or its edits before it has run" =
   show ~running:true [ sprintf {|{"event":"tool_start","call":%s}|} call ];
   [%expect
     {|
-    <div class="open running tool tool-edit">
-      <button type="button" data-fold="c5#open" aria-expanded="true" class="tool-head">
+    <div data-slot="collapsible" data-state="open" class="open running tool tool-edit">
+      <button data-slot="collapsible-trigger"
+              type="button"
+              data-fold="c5#open"
+              aria-expanded="true"
+              class="tool-head">
         <span aria-hidden="true" class="lamp"> </span>
         <span aria-hidden="true" class="tool-icon">
           <icon class="file_pen"> </icon>
@@ -477,7 +524,7 @@ let%expect_test "edit: the diff it returned, or its edits before it has run" =
         <span class="chip del"> −2 </span>
         <span class="chev">  </span>
       </button>
-      <div class="tool-body">
+      <div data-slot="collapsible-content" class="tool-body">
         <div class="diff-view">
           <table class="diff">
             <tbody>
@@ -550,8 +597,12 @@ let%expect_test "edit: the diff it returned, or its edits before it has run" =
     ];
   [%expect
     {|
-    <div class="ok open tool tool-edit">
-      <button type="button" data-fold="c5#open" aria-expanded="true" class="tool-head">
+    <div data-slot="collapsible" data-state="open" class="ok open tool tool-edit">
+      <button data-slot="collapsible-trigger"
+              type="button"
+              data-fold="c5#open"
+              aria-expanded="true"
+              class="tool-head">
         <span title="Done" role="img" aria-label="Done" class="done mark">
           <icon class="check"> </icon>
         </span>
@@ -564,7 +615,7 @@ let%expect_test "edit: the diff it returned, or its edits before it has run" =
         <span class="chip del"> −2 </span>
         <span class="chev">  </span>
       </button>
-      <div class="tool-body">
+      <div data-slot="collapsible-content" class="tool-body">
         <div class="diff-view">
           <table class="diff">
             <tbody>
@@ -661,8 +712,12 @@ let%expect_test "edit: the diff it returned, or its edits before it has run" =
     ];
   [%expect
     {|
-    <div class="error open tool tool-edit">
-      <button type="button" data-fold="c5#open" aria-expanded="true" class="tool-head">
+    <div data-slot="collapsible" data-state="open" class="error open tool tool-edit">
+      <button data-slot="collapsible-trigger"
+              type="button"
+              data-fold="c5#open"
+              aria-expanded="true"
+              class="tool-head">
         <span title="Failed" role="img" aria-label="Failed" class="failed mark">
           <icon class="cross"> </icon>
         </span>
@@ -675,7 +730,7 @@ let%expect_test "edit: the diff it returned, or its edits before it has run" =
         <span class="chip del"> −2 </span>
         <span class="chev">  </span>
       </button>
-      <div class="tool-body">
+      <div data-slot="collapsible-content" class="tool-body">
         <div class="error output">
           <pre> edit 2: old_text not found in file </pre>
         </div>
@@ -754,8 +809,12 @@ let%expect_test "ls, grep, find" =
     ];
   [%expect
     {|
-    <div class="ok open tool tool-ls">
-      <button type="button" data-fold="c6#open" aria-expanded="true" class="tool-head">
+    <div data-slot="collapsible" data-state="open" class="ok open tool tool-ls">
+      <button data-slot="collapsible-trigger"
+              type="button"
+              data-fold="c6#open"
+              aria-expanded="true"
+              class="tool-head">
         <span title="Done" role="img" aria-label="Done" class="done mark">
           <icon class="check"> </icon>
         </span>
@@ -766,15 +825,16 @@ let%expect_test "ls, grep, find" =
         <span class="arg path"> . </span>
         <span class="chev">  </span>
       </button>
-      <div class="tool-body">
+      <div data-slot="collapsible-content" class="tool-body">
         <div class="output">
           <pre> hello.py
     src/ </pre>
         </div>
       </div>
     </div>
-    <div class="ok open tool tool-grep">
-      <button type="button"
+    <div data-slot="collapsible" data-state="open" class="ok open tool tool-grep">
+      <button data-slot="collapsible-trigger"
+              type="button"
               data-fold="c7#open"
               aria-expanded="true"
               title="in src · files *.ml · ignoring case"
@@ -789,7 +849,7 @@ let%expect_test "ls, grep, find" =
         <span class="arg pattern"> salute </span>
         <span class="chev">  </span>
       </button>
-      <div class="tool-body">
+      <div data-slot="collapsible-content" class="tool-body">
         <span class="details"> in src · files *.ml · ignoring case </span>
         <div class="output">
           <pre>
@@ -799,8 +859,12 @@ let%expect_test "ls, grep, find" =
         </div>
       </div>
     </div>
-    <div class="ok open tool tool-find">
-      <button type="button" data-fold="c8#open" aria-expanded="true" class="tool-head">
+    <div data-slot="collapsible" data-state="open" class="ok open tool tool-find">
+      <button data-slot="collapsible-trigger"
+              type="button"
+              data-fold="c8#open"
+              aria-expanded="true"
+              class="tool-head">
         <span title="Done" role="img" aria-label="Done" class="done mark">
           <icon class="check"> </icon>
         </span>
@@ -811,7 +875,7 @@ let%expect_test "ls, grep, find" =
         <span class="arg pattern"> *.ml </span>
         <span class="chev">  </span>
       </button>
-      <div class="tool-body">
+      <div data-slot="collapsible-content" class="tool-body">
         <div class="output">
           <pre> src/app.ml </pre>
         </div>
@@ -1050,8 +1114,12 @@ let%expect_test
     ];
   [%expect
     {|
-    <div class="ok open tool tool-job_status">
-      <button type="button" data-fold="c11#open" aria-expanded="true" class="tool-head">
+    <div data-slot="collapsible" data-state="open" class="ok open tool tool-job_status">
+      <button data-slot="collapsible-trigger"
+              type="button"
+              data-fold="c11#open"
+              aria-expanded="true"
+              class="tool-head">
         <span title="Done" role="img" aria-label="Done" class="done mark">
           <icon class="check"> </icon>
         </span>
@@ -1061,14 +1129,18 @@ let%expect_test
         <span class="name"> job_status </span>
         <span class="chev">  </span>
       </button>
-      <div class="tool-body">
+      <div data-slot="collapsible-content" class="tool-body">
         <div class="output">
           <pre> j1  running  0s  sleep 1; echo bg finished  (last: 0 B, no output) </pre>
         </div>
       </div>
     </div>
-    <div class="ok open tool tool-job_wait">
-      <button type="button" data-fold="c13#open" aria-expanded="true" class="tool-head">
+    <div data-slot="collapsible" data-state="open" class="ok open tool tool-job_wait">
+      <button data-slot="collapsible-trigger"
+              type="button"
+              data-fold="c13#open"
+              aria-expanded="true"
+              class="tool-head">
         <span title="Done" role="img" aria-label="Done" class="done mark">
           <icon class="check"> </icon>
         </span>
@@ -1079,7 +1151,7 @@ let%expect_test
         <span class="arg"> j1 j2 </span>
         <span class="chev">  </span>
       </button>
-      <div class="tool-body">
+      <div data-slot="collapsible-content" class="tool-body">
         <div class="output">
           <pre>
             [job j1 exited 0] sleep 1; echo bg finished
@@ -1090,8 +1162,12 @@ let%expect_test
         </div>
       </div>
     </div>
-    <div class="ok open tool tool-job_kill">
-      <button type="button" data-fold="c14#open" aria-expanded="true" class="tool-head">
+    <div data-slot="collapsible" data-state="open" class="ok open tool tool-job_kill">
+      <button data-slot="collapsible-trigger"
+              type="button"
+              data-fold="c14#open"
+              aria-expanded="true"
+              class="tool-head">
         <span title="Done" role="img" aria-label="Done" class="done mark">
           <icon class="check"> </icon>
         </span>
@@ -1102,7 +1178,7 @@ let%expect_test
         <span class="arg"> j2 </span>
         <span class="chev">  </span>
       </button>
-      <div class="tool-body">
+      <div data-slot="collapsible-content" class="tool-body">
         <div class="delivery">
           <div class="bad delivery-section">
             <div title="job j2" class="delivery-head">
@@ -1115,8 +1191,12 @@ let%expect_test
         </div>
       </div>
     </div>
-    <div class="ok open tool tool-job_output">
-      <button type="button" data-fold="c15#open" aria-expanded="true" class="tool-head">
+    <div data-slot="collapsible" data-state="open" class="ok open tool tool-job_output">
+      <button data-slot="collapsible-trigger"
+              type="button"
+              data-fold="c15#open"
+              aria-expanded="true"
+              class="tool-head">
         <span title="Done" role="img" aria-label="Done" class="done mark">
           <icon class="check"> </icon>
         </span>
@@ -1127,7 +1207,7 @@ let%expect_test
         <span class="arg"> j3 </span>
         <span class="chev">  </span>
       </button>
-      <div class="tool-body">
+      <div data-slot="collapsible-content" class="tool-body">
         <div class="output">
           <pre> [job j3 running after 3s, 12 bytes; lines 1-2 of 2] make
     step 1
@@ -1135,8 +1215,12 @@ let%expect_test
         </div>
       </div>
     </div>
-    <div class="ok open tool tool-job_wait">
-      <button type="button" data-fold="c16#open" aria-expanded="true" class="tool-head">
+    <div data-slot="collapsible" data-state="open" class="ok open tool tool-job_wait">
+      <button data-slot="collapsible-trigger"
+              type="button"
+              data-fold="c16#open"
+              aria-expanded="true"
+              class="tool-head">
         <span title="Done" role="img" aria-label="Done" class="done mark">
           <icon class="check"> </icon>
         </span>
@@ -1146,7 +1230,7 @@ let%expect_test
         <span class="name"> job_wait </span>
         <span class="chev">  </span>
       </button>
-      <div class="tool-body">
+      <div data-slot="collapsible-content" class="tool-body">
         <div class="output">
           <pre> no jobs to wait for </pre>
         </div>
@@ -1184,8 +1268,12 @@ let%expect_test "cancelled calls: what they did, not as errors" =
     ];
   [%expect
     {|
-    <div class="interrupted open tool tool-bash">
-      <button type="button" data-fold="c1#open" aria-expanded="true" class="tool-head">
+    <div data-slot="collapsible" data-state="open" class="interrupted open tool tool-bash">
+      <button data-slot="collapsible-trigger"
+              type="button"
+              data-fold="c1#open"
+              aria-expanded="true"
+              class="tool-head">
         <span title="Interrupted" role="img" aria-label="Interrupted" class="mark stopped">
           <icon class="square"> </icon>
         </span>
@@ -1197,7 +1285,7 @@ let%expect_test "cancelled calls: what they did, not as errors" =
         <span class="chip"> cancelled </span>
         <span class="chev">  </span>
       </button>
-      <div class="tool-body">
+      <div data-slot="collapsible-content" class="tool-body">
         <div class="output">
           <pre> step 1
     step 2 </pre>
@@ -1226,8 +1314,12 @@ let%expect_test "other tools: their main argument and output" =
     ];
   [%expect
     {|
-    <div class="ok open tool tool-web_fetch">
-      <button type="button" data-fold="c1#open" aria-expanded="true" class="tool-head">
+    <div data-slot="collapsible" data-state="open" class="ok open tool tool-web_fetch">
+      <button data-slot="collapsible-trigger"
+              type="button"
+              data-fold="c1#open"
+              aria-expanded="true"
+              class="tool-head">
         <span title="Done" role="img" aria-label="Done" class="done mark">
           <icon class="check"> </icon>
         </span>
@@ -1238,7 +1330,7 @@ let%expect_test "other tools: their main argument and output" =
         <span class="arg url"> https://x </span>
         <span class="chev">  </span>
       </button>
-      <div class="tool-body">
+      <div data-slot="collapsible-content" class="tool-body">
         <div class="output">
           <pre> fetched </pre>
         </div>
@@ -1304,8 +1396,12 @@ let%expect_test "apply_patch: one file's diff, like edit" =
     ];
   [%expect
     {|
-    <div class="ok open tool tool-apply_patch">
-      <button type="button" data-fold="p1#open" aria-expanded="true" class="tool-head">
+    <div data-slot="collapsible" data-state="open" class="ok open tool tool-apply_patch">
+      <button data-slot="collapsible-trigger"
+              type="button"
+              data-fold="p1#open"
+              aria-expanded="true"
+              class="tool-head">
         <span title="Done" role="img" aria-label="Done" class="done mark">
           <icon class="check"> </icon>
         </span>
@@ -1318,7 +1414,7 @@ let%expect_test "apply_patch: one file's diff, like edit" =
         <span class="chip del"> −1 </span>
         <span class="chev">  </span>
       </button>
-      <div class="tool-body">
+      <div data-slot="collapsible-content" class="tool-body">
         <div class="diff-view">
           <table class="diff">
             <tbody>
@@ -1388,8 +1484,12 @@ let%expect_test "apply_patch: several files, each named above its diff" =
     ];
   [%expect
     {|
-    <div class="ok open tool tool-apply_patch">
-      <button type="button" data-fold="p1#open" aria-expanded="true" class="tool-head">
+    <div data-slot="collapsible" data-state="open" class="ok open tool tool-apply_patch">
+      <button data-slot="collapsible-trigger"
+              type="button"
+              data-fold="p1#open"
+              aria-expanded="true"
+              class="tool-head">
         <span title="Done" role="img" aria-label="Done" class="done mark">
           <icon class="check"> </icon>
         </span>
@@ -1403,7 +1503,7 @@ let%expect_test "apply_patch: several files, each named above its diff" =
         <span class="chip del"> −1 </span>
         <span class="chev">  </span>
       </button>
-      <div class="tool-body">
+      <div data-slot="collapsible-content" class="tool-body">
         <div class="add patch-file">
           <span class="kind"> A </span>
           <span class="path"> src/new.ml </span>
@@ -1491,8 +1591,12 @@ let%expect_test "apply_patch: an error, with the patch it tried" =
     ];
   [%expect
     {|
-    <div class="error open tool tool-apply_patch">
-      <button type="button" data-fold="p1#open" aria-expanded="true" class="tool-head">
+    <div data-slot="collapsible" data-state="open" class="error open tool tool-apply_patch">
+      <button data-slot="collapsible-trigger"
+              type="button"
+              data-fold="p1#open"
+              aria-expanded="true"
+              class="tool-head">
         <span title="Failed" role="img" aria-label="Failed" class="failed mark">
           <icon class="cross"> </icon>
         </span>
@@ -1506,7 +1610,7 @@ let%expect_test "apply_patch: an error, with the patch it tried" =
         <span class="chip del"> −1 </span>
         <span class="chev">  </span>
       </button>
-      <div class="tool-body">
+      <div data-slot="collapsible-content" class="tool-body">
         <div class="error output">
           <pre> Failed to find expected lines in src/a.ml:
       x </pre>
@@ -1582,8 +1686,12 @@ let%expect_test "apply_patch: the files streamed so far" =
     ];
   [%expect
     {|
-    <div class="open running tool tool-apply_patch">
-      <button type="button" data-fold="p1#open" aria-expanded="true" class="tool-head">
+    <div data-slot="collapsible" data-state="open" class="open running tool tool-apply_patch">
+      <button data-slot="collapsible-trigger"
+              type="button"
+              data-fold="p1#open"
+              aria-expanded="true"
+              class="tool-head">
         <span aria-hidden="true" class="lamp"> </span>
         <span aria-hidden="true" class="tool-icon">
           <icon class="file_pen"> </icon>
@@ -1595,7 +1703,7 @@ let%expect_test "apply_patch: the files streamed so far" =
         <span class="chip del"> −0 </span>
         <span class="chev">  </span>
       </button>
-      <div class="tool-body">
+      <div data-slot="collapsible-content" class="tool-body">
         <div class="add patch-file">
           <span class="kind"> A </span>
           <span class="path"> src/new.ml </span>
@@ -1723,7 +1831,11 @@ let%expect_test "a finished call shows how long it took, from its message's end"
   Chat_harness.show ~selector:".tool-head" chat;
   [%expect
     {|
-    <button type="button" data-fold="a#open" aria-expanded="true" class="tool-head">
+    <button data-slot="collapsible-trigger"
+            type="button"
+            data-fold="a#open"
+            aria-expanded="true"
+            class="tool-head">
       <span title="Done" role="img" aria-label="Done" class="done mark">
         <icon class="check"> </icon>
       </span>
@@ -1735,7 +1847,11 @@ let%expect_test "a finished call shows how long it took, from its message's end"
       <span data-took="0.1s" title="Took 0.1s" class="took"> </span>
       <span class="chev">  </span>
     </button>
-    <button type="button" data-fold="b#open" aria-expanded="true" class="tool-head">
+    <button data-slot="collapsible-trigger"
+            type="button"
+            data-fold="b#open"
+            aria-expanded="true"
+            class="tool-head">
       <span title="Done" role="img" aria-label="Done" class="done mark">
         <icon class="check"> </icon>
       </span>
@@ -1747,7 +1863,11 @@ let%expect_test "a finished call shows how long it took, from its message's end"
       <span data-took="41s" title="Took 41s" class="took"> </span>
       <span class="chev">  </span>
     </button>
-    <button type="button" data-fold="c#open" aria-expanded="true" class="tool-head">
+    <button data-slot="collapsible-trigger"
+            type="button"
+            data-fold="c#open"
+            aria-expanded="true"
+            class="tool-head">
       <span title="Done" role="img" aria-label="Done" class="done mark">
         <icon class="check"> </icon>
       </span>

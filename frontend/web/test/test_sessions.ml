@@ -344,8 +344,12 @@ let%expect_test
   [%expect
     {|
     Scroll_to_bottom
-    <div class="open running tool tool-bash">
-      <button type="button" data-fold="c1#open" aria-expanded="true" class="tool-head">
+    <div data-slot="collapsible" data-state="open" class="open running tool tool-bash">
+      <button data-slot="collapsible-trigger"
+              type="button"
+              data-fold="c1#open"
+              aria-expanded="true"
+              class="tool-head">
         <span aria-hidden="true" class="lamp"> </span>
         <span aria-hidden="true" class="tool-icon">
           <icon class="terminal"> </icon>
@@ -354,7 +358,7 @@ let%expect_test
         <span class="arg command"> rm -rf build </span>
         <span class="chev">  </span>
       </button>
-      <div class="tool-body">
+      <div data-slot="collapsible-content" class="tool-body">
         <div class="live output">
           <div class="missed"> Output from while this page was away shows when it ends. </div>
         </div>

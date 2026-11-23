@@ -49,6 +49,7 @@ let%expect_test "in chat mode: the chip, the host chip and the placeholder" =
     Mode Chat: no tool host
     (no host)
     <textarea id="editor"
+              data-slot="input-group-control"
               placeholder="Chat, without a tool host: no files or commands. Ask anything…"
               aria-label="Message"
               dir="auto"
@@ -75,6 +76,7 @@ let%expect_test "in chat mode: the chip, the host chip and the placeholder" =
     {|
     Close_dialog
     <textarea id="editor"
+              data-slot="input-group-control"
               placeholder="Chat: no files or commands…"
               aria-label="Message"
               dir="auto"

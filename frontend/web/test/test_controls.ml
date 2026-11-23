@@ -1219,6 +1219,7 @@ let%expect_test
       <span class="chip-label"> Opus 5.5 </span>
     </button>
     <textarea id="editor"
+              data-slot="input-group-control"
               placeholder="Ask prigh…  / commands"
               aria-label="Message"
               dir="auto"

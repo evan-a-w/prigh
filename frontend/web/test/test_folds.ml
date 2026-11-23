@@ -52,8 +52,12 @@ let%expect_test "a call is one line at rest; the line opens its output" =
   H.text h ~selector:".tool";
   [%expect
     {|
-    <div class="ok tool tool-bash">
-      <button type="button" data-fold="c1#open" aria-expanded="false" class="tool-head">
+    <div data-slot="collapsible" data-state="closed" class="ok tool tool-bash">
+      <button data-slot="collapsible-trigger"
+              type="button"
+              data-fold="c1#open"
+              aria-expanded="false"
+              class="tool-head">
         <span title="Done" role="img" aria-label="Done" class="done mark">
           <icon class="check"> </icon>
         </span>

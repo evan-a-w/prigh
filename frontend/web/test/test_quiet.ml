@@ -130,8 +130,12 @@ let%expect_test "a run of steps is one line: what it did and how long it took" =
   show ~selector:".run" chat;
   [%expect
     {|
-    <div class="error run">
-      <button type="button" data-fold="run:think:1:0" aria-expanded="false" class="run-head">
+    <div data-slot="collapsible" data-state="closed" class="error run">
+      <button data-slot="collapsible-trigger"
+              type="button"
+              data-fold="run:think:1:0"
+              aria-expanded="false"
+              class="run-head">
         <span title="A step failed" role="img" aria-label="A step failed" class="failed mark">
           <icon class="cross"> </icon>
         </span>
@@ -400,7 +404,11 @@ let%expect_test
   H.text h ~selector:".run";
   [%expect
     {|
-    <button type="button" data-fold="run:c1#open" aria-expanded="false" class="run-head">
+    <button data-slot="collapsible-trigger"
+            type="button"
+            data-fold="run:c1#open"
+            aria-expanded="false"
+            class="run-head">
       <span aria-hidden="true" class="lamp"> </span>
       <span class="run-label"> Thinking </span>
       <span class="chev">  </span>

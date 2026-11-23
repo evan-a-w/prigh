@@ -475,8 +475,12 @@ let view (m : App.Model.t) ~inject =
           ; Attr.create "data-popover-box" ""
           ]
         [ rest (popup m ~inject)
-        ; div
-            ~cls:"composer-box"
+        ; Node.div
+            ~attrs:
+              [ Attr.class_ "composer-box"
+              ; Attr.create "data-slot" "input-group"
+              ; Attr.role "group"
+              ]
             [ rest (images m ~inject)
             ; rest (pasted m ~inject)
             ; rest (Files_view.chips m ~inject)
@@ -488,6 +492,7 @@ let view (m : App.Model.t) ~inject =
                        ~attrs:
                          [ Attr.class_ "editor"
                          ; Attr.id "editor"
+                         ; Attr.create "data-slot" "input-group-control"
                          ; Attr.placeholder placeholder
                          ; Attr.create "aria-label" "Message"
                          ; Attr.create "dir" "auto"
@@ -519,8 +524,12 @@ let view (m : App.Model.t) ~inject =
                          ]
                        []
                    ]
-            ; div
-                ~cls:"composer-row"
+            ; Node.div
+                ~attrs:
+                  [ Attr.class_ "composer-row"
+                  ; Attr.create "data-slot" "input-group-addon"
+                  ; Attr.create "data-align" "block-end"
+                  ]
                 [ plus m ~inject
                 ; rest (Context_ring_view.view m ~inject)
                 ; (* Stop while there is something to steer with: at the

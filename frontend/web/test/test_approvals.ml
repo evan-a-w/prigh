@@ -657,6 +657,7 @@ let%expect_test "plan mode: the composer says how to leave it" =
   [%expect
     {|
     <textarea id="editor"
+              data-slot="input-group-control"
               placeholder="Plan mode: discuss the plan, or leave it to implement (/plan off or Alt+M)…"
               aria-label="Message"
               dir="auto"
@@ -667,6 +668,7 @@ let%expect_test "plan mode: the composer says how to leave it" =
               #value=""
               @on_input> </textarea>
     <textarea id="editor"
+              data-slot="input-group-control"
               placeholder="Plan mode: /plan off to implement"
               aria-label="Message"
               dir="auto"
@@ -677,6 +679,7 @@ let%expect_test "plan mode: the composer says how to leave it" =
               #value=""
               @on_input> </textarea>
     <textarea id="editor"
+              data-slot="input-group-control"
               placeholder="Ask prigh…  / commands"
               aria-label="Message"
               dir="auto"
@@ -1234,8 +1237,12 @@ let%expect_test "update_plan and ask_user in the transcript" =
   Chat_harness.show ~selector:".tool-update_plan" chat;
   [%expect
     {|
-    <div class="ok open tool tool-update_plan">
-      <button type="button" data-fold="t1#open" aria-expanded="true" class="tool-head">
+    <div data-slot="collapsible" data-state="open" class="ok open tool tool-update_plan">
+      <button data-slot="collapsible-trigger"
+              type="button"
+              data-fold="t1#open"
+              aria-expanded="true"
+              class="tool-head">
         <span title="Done" role="img" aria-label="Done" class="done mark">
           <icon class="check"> </icon>
         </span>
@@ -1247,7 +1254,7 @@ let%expect_test "update_plan and ask_user in the transcript" =
         <span class="chip"> 1/3 done </span>
         <span class="chev">  </span>
       </button>
-      <div class="tool-body">
+      <div data-slot="collapsible-content" class="tool-body">
         <div class="plan">
           <p class="plan-explanation"> first pass </p>
           <ul class="plan-steps">

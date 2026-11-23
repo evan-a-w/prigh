@@ -50,6 +50,7 @@ let%expect_test "the names of the controls" =
     [separator] div "Resize the sessions sidebar" -- Drag to resize, double-click for the default size
     [link] span "New session"
     [region] div "Transcript"
+    [group] div "Ready Context 0 / 200k 0% used \194\183 compacts at 160k (80%) This session $0.00 Tokens 0 in \194\183 0 out Status Ready Reasoning Medium Mode Auto: never asks Model Claude Opus 5.5 Branch main /compact to free context Details backend Opus 5.5"
     [status] span "Ready"
     [dialog] div "Context and cost"
     [group] div "Host and model"
@@ -154,6 +155,7 @@ let%expect_test "the names in dialogs, pickers and the transcript" =
     button "Folder: /work. Change it" -- /work. Start in another folder (/cd)
     button "Branch: main. Change it" -- Work in another worktree (/worktree)
     textarea "Message"
+    [group] div "Ready Context 0 / 200k 0% used \194\183 compacts at 160k (80%) This session $0.00 Last turn $0.000 Tokens 0 in \194\183 0 out Status Ready Reasoning Medium Mode Auto: never asks Model Claude Opus 5.5 Branch main /compact to free context Details backend Opus 5.5"
     [status] span "Ready"
     [dialog] div "Context and cost"
     [group] div "Host and model"

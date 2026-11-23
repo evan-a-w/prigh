@@ -612,7 +612,9 @@ and assistant
         "pending"
         [ Html.lamp ()
         ; span "label" label
-        ; span "stop-hint" "Esc to stop"
+        ; Node.span
+            ~attrs:[ Attr.class_ "stop-hint" ]
+            [ Loon.Kbd.view [ Node.text "Esc" ]; Node.text " to stop" ]
         ; (match detail with
            | Some error -> div "detail" [ Node.text ("after: " ^ error) ]
            | None -> Node.none)
@@ -735,10 +737,13 @@ and activity ~ui ~fold times chat runs (box : Activity_runs.Box.t) =
                 else "ok")
              ]
              @ if opened then [ "open" ] else [])
+        ; Attr.create "data-slot" "collapsible"
+        ; Attr.create "data-state" (if opened then "open" else "closed")
         ]
       [ Node.button
           ~attrs:
             [ Attr.class_ "run-head"
+            ; Attr.create "data-slot" "collapsible-trigger"
             ; Attr.type_ "button"
             ; Fold.toggle_attr fold key
             ; Attr.create "aria-expanded" (Bool.to_string opened)
@@ -760,9 +765,13 @@ and activity ~ui ~fold times chat runs (box : Activity_runs.Box.t) =
                 ]))
       ; (if opened
          then
-           div
-             "run-steps"
-             (List.map steps ~f:(fun (step : Activity_runs.Step.t) ->
+           Node.div
+             ~attrs:
+               [ Attr.class_ "run-steps"
+               ; Attr.create "data-slot" "collapsible-content"
+               ]
+             (present
+              @@ List.map steps ~f:(fun (step : Activity_runs.Step.t) ->
                 match step with
                 | Call { call; streaming; at; _ } ->
                   Tool_view.view
@@ -783,7 +792,8 @@ and activity ~ui ~fold times chat runs (box : Activity_runs.Box.t) =
                     ~live
                     text
                 | Report { user; _ } ->
-                  render_entry ~ui ~fold times chat ~n:0 (Chat.Entry.User user)))
+                  render_entry ~ui ~fold times chat ~n:0 (Chat.Entry.User user))
+             )
          else Node.none)
       ])
 

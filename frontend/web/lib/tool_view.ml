@@ -1070,10 +1070,13 @@ let card
         ~attrs:
           [ Attr.classes
               (String.split cls ~on:' ' @ if opened then [ "open" ] else [])
+          ; Attr.create "data-slot" "collapsible"
+          ; Attr.create "data-state" (if opened then "open" else "closed")
           ]
         (Node.button
            ~attrs:
              ([ Attr.class_ "tool-head"
+              ; Attr.create "data-slot" "collapsible-trigger"
               ; Attr.type_ "button"
               ; Fold.toggle_attr fold key
               ; Attr.create "aria-expanded" (Bool.to_string opened)
@@ -1083,12 +1086,16 @@ let card
          ::
          (if opened
           then
-            [ div
-                "tool-body"
-                ((match tooltip with
-                  | Some t -> span "details" t
-                  | None -> Node.none)
-                 :: body)
+            [ Node.div
+                ~attrs:
+                  [ Attr.class_ "tool-body"
+                  ; Attr.create "data-slot" "collapsible-content"
+                  ]
+                (Chat_html.present
+                   ((match tooltip with
+                     | Some t -> span "details" t
+                     | None -> Node.none)
+                    :: body))
             ]
           else [])))
 ;;

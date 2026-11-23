@@ -70,7 +70,11 @@ let%expect_test
         <div class="pending">
           <span aria-hidden="true" class="lamp"> </span>
           <span class="label"> Waiting for the model… </span>
-          <span class="stop-hint"> Esc to stop </span>
+          <span class="stop-hint">
+            <kbd data-slot="kbd"
+                 class="[&_svg:not([class*='size-'])]:size-3 bg-muted dark:in-data-[slot=tooltip-content]:bg-background/10 font-medium font-sans gap-1 h-5 in-data-[slot=tooltip-content]:bg-background/20 in-data-[slot=tooltip-content]:text-background inline-flex items-center justify-center min-w-5 pointer-events-none px-1 rounded-sm select-none text-muted-foreground text-xs w-fit"> Esc </kbd>
+             to stop
+          </span>
         </div>
       </div>
     </div>
