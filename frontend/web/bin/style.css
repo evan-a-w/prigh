@@ -302,43 +302,40 @@ kbd {
   animation: appear 0.1s ease-out;
 }
 .context-menu:not(.placed) { visibility: hidden; }
-.context-menu-head { display: flex; flex-direction: column; gap: 1px; padding: 6px 10px 7px; border-bottom: 1px solid var(--rule); }
-.context-menu-title { display: flex; align-items: center; gap: 6px; color: var(--chalk); font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.context-menu-head { display: flex; flex-direction: column; gap: 1px; padding: 4px 6px 6px; margin: 0 -4px 4px; padding-left: 10px; padding-right: 10px; border-bottom: 1px solid var(--border); }
+.context-menu-title { display: flex; align-items: center; gap: 6px; color: var(--foreground); font-weight: 500; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .context-menu-title .place-icon { width: 13px; height: 13px; color: var(--sodium); }
 .context-menu-sub { color: var(--faint); font: 11.5px var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .context-menu-head .session-place { flex: none; }
-.context-menu .menu-section { padding: 3px 0; }
-.context-menu .menu-item { gap: 9px; padding: 5px 8px; font-size: 13px; }
-.context-menu .menu-item > .icon { width: 14px; height: 14px; flex-shrink: 0; }
 .context-menu .menu-label { flex-shrink: 0; }
 .menu-command {
   margin-left: auto;
+  padding-left: 12px;
   min-width: 0;
-  padding: 0;
   border: 0;
   background: none;
-  color: var(--faint);
-  font: 11px var(--mono);
+  color: var(--muted-foreground);
+  font: 12px var(--mono);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.menu-item.selected .menu-command, .menu-item:hover .menu-command { color: var(--muted-text); }
+.menu-item.selected .menu-command, .menu-item:hover .menu-command { color: var(--accent-foreground); }
 /* Disabled: dimmed, saying why under its label. */
 .menu-item.disabled { cursor: default; }
-.context-menu .menu-item.disabled .menu-label, .context-menu .menu-item.disabled > .icon { color: var(--faint); }
+.menu-item.disabled :is(.menu-label, .menu-command), .menu-item.disabled > .icon { opacity: 0.5; }
+.menu-item.disabled:hover { background: none; }
 .menu-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.menu-hint { color: var(--faint); font-size: 11.5px; white-space: normal; }
+.menu-hint { color: var(--muted-foreground); font-size: 12px; white-space: normal; }
 .context-menu-head .preview { font-family: var(--sans); }
 @media (max-width: 760px) {
   .context-menu { left: 8px !important; right: 8px; top: auto !important; bottom: 8px; max-width: none; }
-  .context-menu .menu-item { min-height: 40px; }
+  .context-menu .menu-item { min-height: 40px; font-size: 15px; }
 }
 @media (prefers-reduced-motion: reduce) { .context-menu { animation: none; } }
 /* A text field's menu in the desktop app's browser window (Field_menu). */
 .menu-backdrop.field-menu-backdrop { z-index: var(--z-field-menu); }
 .context-menu.field-menu { min-width: 200px; }
-.field-menu .menu-item.disabled:hover { background: none; }
 .field-note { color: var(--faint); font-size: 11.5px; }
 .worktree-dialog .field + .field { margin-top: 12px; }
 .worktree-dialog .dialog-note { margin: 12px 0 0; }
@@ -1082,11 +1079,13 @@ kbd {
 
 .menu-backdrop { position: fixed; inset: 0; z-index: var(--z-menu); }
 /* What a menu floats on: the account's, a composer chip's. */
+/* Loon's DropdownMenu content (Nova), in plain CSS: every menu's surface. */
 .menu-surface {
-  background: var(--slate);
-  border: 1px solid var(--rule-2);
-  border-radius: var(--r-surface);
-  box-shadow: var(--float-shadow);
+  background: var(--popover);
+  color: var(--popover-foreground);
+  border: 0;
+  border-radius: var(--radius);
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--foreground) 10%, transparent), 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
   outline: none;
 }
 .account-menu {
@@ -1105,14 +1104,18 @@ kbd {
 .account-acting { color: var(--sodium); font-size: 12.5px; }
 .account-host { color: var(--muted-text); font: 11.5px var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .account-badge { font-size: 11.5px; color: var(--sage); border: 1px solid var(--sage-line); border-radius: var(--r-chip); padding: 0 6px; white-space: nowrap; }
-.menu-section { display: flex; flex-direction: column; gap: 1px; padding: 4px 0; }
-.menu-section + .menu-section { border-top: 1px solid var(--rule); }
-.menu-heading { color: var(--muted-text); font-size: 12.5px; font-weight: 600; padding: 4px 10px 2px; }
-.menu-item { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-radius: var(--r-control); cursor: pointer; }
-.menu-item > .icon { color: var(--muted-text); }
-.menu-item:hover { background: var(--slate-2); }
-.menu-item.selected { background: var(--slate-2); box-shadow: inset 2px 0 0 var(--sodium); }
-.menu-item.danger .menu-label, .menu-item.danger > .icon { color: var(--brick); }
+/* Loon's DropdownMenu parts (Menu_view): sections apart by a separator,
+   a label, items (the one under the pointer or the keys accented), the
+   destructive ones red, a shortcut at the right. */
+.menu-section { display: flex; flex-direction: column; gap: 0; padding: 0; }
+.menu-section + .menu-section { border-top: 1px solid var(--border); margin: 4px -4px 0; padding: 4px 4px 0; }
+.menu-heading { color: var(--muted-foreground); font-size: 12px; font-weight: 500; padding: 4px 6px; }
+.menu-item { display: flex; align-items: center; gap: 6px; padding: 4px 6px; border-radius: calc(var(--radius) * 0.8); font-size: 14px; cursor: default; user-select: none; outline: none; }
+.menu-item > .icon { width: 16px; height: 16px; flex-shrink: 0; color: var(--muted-foreground); }
+.menu-item:hover, .menu-item.selected { background: var(--accent); color: var(--accent-foreground); }
+.menu-item:is(:hover, .selected) > .icon { color: var(--accent-foreground); }
+.menu-item.danger, .menu-item.danger .menu-label, .menu-item.danger > .icon { color: var(--destructive); }
+.menu-item.danger:is(:hover, .selected) { background: color-mix(in oklab, var(--destructive) 10%, transparent); }
 .menu-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.3; }
 .menu-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .menu-detail { color: var(--muted-text); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

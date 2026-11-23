@@ -124,37 +124,23 @@ let view (m : App.Model.t) (menu : Context_menu.t) picker ~inject =
     (* Dimmed: disabled, the detail says why. *)
     let disabled = item.dimmed in
     let selected = i = Picker.selected picker in
-    Node.div
+    Menu_view.item
+      ~selected
+      ~danger
+      ~disabled
+      ?icon:(Option.map kind ~f:item_icon)
+      ?hint:(if disabled then Some item.detail else None)
+      ?shortcut:
+        (if String.is_empty item.detail || disabled then None else Some item.detail)
       ~attrs:
-        [ classes
-            [ "menu-item" ]
-            [ "selected", selected; "danger", danger; "disabled", disabled ]
-        ; Attr.role "menuitem"
-        ; Attr.create "data-item" item.id
-        ; (if disabled then Attr.create "aria-disabled" "true" else Attr.empty)
+        [ Attr.create "data-item" item.id
         ; Attr.on_click (fun _ -> inject (Action.Picker_choose item.id))
         ; Attr.on_mouseenter (fun _ ->
             if selected
             then Effect.Ignore
             else inject (Action.Picker_move (i - Picker.selected picker)))
         ]
-      [ Option.value_map kind ~default:Node.none ~f:(fun k ->
-          icon (item_icon k))
-      ; (if disabled && not (String.is_empty item.detail)
-         then
-           Node.span
-             ~attrs:[ Attr.class_ "menu-text" ]
-             [ span ~cls:"menu-label" item.label
-             ; span ~cls:"menu-hint" item.detail
-             ]
-         else span ~cls:"menu-label" item.label)
-      ; (if String.is_empty item.detail || disabled
-         then Node.none
-         else
-           Node.kbd
-             ~attrs:[ Attr.class_ "menu-command" ]
-             [ Node.text item.detail ])
-      ]
+      item.label
   in
   (* Separated: going there, changing it, looking at it, copying, and the
      destructive ones. *)
@@ -179,26 +165,14 @@ let view (m : App.Model.t) (menu : Context_menu.t) picker ~inject =
       in
       g a <> g b)
   in
-  Node.div
-    ~attrs:
-      [ Attr.class_ "menu-backdrop context-menu-backdrop"
-      ; Attr.on_click (fun ev ->
-          if Js_of_ocaml.Js.Unsafe.equals ev##.target ev##.currentTarget
-          then close
-          else Effect.Ignore)
-      ; Attr.on_contextmenu (fun ev ->
-          Js_of_ocaml.Dom.preventDefault ev;
-          if Js_of_ocaml.Js.Unsafe.equals ev##.target ev##.currentTarget
-          then close
-          else Effect.Ignore)
-      ]
-    [ Node.div
+  Menu_view.backdrop
+    ~cls:"context-menu-backdrop"
+    ~on_close:close
+    [ Menu_view.surface
+        ~cls:"context-menu"
+        ~label:(Picker.title picker)
         ~attrs:
-          [ Attr.class_ "context-menu menu-surface"
-          ; Attr.id "dialog"
-          ; Attr.role "menu"
-          ; Attr.create "aria-label" (Picker.title picker)
-          ; Attr.tabindex (-1)
+          [ Attr.id "dialog"
           ; (match menu.anchor with
              | Point { x; y } ->
                Attr.many
@@ -209,8 +183,6 @@ let view (m : App.Model.t) (menu : Context_menu.t) picker ~inject =
           ]
         (heading m menu
          :: List.map sections ~f:(fun section ->
-           div
-             ~cls:"menu-section"
-             (List.map section ~f:(fun (i, item) -> row i item))))
+           Menu_view.section (List.map section ~f:(fun (i, item) -> row i item))))
     ]
 ;;
