@@ -63,8 +63,8 @@ let%expect_test
     This session $5.50 · $5.50/$5.00
     (Goal 3/20) (Resumes 14:05)
     <div class="cost hot status-detail">
-    <button class="goal link status-item warm">
-    <button class="link resume status-item warm">
+    <button class="[&>svg]:pointer-events-none [&>svg]:size-3! [a]:hover:bg-muted [a]:hover:text-muted-foreground aria-invalid:border-destructive aria-invalid:ring-destructive/20 border border-primary/40 cursor-pointer dark:aria-invalid:ring-destructive/40 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 font-medium gap-1 goal group/badge h-5 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 hover:bg-muted hover:text-foreground inline-flex items-center justify-center link max-w-[24ch] narrow:h-11 narrow:text-sm overflow-hidden px-2 py-0.5 rounded-4xl shrink-0 status-item text-primary text-xs transition-all w-fit warm whitespace-nowrap">
+    <button class="[&>svg]:pointer-events-none [&>svg]:size-3! [a]:hover:bg-muted [a]:hover:text-muted-foreground aria-invalid:border-destructive aria-invalid:ring-destructive/20 border border-primary/40 cursor-pointer dark:aria-invalid:ring-destructive/40 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 font-medium gap-1 group/badge h-5 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 hover:bg-muted hover:text-foreground inline-flex items-center justify-center link max-w-[24ch] narrow:h-11 narrow:text-sm overflow-hidden px-2 py-0.5 resume rounded-4xl shrink-0 status-item text-primary text-xs transition-all w-fit warm whitespace-nowrap">
     (Resumes 16:05)
     |}];
   H.act h (Run "/goal");

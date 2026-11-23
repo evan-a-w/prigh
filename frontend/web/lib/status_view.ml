@@ -123,10 +123,35 @@ let meter percent =
 
 let text_ text = span ~cls:"status-text" text
 
+(* A note is loon's outline Badge, a button: the accent once it is near a
+   limit ([warm]), destructive past it ([hot]). *)
+let note_classes cls =
+  let words = String.split cls ~on:' ' in
+  let tone =
+    if List.mem words "hot" ~equal:String.equal
+    then "text-destructive border-destructive/40"
+    else if List.mem words "warm" ~equal:String.equal
+    then "text-primary border-primary/40"
+    else "text-muted-foreground"
+  in
+  Loon.Badge.classes
+    ~variant:Outline
+    ~class_:
+      (String.concat
+         ~sep:" "
+         [ "status-item link"
+         ; cls
+         ; "cursor-pointer max-w-[24ch] hover:bg-muted hover:text-foreground \
+            narrow:h-11 narrow:text-sm"
+         ; tone
+         ])
+    ()
+;;
+
 let chip ?label ~cls ~title ~command ~inject children =
   Node.button
     ~attrs:
-      [ Attr.class_ (String.strip ("status-item link " ^ cls))
+      [ Attr.class_ (note_classes cls)
       ; Attr.type_ "button"
       ; Attr.title title
       ; Option.value_map label ~default:Attr.empty ~f:(Attr.create "aria-label")
@@ -196,7 +221,7 @@ let nix_gc (m : App.Model.t) ~inject =
     in
     Node.button
       ~attrs:
-        [ Attr.class_ "status-item link nix-gc active"
+        [ Attr.class_ (note_classes "nix-gc active")
         ; Attr.type_ "button"
         ; Attr.title (String.capitalize text ^ " (Settings shows the store)")
         ; Attr.on_click (fun _ -> inject Action.Open_settings)
@@ -210,7 +235,14 @@ let transfers (m : App.Model.t) =
   | None -> Node.none
   | Some text ->
     Node.span
-      ~attrs:[ Attr.class_ "status-item transfers"; Attr.title text ]
+      ~attrs:
+        [ Attr.class_
+            (Loon.Badge.classes
+               ~variant:Outline
+               ~class_:"status-item transfers max-w-[32ch] text-primary"
+               ())
+        ; Attr.title text
+        ]
       [ Html.lamp (); Node.text text ]
 ;;
 
@@ -218,7 +250,7 @@ let modes (m : App.Model.t) ~inject =
   let chip ?(cls = "") ~title ~command text =
     Node.button
       ~attrs:
-        [ Attr.class_ (String.strip ("status-item link mode " ^ cls))
+        [ Attr.class_ (note_classes ("mode " ^ cls))
         ; Attr.type_ "button"
         ; Attr.title title
         ; Attr.on_click (fun _ -> inject (Action.Run command))
