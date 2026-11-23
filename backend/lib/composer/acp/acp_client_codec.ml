@@ -1087,7 +1087,8 @@ let on_update t params =
         | Some id when Hash_set.mem t.compacted id -> []
         | id ->
           Option.iter id ~f:(Hash_set.add t.compacted);
-          [ Output.Event (Compacted { tokens_before = None; tokens_after = None })
+          [ Output.Event
+              (Compacted { tokens_before = None; tokens_after = None })
           ])
      | Some (("failed" | "cancelled") as status) ->
        [ Output.Event
@@ -1248,14 +1249,13 @@ let on_response t ~id ~result ~error =
           let unknown =
             match reason with
             | Some r
-              when not
-                     (List.mem
-                        known_stop_reasons
-                        r
-                        ~equal:String.equal) ->
+              when not (List.mem known_stop_reasons r ~equal:String.equal) ->
               [ Output.Event
                   (Notice
-                     (sprintf "the agent ended its turn for a reason prigh does not know: %s" r))
+                     (sprintf
+                        "the agent ended its turn for a reason prigh does not \
+                         know: %s"
+                        r))
               ]
             | _ -> []
           in
@@ -1290,26 +1290,26 @@ let on_permission t ~id params =
        cancelled. *)
     [ Output.Send (result_line id cancelled_outcome) ]
   | _ ->
-  Hashtbl.set t.permissions ~key:request_id ~data:{ id; options };
-  let started, kind, tool_id =
-    match tool_of_update t tool_call with
-    | Some (tool_id, tool, started) -> started, tool.kind, Some tool_id
-    | None -> [], Other "other", None
-  in
-  let title = Option.value (str "title" tool_call) ~default:"" in
-  started
-  @ [ Output.Event
-        (Approval_request
-           { request_id
-           ; tool_id
-           ; kind
-           ; summary = title
-           ; input = tool_input ~kind ~title (field "rawInput" tool_call)
-           ; offers_always =
-               List.exists options ~f:(fun (_, k) ->
-                 String.equal k "allow_always")
-           })
-    ]
+    Hashtbl.set t.permissions ~key:request_id ~data:{ id; options };
+    let started, kind, tool_id =
+      match tool_of_update t tool_call with
+      | Some (tool_id, tool, started) -> started, tool.kind, Some tool_id
+      | None -> [], Other "other", None
+    in
+    let title = Option.value (str "title" tool_call) ~default:"" in
+    started
+    @ [ Output.Event
+          (Approval_request
+             { request_id
+             ; tool_id
+             ; kind
+             ; summary = title
+             ; input = tool_input ~kind ~title (field "rawInput" tool_call)
+             ; offers_always =
+                 List.exists options ~f:(fun (_, k) ->
+                   String.equal k "allow_always")
+             })
+      ]
 ;;
 
 let of_our_session t params =
@@ -1323,59 +1323,60 @@ let handle_line t raw =
   if String.is_empty (String.strip raw)
   then []
   else (
-  match Json.parse raw with
-  | Error _ ->
-    [ Output.Event
-        (Notice
-           (sprintf
-              "the ACP agent wrote a line that is not JSON: %s"
-              (String.prefix raw 200)))
-    ]
-  | Ok json ->
-    let id = field "id" json in
-    let params = obj (field "params" json) in
-    (match str "method" json, id with
-     | Some "session/request_permission", Some id ->
-       if of_our_session t params
-       then on_permission t ~id params
-       else
-         [ Output.Send (error_line id ~code:(-32602) ~message:"unknown session")
+    match Json.parse raw with
+    | Error _ ->
+      [ Output.Event
+          (Notice
+             (sprintf
+                "the ACP agent wrote a line that is not JSON: %s"
+                (String.prefix raw 200)))
+      ]
+    | Ok json ->
+      let id = field "id" json in
+      let params = obj (field "params" json) in
+      (match str "method" json, id with
+       | Some "session/request_permission", Some id ->
+         if of_our_session t params
+         then on_permission t ~id params
+         else
+           [ Output.Send
+               (error_line id ~code:(-32602) ~message:"unknown session")
+           ]
+       | Some method_, Some id ->
+         [ Output.Send
+             (error_line
+                id
+                ~code:(-32601)
+                ~message:
+                  (sprintf
+                     "method not found: %s (this client does not offer it)"
+                     method_))
          ]
-     | Some method_, Some id ->
-       [ Output.Send
-           (error_line
-              id
-              ~code:(-32601)
-              ~message:
-                (sprintf
-                   "method not found: %s (this client does not offer it)"
-                   method_))
-       ]
-     | Some "session/update", None ->
-       if of_our_session t params then on_update t params else []
-     | Some "$/cancel_request", None ->
-       (match field "requestId" params with
-        | Some request ->
-          let request_id = request_id_string request in
-          (match Hashtbl.find_and_remove t.permissions request_id with
-           | None -> []
-           | Some p ->
-             [ Output.Send
-                 (error_line p.id ~code:(-32800) ~message:"request cancelled")
-             ; Event (Request_withdrawn { request_id })
-             ])
-        | None -> [])
-     | Some _, None -> []
-     | None, Some id ->
-       (match Json.int id with
-        | None -> []
-        | Some id ->
-          on_response
-            t
-            ~id
-            ~result:(field "result" json)
-            ~error:(field "error" json))
-     | None, None -> []))
+       | Some "session/update", None ->
+         if of_our_session t params then on_update t params else []
+       | Some "$/cancel_request", None ->
+         (match field "requestId" params with
+          | Some request ->
+            let request_id = request_id_string request in
+            (match Hashtbl.find_and_remove t.permissions request_id with
+             | None -> []
+             | Some p ->
+               [ Output.Send
+                   (error_line p.id ~code:(-32800) ~message:"request cancelled")
+               ; Event (Request_withdrawn { request_id })
+               ])
+          | None -> [])
+       | Some _, None -> []
+       | None, Some id ->
+         (match Json.int id with
+          | None -> []
+          | Some id ->
+            on_response
+              t
+              ~id
+              ~result:(field "result" json)
+              ~error:(field "error" json))
+       | None, None -> []))
 ;;
 
 let process_exited ?(name = "the ACP agent") t ~code ~stderr_tail =

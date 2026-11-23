@@ -226,7 +226,8 @@ let steer t input =
       | Steered _ | Failed { kind = Turn_steer; _ } -> true
       | _ -> false)
   with
-  | Failed { message; _ } -> Or_error.error_string ("Codex did not take it: " ^ message)
+  | Failed { message; _ } ->
+    Or_error.error_string ("Codex did not take it: " ^ message)
   | _ -> Ok ()
 ;;
 

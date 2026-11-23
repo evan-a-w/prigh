@@ -1753,7 +1753,8 @@ let%expect_test "MCP tool-call approvals and network access are asked as such" =
   show (C.reply_approval codec ~request_id:"20" Allow);
   show (C.reply_approval codec ~request_id:"21" Allow_always);
   show (C.reply_approval codec ~request_id:"22" (Deny None));
-  [%expect {|
+  [%expect
+    {|
     (Turn_started (turn_id tu-1))
     (Approval_request (request_id 20) (tool_id ())
      (kind (Mcp (server github) (tool create_issue)))

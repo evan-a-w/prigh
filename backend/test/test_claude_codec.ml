@@ -116,7 +116,8 @@ let%expect_test "launch" =
   (* A value that could be read as a flag goes after an [=]. *)
   argv
     { Claude_launch.default with model = Some "--dangerously-skip-permissions" };
-  [%expect {|
+  [%expect
+    {|
     (claude --output-format stream-json --verbose
      --model=--dangerously-skip-permissions --permission-prompt-tool stdio
      --strict-mcp-config --setting-sources=user --include-partial-messages
@@ -134,7 +135,8 @@ let%expect_test "launch" =
         }
     in
     print_s [%sexp (approval : Approval_mode.t), (launch.argv : string list)]);
-  [%expect {|
+  [%expect
+    {|
     (Ask
      (claude --output-format stream-json --verbose --permission-prompt-tool stdio
       --permission-mode default --mcp-config
@@ -166,7 +168,8 @@ let%expect_test "launch" =
           { (Adapter.Start.default ~cwd:"/w") with plan = true })
          .argv
        : string list)];
-  [%expect {|
+  [%expect
+    {|
     (claude --output-format stream-json --verbose --permission-prompt-tool stdio
      --permission-mode plan --mcp-config
      "{\"mcpServers\":{\"prigh\":{\"type\":\"sdk\",\"name\":\"prigh\"}}}"
@@ -178,8 +181,13 @@ let%expect_test "launch" =
 let%expect_test "the user's instructions go in initialize, not on argv" =
   let t = C.create () in
   print_endline
-    (C.initialize t ~append_system_prompt:"About the user" ~sdk_mcp_servers:[] ());
-  [%expect {| {"type":"control_request","request_id":"req_1_prigh","request":{"subtype":"initialize","hooks":null,"sdkMcpServers":[],"appendSystemPrompt":"About the user"}} |}]
+    (C.initialize
+       t
+       ~append_system_prompt:"About the user"
+       ~sdk_mcp_servers:[]
+       ());
+  [%expect
+    {| {"type":"control_request","request_id":"req_1_prigh","request":{"subtype":"initialize","hooks":null,"sdkMcpServers":[],"appendSystemPrompt":"About the user"}} |}]
 ;;
 
 let%expect_test "a resumed session's running cost total counts from its last" =
@@ -196,7 +204,8 @@ let%expect_test "a resumed session's running cost total counts from its last" =
   let t = C.create () in
   print_s [%sexp (C.cost_total t : float option)];
   feed t [ result "0.25" ];
-  [%expect {|
+  [%expect
+    {|
     (Event (Turn_started (turn_id turn-1)))
     (Event
      (Usage

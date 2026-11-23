@@ -117,8 +117,7 @@ let mcp_config ~injected (start : Adapter.Start.t) =
 let launch_config ~injected (start : Adapter.Start.t) : Claude_launch.t =
   { Claude_launch.default with
     model = start.model
-  ; permission_mode =
-      Some (permission_mode ~plan:start.plan)
+  ; permission_mode = Some (permission_mode ~plan:start.plan)
   ; resume =
       (match start.resume with
        | None -> New { session_id = None }

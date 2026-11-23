@@ -254,7 +254,8 @@ let%expect_test "a turn with a command whose permission the user gives" =
     | _ -> ());
   prompt agent "what's here";
   print_s [%sexp (Composer_runner.thread_id composer : string option)];
-  [%expect {|
+  [%expect
+    {|
     spawn #1: opencode acp
     agent got initialize
     agent got session/new session=- mcp=[]
@@ -281,7 +282,8 @@ let%expect_test "plan mode is the agent's plan mode" =
   @@ fun agent _ ->
   Agent.set_mode agent ~plan:true;
   prompt agent "plan it";
-  [%expect {|
+  [%expect
+    {|
     spawn #1: opencode acp
     agent got initialize
     agent got session/new session=- mcp=[]
@@ -310,7 +312,8 @@ let%expect_test "aborting sends session/cancel" =
   Eio.Promise.await started;
   ignore (Agent.abort agent : string list);
   Agent.wait_idle agent;
-  [%expect {|
+  [%expect
+    {|
     spawn #1: opencode acp
     agent got initialize
     agent got session/new session=- mcp=[]
@@ -342,7 +345,8 @@ let%expect_test
   @@ fun agent _ ->
   prompt agent "first";
   prompt agent "second";
-  [%expect {|
+  [%expect
+    {|
     spawn #1: opencode acp
     agent got initialize
     agent got session/new session=- mcp=[]
@@ -373,7 +377,8 @@ let%expect_test "an agent with no session/load starts afresh, saying so" =
   prompt agent "first";
   prompt agent "second";
   print_s [%sexp (Composer_runner.thread_id composer : string option)];
-  [%expect {|
+  [%expect
+    {|
     spawn #1: opencode acp
     agent got initialize
     agent got session/new session=- mcp=[]
@@ -396,7 +401,8 @@ let%expect_test "not logged in" =
     P.error p j ~code:(-32000) "Authentication required")
   @@ fun agent _ ->
   prompt agent "hi";
-  [%expect {|
+  [%expect
+    {|
     spawn #1: opencode acp
     agent got initialize
     agent got session/new session=- mcp=[]
@@ -410,7 +416,8 @@ let%expect_test "an agent on another ACP version is refused, saying why" =
     P.result p j {|{"protocolVersion":2,"agentCapabilities":{}}|})
   @@ fun agent _ ->
   prompt agent "hi";
-  [%expect {|
+  [%expect
+    {|
     spawn #1: opencode acp
     agent got initialize
     assistant (acp:opencode/default, (Error"OpenCode could not start: OpenCode speaks ACP version 2, and prigh speaks version 1: update prigh or OpenCode")): ""
@@ -438,7 +445,8 @@ let%expect_test "capabilities come from what the agent advertises" =
     [%sexp
       (Acp_adapter.capabilities_of (C.agent_capabilities c) (C.session_config c)
        : Capabilities.t)];
-  [%expect {|
+  [%expect
+    {|
     ((fork By_handoff) (rewind Unsupported) (context_edit false)
      (compact Unsupported) (steer Between_turns) (plan_mode true) (btw false)
      (subagents Unsupported) (model_fallback false) (images true)
@@ -477,7 +485,8 @@ let%expect_test "the prigh adapter: a composer session prigh's own harness runs"
         ~label:(Agent.engine_label agent : string)
         ~compact:(Agent.require agent Compact : unit Or_error.t)
         ~rewind:(Agent.require agent Rewind : unit Or_error.t)];
-  [%expect {|
+  [%expect
+    {|
     assistant (deepseek-flash, End_turn): "From the harness."
     ((engine Composer) (label prigh) (compact (Ok ())) (rewind (Ok ())))
     |}]
@@ -502,14 +511,16 @@ let%expect_test "-adapters: ACP agents and prigh, and new sessions on them" =
             ~mine:(Engines.acp_agent t "mine" : Acp_agent.t option)]
   in
   show "codex,acp:opencode,prigh";
-  [%expect {|
+  [%expect
+    {|
     ((adapters (codex acp:opencode prigh)) (check (Ok ()))
      (opencode
       (((name opencode) (display_name OpenCode) (command (opencode acp)))))
      (mine ()))
     |}];
   show "acp:mine=my-agent --acp --verbose,claude";
-  [%expect {|
+  [%expect
+    {|
     ((adapters (acp:mine claude)) (check (Ok ()))
      (opencode
       (((name opencode) (display_name OpenCode) (command (opencode acp)))))
@@ -517,7 +528,8 @@ let%expect_test "-adapters: ACP agents and prigh, and new sessions on them" =
       (((name mine) (display_name mine) (command (my-agent --acp --verbose))))))
     |}];
   show "acp:unheard-of";
-  [%expect {|
+  [%expect
+    {|
     ((adapters (acp:unheard-of))
      (check
       (Error
@@ -542,7 +554,8 @@ let%expect_test "-adapters: ACP agents and prigh, and new sessions on them" =
                (Composer_adapters.find engines id)
                ~f:(fun (module A : Adapter.S) -> A.id)
              : string Or_error.t)]);
-  [%expect {|
+  [%expect
+    {|
     (prigh
      (find
       (Error

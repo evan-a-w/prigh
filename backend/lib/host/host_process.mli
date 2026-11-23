@@ -24,8 +24,9 @@ open! Import
     cwd.
 
     With [mcp], the host also listens on a Unix socket in a private (0700)
-    directory, for as long as the program runs, and sets
-    [$PRIGH_MCP_SOCKET] to it in the program's environment: each connection
+    directory, for as long as the program runs (its path is
+    {!Placeholder.mcp_socket}, for the bridge's MCP config only: it is not in
+    the program's environment, which every command it runs inherits): each connection
     (a [prigh mcp-bridge] the program started as an MCP server) is relayed
     line by line as [Mcp] frames up and [Mcp_in] frames down, numbered by
     [conn]. These are not counted in the window. In [argv]'s arguments and

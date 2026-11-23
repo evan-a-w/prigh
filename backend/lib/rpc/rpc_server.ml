@@ -787,8 +787,7 @@ let sessions_changed ?(changed = []) ?(removed = []) t =
       ([ "type", `String "event"; "event", `String "sessions_changed" ] @ fields)
   in
   if List.is_empty changed && List.is_empty removed
-  then (
-    broadcast t (event []))
+  then broadcast t (event [])
   else (
     let live_now = live_sessions t in
     let live path =

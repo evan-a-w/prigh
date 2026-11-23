@@ -542,7 +542,8 @@ let amendment decisions =
 let mcp_accept ~schema ~always =
   let persistent value =
     let v = String.lowercase value in
-    List.exists [ "session"; "always"; "permanent"; "forever"; "persist" ]
+    List.exists
+      [ "session"; "always"; "permanent"; "forever"; "persist" ]
       ~f:(fun word -> String.is_substring v ~substring:word)
   in
   let once value =
@@ -600,7 +601,9 @@ let mcp_accept ~schema ~always =
   else
     `Object
       ([ "action", `String "accept" ]
-       @ (if always then [ "_meta", `Object [ "persist", `String "session" ] ] else [])
+       @ (if always
+          then [ "_meta", `Object [ "persist", `String "session" ] ]
+          else [])
        @ if Option.is_some schema then [ "content", `Object content ] else [])
 ;;
 
@@ -649,7 +652,8 @@ let reply_approval t ~request_id (answer : Adapter_event.Approval_reply.t) =
       | Permissions _, (Deny _ | Cancel) ->
         `Object [ "permissions", `Object []; "scope", `String "turn" ]
       | Mcp_tool_approval { schema }, Allow -> mcp_accept ~schema ~always:false
-      | Mcp_tool_approval { schema }, Allow_always -> mcp_accept ~schema ~always:true
+      | Mcp_tool_approval { schema }, Allow_always ->
+        mcp_accept ~schema ~always:true
       | Mcp_tool_approval _, Deny _ -> `Object [ "action", `String "decline" ]
       | Mcp_tool_approval _, Cancel -> `Object [ "action", `String "cancel" ]
     in
@@ -1314,6 +1318,10 @@ let notification t method_ params =
        let kind, message = turn_error_of t error in
        if Option.value (bool "willRetry" params) ~default:false
        then [ event (Retrying { attempt = None; message }) ]
+       else if Option.is_none t.turn
+       then
+         (* No turn to fail: the next one would forget it. *)
+         [ event (Notice ("Codex: " ^ message)) ]
        else (
          t.turn_error <- Some (kind, message);
          [])
@@ -1391,11 +1399,13 @@ let server_request t ~id method_ params =
     in
     [ event
         (Approval_request
-           { request_id = key
-             (* Network access is asked for as such: the session's allow
+           { request_id =
+               key
+               (* Network access is asked for as such: the session's allow
                 rules for the command do not cover it. *)
            ; tool_id = (if Option.is_some network then None else tool_id)
-           ; kind = (if Option.is_some network then Other "network" else Command)
+           ; kind =
+               (if Option.is_some network then Other "network" else Command)
            ; summary = with_reason summary
            ; input =
                obj
@@ -1403,7 +1413,9 @@ let server_request t ~id method_ params =
                  ; opt "cwd" (fun c -> `String c) (str "cwd" params)
                  ; opt "reason" (fun r -> `String r) (str "reason" params)
                  ; opt "network" Fn.id network
-                 ; opt "kind" (fun k -> `String k)
+                 ; opt
+                     "kind"
+                     (fun k -> `String k)
                      (Option.filter (str "kind" params) ~f:(fun k ->
                         not (String.equal k "command")))
                  ]
@@ -1500,7 +1512,8 @@ let server_request t ~id method_ params =
     then (
       register (Mcp_tool_approval { schema });
       let tool =
-        List.find_map [ "tool_name"; "toolName"; "tool" ] ~f:(fun key -> str key meta)
+        List.find_map [ "tool_name"; "toolName"; "tool" ] ~f:(fun key ->
+          str key meta)
         |> Option.value ~default:"tool"
       in
       let message = Option.value (str "message" params) ~default:"" in

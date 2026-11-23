@@ -219,7 +219,8 @@ let initialize t ?append_system_prompt ~sdk_mcp_servers () =
     Initialize
     "initialize"
     ([ "hooks", `Null
-     ; "sdkMcpServers", `Array (List.map sdk_mcp_servers ~f:(fun s -> `String s))
+     ; ( "sdkMcpServers"
+       , `Array (List.map sdk_mcp_servers ~f:(fun s -> `String s)) )
      ]
      @
      match append_system_prompt with
@@ -631,12 +632,22 @@ let handle_result t json =
       if t.interrupting || aborted
       then Interrupted
       else (
+        (* In the SDK's order: [errors], [result], the subtype, the HTTP
+           status. *)
         let message =
-          match str json "result", list json "errors" with
-          | Some r, _ when not (String.is_empty r) -> r
-          | _, (_ :: _ as errors) ->
-            String.concat ~sep:"\n" (List.filter_map errors ~f:Json.string)
-          | _ -> subtype
+          let errors =
+            List.map (list json "errors") ~f:(fun e ->
+              Option.value (Json.string e) ~default:(Json.to_string e))
+            |> List.filter ~f:(fun e -> not (String.is_empty e))
+          in
+          match errors, str json "result" with
+          | _ :: _, _ -> String.concat ~sep:"; " errors
+          | [], Some r when not (String.is_empty r) -> r
+          | [], _ ->
+            (match int json "api_error_status", subtype with
+             | Some status, ("success" | "error_during_execution") ->
+               sprintf "API error (HTTP %d)" status
+             | _ -> subtype)
         in
         let status = int json "api_error_status" in
         let legacy = legacy_limit_reset message in

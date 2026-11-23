@@ -211,7 +211,8 @@ let create
       in
       let%bind auth_methods =
         match init with
-        | Initialized { protocol_version = 1; auth_methods; _ } -> Ok auth_methods
+        | Initialized { protocol_version = 1; auth_methods; _ } ->
+          Ok auth_methods
         | Initialized { protocol_version; _ } ->
           Or_error.errorf
             "%s speaks ACP version %d, and prigh speaks version 1: update \
