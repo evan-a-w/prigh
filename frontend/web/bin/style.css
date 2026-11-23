@@ -508,8 +508,8 @@ kbd {
   position: relative;
   display: flex;
   flex-direction: column;
-  background: var(--slate);
-  border: 1px solid var(--rule-2);
+  background: var(--card);
+  border: 1px solid var(--input);
   border-radius: var(--r-surface);
   box-shadow: 0 8px 24px -14px var(--edge-shadow);
   transition: border-color 0.15s, box-shadow 0.15s;
@@ -535,7 +535,7 @@ kbd {
   min-height: 24px;
   max-height: 40vh;
   overflow-y: auto;
-  caret-color: var(--sodium);
+  caret-color: var(--primary);
 }
 .editor::placeholder { color: var(--faint); }
 /* The placeholder is one line, cut rather than wrapped. */
@@ -555,11 +555,11 @@ kbd {
   transition: background-color 0.12s, color 0.12s, border-color 0.12s;
 }
 .round.btn .icon { width: 18px; height: 18px; stroke-width: 1.9; }
-.btn.ghost.round { color: var(--muted-text); }
+.btn.ghost.round { color: var(--muted-foreground); }
 @media (hover: hover) {
-  .btn.ghost.round:not(:disabled):hover { background: var(--slate-2); color: var(--chalk); }
+  .btn.ghost.round:not(:disabled):hover { background: var(--muted); color: var(--foreground); }
 }
-.chip-anchor.open > .btn.plus { background: var(--slate-2); color: var(--chalk); }
+.chip-anchor.open > .btn.plus { background: var(--muted); color: var(--foreground); }
 .composer-buttons { display: flex; align-items: center; gap: 4px; flex-shrink: 0; margin-left: auto; }
 /* Send: a sodium disc; with nothing to send, an empty ring. Running with
    nothing typed, the disc stops. */
@@ -567,17 +567,17 @@ kbd {
    Send is a small neutral disc, not the accent. */
 .composer-row .round.btn .icon { width: 16px; height: 16px; stroke-width: 1.8; }
 .composer-row :is(.send, .stop).round.btn { width: 28px; height: 28px; }
-.composer-buttons :is(.send, .stop.primary) { background: var(--rule-2); border-color: transparent; color: var(--chalk); font-weight: 400; }
-.composer-buttons :is(.send, .stop.primary):hover:not(:disabled) { filter: none; background: var(--muted-text); color: var(--graphite); }
+.composer-buttons :is(.send, .stop.primary) { background: var(--input); border-color: transparent; color: var(--foreground); font-weight: 400; }
+.composer-buttons :is(.send, .stop.primary):hover:not(:disabled) { filter: none; background: var(--muted-foreground); color: var(--background); }
 .composer-buttons .send .icon { width: 14px; height: 14px; color: currentColor; stroke-width: 2.2; }
 .composer-buttons .send:disabled {
   background: transparent;
-  border: 1.5px solid var(--rule-2);
+  border: 1.5px solid var(--input);
   opacity: 1;
 }
 .composer-buttons .send:disabled .icon { color: var(--faint); }
 .composer-row .stop .icon { width: 12px; height: 12px; }
-.composer-row > .stop.ghost { background: var(--brick-wash); border-color: transparent; color: var(--brick); }
+.composer-row > .stop.ghost { background: var(--brick-wash); border-color: transparent; color: var(--destructive); }
 .composer-buttons .stop.primary .icon { color: currentColor; fill: currentColor; }
 @media (prefers-reduced-motion: reduce) {
   .btn.plus .icon { transition: none; }
@@ -606,17 +606,17 @@ kbd {
   color: var(--faint);
   transition: color 0.12s, background-color 0.12s;
 }
-.composer-controls .chip-button:not(.awaiting):focus-visible { background: var(--slate-2); border-color: transparent; color: var(--chalk); }
+.composer-controls .chip-button:not(.awaiting):focus-visible { background: var(--muted); border-color: transparent; color: var(--foreground); }
 @media (hover: hover) {
-  .composer-controls .chip-button:not(.awaiting):hover { background: var(--slate-2); border-color: transparent; color: var(--chalk); }
+  .composer-controls .chip-button:not(.awaiting):hover { background: var(--muted); border-color: transparent; color: var(--foreground); }
 }
 .chip-button:focus-visible { outline-offset: 0; }
 .chip-button .icon { width: 13px; height: 13px; color: currentColor; flex-shrink: 0; }
 .chip-button .chevron { width: 11px; height: 11px; opacity: 0.6; transition: opacity 0.12s, transform 0.15s; }
 .chip-button:is(:hover, :focus-visible) .chevron { opacity: 1; }
-.model-chip { color: var(--muted-text); }
-.composer-controls .model-chip { color: var(--chalk); font-weight: 500; }
-.composer-controls .host-chip { color: var(--muted-text); }
+.model-chip { color: var(--muted-foreground); }
+.composer-controls .model-chip { color: var(--foreground); font-weight: 500; }
+.composer-controls .host-chip { color: var(--muted-foreground); }
 .chip-label { max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .chip-anchor { position: relative; display: flex; min-width: 0; flex-shrink: 0; }
 .chip-anchor.model, .chip-anchor.model > .model-chip { flex-shrink: 1; }
@@ -625,13 +625,13 @@ kbd {
 .composer-controls .host-chip > .icon:first-child { display: inline-block; }
 .chip-anchor.host, .chip-anchor.host > .host-chip { flex-shrink: 6; min-width: 52px; }
 .chip-anchor.host .chip-label { max-width: 180px; }
-.composer-controls .host-chip.warm { color: var(--sodium); }
-.composer-controls .host-chip.chatting { color: var(--sodium); }
+.composer-controls .host-chip.warm { color: var(--primary); }
+.composer-controls .host-chip.chatting { color: var(--primary); }
 /* A disconnected host keeps its name; its server is struck through in
    brick and "offline" follows, which the name gives way to first. */
-.host-chip.offline > .icon:first-child { color: var(--brick); }
+.host-chip.offline > .icon:first-child { color: var(--destructive); }
 .host-chip.offline .chip-label { min-width: 3ch; }
-.host-chip .chip-state { flex-shrink: 0; color: var(--brick); font-size: 11.5px; white-space: nowrap; }
+.host-chip .chip-state { flex-shrink: 0; color: var(--destructive); font-size: 11.5px; white-space: nowrap; }
 
 /* Images going with the message: square tiles, each opening where it can
    be drawn on (the pencil says so), removed from its own corner. */
@@ -643,13 +643,13 @@ kbd {
   width: 56px;
   height: 56px;
   padding: 0;
-  border: 1px solid var(--rule);
+  border: 1px solid var(--border);
   background: var(--well);
   cursor: pointer;
   border-radius: var(--r-control);
   overflow: hidden;
 }
-.pending-thumb:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; }
+.pending-thumb:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 .pending-image img.thumb { display: block; width: 100%; height: 100%; object-fit: cover; }
 .pending-thumb .draw-hint {
   position: absolute;
@@ -680,12 +680,12 @@ kbd {
   transition: opacity 0.12s, background-color 0.12s;
 }
 .remove-image .icon { width: 10px; height: 10px; stroke-width: 2.5; }
-.remove-image.btn:hover { background: var(--brick); color: #fff; }
+.remove-image.btn:hover { background: var(--destructive); color: #fff; }
 .pending-image:is(:hover, :focus-within) :is(.draw-hint, .remove-image.btn) { opacity: 1; }
 @media (hover: none) {
   .pending-image :is(.draw-hint, .remove-image.btn) { opacity: 1; }
 }
-.attach-icon { --mark-size: 15px; color: var(--muted-text); }
+.attach-icon { --mark-size: 15px; color: var(--muted-foreground); }
 
 /* An image too large for the model: a brick ring, and beside it the way
    out (two short lines, a finger-sized target even on a 320px phone). */
@@ -708,14 +708,14 @@ kbd {
   border-radius: 0 var(--r-control) var(--r-control) 0;
 }
 .downsize-image:hover:not(:disabled) { background: var(--brick-wash); }
-.downsize-image:focus-visible { outline: 2px solid var(--sodium); outline-offset: -2px; }
+.downsize-image:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
 .downsize-image:disabled { cursor: progress; }
-.downsize-image .downsize-icon { width: 14px; height: 14px; color: var(--brick); flex: none; }
+.downsize-image .downsize-icon { width: 14px; height: 14px; color: var(--destructive); flex: none; }
 .downsize-text { display: flex; flex-direction: column; line-height: 1.25; }
-.downsize-why { font-size: 11px; color: var(--brick); font-weight: 600; letter-spacing: 0.02em; }
+.downsize-why { font-size: 11px; color: var(--destructive); font-weight: 600; letter-spacing: 0.02em; }
 .downsize-label { font-size: 12.5px; font-weight: 600; color: var(--fg); }
 .downsize-image:hover:not(:disabled) .downsize-label { text-decoration: underline; text-underline-offset: 2px; }
-.pending-image.downsizing .downsize-label { color: var(--muted-text); font-weight: 500; }
+.pending-image.downsizing .downsize-label { color: var(--muted-foreground); font-weight: 500; }
 .pending-image.downsizing .pending-thumb img { opacity: 0.6; }
 
 /* / and @ completion: attached to the top of the card, as wide, the card's
@@ -725,8 +725,8 @@ kbd {
   left: -1px;
   right: -1px;
   bottom: 100%;
-  background: var(--slate);
-  border: 1px solid var(--rule-2);
+  background: var(--card);
+  border: 1px solid var(--input);
   border-bottom: 0;
   border-radius: var(--r-surface) var(--r-surface) 0 0;
   box-shadow: 0 -10px 28px -16px var(--edge-shadow);
@@ -735,7 +735,7 @@ kbd {
   animation: popover-rise 0.12s ease-out;
 }
 .composer-stack.completing { border-top-left-radius: 0; border-top-right-radius: 0; }
-.composer-stack.completing > .composer-box { border-top: 1px solid var(--rule); border-radius: 0; }
+.composer-stack.completing > .composer-box { border-top: 1px solid var(--border); border-radius: 0; }
 .composer-stack.completing:focus-within > .popup { border-color: var(--faint-line); }
 .popup-title {
   display: flex;
@@ -743,8 +743,8 @@ kbd {
   padding: 7px 12px 6px;
   font-size: 12.5px;
   font-weight: 600;
-  color: var(--muted-text);
-  border-bottom: 1px solid var(--rule);
+  color: var(--muted-foreground);
+  border-bottom: 1px solid var(--border);
 }
 .popup-keys { font: 400 11.5px var(--mono); color: var(--faint); }
 .popup-items { max-height: min(300px, 40vh); overflow-y: auto; scrollbar-gutter: stable; padding: 4px; }
@@ -790,7 +790,7 @@ kbd {
 .status-item.context, .status-item.cost { font: 11.5px var(--mono); }
 .status-item { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
 .status-item .icon { width: 13px; height: 13px; }
-.status-item.running { color: var(--sodium); }
+.status-item.running { color: var(--primary); }
 /* A slot of its own, so that the meter and the cost never move as the
    agent starts and stops; its words start at the slot's left. */
 .status-item.activity { width: 14ch; flex-shrink: 0; gap: 7px; justify-content: flex-start; }
@@ -798,26 +798,26 @@ kbd {
 .status-item.activity.idle { color: var(--faint); }
 .status-item.activity > .label { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .status-item.context > .percent { min-width: 3ch; text-align: right; }
-.status-item.retrying { color: var(--brick); }
-.status-item.idle { color: var(--muted-text); }
+.status-item.retrying { color: var(--destructive); }
+.status-item.idle { color: var(--muted-foreground); }
 .idle-dot { width: 7px; height: 7px; flex-shrink: 0; border-radius: 50%; background: var(--sage, var(--faint-line)); opacity: 0.8; }
-.meter { width: 28px; height: 3px; border-radius: 2px; background: var(--rule-2); overflow: hidden; }
-.meter-fill { display: block; height: 100%; background: var(--muted-text); }
-.context.warm { color: var(--sodium); }
-.context.warm .meter-fill { background: var(--sodium); }
-.context.hot { color: var(--brick); }
-.context.hot .meter-fill { background: var(--brick); }
-.status-item.link { background: none; border: 0; padding: 0; color: var(--muted-text); cursor: pointer; font-size: 12px; border-radius: var(--r-chip); }
-.status-item.link:hover { color: var(--chalk); text-decoration: underline; text-underline-offset: 2px; }
-.status-item.link:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; }
-.status-item.queued, .status-item.mode { color: var(--sodium); }
-.status-item.mode.plan { color: var(--muted-text); display: inline-block; min-width: 0; max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
-.status-item.background.active { color: var(--sodium); gap: 7px; }
-.status-item.transfers { color: var(--sodium); gap: 7px; min-width: 0; max-width: 32ch; overflow: hidden; text-overflow: ellipsis; display: inline-block; }
+.meter { width: 28px; height: 3px; border-radius: 2px; background: var(--input); overflow: hidden; }
+.meter-fill { display: block; height: 100%; background: var(--muted-foreground); }
+.context.warm { color: var(--primary); }
+.context.warm .meter-fill { background: var(--primary); }
+.context.hot { color: var(--destructive); }
+.context.hot .meter-fill { background: var(--destructive); }
+.status-item.link { background: none; border: 0; padding: 0; color: var(--muted-foreground); cursor: pointer; font-size: 12px; border-radius: var(--r-chip); }
+.status-item.link:hover { color: var(--foreground); text-decoration: underline; text-underline-offset: 2px; }
+.status-item.link:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.status-item.queued, .status-item.mode { color: var(--primary); }
+.status-item.mode.plan { color: var(--muted-foreground); display: inline-block; min-width: 0; max-width: 260px; overflow: hidden; text-overflow: ellipsis; }
+.status-item.background.active { color: var(--primary); gap: 7px; }
+.status-item.transfers { color: var(--primary); gap: 7px; min-width: 0; max-width: 32ch; overflow: hidden; text-overflow: ellipsis; display: inline-block; }
 .status-item.transfers .lamp { margin-right: 7px; vertical-align: 1px; }
 .status-item.cost.budget { font: 11.5px var(--mono); }
-.status-item.warm { color: var(--sodium); }
-.status-item.hot { color: var(--brick); }
+.status-item.warm { color: var(--primary); }
+.status-item.hot { color: var(--destructive); }
 
 /* Dialogs */
 
@@ -1135,27 +1135,27 @@ kbd {
   justify-content: center;
   padding: 0;
   border-radius: var(--r-control);
-  border: 1px solid var(--rule-2);
-  background: var(--slate-2);
-  color: var(--chalk);
+  border: 1px solid var(--input);
+  background: var(--muted);
+  color: var(--foreground);
   box-shadow: var(--float-shadow);
   cursor: pointer;
   animation: jump-in 0.15s ease-out;
 }
 .jump-to-bottom:hover { background: var(--panel-3); }
-.jump-to-bottom:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; }
+.jump-to-bottom:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 .jump-to-bottom .icon { width: 16px; height: 16px; }
 @keyframes jump-in { from { opacity: 0; transform: translate(-50%, 6px); } }
 
 /* Choices and actions the backend has still to confirm. */
-.chip-button.awaiting { opacity: 1; color: var(--muted-text); border: 1px dashed var(--rule-2); }
+.chip-button.awaiting { opacity: 1; color: var(--muted-foreground); border: 1px dashed var(--input); }
 
-.composer-buttons .send.busy:disabled { background: var(--slate-2); border-color: transparent; }
+.composer-buttons .send.busy:disabled { background: var(--muted); border-color: transparent; }
 
 .composer.offline .composer-stack { border-style: dashed; }
-.status-item.connecting { color: var(--muted-text); }
-.status-item.connecting.offline { color: var(--brick); }
-.loading-row { display: flex; align-items: center; gap: 10px; padding: 18px 4px; color: var(--muted-text); }
+.status-item.connecting { color: var(--muted-foreground); }
+.status-item.connecting.offline { color: var(--destructive); }
+.loading-row { display: flex; align-items: center; gap: 10px; padding: 18px 4px; color: var(--muted-foreground); }
 
 /* Out of touch with the backend, nothing is known to be working: the lamps
    go dark but for the one that says it is reconnecting. */
@@ -1167,7 +1167,7 @@ kbd {
 
 .panel-toggles { display: flex; align-items: center; gap: 2px; }
 .panel-toggles > .btn.icon { width: 28px; height: 28px; color: var(--faint); }
-.panel-toggles > .btn.icon:hover { color: var(--chalk); }
+.panel-toggles > .btn.icon:hover { color: var(--foreground); }
 
 
 /* Steering a subagent: whom the composer writes to, over the editor. */
@@ -1186,13 +1186,13 @@ kbd {
 }
 
 
-.btn.sign-out:hover { color: var(--brick); border-color: var(--brick-line); background: var(--brick-wash); }
+.btn.sign-out:hover { color: var(--destructive); border-color: var(--brick-line); background: var(--brick-wash); }
 
-.segmented { display: inline-flex; gap: 2px; padding: 2px; background: var(--well); border: 1px solid var(--rule); border-radius: var(--r-control); }
-.segment:not([data-slot]) { border: 0; background: none; color: var(--muted-text); font-size: 12.5px; padding: 3px 10px; border-radius: 4px; cursor: pointer; }
-.segment:not([data-slot]):hover { color: var(--chalk); }
-.segment:not([data-slot]).on { background: var(--slate-2); color: var(--chalk); box-shadow: inset 0 0 0 1px var(--rule-2); }
-.segment:not([data-slot]):focus-visible { outline: 2px solid var(--sodium); outline-offset: 0; }
+.segmented { display: inline-flex; gap: 2px; padding: 2px; background: var(--well); border: 1px solid var(--border); border-radius: var(--r-control); }
+.segment:not([data-slot]) { border: 0; background: none; color: var(--muted-foreground); font-size: 12.5px; padding: 3px 10px; border-radius: 4px; cursor: pointer; }
+.segment:not([data-slot]):hover { color: var(--foreground); }
+.segment:not([data-slot]).on { background: var(--muted); color: var(--foreground); box-shadow: inset 0 0 0 1px var(--input); }
+.segment:not([data-slot]):focus-visible { outline: 2px solid var(--primary); outline-offset: 0; }
 
 
 /* Fingers: every control takes at least 32px (44 where the row has room).
@@ -1400,7 +1400,7 @@ kbd {
 .composer-row > .composer-buttons { margin-left: 0; }
 .composer-controls { flex: 0 1 auto; margin-left: auto; display: flex; align-items: center; gap: 2px; min-width: 0; }
 .composer-controls .model-chip { gap: 6px; font-weight: 400; }
-.model-chip .provider-mark { width: 14px; height: 14px; color: var(--muted-text); }
+.model-chip .provider-mark { width: 14px; height: 14px; color: var(--muted-foreground); }
 .provider-mark { flex: none; }
 /* A provider without a logo: its initial, in the logo's square. */
 .provider-letter { display: inline-flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 600; line-height: 1; border-radius: 3px; box-shadow: inset 0 0 0 1.25px currentColor; }
