@@ -13,6 +13,7 @@ import { spawn } from "node:child_process";
 import { mkdirSync, utimesSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { end } from "./end.mjs";
+import { normalVerbosity } from "./verbose_prefs.mjs";
 import { hostName } from "./host_name.mjs";
 
 const phoneSizes = [[390, 844], [320, 640]];
@@ -24,6 +25,7 @@ if (!engine) throw new Error("usage: search.mjs chromium|firefox|webkit");
 const { PRIGH_BACKEND: backend, SITE: site, TOKEN: token } = process.env;
 const dir = join(process.env.TEST_DIR, "search");
 const home = join(dir, "home");
+normalVerbosity(home);
 const cwd = join(dir, "cwd");
 const sessions = join(home, ".prigh", "sessions");
 mkdirSync(sessions, { recursive: true });
@@ -192,7 +194,8 @@ try {
   await editor.evaluate(e => e.blur());
   console.log(await page.locator(".sidebar-actions > *").evaluateAll(es => es.map(e => {
     const r = e.getBoundingClientRect();
-    return `${e.innerText.trim()}: ${r.width < 120 ? "narrow" : "wide"}, ${Math.round(r.height)}px high`;
+    const label = (e.getAttribute("aria-label") || e.innerText).trim().split("\n")[0];
+    return `${label}: ${r.width < 120 ? "narrow" : "wide"}, ${Math.round(r.height)}px high`;
   }).join("\n")));
   console.log(`composer: ${await page.locator(".composer-row button:visible").evaluateAll(bs => bs.map(b => (b.getAttribute("aria-label") || b.innerText).trim().split("\n")[0].split(":")[0]).join(", "))}`);
   await screenshot("desktop composer unfocused");

@@ -115,13 +115,122 @@ module Accent = struct
   ;;
 end
 
+module Radius = struct
+  type t =
+    | Sharp
+    | Small
+    | Default
+    | Round
+  [@@deriving sexp_of, equal, enumerate]
+
+  let to_string = function
+    | Sharp -> "sharp"
+    | Small -> "small"
+    | Default -> "default"
+    | Round -> "round"
+  ;;
+
+  let of_string s =
+    List.find all ~f:(fun t ->
+      String.equal (to_string t) (String.lowercase (String.strip s)))
+  ;;
+
+  let describe = function
+    | Sharp -> "square corners"
+    | Small -> "slightly rounded"
+    | Default -> "rounded, as prigh-web has been"
+    | Round -> "softer, rounder"
+  ;;
+
+  (* A surface's (a card's, a dialog's); controls' and chips' are 0.6 and
+     0.3 of it (style.css), the components' from 0.6 to 2.6 (loon.css). *)
+  let px = function
+    | Sharp -> 0
+    | Small -> 6
+    | Default -> 10
+    | Round -> 16
+  ;;
+end
+
+module Sans = struct
+  type t =
+    | Recursive
+    | Inter
+    | System
+  [@@deriving sexp_of, equal, enumerate]
+
+  let to_string = function
+    | Recursive -> "recursive"
+    | Inter -> "inter"
+    | System -> "system"
+  ;;
+
+  let of_string s =
+    List.find all ~f:(fun t ->
+      String.equal (to_string t) (String.lowercase (String.strip s)))
+  ;;
+
+  let describe = function
+    | Recursive -> "Recursive Sans, prigh-web's own"
+    | Inter -> "Inter, neutral and compact"
+    | System -> "this device's interface font"
+  ;;
+
+  let family = function
+    | Recursive -> None
+    | Inter -> Some {|"Inter", -apple-system, "Segoe UI", Roboto, sans-serif|}
+    | System ->
+      Some
+        {|system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif|}
+  ;;
+end
+
+module Mono = struct
+  type t =
+    | Recursive
+    | System
+  [@@deriving sexp_of, equal, enumerate]
+
+  let to_string = function
+    | Recursive -> "recursive"
+    | System -> "system"
+  ;;
+
+  let of_string s =
+    List.find all ~f:(fun t ->
+      String.equal (to_string t) (String.lowercase (String.strip s)))
+  ;;
+
+  let describe = function
+    | Recursive -> "Recursive Mono, prigh-web's own"
+    | System -> "this device's monospace font"
+  ;;
+
+  let family = function
+    | Recursive -> None
+    | System ->
+      Some
+        {|ui-monospace, "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace|}
+  ;;
+end
+
 type t =
   { name : Name.t
   ; accent : Accent.t
+  ; radius : Radius.t
+  ; sans : Sans.t
+  ; mono : Mono.t
   }
 [@@deriving sexp_of, equal]
 
-let default = { name = Original; accent = Preset Orange }
+let default =
+  { name = Original
+  ; accent = Preset Orange
+  ; radius = Default
+  ; sans = Recursive
+  ; mono = Recursive
+  }
+;;
 
 let attributes t =
   [ "data-theme", Name.to_string t.name
@@ -133,7 +242,14 @@ let attributes t =
 ;;
 
 let vars t =
-  match t.accent with
-  | Preset _ -> []
-  | Custom hex -> [ "--sodium", hex; "--sodium-ink", Accent.ink hex ]
+  (match t.accent with
+   | Preset _ -> []
+   | Custom hex -> [ "--sodium", hex; "--sodium-ink", Accent.ink hex ])
+  @ (if Radius.equal t.radius default.radius
+     then []
+     else [ "--radius", sprintf "%dpx" (Radius.px t.radius) ])
+  @ Option.to_list (Option.map (Sans.family t.sans) ~f:(fun f -> "--sans", f))
+  @ Option.to_list (Option.map (Mono.family t.mono) ~f:(fun f -> "--mono", f))
 ;;
+
+let all_vars = [ "--sodium"; "--sodium-ink"; "--radius"; "--sans"; "--mono" ]

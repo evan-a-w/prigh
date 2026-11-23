@@ -21,6 +21,7 @@ module Target : sig
     | Review_files of string list
     (** files of the review page's list: those selected, or the one
         right-clicked *)
+    | Archive (** the sidebar's Archive row *)
   [@@deriving sexp_of, equal]
 end
 
@@ -78,6 +79,9 @@ module Item : sig
     | Select_files (** add them to the selection *)
     | Unselect_files
     | Copy_paths
+    | Show_archived (** the archived sessions folded into the list *)
+    | Hide_archived
+    | Delete_archived (** every archived session, after asking *)
   [@@deriving sexp_of, equal, enumerate]
 
   val id : t -> string
@@ -143,6 +147,10 @@ end
     commit), Select or Unselect, Copy path. Those that do not apply are
     [dimmed], saying why. *)
 val files_picker : Files.t -> Picker.t
+
+(** The Archive row's menu: Show or Hide archived ([shown]), then Delete
+    all archived… (dimmed when there are none). *)
+val archive_picker : count:int -> shown:bool -> Picker.t
 
 (** The worktree's path, for a worktree's menu. *)
 val worktree : t -> string option

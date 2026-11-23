@@ -60,7 +60,7 @@ let%expect_test "a key typed remakes the composer only; a delta not the sidebar"
   Harness.quiet h (fun () -> Harness.act h Send);
   render h;
   [%expect
-    {| made again: agents btw chat chrome dialogs files review sidebar terminal |}];
+    {| made again: btw chat chrome dialogs files review session_card sidebar terminal |}];
   render h;
   [%expect {| made again: nothing |}];
   let before = Harness.model h in
@@ -85,7 +85,7 @@ let%expect_test "a key typed remakes the composer only; a delta not the sidebar"
     Harness.event h start;
     Harness.event h (delta ~seq:1 "Hi"));
   render h;
-  [%expect {| made again: agents chat chrome dialogs |}];
+  [%expect {| made again: chat chrome dialogs session_card |}];
   let before = Harness.model h in
   Harness.quiet h (fun () -> Harness.event h (delta ~seq:2 " there"));
   print_s [%sexp (changed before (Harness.model h) : string list)];
@@ -93,7 +93,7 @@ let%expect_test "a key typed remakes the composer only; a delta not the sidebar"
   [%expect
     {|
     (chat transcript_events)
-    made again: agents chat chrome dialogs
+    made again: chat chrome dialogs session_card
     |}]
 ;;
 
@@ -104,7 +104,7 @@ let%expect_test "the clock remakes only what shows the time, when it shows" =
     Harness.event h (delta ~seq:1 "Hi"));
   render h;
   [%expect
-    {| made again: agents btw chat chrome dialogs files review sidebar terminal |}];
+    {| made again: btw chat chrome dialogs files review session_card sidebar terminal |}];
   let now = Option.value_exn (Harness.model h).now in
   let tick after =
     Harness.quiet h (fun () ->
@@ -119,21 +119,22 @@ let%expect_test "the clock remakes only what shows the time, when it shows" =
      by the day). *)
   tick 60.;
   [%expect
-    {| made again: agents btw chrome dialogs files review sidebar terminal |}];
+    {| made again: btw chrome dialogs files review session_card sidebar terminal |}];
   (* The next day: the transcript too ("Yesterday"). *)
   tick 86_400.;
   [%expect
-    {| made again: agents btw chat chrome dialogs files review sidebar terminal |}]
+    {| made again: btw chat chrome dialogs files review session_card sidebar terminal |}]
 ;;
 
 let%expect_test "another inject remakes every part" =
   let h = create () in
   render h;
   [%expect
-    {| made again: agents btw chat chrome dialogs files review sidebar terminal |}];
+    {| made again: btw chat chrome dialogs files review session_card sidebar terminal |}];
   ignore (Harness.node h () : _ list);
   print_s
     [%sexp
       (List.sort (View_memo.made ()) ~compare:String.compare : string list)];
-  [%expect {| (agents btw chat chrome dialogs files review sidebar terminal) |}]
+  [%expect
+    {| (btw chat chrome dialogs files review session_card sidebar terminal) |}]
 ;;

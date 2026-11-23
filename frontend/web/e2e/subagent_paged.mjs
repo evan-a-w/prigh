@@ -1,7 +1,8 @@
 // A subagent whose call is in a page not loaded: the main agent delegates,
 // then works on for more messages than a page holds; reloaded, the page has
-// only the newest of them, and the subagent opened in the agents panel
-// shows its transcript all the same (fetched on its own). Run by
+// only the newest of them, and the subagent's chat (opened with /agents 1,
+// its line not being loaded) shows its transcript all the same (fetched on
+// its own). Run by
 // prigh_web.sh; prints normalised results (the expected output is in
 // ENGINE.expected).
 //
@@ -11,6 +12,8 @@ import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { end } from "./end.mjs";
+import { holdGates, waitFor } from "./gates.mjs";
+import { normalVerbosity } from "./verbose_prefs.mjs";
 
 const { chromium, firefox, webkit } = await import(process.env.PLAYWRIGHT_MODULE);
 
@@ -20,6 +23,8 @@ if (!engine) throw new Error("usage: subagent_paged.mjs chromium|firefox|webkit"
 const { PRIGH_BACKEND: backend, SITE: site, TOKEN: token } = process.env;
 const dir = join(process.env.TEST_DIR, "subagent_paged");
 const home = join(dir, "home");
+normalVerbosity(home);
+holdGates(home);
 const cwd = join(dir, "cwd");
 mkdirSync(home, { recursive: true });
 mkdirSync(cwd, { recursive: true });
@@ -27,9 +32,6 @@ setTimeout(() => { console.error("subagent_paged.mjs: timed out"); process.exit(
 
 // The main agent and the subagent share the faux script's replies, in
 // order: the main agent waits in its bash call while the subagent works.
-// Each waits at most as long as the script may run, and every gate is
-// opened at teardown, so no shell is left polling (#67).
-const waitFor = file => `timeout 300 sh -c 'until [ -f ${file} ]; do sleep 0.1; done'; echo ${file}`;
 const gates = ["main-go", "end"];
 
 const steps = 35;
@@ -109,7 +111,7 @@ try {
 
   await composer.fill("count the files");
   await composer.press("Enter");
-  // The subagent done: its line settles to a tick (its report is in the panel).
+  // The subagent done: its line settles to a tick (its report is in its chat).
   // A subagent's whole run: longer than a step on a busy machine.
   await page.waitForFunction(() => document.querySelector("#chat .tool-subagent.ok"), null, { timeout: 90000 });
   writeFileSync(join(cwd, "main-go"), "");
@@ -121,12 +123,14 @@ try {
   console.log(`the call is loaded: ${await chatHas("Delegating the count.")}`);
   console.log(`older messages to load: ${await page.locator("#chat [data-older]").count() > 0}`);
 
-  await page.locator(".agents-toggle").click();
-  await page.locator(".agents-row", { hasText: "Count the files" }).click();
-  await page.waitForFunction(() => document.querySelector(".agents-transcript")?.innerText.includes("3 files"));
+  await composer.fill("/agents 1");
+  await composer.press("Enter");
+  await page.waitForFunction(() => document.querySelector(".subagent-chat .entries")?.innerText.includes("3 files"));
   section("its transcript");
-  console.log(clean(await page.locator(".agents-transcript").innerText()));
+  console.log(clean(await page.locator(".subagent-chat").innerText()));
   await screenshot("its transcript");
+  await page.keyboard.press("Escape");
+  await page.locator(".subagent-chat").waitFor({ state: "detached" });
 
   writeFileSync(join(cwd, "end"), "");
   await page.waitForFunction(() => document.getElementById("chat").innerText.includes("All done."));

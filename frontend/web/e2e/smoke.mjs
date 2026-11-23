@@ -15,6 +15,7 @@ import { join } from "node:path";
 import { hostName } from "./host_name.mjs";
 import { audit } from "./phone_audit.mjs";
 import { end } from "./end.mjs";
+import { normalVerbosity } from "./verbose_prefs.mjs";
 
 const { chromium, firefox, webkit } = await import(process.env.PLAYWRIGHT_MODULE);
 
@@ -27,6 +28,7 @@ const home = join(dir, "home");
 const cwd = join(dir, "cwd");
 mkdirSync(home, { recursive: true });
 mkdirSync(cwd, { recursive: true });
+normalVerbosity(home);
 setTimeout(() => { console.error("smoke.mjs: timed out"); process.exit(2); }, 120000).unref();
 
 // The model's replies in order, before and after the backend restarts.

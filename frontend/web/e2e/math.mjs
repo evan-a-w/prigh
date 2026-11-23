@@ -16,6 +16,7 @@ import { spawn } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { end } from "./end.mjs";
+import { normalVerbosity } from "./verbose_prefs.mjs";
 
 const { chromium, firefox, webkit } = await import(process.env.PLAYWRIGHT_MODULE);
 
@@ -25,6 +26,7 @@ if (!engine) throw new Error("usage: math.mjs chromium|firefox|webkit");
 const { PRIGH_BACKEND: backend, SITE: site, TOKEN: token } = process.env;
 const dir = join(process.env.TEST_DIR, "math");
 const home = join(dir, "home");
+normalVerbosity(home);
 const cwd = join(dir, "cwd");
 const sessions = join(home, ".prigh", "sessions");
 mkdirSync(sessions, { recursive: true });
@@ -197,7 +199,9 @@ try {
   section("loaded once");
   console.log(await page.evaluate(() =>
     ["katex.min.js", "copy-tex.min.js", "katex.min.css"].map(f =>
-      `${f}: ${document.querySelectorAll(`script[src="${f}"], link[href="${f}"]`).length}`).join(", ")));
+      // A stylesheet is an @import into the layer vendor (Page_assets).
+      `${f}: ${document.querySelectorAll(`script[src="${f}"]`).length
+        + [...document.querySelectorAll("style")].filter(s => s.textContent.includes(`url("${f}")`)).length}`).join(", ")));
   section("original");
   console.log(await colours());
   await replyShot("original inline", ".msg.assistant .math-inline");

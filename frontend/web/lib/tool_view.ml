@@ -159,6 +159,53 @@ let last_activity chat =
     | User _ | Compaction _ | Shell _ -> None)
 ;;
 
+(* The tool's icon at the start of its row. *)
+let tool_icon name : Html.Icon.t =
+  match name with
+  | "bash" | "job_input" | "job_output" | "job_kill" -> Terminal
+  | "read" -> File_text
+  | "write" | "edit" | "apply_patch" -> File_pen
+  | "ls" | "find" -> Folder_search
+  | "grep" -> Text_search
+  | "web_search" | "web_fetch" -> Globe
+  | "subagent" | "subagent_status" | "subagent_cancel" -> Bot
+  | "update_plan" -> Toc
+  | "ask_user" -> Help
+  | "computer" -> Target
+  | "worktree" -> Branch
+  | "pull_request" -> Pull_request
+  | _ -> Package
+;;
+
+let tool_icon_view name =
+  Node.span
+    ~attrs:[ Attr.class_ "tool-icon"; Attr.create "aria-hidden" "true" ]
+    [ Html.icon (tool_icon name) ]
+;;
+
+(* How long a call took, from its message's end to its result: shown at the
+   row's end by the stylesheet (from [data-took], so that the text of the
+   row does not change with the timing), and as its tooltip. *)
+let took ~started (result : Message.Tool_result.t option) =
+  match started, Option.bind result ~f:(fun r -> r.at) with
+  | Some started, Some ended when Time_ns.( >= ) ended started ->
+    let span = Time_ns.diff ended started in
+    let text =
+      if Time_ns.Span.( < ) span (Time_ns.Span.of_sec 10.)
+      then sprintf "%.1fs" (Time_ns.Span.to_sec span)
+      else Prigh_ui.Tool_phrase.duration span
+    in
+    [ Node.span
+        ~attrs:
+          [ Attr.class_ "took"
+          ; Attr.create "data-took" text
+          ; Attr.title ("Took " ^ text)
+          ]
+        []
+    ]
+  | _ -> []
+;;
+
 let report text =
   if String.is_empty (String.strip text)
   then Node.none
@@ -645,8 +692,8 @@ let present
       | Some { is_error = false; text; _ } -> Subagent_report.started text
       | _ -> None
     in
-    (* Its name, how it stands and the way into the agents panel: the task,
-       its log and its report are there. *)
+    (* Its name, how it stands and the way into its chat: the task, its log
+       and its report are there. *)
     let name = subagent_title call in
     let agent_id =
       Option.first_some
@@ -857,6 +904,7 @@ let present
 ;;
 
 let card
+      ?started
       ?arg:arg_override
       ~nested
       ~fold
@@ -919,8 +967,8 @@ let card
        | None -> body
        | Some note -> span "tool-allowed" note :: body)
   in
-  (* A subagent's card opens it in the agents panel (the page listens for
-     clicks on [data-agent]); [data-call] finds the card from the panel. *)
+  (* A subagent's card opens its chat (the page listens for clicks on
+     [data-agent]); [data-call] finds the card. *)
   let agent =
     match subagent, result with
     | Some s, _ -> Some s.agent_id
@@ -932,6 +980,7 @@ let card
     | [] -> None
     | details -> Some (String.concat ~sep:" · " details)
   in
+  let took = took ~started result in
   let cls =
     String.concat
       ~sep:" "
@@ -941,10 +990,41 @@ let card
   in
   if String.equal call.name "subagent"
   then (
-    (* "Subagent: its name": what the line is, then which one. *)
+    (* "subagent Its name ↗ its task": what the line is, which one (a
+       link into it), then what it was asked. *)
+    let task =
+      Option.value
+        (Tool_args.string (Tool_args.of_call call) "task")
+        ~default:""
+      |> first_line
+    in
+    let name = subagent_title call in
+    (* The page opens the agent from a click on [data-agent]: this button is
+       the head's way in from the keyboard. *)
+    let open_button =
+      Node.button
+        ~attrs:
+          [ Attr.class_ "open-agent"
+          ; Attr.type_ "button"
+          ; Attr.create "aria-label" "Open its chat"
+          ; Attr.title "Open its chat"
+          ]
+        [ Html.icon External ]
+    in
     let head =
-      (Status.icon status :: span "kind" "Subagent:" :: Option.to_list arg)
+      [ Status.icon status
+      ; tool_icon_view call.name
+      ; span "kind" "subagent"
+      ; (match arg_override with
+         | Some arg -> arg
+         | None -> span "agent-name" name)
+      ]
+      @ Option.to_list (Option.map agent ~f:(fun _ -> open_button))
+      @ (if String.is_empty task || String.equal task name
+         then []
+         else [ span "arg task" task ])
       @ chips
+      @ took
     in
     Node.div
       ~attrs:[ Attr.class_ cls; Attr.create "data-call" call.id ]
@@ -955,18 +1035,8 @@ let card
                ([ Attr.class_ "tool-head"; Attr.create "data-agent" id ]
                 @ Option.to_list
                     (Option.map tooltip ~f:(fun t ->
-                       Attr.title (t ^ " · follow it in the agents panel"))))
-             (head
-              @ [ (* The page opens the agent from a click on [data-agent]:
-                     this button is the head's way in from the keyboard. *)
-                  Node.button
-                    ~attrs:
-                      [ Attr.class_ "open-agent"
-                      ; Attr.type_ "button"
-                      ; Attr.create "aria-label" "Open in the agents panel"
-                      ]
-                    [ Node.text "Open ›" ]
-                ])
+                       Attr.title (t ^ " · open its chat"))))
+             head
          | None -> div "tool-head" head)
       ; (match body with
          | [] -> Node.none
@@ -987,14 +1057,14 @@ let card
     let key = open_key call.id in
     let opened = Fold.opened ~by_default fold key in
     let line =
-      [ Status.icon status ]
+      [ Status.icon status; tool_icon_view call.name ]
       @ Option.to_list
           (Option.map host ~f:(fun host -> span "host" ("on " ^ host ^ ":")))
       @ [ span "name" call.name ]
       @ Option.to_list arg
     in
     match body with
-    | [] -> div cls [ div "tool-head" (line @ chips) ]
+    | [] -> div cls [ div "tool-head" (line @ chips @ took) ]
     | body ->
       Node.div
         ~attrs:
@@ -1009,7 +1079,7 @@ let card
               ; Attr.create "aria-expanded" (Bool.to_string opened)
               ]
               @ Option.to_list (Option.map tooltip ~f:Attr.title))
-           (line @ chips @ [ span "chev" "" ])
+           (line @ chips @ took @ [ span "chev" "" ])
          ::
          (if opened
           then
@@ -1054,6 +1124,7 @@ let render_ui ~ui ~nested ~fold ~streaming ~running (call : Tool_call.t) tool =
 
 let view
       ?(ui = Ui_context.Page.none)
+      ?started
       ~nested
       ~fold
       ~streaming
@@ -1063,7 +1134,7 @@ let view
   =
   if String.equal call.Tool_call.name "render_ui"
   then render_ui ~ui ~nested ~fold ~streaming ~running call tool
-  else card ~nested ~fold ~streaming ~running call tool
+  else card ?started ~nested ~fold ~streaming ~running call tool
 ;;
 
 let server_tool ~fold ~running (s : Content.Server_tool.t) =

@@ -11,4 +11,5 @@
   virtual_dom
   virtual_dom.jsoo_weak_collections
   prigh_protocol
-  prigh_ui))
+  prigh_ui
+  loon_ui))

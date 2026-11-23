@@ -3,7 +3,6 @@ open! Import
 
 module Key = struct
   type t =
-    | Worktree_hours
     | Archive_days
     | Compact_at
     | Budget

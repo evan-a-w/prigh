@@ -70,6 +70,7 @@ let%expect_test
         <div class="pending">
           <span aria-hidden="true" class="lamp"> </span>
           <span class="label"> Waiting for the model… </span>
+          <span class="stop-hint"> Esc to stop </span>
         </div>
       </div>
     </div>
@@ -382,7 +383,7 @@ let%expect_test "deliveries of background work: compact cards" =
               <span class="kind"> Subagent: </span>
               <span class="task"> Count the lines in src/app.ml and report back. </span>
               <span class="chip ok"> finished </span>
-              <button type="button" aria-label="Open in the agents panel" class="open-agent"> Open › </button>
+              <button type="button" aria-label="Open its chat" class="open-agent"> Open › </button>
             </div>
             <details class="delivery-body">
               <summary>
@@ -434,7 +435,7 @@ let%expect_test "deliveries of background work: compact cards" =
               <span class="kind"> Subagent: </span>
               <span class="task"> Fix the tests </span>
               <span class="bad chip"> failed </span>
-              <button type="button" aria-label="Open in the agents panel" class="open-agent"> Open › </button>
+              <button type="button" aria-label="Open its chat" class="open-agent"> Open › </button>
             </div>
             <details class="delivery-body">
               <summary>
@@ -579,7 +580,8 @@ let%expect_test "an image the model refused as too large: downsize and retry" =
              {|{"type":"error","message":"HTTP 400: invalid_request_error: messages.12.content.0: image exceeds 5 MB maximum"}|}
            []
        ]);
-  [%expect {|
+  [%expect
+    {|
     <div class="entries">
       <div data-entry="0" class="assistant msg">
         <div class="error stop">

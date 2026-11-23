@@ -6,7 +6,7 @@
 
 /* Focused: the review and the chat, the sessions sidebar hidden (Ctrl+B
    shows it as a drawer over the page, as on a phone); the terminal spans
-   both, the file browser and the agents panel open beside them. */
+   both, and the file browser open beside them. */
 .app.reviewing:not(.narrow) .desk {
   grid-template-columns: minmax(0, 1fr) 0 var(--review-chat-width, 400px);
   grid-template-areas: "review handle main" "terminal terminal terminal";
@@ -70,7 +70,7 @@
 .review-strip > span.approved { background: var(--sage); }
 .review-strip > span.changed { background: var(--sodium); }
 .review-strip > span.current { box-shadow: 0 0 0 1px var(--chalk); }
-.review-progress-text { font: 12px var(--mono); color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.review-progress-text { font: 12px var(--mono); color: var(--muted-text); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .review-controls { display: flex; align-items: center; gap: 8px; margin-left: auto; flex-wrap: wrap; }
 .review-controls .btn .icon { width: 14px; height: 14px; }
 
@@ -111,10 +111,10 @@
    text (innerText, copy, find); 1/64px is invisible but not empty. */
 .review-file-path .dir { color: var(--faint); overflow: hidden; text-overflow: ellipsis; flex-shrink: 1; min-width: 0.02px; }
 .review-file-path .name { flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
-.review-file.approved .review-file-path .name { color: var(--muted); }
+.review-file.approved .review-file-path .name { color: var(--muted-text); }
 .review-file-counts { font-size: 11px; color: var(--faint); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .review-file-staged { font: 600 10px var(--mono); letter-spacing: .04em; text-transform: uppercase; color: var(--sage); border: 1px solid var(--sage-line); border-radius: 3px; padding: 0 4px; white-space: nowrap; }
-.review-file-staged.partly { color: var(--muted); border-color: var(--rule-2); border-style: dashed; }
+.review-file-staged.partly { color: var(--muted-text); border-color: var(--rule-2); border-style: dashed; }
 /* What changed after the last action on the file, under its name. */
 .review-file-since {
   grid-column: 2 / -1;
@@ -164,7 +164,7 @@
 .review-file-title .chip { margin-left: 8px; }
 .review-file-title .chip, .files-review-bar .chip {
   font: 11px var(--sans);
-  color: var(--muted);
+  color: var(--muted-text);
   background: var(--well);
   border: 1px solid var(--rule-2);
   border-radius: var(--r-chip);
@@ -259,11 +259,11 @@ mark.review-mark[data-comment] { cursor: default; }
 .review-thread.hot { border-color: var(--sodium-line); border-left-color: var(--sodium); }
 
 .review-note { display: flex; align-items: center; gap: 8px; color: var(--faint); font: 12px var(--sans); margin-bottom: 8px; }
-.review-since-note { display: block; color: var(--muted); line-height: 1.5; }
+.review-since-note { display: block; color: var(--muted-text); line-height: 1.5; }
 .review-since-hint { margin-left: 10px; color: var(--faint); }
 .files-preview .review-since-note { padding: 6px 12px 2px; }
 .review-since-counts { font: 12px var(--mono); color: var(--sodium); font-variant-numeric: tabular-nums; }
-.review-since-same { color: var(--muted); }
+.review-since-same { color: var(--muted-text); }
 
 /* The since segment: what it compares with in the code face, and its menu's
    chevron, one control with the switch's other segments. */
@@ -292,10 +292,10 @@ mark.review-mark[data-comment] { cursor: default; }
 .review-since-more.open .chevron { transform: rotate(180deg); color: var(--chalk); }
 .review-since .review-popover { left: auto; right: -2px; width: 380px; }
 .review-head:has(.review-since-more.open), .files-review-bar:has(.review-since-more.open) { position: relative; z-index: var(--z-menu-anchor); }
-.review-empty { display: flex; gap: 8px; align-items: center; color: var(--muted); font: 13px var(--sans); padding: 18px 4px; }
+.review-empty { display: flex; gap: 8px; align-items: center; color: var(--muted-text); font: 13px var(--sans); padding: 18px 4px; }
 .review-empty.big { flex-direction: column; align-items: flex-start; padding: 48px 28px; max-width: 62ch; }
 .review-empty.big p { margin: 0; font-size: 14px; color: var(--chalk); }
-.review-empty.big .review-advice { color: var(--muted); font-size: 13px; }
+.review-empty.big .review-advice { color: var(--muted-text); font-size: 13px; }
 
 /* Comments not on a line shown (their code changed beyond finding, or it is
    outside the hunks): one quiet line each, unfolded on demand. */
@@ -306,14 +306,14 @@ mark.review-mark[data-comment] { cursor: default; }
   gap: 6px;
   align-self: flex-start;
   font: 12px var(--sans);
-  color: var(--muted);
+  color: var(--muted-text);
   background: none;
   border: 1px dashed var(--rule-2);
   border-radius: var(--r-chip);
   padding: 2px 9px 2px 6px;
   cursor: pointer;
 }
-.review-aside-toggle:hover { color: var(--chalk); border-color: var(--muted); }
+.review-aside-toggle:hover { color: var(--chalk); border-color: var(--muted-text); }
 .review-aside-toggle:focus-visible { outline: 2px solid var(--sodium); outline-offset: 1px; }
 .review-aside-toggle .chevron { width: 12px; height: 12px; transform: rotate(-90deg); transition: transform 0.12s ease-out; }
 .review-aside-toggle.open .chevron { transform: none; }
@@ -355,7 +355,7 @@ mark.review-mark[data-comment] { cursor: default; }
   gap: 6px;
   max-width: 100%;
   font: 12px var(--sans);
-  color: var(--muted);
+  color: var(--muted-text);
   background: var(--graphite);
   border: 1px solid var(--sage-line);
   border-radius: 999px;
@@ -376,7 +376,7 @@ mark.review-mark[data-comment] { cursor: default; }
   align-items: center;
   justify-content: center;
   background: var(--slate-2);
-  color: var(--muted);
+  color: var(--muted-text);
 }
 .review-folded-thread:hover, .review-folded-thread.hot { color: var(--chalk); border-color: var(--sage); }
 .review-folded-thread:focus-visible { outline: 2px solid var(--sodium); outline-offset: 1px; }
@@ -404,7 +404,7 @@ mark.review-mark.quiet.hot { background: color-mix(in srgb, var(--sage) 14%, tra
 .review-thread.resolved { border-left-color: var(--sage-line); background: transparent; }
 .review-thread.outdated { border-style: dashed; border-left-style: solid; }
 .review-thread-head { display: flex; align-items: center; gap: 8px; min-height: 24px; }
-.review-id { font: 600 11.5px var(--mono); color: var(--muted); }
+.review-id { font: 600 11.5px var(--mono); color: var(--muted-text); }
 .review-where { font-size: 12px; color: var(--faint); }
 .review-flag { font-size: 11.5px; color: var(--sodium); }
 .review-flag.done { color: var(--sage); }
@@ -425,7 +425,7 @@ mark.review-mark.quiet.hot { background: color-mix(in srgb, var(--sage) 14%, tra
 .review-post-text p { margin: 4px 0; }
 .review-proposal { margin-top: 6px; display: flex; flex-direction: column; gap: 6px; }
 .review-proposal-actions { display: flex; gap: 6px; }
-.review-proposal-state { font-size: 12px; color: var(--muted); }
+.review-proposal-state { font-size: 12px; color: var(--muted-text); }
 .review-proposal-state.done { color: var(--sage); }
 .review-proposal-state.failed { color: var(--brick); }
 .review-reply { display: flex; gap: 6px; align-items: flex-end; margin-top: 8px; }
@@ -503,7 +503,7 @@ mark.review-mark.quiet.hot { background: color-mix(in srgb, var(--sage) 14%, tra
 .files-change-count {
   grid-column: 3;
   font: 600 10.5px var(--sans);
-  color: var(--muted);
+  color: var(--muted-text);
   border: 1px solid var(--rule-2);
   border-radius: 8px;
   padding: 0 5px;
@@ -511,7 +511,7 @@ mark.review-mark.quiet.hot { background: color-mix(in srgb, var(--sage) 14%, tra
 }
 .files-row.changed .files-name { color: var(--chalk); font-weight: 500; }
 .files-review-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; row-gap: 6px; white-space: nowrap; padding: 8px 12px; font: 12px var(--sans); border-bottom: 1px solid var(--rule); }
-.files-review-counts { color: var(--muted); font-variant-numeric: tabular-nums; }
+.files-review-counts { color: var(--muted-text); font-variant-numeric: tabular-nums; }
 .files-review-bar .review-open { margin-left: auto; }
 .files-review-bar .files-note { margin: 0; }
 .review-open { gap: 6px; }
@@ -569,12 +569,12 @@ mark.review-mark.quiet.hot { background: color-mix(in srgb, var(--sage) 14%, tra
   cursor: pointer;
   font: 500 13px var(--mono);
 }
-.review-files-toggle .chip { font: 11px var(--sans); color: var(--muted); background: var(--well); border: 1px solid var(--rule-2); border-radius: var(--r-chip); padding: 0 5px; }
+.review-files-toggle .chip { font: 11px var(--sans); color: var(--muted-text); background: var(--well); border: 1px solid var(--rule-2); border-radius: var(--r-chip); padding: 0 5px; }
 .review-files-toggle .review-file-path { flex: 1; min-width: 0; }
 .review-files-toggle .mark { --mark-size: 13px; }
 .review-files-toggle .review-file-path .dir { color: var(--faint); }
 .review-files-where { font: 11.5px var(--mono); color: var(--faint); font-variant-numeric: tabular-nums; }
-.review-files-toggle .chevron { width: 14px; height: 14px; color: var(--muted); transition: transform 0.12s ease-out; }
+.review-files-toggle .chevron { width: 14px; height: 14px; color: var(--muted-text); transition: transform 0.12s ease-out; }
 .review-files-toggle.open { background: var(--sodium-wash); }
 .review-files-toggle.open .chevron { transform: rotate(180deg); color: var(--chalk); }
 .review-files-toggle:focus-visible { outline: 2px solid var(--sodium); outline-offset: -2px; }
@@ -591,7 +591,7 @@ mark.review-mark.quiet.hot { background: color-mix(in srgb, var(--sage) 14%, tra
   border-bottom: 1px solid var(--rule);
   background: var(--slate);
   font: 12px var(--sans);
-  color: var(--muted);
+  color: var(--muted-text);
 }
 .review-target-text { white-space: nowrap; }
 /* A picker's button: the name in the code face, where it is quieter after
@@ -611,7 +611,7 @@ mark.review-mark.quiet.hot { background: color-mix(in srgb, var(--sage) 14%, tra
   padding: 3px 6px 3px 8px;
   cursor: pointer;
 }
-.review-pick-button:hover, .review-pick-button.open { border-color: var(--muted); }
+.review-pick-button:hover, .review-pick-button.open { border-color: var(--muted-text); }
 .review-pick-button:focus-visible { outline: 2px solid var(--sodium); outline-offset: 1px; }
 .review-pick-button.read-only { border-style: dashed; border-color: var(--sodium-line); }
 .review-pick-button .review-pick-icon { width: 12px; height: 12px; align-self: center; color: var(--sodium); }
@@ -630,7 +630,7 @@ mark.review-mark.quiet.hot { background: color-mix(in srgb, var(--sage) 14%, tra
   top: calc(100% + 6px);
   width: 360px;
   max-width: calc(100vw - 24px);
-  max-height: min(28rem, 70vh);
+  max-height: min(392px, 70vh);
   display: flex;
   flex-direction: column;
   border-top-left-radius: 4px;
@@ -666,12 +666,12 @@ mark.review-mark.quiet.hot { background: color-mix(in srgb, var(--sage) 14%, tra
   border-top: 1px solid var(--rule);
   background: var(--slate);
   font: 12px var(--sans);
-  color: var(--muted);
+  color: var(--muted-text);
 }
 .git-bar > .icon { width: 14px; height: 14px; color: var(--faint); }
 .git-branch { font: 500 12.5px var(--mono); color: var(--chalk); }
 .git-branch.detached { color: var(--brick); }
-.git-upstream { font: 12px var(--mono); color: var(--muted); white-space: nowrap; }
+.git-upstream { font: 12px var(--mono); color: var(--muted-text); white-space: nowrap; }
 .git-upstream.none { font-family: var(--sans); color: var(--faint); font-style: italic; }
 .git-counts { display: flex; gap: 10px; }
 .git-count { white-space: nowrap; }
@@ -740,7 +740,7 @@ mark.review-mark.quiet.hot { background: color-mix(in srgb, var(--sage) 14%, tra
   white-space: nowrap;
 }
 .review-dock kbd { font-size: 10.5px; padding: 0 4px; }
-.review-dock-step.btn { padding: 5px 8px; background: transparent; color: var(--muted); }
+.review-dock-step.btn { padding: 5px 8px; background: transparent; color: var(--muted-text); }
 .review-dock-step.btn:hover:not(:disabled) { color: var(--chalk); }
 .review-approve.btn { min-width: 17ch; gap: 8px; }
 .review-approve .icon { width: 14px; height: 14px; }
@@ -803,11 +803,11 @@ mark.review-mark.quiet.hot { background: color-mix(in srgb, var(--sage) 14%, tra
 table.review-diff tr.gap td { padding: 0; border-top: 1px dashed var(--rule); border-bottom: 1px dashed var(--rule); }
 .review-gap { display: flex; align-items: center; gap: 4px; padding: 2px 6px; font: 11.5px var(--sans); color: var(--faint); }
 .review-gap-text { flex: 1; min-width: 0; }
-.review-gap-show.btn { font: 11.5px var(--sans); color: var(--muted); }
+.review-gap-show.btn { font: 11.5px var(--sans); color: var(--muted-text); }
 .app.narrow .review-gap-show.btn { min-height: var(--tap); min-width: var(--tap); }
 
 /* A generated file or a pure rename, folded. */
-.review-folded-file { padding: 12px; border: 1px dashed var(--rule-2); border-radius: var(--r-control); font: 13px/1.5 var(--sans); color: var(--muted); }
+.review-folded-file { padding: 12px; border: 1px dashed var(--rule-2); border-radius: var(--r-control); font: 13px/1.5 var(--sans); color: var(--muted-text); }
 .review-folded-file p { margin: 0 0 10px; }
 .review-folded-file .chip { font: 11px var(--sans); background: var(--well); border: 1px solid var(--rule-2); border-radius: var(--r-chip); padding: 0 5px; margin-right: 6px; }
 .review-folded-actions { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -816,7 +816,7 @@ table.review-diff tr.gap td { padding: 0; border-top: 1px dashed var(--rule); bo
 /* The file's head: the file picker and the display options (Aa). */
 .review-file-bar { display: flex; align-items: stretch; gap: 4px; }
 .review-file-bar > .review-files-toggle { flex: 1; min-width: 0; }
-.review-display-button.btn { min-width: var(--tap); min-height: var(--tap); font: 600 14px var(--sans); color: var(--muted); }
+.review-display-button.btn { min-width: var(--tap); min-height: var(--tap); font: 600 14px var(--sans); color: var(--muted-text); }
 .review-display-button.on { color: var(--chalk); background: var(--sodium-wash); }
 
 /* The dock on a phone: ← ↑ Approve ↓ →, the file's place being in the
@@ -857,7 +857,7 @@ table.review-diff tr.gap td { padding: 0; border-top: 1px dashed var(--rule); bo
 .review-sheet textarea { font-size: 16px; }
 .review-sheet .btn { min-height: var(--tap); }
 .review-sheet-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.review-sheet-label { font: 13px var(--sans); color: var(--muted); }
+.review-sheet-label { font: 13px var(--sans); color: var(--muted-text); }
 .review-size { display: flex; align-items: center; gap: 6px; }
 .review-size-step.btn { min-width: var(--tap); min-height: var(--tap); font: 600 14px var(--sans); }
 .review-size-name { min-width: 7ch; text-align: center; font: 12.5px var(--sans); }

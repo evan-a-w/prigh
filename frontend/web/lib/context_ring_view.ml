@@ -216,16 +216,6 @@ let ring_svg percent =
            ; "transform", "rotate(-90 15 15)"
            ]
            [])
-    ; Ui_svg.el
-        "circle"
-        [ "class", "context-ring-spin"
-        ; "cx", "15"
-        ; "cy", "15"
-        ; "r", Ui_svg.num radius
-        ; ( "stroke-dasharray"
-          , sprintf "%s %s" (Ui_svg.num 9.) (Ui_svg.num circumference) )
-        ]
-        []
     ]
 ;;
 
@@ -236,18 +226,13 @@ let view (m : App.Model.t) ~inject =
     let at = compacts_at m state in
     let percent = Status_view.context_percent state in
     let p = Option.value percent ~default:0. in
-    let busy = Status_view.busy m in
     let label =
       match percent with
       | Some p -> sprintf "Context %.0f%% full, $%.2f: details" p state.cost_usd
       | None -> sprintf "Context and cost ($%.2f): details" state.cost_usd
     in
     Node.div
-      ~attrs:
-        [ classes
-            [ "context-ring-anchor" ]
-            [ "open", m.context_card; "busy", busy ]
-        ]
+      ~attrs:[ classes [ "context-ring-anchor" ] [ "open", m.context_card ] ]
       [ (if m.context_card
          then
            Node.div

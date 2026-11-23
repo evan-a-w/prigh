@@ -1,11 +1,8 @@
-// The sidebar's worktrees by how recently their sessions were used, and the
-// settings page's Sessions rows for it and for archiving: a session used
-// (and opened) three days ago has its worktrees folded behind ⑂, one used now shows
-// them; "Show worktrees" widens the window, "Archive after" moves the old
-// session to Archived at once (no restart); both on a desktop and on
-// phones (390x844, 320x640). Run by prigh_web.sh; prints normalised
-// snapshots (the expected output is in ENGINE.expected) and, with SHOTS,
-// screenshots.
+// The settings page's Sessions section's "Archive after": a session used
+// three days ago moves to Archived at once (no restart) when it is set to
+// two days, a value it cannot read is refused; and the section on phones
+// (390x844, 320x640). Run by prigh_web.sh; prints normalised snapshots (the
+// expected output is in ENGINE.expected) and, with SHOTS, screenshots.
 //
 // Environment: PLAYWRIGHT_MODULE, PRIGH_BACKEND, SITE, TEST_DIR, TOKEN, and
 // optionally SHOTS.
@@ -13,6 +10,7 @@ import { execFileSync, spawn } from "node:child_process";
 import { mkdirSync, readFileSync, readdirSync, realpathSync, utimesSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { end } from "./end.mjs";
+import { normalVerbosity } from "./verbose_prefs.mjs";
 
 const phoneSizes = [[390, 844], [320, 640]];
 const { chromium, firefox, webkit } = await import(process.env.PLAYWRIGHT_MODULE);
@@ -24,6 +22,7 @@ const { PRIGH_BACKEND: backend, SITE: site, TOKEN: token } = process.env;
 mkdirSync(join(process.env.TEST_DIR, "sessions_settings"), { recursive: true });
 const dir = realpathSync(join(process.env.TEST_DIR, "sessions_settings"));
 const home = join(dir, "home");
+normalVerbosity(home);
 const repo = join(dir, "repo");
 for (const d of [home, repo]) mkdirSync(d, { recursive: true });
 
@@ -92,20 +91,16 @@ const send = async (p, text) => {
 };
 const session = (p, title) =>
   p.locator(".session-item", { has: p.locator(".session-title", { hasText: title }) });
-// Each session's title, its fold (+ shown, - folded) and the worktrees shown.
+// Each session's title, archived ones marked.
 const sidebar = async p => {
   const rows = await p.locator(".sessions .session-item").evaluateAll(items => items.map(item => {
     const title = item.querySelector(".session-title")?.textContent.trim();
-    const fold = item.querySelector(".session-fold");
-    const mark = fold ? (fold.classList.contains("folded") ? "-" : "+") : " ";
-    const wts = [...item.querySelectorAll(".worktree-branch")].map(b => b.textContent.trim());
-    const archived = item.querySelector(".session.archived") ? " (archived)" : "";
-    return `${mark} ${title}${archived}${wts.length ? `: ${wts.join(", ")}` : ""}`;
+    return `${title}${item.querySelector(".session.archived") ? " (archived)" : ""}`;
   }));
   console.log(rows.join("\n"));
 };
 const toast = (p, text) => p.locator(".toast", { hasText: text }).last().waitFor();
-const sessions = p => p.locator(".settings-group", { has: p.locator(".setting.worktree-hours") });
+const sessions = p => p.locator(".settings-group", { has: p.locator(".setting.auto-archive") });
 const openSettings = async p => {
   await p.keyboard.press("Control+,");
   await p.locator(".settings-dialog").waitFor();
@@ -114,10 +109,9 @@ const openSettings = async p => {
   await sessions(p).scrollIntoViewIfNeeded();
 };
 const showSettings = async p => {
-  console.log((await sessions(p).locator(".setting.worktree-hours, .setting.auto-archive").allInnerTexts())
+  console.log((await sessions(p).locator(".setting.auto-archive").allInnerTexts())
     .map(t => t.replace(/\n+/g, " | ")).join("\n"));
-  const field = async id => (await p.locator(id).count() ? JSON.stringify(await p.locator(id).inputValue()) : "hidden");
-  console.log(`fields: ${await field("#worktree-hours")} hours, ${await field("#auto-archive")} days`);
+  console.log(`field: ${JSON.stringify(await p.locator("#auto-archive").inputValue())} days`);
 };
 const config = () => {
   const c = JSON.parse(readFileSync(join(home, ".prigh/config.json"), "utf8"));
@@ -143,102 +137,31 @@ const age = title => {
   utimesSync(file, then, then);
 };
 
-// The user's visits to sessions ("web.sidebar-opened": when they last went
-// into each), three days earlier too, on the backend and in the page's
-// cache, so the old session was not opened since either.
-const shiftVisits = visits => Object.fromEntries(Object.entries(visits).map(([id, at]) => {
-  const then = new Date(new Date(at.replace(" ", "T")).getTime() - 3 * 86400e3);
-  return [id, then.toISOString().replace("T", " ").replace(/\.\d+Z$/, "Z")];
-}));
-const ageVisits = async p => {
-  const file = join(home, ".prigh/prefs.json");
-  const sorted = visits => JSON.stringify(Object.entries(visits ?? {}).sort());
-  const cached = () => p.evaluate(() => JSON.parse(localStorage.getItem("prigh-web.prefs")).prefs["web.sidebar-opened"]);
-  const kept = () => JSON.parse(readFileSync(file, "utf8"))["web.sidebar-opened"];
-  // The page's last visit has reached the backend.
-  for (let i = 0; sorted(await cached()) !== sorted(kept()); i++) {
-    if (i > 200) throw new Error(`visits: the backend has ${sorted(kept())}, the page ${sorted(await cached())}`);
-    await new Promise(resolve => setTimeout(resolve, 50));
-  }
-  const visits = shiftVisits(kept());
-  writeFileSync(file, JSON.stringify({ ...JSON.parse(readFileSync(file, "utf8")), "web.sidebar-opened": visits }));
-  await p.evaluate(visits => {
-    const stored = JSON.parse(localStorage.getItem("prigh-web.prefs"));
-    stored.prefs["web.sidebar-opened"] = visits;
-    localStorage.setItem("prigh-web.prefs", JSON.stringify(stored));
-  }, visits);
-};
-
 const page = await open({ width: 1280, height: 800 });
 try {
   await signIn(page);
-  // Two sessions, each in worktrees of its own; the first used days ago.
+  // Two sessions, the first used days ago.
   await send(page, "Old work");
   await session(page, "Old work").waitFor();
-  await send(page, "/worktree new feat/old-a");
-  await page.locator(".worktree-branch", { hasText: "feat/old-a" }).waitFor();
-  await send(page, "/worktree new feat/old-b");
-  await page.locator(".worktree-branch", { hasText: "feat/old-b" }).waitFor();
   await page.locator(".new-session").click();
-  // In the new session, then in the repo, before its first message, or it
-  // starts in Old work's worktree.
   await page.waitForFunction(() =>
     !document.querySelector(".new-session.opening, .session-item.selected") && document.querySelector(".hero"));
-  await send(page, `/cd ${repo}`);
-  await page.locator(".toast", { hasText: /^Working directory: .*\/repo$/ }).first().waitFor();
   await send(page, "Fresh work");
   await session(page, "Fresh work").waitFor();
-  await send(page, "/worktree new fix/fresh");
-  await page.locator(".worktree-branch", { hasText: "fix/fresh" }).waitFor();
   // Its agent let go of, so the list reads the file again.
   await page.reload();
   await composer(page).waitFor();
   age("Old work");
-  // A save the page sent before (going into the session after the reload)
-  // can reach the backend after the aged visits: then they are aged again.
-  const aged = () => Object.values(JSON.parse(readFileSync(join(home, ".prigh/prefs.json"), "utf8"))["web.sidebar-opened"] ?? {})
-    .some(at => Date.now() - Date.parse(at.replace(" ", "T")) > 86400e3);
-  for (let i = 0; ; i++) {
-    await ageVisits(page);
-    await page.reload();
-    await composer(page).waitFor();
-    if (aged()) break;
-    if (i > 20) throw new Error("the visits stay unaged");
-  }
-  await session(page, "Old work").locator(".session-fold.folded").waitFor();
-  await page.mouse.move(1000, 400);
-  section("used days ago: folded, used now: shown");
+  await page.reload();
+  await composer(page).waitFor();
+  await session(page, "Old work").waitFor();
+  section("two sessions, one used days ago");
   await sidebar(page);
-  await screenshot(page, "sidebar");
 
   await openSettings(page);
   section("the settings");
   await showSettings(page);
   await screenshot(page, "settings");
-
-  // A wider window shows the old session's too; its switch off folds them
-  // all.
-  await page.locator("#worktree-hours").fill("100");
-  await page.locator("#worktree-hours").press("Enter");
-  await page.locator(".setting.worktree-hours .setting-note, .setting.worktree-hours", { hasText: "100 hours" }).first().waitFor();
-  await page.keyboard.press("Escape");
-  await page.locator(".settings-dialog").waitFor({ state: "detached" });
-  await session(page, "Old work").locator(".worktree-branch", { hasText: "feat/old-a" }).waitFor();
-  section("100 hours");
-  await sidebar(page);
-  await openSettings(page);
-  await sessions(page).locator(".setting.worktree-hours .switch").click();
-  await page.locator("#worktree-hours").waitFor({ state: "detached" });
-  await page.keyboard.press("Escape");
-  await page.locator(".settings-dialog").waitFor({ state: "detached" });
-  await session(page, "Fresh work").locator(".session-fold.folded").waitFor();
-  section("off");
-  await sidebar(page);
-  // The user's own unfold wins over the setting and the age.
-  await session(page, "Old work").locator(".session-fold").click();
-  await session(page, "Old work").locator(".worktree-branch", { hasText: "feat/old-a" }).waitFor();
-  section("off, Old work unfolded by hand");
-  await sidebar(page);
 
   // Refused, then archiving after two days: the old session moves to
   // Archived without a restart.
@@ -262,32 +185,18 @@ try {
   console.log(`archived: ${(await page.locator(".sessions-divider").innerText()).replace(/\s+/g, " ")}`);
   await screenshot(page, "archived");
 
-  // Phones: the sidebar, then the settings section, at 390x844 and 320x640.
-  // The worktrees' switch on again: the 100 hours they were.
+  // Back to a week, then the section on phones, at 390x844 and 320x640.
   await openSettings(page);
-  await sessions(page).locator(".setting.worktree-hours .switch").click();
-  await page.locator(".setting.worktree-hours", { hasText: "100 hours" }).waitFor();
-  section("switched on again");
-  await showSettings(page);
   await page.locator("#auto-archive").fill("7");
   await page.locator("#auto-archive").press("Enter");
   await toast(page, "after 7 days");
   for (const [width, height] of phoneSizes) {
     const phone = await open({ width, height }, true);
     await signIn(phone);
-    await phone.locator(".chat-chrome .toggle-sidebar").click();
-    await session(phone, "Old work").locator(".worktree-branch", { hasText: "feat/old-a" }).waitFor();
-    await phone.waitForTimeout(400); // the sidebar slides in
-    section(`phone ${width}x${height}: sidebar`);
-    await sidebar(phone);
-    await screenshot(phone, `phone-${width}-sidebar`);
-    await phone.locator(".scrim").tap({ position: { x: width - 10, y: height / 2 } });
-    await phone.locator(".scrim").waitFor({ state: "detached" });
-    await phone.evaluate(() => document.activeElement?.blur());
     await openSettings(phone);
     section(`phone ${width}x${height}: settings`);
     console.log(`fits: ${await phone.evaluate(() => {
-      const s = document.querySelector(".settings-group:has(.worktree-hours)");
+      const s = document.querySelector(".settings-group:has(.auto-archive)");
       const inside = el => { const r = el.getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth; };
       return s.scrollWidth <= s.clientWidth
         && [...s.querySelectorAll("input, button")].every(inside);

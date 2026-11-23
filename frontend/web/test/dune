@@ -13,7 +13,7 @@
  (name prigh_web_test_harness)
  (wrapped false)
  (enabled_if %{bin-available:node})
- (modules agent_events chat_harness harness page_soup render)
+ (modules agent_events chat_harness harness page_soup render worktree_lines)
  (preprocess
   (pps ppx_jane js_of_ocaml-ppx))
  (libraries
@@ -45,7 +45,7 @@
   test_computer
   test_control_centre
   test_custom_providers
-  test_cwd_placeholder
+  test_composer_where
   test_dialogs
   test_drops
   test_external_link
@@ -71,7 +71,7 @@
   test_signin_link
   test_skills_mcp
   test_smart_approval
-  test_steer_agents
+  test_subagent_chats
   test_subagent_paged
   test_temporary
   test_tool_view
@@ -81,7 +81,6 @@
   test_units
   test_update_notice
   test_worktree_switch
-  test_worktree_use
   test_worktrees
   test_zoom)
  (preprocess
@@ -114,6 +113,7 @@
    harness
    page_soup
    render
+   worktree_lines
    test_about_you
    test_accounts
    test_auto_archive
@@ -127,7 +127,7 @@
    test_computer
    test_control_centre
    test_custom_providers
-   test_cwd_placeholder
+   test_composer_where
    test_dialogs
    test_drops
    test_external_link
@@ -153,7 +153,7 @@
    test_signin_link
    test_skills_mcp
    test_smart_approval
-   test_steer_agents
+   test_subagent_chats
    test_subagent_paged
    test_temporary
    test_tool_view
@@ -163,8 +163,7 @@
    test_units
    test_update_notice
    test_worktree_switch
-   test_worktree_use
-   test_worktrees
+    test_worktrees
    test_zoom))
  (preprocess
   (pps ppx_jane js_of_ocaml-ppx))

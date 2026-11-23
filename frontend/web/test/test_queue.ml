@@ -58,29 +58,70 @@ let%expect_test
     Scroll_to_bottom
     (Rpc (method_ follow_up) (params ((text "then write the changelog")))
      (tag (Sent (text "then write the changelog") (images ()))))
-    Steers this turn also check the docs
+    Steer also check the docs
     (Edit) (Remove from the queue)
-    After this turn then write the changelog
+    Queued then write the changelog
     (Edit) (Remove from the queue)
-    After this turn and a
+    Queued and a
     second line
     (Edit) (Remove from the queue)
-    <li class="queued steer">
-      <span title="Reaches the agent after its current tool calls, in this turn" class="queued-tag"> Steers this turn </span>
-      <span dir="auto" class="queued-text"> also check the docs </span>
-      <div class="queued-actions">
+    <li class="bg-card border border-border flex gap-2 h-9 items-center max-w-[min(100%,36rem)] min-w-0 narrow:h-11 pl-3 pr-1 queued rounded-full shadow-xs steer text-[13px]">
+      <svg xmlns="http://www.w3.org/2000/svg"
+           width="24"
+           height="24"
+           viewBox="0 0 24 24"
+           fill="none"
+           stroke="currentColor"
+           stroke-width="2"
+           stroke-linecap="round"
+           stroke-linejoin="round"
+           class="lucide lucide-clock shrink-0 size-3.5 text-muted-foreground">
+        <circle cx="12" cy="12" r="10"> </circle>
+        <polyline points="12 6 12 12 16 14"> </polyline>
+      </svg>
+      <span title="Reaches the agent after its current tool calls, in this turn"
+            class="font-medium in-[.steer]:text-primary queued-tag shrink-0 text-foreground"> Steer </span>
+      <span dir="auto"
+            title="also check the docs"
+            class="min-w-0 queued-text text-muted-foreground truncate"> also check the docs </span>
+      <div class="flex items-center queued-actions shrink-0">
         <button type="button"
                 title="Edit: take it back into the editor"
-                class="btn ghost queued-edit"
+                class="flex hover:bg-accent hover:text-foreground items-center justify-center narrow:size-11 queued-edit rounded-full shrink-0 size-7 text-muted-foreground"
                 @on_click>
-          <icon class="pencil"> </icon>
-          <span class="queued-action-label"> Edit </span>
+          <svg xmlns="http://www.w3.org/2000/svg"
+               width="24"
+               height="24"
+               viewBox="0 0 24 24"
+               fill="none"
+               stroke="currentColor"
+               stroke-width="2"
+               stroke-linecap="round"
+               stroke-linejoin="round"
+               class="lucide lucide-pencil size-3.5">
+            <path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"> </path>
+            <path d="m15 5 4 4"> </path>
+          </svg>
+          <span class="sr-only"> Edit </span>
         </button>
         <button type="button"
                 title="Remove from the queue"
-                class="btn ghost icon queued-remove"
+                class="flex hover:bg-accent hover:text-destructive items-center justify-center narrow:size-11 queued-remove rounded-full shrink-0 size-7 text-muted-foreground"
                 @on_click>
-          <icon class="close"> </icon>
+          <svg xmlns="http://www.w3.org/2000/svg"
+               width="24"
+               height="24"
+               viewBox="0 0 24 24"
+               fill="none"
+               stroke="currentColor"
+               stroke-width="2"
+               stroke-linecap="round"
+               stroke-linejoin="round"
+               class="lucide lucide-x size-3.5">
+            <path d="M18 6 6 18"> </path>
+            <path d="m6 6 12 12"> </path>
+          </svg>
+          <span class="sr-only"> Remove from the queue </span>
         </button>
       </div>
     </li>
@@ -95,9 +136,9 @@ let%expect_test
     (Rpc (method_ remove_queued)
      (params ((queue follow_up) (index 0) (text "then write the changelog")))
      (tag (Unqueued "then write the changelog")))
-    Steers this turn also check the docs
+    Steer also check the docs
     (Edit) (Remove from the queue)
-    After this turn and a
+    Queued and a
     second line
     (Edit) (Remove from the queue)
     |}];
@@ -133,7 +174,7 @@ let%expect_test
     also check the docs
 
     draft
-    After this turn and a
+    Queued and a
     second line
     (Edit) (Remove from the queue)
     |}]
@@ -153,7 +194,7 @@ let%expect_test
     (Remove_queued Main ((kind Steer) (index 1) (text b)))
     (Rpc (method_ remove_queued) (params ((queue steer) (index 1) (text b)))
      (tag (Unqueued b)))
-    Steers this turn a
+    Steer a
     (Edit) (Remove from the queue)
     |}];
   H.fail
@@ -170,7 +211,7 @@ let%expect_test
     {|
     (Rpc (method_ get_pending) (params ()) (tag Pending))
     That message is no longer queued: it was delivered or removed already (Dismiss)
-    Steers this turn b
+    Steer b
     (Edit) (Remove from the queue)
     |}]
 ;;
@@ -193,7 +234,7 @@ let%expect_test "delivery is acknowledged when the transcript has it" =
     {|
     (Expire_toast (id 0) (after_ms 2500))
     Steer delivered: steer me
-    After this turn after that
+    Queued after that
     (Edit) (Remove from the queue)
     |}];
   (* The run ends; the follow-up starts the next one. *)

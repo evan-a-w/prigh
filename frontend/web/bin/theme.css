@@ -17,7 +17,7 @@
   --rule: #343a44;
   --rule-2: #464d59;
   --chalk: #e3e5e1;
-  --muted: #9aa1ab;
+  --muted-text: #9aa1ab;
   /* Quiet text (meta lines, counts, hints): still 4.5:1 on the ground. */
   --faint: #8a919c;
   /* Quieter, for what is not read: rules, scrollbars, dots. */
@@ -60,11 +60,11 @@
 
   /* Syntax highlighting: strings are sage, types and numbers take a little
      of the accent; plain code stays chalk. */
-  --hl-keyword: var(--muted);
+  --hl-keyword: var(--muted-text);
   --hl-type: color-mix(in srgb, var(--sodium) 25%, var(--chalk));
   --hl-string: var(--sage);
   --hl-number: color-mix(in srgb, var(--sodium) 60%, var(--chalk));
-  --hl-comment: color-mix(in srgb, var(--faint) 50%, var(--muted));
+  --hl-comment: color-mix(in srgb, var(--faint) 50%, var(--muted-text));
 
   /* Older names, kept as aliases. */
   --bg: var(--graphite);
@@ -95,7 +95,7 @@
   --rule: #373737;
   --rule-2: #4a4a4a;
   --chalk: #e6e6e6;
-  --muted: #a3a3a3;
+  --muted-text: #a3a3a3;
   --faint: #909090;
   --faint-line: #6e6e6e;
   --panel-3: #363636;
@@ -107,7 +107,7 @@
   --add-bg: #8cc7a126;
   --del-bg: #e8806f24;
 
-  --hl-keyword: var(--muted);
+  --hl-keyword: var(--muted-text);
   --hl-type: color-mix(in srgb, var(--sodium) 20%, var(--chalk));
   --hl-string: color-mix(in srgb, var(--sodium) 45%, var(--chalk));
   --hl-number: color-mix(in srgb, var(--sodium) 75%, var(--chalk));
@@ -126,7 +126,7 @@
   --rule: #dcdfe5;
   --rule-2: #c2c7cf;
   --chalk: #1c2026;
-  --muted: #535a65;
+  --muted-text: #535a65;
   --faint: #646b76;
   --faint-line: #9aa0a9;
   --panel-3: #e1e4e9;
@@ -161,7 +161,7 @@
   --del-bg: #d0402e17;
   --del-fg: #9a2a1d;
 
-  --hl-keyword: var(--muted);
+  --hl-keyword: var(--muted-text);
   --hl-type: color-mix(in srgb, var(--sodium) 40%, var(--chalk));
   --hl-string: var(--sage);
   --hl-number: color-mix(in srgb, var(--sodium) 80%, var(--chalk));
@@ -190,7 +190,7 @@
   --series-5: var(--accent-pink);
   --series-6: var(--accent-teal);
   --series-7: var(--accent-yellow);
-  --series-8: var(--muted);
+  --series-8: var(--muted-text);
 }
 [data-accent="blue"] { --series-2: var(--accent-orange); }
 [data-accent="green"] { --series-3: var(--accent-orange); }

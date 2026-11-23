@@ -69,8 +69,8 @@ let%expect_test "a dialog makes the page behind it inert: Tab stays in it" =
   [%expect
     {|
     (Focus dialog)
-    <aside class="sidebar">
-    <div class="chrome-anchor">
+    <aside class="bg-sidebar loon sidebar text-sidebar-foreground text-sm">
+    <div class="chrome-anchor loon">
     <div class="chat-frame">
     <footer class="composer">
     |}];
@@ -81,20 +81,16 @@ let%expect_test "a dialog makes the page behind it inert: Tab stays in it" =
     Close_dialog
     (Focus editor)
     |}];
-  (* The agents panel too, and under a tool's confirmation. *)
-  H.act h Toggle_subagents;
+  (* Under a tool's confirmation too. *)
   H.event h (confirm "c1" "rm -rf build");
   inert ();
   [%expect
     {|
-    (Rpc (method_ list_subagents) (params ()) (tag Subagents))
-    (Rpc (method_ list_jobs) (params ()) (tag Jobs))
     (Focus confirm)
-    <aside class="sidebar">
-    <div class="chrome-anchor">
+    <aside class="bg-sidebar loon sidebar text-sidebar-foreground text-sm">
+    <div class="chrome-anchor loon">
     <div class="chat-frame">
     <footer class="composer">
-    <aside class="agents-panel">
     |}];
   H.key h "Escape" ~target:Page;
   inert ();
@@ -139,186 +135,368 @@ let%expect_test "help lists every key and command" =
     {|
     (Focus dialog)
     Keys
-    Enter send; while running, steer the agent
-    Ctrl+Enter / ⌘+Enter send exactly what is typed, ignoring the completion popup
-    Alt+Enter queue a follow-up for after the run
-    Shift+Enter new line
-    Esc stop the run; close a dialog, popup or side answer
-    ↑ ↓ earlier prompts (in an empty editor or its first line)
-    Alt+↑ take the last queued message back into the editor
-    Tab complete a /command, its argument, an @path or a #snippet
-    !cmd run a shell command (!!cmd: not added to the context; !&cmd: as a background job)
-    Ctrl+L the model chip's menu: models by provider, their reasoning and the access mode
-    ← → / ↑ ↓ (in the model menu) ← → the previous or next provider (or the favourites); ↑ ↓ the models; Enter switches, Esc closes
-    Alt+1…9 (in the model menu) switch to the list's Nth model
-    Alt+F (in the model menu) star or unstar the highlighted model
-    ↑ ↓ / Enter / Esc (a chip's menu) move / choose / close it; type to filter the models or hosts
-    Tab (a chip's menu; ← → in the host's) the next chip's menu (host, model)
-    Ctrl+P / Alt+P next / previous scoped model (/scoped-models)
-    Alt+T cycle the thinking level
-    Alt+M cycle the mode: ask → auto-edit → smart → auto → plan (/mode, /plan)
-    Alt+N insert a snippet at the caret: a list to filter (/snippet)
-    Ctrl+O cycle the transcript verbosity
-    ↑ ↓ / Space / Enter / Esc (transcript filter) the filter's menu (/filter, its button left of the files'): choose a kind, show or hide it, keep the filter, or put back the one it opened with
-    Ctrl+X copy the last reply (when nothing is selected)
-    Ctrl+↑ / Ctrl+↓ previous / next of your messages in the transcript (loading earlier ones)
-    Ctrl+J jump to one of your messages: a list to filter (or the marks at the transcript's right edge)
-    Delete (in the jump list) trim the model's context before the highlighted message (confirmed first; /trim undo brings it back)
-    PageUp / PageDown scroll the transcript
-    Ctrl+K the control centre (also the sidebar's Search): search the sessions (their titles and messages), the settings, their values and the commands
-    ↑ ↓ / Enter / Backspace / Esc (the control centre) move / open the session or setting, or set the value / back from a setting's values to the list (in an empty filter) / close it
-    Alt+Enter / Alt+R / Delete (/worktree) start a new session in the highlighted worktree / review its changes / remove it
-    A (on a session) archive or unarchive it (archived sessions are listed last, muted)
-    Alt+E the editor mode: edit the session's files beside the chat (also /edit [path], the file browser's Edit)
-    Ctrl+S / ⌘+S (editor) save the file
-    Ctrl+P / ⌘+P (editor) go to file: fuzzy search over every file under the session's directory
-    Ctrl+F / ⌘+F (editor) find (and replace) in the file
-    Ctrl+G (editor) go to line
-    Ctrl+L / ⌘+L (in the editor's text) ask about the selection: attach it to the composer as path:L1–L2
-    Ctrl+I / ⌘+I (in the editor's text) ask about the selection in a box under its lines (Enter sends, Esc closes)
-    Swipe left / right (editor, a phone) the next or previous open file
-    Ctrl+B / ⌘+B (editor, wide window) show or hide the file tree
-    Alt+C (editor, wide window) show or hide the chat beside the editor
-    Alt+PageDown / Alt+PageUp (editor) the next or previous open file
-    Alt+W (editor) close the file
-    Esc (editor, outside the text) back to the chat
-    P (on a session) pin it to the top of the sidebar, or unpin it (pinned sessions are never archived for being idle)
-    Shift+F10 / ContextMenu (on a session or worktree) its menu: open, rename, fork, new worktree, review, files, terminal, pull request, copy, delete or remove (also right-click, a long press or its ⋯)
-    Shift+F10 / ContextMenu (on a message) its menu: copy, trim everything before or after it, delete it (also right-click or a long press, at the pointer; with text selected, right-click is the browser's, to copy it; on a phone, its Select text selects its words)
-    Shift+F10 / ContextMenu (in a text field, the desktop app's browser window) its menu: cut, copy, paste, select all (also right-click; ↑ ↓ move, Enter chooses, Esc closes); the browser's own menus are hidden there
-    Shift+F10 / ContextMenu (in the terminal, the desktop app's browser window) its menu: copy the selection, paste, select all (also right-click)
-    Space (selecting) mark a session (Shift: the range from the last one); Delete deletes the marked ones, Esc stops selecting
-    Ctrl+Q / ⌘+Q (desktop app) quit prigh: its window and this machine's tool host (/quit)
-    Ctrl+B show or hide the sidebar (while reviewing, over the review)
-    Ctrl+, settings: notifications, transcript detail, your account (/settings)
-    ← → / ↑ ↓ (on a panel's edge) resize the panel (Shift: faster; Home / End: smallest / largest; Enter: the default size); or drag the edge, double-click to reset
-    Esc (the context ring's card open) close the card (the ring by the paperclip: context, cost, Compact)
-    Alt+1…9 follow subagent or job N in the agents panel
-    Alt+] Alt+[ the next or previous subagent or job
-    Alt+0 close the agents panel
-    Enter / Alt+Enter (steering a subagent) send it a message: at its next step / when it ends its turn (its Steer button in the agents panel; /agents steer N TEXT sends one)
-    Alt+↑ (steering a subagent) take its last queued message back
-    Esc (steering a subagent) write to the main agent again
-    Ctrl+Z / ⌘+Z (in the message box) right after a long paste became a chip, or a chip was removed: undo that (otherwise the box's own undo); Ctrl+Shift+Z, ⌘+Shift+Z or Ctrl+Y redoes it
-    Ctrl+Shift+V / ⌘+Shift+V (in the message box) paste a long text into the box as text; a plain paste of over 2,000 characters or 40 lines becomes a Pasted text chip, sent whole with the message (its dialog: Insert as text, Remove)
-    Ctrl+Shift+O a new temporary session (/temporary): not saved or listed, deleted when you leave it; on the new-session screen, its Temporary chip
-    Ctrl+Shift+F open or close the file browser (/files): ↑↓ select, Enter opens, Backspace goes up, F2 renames, Delete deletes, Esc closes
-    Alt+R open or close the review page (/review): the changes file by file, beside the chat
-    → / ← (reviewing; also ] [, n p, j k) the next / previous changed file
-    Space (reviewing) approve the file and go on to the next one not approved (also a); on an approved file, take the approval back
-    x / Shift+X (reviewing) select the file in the list, or unselect it; select every file from the last selected (also Ctrl+click, Shift+click)
-    Shift+F10 / Shift+C (reviewing) the menu of the selected files (else the file): approve, stage, commit, copy; commit them (else the approved files)
-    c / e / v / s (reviewing) comment on the code selected (drag across it, in the review or a changed file's preview); edit or comment; the whole file or the changes; send the new comments to prigh
-    r / b / d (reviewing) choose what to review (a worktree, or a branch read-only); what to compare it with (a branch, tag, commit or any revision typed); since the merge base or directly
-    l / Shift+L (reviewing) what changed since your latest action on the file (or the hunks again); choose the action it compares with: Latest follows your newest
-    Shift+J / Shift+K (reviewing) the next / previous change, past the file's last or first: the next / previous file (on a phone, the bar's ↓ ↑)
-    w / + / - (reviewing) wrap the file's long lines (continuing under their indent) or scroll them sideways; code in diffs bigger / smaller (on a phone: the file's Aa)
-    Esc (reviewing) close the display options, drop the comment, the selected code, the selected files, then close the review
-    Enter / Ctrl+S (reviewing) add the comment or reply (Shift+Enter: a new line); save the file being edited
-    Ctrl+` open or close the terminal (/terminal); in it, every other key goes to the shell but Ctrl+Shift+C (copy the selection) and Ctrl+Shift+V (paste). On a touch screen a bar over the keyboard has Esc, Tab, Ctrl and Alt (tap: the next key; double-tap: locked), the arrows (held: repeat), | ~ / - and Home, End, PgUp, PgDn
-    Esc (in a pull request) back to the list it was opened from (/pr); Enter closes it
-    Alt+G (a pull request, commit message, branch or session name) ✦ Generate: the model drafts it from the changes, the commits and the session (Esc stops, keeping what came; Undo puts the text back)
-    Ctrl+Enter / Esc (the review's commit message) commit the files listed above it; close the commit, keeping the message
-    Ctrl+Enter (in a dialog's text box) accept the dialog, e.g. create the pull request (Enter is a new line)
-    Tab (in /scoped-models) check or uncheck the highlighted model
-    ↑↓ ←→ Home End (settings' sections) show the previous / next section, or the first / last (/settings SECTION opens at one)
-    Ctrl+click / ⌘-click / middle click (a session in the sidebar) open it in a new window (its menu's Open in new window)
-    Delete (in /remind's list) remove the highlighted reminder
-    y / a / n / r (confirmation) allow once, always allow (its rules, this session), deny, deny saying why; Enter allows, Esc denies
-    ↑↓ Space ←→ (question) choose, pick, previous / next question; type for your own answer; Enter accepts, Esc declines
+    Enter
+    send; while running, steer the agent
+    Ctrl+Enter or ⌘+Enter
+    send exactly what is typed, ignoring the completion popup
+    Alt+Enter
+    queue a follow-up for after the run
+    Shift+Enter
+    new line
+    Esc
+    stop the run; close a dialog, popup or side answer
+    ↑ ↓
+    earlier prompts (in an empty editor or its first line)
+    Alt+↑
+    take the last queued message back into the editor
+    Tab
+    complete a /command, its argument, an @path or a #snippet
+    !cmd
+    run a shell command (!!cmd: not added to the context; !&cmd: as a background job)
+    Ctrl+L
+    the model chip's menu: models by provider, their reasoning and the access mode
+    ← → or ↑ ↓ (in the model menu)
+    ← → the previous or next provider (or the favourites); ↑ ↓ the models; Enter switches, Esc closes
+    Alt+1…9 (in the model menu)
+    switch to the list's Nth model
+    Alt+F (in the model menu)
+    star or unstar the highlighted model
+    ↑ ↓ or Enter or Esc (a chip's menu)
+    move / choose / close it; type to filter the models or hosts
+    Tab (a chip's menu; ← → in the host's)
+    the next chip's menu (host, model)
+    Ctrl+P or Alt+P
+    next / previous scoped model (/scoped-models)
+    Alt+T
+    cycle the thinking level
+    Alt+M
+    cycle the mode: ask → auto-edit → smart → auto → plan (/mode, /plan)
+    Alt+N
+    insert a snippet at the caret: a list to filter (/snippet)
+    Ctrl+O
+    cycle the transcript verbosity
+    ↑ ↓ or Space or Enter or Esc (transcript filter)
+    the filter's menu (/filter, Ctrl+K, a phone's ⋯): choose a kind, show or hide it, keep the filter, or put back the one it opened with
+    Ctrl+X
+    copy the last reply (when nothing is selected)
+    Ctrl+↑ or Ctrl+↓
+    previous / next of your messages in the transcript (loading earlier ones)
+    Ctrl+J
+    jump to one of your messages: a list to filter (or the marks at the transcript's left edge)
+    Delete (in the jump list)
+    trim the model's context before the highlighted message (confirmed first; /trim undo brings it back)
+    PageUp or PageDown
+    scroll the transcript
+    Ctrl+K
+    the control centre (also the sidebar's Search): search the sessions (their titles and messages), the settings, their values and the commands
+    ↑ ↓ or Enter or Backspace or Esc (the control centre)
+    move / open the session or setting, or set the value / back from a setting's values to the list (in an empty filter) / close it
+    Alt+Enter or Alt+R or Delete (/worktree)
+    start a new session in the highlighted worktree / review its changes / remove it
+    A (on a session)
+    archive or unarchive it (archived sessions are listed last, muted)
+    Alt+E
+    the editor mode: edit the session's files beside the chat (also /edit [path], the file browser's Edit)
+    Ctrl+S or ⌘+S (editor)
+    save the file
+    Ctrl+P or ⌘+P (editor)
+    go to file: fuzzy search over every file under the session's directory
+    Ctrl+F or ⌘+F (editor)
+    find (and replace) in the file
+    Ctrl+G (editor)
+    go to line
+    Ctrl+L or ⌘+L (in the editor's text)
+    ask about the selection: attach it to the composer as path:L1–L2
+    Ctrl+I or ⌘+I (in the editor's text)
+    ask about the selection in a box under its lines (Enter sends, Esc closes)
+    Swipe left or right (editor, a phone)
+    the next or previous open file
+    Ctrl+B or ⌘+B (editor, wide window)
+    show or hide the file tree
+    Alt+C (editor, wide window)
+    show or hide the chat beside the editor
+    Alt+PageDown or Alt+PageUp (editor)
+    the next or previous open file
+    Alt+W (editor)
+    close the file
+    Esc (editor, outside the text)
+    back to the chat
+    P (on a session)
+    pin it to the top of the sidebar, or unpin it (pinned sessions are never archived for being idle)
+    Shift+F10 or ContextMenu (on a session or worktree)
+    its menu: open, rename, fork, new worktree, review, files, terminal, pull request, copy, delete or remove (also right-click, a long press or its ⋯)
+    Shift+F10 or ContextMenu (on a message)
+    its menu: copy, trim everything before or after it, delete it (also right-click or a long press, at the pointer; with text selected, right-click is the browser's, to copy it; on a phone, its Select text selects its words)
+    Shift+F10 or ContextMenu (in a text field, the desktop app's browser window)
+    its menu: cut, copy, paste, select all (also right-click; ↑ ↓ move, Enter chooses, Esc closes); the browser's own menus are hidden there
+    Shift+F10 or ContextMenu (in the terminal, the desktop app's browser window)
+    its menu: copy the selection, paste, select all (also right-click)
+    Ctrl+click or ⌘+click, Shift+click (a session)
+    select it, or the range from the last one (from the session on show at first); the bar under the list archives or deletes them; a middle click opens it in a new window
+    Space (selecting)
+    mark a session (Shift: the range from the last one); Delete deletes the marked ones, Esc stops selecting
+    Ctrl+Q or ⌘+Q (desktop app)
+    quit prigh: its window and this machine's tool host (/quit)
+    Ctrl+B
+    show or hide the sidebar (while reviewing, over the review)
+    Ctrl+,
+    settings: notifications, transcript detail, your account (/settings)
+    ← → or ↑ ↓ (on a panel's edge)
+    resize the panel (Shift: faster; Home / End: smallest / largest; Enter: the default size); or drag the edge, double-click to reset
+    Esc (the context ring's card open)
+    close the card (the ring by the paperclip: context, cost, Compact)
+    Alt+1…9
+    open the chat of subagent N of this chat (the session card lists them)
+    Enter or Alt+Enter (in a subagent's chat)
+    write to it: at its next step / when it ends its turn while it runs; once it has finished, it carries on with your message (/agents steer N TEXT sends one from anywhere)
+    Alt+↑ (in a subagent's chat)
+    take its last queued message back
+    Esc (in a subagent's chat)
+    back to its parent's chat
+    Ctrl+Z or ⌘+Z (in the message box)
+    right after a long paste became a chip, or a chip was removed: undo that (otherwise the box's own undo); Ctrl+Shift+Z, ⌘+Shift+Z or Ctrl+Y redoes it
+    Ctrl+Shift+V or ⌘+Shift+V (in the message box)
+    paste a long text into the box as text; a plain paste of over 2,000 characters or 40 lines becomes a Pasted text chip, sent whole with the message (its dialog: Insert as text, Remove)
+    Ctrl+Shift+O
+    a new temporary session (/temporary): not saved or listed, deleted when you leave it; on the new-session screen, its Temporary chip
+    Ctrl+Shift+F
+    open or close the file browser (/files): ↑↓ select, Enter opens, Backspace goes up, F2 renames, Delete deletes, Esc closes
+    Alt+R
+    open or close the review page (/review): the changes file by file, beside the chat
+    → or ← (reviewing; also ] [, n p, j k)
+    the next / previous changed file
+    Space (reviewing)
+    approve the file and go on to the next one not approved (also a); on an approved file, take the approval back
+    x or Shift+X (reviewing)
+    select the file in the list, or unselect it; select every file from the last selected (also Ctrl+click, Shift+click)
+    Shift+F10 or Shift+C (reviewing)
+    the menu of the selected files (else the file): approve, stage, commit, copy; commit them (else the approved files)
+    c or e or v or s (reviewing)
+    comment on the code selected (drag across it, in the review or a changed file's preview); edit or comment; the whole file or the changes; send the new comments to prigh
+    r or b or d (reviewing)
+    choose what to review (a worktree, or a branch read-only); what to compare it with (a branch, tag, commit or any revision typed); since the merge base or directly
+    l or Shift+L (reviewing)
+    what changed since your latest action on the file (or the hunks again); choose the action it compares with: Latest follows your newest
+    Shift+J or Shift+K (reviewing)
+    the next / previous change, past the file's last or first: the next / previous file (on a phone, the bar's ↓ ↑)
+    w or + or - (reviewing)
+    wrap the file's long lines (continuing under their indent) or scroll them sideways; code in diffs bigger / smaller (on a phone: the file's Aa)
+    Esc (reviewing)
+    close the display options, drop the comment, the selected code, the selected files, then close the review
+    Enter or Ctrl+S (reviewing)
+    add the comment or reply (Shift+Enter: a new line); save the file being edited
+    Ctrl+`
+    open or close the terminal (/terminal); in it, every other key goes to the shell but Ctrl+Shift+C (copy the selection) and Ctrl+Shift+V (paste). On a touch screen a bar over the keyboard has Esc, Tab, Ctrl and Alt (tap: the next key; double-tap: locked), the arrows (held: repeat), | ~ / - and Home, End, PgUp, PgDn
+    Esc (in a pull request)
+    back to the list it was opened from (/pr); Enter closes it
+    Alt+G (a pull request, commit message, branch or session name)
+    ✦ Generate: the model drafts it from the changes, the commits and the session (Esc stops, keeping what came; Undo puts the text back)
+    Ctrl+Enter or Esc (the review's commit message)
+    commit the files listed above it; close the commit, keeping the message
+    Ctrl+Enter (in a dialog's text box)
+    accept the dialog, e.g. create the pull request (Enter is a new line)
+    Tab (in /scoped-models)
+    check or uncheck the highlighted model
+    ↑↓ ←→ Home End (settings' sections)
+    show the previous / next section, or the first / last (/settings SECTION opens at one)
+    Middle click (a session in the sidebar)
+    open it in a new window (its menu's Open in new window)
+    Delete (in /remind's list)
+    remove the highlighted reminder
+    y or a or n or r (confirmation)
+    allow once, always allow (its rules, this session), deny, deny saying why; Enter allows, Esc denies
+    ↑↓ Space ←→ (question)
+    choose, pick, previous / next question; type for your own answer; Enter accepts, Esc declines
     Commands
-    /help [command] show commands and keys, or a command's usage
-    /hotkeys show the keyboard shortcuts
-    /settings [section] appearance, sessions, new sessions' defaults, models, git hosting and your account; a section opens at it (Ctrl+,)
-    /new start a new session
-    /temporary a temporary session: not saved or listed, deleted when you leave it (Ctrl+Shift+O); in one, keep it or delete it
-    /model [name] pick or switch the model
-    /scoped-models pick the models Ctrl+P and Alt+P cycle through
-    /fallback [model...|off] show or set the models that take over, in order, when one's usage runs out
-    /thinking [off|low|on|high|max] pick or set the thinking level
-    /change_default save the model and thinking level as the default for new sessions
-    /verbosity [quiet|normal|verbose] how much of tool calls and thinking the transcript shows
-    /filter [all|KIND...|-KIND|+KIND] show only some kinds in the transcript (your messages, replies, thinking, tools, subagents, notes); the model's context is unchanged
-    /theme [original|dark|light] pick or set the theme, for you in every browser
-    /accent [name|#rrggbb] pick or set the accent colour: orange, blue, green, purple, pink, teal, yellow or any #rrggbb
-    /confirm [on|off|mode] the mode this session and new ones start in: on (ask), off (auto), ask, auto-edit, smart, auto or chat
-    /mode [mode] pick or set the mode, in Alt+M's order: ask, auto-edit, smart or auto (what asks first), plan (read-only planning) or chat (without the tool host)
-    /plan [on|off] toggle plan mode: the model investigates and plans, changing no files, until you turn it off
-    /chat [on|off] toggle chat mode: talk without the tool host (no files, commands or project; the web and other host-free tools), until you turn it off
-    /todos show the model's plan (its update_plan steps)
-    /permissions show the mode, the allow/ask/deny rules (config and this session) and the calls smart mode remembered, to forget (smart mode judges them again; the hosts they permitted ask again)
-    /notify [on|off] tell you when a turn ends or something waits for you while the tab is hidden
-    /usage how much of your Claude and ChatGPT subscriptions' usage limits you have used, in Settings
-    /memory [on|off] your notes the model saves when you ask it to remember something, in Settings; on or off gives the model the memory tool or takes it away
-    /instructions [on|off] your custom instructions, in the context of every session, in Settings; on or off lets the model add, edit and remove them or not
-    /user-info what you set about yourself for the model (name, country, units...), given to it in every session, in Settings
-    /compact [instructions] summarise older messages to free context
-    /generate-model [MODEL|off] pick the model that drafts commit messages, pull requests and branch names (✦ Generate); MODEL|off: draft them with MODEL (off: the session's)
-    /approval-model [MODEL|off] pick the model that judges tool calls in smart mode; MODEL|off: judge them with MODEL (off: the session's)
-    /naming [model MODEL|off] show which model names sessions and subagents; model MODEL|off: name them with MODEL (off: the drafting model, else the session's)
-    /compaction [at|model|mask ...] show when conversations are compacted and what summarises them; at TOKENS|off: also once the context exceeds TOKENS, not only at 80% of the window; model MODEL|off: the model that writes the summaries (off: the session's); mask on|off: replace old tool outputs with placeholders first
-    /diff [path] show the uncommitted changes where the tools run, untracked files too
-    /review [worktree] [--base REV] the review page, the changes file by file to approve, comment on and edit (Alt+R): of the session's worktree or another (its branch, path or name), against its base or REV; /review BASE [instructions] (HEAD: the uncommitted changes) has the model review them for prioritised findings
-    /init write or improve the project's AGENTS.md
-    /name [name] rename the session
-    /session show the session's details and statistics
-    /trace where the session's time went: model, tools, waiting on you, the slowest steps (prigh trace SESSION -perfetto FILE exports a timeline)
-    /sessions search the saved sessions
-    /switch [path] switch to a saved session
-    /archive [session] archive a session (this one without an argument): it moves under Archived in the sidebar
-    /unarchive [session] unarchive a session (this one without an argument)
-    /pin [session] pin a session to the top of the sidebar (this one without an argument): pinned sessions are never archived for being idle
-    /unpin [session] unpin a session (this one without an argument)
-    /delete [undo|session...] delete a message from the transcript and the model's context (a reply with its tool calls' results): pick it, newest first; undo brings the latest deletion back; with sessions, deletes them after a confirmation
-    /delete-archived delete every archived session, after a confirmation
-    /auto-archive [DAYS|off] show how long a session goes without activity before it is archived; DAYS|off: archive after DAYS days (off: never, only by hand), in Settings
-    /clone copy this session into a new one
-    /fork start a new session from an earlier message
-    /rewind go back to an earlier message in this session
-    /trim [after|undo] drop everything before a message from the model's context (the transcript keeps it folded); after: everything after a message instead (what you send later stays); undo brings back the last trim
-    /tree show the session tree and move to any message in it
-    /cd [path] change the working directory (asks to create a missing one)
-    /mkdir [path] create a directory (and its parents) and change to it
-    /worktree [list|new|open|back|rm] pick a git worktree of the repository to work in (Alt+Enter: in a new session, Alt+R: review its changes, Delete removes it); new BRANCH [BASE] creates one and works there; open [-n] TARGET (-n: in a new session); back [main]: back where the session switched into worktrees from; rm [-f] TARGET (-f: with uncommitted changes)
-    /default-dir [path|off] show or set the directory new sessions start in (on the default host), in Settings
-    /default-host [off|name] pick or set the tool host new sessions start on (off: where you are), in Settings
-    /default-budget [off|dollars] show or set the cost budget of sessions that set none with /budget, in Settings
-    /host [name|backend] pick where tools run, and the directory there
-    /export [path] export the transcript on the backend (markdown, or .jsonl)
-    /import [path] import a session from a JSONL file on the backend
-    /snippet [NAME|add|rm] insert a saved text at the caret (none: pick one, Alt+N); add NAME [TEXT] saves one (no TEXT: your last prompt), rm NAME deletes it
-    /skills pick a skill to invoke (/skill:name)
-    /skill:<name> [args] send a skill's instructions to the agent, with your arguments
-    /mcp [reconnect] MCP servers: their tools, approve a project's, or restart failed ones
-    /budget [dollars|off] show or set the session's cost budget: no turn starts once it is spent
-    /goal [text|off|resume] set a goal the agent keeps working toward until it is met; show, clear or resume it
-    /remind [stop|every|rm|off ...] stop [N] TEXT: remind the agent when it ends its turn (at most N times in a row, default 3); every N TEXT: every N turns; rm NAME, off: remove one or all; none: list the session's (Delete removes one)
-    /resume [now|cancel|on|off] show, run now or cancel the automatic resume after a usage limit, or turn it on or off
-    /downsize-images send the conversation's images smaller (after the model refused one as too large) and retry a failed reply
-    /copy copy the last reply to the clipboard
-    /btw <question> ask a side question without interrupting the run (not added to the conversation)
-    /abort stop the current run
-    /terminal [dir] open a shell where the tools run, in the session's directory (Ctrl+`), or a shell of its own in DIR (a worktree, say)
-    /files [path] browse, preview, upload and download files where the tools run (Ctrl+Shift+F)
-    /edit [path] the editor mode: edit the session's files (PATH, or the last one) beside the chat, and ask about a selection (Alt+E toggles it)
-    /agents [n|id|cancel <n|id>|steer <n|id> <text>|follow-up <n|id> <text>] follow subagents and background jobs in the agents panel, cancel one, or send a running subagent a message (steer: at its next step; follow-up: when it ends its turn)
-    /jobs [id|kill <id>] background jobs in the agents panel: list them, show or kill one
-    /login [provider|github [HOST]|forgejo HOST|HOST] [token] log in to a model provider (or /login custom), or sign in to GitHub or a Forgejo or Gitea host (token: paste one instead of OAuth)
-    /logout [provider|HOST] remove a provider's login, or sign out of a git host (github: github.com)
-    /auth show which providers and git hosts are logged in
-    /pr [list [open|closed|all]|view N|new [title]|checkout N] the repository's pull requests: list and filter them, open one with its checks and diff, create one, or check one out in a worktree
-    /setusr [user] act as another user (superusers); without a user, pick one
-    /signout sign out of this account
-    /retry-backend-connection reconnect to the backend now
-    /state show the session state as the backend reports it
-    /clear clear the transcript view (the conversation is kept)
-    /quit leave: quit the desktop app (Ctrl+Q); in a browser, close the tab (/signout signs out)
+    /help [command]
+    show commands and keys, or a command's usage
+    /hotkeys
+    show the keyboard shortcuts
+    /settings [section]
+    appearance, sessions, new sessions' defaults, models, git hosting and your account; a section opens at it (Ctrl+,)
+    /new
+    start a new session
+    /temporary
+    a temporary session: not saved or listed, deleted when you leave it (Ctrl+Shift+O); in one, keep it or delete it
+    /model [name]
+    pick or switch the model
+    /scoped-models
+    pick the models Ctrl+P and Alt+P cycle through
+    /fallback [model...|off]
+    show or set the models that take over, in order, when one's usage runs out
+    /thinking [off|low|on|high|max]
+    pick or set the thinking level
+    /change_default
+    save the model and thinking level as the default for new sessions
+    /verbosity [quiet|normal|verbose]
+    how much of tool calls and thinking the transcript shows
+    /filter [all|KIND...|-KIND|+KIND]
+    show only some kinds in the transcript (your messages, replies, thinking, tools, subagents, notes); the model's context is unchanged
+    /theme [original|dark|light]
+    pick or set the theme, for you in every browser
+    /accent [name|#rrggbb]
+    pick or set the accent colour: orange, blue, green, purple, pink, teal, yellow or any #rrggbb
+    /corners [sharp|small|default|round]
+    how round the page's corners are, for you in every browser
+    /font [recursive|inter|system]
+    the font of prose and the interface
+    /code-font [recursive|system]
+    the font of code, commands and output
+    /confirm [on|off|mode]
+    the mode this session and new ones start in: on (ask), off (auto), ask, auto-edit, smart, auto or chat
+    /mode [mode]
+    pick or set the mode, in Alt+M's order: ask, auto-edit, smart or auto (what asks first), plan (read-only planning) or chat (without the tool host)
+    /plan [on|off]
+    toggle plan mode: the model investigates and plans, changing no files, until you turn it off
+    /chat [on|off]
+    toggle chat mode: talk without the tool host (no files, commands or project; the web and other host-free tools), until you turn it off
+    /todos
+    show the model's plan (its update_plan steps)
+    /permissions
+    show the mode, the allow/ask/deny rules (config and this session) and the calls smart mode remembered, to forget (smart mode judges them again; the hosts they permitted ask again)
+    /notify [on|off]
+    tell you when a turn ends or something waits for you while the tab is hidden
+    /usage
+    how much of your Claude and ChatGPT subscriptions' usage limits you have used, in Settings
+    /memory [on|off]
+    your notes the model saves when you ask it to remember something, in Settings; on or off gives the model the memory tool or takes it away
+    /instructions [on|off]
+    your custom instructions, in the context of every session, in Settings; on or off lets the model add, edit and remove them or not
+    /user-info
+    what you set about yourself for the model (name, country, units...), given to it in every session, in Settings
+    /compact [instructions]
+    summarise older messages to free context
+    /generate-model [MODEL|off]
+    pick the model that drafts commit messages, pull requests and branch names (✦ Generate); MODEL|off: draft them with MODEL (off: the session's)
+    /approval-model [MODEL|off]
+    pick the model that judges tool calls in smart mode; MODEL|off: judge them with MODEL (off: the session's)
+    /naming [model MODEL|off]
+    show which model names sessions and subagents; model MODEL|off: name them with MODEL (off: the drafting model, else the session's)
+    /compaction [at|model|mask ...]
+    show when conversations are compacted and what summarises them; at TOKENS|off: also once the context exceeds TOKENS, not only at 80% of the window; model MODEL|off: the model that writes the summaries (off: the session's); mask on|off: replace old tool outputs with placeholders first
+    /diff [path]
+    show the uncommitted changes where the tools run, untracked files too
+    /review [worktree] [--base REV]
+    the review page, the changes file by file to approve, comment on and edit (Alt+R): of the session's worktree or another (its branch, path or name), against its base or REV; /review BASE [instructions] (HEAD: the uncommitted changes) has the model review them for prioritised findings
+    /init
+    write or improve the project's AGENTS.md
+    /name [name]
+    rename the session
+    /session
+    show the session's details and statistics
+    /trace
+    where the session's time went: model, tools, waiting on you, the slowest steps (prigh trace SESSION -perfetto FILE exports a timeline)
+    /sessions
+    search the saved sessions
+    /switch [path]
+    switch to a saved session
+    /archive [session]
+    archive a session (this one without an argument): it moves under Archived in the sidebar
+    /unarchive [session]
+    unarchive a session (this one without an argument)
+    /pin [session]
+    pin a session to the top of the sidebar (this one without an argument): pinned sessions are never archived for being idle
+    /unpin [session]
+    unpin a session (this one without an argument)
+    /delete [undo|session...]
+    delete a message from the transcript and the model's context (a reply with its tool calls' results): pick it, newest first; undo brings the latest deletion back; with sessions, deletes them after a confirmation
+    /delete-archived
+    delete every archived session, after a confirmation
+    /auto-archive [DAYS|off]
+    show how long a session goes without activity before it is archived; DAYS|off: archive after DAYS days (off: never, only by hand), in Settings
+    /clone
+    copy this session into a new one
+    /fork
+    start a new session from an earlier message
+    /rewind
+    go back to an earlier message in this session
+    /trim [after|undo]
+    drop everything before a message from the model's context (the transcript keeps it folded); after: everything after a message instead (what you send later stays); undo brings back the last trim
+    /tree
+    show the session tree and move to any message in it
+    /cd [path]
+    change the working directory (asks to create a missing one)
+    /mkdir [path]
+    create a directory (and its parents) and change to it
+    /worktree [list|new|open|back|rm]
+    pick a git worktree of the repository to work in (Alt+Enter: in a new session, Alt+R: review its changes, Delete removes it); new BRANCH [BASE] creates one and works there; open [-n] TARGET (-n: in a new session); back [main]: back where the session switched into worktrees from; rm [-f] TARGET (-f: with uncommitted changes)
+    /default-dir [path|off]
+    show or set the directory new sessions start in (on the default host), in Settings
+    /default-host [off|name]
+    pick or set the tool host new sessions start on (off: where you are), in Settings
+    /default-budget [off|dollars]
+    show or set the cost budget of sessions that set none with /budget, in Settings
+    /host [name|backend]
+    pick where tools run, and the directory there
+    /export [path]
+    export the transcript on the backend (markdown, or .jsonl)
+    /import [path]
+    import a session from a JSONL file on the backend
+    /snippet [NAME|add|rm]
+    insert a saved text at the caret (none: pick one, Alt+N); add NAME [TEXT] saves one (no TEXT: your last prompt), rm NAME deletes it
+    /skills
+    pick a skill to invoke (/skill:name)
+    /skill:<name> [args]
+    send a skill's instructions to the agent, with your arguments
+    /mcp [reconnect]
+    MCP servers: their tools, approve a project's, or restart failed ones
+    /budget [dollars|off]
+    show or set the session's cost budget: no turn starts once it is spent
+    /goal [text|off|resume]
+    set a goal the agent keeps working toward until it is met; show, clear or resume it
+    /remind [stop|every|rm|off ...]
+    stop [N] TEXT: remind the agent when it ends its turn (at most N times in a row, default 3); every N TEXT: every N turns; rm NAME, off: remove one or all; none: list the session's (Delete removes one)
+    /resume [now|cancel|on|off]
+    show, run now or cancel the automatic resume after a usage limit, or turn it on or off
+    /downsize-images
+    send the conversation's images smaller (after the model refused one as too large) and retry a failed reply
+    /copy
+    copy the last reply to the clipboard
+    /btw <question>
+    ask a side question without interrupting the run (not added to the conversation)
+    /abort
+    stop the current run
+    /terminal [dir]
+    open a shell where the tools run, in the session's directory (Ctrl+`), or a shell of its own in DIR (a worktree, say)
+    /files [path]
+    browse, preview, upload and download files where the tools run (Ctrl+Shift+F)
+    /edit [path]
+    the editor mode: edit the session's files (PATH, or the last one) beside the chat, and ask about a selection (Alt+E toggles it)
+    /agents [n|id|cancel <n|id>|steer <n|id> <text>|follow-up <n|id> <text>]
+    open a subagent's chat (none: the session card), cancel one, or send a running subagent a message (steer: at its next step; follow-up: when it ends its turn)
+    /jobs [kill <id>]
+    background jobs: the session card, or kill one
+    /login [provider|github [HOST]|forgejo HOST|HOST] [token]
+    log in to a model provider (or /login custom), or sign in to GitHub or a Forgejo or Gitea host (token: paste one instead of OAuth)
+    /logout [provider|HOST]
+    remove a provider's login, or sign out of a git host (github: github.com)
+    /auth
+    show which providers and git hosts are logged in
+    /pr [list [open|closed|all]|view N|new [title]|checkout N]
+    the repository's pull requests: list and filter them, open one with its checks and diff, create one, or check one out in a worktree
+    /setusr [user]
+    act as another user (superusers); without a user, pick one
+    /signout
+    sign out of this account
+    /retry-backend-connection
+    reconnect to the backend now
+    /state
+    show the session state as the backend reports it
+    /clear
+    clear the transcript view (the conversation is kept)
+    /quit
+    leave: quit the desktop app (Ctrl+Q); in a browser, close the tab (/signout signs out)
     Left to the browser
-    Ctrl+C / Ctrl+V / Ctrl+Z copy, paste, undo: the browser's (Esc stops a run)
-    Ctrl+F find in the page, which has the whole transcript
-    Ctrl+T / Ctrl+N / Ctrl+W the browser's tabs and windows: Alt+T cycles thinking
-    Ctrl+R reload: the session comes back (?session=); Tab completes @paths
-    Ctrl+G no $EDITOR in a browser: edit here (Shift+Enter for new lines)
+    Ctrl+C or Ctrl+V or Ctrl+Z
+    copy, paste, undo: the browser's (Esc stops a run)
+    Ctrl+F
+    find in the page, which has the whole transcript
+    Ctrl+T or Ctrl+N or Ctrl+W
+    the browser's tabs and windows: Alt+T cycles thinking
+    Ctrl+R
+    reload: the session comes back (?session=); Tab completes @paths
+    Ctrl+G
+    no $EDITOR in a browser: edit here (Shift+Enter for new lines)
     |}];
   H.key h "Enter" ~target:Page;
   [%expect
@@ -635,13 +813,11 @@ let%expect_test
     (Rpc (method_ get_prefs)
      (params
       ((keys
-        (web.theme web.accent web.notify web.verbosity web.terminal-open
-         web.sidebar-folded web.sidebar-unfolded web.sidebar-opened
-         web.sidebar-worktree-hours web.review web.code-size favourite-models
-         history web.migrated web.sidebar-width web.files-width
-         web.files-preview-width web.agents-width web.terminal-height
-         web.review-chat-width web.review-files-width web.review-margin-width
-         web.editor-tree-width))))
+        (web.theme web.accent web.radius web.font web.code-font web.notify
+         web.verbosity web.terminal-open web.review web.code-size
+         favourite-models history web.migrated web.sidebar-width web.files-width
+         web.files-preview-width web.terminal-height web.review-chat-width
+         web.review-files-width web.review-margin-width web.editor-tree-width))))
      (tag Prefs))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s1.jsonl) (limit 1000000)))
@@ -682,10 +858,15 @@ let%expect_test "the reconnect delay doubles up to ten seconds" =
 let%expect_test "signing out" =
   let h = H.create () in
   H.text h ~selector:".sidebar-footer";
-  [%expect {| (Commands & keys) (Settings (Ctrl+, or /settings)) |}];
+  [%expect
+    {| (Settings (Ctrl+, or /settings)) (Usage and limits (/usage)) (Commands and keys (/help)) |}];
   H.act h Saved_login;
   H.text h ~selector:".sidebar-footer";
-  [%expect {| (Commands & keys) (Settings (Ctrl+, or /settings)) (Sign out) |}];
+  [%expect
+    {|
+    (Settings (Ctrl+, or /settings)) (Usage and limits (/usage)) (Commands and keys (/help))
+    (Sign out)
+    |}];
   H.act
     h
     (Hello
@@ -696,7 +877,8 @@ let%expect_test "signing out" =
        ; features = []
        });
   H.text h ~selector:".sidebar-footer";
-  [%expect {| (A ann acting as bob) (Settings (Ctrl+, or /settings)) |}];
+  [%expect
+    {| (Settings (Ctrl+, or /settings)) (Usage and limits (/usage)) (Commands and keys (/help)) (acting as bob A) |}];
   H.act h Sign_out;
   H.type_ h "/signout";
   H.act h Send;
@@ -706,25 +888,4 @@ let%expect_test "signing out" =
     (Cache_prefs (((key history) (value ((/signout))))))
     Sign_out
     |}]
-;;
-
-let%expect_test "on a phone the agents panel is a sheet with the keyboard" =
-  let h = H.create () in
-  let inert () = H.elements h ~selector:"[inert]" in
-  H.act h (Set_narrow true);
-  H.act h Toggle_subagents;
-  inert ();
-  [%expect
-    {|
-    (Rpc (method_ list_subagents) (params ()) (tag Subagents))
-    (Rpc (method_ list_jobs) (params ()) (tag Jobs))
-    (Focus agents-panel)
-    <aside class="sidebar">
-    <div class="chrome-anchor">
-    <div class="chat-frame">
-    <footer class="composer">
-    |}];
-  H.act h Toggle_subagents;
-  inert ();
-  [%expect {| <aside class="sidebar"> |}]
 ;;

@@ -475,7 +475,7 @@ let shown_title = ref ""
 
 let sync_title (m : App.Model.t) =
   let session =
-    Option.map m.state ~f:(Prigh_web.Session_view.session_title m)
+    Option.map m.state ~f:(Prigh_web.Session_title.of_state m)
   in
   let title = Prigh_web.Page_notify.title ?session m.notifications in
   if not (String.equal title !shown_title)
@@ -603,7 +603,6 @@ let perform client settings ctx (model : App.Model.t) (command : App.Command.t) 
     | Set_caret byte -> Effect.of_sync_fun (set_caret ~draft:model.draft) byte
     | Sign_out -> Effect.of_sync_fun sign_out settings
     | Quit_desktop -> Effect.of_sync_fun Desktop_page.quit ()
-    | Reveal path -> Effect.of_sync_fun Agents_listeners.reveal path
     | Copy { text; copied } ->
       let%bind.Effect ok = Effect.of_deferred_fun Gesture_copy.copy text in
       inject
@@ -715,7 +714,7 @@ let component client settings ~init ~current (local_ graph) =
         let layout (m : App.Model.t) =
           ( App.Model.running m
           , m.narrow
-          , m.agents.open_
+          , Option.is_some m.subagent_chat
           , App.Model.docked m
           , m.review.open_
           , Option.is_some m.state )

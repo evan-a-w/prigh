@@ -66,16 +66,15 @@ let help =
   ; "Alt+N", "insert a snippet at the caret: a list to filter (/snippet)"
   ; "Ctrl+O", "cycle the transcript verbosity"
   ; ( "↑ ↓ / Space / Enter / Esc (transcript filter)"
-    , "the filter's menu (/filter, its button left of the files'): choose a \
-       kind, show or hide it, keep the filter, or put back the one it opened \
-       with" )
+    , "the filter's menu (/filter, Ctrl+K, a phone's ⋯): choose a kind, show \
+       or hide it, keep the filter, or put back the one it opened with" )
   ; "Ctrl+X", "copy the last reply (when nothing is selected)"
   ; ( "Ctrl+↑ / Ctrl+↓"
     , "previous / next of your messages in the transcript (loading earlier \
        ones)" )
   ; ( "Ctrl+J"
     , "jump to one of your messages: a list to filter (or the marks at the \
-       transcript's right edge)" )
+       transcript's left edge)" )
   ; ( "Delete (in the jump list)"
     , "trim the model's context before the highlighted message (confirmed \
        first; /trim undo brings it back)" )
@@ -130,6 +129,10 @@ let help =
   ; ( "Shift+F10 / ContextMenu (in the terminal, the desktop app's browser \
        window)"
     , "its menu: copy the selection, paste, select all (also right-click)" )
+  ; ( "Ctrl+click / ⌘+click, Shift+click (a session)"
+    , "select it, or the range from the last one (from the session on show at \
+       first); the bar under the list archives or deletes them; a middle click \
+       opens it in a new window" )
   ; ( "Space (selecting)"
     , "mark a session (Shift: the range from the last one); Delete deletes the \
        marked ones, Esc stops selecting" )
@@ -143,14 +146,14 @@ let help =
        the default size); or drag the edge, double-click to reset" )
   ; ( "Esc (the context ring's card open)"
     , "close the card (the ring by the paperclip: context, cost, Compact)" )
-  ; "Alt+1…9", "follow subagent or job N in the agents panel"
-  ; "Alt+] Alt+[", "the next or previous subagent or job"
-  ; "Alt+0", "close the agents panel"
-  ; ( "Enter / Alt+Enter (steering a subagent)"
-    , "send it a message: at its next step / when it ends its turn (its Steer \
-       button in the agents panel; /agents steer N TEXT sends one)" )
-  ; "Alt+↑ (steering a subagent)", "take its last queued message back"
-  ; "Esc (steering a subagent)", "write to the main agent again"
+  ; ( "Alt+1…9"
+    , "open the chat of subagent N of this chat (the session card lists them)" )
+  ; ( "Enter / Alt+Enter (in a subagent's chat)"
+    , "write to it: at its next step / when it ends its turn while it runs; \
+       once it has finished, it carries on with your message (/agents steer N \
+       TEXT sends one from anywhere)" )
+  ; "Alt+↑ (in a subagent's chat)", "take its last queued message back"
+  ; "Esc (in a subagent's chat)", "back to its parent's chat"
   ; ( "Ctrl+Z / ⌘+Z (in the message box)"
     , "right after a long paste became a chip, or a chip was removed: undo \
        that (otherwise the box's own undo); Ctrl+Shift+Z, ⌘+Shift+Z or Ctrl+Y \
@@ -222,7 +225,7 @@ let help =
   ; ( "↑↓ ←→ Home End (settings' sections)"
     , "show the previous / next section, or the first / last (/settings \
        SECTION opens at one)" )
-  ; ( "Ctrl+click / ⌘-click / middle click (a session in the sidebar)"
+  ; ( "Middle click (a session in the sidebar)"
     , "open it in a new window (its menu's Open in new window)" )
   ; "Delete (in /remind's list)", "remove the highlighted reminder"
   ; ( "y / a / n / r (confirmation)"
@@ -464,8 +467,6 @@ let editor_key (m : App.Model.t) t ~cursor : App.Action.t option =
   | "Enter", _ -> Some Send
   | "Escape", _ when m.context_card -> Some Toggle_context_card
   | "Escape", _ when Option.is_some m.btw -> Some Close_btw
-  | "Escape", _ when not (Recipient.equal m.recipient Recipient.Main) ->
-    Some (Set_recipient Main)
   | "Escape", _ when App.Model.running m -> Some Abort
   | "ArrowUp", None
     when plain t
@@ -480,34 +481,17 @@ let editor_key (m : App.Model.t) t ~cursor : App.Action.t option =
   | _ -> None
 ;;
 
-(* The agents panel's keys: the TUI's Alt+digit, but not its Shift+Tab (the
-   browser's way to move the focus back). Only Alt alone: AltGr is Ctrl+Alt
-   on Windows, and macOS's Option types characters, which are left to it. *)
+(* Alt+digit: a subagent's chat (the TUI's keys). Only Alt alone: AltGr is
+   Ctrl+Alt on Windows, and macOS's Option types characters, which are left
+   to it. *)
 let agents_key (m : App.Model.t) t : App.Action.t option =
   let alt = t.alt && not (t.ctrl || t.meta || t.shift) in
-  let listed = List.length (Agents.listed m.agents) in
   match t.key with
-  | "0" when alt && m.agents.open_ -> Some Toggle_subagents
   | ("1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9") when alt ->
     let n = Int.of_string t.key in
-    Option.some_if (n <= listed) (App.Action.Focus_agent n)
-  | "]" when alt && listed > 0 -> Some (Cycle_agent 1)
-  | "[" when alt && listed > 0 -> Some (Cycle_agent (-1))
-  | "Escape"
-    when m.agents.open_
-         && (m.narrow
-             ||
-             match t.target with
-             | Editor _ | Terminal | Files | Review | Code -> false
-             | Field
-             | Multiline
-             | Control
-             | Settings_tab
-             | Session _
-             | Worktree _
-             | Resize _
-             | Message _
-             | Page -> true) -> Some Agents_back
+    Option.some_if
+      (n <= List.length (Agents.children m.agents m.subagent_chat))
+      (App.Action.Open_subagent_n n)
   | _ -> None
 ;;
 
@@ -767,9 +751,20 @@ let handle (m : App.Model.t) t : App.Action.t option =
        Some Toggle_status_tray
      | "Escape" when m.context_card && Option.is_none m.dialog ->
        Some Toggle_context_card
+     (* Sessions selected (a Ctrl or Shift click leaves the focus where it
+        was): Esc ends it from anywhere. *)
+     | "Escape" when m.marks.selecting && Option.is_none m.dialog ->
+       Some (Select_sessions false)
      (* On a phone the file browser is a sheet: Esc closes it from anywhere. *)
      | "Escape" when m.narrow && m.files.open_ && not (Files.asking m.files) ->
        Some (Files Close)
+     | "Escape" when m.narrow && m.session_card.sheet ->
+       Some (Session_card (Sheet false))
+     (* A subagent's chat: back to its parent's. *)
+     | "Escape"
+       when Option.is_some m.subagent_chat
+            && Option.is_none (App.Model.popup m)
+            && Option.is_none m.dialog -> Some Subagent_back
      (* Code selected in the review or a preview: comment on it. *)
      | "c" when plain t && commenting m t -> Some (Review Start_comment)
      | _ ->

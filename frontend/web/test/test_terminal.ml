@@ -158,15 +158,6 @@ let%expect_test "the panel follows the session, the host and the user" =
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
-    (Cache_prefs
-     (((key web.sidebar-opened)
-       (value (((s1 "2026-10-05 10:00:00Z") (s2 "2026-10-05 10:00:00Z")))))))
-    (Rpc (method_ set_prefs)
-     (params
-      ((prefs
-        ((web.sidebar-opened
-          ((s1 "2026-10-05 10:00:00Z") (s2 "2026-10-05 10:00:00Z")))))))
-     (tag Show_error))
     (Rpc (method_ get_review) (params ()) (tag (Review Review)))
     (Rpc (method_ list_worktrees) (params ())
      (tag (Worktrees (place  "s2\
@@ -221,13 +212,11 @@ let%expect_test "the panel follows the session, the host and the user" =
     (Rpc (method_ get_prefs)
      (params
       ((keys
-        (web.theme web.accent web.notify web.verbosity web.terminal-open
-         web.sidebar-folded web.sidebar-unfolded web.sidebar-opened
-         web.sidebar-worktree-hours web.review web.code-size favourite-models
-         history web.migrated web.sidebar-width web.files-width
-         web.files-preview-width web.agents-width web.terminal-height
-         web.review-chat-width web.review-files-width web.review-margin-width
-         web.editor-tree-width))))
+        (web.theme web.accent web.radius web.font web.code-font web.notify
+         web.verbosity web.terminal-open web.review web.code-size
+         favourite-models history web.migrated web.sidebar-width web.files-width
+         web.files-preview-width web.terminal-height web.review-chat-width
+         web.review-files-width web.review-margin-width web.editor-tree-width))))
      (tag Prefs))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s2.jsonl) (limit 1000000)))
@@ -329,12 +318,15 @@ let%expect_test "/terminal, the chrome's button and the height" =
   [%expect
     {|
     <button type="button"
+            data-slot="button"
+            data-variant="ghost"
+            data-size="icon-sm"
             title="Terminal (Ctrl+`)"
             aria-label="Terminal"
             aria-expanded="true"
-            class="btn ghost icon open terminal-toggle"
+            class="[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0 active:not-aria-[haspopup]:translate-y-px aria-expanded:bg-muted aria-expanded:text-foreground aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-accent bg-clip-padding border border-transparent dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:hover:bg-muted/50 disabled:opacity-50 disabled:pointer-events-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 font-medium group/button hover:bg-muted hover:text-foreground in-data-[slot=button-group]:rounded-lg inline-flex items-center justify-center open outline-none rounded-[min(var(--radius-md),12px)] rounded-lg select-none shrink-0 size-7 terminal-toggle text-foreground text-sm transition-all whitespace-nowrap"
             @on_click>
-      <icon class="terminal"> </icon>
+      <icon class="panel_bottom"> </icon>
     </button>
     |}];
   (* Its top edge resizes it: no lower than 120px. *)
@@ -475,7 +467,9 @@ let%expect_test "after a reload the panel reopens without taking the keyboard" =
   H.text h ~selector:".terminal-panel";
   [%expect
     {|
-    (Apply_theme ((name Original) (accent (Preset Orange))))
+    (Apply_theme
+     ((name Original) (accent (Preset Orange)) (radius Default) (sans Recursive)
+      (mono Recursive)))
     backend /work connecting… (Close (Ctrl+`): the shell keeps running for 10 minutes)
     ((session s1)(host backend)(online true)(as_user())(generation 0)(dir()))
     |}]

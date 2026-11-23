@@ -164,9 +164,8 @@ module Reply_tag : sig
     | Reload_state (** the client's session changed: fetch its state *)
     | Subagent of string
     (** [get_subagent] for this [subagent] call or agent id *)
-    | Subagents (** [list_subagents], for the agents panel *)
+    | Subagents (** [list_subagents], for the session card and subagent chats *)
     | Jobs (** [list_jobs] *)
-    | Job_output of string (** the job's id *)
     | Job_started (** [!&command]: the job's id *)
     | Auth_status of Auth_purpose.t
     | Paths of string (** the completion prefix listed *)
@@ -418,9 +417,6 @@ module Command : sig
     | Quit_desktop
     (** stop [prigh desktop] (the desktop app: its window, site and tool
         host) *)
-    | Reveal of string list
-    (** scroll the main chat to a subagent's card, opening the transcripts
-        it is in: the [subagent] call ids from the top-level one down *)
     | Scroll_change of int
     (** the review page's next (1) or previous (-1) change from what is in
         view; past the file's last (first), [Review (Step 1)] ([-1]) *)
@@ -590,6 +586,9 @@ module Action : sig
         ; range : bool (** shift-click: from the last one clicked *)
         }
     | Delete_marked
+    | Archive_marked of bool
+    (** the marked sessions archived ([true]) or unarchived, then the
+        selection ends *)
     | Ask_delete_archived
     | Set_archived of
         { path : string
@@ -647,11 +646,9 @@ module Action : sig
         section and focuses its tab *)
     | Compact_at_input of string (** the settings page's "Compact at" *)
     | Compact_at_commit (** applies it (leaving the field; Enter accepts) *)
-    | Sessions_field_input of Sessions_fields.Which.t * string
-    (** the settings page's session list fields: worktrees' hours, archive's
-        days *)
-    | Sessions_field_commit of Sessions_fields.Which.t
-    (** applies one (leaving the field; Enter accepts) *)
+    | Archive_after_input of string (** the settings page's "Archive after" *)
+    | Archive_after_commit
+    (** applies it (leaving the field; Enter accepts) *)
     | Set_default of New_default.t
     (** the settings' New sessions: saves a default, for new sessions only *)
     | Pick_default of New_default.Picker.t
@@ -715,15 +712,9 @@ module Action : sig
         ; server : string
         }
     | Open_rename
-    | Open_subagents of string option
-    (** the agents panel: its list, or the agent or job with this number
-        (in the list), id or call id *)
-    | Toggle_subagents
-    | Select_item of Agents.Item.t (** shown in full in the panel *)
-    | Agents_back (** from an agent to the list; from the list, closed *)
-    | Focus_agent of int (** the [n]th listed, from 1 *)
-    | Cycle_agent of int (** the next (1) or previous (-1) listed *)
-    | Show_in_chat of string (** a subagent's card in the main chat *)
+    | Open_subagent_n of int
+    (** Alt+1…9: the chat of the [n]th subagent (from 1) of the chat on
+        show *)
     | Clock of Time_ns.t
     (** every second while [Model.ticking]: elapsed times, polling jobs *)
     | Picker_query of string
@@ -744,12 +735,7 @@ module Action : sig
         editor *)
     | Edit_queued of Recipient.t * Queued.Message.t (** back into the editor *)
     | Remove_queued of Recipient.t * Queued.Message.t
-    | Set_recipient of Recipient.t
-    (** the composer sends to the main agent or steers a running subagent *)
     | Remove_reminder of string (** by name, from the [/remind] picker *)
-    | Toggle_folded of string
-    (** fold or unfold the worktrees under a session of the sidebar (by its
-        id), whatever its age ({!Worktree_folds}) *)
     | New_session_in of string
     (** a new session working in this directory (a worktree) *)
     | New_worktree (** its dialog: the session moves into the worktree *)
@@ -784,6 +770,16 @@ module Action : sig
         closes) *)
     (** a phone's header: the tray with the thinking level, the mode, the
         status and the panels' toggles, under the header *)
+    | Toggle_session_card
+    (** the session card beside the chat; on a phone, its sheet *)
+    | Session_card of Session_card.Action.t
+    | Open_subagent_chat of string
+    (** a subagent's chat (by agent id) in the session's place: its
+        transcript, live, and the composer writes to it *)
+    | Close_subagent_chat (** back to the session's own chat *)
+    | Subagent_back
+    (** from a subagent's chat to its parent's (the session's for a
+        top-level one) *)
     | Answer_confirm of
         { call_id : string
         ; agent_id : string option
@@ -997,8 +993,6 @@ module Model : sig
     ; queue : Queued.t
     ; agent_queues : Agent_queue.t list
       (** the background subagents' queues, those not empty *)
-    ; recipient : Recipient.t
-      (** who the composer sends to: a subagent while steering it *)
     ; confirms : Pending.Confirm.t list
     ; confirm_reason : string option
       (** the oldest confirmation's reason, while typing it ([r]) *)
@@ -1027,7 +1021,7 @@ module Model : sig
           filter *)
     ; session_search : int (** counts the searches typed *)
     ; archived_open : bool (** the sidebar shows the archived sessions *)
-    ; agents : Agents.t (** the agents panel, per session *)
+    ; agents : Agents.t (** the subagents and jobs, per session *)
     ; verbosity : Prigh_ui.Verbosity.t
     ; folds : String.Set.t
       (** tool outputs ([Fold.key]s) toggled from how [verbosity] shows them *)
@@ -1046,9 +1040,6 @@ module Model : sig
     ; worktrees : Worktrees.t (** the session's, [/worktree]'s completion *)
     ; repo_worktrees : Repo_listings.t
       (** the repositories of the worktrees under the sidebar's sessions *)
-    ; worktree_folds : Worktree_folds.t
-      (** which of the sidebar's sessions show their worktrees (the user's
-          preferences) *)
     ; pending : In_flight.t (** what we wait on the backend for, on show *)
     ; marks : Session_marks.t (** the sidebar's selection *)
     ; notifications : Page_notify.t
@@ -1095,8 +1086,7 @@ module Model : sig
     ; about_you : About_you.t (** the settings page's About you *)
     ; mcp : Mcp_page.t (** the settings page's MCP servers *)
     ; compact_at : Compact_at.t (** the settings page's "Compact at" *)
-    ; sessions_fields : Sessions_fields.t
-      (** the settings page's session list fields *)
+    ; archive_after : Archive_after.t (** the settings page's "Archive after" *)
     ; default_fields : Default_fields.t
       (** the settings page's New sessions fields *)
     ; switched_off : Switched_off.t
@@ -1114,6 +1104,13 @@ module Model : sig
     ; prefs : Pref_sync.t
     ; generate : Generate.t (** the field being drafted by the model *)
     ; git_bar : Git_bar.t (** the review page's *)
+    ; session_card_open : bool
+      (** the session card (subagents, worktrees) shows in the chat's
+          top-right corner; on a phone it is [session_card.sheet] *)
+    ; session_card : Session_card.t
+    ; subagent_chat : string option
+      (** a subagent's transcript (its agent id) shows in the chat's place,
+          read-only; per session *)
     }
   [@@deriving sexp_of]
 
@@ -1150,12 +1147,14 @@ module Model : sig
   (** The turn or background subagents or jobs run: the session is busy. *)
   val active : t -> bool
 
-  (** The sessions whose worktrees the sidebar shows ({!Worktree_folds}). *)
-  val worktrees_shown : t -> String.Set.t
-
-  (** The agents panel is open with something running: the page sends
-      [Clock] every second. *)
+  (** A subagent or job is running, a transcript is being fetched, or a
+      session still loading waits to ask for its transcript again: the page
+      sends [Clock] every second. *)
   val ticking : t -> bool
+
+  (** Who the composer writes to: the subagent whose chat is on show, else
+      the main agent. *)
+  val recipient : t -> Recipient.t
 
   (** How messages' times read: in [utc_offset], relative to [now]'s day. *)
   val message_time : t -> Message_time.t

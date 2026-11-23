@@ -79,7 +79,11 @@ let switch ?(verbose = false) h ~session ~cwd =
   if verbose then go () else H.quiet h go
 ;;
 
-let sidebar h = H.text h ~selector:".sessions"
+(* The sessions, then the worktrees each shows. *)
+let sidebar h =
+  H.text h ~selector:".sessions";
+  Worktree_lines.print h
+;;
 
 (* The repositories whose listings are kept, and those being checked. *)
 let cache h =
@@ -122,10 +126,10 @@ let%expect_test "a session's worktrees stay when the user leaves it" =
   [%expect
     {|
     Pinned 1
-    (Main work 2m ago work main) (1) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (feat/login ● 2)
+    (work 2m Main work) (More (right-click, Shift+F10)) (Archive) (Delete)
     Recent 1
-    (Site 2m ago site main) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (site 2m Site) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (feat/login ● 2)
     |}];
   (* The work session's listing is checked again; meanwhile the new one
      shows, its repository's listing being older than it. *)
@@ -141,15 +145,15 @@ let%expect_test "a session's worktrees stay when the user leaves it" =
                             \nbackend\
                             \n/work") (purpose (Sidebar 3)))))
     Pinned 1
-    (Main work 2m ago work main) (2) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (work 2m Main work) (More (right-click, Shift+F10)) (Archive) (Delete)
+    Recent 1
+    (site 2m Site) (More (right-click, Shift+F10)) (Archive) (Delete)
     (feat/login ● 2) (agent/tidy subagent)
-    Recent 1
-    (Site 2m ago site main) (More (right-click, Shift+F10)) (Archive) (Delete)
     Pinned 1
-    (Main work 2m ago work main) (2) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (feat/login ● 2) (agent/tidy subagent ● 1)
+    (work 2m Main work) (More (right-click, Shift+F10)) (Archive) (Delete)
     Recent 1
-    (Site 2m ago site main) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (site 2m Site) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (feat/login ● 2) (agent/tidy subagent ● 1)
     |}];
   (* Back to the site: the work session's worktrees stay, with their
      changes, and its repository is not asked again. *)
@@ -166,35 +170,26 @@ let%expect_test "a session's worktrees stay when the user leaves it" =
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
-    (Cache_prefs
-     (((key web.sidebar-opened)
-       (value (((s1 "2026-10-05 10:00:00Z") (s2 "2026-10-05 10:00:00Z")))))))
-    (Rpc (method_ set_prefs)
-     (params
-      ((prefs
-        ((web.sidebar-opened
-          ((s1 "2026-10-05 10:00:00Z") (s2 "2026-10-05 10:00:00Z")))))))
-     (tag Show_error))
     (Rpc (method_ get_review) (params ()) (tag (Review Review)))
     (Rpc (method_ list_worktrees) (params ())
      (tag (Worktrees (place  "s2\
                             \nbackend\
                             \n/site") (purpose (Sidebar 4)))))
     Pinned 1
-    (Main work 2m ago work main) (2) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (feat/login ● 2) (agent/tidy subagent ● 1)
+    (work 2m Main work) (More (right-click, Shift+F10)) (Archive) (Delete)
     Recent 1
-    (Site 2m ago site main) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (site 2m Site) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (feat/login ● 2) (agent/tidy subagent ● 1)
     |}];
   H.reply h "list_worktrees" site_listing;
   sidebar h;
   [%expect
     {|
     Pinned 1
-    (Main work 2m ago work main) (2) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (feat/login ● 2) (agent/tidy subagent ● 1)
+    (work 2m Main work) (More (right-click, Shift+F10)) (Archive) (Delete)
     Recent 1
-    (Site 2m ago site main) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (site 2m Site) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (feat/login ● 2) (agent/tidy subagent ● 1)
     |}];
   (* And into the work session again: the same, its listing checked. *)
   switch h ~session:"s1" ~cwd:"/work";
@@ -204,15 +199,15 @@ let%expect_test "a session's worktrees stay when the user leaves it" =
   [%expect
     {|
     Pinned 1
-    (Main work 2m ago work main) (2) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (work 2m Main work) (More (right-click, Shift+F10)) (Archive) (Delete)
+    Recent 1
+    (site 2m Site) (More (right-click, Shift+F10)) (Archive) (Delete)
     (feat/login ● 2) (agent/tidy subagent ● 1)
-    Recent 1
-    (Site 2m ago site main) (More (right-click, Shift+F10)) (Archive) (Delete)
     Pinned 1
-    (Main work 2m ago work main) (2) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (feat/login ● 5) (agent/tidy subagent ● 1)
+    (work 2m Main work) (More (right-click, Shift+F10)) (Archive) (Delete)
     Recent 1
-    (Site 2m ago site main) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (site 2m Site) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (feat/login ● 5) (agent/tidy subagent ● 1)
     |}]
 ;;
 
@@ -239,15 +234,6 @@ let%expect_test
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
-    (Cache_prefs
-     (((key web.sidebar-opened)
-       (value (((s1 "2026-10-05 10:00:00Z") (s2 "2026-10-05 10:00:00Z")))))))
-    (Rpc (method_ set_prefs)
-     (params
-      ((prefs
-        ((web.sidebar-opened
-          ((s1 "2026-10-05 10:00:00Z") (s2 "2026-10-05 10:00:00Z")))))))
-     (tag Show_error))
     (Rpc (method_ get_review) (params ()) (tag (Review Review)))
     (Rpc (method_ list_worktrees) (params ())
      (tag (Worktrees (place  "s2\
@@ -256,10 +242,10 @@ let%expect_test
     (Rpc (method_ list_worktrees) (params ((cwd /work)))
      (tag (Repo_worktrees /work)))
     Pinned 1
-    (Main work 2m ago work main) (2) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (feat/login ● 2) (agent/tidy subagent)
+    (work 2m Main work) (More (right-click, Shift+F10)) (Archive) (Delete)
     Recent 1
-    (Site 2m ago site main) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (site 2m Site) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (feat/login ● 2) (agent/tidy subagent)
     |}];
   (* The work session's own check comes too late: ignored. The repository's
      listing settles it. *)
@@ -270,14 +256,14 @@ let%expect_test
   [%expect
     {|
     Pinned 1
-    (Main work 2m ago work main) (2) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (feat/login ● 2) (agent/tidy subagent ● 1)
+    (work 2m Main work) (More (right-click, Shift+F10)) (Archive) (Delete)
     Recent 1
-    (Site 2m ago site main) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (site 2m Site) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (feat/login ● 2) (agent/tidy subagent ● 1)
     |}]
 ;;
 
-let%expect_test "folded per the usual rules: pinned show, old sessions fold" =
+let%expect_test "an old session's worktrees are listed too" =
   let old =
     H.session_json
       ~name:"Old work"
@@ -301,11 +287,12 @@ let%expect_test "folded per the usual rules: pinned show, old sessions fold" =
                             \nbackend\
                             \n/work") (purpose (Sidebar 3)))))
     Pinned 1
-    (Main work 2m ago work main) (2) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (feat/login ● 2) (agent/tidy subagent ● 1)
+    (work 2m Main work) (More (right-click, Shift+F10)) (Archive) (Delete)
     Recent 2
-    (Site 2m ago site main) (More (right-click, Shift+F10)) (Archive) (Delete)
-    (Old work 3d ago work main) (1) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (site 2m Site) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (work 3d Old work) (More (right-click, Shift+F10)) (Archive) (Delete)
+    (feat/login ● 2) (agent/tidy subagent ● 1)
+    (docs)
     |}]
 ;;
 

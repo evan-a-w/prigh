@@ -23,7 +23,7 @@
 
 (rule
  (target app.css)
- (deps ../app.css recursive-sans.woff2 recursive-mono.woff2)
+ (deps ../app.css recursive-sans.woff2 recursive-mono.woff2 inter-sans.woff2)
  (action
   (with-stdout-to
    app.css
@@ -44,6 +44,28 @@
  (deps ../recursive-mono.woff2)
  (action
   (copy ../recursive-mono.woff2 recursive-mono.woff2)))
+
+; Inter (SIL OFL 1.1, inter-OFL.txt), for those who pick it (Theme.Font):
+; InterVariable from nixpkgs' inter 4.1, cut down by fontTools' pyftsubset
+; to Latin, punctuation, arrows and maths symbols, as woff2.
+
+(rule
+ (target inter-sans.woff2)
+ (deps ../inter-sans.woff2)
+ (action
+  (copy ../inter-sans.woff2 inter-sans.woff2)))
+
+(rule
+ (target inter-OFL.txt)
+ (deps ../inter-OFL.txt)
+ (action
+  (copy ../inter-OFL.txt inter-OFL.txt)))
+
+(rule
+ (target icons-LICENSES.txt)
+ (deps ../icons-LICENSES.txt)
+ (action
+  (copy ../icons-LICENSES.txt icons-LICENSES.txt)))
 
 (rule
  (target recursive-OFL.txt)
@@ -194,6 +216,8 @@
   (recursive-sans.woff2 as web/recursive-sans.woff2)
   (recursive-mono.woff2 as web/recursive-mono.woff2)
   (recursive-OFL.txt as web/recursive-OFL.txt)
+  (inter-sans.woff2 as web/inter-sans.woff2)
+  (inter-OFL.txt as web/inter-OFL.txt)
   (terminal.js as web/terminal.js)
   (xterm.js as web/xterm.js)
   (xterm.css as web/xterm.css)
@@ -205,6 +229,7 @@
   (katex.min.css as web/katex.min.css)
   (copy-tex.min.js as web/copy-tex.min.js)
   (LICENSE-katex as web/LICENSE-katex)
+  (icons-LICENSES.txt as web/icons-LICENSES.txt)
   (manifest.webmanifest as web/manifest.webmanifest)
   (icon.svg as web/icon.svg)
   (icon-maskable.svg as web/icon-maskable.svg)

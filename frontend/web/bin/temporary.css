@@ -38,7 +38,7 @@
   transition: background 0.2s;
 }
 .hero.temporary .hero-caret { background: var(--rule-2); }
-.hero-sub { margin: 10px 0 0; color: var(--muted); font-size: 14px; animation: appear 0.16s ease-out; }
+.hero-sub { margin: 10px 0 0; color: var(--muted-text); font-size: 14px; animation: appear 0.16s ease-out; }
 
 /* {1 Centred: the heading over the composer, a little above the middle} */
 
@@ -61,7 +61,7 @@
   min-width: 0;
   min-height: 44px;
   font-size: 13px;
-  color: var(--muted);
+  color: var(--muted-text);
 }
 /* Hung from the card's bottom edge, not tucked under it: lifting the card
    over the tray (a z-index) would make it a stacking context, and the
@@ -84,7 +84,7 @@
   gap: 6px;
   border-color: transparent;
   background: none;
-  color: var(--muted);
+  color: var(--muted-text);
   font: 12.5px var(--mono);
 }
 .tray-where:hover { background: var(--slate-2); color: var(--chalk); }
@@ -106,7 +106,7 @@
   border-radius: 999px;
   border-color: transparent;
   background: none;
-  color: var(--muted);
+  color: var(--muted-text);
   font-size: 13px;
   font-weight: 500;
 }
@@ -122,7 +122,7 @@
 
 /* {1 The sodium goes out} */
 
-.main.temporary .msg.user { border-left-color: var(--rule-2); }
+.main.temporary .msg.user { background: transparent; border: 1px dashed var(--border); }
 .main.temporary .composer-stack:focus-within {
   border-color: color-mix(in srgb, var(--chalk) 45%, var(--rule-2));
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--chalk) 7%, transparent), 0 8px 24px -14px var(--edge-shadow);
@@ -144,7 +144,7 @@
   font-weight: 550;
 }
 .temporary-pill:hover, .temporary-pill.open { background: var(--slate-2); }
-.temporary-pill .icon { width: 15px; height: 15px; color: var(--muted); }
+.temporary-pill .icon { width: 15px; height: 15px; color: var(--muted-text); }
 .temporary-pill .icon.chevron { width: 13px; height: 13px; margin-right: -2px; }
 .app.narrow .chat-chrome.strip .temporary-pill {
   height: var(--tap, 44px);
@@ -160,12 +160,14 @@
 .app.narrow .temporary-pill .pill-label { overflow: hidden; text-overflow: ellipsis; }
 
 /* Its menu hangs from it: under the top of the chat, in its middle. */
-.app:not(.narrow) .modal-backdrop:has(> .temporary-menu) { padding-top: 50px; background: transparent; }
+/* Under the pill, at the top bar's left: after the sidebar's toggle (12px
+   of padding, 28px, an 8px gap), or after the docked sidebar. */
+.app:not(.narrow) .modal-backdrop:has(> .temporary-menu) { padding: 44px 12px 12px 48px; justify-content: flex-start; background: transparent; }
 .app:not(.narrow).sidebar-open:not(.sidebar-drawer) .modal-backdrop:has(> .temporary-menu) { padding-left: calc(var(--sidebar-width, 280px) + 12px); }
 .app:not(.narrow) .temporary-menu { width: 300px; background: var(--slate-2); }
 .app:not(.narrow) .temporary-menu .modal-head { display: none; }
 .temporary-menu .modal-body { padding: 6px; }
-.temporary-menu p { margin: 10px 10px 8px; color: var(--muted); font-size: 12.5px; line-height: 1.45; }
+.temporary-menu p { margin: 10px 10px 8px; color: var(--muted-text); font-size: 12.5px; line-height: 1.45; }
 .temporary-actions { display: flex; flex-direction: column; gap: 2px; }
 .temporary-actions .btn {
   justify-content: flex-start;
@@ -180,7 +182,7 @@
   font-weight: 500;
 }
 .temporary-actions .btn:hover, .temporary-actions .btn:focus-visible { background: var(--panel-3); }
-.temporary-actions .btn .icon { color: var(--muted); }
+.temporary-actions .btn .icon { color: var(--muted-text); }
 .temporary-actions .temporary-delete, .temporary-actions .temporary-delete .icon { color: var(--brick); }
 .app.narrow .temporary-menu .modal-body { padding: 4px max(10px, var(--safe-l)) max(14px, var(--safe-b)); }
 .app.narrow .temporary-menu p { font-size: 14px; margin: 0 6px 10px; }
@@ -190,9 +192,9 @@
 
 .leave-temporary { width: min(440px, 100%); }
 .leave-temporary .modal-head h2 { font-size: 16px; }
-.leave-temporary .modal-body p { color: var(--muted); font-size: 14px; line-height: 1.5; }
+.leave-temporary .modal-body p { color: var(--muted-text); font-size: 14px; line-height: 1.5; }
 .leave-temporary .modal-buttons { border-top: 0; flex-wrap: wrap; }
-.leave-temporary .leave-keep { margin-right: auto; padding-left: 4px; border-color: transparent; background: none; color: var(--muted); }
+.leave-temporary .leave-keep { margin-right: auto; padding-left: 4px; border-color: transparent; background: none; color: var(--muted-text); }
 .leave-temporary .leave-keep:hover { color: var(--chalk); }
 .app.narrow .leave-temporary .modal-buttons { flex-direction: column-reverse; align-items: stretch; }
 .app.narrow .leave-temporary .modal-buttons .btn { width: 100%; margin: 0; }

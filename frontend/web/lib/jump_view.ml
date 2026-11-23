@@ -72,19 +72,7 @@ let thin points =
       i = 0 || i = n - 1 || i * most / n <> (i - 1) * most / n)
 ;;
 
-let render ~inject ~narrow times points =
-  let list_button =
-    button
-      ~cls:"icon ghost jump-list"
-      ~title:"Jump to a message (Ctrl+J)"
-      ~label:"Jump to a message"
-      ~attrs:
-        [ Attr.create "aria-keyshortcuts" "Control+J"
-        ; Attr.create "aria-haspopup" "dialog"
-        ]
-      ~on_click:(inject Action.Open_jump_list)
-      [ icon Toc ]
-  in
+let render ~inject times points =
   let _, ticks =
     List.fold_map points ~init:0 ~f:(fun users (p : Jump.Point.t) ->
       let users =
@@ -99,21 +87,15 @@ let render ~inject ~narrow times points =
   in
   div
     ~cls:"jump-nav"
-    [ list_button
-    ; (if narrow
-       then Node.none
-       else
-         Node.nav
-           ~attrs:
-             [ Attr.class_ "rail"; Attr.create "aria-label" "Your messages" ]
-           ticks)
+    [ Node.nav
+        ~attrs:[ Attr.class_ "rail"; Attr.create "aria-label" "Your messages" ]
+        ticks
     ]
 ;;
 
 module Memo = struct
   type t =
     { points : Jump.Point.t list
-    ; narrow : bool
     ; times : Message_time.t
     ; inject : Action.t -> unit Effect.t
     ; node : Node.t
@@ -135,20 +117,17 @@ let view (m : App.Model.t) ~inject =
   let users =
     List.count points ~f:(fun (p : Jump.Point.t) -> Jump.Kind.equal p.kind User)
   in
-  if users < 2
+  if users < 2 || m.narrow
   then Node.none
   else (
     let times = App.Model.message_time m in
     match !last with
     | Some memo
       when phys_equal memo.inject inject
-           && Bool.equal memo.narrow m.narrow
            && Message_time.equal memo.times times
            && [%equal: Jump.Point.t list] memo.points points -> memo.node
     | Some _ | None ->
-      let node =
-        Node.lazy_ (lazy (render ~inject ~narrow:m.narrow times points))
-      in
-      last := Some { points; narrow = m.narrow; times; inject; node };
+      let node = Node.lazy_ (lazy (render ~inject times points)) in
+      last := Some { points; times; inject; node };
       node)
 ;;

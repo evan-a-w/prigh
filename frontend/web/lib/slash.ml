@@ -13,6 +13,9 @@ module Argument = struct
     | Filter
     | Theme
     | Accent
+    | Corners
+    | Font
+    | Code_font
     | Confirm
     | Mode
     | Plan
@@ -114,6 +117,21 @@ let every =
       "accent"
       "pick or set the accent colour: orange, blue, green, purple, pink, teal, \
        yellow or any #rrggbb"
+  ; c
+      ~argument:Corners
+      ~args:"[sharp|small|default|round]"
+      "corners"
+      "how round the page's corners are, for you in every browser"
+  ; c
+      ~argument:Font
+      ~args:"[recursive|inter|system]"
+      "font"
+      "the font of prose and the interface"
+  ; c
+      ~argument:Code_font
+      ~args:"[recursive|system]"
+      "code-font"
+      "the font of code, commands and output"
   ; c
       ~argument:Confirm
       ~args:"[on|off|mode]"
@@ -395,13 +413,13 @@ let every =
   ; c
       ~args:"[n|id|cancel <n|id>|steer <n|id> <text>|follow-up <n|id> <text>]"
       "agents"
-      "follow subagents and background jobs in the agents panel, cancel one, \
-       or send a running subagent a message (steer: at its next step; \
-       follow-up: when it ends its turn)"
+      "open a subagent's chat (none: the session card), cancel one, or send a \
+       running subagent a message (steer: at its next step; follow-up: when it \
+       ends its turn)"
   ; c
-      ~args:"[id|kill <id>]"
+      ~args:"[kill <id>]"
       "jobs"
-      "background jobs in the agents panel: list them, show or kill one"
+      "background jobs: the session card, or kill one"
   ; c
       ~argument:Login
       ~args:"[provider|github [HOST]|forgejo HOST|HOST] [token]"

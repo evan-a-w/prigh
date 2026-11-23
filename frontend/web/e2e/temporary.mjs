@@ -15,6 +15,7 @@ import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { end } from "./end.mjs";
+import { normalVerbosity } from "./verbose_prefs.mjs";
 
 const { chromium, firefox, webkit } = await import(process.env.PLAYWRIGHT_MODULE);
 
@@ -24,6 +25,7 @@ if (!engine) throw new Error("usage: temporary.mjs chromium|firefox|webkit");
 const { PRIGH_BACKEND: backend, SITE: site, TOKEN: token } = process.env;
 const dir = join(process.env.TEST_DIR, "temporary");
 const home = join(dir, "home");
+normalVerbosity(home);
 const cwd = join(dir, "cwd");
 const sessions = join(home, ".prigh", "sessions");
 mkdirSync(sessions, { recursive: true });
@@ -246,15 +248,8 @@ const screen = async (w, h, label) => {
   await page.locator(".temporary-pill").waitFor();
   say("pill:", await text(".temporary-pill"));
   say("layout:", await page.evaluate(() => document.querySelector(".main").className));
-  say("prompt's edge:", await page.evaluate(() => {
-    const edge = getComputedStyle(document.querySelector(".msg.user")).borderLeftColor;
-    const probe = document.createElement("i");
-    probe.style.color = "var(--sodium)";
-    document.body.append(probe);
-    const sodium = getComputedStyle(probe).color;
-    probe.remove();
-    return edge === sodium ? "sodium" : "grey";
-  }));
+  // Not kept: the prompts are outlined, not filled.
+  say("prompt's edge:", await page.evaluate(() => getComputedStyle(document.querySelector(".msg.user")).borderLeftStyle));
   say("tray gone:", (await page.locator(".tray").count()) === 0);
   say("saved:", files(), "listed:", await sidebarSessions());
   say("pill:", await reachable(".temporary-pill"));
@@ -276,7 +271,7 @@ const screen = async (w, h, label) => {
     const m = document.querySelector(".temporary-menu").getBoundingClientRect();
     if (phone) return `a sheet across the bottom: ${m.left <= 1 && m.right >= innerWidth - 1 && Math.abs(m.bottom - innerHeight) <= 1}`;
     const p = document.querySelector(".temporary-pill").getBoundingClientRect();
-    return `under the pill: ${m.top >= p.bottom - 1 && Math.abs((m.left + m.right) / 2 - (p.left + p.right) / 2) < 2}`;
+    return `under the pill: ${m.top >= p.bottom - 1 && m.top - p.bottom <= 8 && Math.abs(m.left - p.left) < 2}`;
   }, phone));
   say("controls:", await reachable(".temporary-actions .btn"));
   await shoot("4-menu");

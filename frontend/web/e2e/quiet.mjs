@@ -133,7 +133,7 @@ try {
   await page.locator("form button[type=submit]").click();
   await composer.waitFor();
   await page.addStyleTag({ content: ".toasts, .toast { display: none !important; } *, *::before, *::after { animation: none !important; transition: none !important; }" });
-  await run("/verbosity quiet");
+  // Quiet is prigh-web's default: no /verbosity, no saved pref.
   await page.locator("#chat.verbosity-quiet").waitFor();
 
   await composer.fill("fix the bug");
@@ -179,6 +179,9 @@ try {
   await screenshot("approval");
   await page.keyboard.press("y");
   await page.locator("#chat .msg.assistant", { hasText: "Cleaned up." }).waitFor();
+  // Its time shows once the message has ended.
+  await page.waitForFunction(() => [...document.querySelectorAll("#chat .msg.assistant")]
+    .some(m => m.innerText.includes("Cleaned up.") && /\b\d\d:\d\d\b/.test(m.innerText)));
   section("approved");
   await transcript();
   await screenshot("approved");

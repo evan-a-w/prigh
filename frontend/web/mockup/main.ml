@@ -1,0 +1,40 @@
+open! Core
+open Bonsai_web
+open Js_of_ocaml
+
+(* The screens, by URL hash; the first is the default. *)
+let screens =
+  [ ( "chat"
+    , fun ~tip (local_ graph) ->
+        Shell.component ~tip ~main:(Screen_chat.component ~tip graph) graph )
+  ; "settings", Screen_settings.component
+  ; "settings-mcp", Screen_settings_mcp.component
+  ; "settings-keys", Screen_settings_keys.component
+  ; "login", Screen_login.component
+  ; ("review", fun ~tip (local_ graph) -> Screen_review.component ~tip graph)
+  ; ("terminal", fun ~tip (local_ graph) -> Screen_terminal.component ~tip graph)
+  ; ("agents", fun ~tip (local_ graph) -> Screen_agents.component ~tip graph)
+  ; ("files", fun ~tip (local_ graph) -> Screen_files.component ~tip graph)
+  ; ("confirm", fun ~tip (local_ graph) -> Screen_confirm.component ~tip graph)
+  ; ("question", fun ~tip (local_ graph) -> Screen_confirm.question ~tip graph)
+  ; ("palette", fun ~tip (local_ graph) -> Screen_palette.component ~tip graph)
+  ; ("model", fun ~tip (local_ graph) -> Screen_model.component ~tip graph)
+  ; ("completion", fun ~tip (local_ graph) -> Screen_completion.component Commands ~tip graph)
+  ; ( "completion-files"
+    , fun ~tip (local_ graph) -> Screen_completion.component Files ~tip graph )
+  ]
+;;
+
+let () =
+  let hash =
+    String.chop_prefix_if_exists (Js.to_string Dom_html.window##.location##.hash) ~prefix:"#"
+  in
+  let screen =
+    match List.Assoc.find screens hash ~equal:String.equal with
+    | Some s -> s
+    | None -> snd (List.hd_exn screens)
+  in
+  Start.start (fun (local_ graph) ->
+    let tip = Tip.component graph in
+    screen ~tip graph)
+;;

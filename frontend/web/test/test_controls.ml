@@ -186,13 +186,14 @@ let%expect_test
   H.show h ~selector:".chat-frame > .chat-tools";
   [%expect
     {|
-    <div class="sidebar-head">
-    <div class="sidebar-actions">
+    <div class="flex gap-1 h-12 items-center narrow:h-14 px-2 shrink-0 sidebar-head">
+    <div class="flex gap-0.5 items-center px-2 shrink-0 sidebar-actions">
     <Vdom.Node.none-widget class="">
-    <div class="sessions">
+    <div class="flex flex-1 flex-col gap-0.5 min-h-0 overflow-y-auto pb-2 px-2 sessions">
     <Vdom.Node.none-widget class="">
-    <div class="sidebar-footer">
-    <div class="chrome-anchor">
+    <div class="flex flex-col gap-1 pb-2 px-2 sidebar-footer">
+    <div class="chrome-anchor loon">
+    <Vdom.Node.none-widget class="">
     <Vdom.Node.none-widget class="">
     <div class="chat-frame">
     <div class="toast-anchor">
@@ -529,7 +530,8 @@ let%expect_test "with one host the chip still names it, and says how to add one"
     (Focus editor)
     <button class="btn chip-button host-chip">
     (Sessions (Ctrl+B))
-    (Filter the transcript (/filter)) (Files (Ctrl+Shift+F)) (Terminal (Ctrl+`))
+    New session
+    (Files (Ctrl+Shift+F)) (Terminal (Ctrl+`)) (Review changes (Alt+R))
     (Settings (Ctrl+, or /settings))
     |}]
 ;;
@@ -554,73 +556,94 @@ let%expect_test "without the docked sidebar, the chrome floats over the chat" =
   [%expect
     {|
     Toggle_sidebar
-    <div class="chrome-anchor">
+    <div class="chrome-anchor loon">
+    <Vdom.Node.none-widget class="">
     <Vdom.Node.none-widget class="">
     <div class="chat-frame">
     <div class="toast-anchor">
     <Vdom.Node.none-widget class="">
     <footer class="composer">
-    <div class="chat-chrome">
-      <div class="chrome-left">
-        <button type="button"
-                title="Sessions (Ctrl+B)"
-                aria-label="Sessions"
-                class="btn chrome-button ghost icon round toggle-sidebar"
-                @on_click>
-          <icon class="menu"> </icon>
-        </button>
+    <div class="chat-chrome flex gap-2 h-12 items-center px-3 text-foreground">
+      <button type="button"
+              data-slot="button"
+              data-variant="ghost"
+              data-size="icon-sm"
+              title="Sessions (Ctrl+B)"
+              aria-label="Sessions"
+              class="[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0 active:not-aria-[haspopup]:translate-y-px aria-expanded:bg-muted aria-expanded:text-foreground aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-clip-padding border border-transparent chrome-button dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:hover:bg-muted/50 disabled:opacity-50 disabled:pointer-events-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 font-medium group/button hover:bg-muted hover:text-foreground in-data-[slot=button-group]:rounded-lg inline-flex items-center justify-center outline-none rounded-[min(var(--radius-md),12px)] rounded-lg select-none shrink-0 size-7 text-muted-foreground text-sm toggle-sidebar transition-all whitespace-nowrap"
+              @on_click>
+        <icon class="sidebar"> </icon>
+      </button>
+      <div class="chrome-center flex items-center min-w-0">
+        <nav aria-label="breadcrumb" data-slot="breadcrumb" class="min-w-0 session-crumbs">
+          <ol data-slot="breadcrumb-list"
+              class="flex flex-nowrap gap-1.5 items-center text-muted-foreground text-sm wrap-break-word">
+            <li data-slot="breadcrumb-item" class="gap-1 inline-flex items-center min-w-0">
+              <span data-slot="breadcrumb-page"
+                    role="link"
+                    aria-disabled="true"
+                    aria-current="page"
+                    class="chrome-title-text font-normal text-foreground truncate"> New session </span>
+            </li>
+          </ol>
+        </nav>
       </div>
-      <div class="chrome-center">
-        <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-      </div>
-      <div class="chrome-right">
-        <div class="chrome-tools">
-          <div class="status-notes">
-            <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-            <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-            <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-            <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-            <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-            <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-          </div>
-          <div class="panel-toggles">
-            <button type="button"
-                    title="Filter the transcript (/filter)"
-                    aria-label="Filter the transcript"
-                    id="filter-toggle"
-                    aria-haspopup="menu"
-                    aria-expanded="false"
-                    class="btn filter-toggle ghost icon"
-                    @on_click>
-              <icon class="filter"> </icon>
-            </button>
-            <button type="button"
-                    title="Files (Ctrl+Shift+F)"
-                    aria-label="Files"
-                    aria-expanded="false"
-                    class="btn files-toggle ghost icon"
-                    @on_click>
-              <icon class="folder"> </icon>
-            </button>
-            <button type="button"
-                    title="Terminal (Ctrl+`)"
-                    aria-label="Terminal"
-                    aria-expanded="false"
-                    class="btn ghost icon terminal-toggle"
-                    @on_click>
-              <icon class="terminal"> </icon>
-            </button>
-            <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-          </div>
-          <button type="button"
-                  title="Settings (Ctrl+, or /settings)"
-                  aria-label="Settings"
-                  aria-haspopup="dialog"
-                  class="btn ghost icon settings-toggle"
-                  @on_click>
-            <icon class="gear"> </icon>
-          </button>
+      <div class="chrome-tools flex gap-2 items-center ml-auto">
+        <div class="status-notes">
+          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
         </div>
+        <div id="filter-anchor" class="flex gap-0.5 items-center panel-toggles">
+          <button type="button"
+                  data-slot="button"
+                  data-variant="ghost"
+                  data-size="icon-sm"
+                  title="Files (Ctrl+Shift+F)"
+                  aria-label="Files"
+                  aria-expanded="false"
+                  class="[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0 active:not-aria-[haspopup]:translate-y-px aria-expanded:bg-muted aria-expanded:text-foreground aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-clip-padding border border-transparent dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:hover:bg-muted/50 disabled:opacity-50 disabled:pointer-events-none files-toggle focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 font-medium group/button hover:bg-muted hover:text-foreground in-data-[slot=button-group]:rounded-lg inline-flex items-center justify-center outline-none rounded-[min(var(--radius-md),12px)] rounded-lg select-none shrink-0 size-7 text-muted-foreground text-sm transition-all whitespace-nowrap"
+                  @on_click>
+            <icon class="folder"> </icon>
+          </button>
+          <button type="button"
+                  data-slot="button"
+                  data-variant="ghost"
+                  data-size="icon-sm"
+                  title="Terminal (Ctrl+`)"
+                  aria-label="Terminal"
+                  aria-expanded="false"
+                  class="[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0 active:not-aria-[haspopup]:translate-y-px aria-expanded:bg-muted aria-expanded:text-foreground aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-clip-padding border border-transparent dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:hover:bg-muted/50 disabled:opacity-50 disabled:pointer-events-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 font-medium group/button hover:bg-muted hover:text-foreground in-data-[slot=button-group]:rounded-lg inline-flex items-center justify-center outline-none rounded-[min(var(--radius-md),12px)] rounded-lg select-none shrink-0 size-7 terminal-toggle text-muted-foreground text-sm transition-all whitespace-nowrap"
+                  @on_click>
+            <icon class="panel_bottom"> </icon>
+          </button>
+          <button type="button"
+                  data-slot="button"
+                  data-variant="ghost"
+                  data-size="icon-sm"
+                  title="Review changes (Alt+R)"
+                  aria-label="Review changes"
+                  aria-expanded="false"
+                  class="[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0 active:not-aria-[haspopup]:translate-y-px aria-expanded:bg-muted aria-expanded:text-foreground aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-clip-padding border border-transparent dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:hover:bg-muted/50 disabled:opacity-50 disabled:pointer-events-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 font-medium group/button hover:bg-muted hover:text-foreground in-data-[slot=button-group]:rounded-lg inline-flex items-center justify-center outline-none review-toggle rounded-[min(var(--radius-md),12px)] rounded-lg select-none shrink-0 size-7 text-muted-foreground text-sm transition-all whitespace-nowrap"
+                  @on_click>
+            <icon class="review"> </icon>
+          </button>
+          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+        </div>
+        <button type="button"
+                data-slot="button"
+                data-variant="ghost"
+                data-size="icon-sm"
+                title="Settings (Ctrl+, or /settings)"
+                aria-label="Settings"
+                aria-haspopup="dialog"
+                class="[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0 active:not-aria-[haspopup]:translate-y-px aria-expanded:bg-muted aria-expanded:text-foreground aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-clip-padding border border-transparent dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:hover:bg-muted/50 disabled:opacity-50 disabled:pointer-events-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 font-medium group/button hover:bg-muted hover:text-foreground in-data-[slot=button-group]:rounded-lg inline-flex items-center justify-center narrow:size-11 outline-none rounded-[min(var(--radius-md),12px)] rounded-lg select-none settings-toggle shrink-0 size-7 text-muted-foreground text-sm transition-all whitespace-nowrap"
+                @on_click>
+          <icon class="gear"> </icon>
+        </button>
       </div>
     </div>
     |}];
@@ -628,7 +651,8 @@ let%expect_test "without the docked sidebar, the chrome floats over the chat" =
   [%expect
     {|
     (Sessions (Ctrl+B))
-    (Filter the transcript (/filter)) (Files (Ctrl+Shift+F)) (Terminal (Ctrl+`))
+    New session
+    (Files (Ctrl+Shift+F)) (Terminal (Ctrl+`)) (Review changes (Alt+R))
     (Settings (Ctrl+, or /settings))
     |}];
   (* Its toggle brings the sidebar back, and the card with it. *)
@@ -638,7 +662,7 @@ let%expect_test "without the docked sidebar, the chrome floats over the chat" =
   [%expect
     {|
     Toggle_sidebar
-    <div class="chat-chrome docked">
+    <div class="chat-chrome docked flex gap-2 h-12 items-center px-3 text-foreground">
     |}];
   (* A phone: the sidebar is a drawer, the chrome stays (under the drawer). *)
   H.quiet h (fun () -> H.act h (Set_narrow true));
@@ -670,7 +694,6 @@ let%expect_test
     {|
     <Vdom.Node.none-widget class="">
     <div class="composer-box">
-    <Vdom.Node.none-widget class="">
     <Vdom.Node.none-widget class="">
     <Vdom.Node.none-widget class="">
     <Vdom.Node.none-widget class="">
@@ -1130,7 +1153,7 @@ let%expect_test "the context ring: idle, running, and what applies" =
   [%expect
     {|
     button "Context 90% full, $0.00: details"
-    <div class="busy context-ring-anchor">
+    <div class="context-ring-anchor">
     <button class="context-ring hot">
     Working
     (Goal 2/20)
@@ -1155,7 +1178,7 @@ let%expect_test "the context ring: idle, running, and what applies" =
     Branch main
     (Compact) (Details)
     Toggle_context_card
-    <div class="busy context-ring-anchor">
+    <div class="context-ring-anchor">
     Toggle_context_card
     (Run /session)
     (Focus dialog)
@@ -1164,8 +1187,14 @@ let%expect_test "the context ring: idle, running, and what applies" =
   (* Waiting for the backend, the card says so; no ring yet. *)
   let h = H.connecting () in
   H.text h ~selector:".session-card";
-  H.elements h ~selector:".context-ring";
-  [%expect {| |}]
+  H.quiet h (fun () -> H.act h Toggle_sidebar);
+  H.text h ~selector:".chat-chrome";
+  [%expect
+    {|
+    (Sessions (Ctrl+B))
+    (Files (Ctrl+Shift+F)) (Terminal (Ctrl+`)) (Review changes (Alt+R))
+    (Settings (Ctrl+, or /settings))
+    |}]
 ;;
 
 (* A phone: the same chips, with the short names CSS shows (style.css's
@@ -1192,13 +1221,13 @@ let%expect_test
       <span class="chip-label"> Opus 5.5 </span>
     </button>
     <textarea id="editor"
-              placeholder="Working in /work on main. Ask prigh anything…"
+              placeholder="Ask prigh…  / commands"
               aria-label="Message"
               dir="auto"
               rows="1"
               autocomplete="off"
               enterkeyhint="send"
-              class="cwd-placeholder editor"
+              class="editor"
               #value=""
               @on_input> </textarea>
     |}]

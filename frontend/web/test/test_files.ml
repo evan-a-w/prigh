@@ -715,15 +715,6 @@ let%expect_test "another session or host resets the browser and drops the chips"
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
-    (Cache_prefs
-     (((key web.sidebar-opened)
-       (value (((s1 "2026-10-05 10:00:00Z") (s2 "2026-10-05 10:00:00Z")))))))
-    (Rpc (method_ set_prefs)
-     (params
-      ((prefs
-        ((web.sidebar-opened
-          ((s1 "2026-10-05 10:00:00Z") (s2 "2026-10-05 10:00:00Z")))))))
-     (tag Show_error))
     (Files (Abort_upload 9))
     (Rpc (method_ fs_list) (params ((hidden false))) (tag (Files (Listed ""))))
     (Rpc (method_ get_review) (params ()) (tag (Review Review)))

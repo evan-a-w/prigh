@@ -1,0 +1,30 @@
+/* The start of Tailwind's input for prigh-web (bin/dune: this, then
+   loon_preflight.css, ../loon_ui/loon.css and loon_bridge.css). The layers'
+   order: the stylesheets loaded later (xterm's, KaTeX's: Page_assets puts
+   them in [vendor]), Tailwind's theme, base styles for the components only,
+   prigh-web's own stylesheets ([legacy], all of theme.css to phone.css),
+   then the components' utilities, which so win over the older rules. */
+@layer vendor, theme, base, legacy, components, utilities;
+
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities) source(none);
+
+/* Dark mode: the original and dark themes (Theme.Name), from [data-theme] on
+   <html> or on a sample of a theme (Theme_view); and loon's inverted menus. */
+@custom-variant dark (&:is([data-theme="original"] *, [data-theme="dark"] *, :root:not([data-theme]) *, .cn-menu-target:where(.menu-inverted *) *));
+
+/* The components' fonts are the page's (style.css, Theme.Font). */
+@theme inline {
+  --font-sans: var(--sans);
+  --font-mono: var(--mono);
+}
+
+/* Tailwind reads every word in ../lib's sources as a possible class, and
+   the utilities win over the older rules: never make utilities of the words
+   that prigh-web's own classes use (Status_view's context ring). New views'
+   own class names must not be utilities' (see AGENTS.md). */
+@source not inline("ring");
+
+/* Phones: prigh-web's narrow layout (App.Model.narrow, the class narrow on
+   .app), not a viewport width: [narrow:h-11] for 44px touch targets. */
+@custom-variant narrow (&:where(.app.narrow *));

@@ -44,6 +44,8 @@ let popup (m : App.Model.t) ~inject =
       | Argument Pr -> "Pull requests"
       | Argument Theme -> "Themes"
       | Argument Accent -> "Accent colours"
+      | Argument Corners -> "Corners"
+      | Argument (Font | Code_font) -> "Fonts"
       | Argument Trim -> "Trim"
       | Argument Filter -> "Show only"
       | Argument Delete -> "Delete"
@@ -349,42 +351,15 @@ let plus (m : App.Model.t) ~inject =
     ]
 ;;
 
-let steered (m : App.Model.t) =
-  match m.recipient with
-  | Main -> None
-  | Agent id -> Some id
+(* The subagent whose chat is on show: the composer writes to it. *)
+let subagent (m : App.Model.t) =
+  Option.bind m.subagent_chat ~f:(Agents.find_agent m.agents)
 ;;
 
-(* Whom the composer writes to, while it is a subagent; the cross (or Esc)
-   goes back to the main agent. *)
-let steer_chip (m : App.Model.t) id ~inject =
-  let task =
-    Option.value_map (Agents.find_agent m.agents id) ~default:"" ~f:(fun a ->
-      Chat_html.first_line a.task)
-  in
-  div
-    ~cls:"steer-chip"
-    ~attrs:
-      [ Attr.title
-          (sprintf
-             "Your messages go to subagent %s: Enter reaches it at its next \
-              step, Alt+Enter when it ends its turn"
-             id)
-      ]
-    [ icon ~cls:"steer-chip-icon" Target
-    ; Node.span
-        ~attrs:[ Attr.class_ "steer-chip-label" ]
-        [ Node.text "Steering "; span ~cls:"steer-chip-id" id ]
-    ; (if String.is_empty task
-       then Node.none
-       else span ~cls:"steer-chip-task" task)
-    ; button
-        ~cls:"icon ghost steer-chip-close"
-        ~title:"Write to the main agent again (Esc)"
-        ~label:"Stop steering"
-        ~on_click:(inject (Action.Set_recipient Main))
-        [ icon Close ]
-    ]
+let subagent_running (a : Agents.Agent.t) =
+  match a.status with
+  | Running -> true
+  | Complete | Failed -> false
 ;;
 
 let connected (m : App.Model.t) =
@@ -403,11 +378,10 @@ let chatting (m : App.Model.t) =
   Option.value_map m.state ~default:false ~f:(fun (s : State.t) -> s.chat_mode)
 ;;
 
-(* The text, and where the session works when that is what it shows. *)
 let placeholder (m : App.Model.t) =
   (* A phone, or the chat beside a side panel. *)
-  let cramped = m.narrow || m.agents.open_ || m.files.open_ in
-  let text s = s, None in
+  let cramped = m.narrow || m.files.open_ in
+  let text s = s in
   if Option.is_some m.session_gone
   then text "Session gone: /new starts one"
   else if not (connected m)
@@ -417,15 +391,17 @@ let placeholder (m : App.Model.t) =
        then "Offline: send once back"
        else "Offline: write now, send once it is back")
   else (
-    match steered m with
-    | Some id when cramped ->
-      text (sprintf "Steer %s (Alt+Enter: after its turn)…" id)
-    | Some id ->
+    match subagent m with
+    | Some a when Option.is_some (Recipient.refusal m.agents a.id) ->
+      text "A subagent's own subagent: write to its parent"
+    | Some a when subagent_running a && cramped ->
+      text (sprintf "Steer %s…" (Agents.Agent.title a))
+    | Some a when subagent_running a ->
       text
         (sprintf
-           "Steer %s (Enter) or queue a follow-up for when it ends its turn \
-            (Alt+Enter)…"
-           id)
+           "Steer %s (Enter) or queue a follow-up (Alt+Enter)…"
+           (Agents.Agent.title a))
+    | Some a -> text (sprintf "Message %s…" (Agents.Agent.title a))
     | None when App.Model.running m && cramped -> text "Steer the agent…"
     | None when App.Model.running m ->
       text "Steer (Enter) or queue a follow-up (Alt+Enter)…"
@@ -440,14 +416,26 @@ let placeholder (m : App.Model.t) =
            "Plan mode: discuss the plan, or leave it to implement (%s)…"
            Session_mode.leave)
     | None ->
-      (match Cwd_placeholder.of_model m with
-       | Some where -> Cwd_placeholder.sentence where, Some where
-       | None when cramped -> text "Ask prigh…  / commands"
-       | None -> text "Ask prigh anything…  / commands, @ files"))
+      if cramped
+      then text "Ask prigh…  / commands"
+      else text "Ask prigh anything…  / commands, @ files")
 ;;
 
 let view (m : App.Model.t) ~inject =
-  let running = App.Model.running m in
+  let sub = subagent m in
+  let running =
+    match sub with
+    | Some a -> subagent_running a
+    | None -> App.Model.running m
+  in
+  let stop =
+    match sub with
+    | Some a -> Action.Cancel_subagent a.id
+    | None -> Action.Abort
+  in
+  let stop_title =
+    if Option.is_some sub then "Stop the subagent" else "Stop (Esc)"
+  in
   let has_input =
     not
       (String.is_empty (String.strip m.draft)
@@ -456,11 +444,11 @@ let view (m : App.Model.t) ~inject =
        && List.is_empty m.files.attachments)
   in
   let sending = m.pending.sending > 0 in
-  (* Running with nothing to steer with, the disc stops the agent (a
-     subagent being steered keeps its steer). *)
-  let stops = running && (not has_input) && Option.is_none (steered m) in
+  (* Running with nothing to steer with, the disc stops the agent (or the
+     subagent whose chat this is). *)
+  let stops = running && not has_input in
   let connected = connected m in
-  let placeholder, where = placeholder m in
+  let placeholder = placeholder m in
   (* A chip's menu leaves only the chips live. *)
   let rest =
     match m.dialog with
@@ -489,10 +477,7 @@ let view (m : App.Model.t) ~inject =
         [ rest (popup m ~inject)
         ; div
             ~cls:"composer-box"
-            [ (match m.recipient with
-               | Main -> Node.none
-               | Agent id -> rest (steer_chip m id ~inject))
-            ; rest (images m ~inject)
+            [ rest (images m ~inject)
             ; rest (pasted m ~inject)
             ; rest (Files_view.chips m ~inject)
             ; rest (Code_editor_view.chip m ~inject)
@@ -501,16 +486,9 @@ let view (m : App.Model.t) ~inject =
                    ~cls:"editor-wrap"
                    [ Node.textarea
                        ~attrs:
-                         [ classes
-                             [ "editor" ]
-                             [ "cwd-placeholder", Option.is_some where ]
+                         [ Attr.class_ "editor"
                          ; Attr.id "editor"
                          ; Attr.placeholder placeholder
-                         ; (match where with
-                            | Some _
-                              when String.is_empty m.draft && not m.narrow ->
-                              Attr.title placeholder
-                            | Some _ | None -> Attr.empty)
                          ; Attr.create "aria-label" "Message"
                          ; Attr.create "dir" "auto"
                          ; (match App.Model.popup m with
@@ -540,10 +518,6 @@ let view (m : App.Model.t) ~inject =
                              inject (Action.Edit { text; cursor }))
                          ]
                        []
-                   ; (match where with
-                      | Some where when String.is_empty m.draft ->
-                        Cwd_placeholder.view where
-                      | Some _ | None -> Node.none)
                    ]
             ; div
                 ~cls:"composer-row"
@@ -557,9 +531,9 @@ let view (m : App.Model.t) ~inject =
                      rest
                        (button
                           ~cls:"icon ghost round stop"
-                          ~title:"Stop (Esc)"
+                          ~title:stop_title
                           ~label:"Stop"
-                          ~on_click:(inject Action.Abort)
+                          ~on_click:(inject stop)
                           [ icon Stop ])
                    else Node.none)
                 ; chips m ~inject
@@ -581,24 +555,20 @@ let view (m : App.Model.t) ~inject =
                             (* Nothing to steer with: the one button stops. *)
                             button
                               ~cls:"primary round stop"
-                              ~title:"Stop (Esc)"
+                              ~title:stop_title
                               ~label:"Stop"
-                              ~on_click:(inject Action.Abort)
+                              ~on_click:(inject stop)
                               [ icon Stop ]
                           else
                             button
                               ~cls:"primary round send"
                               ~title:
-                                (match steered m with
-                                 | _ when not connected ->
-                                   "Not connected to the backend"
-                                 | Some id -> sprintf "Steer %s (Enter)" id
-                                 | None when running -> "Steer (Enter)"
-                                 | None -> "Send (Enter)")
-                              ~label:
-                                (if running || Option.is_some (steered m)
-                                 then "Steer"
-                                 else "Send")
+                                (if not connected
+                                 then "Not connected to the backend"
+                                 else if running
+                                 then "Steer (Enter)"
+                                 else "Send (Enter)")
+                              ~label:(if running then "Steer" else "Send")
                               ~disabled:((not has_input) || not connected)
                               ~on_click:(inject Action.Send)
                               [ icon Send ])
@@ -606,6 +576,12 @@ let view (m : App.Model.t) ~inject =
                 ]
             ]
         ]
-    ; (if App.fresh m then rest (Temporary_view.tray m ~inject) else Node.none)
+    ; (if App.fresh m
+       then rest (Temporary_view.tray m ~inject)
+       else
+         Option.value_map
+           (Composer_where.of_model m)
+           ~default:Node.none
+           ~f:(fun where -> rest (Composer_where.view where ~inject)))
     ]
 ;;

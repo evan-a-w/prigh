@@ -27,9 +27,9 @@
   border-bottom: 1px solid var(--rule);
   font-size: 12.5px;
 }
-.terminal-icon { width: 16px; height: 16px; color: var(--muted); }
+.terminal-icon { width: 16px; height: 16px; color: var(--muted-text); }
 .terminal-machine { font-weight: 600; font-size: 14px; white-space: nowrap; }
-.terminal-cwd { color: var(--muted); font: 12.5px var(--mono); min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.terminal-cwd { color: var(--muted-text); font: 12.5px var(--mono); min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .terminal-state { color: var(--sodium); font-size: 12.5px; white-space: nowrap; }
 .terminal-state.failed { color: var(--brick); }
 .terminal-close { margin-left: auto; width: 28px; height: 28px; }
@@ -48,7 +48,7 @@
 .terminal-host .xterm-viewport, .terminal-host .xterm-rows, .terminal-host .xterm-screen {
   background-color: var(--well) !important;
 }
-.terminal-waiting { color: var(--muted); font-size: 14px; padding: 10px 2px; }
+.terminal-waiting { color: var(--muted-text); font-size: 14px; padding: 10px 2px; }
 
 .terminal-notice {
   position: absolute;
@@ -61,7 +61,7 @@
   padding: 8px 12px;
   background: var(--slate);
   border-top: 1px solid var(--rule);
-  color: var(--muted);
+  color: var(--muted-text);
   font-size: 14px;
   z-index: var(--z-inset);
 }

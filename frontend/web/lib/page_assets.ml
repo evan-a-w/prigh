@@ -57,10 +57,12 @@ let load t k =
     if not t.linked
     then (
       t.linked <- true;
+      (* In the layer [vendor], under the page's own stylesheets
+         (loon_head.css), which adjust them. *)
       List.iter t.css ~f:(fun href ->
-        let css = Dom_html.createLink Dom_html.document in
-        css##.rel := Js.string "stylesheet";
-        css##.href := Js.string href;
+        let css = Dom_html.createStyle Dom_html.document in
+        css##.textContent
+        := Js.some (Js.string (sprintf "@import url(%S) layer(vendor);" href));
         add_to_head css));
     let rec next = function
       | [] -> finish (Ok ())

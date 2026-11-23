@@ -13,6 +13,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { end } from "./end.mjs";
 import { png } from "./png.mjs";
+import { normalVerbosity } from "./verbose_prefs.mjs";
 
 const { chromium, firefox, webkit } = await import(process.env.PLAYWRIGHT_MODULE);
 
@@ -22,6 +23,7 @@ if (!engine) throw new Error("usage: filter.mjs chromium|firefox|webkit");
 const { PRIGH_BACKEND: backend, SITE: site, TOKEN: token } = process.env;
 const dir = join(process.env.TEST_DIR, "filter");
 const home = join(dir, "home");
+normalVerbosity(home);
 const cwd = join(dir, "cwd");
 const sessions = join(home, ".prigh", "sessions");
 mkdirSync(sessions, { recursive: true });
@@ -146,13 +148,13 @@ const shown = () => page.evaluate(() => {
   ].join(", ");
 });
 const button = () => page.evaluate(() => {
-  const b = document.getElementById("filter-toggle");
   // A phone's: the ⋯ sheet's row, which says what it hides.
-  if (b.classList.contains("sheet-row"))
+  const b = document.querySelector(".sheet-row.filter-row");
+  if (b)
     return `${b.innerText.trim().replace(/\s+/g, " ")}; ${b.classList.contains("on") ? "on" : "off"}`;
-  const next = b.nextElementSibling;
-  return `${b.getAttribute("aria-label")}; ${b.classList.contains("active") ? "accented" : "plain"}; ` +
-    `badge ${b.querySelector(".badge")?.innerText ?? "none"}; next: ${next?.getAttribute("aria-label")}`;
+  // A computer's: no button (/filter, Ctrl+K), the menu under the top bar's toggles.
+  return `button: ${document.querySelector(".filter-toggle") ? "shown" : "none"}; ` +
+    `toggles: ${[...document.querySelectorAll(".panel-toggles > button")].map(e => e.getAttribute("aria-label")).join(", ")}`;
 });
 const note = async () =>
   (await page.locator(".filter-note").count()) ? clean(await page.locator(".filter-note").innerText()) : "none";
@@ -171,12 +173,13 @@ const placement = () => page.evaluate(async () => {
   // A phone's: a sheet across the bottom (its row in the ⋯ sheet is gone).
   if (document.querySelector(".app.narrow"))
     return `a sheet across the bottom: ${m.left <= 1 && m.right >= innerWidth - 1 && Math.abs(m.bottom - innerHeight) <= 1}; inside the window: ${inside0}; focused: ${document.activeElement?.classList.contains("filter-menu")}`;
-  const b = document.getElementById("filter-toggle").getBoundingClientRect();
+  const b = document.querySelector(".panel-toggles").getBoundingClientRect();
   const inside = m.left >= 0 && m.right <= innerWidth && m.top >= 0 && m.bottom <= innerHeight;
-  return `below the button: ${m.top >= b.bottom - 1}; inside the window: ${inside}; focused: ${document.activeElement?.classList.contains("filter-menu")}`;
+  return `below the toggles: ${m.top >= b.bottom - 1}; inside the window: ${inside}; focused: ${document.activeElement?.classList.contains("filter-menu")}`;
 });
 const openMenu = async () => {
-  await page.locator("#filter-toggle").click();
+  await page.locator(".composer textarea").fill("/filter");
+  await page.locator(".composer textarea").press("Control+Enter");
   await page.locator(".filter-menu.placed").waitFor();
 };
 const closed = () => page.locator(".filter-menu").waitFor({ state: "detached" });
@@ -304,7 +307,7 @@ try {
   await page.locator('[data-entry="0"] img.thumb').click();
   await page.locator("dialog.viewer[open] .viewer-img").waitFor();
   const covered = await page.evaluate(() =>
-    ["#filter-toggle", ".composer-controls .chip-button"].map(sel => {
+    [".panel-toggles .files-toggle", ".composer-controls .chip-button"].map(sel => {
       const r = document.querySelector(sel).getBoundingClientRect();
       const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
       return `${sel}: ${top?.closest("dialog.viewer") ? "under the image" : "on top"}`;
@@ -330,7 +333,7 @@ try {
   await page.waitForFunction(() => document.querySelector("#chat")?.innerText.includes("Adding it"));
   // In the ⋯ menu, top right.
   await page.locator(".more-toggle").click();
-  await page.locator("#filter-toggle").click();
+  await page.locator(".sheet-row.filter-row").click();
   await page.locator(".filter-menu.placed").waitFor();
   section("phone");
   console.log(await placement());
@@ -345,10 +348,10 @@ try {
   // The click outside closed the ⋯ menu too: the button is in it; then
   // closed again, as it would be over the note.
   if (!(await page.locator("#chrome-menu").count())) await page.locator(".more-toggle").click();
-  await page.locator("#filter-toggle").waitFor();
+  await page.locator(".sheet-row.filter-row").waitFor();
   console.log(await button());
   const buttonInside = await page.evaluate(() => {
-    const b = document.getElementById("filter-toggle").getBoundingClientRect();
+    const b = document.querySelector(".sheet-row.filter-row").getBoundingClientRect();
     return b.left >= 0 && b.right <= innerWidth;
   });
   // Above the sheet (with the session's choices in it, it reaches high).
@@ -364,8 +367,8 @@ try {
   console.log(fits);
   await screenshot("phone filtered");
   if (!(await page.locator("#chrome-menu").count())) await page.locator(".more-toggle").click();
-  await page.locator("#filter-toggle").waitFor();
-  await page.locator("#filter-toggle").click();
+  await page.locator(".sheet-row.filter-row").waitFor();
+  await page.locator(".sheet-row.filter-row").click();
   await page.locator(".filter-menu.placed").waitFor();
   await page.locator(".filter-menu .menu-item", { hasText: "Show all" }).click();
   await page.waitForFunction(() => !document.querySelector(".filter-note"));

@@ -287,12 +287,11 @@ let transcript (m : Model.t) ~inject =
 module Part = struct
   (* The time as a part shows it: what changes at most once a minute
      ("3m ago", "14:32") by the minute, messages' times by the day ("Today",
-     "Yesterday"), the agents panel's running times by the second. *)
+     "Yesterday"). *)
   module Clock = struct
     type t =
       | Minute of Int63.t option
       | Day of Message_time.t
-      | Exact of Time_ns.t option
     [@@deriving equal]
 
     let minute (m : Model.t) =
@@ -320,7 +319,17 @@ module Part = struct
       View_memo.find memo ~deps:(m, clock m, inject) ~equal ~f:(fun () -> f m)
   ;;
 
-  let sidebar = make "sidebar" ~equal:outside_transcript
+  (* The current session's row says what its agent is doing, which its
+     transcript's events tell. *)
+  let sidebar =
+    make "sidebar" ~equal:(fun ((m, _, _) as a) ((m', _, _) as b) ->
+      outside_transcript a b
+      && Option.equal
+           String.equal
+           (Sidebar_view.current_activity m)
+           (Sidebar_view.current_activity m'))
+  ;;
+
   let review = make "review" ~equal:outside_transcript
   let chrome = make "chrome" ~equal:outside_composer
 
@@ -335,13 +344,8 @@ module Part = struct
   let btw = make "btw" ~equal:outside_transcript
   let terminal = make "terminal" ~equal:outside_transcript
   let files = make "files" ~equal:outside_transcript
-
-  let agents =
-    make "agents" ~equal:outside_composer ~clock:(fun m ->
-      if m.agents.open_ then Exact m.now else Clock.minute m)
-  ;;
-
   let dialogs = make "dialogs" ~equal:outside_composer
+  let session_card = make "session_card" ~equal:outside_composer
 end
 
 (* The terminal's widget is one function of its target for the page's
@@ -362,9 +366,9 @@ let view (m : Model.t) ~inject ~terminal ~code_editor =
       false
     | _ -> modal
   in
-  (* On a phone the agents panel is a sheet over the page: it has the
-     keyboard while open. *)
-  let sheet = m.narrow && (m.agents.open_ || m.files.open_) in
+  (* On a phone the file browser and the session card are sheets over the
+     page: they have the keyboard while open. *)
+  let sheet = m.narrow && (m.files.open_ || m.session_card.sheet) in
   (* So is the drawer, over the page. *)
   let drawer = Model.drawer m in
   let layered covered = inert_if (covered || sheet || drawer) in
@@ -381,6 +385,11 @@ let view (m : Model.t) ~inject ~terminal ~code_editor =
     | None, _, [] -> transcript m ~inject
     | None, _, _ -> Node.fragment [ transcript m ~inject; echoes m ]
   in
+  let chat (m : Model.t) =
+    match m.subagent_chat with
+    | Some id -> Subagent_chat_view.view m ~inject id
+    | None -> chat m
+  in
   Node.div
     ~attrs:
       [ classes
@@ -388,7 +397,6 @@ let view (m : Model.t) ~inject ~terminal ~code_editor =
           ([ "sidebar-open", Model.sidebar_shown m
            ; "sidebar-drawer", drawer
            ; "narrow", m.narrow
-           ; "agents-open", m.agents.open_
            ; "terminal-open", m.terminal.open_
            ; ( "offline"
              , match m.connection with
@@ -449,13 +457,22 @@ let view (m : Model.t) ~inject ~terminal ~code_editor =
             ~attrs:
               [ classes
                   [ "main" ]
-                  [ "fresh", App.fresh m && Option.is_none (loading m)
+                  [ ( "fresh"
+                    , App.fresh m
+                      && Option.is_none (loading m)
+                      && Option.is_none m.subagent_chat )
                   ; "temporary", App.temporary_shown m
                   ; "landing", m.landing
                   ]
+              ; Session_card_view.main_attr m
               ]
             [ Part.chrome m ~inject (fun m ->
                 layered modal_composer (Session_view.chrome m ~inject))
+            ; (if m.narrow
+               then Node.none
+               else
+                 Part.session_card m ~inject (fun m ->
+                   layered modal_composer (Session_card_view.view m ~inject)))
             ; under_drawer (banner m ~inject)
             ; Part.chat m ~inject (fun m ->
                 under_drawer
@@ -477,20 +494,27 @@ let view (m : Model.t) ~inject ~terminal ~code_editor =
                               else Attr.empty)
                            ]
                          [ chat m; jump_to_bottom m ~inject ]
-                     ; (match loading m with
-                        | Some _ -> Node.none
-                        | None -> Jump_view.view m ~inject)
+                     ; (match loading m, m.subagent_chat with
+                        | Some _, _ | _, Some _ -> Node.none
+                        | None, None -> Jump_view.view m ~inject)
                      ])
             ; toasts m ~inject
-            ; Part.btw m ~inject (fun m ->
-                under_drawer (Btw_view.view m ~inject))
+            ; (match m.subagent_chat with
+               | Some _ -> Node.none
+               | None ->
+                 Part.btw m ~inject (fun m ->
+                   under_drawer (Btw_view.view m ~inject)))
             ; layered modal_composer (Composer_view.view m ~inject)
             ]
         ; Part.terminal m ~inject (fun m ->
             under_drawer (Terminal_view.view m ~inject ~widget:terminal))
         ]
     ; Part.files m ~inject (fun m -> panel (Files_view.view m ~inject))
-    ; Part.agents m ~inject (fun m -> panel (Agents_view.view m ~inject))
+    ; (if m.narrow
+       then
+         Part.session_card m ~inject (fun m ->
+           inert_if modal (Session_card_view.view m ~inject))
+       else Node.none)
     ; Part.dialogs m ~inject (fun m -> Dialog_view.view m ~inject)
     ; Files_view.dialog m ~inject
     ; Files_view.pickers

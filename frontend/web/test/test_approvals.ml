@@ -673,13 +673,13 @@ let%expect_test "plan mode: the composer says how to leave it" =
               #value=""
               @on_input> </textarea>
     <textarea id="editor"
-              placeholder="Working in /work on main. Ask prigh anything…"
+              placeholder="Ask prigh…  / commands"
               aria-label="Message"
               dir="auto"
               rows="1"
               autocomplete="off"
               enterkeyhint="send"
-              class="cwd-placeholder editor"
+              class="editor"
               #value=""
               @on_input> </textarea>
     |}]
@@ -761,8 +761,8 @@ let%expect_test "a question dialog: keys" =
     Other:
     []
     Space or a click picks, ↑↓ choose, Enter accepts, Esc declines (Decline) (Next)
-    <aside class="sidebar">
-    <div class="chrome-anchor">
+    <aside class="bg-sidebar loon sidebar text-sidebar-foreground text-sm">
+    <div class="chrome-anchor loon">
     <div class="chat-frame">
     <footer class="composer">
     |}];
@@ -1063,13 +1063,11 @@ let%expect_test
     (Rpc (method_ get_prefs)
      (params
       ((keys
-        (web.theme web.accent web.notify web.verbosity web.terminal-open
-         web.sidebar-folded web.sidebar-unfolded web.sidebar-opened
-         web.sidebar-worktree-hours web.review web.code-size favourite-models
-         history web.migrated web.sidebar-width web.files-width
-         web.files-preview-width web.agents-width web.terminal-height
-         web.review-chat-width web.review-files-width web.review-margin-width
-         web.editor-tree-width))))
+        (web.theme web.accent web.radius web.font web.code-font web.notify
+         web.verbosity web.terminal-open web.review web.code-size
+         favourite-models history web.migrated web.sidebar-width web.files-width
+         web.files-preview-width web.terminal-height web.review-chat-width
+         web.review-files-width web.review-margin-width web.editor-tree-width))))
      (tag Prefs))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s1.jsonl) (limit 1000000)))
@@ -1149,15 +1147,6 @@ let%expect_test "switching session drops what the old one waited for" =
     (Rpc (method_ list_sessions) (params ()) (tag Sessions))
     (Rpc (method_ list_subagents) (params ()) (tag Subagents))
     (Rpc (method_ list_jobs) (params ()) (tag Jobs))
-    (Cache_prefs
-     (((key web.sidebar-opened)
-       (value (((s1 "2026-10-05 10:00:00Z") (s2 "2026-10-05 10:00:00Z")))))))
-    (Rpc (method_ set_prefs)
-     (params
-      ((prefs
-        ((web.sidebar-opened
-          ((s1 "2026-10-05 10:00:00Z") (s2 "2026-10-05 10:00:00Z")))))))
-     (tag Show_error))
     (Rpc (method_ get_review) (params ()) (tag (Review Review)))
     (Rpc (method_ list_worktrees) (params ())
      (tag (Worktrees (place  "s2\
@@ -1225,6 +1214,9 @@ let%expect_test "update_plan and ask_user in the transcript" =
       <button type="button" data-fold="t1#open" aria-expanded="true" class="tool-head">
         <span title="Done" role="img" aria-label="Done" class="done mark">
           <icon class="check"> </icon>
+        </span>
+        <span aria-hidden="true" class="tool-icon">
+          <icon class="toc"> </icon>
         </span>
         <span class="name"> update_plan </span>
         <span class="arg step"> test </span>

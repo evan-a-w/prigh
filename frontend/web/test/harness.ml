@@ -42,7 +42,6 @@ let rec act t action =
      | Apply_theme _
      | Sign_out
      | Quit_desktop
-     | Reveal _
      | Copy _
      | Select_message _
      | Switch_account _
@@ -384,7 +383,12 @@ let create ?(verbose = false) ?(sessions = "[]") ?(state = state_json ()) () =
     "get_pending"
     {|{"steer_texts":[],"follow_up_texts":[],"confirms":[],"questions":[]}|};
   reply t "list_sessions" sessions;
-  reply t "get_prefs" {|{"prefs":{"web.migrated":true}}|};
+  (* prigh-web's default is quiet; the tests read the transcript unfolded,
+     as a user who chose normal would (test_prefs checks the default). *)
+  reply
+    t
+    "get_prefs"
+    {|{"prefs":{"web.migrated":true,"web.verbosity":"normal"}}|};
   act t (Tick now);
   t.quiet <- false;
   t
@@ -673,14 +677,21 @@ let keydown ?nth t ~selector key =
     [ "key", Js_of_ocaml.Js.Unsafe.inject (Js_of_ocaml.Js.string key) ]
 ;;
 
-let modified_click ?nth ?(ctrl = false) ?(meta = false) t ~selector =
+let modified_click
+      ?nth
+      ?(ctrl = false)
+      ?(meta = false)
+      ?(shift = false)
+      t
+      ~selector
+  =
   let bool b = Js_of_ocaml.Js.Unsafe.inject (Js_of_ocaml.Js.bool b) in
   mouse_event
     ?nth
     t
     ~selector
     ~event_name:"onclick"
-    [ "ctrlKey", bool ctrl; "metaKey", bool meta; "shiftKey", bool false ]
+    [ "ctrlKey", bool ctrl; "metaKey", bool meta; "shiftKey", bool shift ]
 ;;
 
 let middle_click ?nth t ~selector =

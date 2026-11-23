@@ -31,7 +31,7 @@
 .ui-chart .alt.s3 { --c: color-mix(in srgb, var(--series-3) 55%, var(--slate)); }
 .ui-chart .alt.s4 { --c: color-mix(in srgb, var(--series-4) 55%, var(--slate)); }
 
-.ui-chart-sub { margin-top: -4px; color: var(--muted); font-size: 12.5px; }
+.ui-chart-sub { margin-top: -4px; color: var(--muted-text); font-size: 12.5px; }
 .ui-chart-yname, .ui-chart-xname {
   font: 11px/1.3 var(--mono);
   color: var(--faint);
@@ -116,7 +116,7 @@
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
-  color: var(--muted);
+  color: var(--muted-text);
 }
 
 .ui-chart-grid, .ui-chart-vgrid { position: absolute; inset: 0; pointer-events: none; }
@@ -280,7 +280,7 @@
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   column-gap: 7px;
-  color: var(--muted);
+  color: var(--muted-text);
 }
 .ui-chart-tip-row .ui-chart-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ui-chart-tip-row .ui-chart-value {
@@ -379,7 +379,7 @@
 .ui-chart-total .ui-chart-name, .ui-chart-centre-item .ui-chart-share { font: 11px/1.3 var(--mono); color: var(--faint); }
 .ui-chart-centre-item .ui-chart-name {
   font-size: 12px;
-  color: var(--muted);
+  color: var(--muted-text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -419,7 +419,7 @@
   padding: 0;
   list-style: none;
   font-size: 12px;
-  color: var(--muted);
+  color: var(--muted-text);
 }
 .ui-chart-legend li { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .ui-chart-legend .ui-chart-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

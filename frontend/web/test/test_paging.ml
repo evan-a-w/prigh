@@ -391,6 +391,67 @@ let%expect_test "a cached transcript of a running session" =
     |}]
 ;;
 
+(* A running session opened as its run streams: its first page and the one
+   asked for after it both come older than the events meanwhile. It is asked
+   for again each second, not only when the run ends (which may be long, all
+   that time on "Loading"). *)
+let%expect_test "a loading session's transcript, overtaken twice by its run" =
+  let h = Harness.create () in
+  Harness.quiet h (fun () ->
+    Harness.act h (Switch_session "/sessions/s2.jsonl");
+    Harness.reply h "switch_session" "{}";
+    Harness.reply
+      h
+      "get_state"
+      (Harness.state_json
+         ~fields:[ "session_id", `String "s2"; "running", `True ]
+         ()));
+  let loading () =
+    let m = Harness.model h in
+    print_s
+      [%message
+        ""
+          ~loading:(m.pending.messages : bool)
+          ~ticking:(App.Model.ticking m : bool)]
+  in
+  Harness.event
+    h
+    {|{"event":"message_start","message":{"role":"user","text":"build it"}}|};
+  Harness.reply h "get_messages_page" (Harness.page (messages []));
+  Harness.event
+    h
+    {|{"event":"message_start","message":{"role":"assistant","content":[{"type":"text","text":"On it."}],"stop_reason":{"type":"end_turn"},"usage":{"input":0,"output":0,"cache_read":0},"model":"m"}}|};
+  Harness.reply
+    h
+    "get_messages_page"
+    (Harness.page (messages [ user "build it" ]));
+  loading ();
+  [%expect
+    {|
+    (Rpc (method_ get_messages_page)
+     (params ((session /sessions/s2.jsonl) (limit 60)))
+     (tag (Resync (session s2) (from ()) (events 1))))
+    ((loading true) (ticking true))
+    |}];
+  Harness.act h (Clock Harness.now);
+  Harness.reply
+    h
+    "get_messages_page"
+    (Harness.page (messages [ user "build it"; assistant "On it." ]));
+  loading ();
+  Harness.text h ~selector:".chat";
+  [%expect
+    {|
+    (Rpc (method_ get_messages_page)
+     (params ((session /sessions/s2.jsonl) (limit 60)))
+     (tag (Resync (session s2) (from ()) (events 2))))
+    Scroll_to_bottom
+    ((loading false) (ticking false))
+    build it
+    On it.
+    |}]
+;;
+
 let%expect_test "resting on a session in the sidebar fetches its newest page" =
   let h = Harness.create () in
   Harness.act h (Prefetch_session "/sessions/s2.jsonl");
@@ -494,13 +555,11 @@ let%expect_test "reconnecting with older pages loaded" =
     (Rpc (method_ get_prefs)
      (params
       ((keys
-        (web.theme web.accent web.notify web.verbosity web.terminal-open
-         web.sidebar-folded web.sidebar-unfolded web.sidebar-opened
-         web.sidebar-worktree-hours web.review web.code-size favourite-models
-         history web.migrated web.sidebar-width web.files-width
-         web.files-preview-width web.agents-width web.terminal-height
-         web.review-chat-width web.review-files-width web.review-margin-width
-         web.editor-tree-width))))
+        (web.theme web.accent web.radius web.font web.code-font web.notify
+         web.verbosity web.terminal-open web.review web.code-size
+         favourite-models history web.migrated web.sidebar-width web.files-width
+         web.files-preview-width web.terminal-height web.review-chat-width
+         web.review-files-width web.review-margin-width web.editor-tree-width))))
      (tag Prefs))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s2.jsonl) (from e3) (limit 60)))
@@ -572,13 +631,11 @@ let%expect_test "reconnecting when what was on show has gone from the session" =
     (Rpc (method_ get_prefs)
      (params
       ((keys
-        (web.theme web.accent web.notify web.verbosity web.terminal-open
-         web.sidebar-folded web.sidebar-unfolded web.sidebar-opened
-         web.sidebar-worktree-hours web.review web.code-size favourite-models
-         history web.migrated web.sidebar-width web.files-width
-         web.files-preview-width web.agents-width web.terminal-height
-         web.review-chat-width web.review-files-width web.review-margin-width
-         web.editor-tree-width))))
+        (web.theme web.accent web.radius web.font web.code-font web.notify
+         web.verbosity web.terminal-open web.review web.code-size
+         favourite-models history web.migrated web.sidebar-width web.files-width
+         web.files-preview-width web.terminal-height web.review-chat-width
+         web.review-files-width web.review-margin-width web.editor-tree-width))))
      (tag Prefs))
     (Rpc (method_ get_messages_page)
      (params ((session /sessions/s2.jsonl) (from e5) (limit 60)))

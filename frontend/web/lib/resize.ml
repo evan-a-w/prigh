@@ -6,7 +6,6 @@ module Handle = struct
       | Sidebar
       | Files
       | Files_preview
-      | Agents
       | Terminal
       | Review_chat
       | Review_files
@@ -22,7 +21,6 @@ module Handle = struct
     | Sidebar -> "--sidebar-width"
     | Files -> "--files-width"
     | Files_preview -> "--files-preview-width"
-    | Agents -> "--agents-width"
     | Terminal -> "--terminal-height"
     | Review_chat -> "--review-chat-width"
     | Review_files -> "--review-files-width"
@@ -34,7 +32,6 @@ module Handle = struct
     | Sidebar -> "sidebar"
     | Files -> "files"
     | Files_preview -> "files-preview"
-    | Agents -> "agents"
     | Terminal -> "terminal"
     | Review_chat -> "review-chat"
     | Review_files -> "review-files"
@@ -49,7 +46,6 @@ module Handle = struct
     | Sidebar -> "Resize the sessions sidebar"
     | Files -> "Resize the file browser"
     | Files_preview -> "Resize the file preview"
-    | Agents -> "Resize the agents panel"
     | Terminal -> "Resize the terminal"
     | Review_chat -> "Resize the chat beside the review"
     | Review_files -> "Resize the review's file list"
@@ -62,7 +58,6 @@ module Handle = struct
     | Sidebar
     | Files
     | Files_preview
-    | Agents
     | Review_chat
     | Review_files
     | Review_margin
@@ -71,8 +66,7 @@ module Handle = struct
 
   let grows = function
     | Sidebar | Review_files | Editor_tree -> 1
-    | Files | Files_preview | Agents | Terminal | Review_chat | Review_margin ->
-      -1
+    | Files | Files_preview | Terminal | Review_chat | Review_margin -> -1
   ;;
 end
 
@@ -89,7 +83,6 @@ module Shown = struct
     { sidebar : bool
     ; files : bool
     ; preview : bool
-    ; agents : bool
     ; reviewing : bool
     ; narrow : bool
     }
@@ -120,7 +113,6 @@ let empty =
 let chat_min = 400
 let review_min = 480
 let files_floats_below = 1100
-let agents_floats_below = 1180
 
 (* Room under the terminal's top edge's highest position: the session's bar,
    the composer and a few lines of chat. *)
@@ -140,7 +132,6 @@ let limits t (h : Handle.t) =
   | Sidebar -> 200, 520, 280
   | Files -> 280, 1200, 400
   | Files_preview -> 320, 1400, 480
-  | Agents -> 300, 1200, 420
   | Review_chat -> 300, 1200, 400
   | Review_files -> 160, 520, 260
   | Review_margin -> 240, 640, 340
@@ -171,11 +162,10 @@ let docked_sides t (shown : Shown.t) =
   if shown.narrow
   then []
   else
-    List.filter [ Handle.Sidebar; Review_chat; Files; Agents ] ~f:(function
+    List.filter [ Handle.Sidebar; Review_chat; Files ] ~f:(function
       | Sidebar -> shown.sidebar
       | Review_chat -> shown.reviewing
       | Files -> shown.files && t.viewport.width >= files_floats_below
-      | Agents -> shown.agents && t.viewport.width >= agents_floats_below
       | _ -> false)
 ;;
 
@@ -235,7 +225,7 @@ let rec bounds t (shown : Shown.t) (h : Handle.t) : Bounds.t =
     in
     let max = within (page - beside - review_code_min) in
     { min; max; value = clamp (preferred t h) ~min ~max }
-  | Sidebar | Files | Files_preview | Agents | Review_chat ->
+  | Sidebar | Files | Files_preview | Review_chat ->
     let widths = docked_widths t shown in
     (match List.Assoc.find widths h ~equal:Handle.equal with
      | Some value ->

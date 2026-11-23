@@ -17,6 +17,7 @@ import http from "node:http";
 import net from "node:net";
 import { join } from "node:path";
 import { end } from "./end.mjs";
+import { normalVerbosity } from "./verbose_prefs.mjs";
 
 const { chromium, firefox, webkit } = await import(process.env.PLAYWRIGHT_MODULE);
 
@@ -29,6 +30,7 @@ const dirs = {};
 for (const name of ["server-home", "server-cwd", "laptop-home", "laptop-cwd"]) {
   dirs[name] = join(dir, name);
   mkdirSync(dirs[name], { recursive: true });
+  if (name.endsWith("home")) normalVerbosity(dirs[name]);
 }
 
 const waitFor = (stream, proc, pattern, what) => new Promise((resolve, reject) => {

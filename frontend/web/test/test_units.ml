@@ -15,19 +15,24 @@ let%expect_test "relative ages" =
     ]
     ~f:(fun s ->
       match Rel_time.parse s with
-      | Some time -> printf "%s: %s\n" s (Rel_time.ago ~now time)
+      | Some time ->
+        printf
+          "%s: %s, %s\n"
+          s
+          (Rel_time.ago ~now time)
+          (Rel_time.short ~now time)
       | None -> printf "%s: unparsed\n" s);
   print_s [%sexp (Rel_time.parse "yesterday" : Time_ns.Alternate_sexp.t option)];
   [%expect
     {|
-    2026-10-05 11:59:30.5Z: just now
-    2026-10-05 11:59:00Z: 1m ago
-    2026-10-05 11:01:00Z: 59m ago
-    2026-10-05 09:00:00Z: 3h ago
-    2026-10-03 12:00:00Z: 2d ago
-    2026-08-01 12:00:00Z: 2mo ago
-    2024-10-01 12:00:00Z: 2y ago
-    2026-10-05 12:00:30Z: just now
+    2026-10-05 11:59:30.5Z: just now, now
+    2026-10-05 11:59:00Z: 1m ago, 1m
+    2026-10-05 11:01:00Z: 59m ago, 59m
+    2026-10-05 09:00:00Z: 3h ago, 3h
+    2026-10-03 12:00:00Z: 2d ago, 2d
+    2026-08-01 12:00:00Z: 2mo ago, 2mo
+    2024-10-01 12:00:00Z: 2y ago, 2y
+    2026-10-05 12:00:30Z: just now, now
     ()
     |}]
 ;;
@@ -206,7 +211,10 @@ let%expect_test "byte offsets as browser carets (UTF-16), the round trip" =
 let%expect_test "stale reconnect attempts stay put" =
   let gate = Reconnect_gate.create () in
   let due generation =
-    printf "generation %d: %b\n" generation (Reconnect_gate.due gate ~generation)
+    printf
+      "generation %d: %b\n"
+      generation
+      (Reconnect_gate.due gate ~generation)
   in
   Reconnect_gate.schedule gate ~generation:1;
   due 1;

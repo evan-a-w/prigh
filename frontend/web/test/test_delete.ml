@@ -572,7 +572,7 @@ let%expect_test
     answer 1
     question 2
     10:02
-    ✂ 3 messages trimmed · ~3.0k tokens (Show) · (Undo)
+    3 messages trimmed · ~3.0k tokens (Show) · (Undo)
     question 2 2 of 2  10:02 (Trim before)
     question 1 1 of 2  10:01
     |}]
@@ -601,7 +601,7 @@ let%expect_test "the divider: Show the messages, read-only, Hide; Undo" =
     answer 1
     question 2
     10:02
-    ✂ 3 messages trimmed · ~3.0k tokens (Show) · (Undo)
+    3 messages trimmed · ~3.0k tokens (Show) · (Undo)
     question 4
     10:04
     answer 4
@@ -618,7 +618,7 @@ let%expect_test "the divider: Show the messages, read-only, Hide; Undo" =
     {|
     (Rpc (method_ get_trimmed) (params ((entry t1)))
      (tag (Hidden_messages (path /sessions/s1.jsonl) (entry t1))))
-    ✂ 3 messages trimmed · ~3.0k tokens Loading… · (Undo)
+    3 messages trimmed · ~3.0k tokens Loading… · (Undo)
     |}];
   H.reply
     h
@@ -635,7 +635,7 @@ let%expect_test "the divider: Show the messages, read-only, Hide; Undo" =
     answer 1
     question 2
     10:02
-    ✂ 3 messages trimmed · ~3.0k tokens (Hide) · (Undo)
+    3 messages trimmed · ~3.0k tokens (Hide) · (Undo)
     Not in the model's context Kept in the transcript only; the model no longer sees them.
     answer 2
     question 3
@@ -647,13 +647,13 @@ let%expect_test "the divider: Show the messages, read-only, Hide; Undo" =
     |}];
   H.act h (Show_hidden { entry = "t1"; show = false });
   H.text h ~selector:".hidden-range";
-  [%expect {| ✂ 3 messages trimmed · ~3.0k tokens (Show) · (Undo) |}];
+  [%expect {| 3 messages trimmed · ~3.0k tokens (Show) · (Undo) |}];
   H.act h (Restore_range "t1");
   H.text h ~selector:".trim-divider.after";
   [%expect
     {|
     (Rpc (method_ untrim) (params ((entry t1))) (tag (Range_restored t1)))
-    ✂ 3 messages trimmed · ~3.0k tokens (Show) · Restoring…
+    3 messages trimmed · ~3.0k tokens (Show) · Restoring…
     |}];
   H.act h (Restore_range "t1");
   [%expect {| |}];
@@ -716,7 +716,7 @@ let%expect_test "with a trim before: two dividers, each Undo its own" =
     answer 2
     question 3
     10:03
-    ✂ 3 messages trimmed · ~3.0k tokens (Show) · (Undo)
+    3 messages trimmed · ~3.0k tokens (Show) · (Undo)
     question 5
     10:05
     |}];
@@ -907,7 +907,7 @@ let%expect_test
     {|
     Hiding your messages · 3 items hidden (Show all)
     answer 1
-    ✂ 3 messages trimmed · ~3.0k tokens (Show) · (Undo)
+    3 messages trimmed · ~3.0k tokens (Show) · (Undo)
     answer 4
     <div class="filtered">
     <div class="filtered">
@@ -928,7 +928,7 @@ let%expect_test
     {|
     (Rpc (method_ get_trimmed) (params ((entry t1)))
      (tag (Hidden_messages (path /sessions/s1.jsonl) (entry t1))))
-    ✂ 3 messages trimmed · ~3.0k tokens (Hide) · (Undo)
+    3 messages trimmed · ~3.0k tokens (Hide) · (Undo)
     Not in the model's context Kept in the transcript only; the model no longer sees them.
     answer 2
     answer 3

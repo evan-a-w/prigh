@@ -1,10 +1,9 @@
 open! Core
 open! Import
 
-(** The agents panel's data: the session's subagents ([list_subagents], kept
-    live by their events; nested ones, [<parent>/<call>], under their parent)
-    and background jobs ([list_jobs]), and what the panel shows. Pure; [App]
-    keeps one per session. *)
+(** The session's subagents ([list_subagents], kept live by their events;
+    nested ones, [<parent>/<call>], under their parent) and background jobs
+    ([list_jobs]). Pure; [App] keeps one per session. *)
 
 module Status : sig
   type t =
@@ -75,16 +74,13 @@ module Fetch : sig
 end
 
 type t =
-  { open_ : bool
-  ; selected : Item.t option (** shown in full; the list otherwise *)
-  ; agents : Agent.t list (** in start order *)
+  { agents : Agent.t list (** in start order *)
   ; jobs : Job.t list
   ; earlier : Item.Set.t (** finished before the latest prompt: folded away *)
   ; stopping : Item.Set.t (** asked to cancel or kill, still running *)
-  ; output : (string * string) option (** a job's id and output *)
   ; polled_at : Time_ns.t option
   ; fetches : Fetch.t String.Map.t
-    (** by agent id: the transcripts the panel has asked for and not got *)
+    (** by agent id: the transcripts asked for and not got *)
   }
 [@@deriving sexp_of]
 
@@ -121,7 +117,7 @@ val running_jobs : t -> int
 
 (** The listed (not earlier) agents as a tree, running ones first, with
     their depth; then the listed jobs. Numbered from 1 in this order for
-    Alt+1..9 and [/agents N]. *)
+    [/agents N]. *)
 val listed : t -> (Item.t * int) list
 
 (** Earlier agents (as a tree) and jobs. *)
@@ -129,9 +125,6 @@ val earlier : t -> (Item.t * int) list
 
 (** A number from [listed], an agent's or job's id, or a call id. *)
 val resolve : t -> string -> Item.t option
-
-(** The next ([delta] = 1) or previous listed item from the selected one. *)
-val cycle : t -> int -> Item.t option
 
 val agent_elapsed : Agent.t -> now:Time_ns.t -> Time_ns.Span.t
 val job_elapsed : Job.t -> now:Time_ns.t -> Time_ns.Span.t

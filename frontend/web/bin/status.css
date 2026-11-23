@@ -1,81 +1,28 @@
 /* The chat's chrome and the session's status.
 
-   No bar over the chat: the sidebar's toggle and the panels' toggles float
-   over the top of the transcript, which leaves them room (a phone has a
-   strip, phone.css). The session's status is one chip in the composer's
-   row, by send: the activity's lamp, the context's ring and percent and
-   the cost, with one details card over it (status_view.ml).
+   A bar over the chat: the sidebar's toggle, the session's project and
+   name, the panels' toggles (a phone has a strip, phone.css). The context
+   ring sits in the composer's row, its card over it (status_view.ml).
    The thinking level, the mode and the verbosity are chips beside the host
    (session_chips_view.ml). */
 
 /* {1 The chrome} */
 
-.chrome-anchor { position: relative; height: 0; z-index: var(--z-tools); }
-.chat-chrome {
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: start;
-  gap: 8px;
-  padding: 10px 14px 0;
-  pointer-events: none;
-}
-.chat-chrome > * { pointer-events: none; display: flex; align-items: center; min-width: 0; }
-.chat-chrome > * > * { pointer-events: auto; }
-.chrome-left { justify-content: flex-start; }
-.chrome-center { justify-content: center; }
-.chrome-right { justify-content: flex-end; }
+/* A bar over the chat, in its flow (session_view.ml draws it with the
+   components' classes); a phone's strip is phone.css'. */
+.chrome-anchor { position: relative; flex: none; z-index: var(--z-tools); }
 /* While the ⋯ menu is open, the chrome is over its backdrop. */
 .chrome-anchor:has(.menu-open, .chrome-more.open) { z-index: var(--z-menu-anchor); }
+.main:has(.chat-chrome) .jump-nav { top: 8px; }
+.app.narrow .main:has(.chat-chrome) .chat-frame > .jump-nav { top: 12px; right: 12px; }
 
-/* The transcript starts under the chrome, and fades out under it as it
-   scrolls (the floating buttons never sit on legible text). A veil rather
-   than a mask on the chat: a mask would clip, and stack under the chrome,
-   what the chat opens full screen (the image viewer). */
-.main:has(.chat-chrome) .chat { padding-top: 58px; }
-.chat-chrome::before {
-  content: "";
-  position: absolute;
-  top: 0; left: 0; right: 14px;
-  height: 52px;
-  background: linear-gradient(to bottom, var(--bg), transparent);
-  pointer-events: none;
-}
-/* The jump list's button and marks start under the chrome's buttons. */
-.main:has(.chat-chrome) .jump-nav { top: 56px; }
-.app.narrow .main:has(.chat-chrome) .chat-frame > .jump-nav { top: 58px; right: 12px; }
-
-/* One frosted surface for whatever floats over the chat. */
-.chrome-button.round,
-.chrome-tools {
-  background: color-mix(in srgb, var(--slate) 78%, transparent);
-  -webkit-backdrop-filter: blur(10px) saturate(1.2);
-  backdrop-filter: blur(10px) saturate(1.2);
-  border: 1px solid color-mix(in srgb, var(--rule-2) 70%, transparent);
-  box-shadow: 0 8px 22px -14px var(--edge-shadow);
-}
-.chrome-button.round { width: 34px; height: 34px; border-radius: 50%; color: var(--muted); }
+/* The phone strip's buttons. */
+.chrome-button.round { width: 34px; height: 34px; border-radius: 50%; color: var(--muted-text); }
 .chrome-button.round:hover, .chrome-button.round[aria-expanded="true"] { color: var(--chalk); background: var(--slate-2); }
 .chrome-button.round .icon { width: 17px; height: 17px; }
 
-.chrome-tools {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  height: 34px;
-  padding: 0 3px;
-  border-radius: 999px;
-}
-.chrome-tools > .status-notes:not(:empty) { padding: 0 8px 0 6px; margin-right: 2px; border-right: 1px solid var(--rule); }
-.chrome-tools .btn.icon { width: 28px; height: 28px; border-radius: 50%; color: var(--faint); }
-.chrome-tools .btn.icon:hover { color: var(--chalk); }
-.chrome-tools .btn.icon.active,
-.chrome-tools .btn.icon[aria-pressed="true"] { color: var(--sodium); }
-.chrome-tools .btn.icon .icon { width: 16px; height: 16px; }
-
 /* What applies (a goal, reminders, a resume, a transfer, the plan). */
-.status-notes { display: flex; align-items: center; gap: 12px; min-width: 0; font-size: 12px; color: var(--muted); }
+.status-notes { display: flex; align-items: center; gap: 12px; min-width: 0; font-size: 12px; color: var(--muted-text); }
 .status-notes:empty { display: none; }
 .status-notes .status-item.mode.plan { max-width: 22ch; }
 
@@ -160,7 +107,7 @@
   font: 11.5px/1 var(--mono);
   transition: color 0.15s, background-color 0.15s;
 }
-.composer-status > .status-gauge:hover { background: var(--slate-2); color: var(--muted); }
+.composer-status > .status-gauge:hover { background: var(--slate-2); color: var(--muted-text); }
 .composer-status .status-item { display: inline-flex; align-items: center; gap: 6px; font: inherit; color: inherit; white-space: nowrap; }
 .composer-status .status-item.activity { padding-right: 6px; }
 .composer-status .status-item.activity > .label { display: none; }
@@ -181,7 +128,7 @@
 .composer-status .status-item.cost.warm { color: var(--sodium); }
 .composer-status .status-item.cost.hot { color: var(--brick); }
 /* Working: the lamp's word, in sodium; the figures stay where they were. */
-.composer-status.busy > .status-gauge { color: var(--muted); background: var(--sodium-wash); }
+.composer-status.busy > .status-gauge { color: var(--muted-text); background: var(--sodium-wash); }
 .composer-status.busy .status-item.activity { color: var(--sodium); }
 .composer-status.busy .status-item.activity > .label { display: inline; max-width: 16ch; overflow: hidden; text-overflow: ellipsis; }
 /* Offline, the status says so too (the banner says more). */
@@ -213,7 +160,7 @@
 
 .session-sections { display: flex; flex-direction: column; gap: 4px; padding: 2px 4px 10px; margin-bottom: 6px; border-bottom: 1px solid var(--rule); }
 .session-section { display: flex; flex-direction: column; gap: 6px; padding: 6px 8px 4px; }
-.session-section-head { display: flex; align-items: center; gap: 8px; min-width: 0; color: var(--muted); font-size: 13px; }
+.session-section-head { display: flex; align-items: center; gap: 8px; min-width: 0; color: var(--muted-text); font-size: 13px; }
 .session-section-head > .icon { width: 16px; height: 16px; flex: none; color: var(--faint); }
 .session-section-title { font-weight: 600; color: var(--chalk); }
 .session-section-note { margin-left: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--faint); font-size: 12px; }
@@ -226,7 +173,7 @@
   border: 0;
   border-radius: 8px;
   background: none;
-  color: var(--muted);
+  color: var(--muted-text);
   font: 500 14px var(--sans);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -235,7 +182,7 @@
 }
 .session-choice.on { background: var(--slate-2); color: var(--chalk); box-shadow: 0 1px 0 var(--rule-2) inset, 0 1px 3px -1px var(--edge-shadow); }
 .session-choice:focus-visible { outline: 2px solid var(--sodium); outline-offset: -2px; }
-.session-usage { display: flex; align-items: center; gap: 12px; padding: 0 2px; font-size: 13px; color: var(--muted); }
+.session-usage { display: flex; align-items: center; gap: 12px; padding: 0 2px; font-size: 13px; color: var(--muted-text); }
 .session-context { flex: 1; display: flex; align-items: center; gap: 8px; min-width: 0; }
 .session-context .meter { flex: 1; height: 5px; }
 .session-context .percent { color: var(--chalk); font: 12.5px var(--mono); font-variant-numeric: tabular-nums; }

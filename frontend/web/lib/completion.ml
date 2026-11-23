@@ -155,6 +155,18 @@ let argument_items
     simple
       (List.map Theme.Accent.Preset.all ~f:(fun p ->
          Theme.Accent.Preset.to_string p, ""))
+  | Corners ->
+    simple
+      (List.map Theme.Radius.all ~f:(fun r ->
+         Theme.Radius.to_string r, Theme.Radius.describe r))
+  | Font ->
+    simple
+      (List.map Theme.Sans.all ~f:(fun f ->
+         Theme.Sans.to_string f, Theme.Sans.describe f))
+  | Code_font ->
+    simple
+      (List.map Theme.Mono.all ~f:(fun f ->
+         Theme.Mono.to_string f, Theme.Mono.describe f))
   | Verbosity ->
     simple
       [ "quiet", "hide tool output and thinking"

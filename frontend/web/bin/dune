@@ -14,15 +14,52 @@
  (libraries prigh_web_app))
 
 ; The stylesheets as one (index.html loads it): one request, and the page
-; waits for one file rather than eighteen. In this order: later rules win.
+; waits for one file rather than twenty. First the components' (Tailwind v4
+; compiles ../loon_ui's loon.css with what prigh-web adds, for the classes
+; that ../loon_ui and ../lib use), then prigh-web's own in the layer
+; [legacy], under the components' utilities (loon_head.css). In this order:
+; later rules win.
+
+(rule
+ (target loon.input.css)
+ (deps
+  loon_head.css
+  loon_preflight.css
+  ../loon_ui/loon.css
+  loon_bridge.css)
+ (action
+  (with-stdout-to
+   loon.input.css
+   (progn
+    (cat loon_head.css)
+    (cat loon_preflight.css)
+    (cat ../loon_ui/loon.css)
+    (cat loon_bridge.css)
+    (echo "\n@source \"../loon_ui/*.ml\";\n@source \"../lib/*.ml\";\n")))))
+
+(rule
+ (target loon.out.css)
+ (deps
+  loon.input.css
+  (glob_files ../loon_ui/*.ml)
+  (glob_files ../lib/*.ml))
+ (action
+  (run
+   tailwindcss
+   --silent
+   --optimize
+   --input
+   loon.input.css
+   --output
+   loon.out.css)))
 
 (rule
  (target app.css)
  (deps
+  loon.out.css
   theme.css
   style.css
   chat.css
-  agents.css
   terminal.css
   files.css
   review.css
@@ -42,14 +79,14 @@
   (with-stdout-to
    app.css
    (progn
+    (cat loon.out.css)
+    (echo "\n@layer legacy {\n")
     (cat theme.css)
     (cat style.css)
     (cat chat.css)
-    (cat agents.css)
     (cat terminal.css)
     (cat files.css)
     (cat review.css)
-    (cat editor.css)
     (cat highlight.css)
     (cat resize.css)
     (cat paging.css)
@@ -60,4 +97,8 @@
     (cat control.css)
     (cat ui.css)
     (cat ui-chart.css)
-    (cat phone.css)))))
+    (cat phone.css)
+    (echo "\n}\n")
+    ; Unlayered: it overrides CodeMirror's own theme, which CodeMirror
+    ; injects unlayered and which would beat any layer.
+    (cat editor.css)))))

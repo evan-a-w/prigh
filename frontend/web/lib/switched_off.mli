@@ -1,13 +1,12 @@
 open! Core
 open! Import
 
-(** The settings page's numbers behind an On/Off switch (Show worktrees,
-    Archive after, Compact at, New sessions' Budget): what each was when switched off, so that
-    switching it on again restores that, else its default. *)
+(** The settings page's numbers behind an On/Off switch (Archive after,
+    Compact at, New sessions' Budget): what each was when switched off, so
+    that switching it on again restores that, else its default. *)
 
 module Key : sig
   type t =
-    | Worktree_hours
     | Archive_days
     | Compact_at
     | Budget

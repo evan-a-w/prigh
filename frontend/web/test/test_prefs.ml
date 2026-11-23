@@ -50,11 +50,17 @@ let%expect_test "the cache first, then the backend's, which win" =
   show_prefs h;
   [%expect
     {|
-    (Apply_theme ((name Dark) (accent (Preset Blue))))
-    ((theme ((name Dark) (accent (Preset Blue))))
-     (look ((name Dark) (accent (Preset Blue)))) (notify true) (verbosity Normal)
-     (history (newest oldest)) (sidebar (320)) (terminal_open true)
-     (remote Unknown))
+    (Apply_theme
+     ((name Dark) (accent (Preset Blue)) (radius Default) (sans Recursive)
+      (mono Recursive)))
+    ((theme
+      ((name Dark) (accent (Preset Blue)) (radius Default) (sans Recursive)
+       (mono Recursive)))
+     (look
+      ((name Dark) (accent (Preset Blue)) (radius Default) (sans Recursive)
+       (mono Recursive)))
+     (notify true) (verbosity Quiet) (history (newest oldest)) (sidebar (320))
+     (terminal_open true) (remote Unknown))
     |}];
   (* Another browser changed the theme meanwhile and closed the terminal;
      what the backend does not have is the default. *)
@@ -65,27 +71,32 @@ let%expect_test "the cache first, then the backend's, which win" =
   show_prefs h;
   [%expect
     {|
-    (Apply_theme ((name Light) (accent (Custom #3366ff))))
+    (Apply_theme
+     ((name Light) (accent (Custom #3366ff)) (radius Default) (sans Recursive)
+      (mono Recursive)))
     (Cache_prefs
      (((key web.theme) (value (light))) ((key web.accent) (value (#3366ff)))
-      ((key web.notify) (value ())) ((key web.verbosity) (value (quiet)))
-      ((key web.terminal-open) (value ())) ((key web.sidebar-folded) (value ()))
-      ((key web.sidebar-unfolded) (value ()))
-      ((key web.sidebar-opened) (value ()))
-      ((key web.sidebar-worktree-hours) (value ())) ((key web.review) (value ()))
-      ((key web.code-size) (value ())) ((key favourite-models) (value ()))
+      ((key web.radius) (value ())) ((key web.font) (value ()))
+      ((key web.code-font) (value ())) ((key web.notify) (value ()))
+      ((key web.verbosity) (value (quiet))) ((key web.terminal-open) (value ()))
+      ((key web.review) (value ())) ((key web.code-size) (value ()))
+      ((key favourite-models) (value ()))
       ((key history) (value (("from the tui"))))
       ((key web.migrated) (value (true))) ((key web.sidebar-width) (value ()))
       ((key web.files-width) (value ()))
       ((key web.files-preview-width) (value ()))
-      ((key web.agents-width) (value ())) ((key web.terminal-height) (value ()))
+      ((key web.terminal-height) (value ()))
       ((key web.review-chat-width) (value ()))
       ((key web.review-files-width) (value ()))
       ((key web.review-margin-width) (value ()))
       ((key web.editor-tree-width) (value ()))))
-    ((theme ((name Light) (accent (Custom #3366ff))))
-     (look ((name Light) (accent (Custom #3366ff)))) (notify true)
-     (verbosity Quiet) (history ("from the tui")) (sidebar ())
+    ((theme
+      ((name Light) (accent (Custom #3366ff)) (radius Default) (sans Recursive)
+       (mono Recursive)))
+     (look
+      ((name Light) (accent (Custom #3366ff)) (radius Default) (sans Recursive)
+       (mono Recursive)))
+     (notify true) (verbosity Quiet) (history ("from the tui")) (sidebar ())
      (terminal_open false) (remote Kept))
     |}]
 ;;
@@ -104,21 +115,24 @@ let%expect_test "a page from before uploads the browser's once" =
   show_prefs h;
   [%expect
     {|
-    (Apply_theme ((name Original) (accent (Preset Orange))))
-    (Apply_theme ((name Original) (accent (Preset Orange))))
+    (Apply_theme
+     ((name Original) (accent (Preset Orange)) (radius Default) (sans Recursive)
+      (mono Recursive)))
+    (Apply_theme
+     ((name Original) (accent (Preset Orange)) (radius Default) (sans Recursive)
+      (mono Recursive)))
     (Cache_prefs
      (((key web.theme) (value ())) ((key web.accent) (value ()))
-      ((key web.notify) (value (false))) ((key web.verbosity) (value ()))
-      ((key web.terminal-open) (value ())) ((key web.sidebar-folded) (value ()))
-      ((key web.sidebar-unfolded) (value ()))
-      ((key web.sidebar-opened) (value ()))
-      ((key web.sidebar-worktree-hours) (value ())) ((key web.review) (value ()))
-      ((key web.code-size) (value ())) ((key favourite-models) (value ()))
+      ((key web.radius) (value ())) ((key web.font) (value ()))
+      ((key web.code-font) (value ())) ((key web.notify) (value (false)))
+      ((key web.verbosity) (value ())) ((key web.terminal-open) (value ()))
+      ((key web.review) (value ())) ((key web.code-size) (value ()))
+      ((key favourite-models) (value ()))
       ((key history) (value (("tui prompt"))))
       ((key web.migrated) (value (true))) ((key web.sidebar-width) (value ()))
       ((key web.files-width) (value ()))
       ((key web.files-preview-width) (value ()))
-      ((key web.agents-width) (value ())) ((key web.terminal-height) (value ()))
+      ((key web.terminal-height) (value ()))
       ((key web.review-chat-width) (value ()))
       ((key web.review-files-width) (value ()))
       ((key web.review-margin-width) (value ()))
@@ -126,9 +140,13 @@ let%expect_test "a page from before uploads the browser's once" =
     (Rpc (method_ set_prefs)
      (params ((prefs ((web.notify false) (web.migrated true)))))
      (tag Show_error))
-    ((theme ((name Original) (accent (Preset Orange))))
-     (look ((name Original) (accent (Preset Orange)))) (notify false)
-     (verbosity Normal) (history ("tui prompt")) (sidebar ())
+    ((theme
+      ((name Original) (accent (Preset Orange)) (radius Default) (sans Recursive)
+       (mono Recursive)))
+     (look
+      ((name Original) (accent (Preset Orange)) (radius Default) (sans Recursive)
+       (mono Recursive)))
+     (notify false) (verbosity Quiet) (history ("tui prompt")) (sidebar ())
      (terminal_open false) (remote Kept))
     |}];
   (* Once done, the backend's win: a second browser with a page from before
@@ -140,19 +158,20 @@ let%expect_test "a page from before uploads the browser's once" =
   print_s [%sexp ((H.model h).notifications.enabled : bool)];
   [%expect
     {|
-    (Apply_theme ((name Original) (accent (Preset Orange))))
+    (Apply_theme
+     ((name Original) (accent (Preset Orange)) (radius Default) (sans Recursive)
+      (mono Recursive)))
     (Cache_prefs
      (((key web.theme) (value ())) ((key web.accent) (value ()))
-      ((key web.notify) (value ())) ((key web.verbosity) (value ()))
-      ((key web.terminal-open) (value ())) ((key web.sidebar-folded) (value ()))
-      ((key web.sidebar-unfolded) (value ()))
-      ((key web.sidebar-opened) (value ()))
-      ((key web.sidebar-worktree-hours) (value ())) ((key web.review) (value ()))
-      ((key web.code-size) (value ())) ((key favourite-models) (value ()))
-      ((key history) (value ())) ((key web.migrated) (value (true)))
-      ((key web.sidebar-width) (value ())) ((key web.files-width) (value ()))
+      ((key web.radius) (value ())) ((key web.font) (value ()))
+      ((key web.code-font) (value ())) ((key web.notify) (value ()))
+      ((key web.verbosity) (value ())) ((key web.terminal-open) (value ()))
+      ((key web.review) (value ())) ((key web.code-size) (value ()))
+      ((key favourite-models) (value ())) ((key history) (value ()))
+      ((key web.migrated) (value (true))) ((key web.sidebar-width) (value ()))
+      ((key web.files-width) (value ()))
       ((key web.files-preview-width) (value ()))
-      ((key web.agents-width) (value ())) ((key web.terminal-height) (value ()))
+      ((key web.terminal-height) (value ()))
       ((key web.review-chat-width) (value ()))
       ((key web.review-files-width) (value ()))
       ((key web.review-margin-width) (value ()))
@@ -171,11 +190,19 @@ let%expect_test "changes go to the backend; another browser's arrive live" =
     (Rpc (method_ push_pref)
      (params ((key history) (value "/theme dark") (max 500))) (tag Ignore))
     (Cache_prefs
-     (((key web.theme) (value (dark))) ((key web.accent) (value (orange)))))
+     (((key web.theme) (value (dark))) ((key web.accent) (value (orange)))
+      ((key web.radius) (value (default))) ((key web.font) (value (recursive)))
+      ((key web.code-font) (value (recursive)))))
     (Rpc (method_ set_prefs)
-     (params ((prefs ((web.theme dark) (web.accent orange))))) (tag Show_error))
+     (params
+      ((prefs
+        ((web.theme dark) (web.accent orange) (web.radius default)
+         (web.font recursive) (web.code-font recursive)))))
+     (tag Show_error))
     (Expire_toast (id 0) (after_ms 3620))
-    (Apply_theme ((name Dark) (accent (Preset Orange))))
+    (Apply_theme
+     ((name Dark) (accent (Preset Orange)) (radius Default) (sans Recursive)
+      (mono Recursive)))
     (Rpc (method_ push_pref) (params ((key history) (value hello) (max 500)))
      (tag Ignore))
     Scroll_to_bottom
@@ -193,10 +220,16 @@ let%expect_test "changes go to the backend; another browser's arrive live" =
       ((key web.sidebar-width) (value (300)))
       ((key web.terminal-open) (value (true)))
       ((key web.notify) (value (false)))))
-    (Apply_theme ((name Dark) (accent (Preset Pink))))
-    ((theme ((name Dark) (accent (Preset Pink))))
-     (look ((name Dark) (accent (Preset Pink)))) (notify false)
-     (verbosity Normal) (history (there hello)) (sidebar (300))
+    (Apply_theme
+     ((name Dark) (accent (Preset Pink)) (radius Default) (sans Recursive)
+      (mono Recursive)))
+    ((theme
+      ((name Dark) (accent (Preset Pink)) (radius Default) (sans Recursive)
+       (mono Recursive)))
+     (look
+      ((name Dark) (accent (Preset Pink)) (radius Default) (sans Recursive)
+       (mono Recursive)))
+     (notify false) (verbosity Normal) (history (there hello)) (sidebar (300))
      (terminal_open false) (remote Kept))
     |}];
   (* Browsing the history is not disturbed. *)
@@ -232,9 +265,13 @@ let%expect_test
     {|
     (Cache_prefs (((key history) (value (("/accent teal"))))))
     (Cache_prefs
-     (((key web.theme) (value (original))) ((key web.accent) (value (teal)))))
+     (((key web.theme) (value (original))) ((key web.accent) (value (teal)))
+      ((key web.radius) (value (default))) ((key web.font) (value (recursive)))
+      ((key web.code-font) (value (recursive)))))
     (Expire_toast (id 0) (after_ms 2500))
-    (Apply_theme ((name Original) (accent (Preset Teal))))
+    (Apply_theme
+     ((name Original) (accent (Preset Teal)) (radius Default) (sans Recursive)
+      (mono Recursive)))
     |}];
   (* Switched: theirs are not fetched, ours are not sent. *)
   H.act
@@ -256,9 +293,13 @@ let%expect_test
     (Rpc (method_ forge_status) (params ()) (tag (Forge Status)))
     (Cache_prefs (((key history) (value (("/accent green" "/accent teal"))))))
     (Cache_prefs
-     (((key web.theme) (value (original))) ((key web.accent) (value (green)))))
+     (((key web.theme) (value (original))) ((key web.accent) (value (green)))
+      ((key web.radius) (value (default))) ((key web.font) (value (recursive)))
+      ((key web.code-font) (value (recursive)))))
     (Expire_toast (id 2) (after_ms 2500))
-    (Apply_theme ((name Original) (accent (Preset Green))))
+    (Apply_theme
+     ((name Original) (accent (Preset Green)) (radius Default) (sans Recursive)
+      (mono Recursive)))
     |}];
   (* Back: ours are fetched again. *)
   H.act
@@ -282,13 +323,11 @@ let%expect_test
     (Rpc (method_ get_prefs)
      (params
       ((keys
-        (web.theme web.accent web.notify web.verbosity web.terminal-open
-         web.sidebar-folded web.sidebar-unfolded web.sidebar-opened
-         web.sidebar-worktree-hours web.review web.code-size favourite-models
-         history web.migrated web.sidebar-width web.files-width
-         web.files-preview-width web.agents-width web.terminal-height
-         web.review-chat-width web.review-files-width web.review-margin-width
-         web.editor-tree-width))))
+        (web.theme web.accent web.radius web.font web.code-font web.notify
+         web.verbosity web.terminal-open web.review web.code-size
+         favourite-models history web.migrated web.sidebar-width web.files-width
+         web.files-preview-width web.terminal-height web.review-chat-width
+         web.review-files-width web.review-margin-width web.editor-tree-width))))
      (tag Prefs))
     ("Accent: green" "Back to alice")
     |}];
@@ -302,9 +341,13 @@ let%expect_test
     {|
     (Cache_prefs (((key history) (value (("/theme light"))))))
     (Cache_prefs
-     (((key web.theme) (value (light))) ((key web.accent) (value (orange)))))
+     (((key web.theme) (value (light))) ((key web.accent) (value (orange)))
+      ((key web.radius) (value (default))) ((key web.font) (value (recursive)))
+      ((key web.code-font) (value (recursive)))))
     (Expire_toast (id 0) (after_ms 2500))
-    (Apply_theme ((name Light) (accent (Preset Orange))))
+    (Apply_theme
+     ((name Light) (accent (Preset Orange)) (radius Default) (sans Recursive)
+      (mono Recursive)))
     Local
     |}]
 ;;
@@ -332,11 +375,17 @@ let%expect_test "/theme and /accent: pickers that preview what is highlighted" =
   H.key h "Escape" ~target:Page;
   [%expect
     {|
-    (Apply_theme ((name Dark) (accent (Preset Orange))))
-    (Apply_theme ((name Light) (accent (Preset Orange))))
+    (Apply_theme
+     ((name Dark) (accent (Preset Orange)) (radius Default) (sans Recursive)
+      (mono Recursive)))
+    (Apply_theme
+     ((name Light) (accent (Preset Orange)) (radius Default) (sans Recursive)
+      (mono Recursive)))
     Close_dialog
     (Focus editor)
-    (Apply_theme ((name Original) (accent (Preset Orange))))
+    (Apply_theme
+     ((name Original) (accent (Preset Orange)) (radius Default) (sans Recursive)
+      (mono Recursive)))
     |}];
   run h "/theme";
   H.act h (Picker_query "dar");
@@ -346,12 +395,20 @@ let%expect_test "/theme and /accent: pickers that preview what is highlighted" =
     (Rpc (method_ push_pref) (params ((key history) (value /theme) (max 500)))
      (tag Ignore))
     (Focus picker-input)
-    (Apply_theme ((name Dark) (accent (Preset Orange))))
+    (Apply_theme
+     ((name Dark) (accent (Preset Orange)) (radius Default) (sans Recursive)
+      (mono Recursive)))
     (Focus editor)
     (Cache_prefs
-     (((key web.theme) (value (dark))) ((key web.accent) (value (orange)))))
+     (((key web.theme) (value (dark))) ((key web.accent) (value (orange)))
+      ((key web.radius) (value (default))) ((key web.font) (value (recursive)))
+      ((key web.code-font) (value (recursive)))))
     (Rpc (method_ set_prefs)
-     (params ((prefs ((web.theme dark) (web.accent orange))))) (tag Show_error))
+     (params
+      ((prefs
+        ((web.theme dark) (web.accent orange) (web.radius default)
+         (web.font recursive) (web.code-font recursive)))))
+     (tag Show_error))
     (Expire_toast (id 0) (after_ms 3620))
     |}];
   (* A colour typed into the accent picker is shown, and taken. *)
@@ -365,12 +422,20 @@ let%expect_test "/theme and /accent: pickers that preview what is highlighted" =
     (Rpc (method_ push_pref) (params ((key history) (value /accent) (max 500)))
      (tag Ignore))
     (Focus picker-input)
-    (Apply_theme ((name Dark) (accent (Custom #cc00ff))))
+    (Apply_theme
+     ((name Dark) (accent (Custom #cc00ff)) (radius Default) (sans Recursive)
+      (mono Recursive)))
     (Focus editor)
     (Cache_prefs
-     (((key web.theme) (value (dark))) ((key web.accent) (value (#cc00ff)))))
+     (((key web.theme) (value (dark))) ((key web.accent) (value (#cc00ff)))
+      ((key web.radius) (value (default))) ((key web.font) (value (recursive)))
+      ((key web.code-font) (value (recursive)))))
     (Rpc (method_ set_prefs)
-     (params ((prefs ((web.theme dark) (web.accent #cc00ff))))) (tag Show_error))
+     (params
+      ((prefs
+        ((web.theme dark) (web.accent #cc00ff) (web.radius default)
+         (web.font recursive) (web.code-font recursive)))))
+     (tag Show_error))
     (Expire_toast (id 1) (after_ms 2500))
     (Rpc (method_ push_pref) (params ((key history) (value /accent) (max 500)))
      (tag Ignore))
@@ -420,25 +485,48 @@ let%expect_test
     (Focus dialog)
     (Run "/theme light")
     (Cache_prefs
-     (((key web.theme) (value (light))) ((key web.accent) (value (orange)))))
+     (((key web.theme) (value (light))) ((key web.accent) (value (orange)))
+      ((key web.radius) (value (default))) ((key web.font) (value (recursive)))
+      ((key web.code-font) (value (recursive)))))
     (Rpc (method_ set_prefs)
-     (params ((prefs ((web.theme light) (web.accent orange))))) (tag Show_error))
+     (params
+      ((prefs
+        ((web.theme light) (web.accent orange) (web.radius default)
+         (web.font recursive) (web.code-font recursive)))))
+     (tag Show_error))
     (Expire_toast (id 0) (after_ms 2500))
-    (Apply_theme ((name Light) (accent (Preset Orange))))
+    (Apply_theme
+     ((name Light) (accent (Preset Orange)) (radius Default) (sans Recursive)
+      (mono Recursive)))
     (Run "/accent blue")
     (Cache_prefs
-     (((key web.theme) (value (light))) ((key web.accent) (value (blue)))))
+     (((key web.theme) (value (light))) ((key web.accent) (value (blue)))
+      ((key web.radius) (value (default))) ((key web.font) (value (recursive)))
+      ((key web.code-font) (value (recursive)))))
     (Rpc (method_ set_prefs)
-     (params ((prefs ((web.theme light) (web.accent blue))))) (tag Show_error))
+     (params
+      ((prefs
+        ((web.theme light) (web.accent blue) (web.radius default)
+         (web.font recursive) (web.code-font recursive)))))
+     (tag Show_error))
     (Expire_toast (id 1) (after_ms 2500))
-    (Apply_theme ((name Light) (accent (Preset Blue))))
+    (Apply_theme
+     ((name Light) (accent (Preset Blue)) (radius Default) (sans Recursive)
+      (mono Recursive)))
     (Preview_accent #123456)
-    (Apply_theme ((name Light) (accent (Custom #123456))))
+    (Apply_theme
+     ((name Light) (accent (Custom #123456)) (radius Default) (sans Recursive)
+      (mono Recursive)))
     (Run "/accent #123456")
     (Cache_prefs
-     (((key web.theme) (value (light))) ((key web.accent) (value (#123456)))))
+     (((key web.theme) (value (light))) ((key web.accent) (value (#123456)))
+      ((key web.radius) (value (default))) ((key web.font) (value (recursive)))
+      ((key web.code-font) (value (recursive)))))
     (Rpc (method_ set_prefs)
-     (params ((prefs ((web.theme light) (web.accent #123456)))))
+     (params
+      ((prefs
+        ((web.theme light) (web.accent #123456) (web.radius default)
+         (web.font recursive) (web.code-font recursive)))))
      (tag Show_error))
     (Expire_toast (id 2) (after_ms 2500))
     <label title="Any colour (/accent #rrggbb)" class="accent-choice accent-custom on">
@@ -459,7 +547,8 @@ let%expect_test
     {|
     Close_dialog
     (Focus editor)
-    ((name Light) (accent (Custom #123456)))
+    ((name Light) (accent (Custom #123456)) (radius Default) (sans Recursive)
+     (mono Recursive))
     |}]
 ;;
 
@@ -496,5 +585,190 @@ let%expect_test "accents: names and colours" =
     (#12345 ("Theme.Accent.of_string s" ()) (vars ()))
     (#gggggg ("Theme.Accent.of_string s" ()) (vars ()))
     (red ("Theme.Accent.of_string s" ()) (vars ()))
+    |}]
+;;
+
+let%expect_test "corners and fonts: their variables, saved like the theme" =
+  let show (t : Theme.t) =
+    print_s [%sexp (Theme.vars t : (string * string) list)]
+  in
+  (* The defaults are the stylesheet's: nothing set on <html>. *)
+  show Theme.default;
+  List.iter Theme.Radius.all ~f:(fun radius ->
+    show { Theme.default with radius });
+  List.iter Theme.Sans.all ~f:(fun sans -> show { Theme.default with sans });
+  List.iter Theme.Mono.all ~f:(fun mono -> show { Theme.default with mono });
+  [%expect
+    {|
+    ()
+    ((--radius 0px))
+    ((--radius 6px))
+    ()
+    ((--radius 16px))
+    ()
+    ((--sans "\"Inter\", -apple-system, \"Segoe UI\", Roboto, sans-serif"))
+    ((--sans
+      "system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", Roboto, sans-serif"))
+    ()
+    ((--mono
+      "ui-monospace, \"SF Mono\", Menlo, Consolas, \"DejaVu Sans Mono\", monospace"))
+    |}];
+  (* The backend's prefs set them; an unknown name is the default. *)
+  let h = H.create () in
+  restore
+    h
+    [ change Key.radius (str "round")
+    ; change Key.sans (str "inter")
+    ; change Key.mono (str "comic")
+    ];
+  show_prefs h;
+  [%expect
+    {|
+    (Apply_theme
+     ((name Original) (accent (Preset Orange)) (radius Round) (sans Inter)
+      (mono Recursive)))
+    ((theme
+      ((name Original) (accent (Preset Orange)) (radius Round) (sans Inter)
+       (mono Recursive)))
+     (look
+      ((name Original) (accent (Preset Orange)) (radius Round) (sans Inter)
+       (mono Recursive)))
+     (notify true) (verbosity Normal) (history ()) (sidebar ())
+     (terminal_open false) (remote Kept))
+    |}];
+  (* The commands set and save them; a wrong name says what would do. *)
+  run h "/corners sharp";
+  run h "/code-font system";
+  run h "/font papyrus";
+  H.text h ~selector:".toasts";
+  [%expect
+    {|
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/corners sharp") (max 500))) (tag Ignore))
+    (Cache_prefs
+     (((key web.theme) (value (original))) ((key web.accent) (value (orange)))
+      ((key web.radius) (value (sharp))) ((key web.font) (value (inter)))
+      ((key web.code-font) (value (recursive)))))
+    (Rpc (method_ set_prefs)
+     (params
+      ((prefs
+        ((web.theme original) (web.accent orange) (web.radius sharp)
+         (web.font inter) (web.code-font recursive)))))
+     (tag Show_error))
+    (Expire_toast (id 0) (after_ms 2700))
+    (Apply_theme
+     ((name Original) (accent (Preset Orange)) (radius Sharp) (sans Inter)
+      (mono Recursive)))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/code-font system") (max 500))) (tag Ignore))
+    (Cache_prefs
+     (((key web.theme) (value (original))) ((key web.accent) (value (orange)))
+      ((key web.radius) (value (sharp))) ((key web.font) (value (inter)))
+      ((key web.code-font) (value (system)))))
+    (Rpc (method_ set_prefs)
+     (params
+      ((prefs
+        ((web.theme original) (web.accent orange) (web.radius sharp)
+         (web.font inter) (web.code-font system)))))
+     (tag Show_error))
+    (Expire_toast (id 1) (after_ms 3380))
+    (Apply_theme
+     ((name Original) (accent (Preset Orange)) (radius Sharp) (sans Inter)
+      (mono System)))
+    (Rpc (method_ push_pref)
+     (params ((key history) (value "/font papyrus") (max 500))) (tag Ignore))
+    Code font: system, this device's monospace font
+    Unknown font “papyrus”: use recursive, inter or system (/font alone shows them in the settings). (Dismiss)
+    |}];
+  (* The settings' toggle group runs the command. *)
+  H.quiet h (fun () -> H.act h Open_settings);
+  H.names h ~selector:".settings-dialog .corners [role=radio]";
+  H.click h ~nth:3 ~selector:".settings-dialog .corners [role=radio]";
+  H.names h ~selector:".settings-dialog .corners [aria-checked=true]";
+  [%expect
+    {|
+    [radio] button "Sharp" -- square corners (/corners sharp)
+    [radio] button "Small" -- slightly rounded (/corners small)
+    [radio] button "Default" -- rounded, as prigh-web has been (/corners default)
+    [radio] button "Round" -- softer, rounder (/corners round)
+    (Run "/corners round")
+    (Cache_prefs
+     (((key web.theme) (value (original))) ((key web.accent) (value (orange)))
+      ((key web.radius) (value (round))) ((key web.font) (value (inter)))
+      ((key web.code-font) (value (system)))))
+    (Rpc (method_ set_prefs)
+     (params
+      ((prefs
+        ((web.theme original) (web.accent orange) (web.radius round)
+         (web.font inter) (web.code-font system)))))
+     (tag Show_error))
+    (Expire_toast (id 3) (after_ms 2740))
+    (Apply_theme
+     ((name Original) (accent (Preset Orange)) (radius Round) (sans Inter)
+      (mono System)))
+    [radio] button "Round" -- softer, rounder (/corners round)
+    |}]
+;;
+
+(* The sidebar's worktree folds and their hours (worktrees are in the
+   session card now): whatever is stored of them is ignored, quietly. *)
+let%expect_test "preferences of earlier versions are ignored" =
+  let old =
+    [ change "web.sidebar-folded" (`Object [ "s1", str "2026-10-05 10:00:00Z" ])
+    ; change "web.sidebar-unfolded" (`Array [ str "s2" ])
+    ; change "web.sidebar-opened" (`Object [ "s1", str "2026-10-05 10:00:00Z" ])
+    ; change "web.sidebar-worktree-hours" (`Number "0")
+    ]
+  in
+  (* From the browser's cache, then the backend's. *)
+  let h = H.connecting () in
+  H.quiet h (fun () -> H.act h Start);
+  H.quiet h (fun () -> restore h old);
+  H.reply
+    h
+    "get_prefs"
+    {|{"prefs":{"web.migrated":true,"web.sidebar-folded":{"s1":"2026-10-05 10:00:00Z"},"web.sidebar-unfolded":["s2"],"web.sidebar-opened":{"s1":"2026-10-05 10:00:00Z"},"web.sidebar-worktree-hours":0}}|};
+  let m = H.model h in
+  print_s [%sexp (List.is_empty m.toasts : bool)];
+  [%expect
+    {|
+    (Apply_theme
+     ((name Original) (accent (Preset Orange)) (radius Default) (sans Recursive)
+      (mono Recursive)))
+    (Cache_prefs
+     (((key web.theme) (value ())) ((key web.accent) (value ()))
+      ((key web.radius) (value ())) ((key web.font) (value ()))
+      ((key web.code-font) (value ())) ((key web.notify) (value ()))
+      ((key web.verbosity) (value ())) ((key web.terminal-open) (value ()))
+      ((key web.review) (value ())) ((key web.code-size) (value ()))
+      ((key favourite-models) (value ())) ((key history) (value ()))
+      ((key web.migrated) (value (true))) ((key web.sidebar-width) (value ()))
+      ((key web.files-width) (value ()))
+      ((key web.files-preview-width) (value ()))
+      ((key web.terminal-height) (value ()))
+      ((key web.review-chat-width) (value ()))
+      ((key web.review-files-width) (value ()))
+      ((key web.review-margin-width) (value ()))
+      ((key web.editor-tree-width) (value ()))))
+    true
+    |}];
+  (* Another browser of an earlier version: the page stays as it was. *)
+  let h = H.create () in
+  let page () = H.texts h ~selector:".app" in
+  let before = page () in
+  H.event
+    h
+    {|{"event":"prefs_changed","prefs":{"web.sidebar-worktree-hours":12,"web.sidebar-opened":{"s1":"2026-10-05 10:00:00Z"}}}|};
+  print_s
+    [%sexp
+      (List.is_empty before : bool)
+    , ([%equal: string list] before (page ()) : bool)
+    , (List.is_empty (H.model h).toasts : bool)];
+  [%expect
+    {|
+    (Cache_prefs
+     (((key web.sidebar-worktree-hours) (value (12)))
+      ((key web.sidebar-opened) (value (((s1 "2026-10-05 10:00:00Z")))))))
+    (false true true)
     |}]
 ;;

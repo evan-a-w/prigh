@@ -4,10 +4,10 @@ open! Import
 (** The user's preferences and data that prigh-web keeps on the backend
     ([get_prefs], [set_prefs], [push_pref], [prefs_changed]), so that they
     follow the user from browser to browser and change live in the others:
-    the theme and accent, notifications, the transcript's verbosity, the
-    prompt history (shared with the TUI), the starred models, the panels'
-    sizes, whether the terminal is open and which sessions' worktrees show
-    in the sidebar. The browser caches them ([Command.Cache_prefs]) for the first paint and for
+    the theme, accent, corners and fonts, notifications, the transcript's
+    verbosity, the prompt history (shared with the TUI), the starred models,
+    the panels' sizes and whether the terminal is open. The browser caches them
+    ([Command.Cache_prefs]) for the first paint and for
     backends that keep none.
 
     What stays in the browser only: the sign-ins (needed before there is a
@@ -18,23 +18,17 @@ open! Import
 module Key : sig
   val theme : string
   val accent : string
+
+  (** The corners' radius ({!Theme.Radius}). *)
+  val radius : string
+
+  (** The fonts ({!Theme.Sans}, {!Theme.Mono}). *)
+  val sans : string
+
+  val mono : string
   val notify : string
   val verbosity : string
   val terminal_open : string
-
-  (** The sidebar's sessions whose worktrees the user folded away: their
-      ids, each with when ({!Worktree_folds}). *)
-  val folded : string
-
-  (** Those whose worktrees the user unfolded, however old. *)
-  val unfolded : string
-
-  (** When the user last went into each session. *)
-  val opened : string
-
-  (** How many hours after its last use a session's worktrees show unless
-      folded ([0]: never; unset: 12). *)
-  val worktree_hours : string
 
   (** What the review page compared last ({!Review_memory}). *)
   val review : string
@@ -52,7 +46,8 @@ module Key : sig
       backend had its own). *)
   val migrated : string
 
-  (** Those [get_prefs] asks for. *)
+  (** Those [get_prefs] asks for and the page applies; others (such as
+      those of earlier versions) are ignored. *)
   val all : string list
 end
 

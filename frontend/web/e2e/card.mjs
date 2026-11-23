@@ -19,6 +19,8 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { hostName } from "./host_name.mjs";
 import { join } from "node:path";
 import { end } from "./end.mjs";
+import { holdGates, waitFor } from "./gates.mjs";
+import { normalVerbosity } from "./verbose_prefs.mjs";
 
 const { chromium, firefox, webkit } = await import(process.env.PLAYWRIGHT_MODULE);
 
@@ -28,6 +30,8 @@ if (!engine) throw new Error("usage: card.mjs chromium|firefox|webkit");
 const { PRIGH_BACKEND: backend, SITE: site, TOKEN: token } = process.env;
 const dir = join(process.env.TEST_DIR, "card");
 const home = join(dir, "home");
+normalVerbosity(home);
+holdGates(home);
 const cwd = join(dir, "cwd");
 mkdirSync(home, { recursive: true });
 mkdirSync(cwd, { recursive: true });
@@ -43,9 +47,6 @@ git("init", "-q", "-b", branch);
 git("add", "README.md");
 git("commit", "-q", "-m", "start");
 
-// Each waits at most as long as the script may run, and every gate is
-// opened at teardown, so no shell is left polling.
-const waitFor = file => `timeout 300 sh -c 'until [ -f ${file} ]; do sleep 0.1; done'; echo ${file}`;
 const gates = ["sub-go", "main-go"];
 const open = gate => writeFileSync(join(cwd, gate), "");
 writeFileSync(
@@ -168,7 +169,7 @@ const card = () => page.evaluate(() => {
       problems.push(`on ${e.getAttribute("aria-label") || e.className}`);
   }
   return [
-    `ring: ${ring.getAttribute("aria-label")}; ${status}; turning: ${anchor.classList.contains("busy")}; ${level}`,
+    `ring: ${ring.getAttribute("aria-label")}; ${status}; ${level}`,
     `mode: ${mode}; over the chat: ${notes.join(" | ") || "nothing"}`,
     problems.length ? `problems: ${problems.join("; ")}` : "fits",
   ].join("\n");
@@ -198,26 +199,26 @@ try {
   await page.locator("form input[type=password]").fill(token);
   await page.locator("form button[type=submit]").click();
   await page.locator(".composer textarea").waitFor();
-  await page.locator(".context-ring-anchor:not(.busy)").waitFor({ state: "attached" });
+  await page.locator(".context-ring-anchor [role=status]", { hasText: "Ready" }).waitFor({ state: "attached" });
   await both("idle");
 
   // The agent at work, its subagent too.
   await command("survey the project");
   // The subagent tool at work (its call written), as the card had it.
-  await page.locator(".context-ring-anchor.busy [role=status]", { hasText: "Running tools" }).waitFor({ state: "attached" });
+  await page.locator(".context-ring-anchor [role=status]", { hasText: "Running tools" }).waitFor({ state: "attached" });
   await page.waitForFunction(() => document.querySelector(".chat")?.innerText.includes("main-go"));
   await both("working, a subagent running");
 
   // The agent done, its subagent still running.
   open("main-go");
-  await page.locator(".context-ring-anchor:not(.busy)").waitFor({ state: "attached" });
+  await page.locator(".context-ring-anchor [role=status]", { hasText: "Ready" }).waitFor({ state: "attached" });
   await both("ready, a subagent running");
 
   // All done, and a mode on (Alt+M: ask).
   open("sub-go");
   // The agent answers its subagent's report: wait for that turn to end.
   await page.waitForFunction(() => document.querySelector(".chat")?.innerText.includes("The survey is in."));
-  await page.locator(".context-ring-anchor:not(.busy)").waitFor({ state: "attached" });
+  await page.locator(".context-ring-anchor [role=status]", { hasText: "Ready" }).waitFor({ state: "attached" });
   const mode = () => document.querySelector(".context-card .mode-line .status-detail-value")?.textContent;
   const before = await page.evaluate(mode);
   await page.keyboard.press("Alt+m");

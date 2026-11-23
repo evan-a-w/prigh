@@ -1,0 +1,13 @@
+; Components copied from loon (https://github.com/lloyd-g-w/loon) with
+; `loon add`: they are yours to change. `loon diff` shows how they differ
+; from loon's.
+
+(library
+ (name loon_ui)
+ (libraries core bonsai bonsai_web virtual_dom virtual_dom.svg js_of_ocaml)
+ (preprocess
+  (pps ppx_jane js_of_ocaml-ppx bonsai.ppx_bonsai)))
+
+; The components' classes are Tailwind v4's: loon.css (with palette.css for
+; shadcn's own palette) is the stylesheet's input; the pages that use the
+; components compile it (../bin/dune for prigh-web, ../mockup/dune).

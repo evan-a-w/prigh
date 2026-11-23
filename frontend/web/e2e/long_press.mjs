@@ -1,6 +1,6 @@
 // A long press on a phone opens the menu a right-click opens on a computer:
-// on a message (yours, a reply, a tool line), a session and a worktree in the
-// drawer, and a file of the review. Chromium holds a finger down through the
+// on a message (yours, a reply, a tool line), a session in the drawer, a
+// worktree in the session card's sheet, and a file of the review. Chromium holds a finger down through the
 // DevTools protocol (Input.dispatchTouchEvent, as a phone's touch screen
 // does: the finger never quite still); Firefox, which has no such protocol
 // here, gets pointer events typed touch. Then: Chrome on Android's own long
@@ -17,6 +17,7 @@ import { execFileSync, spawn } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { end } from "./end.mjs";
+import { normalVerbosity } from "./verbose_prefs.mjs";
 
 const { chromium, firefox, webkit } = await import(process.env.PLAYWRIGHT_MODULE);
 
@@ -26,6 +27,7 @@ if (!engine) throw new Error("usage: long_press.mjs chromium|firefox|webkit");
 const { PRIGH_BACKEND: backend, SITE: site, TOKEN: token } = process.env;
 const dir = join(process.env.TEST_DIR, "long_press");
 const home = join(dir, "home");
+normalVerbosity(home);
 const cwd = join(dir, "repo");
 const docs = join(dir, "docs");
 mkdirSync(home, { recursive: true });
@@ -39,7 +41,7 @@ git("init", "-q", "-b", "main");
 git("add", "-A");
 git("commit", "-q", "-m", "start");
 git("worktree", "add", "-q", "-b", "docs", docs);
-// The session works in the worktree, so the drawer has it under the session.
+// The session works in the worktree, so its card lists it.
 writeFileSync(join(docs, "server.ml"), "let port = Sys.getenv \"PORT\"\n");
 
 writeFileSync(
@@ -271,16 +273,24 @@ try {
   await shoot(page, "a session");
   await close();
 
-  section("a worktree in the drawer");
-  const worktree = page.locator(".sidebar [data-worktree]").first();
-  if (await worktree.count()) {
-    await touch(worktree);
-    console.log(await menu());
-    await shoot(page, "a worktree");
-    await close();
-  } else console.log("no worktree row");
   await page.keyboard.press("Escape");
   await page.waitForTimeout(300);
+
+  section("a worktree in the session card");
+  await page.locator(".more-toggle").tap();
+  await page.locator(".session-card-row").tap();
+  const fold = page.locator(".session-card [aria-controls=session-card-worktrees-content]");
+  await fold.waitFor();
+  if (await fold.getAttribute("aria-expanded") !== "true") await fold.tap();
+  const worktree = page.locator(".session-card [data-worktree]").first();
+  await worktree.waitFor();
+  await page.waitForTimeout(300);
+  await touch(worktree);
+  console.log(await menu());
+  await shoot(page, "a worktree");
+  await close();
+  await page.keyboard.press("Escape");
+  await page.locator(".session-card.sheet").waitFor({ state: "detached" });
 
   section("a file of the review");
   await editor.fill("/review");

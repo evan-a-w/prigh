@@ -22,6 +22,8 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { end } from "./end.mjs";
 import { png } from "./png.mjs";
+import { holdGates, waitFor } from "./gates.mjs";
+import { normalVerbosity } from "./verbose_prefs.mjs";
 
 const { chromium, firefox, webkit } = await import(process.env.PLAYWRIGHT_MODULE);
 
@@ -38,6 +40,8 @@ const touch = part !== "desktop";
 const { PRIGH_BACKEND: backend, SITE: site, TOKEN: token } = process.env;
 const dir = join(process.env.TEST_DIR, `computer-${part}`);
 const home = join(dir, "home");
+normalVerbosity(home);
+holdGates(home);
 const cwd = join(dir, "cwd");
 const sessions = join(home, ".prigh", "sessions");
 mkdirSync(sessions, { recursive: true });
@@ -86,7 +90,6 @@ const id = "c0c0c0c0c0c0c0c0";
 
 // A run that drives the screen, then waits (for the gate, which only
 // teardown opens): Stop ends it.
-const waitFor = file => `timeout 300 sh -c 'until [ -f ${file} ]; do sleep 0.1; done'; echo ${file}`;
 writeFileSync(
   join(dir, "script.json"),
   JSON.stringify([
@@ -139,6 +142,7 @@ const server = spawn(
 );
 const serverAddress = await waitForLine(server, /^prigh: prigh-web on http:\/\/(\S+)\/$/m, "the backend");
 // The machine whose screen it is: prigh web with -computer, its tool host.
+normalVerbosity(join(dir, "desk-home"));
 const deskEnv = { ...process.env, HOME: join(dir, "desk-home"), TMUX_TMPDIR: dir, SHELL: "/bin/sh",
   PRIGH_COMPUTER: process.execPath, PRIGH_COMPUTER_ARGS: helper };
 for (const name of ["PRIGH_CONNECT", "PRIGH_TOKEN", "PRIGH_USER", "PRIGH_WEB_LISTEN"]) delete deskEnv[name];

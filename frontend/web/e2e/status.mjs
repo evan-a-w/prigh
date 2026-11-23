@@ -34,6 +34,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { end } from "./end.mjs";
 import { png } from "./png.mjs";
+import { normalVerbosity } from "./verbose_prefs.mjs";
 
 const { chromium, firefox, webkit } = await import(process.env.PLAYWRIGHT_MODULE);
 
@@ -43,6 +44,7 @@ if (!engine) throw new Error("usage: status.mjs chromium|firefox|webkit");
 const { PRIGH_BACKEND: backend, SITE: site, TOKEN: token } = process.env;
 const dir = join(process.env.TEST_DIR, "status");
 const home = join(dir, "home");
+normalVerbosity(home);
 const cwd = join(dir, "cwd");
 mkdirSync(home, { recursive: true });
 mkdirSync(cwd, { recursive: true });
@@ -266,12 +268,13 @@ const desktop = async () => {
   for (const [chip, sel] of [["model", ".model-chip"], ["host", ".host-chip"], ["+", ".composer-plus .plus"]]) {
     await page.locator(`.composer ${sel}`).first().click();
     await page.locator("#chip-popover").waitFor();
-    // On the filter's button: had the click gone through, its menu would open.
-    const filter = await box(".chat-chrome .filter-toggle");
-    await page.mouse.click(filter.x + filter.width / 2, filter.y + filter.height / 2);
+    // On the files' toggle: had the click gone through, the files would open.
+    const files = await box(".chat-chrome .files-toggle");
+    await page.mouse.click(files.x + files.width / 2, files.y + files.height / 2);
     await settle();
-    say(`${chip}: closed: ${!(await popoverOpen())}; the filter's menu opened: ${await page.locator(".filter-menu").count() > 0}`);
-    if (await page.locator(".filter-menu").count()) await page.keyboard.press("Escape");
+    const filesOpen = () => page.locator(".chat-chrome .files-toggle:is([aria-expanded=true], [aria-pressed=true])").count();
+    say(`${chip}: closed: ${!(await popoverOpen())}; the files opened: ${await filesOpen() > 0}`);
+    if (await filesOpen()) await page.locator(".chat-chrome .files-toggle").click();
   }
 
   section("desktop: the ring's card");
