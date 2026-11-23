@@ -204,7 +204,7 @@ let%expect_test "session entries: engine, threads, external turns, handoffs" =
        ((adapter codex) (host backend) (thread_id thr_1) (cwd /proj))))
      (turns (((thread_id thr_1) (turn_id turn_1) (through <id>)))))
     |}];
-  (* The entries as written, and the summary's engine. *)
+  (* The entries as written. *)
   In_channel.read_lines (Session.path t)
   |> List.filter ~f:(fun line ->
     List.exists [ "Engine"; "Thread"; "External_turn"; "Handoff" ] ~f:(fun k ->
@@ -229,17 +229,7 @@ let%expect_test "session entries: engine, threads, external turns, handoffs" =
     {"payload":["Engine",{"engine":"composer","adapter":"claude"}]}
     {"payload":["Handoff",{"from_adapter":"codex","to_adapter":"claude","text":"<handoff>…</handoff>"}]}
     {"payload":["Thread",{"adapter":"claude","host":"laptop","thread_id":"sess-2","cwd":"/proj"}]}
-    |}];
-  let summary =
-    Option.value_exn
-      (Session.summary_with
-         ~live:(fun _ -> None)
-         ~load:Session.load
-         (Session.path t))
-  in
-  print_s
-    [%sexp (summary.engine : string option), (summary.adapter : string option)];
-  [%expect {| ((composer) (claude)) |}]
+    |}]
 ;;
 
 let%expect_test "a session naming an engine this prigh does not know" =

@@ -166,7 +166,9 @@ module Entry : sig
           ; text : string
           }
       (** the summary of the session pushed to [to_adapter] when it took
-          over (another adapter or host, a thread that could not resume) *)
+          over (another adapter or host, a thread that could not resume);
+          [from_adapter] is an [Adapter_id], or [harness] after prigh's
+          harness engine *)
     [@@deriving sexp, jsonaf]
   end
 
@@ -419,9 +421,6 @@ end
     naming an engine or adapter this prigh does not know (a newer one's). *)
 val engine : t -> Engine_choice.t Or_error.t
 
-(** The last [Engine] entry's engine and adapter as written. *)
-val engine_entry : t -> (string * string option) option
-
 val set_engine : t -> Engine_choice.t -> Entry.t
 
 (** The [Thread] entries on the active path, newest first. *)
@@ -642,9 +641,6 @@ module Summary : sig
     ; repo : Git_location.t option option (** {!repo} *)
     ; worktrees : Session_worktree.t list (** {!worktrees} *)
     ; home : Home.t option (** {!home} *)
-    ; engine : string option [@sexp.option]
-      (** the last [Engine] entry's engine: [None] for the harness *)
-    ; adapter : string option [@sexp.option] (** and its adapter *)
     }
   [@@deriving sexp_of]
 

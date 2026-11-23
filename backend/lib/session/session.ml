@@ -1606,10 +1606,8 @@ module External_turn = struct
   [@@deriving sexp_of, equal]
 end
 
-let engine_entry t = (derived t).state.engine
-
 let engine t =
-  match engine_entry t with
+  match (derived t).state.engine with
   | None -> Ok Engine_choice.harness
   | Some (engine, adapter) -> Engine_choice.of_strings ~engine ~adapter
 ;;
@@ -1844,8 +1842,6 @@ module Summary = struct
     ; repo : Git_location.t option option
     ; worktrees : Session_worktree.t list
     ; home : Home.t option
-    ; engine : string option [@sexp.option]
-    ; adapter : string option [@sexp.option]
     }
   [@@deriving sexp]
 
@@ -2043,8 +2039,6 @@ let summarise t ~path ~mtime =
   ; repo = repo t
   ; worktrees = worktrees t
   ; home = t.home
-  ; engine = Option.map (engine_entry t) ~f:fst
-  ; adapter = Option.bind (engine_entry t) ~f:snd
   }
 ;;
 

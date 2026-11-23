@@ -375,7 +375,7 @@ let%expect_test "cancel kills what left the process group" =
 let%expect_test "term_grace: SIGTERM and the end of input first, then SIGKILL" =
   Eio_main.run
   @@ fun env ->
-  let run script =
+  let run ?(grace = 5000) script =
     let cancel = Cancellation.create () in
     let out = Buffer.create 16 in
     let input = Stdin_feed.create () in
@@ -384,7 +384,7 @@ let%expect_test "term_grace: SIGTERM and the end of input first, then SIGKILL" =
         ~env
         ~input
         ~cancel
-        ~term_grace:(Time_ns.Span.of_int_ms 200)
+        ~term_grace:(Time_ns.Span.of_int_ms grace)
         ~on_stdout:(fun s ->
           Buffer.add_string out s;
           if String.is_substring s ~substring:"ready"
@@ -399,8 +399,10 @@ let%expect_test "term_grace: SIGTERM and the end of input first, then SIGKILL" =
   run "trap 'echo saved; exit 0' TERM; echo ready; while :; do sleep 0.01; done";
   (* Ends at the end of its input. *)
   run "trap '' TERM; echo ready; cat; echo eof";
-  (* Ignores both: killed after the grace. *)
-  run "trap '' TERM; echo ready; exec 0<&-; while :; do sleep 0.01; done";
+  (* Ignores both: killed after the grace (the others end within theirs). *)
+  run
+    ~grace:20
+    "trap '' TERM; echo ready; exec 0<&-; while :; do sleep 0.01; done";
   [%expect
     {|
     (Cancelled  "ready\

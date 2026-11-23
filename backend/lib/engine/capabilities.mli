@@ -71,9 +71,6 @@ module Feature : sig
     | Steer_subagent (** steer a subagent or edit its queue *)
     | Plan_mode
   [@@deriving sexp_of, equal, enumerate]
-
-  (** As the user would name it: [fork], [rewind], [trim], ... *)
-  val name : t -> string
 end
 
 val supports : t -> Feature.t -> bool

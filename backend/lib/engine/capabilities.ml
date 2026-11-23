@@ -88,17 +88,6 @@ module Feature = struct
     | Steer_subagent
     | Plan_mode
   [@@deriving sexp_of, equal, enumerate]
-
-  let name = function
-    | Fork -> "fork"
-    | Rewind -> "rewind"
-    | Context_edit -> "trim"
-    | Compact -> "compact"
-    | Downsize_images -> "downsize_images"
-    | Btw -> "btw"
-    | Steer_subagent -> "steer_agent"
-    | Plan_mode -> "plan_mode"
-  ;;
 end
 
 let supports t (feature : Feature.t) =
