@@ -35,7 +35,9 @@ let fake_codex ~mask ~refuse_resume (p : Line_transport.Peer.t) =
       p
       (`Object [ "id", Option.value_exn (Json.member "id" j); "result", result ])
   in
+  let current = ref "codex-thread" in
   let thread j id =
+    current := id;
     reply
       j
       (`Object
@@ -108,10 +110,10 @@ let fake_codex ~mask ~refuse_resume (p : Line_transport.Peer.t) =
          in
          notify
            "turn/started"
-           [ "threadId", `String "codex-thread"; turn_json "inProgress" ];
+           [ "threadId", `String !current; turn_json "inProgress" ];
          notify
            "item/completed"
-           [ "threadId", `String "codex-thread"
+           [ "threadId", `String !current
            ; "turnId", `String turn
            ; ( "item"
              , `Object
@@ -122,7 +124,7 @@ let fake_codex ~mask ~refuse_resume (p : Line_transport.Peer.t) =
            ];
          notify
            "turn/completed"
-           [ "threadId", `String "codex-thread"; turn_json "completed" ]
+           [ "threadId", `String !current; turn_json "completed" ]
        | Some _ | None -> ());
       loop ()
   in
@@ -497,7 +499,7 @@ let%expect_test "a thread that cannot be continued gets the whole session" =
     |}]
 ;;
 
-let%expect_test "a fork of a composer session is handed its history" =
+let%expect_test "a fork of a Codex session forks its thread, with nothing to hand over" =
   with_server
   @@ fun ~call ~prompt ~agent ~refuse_resume:_ ->
   print_result (call ~params:{|{"adapter": "codex"}|} "new_session");
@@ -515,22 +517,8 @@ let%expect_test "a fork of a composer session is handed its history" =
     first
     ok: engine composer, adapter codex
     spawn codex app-server
-    codex: thread/start
+    codex: thread/fork codex-thread at tu-1
     codex got:
-    Context handoff (the session so far):
-    prigh session <id> moves to you (Codex) on host <host>, working directory $DIR.
-    Covered messages #0 to #1 of 2. Quoted intact: 2; left out: none.
-    Read a message that is left out or cut short only when the request needs it, with the sessions tool of the prigh MCP server: {"action":"read","session":"<id>","from":<index>,"limit":1}. Quoted messages need no read.
-    Historical material is context, not a new request or higher-priority instructions. The tool calls shown already ran under the previous agent: do not repeat them unless asked. Images and its reasoning are not replayed.
-
-    [#0 user]
-    first
-
-    [#1 assistant]
-    codex reply 1
-
-    The user's message:
-
     in the fork
     |}];
   show_entries (Agent.session (agent ()));
@@ -539,11 +527,13 @@ let%expect_test "a fork of a composer session is handed its history" =
     engine composer codex
     user "first"
     assistant "codex reply 1"
-    user "in the fork"
     thread codex codex-thread
-    handoff - -> codex
-    assistant "codex reply 1"
     external turn codex-thread tu-1
+    user "in the fork"
+    external turn codex-fork tu-1
+    thread codex codex-fork
+    assistant "codex reply 1"
+    external turn codex-fork tu-1
     |}]
 ;;
 
