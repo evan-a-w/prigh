@@ -129,8 +129,8 @@ let option_rows ~inject (o : Dialog.Control_options.t) =
 
 let hint key what =
   Node.span
-    ~attrs:[ Attr.class_ "control-hint inline-flex items-center gap-1.5" ]
-    [ Loon.Kbd.view [ Node.text key ]; Node.text what ]
+    ~attrs:[ Attr.class_ "control-hint whitespace-nowrap" ]
+    [ Loon.Kbd.view [ Node.text key ]; Node.text (" " ^ what) ]
 ;;
 
 let view (m : App.Model.t) ~(root : Control_centre.t) ~options ~inject =
@@ -184,7 +184,8 @@ let view (m : App.Model.t) ~(root : Control_centre.t) ~options ~inject =
             ; (match options with
                | Some o ->
                  button
-                   ~cls:"control-crumb max-w-[45%] shrink-0 truncate"
+                   ~cls:
+                     "control-crumb max-w-[45%] shrink-0 truncate narrow:h-11"
                    ~variant:Secondary
                    ~size:Xs
                    ~title:"Back (⌫ in an empty filter)"

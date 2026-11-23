@@ -42,11 +42,11 @@ let item_icon : Context_menu.Item.t -> Icon.t = function
    placed); on a narrow window, along the bottom. *)
 let surface_cls =
   "context-menu fixed min-w-[248px] max-w-[min(360px,calc(100vw-16px))] \
-   max-h-[calc(100vh-16px)] [&:not(.placed)]:invisible \
-   [&_.menu-label]:shrink-0 motion-reduce:animate-none max-[760px]:top-auto! \
-   max-[760px]:right-2 max-[760px]:bottom-2 max-[760px]:left-2! \
-   max-[760px]:max-w-none max-[760px]:[&_.menu-item]:min-h-10 \
-   max-[760px]:[&_.menu-item]:text-[15px]"
+   max-h-[calc(100vh-16px)] [&:not(.placed)]:opacity-0 \
+   [&:not(.placed)]:pointer-events-none [&_.menu-label]:shrink-0 \
+   motion-reduce:animate-none max-[760px]:top-auto! max-[760px]:right-2 \
+   max-[760px]:bottom-2 max-[760px]:left-2! max-[760px]:max-w-none \
+   max-[760px]:[&_.menu-item]:min-h-10 max-[760px]:[&_.menu-item]:text-[15px]"
 ;;
 
 (* What the menu is about, above its items. *)

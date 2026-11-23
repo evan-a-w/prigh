@@ -142,7 +142,7 @@ kbd {
 .btn:hover { background: var(--muted); color: var(--foreground); }
 .btn:focus-visible { border-color: var(--ring); box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 50%, transparent); }
 .btn:active:not([aria-haspopup]):not(:disabled) { transform: translateY(1px); }
-.btn:disabled { opacity: 0.5; cursor: default; pointer-events: none; }
+.btn:disabled { opacity: 0.5; cursor: default; }
 .btn .icon { flex-shrink: 0; }
 .btn.primary { background: var(--primary); border-color: transparent; color: var(--primary-foreground); }
 .btn.primary:hover:not(:disabled) { background: color-mix(in oklab, var(--primary) 80%, transparent); color: var(--primary-foreground); }

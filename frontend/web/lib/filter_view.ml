@@ -72,8 +72,8 @@ let menu (m : App.Model.t) (menu : Filter_menu.t) ~inject =
     [ Menu_view.surface
         ~cls:
           "filter-menu fixed w-[min(340px,calc(100vw-16px))] \
-           max-h-[calc(100vh-16px)] [&:not(.placed)]:invisible \
-           motion-reduce:animate-none"
+           max-h-[calc(100vh-16px)] [&:not(.placed)]:opacity-0 \
+           [&:not(.placed)]:pointer-events-none motion-reduce:animate-none"
         ~attrs:
           [ Attr.id "dialog"; Attr.create "data-anchor" Filter_menu.anchor ]
         ~label:"Show in the transcript"
