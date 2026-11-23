@@ -208,6 +208,8 @@ type t =
   { env : Env.t
   ; sw : Switch.t
   ; provider : Provider.t
+  ; runner : Runner.t option
+    (** the session's engine when it is not the harness on [provider] *)
   ; tools : Tool.t list
   ; offered : Tool.t -> bool
   ; user_info : User_info.t option
@@ -2952,6 +2954,17 @@ let loop_config ?cancel t =
   }
 ;;
 
+let runner t =
+  match t.runner with
+  | Some runner -> runner
+  | None ->
+    Harness_runner.create ~provider:t.provider ~config:(fun ~cancel ->
+      loop_config ~cancel t)
+;;
+
+let capabilities t = Runner.capabilities (runner t)
+let engine t = Runner.engine (runner t)
+
 (* The text with the attachments' [<file>] blocks, what they are, and their
    images. *)
 let with_attachments t ~cancel text attachments =
@@ -3204,17 +3217,6 @@ let handover_message ~from ~(to_ : Model.t) ~error =
        (Model.key to_))
 ;;
 
-(* Masks [session]'s messages up to its [through]th, as [Agent_loop.run]'s
-   [mask]. *)
-let mask_session session ~through =
-  match List.nth (Session.context_ids session) through with
-  | Some (Some id) ->
-    ignore (Session.append_masked session ~through:id : Session.Entry.t);
-    Ok (Session.messages session)
-  | Some None | None ->
-    Or_error.error_s [%message "no entry to mask up to" (through : int)]
-;;
-
 let compacted t (outcome : Compaction.Outcome.t) =
   account
     t
@@ -3437,22 +3439,18 @@ let rec start_run
          broadcast t (Loop (Message_start m));
          broadcast t (Loop (Message_end m)));
        let recorded m = List.mem prompts m ~equal:phys_equal in
-       let config = loop_config ~cancel t in
-       let added =
-         match
-           Agent_loop.run
-             ~env:t.env
-             ~provider:t.provider
-             ~config
-             ~cwd:t.cwd
-             ~cancel
-             ~approve:(approve t)
-             ~ask_user:(ask_user t ~cancel)
-             ~ui:(ui_host t ~cancel)
-             ~chat:t.chat_mode
-             ~execute:(executor t)
-             ~background:t.background
-             ~steer:(fun () ->
+       let services : Engine_intf.Services.t =
+         { env = t.env
+         ; cwd = t.cwd
+         ; session
+         ; notice = (fun n -> broadcast t (Notice n))
+         ; approve = approve t
+         ; ask_user = ask_user t ~cancel
+         ; ui = ui_host t ~cancel
+         ; execute = executor t
+         ; background = t.background
+         ; steer =
+             (fun () ->
                let l = Steer_queue.take_steers t.queue in
                if not (List.is_empty l) then queue_update t;
                let queued = List.map l ~f:(user_message t) in
@@ -3473,28 +3471,8 @@ let rec start_run
                  else []
                in
                deliveries t @ mail t @ note @ queued @ due_reminders t)
-             ~compact:
-               (fun
-                 ~model ~keep_recent_tokens ~overflowed ~cancel _messages ->
-               match
-                 Compaction.compact
-                   ~env:t.env
-                   ~provider:t.provider
-                   ~model
-                   ~prompt:(Agent_loop.Config.compaction_prompt config)
-                   ~overflowed
-                   ~keep_recent_tokens
-                   ~cancel
-                   session
-               with
-               | Ok outcome -> Ok (Session.messages session, outcome)
-               | Error e ->
-                 broadcast
-                   t
-                   (Notice ("auto-compaction failed: " ^ Error.to_string_hum e));
-                 Error e)
-             ~mask:(fun ~through _messages -> mask_session session ~through)
-             ~halt:(fun () ->
+         ; halt =
+             (fun () ->
                let reason =
                  match !halted with
                  | Some _ as interrupted -> interrupted
@@ -3502,7 +3480,8 @@ let rec start_run
                in
                Option.iter reason ~f:(fun r -> halted := Some r);
                reason)
-             ~emit:(fun event ->
+         ; emit =
+             (fun event ->
                account t event;
                track_plan t event;
                match event with
@@ -3534,9 +3513,15 @@ let rec start_run
                  ignore (Session.append_message session m : Session.Entry.t);
                  broadcast t (Loop event)
                | _ -> broadcast t (Loop event))
-             ~context
-             ~prompts
-             ()
+         }
+       in
+       let added =
+         match
+           Runner.run_turn
+             (runner t)
+             services
+             ~cancel
+             { context; prompts; chat = t.chat_mode }
          with
          | added -> added
          | exception exn ->
@@ -3850,7 +3835,8 @@ and auto_compact t =
              ; "tokens_saved", Int plan.tokens_saved
              ; "masked", Int plan.masked
              ]
-           (fun () -> mask_session t.session ~through:plan.through)
+           (fun () ->
+              Harness_runner.mask_session t.session ~through:plan.through)
        with
        | Error _ -> tokens
        | Ok _ ->
@@ -3982,6 +3968,7 @@ let create
       ?mcp_auth
       ?user_info
       ?custom_instructions
+      ?runner
       ~cwd
       ()
   =
@@ -4029,6 +4016,7 @@ let create
     { env
     ; sw
     ; provider
+    ; runner
     ; tools
     ; offered
     ; user_info

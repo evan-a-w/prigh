@@ -284,12 +284,20 @@ val create
        (** the user's custom instructions: in the system prompt of a new
            session, and the changes told with the next message to a session
            that knows others ({!Told_environment}); default: none *)
+  -> ?runner:Runner.t
+       (** the engine that does the session's runs; default: the harness, the
+           agent loop on [provider] with [tools] *)
   -> cwd:string
   -> unit
   -> t
 
 val subscribe : t -> f:(Event.t -> unit) -> unit
 val state : t -> State.t
+
+(** The engine doing the session's runs, and what it supports. *)
+val engine : t -> Engine_id.t
+
+val capabilities : t -> Capabilities.t
 val session : t -> Session.t
 val env : t -> Env.t
 val messages : t -> Message.t list
