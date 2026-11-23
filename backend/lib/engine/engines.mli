@@ -12,6 +12,8 @@ type t = private
         sessions *)
   ; adapters : Adapter_id.t list
     (** the composer's, the first its default; empty without the composer *)
+  ; acp_agents : Acp_agent.t list
+    (** ACP agents given with their command ([-adapters acp:name=command]) *)
   }
 [@@deriving sexp_of, equal]
 
@@ -24,10 +26,12 @@ val default_adapters : Adapter_id.t list
 val create
   :  engines:Engine_id.t list
   -> ?adapters:Adapter_id.t list (** default: {!default_adapters} *)
+  -> ?acp_agents:Acp_agent.t list
   -> unit
   -> t Or_error.t
 
-(** From [-engines] and [-adapters] (comma-separated), else
+(** From [-engines] and [-adapters] (comma-separated; an ACP agent may come with
+    its command, [acp:name=command args]), else
     [$PRIGH_ENGINES] and [$PRIGH_ADAPTERS], else {!default}. *)
 val of_flags
   :  engines:string option
@@ -35,10 +39,14 @@ val of_flags
   -> getenv:(string -> string option)
   -> t Or_error.t
 
-(** Whether this build of prigh can drive [adapter] (Codex and Claude Code;
-    not yet ACP agents or prigh itself): a backend asked for another fails
-    at startup with {!check_build}'s error. *)
-val buildable : Adapter_id.t -> bool
+(** The ACP agent [acp:name] starts: one given with its command, else one
+    prigh knows ({!Acp_agent.known}). *)
+val acp_agent : t -> string -> Acp_agent.t option
+
+(** Whether this backend can drive [adapter]: every one but an ACP agent
+    with no known command. A backend asked for one fails at startup with
+    {!check_build}'s error. *)
+val drivable : t -> Adapter_id.t -> bool
 
 val check_build : t -> unit Or_error.t
 val engine_strings : t -> string list
@@ -59,7 +67,7 @@ val choose
 
 (** Why a session on [choice] cannot run on this backend (it can still be
     read), with what to do; [None] when it can. [buildable] (default
-    {!buildable}) is for tests. *)
+    {!drivable}) is for tests. *)
 val unavailable
   :  ?buildable:(Adapter_id.t -> bool)
   -> t

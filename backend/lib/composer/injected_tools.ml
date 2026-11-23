@@ -225,14 +225,15 @@ module Bridge = struct
     }
   ;;
 
-  let codex_config t =
-    ( "mcp_servers." ^ server_name
-    , `Object
-        [ "command", `String t.command
-        ; "args", `Array (List.map t.args ~f:(fun a -> `String a))
-        ; "env", `Object (List.map t.env ~f:(fun (k, v) -> k, `String v))
-        ] )
+  let server_json t =
+    `Object
+      [ "command", `String t.command
+      ; "args", `Array (List.map t.args ~f:(fun a -> `String a))
+      ; "env", `Object (List.map t.env ~f:(fun (k, v) -> k, `String v))
+      ]
   ;;
+
+  let codex_config t = "mcp_servers." ^ server_name, server_json t
 
   let acp_server t =
     `Object

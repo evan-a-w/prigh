@@ -259,3 +259,8 @@ val turn_id : t -> string option
 val in_turn : t -> bool
 val agent_capabilities : t -> Agent_capabilities.t option
 val session_config : t -> Session_config.t
+
+(** Some agents never answer [session/load] once they have replayed the
+    history: after a quiet spell the client takes the session as loaded
+    (its id is [session_id]); a late answer is then ignored. *)
+val assume_loaded : t -> session_id:string -> unit

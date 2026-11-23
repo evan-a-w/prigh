@@ -27,6 +27,9 @@ let capabilities : Capabilities.t =
   }
 ;;
 
+let current_capabilities _ = capabilities
+let native_questions = true
+
 let permission_mode ~approval ~plan : Claude_permission_mode.t =
   if plan
   then Plan

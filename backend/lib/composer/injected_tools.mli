@@ -81,6 +81,10 @@ module Bridge : sig
 
   val create : prigh:string -> socket:string -> t
 
+  (** [{command, args, env}]: the stdio server, as {!Adapter.Start.t}'s
+      [mcp_servers] take it (named {!server_name}). *)
+  val server_json : t -> Json.t
+
   (** Codex's per-thread [config] entry: [mcp_servers.prigh] =
       [{command, args, env}]. *)
   val codex_config : t -> string * Json.t

@@ -1349,3 +1349,11 @@ let process_exited t ~code ~stderr_tail =
   t.loading <- false;
   turn @ withdrawn @ pending
 ;;
+
+let assume_loaded t ~session_id =
+  Hashtbl.filter_inplace t.pending ~f:(function
+    | Pending.Load_session _ -> false
+    | _ -> true);
+  t.loading <- false;
+  t.session_id <- Some session_id
+;;
