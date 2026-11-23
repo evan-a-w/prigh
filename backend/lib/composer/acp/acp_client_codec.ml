@@ -1326,11 +1326,11 @@ let handle_line t raw =
      | None, None -> [])
 ;;
 
-let process_exited t ~code ~stderr_tail =
+let process_exited ?(name = "the ACP agent") t ~code ~stderr_tail =
   let message =
     match code with
-    | Some code -> sprintf "the ACP agent exited (code %d)" code
-    | None -> "the ACP agent exited"
+    | Some code -> sprintf "%s exited (code %d)" name code
+    | None -> sprintf "%s exited" name
   in
   let turn = end_turn t (Failed { kind = Crashed { stderr_tail }; message }) in
   let withdrawn = withdraw_permissions t ~reply:false in

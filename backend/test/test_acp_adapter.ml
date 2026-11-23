@@ -1,0 +1,543 @@
+open! Core
+open! Prigh
+open Tool_test_helpers
+module Json = Jsonaf
+
+(* A scripted ACP agent: [script] reads the requests prigh sends (printing
+   their methods) and writes the agent's side. *)
+
+module P = struct
+  let read p =
+    match Line_transport.Peer.read_line p with
+    | None -> None
+    | Some line -> Some (Json.parse line |> Or_error.ok_exn)
+  ;;
+
+  let str k j = Option.bind (Json.member k j) ~f:Json.string
+  let id j = Option.value (Json.member "id" j) ~default:`Null
+
+  (* The next request or notification, printed; answers are skipped. *)
+  let rec next p =
+    match read p with
+    | None -> None
+    | Some j ->
+      (match str "method" j with
+       | Some m ->
+         let params = Option.value (Json.member "params" j) ~default:`Null in
+         let detail =
+           match m with
+           | "session/new" | "session/load" | "session/resume" ->
+             let servers =
+               match Json.member "mcpServers" params with
+               | Some (`Array l) -> List.filter_map l ~f:(str "name")
+               | _ -> []
+             in
+             sprintf
+               " session=%s mcp=[%s]"
+               (Option.value (str "sessionId" params) ~default:"-")
+               (String.concat ~sep:"," servers)
+           | "session/prompt" ->
+             (match Json.member "prompt" params with
+              | Some (`Array (first :: _)) ->
+                let text = Option.value (str "text" first) ~default:"" in
+                sprintf
+                  " %S"
+                  (match
+                     String.substr_index_all
+                       text
+                       ~may_overlap:false
+                       ~pattern:"\n\n"
+                     |> List.last
+                   with
+                   | Some i -> String.drop_prefix text (i + 2)
+                   | None -> text)
+              | _ -> "")
+           | "session/set_mode" ->
+             " " ^ Option.value (str "modeId" params) ~default:""
+           | _ -> ""
+         in
+         printf "agent got %s%s\n" m detail;
+         Some (m, j)
+       | None ->
+         printf
+           "agent got answer %s\n"
+           (Json.to_string
+              (Option.value (Json.member "result" j) ~default:`Null));
+         next p)
+  ;;
+
+  let answer p =
+    match read p with
+    | Some j ->
+      printf
+        "agent got answer %s\n"
+        (Json.to_string (Option.value (Json.member "result" j) ~default:`Null))
+    | None -> ()
+  ;;
+
+  let write p fields =
+    Line_transport.Peer.write_line p (Json.to_string (`Object fields))
+  ;;
+
+  let result p j result =
+    write
+      p
+      [ "jsonrpc", `String "2.0"
+      ; "id", id j
+      ; "result", Json.parse result |> Or_error.ok_exn
+      ]
+  ;;
+
+  let error p j ~code message =
+    write
+      p
+      [ "jsonrpc", `String "2.0"
+      ; "id", id j
+      ; ( "error"
+        , `Object
+            [ "code", `Number (Int.to_string code); "message", `String message ]
+        )
+      ]
+  ;;
+
+  let update p session update =
+    write
+      p
+      [ "jsonrpc", `String "2.0"
+      ; "method", `String "session/update"
+      ; ( "params"
+        , `Object
+            [ "sessionId", `String session
+            ; "update", Json.parse update |> Or_error.ok_exn
+            ] )
+      ]
+  ;;
+
+  let text p session s =
+    update
+      p
+      session
+      (sprintf
+         {|{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":%S}}|}
+         s)
+  ;;
+
+  let expect p m =
+    match next p with
+    | Some (m', j) when String.equal m m' -> j
+    | Some (m', _) -> raise_s [%message "expected" m "got" m']
+    | None -> raise_s [%message "expected" m "got end of input"]
+  ;;
+
+  let initialize ?(caps = {|{"loadSession":true}|}) p =
+    let j = expect p "initialize" in
+    result
+      p
+      j
+      (sprintf
+         {|{"protocolVersion":1,"agentCapabilities":%s,"authMethods":[{"id":"login","name":"opencode auth login"}]}|}
+         caps)
+  ;;
+
+  let modes =
+    {|"modes":{"currentModeId":"build","availableModes":[{"id":"build","name":"Build"},{"id":"plan","name":"Plan"}]}|}
+  ;;
+
+  let new_session p session =
+    let j = expect p "session/new" in
+    result p j (sprintf {|{"sessionId":%S,%s}|} session modes)
+  ;;
+end
+
+let opencode : Acp_agent.t =
+  { name = "opencode"
+  ; display_name = "OpenCode"
+  ; command = [ "opencode"; "acp" ]
+  }
+;;
+
+let print_event (e : Agent.Event.t) =
+  match e with
+  | Loop (Message_end (Assistant a)) ->
+    printf
+      "assistant (%s, %s): %S\n"
+      a.model
+      (Sexp.to_string [%sexp (a.stop_reason : Stop_reason.t)])
+      (Message.Assistant.text a)
+  | Loop (Tool_start c) -> printf "tool_start %s\n" c.name
+  | Loop (Tool_end { call; result }) ->
+    printf
+      "tool_end %s -> %s%S\n"
+      call.name
+      (if result.is_error then "ERROR " else "")
+      result.text
+  | Notice n -> printf "notice: %s\n" n
+  | _ -> ()
+;;
+
+let with_acp ?(approval : Approval_mode.t option) ~peer f =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let launches = ref 0 in
+  let adapter =
+    Acp_adapter.create ~load_quiet:(Time_float.Span.of_sec 0.2) opencode
+  in
+  let composer =
+    Composer_runner.create
+      ~sw
+      ~adapter
+      ~spawn:(fun (launch : Adapter.Launch.t) ->
+        incr launches;
+        printf "spawn #%d: %s\n" !launches (String.concat ~sep:" " launch.argv);
+        Ok (Line_transport.Peer.spawn ~sw (peer !launches)))
+      ~interrupt_grace:(Time_float.Span.of_sec 0.5)
+      ()
+  in
+  let agent =
+    Agent.create
+      ~env:t.env
+      ~sw
+      ~provider:(Faux_provider.create [])
+      ~tools:Tools.interaction
+      ~sessions_dir:(Filename.concat t.dir "sessions")
+      ~home:t.dir
+      ~runner:(Composer_runner.runner composer)
+      ~cwd:t.dir
+      ()
+  in
+  Agent.set_engine agent { engine = Composer; adapter = Some (Acp "opencode") };
+  Option.iter approval ~f:(fun approval -> Agent.set_mode agent ~approval);
+  Agent.subscribe agent ~f:print_event;
+  f agent composer;
+  Composer_runner.close composer
+;;
+
+let prompt agent text =
+  Or_error.ok_exn (Agent.prompt agent text);
+  Agent.wait_idle agent
+;;
+
+let%expect_test "a turn with a command whose permission the user gives" =
+  with_acp ~approval:Ask ~peer:(fun _ p ->
+    P.initialize p;
+    P.new_session p "ses_1";
+    let prompt = P.expect p "session/prompt" in
+    P.text p "ses_1" "Listing.";
+    P.update
+      p
+      "ses_1"
+      {|{"sessionUpdate":"tool_call","toolCallId":"c1","title":"ls","kind":"execute","status":"pending","rawInput":{"command":"ls"}}|};
+    P.write
+      p
+      [ "jsonrpc", `String "2.0"
+      ; "id", `Number "7"
+      ; "method", `String "session/request_permission"
+      ; ( "params"
+        , Json.parse
+            {|{"sessionId":"ses_1","toolCall":{"toolCallId":"c1","title":"ls"},"options":[{"optionId":"yes","name":"Allow","kind":"allow_once"},{"optionId":"no","name":"Reject","kind":"reject_once"}]}|}
+          |> Or_error.ok_exn )
+      ];
+    P.answer p;
+    P.update
+      p
+      "ses_1"
+      {|{"sessionUpdate":"tool_call_update","toolCallId":"c1","status":"completed","content":[{"type":"content","content":{"type":"text","text":"a.ml"}}]}|};
+    P.text p "ses_1" "One file.";
+    P.result p prompt {|{"stopReason":"end_turn"}|})
+  @@ fun agent composer ->
+  Agent.subscribe agent ~f:(function
+    | Loop (Tool_confirm { call_id; name; _ }) ->
+      printf "confirm %s %s\n" call_id name;
+      Or_error.ok_exn (Agent.respond_confirm agent ~call_id Allow)
+    | _ -> ());
+  prompt agent "what's here";
+  print_s [%sexp (Composer_runner.thread_id composer : string option)];
+  [%expect {|
+    spawn #1: opencode acp
+    agent got initialize
+    agent got session/new session=- mcp=[]
+    agent got session/prompt "what's here"
+    assistant (acp:opencode/default, Tool_use): "Listing."
+    tool_start bash
+    confirm c1 bash
+    agent got answer {"outcome":{"outcome":"selected","optionId":"yes"}}
+    tool_end bash -> "a.ml"
+    assistant (acp:opencode/default, End_turn): "One file."
+    (ses_1)
+    |}]
+;;
+
+let%expect_test "plan mode is the agent's plan mode" =
+  with_acp ~peer:(fun _ p ->
+    P.initialize p;
+    P.new_session p "ses_1";
+    let j = P.expect p "session/set_mode" in
+    P.result p j "{}";
+    let prompt = P.expect p "session/prompt" in
+    P.text p "ses_1" "A plan.";
+    P.result p prompt {|{"stopReason":"end_turn"}|})
+  @@ fun agent _ ->
+  Agent.set_mode agent ~plan:true;
+  prompt agent "plan it";
+  [%expect {|
+    spawn #1: opencode acp
+    agent got initialize
+    agent got session/new session=- mcp=[]
+    agent got session/set_mode plan
+    agent got session/prompt "plan it"
+    assistant (acp:opencode/default, End_turn): "A plan."
+    |}]
+;;
+
+let%expect_test "aborting sends session/cancel" =
+  with_acp ~peer:(fun _ p ->
+    P.initialize p;
+    P.new_session p "ses_1";
+    let prompt = P.expect p "session/prompt" in
+    P.text p "ses_1" "Working";
+    ignore (P.expect p "session/cancel" : Json.t);
+    P.result p prompt {|{"stopReason":"cancelled"}|})
+  @@ fun agent _ ->
+  let started, resolve = Eio.Promise.create () in
+  Agent.subscribe agent ~f:(function
+    | Loop (Message_update _) ->
+      if not (Eio.Promise.is_resolved started)
+      then Eio.Promise.resolve resolve ()
+    | _ -> ());
+  Or_error.ok_exn (Agent.prompt agent "go");
+  Eio.Promise.await started;
+  ignore (Agent.abort agent : string list);
+  Agent.wait_idle agent;
+  [%expect {|
+    spawn #1: opencode acp
+    agent got initialize
+    agent got session/new session=- mcp=[]
+    agent got session/prompt "go"
+    agent got session/cancel
+    assistant (acp:opencode/default, Aborted): "Working"
+    |}]
+;;
+
+let%expect_test
+    "a crash, then the session is loaded again (its replay going quiet)"
+  =
+  with_acp ~peer:(fun n p ->
+    match n with
+    | 1 ->
+      P.initialize p;
+      P.new_session p "ses_1";
+      ignore (P.expect p "session/prompt" : Json.t);
+      P.text p "ses_1" "Half";
+      Line_transport.Peer.exit p ~code:1
+    | _ ->
+      P.initialize p;
+      let _load = P.expect p "session/load" in
+      (* replays the old turn and never answers *)
+      P.text p "ses_1" "Half";
+      let prompt = P.expect p "session/prompt" in
+      P.text p "ses_1" "Back.";
+      P.result p prompt {|{"stopReason":"end_turn"}|})
+  @@ fun agent _ ->
+  prompt agent "first";
+  prompt agent "second";
+  [%expect {|
+    spawn #1: opencode acp
+    agent got initialize
+    agent got session/new session=- mcp=[]
+    agent got session/prompt "first"
+    assistant (acp:opencode/default, (Error"OpenCode exited (code 1)")): "Half"
+    spawn #2: opencode acp
+    agent got initialize
+    agent got session/load session=ses_1 mcp=[]
+    agent got session/prompt "second"
+    assistant (acp:opencode/default, End_turn): "Back."
+    |}]
+;;
+
+let%expect_test "an agent with no session/load starts afresh, saying so" =
+  with_acp ~peer:(fun n p ->
+    P.initialize ~caps:"{}" p;
+    match n with
+    | 1 ->
+      P.new_session p "ses_1";
+      ignore (P.expect p "session/prompt" : Json.t);
+      Line_transport.Peer.exit p ~code:1
+    | _ ->
+      P.new_session p "ses_2";
+      let prompt = P.expect p "session/prompt" in
+      P.text p "ses_2" "Fresh.";
+      P.result p prompt {|{"stopReason":"end_turn"}|})
+  @@ fun agent composer ->
+  prompt agent "first";
+  prompt agent "second";
+  print_s [%sexp (Composer_runner.thread_id composer : string option)];
+  [%expect {|
+    spawn #1: opencode acp
+    agent got initialize
+    agent got session/new session=- mcp=[]
+    agent got session/prompt "first"
+    assistant (acp:opencode/default, (Error"OpenCode exited (code 1)")): ""
+    spawn #2: opencode acp
+    agent got initialize
+    agent got session/new session=- mcp=[]
+    notice: OpenCode can't continue its earlier session: it starts a new one
+    agent got session/prompt "second"
+    assistant (acp:opencode/default, End_turn): "Fresh."
+    (ses_2)
+    |}]
+;;
+
+let%expect_test "not logged in" =
+  with_acp ~peer:(fun _ p ->
+    P.initialize p;
+    let j = P.expect p "session/new" in
+    P.error p j ~code:(-32000) "Authentication required")
+  @@ fun agent _ ->
+  prompt agent "hi";
+  [%expect {|
+    spawn #1: opencode acp
+    agent got initialize
+    agent got session/new session=- mcp=[]
+    assistant (acp:opencode/default, (Error"OpenCode could not start: OpenCode is not logged in on this host: log in with opencode auth login (run `opencode` there)")): ""
+    |}]
+;;
+
+let%expect_test "capabilities come from what the agent advertises" =
+  let module C = Acp_client_codec in
+  let c = C.create () in
+  ignore (C.initialize c ~client_name:"prigh" ~client_version:"0" : string);
+  ignore
+    (C.handle_line
+       c
+       {|{"jsonrpc":"2.0","id":0,"result":{"protocolVersion":1,"agentCapabilities":{"promptCapabilities":{"image":true}}}}|}
+     : C.Output.t list);
+  ignore (C.new_session c ~cwd:"/w" ~mcp_servers:[] : string);
+  ignore
+    (C.handle_line
+       c
+       (sprintf
+          {|{"jsonrpc":"2.0","id":1,"result":{"sessionId":"s",%s}}|}
+          P.modes)
+     : C.Output.t list);
+  print_s
+    [%sexp
+      (Acp_adapter.capabilities_of (C.agent_capabilities c) (C.session_config c)
+       : Capabilities.t)];
+  [%expect {|
+    ((fork By_handoff) (rewind Unsupported) (context_edit false)
+     (compact Unsupported) (steer Between_turns) (plan_mode true) (btw false)
+     (subagents Unsupported) (model_fallback false) (images true)
+     (ask_user true))
+    |}]
+;;
+
+let%expect_test "the prigh adapter: a composer session prigh's own harness runs"
+  =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let agent =
+    Agent.create
+      ~env:t.env
+      ~sw
+      ~provider:
+        (Faux_provider.create [ Faux_provider.Reply.text "From the harness." ])
+      ~tools:Tools.interaction
+      ~sessions_dir:(Filename.concat t.dir "sessions")
+      ~home:t.dir
+      ~cwd:t.dir
+      ()
+  in
+  Agent.set_engine agent { engine = Composer; adapter = Some Prigh };
+  Agent.set_runner
+    agent
+    (Some (Prigh_adapter.runner ~harness:(fun () -> Agent.harness_runner agent)));
+  Agent.subscribe agent ~f:print_event;
+  prompt agent "hi";
+  print_s
+    [%message
+      ""
+        ~engine:(Agent.engine agent : Engine_id.t)
+        ~label:(Agent.engine_label agent : string)
+        ~compact:(Agent.require agent Compact : unit Or_error.t)
+        ~rewind:(Agent.require agent Rewind : unit Or_error.t)];
+  [%expect {|
+    assistant (deepseek-flash, End_turn): "From the harness."
+    ((engine Composer) (label prigh) (compact (Ok ())) (rewind (Ok ())))
+    |}]
+;;
+
+let%expect_test "-adapters: ACP agents and prigh, and new sessions on them" =
+  let show adapters =
+    match
+      Engines.of_flags
+        ~engines:(Some "composer")
+        ~adapters:(Some adapters)
+        ~getenv:(Fn.const None)
+    with
+    | Error e -> print_endline (Error.to_string_hum e)
+    | Ok t ->
+      print_s
+        [%message
+          ""
+            ~adapters:(Engines.adapter_strings t : string list)
+            ~check:(Engines.check_build t : unit Or_error.t)
+            ~opencode:(Engines.acp_agent t "opencode" : Acp_agent.t option)
+            ~mine:(Engines.acp_agent t "mine" : Acp_agent.t option)]
+  in
+  show "codex,acp:opencode,prigh";
+  [%expect {|
+    ((adapters (codex acp:opencode prigh)) (check (Ok ()))
+     (opencode
+      (((name opencode) (display_name OpenCode) (command (opencode acp)))))
+     (mine ()))
+    |}];
+  show "acp:mine=my-agent --acp --verbose,claude";
+  [%expect {|
+    ((adapters (acp:mine claude)) (check (Ok ()))
+     (opencode
+      (((name opencode) (display_name OpenCode) (command (opencode acp)))))
+     (mine
+      (((name mine) (display_name mine) (command (my-agent --acp --verbose))))))
+    |}];
+  show "acp:unheard-of";
+  [%expect {|
+    ((adapters (acp:unheard-of))
+     (check
+      (Error
+       "prigh does not know how to start the ACP agent unheard-of: give its command with -adapters acp:unheard-of=<command and args> (it knows opencode, gemini, goose)"))
+     (opencode
+      (((name opencode) (display_name OpenCode) (command (opencode acp)))))
+     (mine ()))
+    |}];
+  List.iter [ Adapter_id.Prigh; Acp "opencode"; Acp "mine" ] ~f:(fun id ->
+    let engines =
+      Or_error.ok_exn
+        (Engines.create
+           ~engines:[ Composer ]
+           ~adapters:[ Prigh; Acp "opencode" ]
+           ())
+    in
+    print_s
+      [%message
+        (Adapter_id.to_string id)
+          ~find:
+            (Result.map
+               (Composer_adapters.find engines id)
+               ~f:(fun (module A : Adapter.S) -> A.id)
+             : string Or_error.t)]);
+  [%expect {|
+    (prigh
+     (find
+      (Error
+       "prigh's own harness runs in the backend, not as an external process")))
+    (acp:opencode (find (Ok acp:opencode)))
+    (acp:mine
+     (find
+      (Error
+       "prigh does not know how to start the ACP agent mine: give its command with -adapters acp:mine=<command and args> (it knows opencode, gemini, goose)")))
+    |}]
+;;

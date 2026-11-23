@@ -22,7 +22,8 @@ let create ~engines ?(adapters = default_adapters) ?(acp_agents = []) () =
     Or_error.error_string
       "the composer engine needs at least one adapter: codex, claude, prigh or \
        acp:<name>"
-  else Ok { engines; adapters = (if composer then adapters else []); acp_agents }
+  else
+    Ok { engines; adapters = (if composer then adapters else []); acp_agents }
 ;;
 
 let split s =
@@ -85,7 +86,10 @@ let of_flags ~engines ~adapters ~getenv =
 ;;
 
 let acp_agent t name =
-  match List.find t.acp_agents ~f:(fun (a : Acp_agent.t) -> String.equal a.name name) with
+  match
+    List.find t.acp_agents ~f:(fun (a : Acp_agent.t) ->
+      String.equal a.name name)
+  with
   | Some _ as a -> a
   | None -> Acp_agent.find_known name
 ;;

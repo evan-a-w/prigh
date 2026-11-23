@@ -1033,7 +1033,10 @@ let host_spawn t agent launch =
    session's tool host and continuing the thread the session recorded there
    (each process records the threads it starts). *)
 let composer_runner t agent (adapter_id : Adapter_id.t) =
-  let%map.Or_error adapter = Composer_adapters.find adapter_id in
+  match adapter_id with
+  | Prigh -> Ok (Prigh_adapter.runner ~harness:(fun () -> Agent.harness_runner agent))
+  | _ ->
+  let%map.Or_error adapter = Composer_adapters.find t.engines adapter_id in
   let session = Agent.session agent in
   let adapter_name = Adapter_id.to_string adapter_id in
   let start ~cwd =
@@ -3284,6 +3287,9 @@ let list_adapters t (client : Client.t) params =
          else (
            let statuses =
              Adapter_health.probe
+               ~acp:(fun name ->
+                 Option.map (Engines.acp_agent t.engines name) ~f:(fun agent ->
+                   List.hd_exn agent.command))
                ~exec:(fun ~name arguments ->
                  Agent.host_call_on
                    client.agent

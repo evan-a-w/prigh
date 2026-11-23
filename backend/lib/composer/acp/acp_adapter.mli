@@ -7,8 +7,8 @@ open! Import
 
     - prigh's tools reach it as a stdio MCP server (the [prigh mcp-bridge]
       on its host), in [session/new]'s [mcpServers].
-    - A recorded thread is continued with [session/load] (its replay is
-      dropped: prigh keeps its own log), else [session/resume]; an agent
+    - A recorded thread is continued with [session/resume], else
+      [session/load] (its replay is dropped: prigh keeps its own log); an agent
       with neither starts a new session, with a notice: the session's
       handoff is what carries the conversation over then. Some agents never
       answer [session/load]: once the replay has gone quiet for

@@ -53,16 +53,21 @@ end
 
 (** The program an adapter runs ([codex], [claude], an ACP agent's
     command); [None] for [Prigh], which needs none. *)
-val program : Adapter_id.t -> string option
+val program : ?acp:(string -> string option) -> Adapter_id.t -> string option
 
-(** The [$probe_programs] request for [adapters] (one call per host). *)
-val request : Adapter_id.t list -> Host_probe.Request.t
+(** The [$probe_programs] request for [adapters] (one call per host).
+    [acp]: the program an ACP agent runs (default: its name). *)
+val request
+  :  ?acp:(string -> string option)
+  -> Adapter_id.t list
+  -> Host_probe.Request.t
 
 (** The statuses from a [$probe_programs] result on [host] (named
     [host_name]): one per adapter, [Unknown] for them all when the host
     could not run it (an older prigh, gone). *)
 val of_result
-  :  Adapter_id.t list
+  :  ?acp:(string -> string option)
+  -> Adapter_id.t list
   -> host:string
   -> host_name:string
   -> checked_at:float
@@ -71,7 +76,8 @@ val of_result
 
 (** Probes [adapters] on one host: [exec] runs a host operation there. *)
 val probe
-  :  exec:(name:string -> Json.t -> Tool.Result.t)
+  :  ?acp:(string -> string option)
+  -> exec:(name:string -> Json.t -> Tool.Result.t)
   -> Adapter_id.t list
   -> host:string
   -> host_name:string

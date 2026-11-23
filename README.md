@@ -286,13 +286,18 @@ NAME=TOKEN,...` sign in as NAME but never as a superuser, for tool hosts.
 ### Engines
 
 A backend runs sessions on the **harness** (prigh's own agent loop, the
-default) and, once it is built, the **composer**, which drives coding agents
+default) and the **composer**, which drives coding agents
 you have installed and signed in to on the session's tool host (Codex,
 Claude Code, ACP agents) while prigh keeps the session, its log and the UI:
 `prigh serve -engines harness,composer -adapters codex,claude` (or
 `$PRIGH_ENGINES`, `$PRIGH_ADAPTERS`). Users, settings and sign-ins are the
 same on either engine. A session made on an engine the backend does not run
 can still be read there.
+
+The composer drives `codex`, `claude`, any ACP agent (`acp:opencode`,
+`acp:gemini` and `acp:goose` are known; give others their command,
+`-adapters acp:mine=my-agent --acp`) and `prigh`, prigh's own harness as
+one of its adapters.
 
 Settings → Engines in prigh-web, and `/adapters` in the TUI, show whether
 each agent CLI is installed and logged in on each tool host, and what to run

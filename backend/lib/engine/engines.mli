@@ -73,3 +73,7 @@ val unavailable
   -> t
   -> Engine_choice.t
   -> string option
+
+(** Why [acp:name] cannot be driven: no command known for it, and how to
+    give one. *)
+val unknown_acp : string -> string
