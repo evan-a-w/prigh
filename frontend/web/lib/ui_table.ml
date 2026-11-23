@@ -81,16 +81,16 @@ let sort (t : Table.t) ~sort =
 (* loon's Table, with the hook classes; text wraps, figures don't. *)
 let head_cls (c : Table.Column.t) =
   match c.align with
-  | Left -> "left text-muted-foreground text-xs"
-  | Right -> "right text-right! text-muted-foreground text-xs"
-  | Center -> "center text-center! text-muted-foreground text-xs"
+  | Left -> "left text-muted-foreground text-xs first:pl-4 last:pr-4"
+  | Right -> "right text-right! text-muted-foreground text-xs first:pl-4 last:pr-4"
+  | Center -> "center text-center! text-muted-foreground text-xs first:pl-4 last:pr-4"
 ;;
 
 let cell_cls (c : Table.Column.t) =
   match c.align with
-  | Left -> "left whitespace-normal! break-words"
-  | Right -> "right text-right"
-  | Center -> "center text-center"
+  | Left -> "left whitespace-normal! break-words first:pl-4 last:pr-4"
+  | Right -> "right text-right first:pl-4 last:pr-4"
+  | Center -> "center text-center first:pl-4 last:pr-4"
 ;;
 
 let view (ctx : Ui_context.t) ~path (t : Table.t) =

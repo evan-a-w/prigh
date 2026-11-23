@@ -519,7 +519,7 @@ let%expect_test "every component" =
                   <th data-slot="table-head"
                       scope="col"
                       aria-sort="none"
-                      class="[&:has([role=checkbox])]:pr-0 align-middle font-medium h-10 left px-2 text-left text-muted-foreground text-xs whitespace-nowrap">
+                      class="[&:has([role=checkbox])]:pr-0 align-middle first:pl-4 font-medium h-10 last:pr-4 left px-2 text-left text-muted-foreground text-xs whitespace-nowrap">
                     <button type="button" title="Sort by Test" class="ui-sort" @on_click>
                       <span> Test </span>
                       <span aria-hidden="true" class="ui-sort-mark"> ▲ </span>
@@ -528,7 +528,7 @@ let%expect_test "every component" =
                   <th data-slot="table-head"
                       scope="col"
                       aria-sort="none"
-                      class="[&:has([role=checkbox])]:pr-0 align-middle font-medium h-10 px-2 right text-left text-muted-foreground text-right! text-xs whitespace-nowrap">
+                      class="[&:has([role=checkbox])]:pr-0 align-middle first:pl-4 font-medium h-10 last:pr-4 px-2 right text-left text-muted-foreground text-right! text-xs whitespace-nowrap">
                     <button type="button" title="Sort by Time" class="ui-sort" @on_click>
                       <span> Time </span>
                       <span aria-hidden="true" class="ui-sort-mark"> ▲ </span>
@@ -537,7 +537,7 @@ let%expect_test "every component" =
                   <th data-slot="table-head"
                       scope="col"
                       aria-sort="none"
-                      class="[&:has([role=checkbox])]:pr-0 align-middle font-medium h-10 px-2 right text-left text-muted-foreground text-right! text-xs whitespace-nowrap">
+                      class="[&:has([role=checkbox])]:pr-0 align-middle first:pl-4 font-medium h-10 last:pr-4 px-2 right text-left text-muted-foreground text-right! text-xs whitespace-nowrap">
                     <button type="button" title="Sort by Share" class="ui-sort" @on_click>
                       <span> Share </span>
                       <span aria-hidden="true" class="ui-sort-mark"> ▲ </span>
@@ -546,7 +546,7 @@ let%expect_test "every component" =
                   <th data-slot="table-head"
                       scope="col"
                       aria-sort="none"
-                      class="[&:has([role=checkbox])]:pr-0 align-middle font-medium h-10 left px-2 text-left text-muted-foreground text-xs whitespace-nowrap">
+                      class="[&:has([role=checkbox])]:pr-0 align-middle first:pl-4 font-medium h-10 last:pr-4 left px-2 text-left text-muted-foreground text-xs whitespace-nowrap">
                     <button type="button" title="Sort by Passing" class="ui-sort" @on_click>
                       <span> Passing </span>
                       <span aria-hidden="true" class="ui-sort-mark"> ▲ </span>
@@ -558,39 +558,39 @@ let%expect_test "every component" =
                 <tr data-slot="table-row"
                     class="border-b data-[state=selected]:bg-muted has-aria-expanded:bg-muted/50 hover:bg-muted/50 transition-colors">
                   <td data-slot="table-cell"
-                      class="[&:has([role=checkbox])]:pr-0 align-middle break-words left p-2 whitespace-normal! whitespace-nowrap"> e2e/mobile </td>
+                      class="[&:has([role=checkbox])]:pr-0 align-middle break-words first:pl-4 last:pr-4 left p-2 whitespace-normal! whitespace-nowrap"> e2e/mobile </td>
                   <td data-slot="table-cell"
-                      class="[&:has([role=checkbox])]:pr-0 align-middle p-2 right text-right whitespace-nowrap"> 31.2 </td>
+                      class="[&:has([role=checkbox])]:pr-0 align-middle first:pl-4 last:pr-4 p-2 right text-right whitespace-nowrap"> 31.2 </td>
                   <td data-slot="table-cell"
-                      class="[&:has([role=checkbox])]:pr-0 align-middle p-2 right text-right whitespace-nowrap"> 21% </td>
+                      class="[&:has([role=checkbox])]:pr-0 align-middle first:pl-4 last:pr-4 p-2 right text-right whitespace-nowrap"> 21% </td>
                   <td data-slot="table-cell"
-                      class="[&:has([role=checkbox])]:pr-0 align-middle break-words left p-2 whitespace-normal! whitespace-nowrap">
+                      class="[&:has([role=checkbox])]:pr-0 align-middle break-words first:pl-4 last:pr-4 left p-2 whitespace-normal! whitespace-nowrap">
                     <span aria-label="yes" class="ui-yes"> ✓ </span>
                   </td>
                 </tr>
                 <tr data-slot="table-row"
                     class="border-b data-[state=selected]:bg-muted has-aria-expanded:bg-muted/50 hover:bg-muted/50 transition-colors">
                   <td data-slot="table-cell"
-                      class="[&:has([role=checkbox])]:pr-0 align-middle break-words left p-2 whitespace-normal! whitespace-nowrap"> tmux/agents </td>
+                      class="[&:has([role=checkbox])]:pr-0 align-middle break-words first:pl-4 last:pr-4 left p-2 whitespace-normal! whitespace-nowrap"> tmux/agents </td>
                   <td data-slot="table-cell"
-                      class="[&:has([role=checkbox])]:pr-0 align-middle p-2 right text-right whitespace-nowrap"> 18.0 </td>
+                      class="[&:has([role=checkbox])]:pr-0 align-middle first:pl-4 last:pr-4 p-2 right text-right whitespace-nowrap"> 18.0 </td>
                   <td data-slot="table-cell"
-                      class="[&:has([role=checkbox])]:pr-0 align-middle p-2 right text-right whitespace-nowrap"> 12% </td>
+                      class="[&:has([role=checkbox])]:pr-0 align-middle first:pl-4 last:pr-4 p-2 right text-right whitespace-nowrap"> 12% </td>
                   <td data-slot="table-cell"
-                      class="[&:has([role=checkbox])]:pr-0 align-middle break-words left p-2 whitespace-normal! whitespace-nowrap">
+                      class="[&:has([role=checkbox])]:pr-0 align-middle break-words first:pl-4 last:pr-4 left p-2 whitespace-normal! whitespace-nowrap">
                     <span aria-label="no" class="ui-no"> ✗ </span>
                   </td>
                 </tr>
                 <tr data-slot="table-row"
                     class="border-b data-[state=selected]:bg-muted has-aria-expanded:bg-muted/50 hover:bg-muted/50 transition-colors">
                   <td data-slot="table-cell"
-                      class="[&:has([role=checkbox])]:pr-0 align-middle break-words left p-2 whitespace-normal! whitespace-nowrap"> web/test </td>
+                      class="[&:has([role=checkbox])]:pr-0 align-middle break-words first:pl-4 last:pr-4 left p-2 whitespace-normal! whitespace-nowrap"> web/test </td>
                   <td data-slot="table-cell"
-                      class="[&:has([role=checkbox])]:pr-0 align-middle p-2 right text-right whitespace-nowrap"> 9.5 </td>
+                      class="[&:has([role=checkbox])]:pr-0 align-middle first:pl-4 last:pr-4 p-2 right text-right whitespace-nowrap"> 9.5 </td>
                   <td data-slot="table-cell"
-                      class="[&:has([role=checkbox])]:pr-0 align-middle p-2 right text-right whitespace-nowrap"> 6.4% </td>
+                      class="[&:has([role=checkbox])]:pr-0 align-middle first:pl-4 last:pr-4 p-2 right text-right whitespace-nowrap"> 6.4% </td>
                   <td data-slot="table-cell"
-                      class="[&:has([role=checkbox])]:pr-0 align-middle break-words left p-2 whitespace-normal! whitespace-nowrap">
+                      class="[&:has([role=checkbox])]:pr-0 align-middle break-words first:pl-4 last:pr-4 left p-2 whitespace-normal! whitespace-nowrap">
                     <span aria-label="yes" class="ui-yes"> ✓ </span>
                   </td>
                 </tr>
