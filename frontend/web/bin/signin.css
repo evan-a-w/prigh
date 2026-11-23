@@ -1,0 +1,155 @@
+/* The sign-in pages (web_main.ml, cli_signin.ml, the desktop app's pages):
+   HTML of their own, outside the app, drawn as loon's Card with its Field,
+   Input, Button and Alert, in the components' layer from loon's variables.
+   The hook classes are the markup's (signin-*, saved-*). */
+
+.signin-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100%;
+  padding: 32px 16px;
+  background: var(--background);
+  color: var(--foreground);
+  overflow-y: auto;
+}
+.desktop-quitting { position: fixed; inset: 0; z-index: 2147483647; }
+
+/* The card. */
+.signin {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: min(380px, 100%);
+  padding: 24px;
+  background: var(--card);
+  color: var(--card-foreground);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) * 1.4);
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  font-size: 14px;
+}
+.signin .brand { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
+.signin .logo { font: 700 26px/1 var(--mono); letter-spacing: -0.01em; color: var(--foreground); }
+.signin .brand-sub {
+  font: 11.5px var(--mono);
+  color: var(--muted-foreground);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) * 0.6);
+  padding: 0 5px;
+}
+.signin h1 { margin: 0; font-size: 18px; font-weight: 600; line-height: 1.3; }
+.signin .signin-sub { margin: -8px 0 4px; color: var(--muted-foreground); font-size: 13px; overflow-wrap: anywhere; }
+.cli-signin .signin-sub { margin: 0; }
+.cli-signin h1 { margin-bottom: 4px; }
+
+/* Field: a label over its input. */
+.signin label { display: flex; flex-direction: column; gap: 6px; color: var(--foreground); font-size: 13px; font-weight: 500; }
+.signin input,
+.cli-signin-code {
+  width: 100%;
+  min-width: 0;
+  height: 36px;
+  padding: 4px 10px;
+  background: transparent;
+  color: var(--foreground);
+  border: 1px solid var(--input);
+  border-radius: calc(var(--radius) * 0.8);
+  font-size: 14px;
+  font-weight: 400;
+  outline: none;
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+[data-theme="original"] .signin input,
+[data-theme="dark"] .signin input { background: color-mix(in oklab, var(--input) 30%, transparent); }
+.signin input:focus-visible,
+.cli-signin-code:focus-visible {
+  border-color: var(--ring);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 50%, transparent);
+}
+.signin details { color: var(--muted-foreground); font-size: 13px; }
+.signin summary { cursor: pointer; width: max-content; }
+.signin summary:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; border-radius: calc(var(--radius) * 0.6); }
+.signin details input { margin-top: 6px; font: 12.5px var(--mono); }
+.cli-signin-code {
+  display: block;
+  height: auto;
+  padding: 8px 10px;
+  user-select: all;
+  -webkit-user-select: all;
+  font: 13px/1.45 var(--mono);
+  word-break: break-all;
+}
+
+/* Buttons: loon's (Html's btn), the whole width. */
+.signin .btn { width: 100%; justify-content: center; }
+.signin .btn.primary { margin-top: 4px; min-height: 40px; }
+.signin .btn.primary:disabled { opacity: 0.7; cursor: progress; }
+.signin .btn.primary, .cli-signin .btn.ghost { min-height: 44px; }
+
+/* Alert: what went wrong (destructive), or a notice. */
+.signin-error {
+  margin: 0;
+  padding: 8px 12px;
+  white-space: pre-line;
+  font-size: 13px;
+  color: var(--destructive);
+  background: var(--card);
+  border: 1px solid color-mix(in oklab, var(--destructive) 40%, transparent);
+  border-radius: var(--radius);
+}
+.signin-error.notice { color: var(--muted-foreground); border-color: var(--border); }
+.signin-error:empty { display: none; }
+
+/* Saved accounts: loon Items, one click each. */
+.saved-accounts { display: flex; flex-direction: column; gap: 6px; }
+.saved-title { margin: 0; color: var(--muted-foreground); font-size: 12.5px; font-weight: 500; }
+.saved-account { display: flex; align-items: center; gap: 4px; }
+.saved-switch {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  padding: 8px 10px;
+  color: var(--foreground);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) * 0.8);
+  cursor: pointer;
+}
+.saved-switch:hover { background: var(--accent); }
+.saved-switch:focus-visible { outline: none; border-color: var(--ring); box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 50%, transparent); }
+.saved-account.current .saved-switch { border-color: color-mix(in oklab, var(--primary) 50%, var(--border)); }
+.saved-switch .avatar {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--muted);
+  color: var(--foreground);
+  font-size: 13px;
+  font-weight: 600;
+}
+.saved-who { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.3; }
+.saved-name { font-weight: 600; }
+.saved-host { color: var(--muted-foreground); font: 11.5px var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.saved-badge { font-size: 11.5px; color: var(--muted-foreground); }
+.saved-forget { width: 36px; font-size: 18px; }
+.saved-or { margin: 4px 0 -4px; color: var(--muted-foreground); font-size: 12.5px; }
+
+/* A phone: no card around the form, inputs at 16px (no zoom on focus),
+   44px controls. */
+@media (max-width: 480px) {
+  .signin { padding: 8px 0; background: transparent; border: 0; box-shadow: none; }
+}
+@media (pointer: coarse) {
+  .signin input { font-size: 16px; height: 44px; }
+  .signin .btn { min-height: 44px; }
+  .saved-forget { width: 44px; height: 44px; }
+}

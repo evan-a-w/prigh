@@ -30,7 +30,8 @@
   genui.css
   diff.css
   review.css
-  forge.css)
+  forge.css
+  signin.css)
  (action
   (with-stdout-to
    loon.input.css
@@ -46,6 +47,7 @@
     (cat diff.css)
     (cat review.css)
     (cat forge.css)
+    (cat signin.css)
     (echo "\n}\n")
     (echo "\n@source \"../loon_ui/*.ml\";\n@source \"../lib/*.ml\";\n")))))
 

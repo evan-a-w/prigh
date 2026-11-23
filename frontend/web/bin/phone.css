@@ -492,8 +492,6 @@
   }
 }
 
-.app.narrow .computer-banner .btn.computer-banner-stop { height: var(--tap); min-width: var(--tap); }
-.app.narrow .no-host-banner .btn.no-host-banner-chat { height: var(--tap); }
 .app.narrow .instructions-warning .setting-text { flex-basis: 0; }
 .app.narrow .instruction-add { min-height: var(--tap); }
 /* About you: the box at 16px (no zoom on focus), its buttons a thumb's. */

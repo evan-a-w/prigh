@@ -437,29 +437,8 @@ kbd {
 .branch .icon { width: 12px; height: 12px; color: var(--faint); flex-shrink: 0; }
 .branch-name { overflow: hidden; text-overflow: ellipsis; }
 
-.banner {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  background: var(--sodium-wash);
-  color: var(--sodium);
-  padding: 6px 16px;
-  font-size: 12.5px;
-  font-weight: 500;
-  border-bottom: 1px solid var(--sodium-line);
-}
-/* Over the top of the chat rather than above it: the transcript does not
-   move when the connection comes and goes. */
 .banner-anchor { position: relative; height: 0; z-index: var(--z-float); }
-.banner-anchor > .banner {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  background: linear-gradient(var(--sodium-wash), var(--sodium-wash)), var(--graphite);
-}
-.banner:is(.gone, .gave-up) { flex-wrap: wrap; text-align: center; }
+.banner-anchor > .banner { position: absolute; top: 0; left: 0; right: 0; }
 
 /* A tool confirmation: what will run, then an answer per key */
 
@@ -959,81 +938,6 @@ kbd {
 .app.narrow.files-open .toast:not(:last-child),
 .app:has(.modal-backdrop) .toast { max-width: 100%; }
 
-/* Sign in */
-
-.signin-page {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  min-height: 100%;
-  padding: 32px 16px 32px clamp(16px, 16vw, 240px);
-  background: var(--graphite);
-  overflow-y: auto;
-}
-.signin {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  width: min(360px, 100%);
-}
-.signin .brand { align-items: baseline; gap: 8px; margin-bottom: 18px; }
-.signin .logo { font: 700 30px/1 var(--mono); letter-spacing: -0.01em; color: var(--chalk); }
-.signin .brand-sub {
-  font: 11.5px var(--mono);
-  color: var(--muted-text);
-  border: 1px solid var(--rule-2);
-  border-radius: var(--r-chip);
-  padding: 0 5px;
-}
-.signin h1 { margin: 0; font-size: 18px; font-weight: 600; }
-.signin .signin-sub { margin: -8px 0 6px; color: var(--muted-text); font-size: 12.5px; overflow-wrap: anywhere; }
-.signin label { display: flex; flex-direction: column; gap: 5px; color: var(--muted-text); font-size: 12.5px; font-weight: 500; }
-.signin input {
-  background: var(--well);
-  border: 1px solid var(--rule);
-  border-radius: var(--r-control);
-  padding: 8px 10px;
-  font-size: 14px;
-  outline: none;
-}
-.signin input:focus { border-color: var(--sodium); }
-.signin details { color: var(--muted-text); font-size: 12.5px; }
-.signin summary { cursor: pointer; width: max-content; }
-.signin summary:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; border-radius: var(--r-chip); }
-.signin details input { width: 100%; margin-top: 6px; font: 12.5px var(--mono); color: var(--chalk); }
-.signin .btn.primary {
-  padding: 8px;
-  margin-top: 6px;
-  background: var(--sodium);
-  border-color: var(--sodium);
-  color: var(--sodium-ink);
-  font-weight: 600;
-  border-radius: var(--r-control);
-}
-.signin .btn.primary:hover:not(:disabled) {
-  background: var(--sodium-hover);
-  border-color: var(--sodium-hover);
-}
-.signin-error { white-space: pre-line; color: var(--brick); background: var(--brick-wash); border: 1px solid var(--brick-line); border-radius: var(--r-control); padding: 8px 12px; margin: 0; font-size: 12.5px; }
-.signin-error.notice { color: var(--muted-text); background: var(--slate); border-color: var(--rule); }
-.signin-error:empty { display: none; }
-.cli-signin .signin-sub { margin: 0; }
-.cli-signin h1 { margin-bottom: 4px; }
-.signin .btn.primary, .cli-signin .btn.ghost { min-height: 44px; }
-.cli-signin-code {
-  display: block;
-  user-select: all;
-  -webkit-user-select: all;
-  background: var(--well);
-  border: 1px solid var(--rule);
-  border-radius: var(--r-control);
-  padding: 8px 10px;
-  font: 13px/1.45 var(--mono);
-  color: var(--chalk);
-  word-break: break-all;
-  outline: none;
-}
-.cli-signin-code:focus-visible { border-color: var(--sodium); }
 
 /* Phones: the sidebar is a drawer over the page */
 
@@ -1203,31 +1107,6 @@ kbd {
 .chat.verbosity-verbose details > summary > .preview { visibility: hidden; }
 .chat.verbosity-verbose details > summary > .label::before { transform: rotate(90deg); }
 
-.saved-accounts { display: flex; flex-direction: column; gap: 6px; }
-.saved-title { margin: 0; color: var(--muted-text); font-size: 12.5px; font-weight: 600; }
-.saved-account { display: flex; align-items: center; gap: 4px; }
-.saved-switch {
-  flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; text-align: left;
-  background: var(--slate); border: 1px solid var(--rule); border-radius: var(--r-control); padding: 7px 10px; cursor: pointer;
-}
-.saved-switch:hover { background: var(--slate-2); border-color: var(--rule-2); }
-.saved-switch:focus-visible { outline: 2px solid var(--sodium); outline-offset: 1px; }
-.saved-account.current .saved-switch { box-shadow: inset 2px 0 0 var(--sodium); }
-.saved-switch .avatar { background: var(--rule-2); color: var(--chalk); }
-.saved-who { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.3; }
-.saved-name { font-weight: 600; }
-.saved-host { color: var(--muted-text); font: 11.5px var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.saved-badge { font-size: 11.5px; color: var(--muted-text); }
-.saved-forget { font-size: 18px; }
-.saved-or { margin: 4px 0 -4px; color: var(--faint); font-size: 12.5px; }
-.signin #signin-back { justify-content: center; }
-.signin #desktop-quit { justify-content: center; }
-.desktop-quitting { position: fixed; inset: 0; z-index: 2147483647; }
-.signin .btn.primary:disabled { opacity: 0.7; cursor: progress; }
-@media (pointer: coarse) {
-  .signin input { font-size: 16px; }
-  .signin .btn { min-height: 44px; }
-}
 
 @media (prefers-reduced-motion: reduce) {
   .modal, .account-menu { animation: none; }
@@ -1507,51 +1386,6 @@ kbd {
 .annotate-frame { transform-origin: 50% 50%; will-change: transform; }
 @media (prefers-reduced-motion: reduce) { .annotate-frame { transition: none !important; } }
 
-/* Computer use: while the agent drives the user's screen, a strip over the
-   composer says whose, with Stop in reach (Computer_banner). In the
-   composer's flow, like the queue: it never covers the transcript. */
-.computer-banner {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 4px 4px 4px 12px;
-  background: var(--sodium-wash);
-  border-left: 2px solid var(--sodium);
-  border-radius: var(--r-control);
-  font-size: 13.5px;
-  animation: rise 0.12s ease-out;
-}
-.computer-banner-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.computer-banner-text strong { color: var(--sodium); font-weight: 600; }
-.computer-banner .btn.computer-banner-stop {
-  height: 28px;
-  color: var(--brick);
-  border-color: var(--brick-line);
-  background: var(--brick-wash);
-}
-.computer-banner .btn.computer-banner-stop:hover { background: var(--brick); color: var(--graphite); }
-
-/* No tool host can run a message (outside chat mode): said above the
-   composer, with the way to talk anyway (No_host_banner). */
-.no-host-banner {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 4px 4px 10px;
-  background: var(--sodium-wash);
-  border-left: 2px solid var(--sodium);
-  border-radius: var(--r-control);
-  font-size: 13.5px;
-  animation: rise 0.12s ease-out;
-}
-.no-host-banner > .icon { color: var(--sodium); flex: none; }
-.no-host-banner-text { flex: 1; min-width: 0; overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-height: 1.25; }
-.no-host-banner .btn.no-host-banner-chat { height: 28px; flex: none; gap: 6px; color: var(--sodium); border-color: var(--sodium-line); }
-.no-host-banner-chat .short { display: none; }
-@media (max-width: 359px) {
-  .no-host-banner-chat .long { display: none; }
-  .no-host-banner-chat .short { display: inline; }
-}
 /* "No host" whole beside the model: it says the session is a chat, or that
    nothing runs its tools. */
 .chip-anchor.host:has(> .host-chip:is(.chatting, .warm)),
