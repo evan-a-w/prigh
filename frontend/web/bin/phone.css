@@ -417,26 +417,9 @@
 .app.narrow .composer-controls { flex: 0 1 auto; }
 /* Dense, so that Stop by the ring (steering) leaves the model's name whole. */
 .app.narrow :is(.composer-row, .composer-buttons) { gap: 2px; }
-.app.narrow .context-ring { width: var(--tap); height: var(--tap); margin: -6px -2px; }
 .app.narrow .composer-plus .btn.plus { width: 40px; height: 40px; }
-/* The ring's card is a sheet: the whole width, over the home indicator. */
-.app.narrow .context-card {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  width: auto;
-  max-width: none;
-  padding: 14px max(16px, var(--safe-r)) max(14px, var(--safe-b)) max(16px, var(--safe-l));
-  border-radius: 16px 16px 0 0;
-  border-width: 1px 0 0;
-  font-size: 13.5px;
-  gap: 10px 16px;
-}
-.app.narrow .context-card .status-detail-value { font-size: 13px; }
-.app.narrow .context-card-foot .btn { min-height: var(--tap); padding: 0 16px; font-size: 14px; }
+/* The ring's card is a sheet (Context_ring_view): shown only tapped open. */
 .app.narrow .context-ring-anchor:not(.open) > .context-card { display: none; }
-.app.narrow .context-backdrop { background: var(--scrim); }
 
 /* The model's sheet: the rail along the top, the list, then the reasoning
    levels as a row of choices under it; the access mode at its foot. */
@@ -582,7 +565,6 @@
 @media (max-width: 359px) {
   .app.narrow .composer-box { padding-left: 4px; padding-right: 4px; }
   .app.narrow .composer .model-chip { padding-left: 6px; padding-right: 6px; }
-  .session-choice { flex: 1 1 auto; min-width: var(--tap); padding: 0 2px; font-size: 13px; }
   /* The model keeps a target's width beside a long host chip. */
   .composer-controls .chip-anchor.model { min-width: 40px; }
 }

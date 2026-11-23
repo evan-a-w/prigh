@@ -17,15 +17,35 @@ let shortcut : Chip.t -> string = function
 
 let option_id i = sprintf "popover-option-%d" i
 
+let head_cls =
+  "flex shrink-0 items-center gap-2 border-b border-border px-3 pt-2 pb-[7px]"
+;;
+
+let search_cls =
+  "popover-search "
+  ^ head_cls
+  ^ " [&>.icon]:size-3.5 [&>.icon]:shrink-0 [&>.icon]:opacity-50"
+;;
+
+let shortcut_cls =
+  "popover-shortcut text-xs whitespace-nowrap text-muted-foreground \
+   pointer-coarse:hidden"
+;;
+
 let row ~chip ~selected ~inject i (item : Picker.Item.t) =
   Node.div
     ~attrs:
       [ classes
-          [ "menu-item"; "popover-item" ]
+          [ "menu-item popover-item"
+          ; Menu_view.item_look
+          ; "gap-2 px-2 py-1.5 max-[760px]:py-2.5"
+          ]
           [ "selected", i = selected
           ; "marked", item.marked
-          ; "dimmed", item.dimmed
+          ; "dimmed [&_.menu-text]:opacity-55", item.dimmed
           ]
+      ; Attr.create "data-slot" "command-item"
+      ; (if i = selected then Attr.create "data-highlighted" "" else Attr.empty)
       ; Attr.role "option"
       ; Attr.id (option_id i)
       ; Attr.create "aria-selected" (Bool.to_string (i = selected))
@@ -35,17 +55,24 @@ let row ~chip ~selected ~inject i (item : Picker.Item.t) =
     [ (if Chip.equal chip Attach
        then
          Html.mark
-           ~cls:"popover-check attach-icon"
+           ~cls:"popover-check attach-icon w-4 [--mark-size:14px]"
            (if String.equal item.id "image" then Image else Paperclip)
        else if item.marked
-       then Html.mark ~cls:"picked popover-check" Check
-       else Node.span ~attrs:[ Attr.class_ "mark popover-check" ] [])
+       then Html.mark ~cls:"picked popover-check w-4 [--mark-size:14px]" Check
+       else
+         Node.span
+           ~attrs:[ Attr.class_ "mark popover-check w-4 [--mark-size:14px]" ]
+           [])
     ; Node.span
-        ~attrs:[ Attr.class_ "menu-text" ]
-        [ span ~cls:"menu-label" item.label
+        ~attrs:
+          [ Attr.class_ "menu-text flex min-w-0 flex-1 flex-col leading-tight" ]
+        [ span ~cls:(Menu_view.label_look ^ " text-[13.5px]") item.label
         ; (if String.is_empty item.detail
            then Node.none
-           else span ~cls:"menu-detail" item.detail)
+           else
+             span
+               ~cls:"menu-detail truncate text-xs text-muted-foreground"
+               item.detail)
         ]
     ]
 ;;
@@ -62,7 +89,10 @@ let host_note (m : App.Model.t) =
   | Some state when List.length state.hosts <= 1 ->
     Some
       (div
-         ~cls:"popover-hint"
+         ~cls:
+           "popover-hint shrink-0 border-t border-border px-3 py-2 text-xs \
+            leading-normal text-muted-foreground [&_code]:font-mono \
+            [&_code]:text-foreground"
          [ Node.text
              (if List.is_empty state.hosts
               then "No tool host is connected: "
@@ -85,15 +115,22 @@ let session_sections (m : App.Model.t) ~inject =
     let section name ~glyph ?(note = "") body =
       Node.div
         ~attrs:
-          [ Attr.class_ "session-section"
+          [ Attr.class_ "session-section flex flex-col gap-1.5 px-2 pt-1.5 pb-1"
           ; Attr.role "group"
           ; Attr.create "aria-label" name
           ]
         [ div
-            ~cls:"session-section-head"
+            ~cls:
+              "session-section-head flex min-w-0 items-center gap-2 \
+               text-[13px] text-muted-foreground [&>.icon]:size-4 \
+               [&>.icon]:flex-none"
             [ icon glyph
-            ; span ~cls:"session-section-title" name
-            ; span ~cls:"session-section-note" note
+            ; span
+                ~cls:"session-section-title font-semibold text-foreground"
+                name
+            ; span
+                ~cls:"session-section-note ml-auto min-w-0 truncate text-xs"
+                note
             ]
         ; body
         ]
@@ -101,7 +138,19 @@ let session_sections (m : App.Model.t) ~inject =
     let choice ~current ~label ~title ~on_click =
       Node.button
         ~attrs:
-          [ classes [ "session-choice" ] [ "on", current ]
+          [ classes
+              [ "session-choice min-h-11 min-w-0 flex-1 basis-0 truncate \
+                 rounded-md px-1 text-sm font-medium text-muted-foreground \
+                 hover:text-foreground focus-visible:outline-2 \
+                 focus-visible:-outline-offset-2 focus-visible:outline-ring \
+                 data-[state=on]:bg-background data-[state=on]:text-foreground \
+                 data-[state=on]:shadow-sm max-[359px]:min-w-11 \
+                 max-[359px]:flex-auto max-[359px]:px-0.5 \
+                 max-[359px]:text-[13px]"
+              ]
+              [ "on", current ]
+          ; Attr.create "data-slot" "toggle-group-item"
+          ; Attr.create "data-state" (if current then "on" else "off")
           ; Attr.type_ "button"
           ; Attr.title title
           ; Attr.create "aria-pressed" (Bool.to_string current)
@@ -114,7 +163,8 @@ let session_sections (m : App.Model.t) ~inject =
         "Transcript"
         ~glyph:Lines
         (div
-           ~cls:"session-choices"
+           ~cls:"session-choices flex gap-0.5 rounded-lg bg-muted p-[3px]"
+           ~attrs:[ Attr.create "data-slot" "toggle-group"; Attr.role "group" ]
            (List.map Prigh_ui.Verbosity.all ~f:(fun v ->
               let name = Prigh_ui.Verbosity.name v in
               choice
@@ -128,15 +178,27 @@ let session_sections (m : App.Model.t) ~inject =
         "Usage"
         ~glyph:Ring
         (div
-           ~cls:"session-usage"
+           ~cls:
+             "session-usage flex items-center gap-3 px-0.5 text-[13px] \
+              text-muted-foreground [&>.status-item.cost]:font-mono \
+              [&>.status-item.cost]:text-[12.5px] \
+              [&>.status-item.cost]:text-foreground"
            [ (match Status_view.context_percent state with
               | Some percent ->
                 Node.span
-                  ~attrs:[ Attr.class_ "session-context" ]
+                  ~attrs:
+                    [ Attr.class_
+                        "session-context flex min-w-0 flex-1 items-center \
+                         gap-2 [&_.meter]:h-[5px] [&_.meter]:flex-1"
+                    ]
                   [ Status_view.meter percent
-                  ; span ~cls:"percent" (sprintf "%.0f%%" percent)
                   ; span
-                      ~cls:"session-of"
+                      ~cls:
+                        "percent font-mono text-[12.5px] text-foreground \
+                         tabular-nums"
+                      (sprintf "%.0f%%" percent)
+                  ; span
+                      ~cls:"session-of font-mono text-xs text-muted-foreground"
                       (sprintf
                          "%s / %s"
                          (Status_view.tokens state.context_tokens)
@@ -146,7 +208,11 @@ let session_sections (m : App.Model.t) ~inject =
            ; Status_view.cost state ~inject
            ])
     in
-    div ~cls:"session-sections" [ verbosity; usage ]
+    div
+      ~cls:
+        "session-sections mb-1.5 flex flex-col gap-1 border-b border-border \
+         px-1 pt-0.5 pb-2.5"
+      [ verbosity; usage ]
 ;;
 
 let other (m : App.Model.t) ~(chip : Chip.t) (p : Picker.t) ~inject =
@@ -161,7 +227,7 @@ let other (m : App.Model.t) ~(chip : Chip.t) (p : Picker.t) ~inject =
     | [] when String.is_empty (Picker.query p) -> Node.none
     | [] ->
       div
-        ~cls:"popover-empty"
+        ~cls:"popover-empty px-3 py-3.5 text-xs text-muted-foreground"
         [ Node.textf
             "Nothing matches “%s”: Backspace widens the search."
             (Picker.query p)
@@ -171,7 +237,10 @@ let other (m : App.Model.t) ~(chip : Chip.t) (p : Picker.t) ~inject =
       Node.div
         ~key:(Picker.query p)
         ~attrs:
-          ([ Attr.class_ "popover-items"
+          ([ Attr.class_
+               "popover-items min-h-0 flex-1 overflow-y-auto \
+                overscroll-contain p-1 outline-none"
+           ; Attr.create "data-slot" "command-list"
            ; Attr.id "popover-list"
            ; Attr.role "listbox"
            ; Attr.create "aria-label" (title chip)
@@ -184,7 +253,10 @@ let other (m : App.Model.t) ~(chip : Chip.t) (p : Picker.t) ~inject =
   in
   Node.div
     ~attrs:
-      [ Attr.class_ "chip-popover menu-surface"
+      [ Attr.class_
+          "chip-popover menu-surface bg-popover text-popover-foreground \
+           rounded-lg shadow-md ring-1 ring-foreground/10"
+      ; Attr.create "data-slot" "popover-content"
       ; Attr.id "chip-popover"
       ; Attr.create
           "data-chip"
@@ -203,11 +275,15 @@ let other (m : App.Model.t) ~(chip : Chip.t) (p : Picker.t) ~inject =
             | Model | Attach -> "models"
           in
           div
-            ~cls:"popover-search"
+            ~cls:search_cls
             [ icon Search
             ; Node.input
                 ~attrs:
                   [ Attr.id "popover-filter"
+                  ; Attr.class_
+                      "min-w-0 flex-1 bg-transparent text-[13.5px] \
+                       outline-none placeholder:text-muted-foreground \
+                       narrow:text-base"
                   ; Attr.type_ "text"
                   ; Attr.create "aria-label" ("Filter " ^ what)
                   ; Attr.role "combobox"
@@ -223,13 +299,17 @@ let other (m : App.Model.t) ~(chip : Chip.t) (p : Picker.t) ~inject =
                       inject (Action.Picker_query text))
                   ]
                 ()
-            ; span ~cls:"popover-shortcut" (shortcut chip)
+            ; span ~cls:shortcut_cls (shortcut chip)
             ]
         | Attach ->
           div
-            ~cls:"popover-head"
-            [ span ~cls:"popover-title" (title chip)
-            ; span ~cls:"popover-shortcut" (shortcut chip)
+            ~cls:("popover-head " ^ head_cls)
+            [ span
+                ~cls:
+                  "popover-title flex-1 text-xs font-medium \
+                   text-muted-foreground"
+                (title chip)
+            ; span ~cls:shortcut_cls (shortcut chip)
             ])
      ; list
      ]
@@ -238,7 +318,9 @@ let other (m : App.Model.t) ~(chip : Chip.t) (p : Picker.t) ~inject =
           | Host -> host_note m
           | Model | Attach -> None)
      @ [ div
-           ~cls:"menu-keys"
+           ~cls:
+             "menu-keys shrink-0 border-t border-border px-3 pt-1.5 pb-[7px] \
+              text-xs text-muted-foreground pointer-coarse:hidden"
            [ Node.text
                (match chip with
                 | Attach -> "Enter chooses, Esc closes"

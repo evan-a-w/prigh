@@ -47,7 +47,13 @@ let card (m : App.Model.t) (state : State.t) ~inject =
   let line ?(cls = "") k v =
     div
       ~cls:(String.strip ("status-detail " ^ cls))
-      [ span ~cls:"status-detail-key" k; span ~cls:"status-detail-value" v ]
+      [ span ~cls:"status-detail-key text-muted-foreground" k
+      ; span
+          ~cls:
+            "status-detail-value truncate text-right font-mono text-[11.5px] \
+             text-foreground narrow:text-[13px]"
+          v
+      ]
   in
   let at = compacts_at m state in
   let percent = Status_view.context_percent state in
@@ -66,16 +72,29 @@ let card (m : App.Model.t) (state : State.t) ~inject =
   in
   Node.div
     ~attrs:
-      [ Attr.class_ "status-details context-card"
+      [ Attr.class_
+          "status-details context-card w-[260px] gap-x-4 gap-y-1.5 rounded-lg \
+           border-0 bg-popover p-3 text-xs whitespace-normal \
+           text-popover-foreground shadow-md ring-1 ring-foreground/10 \
+           grid-cols-[1fr_auto] narrow:fixed narrow:inset-x-0 narrow:top-auto \
+           narrow:bottom-0 narrow:w-auto narrow:max-w-none narrow:gap-x-4 \
+           narrow:gap-y-2.5 narrow:rounded-t-xl narrow:rounded-b-none \
+           narrow:pt-3.5 narrow:pr-[max(16px,var(--safe-r))] \
+           narrow:pb-[max(14px,var(--safe-b))] \
+           narrow:pl-[max(16px,var(--safe-l))] narrow:text-[13.5px] \
+           narrow:ring-0 narrow:border-t narrow:border-border"
+      ; Attr.create "data-slot" "hover-card-content"
       ; Attr.role "dialog"
       ; Attr.create "aria-label" "Context and cost"
       ; Attr.id card_id
       ]
     [ div
-        ~cls:"context-card-head"
-        [ span ~cls:"context-card-title" "Context"
+        ~cls:
+          "context-card-head col-span-full flex items-baseline justify-between \
+           gap-2"
+        [ span ~cls:"context-card-title text-[12.5px] font-semibold" "Context"
         ; span
-            ~cls:"context-card-of"
+            ~cls:"context-card-of font-mono text-xs"
             (sprintf
                "%s / %s"
                (tokens state.context_tokens)
@@ -86,18 +105,26 @@ let card (m : App.Model.t) (state : State.t) ~inject =
          Node.div
            ~attrs:
              [ Attr.class_
-                 (String.strip ("context-bar " ^ level ~compacts_at:at p))
+                 (String.strip
+                    ("context-bar relative col-span-full h-1.5 rounded-full \
+                      bg-muted "
+                     ^ level ~compacts_at:at p))
              ; Attr.create "aria-hidden" "true"
              ]
            [ Node.span
                ~attrs:
-                 [ Attr.class_ "context-bar-fill"
+                 [ Attr.class_
+                     "context-bar-fill absolute inset-y-0 left-0 rounded-full \
+                      bg-primary in-[.warm]:bg-(--accent-orange) \
+                      in-[.hot]:bg-destructive"
                  ; Attr.style (Status_view.fill p)
                  ]
                []
            ; Node.span
                ~attrs:
-                 [ Attr.class_ "context-bar-mark"
+                 [ Attr.class_
+                     "context-bar-mark absolute -inset-y-0.5 -ml-px w-0.5 \
+                      rounded-full bg-muted-foreground"
                  ; Attr.style
                      (Css_gen.left
                         (`Percent (Percent.of_percentage (Float.min at 100.))))
@@ -106,7 +133,9 @@ let card (m : App.Model.t) (state : State.t) ~inject =
            ]
        | None -> Node.none)
     ; div
-        ~cls:"context-card-sub"
+        ~cls:
+          "context-card-sub col-span-full -mt-0.5 text-[11.5px] \
+           text-muted-foreground"
         [ Node.text
             (match percent with
              | Some p ->
@@ -121,7 +150,7 @@ let card (m : App.Model.t) (state : State.t) ~inject =
                  at
              | None -> sprintf "Compacts at %.0f%%" at)
         ]
-    ; div ~cls:"context-card-rule" []
+    ; div ~cls:"context-card-rule col-span-full border-t border-border" []
     ; (match Prigh_ui.Loop_status.budget_part state with
        | None -> line "This session" (sprintf "$%.2f" state.cost_usd)
        | Some (text, lvl) ->
@@ -141,7 +170,7 @@ let card (m : App.Model.t) (state : State.t) ~inject =
            "%s in · %s out"
            (tokens state.usage.input)
            (tokens state.usage.output))
-    ; div ~cls:"context-card-rule" []
+    ; div ~cls:"context-card-rule col-span-full border-t border-border" []
     ; line ~cls:"status-line" "Status" (Status_view.activity_word m)
     ; line
         ~cls:"reasoning-line"
@@ -155,11 +184,15 @@ let card (m : App.Model.t) (state : State.t) ~inject =
        | Some branch -> line ~cls:"branch-line" "Branch" branch
        | None -> Node.none)
     ; div
-        ~cls:"context-card-foot"
+        ~cls:
+          "context-card-foot col-span-full flex items-center justify-between \
+           gap-2 border-t border-border pt-1.5"
         [ (if Option.exists percent ~f:(fun p -> Float.(p >= 70.))
            then
              button
-               ~cls:"context-compact"
+               ~variant:Outline
+               ~size:Xs
+               ~cls:"context-compact narrow:h-11 narrow:px-4 narrow:text-sm"
                ~title:
                  "Summarise the conversation so far to free context (/compact)"
                ~on_click:
@@ -168,9 +201,18 @@ let card (m : App.Model.t) (state : State.t) ~inject =
                     ; inject (Action.Run "/compact")
                     ])
                [ Node.text "Compact" ]
-           else span ~cls:"status-detail-hint" "/compact to free context")
+           else
+             span
+               ~cls:
+                 "status-detail-hint font-mono text-[11.5px] \
+                  text-muted-foreground"
+               "/compact to free context")
         ; button
-            ~cls:"link context-details"
+            ~variant:Ghost
+            ~size:Xs
+            ~cls:
+              "link context-details text-muted-foreground narrow:h-11 \
+               narrow:px-4 narrow:text-sm"
             ~title:"The session's details (/session)"
             ~on_click:
               (Effect.Many
@@ -232,12 +274,17 @@ let view (m : App.Model.t) ~inject =
       | None -> sprintf "Context and cost ($%.2f): details" state.cost_usd
     in
     Node.div
-      ~attrs:[ classes [ "context-ring-anchor" ] [ "open", m.context_card ] ]
+      ~attrs:
+        [ classes
+            [ "context-ring-anchor relative flex shrink-0" ]
+            [ "open z-(--z-menu-anchor)", m.context_card ]
+        ]
       [ (if m.context_card
          then
            Node.div
              ~attrs:
-               [ Attr.class_ "menu-backdrop context-backdrop"
+               [ Attr.class_
+                   "menu-backdrop context-backdrop narrow:bg-(--scrim)"
                ; Attr.on_click (fun _ -> inject Action.Toggle_context_card)
                ]
              []
@@ -245,7 +292,14 @@ let view (m : App.Model.t) ~inject =
       ; Node.button
           ~attrs:
             [ Attr.class_
-                (String.strip ("context-ring " ^ level ~compacts_at:at p))
+                (String.strip
+                   ("context-ring relative grid size-9 -my-1 cursor-pointer \
+                     place-items-center rounded-full text-primary outline-none \
+                     hover:bg-accent in-[.open]:bg-accent focus-visible:ring-2 \
+                     focus-visible:ring-ring [&.warm]:text-(--accent-orange) \
+                     [&.hot]:text-destructive narrow:size-11 narrow:-mx-0.5 \
+                     narrow:-my-1.5 "
+                    ^ level ~compacts_at:at p))
             ; Attr.type_ "button"
             ; Attr.create "aria-label" label
             ; Attr.create "aria-haspopup" "dialog"
