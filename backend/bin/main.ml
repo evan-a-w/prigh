@@ -1781,6 +1781,24 @@ let desktop_command =
        exit 0)
 ;;
 
+let mcp_bridge_command =
+  Command.basic
+    ~summary:
+      "Serve prigh's tools to a harness prigh runs on this tool host (Codex, \
+       an ACP agent): a stdio MCP server relaying to the socket in \
+       $PRIGH_MCP_SOCKET. The harness starts it; not for use by hand"
+    (let%map_open.Command () = return () in
+     fun () ->
+       match
+         Eio_main.run (fun env ->
+           Mcp_bridge.run env ~socket:(Sys.getenv Mcp_bridge.socket_env))
+       with
+       | Ok () -> ()
+       | Error e ->
+         eprintf "prigh mcp-bridge: %s\n" (Error.to_string_hum e);
+         exit 1)
+;;
+
 let acp_command =
   Command.basic
     ~summary:
@@ -2700,6 +2718,7 @@ let () =
        ; "tool-host", tool_host_command
        ; "browser-signin", browser_signin_command
        ; "acp", acp_command
+       ; "mcp-bridge", mcp_bridge_command
        ; "web", web_command
        ; "desktop", desktop_command
        ; "sessions", sessions_command
