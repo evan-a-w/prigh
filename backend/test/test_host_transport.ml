@@ -93,7 +93,7 @@ let%expect_test
          ~mcp:true
          [ "sh"
          ; "-c"
-         ; {|read socket; { printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'; read more; } | PRIGH_MCP_SOCKET="$socket" "$1" mcp-bridge | head -n 1 | cut -c1-120; echo done|}
+         ; {|read socket; read token; { printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'; read more; } | PRIGH_MCP_SOCKET="$socket" PRIGH_MCP_TOKEN="$token" "$1" mcp-bridge | head -n 1 | cut -c1-120; echo done|}
          ; "sh"
          ; Host_process.Placeholder.prigh
          ])
@@ -118,6 +118,12 @@ let%expect_test
        mcp.bridge.env
        ~equal:String.equal
        Mcp_bridge.socket_env);
+  Line_transport.write_line
+    transport
+    (List.Assoc.find_exn
+       mcp.bridge.env
+       ~equal:String.equal
+       Mcp_bridge.token_env);
   let rec lines () =
     match Line_transport.read_line transport with
     | Some line ->

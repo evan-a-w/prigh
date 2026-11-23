@@ -219,10 +219,10 @@ module Bridge = struct
     }
   [@@deriving sexp_of]
 
-  let create ~prigh ~socket =
+  let create ~prigh ~socket ~token =
     { command = prigh
     ; args = [ "mcp-bridge" ]
-    ; env = [ Mcp_bridge.socket_env, socket ]
+    ; env = [ Mcp_bridge.socket_env, socket; Mcp_bridge.token_env, token ]
     }
   ;;
 

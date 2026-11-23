@@ -1821,7 +1821,10 @@ let mcp_bridge_command =
      fun () ->
        match
          Eio_main.run (fun env ->
-           Mcp_bridge.run env ~socket:(Sys.getenv Mcp_bridge.socket_env))
+           Mcp_bridge.run
+             env
+             ~socket:(Sys.getenv Mcp_bridge.socket_env)
+             ~token:(Sys.getenv Mcp_bridge.token_env))
        with
        | Ok () -> ()
        | Error e ->

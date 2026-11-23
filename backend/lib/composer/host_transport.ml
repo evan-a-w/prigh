@@ -91,12 +91,12 @@ let spawn ~sw ~exec ~host ?on_stderr (launch : Adapter.Launch.t) =
   | Error ended -> Error (Error.of_string (Host_stream.Ended.to_message ended))
   | Ok started ->
     let mcp =
-      match side, started.mcp_socket with
-      | Some side, Some socket ->
+      match side, started.mcp_socket, started.mcp_token with
+      | Some side, Some socket, Some token ->
         Mcp_side.run side ~sw s;
         Some
           { Line_transport.Mcp.bridge =
-              Injected_tools.Bridge.create ~prigh:started.prigh ~socket
+              Injected_tools.Bridge.create ~prigh:started.prigh ~socket ~token
           ; serve = Mcp_side.serve side
           }
       | _ -> None

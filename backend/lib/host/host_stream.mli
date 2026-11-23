@@ -50,6 +50,8 @@ module Started : sig
     { pid : int
     ; prigh : string (** the host's prigh executable *)
     ; mcp_socket : string option (** with [mcp]: the side channel's socket *)
+    ; mcp_token : string option
+      (** with [mcp]: what the bridge presents first ({!Mcp_bridge}) *)
     }
   [@@deriving sexp_of]
 end

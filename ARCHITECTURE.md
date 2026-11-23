@@ -162,9 +162,10 @@ switches the cwd, and `~` means the host's home.
   Cancelling the exec closes its stdin and sends SIGTERM, then kills the
   tree after `term_grace`. The result says how it ended and the end of its
   stderr. With `mcp`, the host also listens on a Unix socket in a private
-  directory (`$PRIGH_MCP_SOCKET` in the program's environment) and relays
-  each connection, a `prigh mcp-bridge` the program started as an MCP
-  server, as `mcp`/`mcp_in` frames, outside the window; `{{prigh}}` and
+  directory and relays each connection that first presents the token it
+  reported in `started` (a `prigh mcp-bridge` the program started as an
+  MCP server, given the socket and token only in its MCP config) as
+  `mcp`/`mcp_in` frames, outside the window; `{{prigh}}` and
   `{{mcp_socket}}` in the arguments become the host's prigh and the
   socket, so the program's MCP configuration can name the bridge.
   `Host_stream` is the backend's end: lines in and out, `stop`,

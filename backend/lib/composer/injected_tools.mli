@@ -79,7 +79,9 @@ module Bridge : sig
     }
   [@@deriving sexp_of]
 
-  val create : prigh:string -> socket:string -> t
+  (** [token] goes only into this config, which the backend sends the CLI
+      over its stdin: commands the CLI runs never see it. *)
+  val create : prigh:string -> socket:string -> token:string -> t
 
   (** [{command, args, env}]: the stdio server, as {!Adapter.Start.t}'s
       [mcp_servers] take it (named {!server_name}). *)

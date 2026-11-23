@@ -279,6 +279,7 @@ let%expect_test "bridge config" =
     Injected_tools.Bridge.create
       ~prigh:"/nix/store/xxx-prigh/bin/prigh"
       ~socket:"/run/user/1000/prigh/mcp-3.sock"
+      ~token:"t0k3n"
   in
   print_s [%sexp (bridge : Injected_tools.Bridge.t)];
   let key, value = Injected_tools.Bridge.codex_config bridge in
@@ -287,9 +288,11 @@ let%expect_test "bridge config" =
   [%expect
     {|
     ((command /nix/store/xxx-prigh/bin/prigh) (args (mcp-bridge))
-     (env ((PRIGH_MCP_SOCKET /run/user/1000/prigh/mcp-3.sock))))
-    mcp_servers.prigh = {"command":"/nix/store/xxx-prigh/bin/prigh","args":["mcp-bridge"],"env":{"PRIGH_MCP_SOCKET":"/run/user/1000/prigh/mcp-3.sock"}}
-    {"name":"prigh","command":"/nix/store/xxx-prigh/bin/prigh","args":["mcp-bridge"],"env":[{"name":"PRIGH_MCP_SOCKET","value":"/run/user/1000/prigh/mcp-3.sock"}]}
+     (env
+      ((PRIGH_MCP_SOCKET /run/user/1000/prigh/mcp-3.sock)
+       (PRIGH_MCP_TOKEN t0k3n))))
+    mcp_servers.prigh = {"command":"/nix/store/xxx-prigh/bin/prigh","args":["mcp-bridge"],"env":{"PRIGH_MCP_SOCKET":"/run/user/1000/prigh/mcp-3.sock","PRIGH_MCP_TOKEN":"t0k3n"}}
+    {"name":"prigh","command":"/nix/store/xxx-prigh/bin/prigh","args":["mcp-bridge"],"env":[{"name":"PRIGH_MCP_SOCKET","value":"/run/user/1000/prigh/mcp-3.sock"},{"name":"PRIGH_MCP_TOKEN","value":"t0k3n"}]}
     |}]
 ;;
 
@@ -327,14 +330,18 @@ let%expect_test "mcp-bridge relay" =
              ~pattern:dir
              ~with_:"$DIR")
     in
-    show (Mcp_bridge.run env ~socket:None);
-    show (Mcp_bridge.run env ~socket:(Some (dir ^/ "gone.sock"))));
+    show (Mcp_bridge.run env ~socket:None ~token:None);
+    show
+      (Mcp_bridge.run
+         env
+         ~socket:(Some (dir ^/ "gone.sock"))
+         ~token:(Some "t0k3n")));
   [%expect
     {|
     reply to one
     reply to two
     bye
-    $PRIGH_MCP_SOCKET is not set: prigh mcp-bridge is started by a harness prigh runs (Codex, an ACP agent), not by hand
+    $PRIGH_MCP_SOCKET or $PRIGH_MCP_TOKEN is not set: prigh mcp-bridge is started by a harness prigh runs (Codex, an ACP agent), not by hand
     cannot reach prigh's tools at $DIR/gone.sock: the session that started this harness is gone
     |}]
 ;;
