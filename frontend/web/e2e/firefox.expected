@@ -2825,7 +2825,7 @@ after Esc, steps: 1 2 3 4 5; divider: 0
 under the message: 0,2
 highlighted: Trim everything before this
 === firefox: trim: trimmed ===
-divider: ✂ | 4 messages trimmed · ~196 tokens | Show | · | Undo
+divider: 4 messages trimmed · ~196 tokens | Show | · | Undo
 steps: 3 4 5
 focusable: 6
 divider in view: true
@@ -2838,7 +2838,7 @@ head: Not in the model's context | Kept in the transcript only; the model no lon
 trimmed: Step 1, Step 2
 menus on them: 0
 dimmed: true
-divider: ✂ | 4 messages trimmed · ~196 tokens | Hide | · | Undo
+divider: 4 messages trimmed · ~196 tokens | Hide | · | Undo
 hidden again
 === firefox: trim: undone ===
 steps: 1 2 3 4 5

@@ -243,7 +243,7 @@ let%expect_test "the plan: its chip in the chrome, /todos" =
   (* The plan's chip is a note at the chrome's right (in the ⋯ menu on a
      phone). *)
   H.elements h ~selector:".status-notes .plan";
-  [%expect {| <button class="link mode plan status-item"> |}];
+  [%expect {| <button class="[&>svg]:pointer-events-none [&>svg]:size-3! [a]:hover:bg-muted [a]:hover:text-muted-foreground aria-invalid:border-destructive aria-invalid:ring-destructive/20 border border-border cursor-pointer dark:aria-invalid:ring-destructive/40 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 font-medium gap-1 group/badge h-5 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 hover:bg-muted hover:text-foreground inline-flex items-center justify-center link loon max-w-[24ch] mode narrow:h-11 narrow:text-sm overflow-hidden plan px-2 py-0.5 rounded-4xl shrink-0 status-item text-muted-foreground text-xs transition-all w-fit whitespace-nowrap"> |}];
   H.quiet h (fun () -> H.act h Toggle_sidebar);
   status h;
   [%expect

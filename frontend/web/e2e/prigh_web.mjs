@@ -1336,7 +1336,7 @@ try {
     await row("notes.txt").click();
     const [download] = await Promise.all([
       page.waitForEvent("download"),
-      page.locator(".files-actions .btn", { hasText: "Download" }).click(),
+      page.locator(".files-actions .files-act", { hasText: "Download" }).click(),
     ]);
     section("files: a downloaded file");
     console.log(download.suggestedFilename());
@@ -1358,7 +1358,7 @@ try {
     await screenshot("files: a directory selected");
     const [download] = await Promise.all([
       page.waitForEvent("download"),
-      page.locator(".files-actions .btn", { hasText: "Download .tar.gz" }).click(),
+      page.locator(".files-actions .files-act", { hasText: "Download .tar.gz" }).click(),
     ]);
     const archive = join(dir, "sub.tar.gz");
     await download.saveAs(archive);
@@ -1389,7 +1389,7 @@ try {
   await showFiles("files: after the changes");
   // Attached from the browser, dropped on the composer, picked.
   await row("hello.txt").click();
-  await page.locator(".files-actions .btn", { hasText: "Attach" }).click();
+  await page.locator(".files-actions .files-act", { hasText: "Attach" }).click();
   // Uploads held back a moment: the status line shows them.
   let release;
   const held = new Promise(resolve => (release = resolve));

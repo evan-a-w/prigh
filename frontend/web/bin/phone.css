@@ -78,7 +78,6 @@
 
 
 /* The jump list is in the ⋯ sheet; the marks are a desktop's. */
-.app.narrow .chat-frame > .jump-nav { display: none; }
 
 /* {1 Sheets}
 
@@ -280,11 +279,6 @@
 /* No gutter for an overlay scrollbar: the rows line up with the search. */
 .app.narrow .sessions { margin: 0; padding: 0 0 8px; scrollbar-gutter: auto; }
 
-/* {1 Panels: full screen, under the safe area} */
-
-.app.narrow :is(.files-panel, .terminal-panel) { padding-top: var(--safe-t); padding-bottom: var(--safe-b); padding-left: var(--safe-l); padding-right: var(--safe-r); }
-.app.narrow :is(.files-head, .terminal-head, .files-preview-head) .btn.icon { min-width: var(--tap); min-height: var(--tap); }
-
 /* {1 The image viewer and drawing} */
 
 .app.narrow .modal.annotate-dialog { height: var(--vvh, 100dvh); padding-top: var(--safe-t); padding-bottom: var(--safe-b); border-radius: 0; border: 0; }
@@ -388,21 +382,7 @@
 .app.narrow .code-head { padding-top: 0; }
 .app.narrow button.copy { min-height: var(--tap); padding: 0 12px; }
 .app.narrow .modal-back { min-width: 44px; justify-content: center; }
-/* The files: the head's buttons and the path's parts a thumb's size. The
-   tools have a row of their own under the host's name and the close. */
-.app.narrow .files-head .btn.icon { width: var(--tap); height: var(--tap); }
-.app.narrow .files-head { flex-wrap: wrap; gap: 0 4px; padding-top: 2px; padding-bottom: 2px; }
-.app.narrow .files-machine { flex: 1; }
-.app.narrow .files-tools { display: contents; }
-.app.narrow .files-close { order: 1; }
-.app.narrow .files-head::after { content: ""; order: 2; flex-basis: 100%; }
-.app.narrow .files-tool { order: 3; }
-.app.narrow .files-head .review-open { order: 1; min-height: var(--tap); }
-.app.narrow .files-crumbs { padding-top: 0; padding-bottom: 0; gap: 0; }
-.app.narrow .files-crumb { min-width: var(--tap); min-height: var(--tap); display: inline-flex; align-items: center; justify-content: center; padding: 0 4px; }
-.app.narrow .files-edit-path { width: var(--tap); height: var(--tap); }
 .app.narrow .account-button { margin-left: 0; min-height: 44px; }
-.app.narrow .files-sort { min-height: var(--tap); }
 
 /* Help: the keys over what they do, not a 1%-wide column broken a letter a line. */
 

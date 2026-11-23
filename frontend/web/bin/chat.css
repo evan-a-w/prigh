@@ -1000,130 +1000,6 @@ button.image:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2
 }
 .thumb:hover { border-color: var(--rule-2); }
 
-/* The viewer: a modal <dialog> in the top layer, the whole screen (dvh: the
-   phone's browser bars), a bar on top and the stage under it. The image is
-   laid out at its natural size at the stage's centre and placed by a
-   transform (Zoom.transform): at fit it is all inside the stage, never
-   cropped. */
-dialog.viewer {
-  position: fixed;
-  inset: 0;
-  width: 100vw;
-  height: 100vh;
-  height: 100dvh;
-  max-width: none;
-  max-height: none;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  background: color-mix(in srgb, #07080a calc(90% - var(--swipe, 0) * 60%), transparent);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  color: #e6e6e6;
-  overflow: hidden;
-  animation: fade 0.15s;
-}
-dialog.viewer::backdrop { background: transparent; }
-.viewer-bar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 0;
-  padding: max(10px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) 10px max(16px, env(safe-area-inset-left));
-  background: linear-gradient(#000000b0, #00000000);
-  z-index: 1;
-}
-.viewer-caption { display: flex; align-items: baseline; gap: 10px; min-width: 0; flex: 1; font: 12px var(--mono); }
-.viewer-count { color: #e6e6e6; font-weight: 600; white-space: nowrap; }
-.viewer-count:empty { display: none; }
-.viewer-name { color: #ffffffa0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.viewer-tools { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
-.viewer-group {
-  display: flex;
-  align-items: center;
-  padding: 2px;
-  border-radius: 10px;
-  background: #ffffff14;
-  box-shadow: inset 0 0 0 1px #ffffff14;
-}
-.viewer-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-width: 34px;
-  height: 32px;
-  padding: 0 8px;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: #e6e6e6;
-  font: 600 12px var(--mono);
-  text-decoration: none;
-  cursor: pointer;
-}
-.viewer-btn .icon { width: 17px; height: 17px; }
-.viewer-btn:hover:not(:disabled) { background: #ffffff1f; }
-.viewer-btn:focus-visible { outline: 2px solid var(--sodium); outline-offset: 1px; }
-.viewer-btn:disabled { color: #ffffff4d; cursor: default; }
-.viewer-pct { min-width: 56px; font-variant-numeric: tabular-nums; }
-.viewer-draw span { font-family: var(--sans); font-size: 12.5px; }
-.viewer-draw[hidden] { display: none; }
-.viewer-close { min-width: 36px; height: 36px; border-radius: 50%; background: #ffffff14; box-shadow: inset 0 0 0 1px #ffffff14; }
-.viewer-stage {
-  position: relative;
-  overflow: hidden;
-  touch-action: none;
-  cursor: zoom-in;
-  user-select: none;
-}
-.viewer.zoomed .viewer-stage { cursor: grab; }
-.viewer.zoomed.dragging .viewer-stage { cursor: grabbing; }
-.viewer-img {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  max-width: none;
-  transform-origin: 50% 50%;
-  will-change: transform;
-  opacity: 0;
-  /* Transparency shows as a checkerboard. */
-  background: repeating-conic-gradient(#ffffff0d 0 25%, transparent 0 50%) 0 0 / 16px 16px;
-  box-shadow: 0 12px 48px #00000080;
-  image-rendering: auto;
-}
-.viewer.ready .viewer-img { opacity: 1; }
-.viewer.animate .viewer-img { transition: transform 0.18s cubic-bezier(0.2, 0.7, 0.2, 1); }
-.viewer-nav {
-  position: absolute;
-  top: 50%;
-  translate: 0 -50%;
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  background: #00000080;
-  box-shadow: inset 0 0 0 1px #ffffff1f;
-  z-index: 1;
-}
-.viewer-prev { left: max(12px, env(safe-area-inset-left)); }
-.viewer-next { right: max(12px, env(safe-area-inset-right)); }
-.viewer-nav .icon { width: 22px; height: 22px; }
-@media (max-width: 600px) {
-  .viewer-bar { gap: 8px; padding-left: max(12px, env(safe-area-inset-left)); padding-right: max(8px, env(safe-area-inset-right)); }
-  .viewer-sizes, .viewer-caption .viewer-name { display: none; }
-  .viewer-draw span { display: none; }
-  .viewer-tools { gap: 4px; margin-left: auto; }
-  .viewer-btn { min-width: 36px; height: 36px; padding: 0 6px; }
-  .viewer-pct { min-width: 48px; }
-  .viewer-nav { width: 38px; height: 38px; top: auto; bottom: max(14px, env(safe-area-inset-bottom)); translate: none; }
-}
-@media (prefers-reduced-motion: reduce) {
-  dialog.viewer { animation: none; }
-  .viewer.animate .viewer-img { transition: none; }
-}
-
 @keyframes blink { 50% { opacity: 0; } }
 @keyframes fade { from { opacity: 0; } }
 
@@ -1306,3 +1182,83 @@ dialog.viewer::backdrop { background: transparent; }
 .tool-head .open-agent { margin-left: auto; padding: 0 4px; border: 0; border-radius: var(--r-chip); background: none; color: var(--muted-text); font: inherit; font-size: 12.5px; white-space: nowrap; cursor: pointer; }
 .tool-head .open-agent:focus-visible { outline: 2px solid var(--sodium); outline-offset: 1px; }
 .tool-head[data-agent]:hover .open-agent { color: var(--chalk); }
+
+/* The composer's attachment chips (Files_view.chips), and where dragged
+   files land. */
+/* Files dragged over the page: where they would land. */
+body.dropping-chat .composer-box::after {
+  content: attr(data-drop);
+  position: absolute;
+  inset: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px dashed var(--sodium);
+  border-radius: var(--r-surface);
+  background: color-mix(in srgb, var(--graphite) 88%, transparent);
+  color: var(--chalk);
+  font-size: 14px;
+  z-index: var(--z-float);
+  pointer-events: none;
+}
+body.dropping-chat .composer-box { position: relative; }
+body.dropping-chat .composer-box::after { content: "Drop to attach to your message"; inset: -1px; }
+
+/* The composer's chips: a file, its size, its upload. */
+.attach-chips { display: flex; gap: 6px; flex-wrap: wrap; padding: 2px 2px 0; }
+.attach-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 280px;
+  padding: 3px 3px 3px 8px;
+  background: var(--slate-2);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-chip);
+  font: 12.5px var(--mono);
+  overflow: hidden;
+  animation: files-open 0.14s ease-out;
+}
+.attach-chip.uploading::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 2px;
+  width: var(--done, 0%);
+  background: var(--sodium);
+  transition: width 0.2s linear;
+}
+.attach-chip.failed { border-color: var(--brick-line); background: var(--brick-wash); }
+.attach-chip-icon { width: 13px; height: 13px; color: var(--muted-text); flex-shrink: 0; }
+.attach-chip-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.attach-chip-detail { color: var(--faint); font-size: 11.5px; white-space: nowrap; }
+.attach-chip.failed .attach-chip-detail { color: var(--brick); overflow: hidden; text-overflow: ellipsis; max-width: 140px; }
+.attach-chip-remove { width: 20px; height: 20px; flex-shrink: 0; }
+.attach-chip-remove .icon { width: 11px; height: 11px; }
+.composer-buttons .attach .icon { width: 17px; height: 17px; }
+
+/* A long paste: its chip opens it (read, insert as text, remove). */
+.pasted-chip { padding-left: 0; max-width: 100%; }
+.pasted-chip .attach-chip-name { flex-shrink: 0; }
+.pasted-chip .attach-chip-detail { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.pasted-chip-open.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 0 2px 0 8px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+}
+.pasted-chip-open.btn:hover .attach-chip-name { text-decoration: underline; text-decoration-color: var(--faint); }
+.pasted-chip .attach-chip-name::before { content: "¶ "; color: var(--faint); }
+
+@media (prefers-reduced-motion: reduce) {
+  .attach-chip { animation: none; }
+  .attach-chip.uploading::after { transition: none; }
+}
+@keyframes files-open { from { opacity: 0; } }

@@ -73,7 +73,10 @@ let%expect_test
     {|
     laptop
     (Up (Backspace)) (Refresh) (Show dot files) (New folder) (Upload files here) (Close (Ctrl+Shift+F))
-    (~) / proj (Type a path)
+    (~)
+    /
+    proj
+    (Type a path)
     (Name ↑) (Size) (Modified)
     docs/ 3 Oct 04:00
     src/ 08:46
@@ -143,7 +146,12 @@ let%expect_test "sorting, dot files, and the list's keys" =
   H.text h ~selector:".files-row.selected";
   [%expect
     {|
-    (~) / (proj) / src (Type a path)
+    (~)
+    /
+    (proj)
+    /
+    src
+    (Type a path)
     (Files Up)
     (Rpc (method_ fs_list) (params ((path /home/me/proj) (hidden true)))
      (tag (Files (Listed /home/me/proj))))
@@ -205,7 +213,12 @@ let%expect_test "typing a path; a path that fails says what to do" =
      (tag (Files (Listed ~/proj))))
     (Rpc (method_ fs_list) (params ((path /srv) (hidden false)))
      (tag (Files (Listed /srv))))
-    (~) / (proj) / src (Type a path)
+    (~)
+    /
+    (proj)
+    /
+    src
+    (Type a path)
     |}]
 ;;
 

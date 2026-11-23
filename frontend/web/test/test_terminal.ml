@@ -61,7 +61,8 @@ let%expect_test
   [%expect
     {|
     <section id="terminal-panel" aria-label="Terminal" class="terminal-panel">
-      <div role="separator"
+      <div data-slot="resizable-handle"
+           role="separator"
            tabindex="0"
            aria-label="Resize the terminal"
            aria-orientation="horizontal"
@@ -75,15 +76,17 @@ let%expect_test
            data-resize-target="#terminal-panel"
            class="resizer resizer-terminal"
            @on_dblclick> </div>
-      <div class="terminal-head">
+      <div class="loon terminal-head">
         <icon class="terminal"> </icon>
         <span class="terminal-machine"> backend </span>
         <span title="/work" class="terminal-cwd where"> /work </span>
-        <span class="terminal-state"> connecting… </span>
+        <span data-slot="badge"
+              data-variant="secondary"
+              class="[&>svg]:pointer-events-none [&>svg]:size-3! [a]:hover:bg-secondary/80 aria-invalid:border-destructive aria-invalid:ring-destructive/20 bg-secondary border border-transparent dark:aria-invalid:ring-destructive/40 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 font-medium gap-1 group/badge h-5 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 inline-flex items-center justify-center overflow-hidden px-2 py-0.5 rounded-4xl shrink-0 terminal-state text-secondary-foreground text-xs transition-all w-fit whitespace-nowrap"> connecting… </span>
         <button type="button"
                 title="Close (Ctrl+`): the shell keeps running for 10 minutes"
                 aria-label="Close terminal"
-                class="btn ghost icon terminal-close"
+                class="[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0 active:not-aria-[haspopup]:translate-y-px aria-expanded:bg-muted aria-expanded:text-foreground aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-clip-padding border border-transparent dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:hover:bg-muted/50 disabled:opacity-50 disabled:pointer-events-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 font-medium group/button hover:bg-muted hover:text-foreground in-data-[slot=button-group]:rounded-lg inline-flex items-center justify-center ml-auto narrow:size-11 outline-none rounded-[min(var(--radius-md),12px)] rounded-lg select-none shrink-0 size-7 terminal-close text-sm transition-all whitespace-nowrap"
                 @on_click>
           <icon class="close"> </icon>
         </button>
@@ -339,7 +342,8 @@ let%expect_test "/terminal, the chrome's button and the height" =
     (Cache_prefs (((key web.terminal-height) (value (120)))))
     (Rpc (method_ set_prefs) (params ((prefs ((web.terminal-height 120)))))
      (tag Show_error))
-    <div role="separator"
+    <div data-slot="resizable-handle"
+         role="separator"
          tabindex="0"
          aria-label="Resize the terminal"
          aria-orientation="horizontal"
@@ -357,7 +361,8 @@ let%expect_test "/terminal, the chrome's button and the height" =
     (Rpc (method_ set_prefs) (params ((prefs ((web.terminal-height 300)))))
      (tag Show_error))
     <section id="terminal-panel" aria-label="Terminal" class="terminal-panel">
-      <div role="separator"
+      <div data-slot="resizable-handle"
+           role="separator"
            tabindex="0"
            aria-label="Resize the terminal"
            aria-orientation="horizontal"
@@ -371,15 +376,17 @@ let%expect_test "/terminal, the chrome's button and the height" =
            data-resize-target="#terminal-panel"
            class="resizer resizer-terminal"
            @on_dblclick> </div>
-      <div class="terminal-head">
+      <div class="loon terminal-head">
         <icon class="terminal"> </icon>
         <span class="terminal-machine"> backend </span>
         <span title="/work" class="terminal-cwd where"> /work </span>
-        <span class="terminal-state"> connecting… </span>
+        <span data-slot="badge"
+              data-variant="secondary"
+              class="[&>svg]:pointer-events-none [&>svg]:size-3! [a]:hover:bg-secondary/80 aria-invalid:border-destructive aria-invalid:ring-destructive/20 bg-secondary border border-transparent dark:aria-invalid:ring-destructive/40 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 font-medium gap-1 group/badge h-5 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 inline-flex items-center justify-center overflow-hidden px-2 py-0.5 rounded-4xl shrink-0 terminal-state text-secondary-foreground text-xs transition-all w-fit whitespace-nowrap"> connecting… </span>
         <button type="button"
                 title="Close (Ctrl+`): the shell keeps running for 10 minutes"
                 aria-label="Close terminal"
-                class="btn ghost icon terminal-close"
+                class="[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0 active:not-aria-[haspopup]:translate-y-px aria-expanded:bg-muted aria-expanded:text-foreground aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-clip-padding border border-transparent dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:hover:bg-muted/50 disabled:opacity-50 disabled:pointer-events-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 font-medium group/button hover:bg-muted hover:text-foreground in-data-[slot=button-group]:rounded-lg inline-flex items-center justify-center ml-auto narrow:size-11 outline-none rounded-[min(var(--radius-md),12px)] rounded-lg select-none shrink-0 size-7 terminal-close text-sm transition-all whitespace-nowrap"
                 @on_click>
           <icon class="close"> </icon>
         </button>

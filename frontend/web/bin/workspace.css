@@ -1,0 +1,1237 @@
+/* The workspace's panels and pieces around the chat: the terminal, the
+   files panel, the code editor's chrome, the image viewer, the resize
+   handles, the jump marks, paging and trimming, and the status figures.
+   Their controls are loon's (Html.button with a variant, Badge, Breadcrumb,
+   Progress, Kbd, Empty, Input group); what has no loon counterpart is drawn
+   here in loon's tokens (--background, --card, --foreground,
+   --muted-foreground, --border, --primary, --destructive, --radius), so a
+   theme, an accent or the corners restyle it. In the [components] layer,
+   under the utilities: a utility on an element wins over these. The
+   editor's text (CodeMirror's .cm-* rules) is editor.css, unlayered, and
+   xterm's own sheet is in [vendor]. */
+
+@layer components {
+
+/* {1 The terminal}
+
+   A shell docked under the chat and the composer, and under the review
+   page while reviewing; a full-screen sheet on a phone. Its height is
+   --terminal-height, set by dragging its top edge (the resizer). */
+
+.terminal-panel {
+  position: relative;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  height: var(--terminal-height, 38%);
+  min-height: 120px;
+  max-height: calc(100dvh - 160px);
+  background: var(--well);
+  border-top: 1px solid var(--border);
+  animation: terminal-in 0.16s ease-out;
+}
+@keyframes terminal-in { from { opacity: 0; transform: translateY(12px); } }
+
+.terminal-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 4px 8px 4px 14px;
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
+  font-size: 12.5px;
+}
+.terminal-icon { width: 16px; height: 16px; color: var(--muted-foreground); }
+.terminal-machine { font-weight: 600; font-size: 13px; white-space: nowrap; }
+.terminal-cwd {
+  min-width: 0;
+  color: var(--muted-foreground);
+  font: 12px var(--mono);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.terminal-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 6px 0 0 10px;
+}
+.terminal-frame { position: relative; flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.terminal-host { position: relative; flex: 1; min-height: 0; overflow: hidden; }
+.terminal-host .xterm { height: 100%; }
+/* xterm sets its own ground inline. */
+.terminal-host :is(.xterm-viewport, .xterm-rows, .xterm-screen) {
+  background-color: var(--well) !important;
+}
+.terminal-waiting { color: var(--muted-foreground); font-size: 13px; padding: 10px 2px; }
+
+.terminal-notice {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--card);
+  border-top: 1px solid var(--border);
+  color: var(--muted-foreground);
+  font-size: 13px;
+  z-index: var(--z-inset);
+}
+.terminal-notice.failed {
+  top: 0;
+  flex-direction: column;
+  justify-content: center;
+  text-align: center;
+  gap: 12px;
+  border-top: 0;
+  background: color-mix(in srgb, var(--well) 94%, transparent);
+}
+.terminal-notice.failed > div { display: flex; flex-direction: column; gap: 4px; max-width: 560px; }
+.terminal-error { color: var(--destructive); font: 12px var(--mono); overflow-wrap: anywhere; }
+.terminal-advice { color: var(--foreground); }
+
+/* The extra keys a phone's keyboard lacks (terminal_keys_widget.ml): on a
+   touch screen, while the shell has the focus (the keyboard is up), one row
+   along the panel's foot (a swipe scrolls it). None on a desktop. */
+.terminal-keys { display: none; }
+@media (hover: none), (pointer: coarse) {
+  .terminal-panel:focus-within .terminal-keys { display: flex; }
+}
+.terminal-keys {
+  flex: none;
+  gap: 5px;
+  margin-left: -10px;
+  padding: 5px 6px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  touch-action: pan-x;
+  scrollbar-width: none;
+  background: var(--card);
+  border-top: 1px solid var(--border);
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+.terminal-keys::-webkit-scrollbar { display: none; }
+/* Each key as loon's Kbd, thumb-sized. */
+.terminal-key {
+  flex: none;
+  min-width: 42px;
+  height: 44px;
+  padding: 0 10px;
+  font: 500 14px/1 var(--mono);
+  color: var(--foreground);
+  background: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) * 0.8);
+  -webkit-tap-highlight-color: transparent;
+  touch-action: pan-x;
+}
+.terminal-key.modifier { font-family: inherit; font-size: 13px; }
+.terminal-key.arrow { font-size: 18px; }
+.terminal-key.pressed { background: color-mix(in srgb, var(--primary) 14%, transparent); border-color: var(--primary); color: var(--primary); }
+.terminal-key.latched { color: var(--primary); border-color: var(--primary); box-shadow: inset 0 -3px 0 var(--primary); }
+.terminal-key.locked { color: var(--primary-foreground); background: var(--primary); border-color: var(--primary); }
+
+/* Phones: a full-screen sheet under the safe area, under dialogs and the
+   other sheets. */
+.app.narrow .terminal-panel {
+  position: fixed;
+  inset: 0 0 auto;
+  height: var(--vvh, 100dvh);
+  max-height: none;
+  z-index: calc(var(--z-sheet) - 5);
+  border-top: 0;
+  padding: var(--safe-t) var(--safe-r) var(--safe-b) var(--safe-l);
+  animation: terminal-up 0.2s ease-out;
+}
+.app.narrow .terminal-head { min-height: 50px; padding-left: 14px; }
+.app.narrow .terminal-body { padding: 4px 0 0 6px; }
+.app.narrow .terminal-keys { margin-left: -6px; }
+/* Over the home indicator, the bar's ground under it. */
+@media (hover: none), (pointer: coarse) {
+  .app.narrow .terminal-panel:focus-within { padding-bottom: 0; }
+  .app.narrow .terminal-panel:focus-within .terminal-keys { padding-bottom: max(5px, var(--safe-b)); }
+}
+@keyframes terminal-up { from { opacity: 0; transform: translateY(24px); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .terminal-panel, .app.narrow .terminal-panel { animation: none; }
+}
+
+/* {1 Resize handles}
+
+   On the panels' inner edges (Resize_view): loon's Resizable handle, a
+   hairline that shows under the pointer, the accent while dragged or
+   focused (arrow keys move it). The sizes are CSS variables on .app, set
+   from the model; while dragging, the page sets them on the panel itself. */
+
+.resizer {
+  position: absolute;
+  z-index: var(--z-handle);
+  touch-action: none;
+  outline: none;
+}
+.resizer[aria-orientation="vertical"] { top: 0; bottom: 0; width: 9px; cursor: col-resize; }
+.resizer[aria-orientation="horizontal"] { left: 0; right: 0; height: 9px; cursor: row-resize; }
+.resizer::after {
+  content: "";
+  position: absolute;
+  background: transparent;
+  border-radius: 999px;
+  transition: background-color 0.12s ease-out;
+}
+.resizer[aria-orientation="vertical"]::after { top: 0; bottom: 0; left: 4px; width: 1px; }
+.resizer[aria-orientation="horizontal"]::after { left: 0; right: 0; top: 4px; height: 1px; }
+.resizer:hover::after { background: var(--border); }
+.resizer[aria-orientation="vertical"]:is(:hover, :focus-visible, .dragging)::after { left: 3px; width: 3px; }
+.resizer[aria-orientation="horizontal"]:is(:hover, :focus-visible, .dragging)::after { top: 3px; height: 3px; }
+.resizer:is(:focus-visible, .dragging)::after { background: var(--ring); }
+
+/* Where each one sits. The sidebar's is in the flow, between it and the
+   chat; the others on their panel's edge. */
+.resizer:is(.resizer-sidebar, .resizer-review-chat, .resizer-review-files) {
+  position: relative;
+  flex: none;
+  margin: 0 -5px 0 -4px;
+}
+/* Between the review page and the chat: in a column of no width. */
+.resizer.resizer-review-chat { grid-area: handle; width: 9px; margin: 0 0 0 -4px; }
+.resizer:is(.resizer-files, .resizer-files-preview, .resizer-review-margin) { left: -5px; }
+.review-margin > .resizer-review-margin { left: -12px; }
+.resizer-terminal { top: -5px; }
+
+/* While dragging: the cursor everywhere, no text selection, and nothing
+   underneath (the terminal, an image) takes the pointer. */
+body.resizing-x, body.resizing-x * { cursor: col-resize !important; user-select: none; }
+body.resizing-y, body.resizing-y * { cursor: row-resize !important; user-select: none; }
+body:is(.resizing-x, .resizing-y) :is(.terminal-body, iframe, img) { pointer-events: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .resizer::after { transition: none; }
+}
+@media (forced-colors: active) {
+  .resizer:is(:hover, :focus-visible, .dragging)::after { background: Highlight; }
+}
+
+/* {1 Jump marks}
+
+   Along the chat's left edge (Jump_view), a rail of marks, one per
+   landmark, evenly spaced like the turns of a log rather than by height.
+   The user's turns are short strokes in the accent, the one in view drawn
+   out; a reply that failed a destructive dot; a compaction a longer faint
+   rule; what is trimmed from the context a dashed cut line at the top;
+   turns not loaded yet are faint. Each one's tip is loon's Tooltip. On a
+   phone, no rail (the ⋯ sheet's "Jump to a message"). */
+
+.jump-nav {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  bottom: 60px;
+  width: 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 6px;
+  z-index: var(--z-inset);
+  pointer-events: none;
+}
+.main:has(.chat-chrome) .jump-nav { top: 8px; }
+.app.narrow .chat-frame > .jump-nav { display: none; }
+.jump-nav > * { pointer-events: auto; }
+
+.rail {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 2px 0;
+}
+.tick {
+  position: relative;
+  flex: 0 1 12px;
+  min-height: 3px;
+  width: 28px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+.tick::before {
+  content: "";
+  width: 10px;
+  height: 2px;
+  border-radius: 1px;
+  background: color-mix(in srgb, var(--primary) 55%, transparent);
+  transition: width 0.12s ease-out, background-color 0.12s ease-out;
+}
+.tick.unloaded::before { background: var(--border); opacity: 0.8; }
+.tick.compaction::before { width: 20px; height: 1px; background: var(--muted-foreground); opacity: 0.6; }
+.tick.trimmed::before { width: 20px; height: 0; border-radius: 0; background: none; border-top: 2px dashed var(--muted-foreground); opacity: 0.8; }
+.tick.trimmed:hover::before { border-top-color: var(--foreground); opacity: 1; }
+.tick.error::before { width: 5px; height: 5px; border-radius: 50%; background: var(--destructive); margin-left: 2px; }
+.tick.user[aria-current]::before { width: 16px; background: var(--primary); opacity: 1; }
+.tick.user:is(:hover, :focus-visible)::before { width: 20px; background: var(--primary); opacity: 1; }
+.tick.compaction:hover::before { opacity: 1; }
+.tick:focus-visible { outline: none; }
+
+/* What the mark stands for, beside it: loon's Tooltip. */
+.tick .tip {
+  display: none;
+  position: absolute;
+  left: calc(100% + 4px);
+  top: 50%;
+  transform: translateY(-50%);
+  width: max-content;
+  max-width: 300px;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 10px 7px;
+  background: var(--foreground);
+  color: var(--background);
+  border-radius: calc(var(--radius) * 0.8);
+  text-align: left;
+  pointer-events: none;
+  z-index: var(--z-menu-surface);
+}
+.tick:is(:hover, :focus-visible) .tip { display: flex; }
+.tip-text {
+  font: 12px/1.4 var(--sans);
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
+.tip-what { font-size: 12px; font-weight: 600; }
+.tick.error .tip-what { color: color-mix(in srgb, var(--destructive) 70%, var(--background)); }
+.tip-time { font: 11px var(--mono); opacity: 0.7; }
+
+/* Where a jump landed, for a moment. */
+#chat .jumped { animation: jumped 1.6s ease-out; }
+#chat .trim-divider.jumped { border-radius: var(--radius); }
+@keyframes jumped {
+  0%, 35% { box-shadow: 0 0 0 2px var(--ring); background-color: color-mix(in srgb, var(--primary) 14%, var(--card)); }
+  100% { box-shadow: 0 0 0 2px transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tick::before { transition: none; }
+  /* Still marked, without the fade: the page takes the mark off. */
+  #chat .jumped { animation: none; box-shadow: 0 0 0 2px var(--ring); }
+}
+
+/* {1 Paging and trimming}
+
+   Earlier messages not loaded yet, above the transcript: a quiet line, like
+   a fold's toggle, that loads them (as does scrolling near the top). An
+   output cut in the middle: its first lines, how many more and a button to
+   load them, its last lines. */
+
+.older {
+  max-width: var(--column);
+  margin: 0 0 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted-foreground);
+  font: 12px/1.5 var(--sans);
+}
+.older::after { content: ""; flex: 1; border-top: 1px solid var(--border); }
+.older .count { font: 11.5px var(--mono); }
+.older.busy { gap: 8px; }
+.load-older, .load-output {
+  border: 0;
+  padding: 2px 0;
+  background: none;
+  color: var(--muted-foreground);
+  font: inherit;
+  cursor: pointer;
+}
+.load-older:hover, .load-output:hover { color: var(--foreground); }
+.load-older:focus-visible, .load-output:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: calc(var(--radius) * 0.5);
+}
+.output.elided .gap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 2px 12px;
+  color: var(--muted-foreground);
+  font: 12px/1.5 var(--sans);
+}
+.output.elided .gap::before,
+.output.elided .gap::after { content: ""; flex: 1; border-top: 1px dashed var(--border); }
+.output.elided .gap::before { flex: 0 0 12px; }
+
+/* The start of a context trimmed before one of the user's messages
+   (Trim_view): a cut line, scissors at its start, saying how much is out of
+   the model's context, with Show and Undo (ghost buttons). Shown, the
+   trimmed messages sit above it, dimmed: kept in the transcript, no longer
+   seen by the model. */
+
+.trim-divider {
+  max-width: var(--column);
+  margin: 0 0 26px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted-foreground);
+  font: 12.5px/1.5 var(--sans);
+}
+.trim-divider > .scissors { order: 0; width: 14px; height: 14px; flex: none; }
+.trim-divider::before,
+.trim-divider::after { content: ""; flex: 1; min-width: 16px; border-top: 1px dashed var(--input); }
+.trim-divider::before { order: 1; flex: 0 0 22px; }
+.trim-divider > .trim-label { order: 2; font-weight: 500; font-variant-numeric: tabular-nums; }
+.trim-divider::after { order: 3; }
+.trim-divider > .trim-actions { order: 4; display: inline-flex; align-items: center; gap: 2px; }
+.trim-sep { color: var(--muted-foreground); opacity: 0.6; }
+.trim-busy { display: inline-flex; align-items: center; gap: 7px; padding: 0 8px; }
+
+.trimmed-messages {
+  max-width: var(--column);
+  margin: 0 0 22px;
+  padding: 0 0 0 14px;
+  border-left: 1px dashed var(--input);
+}
+.trimmed-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  margin-bottom: 18px;
+  font: 12.5px/1.5 var(--sans);
+}
+.trimmed-title { color: var(--muted-foreground); font-weight: 600; }
+.trimmed-note { color: var(--muted-foreground); opacity: 0.8; }
+.trimmed-messages > .entries { opacity: 0.55; filter: saturate(0.35); }
+.trimmed-messages .msg.user { border-left-color: var(--border); background: transparent; box-shadow: inset 0 0 0 1px var(--border); }
+
+/* Trimmed after a message: the divider right under it, the trimmed messages
+   (shown) under the divider, then what was sent since. */
+.entries > .hidden-range { margin-top: 22px; }
+.hidden-range > .trim-divider { margin: 0 auto; }
+.hidden-range > .trimmed-messages { margin: 18px auto 0; }
+.entries > .hidden-range + .msg,
+.entries > .hidden-range + .msg.user { margin-top: 22px; }
+
+/* {1 The files panel}
+
+   A drawer beside the chat (a sheet on phones) listing a directory on the
+   tools' host, an open file's preview left of the list, between it and the
+   chat (in the list's place on phones and when there is no room for both).
+   The path is loon's Breadcrumb, the buttons loon's, an upload loon's
+   Progress. File names, sizes and times are machine data: mono. The
+   selection is the one accent thing in the list. */
+
+.files-panel {
+  position: relative;
+  flex-shrink: 0;
+  display: flex;
+  min-height: 0;
+  background: var(--card);
+  animation: files-in 0.16s ease-out;
+}
+@keyframes files-in { from { opacity: 0; transform: translateX(12px); } }
+
+/* The list's column: its width is --files-width, the preview's
+   --files-preview-width, each set from the handle on its left edge. */
+.files-side {
+  position: relative;
+  width: var(--files-width, 400px);
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  border-left: 1px solid var(--border);
+}
+.files-panel.alone .files-side { display: none; }
+
+.files-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 6px 8px 6px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.files-head-icon { width: 16px; height: 16px; color: var(--muted-foreground); flex-shrink: 0; }
+.files-machine { font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.files-tools { margin-left: auto; display: flex; gap: 2px; }
+.files-tool.on { color: var(--primary); background: color-mix(in srgb, var(--primary) 12%, transparent); }
+
+/* The path: breadcrumbs, or the field typing one. */
+.files-crumbs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 8px 6px 14px;
+  font: 12px/1.6 var(--mono);
+  border-bottom: 1px solid var(--border);
+}
+.files-crumb { padding: 0 3px; border-radius: calc(var(--radius) * 0.5); font: inherit; }
+.files-crumb:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
+.files-sep { color: var(--muted-foreground); opacity: 0.7; }
+.files-path-input {
+  margin: 6px 8px;
+  padding: 6px 8px;
+  font: 12px var(--mono);
+  color: var(--foreground);
+  background: transparent;
+  border: 1px solid var(--ring);
+  border-radius: var(--radius);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 30%, transparent);
+  outline: 0;
+}
+
+.files-body { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+
+.files-columns, .files-row {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto 72px 96px;
+  align-items: center;
+  column-gap: 8px;
+}
+.files-columns { grid-template-columns: minmax(0, 1fr) 72px 96px; padding: 6px 14px 4px 40px; }
+.files-sort {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: 500 12px var(--sans);
+  color: var(--muted-foreground);
+  text-align: left;
+  cursor: pointer;
+}
+.files-sort.col-size, .files-sort.col-modified { text-align: right; }
+.files-sort:hover, .files-sort.active { color: var(--foreground); }
+.files-sort:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.files-arrow { margin-left: 3px; color: var(--primary); }
+
+.files-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 6px 6px;
+  outline: 0;
+}
+.files-list:focus-visible { box-shadow: inset 0 0 0 1px var(--ring); }
+/* A row as loon's Item, small. */
+.files-row {
+  padding: 4px 8px;
+  border-radius: calc(var(--radius) * 0.8);
+  cursor: pointer;
+  font: 12.5px/1.5 var(--mono);
+  color: var(--foreground);
+}
+.files-row:hover { background: var(--accent); }
+.files-row.selected { background: color-mix(in srgb, var(--primary) 12%, transparent); box-shadow: inset 2px 0 0 var(--primary); }
+.files-row.dot .files-name { color: var(--muted-foreground); }
+.files-row.missing .files-name { color: var(--muted-foreground); opacity: 0.7; text-decoration: line-through; }
+.files-kind { width: 15px; height: 15px; color: var(--muted-foreground); opacity: 0.8; }
+.files-kind.dir { opacity: 1; }
+.files-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.files-size, .files-mtime { font-size: 11.5px; color: var(--muted-foreground); text-align: right; white-space: nowrap; }
+.files-row .files-size { grid-column: 4; }
+.files-row .files-mtime { grid-column: 5; }
+
+.files-count { padding: 4px 14px 6px; font: 11px var(--mono); color: var(--muted-foreground); white-space: pre; }
+.files-empty, .files-wait, .files-error { padding: 18px 14px; font-size: 13px; color: var(--muted-foreground); }
+.files-wait { display: flex; align-items: center; gap: 8px; }
+.files-error { color: var(--destructive); display: flex; flex-direction: column; align-items: flex-start; gap: 8px; overflow-wrap: anywhere; }
+.files-advice { color: var(--foreground); }
+
+/* The selected entry's actions: ghost buttons under the list. */
+.files-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 4px;
+  padding: 6px 8px;
+  border-top: 1px solid var(--border);
+}
+
+/* The preview: a well, like tool output, its edge against the list. */
+.files-preview {
+  position: relative;
+  width: var(--files-preview-width, 480px);
+  flex: none;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  border-left: 1px solid var(--border);
+  background: var(--well);
+  animation: files-open 0.14s ease-out;
+}
+.files-panel.alone .files-preview { width: var(--files-width, 400px); }
+@keyframes files-open { from { opacity: 0; } }
+.files-preview-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 6px 4px 14px;
+  border-bottom: 1px solid var(--border);
+  min-height: 48px;
+}
+.files-panel.alone .files-preview-head { padding-left: 6px; }
+.files-preview-name { font: 600 12.5px var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.files-preview-meta { font: 11px var(--mono); color: var(--muted-foreground); white-space: nowrap; }
+.files-close-preview { margin-left: auto; flex-shrink: 0; }
+.files-preview-body { flex: 1; min-height: 0; overflow: auto; }
+.files-text { display: flex; align-items: flex-start; min-width: max-content; }
+.files-gutter, .files-code { margin: 0; padding: 8px 10px; font: 12.5px/1.55 var(--mono); }
+.files-gutter { color: var(--muted-foreground); opacity: 0.8; text-align: right; user-select: none; border-right: 1px solid var(--border); position: sticky; left: 0; background: var(--well); }
+.files-code { color: var(--foreground); white-space: pre; }
+.files-image { padding: 12px; display: flex; justify-content: center; }
+.files-image-open { padding: 0; border: 0; background: none; cursor: zoom-in; border-radius: var(--radius); max-width: 100%; }
+.files-image-open:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.files-image img {
+  display: block;
+  max-width: 100%;
+  max-height: 60vh;
+  object-fit: contain;
+  border-radius: var(--radius);
+  /* Transparency shows as a checkerboard. */
+  background: repeating-conic-gradient(var(--card) 0 25%, var(--muted) 0 50%) 0 0 / 16px 16px;
+}
+.files-note { padding: 10px 14px; color: var(--muted-foreground); font-size: 13px; }
+
+/* Transfers: the work lamp and loon's Progress. */
+.files-transfers { border-top: 1px solid var(--border); padding: 6px 14px 8px; display: flex; flex-direction: column; gap: 6px; }
+.files-transfer {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px 8px;
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+.files-transfer-name { font-family: var(--mono); color: var(--foreground); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.files-transfer-meta { font: 11px var(--mono); }
+.files-bar { grid-column: 2 / 4; }
+
+.hidden-file-input { display: none; }
+
+/* Files dragged over the panel: where they would land. */
+body.dropping-files .files-panel::after {
+  content: attr(data-drop);
+  position: absolute;
+  inset: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px dashed var(--primary);
+  border-radius: calc(var(--radius) * 1.4);
+  background: color-mix(in srgb, var(--background) 88%, transparent);
+  color: var(--foreground);
+  font-size: 13px;
+  z-index: var(--z-float);
+  pointer-events: none;
+}
+
+/* The dialogs. */
+.files-ask-where { font: 12px var(--mono); color: var(--muted-foreground); margin-bottom: 8px; }
+.files-ask .text-input { width: 100%; font-family: var(--mono); }
+.files-ask-text { color: var(--foreground); line-height: 1.5; overflow-wrap: anywhere; }
+.files-ask-error { margin-top: 8px; color: var(--destructive); font-size: 13px; }
+
+/* Narrower windows: the drawer floats over the chat. */
+@media (max-width: 1100px) {
+  .app:not(.narrow) .files-panel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: var(--z-panel);
+    max-width: 86vw;
+    box-shadow: var(--float-shadow);
+  }
+}
+
+/* Phones: a full-screen sheet under the safe area; the preview takes it
+   over. The head's buttons and the path's parts are a thumb's size, the
+   tools a row of their own under the host's name and the close. */
+.app.narrow .files-panel {
+  position: fixed;
+  inset: 0;
+  width: auto;
+  z-index: var(--z-sheet);
+  border-left: 0;
+  padding: var(--safe-t) var(--safe-r) var(--safe-b) var(--safe-l);
+  animation: files-up 0.2s ease-out;
+}
+.app.narrow :is(.files-side, .files-preview) { width: auto; flex: 1 1 auto; border-left: 0; }
+.app.narrow :is(.files-head, .files-preview-head) { min-height: 50px; }
+.app.narrow .files-head { padding: 2px 8px 2px 12px; flex-wrap: wrap; gap: 0 4px; }
+.app.narrow .files-machine { flex: 1; }
+.app.narrow .files-tools { display: contents; }
+.app.narrow .files-close { order: 1; }
+.app.narrow .files-head::after { content: ""; order: 2; flex-basis: 100%; }
+.app.narrow .files-tool { order: 3; }
+.app.narrow .files-head .review-open { order: 1; min-height: var(--tap); }
+.app.narrow .files-crumbs { padding-top: 0; padding-bottom: 0; }
+.app.narrow .files-crumb { display: inline-flex; align-items: center; justify-content: center; padding: 0 4px; }
+.app.narrow .files-sort { min-height: var(--tap); }
+.app.narrow .files-columns, .app.narrow .files-row { grid-template-columns: 18px minmax(0, 1fr) auto 64px; }
+.app.narrow .files-columns { grid-template-columns: minmax(0, 1fr) 64px; }
+.app.narrow .files-sort.col-modified, .app.narrow .files-mtime { display: none; }
+.app.narrow .files-row { padding: 8px; }
+@keyframes files-up { from { opacity: 0; transform: translateY(24px); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .files-panel, .app.narrow .files-panel, .files-preview { animation: none; }
+}
+
+  /* The editor mode (code_editor_view.ml): the session's files in CodeMirror,
+     in the chat's place. The code has the room: one strip over it, the
+     composer under it (the chat's own, without the transcript) and, on a
+     wide window, the files down the left and the chat in a column on the
+     right. On a phone the strip is 40px and slides away as the code scrolls
+     down; the reply peeks over the composer and pulls the chat up under the
+     code; with the keyboard up, the composer gives way to a bar of the keys
+     a phone keyboard buries. */
+  /* {1 Where it sits} */
+  .code-page {
+    grid-area: code;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--background);
+    position: relative;
+  }
+  /* The code over the composer; the transcript and the chat's strip wait
+     until the chat is asked for. */
+  .app.editing .desk {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto auto;
+    grid-template-areas: "code" "main" "terminal";
+  }
+  .app.editing:not(.code-chat) .main > :is(.chrome-anchor, .chat-frame, .banner-anchor) { display: none; }
+  .app.editing:not(.code-chat) .main { border-top: 1px solid var(--border); }
+  /* A wide window's chat: a column right of the code, as beside a review. */
+  .app.editing.code-chat:not(.narrow) .desk {
+    grid-template-columns: minmax(0, 1fr) 0 var(--review-chat-width, 400px);
+    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-areas: "code handle main" "terminal terminal terminal";
+  }
+  .app.editing.code-chat:not(.narrow) .main { border-left: 1px solid var(--border); }
+  .app.editing:not(.narrow) .resizer-sidebar { display: none; }
+  .app.editing:not(.narrow):not(.sidebar-drawer) .sidebar { display: none; }
+  .app.editing.sidebar-drawer:not(.narrow) .sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    max-width: 86vw;
+    z-index: var(--z-drawer);
+    box-shadow: var(--float-shadow);
+  }
+  .app.editing.sidebar-drawer:not(.narrow) .scrim {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: var(--scrim);
+    z-index: var(--z-scrim);
+  }
+  /* A phone's chat: pulled up under the code, which keeps a third of the
+     screen. */
+  .app.narrow.editing.code-chat .desk { grid-template-rows: minmax(120px, 34%) minmax(0, 1fr) auto; }
+  .app.narrow.editing.code-chat .main > .chrome-anchor { display: none; }
+  .app.narrow.editing .main .chat { padding-top: 8px; }
+  /* {1 The strip} */
+  .code-strip {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    height: 44px;
+    padding: 0 6px;
+    border-bottom: 1px solid var(--border);
+    background: var(--background);
+    min-width: 0;
+  }
+  /* The directory gives way (from its start) before the name. */
+  .code-path {
+    flex: 0 1 auto;
+    min-width: 0;
+    display: flex;
+    font: 13.5px var(--mono);
+    white-space: nowrap;
+  }
+  .code-path-dir {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    direction: rtl;
+    color: var(--muted-foreground);
+  }
+  .code-path-dir > bdi { direction: ltr; unicode-bidi: isolate; }
+  .code-path-name { flex: none; color: var(--foreground); font-weight: 550; }
+  .code-path-none { color: var(--muted-foreground); font-family: var(--sans); direction: ltr; }
+  .code-strip > .code-path { margin-left: 4px; }
+  .code-dirty {
+    display: inline-block;
+    flex: none;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--primary);
+    margin-left: 7px;
+  }
+  .code-strip-end { margin-left: auto; display: flex; align-items: center; gap: 2px; flex: none; }
+  .code-chat-toggle[aria-pressed="true"] { color: var(--foreground); background: var(--accent); }
+  .code-dots { display: flex; gap: 5px; padding: 0 8px; flex: none; }
+  .code-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--input); }
+  .code-dot.on { background: var(--foreground); }
+  .code-menu-anchor { position: relative; }
+  .code-menu-backdrop { position: fixed; inset: 0; z-index: var(--z-menu-surface); }
+  .app.narrow .code-menu-backdrop { background: var(--scrim); }
+  /* Its look is the shared menu's (Menu_view: loon's DropdownMenu); here
+     only where it hangs, and its items as buttons. */
+  .code-menu {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 6px);
+    z-index: var(--z-menu-surface);
+    min-width: 240px;
+  }
+  .code-menu-item { cursor: pointer; font: inherit; }
+  .code-menu-item:focus-visible { background: var(--accent); color: var(--accent-foreground); }
+  .code-menu-item:disabled { opacity: 0.5; cursor: default; }
+  .code-menu-item:disabled:hover { background: none; }
+  .code-menu-item.danger:not(:disabled) { color: var(--destructive); }
+  .code-menu-label { flex: 1; }
+  /* A wide window's open files, as tabs under the strip. */
+  .code-tabs {
+    flex: none;
+    display: flex;
+    overflow-x: auto;
+    scrollbar-width: none;
+    border-bottom: 1px solid var(--border);
+    background: var(--well);
+  }
+  .code-tab {
+    display: flex;
+    align-items: center;
+    flex: none;
+    max-width: 240px;
+    border-right: 1px solid var(--border);
+    color: var(--muted-foreground);
+  }
+  .code-tab.on { background: var(--background); color: var(--foreground); box-shadow: inset 0 2px var(--primary); }
+  .code-tab-open {
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    height: 34px;
+    padding: 0 4px 0 12px;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: 13px var(--mono);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    cursor: pointer;
+  }
+  .code-tab-close { opacity: 0.6; }
+  .code-tab:hover .code-tab-close, .code-tab.on .code-tab-close { opacity: 1; }
+  /* {1 The files} */
+  .code-body { flex: 1; min-height: 0; display: flex; position: relative; }
+  .code-tree {
+    width: var(--editor-tree-width, 240px);
+    flex: none;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--card);
+    border-right: 1px solid var(--border);
+  }
+  .code-body > .resizer { margin-left: -4px; }
+  .code-tree-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 4px 0 12px; }
+  .code-section-title {
+    margin: 0;
+    padding: 10px 14px 4px;
+    font: 500 12.5px var(--sans);
+    color: var(--muted-foreground);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .code-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 30px;
+    padding: 0 12px 0 14px;
+    border: 0;
+    background: none;
+    color: var(--foreground);
+    font: 13px var(--mono);
+    text-align: left;
+    cursor: pointer;
+  }
+  .code-row:hover { background: var(--accent); }
+  .code-row:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+  .code-row .icon { width: 15px; height: 15px; color: var(--muted-foreground); flex: none; }
+  .code-row.dir { color: var(--muted-foreground); }
+  .code-row.on { background: color-mix(in srgb, var(--primary) 14%, transparent); box-shadow: inset 3px 0 var(--primary); }
+  .code-row-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .code-row .code-path { flex: 1; }
+  .code-git { margin-left: auto; font: 600 11px var(--mono); color: var(--primary); flex: none; }
+  .code-empty { display: block; padding: 8px 14px; color: var(--muted-foreground); font-size: 13px; }
+  .code-goto-file {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 8px;
+    padding: 0 10px;
+    height: 34px;
+    border-radius: var(--r-control);
+    border: 1px solid var(--input);
+    background: var(--well);
+    color: var(--muted-foreground);
+  }
+  .code-goto-file:focus-within { border-color: var(--primary); }
+  .code-goto-file .icon { width: 15px; height: 15px; flex: none; }
+  .code-goto-file input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    background: none;
+    color: var(--foreground);
+    font: 14px var(--sans);
+    outline: none;
+  }
+  /* {1 The code} */
+  .code-file { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+  .code-editor-host { flex: 1; min-height: 0; display: flex; position: relative; }
+  .code-none {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    padding: 24px;
+    color: var(--muted-foreground);
+    text-align: center;
+  }
+  .code-none p { margin: 0; max-width: 36ch; }
+  .code-notice {
+    flex: none;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 8px 10px 8px 14px;
+    border-bottom: 1px solid var(--border);
+    font-size: 13.5px;
+    line-height: 1.4;
+  }
+  .code-notice-text { flex: 1 1 220px; min-width: 0; }
+  /* Two buttons after a short line: they stay beside it. */
+  .code-notice.agent { flex-wrap: nowrap; }
+  .code-notice.agent .code-notice-text { flex-basis: 0; }
+  .code-notice.conflict { background: var(--brick-wash); border-bottom-color: var(--brick-line); }
+  .code-notice.agent { background: color-mix(in srgb, var(--sage) 9%, var(--background)); border-bottom-color: var(--sage-line); }
+  .code-goto {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px 6px 14px;
+    border-bottom: 1px solid var(--border);
+    background: var(--card);
+    font-size: 13.5px;
+    color: var(--muted-foreground);
+  }
+  .code-goto input {
+    width: 9ch;
+    height: 30px;
+    padding: 0 8px;
+    border: 1px solid var(--input);
+    border-radius: var(--r-control);
+    background: var(--well);
+    color: var(--foreground);
+    font: 14px var(--mono);
+  }
+  .code-editor-host .cm-search br { display: none; }
+  .code-editor-host .cm-search label { display: inline-flex; align-items: center; gap: 4px; color: var(--muted-foreground); }
+  .code-editor-host .cm-search button[name="close"] { color: var(--muted-foreground); font-size: 20px; padding: 0 6px; }
+  /* {1 The composer's chip} */
+  .code-chip { border-color: color-mix(in srgb, var(--primary) 55%, transparent); }
+  .code-chip .attach-chip-name { color: var(--primary); font-family: var(--mono); }
+  /* {1 A phone} */
+  .app.narrow .code-page { padding-top: var(--safe-t); padding-left: var(--safe-l); padding-right: var(--safe-r); }
+  .app.narrow .code-strip { height: 44px; padding: 0 0 0 0; transition: margin-top 0.16s ease-out; }
+  .app.narrow .code-strip.hidden { margin-top: -45px; }
+  .app.narrow .code-menu {
+    position: fixed;
+    left: 0;
+    right: 0;
+    top: auto;
+    bottom: 0;
+    min-width: 0;
+    padding: 8px 8px max(8px, var(--safe-b));
+    border-radius: 16px 16px 0 0;
+  }
+  .app.narrow .code-menu-item { font-size: 16px; }
+  .app.narrow .code-menu-hint { display: none; }
+  /* The files: a drawer from the left, the filter at the thumb. */
+  .code-tree.drawer {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: min(330px, 86vw);
+    z-index: var(--z-drawer);
+    box-shadow: 20px 0 40px #0006;
+    animation: code-drawer-in 0.16s ease-out;
+  }
+  @keyframes code-drawer-in { from { transform: translateX(-24px); opacity: 0; } }
+  .code-scrim { position: absolute; inset: 0; z-index: var(--z-scrim); background: var(--scrim); }
+  .code-tree.drawer .code-row { min-height: 40px; font-size: 14px; }
+  .code-tree.drawer .code-goto-file { height: var(--tap); margin: 8px 10px max(10px, var(--safe-b)); border-radius: 12px; }
+  .code-tree.drawer .code-goto-file input { font-size: 16px; }
+  .app.narrow .code-notice .btn, .app.narrow .code-goto .btn { min-height: var(--tap); }
+  .app.narrow .code-goto input { height: var(--tap); font-size: 16px; }
+  /* The reply, a line over the composer: a tap pulls the chat up. */
+  .code-peek {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    min-height: var(--tap);
+    padding: 0 12px 0 14px;
+    border: 0;
+    border-top: 1px solid var(--border);
+    background: var(--card);
+    color: var(--foreground);
+    font: 14px var(--sans);
+    text-align: left;
+    cursor: pointer;
+  }
+  .code-peek .icon { width: 16px; height: 16px; color: var(--muted-foreground); flex: none; }
+  .code-peek .lamp { flex: none; }
+  .code-peek-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .code-peek > .icon:last-child { transform: rotate(-90deg); transition: transform 0.16s; }
+  .code-peek[aria-expanded="true"] > .icon:last-child { transform: rotate(90deg); }
+  /* With the keyboard up (the code focused), the composer and the peek make
+     way for the keys. */
+  .code-keys {
+    display: none;
+    flex: none;
+    align-items: center;
+    gap: 6px;
+    height: 48px;
+    padding: 0 6px;
+    border-top: 1px solid var(--border);
+    background: var(--card);
+  }
+  .app.narrow .code-page:has(.cm-focused) .code-keys { display: flex; }
+  .app.narrow.editing:has(.code-page .cm-focused) .main { display: none; }
+  .app.narrow .code-page:has(.cm-focused) .code-peek { display: none; }
+  .code-keys-scroll {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    gap: 4px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-mask: linear-gradient(90deg, #000 88%, transparent);
+    mask: linear-gradient(90deg, #000 88%, transparent);
+  }
+  .code-keys-scroll::-webkit-scrollbar { display: none; }
+  .code-key {
+    flex: none;
+    min-width: 40px;
+    height: 40px;
+    padding: 0 8px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border: 0;
+    border-radius: 8px;
+    background: var(--accent);
+    color: var(--foreground);
+    font: 16px var(--mono);
+    touch-action: manipulation;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  .code-key:active { background: var(--input); }
+  .code-key.code-ask { background: var(--primary); color: var(--primary-foreground); font: 600 14px var(--sans); padding: 0 12px; }
+  .code-key.code-ask .icon { width: 16px; height: 16px; }
+  @media (prefers-reduced-motion: reduce) {
+    .code-tree.drawer { animation: none; }
+    .app.narrow .code-strip, .code-peek > .icon:last-child { transition: none; }
+  }
+  /* A fresh session's folder and branch tray: the strip names the file. */
+  .app.narrow.editing .tray { display: none; }
+  /* {1 Go to file's matches: a list as tall as all of them, the rows near
+     the scroll position placed in it} */
+  .code-matches { position: relative; }
+  .code-matches .code-row { position: absolute; left: 0; right: 0; height: 30px; }
+  .app.narrow .code-matches .code-row { height: 44px; }
+  .code-path mark { background: none; color: var(--primary); font-weight: 700; }
+
+  /* {1 The image viewer}
+
+     Over photos, so dark in every theme (loon's radii and focus ring); its
+     DOM is app/viewer_widget.ml's. A modal <dialog> in the top layer, the whole screen (dvh: the
+     phone's browser bars), a bar on top and the stage under it. The image is
+     laid out at its natural size at the stage's centre and placed by a
+     transform (Zoom.transform): at fit it is all inside the stage, never
+     cropped. */
+  dialog.viewer {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    max-width: none;
+    max-height: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    background: color-mix(in srgb, #07080a calc(90% - var(--swipe, 0) * 60%), transparent);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    color: #e6e6e6;
+    overflow: hidden;
+    animation: viewer-fade 0.15s;
+  }
+  dialog.viewer::backdrop { background: transparent; }
+  .viewer-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+    padding: max(10px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) 10px max(16px, env(safe-area-inset-left));
+    background: linear-gradient(#000000b0, #00000000);
+    z-index: 1;
+  }
+  .viewer-caption { display: flex; align-items: baseline; gap: 10px; min-width: 0; flex: 1; font: 12px var(--mono); }
+  .viewer-count { color: #e6e6e6; font-weight: 600; white-space: nowrap; }
+  .viewer-count:empty { display: none; }
+  .viewer-name { color: #ffffffa0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .viewer-tools { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+  .viewer-group {
+    display: flex;
+    align-items: center;
+    padding: 2px;
+    border-radius: calc(var(--radius) * 1.4);
+    background: #ffffff14;
+    box-shadow: inset 0 0 0 1px #ffffff14;
+  }
+  .viewer-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-width: 34px;
+    height: 32px;
+    padding: 0 8px;
+    border: 0;
+    border-radius: var(--radius);
+    background: transparent;
+    color: #e6e6e6;
+    transition: background-color 0.12s;
+    font: 600 12px var(--mono);
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .viewer-btn .icon { width: 17px; height: 17px; }
+  .viewer-btn:hover:not(:disabled) { background: #ffffff1f; }
+  .viewer-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--ring) 60%, transparent); }
+  .viewer-btn:disabled { color: #ffffff4d; cursor: default; }
+  .viewer-pct { min-width: 56px; font-variant-numeric: tabular-nums; }
+  .viewer-draw span { font-family: var(--sans); font-size: 12.5px; }
+  .viewer-draw[hidden] { display: none; }
+  .viewer-close { min-width: 36px; height: 36px; border-radius: 50%; background: #ffffff14; box-shadow: inset 0 0 0 1px #ffffff14; }
+  .viewer-stage {
+    position: relative;
+    overflow: hidden;
+    touch-action: none;
+    cursor: zoom-in;
+    user-select: none;
+  }
+  .viewer.zoomed .viewer-stage { cursor: grab; }
+  .viewer.zoomed.dragging .viewer-stage { cursor: grabbing; }
+  .viewer-img {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    max-width: none;
+    transform-origin: 50% 50%;
+    will-change: transform;
+    opacity: 0;
+    /* Transparency shows as a checkerboard. */
+    background: repeating-conic-gradient(#ffffff0d 0 25%, transparent 0 50%) 0 0 / 16px 16px;
+    box-shadow: 0 12px 48px #00000080;
+    image-rendering: auto;
+  }
+  .viewer.ready .viewer-img { opacity: 1; }
+  .viewer.animate .viewer-img { transition: transform 0.18s cubic-bezier(0.2, 0.7, 0.2, 1); }
+  .viewer-nav {
+    position: absolute;
+    top: 50%;
+    translate: 0 -50%;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: #00000080;
+    box-shadow: inset 0 0 0 1px #ffffff1f;
+    z-index: 1;
+  }
+  .viewer-prev { left: max(12px, env(safe-area-inset-left)); }
+  .viewer-next { right: max(12px, env(safe-area-inset-right)); }
+  .viewer-nav .icon { width: 22px; height: 22px; }
+  @media (max-width: 600px) {
+    .viewer-bar { gap: 8px; padding-left: max(12px, env(safe-area-inset-left)); padding-right: max(8px, env(safe-area-inset-right)); }
+    .viewer-sizes, .viewer-caption .viewer-name { display: none; }
+    .viewer-draw span { display: none; }
+    .viewer-tools { gap: 4px; margin-left: auto; }
+    .viewer-btn { min-width: 36px; height: 36px; padding: 0 6px; }
+    .viewer-pct { min-width: 48px; }
+    .viewer-nav { width: 38px; height: 38px; top: auto; bottom: max(14px, env(safe-area-inset-bottom)); translate: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    dialog.viewer { animation: none; }
+    .viewer.animate .viewer-img { transition: none; }
+  }
+  @keyframes viewer-fade { from { opacity: 0; } }
+
+  /* {1 The top bar's notes (Status_view.notes)}
+
+     loon's outline Badges; the older status items' rules (shared with the
+     context card) do not reach them. */
+  .status-notes > .status-item { margin: 0; display: inline-flex; text-decoration: none; }
+  .status-notes > .status-item:hover { text-decoration: none; }
+  .status-notes > .status-item:focus-visible { outline: none; }
+}

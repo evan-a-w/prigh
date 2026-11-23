@@ -30,7 +30,8 @@
   genui.css
   diff.css
   review.css
-  forge.css)
+  forge.css
+  workspace.css)
  (action
   (with-stdout-to
    loon.input.css
@@ -47,6 +48,7 @@
     (cat review.css)
     (cat forge.css)
     (echo "\n}\n")
+    (cat workspace.css)
     (echo "\n@source \"../loon_ui/*.ml\";\n@source \"../lib/*.ml\";\n")))))
 
 (rule
@@ -72,13 +74,8 @@
   theme.css
   style.css
   chat.css
-  terminal.css
-  files.css
   editor.css
   highlight.css
-  resize.css
-  paging.css
-  jump.css
   status.css
   temporary.css
   control.css
@@ -92,12 +89,7 @@
     (cat theme.css)
     (cat style.css)
     (cat chat.css)
-    (cat terminal.css)
-    (cat files.css)
     (cat highlight.css)
-    (cat resize.css)
-    (cat paging.css)
-    (cat jump.css)
     (cat status.css)
     (cat temporary.css)
     (cat control.css)

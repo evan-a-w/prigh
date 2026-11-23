@@ -99,6 +99,7 @@ let%expect_test "the names of the panels' controls" =
     button "Size" -- Sort by size
     button "Modified" -- Sort by modified
     [separator] div "Resize the file browser" -- Drag to resize, double-click for the default size
+    [link] span "~"
     [row] div "Name \226\134\145 Size Modified"
     [listbox] div "Files"
     [option] div "src/ 1 Jan 1970 00:00"
