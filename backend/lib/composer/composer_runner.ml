@@ -12,6 +12,7 @@ type t =
   ; steer_poll : Time_float.Span.t
   ; mutable live : live option
   ; mutable thread_id : string option
+  ; on_thread : string -> unit
   ; mutable services : Engine_intf.Services.t option (* the running turn's *)
   ; mutable cancel : Cancellation.t
   }
@@ -23,6 +24,7 @@ let create
       ?(start = fun ~cwd -> Adapter.Start.default ~cwd)
       ?interrupt_grace
       ?(steer_poll = Time_float.Span.of_sec 0.2)
+      ?(on_thread = ignore)
       ()
   =
   { sw
@@ -33,6 +35,7 @@ let create
   ; steer_poll
   ; live = None
   ; thread_id = None
+  ; on_thread
   ; services = None
   ; cancel = Cancellation.never
   }
@@ -330,7 +333,11 @@ let run_turn
          Switch.run (fun sw ->
            Fiber.any [ (fun () -> events ~sw); interrupt_on_cancel; steer ];
            Hashtbl.iter requests ~f:Cancellation.cancel);
-         t.thread_id <- Option.first_some (L.thread_id a) t.thread_id;
+         (match L.thread_id a with
+          | Some id when not (Option.equal String.equal (Some id) t.thread_id) ->
+            t.thread_id <- Some id;
+            t.on_thread id
+          | Some _ | None -> ());
          (match !stop with
           | Some Done when not (Cancellation.is_cancelled cancel) ->
             let next = Queue.to_list leftover @ s.steer () in
@@ -365,4 +372,4 @@ module R = struct
   let run_turn = run_turn
 end
 
-let runner t = Runner.create (module R) t
+let runner t = Runner.create ~close:(fun () -> close t) (module R) t

@@ -19,7 +19,8 @@ type t
     host; it fails saying what to do when the harness is not installed
     there. [start]: the process's settings besides the turn's
     ([developer_instructions], [mcp_servers], [resume] to continue a thread
-    the session had). [sw] bounds the processes' fibers. *)
+    the session had). [on_thread]: the harness started or moved to a thread
+    (for the session to record). [sw] bounds the processes' fibers. *)
 val create
   :  sw:Switch.t
   -> adapter:Adapter.t
@@ -27,6 +28,7 @@ val create
   -> ?start:(cwd:string -> Adapter.Start.t)
   -> ?interrupt_grace:Time_float.Span.t
   -> ?steer_poll:Time_float.Span.t
+  -> ?on_thread:(string -> unit)
   -> unit
   -> t
 

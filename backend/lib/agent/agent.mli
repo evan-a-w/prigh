@@ -306,6 +306,10 @@ val engine : t -> Engine_id.t
 
 val capabilities : t -> Capabilities.t
 
+(** Replaces the engine that does the session's runs ([None]: the harness),
+    closing the old one; between runs. *)
+val set_runner : t -> Runner.t option -> unit
+
 (** How errors name the session's engine: [Harness], [Composer]. *)
 val engine_label : t -> string
 

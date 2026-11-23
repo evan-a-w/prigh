@@ -216,7 +216,7 @@ type t =
   { env : Env.t
   ; sw : Switch.t
   ; provider : Provider.t
-  ; runner : Runner.t option
+  ; mutable runner : Runner.t option
     (** the session's engine when it is not the harness on [provider] *)
   ; mutable unavailable : string option
   ; tools : Tool.t list
@@ -3003,9 +3003,19 @@ let runner t =
       loop_config ~cancel t)
 ;;
 
+let set_runner t runner =
+  Option.iter t.runner ~f:Runner.close;
+  t.runner <- runner;
+  state_changed t
+;;
+
 let capabilities t = Runner.capabilities (runner t)
 let engine t = Runner.engine (runner t)
-let engine_label t = String.capitalize (Engine_id.to_string (engine t))
+let engine_label t =
+  match engine t, (engine_choice t).adapter with
+  | Composer, Some adapter -> Adapter_id.label adapter
+  | engine, _ -> String.capitalize (Engine_id.to_string engine)
+;;
 
 let require t feature =
   Capabilities.check (capabilities t) feature ~who:(engine_label t)

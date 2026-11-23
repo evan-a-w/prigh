@@ -113,7 +113,7 @@ let%expect_test "a session the backend cannot run" =
   let unavailable t choice =
     print_s
       [%sexp
-        (Engines.unavailable ~buildable:Engine_id.all t choice : string option)]
+        (Engines.unavailable ~buildable:(Fn.const true) t choice : string option)]
   in
   unavailable Engines.default Engine_choice.harness;
   [%expect {| () |}];

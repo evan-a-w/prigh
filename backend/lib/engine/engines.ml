@@ -67,19 +67,21 @@ let of_flags ~engines ~adapters ~getenv =
      | _ -> create ~engines ?adapters ())
 ;;
 
-let buildable : Engine_id.t list = [ Harness ]
+let buildable : Adapter_id.t -> bool = function
+  | Codex | Claude -> true
+  | Acp _ | Prigh -> false
+;;
 
 let check_build t =
-  match
-    List.filter t.engines ~f:(fun e ->
-      not (List.mem buildable e ~equal:Engine_id.equal))
-  with
+  match List.filter t.adapters ~f:(Fn.non buildable) with
   | [] -> Ok ()
   | missing ->
     Or_error.errorf
-      "the %s engine isn't available in this build yet; run -engines %s"
-      (String.concat ~sep:" and " (List.map missing ~f:Engine_id.to_string))
-      (String.concat ~sep:"," (List.map buildable ~f:Engine_id.to_string))
+      "the composer can't drive %s in this build of prigh yet; run -adapters %s"
+      (String.concat ~sep:" or " (List.map missing ~f:Adapter_id.label))
+      (match List.filter t.adapters ~f:buildable with
+       | [] -> "codex,claude"
+       | ok -> String.concat ~sep:"," (List.map ok ~f:Adapter_id.to_string))
 ;;
 
 let engine_strings t = List.map t.engines ~f:Engine_id.to_string
@@ -140,14 +142,15 @@ let choose t ~engine ~adapter =
 ;;
 
 let unavailable ?(buildable = buildable) t (choice : Engine_choice.t) =
-  if not (List.mem buildable choice.engine ~equal:Engine_id.equal)
-  then
+  match choice.adapter with
+  | Some a when not (buildable a) ->
     Some
       (sprintf
-         "the %s engine isn't available in this build of prigh yet; this \
+         "the composer can't drive %s in this build of prigh yet; this \
           session can still be read here"
-         (Engine_id.to_string choice.engine))
-  else if not (List.mem t.engines choice.engine ~equal:Engine_id.equal)
+         (Adapter_id.label a))
+  | _ ->
+  if not (List.mem t.engines choice.engine ~equal:Engine_id.equal)
   then
     Some
       (sprintf

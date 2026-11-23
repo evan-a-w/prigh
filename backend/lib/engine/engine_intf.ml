@@ -70,7 +70,11 @@ module type Runner_api = sig
   (** A runner of any engine. *)
   type t
 
-  val create : (module S with type t = 'a) -> 'a -> t
+  (** [close]: stops what the runner keeps running between turns (an
+      external harness's process). *)
+  val create : ?close:(unit -> unit) -> (module S with type t = 'a) -> 'a -> t
+
+  val close : t -> unit
   val engine : t -> Engine_id.t
   val capabilities : t -> Capabilities.t
 

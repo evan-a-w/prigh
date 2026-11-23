@@ -113,6 +113,9 @@ val create
            more than the harness; [new_session] takes [engine] and
            [adapter]; a session on one not deployed can be read but not run
            ([state]'s [unavailable]). *)
+  -> ?spawn_external:(Agent.t -> Adapter.Launch.t -> Line_transport.t Or_error.t)
+       (** starts a composer session's harness on its tool host (default:
+           an error until tool hosts can run it) *)
   -> new_agent:(?session:Session.t -> cwd:string -> unit -> Agent.t)
   -> ?default_agent:Agent.t
   -> unit
