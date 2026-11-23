@@ -147,6 +147,10 @@ let with_composer ?(approval : Approval_mode.t option) ~adapter ~peer f =
       ~cwd:t.dir
       ()
   in
+  (let (module A : Adapter.S) = adapter in
+   Agent.set_engine
+     agent
+     { engine = Composer; adapter = Some (Adapter_id.of_string A.id |> Or_error.ok_exn) });
   Option.iter approval ~f:(fun approval -> Agent.set_mode agent ~approval);
   Agent.subscribe agent ~f:(print_event t);
   f t agent composer;
@@ -165,7 +169,14 @@ let%expect_test "codex: a text turn, recorded like a harness turn" =
   @@ fun _ agent composer ->
   prompt agent "say it";
   print_s [%message (Composer_runner.thread_id composer : string option) ~messages:((Agent.state agent).message_count : int)];
-  [%expect {| |}]
+  [%expect {|
+    user: "[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\nsay it"
+    spawn #1: codex app-server
+    assistant (codex/gpt-6-luna, End_turn): "fixture simple ok"
+    (("Composer_runner.thread_id composer"
+      (01a0d5eb-f0c0-7481-a417-5e8871805cbc))
+     (messages 2))
+    |}]
 ;;
 
 let%expect_test "codex: a command's approval goes through the session's approvals" =
@@ -180,7 +191,15 @@ let%expect_test "codex: a command's approval goes through the session's approval
       Or_error.ok_exn (Agent.respond_confirm agent ~call_id Allow)
     | _ -> ());
   prompt agent "run it";
-  [%expect {| |}]
+  [%expect {|
+    user: "[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\nrun it"
+    spawn #1: codex app-server
+    assistant (codex/gpt-6-sol, Tool_use): "I\226\128\153ll write the exact text to the file with a local shell command."
+    tool_start bash {"command":"printf '%s' 'codex app-server approval fixture' > .codex-probe-write-action.txt"}
+    confirm exec-02c3fc6e-7a54-4c15-afda-bc59a03b138a bash: printf '%s' 'codex app-server approval fixture' > .codex-probe-write-action.txt
+    tool_end bash -> ""
+    assistant (codex/gpt-6-sol, End_turn): "Created or overwrote `.codex-probe-write-action.txt` with exactly `codex app-server approval fixture`."
+    |}]
 ;;
 
 let%expect_test "codex: its questions go to the user" =
@@ -195,7 +214,12 @@ let%expect_test "codex: its questions go to the user" =
         (Agent.answer_question agent ~call_id (Answered [ [ "Strict schemas (Recommended)" ] ]))
     | _ -> ());
   prompt agent "ask me";
-  [%expect {| |}]
+  [%expect {|
+    user: "[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\nask me"
+    spawn #1: codex app-server
+    ask_user: Should this fixture prefer strict schemas or UI flexibility?
+    assistant (codex/gpt-6-luna, End_turn): "plan questions fixture complete"
+    |}]
 ;;
 
 let%expect_test "codex: aborting the run interrupts the turn" =
@@ -214,7 +238,12 @@ let%expect_test "codex: aborting the run interrupts the turn" =
   Eio_unix.sleep 0.05;
   print_s [%sexp (Agent.abort agent : string list)];
   Agent.wait_idle agent;
-  [%expect {| |}]
+  [%expect {|
+    user: "[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\nstart"
+    spawn #1: codex app-server
+    peer: waiting for turn/interrupt
+    ()
+    |}]
 ;;
 
 let%expect_test "codex: an interrupt Codex ignores ends the turn after the grace period" =
@@ -231,7 +260,12 @@ let%expect_test "codex: an interrupt Codex ignores ends the turn after the grace
   Eio_unix.sleep 0.05;
   ignore (Agent.abort agent : string list);
   Agent.wait_idle agent;
-  [%expect {| |}]
+  print_s [%message "ended" ~running:((Agent.state agent).running : bool)];
+  [%expect {|
+    user: "[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\nstart"
+    spawn #1: codex app-server
+    (ended (running false))
+    |}]
 ;;
 
 let usage_limit_frames =
@@ -255,7 +289,8 @@ let codex_turn ?crash frames (p : Line_transport.Peer.t) =
   let rec thread () =
     let j = next () in
     match Json.member "method" j with
-    | Some (`String "thread/start") ->
+    | Some (`String (("thread/start" | "thread/resume") as m)) ->
+      printf "codex got %s\n" m;
       reply j (`Object [ "thread", `Object [ "id", `String "th" ]; "model", `String "gpt-5" ])
     | _ -> thread ()
   in
@@ -277,7 +312,13 @@ let%expect_test "codex: a usage limit fails the run the way the agent recognises
     ~peer:(fun _ -> codex_turn usage_limit_frames)
   @@ fun _ agent _ ->
   prompt agent "go";
-  [%expect {| |}]
+  [%expect {|
+    user: "[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\ngo"
+    spawn #1: codex app-server
+    codex got thread/start
+    assistant (codex/gpt-5, (Error"You've hit your usage limit. (usage limit reached)")): ""
+    notice: Codex: the usage limit is reached and the provider did not say when it resets, so the run will not resume by itself; send a message to try again, or /model picks another model
+    |}]
 ;;
 
 let%expect_test "codex: a crash mid-turn ends the turn, and the next one restarts it" =
@@ -291,11 +332,25 @@ let%expect_test "codex: a crash mid-turn ends the turn, and the next one restart
           [ {|{"method":"turn/started","params":{"threadId":"th","turn":{"id":"tu","items":[],"status":"inProgress"}}}|}
           ; {|{"method":"item/started","params":{"threadId":"th","turnId":"tu","item":{"type":"commandExecution","id":"c1","command":"make","status":"inProgress"}}}|}
           ]
-      else codex_replay "simple")
+      else
+        codex_turn
+          [ {|{"method":"turn/started","params":{"threadId":"th","turn":{"id":"tu2","items":[],"status":"inProgress"}}}|}
+          ; {|{"method":"item/completed","params":{"threadId":"th","turnId":"tu2","item":{"type":"agentMessage","id":"m1","text":"back again"}}}|}
+          ; {|{"method":"turn/completed","params":{"threadId":"th","turn":{"id":"tu2","items":[],"status":"completed"}}}|}
+          ])
   @@ fun _ agent _ ->
   prompt agent "first";
   prompt agent "second";
-  [%expect {| |}]
+  [%expect {|
+    user: "[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\nfirst"
+    spawn #1: codex app-server
+    codex got thread/start
+    assistant (codex/gpt-5, (Error"Codex exited (code 101)\nthread 'main' panicked at codex-rs/core")): ""
+    user: "second"
+    spawn #2: codex app-server
+    codex got thread/resume
+    assistant (codex/gpt-5, End_turn): "back again"
+    |}]
 ;;
 
 let%expect_test "claude: a denied write" =
@@ -310,7 +365,16 @@ let%expect_test "claude: a denied write" =
       Or_error.ok_exn (Agent.respond_confirm agent ~call_id (Deny (Some "not that file")))
     | _ -> ());
   prompt agent "write it";
-  [%expect {| |}]
+  [%expect {|
+    user: "[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\nwrite it"
+    spawn #1: claude --output-format
+    assistant (claude/claude-sonnet-4-6, Tool_use): ""
+    tool_start write {"path":"/tmp/claude-replay-tool_call_denied_write/.claude-denied-write.txt","content":"approval fixture"}
+    confirm toolu_016StH6rgvnkDxU2MWt46gYE write: /tmp/claude-replay-tool_call_denied_write/.claude-denied-write.txt
+    claude got: {"type":"control_response","response":{"subtype":"success","request_id":"cli-req-1","response":{"behavior":"deny","message":"not that file"}}}
+    tool_end write -> ERROR "[denied by user] Their reason: not that file"
+    assistant (claude/claude-sonnet-4-6, End_turn): "write permission denied"
+    |}]
 ;;
 
 let%expect_test "claude: a simple turn, with its cost recorded as spend" =
@@ -324,16 +388,27 @@ let%expect_test "claude: a simple turn, with its cost recorded as spend" =
     [%message
       (Composer_runner.thread_id composer : string option)
         ~cost_usd:(Float.round_decimal state.cost_usd ~decimal_digits:4 : float)];
-  [%expect {| |}]
+  [%expect {|
+    user: "[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\nhi"
+    spawn #1: claude --output-format
+    assistant (claude/claude-sonnet-4-6, End_turn): "fixture simple ok"
+    (("Composer_runner.thread_id composer"
+      (77171d01-fb4f-4dff-a961-d9dd334be93d))
+     (cost_usd 0.0117))
+    |}]
 ;;
 
 let%expect_test "claude: the process exits mid-turn" =
   with_composer
     ~adapter:(module Claude_adapter)
-    ~peer:(fun _ -> claude_replay ~exit_after:(Some 5) "simple")
+    ~peer:(fun _ -> claude_replay ~exit_after:(Some 2) "simple")
   @@ fun _ agent _ ->
   prompt agent "hi";
-  [%expect {| |}]
+  [%expect {|
+    user: "[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\nhi"
+    spawn #1: claude --output-format
+    assistant (claude/claude-sonnet-4-6, (Error"Claude Code exited (code 1)")): "fixture simple ok"
+    |}]
 ;;
 
 let%expect_test "spawn failing: the run says why" =
@@ -362,5 +437,8 @@ let%expect_test "spawn failing: the run says why" =
   in
   Agent.subscribe agent ~f:(print_event t);
   prompt agent "hi";
-  [%expect {| |}]
+  [%expect {|
+    user: "[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\nhi"
+    assistant (codex/default, (Error"Codex could not start: Codex is not installed on laptop: install it (npm i -g @openai/codex), then try again")): ""
+    |}]
 ;;

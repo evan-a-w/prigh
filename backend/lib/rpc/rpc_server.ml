@@ -418,7 +418,8 @@ type t =
   ; new_agent : ?session:Session.t -> cwd:string -> unit -> Agent.t
   ; default_agent : Agent.t option
   ; engines : Engines.t (** what this backend deploys *)
-  ; spawn_external : Agent.t -> Adapter.Launch.t -> Line_transport.t Or_error.t
+  ; spawn_external :
+      (Agent.t -> Adapter.Launch.t -> Line_transport.t Or_error.t) option
   ; agents : Agent.t String.Table.t (** live sessions by session id *)
   ; clients : Client.t String.Table.t
   ; mutable client_seq : int
@@ -1016,11 +1017,14 @@ let engine_unavailable t agent =
          (Error.to_string_hum e))
 ;;
 
-let no_external_spawn agent (_ : Adapter.Launch.t) =
-  Or_error.errorf
-    "running %s needs a tool host that can run it (the $process host tool), \
-     which this prigh can't do yet"
-    (Agent.engine_label agent)
+(* The harness on the session's active tool host, in its cwd. *)
+let host_spawn t agent launch =
+  Host_transport.spawn
+    ~sw:t.sw
+    ~exec:(fun ~stdin ~cancel ~on_output ~name args ->
+      Agent.host_call agent ~stdin ~cancel ~on_output ~name args)
+    ~host:(Agent.active_host_name agent)
+    launch
 ;;
 
 (* A composer session's runner, driving its adapter's harness on the
@@ -1054,7 +1058,10 @@ let composer_runner t agent (adapter_id : Adapter_id.t) =
     (Composer_runner.create
        ~sw:t.sw
        ~adapter
-       ~spawn:(t.spawn_external agent)
+       ~spawn:
+         (match t.spawn_external with
+          | Some spawn -> spawn agent
+          | None -> host_spawn t agent)
        ~start
        ~on_thread
        ())
@@ -1222,7 +1229,7 @@ let create
       ~sessions_dir
       ~cwd
       ?(engines = Engines.default)
-      ?(spawn_external = no_external_spawn)
+      ?spawn_external
       ~new_agent
       ?default_agent
       ()

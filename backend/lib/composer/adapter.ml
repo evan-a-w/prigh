@@ -52,13 +52,14 @@ module Driver = struct
       Promise.resolve w.resolve (Ok r)
   ;;
 
-  let exit_message ~display_name (exit : Line_transport.Exit.t) =
+  let exit_message ?(tail = true) ~display_name (exit : Line_transport.Exit.t) =
     let how =
       match exit.code with
       | Some code -> sprintf "%s exited (code %d)" display_name code
       | None -> sprintf "%s was stopped" display_name
     in
     match String.strip exit.stderr_tail with
+    | _ when not tail -> how
     | "" -> how
     | tail -> sprintf "%s: %s" how tail
   ;;
@@ -111,7 +112,7 @@ module Driver = struct
              ; stop =
                  Failed
                    { kind = Crashed { stderr_tail = exit.stderr_tail }
-                   ; message = exit_message ~display_name:"the harness" exit
+                   ; message = exit_message ~tail:false ~display_name:"the harness" exit
                    }
              }))
   ;;

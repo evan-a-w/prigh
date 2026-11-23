@@ -111,13 +111,21 @@ let live t (s : Engine_intf.Services.t) (input : Engine_intf.Turn.Input.t) =
       }
     in
     let%bind.Or_error transport = t.spawn (A.launch start) in
+    let injected = injected t s in
+    (* A harness with no MCP in its protocol reaches prigh's tools through
+       the bridge on its host. *)
+    let start =
+      match Line_transport.mcp transport with
+      | None -> start
+      | Some mcp ->
+        mcp.serve injected;
+        { start with
+          mcp_servers =
+            start.mcp_servers @ [ Injected_tools.Bridge.codex_config mcp.bridge ]
+        }
+    in
     (match
-       A.start
-         ~sw:t.sw
-         ?interrupt_grace:t.interrupt_grace
-         ~injected:(injected t s)
-         transport
-         start
+       A.start ~sw:t.sw ?interrupt_grace:t.interrupt_grace ~injected transport start
      with
      | Ok a ->
        let live = Live ((module A), a) in

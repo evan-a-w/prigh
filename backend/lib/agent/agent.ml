@@ -1443,6 +1443,8 @@ let activate_host t (host : Host.t) ~cwd ~pinned =
   state_changed t
 ;;
 
+let active_host_name t = t.active_host_name
+
 let host_unavailable_message t =
   if String.is_empty t.active_host
   then no_host_message
@@ -3017,6 +3019,13 @@ let engine_label t =
   | engine, _ -> String.capitalize (Engine_id.to_string engine)
 ;;
 
+(* Who a usage limit is with: the model, or the external harness. *)
+let limited_by t =
+  match engine t with
+  | Harness -> Model.key t.model
+  | Composer -> engine_label t
+;;
+
 let require t feature =
   Capabilities.check (capabilities t) feature ~who:(engine_label t)
 ;;
@@ -3797,7 +3806,7 @@ and schedule_resume t ~error =
               "%s: the usage limit is reached and the provider did not say \
                when it resets, so the run will not resume by itself; send a \
                message to try again, or /model picks another model"
-              (Model.key t.model)));
+              (limited_by t)));
       false
     | Some reset ->
       let now = Eio.Time.now (Eio.Stdenv.clock t.env) in
@@ -3831,7 +3840,7 @@ and schedule_resume t ~error =
            (sprintf
               "%s: the usage limit is reached; the run resumes %s: /resume now \
                retries at once, /resume cancel stays stopped"
-              (Model.key t.model)
+              (limited_by t)
               when_));
       true)
 

@@ -1095,6 +1095,9 @@ val tool_hosts : t -> Tool_on_host.Host.t list
 
 val active_host : t -> string
 
+(** The active host's name, for messages. *)
+val active_host_name : t -> string
+
 (** Where the session runs, as it records it ({!Session.Host}): the active
     host, connected or not, and the cwd there; [None] while it has none. *)
 val location : t -> (Session.Host.t * string) option

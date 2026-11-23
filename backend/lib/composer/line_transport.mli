@@ -38,6 +38,20 @@ val ended : t -> Exit.t
 (** Whether it exited already. *)
 val is_ended : t -> bool
 
+(** The MCP side channel of a process started with one: how the harness
+    reaches prigh's tools ({!Injected_tools.Bridge}, the [prigh mcp-bridge]
+    command to give it as a stdio MCP server), and [serve], which answers
+    what comes through it with the given tools from then on. *)
+module Mcp : sig
+  type t =
+    { bridge : Injected_tools.Bridge.t
+    ; serve : Injected_tools.t -> unit
+    }
+end
+
+(** Its MCP side channel, if it was started with one. *)
+val mcp : t -> Mcp.t option
+
 (** A transport from its operations, for [Host_stream] and other
     implementations. [ended] blocks until the process exited. *)
 val create
@@ -48,6 +62,8 @@ val create
   -> stop:(unit -> unit)
   -> ended:(unit -> Exit.t)
   -> is_ended:(unit -> bool)
+  -> ?mcp:Mcp.t
+  -> unit
   -> t
 
 (** An in-memory process, for tests: [peer] runs in its own fiber with the

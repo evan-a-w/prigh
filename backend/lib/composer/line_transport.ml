@@ -1,6 +1,13 @@
 open! Core
 open! Import
 
+module Mcp = struct
+  type t =
+    { bridge : Injected_tools.Bridge.t
+    ; serve : Injected_tools.t -> unit
+    }
+end
+
 module Exit = struct
   type t =
     { code : int option
@@ -17,12 +24,24 @@ type t =
   ; stop : unit -> unit
   ; ended : unit -> Exit.t
   ; is_ended : unit -> bool
+  ; mcp : Mcp.t option
   }
 
-let create ~read_line ~write_line ~close_stdin ~interrupt ~stop ~ended ~is_ended
+let create
+      ~read_line
+      ~write_line
+      ~close_stdin
+      ~interrupt
+      ~stop
+      ~ended
+      ~is_ended
+      ?mcp
+      ()
   =
-  { read_line; write_line; close_stdin; interrupt; stop; ended; is_ended }
+  { read_line; write_line; close_stdin; interrupt; stop; ended; is_ended; mcp }
 ;;
+
+let mcp t = t.mcp
 
 let read_line t = t.read_line ()
 let write_line t line = t.write_line line
@@ -121,6 +140,7 @@ module Peer = struct
             Switch.fail psw (Failure "stopped")))
     ; ended = (fun () -> Promise.await exited)
     ; is_ended = (fun () -> Promise.is_resolved exited)
+    ; mcp = None
     }
   ;;
 end

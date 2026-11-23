@@ -55,6 +55,9 @@ module Launch = struct
     ; env_set : (string * string) list
     ; env_unset : string list
     ; cwd : string
+    ; mcp : bool
+      (** with an MCP side channel, through which prigh's tools reach a
+          harness that has no MCP of its own in its protocol *)
     }
   [@@deriving sexp_of]
 end

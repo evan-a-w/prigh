@@ -90,6 +90,7 @@ let launch (start : Adapter.Start.t) : Adapter.Launch.t =
   { argv = Claude_launch.argv (launch_config ~injected:true start)
   ; env_set = Claude_launch.env_set
   ; env_unset = Claude_launch.env_unset
+  ; mcp = false
   ; cwd = start.cwd
   }
 ;;

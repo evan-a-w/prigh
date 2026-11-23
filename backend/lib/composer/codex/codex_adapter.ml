@@ -26,7 +26,12 @@ let capabilities : Capabilities.t =
 ;;
 
 let launch (start : Adapter.Start.t) : Adapter.Launch.t =
-  { argv = [ "codex"; "app-server" ]; env_set = []; env_unset = []; cwd = start.cwd }
+  { argv = [ "codex"; "app-server" ]
+  ; env_set = []
+  ; env_unset = []
+  ; cwd = start.cwd
+  ; mcp = true
+  }
 ;;
 
 let settings ~cwd (s : Adapter.Settings.t) : Codex_codec.Settings.t =
@@ -79,7 +84,7 @@ let start ~sw ?interrupt_grace ?injected:_ transport (start : Adapter.Start.t) =
              ; stop =
                  Failed
                    { kind = Crashed { stderr_tail = exit.stderr_tail }
-                   ; message = Adapter.Driver.exit_message ~display_name exit
+                   ; message = Adapter.Driver.exit_message ~tail:false ~display_name exit
                    }
              }));
   let fail_with_exit e =

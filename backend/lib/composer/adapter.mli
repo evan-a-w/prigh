@@ -60,5 +60,9 @@ module Driver : sig
   val stop : _ t -> unit
 
   (** Why the process ended, for errors: its exit code and stderr. *)
-  val exit_message : display_name:string -> Line_transport.Exit.t -> string
+  val exit_message
+    :  ?tail:bool (** with the end of its stderr (default: true) *)
+    -> display_name:string
+    -> Line_transport.Exit.t
+    -> string
 end
