@@ -3655,11 +3655,15 @@ let dispatch_server t (client : Client.t) ~meth ~params
   | "pr_list" | "pr_view" | "pr_defaults" | "pr_create" ->
     Some (pull_requests t client ~meth ~params)
   | "list_models" ->
-    let models = Login_manager.models t.login in
-    Model_registry.reload models;
-    tell_problems client (Model_registry.problems models);
-    Some
-      (ok (`Array (List.map (Model_registry.models models) ~f:Rpc_json.model)))
+    (match Agent.external_models client.agent with
+     | Some models -> Some (ok (`Array (List.map models ~f:Rpc_json.model)))
+     | None ->
+       let models = Login_manager.models t.login in
+       Model_registry.reload models;
+       tell_problems client (Model_registry.problems models);
+       Some
+         (ok
+            (`Array (List.map (Model_registry.models models) ~f:Rpc_json.model))))
   | _ -> None
 ;;
 
@@ -3677,6 +3681,25 @@ let ui_action_param params ~meth =
       | Some _ ->
         Or_error.error_string
           "a prompt with ui_action takes no text: send text \"\"")
+;;
+
+(* One of an external harness's models, by key ([codex/gpt-5]), id or
+   name. *)
+let resolve_external (models : Model.t list) query ~who =
+  let q = String.lowercase query in
+  match
+    List.find models ~f:(fun m ->
+      String.equal (Model.key m) query
+      || String.equal m.id query
+      || String.equal (String.lowercase m.name) q)
+  with
+  | Some m -> Ok m
+  | None ->
+    Or_error.errorf
+      "%s has no model %S: pick one of %s (/model lists them)"
+      who
+      query
+      (String.concat ~sep:", " (List.map models ~f:(fun m -> m.id)))
 ;;
 
 let dispatch agent login ~(client : Client.t) ~meth ~params : Json.t Or_error.t =
@@ -3891,7 +3914,9 @@ let dispatch agent login ~(client : Client.t) ~meth ~params : Json.t Or_error.t 
   | "set_model" ->
     Or_error.bind (string_param params "model") ~f:(fun id ->
       Or_error.map
-        (Model_registry.resolve (Login_manager.models login) id)
+        (match Agent.external_models agent with
+         | Some models -> resolve_external models id ~who:(Agent.engine_label agent)
+         | None -> Model_registry.resolve (Login_manager.models login) id)
         ~f:(fun model ->
           Agent.set_model agent model;
           `Object []))

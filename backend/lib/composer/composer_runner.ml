@@ -15,6 +15,8 @@ type t =
   ; on_thread : string -> unit
   ; mutable services : Engine_intf.Services.t option (* the running turn's *)
   ; mutable cancel : Cancellation.t
+  ; mutable models : Model.t list (* the harness's, as it last said *)
+  ; mutable context : int option * int option
   }
 
 let create
@@ -38,6 +40,8 @@ let create
   ; on_thread
   ; services = None
   ; cancel = Cancellation.never
+  ; models = []
+  ; context = None, None
   }
 ;;
 
@@ -88,8 +92,8 @@ let injected t (s : Engine_intf.Services.t) =
          | None -> s.execute ctx tool args))
 ;;
 
-let settings t ~cwd (input : Engine_intf.Turn.Input.t) : Adapter.Settings.t =
-  { model = (t.start ~cwd).model
+let settings (input : Engine_intf.Turn.Input.t) : Adapter.Settings.t =
+  { model = input.model
   ; thinking = input.thinking
   ; approval = input.approval
   ; plan = input.plan
@@ -105,7 +109,8 @@ let live t (s : Engine_intf.Services.t) (input : Engine_intf.Turn.Input.t) =
     let resume = Option.first_some t.thread_id base.resume in
     let start =
       { base with
-        thinking = input.thinking
+        model = input.model
+      ; thinking = input.thinking
       ; approval = input.approval
       ; plan = input.plan
       ; resume
@@ -238,7 +243,7 @@ let run_turn
   let recorder =
     Composer_recorder.create
       ~adapter:A.id
-      ~model:(t.start ~cwd:s.cwd).model
+      ~model:input.model
       ~emit:s.emit
       ~notice:s.notice
       ~prompts:input.prompts
@@ -253,10 +258,16 @@ let run_turn
      fail
        (sprintf "%s could not start: %s" A.display_name (Error.to_string_hum e))
    | Ok (Live ((module L), a)) ->
-     let settings = settings t ~cwd:s.cwd input in
+     let settings = settings input in
      let leftover = Queue.create () in
-     let rec turn messages =
-       match L.send a settings (input_of messages) with
+     let rec turn ~first messages =
+       let sent =
+         match input.kind with
+         | Compact { instructions } when first ->
+           L.compact a settings ~instructions
+         | Compact _ | Prompt -> L.send a settings (input_of messages)
+       in
+       match sent with
        | Error e -> fail (Error.to_string_hum e)
        | Ok () ->
          let requests = String.Table.create () in
@@ -376,13 +387,22 @@ let run_turn
             if (not (List.is_empty next)) && Option.is_none (s.halt ())
             then (
               List.iter next ~f:(Composer_recorder.user_message recorder);
-              turn next)
+              turn ~first:false next)
           | _ ->
             (* Not sent: kept in the session, for the user to send again. *)
             Queue.iter leftover ~f:(Composer_recorder.user_message recorder);
             Queue.clear leftover)
      in
-     turn input.prompts);
+     turn ~first:true input.prompts);
+  (match t.live with
+   | Some (Live ((module L), a)) ->
+     (match L.models a with
+      | [] -> ()
+      | models -> t.models <- models)
+   | None -> ());
+  (let tokens, window = Composer_recorder.context recorder in
+   let old_tokens, old_window = t.context in
+   t.context <- Option.first_some tokens old_tokens, Option.first_some window old_window);
   let cost = Composer_recorder.cost_usd recorder in
   if Float.( > ) cost 0. then s.add_spend ~usage:Usage.zero ~cost_usd:cost;
   t.services <- None;
@@ -403,6 +423,21 @@ module R = struct
       A.capabilities
   ;;
 
+  let models t =
+    let (module A : Adapter.S) = t.adapter in
+    (match t.live with
+     | Some (Live ((module L), a)) ->
+       (match L.models a with
+        | [] -> ()
+        | models -> t.models <- models)
+     | None -> ());
+    Some
+      (match t.models with
+       | [] -> [ External_model.default ~adapter:A.id ]
+       | models -> models)
+  ;;
+
+  let context t = t.context
   let run_turn = run_turn
 end
 

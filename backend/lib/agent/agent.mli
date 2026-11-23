@@ -310,6 +310,10 @@ val capabilities : t -> Capabilities.t
     closing the old one; between runs. *)
 val set_runner : t -> Runner.t option -> unit
 
+(** The models the session can switch to when an external harness runs it
+    (its, {!External_model}); [None]: prigh's ({!Model_registry}). *)
+val external_models : t -> Model.t list option
+
 (** prigh's own harness on the session's provider and model, whatever
     runner the session has (for the composer's [prigh] adapter). *)
 val harness_runner : t -> Runner.t

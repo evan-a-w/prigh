@@ -121,6 +121,14 @@ module type S = sig
       exited. *)
   val send : t -> Settings.t -> Input.t -> unit Or_error.t
 
+  (** The models the running harness offers, once it said ([] before):
+      its default first, as {!External_model.default_id}. *)
+  val models : t -> Model.t list
+
+  (** Compacts the thread's context ([/compact]): runs as a turn, ending
+      with [Turn_end]. *)
+  val compact : t -> Settings.t -> instructions:string option -> unit Or_error.t
+
   (** Adds [input] to the running turn, when the harness can. *)
   val steer : t -> Input.t -> unit Or_error.t
 

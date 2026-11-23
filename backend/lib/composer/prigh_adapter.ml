@@ -6,6 +6,8 @@ module R = struct
 
   let engine = Engine_id.Composer
   let capabilities _ = Capabilities.harness
+  let models _ = None
+  let context _ = None, None
 
   let run_turn harness services ~cancel input =
     Runner.run_turn (harness ()) services ~cancel input

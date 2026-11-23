@@ -8,6 +8,8 @@ type t =
 
 let engine = Engine_id.Harness
 let capabilities (_ : t) = Capabilities.harness
+let models (_ : t) = None
+let context (_ : t) = None, None
 
 let mask_session session ~through =
   match List.nth (Session.context_ids session) through with
@@ -70,6 +72,8 @@ let create ~provider ~config =
 
       let engine = engine
       let capabilities = capabilities
+      let models = models
+      let context = context
       let run_turn = run_turn
     end)
     { provider; config }
