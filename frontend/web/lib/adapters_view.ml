@@ -55,7 +55,6 @@ let adapter ~inject (s : S.t) =
     ~cls:
       ("adapter-status adapter-"
        ^ String.tr s.adapter ~target:':' ~replacement:'-')
-    ~stack:true
     [ Settings_row.text
         ([ name s.label; Settings_row.about detail; note (level, label) ]
          @ Option.value_map s.problem ~default:[] ~f:(fun p ->

@@ -294,6 +294,10 @@ Claude Code, ACP agents) while prigh keeps the session, its log and the UI:
 same on either engine. A session made on an engine the backend does not run
 can still be read there.
 
+Settings → Engines in prigh-web, and `/adapters` in the TUI, show whether
+each agent CLI is installed and logged in on each tool host, and what to run
+there when not (prigh never installs one or logs in for you).
+
 ### Computer use
 
 The `computer` tool drives a screen, mouse and keyboard through

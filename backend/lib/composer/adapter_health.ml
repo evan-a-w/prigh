@@ -116,8 +116,7 @@ module Status = struct
        @ opt "account" account
        @ opt "problem" (problem t)
        @ [ ( "checked_at"
-           , `Number
-               (Float.to_string_hum ~decimals:3 ~strip_zero:true t.checked_at) )
+           , `Number (Int.to_string (Float.iround_down_exn t.checked_at)) )
          ])
   ;;
 end
