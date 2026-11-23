@@ -176,7 +176,9 @@ let row
          ; (if wide
             then "setting-wide"
             else
-              "grid grid-cols-[minmax(10rem,1fr)_minmax(0,auto)]                narrow:grid-cols-1")
+              "grid \
+               grid-cols-[minmax(10rem,1fr)_minmax(0,auto)]                \
+               narrow:grid-cols-1")
          ])
     ~stack:wide
     [ text

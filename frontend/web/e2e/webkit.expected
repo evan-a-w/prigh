@@ -930,7 +930,6 @@ to the prigh backend at ws://127.0.0.1:<PORT>/ws
 Saved accounts
 A
 alice
-127.0.0.1:<PORT>
 ×
 or sign in
 User name
@@ -1023,7 +1022,6 @@ Signed out.
 Continue as
 A
 alice
-127.0.0.1:<PORT>
 ×
 or sign in
 User name
@@ -1861,10 +1859,10 @@ Space
 →
 File 2 of 3
 === webkit: review: chat: what the agent did ===
-reply_to_comment
 c1
 Doubling is intended: v12 feeds the scale.
 reply_to_comment
+c2
 proposes a change
 Agreed, a clearer name:
 -	let twice f x
@@ -2809,7 +2807,7 @@ Your message — Step 1: look at module 1. | Copy | (disabled) Trim everything b
 Reply — Module 3 is fixed. | Copy | Trim everything before this — /trim | Trim everything after this — /trim after | Delete — /delete
 === webkit: trim: a message's menu ===
 Your message — Step 3: look at module 3. | Copy | Trim everything before this — /trim | Trim everything after this — /trim after | Delete — /delete
-at the pointer: -26,0
+at the pointer: -52,0
 marked: true
 cut line: dashed
 after Esc: 1 2 3 4 5; preview: 0
@@ -2822,7 +2820,7 @@ copied: Module 3 is fixed. | Its handler returns the error now instead of droppi
 Trim the context here? | Trim 4 messages (~196 tokens) before this message? | Step 3: look at module 3. | <TIME> | They leave the model's context; the transcript keeps them folded, and Undo brings them back. | Enter trims, Esc cancels | Cancel | Trim
 after Esc, steps: 1 2 3 4 5; divider: 0
 === webkit: trim: keyboard ===
-under the message: 0,2
+under the message: -12,2
 highlighted: Trim everything before this
 === webkit: trim: trimmed ===
 divider: 4 messages trimmed · ~196 tokens | Show | · | Undo
