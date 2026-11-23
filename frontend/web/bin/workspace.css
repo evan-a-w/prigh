@@ -1226,4 +1226,12 @@ body.dropping-files .files-panel::after {
     .viewer.animate .viewer-img { transition: none; }
   }
   @keyframes viewer-fade { from { opacity: 0; } }
+
+  /* {1 The top bar's notes (Status_view.notes)}
+
+     loon's outline Badges; the older status items' rules (shared with the
+     context card) do not reach them. */
+  .status-notes > .status-item { margin: 0; display: inline-flex; text-decoration: none; }
+  .status-notes > .status-item:hover { text-decoration: none; }
+  .status-notes > .status-item:focus-visible { outline: none; }
 }
