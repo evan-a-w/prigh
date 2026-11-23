@@ -13,6 +13,10 @@ module Level : sig
   [@@deriving sexp_of, equal]
 end
 
+(** The session's cost: [$0.12], or [subscription] while it is $0 on an
+    adapter that reports no cost (Codex, ACP agents). *)
+val cost : P.State.t -> string
+
 (** [$0.12/$5.00] when a budget is set. *)
 val budget_part : P.State.t -> (string * Level.t) option
 

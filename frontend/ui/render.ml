@@ -1012,7 +1012,7 @@ let status (m : App.Model.t) : Content.Line.t =
       @ [ 2, [ span ~style:(context_style context) (context_text s) ]
         ; ( 4
           , match Loop_status.budget_part s with
-            | None -> [ span ~style:base (sprintf "$%.2f" s.cost_usd) ]
+            | None -> [ span ~style:base (Loop_status.cost s) ]
             | Some (text, level) -> [ span ~style:(level_style level) text ] )
         ]
       @ Option.value_map s.goal ~default:[] ~f:(fun goal ->

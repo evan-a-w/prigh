@@ -11228,7 +11228,7 @@ let session_value (m : Model.t) (setting : Control_setting.t) =
         | Unset -> "none")
      | Mode -> Session_mode.label (Session_mode.of_state state)
      | Context ->
-       let cost = sprintf "$%.2f" state.cost_usd in
+       let cost = Prigh_ui.Loop_status.cost state in
        if state.model.context_window <= 0
        then cost
        else

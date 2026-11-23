@@ -88,7 +88,7 @@ let cost (state : State.t) ~inject =
         [ Attr.class_ "status-item cost"
         ; Attr.title (sprintf "Session cost: $%.4f" state.cost_usd)
         ]
-      [ Node.textf "$%.2f" state.cost_usd ]
+      [ Node.text (Prigh_ui.Loop_status.cost state) ]
   | Some (text, level) ->
     Node.button
       ~attrs:
