@@ -719,13 +719,19 @@ ol.results .url { margin-left: 8px; font: 11.5px var(--mono); color: var(--faint
    (the tests compare the text). Its title says it to the pointer. */
 .took::after { content: attr(data-took); }
 .tool.error .tool-head .name { color: var(--brick); }
+/* In a narrow column (beside the review) the chips give way before the
+   argument does: it keeps a few characters (WebKit let "c2" go to 0px). */
 .tool .chip {
   font: 11.5px var(--mono);
   color: var(--muted-foreground);
-  flex-shrink: 0;
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
   line-height: 18px;
 }
+.tool-head .arg { min-width: 3ch; }
 .chip.bad, .chip.del { color: var(--brick); }
 .chip.ok, .chip.add { color: var(--sage); }
 .chip.job { color: var(--muted-foreground); }

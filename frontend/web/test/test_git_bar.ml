@@ -105,8 +105,8 @@ let%expect_test "the bar: branch, upstream, counts; no boxes in the list" =
     feat/x ↑1 ↓0 origin/feat/x
     0 staged 1 unstaged 1 untracked
     (Commit…) (Push ↑1) (Create PR)
-    (✓ src/ main.ml +2 −1) (More (right-click, Shift+F10))
-    (○ src/ util.ml +2 −0) (More (right-click, Shift+F10))
+    (✓ M src/ main.ml +2 −1) (More (right-click, Shift+F10))
+    (○ A src/ util.ml +2 −0) (More (right-click, Shift+F10))
     2 files changed, +4 −1
     |}];
   (* A status it cannot read: no actions, and why. *)
@@ -155,8 +155,8 @@ let%expect_test "a file's menu stages, unstages, approves; selecting files" =
        [ file "src/main.ml" ~worktree:"M"; file "src/util.ml" ~index:"A" ]);
   H.text h ~selector:".review-files ul";
   [%expect {|
-    (✓ src/ main.ml +2 −1) (More (right-click, Shift+F10))
-    (○ src/ util.ml staged +2 −0) (More (right-click, Shift+F10))
+    (✓ M src/ main.ml +2 −1) (More (right-click, Shift+F10))
+    (○ A src/ util.ml staged +2 −0) (More (right-click, Shift+F10))
     |}];
   (* Staged now: its menu offers Unstage instead. *)
   H.click h ~selector:".review-file-more" ~nth:1;
@@ -200,8 +200,8 @@ let%expect_test "a file's menu stages, unstages, approves; selecting files" =
     (Review (Mark (path src/util.ml) (range true)))
     2 selected (More for them (Shift+F10)) (Unselect them (Esc))
     (Approve) (Commit…)
-    (✓ src/ main.ml +2 −1) (More (right-click, Shift+F10))
-    (○ src/ util.ml +2 −0) (More (right-click, Shift+F10))
+    (✓ M src/ main.ml +2 −1) (More (right-click, Shift+F10))
+    (○ A src/ util.ml +2 −0) (More (right-click, Shift+F10))
     2 files changed, +4 −1
     |}];
   H.key h "F10" ~shift:true ~target:Review;
@@ -236,8 +236,8 @@ let%expect_test "a file's menu stages, unstages, approves; selecting files" =
   H.text h ~selector:".review-files";
   [%expect {|
     (Review Unmark_all)
-    (✓ src/ main.ml +2 −1) (More (right-click, Shift+F10))
-    (○ src/ util.ml +2 −0) (More (right-click, Shift+F10))
+    (✓ M src/ main.ml +2 −1) (More (right-click, Shift+F10))
+    (○ A src/ util.ml +2 −0) (More (right-click, Shift+F10))
     2 files changed, +4 −1
     |}]
 ;;

@@ -26,21 +26,6 @@
 .auth-git-hosts h3 { font-size: 12.5px; font-weight: 600; color: var(--muted-foreground); margin: 0; padding: 6px 0; }
 
 /* A pull request's state. */
-.pr-state {
-  flex-shrink: 0;
-  min-width: 52px;
-  text-align: center;
-  font-size: 11px;
-  font-weight: 600;
-  line-height: 16px;
-  padding: 0 6px;
-  border: 1px solid var(--input);
-  border-radius: var(--r-chip);
-  color: var(--foreground);
-}
-.pr-state.draft { color: var(--muted-foreground); border-style: dashed; }
-.pr-state.merged { color: var(--sage); border-color: var(--sage-line); }
-.pr-state.closed { color: var(--destructive); border-color: var(--brick-line); }
 .pr-branch { font: 12px var(--mono); background: var(--well); border-radius: var(--r-chip); padding: 1px 5px; overflow-wrap: anywhere; }
 .pr-repo { font: 11.5px var(--mono); color: var(--faint); }
 
@@ -75,12 +60,13 @@
 .pr-check.failure .pr-check-state { color: var(--destructive); }
 .pr-checkout {
   display: flex;
+  background: color-mix(in srgb, var(--sage) 6%, transparent);
   align-items: center;
   flex-wrap: wrap;
   gap: 8px 14px;
   padding: 8px 12px;
   border: 1px solid var(--sage-line);
-  border-radius: var(--r-control);
+  border-radius: calc(var(--radius) + 2px);
 }
 .pr-checkout p { margin: 0; flex: 1 1 260px; font-size: 12.5px; }
 .pr-checkout .path, .modal .path { font-family: var(--mono); overflow-wrap: anywhere; }
@@ -91,10 +77,11 @@
 .pr-create-dialog { width: min(640px, 100%); max-height: 86vh; }
 .pr-create-dialog .modal-body { display: flex; flex-direction: column; gap: 12px; }
 .pr-into { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 8px; font-size: 12.5px; color: var(--muted-foreground); }
-.pr-into #pr-base { width: 18ch; font: 12px var(--mono); padding: 3px 6px; }
+.pr-into #pr-base { width: 18ch; height: 28px; font: 12px var(--mono); }
 .pr-into .pr-repo { margin-left: auto; }
 .pr-field { display: flex; flex-direction: column; gap: 4px; }
-.pr-field label { font-size: 12.5px; color: var(--muted-foreground); }
+.pr-field { gap: 6px; }
+.pr-field label { font: 500 13px var(--sans); color: var(--foreground); }
 .pr-body-input { min-height: 150px; resize: vertical; line-height: 1.5; }
 .pr-commits summary { cursor: pointer; font-size: 12.5px; color: var(--muted-foreground); }
 .pr-commits ul { margin: 6px 0 0; padding-left: 18px; font: 12px/1.6 var(--mono); color: var(--faint); }

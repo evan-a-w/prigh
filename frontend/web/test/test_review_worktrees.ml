@@ -151,8 +151,8 @@ let%expect_test
     (main)
     (merge base abcdef01)
     (Since merge base) (Directly)
-    (○ a.ml 1 +1 −1) (More (right-click, Shift+F10))
-    (⚠ login.ml +1 −0) (More (right-click, Shift+F10))
+    (○ M a.ml 1 +1 −1) (More (right-click, Shift+F10))
+    (⚠ A login.ml +1 −0) (More (right-click, Shift+F10))
     2 files changed, +2 −1
     a.ml
     @@ -1 +1 @@
@@ -264,7 +264,7 @@ let%expect_test
     (main /work)
     against
     (HEAD the uncommitted changes)
-    (✓ a.ml 1 +1 −1) (More (right-click, Shift+F10))
+    (✓ M a.ml 1 +1 −1) (More (right-click, Shift+F10))
     1 file changed, +1 −1
     a.ml
     @@ -1 +1 @@

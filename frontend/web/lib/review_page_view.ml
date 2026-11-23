@@ -42,7 +42,12 @@ let open_button ?path (m : App.Model.t) ~inject =
     ([ icon Check; Node.text "Review" ]
      @
      if unsent > 0
-     then [ span ~cls:"review-count" (Int.to_string unsent) ]
+     then
+       [ Review_badge.view
+           ~variant:Default
+           ~cls:"review-count min-w-5 px-1.5"
+           (Int.to_string unsent)
+       ]
      else [])
 ;;
 
@@ -85,6 +90,25 @@ let menu_paths (t : Code_review.t) path =
 (* Buttons that take the review's keys rather than Space pressing them (see
    [key_target] in web_main). *)
 let review_keys = Attr.create "data-review-keys" ""
+
+(* What happened to the file: M, A, D or B, in its colour (its name says it
+   to a reader, the letter is for the eye). *)
+let status_badge (f : Diff_files.File.t) =
+  let letter, kind, what =
+    match f.status with
+    | Modified -> "M", "modified text-primary border-primary/40", "Modified"
+    | Added ->
+      "A", "added text-(color:--sage) border-(color:--sage-line)", "Added"
+    | Deleted ->
+      "D", "deleted text-destructive border-destructive/40", "Deleted"
+    | Binary -> "B", "binary text-muted-foreground", "Binary"
+  in
+  Review_badge.view
+    ~variant:Outline
+    ~cls:("review-file-status h-[18px] w-[18px] px-0 text-[10px] " ^ kind)
+    ~attrs:[ Attr.title what; Attr.create "aria-hidden" "true" ]
+    letter
+;;
 
 let file_row (m : App.Model.t) (f : Diff_files.File.t) ~inject =
   let t = m.review in
@@ -131,11 +155,21 @@ let file_row (m : App.Model.t) (f : Diff_files.File.t) ~inject =
               else inject (review (Go f.path)))
           ]
         [ approval_mark status
+        ; status_badge f
         ; Node.span
             ~attrs:[ Attr.class_ "review-file-path" ]
             [ span ~cls:"dir" dir; span ~cls:"name" name ]
         ; (if comments > 0
-           then span ~cls:"review-file-comments" (Int.to_string comments)
+           then
+             Review_badge.view
+               ~cls:"review-file-comments min-w-5 px-1.5"
+               ~attrs:
+                 [ Attr.title
+                     (if comments = 1
+                      then "1 open comment"
+                      else sprintf "%d open comments" comments)
+                 ]
+               (Int.to_string comments)
            else Node.none)
         ; (match
              Option.bind (Map.find t.since f.path) ~f:File_approval.since_label
@@ -149,21 +183,31 @@ let file_row (m : App.Model.t) (f : Diff_files.File.t) ~inject =
            | None -> Node.none)
         ; (match Git_bar.stage m.git_bar f.path with
            | Staged ->
-             span
-               ~cls:"review-file-staged"
+             Review_badge.view
+               ~variant:Outline
+               ~cls:
+                 "review-file-staged h-4 px-1.5 text-[10px] \
+                  text-(color:--sage) border-(color:--sage-line)"
                ~attrs:[ Attr.title "Staged: git commits it as it is" ]
                "staged"
            | Partly ->
-             span
-               ~cls:"review-file-staged partly"
+             Review_badge.view
+               ~variant:Outline
+               ~cls:
+                 "review-file-staged partly h-4 px-1.5 text-[10px] \
+                  text-muted-foreground border-dashed border-input"
                ~attrs:[ Attr.title "Partly staged: some changes are not" ]
                "partly"
            | Unstaged | Clean -> Node.none)
-        ; span
-            ~cls:"review-file-counts"
+        ; Node.span
+            ~attrs:[ Attr.class_ "review-file-counts" ]
             (match f.status with
-             | Binary -> "bin"
-             | Added | Deleted | Modified -> sprintf "+%d −%d" f.added f.removed)
+             | Binary -> [ Node.text "bin" ]
+             | Added | Deleted | Modified ->
+               [ span ~cls:"add" (sprintf "+%d" f.added)
+               ; Node.text " "
+               ; span ~cls:"del" (sprintf "−%d" f.removed)
+               ])
         ]
     ; Node.button
         ~attrs:
@@ -446,9 +490,12 @@ let editor (m : App.Model.t) (e : Code_review.Editor.t) ~inject =
 
 let file_chip (file : Diff_files.File.t option) =
   match file with
-  | Some { status = Added; _ } -> span ~cls:"chip" "new"
-  | Some { status = Deleted; _ } -> span ~cls:"chip" "deleted"
-  | Some { status = Binary; _ } -> span ~cls:"chip" "binary"
+  | Some { status = Added; _ } ->
+    Review_badge.view ~variant:Outline ~cls:"chip" "new"
+  | Some { status = Deleted; _ } ->
+    Review_badge.view ~variant:Outline ~cls:"chip" "deleted"
+  | Some { status = Binary; _ } ->
+    Review_badge.view ~variant:Outline ~cls:"chip" "binary"
   | Some { status = Modified; _ } | None -> Node.none
 ;;
 

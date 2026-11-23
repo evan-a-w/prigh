@@ -81,7 +81,7 @@ table.diff tr.add .wd { background: color-mix(in srgb, var(--add-fg) 26%, transp
 .diff-dialog .dialog-note.warn { color: var(--primary); }
 .diff-file > summary {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 10px;
   min-width: 0;
   padding: 2px 0 6px;
@@ -103,13 +103,6 @@ table.diff tr.add .wd { background: color-mix(in srgb, var(--add-fg) 26%, transp
 }
 .diff-file[open] > summary::before { transform: rotate(90deg); }
 .diff-file .path { font: 12.5px var(--mono); color: var(--foreground); overflow-wrap: anywhere; min-width: 0; }
-.diff-file .chip {
-  font: 11px var(--mono);
-  color: var(--muted-foreground);
-  background: var(--accent);
-  border-radius: var(--r-chip);
-  padding: 0 5px;
-}
 .diff-file .count { font: 11.5px var(--mono); font-variant-numeric: tabular-nums; }
 .diff-file .count.add { color: var(--sage); }
 .diff-file .count.del { color: var(--destructive); }

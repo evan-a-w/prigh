@@ -20,7 +20,20 @@ let link ?(cls = "") ~href children =
 
 let state_badge (pr : Pull_request.t) =
   let label = Pull_requests.state_label pr in
-  span ~cls:("pr-state " ^ String.lowercase label) label
+  Review_badge.view
+    ~variant:Outline
+    ~cls:
+      (match String.lowercase label with
+       | "draft" ->
+         "pr-state draft min-w-14 text-muted-foreground border-dashed \
+          border-input"
+       | "merged" ->
+         "pr-state merged min-w-14 text-(color:--sage) \
+          border-(color:--sage-line)"
+       | "closed" ->
+         "pr-state closed min-w-14 text-destructive border-destructive/40"
+       | other -> "pr-state min-w-14 " ^ other)
+    label
 ;;
 
 let failure e =
@@ -388,7 +401,8 @@ let create (generate : Generate.t) (f : Pr_create.t) ~inject =
     Node.input
       ~attrs:
         [ Attr.id id
-        ; Attr.class_ "text-input"
+        ; Attr.class_ (Loon.Input.classes ~class_:"text-input" ())
+        ; Attr.create "data-slot" "input"
         ; Attr.type_ "text"
         ; Attr.create "aria-label" label
         ; Attr.placeholder placeholder
@@ -436,7 +450,9 @@ let create (generate : Generate.t) (f : Pr_create.t) ~inject =
         (Node.textarea
            ~attrs:
              [ Attr.id "pr-body"
-             ; Attr.class_ "text-input pr-body-input"
+             ; Attr.class_
+                 (Loon.Textarea.classes ~class_:"text-input pr-body-input" ())
+             ; Attr.create "data-slot" "textarea"
              ; Attr.create "aria-label" "Description"
              ; Attr.value f.body
              ; Attr.rows 8
