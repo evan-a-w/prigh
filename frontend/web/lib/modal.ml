@@ -3,7 +3,10 @@ open! Import
 open Html
 
 let view ?(cls = "") ?(id = "dialog") ?(footer = []) ?back ~title ~on_close body =
+  (* Its own key: never the node of the menu it replaces, whose placing
+     (Menu_listeners: an inline top and left) would stay on it. *)
   Node.div
+    ~key:"modal"
     ~attrs:
       [ Attr.class_ "modal-backdrop"
       ; Attr.create "data-slot" "dialog-overlay"

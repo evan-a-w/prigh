@@ -72,7 +72,8 @@ let%expect_test "a right-click on the composer in the browser shell" =
   [%expect
     {|
     (Place_field_menu (Point (x 200) (y 500)))
-    <div class="context-menu-backdrop field-menu-backdrop menu-backdrop z-(--z-field-menu)"
+    <div @key=menu
+         class="context-menu-backdrop field-menu-backdrop menu-backdrop z-(--z-field-menu)"
          @on_click
          @on_contextmenu>
       <div data-slot="dropdown-menu-content"

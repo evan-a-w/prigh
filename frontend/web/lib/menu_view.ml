@@ -43,6 +43,7 @@ let backdrop ?(cls = "") ~on_close children =
     Js_of_ocaml.Js.Unsafe.equals ev##.target ev##.currentTarget
   in
   Node.div
+    ~key:"menu"
     ~attrs:
       [ Attr.class_ (String.strip ("menu-backdrop " ^ cls))
       ; Attr.on_click (fun ev -> if outside ev then on_close else Effect.Ignore)
