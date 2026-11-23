@@ -179,9 +179,7 @@ let parent_row ~inject ~label ~title (target : string option) =
              | None -> Action.Close_subagent_chat
              | Some id -> Action.Open_subagent_chat id))
       ]
-    [ Icon.view ~class_:"size-3! shrink-0 text-muted-foreground" Arrow_up
-    ; Node.span ~attrs:[ Attr.class_ "min-w-0 truncate" ] [ Node.text label ]
-    ]
+    [ Node.span ~attrs:[ Attr.class_ "min-w-0 truncate" ] [ Node.text label ] ]
 ;;
 
 (* A click (or a right-click) opens the worktree's menu: open it here or in
@@ -261,6 +259,12 @@ let sections (m : Model.t) ~inject =
   let agents = agents m in
   let worktrees = worktrees m in
   let in_subagent = Option.is_some m.subagent_chat in
+  let session =
+    Option.value_map
+      m.state
+      ~default:"The session's own chat"
+      ~f:(Session_title.of_state m)
+  in
   [ (if not in_subagent
      then Node.none
      else
@@ -270,11 +274,7 @@ let sections (m : Model.t) ~inject =
          ~which:Parents
          ~glyph:Arrow_up
          ~name:"Parents"
-         (parent_row
-            ~inject
-            ~label:"The session"
-            ~title:"The session's own chat"
-            None
+         (parent_row ~inject ~label:"Root" ~title:session None
           :: List.map (parents m) ~f:(fun (a : Agents.Agent.t) ->
             parent_row
               ~inject

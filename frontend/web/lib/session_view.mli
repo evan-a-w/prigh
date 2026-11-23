@@ -14,7 +14,3 @@ open! Import
     ({!Chip_popover_view.session_sections}), what applies, the panels, the
     session card and the settings. *)
 val chrome : App.Model.t -> inject:(App.Action.t -> unit Effect.t) -> Node.t
-
-(** The session's name, else its description or first prompt, else
-    ["New session"]. *)
-val session_title : App.Model.t -> State.t -> string

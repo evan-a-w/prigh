@@ -475,7 +475,7 @@ let shown_title = ref ""
 
 let sync_title (m : App.Model.t) =
   let session =
-    Option.map m.state ~f:(Prigh_web.Session_view.session_title m)
+    Option.map m.state ~f:(Prigh_web.Session_title.of_state m)
   in
   let title = Prigh_web.Page_notify.title ?session m.notifications in
   if not (String.equal title !shown_title)

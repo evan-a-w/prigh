@@ -85,7 +85,7 @@ let%expect_test
     Survey the repository
     card:
     (Parents 1)
-    (The session)
+    (Root)
     (Subagents 1)
     (Count the modules thinking…)
     shown:
@@ -107,7 +107,7 @@ let%expect_test
     Count the modules
     card:
     (Parents 2)
-    (The session) (Survey the repository)
+    (Root) (Survey the repository)
     shown:
     <div class="subagent-chat">
     textarea "Message"
@@ -122,7 +122,7 @@ let%expect_test
     /
     Survey the repository
     (Parents 1)
-    (The session)
+    (Root)
     (Subagents 1)
     (Count the modules thinking…)
     |}];

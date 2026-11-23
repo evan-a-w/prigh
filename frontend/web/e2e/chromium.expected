@@ -227,7 +227,7 @@ Count the files
 The survey: 3 files.
 <TIME>
 breadcrumb: cwd / count some lines / Survey the project
-card: Parents | 1 | The session | Subagents | 1 | Count the files | <age>
+card: Parents | 1 | Root | Subagents | 1 | Count the files | <age>
 composer: Message Survey the project…
 === chromium: Alt+1: its own subagent's chat ===
 on show: a1/n1
@@ -236,7 +236,7 @@ Count the files
 There are 3 files.
 <TIME>
 breadcrumb: cwd / count some lines / Survey the project / Count the files
-card: Parents | 2 | The session | Survey the project
+card: Parents | 2 | Root | Survey the project
 composer: A subagent's own subagent: write to its parent
 Esc: back to a1
 Esc: back to the session's chat: true
@@ -1609,7 +1609,7 @@ Count the modules
 There are 42 modules.
 <time>
 breadcrumb: prigh / Count the modules with a subagent / Count the modules
-card: Parents | 1 | The session
+card: Parents | 1 | Root
 composer: 1, focus in the editor: true
 its task as a filled prompt: true
 the composer where it is in the session's chat: true

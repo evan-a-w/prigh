@@ -3,27 +3,6 @@ open! Import
 open Html
 module Action = App.Action
 
-let session_title (m : App.Model.t) (state : State.t) =
-  match state.session_name, state.session_description with
-  | Some name, _ when not (String.is_empty (String.strip name)) -> name
-  | _, Some description -> description
-  | _ ->
-    (match
-       List.find m.sessions ~f:(fun s -> String.equal s.id state.session_id)
-     with
-     | Some s when Option.is_some s.description || Option.is_some s.first_prompt
-       -> Session_list.title s
-     | _ ->
-       (* Before the session list knows it: the first prompt, at once. *)
-       List.find_map (Chat.entries m.chat) ~f:(function
-         | User u ->
-           (match String.strip (Injected_note.typed u) with
-            | "" -> None
-            | text -> Some (List.hd_exn (String.split_lines text)))
-         | _ -> None)
-       |> Option.value ~default:"New session")
-;;
-
 (* On a phone: one button for the rest, which opens a sheet from the bottom
    with a labelled row each: what applies, the jump list, the filter, the
    panels and the settings (no row of bare icons to guess at). *)
@@ -272,13 +251,13 @@ let breadcrumb (m : App.Model.t) ~inject (state : State.t) =
     | [] ->
       B.page
         ~class_:"chrome-title-text truncate"
-        [ Node.text (session_title m state) ]
+        [ Node.text (Session_title.of_state m state) ]
     | _ :: _ ->
       link
         ~cls:"chrome-title-text"
         ~title:"Back to the session's chat"
         Action.Close_subagent_chat
-        (session_title m state)
+        (Session_title.of_state m state)
   in
   let agents =
     List.concat_mapi lineage ~f:(fun i (a : Agents.Agent.t) ->
@@ -342,7 +321,7 @@ let chrome (m : App.Model.t) ~inject =
       | Some state, None ->
         Node.h1
           ~attrs:[ Attr.class_ "chrome-title" ]
-          [ Node.text (session_title m state) ]
+          [ Node.text (Session_title.of_state m state) ]
       | None, _ -> Node.none
     in
     div
