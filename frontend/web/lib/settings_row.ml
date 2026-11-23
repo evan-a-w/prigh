@@ -35,7 +35,8 @@ let stack_cls = "flex-col flex-nowrap items-stretch gap-y-2.5"
 
 let custom ?(cls = "") ?(stack = false) ?(attrs = []) children =
   Node.div
-    ~attrs:(attr_cls [ row_cls; (if stack then stack_cls else ""); cls ] :: attrs)
+    ~attrs:
+      (attr_cls [ row_cls; (if stack then stack_cls else ""); cls ] :: attrs)
     children
 ;;
 
@@ -100,8 +101,9 @@ let control_cls ~wide =
      narrow:has-[.setting-segments]:basis-full \
      narrow:has-[>.setting-select,>input[type=text]]:ml-0 \
      narrow:has-[>.setting-select,>input[type=text]]:basis-full \
-     narrow:[&>.setting-select]:max-w-none narrow:[&>.setting-select]:flex-auto \
-     narrow:[&>.setting-select]:min-w-0 narrow:[&>.setting-select]:shrink \
+     narrow:[&>.setting-select]:max-w-none \
+     narrow:[&>.setting-select]:flex-auto narrow:[&>.setting-select]:min-w-0 \
+     narrow:[&>.setting-select]:shrink \
      narrow:[&>.setting-select]:justify-between \
      narrow:[&>input[type=text]]:flex-1 \
      narrow:has-[>.default-reset,>.fallback-actions]:ml-0 \
@@ -238,12 +240,12 @@ let group ?title ?note:n rows =
 let switch ?(disabled = false) ~label ~title ~on ~on_click () =
   Loon.Switch.view
     ~class_:
-      ("switch narrow:h-11! narrow:w-11! narrow:border-0 narrow:bg-transparent! \
-        narrow:px-[7px] narrow:before:absolute narrow:before:inset-x-[6px] \
-        narrow:before:inset-y-[13px] narrow:before:rounded-full \
-        narrow:before:bg-input narrow:data-checked:before:bg-primary \
-        narrow:before:transition-colors narrow:[&>span]:relative \
-        narrow:-my-3"
+      ("switch narrow:h-11! narrow:w-11! narrow:border-0 \
+        narrow:bg-transparent! narrow:px-[7px] narrow:before:absolute \
+        narrow:before:inset-x-[6px] narrow:before:inset-y-[13px] \
+        narrow:before:rounded-full narrow:before:bg-input \
+        narrow:data-checked:before:bg-primary narrow:before:transition-colors \
+        narrow:[&>span]:relative narrow:-my-3"
        ^ if on then " on" else "")
     ~attrs:[ Attr.create "aria-label" label; Attr.title title ]
     ~disabled
@@ -337,8 +339,7 @@ let select ?(disabled = false) ~cls ~title ~label ~on_click value =
 
 (* One of a few, as loon's toggle group: the choices' effects keyed by their
    position. *)
-let toggles ?(disabled = false) ?(cls = "") ~group_cls ~label ~item_cls choices
-  =
+let toggles ?(disabled = false) ?(cls = "") ~group_cls ~label ~item_cls choices =
   let current =
     List.find_mapi choices ~f:(fun i (_, _, on, _, _) ->
       if on then Some (Int.to_string i) else None)

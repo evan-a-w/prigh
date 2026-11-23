@@ -28,10 +28,12 @@ let swatch accent =
 let sample name =
   let bar cls = Node.span ~attrs:[ Attr.class_ cls ] [] in
   let line ?(cls = "w-[70%] bg-[var(--faint-line)]") () =
-    bar
-      ("sample-line block h-[3px] rounded-xs [.picker-item_&]:h-0.5 " ^ cls)
+    bar ("sample-line block h-[3px] rounded-xs [.picker-item_&]:h-0.5 " ^ cls)
   in
-  let pane = "flex flex-col gap-[5px] rounded-[3px] p-[5px] [.picker-item_&]:gap-0.5 [.picker-item_&]:p-0.5" in
+  let pane =
+    "flex flex-col gap-[5px] rounded-[3px] p-[5px] [.picker-item_&]:gap-0.5 \
+     [.picker-item_&]:p-0.5"
+  in
   Node.span
     ~attrs:
       [ Attr.class_
@@ -45,10 +47,7 @@ let sample name =
       ]
     [ Node.span
         ~attrs:[ Attr.class_ ("sample-side w-[30%] bg-[var(--slate)] " ^ pane) ]
-        [ line ()
-        ; line ~cls:"current w-[85%] bg-[var(--sodium)]" ()
-        ; line ()
-        ]
+        [ line (); line ~cls:"current w-[85%] bg-[var(--sodium)]" (); line () ]
     ; Node.span
         ~attrs:[ Attr.class_ ("sample-main min-w-0 flex-1 " ^ pane) ]
         [ bar
@@ -165,7 +164,8 @@ let accents (m : App.Model.t) ~inject =
           ~attrs:
             [ Attr.type_ "color"
             ; Attr.class_
-                "absolute inset-0 size-full cursor-pointer border-0 p-0 opacity-0"
+                "absolute inset-0 size-full cursor-pointer border-0 p-0 \
+                 opacity-0"
             ; Attr.id "accent-input"
             ; Attr.create "aria-label" "Custom accent colour"
             ; Attr.value (Theme.Accent.hex current)

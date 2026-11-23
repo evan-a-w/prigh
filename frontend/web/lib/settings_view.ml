@@ -356,7 +356,8 @@ let git_host (m : App.Model.t) (a : Forge_account.t) ~inject =
             ~cls:"git-host-name flex flex-wrap items-baseline gap-2"
             [ name a.label; host a.host ]
         ; about (String.capitalize (Forges.describe a) ^ ".")
-        ; Option.value_map note ~default:Node.none ~f:(fun n -> Settings_row.note n)
+        ; Option.value_map note ~default:Node.none ~f:(fun n ->
+            Settings_row.note n)
         ]
     ; control
         (if Set.mem m.forges.signing_out a.host
@@ -652,7 +653,9 @@ let memory_draft (d : Memory_notes.Draft.t) ~inject =
        | None -> Node.none)
     ; buttons
         ~cls:"memory-draft-buttons"
-        [ hint ~cls:"memory-draft-keys keyboard mr-auto" "Ctrl+Enter saves, Esc cancels"
+        [ hint
+            ~cls:"memory-draft-keys keyboard mr-auto"
+            "Ctrl+Enter saves, Esc cancels"
         ; button
             ~cls:"small ghost"
             ~title:"Esc"
@@ -758,13 +761,16 @@ let about_you_field
           [ (match About_you.Field.choices field with
              | Some _ -> Attr.empty
              | None -> Attr.for_ id)
-          ; Attr.class_ "about-you-label text-[13px] font-medium text-muted-foreground"
+          ; Attr.class_
+              "about-you-label text-[13px] font-medium text-muted-foreground"
           ]
         [ Node.text (About_you.Field.label field) ]
     ; (match detected with
        | None -> control
        | Some detected ->
-         div ~cls:"about-you-with flex min-w-0 items-center gap-2" [ control; detected ])
+         div
+           ~cls:"about-you-with flex min-w-0 items-center gap-2"
+           [ control; detected ])
     ]
 ;;
 
@@ -797,7 +803,9 @@ let about_you (m : App.Model.t) ~inject =
     | (Unknown | Loading), None -> note "muted" "Reading what you set…"
     | Loaded, None when a.elsewhere ->
       div
-        ~cls:"about-you-elsewhere flex items-center gap-2 [&>.setting-note]:min-w-0 [&>.setting-note]:flex-1"
+        ~cls:
+          "about-you-elsewhere flex items-center gap-2 \
+           [&>.setting-note]:min-w-0 [&>.setting-note]:flex-1"
         [ note
             "warm"
             "It was changed somewhere else while you were typing. Saving \
@@ -837,14 +845,14 @@ let about_you (m : App.Model.t) ~inject =
            about_you_field m field ~inject ~disabled))
     ; status
     ; buttons
-        ~cls:
-          "about-you-buttons sticky bottom-0 z-1 -mb-2 bg-card py-2"
+        ~cls:"about-you-buttons sticky bottom-0 z-1 -mb-2 bg-card py-2"
         [ (if max > 0
            then
              hint
                ~cls:
                  (if size * 10 >= max * 9
-                  then "about-you-count near mr-auto tabular-nums text-destructive"
+                  then
+                    "about-you-count near mr-auto tabular-nums text-destructive"
                   else "about-you-count mr-auto tabular-nums")
                (sprintf "%d of %d bytes" size max)
            else Node.none)
@@ -870,6 +878,7 @@ let about_you (m : App.Model.t) ~inject =
 ;;
 
 let note_row_cls = "flex-nowrap items-start"
+
 let forgetting_cls =
   "bg-destructive/10 narrow:flex-wrap narrow:[&>.setting-text]:basis-full \
    narrow:[&>.setting-control]:w-full narrow:[&>.setting-control>.btn]:flex-1"
@@ -906,7 +915,8 @@ let memory_note (n : Memory_notes.t) (note : Memory.Note.t) ~inject =
           ; note_text note.text
           ; Settings_row.note
               (if forgetting
-               then "warm", "Delete this note? The model can no longer recall it."
+               then
+                 "warm", "Delete this note? The model can no longer recall it."
                else "muted", "Saved " ^ Memory.Note.date note)
           ]
       ; control
@@ -1106,7 +1116,9 @@ let instruction_draft
        | None -> Node.none)
     ; buttons
         ~cls:"memory-draft-buttons"
-        [ hint ~cls:"memory-draft-keys keyboard mr-auto" "Ctrl+Enter saves, Esc cancels"
+        [ hint
+            ~cls:"memory-draft-keys keyboard mr-auto"
+            "Ctrl+Enter saves, Esc cancels"
         ; button
             ~cls:"small ghost"
             ~title:"Esc"
@@ -1138,7 +1150,9 @@ let instruction_note
       ~cls:
         (if removing
          then
-           "memory-note instruction forgetting " ^ note_row_cls ^ " "
+           "memory-note instruction forgetting "
+           ^ note_row_cls
+           ^ " "
            ^ forgetting_cls
          else "memory-note instruction " ^ note_row_cls)
       ~attrs:[ Attr.create "data-note" note.id ]
@@ -1150,8 +1164,11 @@ let instruction_note
           ; note_text note.text
           ; Settings_row.note
               (if removing
-               then "warm", "Delete this instruction? No session gets it any more."
-               else "muted", sprintf "%s · saved %s" note.id (Memory.Note.date note))
+               then
+                 "warm", "Delete this instruction? No session gets it any more."
+               else
+                 ( "muted"
+                 , sprintf "%s · saved %s" note.id (Memory.Note.date note) ))
           ]
       ; control
           ~cls:(if removing then "self-center gap-2" else "gap-0.5")
@@ -1402,8 +1419,7 @@ let nav (m : App.Model.t) ~current ~inject =
                   text-left text-[13px] text-sidebar-foreground/80 \
                   outline-none hover:bg-sidebar-accent \
                   hover:text-sidebar-accent-foreground focus-visible:ring-2 \
-                  focus-visible:ring-ring \
-                  aria-selected:bg-sidebar-accent \
+                  focus-visible:ring-ring aria-selected:bg-sidebar-accent \
                   aria-selected:font-medium \
                   aria-selected:text-sidebar-accent-foreground \
                   aria-selected:[&>svg]:text-primary"
@@ -1433,7 +1449,8 @@ let nav (m : App.Model.t) ~current ~inject =
         ~attrs:[ Attr.class_ "flex flex-col gap-0.5"; Attr.role "presentation" ]
         (Node.div
            ~attrs:
-             [ Attr.class_ "px-2 pt-3 pb-1 text-xs font-medium text-muted-foreground"
+             [ Attr.class_
+                 "px-2 pt-3 pb-1 text-xs font-medium text-muted-foreground"
              ; Attr.create "aria-hidden" "true"
              ]
            [ Node.text title ]
@@ -1452,9 +1469,7 @@ let nav (m : App.Model.t) ~current ~inject =
      @
      if List.mem available Account ~equal:Section.equal
      then
-       [ Node.div
-           ~attrs:[ Attr.class_ "mt-auto border-t pt-2" ]
-           [ tab Account ]
+       [ Node.div ~attrs:[ Attr.class_ "mt-auto border-t pt-2" ] [ tab Account ]
        ]
      else [])
 ;;
@@ -1475,11 +1490,11 @@ let phone_home (m : App.Model.t) ~inject =
     Node.button
       ~attrs:
         [ Attr.class_
-            ("settings-home-row settings-tab-" ^ Section.arg section
-             ^ " flex min-h-14 w-full items-center gap-3 border-t px-3 \
-                py-2.5 text-left first:border-t-0 active:bg-accent \
-                hover:bg-accent focus-visible:bg-accent \
-                focus-visible:outline-none")
+            ("settings-home-row settings-tab-"
+             ^ Section.arg section
+             ^ " flex min-h-14 w-full items-center gap-3 border-t px-3 py-2.5 \
+                text-left first:border-t-0 active:bg-accent hover:bg-accent \
+                focus-visible:bg-accent focus-visible:outline-none")
         ; Attr.type_ "button"
         ; Attr.create "data-settings-tab" (Section.arg section)
         ; Attr.title ("/settings " ^ Section.arg section)
@@ -1493,7 +1508,10 @@ let phone_home (m : App.Model.t) ~inject =
             ]
           [ glyph ]
       ; Node.span
-          ~attrs:[ Attr.class_ "settings-home-text flex min-w-0 flex-1 flex-col gap-0.5" ]
+          ~attrs:
+            [ Attr.class_
+                "settings-home-text flex min-w-0 flex-1 flex-col gap-0.5"
+            ]
           [ Node.span
               ~attrs:[ Attr.class_ "settings-home-name text-base font-medium" ]
               [ Node.text (Section.name section) ]
@@ -1505,7 +1523,9 @@ let phone_home (m : App.Model.t) ~inject =
                 ]
               [ Node.text about ]
           ]
-      ; icon ~cls:"settings-home-chevron size-4 flex-none text-muted-foreground" Chevron
+      ; icon
+          ~cls:"settings-home-chevron size-4 flex-none text-muted-foreground"
+          Chevron
       ]
   in
   let card sections =
@@ -1519,7 +1539,8 @@ let phone_home (m : App.Model.t) ~inject =
     | sections ->
       [ Node.div
           ~attrs:
-            [ Attr.class_ "px-1 pt-4 pb-1.5 text-[13px] font-medium text-muted-foreground"
+            [ Attr.class_
+                "px-1 pt-4 pb-1.5 text-[13px] font-medium text-muted-foreground"
             ; Attr.create "aria-hidden" "true"
             ]
           [ Node.text title ]
@@ -1545,12 +1566,13 @@ let panel (m : App.Model.t) current ~inject =
     ~key:(Section.arg current)
     ~attrs:
       [ Attr.class_
-          ("settings-panel settings-panel-" ^ Section.arg current
-           ^ " loon min-h-0 overflow-y-auto px-6 pt-5 pb-6 [scrollbar-gutter:stable] \
-              animate-in fade-in-0 slide-in-from-bottom-1 duration-150 \
-              motion-reduce:animate-none narrow:overflow-visible \
-              narrow:px-[max(16px,var(--safe-r))] narrow:pt-4 \
-              narrow:pb-[max(24px,var(--safe-b))] \
+          ("settings-panel settings-panel-"
+           ^ Section.arg current
+           ^ " loon min-h-0 overflow-y-auto px-6 pt-5 pb-6 \
+              [scrollbar-gutter:stable] animate-in fade-in-0 \
+              slide-in-from-bottom-1 duration-150 motion-reduce:animate-none \
+              narrow:overflow-visible narrow:px-[max(16px,var(--safe-r))] \
+              narrow:pt-4 narrow:pb-[max(24px,var(--safe-b))] \
               narrow:pl-[max(16px,var(--safe-l))] narrow:animate-none")
       ; Attr.id "settings-panel"
       ; (if m.narrow
@@ -1565,7 +1587,8 @@ let panel (m : App.Model.t) current ~inject =
        ~attrs:[ Attr.class_ "settings-panel-head mb-1" ]
        [ Node.h3
            ~attrs:
-             [ Attr.class_ "text-lg font-semibold tracking-tight narrow:hidden" ]
+             [ Attr.class_ "text-lg font-semibold tracking-tight narrow:hidden"
+             ]
            [ Node.text (Section.name current) ]
        ; Node.p
            ~attrs:
@@ -1600,13 +1623,18 @@ let view (m : App.Model.t) ~inject =
   match m.narrow, m.settings_home with
   | true, true ->
     Modal.view
-      ~cls:"settings-dialog phone-page settings-home-page [&>.modal-body]:block [&>.modal-body]:overflow-y-auto [&>.modal-body]:p-0"
+      ~cls:
+        "settings-dialog phone-page settings-home-page [&>.modal-body]:block \
+         [&>.modal-body]:overflow-y-auto [&>.modal-body]:p-0"
       ~title:"Settings"
       ~on_close:(inject Action.Close_dialog)
       [ phone_home m ~inject ]
   | true, false ->
     Modal.view
-      ~cls:"settings-dialog phone-page settings-section-page [&>.modal-body]:block [&>.modal-body]:overflow-y-auto [&>.modal-body]:p-0"
+      ~cls:
+        "settings-dialog phone-page settings-section-page \
+         [&>.modal-body]:block [&>.modal-body]:overflow-y-auto \
+         [&>.modal-body]:p-0"
       ~title:(Section.name current)
       ~back:("Settings", inject Action.Settings_home)
       ~on_close:(inject Action.Close_dialog)

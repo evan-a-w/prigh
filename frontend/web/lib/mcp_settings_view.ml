@@ -40,13 +40,17 @@ let tools_list (tools : Mcp_server.Tool.t list) =
        Node.li
          ~attrs:[ Attr.class_ "mcp-tool flex min-w-0 flex-col gap-px" ]
          [ span
-             ~cls:"mcp-tool-name font-mono text-xs text-foreground [overflow-wrap:anywhere]"
+             ~cls:
+               "mcp-tool-name font-mono text-xs text-foreground \
+                [overflow-wrap:anywhere]"
              tool.name
          ; (if String.is_empty tool.description
             then Node.none
             else
               span
-                ~cls:"mcp-tool-description line-clamp-2 text-xs leading-snug text-muted-foreground"
+                ~cls:
+                  "mcp-tool-description line-clamp-2 text-xs leading-snug \
+                   text-muted-foreground"
                 tool.description)
          ]))
 ;;
@@ -179,8 +183,9 @@ let pair_rows (d : Mcp_page.Draft.t) ~inject =
   List.mapi d.pairs ~f:(fun i (p : Mcp_page.Pair.t) ->
     div
       ~cls:
-        "mcp-pair grid w-full grid-cols-[minmax(0,2fr)_minmax(0,3fr)_auto_auto] \
-         items-center gap-1.5"
+        "mcp-pair grid w-full \
+         grid-cols-[minmax(0,2fr)_minmax(0,3fr)_auto_auto] items-center \
+         gap-1.5"
       [ Node.input
           ~attrs:
             [ Attr.class_ (input_cls "mcp-pair-key min-w-0 font-mono text-xs")
@@ -358,8 +363,7 @@ let draft_form (d : Mcp_page.Draft.t) ~inject =
                    ${VAR} takes VAR from the tool host's environment."
               ])
        ; (match d.error with
-          | Some e ->
-            note ~cls:"mcp-error block" ("warm", String.capitalize e)
+          | Some e -> note ~cls:"mcp-error block" ("warm", String.capitalize e)
           | None -> Node.none)
        ; buttons
            ~cls:"mcp-buttons"
@@ -401,7 +405,8 @@ let paste_form (p : Mcp_page.Paste.t) ~inject =
     ; Node.textarea
         ~attrs:
           [ Attr.id "mcp-paste-text"
-          ; Attr.class_ (textarea_cls "mcp-paste-input min-h-[8em] font-mono text-xs")
+          ; Attr.class_
+              (textarea_cls "mcp-paste-input min-h-[8em] font-mono text-xs")
           ; Attr.create "aria-label" "mcpServers JSON"
           ; Attr.rows 6
           ; Attr.placeholder
@@ -448,12 +453,16 @@ let server_row (m : App.Model.t) (s : Mcp_settings.Server.t) ~inject =
         (String.concat
            ~sep:" "
            ([ "mcp-server" ]
-            @ (if s.enabled then [] else [ "off [&_.setting-name]:text-muted-foreground" ])
+            @ (if s.enabled
+               then []
+               else [ "off [&_.setting-name]:text-muted-foreground" ])
             @ if removing then [ "removing bg-destructive/10" ] else []))
       ~attrs:[ Attr.create "data-server" s.name ]
       ([ text
            [ name s.name
-           ; about ~cls:"mcp-summary" (Mcp_settings.Transport.summary s.transport)
+           ; about
+               ~cls:"mcp-summary"
+               (Mcp_settings.Transport.summary s.transport)
            ; (if removing
               then
                 note

@@ -33,7 +33,12 @@ val row
     puts its parts under each other), its text column, the setting's
     [name], a line [about] it, a [host] (monospace), a [note] ([level]
     ["warm"], ["good"], ["bad"] or ["muted"]), and its controls. *)
-val custom : ?cls:string -> ?stack:bool -> ?attrs:Attr.t list -> Node.t list -> Node.t
+val custom
+  :  ?cls:string
+  -> ?stack:bool
+  -> ?attrs:Attr.t list
+  -> Node.t list
+  -> Node.t
 
 val text : ?cls:string -> ?wide:bool -> Node.t list -> Node.t
 val name : string -> Node.t
@@ -43,6 +48,7 @@ val note : ?cls:string -> string * string -> Node.t
 
 (** The text colour of a note of this level. *)
 val note_colour : string -> string
+
 val control : ?cls:string -> ?wide:bool -> Node.t list -> Node.t
 
 (** A line of small print (the keys that save, a count). *)

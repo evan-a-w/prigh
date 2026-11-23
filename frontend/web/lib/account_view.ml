@@ -113,7 +113,9 @@ let menu (m : App.Model.t) (picker : Picker.t) ~inject =
            | None -> Node.none
            | Some { name; acting_as = acting; host } ->
              div
-               ~cls:"account-current mb-1 flex items-center gap-2.5 border-b px-2 pt-2 pb-2.5"
+               ~cls:
+                 "account-current mb-1 flex items-center gap-2.5 border-b px-2 \
+                  pt-2 pb-2.5"
                [ avatar ~size:`Large name
                ; div
                    ~cls:"account-who flex min-w-0 flex-1 flex-col leading-snug"
@@ -127,7 +129,9 @@ let menu (m : App.Model.t) (picker : Picker.t) ~inject =
                    ; (match host with
                       | Some host ->
                         span
-                          ~cls:"account-host truncate font-mono text-xs text-muted-foreground"
+                          ~cls:
+                            "account-host truncate font-mono text-xs \
+                             text-muted-foreground"
                           host
                       | None -> Node.none)
                    ]

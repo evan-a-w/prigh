@@ -67,8 +67,12 @@ let meter (w : U.Window.t) =
     ; span
         ~cls:
           (if String.equal level "full"
-           then "usage-percent min-w-[8ch] text-right text-[13px] tabular-nums text-destructive"
-           else "usage-percent min-w-[8ch] text-right text-[13px] tabular-nums text-muted-foreground")
+           then
+             "usage-percent min-w-[8ch] text-right text-[13px] tabular-nums \
+              text-destructive"
+           else
+             "usage-percent min-w-[8ch] text-right text-[13px] tabular-nums \
+              text-muted-foreground")
         (percent w.used_percent ^ " used")
     ]
 ;;

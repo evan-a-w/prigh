@@ -297,7 +297,10 @@ let fallback (m : App.Model.t) (config : Config.t option) ~inject =
        | [] -> Node.none
        | models ->
          Node.ol
-           ~attrs:[ Attr.class_ "fallback-list m-0 flex list-none flex-wrap gap-1.5 p-0" ]
+           ~attrs:
+             [ Attr.class_
+                 "fallback-list m-0 flex list-none flex-wrap gap-1.5 p-0"
+             ]
            (List.mapi models ~f:chip))
     ; div
         ~cls:"fallback-actions flex items-center gap-2"
