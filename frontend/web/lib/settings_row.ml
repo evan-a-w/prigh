@@ -26,7 +26,9 @@ let attr_cls parts = Attr.class_ (cn parts)
 
 let row_cls =
   "setting flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-border \
-   px-4 py-3 first:border-t-0 narrow:py-3.5"
+   px-4 py-3 first:border-t-0 narrow:px-3.5 narrow:py-3.5 \
+   narrow:[&_:is(.btn,select,.chip-button,.memory-filter,.memory-title-input)]:min-h-11 \
+   narrow:[&_.btn.icon]:size-11"
 ;;
 
 let stack_cls = "flex-col flex-nowrap items-stretch gap-y-2.5"
@@ -95,7 +97,12 @@ let control_cls ~wide =
   else
     "setting-control ml-auto flex min-w-0 max-w-full shrink-0 items-center \
      gap-2 narrow:has-[.setting-segments]:ml-0 \
-     narrow:has-[.setting-segments]:basis-full"
+     narrow:has-[.setting-segments]:basis-full \
+     narrow:has-[>.setting-select,>input[type=text]]:ml-0 \
+     narrow:has-[>.setting-select,>input[type=text]]:basis-full \
+     narrow:[&>.setting-select]:max-w-none narrow:[&>.setting-select]:flex-auto \
+     narrow:[&>.setting-select]:justify-between \
+     narrow:[&>input[type=text]]:flex-1"
 ;;
 
 let control ?(cls = "") ?(wide = false) children =
@@ -193,7 +200,8 @@ let group ?title ?note:n rows =
          Node.div
            ~attrs:
              [ Attr.class_
-                 "settings-group-head flex items-baseline gap-2.5 px-1 pb-2"
+                 "settings-group-head flex flex-wrap items-baseline gap-x-2.5 \
+                  gap-y-0.5 px-1 pb-2"
              ]
            [ (match title with
               | Some title ->
@@ -207,7 +215,8 @@ let group ?title ?note:n rows =
                 Node.span
                   ~attrs:
                     [ Attr.class_
-                        "settings-group-note text-xs text-muted-foreground"
+                        "settings-group-note text-xs text-muted-foreground \
+                         narrow:basis-full"
                     ]
                   [ Node.text n ]
               | None -> Node.none)
@@ -268,7 +277,8 @@ let number_switch
                  ; Attr.class_
                      (input_cls
                         "number-field-input h-7 w-[calc(6ch+22px)] px-2 \
-                         text-right")
+                         text-center font-mono text-[13px] tabular-nums \
+                         narrow:w-[calc(6ch+26px)]")
                  ; Attr.type_ "text"
                  ; Attr.create "inputmode" "decimal"
                  ; Attr.value value
@@ -284,7 +294,7 @@ let number_switch
                  ]
                ()
            ; Node.span
-               ~attrs:[ Attr.class_ "number-field-unit" ]
+               ~attrs:[ Attr.class_ "number-field-unit min-w-[6ch]" ]
                [ Node.text unit ]
            ]
        else Node.none)

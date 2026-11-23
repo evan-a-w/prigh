@@ -40,6 +40,9 @@ val name : string -> Node.t
 val about : ?cls:string -> string -> Node.t
 val host : string -> Node.t
 val note : ?cls:string -> string * string -> Node.t
+
+(** The text colour of a note of this level. *)
+val note_colour : string -> string
 val control : ?cls:string -> ?wide:bool -> Node.t list -> Node.t
 
 (** A line of small print (the keys that save, a count). *)

@@ -652,7 +652,7 @@ let memory_draft (d : Memory_notes.Draft.t) ~inject =
        | None -> Node.none)
     ; buttons
         ~cls:"memory-draft-buttons"
-        [ hint ~cls:"memory-draft-keys mr-auto" "Ctrl+Enter saves, Esc cancels"
+        [ hint ~cls:"memory-draft-keys keyboard mr-auto" "Ctrl+Enter saves, Esc cancels"
         ; button
             ~cls:"small ghost"
             ~title:"Esc"
@@ -870,7 +870,10 @@ let about_you (m : App.Model.t) ~inject =
 ;;
 
 let note_row_cls = "flex-nowrap items-start"
-let forgetting_cls = "bg-destructive/10"
+let forgetting_cls =
+  "bg-destructive/10 narrow:flex-wrap narrow:[&>.setting-text]:basis-full \
+   narrow:[&>.setting-control]:w-full narrow:[&>.setting-control>.btn]:flex-1"
+;;
 
 let note_text text =
   Node.span
@@ -1103,7 +1106,7 @@ let instruction_draft
        | None -> Node.none)
     ; buttons
         ~cls:"memory-draft-buttons"
-        [ hint ~cls:"memory-draft-keys mr-auto" "Ctrl+Enter saves, Esc cancels"
+        [ hint ~cls:"memory-draft-keys keyboard mr-auto" "Ctrl+Enter saves, Esc cancels"
         ; button
             ~cls:"small ghost"
             ~title:"Esc"

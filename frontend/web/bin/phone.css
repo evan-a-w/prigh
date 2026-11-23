@@ -257,119 +257,6 @@
 .app.narrow .modal-back .icon { width: 20px; height: 20px; }
 @media (max-width: 359px) { .app.narrow .modal-back-label { display: none; } }
 
-/* {1 Settings} */
-
-.app.narrow .settings-dialog .modal-body { display: block; padding: 0; overflow-y: auto; }
-.app.narrow .settings-dialog .settings-nav { display: none; }
-.app.narrow .settings-panel { overflow: visible; padding: 16px max(16px, var(--safe-r)) max(24px, var(--safe-b)) max(16px, var(--safe-l)); animation: none; }
-/* The title is in the bar; the page's own head says what it is about. */
-.app.narrow .settings-section-page .settings-panel-head h3 { display: none; }
-.app.narrow .settings-panel-head p { margin-top: 0; font-size: 14px; }
-
-.settings-home { display: flex; flex-direction: column; padding: 12px max(12px, var(--safe-r)) max(16px, var(--safe-b)) max(12px, var(--safe-l)); gap: 0; }
-.settings-home-row {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  min-height: 64px;
-  padding: 10px 8px 10px 12px;
-  border: 0;
-  border-top: 1px solid var(--rule);
-  background: none;
-  color: var(--chalk);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-.settings-home-row:first-child { border-top: 0; }
-.settings-home-row:active, .settings-home-row:hover { background: var(--slate-2); border-radius: var(--r-control); }
-.settings-home-row:focus-visible { outline: 2px solid var(--sodium); outline-offset: -2px; border-radius: var(--r-control); }
-.settings-home-row.settings-tab-account { margin-top: 18px; border-top: 0; background: var(--well); border-radius: var(--r-surface); }
-.settings-home-icon {
-  width: 34px;
-  height: 34px;
-  flex: none;
-  display: grid;
-  place-items: center;
-  border-radius: 9px;
-  background: var(--slate-2);
-  color: var(--sodium);
-}
-.settings-home-icon .icon { width: 18px; height: 18px; }
-.settings-home-icon .avatar { width: 34px; height: 34px; font-size: 15px; }
-.settings-home-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.settings-home-name { font-size: 16px; font-weight: 600; }
-.settings-home-about { font-size: 13px; color: var(--muted-text); line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.settings-home-chevron { width: 18px; height: 18px; flex: none; color: var(--faint); transform: rotate(-90deg); }
-
-/* Rows: the words over the control, the control the full width. */
-.app.narrow .settings-card { padding: 0 14px; }
-.app.narrow .setting { padding: 14px 0; }
-.app.narrow .setting:not(.setting-wide) .setting-text { flex-basis: 100%; }
-.app.narrow .setting .segmented { display: grid; grid-auto-flow: row; grid-template-columns: repeat(auto-fit, minmax(76px, 1fr)); width: 100%; min-width: 0; }
-.app.narrow .setting .setting-control { min-width: 0; max-width: 100%; }
-.app.narrow .setting .segmented > * { min-height: var(--tap); font-size: 14px; justify-content: center; text-align: center; white-space: normal; line-height: 1.2; }
-.app.narrow .setting :is(.btn, select, .chip-button) { min-height: var(--tap); }
-.app.narrow .setting input[type="text"], .app.narrow .setting input:not([type]) { width: 100%; }
-/* The button a thumb's 46x44, its track the 28px drawn in it; the margin
-   keeps the row as tall as the track. */
-.app.narrow .switch { width: 46px; height: 44px; margin-block: -8px; border: 0; border-radius: 0; background: none; }
-.app.narrow .switch::before { content: ""; position: absolute; inset: 8px 0; border-radius: 14px; border: 1px solid var(--rule-2); background: var(--well); transition: background 0.12s, border-color 0.12s; }
-.app.narrow .switch.on::before { background: var(--sodium); border-color: var(--sodium); }
-@media (prefers-reduced-motion: reduce) { .app.narrow .switch::before { transition: none; } }
-.app.narrow .switch:focus-visible { outline: none; }
-.app.narrow .switch:focus-visible::before { outline: 2px solid var(--sodium); outline-offset: 2px; }
-.app.narrow .switch-knob { top: 12px; left: 4px; width: 20px; height: 20px; }
-.app.narrow .switch.on .switch-knob { transform: translateX(18px); }
-.app.narrow .settings-group h4 { font-size: 12px; }
-/* A wide row is the words, then the control: neither grows into a gap. */
-.app.narrow .setting-wide { flex-wrap: nowrap; }
-.app.narrow .setting-wide .setting-text { flex: none; }
-/* A segmented control takes the row's width, its choices an even grid. */
-.app.narrow .setting .setting-control:has(> .segmented) { flex: 1 1 100%; margin-left: 0; }
-.app.narrow .setting .segmented > .segment { min-height: 44px; padding: 6px 8px; }
-/* New sessions: the choosers and the directory take the row, its reset at
-   the end; thinking's five levels in one row. */
-.app.narrow .setting:is(.default-model, .default-host, .default-dir, .default-fallback) .setting-control { flex: 1 1 100%; margin-left: 0; flex-wrap: wrap; justify-content: flex-start; }
-.app.narrow :is(.default-model-choice, .default-host-choice) { flex: 1 1 auto; max-width: none; min-height: var(--tap); justify-content: space-between; }
-.app.narrow .default-dir-input { flex: 1 1 0; width: auto; min-height: var(--tap); font-size: 16px; }
-.app.narrow .default-reset, .app.narrow .fallback-remove { min-width: var(--tap); min-height: var(--tap); justify-content: center; }
-.app.narrow .default-model-this, .app.narrow .fallback-add { min-height: var(--tap); }
-.app.narrow .fallback-list { flex: 1 1 100%; }
-.app.narrow .default-thinking .segmented { grid-template-columns: repeat(5, minmax(0, 1fr)); }
-.app.narrow .default-thinking .segmented > .segment { padding: 6px 2px; white-space: nowrap; }
-/* Many or long choices (the status styles): a list of rows, each its name
-   over a line about it, a radio's ring before them. */
-.choice-list .segment-about { display: none; }
-.app.narrow .setting .segmented.choice-list { grid-template-columns: minmax(0, 1fr); gap: 2px; padding: 3px; }
-.app.narrow .segmented.choice-list > .segment {
-  display: grid;
-  grid-template-columns: 18px minmax(0, 1fr);
-  column-gap: 12px;
-  align-items: center;
-  justify-content: stretch;
-  text-align: left;
-  padding: 9px 12px;
-  min-height: 52px;
-  white-space: normal;
-}
-.app.narrow .segmented.choice-list > .segment::before {
-  content: "";
-  grid-row: 1 / span 2;
-  width: 16px;
-  height: 16px;
-  box-sizing: border-box;
-  border-radius: 50%;
-  border: 1.5px solid var(--rule-2);
-}
-.app.narrow .segmented.choice-list > .segment.on::before { border: 5px solid var(--sodium); }
-.app.narrow .choice-list .segment-name { font-size: 15px; font-weight: 600; color: var(--chalk); }
-.app.narrow .choice-list .segment-about { display: block; grid-column: 2; font-size: 13px; line-height: 1.35; color: var(--muted-text); }
-.app.narrow .choice-list .segment:not(.on) .segment-name { font-weight: 500; }
-/* Compaction's threshold field: one line, the number and its unit centred. */
-.app.narrow .number-switch { gap: 16px; }
-.app.narrow .number-field { font-size: 15px; white-space: nowrap; }
-.app.narrow .setting input.number-field-input { width: calc(6ch + 22px); min-height: 44px; font-size: 16px; }
 /* Tabs never show on a phone: their switch is for the desktop. */
 
 /* Hints that only make sense with a keyboard (Ctrl+K, Enter accepts…). */
@@ -500,11 +387,7 @@
 .app.narrow .chip-anchor.host > .host-chip { min-width: 40px; }
 .app.narrow .code-head { padding-top: 0; }
 .app.narrow button.copy { min-height: var(--tap); padding: 0 12px; }
-.app.narrow .accent-choice { min-width: var(--tap); min-height: var(--tap); justify-content: center; }
 .app.narrow .modal-back { min-width: 44px; justify-content: center; }
-/* A group's title and its note, one over the other on a narrow page. */
-.app.narrow .settings-group-head { flex-wrap: wrap; row-gap: 2px; }
-.app.narrow .settings-group-note { flex-basis: 100%; }
 /* The files: the head's buttons and the path's parts a thumb's size. The
    tools have a row of their own under the host's name and the close. */
 .app.narrow .files-head .btn.icon { width: var(--tap); height: var(--tap); }
@@ -611,16 +494,6 @@
 
 .app.narrow .computer-banner .btn.computer-banner-stop { height: var(--tap); min-width: var(--tap); }
 .app.narrow .no-host-banner .btn.no-host-banner-chat { height: var(--tap); }
-/* Memory: notes over their buttons' column; the editor's buttons a thumb's. */
-.app.narrow .memory-note .setting-text { flex-basis: 0; }
-.app.narrow .memory-note .btn.icon { width: var(--tap); height: var(--tap); }
-.app.narrow .memory-note.forgetting { flex-wrap: wrap; }
-.app.narrow .memory-note.forgetting .setting-text { flex-basis: 100%; }
-.app.narrow .memory-note.forgetting .setting-control { width: 100%; }
-.app.narrow .memory-note.forgetting .setting-control .btn { flex: 1; min-height: var(--tap); }
-.app.narrow :is(.memory-toolbar, .memory-draft-buttons) .btn { min-height: var(--tap); }
-.app.narrow :is(.memory-filter, .memory-title-input) { min-height: var(--tap); }
-.app.narrow .memory-draft-keys { display: none; }
 .app.narrow .instructions-warning .setting-text { flex-basis: 0; }
 .app.narrow .instruction-add { min-height: var(--tap); }
 /* About you: the box at 16px (no zoom on focus), its buttons a thumb's. */

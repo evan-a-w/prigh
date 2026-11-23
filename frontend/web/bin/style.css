@@ -1081,8 +1081,6 @@ kbd {
 .account-button:hover { background: var(--slate-2); }
 .account-button:focus-visible { background: var(--slate-2); outline: 2px solid var(--sodium); outline-offset: 1px; }
 .account-button .chevron { width: 14px; height: 14px; color: var(--faint); transform: rotate(180deg); }
-.avatar.small { width: 24px; height: 24px; font-size: 12px; background: var(--rule-2); color: var(--chalk); }
-.avatar.large { width: 38px; height: 38px; font-size: 16px; }
 
 .menu-backdrop { position: fixed; inset: 0; z-index: var(--z-menu); }
 /* What a menu floats on: the account's, a composer chip's. */
@@ -1095,22 +1093,6 @@ kbd {
   box-shadow: 0 0 0 1px color-mix(in oklab, var(--foreground) 10%, transparent), 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
   outline: none;
 }
-.account-menu {
-  position: fixed;
-  left: 10px;
-  bottom: 62px;
-  width: 300px;
-  max-height: calc(100vh - 80px);
-  overflow-y: auto;
-  padding: 6px;
-  animation: appear 0.12s ease-out;
-}
-.account-current { display: flex; align-items: center; gap: 10px; padding: 8px 8px 10px; border-bottom: 1px solid var(--rule); margin-bottom: 4px; }
-.account-who { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.35; }
-.account-name { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; }
-.account-acting { color: var(--sodium); font-size: 12.5px; }
-.account-host { color: var(--muted-text); font: 11.5px var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.account-badge { font-size: 11.5px; color: var(--sage); border: 1px solid var(--sage-line); border-radius: var(--r-chip); padding: 0 6px; white-space: nowrap; }
 /* Loon's DropdownMenu parts (Menu_view): sections apart by a separator,
    a label, items (the one under the pointer or the keys accented), the
    destructive ones red, a shortcut at the right. */
@@ -1368,213 +1350,7 @@ kbd {
 }
 
 
-/* Settings: a row per setting, its name, a line on what it does, and its
-   control at the end. The headings say where the setting lives. */
-/* Settings: a large panel, the sections down its side as tabs and the one
-   chosen beside them. Its size does not change with the section, so the
-   tabs stay where the pointer is. */
-.modal-backdrop:has(> .settings-dialog) { padding-top: 6vh; }
-.settings-dialog { width: min(940px, 100%); height: min(720px, 88vh); max-height: none; }
-.settings-dialog .modal-head { padding: 12px 10px 10px 18px; border-bottom: 1px solid var(--rule); }
-.settings-dialog .modal-head h2 { font-size: 15px; }
-.settings-dialog .modal-body { display: grid; grid-template-columns: 208px minmax(0, 1fr); padding: 0; overflow: hidden; flex: 1 1 auto; }
-.settings-dialog .modal-buttons { border-top: 1px solid var(--rule); }
-.settings-nav { display: flex; flex-direction: column; gap: 2px; padding: 10px 8px; background: var(--well); border-right: 1px solid var(--rule); overflow-y: auto; min-height: 0; }
-.settings-tab {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 34px;
-  padding: 6px 10px;
-  border: 0;
-  border-radius: var(--r-control);
-  background: none;
-  color: var(--muted-text);
-  font: inherit;
-  font-size: 13.5px;
-  text-align: left;
-  cursor: pointer;
-}
-.settings-tab > svg { width: 16px; height: 16px; flex-shrink: 0; }
-.settings-tab-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.settings-tab:hover { color: var(--chalk); background: var(--slate); }
-.settings-tab.on { color: var(--chalk); background: var(--slate-2); font-weight: 600; }
-.settings-tab.on::before { content: ""; position: absolute; left: -8px; top: 7px; bottom: 7px; width: 3px; border-radius: 0 3px 3px 0; background: var(--sodium); }
-.settings-tab.on > svg { color: var(--sodium); }
-.settings-tab:focus-visible { outline: 2px solid var(--sodium); outline-offset: -2px; }
-/* The account, last: who we are, at the foot of the list. */
-.settings-tab-account:not(:first-child) { box-shadow: 0 -1px 0 var(--rule); border-radius: 0 0 var(--r-control) var(--r-control); padding-top: 9px; margin-top: auto; }
-.settings-tab-account .avatar { width: 22px; height: 22px; font-size: 11px; flex-shrink: 0; }
-.settings-panel { overflow-y: auto; min-height: 0; padding: 18px 24px 22px; scrollbar-gutter: stable; animation: settings-in 0.12s ease-out; }
-@keyframes settings-in { from { opacity: 0; transform: translateY(3px); } }
-.settings-panel-head { margin-bottom: 6px; }
-.settings-panel-head h3 { margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
-.settings-panel-head p { margin: 4px 0 0; color: var(--muted-text); font-size: 13px; line-height: 1.5; max-width: 62ch; }
-/* A group: a small heading, then its rows on a card, rules between them. */
-.settings-group { margin-top: 18px; }
-.settings-group-head { display: flex; align-items: baseline; gap: 10px; padding: 0 2px 7px; }
-.settings-group h4 { margin: 0; font-size: 11.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--faint); }
-.settings-group-note { color: var(--faint); font-size: 12px; }
-.settings-card { background: var(--well); border: 1px solid var(--rule); border-radius: var(--r-surface); padding: 0 14px; }
-.settings-card > .setting:first-child { border-top: 0; }
-@media (prefers-reduced-motion: reduce) { .settings-panel { animation: none; } }
-.setting { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 16px; padding: 12px 0; border-top: 1px solid var(--rule); }
-.setting-text { flex: 1 1 260px; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.setting-head { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
-.setting-name { font-weight: 600; font-size: 13.5px; overflow-wrap: anywhere; }
-/* Where a setting is kept, when not where its section's are. */
-.setting-scope { font-size: 10.5px; letter-spacing: 0.02em; color: var(--faint); border: 1px solid var(--rule-2); border-radius: 999px; padding: 0 6px; line-height: 15px; cursor: help; }
-.setting-about { color: var(--muted-text); font-size: 12.5px; line-height: 1.45; max-width: 60ch; }
-.setting-about.host { font: 11.5px var(--mono); color: var(--faint); }
-.setting-note { font-size: 12.5px; line-height: 1.45; }
-.setting-note.warm { color: var(--sodium); }
-.setting-note.muted { color: var(--faint); }
-/* A choice made in a picker: reads as a select box. */
-.setting-select { gap: 6px; max-width: 240px; }
-.setting-select-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.setting-select > .chevron { width: 13px; height: 13px; color: var(--faint); flex-shrink: 0; }
-.setting-select:hover > .chevron { color: var(--chalk); }
-/* Settings → New sessions: the directory field, the fallback chain. */
-.default-dir-input { width: 240px; max-width: 100%; }
-.fallback-list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
-.fallback-model { display: inline-flex; align-items: center; gap: 6px; padding: 2px 2px 2px 8px; border: 1px solid var(--rule); border-radius: 6px; }
-.fallback-index { color: var(--faint); font-size: 12px; font-variant-numeric: tabular-nums; }
-.fallback-actions { display: flex; align-items: center; gap: 8px; }
-.default-fallback .setting-control { flex-wrap: wrap; justify-content: flex-end; }
-.setting-control { display: flex; align-items: center; gap: 8px; flex-shrink: 0; margin-left: auto; }
-.account-setting { flex-wrap: nowrap; }
-.account-setting .setting-text { flex-basis: 0; }
-.account-setting .avatar { align-self: flex-start; }
-/* Memory: a filter over the notes, each its text and when it was saved. */
-.memory-toolbar { flex-wrap: nowrap; gap: 8px; }
-.memory-filter { flex: 1; min-width: 0; }
-.memory-note { align-items: flex-start; flex-wrap: nowrap; }
-.memory-note .setting-text { flex-basis: 0; }
-.memory-note-text { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.5; }
-.memory-note .setting-control { gap: 2px; }
-.memory-note.forgetting { background: color-mix(in srgb, var(--brick) 8%, transparent); }
-.memory-note.forgetting .setting-control { gap: 8px; align-self: center; }
-.memory-delete:hover { color: var(--brick); }
-.memory-draft { flex-direction: column; align-items: stretch; gap: 8px; }
-.memory-text-input { resize: vertical; min-height: 4.5em; font: inherit; line-height: 1.5; }
-.memory-draft-buttons { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
-.memory-draft-keys { margin-right: auto; color: var(--faint); font-size: 12px; }
-.memory-add { white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; }
-.memory-add .icon { width: 14px; height: 14px; }
-.memory-error { padding: 8px 0; }
-.instructions-size { padding: 8px 0; }
-.instructions-toolbar { justify-content: flex-end; padding: 10px 0; }
-/* Past the threshold: they cost every session context. */
-.instructions-warning { flex-wrap: nowrap; align-items: flex-start; gap: 10px; margin: 10px 0; padding: 10px 12px; border: 1px solid var(--brick-line); border-radius: var(--r-control); background: var(--brick-wash); }
-.instructions-warning > .icon { flex: none; width: 16px; height: 16px; margin-top: 2px; color: var(--brick); }
-.instructions-warning + .setting { border-top: 0; }
-/* About you: one text the model is given, its size and Save under it. */
-.about-you { flex-direction: column; align-items: stretch; gap: 10px; }
-.about-you .setting-text { flex-basis: auto; }
-.about-you-form { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 12px 16px; }
-.about-you-field { flex: 1 1 220px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-.about-you-field.wide { flex-basis: 100%; }
-.about-you-label { color: var(--muted-text); font-size: 12.5px; font-weight: 500; }
-.about-you-line { width: 100%; min-width: 0; font: inherit; }
-.about-you-choice { min-width: 0; }
-.about-you-choice .segmented { max-width: 100%; }
-.about-you-with { display: flex; gap: 8px; align-items: center; min-width: 0; }
-.about-you-with .about-you-line { flex: 1; }
-.about-you-detect { flex: none; max-width: 50%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.about-you-input { width: 100%; resize: vertical; min-height: 4.5em; font: inherit; line-height: 1.5; }
-/* A long form: Save stays in reach while scrolling it. */
-.about-you-buttons { display: flex; align-items: center; justify-content: flex-end; gap: 8px; position: sticky; bottom: 0; z-index: 1; background: var(--well); padding: 8px 0; margin-bottom: -8px; }
-.about-you-count { margin-right: auto; color: var(--faint); font-size: 12px; font-variant-numeric: tabular-nums; }
-.about-you-count.near { color: var(--brick); }
-.about-you-keys { color: var(--faint); font-size: 12px; }
-.about-you-elsewhere { display: flex; align-items: center; gap: 8px; }
-.about-you-elsewhere .setting-note { flex: 1; min-width: 0; }
-/* MCP servers: the user's (switch, edit, remove), the host's (from its
-   files), the form adding or editing one, and pasted mcpServers JSON. */
-.setting-note.good { color: var(--sage); }
-.btn.mcp-tools-toggle { background: none; border: 0; padding: 0; height: auto; min-height: 0; color: inherit; font: inherit; text-decoration: underline; text-underline-offset: 2px; text-decoration-color: var(--rule-2); cursor: pointer; }
-.btn.mcp-tools-toggle:hover { color: var(--chalk); text-decoration-color: currentColor; }
-.btn.mcp-tools-toggle:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; border-radius: 2px; }
-.mcp-summary, .mcp-source { font-family: var(--mono); font-size: 11.5px; color: var(--faint); overflow-wrap: anywhere; }
-.mcp-server .setting-control { gap: 2px; }
-.mcp-server .setting-control .switch { margin-right: 6px; }
-.mcp-server.off .setting-name { color: var(--muted-text); }
-.mcp-server.removing { background: color-mix(in srgb, var(--brick) 8%, transparent); }
-.mcp-server.removing .setting-control { gap: 8px; }
-.mcp-remove:hover { color: var(--brick); }
-.mcp-health { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 4px; }
-.mcp-settings-tools { flex: 1 1 100%; margin: 0; padding: 8px 10px; list-style: none; display: flex; flex-direction: column; gap: 6px; background: var(--bg); border: 1px solid var(--rule); border-radius: var(--r-control); max-height: 240px; overflow-y: auto; }
-.mcp-tool { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.mcp-tool-name { font: 12px var(--mono); color: var(--chalk); overflow-wrap: anywhere; }
-.mcp-tool-description { font-size: 12px; color: var(--muted-text); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.mcp-actions { gap: 8px; justify-content: flex-start; }
-.mcp-actions .btn, .mcp-pair-add { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
-.mcp-actions .btn .icon, .mcp-pair-add .icon { width: 14px; height: 14px; }
-.mcp-draft, .mcp-paste { flex-direction: column; align-items: stretch; gap: 10px; }
-.mcp-paste .setting-text { flex-basis: auto; }
-.mcp-draft .segmented { align-self: flex-start; }
-.mcp-field { display: flex; flex-direction: column; gap: 4px; }
-.mcp-field-label { color: var(--muted-text); font-size: 12.5px; font-weight: 500; }
-.mcp-field-hint { color: var(--faint); font-size: 12px; line-height: 1.4; }
-.mcp-field .text-input, .mcp-pair .text-input, .mcp-paste-input { width: 100%; min-width: 0; font-family: var(--mono); font-size: 12.5px; }
-.mcp-args, .mcp-paste-input { resize: vertical; line-height: 1.5; }
-.mcp-paste-input { min-height: 8em; }
-.mcp-pairs { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
-.mcp-pair { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr) auto auto; gap: 6px; align-items: center; width: 100%; }
-.mcp-pair-show { min-width: 48px; justify-content: center; }
-.mcp-pair-remove:hover { color: var(--brick); }
-.mcp-error { display: block; }
-.mcp-buttons { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
-.mcp-keys { margin-right: auto; color: var(--faint); font-size: 12px; }
-.mcp-problem .setting-note { overflow-wrap: anywhere; }
-@media (max-width: 760px) {
-  /* A phone: the page fills the screen, the sections a strip across its top. */
-  .modal-backdrop:has(> .settings-dialog) { padding: 8px; }
-  .settings-dialog { height: 100%; }
-  .settings-dialog .modal-body { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
-  .settings-nav { flex-direction: row; gap: 4px; padding: 6px 8px; border-right: 0; border-bottom: 1px solid var(--rule); overflow-x: auto; overflow-y: hidden; scrollbar-width: none; scroll-snap-type: x proximity; }
-  .settings-nav::-webkit-scrollbar { display: none; }
-  /* More sections past the edge fade out rather than stopping short. */
-  .settings-nav { mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent); padding-right: 28px; }
-  .settings-tab { flex-shrink: 0; min-height: 36px; padding: 6px 12px; scroll-snap-align: start; }
-  .settings-tab.on::before { left: 10px; right: 10px; top: auto; bottom: -6px; width: auto; height: 3px; border-radius: 3px 3px 0 0; }
-  .settings-tab-account, .settings-tab-account:not(:first-child) { margin-top: 0; box-shadow: none; padding-top: 6px; border-radius: var(--r-control); }
-  .settings-panel { padding: 14px 14px 18px; }
-  .account-setting { flex-wrap: wrap; }
-  .account-setting .setting-text { flex-basis: calc(100% - 54px); }
-}
 .btn.sign-out:hover { color: var(--brick); border-color: var(--brick-line); background: var(--brick-wash); }
-.settings-dialog .modal-buttons .shortcuts { margin-right: auto; padding-left: 8px; padding-right: 8px; }
-
-.switch {
-  position: relative;
-  width: 34px;
-  height: 20px;
-  padding: 0;
-  flex-shrink: 0;
-  border-radius: 10px;
-  border: 1px solid var(--rule-2);
-  background: var(--well);
-  cursor: pointer;
-  transition: background 0.12s, border-color 0.12s;
-}
-.switch-knob {
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: var(--muted-text);
-  transition: transform 0.15s ease-out, background 0.12s;
-}
-.switch:hover .switch-knob { background: var(--chalk); }
-.switch.on { background: var(--sodium); border-color: var(--sodium); }
-.switch.on .switch-knob { transform: translateX(14px); background: var(--sodium-ink); }
-.switch:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; }
-.switch:disabled { opacity: 0.45; cursor: default; }
-@media (prefers-reduced-motion: reduce) { .switch, .switch-knob { transition: none; } }
 
 .segmented { display: inline-flex; gap: 2px; padding: 2px; background: var(--well); border: 1px solid var(--rule); border-radius: var(--r-control); }
 .segment:not([data-slot]) { border: 0; background: none; color: var(--muted-text); font-size: 12.5px; padding: 3px 10px; border-radius: 4px; cursor: pointer; }
@@ -1582,64 +1358,6 @@ kbd {
 .segment:not([data-slot]).on { background: var(--slate-2); color: var(--chalk); box-shadow: inset 0 0 0 1px var(--rule-2); }
 .segment:not([data-slot]):focus-visible { outline: 2px solid var(--sodium); outline-offset: 0; }
 
-/* Appearance (lib/theme_view.ml): each theme as a small picture of the page
-   in its colours, the user's accent on it; the accents as swatches, the
-   last one any colour (the browser's colour input, over a colour wheel). */
-.setting-wide { flex-direction: column; align-items: stretch; gap: 10px; }
-.setting-wide .setting-text { flex-basis: auto; }
-.setting-wide .setting-control { margin-left: 0; flex-wrap: wrap; }
-.theme-choices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; width: 100%; }
-.theme-choice {
-  display: flex; flex-direction: column; gap: 6px; padding: 6px 6px 7px;
-  background: none; border: 1px solid var(--rule); border-radius: var(--r-surface);
-  color: var(--muted-text); font-size: 12.5px; text-align: left; cursor: pointer;
-}
-.theme-choice:hover { border-color: var(--rule-2); color: var(--chalk); }
-.theme-choice.on { border-color: var(--sodium); color: var(--chalk); box-shadow: inset 0 0 0 1px var(--sodium); }
-.theme-choice:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; }
-.theme-name { padding-left: 2px; font-weight: 600; }
-.theme-sample {
-  display: flex; gap: 4px; padding: 4px; height: 64px; width: 100%;
-  background: var(--graphite); border: 1px solid var(--rule); border-radius: 6px; overflow: hidden;
-}
-.sample-side, .sample-main { display: flex; flex-direction: column; gap: 5px; padding: 5px; border-radius: 3px; }
-.sample-side { width: 30%; background: var(--slate); }
-.sample-main { flex: 1; min-width: 0; }
-.sample-line { display: block; height: 3px; width: 70%; border-radius: 2px; background: var(--faint-line); }
-.sample-line.wide { width: 90%; background: var(--muted-text); }
-.sample-line.current { width: 85%; background: var(--sodium); }
-.sample-bubble { display: block; height: 8px; width: 60%; border-left: 2px solid var(--sodium); background: var(--slate-2); border-radius: 0 2px 2px 0; }
-.sample-box { display: block; flex: 1; border-radius: 2px; background: var(--well); border: 1px solid var(--rule); }
-.picker-item .theme-sample { width: 44px; height: 28px; padding: 2px; gap: 2px; flex-shrink: 0; border-radius: 4px; }
-.picker-item .theme-sample .sample-side, .picker-item .theme-sample .sample-main { padding: 2px; gap: 2px; }
-.picker-item .theme-sample .sample-line { height: 2px; }
-.picker-item .theme-sample .sample-bubble { height: 4px; }
-
-.accent-choices { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.accent-choice {
-  position: relative; display: inline-flex; align-items: center; gap: 8px;
-  padding: 3px; border: 0; border-radius: 999px; background: none; color: var(--muted-text);
-  font-size: 12.5px; cursor: pointer;
-}
-.swatch {
-  display: block; width: 22px; height: 22px; flex-shrink: 0; border-radius: 50%;
-  background: var(--sodium); box-shadow: inset 0 0 0 1px #0000001f;
-}
-.accent-choice.on > .swatch { box-shadow: 0 0 0 2px var(--graphite), 0 0 0 4px var(--chalk); }
-.accent-choice:hover > .swatch { transform: scale(1.08); }
-.accent-choice:focus-visible, .accent-custom:focus-within { outline: 2px solid var(--sodium); outline-offset: 2px; }
-.accent-custom { padding-right: 10px; border: 1px dashed var(--rule-2); }
-.accent-custom:hover { color: var(--chalk); border-color: var(--faint-line); }
-.accent-custom.on { border-style: solid; color: var(--chalk); }
-/* Not chosen: a colour wheel says any colour. */
-.accent-custom:not(.on)::before {
-  content: ""; width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0;
-  background: conic-gradient(#f06d6d, #f0c04c, #7fd36b, #4cc9c0, #6a8ff8, #c084f5, #f06d6d);
-}
-.accent-custom input[type="color"] { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; border: 0; padding: 0; }
-.picker-item .swatch { width: 12px; height: 12px; }
-@media (prefers-reduced-motion: no-preference) { .accent-choice > .swatch { transition: transform 0.12s; } }
-@media (max-width: 520px) { .theme-sample { height: 48px; } }
 
 /* Fingers: every control takes at least 32px (44 where the row has room).
    The small round ones keep their look and grow an invisible margin. */
@@ -1764,18 +1482,6 @@ kbd {
 .generate-field > .generate { align-self: flex-end; }
 .pr-generate { display: flex; justify-content: flex-end; margin-bottom: -6px; }
 
-/* Settings: a number behind its switch (Compact at, Show worktrees,
-   Archive after): a short field, its unit after it as plain text. */
-.number-switch { display: inline-flex; align-items: center; gap: 14px; }
-.number-field { display: inline-flex; align-items: center; gap: 7px; color: var(--muted-text); font-size: 12.5px; cursor: text; }
-/* The same width for every unit, so a section's fields line up. */
-.number-field-unit { min-width: 6ch; }
-.text-input.number-field-input {
-  width: calc(6ch + 18px); padding: 4px 8px;
-  font: 12.5px var(--mono); font-variant-numeric: tabular-nums; text-align: center;
-}
-.text-input.number-field-input[aria-invalid="true"] { border-color: var(--brick); }
-.summary-model-choice { max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Drawing on an image: the image as large as the dialog lets it be, the
    canvas exactly over it, and above them the pen (colours, then widths, as
@@ -1894,24 +1600,6 @@ kbd {
 .chip-anchor.host:has(> .host-chip:is(.chatting, .warm)),
 .composer-controls .host-chip:is(.chatting, .warm) { flex-shrink: 0; }
 
-/* Settings → Usage (lib/usage_view.ml): a window's share used as a bar the
-   row's width, the figure after it in the mono face so the rows line up.
-   Sodium as it fills up, brick near the limit. */
-.usage-window.setting-wide { gap: 8px; }
-.usage-meter { display: flex; align-items: center; gap: 12px; width: 100%; }
-.usage-track {
-  flex: 1; min-width: 0; height: 6px; border-radius: 3px;
-  background: var(--well); box-shadow: inset 0 0 0 1px var(--rule); overflow: hidden;
-}
-.usage-fill { height: 100%; border-radius: 3px; background: var(--muted-text); transition: width 0.3s ease-out; }
-.usage-meter.high .usage-fill { background: var(--sodium); }
-.usage-meter.full .usage-fill { background: var(--brick); }
-.usage-percent {
-  flex: none; min-width: 8ch; text-align: right;
-  font: 12px var(--mono); font-variant-numeric: tabular-nums; color: var(--muted-text);
-}
-.usage-meter.full .usage-percent { color: var(--brick); }
-@media (prefers-reduced-motion: reduce) { .usage-fill { transition: none; } }
 
 /* {1 The composer's row}
 
