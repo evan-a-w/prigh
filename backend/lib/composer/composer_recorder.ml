@@ -59,11 +59,10 @@ type t =
   ; mutable stop : Adapter_event.Stop.t option
   ; mutable plans : int
   ; mutable finished : bool
+  ; mutable steered : Message.t list (* reversed: waiting for open calls *)
   }
 
-let model_name ~adapter model =
-  sprintf "%s/%s" adapter (Option.value model ~default:"default")
-;;
+let model_name = External_model.name
 
 let create ~adapter ~model ~emit ~notice ~prompts =
   emit Agent_event.Agent_start;
@@ -88,6 +87,7 @@ let create ~adapter ~model ~emit ~notice ~prompts =
   ; stop = None
   ; plans = 0
   ; finished = false
+  ; steered = []
   }
 ;;
 
@@ -443,6 +443,23 @@ let plan t (plan : Plan.t) =
       ~images:[])
 ;;
 
+let flush_steered t =
+  let steered = List.rev t.steered in
+  t.steered <- [];
+  List.iter steered ~f:(append_message t)
+;;
+
+let user_message t m =
+  t.steered <- m :: t.steered;
+  match t.open_ with
+  | _ when not (List.is_empty t.steps) -> ()
+  | Some o when not (List.is_empty o.calls) -> ()
+  | Some _ ->
+    close t ~stop_reason:End_turn;
+    flush_steered t
+  | None -> flush_steered t
+;;
+
 let turn_end t (stop : Adapter_event.Stop.t) =
   t.stop <- Some stop;
   let stop_reason : Stop_reason.t =
@@ -462,7 +479,8 @@ let turn_end t (stop : Adapter_event.Stop.t) =
      ignore (open_new t : Open_message.t);
      close t ~stop_reason
    | None, (Done | Interrupted) -> ());
-  end_pending t ~under:None
+  end_pending t ~under:None;
+  flush_steered t
 ;;
 
 let feed t (event : Adapter_event.t) =
@@ -528,9 +546,18 @@ let finish t =
     match t.stop with
     | Some _ ->
       close t ~stop_reason:End_turn;
-      end_pending t ~under:None
+      end_pending t ~under:None;
+      flush_steered t
     | None -> turn_end t Interrupted);
   let added = List.rev t.added in
   t.emit (Agent_end added);
   added
+;;
+
+let call_started t ~tool_id =
+  match Hashtbl.find t.calls tool_id with
+  | None -> None
+  | Some c ->
+    if not c.ended then ensure_started t c;
+    Some (c.canonical, c.parent)
 ;;

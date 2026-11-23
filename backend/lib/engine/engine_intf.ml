@@ -25,6 +25,9 @@ module Services = struct
         mail, reminders and mode notes *)
     ; halt : unit -> string option
       (** [Some reason]: stop before the next turn *)
+    ; add_spend : usage:Usage.t -> cost_usd:float -> unit
+      (** records spend the session's messages do not price: what an
+          external harness reported its replies cost *)
     }
 end
 
@@ -34,6 +37,9 @@ module Turn = struct
       { context : Message.t list (** the session's context before [prompts] *)
       ; prompts : Message.t list (** already in the session *)
       ; chat : bool (** chat mode: no tools *)
+      ; thinking : Thinking.t
+      ; approval : Approval_mode.t
+      ; plan : bool (** plan mode *)
       }
   end
 end
