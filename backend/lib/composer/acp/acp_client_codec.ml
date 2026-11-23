@@ -1326,11 +1326,11 @@ let handle_line t raw =
      | None, None -> [])
 ;;
 
-let process_exited t ~code ~stderr_tail =
+let process_exited ?(name = "the ACP agent") t ~code ~stderr_tail =
   let message =
     match code with
-    | Some code -> sprintf "the ACP agent exited (code %d)" code
-    | None -> "the ACP agent exited"
+    | Some code -> sprintf "%s exited (code %d)" name code
+    | None -> sprintf "%s exited" name
   in
   let turn = end_turn t (Failed { kind = Crashed { stderr_tail }; message }) in
   let withdrawn = withdraw_permissions t ~reply:false in
@@ -1348,4 +1348,12 @@ let process_exited t ~code ~stderr_tail =
   Hashtbl.clear t.pending;
   t.loading <- false;
   turn @ withdrawn @ pending
+;;
+
+let assume_loaded t ~session_id =
+  Hashtbl.filter_inplace t.pending ~f:(function
+    | Pending.Load_session _ -> false
+    | _ -> true);
+  t.loading <- false;
+  t.session_id <- Some session_id
 ;;

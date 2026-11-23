@@ -56,6 +56,15 @@ val build
   -> unit
   -> string
 
+(** The blocks [build] ends with ([user_info] then [custom_instructions]),
+    for a composer's external harness, which has its own prompt; [None]
+    when both are empty. *)
+val user_sections
+  :  ?user_info:string
+  -> ?custom_instructions:Custom_instruction.t list
+  -> unit
+  -> string option
+
 (** Notes prepended to the next user message when the environment changes
     after the system prompt was fixed, so the prompt prefix stays cacheable. *)
 val host_changed_note : host:string -> string

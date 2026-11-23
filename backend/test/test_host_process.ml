@@ -589,8 +589,10 @@ let%expect_test "stream: the MCP side channel, through prigh mcp-bridge" =
       ()
   in
   let stream = ref None in
+  (* Printed after the process's output: the two arrive in either order. *)
+  let mcp_events = Queue.create () in
   let on_mcp (event : Host_stream.Mcp_event.t) =
-    print_s [%sexp (event : Host_stream.Mcp_event.t)];
+    Queue.enqueue mcp_events event;
     match event, !stream with
     | Line { conn; line = _ }, Some s ->
       Host_stream.mcp_write s ~conn {|{"pong":1}|} |> ok_exn;
@@ -636,17 +638,19 @@ let%expect_test "stream: the MCP side channel, through prigh mcp-bridge" =
   in
   lines ();
   print_ended s;
+  Queue.iter mcp_events ~f:(fun event ->
+    print_s [%sexp (event : Host_stream.Mcp_event.t)]);
   print_s [%sexp (Sys_unix.file_exists_exn (Filename.dirname socket) : bool)];
   [%expect
     {|
     (true mcp.sock 700)
     same socket
-    (Line (conn 1) (line "{\"ping\":1}"))
-    (Closed 1)
     {"pong":1}
     done
     (Exited (program sh) (exit (Exited 0)) (stderr_tail ""))
     sh exited (code 0)
+    (Line (conn 1) (line "{\"ping\":1}"))
+    (Closed 1)
     false
     |}]
 ;;

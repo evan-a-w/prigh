@@ -19,6 +19,7 @@ type t =
   ; mutable handoff_from : Engine_choice.t option
   ; mutable last_place : (string * string) option
   ; mutable turns : int
+  ; mutable thread_model : string option (* the model the CLI said it runs *)
   ; on_thread : string -> unit
   ; mutable services : Engine_intf.Services.t option (* the running turn's *)
   ; mutable cancel : Cancellation.t
@@ -51,6 +52,7 @@ let create
   ; handoff_from
   ; last_place = None
   ; turns = 0
+  ; thread_model = None
   ; on_thread
   ; services = None
   ; cancel = Cancellation.never
@@ -87,8 +89,10 @@ let mcp_calls = ref 0
 (* prigh's tools called over MCP: approved and run as the harness engine's
    calls are. *)
 let injected t (s : Engine_intf.Services.t) =
+  let (module A : Adapter.S) = t.adapter in
+  let native_questions = A.native_questions in
   Injected_tools.create
-    ~tools:(Injected_tools.select ~native_questions:true s.tools)
+    ~tools:(Injected_tools.select ~native_questions s.tools)
     ~execute:(fun tool args ->
       match t.services with
       | None -> Tool_result.error "no turn is running"
@@ -140,7 +144,9 @@ let start_process t (s : Engine_intf.Services.t) (start : Adapter.Start.t) =
         { start with
           mcp_servers =
             start.mcp_servers
-            @ [ Injected_tools.Bridge.codex_config mcp.bridge ]
+            @ [ ( Injected_tools.server_name
+                , Injected_tools.Bridge.server_json mcp.bridge )
+              ]
         }
     in
     (match
@@ -366,7 +372,7 @@ let run_turn
   let recorder =
     Composer_recorder.create
       ~adapter:A.id
-      ~model:(t.start ~cwd:s.cwd).model
+      ~model:(Option.first_some t.thread_model (t.start ~cwd:s.cwd).model)
       ~emit:s.emit
       ~notice:s.notice
       ~prompts:input.prompts
@@ -479,6 +485,10 @@ let run_turn
                ~f:Cancellation.cancel;
              events ~sw
            | e ->
+             (match e with
+              | Thread_started { model = Some model; _ } ->
+                t.thread_model <- Some model
+              | _ -> ());
              Composer_recorder.feed recorder e;
              events ~sw
          in
@@ -549,8 +559,11 @@ module R = struct
   let engine = Engine_id.Composer
 
   let capabilities t =
-    let (module A : Adapter.S) = t.adapter in
-    A.capabilities
+    match t.live with
+    | Some (Live ((module L), a)) -> L.current_capabilities a
+    | None ->
+      let (module A : Adapter.S) = t.adapter in
+      A.capabilities
   ;;
 
   let run_turn = run_turn

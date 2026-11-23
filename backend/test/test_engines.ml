@@ -22,35 +22,43 @@ let flags ?engines ?adapters ?(env = []) () =
 let%expect_test "-engines and -adapters" =
   flags ();
   [%expect
-    {| (((engines (Harness)) (adapters ())) (Ok ()) ((engine Harness) (adapter ()))) |}];
+    {|
+    (((engines (Harness)) (adapters ()) (acp_agents ())) (Ok ())
+     ((engine Harness) (adapter ())))
+    |}];
   flags ~engines:"harness" ();
   [%expect
-    {| (((engines (Harness)) (adapters ())) (Ok ()) ((engine Harness) (adapter ()))) |}];
+    {|
+    (((engines (Harness)) (adapters ()) (acp_agents ())) (Ok ())
+     ((engine Harness) (adapter ())))
+    |}];
   (* The composer is not built yet: startup fails with what to run. *)
   flags ~engines:"composer, harness" ();
   [%expect
     {|
-    (((engines (Composer Harness)) (adapters (Codex Claude))) (Ok ())
-     ((engine Composer) (adapter (Codex))))
+    (((engines (Composer Harness)) (adapters (Codex Claude)) (acp_agents ()))
+     (Ok ()) ((engine Composer) (adapter (Codex))))
     |}];
   flags ~engines:"harness,composer" ~adapters:"claude,acp:gemini,prigh" ();
   [%expect
     {|
-    (((engines (Harness Composer)) (adapters (Claude (Acp gemini) Prigh)))
-     (Error
-      "the composer can't drive gemini (ACP) or prigh in this build of prigh yet; run -adapters claude")
-     ((engine Harness) (adapter ())))
+    (((engines (Harness Composer)) (adapters (Claude (Acp gemini) Prigh))
+      (acp_agents ()))
+     (Ok ()) ((engine Harness) (adapter ())))
     |}];
   flags ~env:[ "PRIGH_ENGINES", "composer"; "PRIGH_ADAPTERS", "codex" ] ();
   [%expect
     {|
-    (((engines (Composer)) (adapters (Codex))) (Ok ())
+    (((engines (Composer)) (adapters (Codex)) (acp_agents ())) (Ok ())
      ((engine Composer) (adapter (Codex))))
     |}];
   (* Flags outrank the environment. *)
   flags ~engines:"harness" ~env:[ "PRIGH_ENGINES", "composer" ] ();
   [%expect
-    {| (((engines (Harness)) (adapters ())) (Ok ()) ((engine Harness) (adapter ()))) |}];
+    {|
+    (((engines (Harness)) (adapters ()) (acp_agents ())) (Ok ())
+     ((engine Harness) (adapter ())))
+    |}];
   flags ~engines:"harnes" ();
   [%expect {| "unknown engine \"harnes\": expected harness or composer" |}];
   flags ~engines:"composer" ~adapters:"cursor" ();

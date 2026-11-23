@@ -62,7 +62,7 @@ let%expect_test "/adapters lists each host's CLIs and what to run" =
     │                                                                                        │
     │ prigh never installs them or logs in: run that on the host                             │
     └─────────────────────────────────────────────────────────────────────────── Esc closes ─┘
-    ─────────────────────────────────────────── checking the agent CLIs on the tool hosts… ───
+    ──────────────────────────────────────────────────────────────────────────────────────────
     > ▏
     deepseek-flash  ctx:0.1%/1.0M  $0.01  ↑↓ scroll · Esc closes · typing goes to the editor
     (Rpc (method_ list_adapters) (params ((refresh true))) (tag Adapters_shown))

@@ -648,6 +648,22 @@ let runner_capabilities t =
   | None -> Capabilities.harness
 ;;
 
+(* A composer session's model is its harness's: the one that wrote its
+   latest reply ([codex/gpt-5] shows as [gpt-5]), else the harness's
+   default. *)
+let shown_model t =
+  match engine_choice t with
+  | { engine = Composer; adapter = Some adapter } ->
+    let prefix = Adapter_id.to_string adapter ^ "/" in
+    let name =
+      List.rev (Session.replies t.session)
+      |> List.find_map ~f:(fun (name, _) -> String.chop_prefix name ~prefix)
+      |> Option.value ~default:"default"
+    in
+    { t.model with id = name; name }
+  | _ -> t.model
+;;
+
 let state t =
   let messages = messages t in
   let assistant_usage, assistant_cost = session_spend t in
@@ -659,7 +675,7 @@ let state t =
   ; session_description = Session.description t.session
   ; cwd = t.cwd
   ; git_branch = t.git_branch
-  ; model = t.model
+  ; model = shown_model t
   ; thinking = t.thinking
   ; running = is_running t
   ; message_count = List.length messages
@@ -1444,6 +1460,17 @@ let activate_host t (host : Host.t) ~cwd ~pinned =
 ;;
 
 let active_host_name t = t.active_host_name
+
+let user_instructions t =
+  System_prompt.user_sections
+    ?user_info:(Option.bind t.user_info ~f:User_info.text)
+    ~custom_instructions:
+      (Option.value_map
+         t.custom_instructions
+         ~default:[]
+         ~f:Custom_instructions.for_model)
+    ()
+;;
 
 let host_unavailable_message t =
   if String.is_empty t.active_host
@@ -2997,12 +3024,15 @@ let loop_config ?cancel t =
   }
 ;;
 
+let harness_runner t =
+  Harness_runner.create ~provider:t.provider ~config:(fun ~cancel ->
+    loop_config ~cancel t)
+;;
+
 let runner t =
   match t.runner with
   | Some runner -> runner
-  | None ->
-    Harness_runner.create ~provider:t.provider ~config:(fun ~cancel ->
-      loop_config ~cancel t)
+  | None -> harness_runner t
 ;;
 
 let set_runner t runner =
@@ -3021,11 +3051,16 @@ let engine_label t =
   | engine, _ -> String.capitalize (Engine_id.to_string engine)
 ;;
 
+(* Whether prigh's own loop calls the model: the harness, or the
+   composer's [prigh] adapter. *)
+let own_loop t =
+  match engine t, (engine_choice t).adapter with
+  | Harness, _ | Composer, Some Prigh -> true
+  | Composer, _ -> false
+;;
+
 (* Who a usage limit is with: the model, or the external harness. *)
-let limited_by t =
-  match engine t with
-  | Harness -> Model.key t.model
-  | Composer -> engine_label t
+let limited_by t = if own_loop t then Model.key t.model else engine_label t
 ;;
 
 let require t feature =
@@ -3681,7 +3716,7 @@ let rec start_run
        (* Steering messages that arrived after the last turn boundary go
        first: they were sent before any follow-up still queued. *)
        if Steer_queue.steers_first t.queue then queue_update t;
-       if Engine_id.equal (engine t) Harness then auto_compact t;
+       if own_loop t then auto_compact t;
        (* The goal carries on after a run that ended normally; anything else
        stops it, except a hand-over or a resume, which carry on the run. *)
        let goal_continues =

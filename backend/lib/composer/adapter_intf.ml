@@ -88,7 +88,17 @@ module type S = sig
   (** ["Codex"], ["Claude Code"]. *)
   val display_name : string
 
+  (** What it can do before its process says more ({!current_capabilities}). *)
   val capabilities : Capabilities.t
+
+  (** What the running harness can do: an ACP agent says, at [initialize]
+      and when the session opens. *)
+  val current_capabilities : t -> Capabilities.t
+
+  (** Whether the harness asks the user questions itself (else prigh's
+      [ask_user] tool is offered to it). *)
+  val native_questions : bool
+
   val launch : Start.t -> Launch.t
 
   (** Talks to the process [transport] runs: the handshake, then the thread

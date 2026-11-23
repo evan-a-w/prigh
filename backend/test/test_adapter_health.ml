@@ -421,3 +421,44 @@ esac
       events: 1
       |}])
 ;;
+
+(* A CLI that fails to start is checked again, and the frontends told. *)
+let%expect_test "a CLI that fails to start is re-probed" =
+  let engines =
+    Or_error.ok_exn
+      (Engines.create ~engines:[ Harness; Composer ] ~adapters:[ Codex ] ())
+  in
+  with_server ~engines
+  @@ fun t ~call ~events ->
+  script
+    t
+    "codex"
+    {|case "$1" in
+  --version) echo "codex-cli 0.166.0";;
+  login) echo "Logged in using ChatGPT" >&2;;
+esac
+|};
+  with_path t (fun () ->
+    ignore (call "hello" : Json.t);
+    print_adapters t (call "list_adapters");
+    [%expect
+      {|
+      "codex" installed=true version="0.166.0" auth="logged_in" account="ChatGPT"
+        problem=-
+      |}];
+    Core_unix.unlink (Filename.concat t.dir "bin/codex");
+    ignore (call ~params:{|{"adapter": "codex"}|} "new_session" : Json.t);
+    Queue.clear events;
+    ignore (call ~params:{|{"text": "hi"}|} "prompt" : Json.t);
+    let clock = Eio.Stdenv.clock t.env in
+    let deadline = Eio.Time.now clock +. 20. in
+    while Queue.is_empty events && Float.(Eio.Time.now clock < deadline) do
+      Eio.Time.sleep clock 0.01
+    done;
+    Queue.iter events ~f:(print_adapters t);
+    [%expect
+      {|
+      "codex" installed=false version=- auth="unknown" account=-
+        problem="Codex is not installed on <host>, please install it"
+      |}])
+;;

@@ -314,6 +314,10 @@ val set_runner : t -> Runner.t option -> unit
     it again. *)
 val stop_engine : t -> unit
 
+(** prigh's own harness on the session's provider and model, whatever
+    runner the session has (for the composer's [prigh] adapter). *)
+val harness_runner : t -> Runner.t
+
 (** How errors name the session's engine: [Harness], [Composer]. *)
 val engine_label : t -> string
 
@@ -1111,6 +1115,11 @@ val active_host : t -> string
 
 (** The active host's name, for messages. *)
 val active_host_name : t -> string
+
+(** What the user set about themselves and their custom instructions, as the
+    harness's system prompt ends with them, for a composer's external
+    harness. *)
+val user_instructions : t -> string option
 
 (** Where the session runs, as it records it ({!Session.Host}): the active
     host, connected or not, and the cwd there; [None] while it has none. *)

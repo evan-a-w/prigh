@@ -112,6 +112,7 @@ module Arguments : sig
   type t =
     { argv : string list
     ; env : (string * string) list
+    ; env_unset : string list (** removed from the host's environment *)
     ; window : int
     ; max_line : int
     ; stderr_rate : int
