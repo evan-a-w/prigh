@@ -12,6 +12,7 @@ let hello ~features =
     ; user = None
     ; superuser = false
     ; features
+    ; deployed = Prigh_protocol.Deployed_engines.harness_only
     }
 ;;
 
