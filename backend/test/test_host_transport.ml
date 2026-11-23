@@ -18,7 +18,12 @@ let exec (t : Tool_test_helpers.t) : Host_stream.Exec.t =
 ;;
 
 let launch ?(mcp = false) argv : Adapter.Launch.t =
-  { argv; env_set = [ "GREETING", "hello" ]; env_unset = []; cwd = "."; mcp }
+  { argv
+  ; env_set = [ "GREETING", "hello" ]
+  ; env_unset = [ "HOME" ]
+  ; cwd = "."
+  ; mcp
+  }
 ;;
 
 let%expect_test "a harness that is not installed on the host" =
@@ -52,7 +57,7 @@ let%expect_test "lines both ways, the environment, and the exit" =
       (launch
          [ "sh"
          ; "-c"
-         ; {|echo "$GREETING"; read line; echo "got $line"; echo oops >&2; exit 3|}
+         ; {|echo "$GREETING ${HOME-unset}"; read line; echo "got $line"; echo oops >&2; exit 3|}
          ])
     |> Or_error.ok_exn
   in
@@ -65,7 +70,7 @@ let%expect_test "lines both ways, the environment, and the exit" =
   [%expect
     {|
     false
-    (hello)
+    ("hello unset")
     ("got ping")
     ()
     ((code (3)) (stderr_tail oops))

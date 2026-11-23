@@ -156,7 +156,18 @@ let%expect_test "cwd, extra env and signal exit" =
                                \n") (stderr ""))
     |}];
   print_s [%sexp ((sh ~env "kill -TERM $$").exit : Process.Exit.t)];
-  [%expect {| (Signaled sigterm) |}]
+  [%expect {| (Signaled sigterm) |}];
+  print_s
+    [%sexp
+      (Process.run_collect
+         ~env
+         ~extra_env:[ "PRIGH_TEST_VAR", "yes" ]
+         ~unset_env:[ "HOME" ]
+         ~prog:"sh"
+         ~args:[ "-c"; "echo $PRIGH_TEST_VAR ${HOME-unset}" ]
+         ()
+       : Process.Output.t)];
+  [%expect {| ((exit (Exited 0)) (stdout "yes unset\n") (stderr "")) |}]
 ;;
 
 let%expect_test "missing program" =

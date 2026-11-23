@@ -32,6 +32,7 @@ let run
       ~(env : Env.t)
       ?cwd
       ?(extra_env = [])
+      ?(unset_env = [])
       ?(stdin = "")
       ?input
       ?timeout
@@ -52,12 +53,16 @@ let run
   let stdout_r, stdout_w = Eio_unix.pipe sw in
   let stderr = if merge_stderr then None else Some (Eio_unix.pipe sw) in
   let process_env =
-    if List.is_empty extra_env
+    if List.is_empty extra_env && List.is_empty unset_env
     then None
     else
       Some
         (Array.append
-           (Core_unix.environment ())
+           (Array.filter (Core_unix.environment ()) ~f:(fun entry ->
+              let key = String.lsplit2 entry ~on:'=' |> Option.map ~f:fst in
+              not
+                (List.exists unset_env ~f:(fun u ->
+                   Option.equal String.equal key (Some u)))))
            (Array.of_list (List.map extra_env ~f:(fun (k, v) -> k ^ "=" ^ v))))
   in
   (* The child leads its own process group so that on cancel or timeout its
@@ -200,7 +205,18 @@ module Output = struct
   [@@deriving sexp_of]
 end
 
-let run_collect ~env ?cwd ?extra_env ?stdin ?timeout ?cancel ~prog ~args () =
+let run_collect
+      ~env
+      ?cwd
+      ?extra_env
+      ?unset_env
+      ?stdin
+      ?timeout
+      ?cancel
+      ~prog
+      ~args
+      ()
+  =
   let stdout = Buffer.create 256 in
   let stderr = Buffer.create 256 in
   let exit =
@@ -208,6 +224,7 @@ let run_collect ~env ?cwd ?extra_env ?stdin ?timeout ?cancel ~prog ~args () =
       ~env
       ?cwd
       ?extra_env
+      ?unset_env
       ?stdin
       ?timeout
       ?cancel

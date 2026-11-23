@@ -1019,14 +1019,73 @@ let engine_unavailable t agent =
          (Error.to_string_hum e))
 ;;
 
+(* The statuses of the deployed adapters on [hosts], in that order. *)
+let adapter_statuses t hosts =
+  List.concat_map hosts ~f:(fun (host : Agent.Host.t) ->
+    List.filter_map t.engines.adapters ~f:(fun adapter ->
+      Adapter_health.Cache.find t.adapter_health ~host:host.id adapter))
+;;
+
+let adapters_json statuses =
+  `Array (List.map statuses ~f:Adapter_health.Status.to_json)
+;;
+
+let adapters_changed t ~hosts =
+  let json =
+    `Object
+      [ "type", `String "event"
+      ; "event", `String "adapters_changed"
+      ; "adapters", adapters_json (adapter_statuses t hosts)
+      ]
+  in
+  Hashtbl.iter t.clients ~f:(fun (c : Client.t) -> c.send json)
+;;
+
+(* The session's active tool host by name, for messages. *)
+let active_host_label agent =
+  let id = Agent.active_host agent in
+  match
+    List.find (Agent.hosts agent) ~f:(fun (h : Agent.Host.t) ->
+      String.equal h.id id)
+  with
+  | Some host when not (String.is_empty host.name) -> host.name
+  | _ ->
+    let name = Agent.active_host_name agent in
+    if String.is_empty name then id else name
+;;
+
 (* The harness on the session's active tool host, in its cwd. *)
 let host_spawn t agent launch =
   Host_transport.spawn
     ~sw:t.sw
     ~exec:(fun ~stdin ~cancel ~on_output ~name args ->
       Agent.host_call agent ~stdin ~cancel ~on_output ~name args)
-    ~host:(Agent.active_host_name agent)
+    ~host:(active_host_label agent)
     launch
+;;
+
+(* [adapter]'s harness failed to start on the session's host: what was
+   known of it there is checked again, and the frontends told. *)
+let recheck_adapter t agent adapter =
+  let host = Agent.active_host agent in
+  Adapter_health.Cache.forget t.adapter_health ~host adapter;
+  Fiber.fork ~sw:t.sw (fun () ->
+    let statuses =
+      Adapter_health.probe
+        ~exec:(fun ~name arguments ->
+          Agent.host_call_on
+            agent
+            ~host
+            ~cwd:(Session.cwd (Agent.session agent))
+            ~name
+            arguments)
+        [ adapter ]
+        ~host
+        ~host_name:(active_host_label agent)
+        ~now:(t.now ())
+    in
+    Adapter_health.Cache.set t.adapter_health statuses;
+    adapters_changed t ~hosts:(Agent.state agent).hosts)
 ;;
 
 (* A composer session's runner, driving its adapter's harness on the
@@ -1044,7 +1103,10 @@ let composer_runner t agent (adapter_id : Adapter_id.t) =
         && String.equal thread.host host)
       |> Option.map ~f:(fun (thread : Session.Thread.t) -> thread.thread_id)
     in
-    { (Adapter.Start.default ~cwd) with resume }
+    { (Adapter.Start.default ~cwd) with
+      resume
+    ; developer_instructions = Agent.user_instructions agent
+    }
   in
   let on_thread thread_id =
     ignore
@@ -1061,10 +1123,14 @@ let composer_runner t agent (adapter_id : Adapter_id.t) =
     (Composer_runner.create
        ~sw:t.sw
        ~adapter
-       ~spawn:
-         (match t.spawn_external with
-          | Some spawn -> spawn agent
-          | None -> host_spawn t agent)
+       ~spawn:(fun launch ->
+         let spawned =
+           match t.spawn_external with
+           | Some spawn -> spawn agent launch
+           | None -> host_spawn t agent launch
+         in
+         if Result.is_error spawned then recheck_adapter t agent adapter_id;
+         spawned)
        ~start
        ~on_thread
        ())
@@ -2084,28 +2150,6 @@ let clean_leftovers t =
 
 let composer_deployed t =
   List.mem t.engines.engines Composer ~equal:Engine_id.equal
-;;
-
-(* The statuses of the deployed adapters on [hosts], in that order. *)
-let adapter_statuses t hosts =
-  List.concat_map hosts ~f:(fun (host : Agent.Host.t) ->
-    List.filter_map t.engines.adapters ~f:(fun adapter ->
-      Adapter_health.Cache.find t.adapter_health ~host:host.id adapter))
-;;
-
-let adapters_json statuses =
-  `Array (List.map statuses ~f:Adapter_health.Status.to_json)
-;;
-
-let adapters_changed t ~hosts =
-  let json =
-    `Object
-      [ "type", `String "event"
-      ; "event", `String "adapters_changed"
-      ; "adapters", adapters_json (adapter_statuses t hosts)
-      ]
-  in
-  Hashtbl.iter t.clients ~f:(fun (c : Client.t) -> c.send json)
 ;;
 
 (* A host that (re)connects may have had its CLIs installed or logged in

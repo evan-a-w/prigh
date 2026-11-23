@@ -62,6 +62,7 @@ let spawn ~sw ~exec ~host ?on_stderr (launch : Adapter.Launch.t) =
   let arguments =
     { (Host_process.Arguments.create ~argv:launch.argv) with
       env = launch.env_set
+    ; env_unset = launch.env_unset
     ; mcp = launch.mcp
     }
   in

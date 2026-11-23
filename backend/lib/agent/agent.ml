@@ -1445,6 +1445,17 @@ let activate_host t (host : Host.t) ~cwd ~pinned =
 
 let active_host_name t = t.active_host_name
 
+let user_instructions t =
+  System_prompt.user_sections
+    ?user_info:(Option.bind t.user_info ~f:User_info.text)
+    ~custom_instructions:
+      (Option.value_map
+         t.custom_instructions
+         ~default:[]
+         ~f:Custom_instructions.for_model)
+    ()
+;;
+
 let host_unavailable_message t =
   if String.is_empty t.active_host
   then no_host_message

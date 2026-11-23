@@ -1108,6 +1108,11 @@ val active_host : t -> string
 (** The active host's name, for messages. *)
 val active_host_name : t -> string
 
+(** What the user set about themselves and their custom instructions, as the
+    harness's system prompt ends with them, for a composer's external
+    harness. *)
+val user_instructions : t -> string option
+
 (** Where the session runs, as it records it ({!Session.Host}): the active
     host, connected or not, and the cwd there; [None] while it has none. *)
 val location : t -> (Session.Host.t * string) option

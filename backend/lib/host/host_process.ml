@@ -243,6 +243,7 @@ module Arguments = struct
   type t =
     { argv : string list
     ; env : (string * string) list
+    ; env_unset : string list
     ; window : int
     ; max_line : int
     ; stderr_rate : int
@@ -254,6 +255,7 @@ module Arguments = struct
   let create ~argv =
     { argv
     ; env = []
+    ; env_unset = []
     ; window = 64
     ; max_line = 32 * 1024 * 1024
     ; stderr_rate = 64 * 1024
@@ -274,6 +276,11 @@ module Arguments = struct
        ; ("mcp", if t.mcp then `True else `False)
        ]
        @ Option.value_map t.path ~default:[] ~f:(fun p -> [ "path", `String p ])
+       @
+       if List.is_empty t.env_unset
+       then []
+       else
+         [ "env_unset", `Array (List.map t.env_unset ~f:(fun s -> `String s)) ]
       )
   ;;
 
@@ -296,6 +303,13 @@ module Arguments = struct
            | Some (`Object vars) ->
              List.filter_map vars ~f:(function
                | key, `String value -> Some (key, value)
+               | _ -> None)
+           | _ -> [])
+      ; env_unset =
+          (match field json "env_unset" with
+           | Some (`Array vars) ->
+             List.filter_map vars ~f:(function
+               | `String s -> Some s
                | _ -> None)
            | _ -> [])
       ; window = int "window" ~min:1 ~max:4096 ~default:default.window
@@ -706,6 +720,7 @@ let run ~env ~self ~outer ~cancel ~on_output ~cwd (args : Arguments.t) =
          ~env
          ~cwd
          ~extra_env
+         ~unset_env:args.env_unset
          ~input:inner
          ~cancel:stopped
          ~term_grace:args.term_grace
