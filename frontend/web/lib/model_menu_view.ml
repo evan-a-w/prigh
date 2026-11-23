@@ -227,35 +227,35 @@ let access (m : App.Model.t) ~inject =
                ; Attr.create "aria-label" "When tools ask first"
                ]
              (List.map
-       (Session_mode.choices
-          ~plan:(Session_engine.supports state.engine Plan_mode)
-          ~current
-          ())
-       ~f:(fun mode ->
-                let on = Session_mode.equal mode current in
-                Node.button
-                  ~attrs:
-                    [ classes [ "model-access-item" ] [ "on", on ]
-                    ; Attr.type_ "button"
-                    ; Attr.role "menuitemradio"
-                    ; Attr.create "aria-checked" (Bool.to_string on)
-                    ; Attr.title (Session_mode.describe mode)
-                    ; Attr.on_click (fun _ ->
-                        Effect.Many
-                          [ inject Action.Model_menu_access
-                          ; inject (Action.Set_mode mode)
-                          ])
-                    ]
-                  [ icon (if mode.chat then Message else Shield)
-                  ; Node.span
-                      ~attrs:[ Attr.class_ "menu-text" ]
-                      [ span ~cls:"menu-label" (access_label mode)
-                      ; span ~cls:"menu-detail" (Session_mode.title mode)
+                (Session_mode.choices
+                   ~plan:(Session_engine.supports state.engine Plan_mode)
+                   ~current
+                   ())
+                ~f:(fun mode ->
+                  let on = Session_mode.equal mode current in
+                  Node.button
+                    ~attrs:
+                      [ classes [ "model-access-item" ] [ "on", on ]
+                      ; Attr.type_ "button"
+                      ; Attr.role "menuitemradio"
+                      ; Attr.create "aria-checked" (Bool.to_string on)
+                      ; Attr.title (Session_mode.describe mode)
+                      ; Attr.on_click (fun _ ->
+                          Effect.Many
+                            [ inject Action.Model_menu_access
+                            ; inject (Action.Set_mode mode)
+                            ])
                       ]
-                  ; (if on
-                     then Html.mark ~cls:"model-check" Check
-                     else Node.span ~attrs:[ Attr.class_ "model-check" ] [])
-                  ]))
+                    [ icon (if mode.chat then Message else Shield)
+                    ; Node.span
+                        ~attrs:[ Attr.class_ "menu-text" ]
+                        [ span ~cls:"menu-label" (access_label mode)
+                        ; span ~cls:"menu-detail" (Session_mode.title mode)
+                        ]
+                    ; (if on
+                       then Html.mark ~cls:"model-check" Check
+                       else Node.span ~attrs:[ Attr.class_ "model-check" ] [])
+                    ]))
          else Node.none)
       ; Node.button
           ~attrs:

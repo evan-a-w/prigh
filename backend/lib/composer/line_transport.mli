@@ -68,7 +68,6 @@ module Peer : sig
   val read_line : t -> string option
   val write_line : t -> string -> unit
   val write_stderr : t -> string -> unit
-
   val exit : t -> code:int -> 'a
   val spawn : sw:Switch.t -> (t -> unit) -> transport
 end

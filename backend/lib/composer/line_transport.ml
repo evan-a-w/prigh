@@ -25,15 +25,7 @@ type t =
   ; mcp : Mcp.t option
   }
 
-let create
-      ~read_line
-      ~write_line
-      ~stop
-      ~ended
-      ~is_ended
-      ?mcp
-      ()
-  =
+let create ~read_line ~write_line ~stop ~ended ~is_ended ?mcp () =
   { read_line; write_line; stop; ended; is_ended; mcp }
 ;;
 
@@ -63,7 +55,6 @@ module Peer = struct
   ;;
 
   let write_stderr t s = Buffer.add_string t.stderr s
-
   let exit _ ~code = raise (Exited code)
 
   let spawn ~sw f =

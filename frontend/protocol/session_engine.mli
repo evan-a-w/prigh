@@ -119,4 +119,8 @@ val method_feature
 (** Why the session would refuse the request: a feature its engine lacks,
     or, for what starts a run, the session being [unavailable]; [None] to
     send it. *)
-val refuse : t -> method_:string -> params:(string * Json.t) list -> string option
+val refuse
+  :  t
+  -> method_:string
+  -> params:(string * Json.t) list
+  -> string option

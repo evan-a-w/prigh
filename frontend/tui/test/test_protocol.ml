@@ -2402,7 +2402,8 @@ let%expect_test "MCP sign-ins: the listing, the event, an OAuth client" =
   in
   round_trip
     {|{"type":"http","url":"https://x.example/mcp","oauth":{"clientId":"app","clientSecret":"s3cret","scopes":["a","b"]}}|};
-  [%expect {|
+  [%expect
+    {|
     (Http
       (url https://x.example/mcp)
       (headers ())
@@ -2452,6 +2453,7 @@ let%expect_test "remembered calls: in the state, and forgetting them" =
     {"id":1,"method":"forget_allowed_call","params":{"all":true}}
     |}]
 ;;
+
 let%expect_test "state: the session's engine (absent means the harness)" =
   let engine json =
     match Json.parse json |> Or_error.bind ~f:State.of_json with
@@ -2470,7 +2472,10 @@ let%expect_test "state: the session's engine (absent means the harness)" =
     (sprintf
        {|{%s,"engine":"composer","adapter":"codex","capabilities":{"rewind":"by_handoff","compact":"auto_only","steer":"between_turns","plan_mode":false,"subagents":"observe","something_new":true},"unavailable":"the composer engine isn't available in this build of prigh yet"}|}
        base);
-  engine (sprintf {|{%s,"engine":"composer","capabilities":{"fork":"sideways"}}|} base);
+  engine
+    (sprintf
+       {|{%s,"engine":"composer","capabilities":{"fork":"sideways"}}|}
+       base);
   [%expect
     {|
     (((engine harness)
@@ -2535,7 +2540,8 @@ let%expect_test "hello reply: the engines a backend deploys" =
         [%sexp
           (d : Deployed_engines.t Or_error.t)
         , (Or_error.map d ~f:Deployed_engines.has_choice : bool Or_error.t)]);
-  [%expect {|
+  [%expect
+    {|
     ((Ok ((engines (harness)))) (Ok false))
     ((Ok (
        (engines  (harness composer))

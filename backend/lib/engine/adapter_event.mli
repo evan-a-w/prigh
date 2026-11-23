@@ -46,7 +46,8 @@ end
 module Error_kind : sig
   type t =
     | Usage_limit of { resets_at : float option (** Unix seconds *) }
-    | Auth_required of { hint : string (** e.g. "run `codex login` on <host>" *) }
+    | Auth_required of
+        { hint : string (** e.g. "run `codex login` on <host>" *) }
     | Not_installed of { hint : string }
     | Crashed of { stderr_tail : string }
     | Protocol (** the harness said something we could not follow *)
@@ -111,7 +112,8 @@ type t =
   | Tool_start of
       { id : string
       ; kind : Tool_kind.t
-      ; native_name : string (** the harness's name, e.g. "Bash", "commandExecution" *)
+      ; native_name : string
+        (** the harness's name, e.g. "Bash", "commandExecution" *)
       ; title : string (** one line for the UI *)
       ; input : Json.t
       ; parent : string option (** the [Subagent] call this one runs under *)

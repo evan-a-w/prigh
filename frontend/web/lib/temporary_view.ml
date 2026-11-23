@@ -81,7 +81,6 @@ let chip (m : App.Model.t) ~inject =
     [ icon Ghost; Node.text "Temporary" ]
 ;;
 
-
 (* What the new session runs on, when the backend runs several engines: a
    picker of them. *)
 let engine_chip (m : App.Model.t) ~inject =
@@ -98,9 +97,10 @@ let engine_chip (m : App.Model.t) ~inject =
          bg-transparent px-2 text-[12.5px] font-normal text-muted-foreground \
          hover:bg-accent hover:text-foreground focus-visible:outline-2 \
          focus-visible:outline-offset-1 focus-visible:outline-ring narrow:h-9 \
-         [&_.icon]:size-[15px] [&_.icon]:flex-none max-[359px]:[&_.icon]:hidden \
-         [&>span]:truncate"
-      ~title:(sprintf "Runs on %s: start it on another engine (/new ENGINE)" label)
+         [&_.icon]:size-[15px] [&_.icon]:flex-none \
+         max-[359px]:[&_.icon]:hidden [&>span]:truncate"
+      ~title:
+        (sprintf "Runs on %s: start it on another engine (/new ENGINE)" label)
       ~label:(sprintf "Engine: %s. Change it" label)
       ~on_click:(inject Action.Pick_engine)
       [ icon Bot; span ~cls:"tray-engine-name" label ]

@@ -248,7 +248,8 @@ let supports t (feature : Feature.t) =
 let refusal t (feature : Feature.t) =
   let who = who t in
   match feature with
-  | Fork -> sprintf "%s sessions can't be forked: start a new session (/new)" who
+  | Fork ->
+    sprintf "%s sessions can't be forked: start a new session (/new)" who
   | Rewind ->
     if supports t Fork
     then
@@ -300,7 +301,8 @@ let refusal t (feature : Feature.t) =
       who
 ;;
 
-let method_feature ~method_ ~(params : (string * Json.t) list) : Feature.t option
+let method_feature ~method_ ~(params : (string * Json.t) list)
+  : Feature.t option
   =
   match method_ with
   | "fork" | "clone" -> Some Fork

@@ -397,7 +397,11 @@ let placeholder (m : App.Model.t) =
   if Option.is_some m.session_gone
   then text "Session gone: /new starts one"
   else if Option.is_some (Engine_banner.reason m)
-  then text (if cramped then "Can't run here" else "This session can't run here: see above")
+  then
+    text
+      (if cramped
+       then "Can't run here"
+       else "This session can't run here: see above")
   else if not (connected m)
   then
     text
