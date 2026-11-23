@@ -35,9 +35,10 @@ val of_flags
   -> getenv:(string -> string option)
   -> t Or_error.t
 
-(** The engines this build of prigh can run: a backend asked for another
-    one fails at startup with {!check_build}'s error. *)
-val buildable : Engine_id.t list
+(** Whether this build of prigh can drive [adapter] (Codex and Claude Code;
+    not yet ACP agents or prigh itself): a backend asked for another fails
+    at startup with {!check_build}'s error. *)
+val buildable : Adapter_id.t -> bool
 
 val check_build : t -> unit Or_error.t
 val engine_strings : t -> string list
@@ -60,7 +61,7 @@ val choose
     read), with what to do; [None] when it can. [buildable] (default
     {!buildable}) is for tests. *)
 val unavailable
-  :  ?buildable:Engine_id.t list
+  :  ?buildable:(Adapter_id.t -> bool)
   -> t
   -> Engine_choice.t
   -> string option

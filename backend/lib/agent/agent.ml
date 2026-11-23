@@ -216,7 +216,7 @@ type t =
   { env : Env.t
   ; sw : Switch.t
   ; provider : Provider.t
-  ; runner : Runner.t option
+  ; mutable runner : Runner.t option
     (** the session's engine when it is not the harness on [provider] *)
   ; mutable unavailable : string option
   ; tools : Tool.t list
@@ -536,6 +536,15 @@ let model_of t name =
   else Option.value (Model_registry.find t.models name) ~default:t.model
 ;;
 
+(* What the reply [usage] of the model [name] cost at prigh's prices: none
+   for an external harness's (a composer session's), whose reported cost
+   its runner recorded as spend. *)
+let reply_cost t name usage =
+  if External_model.is_external name
+  then 0.
+  else Model.cost_usd (model_of t name) usage
+;;
+
 (* Every response in the session file (all branches, also those a compaction
    summarised), each at its own model's price, and the recorded spend of
    everything else (subagents, compactions, [btw]). *)
@@ -545,10 +554,16 @@ let session_spend t =
     (Session.replies t.session)
     ~init:(Session.spend t.session)
     ~f:(fun (usage, cost) (name, u) ->
-      let model =
-        Hashtbl.find_or_add models name ~default:(fun () -> model_of t name)
+      let cost_u =
+        if External_model.is_external name
+        then 0.
+        else (
+          let model =
+            Hashtbl.find_or_add models name ~default:(fun () -> model_of t name)
+          in
+          Model.cost_usd model u)
       in
-      Usage.add usage u, cost +. Model.cost_usd model u)
+      Usage.add usage u, cost +. cost_u)
 ;;
 
 let spent_usd t = snd (session_spend t)
@@ -1427,6 +1442,8 @@ let activate_host t (host : Host.t) ~cwd ~pinned =
   broadcast t (Notice (sprintf "tools now run on %s in %s" host.name cwd));
   state_changed t
 ;;
+
+let active_host_name t = t.active_host_name
 
 let host_unavailable_message t =
   if String.is_empty t.active_host
@@ -2988,9 +3005,27 @@ let runner t =
       loop_config ~cancel t)
 ;;
 
+let set_runner t runner =
+  Option.iter t.runner ~f:Runner.close;
+  t.runner <- runner;
+  state_changed t
+;;
+
 let capabilities t = Runner.capabilities (runner t)
 let engine t = Runner.engine (runner t)
-let engine_label t = String.capitalize (Engine_id.to_string (engine t))
+
+let engine_label t =
+  match engine t, (engine_choice t).adapter with
+  | Composer, Some adapter -> Adapter_id.label adapter
+  | engine, _ -> String.capitalize (Engine_id.to_string engine)
+;;
+
+(* Who a usage limit is with: the model, or the external harness. *)
+let limited_by t =
+  match engine t with
+  | Harness -> Model.key t.model
+  | Composer -> engine_label t
+;;
 
 let require t feature =
   Capabilities.check (capabilities t) feature ~who:(engine_label t)
@@ -3106,7 +3141,7 @@ let rec account t ?(nested = false) (event : Agent_event.t) =
   match event with
   | Subagent { event; _ } -> account t ~nested:true event
   | Message_end (Assistant a) when nested ->
-    add a.usage (Model.cost_usd (model_of t a.model) a.usage)
+    add a.usage (reply_cost t a.model a.usage)
   | Compacted { usage; cost_usd; _ } -> add usage cost_usd
   | _ -> ()
 ;;
@@ -3492,6 +3527,7 @@ let rec start_run
          ; approve = approve t
          ; ask_user = ask_user t ~cancel
          ; ui = ui_host t ~cancel
+         ; tools = tools t @ reply_tools t
          ; execute = executor t
          ; background = t.background
          ; steer =
@@ -3525,6 +3561,10 @@ let rec start_run
                in
                Option.iter reason ~f:(fun r -> halted := Some r);
                reason)
+         ; add_spend =
+             (fun ~usage ~cost_usd ->
+               ignore
+                 (Session.add_spend session ~usage ~cost_usd : Session.Entry.t))
          ; emit =
              (fun event ->
                account t event;
@@ -3566,7 +3606,13 @@ let rec start_run
              (runner t)
              services
              ~cancel
-             { context; prompts; chat = t.chat_mode }
+             { context
+             ; prompts
+             ; chat = t.chat_mode
+             ; thinking = t.thinking
+             ; approval = t.approval_mode
+             ; plan = t.plan_mode
+             }
          with
          | added -> added
          | exception exn ->
@@ -3582,31 +3628,34 @@ let rec start_run
          if cancelled || not current then None else unavailable_error added
        in
        let handover =
-         Option.bind unavailable ~f:(fun error ->
-           match next_model t ~tried with
-           | None ->
-             if not (List.is_empty t.config.fallback_models)
-             then
+         Option.bind
+           (Option.some_if (capabilities t).model_fallback unavailable
+            |> Option.join)
+           ~f:(fun error ->
+             match next_model t ~tried with
+             | None ->
+               if not (List.is_empty t.config.fallback_models)
+               then
+                 broadcast
+                   t
+                   (Notice
+                      (sprintf
+                         "%s cannot continue and no model in fallback_models \
+                          is left to hand over to; /model picks another"
+                         (Model.key t.model)));
+               None
+             | Some next ->
+               let from = Model.key t.model in
                broadcast
                  t
                  (Notice
                     (sprintf
-                       "%s cannot continue and no model in fallback_models is \
-                        left to hand over to; /model picks another"
-                       (Model.key t.model)));
-             None
-           | Some next ->
-             let from = Model.key t.model in
-             broadcast
-               t
-               (Notice
-                  (sprintf
-                     "%s: %s; handing over to %s"
-                     from
-                     error
-                     (Model.key next)));
-             set_model t next;
-             Some [ handover_message ~from ~to_:next ~error ])
+                       "%s: %s; handing over to %s"
+                       from
+                       error
+                       (Model.key next)));
+               set_model t next;
+               Some [ handover_message ~from ~to_:next ~error ])
        in
        let resuming =
          match unavailable, handover with
@@ -3631,7 +3680,7 @@ let rec start_run
        (* Steering messages that arrived after the last turn boundary go
        first: they were sent before any follow-up still queued. *)
        if Steer_queue.steers_first t.queue then queue_update t;
-       auto_compact t;
+       if Engine_id.equal (engine t) Harness then auto_compact t;
        (* The goal carries on after a run that ended normally; anything else
        stops it, except a hand-over or a resume, which carry on the run. *)
        let goal_continues =
@@ -3758,7 +3807,7 @@ and schedule_resume t ~error =
               "%s: the usage limit is reached and the provider did not say \
                when it resets, so the run will not resume by itself; send a \
                message to try again, or /model picks another model"
-              (Model.key t.model)));
+              (limited_by t)));
       false
     | Some reset ->
       let now = Eio.Time.now (Eio.Stdenv.clock t.env) in
@@ -3792,7 +3841,7 @@ and schedule_resume t ~error =
            (sprintf
               "%s: the usage limit is reached; the run resumes %s: /resume now \
                retries at once, /resume cancel stays stopped"
-              (Model.key t.model)
+              (limited_by t)
               when_));
       true)
 

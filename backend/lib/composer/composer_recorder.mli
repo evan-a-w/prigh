@@ -35,6 +35,12 @@ val create
 
 val feed : t -> Adapter_event.t -> unit
 
+(** A message the user sent while the harness worked (a steer the runner
+    passed on): recorded and emitted at once when no call is open, else
+    after the open calls end (by the end of the turn at the latest), so
+    calls stay next to their results. *)
+val user_message : t -> Message.t -> unit
+
 (** How the user answered the approval of the call [tool_id]. *)
 val note_approval
   :  t
@@ -63,3 +69,11 @@ val context : t -> int option * int option
     [Usage_limit.unavailable] recognises for a usage limit (with the reset
     time), the hint for missing credentials or installs. *)
 val error_text : Adapter_event.Error_kind.t -> message:string -> string
+
+(** Shows the call [tool_id] as started (ending the assistant message that
+    made it), for an approval of it: its prigh form, and the [Subagent]
+    call it runs under. [None] when no such call was seen. *)
+val call_started
+  :  t
+  -> tool_id:string
+  -> (Canonical_tool.t * string option) option

@@ -420,6 +420,8 @@ type t =
   ; engines : Engines.t (** what this backend deploys *)
   ; adapter_health : Adapter_health.Cache.t
     (** whether the composer's CLIs are installed and logged in, by host *)
+  ; spawn_external :
+      (Agent.t -> Adapter.Launch.t -> Line_transport.t Or_error.t) option
   ; agents : Agent.t String.Table.t (** live sessions by session id *)
   ; clients : Client.t String.Table.t
   ; mutable client_seq : int
@@ -1017,8 +1019,71 @@ let engine_unavailable t agent =
          (Error.to_string_hum e))
 ;;
 
+(* The harness on the session's active tool host, in its cwd. *)
+let host_spawn t agent launch =
+  Host_transport.spawn
+    ~sw:t.sw
+    ~exec:(fun ~stdin ~cancel ~on_output ~name args ->
+      Agent.host_call agent ~stdin ~cancel ~on_output ~name args)
+    ~host:(Agent.active_host_name agent)
+    launch
+;;
+
+(* A composer session's runner, driving its adapter's harness on the
+   session's tool host and continuing the thread the session recorded there
+   (each process records the threads it starts). *)
+let composer_runner t agent (adapter_id : Adapter_id.t) =
+  let%map.Or_error adapter = Composer_adapters.find adapter_id in
+  let session = Agent.session agent in
+  let adapter_name = Adapter_id.to_string adapter_id in
+  let start ~cwd =
+    let host = Agent.active_host agent in
+    let resume =
+      List.find (Session.threads session) ~f:(fun (thread : Session.Thread.t) ->
+        String.equal thread.adapter adapter_name
+        && String.equal thread.host host)
+      |> Option.map ~f:(fun (thread : Session.Thread.t) -> thread.thread_id)
+    in
+    { (Adapter.Start.default ~cwd) with resume }
+  in
+  let on_thread thread_id =
+    ignore
+      (Session.record_thread
+         session
+         { adapter = adapter_name
+         ; host = Agent.active_host agent
+         ; thread_id
+         ; cwd = Session.cwd session
+         }
+       : Session.Entry.t)
+  in
+  Composer_runner.runner
+    (Composer_runner.create
+       ~sw:t.sw
+       ~adapter
+       ~spawn:
+         (match t.spawn_external with
+          | Some spawn -> spawn agent
+          | None -> host_spawn t agent)
+       ~start
+       ~on_thread
+       ())
+;;
+
+(* Gives a composer session (that can run here) its runner. *)
+let attach_engine t agent =
+  match Agent.engine_choice agent, (Agent.state agent).unavailable with
+  | { engine = Composer; adapter = Some adapter }, None
+    when not (Engine_id.equal (Agent.engine agent) Composer) ->
+    (match composer_runner t agent adapter with
+     | Ok runner -> Agent.set_runner agent (Some runner)
+     | Error e -> Agent.set_unavailable agent (Some (Error.to_string_hum e)))
+  | _ -> ()
+;;
+
 let register t agent =
   Agent.set_unavailable agent (engine_unavailable t agent);
+  attach_engine t agent;
   Agent.set_hosts agent (hosts t) ~returning:(returning t);
   Hashtbl.set t.agents ~key:(session_id agent) ~data:agent;
   Hashtbl.set t.listed ~key:(session_id agent) ~data:(Listed.of_agent agent);
@@ -1167,6 +1232,7 @@ let create
       ~sessions_dir
       ~cwd
       ?(engines = Engines.default)
+      ?spawn_external
       ~new_agent
       ?default_agent
       ()
@@ -1195,6 +1261,7 @@ let create
     ; default_agent
     ; engines
     ; adapter_health = Adapter_health.Cache.create ~ttl:60.
+    ; spawn_external
     ; agents = String.Table.create ()
     ; clients = String.Table.create ()
     ; client_seq = 0
@@ -2272,6 +2339,7 @@ let new_session
   let agent = start_new_agent t session start in
   Agent.set_engine agent engine;
   Agent.set_unavailable agent (engine_unavailable t agent);
+  attach_engine t agent;
   attach t client agent;
   match attached_state client, key with
   | `Object fields, Some key ->
