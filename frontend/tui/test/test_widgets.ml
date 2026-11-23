@@ -376,7 +376,7 @@ let%expect_test "fuzzy ranking: command names" =
     {|
     "mo" -> mode model scoped-models generate-model approval-model memory import compaction permissions
     "lo" -> login logout clone default-host approval-model
-    "s"  -> state switch skills skill: signin setusr session snippet signout sessions scoped-models push jobs host todos resume agents hotkeys verbosity user-info permissions default-host instructions downsize-images
+    "s"  -> state switch skills skill: signin setusr session snippet signout sessions scoped-models push jobs host todos resume agents hotkeys adapters verbosity user-info permissions default-host instructions downsize-images
     "sw" -> switch
     "xyz" ->
     |}]
@@ -774,6 +774,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /signin [user]                     sign in to the server, as another user or again
     /signout                           sign out of the server (forgets the saved token), then sign in again
     /setusr [user]                     act as another user (superusers only); without a user, list them
+    /adapters [refresh]                whether the composer's agent CLIs (Codex, Claude Code, ACP agents) are installed and logged in on each tool host, and what to run there when not; refresh checks again
     /nix-gc [run [DAYS|all]]           show the Nix store's size and free space; run collects garbage, first deleting every user's profile generations older than DAYS days (all: all but the current ones)
     /quit                              exit
     !command   run a shell command; its output joins the context

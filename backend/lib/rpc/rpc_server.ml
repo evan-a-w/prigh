@@ -418,6 +418,8 @@ type t =
   ; new_agent : ?session:Session.t -> cwd:string -> unit -> Agent.t
   ; default_agent : Agent.t option
   ; engines : Engines.t (** what this backend deploys *)
+  ; adapter_health : Adapter_health.Cache.t
+    (** whether the composer's CLIs are installed and logged in, by host *)
   ; agents : Agent.t String.Table.t (** live sessions by session id *)
   ; clients : Client.t String.Table.t
   ; mutable client_seq : int
@@ -1192,6 +1194,7 @@ let create
     ; new_agent
     ; default_agent
     ; engines
+    ; adapter_health = Adapter_health.Cache.create ~ttl:60.
     ; agents = String.Table.create ()
     ; clients = String.Table.create ()
     ; client_seq = 0
@@ -2012,6 +2015,41 @@ let clean_leftovers t =
     Agent.shutdown agent)
 ;;
 
+let composer_deployed t =
+  List.mem t.engines.engines Composer ~equal:Engine_id.equal
+;;
+
+(* The statuses of the deployed adapters on [hosts], in that order. *)
+let adapter_statuses t hosts =
+  List.concat_map hosts ~f:(fun (host : Agent.Host.t) ->
+    List.filter_map t.engines.adapters ~f:(fun adapter ->
+      Adapter_health.Cache.find t.adapter_health ~host:host.id adapter))
+;;
+
+let adapters_json statuses =
+  `Array (List.map statuses ~f:Adapter_health.Status.to_json)
+;;
+
+let adapters_changed t ~hosts =
+  let json =
+    `Object
+      [ "type", `String "event"
+      ; "event", `String "adapters_changed"
+      ; "adapters", adapters_json (adapter_statuses t hosts)
+      ]
+  in
+  Hashtbl.iter t.clients ~f:(fun (c : Client.t) -> c.send json)
+;;
+
+(* A host that (re)connects may have had its CLIs installed or logged in
+   meanwhile: its statuses are checked again when next asked for. *)
+let host_connected t (client : Client.t) =
+  if composer_deployed t
+  then (
+    Adapter_health.Cache.forget_host t.adapter_health ~host:client.host_id;
+    adapters_changed t ~hosts:(Agent.state client.agent).hosts)
+;;
+
 (* A backend deploying more than the harness says what, so that frontends
    offer the choice; one with the harness alone says nothing, as before
    engines. *)
@@ -2116,6 +2154,7 @@ let hello t (client : Client.t) params =
             Fiber.fork ~sw:t.sw (fun () ->
               Guarded.run ~what:"cleaning up temporary sessions" (fun () ->
                 clean_leftovers t));
+          if tools then host_connected t client;
           `Object
             ([ "client_id", `String client.id
              ; "host_id", `String client.host_id
@@ -3139,6 +3178,75 @@ let set_config t agent params =
     Config.to_json (Agent.config agent)
 ;;
 
+(* Every deployed adapter on every connected host, the session's host
+   first; statuses older than the cache's ttl (all of them with [refresh])
+   are probed again, the hosts in parallel. *)
+let list_adapters t (client : Client.t) params =
+  let open Or_error.Let_syntax in
+  let%bind () =
+    if composer_deployed t
+    then Ok ()
+    else
+      Or_error.error_string
+        "this backend does not run the composer engine, so it drives no agent \
+         CLIs: start one with prigh serve -engines composer"
+  in
+  let%map refresh = bool_param params "refresh" ~default:false in
+  let state = Agent.state client.agent in
+  let hosts =
+    let active, rest =
+      List.partition_tf state.hosts ~f:(fun (h : Agent.Host.t) ->
+        String.equal h.id state.active_host)
+    in
+    active @ rest
+  in
+  let cache = t.adapter_health in
+  let now = t.now () in
+  let changed =
+    Fiber.List.map
+      (fun (host : Agent.Host.t) ->
+         let stale =
+           List.filter t.engines.adapters ~f:(fun adapter ->
+             refresh
+             || not
+                  (Adapter_health.Cache.fresh cache ~now ~host:host.id adapter))
+         in
+         if List.is_empty stale
+         then false
+         else (
+           let statuses =
+             Adapter_health.probe
+               ~exec:(fun ~name arguments ->
+                 Agent.host_call_on
+                   client.agent
+                   ~host:host.id
+                   ~cwd:host.cwd
+                   ~name
+                   arguments)
+               stale
+               ~host:host.id
+               ~host_name:host.name
+               ~now
+           in
+           let differs (s : Adapter_health.Status.t) =
+             match Adapter_health.Cache.find cache ~host:s.host s.adapter with
+             | None -> true
+             | Some old ->
+               not
+                 (Adapter_health.Status.equal
+                    { old with checked_at = 0. }
+                    { s with checked_at = 0. })
+           in
+           let changed = List.exists statuses ~f:differs in
+           Adapter_health.Cache.set cache statuses;
+           changed))
+      hosts
+    |> List.exists ~f:Fn.id
+  in
+  if changed then adapters_changed t ~hosts:state.hosts;
+  `Object [ "adapters", adapters_json (adapter_statuses t hosts) ]
+;;
+
 let dispatch_server t (client : Client.t) ~meth ~params
   : Json.t Or_error.t option
   =
@@ -3156,6 +3264,7 @@ let dispatch_server t (client : Client.t) ~meth ~params
     Some
       (Or_error.map (switch_user client params) ~f:(fun user ->
          `Object [ "user", `String user ]))
+  | "list_adapters" -> Some (list_adapters t client params)
   | "set_active_host" ->
     Some
       (Or_error.bind (string_param params "host") ~f:(fun host ->

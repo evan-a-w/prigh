@@ -148,6 +148,7 @@ module Reply_tag : sig
     | Reconnect of int (** generation; stale replies are ignored *)
     | Btw of string (** btw id *)
     | Users_list
+    | Adapters_shown (** [/adapters] *)
     | Nix_store_shown (** [/nix-gc] *)
     | Nix_gc_done (** [/nix-gc run] *)
     | User_switched

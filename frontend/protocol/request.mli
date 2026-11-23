@@ -215,6 +215,10 @@ module Method : sig
         ; task : string option (** [Branch_name]: what the branch is for *)
         } (** {!Generated} *)
     | Generate_cancel of { gen_id : string }
+    | List_adapters of { refresh : bool }
+    (** {!Adapter_status.list_of_json}: the composer's agent CLIs on each
+        connected host; [refresh] checks again rather than answering from
+        what was checked in the last minute *)
     | Nix_store_status (** superusers: {!Nix_store_status} *)
     | Nix_store_gc of { delete_generations : Nix_generations.t option }
     (** superusers: {!Nix_gc_progress} events, then a {!Nix_gc_report}; can

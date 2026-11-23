@@ -496,6 +496,7 @@ let rec apply t (event : Event.t) =
   | Custom_instructions_changed _
   | User_info_changed _
   | Mcp_settings_changed _
+  | Adapters_changed _
   | Mcp_auth_changed -> t
 ;;
 

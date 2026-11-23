@@ -81,6 +81,7 @@ let argument_items
       ~(snippets : Snippet.t list)
       ~(forges : Forge_account.t list)
       ~(engines : Deployed_engines.t)
+      ~composer
       ~superuser
   =
   let simple items =
@@ -229,13 +230,15 @@ let argument_items
       ; "off", "the model may not change them (they stay in context)"
       ]
   | Settings ->
-    List.map (Settings_section.available ~superuser) ~f:(fun section ->
-      let arg = Settings_section.arg section in
-      Picker.Item.create
-        ~id:arg
-        ~detail:(Settings_section.about section)
-        ~search:(arg ^ " " ^ Settings_section.name section)
-        arg)
+    List.map
+      (Settings_section.available ~composer ~superuser ())
+      ~f:(fun section ->
+        let arg = Settings_section.arg section in
+        Picker.Item.create
+          ~id:arg
+          ~detail:(Settings_section.about section)
+          ~search:(arg ^ " " ^ Settings_section.name section)
+          arg)
   | Session ->
     List.map sessions ~f:(fun s ->
       Picker.Item.create
@@ -351,6 +354,7 @@ let compute
       ?(engines = Deployed_engines.harness_only)
       ?(worktrees = [])
       ?(refs = Git_diff.Refs.empty)
+      ?(composer = false)
       ~superuser
       ~text
       ~cursor
@@ -488,6 +492,7 @@ let compute
                        ~snippets
                        ~forges
                        ~engines
+                       ~composer
                        ~superuser)
                     ~f:(fun (i : Picker.Item.t) ->
                       String.is_prefix i.id ~prefix)
@@ -510,6 +515,7 @@ let compute
                        ~snippets
                        ~forges
                        ~engines
+                       ~composer
                        ~superuser)
                 with
                 | [] -> None

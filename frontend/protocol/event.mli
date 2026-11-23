@@ -163,6 +163,9 @@ type t =
       } (** the temporary session this client left is deleted *)
   | Prefs_changed of Prefs.Change.t list
   (** another frontend of the user changed their preferences *)
+  | Adapters_changed of Adapter_status.t list
+  (** the composer's agent CLIs were checked again on a host, or a host
+      connected: every status checked so far *)
   | Memory_changed of Memory.t
   (** a note was saved, edited or forgotten, or memory turned on or off *)
   | Custom_instructions_changed of Custom_instructions.t

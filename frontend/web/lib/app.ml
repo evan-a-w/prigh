@@ -282,6 +282,7 @@ module Reply_tag = struct
     | Nix_collected
     | Memory_loaded
     | Usage_loaded
+    | Adapters_loaded
     | Instructions_loaded
     | Instruction_saved
     | Instruction_removed
@@ -511,6 +512,11 @@ module Action = struct
     | Open_help
     | Open_settings
     | Usage_refresh
+    | Adapters_refresh
+    | Copy_text of
+        { text : string
+        ; copied : string
+        }
     | Settings_section of Settings_section.t
     | Settings_home
     | Settings_move of Settings_section.Move.t
@@ -837,6 +843,7 @@ module Model = struct
     ; forges : Forges.t
     ; nix_gc : Nix_gc.t
     ; usage : Usage_page.t
+    ; adapters : Adapters_page.t
     ; memory : Memory_notes.t
     ; instructions : Instruction_notes.t
     ; about_you : About_you.t
@@ -948,6 +955,7 @@ module Model = struct
         ; forges
         ; nix_gc
         ; usage
+        ; adapters
         ; memory
         ; instructions
         ; about_you
@@ -1053,6 +1061,7 @@ module Model = struct
     && phys_equal forges b.forges
     && phys_equal nix_gc b.nix_gc
     && phys_equal usage b.usage
+    && phys_equal adapters b.adapters
     && phys_equal memory b.memory
     && phys_equal instructions b.instructions
     && phys_equal about_you b.about_you
@@ -1389,6 +1398,7 @@ let init =
   ; forges = Forges.empty
   ; nix_gc = Nix_gc.empty
   ; usage = Usage_page.empty
+  ; adapters = Adapters_page.empty
   ; memory = Memory_notes.empty
   ; instructions = Instruction_notes.empty
   ; about_you = About_you.empty
@@ -2298,9 +2308,19 @@ let loading (m : Model.t) title cmds =
 
 let superuser (m : Model.t) = Option.exists m.hello ~f:(fun h -> h.superuser)
 
+let composer_engine (m : Model.t) =
+  Option.exists m.hello ~f:(fun h ->
+    List.mem h.features "engines" ~equal:String.equal)
+;;
+
 let fetch_nix_status (m : Model.t) ~open_settings =
   ( { m with nix_gc = Nix_gc.loading m.nix_gc }
   , [ call Nix_store_status ~tag:(Nix_status { open_settings }) ] )
+;;
+
+let fetch_adapters ?(refresh = false) (m : Model.t) =
+  ( { m with adapters = Adapters_page.loading m.adapters }
+  , [ call (List_adapters { refresh }) ~tag:Adapters_loaded ] )
 ;;
 
 let fetch_usage (m : Model.t) =
@@ -2366,6 +2386,8 @@ let fetch_section (m : Model.t) : Settings_section.t -> _ = function
   | Mcp -> fetch_mcp m
   | Custom_instructions -> fetch_instructions m
   | Usage -> fetch_usage m
+  | Engines when composer_engine m -> fetch_adapters m
+  | Engines -> m, []
   | Appearance
   | Sessions
   | New_sessions
@@ -2445,7 +2467,12 @@ let set_instructions_enabled (m : Model.t) enabled =
 
 (* [/settings SECTION]. *)
 let settings_command (m : Model.t) arg =
-  let sections = Settings_section.available ~superuser:(superuser m) in
+  let sections =
+    Settings_section.available
+      ~composer:(composer_engine m)
+      ~superuser:(superuser m)
+      ()
+  in
   match Settings_section.of_arg arg with
   | Some section when List.mem sections section ~equal:Settings_section.equal ->
     open_settings ~section m
@@ -2694,6 +2721,7 @@ let complete_draft (m : Model.t) ~skills =
       ~forges:(Forges.list m.forges)
       ~hosts:(Option.value_map m.state ~default:[] ~f:(fun s -> s.hosts))
       ~users:(Option.value m.users ~default:[])
+      ~composer:(composer_engine m)
       ~superuser:(superuser m)
       ~text:m.draft
       ~cursor:m.cursor
@@ -5419,6 +5447,7 @@ let user_switched (m : Model.t) (hello : Hello_reply.t) =
     ; forges = Forges.empty
     ; nix_gc = { Nix_gc.empty with collecting = m.nix_gc.collecting }
     ; usage = Usage_page.empty
+    ; adapters = Adapters_page.empty
     ; memory = Memory_notes.empty
     ; instructions = Instruction_notes.empty
     ; about_you = About_you.empty
@@ -9417,6 +9446,14 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
      | Nix_status { open_settings = true }, Error e ->
        error m (String.capitalize e)
      | _ -> m, [])
+  | Adapters_loaded, result ->
+    let result =
+      Result.bind result ~f:(fun json ->
+        Result.map_error
+          (Adapter_status.list_of_json json)
+          ~f:Error.to_string_hum)
+    in
+    { m with adapters = Adapters_page.loaded m.adapters result }, []
   | Usage_loaded, result ->
     let result =
       Result.bind result ~f:(fun json ->
@@ -10231,6 +10268,8 @@ let main_event (m : Model.t) (event : Event.t) =
   (* Saved, edited or forgotten here, elsewhere or by the model. *)
   | Custom_instructions_changed ci ->
     { m with instructions = Instruction_notes.changed m.instructions ci }, []
+  | Adapters_changed statuses ->
+    { m with adapters = Adapters_page.changed m.adapters statuses }, []
   | Memory_changed memory ->
     { m with memory = Memory_notes.changed m.memory memory }, []
   | User_info_changed info ->
@@ -11143,6 +11182,7 @@ let setting_opener (m : Model.t) (setting : Control_setting.t) =
   | Instructions
   | Mcp
   | Git_hosts
+  | Engines
   | Usage
   | Nix_store
   | Account ->
@@ -11264,7 +11304,9 @@ let setting_value (m : Model.t) (setting : Control_setting.t) =
 
 let control_settings (m : Model.t) =
   List.filter_map Control_setting.all ~f:(fun setting ->
-    if Control_setting.superuser_only setting && not (superuser m)
+    if
+      (Control_setting.superuser_only setting && not (superuser m))
+      || (Control_setting.composer_only setting && not (composer_engine m))
     then None
     else
       Some
@@ -11985,6 +12027,8 @@ let update_connected (m : Model.t) (action : Action.t) =
   | Open_help -> open_dialog m Help
   | Open_settings -> open_settings m
   | Usage_refresh -> fetch_usage m
+  | Adapters_refresh -> fetch_adapters ~refresh:true m
+  | Copy_text { text; copied } -> m, [ Command.Copy { text; copied } ]
   | Settings_section section ->
     (match m.dialog with
      | Some Settings ->
@@ -11994,7 +12038,11 @@ let update_connected (m : Model.t) (action : Action.t) =
   | Settings_home -> { m with settings_home = true }, []
   | Settings_move move ->
     let section =
-      Settings_section.move m.settings_section move ~superuser:(superuser m)
+      Settings_section.move
+        ~composer:(composer_engine m)
+        m.settings_section
+        move
+        ~superuser:(superuser m)
     in
     let m, cmds =
       if Settings_section.equal m.settings_section section

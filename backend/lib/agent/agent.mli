@@ -1025,6 +1025,16 @@ val host_call
   -> Json.t
   -> Tool.Result.t
 
+(** Runs the host operation [name] on the connected tool host [host] (by
+    id), in [cwd] there; an error result when it is not connected. *)
+val host_call_on
+  :  t
+  -> host:string
+  -> cwd:string
+  -> name:string
+  -> Json.t
+  -> Tool.Result.t
+
 (** Directory completions for [prefix] (absolute, [~/] or relative to the
     session cwd on that host), listed on [host] (default: the active one),
     in the notation the prefix used. *)

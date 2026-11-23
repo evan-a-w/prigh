@@ -248,6 +248,19 @@ does not deploy, or this build cannot run, can be read but not run
 (`state`'s `unavailable`). `hello` lists `engines` and `adapters` (and the
 `engines` feature) when there is more than the harness, and `state` carries
 `engine`, `adapter` and `capabilities` for sessions not on the harness.
+
+`Adapter_health` (`composer/`) says whether each deployed adapter's CLI can
+run on a host: one `$probe_programs` call per host runs its `--version` and
+its own login-status command (`codex login status`, `claude auth status`),
+never a login, a session or a turn. `Rpc_server` caches the statuses per
+host and adapter for a minute, forgets a host's when it (re)connects
+(`adapters_changed`), and answers `list_adapters {refresh?}` (the deployed
+adapters on every connected host, the session's first); each status has the
+`problem` to show, e.g. "Codex is not installed on laptop, please install
+it" or "Claude Code on laptop is not logged in: run `claude auth login`
+there". prigh never installs a CLI or logs in. prigh-web shows them in
+Settings → Engines (only when the backend deploys the composer), the TUI
+with `/adapters` (which otherwise says how to deploy it).
 The composer is not built yet: asking for it fails at startup.
 
 ### Subagents and background work

@@ -36,6 +36,7 @@ val compute
        (** the repository's, for [/worktree] and [/review] *)
   -> ?refs:Git_diff.Refs.t
        (** the reviewed repository's branches and tags, for [/review] *)
+  -> ?composer:bool (** the backend deploys it: [/settings engines] *)
   -> superuser:bool (** offers the commands only superusers have *)
   -> text:string
   -> cursor:int
