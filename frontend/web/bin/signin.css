@@ -62,8 +62,7 @@
   box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
   transition: border-color 0.12s, box-shadow 0.12s;
 }
-[data-theme="original"] .signin input,
-[data-theme="dark"] .signin input { background: color-mix(in oklab, var(--input) 30%, transparent); }
+:where([data-theme="original"], [data-theme="dark"], :root:not([data-theme])) .signin input { background: color-mix(in oklab, var(--input) 30%, transparent); }
 .signin input:focus-visible,
 .cli-signin-code:focus-visible {
   border-color: var(--ring);

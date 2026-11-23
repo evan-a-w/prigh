@@ -135,7 +135,7 @@ kbd {
   outline: none;
   transition: background 0.12s, border-color 0.12s, color 0.12s, box-shadow 0.12s;
 }
-.dark .btn, [data-theme="original"] .btn, [data-theme="dark"] .btn, :root:not([data-theme]) .btn {
+:where(.dark, [data-theme="original"], [data-theme="dark"], :root:not([data-theme])) .btn {
   background-color: color-mix(in oklab, var(--input) 30%, transparent);
   border-color: var(--input);
 }
