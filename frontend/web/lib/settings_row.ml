@@ -224,7 +224,7 @@ let group ?title ?note:n rows =
     ; Node.div
         ~attrs:
           [ Attr.class_
-              "settings-card overflow-hidden rounded-lg border border-border \
+              "settings-card overflow-clip rounded-lg border border-border \
                bg-card text-card-foreground"
           ]
         rows
@@ -233,7 +233,14 @@ let group ?title ?note:n rows =
 
 let switch ?(disabled = false) ~label ~title ~on ~on_click () =
   Loon.Switch.view
-    ~class_:("switch narrow:after:-inset-y-3" ^ if on then " on" else "")
+    ~class_:
+      ("switch narrow:h-11! narrow:w-11! narrow:border-0 narrow:bg-transparent! \
+        narrow:px-[7px] narrow:before:absolute narrow:before:inset-x-[6px] \
+        narrow:before:inset-y-[13px] narrow:before:rounded-full \
+        narrow:before:bg-input narrow:data-checked:before:bg-primary \
+        narrow:before:transition-colors narrow:[&>span]:relative \
+        narrow:-my-3"
+       ^ if on then " on" else "")
     ~attrs:[ Attr.create "aria-label" label; Attr.title title ]
     ~disabled
     ~checked:on
