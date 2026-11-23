@@ -4,7 +4,8 @@ open! Import
 let fixed = [ "codex"; "claude" ]
 
 let is_adapter adapter =
-  List.mem fixed adapter ~equal:String.equal || String.is_prefix adapter ~prefix:"acp:"
+  List.mem fixed adapter ~equal:String.equal
+  || String.is_prefix adapter ~prefix:"acp:"
 ;;
 
 let default_id = "default"
@@ -35,7 +36,9 @@ let model
   { id
   ; provider = Custom adapter
   ; name =
-      Option.value name ~default:(if String.equal id default_id then "default" else id)
+      Option.value
+        name
+        ~default:(if String.equal id default_id then "default" else id)
   ; context_window
   ; max_output = 0
   ; thinking_levels
@@ -71,7 +74,8 @@ let of_adapter ~adapter (m : Model.t) =
 
 let native_id (m : Model.t) =
   match m.provider with
-  | Custom a when is_adapter a && not (String.equal m.id default_id) -> Some m.id
+  | Custom a when is_adapter a && not (String.equal m.id default_id) ->
+    Some m.id
   | Custom _ | Anthropic | Openai | Openai_codex | Deepseek -> None
 ;;
 

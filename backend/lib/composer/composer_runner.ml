@@ -551,7 +551,8 @@ let run_turn
    | None -> ());
   (let tokens, window = Composer_recorder.context recorder in
    let old_tokens, old_window = t.context in
-   t.context <- Option.first_some tokens old_tokens, Option.first_some window old_window);
+   t.context
+   <- Option.first_some tokens old_tokens, Option.first_some window old_window);
   let cost = Composer_recorder.cost_usd recorder in
   if Float.( > ) cost 0. then s.add_spend ~usage:Usage.zero ~cost_usd:cost;
   t.services <- None;

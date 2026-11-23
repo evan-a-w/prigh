@@ -490,11 +490,12 @@ let compact t =
     (* Codex compacts in a turn of its own, which it starts. *)
     t.turn <- Some { id = None; started = false; interrupt = Not_asked };
     t.turn_error <- None;
-    Ok (request
-    t
-    Compact
-    "thread/compact/start"
-    (`Object [ "threadId", `String thread ]))
+    Ok
+      (request
+         t
+         Compact
+         "thread/compact/start"
+         (`Object [ "threadId", `String thread ]))
 ;;
 
 let revert t ~before_turn_id =

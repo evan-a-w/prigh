@@ -41,18 +41,22 @@ module Choice = struct
   let describe t =
     match t.adapter, t.engine with
     | Some "codex", _ -> "OpenAI's Codex CLI on the session's tool host"
-    | Some "claude", _ -> "Anthropic's Claude Code CLI on the session's tool host"
+    | Some "claude", _ ->
+      "Anthropic's Claude Code CLI on the session's tool host"
     | Some "prigh", _ -> "prigh's harness, run by the composer"
     | Some _, _ -> "an ACP agent on the session's tool host"
     | None, "harness" -> "prigh's own agent, calling the model directly"
     | None, _ -> "external agents on the session's tool host"
   ;;
 
-  let of_session (e : Session_engine.t) = { engine = e.engine; adapter = e.adapter }
+  let of_session (e : Session_engine.t) =
+    { engine = e.engine; adapter = e.adapter }
+  ;;
 
   let params t =
     ("engine", `String t.engine)
-    :: Option.value_map t.adapter ~default:[] ~f:(fun a -> [ "adapter", `String a ])
+    :: Option.value_map t.adapter ~default:[] ~f:(fun a ->
+      [ "adapter", `String a ])
   ;;
 end
 

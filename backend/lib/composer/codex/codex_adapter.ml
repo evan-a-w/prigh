@@ -103,12 +103,14 @@ let list_models driver codec =
         driver
         (Codex_codec.list_models codec ~cursor)
         ~matches:(function
-          | Codex_codec.Response.Models _ | Failed { kind = Model_list; _ } -> true
-          | _ -> false)
+        | Codex_codec.Response.Models _ | Failed { kind = Model_list; _ } ->
+          true
+        | _ -> false)
     with
-    | Ok (Codex_codec.Response.Models { models; next_cursor = Some cursor }) when n < 10 ->
-      pages (Some cursor) (acc @ models) (n + 1)
-    | Ok (Codex_codec.Response.Models { models; next_cursor = _ }) -> acc @ models
+    | Ok (Codex_codec.Response.Models { models; next_cursor = Some cursor })
+      when n < 10 -> pages (Some cursor) (acc @ models) (n + 1)
+    | Ok (Codex_codec.Response.Models { models; next_cursor = _ }) ->
+      acc @ models
     | Ok _ | Error _ -> acc
   in
   let infos =
@@ -243,7 +245,6 @@ let thread_id t = Codex_codec.thread_id t.codec
 let in_turn t = Adapter.Driver.in_turn t.driver
 let alive t = Adapter.Driver.alive t.driver
 let stop t = Adapter.Driver.stop t.driver
-
 let models t = t.models
 
 let compact t settings ~instructions:_ =

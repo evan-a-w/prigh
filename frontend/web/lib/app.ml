@@ -1443,7 +1443,6 @@ let toast (m : Model.t) ?(error = false) ?replaces ?undo text =
 
 let error m text = toast m ~error:true text
 
-
 (* What new sessions can run on ([hello]'s engines and adapters). *)
 let deployed (m : Model.t) =
   Option.value_map
@@ -1456,6 +1455,7 @@ let current_choice (m : Model.t) =
   Option.map m.state ~f:(fun (s : State.t) ->
     Deployed_engines.Choice.of_session s.engine)
 ;;
+
 (* In a browser there is nothing to quit: the tab is closed instead. *)
 let quit_desktop (m : Model.t) =
   if m.desktop
@@ -3934,12 +3934,12 @@ let modes_picker (state : State.t) =
           ~current
           ())
        ~f:(fun mode ->
-       Picker.Item.create
-         ~id:(Session_mode.label mode)
-         ~detail:(Session_mode.describe mode)
-         ~search:(Session_mode.label mode ^ " " ^ Session_mode.title mode)
-         ~marked:(Session_mode.equal mode current)
-         (Session_mode.title mode)))
+         Picker.Item.create
+           ~id:(Session_mode.label mode)
+           ~detail:(Session_mode.describe mode)
+           ~search:(Session_mode.label mode ^ " " ^ Session_mode.title mode)
+           ~marked:(Session_mode.equal mode current)
+           (Session_mode.title mode)))
 ;;
 
 let mode_picker (m : Model.t) =
@@ -6456,13 +6456,12 @@ let switch_adapter (m : Model.t) (c : Deployed_engines.Choice.t) =
   match c.adapter with
   | _
     when Option.equal Deployed_engines.Choice.equal (current_choice m) (Some c)
-    ->
-    toast m (sprintf "Already on %s" (Deployed_engines.Choice.label c))
+    -> toast m (sprintf "Already on %s" (Deployed_engines.Choice.label c))
   | Some _ | None ->
     let m, toast =
       toast m (sprintf "Switching to %s…" (Deployed_engines.Choice.label c))
     in
-    m, (rpc "set_adapter" [ "adapter", str target ] :: toast)
+    m, rpc "set_adapter" [ "adapter", str target ] :: toast
 ;;
 
 let new_session (m : Model.t) =
@@ -6529,8 +6528,8 @@ let new_session_on (m : Model.t) (c : Deployed_engines.Choice.t) =
         Command.Rpc
           { r with
             params =
-              Deployed_engines.Choice.params c
-              @ if temporary then [ "temporary", Json.bool true ] else []
+              (Deployed_engines.Choice.params c
+               @ if temporary then [ "temporary", Json.bool true ] else [])
           }
       | cmd -> cmd) )
 ;;
@@ -6544,21 +6543,27 @@ let engine_chosen (m : Model.t) ~switch arg =
   in
   match Deployed_engines.find_in choices arg with
   | Error e -> error m (Error.to_string_hum e)
-  | Ok c when (not switch) && fresh m && [%equal: Deployed_engines.Choice.t option] (current_choice m) (Some c) ->
-    m, [ focus_editor ]
+  | Ok c
+    when (not switch)
+         && fresh m
+         && [%equal: Deployed_engines.Choice.t option]
+              (current_choice m)
+              (Some c) -> m, [ focus_editor ]
   | Ok c -> if switch then switch_adapter m c else new_session_on m c
 ;;
 
 let engine_command (m : Model.t) ~switch arg =
   let deployed = deployed m in
   match String.strip arg with
-  | "" when switch && List.is_empty (Deployed_engines.switch_targets deployed) ->
+  | "" when switch && List.is_empty (Deployed_engines.switch_targets deployed)
+    ->
     error
       m
       "This backend runs no composer adapters: start it with -engines \
        harness,composer -adapters codex,claude to switch between them."
   | "" when switch -> open_picker m (engine_picker m ~switch)
-  | "" -> starting m, [ rpc "new_session" (new_session_params m) ~tag:Reload_state ]
+  | "" ->
+    starting m, [ rpc "new_session" (new_session_params m) ~tag:Reload_state ]
   | _ when (not switch) && not (Deployed_engines.has_choice deployed) ->
     error m "This backend runs only the harness: /new starts a session on it."
   | arg -> engine_chosen m ~switch arg
@@ -7708,7 +7713,6 @@ let run_command (m : Model.t) (parsed : Slash.Parsed.t) =
     error m (Session_engine.refusal s.engine feature)
   | _ -> run_command_unchecked m parsed
 ;;
-
 
 (* What the agent waits on the user for: confirmations first, then the
    model's questions, one dialog at a time. What is shown or queued already

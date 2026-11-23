@@ -92,7 +92,8 @@ let argument_items
       Picker.Item.create
         ~id:(Deployed_engines.Choice.key c)
         ~detail:(Deployed_engines.Choice.describe c)
-        ~search:(Deployed_engines.Choice.key c ^ " " ^ Deployed_engines.Choice.label c)
+        ~search:
+          (Deployed_engines.Choice.key c ^ " " ^ Deployed_engines.Choice.label c)
         (Deployed_engines.Choice.label c))
   in
   match kind with

@@ -682,7 +682,8 @@ let%expect_test "back to the harness engine and out again; models follow" =
     |}];
   print_result (call ~params:{|{"adapter": "codex"}|} "set_adapter");
   model ();
-  [%expect {|
+  [%expect
+    {|
     ok: engine composer, adapter codex
     codex/default
     |}]

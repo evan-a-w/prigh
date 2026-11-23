@@ -3080,7 +3080,10 @@ let settle_runner_model t =
     if not (Option.equal String.equal recorded (Some (Model.key model)))
     then
       ignore
-        (Session.set_model t.session ~model:(Model.key model) ~thinking:t.thinking
+        (Session.set_model
+           t.session
+           ~model:(Model.key model)
+           ~thinking:t.thinking
          : Session.Entry.t)
   | _ ->
     if is_external t.model
@@ -3099,8 +3102,6 @@ let set_runner t runner =
 (* The models the session can switch to when they are its external
    harness's, not prigh's. *)
 let external_models t = Option.bind t.runner ~f:Runner.models
-
-
 let stop_engine t = Option.iter t.runner ~f:Runner.close
 let capabilities t = Runner.capabilities (runner t)
 let engine t = Runner.engine (runner t)
@@ -3121,7 +3122,6 @@ let own_loop t =
 
 (* Who a usage limit is with: the model, or the external harness. *)
 let limited_by t = if own_loop t then Model.key t.model else engine_label t
-;;
 
 let require t feature =
   Capabilities.check (capabilities t) feature ~who:(engine_label t)
@@ -3628,11 +3628,13 @@ let rec start_run
          ; ask_user = ask_user t ~cancel
          ; ui = ui_host t ~cancel
          ; tools =
-             (tools t @ reply_tools t)
-             @
-             (* An external harness is told of [goal_complete] at its start:
+             ((tools t @ reply_tools t)
+              @
+              (* An external harness is told of [goal_complete] at its start:
                 it has it always, and it refuses when no goal is active. *)
-             (if own_loop t then [] else [ Tool_goal.create ~complete:(complete_goal t) ])
+              if own_loop t
+              then []
+              else [ Tool_goal.create ~complete:(complete_goal t) ])
          ; execute = executor t
          ; background = t.background
          ; steer =
@@ -4028,8 +4030,8 @@ and auto_describe t =
               t
               (Notice
                  (sprintf
-                    "%s; this session is not described (name it with /name, \
-                     or pick a model prigh can call with /naming model)"
+                    "%s; this session is not described (name it with /name, or \
+                     pick a model prigh can call with /naming model)"
                     (Error.to_string_hum e))))
         | Error e -> broadcast t (Notice (Error.to_string_hum e)));
       t.describing <- None;
@@ -4733,8 +4735,8 @@ let compact ?instructions t =
       List.find_map
         (List.rev (List.drop (Session.messages t.session) before))
         ~f:(function
-        | Message.Assistant a -> Some a.stop_reason
-        | User _ | Tool_result _ -> None)
+          | Message.Assistant a -> Some a.stop_reason
+          | User _ | Tool_result _ -> None)
     with
     | Some (Error message) -> Or_error.error_string message
     | Some _ | None -> Ok "")

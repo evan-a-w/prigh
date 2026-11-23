@@ -3977,7 +3977,8 @@ let dispatch agent login ~(client : Client.t) ~meth ~params : Json.t Or_error.t 
     Or_error.bind (string_param params "model") ~f:(fun id ->
       Or_error.map
         (match Agent.external_models agent with
-         | Some models -> resolve_external models id ~who:(Agent.engine_label agent)
+         | Some models ->
+           resolve_external models id ~who:(Agent.engine_label agent)
          | None -> Model_registry.resolve (Login_manager.models login) id)
         ~f:(fun model ->
           Agent.set_model agent model;

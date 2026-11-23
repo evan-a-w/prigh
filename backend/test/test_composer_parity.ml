@@ -14,19 +14,26 @@ let write (p : Line_transport.Peer.t) json =
   Line_transport.Peer.write_line p (Json.to_string json)
 ;;
 
-let thread_frame meth params = `Object [ "method", `String meth; "params", params ]
+let thread_frame meth params =
+  `Object [ "method", `String meth; "params", params ]
+;;
 
 (* A Codex app-server: answers the handshake, the thread, [model/list]
    and turns; a turn writes a reply with usage, a compaction a
    [contextCompaction] item. *)
 let codex (p : Line_transport.Peer.t) =
   let reply j result =
-    write p (`Object [ "id", Option.value_exn (Json.member "id" j); "result", result ])
+    write
+      p
+      (`Object [ "id", Option.value_exn (Json.member "id" j); "result", result ])
   in
   let turns = ref 0 in
   let turn_frames id items =
     let th = "threadId", `String "th" in
-    [ thread_frame "turn/started" (`Object [ th; "turn", `Object [ "id", `String id ] ]) ]
+    [ thread_frame
+        "turn/started"
+        (`Object [ th; "turn", `Object [ "id", `String id ] ])
+    ]
     @ List.map items ~f:(fun item ->
       thread_frame
         "item/completed"
@@ -57,7 +64,8 @@ let codex (p : Line_transport.Peer.t) =
           "turn/completed"
           (`Object
               [ th
-              ; "turn", `Object [ "id", `String id; "status", `String "completed" ]
+              ; ( "turn"
+                , `Object [ "id", `String id; "status", `String "completed" ] )
               ])
       ]
   in
@@ -68,20 +76,23 @@ let codex (p : Line_transport.Peer.t) =
       let j = parse line in
       let params = Option.value (Json.member "params" j) ~default:`Null in
       (match str "method" j with
-       | Some "initialize" -> reply j (`Object [ "userAgent", `String "codex/0.166.0" ])
+       | Some "initialize" ->
+         reply j (`Object [ "userAgent", `String "codex/0.166.0" ])
        | Some "initialized" -> ()
        | Some ("thread/start" | "thread/resume") ->
          reply
            j
            (`Object
-               [ "thread", `Object [ "id", `String "th" ]; "model", `String "gpt-5" ])
+               [ "thread", `Object [ "id", `String "th" ]
+               ; "model", `String "gpt-5"
+               ])
        | Some "model/list" ->
          let model id name efforts default =
            `Object
              [ "id", `String id
              ; "model", `String id
              ; "displayName", `String name
-             ; "isDefault", (if default then `True else `False)
+             ; ("isDefault", if default then `True else `False)
              ; "hidden", `False
              ; ( "supportedReasoningEfforts"
                , `Array
@@ -95,8 +106,16 @@ let codex (p : Line_transport.Peer.t) =
            (`Object
                [ ( "data"
                  , `Array
-                     [ model "gpt-5" "GPT-5" [ "minimal"; "low"; "medium"; "high" ] true
-                     ; model "gpt-5-codex" "GPT-5 Codex" [ "low"; "medium"; "high" ] false
+                     [ model
+                         "gpt-5"
+                         "GPT-5"
+                         [ "minimal"; "low"; "medium"; "high" ]
+                         true
+                     ; model
+                         "gpt-5-codex"
+                         "GPT-5 Codex"
+                         [ "low"; "medium"; "high" ]
+                         false
                      ] )
                ; "nextCursor", `Null
                ])
@@ -124,7 +143,9 @@ let codex (p : Line_transport.Peer.t) =
          List.iter
            (turn_frames
               "tc"
-              [ `Object [ "type", `String "contextCompaction"; "id", `String "cc" ] ])
+              [ `Object
+                  [ "type", `String "contextCompaction"; "id", `String "cc" ]
+              ])
            ~f:(write p)
        | Some m -> printf "codex got %s\n" m
        | None -> ());
@@ -161,7 +182,9 @@ let claude (p : Line_transport.Peer.t) =
       ; "result", `String text
       ; "session_id", `String session
       ; "total_cost_usd", `Number cost
-      ; "usage", `Object [ "input_tokens", `Number "5"; "output_tokens", `Number "2" ]
+      ; ( "usage"
+        , `Object [ "input_tokens", `Number "5"; "output_tokens", `Number "2" ]
+        )
       ]
   in
   let init =
@@ -214,7 +237,8 @@ let claude (p : Line_transport.Peer.t) =
            | Some m ->
              (match Json.member "content" m with
               | Some (`String s) -> s
-              | Some (`Array (first :: _)) -> Option.value (str "text" first) ~default:""
+              | Some (`Array (first :: _)) ->
+                Option.value (str "text" first) ~default:""
               | _ -> "")
            | None -> ""
          in
@@ -230,7 +254,10 @@ let claude (p : Line_transport.Peer.t) =
                  ; "subtype", `String "compact_boundary"
                  ; "session_id", `String session
                  ; ( "compact_metadata"
-                   , `Object [ "trigger", `String "manual"; "pre_tokens", `Number "50000" ] )
+                   , `Object
+                       [ "trigger", `String "manual"
+                       ; "pre_tokens", `Number "50000"
+                       ] )
                  ]);
            write p (result "" "0.02"))
          else (
@@ -246,12 +273,16 @@ let claude (p : Line_transport.Peer.t) =
                        ; "role", `String "assistant"
                        ; ( "content"
                          , `Array
-                             [ `Object [ "type", `String "text"; "text", `String "done" ]
+                             [ `Object
+                                 [ "type", `String "text"
+                                 ; "text", `String "done"
+                                 ]
                              ] )
                        ; ( "usage"
                          , `Object
-                             [ "input_tokens", `Number "5"; "output_tokens", `Number "2" ]
-                         )
+                             [ "input_tokens", `Number "5"
+                             ; "output_tokens", `Number "2"
+                             ] )
                        ] )
                  ]);
            write p (result "done" "0.01"))
@@ -282,7 +313,8 @@ let with_session ~adapter ~peer f =
     Composer_runner.create
       ~sw
       ~adapter
-      ~spawn:(fun (_ : Adapter.Launch.t) -> Ok (Line_transport.Peer.spawn ~sw peer))
+      ~spawn:(fun (_ : Adapter.Launch.t) ->
+        Ok (Line_transport.Peer.spawn ~sw peer))
       ~interrupt_grace:(Time_float.Span.of_sec 0.5)
       ()
   in
@@ -300,7 +332,9 @@ let with_session ~adapter ~peer f =
   let (module A : Adapter.S) = adapter in
   Agent.set_engine
     agent
-    { engine = Composer; adapter = Some (Adapter_id.of_string A.id |> Or_error.ok_exn) };
+    { engine = Composer
+    ; adapter = Some (Adapter_id.of_string A.id |> Or_error.ok_exn)
+    };
   Agent.set_runner agent (Some (Composer_runner.runner composer));
   Agent.subscribe agent ~f:print_event;
   f agent;
@@ -366,7 +400,8 @@ let%expect_test "codex: its models, picked and thought about per turn" =
     agent
     (List.find_exn models ~f:(fun m -> String.equal m.id "gpt-5-codex"));
   Or_error.ok_exn (Agent.set_thinking agent (On (Some High)));
-  print_s [%sexp (Agent.set_thinking agent (On (Some Minimal)) : unit Or_error.t)];
+  print_s
+    [%sexp (Agent.set_thinking agent (On (Some Minimal)) : unit Or_error.t)];
   prompt agent "again";
   show_model agent;
   [%expect
@@ -413,7 +448,9 @@ let%expect_test "claude: models from its handshake; switching them mid-session" 
       claude/haiku "Haiku" thinking=[off default low medium high max]
     |}];
   let models = Option.value_exn (Agent.external_models agent) in
-  Agent.set_model agent (List.find_exn models ~f:(fun m -> String.equal m.id "opus"));
+  Agent.set_model
+    agent
+    (List.find_exn models ~f:(fun m -> String.equal m.id "opus"));
   Or_error.ok_exn (Agent.set_thinking agent (On (Some High)));
   Agent.set_mode agent ~plan:true;
   prompt agent "plan it";
@@ -425,7 +462,9 @@ let%expect_test "claude: models from its handshake; switching them mid-session" 
     claude got user "plan it"
     assistant (claude/opus, End_turn): "done"
     |}];
-  print_s [%sexp (Agent.compact agent ~instructions:"keep the plan" : string Or_error.t)];
+  print_s
+    [%sexp
+      (Agent.compact agent ~instructions:"keep the plan" : string Or_error.t)];
   [%expect
     {|
     claude got user "/compact keep the plan"

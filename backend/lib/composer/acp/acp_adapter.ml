@@ -356,7 +356,9 @@ let create
     (* The choices of its [model] option; the current one is its default. *)
     let models t =
       match
-        Codec.Session_config.option (Codec.session_config t.codec) ~category:"model"
+        Codec.Session_config.option
+          (Codec.session_config t.codec)
+          ~category:"model"
       with
       | Some { value = Select { current; choices }; _ } ->
         let model (c : Codec.Config_option.Choice.t) =
