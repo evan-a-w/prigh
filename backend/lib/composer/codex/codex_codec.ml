@@ -143,10 +143,13 @@ module Server_request = struct
     | Mcp_tool_approval of { schema : Json.t option }
     | Question of { question_ids : string list }
     | Tool
+end
 
-  type entry =
+(* A request of Codex's waiting for our answer, with its JSON-RPC id. *)
+module Pending = struct
+  type t =
     { id : Json.t
-    ; request : t
+    ; request : Server_request.t
     }
 end
 
@@ -177,7 +180,7 @@ end
 type t =
   { mutable next_id : int
   ; pending : Request_kind.t Int.Table.t
-  ; server_requests : Server_request.entry String.Table.t
+  ; server_requests : Pending.t String.Table.t
   ; mutable thread : string option
   ; mutable thread_model : string option
   ; mutable turn : Turn.t option
@@ -635,7 +638,7 @@ let reply_approval t ~request_id (answer : Adapter_event.Approval_reply.t) =
   match Hashtbl.find t.server_requests request_id with
   | None -> None
   | Some { request = Question _ | Tool; _ } -> None
-  | Some { id; request } ->
+  | Some { Pending.id; request } ->
     Hashtbl.remove t.server_requests request_id;
     let decision name = `Object [ "decision", `String name ] in
     let result =
@@ -686,7 +689,7 @@ let reply_approval t ~request_id (answer : Adapter_event.Approval_reply.t) =
 
 let answer_question t ~request_id (answer : User_question.Reply.t) =
   match Hashtbl.find t.server_requests request_id with
-  | Some { id; request = Question { question_ids } } ->
+  | Some { Pending.id; request = Question { question_ids } } ->
     Hashtbl.remove t.server_requests request_id;
     let answers =
       match answer with
@@ -705,7 +708,7 @@ let answer_question t ~request_id (answer : User_question.Reply.t) =
 
 let reply_tool_call t ~request_id ~output ~success =
   match Hashtbl.find t.server_requests request_id with
-  | Some { id; request = Tool } ->
+  | Some { Pending.id; request = Tool } ->
     Hashtbl.remove t.server_requests request_id;
     Some
       (reply
@@ -1384,7 +1387,7 @@ let notification t method_ params =
 let server_request t ~id method_ params =
   let key = request_key id in
   let register request =
-    Hashtbl.set t.server_requests ~key ~data:{ id; request }
+    Hashtbl.set t.server_requests ~key ~data:{ Pending.id; request }
   in
   let tool_id = str "itemId" params in
   let with_reason summary =
