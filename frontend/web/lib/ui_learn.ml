@@ -75,6 +75,7 @@ let calculator (ctx : Ui_context.t) ~path (t : Calculator.t) =
           [ Node.input
               ~attrs:
                 ([ Attr.id id
+                 ; Attr.class_ Ui_look.calc_input
                  ; Attr.type_ "number"
                  ; Attr.create "inputmode" "decimal"
                  ; Attr.value v
@@ -178,7 +179,7 @@ let flashcards (ctx : Ui_context.t) ~path ~title cards =
       Node.button
         ~attrs:
           ([ Attr.type_ "button"
-           ; Attr.class_ "ui-btn ghost"
+           ; Attr.class_ (Ui_look.button `Ghost)
            ; Attr.create "aria-label" label
            ; Attr.on_click (fun _ -> go target)
            ]
@@ -336,7 +337,7 @@ let quiz (ctx : Ui_context.t) ~path ~title (questions : Ui_spec.Question.t list)
              Node.button
                ~attrs:
                  [ Attr.type_ "button"
-                 ; Attr.class_ "ui-btn ghost small"
+                 ; Attr.class_ (Ui_look.button ~small:true `Ghost)
                  ; Attr.on_click (fun _ ->
                      Effect.Many
                        (List.mapi questions ~f:(fun k _ ->
