@@ -6,28 +6,7 @@ module Action = App.Action
 (* On a phone: one button for the rest, which opens a sheet from the bottom
    with a labelled row each: what applies, the jump list, the filter, the
    panels and the settings (no row of bare icons to guess at). *)
-let sheet_row ?(on = false) ?id ?detail ?badge ~cls ~name ~glyph ~on_click () =
-  Node.button
-    ~attrs:
-      [ classes ("sheet-row" :: String.split cls ~on:' ') [ "on", on ]
-      ; Option.value_map id ~default:Attr.empty ~f:Attr.id
-      ; Attr.type_ "button"
-      ; (if on then Attr.create "aria-pressed" "true" else Attr.empty)
-      ; Attr.on_click (fun _ -> on_click)
-      ]
-    [ icon glyph
-    ; Node.span
-        ~attrs:[ Attr.class_ "sheet-row-text" ]
-        [ span ~cls:"sheet-row-name" name
-        ; (match detail with
-           | Some d -> span ~cls:"sheet-row-detail" d
-           | None -> Node.none)
-        ]
-    ; (match badge with
-       | Some b -> span ~cls:"badge" b
-       | None -> Node.none)
-    ]
-;;
+let sheet_row = Sheet_view.row
 
 let sheet (m : App.Model.t) ~inject =
   let go a = Effect.Many [ inject Action.Toggle_status_tray; inject a ] in
@@ -39,7 +18,7 @@ let sheet (m : App.Model.t) ~inject =
       ; Attr.role "group"
       ; Attr.create "aria-label" "Panels and settings"
       ]
-    ([ div ~cls:"sheet-grip" []
+    ([ Sheet_view.grip ()
      ; Chip_popover_view.session_sections m ~inject
      ; Status_view.notes m ~inject
      ; sheet_row

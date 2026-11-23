@@ -97,7 +97,8 @@ let form_values fields ~value =
 ;;
 
 let sent_chip = function
-  | true -> Node.span ~attrs:[ Attr.class_ "ui-sent" ] [ Node.text "✓ Sent" ]
+  | true ->
+    Loon.Badge.view ~variant:Ghost ~class_:"ui-sent" [ Node.text "✓ Sent" ]
   | false -> Node.none
 ;;
 
@@ -164,7 +165,7 @@ let field (ctx : Ui_context.t) ~path ~sent ~value ~set (f : Field.t) =
                     | Date -> "date"
                     | Number -> "number"
                     | _ -> "text")
-               ; Attr.class_ "ui-input"
+               ; Attr.class_ Ui_look.input
                ; Attr.value v
                ; on_input
                ]
@@ -179,7 +180,7 @@ let field (ctx : Ui_context.t) ~path ~sent ~value ~set (f : Field.t) =
       ; Node.textarea
           ~attrs:
             (common
-             @ [ Attr.class_ "ui-input"
+             @ [ Attr.class_ Ui_look.textarea
                ; Attr.value v
                ; Attr.create "rows" "3"
                ; on_input
@@ -210,7 +211,7 @@ let field (ctx : Ui_context.t) ~path ~sent ~value ~set (f : Field.t) =
       ; Node.select
           ~attrs:
             (common
-             @ [ Attr.class_ "ui-input"
+             @ [ Attr.class_ Ui_look.select
                ; Attr.on_change (fun _ s -> set f.name s)
                ])
           (List.map f.options ~f:(fun o ->
@@ -284,18 +285,13 @@ let field (ctx : Ui_context.t) ~path ~sent ~value ~set (f : Field.t) =
       [ Node.label
           ~attrs:[ Attr.class_ "ui-toggle-row"; Attr.for_ id ]
           [ Node.span ~attrs:[ Attr.class_ "ui-label" ] [ Node.text f.label ]
-          ; Node.button
-              ~attrs:
-                ([ Attr.id id
-                 ; Attr.type_ "button"
-                 ; Attr.role "switch"
-                 ; Attr.class_ "ui-switch"
-                 ; Attr.create "aria-checked" (Bool.to_string on)
-                 ; Attr.on_click (fun _ ->
-                     set f.name (if on then "false" else "true"))
-                 ]
-                 @ disabled)
-              [ Node.span ~attrs:[ Attr.class_ "ui-knob" ] [] ]
+          ; Loon.Switch.view
+              ~id
+              ~class_:"ui-switch"
+              ~disabled:sent
+              ~checked:on
+              ~on_change:(fun on -> set f.name (Bool.to_string on))
+              ()
           ]
       ]
   in
@@ -373,7 +369,7 @@ let form
            ; Node.button
                ~attrs:
                  [ Attr.type_ "button"
-                 ; Attr.class_ "ui-btn primary"
+                 ; Attr.class_ (Ui_look.button `Primary)
                  ; Attr.on_click (fun _ ->
                      match result with
                      | Ok values -> send ctx ~component ~title values
@@ -481,7 +477,7 @@ let choices
            ~attrs:[ Attr.class_ "ui-actions" ]
            [ Node.button
                ~attrs:
-                 ([ Attr.type_ "button"; Attr.class_ "ui-btn primary" ]
+                 ([ Attr.type_ "button"; Attr.class_ (Ui_look.button `Primary) ]
                   @
                   if List.is_empty picked
                   then [ Attr.disabled ]
@@ -574,7 +570,7 @@ let checklist
            [ Node.button
                ~attrs:
                  [ Attr.type_ "button"
-                 ; Attr.class_ "ui-btn primary"
+                 ; Attr.class_ (Ui_look.button `Primary)
                  ; Attr.on_click (fun _ ->
                      send
                        ctx

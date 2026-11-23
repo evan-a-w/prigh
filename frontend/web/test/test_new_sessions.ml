@@ -70,19 +70,19 @@ let%expect_test "the section: the built-ins, every control" =
     (Stop sessions starting turns past a cost (/default-budget))
     button "New sessions' model: The backend's choice" -- Choose the model new sessions start with
     button "This session\226\128\153s" -- Start new sessions with Claude Opus 5.5 · thinking provider's default, its thinking level too (/change_default)
-    button "Off" -- New sessions think at off
-    button "Provider's default" -- New sessions think at provider's default
-    button "Minimal" -- New sessions think at minimal
-    button "Low" -- New sessions think at low
-    button "Medium" -- New sessions think at medium
-    button "High" -- New sessions think at high
-    button "Xhigh" -- New sessions think at xhigh
-    button "Max" -- New sessions think at max
-    button "Ask" -- New sessions start in Ask mode
-    button "Auto-edit" -- New sessions start in Auto-edit mode
-    button "Smart" -- New sessions start in Smart mode
-    button "Auto" -- New sessions start in Auto mode
-    button "Chat" -- New sessions start in Chat mode
+    [radio] button "Off" -- New sessions think at off
+    [radio] button "Provider's default" -- New sessions think at provider's default
+    [radio] button "Minimal" -- New sessions think at minimal
+    [radio] button "Low" -- New sessions think at low
+    [radio] button "Medium" -- New sessions think at medium
+    [radio] button "High" -- New sessions think at high
+    [radio] button "Xhigh" -- New sessions think at xhigh
+    [radio] button "Max" -- New sessions think at max
+    [radio] button "Ask" -- New sessions start in Ask mode
+    [radio] button "Auto-edit" -- New sessions start in Auto-edit mode
+    [radio] button "Smart" -- New sessions start in Smart mode
+    [radio] button "Auto" -- New sessions start in Auto mode
+    [radio] button "Chat" -- New sessions start in Chat mode
     button "New sessions' tool host: Where you are" -- Choose the tool host new sessions start on (/default-host)
     button "Add" -- Add a model to the end of the chain (/fallback MODEL…)
     [switch] button "Budget" -- Stop sessions starting turns past a cost (/default-budget)
@@ -162,7 +162,7 @@ let%expect_test "thinking and mode: segmented, for new sessions only" =
      (params ((config ((default_thinking low))) (defaults_only true)))
      (tag (Default_set (Thinking (low)))))
     (Expire_toast (id 0) (after_ms 3620))
-    <button class="on segment">
+    <button class="[&_svg:not([class*='size-'])]:size-3.5 [&_svg]:pointer-events-none [&_svg]:shrink-0 aria-invalid:border-destructive aria-invalid:ring-destructive/20 aria-pressed:bg-muted bg-transparent border border-input dark:aria-invalid:ring-destructive/40 data-[state=on]:bg-muted disabled:opacity-50 disabled:pointer-events-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:z-10 focus:z-10 font-medium gap-1 group-data-[spacing=0]/toggle-group:has-data-[icon=inline-end]:pr-1.5 group-data-[spacing=0]/toggle-group:has-data-[icon=inline-start]:pl-1.5 group-data-[spacing=0]/toggle-group:px-2 group-data-[spacing=0]/toggle-group:rounded-none group-data-horizontal/toggle-group:data-[spacing=0]:data-[variant=outline]:border-l-0 group-data-horizontal/toggle-group:data-[spacing=0]:data-[variant=outline]:first:border-l group-data-horizontal/toggle-group:data-[spacing=0]:first:rounded-l-lg group-data-horizontal/toggle-group:data-[spacing=0]:last:rounded-r-lg group-data-vertical/toggle-group:data-[spacing=0]:data-[variant=outline]:border-t-0 group-data-vertical/toggle-group:data-[spacing=0]:data-[variant=outline]:first:border-t group-data-vertical/toggle-group:data-[spacing=0]:first:rounded-t-lg group-data-vertical/toggle-group:data-[spacing=0]:last:rounded-b-lg group/toggle h-7 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 hover:bg-muted hover:text-foreground inline-flex items-center justify-center min-w-7 narrow:h-auto narrow:justify-start narrow:min-h-11 narrow:py-2 narrow:text-left narrow:w-full on outline-none px-2.5 rounded-[min(var(--radius-md),12px)] rounded-lg segment shrink-0 text-[0.8rem] transition-all whitespace-nowrap">
     Thinking
     How hard new sessions think, on models that can. A model without the level takes its nearest one.
     (Off answer straight away) (Provider's default the provider picks the effort) (Minimal barely) (Low a little) (Medium some) (High more) (Xhigh a lot, for long agentic work) (Max as much as the model allows)

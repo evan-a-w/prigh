@@ -225,7 +225,7 @@ let dir (m : App.Model.t) (config : Config.t option) ~inject =
     [ Node.input
         ~attrs:
           [ Attr.id "default-dir"
-          ; Attr.class_ "text-input default-dir-input"
+          ; Attr.class_ (input_cls "default-dir-input w-60 max-w-full")
           ; Attr.type_ "text"
           ; Attr.value value
           ; Attr.placeholder "The host's working directory"
@@ -260,8 +260,14 @@ let fallback (m : App.Model.t) (config : Config.t option) ~inject =
   in
   let chip i key =
     Node.li
-      ~attrs:[ Attr.class_ "fallback-model" ]
-      [ span ~cls:"fallback-index" (Int.to_string (i + 1))
+      ~attrs:
+        [ Attr.class_
+            "fallback-model inline-flex items-center gap-1.5 rounded-md border \
+             py-0.5 pr-0.5 pl-2 text-[13px]"
+        ]
+      [ span
+          ~cls:"fallback-index text-xs tabular-nums text-muted-foreground"
+          (Int.to_string (i + 1))
       ; span ~cls:"fallback-name" (model_name m key)
       ; button
           ~cls:"small ghost fallback-remove"
@@ -291,10 +297,13 @@ let fallback (m : App.Model.t) (config : Config.t option) ~inject =
        | [] -> Node.none
        | models ->
          Node.ol
-           ~attrs:[ Attr.class_ "fallback-list" ]
+           ~attrs:
+             [ Attr.class_
+                 "fallback-list m-0 flex list-none flex-wrap gap-1.5 p-0"
+             ]
            (List.mapi models ~f:chip))
     ; div
-        ~cls:"fallback-actions"
+        ~cls:"fallback-actions flex items-center gap-2"
         [ button
             ~cls:"small fallback-add"
             ~title:"Add a model to the end of the chain (/fallback MODEL…)"

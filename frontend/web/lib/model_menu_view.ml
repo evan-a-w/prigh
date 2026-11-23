@@ -305,7 +305,11 @@ let view (m : App.Model.t) (p : Picker.t) ~inject =
   in
   Node.div
     ~attrs:
-      [ Attr.class_ "chip-popover menu-surface model-menu"
+      [ Attr.class_
+          "loon chip-popover menu-surface model-menu bg-popover \
+           text-popover-foreground rounded-lg shadow-md ring-1 \
+           ring-foreground/10"
+      ; Attr.create "data-slot" "popover-content"
       ; Attr.id "chip-popover"
       ; Attr.create "data-chip" "model"
       ; Attr.role "dialog"
@@ -316,8 +320,11 @@ let view (m : App.Model.t) (p : Picker.t) ~inject =
         [ rail m ~offered ~inject
         ; div
             ~cls:"model-menu-main"
-            [ div
-                ~cls:"popover-search"
+            [ Node.div
+                ~attrs:
+                  [ Attr.class_ "popover-search"
+                  ; Attr.create "data-slot" "command-input-wrapper"
+                  ]
                 [ icon Search
                 ; Node.input
                     ~attrs:
@@ -349,6 +356,7 @@ let view (m : App.Model.t) (p : Picker.t) ~inject =
                       ^ Sexp.to_string (Model_menu.sexp_of_t m.model_menu))
                    ~attrs:
                      [ Attr.class_ "popover-items model-list"
+                     ; Attr.create "data-slot" "command-list"
                      ; Attr.id "popover-list"
                      ; Attr.role "listbox"
                      ; Attr.create "aria-label" heading

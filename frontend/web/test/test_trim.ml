@@ -235,7 +235,7 @@ let%expect_test
     {|
     Scroll_to_bottom
     Scroll_to_trimmed
-    ✂ 2 messages trimmed · ~19k tokens (Show) · (Undo)
+    2 messages trimmed · ~19k tokens (Show) · (Undo)
     question 2
     10:02
     answer 2
@@ -284,7 +284,7 @@ let%expect_test
     {|
     (Rpc (method_ get_trimmed) (params ())
      (tag (Trimmed_messages /sessions/s1.jsonl)))
-    ✂ 2 messages trimmed · ~19k tokens Loading… · (Undo)
+    2 messages trimmed · ~19k tokens Loading… · (Undo)
     |}];
   H.reply h "get_trimmed" (sprintf {|{"messages":%s}|} (exchanges [ 1 ]));
   H.text h ~selector:"#chat";
@@ -295,7 +295,7 @@ let%expect_test
     question 1
     10:01
     answer 1
-    ✂ 2 messages trimmed · ~19k tokens (Hide) · (Undo)
+    2 messages trimmed · ~19k tokens (Hide) · (Undo)
     question 2
     10:02
     answer 2
@@ -315,7 +315,7 @@ let%expect_test
   H.act h (Show_trimmed false);
   H.text h ~selector:".trimmed-messages";
   divider h;
-  [%expect {| ✂ 2 messages trimmed · ~19k tokens (Show) · (Undo) |}];
+  [%expect {| 2 messages trimmed · ~19k tokens (Show) · (Undo) |}];
   (* Another session: folded there. *)
   H.quiet h (fun () ->
     H.act h (Show_trimmed true);
@@ -343,7 +343,7 @@ let%expect_test
   [%expect
     {|
     (Rpc (method_ untrim) (params ()) (tag Untrimmed))
-    ✂ 2 messages trimmed · ~19k tokens (Show) · Restoring…
+    2 messages trimmed · ~19k tokens (Show) · Restoring…
     |}];
   (* Again while it is on its way: nothing more. *)
   H.act h Untrim;
@@ -422,7 +422,7 @@ let%expect_test
   [%expect
     {|
     (Rpc (method_ untrim) (params ()) (tag Untrimmed))
-    ✂ 2 messages trimmed · ~19k tokens (Show) · (Undo)
+    2 messages trimmed · ~19k tokens (Show) · (Undo)
     Cannot undo a trim while a run is in progress: wait for the run to end or abort it (Esc) (Dismiss)
     |}]
 ;;
@@ -630,7 +630,7 @@ let%expect_test "jumping to the divider loads the pages down to it" =
     {|
     Keep_scroll_position
     Scroll_to_trimmed
-    ✂ 2 messages trimmed · ~19k tokens (Show) · (Undo)
+    2 messages trimmed · ~19k tokens (Show) · (Undo)
     |}]
 ;;
 
@@ -680,7 +680,7 @@ let%expect_test
     (Expire_toast (id 0) (after_ms 3740))
     Scroll_to_bottom
     Scroll_to_trimmed
-    ✂ 3 messages trimmed · ~29k tokens (Show) · (Undo)
+    3 messages trimmed · ~29k tokens (Show) · (Undo)
     answer 2
     question 3
     10:03

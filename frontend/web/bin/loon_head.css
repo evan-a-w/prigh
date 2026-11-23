@@ -1,10 +1,13 @@
 /* The start of Tailwind's input for prigh-web (bin/dune: this, then
    loon_preflight.css, ../loon_ui/loon.css and loon_bridge.css). The layers'
    order: the stylesheets loaded later (xterm's, KaTeX's: Page_assets puts
-   them in [vendor]), Tailwind's theme, base styles for the components only,
-   prigh-web's own stylesheets ([legacy], all of theme.css to phone.css),
-   then the components' utilities, which so win over the older rules. */
-@layer vendor, theme, base, legacy, components, utilities;
+   them in [vendor]), Tailwind's theme, base styles (the components' reset,
+   the themes' palettes), the components (prigh-web's page rules first, in
+   [components.page]: style.css to phone.css; then genui.css, diff.css,
+   review.css, forge.css, workspace.css, signin.css), then the utilities,
+   which win over all of them. */
+@layer vendor, theme, base, components, utilities;
+@layer components.page;
 
 @import "tailwindcss/theme.css" layer(theme);
 @import "tailwindcss/utilities.css" layer(utilities) source(none);

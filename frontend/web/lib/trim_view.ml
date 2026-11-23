@@ -11,15 +11,14 @@ let busy text =
     [ Html.lamp (); Node.text text ]
 ;;
 
-let action ~title ?(attrs = []) ~on_click text =
-  Node.button
-    ~attrs:
-      ([ Attr.class_ "trim-action"
-       ; Attr.type_ "button"
-       ; Attr.title title
-       ; Attr.on_click (fun _ -> on_click)
-       ]
-       @ attrs)
+let action ~title ?attrs ~on_click text =
+  button
+    ~cls:"trim-action loon text-muted-foreground"
+    ~variant:Ghost
+    ~size:Xs
+    ~title
+    ?attrs
+    ~on_click
     [ Node.text text ]
 ;;
 
@@ -86,10 +85,7 @@ let view (m : App.Model.t) ~inject =
             ; Attr.role "group"
             ; Attr.create "aria-label" label
             ]
-          [ Node.span
-              ~attrs:
-                [ Attr.class_ "scissors"; Attr.create "aria-hidden" "true" ]
-              [ Node.text "✂" ]
+          [ icon ~cls:"scissors" Scissors
           ; span ~cls:"trim-label" label
           ; Node.span
               ~attrs:[ Attr.class_ "trim-actions" ]

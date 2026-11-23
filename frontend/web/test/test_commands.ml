@@ -915,8 +915,13 @@ let%expect_test "/tree shows branches and moves the head" =
     (Focus dialog)
     (Rpc (method_ get_entries) (params ((all true))) (tag (Entries Tree)))
     (Focus picker-input)
-    <div role="listbox" id="picker-list" aria-label="Session tree" class="picker-items">
-      <div role="option"
+    <div data-slot="command-list"
+         role="listbox"
+         id="picker-list"
+         aria-label="Session tree"
+         class="picker-items">
+      <div data-slot="command-item"
+           role="option"
            id="picker-option-0"
            aria-selected="false"
            aria-checked="true"
@@ -928,7 +933,8 @@ let%expect_test "/tree shows branches and moves the head" =
           <icon class="check"> </icon>
         </span>
       </div>
-      <div role="option"
+      <div data-slot="command-item"
+           role="option"
            id="picker-option-1"
            aria-selected="false"
            aria-checked="true"
@@ -940,17 +946,28 @@ let%expect_test "/tree shows branches and moves the head" =
           <icon class="check"> </icon>
         </span>
       </div>
-      <div role="option" id="picker-option-2" aria-selected="false" class="picker-item" @on_click>
+      <div data-slot="command-item"
+           role="option"
+           id="picker-option-2"
+           aria-selected="false"
+           class="picker-item"
+           @on_click>
         <span class="picker-label">   > abandoned idea </span>
         <Vdom.Node.none-widget> </Vdom.Node.none-widget>
         <Vdom.Node.none-widget> </Vdom.Node.none-widget>
       </div>
-      <div role="option" id="picker-option-3" aria-selected="false" class="picker-item" @on_click>
+      <div data-slot="command-item"
+           role="option"
+           id="picker-option-3"
+           aria-selected="false"
+           class="picker-item"
+           @on_click>
         <span class="picker-label">   · abandoned answer </span>
         <Vdom.Node.none-widget> </Vdom.Node.none-widget>
         <Vdom.Node.none-widget> </Vdom.Node.none-widget>
       </div>
-      <div role="option"
+      <div data-slot="command-item"
+           role="option"
            id="picker-option-4"
            aria-selected="false"
            aria-checked="true"
@@ -962,7 +979,8 @@ let%expect_test "/tree shows branches and moves the head" =
           <icon class="check"> </icon>
         </span>
       </div>
-      <div role="option"
+      <div data-slot="command-item"
+           role="option"
            id="picker-option-5"
            aria-selected="true"
            aria-checked="true"

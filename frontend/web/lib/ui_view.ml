@@ -143,25 +143,13 @@ let progress ~label ~value ~max ~tone ~caption =
              else
                sprintf "%s / %s" (Ui_format.number value) (Ui_format.number max))
         ]
-    ; Node.div
+    ; Loon.Progress.view
+        ~class_:"ui-bar h-1.5!"
         ~attrs:
-          [ Attr.class_ "ui-bar"
-          ; Attr.role "progressbar"
-          ; Attr.create "aria-valuemin" "0"
-          ; Attr.create "aria-valuemax" (Ui_svg.num max)
-          ; Attr.create "aria-valuenow" (Ui_svg.num value)
-          ; Attr.create "aria-label" (Option.value label ~default:"Progress")
-          ]
-        [ Node.div
-            ~attrs:
-              [ Attr.class_ "ui-bar-fill"
-              ; Attr.style
-                  (Css_gen.create
-                     ~field:"width"
-                     ~value:(sprintf "%.2f%%" (pct *. 100.)))
-              ]
-            []
-        ]
+          [ Attr.create "aria-label" (Option.value label ~default:"Progress") ]
+        ~max:100.
+        ~value:(pct *. 100.)
+        ()
     ; (match caption with
        | Some c -> Ui_context.md ~cls:"ui-caption" c
        | None -> Node.none)
@@ -407,21 +395,32 @@ let rec component (ctx : Ui_context.t) ~path (c : C.t) =
                     (children (sprintf "%s.%d" path k) item.children)
                 else Node.none)
              ]))
-    | Divider -> Node.hr ~attrs:[ Attr.class_ "ui-divider" ] ()
+    | Divider -> Loon.Separator.view ~class_:"ui-divider" ()
     | Markdown t -> div "ui-markdown" [ Markdown_view.render t ]
     | Callout { tone; title; text = t } ->
       Node.div
         ~attrs:
-          [ Attr.classes [ "ui-callout"; tone_cls tone ]
+          [ Attr.class_
+              (Loon.Alert.classes
+                 ~variant:
+                   (match tone with
+                    | Danger -> Destructive
+                    | _ -> Default)
+                 ~class_:("ui-callout " ^ tone_cls tone)
+                 ())
+          ; Attr.create "data-slot" "alert"
           ; Attr.role
               (match tone with
                | Danger | Warning -> "alert"
                | _ -> "note")
           ]
         [ (match title with
-           | Some t -> div "ui-callout-title" [ Node.text t ]
+           | Some t ->
+             Loon.Alert.title ~class_:"ui-callout-title" [ Node.text t ]
            | None -> Node.none)
-        ; Ui_context.md t
+        ; Loon.Alert.description
+            ~class_:"text-foreground/90!"
+            [ Ui_context.md t ]
         ]
     | Stat { label; value; unit; delta; trend; good; caption; spark } ->
       stat ~label ~value ~unit ~delta ~trend ~good ~caption ~spark
@@ -439,8 +438,9 @@ let rec component (ctx : Ui_context.t) ~path (c : C.t) =
       div
         "ui-badges"
         (List.map items ~f:(fun (t, tone) ->
-           Node.span
-             ~attrs:[ Attr.classes [ "ui-badge"; tone_cls tone ] ]
+           Loon.Badge.view
+             ~variant:Ghost
+             ~class_:("ui-badge " ^ tone_cls tone)
              [ Node.text t ]))
     | Table t -> Ui_table.view ctx ~path t
     | Chart chart -> Ui_chart.view ctx ~path chart

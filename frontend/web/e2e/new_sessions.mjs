@@ -198,7 +198,7 @@ try {
 
   await pick(page, ".default-model-choice", "fable", "Claude Fable 5");
   await toast(page, "New sessions start with");
-  await page.locator(".setting.default-thinking").getByRole("button", { name: "High", exact: true }).click();
+  await page.locator(".setting.default-thinking").getByRole("radio", { name: "High", exact: true }).click();
   await toast(page, "think at high");
   await page.locator(".setting.default-mode .segment", { hasText: "Ask" }).click();
   await toast(page, "Ask mode");

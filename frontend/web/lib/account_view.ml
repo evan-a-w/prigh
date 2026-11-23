@@ -30,26 +30,20 @@ let who (m : App.Model.t) : Who.t option =
   | _, None -> None
 ;;
 
-let trigger (m : App.Model.t) ~inject =
-  Option.map (who m) ~f:(fun { name; acting_as = acting; _ } ->
-    Node.button
-      ~attrs:
-        [ Attr.class_ "account-button"
-        ; Attr.type_ "button"
-        ; Attr.title "Accounts: switch, add, act as, sign out"
-        ; Attr.create "aria-haspopup" "dialog"
-        ; Attr.on_click (fun _ -> inject Action.Open_accounts)
-        ]
-      [ span ~cls:"avatar" (initial name)
-      ; div
-          ~cls:"user"
-          [ span ~cls:"user-name" name
-          ; (match acting with
-             | Some ns -> span ~cls:"user-acting" ("acting as " ^ ns)
-             | None -> Node.none)
-          ]
-      ; icon ~cls:"chevron" Chevron
-      ])
+let avatar ?(size = `Default) name =
+  Node.span
+    ~attrs:
+      [ Attr.class_
+          ("avatar flex shrink-0 items-center justify-center rounded-full \
+            bg-muted font-medium text-foreground "
+           ^
+           match size with
+           | `Small -> "size-6 text-xs"
+           | `Default -> "size-7 text-[13px]"
+           | `Large -> "size-10 text-base")
+      ; Attr.create "data-slot" "avatar"
+      ]
+    [ Node.text (initial name) ]
 ;;
 
 let item_icon (id : string) : Icon.t =
@@ -68,81 +62,93 @@ let item_icon (id : string) : Icon.t =
 let menu (m : App.Model.t) (picker : Picker.t) ~inject =
   let close = inject Action.Close_dialog in
   let items = Picker.visible picker in
+  let choose (item : Picker.Item.t) =
+    Attr.on_click (fun _ -> inject (Action.Picker_choose item.id))
+  in
   let row i (item : Picker.Item.t) =
-    let switch = String.is_prefix item.id ~prefix:"switch " in
-    Node.div
-      ~attrs:
-        [ classes
-            [ "menu-item" ]
-            [ "selected", i = Picker.selected picker
-            ; "danger", String.equal item.id "signout"
-            ]
-        ; Attr.role "menuitem"
-        ; Attr.on_click (fun _ -> inject (Action.Picker_choose item.id))
-        ]
-      [ (if switch
-         then span ~cls:"avatar small" (initial item.label)
-         else icon (item_icon item.id))
-      ; div
-          ~cls:"menu-text"
-          [ span ~cls:"menu-label" item.label
-          ; (if String.is_empty item.detail
-             then Node.none
-             else span ~cls:"menu-detail" item.detail)
+    let selected = i = Picker.selected picker in
+    if String.is_prefix item.id ~prefix:"switch "
+    then
+      (* Another account: its avatar, not an icon. *)
+      Node.div
+        ~attrs:
+          [ classes [ "menu-item" ] [ "selected", selected ]
+          ; Attr.create "data-slot" "dropdown-menu-item"
+          ; Attr.role "menuitem"
+          ; choose item
           ]
-      ]
+        [ avatar ~size:`Small item.label
+        ; Node.span
+            ~attrs:[ Attr.class_ "menu-text" ]
+            [ span ~cls:"menu-label" item.label
+            ; (if String.is_empty item.detail
+               then Node.none
+               else span ~cls:"menu-detail" item.detail)
+            ]
+        ]
+    else
+      Menu_view.item
+        ~selected
+        ~danger:(String.equal item.id "signout")
+        ~icon:(item_icon item.id)
+        ?hint:(if String.is_empty item.detail then None else Some item.detail)
+        ~attrs:[ choose item ]
+        item.label
   in
   let switches, actions =
     List.partition_tf
       (List.mapi items ~f:(fun i item -> i, item))
       ~f:(fun (_, item) -> String.is_prefix item.id ~prefix:"switch ")
   in
-  Node.div
-    ~attrs:
-      [ Attr.class_ "menu-backdrop"
-      ; Attr.on_click (fun ev ->
-          if Js_of_ocaml.Js.Unsafe.equals ev##.target ev##.currentTarget
-          then close
-          else Effect.Ignore)
-      ]
-    [ Node.div
-        ~attrs:
-          [ Attr.class_ "account-menu menu-surface"
-          ; Attr.id "dialog"
-          ; Attr.role "dialog"
-          ; Attr.create "aria-label" "Account"
-          ; Attr.tabindex (-1)
-          ]
+  Menu_view.backdrop
+    ~on_close:close
+    [ Menu_view.surface
+        ~cls:
+          "account-menu fixed bottom-[62px] left-2.5 max-h-[calc(100vh-80px)] \
+           w-[300px] overflow-y-auto p-1 animate-in fade-in-0 zoom-in-95 \
+           motion-reduce:animate-none"
+        ~attrs:[ Attr.id "dialog" ]
+        ~label:"Account"
         [ (match who m with
            | None -> Node.none
            | Some { name; acting_as = acting; host } ->
              div
-               ~cls:"account-current"
-               [ span ~cls:"avatar large" (initial name)
+               ~cls:
+                 "account-current mb-1 flex items-center gap-2.5 border-b px-2 \
+                  pt-2 pb-2.5"
+               [ avatar ~size:`Large name
                ; div
-                   ~cls:"account-who"
-                   [ span ~cls:"account-name" name
+                   ~cls:"account-who flex min-w-0 flex-1 flex-col leading-snug"
+                   [ span ~cls:"account-name truncate text-sm font-medium" name
                    ; (match acting with
-                      | Some ns -> span ~cls:"account-acting" ("acting as " ^ ns)
+                      | Some ns ->
+                        span
+                          ~cls:"account-acting text-[13px] text-primary"
+                          ("acting as " ^ ns)
                       | None -> Node.none)
                    ; (match host with
-                      | Some host -> span ~cls:"account-host" host
+                      | Some host ->
+                        span
+                          ~cls:
+                            "account-host truncate font-mono text-xs \
+                             text-muted-foreground"
+                          host
                       | None -> Node.none)
                    ]
-               ; span ~cls:"account-badge" "signed in"
+               ; Loon.Badge.view
+                   ~variant:Outline
+                   ~class_:"account-badge text-[color:var(--sage)]"
+                   [ Node.text "signed in" ]
                ])
         ; (match switches with
            | [] -> Node.none
            | switches ->
-             div
-               ~cls:"menu-section"
-               (span ~cls:"menu-heading" "Switch to"
+             Menu_view.section
+               (Menu_view.heading "Switch to"
                 :: List.map switches ~f:(fun (i, item) -> row i item)))
+        ; Menu_view.section (List.map actions ~f:(fun (i, item) -> row i item))
         ; div
-            ~cls:"menu-section"
-            (List.map actions ~f:(fun (i, item) -> row i item))
-        ; div
-            ~cls:"menu-keys"
+            ~cls:"menu-keys narrow:hidden"
             [ Node.text "↑↓ to move, Enter to choose, Esc to close" ]
         ]
     ]

@@ -13,18 +13,15 @@
 .chrome-anchor { position: relative; flex: none; z-index: var(--z-tools); }
 /* While the ⋯ menu is open, the chrome is over its backdrop. */
 .chrome-anchor:has(.menu-open, .chrome-more.open) { z-index: var(--z-menu-anchor); }
-.main:has(.chat-chrome) .jump-nav { top: 8px; }
-.app.narrow .main:has(.chat-chrome) .chat-frame > .jump-nav { top: 12px; right: 12px; }
 
 /* The phone strip's buttons. */
-.chrome-button.round { width: 34px; height: 34px; border-radius: 50%; color: var(--muted-text); }
-.chrome-button.round:hover, .chrome-button.round[aria-expanded="true"] { color: var(--chalk); background: var(--slate-2); }
+.chrome-button.round { width: 34px; height: 34px; border-radius: 50%; color: var(--muted-foreground); }
+.chrome-button.round:hover, .chrome-button.round[aria-expanded="true"] { color: var(--foreground); background: var(--muted); }
 .chrome-button.round .icon { width: 17px; height: 17px; }
 
 /* What applies (a goal, reminders, a resume, a transfer, the plan). */
-.status-notes { display: flex; align-items: center; gap: 12px; min-width: 0; font-size: 12px; color: var(--muted-text); }
+.status-notes { display: flex; align-items: center; gap: 12px; min-width: 0; font-size: 12px; color: var(--muted-foreground); }
 .status-notes:empty { display: none; }
-.status-notes .status-item.mode.plan { max-width: 22ch; }
 
 /* A phone: the ⋯ opens a small menu of the toggles, the notes, the gear. */
 .chrome-more { position: relative; }
@@ -41,22 +38,22 @@
   min-width: 200px;
   max-width: calc(100vw - 24px);
   padding: 8px;
-  background: var(--slate);
-  border: 1px solid var(--rule-2);
+  background: var(--card);
+  border: 1px solid var(--input);
   border-radius: var(--r-surface);
   box-shadow: var(--float-shadow);
 }
-.chrome-menu > .status-notes { flex-wrap: wrap; padding: 2px 4px 8px; border-bottom: 1px solid var(--rule); }
+.chrome-menu > .status-notes { flex-wrap: wrap; padding: 2px 4px 8px; border-bottom: 1px solid var(--border); }
 .chrome-menu > .panel-toggles { justify-content: space-between; }
 .chrome-menu .btn.icon { width: 40px; height: 40px; }
-.chrome-menu > .settings-toggle { width: 100%; justify-content: center; border-top: 1px solid var(--rule); border-radius: 0; padding-top: 8px; height: auto; }
+.chrome-menu > .settings-toggle { width: 100%; justify-content: center; border-top: 1px solid var(--border); border-radius: 0; padding-top: 8px; height: auto; }
 
 /* {1 The status chip} */
 
 /* The context as a ring: a conic fill of [--pct], warm and hot as the
    meter is. */
 .ring {
-  --ring-color: color-mix(in srgb, var(--chalk) 60%, transparent);
+  --ring-color: color-mix(in srgb, var(--foreground) 60%, transparent);
   --ring-w: 2.5px;
   position: relative;
   display: inline-grid;
@@ -69,72 +66,36 @@
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  background: conic-gradient(var(--ring-color) calc(var(--pct) * 1%), var(--rule-2) 0);
+  background: conic-gradient(var(--ring-color) calc(var(--pct) * 1%), var(--input) 0);
   -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - var(--ring-w)), #000 calc(100% - var(--ring-w) + 0.5px));
   mask: radial-gradient(farthest-side, transparent calc(100% - var(--ring-w)), #000 calc(100% - var(--ring-w) + 0.5px));
   pointer-events: none;
 }
-.ring.warm { --ring-color: var(--sodium); }
-.ring.hot { --ring-color: var(--brick); }
+.ring.warm { --ring-color: var(--primary); }
+.ring.hot { --ring-color: var(--destructive); }
 .ring.mini { width: 13px; height: 13px; }
 
 /* The details card: under what it describes at the top of the page, over
    it at the bottom. */
-.status-gauge { align-items: center; gap: 10px; }
-.status-gauge.below > .status-details { top: calc(100% + 10px); bottom: auto; left: 50%; right: auto; translate: -50% 0; }
-.status-gauge.above > .status-details { top: auto; bottom: calc(100% + 10px); transform: translateY(2px); }
-.status-gauge.above:is(:hover, :focus-within) > .status-details { transform: none; }
+
 .status-details { min-width: 240px; text-align: left; }
-.status-gauge:not(:hover):not(:has(:focus-visible)) > .status-details { visibility: hidden; opacity: 0; }
 
 /* The figures, quiet; their words never move the rest. */
-.status-gauge .status-item.activity { width: auto; max-width: 24ch; }
-.status-item.context .percent { font-variant-numeric: tabular-nums; }
 
+.status-item.context .percent { font-variant-numeric: tabular-nums; }
 
 /* Quiet figures at the right of the composer's row, clear of send: a lamp
    (its word while the agent works), the context's ring and percent, the
    cost. One pill, lit while the agent works; the details
    card stands over it on hover and focus (a tap opens the session's
    details: a phone has no hover). */
-.composer-status { display: flex; align-items: center; min-width: 0; flex-shrink: 0; }
-.composer-status > .status-gauge {
-  align-items: center;
-  height: 28px;
-  padding: 0 4px 0 9px;
-  border-radius: 999px;
-  color: var(--faint);
-  font: 11.5px/1 var(--mono);
-  transition: color 0.15s, background-color 0.15s;
-}
-.composer-status > .status-gauge:hover { background: var(--slate-2); color: var(--muted-text); }
-.composer-status .status-item { display: inline-flex; align-items: center; gap: 6px; font: inherit; color: inherit; white-space: nowrap; }
-.composer-status .status-item.activity { padding-right: 6px; }
-.composer-status .status-item.activity > .label { display: none; }
+
 /* Idle, the lamp is out: the ring and the figures say enough. */
-.composer-status .status-item.activity.idle { display: none; }
-.composer-status .status-item.link {
-  height: 28px;
-  padding: 0 5px;
-  border: 0;
-  border-radius: 999px;
-  background: none;
-  cursor: pointer;
-}
-.composer-status .status-item.link:hover { color: var(--chalk); text-decoration: none; }
-.composer-status .status-item.context { gap: 5px; }
-.composer-status .status-item.context .percent { font-variant-numeric: tabular-nums; min-width: 3ch; text-align: right; }
-.composer-status .status-item.cost { padding: 0 6px 0 4px; font-variant-numeric: tabular-nums; }
-.composer-status .status-item.cost.warm { color: var(--sodium); }
-.composer-status .status-item.cost.hot { color: var(--brick); }
+
 /* Working: the lamp's word, in sodium; the figures stay where they were. */
-.composer-status.busy > .status-gauge { color: var(--muted-text); background: var(--sodium-wash); }
-.composer-status.busy .status-item.activity { color: var(--sodium); }
-.composer-status.busy .status-item.activity > .label { display: inline; max-width: 16ch; overflow: hidden; text-overflow: ellipsis; }
+
 /* Offline, the status says so too (the banner says more). */
-.composer-status .status-item.activity.offline > .label { display: inline; max-width: 16ch; overflow: hidden; text-overflow: ellipsis; }
-.composer-status .status-gauge.above > .status-details { top: auto; bottom: calc(100% + 10px); right: -40px; transform: translateY(2px); }
-.composer-status .status-gauge.above:is(:hover, :focus-within) > .status-details { transform: none; }
+
 .status-details { min-width: 240px; text-align: left; }
 /* On a narrow screen the card's hint wraps rather than leaving it. */
 .status-detail-hint { white-space: normal; }
@@ -147,73 +108,21 @@
    model's. */
 
 .composer-controls:has(+ .row-chips) { flex: 0 1 auto; }
-.row-chips { margin-right: auto; min-width: 0; padding-left: 0; margin-left: 0; }
-.row-chips.menu-open { z-index: var(--z-menu-anchor); }
-.row-chips .chip-button { height: 28px; padding: 0 7px; gap: 5px; font-size: 12.5px; color: var(--faint); }
-.row-chips .chip-button .icon { width: 14px; height: 14px; }
-.row-chips .chip-button:not(.awaiting):is(:hover, :focus-visible) { color: var(--chalk); }
-
-/* {1 The session's sections} (a phone's ⋯ sheet)
-
-   A title with its icon and the current value, then the choices as one
-   segmented row, each a full thumb's height. */
-
-.session-sections { display: flex; flex-direction: column; gap: 4px; padding: 2px 4px 10px; margin-bottom: 6px; border-bottom: 1px solid var(--rule); }
-.session-section { display: flex; flex-direction: column; gap: 6px; padding: 6px 8px 4px; }
-.session-section-head { display: flex; align-items: center; gap: 8px; min-width: 0; color: var(--muted-text); font-size: 13px; }
-.session-section-head > .icon { width: 16px; height: 16px; flex: none; color: var(--faint); }
-.session-section-title { font-weight: 600; color: var(--chalk); }
-.session-section-note { margin-left: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--faint); font-size: 12px; }
-.session-choices { display: flex; gap: 2px; padding: 3px; background: var(--well); border-radius: 10px; }
-.session-choice {
-  flex: 1 1 0;
-  min-width: 0;
-  min-height: 44px;
-  padding: 0 4px;
-  border: 0;
-  border-radius: 8px;
-  background: none;
-  color: var(--muted-text);
-  font: 500 14px var(--sans);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  cursor: pointer;
-}
-.session-choice.on { background: var(--slate-2); color: var(--chalk); box-shadow: 0 1px 0 var(--rule-2) inset, 0 1px 3px -1px var(--edge-shadow); }
-.session-choice:focus-visible { outline: 2px solid var(--sodium); outline-offset: -2px; }
-.session-usage { display: flex; align-items: center; gap: 12px; padding: 0 2px; font-size: 13px; color: var(--muted-text); }
-.session-context { flex: 1; display: flex; align-items: center; gap: 8px; min-width: 0; }
-.session-context .meter { flex: 1; height: 5px; }
-.session-context .percent { color: var(--chalk); font: 12.5px var(--mono); font-variant-numeric: tabular-nums; }
-.session-of { color: var(--faint); font: 12px var(--mono); }
-.session-usage > .status-item.cost { font: 12.5px var(--mono); color: var(--chalk); }
 
 /* {1 A narrow composer} (a small window, or the sidebar and a panel beside
    it): the session's chips keep their icons, the status its ring and
    percent, before the model's and the host's names are cut. */
 
-@container composer (max-width: 760px) {
-  .row-chips .chip-label { display: none; }
-  .row-chips .chip-button { padding: 0 6px; }
-}
-@container composer (max-width: 640px) {
-  .composer-status .status-item.cost { display: none; }
-  .composer-status.busy .status-item.activity > .label { display: none; }
-}
 /* Narrower still (the review page beside the chat): no room for one row,
    so the + and where the message goes are the first, the chips and the
    buttons a second, rather than drawn over the model's name. A phone has
    the chips in its ⋯ sheet instead. */
 @container composer (width < 420px) {
-  .composer-controls .model-family { display: none; }
+  
   .app:not(.narrow) .composer-row { flex-wrap: wrap; row-gap: 2px; }
   .app:not(.narrow) .composer-controls:has(+ .row-chips) { flex: 1 1 calc(100% - 36px); }
-  .app:not(.narrow) .row-chips { padding-left: 3px; }
+  
 }
 
 /* {1 Still} */
 
-@media (prefers-reduced-motion: reduce) {
-  .composer-status > .status-gauge { transition: none; }
-}

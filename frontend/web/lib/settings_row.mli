@@ -29,6 +29,42 @@ val row
   -> Node.t list
   -> Node.t
 
+(** The pieces of a row, for the rows [row] does not fit: a row ([stack]
+    puts its parts under each other), its text column, the setting's
+    [name], a line [about] it, a [host] (monospace), a [note] ([level]
+    ["warm"], ["good"], ["bad"] or ["muted"]), and its controls. *)
+val custom
+  :  ?cls:string
+  -> ?stack:bool
+  -> ?attrs:Attr.t list
+  -> Node.t list
+  -> Node.t
+
+val text : ?cls:string -> ?wide:bool -> Node.t list -> Node.t
+val name : string -> Node.t
+val about : ?cls:string -> string -> Node.t
+val host : string -> Node.t
+val note : ?cls:string -> string * string -> Node.t
+
+(** The text colour of a note of this level. *)
+val note_colour : string -> string
+
+val control : ?cls:string -> ?wide:bool -> Node.t list -> Node.t
+
+(** A line of small print (the keys that save, a count). *)
+val hint : ?cls:string -> string -> Node.t
+
+(** A field's label. *)
+val label : ?cls:string -> ?for_:string -> string -> Node.t
+
+(** loon's input and textarea classes, then [cls] (the hook classes). *)
+val input_cls : string -> string
+
+val textarea_cls : string -> string
+
+(** Buttons at the end of a form. *)
+val buttons : ?cls:string -> Node.t list -> Node.t
+
 (** Rows in a card, under [title] with [note] across from it. *)
 val group : ?title:string -> ?note:string -> Node.t list -> Node.t
 

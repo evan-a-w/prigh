@@ -20,17 +20,16 @@ let view (m : App.Model.t) ~inject =
     let row (item : Field_menu.Item.t) =
       let disabled = not (Field_menu.enabled menu item) in
       let selected = Field_menu.Item.equal item (Field_menu.selected menu) in
-      Node.div
+      Menu_view.item
+        ~selected
+        ~disabled
+        ~icon:(item_icon item)
+        ?shortcut:(Field_menu.Item.key (Field_menu.field menu).kind item)
         ~attrs:
-          [ classes
-              [ "menu-item" ]
-              [ "selected", selected; "disabled", disabled ]
-          ; Attr.role "menuitem"
-          ; Attr.create
+          [ Attr.create
               "data-item"
               (String.lowercase
                  (Sexp.to_string (Field_menu.Item.sexp_of_t item)))
-          ; (if disabled then Attr.create "aria-disabled" "true" else Attr.empty)
           ; (* Keeps the field's focus and selection until an item is
                chosen. *)
             Attr.on_mousedown (fun ev ->
@@ -45,36 +44,16 @@ let view (m : App.Model.t) ~inject =
               then Effect.Ignore
               else inject (Action.Field_menu_select item))
           ]
-        [ icon (item_icon item)
-        ; span ~cls:"menu-label" (Field_menu.Item.label item)
-        ; (match Field_menu.Item.key (Field_menu.field menu).kind item with
-           | None -> Node.none
-           | Some key ->
-             Node.kbd ~attrs:[ Attr.class_ "menu-command" ] [ Node.text key ])
-        ]
+        (Field_menu.Item.label item)
     in
-    let section items = div ~cls:"menu-section" (List.map items ~f:row) in
-    Node.div
-      ~attrs:
-        [ Attr.class_ "menu-backdrop context-menu-backdrop field-menu-backdrop"
-        ; Attr.on_click (fun ev ->
-            if Js_of_ocaml.Js.Unsafe.equals ev##.target ev##.currentTarget
-            then close
-            else Effect.Ignore)
-        ; Attr.on_contextmenu (fun ev ->
-            Js_of_ocaml.Dom.preventDefault ev;
-            if Js_of_ocaml.Js.Unsafe.equals ev##.target ev##.currentTarget
-            then close
-            else Effect.Ignore)
-        ]
-      [ Node.div
-          ~attrs:
-            [ Attr.class_ "context-menu field-menu menu-surface"
-            ; Attr.id id
-            ; Attr.role "menu"
-            ; Attr.create "aria-label" "Edit"
-            ; Attr.tabindex (-1)
-            ]
-          (List.map (Field_menu.sections menu) ~f:section)
+    Menu_view.backdrop
+      ~cls:"context-menu-backdrop field-menu-backdrop z-(--z-field-menu)"
+      ~on_close:close
+      [ Menu_view.surface
+          ~cls:(Context_menu_view.surface_cls ^ " field-menu min-w-[200px]")
+          ~label:"Edit"
+          ~attrs:[ Attr.id id ]
+          (List.map (Field_menu.sections menu) ~f:(fun items ->
+             Menu_view.section (List.map items ~f:row)))
       ]
 ;;

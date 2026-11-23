@@ -131,7 +131,7 @@ const census = () => page.evaluate(() => {
 const fits = () => page.evaluate(() => {
   const over = [...document.querySelectorAll("#chat .genui *")].filter(el => {
     const r = el.getBoundingClientRect();
-    return r.width > 0 && (r.right > window.innerWidth + 1 || r.left < -1) && !el.closest(".ui-table-scroll, .code, .diff-view, [aria-hidden=true]");
+    return r.width > 0 && (r.right > window.innerWidth + 1 || r.left < -1) && !el.closest(".ui-table-scroll, .code, .diff-view, [aria-hidden=true], [data-slot=progress-indicator]");
   });
   return `page fits: ${document.documentElement.scrollWidth <= window.innerWidth}; overflowing: ${over.length}${over.length ? ` (${[...new Set(over.map(e => e.className))].slice(0, 4).join(", ")})` : ""}`;
 });

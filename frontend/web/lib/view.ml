@@ -23,148 +23,104 @@ let jump_to_bottom (m : Model.t) ~inject =
       ]
 ;;
 
-(* Over the top of the chat: the transcript does not move. *)
+(* Over the top of the chat: the transcript does not move. A loon Alert,
+   floating at the top of the column. *)
 let banner (m : Model.t) ~inject =
   let over banner = div ~cls:"banner-anchor" [ banner ] in
+  let alert ?(variant = Loon.Alert.Variant.Default) ~cls ~role children =
+    Node.div
+      ~attrs:
+        [ Attr.create "data-slot" "alert"
+        ; Attr.role role
+        ; Attr.class_
+            (Loon.Alert.classes
+               ~variant
+               ~class_:
+                 (cls
+                  ^ " loon mx-auto mt-2 flex w-fit \
+                     max-w-[min(760px,calc(100%-24px))] flex-wrap items-center \
+                     justify-center gap-x-2 gap-y-1.5 text-center \
+                     text-[12.5px] shadow-sm")
+               ())
+        ]
+      children
+  in
+  let action ~title ~on_click text =
+    button
+      ~cls:"banner-action narrow:h-11"
+      ~variant:Outline
+      ~size:Xs
+      ~title
+      ~on_click
+      [ Node.text text ]
+  in
   match m.connection, m.session_gone with
   | Connected, None -> Node.none
   | Connected, Some _ ->
     over
-    @@ div
+    @@ alert
          ~cls:"banner gone"
-         ~attrs:[ Attr.role "alert" ]
-         [ Node.text
-             "This session is no longer on the backend (it restarted before \
-              saving it): what it showed stays here, read-only."
-         ; button
-             ~cls:"small"
+         ~role:"alert"
+         [ Node.span
+             [ Node.text
+                 "This session is no longer on the backend (it restarted \
+                  before saving it): what it showed stays here, read-only."
+             ]
+         ; action
              ~title:"/new"
              ~on_click:(inject Action.New_session)
-             [ Node.text "New session" ]
-         ; button
-             ~cls:"small"
+             "New session"
+         ; action
              ~title:"Ctrl+K"
              ~on_click:(inject Action.Open_control)
-             [ Node.text "Sessions" ]
+             "Sessions"
          ]
   | Reconnecting _, _ when App.Drops.gave_up m.drops ->
     over
-    @@ div
+    @@ alert
+         ~variant:Destructive
          ~cls:"banner gave-up"
-         ~attrs:[ Attr.role "alert" ]
-         [ Node.text
-             "The backend keeps dropping the connection while loading this \
-              session: open another session, or reload."
-         ; button
-             ~cls:"small"
+         ~role:"alert"
+         [ Node.span
+             [ Node.text
+                 "The backend keeps dropping the connection while loading this \
+                  session: open another session, or reload."
+             ]
+         ; action
              ~title:"/retry-backend-connection"
              ~on_click:(inject Action.Retry_connection)
-             [ Node.text "Retry now" ]
-         ; button
-             ~cls:"small"
+             "Retry now"
+         ; action
              ~title:"Reload the page without this session"
              ~on_click:(inject (Action.Reload_page { keep_session = false }))
-             [ Node.text "Another session" ]
-         ; button
-             ~cls:"small"
+             "Another session"
+         ; action
              ~title:"Reload the page"
              ~on_click:(inject (Action.Reload_page { keep_session = true }))
-             [ Node.text "Reload" ]
+             "Reload"
          ]
   | Reconnecting { attempt; _ }, _ ->
     over
-    @@ div
+    @@ alert
          ~cls:"banner"
-         ~attrs:[ Attr.role "status" ]
+         ~role:"status"
          [ Html.lamp ()
-         ; Node.text
-             (if attempt = 0
-              then "Connection lost: reconnecting…"
-              else
-                sprintf
-                  "Connection lost: reconnecting (attempt %d, next in %.1fs)…"
-                  (attempt + 1)
-                  (Float.of_int (App.Connection.delay_ms ~attempt) /. 1000.))
-         ; button
-             ~cls:"small"
+         ; Node.span
+             [ Node.text
+                 (if attempt = 0
+                  then "Connection lost: reconnecting…"
+                  else
+                    sprintf
+                      "Connection lost: reconnecting (attempt %d, next in \
+                       %.1fs)…"
+                      (attempt + 1)
+                      (Float.of_int (App.Connection.delay_ms ~attempt) /. 1000.))
+             ]
+         ; action
              ~title:"/retry-backend-connection"
              ~on_click:(inject Action.Retry_connection)
-             [ Node.text "Retry now" ]
+             "Retry now"
          ]
-;;
-
-(* Stays until answered: reloading mid-run is the user's call. *)
-let update_notice (m : Model.t) ~inject =
-  if not m.update_ready
-  then []
-  else
-    [ div
-        ~cls:"toast update-notice"
-        ~attrs:[ Attr.role "status" ]
-        [ Node.span [ Node.text "A new version of prigh-web is ready." ]
-        ; Html.button
-            ~cls:"ghost small toast-undo"
-            ~title:"Reload the page into it, in this session"
-            ~on_click:(inject Action.Apply_update)
-            [ Node.text "Reload" ]
-        ; Html.button
-            ~cls:"icon ghost toast-close"
-            ~title:"Later (the next page load uses it)"
-            ~label:"Dismiss"
-            ~on_click:(inject Action.Dismiss_update)
-            [ icon Close ]
-        ]
-    ]
-;;
-
-(* Over the bottom of the chat, above the composer: not over the transcript's
-   top, the side panels or a dialog. *)
-let toasts (m : Model.t) ~inject =
-  div
-    ~cls:"toast-anchor"
-    [ div
-        ~cls:"toasts"
-        ~attrs:[ Attr.create "aria-live" "polite" ]
-        (update_notice m ~inject
-         @ List.map m.toasts ~f:(fun (t : App.Toast.t) ->
-           let shown = Toast.short t.text in
-           Node.div
-             ~attrs:
-               [ classes [ "toast" ] [ "error", t.error ]
-               ; Attr.role (if t.error then "alert" else "status")
-               ; Attr.title
-                   (if String.equal shown t.text
-                    then "Dismiss"
-                    else t.text ^ " (click to dismiss)")
-               ; Attr.on_click (fun _ -> inject (Action.Dismiss_toast t.id))
-               ]
-             [ Node.span ~attrs:[ Attr.create "dir" "auto" ] [ Node.text shown ]
-             ; (if t.repeats > 0
-                then span ~cls:"toast-repeats" (sprintf "×%d" (t.repeats + 1))
-                else Node.none)
-             ; Option.value_map t.undo ~default:Node.none ~f:(fun h ->
-                 Html.button
-                   ~cls:"ghost small toast-undo"
-                   ~title:
-                     "Bring it back into the transcript and the model's \
-                      context (/delete undo)"
-                   ~on_click:
-                     (Effect.Many
-                        [ Effect.Stop_propagation
-                        ; inject (Action.Restore_hidden h)
-                        ])
-                   [ Node.text "Undo" ])
-             ; (if t.error
-                then
-                  Html.button
-                    ~cls:"icon ghost toast-close"
-                    ~title:"Dismiss"
-                    ~label:"Dismiss"
-                    ~on_click:(inject (Action.Dismiss_toast t.id))
-                    [ icon Close ]
-                else Node.none)
-             ]))
-    ]
 ;;
 
 let empty (m : Model.t) = div ~cls:"empty" [ Temporary_view.hero m ]
@@ -498,7 +454,7 @@ let view (m : Model.t) ~inject ~terminal ~code_editor =
                         | Some _, _ | _, Some _ -> Node.none
                         | None, None -> Jump_view.view m ~inject)
                      ])
-            ; toasts m ~inject
+            ; Toast_view.view m ~inject
             ; (match m.subagent_chat with
                | Some _ -> Node.none
                | None ->

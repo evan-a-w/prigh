@@ -323,8 +323,16 @@ let thinking_step ~fold ~key ~live text =
 let stopped (message : Message.Assistant.t) =
   match message.stop_reason with
   | Error e ->
-    div
-      "stop error"
+    (* A loon Alert (destructive): what failed, then the way out. *)
+    Node.div
+      ~attrs:
+        [ Attr.create "data-slot" "alert"
+        ; Attr.class_
+            (Loon.Alert.classes
+               ~variant:Destructive
+               ~class_:"stop error loon flex flex-col gap-1 px-3.5 py-2.5"
+               ())
+        ]
       ([ span "title" "The model returned an error"
        ; div "detail" [ Node.text e ]
        ]
@@ -338,7 +346,16 @@ let stopped (message : Message.Assistant.t) =
               in the session)."
          ; Node.button
              ~attrs:
-               [ Attr.class_ "stop-action"
+               [ Attr.class_
+                   (Loon.Button.classes
+                      ~variant:Outline
+                      ~size:Default
+                      ~class_:
+                        "stop-action mt-1 self-start border-destructive/40 \
+                         dark:border-destructive/40 text-destructive \
+                         hover:bg-destructive/10 dark:hover:bg-destructive/10 \
+                         hover:text-destructive pointer-coarse:h-11"
+                      ())
                ; Attr.type_ "button"
                ; Attr.create run_attribute "/downsize-images"
                ]
@@ -595,7 +612,9 @@ and assistant
         "pending"
         [ Html.lamp ()
         ; span "label" label
-        ; span "stop-hint" "Esc to stop"
+        ; Node.span
+            ~attrs:[ Attr.class_ "stop-hint" ]
+            [ Loon.Kbd.view [ Node.text "Esc" ]; Node.text " to stop" ]
         ; (match detail with
            | Some error -> div "detail" [ Node.text ("after: " ^ error) ]
            | None -> Node.none)
@@ -718,10 +737,13 @@ and activity ~ui ~fold times chat runs (box : Activity_runs.Box.t) =
                 else "ok")
              ]
              @ if opened then [ "open" ] else [])
+        ; Attr.create "data-slot" "collapsible"
+        ; Attr.create "data-state" (if opened then "open" else "closed")
         ]
       [ Node.button
           ~attrs:
             [ Attr.class_ "run-head"
+            ; Attr.create "data-slot" "collapsible-trigger"
             ; Attr.type_ "button"
             ; Fold.toggle_attr fold key
             ; Attr.create "aria-expanded" (Bool.to_string opened)
@@ -743,9 +765,13 @@ and activity ~ui ~fold times chat runs (box : Activity_runs.Box.t) =
                 ]))
       ; (if opened
          then
-           div
-             "run-steps"
-             (List.map steps ~f:(fun (step : Activity_runs.Step.t) ->
+           Node.div
+             ~attrs:
+               [ Attr.class_ "run-steps"
+               ; Attr.create "data-slot" "collapsible-content"
+               ]
+             (present
+              @@ List.map steps ~f:(fun (step : Activity_runs.Step.t) ->
                 match step with
                 | Call { call; streaming; at; _ } ->
                   Tool_view.view
@@ -766,7 +792,8 @@ and activity ~ui ~fold times chat runs (box : Activity_runs.Box.t) =
                     ~live
                     text
                 | Report { user; _ } ->
-                  render_entry ~ui ~fold times chat ~n:0 (Chat.Entry.User user)))
+                  render_entry ~ui ~fold times chat ~n:0 (Chat.Entry.User user))
+             )
          else Node.none)
       ])
 

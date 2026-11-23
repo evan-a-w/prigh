@@ -68,6 +68,7 @@ let%expect_test
   [%expect
     {|
     <textarea id="editor"
+              data-slot="input-group-control"
               placeholder="Steer (Enter) or queue a follow-up (Alt+Enter)…"
               aria-label="Message"
               dir="auto"

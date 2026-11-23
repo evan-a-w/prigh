@@ -16,7 +16,9 @@ let file ~fold (f : Diff_files.File.t) =
     [ Node.summary
         (List.filter_opt
            [ Some (span ~cls:"path" f.path)
-           ; Option.map status ~f:(span ~cls:"chip")
+           ; Option.map
+               status
+               ~f:(Review_badge.view ~variant:Outline ~cls:"chip")
            ; Some (span ~cls:"count add" (sprintf "+%d" f.added))
            ; Some (span ~cls:"count del" (sprintf "−%d" f.removed))
            ])

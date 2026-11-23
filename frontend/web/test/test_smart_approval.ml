@@ -186,7 +186,11 @@ let%expect_test
     ~selector:".tool-bash .tool-body";
   [%expect
     {|
-    <button type="button" data-fold="c1#open" aria-expanded="true" class="tool-head">
+    <button data-slot="collapsible-trigger"
+            type="button"
+            data-fold="c1#open"
+            aria-expanded="true"
+            class="tool-head">
       <span title="Done" role="img" aria-label="Done" class="done mark">
         <icon class="check"> </icon>
       </span>

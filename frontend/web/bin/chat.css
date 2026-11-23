@@ -42,29 +42,18 @@
 .empty {
   padding-top: 18vh;
   gap: 6px;
-  color: var(--muted-text);
+  color: var(--muted-foreground);
 }
 .empty h2 {
   margin: 0;
   padding: 2px 0 2px 16px;
-  border-left: 2px solid var(--sodium);
-  color: var(--chalk);
+  border-left: 2px solid var(--primary);
+  color: var(--foreground);
   font-size: 30px;
   line-height: 1.2;
   font-weight: 700;
 }
-.empty-where { font: 12.5px var(--mono); padding-left: 18px; }
-.empty-hints {
-  list-style: none;
-  margin: 28px 0 0;
-  padding: 0 0 0 18px;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
-  gap: 10px 24px;
-  font-size: 13px;
-  max-width: 640px;
-}
-.empty-hints li kbd { margin-right: 8px; }
+
 .msg { min-width: 0; }
 
 /* Vertical rhythm: a turn starts with room above it; the steps of one turn
@@ -117,7 +106,7 @@ summary > .preview {
   color: var(--faint);
 }
 details[open] > summary > .preview { visibility: hidden; }
-summary:hover > .label { color: var(--fg); }
+summary:hover > .label { color: var(--foreground); }
 summary:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; border-radius: 2px; }
 
 /* The user's turn: a bubble on the right, what came with it (images,
@@ -159,7 +148,7 @@ summary:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; bor
   position: absolute;
   left: -2px;
   right: 0;
-  border-top: 1px dashed var(--sodium);
+  border-top: 1px dashed var(--primary);
   pointer-events: none;
 }
 .msg.preview-trim-before::after { top: -1px; }
@@ -183,9 +172,9 @@ summary:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; bor
 
 /* A skill invoked with /skill:name: its instructions folded above the text */
 .skill-card { font-size: 13px; }
-.skill-card > summary > .label { font-family: var(--mono); font-size: 12.5px; color: var(--sodium); }
+.skill-card > summary > .label { font-family: var(--mono); font-size: 12.5px; color: var(--primary); }
 .skill-card > summary > .preview { font: 11.5px var(--mono); }
-.skill-body { margin-top: 8px; padding-left: 12px; border-left: 1px solid var(--rule); }
+.skill-body { margin-top: 8px; padding-left: 12px; border-left: 1px solid var(--border); }
 .skill-location { color: var(--faint); font: 11.5px var(--mono); overflow-wrap: anywhere; margin-bottom: 6px; }
 .chat.verbosity-quiet .skill-body { display: none; }
 
@@ -202,14 +191,14 @@ summary:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; bor
   display: flex;
   align-items: center;
   gap: 12px;
-  color: var(--muted-text);
+  color: var(--muted-foreground);
   font-size: 12.5px;
   font-weight: 600;
 }
 .day-sep::after {
   content: "";
   flex: 1;
-  border-top: 1px solid var(--rule);
+  border-top: 1px solid var(--border);
 }
 
 /* The agent's turn: its words plain, its steps as rows. */
@@ -238,7 +227,7 @@ summary:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; bor
 }
 .delivery-head .kind { font-size: var(--step-size); flex-shrink: 0; color: var(--muted-foreground); white-space: nowrap; }
 .delivery-head .task {
-  color: var(--fg);
+  color: var(--foreground);
   flex: 1;
   min-width: 0;
   white-space: nowrap;
@@ -288,9 +277,6 @@ summary:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; bor
   .pending > .label, .thinking-head > .label, .run.running .run-label, .tool-subagent.running .tool-head::after { animation: none; color: var(--foreground); background: none; }
 }
 /* How to stop it, on a keyboard. */
-.interrupt-hint { color: var(--muted-foreground); opacity: 0.7; font-size: 12px; white-space: nowrap; }
-.app.narrow .interrupt-hint { display: none; }
-@media (pointer: coarse) { .interrupt-hint { display: none; } }
 
 .msg.assistant.streaming > .markdown:last-child > .md-part:last-child > :is(p, h1, h2, h3, h4, h5, h6):last-child::after,
 .msg.assistant.streaming > .markdown:last-child > .md-part:last-child > :is(ul, ol):last-child > li:last-child::after {
@@ -300,45 +286,20 @@ summary:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; bor
   height: 1.1em;
   margin-left: 2px;
   vertical-align: text-bottom;
-  background: var(--sodium);
+  background: var(--primary);
   animation: blink 1s steps(2) infinite;
 }
 
-.stop.error {
-  background: var(--err-bg);
-  border: 1px solid var(--err-border);
-  border-radius: var(--radius);
-  padding: 10px 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.stop.error .title { color: var(--brick); font-weight: 600; }
+.stop.error .title { color: var(--destructive); font-weight: 600; }
 .stop.error .detail {
+  color: var(--foreground);
   font-family: var(--mono);
   font-size: 12.5px;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
-.stop.error .hint { color: var(--muted-text); font-size: 12.5px; }
-.stop.error .stop-action {
-  align-self: flex-start;
-  margin-top: 4px;
-  min-height: 32px;
-  padding: 0 12px;
-  border: 1px solid var(--brick-line);
-  border-radius: var(--r-control);
-  background: transparent;
-  color: var(--brick);
-  font: inherit;
-  font-size: 12.5px;
-  font-weight: 600;
-  cursor: pointer;
-}
-.stop.error .stop-action:hover { background: var(--brick-wash); }
-.stop.error .stop-action:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; }
-@media (pointer: coarse) { .stop.error .stop-action { min-height: 44px; } }
-.stop.aborted, .stop.length { display: flex; align-items: flex-start; gap: 6px; color: var(--muted-text); font-size: 12.5px; line-height: 18px; }
+.stop.error .hint { color: var(--muted-foreground); font-size: 12.5px; }
+.stop.aborted, .stop.length { display: flex; align-items: flex-start; gap: 6px; color: var(--muted-foreground); font-size: 12.5px; line-height: 18px; }
 .stop.aborted > .mark, .stop.length > .mark { --mark-line: 18px; }
 
 /* The harness's notes (tools moved, another directory, plan mode, a
@@ -365,9 +326,9 @@ summary:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; bor
   color: var(--faint);
   line-height: 1.6;
 }
-.note[data-kind="plan_mode"] .glyph { color: var(--sodium); }
+.note[data-kind="plan_mode"] .glyph { color: var(--primary); }
 /* What the user sent a subagent while it worked: their words follow. */
-.note[data-kind="steer"] .glyph, .note[data-kind="steer"] .title { color: var(--sodium); }
+.note[data-kind="steer"] .glyph, .note[data-kind="steer"] .title { color: var(--primary); }
 .note .title {
   min-width: 0;
   white-space: nowrap;
@@ -377,12 +338,12 @@ summary:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; bor
 .entries > .note { margin-top: 12px; }
 .entries > .note:first-child { margin-top: 0; }
 .note[open] .title { white-space: normal; overflow-wrap: anywhere; }
-.note summary:hover .title { color: var(--fg); }
+.note summary:hover .title { color: var(--foreground); }
 .note .time { flex-shrink: 0; margin-left: auto; }
 .note-text {
   margin: 6px 0 2px;
   padding-left: 10px;
-  border-left: 1px solid var(--rule);
+  border-left: 1px solid var(--border);
   font: 11.5px/1.5 var(--mono);
   color: var(--faint);
   white-space: pre-wrap;
@@ -401,7 +362,7 @@ summary:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; bor
 .msg.user .attachments { display: flex; flex-wrap: wrap; gap: 6px; }
 .msg.user .attachment {
   font: 12px var(--mono);
-  color: var(--muted-text);
+  color: var(--muted-foreground);
   background: var(--well);
   border-radius: var(--r-chip);
   padding: 1px 6px;
@@ -413,11 +374,11 @@ summary:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; bor
 .msg.compaction > summary::after {
   content: "";
   flex: 1;
-  border-top: 1px dashed var(--rule-2);
+  border-top: 1px dashed var(--input);
   align-self: center;
 }
 .msg.compaction > summary > .preview { display: none; }
-.msg.compaction > .markdown { margin-top: 10px; color: var(--muted-text); font-size: 14px; }
+.msg.compaction > .markdown { margin-top: 10px; color: var(--muted-foreground); font-size: 14px; }
 
 /* Markdown */
 
@@ -443,38 +404,38 @@ summary:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; bor
 .markdown li.task > input {
   margin: 0 6px 0 -1.35em;
   vertical-align: -1px;
-  accent-color: var(--sodium);
+  accent-color: var(--primary);
 }
 .markdown blockquote {
   margin: 0 0 10px;
   padding: 2px 0 2px 14px;
-  border-left: 2px solid var(--rule-2);
-  color: var(--muted-text);
+  border-left: 2px solid var(--input);
+  color: var(--muted-foreground);
 }
-.markdown hr { border: 0; border-top: 1px solid var(--rule); margin: 18px 0; }
+.markdown hr { border: 0; border-top: 1px solid var(--border); margin: 18px 0; }
 .markdown a {
-  color: var(--chalk);
+  color: var(--foreground);
   text-decoration: underline;
   text-decoration-color: var(--sodium-line);
   text-underline-offset: 3px;
 }
-.markdown a:hover { text-decoration-color: var(--sodium); }
+.markdown a:hover { text-decoration-color: var(--primary); }
 /* A link to one of the user's sessions (followed in place): washed, with a
    solid underline, apart from links that leave prigh. */
 .session-link {
   position: relative;
-  color: var(--chalk);
+  color: var(--foreground);
   background: var(--sodium-wash);
   border-radius: 3px;
   padding: 0 2px;
   text-decoration: underline;
-  text-decoration-color: var(--sodium);
+  text-decoration-color: var(--primary);
   text-underline-offset: 3px;
   -webkit-box-decoration-break: clone;
   box-decoration-break: clone;
 }
 .session-link:hover { background: var(--sodium-glow); }
-.session-link:focus-visible { outline: 2px solid var(--sodium); outline-offset: 1px; }
+.session-link:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
 .markdown .session-link > code { background: none; padding: 0; font-family: inherit; font-size: inherit; color: inherit; }
 /* A thumb's target (44px tall) around the line's text, without spacing the
    lines apart. */
@@ -490,11 +451,11 @@ summary:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; bor
   }
 }
 .markdown strong { font-weight: 650; }
-.markdown del { color: var(--muted-text); }
+.markdown del { color: var(--muted-foreground); }
 .markdown :not(pre) > code {
   font-family: var(--mono);
   font-size: 0.87em;
-  background: var(--slate);
+  background: var(--card);
   border-radius: var(--r-chip);
   padding: 1px 5px;
 }
@@ -512,11 +473,11 @@ summary:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; bor
 }
 .markdown :is(th, td) {
   padding: 6px 28px 6px 0;
-  border-bottom: 1px solid var(--rule);
+  border-bottom: 1px solid var(--border);
   text-align: left;
   vertical-align: top;
 }
-.markdown th { font-weight: 600; white-space: nowrap; border-bottom-color: var(--rule-2); }
+.markdown th { font-weight: 600; white-space: nowrap; border-bottom-color: var(--input); }
 .markdown tbody tr:last-child td { border-bottom: 0; }
 .markdown :is(th, td).center { text-align: center; }
 .markdown :is(th, td).right { text-align: right; font-variant-numeric: tabular-nums; }
@@ -533,7 +494,7 @@ summary:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; bor
   padding: 2px 0;
   text-align: center;
 }
-.math-display > .katex-display { margin: 0; }
+
 .math:is(.math-pending, .math-error) {
   font-family: var(--mono);
   font-size: 0.87em;
@@ -541,7 +502,7 @@ summary:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; bor
   text-align: left;
 }
 .math-error {
-  color: var(--brick);
+  color: var(--destructive);
   background: var(--brick-wash);
   border-radius: var(--r-chip);
   padding: 1px 5px;
@@ -569,7 +530,7 @@ summary:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; bor
   color: var(--muted-foreground);
 }
 .code-lang { font-family: var(--mono); }
-.code-title { color: var(--muted-text); font-weight: 600; }
+.code-title { color: var(--muted-foreground); font-weight: 600; }
 .code-title + .code-lang { margin: 0 auto 0 8px; }
 .copy {
   border: 0;
@@ -596,7 +557,7 @@ summary:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; bor
 
 .thinking-text {
   margin-top: 6px;
-  color: var(--muted-text);
+  color: var(--muted-foreground);
   font-variation-settings: "CASL" 1;
   font-style: oblique 6deg;
 }
@@ -707,7 +668,7 @@ ol.results .url { margin-left: 8px; font: 11.5px var(--mono); color: var(--faint
 .tool-head > :is(.mark, .lamp) { order: 2; flex-shrink: 0; margin: 0; }
 .tool-head > .chev, .tool-head > .open-agent { order: 3; }
 .tool-head > .mark:not(.failed) { color: color-mix(in srgb, var(--sage) 85%, transparent); }
-.tool-head > .mark.failed { color: var(--brick); }
+.tool-head > .mark.failed { color: var(--destructive); }
 .took {
   flex-shrink: 0;
   color: var(--muted-foreground);
@@ -718,15 +679,21 @@ ol.results .url { margin-left: 8px; font: 11.5px var(--mono); color: var(--faint
 /* Shown, not read: it would change the text of every row with the timing
    (the tests compare the text). Its title says it to the pointer. */
 .took::after { content: attr(data-took); }
-.tool.error .tool-head .name { color: var(--brick); }
+.tool.error .tool-head .name { color: var(--destructive); }
+/* In a narrow column (beside the review) the chips give way before the
+   argument does: it keeps a few characters (WebKit let "c2" go to 0px). */
 .tool .chip {
   font: 11.5px var(--mono);
   color: var(--muted-foreground);
-  flex-shrink: 0;
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
   line-height: 18px;
 }
-.chip.bad, .chip.del { color: var(--brick); }
+.tool-head .arg { min-width: 3ch; }
+.chip.bad, .chip.del { color: var(--destructive); }
 .chip.ok, .chip.add { color: var(--sage); }
 .chip.job { color: var(--muted-foreground); }
 .chip.waiting { color: var(--primary); }
@@ -782,7 +749,7 @@ button.tool-head:is(:hover, :focus-visible) > .chev, .tool.open > button.tool-he
 .run-label { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .run-label:has(+ .run-time) { flex-shrink: 0; }
 .run-did { min-width: 0; flex-shrink: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12px; opacity: 0.75; }
-.run-failed { flex-shrink: 0; color: var(--brick); font: 11.5px var(--mono); white-space: nowrap; }
+.run-failed { flex-shrink: 0; color: var(--destructive); font: 11.5px var(--mono); white-space: nowrap; }
 .run-time { flex-shrink: 0; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .run-head > .chev { order: 1; }
 .run.open > .run-head > .chev { transform: rotate(90deg); }
@@ -842,14 +809,13 @@ button.tool-head:is(:hover, :focus-visible) > .chev, .tool.open > button.tool-he
 
 /* update_plan's checklist */
 .tool-body .plan { padding: 4px 0; }
-.plan-explanation { margin: 0 0 4px; color: var(--muted-text); font-size: 12.5px; }
+.plan-explanation { margin: 0 0 4px; color: var(--muted-foreground); font-size: 12.5px; }
 .plan-steps { list-style: none; margin: 0; padding: 0; font-size: 13px; }
 .plan-step { display: flex; align-items: flex-start; gap: 6px; line-height: 20px; }
 .plan-step > .mark { --mark-line: 20px; }
-.plan-step.step-done { color: var(--muted-text); }
+.plan-step.step-done { color: var(--muted-foreground); }
 .plan-step.step-todo .mark { color: var(--faint); }
 .tool-body .questions { margin: 2px 0; padding-left: 18px; font-size: 13px; }
-
 
 .tool-body {
   padding: 4px 8px 6px;
@@ -863,24 +829,24 @@ button.tool-head:is(:hover, :focus-visible) > .chev, .tool.open > button.tool-he
   font: 12.5px/1.5 var(--mono);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  color: var(--fg);
+  color: var(--foreground);
 }
-.tool-body .caption { color: var(--muted-text); font-size: 12.5px; }
-.tool-body .task-text { white-space: pre-wrap; margin-top: 4px; font-size: 13.5px; }
+.tool-body .caption { color: var(--muted-foreground); font-size: 12.5px; }
+
 .tool-body .report > .markdown {
   margin-top: 6px;
   font-size: 14px;
   padding-left: 12px;
-  border-left: 1px solid var(--rule-2);
+  border-left: 1px solid var(--input);
 }
 .activity {
   display: flex;
   gap: 6px;
-  color: var(--muted-text);
+  color: var(--muted-foreground);
   font-size: 12.5px;
   min-width: 0;
 }
-.activity .arrow { color: var(--sodium); }
+.activity .arrow { color: var(--primary); }
 .activity .text {
   font-family: var(--mono);
   white-space: nowrap;
@@ -944,8 +910,8 @@ button.tool-head:is(:hover, :focus-visible) > .chev, .tool.open > button.tool-he
 }
 .fold { cursor: pointer; border-radius: var(--r-control); }
 .fold .count { font: 11.5px var(--mono); }
-.fold:hover { color: var(--fg); }
-.fold:focus-visible { outline: 2px solid var(--sodium); outline-offset: -2px; }
+.fold:hover { color: var(--foreground); }
+.fold:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
 .fold[aria-expanded="true"] {
   position: sticky;
   bottom: 0;
@@ -956,64 +922,18 @@ button.tool-head:is(:hover, :focus-visible) > .chev, .tool.open > button.tool-he
 .output :is(.earlier, .missed) { padding: 6px 12px 0; gap: 6px; }
 .output .earlier + .missed { padding-top: 0; }
 
-/* Diffs */
-
-.diff-view {
-  background: var(--well);
-  border-radius: var(--r-control);
-  font: 12.5px/1.55 var(--mono);
-  overflow-x: auto;
-  padding: 4px 0;
-}
-table.diff { border-collapse: collapse; width: 100%; }
-table.diff td { padding: 0 8px 0 0; vertical-align: top; }
-table.diff td.text { white-space: pre-wrap; overflow-wrap: anywhere; width: 100%; }
-table.diff td.ln {
-  color: var(--faint);
-  text-align: right;
-  min-width: 3.5ch;
-  padding: 0 4px 0 10px;
-  user-select: none;
-  font-variant-numeric: tabular-nums;
-}
-/* One number per row: a removed line's is its old one, struck through. */
-table.diff td.ln.old {
-  color: color-mix(in srgb, var(--del-fg) 45%, var(--faint));
-  text-decoration: line-through;
-  text-decoration-color: color-mix(in srgb, var(--del-fg) 40%, transparent);
-}
-table.diff td.sign { padding: 0 6px 0 4px; user-select: none; color: var(--faint); }
-table.diff tr.add { background: var(--add-bg); }
-table.diff tr.add td.text, table.diff tr.add td.sign { color: var(--add-fg); }
-table.diff tr.del { background: var(--del-bg); }
-table.diff tr.del td.text, table.diff tr.del td.sign { color: var(--del-fg); }
-/* The bar down the gutter's edge says added or removed without colour too
-   (the sign does). */
-table.diff tr.add td.sign { box-shadow: inset 2px 0 0 color-mix(in srgb, var(--add-fg) 70%, transparent); }
-table.diff tr.del td.sign { box-shadow: inset 2px 0 0 color-mix(in srgb, var(--del-fg) 70%, transparent); }
-table.diff tr.hunk td {
-  color: var(--faint);
-  padding: 6px 10px 2px;
-  font-size: 11.5px;
-  user-select: none;
-}
-table.diff tr.hunk .hunk-range { color: var(--faint); }
-table.diff tr.hunk .hunk-context { color: var(--muted-text); margin-left: 0.5ch; }
-.diff-view .fold { margin-top: 2px; }
-.diff-view .fold[aria-expanded="true"] { border-radius: 0; }
-
 /* apply_patch: each file's name above its diff */
 .patch-file {
   display: flex;
   gap: 8px;
   font: 12.5px/1.55 var(--mono);
-  color: var(--fg);
+  color: var(--foreground);
   margin: 6px 0 3px;
 }
 .patch-file:first-child { margin-top: 0; }
-.patch-file .kind { color: var(--sodium); font-weight: 600; }
+.patch-file .kind { color: var(--primary); font-weight: 600; }
 .patch-file.add .kind { color: var(--sage); }
-.patch-file.del .kind { color: var(--brick); }
+.patch-file.del .kind { color: var(--destructive); }
 
 /* Images: a thumbnail opens the viewer (app/viewer_widget.ml) */
 
@@ -1026,7 +946,7 @@ button.image {
   cursor: zoom-in;
   border-radius: var(--r-control);
 }
-button.image:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; }
+button.image:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 .thumb {
   display: block;
   max-width: min(260px, 100%);
@@ -1035,134 +955,10 @@ button.image:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2
   min-height: 48px;
   object-fit: contain;
   border-radius: var(--r-control);
-  border: 1px solid var(--rule);
+  border: 1px solid var(--border);
   background: repeating-conic-gradient(var(--checker) 0 25%, transparent 0 50%) 0 0 / 16px 16px;
 }
-.thumb:hover { border-color: var(--rule-2); }
-
-/* The viewer: a modal <dialog> in the top layer, the whole screen (dvh: the
-   phone's browser bars), a bar on top and the stage under it. The image is
-   laid out at its natural size at the stage's centre and placed by a
-   transform (Zoom.transform): at fit it is all inside the stage, never
-   cropped. */
-dialog.viewer {
-  position: fixed;
-  inset: 0;
-  width: 100vw;
-  height: 100vh;
-  height: 100dvh;
-  max-width: none;
-  max-height: none;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  background: color-mix(in srgb, #07080a calc(90% - var(--swipe, 0) * 60%), transparent);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  color: #e6e6e6;
-  overflow: hidden;
-  animation: fade 0.15s;
-}
-dialog.viewer::backdrop { background: transparent; }
-.viewer-bar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 0;
-  padding: max(10px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) 10px max(16px, env(safe-area-inset-left));
-  background: linear-gradient(#000000b0, #00000000);
-  z-index: 1;
-}
-.viewer-caption { display: flex; align-items: baseline; gap: 10px; min-width: 0; flex: 1; font: 12px var(--mono); }
-.viewer-count { color: #e6e6e6; font-weight: 600; white-space: nowrap; }
-.viewer-count:empty { display: none; }
-.viewer-name { color: #ffffffa0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.viewer-tools { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
-.viewer-group {
-  display: flex;
-  align-items: center;
-  padding: 2px;
-  border-radius: 10px;
-  background: #ffffff14;
-  box-shadow: inset 0 0 0 1px #ffffff14;
-}
-.viewer-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  min-width: 34px;
-  height: 32px;
-  padding: 0 8px;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: #e6e6e6;
-  font: 600 12px var(--mono);
-  text-decoration: none;
-  cursor: pointer;
-}
-.viewer-btn .icon { width: 17px; height: 17px; }
-.viewer-btn:hover:not(:disabled) { background: #ffffff1f; }
-.viewer-btn:focus-visible { outline: 2px solid var(--sodium); outline-offset: 1px; }
-.viewer-btn:disabled { color: #ffffff4d; cursor: default; }
-.viewer-pct { min-width: 56px; font-variant-numeric: tabular-nums; }
-.viewer-draw span { font-family: var(--sans); font-size: 12.5px; }
-.viewer-draw[hidden] { display: none; }
-.viewer-close { min-width: 36px; height: 36px; border-radius: 50%; background: #ffffff14; box-shadow: inset 0 0 0 1px #ffffff14; }
-.viewer-stage {
-  position: relative;
-  overflow: hidden;
-  touch-action: none;
-  cursor: zoom-in;
-  user-select: none;
-}
-.viewer.zoomed .viewer-stage { cursor: grab; }
-.viewer.zoomed.dragging .viewer-stage { cursor: grabbing; }
-.viewer-img {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  max-width: none;
-  transform-origin: 50% 50%;
-  will-change: transform;
-  opacity: 0;
-  /* Transparency shows as a checkerboard. */
-  background: repeating-conic-gradient(#ffffff0d 0 25%, transparent 0 50%) 0 0 / 16px 16px;
-  box-shadow: 0 12px 48px #00000080;
-  image-rendering: auto;
-}
-.viewer.ready .viewer-img { opacity: 1; }
-.viewer.animate .viewer-img { transition: transform 0.18s cubic-bezier(0.2, 0.7, 0.2, 1); }
-.viewer-nav {
-  position: absolute;
-  top: 50%;
-  translate: 0 -50%;
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  background: #00000080;
-  box-shadow: inset 0 0 0 1px #ffffff1f;
-  z-index: 1;
-}
-.viewer-prev { left: max(12px, env(safe-area-inset-left)); }
-.viewer-next { right: max(12px, env(safe-area-inset-right)); }
-.viewer-nav .icon { width: 22px; height: 22px; }
-@media (max-width: 600px) {
-  .viewer-bar { gap: 8px; padding-left: max(12px, env(safe-area-inset-left)); padding-right: max(8px, env(safe-area-inset-right)); }
-  .viewer-sizes, .viewer-caption .viewer-name { display: none; }
-  .viewer-draw span { display: none; }
-  .viewer-tools { gap: 4px; margin-left: auto; }
-  .viewer-btn { min-width: 36px; height: 36px; padding: 0 6px; }
-  .viewer-pct { min-width: 48px; }
-  .viewer-nav { width: 38px; height: 38px; top: auto; bottom: max(14px, env(safe-area-inset-bottom)); translate: none; }
-}
-@media (prefers-reduced-motion: reduce) {
-  dialog.viewer { animation: none; }
-  .viewer.animate .viewer-img { transition: none; }
-}
+.thumb:hover { border-color: var(--input); }
 
 @keyframes blink { 50% { opacity: 0; } }
 @keyframes fade { from { opacity: 0; } }
@@ -1196,14 +992,14 @@ dialog.viewer::backdrop { background: transparent; }
   display: flex;
   align-items: center;
   gap: 8px;
-  color: var(--muted-text);
+  color: var(--muted-foreground);
   font-size: 13px;
 }
 .skeleton { display: flex; flex-direction: column; gap: 12px; }
 .bone {
   height: 12px;
   border-radius: var(--r-chip);
-  background: var(--slate);
+  background: var(--card);
 }
 .bone.user { height: 38px; width: 45%; margin: 16px 0 0 auto; background: var(--bubble); border-radius: calc(var(--radius) + 6px); }
 .bone.user:first-child { margin-top: 0; }
@@ -1212,70 +1008,21 @@ dialog.viewer::backdrop { background: transparent; }
 .entries + .entries.echoes { margin-top: 34px; }
 .msg.user.sending { opacity: 0.7; }
 
-
-/* The transcript filter (/filter): its button left of the files', accented
-   with how many kinds it hides; its menu under it; and above the transcript
-   a quiet line saying what it hides, with "Show all". A hidden landmark or
-   message keeps an empty .filtered for the jump rail and scrolling to land
-   on. */
-.filter-menu {
-  position: fixed;
-  width: min(340px, calc(100vw - 16px));
-  max-height: calc(100vh - 16px);
-  overflow-y: auto;
-  padding: 4px;
-  animation: appear 0.1s ease-out;
-}
-.filter-menu:not(.placed) { visibility: hidden; }
-.filter-menu > .menu-heading { padding: 6px 8px 2px; }
-.filter-menu .menu-item { gap: 10px; padding: 5px 8px; font-size: 13px; }
-.filter-menu .menu-item > .icon { width: 14px; height: 14px; flex-shrink: 0; margin: 0 0 0 0; }
-.filter-menu .menu-item.show-all[aria-disabled="true"] { opacity: 0.5; }
-.filter-menu > .menu-keys { padding: 6px 8px 4px; }
-@media (pointer: coarse) {
-  .filter-menu .menu-item { min-height: 40px; }
-  .filter-menu > .menu-keys { display: none; }
-}
-@media (prefers-reduced-motion: reduce) { .filter-menu { animation: none; } }
-.filter-note {
-  max-width: var(--column);
-  margin: 0 0 14px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--muted-text);
-  font: 12px/1.5 var(--sans);
-}
-/* A phone's jump button floats over the transcript's top right corner. */
-.app.narrow .filter-note { margin-right: 40px; }
-.filter-note > .icon { width: 13px; height: 13px; flex-shrink: 0; color: var(--sodium); }
-.filter-note-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.filter-note::after { content: ""; flex: 1; min-width: 12px; border-top: 1px solid var(--rule); order: 1; }
-.filter-show-all {
-  order: 2;
-  flex-shrink: 0;
-  border: 0;
-  padding: 2px 0;
-  background: none;
-  color: var(--sodium);
-  font: inherit;
-  cursor: pointer;
-}
-.filter-show-all:hover { text-decoration: underline; }
-.filter-show-all:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; border-radius: var(--r-chip); }
+/* A landmark or message the transcript filter (Filter_view) hides keeps an
+   empty .filtered for the jump rail and scrolling to land on. */
 .entries > .filtered { height: 0; }
 
 /* A delivered subagent's report opens it as its call's line does: the same
    quiet "Open ›", not a button among the message's. */
 .delivery-head[data-agent] { cursor: pointer; border-radius: var(--r-control); }
-.delivery-head[data-agent]:hover { background: var(--slate-2); }
+.delivery-head[data-agent]:hover { background: var(--muted); }
 .delivery-head .open-agent {
   margin-left: 0; padding: 0 4px; border: 0; border-radius: var(--r-chip);
-  background: none; color: var(--muted-text); font: inherit; font-size: 12.5px;
+  background: none; color: var(--muted-foreground); font: inherit; font-size: 12.5px;
   white-space: nowrap; cursor: pointer;
 }
-.delivery-head[data-agent]:hover .open-agent { color: var(--chalk); }
-.delivery-head .open-agent:focus-visible { outline: 2px solid var(--sodium); outline-offset: 1px; }
+.delivery-head[data-agent]:hover .open-agent { color: var(--foreground); }
+.delivery-head .open-agent:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
 
 /* A finger at fit drags the image (aside to the next, down to close): it
    follows, then springs back unless it went far enough. */
@@ -1293,9 +1040,9 @@ dialog.viewer::backdrop { background: transparent; }
   width: 14px;
   height: 14px;
   margin: -7px 0 0 -7px;
-  border: 2px solid var(--sodium);
+  border: 2px solid var(--primary);
   border-radius: 50%;
-  box-shadow: 0 0 0 2px var(--sodium-ink), 0 0 10px var(--sodium-glow-bright);
+  box-shadow: 0 0 0 2px var(--primary-foreground), 0 0 10px var(--sodium-glow-bright);
   pointer-events: none;
 }
 .tool-body .screen + .caption { display: block; margin-top: 4px; white-space: pre-line; }
@@ -1303,7 +1050,7 @@ dialog.viewer::backdrop { background: transparent; }
 /* Long pastes sent with the message: a line each, the text only once
    opened. */
 .msg.user .pasted-texts { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; max-width: 100%; }
-.msg.user .pasted { max-width: min(100%, 640px); background: var(--well); border: 1px solid var(--rule); border-radius: var(--r-control); overflow: hidden; }
+.msg.user .pasted { max-width: min(100%, 640px); background: var(--well); border: 1px solid var(--border); border-radius: var(--r-control); overflow: hidden; }
 .msg.user .pasted.open { width: min(100%, 640px); }
 .pasted-head {
   display: flex;
@@ -1320,43 +1067,20 @@ dialog.viewer::backdrop { background: transparent; }
   text-align: left;
   cursor: pointer;
 }
-.pasted-head:hover { background: var(--slate-2); }
+.pasted-head:hover { background: var(--muted); }
 .pasted-head:focus-visible { outline: 2px solid var(--sodium-line); outline-offset: -2px; }
 .pasted-head > .chev { align-self: center; color: var(--faint); }
 .pasted.open > .pasted-head > .chev { transform: rotate(90deg); }
-.pasted-name { color: var(--fg); white-space: nowrap; flex-shrink: 0; }
+.pasted-name { color: var(--foreground); white-space: nowrap; flex-shrink: 0; }
 .pasted-detail { color: var(--faint); font-size: 11.5px; white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 /* Its own line under the name when fewer than 14 characters would fit
    beside it (a phone). */
-.pasted-preview { color: var(--muted-text); flex: 1 1 14ch; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.pasted-body { position: relative; border-top: 1px solid var(--rule); }
+.pasted-preview { color: var(--muted-foreground); flex: 1 1 14ch; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pasted-body { position: relative; border-top: 1px solid var(--border); }
 .pasted-body > .copy { position: absolute; top: 4px; right: 6px; background: var(--well); }
 .pasted-text { margin: 0; padding: 10px 12px; max-height: 50vh; overflow: auto; font: 12px/1.5 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
 @media (prefers-reduced-motion: reduce) { .pasted-head > .chev { transition: none; } }
 @media (pointer: coarse) { .pasted-head { min-height: 44px; align-items: center; align-content: center; } }
-
-/* A wrapped line continues under its own indent (--hang, set per line by
-   Diff_view.text_attrs: the indent plus 2ch), a faint rule down the
-   continuation's gutter saying it is the same line. The words that changed
-   in a pair of removed and added lines are marked on their own. */
-table.diff td.text {
-  --hang: 2ch;
-  padding-left: var(--hang);
-  text-indent: calc(-1 * var(--hang));
-  background-image: linear-gradient(var(--rule-2), var(--rule-2));
-  background-repeat: no-repeat;
-  background-position: calc(var(--hang) - 1ch) 1lh;
-  background-size: 1px calc(100% - 1lh);
-}
-table.diff tr.del .wd { background: color-mix(in srgb, var(--del-fg) 26%, transparent); border-radius: 2px; }
-table.diff tr.add .wd { background: color-mix(in srgb, var(--add-fg) 26%, transparent); border-radius: 2px; }
-
-/* The size of code in diffs (Code_size, + and -). */
-.app { --code-size: 12.5px; }
-.app.code-small { --code-size: 11px; }
-.app.code-large { --code-size: 14px; }
-.app.code-huge { --code-size: 16px; }
-.diff-view { font-size: var(--code-size); }
 
 /* The way to stop it, where there is a keyboard. */
 .pending > .stop-hint { font-size: 12px; color: var(--muted-foreground); opacity: 0.8; }
@@ -1365,7 +1089,70 @@ table.diff tr.add .wd { background: color-mix(in srgb, var(--add-fg) 26%, transp
 
 /* A subagent's line in the transcript: a way into its chat. */
 .tool-subagent > .tool-head[data-agent] { cursor: pointer; border-radius: var(--r-control); }
-.tool-subagent > .tool-head[data-agent]:hover { background: var(--slate-2); }
-.tool-head .open-agent { margin-left: auto; padding: 0 4px; border: 0; border-radius: var(--r-chip); background: none; color: var(--muted-text); font: inherit; font-size: 12.5px; white-space: nowrap; cursor: pointer; }
-.tool-head .open-agent:focus-visible { outline: 2px solid var(--sodium); outline-offset: 1px; }
-.tool-head[data-agent]:hover .open-agent { color: var(--chalk); }
+.tool-subagent > .tool-head[data-agent]:hover { background: var(--muted); }
+.tool-head .open-agent { margin-left: auto; padding: 0 4px; border: 0; border-radius: var(--r-chip); background: none; color: var(--muted-foreground); font: inherit; font-size: 12.5px; white-space: nowrap; cursor: pointer; }
+.tool-head .open-agent:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+.tool-head[data-agent]:hover .open-agent { color: var(--foreground); }
+
+/* The composer's attachment chips (Files_view.chips), and where dragged
+   files land. */
+/* Files dragged over the page: where they would land. */
+
+/* The composer's chips: a file, its size, its upload. */
+.attach-chips { display: flex; gap: 6px; flex-wrap: wrap; padding: 2px 2px 0; }
+.attach-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 280px;
+  padding: 3px 3px 3px 8px;
+  background: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: var(--r-chip);
+  font: 12.5px var(--mono);
+  overflow: hidden;
+  animation: files-open 0.14s ease-out;
+}
+.attach-chip.uploading::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 2px;
+  width: var(--done, 0%);
+  background: var(--primary);
+  transition: width 0.2s linear;
+}
+.attach-chip.failed { border-color: var(--brick-line); background: var(--brick-wash); }
+.attach-chip-icon { width: 13px; height: 13px; color: var(--muted-foreground); flex-shrink: 0; }
+.attach-chip-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.attach-chip-detail { color: var(--faint); font-size: 11.5px; white-space: nowrap; }
+.attach-chip.failed .attach-chip-detail { color: var(--destructive); overflow: hidden; text-overflow: ellipsis; max-width: 140px; }
+.attach-chip-remove { width: 20px; height: 20px; flex-shrink: 0; }
+.attach-chip-remove .icon { width: 11px; height: 11px; }
+.composer-buttons .attach .icon { width: 17px; height: 17px; }
+
+/* A long paste: its chip opens it (read, insert as text, remove). */
+.pasted-chip { padding-left: 0; max-width: 100%; }
+.pasted-chip .attach-chip-name { flex-shrink: 0; }
+.pasted-chip .attach-chip-detail { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.pasted-chip-open.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 0 2px 0 8px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+}
+.pasted-chip-open.btn:hover .attach-chip-name { text-decoration: underline; text-decoration-color: var(--faint); }
+.pasted-chip .attach-chip-name::before { content: "¶ "; color: var(--faint); }
+
+@media (prefers-reduced-motion: reduce) {
+  .attach-chip { animation: none; }
+  .attach-chip.uploading::after { transition: none; }
+}
+@keyframes files-open { from { opacity: 0; } }

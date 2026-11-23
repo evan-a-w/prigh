@@ -49,7 +49,11 @@ let tick ~inject times ~n (p : Jump.Point.t) =
       ; Attr.on_click (fun _ -> inject (Action.Jump_to p.target))
       ]
     [ Node.span
-        ~attrs:[ Attr.class_ "tip"; Attr.create "aria-hidden" "true" ]
+        ~attrs:
+          [ Attr.class_ "tip"
+          ; Attr.create "data-slot" "tooltip-content"
+          ; Attr.create "aria-hidden" "true"
+          ]
         [ (match p.kind with
            | User -> Node.none
            | Compaction | Error | Trimmed -> span ~cls:"tip-what" (what p ~n))

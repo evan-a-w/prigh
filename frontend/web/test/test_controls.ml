@@ -412,8 +412,8 @@ let%expect_test
     ✓ server-laptop offline: waiting for it to reconnect
     The only host: run prigh tool-host -connect SERVER on a machine, or a prigh TUI connected to this backend, to add one.
     Enter chooses, ← → the next setting, Esc closes
-    <div class="menu-item popover-item">
-    <div class="dimmed marked menu-item popover-item selected">
+    <div class="[&>.icon]:shrink-0 [&>.icon]:size-4 [&>.icon]:text-muted-foreground aria-disabled:*:opacity-50 aria-disabled:hover:bg-transparent aria-disabled:hover:text-inherit cursor-default data-[variant=destructive]:[&>.icon]:text-destructive data-[variant=destructive]:data-highlighted:bg-destructive/10 data-[variant=destructive]:data-highlighted:text-destructive data-[variant=destructive]:hover:bg-destructive/10 data-[variant=destructive]:hover:text-destructive data-[variant=destructive]:text-destructive data-highlighted:[&>.icon]:text-accent-foreground data-highlighted:bg-accent data-highlighted:text-accent-foreground flex gap-1.5 gap-2 group/dropdown-menu-item hover:[&>.icon]:text-accent-foreground hover:bg-accent hover:text-accent-foreground items-center max-[760px]:py-2.5 menu-item narrow:min-h-11 outline-hidden popover-item px-1.5 px-2 py-1 py-1.5 relative rounded-md select-none text-sm">
+    <div class="[&>.icon]:shrink-0 [&>.icon]:size-4 [&>.icon]:text-muted-foreground [&_.menu-text]:opacity-55 aria-disabled:*:opacity-50 aria-disabled:hover:bg-transparent aria-disabled:hover:text-inherit cursor-default data-[variant=destructive]:[&>.icon]:text-destructive data-[variant=destructive]:data-highlighted:bg-destructive/10 data-[variant=destructive]:data-highlighted:text-destructive data-[variant=destructive]:hover:bg-destructive/10 data-[variant=destructive]:hover:text-destructive data-[variant=destructive]:text-destructive data-highlighted:[&>.icon]:text-accent-foreground data-highlighted:bg-accent data-highlighted:text-accent-foreground dimmed flex gap-1.5 gap-2 group/dropdown-menu-item hover:[&>.icon]:text-accent-foreground hover:bg-accent hover:text-accent-foreground items-center marked max-[760px]:py-2.5 menu-item narrow:min-h-11 outline-hidden popover-item px-1.5 px-2 py-1 py-1.5 relative rounded-md select-none selected text-sm">
     |}];
   H.key h "Enter" ~target:Field;
   H.text h ~selector:".toast";
@@ -701,7 +701,6 @@ let%expect_test
     <div class="editor-wrap">
     <div class="composer-row">
     button "Add files or images" -- Add files or images (or paste, or drop them here)
-    button "Details" -- The session's details (/session)
     button "backend" -- Tools run on the backend (/host switches)
     button "Model: Claude Opus 5.5, Medium" -- Claude Opus 5.5, reasoning Medium: models, reasoning and access (Ctrl+L)
     button "Send" -- Send (Enter)
@@ -762,7 +761,6 @@ let%expect_test
   [%expect
     {|
     button "Add files or images" -- Add files or images (or paste, or drop them here)
-    button "Details" -- The session's details (/session)
     button "Stop" -- Stop (Esc)
     button "backend" -- Tools run on the backend (/host switches)
     button "Model: Claude Opus 5.5, Medium" -- Claude Opus 5.5, reasoning Medium: models, reasoning and access (Ctrl+L)
@@ -873,7 +871,7 @@ let%expect_test
     Model_menu_access
     (Ask first Asks: edits & commands) (Auto-edit Asks: commands) (Smart Smart: a model decides) (Full access Auto: never asks ✓) (Plan Plan mode) (Chat Chat: no tool host)
     Close_dialog
-    <div class="chip-popover menu-surface model-menu">
+    <div class="bg-popover chip-popover loon menu-surface model-menu ring-1 ring-foreground/10 rounded-lg shadow-md text-popover-foreground">
     Close_dialog
     (Focus editor)
     Mode Auto: never asks
@@ -1039,9 +1037,9 @@ let%expect_test
     {|
     button "Model: Claude Opus 5.5, Medium" -- Claude Opus 5.5, reasoning Medium: models, reasoning and access (Ctrl+L)
     <div class="editor-wrap">
-    <div class="context-ring-anchor">
+    <div class="context-ring-anchor flex relative shrink-0">
     <div class="composer-buttons">
-    <div class="tray">
+    <div class="flex gap-0.5 in-[.app:not(.narrow)]:-mt-1.5 in-[.app:not(.narrow)]:bg-card/50 in-[.app:not(.narrow)]:border in-[.app:not(.narrow)]:border-border in-[.app:not(.narrow)]:border-t-0 in-[.app:not(.narrow)]:min-h-[34px] in-[.app:not(.narrow)]:mx-3.5 in-[.app:not(.narrow)]:pl-2 in-[.app:not(.narrow)]:pr-1.5 in-[.app:not(.narrow)]:py-0.5 in-[.app:not(.narrow)]:relative in-[.app:not(.narrow)]:rounded-b-[14px] items-center min-h-11 min-w-0 narrow:in-[.fresh]:order-first narrow:in-[.fresh]:pb-1 narrow:in-[.fresh]:px-0.5 text-[13px] text-muted-foreground tray">
     <div class="composer-controls menu-open">
     <div class="attach-menu chip-anchor">
     <div class="chip-anchor host">
@@ -1125,8 +1123,8 @@ let%expect_test "the context ring: idle, running, and what applies" =
   [%expect
     {|
     button "Context 65% full, $0.42: details"
-    <div class="context-ring-anchor">
-    <button class="context-ring warm">
+    <div class="context-ring-anchor flex relative shrink-0">
+    <button class="-my-1 [&.hot]:text-destructive [&.warm]:text-(--accent-orange) context-ring cursor-pointer focus-visible:ring-2 focus-visible:ring-ring grid hover:bg-accent in-[.open]:bg-accent narrow:-mx-0.5 narrow:-my-1.5 narrow:size-11 outline-none place-items-center relative rounded-full size-9 text-primary warm">
     Ready
     |}];
   H.event
@@ -1153,8 +1151,8 @@ let%expect_test "the context ring: idle, running, and what applies" =
   [%expect
     {|
     button "Context 90% full, $0.00: details"
-    <div class="context-ring-anchor">
-    <button class="context-ring hot">
+    <div class="context-ring-anchor flex relative shrink-0">
+    <button class="-my-1 [&.hot]:text-destructive [&.warm]:text-(--accent-orange) context-ring cursor-pointer focus-visible:ring-2 focus-visible:ring-ring grid hot hover:bg-accent in-[.open]:bg-accent narrow:-mx-0.5 narrow:-my-1.5 narrow:size-11 outline-none place-items-center relative rounded-full size-9 text-primary">
     Working
     (Goal 2/20)
     |}];
@@ -1178,7 +1176,7 @@ let%expect_test "the context ring: idle, running, and what applies" =
     Branch main
     (Compact) (Details)
     Toggle_context_card
-    <div class="context-ring-anchor">
+    <div class="context-ring-anchor flex relative shrink-0">
     Toggle_context_card
     (Run /session)
     (Focus dialog)
@@ -1221,6 +1219,7 @@ let%expect_test
       <span class="chip-label"> Opus 5.5 </span>
     </button>
     <textarea id="editor"
+              data-slot="input-group-control"
               placeholder="Ask prigh…  / commands"
               aria-label="Message"
               dir="auto"
@@ -1253,12 +1252,12 @@ let%expect_test "← → and Tab go along the chips; ← → the model menu's ra
     {|
     (Open_chip Host)
     (Chip_step 1)
-    <div class="chip-popover menu-surface model-menu">
+    <div class="bg-popover chip-popover loon menu-surface model-menu ring-1 ring-foreground/10 rounded-lg shadow-md text-popover-foreground">
     <button class="model-rail-tab on">
     (Model_menu_step 1)
-    <div class="chip-popover menu-surface model-menu">
+    <div class="bg-popover chip-popover loon menu-surface model-menu ring-1 ring-foreground/10 rounded-lg shadow-md text-popover-foreground">
     <button class="favourites model-rail-tab on">
     (Chip_step 1)
-    <div class="chip-popover menu-surface">
+    <div class="bg-popover chip-popover loon menu-surface ring-1 ring-foreground/10 rounded-lg shadow-md text-popover-foreground">
     |}]
 ;;

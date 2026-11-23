@@ -56,8 +56,12 @@ let%expect_test
        ]);
   [%expect
     {|
-    <div class="ok open tool tool-computer">
-      <button type="button" data-fold="c1#open" aria-expanded="true" class="tool-head">
+    <div data-slot="collapsible" data-state="open" class="ok open tool tool-computer">
+      <button data-slot="collapsible-trigger"
+              type="button"
+              data-fold="c1#open"
+              aria-expanded="true"
+              class="tool-head">
         <span title="Done" role="img" aria-label="Done" class="done mark">
           <icon class="check"> </icon>
         </span>
@@ -69,7 +73,7 @@ let%expect_test
         <span class="chip"> 1280×800 </span>
         <span class="chev">  </span>
       </button>
-      <div class="tool-body">
+      <div data-slot="collapsible-content" class="tool-body">
         <div data-viewer-group="" class="screen">
           <button type="button"
                   title="[image: image/png, 8 B]"
@@ -86,8 +90,12 @@ let%expect_test
     cursor at (640, 312) </span>
       </div>
     </div>
-    <div class="ok open tool tool-computer">
-      <button type="button" data-fold="c2#open" aria-expanded="true" class="tool-head">
+    <div data-slot="collapsible" data-state="open" class="ok open tool tool-computer">
+      <button data-slot="collapsible-trigger"
+              type="button"
+              data-fold="c2#open"
+              aria-expanded="true"
+              class="tool-head">
         <span title="Done" role="img" aria-label="Done" class="done mark">
           <icon class="check"> </icon>
         </span>
@@ -99,7 +107,7 @@ let%expect_test
         <span class="chip"> 1280×800 </span>
         <span class="chev">  </span>
       </button>
-      <div class="tool-body">
+      <div data-slot="collapsible-content" class="tool-body">
         <div data-viewer-group="" class="screen">
           <button type="button"
                   title="[image: image/png, 8 B]"
@@ -115,8 +123,12 @@ let%expect_test
     cursor at (640, 312) </span>
       </div>
     </div>
-    <div class="ok open tool tool-computer">
-      <button type="button" data-fold="c3#open" aria-expanded="true" class="tool-head">
+    <div data-slot="collapsible" data-state="open" class="ok open tool tool-computer">
+      <button data-slot="collapsible-trigger"
+              type="button"
+              data-fold="c3#open"
+              aria-expanded="true"
+              class="tool-head">
         <span title="Done" role="img" aria-label="Done" class="done mark">
           <icon class="check"> </icon>
         </span>
@@ -127,12 +139,16 @@ let%expect_test
         <span class="arg"> wait 2s </span>
         <span class="chev">  </span>
       </button>
-      <div class="tool-body">
+      <div data-slot="collapsible-content" class="tool-body">
         <span class="caption"> waited 2s </span>
       </div>
     </div>
-    <div class="error open tool tool-computer">
-      <button type="button" data-fold="c4#open" aria-expanded="true" class="tool-head">
+    <div data-slot="collapsible" data-state="open" class="error open tool tool-computer">
+      <button data-slot="collapsible-trigger"
+              type="button"
+              data-fold="c4#open"
+              aria-expanded="true"
+              class="tool-head">
         <span title="Failed" role="img" aria-label="Failed" class="failed mark">
           <icon class="cross"> </icon>
         </span>
@@ -143,7 +159,7 @@ let%expect_test
         <span class="arg"> key ctrl+t </span>
         <span class="chev">  </span>
       </button>
-      <div class="tool-body">
+      <div data-slot="collapsible-content" class="tool-body">
         <div class="error output">
           <pre>
             [interrupted] you moved the mouse: stopped (computer use paused until the next prompt)

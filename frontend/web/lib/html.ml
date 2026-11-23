@@ -21,6 +21,8 @@ let classes always optional =
 
 let button
       ?(cls = "")
+      ?variant
+      ?size
       ?title
       ?label
       ?(disabled = false)
@@ -28,9 +30,15 @@ let button
       ~on_click
       children
   =
+  let look =
+    match variant, size with
+    | None, None -> String.strip ("btn " ^ cls)
+    | _ ->
+      Loon.Button.classes ?variant ?size ~class_:cls ()
+  in
   Node.button
     ~attrs:
-      ([ Attr.class_ (String.strip ("btn " ^ cls))
+      ([ Attr.class_ look
        ; Attr.type_ "button"
        ; Attr.on_click (fun _ -> on_click)
        ]
@@ -486,13 +494,33 @@ let mark ?(cls = "") ?label t =
     [ icon t ]
 ;;
 
+(* Loon's Checkbox and Radio_group item, drawn (the row is the control). *)
 let check ?(radio = false) on =
+  let look =
+    match radio, on with
+    | false, false ->
+      "check flex size-4 shrink-0 items-center justify-center rounded-[4px] \
+       border border-input dark:bg-input/30"
+    | false, true ->
+      "check on flex size-4 shrink-0 items-center justify-center rounded-[4px] \
+       border border-primary bg-primary text-primary-foreground"
+    | true, false ->
+      "check radio flex size-4 shrink-0 items-center justify-center \
+       rounded-full border border-input dark:bg-input/30"
+    | true, true ->
+      "check radio on flex size-4 shrink-0 items-center justify-center \
+       rounded-full border border-primary bg-primary"
+  in
   Node.span
-    ~attrs:
-      [ classes [ "check" ] [ "on", on; "radio", radio ]
-      ; Attr.create "aria-hidden" "true"
-      ]
-    (if on && not radio then [ icon Check ] else [])
+    ~attrs:[ Attr.class_ look; Attr.create "aria-hidden" "true" ]
+    (match radio, on with
+     | false, true -> [ icon ~cls:"size-3.5" Check ]
+     | true, true ->
+       [ Node.span
+           ~attrs:[ Attr.class_ "size-2 rounded-full bg-primary-foreground" ]
+           []
+       ]
+     | _, false -> [])
 ;;
 
 let caret (ev : Dom_html.event Js.t) =

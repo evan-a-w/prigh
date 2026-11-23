@@ -70,7 +70,11 @@ let%expect_test
         <div class="pending">
           <span aria-hidden="true" class="lamp"> </span>
           <span class="label"> Waiting for the model… </span>
-          <span class="stop-hint"> Esc to stop </span>
+          <span class="stop-hint">
+            <kbd data-slot="kbd"
+                 class="[&_svg:not([class*='size-'])]:size-3 bg-muted dark:in-data-[slot=tooltip-content]:bg-background/10 font-medium font-sans gap-1 h-5 in-data-[slot=tooltip-content]:bg-background/20 in-data-[slot=tooltip-content]:text-background inline-flex items-center justify-center min-w-5 pointer-events-none px-1 rounded-sm select-none text-muted-foreground text-xs w-fit"> Esc </kbd>
+             to stop
+          </span>
         </div>
       </div>
     </div>
@@ -207,7 +211,8 @@ let%expect_test "how a reply stopped: error, interrupted, length" =
     {|
     <div class="entries">
       <div data-entry="0" class="assistant msg">
-        <div class="error stop">
+        <div data-slot="alert"
+             class="*:[svg:not([class*='size-'])]:size-4 *:[svg]:row-span-2 *:[svg]:text-current *:[svg]:translate-y-0.5 *:data-[slot=alert-description]:text-destructive/90 bg-card border error flex flex-col gap-1 group/alert has-[>svg]:gap-x-2 has-[>svg]:grid-cols-[auto_1fr] has-data-[slot=alert-action]:pr-18 has-data-[slot=alert-action]:relative loon px-3.5 py-2.5 relative rounded-lg stop text-destructive text-left text-sm w-full">
           <span class="title"> The model returned an error </span>
           <div class="detail"> 429 rate limited: try again in 20s </div>
           <span class="hint"> Send a message to retry, or switch model. </span>
@@ -584,7 +589,8 @@ let%expect_test "an image the model refused as too large: downsize and retry" =
     {|
     <div class="entries">
       <div data-entry="0" class="assistant msg">
-        <div class="error stop">
+        <div data-slot="alert"
+             class="*:[svg:not([class*='size-'])]:size-4 *:[svg]:row-span-2 *:[svg]:text-current *:[svg]:translate-y-0.5 *:data-[slot=alert-description]:text-destructive/90 bg-card border error flex flex-col gap-1 group/alert has-[>svg]:gap-x-2 has-[>svg]:grid-cols-[auto_1fr] has-data-[slot=alert-action]:pr-18 has-data-[slot=alert-action]:relative loon px-3.5 py-2.5 relative rounded-lg stop text-destructive text-left text-sm w-full">
           <span class="title"> The model returned an error </span>
           <div class="detail">
             HTTP 400: invalid_request_error: messages.12.content.0: image exceeds 5 MB maximum
@@ -592,7 +598,9 @@ let%expect_test "an image the model refused as too large: downsize and retry" =
           <span class="hint">
             An image is too large for the model. prigh can send the conversation's images smaller and try again (the originals stay in the session).
           </span>
-          <button type="button" data-run="/downsize-images" class="stop-action"> Downsize images and retry </button>
+          <button type="button"
+                  data-run="/downsize-images"
+                  class="[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0 active:not-aria-[haspopup]:translate-y-px aria-expanded:bg-muted aria-expanded:text-foreground aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-background bg-clip-padding border border-destructive/40 dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:bg-input/30 dark:border-destructive/40 dark:hover:bg-destructive/10 disabled:opacity-50 disabled:pointer-events-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 font-medium gap-1.5 group/button h-8 has-data-[icon=inline-end]:pr-2 has-data-[icon=inline-start]:pl-2 hover:bg-destructive/10 hover:text-destructive inline-flex items-center justify-center mt-1 outline-none pointer-coarse:h-11 px-2.5 rounded-lg select-none self-start shrink-0 stop-action text-destructive text-sm transition-all whitespace-nowrap"> Downsize images and retry </button>
         </div>
       </div>
     </div>

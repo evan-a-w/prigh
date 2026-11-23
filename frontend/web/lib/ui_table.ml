@@ -78,11 +78,21 @@ let sort (t : Table.t) ~sort =
     sorted @ nulls
 ;;
 
-let align_cls (c : Table.Column.t) =
+(* loon's Table, with the hook classes; text wraps, figures don't. *)
+let head_cls (c : Table.Column.t) =
   match c.align with
-  | Left -> "left"
-  | Right -> "right"
-  | Center -> "center"
+  | Left -> "left text-muted-foreground text-xs first:pl-4 last:pr-4"
+  | Right ->
+    "right text-right! text-muted-foreground text-xs first:pl-4 last:pr-4"
+  | Center ->
+    "center text-center! text-muted-foreground text-xs first:pl-4 last:pr-4"
+;;
+
+let cell_cls (c : Table.Column.t) =
+  match c.align with
+  | Left -> "left whitespace-normal! break-words first:pl-4 last:pr-4"
+  | Right -> "right text-right first:pl-4 last:pr-4"
+  | Center -> "center text-center first:pl-4 last:pr-4"
 ;;
 
 let view (ctx : Ui_context.t) ~path (t : Table.t) =
@@ -101,11 +111,12 @@ let view (ctx : Ui_context.t) ~path (t : Table.t) =
       | None -> "none"
     in
     let attrs =
-      [ Attr.class_ (align_cls c); Attr.create "scope" "col" ]
-      @ if t.sortable then [ Attr.create "aria-sort" aria ] else []
+      Attr.create "scope" "col"
+      :: (if t.sortable then [ Attr.create "aria-sort" aria ] else [])
     in
+    let th = Loon.Table.head ~attrs ~class_:(head_cls c) in
     if not t.sortable
-    then Node.th ~attrs [ Node.text c.label ]
+    then th [ Node.text c.label ]
     else (
       let next =
         match dir with
@@ -113,8 +124,7 @@ let view (ctx : Ui_context.t) ~path (t : Table.t) =
         | Some `Desc -> "asc"
         | None -> if numeric c then "desc" else "asc"
       in
-      Node.th
-        ~attrs
+      th
         [ Node.button
             ~attrs:
               [ Attr.type_ "button"
@@ -153,7 +163,7 @@ let view (ctx : Ui_context.t) ~path (t : Table.t) =
           [ Node.text (format c value) ]
       | _ -> Node.text (format c value)
     in
-    Node.td ~attrs:[ Attr.class_ (align_cls c) ] [ content ]
+    Loon.Table.cell ~class_:(cell_cls c) [ content ]
   in
   let rows = sort t ~sort:state in
   Node.figure
@@ -170,10 +180,18 @@ let view (ctx : Ui_context.t) ~path (t : Table.t) =
           ; Attr.create "aria-label" (Option.value t.title ~default:"Table")
           ]
         [ Node.table
-            [ Node.thead [ Node.tr (List.map t.columns ~f:header) ]
-            ; Node.tbody
+            ~attrs:
+              [ Attr.create "data-slot" "table"
+              ; Attr.class_ "w-full text-sm tabular-nums"
+              ]
+            [ Loon.Table.header
+                [ Loon.Table.row
+                    ~class_:"hover:bg-transparent!"
+                    (List.map t.columns ~f:header)
+                ]
+            ; Loon.Table.body
                 (List.map rows ~f:(fun row ->
-                   Node.tr (List.map t.columns ~f:(cell row))))
+                   Loon.Table.row (List.map t.columns ~f:(cell row))))
             ]
         ]
     ; (match t.caption with

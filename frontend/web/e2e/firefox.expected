@@ -697,21 +697,25 @@ chat 400; chips: icon, V4.1 Flash; status: Context 0% full, $<COST>: details; .c
 the panels' toggles: 3 buttons 10px from the top, 12px from the right, clear of the jump list: true, open: Files
 === firefox: settings ===
 Settings
+General
 Appearance
 Sessions
 New sessions
 Models
+Models
 Usage
+You
 Memory
 About you
 Custom instructions
+Integrations
 MCP servers
 Git hosting
 T
 token
 Appearance
 How this page looks. Saved for your account, so it follows you to every browser you sign in on.
-LOOK
+Look
 Theme
 The page's colours.
 Original
@@ -735,7 +739,7 @@ Code font
 Code, commands and their output.
 Recursive
 System
-LAYOUT
+Layout
 Transcript detail
 This browser
 How much of tool calls and thinking the transcript shows (Ctrl+O).
@@ -1213,7 +1217,7 @@ Appearance
 
 How this page looks. Saved for your account, so it follows you to every browser you sign in on.
 
-LOOK
+Look
 Theme
 The page's colours.
 Original
@@ -1237,7 +1241,7 @@ Code font
 Code, commands and their output.
 Recursive
 System
-LAYOUT
+Layout
 Transcript detail
 This browser
 How much of tool calls and thinking the transcript shows (Ctrl+O).
@@ -1248,12 +1252,12 @@ Verbose
 dark orange #f0b44c on #1d1d1d; checked: Dark
 === firefox: themes: the components in dark blue ===
 background #1d1d1d foreground #e6e6e6 primary #6aa6f8 on #1b1608
-radius 10px: the dialog 10px
+radius 10px: the dialog 14px
 fonts: Recursive Sans, Recursive Sans
 pressed Default: rgb(45, 45, 45) rgb(230, 230, 230), corners 10px, 28px
 === firefox: themes: round corners, Inter ===
 background #1d1d1d foreground #e6e6e6 primary #6aa6f8 on #1b1608
-radius 16px: the dialog 16px
+radius 16px: the dialog 22.4px
 fonts: Inter, Inter
 pressed Round: rgb(45, 45, 45) rgb(230, 230, 230), corners 16px, 28px
 === firefox: themes: saved on the backend ===
@@ -1673,10 +1677,12 @@ Since latest
 (comment · <TIME>)
 Send 1 comment
 === firefox: review: page: the files ===
+M
 src/
 main.ml
 1
 +2 −1
+A
 src/
 util.ml
 +3 −0
@@ -1796,12 +1802,15 @@ Space
 →
 File 1 of 2
 === firefox: review: page: the files after the agent's edit ===
+M
 README.md
 +1 −1
+M
 src/
 main.ml
 3
 +2 −1
+A
 src/
 util.ml
 1
@@ -1932,37 +1941,46 @@ Esc closed it: true
 Reviewing feat/login (<WT>) against main (merge base <SHA>)
 base: main
 === firefox: review: worktree: the files ===
+M
 README.md
 +1 −1
+A
 src/
 login.ml
 +1 −0
 2 files changed, +2 −1
 === firefox: review: worktree: against HEAD ===
+M
 README.md
 +1 −1
 1 file changed, +1 −1
 === firefox: review: worktree: against HEAD, what is reviewed ===
 Reviewing feat/login (<WT>) against HEAD
 === firefox: review: worktree: back to the session's own ===
+M
 README.md
 +1 −1
+M
 src/
 main.ml
 3
 +4 −1
+A
 src/
 util.ml
 1
 +3 −0
 3 files changed, +8 −2
 === firefox: review: since: the files ===
+M
 README.md
 +1 −1
+M
 src/
 main.ml
 3
 +4 −1
+A
 src/
 util.ml
 1
@@ -2248,7 +2266,8 @@ Read-only
 Check out into a worktree
 === firefox: review: compare: read-only, what is reviewed ===
 Reviewing feat/old (not checked out) against main (merge base <SHA>)
-files: src/
+files: A
+src/
 old.ml
 +1 −0
 1 file changed, +1 −0
@@ -2630,8 +2649,8 @@ Sign in with your browser
 Sign in here
 Quit prigh
 Sign in with your browser: 44px+, on screen
-Sign in here: 34px, on screen
-Quit prigh: 34px, on screen
+Sign in here: 32px, on screen
+Quit prigh: 32px, on screen
 overflows sideways: false
 focused: desktop-signin-browser
 page line: {"url":"http://127.0.0.1:<PORT>/#cli-signin=<PORT>.<STATE>&program=desktop","external":true}
@@ -2643,7 +2662,7 @@ Waiting for you to allow it in your browser…
 Open it again
 Cancel
 Open it again: 44px+, on screen
-Cancel: 34px, on screen
+Cancel: 32px, on screen
 overflows sideways: false
 focused: desktop-signin-again
 === firefox: desktop_signin: cancelled with Esc ===
@@ -2790,7 +2809,7 @@ Your message — Step 1: look at module 1. | Copy | (disabled) Trim everything b
 Reply — Module 3 is fixed. | Copy | Trim everything before this — /trim | Trim everything after this — /trim after | Delete — /delete
 === firefox: trim: a message's menu ===
 Your message — Step 3: look at module 3. | Copy | Trim everything before this — /trim | Trim everything after this — /trim after | Delete — /delete
-at the pointer: -40,0
+at the pointer: -51,0
 marked: true
 cut line: dashed
 after Esc: 1 2 3 4 5; preview: 0
@@ -2803,10 +2822,10 @@ copied: Module 3 is fixed. | Its handler returns the error now instead of droppi
 Trim the context here? | Trim 4 messages (~196 tokens) before this message? | Step 3: look at module 3. | <TIME> | They leave the model's context; the transcript keeps them folded, and Undo brings them back. | Enter trims, Esc cancels | Cancel | Trim
 after Esc, steps: 1 2 3 4 5; divider: 0
 === firefox: trim: keyboard ===
-under the message: 0,2
+under the message: -11,2
 highlighted: Trim everything before this
 === firefox: trim: trimmed ===
-divider: ✂ | 4 messages trimmed · ~196 tokens | Show | · | Undo
+divider: 4 messages trimmed · ~196 tokens | Show | · | Undo
 steps: 3 4 5
 focusable: 6
 divider in view: true
@@ -2819,7 +2838,7 @@ head: Not in the model's context | Kept in the transcript only; the model no lon
 trimmed: Step 1, Step 2
 menus on them: 0
 dimmed: true
-divider: ✂ | 4 messages trimmed · ~196 tokens | Hide | · | Undo
+divider: 4 messages trimmed · ~196 tokens | Hide | · | Undo
 hidden again
 === firefox: trim: undone ===
 steps: 1 2 3 4 5
@@ -3626,7 +3645,7 @@ draft: a draft
 === firefox: pwa: errors ===
 none
 === firefox: compaction: default ===
-COMPACTION
+Compaction
 Compact at
 Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window.
 tokens
@@ -3637,7 +3656,7 @@ field: "200k" (placeholder 200k); on: true; mask: true
 “lots” isn't a number of tokens: type one like 150k or 200000, or off to compact only at 80% of the window.
 still open: 1
 === firefox: compaction: set ===
-COMPACTION
+Compaction
 Compact at
 Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window.
 tokens
@@ -3649,7 +3668,7 @@ compact_at_tokens=150000 compaction_model=null mask_observations=false
 Summary model; first: The conversation's model whichever model the conversation uses
 chosen: a Haiku; compact_at_tokens=150000 compaction_model=anthropic/(a haiku) mask_observations=false
 === firefox: compaction: reloaded ===
-COMPACTION
+Compaction
 Compact at
 Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window.
 tokens
@@ -3659,7 +3678,7 @@ field: "150k" (placeholder 200k); on: true; mask: false
 === firefox: compaction: /compaction ===
 Compaction: at 150k tokens, or 80% of the model's window if that is less; summaries by the session's model; observation masking off (/compaction at TOKENS|off, /compaction model MODEL|off, /compaction mask on|off)
 === firefox: compaction: off by /compaction ===
-COMPACTION
+Compaction
 Compact at
 Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window.
 Off: only at 80% of the window.
@@ -3668,7 +3687,7 @@ Replace tool outputs older than the last 10 turns with placeholders first, which
 field: hidden; on: false; mask: false
 compact_at_tokens=0 compaction_model=null mask_observations=false
 === firefox: compaction: switched on ===
-COMPACTION
+Compaction
 Compact at
 Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window.
 tokens
@@ -3750,7 +3769,7 @@ host: Tools run on <host>, in <cwd> (/host switches)
 === firefox: new sessions: the built-ins ===
 New sessions
 What a new session starts with. A change applies from the next new session: open ones keep theirs. Kept on the backend.
-START WITH
+Start with
 From the next new session
 Model
 New sessions start with the backend's choice: a model of a provider you are logged in to.
@@ -3778,7 +3797,7 @@ New sessions you start here run their tools where the session you are on does.
 Where you are
 Starting directory
 New sessions start in their tool host's working directory. ~/ is its home.
-LIMITS
+Limits
 Every session without its own
 Fallback models
 When a model's usage runs out, the next in this list takes over the conversation. Every session follows it, open ones too.
@@ -3790,7 +3809,7 @@ Off: no limit.
 === firefox: new sessions: all set ===
 New sessions
 What a new session starts with. A change applies from the next new session: open ones keep theirs. Kept on the backend.
-START WITH
+Start with
 From the next new session
 Model
 New sessions start with Claude Fable 5.
@@ -3818,7 +3837,7 @@ New sessions you start here run their tools on laptop, while it is connected.
 laptop
 Starting directory
 New sessions start in ~/proj, on their tool host.
-LIMITS
+Limits
 Every session without its own
 Fallback models
 When a model's usage runs out, the next in this list takes over the conversation. Every session follows it, open ones too.
@@ -3832,7 +3851,7 @@ default_model="anthropic/claude-fable-5" default_thinking="high" approval_mode="
 === firefox: new sessions: the other browser ===
 New sessions
 What a new session starts with. A change applies from the next new session: open ones keep theirs. Kept on the backend.
-START WITH
+Start with
 From the next new session
 Model
 New sessions start with Claude Fable 5.
@@ -3860,7 +3879,7 @@ New sessions you start here run their tools on laptop, while it is connected.
 laptop
 Starting directory
 New sessions start in ~/proj, on their tool host.
-LIMITS
+Limits
 Every session without its own
 Fallback models
 When a model's usage runs out, the next in this list takes over the conversation. Every session follows it, open ones too.
@@ -3917,7 +3936,7 @@ back: New sessions | What a new session starts with. A change applies from the n
 === firefox: new sessions: reset ===
 New sessions
 What a new session starts with. A change applies from the next new session: open ones keep theirs. Kept on the backend.
-START WITH
+Start with
 From the next new session
 Model
 New sessions start with the backend's choice: a model of a provider you are logged in to.
@@ -3945,7 +3964,7 @@ New sessions you start here run their tools where the session you are on does.
 Where you are
 Starting directory
 New sessions start in their tool host's working directory. ~/ is its home.
-LIMITS
+Limits
 Every session without its own
 Fallback models
 When a model's usage runs out, the next in this list takes over the conversation. Every session follows it, open ones too.
@@ -3962,7 +3981,7 @@ Memory
 What you asked the model to remember, for later sessions. Kept on the backend, for your account.
 Use memory
 The model saves a note only when you ask it to remember something, and looks one up when you refer back to it. Off, it is not given the memory tool, and your notes stay here.
-NOTES
+Notes
 3 notes
 Add note
 shell
@@ -3987,7 +4006,7 @@ Memory
 What you asked the model to remember, for later sessions. Kept on the backend, for your account.
 Use memory
 The model saves a note only when you ask it to remember something, and looks one up when you refer back to it. Off, it is not given the memory tool, and your notes stay here.
-NOTES
+Notes
 3 notes
 Add note
 pager
@@ -4016,13 +4035,13 @@ back: Memory | What you asked the model to remember, for later sessions. Kept on
 === firefox: usage: opened ===
 Usage
 How much of your Claude and ChatGPT subscriptions' usage limits you have used, as the providers report it (read when you open this page), and whether a run stopped by one carries on when it resets.
-AT A LIMIT
+At a limit
 Resume after a usage limit
 A run stopped by a provider's usage limit carries on by itself when the limit resets, if the provider says when. Off: it stays stopped until you send a message.
 Subscription limits
 Read TIME (just now). Updated when you open this page or press Refresh.
 Refresh
-CLAUDE
+Claude
 5-hour session
 Resets in 2h 15m · TIME
 33% used
@@ -4032,7 +4051,7 @@ Resets in 3d 4h · TIME
 Weekly · Opus
 Reset time not reported
 4% used
-CHATGPT
+ChatGPT
 Plus
 5-hour session
 Resets in 43m · TIME
@@ -4047,16 +4066,16 @@ asked: Claude 2, ChatGPT 2; ChatGPT's session: 75% used
 === firefox: usage: Claude rate limited ===
 Usage
 How much of your Claude and ChatGPT subscriptions' usage limits you have used, as the providers report it (read when you open this page), and whether a run stopped by one carries on when it resets.
-AT A LIMIT
+At a limit
 Resume after a usage limit
 A run stopped by a provider's usage limit carries on by itself when the limit resets, if the provider says when. Off: it stays stopped until you send a message.
 Subscription limits
 Read TIME (just now). Updated when you open this page or press Refresh.
 Refresh
-CLAUDE
+Claude
 Could not read the limits
 Claude is limiting how often usage is read (HTTP 429): Refresh in a minute
-CHATGPT
+ChatGPT
 Plus
 5-hour session
 Resets in 43m · TIME
@@ -4175,7 +4194,7 @@ Custom instructions
 Standing instructions for the model, given to it in every session; it may also add or edit them when you state a lasting preference. Kept on the backend, for your account.
 Let the model change them
 When you state a lasting preference or standing instruction, the model adds it here or edits the one that covers it, and tells you. Off, only you change them; they stay in every session either way.
-INSTRUCTIONS
+Instructions
 2 instructions
 2 of 50 · about 43 tokens in every session
 Use Australian spelling.
@@ -4196,7 +4215,7 @@ Custom instructions
 Standing instructions for the model, given to it in every session; it may also add or edit them when you state a lasting preference. Kept on the backend, for your account.
 Let the model change them
 When you state a lasting preference or standing instruction, the model adds it here or edits the one that covers it, and tells you. Off, only you change them; they stay in every session either way.
-INSTRUCTIONS
+Instructions
 2 instructions
 2 of 50 · about 38 tokens in every session
 Use Australian spelling and metric units.
@@ -4231,12 +4250,12 @@ back: Custom instructions | Standing instructions for the model, given to it in 
 === firefox: mcp settings: empty, the host's own ===
 MCP servers
 Tools the model can use from MCP servers. The servers here are kept on the backend for your account and run on every host your sessions use; a host's ~/.prigh/mcp.json and a project's .mcp.json add their own.
-YOUR SERVERS
+Your servers
 No servers yet
 Add one by the command that starts it or by its URL, or paste the mcpServers JSON from another tool's settings. It runs on every host your sessions use.
 Add server
 Paste JSON
-ON HOST
+On HOST
 From its files: change them there
 local
 ~/.prigh/mcp.json
@@ -4268,7 +4287,7 @@ Add servers
 === firefox: mcp settings: pasted ===
 MCP servers
 Tools the model can use from MCP servers. The servers here are kept on the backend for your account and run on every host your sessions use; a host's ~/.prigh/mcp.json and a project's .mcp.json add their own.
-YOUR SERVERS
+Your servers
 3 servers
 echo
 NODE FAKE echo
@@ -4283,7 +4302,7 @@ https://example.com/mcp
 Overridden by ~/.prigh/mcp.json on HOST: that one runs instead. Rename one of them to use both.
 Add server
 Paste JSON
-ON HOST
+On HOST
 From its files: change them there
 local
 ~/.prigh/mcp.json
@@ -5050,7 +5069,7 @@ ok
 === firefox: editor phone: the files drawer ===
 ok
 drawer: src/compact.ml | .. | README.md | src/1
-found: src/turn.mli | src/compact.ml
+found: src/turn.mli
 === firefox: editor phone: go to file ===
 ok
 drawer gone: true
@@ -5096,7 +5115,7 @@ ok
 === firefox: editor small: the files drawer ===
 ok
 drawer: src/compact.ml | .. | README.md | src/1
-found: src/turn.mli | src/compact.ml
+found: src/turn.mli
 === firefox: editor small: go to file ===
 ok
 drawer gone: true

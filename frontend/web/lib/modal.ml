@@ -2,10 +2,15 @@ open! Core
 open! Import
 open Html
 
-let view ?(cls = "") ?(id = "dialog") ?(footer = []) ?back ~title ~on_close body =
+let view ?(cls = "") ?(id = "dialog") ?(footer = []) ?back ~title ~on_close body
+  =
+  (* Its own key: never the node of the menu it replaces, whose placing
+     (Menu_listeners: an inline top and left) would stay on it. *)
   Node.div
+    ~key:"modal"
     ~attrs:
       [ Attr.class_ "modal-backdrop"
+      ; Attr.create "data-slot" "dialog-overlay"
       ; Attr.on_click (fun ev ->
           if Js_of_ocaml.Js.Unsafe.equals ev##.target ev##.currentTarget
           then on_close
@@ -15,13 +20,17 @@ let view ?(cls = "") ?(id = "dialog") ?(footer = []) ?back ~title ~on_close body
         ~attrs:
           [ Attr.class_ (String.strip ("modal " ^ cls))
           ; Attr.id id
+          ; Attr.create "data-slot" "dialog-content"
           ; Attr.role "dialog"
           ; Attr.create "aria-modal" "true"
           ; Attr.create "aria-label" title
           ; Attr.tabindex (-1)
           ]
         [ Node.header
-            ~attrs:[ Attr.class_ "modal-head" ]
+            ~attrs:
+              [ Attr.class_ "modal-head"
+              ; Attr.create "data-slot" "dialog-header"
+              ]
             ((match back with
               | Some (label, on_back) ->
                 [ button
@@ -31,18 +40,26 @@ let view ?(cls = "") ?(id = "dialog") ?(footer = []) ?back ~title ~on_close body
                     [ icon Back; span ~cls:"modal-back-label" label ]
                 ]
               | None -> [])
-             @ [ Node.h2 [ Node.text title ]
-            ; button
-                ~cls:"icon ghost"
-                ~title:"Close (Esc)"
-                ~label:"Close"
-                ~on_click:on_close
-                [ icon Close ]
-            ])
+             @ [ Node.h2
+                   ~attrs:[ Attr.create "data-slot" "dialog-title" ]
+                   [ Node.text title ]
+               ; button
+                   ~cls:"icon ghost"
+                   ~title:"Close (Esc)"
+                   ~label:"Close"
+                   ~on_click:on_close
+                   [ icon Close ]
+               ])
         ; div ~cls:"modal-body" body
         ; (match footer with
            | [] -> Node.none
-           | footer -> Node.footer ~attrs:[ Attr.class_ "modal-buttons" ] footer)
+           | footer ->
+             Node.footer
+               ~attrs:
+                 [ Attr.class_ "modal-buttons"
+                 ; Attr.create "data-slot" "dialog-footer"
+                 ]
+               footer)
         ]
     ]
 ;;

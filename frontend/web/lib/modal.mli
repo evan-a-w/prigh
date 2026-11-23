@@ -1,7 +1,9 @@
 open! Core
 open! Import
 
-(** The one modal component every dialog uses: a backdrop (clicking it closes),
+(** The one modal component every dialog uses, drawn as loon's Dialog (its
+    [data-slot]s; style.css draws them, phone.css makes it a sheet from the
+    bottom or a page on a phone): a backdrop (clicking it closes),
     a titled box with a close button, the body and a row of buttons. The box
     has [id] (default ["dialog"]) so it can take the focus. With [back]
     (its label, what it does), a back button before the title: a phone's

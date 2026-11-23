@@ -30,20 +30,40 @@ let plural n word =
 
 let tools_list (tools : Mcp_server.Tool.t list) =
   Node.ul
-    ~attrs:[ Attr.class_ "mcp-tools mcp-settings-tools" ]
+    ~attrs:
+      [ Attr.class_
+          "mcp-tools mcp-settings-tools m-0 flex max-h-60 basis-full list-none \
+           flex-col gap-1.5 overflow-y-auto rounded-md border bg-background \
+           px-2.5 py-2"
+      ]
     (List.map tools ~f:(fun (tool : Mcp_server.Tool.t) ->
        Node.li
-         ~attrs:[ Attr.class_ "mcp-tool" ]
-         [ span ~cls:"mcp-tool-name" tool.name
+         ~attrs:[ Attr.class_ "mcp-tool flex min-w-0 flex-col gap-px" ]
+         [ span
+             ~cls:
+               "mcp-tool-name font-mono text-xs text-foreground \
+                [overflow-wrap:anywhere]"
+             tool.name
          ; (if String.is_empty tool.description
             then Node.none
-            else span ~cls:"mcp-tool-description" tool.description)
+            else
+              span
+                ~cls:
+                  "mcp-tool-description line-clamp-2 text-xs leading-snug \
+                   text-muted-foreground"
+                tool.description)
          ]))
+;;
+
+let tools_toggle_cls =
+  "mcp-tools-toggle h-auto min-h-0 border-0 bg-transparent p-0 text-inherit \
+   underline decoration-dotted underline-offset-2 shadow-none \
+   hover:bg-transparent hover:text-foreground"
 ;;
 
 let tools_button ~shown ~name ~count ~inject =
   button
-    ~cls:"mcp-tools-toggle"
+    ~cls:tools_toggle_cls
     ~attrs:[ Attr.create "aria-expanded" (Bool.to_string shown) ]
     ~title:(if shown then "Hide its tools" else "Show its tools")
     ~on_click:(inject (Action.Mcp_show_tools name))
@@ -64,7 +84,11 @@ let sign_in_control (m : App.Model.t) ~source ~name ~inject =
         [ Attr.href url
         ; Attr.target "_blank"
         ; Attr.create "rel" "noopener noreferrer"
-        ; Attr.class_ "btn small primary link-button mcp-sign-in-open"
+        ; Attr.class_
+            (Loon.Button.classes
+               ~size:Sm
+               ~class_:"mcp-sign-in-open link-button no-underline"
+               ())
         ; Attr.title "Opens the server's sign-in page in a new tab"
         ]
       [ Node.text "Open sign-in page"; icon External ]
@@ -90,7 +114,18 @@ let sign_out_control (m : App.Model.t) ~source ~name ~inject =
 
 let health_note (m : App.Model.t) (s : Mcp_settings.Server.t) ~inject =
   let host = host_name m in
-  let note level parts = div ~cls:("setting-note mcp-health " ^ level) parts in
+  let note level parts =
+    div
+      ~cls:
+        (String.concat
+           ~sep:" "
+           [ "setting-note mcp-health flex flex-wrap items-baseline gap-x-1 \
+              text-[13px] leading-snug"
+           ; level
+           ; Settings_row.note_colour (List.hd_exn (String.split level ~on:' '))
+           ])
+      parts
+  in
   match Mcp_page.health m.mcp s with
   | Off -> note "muted" [ Node.text "Off: not started on any host" ], []
   | Checking -> note "muted" [ Node.textf "Checking %s…" host ], []
@@ -147,10 +182,13 @@ let pair_rows (d : Mcp_page.Draft.t) ~inject =
   let field f = inject (Action.Mcp_field f) in
   List.mapi d.pairs ~f:(fun i (p : Mcp_page.Pair.t) ->
     div
-      ~cls:"mcp-pair"
+      ~cls:
+        "mcp-pair grid w-full \
+         grid-cols-[minmax(0,2fr)_minmax(0,3fr)_auto_auto] items-center \
+         gap-1.5"
       [ Node.input
           ~attrs:
-            [ Attr.class_ "text-input mcp-pair-key"
+            [ Attr.class_ (input_cls "mcp-pair-key min-w-0 font-mono text-xs")
             ; Attr.type_ "text"
             ; Attr.create "aria-label" (sprintf "%s %d: name" what (i + 1))
             ; Attr.placeholder placeholder_key
@@ -163,7 +201,7 @@ let pair_rows (d : Mcp_page.Draft.t) ~inject =
           ()
       ; Node.input
           ~attrs:
-            [ Attr.class_ "text-input mcp-pair-value"
+            [ Attr.class_ (input_cls "mcp-pair-value min-w-0 font-mono text-xs")
             ; Attr.type_ (if p.shown then "text" else "password")
             ; Attr.create "aria-label" (sprintf "%s %d: value" what (i + 1))
             ; Attr.placeholder placeholder_value
@@ -175,13 +213,13 @@ let pair_rows (d : Mcp_page.Draft.t) ~inject =
             ]
           ()
       ; button
-          ~cls:"small ghost mcp-pair-show"
+          ~cls:"small ghost mcp-pair-show min-w-12 justify-center"
           ~attrs:[ Attr.create "aria-pressed" (Bool.to_string p.shown) ]
           ~title:(if p.shown then "Hide the value" else "Show the value")
           ~on_click:(field (Pair_shown i))
           [ Node.text (if p.shown then "Hide" else "Show") ]
       ; button
-          ~cls:"icon ghost mcp-pair-remove"
+          ~cls:"icon ghost mcp-pair-remove hover:text-destructive"
           ~label:(sprintf "Remove %s %d" (String.lowercase what) (i + 1))
           ~title:"Remove"
           ~on_click:(field (Pair_remove i))
@@ -191,13 +229,11 @@ let pair_rows (d : Mcp_page.Draft.t) ~inject =
 
 let labelled ~label ~for_ ?hint control =
   div
-    ~cls:"mcp-field"
-    [ Node.label
-        ~attrs:[ Attr.class_ "mcp-field-label"; Attr.for_ for_ ]
-        [ Node.text label ]
+    ~cls:"mcp-field flex flex-col gap-1.5"
+    [ Settings_row.label ~cls:"mcp-field-label" ~for_ label
     ; control
     ; (match hint with
-       | Some hint -> span ~cls:"mcp-field-hint" hint
+       | Some text -> Settings_row.hint ~cls:"mcp-field-hint" text
        | None -> Node.none)
     ]
 ;;
@@ -206,7 +242,7 @@ let text_input ~id ~value ?placeholder ?(disabled = false) ~on_input () =
   Node.input
     ~attrs:
       [ Attr.id id
-      ; Attr.class_ "text-input"
+      ; Attr.class_ (input_cls "w-full min-w-0 font-mono text-xs")
       ; Attr.type_ "text"
       ; Attr.value value
       ; Option.value_map placeholder ~default:Attr.empty ~f:Attr.placeholder
@@ -255,7 +291,7 @@ let draft_form (d : Mcp_page.Draft.t) ~inject =
           (Node.textarea
              ~attrs:
                [ Attr.id "mcp-args"
-               ; Attr.class_ "text-input mcp-args"
+               ; Attr.class_ (textarea_cls "mcp-args font-mono text-xs")
                ; Attr.rows 3
                ; Attr.placeholder "-y\n@modelcontextprotocol/server-filesystem"
                ; Attr.value d.args
@@ -284,8 +320,9 @@ let draft_form (d : Mcp_page.Draft.t) ~inject =
     | Stdio -> "Environment", "Add variable"
     | Http -> "Headers", "Add header"
   in
-  div
-    ~cls:"setting mcp-draft"
+  custom
+    ~cls:"mcp-draft [&_.setting-segments]:self-start"
+    ~stack:true
     ~attrs:
       [ Attr.create
           "aria-label"
@@ -293,8 +330,7 @@ let draft_form (d : Mcp_page.Draft.t) ~inject =
            | Some name -> "Edit " ^ name
            | None -> "New MCP server")
       ]
-    ([ span
-         ~cls:"setting-name"
+    ([ name
          (match d.editing with
           | Some name -> "Edit " ^ name
           | None -> "New server")
@@ -313,26 +349,25 @@ let draft_form (d : Mcp_page.Draft.t) ~inject =
      ]
      @ where
      @ [ div
-           ~cls:"mcp-pairs"
-           ([ span ~cls:"mcp-field-label" pairs_title ]
+           ~cls:"mcp-pairs flex flex-col items-start gap-1.5"
+           ([ Settings_row.label ~cls:"mcp-field-label" pairs_title ]
             @ pair_rows d ~inject
             @ [ button
-                  ~cls:"small ghost mcp-pair-add"
+                  ~cls:"small ghost mcp-pair-add whitespace-nowrap"
                   ~disabled:d.saving
                   ~on_click:(field Pair_add)
                   [ icon Plus; Node.text add_label ]
-              ; span
+              ; hint
                   ~cls:"mcp-field-hint"
                   "Values are kept on the backend and hidden here until shown; \
                    ${VAR} takes VAR from the tool host's environment."
               ])
        ; (match d.error with
-          | Some e ->
-            span ~cls:"setting-note warm mcp-error" (String.capitalize e)
+          | Some e -> note ~cls:"mcp-error block" ("warm", String.capitalize e)
           | None -> Node.none)
-       ; div
+       ; buttons
            ~cls:"mcp-buttons"
-           [ span ~cls:"mcp-keys" "Ctrl+Enter saves, Esc cancels"
+           [ hint ~cls:"mcp-keys mr-auto" "Ctrl+Enter saves, Esc cancels"
            ; button
                ~cls:"small ghost"
                ~title:"Esc"
@@ -356,13 +391,13 @@ let draft_form (d : Mcp_page.Draft.t) ~inject =
 ;;
 
 let paste_form (p : Mcp_page.Paste.t) ~inject =
-  div
-    ~cls:"setting mcp-paste"
-    [ div
-        ~cls:"setting-text"
-        [ span ~cls:"setting-name" "Paste JSON"
-        ; span
-            ~cls:"setting-about"
+  custom
+    ~cls:"mcp-paste"
+    ~stack:true
+    [ text
+        ~wide:true
+        [ name "Paste JSON"
+        ; about
             "An mcpServers object, as in Claude Code's or Cursor's settings, \
              with or without the mcpServers around it. Every server in it is \
              added, or none is."
@@ -370,7 +405,8 @@ let paste_form (p : Mcp_page.Paste.t) ~inject =
     ; Node.textarea
         ~attrs:
           [ Attr.id "mcp-paste-text"
-          ; Attr.class_ "text-input mcp-paste-input"
+          ; Attr.class_
+              (textarea_cls "mcp-paste-input min-h-[8em] font-mono text-xs")
           ; Attr.create "aria-label" "mcpServers JSON"
           ; Attr.rows 6
           ; Attr.placeholder
@@ -383,11 +419,11 @@ let paste_form (p : Mcp_page.Paste.t) ~inject =
           ]
         []
     ; (match p.error with
-       | Some e -> span ~cls:"setting-note warm mcp-error" (String.capitalize e)
+       | Some e -> note ~cls:"mcp-error block" ("warm", String.capitalize e)
        | None -> Node.none)
-    ; div
+    ; buttons
         ~cls:"mcp-buttons"
-        [ span ~cls:"mcp-keys" "Ctrl+Enter adds, Esc cancels"
+        [ hint ~cls:"mcp-keys mr-auto" "Ctrl+Enter adds, Esc cancels"
         ; button
             ~cls:"small ghost"
             ~title:"Esc"
@@ -412,30 +448,31 @@ let server_row (m : App.Model.t) (s : Mcp_settings.Server.t) ~inject =
     let removing = Option.equal String.equal m.mcp.removing (Some s.name) in
     let busy = Set.mem m.mcp.busy s.name in
     let health, tools = health_note m s ~inject in
-    div
+    custom
       ~cls:
         (String.concat
            ~sep:" "
-           ([ "setting"; "mcp-server" ]
-            @ (if s.enabled then [] else [ "off" ])
-            @ if removing then [ "removing" ] else []))
+           ([ "mcp-server" ]
+            @ (if s.enabled
+               then []
+               else [ "off [&_.setting-name]:text-muted-foreground" ])
+            @ if removing then [ "removing bg-destructive/10" ] else []))
       ~attrs:[ Attr.create "data-server" s.name ]
-      ([ div
-           ~cls:"setting-text"
-           [ span ~cls:"setting-name" s.name
-           ; span
-               ~cls:"setting-about mcp-summary"
+      ([ text
+           [ name s.name
+           ; about
+               ~cls:"mcp-summary"
                (Mcp_settings.Transport.summary s.transport)
            ; (if removing
               then
-                span
-                  ~cls:"setting-note warm"
-                  "Remove it from your settings? Its tools go from every \
-                   session."
+                note
+                  ( "warm"
+                  , "Remove it from your settings? Its tools go from every \
+                     session." )
               else health)
            ]
-       ; div
-           ~cls:"setting-control"
+       ; control
+           ~cls:(if removing then "gap-2" else "gap-0.5 [&>.switch]:mr-1.5")
            (if removing
             then
               [ button
@@ -469,7 +506,7 @@ let server_row (m : App.Model.t) (s : Mcp_settings.Server.t) ~inject =
                   ~on_click:(inject (Action.Mcp_edit (Some s.name)))
                   [ icon Pencil ]
               ; button
-                  ~cls:"icon ghost mcp-remove"
+                  ~cls:"icon ghost mcp-remove hover:text-destructive"
                   ~label:("Remove " ^ s.name)
                   ~title:(sprintf "Remove (/mcp remove %s)" s.name)
                   ~on_click:(inject (Action.Mcp_remove s.name))
@@ -487,10 +524,12 @@ let host_row (m : App.Model.t) (s : Mcp_server.t) ~inject =
     match s.status with
     | Ready ->
       ( div
-          ~cls:"setting-note good mcp-health"
+          ~cls:
+            "setting-note good mcp-health flex flex-wrap items-baseline \
+             gap-x-1 text-[13px] leading-snug text-[color:var(--sage)]"
           ([ Node.text "Ready · "
            ; button
-               ~cls:"mcp-tools-toggle"
+               ~cls:tools_toggle_cls
                ~attrs:[ Attr.create "aria-expanded" (Bool.to_string shown) ]
                ~title:(if shown then "Hide its tools" else "Show its tools")
                ~on_click:(inject (Action.Mcp_show_tools ("host:" ^ s.name)))
@@ -501,14 +540,15 @@ let host_row (m : App.Model.t) (s : Mcp_server.t) ~inject =
         then [ sign_out_control m ~source:s.source ~name:s.name ~inject ]
         else [] )
     | Needs_sign_in ->
-      ( span ~cls:"setting-note warm mcp-health" "Needs you to sign in"
+      ( note ~cls:"mcp-health" ("warm", "Needs you to sign in")
       , [ sign_in_control m ~source:s.source ~name:s.name ~inject ] )
     | Failed ->
-      ( span
-          ~cls:"setting-note warm mcp-health"
-          ("Failed: "
-           ^ String.capitalize
-               (Option.value s.error ~default:"it did not start"))
+      ( note
+          ~cls:"mcp-health"
+          ( "warm"
+          , "Failed: "
+            ^ String.capitalize
+                (Option.value s.error ~default:"it did not start") )
       , [ button
             ~cls:"small"
             ~disabled:busy
@@ -517,9 +557,9 @@ let host_row (m : App.Model.t) (s : Mcp_server.t) ~inject =
             [ icon Restart; Node.text "Retry" ]
         ] )
     | Needs_approval ->
-      ( span
-          ~cls:"setting-note warm mcp-health"
-          "The project asks to run it: approve it to start it"
+      ( note
+          ~cls:"mcp-health"
+          ("warm", "The project asks to run it: approve it to start it")
       , [ button
             ~cls:"small primary"
             ~disabled:busy
@@ -531,16 +571,11 @@ let host_row (m : App.Model.t) (s : Mcp_server.t) ~inject =
             [ Node.text (if busy then "Approving…" else "Approve") ]
         ] )
   in
-  div
-    ~cls:"setting mcp-server mcp-host-server"
+  custom
+    ~cls:"mcp-server mcp-host-server"
     ~attrs:[ Attr.create "data-server" s.name ]
-    ([ div
-         ~cls:"setting-text"
-         [ span ~cls:"setting-name" s.name
-         ; span ~cls:"setting-about mcp-source" source
-         ; note
-         ]
-     ; div ~cls:"setting-control" control
+    ([ text [ name s.name; about ~cls:"mcp-source" source; note ]
+     ; Settings_row.control ~cls:"gap-0.5" control
      ]
      @ if shown then [ tools_list s.tools ] else [])
 ;;
@@ -561,15 +596,15 @@ let settings_servers (m : App.Model.t) ~inject =
     if Option.is_some p.paste || not (List.is_empty adding)
     then []
     else
-      [ div
-          ~cls:"setting mcp-actions"
+      [ custom
+          ~cls:"mcp-actions justify-start gap-2"
           [ button
-              ~cls:"small primary mcp-add"
+              ~cls:"small primary mcp-add whitespace-nowrap"
               ~title:"/mcp add NAME URL|COMMAND [ARGS...]"
               ~on_click:(inject (Action.Mcp_edit None))
               [ icon Plus; Node.text "Add server" ]
           ; button
-              ~cls:"small ghost mcp-paste-open"
+              ~cls:"small ghost mcp-paste-open whitespace-nowrap"
               ~title:"Claude Code's mcpServers JSON (/mcp add {...})"
               ~on_click:(inject Action.Mcp_paste)
               [ icon Clipboard; Node.text "Paste JSON" ]
@@ -579,10 +614,7 @@ let settings_servers (m : App.Model.t) ~inject =
   let error =
     match p.error with
     | Some e ->
-      [ div
-          ~cls:"setting mcp-failed"
-          [ span ~cls:"setting-note warm" (String.capitalize e) ]
-      ]
+      [ custom ~cls:"mcp-failed" [ note ("warm", String.capitalize e) ] ]
     | None -> []
   in
   match p.status with
@@ -633,9 +665,7 @@ let host_servers (m : App.Model.t) ~inject =
   | Some l, _ ->
     let problems =
       List.map l.problems ~f:(fun problem ->
-        div
-          ~cls:"setting mcp-problem"
-          [ span ~cls:"setting-note warm" (String.capitalize problem) ])
+        custom ~cls:"mcp-problem" [ note ("warm", String.capitalize problem) ])
     in
     (match Mcp_page.host_servers p with
      | [] ->

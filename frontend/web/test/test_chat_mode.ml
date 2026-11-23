@@ -49,6 +49,7 @@ let%expect_test "in chat mode: the chip, the host chip and the placeholder" =
     Mode Chat: no tool host
     (no host)
     <textarea id="editor"
+              data-slot="input-group-control"
               placeholder="Chat, without a tool host: no files or commands. Ask anything…"
               aria-label="Message"
               dir="auto"
@@ -75,6 +76,7 @@ let%expect_test "in chat mode: the chip, the host chip and the placeholder" =
     {|
     Close_dialog
     <textarea id="editor"
+              data-slot="input-group-control"
               placeholder="Chat: no files or commands…"
               aria-label="Message"
               dir="auto"
@@ -152,19 +154,20 @@ let%expect_test "no tool host: the banner, the message kept, one click to chat" 
   H.show h ~selector:".no-host-banner";
   [%expect
     {|
-    <div role="status"
+    <div data-slot="alert"
+         role="status"
          aria-live="polite"
          title="No tool host connected: connect one with `prigh tool-host -connect ...` or a TUI, then pick it with /host, or talk without one in chat mode (/mode chat)"
-         class="no-host-banner">
+         class="*:[svg:not([class*='size-'])]:size-4 *:[svg]:row-span-2 *:[svg]:text-current *:[svg]:translate-y-0.5 [&>.icon]:shrink-0 [&>.icon]:text-primary bg-primary/10 border border-primary/40 flex gap-2 group/alert has-[>svg]:gap-x-2 has-[>svg]:grid-cols-[auto_1fr] has-data-[slot=alert-action]:pr-18 has-data-[slot=alert-action]:relative items-center loon no-host-banner pl-2.5 pr-1 px-2.5 py-1 relative rounded-lg text-[13.5px] text-card-foreground text-left w-full">
       <icon class="server_off"> </icon>
-      <span class="no-host-banner-text"> No tool host connected </span>
+      <span class="flex-1 leading-tight line-clamp-2 min-w-0 no-host-banner-text"> No tool host connected </span>
       <button type="button"
               title="Switch this session to chat mode (no files or commands) and send your message"
-              class="btn no-host-banner-chat"
+              class="[&_svg:not([class*='size-'])]:size-3.5 [&_svg]:pointer-events-none [&_svg]:shrink-0 active:not-aria-[haspopup]:translate-y-px aria-expanded:bg-muted aria-expanded:text-foreground aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-background bg-clip-padding border border-border dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:bg-input/30 dark:border-input dark:hover:bg-input/50 disabled:opacity-50 disabled:pointer-events-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 font-medium gap-1.5 group/button h-7 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 hover:bg-muted hover:text-foreground in-data-[slot=button-group]:rounded-lg inline-flex items-center justify-center narrow:h-11 no-host-banner-chat outline-none px-2.5 rounded-[min(var(--radius-md),12px)] rounded-lg select-none shrink-0 text-[0.8rem] text-primary transition-all whitespace-nowrap"
               @on_click>
         <icon class="message"> </icon>
-        <span class="long"> Chat without a host </span>
-        <span class="short"> Chat anyway </span>
+        <span class="long max-[359px]:hidden"> Chat without a host </span>
+        <span class="hidden max-[359px]:inline short"> Chat anyway </span>
       </button>
     </div>
     |}];

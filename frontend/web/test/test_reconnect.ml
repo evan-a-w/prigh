@@ -85,7 +85,7 @@ let%expect_test "the page is offline while it reconnects" =
     (Reconnect (generation 1) (delay_ms 0) (session (s1)))
     <div class="app offline sidebar-open">
     <span class="lamp">
-    <div class="context-ring-anchor">
+    <div class="context-ring-anchor flex relative shrink-0">
     |}]
 ;;
 
@@ -299,6 +299,7 @@ let%expect_test "a session the backend lost stays on show, read-only" =
     second
     two
     <textarea id="editor"
+              data-slot="input-group-control"
               placeholder="Session gone: /new starts one"
               aria-label="Message"
               dir="auto"
@@ -479,6 +480,7 @@ let%expect_test "sending while offline keeps the draft" =
     {|
     (Reconnect (generation 1) (delay_ms 0) (session (s1)))
     <textarea id="editor"
+              data-slot="input-group-control"
               placeholder="Offline: write now, send once it is back"
               aria-label="Message"
               dir="auto"

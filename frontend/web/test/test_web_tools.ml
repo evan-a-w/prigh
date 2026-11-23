@@ -134,8 +134,12 @@ let%expect_test "web search streamed between text: running, then its results" =
           <p dir="auto"> Let me look that up. </p>
         </div>
       </div>
-      <div class="ok open tool tool-web_search">
-        <button type="button" data-fold="s1#open" aria-expanded="true" class="tool-head">
+      <div data-slot="collapsible" data-state="open" class="ok open tool tool-web_search">
+        <button data-slot="collapsible-trigger"
+                type="button"
+                data-fold="s1#open"
+                aria-expanded="true"
+                class="tool-head">
           <span title="Done" role="img" aria-label="Done" class="done mark">
             <icon class="check"> </icon>
           </span>
@@ -147,7 +151,7 @@ let%expect_test "web search streamed between text: running, then its results" =
           <span class="chip"> 3 results </span>
           <span class="chev">  </span>
         </button>
-        <div class="tool-body">
+        <div data-slot="collapsible-content" class="tool-body">
           <details class="results">
             <summary>
               <span class="label"> 3 results </span>
@@ -215,8 +219,12 @@ let%expect_test
   Chat_harness.show ~selector:".tool" chat;
   [%expect
     {|
-    <div class="ok open tool tool-web_search">
-      <button type="button" data-fold="s1#open" aria-expanded="true" class="tool-head">
+    <div data-slot="collapsible" data-state="open" class="ok open tool tool-web_search">
+      <button data-slot="collapsible-trigger"
+              type="button"
+              data-fold="s1#open"
+              aria-expanded="true"
+              class="tool-head">
         <span title="Done" role="img" aria-label="Done" class="done mark">
           <icon class="check"> </icon>
         </span>
@@ -227,14 +235,18 @@ let%expect_test
         <span class="arg query"> "ocaml eio" </span>
         <span class="chev">  </span>
       </button>
-      <div class="tool-body">
+      <div data-slot="collapsible-content" class="tool-body">
         <div class="output">
           <pre> searched </pre>
         </div>
       </div>
     </div>
-    <div class="error open tool tool-web_search">
-      <button type="button" data-fold="s2#open" aria-expanded="true" class="tool-head">
+    <div data-slot="collapsible" data-state="open" class="error open tool tool-web_search">
+      <button data-slot="collapsible-trigger"
+              type="button"
+              data-fold="s2#open"
+              aria-expanded="true"
+              class="tool-head">
         <span title="Failed" role="img" aria-label="Failed" class="failed mark">
           <icon class="cross"> </icon>
         </span>
@@ -245,7 +257,7 @@ let%expect_test
         <span class="arg query"> "rate me" </span>
         <span class="chev">  </span>
       </button>
-      <div class="tool-body">
+      <div data-slot="collapsible-content" class="tool-body">
         <div class="error output">
           <pre> web search failed: too many requests </pre>
         </div>
@@ -264,8 +276,12 @@ let%expect_test
         <span class="chip"> no result </span>
       </div>
     </div>
-    <div class="ok open tool tool-code_execution">
-      <button type="button" data-fold="s4#open" aria-expanded="true" class="tool-head">
+    <div data-slot="collapsible" data-state="open" class="ok open tool tool-code_execution">
+      <button data-slot="collapsible-trigger"
+              type="button"
+              data-fold="s4#open"
+              aria-expanded="true"
+              class="tool-head">
         <span title="Done" role="img" aria-label="Done" class="done mark">
           <icon class="check"> </icon>
         </span>
@@ -276,7 +292,7 @@ let%expect_test
         <span class="arg"> {"code":"print(1)"} </span>
         <span class="chev">  </span>
       </button>
-      <div class="tool-body">
+      <div data-slot="collapsible-content" class="tool-body">
         <div class="output">
           <pre> 1 </pre>
         </div>
@@ -369,8 +385,9 @@ let%expect_test "web_fetch: the URL as a link, the page folded" =
     (Chat_harness.chat [ tool_end ~name:"web_fetch" ~arguments page ]);
   [%expect
     {|
-    <div class="ok open tool tool-web_fetch">
-      <button type="button"
+    <div data-slot="collapsible" data-state="open" class="ok open tool tool-web_fetch">
+      <button data-slot="collapsible-trigger"
+              type="button"
               data-fold="c1#open"
               aria-expanded="true"
               title="→ https://ocaml.org/p/eio/latest · HTTP 200, text/html, 12.3 KB"
@@ -385,7 +402,7 @@ let%expect_test "web_fetch: the URL as a link, the page folded" =
         <span class="arg url"> https://ocaml.org/p/eio </span>
         <span class="chev">  </span>
       </button>
-      <div class="tool-body">
+      <div data-slot="collapsible-content" class="tool-body">
         <span class="details"> → https://ocaml.org/p/eio/latest · HTTP 200, text/html, 12.3 KB </span>
         <a href="https://ocaml.org/p/eio" target="_blank" rel="noopener noreferrer" class="url-link"> https://ocaml.org/p/eio </a>
         <div class="clipped from-start output">
@@ -418,8 +435,12 @@ let%expect_test "web_fetch: the URL as a link, the page folded" =
        ]);
   [%expect
     {|
-    <div class="error open tool tool-web_fetch">
-      <button type="button" data-fold="c1#open" aria-expanded="true" class="tool-head">
+    <div data-slot="collapsible" data-state="open" class="error open tool tool-web_fetch">
+      <button data-slot="collapsible-trigger"
+              type="button"
+              data-fold="c1#open"
+              aria-expanded="true"
+              class="tool-head">
         <span title="Failed" role="img" aria-label="Failed" class="failed mark">
           <icon class="cross"> </icon>
         </span>
@@ -430,7 +451,7 @@ let%expect_test "web_fetch: the URL as a link, the page folded" =
         <span class="arg url"> https://ocaml.org/p/eio </span>
         <span class="chev">  </span>
       </button>
-      <div class="tool-body">
+      <div data-slot="collapsible-content" class="tool-body">
         <div class="error output">
           <pre> fetch failed: HTTP 404 </pre>
         </div>
@@ -465,8 +486,9 @@ let%expect_test "job_input: the job and what it was sent, escaped" =
        [ tool_end ~name:"job_input" ~arguments "sent 9 bytes to job j1\n1" ]);
   [%expect
     {|
-    <div class="ok open tool tool-job_input">
-      <button type="button"
+    <div data-slot="collapsible" data-state="open" class="ok open tool tool-job_input">
+      <button data-slot="collapsible-trigger"
+              type="button"
               data-fold="c1#open"
               aria-expanded="true"
               title="closes its stdin"
@@ -481,7 +503,7 @@ let%expect_test "job_input: the job and what it was sent, escaped" =
         <span class="arg input"> j1 "print(1)\n" </span>
         <span class="chev">  </span>
       </button>
-      <div class="tool-body">
+      <div data-slot="collapsible-content" class="tool-body">
         <span class="details"> closes its stdin </span>
         <div class="output">
           <pre> sent 9 bytes to job j1
@@ -691,7 +713,11 @@ let%expect_test "on_host: the call it ran, on its host" =
     ✓ on laptop: read notes.txt
     ✓ on_host list hosts
     ✕ on lapto: bash pwd
-    <button type="button" data-fold="c1#open" aria-expanded="true" class="tool-head">
+    <button data-slot="collapsible-trigger"
+            type="button"
+            data-fold="c1#open"
+            aria-expanded="true"
+            class="tool-head">
       <span title="Done" role="img" aria-label="Done" class="done mark">
         <icon class="check"> </icon>
       </span>
@@ -703,7 +729,11 @@ let%expect_test "on_host: the call it ran, on its host" =
       <span class="arg command"> uname -a </span>
       <span class="chev">  </span>
     </button>
-    <button type="button" data-fold="c2#open" aria-expanded="true" class="tool-head">
+    <button data-slot="collapsible-trigger"
+            type="button"
+            data-fold="c2#open"
+            aria-expanded="true"
+            class="tool-head">
       <span title="Done" role="img" aria-label="Done" class="done mark">
         <icon class="check"> </icon>
       </span>
@@ -715,7 +745,11 @@ let%expect_test "on_host: the call it ran, on its host" =
       <span class="arg path"> notes.txt </span>
       <span class="chev">  </span>
     </button>
-    <button type="button" data-fold="c3#open" aria-expanded="true" class="tool-head">
+    <button data-slot="collapsible-trigger"
+            type="button"
+            data-fold="c3#open"
+            aria-expanded="true"
+            class="tool-head">
       <span title="Done" role="img" aria-label="Done" class="done mark">
         <icon class="check"> </icon>
       </span>
@@ -726,7 +760,11 @@ let%expect_test "on_host: the call it ran, on its host" =
       <span class="arg"> list hosts </span>
       <span class="chev">  </span>
     </button>
-    <button type="button" data-fold="c4#open" aria-expanded="true" class="tool-head">
+    <button data-slot="collapsible-trigger"
+            type="button"
+            data-fold="c4#open"
+            aria-expanded="true"
+            class="tool-head">
       <span title="Failed" role="img" aria-label="Failed" class="failed mark">
         <icon class="cross"> </icon>
       </span>

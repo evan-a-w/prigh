@@ -76,45 +76,73 @@ let%expect_test "a right-click on a message opens its menu there" =
       <div dir="auto" class="bubble"> question 2 </div>
       <time title="Monday 5 October 2026, 10:02:00" datetime="2026-10-05T10:02:00Z" class="time"> 10:02 </time>
     </div>
-    <div id="dialog"
+    <div data-slot="dropdown-menu-content"
          role="menu"
          aria-label="Your message"
          tabindex="-1"
+         id="dialog"
          data-x="300"
          data-y="120"
-         class="context-menu menu-surface">
-      <div class="context-menu-head">
-        <span class="context-menu-title"> Your message </span>
-        <span class="context-menu-sub preview"> question 2 </span>
+         class="[&:not(.placed)]:opacity-0 [&:not(.placed)]:pointer-events-none [&_.menu-label]:shrink-0 animate-in bg-popover cn-menu-target context-menu duration-100 fade-in-0 fixed loon max-[760px]:[&_.menu-item]:min-h-10 max-[760px]:[&_.menu-item]:text-[15px] max-[760px]:bottom-2 max-[760px]:left-2! max-[760px]:max-w-none max-[760px]:right-2 max-[760px]:top-auto! max-h-[calc(100vh-16px)] max-w-[min(360px,calc(100vw-16px))] menu-surface min-w-32 min-w-[248px] motion-reduce:animate-none narrow:[&_.menu-item]:min-h-11! narrow:animate-[sheet-up_0.18s_ease-out] narrow:border-border narrow:border-t narrow:overscroll-contain narrow:pb-[max(8px,var(--safe-b))] narrow:pl-[max(8px,var(--safe-l))] narrow:pr-[max(8px,var(--safe-r))] narrow:pt-0 narrow:ring-0 narrow:rounded-b-none narrow:rounded-t-xl narrow:shadow-[0_-12px_40px_-12px_var(--edge-shadow)] narrow:z-(--z-menu-surface) overflow-x-hidden overflow-y-auto p-1 ring-1 ring-foreground/10 rounded-lg shadow-md text-popover-foreground zoom-in-95">
+      <div class="-mx-1 [&_.session-place]:flex-none border-b border-border context-menu-head flex flex-col gap-px mb-1 pb-1.5 pt-1 px-2.5">
+        <span class="context-menu-title flex font-medium gap-1.5 items-center text-[13px] text-foreground truncate"> Your message </span>
+        <span class="context-menu-sub font-mono font-sans preview text-muted-foreground text-xs truncate"> question 2 </span>
       </div>
-      <div class="menu-section">
-        <div role="menuitem"
+      <div data-slot="dropdown-menu-group"
+           role="group"
+           class=" [&+&]:-mx-1 [&+&]:border-border [&+&]:border-t [&+&]:mt-1 [&+&]:pt-1 [&+&]:px-1 flex flex-col menu-section">
+        <div data-slot="dropdown-menu-item"
+             data-highlighted=""
+             role="menuitem"
              data-item="copy_message"
-             class="menu-item selected"
+             class="[&>.icon]:shrink-0 [&>.icon]:size-4 [&>.icon]:text-muted-foreground aria-disabled:*:opacity-50 aria-disabled:hover:bg-transparent aria-disabled:hover:text-inherit cursor-default data-[variant=destructive]:[&>.icon]:text-destructive data-[variant=destructive]:data-highlighted:bg-destructive/10 data-[variant=destructive]:data-highlighted:text-destructive data-[variant=destructive]:hover:bg-destructive/10 data-[variant=destructive]:hover:text-destructive data-[variant=destructive]:text-destructive data-highlighted:[&>.icon]:text-accent-foreground data-highlighted:bg-accent data-highlighted:text-accent-foreground flex gap-1.5 group/dropdown-menu-item hover:[&>.icon]:text-accent-foreground hover:bg-accent hover:text-accent-foreground items-center menu-item narrow:min-h-11 outline-hidden px-1.5 py-1 relative rounded-md select-none selected text-sm"
              @on_click
              @on_mouseenter>
           <icon class="copy"> </icon>
-          <span class="menu-label"> Copy </span>
+          <span class="menu-label truncate"> Copy </span>
           <Vdom.Node.none-widget> </Vdom.Node.none-widget>
         </div>
       </div>
-      <div class="menu-section">
-        <div role="menuitem" data-item="trim_before" class="menu-item" @on_click @on_mouseenter>
+      <div data-slot="dropdown-menu-group"
+           role="group"
+           class=" [&+&]:-mx-1 [&+&]:border-border [&+&]:border-t [&+&]:mt-1 [&+&]:pt-1 [&+&]:px-1 flex flex-col menu-section">
+        <div data-slot="dropdown-menu-item"
+             role="menuitem"
+             data-item="trim_before"
+             class="[&>.icon]:shrink-0 [&>.icon]:size-4 [&>.icon]:text-muted-foreground aria-disabled:*:opacity-50 aria-disabled:hover:bg-transparent aria-disabled:hover:text-inherit cursor-default data-[variant=destructive]:[&>.icon]:text-destructive data-[variant=destructive]:data-highlighted:bg-destructive/10 data-[variant=destructive]:data-highlighted:text-destructive data-[variant=destructive]:hover:bg-destructive/10 data-[variant=destructive]:hover:text-destructive data-[variant=destructive]:text-destructive data-highlighted:[&>.icon]:text-accent-foreground data-highlighted:bg-accent data-highlighted:text-accent-foreground flex gap-1.5 group/dropdown-menu-item hover:[&>.icon]:text-accent-foreground hover:bg-accent hover:text-accent-foreground items-center menu-item narrow:min-h-11 outline-hidden px-1.5 py-1 relative rounded-md select-none text-sm"
+             @on_click
+             @on_mouseenter>
           <icon class="scissors"> </icon>
-          <span class="menu-label"> Trim everything before this </span>
-          <kbd class="menu-command"> /trim </kbd>
+          <span class="menu-label truncate"> Trim everything before this </span>
+          <kbd data-slot="dropdown-menu-shortcut"
+               class="font-mono group-data-highlighted/dropdown-menu-item:text-accent-foreground group-hover/dropdown-menu-item:text-accent-foreground menu-command min-w-0 ml-auto pl-3 text-muted-foreground text-xs truncate"> /trim </kbd>
         </div>
-        <div role="menuitem" data-item="trim_after" class="menu-item" @on_click @on_mouseenter>
+        <div data-slot="dropdown-menu-item"
+             role="menuitem"
+             data-item="trim_after"
+             class="[&>.icon]:shrink-0 [&>.icon]:size-4 [&>.icon]:text-muted-foreground aria-disabled:*:opacity-50 aria-disabled:hover:bg-transparent aria-disabled:hover:text-inherit cursor-default data-[variant=destructive]:[&>.icon]:text-destructive data-[variant=destructive]:data-highlighted:bg-destructive/10 data-[variant=destructive]:data-highlighted:text-destructive data-[variant=destructive]:hover:bg-destructive/10 data-[variant=destructive]:hover:text-destructive data-[variant=destructive]:text-destructive data-highlighted:[&>.icon]:text-accent-foreground data-highlighted:bg-accent data-highlighted:text-accent-foreground flex gap-1.5 group/dropdown-menu-item hover:[&>.icon]:text-accent-foreground hover:bg-accent hover:text-accent-foreground items-center menu-item narrow:min-h-11 outline-hidden px-1.5 py-1 relative rounded-md select-none text-sm"
+             @on_click
+             @on_mouseenter>
           <icon class="scissors"> </icon>
-          <span class="menu-label"> Trim everything after this </span>
-          <kbd class="menu-command"> /trim after </kbd>
+          <span class="menu-label truncate"> Trim everything after this </span>
+          <kbd data-slot="dropdown-menu-shortcut"
+               class="font-mono group-data-highlighted/dropdown-menu-item:text-accent-foreground group-hover/dropdown-menu-item:text-accent-foreground menu-command min-w-0 ml-auto pl-3 text-muted-foreground text-xs truncate"> /trim after </kbd>
         </div>
       </div>
-      <div class="menu-section">
-        <div role="menuitem" data-item="delete" class="danger menu-item" @on_click @on_mouseenter>
+      <div data-slot="dropdown-menu-group"
+           role="group"
+           class=" [&+&]:-mx-1 [&+&]:border-border [&+&]:border-t [&+&]:mt-1 [&+&]:pt-1 [&+&]:px-1 flex flex-col menu-section">
+        <div data-slot="dropdown-menu-item"
+             role="menuitem"
+             data-variant="destructive"
+             data-item="delete"
+             class="[&>.icon]:shrink-0 [&>.icon]:size-4 [&>.icon]:text-muted-foreground aria-disabled:*:opacity-50 aria-disabled:hover:bg-transparent aria-disabled:hover:text-inherit cursor-default danger data-[variant=destructive]:[&>.icon]:text-destructive data-[variant=destructive]:data-highlighted:bg-destructive/10 data-[variant=destructive]:data-highlighted:text-destructive data-[variant=destructive]:hover:bg-destructive/10 data-[variant=destructive]:hover:text-destructive data-[variant=destructive]:text-destructive data-highlighted:[&>.icon]:text-accent-foreground data-highlighted:bg-accent data-highlighted:text-accent-foreground flex gap-1.5 group/dropdown-menu-item hover:[&>.icon]:text-accent-foreground hover:bg-accent hover:text-accent-foreground items-center menu-item narrow:min-h-11 outline-hidden px-1.5 py-1 relative rounded-md select-none text-sm"
+             @on_click
+             @on_mouseenter>
           <icon class="trash"> </icon>
-          <span class="menu-label"> Delete </span>
-          <kbd class="menu-command"> /delete </kbd>
+          <span class="menu-label truncate"> Delete </span>
+          <kbd data-slot="dropdown-menu-shortcut"
+               class="font-mono group-data-highlighted/dropdown-menu-item:text-accent-foreground group-hover/dropdown-menu-item:text-accent-foreground menu-command min-w-0 ml-auto pl-3 text-muted-foreground text-xs truncate"> /delete </kbd>
         </div>
       </div>
     </div>
@@ -260,7 +288,7 @@ let%expect_test "what does not apply is disabled, saying why" =
     <div class="assistant msg">
     <div class="msg user">
     <div class="assistant menu-open msg">
-    <div class="disabled menu-item selected">
+    <div class="[&>.icon]:shrink-0 [&>.icon]:size-4 [&>.icon]:text-muted-foreground aria-disabled:*:opacity-50 aria-disabled:hover:bg-transparent aria-disabled:hover:text-inherit cursor-default data-[variant=destructive]:[&>.icon]:text-destructive data-[variant=destructive]:data-highlighted:bg-destructive/10 data-[variant=destructive]:data-highlighted:text-destructive data-[variant=destructive]:hover:bg-destructive/10 data-[variant=destructive]:hover:text-destructive data-[variant=destructive]:text-destructive data-highlighted:[&>.icon]:text-accent-foreground data-highlighted:bg-accent data-highlighted:text-accent-foreground disabled flex gap-1.5 group/dropdown-menu-item hover:[&>.icon]:text-accent-foreground hover:bg-accent hover:text-accent-foreground items-center menu-item narrow:min-h-11 outline-hidden px-1.5 py-1 relative rounded-md select-none selected text-sm">
     |}];
   H.key h "Escape" ~target:Page;
   (* During a run, all but Copy. *)
@@ -293,7 +321,7 @@ let%expect_test "the keyboard: arrows skip nothing, Enter accepts" =
     (Focus dialog)
     (Place_menu (Element msg-2))
     (Dialog_move 1)
-    <div class="menu-item selected">
+    <div class="[&>.icon]:shrink-0 [&>.icon]:size-4 [&>.icon]:text-muted-foreground aria-disabled:*:opacity-50 aria-disabled:hover:bg-transparent aria-disabled:hover:text-inherit cursor-default data-[variant=destructive]:[&>.icon]:text-destructive data-[variant=destructive]:data-highlighted:bg-destructive/10 data-[variant=destructive]:data-highlighted:text-destructive data-[variant=destructive]:hover:bg-destructive/10 data-[variant=destructive]:hover:text-destructive data-[variant=destructive]:text-destructive data-highlighted:[&>.icon]:text-accent-foreground data-highlighted:bg-accent data-highlighted:text-accent-foreground flex gap-1.5 group/dropdown-menu-item hover:[&>.icon]:text-accent-foreground hover:bg-accent hover:text-accent-foreground items-center menu-item narrow:min-h-11 outline-hidden px-1.5 py-1 relative rounded-md select-none selected text-sm">
     <div class="msg user">
     <div class="assistant msg">
     <div class="menu-open msg preview-trim-before user">
@@ -307,7 +335,7 @@ let%expect_test "the keyboard: arrows skip nothing, Enter accepts" =
   [%expect
     {|
     (Dialog_move 1)
-    <div class="menu-item selected">
+    <div class="[&>.icon]:shrink-0 [&>.icon]:size-4 [&>.icon]:text-muted-foreground aria-disabled:*:opacity-50 aria-disabled:hover:bg-transparent aria-disabled:hover:text-inherit cursor-default data-[variant=destructive]:[&>.icon]:text-destructive data-[variant=destructive]:data-highlighted:bg-destructive/10 data-[variant=destructive]:data-highlighted:text-destructive data-[variant=destructive]:hover:bg-destructive/10 data-[variant=destructive]:hover:text-destructive data-[variant=destructive]:text-destructive data-highlighted:[&>.icon]:text-accent-foreground data-highlighted:bg-accent data-highlighted:text-accent-foreground flex gap-1.5 group/dropdown-menu-item hover:[&>.icon]:text-accent-foreground hover:bg-accent hover:text-accent-foreground items-center menu-item narrow:min-h-11 outline-hidden px-1.5 py-1 relative rounded-md select-none selected text-sm">
     <div class="msg user">
     <div class="assistant msg">
     <div class="menu-open msg preview-trim-after user">
@@ -321,7 +349,7 @@ let%expect_test "the keyboard: arrows skip nothing, Enter accepts" =
   [%expect
     {|
     (Dialog_move 1)
-    <div class="danger menu-item selected">
+    <div class="[&>.icon]:shrink-0 [&>.icon]:size-4 [&>.icon]:text-muted-foreground aria-disabled:*:opacity-50 aria-disabled:hover:bg-transparent aria-disabled:hover:text-inherit cursor-default danger data-[variant=destructive]:[&>.icon]:text-destructive data-[variant=destructive]:data-highlighted:bg-destructive/10 data-[variant=destructive]:data-highlighted:text-destructive data-[variant=destructive]:hover:bg-destructive/10 data-[variant=destructive]:hover:text-destructive data-[variant=destructive]:text-destructive data-highlighted:[&>.icon]:text-accent-foreground data-highlighted:bg-accent data-highlighted:text-accent-foreground flex gap-1.5 group/dropdown-menu-item hover:[&>.icon]:text-accent-foreground hover:bg-accent hover:text-accent-foreground items-center menu-item narrow:min-h-11 outline-hidden px-1.5 py-1 relative rounded-md select-none selected text-sm">
     <div class="msg user">
     <div class="assistant msg">
     <div class="menu-open msg preview-delete user">
@@ -477,8 +505,12 @@ let%expect_test "a tool call's menu is its reply's" =
           <p dir="auto"> Listing. </p>
         </div>
       </div>
-      <div class="ok tool tool-bash">
-        <button type="button" data-fold="c1#open" aria-expanded="false" class="tool-head">
+      <div data-slot="collapsible" data-state="closed" class="ok tool tool-bash">
+        <button data-slot="collapsible-trigger"
+                type="button"
+                data-fold="c1#open"
+                aria-expanded="false"
+                class="tool-head">
           <span title="Done" role="img" aria-label="Done" class="done mark">
             <icon class="check"> </icon>
           </span>

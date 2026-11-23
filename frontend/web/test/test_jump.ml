@@ -145,7 +145,7 @@ let%expect_test
             data-jump-entry="0"
             class="tick user"
             @on_click>
-      <span aria-hidden="true" class="tip">
+      <span data-slot="tooltip-content" aria-hidden="true" class="tip">
         <Vdom.Node.none-widget> </Vdom.Node.none-widget>
         <span class="tip-text"> question 4 </span>
         <span class="tip-time"> 10:04 </span>
