@@ -2384,10 +2384,12 @@ let new_session
         "prigh: the ledger of a temporary session: %s\n%!"
         (Exn.to_string exn));
   let agent = start_new_agent t session start in
+  (* Attached first: recording the engine changes the state, and a session
+     no client has is evicted when its state changes. *)
+  attach t client agent;
   Agent.set_engine agent engine;
   Agent.set_unavailable agent (engine_unavailable t agent);
   attach_engine t agent;
-  attach t client agent;
   match attached_state client, key with
   | `Object fields, Some key ->
     `Object (fields @ [ "temporary_key", `String key ])

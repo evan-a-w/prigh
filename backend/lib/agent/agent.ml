@@ -648,6 +648,22 @@ let runner_capabilities t =
   | None -> Capabilities.harness
 ;;
 
+(* A composer session's model is its harness's: the one that wrote its
+   latest reply ([codex/gpt-5] shows as [gpt-5]), else the harness's
+   default. *)
+let shown_model t =
+  match engine_choice t with
+  | { engine = Composer; adapter = Some adapter } ->
+    let prefix = Adapter_id.to_string adapter ^ "/" in
+    let name =
+      List.rev (Session.replies t.session)
+      |> List.find_map ~f:(fun (name, _) -> String.chop_prefix name ~prefix)
+      |> Option.value ~default:"default"
+    in
+    { t.model with id = name; name }
+  | _ -> t.model
+;;
+
 let state t =
   let messages = messages t in
   let assistant_usage, assistant_cost = session_spend t in
@@ -659,7 +675,7 @@ let state t =
   ; session_description = Session.description t.session
   ; cwd = t.cwd
   ; git_branch = t.git_branch
-  ; model = t.model
+  ; model = shown_model t
   ; thinking = t.thinking
   ; running = is_running t
   ; message_count = List.length messages
