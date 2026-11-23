@@ -16,7 +16,7 @@ let button ?(small = false) kind =
 ;;
 
 let input = Loon.Input.classes ~class_:"ui-input" ()
-let textarea = Loon.Textarea.classes ~class_:"ui-input min-h-16" ()
+let textarea = Loon.Textarea.classes ~class_:"ui-input" ()
 
 let select =
   Loon.Input.classes ~class_:"ui-input ui-select appearance-none pr-8" ()

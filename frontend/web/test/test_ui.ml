@@ -55,18 +55,24 @@ let%expect_test "every component" =
     {|
     <div data-call="u1" class="tool-ui">
       <div class="genui ui-stack">
-        <div role="note" class="tone-info ui-callout">
-          <div class="ui-callout-title"> Build health </div>
-          <div class="ui-md">
-            <div class="markdown">
-              <div class="md-part">
-                <p dir="auto">
-                  Builds got
-                  <strong> 18% faster </strong>
-                   since
-                  <code> dune 3.22 </code>
-                  .
-                </p>
+        <div data-slot="alert"
+             role="note"
+             class="*:[svg:not([class*='size-'])]:size-4 *:[svg]:row-span-2 *:[svg]:text-current *:[svg]:translate-y-0.5 bg-card border gap-0.5 grid group/alert has-[>svg]:gap-x-2 has-[>svg]:grid-cols-[auto_1fr] has-data-[slot=alert-action]:pr-18 has-data-[slot=alert-action]:relative px-2.5 py-2 relative rounded-lg text-card-foreground text-left text-sm tone-info ui-callout w-full">
+          <div data-slot="alert-title"
+               class="[&_a]:hover:text-foreground [&_a]:underline [&_a]:underline-offset-3 font-medium group-has-[>svg]/alert:col-start-2 ui-callout-title"> Build health </div>
+          <div data-slot="alert-description"
+               class="[&_a]:hover:text-foreground [&_a]:underline [&_a]:underline-offset-3 [&_p:not(:last-child)]:mb-4 md:text-pretty text-balance text-foreground/90! text-muted-foreground text-sm">
+            <div class="ui-md">
+              <div class="markdown">
+                <div class="md-part">
+                  <p dir="auto">
+                    Builds got
+                    <strong> 18% faster </strong>
+                     since
+                    <code> dune 3.22 </code>
+                    .
+                  </p>
+                </div>
               </div>
             </div>
           </div>
@@ -473,13 +479,25 @@ let%expect_test "every component" =
                 <span class="ui-progress-label"> Coverage </span>
                 <span class="ui-progress-value"> 78% </span>
               </div>
-              <div role="progressbar"
+              <div aria-valuemax="100"
                    aria-valuemin="0"
-                   aria-valuemax="100"
                    aria-valuenow="78"
+                   aria-valuetext="78%"
+                   role="progressbar"
+                   data-state="loading"
+                   data-value="78"
+                   data-max="100"
+                   data-slot="progress"
                    aria-label="Coverage"
-                   class="ui-bar">
-                <div class="ui-bar-fill" style={ width: 78.00%; }> </div>
+                   class="bg-muted flex h-1 h-1.5! items-center overflow-x-hidden relative rounded-full ui-bar w-full">
+                <div data-state="loading"
+                     data-value="78"
+                     data-max="100"
+                     data-slot="progress-indicator"
+                     class="bg-primary flex-1 size-full transition-all"
+                     style={
+                       transform: translateX(-22%);
+                     }> </div>
               </div>
               <div class="ui-caption ui-md">
                 <div class="markdown">
@@ -494,28 +512,41 @@ let%expect_test "every component" =
         <figure class="ui-table">
           <div class="ui-title"> Slowest tests </div>
           <div tabindex="0" role="region" aria-label="Slowest tests" class="ui-table-scroll">
-            <table>
-              <thead>
-                <tr>
-                  <th scope="col" aria-sort="none" class="left">
+            <table data-slot="table" class="tabular-nums text-sm w-full">
+              <thead data-slot="table-header" class="[&_tr]:border-b">
+                <tr data-slot="table-row"
+                    class="border-b data-[state=selected]:bg-muted has-aria-expanded:bg-muted/50 hover:bg-muted/50 hover:bg-transparent! transition-colors">
+                  <th data-slot="table-head"
+                      scope="col"
+                      aria-sort="none"
+                      class="[&:has([role=checkbox])]:pr-0 align-middle font-medium h-10 left px-2 text-left text-muted-foreground text-xs whitespace-nowrap">
                     <button type="button" title="Sort by Test" class="ui-sort" @on_click>
                       <span> Test </span>
                       <span aria-hidden="true" class="ui-sort-mark"> ▲ </span>
                     </button>
                   </th>
-                  <th scope="col" aria-sort="none" class="right">
+                  <th data-slot="table-head"
+                      scope="col"
+                      aria-sort="none"
+                      class="[&:has([role=checkbox])]:pr-0 align-middle font-medium h-10 px-2 right text-left text-muted-foreground text-right! text-xs whitespace-nowrap">
                     <button type="button" title="Sort by Time" class="ui-sort" @on_click>
                       <span> Time </span>
                       <span aria-hidden="true" class="ui-sort-mark"> ▲ </span>
                     </button>
                   </th>
-                  <th scope="col" aria-sort="none" class="right">
+                  <th data-slot="table-head"
+                      scope="col"
+                      aria-sort="none"
+                      class="[&:has([role=checkbox])]:pr-0 align-middle font-medium h-10 px-2 right text-left text-muted-foreground text-right! text-xs whitespace-nowrap">
                     <button type="button" title="Sort by Share" class="ui-sort" @on_click>
                       <span> Share </span>
                       <span aria-hidden="true" class="ui-sort-mark"> ▲ </span>
                     </button>
                   </th>
-                  <th scope="col" aria-sort="none" class="left">
+                  <th data-slot="table-head"
+                      scope="col"
+                      aria-sort="none"
+                      class="[&:has([role=checkbox])]:pr-0 align-middle font-medium h-10 left px-2 text-left text-muted-foreground text-xs whitespace-nowrap">
                     <button type="button" title="Sort by Passing" class="ui-sort" @on_click>
                       <span> Passing </span>
                       <span aria-hidden="true" class="ui-sort-mark"> ▲ </span>
@@ -523,28 +554,43 @@ let%expect_test "every component" =
                   </th>
                 </tr>
               </thead>
-              <tbody>
-                <tr>
-                  <td class="left"> e2e/mobile </td>
-                  <td class="right"> 31.2 </td>
-                  <td class="right"> 21% </td>
-                  <td class="left">
+              <tbody data-slot="table-body" class="[&_tr:last-child]:border-0">
+                <tr data-slot="table-row"
+                    class="border-b data-[state=selected]:bg-muted has-aria-expanded:bg-muted/50 hover:bg-muted/50 transition-colors">
+                  <td data-slot="table-cell"
+                      class="[&:has([role=checkbox])]:pr-0 align-middle break-words left p-2 whitespace-normal! whitespace-nowrap"> e2e/mobile </td>
+                  <td data-slot="table-cell"
+                      class="[&:has([role=checkbox])]:pr-0 align-middle p-2 right text-right whitespace-nowrap"> 31.2 </td>
+                  <td data-slot="table-cell"
+                      class="[&:has([role=checkbox])]:pr-0 align-middle p-2 right text-right whitespace-nowrap"> 21% </td>
+                  <td data-slot="table-cell"
+                      class="[&:has([role=checkbox])]:pr-0 align-middle break-words left p-2 whitespace-normal! whitespace-nowrap">
                     <span aria-label="yes" class="ui-yes"> ✓ </span>
                   </td>
                 </tr>
-                <tr>
-                  <td class="left"> tmux/agents </td>
-                  <td class="right"> 18.0 </td>
-                  <td class="right"> 12% </td>
-                  <td class="left">
+                <tr data-slot="table-row"
+                    class="border-b data-[state=selected]:bg-muted has-aria-expanded:bg-muted/50 hover:bg-muted/50 transition-colors">
+                  <td data-slot="table-cell"
+                      class="[&:has([role=checkbox])]:pr-0 align-middle break-words left p-2 whitespace-normal! whitespace-nowrap"> tmux/agents </td>
+                  <td data-slot="table-cell"
+                      class="[&:has([role=checkbox])]:pr-0 align-middle p-2 right text-right whitespace-nowrap"> 18.0 </td>
+                  <td data-slot="table-cell"
+                      class="[&:has([role=checkbox])]:pr-0 align-middle p-2 right text-right whitespace-nowrap"> 12% </td>
+                  <td data-slot="table-cell"
+                      class="[&:has([role=checkbox])]:pr-0 align-middle break-words left p-2 whitespace-normal! whitespace-nowrap">
                     <span aria-label="no" class="ui-no"> ✗ </span>
                   </td>
                 </tr>
-                <tr>
-                  <td class="left"> web/test </td>
-                  <td class="right"> 9.5 </td>
-                  <td class="right"> 6.4% </td>
-                  <td class="left">
+                <tr data-slot="table-row"
+                    class="border-b data-[state=selected]:bg-muted has-aria-expanded:bg-muted/50 hover:bg-muted/50 transition-colors">
+                  <td data-slot="table-cell"
+                      class="[&:has([role=checkbox])]:pr-0 align-middle break-words left p-2 whitespace-normal! whitespace-nowrap"> web/test </td>
+                  <td data-slot="table-cell"
+                      class="[&:has([role=checkbox])]:pr-0 align-middle p-2 right text-right whitespace-nowrap"> 9.5 </td>
+                  <td data-slot="table-cell"
+                      class="[&:has([role=checkbox])]:pr-0 align-middle p-2 right text-right whitespace-nowrap"> 6.4% </td>
+                  <td data-slot="table-cell"
+                      class="[&:has([role=checkbox])]:pr-0 align-middle break-words left p-2 whitespace-normal! whitespace-nowrap">
                     <span aria-label="yes" class="ui-yes"> ✓ </span>
                   </td>
                 </tr>
@@ -648,9 +694,15 @@ let%expect_test "every component" =
           </dl>
         </div>
         <div class="ui-badges">
-          <span class="tone-neutral ui-badge"> ocaml </span>
-          <span class="tone-success ui-badge"> passing </span>
-          <span class="tone-warning ui-badge"> flaky </span>
+          <span data-slot="badge"
+                data-variant="ghost"
+                class="[&>svg]:pointer-events-none [&>svg]:size-3! aria-invalid:border-destructive aria-invalid:ring-destructive/20 border border-transparent dark:aria-invalid:ring-destructive/40 dark:hover:bg-muted/50 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 font-medium gap-1 group/badge h-5 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 hover:bg-muted hover:text-muted-foreground inline-flex items-center justify-center overflow-hidden px-2 py-0.5 rounded-4xl shrink-0 text-xs tone-neutral transition-all ui-badge w-fit whitespace-nowrap"> ocaml </span>
+          <span data-slot="badge"
+                data-variant="ghost"
+                class="[&>svg]:pointer-events-none [&>svg]:size-3! aria-invalid:border-destructive aria-invalid:ring-destructive/20 border border-transparent dark:aria-invalid:ring-destructive/40 dark:hover:bg-muted/50 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 font-medium gap-1 group/badge h-5 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 hover:bg-muted hover:text-muted-foreground inline-flex items-center justify-center overflow-hidden px-2 py-0.5 rounded-4xl shrink-0 text-xs tone-success transition-all ui-badge w-fit whitespace-nowrap"> passing </span>
+          <span data-slot="badge"
+                data-variant="ghost"
+                class="[&>svg]:pointer-events-none [&>svg]:size-3! aria-invalid:border-destructive aria-invalid:ring-destructive/20 border border-transparent dark:aria-invalid:ring-destructive/40 dark:hover:bg-muted/50 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 font-medium gap-1 group/badge h-5 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 hover:bg-muted hover:text-muted-foreground inline-flex items-center justify-center overflow-hidden px-2 py-0.5 rounded-4xl shrink-0 text-xs tone-warning transition-all ui-badge w-fit whitespace-nowrap"> flaky </span>
         </div>
         <div class="ui-calc">
           <div class="ui-title"> Cache savings </div>
@@ -665,6 +717,7 @@ let%expect_test "every component" =
                          min="0"
                          max="200"
                          step="1"
+                         class="aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-transparent border border-input dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:bg-input/30 dark:disabled:bg-input/80 disabled:bg-input/50 disabled:cursor-not-allowed disabled:opacity-50 disabled:pointer-events-none file:bg-transparent file:border-0 file:font-medium file:h-6 file:inline-flex file:text-foreground file:text-sm focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 font-mono h-8 md:text-sm min-w-0 outline-none placeholder:text-muted-foreground px-2.5 py-1 rounded-lg tabular-nums text-base transition-colors w-full"
                          #value="40"
                          @on_input/>
                   <Vdom.Node.none-widget> </Vdom.Node.none-widget>
@@ -684,6 +737,7 @@ let%expect_test "every component" =
                   <input id="ui-u1-8-minutes"
                          type="number"
                          inputmode="decimal"
+                         class="aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-transparent border border-input dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:bg-input/30 dark:disabled:bg-input/80 disabled:bg-input/50 disabled:cursor-not-allowed disabled:opacity-50 disabled:pointer-events-none file:bg-transparent file:border-0 file:font-medium file:h-6 file:inline-flex file:text-foreground file:text-sm focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 font-mono h-8 md:text-sm min-w-0 outline-none placeholder:text-muted-foreground px-2.5 py-1 rounded-lg tabular-nums text-base transition-colors w-full"
                          #value="1.5"
                          @on_input/>
                   <span class="ui-unit"> min </span>
@@ -775,10 +829,13 @@ let%expect_test "every component" =
             <button type="button"
                     aria-label="Previous card"
                     disabled=""
-                    class="ghost ui-btn"
+                    class="[&_svg:not([class*='size-'])]:size-3.5 [&_svg]:pointer-events-none [&_svg]:shrink-0 active:not-aria-[haspopup]:translate-y-px aria-expanded:bg-muted aria-expanded:text-foreground aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-clip-padding border border-transparent dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:hover:bg-muted/50 disabled:opacity-50 disabled:pointer-events-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 font-medium gap-1 ghost group/button h-7 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 hover:bg-muted hover:text-foreground in-data-[slot=button-group]:rounded-lg inline-flex items-center justify-center outline-none px-2.5 rounded-[min(var(--radius-md),12px)] rounded-lg select-none shrink-0 text-[0.8rem] transition-all ui-btn whitespace-nowrap"
                     @on_click> ‹ Prev </button>
             <span aria-live="polite" class="ui-count"> 1 / 2 </span>
-            <button type="button" aria-label="Next card" class="ghost ui-btn" @on_click> Next › </button>
+            <button type="button"
+                    aria-label="Next card"
+                    class="[&_svg:not([class*='size-'])]:size-3.5 [&_svg]:pointer-events-none [&_svg]:shrink-0 active:not-aria-[haspopup]:translate-y-px aria-expanded:bg-muted aria-expanded:text-foreground aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-clip-padding border border-transparent dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:hover:bg-muted/50 disabled:opacity-50 disabled:pointer-events-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 font-medium gap-1 ghost group/button h-7 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 hover:bg-muted hover:text-foreground in-data-[slot=button-group]:rounded-lg inline-flex items-center justify-center outline-none px-2.5 rounded-[min(var(--radius-md),12px)] rounded-lg select-none shrink-0 text-[0.8rem] transition-all ui-btn whitespace-nowrap"
+                    @on_click> Next › </button>
           </div>
         </div>
         <div class="ui-choices ui-reply">
@@ -822,7 +879,10 @@ let%expect_test "every component" =
                 Environment
                 <Vdom.Node.none-widget> </Vdom.Node.none-widget>
               </label>
-              <select id="ui-u1-12-env" name="env" class="ui-input" @on_change>
+              <select id="ui-u1-12-env"
+                      name="env"
+                      class="appearance-none aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-transparent border border-input dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:bg-input/30 dark:disabled:bg-input/80 disabled:bg-input/50 disabled:cursor-not-allowed disabled:opacity-50 disabled:pointer-events-none file:bg-transparent file:border-0 file:font-medium file:h-6 file:inline-flex file:text-foreground file:text-sm focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 h-8 md:text-sm min-w-0 outline-none placeholder:text-muted-foreground pr-8 px-2.5 py-1 rounded-lg text-base transition-colors ui-input ui-select w-full"
+                      @on_change>
                 <option selected="" #value="staging"> staging </option>
                 <option #value="prod"> prod </option>
               </select>
@@ -839,7 +899,7 @@ let%expect_test "every component" =
                      inputmode="decimal"
                      min="1"
                      max="9"
-                     class="ui-input"
+                     class="aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-transparent border border-input dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:bg-input/30 dark:disabled:bg-input/80 disabled:bg-input/50 disabled:cursor-not-allowed disabled:opacity-50 disabled:pointer-events-none file:bg-transparent file:border-0 file:font-medium file:h-6 file:inline-flex file:text-foreground file:text-sm focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 h-8 md:text-sm min-w-0 outline-none placeholder:text-muted-foreground px-2.5 py-1 rounded-lg text-base transition-colors ui-input w-full"
                      #value="2"
                      @on_input/>
               <Vdom.Node.none-widget> </Vdom.Node.none-widget>
@@ -847,13 +907,19 @@ let%expect_test "every component" =
             <div class="ui-field ui-field-toggle">
               <label for="ui-u1-12-notify" class="ui-toggle-row">
                 <span class="ui-label"> Notify team </span>
-                <button id="ui-u1-12-notify"
-                        type="button"
+                <button type="button"
                         role="switch"
                         aria-checked="true"
-                        class="ui-switch"
+                        data-state="checked"
+                        data-slot="switch"
+                        data-size="default"
+                        id="ui-u1-12-notify"
+                        class="after:-inset-x-3 after:-inset-y-2 after:absolute aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 border border-transparent dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:data-unchecked:bg-input/80 data-[size=default]:h-[18.4px] data-[size=default]:w-[32px] data-[size=sm]:h-[14px] data-[size=sm]:w-[24px] data-checked:bg-primary data-disabled:cursor-not-allowed data-disabled:opacity-50 data-unchecked:bg-input focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 group-has-[:focus-visible]/field-label:border-transparent group-has-[:focus-visible]/field-label:ring-0 group/switch inline-flex items-center outline-none peer relative rounded-full shrink-0 transition-all ui-switch"
+                        #value="on"
                         @on_click>
-                  <span class="ui-knob"> </span>
+                  <span data-state="checked"
+                        data-slot="switch-thumb"
+                        class="bg-background block dark:data-checked:bg-primary-foreground dark:data-unchecked:bg-foreground group-data-[size=default]/switch:data-checked:translate-x-[calc(100%-2px)] group-data-[size=default]/switch:data-unchecked:translate-x-0 group-data-[size=default]/switch:size-4 group-data-[size=sm]/switch:data-checked:translate-x-[calc(100%-2px)] group-data-[size=sm]/switch:data-unchecked:translate-x-0 group-data-[size=sm]/switch:size-3 pointer-events-none ring-0 rounded-full transition-transform"> </span>
                 </button>
               </label>
               <Vdom.Node.none-widget> </Vdom.Node.none-widget>
@@ -867,7 +933,7 @@ let%expect_test "every component" =
                         name="note"
                         placeholder="Optional"
                         rows="3"
-                        class="ui-input"
+                        class="aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-transparent border border-input dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:bg-input/30 dark:disabled:bg-input/80 disabled:bg-input/50 disabled:cursor-not-allowed disabled:opacity-50 field-sizing-content flex focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 md:text-sm min-h-16 outline-none placeholder:text-muted-foreground px-2.5 py-2 rounded-lg text-base transition-colors ui-input w-full"
                         #value=""
                         @on_input> </textarea>
               <Vdom.Node.none-widget> </Vdom.Node.none-widget>
@@ -875,7 +941,9 @@ let%expect_test "every component" =
           </div>
           <div class="ui-actions">
             <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-            <button type="button" class="primary ui-btn" @on_click> Deploy </button>
+            <button type="button"
+                    class="[&_svg:not([class*='size-'])]:size-3.5 [&_svg]:pointer-events-none [&_svg]:shrink-0 active:not-aria-[haspopup]:translate-y-px aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-clip-padding bg-primary border border-transparent dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 disabled:opacity-50 disabled:pointer-events-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 font-medium gap-1 group/button h-7 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 hover:bg-primary/80 in-data-[slot=button-group]:rounded-lg inline-flex items-center justify-center outline-none primary px-2.5 rounded-[min(var(--radius-md),12px)] rounded-lg select-none shrink-0 text-[0.8rem] text-primary-foreground transition-all ui-btn whitespace-nowrap"
+                    @on_click> Deploy </button>
           </div>
         </div>
         <div class="ui-checklist">
@@ -1012,7 +1080,10 @@ let%expect_test "every component" =
             </li>
           </ul>
         </div>
-        <hr class="ui-divider"/>
+        <div data-slot="separator"
+             role="none"
+             data-orientation="horizontal"
+             class="bg-border data-horizontal:h-px data-horizontal:w-full data-vertical:self-stretch data-vertical:w-px shrink-0 ui-divider"> </div>
         <div class="ui-markdown">
           <div class="markdown">
             <div class="md-part">
@@ -1612,8 +1683,7 @@ let%expect_test "after a reload, answered components show what was sent" =
   H.elements h ~selector:".ui-form [disabled]";
   H.show h ~selector:".ui-switch, .ui-group input";
   [%expect.unreachable]
-[@@expect.uncaught_exn
-  {|
+[@@expect.uncaught_exn {|
   ("Soup.Parse_error(\"expected tag name or '*'\")")
   Trailing output
   ---------------
@@ -1633,12 +1703,12 @@ let%expect_test "after a reload, answered components show what was sent" =
   ↵ Sent "Deploy options": env = prod, replicas = 3
   The user responded through "Deploy options" (render_ui call u1, component deploy):
   {"env":"prod","replicas":3,"notify":true,"tags":["b"],"who":"ops"}
-  <select class="ui-input">
-  <input class="ui-input">
-  <button class="ui-switch">
+  <select class="appearance-none aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-transparent border border-input dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:bg-input/30 dark:disabled:bg-input/80 disabled:bg-input/50 disabled:cursor-not-allowed disabled:opacity-50 disabled:pointer-events-none file:bg-transparent file:border-0 file:font-medium file:h-6 file:inline-flex file:text-foreground file:text-sm focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 h-8 md:text-sm min-w-0 outline-none placeholder:text-muted-foreground pr-8 px-2.5 py-1 rounded-lg text-base transition-colors ui-input ui-select w-full">
+  <input class="aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-transparent border border-input dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:bg-input/30 dark:disabled:bg-input/80 disabled:bg-input/50 disabled:cursor-not-allowed disabled:opacity-50 disabled:pointer-events-none file:bg-transparent file:border-0 file:font-medium file:h-6 file:inline-flex file:text-foreground file:text-sm focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 h-8 md:text-sm min-w-0 outline-none placeholder:text-muted-foreground px-2.5 py-1 rounded-lg text-base transition-colors ui-input w-full">
+  <button class="after:-inset-x-3 after:-inset-y-2 after:absolute aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 border border-transparent dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:data-unchecked:bg-input/80 data-[size=default]:h-[18.4px] data-[size=default]:w-[32px] data-[size=sm]:h-[14px] data-[size=sm]:w-[24px] data-checked:bg-primary data-disabled:cursor-not-allowed data-disabled:opacity-50 data-unchecked:bg-input focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 group-has-[:focus-visible]/field-label:border-transparent group-has-[:focus-visible]/field-label:ring-0 group/switch inline-flex items-center outline-none peer relative rounded-full shrink-0 transition-all ui-switch">
   <input class="">
   <input class="">
-  <input class="ui-input">
+  <input class="aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-transparent border border-input dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:bg-input/30 dark:disabled:bg-input/80 disabled:bg-input/50 disabled:cursor-not-allowed disabled:opacity-50 disabled:pointer-events-none file:bg-transparent file:border-0 file:font-medium file:h-6 file:inline-flex file:text-foreground file:text-sm focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 h-8 md:text-sm min-w-0 outline-none placeholder:text-muted-foreground px-2.5 py-1 rounded-lg text-base transition-colors ui-input w-full">
   |}]
 ;;
 

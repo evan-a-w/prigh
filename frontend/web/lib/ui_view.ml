@@ -144,7 +144,7 @@ let progress ~label ~value ~max ~tone ~caption =
                sprintf "%s / %s" (Ui_format.number value) (Ui_format.number max))
         ]
     ; Loon.Progress.view
-        ~class_:"ui-bar h-1.5"
+        ~class_:"ui-bar h-1.5!"
         ~attrs:
           [ Attr.create "aria-label" (Option.value label ~default:"Progress") ]
         ~max:100.
@@ -406,7 +406,7 @@ let rec component (ctx : Ui_context.t) ~path (c : C.t) =
                    (match tone with
                     | Danger -> Destructive
                     | _ -> Default)
-                 ~class_:("ui-callout " ^ tone_cls tone ^ " px-3.5 py-2.5")
+                 ~class_:("ui-callout " ^ tone_cls tone)
                  ())
           ; Attr.create "data-slot" "alert"
           ; Attr.role
@@ -419,7 +419,7 @@ let rec component (ctx : Ui_context.t) ~path (c : C.t) =
              Loon.Alert.title ~class_:"ui-callout-title" [ Node.text t ]
            | None -> Node.none)
         ; Loon.Alert.description
-            ~class_:"text-foreground/90 text-[length:inherit] text-pretty"
+            ~class_:"text-foreground/90!"
             [ Ui_context.md t ]
         ]
     | Stat { label; value; unit; delta; trend; good; caption; spark } ->
