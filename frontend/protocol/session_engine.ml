@@ -69,6 +69,7 @@ module Capabilities = struct
     ; model_fallback : bool
     ; images : bool
     ; ask_user : bool
+    ; rewind_note : string option [@sexp.option]
     }
   [@@deriving sexp_of, equal]
 
@@ -84,6 +85,7 @@ module Capabilities = struct
     ; model_fallback = true
     ; images = true
     ; ask_user = true
+    ; rewind_note = None
     }
   ;;
 
@@ -138,7 +140,8 @@ module Capabilities = struct
     in
     let%bind model_fallback = bool "model_fallback" ~default:h.model_fallback in
     let%bind images = bool "images" ~default:h.images in
-    let%map ask_user = bool "ask_user" ~default:h.ask_user in
+    let%bind ask_user = bool "ask_user" ~default:h.ask_user in
+    let%map rewind_note = Json.string_opt_field j "rewind_note" in
     { fork
     ; rewind
     ; context_edit
@@ -150,6 +153,7 @@ module Capabilities = struct
     ; model_fallback
     ; images
     ; ask_user
+    ; rewind_note
     }
   ;;
 end
@@ -249,6 +253,11 @@ let refusal t (feature : Feature.t) =
   let who = who t in
   match feature with
   | Fork -> sprintf "%s sessions can't be forked: start a new session (/new)" who
+  | Rewind when Option.is_some t.capabilities.rewind_note ->
+    sprintf
+      "%s sessions can't rewind here: %s"
+      who
+      (Option.value_exn t.capabilities.rewind_note)
   | Rewind ->
     if supports t Fork
     then

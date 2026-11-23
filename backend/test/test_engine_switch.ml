@@ -575,7 +575,7 @@ let%expect_test "moving to another tool host: a new process and thread there" =
         ignore
           (Session.record_thread
              (Option.value_exn !session)
-             { adapter = "codex"; host = !host; thread_id; cwd = t.dir }
+             { adapter = "codex"; host = !host; thread_id; cwd = t.dir; fork_from = None }
            : Session.Entry.t))
       ()
   in

@@ -27,6 +27,17 @@ module Home : sig
   [@@deriving sexp, jsonaf, equal]
 end
 
+(** Where a composer thread is forked or rolled back to: the last turn to
+    keep, as the external agent names it (its turn id; the id of its last
+    message, for Claude Code). *)
+module Fork_point : sig
+  type t =
+    { turn_id : string option
+    ; mark : string option
+    }
+  [@@deriving sexp, jsonaf, equal]
+end
+
 module Entry : sig
   module Payload : sig
     type t =
@@ -150,6 +161,9 @@ module Entry : sig
           ; host : string (** the [Host.id] the external agent ran on *)
           ; thread_id : string (** its own id of the conversation *)
           ; cwd : string
+          ; fork_from : Fork_point.t option [@jsonaf.option] [@sexp.option]
+            (** the session is to continue a fork of [thread_id] (another
+                session's) at this point, not [thread_id] itself *)
           }
       (** the composer's adapter reported its thread, see {!threads}; not
           copied by [fork], so a fork never writes to its parent's thread *)
@@ -157,6 +171,14 @@ module Entry : sig
           { thread_id : string
           ; turn_id : string
           ; through : string (** the last entry of the turn *)
+          ; first_turn_id : string option [@jsonaf.option] [@sexp.option]
+            (** the agent's first turn of the run, when it took several *)
+          ; mark : string option [@jsonaf.option] [@sexp.option]
+            (** where its conversation ended (Claude Code: its last message) *)
+          ; before : string option [@jsonaf.option] [@sexp.option]
+            (** the checkpoint of the files before the run ({!Checkpoint}) *)
+          ; after : string option [@jsonaf.option] [@sexp.option]
+            (** ... and after it *)
           }
       (** an external agent's turn, for mapping rewinds onto its history;
           not copied by [fork] *)
@@ -402,15 +424,24 @@ module Thread : sig
     ; host : string (** the [Host.id] it ran on *)
     ; thread_id : string
     ; cwd : string
+    ; fork_from : Fork_point.t option
+      (** to be forked at this point (from another session's thread) *)
     }
   [@@deriving sexp_of, equal]
 end
 
+(** A run of an external agent: its turns and what they did to the files. *)
 module External_turn : sig
   type t =
     { thread_id : string
-    ; turn_id : string
-    ; through : string (** the last entry of the turn *)
+    ; turn_id : string (** its last turn *)
+    ; through : string (** the last entry of the run *)
+    ; first_turn_id : string option (** its first turn, if not [turn_id] *)
+    ; mark : string option
+      (** where the conversation ended, for an agent that rolls back to a
+          message (Claude Code) *)
+    ; before : string option (** the files' checkpoint before the run *)
+    ; after : string option (** ... and after it *)
     }
   [@@deriving sexp_of, equal]
 end
@@ -429,8 +460,9 @@ val threads : t -> Thread.t list
 
 val record_thread : t -> Thread.t -> Entry.t
 
-(** The [External_turn] entries on the active path, oldest first. *)
-val external_turns : t -> External_turn.t list
+(** The [External_turn] entries on the active path (with [all]: in the
+    whole file, abandoned branches too), oldest first. *)
+val external_turns : ?all:bool -> t -> External_turn.t list
 
 val record_external_turn : t -> External_turn.t -> Entry.t
 

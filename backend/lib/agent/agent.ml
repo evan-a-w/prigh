@@ -5250,6 +5250,7 @@ let rewind t ~to_ =
   if is_running t
   then Or_error.error_string "cannot rewind while a run is in progress"
   else
+    let%bind.Or_error () = Runner.rewind (runner t) t.session ~to_ in
     Or_error.map (Session.rewind t.session ~to_) ~f:(fun () ->
       t.plan <- Plan.latest (path_messages t.session);
       restore_told t;

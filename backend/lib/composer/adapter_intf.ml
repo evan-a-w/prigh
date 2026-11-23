@@ -11,6 +11,10 @@ module Start = struct
     ; plan : bool
     ; resume : string option (** the harness's thread to continue *)
     ; fork : bool (** continue [resume] in a new thread *)
+    ; at : Session.Fork_point.t option
+      (** continue [resume] only up to this turn: its fork ([fork]) is
+          made there, or (an agent that rolls back by resuming at a
+          message: {!Rollback.Resume_at}) it is rolled back to it *)
     ; developer_instructions : string option
       (** appended to the harness's own system prompt *)
     ; mcp_servers : (string * Json.t) list
@@ -26,6 +30,7 @@ module Start = struct
     ; plan = false
     ; resume = None
     ; fork = false
+    ; at = None
     ; developer_instructions = None
     ; mcp_servers = []
     }
@@ -72,6 +77,17 @@ module Input = struct
     ; images : Image.t list
     }
   [@@deriving sexp_of]
+end
+
+(** How a harness takes its conversation back to an earlier turn. *)
+module Rollback = struct
+  type t =
+    | Unsupported
+    | Revert (** asked of the running process ({!S.revert}) *)
+    | Resume_at
+      (** its next process continues the thread at a turn's end
+          ([Start.at], with {!S.mark}) *)
+  [@@deriving sexp_of, equal]
 end
 
 (** An external harness (Codex, Claude Code, ...) driven over its process's
@@ -134,6 +150,20 @@ module type S = sig
     -> unit
 
   val answer : t -> request_id:string -> User_question.Reply.t -> unit
+
+  val rollback : Rollback.t
+
+  (** Whether it forks a thread at a turn itself (else a fork is a new
+      thread, handed the session). *)
+  val fork_native : bool
+
+  (** Drops the turns from [before_turn_id] on from the thread (not the
+      files: those are prigh's to restore). Only for {!Rollback.Revert}. *)
+  val revert : t -> before_turn_id:string -> unit Or_error.t
+
+  (** After a turn: where its conversation ends, for {!Rollback.Resume_at}
+      (Claude Code: the id of its last message). *)
+  val mark : t -> string option
 
   (** The thread to resume later. *)
   val thread_id : t -> string option

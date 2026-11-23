@@ -50,7 +50,7 @@ let codex_session dir =
   let (_ : Session.Entry.t) =
     Session.record_thread
       t
-      { adapter = "codex"; host = "laptop"; thread_id = "thr_1"; cwd = "/proj" }
+      { adapter = "codex"; host = "laptop"; thread_id = "thr_1"; cwd = "/proj"; fork_from = None }
   in
   let (_ : string) = append t (Message.user "Why does the build fail?") in
   let (_ : string) =
@@ -82,7 +82,7 @@ let codex_session dir =
   let (_ : Session.Entry.t) =
     Session.record_external_turn
       t
-      { thread_id = "thr_1"; turn_id = "turn_1"; through = last }
+      { thread_id = "thr_1"; turn_id = "turn_1"; through = last; first_turn_id = None; mark = None; before = None; after = None }
   in
   t
 ;;
@@ -153,6 +153,7 @@ let%expect_test "switching back: only what Codex has not seen" =
       ; host = "laptop"
       ; thread_id = "sess-9"
       ; cwd = "/proj"
+      ; fork_from = None
       }
   in
   let (_ : string) = append t (Message.user "Fix it then.") in
@@ -160,7 +161,7 @@ let%expect_test "switching back: only what Codex has not seen" =
   let (_ : Session.Entry.t) =
     Session.record_external_turn
       t
-      { thread_id = "sess-9"; turn_id = "turn-1"; through = last }
+      { thread_id = "sess-9"; turn_id = "turn-1"; through = last; first_turn_id = None; mark = None; before = None; after = None }
   in
   let h =
     Handoff.build

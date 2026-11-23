@@ -23,6 +23,10 @@ val create : unit -> t
     [--resume]. It changes on a fork and on [/clear]. *)
 val session_id : t -> string option
 
+(** The uuid of the latest top-level assistant message: where
+    [--resume-session-at] can roll the session back to. *)
+val last_assistant : t -> string option
+
 (** Whether a turn is running (started and not yet ended). *)
 val in_turn : t -> bool
 

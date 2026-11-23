@@ -491,7 +491,7 @@ let history_op : Capabilities.History_op.t -> Json.t = function
 let capabilities (c : Capabilities.t) =
   let bool b = if b then `True else `False in
   `Object
-    [ "fork", history_op c.fork
+    ([ "fork", history_op c.fork
     ; "rewind", history_op c.rewind
     ; "context_edit", bool c.context_edit
     ; ( "compact"
@@ -517,6 +517,8 @@ let capabilities (c : Capabilities.t) =
     ; "images", bool c.images
     ; "ask_user", bool c.ask_user
     ]
+    @ Option.value_map c.rewind_note ~default:[] ~f:(fun note ->
+      [ "rewind_note", str note ]))
 ;;
 
 (* The harness's sessions (every one from before engines) carry none of
@@ -695,14 +697,14 @@ let entry (e : Session.Entry.t) =
       ; "engine", str engine
       ; "adapter", Option.value_map adapter ~default:`Null ~f:str
       ]
-    | Thread { adapter; host; thread_id; cwd } ->
+    | Thread { adapter; host; thread_id; cwd; fork_from = _ } ->
       [ "kind", str "thread"
       ; "adapter", str adapter
       ; "host", str host
       ; "thread_id", str thread_id
       ; "cwd", str cwd
       ]
-    | External_turn { thread_id; turn_id; through } ->
+    | External_turn { thread_id; turn_id; through; _ } ->
       [ "kind", str "external_turn"
       ; "thread_id", str thread_id
       ; "turn_id", str turn_id

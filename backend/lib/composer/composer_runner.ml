@@ -21,6 +21,11 @@ type t =
   ; mutable turns : int
   ; mutable thread_model : string option (* the model the CLI said it runs *)
   ; on_thread : string -> unit
+  ; checkpoint : (Json.t -> Tool.Result.t) option (* runs [Checkpoint.op] *)
+  ; mutable not_git : (string * string) option
+    (* a cwd whose files have no checkpoints, and why *)
+  ; mutable checkpoint_noted : bool
+  ; mutable forking : string option (* the thread a new one forks *)
   ; mutable services : Engine_intf.Services.t option (* the running turn's *)
   ; mutable cancel : Cancellation.t
   }
@@ -35,6 +40,7 @@ let create
       ?(on_thread = ignore)
       ?(host = fun () -> "local")
       ?handoff_from
+      ?checkpoint
       ()
   =
   { sw
@@ -54,6 +60,10 @@ let create
   ; turns = 0
   ; thread_model = None
   ; on_thread
+  ; checkpoint
+  ; not_git = None
+  ; checkpoint_noted = false
+  ; forking = None
   ; services = None
   ; cancel = Cancellation.never
   }
@@ -117,13 +127,32 @@ let settings t ~cwd (input : Engine_intf.Turn.Input.t) : Adapter.Settings.t =
 (* The thread [a] is on, once known: recorded when it is not the one it was
    asked to continue (that one is recorded already). A thread other than
    that one is new, so it is handed the whole session. *)
-let note_thread t (type a) (module A : Adapter.S with type t = a) (a : a) =
+let note_thread
+      t
+      (s : Engine_intf.Services.t)
+      (type a)
+      (module A : Adapter.S with type t = a)
+      (a : a)
+  =
   match A.thread_id a with
   | Some id when not (Option.equal String.equal (Some id) t.thread_id) ->
     t.thread_id <- Some id;
     if not (Option.equal String.equal (Some id) t.resumed)
     then (
-      if Option.is_some t.resumed then t.fresh <- true;
+      (match t.forking with
+       | Some parent ->
+         (* A fork of [parent] at the session's last run: it has seen what
+            that run had. *)
+         t.forking <- None;
+         Option.iter
+           (List.last
+              (List.filter (Session.external_turns s.session) ~f:(fun turn ->
+                 String.equal turn.thread_id parent)))
+           ~f:(fun turn ->
+             ignore
+               (Session.record_external_turn s.session { turn with thread_id = id }
+                : Session.Entry.t))
+       | None -> if Option.is_some t.resumed then t.fresh <- true);
       t.on_thread id)
   | Some _ | None -> ()
 ;;
@@ -159,13 +188,57 @@ let start_process t (s : Engine_intf.Services.t) (start : Adapter.Start.t) =
      with
      | Ok a ->
        t.resumed <- start.resume;
+       t.forking <- Option.some_if start.fork start.resume |> Option.join;
        (* A new thread has seen nothing: whatever an older one saw. *)
        if Option.is_none start.resume then t.fresh <- true;
-       note_thread t (module A) a;
+       note_thread t s (module A) a;
        Ok (Live ((module A), a))
      | Error e ->
        Line_transport.stop transport;
        Error (`Start e))
+;;
+
+(* How to continue [resume] after the session was rewound past some of its
+   runs on it (they are off the active path): as it is ([`Whole]), rolled
+   back to the end of its last run still on the path, or not at all (a new
+   thread, handed the session) when it cannot be rolled back there. Runs off
+   the path with a later run on it were rolled back before that one ran. *)
+let rollback_plan t session ~resume =
+  let (module A : Adapter.S) = t.adapter in
+  match resume with
+  | None -> `Whole
+  | Some thread ->
+    let of_thread turns =
+      List.filter turns ~f:(fun (turn : Session.External_turn.t) ->
+        String.equal turn.thread_id thread)
+    in
+    let on_path = of_thread (Session.external_turns session) in
+    let on turn = List.mem on_path turn ~equal:Session.External_turn.equal in
+    let rec has = function
+      | [] -> []
+      | turn :: rest ->
+        if (not (on turn)) && List.exists rest ~f:on
+        then has rest
+        else turn :: has rest
+    in
+    let has = has (of_thread (Session.external_turns ~all:true session)) in
+    let kept = List.length on_path in
+    if not
+         (List.is_prefix has ~prefix:on_path ~equal:Session.External_turn.equal)
+    then `Nothing
+    else if List.length has = kept
+    then `Whole
+    else (
+      match A.rollback with
+      | Unsupported -> `Nothing
+      | Revert ->
+        let (first : Session.External_turn.t) = List.nth_exn has kept in
+        `Revert (Option.value first.first_turn_id ~default:first.turn_id)
+      | Resume_at ->
+        (match List.last on_path with
+         | Some ({ mark = Some _; _ } as last) ->
+           `At { Session.Fork_point.turn_id = Some last.turn_id; mark = last.mark }
+         | Some { mark = None; _ } | None -> `Nothing))
 ;;
 
 let live t (s : Engine_intf.Services.t) (input : Engine_intf.Turn.Input.t) =
@@ -185,13 +258,27 @@ let live t (s : Engine_intf.Services.t) (input : Engine_intf.Turn.Input.t) =
     let (module A) = t.adapter in
     let base = t.start ~cwd:s.cwd in
     let resume = Option.first_some t.thread_id base.resume in
+    let fork = base.fork && Option.is_none t.thread_id in
+    let resume, at, revert =
+      if fork
+      then resume, base.at, None
+      else (
+        match rollback_plan t s.session ~resume with
+        | `Whole -> resume, None, None
+        | `At at -> resume, Some at, None
+        | `Revert before_turn_id -> resume, None, Some before_turn_id
+        | `Nothing ->
+          t.fresh <- true;
+          None, None, None)
+    in
     let start =
       { base with
         thinking = input.thinking
       ; approval = input.approval
       ; plan = input.plan
       ; resume
-      ; fork = base.fork && Option.is_none t.thread_id
+      ; fork = fork && Option.is_some resume
+      ; at
       }
     in
     let started =
@@ -208,7 +295,23 @@ let live t (s : Engine_intf.Services.t) (input : Engine_intf.Turn.Input.t) =
              (Error.to_string_hum e));
         t.thread_id <- None;
         t.fresh <- true;
-        start_process t s { start with resume = None; fork = false }
+        start_process t s { start with resume = None; fork = false; at = None }
+      | Ok (Live ((module L), a)), Some thread when Option.is_some revert ->
+        (* The session was rewound: its thread drops the runs it lost. *)
+        (match L.revert a ~before_turn_id:(Option.value_exn revert) with
+         | Ok () -> Ok (Live ((module L), a))
+         | Error e ->
+           s.notice
+             (sprintf
+                "%s could not roll its thread %s back to the rewound session \
+                 (%s): starting a new one, with the session handed over"
+                A.display_name
+                thread
+                (Error.to_string_hum e));
+           L.stop a;
+           t.thread_id <- None;
+           t.fresh <- true;
+           start_process t s { start with resume = None; fork = false; at = None })
       | started, _ -> started
     in
     (match started with
@@ -358,6 +461,44 @@ let approve_plan (s : Engine_intf.Services.t) ~display_name ~request_id ~summary
   | Cancelled | Timed_out _ | Unavailable _ -> Cancel
 ;;
 
+let checkpoints_made = ref 0
+
+(* The files now, kept under a ref for a rewind to return to; [None]
+   without checkpoints (none asked for, not in a git repository, an older
+   prigh on the host). *)
+let capture t (s : Engine_intf.Services.t) ~which =
+  match t.checkpoint, t.not_git with
+  | None, _ -> None
+  | Some _, Some (cwd, _) when String.equal cwd s.cwd -> None
+  | Some exec, _ ->
+    incr checkpoints_made;
+    let ref =
+      sprintf
+        "%s%s-%d-%s"
+        (Checkpoint.session_prefix ~session:(Session.id s.session))
+        (Int63.to_string (Time_ns.to_int63_ns_since_epoch (Time_ns.now ())))
+        !checkpoints_made
+        which
+    in
+    (match Checkpoint.Client.capture exec ~ref:(Some ref) with
+     | Ok (Snapshot { commit; _ }) ->
+       t.not_git <- None;
+       commit
+     | Ok (Not_git why) ->
+       t.not_git <- Some (s.cwd, why);
+       None
+     | Error e ->
+       if not t.checkpoint_noted
+       then (
+         t.checkpoint_noted <- true;
+         s.notice
+           (sprintf
+              "prigh could not checkpoint the files, so this session cannot \
+               rewind them: %s"
+              (Error.to_string_hum e)));
+       None)
+;;
+
 let run_turn
       t
       (s : Engine_intf.Services.t)
@@ -369,6 +510,9 @@ let run_turn
   t.cancel <- cancel;
   let sent = ref false in
   let last_turn = ref None in
+  let first_turn = ref None in
+  let mark = ref None in
+  let before = ref None in
   let recorder =
     Composer_recorder.create
       ~adapter:A.id
@@ -387,6 +531,7 @@ let run_turn
      fail
        (sprintf "%s could not start: %s" A.display_name (Error.to_string_hum e))
    | Ok (Live ((module L), a)) ->
+     before := capture t s ~which:"before";
      let settings = settings t ~cwd:s.cwd input in
      let leftover = Queue.create () in
      let handoff =
@@ -421,7 +566,9 @@ let run_turn
            match L.next_event a with
            | Turn_end { stop = st; turn_id } as e ->
              Composer_recorder.feed recorder e;
-             Option.iter turn_id ~f:(fun id -> last_turn := Some id);
+             Option.iter turn_id ~f:(fun id ->
+               if Option.is_none !first_turn then first_turn := Some id;
+               last_turn := Some id);
              stop := Some st
            | Approval_request { request_id; tool_id; kind; summary; input; _ }
              ->
@@ -516,7 +663,8 @@ let run_turn
          Switch.run (fun sw ->
            Fiber.any [ (fun () -> events ~sw); interrupt_on_cancel; steer ];
            Hashtbl.iter requests ~f:Cancellation.cancel);
-         note_thread t (module L) a;
+         note_thread t s (module L) a;
+         mark := L.mark a;
          (match !stop with
           | Some Done when not (Cancellation.is_cancelled cancel) ->
             let next = Queue.to_list leftover @ s.steer () in
@@ -540,17 +688,127 @@ let run_turn
   (match t.thread_id, Session.head s.session with
    | Some thread_id, Some through when !sent ->
      t.turns <- t.turns + 1;
+     let turn_id = Option.value !last_turn ~default:(sprintf "turn-%d" t.turns) in
+     let after =
+       if Option.is_some !before then capture t s ~which:"after" else None
+     in
      ignore
        (Session.record_external_turn
           s.session
           { thread_id
-          ; turn_id =
-              Option.value !last_turn ~default:(sprintf "turn-%d" t.turns)
+          ; turn_id
           ; through
+          ; first_turn_id =
+              Option.filter !first_turn ~f:(fun f -> not (String.equal f turn_id))
+          ; mark = !mark
+          ; before = Option.bind after ~f:(fun _ -> !before)
+          ; after
           }
         : Session.Entry.t)
    | _ -> ());
   List.drop added (List.length input.prompts)
+;;
+
+(* Before the session is rewound to [to_]: the files go back to how they
+   were before the first run it drops, and the agent (stopped here) drops
+   those runs from its thread when it next starts ([rollback_plan]). Refused,
+   changing nothing, unless every run dropped kept checkpoints and no file
+   changed outside them since: between them, or after the last. *)
+let rewind t session ~to_ =
+  let path = List.map (Session.active_path session) ~f:(fun e -> e.id) in
+  let index id =
+    Option.map (List.findi path ~f:(fun _ x -> String.equal x id)) ~f:fst
+  in
+  match index to_ with
+  | None -> Ok ()
+  | Some cut ->
+    let dropped =
+      List.filter (Session.external_turns session) ~f:(fun run ->
+        match index run.through with
+        | Some i -> i > cut
+        | None -> false)
+    in
+    let (module A : Adapter.S) = t.adapter in
+    let fork_instead = "fork from that message instead (/fork)" in
+    let restore exec =
+      let open Or_error.Let_syntax in
+      let%bind checkpoints =
+        List.map dropped ~f:(fun (run : Session.External_turn.t) ->
+          match run.before, run.after with
+          | Some before, Some after -> Ok (before, after)
+          | _ ->
+            Or_error.errorf
+              "the files as %s left them after a turn being rewound were not \
+               saved (%s), so prigh can't put them back: %s"
+              A.display_name
+              (match t.not_git with
+               | Some (_, why) -> why
+               | None -> "no checkpoint was taken")
+              fork_instead)
+        |> Or_error.all
+      in
+      let%bind () =
+        List.zip_exn
+          (List.drop_last_exn checkpoints)
+          (List.tl_exn checkpoints)
+        |> List.map ~f:(fun ((_, after), (before, _)) ->
+          match%bind
+            Checkpoint.Client.changed exec ~from:after ~to_:(Some before)
+          with
+          | [] -> Ok ()
+          | files ->
+            Or_error.errorf
+              "files changed between %s's turns being rewound, outside them: \
+               %s. Rewinding would undo those changes too: commit or stash \
+               them first, or %s"
+              A.display_name
+              (String.concat ~sep:", " files)
+              fork_instead)
+        |> Or_error.all_unit
+      in
+      let before, _ = List.hd_exn checkpoints in
+      let _, after = List.last_exn checkpoints in
+      let%map (_ : string list) =
+        Checkpoint.Client.restore exec ~to_:before ~expect:after
+        |> Or_error.tag
+             ~tag:
+               (sprintf
+                  "could not put the files back as they were before %s's turn \
+                   (nothing was changed)"
+                  A.display_name)
+      in
+      ()
+    in
+    if List.is_empty dropped
+    then Ok ()
+    else (
+      match t.checkpoint, A.rollback with
+      | None, _ | _, Unsupported ->
+        Or_error.errorf "%s sessions can't rewind: %s" A.display_name fork_instead
+      | Some exec, (Revert | Resume_at) ->
+        let%map.Or_error () = restore exec in
+        if List.exists dropped ~f:(fun run ->
+             Option.equal String.equal (Some run.thread_id) t.thread_id)
+        then close t)
+;;
+
+(* Rewinding needs checkpoints of the files, which need a git repository. *)
+let with_rewind t (c : Capabilities.t) =
+  let (module A : Adapter.S) = t.adapter in
+  match A.rollback, t.checkpoint, t.not_git with
+  | Unsupported, _, _ -> c
+  | _, None, _ -> { c with rewind = Unsupported }
+  | _, Some _, Some (_, why) ->
+    { c with
+      rewind = Unsupported
+    ; rewind_note =
+        Some
+          (sprintf
+             "%s, so prigh can't put its files back: fork from that message \
+              instead (/fork)"
+             why)
+    }
+  | _, Some _, None -> c
 ;;
 
 module R = struct
@@ -559,14 +817,18 @@ module R = struct
   let engine = Engine_id.Composer
 
   let capabilities t =
-    match t.live with
-    | Some (Live ((module L), a)) -> L.current_capabilities a
-    | None ->
-      let (module A : Adapter.S) = t.adapter in
-      A.capabilities
+    with_rewind
+      t
+      (match t.live with
+       | Some (Live ((module L), a)) -> L.current_capabilities a
+       | None ->
+         let (module A : Adapter.S) = t.adapter in
+         A.capabilities)
   ;;
 
   let run_turn = run_turn
 end
 
-let runner t = Runner.create ~close:(fun () -> close t) (module R) t
+let runner t =
+  Runner.create ~close:(fun () -> close t) ~rewind:(rewind t) (module R) t
+;;

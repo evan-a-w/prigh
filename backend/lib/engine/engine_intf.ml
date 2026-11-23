@@ -72,9 +72,23 @@ module type Runner_api = sig
 
   (** [close]: stops what the runner keeps running between turns (an
       external harness's process). *)
-  val create : ?close:(unit -> unit) -> (module S with type t = 'a) -> 'a -> t
+  (** [rewind]: what the engine must undo outside the session (an external
+      harness's conversation and the files it changed) before the session
+      is rewound to the entry [to_]; an error leaves both as they were.
+      Without it, rewinding is the session's alone. *)
+  val create
+    :  ?close:(unit -> unit)
+    -> ?rewind:(Session.t -> to_:string -> unit Or_error.t)
+    -> (module S with type t = 'a)
+    -> 'a
+    -> t
 
   val close : t -> unit
+
+  (** Undoes, before the session is rewound to [to_], what the engine
+      must outside it (see [create]). *)
+  val rewind : t -> Session.t -> to_:string -> unit Or_error.t
+
   val engine : t -> Engine_id.t
   val capabilities : t -> Capabilities.t
 

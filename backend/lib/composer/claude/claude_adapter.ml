@@ -13,8 +13,8 @@ let id = "claude"
 let display_name = "Claude Code"
 
 let capabilities : Capabilities.t =
-  { fork = By_handoff
-  ; rewind = Unsupported
+  { fork = Native
+  ; rewind = Native
   ; context_edit = false
   ; compact = Auto_only
   ; steer = Between_turns
@@ -24,6 +24,7 @@ let capabilities : Capabilities.t =
   ; model_fallback = false
   ; images = true
   ; ask_user = true
+  ; rewind_note = None
   }
 ;;
 
@@ -84,7 +85,12 @@ let launch_config ~injected (start : Adapter.Start.t) : Claude_launch.t =
   ; resume =
       (match start.resume with
        | None -> New { session_id = None }
-       | Some session_id -> Resume { session_id; fork = start.fork; at = None })
+       | Some session_id ->
+         Resume
+           { session_id
+           ; fork = start.fork
+           ; at = Option.bind start.at ~f:(fun at -> at.mark)
+           })
   ; append_system_prompt = start.developer_instructions
   ; mcp_config = mcp_config ~injected start
   ; max_thinking_tokens = thinking_tokens start.thinking
@@ -242,6 +248,14 @@ let answer t ~request_id reply =
     ~f:(Adapter.Driver.write t.driver)
 ;;
 
+let rollback = Adapter.Rollback.Resume_at
+let fork_native = true
+
+let revert _ ~before_turn_id:_ =
+  Or_error.error_string "Claude Code rolls back when it next starts, not while it runs"
+;;
+
+let mark t = Claude_codec.last_assistant t.codec
 let thread_id t = Claude_codec.session_id t.codec
 let in_turn t = Adapter.Driver.in_turn t.driver
 let alive t = Adapter.Driver.alive t.driver

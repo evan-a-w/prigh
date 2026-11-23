@@ -49,6 +49,8 @@ module Capabilities : sig
     ; model_fallback : bool
     ; images : bool
     ; ask_user : bool
+    ; rewind_note : string option
+      (** why it cannot rewind, for a reason of the session's *)
     }
   [@@deriving sexp_of, equal]
 

@@ -167,13 +167,14 @@ let%expect_test "session entries: engine, threads, external turns, handoffs" =
       ; host = "backend"
       ; thread_id = "thr_1"
       ; cwd = "/proj"
+      ; fork_from = None
       }
   in
   let m = Session.append_message t (Message.user "hi") in
   let (_ : Session.Entry.t) =
     Session.record_external_turn
       t
-      { thread_id = "thr_1"; turn_id = "turn_1"; through = m.id }
+      { thread_id = "thr_1"; turn_id = "turn_1"; through = m.id; first_turn_id = None; mark = None; before = None; after = None }
   in
   let (_ : Session.Entry.t) =
     Session.set_engine t { engine = Composer; adapter = Some Claude }
@@ -192,6 +193,7 @@ let%expect_test "session entries: engine, threads, external turns, handoffs" =
       ; host = "laptop"
       ; thread_id = "sess-2"
       ; cwd = "/proj"
+      ; fork_from = None
       }
   in
   let loaded = Or_error.ok_exn (Session.load (Session.path t)) in

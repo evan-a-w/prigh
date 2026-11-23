@@ -20,6 +20,7 @@ let capabilities_of
   ; model_fallback = false
   ; images = Option.value_map caps ~default:false ~f:(fun c -> c.images)
   ; ask_user = true
+  ; rewind_note = None
   }
 ;;
 
@@ -372,6 +373,14 @@ let create
 
     (* ACP agents ask the user through prigh's [ask_user] tool. *)
     let answer _ ~request_id:_ (_ : User_question.Reply.t) = ()
+    let rollback = Adapter.Rollback.Unsupported
+    let fork_native = false
+
+    let revert _ ~before_turn_id:_ =
+      Or_error.errorf "%s cannot roll its conversation back" agent.display_name
+    ;;
+
+    let mark _ = None
     let thread_id t = Codec.session_id t.codec
     let in_turn t = Adapter.Driver.in_turn t.driver
     let alive t = Adapter.Driver.alive t.driver

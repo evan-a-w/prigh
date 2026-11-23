@@ -24,7 +24,10 @@ type t
     always ["local"]): when it changes, the process stops and the next turn
     starts one there, on that host's thread. [handoff_from]: the engine the
     session ran on before this runner, named in the first handoff. [sw]
-    bounds the processes' fibers.
+    bounds the processes' fibers. [checkpoint] runs {!Checkpoint.op} on
+    the session's tool host: with it, the files are checkpointed around
+    each run (in a git repository), which lets the session rewind them with
+    the harness's conversation; without it the session cannot rewind.
 
     Before each turn the harness is handed what it has not seen of the
     session ({!Handoff}), recorded as a [Handoff] entry; after it, the turn
@@ -39,6 +42,7 @@ val create
   -> ?on_thread:(string -> unit)
   -> ?host:(unit -> string)
   -> ?handoff_from:Engine_choice.t
+  -> ?checkpoint:(Json.t -> Tool.Result.t)
   -> unit
   -> t
 

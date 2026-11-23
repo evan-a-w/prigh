@@ -11,8 +11,8 @@ let id = "codex"
 let display_name = "Codex"
 
 let capabilities : Capabilities.t =
-  { fork = By_handoff
-  ; rewind = Unsupported
+  { fork = Native
+  ; rewind = Native
   ; context_edit = false
   ; compact = Auto_only
   ; steer = In_run
@@ -22,6 +22,7 @@ let capabilities : Capabilities.t =
   ; model_fallback = false
   ; images = true
   ; ask_user = true
+  ; rewind_note = None
   }
 ;;
 
@@ -127,7 +128,12 @@ let start ~sw ?interrupt_grace ?injected:_ transport (start : Adapter.Start.t) =
     match start.resume with
     | None -> Codex_codec.start_thread codec s options
     | Some thread_id when start.fork ->
-      Codex_codec.fork_thread codec ~thread_id ~last_turn_id:None s options
+      Codex_codec.fork_thread
+        codec
+        ~thread_id
+        ~last_turn_id:(Option.bind start.at ~f:(fun at -> at.turn_id))
+        s
+        options
     | Some thread_id -> Codex_codec.resume_thread codec ~thread_id s options
   in
   let%bind thread =
@@ -179,6 +185,21 @@ let answer t ~request_id reply =
     ~f:(Adapter.Driver.write t.driver)
 ;;
 
+let rollback = Adapter.Rollback.Revert
+let fork_native = true
+
+let revert t ~before_turn_id =
+  let open Or_error.Let_syntax in
+  let%bind line = Codex_codec.revert t.codec ~before_turn_id in
+  let%bind reply =
+    Adapter.Driver.request t.driver line ~matches:(function
+      | Done Revert | Failed { kind = Revert; _ } -> true
+      | _ -> false)
+  in
+  failed reply ~what:"to roll its thread back"
+;;
+
+let mark _ = None
 let thread_id t = Codex_codec.thread_id t.codec
 let in_turn t = Adapter.Driver.in_turn t.driver
 let alive t = Adapter.Driver.alive t.driver

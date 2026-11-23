@@ -50,6 +50,9 @@ type t =
   ; model_fallback : bool (** hand over to [fallback_models] *)
   ; images : bool
   ; ask_user : bool
+  ; rewind_note : string option
+    (** why it cannot rewind, when it is for a reason of the session's
+        (its directory is not in a git repository), with what to do *)
   }
 [@@deriving sexp_of]
 

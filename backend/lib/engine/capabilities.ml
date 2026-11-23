@@ -44,6 +44,7 @@ type t =
   ; model_fallback : bool
   ; images : bool
   ; ask_user : bool
+  ; rewind_note : string option [@sexp.option]
   }
 [@@deriving sexp_of]
 
@@ -59,6 +60,7 @@ let harness =
   ; model_fallback = true
   ; images = true
   ; ask_user = true
+  ; rewind_note = None
   }
 ;;
 
@@ -114,6 +116,8 @@ let refusal t (feature : Feature.t) ~who =
   match feature with
   | Fork ->
     sprintf "%s sessions can't be forked: start a new session (/new)" who
+  | Rewind when Option.is_some t.rewind_note ->
+    sprintf "%s sessions can't rewind here: %s" who (Option.value_exn t.rewind_note)
   | Rewind ->
     if supports t Fork
     then

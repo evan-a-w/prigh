@@ -1104,16 +1104,27 @@ let composer_runner ?handoff_from t agent (adapter_id : Adapter_id.t) =
     let adapter_name = Adapter_id.to_string adapter_id in
     let start ~cwd =
       let host = Agent.active_host agent in
-      let resume =
+      let (module A : Adapter.S) = adapter in
+      let thread =
         List.find
           (Session.threads session)
           ~f:(fun (thread : Session.Thread.t) ->
             String.equal thread.adapter adapter_name
             && String.equal thread.host host)
-        |> Option.map ~f:(fun (thread : Session.Thread.t) -> thread.thread_id)
+      in
+      (* A forked session continues a fork of its parent's thread, where the
+         agent forks one. *)
+      let resume, fork, at =
+        match thread with
+        | None -> None, false, None
+        | Some { fork_from = None; thread_id; _ } -> Some thread_id, false, None
+        | Some { fork_from = Some at; thread_id; _ } ->
+          if A.fork_native then Some thread_id, true, Some at else None, false, None
       in
       { (Adapter.Start.default ~cwd) with
         resume
+      ; fork
+      ; at
       ; developer_instructions = Agent.user_instructions agent
       }
     in
@@ -1125,6 +1136,7 @@ let composer_runner ?handoff_from t agent (adapter_id : Adapter_id.t) =
            ; host = Agent.active_host agent
            ; thread_id
            ; cwd = Session.cwd session
+           ; fork_from = None
            }
          : Session.Entry.t)
     in
@@ -1142,6 +1154,7 @@ let composer_runner ?handoff_from t agent (adapter_id : Adapter_id.t) =
            spawned)
          ~start
          ~on_thread
+         ~checkpoint:(fun args -> Agent.host_call agent ~name:Checkpoint.op args)
          ~host:(fun () -> Agent.active_host agent)
          ?handoff_from
          ())

@@ -19,6 +19,14 @@ module Home = struct
   [@@deriving sexp, jsonaf, equal]
 end
 
+module Fork_point = struct
+  type t =
+    { turn_id : string option [@jsonaf.option] [@sexp.option]
+    ; mark : string option [@jsonaf.option] [@sexp.option]
+    }
+  [@@deriving sexp, jsonaf, equal]
+end
+
 module Entry = struct
   module Payload = struct
     type t =
@@ -95,11 +103,16 @@ module Entry = struct
           ; host : string
           ; thread_id : string
           ; cwd : string
+          ; fork_from : Fork_point.t option [@jsonaf.option] [@sexp.option]
           }
       | External_turn of
           { thread_id : string
           ; turn_id : string
           ; through : string
+          ; first_turn_id : string option [@jsonaf.option] [@sexp.option]
+          ; mark : string option [@jsonaf.option] [@sexp.option]
+          ; before : string option [@jsonaf.option] [@sexp.option]
+          ; after : string option [@jsonaf.option] [@sexp.option]
           }
       | Handoff of
           { from_adapter : string option [@jsonaf.option] [@sexp.option]
@@ -1593,6 +1606,7 @@ module Thread = struct
     ; host : string
     ; thread_id : string
     ; cwd : string
+    ; fork_from : Fork_point.t option
     }
   [@@deriving sexp_of, equal]
 end
@@ -1602,6 +1616,10 @@ module External_turn = struct
     { thread_id : string
     ; turn_id : string
     ; through : string
+    ; first_turn_id : string option
+    ; mark : string option
+    ; before : string option
+    ; after : string option
     }
   [@@deriving sexp_of, equal]
 end
@@ -1626,25 +1644,28 @@ let set_engine t (choice : Engine_choice.t) =
 let threads t =
   List.rev_filter_map (active_path t) ~f:(fun (e : Entry.t) ->
     match e.payload with
-    | Thread { adapter; host; thread_id; cwd } ->
-      Some { Thread.adapter; host; thread_id; cwd }
+    | Thread { adapter; host; thread_id; cwd; fork_from } ->
+      Some { Thread.adapter; host; thread_id; cwd; fork_from }
     | _ -> None)
 ;;
 
-let record_thread t ({ adapter; host; thread_id; cwd } : Thread.t) =
-  append t (Thread { adapter; host; thread_id; cwd })
+let record_thread t ({ adapter; host; thread_id; cwd; fork_from } : Thread.t) =
+  append t (Thread { adapter; host; thread_id; cwd; fork_from })
 ;;
 
-let external_turns t =
-  List.filter_map (active_path t) ~f:(fun (e : Entry.t) ->
+let external_turns ?(all = false) t =
+  List.filter_map (if all then entries t else active_path t) ~f:(fun (e : Entry.t) ->
     match e.payload with
-    | External_turn { thread_id; turn_id; through } ->
-      Some { External_turn.thread_id; turn_id; through }
+    | External_turn { thread_id; turn_id; through; first_turn_id; mark; before; after } ->
+      Some { External_turn.thread_id; turn_id; through; first_turn_id; mark; before; after }
     | _ -> None)
 ;;
 
-let record_external_turn t ({ thread_id; turn_id; through } : External_turn.t) =
-  append t (External_turn { thread_id; turn_id; through })
+let record_external_turn
+      t
+      ({ thread_id; turn_id; through; first_turn_id; mark; before; after } : External_turn.t)
+  =
+  append t (External_turn { thread_id; turn_id; through; first_turn_id; mark; before; after })
 ;;
 
 let record_handoff t ~from_adapter ~to_adapter ~text =
@@ -1746,6 +1767,8 @@ let fork ?at t ~dir =
          which may be on another branch. *)
       let texts = String.Hash_set.create () in
       let review = lazy (review t) in
+      let latest_thread = ref None in
+      let last_turns = String.Table.create () in
       let rec copy = function
         | [] -> ()
         | (e : Entry.t) :: rest ->
@@ -1792,10 +1815,16 @@ let fork ?at t ~dir =
             | Pinned _
             | Spend _
             | Resume_at _
-            | Agent_worktree _
-            | Thread _
-            | External_turn _
-            | Transcript_filter _ -> None
+            | Agent_worktree _ | Transcript_filter _ -> None
+            | Thread { adapter; host; thread_id; cwd; fork_from = _ } ->
+              latest_thread := Some { Thread.adapter; host; thread_id; cwd; fork_from = None };
+              None
+            | External_turn { thread_id; turn_id; through; first_turn_id; mark; _ } ->
+              Hashtbl.set
+                last_turns
+                ~key:thread_id
+                ~data:(turn_id, renamed through, first_turn_id, mark);
+              None
             | payload -> Some payload
           in
           Option.iter payload ~f:(fun payload ->
@@ -1804,6 +1833,39 @@ let fork ?at t ~dir =
           if not (String.equal e.id at) then copy rest
       in
       copy path;
+      (* The fork continues a fork of the thread its agent was on, from its
+         last turn in what was copied (agents that cannot fork one start
+         afresh, handed the session). *)
+      Option.iter !latest_thread ~f:(fun (thread : Thread.t) ->
+        Option.iter
+          (Hashtbl.find last_turns thread.thread_id)
+          ~f:(fun (turn_id, through, first_turn_id, mark) ->
+            ignore
+              (append
+                 forked
+                 (Thread
+                    { adapter = thread.adapter
+                    ; host = thread.host
+                    ; thread_id = thread.thread_id
+                    ; cwd = thread.cwd
+                    ; fork_from = Some { turn_id = Some turn_id; mark }
+                    })
+               : Entry.t);
+            (* What it saw, for handoffs; its files' checkpoints stay the
+               parent's. *)
+            ignore
+              (append
+                 forked
+                 (External_turn
+                    { thread_id = thread.thread_id
+                    ; turn_id
+                    ; through
+                    ; first_turn_id
+                    ; mark
+                    ; before = None
+                    ; after = None
+                    })
+               : Entry.t)));
       keep_hidden
         forked
         (List.map (hidden_kinds t) ~f:(fun (kind : Hidden.Kind.t) ->
