@@ -1577,10 +1577,10 @@ kbd {
 @media (prefers-reduced-motion: reduce) { .switch, .switch-knob { transition: none; } }
 
 .segmented { display: inline-flex; gap: 2px; padding: 2px; background: var(--well); border: 1px solid var(--rule); border-radius: var(--r-control); }
-.segment { border: 0; background: none; color: var(--muted-text); font-size: 12.5px; padding: 3px 10px; border-radius: 4px; cursor: pointer; }
-.segment:hover { color: var(--chalk); }
-.segment.on { background: var(--slate-2); color: var(--chalk); box-shadow: inset 0 0 0 1px var(--rule-2); }
-.segment:focus-visible { outline: 2px solid var(--sodium); outline-offset: 0; }
+.segment:not([data-slot]) { border: 0; background: none; color: var(--muted-text); font-size: 12.5px; padding: 3px 10px; border-radius: 4px; cursor: pointer; }
+.segment:not([data-slot]):hover { color: var(--chalk); }
+.segment:not([data-slot]).on { background: var(--slate-2); color: var(--chalk); box-shadow: inset 0 0 0 1px var(--rule-2); }
+.segment:not([data-slot]):focus-visible { outline: 2px solid var(--sodium); outline-offset: 0; }
 
 /* Appearance (lib/theme_view.ml): each theme as a small picture of the page
    in its colours, the user's accent on it; the accents as swatches, the

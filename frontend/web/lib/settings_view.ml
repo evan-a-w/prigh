@@ -349,22 +349,16 @@ let git_host (m : App.Model.t) (a : Forge_account.t) ~inject =
     | Some note -> Some ("warm", String.capitalize note)
     | None -> None
   in
-  div
-    ~cls:"setting git-host"
-    [ div
-        ~cls:"setting-text"
+  custom
+    ~cls:"git-host"
+    [ text
         [ div
-            ~cls:"git-host-name"
-            [ span ~cls:"setting-name" a.label
-            ; span ~cls:"setting-about host" a.host
-            ]
-        ; span ~cls:"setting-about" (String.capitalize (Forges.describe a) ^ ".")
-        ; (match note with
-           | Some (level, text) -> span ~cls:("setting-note " ^ level) text
-           | None -> Node.none)
+            ~cls:"git-host-name flex flex-wrap items-baseline gap-2"
+            [ name a.label; host a.host ]
+        ; about (String.capitalize (Forges.describe a) ^ ".")
+        ; Option.value_map note ~default:Node.none ~f:(fun n -> Settings_row.note n)
         ]
-    ; div
-        ~cls:"setting-control"
+    ; control
         (if Set.mem m.forges.signing_out a.host
          then
            [ button
@@ -481,13 +475,11 @@ let nix_store (m : App.Model.t) ~inject =
         ~note:("warm", String.capitalize e)
         [ refresh "Retry" ]
     | Loaded s ->
-      div
-        ~cls:"setting nix-store"
-        [ div
-            ~cls:"setting-text"
-            ([ span ~cls:"setting-name" "Disk usage"
-             ; span
-                 ~cls:"setting-about"
+      custom
+        ~cls:"nix-store"
+        [ text
+            ([ name "Disk usage"
+             ; Settings_row.about
                  (String.capitalize
                     (sprintf
                        "%s; %s."
@@ -496,9 +488,8 @@ let nix_store (m : App.Model.t) ~inject =
              ]
              @ List.map
                  (Nix_gc_command.details ~utc_offset:m.utc_offset s)
-                 ~f:(fun line ->
-                   span ~cls:"setting-note muted" (String.capitalize line)))
-        ; div ~cls:"setting-control" [ refresh "Refresh" ]
+                 ~f:(fun line -> note ("muted", String.capitalize line)))
+        ; control [ refresh "Refresh" ]
         ]
   in
   let days = keep_days n in
@@ -561,26 +552,25 @@ let account (m : App.Model.t) ~inject =
         []
     ]
   | Some { name; acting_as; host } ->
-    [ div
-        ~cls:"setting account-setting"
-        [ span ~cls:"avatar large" (Account_view.initial name)
-        ; div
-            ~cls:"setting-text"
-            [ span ~cls:"setting-name" ("Signed in as " ^ name)
+    [ custom
+        ~cls:"account-setting flex-nowrap items-start narrow:flex-wrap"
+        [ Account_view.avatar ~size:`Large name
+        ; text
+            ~cls:"basis-0 narrow:basis-[calc(100%-54px)]"
+            [ Settings_row.name ("Signed in as " ^ name)
             ; (match acting_as with
                | Some ns ->
-                 span
-                   ~cls:"setting-note warm"
-                   (sprintf
-                      "Acting as %s: you see and work in their sessions."
-                      ns)
+                 note
+                   ( "warm"
+                   , sprintf
+                       "Acting as %s: you see and work in their sessions."
+                       ns )
                | None -> Node.none)
             ; (match host with
-               | Some host -> span ~cls:"setting-about host" host
+               | Some h -> Settings_row.host h
                | None -> Node.none)
             ]
-        ; div
-            ~cls:"setting-control"
+        ; control
             [ button
                 ~cls:"small"
                 ~title:"Switch, add or act as another account"
@@ -627,12 +617,13 @@ let memory_switch (m : App.Model.t) ~inject =
 ;;
 
 let memory_draft (d : Memory_notes.Draft.t) ~inject =
-  div
-    ~cls:"setting memory-draft"
+  custom
+    ~cls:"memory-draft"
+    ~stack:true
     [ Node.input
         ~attrs:
           [ Attr.id "memory-title"
-          ; Attr.class_ "text-input memory-title-input"
+          ; Attr.class_ (input_cls "memory-title-input")
           ; Attr.type_ "text"
           ; Attr.create "aria-label" "Title"
           ; Attr.placeholder "Title (optional): a few words"
@@ -646,7 +637,7 @@ let memory_draft (d : Memory_notes.Draft.t) ~inject =
     ; Node.textarea
         ~attrs:
           [ Attr.id "memory-text"
-          ; Attr.class_ "text-input memory-text-input"
+          ; Attr.class_ (textarea_cls "memory-text-input min-h-[4.5em]")
           ; Attr.create "aria-label" "Note"
           ; Attr.placeholder "What the model should remember"
           ; Attr.value d.text
@@ -657,11 +648,11 @@ let memory_draft (d : Memory_notes.Draft.t) ~inject =
           ]
         []
     ; (match d.error with
-       | Some e -> span ~cls:"setting-note warm" e
+       | Some e -> note ("warm", e)
        | None -> Node.none)
-    ; div
+    ; buttons
         ~cls:"memory-draft-buttons"
-        [ span ~cls:"memory-draft-keys" "Ctrl+Enter saves, Esc cancels"
+        [ hint ~cls:"memory-draft-keys mr-auto" "Ctrl+Enter saves, Esc cancels"
         ; button
             ~cls:"small ghost"
             ~title:"Esc"
@@ -705,7 +696,7 @@ let about_you_field
   let control =
     match About_you.Field.choices field with
     | Some choices ->
-      div ~cls:"about-you-choice" ~attrs:[ Attr.id id ]
+      div ~cls:"about-you-choice min-w-0" ~attrs:[ Attr.id id ]
       @@ [ segmented
              ~disabled
              ~label:(About_you.Field.label field)
@@ -721,7 +712,7 @@ let about_you_field
       Node.textarea
         ~attrs:
           (common
-           @ [ Attr.class_ "text-input about-you-input"
+           @ [ Attr.class_ (textarea_cls "about-you-input min-h-[4.5em]")
              ; Attr.placeholder (About_you.Field.placeholder field)
              ; Attr.value value
              ; Attr.rows
@@ -735,7 +726,7 @@ let about_you_field
       Node.input
         ~attrs:
           (common
-           @ [ Attr.class_ "text-input about-you-line"
+           @ [ Attr.class_ (input_cls "about-you-line w-full min-w-0 flex-1")
              ; Attr.type_ "text"
              ; Attr.placeholder (About_you.Field.placeholder field)
              ; Attr.value value
@@ -749,7 +740,7 @@ let about_you_field
     | Time_zone, Some zone when not (String.equal (String.strip value) zone) ->
       Some
         (button
-           ~cls:"small about-you-detect"
+           ~cls:"small about-you-detect max-w-1/2 flex-none truncate"
            ~title:("Fill in this browser's time zone, " ^ zone)
            ~disabled
            ~on_click:(inject (Action.About_you_field (Time_zone, zone)))
@@ -758,20 +749,22 @@ let about_you_field
   in
   div
     ~cls:
-      ("about-you-field"
-       ^ if About_you.Field.multiline field then " wide" else "")
+      (if About_you.Field.multiline field
+       then "about-you-field wide flex min-w-0 basis-full flex-col gap-1.5"
+       else "about-you-field flex min-w-0 flex-[1_1_220px] flex-col gap-1.5")
     ~attrs:[ Attr.id (id ^ "-field") ]
     [ Node.label
         ~attrs:
           [ (match About_you.Field.choices field with
              | Some _ -> Attr.empty
              | None -> Attr.for_ id)
-          ; Attr.class_ "about-you-label"
+          ; Attr.class_ "about-you-label text-[13px] font-medium text-muted-foreground"
           ]
         [ Node.text (About_you.Field.label field) ]
     ; (match detected with
        | None -> control
-       | Some detected -> div ~cls:"about-you-with" [ control; detected ])
+       | Some detected ->
+         div ~cls:"about-you-with flex min-w-0 items-center gap-2" [ control; detected ])
     ]
 ;;
 
@@ -789,7 +782,11 @@ let about_you (m : App.Model.t) ~inject =
   let max = a.info.max_total in
   let dirty = About_you.dirty a in
   let ready = About_you.Status.equal a.status Loaded in
-  let note cls text = span ~cls:("setting-note " ^ cls) text in
+  let note cls text =
+    match String.lsplit2 cls ~on:' ' with
+    | Some (level, extra) -> Settings_row.note ~cls:extra (level, text)
+    | None -> Settings_row.note (cls, text)
+  in
   let status =
     match a.status, a.error with
     | _, Some e -> note "warm about-you-error" e
@@ -800,7 +797,7 @@ let about_you (m : App.Model.t) ~inject =
     | (Unknown | Loading), None -> note "muted" "Reading what you set…"
     | Loaded, None when a.elsewhere ->
       div
-        ~cls:"about-you-elsewhere"
+        ~cls:"about-you-elsewhere flex items-center gap-2 [&>.setting-note]:min-w-0 [&>.setting-note]:flex-1"
         [ note
             "warm"
             "It was changed somewhere else while you were typing. Saving \
@@ -822,35 +819,36 @@ let about_you (m : App.Model.t) ~inject =
     | Loaded, None -> Node.none
   in
   let disabled = a.saving || not ready in
-  div
-    ~cls:"setting about-you"
-    [ div
-        ~cls:"setting-text"
-        [ span ~cls:"setting-name" "Tell the model about you"
-        ; span
-            ~cls:"setting-about"
+  custom
+    ~cls:"about-you"
+    ~stack:true
+    [ text
+        ~wide:true
+        [ name "Tell the model about you"
+        ; Settings_row.about
             "Every field is optional. What you fill in is given to the model \
              in every session: new ones start with it, and open ones get it \
              with your next message. Memory is for notes the model looks up \
              only when it needs them."
         ]
     ; div
-        ~cls:"about-you-form"
+        ~cls:"about-you-form flex flex-wrap items-start gap-x-4 gap-y-3"
         (List.map About_you.Field.all ~f:(fun field ->
            about_you_field m field ~inject ~disabled))
     ; status
-    ; div
-        ~cls:"about-you-buttons"
+    ; buttons
+        ~cls:
+          "about-you-buttons sticky bottom-0 z-1 -mb-2 bg-card py-2"
         [ (if max > 0
            then
-             span
+             hint
                ~cls:
                  (if size * 10 >= max * 9
-                  then "about-you-count near"
-                  else "about-you-count")
+                  then "about-you-count near mr-auto tabular-nums text-destructive"
+                  else "about-you-count mr-auto tabular-nums")
                (sprintf "%d of %d bytes" size max)
            else Node.none)
-        ; span ~cls:"about-you-keys" "Ctrl+Enter saves"
+        ; hint ~cls:"about-you-keys" "Ctrl+Enter saves"
         ; (if dirty
            then
              button
@@ -871,6 +869,19 @@ let about_you (m : App.Model.t) ~inject =
     ]
 ;;
 
+let note_row_cls = "flex-nowrap items-start"
+let forgetting_cls = "bg-destructive/10"
+
+let note_text text =
+  Node.span
+    ~attrs:
+      [ Attr.class_
+          "memory-note-text whitespace-pre-wrap text-sm leading-normal \
+           [overflow-wrap:anywhere]"
+      ]
+    [ Node.text text ]
+;;
+
 let memory_note (n : Memory_notes.t) (note : Memory.Note.t) ~inject =
   match n.draft with
   | Some ({ id = Some id; _ } as d) when String.equal id note.id ->
@@ -878,29 +889,25 @@ let memory_note (n : Memory_notes.t) (note : Memory.Note.t) ~inject =
   | _ ->
     let forgetting = Option.equal String.equal n.forgetting (Some note.id) in
     let name = Option.value note.title ~default:"Untitled note" in
-    div
+    custom
       ~cls:
         (if forgetting
-         then "setting memory-note forgetting"
-         else "setting memory-note")
+         then "memory-note forgetting " ^ note_row_cls ^ " " ^ forgetting_cls
+         else "memory-note " ^ note_row_cls)
       ~attrs:[ Attr.create "data-note" note.id ]
-      [ div
-          ~cls:"setting-text"
+      [ text
+          ~cls:"basis-0"
           [ (match note.title with
-             | Some title -> span ~cls:"setting-name" title
+             | Some title -> Settings_row.name title
              | None -> Node.none)
-          ; span ~cls:"memory-note-text" note.text
-          ; span
-              ~cls:
-                (if forgetting
-                 then "setting-note warm"
-                 else "setting-note muted")
+          ; note_text note.text
+          ; Settings_row.note
               (if forgetting
-               then "Delete this note? The model can no longer recall it."
-               else "Saved " ^ Memory.Note.date note)
+               then "warm", "Delete this note? The model can no longer recall it."
+               else "muted", "Saved " ^ Memory.Note.date note)
           ]
-      ; div
-          ~cls:"setting-control"
+      ; control
+          ~cls:(if forgetting then "self-center gap-2" else "gap-0.5")
           (if forgetting
            then
              [ button
@@ -922,7 +929,7 @@ let memory_note (n : Memory_notes.t) (note : Memory.Note.t) ~inject =
                  ~on_click:(inject (Action.Memory_edit (Some note.id)))
                  [ icon Pencil ]
              ; button
-                 ~cls:"icon ghost memory-delete"
+                 ~cls:"icon ghost memory-delete hover:text-destructive"
                  ~label:("Delete " ^ name)
                  ~title:"Delete"
                  ~on_click:(inject (Action.Memory_forget note.id))
@@ -936,19 +943,19 @@ let memory_notes (m : App.Model.t) ~inject =
   let notes = n.memory.notes in
   let add =
     button
-      ~cls:"small memory-add"
+      ~cls:"small memory-add whitespace-nowrap"
       ~title:"Write a note for the model yourself"
       ~disabled:(Option.is_some n.draft)
       ~on_click:(inject (Action.Memory_edit None))
       [ icon Plus; Node.text "Add note" ]
   in
   let toolbar =
-    div
-      ~cls:"setting memory-toolbar"
+    custom
+      ~cls:"memory-toolbar flex-nowrap gap-2"
       [ Node.input
           ~attrs:
             [ Attr.id "memory-filter"
-            ; Attr.class_ "text-input memory-filter"
+            ; Attr.class_ (input_cls "memory-filter min-w-0 flex-1")
             ; Attr.type_ "search"
             ; Attr.create "aria-label" "Filter notes"
             ; Attr.placeholder "Filter notes"
@@ -964,10 +971,10 @@ let memory_notes (m : App.Model.t) ~inject =
   let error =
     match n.error with
     | Some e ->
-      [ div
-          ~cls:"setting memory-error"
+      [ custom
+          ~cls:"memory-error"
           ~attrs:[ Attr.role "alert" ]
-          [ span ~cls:"setting-note warm" e ]
+          [ note ("warm", e) ]
       ]
     | None -> []
   in
@@ -1060,12 +1067,13 @@ let instruction_draft
       ~inject
   =
   let limits = n.instructions.limits in
-  div
-    ~cls:"setting memory-draft instruction-draft"
+  custom
+    ~cls:"memory-draft instruction-draft"
+    ~stack:true
     [ Node.input
         ~attrs:
           [ Attr.id "instruction-title"
-          ; Attr.class_ "text-input memory-title-input"
+          ; Attr.class_ (input_cls "memory-title-input")
           ; Attr.type_ "text"
           ; Attr.create "aria-label" "Title"
           ; Attr.placeholder "Title (optional): a few words"
@@ -1079,7 +1087,7 @@ let instruction_draft
     ; Node.textarea
         ~attrs:
           [ Attr.id "instruction-text"
-          ; Attr.class_ "text-input memory-text-input"
+          ; Attr.class_ (textarea_cls "memory-text-input min-h-[4.5em]")
           ; Attr.create "aria-label" "Instruction"
           ; Attr.placeholder
               "What the model should always do, e.g. “Use Australian spelling.”"
@@ -1091,11 +1099,11 @@ let instruction_draft
           ]
         []
     ; (match d.error with
-       | Some e -> span ~cls:"setting-note warm" e
+       | Some e -> note ("warm", e)
        | None -> Node.none)
-    ; div
+    ; buttons
         ~cls:"memory-draft-buttons"
-        [ span ~cls:"memory-draft-keys" "Ctrl+Enter saves, Esc cancels"
+        [ hint ~cls:"memory-draft-keys mr-auto" "Ctrl+Enter saves, Esc cancels"
         ; button
             ~cls:"small ghost"
             ~title:"Esc"
@@ -1123,27 +1131,27 @@ let instruction_note
   | _ ->
     let removing = Option.equal String.equal n.removing (Some note.id) in
     let name = Option.value note.title ~default:note.id in
-    div
+    custom
       ~cls:
         (if removing
-         then "setting memory-note instruction forgetting"
-         else "setting memory-note instruction")
+         then
+           "memory-note instruction forgetting " ^ note_row_cls ^ " "
+           ^ forgetting_cls
+         else "memory-note instruction " ^ note_row_cls)
       ~attrs:[ Attr.create "data-note" note.id ]
-      [ div
-          ~cls:"setting-text"
+      [ text
+          ~cls:"basis-0"
           [ (match note.title with
-             | Some title -> span ~cls:"setting-name" title
+             | Some title -> Settings_row.name title
              | None -> Node.none)
-          ; span ~cls:"memory-note-text" note.text
-          ; span
-              ~cls:
-                (if removing then "setting-note warm" else "setting-note muted")
+          ; note_text note.text
+          ; Settings_row.note
               (if removing
-               then "Delete this instruction? No session gets it any more."
-               else sprintf "%s · saved %s" note.id (Memory.Note.date note))
+               then "warm", "Delete this instruction? No session gets it any more."
+               else "muted", sprintf "%s · saved %s" note.id (Memory.Note.date note))
           ]
-      ; div
-          ~cls:"setting-control"
+      ; control
+          ~cls:(if removing then "self-center gap-2" else "gap-0.5")
           (if removing
            then
              [ button
@@ -1165,7 +1173,7 @@ let instruction_note
                  ~on_click:(inject (Action.Instruction_edit (Some note.id)))
                  [ icon Pencil ]
              ; button
-                 ~cls:"icon ghost memory-delete"
+                 ~cls:"icon ghost memory-delete hover:text-destructive"
                  ~label:("Delete " ^ name)
                  ~title:"Delete"
                  ~on_click:(inject (Action.Instruction_remove note.id))
@@ -1179,19 +1187,19 @@ let instructions_size (n : Instruction_notes.t) =
   let count = List.length n.instructions.notes in
   if tokens > Instruction_notes.warn_tokens
   then
-    div
-      ~cls:"setting instructions-warning"
+    custom
+      ~cls:
+        "instructions-warning m-3 flex-nowrap items-start gap-2.5 rounded-md \
+         border border-destructive/40 bg-destructive/10 px-3 py-2.5 \
+         first:border-t"
       ~attrs:[ Attr.role "status" ]
-      [ icon Warning
-      ; div
-          ~cls:"setting-text"
-          [ span
-              ~cls:"setting-name"
+      [ icon ~cls:"mt-0.5 size-4 flex-none text-destructive" Warning
+      ; text
+          [ name
               (sprintf
                  "About %s tokens in every session"
                  (Int.to_string_hum ~delimiter:',' tokens))
-          ; span
-              ~cls:"setting-about"
+          ; Settings_row.about
               "They are added to the context of every session, before you say \
                anything: that is cost on every message and room the work no \
                longer has. Trim them: merge near-duplicates, drop what no \
@@ -1200,15 +1208,15 @@ let instructions_size (n : Instruction_notes.t) =
           ]
       ]
   else
-    div
-      ~cls:"setting instructions-size"
-      [ span
-          ~cls:"setting-note muted"
-          (sprintf
-             "%d of %d · about %s tokens in every session"
-             count
-             n.instructions.limits.count
-             (Int.to_string_hum ~delimiter:',' tokens))
+    custom
+      ~cls:"instructions-size py-2"
+      [ note
+          ( "muted"
+          , sprintf
+              "%d of %d · about %s tokens in every session"
+              count
+              n.instructions.limits.count
+              (Int.to_string_hum ~delimiter:',' tokens) )
       ]
 ;;
 
@@ -1217,7 +1225,7 @@ let instruction_rows (m : App.Model.t) ~inject =
   let notes = n.instructions.notes in
   let add =
     button
-      ~cls:"small memory-add instruction-add"
+      ~cls:"small memory-add instruction-add whitespace-nowrap"
       ~title:"Write an instruction for the model yourself"
       ~disabled:(Option.is_some n.draft)
       ~on_click:(inject (Action.Instruction_edit None))
@@ -1226,10 +1234,10 @@ let instruction_rows (m : App.Model.t) ~inject =
   let error =
     match n.error with
     | Some e ->
-      [ div
-          ~cls:"setting memory-error"
+      [ custom
+          ~cls:"memory-error"
           ~attrs:[ Attr.role "alert" ]
-          [ span ~cls:"setting-note warm" e ]
+          [ note ("warm", e) ]
       ]
     | None -> []
   in
@@ -1271,7 +1279,7 @@ let instruction_rows (m : App.Model.t) ~inject =
     @ draft
     @
     if List.is_empty draft
-    then [ div ~cls:"setting instructions-toolbar" [ add ] ]
+    then [ custom ~cls:"instructions-toolbar justify-end py-2.5" [ add ] ]
     else []
 ;;
 
@@ -1358,27 +1366,45 @@ let section_icon : Section.t -> Icon.t = function
   | Account -> User
 ;;
 
-(* The sections down the side (a strip over the page on a phone), as tabs:
-   the arrows move between them. The account's tab, last, is the user. *)
+(* The sections down the side in groups (in the sections' order), as tabs:
+   the arrows move between them. The account's tab, last and apart, is the user. *)
+let nav_groups : (string * Section.t list) list =
+  [ "General", [ Appearance; Sessions; New_sessions ]
+  ; "Models", [ Models; Usage ]
+  ; "You", [ Memory; About_you; Custom_instructions ]
+  ; "Integrations", [ Mcp; Git_hosting; Nix_store ]
+  ]
+;;
+
+let face (m : App.Model.t) (section : Section.t) =
+  match section, Account_view.who m with
+  | Account, Some who -> Account_view.avatar ~size:`Small who.name, who.name
+  | _ ->
+    ( icon ~cls:"size-4 shrink-0 text-muted-foreground" (section_icon section)
+    , Section.name section )
+;;
+
 let nav (m : App.Model.t) ~current ~inject =
+  let available = Section.available ~superuser:(App.superuser m) in
   let tab (section : Section.t) =
     let selected = Section.equal section current in
-    let face =
-      match section, Account_view.who m with
-      | Account, Some who ->
-        [ span ~cls:"avatar" (Account_view.initial who.name)
-        ; span ~cls:"settings-tab-name" who.name
-        ]
-      | _ ->
-        [ icon (section_icon section)
-        ; span ~cls:"settings-tab-name" (Section.name section)
-        ]
-    in
+    let glyph, label = face m section in
     Node.button
       ~attrs:
-        [ classes
-            [ "settings-tab"; "settings-tab-" ^ Section.arg section ]
-            [ "on", selected ]
+        [ Attr.class_
+            (Loon.Cn.cn
+               [ "settings-tab settings-tab-" ^ Section.arg section
+               ; (if selected then "on" else "")
+               ; "flex h-8 w-full min-w-0 items-center gap-2 rounded-md px-2 \
+                  text-left text-[13px] text-sidebar-foreground/80 \
+                  outline-none hover:bg-sidebar-accent \
+                  hover:text-sidebar-accent-foreground focus-visible:ring-2 \
+                  focus-visible:ring-ring \
+                  aria-selected:bg-sidebar-accent \
+                  aria-selected:font-medium \
+                  aria-selected:text-sidebar-accent-foreground \
+                  aria-selected:[&>svg]:text-primary"
+               ])
         ; Attr.id (Section.tab_id section)
         ; Attr.type_ "button"
         ; Attr.role "tab"
@@ -1390,63 +1416,139 @@ let nav (m : App.Model.t) ~current ~inject =
         ; Attr.tabindex (if selected then 0 else -1)
         ; Attr.on_click (fun _ -> inject (Action.Settings_section section))
         ]
-      face
+      [ glyph
+      ; Node.span
+          ~attrs:[ Attr.class_ "settings-tab-name min-w-0 truncate" ]
+          [ Node.text label ]
+      ]
+  in
+  let group (title, sections) =
+    match List.filter sections ~f:(List.mem available ~equal:Section.equal) with
+    | [] -> Node.none
+    | sections ->
+      Node.div
+        ~attrs:[ Attr.class_ "flex flex-col gap-0.5"; Attr.role "presentation" ]
+        (Node.div
+           ~attrs:
+             [ Attr.class_ "px-2 pt-3 pb-1 text-xs font-medium text-muted-foreground"
+             ; Attr.create "aria-hidden" "true"
+             ]
+           [ Node.text title ]
+         :: List.map sections ~f:tab)
   in
   Node.div
     ~attrs:
-      [ Attr.class_ "settings-nav"
+      [ Attr.class_
+          "settings-nav loon flex min-h-0 flex-col gap-1 overflow-y-auto \
+           border-r bg-sidebar px-2 pt-1 pb-2"
       ; Attr.role "tablist"
       ; Attr.create "aria-label" "Settings sections"
-      ; Attr.create
-          "aria-orientation"
-          (if m.narrow then "horizontal" else "vertical")
+      ; Attr.create "aria-orientation" "vertical"
       ]
-    (List.map (Section.available ~superuser:(App.superuser m)) ~f:tab)
+    (List.map nav_groups ~f:group
+     @
+     if List.mem available Account ~equal:Section.equal
+     then
+       [ Node.div
+           ~attrs:[ Attr.class_ "mt-auto border-t pt-2" ]
+           [ tab Account ]
+       ]
+     else [])
 ;;
 
 (* On a phone: the settings fill the screen, a list of the sections (each
    with what it is about) and a level down to one, with a way back, rather
    than a strip of tabs over a page. *)
 let phone_home (m : App.Model.t) ~inject =
+  let available = Section.available ~superuser:(App.superuser m) in
   let row (section : Section.t) =
-    let face, about =
+    let glyph, about =
       match section, Account_view.who m with
-      | Account, Some who ->
-        span ~cls:"avatar" (Account_view.initial who.name), who.name
-      | _ -> icon (section_icon section), Section.about section
+      | Account, Some who -> Account_view.avatar who.name, who.name
+      | _ ->
+        ( icon ~cls:"size-[18px] text-muted-foreground" (section_icon section)
+        , Section.about section )
     in
     Node.button
       ~attrs:
-        [ classes
-            [ "settings-home-row"; "settings-tab-" ^ Section.arg section ]
-            []
+        [ Attr.class_
+            ("settings-home-row settings-tab-" ^ Section.arg section
+             ^ " flex min-h-14 w-full items-center gap-3 border-t px-3 \
+                py-2.5 text-left first:border-t-0 active:bg-accent \
+                hover:bg-accent focus-visible:bg-accent \
+                focus-visible:outline-none")
         ; Attr.type_ "button"
         ; Attr.create "data-settings-tab" (Section.arg section)
         ; Attr.title ("/settings " ^ Section.arg section)
         ; Attr.on_click (fun _ -> inject (Action.Settings_section section))
         ]
-      [ Node.span ~attrs:[ Attr.class_ "settings-home-icon" ] [ face ]
+      [ Node.span
+          ~attrs:
+            [ Attr.class_
+                "settings-home-icon flex size-9 flex-none items-center \
+                 justify-center rounded-md bg-muted"
+            ]
+          [ glyph ]
       ; Node.span
-          ~attrs:[ Attr.class_ "settings-home-text" ]
-          [ span ~cls:"settings-home-name" (Section.name section)
-          ; span ~cls:"settings-home-about" about
+          ~attrs:[ Attr.class_ "settings-home-text flex min-w-0 flex-1 flex-col gap-0.5" ]
+          [ Node.span
+              ~attrs:[ Attr.class_ "settings-home-name text-base font-medium" ]
+              [ Node.text (Section.name section) ]
+          ; Node.span
+              ~attrs:
+                [ Attr.class_
+                    "settings-home-about line-clamp-2 text-[13px] leading-snug \
+                     text-muted-foreground"
+                ]
+              [ Node.text about ]
           ]
-      ; icon ~cls:"settings-home-chevron" Chevron
+      ; icon ~cls:"settings-home-chevron size-4 flex-none text-muted-foreground" Chevron
+      ]
+  in
+  let card sections =
+    Node.div
+      ~attrs:[ Attr.class_ "overflow-hidden rounded-lg border bg-card" ]
+      (List.map sections ~f:row)
+  in
+  let group (title, sections) =
+    match List.filter sections ~f:(List.mem available ~equal:Section.equal) with
+    | [] -> []
+    | sections ->
+      [ Node.div
+          ~attrs:
+            [ Attr.class_ "px-1 pt-4 pb-1.5 text-[13px] font-medium text-muted-foreground"
+            ; Attr.create "aria-hidden" "true"
+            ]
+          [ Node.text title ]
+      ; card sections
       ]
   in
   Node.nav
     ~attrs:
-      [ Attr.class_ "settings-home"
+      [ Attr.class_
+          "settings-home loon flex flex-col px-[max(12px,var(--safe-r))] \
+           pb-[max(16px,var(--safe-b))] pl-[max(12px,var(--safe-l))]"
       ; Attr.create "aria-label" "Settings sections"
       ]
-    (List.map (Section.available ~superuser:(App.superuser m)) ~f:row)
+    (List.concat_map nav_groups ~f:group
+     @
+     if List.mem available Account ~equal:Section.equal
+     then [ Node.div ~attrs:[ Attr.class_ "mt-5" ] [ card [ Account ] ] ]
+     else [])
 ;;
 
 let panel (m : App.Model.t) current ~inject =
   Node.div
     ~key:(Section.arg current)
     ~attrs:
-      [ classes [ "settings-panel"; "settings-panel-" ^ Section.arg current ] []
+      [ Attr.class_
+          ("settings-panel settings-panel-" ^ Section.arg current
+           ^ " loon min-h-0 overflow-y-auto px-6 pt-5 pb-6 [scrollbar-gutter:stable] \
+              animate-in fade-in-0 slide-in-from-bottom-1 duration-150 \
+              motion-reduce:animate-none narrow:overflow-visible \
+              narrow:px-[max(16px,var(--safe-r))] narrow:pt-4 \
+              narrow:pb-[max(24px,var(--safe-b))] \
+              narrow:pl-[max(16px,var(--safe-l))] narrow:animate-none")
       ; Attr.id "settings-panel"
       ; (if m.narrow
          then Attr.create "aria-label" (Section.name current)
@@ -1457,9 +1559,18 @@ let panel (m : App.Model.t) current ~inject =
              ])
       ]
     (Node.header
-       ~attrs:[ Attr.class_ "settings-panel-head" ]
-       [ Node.h3 [ Node.text (Section.name current) ]
-       ; Node.p [ Node.text (Section.about current) ]
+       ~attrs:[ Attr.class_ "settings-panel-head mb-1" ]
+       [ Node.h3
+           ~attrs:
+             [ Attr.class_ "text-lg font-semibold tracking-tight narrow:hidden" ]
+           [ Node.text (Section.name current) ]
+       ; Node.p
+           ~attrs:
+             [ Attr.class_
+                 "mt-1 max-w-[62ch] text-[13px] leading-normal \
+                  text-muted-foreground narrow:mt-0 narrow:text-sm"
+             ]
+           [ Node.text (Section.about current) ]
        ]
      :: content m current ~inject)
 ;;
@@ -1473,7 +1584,7 @@ let view (m : App.Model.t) ~inject =
     then []
     else
       [ button
-          ~cls:"ghost shortcuts"
+          ~cls:"ghost shortcuts mr-auto px-2"
           ~title:"/hotkeys"
           ~on_click:(inject (Action.Run "/hotkeys"))
           [ Node.text "Keyboard shortcuts" ]
@@ -1486,20 +1597,25 @@ let view (m : App.Model.t) ~inject =
   match m.narrow, m.settings_home with
   | true, true ->
     Modal.view
-      ~cls:"settings-dialog phone-page settings-home-page"
+      ~cls:"settings-dialog phone-page settings-home-page [&>.modal-body]:block [&>.modal-body]:overflow-y-auto [&>.modal-body]:p-0"
       ~title:"Settings"
       ~on_close:(inject Action.Close_dialog)
       [ phone_home m ~inject ]
   | true, false ->
     Modal.view
-      ~cls:"settings-dialog phone-page settings-section-page"
+      ~cls:"settings-dialog phone-page settings-section-page [&>.modal-body]:block [&>.modal-body]:overflow-y-auto [&>.modal-body]:p-0"
       ~title:(Section.name current)
       ~back:("Settings", inject Action.Settings_home)
       ~on_close:(inject Action.Close_dialog)
       [ panel m current ~inject ]
   | false, _ ->
     Modal.view
-      ~cls:"settings-dialog"
+      ~cls:
+        "settings-dialog h-[min(720px,88vh)] max-h-none w-[min(940px,100%)] \
+         [&>.modal-body]:grid [&>.modal-body]:flex-auto \
+         [&>.modal-body]:grid-cols-[208px_minmax(0,1fr)] \
+         [&>.modal-body]:overflow-hidden [&>.modal-body]:p-0 \
+         [&>.modal-buttons]:border-t [&>.modal-head]:border-b"
       ~title:"Settings"
       ~on_close:(inject Action.Close_dialog)
       ~footer

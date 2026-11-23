@@ -1,8 +1,7 @@
 open! Core
 open! Import
 
-(** The account switcher: the button at the bottom of the sidebar (who we are,
-    and who we act as) and the menu it opens. *)
+(** Who we are signed in as, their avatar, and the account menu. *)
 
 module Who : sig
   type t =
@@ -18,11 +17,8 @@ val who : App.Model.t -> Who.t option
 (** The avatar's letter. *)
 val initial : string -> string
 
-(** [None] when there is no account to show (an open backend). *)
-val trigger
-  :  App.Model.t
-  -> inject:(App.Action.t -> unit Effect.t)
-  -> Node.t option
+(** Their letter in a circle (loon's Avatar fallback). *)
+val avatar : ?size:[ `Small | `Default | `Large ] -> string -> Node.t
 
 (** The account menu, from its [Dialog.Picker { kind = Accounts; _ }]. *)
 val menu
