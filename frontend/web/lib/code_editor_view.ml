@@ -71,21 +71,36 @@ let dirty_dot (b : E.Buffer.t) =
   else Node.none
 ;;
 
+(* loon's DropdownMenu (Menu_view's surface), its items buttons. *)
 let menu (_ : E.t) (b : E.Buffer.t option) ~inject =
   let item ?(cls = "") ?(disabled = false) label hint action =
     Node.button
       ~attrs:
-        ([ Attr.class_ ("code-menu-item " ^ cls)
+        ([ Attr.class_
+             (String.strip
+                ("code-menu-item menu-item w-full border-0 bg-transparent \
+                  text-left narrow:min-h-11 "
+                 ^ cls))
+         ; Attr.create "data-slot" "dropdown-menu-item"
          ; Attr.type_ "button"
          ; Attr.role "menuitem"
          ; Attr.on_click (fun _ -> inject (code action))
          ]
+         @ (if String.equal cls "danger"
+            then [ Attr.create "data-variant" "destructive" ]
+            else [])
          @ if disabled then [ Attr.disabled ] else [])
-      [ span ~cls:"code-menu-label" label; span ~cls:"code-menu-hint" hint ]
+      [ span ~cls:"code-menu-label menu-label" label
+      ; (if String.is_empty hint
+         then Node.none
+         else span ~cls:"code-menu-hint menu-command" hint)
+      ]
   in
   let no_file = Option.is_none b in
-  Node.div
-    ~attrs:[ Attr.class_ "code-menu"; Attr.role "menu"; Attr.id "code-menu" ]
+  Menu_view.surface
+    ~cls:"code-menu"
+    ~label:"Editor"
+    ~attrs:[ Attr.id "code-menu" ]
     [ item ~disabled:no_file "Save" "Ctrl+S" Save
     ; item ~disabled:no_file "Reload from disk" "" Reload
     ; item ~disabled:no_file "Go to line" "Ctrl+G" Goto_open
@@ -127,7 +142,9 @@ let strip (m : App.Model.t) ~inject =
   Node.header
     ~attrs:[ classes [ "code-strip" ] [ "hidden", t.strip_hidden && m.narrow ] ]
     [ button
-        ~cls:"icon ghost code-tree-toggle"
+        ~cls:"code-tree-toggle shrink-0 narrow:size-11"
+        ~variant:Ghost
+        ~size:Icon_sm
         ~title:(if m.narrow then "Files" else "Show or hide the files (Ctrl+B)")
         ~label:"Files"
         ~attrs:
@@ -148,7 +165,9 @@ let strip (m : App.Model.t) ~inject =
         [ (match b with
            | Some b when E.Buffer.dirty b && not m.narrow ->
              button
-               ~cls:"small primary code-save"
+               ~cls:"code-save mr-1.5"
+               ~variant:Default
+               ~size:Sm
                ~title:"Save (Ctrl+S)"
                ~disabled:b.saving
                ~on_click:(inject (code Save))
@@ -158,7 +177,9 @@ let strip (m : App.Model.t) ~inject =
            then Node.none
            else
              button
-               ~cls:"icon ghost code-chat-toggle"
+               ~cls:"code-chat-toggle shrink-0 narrow:size-11"
+        ~variant:Ghost
+        ~size:Icon_sm
                ~title:"Show or hide the chat (Alt+C)"
                ~label:"Chat"
                ~attrs:[ Attr.create "aria-pressed" (Bool.to_string t.chat) ]
@@ -167,7 +188,9 @@ let strip (m : App.Model.t) ~inject =
         ; Node.div
             ~attrs:[ Attr.class_ "code-menu-anchor" ]
             [ button
-                ~cls:"icon ghost code-more"
+                ~cls:"code-more shrink-0 narrow:size-11"
+        ~variant:Ghost
+        ~size:Icon_sm
                 ~title:"More"
                 ~label:"More"
                 ~attrs:
@@ -191,7 +214,9 @@ let strip (m : App.Model.t) ~inject =
            then Node.none
            else
              button
-               ~cls:"icon ghost code-leave"
+               ~cls:"code-leave shrink-0 narrow:size-11"
+        ~variant:Ghost
+        ~size:Icon_sm
                ~title:"Back to the chat (Esc)"
                ~label:"Leave the editor"
                ~on_click:(inject (code Leave))
@@ -224,7 +249,9 @@ let tabs (m : App.Model.t) ~inject =
                  ]
                [ Node.text name; dirty_dot b ]
            ; button
-               ~cls:"icon ghost code-tab-close"
+               ~cls:"code-tab-close mr-1"
+               ~variant:Ghost
+               ~size:Icon_xs
                ~title:(sprintf "Close %s (Alt+W)" name)
                ~label:(sprintf "Close %s" name)
                ~on_click:(inject (code (Close b.path)))
