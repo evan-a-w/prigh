@@ -41,6 +41,7 @@ start() {
 	session="prigh-test-$$-$RANDOM"
 	{
 		echo "export HOME=$tmp/home TERM=xterm-256color EDITOR=$tmp/editor.sh PRIGH_BACKEND=$backend"
+		for e in ${extra_env[@]+"${extra_env[@]}"}; do echo "export $(printf %q "$e")"; done
 		echo "$exe ${tui_args:--faux} -cwd $tmp/cwd -auth-file $tmp/home/auth.json $*"
 		echo "echo EXITED"
 		echo "stty -a | tr ' ;' '\\n\\n' | grep -E '^-?(icanon|echo|iexten|isig|ixon)\$' | tr '\\n' ' '; echo"
@@ -124,6 +125,7 @@ run_scenario() {
 	# Fixed length, so that lines wrap the same everywhere.
 	tmp="$(mktemp -d /tmp/prigh-tmux.XXXXXX)"
 	extra_args=""
+	extra_env=()
 	tui_args=""
 	interactive=""
 	no_start=""
@@ -845,6 +847,63 @@ scenario_detached() {
 	detached -faux -connect 127.0.0.1:1 cwd
 	detached PRIGH_TMUX=/nonexistent/tmux -faux cwd
 	sessions
+}
+
+# The composer engine: a backend running Codex and Claude Code sessions, with
+# `prigh fake-cli` standing in for a logged-in `codex` (one turn of `codex
+# app-server`) and no `claude` on the PATH.
+setup_engines() {
+	extra_args="-- -engines harness,composer -adapters codex,claude"
+	mkdir -p "$tmp/bin"
+	local dirs=() d
+	IFS=: read -r -a dirs <<<"$PATH"
+	local path="$tmp/bin"
+	for d in "${dirs[@]}"; do
+		[ -n "$d" ] && [ ! -e "$d/claude" ] && path="$path:$d"
+	done
+	extra_env=("PATH=$path" "PRIGH_HOST_NAME=laptop")
+	local t='"threadId":"thr_t","turnId":"turn_1"'
+	local turn='{"id":"turn_1","items":[],"status":"%s","error":null}'
+	cat >"$tmp/codex.jsonl" <<JSONL
+{"type":"command","args":["--version"],"stdout":"codex-cli 0.166.0\n"}
+{"type":"command","args":["login","status"],"stdout":"Logged in using ChatGPT\n"}
+{"type":"expect_outbound","frame":{"id":1,"method":"initialize"}}
+{"type":"emit_inbound","frame":{"id":1,"result":{"userAgent":"codex_cli_rs/0.166.0 (linux; x86_64)"}}}
+{"type":"expect_outbound","frame":{"method":"initialized"}}
+{"type":"expect_outbound","frame":{"id":2,"method":"thread/start"}}
+{"type":"emit_inbound","frame":{"id":2,"result":{"thread":{"id":"thr_t"},"model":"gpt-5.2-codex","modelProvider":"openai","approvalPolicy":"untrusted","sandbox":{"type":"readOnly"},"reasoningEffort":null}}}
+{"type":"expect_outbound","frame":{"id":3,"method":"turn/start"}}
+{"type":"emit_inbound","frame":{"id":3,"result":{"turn":$(printf "$turn" inProgress)}}}
+{"type":"emit_inbound","frame":{"method":"turn/started","params":{"threadId":"thr_t","turn":$(printf "$turn" inProgress)}}}
+{"type":"emit_inbound","frame":{"method":"item/started","params":{$t,"item":{"type":"agentMessage","id":"m1","text":"","phase":"final_answer"}}}}
+{"type":"emit_inbound","frame":{"method":"item/agentMessage/delta","params":{$t,"itemId":"m1","delta":"Hello from Codex."}}}
+{"type":"emit_inbound","frame":{"method":"item/completed","params":{$t,"item":{"type":"agentMessage","id":"m1","text":"Hello from Codex.","phase":"final_answer"}}}}
+{"type":"emit_inbound","frame":{"method":"turn/completed","params":{"threadId":"thr_t","turn":$(printf "$turn" completed)}}}
+JSONL
+	printf '#!/bin/sh\nexec %q fake-cli codex --script %q -- "$@"\n' "$backend" "$tmp/codex.jsonl" >"$tmp/bin/codex"
+	chmod +x "$tmp/bin/codex"
+}
+
+scenario_engines() {
+	wait_for "Ctrl+C"
+	type_text "/new codex"
+	keys Enter
+	wait_for "Codex"
+	type_text "hello"
+	keys Enter
+	wait_for "Hello from Codex"
+	settle
+	capture engines "a Codex session's turn"
+	type_text "/compact"
+	keys Enter
+	wait_for "compacts its context"
+	settle
+	capture engines "a control Codex sessions do not have"
+	type_text "/adapters"
+	keys Enter
+	wait_for "not installed"
+	settle
+	capture engines "/adapters"
 }
 
 run_scenario "$1"

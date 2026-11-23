@@ -285,14 +285,39 @@ NAME=TOKEN,...` sign in as NAME but never as a superuser, for tool hosts.
 
 ### Engines
 
-A backend runs sessions on the **harness** (prigh's own agent loop, the
-default) and the **composer**, which drives coding agents
-you have installed and signed in to on the session's tool host (Codex,
-Claude Code, ACP agents) while prigh keeps the session, its log and the UI:
-`prigh serve -engines harness,composer -adapters codex,claude` (or
-`$PRIGH_ENGINES`, `$PRIGH_ADAPTERS`). Users, settings and sign-ins are the
-same on either engine. A session made on an engine the backend does not run
-can still be read there.
+A backend runs sessions on the **harness**, prigh's own agent loop calling
+the model's API (the default), and, when you deploy it, the **composer**,
+which hands the work to a coding agent you have installed and signed in to
+on the session's tool host: the Codex CLI (`codex app-server`) or Claude
+Code (`claude`, stream-json). prigh keeps the session: its log (messages,
+tool calls, models, usage and the cost the agent reports), naming, search,
+worktrees, approvals and the UI, so a Codex or Claude Code session looks and
+works like any other: the same tool cards and diffs, the confirm dialog and
+approval rules, questions, plans and subagents. Their tools run where the
+session's tools run (the tool host you choose), and prigh's own tools that
+the agents lack (`render_ui`, `memory`, `sessions`, the git host's pull
+requests and issues, worktrees, ...) are served to them as an MCP server
+named `prigh`. Your custom instructions and what prigh knows about you go
+to them too.
+
+```
+prigh serve -engines harness,composer -adapters codex,claude
+```
+
+(or `$PRIGH_ENGINES`, `$PRIGH_ADAPTERS`; the first engine is the default for
+new sessions). Users, settings and sign-ins are the same on either engine,
+so one backend can run both or you can run one of each. With the composer
+deployed, prigh-web's new-session screen has an engine chip, `/new codex`
+(or `/new` for a picker) starts a session on an adapter, and `/engine`
+switches a session to another agent (or the harness), which gets the
+conversation so far quoted in a handoff ahead of your next message, as does
+an agent taking over on another tool host. ACP agents (`-adapters
+acp:opencode`, Gemini CLI, ...) and prigh's own harness (`prigh`) are
+adapters too. The model chip and status line say which agent runs it
+(`Codex · gpt-5.2-codex`). What an agent cannot do is refused with what to
+do instead ("Codex sessions can't rewind in place: fork from that
+message instead (/fork)"); the controls for it are hidden or disabled. A
+session made on an engine the backend does not run can still be read there.
 
 The composer drives `codex`, `claude`, any ACP agent (`acp:opencode`,
 `acp:gemini` and `acp:goose` are known; give others their command,
@@ -301,7 +326,9 @@ one of its adapters.
 
 Settings → Engines in prigh-web, and `/adapters` in the TUI, show whether
 each agent CLI is installed and logged in on each tool host, and what to run
-there when not (prigh never installs one or logs in for you).
+there when not ("Codex is not installed on laptop, please install it",
+"Claude Code on laptop is not logged in: run `claude auth login` there").
+prigh never installs one or logs in for you.
 
 ### Computer use
 

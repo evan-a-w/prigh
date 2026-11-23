@@ -262,6 +262,70 @@ there". prigh never installs a CLI or logs in. prigh-web shows them in
 Settings → Engines (only when the backend deploys the composer), the TUI
 with `/adapters` (which otherwise says how to deploy it).
 
+`Engine_gate` (`rpc/`) refuses, before dispatch, the methods the attached
+session's engine lacks (`Capabilities.method_feature`: fork, rewind, trim
+and delete, compact, `downsize_images`, `btw`, steering subagents, plan
+mode), with what to do instead, named after the adapter ("Codex sessions
+can't rewind in place: fork from that message instead (/fork)"); the
+`Agent` vals behind them check too, and the frontends mirror the check
+(`Session_engine`) to hide or disable the controls.
+
+The composer (`composer/`), from the bottom up:
+
+- **Codecs** (`codex/`, `claude/`, `acp/`): pure, no I/O. Each turns its
+  CLI's lines into `Adapter_event`s (`engine/`: text and thinking deltas,
+  tool start/update/end with a `Tool_kind` and diffs, approval requests,
+  questions, plans, usage and reported cost, turn end with its `Stop`,
+  errors classified as usage limits, auth, overload...) and builds the lines
+  to send. `Codex_codec` speaks `codex app-server` (JSON-RPC lines: threads,
+  turns, `turn/steer`, approvals, `item/tool/requestUserInput`);
+  `Claude_codec` speaks `claude` stream-json with its control protocol
+  (`can_use_tool` permission prompts, `AskUserQuestion`, `ExitPlanMode`,
+  in-band `mcp_message`), with `Claude_launch` building the argv;
+  `Acp_client_codec` is the client side of ACP v1, spec only. Their tests
+  replay transcripts recorded by T3 Code (`test/fixtures/`, see `NOTICE`).
+- **Adapters** (`Adapter_intf.S`: `Codex_adapter`, `Claude_adapter`; found
+  by `Composer_adapters`) wrap a codec around a `Line_transport`: launch
+  argv and environment, start or resume a thread, send, steer, interrupt,
+  answer, and the adapter's `Capabilities`.
+- **`Host_transport`** spawns the adapter's CLI on the session's active
+  tool host through `$process` (`Host_stream`, see Tool hosts), with the MCP
+  side channel on: a CLI that is not installed there fails with
+  `Host_stream.Ended`'s message and makes `Adapter_health` check that host
+  again.
+- **`Composer_runner`** is the composer's `Runner`: it starts the CLI on
+  the first turn and keeps it between turns, restarting it and resuming the
+  recorded thread (a `Thread` entry per adapter and host) when it exited or
+  its host went; routes approval requests through `Services.approve` (the
+  approval mode, rules, Smart mode and the confirm dialog) and questions
+  through `ask_user`; steers mid-turn where the CLI can (Codex) and between
+  turns otherwise; and records the cost the CLI reports as spend
+  (`External_model` names its replies `codex/MODEL`, priced at zero).
+- **`Composer_recorder`** turns the events into the same `Agent_event`s
+  and messages a harness run makes, with each external tool call under
+  prigh's name for it (`Canonical_tool`: `Bash` and `commandExecution` are
+  `bash`, `fileChange` is `apply_patch`, `TodoWrite` is `update_plan`,
+  `Task` a nested subagent), so tool cards, diffs, approval rules, search
+  and plans work unchanged.
+- **`Injected_tools`** serves prigh's tools the agents lack (`render_ui`,
+  `memory`, `custom_instructions`, `sessions`, `ask_session`, the forge
+  tools, `worktree`; `ask_user` only for agents without questions of their
+  own) as the MCP server `prigh`: in band for Claude Code, through `prigh
+  mcp-bridge` on the tool host (`Mcp_bridge`, relaying stdio to
+  `$PRIGH_MCP_SOCKET`) for Codex and ACP agents. The user's custom
+  instructions and user info go to the CLI as developer instructions
+  (Codex) or `--append-system-prompt` (Claude Code).
+- **`Handoff`** quotes the session for an adapter taking over (another
+  adapter, another host, a thread it cannot resume): within a token budget,
+  the latest messages verbatim under a header saying where the session
+  came from and how to read what was left out (`sessions`), or only what
+  that adapter has not seen when switching back. `set_adapter` switches a
+  session's adapter.
+- **`Fake_cli`** (`prigh fake-cli codex|claude --script FILE`, hidden)
+  stands in for a CLI in the e2e tests: it answers `--version` and the
+  login-status commands, and replays a transcript's frames against the
+  backend's.
+
 The composer's adapters (`Adapter_intf`) are `Codex_adapter`,
 `Claude_adapter` and `Acp_adapter`, each a process wrapper over its codec,
 plus `Prigh_adapter`, which runs the harness in the backend for a composer
@@ -541,11 +605,13 @@ builds installers for Linux, macOS and Windows.
 
 | Command | What |
 |---|---|
-| `serve` | the backend: stdio, `-listen`, `-web` (`-open`, `-web-root`), `-token`/`-tokens`, `-no-backend-host`, `-session` (the default session) |
+| `serve` | the backend: stdio, `-listen`, `-web` (`-open`, `-web-root`), `-token`/`-tokens`, `-no-backend-host`, `-session` (the default session), `-engines`/`-adapters` |
 | `tool-host` | the local tool worker; `-connect`/`-remote` for a standalone host; `-computer` |
 | `web` | prigh-web locally for a remote backend (`-connect`, else `$PRIGH_CONNECT` or the saved connection) |
 | `desktop` | the desktop app's sidecar |
 | `acp` | the Agent Client Protocol on stdio |
+| `mcp-bridge` | prigh's tools for a CLI the composer runs (started by the CLI, relaying to `$PRIGH_MCP_SOCKET`) |
+| `fake-cli codex\|claude --script FILE` | hidden: a stand-in for a CLI in the e2e tests |
 | `run <prompt>` | headless run streaming to stdout (confirmations denied) |
 | `sessions`, `login`, `logout`, `auth` | sessions and credentials without a backend |
 | `trace SESSION` | `Trace_report` over a session's trace |

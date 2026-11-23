@@ -66,6 +66,8 @@ let methods =
   ; "resume_now"
   ; "downsize_images"
   ; "new_session"
+  ; "set_adapter"
+  ; "list_adapters"
   ; "keep_session"
   ; "switch_session"
   ; "list_sessions"
@@ -837,6 +839,7 @@ let maybe_evict t agent =
   then (
     Hashtbl.remove t.agents (session_id agent);
     Hashtbl.remove t.listed (session_id agent);
+    Agent.stop_engine agent;
     let session = Agent.session agent in
     if Session.persisted session && not (Session.gone session)
     then (
@@ -1091,52 +1094,57 @@ let recheck_adapter t agent adapter =
 (* A composer session's runner, driving its adapter's harness on the
    session's tool host and continuing the thread the session recorded there
    (each process records the threads it starts). *)
-let composer_runner t agent (adapter_id : Adapter_id.t) =
+let composer_runner ?handoff_from t agent (adapter_id : Adapter_id.t) =
   match adapter_id with
-  | Prigh -> Ok (Prigh_adapter.runner ~harness:(fun () -> Agent.harness_runner agent))
+  | Prigh ->
+    Ok (Prigh_adapter.runner ~harness:(fun () -> Agent.harness_runner agent))
   | _ ->
-  let%map.Or_error adapter = Composer_adapters.find t.engines adapter_id in
-  let session = Agent.session agent in
-  let adapter_name = Adapter_id.to_string adapter_id in
-  let start ~cwd =
-    let host = Agent.active_host agent in
-    let resume =
-      List.find (Session.threads session) ~f:(fun (thread : Session.Thread.t) ->
-        String.equal thread.adapter adapter_name
-        && String.equal thread.host host)
-      |> Option.map ~f:(fun (thread : Session.Thread.t) -> thread.thread_id)
+    let%map.Or_error adapter = Composer_adapters.find t.engines adapter_id in
+    let session = Agent.session agent in
+    let adapter_name = Adapter_id.to_string adapter_id in
+    let start ~cwd =
+      let host = Agent.active_host agent in
+      let resume =
+        List.find
+          (Session.threads session)
+          ~f:(fun (thread : Session.Thread.t) ->
+            String.equal thread.adapter adapter_name
+            && String.equal thread.host host)
+        |> Option.map ~f:(fun (thread : Session.Thread.t) -> thread.thread_id)
+      in
+      { (Adapter.Start.default ~cwd) with
+        resume
+      ; developer_instructions = Agent.user_instructions agent
+      }
     in
-    { (Adapter.Start.default ~cwd) with
-      resume
-    ; developer_instructions = Agent.user_instructions agent
-    }
-  in
-  let on_thread thread_id =
-    ignore
-      (Session.record_thread
-         session
-         { adapter = adapter_name
-         ; host = Agent.active_host agent
-         ; thread_id
-         ; cwd = Session.cwd session
-         }
-       : Session.Entry.t)
-  in
-  Composer_runner.runner
-    (Composer_runner.create
-       ~sw:t.sw
-       ~adapter
-       ~spawn:(fun launch ->
-         let spawned =
-           match t.spawn_external with
-           | Some spawn -> spawn agent launch
-           | None -> host_spawn t agent launch
-         in
-         if Result.is_error spawned then recheck_adapter t agent adapter_id;
-         spawned)
-       ~start
-       ~on_thread
-       ())
+    let on_thread thread_id =
+      ignore
+        (Session.record_thread
+           session
+           { adapter = adapter_name
+           ; host = Agent.active_host agent
+           ; thread_id
+           ; cwd = Session.cwd session
+           }
+         : Session.Entry.t)
+    in
+    Composer_runner.runner
+      (Composer_runner.create
+         ~sw:t.sw
+         ~adapter
+         ~spawn:(fun launch ->
+           let spawned =
+             match t.spawn_external with
+             | Some spawn -> spawn agent launch
+             | None -> host_spawn t agent launch
+           in
+           if Result.is_error spawned then recheck_adapter t agent adapter_id;
+           spawned)
+         ~start
+         ~on_thread
+         ~host:(fun () -> Agent.active_host agent)
+         ?handoff_from
+         ())
 ;;
 
 (* Gives a composer session (that can run here) its runner. *)
@@ -2317,6 +2325,47 @@ let attached_state (client : Client.t) =
    it, where it is; another client's on the config's [default_host] while
    that is connected, else as [start_location] says. On the default host
    (the backend's without one), in [default_cwd] when there is one. *)
+(* Moves the attached session to another of the composer's adapters: the
+   new one's harness takes over at the next turn, handed what it has not
+   seen of the session. Not while a run goes on. *)
+let set_adapter t (client : Client.t) params =
+  let open Or_error.Let_syntax in
+  let agent = client.agent in
+  let%bind name = string_param params "adapter" in
+  let%bind choice =
+    Engines.choose t.engines ~engine:(Some "composer") ~adapter:(Some name)
+  in
+  let previous = Agent.engine_choice agent in
+  if Engine_choice.equal choice previous
+  then Ok (attached_state client)
+  else if Agent.is_running agent
+  then
+    Or_error.errorf
+      "%s is still running: wait for the run to end (or abort it with Esc), \n\
+      \       then switch to %s"
+      (Agent.engine_label agent)
+      (Option.value_map
+         choice.adapter
+         ~default:(Engine_choice.label choice)
+         ~f:Adapter_id.label)
+  else (
+    let%bind () =
+      match Engines.unavailable t.engines choice with
+      | None -> Ok ()
+      | Some why -> Error (Error.of_string why)
+    in
+    let%bind adapter =
+      Result.of_option
+        choice.adapter
+        ~error:(Error.of_string "the composer needs an adapter")
+    in
+    let%map runner = composer_runner t agent adapter ~handoff_from:previous in
+    Agent.set_engine agent choice;
+    Agent.set_unavailable agent None;
+    Agent.set_runner agent (Some runner);
+    attached_state client)
+;;
+
 let new_session_start t (client : Client.t) =
   let start = start_location t client ~cwd:(own_cwd client) in
   if client.tools
@@ -2384,10 +2433,12 @@ let new_session
         "prigh: the ledger of a temporary session: %s\n%!"
         (Exn.to_string exn));
   let agent = start_new_agent t session start in
+  (* Attached first: recording the engine changes the state, and a session
+     no client has is evicted when its state changes. *)
+  attach t client agent;
   Agent.set_engine agent engine;
   Agent.set_unavailable agent (engine_unavailable t agent);
   attach_engine t agent;
-  attach t client agent;
   match attached_state client, key with
   | `Object fields, Some key ->
     `Object (fields @ [ "temporary_key", `String key ])
@@ -3461,6 +3512,7 @@ let dispatch_server t (client : Client.t) ~meth ~params
       (Or_error.map (Agent.save_as_default client.agent) ~f:(fun () ->
          config_saved t client.agent;
          Config.to_json (Agent.config client.agent)))
+  | "set_adapter" -> Some (set_adapter t client params)
   | "new_session" ->
     Some
       (let%bind.Or_error temporary =
