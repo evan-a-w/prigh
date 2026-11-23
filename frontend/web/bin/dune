@@ -68,9 +68,6 @@
   review.css
   editor.css
   highlight.css
-  resize.css
-  paging.css
-  jump.css
   forge.css
   status.css
   temporary.css
@@ -88,9 +85,6 @@
     (cat files.css)
     (cat review.css)
     (cat highlight.css)
-    (cat resize.css)
-    (cat paging.css)
-    (cat jump.css)
     (cat forge.css)
     (cat status.css)
     (cat temporary.css)

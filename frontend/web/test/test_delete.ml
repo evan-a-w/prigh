@@ -710,7 +710,7 @@ let%expect_test "with a trim before: two dividers, each Undo its own" =
   chat h;
   [%expect
     {|
-    ✂ 2 messages trimmed · ~19k tokens (Show) · (Undo)
+    2 messages trimmed · ~19k tokens (Show) · (Undo)
     question 2
     10:02
     answer 2

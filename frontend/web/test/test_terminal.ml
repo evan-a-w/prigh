@@ -61,7 +61,8 @@ let%expect_test
   [%expect
     {|
     <section id="terminal-panel" aria-label="Terminal" class="terminal-panel">
-      <div role="separator"
+      <div data-slot="resizable-handle"
+           role="separator"
            tabindex="0"
            aria-label="Resize the terminal"
            aria-orientation="horizontal"
@@ -341,7 +342,8 @@ let%expect_test "/terminal, the chrome's button and the height" =
     (Cache_prefs (((key web.terminal-height) (value (120)))))
     (Rpc (method_ set_prefs) (params ((prefs ((web.terminal-height 120)))))
      (tag Show_error))
-    <div role="separator"
+    <div data-slot="resizable-handle"
+         role="separator"
          tabindex="0"
          aria-label="Resize the terminal"
          aria-orientation="horizontal"
@@ -359,7 +361,8 @@ let%expect_test "/terminal, the chrome's button and the height" =
     (Rpc (method_ set_prefs) (params ((prefs ((web.terminal-height 300)))))
      (tag Show_error))
     <section id="terminal-panel" aria-label="Terminal" class="terminal-panel">
-      <div role="separator"
+      <div data-slot="resizable-handle"
+           role="separator"
            tabindex="0"
            aria-label="Resize the terminal"
            aria-orientation="horizontal"

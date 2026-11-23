@@ -1406,7 +1406,8 @@ let%expect_test "on a wide window threads sit in a margin beside their lines" =
     <div class="review-code-main">
     <aside class="review-margin">
     <aside aria-label="Comments" class="review-margin">
-      <div role="separator"
+      <div data-slot="resizable-handle"
+           role="separator"
            tabindex="0"
            aria-label="Resize the review's comments"
            aria-orientation="vertical"
