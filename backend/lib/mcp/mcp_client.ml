@@ -159,59 +159,23 @@ module Stdio = struct
   let stderr_capacity = 4096
   let max_message_bytes = 64 * 1024 * 1024
 
-  let environment ~extra =
-    let overridden = String.Set.of_list (List.map extra ~f:fst) in
-    let inherited =
-      Array.to_list (Core_unix.environment ())
-      |> List.filter ~f:(fun entry ->
-        match String.lsplit2 entry ~on:'=' with
-        | Some (key, _) -> not (Set.mem overridden key)
-        | None -> true)
-    in
-    inherited @ List.map extra ~f:(fun (k, v) -> k ^ "=" ^ v)
-  ;;
-
-  let is_executable path =
-    match Core_unix.access path [ `Exec ] with
-    | Ok () -> not (Sys_unix.is_directory_exn path)
-    | Error _ -> false
-  ;;
-
   (* Resolved here rather than by Eio so that [PATH] comes from the
      server's environment and relative commands from its directory. *)
   let resolve ~(server : Mcp_config.Server.t) ~environment command =
-    if String.mem command '/'
-    then (
-      let path =
-        if Filename.is_relative command
-        then Filename.concat server.dir command
-        else command
-      in
-      if is_executable path
-      then Ok path
-      else
-        Error
-          (sprintf
-             "%s does not exist or is not executable; fix \"command\" in %s"
-             path
-             server.source))
-    else (
-      let path =
-        List.find_map environment ~f:(String.chop_prefix ~prefix:"PATH=")
-        |> Option.value ~default:"/usr/bin:/bin"
-      in
-      List.find_map (String.split path ~on:':') ~f:(fun dir ->
-        let candidate =
-          Filename.concat (if String.is_empty dir then "." else dir) command
-        in
-        Option.some_if (is_executable candidate) candidate)
-      |> Result.of_option
-           ~error:
-             (sprintf
-                "the command %S was not found on PATH; install it, or fix \
-                 \"command\" in %s"
-                command
-                server.source))
+    Result.map_error
+      (Executable.resolve ~environment ~dir:server.dir command)
+      ~f:(function
+        | Not_executable path ->
+          sprintf
+            "%s does not exist or is not executable; fix \"command\" in %s"
+            path
+            server.source
+        | Not_on_path ->
+          sprintf
+            "the command %S was not found on PATH; install it, or fix \
+             \"command\" in %s"
+            command
+            server.source)
   ;;
 
   let tail output =
@@ -219,12 +183,7 @@ module Stdio = struct
   ;;
 
   let exit_reason status ~stderr =
-    let how =
-      match status with
-      | `Exited n -> sprintf "exited (code %d)" n
-      | `Signaled n ->
-        sprintf "was killed (%s)" (Signal.to_string (Signal.of_caml_int n))
-    in
+    let how = Executable.describe_status status in
     match tail stderr with
     | "" -> "the server " ^ how
     | stderr -> sprintf "the server %s: %s" how stderr
@@ -250,7 +209,7 @@ module Stdio = struct
         ~args
         ~extra_env
     =
-    let environment = environment ~extra:extra_env in
+    let environment = Executable.environment ~extra:extra_env in
     let open Result.Let_syntax in
     let%bind executable = resolve ~server ~environment command in
     let%bind () =

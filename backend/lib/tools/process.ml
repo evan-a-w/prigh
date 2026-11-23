@@ -39,6 +39,8 @@ let run
       ?(on_stdout = ignore)
       ?(on_stderr = ignore)
       ?(merge_stderr = false)
+      ?term_grace
+      ?(on_spawn = ignore)
       ~prog
       ~args
       ()
@@ -88,6 +90,7 @@ let run
      not by [cancel]: Eio kills only the child, not what it started. *)
   Switch.on_release sw (fun () ->
     if not !reaped then Signal_unix.send_i Signal.kill group);
+  on_spawn (Pid.of_int (Eio.Process.pid child));
   Eio.Flow.close stdin_r;
   Eio.Flow.close stdout_w;
   Option.iter stderr ~f:(fun (_, stderr_w) -> Eio.Flow.close stderr_w);
@@ -141,7 +144,10 @@ let run
     | Some (Error `Timeout) -> `Timed_out
     | Some (Ok status) -> `Done status
   in
-  Option.iter input ~f:Stdin_feed.finish;
+  (match outcome, term_grace with
+   | `Cancelled, Some _ -> ()
+   | (`Cancelled | `Timed_out | `Done _), _ ->
+     Option.iter input ~f:Stdin_feed.finish);
   (* What escaped even the tree (a daemon reparented to init) may hold the
      pipes: the output stops being waited for after [drain_after_kill]. *)
   let kill_and_reap () =
@@ -152,10 +158,27 @@ let run
        : (unit, [ `Timeout ]) Result.t);
     ignore (Eio.Process.await child : Eio.Process.exit_status)
   in
+  (* Asked to stop: end of input and SIGTERM first, so that it may save its
+     state; [kill_and_reap] whatever is left after [grace]. Once it exited
+     and its output ended, nothing of it is left to kill. *)
+  let terminated grace =
+    Option.iter input ~f:(fun input ->
+      ignore (Stdin_feed.write input "" ~close:true : unit Or_error.t));
+    Signal_unix.send_i Signal.term group;
+    match
+      Eio.Time.with_timeout
+        (Eio.Stdenv.clock env)
+        (Time_ns.Span.to_sec grace)
+        (fun () -> Ok (wait ()))
+    with
+    | Ok (_ : Eio.Process.exit_status) -> true
+    | Error `Timeout -> false
+  in
   let exit =
     match outcome with
     | `Cancelled ->
-      kill_and_reap ();
+      if not (Option.value_map term_grace ~default:false ~f:terminated)
+      then kill_and_reap ();
       Exit.Cancelled
     | `Timed_out ->
       kill_and_reap ();
@@ -163,6 +186,7 @@ let run
     | `Done (`Exited n) -> Exited n
     | `Done (`Signaled n) -> Signaled (Signal.of_caml_int n)
   in
+  Option.iter input ~f:Stdin_feed.finish;
   reaped := true;
   exit
 ;;

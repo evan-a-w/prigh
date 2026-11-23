@@ -21,7 +21,12 @@ end
 
     With [merge_stderr], the process's stderr is its stdout's pipe:
     [on_stdout] gets both in the order the process wrote them, and
-    [on_stderr] nothing. *)
+    [on_stderr] nothing.
+
+    On [cancel], with [term_grace] the process first gets the end of
+    [input] and SIGTERM, and is killed only if it has not exited within
+    [term_grace]; without it, it is killed straight away. [on_spawn] gets
+    its pid once it started. *)
 val run
   :  env:Env.t
   -> ?cwd:string
@@ -33,6 +38,8 @@ val run
   -> ?on_stdout:(string -> unit)
   -> ?on_stderr:(string -> unit)
   -> ?merge_stderr:bool
+  -> ?term_grace:Time_ns.Span.t
+  -> ?on_spawn:(Pid.t -> unit)
   -> prog:string
   -> args:string list
   -> unit
