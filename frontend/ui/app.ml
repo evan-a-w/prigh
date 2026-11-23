@@ -1030,13 +1030,12 @@ let current_choice m =
 let engine_choices m ~switch =
   let choices =
     if switch
-    then P.Deployed_engines.adapters m.deployed
+    then P.Deployed_engines.switch_targets m.deployed
     else P.Deployed_engines.choices m.deployed
   in
   match current_choice m with
   | Some c when List.mem choices c ~equal:P.Deployed_engines.Choice.equal ->
-    c
-    :: List.filter choices ~f:(Fn.non (P.Deployed_engines.Choice.equal c))
+    c :: List.filter choices ~f:(Fn.non (P.Deployed_engines.Choice.equal c))
   | _ -> choices
 ;;
 
@@ -1047,8 +1046,7 @@ let engine_picker m ~switch =
       Picker.Item.create
         ~id:(P.Deployed_engines.Choice.key c)
         ~detail:(P.Deployed_engines.Choice.describe c)
-        ~marked:
-          (Option.equal P.Deployed_engines.Choice.equal current (Some c))
+        ~marked:(Option.equal P.Deployed_engines.Choice.equal current (Some c))
         (P.Deployed_engines.Choice.label c))
   in
   let title = if switch then "Switch this session to" else "New session on" in
@@ -1067,21 +1065,23 @@ let new_session_on m (c : P.Deployed_engines.Choice.t) =
 ;;
 
 let switch_adapter m (c : P.Deployed_engines.Choice.t) =
+  let target = Option.value c.adapter ~default:c.engine in
   match c.adapter with
-  | None -> error m "/engine switches between the composer's adapters", []
-  | Some adapter
-    when Option.exists m.state ~f:(fun (s : P.State.t) ->
-           [%equal: string option] s.engine.adapter (Some adapter)) ->
+  | _
+    when Option.equal
+           P.Deployed_engines.Choice.equal
+           (current_choice m)
+           (Some c) ->
     notice m (sprintf "already on %s" (P.Deployed_engines.Choice.label c)), []
-  | Some adapter ->
+  | Some _ | None ->
     ( notice m (sprintf "switching to %s…" (P.Deployed_engines.Choice.label c))
-    , [ rpc "set_adapter" ~params:[ "adapter", str adapter ] ] )
+    , [ rpc "set_adapter" ~params:[ "adapter", str target ] ] )
 ;;
 
 let engine_chosen m ~switch arg =
   let choices =
     if switch
-    then P.Deployed_engines.adapters m.deployed
+    then P.Deployed_engines.switch_targets m.deployed
     else P.Deployed_engines.choices m.deployed
   in
   match P.Deployed_engines.find_in choices arg with
@@ -1093,17 +1093,17 @@ let new_command m args =
   match args with
   | [] when P.Deployed_engines.has_choice m.deployed ->
     engine_picker m ~switch:false, []
-  | [] ->
-    m, [ rpc "new_session" ~tag:(Reload_messages_notice "new session") ]
+  | [] -> m, [ rpc "new_session" ~tag:(Reload_messages_notice "new session") ]
   | [ arg ] when P.Deployed_engines.has_choice m.deployed ->
     engine_chosen m ~switch:false arg
   | [ _ ] ->
-    error m "this backend runs only the harness: /new starts a session on it", []
+    ( error m "this backend runs only the harness: /new starts a session on it"
+    , [] )
   | _ -> error m "usage: /new [engine]  (e.g. /new codex)", []
 ;;
 
 let engine_command m args =
-  match args, P.Deployed_engines.adapters m.deployed with
+  match args, P.Deployed_engines.switch_targets m.deployed with
   | _, [] ->
     ( error
         m
@@ -2885,8 +2885,14 @@ let relinked m ~generation (outcome : Server_link.Outcome.t) =
        let m = reset_connection m in
        let m =
          match P.Hello_reply.of_json json with
-         | Ok ({ client_id; namespace; user; superuser; features = _; deployed = _ } as hello)
-           ->
+         | Ok
+             ({ client_id
+              ; namespace
+              ; user
+              ; superuser
+              ; features = _
+              ; deployed = _
+              } as hello) ->
            { m with
              client_id = Some client_id
            ; namespace
@@ -2964,8 +2970,14 @@ let reconnect_reply m ~generation result =
      | Ok json ->
        let client_id, namespace, user, superuser, pasted_text, deployed =
          match P.Hello_reply.of_json json with
-         | Ok ({ client_id; namespace; user; superuser; features = _; deployed = _ } as hello)
-           ->
+         | Ok
+             ({ client_id
+              ; namespace
+              ; user
+              ; superuser
+              ; features = _
+              ; deployed = _
+              } as hello) ->
            ( Some client_id
            , namespace
            , user
@@ -2973,7 +2985,12 @@ let reconnect_reply m ~generation result =
            , P.Hello_reply.pasted_text hello
            , hello.deployed )
          | Error _ ->
-           m.client_id, m.namespace, m.user, m.superuser, m.pasted_text, m.deployed
+           ( m.client_id
+           , m.namespace
+           , m.user
+           , m.superuser
+           , m.pasted_text
+           , m.deployed )
        in
        let m, session_commands =
          reset_session
@@ -3202,7 +3219,10 @@ let set_chat m (s : P.State.t) ~on =
 let cycle_mode m =
   match m.state with
   | None -> notice m "not connected", []
-  | Some s -> set_mode m (Session_mode.cycle
+  | Some s ->
+    set_mode
+      m
+      (Session_mode.cycle
          ~plan:(P.Session_engine.supports s.engine Plan_mode)
          (Session_mode.of_state s))
 ;;
@@ -3213,15 +3233,17 @@ let mode_picker m =
   | Some s ->
     let current = Session_mode.of_state s in
     let items =
-      List.map (Session_mode.choices
+      List.map
+        (Session_mode.choices
            ~plan:(P.Session_engine.supports s.engine Plan_mode)
            ~current
-           ()) ~f:(fun mode ->
-        Picker.Item.create
-          ~id:(Session_mode.label mode)
-          ~detail:(Session_mode.describe mode)
-          ~marked:(Session_mode.equal mode current)
-          (Session_mode.label mode))
+           ())
+        ~f:(fun mode ->
+          Picker.Item.create
+            ~id:(Session_mode.label mode)
+            ~detail:(Session_mode.describe mode)
+            ~marked:(Session_mode.equal mode current)
+            (Session_mode.label mode))
     in
     open_picker m Modes (Picker.create ~title:"Mode (Alt+M cycles)" items), []
 ;;
@@ -4967,7 +4989,8 @@ let run_command_unchecked m (cmd : Commands.Parsed.t) =
 
 (* The feature a slash command needs of the session's engine: checked before
    any picker opens, so a refusal comes first. *)
-let command_feature (cmd : Commands.Parsed.t) : P.Session_engine.Feature.t option
+let command_feature (cmd : Commands.Parsed.t)
+  : P.Session_engine.Feature.t option
   =
   match cmd.name, cmd.args with
   | ("fork" | "clone"), _ -> Some Fork
@@ -4993,7 +5016,6 @@ let run_command m (cmd : Commands.Parsed.t) =
   | Some why -> error m why, []
   | None -> run_command_unchecked m cmd
 ;;
-
 
 (* ---- editing mode ----------------------------------------------------- *)
 
@@ -7753,8 +7775,13 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
          json
          ~f:P.Hello_reply.of_json
          (fun
-             ({ client_id; namespace; user; superuser = _; features = _; deployed = _ } as
-              hello)
+             ({ client_id
+              ; namespace
+              ; user
+              ; superuser = _
+              ; features = _
+              ; deployed = _
+              } as hello)
             ->
             let m, session_commands =
               reset_session
@@ -8302,8 +8329,9 @@ let update m (action : Action.t) =
       | Set_utc_offset utc_offset -> { m with utc_offset }, []
       | Focus focused ->
         { m with terminal_focus = (if focused then Focused else Unfocused) }, []
-      | Hello ({ client_id; namespace; user; superuser; features = _; deployed = _ } as hello)
-        ->
+      | Hello
+          ({ client_id; namespace; user; superuser; features = _; deployed = _ }
+           as hello) ->
         ( { m with
             client_id = Some client_id
           ; namespace

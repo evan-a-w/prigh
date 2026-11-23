@@ -195,6 +195,8 @@ val steer : t -> Input.t list -> string Or_error.t
     with the response. *)
 val interrupt : t -> [ `Send of string | `Deferred | `Idle ]
 
+(** [thread/compact/start]: Codex compacts in a turn of its own (events as
+    for {!start_turn}'s, ending with [Turn_end]). *)
 val compact : t -> string Or_error.t
 
 (** Drops the turn [before_turn_id] and those after it from the thread's

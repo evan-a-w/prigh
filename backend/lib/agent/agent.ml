@@ -233,6 +233,10 @@ type t =
   ; mutable repo_asked : (string * string) option
     (** the client host and directory last asked where it is in git *)
   ; mutable model : Model.t
+  ; mutable harness_model : Model.t
+    (** the model prigh's own loop and aux requests use while [model] is
+        an external harness's *)
+  ; mutable aux_noted : bool (* told that aux requests fail *)
   ; mutable thinking : Thinking.t
   ; mutable run : Run.t option
   ; mutable describing : unit Promise.t option
@@ -370,6 +374,13 @@ let settle_thinking model thinking =
   else thinking
 ;;
 
+let is_external (m : Model.t) = External_model.is_external (Model.key m)
+
+(* The model of requests prigh makes itself (approval verdicts, names,
+   descriptions): the session's, or prigh's own while an external harness
+   runs the session. *)
+let aux_model t = if is_external t.model then t.harness_model else t.model
+
 let restore_settings t =
   t.goal <- Session.goal t.session;
   t.review <- Session.review t.session;
@@ -377,7 +388,8 @@ let restore_settings t =
   (match Session.model t.session with
    | Some (model_id, thinking) ->
      Option.iter (Model_registry.find t.models model_id) ~f:(fun m ->
-       t.model <- m);
+       t.model <- m;
+       t.harness_model <- m);
      t.thinking <- settle_thinking t.model thinking
    | None -> ());
   restore_approvals t
@@ -648,11 +660,12 @@ let runner_capabilities t =
   | None -> Capabilities.harness
 ;;
 
-(* A composer session's model is its harness's: the one that wrote its
-   latest reply ([codex/gpt-5] shows as [gpt-5]), else the harness's
-   default. *)
+(* A composer session's model is its harness's: the one picked (an
+   {!External_model}), else the one that wrote its latest reply
+   ([codex/gpt-5] shows as [gpt-5]), else the harness's default. *)
 let shown_model t =
   match engine_choice t with
+  | _ when is_external t.model -> t.model
   | { engine = Composer; adapter = Some adapter } ->
     let prefix = Adapter_id.to_string adapter ^ "/" in
     let name =
@@ -668,7 +681,13 @@ let state t =
   let messages = messages t in
   let assistant_usage, assistant_cost = session_spend t in
   let usage = assistant_usage in
-  let context_tokens = Session.context_tokens t.session in
+  let context_tokens =
+    (* An external harness says how full its context is; the usage it
+       reports per turn covers every request of the turn. *)
+    match Option.bind t.runner ~f:(fun r -> fst (Runner.context r)) with
+    | Some tokens -> tokens
+    | None -> Session.context_tokens t.session
+  in
   { State.session_id = Session.id t.session
   ; session_path = Session.path t.session
   ; session_name = Session.name t.session
@@ -1782,7 +1801,7 @@ let tool_hosts t =
 
 let approval_model t =
   match t.config.approval_model with
-  | None -> Ok t.model
+  | None -> Ok (aux_model t)
   | Some name ->
     Model_registry.resolve t.models name
     |> Result.map_error ~f:(fun e ->
@@ -3035,12 +3054,54 @@ let runner t =
   | None -> harness_runner t
 ;;
 
+(* The session's model follows its runner: an external harness's (the one
+   the session recorded, else the harness's default) or prigh's own. *)
+let settle_runner_model t =
+  let external_models = Option.bind t.runner ~f:Runner.models in
+  match external_models, (engine_choice t).adapter with
+  | Some models, Some adapter ->
+    let adapter = Adapter_id.to_string adapter in
+    let recorded = Option.map (Session.model t.session) ~f:fst in
+    let model =
+      if External_model.of_adapter ~adapter t.model
+      then t.model
+      else (
+        match
+          Option.bind recorded ~f:(External_model.restore ~adapter ~models)
+        with
+        | Some m -> m
+        | None ->
+          (match models with
+           | m :: _ -> m
+           | [] -> External_model.default ~adapter))
+    in
+    t.model <- model;
+    t.thinking <- settle_thinking model t.thinking;
+    if not (Option.equal String.equal recorded (Some (Model.key model)))
+    then
+      ignore
+        (Session.set_model
+           t.session
+           ~model:(Model.key model)
+           ~thinking:t.thinking
+         : Session.Entry.t)
+  | _ ->
+    if is_external t.model
+    then (
+      t.model <- t.harness_model;
+      t.thinking <- settle_thinking t.model t.thinking)
+;;
+
 let set_runner t runner =
   Option.iter t.runner ~f:Runner.close;
   t.runner <- runner;
+  settle_runner_model t;
   state_changed t
 ;;
 
+(* The models the session can switch to when they are its external
+   harness's, not prigh's. *)
+let external_models t = Option.bind t.runner ~f:Runner.models
 let stop_engine t = Option.iter t.runner ~f:Runner.close
 let capabilities t = Runner.capabilities (runner t)
 let engine t = Runner.engine (runner t)
@@ -3061,7 +3122,6 @@ let own_loop t =
 
 (* Who a usage limit is with: the model, or the external harness. *)
 let limited_by t = if own_loop t then Model.key t.model else engine_label t
-;;
 
 let require t feature =
   Capabilities.check (capabilities t) feature ~who:(engine_label t)
@@ -3265,6 +3325,7 @@ let deliveries t =
 (* The system prompt names the tools of the model it was built for. *)
 let set_model t model =
   t.model <- model;
+  if not (is_external model) then t.harness_model <- model;
   let thinking = settle_thinking model t.thinking in
   if not (Thinking.equal thinking t.thinking)
   then (
@@ -3447,7 +3508,7 @@ let run_failed t ~resolve exn =
    models a hand-over chain has used so far (empty for a user's prompt). *)
 let generate_model t =
   match t.config.generate_model with
-  | None -> Ok t.model
+  | None -> Ok (aux_model t)
   | Some name ->
     Model_registry.resolve t.models name
     |> Result.map_error ~f:(fun e ->
@@ -3471,14 +3532,16 @@ let naming_model t =
    that a name still comes; the notice says what to fix. *)
 let with_naming_model t ~f =
   let fix = "change it with /naming model, or /naming model off" in
+  let session_model = aux_model t in
   match naming_model t with
   | Error e ->
     broadcast
       t
       (Notice
          (sprintf "%s; named with the session's model" (Error.to_string_hum e)));
-    f t.model
-  | Ok model when String.equal (Model.key model) (Model.key t.model) -> f model
+    f session_model
+  | Ok model when String.equal (Model.key model) (Model.key session_model) ->
+    f model
   | Ok model ->
     (match f model with
      | Ok _ as ok -> ok
@@ -3491,7 +3554,7 @@ let with_naming_model t ~f =
                (Error.to_string_hum e)
                (Model.key model)
                fix));
-       f t.model)
+       f session_model)
 ;;
 
 let name_subagent t ~task ~siblings ~cancel =
@@ -3501,6 +3564,7 @@ let name_subagent t ~task ~siblings ~cancel =
 ;;
 
 let rec start_run
+          ?(kind = Engine_intf.Turn.Kind.Prompt)
           ?(tried = String.Set.empty)
           ?(then_ = fun ~cancel:_ -> [])
           t
@@ -3563,7 +3627,14 @@ let rec start_run
          ; approve = approve t
          ; ask_user = ask_user t ~cancel
          ; ui = ui_host t ~cancel
-         ; tools = tools t @ reply_tools t
+         ; tools =
+             ((tools t @ reply_tools t)
+              @
+              (* An external harness is told of [goal_complete] at its start:
+                it has it always, and it refuses when no goal is active. *)
+              if own_loop t
+              then []
+              else [ Tool_goal.create ~complete:(complete_goal t) ])
          ; execute = executor t
          ; background = t.background
          ; steer =
@@ -3648,6 +3719,8 @@ let rec start_run
              ; thinking = t.thinking
              ; approval = t.approval_mode
              ; plan = t.plan_mode
+             ; model = External_model.native_id t.model
+             ; kind
              }
          with
          | added -> added
@@ -3655,6 +3728,22 @@ let rec start_run
            broadcast t (Notice ("run failed: " ^ Exn.to_string exn));
            []
        in
+       (* An external harness says what its models are, and how big the
+          context of the one it runs is. *)
+       if is_external t.model
+       then (
+         let r = runner t in
+         let model =
+           Option.bind (Runner.models r) ~f:(fun models ->
+             List.find models ~f:(fun (m : Model.t) ->
+               String.equal m.id t.model.id))
+           |> Option.value ~default:t.model
+         in
+         t.model
+         <- (match Runner.context r with
+             | _, Some context_window -> { model with context_window }
+             | _, None -> model);
+         t.thinking <- settle_thinking t.model t.thinking);
        Option.iter !halted ~f:(fun reason -> broadcast t (Notice reason));
        sweep_orphans t ~main_running:false;
        let tried = Set.add tried (Model.key t.model) in
@@ -3932,6 +4021,18 @@ and auto_describe t =
         in
         match with_naming_model t ~f:describe with
         | Ok _ -> if phys_equal session t.session then state_changed t
+        | Error e when is_external t.model ->
+          (* prigh may have no model of its own to call: said once. *)
+          if not t.aux_noted
+          then (
+            t.aux_noted <- true;
+            broadcast
+              t
+              (Notice
+                 (sprintf
+                    "%s; this session is not described (name it with /name, or \
+                     pick a model prigh can call with /naming model)"
+                    (Error.to_string_hum e))))
         | Error e -> broadcast t (Notice (Error.to_string_hum e)));
       t.describing <- None;
       Promise.resolve resolve ()))
@@ -4164,6 +4265,8 @@ let create
          else None)
     ; repo_asked = None
     ; model
+    ; harness_model = model
+    ; aux_noted = false
     ; thinking
     ; run = None
     ; describing = None
@@ -4621,6 +4724,22 @@ let compact ?instructions t =
   let%bind.Or_error () = require t Compact in
   if is_running t
   then Or_error.error_string "cannot compact while a run is in progress"
+  else if not (own_loop t)
+  then (
+    (* The external harness compacts its own context, in a run of its own;
+       the reply waits for it as for prigh's compaction. *)
+    let before = List.length (Session.messages t.session) in
+    start_run ~kind:(Compact { instructions }) t [];
+    Option.iter t.run ~f:(fun run -> Promise.await run.finished);
+    match
+      List.find_map
+        (List.rev (List.drop (Session.messages t.session) before))
+        ~f:(function
+          | Message.Assistant a -> Some a.stop_reason
+          | User _ | Tool_result _ -> None)
+    with
+    | Some (Error message) -> Or_error.error_string message
+    | Some _ | None -> Ok "")
   else (
     let model = summary_model t in
     Trace.run t.tracer (fun () ->

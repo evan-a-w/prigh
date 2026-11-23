@@ -373,7 +373,7 @@ let argument_items
       (P.Deployed_engines.has_choice engines)
       (engine_items (P.Deployed_engines.choices engines))
   | Adapter ->
-    (match P.Deployed_engines.adapters engines with
+    (match P.Deployed_engines.switch_targets engines with
      | [] -> None
      | adapters -> Some (engine_items adapters))
   | Server -> Some (server_items server)

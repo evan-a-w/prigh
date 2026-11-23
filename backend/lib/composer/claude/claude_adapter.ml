@@ -7,6 +7,7 @@ type t =
   ; sw : Switch.t
   ; injected : Injected_tools.t option
   ; mutable settings : Adapter.Settings.t (* what the process runs with *)
+  ; mutable models : Model.t list
   }
 
 let id = "claude"
@@ -16,7 +17,7 @@ let capabilities : Capabilities.t =
   { fork = By_handoff
   ; rewind = Unsupported
   ; context_edit = false
-  ; compact = Auto_only
+  ; compact = Native
   ; steer = Between_turns
   ; plan_mode = true
   ; btw = false
@@ -48,9 +49,48 @@ let effort : Thinking.t -> string option = function
   | On (Some Max) -> Some "max"
 ;;
 
+(* Claude Code's thinking budget per level (its [maxThinkingTokens]),
+   which it takes mid-session; [None] leaves it to Claude Code. *)
 let thinking_tokens : Thinking.t -> int option = function
   | Off -> Some 0
-  | On _ -> None
+  | On None -> None
+  | On (Some (Minimal | Low)) -> Some 4_000
+  | On (Some Medium) -> Some 10_000
+  | On (Some High) -> Some 32_000
+  | On (Some (Xhigh | Max)) -> Some 63_999
+;;
+
+let thinking_levels = Thinking.Level.[ Low; Medium; High; Max ]
+
+let model_of (m : Claude_codec.Model_info.t) =
+  External_model.model
+    ~adapter:id
+    ~name:m.display_name
+    ~thinking_levels
+    ~can_disable_thinking:true
+    m.value
+;;
+
+(* Claude Code's models, its default first (as [default]). *)
+let models_of (infos : Claude_codec.Model_info.t list) =
+  match infos with
+  | [] -> []
+  | _ ->
+    let default, others =
+      List.partition_tf infos ~f:(fun (m : Claude_codec.Model_info.t) ->
+        String.equal m.value External_model.default_id)
+    in
+    let default =
+      match default with
+      | m :: _ -> { (model_of m) with name = m.display_name }
+      | [] ->
+        External_model.model
+          ~adapter:id
+          ~thinking_levels
+          ~can_disable_thinking:true
+          External_model.default_id
+    in
+    default :: List.map others ~f:model_of
 ;;
 
 let mcp_config ~injected (start : Adapter.Start.t) =
@@ -135,7 +175,13 @@ let start ~sw ?interrupt_grace ?injected transport (start : Adapter.Start.t) =
   let codec = Claude_codec.create ?cost_total:start.cost_total () in
   let driver = Adapter.Driver.create ~sw ?interrupt_grace transport in
   let t =
-    { codec; driver; sw; injected; settings = Adapter.Settings.of_start start }
+    { codec
+    ; driver
+    ; sw
+    ; injected
+    ; settings = Adapter.Settings.of_start start
+    ; models = []
+    }
   in
   Adapter.Driver.run
     driver
@@ -167,7 +213,10 @@ let start ~sw ?interrupt_grace ?injected transport (start : Adapter.Start.t) =
   match init with
   | Failed { message; _ } ->
     Or_error.errorf "Claude Code refused to start: %s" message
-  | Initialized _ | Done _ -> Ok t
+  | Initialized info ->
+    t.models <- models_of info.models;
+    Ok t
+  | Done _ -> Ok t
 ;;
 
 let next_event t = Adapter.Driver.next_event t.driver
@@ -244,3 +293,16 @@ let cost_total t = Claude_codec.cost_total t.codec
 let in_turn t = Adapter.Driver.in_turn t.driver
 let alive t = Adapter.Driver.alive t.driver
 let stop t = Adapter.Driver.stop t.driver
+let models t = t.models
+
+let compact t settings ~instructions =
+  if not (Adapter.Driver.alive t.driver)
+  then Or_error.error_string "Claude Code is not running"
+  else if Adapter.Driver.in_turn t.driver
+  then Or_error.error_string "a Claude Code turn is already running"
+  else (
+    apply t settings;
+    Adapter.Driver.begin_turn t.driver;
+    Adapter.Driver.write t.driver (Claude_codec.compact t.codec ~instructions);
+    Ok ())
+;;

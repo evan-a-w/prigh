@@ -63,7 +63,8 @@ let%expect_test "a harness session on a harness-only backend: as before" =
     |}];
   command h "/engine";
   H.show h;
-  [%expect {|
+  [%expect
+    {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
@@ -83,7 +84,8 @@ let%expect_test "/new asks which engine; the session's first; Enter sends it" =
   status h;
   command h "/new";
   H.show h;
-  [%expect {|
+  [%expect
+    {|
     /work  Codex · deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
 
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
@@ -102,7 +104,8 @@ let%expect_test "/new asks which engine; the session's first; Enter sends it" =
     |}];
   H.keys h "cla";
   H.enter h;
-  [%expect {|
+  [%expect
+    {|
     (Rpc
       (method_ new_session)
       (params (
@@ -118,7 +121,8 @@ let%expect_test "/new and /engine take the engine as an argument" =
   command h "/new gemini";
   H.show h;
   command h "/engine claude";
-  [%expect {|
+  [%expect
+    {|
     (Rpc
       (method_ new_session)
       (params ((engine harness)))
@@ -147,20 +151,22 @@ let%expect_test "/engine picks among the adapters" =
   H.show h;
   H.key h (Key.plain Down);
   H.enter h;
-  [%expect {|
+  [%expect
+    {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
-    Switch this session to  (2)
+    Switch this session to  (3)
     / ▏
-    ▸* Codex        OpenAI's Codex CLI on the session's tool host
-       Claude Code  Anthropic's Claude Code CLI on the session's tool host
+    ▸* Codex          OpenAI's Codex CLI on the session's tool host
+       prigh harness  prigh's own agent, calling the model directly
+       Claude Code    Anthropic's Claude Code CLI on the session's tool host
     ────────────────────────────────────────────────────────────────────────────────
     >
     Codex · deepseek-flash  think:off  ctx:0.1%/1.0M  Enter selects · Esc closes
-    (Rpc (method_ set_adapter) (params ((adapter claude))) (tag Show_error))
+    (Rpc (method_ set_adapter) (params ((adapter harness))) (tag Show_error))
     |}]
 ;;
 
@@ -173,7 +179,8 @@ let%expect_test "what the engine cannot do is refused, in the backend's words" =
       print_endline
         (Option.value_map h.H.model.notice ~default:"(no notice)" ~f:(fun n ->
            n.text)));
-  [%expect {|
+  [%expect
+    {|
     Codex sessions can't rewind in place: fork from that message instead (/fork)
     (Rpc (method_ get_entries) (params ()) (tag Entries_for_fork))
     (no notice)
@@ -197,8 +204,10 @@ let%expect_test "an unavailable session: the status and the prompt say why" =
   H.keys h "hello";
   H.enter h;
   print_endline
-    (Option.value_map h.H.model.notice ~default:"(no notice)" ~f:(fun n -> n.text));
-  [%expect {|
+    (Option.value_map h.H.model.notice ~default:"(no notice)" ~f:(fun n ->
+       n.text));
+  [%expect
+    {|
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question

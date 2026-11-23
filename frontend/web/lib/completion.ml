@@ -92,12 +92,13 @@ let argument_items
       Picker.Item.create
         ~id:(Deployed_engines.Choice.key c)
         ~detail:(Deployed_engines.Choice.describe c)
-        ~search:(Deployed_engines.Choice.key c ^ " " ^ Deployed_engines.Choice.label c)
+        ~search:
+          (Deployed_engines.Choice.key c ^ " " ^ Deployed_engines.Choice.label c)
         (Deployed_engines.Choice.label c))
   in
   match kind with
   | Model -> model_items models ~auth ~current_model
-  | Adapter -> engine_items (Deployed_engines.adapters engines)
+  | Adapter -> engine_items (Deployed_engines.switch_targets engines)
   | Thinking ->
     let llm =
       Option.bind current_model ~f:(fun key ->

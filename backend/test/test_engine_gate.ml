@@ -9,6 +9,8 @@ module Limited = struct
 
   let engine = Engine_id.Composer
   let capabilities t = t
+  let models _ = None
+  let context _ = None, None
   let run_turn _ _ ~cancel:_ _ = []
 end
 
