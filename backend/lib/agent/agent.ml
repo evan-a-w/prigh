@@ -3467,6 +3467,7 @@ let rec start_run
          ; approve = approve t
          ; ask_user = ask_user t ~cancel
          ; ui = ui_host t ~cancel
+         ; tools = tools t @ reply_tools t
          ; execute = executor t
          ; background = t.background
          ; steer =

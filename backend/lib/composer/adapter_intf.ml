@@ -87,10 +87,13 @@ module type S = sig
   (** Talks to the process [transport] runs: the handshake, then the thread
       (new, resumed or forked). Fails, saying why, when the process does not
       answer as expected or exits. [interrupt_grace]: how long an
-      interrupted turn may take to end before it is ended for it (10s). *)
+      interrupted turn may take to end before it is ended for it (10s).
+      [injected]: prigh's tools, for a harness that carries MCP in-band
+      (Claude Code); the others reach them through [Start.mcp_servers]. *)
   val start
     :  sw:Switch.t
     -> ?interrupt_grace:Time_float.Span.t
+    -> ?injected:Injected_tools.t
     -> Line_transport.t
     -> Start.t
     -> t Or_error.t

@@ -268,7 +268,13 @@ let of_start ~(kind : Adapter_event.Tool_kind.t) ~native_name ~input =
        }
      | None, None -> keep ())
   | Mcp { server; tool } ->
-    { name = Mcp_tools.tool_name ~server ~tool; arguments = input; native_name }
+    { name =
+        (match Injected_tools.canonical_of_mcp ~server ~tool with
+         | Some name -> name
+         | None -> Mcp_tools.tool_name ~server ~tool)
+    ; arguments = input
+    ; native_name
+    }
   | Todo ->
     (match
        Option.first_some (list_field input "todos") (list_field input "plan")

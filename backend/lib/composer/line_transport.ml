@@ -33,7 +33,7 @@ let ended t = t.ended ()
 let is_ended t = t.is_ended ()
 
 module Peer = struct
-  type transport = t
+
 
   exception Exited of int
 

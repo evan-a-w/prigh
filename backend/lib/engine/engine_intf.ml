@@ -18,6 +18,8 @@ module Services = struct
         -> User_question.t list
         -> User_question.Reply.t
     ; ui : Ui_host.t
+    ; tools : Tool.t list
+      (** the session's tools, as the harness engine offers them *)
     ; execute : Tool.executor (** prigh's tools, on the session's host *)
     ; background : Background_tasks.t
     ; steer : unit -> Message.t list
