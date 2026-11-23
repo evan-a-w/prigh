@@ -7,14 +7,14 @@
 .hl-str { color: var(--hl-string); }
 .hl-num, .hl-con, .hl-var { color: var(--hl-number); }
 .hl-com { color: var(--hl-comment); font-style: italic; }
-.hl-prop { color: var(--chalk); }
-.hl-meta { color: var(--muted-text); }
-.hl-head { color: var(--chalk); font-weight: 700; }
+.hl-prop { color: var(--foreground); }
+.hl-meta { color: var(--muted-foreground); }
+.hl-head { color: var(--foreground); font-weight: 700; }
 .hl-strong { font-weight: 700; }
 .hl-em { font-style: italic; }
-.hl-link { color: var(--muted-text); text-decoration: underline; text-decoration-color: var(--rule-2); }
+.hl-link { color: var(--muted-foreground); text-decoration: underline; text-decoration-color: var(--input); }
 .hl-add { color: var(--sage); }
-.hl-del { color: var(--brick); }
+.hl-del { color: var(--destructive); }
 
 /* In a diff the row's tint says added or removed; the tokens keep their
    colours, plain code the row's. */

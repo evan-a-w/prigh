@@ -29,10 +29,10 @@
 
 .main.temporary .msg.user { background: transparent; border: 1px dashed var(--border); }
 .main.temporary .composer-stack:focus-within {
-  border-color: color-mix(in srgb, var(--chalk) 45%, var(--rule-2));
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--chalk) 7%, transparent), 0 8px 24px -14px var(--edge-shadow);
+  border-color: color-mix(in srgb, var(--foreground) 45%, var(--input));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--foreground) 7%, transparent), 0 8px 24px -14px var(--edge-shadow);
 }
-.main.temporary .editor { caret-color: var(--chalk); }
+.main.temporary .editor { caret-color: var(--foreground); }
 
 /* Its menu hangs from it: under the top of the chat, in its middle. */
 /* Under the pill, at the top bar's left: after the sidebar's toggle (12px

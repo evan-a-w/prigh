@@ -53,18 +53,7 @@
   line-height: 1.2;
   font-weight: 700;
 }
-.empty-where { font: 12.5px var(--mono); padding-left: 18px; }
-.empty-hints {
-  list-style: none;
-  margin: 28px 0 0;
-  padding: 0 0 0 18px;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
-  gap: 10px 24px;
-  font-size: 13px;
-  max-width: 640px;
-}
-.empty-hints li kbd { margin-right: 8px; }
+
 .msg { min-width: 0; }
 
 /* Vertical rhythm: a turn starts with room above it; the steps of one turn
@@ -117,7 +106,7 @@ summary > .preview {
   color: var(--faint);
 }
 details[open] > summary > .preview { visibility: hidden; }
-summary:hover > .label { color: var(--fg); }
+summary:hover > .label { color: var(--foreground); }
 summary:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; border-radius: 2px; }
 
 /* The user's turn: a bubble on the right, what came with it (images,
@@ -238,7 +227,7 @@ summary:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; bor
 }
 .delivery-head .kind { font-size: var(--step-size); flex-shrink: 0; color: var(--muted-foreground); white-space: nowrap; }
 .delivery-head .task {
-  color: var(--fg);
+  color: var(--foreground);
   flex: 1;
   min-width: 0;
   white-space: nowrap;
@@ -288,9 +277,6 @@ summary:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; bor
   .pending > .label, .thinking-head > .label, .run.running .run-label, .tool-subagent.running .tool-head::after { animation: none; color: var(--foreground); background: none; }
 }
 /* How to stop it, on a keyboard. */
-.interrupt-hint { color: var(--muted-foreground); opacity: 0.7; font-size: 12px; white-space: nowrap; }
-.app.narrow .interrupt-hint { display: none; }
-@media (pointer: coarse) { .interrupt-hint { display: none; } }
 
 .msg.assistant.streaming > .markdown:last-child > .md-part:last-child > :is(p, h1, h2, h3, h4, h5, h6):last-child::after,
 .msg.assistant.streaming > .markdown:last-child > .md-part:last-child > :is(ul, ol):last-child > li:last-child::after {
@@ -352,7 +338,7 @@ summary:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; bor
 .entries > .note { margin-top: 12px; }
 .entries > .note:first-child { margin-top: 0; }
 .note[open] .title { white-space: normal; overflow-wrap: anywhere; }
-.note summary:hover .title { color: var(--fg); }
+.note summary:hover .title { color: var(--foreground); }
 .note .time { flex-shrink: 0; margin-left: auto; }
 .note-text {
   margin: 6px 0 2px;
@@ -508,7 +494,7 @@ summary:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; bor
   padding: 2px 0;
   text-align: center;
 }
-.math-display > .katex-display { margin: 0; }
+
 .math:is(.math-pending, .math-error) {
   font-family: var(--mono);
   font-size: 0.87em;
@@ -831,7 +817,6 @@ button.tool-head:is(:hover, :focus-visible) > .chev, .tool.open > button.tool-he
 .plan-step.step-todo .mark { color: var(--faint); }
 .tool-body .questions { margin: 2px 0; padding-left: 18px; font-size: 13px; }
 
-
 .tool-body {
   padding: 4px 8px 6px;
   display: flex;
@@ -844,10 +829,10 @@ button.tool-head:is(:hover, :focus-visible) > .chev, .tool.open > button.tool-he
   font: 12.5px/1.5 var(--mono);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  color: var(--fg);
+  color: var(--foreground);
 }
 .tool-body .caption { color: var(--muted-foreground); font-size: 12.5px; }
-.tool-body .task-text { white-space: pre-wrap; margin-top: 4px; font-size: 13.5px; }
+
 .tool-body .report > .markdown {
   margin-top: 6px;
   font-size: 14px;
@@ -925,7 +910,7 @@ button.tool-head:is(:hover, :focus-visible) > .chev, .tool.open > button.tool-he
 }
 .fold { cursor: pointer; border-radius: var(--r-control); }
 .fold .count { font: 11.5px var(--mono); }
-.fold:hover { color: var(--fg); }
+.fold:hover { color: var(--foreground); }
 .fold:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
 .fold[aria-expanded="true"] {
   position: sticky;
@@ -942,7 +927,7 @@ button.tool-head:is(:hover, :focus-visible) > .chev, .tool.open > button.tool-he
   display: flex;
   gap: 8px;
   font: 12.5px/1.55 var(--mono);
-  color: var(--fg);
+  color: var(--foreground);
   margin: 6px 0 3px;
 }
 .patch-file:first-child { margin-top: 0; }
@@ -1023,7 +1008,6 @@ button.image:focus-visible { outline: 2px solid var(--primary); outline-offset: 
 .entries + .entries.echoes { margin-top: 34px; }
 .msg.user.sending { opacity: 0.7; }
 
-
 /* A landmark or message the transcript filter (Filter_view) hides keeps an
    empty .filtered for the jump rail and scrolling to land on. */
 .entries > .filtered { height: 0; }
@@ -1087,7 +1071,7 @@ button.image:focus-visible { outline: 2px solid var(--primary); outline-offset: 
 .pasted-head:focus-visible { outline: 2px solid var(--sodium-line); outline-offset: -2px; }
 .pasted-head > .chev { align-self: center; color: var(--faint); }
 .pasted.open > .pasted-head > .chev { transform: rotate(90deg); }
-.pasted-name { color: var(--fg); white-space: nowrap; flex-shrink: 0; }
+.pasted-name { color: var(--foreground); white-space: nowrap; flex-shrink: 0; }
 .pasted-detail { color: var(--faint); font-size: 11.5px; white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 /* Its own line under the name when fewer than 14 characters would fit
    beside it (a phone). */
@@ -1113,23 +1097,6 @@ button.image:focus-visible { outline: 2px solid var(--primary); outline-offset: 
 /* The composer's attachment chips (Files_view.chips), and where dragged
    files land. */
 /* Files dragged over the page: where they would land. */
-body.dropping-chat .composer-box::after {
-  content: attr(data-drop);
-  position: absolute;
-  inset: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 1.5px dashed var(--primary);
-  border-radius: var(--r-surface);
-  background: color-mix(in srgb, var(--background) 88%, transparent);
-  color: var(--foreground);
-  font-size: 14px;
-  z-index: var(--z-float);
-  pointer-events: none;
-}
-body.dropping-chat .composer-box { position: relative; }
-body.dropping-chat .composer-box::after { content: "Drop to attach to your message"; inset: -1px; }
 
 /* The composer's chips: a file, its size, its upload. */
 .attach-chips { display: flex; gap: 6px; flex-wrap: wrap; padding: 2px 2px 0; }

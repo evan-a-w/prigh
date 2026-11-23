@@ -41,7 +41,7 @@
   height: calc(var(--strip-h) + var(--safe-t));
   padding: var(--safe-t) 4px 0;
   background: var(--bg);
-  border-bottom: 1px solid var(--rule);
+  border-bottom: 1px solid var(--border);
 }
 .app.narrow .main:has(.chat-chrome) .chat { padding-top: 12px; }
 /* Flat in the strip: no bubbles. */
@@ -72,10 +72,9 @@
   font-size: 15px;
   font-weight: 600;
   letter-spacing: -0.005em;
-  color: var(--chalk);
+  color: var(--foreground);
   text-align: center;
 }
-
 
 /* The jump list is in the ⋯ sheet; the marks are a desktop's. */
 
@@ -148,7 +147,7 @@
     flex: none;
     height: 64px;
     margin-top: -64px;
-    background: linear-gradient(transparent, var(--slate) 75%);
+    background: linear-gradient(transparent, var(--card) 75%);
     pointer-events: none;
     /* Seen only while the sheet scrolls: a sheet that fits has no timeline. */
     opacity: 0;
@@ -156,7 +155,7 @@
     animation-timeline: scroll();
   }
 }
-.app.narrow .chrome-menu.sheet > .status-notes { flex-direction: column; align-items: stretch; gap: 0; padding: 0 0 6px; margin-bottom: 6px; font-size: 14px; border-bottom: 1px solid var(--rule); }
+.app.narrow .chrome-menu.sheet > .status-notes { flex-direction: column; align-items: stretch; gap: 0; padding: 0 0 6px; margin-bottom: 6px; font-size: 14px; border-bottom: 1px solid var(--border); }
 .app.narrow .chrome-menu.sheet > .status-notes > * { min-height: var(--tap); display: flex; align-items: center; padding: 0 12px; max-width: none; }
 .sheet-row {
   display: flex;
@@ -178,9 +177,9 @@
 .sheet-row > .icon { width: 20px; height: 20px; flex: none; color: var(--muted-foreground); }
 .sheet-row.on > .icon { color: var(--primary); }
 .sheet-row-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.sheet-row-detail { font-size: 12.5px; color: var(--muted-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sheet-row .badge { min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; background: var(--sodium); color: var(--on-sodium, #000); font-size: 12px; font-weight: 600; display: inline-grid; place-items: center; }
-.sheet-row.settings-row { border-top: 1px solid var(--rule); border-radius: 0; margin-top: 6px; padding-top: 2px; }
+.sheet-row-detail { font-size: 12.5px; color: var(--muted-foreground); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sheet-row .badge { min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; background: var(--primary); color: var(--on-sodium, #000); font-size: 12px; font-weight: 600; display: inline-grid; place-items: center; }
+.sheet-row.settings-row { border-top: 1px solid var(--border); border-radius: 0; margin-top: 6px; padding-top: 2px; }
 
 /* {1 The composer} */
 
@@ -234,7 +233,7 @@
 }
 @keyframes page-in { from { transform: translateX(16px); opacity: 0.6; } }
 @media (prefers-reduced-motion: reduce) { .app.narrow .modal { animation: none !important; } }
-.app.narrow .modal:is(.picker-dialog, .settings-dialog, .help-dialog, .session-dialog, .phone-page, .tree-dialog, .hotkeys-dialog) > .modal-head { border-bottom: 1px solid var(--rule); }
+.app.narrow .modal:is(.picker-dialog, .settings-dialog, .help-dialog, .session-dialog, .phone-page, .tree-dialog, .hotkeys-dialog) > .modal-head { border-bottom: 1px solid var(--border); }
 .app.narrow .modal:is(.picker-dialog, .settings-dialog, .help-dialog, .session-dialog, .phone-page, .tree-dialog, .hotkeys-dialog) > .modal-body { flex: 1 1 auto; }
 
 /* A level down: back at the left, the title, the close at the right. */
@@ -247,7 +246,7 @@
   height: var(--tap);
   padding: 0 10px 0 6px;
   margin-right: 2px;
-  color: var(--sodium);
+  color: var(--primary);
   font-size: 15px;
   flex: none;
 }
@@ -278,7 +277,6 @@
 .app.narrow .sessions { margin: 0; padding: 0 0 8px; scrollbar-gutter: auto; }
 
 /* {1 The image viewer and drawing} */
-
 
 /* {1 Long words} */
 
@@ -397,10 +395,10 @@
   border: 0;
   font: 12px var(--sans);
   color: var(--ink);
-  background: var(--slate-2);
+  background: var(--muted);
 }
 .session-swipe-action .icon { width: 18px; height: 18px; }
-.session-swipe-action.delete { background: var(--brick); color: #fff; }
+.session-swipe-action.delete { background: var(--destructive); color: #fff; }
 .app.narrow .sidebar { touch-action: pan-y; }
 .app.narrow .scrim { touch-action: none; }
 .app.narrow .pending-image { touch-action: pan-x; }
@@ -417,7 +415,7 @@
   height: 4px;
   margin: 8px auto 6px;
   border-radius: 2px;
-  background: var(--rule-2);
+  background: var(--input);
 }
 .app.narrow .session:is(.swiping, .swiped) > :is(.session-actions, .fold) { visibility: hidden; }
 /* The narrowest phones: the model's mark and name, its level in its sheet
@@ -447,7 +445,7 @@
     transition: background-color 220ms ease-out;
   }
   .msg[tabindex].pressing, .session-open.pressing, .worktree.pressing, .review-file-row.pressing {
-    background-color: color-mix(in srgb, var(--chalk) 6%, transparent);
+    background-color: color-mix(in srgb, var(--foreground) 6%, transparent);
   }
 }
 

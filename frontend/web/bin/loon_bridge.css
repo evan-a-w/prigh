@@ -59,7 +59,7 @@
   }
 }
 
-/* prigh-web's own small pieces, under its older rules ([legacy]) so a rule
+/* prigh-web's own small pieces, under its page rules ([components.page]) so a rule
    that places one in particular still wins: scrollbars, the work lamp and
    the chevron. ([sr-only] is Tailwind's utility.) */
 @layer base {

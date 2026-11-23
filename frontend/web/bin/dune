@@ -16,9 +16,10 @@
 ; The stylesheets as one (index.html loads it): one request, and the page
 ; waits for one file rather than twenty. First the components' (Tailwind v4
 ; compiles ../loon_ui's loon.css with what prigh-web adds, for the classes
-; that ../loon_ui and ../lib use), then prigh-web's own in the layer
-; [legacy], under the components' utilities (loon_head.css). In this order:
-; later rules win.
+; that ../loon_ui and ../lib use), then prigh-web's own: the themes'
+; palettes (theme.css) in [base], the page's rules in [components.page]
+; (under the components' own rules and the utilities: loon_head.css). In
+; this order: later rules win.
 
 (rule
  (target loon.input.css)
@@ -43,7 +44,7 @@
     (cat loon_bridge.css)
     (cat genui.css)
     ; Diffs, the review page and git hosting: on loon's look and variables, in the
-    ; components' layer (over [legacy], under the utilities).
+    ; components' layer (over the page's rules, under the utilities).
     (echo "\n@layer components {\n")
     (cat diff.css)
     (cat review.css)
@@ -86,15 +87,16 @@
    app.css
    (progn
     (cat loon.out.css)
-    (echo "\n@layer legacy {\n")
+    (echo "\n@layer base {\n")
     (cat theme.css)
+    (echo "\n}\n@layer components {\n@layer page {\n")
     (cat style.css)
     (cat chat.css)
     (cat highlight.css)
     (cat status.css)
     (cat temporary.css)
     (cat phone.css)
-    (echo "\n}\n")
+    (echo "\n}\n}\n")
     ; Unlayered: it overrides CodeMirror's own theme, which CodeMirror
     ; injects unlayered and which would beat any layer.
     (cat editor.css)))))
