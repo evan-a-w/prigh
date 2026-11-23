@@ -70,7 +70,9 @@ let size = Session_summary.size_string
 
 let tool ~inject ?(cls = "") ~title ?label ?disabled action icon =
   button
-    ~cls:("icon ghost files-tool " ^ cls)
+    ~cls:("files-tool narrow:size-11 " ^ cls)
+    ~variant:Ghost
+    ~size:Icon_sm
     ~title
     ~label:(Option.value label ~default:title)
     ?disabled
@@ -107,17 +109,25 @@ let crumbs (t : Files.t) (listing : File_listing.t) ~inject =
         path, acc @ [ part, path ])
   in
   let crumb ~last (label, path) =
-    if last
-    then span ~cls:"files-crumb current" label
-    else
-      Node.button
-        ~attrs:
-          [ Attr.class_ "files-crumb"
-          ; Attr.type_ "button"
-          ; Attr.title (Files.display_path t path)
-          ; Attr.on_click (fun _ -> inject (files (Go path)))
-          ]
-        [ Node.text label ]
+    Loon.Breadcrumb.item
+      [ (if last
+         then
+           Loon.Breadcrumb.page
+             ~class_:"files-crumb current font-[inherit]"
+             [ Node.text label ]
+         else
+           Node.button
+             ~attrs:
+               [ Attr.class_
+                   (Loon.Breadcrumb.link_classes
+                      ~class_:"files-crumb narrow:min-h-11 narrow:min-w-11"
+                      ())
+               ; Attr.type_ "button"
+               ; Attr.title (Files.display_path t path)
+               ; Attr.on_click (fun _ -> inject (files (Go path)))
+               ]
+             [ Node.text label ])
+      ]
   in
   let all = root :: links in
   let n = List.length all in
@@ -125,7 +135,22 @@ let crumbs (t : Files.t) (listing : File_listing.t) ~inject =
     let node = crumb ~last:(i = n - 1) c in
     if i = 0 || (i = 1 && String.equal (fst root) "/")
     then [ node ]
-    else [ span ~cls:"files-sep" "/"; node ])
+    else
+      [ Loon.Breadcrumb.separator
+          ~class_:"files-sep"
+          ~children:[ Node.text "/" ]
+          ()
+      ; node
+      ])
+;;
+
+(* The path as loon's Breadcrumb ([loon]: its list unstyled). *)
+let crumbs_bar items extra =
+  Loon.Breadcrumb.root
+    ~class_:"files-crumbs loon"
+    [ Loon.Breadcrumb.list ~class_:"gap-0.5 font-[inherit] text-[length:inherit]" items
+    ; extra
+    ]
 ;;
 
 let path_bar (t : Files.t) ~inject =
@@ -153,27 +178,29 @@ let path_bar (t : Files.t) ~inject =
         ]
       ()
   | None, Some listing ->
-    div
-      ~cls:"files-crumbs"
-      ~attrs:[ Attr.create "aria-label" "Path" ]
-      (crumbs t listing ~inject
-       @ [ button
-             ~cls:"icon ghost files-edit-path"
-             ~title:"Type a path"
-             ~on_click:
-               (inject
-                  (files (Edit_path (Some (Files.display_path t listing.path)))))
-             [ icon Pencil ]
-         ])
+    crumbs_bar
+      (crumbs t listing ~inject)
+      (button
+         ~cls:"files-edit-path ml-auto narrow:size-11"
+         ~variant:Ghost
+         ~size:Icon_xs
+         ~title:"Type a path"
+         ~on_click:
+           (inject (files (Edit_path (Some (Files.display_path t listing.path)))))
+         [ icon Pencil ])
   | None, None ->
-    div
-      ~cls:"files-crumbs"
-      [ span
-          ~cls:"files-crumb current"
-          (match t.where with
-           | Some w -> Files.display_path t w.cwd
-           | None -> "")
+    crumbs_bar
+      [ Loon.Breadcrumb.item
+          [ Loon.Breadcrumb.page
+              ~class_:"files-crumb current font-[inherit]"
+              [ Node.text
+                  (match t.where with
+                   | Some w -> Files.display_path t w.cwd
+                   | None -> "")
+              ]
+          ]
       ]
+      Node.none
 ;;
 
 let sort_header (t : Files.t) ~inject =
@@ -346,7 +373,9 @@ let actions (t : Files.t) ~inject =
     let path = entry_path t e.name in
     let act ?(cls = "") ~title label icon action =
       button
-        ~cls:("small ghost files-act " ^ cls)
+        ~cls:("files-act narrow:h-11 " ^ cls)
+        ~variant:(if String.equal cls "danger" then Destructive else Ghost)
+        ~size:Xs
         ~title
         ~on_click:(inject (files action))
         [ icon; Node.text label ]
@@ -516,7 +545,9 @@ let preview (m : App.Model.t) (t : Files.t) ~alone ~inject =
           ((if alone
             then
               [ button
-                  ~cls:"icon ghost files-back"
+                  ~cls:"files-back narrow:size-11"
+                  ~variant:Ghost
+                  ~size:Icon_sm
                   ~title:"Back to the list (Esc)"
                   ~label:"Back to the list"
                   ~on_click:close_preview
@@ -530,7 +561,9 @@ let preview (m : App.Model.t) (t : Files.t) ~alone ~inject =
            then []
            else
              [ button
-                 ~cls:"icon ghost files-close-preview"
+                 ~cls:"files-close-preview narrow:size-11"
+                  ~variant:Ghost
+                  ~size:Icon_sm
                  ~title:"Close the preview (Esc)"
                  ~on_click:close_preview
                  [ icon Close ]
@@ -648,14 +681,10 @@ let uploads (t : Files.t) =
                 | None -> "waiting…"
                 | Some sent ->
                   sprintf "%s of %s" (size sent) (size u.local.size))
-           ; Node.div
-               ~attrs:
-                 [ Attr.class_ "files-bar"
-                 ; Attr.css_var ~name:"done" (sprintf "%d%%" percent)
-                 ; Attr.role "progressbar"
-                 ; Attr.create "aria-valuenow" (Int.to_string percent)
-                 ]
-               []
+           ; Loon.Progress.view
+               ~class_:"files-bar h-1"
+               ~value:(Float.of_int percent)
+               ()
            ]))
 ;;
 
@@ -673,7 +702,8 @@ let body (m : App.Model.t) (t : Files.t) ~inject =
                   "Check the path (the pencil types one), go up, or try again."
               ]
           ; button
-              ~cls:"small"
+              ~variant:Outline
+              ~size:Sm
               ~on_click:(inject (files Refresh))
               [ Node.text "Try again" ]
           ]
@@ -806,7 +836,9 @@ let view (m : App.Model.t) ~inject =
                      then Node.none
                      else Review_page_view.open_button m ~inject)
                   ; button
-                      ~cls:"icon ghost files-close"
+                      ~cls:"files-close narrow:size-11"
+                  ~variant:Ghost
+                  ~size:Icon_sm
                       ~title:"Close (Ctrl+Shift+F)"
                       ~label:"Close files"
                       ~on_click:(inject (files Close))
@@ -930,19 +962,6 @@ let dialog (m : App.Model.t) ~inject =
                  (size u.local.size))
           ]
       ]
-;;
-
-let toggle (m : App.Model.t) ~inject =
-  button
-    ~cls:
-      (if m.files.open_
-       then "icon ghost files-toggle open"
-       else "icon ghost files-toggle")
-    ~title:"Files (Ctrl+Shift+F)"
-    ~label:"Files"
-    ~attrs:[ Attr.create "aria-expanded" (Bool.to_string m.files.open_) ]
-    ~on_click:(inject (files Toggle))
-    [ glyph Folder ]
 ;;
 
 (* ---- the composer *)

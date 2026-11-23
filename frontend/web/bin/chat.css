@@ -1369,3 +1369,83 @@ table.diff tr.add .wd { background: color-mix(in srgb, var(--add-fg) 26%, transp
 .tool-head .open-agent { margin-left: auto; padding: 0 4px; border: 0; border-radius: var(--r-chip); background: none; color: var(--muted-text); font: inherit; font-size: 12.5px; white-space: nowrap; cursor: pointer; }
 .tool-head .open-agent:focus-visible { outline: 2px solid var(--sodium); outline-offset: 1px; }
 .tool-head[data-agent]:hover .open-agent { color: var(--chalk); }
+
+/* The composer's attachment chips (Files_view.chips), and where dragged
+   files land. */
+/* Files dragged over the page: where they would land. */
+body.dropping-chat .composer-box::after {
+  content: attr(data-drop);
+  position: absolute;
+  inset: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px dashed var(--sodium);
+  border-radius: var(--r-surface);
+  background: color-mix(in srgb, var(--graphite) 88%, transparent);
+  color: var(--chalk);
+  font-size: 14px;
+  z-index: var(--z-float);
+  pointer-events: none;
+}
+body.dropping-chat .composer-box { position: relative; }
+body.dropping-chat .composer-box::after { content: "Drop to attach to your message"; inset: -1px; }
+
+/* The composer's chips: a file, its size, its upload. */
+.attach-chips { display: flex; gap: 6px; flex-wrap: wrap; padding: 2px 2px 0; }
+.attach-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 280px;
+  padding: 3px 3px 3px 8px;
+  background: var(--slate-2);
+  border: 1px solid var(--rule);
+  border-radius: var(--r-chip);
+  font: 12.5px var(--mono);
+  overflow: hidden;
+  animation: files-open 0.14s ease-out;
+}
+.attach-chip.uploading::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 2px;
+  width: var(--done, 0%);
+  background: var(--sodium);
+  transition: width 0.2s linear;
+}
+.attach-chip.failed { border-color: var(--brick-line); background: var(--brick-wash); }
+.attach-chip-icon { width: 13px; height: 13px; color: var(--muted-text); flex-shrink: 0; }
+.attach-chip-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.attach-chip-detail { color: var(--faint); font-size: 11.5px; white-space: nowrap; }
+.attach-chip.failed .attach-chip-detail { color: var(--brick); overflow: hidden; text-overflow: ellipsis; max-width: 140px; }
+.attach-chip-remove { width: 20px; height: 20px; flex-shrink: 0; }
+.attach-chip-remove .icon { width: 11px; height: 11px; }
+.composer-buttons .attach .icon { width: 17px; height: 17px; }
+
+/* A long paste: its chip opens it (read, insert as text, remove). */
+.pasted-chip { padding-left: 0; max-width: 100%; }
+.pasted-chip .attach-chip-name { flex-shrink: 0; }
+.pasted-chip .attach-chip-detail { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.pasted-chip-open.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 0 2px 0 8px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+}
+.pasted-chip-open.btn:hover .attach-chip-name { text-decoration: underline; text-decoration-color: var(--faint); }
+.pasted-chip .attach-chip-name::before { content: "¶ "; color: var(--faint); }
+
+@media (prefers-reduced-motion: reduce) {
+  .attach-chip { animation: none; }
+  .attach-chip.uploading::after { transition: none; }
+}
+@keyframes files-open { from { opacity: 0; } }

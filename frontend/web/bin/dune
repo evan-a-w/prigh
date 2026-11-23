@@ -64,7 +64,6 @@
   theme.css
   style.css
   chat.css
-  files.css
   review.css
   editor.css
   highlight.css
@@ -82,7 +81,6 @@
     (cat theme.css)
     (cat style.css)
     (cat chat.css)
-    (cat files.css)
     (cat review.css)
     (cat highlight.css)
     (cat forge.css)
