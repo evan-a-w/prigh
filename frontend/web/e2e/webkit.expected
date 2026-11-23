@@ -2649,8 +2649,8 @@ Sign in with your browser
 Sign in here
 Quit prigh
 Sign in with your browser: 44px+, on screen
-Sign in here: 34px, on screen
-Quit prigh: 34px, on screen
+Sign in here: 32px, on screen
+Quit prigh: 32px, on screen
 overflows sideways: false
 focused: desktop-signin-browser
 page line: {"url":"http://127.0.0.1:<PORT>/#cli-signin=<PORT>.<STATE>&program=desktop","external":true}
@@ -2662,7 +2662,7 @@ Waiting for you to allow it in your browser…
 Open it again
 Cancel
 Open it again: 44px+, on screen
-Cancel: 34px, on screen
+Cancel: 32px, on screen
 overflows sideways: false
 focused: desktop-signin-again
 === webkit: desktop_signin: cancelled with Esc ===
