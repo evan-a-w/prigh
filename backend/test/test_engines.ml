@@ -202,11 +202,13 @@ let%expect_test "session entries: engine, threads, external turns, handoffs" =
     {|
     ((engine (Ok ((engine Composer) (adapter (Claude)))))
      (threads
-      (((adapter claude) (host laptop) (thread_id sess-2) (cwd /proj))
-       ((adapter codex) (host backend) (thread_id thr_1) (cwd /proj))))
+      (((adapter claude) (host laptop) (thread_id sess-2) (cwd /proj)
+        (fork_from ()))
+       ((adapter codex) (host backend) (thread_id thr_1) (cwd /proj)
+        (fork_from ()))))
      (turns
       (((thread_id thr_1) (turn_id turn_1) (through <id>)
-        (cost_total ())))))
+        (first_turn_id ()) (mark ()) (before ()) (after ()) (cost_total ())))))
     |}];
   (* The entries as written. *)
   In_channel.read_lines (Session.path t)
@@ -385,7 +387,7 @@ let%expect_test "hello, new_session and state with the composer deployed" =
     {|
     result.state.engine: "composer"
     result.state.adapter: "claude"
-    result.state.capabilities: {"fork":"by_handoff","rewind":"unsupported","context_edit":false,"compact":"native","steer":"between_turns","plan_mode":true,"btw":false,"subagents":"observe","model_fallback":false,"images":true,"ask_user":true}
+    result.state.capabilities: {"fork":"native","rewind":"native","context_edit":false,"compact":"native","steer":"between_turns","plan_mode":true,"btw":false,"subagents":"observe","model_fallback":false,"images":true,"ask_user":true}
     result.state.unavailable: -
     |}];
   print_fields (call "get_state") (engine_paths [ "result" ]);
@@ -393,7 +395,7 @@ let%expect_test "hello, new_session and state with the composer deployed" =
     {|
     result.engine: "composer"
     result.adapter: "claude"
-    result.capabilities: {"fork":"by_handoff","rewind":"unsupported","context_edit":false,"compact":"native","steer":"between_turns","plan_mode":true,"btw":false,"subagents":"observe","model_fallback":false,"images":true,"ask_user":true}
+    result.capabilities: {"fork":"native","rewind":"native","context_edit":false,"compact":"native","steer":"between_turns","plan_mode":true,"btw":false,"subagents":"observe","model_fallback":false,"images":true,"ask_user":true}
     result.unavailable: -
     |}];
   List.iter
