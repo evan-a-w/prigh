@@ -135,10 +135,39 @@ let list_models driver codec =
     default :: List.map infos ~f:(model_of ~id)
 ;;
 
-let start ~sw ?interrupt_grace ?injected:_ transport (start : Adapter.Start.t) =
+(* Codex asks in a turn of its own, which no prigh turn is there to answer. *)
+let refuse_orphan t (event : Adapter_event.t) =
+  match event with
+  | Approval_request { request_id; _ } ->
+    Option.iter
+      (Codex_codec.reply_approval t.codec ~request_id Cancel)
+      ~f:(Adapter.Driver.write t.driver)
+  | User_question { request_id; _ } ->
+    Option.iter
+      (Codex_codec.answer_question t.codec ~request_id Cancelled)
+      ~f:(Adapter.Driver.write t.driver)
+  | _ -> ()
+;;
+
+let start
+      ~sw
+      ?interrupt_grace
+      ?request_timeout
+      ?injected:_
+      transport
+      (start : Adapter.Start.t)
+  =
   let codec = Codex_codec.create () in
-  let driver = Adapter.Driver.create ~sw ?interrupt_grace transport in
+  let driver =
+    Adapter.Driver.create
+      ~sw
+      ~name:display_name
+      ?interrupt_grace
+      ?request_timeout
+      transport
+  in
   let t = { codec; driver; cwd = start.cwd; models = [] } in
+  Adapter.Driver.on_orphan_request driver (refuse_orphan t);
   Adapter.Driver.run
     driver
     ~handle_line:(fun line ->
@@ -212,6 +241,7 @@ let next_event t = Adapter.Driver.next_event t.driver
 let settings_of t s = settings ~cwd:t.cwd s
 
 let send t settings input =
+  Adapter.Driver.await_idle t.driver;
   if not (Adapter.Driver.alive t.driver)
   then Or_error.error_string "Codex is not running"
   else (
@@ -222,9 +252,19 @@ let send t settings input =
     Adapter.Driver.write t.driver line)
 ;;
 
+(* Waits for Codex's answer: a refused steer (the turn ended meanwhile,
+   or cannot be steered) fails, so the runner keeps the message for the next
+   turn rather than losing it. *)
 let steer t input =
-  let%map.Or_error line = Codex_codec.steer t.codec (inputs input) in
-  Adapter.Driver.write t.driver line
+  let%bind.Or_error line = Codex_codec.steer t.codec (inputs input) in
+  match%bind.Or_error
+    Adapter.Driver.request t.driver line ~matches:(function
+      | Steered _ | Failed { kind = Turn_steer; _ } -> true
+      | _ -> false)
+  with
+  | Failed { message; _ } ->
+    Or_error.error_string ("Codex did not take it: " ^ message)
+  | _ -> Ok ()
 ;;
 
 let interrupt t =
@@ -263,12 +303,14 @@ let revert t ~before_turn_id =
 
 let mark _ = None
 let thread_id t = Codex_codec.thread_id t.codec
+let cost_total _ = None
 let in_turn t = Adapter.Driver.in_turn t.driver
 let alive t = Adapter.Driver.alive t.driver
 let stop t = Adapter.Driver.stop t.driver
 let models t = t.models
 
 let compact t settings ~instructions:_ =
+  Adapter.Driver.await_idle t.driver;
   if not (Adapter.Driver.alive t.driver)
   then Or_error.error_string "Codex is not running"
   else (

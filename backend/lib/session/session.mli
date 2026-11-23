@@ -179,6 +179,8 @@ module Entry : sig
             (** the checkpoint of the files before the run ({!Checkpoint}) *)
           ; after : string option [@jsonaf.option] [@sexp.option]
             (** ... and after it *)
+          ; cost_total : float option [@jsonaf.option] [@sexp.option]
+            (** the running cost total the agent reported after it *)
           }
       (** an external agent's turn, for mapping rewinds onto its history;
           not copied by [fork] *)
@@ -188,7 +190,9 @@ module Entry : sig
           ; text : string
           }
       (** the summary of the session pushed to [to_adapter] when it took
-          over (another adapter or host, a thread that could not resume) *)
+          over (another adapter or host, a thread that could not resume);
+          [from_adapter] is an [Adapter_id], or [harness] after prigh's
+          harness engine *)
     [@@deriving sexp, jsonaf]
   end
 
@@ -442,6 +446,9 @@ module External_turn : sig
           message (Claude Code) *)
     ; before : string option (** the files' checkpoint before the run *)
     ; after : string option (** ... and after it *)
+    ; cost_total : float option
+      (** the running cost total its agent reported after it, to seed a
+          resume (the composer's [Start.cost_total]) *)
     }
   [@@deriving sexp_of, equal]
 end
@@ -449,9 +456,6 @@ end
 (** The harness for a session with no [Engine] entry; an error for one
     naming an engine or adapter this prigh does not know (a newer one's). *)
 val engine : t -> Engine_choice.t Or_error.t
-
-(** The last [Engine] entry's engine and adapter as written. *)
-val engine_entry : t -> (string * string option) option
 
 val set_engine : t -> Engine_choice.t -> Entry.t
 
@@ -674,9 +678,6 @@ module Summary : sig
     ; repo : Git_location.t option option (** {!repo} *)
     ; worktrees : Session_worktree.t list (** {!worktrees} *)
     ; home : Home.t option (** {!home} *)
-    ; engine : string option [@sexp.option]
-      (** the last [Engine] entry's engine: [None] for the harness *)
-    ; adapter : string option [@sexp.option] (** and its adapter *)
     }
   [@@deriving sexp_of]
 

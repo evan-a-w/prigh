@@ -90,11 +90,15 @@ let of_structured_patch ~path ~added hunks =
   match hunks with
   | [] -> None
   | hunks ->
-    let old = if added then "/dev/null" else "a/" ^ path in
+    let side prefix =
+      if String.is_prefix path ~prefix:"/" then path else prefix ^ path
+    in
+    let old = if added then "/dev/null" else side "a/" in
     Some
       (String.concat
          ~sep:"\n"
-         ((sprintf "--- %s" old :: sprintf "+++ b/%s" path :: hunks) @ [ "" ]))
+         ((sprintf "--- %s" old :: sprintf "+++ %s" (side "b/") :: hunks)
+          @ [ "" ]))
 ;;
 
 let snippet_diff ~path ~old ~new_ = (Text_diff.unified ~path ~old ~new_).diff

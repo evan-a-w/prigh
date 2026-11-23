@@ -17,7 +17,3 @@ type t =
 val to_string : t -> string
 
 val of_string : string -> t option
-
-(** The mode that enforces prigh's approval mode natively, if Claude Code
-    has one: [Smart] (prigh's approval model) has none. *)
-val of_approval_mode : Approval_mode.t -> t option

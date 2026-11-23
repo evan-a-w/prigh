@@ -609,7 +609,7 @@ let%expect_test "stream: the MCP side channel, through prigh mcp-bridge" =
            ~argv:
              [ "sh"
              ; "-c"
-             ; {|[ "$PRIGH_MCP_SOCKET" = "$2" ] && echo same socket; echo '{"ping":1}' | "$1" mcp-bridge; echo done|}
+             ; {|[ -z "$PRIGH_MCP_SOCKET" ] && echo not in its env; [ -S "$2" ] && echo same socket; echo '{"ping":1}' | PRIGH_MCP_SOCKET="$2" "$1" mcp-bridge; echo done|}
              ; "sh"
              ; Host_process.Placeholder.prigh
              ; Host_process.Placeholder.mcp_socket
@@ -644,6 +644,7 @@ let%expect_test "stream: the MCP side channel, through prigh mcp-bridge" =
   [%expect
     {|
     (true mcp.sock 700)
+    not in its env
     same socket
     {"pong":1}
     done

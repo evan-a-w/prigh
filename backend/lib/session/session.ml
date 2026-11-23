@@ -113,6 +113,7 @@ module Entry = struct
           ; mark : string option [@jsonaf.option] [@sexp.option]
           ; before : string option [@jsonaf.option] [@sexp.option]
           ; after : string option [@jsonaf.option] [@sexp.option]
+          ; cost_total : float option [@jsonaf.option] [@sexp.option]
           }
       | Handoff of
           { from_adapter : string option [@jsonaf.option] [@sexp.option]
@@ -1620,14 +1621,13 @@ module External_turn = struct
     ; mark : string option
     ; before : string option
     ; after : string option
+    ; cost_total : float option
     }
   [@@deriving sexp_of, equal]
 end
 
-let engine_entry t = (derived t).state.engine
-
 let engine t =
-  match engine_entry t with
+  match (derived t).state.engine with
   | None -> Ok Engine_choice.harness
   | Some (engine, adapter) -> Engine_choice.of_strings ~engine ~adapter
 ;;
@@ -1656,16 +1656,16 @@ let record_thread t ({ adapter; host; thread_id; cwd; fork_from } : Thread.t) =
 let external_turns ?(all = false) t =
   List.filter_map (if all then entries t else active_path t) ~f:(fun (e : Entry.t) ->
     match e.payload with
-    | External_turn { thread_id; turn_id; through; first_turn_id; mark; before; after } ->
-      Some { External_turn.thread_id; turn_id; through; first_turn_id; mark; before; after }
+    | External_turn { thread_id; turn_id; through; first_turn_id; mark; before; after; cost_total } ->
+      Some { External_turn.thread_id; turn_id; through; first_turn_id; mark; before; after; cost_total }
     | _ -> None)
 ;;
 
 let record_external_turn
       t
-      ({ thread_id; turn_id; through; first_turn_id; mark; before; after } : External_turn.t)
+      ({ thread_id; turn_id; through; first_turn_id; mark; before; after; cost_total } : External_turn.t)
   =
-  append t (External_turn { thread_id; turn_id; through; first_turn_id; mark; before; after })
+  append t (External_turn { thread_id; turn_id; through; first_turn_id; mark; before; after; cost_total })
 ;;
 
 let record_handoff t ~from_adapter ~to_adapter ~text =
@@ -1870,6 +1870,7 @@ let fork ?at t ~dir =
                     ; mark
                     ; before = None
                     ; after = None
+                    ; cost_total = None
                     })
                : Entry.t)));
       keep_hidden
@@ -1912,8 +1913,6 @@ module Summary = struct
     ; repo : Git_location.t option option
     ; worktrees : Session_worktree.t list
     ; home : Home.t option
-    ; engine : string option [@sexp.option]
-    ; adapter : string option [@sexp.option]
     }
   [@@deriving sexp]
 
@@ -2111,8 +2110,6 @@ let summarise t ~path ~mtime =
   ; repo = repo t
   ; worktrees = worktrees t
   ; home = t.home
-  ; engine = Option.map (engine_entry t) ~f:fst
-  ; adapter = Option.bind (engine_entry t) ~f:snd
   }
 ;;
 

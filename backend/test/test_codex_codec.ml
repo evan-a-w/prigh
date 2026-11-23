@@ -1414,9 +1414,9 @@ let%expect_test "what a thread and a turn are started with" =
     (response
      (response (Thread (kind Thread_start) (thread_id th-1) (model (gpt-5.5)))))
     -> {"id":2,"method":"turn/start","params":{"threadId":"th-1","input":[{"type":"text","text":"look"},{"type":"image","url":"data:image/png;base64,iVBO"},{"type":"localImage","path":"/tmp/a.png"}],"cwd":"/work","approvalPolicy":"untrusted","approvalsReviewer":"user","sandboxPolicy":{"type":"readOnly"},"effort":"none","summary":"auto","collaborationMode":{"mode":"plan","settings":{"model":"gpt-5.5","reasoning_effort":"none","developer_instructions":null}}}}
-    -> {"id":2,"method":"turn/start","params":{"threadId":"th-1","input":[{"type":"text","text":"look"},{"type":"image","url":"data:image/png;base64,iVBO"},{"type":"localImage","path":"/tmp/a.png"}],"cwd":"/work","approvalPolicy":"on-request","approvalsReviewer":"user","sandboxPolicy":{"type":"workspaceWrite"},"effort":"low","summary":"auto","collaborationMode":{"mode":"default","settings":{"model":"gpt-5.5","reasoning_effort":"low","developer_instructions":null}}}}
-    -> {"id":2,"method":"turn/start","params":{"threadId":"th-1","input":[{"type":"text","text":"look"},{"type":"image","url":"data:image/png;base64,iVBO"},{"type":"localImage","path":"/tmp/a.png"}],"cwd":"/work","approvalPolicy":"on-request","approvalsReviewer":"auto_review","sandboxPolicy":{"type":"workspaceWrite"},"summary":"auto","collaborationMode":{"mode":"default","settings":{"model":"gpt-5.5","reasoning_effort":null,"developer_instructions":null}}}}
-    -> {"id":2,"method":"turn/start","params":{"threadId":"th-1","input":[{"type":"text","text":"look"},{"type":"image","url":"data:image/png;base64,iVBO"},{"type":"localImage","path":"/tmp/a.png"}],"cwd":"/work","approvalPolicy":{"granular":{"sandbox_approval":false,"rules":false,"skill_approval":false,"request_permissions":false,"mcp_elicitations":true}},"approvalsReviewer":"user","sandboxPolicy":{"type":"dangerFullAccess"},"effort":"xhigh","summary":"auto","collaborationMode":{"mode":"default","settings":{"model":"gpt-5.5","reasoning_effort":"xhigh","developer_instructions":null}}}}
+    -> {"id":2,"method":"turn/start","params":{"threadId":"th-1","input":[{"type":"text","text":"look"},{"type":"image","url":"data:image/png;base64,iVBO"},{"type":"localImage","path":"/tmp/a.png"}],"cwd":"/work","approvalPolicy":"untrusted","approvalsReviewer":"user","sandboxPolicy":{"type":"workspaceWrite"},"effort":"low","summary":"auto","collaborationMode":{"mode":"default","settings":{"model":"gpt-5.5","reasoning_effort":"low","developer_instructions":null}}}}
+    -> {"id":2,"method":"turn/start","params":{"threadId":"th-1","input":[{"type":"text","text":"look"},{"type":"image","url":"data:image/png;base64,iVBO"},{"type":"localImage","path":"/tmp/a.png"}],"cwd":"/work","approvalPolicy":"untrusted","approvalsReviewer":"user","sandboxPolicy":{"type":"workspaceWrite"},"summary":"auto","collaborationMode":{"mode":"default","settings":{"model":"gpt-5.5","reasoning_effort":null,"developer_instructions":null}}}}
+    -> {"id":2,"method":"turn/start","params":{"threadId":"th-1","input":[{"type":"text","text":"look"},{"type":"image","url":"data:image/png;base64,iVBO"},{"type":"localImage","path":"/tmp/a.png"}],"cwd":"/work","approvalPolicy":"untrusted","approvalsReviewer":"user","sandboxPolicy":{"type":"dangerFullAccess"},"effort":"xhigh","summary":"auto","collaborationMode":{"mode":"default","settings":{"model":"gpt-5.5","reasoning_effort":"xhigh","developer_instructions":null}}}}
     |}]
 ;;
 
@@ -1461,7 +1461,7 @@ let%expect_test "notifications before turn/start's response; one turn at a time"
   print_s [%sexp (C.turn_id codec : string option)];
   [%expect
     {|
-    -> {"id":2,"method":"turn/start","params":{"threadId":"th-1","input":[{"type":"text","text":"go"}],"cwd":"/work","approvalPolicy":{"granular":{"sandbox_approval":false,"rules":false,"skill_approval":false,"request_permissions":false,"mcp_elicitations":true}},"approvalsReviewer":"user","sandboxPolicy":{"type":"dangerFullAccess"},"summary":"auto","collaborationMode":{"mode":"default","settings":{"model":"gpt-5.5","reasoning_effort":null,"developer_instructions":null}}}}
+    -> {"id":2,"method":"turn/start","params":{"threadId":"th-1","input":[{"type":"text","text":"go"}],"cwd":"/work","approvalPolicy":"untrusted","approvalsReviewer":"user","sandboxPolicy":{"type":"dangerFullAccess"},"summary":"auto","collaborationMode":{"mode":"default","settings":{"model":"gpt-5.5","reasoning_effort":null,"developer_instructions":null}}}}
     (Error "a Codex turn is already running")
     (Error "the Codex turn has not started yet")
     (Turn_started (turn_id tu-1))
@@ -1690,9 +1690,9 @@ let%expect_test "Codex's requests: answered, withdrawn, declined, unknown" =
      (call
       ((request_id 9) (call_id call-1) (tool ask_user)
        (arguments (Object ((q (Number 1))))))))
-    -> {"id":10,"result":{"action":"decline","content":null,"_meta":null}}
+    -> {"id":10,"result":{"action":"cancel"}}
     (Notice
-     "Codex's github asked for input, which prigh cannot show yet: declined")
+     "Codex's github asked for input, which prigh cannot show yet: cancelled")
     -> {"id":11,"error":{"code":-32601,"message":"prigh does not handle item/somethingNew"}}
     -> {"id":7,"result":{"decision":"acceptForSession"}}
     -> {"id":"q","result":{"decision":"decline"}}
@@ -1720,6 +1720,78 @@ let%expect_test "Codex's requests: answered, withdrawn, declined, unknown" =
      (images ()))
     (Notice "Codex wrote something that is not JSON: not json")
     ()
+    |}]
+;;
+
+let%expect_test "MCP tool-call approvals and network access are asked as such" =
+  let codec = started () in
+  ignore (C.start_turn codec (settings ()) [ Text "go" ] : string Or_error.t);
+  let form =
+    {|"requestedSchema":{"type":"object","properties":{"decision":{"type":"string","oneOf":[{"const":"allow_once","title":"Allow"},{"const":"allow_session","title":"Allow for this session"},{"const":"deny","title":"Deny"}]},"remember":{"type":"boolean","title":"Always allow"}},"required":["decision"]}|}
+  in
+  feed
+    codec
+    [ turn_event "turn/started" "tu-1"
+    ; sprintf
+        {|{"id":20,"method":"mcpServer/elicitation/request","params":{"threadId":"th-1","turnId":"tu-1","serverName":"github","mode":"form","message":"Allow github to create_issue?","_meta":{"codex_approval_kind":"mcp_tool_call","tool_name":"create_issue"},%s}}|}
+        form
+    ; sprintf
+        {|{"id":21,"method":"mcpServer/elicitation/request","params":{"threadId":"th-1","turnId":"tu-1","serverName":"github","mode":"form","message":"Allow?","_meta":{"codex_approval_kind":"mcp_tool_call"},%s}}|}
+        form
+    ; sprintf
+        {|{"id":22,"method":"mcpServer/elicitation/request","params":{"threadId":"th-1","turnId":"tu-1","serverName":"github","mode":"form","message":"Allow?","_meta":{"codex_approval_kind":"mcp_tool_call"},%s}}|}
+        form
+    ; (* prigh's own tools: prigh asks when the call reaches it. *)
+      sprintf
+        {|{"id":23,"method":"mcpServer/elicitation/request","params":{"threadId":"th-1","turnId":"tu-1","serverName":"prigh","mode":"form","message":"Allow?","_meta":{"codex_approval_kind":"mcp_tool_call"},%s}}|}
+        form
+    ; {|{"id":24,"method":"mcpServer/elicitation/request","params":{"threadId":"th-1","turnId":"tu-1","serverName":"web","mode":"url","message":"Sign in","url":"https://example.com","elicitationId":"e","_meta":{"codex_approval_kind":"mcp_tool_call"}}}|}
+    ; {|{"id":25,"method":"item/commandExecution/requestApproval","params":{"threadId":"th-1","turnId":"tu-1","itemId":"c-9","command":"curl https://example.com","cwd":"/work","networkApprovalContext":{"host":"example.com","protocol":"https"}}}|}
+    ; {|{"id":26,"method":"item/commandExecution/requestApproval","params":{"threadId":"th-1","turnId":"tu-1","itemId":"c-10","command":"y","kind":"writeStdin"}}|}
+    ];
+  let show = Option.iter ~f:print_line in
+  show (C.reply_approval codec ~request_id:"20" Allow);
+  show (C.reply_approval codec ~request_id:"21" Allow_always);
+  show (C.reply_approval codec ~request_id:"22" (Deny None));
+  [%expect
+    {|
+    (Turn_started (turn_id tu-1))
+    (Approval_request (request_id 20) (tool_id ())
+     (kind (Mcp (server github) (tool create_issue)))
+     (summary "Allow github to create_issue?")
+     (input
+      (Object
+       ((codex_approval_kind (String mcp_tool_call))
+        (tool_name (String create_issue)))))
+     (offers_always true))
+    (Approval_request (request_id 21) (tool_id ())
+     (kind (Mcp (server github) (tool tool))) (summary Allow?)
+     (input (Object ((codex_approval_kind (String mcp_tool_call)))))
+     (offers_always true))
+    (Approval_request (request_id 22) (tool_id ())
+     (kind (Mcp (server github) (tool tool))) (summary Allow?)
+     (input (Object ((codex_approval_kind (String mcp_tool_call)))))
+     (offers_always true))
+    -> {"id":23,"result":{"action":"accept","content":{"decision":"allow_once","remember":false}}}
+    -> {"id":24,"result":{"action":"cancel"}}
+    (Notice
+     "Codex's web asked for input, which prigh cannot show yet: cancelled")
+    (Approval_request (request_id 25) (tool_id ()) (kind (Other network))
+     (summary
+      "Network access to example.com (https) for: curl https://example.com")
+     (input
+      (Object
+       ((command (String "curl https://example.com")) (cwd (String /work))
+        (network
+         (Object ((host (String example.com)) (protocol (String https))))))))
+     (offers_always true))
+    (Approval_request (request_id 26) (tool_id (c-10)) (kind Command)
+     (summary "Send input to the running command: y")
+     (input (Object ((command (String y)) (kind (String writeStdin)))))
+     (offers_always true))
+    -> {"id":20,"result":{"action":"accept","content":{"decision":"allow_once","remember":false}}}
+    -> {"id":21,"result":{"action":"accept","_meta":{"persist":"session"},"content":{"decision":"allow_session","remember":true}}}
+    -> {"id":22,"result":{"action":"decline"}}
     |}]
 ;;
 
@@ -1812,7 +1884,7 @@ let%expect_test "a fork becomes the codec's thread; compaction" =
   print_s [%sexp (C.thread_id codec : string option)];
   [%expect
     {|
-    -> {"id":2,"method":"thread/fork","params":{"threadId":"th-1","lastTurnId":"tu-1","excludeTurns":true,"cwd":"/work","approvalPolicy":{"granular":{"sandbox_approval":false,"rules":false,"skill_approval":false,"request_permissions":false,"mcp_elicitations":true}},"approvalsReviewer":"user","sandbox":"danger-full-access","config":{"tools.update_plan.enabled":true}}}
+    -> {"id":2,"method":"thread/fork","params":{"threadId":"th-1","lastTurnId":"tu-1","excludeTurns":true,"cwd":"/work","approvalPolicy":"untrusted","approvalsReviewer":"user","sandbox":"danger-full-access","config":{"tools.update_plan.enabled":true}}}
     (Thread_started (thread_id th-2) (model (gpt-5.5)))
     (response
      (response (Thread (kind Thread_fork) (thread_id th-2) (model (gpt-5.5)))))

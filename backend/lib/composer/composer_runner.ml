@@ -9,6 +9,7 @@ type t =
   ; spawn : Adapter.Launch.t -> Line_transport.t Or_error.t
   ; start : cwd:string -> Adapter.Start.t
   ; interrupt_grace : Time_float.Span.t option
+  ; request_timeout : Time_float.Span.t option
   ; steer_poll : Time_float.Span.t
   ; host : unit -> string
   ; mutable live : live option
@@ -38,6 +39,7 @@ let create
       ~spawn
       ?(start = fun ~cwd -> Adapter.Start.default ~cwd)
       ?interrupt_grace
+      ?request_timeout
       ?(steer_poll = Time_float.Span.of_sec 0.2)
       ?(on_thread = ignore)
       ?(host = fun () -> "local")
@@ -50,6 +52,7 @@ let create
   ; spawn
   ; start
   ; interrupt_grace
+  ; request_timeout
   ; steer_poll
   ; host
   ; live = None
@@ -80,7 +83,14 @@ let close t =
   t.live <- None
 ;;
 
-let context (s : Engine_intf.Services.t) ~cancel ~call_id ?agent_id () =
+let context
+      (s : Engine_intf.Services.t)
+      ~cancel
+      ?(cwd = s.cwd)
+      ~call_id
+      ?agent_id
+      ()
+  =
   Tool.Context.create
     ~cancel
     ~execute:s.execute
@@ -94,7 +104,7 @@ let context (s : Engine_intf.Services.t) ~cancel ~call_id ?agent_id () =
     ~ask_user:s.ask_user
     ~ui:s.ui
     ~env:s.env
-    ~cwd:s.cwd
+    ~cwd
     ()
 ;;
 
@@ -117,6 +127,9 @@ let injected t (s : Engine_intf.Services.t) =
         in
         (match s.approve ctx tool args with
          | Some refused -> refused
+         | None when Cancellation.is_cancelled ctx.cancel ->
+           (* Approved after its turn ended: nobody waits for it now. *)
+           Tool_result.error "[cancelled]: its turn ended"
          | None -> s.execute ctx tool args))
 ;;
 
@@ -186,10 +199,15 @@ let start_process t (s : Engine_intf.Services.t) (start : Adapter.Start.t) =
        A.start
          ~sw:t.sw
          ?interrupt_grace:t.interrupt_grace
+         ?request_timeout:t.request_timeout
          ~injected
          transport
          start
      with
+     | exception exn ->
+       (* Cancelled while it started (Esc): it would run for nobody. *)
+       Line_transport.stop transport;
+       raise exn
      | Ok a ->
        t.resumed <- start.resume;
        t.forking <- Option.some_if start.fork start.resume |> Option.join;
@@ -243,6 +261,11 @@ let rollback_plan t session ~resume =
          | Some ({ mark = Some _; _ } as last) ->
            `At { Session.Fork_point.turn_id = Some last.turn_id; mark = last.mark }
          | Some { mark = None; _ } | None -> `Nothing))
+(* The running cost total [thread] reported after its last recorded turn. *)
+let cost_total_of session thread =
+  List.rev (Session.external_turns session)
+  |> List.find_map ~f:(fun (turn : Session.External_turn.t) ->
+    if String.equal turn.thread_id thread then turn.cost_total else None)
 ;;
 
 let live t (s : Engine_intf.Services.t) (input : Engine_intf.Turn.Input.t) =
@@ -277,7 +300,11 @@ let live t (s : Engine_intf.Services.t) (input : Engine_intf.Turn.Input.t) =
     in
     let start =
       { base with
-        model = input.model
+        cost_total =
+          Option.first_some
+            (Option.bind resume ~f:(cost_total_of s.session))
+            base.cost_total
+      ; model = input.model
       ; thinking = input.thinking
       ; approval = input.approval
       ; plan = input.plan
@@ -300,7 +327,7 @@ let live t (s : Engine_intf.Services.t) (input : Engine_intf.Turn.Input.t) =
              (Error.to_string_hum e));
         t.thread_id <- None;
         t.fresh <- true;
-        start_process t s { start with resume = None; fork = false; at = None }
+        start_process t s { start with resume = None; fork = false; at = None; cost_total = None }
       | Ok (Live ((module L), a)), Some thread when Option.is_some revert ->
         (* The session was rewound: its thread drops the runs it lost. *)
         (match L.revert a ~before_turn_id:(Option.value_exn revert) with
@@ -316,7 +343,7 @@ let live t (s : Engine_intf.Services.t) (input : Engine_intf.Turn.Input.t) =
            L.stop a;
            t.thread_id <- None;
            t.fresh <- true;
-           start_process t s { start with resume = None; fork = false; at = None })
+           start_process t s { start with resume = None; fork = false; at = None; cost_total = None })
       | started, _ -> started
     in
     (match started with
@@ -504,20 +531,49 @@ let capture t (s : Engine_intf.Services.t) ~which =
        None)
 ;;
 
-let run_turn
+let rec run_turn
+          t
+          (s : Engine_intf.Services.t)
+          ~cancel
+          (input : Engine_intf.Turn.Input.t)
+  =
+  let (module A) = t.adapter in
+  (* Cancelled when the run is, and when the turn ends however it does:
+     what prigh's tools were asked over MCP for it is withdrawn then. *)
+  let turn_cancel = Cancellation.create () in
+  Fiber.fork_daemon ~sw:t.sw (fun () ->
+    Fiber.first
+      (fun () -> Cancellation.await cancel)
+      (fun () -> Cancellation.await turn_cancel);
+    Cancellation.cancel turn_cancel;
+    `Stop_daemon);
+  t.services <- Some s;
+  t.cancel <- turn_cancel;
+  Exn.protect
+    ~finally:(fun () -> Cancellation.cancel turn_cancel)
+    ~f:(fun () ->
+      match run_turn' t s ~cancel input with
+      | added -> added
+      | exception exn ->
+        (* Its events may still come, for a turn that is no longer
+           anyone's: the next turn starts a new process instead. *)
+        t.services <- None;
+        close t;
+        raise exn)
+
+and run_turn'
       t
       (s : Engine_intf.Services.t)
       ~cancel
       (input : Engine_intf.Turn.Input.t)
   =
   let (module A) = t.adapter in
-  t.services <- Some s;
-  t.cancel <- cancel;
   let sent = ref false in
   let last_turn = ref None in
   let first_turn = ref None in
   let mark = ref None in
   let before = ref None in
+  let cost_total = ref None in
   let recorder =
     Composer_recorder.create
       ~adapter:A.id
@@ -531,11 +587,15 @@ let run_turn
       recorder
       (Turn_end { turn_id = None; stop = Failed { kind = Other; message } })
   in
-  (match live t s input with
-   | Error e ->
+  (match Cancellation.protect cancel ~f:(fun () -> live t s input) with
+   | None ->
+     Composer_recorder.feed
+       recorder
+       (Turn_end { turn_id = None; stop = Interrupted })
+   | Some (Error e) ->
      fail
        (sprintf "%s could not start: %s" A.display_name (Error.to_string_hum e))
-   | Ok (Live ((module L), a)) ->
+   | Some (Ok (Live ((module L), a))) ->
      (match input.kind with
       | Prompt -> before := capture t s ~which:"before"
       | Compact _ -> ());
@@ -566,15 +626,24 @@ let run_turn
        | Error e -> fail (Error.to_string_hum e)
        | Ok () ->
          sent := true;
+         cost_total := Some (fun () -> L.cost_total a);
          let requests = String.Table.create () in
          let stop = ref None in
+         (* Each request waits in a fiber of its own, until answered,
+            withdrawn, the run cancelled or the turn ended: its dialog
+            closes then ({!Agent.confirm} and [ask_user] clean up when
+            cancelled). Not daemons: the turn waits for them to close. *)
          let handle_request ~sw request_id f =
            let c = Cancellation.create () in
            Hashtbl.set requests ~key:request_id ~data:c;
-           Fiber.fork_daemon ~sw (fun () ->
-             f c;
-             Hashtbl.remove requests request_id;
-             `Stop_daemon)
+           Fiber.fork ~sw (fun () ->
+             Fiber.first
+               (fun () -> f c)
+               (fun () ->
+                  Fiber.first
+                    (fun () -> Cancellation.await c)
+                    (fun () -> Cancellation.await cancel));
+             Hashtbl.remove requests request_id)
          in
          let rec events ~sw =
            match L.next_event a with
@@ -596,18 +665,30 @@ let run_turn
                      ~request_id
                      ~summary
                  | _ ->
-                   let canonical, parent =
+                   (* What is judged is what the harness asks to run: the
+                      request's own input, not the call it announced
+                      (a hook or the harness may have changed it). The
+                      announced call only says what it is called and which
+                      subagent runs it. *)
+                   let native_name, parent =
                      match
                        Option.bind tool_id ~f:(fun tool_id ->
                          Composer_recorder.call_started recorder ~tool_id)
                      with
-                     | Some (canonical, parent) -> canonical, parent
-                     | None ->
-                       ( Canonical_tool.of_start
-                           ~kind
-                           ~native_name:(kind_name kind)
-                           ~input
-                       , None )
+                     | Some ((announced : Canonical_tool.t), parent) ->
+                       announced.native_name, parent
+                     | None -> kind_name kind, None
+                   in
+                   let canonical =
+                     Canonical_tool.of_start ~kind ~native_name ~input
+                   in
+                   (* Where the harness runs it (Codex says), for the
+                      rules: else the session's. *)
+                   let cwd =
+                     match Json.member "cwd" input with
+                     | Some (`String cwd) when Filename.is_absolute cwd ->
+                       Some cwd
+                     | _ -> None
                    in
                    let tool =
                      Option.value_or_thunk
@@ -618,6 +699,7 @@ let run_turn
                      context
                        s
                        ~cancel:c
+                       ?cwd
                        ~call_id:(Option.value tool_id ~default:request_id)
                        ?agent_id:parent
                        ()
@@ -727,6 +809,7 @@ let run_turn
           ; mark = !mark
           ; before = Option.bind after ~f:(fun _ -> !before)
           ; after
+          ; cost_total = Option.bind !cost_total ~f:(fun f -> f ())
           }
         : Session.Entry.t)
    | _ -> ());

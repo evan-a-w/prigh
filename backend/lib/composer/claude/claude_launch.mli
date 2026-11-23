@@ -22,18 +22,24 @@ type t =
   ; model : string option
   ; permission_mode : Claude_permission_mode.t option
   ; resume : Resume.t
-  ; append_system_prompt : string option
   ; mcp_config : Json.t option
     (** [{"mcpServers": {...}}]; see {!sdk_mcp_config} for prigh's in-band tools *)
   ; max_thinking_tokens : int option
   ; effort : string option (** ["low"] .. ["max"] *)
+  ; setting_sources : string list
+    (** which settings files apply ([--setting-sources]): by default only
+        the user's, so a repository's [.claude/settings*.json] (its hooks,
+        allow rules and MCP servers) does not run in prigh's sessions *)
+  ; strict_mcp_config : bool
+    (** only the [mcp_config] servers start, not the project's [.mcp.json]
+        (default) *)
   }
 [@@deriving sexp_of]
 
 val default : t
 
-(** The command line. Value flags that could look like flags use
-    [--flag=value]; [--input-format stream-json] is last, as the SDKs pass
+(** The command line. Values that could look like flags (start with [-])
+    go after [--flag=]; [--input-format stream-json] is last, as the SDKs pass
     it. *)
 val argv : t -> string list
 

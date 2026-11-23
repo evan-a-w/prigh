@@ -15,6 +15,10 @@ module Start = struct
       (** continue [resume] only up to this turn: its fork ([fork]) is
           made there, or (an agent that rolls back by resuming at a
           message: {!Rollback.Resume_at}) it is rolled back to it *)
+    ; cost_total : float option
+      (** the running cost total [resume] reported last: the harnesses that
+          report a session's cost as a running total carry it on when the
+          thread is continued, so only what comes after it is new spend *)
     ; developer_instructions : string option
       (** appended to the harness's own system prompt *)
     ; mcp_servers : (string * Json.t) list
@@ -31,6 +35,7 @@ module Start = struct
     ; resume = None
     ; fork = false
     ; at = None
+    ; cost_total = None
     ; developer_instructions = None
     ; mcp_servers = []
     }
@@ -119,13 +124,15 @@ module type S = sig
 
   (** Talks to the process [transport] runs: the handshake, then the thread
       (new, resumed or forked). Fails, saying why, when the process does not
-      answer as expected or exits. [interrupt_grace]: how long an
+      answer as expected, in time ([request_timeout] for each request, 60s),
+      or exits. Cancelling the calling fiber abandons it. [interrupt_grace]: how long an
       interrupted turn may take to end before it is ended for it (10s).
       [injected]: prigh's tools, for a harness that carries MCP in-band
       (Claude Code); the others reach them through [Start.mcp_servers]. *)
   val start
     :  sw:Switch.t
     -> ?interrupt_grace:Time_float.Span.t
+    -> ?request_timeout:Time_float.Span.t
     -> ?injected:Injected_tools.t
     -> Line_transport.t
     -> Start.t
@@ -175,6 +182,11 @@ module type S = sig
 
   (** The thread to resume later. *)
   val thread_id : t -> string option
+
+  (** The running cost total the harness reported last for its thread, to
+      seed {!Start.cost_total} when the thread is continued; [None] for one
+      that reports no running total. *)
+  val cost_total : t -> float option
 
   val in_turn : t -> bool
 

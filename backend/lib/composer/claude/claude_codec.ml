@@ -122,6 +122,7 @@ type t =
   ; mutable turns : int
   ; mutable interrupting : bool
   ; mutable cost_total : float
+  ; mutable cost_seen : bool
   ; mutable context_tokens : int option
   ; mutable rate_limited : bool
   ; mutable auth_failed : bool
@@ -132,7 +133,7 @@ type t =
   ; warned : String.Hash_set.t
   }
 
-let create () =
+let create ?cost_total () =
   { next_id = 0
   ; ours = String.Table.create ()
   ; permissions = []
@@ -142,7 +143,8 @@ let create () =
   ; turn = None
   ; turns = 0
   ; interrupting = false
-  ; cost_total = 0.
+  ; cost_total = Option.value cost_total ~default:0.
+  ; cost_seen = Option.is_some cost_total
   ; context_tokens = None
   ; rate_limited = false
   ; auth_failed = false
@@ -156,6 +158,7 @@ let create () =
 
 let session_id t = t.session_id
 let last_assistant t = t.last_assistant
+let cost_total t = if t.cost_seen then Some t.cost_total else None
 let in_turn t = Option.is_some t.turn
 
 (* JSON helpers *)
@@ -213,14 +216,19 @@ let error_response ~request_id message =
         ])
 ;;
 
-let initialize t ~sdk_mcp_servers =
+let initialize t ?append_system_prompt ~sdk_mcp_servers () =
   control_request
     t
     Initialize
     "initialize"
-    [ "hooks", `Null
-    ; "sdkMcpServers", `Array (List.map sdk_mcp_servers ~f:(fun s -> `String s))
-    ]
+    ([ "hooks", `Null
+     ; ( "sdkMcpServers"
+       , `Array (List.map sdk_mcp_servers ~f:(fun s -> `String s)) )
+     ]
+     @
+     match append_system_prompt with
+     | Some text -> [ "appendSystemPrompt", `String text ]
+     | None -> [])
 ;;
 
 let user_message t ?uuid ~text ~images () =
@@ -602,6 +610,7 @@ let handle_result t json =
             else total
           in
           t.cost_total <- total;
+          t.cost_seen <- true;
           delta)
       in
       [ Output.Event
@@ -628,12 +637,22 @@ let handle_result t json =
       if t.interrupting || aborted
       then Interrupted
       else (
+        (* In the SDK's order: [errors], [result], the subtype, the HTTP
+           status. *)
         let message =
-          match str json "result", list json "errors" with
-          | Some r, _ when not (String.is_empty r) -> r
-          | _, (_ :: _ as errors) ->
-            String.concat ~sep:"\n" (List.filter_map errors ~f:Json.string)
-          | _ -> subtype
+          let errors =
+            List.map (list json "errors") ~f:(fun e ->
+              Option.value (Json.string e) ~default:(Json.to_string e))
+            |> List.filter ~f:(fun e -> not (String.is_empty e))
+          in
+          match errors, str json "result" with
+          | _ :: _, _ -> String.concat ~sep:"; " errors
+          | [], Some r when not (String.is_empty r) -> r
+          | [], _ ->
+            (match int json "api_error_status", subtype with
+             | Some status, ("success" | "error_during_execution") ->
+               sprintf "API error (HTTP %d)" status
+             | _ -> subtype)
         in
         let status = int json "api_error_status" in
         let legacy = legacy_limit_reset message in

@@ -32,15 +32,13 @@ let capabilities : Capabilities.t =
 let current_capabilities _ = capabilities
 let native_questions = true
 
-let permission_mode ~approval ~plan : Claude_permission_mode.t =
-  if plan
-  then Plan
-  else
-    (* Smart mode has no equivalent: Claude Code asks, and prigh's approval
-       model answers. *)
-    Option.value
-      (Claude_permission_mode.of_approval_mode approval)
-      ~default:Default
+(* Claude Code asks ([can_use_tool]) before every tool that is not
+   read-only, in every prigh mode: prigh's approval (the session's mode, its
+   deny and ask rules, Smart's judge) decides, as for the harness's own
+   tools. Its own modes that decide by themselves (acceptEdits,
+   bypassPermissions) would skip those rules. *)
+let permission_mode ~plan : Claude_permission_mode.t =
+  if plan then Plan else Default
 ;;
 
 let effort : Thinking.t -> string option = function
@@ -120,8 +118,7 @@ let mcp_config ~injected (start : Adapter.Start.t) =
 let launch_config ~injected (start : Adapter.Start.t) : Claude_launch.t =
   { Claude_launch.default with
     model = start.model
-  ; permission_mode =
-      Some (permission_mode ~approval:start.approval ~plan:start.plan)
+  ; permission_mode = Some (permission_mode ~plan:start.plan)
   ; resume =
       (match start.resume with
        | None -> New { session_id = None }
@@ -131,7 +128,6 @@ let launch_config ~injected (start : Adapter.Start.t) : Claude_launch.t =
            ; fork = start.fork
            ; at = Option.bind start.at ~f:(fun at -> at.mark)
            })
-  ; append_system_prompt = start.developer_instructions
   ; mcp_config = mcp_config ~injected start
   ; max_thinking_tokens = thinking_tokens start.thinking
   ; effort = effort start.thinking
@@ -180,9 +176,38 @@ let dispatch t (output : Claude_codec.Output.t) =
                    ]))))
 ;;
 
-let start ~sw ?interrupt_grace ?injected transport (start : Adapter.Start.t) =
-  let codec = Claude_codec.create () in
-  let driver = Adapter.Driver.create ~sw ?interrupt_grace transport in
+(* Claude Code asks in a turn of its own (after a background task), which
+   no prigh turn is there to answer. *)
+let refuse_orphan t (event : Adapter_event.t) =
+  match event with
+  | Approval_request { request_id; _ } ->
+    Result.iter
+      (Claude_codec.respond_approval t.codec ~request_id Cancel)
+      ~f:(Adapter.Driver.write t.driver)
+  | User_question { request_id; _ } ->
+    Result.iter
+      (Claude_codec.answer t.codec ~request_id Cancelled)
+      ~f:(Adapter.Driver.write t.driver)
+  | _ -> ()
+;;
+
+let start
+      ~sw
+      ?interrupt_grace
+      ?request_timeout
+      ?injected
+      transport
+      (start : Adapter.Start.t)
+  =
+  let codec = Claude_codec.create ?cost_total:start.cost_total () in
+  let driver =
+    Adapter.Driver.create
+      ~sw
+      ~name:display_name
+      ?interrupt_grace
+      ?request_timeout
+      transport
+  in
   let t =
     { codec
     ; driver
@@ -192,6 +217,7 @@ let start ~sw ?interrupt_grace ?injected transport (start : Adapter.Start.t) =
     ; models = []
     }
   in
+  Adapter.Driver.on_orphan_request driver (refuse_orphan t);
   Adapter.Driver.run
     driver
     ~handle_line:(fun line ->
@@ -209,7 +235,11 @@ let start ~sw ?interrupt_grace ?injected transport (start : Adapter.Start.t) =
   let%bind.Or_error init =
     Adapter.Driver.request
       driver
-      (Claude_codec.initialize codec ~sdk_mcp_servers)
+      (Claude_codec.initialize
+         codec
+         ?append_system_prompt:start.developer_instructions
+         ~sdk_mcp_servers
+         ())
       ~matches:(function
       | Initialized _ | Failed { command = Initialize; _ } -> true
       | Done _ | Failed _ -> false)
@@ -234,12 +264,8 @@ let apply t (s : Adapter.Settings.t) =
   let write = Adapter.Driver.write t.driver in
   if not (Option.equal String.equal old.model s.model)
   then write (Claude_codec.set_model t.codec s.model);
-  let mode = permission_mode ~approval:s.approval ~plan:s.plan in
-  if
-    not
-      (Claude_permission_mode.equal
-         mode
-         (permission_mode ~approval:old.approval ~plan:old.plan))
+  let mode = permission_mode ~plan:s.plan in
+  if not (Claude_permission_mode.equal mode (permission_mode ~plan:old.plan))
   then write (Claude_codec.set_permission_mode t.codec mode);
   if
     not
@@ -255,6 +281,7 @@ let apply t (s : Adapter.Settings.t) =
 ;;
 
 let send t settings (input : Adapter.Input.t) =
+  Adapter.Driver.await_idle t.driver;
   if not (Adapter.Driver.alive t.driver)
   then Or_error.error_string "Claude Code is not running"
   else if Adapter.Driver.in_turn t.driver
@@ -306,12 +333,14 @@ let revert _ ~before_turn_id:_ =
 
 let mark t = Claude_codec.last_assistant t.codec
 let thread_id t = Claude_codec.session_id t.codec
+let cost_total t = Claude_codec.cost_total t.codec
 let in_turn t = Adapter.Driver.in_turn t.driver
 let alive t = Adapter.Driver.alive t.driver
 let stop t = Adapter.Driver.stop t.driver
 let models t = t.models
 
 let compact t settings ~instructions =
+  Adapter.Driver.await_idle t.driver;
   if not (Adapter.Driver.alive t.driver)
   then Or_error.error_string "Claude Code is not running"
   else if Adapter.Driver.in_turn t.driver

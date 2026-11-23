@@ -174,7 +174,7 @@ let%expect_test "session entries: engine, threads, external turns, handoffs" =
   let (_ : Session.Entry.t) =
     Session.record_external_turn
       t
-      { thread_id = "thr_1"; turn_id = "turn_1"; through = m.id; first_turn_id = None; mark = None; before = None; after = None }
+      { thread_id = "thr_1"; turn_id = "turn_1"; through = m.id; first_turn_id = None; mark = None; before = None; after = None; cost_total = None }
   in
   let (_ : Session.Entry.t) =
     Session.set_engine t { engine = Composer; adapter = Some Claude }
@@ -204,9 +204,11 @@ let%expect_test "session entries: engine, threads, external turns, handoffs" =
      (threads
       (((adapter claude) (host laptop) (thread_id sess-2) (cwd /proj))
        ((adapter codex) (host backend) (thread_id thr_1) (cwd /proj))))
-     (turns (((thread_id thr_1) (turn_id turn_1) (through <id>)))))
+     (turns
+      (((thread_id thr_1) (turn_id turn_1) (through <id>)
+        (cost_total ())))))
     |}];
-  (* The entries as written, and the summary's engine. *)
+  (* The entries as written. *)
   In_channel.read_lines (Session.path t)
   |> List.filter ~f:(fun line ->
     List.exists [ "Engine"; "Thread"; "External_turn"; "Handoff" ] ~f:(fun k ->
@@ -231,17 +233,7 @@ let%expect_test "session entries: engine, threads, external turns, handoffs" =
     {"payload":["Engine",{"engine":"composer","adapter":"claude"}]}
     {"payload":["Handoff",{"from_adapter":"codex","to_adapter":"claude","text":"<handoff>…</handoff>"}]}
     {"payload":["Thread",{"adapter":"claude","host":"laptop","thread_id":"sess-2","cwd":"/proj"}]}
-    |}];
-  let summary =
-    Option.value_exn
-      (Session.summary_with
-         ~live:(fun _ -> None)
-         ~load:Session.load
-         (Session.path t))
-  in
-  print_s
-    [%sexp (summary.engine : string option), (summary.adapter : string option)];
-  [%expect {| ((composer) (claude)) |}]
+    |}]
 ;;
 
 let%expect_test "a session naming an engine this prigh does not know" =
@@ -438,13 +430,32 @@ let%expect_test
     {|
     result.state.engine: "composer"
     result.state.adapter: "codex"
-    result.state.capabilities: -
+    result.state.capabilities: {"fork":"unsupported","rewind":"unsupported","context_edit":false,"compact":"unsupported","steer":"between_turns","plan_mode":false,"btw":false,"subagents":"observe","model_fallback":false,"images":false,"ask_user":false}
     result.state.unavailable: "this session runs on the composer (Codex) engine, which this backend does not run (it runs harness): open it on a backend started with prigh serve -engines composer; it can still be read here"
     error: -
     |}];
   print_fields (call ~params:{|{"text": "hi"}|} "prompt") [ [ "error" ] ];
   [%expect
     {| error: "this session runs on the composer (Codex) engine, which this backend does not run (it runs harness): open it on a backend started with prigh serve -engines composer; it can still be read here" |}];
+  (* Nothing else runs the harness in its place either, nor edits its
+     history behind its harness's back. *)
+  List.iter
+    [ "set_goal", {|{"text": "tests pass"}|}
+    ; "compact", "{}"
+    ; "rewind", {|{"index": 0}|}
+    ; "btw", {|{"text": "aside"}|}
+    ]
+    ~f:(fun (meth, params) -> print_fields (call ~params meth) [ [ "error" ] ]);
+  [%expect
+    {|
+    error: "this session runs on the composer (Codex) engine, which this backend does not run (it runs harness): open it on a backend started with prigh serve -engines composer; it can still be read here"
+    error: "Codex sessions can't be compacted: start a new session (/new) for a fresh context"
+    error: "Codex sessions can't rewind: start a new session (/new) to begin again"
+    error: "Codex sessions have no side questions (/btw): ask in the session instead"
+    |}];
+  print_fields (call "get_state") [ [ "result"; "capabilities" ] ];
+  [%expect
+    {| result.capabilities: {"fork":"unsupported","rewind":"unsupported","context_edit":false,"compact":"unsupported","steer":"between_turns","plan_mode":false,"btw":false,"subagents":"observe","model_fallback":false,"images":false,"ask_user":false} |}];
   (match field (call "get_messages") [ "result" ] with
    | Some (`Array messages) -> printf "%d message(s)\n" (List.length messages)
    | json -> print_s [%sexp (Option.map json ~f:Json.to_string : string option)]);
