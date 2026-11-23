@@ -93,80 +93,6 @@ let banner (m : Model.t) ~inject =
          ]
 ;;
 
-(* Stays until answered: reloading mid-run is the user's call. *)
-let update_notice (m : Model.t) ~inject =
-  if not m.update_ready
-  then []
-  else
-    [ div
-        ~cls:"toast update-notice"
-        ~attrs:[ Attr.role "status" ]
-        [ Node.span [ Node.text "A new version of prigh-web is ready." ]
-        ; Html.button
-            ~cls:"ghost small toast-undo"
-            ~title:"Reload the page into it, in this session"
-            ~on_click:(inject Action.Apply_update)
-            [ Node.text "Reload" ]
-        ; Html.button
-            ~cls:"icon ghost toast-close"
-            ~title:"Later (the next page load uses it)"
-            ~label:"Dismiss"
-            ~on_click:(inject Action.Dismiss_update)
-            [ icon Close ]
-        ]
-    ]
-;;
-
-(* Over the bottom of the chat, above the composer: not over the transcript's
-   top, the side panels or a dialog. *)
-let toasts (m : Model.t) ~inject =
-  div
-    ~cls:"toast-anchor"
-    [ div
-        ~cls:"toasts"
-        ~attrs:[ Attr.create "aria-live" "polite" ]
-        (update_notice m ~inject
-         @ List.map m.toasts ~f:(fun (t : App.Toast.t) ->
-           let shown = Toast.short t.text in
-           Node.div
-             ~attrs:
-               [ classes [ "toast" ] [ "error", t.error ]
-               ; Attr.role (if t.error then "alert" else "status")
-               ; Attr.title
-                   (if String.equal shown t.text
-                    then "Dismiss"
-                    else t.text ^ " (click to dismiss)")
-               ; Attr.on_click (fun _ -> inject (Action.Dismiss_toast t.id))
-               ]
-             [ Node.span ~attrs:[ Attr.create "dir" "auto" ] [ Node.text shown ]
-             ; (if t.repeats > 0
-                then span ~cls:"toast-repeats" (sprintf "×%d" (t.repeats + 1))
-                else Node.none)
-             ; Option.value_map t.undo ~default:Node.none ~f:(fun h ->
-                 Html.button
-                   ~cls:"ghost small toast-undo"
-                   ~title:
-                     "Bring it back into the transcript and the model's \
-                      context (/delete undo)"
-                   ~on_click:
-                     (Effect.Many
-                        [ Effect.Stop_propagation
-                        ; inject (Action.Restore_hidden h)
-                        ])
-                   [ Node.text "Undo" ])
-             ; (if t.error
-                then
-                  Html.button
-                    ~cls:"icon ghost toast-close"
-                    ~title:"Dismiss"
-                    ~label:"Dismiss"
-                    ~on_click:(inject (Action.Dismiss_toast t.id))
-                    [ icon Close ]
-                else Node.none)
-             ]))
-    ]
-;;
-
 let empty (m : Model.t) = div ~cls:"empty" [ Temporary_view.hero m ]
 
 (* Until the backend has answered: what we wait for, over the shape of a
@@ -498,7 +424,7 @@ let view (m : Model.t) ~inject ~terminal ~code_editor =
                         | Some _, _ | _, Some _ -> Node.none
                         | None, None -> Jump_view.view m ~inject)
                      ])
-            ; toasts m ~inject
+            ; Toast_view.view m ~inject
             ; (match m.subagent_chat with
                | Some _ -> Node.none
                | None ->

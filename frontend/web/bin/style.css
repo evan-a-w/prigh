@@ -935,31 +935,15 @@ kbd {
   z-index: var(--z-tools);
   pointer-events: none;
 }
+/* Toast_view draws the toast (Sonner's look); here only what places it. */
 .toast {
   pointer-events: auto;
   max-width: min(460px, 100%);
-  background: var(--slate-2);
-  border: 1px solid var(--rule-2);
-  border-radius: var(--r-control);
-  padding: 6px 12px;
   cursor: pointer;
-  box-shadow: var(--float-shadow);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-  font-size: 13px;
-  line-height: 1.45;
   animation: rise 0.14s ease-out;
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
 }
-.toast .btn.toast-undo { margin: -2px -4px -2px 4px; padding: 0 8px; color: var(--sodium); font-weight: 600; flex-shrink: 0; }
-.toast-repeats { font: 11.5px/1.7 var(--mono); color: var(--faint); }
-.toast .btn.icon.toast-close { width: 22px; height: 22px; margin: -1px -6px -1px 0; flex-shrink: 0; color: var(--faint); }
-.toast-close .icon { width: 13px; height: 13px; }
-.toast:hover .toast-close, .toast-close:focus-visible { color: var(--chalk); }
-.toast.update-notice { cursor: default; box-shadow: inset 2px 0 0 var(--sodium), var(--float-shadow); }
-.toast.error { border-color: var(--brick-line); box-shadow: inset 2px 0 0 var(--brick), var(--float-shadow); color: var(--brick); }
 /* Right of the jump-to-the-end button, in the middle, not over it (on a
    phone, above it). */
 .main:has(.jump-to-bottom) .toast { max-width: min(460px, calc(50% - 44px)); }
@@ -1652,12 +1636,12 @@ kbd {
 @media (pointer: coarse) {
   .remove-image::after,
   .attach-chip-remove::after,
-  .toast .btn.icon.toast-close::after {
+  .toast .toast-close::after {
     content: "";
     position: absolute;
     inset: -8px;
   }
-  .attach-chip-remove, .toast .btn.icon.toast-close { position: relative; }
+  .attach-chip-remove, .toast .toast-close { position: relative; }
   /* Out and up only: a tap in the thumbnail's middle opens it. */
   .pending-image .remove-image::after { inset: -12px -12px 0 0; }
   .status-item.link { padding: 8px 6px; margin: -8px -6px; }
