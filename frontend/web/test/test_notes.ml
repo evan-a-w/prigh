@@ -272,7 +272,8 @@ let%expect_test
         <details class="diff-file" #open="true">
           <summary>
             <span class="path"> notes.txt </span>
-            <span class="chip"> new </span>
+            <span data-slot="badge"
+                  class="[&>svg]:pointer-events-none [&>svg]:size-3! [a]:hover:bg-muted [a]:hover:text-muted-foreground aria-invalid:border-destructive aria-invalid:ring-destructive/20 border border-border chip dark:aria-invalid:ring-destructive/40 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 font-medium gap-1 group/badge h-5 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 inline-flex items-center justify-center overflow-hidden px-2 py-0.5 rounded-4xl shrink-0 text-foreground text-xs transition-all w-fit whitespace-nowrap"> new </span>
             <span class="add count"> +1 </span>
             <span class="count del"> −0 </span>
           </summary>

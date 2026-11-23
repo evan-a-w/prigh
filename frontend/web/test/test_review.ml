@@ -165,8 +165,8 @@ let%expect_test "/review opens the page in the chat's place, at the first file" 
     (proj /home/me/proj)
     against
     (HEAD the uncommitted changes)
-    (○ src/ main.ml +2 −1) (More (right-click, Shift+F10))
-    (○ src/ util.ml +2 −0) (More (right-click, Shift+F10))
+    (○ M src/ main.ml +2 −1) (More (right-click, Shift+F10))
+    (○ A src/ util.ml +2 −0) (More (right-click, Shift+F10))
     2 files changed, +4 −1
     src/main.ml
     @@ -2,3 +2,4 @@
@@ -525,7 +525,8 @@ let%expect_test
         <span class="dir"> src/ </span>
         <span class="name"> util.ml </span>
       </span>
-      <span class="chip"> new </span>
+      <span data-slot="badge"
+            class="[&>svg]:pointer-events-none [&>svg]:size-3! [a]:hover:bg-muted [a]:hover:text-muted-foreground aria-invalid:border-destructive aria-invalid:ring-destructive/20 border border-border chip dark:aria-invalid:ring-destructive/40 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 font-medium gap-1 group/badge h-5 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 inline-flex items-center justify-center overflow-hidden px-2 py-0.5 rounded-4xl shrink-0 text-foreground text-xs transition-all w-fit whitespace-nowrap"> new </span>
       <span class="review-files-where"> 2/2 </span>
       <icon class="chevron"> </icon>
     </button>
@@ -549,9 +550,9 @@ let%expect_test
   H.text h ~selector:".review-file.current";
   [%expect
     {|
-    (○ src/ util.ml +2 −0)
+    (○ A src/ util.ml +2 −0)
     (Review (Step -1))
-    (○ src/ main.ml +2 −1)
+    (○ M src/ main.ml +2 −1)
     |}];
   (* j and k too; past the last it wraps round. *)
   H.key h "j" ~target:Review;
@@ -561,7 +562,7 @@ let%expect_test
     {|
     (Review (Step 1))
     (Review (Step 1))
-    (○ src/ main.ml +2 −1)
+    (○ M src/ main.ml +2 −1)
     |}];
   H.key h "a" ~target:Review;
   [%expect
@@ -585,7 +586,7 @@ let%expect_test
   [%expect
     {|
     1/2 approved
-    (○ src/ util.ml +2 −0)
+    (○ A src/ util.ml +2 −0)
     (Review (Step -1))
     src/main.ml
     |}];
@@ -650,7 +651,7 @@ let%expect_test
     {|
     (Complete_accept (run true))
     0/2 approved
-    (○ src/ main.ml +2 −1)
+    (○ M src/ main.ml +2 −1)
     (←) (Approve & next Space) (→) File 1 of 2
     |}];
   H.key h " " ~target:Review;
@@ -667,7 +668,7 @@ let%expect_test
     (Rpc (method_ fs_preview) (params ((path /home/me/proj/src/util.ml)))
      (tag (Review (Content src/util.ml))))
     1/2 approved
-    (○ src/ util.ml +2 −0)
+    (○ A src/ util.ml +2 −0)
     (←) (Approve Space) (→) File 2 of 2
     |}];
   (* The last one: nothing left to go on to, so it stays and says so. *)
@@ -696,7 +697,7 @@ let%expect_test
     {|
     (Review (Step -1))
     2/2 approved
-    (✓ src/ main.ml +2 −1)
+    (✓ M src/ main.ml +2 −1)
     (←) (Approved Space) (→) File 1 of 2
     |}];
   H.key h " " ~target:Review;
@@ -711,7 +712,7 @@ let%expect_test
   [%expect
     {|
     (Review (Step 1))
-    (✓ src/ util.ml +2 −0)
+    (✓ A src/ util.ml +2 −0)
     |}];
   (* Typing in a field, or with Ctrl or Alt, the keys are the field's. *)
   List.iter
@@ -739,7 +740,7 @@ let%expect_test
     (browser default)
     |}];
   H.text h ~selector:".review-file.current";
-  [%expect {| (✓ src/ util.ml +2 −0) |}]
+  [%expect {| (✓ A src/ util.ml +2 −0) |}]
 ;;
 
 let point side line offset =
@@ -965,7 +966,7 @@ let%expect_test
     []
     |}];
   H.text h ~selector:".review-file.current";
-  [%expect {| (○ src/ main.ml 2 +2 −1) |}]
+  [%expect {| (○ M src/ main.ml 2 +2 −1) |}]
 ;;
 
 let%expect_test "the whole file with the changes inline" =
@@ -1428,7 +1429,8 @@ let%expect_test "on a wide window threads sit in a margin beside their lines" =
                  @on_mouseenter
                  @on_mouseleave>
           <div class="review-thread-head">
-            <span class="review-id"> c1 </span>
+            <span data-slot="badge"
+                  class="[&>svg]:pointer-events-none [&>svg]:size-3! [a]:hover:bg-muted [a]:hover:text-muted-foreground aria-invalid:border-destructive aria-invalid:ring-destructive/20 border border-border dark:aria-invalid:ring-destructive/40 focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 font-medium font-mono gap-1 group/badge h-5 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 inline-flex items-center justify-center overflow-hidden px-2 py-0.5 review-id rounded-4xl shrink-0 text-foreground text-xs transition-all w-fit whitespace-nowrap"> c1 </span>
             <span class="review-where"> lines 3–4 </span>
             <Vdom.Node.none-widget> </Vdom.Node.none-widget>
             <Vdom.Node.none-widget> </Vdom.Node.none-widget>
@@ -1466,10 +1468,11 @@ let%expect_test "on a wide window threads sit in a margin beside their lines" =
           </ul>
           <div class="review-reply">
             <textarea id="review-reply-c1"
+                      data-slot="textarea"
                       placeholder="Reply…"
                       rows="1"
                       aria-label="Reply to c1"
-                      class="review-field"
+                      class="aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-transparent border border-input dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:bg-input/30 dark:disabled:bg-input/80 disabled:bg-input/50 disabled:cursor-not-allowed disabled:opacity-50 field-sizing-content flex focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 md:text-sm min-h-9 outline-none placeholder:text-muted-foreground px-2.5 py-1.5 review-field rounded-lg text-base transition-colors w-full"
                       #value=""
                       @on_input
                       @on_keydown> </textarea>

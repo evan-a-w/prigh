@@ -212,8 +212,8 @@ let%expect_test "a file changed since its last action shows what changed since" 
     (main /work)
     against
     (HEAD the uncommitted changes)
-    (○ a.ml +2 −1 since approved +2 −1) (More (right-click, Shift+F10))
-    (⚠ b.ml +1 −1) (More (right-click, Shift+F10))
+    (○ M a.ml +2 −1 since approved +2 −1) (More (right-click, Shift+F10))
+    (⚠ M b.ml +1 −1) (More (right-click, Shift+F10))
     2 files changed, +3 −2
     a.ml
     Since bob's approval · 10:00: +2 −1 (removed lines are the file as it was then)
@@ -460,8 +460,8 @@ let%expect_test "an older backend: no since-view" =
   H.text h ~selector:".review-files";
   [%expect
     {|
-    (○ a.ml +2 −1) (More (right-click, Shift+F10))
-    (⚠ b.ml +1 −1) (More (right-click, Shift+F10))
+    (○ M a.ml +2 −1) (More (right-click, Shift+F10))
+    (⚠ M b.ml +1 −1) (More (right-click, Shift+F10))
     2 files changed, +3 −2
     |}]
 ;;

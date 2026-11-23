@@ -322,8 +322,9 @@ let where = Review_comment.Range.label
 let old_flag (range : Review_comment.Range.t) =
   match range.side with
   | Old ->
-    span
-      ~cls:"review-flag old"
+    Review_badge.view
+      ~variant:Outline
+      ~cls:"review-flag old text-(color:--del-fg)"
       ~attrs:[ Attr.title "On lines the change removed" ]
       "old text"
   | New -> Node.none
@@ -440,14 +441,24 @@ let thread ?at (m : App.Model.t) (c : Review_comment.t) ~outdated ~inject =
       ]
     [ div
         ~cls:"review-thread-head"
-        [ span ~cls:"review-id" c.id
+        [ Review_badge.view ~variant:Outline ~cls:"review-id font-mono" c.id
         ; span ~cls:"review-where" (where range)
         ; old_flag range
         ; (if outdated
-           then span ~cls:"review-flag" "its code changed"
+           then
+             Review_badge.view
+               ~variant:Outline
+               ~cls:"review-flag text-primary border-primary/40"
+               "its code changed"
            else Node.none)
         ; (if resolved
-           then span ~cls:"review-flag done" "resolved"
+           then
+             Review_badge.view
+               ~variant:Outline
+               ~cls:
+                 "review-flag done text-(color:--sage) \
+                  border-(color:--sage-line)"
+               "resolved"
            else Node.none)
         ; (if busy then lamp ~title:"Saving" () else Node.none)
         ; div
@@ -495,7 +506,11 @@ let thread ?at (m : App.Model.t) (c : Review_comment.t) ~outdated ~inject =
            [ Node.textarea
                ~attrs:
                  [ Attr.id field_id
-                 ; Attr.class_ "review-field"
+                 ; Attr.class_
+                     (Loon.Textarea.classes
+                        ~class_:"review-field min-h-9 py-1.5"
+                        ())
+                 ; Attr.create "data-slot" "textarea"
                  ; Attr.placeholder "Reply…"
                  ; Attr.create "rows" "1"
                  ; Attr.create "aria-label" ("Reply to " ^ c.id)
@@ -530,7 +545,8 @@ let draft_view (m : App.Model.t) (d : Code_review.Draft.t) ~inject =
     ; Node.textarea
         ~attrs:
           [ Attr.id "review-draft"
-          ; Attr.class_ "review-field"
+          ; Attr.class_ (Loon.Textarea.classes ~class_:"review-field" ())
+          ; Attr.create "data-slot" "textarea"
           ; Attr.placeholder
               (match d.range.columns with
                | Some _ ->
@@ -743,7 +759,13 @@ let folded_card (m : App.Model.t) ~path (why : Folded_files.Why.t) ~inject =
   let unapproved = folded_unapproved t in
   div
     ~cls:"review-folded-file"
-    [ Node.p [ span ~cls:"chip" (Folded_files.Why.label why); Node.text text ]
+    [ Node.p
+        [ Review_badge.view
+            ~variant:Outline
+            ~cls:"chip"
+            (Folded_files.Why.label why)
+        ; Node.text text
+        ]
     ; div
         ~cls:"review-folded-actions"
         ([ button
