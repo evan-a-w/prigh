@@ -423,13 +423,17 @@ module Stderr = struct
       t.forwarded <- 0);
     let text, pending = Utf8.split_incomplete_suffix (t.pending ^ data) in
     t.pending <- pending;
-    if not (String.is_empty text)
-    then
-      if t.forwarded + String.length text <= t.rate
-      then (
-        t.forwarded <- t.forwarded + String.length text;
-        t.send (Up.to_line (Err (Utf8.sanitize text))))
-      else t.dropped <- t.dropped + String.length text
+    (* Up to the budget, cut where a character starts, whatever the reads
+       were. *)
+    let room = Int.max 0 (t.rate - t.forwarded) in
+    let sent, _ =
+      Utf8.split_incomplete_suffix (String.prefix text room)
+    in
+    if not (String.is_empty sent)
+    then (
+      t.forwarded <- t.forwarded + String.length sent;
+      t.send (Up.to_line (Err (Utf8.sanitize sent))));
+    t.dropped <- t.dropped + String.length text - String.length sent
   ;;
 
   let tail t =
@@ -545,7 +549,7 @@ let run ~env ~outer ~cancel ~on_output ~cwd (args : Arguments.t) =
          Outcome.Failed
            (sprintf
               "%s wrote a line over %d bytes, so it was stopped"
-              (List.hd_exn args.argv)
+              (Filename.basename (List.hd_exn args.argv))
               args.max_line)
        else Ran { exit; stderr_tail = Stderr.tail stderr }
      | exception (Eio.Cancel.Cancelled _ as exn) -> raise exn
