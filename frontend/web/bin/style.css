@@ -57,65 +57,8 @@
 
 * { box-sizing: border-box; }
 
-/* Scrollbars: thin and quiet, in the rules' colours, brighter under the
-   pointer; the thumb is still wide enough to grab. WebKit and Blink take the
-   pseudo-elements (which scrollbar-color would switch off), Firefox the
-   standard properties. A touch screen keeps its own overlay scrollbars
-   (styled, WebKit's would take room beside the content). */
-@media (hover: hover) {
-  ::-webkit-scrollbar { width: 10px; height: 10px; }
-  ::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
-  ::-webkit-scrollbar-thumb {
-    min-height: 32px;
-    background: var(--rule-2) padding-box;
-    border: 3px solid transparent;
-    border-radius: 10px;
-  }
-  :hover::-webkit-scrollbar-thumb { background-color: var(--faint-line); }
-  ::-webkit-scrollbar-thumb:hover { background-color: var(--muted-text); border-width: 2px; }
-  ::-webkit-scrollbar-thumb:active { background-color: var(--chalk); border-width: 2px; }
-}
-@media (hover: hover) and (forced-colors: active) {
-  ::-webkit-scrollbar-thumb { background-color: CanvasText; }
-}
-@supports not selector(::-webkit-scrollbar) {
-  * { scrollbar-width: thin; scrollbar-color: var(--rule-2) transparent; }
-  :hover { scrollbar-color: var(--faint-line) transparent; }
-}
 
-/* The work lamp: sodium, breathing slowly, wherever work is in progress
-   (a running session, tool or agent, a request on its way). Nothing
-   finished or dead glows. --lamp-ring cuts it out of a line it sits on. */
-.lamp {
-  --lamp-ring: 0 0 0 0 transparent;
-  display: inline-block;
-  width: 7px;
-  height: 7px;
-  flex-shrink: 0;
-  border-radius: 50%;
-  background: var(--sodium);
-  box-shadow: var(--lamp-ring), 0 0 4px 0 var(--sodium-glow);
-  animation: breathe 2s ease-in-out infinite;
-}
-@keyframes breathe {
-  0%, 100% { opacity: 0.55; box-shadow: var(--lamp-ring), 0 0 2px 0 transparent; }
-  50% { opacity: 1; box-shadow: var(--lamp-ring), 0 0 8px 2px var(--sodium-glow-bright); }
-}
 
-/* A chevron (Lucide's chevron-right, as a mask so it takes the text's
-   colour): closed it points right; [aria-expanded=true] or an open fold
-   turns it down. */
-.chev {
-  display: inline-block;
-  flex-shrink: 0;
-  width: 14px;
-  height: 14px;
-  background: currentColor;
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 18 6-6-6-6'/%3E%3C/svg%3E") center / contain no-repeat;
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m9 18 6-6-6-6'/%3E%3C/svg%3E") center / contain no-repeat;
-  transition: transform 0.15s;
-}
-[aria-expanded="true"] > .chev { transform: rotate(90deg); }
 
 html, body {
   margin: 0;
@@ -168,33 +111,48 @@ kbd {
 .mark.stopped, .mark.todo { color: var(--faint); }
 .mark.now, .mark.warn, .mark.picked { color: var(--sodium); }
 
+/* Html.button: loon's Button (shadcn, the Nova style) in plain CSS, so the
+   rules below that size or colour a particular button still win over it.
+   Roles: (none) outline, primary default, danger destructive, ghost, icon,
+   small. Html.button with ~variant uses Loon.Button's classes instead. */
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  border: 1px solid var(--rule);
-  background: var(--slate-2);
-  border-radius: var(--r-control);
-  padding: 5px 12px;
+  height: 32px;
+  border: 1px solid var(--border);
+  background: var(--background);
+  background-clip: padding-box;
+  border-radius: var(--radius);
+  padding: 0 10px;
+  font-size: 14px;
   font-weight: 500;
+  color: var(--foreground);
   cursor: pointer;
   white-space: nowrap;
-  transition: background 0.12s, border-color 0.12s, color 0.12s;
+  user-select: none;
+  outline: none;
+  transition: background 0.12s, border-color 0.12s, color 0.12s, box-shadow 0.12s;
 }
-.btn:hover { background: var(--panel-3); border-color: var(--rule-2); }
-.btn:focus-visible { outline: 2px solid var(--sodium); outline-offset: 2px; }
-.btn:disabled { opacity: 0.45; cursor: default; }
-.btn.primary { background: var(--sodium); border-color: var(--sodium); color: var(--sodium-ink); font-weight: 600; }
-.btn.primary:hover:not(:disabled) { filter: brightness(1.08); }
-.btn.danger { background: var(--brick); border-color: var(--brick); color: var(--graphite); font-weight: 600; }
-.btn.danger:hover { filter: brightness(1.08); }
-.btn.stop, .btn.deny { background: transparent; border-color: var(--brick-line); color: var(--brick); }
-.btn.stop:hover, .btn.deny:hover { background: var(--brick-wash); border-color: var(--brick-line); }
-.btn.icon { width: 30px; height: 30px; padding: 0; }
-.btn.ghost { background: transparent; border-color: transparent; color: var(--muted-text); }
-.btn.ghost:hover { background: var(--slate-2); color: var(--chalk); }
-.btn.small { padding: 2px 9px; font-size: 12.5px; }
+.dark .btn, [data-theme="original"] .btn, [data-theme="dark"] .btn, :root:not([data-theme]) .btn {
+  background-color: color-mix(in oklab, var(--input) 30%, transparent);
+  border-color: var(--input);
+}
+.btn:hover { background: var(--muted); color: var(--foreground); }
+.btn:focus-visible { border-color: var(--ring); box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 50%, transparent); }
+.btn:active:not([aria-haspopup]):not(:disabled) { transform: translateY(1px); }
+.btn:disabled { opacity: 0.5; cursor: default; pointer-events: none; }
+.btn .icon { flex-shrink: 0; }
+.btn.primary { background: var(--primary); border-color: transparent; color: var(--primary-foreground); }
+.btn.primary:hover:not(:disabled) { background: color-mix(in oklab, var(--primary) 80%, transparent); color: var(--primary-foreground); }
+.btn:is(.danger, .stop, .deny) { background: color-mix(in oklab, var(--destructive) 15%, transparent); border-color: transparent; color: var(--destructive); }
+.btn:is(.danger, .stop, .deny):hover { background: color-mix(in oklab, var(--destructive) 25%, transparent); color: var(--destructive); }
+.btn.icon { width: 32px; height: 32px; padding: 0; }
+.btn.ghost { background: transparent; border-color: transparent; color: var(--muted-foreground); }
+.btn.ghost:hover { background: color-mix(in oklab, var(--muted) 50%, transparent); color: var(--foreground); }
+.btn.small { height: 28px; padding: 0 10px; font-size: 0.8rem; gap: 4px; border-radius: min(calc(var(--radius) * 0.8), 12px); }
+.btn.small.icon { width: 28px; padding: 0; }
 
 .text-input, .search input {
   width: 100%;
@@ -217,8 +175,6 @@ kbd {
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
-  .lamp { animation: none !important; opacity: 1; }
-  .chev { transition: none; }
 }
 
 /* Layout */
@@ -275,13 +231,7 @@ kbd {
 .session-place:has(+ .session-home) { flex: 0 1 auto; }
 
 /* Every checkbox (and radio button) of the page. */
-.check { width: 14px; height: 14px; flex-shrink: 0; border: 1.5px solid var(--rule-2); border-radius: var(--r-chip); display: inline-flex; align-items: center; justify-content: center; }
-.check.on { background: var(--sodium); border-color: var(--sodium); color: var(--sodium-ink); }
-.check .icon { width: 11px; height: 11px; stroke-width: 3; }
-.check.radio { border-radius: 50%; }
 .check-item .check, .question-choice .check { align-self: center; }
-.check.radio.on { background: none; }
-.check.radio.on::after { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--sodium); }
 .session-open > .check { margin-top: 3px; animation: check-in 0.16s ease-out; }
 @keyframes check-in { from { margin-left: -14px; opacity: 0; } }
 .session-open[role="checkbox"] { user-select: none; }
@@ -1189,18 +1139,6 @@ kbd {
 .btw-answer .markdown > .md-part:first-child > :first-child { margin-top: 0; }
 .btw-status { display: flex; align-items: center; gap: 8px; color: var(--muted-text); font-size: 12.5px; }
 .btw-status:empty { display: none; }
-/* Said to screen readers, not shown. */
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  margin: -1px;
-  padding: 0;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-  border: 0;
-}
 .btw-error { color: var(--brick); font-size: 12.5px; }
 .btw-note { color: var(--faint); font-size: 11.5px; margin-top: 4px; }
 

@@ -10,8 +10,14 @@ val classes : string list -> (string * bool) list -> Attr.t
 (** [title] is the tooltip: the hint (its key, its command, more words).
     The accessible name is its text, or [label] (what it does) for a button
     with only an icon. *)
+(** Without [variant] and [size], the class [btn] and [cls], whose role
+    words (primary, danger, ghost, icon, small) style.css draws as loon's
+    Button; with either, loon's Button classes ([Loon.Button.classes]) after
+    [cls], which then holds only hook names and placement utilities. *)
 val button
   :  ?cls:string
+  -> ?variant:Loon.Button.Variant.t
+  -> ?size:Loon.Button.Size.t
   -> ?title:string
   -> ?label:string
   -> ?disabled:bool
