@@ -1934,7 +1934,7 @@ let set_state_without_files (m : Model.t) (state : State.t) =
       ; btw = None
       ; generate = Generate.empty
       ; git_bar = Git_bar.empty
-      ; session_card = { m.session_card with sheet = false }
+      ; session_card = Session_card.for_session m.session_card
       ; subagent_chat = None
       ; completion = None
       ; scrolled_up = false

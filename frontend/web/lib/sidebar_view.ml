@@ -578,19 +578,29 @@ let account (m : App.Model.t) ~inject =
     Node.button
       ~attrs:
         [ Attr.class_
-            "account-button ml-auto flex min-w-0 items-center gap-2 \
-             rounded-full p-0.5 text-xs text-muted-foreground outline-none \
-             hover:text-foreground focus-visible:ring-2 \
-             focus-visible:ring-sidebar-ring"
+            "account-button ml-auto flex max-w-[60%] flex-none items-center \
+             gap-1.5 rounded-full border-0 p-0.5 text-xs text-muted-foreground \
+             outline-none hover:bg-transparent hover:text-foreground \
+             focus-visible:ring-2 focus-visible:ring-sidebar-ring"
         ; Attr.type_ "button"
-        ; Attr.title (name ^ ": switch, add, act as, sign out")
+        ; Attr.title
+            (name
+             ^ Option.value_map
+                 acting_as
+                 ~default:""
+                 ~f:(sprintf ", acting as %s")
+             ^ ": switch, add, act as, sign out")
         ; Attr.create "aria-label" ("Accounts: " ^ name)
         ; Attr.create "aria-haspopup" "dialog"
         ; Attr.on_click (fun _ -> inject Action.Open_accounts)
         ]
       [ (match acting_as with
          | Some ns ->
-           span ~cls:"user-acting truncate text-primary" ("acting as " ^ ns)
+           span
+             ~cls:
+               "user-acting min-w-0 truncate rounded-full bg-primary/15 px-1.5 \
+                text-[11px] text-primary"
+             ("acting as " ^ ns)
          | None -> Node.none)
       ; span
           ~cls:

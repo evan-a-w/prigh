@@ -10,6 +10,7 @@ module Section : sig
   type t =
     | Parents
     | Subagents
+    | Ended (** the finished and failed subagents, in one row *)
     | Worktrees
   [@@deriving sexp_of, equal]
 end
@@ -23,13 +24,18 @@ end
 
 type t =
   { subagents_open : bool
+  ; ended_open : bool
   ; worktrees_open : bool
   ; sheet : bool
   }
 [@@deriving sexp_of, equal]
 
-(** The subagents unfolded, the worktrees folded, the sheet closed. *)
+(** The subagents unfolded (the running ones; those that ended in one folded
+    row), the worktrees folded, the sheet closed. *)
 val default : t
+
+(** Another session's: the ended subagents folded again, the sheet closed. *)
+val for_session : t -> t
 
 val is_open : t -> Section.t -> bool
 val apply : t -> Action.t -> t

@@ -2,8 +2,8 @@ open! Core
 module H = Harness
 
 (* The line under the composer says where the session works: its cwd (under
-   the tool host's home as ~), its branch, and the host when it is not the
-   usual one. A session with no messages yet shows the tray instead
+   the tool host's home as ~) and its branch, never the host (its chip
+   names it). A session with no messages yet shows the tray instead
    (Temporary_view), which says the same and more. *)
 
 let hosts =
@@ -117,7 +117,7 @@ let%expect_test "the home directory itself, and a path outside it" =
     |}]
 ;;
 
-let%expect_test "another host: named first; its branch from the session list" =
+let%expect_test "another host: not named; its branch from the session list" =
   let fields =
     [ "cwd", `String "/Users/me/projects/prigh"
     ; "active_host", `String "c7"
@@ -125,59 +125,24 @@ let%expect_test "another host: named first; its branch from the session list" =
     ]
   in
   show (create ~fields ());
-  let h =
-    create
-      ~fields
-      ~sessions:
-        (sprintf
-           "[%s]"
-           (H.session_json
-              ~cwd:"/Users/me/projects/prigh"
-              ~repo:
-                ( "/Users/me/projects/prigh"
-                , "/Users/me/projects/prigh"
-                , Some "feat/x" )
-              ~host:"c7"
-              "s1"))
-      ()
-  in
-  show h;
-  (* This browser's own host, or the default for new sessions, is not
-     named. *)
-  H.quiet h (fun () ->
-    H.act
-      h
-      (Hello
-         { client_id = "c7"
-         ; namespace = None
-         ; user = None
-         ; superuser = false
-         ; features = []
-         }));
-  show h;
-  H.quiet h (fun () ->
-    H.act
-      h
-      (Hello
-         { client_id = "c1"
-         ; namespace = None
-         ; user = None
-         ; superuser = false
-         ; features = []
-         });
-    H.act
-      h
-      (Reply
-         ( Config
-         , Ok (Jsonaf.of_string {|{"scoped_models":[],"default_host":"c7"}|}) )));
-  show h;
+  show
+    (create
+       ~fields
+       ~sessions:
+         (sprintf
+            "[%s]"
+            (H.session_json
+               ~cwd:"/Users/me/projects/prigh"
+               ~repo:
+                 ( "/Users/me/projects/prigh"
+                 , "/Users/me/projects/prigh"
+                 , Some "feat/x" )
+               ~host:"c7"
+               "s1"))
+       ());
   [%expect
     {|
-    button "Folder: laptop: ~/projects/prigh. Change it" -- On laptop, in ~/projects/prigh. Start in another folder (/cd)
-    button "Folder: laptop: ~/projects/prigh. Change it" -- On laptop, in ~/projects/prigh. Start in another folder (/cd)
-    button "Branch: feat/x. Change it" -- Work in another worktree (/worktree)
     button "Folder: ~/projects/prigh. Change it" -- ~/projects/prigh. Start in another folder (/cd)
-    button "Branch: feat/x. Change it" -- Work in another worktree (/worktree)
     button "Folder: ~/projects/prigh. Change it" -- ~/projects/prigh. Start in another folder (/cd)
     button "Branch: feat/x. Change it" -- Work in another worktree (/worktree)
     |}]

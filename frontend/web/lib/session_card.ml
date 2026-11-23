@@ -5,6 +5,7 @@ module Section = struct
   type t =
     | Parents
     | Subagents
+    | Ended (** the finished and failed subagents, in one row *)
     | Worktrees
   [@@deriving sexp_of, equal]
 end
@@ -18,17 +19,27 @@ end
 
 type t =
   { subagents_open : bool
+  ; ended_open : bool
   ; worktrees_open : bool
   ; sheet : bool
   }
 [@@deriving sexp_of, equal]
 
-let default = { subagents_open = true; worktrees_open = false; sheet = false }
+let default =
+  { subagents_open = true
+  ; ended_open = false
+  ; worktrees_open = false
+  ; sheet = false
+  }
+;;
+
+let for_session t = { t with ended_open = false; sheet = false }
 
 let is_open t (section : Section.t) =
   match section with
   | Parents -> true
   | Subagents -> t.subagents_open
+  | Ended -> t.ended_open
   | Worktrees -> t.worktrees_open
 ;;
 
@@ -36,6 +47,7 @@ let apply t (action : Action.t) =
   match action with
   | Fold Parents -> t
   | Fold Subagents -> { t with subagents_open = not t.subagents_open }
+  | Fold Ended -> { t with ended_open = not t.ended_open }
   | Fold Worktrees -> { t with worktrees_open = not t.worktrees_open }
   | Sheet sheet -> { t with sheet }
 ;;

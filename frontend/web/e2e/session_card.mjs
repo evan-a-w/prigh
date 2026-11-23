@@ -139,7 +139,8 @@ try {
   await editor().press("Enter");
   await page.locator(".chat", { hasText: "There are 42 modules." }).first().waitFor();
   await idle();
-  await page.locator(".session-card-agent").waitFor();
+  // It finished: folded into the card's one row of those that ended.
+  await page.locator(".session-card-ended").waitFor();
   // Into the repository's other worktree: the session's own, so the card
   // lists it.
   await editor().fill("/worktree open feat/ui");
@@ -167,6 +168,10 @@ try {
   // the breadcrumb and the card say where it is.
   const composerBox = () => page.evaluate(() => JSON.stringify(document.querySelector(".composer-box").getBoundingClientRect()));
   const sessionComposer = await composerBox();
+  await page.locator(".session-card-ended").click();
+  await page.locator(".session-card-agent").waitFor();
+  section("the ended subagents unfolded");
+  console.log(clean(await page.locator(".session-card").innerText()).replace(/\n/g, " | "));
   await page.locator(".session-card-agent").click();
   await page.locator(".subagent-chat").waitFor();
   await page.locator(".subagent-chat", { hasText: "There are 42 modules." }).first().waitFor();

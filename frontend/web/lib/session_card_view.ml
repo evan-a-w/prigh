@@ -69,15 +69,18 @@ let section
       (m : Model.t)
       ~inject
       ~(which : Session_card.Section.t)
+      ?count
       ~glyph
       ~name
       items
   =
+  let count = Option.value count ~default:(List.length items) in
   let open_ = Session_card.is_open m.session_card which in
   let id =
     match which with
     | Parents -> "session-card-parents"
     | Subagents -> "session-card-subagents"
+    | Ended -> "session-card-ended"
     | Worktrees -> "session-card-worktrees"
   in
   Loon.Collapsible.view
@@ -102,7 +105,7 @@ let section
                      "flex items-center gap-1 text-[11px] tabular-nums \
                       text-muted-foreground"
                  ]
-               [ Node.text (Int.to_string (List.length items))
+               [ Node.text (Int.to_string count)
                ; Icon.view
                    ~class_:
                      (if open_
@@ -161,6 +164,72 @@ let subagent_row (m : Model.t) ~inject ((a : Agents.Agent.t), depth) =
           ]
         [ Node.text (Session_card.Activity.to_string activity) ]
     ]
+;;
+
+(* The subagents that ended, folded into one row by default: "24 finished
+   · 3 failed"; unfolded, they follow it, the latest first. *)
+let ended_row (m : Model.t) ~inject ended =
+  let failed =
+    List.count ended ~f:(fun ((a : Agents.Agent.t), _) ->
+      Agents.Status.equal a.status Failed)
+  in
+  let finished = List.length ended - failed in
+  let open_ = Session_card.is_open m.session_card Ended in
+  let part n what cls =
+    Node.span ~attrs:[ Attr.class_ cls ] [ Node.text (sprintf "%d %s" n what) ]
+  in
+  let parts =
+    List.filter_opt
+      [ (if finished > 0 then Some (part finished "finished" "") else None)
+      ; (if failed > 0
+         then Some (part failed "failed" "text-destructive")
+         else None)
+      ]
+    |> List.intersperse ~sep:(Node.span [ Node.text " · " ])
+  in
+  Node.button
+    ~attrs:
+      [ Attr.type_ "button"
+      ; Attr.class_
+          "session-card-ended flex h-7 w-full items-center gap-1.5 rounded-md \
+           px-2 text-left text-[12px] text-muted-foreground hover:bg-accent \
+           hover:text-foreground narrow:h-11"
+      ; Attr.create "aria-expanded" (Bool.to_string open_)
+      ; Attr.on_click (fun _ -> inject (Action.Session_card (Fold Ended)))
+      ]
+    [ Node.span ~attrs:[ Attr.class_ "min-w-0 truncate" ] parts
+    ; Icon.view
+        ~class_:
+          (if open_
+           then "ml-auto size-3! shrink-0 rotate-90 transition-transform"
+           else "ml-auto size-3! shrink-0 transition-transform")
+        Chevron_right
+    ]
+;;
+
+(* Running subagents, then those that ended: one row, unfolding to them. *)
+let subagent_rows (m : Model.t) ~inject agents =
+  let running, ended =
+    List.partition_tf agents ~f:(fun ((a : Agents.Agent.t), _) ->
+      Agents.Status.equal a.status Running)
+  in
+  let ended_at (a : Agents.Agent.t) =
+    Option.value a.ended_at ~default:a.started_at
+  in
+  let ended =
+    List.stable_sort ended ~compare:(fun ((a : Agents.Agent.t), _) (b, _) ->
+      Time_ns.compare (ended_at b) (ended_at a))
+  in
+  List.map running ~f:(subagent_row m ~inject)
+  @
+  match ended with
+  | [] -> []
+  | ended ->
+    ended_row m ~inject ended
+    ::
+    (if Session_card.is_open m.session_card Ended
+     then List.map ended ~f:(subagent_row m ~inject)
+     else [])
 ;;
 
 (* A chat above the one on show: the session's ([None]) or a subagent's. *)
@@ -290,7 +359,8 @@ let sections (m : Model.t) ~inject =
          ~which:Subagents
          ~glyph:Bot
          ~name:"Subagents"
-         (List.map agents ~f:(subagent_row m ~inject)))
+         ~count:(List.length agents)
+         (subagent_rows m ~inject agents))
   ; (if List.is_empty worktrees || in_subagent
      then Node.none
      else

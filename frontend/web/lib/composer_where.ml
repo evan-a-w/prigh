@@ -3,8 +3,7 @@ open! Import
 open Html
 
 type t =
-  { host : string option
-  ; path : string
+  { path : string
   ; branch : string option
   }
 
@@ -21,28 +20,6 @@ let branch (m : App.Model.t) (s : State.t) =
       else None)
 ;;
 
-(* Named only when it is not where tools run unless asked otherwise: the
-   default host for new sessions (the backend's without one), or this
-   browser's own. *)
-let host (m : App.Model.t) (s : State.t) =
-  let default =
-    match Option.bind m.config ~f:(fun (c : Config.t) -> c.default_host) with
-    | Some id when List.exists s.hosts ~f:(fun h -> String.equal h.id id) -> id
-    | Some _ | None -> Host.backend_id
-  in
-  let here =
-    Option.exists m.hello ~f:(fun (hello : Hello_reply.t) ->
-      String.equal hello.client_id s.active_host)
-  in
-  if here || String.equal s.active_host default
-  then None
-  else (
-    match Active_host.of_state s with
-    | Connected h -> Some h.name
-    | Disconnected { name; _ } -> Some name
-    | Unset -> None)
-;;
-
 let of_model (m : App.Model.t) =
   match m.state with
   | None -> None
@@ -50,8 +27,7 @@ let of_model (m : App.Model.t) =
     None
   | Some s ->
     Some
-      { host = host m s
-      ; path = Tilde.of_path ?host_home:(Tilde.active_host_home s) s.cwd
+      { path = Tilde.of_path ?host_home:(Tilde.active_host_home s) s.cwd
       ; branch = branch m s
       }
 ;;
@@ -75,9 +51,7 @@ let item ~cls ~title ~label ~on_click ~glyph text =
 ;;
 
 let view t ~inject =
-  let where =
-    Option.value_map t.host ~default:"" ~f:(sprintf "%s: ") ^ t.path
-  in
+  let where = t.path in
   Node.div
     ~attrs:
       [ Attr.class_
@@ -86,10 +60,7 @@ let view t ~inject =
       ]
     [ item
         ~cls:"where-path"
-        ~title:
-          (Option.value_map t.host ~default:"" ~f:(sprintf "On %s, in ")
-           ^ t.path
-           ^ ". Start in another folder (/cd)")
+        ~title:(t.path ^ ". Start in another folder (/cd)")
         ~label:(sprintf "Folder: %s. Change it" where)
         ~on_click:(inject (App.Action.Run "/cd"))
         ~glyph:Folder
