@@ -1673,10 +1673,12 @@ Since latest
 (comment · <TIME>)
 Send 1 comment
 === webkit: review: page: the files ===
+M
 src/
 main.ml
 1
 +2 −1
+A
 src/
 util.ml
 +3 −0
@@ -1796,12 +1798,15 @@ Space
 →
 File 1 of 2
 === webkit: review: page: the files after the agent's edit ===
+M
 README.md
 +1 −1
+M
 src/
 main.ml
 3
 +2 −1
+A
 src/
 util.ml
 1
@@ -1932,37 +1937,46 @@ Esc closed it: true
 Reviewing feat/login (<WT>) against main (merge base <SHA>)
 base: main
 === webkit: review: worktree: the files ===
+M
 README.md
 +1 −1
+A
 src/
 login.ml
 +1 −0
 2 files changed, +2 −1
 === webkit: review: worktree: against HEAD ===
+M
 README.md
 +1 −1
 1 file changed, +1 −1
 === webkit: review: worktree: against HEAD, what is reviewed ===
 Reviewing feat/login (<WT>) against HEAD
 === webkit: review: worktree: back to the session's own ===
+M
 README.md
 +1 −1
+M
 src/
 main.ml
 3
 +4 −1
+A
 src/
 util.ml
 1
 +3 −0
 3 files changed, +8 −2
 === webkit: review: since: the files ===
+M
 README.md
 +1 −1
+M
 src/
 main.ml
 3
 +4 −1
+A
 src/
 util.ml
 1
@@ -2248,7 +2262,8 @@ Read-only
 Check out into a worktree
 === webkit: review: compare: read-only, what is reviewed ===
 Reviewing feat/old (not checked out) against main (merge base <SHA>)
-files: src/
+files: A
+src/
 old.ml
 +1 −0
 1 file changed, +1 −0
