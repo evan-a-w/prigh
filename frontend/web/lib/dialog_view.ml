@@ -65,7 +65,6 @@ let trimmable (m : App.Model.t) =
 ;;
 
 let picker ?(trimmable = String.Set.empty) ~kind (p : Picker.t) ~inject =
-  let visible = Picker.visible p in
   Modal.view
     ~cls:
       (match kind with
@@ -87,125 +86,53 @@ let picker ?(trimmable = String.Set.empty) ~kind (p : Picker.t) ~inject =
               Esc to close"
            | _ -> "↑↓ to move, Enter to choose, Esc to close")
       ]
-    [ div
-        ~cls:"search"
-        [ icon Search
-        ; Node.input
-            ~attrs:
-              [ Attr.id "picker-input"
-              ; Attr.type_ "text"
-              ; Attr.create
-                  "aria-label"
-                  ("Filter " ^ String.lowercase (picker_title kind))
-              ; Attr.role "combobox"
-              ; Attr.create "aria-controls" "picker-list"
-              ; Attr.create "aria-expanded" "true"
-              ; Attr.create "aria-autocomplete" "list"
-              ; (if List.is_empty visible
-                 then Attr.empty
-                 else
-                   Attr.create
-                     "aria-activedescendant"
-                     (sprintf "picker-option-%d" (Picker.selected p)))
-              ; Attr.placeholder
-                  ("Filter " ^ String.lowercase (picker_title kind) ^ "…")
-              ; Attr.value (Picker.query p)
-              ; Attr.create "autocomplete" "off"
-              ; Attr.create "spellcheck" "false"
-              ; Attr.on_input (fun _ text -> inject (Action.Picker_query text))
-              ]
-            ()
-        ]
-    ; (match visible, kind with
-       | [], Mcp { servers = []; _ } ->
-         div ~cls:"picker-empty" [ Node.text Mcp_servers.none ]
-       | [], _ ->
-         div
-           ~cls:"picker-empty"
-           [ Node.textf
-               "Nothing matches “%s”: Backspace widens the search."
-               (Picker.query p)
+    (Picker_view.view
+       p
+       ~noun:(String.lowercase (picker_title kind))
+       ?empty:
+         (match kind with
+          | Mcp { servers = []; _ } -> Some (Node.text Mcp_servers.none)
+          | _ -> None)
+       ~leading:(fun (item : Picker.Item.t) ->
+         match kind with
+         | Accents ->
+           Option.to_list
+             (Option.map (Theme.Accent.of_string item.id) ~f:Theme_view.swatch)
+         | Themes ->
+           Option.to_list
+             (Option.map (Theme.Name.of_string item.id) ~f:Theme_view.sample)
+         | _ -> [])
+       ~trailing:(fun (item : Picker.Item.t) ->
+         match kind with
+         | Reminders ->
+           [ button
+               ~cls:"small picker-remove"
+               ~title:"Delete"
+               ~label:("Remove reminder " ^ item.id)
+               ~on_click:
+                 (Effect.Many
+                    [ Effect.Stop_propagation
+                    ; inject (Action.Remove_reminder item.id)
+                    ])
+               [ Node.text "Remove" ]
            ]
-       | visible, _ ->
-         div
-           ~cls:"picker-items"
-           ~attrs:
-             [ Attr.role "listbox"
-             ; Attr.id "picker-list"
-             ; Attr.create "aria-label" (Picker.title p)
-             ]
-           (List.mapi visible ~f:(fun i (item : Picker.Item.t) ->
-              Node.div
-                ~attrs:
-                  [ classes
-                      [ "picker-item" ]
-                      [ "selected", i = Picker.selected p
-                      ; "marked", item.marked
-                      ; "dimmed", item.dimmed
-                      ]
-                  ; Attr.role "option"
-                  ; Attr.id (sprintf "picker-option-%d" i)
-                  ; Attr.create
-                      "aria-selected"
-                      (Bool.to_string (i = Picker.selected p))
-                  ; (if item.marked
-                     then Attr.create "aria-checked" "true"
-                     else Attr.empty)
-                  ; Attr.on_click (fun _ ->
-                      inject (Action.Picker_choose item.id))
-                  ]
-                ((match kind with
-                  | Accents ->
-                    Option.to_list
-                      (Option.map
-                         (Theme.Accent.of_string item.id)
-                         ~f:Theme_view.swatch)
-                  | Themes ->
-                    Option.to_list
-                      (Option.map
-                         (Theme.Name.of_string item.id)
-                         ~f:Theme_view.sample)
-                  | _ -> [])
-                 @ [ span ~cls:"picker-label" item.label
-                   ; (if String.is_empty item.detail
-                      then Node.none
-                      else span ~cls:"picker-detail" item.detail)
-                   ; (if item.marked
-                      then Html.mark ~cls:"picker-check" Check
-                      else Node.none)
-                   ]
-                 @
-                 match kind with
-                 | Reminders ->
-                   [ button
-                       ~cls:"small picker-remove"
-                       ~title:"Delete"
-                       ~label:("Remove reminder " ^ item.id)
-                       ~on_click:
-                         (Effect.Many
-                            [ Effect.Stop_propagation
-                            ; inject (Action.Remove_reminder item.id)
-                            ])
-                       [ Node.text "Remove" ]
-                   ]
-                 | Jump when Set.mem trimmable item.id ->
-                   (match Jump.Target.of_string item.id with
-                    | Some target ->
-                      [ button
-                          ~cls:"small picker-trim"
-                          ~title:"Trim everything before this (Delete)"
-                          ~label:("Trim the context before " ^ item.label)
-                          ~on_click:
-                            (Effect.Many
-                               [ Effect.Stop_propagation
-                               ; inject (Action.Ask_trim target)
-                               ])
-                          [ Node.text "Trim before" ]
-                      ]
-                    | None -> [])
-                 | _ -> []))))
-    ; mcp_problems kind
-    ]
+         | Jump when Set.mem trimmable item.id ->
+           (match Jump.Target.of_string item.id with
+            | Some target ->
+              [ button
+                  ~cls:"small picker-trim"
+                  ~title:"Trim everything before this (Delete)"
+                  ~label:("Trim the context before " ^ item.label)
+                  ~on_click:
+                    (Effect.Many
+                       [ Effect.Stop_propagation; inject (Action.Ask_trim target) ])
+                  [ Node.text "Trim before" ]
+              ]
+            | None -> [])
+         | _ -> [])
+       ~on_query:(fun text -> inject (Action.Picker_query text))
+       ~on_choose:(fun id -> inject (Action.Picker_choose id))
+     @ [ mcp_problems kind ])
 ;;
 
 (* A key of the help: alternatives ("Ctrl+Enter / ⌘+Enter") as keys side by
