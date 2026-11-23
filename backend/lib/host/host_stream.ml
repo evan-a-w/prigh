@@ -118,6 +118,13 @@ let send t frame =
 let write_line t line =
   if t.finished
   then Or_error.error_string "the program has ended"
+  else if String.length line > Host_process.max_line
+  then
+    Or_error.errorf
+      "a message of %d MiB is more than the %d MiB prigh can send to a program \
+       on a tool host: send less at once (fewer or smaller images)"
+      ((String.length line + (1024 * 1024) - 1) / 1024 / 1024)
+      (Host_process.max_line / 1024 / 1024)
   else send t (In line)
 ;;
 

@@ -38,6 +38,10 @@ open! Import
 
 val op : string
 
+(** The longest line, in bytes, a program's stdout or stdin may carry: twice
+    JSON-escaped, it stays under the RPC's frame limit. *)
+val max_line : int
+
 module Up : sig
   type t =
     | Started of

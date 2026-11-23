@@ -105,7 +105,10 @@ let spawn ~sw ~exec ~host ?on_stderr (launch : Adapter.Launch.t) =
       (Line_transport.create
          ~read_line:(fun () -> Host_stream.read_line s)
          ~write_line:(fun line ->
-           ignore (Host_stream.write_line s line : unit Or_error.t))
+           match Host_stream.write_line s line with
+           | Ok () -> ()
+           | Error _ when Promise.is_resolved (Host_stream.ended s) -> ()
+           | Error e -> Error.raise e)
          ~close_stdin:(fun () -> Host_stream.close_stdin s)
          ~interrupt:(fun () -> Host_stream.interrupt s)
          ~stop:(fun () -> Host_stream.stop s)

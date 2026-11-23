@@ -89,7 +89,7 @@ val started : t -> (Started.t, Ended.t) Result.t Promise.t
 val read_line : t -> string option
 
 (** Writes [line] and a newline to the program's stdin. Fails once the
-    stream ended. *)
+    stream ended, or for a line over {!Host_process.max_line}. *)
 val write_line : t -> string -> unit Or_error.t
 
 (** The end of the program's stdin. *)
