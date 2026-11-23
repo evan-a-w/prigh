@@ -8,6 +8,7 @@ module Settings = struct
     ; thinking : Thinking.t
     ; approval : Approval_mode.t
     ; plan : bool
+    ; efforts : string list option
     }
   [@@deriving sexp_of]
 end
@@ -280,11 +281,34 @@ let sandbox_policy (mode : Approval_mode.t) =
   `Object [ "type", `String type_ ]
 ;;
 
-let effort : Thinking.t -> string option = function
-  | Off -> Some "none"
-  | On None -> None
-  | On (Some Max) -> Some "xhigh"
-  | On (Some level) -> Some (Thinking.Level.to_string level)
+(* Codex's efforts, lowest first. *)
+let effort_order = [ "none"; "minimal"; "low"; "medium"; "high"; "xhigh" ]
+
+let effort_rank e =
+  List.findi effort_order ~f:(fun _ x -> String.equal x e) |> Option.map ~f:fst
+;;
+
+let effort ?supported (thinking : Thinking.t) =
+  let wanted =
+    match thinking with
+    | Off -> Some "none"
+    | On None -> None
+    | On (Some Max) -> Some "xhigh"
+    | On (Some level) -> Some (Thinking.Level.to_string level)
+  in
+  match wanted, supported with
+  | None, _ | _, (None | Some []) -> wanted
+  | Some e, Some supported when List.mem supported e ~equal:String.equal ->
+    Some e
+  | Some e, Some supported ->
+    let rank e = Option.value (effort_rank e) ~default:Int.max_value in
+    let target = rank e in
+    List.min_elt supported ~compare:(fun a b ->
+      Comparable.lift
+        [%compare: int * int]
+        ~f:(fun x -> abs (rank x - target), rank x)
+        a
+        b)
 ;;
 
 let thread_params
@@ -396,7 +420,7 @@ let start_turn t (s : Settings.t) inputs =
   | None ->
     t.turn <- Some { id = None; started = false; interrupt = Not_asked };
     t.turn_error <- None;
-    let effort = effort s.thinking in
+    let effort = effort ?supported:s.efforts s.thinking in
     let model = Option.first_some s.model t.thread_model in
     let collaboration =
       Option.map model ~f:(fun model ->

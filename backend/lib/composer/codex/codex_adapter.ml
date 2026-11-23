@@ -38,12 +38,22 @@ let launch (start : Adapter.Start.t) : Adapter.Launch.t =
   }
 ;;
 
-let settings ~cwd (s : Adapter.Settings.t) : Codex_codec.Settings.t =
+(* The model's efforts in Codex's names, once Codex has listed its models. *)
+let efforts models (s : Adapter.Settings.t) =
+  let id = Option.value s.model ~default:External_model.default_id in
+  List.find models ~f:(fun (m : Model.t) -> String.equal m.id id)
+  |> Option.map ~f:(fun (m : Model.t) ->
+    (if m.can_disable_thinking then [ "none" ] else [])
+    @ List.map m.thinking_levels ~f:Thinking.Level.to_string)
+;;
+
+let settings ~cwd ~models (s : Adapter.Settings.t) : Codex_codec.Settings.t =
   { cwd
   ; model = s.model
   ; thinking = s.thinking
   ; approval = s.approval
   ; plan = s.plan
+  ; efforts = efforts models s
   }
 ;;
 
@@ -203,7 +213,9 @@ let start
     |> Result.map_error ~f:fail_with_exit
   in
   let%bind () = failed init ~what:"initialize" in
-  let s = settings ~cwd:start.cwd (Adapter.Settings.of_start start) in
+  let s =
+    settings ~cwd:start.cwd ~models:[] (Adapter.Settings.of_start start)
+  in
   let options : Codex_codec.Thread_options.t =
     { Codex_codec.Thread_options.empty with
       developer_instructions = start.developer_instructions
@@ -232,7 +244,7 @@ let start
 ;;
 
 let next_event t = Adapter.Driver.next_event t.driver
-let settings_of t s = settings ~cwd:t.cwd s
+let settings_of t s = settings ~cwd:t.cwd ~models:t.models s
 
 let send t settings input =
   Adapter.Driver.await_idle t.driver;
