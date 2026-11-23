@@ -11,6 +11,21 @@ end
 
 let money usd = sprintf "$%.2f" usd
 
+(* Codex and ACP agents say nothing of what their turns cost: a session that
+   only ran there spent nothing we know of, not nothing. *)
+let unpriced (s : P.State.t) =
+  Float.(s.cost_usd = 0.)
+  &&
+  match s.engine.adapter with
+  | Some adapter ->
+    String.equal adapter "codex" || String.is_prefix adapter ~prefix:"acp:"
+  | None -> false
+;;
+
+let cost (s : P.State.t) =
+  if unpriced s then "subscription" else money s.cost_usd
+;;
+
 let budget_part (s : P.State.t) =
   Option.map s.budget_usd ~f:(fun budget ->
     let level : Level.t =

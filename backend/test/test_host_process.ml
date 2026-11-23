@@ -261,6 +261,10 @@ let%expect_test "stream: lines both ways, then the end of input" =
   for _ = 1 to 10 do
     ignore (Host_stream.read_line s : string option)
   done;
+  print_s
+    [%sexp
+      (Host_stream.write_line s (String.make (Host_process.max_line + 1) 'x')
+       : unit Or_error.t)];
   Host_stream.write_line s "a" |> ok_exn;
   Host_stream.write_line s {|{"json": "with \"quotes\"\nand a newline"}|}
   |> ok_exn;
@@ -275,6 +279,8 @@ let%expect_test "stream: lines both ways, then the end of input" =
   [%expect
     {|
     started
+    (Error
+     "a message of 13 MiB is more than the 12 MiB prigh can send to a program on a tool host: send less at once (fewer or smaller images)")
     ("echo a")
     ("echo {\"json\": \"with \\\"quotes\\\"\\nand a newline\"}")
     ()
@@ -474,6 +480,7 @@ let%expect_test "stream: lost lines, old hosts and hosts that went away" =
           ; path = "/bin/codex"
           ; prigh = "/bin/prigh"
           ; mcp_socket = None
+          ; mcp_token = None
           }
       ; Out { seq = 1; line = "one" }
       ; Out { seq = 3; line = "three" }
@@ -609,7 +616,7 @@ let%expect_test "stream: the MCP side channel, through prigh mcp-bridge" =
            ~argv:
              [ "sh"
              ; "-c"
-             ; {|[ -z "$PRIGH_MCP_SOCKET" ] && echo not in its env; [ -S "$2" ] && echo same socket; echo '{"ping":1}' | PRIGH_MCP_SOCKET="$2" "$1" mcp-bridge; echo done|}
+             ; {|[ -z "$PRIGH_MCP_SOCKET" ] && echo not in its env; [ -S "$2" ] && echo same socket; echo '{"ping":0}' | PRIGH_MCP_SOCKET="$2" PRIGH_MCP_TOKEN=guess "$1" mcp-bridge; echo no reply without the token; read tok; echo '{"ping":1}' | PRIGH_MCP_SOCKET="$2" PRIGH_MCP_TOKEN="$tok" "$1" mcp-bridge; echo done|}
              ; "sh"
              ; Host_process.Placeholder.prigh
              ; Host_process.Placeholder.mcp_socket
@@ -623,6 +630,7 @@ let%expect_test "stream: the MCP side channel, through prigh mcp-bridge" =
     Eio.Promise.await (Host_stream.started s) |> Result.ok |> Option.value_exn
   in
   let socket = Option.value_exn started.mcp_socket in
+  Host_stream.write_line s (Option.value_exn started.mcp_token) |> ok_exn;
   let perm = sprintf "%o" (Core_unix.stat (Filename.dirname socket)).st_perm in
   print_s
     [%sexp
@@ -646,12 +654,13 @@ let%expect_test "stream: the MCP side channel, through prigh mcp-bridge" =
     (true mcp.sock 700)
     not in its env
     same socket
+    no reply without the token
     {"pong":1}
     done
     (Exited (program sh) (exit (Exited 0)) (stderr_tail ""))
     sh exited (code 0)
-    (Line (conn 1) (line "{\"ping\":1}"))
-    (Closed 1)
+    (Line (conn 2) (line "{\"ping\":1}"))
+    (Closed 2)
     false
     |}]
 ;;

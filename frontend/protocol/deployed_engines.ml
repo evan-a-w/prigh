@@ -103,5 +103,3 @@ let find_in choices arg =
          arg
          (String.concat ~sep:", " (List.map choices ~f:Choice.key)))
 ;;
-
-let find t arg = find_in (choices t) arg

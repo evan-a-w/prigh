@@ -29,6 +29,7 @@ type t =
   ; mutable forking : string option (* the thread a new one forks *)
   ; mutable services : Engine_intf.Services.t option (* the running turn's *)
   ; mutable cancel : Cancellation.t
+  ; mutable run_cancel : Cancellation.t (* the run [cancel] is part of *)
   ; mutable models : Model.t list (* the harness's, as it last said *)
   ; mutable context : int option * int option
   }
@@ -71,6 +72,7 @@ let create
   ; forking = None
   ; services = None
   ; cancel = Cancellation.never
+  ; run_cancel = Cancellation.never
   ; models = []
   ; context = None, None
   }
@@ -122,12 +124,15 @@ let injected t (s : Engine_intf.Services.t) =
       | None -> Tool_result.error "no turn is running"
       | Some s ->
         incr mcp_calls;
+        let run_cancel = t.run_cancel in
         let ctx =
           context s ~cancel:t.cancel ~call_id:(sprintf "mcp-%d" !mcp_calls) ()
         in
         (match s.approve ctx tool args with
          | Some refused -> refused
-         | None when Cancellation.is_cancelled ctx.cancel ->
+         | None
+           when Cancellation.is_cancelled ctx.cancel
+                || Cancellation.is_cancelled run_cancel ->
            (* Approved after its turn ended: nobody waits for it now. *)
            Tool_result.error "[cancelled]: its turn ended"
          | None -> s.execute ctx tool args))
@@ -549,6 +554,7 @@ let rec run_turn
     `Stop_daemon);
   t.services <- Some s;
   t.cancel <- turn_cancel;
+  t.run_cancel <- cancel;
   Exn.protect
     ~finally:(fun () -> Cancellation.cancel turn_cancel)
     ~f:(fun () ->

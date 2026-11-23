@@ -48,8 +48,6 @@ val choices : t -> Choice.t list
     and the harness engine when it runs too (none without adapters). *)
 val switch_targets : t -> Choice.t list
 
-(** The choice [arg] names (its key or label, or a prefix naming one); else
-    an error listing them. *)
-val find : t -> string -> Choice.t Or_error.t
-
+(** The choice among [choices] that [arg] names (its key or label, or a
+    prefix naming one); else an error listing them. *)
 val find_in : Choice.t list -> string -> Choice.t Or_error.t

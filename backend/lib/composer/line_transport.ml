@@ -19,33 +19,19 @@ end
 type t =
   { read_line : unit -> string option
   ; write_line : string -> unit
-  ; close_stdin : unit -> unit
-  ; interrupt : unit -> unit
   ; stop : unit -> unit
   ; ended : unit -> Exit.t
   ; is_ended : unit -> bool
   ; mcp : Mcp.t option
   }
 
-let create
-      ~read_line
-      ~write_line
-      ~close_stdin
-      ~interrupt
-      ~stop
-      ~ended
-      ~is_ended
-      ?mcp
-      ()
-  =
-  { read_line; write_line; close_stdin; interrupt; stop; ended; is_ended; mcp }
+let create ~read_line ~write_line ~stop ~ended ~is_ended ?mcp () =
+  { read_line; write_line; stop; ended; is_ended; mcp }
 ;;
 
 let mcp t = t.mcp
 let read_line t = t.read_line ()
 let write_line t line = t.write_line line
-let close_stdin t = t.close_stdin ()
-let interrupt t = t.interrupt ()
 let stop t = t.stop ()
 let ended t = t.ended ()
 let is_ended t = t.is_ended ()
@@ -57,7 +43,6 @@ module Peer = struct
     { input : string option Eio.Stream.t (* what we wrote; [None]: EOF *)
     ; output : string option Eio.Stream.t (* what it wrote; [None]: done *)
     ; stderr : Buffer.t
-    ; mutable interrupted : bool
     ; mutable input_closed : bool
     }
 
@@ -70,13 +55,6 @@ module Peer = struct
   ;;
 
   let write_stderr t s = Buffer.add_string t.stderr s
-
-  let take_interrupt t =
-    let i = t.interrupted in
-    t.interrupted <- false;
-    i
-  ;;
-
   let exit _ ~code = raise (Exited code)
 
   let spawn ~sw f =
@@ -84,7 +62,6 @@ module Peer = struct
       { input = Eio.Stream.create Int.max_value
       ; output = Eio.Stream.create Int.max_value
       ; stderr = Buffer.create 16
-      ; interrupted = false
       ; input_closed = false
       }
     in
@@ -128,8 +105,6 @@ module Peer = struct
         (fun line ->
           if (not p.input_closed) && not (Promise.is_resolved exited)
           then Eio.Stream.add p.input (Some line))
-    ; close_stdin = close_input
-    ; interrupt = (fun () -> p.interrupted <- true)
     ; stop =
         (fun () ->
           close_input ();

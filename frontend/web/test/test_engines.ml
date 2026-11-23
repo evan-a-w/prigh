@@ -282,3 +282,16 @@ let%expect_test
     (Focus editor)
     |}]
 ;;
+
+let%expect_test "a Codex session that reported no cost runs on a subscription" =
+  let show h = H.names h ~selector:".context-ring-anchor > button" in
+  show (session ());
+  show (session ~fields:[ "cost_usd", `Number "0.5" ] ());
+  show (H.create ());
+  [%expect
+    {|
+    button "Context 0% full, subscription: details"
+    button "Context 0% full, $0.50: details"
+    button "Context 0% full, $0.00: details"
+    |}]
+;;

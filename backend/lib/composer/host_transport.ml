@@ -91,12 +91,12 @@ let spawn ~sw ~exec ~host ?on_stderr (launch : Adapter.Launch.t) =
   | Error ended -> Error (Error.of_string (Host_stream.Ended.to_message ended))
   | Ok started ->
     let mcp =
-      match side, started.mcp_socket with
-      | Some side, Some socket ->
+      match side, started.mcp_socket, started.mcp_token with
+      | Some side, Some socket, Some token ->
         Mcp_side.run side ~sw s;
         Some
           { Line_transport.Mcp.bridge =
-              Injected_tools.Bridge.create ~prigh:started.prigh ~socket
+              Injected_tools.Bridge.create ~prigh:started.prigh ~socket ~token
           ; serve = Mcp_side.serve side
           }
       | _ -> None
@@ -105,9 +105,10 @@ let spawn ~sw ~exec ~host ?on_stderr (launch : Adapter.Launch.t) =
       (Line_transport.create
          ~read_line:(fun () -> Host_stream.read_line s)
          ~write_line:(fun line ->
-           ignore (Host_stream.write_line s line : unit Or_error.t))
-         ~close_stdin:(fun () -> Host_stream.close_stdin s)
-         ~interrupt:(fun () -> Host_stream.interrupt s)
+           match Host_stream.write_line s line with
+           | Ok () -> ()
+           | Error _ when Promise.is_resolved (Host_stream.ended s) -> ()
+           | Error e -> Error.raise e)
          ~stop:(fun () -> Host_stream.stop s)
          ~ended:(fun () -> exit_of (Promise.await (Host_stream.ended s)))
          ~is_ended:(fun () -> Promise.is_resolved (Host_stream.ended s))

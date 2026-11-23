@@ -189,7 +189,14 @@ let codex ?(hang_init = false) ~frames ~signal (p : Line_transport.Peer.t) =
   drain ()
 ;;
 
-let with_codex ?request_timeout ~peer f =
+let with_codex
+      ?request_timeout
+      ?(wrap = Fn.id)
+      ?(adapter = (module Codex_adapter : Adapter.S))
+      ?(tools = Tools.interaction)
+      ~peer
+      f
+  =
   with_sandbox
   @@ fun t ->
   Eio.Switch.run
@@ -198,11 +205,11 @@ let with_codex ?request_timeout ~peer f =
   let composer =
     Composer_runner.create
       ~sw
-      ~adapter:(module Codex_adapter)
+      ~adapter
       ~spawn:(fun (_ : Adapter.Launch.t) ->
         incr launches;
         printf "spawn #%d\n" !launches;
-        Ok (Line_transport.Peer.spawn ~sw (peer !launches)))
+        Ok (wrap (Line_transport.Peer.spawn ~sw (peer !launches))))
       ?request_timeout
       ()
   in
@@ -211,14 +218,19 @@ let with_codex ?request_timeout ~peer f =
       ~env:t.env
       ~sw
       ~provider:(Faux_provider.create [])
-      ~tools:Tools.interaction
+      ~tools
       ~sessions_dir:(Filename.concat t.dir "sessions")
       ~home:t.dir
       ~runner:(Composer_runner.runner composer)
       ~cwd:t.dir
       ()
   in
-  Agent.set_engine agent { engine = Composer; adapter = Some Codex };
+  let (module A) = adapter in
+  Agent.set_engine
+    agent
+    { engine = Composer
+    ; adapter = Some (Or_error.ok_exn (Adapter_id.of_string A.id))
+    };
   Agent.subscribe agent ~f:(function
     | Loop (Message_end (Assistant a)) ->
       printf
@@ -384,5 +396,253 @@ let%expect_test "Claude's approval judges the command it asks to run" =
     {|
     confirm bash: rm -rf build
     claude got: {"type":"control_response","response":{"subtype":"success","request_id":"r1","response":{"behavior":"deny","message":"not that"}}}
+    |}]
+;;
+
+let%expect_test "claude: an MCP call it gives up on is stopped and not answered"
+  =
+  Eio_main.run
+  @@ fun _ ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let running, run = Eio.Promise.create () in
+  let abandoned, abandon = Eio.Promise.create () in
+  let finished, finish = Eio.Promise.create () in
+  let injected =
+    Injected_tools.create ~tools:[ Tool_render_ui.tool ] ~execute:(fun _ _ ->
+      Eio.Promise.resolve run ();
+      Fun.protect
+        ~finally:(fun () -> Eio.Promise.resolve abandon ())
+        (fun () -> Eio.Fiber.await_cancel ()))
+  in
+  let read p =
+    Option.map (Line_transport.Peer.read_line p) ~f:(fun line ->
+      Json.parse line |> Or_error.ok_exn)
+  in
+  let transport =
+    Line_transport.Peer.spawn ~sw (fun p ->
+      (match read p with
+       | Some init ->
+         Line_transport.Peer.write_line
+           p
+           (sprintf
+              {|{"type":"control_response","response":{"subtype":"success","request_id":"%s","response":{"models":[],"commands":[]}}}|}
+              (Option.value_exn
+                 (Option.bind (Json.member "request_id" init) ~f:Json.string)))
+       | None -> ());
+      Line_transport.Peer.write_line
+        p
+        {|{"type":"control_request","request_id":"r-m","request":{"subtype":"mcp_message","server_name":"prigh","message":{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"render_ui","arguments":{"components":[]}}}}}|};
+      Eio.Promise.await running;
+      print_endline "the tool runs";
+      Line_transport.Peer.write_line
+        p
+        {|{"type":"control_cancel_request","request_id":"r-m"}|};
+      Eio.Promise.await abandoned;
+      print_endline "the tool is stopped";
+      let rec rest () =
+        match Line_transport.Peer.read_line p with
+        | Some line ->
+          printf "claude got: %s\n" line;
+          rest ()
+        | None -> print_endline "claude's input ends"
+      in
+      rest ();
+      Eio.Promise.resolve finish ())
+  in
+  let adapter =
+    Claude_adapter.start
+      ~sw
+      ~injected
+      transport
+      (Adapter.Start.default ~cwd:"/work")
+    |> Or_error.ok_exn
+  in
+  Eio.Promise.await abandoned;
+  Claude_adapter.stop adapter;
+  Eio.Promise.await finished;
+  [%expect
+    {|
+    the tool runs
+    the tool is stopped
+    claude's input ends
+    |}]
+;;
+
+let done_frames =
+  [ {|{"method":"turn/started","params":{"threadId":"th","turn":{"id":"tu","items":[],"status":"inProgress"}}}|}
+  ; {|{"method":"item/completed","params":{"threadId":"th","turnId":"tu","item":{"type":"agentMessage","id":"m1","text":"hello"}}}|}
+  ; {|{"method":"turn/completed","params":{"threadId":"th","turn":{"id":"tu","items":[],"status":"completed"}}}|}
+  ]
+;;
+
+let%expect_test "a turn that raises stops its process: the next starts another" =
+  let _, signal = signals () in
+  (* The first process's transport fails to send the first prompt. *)
+  let wrapped = ref 0 in
+  let wrap transport =
+    incr wrapped;
+    let first = !wrapped = 1 in
+    Line_transport.create
+      ~read_line:(fun () -> Line_transport.read_line transport)
+      ~write_line:(fun line ->
+        if first && String.is_substring line ~substring:"boom"
+        then failwith "the line could not be sent"
+        else Line_transport.write_line transport line)
+      ~stop:(fun () -> Line_transport.stop transport)
+      ~ended:(fun () -> Line_transport.ended transport)
+      ~is_ended:(fun () -> Line_transport.is_ended transport)
+      ()
+  in
+  with_codex ~wrap ~peer:(fun _ ->
+    codex ~hang_init:false ~frames:done_frames ~signal)
+  @@ fun agent _ ->
+  Or_error.ok_exn (Agent.prompt agent "boom");
+  Agent.wait_idle agent;
+  Or_error.ok_exn (Agent.prompt agent "fine");
+  Agent.wait_idle agent;
+  [%expect
+    {|
+    spawn #1
+    notice: run failed: (Failure "the line could not be sent")
+    spawn #2
+    assistant: End_turn "hello"
+    |}]
+;;
+
+let%expect_test "a new session in the agent stops the old one's process" =
+  let reached, signal = signals () in
+  let peer_done, peer_ended = Eio.Promise.create () in
+  with_codex ~peer:(fun _ p ->
+    codex ~hang_init:false ~frames:done_frames ~signal p;
+    print_endline "its input ends";
+    Eio.Promise.resolve peer_ended ())
+  @@ fun agent _ ->
+  Or_error.ok_exn (Agent.prompt agent "hi");
+  Agent.wait_idle agent;
+  Eio.Promise.await (reached "turn");
+  Agent.new_session agent;
+  Eio.Promise.await peer_done;
+  print_s [%message "" ~engine:(Agent.engine agent : Engine_id.t)];
+  [%expect
+    {|
+    spawn #1
+    assistant: End_turn "hello"
+    its input ends
+    (engine Harness)
+    |}]
+;;
+
+let%expect_test "the session's host leaving stops its process" =
+  let reached, signal = signals () in
+  let peer_done, peer_ended = Eio.Promise.create () in
+  with_codex ~peer:(fun _ p ->
+    codex ~hang_init:false ~frames:done_frames ~signal p;
+    print_endline "its input ends";
+    Eio.Promise.resolve peer_ended ())
+  @@ fun agent _ ->
+  let laptop =
+    { Agent.Host.id = "host-laptop"
+    ; name = "laptop"
+    ; cwd = "/"
+    ; session_id = None
+    ; session_name = None
+    ; home = None
+    ; exec_input = true
+    ; git_location = false
+    ; computer = None
+    }
+  in
+  Agent.set_hosts agent [ laptop ];
+  ignore
+    (Or_error.ok_exn (Agent.set_active_host agent "host-laptop" ~cwd:None)
+     : Dir_change.Outcome.t);
+  Or_error.ok_exn (Agent.prompt agent "hi");
+  Agent.wait_idle agent;
+  Eio.Promise.await (reached "turn");
+  Agent.set_hosts agent [];
+  Eio.Promise.await peer_done;
+  [%expect
+    {|
+    notice: tools now run on laptop in /
+    spawn #1
+    assistant: End_turn "hello"
+    notice: waiting for tool host "laptop" to reconnect; /host picks another
+    its input ends
+    |}]
+;;
+
+let%expect_test
+    "claude: one of prigh's tools approved as its turn ends does not run"
+  =
+  let ran = ref false in
+  let memory =
+    { Tool.spec = Tool_memory.spec
+    ; run =
+        (fun _ _ ->
+          ran := true;
+          Tool_result.ok "saved")
+    }
+  in
+  with_codex
+    ~adapter:(module Claude_adapter)
+    ~tools:[ memory ]
+    ~peer:(fun _ p ->
+      let read () =
+        Option.map (Line_transport.Peer.read_line p) ~f:(fun line ->
+          Json.parse line |> Or_error.ok_exn)
+      in
+      let str path j =
+        List.fold path ~init:(Some j) ~f:(fun j key ->
+          Option.bind j ~f:(Json.member key))
+        |> Option.bind ~f:Json.string
+        |> Option.value ~default:""
+      in
+      let init = Option.value_exn (read ()) in
+      Line_transport.Peer.write_line
+        p
+        (sprintf
+           {|{"type":"control_response","response":{"subtype":"success","request_id":"%s","response":{"models":[],"commands":[]}}}|}
+           (str [ "request_id" ] init));
+      ignore (read () : Json.t option);
+      Line_transport.Peer.write_line
+        p
+        {|{"type":"control_request","request_id":"r-m","request":{"subtype":"mcp_message","server_name":"prigh","message":{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"memory","arguments":{"action":"save","text":"x"}}}}}|};
+      let rec loop () =
+        match read () with
+        | None -> ()
+        | Some j ->
+          (match str [ "type" ] j, str [ "request"; "subtype" ] j with
+           | "control_request", "interrupt" ->
+             Line_transport.Peer.write_line
+               p
+               (sprintf
+                  {|{"type":"control_response","response":{"subtype":"success","request_id":"%s"}}|}
+                  (str [ "request_id" ] j));
+             Line_transport.Peer.write_line
+               p
+               {|{"type":"result","subtype":"error_during_execution","is_error":true,"session_id":"s","total_cost_usd":0}|}
+           | _ -> printf "claude got: %s\n" (Json.to_string j));
+          loop ()
+      in
+      loop ())
+  @@ fun agent _ ->
+  Agent.set_mode agent ~approval:Ask;
+  Agent.subscribe agent ~f:(function
+    | Loop (Tool_confirm { call_id; _ }) ->
+      (* Allowed, and the turn ended, before the call carries on. *)
+      Or_error.ok_exn (Agent.respond_confirm agent ~call_id Allow);
+      ignore (Agent.abort agent : string list)
+    | _ -> ());
+  Or_error.ok_exn (Agent.prompt agent "remember x");
+  Agent.wait_idle agent;
+  print_s [%message (!ran : bool)];
+  [%expect
+    {|
+    spawn #1
+    confirm memory
+    confirm done
+    claude got: {"type":"control_response","response":{"subtype":"success","request_id":"r-m","response":{"mcp_response":{"jsonrpc":"2.0","id":7,"result":{"content":[{"type":"text","text":"[cancelled]: its turn ended"}],"isError":true}}}}}
+    (!ran false)
     |}]
 ;;

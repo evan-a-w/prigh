@@ -73,8 +73,8 @@ let card (m : App.Model.t) (state : State.t) ~inject =
   Node.div
     ~attrs:
       [ Attr.class_
-          "loon status-details context-card w-[260px] gap-x-4 gap-y-1.5 rounded-lg \
-           border-0 bg-popover p-3 text-xs whitespace-normal \
+          "loon status-details context-card w-[260px] gap-x-4 gap-y-1.5 \
+           rounded-lg border-0 bg-popover p-3 text-xs whitespace-normal \
            text-popover-foreground shadow-md ring-1 ring-foreground/10 \
            grid-cols-[1fr_auto] narrow:fixed narrow:inset-x-0 narrow:top-auto \
            narrow:bottom-0 narrow:w-auto narrow:max-w-none narrow:gap-x-4 \
@@ -152,7 +152,7 @@ let card (m : App.Model.t) (state : State.t) ~inject =
         ]
     ; div ~cls:"context-card-rule col-span-full border-t border-border" []
     ; (match Prigh_ui.Loop_status.budget_part state with
-       | None -> line "This session" (sprintf "$%.2f" state.cost_usd)
+       | None -> line "This session" (Prigh_ui.Loop_status.cost state)
        | Some (text, lvl) ->
          line
            ~cls:("cost " ^ Status_view.level_class lvl)
@@ -268,10 +268,11 @@ let view (m : App.Model.t) ~inject =
     let at = compacts_at m state in
     let percent = Status_view.context_percent state in
     let p = Option.value percent ~default:0. in
+    let cost = Prigh_ui.Loop_status.cost state in
     let label =
       match percent with
-      | Some p -> sprintf "Context %.0f%% full, $%.2f: details" p state.cost_usd
-      | None -> sprintf "Context and cost ($%.2f): details" state.cost_usd
+      | Some p -> sprintf "Context %.0f%% full, %s: details" p cost
+      | None -> sprintf "Context and cost (%s): details" cost
     in
     Node.div
       ~attrs:

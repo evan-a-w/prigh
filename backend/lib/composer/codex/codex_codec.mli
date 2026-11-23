@@ -24,6 +24,10 @@ module Settings : sig
     ; thinking : Thinking.t
     ; approval : Approval_mode.t
     ; plan : bool (** Codex's plan collaboration mode *)
+    ; efforts : string list option
+      (** the model's reasoning efforts, when Codex listed them: the
+            effort sent is the one asked for if it is among them, else the
+            nearest (the lowest for thinking off) *)
     }
   [@@deriving sexp_of]
 end

@@ -13,7 +13,7 @@ let deployed : P.Deployed_engines.t =
   { engines = [ "harness"; "composer" ]; adapters = [ "codex"; "claude" ] }
 ;;
 
-let connected ?(deployed = deployed) ?(extra = "") () =
+let connected ?(deployed = deployed) ?cost_usd ?(extra = "") () =
   let h = Test_app.connected ~width:80 ~height:14 () in
   H.step
     ~quiet:true
@@ -32,7 +32,9 @@ let connected ?(deployed = deployed) ?(extra = "") () =
       ~quiet:true
       h
       Initial_state
-      (String.chop_suffix_exn (state_json ()) ~suffix:"}" ^ extra ^ "}");
+      (String.chop_suffix_exn (state_json ?cost_usd ()) ~suffix:"}"
+       ^ extra
+       ^ "}");
   h
 ;;
 
@@ -225,5 +227,15 @@ let%expect_test "an unavailable session: the status and the prompt say why" =
         (max   500)))
       (tag Ignore))
     Codex is not installed on srv: install it there (npm i -g @openai/codex), then retry
+    |}]
+;;
+
+let%expect_test "a Codex session that reported no cost runs on a subscription" =
+  status (connected ~cost_usd:0. ~extra:codex_engine ());
+  status (connected ~cost_usd:0.5 ~extra:codex_engine ());
+  [%expect
+    {|
+    /work  Codex · deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  subscription
+    /work  Codex · deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.50
     |}]
 ;;

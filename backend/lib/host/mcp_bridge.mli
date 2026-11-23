@@ -11,6 +11,10 @@ open! Import
 (** ["PRIGH_MCP_SOCKET"] *)
 val socket_env : string
 
+(** ["PRIGH_MCP_TOKEN"]: the secret the bridge sends as its first line, which
+    the tool host requires before it relays a connection. *)
+val token_env : string
+
 (** Copies [stdin] to [socket] and [socket] to [stdout] until the socket's
     side ends (the backend is done); at the end of [stdin] it shuts the
     socket's sending side and waits for the rest of the replies. *)
@@ -20,7 +24,11 @@ val relay
   -> [> Eio.Flow.two_way_ty ] Eio.Resource.t
   -> unit
 
-(** Connects to [socket] and {!relay}s this process's stdio; an error says
-    what is wrong (no socket: prigh mcp-bridge is started by a harness that
-    prigh runs, not by hand). *)
-val run : Eio_unix.Stdenv.base -> socket:string option -> unit Or_error.t
+(** Connects to [socket], presents [token] and {!relay}s this process's
+    stdio; an error says what is wrong (neither given: prigh mcp-bridge is
+    started by a harness that prigh runs, not by hand). *)
+val run
+  :  Eio_unix.Stdenv.base
+  -> socket:string option
+  -> token:string option
+  -> unit Or_error.t

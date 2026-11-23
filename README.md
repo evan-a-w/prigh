@@ -287,18 +287,18 @@ NAME=TOKEN,...` sign in as NAME but never as a superuser, for tool hosts.
 
 A backend runs sessions on the **harness**, prigh's own agent loop calling
 the model's API (the default), and, when you deploy it, the **composer**,
-which hands the work to a coding agent you have installed and signed in to
-on the session's tool host: the Codex CLI (`codex app-server`) or Claude
-Code (`claude`, stream-json). prigh keeps the session: its log (messages,
-tool calls, models, usage and the cost the agent reports), naming, search,
-worktrees, approvals and the UI, so a Codex or Claude Code session looks and
-works like any other: the same tool cards and diffs, the confirm dialog and
-approval rules, questions, plans and subagents. Their tools run where the
-session's tools run (the tool host you choose), and prigh's own tools that
-the agents lack (`render_ui`, `memory`, `sessions`, the git host's pull
-requests and issues, worktrees, ...) are served to them as an MCP server
-named `prigh`. Your custom instructions and what prigh knows about you go
-to them too.
+which hands the work to a coding agent installed and signed in on the
+session's tool host: the Codex CLI (`codex app-server`), Claude Code
+(`claude`, stream-json), any ACP agent (`acp:opencode`, `acp:gemini` and
+`acp:goose` are known; give others their command, `-adapters
+acp:mine=my-agent --acp`) or `prigh`, prigh's own harness as an adapter.
+prigh keeps the session: its log (messages, tool calls, models, usage and
+the cost the agent reports), naming, search, worktrees, approvals and the
+UI, so a Codex or Claude Code session looks and works like any other. Their
+tools run on the tool host you choose, and prigh's own tools they lack
+(`render_ui`, `memory`, `sessions`, pull requests and issues, worktrees,
+...) are served to them as an MCP server named `prigh`; your custom
+instructions and what prigh knows about you go to them too.
 
 ```
 prigh serve -engines harness,composer -adapters codex,claude
@@ -311,29 +311,21 @@ deployed, prigh-web's new-session screen has an engine chip, `/new codex`
 (or `/new` for a picker) starts a session on an adapter, and `/engine`
 switches a session to another agent (or the harness), which gets the
 conversation so far quoted in a handoff ahead of your next message, as does
-an agent taking over on another tool host. ACP agents (`-adapters
-acp:opencode`, Gemini CLI, ...) and prigh's own harness (`prigh`) are
-adapters too. The model chip and status line say which agent runs it
-(`Codex · gpt-5.2-codex`). What an agent cannot do is refused with what to
-do instead ("Codex sessions can't rewind in place: fork from that
-message instead (/fork)"); the controls for it are hidden or disabled. A
+an agent taking over on another tool host. The model chip and status line
+say which agent runs it (`Codex · gpt-5.2-codex`; a cost Codex does not
+report shows as `subscription`). What an agent cannot do is refused with
+what to do instead ("Codex sessions can't rewind in place: fork from that
+message instead (/fork)"), and its controls are hidden or disabled. A
 session made on an engine the backend does not run can still be read there.
 
-The composer drives `codex`, `claude`, any ACP agent (`acp:opencode`,
-`acp:gemini` and `acp:goose` are known; give others their command,
-`-adapters acp:mine=my-agent --acp`) and `prigh`, prigh's own harness as
-one of its adapters.
-
-The agent CLIs ask prigh before they act, so your approval mode, deny and
-ask rules and Smart mode apply to their commands and edits as to the
-harness's (Codex runs commands it knows to be read-only without asking). A
-repository's `.claude` settings and hooks are not loaded.
-
-Settings → Engines in prigh-web, and `/adapters` in the TUI, show whether
-each agent CLI is installed and logged in on each tool host, and what to run
-there when not ("Codex is not installed on laptop, please install it",
-"Claude Code on laptop is not logged in: run `claude auth login` there").
-prigh never installs one or logs in for you.
+The agent CLIs ask prigh before they act, so your approval mode, rules and
+Smart mode apply to their commands and edits (Codex runs commands it knows
+to be read-only without asking). A repository's `.claude` settings and
+hooks are not loaded. Settings → Engines in prigh-web, and `/adapters` in
+the TUI, show whether each CLI is installed and logged in on each tool host,
+and what to run there when not ("Claude Code on laptop is not logged in:
+run `claude auth login` there"); prigh never installs one or logs in for
+you.
 
 ### Computer use
 
@@ -583,9 +575,8 @@ prigh run -session ID "go on"          # continue a saved session
 prigh sessions list                    # also: delete ID..., prune -dry-run
 prigh trace SESSION                    # where the time went (-perfetto out.json)
 prigh serve                            # JSON-lines RPC on stdio
+prigh SUBCOMMAND -help                 # each one's flags
 ```
-
-Each subcommand has `-help`.
 
 ## Development
 
@@ -595,16 +586,14 @@ The code is in `backend/` (the agent and servers, `prigh`), `frontend/`
 gives the OxCaml toolchain; `backend/` and `frontend/` are separate dune
 projects (run one dune at a time).
 
-**Testing.** `./test` is the test suite, and the only one to run. Run it
-before pushing and before merging. It builds and tests everything, then
-runs a browser smoke test and the desktop's `cargo test`. It skips whatever
-has not changed, so it takes seconds to under a minute.
+**Testing.** `./test` is the test suite, and the only one to run: before
+pushing and before merging. It builds and tests everything, then runs a
+browser smoke test and the desktop's `cargo test`, skipping whatever has
+not changed (seconds to under a minute). `./test --full` adds the slow tier
+and every browser e2e script in Chromium, Firefox and WebKit: run it **only
+when the user explicitly asks for it**, never by default or "to be safe"
+before merging.
 
-`./test --full` adds the slow tier and every browser e2e script in
-Chromium, Firefox and WebKit. Run it **only when the user explicitly asks
-for it**: never by default, and never "to be safe" before merging.
-
-Contributor conventions (OCaml style, tests, pull requests, the shared
-machine) are in [AGENTS.md](AGENTS.md). How the pieces fit together is in
-[ARCHITECTURE.md](ARCHITECTURE.md), and the container is in
-[DOCKER.md](DOCKER.md).
+Conventions (OCaml style, tests, pull requests, the shared machine) are in
+[AGENTS.md](AGENTS.md), how the pieces fit together in
+[ARCHITECTURE.md](ARCHITECTURE.md), the container in [DOCKER.md](DOCKER.md).

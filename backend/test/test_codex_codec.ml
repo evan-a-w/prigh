@@ -17,6 +17,7 @@ let settings ?(approval = Approval_mode.Auto) ?model () =
   ; thinking = On None
   ; approval
   ; plan = false
+  ; efforts = None
   }
 ;;
 
@@ -1892,5 +1893,52 @@ let%expect_test "a fork becomes the codec's thread; compaction" =
     (response (response (Done Compact)))
     (Compacted (tokens_before ()) (tokens_after ()))
     (th-2)
+    |}]
+;;
+
+let%expect_test "the effort sent is one the model supports" =
+  List.iter
+    [ Thinking.Off, Some [ "none"; "low"; "high" ]
+    ; Off, Some [ "minimal"; "low"; "medium" ]
+    ; On (Some Medium), Some [ "low"; "high" ]
+    ; On (Some Max), Some [ "low"; "medium"; "high" ]
+    ; On (Some Minimal), Some [ "low"; "medium" ]
+    ; On None, Some [ "low" ]
+    ; Off, None
+    ; On (Some Xhigh), Some []
+    ]
+    ~f:(fun (thinking, efforts) ->
+      let codec = started () in
+      let line =
+        Or_error.ok_exn
+          (C.start_turn
+             codec
+             { (settings ()) with thinking; efforts }
+             [ Text "x" ])
+      in
+      let effort =
+        match Json.member "params" (Json.of_string line) with
+        | Some params ->
+          (match Json.member "effort" params with
+           | Some (`String e) -> Some e
+           | _ -> None)
+        | None -> None
+      in
+      print_s
+        [%sexp
+          (thinking : Thinking.t)
+        , (efforts : string list option)
+        , "->"
+        , (effort : string option)]);
+  [%expect
+    {|
+    (Off ((none low high)) -> (none))
+    (Off ((minimal low medium)) -> (minimal))
+    ((On (Medium)) ((low high)) -> (low))
+    ((On (Max)) ((low medium high)) -> (high))
+    ((On (Minimal)) ((low medium)) -> (low))
+    ((On ()) ((low)) -> ())
+    (Off () -> (none))
+    ((On (Xhigh)) (()) -> (xhigh))
     |}]
 ;;

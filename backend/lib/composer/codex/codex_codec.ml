@@ -8,6 +8,7 @@ module Settings = struct
     ; thinking : Thinking.t
     ; approval : Approval_mode.t
     ; plan : bool
+    ; efforts : string list option
     }
   [@@deriving sexp_of]
 end
@@ -142,10 +143,13 @@ module Server_request = struct
     | Mcp_tool_approval of { schema : Json.t option }
     | Question of { question_ids : string list }
     | Tool
+end
 
-  type entry =
+(* A request of Codex's waiting for our answer, with its JSON-RPC id. *)
+module Pending = struct
+  type t =
     { id : Json.t
-    ; request : t
+    ; request : Server_request.t
     }
 end
 
@@ -176,7 +180,7 @@ end
 type t =
   { mutable next_id : int
   ; pending : Request_kind.t Int.Table.t
-  ; server_requests : Server_request.entry String.Table.t
+  ; server_requests : Pending.t String.Table.t
   ; mutable thread : string option
   ; mutable thread_model : string option
   ; mutable turn : Turn.t option
@@ -280,11 +284,34 @@ let sandbox_policy (mode : Approval_mode.t) =
   `Object [ "type", `String type_ ]
 ;;
 
-let effort : Thinking.t -> string option = function
-  | Off -> Some "none"
-  | On None -> None
-  | On (Some Max) -> Some "xhigh"
-  | On (Some level) -> Some (Thinking.Level.to_string level)
+(* Codex's efforts, lowest first. *)
+let effort_order = [ "none"; "minimal"; "low"; "medium"; "high"; "xhigh" ]
+
+let effort_rank e =
+  List.findi effort_order ~f:(fun _ x -> String.equal x e) |> Option.map ~f:fst
+;;
+
+let effort ?supported (thinking : Thinking.t) =
+  let wanted =
+    match thinking with
+    | Off -> Some "none"
+    | On None -> None
+    | On (Some Max) -> Some "xhigh"
+    | On (Some level) -> Some (Thinking.Level.to_string level)
+  in
+  match wanted, supported with
+  | None, _ | _, (None | Some []) -> wanted
+  | Some e, Some supported when List.mem supported e ~equal:String.equal ->
+    Some e
+  | Some e, Some supported ->
+    let rank e = Option.value (effort_rank e) ~default:Int.max_value in
+    let target = rank e in
+    List.min_elt supported ~compare:(fun a b ->
+      Comparable.lift
+        [%compare: int * int]
+        ~f:(fun x -> abs (rank x - target), rank x)
+        a
+        b)
 ;;
 
 let thread_params
@@ -396,7 +423,7 @@ let start_turn t (s : Settings.t) inputs =
   | None ->
     t.turn <- Some { id = None; started = false; interrupt = Not_asked };
     t.turn_error <- None;
-    let effort = effort s.thinking in
+    let effort = effort ?supported:s.efforts s.thinking in
     let model = Option.first_some s.model t.thread_model in
     let collaboration =
       Option.map model ~f:(fun model ->
@@ -611,7 +638,7 @@ let reply_approval t ~request_id (answer : Adapter_event.Approval_reply.t) =
   match Hashtbl.find t.server_requests request_id with
   | None -> None
   | Some { request = Question _ | Tool; _ } -> None
-  | Some { id; request } ->
+  | Some { Pending.id; request } ->
     Hashtbl.remove t.server_requests request_id;
     let decision name = `Object [ "decision", `String name ] in
     let result =
@@ -662,7 +689,7 @@ let reply_approval t ~request_id (answer : Adapter_event.Approval_reply.t) =
 
 let answer_question t ~request_id (answer : User_question.Reply.t) =
   match Hashtbl.find t.server_requests request_id with
-  | Some { id; request = Question { question_ids } } ->
+  | Some { Pending.id; request = Question { question_ids } } ->
     Hashtbl.remove t.server_requests request_id;
     let answers =
       match answer with
@@ -681,7 +708,7 @@ let answer_question t ~request_id (answer : User_question.Reply.t) =
 
 let reply_tool_call t ~request_id ~output ~success =
   match Hashtbl.find t.server_requests request_id with
-  | Some { id; request = Tool } ->
+  | Some { Pending.id; request = Tool } ->
     Hashtbl.remove t.server_requests request_id;
     Some
       (reply
@@ -1360,7 +1387,7 @@ let notification t method_ params =
 let server_request t ~id method_ params =
   let key = request_key id in
   let register request =
-    Hashtbl.set t.server_requests ~key ~data:{ id; request }
+    Hashtbl.set t.server_requests ~key ~data:{ Pending.id; request }
   in
   let tool_id = str "itemId" params in
   let with_reason summary =

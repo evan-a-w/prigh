@@ -33,9 +33,14 @@ open! Import
     [env]'s values, {!Placeholder.prigh} becomes the host's own prigh
     executable and {!Placeholder.mcp_socket} the socket, so that the
     program's MCP configuration can name the bridge. [Started] reports
-    both. *)
+    both, and the token a connection must send as its first line (else it is
+    closed): the backend gives it only to the bridge, in its MCP config. *)
 
 val op : string
+
+(** The longest line, in bytes, a program's stdout or stdin may carry: twice
+    JSON-escaped, it stays under the RPC's frame limit. *)
+val max_line : int
 
 module Up : sig
   type t =
@@ -44,6 +49,8 @@ module Up : sig
         ; path : string
         ; prigh : string (** this host's prigh executable *)
         ; mcp_socket : string option
+        ; mcp_token : string option
+          (** what a bridge presents first, else the socket closes *)
         }
     | Out of
         { seq : int

@@ -43,6 +43,7 @@ module Up = struct
         ; path : string
         ; prigh : string
         ; mcp_socket : string option
+        ; mcp_token : string option
         }
     | Out of
         { seq : int
@@ -58,7 +59,7 @@ module Up = struct
   [@@deriving sexp_of, equal]
 
   let to_line = function
-    | Started { pid; path; prigh; mcp_socket } ->
+    | Started { pid; path; prigh; mcp_socket; mcp_token } ->
       frame
         ([ "t", `String "started"
          ; "pid", number pid
@@ -66,7 +67,9 @@ module Up = struct
          ; "prigh", `String prigh
          ]
          @ Option.value_map mcp_socket ~default:[] ~f:(fun s ->
-           [ "mcp_socket", `String s ]))
+           [ "mcp_socket", `String s ])
+         @ Option.value_map mcp_token ~default:[] ~f:(fun s ->
+           [ "mcp_token", `String s ]))
     | Mcp { conn; line } ->
       frame [ "t", `String "mcp"; "conn", number conn; "line", `String line ]
     | Mcp_closed conn ->
@@ -87,7 +90,12 @@ module Up = struct
         let%bind path = string_field json "path" in
         let%map prigh = string_field json "prigh" in
         Started
-          { pid; path; prigh; mcp_socket = string_field json "mcp_socket" }
+          { pid
+          ; path
+          ; prigh
+          ; mcp_socket = string_field json "mcp_socket"
+          ; mcp_token = string_field json "mcp_token"
+          }
       | "out" ->
         let%bind seq = int_field json "s" in
         let%map line = string_field json "line" in
@@ -515,6 +523,14 @@ end
 (* The MCP side channel: a private Unix socket whose connections (each a
    [prigh mcp-bridge] the program started) are relayed as [Mcp] frames. *)
 module Mcp_listener = struct
+  (* Compared by digest, so that the time taken says nothing about the
+     token. *)
+  let digest_equal a b =
+    String.equal
+      (Digestif.SHA256.to_raw_string (Digestif.SHA256.digest_string a))
+      (Digestif.SHA256.to_raw_string (Digestif.SHA256.digest_string b))
+  ;;
+
   module Conn = struct
     type t =
       { write : string -> unit
@@ -524,13 +540,16 @@ module Mcp_listener = struct
 
   type t =
     { socket : string
+    ; token : string
     ; conns : Conn.t Int.Table.t
     }
 
   let create ~sw ~env ~max_line ~send =
     let dir = Filename_unix.temp_dir ~perm:0o700 "prigh-mcp" "" in
     let socket = Filename.concat dir "mcp.sock" in
-    let t = { socket; conns = Int.Table.create () } in
+    let t =
+      { socket; token = Pkce.random_hex 32; conns = Int.Table.create () }
+    in
     (* Released after the listening socket (which Eio may unlink). *)
     Switch.on_release sw (fun () ->
       (try Core_unix.unlink socket with
@@ -543,17 +562,30 @@ module Mcp_listener = struct
     let next = ref 0 in
     let serve conn id =
       let reader = Eio.Buf_read.of_flow conn ~max_size:max_line in
-      (try
-         let rec loop () =
-           let line = Eio.Buf_read.line reader in
-           send (Up.to_line (Mcp { conn = id; line = Utf8.sanitize line }));
-           loop ()
-         in
-         loop ()
-       with
-       | End_of_file | Eio.Buf_read.Buffer_limit_exceeded | Eio.Io _ -> ());
-      Hashtbl.remove t.conns id;
-      send (Up.to_line (Mcp_closed id))
+      let lines f =
+        try f () with
+        | End_of_file | Eio.Buf_read.Buffer_limit_exceeded | Eio.Io _ -> ()
+      in
+      (* A bridge presents the token first: other processes that find the
+         socket (the program's own commands) get nothing. *)
+      let authentic =
+        match Eio.Buf_read.line reader with
+        | line -> digest_equal line t.token
+        | exception (End_of_file | Eio.Buf_read.Buffer_limit_exceeded | Eio.Io _)
+          -> false
+      in
+      if authentic
+      then (
+        lines (fun () ->
+          let rec loop () =
+            let line = Eio.Buf_read.line reader in
+            send (Up.to_line (Mcp { conn = id; line = Utf8.sanitize line }));
+            loop ()
+          in
+          loop ());
+        Hashtbl.remove t.conns id;
+        send (Up.to_line (Mcp_closed id)))
+      else Hashtbl.remove t.conns id
     in
     Fiber.fork_daemon ~sw (fun () ->
       let rec accept () =
@@ -748,6 +780,7 @@ let run ~env ~self ~outer ~cancel ~on_output ~cwd (args : Arguments.t) =
                    ; path
                    ; prigh = self
                    ; mcp_socket = socket
+                   ; mcp_token = Option.map mcp ~f:(fun mcp -> mcp.token)
                    })))
          ~on_stdout:(Lines.add lines)
          ~on_stderr:(Stderr.add stderr)

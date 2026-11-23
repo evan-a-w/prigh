@@ -37,8 +37,8 @@ end
 
 module Error_kind = struct
   type t =
-    | Usage_limit of { resets_at : float option  }
-    | Auth_required of { hint : string  }
+    | Usage_limit of { resets_at : float option }
+    | Auth_required of { hint : string }
     | Not_installed of { hint : string }
     | Crashed of { stderr_tail : string }
     | Protocol
@@ -130,7 +130,6 @@ type t =
       ; questions : User_question.t list
       }
   | Request_withdrawn of { request_id : string }
-
   | Plan of Plan.t
   | Turn_diff of { unified : string }
   | Usage of Usage_report.t

@@ -147,6 +147,7 @@ let call t ~id params =
        let result =
          match t.execute tool arguments with
          | result -> result
+         | exception (Eio.Cancel.Cancelled _ as exn) -> raise exn
          | exception exn -> Tool_result.error (Exn.to_string exn)
        in
        response ~id (result_to_mcp result))
@@ -219,10 +220,10 @@ module Bridge = struct
     }
   [@@deriving sexp_of]
 
-  let create ~prigh ~socket =
+  let create ~prigh ~socket ~token =
     { command = prigh
     ; args = [ "mcp-bridge" ]
-    ; env = [ Mcp_bridge.socket_env, socket ]
+    ; env = [ Mcp_bridge.socket_env, socket; Mcp_bridge.token_env, token ]
     }
   ;;
 

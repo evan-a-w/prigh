@@ -1075,7 +1075,7 @@ let switch_adapter m (c : P.Deployed_engines.Choice.t) =
     notice m (sprintf "already on %s" (P.Deployed_engines.Choice.label c)), []
   | Some _ | None ->
     ( notice m (sprintf "switching to %s…" (P.Deployed_engines.Choice.label c))
-    , [ rpc "set_adapter" ~params:[ "adapter", str target ] ] )
+    , [ call (Set_adapter { adapter = target }) ] )
 ;;
 
 let engine_chosen m ~switch arg =

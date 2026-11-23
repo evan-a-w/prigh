@@ -7,7 +7,7 @@ type t =
   ; superuser : bool
   ; features : string list [@sexp.list]
   ; deployed : Deployed_engines.t
-       [@sexp_drop_if Deployed_engines.(equal harness_only)]
+        [@sexp_drop_if Deployed_engines.(equal harness_only)]
   }
 [@@deriving sexp_of, equal]
 

@@ -6461,7 +6461,7 @@ let switch_adapter (m : Model.t) (c : Deployed_engines.Choice.t) =
     let m, toast =
       toast m (sprintf "Switching to %s…" (Deployed_engines.Choice.label c))
     in
-    m, rpc "set_adapter" [ "adapter", str target ] :: toast
+    m, call (Set_adapter { adapter = target }) :: toast
 ;;
 
 let new_session (m : Model.t) =
@@ -11228,7 +11228,7 @@ let session_value (m : Model.t) (setting : Control_setting.t) =
         | Unset -> "none")
      | Mode -> Session_mode.label (Session_mode.of_state state)
      | Context ->
-       let cost = sprintf "$%.2f" state.cost_usd in
+       let cost = Prigh_ui.Loop_status.cost state in
        if state.model.context_window <= 0
        then cost
        else
