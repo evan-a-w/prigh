@@ -23,12 +23,6 @@ val read_line : t -> string option
     process ended. *)
 val write_line : t -> string -> unit
 
-(** Ends the process's input (EOF). *)
-val close_stdin : t -> unit
-
-(** Asks the process to stop (SIGINT). *)
-val interrupt : t -> unit
-
 (** Stops the process: closes its input, then terminates it. *)
 val stop : t -> unit
 
@@ -57,8 +51,6 @@ val mcp : t -> Mcp.t option
 val create
   :  read_line:(unit -> string option)
   -> write_line:(string -> unit)
-  -> close_stdin:(unit -> unit)
-  -> interrupt:(unit -> unit)
   -> stop:(unit -> unit)
   -> ended:(unit -> Exit.t)
   -> is_ended:(unit -> bool)
@@ -76,9 +68,6 @@ module Peer : sig
   val read_line : t -> string option
   val write_line : t -> string -> unit
   val write_stderr : t -> string -> unit
-
-  (** Whether our side asked to [interrupt] it, since it last looked. *)
-  val take_interrupt : t -> bool
 
   val exit : t -> code:int -> 'a
   val spawn : sw:Switch.t -> (t -> unit) -> transport

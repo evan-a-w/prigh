@@ -109,8 +109,6 @@ let spawn ~sw ~exec ~host ?on_stderr (launch : Adapter.Launch.t) =
            | Ok () -> ()
            | Error _ when Promise.is_resolved (Host_stream.ended s) -> ()
            | Error e -> Error.raise e)
-         ~close_stdin:(fun () -> Host_stream.close_stdin s)
-         ~interrupt:(fun () -> Host_stream.interrupt s)
          ~stop:(fun () -> Host_stream.stop s)
          ~ended:(fun () -> exit_of (Promise.await (Host_stream.ended s)))
          ~is_ended:(fun () -> Promise.is_resolved (Host_stream.ended s))
