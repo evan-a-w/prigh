@@ -139,7 +139,7 @@ let note_classes cls =
     ~class_:
       (String.concat
          ~sep:" "
-         [ "status-item link"
+         [ "status-item link loon"
          ; cls
          ; "cursor-pointer max-w-[24ch] hover:bg-muted hover:text-foreground \
             narrow:h-11 narrow:text-sm"

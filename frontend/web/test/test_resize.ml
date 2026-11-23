@@ -323,7 +323,7 @@ let%expect_test
   columns h;
   [%expect
     {|
-    <aside class="files-panel">
+    <aside class="files-panel loon">
     <Vdom.Node.none-widget class="">
     <div class="files-side">
     <div class="resizer resizer-files">
@@ -334,7 +334,7 @@ let%expect_test
   [%expect
     {|
     (Files (Select main.ml))
-    <aside class="files-panel previewing">
+    <aside class="files-panel loon previewing">
     <section class="files-preview">
     <div class="files-side">
     <div class="resizer resizer-files-preview">
@@ -386,7 +386,7 @@ let%expect_test
     {|
     (Files Close_preview)
     (Files (Focus files-list))
-    <aside class="files-panel">
+    <aside class="files-panel loon">
     <Vdom.Node.none-widget class="">
     <div class="files-side">
     <div class="resizer resizer-files">
@@ -425,7 +425,7 @@ let%expect_test "without room for both, the preview takes the list's place" =
   [%expect
     {|
     (Files (Select main.ml))
-    <aside class="alone files-panel previewing">
+    <aside class="alone files-panel loon previewing">
     <section class="files-preview">
     <div class="files-side">
     <div class="resizer resizer-files">
@@ -457,7 +457,7 @@ let%expect_test "without room for both, the preview takes the list's place" =
     {|
     (Files Close_preview)
     (Files (Focus files-list))
-    <aside class="files-panel">
+    <aside class="files-panel loon">
     <Vdom.Node.none-widget class="">
     <div class="files-side">
     <div class="resizer resizer-files">
@@ -469,7 +469,7 @@ let%expect_test "without room for both, the preview takes the list's place" =
   [%expect
     {|
     (Files (Select main.ml))
-    <aside class="alone files-panel previewing">
+    <aside class="alone files-panel loon previewing">
     <section class="files-preview">
     <div class="files-side">
     <div class="resizer resizer-files">
@@ -478,7 +478,7 @@ let%expect_test "without room for both, the preview takes the list's place" =
   columns h;
   [%expect
     {|
-    <aside class="files-panel previewing">
+    <aside class="files-panel loon previewing">
     <section class="files-preview">
     <div class="files-side">
     <div class="resizer resizer-files-preview">
@@ -701,7 +701,7 @@ let%expect_test
   columns h;
   [%expect
     {|
-    <aside class="alone files-panel previewing">
+    <aside class="alone files-panel loon previewing">
     <section class="files-preview">
     <div class="files-side">
     |}]

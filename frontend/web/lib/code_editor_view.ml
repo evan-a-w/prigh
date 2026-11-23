@@ -140,7 +140,7 @@ let strip (m : App.Model.t) ~inject =
              []))
   in
   Node.header
-    ~attrs:[ classes [ "code-strip" ] [ "hidden", t.strip_hidden && m.narrow ] ]
+    ~attrs:[ classes [ "code-strip"; "loon" ] [ "hidden", t.strip_hidden && m.narrow ] ]
     [ button
         ~cls:"code-tree-toggle shrink-0 narrow:size-11"
         ~variant:Ghost
@@ -231,7 +231,7 @@ let tabs (m : App.Model.t) ~inject =
   | [] -> Node.none
   | buffers ->
     div
-      ~cls:"code-tabs"
+      ~cls:"code-tabs loon"
       ~attrs:[ Attr.role "tablist"; Attr.create "aria-label" "Open files" ]
       (List.map buffers ~f:(fun (b : E.Buffer.t) ->
          let on = Option.equal String.equal t.current (Some b.path) in

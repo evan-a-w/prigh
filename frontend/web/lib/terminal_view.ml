@@ -16,7 +16,7 @@ let close ~inject =
 
 let restart ~inject label =
   button
-    ~cls:"terminal-restart"
+    ~cls:"terminal-restart loon"
     ~variant:Outline
     ~size:Sm
     ~on_click:(inject Action.New_shell)
@@ -110,7 +110,7 @@ let view (m : App.Model.t) ~inject ~widget =
         ]
       [ Resize_view.handle m ~inject Terminal
       ; div
-          ~cls:"terminal-head"
+          ~cls:"terminal-head loon"
           ((icon ~cls:"terminal-icon" Terminal :: head) @ [ close ~inject ])
       ; div ~cls:"terminal-body" body
       ])

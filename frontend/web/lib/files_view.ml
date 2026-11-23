@@ -779,7 +779,7 @@ let view (m : App.Model.t) ~inject =
       "aside"
       ~attrs:
         [ classes
-            [ "files-panel" ]
+            [ "files-panel"; "loon" ]
             [ "previewing", previewing; "alone", previewing && alone ]
         ; Attr.id "files-panel"
         ; Attr.create "aria-label" "Files"

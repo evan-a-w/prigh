@@ -13,7 +13,7 @@ let busy text =
 
 let action ~title ?attrs ~on_click text =
   button
-    ~cls:"trim-action text-muted-foreground"
+    ~cls:"trim-action loon text-muted-foreground"
     ~variant:Ghost
     ~size:Xs
     ~title

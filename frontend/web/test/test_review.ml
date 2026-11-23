@@ -282,7 +282,7 @@ let%expect_test
     <div class="app files-open reviewing terminal-open">
     <aside class="bg-sidebar loon sidebar text-sidebar-foreground text-sm">
     <div class="desk">
-    <aside class="files-panel">
+    <aside class="files-panel loon">
     -- the desk:
     <section class="review-page">
     <div class="resizer resizer-review-chat">
@@ -313,7 +313,7 @@ let%expect_test
     <aside class="bg-sidebar loon sidebar text-sidebar-foreground text-sm">
     <div class="scrim">
     <div class="desk">
-    <aside class="files-panel">
+    <aside class="files-panel loon">
     -- the desk:
     <section class="review-page">
     <div class="resizer resizer-review-chat">
@@ -330,7 +330,7 @@ let%expect_test
     <div class="resizer resizer-terminal">
     <div class="resizer resizer-files">
     -- inert:
-    <aside class="files-panel">
+    <aside class="files-panel loon">
     <section class="review-page">
     <section class="terminal-panel">
     <div class="chrome-anchor loon">
@@ -357,7 +357,7 @@ let%expect_test
     <aside class="bg-sidebar loon sidebar text-sidebar-foreground text-sm">
     <div class="resizer resizer-sidebar">
     <div class="desk">
-    <aside class="files-panel">
+    <aside class="files-panel loon">
     -- the desk:
     <main class="fresh main">
     <section class="terminal-panel">

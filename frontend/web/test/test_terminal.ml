@@ -76,7 +76,7 @@ let%expect_test
            data-resize-target="#terminal-panel"
            class="resizer resizer-terminal"
            @on_dblclick> </div>
-      <div class="terminal-head">
+      <div class="loon terminal-head">
         <icon class="terminal"> </icon>
         <span class="terminal-machine"> backend </span>
         <span title="/work" class="terminal-cwd where"> /work </span>
@@ -376,7 +376,7 @@ let%expect_test "/terminal, the chrome's button and the height" =
            data-resize-target="#terminal-panel"
            class="resizer resizer-terminal"
            @on_dblclick> </div>
-      <div class="terminal-head">
+      <div class="loon terminal-head">
         <icon class="terminal"> </icon>
         <span class="terminal-machine"> backend </span>
         <span title="/work" class="terminal-cwd where"> /work </span>
