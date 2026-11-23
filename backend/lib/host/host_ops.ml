@@ -463,6 +463,10 @@ let execute
   else if Host_files.is_op name
   then
     Host_files.execute ~env ?stdin ~cancel ~on_output ~cwd ~name ~arguments ()
+  else if String.equal name Host_process.op
+  then Host_process.execute ~env ~stdin ~cancel ~on_output ~cwd ~arguments ()
+  else if String.equal name Host_probe.op
+  then Host_probe.execute ~env ~cancel ~cwd ~arguments ()
   else (
     match
       List.find (host_tools ()) ~f:(fun t -> String.equal (Tool.name t) name)

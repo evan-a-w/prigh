@@ -151,6 +151,28 @@ switches the cwd, and `~` means the host's home.
   `$list_paths`, `$list_dirs`, `$instructions` (AGENTS.md/CLAUDE.md and
   skills from the host), `$skill`, `$mcp_*`, `$git_diff`, `$git_forge`,
   `$git_actions`, `$fs_*`. Older hosts answer "unknown host tool".
+- Long-lived programs: `$process` (`Host_process`) runs a line-oriented
+  program (an agent CLI on stdio) for as long as its exec lasts, over the
+  same `tool_exec` channel, so it works on every kind of host with nothing
+  new in the protocol. Output and input chunks are JSON frames, one per
+  line: up `started`, `out` (numbered stdout lines, so a lost one is
+  seen), rate-capped `err`/`err_dropped`; down `in`, `ack`, `close`,
+  `signal`. The host reads stdout only while fewer than the window's lines
+  are unacknowledged, so a slow backend blocks the program on its own pipe.
+  Cancelling the exec closes its stdin and sends SIGTERM, then kills the
+  tree after `term_grace`. The result says how it ended and the end of its
+  stderr. With `mcp`, the host also listens on a Unix socket in a private
+  directory (`$PRIGH_MCP_SOCKET` in the program's environment) and relays
+  each connection, a `prigh mcp-bridge` the program started as an MCP
+  server, as `mcp`/`mcp_in` frames, outside the window; `{{prigh}}` and
+  `{{mcp_socket}}` in the arguments become the host's prigh and the
+  socket, so the program's MCP configuration can name the bridge.
+  `Host_stream` is the backend's end: lines in and out, `stop`,
+  `interrupt` and an `ended` that says why (exited, not installed or only
+  on a login shell's `PATH`, an older host, the host gone). `$probe_programs`
+  (`Host_probe`) checks without side effects which programs a host has,
+  their `--version` and status command, and whether given files exist and
+  variables are set, never their contents.
 - Choice: a new session starts on a host chosen from the client's context
   (`Rpc_server.start_location`): the client itself if it is a tool host
   (or its `hello`'s `prefer_host`), else where its current session runs.
