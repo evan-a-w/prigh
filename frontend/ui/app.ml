@@ -134,6 +134,7 @@ module Reply_tag = struct
     | Reconnect of int (** generation; stale replies are ignored *)
     | Btw of string (** btw id *)
     | Users_list
+    | Adapters_shown (** [/adapters] *)
     | Nix_store_shown (** [/nix-gc] *)
     | Nix_gc_done (** [/nix-gc run] *)
     | User_switched
@@ -3884,6 +3885,18 @@ let start_nix_gc m generations =
       ] )
 ;;
 
+let adapters_command m rest =
+  match Adapters_command.parse rest with
+  | Error e ->
+    ( error
+        (restore_command m (String.strip ("/adapters " ^ rest)))
+        (Error.to_string_hum e)
+    , [] )
+  | Ok refresh ->
+    ( notice m "checking the agent CLIs on the tool hosts…"
+    , [ call (List_adapters { refresh }) ~tag:Adapters_shown ] )
+;;
+
 let nix_gc_command m rest =
   match Nix_gc_command.parse rest with
   | Status ->
@@ -4830,6 +4843,7 @@ let run_command m (cmd : Commands.Parsed.t) =
   | "connect", _ -> connect m cmd.rest
   | "signin", args -> sign_in m args
   | "signout", _ -> sign_out m
+  | "adapters", _ -> adapters_command m cmd.rest
   | "nix-gc", _ when m.superuser -> nix_gc_command m cmd.rest
   | "setusr", [] -> m, [ rpc "list_users" ~tag:Users_list ]
   | "setusr", [ user ] ->
@@ -6932,7 +6946,7 @@ let apply_event m (e : P.Event.t) =
   | Terminal_kill _ -> m, []
   | Memory_changed memory -> memory_changed m memory, []
   | Custom_instructions_changed ci -> instructions_changed m ci, []
-  | User_info_changed _ | Mcp_settings_changed _ -> m, []
+  | User_info_changed _ | Mcp_settings_changed _ | Adapters_changed _ -> m, []
   | Mcp_auth_changed ->
     m, [ call (List_mcp { reconnect = false }) ~tag:Mcp_auth_refreshed ]
   | Prefs_changed changes ->
@@ -7262,6 +7276,14 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
                 "added %s, in the context of every session: /instructions \
                  lists them"
                 note.id)
+         , [] ))
+     | Adapters_shown ->
+       decode json ~f:P.Adapter_status.list_of_json (fun statuses ->
+         ( output
+             m
+             ~title:"Agent CLIs"
+             (Content.lines
+                (String.concat ~sep:"\n" (Adapters_command.lines statuses)))
          , [] ))
      | Nix_store_shown ->
        decode json ~f:P.Nix_store_status.of_json (fun status ->

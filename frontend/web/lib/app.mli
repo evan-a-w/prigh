@@ -329,6 +329,7 @@ module Reply_tag : sig
     | Nix_collected (** [nix_store_gc] *)
     | Memory_loaded (** [get_memory] *)
     | Usage_loaded (** [usage_limits] *)
+    | Adapters_loaded (** [list_adapters] *)
     | Instructions_loaded (** [get_custom_instructions] *)
     | Instruction_saved
     (** [save_custom_instruction]: the draft closes, or says why not *)
@@ -637,6 +638,11 @@ module Action : sig
     | Open_help
     | Open_settings (** the gear, Ctrl+, *)
     | Usage_refresh (** Settings → Usage's Refresh *)
+    | Adapters_refresh (** Settings → Engines' Refresh: checks the hosts again *)
+    | Copy_text of
+        { text : string
+        ; copied : string (** the toast once it is there *)
+        } (** to the clipboard *)
     | Settings_section of Settings_section.t
     | Settings_home
     (** a section of the settings page, from its list; opens the page there
@@ -1080,6 +1086,7 @@ module Model : sig
     ; forges : Forges.t (** the user's git hosts *)
     ; nix_gc : Nix_gc.t (** superusers': the Nix store *)
     ; usage : Usage_page.t (** the settings page's Usage *)
+    ; adapters : Adapters_page.t (** the settings page's Engines *)
     ; memory : Memory_notes.t (** the settings page's Memory *)
     ; instructions : Instruction_notes.t
     (** the settings page's Custom instructions *)
@@ -1224,6 +1231,10 @@ val offered_models : Model.t -> Llm.t list
 
 (** Whether the user signed in as a superuser. *)
 val superuser : Model.t -> bool
+
+(** The backend deploys the composer engine ([hello]'s [engines] feature):
+    Settings shows Engines. *)
+val composer_engine : Model.t -> bool
 
 (** Whether the session is temporary ([State.temporary]). *)
 val temporary : Model.t -> bool

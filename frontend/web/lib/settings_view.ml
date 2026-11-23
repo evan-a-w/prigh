@@ -1365,6 +1365,7 @@ let content (m : App.Model.t) (section : Section.t) ~inject =
   | Mcp -> Mcp_settings_view.groups m ~inject
   | Git_hosting -> [ group ~title:"Hosts" (git_hosts m ~inject) ]
   | Nix_store -> [ group (nix_store m ~inject) ]
+  | Engines -> Adapters_view.groups m ~inject
   | Usage ->
     group ~title:"At a limit" [ auto_resume m.config ~inject ]
     :: Usage_view.groups m ~inject
@@ -1376,6 +1377,7 @@ let section_icon : Section.t -> Icon.t = function
   | Sessions -> Bot
   | New_sessions -> Plus
   | Models -> Brain
+  | Engines -> Monitor
   | Memory -> Book
   | About_you -> User
   | Custom_instructions -> Toc
@@ -1390,7 +1392,7 @@ let section_icon : Section.t -> Icon.t = function
    the arrows move between them. The account's tab, last and apart, is the user. *)
 let nav_groups : (string * Section.t list) list =
   [ "General", [ Appearance; Sessions; New_sessions ]
-  ; "Models", [ Models; Usage ]
+  ; "Models", [ Models; Engines; Usage ]
   ; "You", [ Memory; About_you; Custom_instructions ]
   ; "Integrations", [ Mcp; Git_hosting; Nix_store ]
   ]
@@ -1405,7 +1407,12 @@ let face (m : App.Model.t) (section : Section.t) =
 ;;
 
 let nav (m : App.Model.t) ~current ~inject =
-  let available = Section.available ~superuser:(App.superuser m) in
+  let available =
+    Section.available
+      ~composer:(App.composer_engine m)
+      ~superuser:(App.superuser m)
+      ()
+  in
   let tab (section : Section.t) =
     let selected = Section.equal section current in
     let glyph, label = face m section in
@@ -1478,7 +1485,12 @@ let nav (m : App.Model.t) ~current ~inject =
    with what it is about) and a level down to one, with a way back, rather
    than a strip of tabs over a page. *)
 let phone_home (m : App.Model.t) ~inject =
-  let available = Section.available ~superuser:(App.superuser m) in
+  let available =
+    Section.available
+      ~composer:(App.composer_engine m)
+      ~superuser:(App.superuser m)
+      ()
+  in
   let row (section : Section.t) =
     let glyph, about =
       match section, Account_view.who m with
@@ -1603,7 +1615,10 @@ let panel (m : App.Model.t) current ~inject =
 
 let view (m : App.Model.t) ~inject =
   let current =
-    Section.visible m.settings_section ~superuser:(App.superuser m)
+    Section.visible
+      ~composer:(App.composer_engine m)
+      m.settings_section
+      ~superuser:(App.superuser m)
   in
   let footer =
     if m.narrow

@@ -42,6 +42,7 @@ type t =
   | Instructions
   | Mcp
   | Git_hosts
+  | Engines
   | Usage
   | Auto_resume
   | Nix_store
@@ -75,6 +76,9 @@ val page : t -> (Settings_section.t * string) option
 
 (** Only superusers have it. *)
 val superuser_only : t -> bool
+
+(** Only on a backend deploying the composer engine. *)
+val composer_only : t -> bool
 
 (** Its id in a row's DOM id. *)
 val to_string : t -> string

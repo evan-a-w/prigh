@@ -437,6 +437,12 @@ let every =
       "[user]"
       "act as another user (superusers only); without a user, list them"
   ; c
+      "adapters"
+      "[refresh]"
+      "whether the composer's agent CLIs (Codex, Claude Code, ACP agents) are \
+       installed and logged in on each tool host, and what to run there when \
+       not; refresh checks again"
+  ; c
       "nix-gc"
       "[run [DAYS|all]]"
       "show the Nix store's size and free space; run collects garbage, first \

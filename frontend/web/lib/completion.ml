@@ -80,6 +80,7 @@ let argument_items
       ~(skills : Skill.t list)
       ~(snippets : Snippet.t list)
       ~(forges : Forge_account.t list)
+      ~composer
       ~superuser
   =
   let simple items =
@@ -219,13 +220,15 @@ let argument_items
       ; "off", "the model may not change them (they stay in context)"
       ]
   | Settings ->
-    List.map (Settings_section.available ~superuser) ~f:(fun section ->
-      let arg = Settings_section.arg section in
-      Picker.Item.create
-        ~id:arg
-        ~detail:(Settings_section.about section)
-        ~search:(arg ^ " " ^ Settings_section.name section)
-        arg)
+    List.map
+      (Settings_section.available ~composer ~superuser ())
+      ~f:(fun section ->
+        let arg = Settings_section.arg section in
+        Picker.Item.create
+          ~id:arg
+          ~detail:(Settings_section.about section)
+          ~search:(arg ^ " " ^ Settings_section.name section)
+          arg)
   | Session ->
     List.map sessions ~f:(fun s ->
       Picker.Item.create
@@ -340,6 +343,7 @@ let compute
       ?(forges = [])
       ?(worktrees = [])
       ?(refs = Git_diff.Refs.empty)
+      ?(composer = false)
       ~superuser
       ~text
       ~cursor
@@ -476,6 +480,7 @@ let compute
                        ~skills
                        ~snippets
                        ~forges
+                       ~composer
                        ~superuser)
                     ~f:(fun (i : Picker.Item.t) ->
                       String.is_prefix i.id ~prefix)
@@ -497,6 +502,7 @@ let compute
                        ~skills
                        ~snippets
                        ~forges
+                       ~composer
                        ~superuser)
                 with
                 | [] -> None

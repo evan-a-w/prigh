@@ -638,25 +638,27 @@ let%expect_test "each setting has an entry" =
        ; namespace = None
        ; user = None
        ; superuser = true
-       ; features = []
+       ; features = [ "engines" ]
        });
   let covered =
     List.filter_map Control_setting.all ~f:Control_setting.page
     |> List.map ~f:(fun (section, name) -> Settings_section.name section, name)
   in
   let missing = ref [] in
-  List.iter (Settings_section.available ~superuser:true) ~f:(fun section ->
-    H.quiet h (fun () -> H.act h (Settings_section section));
-    let names = H.texts h ~selector:".setting-name" in
-    let covers name =
-      List.mem
-        covered
-        (Settings_section.name section, name)
-        ~equal:[%equal: string * string]
-    in
-    List.iter names ~f:(fun name ->
-      if not (covers name || covers (Settings_section.name section))
-      then missing := (Settings_section.name section, name) :: !missing));
+  List.iter
+    (Settings_section.available ~composer:true ~superuser:true ())
+    ~f:(fun section ->
+      H.quiet h (fun () -> H.act h (Settings_section section));
+      let names = H.texts h ~selector:".setting-name" in
+      let covers name =
+        List.mem
+          covered
+          (Settings_section.name section, name)
+          ~equal:[%equal: string * string]
+      in
+      List.iter names ~f:(fun name ->
+        if not (covers name || covers (Settings_section.name section))
+        then missing := (Settings_section.name section, name) :: !missing));
   print_s [%sexp (List.rev !missing : (string * string) list)];
   [%expect {| () |}]
 ;;
