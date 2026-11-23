@@ -630,3 +630,61 @@ let%expect_test "moving to another tool host: a new process and thread there" =
     |}];
   Composer_runner.close composer
 ;;
+
+let%expect_test "back to the harness engine and out again; models follow" =
+  with_server
+  @@ fun ~call ~prompt ~agent ~refuse_resume:_ ->
+  let models () =
+    match call "list_models" with
+    | `Object fields ->
+      (match List.Assoc.find fields "result" ~equal:String.equal with
+       | Some (`Array models) ->
+         let keys =
+           List.filter_map models ~f:(fun m ->
+             match Json.member "provider" m, Json.member "id" m with
+             | Some (`String p), Some (`String id) -> Some (p ^ "/" ^ id)
+             | _ -> None)
+         in
+         printf
+           "models: %s%s\n"
+           (String.concat ~sep:" " (List.take keys 3))
+           (if List.length keys > 3 then " ..." else "")
+       | _ -> print_endline "models: ?")
+    | _ -> ()
+  in
+  let model () = print_endline (Model.key (Agent.state (agent ())).model) in
+  print_result (call ~params:{|{"adapter": "codex"}|} "new_session");
+  prompt "first";
+  model ();
+  models ();
+  print_result (call ~params:{|{"model": "nope"}|} "set_model");
+  [%expect
+    {|
+    ok: engine composer, adapter codex
+    spawn codex app-server
+    codex: thread/start
+    codex got:
+    [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]
+
+    first
+    codex/default
+    models: codex/default
+    error: "Codex has no model \"nope\": pick one of default (/model lists them)"
+    |}];
+  print_result (call ~params:{|{"adapter": "harness"}|} "set_adapter");
+  model ();
+  models ();
+  [%expect
+    {|
+    ok: engine -, adapter -
+    deepseek/deepseek-flash
+    models: anthropic/claude-fable-5 anthropic/claude-fable-5-1 anthropic/claude-fable-5-2 ...
+    |}];
+  print_result (call ~params:{|{"adapter": "codex"}|} "set_adapter");
+  model ();
+  [%expect
+    {|
+    ok: engine composer, adapter codex
+    codex/default
+    |}]
+;;

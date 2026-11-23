@@ -18,6 +18,9 @@ module Scripted = struct
     }
   ;;
 
+  let models _ = None
+  let context _ = None, None
+
   let run_turn
         t
         (services : Engine_intf.Services.t)

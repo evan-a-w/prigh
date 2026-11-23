@@ -5,6 +5,7 @@ type t =
   { codec : Codex_codec.t
   ; driver : Codex_codec.Response.t Adapter.Driver.t
   ; cwd : string
+  ; mutable models : Model.t list
   }
 
 let id = "codex"
@@ -14,7 +15,7 @@ let capabilities : Capabilities.t =
   { fork = By_handoff
   ; rewind = Unsupported
   ; context_edit = false
-  ; compact = Auto_only
+  ; compact = Native
   ; steer = In_run
   ; plan_mode = true
   ; btw = false
@@ -76,10 +77,67 @@ let failed (r : Codex_codec.Response.t) ~what =
   | _ -> Ok ()
 ;;
 
+let level_of_effort = function
+  | "xhigh" -> Some Thinking.Level.Xhigh
+  | e -> Thinking.Level.of_string e
+;;
+
+let model_of (m : Codex_codec.Model_info.t) ~id =
+  External_model.model
+    ~adapter:id
+    ~name:m.display_name
+    ~thinking_levels:
+      (List.filter_map m.efforts ~f:level_of_effort
+       |> List.dedup_and_sort ~compare:Thinking.Level.compare)
+    ~can_disable_thinking:(List.mem m.efforts "none" ~equal:String.equal)
+    ~images:m.images
+    m.id
+;;
+
+(* The models Codex offers (its default first, as [default]): asked once
+   the thread is open; none when it cannot say. *)
+let list_models driver codec =
+  let rec pages cursor acc n =
+    match
+      Adapter.Driver.request
+        driver
+        (Codex_codec.list_models codec ~cursor)
+        ~matches:(function
+        | Codex_codec.Response.Models _ | Failed { kind = Model_list; _ } ->
+          true
+        | _ -> false)
+    with
+    | Ok (Codex_codec.Response.Models { models; next_cursor = Some cursor })
+      when n < 10 -> pages (Some cursor) (acc @ models) (n + 1)
+    | Ok (Codex_codec.Response.Models { models; next_cursor = _ }) ->
+      acc @ models
+    | Ok _ | Error _ -> acc
+  in
+  let infos =
+    List.filter (pages None [] 0) ~f:(fun (m : Codex_codec.Model_info.t) ->
+      not m.hidden)
+  in
+  match infos with
+  | [] -> []
+  | _ ->
+    let default =
+      match
+        List.find infos ~f:(fun (m : Codex_codec.Model_info.t) -> m.is_default)
+      with
+      | Some m ->
+        { (model_of m ~id) with
+          id = External_model.default_id
+        ; name = sprintf "default (%s)" m.display_name
+        }
+      | None -> External_model.default ~adapter:id
+    in
+    default :: List.map infos ~f:(model_of ~id)
+;;
+
 let start ~sw ?interrupt_grace ?injected:_ transport (start : Adapter.Start.t) =
   let codec = Codex_codec.create () in
   let driver = Adapter.Driver.create ~sw ?interrupt_grace transport in
-  let t = { codec; driver; cwd = start.cwd } in
+  let t = { codec; driver; cwd = start.cwd; models = [] } in
   Adapter.Driver.run
     driver
     ~handle_line:(fun line ->
@@ -137,6 +195,10 @@ let start ~sw ?interrupt_grace ?injected:_ transport (start : Adapter.Start.t) =
       | _ -> false)
   in
   let%map () = failed thread ~what:"the thread" in
+  (* Not waited for: a turn need not wait for the list. *)
+  Fiber.fork_daemon ~sw (fun () ->
+    t.models <- list_models driver codec;
+    `Stop_daemon);
   t
 ;;
 
@@ -183,3 +245,14 @@ let thread_id t = Codex_codec.thread_id t.codec
 let in_turn t = Adapter.Driver.in_turn t.driver
 let alive t = Adapter.Driver.alive t.driver
 let stop t = Adapter.Driver.stop t.driver
+let models t = t.models
+
+let compact t settings ~instructions:_ =
+  if not (Adapter.Driver.alive t.driver)
+  then Or_error.error_string "Codex is not running"
+  else (
+    ignore (settings : Adapter.Settings.t);
+    let%map.Or_error line = Codex_codec.compact t.codec in
+    Adapter.Driver.begin_turn t.driver;
+    Adapter.Driver.write t.driver line)
+;;

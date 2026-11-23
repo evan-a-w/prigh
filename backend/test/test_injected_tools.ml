@@ -55,9 +55,9 @@ let%expect_test "default set" =
   [%expect
     {|
     (render_ui memory custom_instructions sessions ask_session answer_session
-     pull_request issue repo worktree reply_to_comment)
+     pull_request issue repo worktree reply_to_comment goal_complete)
     (render_ui memory custom_instructions sessions ask_session answer_session
-     pull_request issue repo worktree reply_to_comment ask_user)
+     pull_request issue repo worktree reply_to_comment goal_complete ask_user)
     |}];
   let canonical server tool =
     print_s
@@ -180,6 +180,7 @@ let%expect_test "initialize and list" =
     repo: the repo tool
     worktree: the worktree tool
     reply_to_comment: the reply_to_comment tool
+    goal_complete: the goal_complete tool
     |}]
 ;;
 
@@ -230,7 +231,7 @@ let%expect_test "errors" =
   [%expect
     {|
     > {"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"bash","arguments":{"command":"ls"}}}
-    < {"jsonrpc":"2.0","id":7,"error":{"code":-32602,"message":"unknown tool bash: prigh offers render_ui, memory, custom_instructions, sessions, ask_session, answer_session, pull_request, issue, repo, worktree, reply_to_comment"}}
+    < {"jsonrpc":"2.0","id":7,"error":{"code":-32602,"message":"unknown tool bash: prigh offers render_ui, memory, custom_instructions, sessions, ask_session, answer_session, pull_request, issue, repo, worktree, reply_to_comment, goal_complete"}}
     > {"jsonrpc":"2.0","id":8,"method":"tools/call","params":{"name":"memory","arguments":"recall"}}
     < {"jsonrpc":"2.0","id":8,"error":{"code":-32602,"message":"arguments must be an object"}}
     > {"jsonrpc":"2.0","id":9,"method":"tools/call","params":{}}

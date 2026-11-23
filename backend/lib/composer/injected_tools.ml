@@ -15,6 +15,7 @@ let default_names ~native_questions =
   ; Tool_repo.name
   ; Tool_worktree.name
   ; Tool_review_reply.name
+  ; Goal.tool_name
   ]
   @ if native_questions then [] else [ Tool_ask_user.name ]
 ;;
