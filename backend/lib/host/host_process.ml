@@ -239,6 +239,11 @@ module Outcome = struct
   ;;
 end
 
+(* A line goes up JSON-escaped twice (in an [out] frame, in the host's
+   output chunk), up to 4 bytes a byte for a line full of escapes: this keeps
+   the frame under the RPC's 64 MiB, whose excess would drop the host. *)
+let max_line = 12 * 1024 * 1024
+
 module Arguments = struct
   type t =
     { argv : string list
@@ -257,7 +262,7 @@ module Arguments = struct
     ; env = []
     ; env_unset = []
     ; window = 64
-    ; max_line = 32 * 1024 * 1024
+    ; max_line
     ; stderr_rate = 64 * 1024
     ; term_grace = Time_ns.Span.of_int_ms 3000
     ; path = None
@@ -314,11 +319,7 @@ module Arguments = struct
            | _ -> [])
       ; window = int "window" ~min:1 ~max:4096 ~default:default.window
       ; max_line =
-          int
-            "max_line"
-            ~min:1024
-            ~max:(64 * 1024 * 1024)
-            ~default:default.max_line
+          int "max_line" ~min:1024 ~max:max_line ~default:default.max_line
       ; stderr_rate =
           int
             "stderr_rate"
@@ -567,19 +568,32 @@ module Mcp_listener = struct
                try f () with
                | Eio.Io _ -> ()
              in
+             (* Written by a fiber of its own: the backend's frames are
+                handled by one fiber, which a client slow to read must not
+                hold up (its acks would wait, and so the program). *)
+             let outbox = Eio.Stream.create Int.max_value in
              Hashtbl.set
                t.conns
                ~key:id
                ~data:
-                 { write =
-                     (fun line ->
-                       quietly (fun () ->
-                         Eio.Flow.copy_string (line ^ "\n") conn))
-                 ; close =
-                     (fun () ->
-                       quietly (fun () -> Eio.Flow.shutdown conn `Send))
+                 { write = (fun line -> Eio.Stream.add outbox (`Line line))
+                 ; close = (fun () -> Eio.Stream.add outbox `Shutdown)
                  };
-             serve conn id);
+             let rec drain () =
+               match Eio.Stream.take outbox with
+               | `Line line ->
+                 quietly (fun () -> Eio.Flow.copy_string (line ^ "\n") conn);
+                 drain ()
+               | `Shutdown ->
+                 quietly (fun () -> Eio.Flow.shutdown conn `Send);
+                 drain ()
+               | `Done -> ()
+             in
+             Fiber.both
+               (fun () ->
+                  serve conn id;
+                  Eio.Stream.add outbox `Done)
+               drain);
         accept ()
       in
       accept ());

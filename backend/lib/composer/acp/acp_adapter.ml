@@ -128,7 +128,11 @@ let create
     let load t line ~session_id =
       let lines_before = t.lines in
       let answered () =
-        Adapter.Driver.request t.driver line ~matches:(function
+        Adapter.Driver.request
+          ~timeout:load_timeout
+          t.driver
+          line
+          ~matches:(function
           | Session_opened { kind = Load_session; _ }
           | Failed { kind = Load_session; _ } -> true
           | _ -> false)
@@ -166,12 +170,20 @@ let create
     let start
           ~sw
           ?interrupt_grace
+          ?request_timeout
           ?injected:_
           transport
           (start : Adapter.Start.t)
       =
       let codec = Codec.create () in
-      let driver = Adapter.Driver.create ~sw ?interrupt_grace transport in
+      let driver =
+        Adapter.Driver.create
+          ~sw
+          ~name:agent.display_name
+          ?interrupt_grace
+          ?request_timeout
+          transport
+      in
       let t =
         { codec
         ; driver

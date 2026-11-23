@@ -174,9 +174,38 @@ let dispatch t (output : Claude_codec.Output.t) =
                    ]))))
 ;;
 
-let start ~sw ?interrupt_grace ?injected transport (start : Adapter.Start.t) =
+(* Claude Code asks in a turn of its own (after a background task), which
+   no prigh turn is there to answer. *)
+let refuse_orphan t (event : Adapter_event.t) =
+  match event with
+  | Approval_request { request_id; _ } ->
+    Result.iter
+      (Claude_codec.respond_approval t.codec ~request_id Cancel)
+      ~f:(Adapter.Driver.write t.driver)
+  | User_question { request_id; _ } ->
+    Result.iter
+      (Claude_codec.answer t.codec ~request_id Cancelled)
+      ~f:(Adapter.Driver.write t.driver)
+  | _ -> ()
+;;
+
+let start
+      ~sw
+      ?interrupt_grace
+      ?request_timeout
+      ?injected
+      transport
+      (start : Adapter.Start.t)
+  =
   let codec = Claude_codec.create () in
-  let driver = Adapter.Driver.create ~sw ?interrupt_grace transport in
+  let driver =
+    Adapter.Driver.create
+      ~sw
+      ~name:display_name
+      ?interrupt_grace
+      ?request_timeout
+      transport
+  in
   let t =
     { codec
     ; driver
@@ -186,6 +215,7 @@ let start ~sw ?interrupt_grace ?injected transport (start : Adapter.Start.t) =
     ; models = []
     }
   in
+  Adapter.Driver.on_orphan_request driver (refuse_orphan t);
   Adapter.Driver.run
     driver
     ~handle_line:(fun line ->
@@ -249,6 +279,7 @@ let apply t (s : Adapter.Settings.t) =
 ;;
 
 let send t settings (input : Adapter.Input.t) =
+  Adapter.Driver.await_idle t.driver;
   if not (Adapter.Driver.alive t.driver)
   then Or_error.error_string "Claude Code is not running"
   else if Adapter.Driver.in_turn t.driver
@@ -298,6 +329,7 @@ let stop t = Adapter.Driver.stop t.driver
 let models t = t.models
 
 let compact t settings ~instructions =
+  Adapter.Driver.await_idle t.driver;
   if not (Adapter.Driver.alive t.driver)
   then Or_error.error_string "Claude Code is not running"
   else if Adapter.Driver.in_turn t.driver

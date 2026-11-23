@@ -134,10 +134,39 @@ let list_models driver codec =
     default :: List.map infos ~f:(model_of ~id)
 ;;
 
-let start ~sw ?interrupt_grace ?injected:_ transport (start : Adapter.Start.t) =
+(* Codex asks in a turn of its own, which no prigh turn is there to answer. *)
+let refuse_orphan t (event : Adapter_event.t) =
+  match event with
+  | Approval_request { request_id; _ } ->
+    Option.iter
+      (Codex_codec.reply_approval t.codec ~request_id Cancel)
+      ~f:(Adapter.Driver.write t.driver)
+  | User_question { request_id; _ } ->
+    Option.iter
+      (Codex_codec.answer_question t.codec ~request_id Cancelled)
+      ~f:(Adapter.Driver.write t.driver)
+  | _ -> ()
+;;
+
+let start
+      ~sw
+      ?interrupt_grace
+      ?request_timeout
+      ?injected:_
+      transport
+      (start : Adapter.Start.t)
+  =
   let codec = Codex_codec.create () in
-  let driver = Adapter.Driver.create ~sw ?interrupt_grace transport in
+  let driver =
+    Adapter.Driver.create
+      ~sw
+      ~name:display_name
+      ?interrupt_grace
+      ?request_timeout
+      transport
+  in
   let t = { codec; driver; cwd = start.cwd; models = [] } in
+  Adapter.Driver.on_orphan_request driver (refuse_orphan t);
   Adapter.Driver.run
     driver
     ~handle_line:(fun line ->
@@ -206,6 +235,7 @@ let next_event t = Adapter.Driver.next_event t.driver
 let settings_of t s = settings ~cwd:t.cwd s
 
 let send t settings input =
+  Adapter.Driver.await_idle t.driver;
   if not (Adapter.Driver.alive t.driver)
   then Or_error.error_string "Codex is not running"
   else (
@@ -248,6 +278,7 @@ let stop t = Adapter.Driver.stop t.driver
 let models t = t.models
 
 let compact t settings ~instructions:_ =
+  Adapter.Driver.await_idle t.driver;
   if not (Adapter.Driver.alive t.driver)
   then Or_error.error_string "Codex is not running"
   else (

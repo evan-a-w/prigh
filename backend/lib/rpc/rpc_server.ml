@@ -1007,8 +1007,6 @@ let route t agent (event : Agent.Event.t) =
   | _ -> ()
 ;;
 
-(* Hosts are set before subscribing: the state change would otherwise evict
-   the agent, which has no client until [attach]. *)
 (* Why [agent]'s session cannot run here: its engine is not deployed, or it
    names one this prigh does not know. *)
 let engine_unavailable t agent =
@@ -1158,6 +1156,8 @@ let attach_engine t agent =
   | _ -> ()
 ;;
 
+(* Hosts are set before subscribing: the state change would otherwise evict
+   the agent, which has no client until [attach]. *)
 let register t agent =
   Agent.set_unavailable agent (engine_unavailable t agent);
   attach_engine t agent;
@@ -2318,13 +2318,6 @@ let attached_state (client : Client.t) =
   `Object [ "state", Rpc_json.state (Agent.state client.agent) ]
 ;;
 
-(* A temporary session is not saved or listed, and ends when its client
-   leaves it ([attach]), or [temporary_grace] after the last one went. Its
-   ledger exists from the start, so that a restart knows to clean up. *)
-(* Where [new_session] starts a session. A tool host's sessions start on
-   it, where it is; another client's on the config's [default_host] while
-   that is connected, else as [start_location] says. On the default host
-   (the backend's without one), in [default_cwd] when there is one. *)
 (* Moves the attached session to another of the composer's adapters (the
    new one's harness takes over at the next turn, handed what it has not
    seen of the session), or back to prigh's harness engine ([harness]),
@@ -2344,8 +2337,8 @@ let set_adapter t (client : Client.t) params =
   else if Agent.is_running agent
   then
     Or_error.errorf
-      "%s is still running: wait for the run to end (or abort it with Esc), \n\
-      \       then switch to %s"
+      "%s is still running: wait for the run to end (or abort it with Esc), \
+       then switch to %s"
       (Agent.engine_label agent)
       (Option.value_map
          choice.adapter
@@ -2376,6 +2369,13 @@ let set_adapter t (client : Client.t) params =
       attached_state client)
 ;;
 
+(* A temporary session is not saved or listed, and ends when its client
+   leaves it ([attach]), or [temporary_grace] after the last one went. Its
+   ledger exists from the start, so that a restart knows to clean up. *)
+(* Where [new_session] starts a session. A tool host's sessions start on
+   it, where it is; another client's on the config's [default_host] while
+   that is connected, else as [start_location] says. On the default host
+   (the backend's without one), in [default_cwd] when there is one. *)
 let new_session_start t (client : Client.t) =
   let start = start_location t client ~cwd:(own_cwd client) in
   if client.tools
@@ -2607,7 +2607,9 @@ let delete_saved ?leaving t client (summary : Session.Summary.t) =
       Hashtbl.remove t.listed summary.id;
       Option.iter agent ~f:(fun agent ->
         if Agent.resume_pending agent
-        then ignore (Agent.cancel_resume agent : unit Or_error.t));
+        then ignore (Agent.cancel_resume agent : unit Or_error.t);
+        (* Its external harness, idle, would run on its host for good. *)
+        Agent.stop_engine agent);
       forget_session t summary.id;
       { Deleted.path = summary.path; id = summary.id; bytes })
 ;;

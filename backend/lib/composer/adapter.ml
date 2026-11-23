@@ -10,36 +10,120 @@ module Driver = struct
     ; resolve : 'r Or_error.t Promise.u
     }
 
+  (* A turn the harness runs of its own: what it said, for the notice. *)
+  module Orphan = struct
+    type t = { mutable text : string option }
+  end
+
   type 'r t =
     { sw : Switch.t
+    ; name : string
     ; transport : Line_transport.t
     ; interrupt_grace : Time_float.Span.t
+    ; request_timeout : Time_float.Span.t
     ; events : Adapter_event.t Eio.Stream.t
     ; mutable waiters : 'r waiter list
     ; mutable in_turn : bool
     ; mutable turns : int (* turns begun, to tell them apart *)
     ; mutable alive : bool
+    ; mutable stopping : bool
+    ; mutable orphan : Orphan.t option
+    ; idle : Eio.Condition.t (* the orphan turn ended, or the process *)
+    ; mutable on_orphan_request : Adapter_event.t -> unit
     }
 
-  let create ~sw ?(interrupt_grace = Time_float.Span.of_sec 10.) transport =
+  let create
+        ~sw
+        ~name
+        ?(interrupt_grace = Time_float.Span.of_sec 10.)
+        ?(request_timeout = Time_float.Span.of_sec 60.)
+        transport
+    =
     { sw
+    ; name
     ; transport
     ; interrupt_grace
+    ; request_timeout
     ; events = Eio.Stream.create Int.max_value
     ; waiters = []
     ; in_turn = false
     ; turns = 0
     ; alive = true
+    ; stopping = false
+    ; orphan = None
+    ; idle = Eio.Condition.create ()
+    ; on_orphan_request = ignore
     }
   ;;
 
-  let write t line = if t.alive then Line_transport.write_line t.transport line
+  let alive t = t.alive && not t.stopping
+  let write t line = if alive t then Line_transport.write_line t.transport line
+  let on_orphan_request t f = t.on_orphan_request <- f
+
+  (* Events that belong to no turn in particular go to whoever reads. *)
+  let of_no_turn : Adapter_event.t -> bool = function
+    | Thread_started _
+    | Usage _
+    | Notice _
+    | Compacted _
+    | Retrying _
+    | Request_withdrawn _ -> true
+    | Turn_started _
+    | Text_delta _
+    | Text_done _
+    | Thinking_delta _
+    | Thinking_done _
+    | Tool_start _
+    | Tool_update _
+    | Tool_end _
+    | Approval_request _
+    | User_question _
+    | Plan _
+    | Turn_diff _
+    | Turn_end _ -> false
+  ;;
+
+  let orphan_ended t (orphan : Orphan.t) =
+    t.orphan <- None;
+    Eio.Stream.add
+      t.events
+      (Notice
+         (match orphan.text with
+          | None -> sprintf "%s ran a turn of its own" t.name
+          | Some text ->
+            sprintf
+              "%s ran a turn of its own between your messages: %s"
+              t.name
+              (if String.length text > 2000
+               then String.prefix text 2000 ^ "..."
+               else text)));
+    Eio.Condition.broadcast t.idle
+  ;;
 
   let push t (event : Adapter_event.t) =
-    (match event with
-     | Turn_end _ -> t.in_turn <- false
-     | _ -> ());
-    Eio.Stream.add t.events event
+    match event with
+    | Turn_end _ when t.in_turn ->
+      t.in_turn <- false;
+      Eio.Stream.add t.events event
+    | _ when t.in_turn || of_no_turn event -> Eio.Stream.add t.events event
+    | Turn_end _ ->
+      (* A turn of its own ended, or one that was ended for it already (an
+         ignored interrupt) ended late. *)
+      Option.iter t.orphan ~f:(orphan_ended t)
+    | _ ->
+      let orphan =
+        match t.orphan with
+        | Some o -> o
+        | None ->
+          let o = { Orphan.text = None } in
+          t.orphan <- Some o;
+          o
+      in
+      (match event with
+       | Text_done { text; _ } when not (String.is_empty (String.strip text)) ->
+         orphan.text <- Some text
+       | Approval_request _ | User_question _ -> t.on_orphan_request event
+       | _ -> ())
   ;;
 
   let next_event t = Eio.Stream.take t.events
@@ -64,14 +148,52 @@ module Driver = struct
     | tail -> sprintf "%s: %s" how tail
   ;;
 
-  let request t line ~matches =
-    if not t.alive
+  let request ?timeout t line ~matches =
+    if not (alive t)
     then Or_error.error_string "the process exited"
     else (
       let p, resolve = Promise.create () in
-      t.waiters <- t.waiters @ [ { matches; resolve } ];
+      let w = { matches; resolve } in
+      t.waiters <- t.waiters @ [ w ];
+      let withdraw () =
+        t.waiters <- List.filter t.waiters ~f:(fun w' -> not (phys_equal w w'))
+      in
       write t line;
-      Promise.await p)
+      let timeout = Option.value timeout ~default:t.request_timeout in
+      match
+        Fiber.first
+          (fun () -> Promise.await p)
+          (fun () ->
+             Eio_unix.sleep (Time_float.Span.to_sec timeout);
+             Or_error.errorf
+               "no answer within %s"
+               (Time_float.Span.to_string_hum timeout))
+      with
+      | result ->
+        withdraw ();
+        result
+      | exception exn ->
+        withdraw ();
+        raise exn)
+  ;;
+
+  let await_idle t =
+    match t.orphan with
+    | None -> ()
+    | Some _ ->
+      Eio.Stream.add
+        t.events
+        (Notice
+           (sprintf
+              "%s is finishing a turn of its own: your message waits for it"
+              t.name));
+      let rec wait () =
+        if Option.is_some t.orphan && t.alive
+        then (
+          Eio.Condition.await_no_mutex t.idle;
+          wait ())
+      in
+      wait ()
   ;;
 
   let begin_turn t =
@@ -80,8 +202,28 @@ module Driver = struct
   ;;
 
   let in_turn t = t.in_turn
-  let alive t = t.alive
-  let stop t = Line_transport.stop t.transport
+
+  let stop t =
+    if not t.stopping
+    then (
+      t.stopping <- true;
+      (* Its turn ends now: the process may take long to go (a host away
+         answers nothing). *)
+      if t.in_turn
+      then
+        push
+          t
+          (Turn_end
+             { turn_id = None
+             ; stop =
+                 Failed
+                   { kind = Crashed { stderr_tail = "" }
+                   ; message =
+                       sprintf "%s was stopped before its turn ended" t.name
+                   }
+             });
+      Line_transport.stop t.transport)
+  ;;
 
   let run t ~handle_line ~on_exit =
     Fiber.fork ~sw:t.sw (fun () ->
@@ -95,6 +237,8 @@ module Driver = struct
       loop ();
       let exit = Line_transport.ended t.transport in
       t.alive <- false;
+      t.orphan <- None;
+      Eio.Condition.broadcast t.idle;
       let waiters = t.waiters in
       t.waiters <- [];
       List.iter waiters ~f:(fun w ->

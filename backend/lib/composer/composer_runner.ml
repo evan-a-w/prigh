@@ -9,6 +9,7 @@ type t =
   ; spawn : Adapter.Launch.t -> Line_transport.t Or_error.t
   ; start : cwd:string -> Adapter.Start.t
   ; interrupt_grace : Time_float.Span.t option
+  ; request_timeout : Time_float.Span.t option
   ; steer_poll : Time_float.Span.t
   ; host : unit -> string
   ; mutable live : live option
@@ -33,6 +34,7 @@ let create
       ~spawn
       ?(start = fun ~cwd -> Adapter.Start.default ~cwd)
       ?interrupt_grace
+      ?request_timeout
       ?(steer_poll = Time_float.Span.of_sec 0.2)
       ?(on_thread = ignore)
       ?(host = fun () -> "local")
@@ -44,6 +46,7 @@ let create
   ; spawn
   ; start
   ; interrupt_grace
+  ; request_timeout
   ; steer_poll
   ; host
   ; live = None
@@ -107,6 +110,9 @@ let injected t (s : Engine_intf.Services.t) =
         in
         (match s.approve ctx tool args with
          | Some refused -> refused
+         | None when Cancellation.is_cancelled ctx.cancel ->
+           (* Approved after its turn ended: nobody waits for it now. *)
+           Tool_result.error "[cancelled]: its turn ended"
          | None -> s.execute ctx tool args))
 ;;
 
@@ -157,10 +163,15 @@ let start_process t (s : Engine_intf.Services.t) (start : Adapter.Start.t) =
        A.start
          ~sw:t.sw
          ?interrupt_grace:t.interrupt_grace
+         ?request_timeout:t.request_timeout
          ~injected
          transport
          start
      with
+     | exception exn ->
+       (* Cancelled while it started (Esc): it would run for nobody. *)
+       Line_transport.stop transport;
+       raise exn
      | Ok a ->
        t.resumed <- start.resume;
        (* A new thread has seen nothing: whatever an older one saw. *)
@@ -363,15 +374,43 @@ let approve_plan (s : Engine_intf.Services.t) ~display_name ~request_id ~summary
   | Cancelled | Timed_out _ | Unavailable _ -> Cancel
 ;;
 
-let run_turn
+let rec run_turn
+          t
+          (s : Engine_intf.Services.t)
+          ~cancel
+          (input : Engine_intf.Turn.Input.t)
+  =
+  let (module A) = t.adapter in
+  (* Cancelled when the run is, and when the turn ends however it does:
+     what prigh's tools were asked over MCP for it is withdrawn then. *)
+  let turn_cancel = Cancellation.create () in
+  Fiber.fork_daemon ~sw:t.sw (fun () ->
+    Fiber.first
+      (fun () -> Cancellation.await cancel)
+      (fun () -> Cancellation.await turn_cancel);
+    Cancellation.cancel turn_cancel;
+    `Stop_daemon);
+  t.services <- Some s;
+  t.cancel <- turn_cancel;
+  Exn.protect
+    ~finally:(fun () -> Cancellation.cancel turn_cancel)
+    ~f:(fun () ->
+      match run_turn' t s ~cancel input with
+      | added -> added
+      | exception exn ->
+        (* Its events may still come, for a turn that is no longer
+           anyone's: the next turn starts a new process instead. *)
+        t.services <- None;
+        close t;
+        raise exn)
+
+and run_turn'
       t
       (s : Engine_intf.Services.t)
       ~cancel
       (input : Engine_intf.Turn.Input.t)
   =
   let (module A) = t.adapter in
-  t.services <- Some s;
-  t.cancel <- cancel;
   let sent = ref false in
   let last_turn = ref None in
   let recorder =
@@ -387,11 +426,15 @@ let run_turn
       recorder
       (Turn_end { turn_id = None; stop = Failed { kind = Other; message } })
   in
-  (match live t s input with
-   | Error e ->
+  (match Cancellation.protect cancel ~f:(fun () -> live t s input) with
+   | None ->
+     Composer_recorder.feed
+       recorder
+       (Turn_end { turn_id = None; stop = Interrupted })
+   | Some (Error e) ->
      fail
        (sprintf "%s could not start: %s" A.display_name (Error.to_string_hum e))
-   | Ok (Live ((module L), a)) ->
+   | Some (Ok (Live ((module L), a))) ->
      let settings = settings input in
      let leftover = Queue.create () in
      let handoff =
@@ -421,13 +464,21 @@ let run_turn
          sent := true;
          let requests = String.Table.create () in
          let stop = ref None in
+         (* Each request waits in a fiber of its own, until answered,
+            withdrawn, the run cancelled or the turn ended: its dialog
+            closes then ({!Agent.confirm} and [ask_user] clean up when
+            cancelled). Not daemons: the turn waits for them to close. *)
          let handle_request ~sw request_id f =
            let c = Cancellation.create () in
            Hashtbl.set requests ~key:request_id ~data:c;
-           Fiber.fork_daemon ~sw (fun () ->
-             f c;
-             Hashtbl.remove requests request_id;
-             `Stop_daemon)
+           Fiber.fork ~sw (fun () ->
+             Fiber.first
+               (fun () -> f c)
+               (fun () ->
+                  Fiber.first
+                    (fun () -> Cancellation.await c)
+                    (fun () -> Cancellation.await cancel));
+             Hashtbl.remove requests request_id)
          in
          let rec events ~sw =
            match L.next_event a with

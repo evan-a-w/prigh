@@ -66,6 +66,13 @@ let spawn ~sw ~exec ~host ?on_stderr (launch : Adapter.Launch.t) =
     ; mcp = launch.mcp
     }
   in
+  (* Its tail comes with the exit: what it writes before is only worth
+     sending when someone reads it. *)
+  let arguments =
+    if Option.is_none on_stderr
+    then { arguments with stderr_rate = 0 }
+    else arguments
+  in
   let side = Option.some_if launch.mcp (Mcp_side.create ()) in
   let s =
     Host_stream.start
@@ -77,6 +84,10 @@ let spawn ~sw ~exec ~host ?on_stderr (launch : Adapter.Launch.t) =
       arguments
   in
   match Promise.await (Host_stream.started s) with
+  | exception exn ->
+    (* The turn was cancelled while it started: it would run for nobody. *)
+    Host_stream.stop s;
+    raise exn
   | Error ended -> Error (Error.of_string (Host_stream.Ended.to_message ended))
   | Ok started ->
     let mcp =

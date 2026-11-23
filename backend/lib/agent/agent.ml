@@ -918,13 +918,18 @@ let confirm
           | Some w when phys_equal w.resolver resolver -> Error after
           | Some _ | None -> answered ())
   in
-  let answer =
-    Trace.span "approval_wait" (fun () ->
-      Cancellation.protect context.cancel ~f:wait)
+  (* Also when the waiting fiber is cancelled (its turn ended): the
+     frontends would show the dialog for good otherwise. *)
+  let done_ () =
+    (match Hashtbl.find t.pending_confirms key with
+     | Some w when phys_equal w.resolver resolver ->
+       Hashtbl.remove t.pending_confirms key
+     | Some _ | None -> ());
+    broadcast t (Loop (Tool_confirm_done { call_id; agent_id }))
   in
-  Hashtbl.remove t.pending_confirms key;
-  broadcast t (Loop (Tool_confirm_done { call_id; agent_id }));
-  answer
+  Exn.protect ~finally:done_ ~f:(fun () ->
+    Trace.span "approval_wait" (fun () ->
+      Cancellation.protect context.cancel ~f:wait))
 ;;
 
 let respond_confirm ?agent_id t ~call_id (answer : Confirm_answer.t) =
@@ -992,6 +997,12 @@ let ask_user t ~cancel ~call_id ~timeout_seconds questions =
           | Some _ | None -> answered ())
     | _ -> answered
   in
+  let forget () =
+    match Hashtbl.find t.pending_questions call_id with
+    | Some (_, r) when phys_equal r resolver ->
+      Hashtbl.remove t.pending_questions call_id
+    | Some _ | None -> ()
+  in
   let reply =
     match
       Trace.span
@@ -1001,8 +1012,14 @@ let ask_user t ~cancel ~call_id ~timeout_seconds questions =
     with
     | None -> User_question.Reply.Cancelled
     | Some reply -> reply
+    | exception exn ->
+      (* Its fiber was cancelled (the turn ended): the frontends would show
+         the question for good otherwise. *)
+      forget ();
+      broadcast t (Loop (Ask_user_done { call_id; timed_out = false }));
+      raise exn
   in
-  Hashtbl.remove t.pending_questions call_id;
+  forget ();
   let timed_out =
     match reply with
     | Timed_out _ -> true
@@ -1551,7 +1568,13 @@ let set_hosts ?(returning = String.Map.empty) t clients =
       t.active_host_name <- host.name;
       state_changed t
     | None, _ ->
-      if was_connected then notice (host_unavailable_message t);
+      if was_connected
+      then (
+        (* What is sent to a program there while it is away is lost: an
+           external harness's turn ends now, and the next one starts it
+           again, continuing its thread. *)
+        Option.iter t.runner ~f:Runner.close;
+        notice (host_unavailable_message t));
       state_changed t)
 ;;
 
@@ -3581,9 +3604,9 @@ let rec start_run
           t
           prompts
   =
-  if Option.is_none t.unavailable then run_now ~tried ~then_ t prompts
+  if Option.is_none t.unavailable then run_now ~kind ~tried ~then_ t prompts
 
-and run_now ~tried ~then_ t prompts =
+and run_now ~kind ~tried ~then_ t prompts =
   if not t.chat_mode then refresh_location t;
   cancel_resume_timer t;
   close_interrupted t;
