@@ -391,7 +391,7 @@ let%expect_test "hello, new_session and state with the composer deployed" =
     {|
     result.state.engine: "composer"
     result.state.adapter: "claude"
-    result.state.capabilities: {"fork":"by_handoff","rewind":"unsupported","context_edit":false,"compact":"auto_only","steer":"between_turns","plan_mode":true,"btw":false,"subagents":"observe","model_fallback":false,"images":true,"ask_user":true}
+    result.state.capabilities: {"fork":"by_handoff","rewind":"unsupported","context_edit":false,"compact":"native","steer":"between_turns","plan_mode":true,"btw":false,"subagents":"observe","model_fallback":false,"images":true,"ask_user":true}
     result.state.unavailable: -
     |}];
   print_fields (call "get_state") (engine_paths [ "result" ]);
@@ -399,7 +399,7 @@ let%expect_test "hello, new_session and state with the composer deployed" =
     {|
     result.engine: "composer"
     result.adapter: "claude"
-    result.capabilities: {"fork":"by_handoff","rewind":"unsupported","context_edit":false,"compact":"auto_only","steer":"between_turns","plan_mode":true,"btw":false,"subagents":"observe","model_fallback":false,"images":true,"ask_user":true}
+    result.capabilities: {"fork":"by_handoff","rewind":"unsupported","context_edit":false,"compact":"native","steer":"between_turns","plan_mode":true,"btw":false,"subagents":"observe","model_fallback":false,"images":true,"ask_user":true}
     result.unavailable: -
     |}];
   List.iter

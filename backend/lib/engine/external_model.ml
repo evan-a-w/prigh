@@ -49,7 +49,19 @@ let model
   }
 ;;
 
-let default ~adapter = model ~adapter default_id
+(* Before the harness lists its models: the levels every model of it takes
+   (Claude Code's are budgets prigh sets). *)
+let default ~adapter =
+  match adapter with
+  | "claude" ->
+    model
+      ~adapter
+      ~thinking_levels:[ Low; Medium; High; Max ]
+      ~can_disable_thinking:true
+      default_id
+  | "codex" -> model ~adapter ~thinking_levels:[ Low; Medium; High ] default_id
+  | _ -> model ~adapter default_id
+;;
 
 let of_adapter ~adapter (m : Model.t) =
   match m.provider with

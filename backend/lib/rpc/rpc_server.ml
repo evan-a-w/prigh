@@ -2325,15 +2325,18 @@ let attached_state (client : Client.t) =
    it, where it is; another client's on the config's [default_host] while
    that is connected, else as [start_location] says. On the default host
    (the backend's without one), in [default_cwd] when there is one. *)
-(* Moves the attached session to another of the composer's adapters: the
+(* Moves the attached session to another of the composer's adapters (the
    new one's harness takes over at the next turn, handed what it has not
-   seen of the session. Not while a run goes on. *)
+   seen of the session), or back to prigh's harness engine ([harness]),
+   which reads the session itself. Not while a run goes on. *)
 let set_adapter t (client : Client.t) params =
   let open Or_error.Let_syntax in
   let agent = client.agent in
   let%bind name = string_param params "adapter" in
   let%bind choice =
-    Engines.choose t.engines ~engine:(Some "composer") ~adapter:(Some name)
+    if String.equal name "harness"
+    then Engines.choose t.engines ~engine:(Some "harness") ~adapter:None
+    else Engines.choose t.engines ~engine:(Some "composer") ~adapter:(Some name)
   in
   let previous = Agent.engine_choice agent in
   if Engine_choice.equal choice previous
@@ -2354,16 +2357,23 @@ let set_adapter t (client : Client.t) params =
       | None -> Ok ()
       | Some why -> Error (Error.of_string why)
     in
-    let%bind adapter =
-      Result.of_option
-        choice.adapter
-        ~error:(Error.of_string "the composer needs an adapter")
-    in
-    let%map runner = composer_runner t agent adapter ~handoff_from:previous in
-    Agent.set_engine agent choice;
-    Agent.set_unavailable agent None;
-    Agent.set_runner agent (Some runner);
-    attached_state client)
+    match choice with
+    | { engine = Harness; _ } ->
+      Agent.set_engine agent choice;
+      Agent.set_unavailable agent None;
+      Agent.set_runner agent None;
+      Ok (attached_state client)
+    | { engine = Composer; _ } ->
+      let%bind adapter =
+        Result.of_option
+          choice.adapter
+          ~error:(Error.of_string "the composer needs an adapter")
+      in
+      let%map runner = composer_runner t agent adapter ~handoff_from:previous in
+      Agent.set_engine agent choice;
+      Agent.set_unavailable agent None;
+      Agent.set_runner agent (Some runner);
+      attached_state client)
 ;;
 
 let new_session_start t (client : Client.t) =

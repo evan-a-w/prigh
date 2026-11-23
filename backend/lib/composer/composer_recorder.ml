@@ -483,6 +483,13 @@ let turn_end t (stop : Adapter_event.Stop.t) =
   flush_steered t
 ;;
 
+(* The harness, for people: [Codex], [Claude Code]. *)
+let label t =
+  match Adapter_id.of_string t.adapter with
+  | Ok adapter -> Adapter_id.label adapter
+  | Error _ -> t.adapter
+;;
+
 let feed t (event : Adapter_event.t) =
   match event with
   | Thread_started { thread_id; model } ->
@@ -522,7 +529,7 @@ let feed t (event : Adapter_event.t) =
     t.notice
       (sprintf
          "%s compacted its context%s"
-         t.adapter
+         (label t)
          (match tokens_before, tokens_after with
           | Some before, Some after -> sprintf " (%d → %d tokens)" before after
           | _ -> ""))
@@ -530,7 +537,7 @@ let feed t (event : Adapter_event.t) =
     t.notice
       (sprintf
          "%s is retrying%s: %s"
-         t.adapter
+         (label t)
          (Option.value_map attempt ~default:"" ~f:(sprintf " (attempt %d)"))
          message)
   | Notice message -> t.notice message

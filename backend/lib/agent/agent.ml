@@ -660,11 +660,12 @@ let runner_capabilities t =
   | None -> Capabilities.harness
 ;;
 
-(* A composer session's model is its harness's: the one that wrote its
-   latest reply ([codex/gpt-5] shows as [gpt-5]), else the harness's
-   default. *)
+(* A composer session's model is its harness's: the one picked (an
+   {!External_model}), else the one that wrote its latest reply
+   ([codex/gpt-5] shows as [gpt-5]), else the harness's default. *)
 let shown_model t =
   match engine_choice t with
+  | _ when is_external t.model -> t.model
   | { engine = Composer; adapter = Some adapter } ->
     let prefix = Adapter_id.to_string adapter ^ "/" in
     let name =
@@ -3725,12 +3726,22 @@ let rec start_run
            broadcast t (Notice ("run failed: " ^ Exn.to_string exn));
            []
        in
-       (* An external harness says how big its model's context is. *)
-       (match Runner.context (runner t) with
-        | _, Some window
-          when is_external t.model && window <> t.model.context_window ->
-          t.model <- { t.model with context_window = window }
-        | _ -> ());
+       (* An external harness says what its models are, and how big the
+          context of the one it runs is. *)
+       if is_external t.model
+       then (
+         let r = runner t in
+         let model =
+           Option.bind (Runner.models r) ~f:(fun models ->
+             List.find models ~f:(fun (m : Model.t) ->
+               String.equal m.id t.model.id))
+           |> Option.value ~default:t.model
+         in
+         t.model
+         <- (match Runner.context r with
+             | _, Some context_window -> { model with context_window }
+             | _, None -> model);
+         t.thinking <- settle_thinking t.model t.thinking);
        Option.iter !halted ~f:(fun reason -> broadcast t (Notice reason));
        sweep_orphans t ~main_running:false;
        let tried = Set.add tried (Model.key t.model) in
