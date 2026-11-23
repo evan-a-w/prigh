@@ -146,6 +146,8 @@ docker run --rm -it -v "$PWD:/work" -w /work ghcr.io/evan-a-w/prigh:main prigh t
 | `PRIGH_TOKENS` | – | `name=token,name2=token2`; replaces `PRIGH_TOKEN` |
 | `PRIGH_SUPERUSERS` | – | comma-separated users allowed `/setusr` and Nix store cleaning |
 | `PRIGH_NO_BACKEND_HOST` | – | `1`: no tool hosts in the container |
+| `PRIGH_ENGINES` | `harness` | what runs sessions: `harness`, `composer` (drives Codex, Claude Code and other agents on each session's tool host; not in this build yet) or both, the first the default |
+| `PRIGH_ADAPTERS` | `codex,claude` | the agents the composer drives (`codex`, `claude`, `prigh`, `acp:NAME`); install and sign in to them on the tool hosts yourself |
 | `PRIGH_ALLOW_NO_TOKEN` | – | `1`: start without a token |
 | `PRIGH_BIND` | `0.0.0.0` | host address the ports are published on (`127.0.0.1` behind a proxy) |
 | `PRIGH_WEB_PORT`, `PRIGH_SERVER_PORT` | 7790, 7777 | host ports |
