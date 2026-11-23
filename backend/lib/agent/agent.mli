@@ -298,6 +298,14 @@ val state : t -> State.t
 val engine : t -> Engine_id.t
 
 val capabilities : t -> Capabilities.t
+
+(** How errors name the session's engine: [Harness], [Composer]. *)
+val engine_label : t -> string
+
+(** [Ok ()] when the session's engine has [feature]; else an error saying
+    what to do instead. The vals below that need a feature check it. *)
+val require : t -> Capabilities.Feature.t -> unit Or_error.t
+
 val session : t -> Session.t
 val env : t -> Env.t
 val messages : t -> Message.t list

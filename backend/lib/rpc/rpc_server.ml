@@ -3903,9 +3903,14 @@ let handle t client (request : Json.t) : Json.t =
             Or_error.error_string
               "unauthorised: send hello with the token first"
           else (
-            match dispatch_server t client ~meth ~params with
-            | Some result -> result
-            | None ->
+            match
+              Or_error.bind
+                (Engine_gate.check client.agent ~meth ~params)
+                ~f:(fun () -> Ok (dispatch_server t client ~meth ~params))
+            with
+            | Error e -> Error e
+            | Ok (Some result) -> result
+            | Ok None ->
               let agent = agent_of_client t client in
               let by =
                 Option.map client.signed_in ~f:(fun s ->

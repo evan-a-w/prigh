@@ -2964,6 +2964,11 @@ let runner t =
 
 let capabilities t = Runner.capabilities (runner t)
 let engine t = Runner.engine (runner t)
+let engine_label t = String.capitalize (Engine_id.to_string (engine t))
+
+let require t feature =
+  Capabilities.check (capabilities t) feature ~who:(engine_label t)
+;;
 
 (* The text with the attachments' [<file>] blocks, what they are, and their
    images. *)
@@ -4304,16 +4309,19 @@ let has_running_background t = Background_tasks.has_running t.background
 let running_background t = Background_tasks.running_count t.background
 
 let steer_subagent t ~agent_id ~kind text =
+  let%bind.Or_error () = require t Steer_subagent in
   Background_tasks.send t.background ~id:agent_id kind ~from:User text
 ;;
 
 let dequeue_subagent t ~agent_id =
+  let%bind.Or_error () = require t Steer_subagent in
   Or_error.map
     (Background_tasks.inbox_of t.background agent_id)
     ~f:Subagent_inbox.pop_last
 ;;
 
 let remove_subagent_queued t ~agent_id ~queue ~index ~text =
+  let%bind.Or_error () = require t Steer_subagent in
   Or_error.bind
     (Background_tasks.inbox_of t.background agent_id)
     ~f:(fun inbox -> Subagent_inbox.remove inbox queue ~index ~text)
@@ -4480,6 +4488,7 @@ let set_thinking t thinking =
 ;;
 
 let compact ?instructions t =
+  let%bind.Or_error () = require t Compact in
   if is_running t
   then Or_error.error_string "cannot compact while a run is in progress"
   else (
@@ -4933,6 +4942,7 @@ let last_reply_failed t =
 ;;
 
 let downsize_images t =
+  let%bind.Or_error () = require t Downsize_images in
   if not t.model.supports_images
   then
     Or_error.errorf
@@ -4946,6 +4956,7 @@ let downsize_images t =
 ;;
 
 let btw t ~question ~cancel ~on_delta =
+  let%bind.Or_error () = require t Btw in
   let session = t.session in
   let model = t.model in
   let system =
@@ -5060,6 +5071,7 @@ let switch_session t ~path =
 ;;
 
 let fork t ?at () =
+  let%bind.Or_error () = require t Fork in
   Or_error.map
     (Session.fork ?at t.session ~dir:t.sessions_dir)
     ~f:(fun session -> replace_session t session ~keep_host:true)
@@ -5079,26 +5091,32 @@ let unless_running t ~doing f =
 ;;
 
 let trim t ~before =
+  let%bind.Or_error () = require t Context_edit in
   unless_running t ~doing:"trim" (Session.append_trim ~before)
 ;;
 
 let trim_after t ~after =
+  let%bind.Or_error () = require t Context_edit in
   unless_running t ~doing:"trim" (Session.append_trim_after ~after)
 ;;
 
 let untrim ?entry t =
+  let%bind.Or_error () = require t Context_edit in
   unless_running t ~doing:"undo a trim" (Session.append_untrim ?entry)
 ;;
 
 let delete_message t ~message =
+  let%bind.Or_error () = require t Context_edit in
   unless_running t ~doing:"delete a message" (Session.append_delete ~message)
 ;;
 
 let undelete ?entry t =
+  let%bind.Or_error () = require t Context_edit in
   unless_running t ~doing:"undo a deletion" (Session.append_undelete ?entry)
 ;;
 
 let rewind t ~to_ =
+  let%bind.Or_error () = require t Rewind in
   if is_running t
   then Or_error.error_string "cannot rewind while a run is in progress"
   else

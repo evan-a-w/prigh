@@ -55,3 +55,31 @@ type t =
 
 (** prigh's own harness: everything. *)
 val harness : t
+
+(** What a request can need of its session's engine. *)
+module Feature : sig
+  type t =
+    | Fork (** fork or clone the session *)
+    | Rewind
+    | Context_edit (** trim, delete and their undos *)
+    | Compact (** [/compact] on request *)
+    | Downsize_images
+    | Btw
+    | Steer_subagent (** steer a subagent or edit its queue *)
+    | Plan_mode
+  [@@deriving sexp_of, equal, enumerate]
+
+  (** As the user would name it: [fork], [rewind], [trim], ... *)
+  val name : t -> string
+end
+
+val supports : t -> Feature.t -> bool
+
+(** The feature an RPC method needs, if it needs one. [set_mode] needs
+    [Plan_mode] only when it turns plan mode on, which the method alone does
+    not say: see [Engine_gate]. *)
+val method_feature : string -> Feature.t option
+
+(** [Ok ()] when the engine supports the feature; else an error saying what
+    to do instead. [who] names the sessions, e.g. ["Codex"]. *)
+val check : t -> Feature.t -> who:string -> unit Or_error.t
