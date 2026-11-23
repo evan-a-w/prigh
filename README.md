@@ -313,10 +313,10 @@ switches a session to another agent (or the harness), which gets the
 conversation so far quoted in a handoff ahead of your next message, as does
 an agent taking over on another tool host. The model chip and status line
 say which agent runs it (`Codex · gpt-5.2-codex`; a cost Codex does not
-report shows as `subscription`). What an agent cannot do is refused with
-what to do instead ("Codex sessions can't rewind in place: fork from that
-message instead (/fork)"), and its controls are hidden or disabled. A
-session made on an engine the backend does not run can still be read there.
+report shows as `subscription`). Codex and Claude Code sessions rewind files
+too (in a git repository) and fork their thread. What an agent cannot do is
+refused with what to do instead, its controls hidden. A session made on an
+engine the backend does not run can still be read there.
 
 The agent CLIs ask prigh before they act, so your approval mode, rules and
 Smart mode apply to their commands and edits (Codex runs commands it knows

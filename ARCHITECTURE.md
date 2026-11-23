@@ -309,6 +309,8 @@ The composer (`composer/`), from the bottom up:
   within a token budget, the latest messages verbatim under a header saying
   where the session came from and how to read what was left out
   (`sessions`), or only what that adapter has not seen when switching back.
+- **`Checkpoint`** (`$checkpoint`) keeps each run's files under hidden refs:
+  rewind restores them and rolls the agent's thread back; forks fork it.
 - **`Fake_cli`** (`prigh fake-cli codex|claude --script FILE`, hidden)
   stands in for a CLI in the e2e tests: it answers `--version` and the
   login-status commands, and replays a transcript against the backend's.
