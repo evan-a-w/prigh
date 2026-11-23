@@ -97,8 +97,12 @@
   margin: 0;
   translate: none !important;
   transform: none;
-  border-radius: 16px 16px 0 0 !important;
-  border-width: 1px 0 0;
+  /* Loon's Drawer from the bottom (Nova). */
+  background: var(--popover);
+  color: var(--popover-foreground);
+  border-radius: calc(var(--radius) * 1.4) calc(var(--radius) * 1.4) 0 0 !important;
+  border: 0;
+  border-top: 1px solid var(--border);
   padding-bottom: max(8px, var(--safe-b));
   padding-left: max(8px, var(--safe-l));
   scroll-padding-bottom: max(8px, var(--safe-b));
@@ -129,7 +133,7 @@
 
 /* The ⋯ sheet: what applies, then a labelled row each. */
 .sheet-grip { display: none; }
-.app.narrow .sheet-grip { display: block; width: 36px; height: 4px; margin: 0 auto 6px; border-radius: 2px; background: var(--rule-2); flex: none; }
+.app.narrow .sheet-grip { display: block; width: 100px; height: 4px; margin: 8px auto 10px; border-radius: 9999px; background: var(--muted); flex: none; }
 .app.narrow .chrome-menu.sheet { gap: 0; padding-top: 8px; min-width: 0; }
 /* Taller than a menu's sheet, short of the top strip's ⋯ (a 640px phone
    has all but a row or two of it), and while more is below its foot fades
@@ -162,18 +166,18 @@
   min-height: 48px;
   padding: 0 12px;
   border: 0;
-  border-radius: var(--r-control);
+  border-radius: calc(var(--radius) * 0.8);
   background: none;
-  color: var(--chalk);
+  color: var(--foreground);
   font: inherit;
   font-size: 15px;
   text-align: left;
   cursor: pointer;
 }
-.sheet-row:active, .sheet-row:hover { background: var(--slate-2); }
-.sheet-row:focus-visible { outline: 2px solid var(--sodium); outline-offset: -2px; }
-.sheet-row > .icon { width: 20px; height: 20px; flex: none; color: var(--muted-text); }
-.sheet-row.on > .icon { color: var(--sodium); }
+.sheet-row:active, .sheet-row:hover { background: var(--accent); color: var(--accent-foreground); }
+.sheet-row:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--ring); }
+.sheet-row > .icon { width: 20px; height: 20px; flex: none; color: var(--muted-foreground); }
+.sheet-row.on > .icon { color: var(--primary); }
 .sheet-row-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .sheet-row-detail { font-size: 12.5px; color: var(--muted-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sheet-row .badge { min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; background: var(--sodium); color: var(--on-sodium, #000); font-size: 12px; font-weight: 600; display: inline-grid; place-items: center; }
