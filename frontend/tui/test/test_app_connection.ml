@@ -26,6 +26,7 @@ let on ?(width = 100) ?(height = 14) (link : Server_link.t) =
        ; user = link.user
        ; superuser = false
        ; features = []
+       ; deployed = Prigh_protocol.Deployed_engines.harness_only
        });
   h
 ;;

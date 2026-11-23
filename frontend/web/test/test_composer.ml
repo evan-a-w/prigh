@@ -401,7 +401,8 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /help [command] show commands and keys, or a command's usage
     /hotkeys show the keyboard shortcuts
     /settings [section] appearance, sessions, new sessions' defaults, models, git hosting and your account; a section opens at it (Ctrl+,)
-    /new start a new session
+    /new start a new session (/new ENGINE: on another engine or adapter, e.g. codex or claude, when the backend runs several; the new-session screen picks one too)
+    /engine [adapter] switch this session to another of the composer's adapters (codex, claude, ...): it carries on from a summary of the session so far
     /temporary a temporary session: not saved or listed, deleted when you leave it (Ctrl+Shift+O); in one, keep it or delete it
     /model [name] pick or switch the model
     /scoped-models pick the models Ctrl+P and Alt+P cycle through
@@ -447,7 +448,6 @@ let%expect_test "slash commands: the popup, arguments, running, unknown ones" =
     /delete-archived delete every archived session, after a confirmation
     /auto-archive [DAYS|off] show how long a session goes without activity before it is archived; DAYS|off: archive after DAYS days (off: never, only by hand), in Settings
     /clone copy this session into a new one
-    /fork start a new session from an earlier message
     |}];
   H.type_ h "/mod";
   H.key h "Tab";

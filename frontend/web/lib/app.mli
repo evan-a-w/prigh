@@ -559,6 +559,7 @@ module Action : sig
     | Set_temporary of bool
     (** the new-session screen's Temporary chip: a new session of that
         kind, unless the empty one shown is already *)
+    | Pick_engine (** the new-session screen's engine chip: [/new]'s choices *)
     | New_temporary
     (** Ctrl+Shift+O: a new temporary session; on the new-session screen,
         the Temporary chip *)
@@ -1230,6 +1231,12 @@ val temporary : Model.t -> bool
 
 (** A session with nothing in it yet: the new-session screen. *)
 val fresh : Model.t -> bool
+
+(** What new sessions can run on ([hello]'s engines and adapters). *)
+val deployed : Model.t -> Deployed_engines.t
+
+(** The session's engine and adapter, as a choice of [/new]. *)
+val current_choice : Model.t -> Deployed_engines.Choice.t option
 
 (** What the Temporary chip shows: the session's kind, or the one asked
     for. *)

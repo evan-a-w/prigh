@@ -11,6 +11,7 @@ let picker_title : Dialog.Picker_kind.t -> string = function
   | Login -> "Providers"
   | Logout -> "Providers"
   | Verbosity -> "Levels"
+  | Engines _ -> "Engines"
   | Confirm_tools -> "Settings"
   | Modes -> "Modes"
   | Fork _ | Rewind _ -> "Messages"

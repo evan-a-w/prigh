@@ -9,6 +9,8 @@ module Picker_kind : sig
     | Scoped_models
     | Thinking
     | Verbosity
+    | Engines of { switch : bool }
+    (** [/new] (a new session's engine) or [/engine] (this session's adapter) *)
     | Transcript_filter (** [/filter]: the kinds on show, checked *)
     | Login
     | Logout

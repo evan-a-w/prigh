@@ -18,6 +18,7 @@ let popup (m : App.Model.t) ~inject =
       | Argument Backend_directory -> "Directories on the backend"
       | Argument (Path | File) | Path -> "Files"
       | Argument Verbosity -> "Verbosity"
+      | Argument Adapter -> "Switch this session to"
       | Argument Confirm -> "Mode, also for new sessions"
       | Argument Mode -> "Modes"
       | Argument Plan -> "Plan mode"
@@ -244,17 +245,28 @@ let model_chip (m : App.Model.t) (state : State.t) ~inject =
       ~title:
         (sprintf
            "%s%s: models, reasoning and access (Ctrl+L)"
-           state.model.name
+           (Session_engine.model_label state.engine ~model:state.model.name)
            (Option.value_map level ~default:"" ~f:(fun l -> ", reasoning " ^ l)))
       ~label:
         (sprintf
            "Model: %s%s"
-           state.model.name
+           (Session_engine.model_label state.engine ~model:state.model.name)
            (Option.value_map level ~default:"" ~f:(fun l -> ", " ^ l)))
       ~attrs:(menu_attrs m Model)
       ~on_click:(inject (Action.Open_chip Model))
       [ Provider_mark.view state.model.provider
-      ; span ~cls:"chip-label" (Model_menu.short_name state.model.name)
+      ; (if Session_engine.is_harness state.engine
+         then span ~cls:"chip-label" (Model_menu.short_name state.model.name)
+         else
+           (* On the narrowest phones the model keeps the room: the engine
+              is in the chip's title and label. *)
+           Node.span
+             ~attrs:[ Attr.class_ "chip-label" ]
+             [ Node.span
+                 ~attrs:[ Attr.class_ "chip-engine max-[359px]:hidden" ]
+                 [ Node.text (Session_engine.who state.engine ^ " · ") ]
+             ; Node.text (Model_menu.short_name state.model.name)
+             ])
       ]
 ;;
 
@@ -384,6 +396,8 @@ let placeholder (m : App.Model.t) =
   let text s = s in
   if Option.is_some m.session_gone
   then text "Session gone: /new starts one"
+  else if Option.is_some (Engine_banner.reason m)
+  then text (if cramped then "Can't run here" else "This session can't run here: see above")
   else if not (connected m)
   then
     text
@@ -465,6 +479,7 @@ let view (m : App.Model.t) ~inject =
           ]
       ]
     [ Computer_banner.view m ~inject
+    ; Engine_banner.view m ~inject
     ; No_host_banner.view m ~inject
     ; rest (Queue_view.view m ~inject)
     ; Node.div
@@ -572,13 +587,18 @@ let view (m : App.Model.t) ~inject =
                             button
                               ~cls:"primary round send"
                               ~title:
-                                (if not connected
+                                (if Option.is_some (Engine_banner.reason m)
+                                 then "This session can't run here: see above"
+                                 else if not connected
                                  then "Not connected to the backend"
                                  else if running
                                  then "Steer (Enter)"
                                  else "Send (Enter)")
                               ~label:(if running then "Steer" else "Send")
-                              ~disabled:((not has_input) || not connected)
+                              ~disabled:
+                                ((not has_input)
+                                 || (not connected)
+                                 || Option.is_some (Engine_banner.reason m))
                               ~on_click:(inject Action.Send)
                               [ icon Send ])
                        ]

@@ -192,6 +192,7 @@ let%expect_test "the panel follows the session, the host and the user" =
        ; user = Some "alice"
        ; superuser = false
        ; features = []
+       ; deployed = Prigh_protocol.Deployed_engines.harness_only
        });
   show ();
   [%expect

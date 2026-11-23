@@ -735,7 +735,8 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /push                              push the session's worktree's branch to its upstream (set to the remote's branch of the same name when there is none)
     /review [target] [--base REV ...]  the changed files' approvals and review comments (prigh-web: the review page) of the session's worktree or another (its branch, path or name), or of a branch not checked out (read-only), against its base or REV since their merge base (--direct: against REV itself); /review BASE [instructions] (HEAD: the uncommitted changes) has the model review the changes for prioritised findings
     /init                              write or improve the project's AGENTS.md
-    /new                               start a new session
+    /new [engine]                      start a new session (on another engine or adapter, e.g. codex or claude, when the backend runs several: without one it asks)
+    /engine [adapter]                  switch this session to another of the composer's adapters (codex, claude, ...): it carries on from a summary of the session so far
     /name [text]                       set the session name
     /session                           show session statistics
     /trace                             where the session's time went: model, tools, waiting on you, the slowest steps (prigh trace SESSION -perfetto FILE exports a timeline)
@@ -2241,6 +2242,7 @@ let%expect_test
       ~logged_in:(fun _ -> true)
       ~default_dir_host:None
       ~server:None
+      ~engines:Prigh_protocol.Deployed_engines.harness_only
       ~model:None
   in
   let show name ac =
@@ -2324,6 +2326,7 @@ let%expect_test "autocomplete: /skill: completes skill names" =
       ~logged_in:(fun _ -> true)
       ~default_dir_host:None
       ~server:None
+      ~engines:Prigh_protocol.Deployed_engines.harness_only
       ~model:None
   in
   let show line ?skills () =
@@ -2479,6 +2482,7 @@ let%expect_test
         ~logged_in:(fun _ -> true)
         ~default_dir_host
         ~server:None
+        ~engines:Prigh_protocol.Deployed_engines.harness_only
         ~model:None
     with
     | None -> printf "%S none\n" line
