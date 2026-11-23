@@ -26,7 +26,10 @@
   loon_head.css
   loon_preflight.css
   ../loon_ui/loon.css
-  loon_bridge.css)
+  loon_bridge.css
+  diff.css
+  review.css
+  forge.css)
  (action
   (with-stdout-to
    loon.input.css
@@ -35,6 +38,13 @@
     (cat loon_preflight.css)
     (cat ../loon_ui/loon.css)
     (cat loon_bridge.css)
+    ; Diffs, the review page and git hosting: on loon's look and variables, in the
+    ; components' layer (over [legacy], under the utilities).
+    (echo "\n@layer components {\n")
+    (cat diff.css)
+    (cat review.css)
+    (cat forge.css)
+    (echo "\n}\n")
     (echo "\n@source \"../loon_ui/*.ml\";\n@source \"../lib/*.ml\";\n")))))
 
 (rule
@@ -62,13 +72,11 @@
   chat.css
   terminal.css
   files.css
-  review.css
   editor.css
   highlight.css
   resize.css
   paging.css
   jump.css
-  forge.css
   status.css
   temporary.css
   control.css
@@ -86,12 +94,10 @@
     (cat chat.css)
     (cat terminal.css)
     (cat files.css)
-    (cat review.css)
     (cat highlight.css)
     (cat resize.css)
     (cat paging.css)
     (cat jump.css)
-    (cat forge.css)
     (cat status.css)
     (cat temporary.css)
     (cat control.css)
