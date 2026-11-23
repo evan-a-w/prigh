@@ -169,10 +169,8 @@ let%expect_test "the settings page: the account, switching it, signing out" =
     Open_accounts
     (Focus dialog)
     Switch to
-    B
-    bob 127.0.0.1:7790
-    C
-    carol prigh.example.com
+    B bob 127.0.0.1:7790
+    C carol prigh.example.com
     Add account… sign in as another user, or to another backend
     Turn notifications off stop telling you what happens while the tab is hidden
     Settings Ctrl+,
@@ -227,10 +225,8 @@ let%expect_test "the account menu: who we are, the other accounts, actions" =
     alice 127.0.0.1:7790
     signed in
     Switch to
-    B
-    bob 127.0.0.1:7790
-    C
-    carol prigh.example.com
+    B bob 127.0.0.1:7790
+    C carol prigh.example.com
     Add account… sign in as another user, or to another backend
     Turn notifications off stop telling you what happens while the tab is hidden
     Settings Ctrl+,

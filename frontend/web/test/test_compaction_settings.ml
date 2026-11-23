@@ -67,7 +67,7 @@ let%expect_test "the section: defaults, then each control" =
            aria-invalid="false"
            autocomplete="off"
            spellcheck="false"
-           class="number-field-input text-input"
+           class="aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-transparent border border-input dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:bg-input/30 dark:disabled:bg-input/80 disabled:bg-input/50 disabled:cursor-not-allowed disabled:opacity-50 disabled:pointer-events-none file:bg-transparent file:border-0 file:font-medium file:h-6 file:inline-flex file:text-foreground file:text-sm focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 font-mono h-7 md:text-sm min-w-0 narrow:h-11 narrow:text-base narrow:w-[calc(6ch+26px)] number-field-input outline-none placeholder:text-muted-foreground px-2 py-1 rounded-lg tabular-nums text-[13px] text-center transition-colors w-[calc(6ch+22px)]"
            #value="150k"
            @on_change
            @on_input/>
@@ -105,7 +105,7 @@ let%expect_test "the section: defaults, then each control" =
            aria-invalid="true"
            autocomplete="off"
            spellcheck="false"
-           class="number-field-input text-input"
+           class="aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-transparent border border-input dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:bg-input/30 dark:disabled:bg-input/80 disabled:bg-input/50 disabled:cursor-not-allowed disabled:opacity-50 disabled:pointer-events-none file:bg-transparent file:border-0 file:font-medium file:h-6 file:inline-flex file:text-foreground file:text-sm focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 font-mono h-7 md:text-sm min-w-0 narrow:h-11 narrow:text-base narrow:w-[calc(6ch+26px)] number-field-input outline-none placeholder:text-muted-foreground px-2 py-1 rounded-lg tabular-nums text-[13px] text-center transition-colors w-[calc(6ch+22px)]"
            #value="lots"
            @on_change
            @on_input/>
@@ -128,7 +128,7 @@ let%expect_test "the section: defaults, then each control" =
            aria-invalid="false"
            autocomplete="off"
            spellcheck="false"
-           class="number-field-input text-input"
+           class="aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-transparent border border-input dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:bg-input/30 dark:disabled:bg-input/80 disabled:bg-input/50 disabled:cursor-not-allowed disabled:opacity-50 disabled:pointer-events-none file:bg-transparent file:border-0 file:font-medium file:h-6 file:inline-flex file:text-foreground file:text-sm focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 font-mono h-7 md:text-sm min-w-0 narrow:h-11 narrow:text-base narrow:w-[calc(6ch+26px)] number-field-input outline-none placeholder:text-muted-foreground px-2 py-1 rounded-lg tabular-nums text-[13px] text-center transition-colors w-[calc(6ch+22px)]"
            #value="15"
            @on_change
            @on_input/>
@@ -138,7 +138,7 @@ let%expect_test "the section: defaults, then each control" =
     Compact at
     Also summarise once the context passes this many tokens (default 200k), not only at 80% of the model's window. Off: only at 80% of the window.
     (Also at a number of tokens (/compaction at TOKENS))
-    <button class="switch">
+    <button class="after:-inset-x-3 after:-inset-y-2 after:absolute aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 border border-transparent dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:data-unchecked:bg-input/80 data-[size=default]:h-[18.4px] data-[size=default]:w-[32px] data-[size=sm]:h-[14px] data-[size=sm]:w-[24px] data-checked:bg-primary data-disabled:cursor-not-allowed data-disabled:opacity-50 data-unchecked:bg-input focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 group-has-[:focus-visible]/field-label:border-transparent group-has-[:focus-visible]/field-label:ring-0 group/switch inline-flex items-center narrow:after:-inset-y-3 outline-none peer relative rounded-full shrink-0 switch transition-all">
     |}];
   H.quiet h (fun () -> H.reply h "set_config" (config ~at:0 ()));
   H.act h (Compact_at_input "off");
@@ -253,7 +253,7 @@ let%expect_test "mask: the switch" =
     (Run "/compaction mask off")
     (Rpc (method_ set_config) (params ((config ((mask_observations false)))))
      (tag Compaction_saved))
-    <button class="switch">
+    <button class="after:-inset-x-3 after:-inset-y-2 after:absolute aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 border border-transparent dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:data-unchecked:bg-input/80 data-[size=default]:h-[18.4px] data-[size=default]:w-[32px] data-[size=sm]:h-[14px] data-[size=sm]:w-[24px] data-checked:bg-primary data-disabled:cursor-not-allowed data-disabled:opacity-50 data-unchecked:bg-input focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 group-has-[:focus-visible]/field-label:border-transparent group-has-[:focus-visible]/field-label:ring-0 group/switch inline-flex items-center narrow:after:-inset-y-3 outline-none peer relative rounded-full shrink-0 switch transition-all">
     (Expire_toast (id 0) (after_ms 6000))
     [switch] button "Mask old tool outputs" -- Mask old tool outputs (/compaction mask on)
     |}]
@@ -349,7 +349,7 @@ let%expect_test "the picker: Esc goes back to settings; from the composer too" =
     (Run "/compaction model")
     Close_dialog
     (Focus dialog)
-    <div class="modal settings-dialog">
+    <div class="[&>.modal-body]:flex-auto [&>.modal-body]:grid [&>.modal-body]:grid-cols-[208px_minmax(0,1fr)] [&>.modal-body]:overflow-hidden [&>.modal-body]:p-0 [&>.modal-buttons]:border-t [&>.modal-head]:border-b h-[min(720px,88vh)] max-h-none modal settings-dialog w-[min(940px,100%)]">
     |}];
   H.quiet h (fun () -> H.act h Close_dialog);
   H.quiet h (fun () -> H.type_ h "/compaction model");

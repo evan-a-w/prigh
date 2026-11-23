@@ -107,7 +107,7 @@ let menu (m : App.Model.t) (picker : Picker.t) ~inject =
           "account-menu fixed bottom-[62px] left-2.5 max-h-[calc(100vh-80px)] \
            w-[300px] overflow-y-auto p-1 animate-in fade-in-0 zoom-in-95 \
            motion-reduce:animate-none"
-        ~attrs:[ Attr.id "dialog"; Attr.role "dialog" ]
+        ~attrs:[ Attr.id "dialog" ]
         ~label:"Account"
         [ (match who m with
            | None -> Node.none
