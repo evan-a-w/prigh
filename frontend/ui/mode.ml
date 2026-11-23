@@ -7,6 +7,7 @@ module Picker_kind = struct
     | Scoped_models
     | Thinking
     | Verbosity
+    | Engines of { switch : bool }
     | Transcript_filter
     | Login
     | Logout

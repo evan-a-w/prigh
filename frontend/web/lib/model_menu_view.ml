@@ -226,7 +226,12 @@ let access (m : App.Model.t) ~inject =
                ; Attr.role "menu"
                ; Attr.create "aria-label" "When tools ask first"
                ]
-             (List.map (Session_mode.choices ~current) ~f:(fun mode ->
+             (List.map
+       (Session_mode.choices
+          ~plan:(Session_engine.supports state.engine Plan_mode)
+          ~current
+          ())
+       ~f:(fun mode ->
                 let on = Session_mode.equal mode current in
                 Node.button
                   ~attrs:

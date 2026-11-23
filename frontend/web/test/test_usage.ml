@@ -222,6 +222,7 @@ let%expect_test "/usage opens the section; switching users forgets it" =
          ; user = Some "alice"
          ; superuser = true
          ; features = []
+         ; deployed = Prigh_protocol.Deployed_engines.harness_only
          }));
   H.act h (Run "/usage");
   H.reply h "usage_limits" usage_json;

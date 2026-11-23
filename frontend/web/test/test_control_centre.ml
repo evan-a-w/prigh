@@ -58,7 +58,7 @@ let%expect_test
     1d ago · /work
     Commands
     /new
-    start a new session
+    start a new session (/new ENGINE: on another engine or adapter, e.g. codex or claude, when the backend runs several; the new-session screen picks one too)
     /settings
     appearance, sessions, new sessions' defaults, models, git hosting and your account; a section opens at it (Ctrl+,)
     /review
@@ -613,7 +613,7 @@ let%expect_test "switching sessions resets it" =
     1d ago · /work
     Commands
     /new
-    start a new session
+    start a new session (/new ENGINE: on another engine or adapter, e.g. codex or claude, when the backend runs several; the new-session screen picks one too)
     /settings
     appearance, sessions, new sessions' defaults, models, git hosting and your account; a section opens at it (Ctrl+,)
     /review
@@ -639,6 +639,7 @@ let%expect_test "each setting has an entry" =
        ; user = None
        ; superuser = true
        ; features = []
+       ; deployed = Prigh_protocol.Deployed_engines.harness_only
        });
   let covered =
     List.filter_map Control_setting.all ~f:Control_setting.page

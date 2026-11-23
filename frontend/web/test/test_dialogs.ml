@@ -315,7 +315,9 @@ let%expect_test "help lists every key and command" =
     /settings [section]
     appearance, sessions, new sessions' defaults, models, git hosting and your account; a section opens at it (Ctrl+,)
     /new
-    start a new session
+    start a new session (/new ENGINE: on another engine or adapter, e.g. codex or claude, when the backend runs several; the new-session screen picks one too)
+    /engine [adapter]
+    switch this session to another of the composer's adapters (codex, claude, ...): it carries on from a summary of the session so far
     /temporary
     a temporary session: not saved or listed, deleted when you leave it (Ctrl+Shift+O); in one, keep it or delete it
     /model [name]
@@ -875,6 +877,7 @@ let%expect_test "signing out" =
        ; user = Some "ann"
        ; superuser = false
        ; features = []
+       ; deployed = Prigh_protocol.Deployed_engines.harness_only
        });
   H.text h ~selector:".sidebar-footer";
   [%expect

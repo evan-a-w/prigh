@@ -72,3 +72,51 @@ val is_harness : t -> bool
 (** From a [state] object's [engine], [adapter], [capabilities] and
     [unavailable]. *)
 val of_state_json : Json.t -> t Or_error.t
+
+(** How sessions of an adapter are named: [codex] is "Codex", [claude]
+    "Claude Code", [acp:NAME] "NAME (ACP)". *)
+val adapter_label : string -> string
+
+(** "Harness", "Composer". *)
+val engine_label : string -> string
+
+(** Who the session's messages name: its adapter's label, else its
+    engine's. *)
+val who : t -> string
+
+(** The model as the status line and the model chip show it: harness
+    sessions the model alone, others "Codex · MODEL". *)
+val model_label : t -> model:string -> string
+
+(** What a request can need of the session's engine (the backend's
+    [Capabilities.Feature]). *)
+module Feature : sig
+  type t =
+    | Fork
+    | Rewind
+    | Context_edit (** trim, delete and their undos *)
+    | Compact (** [/compact] on request *)
+    | Downsize_images
+    | Btw
+    | Steer_subagent
+    | Plan_mode
+  [@@deriving sexp_of, equal, enumerate]
+end
+
+val supports : t -> Feature.t -> bool
+
+(** Why the session's engine cannot do it, and what to do instead, in the
+    backend's words. *)
+val refusal : t -> Feature.t -> string
+
+(** The feature a request needs, if any ([set_mode] needs [Plan_mode] when
+    it turns plan mode on). *)
+val method_feature
+  :  method_:string
+  -> params:(string * Json.t) list
+  -> Feature.t option
+
+(** Why the session would refuse the request: a feature its engine lacks,
+    or, for what starts a run, the session being [unavailable]; [None] to
+    send it. *)
+val refuse : t -> method_:string -> params:(string * Json.t) list -> string option

@@ -15,3 +15,40 @@ val harness_only : t
 val has_choice : t -> bool
 
 val of_hello_json : Json.t -> t Or_error.t
+
+(** What a new session can run on: the harness, or the composer with one of
+    its adapters. *)
+module Choice : sig
+  type t =
+    { engine : string
+    ; adapter : string option
+    }
+  [@@deriving sexp_of, equal]
+
+  (** What [/new] and [/engine] take: the adapter ([codex], [claude],
+      [acp:NAME]), else the engine ([harness]). *)
+  val key : t -> string
+
+  (** "Codex", "Claude Code", "prigh harness". *)
+  val label : t -> string
+
+  (** One line on what runs the session. *)
+  val describe : t -> string
+
+  val of_session : Session_engine.t -> t
+
+  (** [new_session]'s [engine] and [adapter]. *)
+  val params : t -> (string * Json.t) list
+end
+
+(** Every choice, in the order the backend lists its engines and adapters. *)
+val choices : t -> Choice.t list
+
+(** The composer's adapters: what a session can switch to ([set_adapter]). *)
+val adapters : t -> Choice.t list
+
+(** The choice [arg] names (its key or label, or a prefix naming one); else
+    an error listing them. *)
+val find : t -> string -> Choice.t Or_error.t
+
+val find_in : Choice.t list -> string -> Choice.t Or_error.t

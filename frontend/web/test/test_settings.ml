@@ -613,6 +613,7 @@ let%expect_test "superusers have the Nix store's section" =
        ; user = Some "root"
        ; superuser = true
        ; features = []
+       ; deployed = Prigh_protocol.Deployed_engines.harness_only
        });
   H.quiet h (fun () -> H.act h Open_settings);
   H.text h ~selector:".settings-nav";

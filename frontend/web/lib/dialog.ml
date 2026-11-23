@@ -8,6 +8,7 @@ module Picker_kind = struct
     | Login
     | Logout
     | Verbosity
+    | Engines of { switch : bool }
     | Confirm_tools
     | Modes
     | Fork of Entry.t list
@@ -193,6 +194,7 @@ let per_session = function
           | Login
           | Logout
           | Verbosity
+          | Engines _
           | Confirm_tools
           | Users
           | Accounts

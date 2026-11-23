@@ -18,6 +18,7 @@ let connected ?(superuser = true) () =
        ; user = None
        ; superuser
        ; features = []
+       ; deployed = Prigh_protocol.Deployed_engines.harness_only
        });
   H.event h (State (state ()));
   h
@@ -301,6 +302,7 @@ let%expect_test "a superuser acting as another user keeps /nix-gc" =
        ; user = Some "alice"
        ; superuser = true
        ; features = []
+       ; deployed = Prigh_protocol.Deployed_engines.harness_only
        });
   run h "/nix-gc";
   [%expect

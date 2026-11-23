@@ -188,3 +188,148 @@ let of_state_json j =
   ; unavailable
   }
 ;;
+
+let adapter_label = function
+  | "codex" -> "Codex"
+  | "claude" -> "Claude Code"
+  | "prigh" -> "prigh"
+  | adapter ->
+    (match String.chop_prefix adapter ~prefix:"acp:" with
+     | Some name -> name ^ " (ACP)"
+     | None -> adapter)
+;;
+
+let engine_label = function
+  | "harness" -> "Harness"
+  | "composer" -> "Composer"
+  | engine -> String.capitalize engine
+;;
+
+let who t =
+  match t.adapter with
+  | Some adapter -> adapter_label adapter
+  | None -> engine_label t.engine
+;;
+
+let model_label t ~model =
+  match t.adapter with
+  | Some adapter -> sprintf "%s · %s" (adapter_label adapter) model
+  | None when is_harness t || String.equal t.engine "harness" -> model
+  | None -> sprintf "%s · %s" (engine_label t.engine) model
+;;
+
+module Feature = struct
+  type t =
+    | Fork
+    | Rewind
+    | Context_edit
+    | Compact
+    | Downsize_images
+    | Btw
+    | Steer_subagent
+    | Plan_mode
+  [@@deriving sexp_of, equal, enumerate]
+end
+
+let supports t (feature : Feature.t) =
+  let c = t.capabilities in
+  match feature with
+  | Fork -> not (History_op.equal c.fork Unsupported)
+  | Rewind -> not (History_op.equal c.rewind Unsupported)
+  | Context_edit | Downsize_images -> c.context_edit
+  | Compact -> Compact.equal c.compact Native
+  | Btw -> c.btw
+  | Steer_subagent -> Subagents.equal c.subagents Full
+  | Plan_mode -> c.plan_mode
+;;
+
+(* The backend's wording ([Capabilities.refusal]), so an action refused here
+   reads as one the backend refused. *)
+let refusal t (feature : Feature.t) =
+  let who = who t in
+  match feature with
+  | Fork -> sprintf "%s sessions can't be forked: start a new session (/new)" who
+  | Rewind ->
+    if supports t Fork
+    then
+      sprintf
+        "%s sessions can't rewind in place: fork from that message instead \
+         (/fork)"
+        who
+    else
+      sprintf
+        "%s sessions can't rewind: start a new session (/new) to begin again"
+        who
+  | Context_edit ->
+    sprintf
+      "%s sessions can't trim or delete messages, the agent keeps its own \
+       context: %s"
+      who
+      (if supports t Compact
+       then "compact it instead (/compact)"
+       else "start a new session (/new) for a fresh one")
+  | Downsize_images ->
+    sprintf
+      "%s sessions can't downsize the images already sent: start a new session \
+       (/new) with smaller images"
+      who
+  | Compact ->
+    (match t.capabilities.compact with
+     | Auto_only ->
+       sprintf
+         "%s compacts its context by itself when it fills: /compact isn't \
+          available"
+         who
+     | Native | Unsupported ->
+       sprintf
+         "%s sessions can't be compacted: start a new session (/new) for a \
+          fresh context"
+         who)
+  | Btw ->
+    sprintf
+      "%s sessions have no side questions (/btw): ask in the session instead"
+      who
+  | Steer_subagent ->
+    sprintf
+      "%s sessions show their subagents but can't steer them: steer the \
+       session itself instead"
+      who
+  | Plan_mode ->
+    sprintf
+      "%s sessions have no plan mode: ask for a plan in your message instead"
+      who
+;;
+
+let method_feature ~method_ ~(params : (string * Json.t) list) : Feature.t option
+  =
+  match method_ with
+  | "fork" | "clone" -> Some Fork
+  | "rewind" -> Some Rewind
+  | "trim" | "trim_after" | "untrim" | "delete" | "undelete" ->
+    Some Context_edit
+  | "compact" -> Some Compact
+  | "downsize_images" -> Some Downsize_images
+  | "btw" -> Some Btw
+  | "steer_agent" | "dequeue_agent" | "remove_agent_queued" ->
+    Some Steer_subagent
+  | "set_mode" ->
+    (match List.Assoc.find params "plan_mode" ~equal:String.equal with
+     | Some `True -> Some Plan_mode
+     | _ -> None)
+  | _ -> None
+;;
+
+(* What starts or feeds a run: refused while the session is unavailable. *)
+let runs_agent = function
+  | "prompt" | "steer" | "follow_up" | "review" | "init" | "review_submit" ->
+    true
+  | _ -> false
+;;
+
+let refuse t ~method_ ~params =
+  match t.unavailable with
+  | Some why when runs_agent method_ -> Some why
+  | _ ->
+    Option.bind (method_feature ~method_ ~params) ~f:(fun feature ->
+      if supports t feature then None else Some (refusal t feature))
+;;

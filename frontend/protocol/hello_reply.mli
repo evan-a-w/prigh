@@ -13,6 +13,8 @@ type t =
   ; superuser : bool (** [user] is one: may act as anyone, clean the Nix store *)
   ; features : string list [@sexp.list]
     (** what the backend takes beyond the basics: [pasted_text] *)
+  ; deployed : Deployed_engines.t
+    (** the engines (and the composer's adapters) new sessions can run on *)
   }
 [@@deriving sexp_of, equal]
 

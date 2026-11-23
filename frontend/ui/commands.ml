@@ -40,6 +40,8 @@ module Argument = struct
     | Generate_model
     | Approval_model
     | Naming
+    | Engine
+    | Adapter
   [@@deriving sexp_of, equal]
 end
 
@@ -292,7 +294,18 @@ let every =
        [instructions] (HEAD: the uncommitted changes) has the model review the \
        changes for prioritised findings"
   ; c "init" "" "write or improve the project's AGENTS.md"
-  ; c "new" "" "start a new session"
+  ; c
+      ~argument:Argument.Engine
+      "new"
+      "[engine]"
+      "start a new session (on another engine or adapter, e.g. codex or \
+       claude, when the backend runs several: without one it asks)"
+  ; c
+      ~argument:Argument.Adapter
+      "engine"
+      "[adapter]"
+      "switch this session to another of the composer's adapters (codex, \
+       claude, ...): it carries on from a summary of the session so far"
   ; c "name" "[text]" "set the session name"
   ; c "session" "" "show session statistics"
   ; c

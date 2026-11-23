@@ -80,13 +80,23 @@ let argument_items
       ~(skills : Skill.t list)
       ~(snippets : Snippet.t list)
       ~(forges : Forge_account.t list)
+      ~(engines : Deployed_engines.t)
       ~superuser
   =
   let simple items =
     List.map items ~f:(fun (id, detail) -> Picker.Item.create ~id ~detail id)
   in
+  let engine_items choices =
+    List.map choices ~f:(fun c ->
+      Picker.Item.create
+        ~id:(Deployed_engines.Choice.key c)
+        ~detail:(Deployed_engines.Choice.describe c)
+        ~search:(Deployed_engines.Choice.key c ^ " " ^ Deployed_engines.Choice.label c)
+        (Deployed_engines.Choice.label c))
+  in
   match kind with
   | Model -> model_items models ~auth ~current_model
+  | Adapter -> engine_items (Deployed_engines.adapters engines)
   | Thinking ->
     let llm =
       Option.bind current_model ~f:(fun key ->
@@ -338,6 +348,7 @@ let compute
       ?(snippets = [])
       ?(reminders = [])
       ?(forges = [])
+      ?(engines = Deployed_engines.harness_only)
       ?(worktrees = [])
       ?(refs = Git_diff.Refs.empty)
       ~superuser
@@ -476,6 +487,7 @@ let compute
                        ~skills
                        ~snippets
                        ~forges
+                       ~engines
                        ~superuser)
                     ~f:(fun (i : Picker.Item.t) ->
                       String.is_prefix i.id ~prefix)
@@ -497,6 +509,7 @@ let compute
                        ~skills
                        ~snippets
                        ~forges
+                       ~engines
                        ~superuser)
                 with
                 | [] -> None

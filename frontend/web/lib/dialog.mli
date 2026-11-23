@@ -11,6 +11,9 @@ module Picker_kind : sig
     | Login (** item ids are [provider method] *)
     | Logout
     | Verbosity
+    | Engines of { switch : bool }
+    (** [/new] (a new session's engine) or [/engine] (this session's
+        adapter); item ids are [Deployed_engines.Choice.key]s *)
     | Confirm_tools
     | Modes (** item ids are [Session_mode.label]s *)
     | Fork of Entry.t list (** item ids are entry ids *)
