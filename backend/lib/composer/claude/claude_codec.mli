@@ -117,6 +117,9 @@ module Output : sig
     | Send of string (** a line to write to the process's stdin now *)
     | Response of Response.t
     | Mcp of Mcp_request.t
+    | Mcp_cancelled of string
+    (** Claude Code gave up on that {!Mcp} request: stop working on it
+            and send no reply *)
   [@@deriving sexp_of]
 end
 

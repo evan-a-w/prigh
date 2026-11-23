@@ -408,7 +408,7 @@ let%expect_test "streamed text and a command with its output" =
       (text "command output fixture complete")))
     (Event
      (Usage
-      ((usage ((input 269947) (output 175) (cache_read 256120)))
+      ((usage ((input 271037) (output 186) (cache_read 256120)))
        (cost_usd (0.16666124999999998)) (context_tokens (135090))
        (context_window (200000)))))
     (Event (Turn_end (turn_id (turn-1)) (stop Done)))
@@ -534,7 +534,7 @@ let%expect_test "subagents: their calls name the Agent call as parent" =
        "Both subagents completed in parallel! Here's a summary of what they...")))
     (Event
      (Usage
-      ((usage ((input 24305) (output 419) (cache_read 21261)))
+      ((usage ((input 62931) (output 917) (cache_read 53508)))
        (cost_usd (0.064978650000000013)) (context_tokens (12498))
        (context_window (200000)))))
     (Event (Turn_end (turn_id (turn-1)) (stop Done)))
@@ -602,7 +602,7 @@ let%expect_test "compaction" =
       (text "compact probe first turn")))
     (Event
      (Usage
-      ((usage ((input 27438) (output 7) (cache_read 0)))
+      ((usage ((input 28453) (output 19) (cache_read 0)))
        (cost_usd (0.16794900000000001)) (context_tokens (27439))
        (context_window (200000)))))
     (Event (Turn_end (turn_id (turn-1)) (stop Done)))
@@ -617,8 +617,8 @@ let%expect_test "compaction" =
     (Event (Compacted (tokens_before (27445)) (tokens_after (1192))))
     (Event
      (Usage
-      ((usage ((input 0) (output 0) (cache_read 0))) (cost_usd (0.1852365))
-       (context_tokens (7)) (context_window (200000)))))
+      ((usage ((input 28871) (output 830) (cache_read 27435)))
+       (cost_usd (0.1852365)) (context_tokens (7)) (context_window (200000)))))
     (Event (Turn_end (turn_id (turn-3)) (stop Done)))
     |}]
 ;;
@@ -668,7 +668,7 @@ let%expect_test "web search" =
        \n- [Tickets - FIFA World Cup 2...")))
     (Event
      (Usage
-      ((usage ((input 37763) (output 471) (cache_read 24246)))
+      ((usage ((input 50988) (output 995) (cache_read 24246)))
        (cost_usd (0.093582800000000008)) (context_tokens (13512))
        (context_window (200000)))))
     (Event (Turn_end (turn_id (turn-1)) (stop Done)))
@@ -727,7 +727,7 @@ let%expect_test "an approval the user denies" =
       (text "write permission denied")))
     (Event
      (Usage
-      ((usage ((input 43461) (output 224) (cache_read 35908)))
+      ((usage ((input 44410) (output 240) (cache_read 35908)))
        (cost_usd (0.060467400000000004)) (context_tokens (21867))
        (context_window (200000)))))
     (Event (Turn_end (turn_id (turn-1)) (stop Done)))
@@ -1134,5 +1134,65 @@ let%expect_test "health" =
     ("Claude Code is not installed on lloyd-desktop: install it there (e.g. `npm install -g @anthropic-ai/claude-code`), then try again.")
     ("Claude Code is not logged in on lloyd-desktop: run `claude auth login` there, then try again.")
     ()
+    |}]
+;;
+
+let%expect_test "usage counts subagents through modelUsage's change" =
+  let result ~cost ~main ~model =
+    sprintf
+      {|{"type":"result","subtype":"success","is_error":false,"session_id":"s-1","total_cost_usd":%g,"usage":{"input_tokens":%d,"output_tokens":%d},"modelUsage":{"claude-opus-4-7":{"inputTokens":%d,"outputTokens":%d,"cacheReadInputTokens":0,"cacheCreationInputTokens":0,"contextWindow":200000}}}|}
+      cost
+      (fst main)
+      (snd main)
+      (fst model)
+      (snd model)
+  in
+  let usages t lines =
+    List.iter lines ~f:(fun line ->
+      List.iter (C.handle_line t line) ~f:(function
+        | Event (Usage { usage; _ }) -> print_s [%sexp (usage : Usage.t)]
+        | _ -> ()))
+  in
+  (* A new session: each turn is the change, subagents included. *)
+  usages
+    (C.create ())
+    [ result ~cost:0.1 ~main:(10, 2) ~model:(10, 2)
+    ; result ~cost:0.3 ~main:(5, 1) ~model:(40, 9)
+    ];
+  [%expect
+    {|
+    ((input 10) (output 2) (cache_read 0))
+    ((input 30) (output 7) (cache_read 0))
+    |}];
+  (* Resumed: the first total includes turns counted before, so that turn
+     counts the main loop only; the next ones the change. *)
+  usages
+    (C.create ~cost_total:0.5 ())
+    [ result ~cost:0.6 ~main:(5, 1) ~model:(500, 90)
+    ; result ~cost:0.7 ~main:(5, 1) ~model:(520, 95)
+    ];
+  [%expect
+    {|
+    ((input 5) (output 1) (cache_read 0))
+    ((input 20) (output 5) (cache_read 0))
+    |}]
+;;
+
+let%expect_test "an MCP request Claude Code gives up on is abandoned" =
+  let t = C.create () in
+  feed
+    t
+    [ {|{"type":"control_request","request_id":"r-m","request":{"subtype":"mcp_message","server_name":"prigh","message":{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"ask_user","arguments":{}}}}}|}
+    ; {|{"type":"control_cancel_request","request_id":"r-m"}|}
+    ];
+  [%expect
+    {|
+    (Mcp
+     ((request_id r-m) (server prigh)
+      (message
+       (Object
+        ((jsonrpc (String 2.0)) (id (Number 7)) (method (String tools/call))
+         (params (Object ((name (String ask_user)) (arguments (Object ()))))))))))
+    (Mcp_cancelled r-m)
     |}]
 ;;

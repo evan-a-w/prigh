@@ -386,3 +386,73 @@ let%expect_test "Claude's approval judges the command it asks to run" =
     claude got: {"type":"control_response","response":{"subtype":"success","request_id":"r1","response":{"behavior":"deny","message":"not that"}}}
     |}]
 ;;
+
+let%expect_test "claude: an MCP call it gives up on is stopped and not answered"
+  =
+  Eio_main.run
+  @@ fun _ ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let running, run = Eio.Promise.create () in
+  let abandoned, abandon = Eio.Promise.create () in
+  let finished, finish = Eio.Promise.create () in
+  let injected =
+    Injected_tools.create ~tools:[ Tool_render_ui.tool ] ~execute:(fun _ _ ->
+      Eio.Promise.resolve run ();
+      Fun.protect
+        ~finally:(fun () -> Eio.Promise.resolve abandon ())
+        (fun () -> Eio.Fiber.await_cancel ()))
+  in
+  let read p =
+    Option.map (Line_transport.Peer.read_line p) ~f:(fun line ->
+      Json.parse line |> Or_error.ok_exn)
+  in
+  let transport =
+    Line_transport.Peer.spawn ~sw (fun p ->
+      (match read p with
+       | Some init ->
+         Line_transport.Peer.write_line
+           p
+           (sprintf
+              {|{"type":"control_response","response":{"subtype":"success","request_id":"%s","response":{"models":[],"commands":[]}}}|}
+              (Option.value_exn
+                 (Option.bind (Json.member "request_id" init) ~f:Json.string)))
+       | None -> ());
+      Line_transport.Peer.write_line
+        p
+        {|{"type":"control_request","request_id":"r-m","request":{"subtype":"mcp_message","server_name":"prigh","message":{"jsonrpc":"2.0","id":7,"method":"tools/call","params":{"name":"render_ui","arguments":{"components":[]}}}}}|};
+      Eio.Promise.await running;
+      print_endline "the tool runs";
+      Line_transport.Peer.write_line
+        p
+        {|{"type":"control_cancel_request","request_id":"r-m"}|};
+      Eio.Promise.await abandoned;
+      print_endline "the tool is stopped";
+      let rec rest () =
+        match Line_transport.Peer.read_line p with
+        | Some line ->
+          printf "claude got: %s\n" line;
+          rest ()
+        | None -> print_endline "claude's input ends"
+      in
+      rest ();
+      Eio.Promise.resolve finish ())
+  in
+  let adapter =
+    Claude_adapter.start
+      ~sw
+      ~injected
+      transport
+      (Adapter.Start.default ~cwd:"/work")
+    |> Or_error.ok_exn
+  in
+  Eio.Promise.await abandoned;
+  Claude_adapter.stop adapter;
+  Eio.Promise.await finished;
+  [%expect
+    {|
+    the tool runs
+    the tool is stopped
+    claude's input ends
+    |}]
+;;

@@ -147,6 +147,7 @@ let call t ~id params =
        let result =
          match t.execute tool arguments with
          | result -> result
+         | exception (Eio.Cancel.Cancelled _ as exn) -> raise exn
          | exception exn -> Tool_result.error (Exn.to_string exn)
        in
        response ~id (result_to_mcp result))

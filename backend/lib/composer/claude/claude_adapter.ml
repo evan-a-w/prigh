@@ -8,6 +8,7 @@ type t =
   ; injected : Injected_tools.t option
   ; mutable settings : Adapter.Settings.t (* what the process runs with *)
   ; mutable models : Model.t list
+  ; mcp_calls : unit Promise.u String.Table.t (* by request id: abandons it *)
   }
 
 let id = "claude"
@@ -146,10 +147,15 @@ let dispatch t (output : Claude_codec.Output.t) =
     (match t.injected with
      | Some injected ->
        (* A tool may wait for the user: the other lines go on meanwhile. *)
+       let abandoned, abandon = Promise.create () in
+       Hashtbl.set t.mcp_calls ~key:request.request_id ~data:abandon;
        Fiber.fork ~sw:t.sw (fun () ->
-         Adapter.Driver.write
-           t.driver
-           (Injected_tools.claude_reply injected request))
+         Fiber.first
+           (fun () ->
+              let reply = Injected_tools.claude_reply injected request in
+              Hashtbl.remove t.mcp_calls request.request_id;
+              Adapter.Driver.write t.driver reply)
+           (fun () -> Promise.await abandoned))
      | None ->
        Adapter.Driver.write
          t.driver
@@ -168,6 +174,10 @@ let dispatch t (output : Claude_codec.Output.t) =
                          ; "message", `String "no in-band MCP server here"
                          ] )
                    ]))))
+  | Mcp_cancelled request_id ->
+    Option.iter
+      (Hashtbl.find_and_remove t.mcp_calls request_id)
+      ~f:(fun abandon -> Promise.resolve abandon ())
 ;;
 
 (* Claude Code asks in a turn of its own (after a background task), which
@@ -209,6 +219,7 @@ let start
     ; injected
     ; settings = Adapter.Settings.of_start start
     ; models = []
+    ; mcp_calls = String.Table.create ()
     }
   in
   Adapter.Driver.on_orphan_request driver (refuse_orphan t);

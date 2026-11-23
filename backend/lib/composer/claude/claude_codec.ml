@@ -91,6 +91,7 @@ module Output = struct
     | Send of string
     | Response of Response.t
     | Mcp of Mcp_request.t
+    | Mcp_cancelled of string
   [@@deriving sexp_of]
 end
 
@@ -123,6 +124,9 @@ type t =
   ; mutable interrupting : bool
   ; mutable cost_total : float
   ; mutable cost_seen : bool
+  ; mutable usage_total : Usage.t option
+    (* [modelUsage]'s sum at the last result; [None] in a resumed session
+         until its first result, whose total includes turns counted before *)
   ; mutable context_tokens : int option
   ; mutable rate_limited : bool
   ; mutable auth_failed : bool
@@ -144,6 +148,7 @@ let create ?cost_total () =
   ; interrupting = false
   ; cost_total = Option.value cost_total ~default:0.
   ; cost_seen = Option.is_some cost_total
+  ; usage_total = (if Option.is_some cost_total then None else Some Usage.zero)
   ; context_tokens = None
   ; rate_limited = false
   ; auth_failed = false
@@ -577,6 +582,47 @@ let context_window t json =
   | None -> List.find_map models ~f:window
 ;;
 
+(* [modelUsage] is cumulative and, unlike [usage], counts subagents and
+   compaction too; [None] when it gives no token counts. *)
+let model_usage_total json =
+  match member "modelUsage" json with
+  | Some (`Object models)
+    when List.exists models ~f:(fun (_, m) ->
+           Option.is_some (int m "inputTokens")) ->
+    Some
+      (List.fold models ~init:Usage.zero ~f:(fun acc (_, m) ->
+         let get key = Option.value (int m key) ~default:0 in
+         let cache_read = get "cacheReadInputTokens" in
+         Usage.add
+           acc
+           { input =
+               get "inputTokens" + get "cacheCreationInputTokens" + cache_read
+           ; output = get "outputTokens"
+           ; cache_read
+           }))
+  | Some _ | None -> None
+;;
+
+(* The turn's usage: the change in [modelUsage] since the last result, which
+   includes the main loop's [usage]; else (no baseline yet, the totals went
+   back, or they say less than the main loop alone) [usage]. *)
+let turn_usage t json ~(main : Usage.t) =
+  match model_usage_total json with
+  | None -> main
+  | Some total ->
+    let previous = t.usage_total in
+    t.usage_total <- Some total;
+    (match previous with
+     | Some (base : Usage.t)
+       when total.input - base.input >= main.input
+            && total.output - base.output >= main.output ->
+       { input = total.input - base.input
+       ; output = total.output - base.output
+       ; cache_read = Int.max 0 (total.cache_read - base.cache_read)
+       }
+     | Some _ | None -> main)
+;;
+
 (* "Claude AI usage limit reached|1764000000": the legacy form, with the
    reset time. *)
 let legacy_limit_reset text =
@@ -590,13 +636,21 @@ let legacy_limit_reset text =
 let handle_result t json =
   let outs = ensure_turn t in
   let usage =
+    let turn =
+      turn_usage
+        t
+        json
+        ~main:
+          (Option.value_map
+             (member "usage" json)
+             ~default:Usage.zero
+             ~f:usage_of)
+    in
     match member "usage" json with
-    | Some usage
+    | Some _
       when Option.exists (num json "total_cost_usd") ~f:(fun c ->
              Float.(c > 0.))
-           ||
-           let u = usage_of usage in
-           u.input + u.output > 0 ->
+           || turn.input + turn.output > 0 ->
       let cost_usd =
         Option.map (num json "total_cost_usd") ~f:(fun total ->
           let delta =
@@ -610,7 +664,7 @@ let handle_result t json =
       in
       [ Output.Event
           (Usage
-             { usage = usage_of usage
+             { usage = turn
              ; cost_usd
              ; context_tokens = t.context_tokens
              ; context_window = context_window t json
@@ -837,8 +891,11 @@ let handle_cancel t json =
         String.equal p.request_id request_id)
     in
     t.permissions <- rest;
-    List.map cancelled ~f:(fun p ->
-      Output.Event (Request_withdrawn { request_id = p.request_id }))
+    (match cancelled with
+     | [] -> [ Output.Mcp_cancelled request_id ]
+     | _ ->
+       List.map cancelled ~f:(fun p ->
+         Output.Event (Request_withdrawn { request_id = p.request_id })))
 ;;
 
 let handle_line t text =
