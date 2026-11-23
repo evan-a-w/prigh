@@ -6461,7 +6461,7 @@ let switch_adapter (m : Model.t) (c : Deployed_engines.Choice.t) =
     let m, toast =
       toast m (sprintf "Switching to %s…" (Deployed_engines.Choice.label c))
     in
-    m, rpc "set_adapter" [ "adapter", str target ] :: toast
+    m, call (Set_adapter { adapter = target }) :: toast
 ;;
 
 let new_session (m : Model.t) =
