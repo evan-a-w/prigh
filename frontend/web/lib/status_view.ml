@@ -287,4 +287,3 @@ let notes (m : App.Model.t) ~inject =
 ;;
 
 (* {2 In the composer's row} *)
-

@@ -140,7 +140,11 @@ let strip (m : App.Model.t) ~inject =
              []))
   in
   Node.header
-    ~attrs:[ classes [ "code-strip"; "loon" ] [ "hidden", t.strip_hidden && m.narrow ] ]
+    ~attrs:
+      [ classes
+          [ "code-strip"; "loon" ]
+          [ "hidden", t.strip_hidden && m.narrow ]
+      ]
     [ button
         ~cls:"code-tree-toggle shrink-0 narrow:size-11"
         ~variant:Ghost
@@ -178,8 +182,8 @@ let strip (m : App.Model.t) ~inject =
            else
              button
                ~cls:"code-chat-toggle shrink-0 narrow:size-11"
-        ~variant:Ghost
-        ~size:Icon_sm
+               ~variant:Ghost
+               ~size:Icon_sm
                ~title:"Show or hide the chat (Alt+C)"
                ~label:"Chat"
                ~attrs:[ Attr.create "aria-pressed" (Bool.to_string t.chat) ]
@@ -189,8 +193,8 @@ let strip (m : App.Model.t) ~inject =
             ~attrs:[ Attr.class_ "code-menu-anchor" ]
             [ button
                 ~cls:"code-more shrink-0 narrow:size-11"
-        ~variant:Ghost
-        ~size:Icon_sm
+                ~variant:Ghost
+                ~size:Icon_sm
                 ~title:"More"
                 ~label:"More"
                 ~attrs:
@@ -215,8 +219,8 @@ let strip (m : App.Model.t) ~inject =
            else
              button
                ~cls:"code-leave shrink-0 narrow:size-11"
-        ~variant:Ghost
-        ~size:Icon_sm
+               ~variant:Ghost
+               ~size:Icon_sm
                ~title:"Back to the chat (Esc)"
                ~label:"Leave the editor"
                ~on_click:(inject (code Leave))

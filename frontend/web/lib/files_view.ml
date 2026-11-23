@@ -148,7 +148,9 @@ let crumbs (t : Files.t) (listing : File_listing.t) ~inject =
 let crumbs_bar items extra =
   Loon.Breadcrumb.root
     ~class_:"files-crumbs loon"
-    [ Loon.Breadcrumb.list ~class_:"gap-0.5 font-[inherit] text-[length:inherit]" items
+    [ Loon.Breadcrumb.list
+        ~class_:"gap-0.5 font-[inherit] text-[length:inherit]"
+        items
     ; extra
     ]
 ;;
@@ -186,7 +188,8 @@ let path_bar (t : Files.t) ~inject =
          ~size:Icon_xs
          ~title:"Type a path"
          ~on_click:
-           (inject (files (Edit_path (Some (Files.display_path t listing.path)))))
+           (inject
+              (files (Edit_path (Some (Files.display_path t listing.path)))))
          [ icon Pencil ])
   | None, None ->
     crumbs_bar
@@ -562,8 +565,8 @@ let preview (m : App.Model.t) (t : Files.t) ~alone ~inject =
            else
              [ button
                  ~cls:"files-close-preview narrow:size-11"
-                  ~variant:Ghost
-                  ~size:Icon_sm
+                 ~variant:Ghost
+                 ~size:Icon_sm
                  ~title:"Close the preview (Esc)"
                  ~on_click:close_preview
                  [ icon Close ]
@@ -837,8 +840,8 @@ let view (m : App.Model.t) ~inject =
                      else Review_page_view.open_button m ~inject)
                   ; button
                       ~cls:"files-close narrow:size-11"
-                  ~variant:Ghost
-                  ~size:Icon_sm
+                      ~variant:Ghost
+                      ~size:Icon_sm
                       ~title:"Close (Ctrl+Shift+F)"
                       ~label:"Close files"
                       ~on_click:(inject (files Close))
