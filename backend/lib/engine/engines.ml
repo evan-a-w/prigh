@@ -1,0 +1,173 @@
+open! Core
+open! Import
+
+type t =
+  { engines : Engine_id.t list
+  ; adapters : Adapter_id.t list
+  }
+[@@deriving sexp_of, equal]
+
+let default = { engines = [ Harness ]; adapters = [] }
+let default_adapters : Adapter_id.t list = [ Codex; Claude ]
+
+let create ~engines ?(adapters = default_adapters) () =
+  let engines = List.stable_dedup engines ~compare:Engine_id.compare in
+  let adapters = List.stable_dedup adapters ~compare:Adapter_id.compare in
+  let composer = List.mem engines Composer ~equal:Engine_id.equal in
+  if List.is_empty engines
+  then Or_error.error_string "no engines: give harness, composer or both"
+  else if composer && List.is_empty adapters
+  then
+    Or_error.error_string
+      "the composer engine needs at least one adapter: codex, claude, prigh or \
+       acp:<name>"
+  else Ok { engines; adapters = (if composer then adapters else []) }
+;;
+
+let split s =
+  String.split s ~on:','
+  |> List.map ~f:String.strip
+  |> List.filter ~f:(fun s -> not (String.is_empty s))
+;;
+
+let of_flags ~engines ~adapters ~getenv =
+  let open Or_error.Let_syntax in
+  let from flag var =
+    match flag with
+    | Some _ -> flag
+    | None ->
+      Option.filter (getenv var) ~f:(fun s ->
+        not (String.is_empty (String.strip s)))
+  in
+  match from engines "PRIGH_ENGINES", from adapters "PRIGH_ADAPTERS" with
+  | None, None -> Ok default
+  | None, Some a ->
+    Or_error.errorf
+      "adapters (%s) are for the composer engine: add -engines composer (or \
+       harness,composer)"
+      a
+  | Some e, a ->
+    let%bind engines =
+      Or_error.combine_errors (List.map (split e) ~f:Engine_id.of_string)
+    in
+    let%bind adapters =
+      match a with
+      | None -> Ok None
+      | Some a ->
+        Or_error.combine_errors (List.map (split a) ~f:Adapter_id.of_string)
+        >>| Option.some
+    in
+    let composer = List.mem engines Composer ~equal:Engine_id.equal in
+    (match adapters with
+     | Some (_ :: _ as adapters) when not composer ->
+       Or_error.errorf
+         "adapters (%s) are for the composer engine: add composer to the \
+          engines"
+         (String.concat ~sep:"," (List.map adapters ~f:Adapter_id.to_string))
+     | _ -> create ~engines ?adapters ())
+;;
+
+let buildable : Engine_id.t list = [ Harness ]
+
+let check_build t =
+  match
+    List.filter t.engines ~f:(fun e ->
+      not (List.mem buildable e ~equal:Engine_id.equal))
+  with
+  | [] -> Ok ()
+  | missing ->
+    Or_error.errorf
+      "the %s engine isn't available in this build yet; run -engines %s"
+      (String.concat ~sep:" and " (List.map missing ~f:Engine_id.to_string))
+      (String.concat ~sep:"," (List.map buildable ~f:Engine_id.to_string))
+;;
+
+let engine_strings t = List.map t.engines ~f:Engine_id.to_string
+let adapter_strings t = List.map t.adapters ~f:Adapter_id.to_string
+
+let default_choice t : Engine_choice.t =
+  match List.hd_exn t.engines with
+  | Harness -> Engine_choice.harness
+  | Composer -> { engine = Composer; adapter = List.hd t.adapters }
+;;
+
+let deployed t = String.concat ~sep:"," (engine_strings t)
+
+let choose t ~engine ~adapter =
+  let open Or_error.Let_syntax in
+  let%bind engine =
+    match engine with
+    | Some e -> Engine_id.of_string e
+    | None ->
+      (match adapter with
+       | Some _ -> Ok Engine_id.Composer
+       | None -> Ok (default_choice t).engine)
+  in
+  if not (List.mem t.engines engine ~equal:Engine_id.equal)
+  then
+    Or_error.errorf
+      "this backend does not run the %s engine (it runs %s): start one with \
+       prigh serve -engines %s"
+      (Engine_id.to_string engine)
+      (deployed t)
+      (Engine_id.to_string engine)
+  else (
+    match engine with
+    | Harness ->
+      (match adapter with
+       | None -> Ok Engine_choice.harness
+       | Some a ->
+         Or_error.errorf
+           "the harness engine takes no adapter (got %s): use engine composer"
+           a)
+    | Composer ->
+      let%bind adapter =
+        match adapter with
+        | None -> Ok (List.hd_exn t.adapters)
+        | Some a ->
+          let%bind a = Adapter_id.of_string a in
+          if List.mem t.adapters a ~equal:Adapter_id.equal
+          then Ok a
+          else
+            Or_error.errorf
+              "this backend's composer does not drive %s (it drives %s)"
+              (Adapter_id.label a)
+              (String.concat
+                 ~sep:", "
+                 (List.map t.adapters ~f:Adapter_id.label))
+      in
+      Ok { Engine_choice.engine = Composer; adapter = Some adapter })
+;;
+
+let unavailable ?(buildable = buildable) t (choice : Engine_choice.t) =
+  if not (List.mem buildable choice.engine ~equal:Engine_id.equal)
+  then
+    Some
+      (sprintf
+         "the %s engine isn't available in this build of prigh yet; this \
+          session can still be read here"
+         (Engine_id.to_string choice.engine))
+  else if not (List.mem t.engines choice.engine ~equal:Engine_id.equal)
+  then
+    Some
+      (sprintf
+         "this session runs on the %s engine, which this backend does not run \
+          (it runs %s): open it on a backend started with prigh serve -engines \
+          %s; it can still be read here"
+         (Engine_choice.label choice)
+         (deployed t)
+         (Engine_id.to_string choice.engine))
+  else (
+    match choice.adapter with
+    | Some a when not (List.mem t.adapters a ~equal:Adapter_id.equal) ->
+      Some
+        (sprintf
+           "this session drives %s, which this backend's composer does not (it \
+            drives %s): add it with -adapters %s"
+           (Adapter_id.label a)
+           (String.concat ~sep:", " (List.map t.adapters ~f:Adapter_id.label))
+           (String.concat
+              ~sep:","
+              (List.map (t.adapters @ [ a ]) ~f:Adapter_id.to_string)))
+    | Some _ | None -> None)
+;;

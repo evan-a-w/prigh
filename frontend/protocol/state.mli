@@ -85,6 +85,8 @@ type t =
   ; temporary : bool
     (** not saved or listed, deleted when left: [new_session] with
         [temporary] made it, and only its [temporary_key] reaches it *)
+  ; engine : Session_engine.t
+    (** the engine it runs on: the harness when the backend says nothing *)
   }
 [@@deriving sexp_of, equal]
 

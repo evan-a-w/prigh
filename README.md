@@ -283,6 +283,17 @@ hosts each user connects), `-superusers NAME,...` may act as others
 (`/setusr`) and clean the Nix store (`/nix-gc`), and `-host-tokens
 NAME=TOKEN,...` sign in as NAME but never as a superuser, for tool hosts.
 
+### Engines
+
+A backend runs sessions on the **harness** (prigh's own agent loop, the
+default) and, once it is built, the **composer**, which drives coding agents
+you have installed and signed in to on the session's tool host (Codex,
+Claude Code, ACP agents) while prigh keeps the session, its log and the UI:
+`prigh serve -engines harness,composer -adapters codex,claude` (or
+`$PRIGH_ENGINES`, `$PRIGH_ADAPTERS`). Users, settings and sign-ins are the
+same on either engine. A session made on an engine the backend does not run
+can still be read there.
+
 ### Computer use
 
 The `computer` tool drives a screen, mouse and keyboard through
