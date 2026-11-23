@@ -73,7 +73,14 @@ let close t =
   t.live <- None
 ;;
 
-let context (s : Engine_intf.Services.t) ~cancel ~call_id ?agent_id () =
+let context
+      (s : Engine_intf.Services.t)
+      ~cancel
+      ?(cwd = s.cwd)
+      ~call_id
+      ?agent_id
+      ()
+  =
   Tool.Context.create
     ~cancel
     ~execute:s.execute
@@ -87,7 +94,7 @@ let context (s : Engine_intf.Services.t) ~cancel ~call_id ?agent_id () =
     ~ask_user:s.ask_user
     ~ui:s.ui
     ~env:s.env
-    ~cwd:s.cwd
+    ~cwd
     ()
 ;;
 
@@ -514,18 +521,30 @@ and run_turn'
                      ~request_id
                      ~summary
                  | _ ->
-                   let canonical, parent =
+                   (* What is judged is what the harness asks to run: the
+                      request's own input, not the call it announced
+                      (a hook or the harness may have changed it). The
+                      announced call only says what it is called and which
+                      subagent runs it. *)
+                   let native_name, parent =
                      match
                        Option.bind tool_id ~f:(fun tool_id ->
                          Composer_recorder.call_started recorder ~tool_id)
                      with
-                     | Some (canonical, parent) -> canonical, parent
-                     | None ->
-                       ( Canonical_tool.of_start
-                           ~kind
-                           ~native_name:(kind_name kind)
-                           ~input
-                       , None )
+                     | Some ((announced : Canonical_tool.t), parent) ->
+                       announced.native_name, parent
+                     | None -> kind_name kind, None
+                   in
+                   let canonical =
+                     Canonical_tool.of_start ~kind ~native_name ~input
+                   in
+                   (* Where the harness runs it (Codex says), for the
+                      rules: else the session's. *)
+                   let cwd =
+                     match Json.member "cwd" input with
+                     | Some (`String cwd) when Filename.is_absolute cwd ->
+                       Some cwd
+                     | _ -> None
                    in
                    let tool =
                      Option.value_or_thunk
@@ -536,6 +555,7 @@ and run_turn'
                      context
                        s
                        ~cancel:c
+                       ?cwd
                        ~call_id:(Option.value tool_id ~default:request_id)
                        ?agent_id:parent
                        ()

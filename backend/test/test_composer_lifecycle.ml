@@ -317,3 +317,72 @@ let%expect_test "stopping the harness mid-turn ends it and closes its dialog" =
     ((pending 0) (running false))
     |}]
 ;;
+
+(* Claude Code announcing one command and asking to run another (a hook
+   rewrote it): the user is asked about what would run. *)
+let claude_rewritten (p : Line_transport.Peer.t) =
+  let read () =
+    Json.parse (Option.value_exn (Line_transport.Peer.read_line p))
+    |> Or_error.ok_exn
+  in
+  let init = read () in
+  Line_transport.Peer.write_line
+    p
+    (sprintf
+       {|{"type":"control_response","response":{"subtype":"success","request_id":"%s","response":{"models":[],"commands":[]}}}|}
+       (Option.value_exn
+          (Option.bind (Json.member "request_id" init) ~f:Json.string)));
+  ignore (read () : Json.t);
+  List.iter
+    ~f:(Line_transport.Peer.write_line p)
+    [ {|{"type":"assistant","message":{"id":"m1","role":"assistant","content":[{"type":"tool_use","id":"tu1","name":"Bash","input":{"command":"ls"}}]},"session_id":"s","parent_tool_use_id":null}|}
+    ; {|{"type":"control_request","request_id":"r1","request":{"subtype":"can_use_tool","tool_name":"Bash","input":{"command":"rm -rf build"},"tool_use_id":"tu1"}}|}
+    ];
+  printf "claude got: %s\n" (Json.to_string (read ()));
+  Line_transport.Peer.write_line
+    p
+    {|{"type":"result","subtype":"success","is_error":false,"result":"","session_id":"s","total_cost_usd":0}|}
+;;
+
+let%expect_test "Claude's approval judges the command it asks to run" =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let composer =
+    Composer_runner.create
+      ~sw
+      ~adapter:(module Claude_adapter)
+      ~spawn:(fun (_ : Adapter.Launch.t) ->
+        Ok (Line_transport.Peer.spawn ~sw claude_rewritten))
+      ()
+  in
+  let agent =
+    Agent.create
+      ~env:t.env
+      ~sw
+      ~provider:(Faux_provider.create [])
+      ~tools:Tools.interaction
+      ~sessions_dir:(Filename.concat t.dir "sessions")
+      ~home:t.dir
+      ~runner:(Composer_runner.runner composer)
+      ~cwd:t.dir
+      ()
+  in
+  Agent.set_engine agent { engine = Composer; adapter = Some Claude };
+  Agent.set_mode agent ~approval:Ask;
+  Agent.subscribe agent ~f:(function
+    | Loop (Tool_confirm { call_id; name; summary; _ }) ->
+      printf "confirm %s: %s\n" name summary;
+      Or_error.ok_exn
+        (Agent.respond_confirm agent ~call_id (Deny (Some "not that")))
+    | _ -> ());
+  Or_error.ok_exn (Agent.prompt agent "list");
+  Agent.wait_idle agent;
+  Composer_runner.close composer;
+  [%expect
+    {|
+    confirm bash: rm -rf build
+    claude got: {"type":"control_response","response":{"subtype":"success","request_id":"r1","response":{"behavior":"deny","message":"not that"}}}
+    |}]
+;;
