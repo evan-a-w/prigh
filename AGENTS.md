@@ -119,6 +119,32 @@ the diffs from `dune build @runtest` and `dune promote` if right.
   the e2e). Output must not depend on timing: a test that passes only on an
   idle machine is broken.
 
+### Tests must not slow `./test` down
+
+`./test` is about 4 CPU-seconds when nothing changed and under a minute
+after a change, on a busy machine. That is a budget, not a starting point:
+a change must not noticeably grow it. Cheap tests are part of the work,
+not an optimisation for later.
+
+- A test in the default run costs at most about 100 ms of CPU (in every
+  project, not just the backend). Anything dearer goes in the slow tier
+  (below) with a cheap main-path test left in the default.
+- No sleeps and no waits that are meant to time out: wait for the
+  condition, polling with a short back-off.
+- Process start-up is the usual hidden cost. Don't add a test executable,
+  shard, node process, dune rule or cram file per test: add tests to the
+  existing libraries and groups. Don't start a backend, server, browser,
+  tmux, real git repository or subprocess for something an in-process
+  test (`Faux_provider`, `H`, `Harness`) can show.
+- No scale in the default: big sessions, long replies, many files and
+  stress loops are slow-tier.
+- Measure what you add: time a backend test with the runner command
+  below, and compare `./test`'s per-step times (it prints them) after a
+  change to that area, with and without your tests. If a step grew by more
+  than a second or two, make the tests cheaper or move them before
+  pushing.
+- The PR description says what the new tests cost.
+
 Keep `./test` minimal; depth goes in the slow tier, which only `./test
 --full` runs:
 
