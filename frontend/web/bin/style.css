@@ -318,20 +318,8 @@ kbd {
 .menu-item.disabled:hover { background: none; }
 .menu-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .menu-hint { color: var(--muted-foreground); font-size: 12px; white-space: normal; }
-.field-note { color: var(--faint); font-size: 11.5px; }
-.worktree-dialog .field + .field { margin-top: 12px; }
-.worktree-dialog .dialog-note { margin: 12px 0 0; }
-.remove-worktree-dialog p { margin: 0 0 8px; overflow-wrap: anywhere; }
 
 /* The delete confirmation's list. */
-.delete-list { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
-.delete-row { display: flex; gap: 10px; padding: 3px 8px; border-radius: var(--r-chip); background: var(--well); }
-.delete-row.kept { opacity: 0.6; }
-.delete-title { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.delete-size, .delete-more { color: var(--faint); font-size: 12px; font-variant-numeric: tabular-nums; }
-.delete-pinned { color: var(--sodium); font-size: 12px; }
-.delete-more { padding: 3px 8px; }
-.delete-warnings { margin: 10px 0 0; padding: 8px 10px 8px 26px; border: 1px solid var(--brick-line); background: var(--brick-wash); border-radius: var(--r-control); color: var(--chalk); font-size: 13px; }
 
 .avatar {
   width: 28px;
@@ -827,30 +815,12 @@ kbd {
 .picker-label { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .picker-detail { margin-left: auto; }
 .picker-check { color: var(--foreground); align-self: center; }
-.picker-remove, .picker-trim { flex-shrink: 0; align-self: center; }
-.picker-item:not(.selected):not(:hover) > .picker-trim { visibility: hidden; }
-.rewind-quote .quote-time { display: block; margin-top: 4px; color: var(--faint); font: 11.5px var(--mono); }
 .picker-empty { color: var(--muted-foreground); padding: 24px 4px; font-size: 14px; text-align: center; }
 
-.help-dialog { width: min(720px, 100%); }
 
 
-.login-url { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin-bottom: 12px; }
-.login-url p { margin: 0; }
 .link-button { text-decoration: none; }
-.login-url-text { font: 11.5px var(--mono); color: var(--faint); word-break: break-all; }
-.login-progress { color: var(--muted-text); font-size: 12.5px; padding-left: 18px; margin: 0 0 12px; }
-.login-prompt { display: flex; flex-direction: column; gap: 8px; }
-.login-message p { margin: 0; font-size: 12.5px; color: var(--muted-text); overflow-wrap: anywhere; }
-.login-waiting { display: flex; align-items: center; gap: 8px; color: var(--muted-text); }
-.login-failed { color: var(--brick); background: var(--brick-wash); border: 1px solid var(--brick-line); border-radius: var(--r-control); padding: 8px 12px; }
 
-.auth-list { display: flex; flex-direction: column; }
-.auth-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0; }
-.auth-row + .auth-row { border-top: 1px solid var(--rule); }
-.auth-name { display: flex; flex-direction: column; min-width: 0; }
-.auth-name .picker-detail { margin: 0; white-space: normal; overflow-wrap: anywhere; }
-.auth-buttons { display: flex; gap: 6px; flex-shrink: 0; }
 
 /* Toasts: over the bottom of the chat column, above the composer, the
    newest nearest to it. */
@@ -1080,17 +1050,11 @@ kbd {
 .btw-note { color: var(--faint); font-size: 11.5px; margin-top: 4px; }
 
 .dialog-note { color: var(--muted-text); font-size: 12.5px; margin: 0 0 8px; }
-.create-dir-dialog p { margin: 0 0 8px; }
-.create-dir-path { font: 13px var(--mono); color: var(--chalk); background: var(--well); border-radius: var(--r-control); padding: 7px 11px; overflow-wrap: anywhere; }
 .dialog-error { color: var(--brick); background: var(--brick-wash); border: 1px solid var(--brick-line); border-radius: var(--r-control); padding: 7px 11px; margin-top: 10px; font-size: 12.5px; overflow-wrap: anywhere; }
 .field { display: flex; flex-direction: column; gap: 6px; }
 .field-label { color: var(--muted-text); font-size: 12.5px; font-weight: 500; }
 .modal .text-input { background: var(--well); border-radius: var(--r-control); }
 .modal .text-input:focus { border-color: var(--sodium); box-shadow: none; }
-.prompt-dialog .text-input { width: 100%; font-family: var(--mono); font-size: 13px; }
-.suggestions { display: flex; flex-direction: column; gap: 1px; margin-top: 8px; max-height: 260px; overflow-y: auto; }
-.suggestion .icon { width: 14px; height: 14px; color: var(--faint); }
-.suggestion .picker-label { font: 12.5px var(--mono); overflow: hidden; text-overflow: ellipsis; }
 
 
 .tree-dialog { width: min(720px, 100%); }
@@ -1103,44 +1067,15 @@ kbd {
 /* /mcp: servers, their problems and a ready one's tools */
 .mcp-dialog { width: min(720px, 100%); }
 .mcp-dialog .picker-label { font: 12.5px var(--mono); }
-.mcp-problems { margin-top: 10px; color: var(--chalk); background: var(--brick-wash); border: 1px solid var(--brick-line); border-radius: var(--r-control); padding: 7px 11px; font-size: 12.5px; }
-.mcp-problems h3 { margin: 0 0 4px; font-size: 12.5px; font-weight: 600; color: var(--brick); }
-.mcp-problems ul { margin: 0; padding-left: 18px; }
-.mcp-problems li { overflow-wrap: anywhere; }
-.mcp-tools-dialog { width: min(720px, 100%); }
-.mcp-tools-dialog .dialog-note { font: 11.5px var(--mono); overflow-wrap: anywhere; }
 .mcp-tools { display: flex; flex-direction: column; }
 .mcp-tool { display: flex; flex-direction: column; gap: 2px; padding: 7px 0; }
 .mcp-tool + .mcp-tool { border-top: 1px solid var(--rule); }
 .mcp-tool-name { font: 12.5px var(--mono); overflow-wrap: anywhere; }
 .mcp-tool-description { color: var(--muted-text); font-size: 12.5px; }
 
-.rewind-quote { margin: 0 0 10px; padding: 8px 12px; border-left: 2px solid var(--sodium); background: var(--well); border-radius: 0 var(--r-control) var(--r-control) 0; white-space: pre-wrap; }
 
-.session-dialog { width: min(600px, 100%); }
-.info-list { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; margin: 0 0 12px; font-size: 12.5px; }
-.info-list dt { color: var(--muted-text); }
-.info-list dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
-.stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 12px; }
-.stat { background: var(--well); border-radius: var(--r-control); padding: 8px 10px; display: flex; flex-direction: column; }
-.stat-value { font: 600 15px var(--mono); font-variant-numeric: tabular-nums; }
-.stat-label { color: var(--muted-text); font-size: 11.5px; }
 
-.text-block {
-  margin: 6px 0 0; padding: 10px 12px; background: var(--well); border: 1px solid var(--rule);
-  border-radius: var(--r-control); font: 12px/1.5 var(--mono); max-height: 40vh; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere;
-}
-.text-dialog { width: min(720px, 100%); }
 /* /permissions: each remembered call with its Forget button */
-.permissions-dialog .modal-body { display: flex; flex-direction: column; gap: 10px; }
-.permissions-dialog .dialog-note { margin: 0; color: var(--muted-text); }
-.allowed-calls ul { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
-.allowed-call {
-  display: flex; align-items: center; gap: 10px; padding: 6px 6px 6px 12px;
-  background: var(--well); border: 1px solid var(--rule); border-radius: var(--r-control);
-}
-.allowed-call-text { flex: 1 1 auto; min-width: 0; font: 12px/1.5 var(--mono); overflow-wrap: anywhere; }
-.allowed-call .forget { flex-shrink: 0; }
 
 /* /diff: the working tree's changes, file by file */
 .diff-dialog { width: min(980px, 100%); }
@@ -1185,7 +1120,6 @@ kbd {
 .diff-file .count.del { color: var(--brick); }
 .diff-file .diff-empty { color: var(--faint); font-size: 12.5px; }
 @media (prefers-reduced-motion: reduce) { .diff-file > summary::before { transition: none; } }
-.text-dialog .text-block { max-height: none; overflow: visible; }
 
 /* Verbose: every fold open (images open the viewer). Quiet folds runs of
    steps into one line each (chat.css). */
@@ -1228,7 +1162,6 @@ kbd {
   .signin { width: 100%; }
   .menu-backdrop { background: var(--backdrop); }
   .account-menu { left: 8px; right: 8px; bottom: 8px; width: auto; }
-  .stats-grid { grid-template-columns: repeat(2, 1fr); }
 }
 
 /* Jump back to the end of the chat while it is scrolled up */
@@ -1685,8 +1618,6 @@ kbd {
 .generate .btn { padding-inline: 8px; }
 .generate-spark { color: var(--sodium); margin-right: 4px; font-size: 11px; }
 .generate-stop { color: var(--sodium); }
-.generate-field { position: relative; display: flex; flex-direction: column; gap: 6px; }
-.generate-field > .generate { align-self: flex-end; }
 .pr-generate { display: flex; justify-content: flex-end; margin-bottom: -6px; }
 
 /* Settings: a number behind its switch (Compact at, Show worktrees,
