@@ -835,31 +835,42 @@ kbd {
 
 /* Dialogs */
 
+/* Modal.view: loon's Dialog (shadcn, Nova) in plain CSS, so the dialogs'
+   own rules below and phone.css's sheets still win over it. App and Keys
+   own Esc and the focus, not loon's Modal. */
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  background: var(--backdrop);
+  background: rgb(0 0 0 / 0.1);
   display: flex;
   justify-content: center;
   align-items: flex-start;
   padding: 12vh 12px 12px;
   z-index: var(--z-modal);
+  animation: modal-fade 0.1s ease-out;
 }
+@supports (backdrop-filter: blur(4px)) { .modal-backdrop { backdrop-filter: blur(4px); } }
 .modal {
-  background: var(--slate);
-  border: 1px solid var(--rule-2);
-  border-radius: var(--r-surface);
+  position: relative;
+  background: var(--popover);
+  color: var(--popover-foreground);
+  border: 0;
+  border-radius: calc(var(--radius) * 1.4);
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--foreground) 10%, transparent), var(--float-shadow);
   width: min(560px, 100%);
   max-height: 76vh;
   display: flex;
   flex-direction: column;
-  box-shadow: var(--float-shadow);
+  font-size: 14px;
   outline: none;
-  animation: appear 0.12s ease-out;
+  animation: modal-in 0.1s ease-out;
 }
-.modal-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 8px 2px 16px; }
-.modal-head h2 { margin: 0; font-size: 14px; font-weight: 600; }
-.modal-body { padding: 8px 16px 14px; overflow-y: auto; min-height: 0; scrollbar-gutter: stable; }
+@keyframes modal-fade { from { opacity: 0; } }
+@keyframes modal-in { from { opacity: 0; transform: scale(0.95); } }
+.modal-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 8px 0 16px; }
+.modal-head h2 { margin: 0; font-size: 16px; line-height: 1.25; font-weight: 500; }
+.modal-head > .btn.icon.ghost { width: 28px; height: 28px; border-radius: min(calc(var(--radius) * 0.8), 12px); }
+.modal-body { padding: 12px 16px 16px; overflow-y: auto; min-height: 0; scrollbar-gutter: stable; }
 @media (hover: hover) { @supports selector(::-webkit-scrollbar) { .modal-body { padding-right: 6px; } } }
 .modal-body > p:first-child { margin-top: 0; }
 .modal-buttons {
@@ -867,8 +878,11 @@ kbd {
   justify-content: flex-end;
   align-items: center;
   gap: 8px;
-  padding: 10px 16px;
-  border-top: 1px solid var(--rule);
+  padding: 16px;
+  background: color-mix(in oklab, var(--muted) 50%, transparent);
+  border-top: 1px solid var(--border);
+  border-bottom-left-radius: inherit;
+  border-bottom-right-radius: inherit;
 }
 .keys-hint { color: var(--faint); font-size: 11.5px; margin-right: auto; }
 
