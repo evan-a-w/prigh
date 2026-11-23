@@ -163,8 +163,21 @@ let row
       ~about:a
       controls
   =
+  (* Not wide: a grid of the text and the control rather than a wrapping
+     flex row, whose wrap flips (WebKit) on a re-layout as small as a focus
+     when the two only just fit, moving a control from under the pointer
+     between a click's press and its release. The control's column shrinks
+     (its segments wrap) before the text's goes under 10rem. *)
   custom
-    ~cls:(String.concat ~sep:" " [ cls; (if wide then "setting-wide" else "") ])
+    ~cls:
+      (String.concat
+         ~sep:" "
+         [ cls
+         ; (if wide
+            then "setting-wide"
+            else
+              "grid grid-cols-[minmax(10rem,1fr)_minmax(0,auto)]                narrow:grid-cols-1")
+         ])
     ~stack:wide
     [ text
         ~wide
