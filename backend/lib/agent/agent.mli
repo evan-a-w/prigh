@@ -310,6 +310,10 @@ val capabilities : t -> Capabilities.t
     closing the old one; between runs. *)
 val set_runner : t -> Runner.t option -> unit
 
+(** Stops the external harness's process, if one runs: a later run starts
+    it again. *)
+val stop_engine : t -> unit
+
 (** prigh's own harness on the session's provider and model, whatever
     runner the session has (for the composer's [prigh] adapter). *)
 val harness_runner : t -> Runner.t

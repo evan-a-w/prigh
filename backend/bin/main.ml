@@ -2738,6 +2738,9 @@ let () =
        ~argv:((prog ^ " compaction-eval") :: args)
        compaction_eval_command;
      exit 0
+   | _ :: "fake-cli" :: args ->
+     Fake_cli.main args;
+     exit 0
    | _ -> ());
   Command_unix.run
     ~version:Version.to_string

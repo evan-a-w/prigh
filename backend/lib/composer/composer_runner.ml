@@ -10,8 +10,16 @@ type t =
   ; start : cwd:string -> Adapter.Start.t
   ; interrupt_grace : Time_float.Span.t option
   ; steer_poll : Time_float.Span.t
+  ; host : unit -> string
   ; mutable live : live option
+  ; mutable live_host : string option
   ; mutable thread_id : string option
+  ; mutable resumed : string option
+  ; mutable fresh : bool
+  ; mutable handoff_from : Engine_choice.t option
+  ; mutable last_place : (string * string) option
+  ; mutable turns : int
+  ; mutable thread_model : string option (* the model the CLI said it runs *)
   ; on_thread : string -> unit
   ; mutable services : Engine_intf.Services.t option (* the running turn's *)
   ; mutable cancel : Cancellation.t
@@ -25,6 +33,8 @@ let create
       ?interrupt_grace
       ?(steer_poll = Time_float.Span.of_sec 0.2)
       ?(on_thread = ignore)
+      ?(host = fun () -> "local")
+      ?handoff_from
       ()
   =
   { sw
@@ -33,8 +43,16 @@ let create
   ; start
   ; interrupt_grace
   ; steer_poll
+  ; host
   ; live = None
+  ; live_host = None
   ; thread_id = None
+  ; resumed = None
+  ; fresh = false
+  ; handoff_from
+  ; last_place = None
+  ; turns = 0
+  ; thread_model = None
   ; on_thread
   ; services = None
   ; cancel = Cancellation.never
@@ -96,23 +114,25 @@ let settings t ~cwd (input : Engine_intf.Turn.Input.t) : Adapter.Settings.t =
   }
 ;;
 
-let live t (s : Engine_intf.Services.t) (input : Engine_intf.Turn.Input.t) =
-  match t.live with
-  | Some (Live ((module A), a)) when A.alive a -> Ok (Live ((module A), a))
-  | _ ->
-    let (module A) = t.adapter in
-    let base = t.start ~cwd:s.cwd in
-    let resume = Option.first_some t.thread_id base.resume in
-    let start =
-      { base with
-        thinking = input.thinking
-      ; approval = input.approval
-      ; plan = input.plan
-      ; resume
-      ; fork = base.fork && Option.is_none t.thread_id
-      }
-    in
-    let%bind.Or_error transport = t.spawn (A.launch start) in
+(* The thread [a] is on, once known: recorded when it is not the one it was
+   asked to continue (that one is recorded already). A thread other than
+   that one is new, so it is handed the whole session. *)
+let note_thread t (type a) (module A : Adapter.S with type t = a) (a : a) =
+  match A.thread_id a with
+  | Some id when not (Option.equal String.equal (Some id) t.thread_id) ->
+    t.thread_id <- Some id;
+    if not (Option.equal String.equal (Some id) t.resumed)
+    then (
+      if Option.is_some t.resumed then t.fresh <- true;
+      t.on_thread id)
+  | Some _ | None -> ()
+;;
+
+let start_process t (s : Engine_intf.Services.t) (start : Adapter.Start.t) =
+  let (module A) = t.adapter in
+  match t.spawn (A.launch start) with
+  | Error e -> Error (`Spawn e)
+  | Ok transport ->
     let injected = injected t s in
     (* A harness with no MCP in its protocol reaches prigh's tools through
        the bridge on its host. *)
@@ -138,12 +158,124 @@ let live t (s : Engine_intf.Services.t) (input : Engine_intf.Turn.Input.t) =
          start
      with
      | Ok a ->
-       let live = Live ((module A), a) in
-       t.live <- Some live;
-       Ok live
-     | Error _ as e ->
+       t.resumed <- start.resume;
+       (* A new thread has seen nothing: whatever an older one saw. *)
+       if Option.is_none start.resume then t.fresh <- true;
+       note_thread t (module A) a;
+       Ok (Live ((module A), a))
+     | Error e ->
        Line_transport.stop transport;
-       e)
+       Error (`Start e))
+;;
+
+let live t (s : Engine_intf.Services.t) (input : Engine_intf.Turn.Input.t) =
+  let host = t.host () in
+  (* The session moved to another tool host: its harness runs there now,
+     on a thread of its own there. *)
+  (match t.live with
+   | Some (Live ((module A), a))
+     when not (Option.equal String.equal t.live_host (Some host)) ->
+     A.stop a;
+     t.live <- None;
+     t.thread_id <- None
+   | Some _ | None -> ());
+  match t.live with
+  | Some (Live ((module A), a)) when A.alive a -> Ok (Live ((module A), a))
+  | _ ->
+    let (module A) = t.adapter in
+    let base = t.start ~cwd:s.cwd in
+    let resume = Option.first_some t.thread_id base.resume in
+    let start =
+      { base with
+        thinking = input.thinking
+      ; approval = input.approval
+      ; plan = input.plan
+      ; resume
+      ; fork = base.fork && Option.is_none t.thread_id
+      }
+    in
+    let started =
+      match start_process t s start, resume with
+      | Error (`Start e), Some thread ->
+        (* Its thread cannot be continued (gone, or in use elsewhere): a new
+           one, handed the whole session. *)
+        s.notice
+          (sprintf
+             "%s could not continue its thread %s (%s): starting a new one, \
+              with the session handed over"
+             A.display_name
+             thread
+             (Error.to_string_hum e));
+        t.thread_id <- None;
+        t.fresh <- true;
+        start_process t s { start with resume = None; fork = false }
+      | started, _ -> started
+    in
+    (match started with
+     | Ok live ->
+       t.live <- Some live;
+       t.live_host <- Some host;
+       Ok live
+     | Error (`Spawn e | `Start e) -> Error e)
+;;
+
+(* What the harness has not seen of the session, handed to it before the
+   turn's prompt: everything when it starts a thread on a session with
+   history (after another adapter, on another host, or when its thread
+   could not be continued), else what came after its last turn. Recorded in
+   the session. *)
+let handoff t (s : Engine_intf.Services.t) ~pending =
+  let (module A) = t.adapter in
+  match Adapter_id.of_string A.id with
+  | Error _ -> None
+  | Ok to_ when not (Handoff.needed to_) -> None
+  | Ok to_ ->
+    let from =
+      match t.handoff_from with
+      | Some _ as from -> from
+      | None ->
+        (match Session.threads s.session with
+         | thread :: _ when not (String.equal thread.adapter A.id) ->
+           Result.ok (Adapter_id.of_string thread.adapter)
+           |> Option.map ~f:(fun adapter ->
+             { Engine_choice.engine = Composer; adapter = Some adapter })
+         | _ :: _ | [] -> None)
+    in
+    let from_host, from_cwd =
+      match t.last_place with
+      | Some (host, cwd) -> Some host, Some cwd
+      | None -> None, None
+    in
+    let host = t.host () in
+    let handoff =
+      Handoff.build
+        ~session:s.session
+        ~from
+        ~fresh:t.fresh
+        ~pending
+        ?from_host
+        ?from_cwd
+        ~to_
+        ~host
+        ~cwd:s.cwd
+        ()
+    in
+    t.fresh <- false;
+    t.handoff_from <- None;
+    t.last_place <- Some (host, s.cwd);
+    Option.iter handoff ~f:(fun (handoff : Handoff.t) ->
+      ignore
+        (Session.record_handoff
+           s.session
+           ~from_adapter:
+             (Option.map from ~f:(fun (from : Engine_choice.t) ->
+                match from.adapter with
+                | Some adapter -> Adapter_id.to_string adapter
+                | None -> Engine_id.to_string from.engine))
+           ~to_adapter:A.id
+           ~text:handoff.text
+         : Session.Entry.t));
+    handoff
 ;;
 
 let input_of (messages : Message.t list) : Adapter.Input.t =
@@ -235,10 +367,12 @@ let run_turn
   let (module A) = t.adapter in
   t.services <- Some s;
   t.cancel <- cancel;
+  let sent = ref false in
+  let last_turn = ref None in
   let recorder =
     Composer_recorder.create
       ~adapter:A.id
-      ~model:(t.start ~cwd:s.cwd).model
+      ~model:(Option.first_some t.thread_model (t.start ~cwd:s.cwd).model)
       ~emit:s.emit
       ~notice:s.notice
       ~prompts:input.prompts
@@ -255,10 +389,24 @@ let run_turn
    | Ok (Live ((module L), a)) ->
      let settings = settings t ~cwd:s.cwd input in
      let leftover = Queue.create () in
+     let handoff =
+       ref
+         (Option.map
+            (handoff t s ~pending:(List.length input.prompts))
+            ~f:(fun (h : Handoff.t) -> h.text))
+     in
+     let with_handoff (input : Adapter.Input.t) =
+       match !handoff with
+       | None -> input
+       | Some text ->
+         handoff := None;
+         { input with text = text ^ "\n\nThe user's message:\n\n" ^ input.text }
+     in
      let rec turn messages =
-       match L.send a settings (input_of messages) with
+       match L.send a settings (with_handoff (input_of messages)) with
        | Error e -> fail (Error.to_string_hum e)
        | Ok () ->
+         sent := true;
          let requests = String.Table.create () in
          let stop = ref None in
          let handle_request ~sw request_id f =
@@ -271,8 +419,9 @@ let run_turn
          in
          let rec events ~sw =
            match L.next_event a with
-           | Turn_end { stop = st; _ } as e ->
+           | Turn_end { stop = st; turn_id } as e ->
              Composer_recorder.feed recorder e;
+             Option.iter turn_id ~f:(fun id -> last_turn := Some id);
              stop := Some st
            | Approval_request { request_id; tool_id; kind; summary; input; _ }
              ->
@@ -336,6 +485,10 @@ let run_turn
                ~f:Cancellation.cancel;
              events ~sw
            | e ->
+             (match e with
+              | Thread_started { model = Some model; _ } ->
+                t.thread_model <- Some model
+              | _ -> ());
              Composer_recorder.feed recorder e;
              events ~sw
          in
@@ -363,12 +516,7 @@ let run_turn
          Switch.run (fun sw ->
            Fiber.any [ (fun () -> events ~sw); interrupt_on_cancel; steer ];
            Hashtbl.iter requests ~f:Cancellation.cancel);
-         (match L.thread_id a with
-          | Some id when not (Option.equal String.equal (Some id) t.thread_id)
-            ->
-            t.thread_id <- Some id;
-            t.on_thread id
-          | Some _ | None -> ());
+         note_thread t (module L) a;
          (match !stop with
           | Some Done when not (Cancellation.is_cancelled cancel) ->
             let next = Queue.to_list leftover @ s.steer () in
@@ -387,6 +535,21 @@ let run_turn
   if Float.( > ) cost 0. then s.add_spend ~usage:Usage.zero ~cost_usd:cost;
   t.services <- None;
   let added = Composer_recorder.finish recorder in
+  (* What the harness saw, for a later handoff to give it only what came
+     after. *)
+  (match t.thread_id, Session.head s.session with
+   | Some thread_id, Some through when !sent ->
+     t.turns <- t.turns + 1;
+     ignore
+       (Session.record_external_turn
+          s.session
+          { thread_id
+          ; turn_id =
+              Option.value !last_turn ~default:(sprintf "turn-%d" t.turns)
+          ; through
+          }
+        : Session.Entry.t)
+   | _ -> ());
   List.drop added (List.length input.prompts)
 ;;
 

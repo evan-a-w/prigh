@@ -7421,7 +7421,7 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
      | Adapters_shown ->
        decode json ~f:P.Adapter_status.list_of_json (fun statuses ->
          ( output
-             m
+             { m with notice = None }
              ~title:"Agent CLIs"
              (Content.lines
                 (String.concat ~sep:"\n" (Adapters_command.lines statuses)))

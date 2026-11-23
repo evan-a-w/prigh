@@ -5132,6 +5132,92 @@ drawer gone: true
 strip: src/ turn.mli
 swiped: src/ compact.ml
 left: the chat
+=== webkit: engines (desktop): the new-session engine chip ===
+chip: Harness (Engine: Harness. Change it)
+=== webkit: engines (desktop): the engine picker ===
+prigh harness prigh's own agent, calling the model directly
+Codex OpenAI's Codex CLI on the session's tool host
+Claude Code Anthropic's Claude Code CLI on the session's tool host
+=== webkit: engines (desktop): chosen ===
+chip: Codex
+=== webkit: engines (desktop): the first turn ===
+Hello from Codex: ask me to look at the project. codex/gpt-5.2-codex 2.3k in 100 out <TIME>
+model chip: Codex · gpt-5.2-codex
+sidebar: 1 session, "Hello"
+=== webkit: engines (desktop): Codex asks to run a command ===
+Confirm Run bash: ls? y Allow once a Always allow bash(ls:*) this session n Deny r Deny, saying why
+=== webkit: engines (desktop): the command ran ===
+card: bash ls
+Two entries: README.md and src. <TIME>
+=== webkit: engines (desktop): a control Codex sessions do not have ===
+Codex compacts its context by itself when it fills: /compact isn't available
+=== webkit: engines (desktop): Settings → Engines ===
+Agent CLIs Checked on each connected tool host when you open this page, when a host connects, and on Refresh. prigh never installs a CLI or logs in: do that on the host. Refresh
+Codex 0.166.0 · <BIN>/codex Logged in · ChatGPT
+Claude Code Not on the tool host's PATH Not installed Claude Code is not installed on server-laptop, please install it Copy
+copy: Copy what to do: Claude Code is not installed on server-laptop, please install it
+=== webkit: engines (desktop): errors ===
+none
+=== webkit: engines (phone): the new-session engine chip ===
+chip: Harness (Engine: Harness. Change it)
+=== webkit: engines (phone): the engine picker ===
+prigh harness prigh's own agent, calling the model directly
+Codex OpenAI's Codex CLI on the session's tool host
+Claude Code Anthropic's Claude Code CLI on the session's tool host
+phone: ok
+=== webkit: engines (phone): chosen ===
+chip: Codex
+=== webkit: engines (phone): the first turn ===
+Hello from Codex: ask me to look at the project. codex/gpt-5.2-codex 2.3k in 100 out <TIME>
+model chip: Codex · gpt-5.2-codex
+sidebar: 1 session, "Hello"
+phone: ok
+=== webkit: engines (phone): Codex asks to run a command ===
+Confirm Run bash: ls? y Allow once a Always allow bash(ls:*) this session n Deny r Deny, saying why
+phone: ok
+=== webkit: engines (phone): the command ran ===
+card: bash ls
+Two entries: README.md and src. <TIME>
+=== webkit: engines (phone): a control Codex sessions do not have ===
+Codex compacts its context by itself when it fills: /compact isn't available
+=== webkit: engines (phone): Settings → Engines ===
+Agent CLIs Checked on each connected tool host when you open this page, when a host connects, and on Refresh. prigh never installs a CLI or logs in: do that on the host. Refresh
+Codex 0.166.0 · <BIN>/codex Logged in · ChatGPT
+Claude Code Not on the tool host's PATH Not installed Claude Code is not installed on server-laptop, please install it Copy
+copy: Copy what to do: Claude Code is not installed on server-laptop, please install it
+phone: ok
+=== webkit: engines (phone): errors ===
+none
+=== webkit: engines (small): the new-session engine chip ===
+chip: Harness (Engine: Harness. Change it)
+=== webkit: engines (small): the engine picker ===
+prigh harness prigh's own agent, calling the model directly
+Codex OpenAI's Codex CLI on the session's tool host
+Claude Code Anthropic's Claude Code CLI on the session's tool host
+phone: ok
+=== webkit: engines (small): chosen ===
+chip: Codex
+=== webkit: engines (small): the first turn ===
+Hello from Codex: ask me to look at the project. codex/gpt-5.2-codex 2.3k in 100 out <TIME>
+model chip: gpt-5.2-codex
+sidebar: 1 session, "Hello"
+phone: ok
+=== webkit: engines (small): Codex asks to run a command ===
+Confirm Run bash: ls? y Allow once a Always allow bash(ls:*) this session n Deny r Deny, saying why
+phone: ok
+=== webkit: engines (small): the command ran ===
+card: bash ls
+Two entries: README.md and src. <TIME>
+=== webkit: engines (small): a control Codex sessions do not have ===
+Codex compacts its context by itself when it fills: /compact isn't available
+=== webkit: engines (small): Settings → Engines ===
+Agent CLIs Checked on each connected tool host when you open this page, when a host connects, and on Refresh. prigh never installs a CLI or logs in: do that on the host. Refresh
+Codex 0.166.0 · <BIN>/codex Logged in · ChatGPT
+Claude Code Not on the tool host's PATH Not installed Claude Code is not installed on server-laptop, please install it Copy
+copy: Copy what to do: Claude Code is not installed on server-laptop, please install it
+phone: ok
+=== webkit: engines (small): errors ===
+none
 === webkit: smoke: sign in ===
 prigh
 web
