@@ -101,8 +101,12 @@ let control_cls ~wide =
      narrow:has-[>.setting-select,>input[type=text]]:ml-0 \
      narrow:has-[>.setting-select,>input[type=text]]:basis-full \
      narrow:[&>.setting-select]:max-w-none narrow:[&>.setting-select]:flex-auto \
+     narrow:[&>.setting-select]:min-w-0 narrow:[&>.setting-select]:shrink \
      narrow:[&>.setting-select]:justify-between \
-     narrow:[&>input[type=text]]:flex-1"
+     narrow:[&>input[type=text]]:flex-1 \
+     narrow:has-[>.default-reset,>.fallback-actions]:ml-0 \
+     narrow:has-[>.default-reset,>.fallback-actions]:basis-full \
+     narrow:[&>.default-reset]:min-w-11"
 ;;
 
 let control ?(cls = "") ?(wide = false) children =
