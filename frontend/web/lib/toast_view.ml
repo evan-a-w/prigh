@@ -81,31 +81,40 @@ let toast ~inject (t : App.Toast.t) =
            else t.text ^ " (click to dismiss)")
       ; Attr.on_click (fun _ -> inject (Action.Dismiss_toast t.id))
       ]
-    [ (if t.error
-       then
-         Loon.Icon.view ~class_:"mt-0.5 size-4 shrink-0 text-destructive" Circle_x
-       else Node.none)
-    ; Node.span
-        ~attrs:[ Attr.class_ "min-w-0 flex-1 font-medium"; Attr.create "dir" "auto" ]
-        [ Node.text shown ]
-    ; (if t.repeats > 0
-       then
-         span
-           ~cls:"toast-repeats font-mono text-[11.5px] leading-[1.7] text-muted-foreground"
-           (sprintf "×%d" (t.repeats + 1))
-       else Node.none)
-    ; Option.value_map t.undo ~default:Node.none ~f:(fun h ->
-        action
-          ~title:
-            "Bring it back into the transcript and the model's context \
-             (/delete undo)"
-          ~on_click:
-            (Effect.Many [ Effect.Stop_propagation; inject (Action.Restore_hidden h) ])
-          "Undo")
-    ; (if t.error
-       then close ~title:"Dismiss" ~on_click:(inject (Action.Dismiss_toast t.id))
-       else Node.none)
-    ]
+    (List.filter_opt
+       [ (if t.error
+          then
+            Some
+              (Loon.Icon.view ~class_:"mt-0.5 size-4 shrink-0 text-destructive" Circle_x)
+          else None)
+       ; Some
+           (Node.span
+              ~attrs:
+                [ Attr.class_ "min-w-0 flex-1 font-medium"; Attr.create "dir" "auto" ]
+              [ Node.text shown ])
+       ; (if t.repeats > 0
+          then
+            Some
+              (span
+                 ~cls:
+                   "toast-repeats font-mono text-[11.5px] leading-[1.7] \
+                    text-muted-foreground"
+                 (sprintf "×%d" (t.repeats + 1)))
+          else None)
+       ; Option.map t.undo ~f:(fun h ->
+           action
+             ~title:
+               "Bring it back into the transcript and the model's context \
+                (/delete undo)"
+             ~on_click:
+               (Effect.Many
+                  [ Effect.Stop_propagation; inject (Action.Restore_hidden h) ])
+             "Undo")
+       ; (if t.error
+          then
+            Some (close ~title:"Dismiss" ~on_click:(inject (Action.Dismiss_toast t.id)))
+          else None)
+       ])
 ;;
 
 let view (m : Model.t) ~inject =

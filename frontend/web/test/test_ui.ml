@@ -891,7 +891,8 @@ let%expect_test "every component" =
                       aria-checked="true"
                       class="on ui-check-item"
                       @on_click>
-                <span aria-hidden="true" class="check on">
+                <span aria-hidden="true"
+                      class="bg-primary border border-primary check flex items-center justify-center on rounded-[4px] shrink-0 size-4 text-primary-foreground">
                   <icon class="check"> </icon>
                 </span>
                 <div class="ui-md">
@@ -912,7 +913,8 @@ let%expect_test "every component" =
                       aria-checked="false"
                       class="ui-check-item"
                       @on_click>
-                <span aria-hidden="true" class="check"> </span>
+                <span aria-hidden="true"
+                      class="border border-input check dark:bg-input/30 flex items-center justify-center rounded-[4px] shrink-0 size-4"> </span>
                 <div class="ui-md">
                   <div class="markdown">
                     <div class="md-part">

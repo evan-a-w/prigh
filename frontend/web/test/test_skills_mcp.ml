@@ -590,7 +590,12 @@ let%expect_test "/mcp: servers to act on first, problems below; Enter approves" 
   H.show h ~selector:".picker-item.dimmed";
   [%expect
     {|
-    <div role="option" id="picker-option-1" aria-selected="false" class="dimmed picker-item" @on_click>
+    <div data-slot="command-item"
+         role="option"
+         id="picker-option-1"
+         aria-selected="false"
+         class="dimmed picker-item"
+         @on_click>
       <span class="picker-label"> web </span>
       <span class="picker-detail"> failed: spawn uvx: not found. Enter restarts it, /home/u/.prigh/mcp.json </span>
       <Vdom.Node.none-widget> </Vdom.Node.none-widget>

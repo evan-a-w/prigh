@@ -76,10 +76,11 @@ let%expect_test "a right-click on a message opens its menu there" =
       <div dir="auto" class="bubble"> question 2 </div>
       <time title="Monday 5 October 2026, 10:02:00" datetime="2026-10-05T10:02:00Z" class="time"> 10:02 </time>
     </div>
-    <div id="dialog"
+    <div data-slot="dropdown-menu-content"
          role="menu"
          aria-label="Your message"
          tabindex="-1"
+         id="dialog"
          data-x="300"
          data-y="120"
          class="context-menu menu-surface">
@@ -87,8 +88,9 @@ let%expect_test "a right-click on a message opens its menu there" =
         <span class="context-menu-title"> Your message </span>
         <span class="context-menu-sub preview"> question 2 </span>
       </div>
-      <div class="menu-section">
-        <div role="menuitem"
+      <div data-slot="dropdown-menu-group" role="group" class="menu-section">
+        <div data-slot="dropdown-menu-item"
+             role="menuitem"
              data-item="copy_message"
              class="menu-item selected"
              @on_click
@@ -98,23 +100,39 @@ let%expect_test "a right-click on a message opens its menu there" =
           <Vdom.Node.none-widget> </Vdom.Node.none-widget>
         </div>
       </div>
-      <div class="menu-section">
-        <div role="menuitem" data-item="trim_before" class="menu-item" @on_click @on_mouseenter>
+      <div data-slot="dropdown-menu-group" role="group" class="menu-section">
+        <div data-slot="dropdown-menu-item"
+             role="menuitem"
+             data-item="trim_before"
+             class="menu-item"
+             @on_click
+             @on_mouseenter>
           <icon class="scissors"> </icon>
           <span class="menu-label"> Trim everything before this </span>
-          <kbd class="menu-command"> /trim </kbd>
+          <kbd data-slot="dropdown-menu-shortcut" class="menu-command"> /trim </kbd>
         </div>
-        <div role="menuitem" data-item="trim_after" class="menu-item" @on_click @on_mouseenter>
+        <div data-slot="dropdown-menu-item"
+             role="menuitem"
+             data-item="trim_after"
+             class="menu-item"
+             @on_click
+             @on_mouseenter>
           <icon class="scissors"> </icon>
           <span class="menu-label"> Trim everything after this </span>
-          <kbd class="menu-command"> /trim after </kbd>
+          <kbd data-slot="dropdown-menu-shortcut" class="menu-command"> /trim after </kbd>
         </div>
       </div>
-      <div class="menu-section">
-        <div role="menuitem" data-item="delete" class="danger menu-item" @on_click @on_mouseenter>
+      <div data-slot="dropdown-menu-group" role="group" class="menu-section">
+        <div data-slot="dropdown-menu-item"
+             role="menuitem"
+             data-variant="destructive"
+             data-item="delete"
+             class="danger menu-item"
+             @on_click
+             @on_mouseenter>
           <icon class="trash"> </icon>
           <span class="menu-label"> Delete </span>
-          <kbd class="menu-command"> /delete </kbd>
+          <kbd data-slot="dropdown-menu-shortcut" class="menu-command"> /delete </kbd>
         </div>
       </div>
     </div>

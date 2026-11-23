@@ -73,13 +73,15 @@ let%expect_test "a right-click on the composer in the browser shell" =
     {|
     (Place_field_menu (Point (x 200) (y 500)))
     <div class="context-menu-backdrop field-menu-backdrop menu-backdrop" @on_click @on_contextmenu>
-      <div id="field-menu"
+      <div data-slot="dropdown-menu-content"
            role="menu"
            aria-label="Edit"
            tabindex="-1"
+           id="field-menu"
            class="context-menu field-menu menu-surface">
-        <div class="menu-section">
-          <div role="menuitem"
+        <div data-slot="dropdown-menu-group" role="group" class="menu-section">
+          <div data-slot="dropdown-menu-item"
+               role="menuitem"
                data-item="cut"
                class="menu-item selected"
                @on_click
@@ -87,9 +89,10 @@ let%expect_test "a right-click on the composer in the browser shell" =
                @on_mouseenter>
             <icon class="scissors"> </icon>
             <span class="menu-label"> Cut </span>
-            <kbd class="menu-command"> Ctrl+X </kbd>
+            <kbd data-slot="dropdown-menu-shortcut" class="menu-command"> Ctrl+X </kbd>
           </div>
-          <div role="menuitem"
+          <div data-slot="dropdown-menu-item"
+               role="menuitem"
                data-item="copy"
                class="menu-item"
                @on_click
@@ -97,9 +100,10 @@ let%expect_test "a right-click on the composer in the browser shell" =
                @on_mouseenter>
             <icon class="copy"> </icon>
             <span class="menu-label"> Copy </span>
-            <kbd class="menu-command"> Ctrl+C </kbd>
+            <kbd data-slot="dropdown-menu-shortcut" class="menu-command"> Ctrl+C </kbd>
           </div>
-          <div role="menuitem"
+          <div data-slot="dropdown-menu-item"
+               role="menuitem"
                data-item="paste"
                class="menu-item"
                @on_click
@@ -107,11 +111,12 @@ let%expect_test "a right-click on the composer in the browser shell" =
                @on_mouseenter>
             <icon class="clipboard"> </icon>
             <span class="menu-label"> Paste </span>
-            <kbd class="menu-command"> Ctrl+V </kbd>
+            <kbd data-slot="dropdown-menu-shortcut" class="menu-command"> Ctrl+V </kbd>
           </div>
         </div>
-        <div class="menu-section">
-          <div role="menuitem"
+        <div data-slot="dropdown-menu-group" role="group" class="menu-section">
+          <div data-slot="dropdown-menu-item"
+               role="menuitem"
                data-item="select_all"
                class="menu-item"
                @on_click
@@ -119,7 +124,7 @@ let%expect_test "a right-click on the composer in the browser shell" =
                @on_mouseenter>
             <icon class="lines"> </icon>
             <span class="menu-label"> Select all </span>
-            <kbd class="menu-command"> Ctrl+A </kbd>
+            <kbd data-slot="dropdown-menu-shortcut" class="menu-command"> Ctrl+A </kbd>
           </div>
         </div>
       </div>

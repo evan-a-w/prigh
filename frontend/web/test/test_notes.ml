@@ -202,13 +202,14 @@ let%expect_test
     (Rpc (method_ git_diff) (params ()) (tag Git_diff))
     (Focus dialog)
     <div id="dialog"
+         data-slot="dialog-content"
          role="dialog"
          aria-modal="true"
          aria-label="Changes"
          tabindex="-1"
          class="diff-dialog modal">
-      <header class="modal-head">
-        <h2> Changes </h2>
+      <header data-slot="dialog-header" class="modal-head">
+        <h2 data-slot="dialog-title"> Changes </h2>
         <button type="button" title="Close (Esc)" aria-label="Close" class="btn ghost icon" @on_click>
           <icon class="close"> </icon>
         </button>
@@ -293,7 +294,7 @@ let%expect_test
           </div>
         </details>
       </div>
-      <footer class="modal-buttons">
+      <footer data-slot="dialog-footer" class="modal-buttons">
         <span class="keys-hint"> /diff PATH shows one file or directory </span>
         <button type="button"
                 title="Approve and comment file by file (Alt+R, /review)"

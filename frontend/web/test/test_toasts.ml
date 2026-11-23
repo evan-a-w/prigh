@@ -91,17 +91,20 @@ let%expect_test "two at most, the newest; a repeat is counted, not stacked" =
     (Expire_toast (id 4) (after_ms 3020))
     <div class="toast-anchor">
       <div aria-live="polite" class="toasts">
-        <div role="status" title="Dismiss" class="toast" @on_click>
-          <span dir="auto"> Answered </span>
-          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+        <div role="status"
+             data-sonner-type="success"
+             title="Dismiss"
+             class="bg-popover border border-border flex gap-2 items-start leading-normal px-3.5 py-2.5 rounded-lg shadow-lg text-[13px] text-popover-foreground toast"
+             @on_click>
+          <span dir="auto" class="flex-1 font-medium min-w-0"> Answered </span>
         </div>
-        <div role="status" title="Dismiss" class="toast" @on_click>
-          <span dir="auto"> Copied the last reply to the clipboard </span>
-          <span class="toast-repeats"> ×3 </span>
-          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+        <div role="status"
+             data-sonner-type="success"
+             title="Dismiss"
+             class="bg-popover border border-border flex gap-2 items-start leading-normal px-3.5 py-2.5 rounded-lg shadow-lg text-[13px] text-popover-foreground toast"
+             @on_click>
+          <span dir="auto" class="flex-1 font-medium min-w-0"> Copied the last reply to the clipboard </span>
+          <span class="font-mono leading-[1.7] text-[11.5px] text-muted-foreground toast-repeats"> ×3 </span>
         </div>
       </div>
     </div>
@@ -121,23 +124,39 @@ let%expect_test "two at most, the newest; a repeat is counted, not stacked" =
     {|
     <div class="toast-anchor">
       <div aria-live="polite" class="toasts">
-        <div role="status" title="Dismiss" class="toast" @on_click>
-          <span dir="auto"> Copied the last reply to the clipboard </span>
-          <span class="toast-repeats"> ×3 </span>
-          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+        <div role="status"
+             data-sonner-type="success"
+             title="Dismiss"
+             class="bg-popover border border-border flex gap-2 items-start leading-normal px-3.5 py-2.5 rounded-lg shadow-lg text-[13px] text-popover-foreground toast"
+             @on_click>
+          <span dir="auto" class="flex-1 font-medium min-w-0"> Copied the last reply to the clipboard </span>
+          <span class="font-mono leading-[1.7] text-[11.5px] text-muted-foreground toast-repeats"> ×3 </span>
         </div>
         <div role="alert"
+             data-sonner-type="error"
              title="Working directory: /tmp/nix-shell.MOI5Ul/nix-shell.cHNpd9/tmp.bHrKSDsr6i/chromium/cwd (click to dismiss)"
-             class="error toast"
+             class="bg-popover border border-border error flex gap-2 items-start leading-normal px-3.5 py-2.5 rounded-lg shadow-lg text-[13px] text-popover-foreground toast"
              @on_click>
-          <span dir="auto"> Working directory: /tmp/…/chromium/cwd </span>
-          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-          <Vdom.Node.none-widget> </Vdom.Node.none-widget>
+          <svg xmlns="http://www.w3.org/2000/svg"
+               width="24"
+               height="24"
+               viewBox="0 0 24 24"
+               fill="none"
+               stroke="currentColor"
+               stroke-width="2"
+               stroke-linecap="round"
+               stroke-linejoin="round"
+               class="lucide lucide-circle-x mt-0.5 shrink-0 size-4 text-destructive">
+            <circle cx="12" cy="12" r="10"> </circle>
+            <path d="m15 9-6 6"> </path>
+            <path d="m9 9 6 6"> </path>
+          </svg>
+          <span dir="auto" class="flex-1 font-medium min-w-0"> Working directory: /tmp/…/chromium/cwd </span>
           <button type="button"
                   title="Dismiss"
                   aria-label="Dismiss"
-                  class="btn ghost icon toast-close"
+                  data-close-button=""
+                  class="-mr-1.5 -my-0.5 [&_svg:not([class*='size-'])]:size-3 [&_svg]:pointer-events-none [&_svg]:shrink-0 active:not-aria-[haspopup]:translate-y-px aria-expanded:bg-muted aria-expanded:text-foreground aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-clip-padding border border-transparent dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:hover:bg-muted/50 disabled:opacity-50 disabled:pointer-events-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 font-medium group/button hover:bg-muted hover:text-foreground in-data-[slot=button-group]:rounded-lg inline-flex items-center justify-center outline-none rounded-[min(var(--radius-md),10px)] rounded-lg select-none shrink-0 size-6 text-muted-foreground text-sm toast-close transition-all whitespace-nowrap"
                   @on_click>
             <icon class="close"> </icon>
           </button>
@@ -172,7 +191,7 @@ let%expect_test "toasts are not under a dialog's inert page" =
     <div class="context-ring-anchor">
     <div class="composer-buttons">
     <div class="tray">
-    <div class="toast">
+    <div class="bg-popover border border-border flex gap-2 items-start leading-normal px-3.5 py-2.5 rounded-lg shadow-lg text-[13px] text-popover-foreground toast">
     |}]
 ;;
 

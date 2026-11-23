@@ -238,10 +238,11 @@ let%expect_test "a session's menu: right-click, Shift+F10, ContextMenu, ⋯; Esc
     Pin to top P
     Archive A
     Delete… Delete
-    <div id="dialog"
+    <div data-slot="dropdown-menu-content"
          role="menu"
          aria-label="Session"
          tabindex="-1"
+         id="dialog"
          data-x="40"
          data-y="200"
          class="context-menu menu-surface">
@@ -255,79 +256,145 @@ let%expect_test "a session's menu: right-click, Shift+F10, ContextMenu, ⋯; Esc
           </span>
         </span>
       </div>
-      <div class="menu-section">
-        <div role="menuitem" data-item="open" class="menu-item selected" @on_click @on_mouseenter>
+      <div data-slot="dropdown-menu-group" role="group" class="menu-section">
+        <div data-slot="dropdown-menu-item"
+             role="menuitem"
+             data-item="open"
+             class="menu-item selected"
+             @on_click
+             @on_mouseenter>
           <icon class="arrow_down"> </icon>
           <span class="menu-label"> Open </span>
-          <kbd class="menu-command"> Enter </kbd>
+          <kbd data-slot="dropdown-menu-shortcut" class="menu-command"> Enter </kbd>
         </div>
-        <div role="menuitem" data-item="open_window" class="menu-item" @on_click @on_mouseenter>
+        <div data-slot="dropdown-menu-item"
+             role="menuitem"
+             data-item="open_window"
+             class="menu-item"
+             @on_click
+             @on_mouseenter>
           <icon class="external"> </icon>
           <span class="menu-label"> Open in new window </span>
           <Vdom.Node.none-widget> </Vdom.Node.none-widget>
         </div>
       </div>
-      <div class="menu-section">
-        <div role="menuitem" data-item="rename" class="menu-item" @on_click @on_mouseenter>
+      <div data-slot="dropdown-menu-group" role="group" class="menu-section">
+        <div data-slot="dropdown-menu-item"
+             role="menuitem"
+             data-item="rename"
+             class="menu-item"
+             @on_click
+             @on_mouseenter>
           <icon class="pencil"> </icon>
           <span class="menu-label"> Rename… </span>
-          <kbd class="menu-command"> /name </kbd>
+          <kbd data-slot="dropdown-menu-shortcut" class="menu-command"> /name </kbd>
         </div>
-        <div role="menuitem" data-item="fork" class="menu-item" @on_click @on_mouseenter>
+        <div data-slot="dropdown-menu-item"
+             role="menuitem"
+             data-item="fork"
+             class="menu-item"
+             @on_click
+             @on_mouseenter>
           <icon class="fork"> </icon>
           <span class="menu-label"> Fork… </span>
-          <kbd class="menu-command"> /fork </kbd>
+          <kbd data-slot="dropdown-menu-shortcut" class="menu-command"> /fork </kbd>
         </div>
-        <div role="menuitem" data-item="new_worktree" class="menu-item" @on_click @on_mouseenter>
+        <div data-slot="dropdown-menu-item"
+             role="menuitem"
+             data-item="new_worktree"
+             class="menu-item"
+             @on_click
+             @on_mouseenter>
           <icon class="branch_plus"> </icon>
           <span class="menu-label"> New worktree… </span>
-          <kbd class="menu-command"> /worktree new </kbd>
+          <kbd data-slot="dropdown-menu-shortcut" class="menu-command"> /worktree new </kbd>
         </div>
       </div>
-      <div class="menu-section">
-        <div role="menuitem" data-item="review" class="menu-item" @on_click @on_mouseenter>
+      <div data-slot="dropdown-menu-group" role="group" class="menu-section">
+        <div data-slot="dropdown-menu-item"
+             role="menuitem"
+             data-item="review"
+             class="menu-item"
+             @on_click
+             @on_mouseenter>
           <icon class="review"> </icon>
           <span class="menu-label"> Review changes </span>
-          <kbd class="menu-command"> /review </kbd>
+          <kbd data-slot="dropdown-menu-shortcut" class="menu-command"> /review </kbd>
         </div>
-        <div role="menuitem" data-item="files" class="menu-item" @on_click @on_mouseenter>
+        <div data-slot="dropdown-menu-item"
+             role="menuitem"
+             data-item="files"
+             class="menu-item"
+             @on_click
+             @on_mouseenter>
           <icon class="folder"> </icon>
           <span class="menu-label"> Open in file browser </span>
-          <kbd class="menu-command"> /files </kbd>
+          <kbd data-slot="dropdown-menu-shortcut" class="menu-command"> /files </kbd>
         </div>
-        <div role="menuitem" data-item="terminal" class="menu-item" @on_click @on_mouseenter>
+        <div data-slot="dropdown-menu-item"
+             role="menuitem"
+             data-item="terminal"
+             class="menu-item"
+             @on_click
+             @on_mouseenter>
           <icon class="terminal"> </icon>
           <span class="menu-label"> Open terminal there </span>
-          <kbd class="menu-command"> /terminal </kbd>
+          <kbd data-slot="dropdown-menu-shortcut" class="menu-command"> /terminal </kbd>
         </div>
       </div>
-      <div class="menu-section">
-        <div role="menuitem" data-item="copy_path" class="menu-item" @on_click @on_mouseenter>
+      <div data-slot="dropdown-menu-group" role="group" class="menu-section">
+        <div data-slot="dropdown-menu-item"
+             role="menuitem"
+             data-item="copy_path"
+             class="menu-item"
+             @on_click
+             @on_mouseenter>
           <icon class="copy"> </icon>
           <span class="menu-label"> Copy path </span>
           <Vdom.Node.none-widget> </Vdom.Node.none-widget>
         </div>
-        <div role="menuitem" data-item="copy_id" class="menu-item" @on_click @on_mouseenter>
+        <div data-slot="dropdown-menu-item"
+             role="menuitem"
+             data-item="copy_id"
+             class="menu-item"
+             @on_click
+             @on_mouseenter>
           <icon class="copy"> </icon>
           <span class="menu-label"> Copy session id </span>
           <Vdom.Node.none-widget> </Vdom.Node.none-widget>
         </div>
       </div>
-      <div class="menu-section">
-        <div role="menuitem" data-item="pin" class="menu-item" @on_click @on_mouseenter>
+      <div data-slot="dropdown-menu-group" role="group" class="menu-section">
+        <div data-slot="dropdown-menu-item"
+             role="menuitem"
+             data-item="pin"
+             class="menu-item"
+             @on_click
+             @on_mouseenter>
           <icon class="pin"> </icon>
           <span class="menu-label"> Pin to top </span>
-          <kbd class="menu-command"> P </kbd>
+          <kbd data-slot="dropdown-menu-shortcut" class="menu-command"> P </kbd>
         </div>
-        <div role="menuitem" data-item="archive" class="menu-item" @on_click @on_mouseenter>
+        <div data-slot="dropdown-menu-item"
+             role="menuitem"
+             data-item="archive"
+             class="menu-item"
+             @on_click
+             @on_mouseenter>
           <icon class="archive"> </icon>
           <span class="menu-label"> Archive </span>
-          <kbd class="menu-command"> A </kbd>
+          <kbd data-slot="dropdown-menu-shortcut" class="menu-command"> A </kbd>
         </div>
-        <div role="menuitem" data-item="delete" class="danger menu-item" @on_click @on_mouseenter>
+        <div data-slot="dropdown-menu-item"
+             role="menuitem"
+             data-variant="destructive"
+             data-item="delete"
+             class="danger menu-item"
+             @on_click
+             @on_mouseenter>
           <icon class="trash"> </icon>
           <span class="menu-label"> Delete… </span>
-          <kbd class="menu-command"> Delete </kbd>
+          <kbd data-slot="dropdown-menu-shortcut" class="menu-command"> Delete </kbd>
         </div>
       </div>
     </div>
