@@ -86,6 +86,26 @@ module Entry = struct
           }
       | Delete of { message : string }
       | Restore of { entry : string }
+      | Engine of
+          { engine : string
+          ; adapter : string option [@jsonaf.option] [@sexp.option]
+          }
+      | Thread of
+          { adapter : string
+          ; host : string
+          ; thread_id : string
+          ; cwd : string
+          }
+      | External_turn of
+          { thread_id : string
+          ; turn_id : string
+          ; through : string
+          }
+      | Handoff of
+          { from_adapter : string option [@jsonaf.option] [@sexp.option]
+          ; to_adapter : string
+          ; text : string
+          }
     [@@deriving sexp, jsonaf]
   end
 
@@ -206,6 +226,7 @@ module Path_state = struct
     ; reminders : Reminder.t list
     ; budget : float option option
     ; model : (string * Thinking.t) option
+    ; engine : (string * string option) option
     ; rev_allow_rules : string list
     ; rev_allowed_calls : Allowed_call.t list
     ; forgot_all : string option
@@ -226,6 +247,7 @@ module Path_state = struct
     ; reminders = []
     ; budget = None
     ; model = None
+    ; engine = None
     ; rev_allow_rules = []
     ; rev_allowed_calls = []
     ; forgot_all = None
@@ -400,6 +422,10 @@ let worth_saving (line : Line.t) =
           | Worktree_removed _
           | Home _
           | Transcript_filter _
+          | Engine _
+          | Thread _
+          | External_turn _
+          | Handoff _
           | Trim _
           | Untrim
           | Trim_after _
@@ -817,6 +843,10 @@ let step ~find position (s : Path_state.t) (e : Entry.t) : Path_state.t =
     | Worktree_removed _
     | Home _
     | Transcript_filter _
+    | Engine _
+    | Thread _
+    | External_turn _
+    | Handoff _
     | Review _ -> acc
   in
   let reply : Path_state.Reply.t option =
@@ -846,6 +876,7 @@ let step ~find position (s : Path_state.t) (e : Entry.t) : Path_state.t =
   | Reminders { reminders } -> { s with reminders }
   | Budget { usd } -> { s with budget = Some usd }
   | Model { model; thinking } -> { s with model = Some (model, thinking) }
+  | Engine { engine; adapter } -> { s with engine = Some (engine, adapter) }
   | Allow_rule { rule } ->
     { s with rev_allow_rules = rule :: s.rev_allow_rules }
   | Allowed_call call ->
@@ -873,6 +904,9 @@ let step ~find position (s : Path_state.t) (e : Entry.t) : Path_state.t =
   | Worktree_removed _
   | Home _
   | Transcript_filter _
+  | Thread _
+  | External_turn _
+  | Handoff _
   | Trim _
   | Untrim
   | Trim_after _
@@ -1016,6 +1050,10 @@ let add_entry t (entry : Entry.t) =
   | Untrim
   | Trim_after _
   | Delete _
+  | Engine _
+  | Thread _
+  | External_turn _
+  | Handoff _
   | Restore _ -> ()
   | Repo { cwd; repo } ->
     Hashtbl.set t.repos ~key:cwd ~data:repo;
@@ -1502,6 +1540,10 @@ let context_cwds t =
       | Worktree_removed _
       | Home _
       | Transcript_filter _
+      | Engine _
+      | Thread _
+      | External_turn _
+      | Handoff _
       | Trim _
       | Untrim
       | Trim_after _
@@ -1544,6 +1586,70 @@ let reminder_names t =
 
 let budget t = (derived t).state.budget
 let model t = (derived t).state.model
+
+module Thread = struct
+  type t =
+    { adapter : string
+    ; host : string
+    ; thread_id : string
+    ; cwd : string
+    }
+  [@@deriving sexp_of, equal]
+end
+
+module External_turn = struct
+  type t =
+    { thread_id : string
+    ; turn_id : string
+    ; through : string
+    }
+  [@@deriving sexp_of, equal]
+end
+
+let engine_entry t = (derived t).state.engine
+
+let engine t =
+  match engine_entry t with
+  | None -> Ok Engine_choice.harness
+  | Some (engine, adapter) -> Engine_choice.of_strings ~engine ~adapter
+;;
+
+let set_engine t (choice : Engine_choice.t) =
+  append
+    t
+    (Engine
+       { engine = Engine_id.to_string choice.engine
+       ; adapter = Option.map choice.adapter ~f:Adapter_id.to_string
+       })
+;;
+
+let threads t =
+  List.rev_filter_map (active_path t) ~f:(fun (e : Entry.t) ->
+    match e.payload with
+    | Thread { adapter; host; thread_id; cwd } ->
+      Some { Thread.adapter; host; thread_id; cwd }
+    | _ -> None)
+;;
+
+let record_thread t ({ adapter; host; thread_id; cwd } : Thread.t) =
+  append t (Thread { adapter; host; thread_id; cwd })
+;;
+
+let external_turns t =
+  List.filter_map (active_path t) ~f:(fun (e : Entry.t) ->
+    match e.payload with
+    | External_turn { thread_id; turn_id; through } ->
+      Some { External_turn.thread_id; turn_id; through }
+    | _ -> None)
+;;
+
+let record_external_turn t ({ thread_id; turn_id; through } : External_turn.t) =
+  append t (External_turn { thread_id; turn_id; through })
+;;
+
+let record_handoff t ~from_adapter ~to_adapter ~text =
+  append t (Handoff { from_adapter; to_adapter; text })
+;;
 
 let in_context t id =
   List.exists (context t) ~f:(fun (i, _) ->
@@ -1687,6 +1793,8 @@ let fork ?at t ~dir =
             | Spend _
             | Resume_at _
             | Agent_worktree _
+            | Thread _
+            | External_turn _
             | Transcript_filter _ -> None
             | payload -> Some payload
           in
@@ -1736,6 +1844,8 @@ module Summary = struct
     ; repo : Git_location.t option option
     ; worktrees : Session_worktree.t list
     ; home : Home.t option
+    ; engine : string option [@sexp.option]
+    ; adapter : string option [@sexp.option]
     }
   [@@deriving sexp]
 
@@ -1858,6 +1968,10 @@ let archived_and_activity t ~mtime =
         | Worktree_removed _
         | Home _
         | Transcript_filter _
+        | Engine _
+        | Thread _
+        | External_turn _
+        | Handoff _
         | Trim _
         | Untrim
         | Trim_after _
@@ -1929,6 +2043,8 @@ let summarise t ~path ~mtime =
   ; repo = repo t
   ; worktrees = worktrees t
   ; home = t.home
+  ; engine = Option.map (engine_entry t) ~f:fst
+  ; adapter = Option.bind (engine_entry t) ~f:snd
   }
 ;;
 
@@ -2305,6 +2421,10 @@ let to_markdown t =
     | Worktree_removed _
     | Home _
     | Transcript_filter _
+    | Engine _
+    | Thread _
+    | External_turn _
+    | Handoff _
     | Trim _
     | Untrim
     | Trim_after _
