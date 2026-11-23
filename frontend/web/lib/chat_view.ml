@@ -323,8 +323,16 @@ let thinking_step ~fold ~key ~live text =
 let stopped (message : Message.Assistant.t) =
   match message.stop_reason with
   | Error e ->
-    div
-      "stop error"
+    (* A loon Alert (destructive): what failed, then the way out. *)
+    Node.div
+      ~attrs:
+        [ Attr.create "data-slot" "alert"
+        ; Attr.class_
+            (Loon.Alert.classes
+               ~variant:Destructive
+               ~class_:"stop error flex flex-col gap-1 px-3.5 py-2.5"
+               ())
+        ]
       ([ span "title" "The model returned an error"
        ; div "detail" [ Node.text e ]
        ]
@@ -338,7 +346,15 @@ let stopped (message : Message.Assistant.t) =
               in the session)."
          ; Node.button
              ~attrs:
-               [ Attr.class_ "stop-action"
+               [ Attr.class_
+                   (Loon.Button.classes
+                      ~variant:Outline
+                      ~size:Sm
+                      ~class_:
+                        "stop-action mt-1 self-start border-destructive/40 dark:border-destructive/40 \
+                         text-destructive hover:bg-destructive/10 \
+                         hover:text-destructive pointer-coarse:h-11"
+                      ())
                ; Attr.type_ "button"
                ; Attr.create run_attribute "/downsize-images"
                ]
