@@ -1257,6 +1257,6 @@ let%expect_test "← → and Tab go along the chips; ← → the model menu's ra
     <div class="chip-popover menu-surface model-menu">
     <button class="favourites model-rail-tab on">
     (Chip_step 1)
-    <div class="bg-popover chip-popover menu-surface ring-1 ring-foreground/10 rounded-lg shadow-md text-popover-foreground">
+    <div class="bg-popover chip-popover loon menu-surface ring-1 ring-foreground/10 rounded-lg shadow-md text-popover-foreground">
     |}]
 ;;

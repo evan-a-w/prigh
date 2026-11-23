@@ -73,7 +73,7 @@ let card (m : App.Model.t) (state : State.t) ~inject =
   Node.div
     ~attrs:
       [ Attr.class_
-          "status-details context-card w-[260px] gap-x-4 gap-y-1.5 rounded-lg \
+          "loon status-details context-card w-[260px] gap-x-4 gap-y-1.5 rounded-lg \
            border-0 bg-popover p-3 text-xs whitespace-normal \
            text-popover-foreground shadow-md ring-1 ring-foreground/10 \
            grid-cols-[1fr_auto] narrow:fixed narrow:inset-x-0 narrow:top-auto \

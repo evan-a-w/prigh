@@ -254,7 +254,7 @@ let other (m : App.Model.t) ~(chip : Chip.t) (p : Picker.t) ~inject =
   Node.div
     ~attrs:
       [ Attr.class_
-          "chip-popover menu-surface bg-popover text-popover-foreground \
+          "loon chip-popover menu-surface bg-popover text-popover-foreground \
            rounded-lg shadow-md ring-1 ring-foreground/10"
       ; Attr.create "data-slot" "popover-content"
       ; Attr.id "chip-popover"

@@ -158,7 +158,7 @@ let view (m : App.Model.t) ~(root : Control_centre.t) ~options ~inject =
     [ Node.div
         ~attrs:
           [ Attr.class_
-              "control-centre flex max-h-[72vh] w-[min(640px,100%)] flex-col \
+              "loon control-centre flex max-h-[72vh] w-[min(640px,100%)] flex-col \
                overflow-hidden rounded-xl bg-popover text-popover-foreground \
                shadow-lg ring-1 ring-foreground/10 outline-none animate-in \
                fade-in-0 zoom-in-95 narrow:h-(--vvh,100dvh) narrow:max-h-none \
