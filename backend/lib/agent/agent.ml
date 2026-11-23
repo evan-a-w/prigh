@@ -642,10 +642,13 @@ let engine_choice t =
   |> Option.value ~default:Engine_choice.harness
 ;;
 
+(* A session that cannot run here (its engine is not deployed) can only be
+   read: nothing would put what it does in its harness's thread. *)
 let runner_capabilities t =
-  match t.runner with
-  | Some runner -> Runner.capabilities runner
-  | None -> Capabilities.harness
+  match t.runner, t.unavailable with
+  | Some runner, _ -> Runner.capabilities runner
+  | None, Some _ -> Capabilities.none
+  | None, None -> Capabilities.harness
 ;;
 
 (* A composer session's model is its harness's: the one that wrote its
@@ -3042,8 +3045,13 @@ let set_runner t runner =
 ;;
 
 let stop_engine t = Option.iter t.runner ~f:Runner.close
-let capabilities t = Runner.capabilities (runner t)
-let engine t = Runner.engine (runner t)
+let capabilities t = runner_capabilities t
+
+let engine t =
+  match t.runner, t.unavailable with
+  | None, Some _ -> (engine_choice t).engine
+  | _ -> Runner.engine (runner t)
+;;
 
 let engine_label t =
   match engine t, (engine_choice t).adapter with
@@ -3061,7 +3069,6 @@ let own_loop t =
 
 (* Who a usage limit is with: the model, or the external harness. *)
 let limited_by t = if own_loop t then Model.key t.model else engine_label t
-;;
 
 let require t feature =
   Capabilities.check (capabilities t) feature ~who:(engine_label t)
@@ -3500,12 +3507,18 @@ let name_subagent t ~task ~siblings ~cancel =
   |> Result.ok
 ;;
 
+(* No run starts on a session this backend cannot run (its engine is not
+   deployed here): neither the user's nor mail, resumes, goals or
+   background reports, which would otherwise run the harness in its place. *)
 let rec start_run
           ?(tried = String.Set.empty)
           ?(then_ = fun ~cancel:_ -> [])
           t
           prompts
   =
+  if Option.is_none t.unavailable then run_now ~tried ~then_ t prompts
+
+and run_now ~tried ~then_ t prompts =
   if not t.chat_mode then refresh_location t;
   cancel_resume_timer t;
   close_interrupted t;
@@ -4918,7 +4931,7 @@ let set_goal t text =
     Or_error.error_string
       "say what done means, e.g. /goal all tests pass (/goal off clears it)"
   else (
-    match budget_exhausted t with
+    match Option.first_some t.unavailable (budget_exhausted t) with
     | Some reason -> Or_error.error_string reason
     | None ->
       let goal = Goal.create text in
@@ -4943,7 +4956,7 @@ let resume_goal t =
   | Some goal when Goal.is_active goal ->
     Or_error.error_string "the goal is already active"
   | Some goal ->
-    (match budget_exhausted t with
+    (match Option.first_some t.unavailable (budget_exhausted t) with
      | Some reason -> Or_error.error_string reason
      | None ->
        let goal = { goal with status = Active; continuations = 0 } in
@@ -5167,6 +5180,11 @@ let replace_session t session ~keep_host =
   Background_tasks.cancel_all ~discard:true t.background;
   wait_idle t;
   Background_tasks.forget_finished t.background;
+  (* The old session's engine drives its own thread: the new one gets its
+     own, from whoever attaches it. *)
+  Option.iter t.runner ~f:Runner.close;
+  t.runner <- None;
+  t.unavailable <- None;
   t.session <- session;
   Hashtbl.clear t.judgements;
   t.tracer <- tracer_for ~clock:t.trace_clock ~config:t.config session;

@@ -56,6 +56,9 @@ type t =
 (** prigh's own harness: everything. *)
 val harness : t
 
+(** A session whose engine does not run here: nothing but reading it. *)
+val none : t
+
 (** What a request can need of its session's engine. *)
 module Feature : sig
   type t =

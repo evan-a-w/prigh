@@ -62,6 +62,21 @@ let harness =
   }
 ;;
 
+let none =
+  { fork = Unsupported
+  ; rewind = Unsupported
+  ; context_edit = false
+  ; compact = Unsupported
+  ; steer = Between_turns
+  ; plan_mode = false
+  ; btw = false
+  ; subagents = Observe
+  ; model_fallback = false
+  ; images = false
+  ; ask_user = false
+  }
+;;
+
 module Feature = struct
   type t =
     | Fork
