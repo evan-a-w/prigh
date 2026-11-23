@@ -29,7 +29,7 @@ let key_table rows =
 
 let hotkeys ~inject =
   Modal.view
-    ~cls:"help-dialog"
+    ~cls:"help-dialog w-[min(720px,100%)]"
     ~title:"Keyboard shortcuts"
     ~on_close:(inject Action.Close_dialog)
     ~footer:[ keys_hint "/help also lists the commands"; done_button ~inject ]
@@ -161,7 +161,9 @@ let prompt (m : App.Model.t) (p : Prompt.t) ~inject =
     | _ -> Node.none
   in
   Modal.view
-    ~cls:"prompt-dialog"
+    ~cls:
+      "prompt-dialog [&_.text-input]:w-full [&_.text-input]:font-mono \
+       [&_.text-input]:text-[13px]"
     ~title
     ~on_close:(inject Action.Close_dialog)
     ~footer:
@@ -199,7 +201,11 @@ let prompt (m : App.Model.t) (p : Prompt.t) ~inject =
        | [] -> Node.none
        | suggestions ->
          div
-           ~cls:"suggestions"
+           ~cls:
+             "suggestions mt-2 flex max-h-[260px] flex-col gap-px \
+              overflow-y-auto [&_.icon]:size-3.5 \
+              [&_.icon]:text-muted-foreground [&_.picker-label]:truncate \
+              [&_.picker-label]:font-mono [&_.picker-label]:text-[12.5px]"
            ~attrs:[ Attr.role "listbox" ]
            (List.mapi (List.take suggestions 12) ~f:(fun i path ->
               Node.div
@@ -231,7 +237,7 @@ let create_dir (m : App.Model.t) ~target ~path ~busy ~error ~inject =
     | Cwd -> active_host_name m
   in
   Modal.view
-    ~cls:"create-dir-dialog"
+    ~cls:"create-dir-dialog [&_p]:mb-2"
     ~title:"Create folder?"
     ~on_close:(inject Action.Close_dialog)
     ~footer:
@@ -250,7 +256,13 @@ let create_dir (m : App.Model.t) ~target ~path ~busy ~error ~inject =
              | Some host -> sprintf "This folder doesn't exist on %s:" host
              | None -> "This folder doesn't exist:")
         ]
-    ; Node.p ~attrs:[ Attr.class_ "create-dir-path" ] [ Node.text path ]
+    ; Node.p
+        ~attrs:
+          [ Attr.class_
+              "create-dir-path rounded-md bg-muted px-3 py-2 font-mono \
+               text-[13px] break-words text-foreground"
+          ]
+        [ Node.text path ]
     ; Node.p
         ~attrs:[ Attr.class_ "dialog-note" ]
         [ Node.text
@@ -301,12 +313,15 @@ let new_worktree (m : App.Model.t) (d : New_worktree.t) ~inject =
                 inject (Action.New_worktree_input { field = f; text }))
             ]
           ()
-      ; span ~cls:"field-note" note
+      ; span ~cls:"field-note text-[11.5px] text-muted-foreground" note
       ]
   in
   let head = Option.value d.head ~default:"HEAD" in
   Modal.view
-    ~cls:"prompt-dialog worktree-dialog"
+    ~cls:
+      "prompt-dialog [&_.text-input]:w-full [&_.text-input]:font-mono \
+       [&_.text-input]:text-[13px] worktree-dialog [&_.field+.field]:mt-3 \
+       [&_.dialog-note]:mt-3 [&_.dialog-note]:mb-0"
     ~title:"New worktree"
     ~on_close:(inject Action.Close_dialog)
     ~footer:
@@ -379,7 +394,7 @@ let remove_worktree (w : Worktree.t) ~force ~busy ~error ~inject =
       ]
   in
   Modal.view
-    ~cls:"remove-worktree-dialog"
+    ~cls:"remove-worktree-dialog [&_p]:mb-2 [&_p]:break-words"
     ~title:
       (if dirty then "Remove worktree with changes?" else "Remove worktree?")
     ~on_close:(inject Action.Close_dialog)
@@ -419,7 +434,11 @@ let rewind_confirm ~text ~inject =
       ]
     [ Node.p [ Node.text "The conversation goes back to:" ]
     ; Node.blockquote
-        ~attrs:[ Attr.class_ "rewind-quote" ]
+        ~attrs:
+          [ Attr.class_
+              "rewind-quote mb-2.5 rounded-r-md border-l-2 border-primary \
+               bg-muted px-3 py-2 whitespace-pre-wrap"
+          ]
         [ Node.text (String.prefix text 400) ]
     ; Node.p
         ~attrs:[ Attr.class_ "dialog-note" ]
@@ -453,14 +472,20 @@ let trim_confirm (m : App.Model.t) (point : Trim.Point.t) ~busy ~error ~inject =
             (if point.reply then "reply" else "message")
         ]
     ; Node.blockquote
-        ~attrs:[ Attr.class_ "rewind-quote" ]
+        ~attrs:
+          [ Attr.class_
+              "rewind-quote mb-2.5 rounded-r-md border-l-2 border-primary \
+               bg-muted px-3 py-2 whitespace-pre-wrap"
+          ]
         [ Node.text
             (if String.is_empty text
              then "(an image)"
              else String.prefix text 400)
         ; Option.value_map point.at ~default:Node.none ~f:(fun at ->
             span
-              ~cls:"quote-time"
+              ~cls:
+                "quote-time mt-1 block font-mono text-[11.5px] \
+                 text-muted-foreground"
               (Message_time.short (App.Model.message_time m) at))
         ]
     ; Node.p
@@ -507,14 +532,20 @@ let trim_after_confirm
             (Trim.tokens_label freed.tokens)
         ]
     ; Node.blockquote
-        ~attrs:[ Attr.class_ "rewind-quote" ]
+        ~attrs:
+          [ Attr.class_
+              "rewind-quote mb-2.5 rounded-r-md border-l-2 border-primary \
+               bg-muted px-3 py-2 whitespace-pre-wrap"
+          ]
         [ Node.text
             (if String.is_empty text
              then "(an image)"
              else String.prefix text 400)
         ; Option.value_map point.at ~default:Node.none ~f:(fun at ->
             span
-              ~cls:"quote-time"
+              ~cls:
+                "quote-time mt-1 block font-mono text-[11.5px] \
+                 text-muted-foreground"
               (Message_time.short (App.Model.message_time m) at))
         ]
     ; Node.p
@@ -577,7 +608,12 @@ let duration seconds =
 
 let rows list =
   Node.dl
-    ~attrs:[ Attr.class_ "info-list" ]
+    ~attrs:
+      [ Attr.class_
+          "info-list mb-3 grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 \
+           text-xs [&_dt]:text-muted-foreground [&_dd]:m-0 [&_dd]:min-w-0 \
+           [&_dd]:break-words"
+      ]
     (List.concat_map list ~f:(fun (k, v) ->
        [ Node.dt [ Node.text k ]; Node.dd [ Node.text v ] ]))
 ;;
@@ -608,7 +644,7 @@ let session (m : App.Model.t) (s : Session_stats.t) ~inject =
         (List.map calls ~f:(fun (name, n) -> sprintf "%s %d" name n))
   in
   Modal.view
-    ~cls:"session-dialog"
+    ~cls:"session-dialog w-[min(600px,100%)]"
     ~title:"Session"
     ~on_close:(inject Action.Close_dialog)
     ~footer:
@@ -619,7 +655,7 @@ let session (m : App.Model.t) (s : Session_stats.t) ~inject =
       ]
     [ rows info
     ; div
-        ~cls:"stats-grid"
+        ~cls:"stats-grid mb-3 grid grid-cols-4 gap-2 narrow:grid-cols-2"
         (List.map
            [ "Messages", Int.to_string s.message_count
            ; "Turns", Int.to_string s.turns
@@ -632,8 +668,14 @@ let session (m : App.Model.t) (s : Session_stats.t) ~inject =
            ]
            ~f:(fun (k, v) ->
              div
-               ~cls:"stat"
-               [ span ~cls:"stat-value" v; span ~cls:"stat-label" k ]))
+               ~cls:"stat flex flex-col rounded-md bg-muted px-2.5 py-2"
+               [ span
+                   ~cls:
+                     "stat-value font-mono text-[15px] font-semibold \
+                      tabular-nums"
+                   v
+               ; span ~cls:"stat-label text-[11.5px] text-muted-foreground" k
+               ]))
     ; rows
         [ "Tools", tools
         ; "Model changes", Int.to_string s.model_changes
@@ -648,11 +690,20 @@ let session (m : App.Model.t) (s : Session_stats.t) ~inject =
 
 let text ~title ~text ~inject =
   Modal.view
-    ~cls:"text-dialog"
+    ~cls:"text-dialog w-[min(720px,100%)]"
     ~title
     ~on_close:(inject Action.Close_dialog)
     ~footer:[ done_button ~inject ]
-    [ Node.pre ~attrs:[ Attr.class_ "text-block" ] [ Node.text text ] ]
+    [ Node.pre
+        ~attrs:
+          [ Attr.class_
+              "text-block mt-1.5 max-h-[40vh] overflow-auto rounded-md border \
+               border-border bg-muted px-3 py-2.5 font-mono text-xs \
+               leading-normal break-words whitespace-pre-wrap \
+               in-[.text-dialog]:max-h-none in-[.text-dialog]:overflow-visible"
+          ]
+        [ Node.text text ]
+    ]
 ;;
 
 (* [/permissions]: the remembered calls come from the state, so one forgotten
@@ -663,7 +714,9 @@ let permissions (m : App.Model.t) ~rules ~hint ~inject =
       s.allowed_calls)
   in
   Modal.view
-    ~cls:"text-dialog permissions-dialog"
+    ~cls:
+      "text-dialog w-[min(720px,100%)] permissions-dialog [&_.modal-body]:flex \
+       [&_.modal-body]:flex-col [&_.modal-body]:gap-2.5 [&_.dialog-note]:m-0"
     ~title:"Permissions"
     ~on_close:(inject Action.Close_dialog)
     ~footer:
@@ -679,12 +732,24 @@ let permissions (m : App.Model.t) ~rules ~hint ~inject =
               [ Node.text "Forget all" ]
           ])
        @ [ done_button ~inject ])
-    [ Node.pre ~attrs:[ Attr.class_ "text-block" ] [ Node.text rules ]
+    [ Node.pre
+        ~attrs:
+          [ Attr.class_
+              "text-block mt-1.5 max-h-[40vh] overflow-auto rounded-md border \
+               border-border bg-muted px-3 py-2.5 font-mono text-xs \
+               leading-normal break-words whitespace-pre-wrap \
+               in-[.text-dialog]:max-h-none in-[.text-dialog]:overflow-visible"
+          ]
+        [ Node.text rules ]
     ; (match calls with
        | [] -> Node.none
        | calls ->
          Node.div
-           ~attrs:[ Attr.class_ "allowed-calls" ]
+           ~attrs:
+             [ Attr.class_
+                 "allowed-calls [&_ul]:mt-1.5 [&_ul]:flex [&_ul]:list-none \
+                  [&_ul]:flex-col [&_ul]:gap-1 [&_ul]:p-0"
+             ]
            [ Node.p
                ~attrs:[ Attr.class_ "dialog-note" ]
                [ Node.text
@@ -697,8 +762,17 @@ let permissions (m : App.Model.t) ~rules ~hint ~inject =
            ; Node.ul
                (List.map calls ~f:(fun line ->
                   Node.li
-                    ~attrs:[ Attr.class_ "allowed-call" ]
-                    [ span ~cls:"allowed-call-text" line
+                    ~attrs:
+                      [ Attr.class_
+                          "allowed-call flex items-center gap-2.5 rounded-md \
+                           border border-border bg-muted py-1.5 pr-1.5 pl-3 \
+                           [&_.forget]:shrink-0 narrow:[&_.forget]:min-h-11"
+                      ]
+                    [ span
+                        ~cls:
+                          "allowed-call-text min-w-0 flex-auto font-mono \
+                           text-xs leading-normal break-words"
+                        line
                     ; button
                         ~cls:"small forget"
                         ~title:"Forget it: smart mode judges it again"
@@ -722,7 +796,7 @@ let pasted (m : App.Model.t) i ~inject =
   | Some t ->
     Some
       (Modal.view
-         ~cls:"text-dialog pasted-dialog"
+         ~cls:"text-dialog w-[min(720px,100%)] pasted-dialog"
          ~title:
            (sprintf
               "%s · %s"
@@ -743,7 +817,17 @@ let pasted (m : App.Model.t) i ~inject =
                [ Node.text "Insert as text" ]
            ; done_button ~inject
            ]
-         [ Node.pre ~attrs:[ Attr.class_ "text-block" ] [ Node.text t ] ])
+         [ Node.pre
+             ~attrs:
+               [ Attr.class_
+                   "text-block mt-1.5 max-h-[40vh] overflow-auto rounded-md \
+                    border border-border bg-muted px-3 py-2.5 font-mono \
+                    text-xs leading-normal break-words whitespace-pre-wrap \
+                    in-[.text-dialog]:max-h-none \
+                    in-[.text-dialog]:overflow-visible"
+               ]
+             [ Node.text t ]
+         ])
 ;;
 
 let mcp_sign_in ~server ~url ~error ~inject =
@@ -777,14 +861,20 @@ let mcp_sign_in ~server ~url ~error ~inject =
                  ; Attr.class_ "btn primary link-button mcp-sign-in-open"
                  ]
                [ Node.text "Open the sign-in page"; icon External ]
-           ; div ~cls:"login-url-text" [ Node.text url ]
+           ; div
+               ~cls:
+                 "login-url-text font-mono text-[11.5px] break-all \
+                  text-muted-foreground"
+               [ Node.text url ]
            ])
     ]
 ;;
 
 let mcp_tools (server : Mcp_server.t) ~inject =
   Modal.view
-    ~cls:"mcp-tools-dialog"
+    ~cls:
+      "mcp-tools-dialog w-[min(720px,100%)] [&_.dialog-note]:font-mono \
+       [&_.dialog-note]:text-[11.5px] [&_.dialog-note]:break-words"
     ~title:
       (sprintf
          "%s: %s"

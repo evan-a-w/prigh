@@ -72,59 +72,71 @@ let%expect_test "a right-click on the composer in the browser shell" =
   [%expect
     {|
     (Place_field_menu (Point (x 200) (y 500)))
-    <div class="context-menu-backdrop field-menu-backdrop menu-backdrop" @on_click @on_contextmenu>
+    <div @key=menu
+         class="context-menu-backdrop field-menu-backdrop menu-backdrop z-(--z-field-menu)"
+         @on_click
+         @on_contextmenu>
       <div data-slot="dropdown-menu-content"
            role="menu"
            aria-label="Edit"
            tabindex="-1"
            id="field-menu"
-           class="context-menu field-menu menu-surface">
-        <div data-slot="dropdown-menu-group" role="group" class="menu-section">
+           class="[&:not(.placed)]:opacity-0 [&:not(.placed)]:pointer-events-none [&_.menu-label]:shrink-0 animate-in bg-popover cn-menu-target context-menu duration-100 fade-in-0 field-menu fixed loon max-[760px]:[&_.menu-item]:min-h-10 max-[760px]:[&_.menu-item]:text-[15px] max-[760px]:bottom-2 max-[760px]:left-2! max-[760px]:max-w-none max-[760px]:right-2 max-[760px]:top-auto! max-h-[calc(100vh-16px)] max-w-[min(360px,calc(100vw-16px))] menu-surface min-w-32 min-w-[200px] min-w-[248px] motion-reduce:animate-none narrow:[&_.menu-item]:min-h-11! narrow:animate-[sheet-up_0.18s_ease-out] narrow:border-border narrow:border-t narrow:overscroll-contain narrow:pb-[max(8px,var(--safe-b))] narrow:pl-[max(8px,var(--safe-l))] narrow:pr-[max(8px,var(--safe-r))] narrow:pt-0 narrow:ring-0 narrow:rounded-b-none narrow:rounded-t-xl narrow:shadow-[0_-12px_40px_-12px_var(--edge-shadow)] narrow:z-(--z-menu-surface) overflow-x-hidden overflow-y-auto p-1 ring-1 ring-foreground/10 rounded-lg shadow-md text-popover-foreground zoom-in-95">
+        <div data-slot="dropdown-menu-group"
+             role="group"
+             class=" [&+&]:-mx-1 [&+&]:border-border [&+&]:border-t [&+&]:mt-1 [&+&]:pt-1 [&+&]:px-1 flex flex-col menu-section">
           <div data-slot="dropdown-menu-item"
+               data-highlighted=""
                role="menuitem"
                data-item="cut"
-               class="menu-item selected"
+               class="[&>.icon]:shrink-0 [&>.icon]:size-4 [&>.icon]:text-muted-foreground aria-disabled:*:opacity-50 aria-disabled:hover:bg-transparent aria-disabled:hover:text-inherit cursor-default data-[variant=destructive]:[&>.icon]:text-destructive data-[variant=destructive]:data-highlighted:bg-destructive/10 data-[variant=destructive]:data-highlighted:text-destructive data-[variant=destructive]:hover:bg-destructive/10 data-[variant=destructive]:hover:text-destructive data-[variant=destructive]:text-destructive data-highlighted:[&>.icon]:text-accent-foreground data-highlighted:bg-accent data-highlighted:text-accent-foreground flex gap-1.5 group/dropdown-menu-item hover:[&>.icon]:text-accent-foreground hover:bg-accent hover:text-accent-foreground items-center menu-item narrow:min-h-11 outline-hidden px-1.5 py-1 relative rounded-md select-none selected text-sm"
                @on_click
                @on_mousedown
                @on_mouseenter>
             <icon class="scissors"> </icon>
-            <span class="menu-label"> Cut </span>
-            <kbd data-slot="dropdown-menu-shortcut" class="menu-command"> Ctrl+X </kbd>
+            <span class="menu-label truncate"> Cut </span>
+            <kbd data-slot="dropdown-menu-shortcut"
+                 class="font-mono group-data-highlighted/dropdown-menu-item:text-accent-foreground group-hover/dropdown-menu-item:text-accent-foreground menu-command min-w-0 ml-auto pl-3 text-muted-foreground text-xs truncate"> Ctrl+X </kbd>
           </div>
           <div data-slot="dropdown-menu-item"
                role="menuitem"
                data-item="copy"
-               class="menu-item"
+               class="[&>.icon]:shrink-0 [&>.icon]:size-4 [&>.icon]:text-muted-foreground aria-disabled:*:opacity-50 aria-disabled:hover:bg-transparent aria-disabled:hover:text-inherit cursor-default data-[variant=destructive]:[&>.icon]:text-destructive data-[variant=destructive]:data-highlighted:bg-destructive/10 data-[variant=destructive]:data-highlighted:text-destructive data-[variant=destructive]:hover:bg-destructive/10 data-[variant=destructive]:hover:text-destructive data-[variant=destructive]:text-destructive data-highlighted:[&>.icon]:text-accent-foreground data-highlighted:bg-accent data-highlighted:text-accent-foreground flex gap-1.5 group/dropdown-menu-item hover:[&>.icon]:text-accent-foreground hover:bg-accent hover:text-accent-foreground items-center menu-item narrow:min-h-11 outline-hidden px-1.5 py-1 relative rounded-md select-none text-sm"
                @on_click
                @on_mousedown
                @on_mouseenter>
             <icon class="copy"> </icon>
-            <span class="menu-label"> Copy </span>
-            <kbd data-slot="dropdown-menu-shortcut" class="menu-command"> Ctrl+C </kbd>
+            <span class="menu-label truncate"> Copy </span>
+            <kbd data-slot="dropdown-menu-shortcut"
+                 class="font-mono group-data-highlighted/dropdown-menu-item:text-accent-foreground group-hover/dropdown-menu-item:text-accent-foreground menu-command min-w-0 ml-auto pl-3 text-muted-foreground text-xs truncate"> Ctrl+C </kbd>
           </div>
           <div data-slot="dropdown-menu-item"
                role="menuitem"
                data-item="paste"
-               class="menu-item"
+               class="[&>.icon]:shrink-0 [&>.icon]:size-4 [&>.icon]:text-muted-foreground aria-disabled:*:opacity-50 aria-disabled:hover:bg-transparent aria-disabled:hover:text-inherit cursor-default data-[variant=destructive]:[&>.icon]:text-destructive data-[variant=destructive]:data-highlighted:bg-destructive/10 data-[variant=destructive]:data-highlighted:text-destructive data-[variant=destructive]:hover:bg-destructive/10 data-[variant=destructive]:hover:text-destructive data-[variant=destructive]:text-destructive data-highlighted:[&>.icon]:text-accent-foreground data-highlighted:bg-accent data-highlighted:text-accent-foreground flex gap-1.5 group/dropdown-menu-item hover:[&>.icon]:text-accent-foreground hover:bg-accent hover:text-accent-foreground items-center menu-item narrow:min-h-11 outline-hidden px-1.5 py-1 relative rounded-md select-none text-sm"
                @on_click
                @on_mousedown
                @on_mouseenter>
             <icon class="clipboard"> </icon>
-            <span class="menu-label"> Paste </span>
-            <kbd data-slot="dropdown-menu-shortcut" class="menu-command"> Ctrl+V </kbd>
+            <span class="menu-label truncate"> Paste </span>
+            <kbd data-slot="dropdown-menu-shortcut"
+                 class="font-mono group-data-highlighted/dropdown-menu-item:text-accent-foreground group-hover/dropdown-menu-item:text-accent-foreground menu-command min-w-0 ml-auto pl-3 text-muted-foreground text-xs truncate"> Ctrl+V </kbd>
           </div>
         </div>
-        <div data-slot="dropdown-menu-group" role="group" class="menu-section">
+        <div data-slot="dropdown-menu-group"
+             role="group"
+             class=" [&+&]:-mx-1 [&+&]:border-border [&+&]:border-t [&+&]:mt-1 [&+&]:pt-1 [&+&]:px-1 flex flex-col menu-section">
           <div data-slot="dropdown-menu-item"
                role="menuitem"
                data-item="select_all"
-               class="menu-item"
+               class="[&>.icon]:shrink-0 [&>.icon]:size-4 [&>.icon]:text-muted-foreground aria-disabled:*:opacity-50 aria-disabled:hover:bg-transparent aria-disabled:hover:text-inherit cursor-default data-[variant=destructive]:[&>.icon]:text-destructive data-[variant=destructive]:data-highlighted:bg-destructive/10 data-[variant=destructive]:data-highlighted:text-destructive data-[variant=destructive]:hover:bg-destructive/10 data-[variant=destructive]:hover:text-destructive data-[variant=destructive]:text-destructive data-highlighted:[&>.icon]:text-accent-foreground data-highlighted:bg-accent data-highlighted:text-accent-foreground flex gap-1.5 group/dropdown-menu-item hover:[&>.icon]:text-accent-foreground hover:bg-accent hover:text-accent-foreground items-center menu-item narrow:min-h-11 outline-hidden px-1.5 py-1 relative rounded-md select-none text-sm"
                @on_click
                @on_mousedown
                @on_mouseenter>
             <icon class="lines"> </icon>
-            <span class="menu-label"> Select all </span>
-            <kbd data-slot="dropdown-menu-shortcut" class="menu-command"> Ctrl+A </kbd>
+            <span class="menu-label truncate"> Select all </span>
+            <kbd data-slot="dropdown-menu-shortcut"
+                 class="font-mono group-data-highlighted/dropdown-menu-item:text-accent-foreground group-hover/dropdown-menu-item:text-accent-foreground menu-command min-w-0 ml-auto pl-3 text-muted-foreground text-xs truncate"> Ctrl+A </kbd>
           </div>
         </div>
       </div>
@@ -164,16 +176,16 @@ let%expect_test "nothing selected: Cut and Copy are disabled" =
     [menuitem] div "Copy Ctrl+C"
     [menuitem] div "Paste Ctrl+V"
     [menuitem] div "Select all Ctrl+A"
-    <div class="disabled menu-item">
-    <div class="disabled menu-item">
-    <div class="menu-item selected">
-    <div class="menu-item">
+    <div class="[&>.icon]:shrink-0 [&>.icon]:size-4 [&>.icon]:text-muted-foreground aria-disabled:*:opacity-50 aria-disabled:hover:bg-transparent aria-disabled:hover:text-inherit cursor-default data-[variant=destructive]:[&>.icon]:text-destructive data-[variant=destructive]:data-highlighted:bg-destructive/10 data-[variant=destructive]:data-highlighted:text-destructive data-[variant=destructive]:hover:bg-destructive/10 data-[variant=destructive]:hover:text-destructive data-[variant=destructive]:text-destructive data-highlighted:[&>.icon]:text-accent-foreground data-highlighted:bg-accent data-highlighted:text-accent-foreground disabled flex gap-1.5 group/dropdown-menu-item hover:[&>.icon]:text-accent-foreground hover:bg-accent hover:text-accent-foreground items-center menu-item narrow:min-h-11 outline-hidden px-1.5 py-1 relative rounded-md select-none text-sm">
+    <div class="[&>.icon]:shrink-0 [&>.icon]:size-4 [&>.icon]:text-muted-foreground aria-disabled:*:opacity-50 aria-disabled:hover:bg-transparent aria-disabled:hover:text-inherit cursor-default data-[variant=destructive]:[&>.icon]:text-destructive data-[variant=destructive]:data-highlighted:bg-destructive/10 data-[variant=destructive]:data-highlighted:text-destructive data-[variant=destructive]:hover:bg-destructive/10 data-[variant=destructive]:hover:text-destructive data-[variant=destructive]:text-destructive data-highlighted:[&>.icon]:text-accent-foreground data-highlighted:bg-accent data-highlighted:text-accent-foreground disabled flex gap-1.5 group/dropdown-menu-item hover:[&>.icon]:text-accent-foreground hover:bg-accent hover:text-accent-foreground items-center menu-item narrow:min-h-11 outline-hidden px-1.5 py-1 relative rounded-md select-none text-sm">
+    <div class="[&>.icon]:shrink-0 [&>.icon]:size-4 [&>.icon]:text-muted-foreground aria-disabled:*:opacity-50 aria-disabled:hover:bg-transparent aria-disabled:hover:text-inherit cursor-default data-[variant=destructive]:[&>.icon]:text-destructive data-[variant=destructive]:data-highlighted:bg-destructive/10 data-[variant=destructive]:data-highlighted:text-destructive data-[variant=destructive]:hover:bg-destructive/10 data-[variant=destructive]:hover:text-destructive data-[variant=destructive]:text-destructive data-highlighted:[&>.icon]:text-accent-foreground data-highlighted:bg-accent data-highlighted:text-accent-foreground flex gap-1.5 group/dropdown-menu-item hover:[&>.icon]:text-accent-foreground hover:bg-accent hover:text-accent-foreground items-center menu-item narrow:min-h-11 outline-hidden px-1.5 py-1 relative rounded-md select-none selected text-sm">
+    <div class="[&>.icon]:shrink-0 [&>.icon]:size-4 [&>.icon]:text-muted-foreground aria-disabled:*:opacity-50 aria-disabled:hover:bg-transparent aria-disabled:hover:text-inherit cursor-default data-[variant=destructive]:[&>.icon]:text-destructive data-[variant=destructive]:data-highlighted:bg-destructive/10 data-[variant=destructive]:data-highlighted:text-destructive data-[variant=destructive]:hover:bg-destructive/10 data-[variant=destructive]:hover:text-destructive data-[variant=destructive]:text-destructive data-highlighted:[&>.icon]:text-accent-foreground data-highlighted:bg-accent data-highlighted:text-accent-foreground flex gap-1.5 group/dropdown-menu-item hover:[&>.icon]:text-accent-foreground hover:bg-accent hover:text-accent-foreground items-center menu-item narrow:min-h-11 outline-hidden px-1.5 py-1 relative rounded-md select-none text-sm">
     |}];
   (* A click on one does nothing, and leaves the menu open. *)
   H.click h ~selector:".field-menu [data-item=cut]";
   H.click h ~selector:".field-menu [data-item=copy]";
   H.elements h ~selector:".field-menu";
-  [%expect {| <div class="context-menu field-menu menu-surface"> |}];
+  [%expect {| <div class="[&:not(.placed)]:opacity-0 [&:not(.placed)]:pointer-events-none [&_.menu-label]:shrink-0 animate-in bg-popover cn-menu-target context-menu duration-100 fade-in-0 field-menu fixed loon max-[760px]:[&_.menu-item]:min-h-10 max-[760px]:[&_.menu-item]:text-[15px] max-[760px]:bottom-2 max-[760px]:left-2! max-[760px]:max-w-none max-[760px]:right-2 max-[760px]:top-auto! max-h-[calc(100vh-16px)] max-w-[min(360px,calc(100vw-16px))] menu-surface min-w-32 min-w-[200px] min-w-[248px] motion-reduce:animate-none narrow:[&_.menu-item]:min-h-11! narrow:animate-[sheet-up_0.18s_ease-out] narrow:border-border narrow:border-t narrow:overscroll-contain narrow:pb-[max(8px,var(--safe-b))] narrow:pl-[max(8px,var(--safe-l))] narrow:pr-[max(8px,var(--safe-r))] narrow:pt-0 narrow:ring-0 narrow:rounded-b-none narrow:rounded-t-xl narrow:shadow-[0_-12px_40px_-12px_var(--edge-shadow)] narrow:z-(--z-menu-surface) overflow-x-hidden overflow-y-auto p-1 ring-1 ring-foreground/10 rounded-lg shadow-md text-popover-foreground zoom-in-95"> |}];
   (* The keyboard skips them. *)
   H.key h "ArrowDown";
   H.key h "ArrowDown";
@@ -182,7 +194,7 @@ let%expect_test "nothing selected: Cut and Copy are disabled" =
     {|
     (Field_menu_move 1)
     (Field_menu_move 1)
-    <div class="menu-item selected">
+    <div class="[&>.icon]:shrink-0 [&>.icon]:size-4 [&>.icon]:text-muted-foreground aria-disabled:*:opacity-50 aria-disabled:hover:bg-transparent aria-disabled:hover:text-inherit cursor-default data-[variant=destructive]:[&>.icon]:text-destructive data-[variant=destructive]:data-highlighted:bg-destructive/10 data-[variant=destructive]:data-highlighted:text-destructive data-[variant=destructive]:hover:bg-destructive/10 data-[variant=destructive]:hover:text-destructive data-[variant=destructive]:text-destructive data-highlighted:[&>.icon]:text-accent-foreground data-highlighted:bg-accent data-highlighted:text-accent-foreground flex gap-1.5 group/dropdown-menu-item hover:[&>.icon]:text-accent-foreground hover:bg-accent hover:text-accent-foreground items-center menu-item narrow:min-h-11 outline-hidden px-1.5 py-1 relative rounded-md select-none selected text-sm">
     |}];
   H.key h "Enter";
   [%expect
@@ -202,17 +214,17 @@ let%expect_test "read-only and password fields" =
   [%expect
     {|
     (Place_field_menu (Point (x 200) (y 500)))
-    <div class="disabled menu-item">
-    <div class="menu-item selected">
-    <div class="disabled menu-item">
-    <div class="menu-item">
+    <div class="[&>.icon]:shrink-0 [&>.icon]:size-4 [&>.icon]:text-muted-foreground aria-disabled:*:opacity-50 aria-disabled:hover:bg-transparent aria-disabled:hover:text-inherit cursor-default data-[variant=destructive]:[&>.icon]:text-destructive data-[variant=destructive]:data-highlighted:bg-destructive/10 data-[variant=destructive]:data-highlighted:text-destructive data-[variant=destructive]:hover:bg-destructive/10 data-[variant=destructive]:hover:text-destructive data-[variant=destructive]:text-destructive data-highlighted:[&>.icon]:text-accent-foreground data-highlighted:bg-accent data-highlighted:text-accent-foreground disabled flex gap-1.5 group/dropdown-menu-item hover:[&>.icon]:text-accent-foreground hover:bg-accent hover:text-accent-foreground items-center menu-item narrow:min-h-11 outline-hidden px-1.5 py-1 relative rounded-md select-none text-sm">
+    <div class="[&>.icon]:shrink-0 [&>.icon]:size-4 [&>.icon]:text-muted-foreground aria-disabled:*:opacity-50 aria-disabled:hover:bg-transparent aria-disabled:hover:text-inherit cursor-default data-[variant=destructive]:[&>.icon]:text-destructive data-[variant=destructive]:data-highlighted:bg-destructive/10 data-[variant=destructive]:data-highlighted:text-destructive data-[variant=destructive]:hover:bg-destructive/10 data-[variant=destructive]:hover:text-destructive data-[variant=destructive]:text-destructive data-highlighted:[&>.icon]:text-accent-foreground data-highlighted:bg-accent data-highlighted:text-accent-foreground flex gap-1.5 group/dropdown-menu-item hover:[&>.icon]:text-accent-foreground hover:bg-accent hover:text-accent-foreground items-center menu-item narrow:min-h-11 outline-hidden px-1.5 py-1 relative rounded-md select-none selected text-sm">
+    <div class="[&>.icon]:shrink-0 [&>.icon]:size-4 [&>.icon]:text-muted-foreground aria-disabled:*:opacity-50 aria-disabled:hover:bg-transparent aria-disabled:hover:text-inherit cursor-default data-[variant=destructive]:[&>.icon]:text-destructive data-[variant=destructive]:data-highlighted:bg-destructive/10 data-[variant=destructive]:data-highlighted:text-destructive data-[variant=destructive]:hover:bg-destructive/10 data-[variant=destructive]:hover:text-destructive data-[variant=destructive]:text-destructive data-highlighted:[&>.icon]:text-accent-foreground data-highlighted:bg-accent data-highlighted:text-accent-foreground disabled flex gap-1.5 group/dropdown-menu-item hover:[&>.icon]:text-accent-foreground hover:bg-accent hover:text-accent-foreground items-center menu-item narrow:min-h-11 outline-hidden px-1.5 py-1 relative rounded-md select-none text-sm">
+    <div class="[&>.icon]:shrink-0 [&>.icon]:size-4 [&>.icon]:text-muted-foreground aria-disabled:*:opacity-50 aria-disabled:hover:bg-transparent aria-disabled:hover:text-inherit cursor-default data-[variant=destructive]:[&>.icon]:text-destructive data-[variant=destructive]:data-highlighted:bg-destructive/10 data-[variant=destructive]:data-highlighted:text-destructive data-[variant=destructive]:hover:bg-destructive/10 data-[variant=destructive]:hover:text-destructive data-[variant=destructive]:text-destructive data-highlighted:[&>.icon]:text-accent-foreground data-highlighted:bg-accent data-highlighted:text-accent-foreground flex gap-1.5 group/dropdown-menu-item hover:[&>.icon]:text-accent-foreground hover:bg-accent hover:text-accent-foreground items-center menu-item narrow:min-h-11 outline-hidden px-1.5 py-1 relative rounded-md select-none text-sm">
     Close_field_menu
     (Edit_field ())
     (Place_field_menu (Point (x 200) (y 500)))
-    <div class="disabled menu-item">
-    <div class="disabled menu-item">
-    <div class="menu-item selected">
-    <div class="menu-item">
+    <div class="[&>.icon]:shrink-0 [&>.icon]:size-4 [&>.icon]:text-muted-foreground aria-disabled:*:opacity-50 aria-disabled:hover:bg-transparent aria-disabled:hover:text-inherit cursor-default data-[variant=destructive]:[&>.icon]:text-destructive data-[variant=destructive]:data-highlighted:bg-destructive/10 data-[variant=destructive]:data-highlighted:text-destructive data-[variant=destructive]:hover:bg-destructive/10 data-[variant=destructive]:hover:text-destructive data-[variant=destructive]:text-destructive data-highlighted:[&>.icon]:text-accent-foreground data-highlighted:bg-accent data-highlighted:text-accent-foreground disabled flex gap-1.5 group/dropdown-menu-item hover:[&>.icon]:text-accent-foreground hover:bg-accent hover:text-accent-foreground items-center menu-item narrow:min-h-11 outline-hidden px-1.5 py-1 relative rounded-md select-none text-sm">
+    <div class="[&>.icon]:shrink-0 [&>.icon]:size-4 [&>.icon]:text-muted-foreground aria-disabled:*:opacity-50 aria-disabled:hover:bg-transparent aria-disabled:hover:text-inherit cursor-default data-[variant=destructive]:[&>.icon]:text-destructive data-[variant=destructive]:data-highlighted:bg-destructive/10 data-[variant=destructive]:data-highlighted:text-destructive data-[variant=destructive]:hover:bg-destructive/10 data-[variant=destructive]:hover:text-destructive data-[variant=destructive]:text-destructive data-highlighted:[&>.icon]:text-accent-foreground data-highlighted:bg-accent data-highlighted:text-accent-foreground disabled flex gap-1.5 group/dropdown-menu-item hover:[&>.icon]:text-accent-foreground hover:bg-accent hover:text-accent-foreground items-center menu-item narrow:min-h-11 outline-hidden px-1.5 py-1 relative rounded-md select-none text-sm">
+    <div class="[&>.icon]:shrink-0 [&>.icon]:size-4 [&>.icon]:text-muted-foreground aria-disabled:*:opacity-50 aria-disabled:hover:bg-transparent aria-disabled:hover:text-inherit cursor-default data-[variant=destructive]:[&>.icon]:text-destructive data-[variant=destructive]:data-highlighted:bg-destructive/10 data-[variant=destructive]:data-highlighted:text-destructive data-[variant=destructive]:hover:bg-destructive/10 data-[variant=destructive]:hover:text-destructive data-[variant=destructive]:text-destructive data-highlighted:[&>.icon]:text-accent-foreground data-highlighted:bg-accent data-highlighted:text-accent-foreground flex gap-1.5 group/dropdown-menu-item hover:[&>.icon]:text-accent-foreground hover:bg-accent hover:text-accent-foreground items-center menu-item narrow:min-h-11 outline-hidden px-1.5 py-1 relative rounded-md select-none selected text-sm">
+    <div class="[&>.icon]:shrink-0 [&>.icon]:size-4 [&>.icon]:text-muted-foreground aria-disabled:*:opacity-50 aria-disabled:hover:bg-transparent aria-disabled:hover:text-inherit cursor-default data-[variant=destructive]:[&>.icon]:text-destructive data-[variant=destructive]:data-highlighted:bg-destructive/10 data-[variant=destructive]:data-highlighted:text-destructive data-[variant=destructive]:hover:bg-destructive/10 data-[variant=destructive]:hover:text-destructive data-[variant=destructive]:text-destructive data-highlighted:[&>.icon]:text-accent-foreground data-highlighted:bg-accent data-highlighted:text-accent-foreground flex gap-1.5 group/dropdown-menu-item hover:[&>.icon]:text-accent-foreground hover:bg-accent hover:text-accent-foreground items-center menu-item narrow:min-h-11 outline-hidden px-1.5 py-1 relative rounded-md select-none text-sm">
     |}]
 ;;
 
@@ -261,7 +273,7 @@ let%expect_test "over a dialog, which stays open under it" =
     {|
     (Place_field_menu (Point (x 200) (y 500)))
     <div class="modal">
-    <div class="context-menu field-menu menu-surface">
+    <div class="[&:not(.placed)]:opacity-0 [&:not(.placed)]:pointer-events-none [&_.menu-label]:shrink-0 animate-in bg-popover cn-menu-target context-menu duration-100 fade-in-0 field-menu fixed loon max-[760px]:[&_.menu-item]:min-h-10 max-[760px]:[&_.menu-item]:text-[15px] max-[760px]:bottom-2 max-[760px]:left-2! max-[760px]:max-w-none max-[760px]:right-2 max-[760px]:top-auto! max-h-[calc(100vh-16px)] max-w-[min(360px,calc(100vw-16px))] menu-surface min-w-32 min-w-[200px] min-w-[248px] motion-reduce:animate-none narrow:[&_.menu-item]:min-h-11! narrow:animate-[sheet-up_0.18s_ease-out] narrow:border-border narrow:border-t narrow:overscroll-contain narrow:pb-[max(8px,var(--safe-b))] narrow:pl-[max(8px,var(--safe-l))] narrow:pr-[max(8px,var(--safe-r))] narrow:pt-0 narrow:ring-0 narrow:rounded-b-none narrow:rounded-t-xl narrow:shadow-[0_-12px_40px_-12px_var(--edge-shadow)] narrow:z-(--z-menu-surface) overflow-x-hidden overflow-y-auto p-1 ring-1 ring-foreground/10 rounded-lg shadow-md text-popover-foreground zoom-in-95">
     Close_field_menu
     (Edit_field ())
     <div class="modal">
@@ -297,8 +309,8 @@ let%expect_test "in the terminal" =
     [menuitem] div "Copy Ctrl+Shift+C"
     [menuitem] div "Paste Ctrl+Shift+V"
     [menuitem] div "Select all"
-    <div class="menu-section">
-    <div class="menu-section">
+    <div class=" [&+&]:-mx-1 [&+&]:border-border [&+&]:border-t [&+&]:mt-1 [&+&]:pt-1 [&+&]:px-1 flex flex-col menu-section">
+    <div class=" [&+&]:-mx-1 [&+&]:border-border [&+&]:border-t [&+&]:mt-1 [&+&]:pt-1 [&+&]:px-1 flex flex-col menu-section">
     |}];
   H.key h ~target:Terminal "ArrowDown";
   H.text h ~selector:".field-menu .menu-item.selected";
@@ -320,9 +332,9 @@ let%expect_test "in the terminal" =
   [%expect
     {|
     (Place_field_menu (Point (x 300) (y 200)))
-    <div class="disabled menu-item">
-    <div class="menu-item selected">
-    <div class="menu-item">
+    <div class="[&>.icon]:shrink-0 [&>.icon]:size-4 [&>.icon]:text-muted-foreground aria-disabled:*:opacity-50 aria-disabled:hover:bg-transparent aria-disabled:hover:text-inherit cursor-default data-[variant=destructive]:[&>.icon]:text-destructive data-[variant=destructive]:data-highlighted:bg-destructive/10 data-[variant=destructive]:data-highlighted:text-destructive data-[variant=destructive]:hover:bg-destructive/10 data-[variant=destructive]:hover:text-destructive data-[variant=destructive]:text-destructive data-highlighted:[&>.icon]:text-accent-foreground data-highlighted:bg-accent data-highlighted:text-accent-foreground disabled flex gap-1.5 group/dropdown-menu-item hover:[&>.icon]:text-accent-foreground hover:bg-accent hover:text-accent-foreground items-center menu-item narrow:min-h-11 outline-hidden px-1.5 py-1 relative rounded-md select-none text-sm">
+    <div class="[&>.icon]:shrink-0 [&>.icon]:size-4 [&>.icon]:text-muted-foreground aria-disabled:*:opacity-50 aria-disabled:hover:bg-transparent aria-disabled:hover:text-inherit cursor-default data-[variant=destructive]:[&>.icon]:text-destructive data-[variant=destructive]:data-highlighted:bg-destructive/10 data-[variant=destructive]:data-highlighted:text-destructive data-[variant=destructive]:hover:bg-destructive/10 data-[variant=destructive]:hover:text-destructive data-[variant=destructive]:text-destructive data-highlighted:[&>.icon]:text-accent-foreground data-highlighted:bg-accent data-highlighted:text-accent-foreground flex gap-1.5 group/dropdown-menu-item hover:[&>.icon]:text-accent-foreground hover:bg-accent hover:text-accent-foreground items-center menu-item narrow:min-h-11 outline-hidden px-1.5 py-1 relative rounded-md select-none selected text-sm">
+    <div class="[&>.icon]:shrink-0 [&>.icon]:size-4 [&>.icon]:text-muted-foreground aria-disabled:*:opacity-50 aria-disabled:hover:bg-transparent aria-disabled:hover:text-inherit cursor-default data-[variant=destructive]:[&>.icon]:text-destructive data-[variant=destructive]:data-highlighted:bg-destructive/10 data-[variant=destructive]:data-highlighted:text-destructive data-[variant=destructive]:hover:bg-destructive/10 data-[variant=destructive]:hover:text-destructive data-[variant=destructive]:text-destructive data-highlighted:[&>.icon]:text-accent-foreground data-highlighted:bg-accent data-highlighted:text-accent-foreground flex gap-1.5 group/dropdown-menu-item hover:[&>.icon]:text-accent-foreground hover:bg-accent hover:text-accent-foreground items-center menu-item narrow:min-h-11 outline-hidden px-1.5 py-1 relative rounded-md select-none text-sm">
     Close_field_menu
     (Edit_field ())
     |}]

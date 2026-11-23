@@ -28,7 +28,8 @@ let view (m : App.Model.t) ~inject =
         ~attrs:
           [ Attr.create
               "data-item"
-              (String.lowercase (Sexp.to_string (Field_menu.Item.sexp_of_t item)))
+              (String.lowercase
+                 (Sexp.to_string (Field_menu.Item.sexp_of_t item)))
           ; (* Keeps the field's focus and selection until an item is
                chosen. *)
             Attr.on_mousedown (fun ev ->
@@ -46,10 +47,10 @@ let view (m : App.Model.t) ~inject =
         (Field_menu.Item.label item)
     in
     Menu_view.backdrop
-      ~cls:"context-menu-backdrop field-menu-backdrop"
+      ~cls:"context-menu-backdrop field-menu-backdrop z-(--z-field-menu)"
       ~on_close:close
       [ Menu_view.surface
-          ~cls:"context-menu field-menu"
+          ~cls:(Context_menu_view.surface_cls ^ " field-menu min-w-[200px]")
           ~label:"Edit"
           ~attrs:[ Attr.id id ]
           (List.map (Field_menu.sections menu) ~f:(fun items ->

@@ -12,7 +12,7 @@ let%expect_test
   [%expect
     {|
     <div class="composer-plus">
-    <div class="context-ring-anchor">
+    <div class="context-ring-anchor flex relative shrink-0">
     <Vdom.Node.none-widget class="">
     <div class="composer-controls">
     <div class="composer-buttons">
@@ -293,7 +293,7 @@ let%expect_test "the ring opens its card; Esc closes it" =
   [%expect
     {|
     Toggle_context_card
-    <div class="context-ring-anchor open">
+    <div class="context-ring-anchor flex open relative shrink-0 z-(--z-menu-anchor)">
     button "Details" -- The session's details (/session)
     |}];
   H.key h "Escape" ~target:Page;
@@ -301,7 +301,7 @@ let%expect_test "the ring opens its card; Esc closes it" =
   [%expect
     {|
     Toggle_context_card
-    <div class="context-ring-anchor">
+    <div class="context-ring-anchor flex relative shrink-0">
     |}];
   H.act h Toggle_context_card;
   H.elements h ~selector:".context-ring-anchor";
@@ -309,7 +309,7 @@ let%expect_test "the ring opens its card; Esc closes it" =
   H.elements h ~selector:".context-ring-anchor";
   [%expect
     {|
-    <div class="context-ring-anchor open">
-    <div class="context-ring-anchor">
+    <div class="context-ring-anchor flex open relative shrink-0 z-(--z-menu-anchor)">
+    <div class="context-ring-anchor flex relative shrink-0">
     |}]
 ;;

@@ -9,11 +9,7 @@ open! Import
 
 (** The clear layer behind an open menu: a click or a right-click on it
     (not on the menu) runs [on_close]. *)
-val backdrop
-  :  ?cls:string
-  -> on_close:unit Effect.t
-  -> Node.t list
-  -> Node.t
+val backdrop : ?cls:string -> on_close:unit Effect.t -> Node.t list -> Node.t
 
 (** What the items float on ([role=menu]); [cls] adds hook names and
     placement. *)
@@ -45,3 +41,10 @@ val item
   -> ?attrs:Attr.t list
   -> string
   -> Node.t
+
+(** The classes of an item ([menu-item]'s look), for an item built by hand
+    (a checkbox item). *)
+val item_look : string
+
+(** An item's label: one line, cut with an ellipsis. *)
+val label_look : string

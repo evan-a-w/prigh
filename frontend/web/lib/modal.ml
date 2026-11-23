@@ -2,8 +2,12 @@ open! Core
 open! Import
 open Html
 
-let view ?(cls = "") ?(id = "dialog") ?(footer = []) ?back ~title ~on_close body =
+let view ?(cls = "") ?(id = "dialog") ?(footer = []) ?back ~title ~on_close body
+  =
+  (* Its own key: never the node of the menu it replaces, whose placing
+     (Menu_listeners: an inline top and left) would stay on it. *)
   Node.div
+    ~key:"modal"
     ~attrs:
       [ Attr.class_ "modal-backdrop"
       ; Attr.create "data-slot" "dialog-overlay"
@@ -24,7 +28,9 @@ let view ?(cls = "") ?(id = "dialog") ?(footer = []) ?back ~title ~on_close body
           ]
         [ Node.header
             ~attrs:
-              [ Attr.class_ "modal-head"; Attr.create "data-slot" "dialog-header" ]
+              [ Attr.class_ "modal-head"
+              ; Attr.create "data-slot" "dialog-header"
+              ]
             ((match back with
               | Some (label, on_back) ->
                 [ button
@@ -37,13 +43,13 @@ let view ?(cls = "") ?(id = "dialog") ?(footer = []) ?back ~title ~on_close body
              @ [ Node.h2
                    ~attrs:[ Attr.create "data-slot" "dialog-title" ]
                    [ Node.text title ]
-            ; button
-                ~cls:"icon ghost"
-                ~title:"Close (Esc)"
-                ~label:"Close"
-                ~on_click:on_close
-                [ icon Close ]
-            ])
+               ; button
+                   ~cls:"icon ghost"
+                   ~title:"Close (Esc)"
+                   ~label:"Close"
+                   ~on_click:on_close
+                   [ icon Close ]
+               ])
         ; div ~cls:"modal-body" body
         ; (match footer with
            | [] -> Node.none

@@ -67,13 +67,14 @@ let%expect_test
     1h ago · /work
     fix the parser bug …then make the port config urable via the config file
     2h ago · /work
-    <span dir="auto" class="control-snippet">
+    <span dir="auto"
+          class="control-snippet flex-1 min-w-0 narrow:basis-full text-muted-foreground text-xs truncate">
       …then make the
-      <mark> port </mark>
+      <mark class="bg-transparent font-semibold text-primary"> port </mark>
 
-      <mark> config </mark>
+      <mark class="bg-transparent font-semibold text-primary"> config </mark>
       urable via the
-      <mark> config </mark>
+      <mark class="bg-transparent font-semibold text-primary"> config </mark>
        file
     </span>
     |}]

@@ -152,7 +152,7 @@ const card = () => page.evaluate(() => {
     const r = e.getBoundingClientRect();
     return r.width > 0 && r.height > 0 && getComputedStyle(e).visibility !== "hidden";
   };
-  const level = ring.className.replace("context-ring", "").trim() || "calm";
+  const level = ["warm", "hot"].find(c => ring.classList.contains(c)) || "calm";
   const status = anchor.querySelector("[role=status]")?.textContent.trim();
   const mode = anchor.querySelector(".context-card .mode-line .status-detail-value")?.textContent.trim();
   const notes = [...document.querySelectorAll(".chat-chrome .status-notes .status-item")].filter(shown)

@@ -80,7 +80,6 @@
   highlight.css
   status.css
   temporary.css
-  control.css
   phone.css)
  (action
   (with-stdout-to
@@ -94,7 +93,6 @@
     (cat highlight.css)
     (cat status.css)
     (cat temporary.css)
-    (cat control.css)
     (cat phone.css)
     (echo "\n}\n")
     ; Unlayered: it overrides CodeMirror's own theme, which CodeMirror

@@ -168,7 +168,7 @@ let%expect_test
   [%expect
     {|
     Toggle_context_card
-    <div class="context-ring-anchor open">
+    <div class="context-ring-anchor flex open relative shrink-0 z-(--z-menu-anchor)">
     Toggle_context_card
     (Run /session)
     (Focus dialog)
@@ -302,7 +302,7 @@ let%expect_test "a phone's chrome: the ⋯ opens the menu" =
     </button>
     Toggle_status_tray
     <div class="sheet-grip">
-    <div class="session-sections">
+    <div class="border-b border-border flex flex-col gap-1 mb-1.5 pb-2.5 pt-0.5 px-1 session-sections">
     <div class="status-notes">
     <button class="jump-row sheet-row">
     <button class="filter-row sheet-row">

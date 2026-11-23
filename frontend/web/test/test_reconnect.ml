@@ -85,7 +85,7 @@ let%expect_test "the page is offline while it reconnects" =
     (Reconnect (generation 1) (delay_ms 0) (session (s1)))
     <div class="app offline sidebar-open">
     <span class="lamp">
-    <div class="context-ring-anchor">
+    <div class="context-ring-anchor flex relative shrink-0">
     |}]
 ;;
 
