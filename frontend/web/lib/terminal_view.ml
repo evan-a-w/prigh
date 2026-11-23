@@ -5,7 +5,9 @@ module Action = App.Action
 
 let close ~inject =
   button
-    ~cls:"icon ghost terminal-close"
+    ~cls:"terminal-close ml-auto narrow:size-11"
+    ~variant:Ghost
+    ~size:Icon_sm
     ~title:"Close (Ctrl+`): the shell keeps running for 10 minutes"
     ~label:"Close terminal"
     ~on_click:(inject Action.Close_terminal)
@@ -14,7 +16,9 @@ let close ~inject =
 
 let restart ~inject label =
   button
-    ~cls:"small terminal-restart"
+    ~cls:"terminal-restart"
+    ~variant:Outline
+    ~size:Sm
     ~on_click:(inject Action.New_shell)
     [ icon Restart; Node.text label ]
 ;;
@@ -61,7 +65,11 @@ let view (m : App.Model.t) ~inject ~widget =
     let head, body =
       match m.state with
       | None ->
-        ( [ span ~cls:"terminal-state" "connecting…" ]
+        ( [ Loon.Badge.view
+              ~class_:"terminal-state"
+              ~variant:Secondary
+              [ Node.text "connecting…" ]
+          ]
         , [ div
               ~cls:"terminal-waiting"
               [ Node.text "Connecting to the backend…" ]
@@ -79,12 +87,16 @@ let view (m : App.Model.t) ~inject ~widget =
                  cwd)
           ; (match state_label status with
              | Some label ->
-               span
-                 ~cls:
+               Loon.Badge.view
+                 ~class_:
                    (match status with
                     | Failed _ -> "terminal-state failed"
                     | _ -> "terminal-state")
-                 label
+                 ~variant:
+                   (match status with
+                    | Failed _ -> Destructive
+                    | _ -> Secondary)
+                 [ Node.text label ]
              | None -> Node.none)
           ]
         , [ widget target; notice ~inject status ] )
@@ -102,17 +114,4 @@ let view (m : App.Model.t) ~inject ~widget =
           ((icon ~cls:"terminal-icon" Terminal :: head) @ [ close ~inject ])
       ; div ~cls:"terminal-body" body
       ])
-;;
-
-let toggle (m : App.Model.t) ~inject =
-  button
-    ~cls:
-      (if m.terminal.open_
-       then "icon ghost terminal-toggle open"
-       else "icon ghost terminal-toggle")
-    ~title:"Terminal (Ctrl+`)"
-    ~label:"Terminal"
-    ~attrs:[ Attr.create "aria-expanded" (Bool.to_string m.terminal.open_) ]
-    ~on_click:(inject Action.Toggle_terminal)
-    [ icon Terminal ]
 ;;

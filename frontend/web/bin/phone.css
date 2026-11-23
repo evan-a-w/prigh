@@ -395,8 +395,8 @@
 
 /* {1 Panels: full screen, under the safe area} */
 
-.app.narrow :is(.files-panel, .terminal-panel) { padding-top: var(--safe-t); padding-bottom: var(--safe-b); padding-left: var(--safe-l); padding-right: var(--safe-r); }
-.app.narrow :is(.files-head, .terminal-head, .files-preview-head) .btn.icon { min-width: var(--tap); min-height: var(--tap); }
+.app.narrow .files-panel { padding-top: var(--safe-t); padding-bottom: var(--safe-b); padding-left: var(--safe-l); padding-right: var(--safe-r); }
+.app.narrow :is(.files-head, .files-preview-head) .btn.icon { min-width: var(--tap); min-height: var(--tap); }
 
 /* {1 The image viewer and drawing} */
 

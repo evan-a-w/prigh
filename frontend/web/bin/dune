@@ -27,7 +27,8 @@
   loon_preflight.css
   ../loon_ui/loon.css
   loon_bridge.css
-  genui.css)
+  genui.css
+  workspace.css)
  (action
   (with-stdout-to
    loon.input.css
@@ -37,6 +38,7 @@
     (cat ../loon_ui/loon.css)
     (cat loon_bridge.css)
     (cat genui.css)
+    (cat workspace.css)
     (echo "\n@source \"../loon_ui/*.ml\";\n@source \"../lib/*.ml\";\n")))))
 
 (rule
@@ -62,7 +64,6 @@
   theme.css
   style.css
   chat.css
-  terminal.css
   files.css
   review.css
   editor.css
@@ -84,7 +85,6 @@
     (cat theme.css)
     (cat style.css)
     (cat chat.css)
-    (cat terminal.css)
     (cat files.css)
     (cat review.css)
     (cat highlight.css)
