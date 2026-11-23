@@ -6,7 +6,10 @@
   (pps ppx_jane ppx_jsonaf_conv))
  (inline_tests
   (backend prigh_test_backend)
-  (deps fake_mcp_server/fake_mcp_server.exe ../bin/main.exe)
+  (deps
+   fake_mcp_server/fake_mcp_server.exe
+   ../bin/main.exe
+   (source_tree fixtures))
   (flags
    (-source-tree-root .)))
  (libraries
