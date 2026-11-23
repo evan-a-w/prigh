@@ -324,6 +324,11 @@ The composer drives `codex`, `claude`, any ACP agent (`acp:opencode`,
 `-adapters acp:mine=my-agent --acp`) and `prigh`, prigh's own harness as
 one of its adapters.
 
+The agent CLIs ask prigh before they act, so your approval mode, deny and
+ask rules and Smart mode apply to their commands and edits as to the
+harness's (Codex runs commands it knows to be read-only without asking). A
+repository's `.claude` settings and hooks are not loaded.
+
 Settings → Engines in prigh-web, and `/adapters` in the TUI, show whether
 each agent CLI is installed and logged in on each tool host, and what to run
 there when not ("Codex is not installed on laptop, please install it",

@@ -100,6 +100,7 @@ module Entry = struct
           { thread_id : string
           ; turn_id : string
           ; through : string
+          ; cost_total : float option [@jsonaf.option] [@sexp.option]
           }
       | Handoff of
           { from_adapter : string option [@jsonaf.option] [@sexp.option]
@@ -1602,6 +1603,7 @@ module External_turn = struct
     { thread_id : string
     ; turn_id : string
     ; through : string
+    ; cost_total : float option
     }
   [@@deriving sexp_of, equal]
 end
@@ -1636,13 +1638,16 @@ let record_thread t ({ adapter; host; thread_id; cwd } : Thread.t) =
 let external_turns t =
   List.filter_map (active_path t) ~f:(fun (e : Entry.t) ->
     match e.payload with
-    | External_turn { thread_id; turn_id; through } ->
-      Some { External_turn.thread_id; turn_id; through }
+    | External_turn { thread_id; turn_id; through; cost_total } ->
+      Some { External_turn.thread_id; turn_id; through; cost_total }
     | _ -> None)
 ;;
 
-let record_external_turn t ({ thread_id; turn_id; through } : External_turn.t) =
-  append t (External_turn { thread_id; turn_id; through })
+let record_external_turn
+      t
+      ({ thread_id; turn_id; through; cost_total } : External_turn.t)
+  =
+  append t (External_turn { thread_id; turn_id; through; cost_total })
 ;;
 
 let record_handoff t ~from_adapter ~to_adapter ~text =

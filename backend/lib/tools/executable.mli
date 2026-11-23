@@ -19,7 +19,9 @@ module Missing : sig
 end
 
 (** [command] with a [/] is a path, relative to [dir]; a bare name is looked
-    up on [environment]'s [PATH] (default [/usr/bin:/bin]). *)
+    up in the absolute directories of [environment]'s [PATH] (default
+    [/usr/bin:/bin]): a relative entry would be looked up in one directory
+    and run in another. *)
 val resolve
   :  environment:string list
   -> dir:string

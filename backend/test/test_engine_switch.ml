@@ -340,7 +340,7 @@ let%expect_test "switching adapters hands each what it has not seen" =
   [%expect
     {|
     ok: engine composer, adapter claude
-    spawn claude --output-format stream-json --verbose --permission-prompt-tool stdio --permission-mode bypassPermissions --allow-dangerously-skip-permissions --mcp-config {"mcpServers":{"prigh":{"type":"sdk","name":"prigh"}}} --include-partial-messages --input-format stream-json
+    spawn claude --output-format stream-json --verbose --permission-prompt-tool stdio --permission-mode default --mcp-config {"mcpServers":{"prigh":{"type":"sdk","name":"prigh"}}} --strict-mcp-config --setting-sources=user --include-partial-messages --input-format stream-json
     claude got:
     Context handoff (the session so far):
     prigh session <id> moves from Codex to you (Claude Code) on host <host>, working directory $DIR.
@@ -444,7 +444,7 @@ let%expect_test "a thread that cannot be continued gets the whole session" =
 
     first
     ok: engine composer, adapter claude
-    spawn claude --output-format stream-json --verbose --permission-prompt-tool stdio --permission-mode bypassPermissions --allow-dangerously-skip-permissions --mcp-config {"mcpServers":{"prigh":{"type":"sdk","name":"prigh"}}} --include-partial-messages --input-format stream-json
+    spawn claude --output-format stream-json --verbose --permission-prompt-tool stdio --permission-mode default --mcp-config {"mcpServers":{"prigh":{"type":"sdk","name":"prigh"}}} --strict-mcp-config --setting-sources=user --include-partial-messages --input-format stream-json
     claude got:
     Context handoff (the session so far):
     prigh session <id> moves from Codex to you (Claude Code) on host <host>, working directory $DIR.

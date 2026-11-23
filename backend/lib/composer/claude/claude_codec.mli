@@ -17,7 +17,15 @@ open! Import
 
 type t
 
-val create : unit -> t
+(** [cost_total]: the running cost total ([result.total_cost_usd]) the
+    resumed or forked session reported last: Claude Code carries it on
+    from the transcript, so the first result of this process counts only
+    what came after it. *)
+val create : ?cost_total:float -> unit -> t
+
+(** The running cost total of the session, as the last [result] reported
+    it (or as given to {!create}); persist it to seed a later resume. *)
+val cost_total : t -> float option
 
 (** The session id Claude Code reported last ([system/init]); persist it to
     [--resume]. It changes on a fork and on [/clear]. *)
@@ -124,8 +132,16 @@ val process_exited : t -> code:int option -> stderr_tail:string -> Output.t list
 
 (** {2 Our requests} Each returns the line to write. *)
 
-(** The first line to send: registers the in-band MCP servers by name. *)
-val initialize : t -> sdk_mcp_servers:string list -> string
+(** The first line to send: registers the in-band MCP servers by name, and
+    appends [append_system_prompt] to Claude Code's system prompt (sent here
+    rather than on the command line, which other users of the machine can
+    read). *)
+val initialize
+  :  t
+  -> ?append_system_prompt:string
+  -> sdk_mcp_servers:string list
+  -> unit
+  -> string
 
 (** A user turn (queued by Claude Code if one is running). Slash commands
     are text: see {!compact}. *)

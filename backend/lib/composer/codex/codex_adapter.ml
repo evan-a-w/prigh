@@ -246,9 +246,19 @@ let send t settings input =
     Adapter.Driver.write t.driver line)
 ;;
 
+(* Waits for Codex's answer: a refused steer (the turn ended meanwhile,
+   or cannot be steered) fails, so the runner keeps the message for the next
+   turn rather than losing it. *)
 let steer t input =
-  let%map.Or_error line = Codex_codec.steer t.codec (inputs input) in
-  Adapter.Driver.write t.driver line
+  let%bind.Or_error line = Codex_codec.steer t.codec (inputs input) in
+  match%bind.Or_error
+    Adapter.Driver.request t.driver line ~matches:(function
+      | Steered _ | Failed { kind = Turn_steer; _ } -> true
+      | _ -> false)
+  with
+  | Failed { message; _ } ->
+    Or_error.error_string ("Codex did not take it: " ^ message)
+  | _ -> Ok ()
 ;;
 
 let interrupt t =
@@ -272,6 +282,7 @@ let answer t ~request_id reply =
 ;;
 
 let thread_id t = Codex_codec.thread_id t.codec
+let cost_total _ = None
 let in_turn t = Adapter.Driver.in_turn t.driver
 let alive t = Adapter.Driver.alive t.driver
 let stop t = Adapter.Driver.stop t.driver

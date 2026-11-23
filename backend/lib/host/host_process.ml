@@ -717,10 +717,11 @@ let run ~env ~self ~outer ~cancel ~on_output ~cwd (args : Arguments.t) =
     in
     let socket = Option.map mcp ~f:(fun mcp -> mcp.socket) in
     let fill = Placeholder.fill ~self ~socket in
+    (* The socket goes only to the bridge, in its MCP config (a
+       [{{mcp_socket}}] placeholder): not into the program's environment,
+       which every command it runs would inherit. *)
     let extra_env =
       List.map args.env ~f:(fun (key, value) -> key, fill value)
-      @ Option.value_map socket ~default:[] ~f:(fun socket ->
-        [ Mcp_bridge.socket_env, socket ])
     in
     Fiber.fork_daemon ~sw (fun () ->
       Cancellation.await cancel;

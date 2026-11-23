@@ -314,7 +314,13 @@ The composer (`composer/`), from the bottom up:
   mcp-bridge` on the tool host (`Mcp_bridge`, relaying stdio to
   `$PRIGH_MCP_SOCKET`) for Codex and ACP agents. The user's custom
   instructions and user info go to the CLI as developer instructions
-  (Codex) or `--append-system-prompt` (Claude Code).
+  (Codex) or `initialize`'s `appendSystemPrompt` (Claude Code), never on
+  its command line. The CLIs always ask before acting (Codex `untrusted`,
+  Claude Code `default`, launched with `--setting-sources=user
+  --strict-mcp-config` so a repository's `.claude` settings and hooks do
+  not apply), so prigh's approval mode, deny and ask rules and Smart judge
+  decide; the approval mode only picks Codex's sandbox. Codex still runs
+  commands it knows to be read-only without asking.
 - **`Handoff`** quotes the session for an adapter taking over (another
   adapter, another host, a thread it cannot resume): within a token budget,
   the latest messages verbatim under a header saying where the session

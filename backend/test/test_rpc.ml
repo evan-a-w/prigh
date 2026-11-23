@@ -2085,3 +2085,32 @@ let%expect_test "forget_allowed_call: one by its line, or all" =
     --- reloaded
     |}]
 ;;
+
+let%expect_test "the namespace's events go only to clients that signed in" =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let _agent, h =
+    make_server t ~sw ~token:"sekrit" ~provider:(Faux_provider.create [])
+  in
+  let stranger = Queue.create () in
+  let _ : Rpc_server.Client.t =
+    Rpc_server.connect h.server ~send:(Queue.enqueue stranger)
+  in
+  call t h ~params:{|{"token": "sekrit"}|} "hello";
+  Queue.clear h.sent;
+  call t h ~params:{|{"name": "renamed"}|} "set_session_name";
+  ignore ([%expect.output] : string);
+  let events q =
+    Queue.to_list q
+    |> List.filter_map ~f:(fun json ->
+      Option.bind (Json.member "event" json) ~f:Json.string)
+  in
+  print_s
+    [%sexp
+      { signed_in = (events h.sent : string list)
+      ; stranger = (events stranger : string list)
+      }];
+  [%expect {| ((signed_in (state sessions_changed)) (stranger ())) |}]
+;;

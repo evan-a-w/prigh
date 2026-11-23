@@ -175,7 +175,7 @@ let create
           transport
           (start : Adapter.Start.t)
       =
-      let codec = Codec.create () in
+      let codec = Codec.create ?cost_total:start.cost_total () in
       let driver =
         Adapter.Driver.create
           ~sw
@@ -223,7 +223,15 @@ let create
       in
       let%bind auth_methods =
         match init with
-        | Initialized { auth_methods; _ } -> Ok auth_methods
+        | Initialized { protocol_version = 1; auth_methods; _ } ->
+          Ok auth_methods
+        | Initialized { protocol_version; _ } ->
+          Or_error.errorf
+            "%s speaks ACP version %d, and prigh speaks version 1: update \
+             prigh or %s"
+            agent.display_name
+            protocol_version
+            agent.display_name
         | r -> refused "to start" r >>| fun () -> []
       in
       let mcp_servers = List.filter_map start.mcp_servers ~f:mcp_server in
@@ -416,6 +424,7 @@ let create
     (* ACP agents ask the user through prigh's [ask_user] tool. *)
     let answer _ ~request_id:_ (_ : User_question.Reply.t) = ()
     let thread_id t = Codec.session_id t.codec
+    let cost_total t = Codec.cost_total t.codec
     let in_turn t = Adapter.Driver.in_turn t.driver
     let alive t = Adapter.Driver.alive t.driver
     let stop t = Adapter.Driver.stop t.driver

@@ -193,7 +193,13 @@ end
 
 type t
 
-val create : unit -> t
+(** [cost_total]: the running cost total ([usage_update.cost]) the session
+    to resume reported last: the first live update counts only what came
+    after it. *)
+val create : ?cost_total:float -> unit -> t
+
+(** The session's running cost total, as the agent reported it last. *)
+val cost_total : t -> float option
 
 (** [initialize] with protocol version 1. *)
 val initialize : t -> client_name:string -> client_version:string -> string

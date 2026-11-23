@@ -157,6 +157,8 @@ module Entry : sig
           { thread_id : string
           ; turn_id : string
           ; through : string (** the last entry of the turn *)
+          ; cost_total : float option [@jsonaf.option] [@sexp.option]
+            (** the running cost total the agent reported after it *)
           }
       (** an external agent's turn, for mapping rewinds onto its history;
           not copied by [fork] *)
@@ -413,6 +415,9 @@ module External_turn : sig
     { thread_id : string
     ; turn_id : string
     ; through : string (** the last entry of the turn *)
+    ; cost_total : float option
+      (** the running cost total its agent reported after it, to seed a
+          resume (the composer's [Start.cost_total]) *)
     }
   [@@deriving sexp_of, equal]
 end

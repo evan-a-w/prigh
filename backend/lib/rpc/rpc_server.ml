@@ -768,6 +768,14 @@ let list_sessions t client =
   `Array (List.map (listings t client) ~f:(listing_json t))
 ;;
 
+(* The clients that have signed in: the namespace's events (its sessions,
+   settings, hosts and agent CLIs) are not for a connection that has not. *)
+let iter_authed t ~f =
+  Hashtbl.iter t.clients ~f:(fun (c : Client.t) -> if c.authed then f c)
+;;
+
+let broadcast t json = iter_authed t ~f:(fun (c : Client.t) -> c.send json)
+
 (* Every client of the server, whichever session it is in. With [changed]
    (sessions whose entries changed, in memory as they are now) or
    [removed] (session ids), they get those sessions' [list_sessions]
@@ -779,9 +787,7 @@ let sessions_changed ?(changed = []) ?(removed = []) t =
       ([ "type", `String "event"; "event", `String "sessions_changed" ] @ fields)
   in
   if List.is_empty changed && List.is_empty removed
-  then (
-    let json = event [] in
-    Hashtbl.iter t.clients ~f:(fun (c : Client.t) -> c.send json))
+  then broadcast t (event [])
   else (
     let live_now = live_sessions t in
     let live path =
@@ -810,7 +816,7 @@ let sessions_changed ?(changed = []) ?(removed = []) t =
              ~f:(fun id -> `String id)) )
     in
     let now = t.now () in
-    Hashtbl.iter t.clients ~f:(fun (c : Client.t) ->
+    iter_authed t ~f:(fun (c : Client.t) ->
       let archive_after_days = archive_after_days t c in
       c.send
         (event
@@ -1039,7 +1045,7 @@ let adapters_changed t ~hosts =
       ; "adapters", adapters_json (adapter_statuses t hosts)
       ]
   in
-  Hashtbl.iter t.clients ~f:(fun (c : Client.t) -> c.send json)
+  broadcast t json
 ;;
 
 (* The session's active tool host by name, for messages. *)
@@ -1194,7 +1200,7 @@ let memory_changed (t : t) memory =
       `Object
         ([ "type", `String "event"; "event", `String "memory_changed" ] @ fields)
     in
-    Hashtbl.iter t.clients ~f:(fun (c : Client.t) -> c.send json)
+    broadcast t json
 ;;
 
 let custom_instructions_json ci =
@@ -1222,7 +1228,7 @@ let custom_instructions_changed (t : t) ci =
          ]
          @ fields)
     in
-    Hashtbl.iter t.clients ~f:(fun (c : Client.t) -> c.send json)
+    broadcast t json
 ;;
 
 let user_info_json user_info =
@@ -1249,7 +1255,7 @@ let user_info_changed (t : t) user_info =
         ([ "type", `String "event"; "event", `String "user_info_changed" ]
          @ fields)
     in
-    Hashtbl.iter t.clients ~f:(fun (c : Client.t) -> c.send json)
+    broadcast t json
 ;;
 
 let mcp_listing_json agent listing =
@@ -1271,7 +1277,7 @@ let mcp_settings_changed (t : t) mcp_settings =
          ([ "type", `String "event"; "event", `String "mcp_settings_changed" ]
           @ mcp_settings_json entries)
      in
-     Hashtbl.iter t.clients ~f:(fun (c : Client.t) -> c.send json));
+     broadcast t json);
   Hashtbl.iter t.agents ~f:Agent.mcp_settings_changed
 ;;
 
@@ -1281,7 +1287,7 @@ let mcp_auth_changed (t : t) =
   let json =
     `Object [ "type", `String "event"; "event", `String "mcp_auth_changed" ]
   in
-  Hashtbl.iter t.clients ~f:(fun (c : Client.t) -> c.send json);
+  broadcast t json;
   Hashtbl.iter t.agents ~f:Agent.mcp_settings_changed
 ;;
 
@@ -1426,9 +1432,9 @@ let create
         (Option.bind t.login_owner ~f:(Hashtbl.find t.clients))
         ~f:(fun c -> c.send json)
     | Done _ | Failed _ | Logged_out _ | Forge_done _ | Forge_logged_out _ ->
-      Hashtbl.iter t.clients ~f:(fun c -> c.send json));
+      broadcast t json);
   Model_registry.subscribe (Login_manager.models login) ~f:(fun problem ->
-    Hashtbl.iter t.clients ~f:(fun c -> tell_problems c [ problem ]));
+    iter_authed t ~f:(fun c -> tell_problems c [ problem ]));
   t
 ;;
 
@@ -3102,7 +3108,7 @@ let prefs_changed t (from : Client.t) changes =
         ; "prefs", User_prefs.Change.to_json changes
         ]
     in
-    Hashtbl.iter t.clients ~f:(fun (c : Client.t) ->
+    iter_authed t ~f:(fun (c : Client.t) ->
       if not (String.equal c.id from.id) then c.send json))
 ;;
 

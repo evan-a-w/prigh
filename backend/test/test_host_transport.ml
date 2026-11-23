@@ -93,7 +93,7 @@ let%expect_test
          ~mcp:true
          [ "sh"
          ; "-c"
-         ; {|read go; { printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'; read more; } | "$1" mcp-bridge | head -n 1 | cut -c1-120; echo done|}
+         ; {|read socket; { printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'; read more; } | PRIGH_MCP_SOCKET="$socket" "$1" mcp-bridge | head -n 1 | cut -c1-120; echo done|}
          ; "sh"
          ; Host_process.Placeholder.prigh
          ])
@@ -110,7 +110,14 @@ let%expect_test
   mcp.serve
     (Injected_tools.create ~tools:[ Tool_render_ui.tool ] ~execute:(fun _ _ ->
        Tool_result.ok "unused"));
-  Line_transport.write_line transport "go";
+  (* The harness learns the socket from the bridge's MCP config, as Codex
+     and ACP agents do, not from its own environment. *)
+  Line_transport.write_line
+    transport
+    (List.Assoc.find_exn
+       mcp.bridge.env
+       ~equal:String.equal
+       Mcp_bridge.socket_env);
   let rec lines () =
     match Line_transport.read_line transport with
     | Some line ->
