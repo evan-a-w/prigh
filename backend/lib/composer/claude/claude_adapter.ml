@@ -339,7 +339,8 @@ let rollback = Adapter.Rollback.Resume_at
 let fork_native = true
 
 let revert _ ~before_turn_id:_ =
-  Or_error.error_string "Claude Code rolls back when it next starts, not while it runs"
+  Or_error.error_string
+    "Claude Code rolls back when it next starts, not while it runs"
 ;;
 
 let mark t = Claude_codec.last_assistant t.codec

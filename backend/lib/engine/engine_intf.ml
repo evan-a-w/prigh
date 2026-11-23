@@ -89,8 +89,7 @@ module type Runner_api = sig
   type t
 
   (** [close]: stops what the runner keeps running between turns (an
-      external harness's process). *)
-  (** [rewind]: what the engine must undo outside the session (an external
+      external harness's process). [rewind]: what the engine must undo outside the session (an external
       harness's conversation and the files it changed) before the session
       is rewound to the entry [to_]; an error leaves both as they were.
       Without it, rewinding is the session's alone. *)

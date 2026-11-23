@@ -1654,18 +1654,58 @@ let record_thread t ({ adapter; host; thread_id; cwd; fork_from } : Thread.t) =
 ;;
 
 let external_turns ?(all = false) t =
-  List.filter_map (if all then entries t else active_path t) ~f:(fun (e : Entry.t) ->
-    match e.payload with
-    | External_turn { thread_id; turn_id; through; first_turn_id; mark; before; after; cost_total } ->
-      Some { External_turn.thread_id; turn_id; through; first_turn_id; mark; before; after; cost_total }
-    | _ -> None)
+  List.filter_map
+    (if all then entries t else active_path t)
+    ~f:(fun (e : Entry.t) ->
+      match e.payload with
+      | External_turn
+          { thread_id
+          ; turn_id
+          ; through
+          ; first_turn_id
+          ; mark
+          ; before
+          ; after
+          ; cost_total
+          } ->
+        Some
+          { External_turn.thread_id
+          ; turn_id
+          ; through
+          ; first_turn_id
+          ; mark
+          ; before
+          ; after
+          ; cost_total
+          }
+      | _ -> None)
 ;;
 
 let record_external_turn
       t
-      ({ thread_id; turn_id; through; first_turn_id; mark; before; after; cost_total } : External_turn.t)
+      ({ thread_id
+       ; turn_id
+       ; through
+       ; first_turn_id
+       ; mark
+       ; before
+       ; after
+       ; cost_total
+       } :
+        External_turn.t)
   =
-  append t (External_turn { thread_id; turn_id; through; first_turn_id; mark; before; after; cost_total })
+  append
+    t
+    (External_turn
+       { thread_id
+       ; turn_id
+       ; through
+       ; first_turn_id
+       ; mark
+       ; before
+       ; after
+       ; cost_total
+       })
 ;;
 
 let record_handoff t ~from_adapter ~to_adapter ~text =
@@ -1815,9 +1855,11 @@ let fork ?at t ~dir =
             | Pinned _
             | Spend _
             | Resume_at _
-            | Agent_worktree _ | Transcript_filter _ -> None
+            | Agent_worktree _
+            | Transcript_filter _ -> None
             | Thread { adapter; host; thread_id; cwd; fork_from = _ } ->
-              latest_thread := Some { Thread.adapter; host; thread_id; cwd; fork_from = None };
+              latest_thread
+              := Some { Thread.adapter; host; thread_id; cwd; fork_from = None };
               None
             | External_turn _ -> None
             | payload -> Some payload

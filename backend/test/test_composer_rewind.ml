@@ -42,7 +42,9 @@ let fake_codex ~turns (p : Line_transport.Peer.t) =
     reply
       j
       (`Object
-          [ "thread", `Object [ "id", `String !thread ]; "model", `String "gpt-5" ])
+          [ "thread", `Object [ "id", `String !thread ]
+          ; "model", `String "gpt-5"
+          ])
   in
   let rec loop () =
     match read p with
@@ -63,7 +65,9 @@ let fake_codex ~turns (p : Line_transport.Peer.t) =
          printf
            "codex: thread/fork %s at %s\n"
            (Option.value_exn (string_at [ "params"; "threadId" ] j))
-           (Option.value (string_at [ "params"; "lastTurnId" ] j) ~default:"its end");
+           (Option.value
+              (string_at [ "params"; "lastTurnId" ] j)
+              ~default:"its end");
          thread := "codex-fork";
          thread_reply j
        | Some "thread/revert" ->
@@ -87,18 +91,25 @@ let fake_codex ~turns (p : Line_transport.Peer.t) =
            j
            (`Object
                [ ( "turn"
-                 , `Object [ "id", `String turn; "status", `String "inProgress" ] )
+                 , `Object
+                     [ "id", `String turn; "status", `String "inProgress" ] )
                ]);
          let notify meth params =
-           write p (`Object [ "method", `String meth; "params", `Object params ])
+           write
+             p
+             (`Object [ "method", `String meth; "params", `Object params ])
          in
          let turn_json status =
            ( "turn"
            , `Object
-               [ "id", `String turn; "items", `Array []; "status", `String status ]
-           )
+               [ "id", `String turn
+               ; "items", `Array []
+               ; "status", `String status
+               ] )
          in
-         notify "turn/started" [ "threadId", `String !thread; turn_json "inProgress" ];
+         notify
+           "turn/started"
+           [ "threadId", `String !thread; turn_json "inProgress" ];
          run_edit ();
          notify
            "item/completed"
@@ -111,7 +122,9 @@ let fake_codex ~turns (p : Line_transport.Peer.t) =
                  ; "text", `String (sprintf "codex reply %d" !turns)
                  ] )
            ];
-         notify "turn/completed" [ "threadId", `String !thread; turn_json "completed" ]
+         notify
+           "turn/completed"
+           [ "threadId", `String !thread; turn_json "completed" ]
        | Some _ | None -> ());
       loop ()
   in
@@ -135,8 +148,9 @@ let fake_claude ~turns (p : Line_transport.Peer.t) =
                      [ "subtype", `String "success"
                      ; ( "request_id"
                        , `String
-                           (Option.value (string_at [ "request_id" ] j) ~default:"")
-                       )
+                           (Option.value
+                              (string_at [ "request_id" ] j)
+                              ~default:"") )
                      ; "response", `Object [ "models", `Array [] ]
                      ] )
                ])
@@ -164,7 +178,10 @@ let fake_claude ~turns (p : Line_transport.Peer.t) =
 
 let composer =
   Or_error.ok_exn
-    (Engines.create ~engines:[ Harness; Composer ] ~adapters:[ Codex; Claude ] ())
+    (Engines.create
+       ~engines:[ Harness; Composer ]
+       ~adapters:[ Codex; Claude ]
+       ())
 ;;
 
 let git_env =
@@ -175,7 +192,11 @@ let git_env =
 let sh dir script =
   match
     Sys_unix.command
-      (sprintf "cd %s && %s && (%s) > /dev/null 2>&1" (Filename.quote dir) git_env script)
+      (sprintf
+         "cd %s && %s && (%s) > /dev/null 2>&1"
+         (Filename.quote dir)
+         git_env
+         script)
   with
   | 0 -> ()
   | n -> raise_s [%message "setup failed" (script : string) (n : int)]
@@ -228,9 +249,7 @@ let with_server ?(git = true) f =
   let mask = mask t in
   let turns = ref 0 in
   let spawn_external _agent (launch : Adapter.Launch.t) =
-    printf
-      "spawn %s\n"
-      (String.concat ~sep:" " launch.argv |> mask);
+    printf "spawn %s\n" (String.concat ~sep:" " launch.argv |> mask);
     Ok
       (Line_transport.Peer.spawn
          ~sw
@@ -261,11 +280,14 @@ let with_server ?(git = true) f =
     Rpc_server.handle
       server
       client
-      (Json.of_string (sprintf {|{"id": "r", "method": "%s", "params": %s}|} meth params))
+      (Json.of_string
+         (sprintf {|{"id": "r", "method": "%s", "params": %s}|} meth params))
   in
   let agent () = Option.value_exn !latest in
   let prompt text =
-    (match call ~params:(Json.to_string (`Object [ "text", `String text ])) "prompt" with
+    (match
+       call ~params:(Json.to_string (`Object [ "text", `String text ])) "prompt"
+     with
      | `Object fields when List.Assoc.mem fields "error" ~equal:String.equal ->
        print_endline (Json.to_string (`Object fields))
      | _ -> ());
@@ -301,8 +323,8 @@ let files (s : Server.t) =
       ~prog:"sh"
       ~args:
         [ "-c"
-        ; "find . -path ./.git -prune -o -type f -print | sort | while read f; do \
-           printf '%s: %s\\n' \"$f\" \"$(cat \"$f\")\"; done"
+        ; "find . -path ./.git -prune -o -type f -print | sort | while read f; \
+           do printf '%s: %s\\n' \"$f\" \"$(cat \"$f\")\"; done"
         ]
       ()
   in
@@ -311,17 +333,20 @@ let files (s : Server.t) =
 
 let entry_of (s : Server.t) ~user =
   let session = Agent.session (s.agent ()) in
-  List.find_map_exn (Session.active_path session) ~f:(fun (e : Session.Entry.t) ->
-    match e.payload with
-    | Message (User u) when String.is_suffix u.text ~suffix:user -> Some e.id
-    | _ -> None)
+  List.find_map_exn
+    (Session.active_path session)
+    ~f:(fun (e : Session.Entry.t) ->
+      match e.payload with
+      | Message (User u) when String.is_suffix u.text ~suffix:user -> Some e.id
+      | _ -> None)
 ;;
 
 let rewind (s : Server.t) ~to_user =
   print_result
     s
     (s.call
-       ~params:(Json.to_string (`Object [ "to", `String (entry_of s ~user:to_user) ]))
+       ~params:
+         (Json.to_string (`Object [ "to", `String (entry_of s ~user:to_user) ]))
        "rewind")
 ;;
 
@@ -422,7 +447,8 @@ let%expect_test "codex: rewinding puts the files back and reverts its thread" =
 let%expect_test "a rewind is refused when files changed since the agent's turn" =
   with_server
   @@ fun s ->
-  Queue.enqueue edits (fun () -> in_dir s "a.txt" (Out_channel.write_all ~data:"two\n"));
+  Queue.enqueue edits (fun () ->
+    in_dir s "a.txt" (Out_channel.write_all ~data:"two\n"));
   print_result s (s.call ~params:{|{"adapter": "codex"}|} "new_session");
   s.prompt "first";
   (* The user edits a file after Codex's turn. *)
@@ -447,7 +473,8 @@ let%expect_test "a rewind is refused when files changed since the agent's turn" 
 let%expect_test "files changed between turns: refused" =
   with_server
   @@ fun s ->
-  Queue.enqueue edits (fun () -> in_dir s "a.txt" (Out_channel.write_all ~data:"two\n"));
+  Queue.enqueue edits (fun () ->
+    in_dir s "a.txt" (Out_channel.write_all ~data:"two\n"));
   Queue.enqueue edits ignore;
   print_result s (s.call ~params:{|{"adapter": "codex"}|} "new_session");
   s.prompt "first";
@@ -490,7 +517,9 @@ let%expect_test "outside a git repository: no rewind, and why" =
       [ [ "result"; "state" ]; [ "result" ] ]
       ~f:(fun path -> member (path @ [ "capabilities"; "rewind_note" ]) state)
   in
-  print_endline (Option.value_map note ~default:"no note" ~f:(fun n -> s.mask (Json.to_string n)));
+  print_endline
+    (Option.value_map note ~default:"no note" ~f:(fun n ->
+       s.mask (Json.to_string n)));
   [%expect
     {| "$DIR/work is not in a git repository, so prigh can't put its files back: fork from that message instead (/fork)" |}]
 ;;
@@ -516,8 +545,9 @@ let%expect_test "codex: a fork forks its thread at the turn" =
                          ~f:(fun (e : Session.Entry.t) ->
                            match e.payload with
                            | Message (Assistant a)
-                             when String.equal (Message.Assistant.text a) "codex reply 1"
-                             -> Some e.id
+                             when String.equal
+                                    (Message.Assistant.text a)
+                                    "codex reply 1" -> Some e.id
                            | _ -> None)) )
                 ]))
        "fork");
@@ -543,8 +573,10 @@ let%expect_test "codex: a fork forks its thread at the turn" =
 let%expect_test "claude: rewinding resumes it at its message; forks fork it" =
   with_server
   @@ fun s ->
-  Queue.enqueue edits (fun () -> in_dir s "a.txt" (Out_channel.write_all ~data:"two\n"));
-  Queue.enqueue edits (fun () -> in_dir s "a.txt" (Out_channel.write_all ~data:"three\n"));
+  Queue.enqueue edits (fun () ->
+    in_dir s "a.txt" (Out_channel.write_all ~data:"two\n"));
+  Queue.enqueue edits (fun () ->
+    in_dir s "a.txt" (Out_channel.write_all ~data:"three\n"));
   print_result s (s.call ~params:{|{"adapter": "claude"}|} "new_session");
   s.prompt "first";
   s.prompt "second";
@@ -593,7 +625,9 @@ let%expect_test "deleting a session drops its checkpoints" =
   print_result s (s.call "new_session");
   print_result
     s
-    (s.call ~params:(Json.to_string (`Object [ "path", `String path ])) "delete_session");
+    (s.call
+       ~params:(Json.to_string (`Object [ "path", `String path ]))
+       "delete_session");
   (* They go in the background: wait for them to. *)
   let rec wait n =
     if refs () > 0 && n > 0

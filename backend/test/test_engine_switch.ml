@@ -58,7 +58,9 @@ let fake_codex ~mask ~refuse_resume (p : Line_transport.Peer.t) =
          printf
            "codex: thread/fork %s at %s\n"
            (Option.value_exn (string_at [ "params"; "threadId" ] j))
-           (Option.value (string_at [ "params"; "lastTurnId" ] j) ~default:"its end");
+           (Option.value
+              (string_at [ "params"; "lastTurnId" ] j)
+              ~default:"its end");
          thread j "codex-fork"
        | Some "thread/resume" ->
          let id = Option.value_exn (string_at [ "params"; "threadId" ] j) in
@@ -499,7 +501,9 @@ let%expect_test "a thread that cannot be continued gets the whole session" =
     |}]
 ;;
 
-let%expect_test "a fork of a Codex session forks its thread, with nothing to hand over" =
+let%expect_test
+    "a fork of a Codex session forks its thread, with nothing to hand over"
+  =
   with_server
   @@ fun ~call ~prompt ~agent ~refuse_resume:_ ->
   print_result (call ~params:{|{"adapter": "codex"}|} "new_session");
@@ -571,7 +575,12 @@ let%expect_test "moving to another tool host: a new process and thread there" =
         ignore
           (Session.record_thread
              (Option.value_exn !session)
-             { adapter = "codex"; host = !host; thread_id; cwd = t.dir; fork_from = None }
+             { adapter = "codex"
+             ; host = !host
+             ; thread_id
+             ; cwd = t.dir
+             ; fork_from = None
+             }
            : Session.Entry.t))
       ()
   in

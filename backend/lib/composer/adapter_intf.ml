@@ -90,7 +90,7 @@ module Rollback = struct
     | Unsupported
     | Revert (** asked of the running process ({!S.revert}) *)
     | Resume_at
-      (** its next process continues the thread at a turn's end
+    (** its next process continues the thread at a turn's end
           ([Start.at], with {!S.mark}) *)
   [@@deriving sexp_of, equal]
 end
@@ -165,7 +165,6 @@ module type S = sig
     -> unit
 
   val answer : t -> request_id:string -> User_question.Reply.t -> unit
-
   val rollback : Rollback.t
 
   (** Whether it forks a thread at a turn itself (else a fork is a new

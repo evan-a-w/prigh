@@ -172,7 +172,9 @@ let note_thread
                  String.equal turn.thread_id parent)))
            ~f:(fun turn ->
              ignore
-               (Session.record_external_turn s.session { turn with thread_id = id }
+               (Session.record_external_turn
+                  s.session
+                  { turn with thread_id = id }
                 : Session.Entry.t))
        | None -> if Option.is_some t.resumed then t.fresh <- true);
       t.on_thread id)
@@ -250,8 +252,9 @@ let rollback_plan t session ~resume =
     in
     let has = has (of_thread (Session.external_turns ~all:true session)) in
     let kept = List.length on_path in
-    if not
-         (List.is_prefix has ~prefix:on_path ~equal:Session.External_turn.equal)
+    if
+      not
+        (List.is_prefix has ~prefix:on_path ~equal:Session.External_turn.equal)
     then `Nothing
     else if List.length has = kept
     then `Whole
@@ -264,8 +267,13 @@ let rollback_plan t session ~resume =
       | Resume_at ->
         (match List.last on_path with
          | Some ({ mark = Some _; _ } as last) ->
-           `At { Session.Fork_point.turn_id = Some last.turn_id; mark = last.mark }
+           `At
+             { Session.Fork_point.turn_id = Some last.turn_id
+             ; mark = last.mark
+             }
          | Some { mark = None; _ } | None -> `Nothing))
+;;
+
 (* The running cost total [thread] reported after its last recorded turn. *)
 let cost_total_of session thread =
   List.rev (Session.external_turns session)
@@ -332,7 +340,15 @@ let live t (s : Engine_intf.Services.t) (input : Engine_intf.Turn.Input.t) =
              (Error.to_string_hum e));
         t.thread_id <- None;
         t.fresh <- true;
-        start_process t s { start with resume = None; fork = false; at = None; cost_total = None }
+        start_process
+          t
+          s
+          { start with
+            resume = None
+          ; fork = false
+          ; at = None
+          ; cost_total = None
+          }
       | Ok (Live ((module L), a)), Some thread when Option.is_some revert ->
         (* The session was rewound: its thread drops the runs it lost. *)
         (match L.revert a ~before_turn_id:(Option.value_exn revert) with
@@ -348,7 +364,15 @@ let live t (s : Engine_intf.Services.t) (input : Engine_intf.Turn.Input.t) =
            L.stop a;
            t.thread_id <- None;
            t.fresh <- true;
-           start_process t s { start with resume = None; fork = false; at = None; cost_total = None })
+           start_process
+             t
+             s
+             { start with
+               resume = None
+             ; fork = false
+             ; at = None
+             ; cost_total = None
+             })
       | started, _ -> started
     in
     (match started with
@@ -800,7 +824,9 @@ and run_turn'
   (match t.thread_id, Session.head s.session with
    | Some thread_id, Some through when !sent ->
      t.turns <- t.turns + 1;
-     let turn_id = Option.value !last_turn ~default:(sprintf "turn-%d" t.turns) in
+     let turn_id =
+       Option.value !last_turn ~default:(sprintf "turn-%d" t.turns)
+     in
      let after =
        if Option.is_some !before then capture t s ~which:"after" else None
      in
@@ -811,7 +837,8 @@ and run_turn'
           ; turn_id
           ; through
           ; first_turn_id =
-              Option.filter !first_turn ~f:(fun f -> not (String.equal f turn_id))
+              Option.filter !first_turn ~f:(fun f ->
+                not (String.equal f turn_id))
           ; mark = !mark
           ; before = Option.bind after ~f:(fun _ -> !before)
           ; after
@@ -861,9 +888,7 @@ let rewind t session ~to_ =
         |> Or_error.all
       in
       let%bind () =
-        List.zip_exn
-          (List.drop_last_exn checkpoints)
-          (List.tl_exn checkpoints)
+        List.zip_exn (List.drop_last_exn checkpoints) (List.tl_exn checkpoints)
         |> List.map ~f:(fun ((_, after), (before, _)) ->
           match%bind
             Checkpoint.Client.changed exec ~from:after ~to_:(Some before)
@@ -885,8 +910,8 @@ let rewind t session ~to_ =
       | Ok (_ : string list) -> Ok ()
       | Error e ->
         Or_error.errorf
-          "could not put the files back as they were before %s's turn \
-           (nothing was changed): %s"
+          "could not put the files back as they were before %s's turn (nothing \
+           was changed): %s"
           A.display_name
           (Error.to_string_hum e)
     in
@@ -895,11 +920,15 @@ let rewind t session ~to_ =
     else (
       match t.checkpoint, A.rollback with
       | None, _ | _, Unsupported ->
-        Or_error.errorf "%s sessions can't rewind: %s" A.display_name fork_instead
+        Or_error.errorf
+          "%s sessions can't rewind: %s"
+          A.display_name
+          fork_instead
       | Some exec, (Revert | Resume_at) ->
         let%map.Or_error () = restore exec in
-        if List.exists dropped ~f:(fun run ->
-             Option.equal String.equal (Some run.thread_id) t.thread_id)
+        if
+          List.exists dropped ~f:(fun run ->
+            Option.equal String.equal (Some run.thread_id) t.thread_id)
         then close t)
 ;;
 

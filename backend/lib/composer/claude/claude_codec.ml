@@ -133,7 +133,8 @@ type t =
   ; mutable limit_resets_at : float option
   ; blocks : int String.Table.t (* message id -> content blocks seen *)
   ; mutable streaming : string option (* the top-level message being streamed *)
-  ; mutable last_assistant : string option (* the uuid of the latest top-level one *)
+  ; mutable last_assistant :
+      string option (* the uuid of the latest top-level one *)
   ; warned : String.Hash_set.t
   }
 
@@ -463,7 +464,8 @@ let handle_assistant t json =
     [%equal: string option] (str message "model") (Some "<synthetic>")
   in
   if Option.is_none parent && not synthetic
-  then Option.iter (str json "uuid") ~f:(fun uuid -> t.last_assistant <- Some uuid);
+  then
+    Option.iter (str json "uuid") ~f:(fun uuid -> t.last_assistant <- Some uuid);
   (match str json "error" with
    | Some "rate_limit" -> t.rate_limited <- true
    | Some ("authentication_failed" | "oauth_org_not_allowed") ->

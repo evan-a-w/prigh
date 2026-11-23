@@ -102,9 +102,11 @@ let with_temp_index f =
   Exn.protect
     ~f:(fun () -> f path)
     ~finally:(fun () ->
-      List.iter [ path; path ^ ".lock" ] ~f:(fun p ->
-        try Core_unix.unlink p with
-        | _ -> ()))
+      List.iter
+        [ path; path ^ ".lock" ]
+        ~f:(fun p ->
+          try Core_unix.unlink p with
+          | _ -> ()))
 ;;
 
 (* A temporary index with the repository's as its start: its stat cache
@@ -142,7 +144,14 @@ let worktree_tree ~env ~cancel ~root =
             ~what:"add"
             [ "add"; "-A"; "--"; "." ]
           : string));
-    line (git_exn ~env ~cancel ~index ~dir:root ~what:"write-tree" [ "write-tree" ]))
+    line
+      (git_exn
+         ~env
+         ~cancel
+         ~index
+         ~dir:root
+         ~what:"write-tree"
+         [ "write-tree" ]))
 ;;
 
 let check_ref ref =
@@ -295,7 +304,13 @@ let restore ~env ~cancel ~cwd ~to_ ~expect =
       then
         with_temp_index (fun index ->
           ignore
-            (git_exn ~env ~cancel ~index ~dir:root ~what:"read-tree" [ "read-tree"; target ]
+            (git_exn
+               ~env
+               ~cancel
+               ~index
+               ~dir:root
+               ~what:"read-tree"
+               [ "read-tree"; target ]
              : string);
           (* A directory where a file goes: it held only files the target
              lacks, removed above. *)
@@ -306,7 +321,8 @@ let restore ~env ~cancel ~cwd ~to_ ~expect =
                ~index
                ~dir:root
                ~what:"checkout-index"
-               ~stdin:(String.concat (List.map written ~f:(fun p -> p ^ "\000")))
+               ~stdin:
+                 (String.concat (List.map written ~f:(fun p -> p ^ "\000")))
                [ "checkout-index"; "-f"; "-z"; "--stdin" ]
              : string));
       let after = worktree_tree ~env ~cancel ~root in
@@ -344,7 +360,9 @@ let drop ~env ~cancel ~cwd ~prefix =
              ~cancel
              ~dir:root
              ~what:"update-ref"
-             ~stdin:(String.concat (List.map refs ~f:(fun r -> "delete " ^ r ^ "\n")))
+             ~stdin:
+               (String.concat
+                  (List.map refs ~f:(fun r -> "delete " ^ r ^ "\n")))
              [ "update-ref"; "--stdin" ]
            : string);
       List.length refs)
@@ -370,16 +388,21 @@ let run ~env ~cancel ~cwd ~arguments =
   let files l = `Array (List.map l ~f:(fun s -> `String s)) in
   match string "action" with
   | Some "capture" ->
-    reply [%jsonaf_of: Captured.t] (capture ~env ~cancel ~cwd ~ref:(string "ref"))
+    reply
+      [%jsonaf_of: Captured.t]
+      (capture ~env ~cancel ~cwd ~ref:(string "ref"))
   | Some "changed" ->
     need "from" (fun from ->
       reply files (changed ~env ~cancel ~cwd ~from ~to_:(string "to")))
   | Some "restore" ->
     need "to" (fun to_ ->
-      need "expect" (fun expect -> reply files (restore ~env ~cancel ~cwd ~to_ ~expect)))
+      need "expect" (fun expect ->
+        reply files (restore ~env ~cancel ~cwd ~to_ ~expect)))
   | Some "drop" ->
     need "prefix" (fun prefix ->
-      reply (fun n -> `Number (Int.to_string n)) (drop ~env ~cancel ~cwd ~prefix))
+      reply
+        (fun n -> `Number (Int.to_string n))
+        (drop ~env ~cancel ~cwd ~prefix))
   | Some other -> Tool.Result.error (sprintf "%s: unknown action %s" op other)
   | None -> Tool.Result.error (sprintf "%s: missing action" op)
 ;;
@@ -433,7 +456,10 @@ module Client = struct
   let restore exec ~to_ ~expect =
     call
       exec
-      [ "action", `String "restore"; "to", `String to_; "expect", `String expect ]
+      [ "action", `String "restore"
+      ; "to", `String to_
+      ; "expect", `String expect
+      ]
       files
   ;;
 

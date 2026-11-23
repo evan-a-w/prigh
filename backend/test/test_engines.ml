@@ -174,7 +174,15 @@ let%expect_test "session entries: engine, threads, external turns, handoffs" =
   let (_ : Session.Entry.t) =
     Session.record_external_turn
       t
-      { thread_id = "thr_1"; turn_id = "turn_1"; through = m.id; first_turn_id = None; mark = None; before = None; after = None; cost_total = None }
+      { thread_id = "thr_1"
+      ; turn_id = "turn_1"
+      ; through = m.id
+      ; first_turn_id = None
+      ; mark = None
+      ; before = None
+      ; after = None
+      ; cost_total = None
+      }
   in
   let (_ : Session.Entry.t) =
     Session.set_engine t { engine = Composer; adapter = Some Claude }

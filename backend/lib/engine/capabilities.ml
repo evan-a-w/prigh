@@ -122,7 +122,10 @@ let refusal t (feature : Feature.t) ~who =
   | Fork ->
     sprintf "%s sessions can't be forked: start a new session (/new)" who
   | Rewind when Option.is_some t.rewind_note ->
-    sprintf "%s sessions can't rewind here: %s" who (Option.value_exn t.rewind_note)
+    sprintf
+      "%s sessions can't rewind here: %s"
+      who
+      (Option.value_exn t.rewind_note)
   | Rewind ->
     if supports t Fork
     then

@@ -1123,7 +1123,9 @@ let composer_runner ?handoff_from t agent (adapter_id : Adapter_id.t) =
         | None -> None, false, None
         | Some { fork_from = None; thread_id; _ } -> Some thread_id, false, None
         | Some { fork_from = Some at; thread_id; _ } ->
-          if A.fork_native then Some thread_id, true, Some at else None, false, None
+          if A.fork_native
+          then Some thread_id, true, Some at
+          else None, false, None
       in
       { (Adapter.Start.default ~cwd) with
         resume
@@ -1158,7 +1160,8 @@ let composer_runner ?handoff_from t agent (adapter_id : Adapter_id.t) =
            spawned)
          ~start
          ~on_thread
-         ~checkpoint:(fun args -> Agent.host_call agent ~name:Checkpoint.op args)
+         ~checkpoint:(fun args ->
+           Agent.host_call agent ~name:Checkpoint.op args)
          ~host:(fun () -> Agent.active_host agent)
          ?handoff_from
          ())
@@ -2620,8 +2623,9 @@ let checkpointed_places (summary : Session.Summary.t) =
   match Session.load summary.path with
   | Error _ -> []
   | Ok session ->
-    if List.exists (Session.external_turns ~all:true session) ~f:(fun run ->
-         Option.is_some run.after)
+    if
+      List.exists (Session.external_turns ~all:true session) ~f:(fun run ->
+        Option.is_some run.after)
     then
       List.map (Session.threads session) ~f:(fun (thread : Session.Thread.t) ->
         thread.host, thread.cwd)

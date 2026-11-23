@@ -93,13 +93,13 @@ module Client : sig
   type exec := Json.t -> Tool.Result.t
 
   val capture : exec -> ref:string option -> Captured.t Or_error.t
-  val changed : exec -> from:string -> to_:string option -> string list Or_error.t
 
-  val restore
+  val changed
     :  exec
-    -> to_:string
-    -> expect:string
+    -> from:string
+    -> to_:string option
     -> string list Or_error.t
 
+  val restore : exec -> to_:string -> expect:string -> string list Or_error.t
   val drop : exec -> prefix:string -> int Or_error.t
 end
