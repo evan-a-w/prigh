@@ -291,9 +291,10 @@ type t =
   ; permissions : Permission.t String.Table.t
   ; tools : Tool.t String.Table.t
   ; mutable cost : float option
+  ; compacted : String.Hash_set.t (* compactionIds already reported *)
   }
 
-let create () =
+let create ?cost_total () =
   { next_id = 0
   ; pending = Int.Table.create ()
   ; capabilities = None
@@ -304,11 +305,13 @@ let create () =
   ; turns = 0
   ; permissions = String.Table.create ()
   ; tools = String.Table.create ()
-  ; cost = None
+  ; cost = cost_total
+  ; compacted = String.Hash_set.create ()
   }
 ;;
 
 let session_id t = t.session_id
+let cost_total t = t.cost
 let turn_id t = Option.map t.turn ~f:(fun turn -> turn.id)
 let in_turn t = Option.is_some t.turn
 let agent_capabilities t = t.capabilities
@@ -564,13 +567,16 @@ let reply_approval t ~request_id (reply : Adapter_event.Approval_reply.t) =
       List.find_map p.options ~f:(fun (id, k) ->
         Option.some_if (String.equal k kind) id)
     in
+    (* A persistent option only when the user chose one: approving once
+       never leaves an "always allow" behind, nor denying once an "always
+       reject". Without the option the user asked for, the request is
+       cancelled. *)
     let choice =
       match reply with
       | Allow -> of_kind "allow_once"
       | Allow_always ->
         Option.first_some (of_kind "allow_always") (of_kind "allow_once")
-      | Deny _ ->
-        Option.first_some (of_kind "reject_once") (of_kind "reject_always")
+      | Deny _ -> of_kind "reject_once"
       | Cancel -> None
     in
     let outcome =
@@ -1035,6 +1041,11 @@ let on_update t params =
     ]
   | Some "session_info_update" when Option.is_some (field "title" update) ->
     [ Output.Title (str "title" update) ]
+  | Some "usage_update" when replay ->
+    (* The replay of a loaded session: its running cost total is where the
+       live updates count from. *)
+    ignore (on_usage t update : Output.t list);
+    []
   | _ when replay -> []
   | Some "agent_message_chunk" ->
     (match block_text (obj (field "content" update)) with
@@ -1046,6 +1057,9 @@ let on_update t params =
      | Some text when not (String.is_empty text) ->
        chunk t ~thought:true ~message_id:(str "messageId" update) text
      | _ -> [])
+  | Some ("tool_call" | "tool_call_update") when Option.is_none t.turn ->
+    (* After its prompt was answered: no turn to show it in. *)
+    []
   | Some ("tool_call" | "tool_call_update") -> on_tool_update t update
   | Some "plan" -> on_plan (items "entries" update)
   | Some "usage_update" -> on_usage t update
@@ -1068,8 +1082,13 @@ let on_update t params =
   | Some "compaction_update" ->
     (match str "status" update with
      | Some "completed" ->
-       [ Output.Event (Compacted { tokens_before = None; tokens_after = None })
-       ]
+       (* An upsert: later patches of the same compaction are not new ones. *)
+       (match str "compactionId" update with
+        | Some id when Hash_set.mem t.compacted id -> []
+        | id ->
+          Option.iter id ~f:(Hash_set.add t.compacted);
+          [ Output.Event (Compacted { tokens_before = None; tokens_after = None })
+          ])
      | Some (("failed" | "cancelled") as status) ->
        [ Output.Event
            (Notice
@@ -1115,6 +1134,10 @@ let end_turn t (stop : Adapter_event.Stop.t) =
     @ [ Output.Event (Turn_end { turn_id = Some turn.id; stop }) ]
 ;;
 
+let known_stop_reasons =
+  [ "end_turn"; "cancelled"; "max_tokens"; "max_turn_requests"; "refusal" ]
+;;
+
 let stop_of_reason ~cancelled reason : Adapter_event.Stop.t =
   match reason with
   | Some "end_turn" -> Done
@@ -1133,8 +1156,9 @@ let stop_of_reason ~cancelled reason : Adapter_event.Stop.t =
       }
   | Some "refusal" ->
     Failed { kind = Other; message = "the agent refused to continue" }
-  | Some other ->
-    Failed { kind = Protocol; message = "unknown stopReason " ^ other }
+  | Some _ ->
+    (* A newer agent's reason: the turn ended, not failed. *)
+    Done
   | None ->
     Failed
       { kind = Protocol
@@ -1207,6 +1231,10 @@ let on_response t ~id ~result ~error =
                     })
              ]
            | Some session_id ->
+             (* A new session counts its cost from nothing. *)
+             (match pending with
+              | New_session -> t.cost <- None
+              | _ -> ());
              t.session_id <- Some session_id;
              let config = parse_session_config result in
              t.config <- config;
@@ -1216,7 +1244,22 @@ let on_response t ~id ~result ~error =
             Option.value_map t.turn ~default:false ~f:(fun turn ->
               turn.cancelled)
           in
-          end_turn t (stop_of_reason ~cancelled (str "stopReason" result))
+          let reason = str "stopReason" result in
+          let unknown =
+            match reason with
+            | Some r
+              when not
+                     (List.mem
+                        known_stop_reasons
+                        r
+                        ~equal:String.equal) ->
+              [ Output.Event
+                  (Notice
+                     (sprintf "the agent ended its turn for a reason prigh does not know: %s" r))
+              ]
+            | _ -> []
+          in
+          unknown @ end_turn t (stop_of_reason ~cancelled reason)
         | Set_mode mode_id ->
           t.config <- { t.config with current_mode = Some mode_id };
           [ Output.Response (Mode_set mode_id); Config_changed t.config ]
@@ -1241,6 +1284,12 @@ let on_permission t ~id params =
       | Some option_id, Some kind -> Some (option_id, kind)
       | _ -> None)
   in
+  match t.turn with
+  | Some { cancelled = true; _ } ->
+    (* After [session/cancel], every permission request is answered
+       cancelled. *)
+    [ Output.Send (result_line id cancelled_outcome) ]
+  | _ ->
   Hashtbl.set t.permissions ~key:request_id ~data:{ id; options };
   let started, kind, tool_id =
     match tool_of_update t tool_call with
@@ -1271,6 +1320,9 @@ let of_our_session t params =
 ;;
 
 let handle_line t raw =
+  if String.is_empty (String.strip raw)
+  then []
+  else (
   match Json.parse raw with
   | Error _ ->
     [ Output.Event
@@ -1323,7 +1375,7 @@ let handle_line t raw =
             ~id
             ~result:(field "result" json)
             ~error:(field "error" json))
-     | None, None -> [])
+     | None, None -> []))
 ;;
 
 let process_exited ?(name = "the ACP agent") t ~code ~stderr_tail =

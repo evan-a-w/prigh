@@ -11,6 +11,10 @@ module Start = struct
     ; plan : bool
     ; resume : string option (** the harness's thread to continue *)
     ; fork : bool (** continue [resume] in a new thread *)
+    ; cost_total : float option
+      (** the running cost total [resume] reported last: the harnesses that
+          report a session's cost as a running total carry it on when the
+          thread is continued, so only what comes after it is new spend *)
     ; developer_instructions : string option
       (** appended to the harness's own system prompt *)
     ; mcp_servers : (string * Json.t) list
@@ -26,6 +30,7 @@ module Start = struct
     ; plan = false
     ; resume = None
     ; fork = false
+    ; cost_total = None
     ; developer_instructions = None
     ; mcp_servers = []
     }
@@ -137,6 +142,11 @@ module type S = sig
 
   (** The thread to resume later. *)
   val thread_id : t -> string option
+
+  (** The running cost total the harness reported last for its thread, to
+      seed {!Start.cost_total} when the thread is continued; [None] for one
+      that reports no running total. *)
+  val cost_total : t -> float option
 
   val in_turn : t -> bool
 

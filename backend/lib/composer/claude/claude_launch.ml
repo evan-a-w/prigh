@@ -17,10 +17,11 @@ type t =
   ; model : string option
   ; permission_mode : Claude_permission_mode.t option
   ; resume : Resume.t
-  ; append_system_prompt : string option
   ; mcp_config : Json.t option
   ; max_thinking_tokens : int option
   ; effort : string option
+  ; setting_sources : string list
+  ; strict_mcp_config : bool
   }
 [@@deriving sexp_of]
 
@@ -29,16 +30,20 @@ let default =
   ; model = None
   ; permission_mode = None
   ; resume = New { session_id = None }
-  ; append_system_prompt = None
   ; mcp_config = None
   ; max_thinking_tokens = None
   ; effort = None
+  ; setting_sources = [ "user" ]
+  ; strict_mcp_config = true
   }
 ;;
 
 let argv t =
+  (* As the SDK does: a value that could be read as a flag goes after an
+     [=]. *)
   let opt flag = function
     | None -> []
+    | Some v when String.is_prefix v ~prefix:"-" -> [ flag ^ "=" ^ v ]
     | Some v -> [ flag; v ]
   in
   let eq flag = function
@@ -60,7 +65,6 @@ let argv t =
   in
   List.concat
     [ [ t.executable; "--output-format"; "stream-json"; "--verbose" ]
-    ; opt "--append-system-prompt" t.append_system_prompt
     ; opt "--model" t.model
     ; [ "--permission-prompt-tool"; "stdio" ]
     ; opt
@@ -69,6 +73,8 @@ let argv t =
     ; bypass
     ; resume
     ; opt "--mcp-config" (Option.map t.mcp_config ~f:Json.to_string)
+    ; (if t.strict_mcp_config then [ "--strict-mcp-config" ] else [])
+    ; [ "--setting-sources=" ^ String.concat ~sep:"," t.setting_sources ]
     ; [ "--include-partial-messages" ]
     ; opt
         "--max-thinking-tokens"

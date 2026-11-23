@@ -82,7 +82,7 @@ let codex_session dir =
   let (_ : Session.Entry.t) =
     Session.record_external_turn
       t
-      { thread_id = "thr_1"; turn_id = "turn_1"; through = last }
+      { thread_id = "thr_1"; turn_id = "turn_1"; through = last; cost_total = None }
   in
   t
 ;;
@@ -160,7 +160,7 @@ let%expect_test "switching back: only what Codex has not seen" =
   let (_ : Session.Entry.t) =
     Session.record_external_turn
       t
-      { thread_id = "sess-9"; turn_id = "turn-1"; through = last }
+      { thread_id = "sess-9"; turn_id = "turn-1"; through = last; cost_total = None }
   in
   let h =
     Handoff.build

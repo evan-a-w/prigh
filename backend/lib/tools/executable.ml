@@ -40,11 +40,15 @@ let resolve ~environment ~dir command =
       List.find_map environment ~f:(String.chop_prefix ~prefix:"PATH=")
       |> Option.value ~default:"/usr/bin:/bin"
     in
-    List.find_map (String.split path ~on:':') ~f:(fun dir ->
-      let candidate =
-        Filename.concat (if String.is_empty dir then "." else dir) command
-      in
-      Option.some_if (is_executable candidate) candidate)
+    (* Only absolute entries: a relative one (or an empty one, meaning ".")
+       would be looked up in one directory and run in another, the
+       session's, which may be an untrusted repository. *)
+    List.find_map (String.split path ~on:':') ~f:(fun entry ->
+      if Filename.is_relative entry
+      then None
+      else (
+        let candidate = Filename.concat entry command in
+        Option.some_if (is_executable candidate) candidate))
     |> Result.of_option ~error:Missing.Not_on_path)
 ;;
 

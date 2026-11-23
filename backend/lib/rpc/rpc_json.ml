@@ -702,7 +702,7 @@ let entry (e : Session.Entry.t) =
       ; "thread_id", str thread_id
       ; "cwd", str cwd
       ]
-    | External_turn { thread_id; turn_id; through } ->
+    | External_turn { thread_id; turn_id; through; cost_total = _ } ->
       [ "kind", str "external_turn"
       ; "thread_id", str thread_id
       ; "turn_id", str turn_id

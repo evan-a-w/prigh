@@ -24,10 +24,3 @@ let of_string s =
   | "manual" -> Some Default
   | _ -> List.find all ~f:(fun t -> String.equal (to_string t) s)
 ;;
-
-let of_approval_mode : Approval_mode.t -> t option = function
-  | Ask -> Some Default
-  | Auto_edit -> Some Accept_edits
-  | Auto -> Some Bypass_permissions
-  | Smart -> None
-;;

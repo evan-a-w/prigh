@@ -122,6 +122,7 @@ type t =
   ; mutable turns : int
   ; mutable interrupting : bool
   ; mutable cost_total : float
+  ; mutable cost_seen : bool
   ; mutable context_tokens : int option
   ; mutable rate_limited : bool
   ; mutable auth_failed : bool
@@ -131,7 +132,7 @@ type t =
   ; warned : String.Hash_set.t
   }
 
-let create () =
+let create ?cost_total () =
   { next_id = 0
   ; ours = String.Table.create ()
   ; permissions = []
@@ -141,7 +142,8 @@ let create () =
   ; turn = None
   ; turns = 0
   ; interrupting = false
-  ; cost_total = 0.
+  ; cost_total = Option.value cost_total ~default:0.
+  ; cost_seen = Option.is_some cost_total
   ; context_tokens = None
   ; rate_limited = false
   ; auth_failed = false
@@ -153,6 +155,7 @@ let create () =
 ;;
 
 let session_id t = t.session_id
+let cost_total t = if t.cost_seen then Some t.cost_total else None
 let in_turn t = Option.is_some t.turn
 
 (* JSON helpers *)
@@ -210,14 +213,18 @@ let error_response ~request_id message =
         ])
 ;;
 
-let initialize t ~sdk_mcp_servers =
+let initialize t ?append_system_prompt ~sdk_mcp_servers () =
   control_request
     t
     Initialize
     "initialize"
-    [ "hooks", `Null
-    ; "sdkMcpServers", `Array (List.map sdk_mcp_servers ~f:(fun s -> `String s))
-    ]
+    ([ "hooks", `Null
+     ; "sdkMcpServers", `Array (List.map sdk_mcp_servers ~f:(fun s -> `String s))
+     ]
+     @
+     match append_system_prompt with
+     | Some text -> [ "appendSystemPrompt", `String text ]
+     | None -> [])
 ;;
 
 let user_message t ?uuid ~text ~images () =
@@ -597,6 +604,7 @@ let handle_result t json =
             else total
           in
           t.cost_total <- total;
+          t.cost_seen <- true;
           delta)
       in
       [ Output.Event

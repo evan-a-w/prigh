@@ -168,6 +168,13 @@ let start_process t (s : Engine_intf.Services.t) (start : Adapter.Start.t) =
        Error (`Start e))
 ;;
 
+(* The running cost total [thread] reported after its last recorded turn. *)
+let cost_total_of session thread =
+  List.rev (Session.external_turns session)
+  |> List.find_map ~f:(fun (turn : Session.External_turn.t) ->
+    if String.equal turn.thread_id thread then turn.cost_total else None)
+;;
+
 let live t (s : Engine_intf.Services.t) (input : Engine_intf.Turn.Input.t) =
   let host = t.host () in
   (* The session moved to another tool host: its harness runs there now,
@@ -187,6 +194,11 @@ let live t (s : Engine_intf.Services.t) (input : Engine_intf.Turn.Input.t) =
     let resume = Option.first_some t.thread_id base.resume in
     let start =
       { base with
+        cost_total =
+          Option.first_some
+            (Option.bind resume ~f:(cost_total_of s.session))
+            base.cost_total
+      ;
         thinking = input.thinking
       ; approval = input.approval
       ; plan = input.plan
@@ -208,7 +220,10 @@ let live t (s : Engine_intf.Services.t) (input : Engine_intf.Turn.Input.t) =
              (Error.to_string_hum e));
         t.thread_id <- None;
         t.fresh <- true;
-        start_process t s { start with resume = None; fork = false }
+        start_process
+          t
+          s
+          { start with resume = None; fork = false; cost_total = None }
       | started, _ -> started
     in
     (match started with
@@ -369,6 +384,7 @@ let run_turn
   t.cancel <- cancel;
   let sent = ref false in
   let last_turn = ref None in
+  let cost_total = ref None in
   let recorder =
     Composer_recorder.create
       ~adapter:A.id
@@ -407,6 +423,7 @@ let run_turn
        | Error e -> fail (Error.to_string_hum e)
        | Ok () ->
          sent := true;
+         cost_total := Some (fun () -> L.cost_total a);
          let requests = String.Table.create () in
          let stop = ref None in
          let handle_request ~sw request_id f =
@@ -547,6 +564,7 @@ let run_turn
           ; turn_id =
               Option.value !last_turn ~default:(sprintf "turn-%d" t.turns)
           ; through
+          ; cost_total = Option.bind !cost_total ~f:(fun f -> f ())
           }
         : Session.Entry.t)
    | _ -> ());

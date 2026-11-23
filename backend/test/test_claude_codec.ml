@@ -90,7 +90,6 @@ let%expect_test "launch" =
       model = Some "claude-sonnet-4-6"
     ; permission_mode = Some Bypass_permissions
     ; resume = Resume { session_id = "abc"; fork = true; at = Some "-uuid" }
-    ; append_system_prompt = Some "Be brief."
     ; mcp_config = Some (Claude_launch.sdk_mcp_config [ "prigh" ])
     ; max_thinking_tokens = Some 8000
     ; effort = Some "high"
@@ -112,21 +111,37 @@ let%expect_test "launch" =
     (claude --output-format stream-json --verbose --permission-prompt-tool stdio
      --session-id=pinned --include-partial-messages --input-format stream-json)
     |}];
+  (* A value that could be read as a flag goes after an [=]. *)
+  argv
+    { Claude_launch.default with model = Some "--dangerously-skip-permissions" };
+  [%expect {| |}];
+  (* Every prigh mode launches Claude Code asking ([default]): prigh's
+     approval, with its rules, answers. The user's instructions are not on
+     the command line. *)
+  List.iter Approval_mode.all ~f:(fun approval ->
+    let launch =
+      Claude_adapter.launch
+        { (Adapter.Start.default ~cwd:"/w") with
+          approval
+        ; developer_instructions = Some "secret about the user"
+        }
+    in
+    print_s [%sexp (approval : Approval_mode.t), (launch.argv : string list)]);
+  [%expect {| |}];
   print_s
     [%sexp
-      (List.map Approval_mode.all ~f:(fun m ->
-         m, Claude_permission_mode.of_approval_mode m)
-       : (Approval_mode.t * Claude_permission_mode.t option) list)];
-  [%expect
-    {|
-    ((Ask (Default)) (Auto_edit (Accept_edits)) (Auto (Bypass_permissions))
-     (Smart ()))
-    |}]
+      ((Claude_adapter.launch
+          { (Adapter.Start.default ~cwd:"/w") with plan = true })
+         .argv
+       : string list)];
+  [%expect {| |}]
 ;;
 
 let%expect_test "our requests and the answers to them" =
   let t = C.create () in
-  print_endline (C.initialize t ~sdk_mcp_servers:[ "prigh" ]);
+  print_endline (C.initialize t ~sdk_mcp_servers:[ "prigh" ] ());
+  print_endline
+    (C.initialize t ~append_system_prompt:"About the user" ~sdk_mcp_servers:[] ());
   print_endline
     (C.user_message
        t

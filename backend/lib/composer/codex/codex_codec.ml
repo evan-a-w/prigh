@@ -139,6 +139,7 @@ module Server_request = struct
     | Command_approval of { decisions : Json.t list option }
     | File_approval
     | Permissions of { requested : Json.t }
+    | Mcp_tool_approval of { schema : Json.t option }
     | Question of { question_ids : string list }
     | Tool
 
@@ -254,27 +255,14 @@ let reply_error id ~code message =
         ])
 ;;
 
-let approval_policy : Approval_mode.t -> Json.t = function
-  | Ask -> `String "untrusted"
-  | Auto_edit | Smart -> `String "on-request"
-  | Auto ->
-    (* "never" would also refuse MCP elicitations; like T3, ask for those only. *)
-    `Object
-      [ ( "granular"
-        , `Object
-            [ "sandbox_approval", `False
-            ; "rules", `False
-            ; "skill_approval", `False
-            ; "request_permissions", `False
-            ; "mcp_elicitations", `True
-            ] )
-      ]
-;;
-
-let reviewer : Approval_mode.t -> string = function
-  | Smart -> "auto_review"
-  | Ask | Auto_edit | Auto -> "user"
-;;
+(* Codex asks prigh before every command it does not know to be read-only
+   and every file change, in every mode: prigh's approval (the session's
+   mode, its deny and ask rules, Smart's judge) decides, as for the
+   harness's own tools. Modes where Codex decides itself ("on-request"
+   inside the sandbox, "never", its own [auto_review] reviewer) would skip
+   those rules. *)
+let approval_policy : Json.t = `String "untrusted"
+let reviewer = "user"
 
 let sandbox_mode : Approval_mode.t -> string = function
   | Ask -> "read-only"
@@ -334,8 +322,8 @@ let thread_params
     ; Option.map thread_id ~f:(fun _ -> "excludeTurns", `True)
     ; Some ("cwd", `String s.cwd)
     ; opt "model" (fun m -> `String m) s.model
-    ; Some ("approvalPolicy", approval_policy s.approval)
-    ; Some ("approvalsReviewer", `String (reviewer s.approval))
+    ; Some ("approvalPolicy", approval_policy)
+    ; Some ("approvalsReviewer", `String reviewer)
     ; Some ("sandbox", `String (sandbox_mode s.approval))
     ; opt "developerInstructions" (fun i -> `String i) o.developer_instructions
     ; Some ("config", `Object config)
@@ -434,8 +422,8 @@ let start_turn t (s : Settings.t) inputs =
             [ Some ("threadId", `String thread)
             ; Some ("input", `Array (List.map inputs ~f:input_json))
             ; Some ("cwd", `String s.cwd)
-            ; Some ("approvalPolicy", approval_policy s.approval)
-            ; Some ("approvalsReviewer", `String (reviewer s.approval))
+            ; Some ("approvalPolicy", approval_policy)
+            ; Some ("approvalsReviewer", `String reviewer)
             ; Some ("sandboxPolicy", sandbox_policy s.approval)
             ; opt "model" (fun m -> `String m) s.model
             ; opt "effort" (fun e -> `String e) effort
@@ -539,6 +527,76 @@ let amendment decisions =
     Option.is_some (field "acceptWithExecpolicyAmendment" d))
 ;;
 
+(* The answer accepting an MCP tool-call approval form ([always]: for the
+   session): each of the form's fields gets the option that means "allow
+   once" (or "for the session"), a persistence switch [always], else its
+   default. A form with a required field left unanswered is cancelled
+   rather than guessed. *)
+let mcp_accept ~schema ~always =
+  let persistent value =
+    let v = String.lowercase value in
+    List.exists [ "session"; "always"; "permanent"; "forever"; "persist" ]
+      ~f:(fun word -> String.is_substring v ~substring:word)
+  in
+  let once value =
+    let v = String.lowercase (String.strip value) in
+    (not (persistent v))
+    && List.exists [ "once"; "accept"; "approve"; "allow" ] ~f:(fun word ->
+      String.is_prefix v ~prefix:word)
+  in
+  let for_session value =
+    String.is_substring (String.lowercase value) ~substring:"session"
+  in
+  let properties =
+    match Option.bind schema ~f:(Json.member "properties") with
+    | Some (`Object fields) -> fields
+    | _ -> []
+  in
+  let options field =
+    match Json.member "oneOf" field, Json.member "enum" field with
+    | Some (`Array options), _ ->
+      List.filter_map options ~f:(fun o ->
+        Option.bind (Json.member "const" o) ~f:Json.string)
+    | _, Some (`Array values) -> List.filter_map values ~f:Json.string
+    | _ -> []
+  in
+  let content =
+    List.filter_map properties ~f:(fun (key, field) ->
+      let choice =
+        List.find (options field) ~f:(if always then for_session else once)
+      in
+      match choice with
+      | Some value -> Some (key, `String value)
+      | None ->
+        let title =
+          Option.value
+            (Option.bind (Json.member "title" field) ~f:Json.string)
+            ~default:""
+        in
+        (match Option.bind (Json.member "type" field) ~f:Json.string with
+         | Some "boolean" when persistent key || persistent title ->
+           Some (key, if always then `True else `False)
+         | _ ->
+           (match Json.member "default" field with
+            | None | Some `Null -> None
+            | Some default -> Some (key, default))))
+  in
+  let required =
+    match Option.bind schema ~f:(Json.member "required") with
+    | Some (`Array keys) -> List.filter_map keys ~f:Json.string
+    | _ -> []
+  in
+  if
+    List.exists required ~f:(fun key ->
+      not (List.Assoc.mem content key ~equal:String.equal))
+  then `Object [ "action", `String "cancel" ]
+  else
+    `Object
+      ([ "action", `String "accept" ]
+       @ (if always then [ "_meta", `Object [ "persist", `String "session" ] ] else [])
+       @ if Option.is_some schema then [ "content", `Object content ] else [])
+;;
+
 let reply_approval t ~request_id (answer : Adapter_event.Approval_reply.t) =
   match Hashtbl.find t.server_requests request_id with
   | None -> None
@@ -583,6 +641,10 @@ let reply_approval t ~request_id (answer : Adapter_event.Approval_reply.t) =
           ]
       | Permissions _, (Deny _ | Cancel) ->
         `Object [ "permissions", `Object []; "scope", `String "turn" ]
+      | Mcp_tool_approval { schema }, Allow -> mcp_accept ~schema ~always:false
+      | Mcp_tool_approval { schema }, Allow_always -> mcp_accept ~schema ~always:true
+      | Mcp_tool_approval _, Deny _ -> `Object [ "action", `String "decline" ]
+      | Mcp_tool_approval _, Cancel -> `Object [ "action", `String "cancel" ]
     in
     Some (reply id result)
 ;;
@@ -1299,17 +1361,42 @@ let server_request t ~id method_ params =
     in
     register (Command_approval { decisions });
     let command = shell_command params in
+    let network =
+      match field "networkApprovalContext" params with
+      | None | Some `Null -> None
+      | Some n -> Some n
+    in
+    let network_host =
+      Option.map network ~f:(fun n ->
+        let host = Option.value (str "host" n) ~default:"a host" in
+        match str "protocol" n with
+        | Some protocol -> [%string "%{host} (%{protocol})"]
+        | None -> host)
+    in
+    let stdin =
+      Option.equal String.equal (str "kind" params) (Some "writeStdin")
+    in
+    let summary =
+      match network_host with
+      | Some host -> [%string "Network access to %{host} for: %{command}"]
+      | None when stdin -> "Send input to the running command: " ^ command
+      | None -> command
+    in
     [ event
         (Approval_request
            { request_id = key
-           ; tool_id
-           ; kind = Command
-           ; summary = with_reason command
+             (* Network access is asked for as such: the session's allow
+                rules for the command do not cover it. *)
+           ; tool_id = (if Option.is_some network then None else tool_id)
+           ; kind = (if Option.is_some network then Other "network" else Command)
+           ; summary = with_reason summary
            ; input =
                obj
                  [ Some ("command", `String command)
                  ; opt "cwd" (fun c -> `String c) (str "cwd" params)
                  ; opt "reason" (fun r -> `String r) (str "reason" params)
+                 ; opt "network" Fn.id network
+                 ; opt "kind" (fun k -> `String k) (str "kind" params)
                  ]
            ; offers_always =
                offered decisions "acceptForSession"
@@ -1384,17 +1471,54 @@ let server_request t ~id method_ params =
     let server =
       Option.value (str "serverName" params) ~default:"an MCP server"
     in
-    [ Output.Send
-        (reply
-           id
-           (`Object
-               [ "action", `String "decline"; "content", `Null; "_meta", `Null ]))
-    ; event
-        (Notice
-           [%string
-             "Codex's %{server} asked for input, which prigh cannot show yet: \
-              declined"])
-    ]
+    let meta = Option.value (field "_meta" params) ~default:`Null in
+    let tool_approval =
+      Option.equal
+        String.equal
+        (str "codex_approval_kind" meta)
+        (Some "mcp_tool_call")
+      && List.mem
+           [ "form"; "openai/form"; "openaiForm" ]
+           (Option.value (str "mode" params) ~default:"")
+           ~equal:String.equal
+    in
+    let schema = field "requestedSchema" params in
+    if tool_approval && String.equal server Injected_tools.server_name
+    then
+      (* prigh's own tools: prigh's approval runs when the call reaches it. *)
+      [ Output.Send (reply id (mcp_accept ~schema ~always:false)) ]
+    else if tool_approval
+    then (
+      register (Mcp_tool_approval { schema });
+      let tool =
+        List.find_map [ "tool_name"; "toolName"; "tool" ] ~f:(fun key -> str key meta)
+        |> Option.value ~default:"tool"
+      in
+      let message = Option.value (str "message" params) ~default:"" in
+      [ event
+          (Approval_request
+             { request_id = key
+             ; tool_id
+             ; kind = Mcp { server; tool }
+             ; summary =
+                 (if String.is_empty message
+                  then [%string "Use %{server}'s %{tool}"]
+                  else message)
+             ; input = meta
+             ; offers_always = true
+             })
+      ])
+    else
+      (* Nothing prigh can show: [cancel] leaves no decision behind, where
+         [decline] reads as the user's refusal (which Codex may keep for
+         the thread). *)
+      [ Output.Send (reply id (`Object [ "action", `String "cancel" ]))
+      ; event
+          (Notice
+             [%string
+               "Codex's %{server} asked for input, which prigh cannot show \
+                yet: cancelled"])
+      ]
   | _ ->
     [ Output.Send
         (reply_error id ~code:(-32601) ("prigh does not handle " ^ method_))
