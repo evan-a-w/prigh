@@ -21,7 +21,7 @@ let view m ~inject =
         ; Attr.class_
             (Loon.Alert.classes
                ~class_:
-                 "no-host-banner flex items-center gap-2 border-primary/40 \
+                 "no-host-banner loon flex items-center gap-2 border-primary/40 \
                   bg-primary/10 py-1 pr-1 pl-2.5 text-[13.5px] \
                   [&>.icon]:shrink-0 [&>.icon]:text-primary"
                ())

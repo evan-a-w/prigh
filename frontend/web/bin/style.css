@@ -570,10 +570,13 @@ kbd {
 .composer-buttons :is(.send, .stop.primary) { background: var(--input); border-color: transparent; color: var(--foreground); font-weight: 400; }
 .composer-buttons :is(.send, .stop.primary):hover:not(:disabled) { filter: none; background: var(--muted-foreground); color: var(--background); }
 .composer-buttons .send .icon { width: 14px; height: 14px; color: currentColor; stroke-width: 2.2; }
+/* With nothing to send: an empty ring, still under the pointer (its title
+   says why it waits; Html's disabled buttons ignore the pointer). */
 .composer-buttons .send:disabled {
   background: transparent;
   border: 1.5px solid var(--input);
   opacity: 1;
+  pointer-events: auto;
 }
 .composer-buttons .send:disabled .icon { color: var(--faint); }
 .composer-row .stop .icon { width: 12px; height: 12px; }

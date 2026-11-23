@@ -330,7 +330,7 @@ let stopped (message : Message.Assistant.t) =
         ; Attr.class_
             (Loon.Alert.classes
                ~variant:Destructive
-               ~class_:"stop error flex flex-col gap-1 px-3.5 py-2.5"
+               ~class_:"stop error loon flex flex-col gap-1 px-3.5 py-2.5"
                ())
         ]
       ([ span "title" "The model returned an error"
@@ -349,7 +349,7 @@ let stopped (message : Message.Assistant.t) =
                [ Attr.class_
                    (Loon.Button.classes
                       ~variant:Outline
-                      ~size:Sm
+                      ~size:Default
                       ~class_:
                         "stop-action mt-1 self-start border-destructive/40 dark:border-destructive/40 \
                          text-destructive hover:bg-destructive/10 dark:hover:bg-destructive/10 \

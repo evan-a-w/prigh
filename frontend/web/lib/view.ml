@@ -37,7 +37,7 @@ let banner (m : Model.t) ~inject =
                ~variant
                ~class_:
                  (cls
-                  ^ " mx-auto mt-2 flex w-fit max-w-[min(760px,calc(100%-24px))] \
+                  ^ " loon mx-auto mt-2 flex w-fit max-w-[min(760px,calc(100%-24px))] \
                      flex-wrap items-center justify-center gap-x-2 gap-y-1.5 \
                      text-center text-[12.5px] shadow-sm")
                ())
