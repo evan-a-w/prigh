@@ -217,6 +217,8 @@ let source_label : Engine_choice.t -> string = function
 let build
       ~session
       ~from
+      ?(fresh = false)
+      ?(pending = 0)
       ?from_host
       ?from_cwd
       ~to_
@@ -232,13 +234,16 @@ let build
   let from_cwd =
     Option.first_some from_cwd (Option.map latest_thread ~f:(fun t -> t.cwd))
   in
-  let messages = Session.identified_messages session in
+  let messages =
+    let all = Session.identified_messages session in
+    List.take all (List.length all - pending)
+  in
   let count = List.length messages in
   let strategy, considered =
     let all =
       List.mapi messages ~f:(fun i (id, m) -> i, id, m.Timed_message.message)
     in
-    match seen_through session ~to_ ~host with
+    match if fresh then None else seen_through session ~to_ ~host with
     | None -> Strategy.Full, all
     | Some (entry, after) ->
       ( Strategy.Since { entry }

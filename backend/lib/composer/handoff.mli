@@ -41,10 +41,15 @@ val needed : Adapter_id.t -> bool
 (** The handoff for [to_] on [host] in [cwd]; [None] when there is nothing
     it has not seen. [from] is the engine the session ran on until now
     ([None]: none yet); [from_host] and [from_cwd] default to those of the
-    session's latest external thread. *)
+    session's latest external thread. [fresh]: [to_]'s thread is new (its
+    recorded one could not be continued), so it gets the whole session
+    whatever it saw before (default: false). The last [pending] messages
+    (default: 0) are the prompts the handoff goes with: left out. *)
 val build
   :  session:Session.t
   -> from:Engine_choice.t option
+  -> ?fresh:bool
+  -> ?pending:int
   -> ?from_host:string
   -> ?from_cwd:string
   -> to_:Adapter_id.t

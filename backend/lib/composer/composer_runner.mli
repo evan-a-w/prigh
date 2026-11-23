@@ -20,7 +20,15 @@ type t
     there. [start]: the process's settings besides the turn's
     ([developer_instructions], [mcp_servers], [resume] to continue a thread
     the session had). [on_thread]: the harness started or moved to a thread
-    (for the session to record). [sw] bounds the processes' fibers. *)
+    (for the session to record). [host]: the session's tool host now (default:
+    always ["local"]): when it changes, the process stops and the next turn
+    starts one there, on that host's thread. [handoff_from]: the engine the
+    session ran on before this runner, named in the first handoff. [sw]
+    bounds the processes' fibers.
+
+    Before each turn the harness is handed what it has not seen of the
+    session ({!Handoff}), recorded as a [Handoff] entry; after it, the turn
+    is recorded ([External_turn]) so that the next handoff starts there. *)
 val create
   :  sw:Switch.t
   -> adapter:Adapter.t
@@ -29,6 +37,8 @@ val create
   -> ?interrupt_grace:Time_float.Span.t
   -> ?steer_poll:Time_float.Span.t
   -> ?on_thread:(string -> unit)
+  -> ?host:(unit -> string)
+  -> ?handoff_from:Engine_choice.t
   -> unit
   -> t
 

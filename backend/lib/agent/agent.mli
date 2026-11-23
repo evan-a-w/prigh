@@ -310,6 +310,10 @@ val capabilities : t -> Capabilities.t
     closing the old one; between runs. *)
 val set_runner : t -> Runner.t option -> unit
 
+(** Stops the external harness's process, if one runs: a later run starts
+    it again. *)
+val stop_engine : t -> unit
+
 (** How errors name the session's engine: [Harness], [Composer]. *)
 val engine_label : t -> string
 

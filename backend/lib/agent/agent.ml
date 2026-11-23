@@ -3011,6 +3011,7 @@ let set_runner t runner =
   state_changed t
 ;;
 
+let stop_engine t = Option.iter t.runner ~f:Runner.close
 let capabilities t = Runner.capabilities (runner t)
 let engine t = Runner.engine (runner t)
 
@@ -4442,7 +4443,8 @@ let shutdown t =
   Subagent_log.detach t.subagent_log;
   Mcp_refresh.cancel t.mcp_refresh;
   cancel_background ~discard:true t;
-  ignore (abort t : string list)
+  ignore (abort t : string list);
+  stop_engine t
 ;;
 
 let jobs t = Background_tasks.tasks t.background ~kind:Job
