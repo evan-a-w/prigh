@@ -1096,52 +1096,55 @@ let recheck_adapter t agent adapter =
    (each process records the threads it starts). *)
 let composer_runner ?handoff_from t agent (adapter_id : Adapter_id.t) =
   match adapter_id with
-  | Prigh -> Ok (Prigh_adapter.runner ~harness:(fun () -> Agent.harness_runner agent))
+  | Prigh ->
+    Ok (Prigh_adapter.runner ~harness:(fun () -> Agent.harness_runner agent))
   | _ ->
-  let%map.Or_error adapter = Composer_adapters.find t.engines adapter_id in
-  let session = Agent.session agent in
-  let adapter_name = Adapter_id.to_string adapter_id in
-  let start ~cwd =
-    let host = Agent.active_host agent in
-    let resume =
-      List.find (Session.threads session) ~f:(fun (thread : Session.Thread.t) ->
-        String.equal thread.adapter adapter_name
-        && String.equal thread.host host)
-      |> Option.map ~f:(fun (thread : Session.Thread.t) -> thread.thread_id)
+    let%map.Or_error adapter = Composer_adapters.find t.engines adapter_id in
+    let session = Agent.session agent in
+    let adapter_name = Adapter_id.to_string adapter_id in
+    let start ~cwd =
+      let host = Agent.active_host agent in
+      let resume =
+        List.find
+          (Session.threads session)
+          ~f:(fun (thread : Session.Thread.t) ->
+            String.equal thread.adapter adapter_name
+            && String.equal thread.host host)
+        |> Option.map ~f:(fun (thread : Session.Thread.t) -> thread.thread_id)
+      in
+      { (Adapter.Start.default ~cwd) with
+        resume
+      ; developer_instructions = Agent.user_instructions agent
+      }
     in
-    { (Adapter.Start.default ~cwd) with
-      resume
-    ; developer_instructions = Agent.user_instructions agent
-    }
-  in
-  let on_thread thread_id =
-    ignore
-      (Session.record_thread
-         session
-         { adapter = adapter_name
-         ; host = Agent.active_host agent
-         ; thread_id
-         ; cwd = Session.cwd session
-         }
-       : Session.Entry.t)
-  in
-  Composer_runner.runner
-    (Composer_runner.create
-       ~sw:t.sw
-       ~adapter
-       ~spawn:(fun launch ->
-         let spawned =
-           match t.spawn_external with
-           | Some spawn -> spawn agent launch
-           | None -> host_spawn t agent launch
-         in
-         if Result.is_error spawned then recheck_adapter t agent adapter_id;
-         spawned)
-       ~start
-       ~on_thread
-       ~host:(fun () -> Agent.active_host agent)
-       ?handoff_from
-       ())
+    let on_thread thread_id =
+      ignore
+        (Session.record_thread
+           session
+           { adapter = adapter_name
+           ; host = Agent.active_host agent
+           ; thread_id
+           ; cwd = Session.cwd session
+           }
+         : Session.Entry.t)
+    in
+    Composer_runner.runner
+      (Composer_runner.create
+         ~sw:t.sw
+         ~adapter
+         ~spawn:(fun launch ->
+           let spawned =
+             match t.spawn_external with
+             | Some spawn -> spawn agent launch
+             | None -> host_spawn t agent launch
+           in
+           if Result.is_error spawned then recheck_adapter t agent adapter_id;
+           spawned)
+         ~start
+         ~on_thread
+         ~host:(fun () -> Agent.active_host agent)
+         ?handoff_from
+         ())
 ;;
 
 (* Gives a composer session (that can run here) its runner. *)
@@ -2338,10 +2341,13 @@ let set_adapter t (client : Client.t) params =
   else if Agent.is_running agent
   then
     Or_error.errorf
-      "%s is still running: wait for the run to end (or abort it with Esc), 
-       then switch to %s"
+      "%s is still running: wait for the run to end (or abort it with Esc), \n\
+      \       then switch to %s"
       (Agent.engine_label agent)
-      (Engine_choice.label choice)
+      (Option.value_map
+         choice.adapter
+         ~default:(Engine_choice.label choice)
+         ~f:Adapter_id.label)
   else (
     let%bind () =
       match Engines.unavailable t.engines choice with
