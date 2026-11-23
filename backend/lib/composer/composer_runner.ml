@@ -12,6 +12,7 @@ type t =
   ; steer_poll : Time_float.Span.t
   ; mutable live : live option
   ; mutable thread_id : string option
+  ; mutable thread_model : string option (* the model the CLI said it runs *)
   ; on_thread : string -> unit
   ; mutable services : Engine_intf.Services.t option (* the running turn's *)
   ; mutable cancel : Cancellation.t
@@ -35,6 +36,7 @@ let create
   ; steer_poll
   ; live = None
   ; thread_id = None
+  ; thread_model = None
   ; on_thread
   ; services = None
   ; cancel = Cancellation.never
@@ -234,7 +236,7 @@ let run_turn
   let recorder =
     Composer_recorder.create
       ~adapter:A.id
-      ~model:(t.start ~cwd:s.cwd).model
+      ~model:(Option.first_some t.thread_model (t.start ~cwd:s.cwd).model)
       ~emit:s.emit
       ~notice:s.notice
       ~prompts:input.prompts
@@ -332,6 +334,10 @@ let run_turn
                ~f:Cancellation.cancel;
              events ~sw
            | e ->
+             (match e with
+              | Thread_started { model = Some model; _ } ->
+                t.thread_model <- Some model
+              | _ -> ());
              Composer_recorder.feed recorder e;
              events ~sw
          in
