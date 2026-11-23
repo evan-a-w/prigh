@@ -223,6 +223,35 @@ let%expect_test "a resumed session's running cost total counts from its last" =
     |}]
 ;;
 
+let%expect_test "error results: errors first, then result, then the HTTP status"
+  =
+  let t = C.create () in
+  feed
+    t
+    [ {|{"type":"result","subtype":"error_during_execution","is_error":true,"result":"ignored","errors":["first",{"code":2}],"session_id":"s-1","usage":{"input_tokens":1,"output_tokens":1}}|}
+    ; {|{"type":"result","subtype":"error_during_execution","is_error":true,"session_id":"s-1","api_error_status":500,"usage":{"input_tokens":1,"output_tokens":1}}|}
+    ];
+  [%expect
+    {|
+    (Event (Turn_started (turn_id turn-1)))
+    (Event
+     (Usage
+      ((usage ((input 1) (output 1) (cache_read 0))) (cost_usd ())
+       (context_tokens ()) (context_window ()))))
+    (Event
+     (Turn_end (turn_id (turn-1))
+      (stop (Failed (kind Other) (message "first; {\"code\":2}")))))
+    (Event (Turn_started (turn_id turn-2)))
+    (Event
+     (Usage
+      ((usage ((input 1) (output 1) (cache_read 0))) (cost_usd ())
+       (context_tokens ()) (context_window ()))))
+    (Event
+     (Turn_end (turn_id (turn-2))
+      (stop (Failed (kind Other) (message "API error (HTTP 500)")))))
+    |}]
+;;
+
 let%expect_test "our requests and the answers to them" =
   let t = C.create () in
   print_endline (C.initialize t ~sdk_mcp_servers:[ "prigh" ] ());
