@@ -65,8 +65,16 @@ let choices t =
     | engine, _ -> [ { Choice.engine; adapter = None } ])
 ;;
 
-let adapters t =
-  List.filter (choices t) ~f:(fun (c : Choice.t) -> Option.is_some c.adapter)
+let switch_targets t =
+  let choices = choices t in
+  let adapters =
+    List.filter choices ~f:(fun (c : Choice.t) -> Option.is_some c.adapter)
+  in
+  match adapters with
+  | [] -> []
+  | _ ->
+    List.filter choices ~f:(fun (c : Choice.t) ->
+      Option.is_some c.adapter || String.equal c.engine "harness")
 ;;
 
 let find_in choices arg =

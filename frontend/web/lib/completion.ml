@@ -97,7 +97,7 @@ let argument_items
   in
   match kind with
   | Model -> model_items models ~auth ~current_model
-  | Adapter -> engine_items (Deployed_engines.adapters engines)
+  | Adapter -> engine_items (Deployed_engines.switch_targets engines)
   | Thinking ->
     let llm =
       Option.bind current_model ~f:(fun key ->

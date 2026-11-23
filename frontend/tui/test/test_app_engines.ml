@@ -153,14 +153,15 @@ let%expect_test "/engine picks among the adapters" =
     ▌ earlier question
       earlier answer
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
-    Switch this session to  (2)
+    Switch this session to  (3)
     / ▏
-    ▸* Codex        OpenAI's Codex CLI on the session's tool host
-       Claude Code  Anthropic's Claude Code CLI on the session's tool host
+    ▸* Codex          OpenAI's Codex CLI on the session's tool host
+       prigh harness  prigh's own agent, calling the model directly
+       Claude Code    Anthropic's Claude Code CLI on the session's tool host
     ────────────────────────────────────────────────────────────────────────────────
     >
     Codex · deepseek-flash  think:off  ctx:0.1%/1.0M  Enter selects · Esc closes
-    (Rpc (method_ set_adapter) (params ((adapter claude))) (tag Show_error))
+    (Rpc (method_ set_adapter) (params ((adapter harness))) (tag Show_error))
     |}]
 ;;
 

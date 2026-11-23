@@ -6403,7 +6403,7 @@ let engine_choices (m : Model.t) ~switch =
   let deployed = deployed m in
   let choices =
     if switch
-    then Deployed_engines.adapters deployed
+    then Deployed_engines.switch_targets deployed
     else Deployed_engines.choices deployed
   in
   match current_choice m with
@@ -6452,17 +6452,17 @@ let engine_picker (m : Model.t) ~switch =
 ;;
 
 let switch_adapter (m : Model.t) (c : Deployed_engines.Choice.t) =
+  let target = Option.value c.adapter ~default:c.engine in
   match c.adapter with
-  | None -> error m "/engine switches between the composer's adapters"
-  | Some adapter
-    when Option.exists m.state ~f:(fun (s : State.t) ->
-           [%equal: string option] s.engine.adapter (Some adapter)) ->
+  | _
+    when Option.equal Deployed_engines.Choice.equal (current_choice m) (Some c)
+    ->
     toast m (sprintf "Already on %s" (Deployed_engines.Choice.label c))
-  | Some adapter ->
+  | Some _ | None ->
     let m, toast =
       toast m (sprintf "Switching to %s…" (Deployed_engines.Choice.label c))
     in
-    m, (rpc "set_adapter" [ "adapter", str adapter ] :: toast)
+    m, (rpc "set_adapter" [ "adapter", str target ] :: toast)
 ;;
 
 let new_session (m : Model.t) =
@@ -6539,7 +6539,7 @@ let engine_chosen (m : Model.t) ~switch arg =
   let deployed = deployed m in
   let choices =
     if switch
-    then Deployed_engines.adapters deployed
+    then Deployed_engines.switch_targets deployed
     else Deployed_engines.choices deployed
   in
   match Deployed_engines.find_in choices arg with
@@ -6552,7 +6552,7 @@ let engine_chosen (m : Model.t) ~switch arg =
 let engine_command (m : Model.t) ~switch arg =
   let deployed = deployed m in
   match String.strip arg with
-  | "" when switch && List.is_empty (Deployed_engines.adapters deployed) ->
+  | "" when switch && List.is_empty (Deployed_engines.switch_targets deployed) ->
     error
       m
       "This backend runs no composer adapters: start it with -engines \

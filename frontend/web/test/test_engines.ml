@@ -155,6 +155,7 @@ let%expect_test "/engine switches the adapter (set_adapter)" =
     (Close (Esc))
     []
     Codex OpenAI's Codex CLI on the session's tool host ✓
+    prigh harness prigh's own agent, calling the model directly
     Claude Code Anthropic's Claude Code CLI on the session's tool host
     ↑↓ to move, Enter to choose, Esc to close
     (Focus editor)

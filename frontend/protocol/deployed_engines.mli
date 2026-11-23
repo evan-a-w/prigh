@@ -44,8 +44,9 @@ end
 (** Every choice, in the order the backend lists its engines and adapters. *)
 val choices : t -> Choice.t list
 
-(** The composer's adapters: what a session can switch to ([set_adapter]). *)
-val adapters : t -> Choice.t list
+(** What a session can switch to ([set_adapter]): the composer's adapters,
+    and the harness engine when it runs too (none without adapters). *)
+val switch_targets : t -> Choice.t list
 
 (** The choice [arg] names (its key or label, or a prefix naming one); else
     an error listing them. *)

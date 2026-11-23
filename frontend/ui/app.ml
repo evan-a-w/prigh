@@ -1030,7 +1030,7 @@ let current_choice m =
 let engine_choices m ~switch =
   let choices =
     if switch
-    then P.Deployed_engines.adapters m.deployed
+    then P.Deployed_engines.switch_targets m.deployed
     else P.Deployed_engines.choices m.deployed
   in
   match current_choice m with
@@ -1067,21 +1067,23 @@ let new_session_on m (c : P.Deployed_engines.Choice.t) =
 ;;
 
 let switch_adapter m (c : P.Deployed_engines.Choice.t) =
+  let target = Option.value c.adapter ~default:c.engine in
   match c.adapter with
-  | None -> error m "/engine switches between the composer's adapters", []
-  | Some adapter
-    when Option.exists m.state ~f:(fun (s : P.State.t) ->
-           [%equal: string option] s.engine.adapter (Some adapter)) ->
+  | _
+    when Option.equal
+           P.Deployed_engines.Choice.equal
+           (current_choice m)
+           (Some c) ->
     notice m (sprintf "already on %s" (P.Deployed_engines.Choice.label c)), []
-  | Some adapter ->
+  | Some _ | None ->
     ( notice m (sprintf "switching to %s…" (P.Deployed_engines.Choice.label c))
-    , [ rpc "set_adapter" ~params:[ "adapter", str adapter ] ] )
+    , [ rpc "set_adapter" ~params:[ "adapter", str target ] ] )
 ;;
 
 let engine_chosen m ~switch arg =
   let choices =
     if switch
-    then P.Deployed_engines.adapters m.deployed
+    then P.Deployed_engines.switch_targets m.deployed
     else P.Deployed_engines.choices m.deployed
   in
   match P.Deployed_engines.find_in choices arg with
@@ -1103,7 +1105,7 @@ let new_command m args =
 ;;
 
 let engine_command m args =
-  match args, P.Deployed_engines.adapters m.deployed with
+  match args, P.Deployed_engines.switch_targets m.deployed with
   | _, [] ->
     ( error
         m
