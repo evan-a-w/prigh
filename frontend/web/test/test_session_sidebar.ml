@@ -245,10 +245,11 @@ let%expect_test "a session's menu: right-click, Shift+F10, ContextMenu, ⋯; Esc
          id="dialog"
          data-x="40"
          data-y="200"
-         class="context-menu menu-surface">
-      <div class="context-menu-head">
-        <span class="context-menu-title"> Landing page </span>
-        <span title="~/src/site" class="context-menu-sub session-place">
+         class="[&:not(.placed)]:invisible [&_.menu-label]:shrink-0 animate-in bg-popover cn-menu-target context-menu duration-100 fade-in-0 fixed max-[760px]:[&_.menu-item]:min-h-10 max-[760px]:[&_.menu-item]:text-[15px] max-[760px]:bottom-2 max-[760px]:left-2! max-[760px]:max-w-none max-[760px]:right-2 max-[760px]:top-auto! max-h-[calc(100vh-16px)] max-w-[min(360px,calc(100vw-16px))] menu-surface min-w-32 min-w-[248px] motion-reduce:animate-none narrow:animate-[sheet-up_0.18s_ease-out] narrow:border-border narrow:border-t narrow:overscroll-contain narrow:pb-[max(8px,var(--safe-b))] narrow:pl-[max(8px,var(--safe-l))] narrow:pr-[max(8px,var(--safe-r))] narrow:pt-0 narrow:ring-0 narrow:rounded-b-none narrow:rounded-t-xl narrow:shadow-[0_-12px_40px_-12px_var(--edge-shadow)] narrow:z-(--z-menu-surface) overflow-x-hidden overflow-y-auto p-1 ring-1 ring-foreground/10 rounded-lg shadow-md text-popover-foreground zoom-in-95">
+      <div class="-mx-1 [&_.session-place]:flex-none border-b border-border context-menu-head flex flex-col gap-px mb-1 pb-1.5 pt-1 px-2.5">
+        <span class="context-menu-title flex font-medium gap-1.5 items-center text-[13px] text-foreground truncate"> Landing page </span>
+        <span title="~/src/site"
+              class="context-menu-sub font-mono session-place text-muted-foreground text-xs truncate">
           <span class="session-repo"> site </span>
           <span class="session-branch">
             <icon class="branch"> </icon>
@@ -256,145 +257,166 @@ let%expect_test "a session's menu: right-click, Shift+F10, ContextMenu, ⋯; Esc
           </span>
         </span>
       </div>
-      <div data-slot="dropdown-menu-group" role="group" class="menu-section">
+      <div data-slot="dropdown-menu-group"
+           role="group"
+           class=" [&+&]:-mx-1 [&+&]:border-border [&+&]:border-t [&+&]:mt-1 [&+&]:pt-1 [&+&]:px-1 flex flex-col menu-section">
         <div data-slot="dropdown-menu-item"
+             data-highlighted=""
              role="menuitem"
              data-item="open"
-             class="menu-item selected"
+             class="[&>.icon]:shrink-0 [&>.icon]:size-4 [&>.icon]:text-muted-foreground aria-disabled:*:opacity-50 aria-disabled:hover:bg-transparent aria-disabled:hover:text-inherit cursor-default data-[variant=destructive]:[&>.icon]:text-destructive data-[variant=destructive]:data-highlighted:bg-destructive/10 data-[variant=destructive]:data-highlighted:text-destructive data-[variant=destructive]:hover:bg-destructive/10 data-[variant=destructive]:hover:text-destructive data-[variant=destructive]:text-destructive data-highlighted:[&>.icon]:text-accent-foreground data-highlighted:bg-accent data-highlighted:text-accent-foreground flex gap-1.5 group/dropdown-menu-item hover:[&>.icon]:text-accent-foreground hover:bg-accent hover:text-accent-foreground items-center menu-item narrow:min-h-11 outline-hidden px-1.5 py-1 relative rounded-md select-none selected text-sm"
              @on_click
              @on_mouseenter>
           <icon class="arrow_down"> </icon>
-          <span class="menu-label"> Open </span>
-          <kbd data-slot="dropdown-menu-shortcut" class="menu-command"> Enter </kbd>
+          <span class="menu-label truncate"> Open </span>
+          <kbd data-slot="dropdown-menu-shortcut"
+               class="font-mono group-data-highlighted/dropdown-menu-item:text-accent-foreground group-hover/dropdown-menu-item:text-accent-foreground menu-command min-w-0 ml-auto pl-3 text-muted-foreground text-xs truncate"> Enter </kbd>
         </div>
         <div data-slot="dropdown-menu-item"
              role="menuitem"
              data-item="open_window"
-             class="menu-item"
+             class="[&>.icon]:shrink-0 [&>.icon]:size-4 [&>.icon]:text-muted-foreground aria-disabled:*:opacity-50 aria-disabled:hover:bg-transparent aria-disabled:hover:text-inherit cursor-default data-[variant=destructive]:[&>.icon]:text-destructive data-[variant=destructive]:data-highlighted:bg-destructive/10 data-[variant=destructive]:data-highlighted:text-destructive data-[variant=destructive]:hover:bg-destructive/10 data-[variant=destructive]:hover:text-destructive data-[variant=destructive]:text-destructive data-highlighted:[&>.icon]:text-accent-foreground data-highlighted:bg-accent data-highlighted:text-accent-foreground flex gap-1.5 group/dropdown-menu-item hover:[&>.icon]:text-accent-foreground hover:bg-accent hover:text-accent-foreground items-center menu-item narrow:min-h-11 outline-hidden px-1.5 py-1 relative rounded-md select-none text-sm"
              @on_click
              @on_mouseenter>
           <icon class="external"> </icon>
-          <span class="menu-label"> Open in new window </span>
+          <span class="menu-label truncate"> Open in new window </span>
           <Vdom.Node.none-widget> </Vdom.Node.none-widget>
         </div>
       </div>
-      <div data-slot="dropdown-menu-group" role="group" class="menu-section">
+      <div data-slot="dropdown-menu-group"
+           role="group"
+           class=" [&+&]:-mx-1 [&+&]:border-border [&+&]:border-t [&+&]:mt-1 [&+&]:pt-1 [&+&]:px-1 flex flex-col menu-section">
         <div data-slot="dropdown-menu-item"
              role="menuitem"
              data-item="rename"
-             class="menu-item"
+             class="[&>.icon]:shrink-0 [&>.icon]:size-4 [&>.icon]:text-muted-foreground aria-disabled:*:opacity-50 aria-disabled:hover:bg-transparent aria-disabled:hover:text-inherit cursor-default data-[variant=destructive]:[&>.icon]:text-destructive data-[variant=destructive]:data-highlighted:bg-destructive/10 data-[variant=destructive]:data-highlighted:text-destructive data-[variant=destructive]:hover:bg-destructive/10 data-[variant=destructive]:hover:text-destructive data-[variant=destructive]:text-destructive data-highlighted:[&>.icon]:text-accent-foreground data-highlighted:bg-accent data-highlighted:text-accent-foreground flex gap-1.5 group/dropdown-menu-item hover:[&>.icon]:text-accent-foreground hover:bg-accent hover:text-accent-foreground items-center menu-item narrow:min-h-11 outline-hidden px-1.5 py-1 relative rounded-md select-none text-sm"
              @on_click
              @on_mouseenter>
           <icon class="pencil"> </icon>
-          <span class="menu-label"> Rename… </span>
-          <kbd data-slot="dropdown-menu-shortcut" class="menu-command"> /name </kbd>
+          <span class="menu-label truncate"> Rename… </span>
+          <kbd data-slot="dropdown-menu-shortcut"
+               class="font-mono group-data-highlighted/dropdown-menu-item:text-accent-foreground group-hover/dropdown-menu-item:text-accent-foreground menu-command min-w-0 ml-auto pl-3 text-muted-foreground text-xs truncate"> /name </kbd>
         </div>
         <div data-slot="dropdown-menu-item"
              role="menuitem"
              data-item="fork"
-             class="menu-item"
+             class="[&>.icon]:shrink-0 [&>.icon]:size-4 [&>.icon]:text-muted-foreground aria-disabled:*:opacity-50 aria-disabled:hover:bg-transparent aria-disabled:hover:text-inherit cursor-default data-[variant=destructive]:[&>.icon]:text-destructive data-[variant=destructive]:data-highlighted:bg-destructive/10 data-[variant=destructive]:data-highlighted:text-destructive data-[variant=destructive]:hover:bg-destructive/10 data-[variant=destructive]:hover:text-destructive data-[variant=destructive]:text-destructive data-highlighted:[&>.icon]:text-accent-foreground data-highlighted:bg-accent data-highlighted:text-accent-foreground flex gap-1.5 group/dropdown-menu-item hover:[&>.icon]:text-accent-foreground hover:bg-accent hover:text-accent-foreground items-center menu-item narrow:min-h-11 outline-hidden px-1.5 py-1 relative rounded-md select-none text-sm"
              @on_click
              @on_mouseenter>
           <icon class="fork"> </icon>
-          <span class="menu-label"> Fork… </span>
-          <kbd data-slot="dropdown-menu-shortcut" class="menu-command"> /fork </kbd>
+          <span class="menu-label truncate"> Fork… </span>
+          <kbd data-slot="dropdown-menu-shortcut"
+               class="font-mono group-data-highlighted/dropdown-menu-item:text-accent-foreground group-hover/dropdown-menu-item:text-accent-foreground menu-command min-w-0 ml-auto pl-3 text-muted-foreground text-xs truncate"> /fork </kbd>
         </div>
         <div data-slot="dropdown-menu-item"
              role="menuitem"
              data-item="new_worktree"
-             class="menu-item"
+             class="[&>.icon]:shrink-0 [&>.icon]:size-4 [&>.icon]:text-muted-foreground aria-disabled:*:opacity-50 aria-disabled:hover:bg-transparent aria-disabled:hover:text-inherit cursor-default data-[variant=destructive]:[&>.icon]:text-destructive data-[variant=destructive]:data-highlighted:bg-destructive/10 data-[variant=destructive]:data-highlighted:text-destructive data-[variant=destructive]:hover:bg-destructive/10 data-[variant=destructive]:hover:text-destructive data-[variant=destructive]:text-destructive data-highlighted:[&>.icon]:text-accent-foreground data-highlighted:bg-accent data-highlighted:text-accent-foreground flex gap-1.5 group/dropdown-menu-item hover:[&>.icon]:text-accent-foreground hover:bg-accent hover:text-accent-foreground items-center menu-item narrow:min-h-11 outline-hidden px-1.5 py-1 relative rounded-md select-none text-sm"
              @on_click
              @on_mouseenter>
           <icon class="branch_plus"> </icon>
-          <span class="menu-label"> New worktree… </span>
-          <kbd data-slot="dropdown-menu-shortcut" class="menu-command"> /worktree new </kbd>
+          <span class="menu-label truncate"> New worktree… </span>
+          <kbd data-slot="dropdown-menu-shortcut"
+               class="font-mono group-data-highlighted/dropdown-menu-item:text-accent-foreground group-hover/dropdown-menu-item:text-accent-foreground menu-command min-w-0 ml-auto pl-3 text-muted-foreground text-xs truncate"> /worktree new </kbd>
         </div>
       </div>
-      <div data-slot="dropdown-menu-group" role="group" class="menu-section">
+      <div data-slot="dropdown-menu-group"
+           role="group"
+           class=" [&+&]:-mx-1 [&+&]:border-border [&+&]:border-t [&+&]:mt-1 [&+&]:pt-1 [&+&]:px-1 flex flex-col menu-section">
         <div data-slot="dropdown-menu-item"
              role="menuitem"
              data-item="review"
-             class="menu-item"
+             class="[&>.icon]:shrink-0 [&>.icon]:size-4 [&>.icon]:text-muted-foreground aria-disabled:*:opacity-50 aria-disabled:hover:bg-transparent aria-disabled:hover:text-inherit cursor-default data-[variant=destructive]:[&>.icon]:text-destructive data-[variant=destructive]:data-highlighted:bg-destructive/10 data-[variant=destructive]:data-highlighted:text-destructive data-[variant=destructive]:hover:bg-destructive/10 data-[variant=destructive]:hover:text-destructive data-[variant=destructive]:text-destructive data-highlighted:[&>.icon]:text-accent-foreground data-highlighted:bg-accent data-highlighted:text-accent-foreground flex gap-1.5 group/dropdown-menu-item hover:[&>.icon]:text-accent-foreground hover:bg-accent hover:text-accent-foreground items-center menu-item narrow:min-h-11 outline-hidden px-1.5 py-1 relative rounded-md select-none text-sm"
              @on_click
              @on_mouseenter>
           <icon class="review"> </icon>
-          <span class="menu-label"> Review changes </span>
-          <kbd data-slot="dropdown-menu-shortcut" class="menu-command"> /review </kbd>
+          <span class="menu-label truncate"> Review changes </span>
+          <kbd data-slot="dropdown-menu-shortcut"
+               class="font-mono group-data-highlighted/dropdown-menu-item:text-accent-foreground group-hover/dropdown-menu-item:text-accent-foreground menu-command min-w-0 ml-auto pl-3 text-muted-foreground text-xs truncate"> /review </kbd>
         </div>
         <div data-slot="dropdown-menu-item"
              role="menuitem"
              data-item="files"
-             class="menu-item"
+             class="[&>.icon]:shrink-0 [&>.icon]:size-4 [&>.icon]:text-muted-foreground aria-disabled:*:opacity-50 aria-disabled:hover:bg-transparent aria-disabled:hover:text-inherit cursor-default data-[variant=destructive]:[&>.icon]:text-destructive data-[variant=destructive]:data-highlighted:bg-destructive/10 data-[variant=destructive]:data-highlighted:text-destructive data-[variant=destructive]:hover:bg-destructive/10 data-[variant=destructive]:hover:text-destructive data-[variant=destructive]:text-destructive data-highlighted:[&>.icon]:text-accent-foreground data-highlighted:bg-accent data-highlighted:text-accent-foreground flex gap-1.5 group/dropdown-menu-item hover:[&>.icon]:text-accent-foreground hover:bg-accent hover:text-accent-foreground items-center menu-item narrow:min-h-11 outline-hidden px-1.5 py-1 relative rounded-md select-none text-sm"
              @on_click
              @on_mouseenter>
           <icon class="folder"> </icon>
-          <span class="menu-label"> Open in file browser </span>
-          <kbd data-slot="dropdown-menu-shortcut" class="menu-command"> /files </kbd>
+          <span class="menu-label truncate"> Open in file browser </span>
+          <kbd data-slot="dropdown-menu-shortcut"
+               class="font-mono group-data-highlighted/dropdown-menu-item:text-accent-foreground group-hover/dropdown-menu-item:text-accent-foreground menu-command min-w-0 ml-auto pl-3 text-muted-foreground text-xs truncate"> /files </kbd>
         </div>
         <div data-slot="dropdown-menu-item"
              role="menuitem"
              data-item="terminal"
-             class="menu-item"
+             class="[&>.icon]:shrink-0 [&>.icon]:size-4 [&>.icon]:text-muted-foreground aria-disabled:*:opacity-50 aria-disabled:hover:bg-transparent aria-disabled:hover:text-inherit cursor-default data-[variant=destructive]:[&>.icon]:text-destructive data-[variant=destructive]:data-highlighted:bg-destructive/10 data-[variant=destructive]:data-highlighted:text-destructive data-[variant=destructive]:hover:bg-destructive/10 data-[variant=destructive]:hover:text-destructive data-[variant=destructive]:text-destructive data-highlighted:[&>.icon]:text-accent-foreground data-highlighted:bg-accent data-highlighted:text-accent-foreground flex gap-1.5 group/dropdown-menu-item hover:[&>.icon]:text-accent-foreground hover:bg-accent hover:text-accent-foreground items-center menu-item narrow:min-h-11 outline-hidden px-1.5 py-1 relative rounded-md select-none text-sm"
              @on_click
              @on_mouseenter>
           <icon class="terminal"> </icon>
-          <span class="menu-label"> Open terminal there </span>
-          <kbd data-slot="dropdown-menu-shortcut" class="menu-command"> /terminal </kbd>
+          <span class="menu-label truncate"> Open terminal there </span>
+          <kbd data-slot="dropdown-menu-shortcut"
+               class="font-mono group-data-highlighted/dropdown-menu-item:text-accent-foreground group-hover/dropdown-menu-item:text-accent-foreground menu-command min-w-0 ml-auto pl-3 text-muted-foreground text-xs truncate"> /terminal </kbd>
         </div>
       </div>
-      <div data-slot="dropdown-menu-group" role="group" class="menu-section">
+      <div data-slot="dropdown-menu-group"
+           role="group"
+           class=" [&+&]:-mx-1 [&+&]:border-border [&+&]:border-t [&+&]:mt-1 [&+&]:pt-1 [&+&]:px-1 flex flex-col menu-section">
         <div data-slot="dropdown-menu-item"
              role="menuitem"
              data-item="copy_path"
-             class="menu-item"
+             class="[&>.icon]:shrink-0 [&>.icon]:size-4 [&>.icon]:text-muted-foreground aria-disabled:*:opacity-50 aria-disabled:hover:bg-transparent aria-disabled:hover:text-inherit cursor-default data-[variant=destructive]:[&>.icon]:text-destructive data-[variant=destructive]:data-highlighted:bg-destructive/10 data-[variant=destructive]:data-highlighted:text-destructive data-[variant=destructive]:hover:bg-destructive/10 data-[variant=destructive]:hover:text-destructive data-[variant=destructive]:text-destructive data-highlighted:[&>.icon]:text-accent-foreground data-highlighted:bg-accent data-highlighted:text-accent-foreground flex gap-1.5 group/dropdown-menu-item hover:[&>.icon]:text-accent-foreground hover:bg-accent hover:text-accent-foreground items-center menu-item narrow:min-h-11 outline-hidden px-1.5 py-1 relative rounded-md select-none text-sm"
              @on_click
              @on_mouseenter>
           <icon class="copy"> </icon>
-          <span class="menu-label"> Copy path </span>
+          <span class="menu-label truncate"> Copy path </span>
           <Vdom.Node.none-widget> </Vdom.Node.none-widget>
         </div>
         <div data-slot="dropdown-menu-item"
              role="menuitem"
              data-item="copy_id"
-             class="menu-item"
+             class="[&>.icon]:shrink-0 [&>.icon]:size-4 [&>.icon]:text-muted-foreground aria-disabled:*:opacity-50 aria-disabled:hover:bg-transparent aria-disabled:hover:text-inherit cursor-default data-[variant=destructive]:[&>.icon]:text-destructive data-[variant=destructive]:data-highlighted:bg-destructive/10 data-[variant=destructive]:data-highlighted:text-destructive data-[variant=destructive]:hover:bg-destructive/10 data-[variant=destructive]:hover:text-destructive data-[variant=destructive]:text-destructive data-highlighted:[&>.icon]:text-accent-foreground data-highlighted:bg-accent data-highlighted:text-accent-foreground flex gap-1.5 group/dropdown-menu-item hover:[&>.icon]:text-accent-foreground hover:bg-accent hover:text-accent-foreground items-center menu-item narrow:min-h-11 outline-hidden px-1.5 py-1 relative rounded-md select-none text-sm"
              @on_click
              @on_mouseenter>
           <icon class="copy"> </icon>
-          <span class="menu-label"> Copy session id </span>
+          <span class="menu-label truncate"> Copy session id </span>
           <Vdom.Node.none-widget> </Vdom.Node.none-widget>
         </div>
       </div>
-      <div data-slot="dropdown-menu-group" role="group" class="menu-section">
+      <div data-slot="dropdown-menu-group"
+           role="group"
+           class=" [&+&]:-mx-1 [&+&]:border-border [&+&]:border-t [&+&]:mt-1 [&+&]:pt-1 [&+&]:px-1 flex flex-col menu-section">
         <div data-slot="dropdown-menu-item"
              role="menuitem"
              data-item="pin"
-             class="menu-item"
+             class="[&>.icon]:shrink-0 [&>.icon]:size-4 [&>.icon]:text-muted-foreground aria-disabled:*:opacity-50 aria-disabled:hover:bg-transparent aria-disabled:hover:text-inherit cursor-default data-[variant=destructive]:[&>.icon]:text-destructive data-[variant=destructive]:data-highlighted:bg-destructive/10 data-[variant=destructive]:data-highlighted:text-destructive data-[variant=destructive]:hover:bg-destructive/10 data-[variant=destructive]:hover:text-destructive data-[variant=destructive]:text-destructive data-highlighted:[&>.icon]:text-accent-foreground data-highlighted:bg-accent data-highlighted:text-accent-foreground flex gap-1.5 group/dropdown-menu-item hover:[&>.icon]:text-accent-foreground hover:bg-accent hover:text-accent-foreground items-center menu-item narrow:min-h-11 outline-hidden px-1.5 py-1 relative rounded-md select-none text-sm"
              @on_click
              @on_mouseenter>
           <icon class="pin"> </icon>
-          <span class="menu-label"> Pin to top </span>
-          <kbd data-slot="dropdown-menu-shortcut" class="menu-command"> P </kbd>
+          <span class="menu-label truncate"> Pin to top </span>
+          <kbd data-slot="dropdown-menu-shortcut"
+               class="font-mono group-data-highlighted/dropdown-menu-item:text-accent-foreground group-hover/dropdown-menu-item:text-accent-foreground menu-command min-w-0 ml-auto pl-3 text-muted-foreground text-xs truncate"> P </kbd>
         </div>
         <div data-slot="dropdown-menu-item"
              role="menuitem"
              data-item="archive"
-             class="menu-item"
+             class="[&>.icon]:shrink-0 [&>.icon]:size-4 [&>.icon]:text-muted-foreground aria-disabled:*:opacity-50 aria-disabled:hover:bg-transparent aria-disabled:hover:text-inherit cursor-default data-[variant=destructive]:[&>.icon]:text-destructive data-[variant=destructive]:data-highlighted:bg-destructive/10 data-[variant=destructive]:data-highlighted:text-destructive data-[variant=destructive]:hover:bg-destructive/10 data-[variant=destructive]:hover:text-destructive data-[variant=destructive]:text-destructive data-highlighted:[&>.icon]:text-accent-foreground data-highlighted:bg-accent data-highlighted:text-accent-foreground flex gap-1.5 group/dropdown-menu-item hover:[&>.icon]:text-accent-foreground hover:bg-accent hover:text-accent-foreground items-center menu-item narrow:min-h-11 outline-hidden px-1.5 py-1 relative rounded-md select-none text-sm"
              @on_click
              @on_mouseenter>
           <icon class="archive"> </icon>
-          <span class="menu-label"> Archive </span>
-          <kbd data-slot="dropdown-menu-shortcut" class="menu-command"> A </kbd>
+          <span class="menu-label truncate"> Archive </span>
+          <kbd data-slot="dropdown-menu-shortcut"
+               class="font-mono group-data-highlighted/dropdown-menu-item:text-accent-foreground group-hover/dropdown-menu-item:text-accent-foreground menu-command min-w-0 ml-auto pl-3 text-muted-foreground text-xs truncate"> A </kbd>
         </div>
         <div data-slot="dropdown-menu-item"
              role="menuitem"
              data-variant="destructive"
              data-item="delete"
-             class="danger menu-item"
+             class="[&>.icon]:shrink-0 [&>.icon]:size-4 [&>.icon]:text-muted-foreground aria-disabled:*:opacity-50 aria-disabled:hover:bg-transparent aria-disabled:hover:text-inherit cursor-default danger data-[variant=destructive]:[&>.icon]:text-destructive data-[variant=destructive]:data-highlighted:bg-destructive/10 data-[variant=destructive]:data-highlighted:text-destructive data-[variant=destructive]:hover:bg-destructive/10 data-[variant=destructive]:hover:text-destructive data-[variant=destructive]:text-destructive data-highlighted:[&>.icon]:text-accent-foreground data-highlighted:bg-accent data-highlighted:text-accent-foreground flex gap-1.5 group/dropdown-menu-item hover:[&>.icon]:text-accent-foreground hover:bg-accent hover:text-accent-foreground items-center menu-item narrow:min-h-11 outline-hidden px-1.5 py-1 relative rounded-md select-none text-sm"
              @on_click
              @on_mouseenter>
           <icon class="trash"> </icon>
-          <span class="menu-label"> Delete… </span>
-          <kbd data-slot="dropdown-menu-shortcut" class="menu-command"> Delete </kbd>
+          <span class="menu-label truncate"> Delete… </span>
+          <kbd data-slot="dropdown-menu-shortcut"
+               class="font-mono group-data-highlighted/dropdown-menu-item:text-accent-foreground group-hover/dropdown-menu-item:text-accent-foreground menu-command min-w-0 ml-auto pl-3 text-muted-foreground text-xs truncate"> Delete </kbd>
         </div>
       </div>
     </div>
@@ -490,7 +512,7 @@ let%expect_test "the menu from the keyboard: ↑↓ move, Enter chooses" =
     (Place_menu (Element session-s3))
     (Dialog_move 1)
     (Dialog_move 1)
-    <div class="menu-item selected">
+    <div class="[&>.icon]:shrink-0 [&>.icon]:size-4 [&>.icon]:text-muted-foreground aria-disabled:*:opacity-50 aria-disabled:hover:bg-transparent aria-disabled:hover:text-inherit cursor-default data-[variant=destructive]:[&>.icon]:text-destructive data-[variant=destructive]:data-highlighted:bg-destructive/10 data-[variant=destructive]:data-highlighted:text-destructive data-[variant=destructive]:hover:bg-destructive/10 data-[variant=destructive]:hover:text-destructive data-[variant=destructive]:text-destructive data-highlighted:[&>.icon]:text-accent-foreground data-highlighted:bg-accent data-highlighted:text-accent-foreground flex gap-1.5 group/dropdown-menu-item hover:[&>.icon]:text-accent-foreground hover:bg-accent hover:text-accent-foreground items-center menu-item narrow:min-h-11 outline-hidden px-1.5 py-1 relative rounded-md select-none selected text-sm">
     Dialog_accept
     (Focus editor)
     (Rpc (method_ switch_session) (params ((path /sessions/s3.jsonl)))

@@ -74,10 +74,12 @@ let%expect_test
   H.show h ~selector:".control-input-row";
   [%expect
     {|
-    <div class="control-input-row">
+    <div data-slot="command-input-wrapper"
+         class="[&>.icon]:opacity-50 [&>.icon]:shrink-0 [&>.icon]:size-4 border-b border-border control-input-row flex gap-2 items-center min-h-12 narrow:min-h-(--strip-h,52px) narrow:pl-[max(14px,var(--safe-l))] narrow:pr-[max(4px,var(--safe-r))] pl-3.5 pr-1.5">
       <icon class="search"> </icon>
       <Vdom.Node.none-widget> </Vdom.Node.none-widget>
       <input id="control-input"
+             data-slot="command-input"
              type="text"
              aria-label="Search sessions, settings and commands"
              role="combobox"
@@ -88,12 +90,13 @@ let%expect_test
              placeholder="Search sessions, settings and commands…"
              autocomplete="off"
              spellcheck="false"
+             class="bg-transparent flex-1 md:text-sm min-w-0 narrow:text-base outline-none placeholder:text-muted-foreground py-3 text-base"
              #value=""
              @on_input/>
       <button type="button"
               title="Close (Esc)"
               aria-label="Close"
-              class="btn control-close ghost icon"
+              class="[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0 active:not-aria-[haspopup]:translate-y-px aria-expanded:bg-muted aria-expanded:text-foreground aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-clip-padding border border-transparent control-close dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:hover:bg-muted/50 disabled:opacity-50 disabled:pointer-events-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 font-medium group/button hover:bg-muted hover:text-foreground in-data-[slot=button-group]:rounded-lg inline-flex items-center justify-center narrow:size-11 outline-none rounded-[min(var(--radius-md),12px)] rounded-lg select-none shrink-0 size-7 text-sm transition-all whitespace-nowrap"
               @on_click>
         <icon class="close"> </icon>
       </button>
@@ -160,22 +163,25 @@ let%expect_test "typing ranks the settings, their values, sessions and commands"
     / verbos ity
     how much of tool calls and thinking the transcript shows
     ↑↓ move ↵ open ⌫ back esc close
-    <div role="option"
+    <div data-slot="command-item"
+         data-selected="true"
+         role="option"
          id="control-option-0"
          aria-selected="true"
-         class="control-row selected"
+         class="control-row cursor-default data-[selected=true]:bg-muted flex gap-3 group/command-item hover:bg-muted items-center min-h-8 min-w-0 narrow:min-h-11 outline-hidden px-2 py-1.5 relative rounded-lg select-none selected text-sm"
          @on_click>
-      <div class="control-main">
+      <div class="control-main flex flex-1 gap-2.5 items-baseline min-w-0 narrow:flex-wrap narrow:gap-y-0.5 narrow:py-1">
         <Vdom.Node.none-widget> </Vdom.Node.none-widget>
-        <span dir="auto" class="control-label">
+        <span dir="auto" class="control-label max-w-full min-w-0 shrink-0 truncate">
           Set
-          <mark> verbos </mark>
+          <mark class="bg-transparent font-semibold text-primary"> verbos </mark>
           ity
         </span>
         <Vdom.Node.none-widget> </Vdom.Node.none-widget>
       </div>
-      <span class="control-detail"> normal </span>
-      <kbd class="control-keys"> Ctrl+O </kbd>
+      <span class="control-detail max-w-[45%] shrink text-muted-foreground text-xs truncate"> normal </span>
+      <kbd data-slot="kbd"
+           class="[&_svg:not([class*='size-'])]:size-3 bg-muted control-keys dark:in-data-[slot=tooltip-content]:bg-background/10 font-medium font-sans gap-1 h-5 in-data-[slot=tooltip-content]:bg-background/20 in-data-[slot=tooltip-content]:text-background inline-flex items-center justify-center min-w-5 narrow:hidden pointer-events-none px-1 rounded-sm select-none text-muted-foreground text-xs w-fit"> Ctrl+O </kbd>
     </div>
     |}];
   H.input h ~selector:"#control-input" "default mode";
@@ -249,10 +255,15 @@ let%expect_test
     current
     Verbose everything unfolded
     ↑↓ move ↵ set ⌫ back esc close
-    <div class="control-input-row">
+    <div data-slot="command-input-wrapper"
+         class="[&>.icon]:opacity-50 [&>.icon]:shrink-0 [&>.icon]:size-4 border-b border-border control-input-row flex gap-2 items-center min-h-12 narrow:min-h-(--strip-h,52px) narrow:pl-[max(14px,var(--safe-l))] narrow:pr-[max(4px,var(--safe-r))] pl-3.5 pr-1.5">
       <icon class="search"> </icon>
-      <button type="button" title="Back (⌫ in an empty filter)" class="btn control-crumb" @on_click> Verbosity </button>
+      <button type="button"
+              title="Back (⌫ in an empty filter)"
+              class="[&_svg:not([class*='size-'])]:size-3 [&_svg]:pointer-events-none [&_svg]:shrink-0 active:not-aria-[haspopup]:translate-y-px aria-expanded:bg-secondary aria-expanded:text-secondary-foreground aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-clip-padding bg-secondary border border-transparent control-crumb dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 disabled:opacity-50 disabled:pointer-events-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 font-medium gap-1 group/button h-6 has-data-[icon=inline-end]:pr-1.5 has-data-[icon=inline-start]:pl-1.5 hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)] in-data-[slot=button-group]:rounded-lg inline-flex items-center justify-center max-w-[45%] outline-none px-2 rounded-[min(var(--radius-md),10px)] rounded-lg select-none shrink-0 text-secondary-foreground text-xs transition-all truncate whitespace-nowrap"
+              @on_click> Verbosity </button>
       <input id="control-input"
+             data-slot="command-input"
              type="text"
              aria-label="Search sessions, settings and commands"
              role="combobox"
@@ -263,12 +274,13 @@ let%expect_test
              placeholder="Filter verbosity…"
              autocomplete="off"
              spellcheck="false"
+             class="bg-transparent flex-1 md:text-sm min-w-0 narrow:text-base outline-none placeholder:text-muted-foreground py-3 text-base"
              #value=""
              @on_input/>
       <button type="button"
               title="Close (Esc)"
               aria-label="Close"
-              class="btn control-close ghost icon"
+              class="[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0 active:not-aria-[haspopup]:translate-y-px aria-expanded:bg-muted aria-expanded:text-foreground aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-clip-padding border border-transparent control-close dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:hover:bg-muted/50 disabled:opacity-50 disabled:pointer-events-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 font-medium group/button hover:bg-muted hover:text-foreground in-data-[slot=button-group]:rounded-lg inline-flex items-center justify-center narrow:size-11 outline-none rounded-[min(var(--radius-md),12px)] rounded-lg select-none shrink-0 size-7 text-sm transition-all whitespace-nowrap"
               @on_click>
         <icon class="close"> </icon>
       </button>
@@ -311,15 +323,18 @@ let%expect_test
     (Focus control-input)
     (Dialog_move 1)
     (Dialog_move 1)
-    <div role="option"
+    <div data-slot="command-item"
+         data-selected="true"
+         role="option"
          id="control-option-2"
          aria-selected="true"
-         class="control-row selected"
+         class="control-row cursor-default data-[selected=true]:bg-muted flex gap-3 group/command-item hover:bg-muted items-center min-h-8 min-w-0 narrow:min-h-11 outline-hidden px-2 py-1.5 relative rounded-lg select-none selected text-sm"
          @on_click>
-      <div class="control-main">
-        <span aria-hidden="true" class="control-dot"> </span>
-        <span class="control-label"> Verbose </span>
-        <span class="control-about"> everything unfolded </span>
+      <div class="control-main flex flex-1 gap-2.5 items-baseline min-w-0">
+        <span aria-hidden="true"
+              class="border border-border control-dot rounded-full self-center shrink-0 size-1.5"> </span>
+        <span class="control-label max-w-full min-w-0 shrink-0 truncate"> Verbose </span>
+        <span class="control-about flex-1 min-w-0 text-muted-foreground text-xs truncate"> everything unfolded </span>
       </div>
       <Vdom.Node.none-widget> </Vdom.Node.none-widget>
     </div>
@@ -479,13 +494,14 @@ let%expect_test
     1h ago · /work
     fix the parser bug …then make the port config urable via the config file
     2h ago · /work
-    <span dir="auto" class="control-snippet">
+    <span dir="auto"
+          class="control-snippet flex-1 min-w-0 narrow:basis-full text-muted-foreground text-xs truncate">
       …then make the
-      <mark> port </mark>
+      <mark class="bg-transparent font-semibold text-primary"> port </mark>
 
-      <mark> config </mark>
+      <mark class="bg-transparent font-semibold text-primary"> config </mark>
       urable via the
-      <mark> config </mark>
+      <mark class="bg-transparent font-semibold text-primary"> config </mark>
        file
     </span>
     |}];

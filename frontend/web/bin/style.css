@@ -299,22 +299,6 @@ kbd {
 /* A session's, worktree's or message's context menu: at the pointer (or under its
    row), the command doing the same at each item's right. Hidden until the
    page has put it in the window. */
-.context-menu {
-  position: fixed;
-  min-width: 248px;
-  max-width: min(360px, calc(100vw - 16px));
-  max-height: calc(100vh - 16px);
-  overflow-y: auto;
-  padding: 4px;
-  animation: appear 0.1s ease-out;
-}
-.context-menu:not(.placed) { visibility: hidden; }
-.context-menu-head { display: flex; flex-direction: column; gap: 1px; padding: 4px 6px 6px; margin: 0 -4px 4px; padding-left: 10px; padding-right: 10px; border-bottom: 1px solid var(--border); }
-.context-menu-title { display: flex; align-items: center; gap: 6px; color: var(--foreground); font-weight: 500; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.context-menu-title .place-icon { width: 13px; height: 13px; color: var(--sodium); }
-.context-menu-sub { color: var(--faint); font: 11.5px var(--mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.context-menu-head .session-place { flex: none; }
-.context-menu .menu-label { flex-shrink: 0; }
 .menu-command {
   margin-left: auto;
   padding-left: 12px;
@@ -334,15 +318,6 @@ kbd {
 .menu-item.disabled:hover { background: none; }
 .menu-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .menu-hint { color: var(--muted-foreground); font-size: 12px; white-space: normal; }
-.context-menu-head .preview { font-family: var(--sans); }
-@media (max-width: 760px) {
-  .context-menu { left: 8px !important; right: 8px; top: auto !important; bottom: 8px; max-width: none; }
-  .context-menu .menu-item { min-height: 40px; font-size: 15px; }
-}
-@media (prefers-reduced-motion: reduce) { .context-menu { animation: none; } }
-/* A text field's menu in the desktop app's browser window (Field_menu). */
-.menu-backdrop.field-menu-backdrop { z-index: var(--z-field-menu); }
-.context-menu.field-menu { min-width: 200px; }
 .field-note { color: var(--faint); font-size: 11.5px; }
 .worktree-dialog .field + .field { margin-top: 12px; }
 .worktree-dialog .dialog-note { margin: 12px 0 0; }

@@ -12,3 +12,7 @@ val view
   -> Picker.t
   -> inject:(App.Action.t -> unit Effect.t)
   -> Node.t
+
+(** The classes of a context menu's surface (placed by the page; along the
+    bottom on a narrow window), which the field menu shares. *)
+val surface_cls : string

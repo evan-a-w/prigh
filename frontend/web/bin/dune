@@ -71,7 +71,6 @@
   forge.css
   status.css
   temporary.css
-  control.css
   ui.css
   ui-chart.css
   phone.css)
@@ -94,7 +93,6 @@
     (cat forge.css)
     (cat status.css)
     (cat temporary.css)
-    (cat control.css)
     (cat ui.css)
     (cat ui-chart.css)
     (cat phone.css)
