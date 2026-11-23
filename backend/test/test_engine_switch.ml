@@ -52,6 +52,12 @@ let fake_codex ~mask ~refuse_resume (p : Line_transport.Peer.t) =
        | Some "thread/start" ->
          print_endline "codex: thread/start";
          thread j "codex-thread"
+       | Some "thread/fork" ->
+         printf
+           "codex: thread/fork %s at %s\n"
+           (Option.value_exn (string_at [ "params"; "threadId" ] j))
+           (Option.value (string_at [ "params"; "lastTurnId" ] j) ~default:"its end");
+         thread j "codex-fork"
        | Some "thread/resume" ->
          let id = Option.value_exn (string_at [ "params"; "threadId" ] j) in
          if !refuse_resume

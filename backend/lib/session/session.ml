@@ -1819,12 +1819,7 @@ let fork ?at t ~dir =
             | Thread { adapter; host; thread_id; cwd; fork_from = _ } ->
               latest_thread := Some { Thread.adapter; host; thread_id; cwd; fork_from = None };
               None
-            | External_turn { thread_id; turn_id; through; first_turn_id; mark; _ } ->
-              Hashtbl.set
-                last_turns
-                ~key:thread_id
-                ~data:(turn_id, renamed through, first_turn_id, mark);
-              None
+            | External_turn _ -> None
             | payload -> Some payload
           in
           Option.iter payload ~f:(fun payload ->
@@ -1833,6 +1828,17 @@ let fork ?at t ~dir =
           if not (String.equal e.id at) then copy rest
       in
       copy path;
+      (* A run is recorded after its last entry: those whose entries were
+         copied, wherever they are. *)
+      List.iter path ~f:(fun (e : Entry.t) ->
+        match e.payload with
+        | External_turn { thread_id; turn_id; through; first_turn_id; mark; _ }
+          when Hashtbl.mem ids through ->
+          Hashtbl.set
+            last_turns
+            ~key:thread_id
+            ~data:(turn_id, renamed through, first_turn_id, mark)
+        | _ -> ());
       (* The fork continues a fork of the thread its agent was on, from its
          last turn in what was copied (agents that cannot fork one start
          afresh, handed the session). *)

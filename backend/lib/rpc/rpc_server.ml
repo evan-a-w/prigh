@@ -2608,10 +2608,46 @@ module Deleted = struct
 end
 
 (* Deletes the session's files and everything kept for it in memory. *)
+(* Where a session kept checkpoints of its files (the tool hosts and
+   directories of its composer threads), for them to go with it. *)
+let checkpointed_places (summary : Session.Summary.t) =
+  match Session.load summary.path with
+  | Error _ -> []
+  | Ok session ->
+    if List.exists (Session.external_turns ~all:true session) ~f:(fun run ->
+         Option.is_some run.after)
+    then
+      List.map (Session.threads session) ~f:(fun (thread : Session.Thread.t) ->
+        thread.host, thread.cwd)
+      |> List.dedup_and_sort ~compare:[%compare: string * string]
+    else []
+;;
+
+(* Best effort, in the background: a host away keeps them (hidden refs,
+   which git's gc keeps too). *)
+let drop_checkpoints t (client : Client.t) id places =
+  if not (List.is_empty places)
+  then
+    Fiber.fork ~sw:t.sw (fun () ->
+      List.iter places ~f:(fun (host, cwd) ->
+        ignore
+          (Agent.host_call_on
+             client.agent
+             ~host
+             ~cwd
+             ~name:Checkpoint.op
+             (`Object
+                 [ "action", `String "drop"
+                 ; "prefix", `String (Checkpoint.session_prefix ~session:id)
+                 ])
+           : Tool.Result.t)))
+;;
+
 let delete_saved ?leaving t client (summary : Session.Summary.t) =
   match refusal ?leaving t client summary with
   | Some refused -> Or_error.error_string refused
   | None ->
+    let checkpointed = checkpointed_places summary in
     Or_error.try_with (fun () ->
       let bytes = Session.disk_usage summary.path in
       Session.delete_files summary.path;
@@ -2622,6 +2658,7 @@ let delete_saved ?leaving t client (summary : Session.Summary.t) =
         if Agent.resume_pending agent
         then ignore (Agent.cancel_resume agent : unit Or_error.t));
       forget_session t summary.id;
+      drop_checkpoints t client summary.id checkpointed;
       { Deleted.path = summary.path; id = summary.id; bytes })
 ;;
 

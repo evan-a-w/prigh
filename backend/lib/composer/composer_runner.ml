@@ -792,16 +792,14 @@ let rewind t session ~to_ =
       in
       let before, _ = List.hd_exn checkpoints in
       let _, after = List.last_exn checkpoints in
-      let%map (_ : string list) =
-        Checkpoint.Client.restore exec ~to_:before ~expect:after
-        |> Or_error.tag
-             ~tag:
-               (sprintf
-                  "could not put the files back as they were before %s's turn \
-                   (nothing was changed)"
-                  A.display_name)
-      in
-      ()
+      match Checkpoint.Client.restore exec ~to_:before ~expect:after with
+      | Ok (_ : string list) -> Ok ()
+      | Error e ->
+        Or_error.errorf
+          "could not put the files back as they were before %s's turn \
+           (nothing was changed): %s"
+          A.display_name
+          (Error.to_string_hum e)
     in
     if List.is_empty dropped
     then Ok ()
