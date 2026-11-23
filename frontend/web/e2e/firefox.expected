@@ -215,8 +215,7 @@ back again
 === firefox: the session's card lists its subagent ===
 Subagents
 1
-Survey the project
-<age>
+1 finished
 === firefox: its line opens its chat ===
 on show: a1
 Survey the project
@@ -227,7 +226,7 @@ Count the files
 The survey: 3 files.
 <TIME>
 breadcrumb: cwd / count some lines / Survey the project
-card: Parents | 1 | Root | Subagents | 1 | Count the files | <age>
+card: Parents | 1 | Root | Subagents | 1 | 1 finished
 composer: Message Survey the project…
 === firefox: Alt+1: its own subagent's chat ===
 on show: a1/n1
@@ -1544,15 +1543,13 @@ none
 === firefox: session card: the card ===
 Subagents
 1
-Count the modules
-<age>
+1 finished
 Worktrees
 1
 === firefox: session card: the worktrees unfolded ===
 Subagents
 1
-Count the modules
-<age>
+1 finished
 Worktrees
 1
 feat/ui
@@ -1585,6 +1582,8 @@ the column keeps its left margin
 === firefox: session card: hidden from the chrome, 1440px wide ===
 pane 1160px, the column centred
 no card
+=== firefox: session card: the ended subagents unfolded ===
+Subagents | 1 | 1 finished | Count the modules | <age> | Worktrees | 1 | feat/ui | 1 changed
 === firefox: session card: a subagent's chat ===
 Count the modules
 <time>
@@ -1602,8 +1601,7 @@ card beside the chat: 0
 This session
 Subagents
 1
-Count the modules
-<age>
+1 finished
 Worktrees
 1
 inside the screen: true; rows 44px or more: true (3)
@@ -1613,8 +1611,7 @@ card beside the chat: 0
 This session
 Subagents
 1
-Count the modules
-<age>
+1 finished
 Worktrees
 1
 inside the screen: true; rows 44px or more: true (3)
@@ -5117,8 +5114,6 @@ Backend
 Sign in
 signed in: the composer and the sidebar: true
 === firefox: smoke: a run with a tool call ===
-▢
-Using prigh-web
 count some lines
 <TIME>
 let me look

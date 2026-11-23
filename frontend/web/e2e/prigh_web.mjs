@@ -846,7 +846,7 @@ try {
   await send("survey it");
   await bodyHas("Started a survey and a job.");
   await idle();
-  await page.waitForFunction(() => document.querySelector(".session-card-agent")
+  await page.waitForFunction(() => document.querySelector(".session-card-ended")
     && !document.querySelector(".session-card-agent.running"));
   section("the session's card lists its subagent");
   console.log(clean(await page.locator(".session-card").innerText()).replace(/\b(now|\d+[smhd])$/gm, "<age>"));

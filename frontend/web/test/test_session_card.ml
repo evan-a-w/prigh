@@ -171,12 +171,17 @@ let%expect_test "a subagent finishes: how long ago, then failed" =
       [ end_ ~call:"s1" ~agent:"a1" ~turns:2 "Done: 44px everywhere."
       ; end_ ~error:true ~call:"s2" ~agent:"a2" ~turns:1 "The phone died."
       ]);
+  H.text h ~selector:".session-card";
+  H.click h ~selector:".session-card-ended";
   H.texts h ~selector:".session-card-agent" |> List.iter ~f:print_endline;
   H.quiet h (fun () ->
     H.act h (Tick (Time_ns.add H.now (Time_ns.Span.of_min 12.))));
   H.texts h ~selector:".session-card-agent" |> List.iter ~f:print_endline;
   [%expect
     {|
+    (Subagents 2)
+    (1 finished · 1 failed)
+    (Session_card (Fold Ended))
     Fix the touch targets now
     Review the phone layout failed now
     Fix the touch targets 12m
@@ -304,5 +309,51 @@ let%expect_test
     (Subagents 2)
     (Fix the touch targets working…) (Review the phone layout thinking…)
     (Session_card (Sheet false))
+    |}]
+;;
+
+let%expect_test
+    "the running subagents listed; those that ended folded into one row, \
+     unfolded again for another session"
+  =
+  let h = H.create () in
+  two_agents h;
+  H.quiet h (fun () ->
+    events h [ end_ ~call:"s1" ~agent:"a1" ~turns:2 "Done: 44px everywhere." ]);
+  H.text h ~selector:".session-card";
+  H.names h ~selector:".session-card-ended";
+  H.quiet h (fun () ->
+    events
+      h
+      [ end_ ~error:true ~call:"s2" ~agent:"a2" ~turns:1 "The phone died." ]);
+  H.text h ~selector:".session-card";
+  H.click h ~selector:".session-card-ended";
+  H.text h ~selector:".session-card";
+  H.click h ~selector:".session-card-ended";
+  H.text h ~selector:".session-card";
+  H.click h ~selector:".session-card-ended";
+  H.quiet h (fun () ->
+    H.event
+      h
+      (sprintf
+         {|{"event":"state","state":%s}|}
+         (H.state_json ~fields:[ "session_id", `String "s2" ] ())));
+  print_s [%sexp ((H.model h).session_card : Prigh_web.Session_card.t)];
+  [%expect
+    {|
+    (Subagents 2)
+    (Review the phone layout thinking…) (1 finished)
+    button "1 finished"
+    (Subagents 2)
+    (1 finished · 1 failed)
+    (Session_card (Fold Ended))
+    (Subagents 2)
+    (1 finished · 1 failed) (Fix the touch targets now) (Review the phone layout failed now)
+    (Session_card (Fold Ended))
+    (Subagents 2)
+    (1 finished · 1 failed)
+    (Session_card (Fold Ended))
+    ((subagents_open true) (ended_open false) (worktrees_open false)
+     (sheet false))
     |}]
 ;;
