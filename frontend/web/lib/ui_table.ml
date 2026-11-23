@@ -82,8 +82,10 @@ let sort (t : Table.t) ~sort =
 let head_cls (c : Table.Column.t) =
   match c.align with
   | Left -> "left text-muted-foreground text-xs first:pl-4 last:pr-4"
-  | Right -> "right text-right! text-muted-foreground text-xs first:pl-4 last:pr-4"
-  | Center -> "center text-center! text-muted-foreground text-xs first:pl-4 last:pr-4"
+  | Right ->
+    "right text-right! text-muted-foreground text-xs first:pl-4 last:pr-4"
+  | Center ->
+    "center text-center! text-muted-foreground text-xs first:pl-4 last:pr-4"
 ;;
 
 let cell_cls (c : Table.Column.t) =
