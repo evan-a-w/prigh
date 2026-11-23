@@ -149,7 +149,7 @@ let%expect_test "deleting generations asks first, then returns to Settings" =
     (Cancel) (Delete and collect)
     Close_dialog
     (Focus dialog)
-    <div class="[&>.modal-body]:flex-auto [&>.modal-body]:grid [&>.modal-body]:grid-cols-[208px_minmax(0,1fr)] [&>.modal-body]:overflow-hidden [&>.modal-body]:p-0 [&>.modal-buttons]:border-t [&>.modal-head]:border-b h-[min(720px,88vh)] max-h-none modal settings-dialog w-[min(940px,100%)]">
+    <div class="[&>.modal-body]:flex-auto [&>.modal-body]:grid [&>.modal-body]:grid-cols-[208px_minmax(0,1fr)] [&>.modal-body]:overflow-hidden [&>.modal-body]:p-0 [&>.modal-buttons]:border-border [&>.modal-buttons]:border-t [&>.modal-head]:border-b [&>.modal-head]:border-border h-[min(720px,88vh)] max-h-none modal settings-dialog w-[min(940px,100%)]">
     (Run "/nix-gc run 14")
     (Focus dialog)
     Dialog_accept
@@ -157,7 +157,7 @@ let%expect_test "deleting generations asks first, then returns to Settings" =
     (Expire_toast (id 0) (after_ms 4460))
     (Rpc (method_ nix_store_gc) (params ((delete_generations 14)))
      (tag Nix_collected))
-    <div class="[&>.modal-body]:flex-auto [&>.modal-body]:grid [&>.modal-body]:grid-cols-[208px_minmax(0,1fr)] [&>.modal-body]:overflow-hidden [&>.modal-body]:p-0 [&>.modal-buttons]:border-t [&>.modal-head]:border-b h-[min(720px,88vh)] max-h-none modal settings-dialog w-[min(940px,100%)]">
+    <div class="[&>.modal-body]:flex-auto [&>.modal-body]:grid [&>.modal-body]:grid-cols-[208px_minmax(0,1fr)] [&>.modal-body]:overflow-hidden [&>.modal-body]:p-0 [&>.modal-buttons]:border-border [&>.modal-buttons]:border-t [&>.modal-head]:border-b [&>.modal-head]:border-border h-[min(720px,88vh)] max-h-none modal settings-dialog w-[min(940px,100%)]">
     |}]
 ;;
 
@@ -174,7 +174,7 @@ let%expect_test "/nix-gc opens Settings once the store is read" =
     (Rpc (method_ nix_store_status) (params ())
      (tag (Nix_status (open_settings true))))
     (Focus dialog)
-    <div class="[&>.modal-body]:flex-auto [&>.modal-body]:grid [&>.modal-body]:grid-cols-[208px_minmax(0,1fr)] [&>.modal-body]:overflow-hidden [&>.modal-body]:p-0 [&>.modal-buttons]:border-t [&>.modal-head]:border-b h-[min(720px,88vh)] max-h-none modal settings-dialog w-[min(940px,100%)]">
+    <div class="[&>.modal-body]:flex-auto [&>.modal-body]:grid [&>.modal-body]:grid-cols-[208px_minmax(0,1fr)] [&>.modal-body]:overflow-hidden [&>.modal-body]:p-0 [&>.modal-buttons]:border-border [&>.modal-buttons]:border-t [&>.modal-head]:border-b [&>.modal-head]:border-border h-[min(720px,88vh)] max-h-none modal settings-dialog w-[min(940px,100%)]">
     |}]
 ;;
 

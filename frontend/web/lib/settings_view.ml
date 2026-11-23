@@ -1618,7 +1618,8 @@ let view (m : App.Model.t) ~inject =
          [&>.modal-body]:grid [&>.modal-body]:flex-auto \
          [&>.modal-body]:grid-cols-[208px_minmax(0,1fr)] \
          [&>.modal-body]:overflow-hidden [&>.modal-body]:p-0 \
-         [&>.modal-buttons]:border-t [&>.modal-head]:border-b"
+         [&>.modal-buttons]:border-t [&>.modal-buttons]:border-border \
+         [&>.modal-head]:border-b [&>.modal-head]:border-border"
       ~title:"Settings"
       ~on_close:(inject Action.Close_dialog)
       ~footer

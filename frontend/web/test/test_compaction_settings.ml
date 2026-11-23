@@ -349,7 +349,7 @@ let%expect_test "the picker: Esc goes back to settings; from the composer too" =
     (Run "/compaction model")
     Close_dialog
     (Focus dialog)
-    <div class="[&>.modal-body]:flex-auto [&>.modal-body]:grid [&>.modal-body]:grid-cols-[208px_minmax(0,1fr)] [&>.modal-body]:overflow-hidden [&>.modal-body]:p-0 [&>.modal-buttons]:border-t [&>.modal-head]:border-b h-[min(720px,88vh)] max-h-none modal settings-dialog w-[min(940px,100%)]">
+    <div class="[&>.modal-body]:flex-auto [&>.modal-body]:grid [&>.modal-body]:grid-cols-[208px_minmax(0,1fr)] [&>.modal-body]:overflow-hidden [&>.modal-body]:p-0 [&>.modal-buttons]:border-border [&>.modal-buttons]:border-t [&>.modal-head]:border-b [&>.modal-head]:border-border h-[min(720px,88vh)] max-h-none modal settings-dialog w-[min(940px,100%)]">
     |}];
   H.quiet h (fun () -> H.act h Close_dialog);
   H.quiet h (fun () -> H.type_ h "/compaction model");

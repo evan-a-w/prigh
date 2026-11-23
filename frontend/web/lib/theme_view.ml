@@ -191,8 +191,9 @@ let accents (m : App.Model.t) ~inject =
    toggle group. *)
 let choice ~label ~command ~all ~to_string ~describe ~current ~inject =
   Node.div
-    ~attrs:[ Attr.class_ "loon" ]
+    ~attrs:[ Attr.class_ "setting-segments loon narrow:w-full" ]
     [ Loon.Toggle_group.single
+        ~class_:"narrow:w-full"
         ~attrs:[ Attr.create "aria-label" label ]
         ~variant:Outline
         ~size:Sm
@@ -207,7 +208,7 @@ let choice ~label ~command ~all ~to_string ~describe ~current ~inject =
                group
                ~value:name
                ~attrs:
-                 [ Attr.class_ "narrow:h-11 narrow:px-3"
+                 [ Attr.class_ "narrow:h-11 narrow:flex-1 narrow:px-3"
                  ; Attr.title (sprintf "%s (/%s %s)" (describe v) command name)
                  ]
                [ Node.text (String.capitalize name) ]))
