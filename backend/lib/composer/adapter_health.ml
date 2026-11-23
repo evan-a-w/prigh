@@ -21,10 +21,10 @@ module Auth = struct
   [@@deriving sexp_of, equal]
 end
 
-let program : Adapter_id.t -> string option = function
+let program ?(acp = Option.some) : Adapter_id.t -> string option = function
   | Codex -> Some "codex"
   | Claude -> Some "claude"
-  | Acp name -> Some name
+  | Acp name -> acp name
   | Prigh -> None
 ;;
 
@@ -127,10 +127,10 @@ let status_args : Adapter_id.t -> string list = function
   | Acp _ | Prigh -> []
 ;;
 
-let request adapters : Host_probe.Request.t =
+let request ?acp adapters : Host_probe.Request.t =
   { programs =
       List.filter_map adapters ~f:(fun adapter ->
-        Option.map (program adapter) ~f:(fun name ->
+        Option.map (program ?acp adapter) ~f:(fun name ->
           { Host_probe.Program.name
           ; version = [ "--version" ]
           ; status = status_args adapter
@@ -250,7 +250,14 @@ let unknown adapters ~host ~host_name ~checked_at why =
       })
 ;;
 
-let of_result adapters ~host ~host_name ~checked_at (result : Tool.Result.t) =
+let of_result
+      ?acp
+      adapters
+      ~host
+      ~host_name
+      ~checked_at
+      (result : Tool.Result.t)
+  =
   let old_host =
     String.is_prefix
       result.text
@@ -273,7 +280,7 @@ let of_result adapters ~host ~host_name ~checked_at (result : Tool.Result.t) =
       unknown adapters ~host ~host_name ~checked_at (Error.to_string_hum e)
     | Ok reply ->
       List.map adapters ~f:(fun adapter ->
-        match program adapter with
+        match program ?acp adapter with
         | None -> prigh_status ~host ~host_name ~checked_at
         | Some name ->
           (match
@@ -291,14 +298,16 @@ let of_result adapters ~host ~host_name ~checked_at (result : Tool.Result.t) =
              })))
 ;;
 
-let probe ~exec adapters ~host ~host_name ~now =
+let probe ?acp ~exec adapters ~host ~host_name ~now =
   let result =
-    if List.exists adapters ~f:(fun a -> Option.is_some (program a))
+    if List.exists adapters ~f:(fun a -> Option.is_some (program ?acp a))
     then
-      exec ~name:Host_probe.op (Host_probe.Request.to_json (request adapters))
+      exec
+        ~name:Host_probe.op
+        (Host_probe.Request.to_json (request ?acp adapters))
     else { Tool.Result.text = "{}"; is_error = false; images = [] }
   in
-  of_result adapters ~host ~host_name ~checked_at:now result
+  of_result ?acp adapters ~host ~host_name ~checked_at:now result
 ;;
 
 module Key = struct

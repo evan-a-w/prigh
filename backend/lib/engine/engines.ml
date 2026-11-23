@@ -4,13 +4,14 @@ open! Import
 type t =
   { engines : Engine_id.t list
   ; adapters : Adapter_id.t list
+  ; acp_agents : Acp_agent.t list
   }
 [@@deriving sexp_of, equal]
 
-let default = { engines = [ Harness ]; adapters = [] }
+let default = { engines = [ Harness ]; adapters = []; acp_agents = [] }
 let default_adapters : Adapter_id.t list = [ Codex; Claude ]
 
-let create ~engines ?(adapters = default_adapters) () =
+let create ~engines ?(adapters = default_adapters) ?(acp_agents = []) () =
   let engines = List.stable_dedup engines ~compare:Engine_id.compare in
   let adapters = List.stable_dedup adapters ~compare:Adapter_id.compare in
   let composer = List.mem engines Composer ~equal:Engine_id.equal in
@@ -21,13 +22,26 @@ let create ~engines ?(adapters = default_adapters) () =
     Or_error.error_string
       "the composer engine needs at least one adapter: codex, claude, prigh or \
        acp:<name>"
-  else Ok { engines; adapters = (if composer then adapters else []) }
+  else
+    Ok { engines; adapters = (if composer then adapters else []); acp_agents }
 ;;
 
 let split s =
   String.split s ~on:','
   |> List.map ~f:String.strip
   |> List.filter ~f:(fun s -> not (String.is_empty s))
+;;
+
+(* [acp:name=command args] names an ACP agent and how to start it. *)
+let adapter_of_flag s =
+  let open Or_error.Let_syntax in
+  match String.chop_prefix s ~prefix:"acp:" with
+  | Some spec when String.mem spec '=' ->
+    let%map agent = Acp_agent.of_spec spec in
+    Adapter_id.Acp agent.name, Some agent
+  | _ ->
+    let%map id = Adapter_id.of_string s in
+    id, None
 ;;
 
 let of_flags ~engines ~adapters ~getenv =
@@ -54,9 +68,13 @@ let of_flags ~engines ~adapters ~getenv =
       match a with
       | None -> Ok None
       | Some a ->
-        Or_error.combine_errors (List.map (split a) ~f:Adapter_id.of_string)
+        Or_error.combine_errors (List.map (split a) ~f:adapter_of_flag)
         >>| Option.some
     in
+    let acp_agents =
+      Option.value_map adapters ~default:[] ~f:(List.filter_map ~f:snd)
+    in
+    let adapters = Option.map adapters ~f:(List.map ~f:fst) in
     let composer = List.mem engines Composer ~equal:Engine_id.equal in
     (match adapters with
      | Some (_ :: _ as adapters) when not composer ->
@@ -64,24 +82,42 @@ let of_flags ~engines ~adapters ~getenv =
          "adapters (%s) are for the composer engine: add composer to the \
           engines"
          (String.concat ~sep:"," (List.map adapters ~f:Adapter_id.to_string))
-     | _ -> create ~engines ?adapters ())
+     | _ -> create ~engines ?adapters ~acp_agents ())
 ;;
 
-let buildable : Adapter_id.t -> bool = function
-  | Codex | Claude -> true
-  | Acp _ | Prigh -> false
+let acp_agent t name =
+  match
+    List.find t.acp_agents ~f:(fun (a : Acp_agent.t) ->
+      String.equal a.name name)
+  with
+  | Some _ as a -> a
+  | None -> Acp_agent.find_known name
+;;
+
+let drivable t : Adapter_id.t -> bool = function
+  | Codex | Claude | Prigh -> true
+  | Acp name -> Option.is_some (acp_agent t name)
+;;
+
+let unknown_acp name =
+  sprintf
+    "prigh does not know how to start the ACP agent %s: give its command with \
+     -adapters acp:%s=<command and args> (it knows %s)"
+    name
+    name
+    (String.concat ~sep:", " (List.map Acp_agent.known ~f:(fun a -> a.name)))
 ;;
 
 let check_build t =
-  match List.filter t.adapters ~f:(Fn.non buildable) with
+  match List.filter t.adapters ~f:(Fn.non (drivable t)) with
   | [] -> Ok ()
   | missing ->
-    Or_error.errorf
-      "the composer can't drive %s in this build of prigh yet; run -adapters %s"
-      (String.concat ~sep:" or " (List.map missing ~f:Adapter_id.label))
-      (match List.filter t.adapters ~f:buildable with
-       | [] -> "codex,claude"
-       | ok -> String.concat ~sep:"," (List.map ok ~f:Adapter_id.to_string))
+    Or_error.error_string
+      (String.concat
+         ~sep:"; "
+         (List.map missing ~f:(function
+            | Acp name -> unknown_acp name
+            | a -> sprintf "the composer can't drive %s" (Adapter_id.label a))))
 ;;
 
 let engine_strings t = List.map t.engines ~f:Engine_id.to_string
@@ -141,14 +177,16 @@ let choose t ~engine ~adapter =
       Ok { Engine_choice.engine = Composer; adapter = Some adapter })
 ;;
 
-let unavailable ?(buildable = buildable) t (choice : Engine_choice.t) =
+let unavailable ?buildable t (choice : Engine_choice.t) =
+  let buildable = Option.value buildable ~default:(drivable t) in
   match choice.adapter with
   | Some a when not (buildable a) ->
     Some
       (sprintf
-         "the composer can't drive %s in this build of prigh yet; this session \
-          can still be read here"
-         (Adapter_id.label a))
+         "%s; this session can still be read here"
+         (match a with
+          | Acp name -> unknown_acp name
+          | _ -> sprintf "the composer can't drive %s" (Adapter_id.label a)))
   | _ ->
     if not (List.mem t.engines choice.engine ~equal:Engine_id.equal)
     then

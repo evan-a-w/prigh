@@ -3008,12 +3008,15 @@ let loop_config ?cancel t =
   }
 ;;
 
+let harness_runner t =
+  Harness_runner.create ~provider:t.provider ~config:(fun ~cancel ->
+    loop_config ~cancel t)
+;;
+
 let runner t =
   match t.runner with
   | Some runner -> runner
-  | None ->
-    Harness_runner.create ~provider:t.provider ~config:(fun ~cancel ->
-      loop_config ~cancel t)
+  | None -> harness_runner t
 ;;
 
 let set_runner t runner =
@@ -3031,11 +3034,16 @@ let engine_label t =
   | engine, _ -> String.capitalize (Engine_id.to_string engine)
 ;;
 
+(* Whether prigh's own loop calls the model: the harness, or the
+   composer's [prigh] adapter. *)
+let own_loop t =
+  match engine t, (engine_choice t).adapter with
+  | Harness, _ | Composer, Some Prigh -> true
+  | Composer, _ -> false
+;;
+
 (* Who a usage limit is with: the model, or the external harness. *)
-let limited_by t =
-  match engine t with
-  | Harness -> Model.key t.model
-  | Composer -> engine_label t
+let limited_by t = if own_loop t then Model.key t.model else engine_label t
 ;;
 
 let require t feature =
@@ -3691,7 +3699,7 @@ let rec start_run
        (* Steering messages that arrived after the last turn boundary go
        first: they were sent before any follow-up still queued. *)
        if Steer_queue.steers_first t.queue then queue_update t;
-       if Engine_id.equal (engine t) Harness then auto_compact t;
+       if own_loop t then auto_compact t;
        (* The goal carries on after a run that ended normally; anything else
        stops it, except a hand-over or a resume, which carry on the run. *)
        let goal_continues =

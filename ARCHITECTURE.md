@@ -261,7 +261,18 @@ it" or "Claude Code on laptop is not logged in: run `claude auth login`
 there". prigh never installs a CLI or logs in. prigh-web shows them in
 Settings → Engines (only when the backend deploys the composer), the TUI
 with `/adapters` (which otherwise says how to deploy it).
-The composer is not built yet: asking for it fails at startup.
+
+The composer's adapters (`Adapter_intf`) are `Codex_adapter`,
+`Claude_adapter` and `Acp_adapter`, each a process wrapper over its codec,
+plus `Prigh_adapter`, which runs the harness in the backend for a composer
+session. `Acp_adapter` is strictly the spec: its capabilities come from what
+the agent advertises (plan mode when it has a `plan` mode, images when it
+takes them); prigh's tools reach it as a stdio MCP server in
+`session/new`'s `mcpServers`; a recorded thread is continued with
+`session/resume`, else `session/load` (counted as loaded once the replay goes
+quiet, as some agents never answer it), else a new session. ACP agents'
+commands come from `Acp_agent` (`known`, or `-adapters acp:name=command`);
+one with no command fails at startup.
 
 ### Subagents and background work
 

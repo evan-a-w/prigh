@@ -71,8 +71,10 @@ let mcp_calls = ref 0
 (* prigh's tools called over MCP: approved and run as the harness engine's
    calls are. *)
 let injected t (s : Engine_intf.Services.t) =
+  let (module A : Adapter.S) = t.adapter in
+  let native_questions = A.native_questions in
   Injected_tools.create
-    ~tools:(Injected_tools.select ~native_questions:true s.tools)
+    ~tools:(Injected_tools.select ~native_questions s.tools)
     ~execute:(fun tool args ->
       match t.services with
       | None -> Tool_result.error "no turn is running"
@@ -122,7 +124,9 @@ let live t (s : Engine_intf.Services.t) (input : Engine_intf.Turn.Input.t) =
         { start with
           mcp_servers =
             start.mcp_servers
-            @ [ Injected_tools.Bridge.codex_config mcp.bridge ]
+            @ [ ( Injected_tools.server_name
+                , Injected_tools.Bridge.server_json mcp.bridge )
+              ]
         }
     in
     (match
@@ -392,8 +396,11 @@ module R = struct
   let engine = Engine_id.Composer
 
   let capabilities t =
-    let (module A : Adapter.S) = t.adapter in
-    A.capabilities
+    match t.live with
+    | Some (Live ((module L), a)) -> L.current_capabilities a
+    | None ->
+      let (module A : Adapter.S) = t.adapter in
+      A.capabilities
   ;;
 
   let run_turn = run_turn

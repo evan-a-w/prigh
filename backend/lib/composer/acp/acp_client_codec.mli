@@ -251,11 +251,22 @@ val reply_approval
 val handle_line : t -> string -> Output.t list
 
 (** The agent's process ended: a running turn fails ([Crashed]) and waiting
-    requests are withdrawn. *)
-val process_exited : t -> code:int option -> stderr_tail:string -> Output.t list
+    requests are withdrawn. [name]: how its message names the agent (default "the
+    ACP agent"). *)
+val process_exited
+  :  ?name:string
+  -> t
+  -> code:int option
+  -> stderr_tail:string
+  -> Output.t list
 
 val session_id : t -> string option
 val turn_id : t -> string option
 val in_turn : t -> bool
 val agent_capabilities : t -> Agent_capabilities.t option
 val session_config : t -> Session_config.t
+
+(** Some agents never answer [session/load] once they have replayed the
+    history: after a quiet spell the client takes the session as loaded
+    (its id is [session_id]); a late answer is then ignored. *)
+val assume_loaded : t -> session_id:string -> unit
