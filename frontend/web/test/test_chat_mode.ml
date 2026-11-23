@@ -156,7 +156,7 @@ let%expect_test "no tool host: the banner, the message kept, one click to chat" 
          role="status"
          aria-live="polite"
          title="No tool host connected: connect one with `prigh tool-host -connect ...` or a TUI, then pick it with /host, or talk without one in chat mode (/mode chat)"
-         class="*:[svg:not([class*='size-'])]:size-4 *:[svg]:row-span-2 *:[svg]:text-current *:[svg]:translate-y-0.5 [&>.icon]:shrink-0 [&>.icon]:text-primary bg-primary/10 border border-primary/40 flex gap-2 group/alert has-[>svg]:gap-x-2 has-[>svg]:grid-cols-[auto_1fr] has-data-[slot=alert-action]:pr-18 has-data-[slot=alert-action]:relative items-center no-host-banner pl-2.5 pr-1 px-2.5 py-1 relative rounded-lg text-[13.5px] text-card-foreground text-left w-full">
+         class="*:[svg:not([class*='size-'])]:size-4 *:[svg]:row-span-2 *:[svg]:text-current *:[svg]:translate-y-0.5 [&>.icon]:shrink-0 [&>.icon]:text-primary bg-primary/10 border border-primary/40 flex gap-2 group/alert has-[>svg]:gap-x-2 has-[>svg]:grid-cols-[auto_1fr] has-data-[slot=alert-action]:pr-18 has-data-[slot=alert-action]:relative items-center loon no-host-banner pl-2.5 pr-1 px-2.5 py-1 relative rounded-lg text-[13.5px] text-card-foreground text-left w-full">
       <icon class="server_off"> </icon>
       <span class="flex-1 leading-tight line-clamp-2 min-w-0 no-host-banner-text"> No tool host connected </span>
       <button type="button"
