@@ -13,8 +13,6 @@
 .chrome-anchor { position: relative; flex: none; z-index: var(--z-tools); }
 /* While the ⋯ menu is open, the chrome is over its backdrop. */
 .chrome-anchor:has(.menu-open, .chrome-more.open) { z-index: var(--z-menu-anchor); }
-.main:has(.chat-chrome) .jump-nav { top: 8px; }
-.app.narrow .main:has(.chat-chrome) .chat-frame > .jump-nav { top: 12px; right: 12px; }
 
 /* The phone strip's buttons. */
 .chrome-button.round { width: 34px; height: 34px; border-radius: 50%; color: var(--muted-text); }
@@ -24,7 +22,6 @@
 /* What applies (a goal, reminders, a resume, a transfer, the plan). */
 .status-notes { display: flex; align-items: center; gap: 12px; min-width: 0; font-size: 12px; color: var(--muted-text); }
 .status-notes:empty { display: none; }
-.status-notes .status-item.mode.plan { max-width: 22ch; }
 
 /* A phone: the ⋯ opens a small menu of the toggles, the notes, the gear. */
 .chrome-more { position: relative; }

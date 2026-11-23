@@ -22,6 +22,7 @@ let handle (m : App.Model.t) ~inject h =
     Node.div
       ~attrs:
         [ Attr.classes [ "resizer"; "resizer-" ^ Handle.name h ]
+        ; Attr.create "data-slot" "resizable-handle"
         ; Attr.role "separator"
         ; Attr.tabindex 0
         ; Attr.create "aria-label" (Handle.label h)

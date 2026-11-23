@@ -9,6 +9,3 @@ val view
   -> inject:(App.Action.t -> unit Effect.t)
   -> widget:(Terminal.Target.t -> Node.t)
   -> Node.t
-
-(** The session's button (in its card or bar). *)
-val toggle : App.Model.t -> inject:(App.Action.t -> unit Effect.t) -> Node.t

@@ -201,6 +201,16 @@ kbd {
 }
 .desk > .terminal-panel { grid-area: terminal; }
 
+/* The transcript's frame: the jump marks sit on its left edge. */
+.chat-frame {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.chat-frame:has(.rail) > .chat { --rail-room: 44px; }
+
 .main {
   grid-area: main;
   display: flex;

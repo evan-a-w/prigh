@@ -46,7 +46,8 @@ let%expect_test "a handle: a focusable separator with its size and bounds" =
   H.show h ~selector:".resizer-sidebar";
   [%expect
     {|
-    <div role="separator"
+    <div data-slot="resizable-handle"
+         role="separator"
          tabindex="0"
          aria-label="Resize the sessions sidebar"
          aria-orientation="vertical"
@@ -322,7 +323,7 @@ let%expect_test
   columns h;
   [%expect
     {|
-    <aside class="files-panel">
+    <aside class="files-panel loon">
     <Vdom.Node.none-widget class="">
     <div class="files-side">
     <div class="resizer resizer-files">
@@ -333,7 +334,7 @@ let%expect_test
   [%expect
     {|
     (Files (Select main.ml))
-    <aside class="files-panel previewing">
+    <aside class="files-panel loon previewing">
     <section class="files-preview">
     <div class="files-side">
     <div class="resizer resizer-files-preview">
@@ -385,7 +386,7 @@ let%expect_test
     {|
     (Files Close_preview)
     (Files (Focus files-list))
-    <aside class="files-panel">
+    <aside class="files-panel loon">
     <Vdom.Node.none-widget class="">
     <div class="files-side">
     <div class="resizer resizer-files">
@@ -424,7 +425,7 @@ let%expect_test "without room for both, the preview takes the list's place" =
   [%expect
     {|
     (Files (Select main.ml))
-    <aside class="alone files-panel previewing">
+    <aside class="alone files-panel loon previewing">
     <section class="files-preview">
     <div class="files-side">
     <div class="resizer resizer-files">
@@ -456,7 +457,7 @@ let%expect_test "without room for both, the preview takes the list's place" =
     {|
     (Files Close_preview)
     (Files (Focus files-list))
-    <aside class="files-panel">
+    <aside class="files-panel loon">
     <Vdom.Node.none-widget class="">
     <div class="files-side">
     <div class="resizer resizer-files">
@@ -468,7 +469,7 @@ let%expect_test "without room for both, the preview takes the list's place" =
   [%expect
     {|
     (Files (Select main.ml))
-    <aside class="alone files-panel previewing">
+    <aside class="alone files-panel loon previewing">
     <section class="files-preview">
     <div class="files-side">
     <div class="resizer resizer-files">
@@ -477,7 +478,7 @@ let%expect_test "without room for both, the preview takes the list's place" =
   columns h;
   [%expect
     {|
-    <aside class="files-panel previewing">
+    <aside class="files-panel loon previewing">
     <section class="files-preview">
     <div class="files-side">
     <div class="resizer resizer-files-preview">
@@ -574,7 +575,8 @@ let%expect_test "the review: the chat's edge beside it, its file list's edge" =
     (Complete_accept (run true))
     <div class="resizer resizer-review-files">
     <div class="resizer resizer-review-chat">
-    <div role="separator"
+    <div data-slot="resizable-handle"
+         role="separator"
          tabindex="0"
          aria-label="Resize the chat beside the review"
          aria-orientation="vertical"
@@ -699,7 +701,7 @@ let%expect_test
   columns h;
   [%expect
     {|
-    <aside class="alone files-panel previewing">
+    <aside class="alone files-panel loon previewing">
     <section class="files-preview">
     <div class="files-side">
     |}]
