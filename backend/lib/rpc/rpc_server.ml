@@ -770,13 +770,11 @@ let list_sessions t client =
 
 (* The clients that have signed in: the namespace's events (its sessions,
    settings, hosts and agent CLIs) are not for a connection that has not. *)
-let authed_clients t =
-  Hashtbl.data t.clients |> List.filter ~f:(fun (c : Client.t) -> c.authed)
+let iter_authed t ~f =
+  Hashtbl.iter t.clients ~f:(fun (c : Client.t) -> if c.authed then f c)
 ;;
 
-let broadcast t json =
-  List.iter (authed_clients t) ~f:(fun (c : Client.t) -> c.send json)
-;;
+let broadcast t json = iter_authed t ~f:(fun (c : Client.t) -> c.send json)
 
 (* Every client of the server, whichever session it is in. With [changed]
    (sessions whose entries changed, in memory as they are now) or
@@ -819,7 +817,7 @@ let sessions_changed ?(changed = []) ?(removed = []) t =
              ~f:(fun id -> `String id)) )
     in
     let now = t.now () in
-    List.iter (authed_clients t) ~f:(fun (c : Client.t) ->
+    iter_authed t ~f:(fun (c : Client.t) ->
       let archive_after_days = archive_after_days t c in
       c.send
         (event
@@ -1437,7 +1435,7 @@ let create
     | Done _ | Failed _ | Logged_out _ | Forge_done _ | Forge_logged_out _ ->
       broadcast t json);
   Model_registry.subscribe (Login_manager.models login) ~f:(fun problem ->
-    List.iter (authed_clients t) ~f:(fun c -> tell_problems c [ problem ]));
+    iter_authed t ~f:(fun c -> tell_problems c [ problem ]));
   t
 ;;
 
@@ -3109,7 +3107,7 @@ let prefs_changed t (from : Client.t) changes =
         ; "prefs", User_prefs.Change.to_json changes
         ]
     in
-    List.iter (authed_clients t) ~f:(fun (c : Client.t) ->
+    iter_authed t ~f:(fun (c : Client.t) ->
       if not (String.equal c.id from.id) then c.send json))
 ;;
 

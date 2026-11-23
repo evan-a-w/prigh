@@ -1403,7 +1403,9 @@ let server_request t ~id method_ params =
                  ; opt "cwd" (fun c -> `String c) (str "cwd" params)
                  ; opt "reason" (fun r -> `String r) (str "reason" params)
                  ; opt "network" Fn.id network
-                 ; opt "kind" (fun k -> `String k) (str "kind" params)
+                 ; opt "kind" (fun k -> `String k)
+                     (Option.filter (str "kind" params) ~f:(fun k ->
+                        not (String.equal k "command")))
                  ]
            ; offers_always =
                offered decisions "acceptForSession"

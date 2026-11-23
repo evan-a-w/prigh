@@ -404,6 +404,19 @@ let%expect_test "not logged in" =
     |}]
 ;;
 
+let%expect_test "an agent on another ACP version is refused, saying why" =
+  with_acp ~peer:(fun _ p ->
+    let j = P.expect p "initialize" in
+    P.result p j {|{"protocolVersion":2,"agentCapabilities":{}}|})
+  @@ fun agent _ ->
+  prompt agent "hi";
+  [%expect {|
+    spawn #1: opencode acp
+    agent got initialize
+    assistant (acp:opencode/default, (Error"OpenCode could not start: OpenCode speaks ACP version 2, and prigh speaks version 1: update prigh or OpenCode")): ""
+    |}]
+;;
+
 let%expect_test "capabilities come from what the agent advertises" =
   let module C = Acp_client_codec in
   let c = C.create () in

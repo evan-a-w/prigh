@@ -300,6 +300,89 @@ let%expect_test "permission requests pick the agent's options" =
     |}]
 ;;
 
+let%expect_test "permissions: nothing persistent unless asked; after cancel" =
+  let t = started () in
+  ok (C.prompt t [ Text "go" ]);
+  let permission id options =
+    sprintf
+      {|{"jsonrpc":"2.0","id":%d,"method":"session/request_permission","params":{"sessionId":"ses_1","toolCall":{"toolCallId":"c%d","title":"rm -rf build","kind":"execute"},"options":%s}}|}
+      id
+      id
+      options
+  in
+  let always_only =
+    {|[{"optionId":"aa","name":"Always","kind":"allow_always"},{"optionId":"ra","name":"Never","kind":"reject_always"}]|}
+  in
+  let quietly line = ignore (C.handle_line t line : C.Output.t list) in
+  ignore ([%expect.output] : string);
+  quietly (permission 20 always_only);
+  (* Approving once, or denying once, picks no "always" option. *)
+  print_s [%sexp (C.reply_approval t ~request_id:"20" Allow : string option)];
+  quietly (permission 21 always_only);
+  print_s
+    [%sexp (C.reply_approval t ~request_id:"21" (Deny None) : string option)];
+  quietly (permission 22 always_only);
+  print_s
+    [%sexp (C.reply_approval t ~request_id:"22" Allow_always : string option)];
+  [%expect {|
+    ("{\"jsonrpc\":\"2.0\",\"id\":20,\"result\":{\"outcome\":{\"outcome\":\"cancelled\"}}}")
+    ("{\"jsonrpc\":\"2.0\",\"id\":21,\"result\":{\"outcome\":{\"outcome\":\"cancelled\"}}}")
+    ("{\"jsonrpc\":\"2.0\",\"id\":22,\"result\":{\"outcome\":{\"outcome\":\"selected\",\"optionId\":\"aa\"}}}")
+    |}];
+  (* After session/cancel a new request is answered cancelled at once. *)
+  List.iter (C.cancel t) ~f:print_output;
+  recv t (permission 23 always_only);
+  [%expect {|
+      > {"jsonrpc":"2.0","method":"session/cancel","params":{"sessionId":"ses_1"}}
+    < {"jsonrpc":"2.0","id":23,"method":"session/request_permission","params":{"sessionId":"ses_1","toolCall":{"toolCallId":"c23","title":"rm -rf build","kind":"execute"},"options":[{"optionId":"aa","name":"Always","kind":"allow_always"},{"optionId":"ra","name":"Never","kind":"reject_always"}]}}
+      > {"jsonrpc":"2.0","id":23,"result":{"outcome":{"outcome":"cancelled"}}}
+    |}]
+;;
+
+let%expect_test "the codec reports the agent's ACP version (Acp_adapter refuses others)" =
+  let t = C.create () in
+  send (C.initialize t ~client_name:"prigh" ~client_version:"0.1");
+  recv
+    t
+    {|{"jsonrpc":"2.0","id":0,"result":{"protocolVersion":2,"agentCapabilities":{}}}|};
+  [%expect {|
+    > {"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":1,"clientCapabilities":{"fs":{"readTextFile":false,"writeTextFile":false},"terminal":false,"session":{"notices":{},"compaction":{}}},"clientInfo":{"name":"prigh","version":"0.1"}}}
+    < {"jsonrpc":"2.0","id":0,"result":{"protocolVersion":2,"agentCapabilities":{}}}
+    (Response
+     (Initialized (protocol_version 2) (agent ())
+      (capabilities
+       ((load_session false) (resume_session false) (close_session false)
+        (images false) (audio false) (embedded_context false) (mcp_http false)
+        (mcp_sse false)))
+      (auth_methods ())))
+    |}]
+;;
+
+let%expect_test "a loaded session's running cost counts from its replay" =
+  let t = C.create ~cost_total:0.5 () in
+  send (C.initialize t ~client_name:"prigh" ~client_version:"0.1");
+  recv t init_response;
+  send (C.load_session t ~session_id:"ses_old" ~cwd:"/w" ~mcp_servers:[]);
+  recv
+    t
+    {|{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"ses_old","update":{"sessionUpdate":"usage_update","used":100,"size":1000,"cost":{"amount":0.6,"currency":"USD"}}}}|};
+  recv t {|{"jsonrpc":"2.0","id":1,"result":{"modes":null}}|};
+  ok (C.prompt t [ Text "hi" ]);
+  ignore ([%expect.output] : string);
+  recv
+    t
+    {|{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"ses_old","update":{"sessionUpdate":"usage_update","used":200,"size":1000,"cost":{"amount":0.75,"currency":"USD"}}}}|};
+  print_s [%sexp (C.cost_total t : float option)];
+  [%expect {|
+    < {"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"ses_old","update":{"sessionUpdate":"usage_update","used":200,"size":1000,"cost":{"amount":0.75,"currency":"USD"}}}}
+    (Usage
+     ((usage ((input 0) (output 0) (cache_read 0)))
+      (cost_usd (0.15000000000000002)) (context_tokens (200))
+      (context_window (1000))))
+    (0.75)
+    |}]
+;;
+
 let%expect_test
     "cancel answers waiting permissions and ends the turn on the response"
   =

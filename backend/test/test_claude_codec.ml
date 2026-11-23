@@ -83,7 +83,8 @@ let%expect_test "launch" =
   [%expect
     {|
     (claude --output-format stream-json --verbose --permission-prompt-tool stdio
-     --include-partial-messages --input-format stream-json)
+     --strict-mcp-config --setting-sources=user --include-partial-messages
+     --input-format stream-json)
     |}];
   argv
     { Claude_launch.default with
@@ -96,25 +97,31 @@ let%expect_test "launch" =
     };
   [%expect
     {|
-    (claude --output-format stream-json --verbose --append-system-prompt
-     "Be brief." --model claude-sonnet-4-6 --permission-prompt-tool stdio
-     --permission-mode bypassPermissions --allow-dangerously-skip-permissions
-     --resume=abc --fork-session --resume-session-at=-uuid --mcp-config
+    (claude --output-format stream-json --verbose --model claude-sonnet-4-6
+     --permission-prompt-tool stdio --permission-mode bypassPermissions
+     --allow-dangerously-skip-permissions --resume=abc --fork-session
+     --resume-session-at=-uuid --mcp-config
      "{\"mcpServers\":{\"prigh\":{\"type\":\"sdk\",\"name\":\"prigh\"}}}"
-     --include-partial-messages --max-thinking-tokens 8000 --effort=high
-     --input-format stream-json)
+     --strict-mcp-config --setting-sources=user --include-partial-messages
+     --max-thinking-tokens 8000 --effort=high --input-format stream-json)
     |}];
   argv
     { Claude_launch.default with resume = New { session_id = Some "pinned" } };
   [%expect
     {|
     (claude --output-format stream-json --verbose --permission-prompt-tool stdio
-     --session-id=pinned --include-partial-messages --input-format stream-json)
+     --session-id=pinned --strict-mcp-config --setting-sources=user
+     --include-partial-messages --input-format stream-json)
     |}];
   (* A value that could be read as a flag goes after an [=]. *)
   argv
     { Claude_launch.default with model = Some "--dangerously-skip-permissions" };
-  [%expect {| |}];
+  [%expect {|
+    (claude --output-format stream-json --verbose
+     --model=--dangerously-skip-permissions --permission-prompt-tool stdio
+     --strict-mcp-config --setting-sources=user --include-partial-messages
+     --input-format stream-json)
+    |}];
   (* Every prigh mode launches Claude Code asking ([default]): prigh's
      approval, with its rules, answers. The user's instructions are not on
      the command line. *)
@@ -127,21 +134,89 @@ let%expect_test "launch" =
         }
     in
     print_s [%sexp (approval : Approval_mode.t), (launch.argv : string list)]);
-  [%expect {| |}];
+  [%expect {|
+    (Ask
+     (claude --output-format stream-json --verbose --permission-prompt-tool stdio
+      --permission-mode default --mcp-config
+      "{\"mcpServers\":{\"prigh\":{\"type\":\"sdk\",\"name\":\"prigh\"}}}"
+      --strict-mcp-config --setting-sources=user --include-partial-messages
+      --input-format stream-json))
+    (Auto_edit
+     (claude --output-format stream-json --verbose --permission-prompt-tool stdio
+      --permission-mode default --mcp-config
+      "{\"mcpServers\":{\"prigh\":{\"type\":\"sdk\",\"name\":\"prigh\"}}}"
+      --strict-mcp-config --setting-sources=user --include-partial-messages
+      --input-format stream-json))
+    (Auto
+     (claude --output-format stream-json --verbose --permission-prompt-tool stdio
+      --permission-mode default --mcp-config
+      "{\"mcpServers\":{\"prigh\":{\"type\":\"sdk\",\"name\":\"prigh\"}}}"
+      --strict-mcp-config --setting-sources=user --include-partial-messages
+      --input-format stream-json))
+    (Smart
+     (claude --output-format stream-json --verbose --permission-prompt-tool stdio
+      --permission-mode default --mcp-config
+      "{\"mcpServers\":{\"prigh\":{\"type\":\"sdk\",\"name\":\"prigh\"}}}"
+      --strict-mcp-config --setting-sources=user --include-partial-messages
+      --input-format stream-json))
+    |}];
   print_s
     [%sexp
       ((Claude_adapter.launch
           { (Adapter.Start.default ~cwd:"/w") with plan = true })
          .argv
        : string list)];
-  [%expect {| |}]
+  [%expect {|
+    (claude --output-format stream-json --verbose --permission-prompt-tool stdio
+     --permission-mode plan --mcp-config
+     "{\"mcpServers\":{\"prigh\":{\"type\":\"sdk\",\"name\":\"prigh\"}}}"
+     --strict-mcp-config --setting-sources=user --include-partial-messages
+     --input-format stream-json)
+    |}]
+;;
+
+let%expect_test "the user's instructions go in initialize, not on argv" =
+  let t = C.create () in
+  print_endline
+    (C.initialize t ~append_system_prompt:"About the user" ~sdk_mcp_servers:[] ());
+  [%expect {| {"type":"control_request","request_id":"req_1_prigh","request":{"subtype":"initialize","hooks":null,"sdkMcpServers":[],"appendSystemPrompt":"About the user"}} |}]
+;;
+
+let%expect_test "a resumed session's running cost total counts from its last" =
+  let result total =
+    sprintf
+      {|{"type":"result","subtype":"success","is_error":false,"result":"ok","session_id":"s-1","total_cost_usd":%s,"usage":{"input_tokens":10,"output_tokens":3}}|}
+      total
+  in
+  (* Resumed with the total it reported last: only the new part is spend. *)
+  let t = C.create ~cost_total:0.5 () in
+  feed t [ result "0.75" ];
+  print_s [%sexp (C.cost_total t : float option)];
+  (* A new session counts from nothing. *)
+  let t = C.create () in
+  print_s [%sexp (C.cost_total t : float option)];
+  feed t [ result "0.25" ];
+  [%expect {|
+    (Event (Turn_started (turn_id turn-1)))
+    (Event
+     (Usage
+      ((usage ((input 10) (output 3) (cache_read 0))) (cost_usd (0.25))
+       (context_tokens ()) (context_window ()))))
+    (Event (Turn_end (turn_id (turn-1)) (stop Done)))
+    (0.75)
+    ()
+    (Event (Turn_started (turn_id turn-1)))
+    (Event
+     (Usage
+      ((usage ((input 10) (output 3) (cache_read 0))) (cost_usd (0.25))
+       (context_tokens ()) (context_window ()))))
+    (Event (Turn_end (turn_id (turn-1)) (stop Done)))
+    |}]
 ;;
 
 let%expect_test "our requests and the answers to them" =
   let t = C.create () in
   print_endline (C.initialize t ~sdk_mcp_servers:[ "prigh" ] ());
-  print_endline
-    (C.initialize t ~append_system_prompt:"About the user" ~sdk_mcp_servers:[] ());
   print_endline
     (C.user_message
        t

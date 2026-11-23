@@ -206,7 +206,9 @@ let%expect_test "session entries: engine, threads, external turns, handoffs" =
      (threads
       (((adapter claude) (host laptop) (thread_id sess-2) (cwd /proj))
        ((adapter codex) (host backend) (thread_id thr_1) (cwd /proj))))
-     (turns (((thread_id thr_1) (turn_id turn_1) (through <id>)))))
+     (turns
+      (((thread_id thr_1) (turn_id turn_1) (through <id>)
+        (cost_total ())))))
     |}];
   (* The entries as written, and the summary's engine. *)
   In_channel.read_lines (Session.path t)
