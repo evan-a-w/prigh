@@ -5,7 +5,7 @@ open Html
 let view ?(cls = "") ?(id = "dialog") ?(footer = []) ?back ~title ~on_close body =
   Node.div
     ~attrs:
-      [ Attr.class_ "loon modal-backdrop"
+      [ Attr.class_ "modal-backdrop"
       ; Attr.create "data-slot" "dialog-overlay"
       ; Attr.on_click (fun ev ->
           if Js_of_ocaml.Js.Unsafe.equals ev##.target ev##.currentTarget

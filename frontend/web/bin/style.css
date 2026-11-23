@@ -82,6 +82,9 @@ html { font-size: 16px; }
 }
 
 button { font: inherit; color: inherit; }
+/* A button drawn with loon's classes (a ghost or link one sets no
+   background or border of its own) shows none of the browser's. */
+:where(button:not(.btn)) { background-color: transparent; border-width: 0; }
 input, textarea { font: inherit; color: inherit; }
 kbd {
   font: 11.5px var(--mono);
