@@ -166,45 +166,6 @@ let%expect_test
     |}]
 ;;
 
-(* 0 turns it off: a command runs in the foreground however long it takes
-   (the web e2e scripts' gates rely on it). *)
-let%expect_test "with auto_background_seconds 0 a command never moves" =
-  with_agent
-    ~seconds:0.
-    ~main:
-      [ bash ~id:"c1" ("echo before; " ^ gated "echo after")
-      ; Reply.text "done"
-      ]
-    []
-  @@ fun t agent ->
-  let output = ref false in
-  Agent.subscribe agent ~f:(function
-    | Loop (Tool_output _) -> output := true
-    | _ -> ());
-  Or_error.ok_exn (Agent.prompt agent "go");
-  ignore (eventually t (fun () -> !output) : bool);
-  Eio.Time.sleep (Eio.Stdenv.clock t.env) 0.3;
-  print_endline "--- gate opened";
-  open_gate t;
-  Agent.wait_idle agent;
-  printf "jobs: %d\n" (List.length (Agent.jobs agent));
-  [%expect
-    {|
-    state: running=true subagents=[] jobs=[]
-    agent_start
-    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
-    assistant:  bash{"command":"echo before; while [ ! -f gate ]; do sleep 0.02; done; echo after"}
-    tool_output c1: before
-    --- gate opened
-    tool_output c1: after
-    tool_result bash: before | after
-    assistant: done
-    agent_end
-    state: running=false subagents=[] jobs=[]
-    jobs: 0
-    |}]
-;;
-
 let%expect_test
     "a foreground command still running after the limit becomes a job; its \
      report comes once"

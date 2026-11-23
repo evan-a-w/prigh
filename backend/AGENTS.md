@@ -37,7 +37,8 @@ code. Put a new module in the group it belongs to:
   small shared pieces
 
 `test/` stays flat: its subdirectories are separate dune targets
-(`fake_mcp_server/`, `terminal/`).
+(`fake_mcp_server/`, `terminal/`, and `full/`, the slow tier that only
+`./test --full` runs, and only when the user asks; see `AGENTS.md`).
 
 Concurrency uses Eio (effects, direct style). Functions that do I/O take
 [~env:Env.t] (= Eio_unix.Stdenv.base). Tests wrap their body in
