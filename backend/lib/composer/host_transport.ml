@@ -31,23 +31,30 @@ module Mcp_side = struct
   ;;
 
   let serve t injected =
-    if not (Promise.is_resolved t.tools) then Promise.resolve t.set_tools injected
+    if not (Promise.is_resolved t.tools)
+    then Promise.resolve t.set_tools injected
   ;;
 
   let run t ~sw stream =
     Fiber.fork ~sw (fun () ->
       Fiber.first
-        (fun () -> ignore (Promise.await (Host_stream.ended stream) : Host_stream.Ended.t))
         (fun () ->
-          let injected = Promise.await t.tools in
-          let rec loop () =
-            let conn, line = Eio.Stream.take t.lines in
-            Fiber.fork ~sw (fun () ->
-              Option.iter (Injected_tools.handle_line injected line) ~f:(fun reply ->
-                ignore (Host_stream.mcp_write stream ~conn reply : unit Or_error.t)));
-            loop ()
-          in
-          loop ()))
+           ignore
+             (Promise.await (Host_stream.ended stream) : Host_stream.Ended.t))
+        (fun () ->
+           let injected = Promise.await t.tools in
+           let rec loop () =
+             let conn, line = Eio.Stream.take t.lines in
+             Fiber.fork ~sw (fun () ->
+               Option.iter
+                 (Injected_tools.handle_line injected line)
+                 ~f:(fun reply ->
+                   ignore
+                     (Host_stream.mcp_write stream ~conn reply
+                      : unit Or_error.t)));
+             loop ()
+           in
+           loop ()))
   ;;
 end
 

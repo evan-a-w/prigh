@@ -121,11 +121,17 @@ let live t (s : Engine_intf.Services.t) (input : Engine_intf.Turn.Input.t) =
         mcp.serve injected;
         { start with
           mcp_servers =
-            start.mcp_servers @ [ Injected_tools.Bridge.codex_config mcp.bridge ]
+            start.mcp_servers
+            @ [ Injected_tools.Bridge.codex_config mcp.bridge ]
         }
     in
     (match
-       A.start ~sw:t.sw ?interrupt_grace:t.interrupt_grace ~injected transport start
+       A.start
+         ~sw:t.sw
+         ?interrupt_grace:t.interrupt_grace
+         ~injected
+         transport
+         start
      with
      | Ok a ->
        let live = Live ((module A), a) in
@@ -169,7 +175,9 @@ let reply_of_refusal (r : Tool_result.t) : Adapter_event.Approval_reply.t =
   | "[cancelled]" -> Cancel
   | "[denied by user]" -> Deny None
   | text ->
-    (match String.chop_prefix text ~prefix:"[denied by user] Their reason: " with
+    (match
+       String.chop_prefix text ~prefix:"[denied by user] Their reason: "
+     with
      | Some reason -> Deny (Some reason)
      | None -> Deny (Some text))
 ;;
@@ -238,7 +246,8 @@ let run_turn
   in
   (match live t s input with
    | Error e ->
-     fail (sprintf "%s could not start: %s" A.display_name (Error.to_string_hum e))
+     fail
+       (sprintf "%s could not start: %s" A.display_name (Error.to_string_hum e))
    | Ok (Live ((module L), a)) ->
      let settings = settings t ~cwd:s.cwd input in
      let leftover = Queue.create () in
@@ -261,12 +270,17 @@ let run_turn
            | Turn_end { stop = st; _ } as e ->
              Composer_recorder.feed recorder e;
              stop := Some st
-           | Approval_request { request_id; tool_id; kind; summary; input; _ } ->
+           | Approval_request { request_id; tool_id; kind; summary; input; _ }
+             ->
              handle_request ~sw request_id (fun c ->
                let reply =
                  match kind with
                  | Other "ExitPlanMode" ->
-                   approve_plan s ~display_name:A.display_name ~request_id ~summary
+                   approve_plan
+                     s
+                     ~display_name:A.display_name
+                     ~request_id
+                     ~summary
                  | _ ->
                    let canonical, parent =
                      match
@@ -313,7 +327,9 @@ let run_turn
                then L.answer a ~request_id reply);
              events ~sw
            | Request_withdrawn { request_id } ->
-             Option.iter (Hashtbl.find requests request_id) ~f:Cancellation.cancel;
+             Option.iter
+               (Hashtbl.find requests request_id)
+               ~f:Cancellation.cancel;
              events ~sw
            | e ->
              Composer_recorder.feed recorder e;
@@ -332,7 +348,9 @@ let run_turn
               | messages ->
                 (match L.steer a (input_of messages) with
                  | Ok () ->
-                   List.iter messages ~f:(Composer_recorder.user_message recorder)
+                   List.iter
+                     messages
+                     ~f:(Composer_recorder.user_message recorder)
                  | Error _ -> Queue.enqueue_all leftover messages));
              loop ()
            in
@@ -342,7 +360,8 @@ let run_turn
            Fiber.any [ (fun () -> events ~sw); interrupt_on_cancel; steer ];
            Hashtbl.iter requests ~f:Cancellation.cancel);
          (match L.thread_id a with
-          | Some id when not (Option.equal String.equal (Some id) t.thread_id) ->
+          | Some id when not (Option.equal String.equal (Some id) t.thread_id)
+            ->
             t.thread_id <- Some id;
             t.on_thread id
           | Some _ | None -> ());

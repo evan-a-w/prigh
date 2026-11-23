@@ -30,9 +30,7 @@ let%expect_test "-engines and -adapters" =
   flags ~engines:"composer, harness" ();
   [%expect
     {|
-    (((engines (Composer Harness)) (adapters (Codex Claude)))
-     (Error
-      "the composer engine isn't available in this build yet; run -engines harness")
+    (((engines (Composer Harness)) (adapters (Codex Claude))) (Ok ())
      ((engine Composer) (adapter (Codex))))
     |}];
   flags ~engines:"harness,composer" ~adapters:"claude,acp:gemini,prigh" ();
@@ -40,15 +38,13 @@ let%expect_test "-engines and -adapters" =
     {|
     (((engines (Harness Composer)) (adapters (Claude (Acp gemini) Prigh)))
      (Error
-      "the composer engine isn't available in this build yet; run -engines harness")
+      "the composer can't drive gemini (ACP) or prigh in this build of prigh yet; run -adapters claude")
      ((engine Harness) (adapter ())))
     |}];
   flags ~env:[ "PRIGH_ENGINES", "composer"; "PRIGH_ADAPTERS", "codex" ] ();
   [%expect
     {|
-    (((engines (Composer)) (adapters (Codex)))
-     (Error
-      "the composer engine isn't available in this build yet; run -engines harness")
+    (((engines (Composer)) (adapters (Codex))) (Ok ())
      ((engine Composer) (adapter (Codex))))
     |}];
   (* Flags outrank the environment. *)
@@ -113,7 +109,8 @@ let%expect_test "a session the backend cannot run" =
   let unavailable t choice =
     print_s
       [%sexp
-        (Engines.unavailable ~buildable:(Fn.const true) t choice : string option)]
+        (Engines.unavailable ~buildable:(Fn.const true) t choice
+         : string option)]
   in
   unavailable Engines.default Engine_choice.harness;
   [%expect {| () |}];
@@ -386,16 +383,16 @@ let%expect_test "hello, new_session and state with the composer deployed" =
     {|
     result.state.engine: "composer"
     result.state.adapter: "claude"
-    result.state.capabilities: -
-    result.state.unavailable: "the composer engine isn't available in this build of prigh yet; this session can still be read here"
+    result.state.capabilities: {"fork":"by_handoff","rewind":"unsupported","context_edit":false,"compact":"auto_only","steer":"between_turns","plan_mode":true,"btw":false,"subagents":"observe","model_fallback":false,"images":true,"ask_user":true}
+    result.state.unavailable: -
     |}];
   print_fields (call "get_state") (engine_paths [ "result" ]);
   [%expect
     {|
     result.engine: "composer"
     result.adapter: "claude"
-    result.capabilities: -
-    result.unavailable: "the composer engine isn't available in this build of prigh yet; this session can still be read here"
+    result.capabilities: {"fork":"by_handoff","rewind":"unsupported","context_edit":false,"compact":"auto_only","steer":"between_turns","plan_mode":true,"btw":false,"subagents":"observe","model_fallback":false,"images":true,"ask_user":true}
+    result.unavailable: -
     |}];
   List.iter
     [ {|{"adapter": "acp:gemini"}|}; {|{"engine": "warp"}|}; {|{"engine": 3}|} ]
@@ -432,12 +429,12 @@ let%expect_test
     result.state.engine: "composer"
     result.state.adapter: "codex"
     result.state.capabilities: -
-    result.state.unavailable: "the composer engine isn't available in this build of prigh yet; this session can still be read here"
+    result.state.unavailable: "this session runs on the composer (Codex) engine, which this backend does not run (it runs harness): open it on a backend started with prigh serve -engines composer; it can still be read here"
     error: -
     |}];
   print_fields (call ~params:{|{"text": "hi"}|} "prompt") [ [ "error" ] ];
   [%expect
-    {| error: "the composer engine isn't available in this build of prigh yet; this session can still be read here" |}];
+    {| error: "this session runs on the composer (Codex) engine, which this backend does not run (it runs harness): open it on a backend started with prigh serve -engines composer; it can still be read here" |}];
   (match field (call "get_messages") [ "result" ] with
    | Some (`Array messages) -> printf "%d message(s)\n" (List.length messages)
    | json -> print_s [%sexp (Option.map json ~f:Json.to_string : string option)]);

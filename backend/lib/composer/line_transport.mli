@@ -81,6 +81,5 @@ module Peer : sig
   val take_interrupt : t -> bool
 
   val exit : t -> code:int -> 'a
-
   val spawn : sw:Switch.t -> (t -> unit) -> transport
 end

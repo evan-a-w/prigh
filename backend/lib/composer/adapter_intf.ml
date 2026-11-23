@@ -44,7 +44,11 @@ module Settings = struct
   [@@deriving sexp_of, equal]
 
   let of_start (s : Start.t) =
-    { model = s.model; thinking = s.thinking; approval = s.approval; plan = s.plan }
+    { model = s.model
+    ; thinking = s.thinking
+    ; approval = s.approval
+    ; plan = s.plan
+    }
   ;;
 end
 

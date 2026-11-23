@@ -35,7 +35,8 @@ let%expect_test "a harness that is not installed on the host" =
    with
    | Ok _ -> print_endline "started?"
    | Error e -> print_endline (Error.to_string_hum e));
-  [%expect {| codex-not-installed-anywhere is not installed on laptop, please install it |}]
+  [%expect
+    {| codex-not-installed-anywhere is not installed on laptop, please install it |}]
 ;;
 
 let%expect_test "lines both ways, the environment, and the exit" =
@@ -61,7 +62,8 @@ let%expect_test "lines both ways, the environment, and the exit" =
   print_s [%sexp (Line_transport.read_line transport : string option)];
   print_s [%sexp (Line_transport.read_line transport : string option)];
   print_s [%sexp (Line_transport.ended transport : Line_transport.Exit.t)];
-  [%expect {|
+  [%expect
+    {|
     false
     (hello)
     ("got ping")
@@ -70,7 +72,9 @@ let%expect_test "lines both ways, the environment, and the exit" =
     |}]
 ;;
 
-let%expect_test "prigh's tools through the MCP side channel and prigh mcp-bridge" =
+let%expect_test
+    "prigh's tools through the MCP side channel and prigh mcp-bridge"
+  =
   with_sandbox
   @@ fun t ->
   Eio.Switch.run
@@ -84,7 +88,7 @@ let%expect_test "prigh's tools through the MCP side channel and prigh mcp-bridge
          ~mcp:true
          [ "sh"
          ; "-c"
-         ; {|read go; printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | "$1" mcp-bridge | head -c 120; echo; echo done|}
+         ; {|read go; { printf '%s\n' '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'; read more; } | "$1" mcp-bridge | head -n 1 | cut -c1-120; echo done|}
          ; "sh"
          ; Host_process.Placeholder.prigh
          ])
@@ -99,20 +103,23 @@ let%expect_test "prigh's tools through the MCP side channel and prigh mcp-bridge
     , (mcp.bridge.args : string list)];
   ignore (config : Jsonaf.t);
   mcp.serve
-    (Injected_tools.create
-       ~tools:[ Tool_render_ui.tool ]
-       ~execute:(fun _ _ -> Tool_result.ok "unused"));
+    (Injected_tools.create ~tools:[ Tool_render_ui.tool ] ~execute:(fun _ _ ->
+       Tool_result.ok "unused"));
   Line_transport.write_line transport "go";
   let rec lines () =
     match Line_transport.read_line transport with
     | Some line ->
       print_endline line;
+      (* The bridge answered: let its input end. *)
+      if String.is_prefix line ~prefix:"{"
+      then Line_transport.write_line transport "more";
       lines ()
     | None -> ()
   in
   lines ();
   print_s [%sexp (Line_transport.ended transport : Line_transport.Exit.t)];
-  [%expect {|
+  [%expect
+    {|
     (mcp_servers.prigh true (mcp-bridge))
     {"jsonrpc":"2.0","id":1,"result":{"tools":[{"name":"render_ui","description":"Shows rich components inline in the user's
     done

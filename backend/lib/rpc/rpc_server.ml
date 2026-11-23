@@ -1038,7 +1038,8 @@ let composer_runner t agent (adapter_id : Adapter_id.t) =
     let host = Agent.active_host agent in
     let resume =
       List.find (Session.threads session) ~f:(fun (thread : Session.Thread.t) ->
-        String.equal thread.adapter adapter_name && String.equal thread.host host)
+        String.equal thread.adapter adapter_name
+        && String.equal thread.host host)
       |> Option.map ~f:(fun (thread : Session.Thread.t) -> thread.thread_id)
     in
     { (Adapter.Start.default ~cwd) with resume }

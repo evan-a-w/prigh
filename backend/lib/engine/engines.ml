@@ -146,31 +146,31 @@ let unavailable ?(buildable = buildable) t (choice : Engine_choice.t) =
   | Some a when not (buildable a) ->
     Some
       (sprintf
-         "the composer can't drive %s in this build of prigh yet; this \
-          session can still be read here"
+         "the composer can't drive %s in this build of prigh yet; this session \
+          can still be read here"
          (Adapter_id.label a))
   | _ ->
-  if not (List.mem t.engines choice.engine ~equal:Engine_id.equal)
-  then
-    Some
-      (sprintf
-         "this session runs on the %s engine, which this backend does not run \
-          (it runs %s): open it on a backend started with prigh serve -engines \
-          %s; it can still be read here"
-         (Engine_choice.label choice)
-         (deployed t)
-         (Engine_id.to_string choice.engine))
-  else (
-    match choice.adapter with
-    | Some a when not (List.mem t.adapters a ~equal:Adapter_id.equal) ->
+    if not (List.mem t.engines choice.engine ~equal:Engine_id.equal)
+    then
       Some
         (sprintf
-           "this session drives %s, which this backend's composer does not (it \
-            drives %s): add it with -adapters %s"
-           (Adapter_id.label a)
-           (String.concat ~sep:", " (List.map t.adapters ~f:Adapter_id.label))
-           (String.concat
-              ~sep:","
-              (List.map (t.adapters @ [ a ]) ~f:Adapter_id.to_string)))
-    | Some _ | None -> None)
+           "this session runs on the %s engine, which this backend does not \
+            run (it runs %s): open it on a backend started with prigh serve \
+            -engines %s; it can still be read here"
+           (Engine_choice.label choice)
+           (deployed t)
+           (Engine_id.to_string choice.engine))
+    else (
+      match choice.adapter with
+      | Some a when not (List.mem t.adapters a ~equal:Adapter_id.equal) ->
+        Some
+          (sprintf
+             "this session drives %s, which this backend's composer does not \
+              (it drives %s): add it with -adapters %s"
+             (Adapter_id.label a)
+             (String.concat ~sep:", " (List.map t.adapters ~f:Adapter_id.label))
+             (String.concat
+                ~sep:","
+                (List.map (t.adapters @ [ a ]) ~f:Adapter_id.to_string)))
+      | Some _ | None -> None)
 ;;

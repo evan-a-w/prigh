@@ -35,11 +35,18 @@ let launch (start : Adapter.Start.t) : Adapter.Launch.t =
 ;;
 
 let settings ~cwd (s : Adapter.Settings.t) : Codex_codec.Settings.t =
-  { cwd; model = s.model; thinking = s.thinking; approval = s.approval; plan = s.plan }
+  { cwd
+  ; model = s.model
+  ; thinking = s.thinking
+  ; approval = s.approval
+  ; plan = s.plan
+  }
 ;;
 
 let inputs (input : Adapter.Input.t) : Codex_codec.Input.t list =
-  (if String.is_empty input.text then [] else [ Codex_codec.Input.Text input.text ])
+  (if String.is_empty input.text
+   then []
+   else [ Codex_codec.Input.Text input.text ])
   @ List.map input.images ~f:(fun i -> Codex_codec.Input.Image i)
 ;;
 
@@ -84,20 +91,25 @@ let start ~sw ?interrupt_grace ?injected:_ transport (start : Adapter.Start.t) =
              ; stop =
                  Failed
                    { kind = Crashed { stderr_tail = exit.stderr_tail }
-                   ; message = Adapter.Driver.exit_message ~tail:false ~display_name exit
+                   ; message =
+                       Adapter.Driver.exit_message
+                         ~tail:false
+                         ~display_name
+                         exit
                    }
              }));
-  let fail_with_exit e =
-    Error.tag e ~tag:"Codex did not start"
-  in
+  let fail_with_exit e = Error.tag e ~tag:"Codex did not start" in
   let open Or_error.Let_syntax in
   let%bind init =
     Adapter.Driver.request
       driver
-      (Codex_codec.initialize codec ~client_name:"prigh" ~client_version:Version.to_string)
+      (Codex_codec.initialize
+         codec
+         ~client_name:"prigh"
+         ~client_version:Version.to_string)
       ~matches:(function
-        | Initialized _ | Failed { kind = Initialize; _ } -> true
-        | _ -> false)
+      | Initialized _ | Failed { kind = Initialize; _ } -> true
+      | _ -> false)
     |> Result.map_error ~f:fail_with_exit
   in
   let%bind () = failed init ~what:"initialize" in
@@ -126,7 +138,6 @@ let start ~sw ?interrupt_grace ?injected:_ transport (start : Adapter.Start.t) =
 ;;
 
 let next_event t = Adapter.Driver.next_event t.driver
-
 let settings_of t s = settings ~cwd:t.cwd s
 
 let send t settings input =
@@ -149,7 +160,8 @@ let interrupt t =
   (match Codex_codec.interrupt t.codec with
    | `Send line -> Adapter.Driver.write t.driver line
    | `Deferred | `Idle -> ());
-  if Adapter.Driver.in_turn t.driver then Adapter.Driver.watch_interrupt t.driver
+  if Adapter.Driver.in_turn t.driver
+  then Adapter.Driver.watch_interrupt t.driver
 ;;
 
 let reply_approval t ~request_id reply =

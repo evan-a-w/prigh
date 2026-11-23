@@ -42,7 +42,6 @@ let create
 ;;
 
 let mcp t = t.mcp
-
 let read_line t = t.read_line ()
 let write_line t line = t.write_line line
 let close_stdin t = t.close_stdin ()
@@ -52,8 +51,6 @@ let ended t = t.ended ()
 let is_ended t = t.is_ended ()
 
 module Peer = struct
-
-
   exception Exited of int
 
   type t =

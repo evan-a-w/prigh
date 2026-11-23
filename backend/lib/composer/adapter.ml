@@ -112,7 +112,8 @@ module Driver = struct
              ; stop =
                  Failed
                    { kind = Crashed { stderr_tail = exit.stderr_tail }
-                   ; message = exit_message ~tail:false ~display_name:"the harness" exit
+                   ; message =
+                       exit_message ~tail:false ~display_name:"the harness" exit
                    }
              }))
   ;;

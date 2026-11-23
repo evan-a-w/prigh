@@ -33,7 +33,9 @@ let permission_mode ~approval ~plan : Claude_permission_mode.t =
   else
     (* Smart mode has no equivalent: Claude Code asks, and prigh's approval
        model answers. *)
-    Option.value (Claude_permission_mode.of_approval_mode approval) ~default:Default
+    Option.value
+      (Claude_permission_mode.of_approval_mode approval)
+      ~default:Default
 ;;
 
 let effort : Thinking.t -> string option = function
@@ -74,7 +76,8 @@ let mcp_config ~injected (start : Adapter.Start.t) =
 let launch_config ~injected (start : Adapter.Start.t) : Claude_launch.t =
   { Claude_launch.default with
     model = start.model
-  ; permission_mode = Some (permission_mode ~approval:start.approval ~plan:start.plan)
+  ; permission_mode =
+      Some (permission_mode ~approval:start.approval ~plan:start.plan)
   ; resume =
       (match start.resume with
        | None -> New { session_id = None }
@@ -105,7 +108,9 @@ let dispatch t (output : Claude_codec.Output.t) =
      | Some injected ->
        (* A tool may wait for the user: the other lines go on meanwhile. *)
        Fiber.fork ~sw:t.sw (fun () ->
-         Adapter.Driver.write t.driver (Injected_tools.claude_reply injected request))
+         Adapter.Driver.write
+           t.driver
+           (Injected_tools.claude_reply injected request))
      | None ->
        Adapter.Driver.write
          t.driver
@@ -114,7 +119,10 @@ let dispatch t (output : Claude_codec.Output.t) =
             (Some
                (`Object
                    [ "jsonrpc", `String "2.0"
-                   ; "id", Option.value (Json.member "id" request.message) ~default:`Null
+                   ; ( "id"
+                     , Option.value
+                         (Json.member "id" request.message)
+                         ~default:`Null )
                    ; ( "error"
                      , `Object
                          [ "code", `Number "-32601"
@@ -148,12 +156,13 @@ let start ~sw ?interrupt_grace ?injected transport (start : Adapter.Start.t) =
       driver
       (Claude_codec.initialize codec ~sdk_mcp_servers)
       ~matches:(function
-        | Initialized _ | Failed { command = Initialize; _ } -> true
-        | Done _ | Failed _ -> false)
+      | Initialized _ | Failed { command = Initialize; _ } -> true
+      | Done _ | Failed _ -> false)
     |> Result.map_error ~f:(Error.tag ~tag:"Claude Code did not start")
   in
   match init with
-  | Failed { message; _ } -> Or_error.errorf "Claude Code refused to start: %s" message
+  | Failed { message; _ } ->
+    Or_error.errorf "Claude Code refused to start: %s" message
   | Initialized _ | Done _ -> Ok t
 ;;
 
@@ -174,8 +183,17 @@ let apply t (s : Adapter.Settings.t) =
          mode
          (permission_mode ~approval:old.approval ~plan:old.plan))
   then write (Claude_codec.set_permission_mode t.codec mode);
-  if not (Option.equal Int.equal (thinking_tokens old.thinking) (thinking_tokens s.thinking))
-  then write (Claude_codec.set_max_thinking_tokens t.codec (thinking_tokens s.thinking))
+  if
+    not
+      (Option.equal
+         Int.equal
+         (thinking_tokens old.thinking)
+         (thinking_tokens s.thinking))
+  then
+    write
+      (Claude_codec.set_max_thinking_tokens
+         t.codec
+         (thinking_tokens s.thinking))
 ;;
 
 let send t settings (input : Adapter.Input.t) =
@@ -188,7 +206,11 @@ let send t settings (input : Adapter.Input.t) =
     Adapter.Driver.begin_turn t.driver;
     Adapter.Driver.write
       t.driver
-      (Claude_codec.user_message t.codec ~text:input.text ~images:input.images ());
+      (Claude_codec.user_message
+         t.codec
+         ~text:input.text
+         ~images:input.images
+         ());
     Ok ())
 ;;
 
@@ -212,7 +234,9 @@ let reply_approval t ~request_id reply =
 ;;
 
 let answer t ~request_id reply =
-  Result.iter (Claude_codec.answer t.codec ~request_id reply) ~f:(Adapter.Driver.write t.driver)
+  Result.iter
+    (Claude_codec.answer t.codec ~request_id reply)
+    ~f:(Adapter.Driver.write t.driver)
 ;;
 
 let thread_id t = Claude_codec.session_id t.codec

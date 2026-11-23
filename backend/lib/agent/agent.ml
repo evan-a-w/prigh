@@ -3013,6 +3013,7 @@ let set_runner t runner =
 
 let capabilities t = Runner.capabilities (runner t)
 let engine t = Runner.engine (runner t)
+
 let engine_label t =
   match engine t, (engine_choice t).adapter with
   | Composer, Some adapter -> Adapter_id.label adapter
@@ -3631,30 +3632,30 @@ let rec start_run
            (Option.some_if (capabilities t).model_fallback unavailable
             |> Option.join)
            ~f:(fun error ->
-           match next_model t ~tried with
-           | None ->
-             if not (List.is_empty t.config.fallback_models)
-             then
+             match next_model t ~tried with
+             | None ->
+               if not (List.is_empty t.config.fallback_models)
+               then
+                 broadcast
+                   t
+                   (Notice
+                      (sprintf
+                         "%s cannot continue and no model in fallback_models \
+                          is left to hand over to; /model picks another"
+                         (Model.key t.model)));
+               None
+             | Some next ->
+               let from = Model.key t.model in
                broadcast
                  t
                  (Notice
                     (sprintf
-                       "%s cannot continue and no model in fallback_models is \
-                        left to hand over to; /model picks another"
-                       (Model.key t.model)));
-             None
-           | Some next ->
-             let from = Model.key t.model in
-             broadcast
-               t
-               (Notice
-                  (sprintf
-                     "%s: %s; handing over to %s"
-                     from
-                     error
-                     (Model.key next)));
-             set_model t next;
-             Some [ handover_message ~from ~to_:next ~error ])
+                       "%s: %s; handing over to %s"
+                       from
+                       error
+                       (Model.key next)));
+               set_model t next;
+               Some [ handover_message ~from ~to_:next ~error ])
        in
        let resuming =
          match unavailable, handover with

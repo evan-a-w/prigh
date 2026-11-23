@@ -8,9 +8,21 @@ module Json = Jsonaf
    it with the recorded answer, and writes the recorded notifications and
    requests. Requests the recording made that we do not ([config/read],
    [thread/name/set]) are skipped with their answers. *)
-let codex_replay ?(on_wait = fun (_ : string) -> ()) name (p : Line_transport.Peer.t) =
+let codex_replay
+      ?(on_wait = fun (_ : string) -> ())
+      name
+      (p : Line_transport.Peer.t)
+  =
   let lines = In_channel.read_lines [%string "fixtures/codex/%{name}.ndjson"] in
-  let ours = [ "initialize"; "thread/start"; "thread/resume"; "turn/start"; "turn/interrupt"; "turn/steer" ] in
+  let ours =
+    [ "initialize"
+    ; "thread/start"
+    ; "thread/resume"
+    ; "turn/start"
+    ; "turn/interrupt"
+    ; "turn/steer"
+    ]
+  in
   let ids = Int.Table.create () in
   let skipped = Int.Table.create () in
   let member k j = Json.member k j in
@@ -24,8 +36,16 @@ let codex_replay ?(on_wait = fun (_ : string) -> ()) name (p : Line_transport.Pe
   in
   List.iter lines ~f:(fun line ->
     let record = Json.parse line |> Or_error.ok_exn in
-    let kind = Option.value (Option.bind (member "type" record) ~f:Json.string) ~default:"" in
-    let label = Option.value (Option.bind (member "label" record) ~f:Json.string) ~default:"" in
+    let kind =
+      Option.value
+        (Option.bind (member "type" record) ~f:Json.string)
+        ~default:""
+    in
+    let label =
+      Option.value
+        (Option.bind (member "label" record) ~f:Json.string)
+        ~default:""
+    in
     let frame = Option.value (member "frame" record) ~default:`Null in
     let id = int_of (member "id" frame) in
     let meth = member "method" frame in
@@ -40,14 +60,18 @@ let codex_replay ?(on_wait = fun (_ : string) -> ()) name (p : Line_transport.Pe
               | Some (`String m) -> String.equal m label
               | _ -> false)
           with
-          | Some j -> Option.iter (int_of (member "id" j)) ~f:(fun ours -> Hashtbl.set ids ~key:id ~data:ours)
+          | Some j ->
+            Option.iter
+              (int_of (member "id" j))
+              ~f:(fun ours -> Hashtbl.set ids ~key:id ~data:ours)
           | None -> ())
        | Some _, Some id -> Hashtbl.set skipped ~key:id ~data:()
        | Some _, None -> ()
        | None, _ ->
          (* our answer to its request *)
          ignore
-           (read_until (fun j -> Option.is_none (member "method" j)) : Json.t option))
+           (read_until (fun j -> Option.is_none (member "method" j))
+            : Json.t option))
     | "emit_inbound" ->
       (match meth, id with
        | None, Some id when Hashtbl.mem skipped id -> ()
@@ -56,7 +80,11 @@ let codex_replay ?(on_wait = fun (_ : string) -> ()) name (p : Line_transport.Pe
          let frame =
            match frame with
            | `Object fields ->
-             `Object (List.map fields ~f:(fun (k, v) -> if String.equal k "id" then k, `Number (Int.to_string ours) else k, v))
+             `Object
+               (List.map fields ~f:(fun (k, v) ->
+                  if String.equal k "id"
+                  then k, `Number (Int.to_string ours)
+                  else k, v))
            | j -> j
          in
          Line_transport.Peer.write_line p (Json.to_string frame)
@@ -73,9 +101,7 @@ let claude_replay ?(exit_after = None) name (p : Line_transport.Peer.t) =
     | None -> None
     | Some line -> Some (Json.parse line |> Or_error.ok_exn)
   in
-  let request_id j =
-    Option.bind (Json.member "request_id" j) ~f:Json.string
-  in
+  let request_id j = Option.bind (Json.member "request_id" j) ~f:Json.string in
   (match read () with
    | Some init ->
      Line_transport.Peer.write_line
@@ -111,9 +137,14 @@ let print_event t (e : Agent.Event.t) =
       (Sexp.to_string [%sexp (a.stop_reason : Stop_reason.t)])
       (Message.Assistant.text a)
   | Loop (Message_end (User u)) -> printf "user: %S\n" u.text
-  | Loop (Tool_start c) -> printf "tool_start %s %s\n" c.name (mask t c.arguments)
+  | Loop (Tool_start c) ->
+    printf "tool_start %s %s\n" c.name (mask t c.arguments)
   | Loop (Tool_end { call; result }) ->
-    printf "tool_end %s -> %s%S\n" call.name (if result.is_error then "ERROR " else "") (String.prefix result.text 120)
+    printf
+      "tool_end %s -> %s%S\n"
+      call.name
+      (if result.is_error then "ERROR " else "")
+      (String.prefix result.text 120)
   | Notice n -> printf "notice: %s\n" n
   | _ -> ()
 ;;
@@ -130,7 +161,10 @@ let with_composer ?(approval : Approval_mode.t option) ~adapter ~peer f =
       ~adapter
       ~spawn:(fun (launch : Adapter.Launch.t) ->
         incr launches;
-        printf "spawn #%d: %s\n" !launches (String.concat ~sep:" " (List.take launch.argv 2));
+        printf
+          "spawn #%d: %s\n"
+          !launches
+          (String.concat ~sep:" " (List.take launch.argv 2));
         Ok (Line_transport.Peer.spawn ~sw (peer !launches)))
       ~interrupt_grace:(Time_float.Span.of_sec 0.5)
       ()
@@ -150,7 +184,9 @@ let with_composer ?(approval : Approval_mode.t option) ~adapter ~peer f =
   (let (module A : Adapter.S) = adapter in
    Agent.set_engine
      agent
-     { engine = Composer; adapter = Some (Adapter_id.of_string A.id |> Or_error.ok_exn) });
+     { engine = Composer
+     ; adapter = Some (Adapter_id.of_string A.id |> Or_error.ok_exn)
+     });
   Option.iter approval ~f:(fun approval -> Agent.set_mode agent ~approval);
   Agent.subscribe agent ~f:(print_event t);
   f t agent composer;
@@ -168,8 +204,12 @@ let%expect_test "codex: a text turn, recorded like a harness turn" =
     ~peer:(fun _ -> codex_replay "simple")
   @@ fun _ agent composer ->
   prompt agent "say it";
-  print_s [%message (Composer_runner.thread_id composer : string option) ~messages:((Agent.state agent).message_count : int)];
-  [%expect {|
+  print_s
+    [%message
+      (Composer_runner.thread_id composer : string option)
+        ~messages:((Agent.state agent).message_count : int)];
+  [%expect
+    {|
     user: "[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\nsay it"
     spawn #1: codex app-server
     assistant (codex/gpt-6-luna, End_turn): "fixture simple ok"
@@ -179,7 +219,9 @@ let%expect_test "codex: a text turn, recorded like a harness turn" =
     |}]
 ;;
 
-let%expect_test "codex: a command's approval goes through the session's approvals" =
+let%expect_test
+    "codex: a command's approval goes through the session's approvals"
+  =
   with_composer
     ~approval:Ask
     ~adapter:(module Codex_adapter)
@@ -191,7 +233,8 @@ let%expect_test "codex: a command's approval goes through the session's approval
       Or_error.ok_exn (Agent.respond_confirm agent ~call_id Allow)
     | _ -> ());
   prompt agent "run it";
-  [%expect {|
+  [%expect
+    {|
     user: "[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\nrun it"
     spawn #1: codex app-server
     assistant (codex/gpt-6-sol, Tool_use): "I\226\128\153ll write the exact text to the file with a local shell command."
@@ -211,10 +254,14 @@ let%expect_test "codex: its questions go to the user" =
     | Loop (Ask_user { call_id; questions; _ }) ->
       List.iter questions ~f:(fun q -> printf "ask_user: %s\n" q.question);
       Or_error.ok_exn
-        (Agent.answer_question agent ~call_id (Answered [ [ "Strict schemas (Recommended)" ] ]))
+        (Agent.answer_question
+           agent
+           ~call_id
+           (Answered [ [ "Strict schemas (Recommended)" ] ]))
     | _ -> ());
   prompt agent "ask me";
-  [%expect {|
+  [%expect
+    {|
     user: "[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\nask me"
     spawn #1: codex app-server
     ask_user: Should this fixture prefer strict schemas or UI flexibility?
@@ -238,7 +285,8 @@ let%expect_test "codex: aborting the run interrupts the turn" =
   Eio_unix.sleep 0.05;
   print_s [%sexp (Agent.abort agent : string list)];
   Agent.wait_idle agent;
-  [%expect {|
+  [%expect
+    {|
     user: "[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\nstart"
     spawn #1: codex app-server
     peer: waiting for turn/interrupt
@@ -246,7 +294,9 @@ let%expect_test "codex: aborting the run interrupts the turn" =
     |}]
 ;;
 
-let%expect_test "codex: an interrupt Codex ignores ends the turn after the grace period" =
+let%expect_test
+    "codex: an interrupt Codex ignores ends the turn after the grace period"
+  =
   with_composer
     ~adapter:(module Codex_adapter)
     ~peer:(fun _ p ->
@@ -261,7 +311,8 @@ let%expect_test "codex: an interrupt Codex ignores ends the turn after the grace
   ignore (Agent.abort agent : string list);
   Agent.wait_idle agent;
   print_s [%message "ended" ~running:((Agent.state agent).running : bool)];
-  [%expect {|
+  [%expect
+    {|
     user: "[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\nstart"
     spawn #1: codex app-server
     (ended (running false))
@@ -278,11 +329,16 @@ let usage_limit_frames =
 (* A Codex that answers the handshake and the thread, then plays [frames]
    for the turn, or exits with [crash] partway. *)
 let codex_turn ?crash frames (p : Line_transport.Peer.t) =
-  let next () = Json.parse (Option.value_exn (Line_transport.Peer.read_line p)) |> Or_error.ok_exn in
+  let next () =
+    Json.parse (Option.value_exn (Line_transport.Peer.read_line p))
+    |> Or_error.ok_exn
+  in
   let reply j result =
     Line_transport.Peer.write_line
       p
-      (Json.to_string (`Object [ "id", Option.value_exn (Json.member "id" j); "result", result ]))
+      (Json.to_string
+         (`Object
+             [ "id", Option.value_exn (Json.member "id" j); "result", result ]))
   in
   let init = next () in
   reply init (`Object [ "userAgent", `String "codex/0.166.0" ]);
@@ -291,28 +347,42 @@ let codex_turn ?crash frames (p : Line_transport.Peer.t) =
     match Json.member "method" j with
     | Some (`String (("thread/start" | "thread/resume") as m)) ->
       printf "codex got %s\n" m;
-      reply j (`Object [ "thread", `Object [ "id", `String "th" ]; "model", `String "gpt-5" ])
+      reply
+        j
+        (`Object
+            [ "thread", `Object [ "id", `String "th" ]
+            ; "model", `String "gpt-5"
+            ])
     | _ -> thread ()
   in
   thread ();
   let turn = next () in
-  reply turn (`Object [ "turn", `Object [ "id", `String "tu"; "status", `String "inProgress" ] ]);
+  reply
+    turn
+    (`Object
+        [ "turn", `Object [ "id", `String "tu"; "status", `String "inProgress" ]
+        ]);
   List.iteri frames ~f:(fun i frame ->
     (match crash with
      | Some n when i = n ->
-       Line_transport.Peer.write_stderr p "thread 'main' panicked at codex-rs/core\n";
+       Line_transport.Peer.write_stderr
+         p
+         "thread 'main' panicked at codex-rs/core\n";
        Line_transport.Peer.exit p ~code:101
      | _ -> ());
     Line_transport.Peer.write_line p frame)
 ;;
 
-let%expect_test "codex: a usage limit fails the run the way the agent recognises" =
+let%expect_test
+    "codex: a usage limit fails the run the way the agent recognises"
+  =
   with_composer
     ~adapter:(module Codex_adapter)
     ~peer:(fun _ -> codex_turn usage_limit_frames)
   @@ fun _ agent _ ->
   prompt agent "go";
-  [%expect {|
+  [%expect
+    {|
     user: "[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\ngo"
     spawn #1: codex app-server
     codex got thread/start
@@ -321,7 +391,9 @@ let%expect_test "codex: a usage limit fails the run the way the agent recognises
     |}]
 ;;
 
-let%expect_test "codex: a crash mid-turn ends the turn, and the next one restarts it" =
+let%expect_test
+    "codex: a crash mid-turn ends the turn, and the next one restarts it"
+  =
   with_composer
     ~adapter:(module Codex_adapter)
     ~peer:(fun n ->
@@ -341,7 +413,8 @@ let%expect_test "codex: a crash mid-turn ends the turn, and the next one restart
   @@ fun _ agent _ ->
   prompt agent "first";
   prompt agent "second";
-  [%expect {|
+  [%expect
+    {|
     user: "[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\nfirst"
     spawn #1: codex app-server
     codex got thread/start
@@ -362,10 +435,12 @@ let%expect_test "claude: a denied write" =
   Agent.subscribe agent ~f:(function
     | Loop (Tool_confirm { call_id; name; summary; _ }) ->
       printf "confirm %s %s: %s\n" call_id name summary;
-      Or_error.ok_exn (Agent.respond_confirm agent ~call_id (Deny (Some "not that file")))
+      Or_error.ok_exn
+        (Agent.respond_confirm agent ~call_id (Deny (Some "not that file")))
     | _ -> ());
   prompt agent "write it";
-  [%expect {|
+  [%expect
+    {|
     user: "[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\nwrite it"
     spawn #1: claude --output-format
     assistant (claude/claude-sonnet-4-6, Tool_use): ""
@@ -388,7 +463,8 @@ let%expect_test "claude: a simple turn, with its cost recorded as spend" =
     [%message
       (Composer_runner.thread_id composer : string option)
         ~cost_usd:(Float.round_decimal state.cost_usd ~decimal_digits:4 : float)];
-  [%expect {|
+  [%expect
+    {|
     user: "[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\nhi"
     spawn #1: claude --output-format
     assistant (claude/claude-sonnet-4-6, End_turn): "fixture simple ok"
@@ -404,7 +480,8 @@ let%expect_test "claude: the process exits mid-turn" =
     ~peer:(fun _ -> claude_replay ~exit_after:(Some 2) "simple")
   @@ fun _ agent _ ->
   prompt agent "hi";
-  [%expect {|
+  [%expect
+    {|
     user: "[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\nhi"
     spawn #1: claude --output-format
     assistant (claude/claude-sonnet-4-6, (Error"Claude Code exited (code 1)")): "fixture simple ok"
@@ -420,7 +497,10 @@ let%expect_test "spawn failing: the run says why" =
     Composer_runner.create
       ~sw
       ~adapter:(module Codex_adapter)
-      ~spawn:(fun _ -> Or_error.error_string "Codex is not installed on laptop: install it (npm i -g @openai/codex), then try again")
+      ~spawn:(fun _ ->
+        Or_error.error_string
+          "Codex is not installed on laptop: install it (npm i -g \
+           @openai/codex), then try again")
       ()
   in
   let agent =
@@ -437,7 +517,8 @@ let%expect_test "spawn failing: the run says why" =
   in
   Agent.subscribe agent ~f:(print_event t);
   prompt agent "hi";
-  [%expect {|
+  [%expect
+    {|
     user: "[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\nhi"
     assistant (codex/default, (Error"Codex could not start: Codex is not installed on laptop: install it (npm i -g @openai/codex), then try again")): ""
     |}]
