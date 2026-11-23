@@ -37,9 +37,10 @@ let banner (m : Model.t) ~inject =
                ~variant
                ~class_:
                  (cls
-                  ^ " loon mx-auto mt-2 flex w-fit max-w-[min(760px,calc(100%-24px))] \
-                     flex-wrap items-center justify-center gap-x-2 gap-y-1.5 \
-                     text-center text-[12.5px] shadow-sm")
+                  ^ " loon mx-auto mt-2 flex w-fit \
+                     max-w-[min(760px,calc(100%-24px))] flex-wrap items-center \
+                     justify-center gap-x-2 gap-y-1.5 text-center \
+                     text-[12.5px] shadow-sm")
                ())
         ]
       children
@@ -82,8 +83,8 @@ let banner (m : Model.t) ~inject =
          ~role:"alert"
          [ Node.span
              [ Node.text
-                 "The backend keeps dropping the connection while loading \
-                  this session: open another session, or reload."
+                 "The backend keeps dropping the connection while loading this \
+                  session: open another session, or reload."
              ]
          ; action
              ~title:"/retry-backend-connection"

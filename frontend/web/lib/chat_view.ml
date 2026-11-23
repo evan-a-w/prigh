@@ -351,8 +351,9 @@ let stopped (message : Message.Assistant.t) =
                       ~variant:Outline
                       ~size:Default
                       ~class_:
-                        "stop-action mt-1 self-start border-destructive/40 dark:border-destructive/40 \
-                         text-destructive hover:bg-destructive/10 dark:hover:bg-destructive/10 \
+                        "stop-action mt-1 self-start border-destructive/40 \
+                         dark:border-destructive/40 text-destructive \
+                         hover:bg-destructive/10 dark:hover:bg-destructive/10 \
                          hover:text-destructive pointer-coarse:h-11"
                       ())
                ; Attr.type_ "button"

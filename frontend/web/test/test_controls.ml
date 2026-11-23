@@ -871,7 +871,7 @@ let%expect_test
     Model_menu_access
     (Ask first Asks: edits & commands) (Auto-edit Asks: commands) (Smart Smart: a model decides) (Full access Auto: never asks ✓) (Plan Plan mode) (Chat Chat: no tool host)
     Close_dialog
-    <div class="chip-popover menu-surface model-menu">
+    <div class="bg-popover chip-popover loon menu-surface model-menu ring-1 ring-foreground/10 rounded-lg shadow-md text-popover-foreground">
     Close_dialog
     (Focus editor)
     Mode Auto: never asks
@@ -1251,10 +1251,10 @@ let%expect_test "← → and Tab go along the chips; ← → the model menu's ra
     {|
     (Open_chip Host)
     (Chip_step 1)
-    <div class="chip-popover menu-surface model-menu">
+    <div class="bg-popover chip-popover loon menu-surface model-menu ring-1 ring-foreground/10 rounded-lg shadow-md text-popover-foreground">
     <button class="model-rail-tab on">
     (Model_menu_step 1)
-    <div class="chip-popover menu-surface model-menu">
+    <div class="bg-popover chip-popover loon menu-surface model-menu ring-1 ring-foreground/10 rounded-lg shadow-md text-popover-foreground">
     <button class="favourites model-rail-tab on">
     (Chip_step 1)
     <div class="bg-popover chip-popover loon menu-surface ring-1 ring-foreground/10 rounded-lg shadow-md text-popover-foreground">
