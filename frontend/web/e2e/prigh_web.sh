@@ -57,7 +57,7 @@
 # then chat.mjs, chat mode on a backend with no tool host, on a desktop and
 # phones, then quiet.mjs, the quiet transcript's runs of steps, on a desktop
 # and two phones, then editor.mjs, the editor mode, on a desktop and two
-# phones) in each browser and diffs the output with ENGINE.expected (chromium.expected,
+# phones, then smoke.mjs, ./test's suite: the main flows once each) in each browser and diffs the output with ENGINE.expected (chromium.expected,
 # firefox.expected, webkit.expected). The scripts all run at once (JOBS at a
 # time, default: the number of CPUs, fewer if the memory available would not
 # hold them; and on Linux none starts while less than MEM_PER_JOB is
@@ -73,6 +73,9 @@
 #   PRIGH_E2E_SHELL      the terminal panel's shell, an interactive bash
 #                        (default: bash on the PATH)
 #   ENGINES              browsers to run (default: chromium firefox webkit)
+#   SUITE                full (default: every script, each at every size)
+#                        or core (./test's: smoke.mjs alone, diffed with
+#                        ENGINE.core.expected)
 #   SHOTS                a directory to save screenshots of each step in
 #   JOBS                 how many scripts run at once (at most)
 #   MEM_PER_JOB          MiB a script (backend, browser, node) may need (default 1536)
@@ -84,6 +87,12 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export PRIGH_BACKEND="${PRIGH_BACKEND:-$here/../../../backend/_build/default/bin/main.exe}"
 export SITE="${PRIGH_WEB_ROOT:-$here/../../_build/default/web/bin/site}"
 export TOKEN='sekrit&x=y'
+# The scripts' Playwright: the real one with service workers blocked by
+# default (playwright.mjs).
+if [ -z "${PRIGH_E2E_PLAYWRIGHT:-}" ]; then
+	export PRIGH_E2E_PLAYWRIGHT="$PLAYWRIGHT_MODULE"
+	export PLAYWRIGHT_MODULE="$here/playwright.mjs"
+fi
 # The backends' own host by a fixed name, the one ENGINE.expected was
 # recorded with (the build host's): the pages show it, and its length moves
 # the host chip.
@@ -93,8 +102,16 @@ export PRIGH_HOST_NAME=server-laptop
 PRIGH_E2E_SHELL="${PRIGH_E2E_SHELL:-$(command -v bash || true)}"
 export PRIGH_E2E_SHELL
 tmp="$(mktemp -d)"
+# The terminal panels' tmux servers outlive the backends that started them,
+# and one can start while a script ends: every one left goes with the run.
+kill_tmux_servers() {
+	find "$1" -type s -path '*/tmux-*/*' 2>/dev/null | while read -r socket; do
+		"${PRIGH_TMUX:-tmux}" -S "$socket" kill-server 2>/dev/null || true
+	done
+}
 cleanup() {
 	status=$?
+	kill_tmux_servers "$tmp"
 	rm -rf "$tmp"
 	exit "$status"
 }
@@ -103,7 +120,24 @@ test -x "$PRIGH_BACKEND" || { echo "no backend at $PRIGH_BACKEND: build it (cd b
 test -f "$SITE/main.bc.js" || { echo "no site at $SITE: build it (cd frontend && dune build ./web/bin/site)" >&2; exit 1; }
 if [ -n "${SHOTS:-}" ]; then mkdir -p "$SHOTS"; fi
 
-scripts="prigh_web temporary accounts reconnect paging resilience:slow resilience:drops stability themes worktrees worktrees_switch review review_git remote cli_signin desktop desktop_signin steer subagent_paged trim filter search session_links viewer math clipboard field_menu desktop_links card status mobile review_phone terminal_keys long_press pwa compaction sessions_settings new_sessions memory usage user_info custom_instructions mcp_settings mcp_oauth images:desktop images:phone images:small pasted:desktop pasted:phone pasted:small computer:desktop computer:phone computer:small smart:desktop smart:phone smart:small ui chat quiet:desktop quiet:phone quiet:small editor:desktop editor:phone editor:small"
+scripts="prigh_web temporary accounts reconnect paging resilience:slow resilience:drops stability themes worktrees worktrees_switch review review_git remote cli_signin desktop desktop_signin steer subagent_paged trim filter search session_links viewer math clipboard field_menu desktop_links card status mobile review_phone terminal_keys long_press pwa compaction sessions_settings new_sessions memory usage user_info custom_instructions mcp_settings mcp_oauth images:desktop images:phone images:small pasted:desktop pasted:phone pasted:small computer:desktop computer:phone computer:small smart:desktop smart:phone smart:small ui chat quiet:desktop quiet:phone quiet:small editor:desktop editor:phone editor:small smoke"
+# The core suite, ./test's: smoke.mjs alone, what only a real browser
+# catches on the main flows, in one script with three page loads. ./test
+# --full runs every script.
+core="smoke"
+suite="${SUITE:-full}"
+case "$suite" in
+core)
+	scripts="$core"
+	expected_suffix=.core.expected
+	;;
+full) expected_suffix=.expected ;;
+*)
+	echo "SUITE is core or full, not $suite" >&2
+	exit 2
+	;;
+esac
+export SUITE="$suite"
 engines="${ENGINES:-chromium firefox webkit}"
 jobs="${JOBS:-$(nproc)}"
 # Measured peaks (PSS of the script, its backend and browser): 1.2 to 1.7 GiB,
@@ -141,10 +175,7 @@ run_one() {
 	TEST_DIR="$tmp/$engine/$script" timeout -k 10 "${SCRIPT_TIMEOUT:-300}" \
 		node "$here/$file.mjs" "$engine" $part \
 		>"$tmp/$engine-$script.out" 2>"$tmp/$engine-$script.err" || status=$?
-	# The terminal panel's tmux server outlives a backend that was killed.
-	find "$tmp/$engine/$script" -type s -path '*/tmux-*/*' 2>/dev/null | while read -r socket; do
-		"${PRIGH_TMUX:-tmux}" -S "$socket" kill-server 2>/dev/null || true
-	done
+	kill_tmux_servers "$tmp/$engine/$script"
 	if [ -n "${TIMES:-}" ]; then
 		printf '%-9s %-11s %6.1fs\n' "$engine" "$script" "$(awk "BEGIN { print $EPOCHREALTIME - $start }")" >&2
 	fi
@@ -177,10 +208,10 @@ for engine in $engines; do
 		fi
 	done
 	if [ "${UPDATE:-}" = 1 ] && [ -n "$ok" ]; then
-		cp "$tmp/$engine.actual" "$here/$engine.expected"
-		echo "updated $here/$engine.expected"
+		cp "$tmp/$engine.actual" "$here/$engine$expected_suffix"
+		echo "updated $here/$engine$expected_suffix"
 	else
-		diff -u "$here/$engine.expected" "$tmp/$engine.actual" || failed="$failed $engine/diff"
+		diff -u "$here/$engine$expected_suffix" "$tmp/$engine.actual" || failed="$failed $engine/diff"
 	fi
 done
 if [ -n "$failed" ]; then

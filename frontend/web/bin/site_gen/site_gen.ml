@@ -24,20 +24,31 @@ let sw template paths =
     |> fun hex -> String.prefix hex 16
   in
   (* Each file as the page asks for it: by its versioned name where a file
-     of the shell (index.html, app.css) names it so. *)
-  let contents =
-    List.map (files paths) ~f:(fun (_, path) -> In_channel.read_all path)
+     of the shell (index.html, app.css) names it so. Each file is read once,
+     looking only at its "?v=": main.bc.js is tens of MB. *)
+  let named =
+    let named = String.Hash_set.create () in
+    List.iter (files paths) ~f:(fun (_, path) ->
+      let text = In_channel.read_all path in
+      List.iter
+        (String.substr_index_all text ~may_overlap:false ~pattern:"?v=")
+        ~f:(fun at ->
+          List.iter versions ~f:(fun (name, version) ->
+            let versioned = versioned_name ~name ~version in
+            let start = at - String.length name in
+            if
+              start >= 0
+              && start + String.length versioned <= String.length text
+              && String.equal
+                   (String.sub text ~pos:start ~len:(String.length versioned))
+                   versioned
+            then Hash_set.add named versioned)));
+    named
   in
   let shell =
     List.map versions ~f:(fun (name, version) ->
       let versioned = versioned_name ~name ~version in
-      sprintf
-        "%S"
-        (if
-           List.exists contents ~f:(fun text ->
-             String.is_substring text ~substring:versioned)
-         then versioned
-         else name))
+      sprintf "%S" (if Hash_set.mem named versioned then versioned else name))
     |> String.concat ~sep:", "
     |> sprintf "[%s]"
   in

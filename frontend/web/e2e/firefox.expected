@@ -1187,7 +1187,7 @@ selection kept: true
 messages reused: true
 messages drawn again: 0
 sidebar, transcript and status touched: none
-=== firefox: stability: idle for 3 s ===
+=== firefox: stability: idle for 1 s ===
 renders: at most one
 changes to the page: 0
 === firefox: stability: the editor ===
@@ -2855,14 +2855,14 @@ none
 === firefox: search: the sidebar's row and the composer's ===
 New session: wide, 34px high
 Search: narrow, 34px high
-composer: Add files or images, Context 0% full, $0.00, server-laptop, Model, Send
+composer: Add files or images, Context 0% full, $0.00, <HOSTNAME>, Model, Send
 === firefox: search: Ctrl+K: the session's settings, recent sessions, commands ===
 focus in the filter: control-input
 -- This session --
 > Set model | DeepSeek V4.1 Flash Ctrl+L
   Set thinking | provider's default Alt+T
   Set verbosity | normal Ctrl+O
-  Switch host | server-laptop
+  Switch host | <HOSTNAME>
   Set mode | auto Alt+M
   Context and cost | 0% · $0.00
 -- Recent sessions --
@@ -3159,15 +3159,6 @@ fits
 ring: Context 0% full, $<COST>: details; Ready; turning: false; calm
 mode: Plan mode; over the chat: nothing
 fits
-chips 1: icon | V4.1 Flash
-chip problems: none
-=== firefox: card: the host stopped answering ===
-chips 1: icon | V4.1 Flash
-chip problems: none
-<HOSTNAME> <CWD>
-✓ (dimmed) build-runner-eu-west-a-long-hostname offline: waiting for it to reconnect
-build-runner-eu-west-a-long-hostname is offline: pick another host, or run prigh tool-host -connect there to bring it back.
-=== firefox: card: the host is back ===
 chips 1: icon | V4.1 Flash
 chip problems: none
 === firefox: status: desktop 1280: the row ===
@@ -4913,13 +4904,19 @@ overwritten: ["open! Import (* edited *)","(* mine *)"]
 chip: src/compact.ml:4–6 3 lines
 === firefox: editor desktop: asking about lines ===
 ok
-agent: The agent changed this file: +3 −1 Keep Undo
-removed:   go [] 0 (List.rev turns)
-added:   match turns with |   | system :: rest -> system :: go [] (Turn.tokens system) (List.rev rest) |   | [] -> []
+agent: The agent changed this file: 2 changes, +4 −2 Keep all Undo all
+removed:   let limit = budget.window - budget.reserve in |   go [] 0 (List.rev turns)
+added:   let limit = Budget.usable budget in |   match turns with |   | system :: rest -> system :: go [] (Turn.tokens system) (List.rev rest) |   | [] -> []
 === firefox: editor desktop: the agent's change ===
 ok
 sent: [src/compact.ml:4–6] Pin the system turn Pasted text #1 4 lines · 162 B src/compact.ml, lines 4–6: HH:MM
-undone: true
+changes: 1/2 · +1 −1 Undo Keep | 2/2 · +3 −1 Undo Keep
+first kept, second undone: true
+=== firefox: editor desktop: a kept change's badge ===
+ok
+reopened: +1 −1 Undo Keep
+=== firefox: editor desktop: a kept change shown again ===
+ok
 chat after sending: beside
 === firefox: editor desktop: the chat beside ===
 ok
@@ -4944,24 +4941,34 @@ saved: open! Import (* edited *)
 ok
 notice: src/compact.ml changed on the host since you opened it: reload it (losing your edits) or keep yours and overwrite it. Reload Overwrite
 overwritten: ["open! Import (* edited *)","(* mine *)"]
-chip: src/compact.ml:4–5 2 lines
-=== firefox: editor phone: asking about lines ===
+ask box: src/compact.ml:4–5 Cancel
+=== firefox: editor phone: the ask box under the lines ===
 ok
-agent: The agent changed this file: +3 −1 Keep Undo
-removed:   go [] 0 (List.rev turns)
-added:   match turns with |   | system :: rest -> system :: go [] (Turn.tokens system) (List.rev rest) |   | [] -> []
+agent: The agent changed this file: 2 changes, +4 −2 Keep all Undo all
+removed:   let limit = budget.window - budget.reserve in |   go [] 0 (List.rev turns)
+added:   let limit = Budget.usable budget in |   match turns with |   | system :: rest -> system :: go [] (Turn.tokens system) (List.rev rest) |   | [] -> []
 peek: The system turn is now pinned: go starts after it and never drops it.
 === firefox: editor phone: the agent's change ===
 ok
 sent: [src/compact.ml:4–5] Pin the system turnPasted text #13 lines · 111 Bsrc/compact.ml, lines 4–5:HH:MM
-undone: true
+changes: 1/2 · +1 −1 Undo Keep | 2/2 · +3 −1 Undo Keep
+first kept, second undone: true
+=== firefox: editor phone: a kept change's badge ===
+ok
+reopened: +1 −1 Undo Keep
+=== firefox: editor phone: a kept change shown again ===
+ok
 === firefox: editor phone: the chat pulled up ===
 ok
 === firefox: editor phone: the files drawer ===
 ok
 drawer: src/compact.ml | .. | README.md | src/1
+found: src/turn.mli | src/compact.ml
+=== firefox: editor phone: go to file ===
+ok
 drawer gone: true
 strip: src/ turn.mli
+swiped: src/ compact.ml
 left: the chat
 === firefox: editor small: a file open ===
 ok
@@ -4980,22 +4987,78 @@ saved: open! Import (* edited *)
 ok
 notice: src/compact.ml changed on the host since you opened it: reload it (losing your edits) or keep yours and overwrite it. Reload Overwrite
 overwritten: ["open! Import (* edited *)","(* mine *)"]
-chip: src/compact.ml:4–5 2 lines
-=== firefox: editor small: asking about lines ===
-ok
-agent: The agent changed this file: +3 −1 Keep Undo
-removed:   go [] 0 (List.rev turns)
-added:   match turns with |   | system :: rest -> system :: go [] (Turn.tokens system) (List.rev rest) |   | [] -> []
+ask box: src/compact.ml:4–5 Cancel
+=== firefox: editor small: the ask box under the lines ===
+the code scrolls sideways
+agent: The agent changed this file: 2 changes, +4 −2 Keep all Undo all
+removed:   let limit = budget.window - budget.reserve in |   go [] 0 (List.rev turns)
+added:   let limit = Budget.usable budget in |   match turns with |   | system :: rest -> system :: go [] (Turn.tokens system) (List.rev rest) |   | [] -> []
 peek: The system turn is now pinned: go starts after it and never drops it.
 === firefox: editor small: the agent's change ===
 ok
 sent: [src/compact.ml:4–5] Pin the system turnPasted text #13 lines · 111 Bsrc/compact.ml, lines 4–5:HH:MM
-undone: true
+changes: 1/2 · +1 −1 Undo Keep | 2/2 · +3 −1 Undo Keep
+first kept, second undone: true
+=== firefox: editor small: a kept change's badge ===
+ok
+reopened: +1 −1 Undo Keep
+=== firefox: editor small: a kept change shown again ===
+ok
 === firefox: editor small: the chat pulled up ===
 ok
 === firefox: editor small: the files drawer ===
 ok
 drawer: src/compact.ml | .. | README.md | src/1
+found: src/turn.mli | src/compact.ml
+=== firefox: editor small: go to file ===
+ok
 drawer gone: true
 strip: src/ turn.mli
+swiped: src/ compact.ml
 left: the chat
+=== firefox: smoke: sign in ===
+prigh
+web
+Sign in
+to the prigh backend at ws://127.0.0.1:<PORT>/ws
+User name
+Password
+Backend
+Sign in
+signed in: the composer and the sidebar: true
+=== firefox: smoke: a run with a tool call ===
+▢
+Using prigh-web
+count some lines
+<TIME>
+let me look
+bash
+printf 'one\ntwo\nthree\n'
+three lines
+<TIME>
+the session in the address: true
+=== firefox: smoke: sessions ===
+the sidebar: hello again | count some lines
+a new session in the address: true
+back to the first: true
+=== firefox: smoke: Ctrl+K ===
+focus in its filter: true
+"verbosity" selects: Set verbosity
+Esc: closed, the focus back in the editor
+=== firefox: smoke: the backend restarts ===
+Connection lost: reconnecting…
+Reconnecting…
+the same session after reconnecting: true
+=== firefox: smoke: after reconnecting ===
+still there?
+<TIME>
+back again
+<TIME>
+=== firefox: smoke: a phone: the chat ===
+narrow: true
+ok
+=== firefox: smoke: a phone: the drawer ===
+ok
+its sessions: count some lines | hello again
+=== firefox: smoke: errors ===
+none

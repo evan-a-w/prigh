@@ -1,0 +1,21 @@
+; The dev profile's JavaScript without source maps or pretty-printing: they
+; made each library's JavaScript a third slower to compile, the dev
+; main.bc.js twice as large (64 MB), and every page load and test parse it.
+; (sourcemap no) covers linking only: dune still asks for inline maps when it
+; compiles each library, which --no-source-map (given after) overrides.
+; To debug in a browser with them: dune build --profile debug-js.
+
+(env
+ (dev
+  (js_of_ocaml
+   (sourcemap no)
+   (flags
+    ((:standard \ --pretty)
+     --no-source-map))))
+ (debug-js
+  (js_of_ocaml
+   (sourcemap inline))))
+
+; The slow tier: tests that run only with PRIGH_TEST_TIER=full (`./test
+; --full`), by (enabled_if (= %{env:PRIGH_TEST_TIER=default} full)) on their
+; inline_tests, cram or rule stanzas. Their code builds in every run.

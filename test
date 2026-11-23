@@ -4,10 +4,23 @@
 # e2e and tmux tests) one project after the other, while prigh-web's browser
 # e2e runs alongside.
 #
-#   ./test           the quick run, before pushing: the browser e2e in Chromium
-#   ./test --full    everything, before merging: every dune test run again,
-#                    even those dune has a result for, and the browser e2e in
-#                    Chromium, Firefox and WebKit (what the flake's checks run)
+#   ./test           THE test suite, before pushing and before merging: the
+#                    dune tests in @runtest, the desktop's cargo tests and
+#                    the browser e2e's smoke (frontend/web/e2e/smoke.mjs,
+#                    SUITE=core) in Chromium
+#   ./test --full    only when asked for: every test run again, even those
+#                    with a result, with the slow tier of dune tests
+#                    (PRIGH_TEST_TIER=full: backend/test/full and terminal,
+#                    frontend/web/test/full, the TUI's websocket e2e and
+#                    tmux groups) and every browser e2e script at every size
+#                    in Chromium, Firefox and WebKit. No CI job runs it: the
+#                    flake's web-e2e check runs only the browser e2e.
+#
+# Like dune, ./test does not repeat what it has a result for: the browser e2e
+# is skipped when the backend, the site, the e2e scripts and their expected
+# output are what they were at the last green run, and the desktop's tests
+# when their test executables are (PRIGH_TEST_E2E=always and
+# PRIGH_TEST_DESKTOP=always run them anyway, as do --full and SHOTS).
 #
 # Outside the dev shell it re-runs itself in it (`nix develop`). Playwright
 # comes from PLAYWRIGHT_MODULE and PLAYWRIGHT_BROWSERS_PATH, or else from
@@ -19,11 +32,15 @@ set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 engines=chromium
+suite=core
+tier=default
 force=()
 case "${1:-}" in
 "") ;;
 --full)
 	engines="chromium firefox webkit"
+	suite=full
+	tier=full
 	force=(--force)
 	;;
 *)
@@ -32,12 +49,39 @@ case "${1:-}" in
 	;;
 esac
 
+# shell NAME FLAKE_ATTR FILE...: a saved profile of a dev shell (a GC root),
+# named by the files it is made from, made when there is none: entering
+# it skips evaluating the flake, which takes seconds. Profiles unused for a
+# week are dropped.
+shell() {
+	local name=$1 attr=$2 key dir profile
+	shift 2
+	key="$(cd "$root" && cat "$@" $(find nix -type f | LC_ALL=C sort) | sha256sum | cut -c1-16)"
+	dir="${XDG_CACHE_HOME:-$HOME/.cache}/prigh/test-shell"
+	mkdir -p "$dir"
+	for profile in "$dir"/*; do
+		case $profile in *-link) continue ;; esac
+		if [ -n "$(find "$profile" -maxdepth 0 -mtime +7)" ]; then
+			rm -f "$profile" "$profile"-*-link
+		fi
+	done
+	profile="$dir/$name-$key"
+	if [ ! -e "$profile" ]; then
+		nix develop --accept-flake-config --profile "$profile" "$root#$attr" -c true >&2
+	fi
+	touch -h "$profile"
+	echo "$profile"
+}
+
 if ! command -v dune >/dev/null; then
-	exec nix develop --accept-flake-config "$root" -c "$0" "$@"
+	exec nix develop "$(shell dev default flake.nix flake.lock backend/*.opam frontend/*.opam)" -c "$0" "$@"
 fi
 
+logs="$(mktemp -d /tmp/prigh-test.XXXXXX)"
+
+# Out-links in $logs keep what the run uses from a garbage collection meanwhile.
 if [ -z "${PLAYWRIGHT_MODULE:-}" ] || [ -z "${PLAYWRIGHT_BROWSERS_PATH:-}" ]; then
-	mapfile -t playwright < <(nix build --accept-flake-config --no-link --print-out-paths \
+	mapfile -t playwright < <(nix build --accept-flake-config --out-link "$logs/playwright" --print-out-paths \
 		--inputs-from "$root" nixpkgs#playwright-test nixpkgs#playwright-driver.browsers)
 	export PLAYWRIGHT_MODULE="${playwright[0]}/lib/node_modules/playwright/index.mjs"
 	export PLAYWRIGHT_BROWSERS_PATH="${playwright[1]}"
@@ -45,7 +89,7 @@ fi
 # WebKit (WPE) renders through EGL: without a system OpenGL driver
 # (/run/opengl-driver on NixOS) glvnd finds no EGL vendor and WebKit aborts.
 if [[ $engines == *webkit* ]] && [ "$(uname)" = Linux ] && [ -z "${__EGL_VENDOR_LIBRARY_DIRS:-}" ]; then
-	mesa="$(nix build --accept-flake-config --no-link --print-out-paths \
+	mesa="$(nix build --accept-flake-config --out-link "$logs/mesa" --print-out-paths \
 		--inputs-from "$root" nixpkgs#mesa)"
 	export __EGL_VENDOR_LIBRARY_DIRS="$mesa/share/glvnd/egl_vendor.d"
 fi
@@ -58,15 +102,17 @@ if [ -z "${PRIGH_E2E_SHELL:-}" ]; then
 fi
 export PRIGH_BACKEND="$root/backend/_build/default/bin/main.exe"
 unset PRIGH_WEB_ROOT
-
-logs="$(mktemp -d /tmp/prigh-test.XXXXXX)"
+export PRIGH_TEST_TIER=$tier
+# Dune's shared cache: a new worktree builds from what the others built (the
+# dev shell sets it too; this dune's default stores nothing).
+export DUNE_CACHE="${DUNE_CACHE:-enabled}"
 
 # The fonts the flake's web-e2e check gives the browsers: without a fontconfig
 # configuration, Chromium's headless shell fails to load prigh-web's web fonts
 # (from the network the first time, from the service worker every time) and
 # renders no text.
 if [ -z "${FONTCONFIG_FILE:-}" ]; then
-	dejavu="$(nix build --accept-flake-config --no-link --print-out-paths \
+	dejavu="$(nix build --accept-flake-config --out-link "$logs/dejavu" --print-out-paths \
 		--inputs-from "$root" nixpkgs#dejavu_fonts)"
 	cat >"$logs/fonts.conf" <<EOF
 <?xml version="1.0"?>
@@ -94,35 +140,85 @@ step() {
 	fi
 }
 
-step "build backend" dune build --root "$root/backend"
-step "build frontend" dune build --root "$root/frontend"
-if [ -n "$failed" ]; then
+# One dune per project, building and testing at once: a second one costs
+# its loading of the rules again (2.3 CPU-s in the frontend), every run.
+step "backend" dune build --root "$root/backend" @default @runtest "${force[@]}"
+step "frontend" dune build --root "$root/frontend" @default @runtest "${force[@]}"
+if [ ! -x "$PRIGH_BACKEND" ] || [ ! -f "$root/frontend/_build/default/tui/e2e/backend.digest" ] ||
+	[ ! -f "$root/frontend/_build/default/web/bin/site/main.bc.js" ]; then
 	echo "the build failed:$failed" >&2
 	exit 1
 fi
 
-# The browser e2e only needs what was built: it runs while dune runs the
-# rest (one dune at a time).
+# The browser e2e's inputs: what it runs (the backend, the built site, the
+# scripts and their expected output) and with what. The same as at the last
+# green run: nothing to run.
+site="$root/frontend/_build/default/web/bin/site"
+web_stamp="$root/frontend/_build/.prigh-web-e2e-green"
+web_digest="$(
+	{
+		echo "$suite $engines ${PRIGH_E2E_PLAYWRIGHT:-$PLAYWRIGHT_MODULE} $PLAYWRIGHT_BROWSERS_PATH ${PRIGH_E2E_SHELL:-}"
+		cat "$root/frontend/_build/default/tui/e2e/backend.digest"
+		cd "$site" && find -L . -type f | LC_ALL=C sort | xargs -d '\n' sha256sum
+		cd "$root/frontend/web/e2e" && find . -type f | LC_ALL=C sort | xargs -d '\n' sha256sum
+	} | sha256sum | cut -c1-64
+)"
+web=""
 web_start=$EPOCHREALTIME
-ENGINES="$engines" bash "$root/frontend/web/e2e/prigh_web.sh" >"$logs/web e2e.log" 2>&1 &
-web=$!
+if [ "${PRIGH_TEST_E2E:-}" != always ] && [ "$suite" = core ] && [ -z "${SHOTS:-}" ] &&
+	[ "$(cat "$web_stamp" 2>/dev/null)" = "$web_digest" ]; then
+	echo "ok    web e2e: $suite, $engines: skipped (unchanged since the last green run)"
+else
+	rm -f "$web_stamp"
+	# It runs alongside the desktop's tests.
+	# Its own time, taken when it ends, not when it is waited for.
+	{
+		status=0
+		SUITE="$suite" ENGINES="$engines" bash "$root/frontend/web/e2e/prigh_web.sh" >"$logs/web e2e.log" 2>&1 || status=$?
+		elapsed "$web_start" >"$logs/web e2e.time"
+		exit "$status"
+	} &
+	web=$!
+fi
 
-# Dune does not know that the frontend's e2e and tmux tests use the backend:
-# they run again every time.
-rm -rf "$root"/frontend/_build/default/tui/e2e/e2e.actual \
-	"$root"/frontend/_build/default/tui/tmux-test/.cram.*
-step "backend tests" dune build --root "$root/backend" @runtest "${force[@]}"
-step "frontend tests" dune build --root "$root/frontend" @runtest "${force[@]}"
 # The desktop app's logic and the computer-use helper (their windows and
 # desktops run in the flake's desktop-window and computer-use checks), in the
-# desktop dev shell: the helper's portal backend links PipeWire.
-step "desktop tests" nix develop --accept-flake-config "$root#desktop" \
-	-c cargo test --locked --manifest-path "$root/desktop/Cargo.toml" -p prigh-desktop-core -p prigh-computer
+# desktop dev shell: the helper's portal backend links PipeWire. Skipped when
+# the test executables (cargo builds them first, or finds them fresh) are
+# those of the last green run. timeout signals its whole process group, so a
+# test that hangs is killed with what it started, and fails the step (with
+# what it printed) rather than the run: 10 minutes covers compiling them from
+# nothing on a busy machine.
+desktop_stamp="$root/desktop/target/.prigh-test-green"
+desktop_always=""
+if [ "$suite" = full ] || [ "${PRIGH_TEST_DESKTOP:-}" = always ]; then desktop_always=1; fi
+# shellcheck disable=SC2016
+step "desktop tests" timeout -k 10 "${DESKTOP_TEST_TIMEOUT:-600}" \
+	nix develop "$(shell desktop desktop flake.nix flake.lock desktop/Cargo.lock)" -c \
+	env STAMP="$desktop_stamp" ALWAYS="$desktop_always" bash -euo pipefail -c '
+		cargo=(cargo test --locked --manifest-path "$0/desktop/Cargo.toml" -p prigh-desktop-core -p prigh-computer)
+		digest="$("${cargo[@]}" --no-run --message-format=json |
+			grep -o "\"executable\":\"[^\"]*\"" | cut -d\" -f4 | LC_ALL=C sort |
+			xargs -d "\n" sha256sum | sha256sum | cut -c1-64)"
+		if [ -z "$ALWAYS" ] && [ "$(cat "$STAMP" 2>/dev/null)" = "$digest" ]; then
+			echo "skipped (unchanged since the last green run)"
+			exit
+		fi
+		rm -f "$STAMP"
+		"${cargo[@]}"
+		echo "$digest" >"$STAMP"
+	' "$root"
+if grep -qx 'skipped (unchanged since the last green run)' "$logs/desktop tests.log" 2>/dev/null; then
+	echo "      desktop tests skipped: unchanged since the last green run"
+fi
 
-if wait "$web"; then
-	echo "ok    web e2e: $engines ($(elapsed "$web_start"))"
+if [ -z "$web" ]; then
+	:
+elif wait "$web"; then
+	echo "ok    web e2e: $suite, $engines ($(cat "$logs/web e2e.time"))"
+	echo "$web_digest" >"$web_stamp"
 else
-	echo "FAIL  web e2e: $engines ($(elapsed "$web_start")): $logs/web e2e.log"
+	echo "FAIL  web e2e: $suite, $engines ($(cat "$logs/web e2e.time")): $logs/web e2e.log"
 	cat "$logs/web e2e.log"
 	failed="$failed web-e2e"
 fi

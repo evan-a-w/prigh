@@ -1,8 +1,11 @@
+; The tests run in one process (prigh_inline_test_backend), not one per file.
+
 (library
  (name prigh_tui_test)
  (preprocess
   (pps ppx_jane bonsai.ppx_bonsai))
  (inline_tests
+  (backend prigh_inline_test_backend)
   (flags
    (-source-tree-root .)))
  (libraries

@@ -1,16 +1,21 @@
-; Runs under node (virtual_dom needs a JavaScript runtime): the state machine
+; Run under node (virtual_dom needs a JavaScript runtime): the state machine
 ; driven by actions, the page it renders as HTML, and the page glue's pure
 ; parts (prigh_web_app).
+;
+; The test files are split between two libraries, each run by one node: a
+; node of its own per file (dune's partitions) paid the runner's start, mostly
+; parsing it, a hundred times over, and each node more costs about 2 CPU-s.
+; Two keep the wall time near ten seconds. The shards are balanced by the
+; tests' cost; the second takes every file not listed, so a new file needs no
+; entry.
 
 (library
- (name prigh_web_test)
+ (name prigh_web_test_harness)
+ (wrapped false)
  (enabled_if %{bin-available:node})
+ (modules agent_events chat_harness harness page_soup render)
  (preprocess
   (pps ppx_jane js_of_ocaml-ppx))
- (inline_tests
-  (modes js)
-  (flags
-   (-source-tree-root .)))
  (libraries
   core
   expect_test_helpers_core
@@ -20,4 +25,178 @@
   prigh_web_app
   virtual_dom
   virtual_dom.vdom_test_helpers
+  lambdasoup
   re))
+
+(library
+ (name prigh_web_test_a)
+ (enabled_if %{bin-available:node})
+ (modules
+  test_about_you
+  test_accounts
+  test_auto_archive
+  test_card
+  test_chat_view
+  test_cli_signin
+  test_code_editor
+  test_commands
+  test_compaction
+  test_compaction_settings
+  test_computer
+  test_control_centre
+  test_custom_providers
+  test_cwd_placeholder
+  test_dialogs
+  test_drops
+  test_external_link
+  test_filter
+  test_highlight
+  test_image_size
+  test_jump
+  test_markdown
+  test_mcp_settings
+  test_memory
+  test_model_menu
+  test_models
+  test_page
+  test_paging
+  test_pasted
+  test_prefs
+  test_pull_requests
+  test_queue
+  test_review_worktrees
+  test_session_pin
+  test_sessions
+  test_shell
+  test_signin_link
+  test_skills_mcp
+  test_smart_approval
+  test_steer_agents
+  test_subagent_paged
+  test_temporary
+  test_tool_view
+  test_trim
+  test_ui
+  test_ui_chart
+  test_units
+  test_update_notice
+  test_worktree_switch
+  test_worktree_use
+  test_worktrees
+  test_zoom)
+ (preprocess
+  (pps ppx_jane js_of_ocaml-ppx))
+ (inline_tests
+  (backend prigh_inline_test_backend)
+  (modes js)
+  (flags
+   (-source-tree-root .)))
+ (libraries
+  prigh_web_test_harness
+  core
+  expect_test_helpers_core
+  js_of_ocaml
+  prigh_protocol
+  prigh_web
+  prigh_web_app
+  virtual_dom
+  virtual_dom.vdom_test_helpers
+  re))
+
+(library
+ (name prigh_web_test_b)
+ (enabled_if %{bin-available:node})
+ (modules
+  (:standard
+   \
+   agent_events
+   chat_harness
+   harness
+   page_soup
+   render
+   test_about_you
+   test_accounts
+   test_auto_archive
+   test_card
+   test_chat_view
+   test_cli_signin
+   test_code_editor
+   test_commands
+   test_compaction
+   test_compaction_settings
+   test_computer
+   test_control_centre
+   test_custom_providers
+   test_cwd_placeholder
+   test_dialogs
+   test_drops
+   test_external_link
+   test_filter
+   test_highlight
+   test_image_size
+   test_jump
+   test_markdown
+   test_mcp_settings
+   test_memory
+   test_model_menu
+   test_models
+   test_page
+   test_paging
+   test_pasted
+   test_prefs
+   test_pull_requests
+   test_queue
+   test_review_worktrees
+   test_session_pin
+   test_sessions
+   test_shell
+   test_signin_link
+   test_skills_mcp
+   test_smart_approval
+   test_steer_agents
+   test_subagent_paged
+   test_temporary
+   test_tool_view
+   test_trim
+   test_ui
+   test_ui_chart
+   test_units
+   test_update_notice
+   test_worktree_switch
+   test_worktree_use
+   test_worktrees
+   test_zoom))
+ (preprocess
+  (pps ppx_jane js_of_ocaml-ppx))
+ (inline_tests
+  (backend prigh_inline_test_backend)
+  (modes js)
+  (flags
+   (-source-tree-root .)))
+ (libraries
+  prigh_web_test_harness
+  core
+  expect_test_helpers_core
+  js_of_ocaml
+  prigh_protocol
+  prigh_web
+  prigh_web_app
+  virtual_dom
+  virtual_dom.vdom_test_helpers
+  re))
+
+; No source map: node only reads one with --enable-source-maps.
+
+(env
+ (_
+  (js_of_ocaml
+   (sourcemap no))))
+
+; full/: the slow tier, run only with PRIGH_TEST_TIER=full (see full/dune).
+
+(rule
+ (alias runtest)
+ (enabled_if %{bin-available:node})
+ (deps
+  (alias full/check))
+ (action (progn)))

@@ -1,0 +1,16 @@
+; The slow tier: tests that run only with PRIGH_TEST_TIER=full (`./test
+; --full`), the ones taking about 100ms of CPU or 1s of wall or more (git,
+; subprocesses, servers, timers), in test/full/ and test/terminal/. Their
+; inline_tests are (enabled_if (= %{env:PRIGH_TEST_TIER=default} full)): the
+; libraries build in every run, so they never fall behind the cheap tests
+; whose helpers they open. test/full/test_x_full.ml holds test/test_x.ml's
+; slow tests; test_x.ml keeps the cheap ones, so every area still has tests in
+; the default run. @runtest type-checks them too, for `dune build @runtest` by
+; hand.
+
+(rule
+ (alias runtest)
+ (deps
+  (alias test/full/check)
+  (alias test/terminal/check))
+ (action (progn)))

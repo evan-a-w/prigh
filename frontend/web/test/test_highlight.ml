@@ -364,20 +364,6 @@ let%expect_test "any text tokenizes to itself, in every language" =
   [%expect {| |}]
 ;;
 
-let%expect_test "a 256 KiB line does not overflow the stack" =
-  let line = String.concat (List.init 40_000 ~f:(fun i -> sprintf "%d," i)) in
-  List.iter [ Lang.Json; Javascript; Html; Markdown; Css ] ~f:(fun lang ->
-    printf "%d\n" (List.length (Highlight.tokens lang line)));
-  [%expect
-    {|
-    80000
-    80000
-    1
-    1
-    80000
-    |}]
-;;
-
 (* In the page: fenced code in replies (also while it streams), by the
    fence's language; none without one. *)
 let reply ?(event = "message_end") text =

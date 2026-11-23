@@ -194,12 +194,13 @@ let run_foreground (context : Tool.Context.t) args =
     if not (String.is_empty complete)
     then context.on_output (Utf8.sanitize complete)
   in
-  let marker = Stray_processes.marker () in
+  let marker = Stray_processes.Marker.create () in
   let exit =
     Process.run
       ~env:context.env
       ~cwd:context.cwd
-      ~extra_env:[ Stray_processes.variable, marker ]
+      ~extra_env:
+        [ Stray_processes.variable, Stray_processes.Marker.value marker ]
       ?input:context.stdin
       ~timeout
       ~cancel:context.cancel
@@ -215,15 +216,15 @@ let run_foreground (context : Tool.Context.t) args =
      by itself is looked at. *)
   let strays =
     match exit with
-    | Exited _ | Signaled _ -> Stray_processes.find ~marker
+    | Exited _ | Signaled _ -> Stray_processes.find marker
     | Timed_out | Cancelled -> []
   in
   Option.iter (Stray_processes.note strays) ~f:(fun note ->
-      let so_far = Buffer.contents output in
-      on_data
-        (if String.is_empty so_far || String.is_suffix so_far ~suffix:"\n"
-         then note ^ "\n"
-         else "\n" ^ note ^ "\n"));
+    let so_far = Buffer.contents output in
+    on_data
+      (if String.is_empty so_far || String.is_suffix so_far ~suffix:"\n"
+       then note ^ "\n"
+       else "\n" ^ note ^ "\n"));
   let full = Buffer.contents output in
   let truncated = Truncate.head_and_tail full in
   let text =
