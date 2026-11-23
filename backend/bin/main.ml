@@ -680,6 +680,23 @@ let serve_command =
             build)"
      and open_browser =
        flag "-open" no_arg ~doc:" open the web frontend in a browser"
+     and engines =
+       flag
+         "-engines"
+         (optional string)
+         ~doc:
+           "ENGINE,... what runs sessions: harness (prigh's own agent loop), \
+            composer (drives coding agents such as Codex and Claude Code on \
+            the session's tool host), or both; the first is the default for \
+            new sessions (default: $PRIGH_ENGINES, else harness)"
+     and adapters =
+       flag
+         "-adapters"
+         (optional string)
+         ~doc:
+           "ADAPTER,... the agents the composer drives: codex, claude, prigh, \
+            acp:NAME; the first is the default (default: $PRIGH_ADAPTERS, else \
+            codex,claude)"
      and nix_gc_helper =
        flag
          "-nix-gc-helper"
@@ -706,6 +723,18 @@ let serve_command =
            | Error e ->
              eprintf "%s\n" (Error.to_string_hum e);
              exit 2)
+       in
+       let engines =
+         match
+           Or_error.bind
+             (Engines.of_flags ~engines ~adapters ~getenv:Sys.getenv)
+             ~f:(fun engines ->
+               Or_error.map (Engines.check_build engines) ~f:(fun () -> engines))
+         with
+         | Ok engines -> engines
+         | Error e ->
+           eprintf "%s\n" (Error.to_string_hum e);
+           exit 2
        in
        let superusers =
          Option.map
@@ -837,6 +866,7 @@ let serve_command =
              ~mcp_auth
              ~sessions_dir:world.sessions_dir
              ~cwd
+             ~engines
              ~new_agent
              ?default_agent
              ()

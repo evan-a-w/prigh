@@ -124,6 +124,14 @@ module State = struct
     ; hidden : Session.Hidden.t list [@sexp.list]
     ; transcript_filter : string option [@sexp.option]
     ; temporary : bool [@sexp.bool]
+    ; engine : Engine_choice.t [@sexp_drop_if Engine_choice.is_harness]
+    ; capabilities : Capabilities.t
+          [@sexp_drop_if
+            fun c ->
+              Sexp.equal
+                (Capabilities.sexp_of_t c)
+                (Capabilities.sexp_of_t Capabilities.harness)]
+    ; unavailable : string option [@sexp.option]
     }
   [@@deriving sexp_of]
 end
@@ -210,6 +218,7 @@ type t =
   ; provider : Provider.t
   ; runner : Runner.t option
     (** the session's engine when it is not the harness on [provider] *)
+  ; mutable unavailable : string option
   ; tools : Tool.t list
   ; offered : Tool.t -> bool
   ; user_info : User_info.t option
@@ -610,6 +619,20 @@ let describe_allowed t =
     | None -> id)
 ;;
 
+(* A session naming an engine this prigh does not know is shown as the
+   harness's; [unavailable] says why it cannot run. *)
+let engine_choice t =
+  Session.engine t.session
+  |> Result.ok
+  |> Option.value ~default:Engine_choice.harness
+;;
+
+let runner_capabilities t =
+  match t.runner with
+  | Some runner -> Runner.capabilities runner
+  | None -> Capabilities.harness
+;;
+
 let state t =
   let messages = messages t in
   let assistant_usage, assistant_cost = session_spend t in
@@ -667,6 +690,9 @@ let state t =
   ; hidden = Session.hidden t.session
   ; transcript_filter = Session.transcript_filter t.session
   ; temporary = Session.temporary t.session
+  ; engine = engine_choice t
+  ; capabilities = runner_capabilities t
+  ; unavailable = t.unavailable
   }
 ;;
 
@@ -2965,6 +2991,20 @@ let runner t =
 let capabilities t = Runner.capabilities (runner t)
 let engine t = Runner.engine (runner t)
 
+let set_engine t (choice : Engine_choice.t) =
+  if not (Engine_choice.equal choice (engine_choice t))
+  then (
+    ignore (Session.set_engine t.session choice : Session.Entry.t);
+    state_changed t)
+;;
+
+let set_unavailable t why =
+  if not (Option.equal String.equal why t.unavailable)
+  then (
+    t.unavailable <- why;
+    state_changed t)
+;;
+
 (* The text with the attachments' [<file>] blocks, what they are, and their
    images. *)
 let with_attachments t ~cancel text attachments =
@@ -4017,6 +4057,7 @@ let create
     ; sw
     ; provider
     ; runner
+    ; unavailable = None
     ; tools
     ; offered
     ; user_info
@@ -4192,9 +4233,12 @@ let to_queue t ~attachments ~pasted ~images ~client ~ui_action text =
 (* Why a message cannot start a run now: outside chat mode, it needs a
    tool host. *)
 let cannot_start t =
-  match budget_exhausted t with
-  | Some _ as exhausted -> exhausted
-  | None -> if t.chat_mode then None else no_host t
+  match t.unavailable with
+  | Some _ as unavailable -> unavailable
+  | None ->
+    (match budget_exhausted t with
+     | Some _ as exhausted -> exhausted
+     | None -> if t.chat_mode then None else no_host t)
 ;;
 
 let prompt

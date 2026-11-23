@@ -138,6 +138,35 @@ module Entry : sig
           and so are the results of its tool calls *)
       | Restore of { entry : string }
       (** cancels the [Trim], [Trim_after] or [Delete] entry [entry] *)
+      | Engine of
+          { engine : string (** an [Engine_id] *)
+          ; adapter : string option [@jsonaf.option] [@sexp.option]
+            (** an [Adapter_id], for the composer *)
+          }
+      (** the engine the session runs on from here on, see {!engine}; absent
+          from harness sessions (all of those from before engines) *)
+      | Thread of
+          { adapter : string
+          ; host : string (** the [Host.id] the external agent ran on *)
+          ; thread_id : string (** its own id of the conversation *)
+          ; cwd : string
+          }
+      (** the composer's adapter reported its thread, see {!threads}; not
+          copied by [fork], so a fork never writes to its parent's thread *)
+      | External_turn of
+          { thread_id : string
+          ; turn_id : string
+          ; through : string (** the last entry of the turn *)
+          }
+      (** an external agent's turn, for mapping rewinds onto its history;
+          not copied by [fork] *)
+      | Handoff of
+          { from_adapter : string option [@jsonaf.option] [@sexp.option]
+          ; to_adapter : string
+          ; text : string
+          }
+      (** the summary of the session pushed to [to_adapter] when it took
+          over (another adapter or host, a thread that could not resume) *)
     [@@deriving sexp, jsonaf]
   end
 
@@ -360,6 +389,58 @@ val identified_messages : t -> (string option * Timed_message.t) list
 
 val model : t -> (string * Thinking.t) option
 
+(** {2 Engines}
+
+    Which engine a session runs on (the last [Engine] entry on the active
+    path; the harness without one), and what the composer recorded of the
+    external agent it drives. *)
+
+(** An external agent's conversation, as its adapter reported it. *)
+module Thread : sig
+  type t =
+    { adapter : string (** an [Adapter_id] *)
+    ; host : string (** the [Host.id] it ran on *)
+    ; thread_id : string
+    ; cwd : string
+    }
+  [@@deriving sexp_of, equal]
+end
+
+module External_turn : sig
+  type t =
+    { thread_id : string
+    ; turn_id : string
+    ; through : string (** the last entry of the turn *)
+    }
+  [@@deriving sexp_of, equal]
+end
+
+(** The harness for a session with no [Engine] entry; an error for one
+    naming an engine or adapter this prigh does not know (a newer one's). *)
+val engine : t -> Engine_choice.t Or_error.t
+
+(** The last [Engine] entry's engine and adapter as written. *)
+val engine_entry : t -> (string * string option) option
+
+val set_engine : t -> Engine_choice.t -> Entry.t
+
+(** The [Thread] entries on the active path, newest first. *)
+val threads : t -> Thread.t list
+
+val record_thread : t -> Thread.t -> Entry.t
+
+(** The [External_turn] entries on the active path, oldest first. *)
+val external_turns : t -> External_turn.t list
+
+val record_external_turn : t -> External_turn.t -> Entry.t
+
+val record_handoff
+  :  t
+  -> from_adapter:string option
+  -> to_adapter:string
+  -> text:string
+  -> Entry.t
+
 (** The system prompt fixed for this conversation, if one was recorded on the
     active path. *)
 val system_prompt : t -> string option
@@ -561,6 +642,9 @@ module Summary : sig
     ; repo : Git_location.t option option (** {!repo} *)
     ; worktrees : Session_worktree.t list (** {!worktrees} *)
     ; home : Home.t option (** {!home} *)
+    ; engine : string option [@sexp.option]
+      (** the last [Engine] entry's engine: [None] for the harness *)
+    ; adapter : string option [@sexp.option] (** and its adapter *)
     }
   [@@deriving sexp_of]
 
