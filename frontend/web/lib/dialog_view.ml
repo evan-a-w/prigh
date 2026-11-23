@@ -125,7 +125,9 @@ let picker ?(trimmable = String.Set.empty) ~kind (p : Picker.t) ~inject =
                   ~label:("Trim the context before " ^ item.label)
                   ~on_click:
                     (Effect.Many
-                       [ Effect.Stop_propagation; inject (Action.Ask_trim target) ])
+                       [ Effect.Stop_propagation
+                       ; inject (Action.Ask_trim target)
+                       ])
                   [ Node.text "Trim before" ]
               ]
             | None -> [])
@@ -682,24 +684,47 @@ let confirm (m : App.Model.t) ~inject =
       match m.confirm_reason with
       | None ->
         ( [ Node.p
-              ~attrs:[ Attr.class_ "confirm-question" ]
+              ~attrs:
+                [ Attr.class_
+                    "confirm-question mb-2.5 max-h-[30vh] overflow-auto \
+                     rounded-md bg-muted px-3 py-2.5 font-mono text-[12.5px] \
+                     break-words whitespace-pre-wrap \
+                     in-[.computer-consent]:bg-transparent \
+                     in-[.computer-consent]:p-0 in-[.computer-consent]:mb-1.5 \
+                     in-[.computer-consent]:font-sans \
+                     in-[.computer-consent]:text-sm \
+                     in-[.computer-consent]:font-semibold"
+                ]
               [ Node.text (Confirm_prompt.title c) ]
           ; (match Confirm_prompt.detail c with
              | None -> Node.none
              | Some text ->
-               Node.p ~attrs:[ Attr.class_ "confirm-detail" ] [ Node.text text ])
+               Node.p
+                 ~attrs:
+                   [ Attr.class_
+                       "confirm-detail mb-3 text-xs text-muted-foreground"
+                   ]
+                 [ Node.text text ])
           ; div
-              ~cls:"confirm-answers"
+              ~cls:"confirm-answers flex flex-col gap-1.5"
               (List.map (Confirm_prompt.answers c) ~f:(fun (a, key, label) ->
                  let cls =
                    match a with
-                   | Allow -> "primary allow"
-                   | Always -> "always"
+                   | Allow -> "allow"
+                   | Always -> "always border-primary/40"
                    | Deny -> "deny"
                    | Deny_with_reason -> "reason"
                  in
                  button
-                   ~cls:("confirm-answer " ^ cls)
+                   ~variant:
+                     (match a with
+                      | Allow -> Default
+                      | Always | Deny | Deny_with_reason -> Outline)
+                   ~cls:
+                     ("confirm-answer h-auto min-h-8 justify-start gap-2.5 \
+                       px-2.5 py-1.5 text-left whitespace-normal break-words \
+                       narrow:min-h-11 narrow:text-[15px] "
+                      ^ cls)
                    ~title:
                      (match a with
                       | Allow -> key ^ " or Enter"
@@ -708,7 +733,11 @@ let confirm (m : App.Model.t) ~inject =
                    ~label:(String.capitalize label)
                    ~attrs:[ Attr.create "aria-keyshortcuts" key ]
                    ~on_click:(answer a)
-                   [ Node.kbd [ Node.text key ]
+                   [ Loon.Kbd.view
+                       ~class_:
+                         "shrink-0 in-[.allow]:bg-primary-foreground/20 \
+                          in-[.allow]:text-primary-foreground"
+                       [ Node.text key ]
                    ; Node.text (String.capitalize label)
                    ]))
           ]
@@ -717,18 +746,30 @@ let confirm (m : App.Model.t) ~inject =
       | Some reason ->
         let back = inject Action.Cancel_confirm_reason in
         ( [ Node.p
-              ~attrs:[ Attr.class_ "confirm-question" ]
+              ~attrs:
+                [ Attr.class_
+                    "confirm-question mb-2.5 max-h-[30vh] overflow-auto \
+                     rounded-md bg-muted px-3 py-2.5 font-mono text-[12.5px] \
+                     break-words whitespace-pre-wrap \
+                     in-[.computer-consent]:bg-transparent \
+                     in-[.computer-consent]:p-0 in-[.computer-consent]:mb-1.5 \
+                     in-[.computer-consent]:font-sans \
+                     in-[.computer-consent]:text-sm \
+                     in-[.computer-consent]:font-semibold"
+                ]
               [ Node.text (Confirm_prompt.title c) ]
           ; Node.label
               ~attrs:
-                [ Attr.class_ "confirm-reason-label"
+                [ Attr.class_
+                    "confirm-reason-label mb-1.5 block text-xs \
+                     text-muted-foreground"
                 ; Attr.for_ "confirm-reason"
                 ]
               [ Node.text Confirm_prompt.reason_question ]
           ; Node.input
               ~attrs:
                 [ Attr.id "confirm-reason"
-                ; Attr.class_ "text-input"
+                ; Attr.class_ "text-input w-full"
                 ; Attr.type_ "text"
                 ; Attr.value reason
                 ; Attr.create "autocomplete" "off"
