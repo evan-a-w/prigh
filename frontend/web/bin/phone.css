@@ -398,7 +398,6 @@
 
 /* {1 The image viewer and drawing} */
 
-.app.narrow .modal.annotate-dialog { height: var(--vvh, 100dvh); padding-top: var(--safe-t); padding-bottom: var(--safe-b); border-radius: 0; border: 0; }
 
 /* {1 Long words} */
 

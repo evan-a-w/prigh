@@ -1039,7 +1039,7 @@ let%expect_test
     <div class="editor-wrap">
     <div class="context-ring-anchor flex relative shrink-0">
     <div class="composer-buttons">
-    <div class="tray">
+    <div class="flex gap-0.5 in-[.app:not(.narrow)]:-mt-1.5 in-[.app:not(.narrow)]:bg-card/50 in-[.app:not(.narrow)]:border in-[.app:not(.narrow)]:border-border in-[.app:not(.narrow)]:border-t-0 in-[.app:not(.narrow)]:min-h-[34px] in-[.app:not(.narrow)]:mx-3.5 in-[.app:not(.narrow)]:pl-2 in-[.app:not(.narrow)]:pr-1.5 in-[.app:not(.narrow)]:py-0.5 in-[.app:not(.narrow)]:relative in-[.app:not(.narrow)]:rounded-b-[14px] items-center min-h-11 min-w-0 narrow:in-[.fresh]:order-first narrow:in-[.fresh]:pb-1 narrow:in-[.fresh]:px-0.5 text-[13px] text-muted-foreground tray">
     <div class="composer-controls menu-open">
     <div class="attach-menu chip-anchor">
     <div class="chip-anchor host">

@@ -1637,68 +1637,9 @@ kbd {
    canvas exactly over it, and above them the pen (colours, then widths, as
    dots of that colour) with undo and clear. */
 .modal-backdrop:has(> .annotate-dialog) { padding: 16px; align-items: center; }
-.modal.annotate-dialog { width: min(1100px, calc(100vw - 32px)); max-width: none; height: min(860px, 100%); max-height: none; }
-.annotate-dialog .modal-body { display: flex; flex-direction: column; gap: 10px; overflow: hidden; scrollbar-gutter: auto; flex: 1; }
-.annotate-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.annotate-swatches, .annotate-sizes { display: flex; align-items: center; gap: 6px; }
-.annotate-swatch {
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  border-radius: 50%;
-  border: 2px solid transparent;
-  background: var(--swatch);
-  box-shadow: inset 0 0 0 1px #0000003d;
-  cursor: pointer;
-}
-.annotate-swatch.on { border-color: var(--chalk); box-shadow: 0 0 0 2px var(--slate), inset 0 0 0 1px #0000003d; }
-.annotate-size {
-  width: 30px;
-  height: 30px;
-  padding: 0;
-  display: grid;
-  place-items: center;
-  border-radius: var(--r-control);
-  border: 1px solid transparent;
-  background: transparent;
-  cursor: pointer;
-}
-.annotate-size:hover { background: var(--slate-2); }
-.annotate-size.on { background: var(--slate-2); border-color: var(--rule-2); }
-.annotate-dot { width: var(--pen); height: var(--pen); max-width: 18px; max-height: 18px; border-radius: 50%; background: var(--swatch); }
-.annotate-sep { width: 1px; height: 22px; background: var(--rule); }
-.annotate-spacer { flex: 1; }
-.annotate-toolbar .btn.small { gap: 6px; }
-.annotate-toolbar .btn .icon { width: 14px; height: 14px; }
-.annotate-stage {
-  flex: 1;
-  min-height: 0;
-  display: grid;
-  place-items: center;
-  border-radius: var(--r-control);
-  background: var(--well) repeating-conic-gradient(var(--checker) 0 25%, transparent 0 50%) 0 0 / 16px 16px;
-  overflow: hidden;
-}
-.annotate-frame { position: relative; display: inline-block; max-width: 100%; max-height: 100%; line-height: 0; }
-.annotate-frame img { display: block; max-width: 100%; max-height: 100%; object-fit: contain; image-rendering: auto; user-select: none; -webkit-user-drag: none; }
-.annotate-canvas { position: absolute; inset: 0; width: 100%; height: 100%; cursor: crosshair; touch-action: none; }
-.annotate-hint { flex: 1; color: var(--faint); font-size: 12px; }
 @media (max-width: 760px) {
   .modal-backdrop:has(> .annotate-dialog) { padding: 0; }
-  .modal.annotate-dialog { width: 100vw; height: 100dvh; border-radius: 0; }
-  .annotate-hint { display: none; }
 }
-/* The drawing's zoom: − % + (app/annotate_widget.ml), the frame placed by a
-   transform; the stage clips it. */
-.annotate-zoom { display: inline-flex; align-items: center; padding: 2px; border-radius: 9px; background: var(--slate-2); box-shadow: inset 0 0 0 1px var(--rule); }
-.annotate-zoom-btn { display: inline-flex; align-items: center; justify-content: center; min-width: 28px; height: 26px; padding: 0 6px; border: 0; border-radius: 7px; background: transparent; color: var(--chalk); font: 600 11.5px var(--mono); cursor: pointer; }
-.annotate-zoom-btn .icon { width: 15px; height: 15px; }
-.annotate-zoom-btn:hover:not(:disabled) { background: var(--panel-3); }
-.annotate-zoom-btn:disabled { color: var(--faint-line); cursor: default; }
-.annotate-zoom-btn:focus-visible { outline: 2px solid var(--sodium); outline-offset: 1px; }
-.annotate-zoom-pct { min-width: 50px; font-variant-numeric: tabular-nums; }
-.annotate-frame { transform-origin: 50% 50%; will-change: transform; }
-@media (prefers-reduced-motion: reduce) { .annotate-frame { transition: none !important; } }
 
 /* Computer use: while the agent drives the user's screen, a strip over the
    composer says whose, with Stop in reach (Computer_banner). In the
