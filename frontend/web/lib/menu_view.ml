@@ -58,7 +58,9 @@ let surface ?(cls = "") ?(attrs = []) ~label children =
   Node.div
     ~attrs:
       ([ Attr.class_
-           (String.concat ~sep:" " [ "loon"; cls; "menu-surface"; surface_look ])
+           (String.concat
+              ~sep:" "
+              [ "loon"; cls; "menu-surface"; surface_look ])
        ; slot "dropdown-menu-content"
        ; Attr.role "menu"
        ; Attr.create "aria-label" label

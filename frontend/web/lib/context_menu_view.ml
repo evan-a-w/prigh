@@ -46,7 +46,8 @@ let surface_cls =
    [&:not(.placed)]:pointer-events-none [&_.menu-label]:shrink-0 \
    motion-reduce:animate-none max-[760px]:top-auto! max-[760px]:right-2 \
    max-[760px]:bottom-2 max-[760px]:left-2! max-[760px]:max-w-none \
-   max-[760px]:[&_.menu-item]:min-h-10 max-[760px]:[&_.menu-item]:text-[15px]"
+   max-[760px]:[&_.menu-item]:min-h-10 narrow:[&_.menu-item]:min-h-11! \
+   max-[760px]:[&_.menu-item]:text-[15px]"
 ;;
 
 (* What the menu is about, above its items. *)

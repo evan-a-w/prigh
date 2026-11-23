@@ -187,9 +187,7 @@ let view (a : Annotate.t) ~inject =
                 ()
             ; Node.canvas
                 ~attrs:
-                  [ Attr.id
-                      "annotate-canvas absolute inset-0 size-full \
-                       cursor-crosshair touch-none"
+                  [ Attr.id "annotate-canvas"
                   ; Attr.class_
                       "annotate-canvas absolute inset-0 size-full \
                        cursor-crosshair touch-none"
