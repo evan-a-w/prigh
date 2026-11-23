@@ -467,6 +467,8 @@ let execute
   then Host_process.execute ~env ~stdin ~cancel ~on_output ~cwd ~arguments ()
   else if String.equal name Host_probe.op
   then Host_probe.execute ~env ~cancel ~cwd ~arguments ()
+  else if String.equal name Checkpoint.op
+  then Checkpoint.run ~env ~cancel ~cwd ~arguments
   else (
     match
       List.find (host_tools ()) ~f:(fun t -> String.equal (Tool.name t) name)
