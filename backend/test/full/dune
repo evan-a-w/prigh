@@ -1,0 +1,37 @@
+; The slow tier: each test_x_full.ml has the slow tests of ../test_x.ml,
+; whose helpers it opens. Built (and warned about) like the rest, but run only
+; with PRIGH_TEST_TIER=full (`./test --full`).
+
+(library
+ (name prigh_test_full)
+ (preprocess
+  (pps ppx_jane ppx_jsonaf_conv))
+ (flags
+  (:standard -open Prigh_test))
+ (inline_tests
+  (enabled_if
+   (= %{env:PRIGH_TEST_TIER=default} full))
+  (deps ../../bin/main.exe)
+  (flags
+   (-source-tree-root .)))
+ (libraries
+  core
+  core_unix
+  core_unix.filename_unix
+  core_unix.sys_unix
+  core_unix.signal_unix
+  jsonaf
+  prigh
+  prigh_test
+  eio
+  eio.mock
+  eio.unix
+  eio_main
+  eio_posix
+  tls
+  tls-eio
+  x509
+  ptime
+  mirage-crypto-rng.unix
+  expect_test_helpers_core
+  re))

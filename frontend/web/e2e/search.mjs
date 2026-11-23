@@ -14,7 +14,9 @@ import { mkdirSync, utimesSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { end } from "./end.mjs";
 import { normalVerbosity } from "./verbose_prefs.mjs";
+import { hostName } from "./host_name.mjs";
 
+const phoneSizes = [[390, 844], [320, 640]];
 const { chromium, firefox, webkit } = await import(process.env.PLAYWRIGHT_MODULE);
 
 const [engineName] = process.argv.slice(2);
@@ -114,6 +116,8 @@ const open = async options => {
   page.on("pageerror", error => errors.push(`page: ${error.message}`));
 };
 
+const out = console.log;
+console.log = (...xs) => out(...xs.map(x => typeof x === "string" ? x.replaceAll(hostName(), "<HOSTNAME>") : x));
 const section = label => console.log(`=== ${engineName}: search: ${label} ===`);
 let shot = 0;
 const screenshot = async label => {
@@ -266,7 +270,7 @@ try {
   console.log("switched to Release notes");
   await page.context().close();
 
-  for (const [w, h] of [[390, 844], [320, 640]]) {
+  for (const [w, h] of phoneSizes) {
     const options = { viewport: { width: w, height: h }, hasTouch: true };
     if (engineName !== "firefox") options.isMobile = true;
     await open(options);

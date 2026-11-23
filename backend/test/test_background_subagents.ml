@@ -10,6 +10,13 @@ let one_line s =
   else String.substr_replace_all (String.strip s) ~pattern:"\n" ~with_:" | "
 ;;
 
+(* An agent's age in subagent_status depends on the machine's speed. *)
+let age name text =
+  if String.equal name "subagent_status"
+  then Re.replace_string (Re.Perl.compile_pat {|\b[0-9]+s\b|}) ~by:"Ns" text
+  else text
+;;
+
 let message_line (m : Message.t) =
   match m with
   | User { text; _ } -> "user: " ^ one_line text
@@ -19,7 +26,8 @@ let message_line (m : Message.t) =
         sprintf " %s%s" c.name c.arguments)
     in
     "assistant: " ^ one_line (Message.Assistant.text a) ^ String.concat calls
-  | Tool_result r -> sprintf "tool_result %s: %s" r.tool_name (one_line r.text)
+  | Tool_result r ->
+    sprintf "tool_result %s: %s" r.tool_name (one_line (age r.tool_name r.text))
 ;;
 
 let print_messages messages =
@@ -94,7 +102,7 @@ let with_agent ?(extra_tools = []) ?before ?on_request ~main children f =
 let rec wait_turn agent =
   if Agent.is_running agent
   then (
-    Eio.Fiber.yield ();
+    Eio_unix.sleep 0.002;
     wait_turn agent)
 ;;
 
@@ -305,7 +313,7 @@ let%expect_test "subagent_status and subagent_cancel" =
     agent_start
     user: [subagent a1 finished] quick | quick report | [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
     assistant:  subagent_status{}
-    tool_result subagent_status: a1  finished, delivered  0s  quick  (last: finished) | a2  running  0s  slow  (last: waiting for the model)
+    tool_result subagent_status: a1  finished, delivered  Ns  quick  (last: finished) | a2  running  Ns  slow  (last: waiting for the model)
     assistant:  subagent_cancel{"id":"a9"}
     tool_result subagent_cancel: invalid arguments: unknown subagent "a9"; known: a1, a2
     assistant:  subagent_cancel{"id":"a2"}
@@ -314,7 +322,7 @@ let%expect_test "subagent_status and subagent_cancel" =
     state: running=true subagents=[]
     tool_result subagent_cancel: [subagent a2 failed] slow | [cancelled] | [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
     assistant:  subagent_status{}
-    tool_result subagent_status: a1  finished, delivered  0s  quick  (last: finished) | a2  failed, delivered  0s  slow  (last: finished)
+    tool_result subagent_status: a1  finished, delivered  Ns  quick  (last: finished) | a2  failed, delivered  Ns  slow  (last: finished)
     assistant: done
     agent_end
     state: running=false subagents=[]
@@ -326,13 +334,13 @@ let%expect_test "subagent_status and subagent_cancel" =
     assistant: waiting for a1
     user: [subagent a1 finished] quick | quick report | [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
     assistant:  subagent_status{}
-    tool_result subagent_status: a1  finished, delivered  0s  quick  (last: finished) | a2  running  0s  slow  (last: waiting for the model)
+    tool_result subagent_status: a1  finished, delivered  Ns  quick  (last: finished) | a2  running  Ns  slow  (last: waiting for the model)
     assistant:  subagent_cancel{"id":"a9"}
     tool_result subagent_cancel: invalid arguments: unknown subagent "a9"; known: a1, a2
     assistant:  subagent_cancel{"id":"a2"}
     tool_result subagent_cancel: [subagent a2 failed] slow | [cancelled] | [subagent: 1 turns, 10 in / 5 out tokens, $0.0000]
     assistant:  subagent_status{}
-    tool_result subagent_status: a1  finished, delivered  0s  quick  (last: finished) | a2  failed, delivered  0s  slow  (last: finished)
+    tool_result subagent_status: a1  finished, delivered  Ns  quick  (last: finished) | a2  failed, delivered  Ns  slow  (last: finished)
     assistant: done
     |}]
 ;;

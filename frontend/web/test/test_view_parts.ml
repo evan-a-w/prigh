@@ -7,6 +7,13 @@ open Prigh_web
 
 let inject (_ : App.Action.t) = Virtual_dom.Vdom.Effect.Ignore
 
+(* A harness, with the parts other tests in this process made forgotten. *)
+let create () =
+  let h = Harness.create () in
+  ignore (View_memo.made () : string list);
+  h
+;;
+
 (* Renders the page (with one [inject] throughout, as the page has) and
    prints the parts made again. *)
 let render h =
@@ -48,7 +55,7 @@ let delta ~seq text =
 
 let%expect_test "a key typed remakes the composer only; a delta not the sidebar"
   =
-  let h = Harness.create () in
+  let h = create () in
   Harness.quiet h (fun () -> Harness.type_ h "hello");
   Harness.quiet h (fun () -> Harness.act h Send);
   render h;
@@ -91,7 +98,7 @@ let%expect_test "a key typed remakes the composer only; a delta not the sidebar"
 ;;
 
 let%expect_test "the clock remakes only what shows the time, when it shows" =
-  let h = Harness.create () in
+  let h = create () in
   Harness.quiet h (fun () ->
     Harness.event h start;
     Harness.event h (delta ~seq:1 "Hi"));
@@ -120,7 +127,7 @@ let%expect_test "the clock remakes only what shows the time, when it shows" =
 ;;
 
 let%expect_test "another inject remakes every part" =
-  let h = Harness.create () in
+  let h = create () in
   render h;
   [%expect
     {| made again: btw chat chrome dialogs files review session_card sidebar terminal |}];

@@ -12,6 +12,7 @@ import { join } from "node:path";
 import { end } from "./end.mjs";
 import { normalVerbosity } from "./verbose_prefs.mjs";
 
+const phoneSizes = [[390, 844], [320, 640]];
 const { chromium, firefox, webkit } = await import(process.env.PLAYWRIGHT_MODULE);
 
 const [engineName] = process.argv.slice(2);
@@ -189,7 +190,7 @@ try {
   await page.locator("#auto-archive").fill("7");
   await page.locator("#auto-archive").press("Enter");
   await toast(page, "after 7 days");
-  for (const [width, height] of [[390, 844], [320, 640]]) {
+  for (const [width, height] of phoneSizes) {
     const phone = await open({ width, height }, true);
     await signIn(phone);
     await openSettings(phone);

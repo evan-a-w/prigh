@@ -36,7 +36,9 @@ fn spawn(dir: &Path, program: &str, args: &[&str]) -> Option<Child> {
         .env("HOME", dir)
         .env("XDG_STATE_HOME", dir)
         .env("XDG_CONFIG_HOME", dir)
-        .env_remove("DBUS_SESSION_BUS_ADDRESS")
+        // no session bus, and none autolaunched (dbus-launch --autolaunch
+        // starts one that outlives the test)
+        .env("DBUS_SESSION_BUS_ADDRESS", format!("unix:path={}", dir.join("no-bus").display()))
         .env_remove("PIPEWIRE_REMOTE")
         .stdout(log.try_clone().unwrap())
         .stderr(log);
@@ -63,7 +65,7 @@ fn wait_for<T>(what: &str, dir: &Path, mut f: impl FnMut() -> Option<T>) -> T {
                 .collect();
             panic!("no {what} within 30s:\n{}", logs.join("\n"));
         }
-        std::thread::yield_now();
+        std::thread::sleep(Duration::from_millis(20));
     }
 }
 

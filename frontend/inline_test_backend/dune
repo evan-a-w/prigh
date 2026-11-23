@@ -1,0 +1,20 @@
+; ppx_inline_test's backend without partitions: a test library's tests all run
+; in one process. Dune's default runs one process per file (a partition),
+; each paying the runner's start: for prigh-web a node parsing the runner, for
+; the TUI's native runner about 40 ms. Test files must leave no state behind
+; that another file sees.
+
+(library
+ (name prigh_inline_test_backend)
+ (modules ())
+ (inline_tests.backend
+  (runner_libraries ppx_inline_test.runner.lib)
+  (flags
+   inline-test-runner
+   %{library-name}
+   -source-tree-root
+   %{workspace_root}
+   -diff-cmd
+   -)
+  (generate_runner
+   (echo "let () = Ppx_inline_test_lib.exit ();;"))))

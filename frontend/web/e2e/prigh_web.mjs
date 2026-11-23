@@ -14,6 +14,7 @@ import { png, pngSize } from "./png.mjs";
 import { end } from "./end.mjs";
 import { normalVerbosity } from "./verbose_prefs.mjs";
 
+const phoneSizes = [[390, 844], [320, 640]];
 const { chromium, firefox, webkit } = await import(process.env.PLAYWRIGHT_MODULE);
 
 const [engineName] = process.argv.slice(2);
@@ -81,7 +82,8 @@ const script3 = [
   { text: "1. Write the **schema**\n2. Test it" },
   { text: "Implementing." },
   // Long enough to queue messages while it runs.
-  { text: "waiting", tool_calls: [{ id: "w2", name: "bash", arguments: { command: "sleep 8" } }] },
+  { text: "waiting", tool_calls: [{ id: "w2", name: "bash", arguments: {
+    command: `timeout 300 sh -c 'until [ -f ${join(dir, "queue-go")} ]; do sleep 0.1; done'` } }] },
   { text: "Done waiting." },
   { text: "Noted." },
   { text: "Read the attachments." },
@@ -405,10 +407,11 @@ const popoverPlace = () => page.evaluate(() => {
 const bodyHas = text => page.waitForFunction(t => document.body.innerText.includes(t), text);
 const bodyLacks = text => page.waitForFunction(t => !document.body.innerText.includes(t), text);
 const composer = () => page.locator(".composer textarea");
-// Clicks the toasts away, one at a time: each click removes the one under it.
+// Clicks the toasts away (a click on one removes it), without waiting for
+// one that expires meanwhile.
 const dismissToasts = async () => {
-  const toasts = page.locator(".toast");
-  for (let i = 0; i < 20 && await toasts.count(); i++) await toasts.first().click({ timeout: 2000 }).catch(() => {});
+  await page.evaluate(() => document.querySelectorAll(".toast").forEach(t => t.click()));
+  await page.waitForFunction(() => !document.querySelector(".toast"));
 };
 const idle = () => page.waitForFunction(() => !document.querySelector(".streaming, .btn.stop"));
 
@@ -1149,6 +1152,7 @@ try {
   await page.waitForFunction(() => document.querySelectorAll(".queue .queued").length === 1);
   await page.locator(".toast", { hasText: "Removed from the queue" }).waitFor();
   await show("one removed", ".queue");
+  writeFileSync(join(dir, "queue-go"), "");
   await page.locator(".toast", { hasText: "Steer delivered" }).waitFor();
   await page.waitForSelector(".queue", { state: "detached" });
   await bodyHas("Done waiting.");
@@ -1211,7 +1215,7 @@ try {
   console.log(`pin: ${await newest.locator(".session-pin").getAttribute("aria-label")}`);
   await page.mouse.move(700, 400);
   await screenshot("pinned");
-  for (const [width, height] of [[390, 844], [320, 640]]) {
+  for (const [width, height] of phoneSizes) {
     await page.setViewportSize({ width, height });
     await page.waitForFunction(() => document.querySelector(".app.narrow"));
     if (!(await page.locator(".app.sidebar-open").count())) {
@@ -1422,7 +1426,7 @@ try {
   }
   // At phone size the browser is a sheet; a preview takes it over, with a
   // way back to the list.
-  await page.waitForFunction(() => !document.querySelector(".toast"));
+  await dismissToasts();
   await page.setViewportSize({ width: 390, height: 844 });
   await page.waitForFunction(() => document.querySelector(".app.narrow:not(.sidebar-open)"));
   // The panels' toggles are in the ⋯ menu, top right.

@@ -3,10 +3,23 @@ prigh is a coding agent. Read `README.md` for what it does and
 
 ## Layout and builds
 
-Run every suite with `./test` (about a minute warm: it builds both projects,
-runs their dune tests and prigh-web's browser e2e in Chromium, in parallel);
-`./test --full` adds the browser e2e in Firefox and WebKit (the desktop
-app's engine on Linux and macOS), the whole matrix the flake checks run: run it before merging. Both work from any shell (outside the dev
+`./test` is the test suite: run it, and only it, before pushing and before
+merging. It builds and tests each project in one dune call (`dune build
+@default @runtest`), then runs prigh-web's browser smoke (`smoke.mjs`, one
+script, about 3 CPU-seconds) in Chromium alongside the desktop's `cargo
+test`. It is meant to take under a minute after a change, also on a machine
+busy with other work, and about 4 CPU-seconds when nothing changed: it
+repeats nothing it has a result for. Dune keeps its test results; the browser
+smoke is skipped when the backend, the site and the e2e scripts are what they
+were at its last green run, and `cargo test` when its test executables are
+(`PRIGH_TEST_E2E=always`, `PRIGH_TEST_DESKTOP=always` or `SHOTS` run them
+anyway). It enters the dev shells through saved profiles
+(`~/.cache/prigh/test-shell`), so it does not evaluate the flake each time.
+`./test --full` runs everything again: every dune test, also the slow tier
+(`PRIGH_TEST_TIER=full`), and every browser e2e script at every size in
+Chromium, Firefox and WebKit (the desktop app's engine on Linux and macOS):
+run it only when the user asks for it. No CI job runs it (the flake's
+`web-e2e` check runs the browser e2e alone). Both work from any shell (outside the dev
 shell they enter it) and test what they build. Run single suites as below
 while iterating.
 
@@ -33,12 +46,10 @@ while iterating.
   OxCaml.
 - `frontend/`'s `@runtest` includes the TUI's e2e and tmux tests, which run
   `backend/_build/default/bin/main.exe`: build the backend first (`dune
-  build`, not just `@runtest`, which does not rebuild `main.exe`). Dune does
-  not see the backend binary as a dependency, so after changing only the
-  backend, clear the stale results (`rm -rf
-  frontend/_build/default/tui/e2e/e2e.actual
-  frontend/_build/default/tui/tmux-test/.cram.*`; `./test` does) or they
-  report the old run. The tmux tests need a terminal multiplexer (`tmux`);
+  build`, not just `@runtest`, which does not rebuild `main.exe`). They
+  depend on `tui/e2e/backend.digest`, its hash (of `$PRIGH_BACKEND` if
+  set), which dune computes on every build: they run again when the backend
+  changes, and only then. The tmux tests need a terminal multiplexer (`tmux`);
   each `.t` file in `tmux-test/` is a group of scenarios, and dune runs the
   groups in parallel. `dune build @tui/test/runtest` runs only the TUI's
   unit tests. `$PRIGH_BACKEND` overrides that path: unset it
@@ -55,7 +66,13 @@ while iterating.
   with its own backend, browser and directory (as many at a time as the
   CPUs and the available memory allow: `JOBS`, `MEM_PER_JOB` MiB each),
   and print what they see;
-  `ENGINE.expected` is each browser's output. Wait for a condition, not a
+  `ENGINE.expected` is each browser's output (`ENGINE.core.expected`:
+  `SUITE=core`'s, the smoke alone). They load Playwright through
+  `playwright.mjs`, whose contexts block service workers unless a script
+  asks for them (`pwa.mjs` allows the worker it tests). `./test` runs only
+  `smoke.mjs` (`SUITE=core`), and skips it when the backend, the site and
+  the scripts are what they were at its last green run
+  (`PRIGH_TEST_E2E=always` runs it anyway). Wait for a condition, not a
   time (`waitForFunction`, `waitFor`): a fixed wait is either slow or flaky
   on a busy machine, and a wait that is meant to time out costs its whole
   timeout. A script that orders agents with gates (bash calls waiting for a
@@ -65,6 +82,10 @@ while iterating.
   self-hosted build host fills from every push to `main` (DOCKER.md,
   "Binary cache"); pass
   `--accept-flake-config` to Nix in non-interactive use.
+- The dev shell and `./test` turn on dune's shared cache (`DUNE_CACHE=enabled`,
+  in `~/.cache/dune`): a new worktree builds in seconds from what the others
+  built, rather than minutes. `dune cache trim --size=4GB` keeps it in
+  bounds; `DUNE_CACHE=disabled` turns it off.
 - Only have one dune process running at a time, otherwise it hangs. E.g. if
   you are running tests, don't also `dune exec`.
 - Every new RPC field or method must be mirrored by the frontends that use it
@@ -111,10 +132,44 @@ sexps or screens demonstrating state rather than asserting equality with a
 hand-written value (e.g. don't just [assert_true] some condition). Look at the
 output of `dune build @runtest`, and if the diffs are right, `dune promote`.
 
-Run `./test` before pushing and `./test --full` before merging (see "Layout
-and builds"). Keep them fast: tests wait for what they expect rather than
-sleeping, and output does not depend on timing (a test that passes only on an
-idle machine is broken).
+Run `./test` before pushing and before merging; `./test --full` only when
+the user asks (see "Layout and builds"). Keep `./test` minimal and under a
+minute on a busy machine; `--full` is where depth goes:
+
+- Dune tests: `@runtest` is for unit and expect tests and a cheap check of
+  each real binary. A slow, integration-style test whose behaviour cheaper
+  tests already pin goes in the slow tier instead: its stanza (inline_tests,
+  cram or rule) gets `(enabled_if (= %{env:PRIGH_TEST_TIER=default} full))`,
+  so only `PRIGH_TEST_TIER=full dune build @runtest` (`./test --full`) runs
+  it. Its code still builds, warnings and all, in every run, so it never falls
+  behind. Where the slow ones live:
+  - Backend: a test taking 100 ms of CPU or 1 s of wall or more goes in
+    `backend/test/full/test_x_full.ml` (opening `Test_x` for its helpers),
+    and `test_x.ml` keeps the cheap ones, so every area stays in the default
+    run. `test/full` and `test/terminal` are the slow tier's directories
+    (ppx_expect rejects custom tags, so the tiers are split by directory). To time one test:
+    `inline-test-runner.exe inline-test-runner <lib> -source-tree-root .
+    -only-test file.ml:LINE`.
+  - prigh-web: scale tests (huge replies, trees, file lists) go in
+    `frontend/web/test/full/`. The rest run in two node processes: shard a
+    lists its modules in `web/test/dune`, shard b takes the others, so a new
+    test file needs no entry. `Harness` reuses the last rendering until the
+    model changes: change state only through `App.update`.
+  - TUI: the default runs the e2e transcript and the tmux group `smoke.t`;
+    the other tmux groups and the websocket e2e (`tui/e2e/websocket`, a
+    library every build compiles; its executable exists only in the slow
+    tier, as linking it cost more than running it) are in the slow tier.
+- Browser e2e: `./test` runs `smoke.mjs` alone, the main flows once each,
+  one backend, one browser and few page loads. Add a check to it only for a
+  main flow that nothing else catches and only a real browser can; anything
+  else is a new script or a step in one, in the full suite (`scripts` in
+  `frontend/web/e2e/prigh_web.sh`, at every size it needs).
+- The dev profile's JavaScript has no source maps, to keep builds and page
+  loads cheap (`--profile debug-js` adds them).
+
+Keep tests fast: they wait for what they expect rather than sleeping, and
+output does not depend on timing (a test that passes only on an idle
+machine is broken).
 
 - Backend: drive the agent with `Faux_provider` and print event streams; no
   network.
@@ -132,7 +187,8 @@ idle machine is broken).
   apply). Consider the on-screen keyboard (the visual viewport shrinks) and
   touch (no hover: whatever a hover shows has a tap). `e2e/mobile.mjs` checks
   no page overflows sideways and no control is off screen, covered or
-  under 44px (40px in the few dense rows it lists).
+  under 44px (40px in the few dense rows it lists), with the audit in
+  `e2e/phone_audit.mjs`, which `smoke.mjs` runs on the main page too.
 
 ## UI principles
 

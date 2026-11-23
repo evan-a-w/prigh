@@ -1157,7 +1157,7 @@ selection kept: true
 messages reused: true
 messages drawn again: 0
 sidebar, transcript and status touched: none
-=== webkit: stability: idle for 3 s ===
+=== webkit: stability: idle for 1 s ===
 renders: at most one
 changes to the page: 0
 === webkit: stability: the editor ===
@@ -2923,14 +2923,14 @@ none
 === webkit: search: the sidebar's row and the composer's ===
 Search: wide, 28px high
 New session: narrow, 28px high
-composer: Add files or images, Context 0% full, $0.00, server-laptop, Model, Send
+composer: Add files or images, Context 0% full, $0.00, <HOSTNAME>, Model, Send
 === webkit: search: Ctrl+K: the session's settings, recent sessions, commands ===
 focus in the filter: control-input
 -- This session --
 > Set model | DeepSeek V4.1 Flash Ctrl+L
   Set thinking | provider's default Alt+T
   Set verbosity | normal Ctrl+O
-  Switch host | server-laptop
+  Switch host | <HOSTNAME>
   Set mode | auto Alt+M
   Context and cost | 0% · $0.00
 -- Recent sessions --
@@ -3227,15 +3227,6 @@ fits
 ring: Context 0% full, $<COST>: details; Ready; calm
 mode: Plan mode; over the chat: nothing
 fits
-chips 1: icon | V4.1 Flash
-chip problems: none
-=== webkit: card: the host stopped answering ===
-chips 1: icon | V4.1 Flash
-chip problems: none
-<HOSTNAME> <CWD>
-✓ (dimmed) build-runner-eu-west-a-long-hostname offline: waiting for it to reconnect
-build-runner-eu-west-a-long-hostname is offline: pick another host, or run prigh tool-host -connect there to bring it back.
-=== webkit: card: the host is back ===
 chips 1: icon | V4.1 Flash
 chip problems: none
 === webkit: status: desktop 1280: the row ===
@@ -5127,3 +5118,49 @@ drawer gone: true
 strip: src/ turn.mli
 swiped: src/ compact.ml
 left: the chat
+=== webkit: smoke: sign in ===
+prigh
+web
+Sign in
+to the prigh backend at ws://127.0.0.1:<PORT>/ws
+User name
+Password
+Backend
+Sign in
+signed in: the composer and the sidebar: true
+=== webkit: smoke: a run with a tool call ===
+▢
+Using prigh-web
+count some lines
+<TIME>
+let me look
+bash
+printf 'one\ntwo\nthree\n'
+three lines
+<TIME>
+the session in the address: true
+=== webkit: smoke: sessions ===
+the sidebar: hello again | count some lines
+a new session in the address: true
+back to the first: true
+=== webkit: smoke: Ctrl+K ===
+focus in its filter: true
+"verbosity" selects: Set verbosity
+Esc: closed, the focus back in the editor
+=== webkit: smoke: the backend restarts ===
+Connection lost: reconnecting…
+Reconnecting…
+the same session after reconnecting: true
+=== webkit: smoke: after reconnecting ===
+still there?
+<TIME>
+back again
+<TIME>
+=== webkit: smoke: a phone: the chat ===
+narrow: true
+ok
+=== webkit: smoke: a phone: the drawer ===
+ok
+its sessions: count some lines | hello again
+=== webkit: smoke: errors ===
+none

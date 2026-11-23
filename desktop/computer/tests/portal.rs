@@ -110,9 +110,13 @@ const SESSION: &str = "/org/freedesktop/portal/desktop/session/1/prigh";
 /// The fake portal: serves until the bus goes away.
 fn serve(address: &str, fake: Shared) {
     let conn = portal::bus(Some(address)).unwrap();
+    // Listening before the name is ours: an iterator sees only what arrives
+    // after it is made, and a call missed (the thread not yet started, on a
+    // busy machine) would never be answered, nor time out.
+    let messages = MessageIterator::from(&conn);
     conn.request_name(portal::DESTINATION).unwrap();
     std::thread::spawn(move || {
-        for msg in MessageIterator::from(&conn) {
+        for msg in messages {
             let Ok(msg) = msg else { break };
             let hdr = msg.header();
             if hdr.message_type() != Type::MethodCall {

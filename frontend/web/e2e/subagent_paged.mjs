@@ -9,7 +9,7 @@
 // Environment: PLAYWRIGHT_MODULE, PRIGH_BACKEND, SITE, TEST_DIR, TOKEN and
 // optionally SHOTS.
 import { spawn } from "node:child_process";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { end } from "./end.mjs";
 import { holdGates, waitFor } from "./gates.mjs";
@@ -52,7 +52,9 @@ writeFileSync(
       tool_calls: [{ id: `e${i + 1}`, name: "bash", arguments: { command: `echo ${i + 1}` } }],
     })),
     // Still running when the page reloads.
-    { text: "Waiting.", tool_calls: [{ id: "w2", name: "bash", arguments: { command: waitFor("end") } }] },
+    // It marks that it got there: the test waits for that, not for the page
+    // to draw every step (slow on a busy machine, and not what is tested).
+    { text: "Waiting.", tool_calls: [{ id: "w2", name: "bash", arguments: { command: `touch at-end; ${waitFor("end")}` } }] },
     { text: "All done." },
   ]),
 );
@@ -113,12 +115,7 @@ try {
   // A subagent's whole run: longer than a step on a busy machine.
   await page.waitForFunction(() => document.querySelector("#chat .tool-subagent.ok"), null, { timeout: 90000 });
   writeFileSync(join(cwd, "main-go"), "");
-  // 35 steps: as long as the subagent's run on a busy machine.
-  await page.waitForFunction(() => document.getElementById("chat").innerText.includes("Waiting."), null, { timeout: 90000 })
-    .catch(async error => {
-      console.error(`the chat's end: ${(await page.locator("#chat").innerText()).slice(-600)}`);
-      throw error;
-    });
+  while (!existsSync(join(cwd, "at-end"))) await new Promise(r => setTimeout(r, 100));
 
   await page.reload();
   await page.waitForFunction(() => document.getElementById("chat")?.innerText.includes("Waiting."));
