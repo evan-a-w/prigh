@@ -888,3 +888,8 @@ table.review-diff tr.gap td { padding: 0; border-top: 1px dashed var(--border); 
 .review-since { height: 100%; border-radius: calc(var(--radius) - 2px); }
 .review-since.on { background: var(--background); box-shadow: 0 0 0 1px var(--border), 0 1px 2px color-mix(in srgb, var(--edge-shadow) 30%, transparent); }
 .review-since.on .segment.on { border-color: transparent; }
+
+/* On a phone the track is the touch target's height and the segments fill
+   it (a 44px segment in a 32px track stuck out of it). */
+.app.narrow :is(.review-page, .files-review-bar, .prs-head, .review-sheet) .segmented { height: calc(var(--tap) + 6px); padding: 3px; }
+.app.narrow :is(.review-page, .files-review-bar, .prs-head, .review-sheet) .segment { min-height: 0; height: 100%; }
