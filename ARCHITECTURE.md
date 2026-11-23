@@ -222,6 +222,28 @@ and budgets, delivery of background work's reports, and eviction.
 | Worktrees | `Worktree` (`host/`), `Tool_worktree`, `Agent_worktree`, `Worktree_home`, `Worktree_watch` |
 | Temporary sessions | `Leftover`, `Temporary_ledger` (`rpc/`): what they made, deleted when they end |
 
+### Engines
+
+A session runs on an engine (`engine/`): the **harness** (prigh's own
+`Agent_loop`, providers and tools) or the **composer**, which drives an
+external coding agent (Codex, Claude Code, ACP agents, prigh itself) on the
+session's tool host through an adapter. `Agent` stays the session object
+either way (log, clients, queues, approvals, hosts, worktrees, naming); only
+its runs go through `Runner` (`Engine_intf`), whose `Capabilities` say what
+the engine supports. `Harness_runner` (`agent/`) wraps `Agent_loop`.
+
+`Engines` is what a backend deploys (`prigh serve -engines harness,composer
+-adapters codex,claude`, or `$PRIGH_ENGINES`/`$PRIGH_ADAPTERS`; the harness
+alone by default), shared by all its namespaces, so users, settings and
+logins are the same whichever engine a session runs on. A session's engine
+is its last `Engine` entry (`Engine_choice`; none: the harness), set when
+`new_session` names one (`engine`, `adapter`); one whose engine the backend
+does not deploy, or this build cannot run, can be read but not run
+(`state`'s `unavailable`). `hello` lists `engines` and `adapters` (and the
+`engines` feature) when there is more than the harness, and `state` carries
+`engine`, `adapter` and `capabilities` for sessions not on the harness.
+The composer is not built yet: asking for it fails at startup.
+
 ### Subagents and background work
 
 - `Tool_subagent` (`tools/`): `subagent {task, tools?, model?, thinking?,
@@ -320,7 +342,7 @@ to `head`. Rewinding moves `head`; forking copies the active path to a new
 file. Besides messages, entries record model and thinking changes,
 compaction summaries, masking, names, descriptions, cwds with their host, the
 system prompt, goal, reminders, approval mode and rules, archiving, pinning,
-spend, review changes and what the model was told. `Session.mli` lists them.
+spend, review changes and what the model was told, and for engines the session's engine (`Engine`), its external agent's threads (`Thread`) and turns (`External_turn`), and handoffs between adapters (`Handoff`). `Session.mli` lists them.
 
 Related: `Message_page`/`Outline`/`Trim_point` (paged transcripts and
 landmarks), `Session_search` (word index over saved sessions),

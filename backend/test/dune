@@ -9,7 +9,8 @@
   (deps
    fake_mcp_server/fake_mcp_server.exe
    fake_line_peer/fake_line_peer.exe
-   ../bin/main.exe)
+   ../bin/main.exe
+   (source_tree fixtures))
   (flags
    (-source-tree-root .)))
  (libraries

@@ -102,6 +102,13 @@ module State : sig
       (** what prigh-web shows of the transcript ({!set_transcript_filter}) *)
     ; temporary : bool
       (** never saved or listed, deleted when left ({!Session.temporary}) *)
+    ; engine : Engine_choice.t
+      (** the engine the session runs on ({!Session.engine}; the harness for
+          one naming an engine this prigh does not know) *)
+    ; capabilities : Capabilities.t
+    ; unavailable : string option
+      (** why the session cannot run on this backend (its engine is not
+          deployed here), naming what to do; it can still be read *)
     }
   [@@deriving sexp_of]
 end
@@ -284,12 +291,40 @@ val create
        (** the user's custom instructions: in the system prompt of a new
            session, and the changes told with the next message to a session
            that knows others ({!Told_environment}); default: none *)
+  -> ?runner:Runner.t
+       (** the engine that does the session's runs; default: the harness, the
+           agent loop on [provider] with [tools] *)
   -> cwd:string
   -> unit
   -> t
 
 val subscribe : t -> f:(Event.t -> unit) -> unit
 val state : t -> State.t
+
+(** The engine doing the session's runs, and what it supports. *)
+val engine : t -> Engine_id.t
+
+val capabilities : t -> Capabilities.t
+
+(** How errors name the session's engine: [Harness], [Composer]. *)
+val engine_label : t -> string
+
+(** [Ok ()] when the session's engine has [feature]; else an error saying
+    what to do instead. The vals below that need a feature check it. *)
+val require : t -> Capabilities.Feature.t -> unit Or_error.t
+
+(** The engine the session records ({!Session.engine}). *)
+val engine_choice : t -> Engine_choice.t
+
+(** Records [choice] as the session's engine (when it changes): for a new
+    session, before its first run. *)
+val set_engine : t -> Engine_choice.t -> unit
+
+(** Marks the session as one this backend cannot run, and why (its engine is
+    not deployed here): no run starts, it can still be read. [None] lifts
+    it. *)
+val set_unavailable : t -> string option -> unit
+
 val session : t -> Session.t
 val env : t -> Env.t
 val messages : t -> Message.t list

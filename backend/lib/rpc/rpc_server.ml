@@ -417,6 +417,7 @@ type t =
   ; cwd : string
   ; new_agent : ?session:Session.t -> cwd:string -> unit -> Agent.t
   ; default_agent : Agent.t option
+  ; engines : Engines.t (** what this backend deploys *)
   ; agents : Agent.t String.Table.t (** live sessions by session id *)
   ; clients : Client.t String.Table.t
   ; mutable client_seq : int
@@ -1001,7 +1002,21 @@ let route t agent (event : Agent.Event.t) =
 
 (* Hosts are set before subscribing: the state change would otherwise evict
    the agent, which has no client until [attach]. *)
+(* Why [agent]'s session cannot run here: its engine is not deployed, or it
+   names one this prigh does not know. *)
+let engine_unavailable t agent =
+  match Session.engine (Agent.session agent) with
+  | Ok choice -> Engines.unavailable t.engines choice
+  | Error e ->
+    Some
+      (sprintf
+         "this session was made by a newer prigh (%s): update prigh to run it; \
+          it can still be read here"
+         (Error.to_string_hum e))
+;;
+
 let register t agent =
+  Agent.set_unavailable agent (engine_unavailable t agent);
   Agent.set_hosts agent (hosts t) ~returning:(returning t);
   Hashtbl.set t.agents ~key:(session_id agent) ~data:agent;
   Hashtbl.set t.listed ~key:(session_id agent) ~data:(Listed.of_agent agent);
@@ -1149,6 +1164,7 @@ let create
       ~login
       ~sessions_dir
       ~cwd
+      ?(engines = Engines.default)
       ~new_agent
       ?default_agent
       ()
@@ -1175,6 +1191,7 @@ let create
     ; cwd
     ; new_agent
     ; default_agent
+    ; engines
     ; agents = String.Table.create ()
     ; clients = String.Table.create ()
     ; client_seq = 0
@@ -1995,6 +2012,22 @@ let clean_leftovers t =
     Agent.shutdown agent)
 ;;
 
+(* A backend deploying more than the harness says what, so that frontends
+   offer the choice; one with the harness alone says nothing, as before
+   engines. *)
+let engine_features t =
+  if Engines.equal t.engines Engines.default then [] else [ "engines" ]
+;;
+
+let engines_json t =
+  if Engines.equal t.engines Engines.default
+  then []
+  else
+    [ "engines", strings (Engines.engine_strings t.engines)
+    ; "adapters", strings (Engines.adapter_strings t.engines)
+    ]
+;;
+
 let hello t (client : Client.t) params =
   let string name =
     match param params name with
@@ -2084,21 +2117,22 @@ let hello t (client : Client.t) params =
               Guarded.run ~what:"cleaning up temporary sessions" (fun () ->
                 clean_leftovers t));
           `Object
-            [ "client_id", `String client.id
-            ; "host_id", `String client.host_id
-            ; ( "namespace"
-              , Option.value_map t.namespace ~default:`Null ~f:(fun n ->
-                  `String n) )
-            ; ( "user"
-              , Option.value_map client.signed_in ~default:`Null ~f:(fun s ->
-                  `String s.user) )
-            ; ( "superuser"
-              , if Option.exists client.signed_in ~f:(fun s -> s.superuser)
-                then `True
-                else `False )
-            ; "features", strings backend_features
-            ; "state", Rpc_json.state (Agent.state agent)
-            ]))))
+            ([ "client_id", `String client.id
+             ; "host_id", `String client.host_id
+             ; ( "namespace"
+               , Option.value_map t.namespace ~default:`Null ~f:(fun n ->
+                   `String n) )
+             ; ( "user"
+               , Option.value_map client.signed_in ~default:`Null ~f:(fun s ->
+                   `String s.user) )
+             ; ( "superuser"
+               , if Option.exists client.signed_in ~f:(fun s -> s.superuser)
+                 then `True
+                 else `False )
+             ; "features", strings (backend_features @ engine_features t)
+             ; "state", Rpc_json.state (Agent.state agent)
+             ]
+             @ engines_json t)))))
 ;;
 
 (* The namespace's file as it is now, which another session may have
@@ -2168,7 +2202,12 @@ let new_session_start t (client : Client.t) =
     | _ -> start)
 ;;
 
-let new_session t (client : Client.t) ~temporary =
+let new_session
+      ?(engine = Engine_choice.harness)
+      t
+      (client : Client.t)
+      ~temporary
+  =
   let start = new_session_start t client in
   let cwd =
     match start with
@@ -2191,7 +2230,10 @@ let new_session t (client : Client.t) ~temporary =
       eprintf
         "prigh: the ledger of a temporary session: %s\n%!"
         (Exn.to_string exn));
-  start_new_agent t session start |> attach t client;
+  let agent = start_new_agent t session start in
+  Agent.set_engine agent engine;
+  Agent.set_unavailable agent (engine_unavailable t agent);
+  attach t client agent;
   match attached_state client, key with
   | `Object fields, Some key ->
     `Object (fields @ [ "temporary_key", `String key ])
@@ -3194,9 +3236,13 @@ let dispatch_server t (client : Client.t) ~meth ~params
          Config.to_json (Agent.config client.agent)))
   | "new_session" ->
     Some
-      (Or_error.map
-         (bool_param params "temporary" ~default:false)
-         ~f:(fun temporary -> new_session t client ~temporary))
+      (let%bind.Or_error temporary =
+         bool_param params "temporary" ~default:false
+       in
+       let%bind.Or_error engine = string_param_opt params "engine" in
+       let%bind.Or_error adapter = string_param_opt params "adapter" in
+       let%map.Or_error engine = Engines.choose t.engines ~engine ~adapter in
+       new_session ~engine t client ~temporary)
   | "keep_session" -> Some (keep_session t client)
   | "switch_session" ->
     Some
@@ -3903,9 +3949,14 @@ let handle t client (request : Json.t) : Json.t =
             Or_error.error_string
               "unauthorised: send hello with the token first"
           else (
-            match dispatch_server t client ~meth ~params with
-            | Some result -> result
-            | None ->
+            match
+              Or_error.bind
+                (Engine_gate.check client.agent ~meth ~params)
+                ~f:(fun () -> Ok (dispatch_server t client ~meth ~params))
+            with
+            | Error e -> Error e
+            | Ok (Some result) -> result
+            | Ok None ->
               let agent = agent_of_client t client in
               let by =
                 Option.map client.signed_in ~f:(fun s ->

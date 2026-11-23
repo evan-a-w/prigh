@@ -107,6 +107,12 @@ val create
   -> login:Login_manager.t
   -> sessions_dir:string
   -> cwd:string
+  -> ?engines:Engines.t
+       (** the engines (and the composer's adapters) this backend deploys
+           (default: the harness alone). [hello] lists them when there is
+           more than the harness; [new_session] takes [engine] and
+           [adapter]; a session on one not deployed can be read but not run
+           ([state]'s [unavailable]). *)
   -> new_agent:(?session:Session.t -> cwd:string -> unit -> Agent.t)
   -> ?default_agent:Agent.t
   -> unit

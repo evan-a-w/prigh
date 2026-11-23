@@ -77,6 +77,7 @@ type t =
   ; hidden : Hidden.t list [@sexp.list]
   ; transcript_filter : string option [@sexp.option]
   ; temporary : bool [@sexp.bool]
+  ; engine : Session_engine.t [@sexp_drop_if Session_engine.is_harness]
   }
 [@@deriving sexp_of, equal]
 
@@ -165,7 +166,8 @@ let of_json j =
   let%bind trim = Trim.field j in
   let%bind hidden = Hidden.field j in
   let%bind transcript_filter = Json.string_opt_field j "transcript_filter" in
-  let%map temporary = Json.bool_default_field j "temporary" ~default:false in
+  let%bind temporary = Json.bool_default_field j "temporary" ~default:false in
+  let%map engine = Session_engine.of_state_json j in
   { session_id
   ; session_path
   ; session_name
@@ -201,5 +203,6 @@ let of_json j =
   ; hidden
   ; transcript_filter
   ; temporary
+  ; engine
   }
 ;;

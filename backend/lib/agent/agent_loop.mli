@@ -32,6 +32,10 @@ val is_retryable_error : string -> bool
     [on_host]. *)
 val tool_summary : name:string -> Json.t -> string
 
+(** A new id for a streamed message ([Message_update]'s [stream]), unique
+    in the process. *)
+val next_stream : unit -> int
+
 (** Returns the messages added to the context (prompts, assistant messages
     and tool results). [steer] is polled after each turn's tool results; any
     messages it returns are appended before the next provider request.

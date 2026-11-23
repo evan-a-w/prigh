@@ -124,6 +124,14 @@ module State = struct
     ; hidden : Session.Hidden.t list [@sexp.list]
     ; transcript_filter : string option [@sexp.option]
     ; temporary : bool [@sexp.bool]
+    ; engine : Engine_choice.t [@sexp_drop_if Engine_choice.is_harness]
+    ; capabilities : Capabilities.t
+          [@sexp_drop_if
+            fun c ->
+              Sexp.equal
+                (Capabilities.sexp_of_t c)
+                (Capabilities.sexp_of_t Capabilities.harness)]
+    ; unavailable : string option [@sexp.option]
     }
   [@@deriving sexp_of]
 end
@@ -208,6 +216,9 @@ type t =
   { env : Env.t
   ; sw : Switch.t
   ; provider : Provider.t
+  ; runner : Runner.t option
+    (** the session's engine when it is not the harness on [provider] *)
+  ; mutable unavailable : string option
   ; tools : Tool.t list
   ; offered : Tool.t -> bool
   ; user_info : User_info.t option
@@ -608,6 +619,20 @@ let describe_allowed t =
     | None -> id)
 ;;
 
+(* A session naming an engine this prigh does not know is shown as the
+   harness's; [unavailable] says why it cannot run. *)
+let engine_choice t =
+  Session.engine t.session
+  |> Result.ok
+  |> Option.value ~default:Engine_choice.harness
+;;
+
+let runner_capabilities t =
+  match t.runner with
+  | Some runner -> Runner.capabilities runner
+  | None -> Capabilities.harness
+;;
+
 let state t =
   let messages = messages t in
   let assistant_usage, assistant_cost = session_spend t in
@@ -665,6 +690,9 @@ let state t =
   ; hidden = Session.hidden t.session
   ; transcript_filter = Session.transcript_filter t.session
   ; temporary = Session.temporary t.session
+  ; engine = engine_choice t
+  ; capabilities = runner_capabilities t
+  ; unavailable = t.unavailable
   }
 ;;
 
@@ -2952,6 +2980,36 @@ let loop_config ?cancel t =
   }
 ;;
 
+let runner t =
+  match t.runner with
+  | Some runner -> runner
+  | None ->
+    Harness_runner.create ~provider:t.provider ~config:(fun ~cancel ->
+      loop_config ~cancel t)
+;;
+
+let capabilities t = Runner.capabilities (runner t)
+let engine t = Runner.engine (runner t)
+let engine_label t = String.capitalize (Engine_id.to_string (engine t))
+
+let require t feature =
+  Capabilities.check (capabilities t) feature ~who:(engine_label t)
+;;
+
+let set_engine t (choice : Engine_choice.t) =
+  if not (Engine_choice.equal choice (engine_choice t))
+  then (
+    ignore (Session.set_engine t.session choice : Session.Entry.t);
+    state_changed t)
+;;
+
+let set_unavailable t why =
+  if not (Option.equal String.equal why t.unavailable)
+  then (
+    t.unavailable <- why;
+    state_changed t)
+;;
+
 (* The text with the attachments' [<file>] blocks, what they are, and their
    images. *)
 let with_attachments t ~cancel text attachments =
@@ -3204,17 +3262,6 @@ let handover_message ~from ~(to_ : Model.t) ~error =
        (Model.key to_))
 ;;
 
-(* Masks [session]'s messages up to its [through]th, as [Agent_loop.run]'s
-   [mask]. *)
-let mask_session session ~through =
-  match List.nth (Session.context_ids session) through with
-  | Some (Some id) ->
-    ignore (Session.append_masked session ~through:id : Session.Entry.t);
-    Ok (Session.messages session)
-  | Some None | None ->
-    Or_error.error_s [%message "no entry to mask up to" (through : int)]
-;;
-
 let compacted t (outcome : Compaction.Outcome.t) =
   account
     t
@@ -3437,22 +3484,18 @@ let rec start_run
          broadcast t (Loop (Message_start m));
          broadcast t (Loop (Message_end m)));
        let recorded m = List.mem prompts m ~equal:phys_equal in
-       let config = loop_config ~cancel t in
-       let added =
-         match
-           Agent_loop.run
-             ~env:t.env
-             ~provider:t.provider
-             ~config
-             ~cwd:t.cwd
-             ~cancel
-             ~approve:(approve t)
-             ~ask_user:(ask_user t ~cancel)
-             ~ui:(ui_host t ~cancel)
-             ~chat:t.chat_mode
-             ~execute:(executor t)
-             ~background:t.background
-             ~steer:(fun () ->
+       let services : Engine_intf.Services.t =
+         { env = t.env
+         ; cwd = t.cwd
+         ; session
+         ; notice = (fun n -> broadcast t (Notice n))
+         ; approve = approve t
+         ; ask_user = ask_user t ~cancel
+         ; ui = ui_host t ~cancel
+         ; execute = executor t
+         ; background = t.background
+         ; steer =
+             (fun () ->
                let l = Steer_queue.take_steers t.queue in
                if not (List.is_empty l) then queue_update t;
                let queued = List.map l ~f:(user_message t) in
@@ -3473,28 +3516,8 @@ let rec start_run
                  else []
                in
                deliveries t @ mail t @ note @ queued @ due_reminders t)
-             ~compact:
-               (fun
-                 ~model ~keep_recent_tokens ~overflowed ~cancel _messages ->
-               match
-                 Compaction.compact
-                   ~env:t.env
-                   ~provider:t.provider
-                   ~model
-                   ~prompt:(Agent_loop.Config.compaction_prompt config)
-                   ~overflowed
-                   ~keep_recent_tokens
-                   ~cancel
-                   session
-               with
-               | Ok outcome -> Ok (Session.messages session, outcome)
-               | Error e ->
-                 broadcast
-                   t
-                   (Notice ("auto-compaction failed: " ^ Error.to_string_hum e));
-                 Error e)
-             ~mask:(fun ~through _messages -> mask_session session ~through)
-             ~halt:(fun () ->
+         ; halt =
+             (fun () ->
                let reason =
                  match !halted with
                  | Some _ as interrupted -> interrupted
@@ -3502,7 +3525,8 @@ let rec start_run
                in
                Option.iter reason ~f:(fun r -> halted := Some r);
                reason)
-             ~emit:(fun event ->
+         ; emit =
+             (fun event ->
                account t event;
                track_plan t event;
                match event with
@@ -3534,9 +3558,15 @@ let rec start_run
                  ignore (Session.append_message session m : Session.Entry.t);
                  broadcast t (Loop event)
                | _ -> broadcast t (Loop event))
-             ~context
-             ~prompts
-             ()
+         }
+       in
+       let added =
+         match
+           Runner.run_turn
+             (runner t)
+             services
+             ~cancel
+             { context; prompts; chat = t.chat_mode }
          with
          | added -> added
          | exception exn ->
@@ -3850,7 +3880,8 @@ and auto_compact t =
              ; "tokens_saved", Int plan.tokens_saved
              ; "masked", Int plan.masked
              ]
-           (fun () -> mask_session t.session ~through:plan.through)
+           (fun () ->
+              Harness_runner.mask_session t.session ~through:plan.through)
        with
        | Error _ -> tokens
        | Ok _ ->
@@ -3982,6 +4013,7 @@ let create
       ?mcp_auth
       ?user_info
       ?custom_instructions
+      ?runner
       ~cwd
       ()
   =
@@ -4029,6 +4061,8 @@ let create
     { env
     ; sw
     ; provider
+    ; runner
+    ; unavailable = None
     ; tools
     ; offered
     ; user_info
@@ -4204,9 +4238,12 @@ let to_queue t ~attachments ~pasted ~images ~client ~ui_action text =
 (* Why a message cannot start a run now: outside chat mode, it needs a
    tool host. *)
 let cannot_start t =
-  match budget_exhausted t with
-  | Some _ as exhausted -> exhausted
-  | None -> if t.chat_mode then None else no_host t
+  match t.unavailable with
+  | Some _ as unavailable -> unavailable
+  | None ->
+    (match budget_exhausted t with
+     | Some _ as exhausted -> exhausted
+     | None -> if t.chat_mode then None else no_host t)
 ;;
 
 let prompt
@@ -4316,16 +4353,19 @@ let has_running_background t = Background_tasks.has_running t.background
 let running_background t = Background_tasks.running_count t.background
 
 let steer_subagent t ~agent_id ~kind text =
+  let%bind.Or_error () = require t Steer_subagent in
   Background_tasks.send t.background ~id:agent_id kind ~from:User text
 ;;
 
 let dequeue_subagent t ~agent_id =
+  let%bind.Or_error () = require t Steer_subagent in
   Or_error.map
     (Background_tasks.inbox_of t.background agent_id)
     ~f:Subagent_inbox.pop_last
 ;;
 
 let remove_subagent_queued t ~agent_id ~queue ~index ~text =
+  let%bind.Or_error () = require t Steer_subagent in
   Or_error.bind
     (Background_tasks.inbox_of t.background agent_id)
     ~f:(fun inbox -> Subagent_inbox.remove inbox queue ~index ~text)
@@ -4492,6 +4532,7 @@ let set_thinking t thinking =
 ;;
 
 let compact ?instructions t =
+  let%bind.Or_error () = require t Compact in
   if is_running t
   then Or_error.error_string "cannot compact while a run is in progress"
   else (
@@ -4945,6 +4986,7 @@ let last_reply_failed t =
 ;;
 
 let downsize_images t =
+  let%bind.Or_error () = require t Downsize_images in
   if not t.model.supports_images
   then
     Or_error.errorf
@@ -4958,6 +5000,7 @@ let downsize_images t =
 ;;
 
 let btw t ~question ~cancel ~on_delta =
+  let%bind.Or_error () = require t Btw in
   let session = t.session in
   let model = t.model in
   let system =
@@ -5072,6 +5115,7 @@ let switch_session t ~path =
 ;;
 
 let fork t ?at () =
+  let%bind.Or_error () = require t Fork in
   Or_error.map
     (Session.fork ?at t.session ~dir:t.sessions_dir)
     ~f:(fun session -> replace_session t session ~keep_host:true)
@@ -5091,26 +5135,32 @@ let unless_running t ~doing f =
 ;;
 
 let trim t ~before =
+  let%bind.Or_error () = require t Context_edit in
   unless_running t ~doing:"trim" (Session.append_trim ~before)
 ;;
 
 let trim_after t ~after =
+  let%bind.Or_error () = require t Context_edit in
   unless_running t ~doing:"trim" (Session.append_trim_after ~after)
 ;;
 
 let untrim ?entry t =
+  let%bind.Or_error () = require t Context_edit in
   unless_running t ~doing:"undo a trim" (Session.append_untrim ?entry)
 ;;
 
 let delete_message t ~message =
+  let%bind.Or_error () = require t Context_edit in
   unless_running t ~doing:"delete a message" (Session.append_delete ~message)
 ;;
 
 let undelete ?entry t =
+  let%bind.Or_error () = require t Context_edit in
   unless_running t ~doing:"undo a deletion" (Session.append_undelete ?entry)
 ;;
 
 let rewind t ~to_ =
+  let%bind.Or_error () = require t Rewind in
   if is_running t
   then Or_error.error_string "cannot rewind while a run is in progress"
   else
