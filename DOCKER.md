@@ -1,483 +1,317 @@
 # Running prigh in Docker
 
-`Dockerfile` + `docker-compose.yml` at the repository root run the prigh
+`Dockerfile` and `docker-compose.yml` at the repository root run the prigh
 backend in a container serving prigh-web (the browser UI), terminal
-frontends, or an interactive TUI. They are chosen with environment
-variables.
+frontends, or an interactive TUI.
 
-Each user (namespace) is its own Linux user in the container. Its agent's
-tools (bash, edits, the `>_` shell) run as that user, in its home
-`/home/<name>`, which only it can access. The backend runs as
-the separate `prigh` service user, and nothing but `nix-daemon` runs as root
-after startup. Agents install the tools they need with Nix, into a store
-shared by all users. See [Users](#users), [Installing tools](#installing-tools)
-and [Isolation](#isolation).
+Each user (namespace) is its own Linux user in the container: its agent's
+tools (bash, edits, the `>_` shell) run as that user in `/home/<name>`,
+which only it can access. The backend runs as the `prigh` service user;
+after startup only `nix-daemon` runs as root. Agents install tools with Nix
+into a store shared by all users.
 
-## The image
-
-The image is published for every commit of `main` to
-`ghcr.io/evan-a-w/prigh` by the build host, once it has built that commit
-(see [Binary cache](#binary-cache)): the tags `main` and `latest` follow
-`main`, and each commit's short sha (`:e9c8b23`) pins it.
-`docker-compose.yml` runs `${PRIGH_IMAGE:-ghcr.io/evan-a-w/prigh:main}`
-with `pull_policy: always`, so every `docker compose up` (and Portainer's
-redeploy) checks for a newer image, and updating is a download of the
-layers that changed: usually one of a few hundred MB.
-
-The package must be public for anonymous pulls: whoever owns it makes it
-so once, on GitHub under **Packages → prigh → Package settings → Change
-visibility**. Until then, `docker login ghcr.io` (a personal access token
-with `read:packages`) on the Docker host.
-
-A compose file of your own that builds from the repository (`build:
-https://github.com/evan-a-w/prigh.git#main` with `pull_policy: build`)
-rebuilds at every `up`; replace its `build:` with `image:
-ghcr.io/evan-a-w/prigh:main` and `pull_policy: always` (or run `docker
-compose pull` before `up`) to update by pulling instead.
-
-## Docker Compose
+## Quick start
 
 ```
-export PRIGH_TOKEN=$(openssl rand -hex 32)   # or put these in a .env file next to docker-compose.yml
+export PRIGH_TOKEN=$(openssl rand -hex 32)   # or put it in .env next to docker-compose.yml
 docker compose up -d
 docker compose logs -f
 ```
 
-To update:
+Open `http://<docker-host>:7790/`, sign in as `default` with the token as
+the password, and `/login` to a provider (see [Logging in](#logging-in)).
 
-```
-docker compose pull && docker compose up -d
-```
+Update with `docker compose pull && docker compose up -d` (with the default
+`PRIGH_PULL_POLICY=always`, `up -d` alone pulls too). The volumes, and so
+users, logins, sessions and installed tools, are kept.
 
-(with the default `PRIGH_PULL_POLICY=always`, `docker compose up -d` alone
-pulls too). The volumes, and so users, logins, sessions and installed
-tools, are kept.
+### The image
+
+The build host publishes every commit of `main` to `ghcr.io/evan-a-w/prigh`
+(see [Binary cache](#binary-cache)): `:main` and `:latest` follow `main`, a
+short sha (`:e9c8b23`) pins a commit. Compose runs
+`${PRIGH_IMAGE:-ghcr.io/evan-a-w/prigh:main}`; an update downloads only the
+changed layers.
+
+The package must be public for anonymous pulls (GitHub: **Packages → prigh →
+Package settings → Change visibility**); until then, `docker login ghcr.io`
+with a token that has `read:packages`.
+
+### Portainer
+
+1. **Stacks → Add stack → Repository**: the repository URL, reference
+   (e.g. `refs/heads/main`) and compose path `docker-compose.yml` (add
+   `docker-compose.build.yml` under additional paths to build from source).
+2. Under **Environment variables**, set `PRIGH_TOKEN` (or `PRIGH_TOKENS`).
+3. **Deploy the stack**. "Re-pull image and redeploy" (or GitOps
+   auto-update) updates it.
 
 ### Building from source
 
 `docker-compose.build.yml` builds the image from the checkout (tagged
-`prigh:local`, never pulled) instead, with the build arguments (`PRIGH_UID`,
-`PRIGH_EXTRA_APT_PACKAGES`, … marked "(build)" [below](#environment-variables)):
+`prigh:local`, never pulled), with the build arguments marked "(build)" in
+[Environment variables](#environment-variables):
 
 ```
 docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
 # or once, in .env: COMPOSE_FILE=docker-compose.yml:docker-compose.build.yml
 ```
 
-A build of a commit of `main` downloads prigh's backend and frontend from
-the binary cache `attic.caduc.co/prigh` (a few hundred MB, without the
-toolchain they were built with) and compiles nothing; the build prints
-what it fetches (`prigh: fetching backend ...`), and before compiling what
-the cache lacks (a branch, or `main` before its attic run finished) it
-warns (`prigh: WARNING: no binary cache ... has frontend ...`) and prints
-what that builds and fetches. Without the cache,
-compiling the OxCaml toolchain and packages takes an hour or more and over
-8 GB of RAM. When building a branch repeatedly, set `PRIGH_PREFETCH_DEPS=1`:
-the toolchain (several GB, from the cache when it has it) is then built in
-layers of its own from `flake.nix`, `flake.lock`, `nix/` and the
-`*.opam`/`dune-project` files, which later builds reuse while those are
-unchanged (and while Docker's build cache keeps them). By default that step
-is skipped, since prigh itself is cached and needs none of it.
-
-## Portainer
-
-1. **Stacks → Add stack → Repository**. Fill in the repository URL, the
-   reference (e.g. `refs/heads/main`) and the compose path
-   `docker-compose.yml` (add `docker-compose.build.yml` under additional
-   paths to build from source instead).
-2. Under **Environment variables**, set at least `PRIGH_TOKEN`, a long
-   random secret (`openssl rand -hex 32`), or `PRIGH_TOKENS` for several
-   users (see [Users](#users)).
-3. **Deploy the stack**. Portainer pulls the image.
-4. Open `http://<docker-host>:7790/`, sign in (with `PRIGH_TOKEN` the user
-   is `default` and the token is the password), and `/login` to a provider
-   (see [Logging in](#logging-in)).
-
-Redeploying with "Re-pull image and redeploy" (or the GitOps auto-update)
-pulls the new image.
+- A commit of `main` downloads the backend and frontend from the binary
+  cache `attic.caduc.co/prigh` (a few hundred MB) and compiles nothing
+  (`prigh: fetching backend ...`).
+- What the cache lacks (a branch, or `main` before its build finished) is
+  compiled after a warning (`prigh: WARNING: no binary cache ...`). Without
+  the cache, compiling the OxCaml toolchain takes an hour or more and over
+  8 GB of RAM.
+- Building a branch repeatedly: `PRIGH_PREFETCH_DEPS=1` builds the
+  toolchain in layers of its own (from `flake.nix`, `flake.lock`, `nix/`,
+  `*.opam`, `dune-project`), which Docker's cache reuses while those are
+  unchanged.
 
 ## Modes
 
-`PRIGH_MODE` is a comma-separated list of what to serve. One backend
-serves all of them, and they share sessions:
+`PRIGH_MODE` is a comma-separated list; one backend serves all entries, and
+they share sessions.
 
-| Entry | Container port | Host port variable | What |
+| Entry | Port | Host port variable | What |
 |---|---|---|---|
-| `web` (default) | 7790 | `PRIGH_WEB_PORT` | prigh-web, the browser UI (`frontend/web/`); also accepts terminal frontends and tool hosts (`prigh-tui -connect`, `prigh tool-host -connect`) |
+| `web` (default) | 7790 | `PRIGH_WEB_PORT` | prigh-web; also accepts `prigh-tui -connect` and `prigh tool-host -connect` |
 | `server` | 7777 | `PRIGH_SERVER_PORT` | plain TCP for terminal frontends and tool hosts only |
-| `tui` | – | – | an interactive TUI as the container's main process (must be the only entry; single-user, see below) |
+| `tui` | – | – | an interactive TUI as the container's main process (must be the only entry) |
 
-For example, `PRIGH_MODE=web,server` serves prigh-web and a plain TCP
-port. The former entries `prigh-web` (now `web`, same port)
-and `pi-web` (removed) are refused with a message saying so.
+The old entries `prigh-web` (now `web`) and `pi-web` (removed) are refused
+with a message saying so.
 
 ### TUI
 
-There are two ways to get a TUI:
-
-- **Against the running server.** This works with any network mode and is
-  usually what you want: `docker compose exec prigh prigh-docker tui -user
-  NAME -token TOKEN` or, in Portainer, **Containers → prigh → Console**,
-  with that command. It sees the same sessions as the browser (`/sessions`,
-  `-session ID` to join one), and the tools run on the user's tool host in
-  the container (`-tools remote`). With a single `PRIGH_TOKEN` it signs in
-  as `default` by itself. Extra arguments go to `prigh-tui`. `-tools local`
-  is refused, because the TUI runs as the `prigh` service user; to host
-  tools from a console, run it as the user:
+- **Against the running server** (usually what you want):
+  `docker compose exec prigh prigh-docker tui -user NAME -token TOKEN`
+  (Portainer: **Containers → prigh → Console**). It shares the browser's
+  sessions, and tools run on the user's tool host in the container. With a
+  single `PRIGH_TOKEN` it signs in as `default` by itself; extra arguments go
+  to `prigh-tui`. `-tools local` is refused (it runs as `prigh`); to host
+  tools from a console:
   `prigh-docker as NAME prigh-tui -connect 127.0.0.1:7790 -user NAME -token TOKEN -tools local`.
-- **As the container's process.** Set `PRIGH_MODE=tui` and attach to the
-  container: `docker attach prigh-prigh-1` (detach with Ctrl+P Ctrl+Q), or
-  **Attach** in Portainer. No ports are used, and `/quit` stops the
-  container until it is restarted. `PRIGH_TUI_ARGS` holds TUI flags
-  (e.g. `-model ...`). This mode is **single-user**: there are no
-  per-namespace users, and the TUI, its backend and its tools all run as
-  `prigh` in `PRIGH_CWD` (default `/home/prigh`), with the logins of
-  the `default` namespace.
-
-From another machine, connect to the web or server port:
-`prigh-tui -connect <docker-host>:7790 -user NAME -token TOKEN -cwd ~/proj`.
-By default the tools then run on *that* machine. Add `-tools remote` to run
-them on the user's tool host in the container instead.
-The browser UI can be served from that machine the same way, with its
-tools there and the page signed in for you: `prigh -web -connect
-<docker-host>:7790 -user NAME -token TOKEN -cwd ~/proj` (`prigh web`; see
-the README's "prigh-web for a backend elsewhere").
+- **As the container's process**: `PRIGH_MODE=tui`, then
+  `docker attach prigh-prigh-1` (detach with Ctrl+P Ctrl+Q). `/quit` stops
+  the container. Single-user: everything runs as `prigh` in `PRIGH_CWD`
+  with the `default` namespace's logins; `PRIGH_TUI_ARGS` holds TUI flags.
+- **From another machine**:
+  `prigh-tui -connect <docker-host>:7790 -user NAME -token TOKEN -cwd ~/proj`
+  runs tools on that machine (`-tools remote`: in the container). `prigh
+  -web -connect <docker-host>:7790 -user NAME -token TOKEN -cwd ~/proj`
+  serves prigh-web there the same way.
 
 ## Users
 
-Set `PRIGH_TOKENS=alice=<token1>,bob=<token2>` instead of `PRIGH_TOKEN`.
-Each name is a user: it signs in with the name and its token as the
-password (the status line then shows `user:<name>`; `/signout` or the
-`sign out` button next to `>_` returns to the sign-in form). A single
-`PRIGH_TOKEN` is the one user `default`.
+`PRIGH_TOKENS=alice=<token1>,bob=<token2>` makes several users, each signing
+in with its name and token; a single `PRIGH_TOKEN` is the one user
+`default`. `/signout` (or the sign-out button) returns to the sign-in form.
 
-Each user is a namespace of the backend, with its own provider logins,
-sessions, config and connected tool hosts, and a Linux user of the same
-name in the container. At startup, the entrypoint (as root):
+Each user has its own provider logins, sessions, config and tool hosts, and
+a Linux user of the same name. At every start the entrypoint (as root):
 
-- creates the Linux users. Names must be valid user names (letters, digits,
-  `_`, `-`, at most 32 characters, not starting with a digit or `-`), and
-  must not be a user or group of the image (`root`, `prigh`, `nobody`, …).
-  A user keeps its uid across restarts and reorderings: it is the owner of
-  `/home/<name>` (uids start at 10000);
-- creates `/home/<name>` (mode 700) for each user: its home and its
-  agent's working directory (clone projects there);
-- starts one tool host per user, running as that user in
-  `/home/<name>`, and restarts it if it exits (with a fixed
-  `-host-id container-<name>`, so its sessions resume on it after a
-  restart, and it is not confused with a TUI run as that user in the
-  container, which would use `/home/<name>/.prigh/host-id`). The backend
-  runs no tools itself (`-no-backend-host`). A new session made from a
-  TUI starts on that TUI's machine (one made from the browser, where the
-  session it came from runs); otherwise it adopts its user's first
-  connected tool host, normally this one. `/host` picks another, and a
-  session stays on the host it has (waiting while that host
-  is away, also across the backend's restarts) until `/host` moves it;
+- creates the Linux users (uids from 10000, stable across restarts: the
+  owner of `/home/<name>`). Names: letters, digits, `_`, `-`, at most 32
+  characters, not starting with a digit or `-`, and not a user or group of
+  the image (`root`, `prigh`, `nobody`, …);
+- creates `/home/<name>` (mode 700), the user's home and working directory;
+- starts one tool host per user as that user (`-host-id container-<name>`,
+  restarted if it exits); the backend runs no tools itself
+  (`-no-backend-host`). New sessions adopt the user's first connected host;
+  `/host` moves a session to another;
 - runs the backend as `prigh`.
 
-`prigh-docker users` lists the users, their uids and homes.
+| Option | Effect |
+|---|---|
+| `PRIGH_SUPERUSERS=alice` | alice can `/setusr NAME` to act as another user (`/setusr` lists them) and clean the Nix store. Tool hosts' tokens never have superuser rights, so her agent cannot. |
+| `PRIGH_NO_BACKEND_HOST=1` | no tool hosts in the container; users connect their own (below) |
+| `PRIGH_ALLOW_NO_TOKEN=1` | no sign-in, one user `default` (only behind something else that authenticates) |
 
-**Superusers.** `PRIGH_SUPERUSERS=alice` makes alice a superuser. `/setusr
-NAME` in any of the UIs switches her connection to user NAME (its sessions,
-logins and tool host, so its tools run as NAME), `/setusr` lists the users
-and `/setusr alice` switches back; other users get an error.
-From their own shell, superusers have no access to other users' homes.
-The container tool hosts sign in with separate per-user tokens that never
-have superuser rights, so a superuser's agent cannot use `/setusr`.
-
-**No tools in the container.** With `PRIGH_NO_BACKEND_HOST=1` no tool hosts
-are started, so nothing model-controlled runs in the container. Each user
-connects a tool host from their own machine, which runs that user's tools
-and `>_` terminal:
+Connecting a tool host from your own machine (then pick it with `/host`):
 
 ```
-prigh tool-host -connect <docker-host>:7790 -user <name> -token <their token> -cwd ~/proj
-# or, with the tools themselves in a throwaway container on that machine:
-docker run --rm -it -v "$PWD:/work" -w /work ghcr.io/evan-a-w/prigh:main prigh tool-host -connect <docker-host>:7790 -user <name> -token <their token> -cwd /work
+prigh tool-host -connect <docker-host>:7790 -user <name> -token <token> -cwd ~/proj
+# or with the tools in a throwaway container there (pass -host-id to keep its sessions across runs):
+docker run --rm -it -v "$PWD:/work" -w /work ghcr.io/evan-a-w/prigh:main prigh tool-host -connect <docker-host>:7790 -user <name> -token <token> -cwd /work
 ```
-
-Then `/host` in the web UI (or TUI) picks it. A TUI started with
-`prigh-tui -connect` is a tool host too, while it is open; both are known
-by the machine's `~/.prigh/host-id`, so sessions on them wait for them and
-resume when they come back. A throwaway container gets a new id each run:
-pass `-host-id` (or mount a home) to keep its sessions.
-
-**Without a token** (`PRIGH_ALLOW_NO_TOKEN=1`) there is no sign-in and one
-user, `default`.
 
 ## Environment variables
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `PRIGH_MODE` | `web` | see above |
-| `PRIGH_TOKEN` | – | password of the single user `default`. **Required** for network modes (or `PRIGH_TOKENS`) |
-| `PRIGH_TOKENS` | – | several users, `name=token,name2=token2` (see [Users](#users)); replaces `PRIGH_TOKEN` |
-| `PRIGH_SUPERUSERS` | – | comma-separated users that can switch to any user with `/setusr`, and clean the Nix store (`/nix-gc`, prigh-web's Settings) |
-| `PRIGH_NO_BACKEND_HOST` | – | `1`: no tool hosts in the container; tools and terminals run only on hosts the users connect |
-| `PRIGH_ALLOW_NO_TOKEN` | – | set to `1` to start without a token (only behind something else that authenticates) |
-| `PRIGH_BIND` | `0.0.0.0` | host address the ports are published on (`127.0.0.1` keeps them local, e.g. behind a reverse proxy) |
+| `PRIGH_MODE` | `web` | see [Modes](#modes) |
+| `PRIGH_TOKEN` | – | password of the single user `default`; this or `PRIGH_TOKENS` is **required** for network modes |
+| `PRIGH_TOKENS` | – | `name=token,name2=token2`; replaces `PRIGH_TOKEN` |
+| `PRIGH_SUPERUSERS` | – | comma-separated users allowed `/setusr` and Nix store cleaning |
+| `PRIGH_NO_BACKEND_HOST` | – | `1`: no tool hosts in the container |
+| `PRIGH_ALLOW_NO_TOKEN` | – | `1`: start without a token |
+| `PRIGH_BIND` | `0.0.0.0` | host address the ports are published on (`127.0.0.1` behind a proxy) |
 | `PRIGH_WEB_PORT`, `PRIGH_SERVER_PORT` | 7790, 7777 | host ports |
-| `PRIGH_ARGS` | – | extra backend arguments, e.g. `-model anthropic/claude-sonnet-4-5 -thinking high`, or `-faux` for a scripted provider with no API calls |
+| `PRIGH_ARGS` | – | extra backend arguments, e.g. `-model anthropic/claude-sonnet-4-5 -thinking high`, `-faux` |
 | `PRIGH_TUI_ARGS` | – | extra `prigh-tui` arguments for `PRIGH_MODE=tui` |
-| `PRIGH_CWD` | `/home/prigh` | working directory for `PRIGH_MODE=tui` only |
-| `PRIGH_NIX_GC_INTERVAL` | `12h` | how often the container collects Nix garbage: a number with `s`, `m`, `h` or `d` (`12h`, `7d`); `0` or `off`: never (see [Garbage collection](#garbage-collection)) |
-| `PRIGH_NIX_GC_KEEP_DAYS` | `7` | the scheduled collection first deletes users' profile generations older than this many days; `0`: all but the current ones; `off`: keeps them all |
-| `PRIGH_NIX_MIN_FREE` | `15%` | Nix's `min-free`: while it builds or fetches, Nix collects garbage when less than this is free on `/nix`'s filesystem. Bytes as `nix.conf` takes them (`20G`, `512M`, `1T`, `10737418240`) or a percentage of the filesystem (`20%`); `0`: never |
-| `PRIGH_NIX_MAX_FREE` | `30%` | Nix's `max-free`: such a collection stops once this much is free; same forms, more than `PRIGH_NIX_MIN_FREE` |
-| `PRIGH_VOLUME_WAIT` | `2m` | how long the start waits for `/home` and `/nix` to be writable (a disk the host mounts late, or read-only for a while) before it gives up: a number with `s`, `m`, `h` or `d`; `0`: not at all (see [Data](#data)) |
-| `GH_TOKEN` | – | GitHub token for `git` over HTTPS, for users without one in `PRIGH_GH_TOKENS` (shared by all of them; see [Git and SSH](#git-and-ssh)) |
+| `PRIGH_CWD` | `/home/prigh` | working directory, `PRIGH_MODE=tui` only |
+| `PRIGH_NIX_GC_INTERVAL` | `12h` | scheduled Nix GC: number with `s`/`m`/`h`/`d`; `0` or `off`: never |
+| `PRIGH_NIX_GC_KEEP_DAYS` | `7` | profile generations older than this are deleted first; `0`: all but current; `off`: keep all |
+| `PRIGH_NIX_MIN_FREE` | `15%` | Nix's `min-free` on `/nix`: size (`20G`, `512M`) or percentage; `0`: off |
+| `PRIGH_NIX_MAX_FREE` | `30%` | Nix's `max-free`; same forms, more than `PRIGH_NIX_MIN_FREE` |
+| `PRIGH_VOLUME_WAIT` | `2m` | how long the start waits for `/home` and `/nix` to be writable; `0`: not at all |
+| `GH_TOKEN` | – | GitHub token for `git` over HTTPS, shared by users without one in `PRIGH_GH_TOKENS` |
 | `PRIGH_GH_TOKENS` | – | per-user GitHub tokens, `name=token,...` |
-| `PRIGH_GITHUB_CLIENT_ID` | – | client id of your GitHub OAuth app (with Device Flow enabled), for `/login github` and prigh-web's Git hosting settings (README: Git hosting) |
-| `PRIGH_GIT_NAME`, `PRIGH_GIT_EMAIL` | – | commit author written to a user's `~/.gitconfig` at start if it has none yet |
-| `PRIGH_IMAGE` | `ghcr.io/evan-a-w/prigh:main` | the image to run (e.g. `:<short sha>` to pin a commit); not used when building from source |
-| `PRIGH_PULL_POLICY` | `always` | compose's `pull_policy` for it: `always` checks for a newer image at every `up`, `missing` only pulls with `docker compose pull` |
-| `PRIGH_PREFETCH_DEPS` | `0` | (build) `1`: build the OxCaml toolchain in layers of its own first (see [Building from source](#building-from-source)) |
-| `PRIGH_UID`, `PRIGH_GID` | 1000 | (build) uid/gid of the `prigh` service user. `/home/prigh` is chowned to it at start if it differs |
-| `PRIGH_NIX_SUBSTITUTER`, `PRIGH_NIX_SUBSTITUTER_KEY` | `https://attic.caduc.co/prigh` and its key | (build) the Nix binary caches, space-separated (the keys too). Set the substituter to an empty value to compile everything |
-| `PRIGH_EXTRA_APT_PACKAGES` | – | (build) extra Debian packages baked into the image, e.g. `python3 build-essential` |
+| `PRIGH_GITHUB_CLIENT_ID` | – | your GitHub OAuth app's client id (Device Flow on), for `/login github` |
+| `PRIGH_GIT_NAME`, `PRIGH_GIT_EMAIL` | – | commit author written to a user's `~/.gitconfig` if it has none |
+| `PRIGH_IMAGE` | `ghcr.io/evan-a-w/prigh:main` | image to run (`:<short sha>` pins a commit) |
+| `PRIGH_PULL_POLICY` | `always` | compose `pull_policy`: `always` checks at every `up`, `missing` only on `docker compose pull` |
+| `PRIGH_PREFETCH_DEPS` | `0` | (build) `1`: build the toolchain in its own layers first |
+| `PRIGH_UID`, `PRIGH_GID` | 1000 | (build) uid/gid of `prigh`; `/home/prigh` is chowned at start if it differs |
+| `PRIGH_NIX_SUBSTITUTER`, `PRIGH_NIX_SUBSTITUTER_KEY` | `https://attic.caduc.co/prigh` and its key | (build) binary caches, space-separated; empty substituter: compile everything |
+| `PRIGH_EXTRA_APT_PACKAGES` | – | (build) Debian packages baked into the image, e.g. `python3 build-essential` |
 
-## Installing tools
+Provider keys in the environment (`ANTHROPIC_API_KEY`, …) are ignored when
+there are tokens; they apply only with `PRIGH_ALLOW_NO_TOKEN=1` or
+`PRIGH_MODE=tui` (add them under `environment:` in `docker-compose.yml`).
 
-The image ships `bash git ripgrep tmux curl jq less openssh-client procps`,
-ImageMagick's `magick` (which the backend downscales images too large for a
-model with) and Nix. The agents run as unprivileged users on a read-only root
-filesystem, so apt and sudo are out; any user (agent or `>_` shell) gets
-other tools from nixpkgs instead, as itself:
+## Volumes and data
+
+| Path | Volume | Contents |
+|---|---|---|
+| `/home/prigh` | `prigh-home` | the backend's sessions, provider logins, config, prompt history (per user under `.prigh/namespaces/<name>/`) |
+| `/home/<name>` | `prigh-home` | user's home and projects (clone here; `/cd` switches), `~/.ssh`, `~/.gitconfig` |
+| `/nix` | `prigh-nix` | the shared Nix store, plus prigh's runtime seeded from the image |
+| `/run/prigh` | tmpfs | the users (`extrausers/passwd`, `group`, `shadow`), rebuilt each start |
+
+- `docker compose down -v` deletes the volumes, logins and sessions included.
+- `prigh-nix` alone can be removed with the stack down; the next start seeds
+  a fresh store and users reinstall their packages.
+- Bind mounts on a separate disk: make sure the host mounts it read-write
+  before Docker starts (systemd: `RequiresMountsFor=` on `docker.service`);
+  otherwise the start gives up after `PRIGH_VOLUME_WAIT`, saying which.
+
+**Files in and out.** In prigh-web, the folder button (Ctrl+Shift+F)
+browses the session's directory: download files, or directories as
+`.tar.gz`; upload or drop files into it. From the Docker host:
 
 ```
-nix shell nixpkgs#python3 nixpkgs#nodejs -c python3 script.py   # for one command
-nix run nixpkgs#cowsay -- hi                                      # a package's program
-nix search nixpkgs ripgrep                                        # find a package's name
-nix profile install nixpkgs#gh                                    # keep it on PATH (~/.nix-profile/bin)
+docker compose cp prigh:/home/alice/proj ./proj
+docker compose cp ./proj prigh:/home/alice/proj && docker compose exec prigh chown -R alice: /home/alice/proj
 ```
-
-The system prompt tells the model this whenever its tool host has `nix` on
-PATH. Packages come prebuilt from `cache.nixos.org` and land in `/nix`, the
-`prigh-nix` volume, shared by all users: a package one user fetched is there
-for the others, and everything survives restarts and upgrades. `nixpkgs`
-means the revision in prigh's `flake.lock` (pinned in
-`/etc/nix/flake-registry.json`), so every user sees the same package
-versions; the first `nixpkgs#` use per user unpacks it (a few seconds), and
-the first `nix search` evaluates all of nixpkgs (slow). Other flakes work
-too (`nix run github:owner/repo`).
-
-`PRIGH_EXTRA_APT_PACKAGES` still adds Debian packages at build time, for
-tools that every user should have without asking.
-
-How it fits together:
-
-- **The daemon.** All store writes go through `nix-daemon`, which the
-  entrypoint starts as root (and restarts if it exits; if it keeps failing,
-  prigh runs on without it and the startup line says `nix: NOT RUNNING`).
-  Every user's environment (tool hosts, `prigh-docker as`) has
-  `NIX_REMOTE=daemon` and `~/.nix-profile/bin` on PATH. Shells keep the
-  profile on PATH too: `/etc/profile.d/nix-path.sh` (also sourced by
-  `/etc/bash.bashrc`) adds `~/.local/state/nix/profiles/profile/bin`, which
-  login shells (the terminal panel's, `bash -l`) and `docker exec` would
-  otherwise lose.
-- **Users are not trusted** by Nix (`/etc/nix/nix.conf`): they cannot add
-  substituters or keys or change the sandbox settings, so everything they
-  substitute is signed by `cache.nixos.org`. Packages not in the cache are
-  built locally, as the `nixbld1`…`nixbld8` users.
-- **Seeding.** prigh itself links against store paths (glibc), and nix and
-  ImageMagick are store paths too. Since the volume hides the image's
-  `/nix`, the image keeps them in `/opt/nix-seed`, and the entrypoint copies
-  any that are missing into `/nix/store` and registers them at every start
-  (the first start copies a few hundred MB). `/usr/local/bin/nix*` and
-  `/usr/local/bin/magick` link to the seeded ones.
-- **Garbage collection**: see [below](#garbage-collection).
-- **Upgrades.** A new image brings its seed; the entrypoint adds what is new
-  and moves the GC roots to it, so the old image's paths become garbage.
-  Users' profiles and packages are kept. If an image ever ships an older
-  Nix than the volume was used with, Nix may refuse the newer database: then
-  remove the volume (`docker volume rm <project>_prigh-nix`; users reinstall
-  their profile packages).
-
-### Garbage collection
-
-The shared `/nix` volume grows as agents fetch tools. What users installed
-with `nix profile` (the current generation of each profile) stays; what they
-only used with `nix shell` or `nix run` is garbage, fetched again when
-needed. GC roots in `/nix/var/nix/gcroots/prigh` keep the paths prigh and
-nix need. Three things clean it:
-
-- **While Nix works.** When it fetches or builds with less than
-  `PRIGH_NIX_MIN_FREE` free on the volume's filesystem, it deletes unused
-  paths until `PRIGH_NIX_MAX_FREE` is free: Nix's own `min-free` and
-  `max-free`, as a size (`20G`) or a percentage of the filesystem (`20%`).
-  The defaults, 15% and 30%, are clamped to 1–50 GiB and 3–100 GiB (on a
-  104 GiB disk: below 15.6 GiB free, up to 31.2 GiB); values you set are
-  used as given, and `PRIGH_NIX_MIN_FREE=0` turns this off. The entrypoint
-  works them out from the filesystem at every start, into
-  `/run/prigh/nix.conf` (included by `/etc/nix/nix.conf`); the startup line
-  says what they are. Only Nix's own work triggers this: when something
-  else on a shared disk fills it, the scheduled collection is what frees
-  space, so raise these values (or shorten the interval) if `/nix` shares
-  its disk.
-- **On a schedule.** Every `PRIGH_NIX_GC_INTERVAL` (default 12 hours; the
-  first run at least 5 minutes after start, counted from the last one, so
-  restarts do not postpone it), the entrypoint deletes every user's profile
-  generations older than `PRIGH_NIX_GC_KEEP_DAYS` (default 7), as that user,
-  then runs `nix store gc` as root. Profiles are those under
-  `~/.local/state/nix/profiles` (where `nix profile` keeps them) and the
-  older `/nix/var/nix/profiles/per-user/NAME`; the current generation is
-  always kept. Users can no longer roll back (`nix profile rollback`) past
-  what was deleted.
-- **By a superuser** (`PRIGH_SUPERUSERS`), from prigh-web's Settings (Nix
-  store: its size, the free space on the volume, the last and the next
-  collection; Collect, or Also delete generations over N days…) or `/nix-gc`
-  in either frontend (`/nix-gc run`, `/nix-gc run DAYS`, `/nix-gc run all`),
-  with progress while it runs and what it freed at the end. Other users
-  see none of it: no `/nix-gc`, no Settings section, nothing about the
-  store from the backend. From the host:
-  `docker compose exec prigh prigh-docker nix-gc [keep|all|Nd]` (default:
-  `PRIGH_NIX_GC_KEEP_DAYS`).
-
-One collection runs at a time; the last one (whoever started it) is
-recorded in `/nix/var/prigh/last-gc` and shown in Settings, and each is
-logged in the container's output.
-
-**Privileges.** The backend runs as `prigh`, not root, and cannot delete
-other users' generations or collect for them. The entrypoint's root helper
-does it: it reads requests from the FIFO `/run/prigh/nix-gc/requests`
-(owned by root, writable only by the `prigh` group, which the users' tool
-hosts are not in) and accepts only lines `gc ID keep|all|Nd USER` (anything
-else is logged and ignored), so the backend can ask for a collection but
-not run anything else as root: the worst a forged request does is collect
-garbage. The backend checks that the user is a superuser
-before asking. The helper writes Nix's output to `/run/prigh/nix-gc/ID.log`
-and the outcome to `ID.result`, which the backend reads (with `running`,
-`last-gc` and `schedule` in the same directory) and streams to the
-frontend. `-nix-gc-helper DIR` (`$PRIGH_NIX_GC_HELPER`, set by the
-entrypoint) points the backend at it; without it (outside the container) the
-backend runs `nix store gc`, or `nix-collect-garbage` for generations, as
-its own user.
 
 ## Logging in
 
-Provider logins belong to a user. Use `/login` in either UI, or a console
-in the container, naming the user:
+Provider logins belong to a user: `/login` in either UI, or from the host:
 
 ```
 docker compose exec prigh prigh-docker login alice anthropic                   # Claude Pro/Max (OAuth)
 docker compose exec prigh prigh-docker login alice anthropic -method api_key
 docker compose exec prigh prigh-docker login alice openai-codex                # ChatGPT (OAuth)
-docker compose exec prigh prigh-docker login alice openai                      # API key
 docker compose exec prigh prigh-docker login default deepseek                  # API key, single PRIGH_TOKEN
 ```
 
-The OAuth redirect goes to `localhost` on the machine running the browser,
-which is not the container. The page fails to load, so copy the full URL
-from the browser's address bar and paste it at the prompt. Credentials are
-stored in `/home/prigh/.prigh/namespaces/<name>/.config/prigh/auth.json`
-(`/home/prigh/.config/prigh/auth.json` for `default`), in the home volume,
-so they survive rebuilds. Only the backend (`prigh`) can read them.
-
-Provider keys in the environment (`ANTHROPIC_API_KEY`, …) are ignored when
-there are tokens, since every user has its own logins. They only apply with
-`PRIGH_ALLOW_NO_TOKEN=1` or `PRIGH_MODE=tui`; add them under `environment:`
-in `docker-compose.yml` for those.
+The OAuth redirect goes to `localhost` on your machine, not the container:
+when the page fails to load, copy the full URL from the address bar and
+paste it at the prompt. Credentials live under `/home/prigh` (readable only
+by `prigh`) and survive rebuilds.
 
 ## Git and SSH
 
-Each user's agent can use every credential of that user: its `~/.ssh`,
-`~/.gitconfig` and `GH_TOKEN`. Give it scoped, revocable credentials rather
-than your own keys. There are two supported ways.
+A user's agent can use all of that user's credentials, so give it scoped,
+revocable ones.
 
-**SSH deploy key.** The key is generated inside the container and never
-leaves it:
+- **SSH deploy key**, generated in the container:
+  `docker compose exec prigh prigh-docker ssh-key alice` creates
+  `~/.ssh/id_ed25519` if missing and prints the public key (NAME may be
+  omitted with one user). Add it under the repository's **Settings → Deploy
+  keys** ("Allow write access" only if the agent should push).
+- **HTTPS token**: `PRIGH_GH_TOKENS=alice=<token>` (or a shared `GH_TOKEN`)
+  set to a fine-grained personal access token limited to the repositories
+  needed. A credential helper in `/etc/gitconfig` passes it to `git` for
+  `https://github.com/...`.
+
+GitHub's host keys are pinned; other hosts are trusted on first use
+(`StrictHostKeyChecking accept-new`). `GIT_TERMINAL_PROMPT=0` makes `git`
+fail rather than prompt. Set `PRIGH_GIT_NAME`/`PRIGH_GIT_EMAIL` for a commit
+author (a user's own `git config --global` wins).
+
+## Installing tools
+
+The image ships `bash git ripgrep tmux curl jq less openssh-client procps`,
+ImageMagick's `magick` and Nix. The root filesystem is read-only and users
+are unprivileged, so there is no apt or sudo; any user gets tools from
+nixpkgs as itself:
 
 ```
-docker compose exec prigh prigh-docker ssh-key alice     # or the Portainer console
+nix shell nixpkgs#python3 nixpkgs#nodejs -c python3 script.py   # for one command
+nix run nixpkgs#cowsay -- hi                                      # a package's program
+nix search nixpkgs ripgrep                                        # find a package
+nix profile install nixpkgs#gh                                    # keep it on PATH
 ```
 
-This creates alice's `~/.ssh/id_ed25519` (NAME may be omitted when there is
-only one user) if it doesn't exist yet, and prints the public key. Users can
-also run `ssh-keygen` and `git config --global` in their own `>_` terminal.
-Add the key to each repository under **Settings → Deploy keys**, and tick
-"Allow write access" only if the agent should push. A deploy key works for
-one repository only; for several, use a machine user's account key, or
-HTTPS with a token.
+- `nixpkgs` is pinned to prigh's `flake.lock`, so all users get the same
+  versions; packages land in the shared `prigh-nix` volume and survive
+  upgrades. Store paths are world-readable: nothing secret belongs there.
+- Writes go through `nix-daemon`. Users are not trusted by Nix (no extra
+  substituters or keys); what `cache.nixos.org` lacks is built locally as
+  `nixbld1`…`nixbld8`, without a sandbox (see [Isolation](#isolation)).
+- The entrypoint seeds prigh's own store paths from `/opt/nix-seed` at
+  every start. If a new image's older Nix refuses the volume's database,
+  `docker volume rm <project>_prigh-nix`.
+- `PRIGH_EXTRA_APT_PACKAGES` bakes Debian packages in at build time.
 
-**HTTPS with a token.** Set `PRIGH_GH_TOKENS=alice=<token>,...` (or
-`GH_TOKEN`, which every user without its own token then shares) to a
-[fine-grained personal access token](https://github.com/settings/personal-access-tokens)
-limited to the repositories (and permissions, e.g. Contents read/write)
-the agent needs. A credential helper in `/etc/gitconfig` hands it to `git`
-for `https://github.com/...`; `gh` reads `GH_TOKEN` too if you install it.
+### Garbage collection
 
-For both:
+What users installed with `nix profile` (current generations) stays; what
+they only used with `nix shell`/`nix run` is garbage. Three things collect:
 
-- GitHub's host keys are pinned in `/etc/ssh/ssh_known_hosts`. Other hosts
-  are trusted on first use (`StrictHostKeyChecking accept-new`), because
-  the agent cannot answer a prompt. `GIT_TERMINAL_PROMPT=0` makes `git`
-  fail instead of waiting for a password.
-- Set `PRIGH_GIT_NAME` / `PRIGH_GIT_EMAIL` so that commits have an author
-  (a user's own `git config --global user.name` wins).
+| When | What |
+|---|---|
+| While Nix fetches or builds | with less than `PRIGH_NIX_MIN_FREE` free on `/nix`'s filesystem, deletes unused paths until `PRIGH_NIX_MAX_FREE` is free. The defaults (15%, 30%) are clamped to 1–50 GiB and 3–100 GiB; values you set are used as given. Written to `/run/prigh/nix.conf` at start. |
+| Every `PRIGH_NIX_GC_INTERVAL` | deletes each user's profile generations older than `PRIGH_NIX_GC_KEEP_DAYS` (as that user), then `nix store gc` as root. First run at least 5 minutes after start, counted from the last run. |
+| A superuser asks | prigh-web's Settings (Nix store), `/nix-gc run [DAYS\|all]`, or from the host `docker compose exec prigh prigh-docker nix-gc [keep\|all\|Nd]` |
+
+Only Nix's own work triggers the first: if something else fills a shared
+disk, raise the thresholds or shorten the interval. Deleted generations
+cannot be rolled back to. One collection runs at a time; the last is
+recorded in `/nix/var/prigh/last-gc` and each is logged.
+
+The backend (as `prigh`) asks the entrypoint's root helper through the FIFO
+`/run/prigh/nix-gc/requests` (writable only by the `prigh` group), which
+accepts nothing but `gc ID keep|all|Nd USER` lines. `-nix-gc-helper DIR`
+(`$PRIGH_NIX_GC_HELPER`) points the backend at it.
 
 ## Isolation
 
-What a user's agent (and `>_` shell) can and cannot see:
-
 | | own user | other users |
 |---|---|---|
-| `/home/<name>` (mode 700) | read/write | no access |
-| `/home/prigh` (mode 700: sessions, provider logins, tokens) | no access | no access |
-| `/tmp` (shared tmpfs, mode 1777) | its own files | files others make world-readable |
-| `/nix/store` (written only by `nix-daemon`) | read | read: everything in the store is world-readable, so nothing secret belongs there |
-| processes | full control | visible in `ps`, but not their environment (no tokens are in command lines) |
+| `/home/<name>` (700) | read/write | no access |
+| `/home/prigh` (700: sessions, logins, tokens) | no access | no access |
+| `/tmp` (shared tmpfs, 1777) | its own files | files others make world-readable |
+| `/nix/store` | read | read |
+| processes | full control | visible in `ps`, not their environment |
 
-- Agents see only the container filesystem. `read_only: true` makes
-  everything outside the two volumes, `/tmp` and `/run` (tmpfs)
-  unwritable. There are no bind mounts of the host, and the Docker socket
-  is not mounted.
-- The container starts as root, with all capabilities dropped except those
-  the entrypoint needs to set up the users: `CHOWN` (give users their
-  directories), `DAC_OVERRIDE` (create and move directories it doesn't own,
-  e.g. the old home layout), `FOWNER` (set the mode
-  of the users' directories), `SETUID`/`SETGID` (switch to the users with
-  `setpriv`) and `KILL` (`tini` forwards stop signals to processes of other
-  users). Only the entrypoint, its tool host restart loops and `nix-daemon`
-  run as root. The processes they start (backend, tool hosts, `prigh-docker
-  as/tui/login/ssh-key`) switch uid and so have no capabilities at all, and
-  `no-new-privileges` keeps setuid binaries from regaining any.
-- `nix-daemon` needs no capability beyond these: it chowns and fixes the
-  permissions of store paths (`CHOWN`, `FOWNER`, `DAC_OVERRIDE`), runs
-  builds as the `nixbld` users (`SETUID`, `SETGID`) and kills their leftover
-  processes (`KILL`). It is the one root process that model-controlled
-  requests reach, through its socket, as with any multi-user Nix install.
-  Without `CAP_SYS_ADMIN` there is no build sandbox (`sandbox = false`, no
-  seccomp filter): a local build runs as a `nixbld` user with network
-  access and sees what that user can, e.g. world-readable files in `/tmp`,
-  but not the users' homes. A user could thus make a build
-  of their own impure, and another user who later uses that same store path
-  gets the impure result. Substituted paths are unaffected (they are
-  checked against `cache.nixos.org`'s signature), and so are paths already
-  in the store. If that matters, don't let mutually distrusting users share
-  a container.
-- The backend holds every token and provider login. A tool host has only a
-  token of its own user, without superuser rights, plus that user's
-  `GH_TOKEN`; neither `PRIGH_TOKENS`, `PRIGH_GH_TOKENS` nor other users'
-  secrets are in its environment.
-- Network access is unrestricted: agents need it for provider APIs, and
-  they can reach anything the Docker network can, including the backend's
-  ports. Put the stack on an isolated network if that matters.
-- The file browser (prigh-web's folder button) reaches files only through
-  the session's tool host, as its user: a user's own container tool host
-  sees what that Linux user may (the table above); the backend's own files
-  are never reachable, since it runs no tools here. Transfer links are
-  one-time tickets issued over the signed-in connection.
-- The token is the only authentication, and the traffic is plain HTTP/WS
-  (`prigh serve` warns about it when listening beyond loopback).
-  Outside a trusted LAN, set `PRIGH_BIND=127.0.0.1` and put a
-  TLS-terminating reverse proxy (Caddy, Traefik, nginx; it must pass
-  WebSockets on `/ws` and `/terminal`, see below) or an SSH tunnel in front.
+- `read_only: true`: only the two volumes, `/tmp` and `/run` are writable.
+  No host bind mounts, no Docker socket.
+- All capabilities are dropped except `CHOWN`, `DAC_OVERRIDE`, `FOWNER`,
+  `SETUID`, `SETGID` and `KILL`, which the entrypoint and `nix-daemon` need.
+  Everything else (backend, tool hosts, `prigh-docker` commands) switches
+  uid and has none; `no-new-privileges` keeps setuid binaries from
+  regaining any.
+- Without `CAP_SYS_ADMIN` Nix has no build sandbox: a user could make a
+  local build impure, and another user of that store path would get it.
+  Substituted (signed) paths are unaffected. Don't put mutually
+  distrusting users in one container if that matters.
+- Only the backend holds tokens and provider logins; a tool host has its
+  user's own token (no superuser rights) and that user's GitHub token.
+- Network access is unrestricted, including to the backend's ports; use an
+  isolated Docker network if that matters.
+- The token is the only authentication and traffic is plain HTTP/WS. Outside
+  a trusted LAN, set `PRIGH_BIND=127.0.0.1` and put a TLS proxy (below) or
+  an SSH tunnel in front.
 
 ## Behind a reverse proxy
 
-Publish the web port on loopback only (`PRIGH_BIND=127.0.0.1`) and let a
-proxy terminate TLS in front of it. Browsers then open
-`https://prigh.example.com/`, and the TUI and tool hosts on other machines
+Publish the port on loopback (`PRIGH_BIND=127.0.0.1`) and let a proxy
+terminate TLS. Browsers open `https://prigh.example.com/`; other machines
 connect to the same site:
 
 ```
@@ -485,52 +319,28 @@ prigh-tui -connect https://prigh.example.com/ -token T ~/proj     # = wss://prig
 prigh tool-host -connect wss://prigh.example.com/ws -token T -cwd ~/proj
 ```
 
-The proxy must pass WebSocket upgrades (`Upgrade`, `Connection`) on `/ws`
-(the RPC) and `/terminal` (the browser's terminal) and keep them open
-(prigh pings every 20s; give it a read timeout of a minute or more).
+The proxy must:
 
-If the proxy also signs users in (authentik, Authelia, oauth2-proxy,
-Cloudflare Access...), prigh-tui, `prigh web` and `prigh tool-host` sign in
-through the browser when they meet its login instead of the WebSocket
-(`answered with a login page (HTTP 302 Found to https://login…)`; prigh-tui
-asks first). They listen on a port of 127.0.0.1 and open
-`https://prigh.example.com/#cli-signin=PORT.STATE&program=NAME`: you sign
-in to the proxy as for the page, prigh-web asks "Allow prigh-tui to sign in
-as you?", and on *Allow* it asks the server (`POST /cli-signin/grant`, with
-prigh-web's own credentials) for the `Cookie` header its request carried,
-which holds the proxy's session (HttpOnly: the page itself cannot read it),
-and hands it to the program, which sends it with each connection and saves
-it in `~/.prigh/tui-connection.sexp` (mode 0600) for next time. The proxy's
-session lasts as long as the proxy says; when it ends, the program asks
-again. Over SSH the browser is on another computer and cannot reach that
-port. Either paste: the link then carries a one-time public key
-(`&paste=KEY&from=HOST`), and after *Allow* the page shows a code instead
-(`prigh1:…`, the grant sealed to that key: X25519, HKDF-SHA256,
-AES-256-GCM, bound to the sign-in's state, 30 minutes) with a Copy button;
-paste it into the program's terminal (prigh-tui asks for it in a dialog;
-`prigh tool-host`, `prigh web` and `prigh browser-signin` read it from the
-terminal). Programs offer this when `SSH_CONNECTION` or `SSH_TTY` is set
-and someone is at a terminal; `PRIGH_SIGNIN_PASTE=1` or `0` overrides,
-`prigh browser-signin -paste` forces it. Or forward the port it prints
-first (`ssh -L PORT:127.0.0.1:PORT host`): the page's *Send to the
-forwarded port* still posts to it. Without a terminal (`prigh desktop`, a
-tool host as a service) only the forwarded port works. `prigh browser-signin
--connect URL` does it by hand (it saves the cookie for the saved address).
-The server only answers the page's own requests (`Content-Type:
-application/json`, an `Origin` matching `Host` or `X-Forwarded-Host`), so
-the proxy must pass `Host` (or set `X-Forwarded-Host`) and `Cookie` through.
+- pass WebSocket upgrades (`Upgrade`, `Connection`) on `/ws` (RPC) and
+  `/terminal` (the browser terminal);
+- allow a read timeout of a minute or more (prigh pings every 20s);
+- pass `Host` (or set `X-Forwarded-Host`) and `Cookie`;
+- use a certificate the clients' system CAs trust (`$SSL_CERT_FILE` points
+  prigh-tui at another bundle).
 
-Simpler still, exempt `/ws` and `/terminal` from the sign-in: prigh checks
-its own token on both, so nothing is lost, and the programs never meet the
-login. The page itself (`/`) can stay behind the sign-in. Otherwise send
-the proxy's own credentials with `prigh-tui -header 'NAME: VALUE'` (e.g. a
-service token; `$PRIGH_CONNECT_HEADERS` for several, one per line), or use
-an SSH tunnel to the published port.
+On a tailnet, `tailscale serve --bg 7790` on the Docker host is the shortest
+route to HTTPS. HTTPS also lets prigh-web be installed as an app; keep the
+site at the root of its host (the service worker's scope).
 
-- **authentik** (proxy provider, forward auth or the embedded outpost): in
-  the provider's *Advanced protocol settings*, *Unauthenticated Paths*, add
-  `^/(ws|terminal)(\?.*)?$` (in *Forward auth (domain level)* mode the
-  regex is matched against the full URL:
+### Proxies that sign users in
+
+With authentik, Authelia, oauth2-proxy, Cloudflare Access and the like, the
+simplest fix is to **exempt `/ws` and `/terminal` from the sign-in**: prigh
+checks its own token there, and `/` can stay behind it.
+
+- **authentik**: in the provider's *Advanced protocol settings →
+  Unauthenticated Paths*, add `^/(ws|terminal)(\?.*)?$` (in *Forward auth
+  (domain level)* mode, the full URL:
   `^https://prigh\.example\.com/(ws|terminal)(\?.*)?$`).
 - **Caddy** with `forward_auth`:
 
@@ -569,8 +379,8 @@ an SSH tunnel to the published port.
   }
   ```
 
-- **Traefik**: a second router for the sockets, with a higher priority and
-  without the sign-in middleware (labels on the prigh container):
+- **Traefik**: a higher-priority router for the sockets without the
+  sign-in middleware:
 
   ```
   traefik.http.routers.prigh.rule=Host(`prigh.example.com`)
@@ -580,80 +390,58 @@ an SSH tunnel to the published port.
   traefik.http.services.prigh.loadbalancer.server.port=7790
   ```
 
-The proxy's certificate must be one the clients' system CAs trust (e.g.
-Let's Encrypt); `$SSL_CERT_FILE` points prigh-tui at another bundle.
+Otherwise:
 
-Over HTTPS, prigh-web can be installed as an app (see "In a browser" in
-the README): browsers only allow that, and its offline shell, on `https://`
-or localhost. On a tailnet, `tailscale serve --bg 7790` on the Docker host
-is the shortest way there (`https://HOST.TAILNET.ts.net/`, with a
-certificate and WebSockets handled). Behind a proxy that signs users in,
-the page's files, `manifest.webmanifest` and `sw.js` can all stay behind
-the sign-in (the manifest is fetched with credentials); an installed app
-whose sign-in expired gets the proxy's login page when it starts, as a
-tab would. Keep the site at the root of its host: the service worker's
-scope is the directory it is served from.
+- **Browser sign-in.** prigh-tui, `prigh web` and `prigh tool-host` notice
+  the proxy's login page and sign in through the browser: they open
+  `https://prigh.example.com/#cli-signin=…`, you sign in to the proxy and
+  *Allow*, and prigh-web hands over the proxy's session cookie, saved in
+  `~/.prigh/tui-connection.sexp` until it expires. Over SSH (`SSH_CONNECTION`
+  or `SSH_TTY` set) the page shows a `prigh1:…` code to paste into the
+  terminal instead; `PRIGH_SIGNIN_PASTE=1`/`0` overrides, or forward the
+  printed port (`ssh -L PORT:127.0.0.1:PORT host`). `prigh browser-signin
+  -connect URL` does it by hand (`-paste` forces the code).
+- **Proxy credentials**: `prigh-tui -header 'NAME: VALUE'` (e.g. a service
+  token; `$PRIGH_CONNECT_HEADERS` for several, one per line).
+- **An SSH tunnel** to the published port.
 
-## Data
+## Other commands
 
-| Path | Volume | Contents |
-|---|---|---|
-| `/home/prigh` | `prigh-home` | the backend's data: sessions (`.prigh/sessions`, per user `.prigh/namespaces/<name>/`), provider logins, config, prompt history |
-| `/home/<name>` | `prigh-home` | user `<name>`'s home and working directory: its projects (clone them here; `/cd` switches between them), `~/.ssh`, `~/.gitconfig`, shell history |
-| `/nix` | `prigh-nix` | the Nix store: what users installed (see [Installing tools](#installing-tools)), and prigh's own runtime, copied in from the image at start |
-| `/run/prigh` | tmpfs | the users (`extrausers/passwd`, `group`, `shadow`), rebuilt at each start |
+`docker compose exec` runs as root and skips the entrypoint; prefix commands
+with `prigh-docker` to drop root:
 
-The start first waits, up to `PRIGH_VOLUME_WAIT` (2 minutes), for `/home`
-and `/nix` to be writable, logging once what it waits for; if they never
-are, it exits saying which and what to check. With bind mounts on a disk
-of their own, make sure the host mounts it read-write before Docker starts
-(systemd: `RequiresMountsFor=` on `docker.service`).
+```
+docker compose exec prigh prigh-docker users                 # name, uid, home, superuser
+docker compose exec -it prigh prigh-docker as alice bash     # a shell as alice
+docker compose exec prigh prigh-docker as alice nix profile list
+docker compose exec prigh prigh-docker prigh sessions list   # any other command runs as prigh
+docker compose exec prigh prigh-docker nix-gc 30d            # collect now, deleting generations over 30 days
+docker compose run --rm prigh bash                           # likewise, in a new container
+```
 
-Removing the stack keeps named volumes unless they are removed
-explicitly (`docker compose down -v` deletes them, logins and sessions
-included).
-
-**Getting files out (and in).** In prigh-web (`PRIGH_MODE=web`,
-port 7790), the folder button at the chat's top right (Ctrl+Shift+F) browses the
-session's directory in the container: select a file and Download it, or a
-directory to download it as a `.tar.gz` (`tar -tzf` lists it; `tar -xzf`
-unpacks it into a directory of its name). The upload button, or files
-dropped on the browser, put files into the directory shown; files dropped
-on the message box go to `.prigh/uploads/` in the session's directory and
-are attached to the message. From the Docker host, `docker compose cp
-prigh:/home/<name>/proj ./proj` (the service is `prigh`) copies whole
-trees; files copied in are owned by root, so `chown -R <name>:` them
-(`docker compose exec prigh chown -R alice: /home/alice/proj`). `prigh-nix` alone can be removed at any time with the stack
-down: the next start seeds a fresh store, and users reinstall their
-packages.
+Plain `docker compose exec prigh CMD` is a root shell, for administration
+(e.g. `chown`).
 
 ## Migrating from the single-user layout
 
-Older images ran everything as `prigh`, with the `prigh-home` volume
-mounted at `/home/prigh` and projects directly in `/workspace`. On the
-first start of the new image:
+Older images ran everything as `prigh` with `prigh-home` at `/home/prigh`.
+On the first start of a new image:
 
-- The `prigh-home` volume is now mounted at `/home`. If its root holds the
-  old home (`.prigh` or `.config`) and there is no `/home/prigh`, the
-  entrypoint moves everything into `/home/prigh` (and logs it), so logins
-  and sessions are kept. With a single `PRIGH_TOKEN`, they are the `default`
-  user's.
-- Projects in `/workspace` must be moved into a user's home: see
-  [Migrating from /workspace](#migrating-from-workspace).
-- The SSH key and git config of the old home stay in `/home/prigh`, where
-  no agent can use them. Create a key per user with `prigh-docker ssh-key
-  NAME` (or copy the old one into `/home/NAME/.ssh` and chown it).
+- If the volume's root holds the old home (`.prigh` or `.config`) and there
+  is no `/home/prigh`, the entrypoint moves it there, keeping logins and
+  sessions (the `default` user's with a single `PRIGH_TOKEN`).
+- The old SSH key and git config stay in `/home/prigh`, out of agents'
+  reach: create per-user keys with `prigh-docker ssh-key NAME`.
 - Remove any `user:` override: the container must start as root.
 
 ## Migrating from /workspace
 
-Older images had a second volume, `prigh-workspace` (or a host path in
-`PRIGH_WORKSPACE`), at `/workspace`, with each user's projects in
-`/workspace/<name>`. Users now work in their homes, and nothing is mounted at
-`/workspace`. If a `/workspace/<name>` is still there (a leftover mount),
-the entrypoint logs, for each, the command that moves it. Otherwise copy the
-old volume into the homes once, with the stack down and after the new image
-has started once (so that `/home/<name>` exists with the user's uid):
+Older images mounted `prigh-workspace` (or a host path in
+`PRIGH_WORKSPACE`) at `/workspace`, with projects in `/workspace/<name>`.
+Users now work in their homes. If a `/workspace/<name>` is still mounted,
+the entrypoint logs the command that moves each one. Otherwise, after the
+new image has started once (so the homes exist), copy the old volume with
+the stack down:
 
 ```
 docker compose down
@@ -662,98 +450,57 @@ docker run --rm -v <project>_prigh-home:/home -v <project>_prigh-workspace:/work
 docker compose up -d
 ```
 
-(`-v /host/path:/workspace` for a `PRIGH_WORKSPACE` bind mount; `docker
-volume ls` shows the volume names.) Directories that are not named after a
-user are skipped: copy them into a home by hand the same way. When everything
-is in place, `docker volume rm <project>_prigh-workspace`. Sessions keep the
-directory they were in, so `/cd` those that were in `/workspace/<name>/...`
-to the new place.
+Use `-v /host/path:/workspace` for a bind mount; `docker volume ls` shows the
+names. Directories not named after a user are skipped: copy them by hand.
+Then `docker volume rm <project>_prigh-workspace`, and `/cd` sessions that
+were in `/workspace/<name>/...` to their new place.
 
-## Other commands
+## Troubleshooting
 
-`docker compose exec` runs commands as root and skips the entrypoint, so
-prefix them with `prigh-docker`, which runs them without root:
+The backend logs to the container's output:
+`docker compose logs --timestamps --since 2h prigh`. Save it before
+recreating a stuck container (`docker compose logs --timestamps prigh >
+prigh.log`), as redeploying discards it.
 
-```
-docker compose exec prigh prigh-docker users                 # name, uid, home, superuser
-docker compose exec -it prigh prigh-docker as alice bash     # a shell as alice, in alice's clean environment
-docker compose exec prigh prigh-docker prigh sessions list   # any other command runs as prigh
-docker compose exec prigh prigh-docker as alice nix profile list
-docker compose exec prigh prigh-docker nix-gc 30d             # collect Nix garbage now (root), deleting generations over 30 days
-docker compose run --rm prigh bash                           # likewise, in a new container
-```
+| Symptom or log line | Meaning / fix |
+|---|---|
+| `prigh: closing the connection of prigh-web: …` | the backend ended a connection: `the peer is not reading what is sent to it`, `cannot write: …`, or `a newer connection from the same page took over` |
+| `prigh: request from … failed: …` | a request raised an exception (the connection stays) |
+| `prigh: web connection failed: …` | a connection ended with an error |
+| browser keeps reconnecting behind a proxy | check WebSocket upgrades and read timeouts on `/ws` and `/terminal` ([Behind a reverse proxy](#behind-a-reverse-proxy)) |
+| clients get a login page or HTTP 302/401 instead of the WebSocket | the proxy signs users in: exempt `/ws` and `/terminal` |
+| start waits, then exits about `/home` or `/nix` | the volume is not writable; check the host mount (`PRIGH_VOLUME_WAIT`) |
+| startup line says `nix: NOT RUNNING` | `nix-daemon` keeps failing; prigh runs without Nix installs |
+| `/workspace/<name> is from an older image` | see [Migrating from /workspace](#migrating-from-workspace) |
+| `PRIGH_MODE=prigh-web is now PRIGH_MODE=web` | rename the mode |
 
-Plain `docker compose exec prigh CMD` (e.g. a root shell) is for
-administration, like the `cp`/`chown` above.
-
-## Logs
-
-The backend writes its log to the container's output: `docker compose logs
---timestamps --since 2h prigh` (or **Containers → prigh → Logs** in
-Portainer, with timestamps on). Save it before restarting a stuck
-container: `docker compose logs --timestamps prigh > prigh.log`
-(recreating the container, e.g. redeploying, discards its log). Lines worth
-looking for when the browser keeps reconnecting:
-
-- `prigh: closing the connection of prigh-web: …` — the backend ended a
-  connection: `the peer is not reading what is sent to it` (a page that
-  went away without closing its socket fell too far behind), `cannot
-  write: …`, or `a newer connection from the same page took over` (the
-  page reconnected before the backend noticed the old one had gone).
-- `prigh: request from … failed: …` — a request failed with an exception
-  (the connection stays).
-- `prigh: web connection failed: …` — a connection ended with an error.
-
-A WebSocket whose peer answers nothing (not even pings) for 45 seconds, or
-whose writes have been stuck for 5 minutes, is closed by the backend, so a
-proxy that keeps dead sockets open does not keep their work alive.
+The backend closes a WebSocket whose peer answers nothing for 45 seconds or
+whose writes are stuck for 5 minutes.
 
 ## Binary cache
 
-A self-hosted build host ([Komodo](https://komo.do), outside this
-repository) picks up every push to `main` within a few minutes. It builds
-prigh, prigh-desktop, prigh-computer, everything they are built from and
-the dev shells' inputs, and pushes them to the Attic cache `prigh`. So when
-`flake.lock`, `nix/` or the `*.opam`/`dune-project` files change, the new
-dependencies are cached once that run finishes. Its Nix store persists
-between runs, so a commit only builds what changed. Then it builds the
-image from its own store (the backend and frontend as NARs in the
-`prebuilt` build context, with `REQUIRE_CACHED=1`) and pushes it to
-`ghcr.io/evan-a-w/prigh`. Only merged code reaches it: pull requests run
-nothing there. To push to the cache by hand, from a machine with Nix,
-enough RAM and a push token (`attic login`):
+A self-hosted build host ([Komodo](https://komo.do)) builds every push to
+`main` within minutes: prigh, prigh-desktop, prigh-computer, their
+dependencies and the dev shells' inputs, pushed to the Attic cache `prigh`
+(`attic.caduc.co/prigh`). It then builds the image from its own store
+(backend and frontend as NARs in the `prebuilt` build context, with
+`REQUIRE_CACHED=1`) and pushes it to `ghcr.io/evan-a-w/prigh`. Pull requests
+run nothing there.
+
+To push by hand (Nix, enough RAM, and `attic login` with a push token):
 
 ```
 nix build --no-link --print-out-paths path:.#frontend.inputDerivation path:.#backend.inputDerivation \
   | xargs nix run nixpkgs#attic-client -- push prigh
 ```
 
-Anything missing from the cache is compiled, so a stale cache makes the
-build slower but does not break it.
+A stale cache makes builds slower, never broken.
 
 ## How the image is built
 
-1. A `nixos/nix` stage gets `.#backend` and `.#frontend` of the flake
-   (`docker/fetch-prigh.sh`): one the binary cache has (signed by a trusted
-   key) is downloaded as that store path alone (the build host passes the
-   ones it just built as NARs in the `prebuilt` build context, which come first), checked against its hash
-   and unpacked, without its closure (which holds the whole OxCaml
-   toolchain, ~3 GB to download); one it lacks is built, after a warning
-   and `nix build --dry-run`'s plan (`REQUIRE_CACHED=1`, as the build host
-   sets, fails instead). With `PREFETCH_DEPS=1` it first builds only their
-   dependencies, from a copy of the files that determine them, so that
-   layer stays cached. It then keeps just the two
-   binaries, prigh-web's site and, as the Nix seed, the few store paths the
-   binaries link against (glibc, gmp) plus the `nix` of the `nixos/nix`
-   image and nixpkgs' `imagemagick` (the one the flake's `prigh` wrapper
-   puts on PATH; the build checks that it downscales a PNG to PNG and
-   JPEG) with their closures and database registration (`nix-store
-   --dump-db`), a few hundred MB instead of the ~10 GB build closure.
-   The runtime stage links `nix*` and `magick` into `/usr/local/bin`. It also
-   writes the flake registry that pins `nixpkgs` to `flake.lock`.
-2. The runtime stage is `debian:bookworm-slim`. `tini -g` is PID 1, so
-   signals reach the backend and tool hosts and child processes are
-   reaped. `libnss-extrausers` lets the entrypoint add users at runtime
-   despite the read-only root (`/var/lib/extrausers` points into `/run`);
-   the build checks that lookups through it work. The `nixbld` group and
-   users and `/etc/nix/nix.conf` (from `docker/nix.conf`) are baked in.
+1. A `nixos/nix` stage (`docker/fetch-prigh.sh`) fetches `.#backend` and
+   `.#frontend` (from `prebuilt` NARs or the cache, without their ~3 GB
+   toolchain closure; built if missing) and keeps the binaries, prigh-web's
+   site and the Nix seed (glibc, gmp, `nix`, `imagemagick`).
+2. The runtime stage is `debian:bookworm-slim`, with `tini -g` as PID 1 and
+   `libnss-extrausers` for users added at runtime on the read-only root.
