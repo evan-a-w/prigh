@@ -24,3 +24,6 @@ let capabilities (T { runner = (module R); value; _ }) = R.capabilities value
 let run_turn (T { runner = (module R); value; _ }) services ~cancel input =
   R.run_turn value services ~cancel input
 ;;
+
+let models (T { runner = (module R); value; _ }) = R.models value
+let context (T { runner = (module R); value; _ }) = R.context value

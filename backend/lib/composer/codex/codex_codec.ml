@@ -483,12 +483,19 @@ let interrupt t =
 ;;
 
 let compact t =
-  let%map.Or_error thread = require_thread t in
-  request
-    t
-    Compact
-    "thread/compact/start"
-    (`Object [ "threadId", `String thread ])
+  let%bind.Or_error thread = require_thread t in
+  match t.turn with
+  | Some _ -> Or_error.error_string "a Codex turn is already running"
+  | None ->
+    (* Codex compacts in a turn of its own, which it starts. *)
+    t.turn <- Some { id = None; started = false; interrupt = Not_asked };
+    t.turn_error <- None;
+    Ok
+      (request
+         t
+         Compact
+         "thread/compact/start"
+         (`Object [ "threadId", `String thread ]))
 ;;
 
 let revert t ~before_turn_id =

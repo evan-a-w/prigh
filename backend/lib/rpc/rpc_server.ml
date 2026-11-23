@@ -2338,15 +2338,18 @@ let attached_state (client : Client.t) =
    it, where it is; another client's on the config's [default_host] while
    that is connected, else as [start_location] says. On the default host
    (the backend's without one), in [default_cwd] when there is one. *)
-(* Moves the attached session to another of the composer's adapters: the
+(* Moves the attached session to another of the composer's adapters (the
    new one's harness takes over at the next turn, handed what it has not
-   seen of the session. Not while a run goes on. *)
+   seen of the session), or back to prigh's harness engine ([harness]),
+   which reads the session itself. Not while a run goes on. *)
 let set_adapter t (client : Client.t) params =
   let open Or_error.Let_syntax in
   let agent = client.agent in
   let%bind name = string_param params "adapter" in
   let%bind choice =
-    Engines.choose t.engines ~engine:(Some "composer") ~adapter:(Some name)
+    if String.equal name "harness"
+    then Engines.choose t.engines ~engine:(Some "harness") ~adapter:None
+    else Engines.choose t.engines ~engine:(Some "composer") ~adapter:(Some name)
   in
   let previous = Agent.engine_choice agent in
   if Engine_choice.equal choice previous
@@ -2367,16 +2370,23 @@ let set_adapter t (client : Client.t) params =
       | None -> Ok ()
       | Some why -> Error (Error.of_string why)
     in
-    let%bind adapter =
-      Result.of_option
-        choice.adapter
-        ~error:(Error.of_string "the composer needs an adapter")
-    in
-    let%map runner = composer_runner t agent adapter ~handoff_from:previous in
-    Agent.set_engine agent choice;
-    Agent.set_unavailable agent None;
-    Agent.set_runner agent (Some runner);
-    attached_state client)
+    match choice with
+    | { engine = Harness; _ } ->
+      Agent.set_engine agent choice;
+      Agent.set_unavailable agent None;
+      Agent.set_runner agent None;
+      Ok (attached_state client)
+    | { engine = Composer; _ } ->
+      let%bind adapter =
+        Result.of_option
+          choice.adapter
+          ~error:(Error.of_string "the composer needs an adapter")
+      in
+      let%map runner = composer_runner t agent adapter ~handoff_from:previous in
+      Agent.set_engine agent choice;
+      Agent.set_unavailable agent None;
+      Agent.set_runner agent (Some runner);
+      attached_state client)
 ;;
 
 let new_session_start t (client : Client.t) =
@@ -3720,11 +3730,15 @@ let dispatch_server t (client : Client.t) ~meth ~params
   | "pr_list" | "pr_view" | "pr_defaults" | "pr_create" ->
     Some (pull_requests t client ~meth ~params)
   | "list_models" ->
-    let models = Login_manager.models t.login in
-    Model_registry.reload models;
-    tell_problems client (Model_registry.problems models);
-    Some
-      (ok (`Array (List.map (Model_registry.models models) ~f:Rpc_json.model)))
+    (match Agent.external_models client.agent with
+     | Some models -> Some (ok (`Array (List.map models ~f:Rpc_json.model)))
+     | None ->
+       let models = Login_manager.models t.login in
+       Model_registry.reload models;
+       tell_problems client (Model_registry.problems models);
+       Some
+         (ok
+            (`Array (List.map (Model_registry.models models) ~f:Rpc_json.model))))
   | _ -> None
 ;;
 
@@ -3742,6 +3756,25 @@ let ui_action_param params ~meth =
       | Some _ ->
         Or_error.error_string
           "a prompt with ui_action takes no text: send text \"\"")
+;;
+
+(* One of an external harness's models, by key ([codex/gpt-5]), id or
+   name. *)
+let resolve_external (models : Model.t list) query ~who =
+  let q = String.lowercase query in
+  match
+    List.find models ~f:(fun m ->
+      String.equal (Model.key m) query
+      || String.equal m.id query
+      || String.equal (String.lowercase m.name) q)
+  with
+  | Some m -> Ok m
+  | None ->
+    Or_error.errorf
+      "%s has no model %S: pick one of %s (/model lists them)"
+      who
+      query
+      (String.concat ~sep:", " (List.map models ~f:(fun m -> m.id)))
 ;;
 
 let dispatch agent login ~(client : Client.t) ~meth ~params : Json.t Or_error.t =
@@ -3956,7 +3989,10 @@ let dispatch agent login ~(client : Client.t) ~meth ~params : Json.t Or_error.t 
   | "set_model" ->
     Or_error.bind (string_param params "model") ~f:(fun id ->
       Or_error.map
-        (Model_registry.resolve (Login_manager.models login) id)
+        (match Agent.external_models agent with
+         | Some models ->
+           resolve_external models id ~who:(Agent.engine_label agent)
+         | None -> Model_registry.resolve (Login_manager.models login) id)
         ~f:(fun model ->
           Agent.set_model agent model;
           `Object []))

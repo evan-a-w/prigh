@@ -34,6 +34,13 @@ module Services = struct
 end
 
 module Turn = struct
+  module Kind = struct
+    type t =
+      | Prompt (** answer the prompts *)
+      | Compact of { instructions : string option }
+      (** compact the context ([/compact]); there are no prompts *)
+  end
+
   module Input = struct
     type t =
       { context : Message.t list (** the session's context before [prompts] *)
@@ -42,6 +49,10 @@ module Turn = struct
       ; thinking : Thinking.t
       ; approval : Approval_mode.t
       ; plan : bool (** plan mode *)
+      ; model : string option
+        (** the external harness's model to use: [None] for its default (or,
+            in the harness, the session's) *)
+      ; kind : Kind.t
       }
   end
 end
@@ -52,6 +63,13 @@ module type Runner = sig
 
   val engine : Engine_id.t
   val capabilities : t -> Capabilities.t
+
+  (** The models the session can switch to, when they are the runner's (an
+      external harness's) rather than prigh's. *)
+  val models : t -> Model.t list option
+
+  (** The latest context size the runner saw reported: tokens, window. *)
+  val context : t -> int option * int option
 
   (** Runs the agent on [input] until it ends its turn, is cancelled or
       halted, emitting what happens through the services; returns the
@@ -91,6 +109,8 @@ module type Runner_api = sig
 
   val engine : t -> Engine_id.t
   val capabilities : t -> Capabilities.t
+  val models : t -> Model.t list option
+  val context : t -> int option * int option
 
   val run_turn
     :  t

@@ -40,27 +40,35 @@ let codex_fields ?unavailable () =
 ;;
 
 let session ?deployed ?unavailable ?(fields = []) () =
-  let h = H.create ~state:(H.state_json ~fields:(codex_fields ?unavailable () @ fields) ()) () in
+  let h =
+    H.create
+      ~state:(H.state_json ~fields:(codex_fields ?unavailable () @ fields) ())
+      ()
+  in
   H.quiet h (fun () -> hello ?deployed h);
   h
 ;;
 
 let toasts h = H.text h ~selector:".toast"
 
-let%expect_test "the model chip names the adapter; a harness session's does not" =
+let%expect_test "the model chip names the adapter; a harness session's does not"
+  =
   let h = session () in
   H.names h ~selector:".model-chip";
   H.text h ~selector:".model-chip";
   let h = H.create () in
   H.names h ~selector:".model-chip";
-  [%expect {|
+  [%expect
+    {|
     button "Model: Codex \194\183 Claude Opus 5.5, Medium" -- Codex · Claude Opus 5.5, reasoning Medium: models, reasoning and access (Ctrl+L)
     (Codex · Opus 5.5)
     button "Model: Claude Opus 5.5, Medium" -- Claude Opus 5.5, reasoning Medium: models, reasoning and access (Ctrl+L)
     |}]
 ;;
 
-let%expect_test "/new starts a session on this one's engine; /new ENGINE on another" =
+let%expect_test
+    "/new starts a session on this one's engine; /new ENGINE on another"
+  =
   let h = session () in
   H.type_ h "/new";
   H.act h Send;
@@ -71,7 +79,8 @@ let%expect_test "/new starts a session on this one's engine; /new ENGINE on anot
   H.type_ h "/new gemini";
   H.act h Send;
   toasts h;
-  [%expect {|
+  [%expect
+    {|
     (Rpc (method_ push_pref) (params ((key history) (value /new) (max 500)))
      (tag Ignore))
     (Rpc (method_ new_session) (params ((engine composer) (adapter codex)))
@@ -93,7 +102,8 @@ let%expect_test "/new starts a session on this one's engine; /new ENGINE on anot
 
 let%expect_test "/new on a harness-only backend: as before" =
   let h = H.create () in
-  H.quiet h (fun () -> hello ~deployed:Prigh_protocol.Deployed_engines.harness_only h);
+  H.quiet h (fun () ->
+    hello ~deployed:Prigh_protocol.Deployed_engines.harness_only h);
   H.type_ h "/new";
   H.act h Send;
   H.type_ h "/new codex";
@@ -101,7 +111,8 @@ let%expect_test "/new on a harness-only backend: as before" =
   H.type_ h "/engine";
   H.act h Send;
   toasts h;
-  [%expect {|
+  [%expect
+    {|
     (Rpc (method_ push_pref) (params ((key history) (value /new) (max 500)))
      (tag Ignore))
     (Rpc (method_ new_session) (params ()) (tag Reload_state))
@@ -120,7 +131,8 @@ let%expect_test "the new-session screen's engine chip picks the engine" =
   H.text h ~selector:".modal";
   H.act h (Picker_query "claude");
   H.act h Dialog_accept;
-  [%expect {|
+  [%expect
+    {|
     button "Engine: Codex. Change it" -- Runs on Codex: start it on another engine (/new ENGINE)
     Pick_engine
     (Focus picker-input)
@@ -147,7 +159,8 @@ let%expect_test "/engine switches the adapter (set_adapter)" =
   H.type_ h "/engine claude";
   H.act h Send;
   toasts h;
-  [%expect {|
+  [%expect
+    {|
     (Rpc (method_ push_pref) (params ((key history) (value /engine) (max 500)))
      (tag Ignore))
     (Focus picker-input)
@@ -155,6 +168,7 @@ let%expect_test "/engine switches the adapter (set_adapter)" =
     (Close (Esc))
     []
     Codex OpenAI's Codex CLI on the session's tool host ✓
+    prigh harness prigh's own agent, calling the model directly
     Claude Code Anthropic's Claude Code CLI on the session's tool host
     ↑↓ to move, Enter to choose, Esc to close
     (Focus editor)
@@ -179,7 +193,8 @@ let%expect_test "what the engine cannot do is refused before anything opens" =
         printf "%s: " c;
         toasts h;
         H.act h Close_dialog));
-  [%expect {|
+  [%expect
+    {|
     /rewind: Codex sessions can't rewind in place: fork from that message instead (/fork) (Dismiss)
     /fork: /compact: Codex compacts its context by itself when it fills: /compact isn't available (Dismiss)
     /trim: Codex sessions can't trim or delete messages, the agent keeps its own context: start a new session (/new) for a fresh one (Dismiss)
@@ -200,9 +215,12 @@ let%expect_test "a message's menu: trim and delete disabled, with why" =
                 (H.page
                    {|[{"role":"user","text":"question"},{"role":"assistant","content":[{"type":"text","text":"answer"}],"stop_reason":{"type":"end_turn"},"usage":{"input":0,"output":0,"cache_read":0},"model":"m"}]|}))
          )));
-  H.act h (Open_menu { target = Message 1; anchor = Point { x = 300; y = 120 } });
+  H.act
+    h
+    (Open_menu { target = Message 1; anchor = Point { x = 300; y = 120 } });
   H.names h ~selector:".context-menu [role=menuitem]";
-  [%expect {|
+  [%expect
+    {|
     (Focus dialog)
     (Place_menu (Point (x 300) (y 120)))
     [menuitem] div "Copy"
@@ -217,7 +235,8 @@ let%expect_test "the modes: no plan mode where the engine has none" =
   H.type_ h "/mode";
   H.act h Send;
   H.text h ~selector:".modal";
-  [%expect {|
+  [%expect
+    {|
     (Rpc (method_ push_pref) (params ((key history) (value /mode) (max 500)))
      (tag Ignore))
     (Focus picker-input)
@@ -233,7 +252,9 @@ let%expect_test "the modes: no plan mode where the engine has none" =
     |}]
 ;;
 
-let%expect_test "a session that cannot run here: the banner says why; Send is off" =
+let%expect_test
+    "a session that cannot run here: the banner says why; Send is off"
+  =
   let h =
     session
       ~unavailable:
@@ -247,7 +268,8 @@ let%expect_test "a session that cannot run here: the banner says why; Send is of
   H.act h Send;
   toasts h;
   H.click h ~selector:".engine-banner-new";
-  [%expect {|
+  [%expect
+    {|
     Codex is not installed on srv: install it there (npm i -g @openai/codex), then retry (New session)
     button "Send" -- This session can't run here: see above
     icon "(no name)"

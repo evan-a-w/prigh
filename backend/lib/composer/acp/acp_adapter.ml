@@ -354,6 +354,37 @@ let create
         List.iter outputs ~f:(dispatch t)
     ;;
 
+    (* The choices of its [model] option; the current one is its default. *)
+    let models t =
+      match
+        Codec.Session_config.option
+          (Codec.session_config t.codec)
+          ~category:"model"
+      with
+      | Some { value = Select { current; choices }; _ } ->
+        let model (c : Codec.Config_option.Choice.t) =
+          External_model.model ~adapter:id ~name:c.name c.value
+        in
+        let default =
+          match
+            List.find choices ~f:(fun (c : Codec.Config_option.Choice.t) ->
+              String.equal c.value current)
+          with
+          | Some c ->
+            { (model c) with
+              id = External_model.default_id
+            ; name = sprintf "default (%s)" c.name
+            }
+          | None -> External_model.default ~adapter:id
+        in
+        default :: List.map choices ~f:model
+      | Some _ | None -> []
+    ;;
+
+    let compact _ _ ~instructions:_ =
+      Or_error.errorf "%s does not compact on request" display_name
+    ;;
+
     let steer _ (_ : Adapter.Input.t) =
       Or_error.errorf "%s takes new messages between turns" agent.display_name
     ;;
