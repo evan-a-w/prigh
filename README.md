@@ -186,7 +186,8 @@ machine's tool host, so sessions run their tools here, as with a TUI.
 ```nix
 # Home Manager (flake input `prigh`):
 imports = [ prigh.homeManagerModules.default ];
-programs.prigh.enable = true;          # prigh on the PATH
+programs.prigh.enable = true;          # prigh, codex and bwrap on the PATH (agents.*: claudeCode,
+                                       # on when unfree is allowed; extraPackages)
 programs.prigh.desktop.enable = true;  # "prigh" in the application menu
 # also desktop.ui, .window, .browser (table below), .extraArgs,
 # .useSystemNixpkgs, .disableDmabuf (troubleshooting), .computerUse
