@@ -9185,6 +9185,10 @@ let%expect_test "/new and /switch leave the previous session's subagents behind"
   print_s [%sexp (h.model.focus : [ `Main | `Agent of string ])];
   [%expect
     {|
+    (Rpc
+      (method_ new_session)
+      (params ())
+      (tag (Reload_messages_notice "new session")))
     (Rpc (method_ get_state) (params ()) (tag Initial_state))
     (Rpc (method_ get_messages) (params ()) (tag Initial_messages))
     (Rpc (method_ get_pending) (params ()) (tag Pending))
