@@ -897,3 +897,72 @@ let%expect_test "Antigravity: stopping a steered turn" =
     user: also this
     |}]
 ;;
+
+let%expect_test
+    "Grok's plan is put to the user: start working, or keep planning"
+  =
+  let exit_plan p ~id plan =
+    P.write
+      p
+      [ "jsonrpc", `String "2.0"
+      ; "id", `String id
+      ; "method", `String "_x.ai/exit_plan_mode"
+      ; ( "params"
+        , `Object
+            [ "sessionId", `String "ses_1"
+            ; "toolCallId", `String ("tc-" ^ id)
+            ; "planContent", `String plan
+            ] )
+      ]
+  in
+  with_acp ~agent:(known "grok") ~peer:(fun _ p ->
+    P.initialize p;
+    P.new_session p "ses_1";
+    let mode = P.expect p "session/set_mode" in
+    P.result p mode "{}";
+    let prompt = P.expect p "session/prompt" in
+    exit_plan p ~id:"p1" "1. Fix\n2. Test";
+    P.answer p;
+    P.text p "ses_1" "Changed it.";
+    exit_plan p ~id:"p2" "1. Fix\n2. Test\n3. Document";
+    P.answer p;
+    P.text p "ses_1" "Done.";
+    P.result p prompt {|{"stopReason":"end_turn"}|})
+  @@ fun agent _ ->
+  let answers = Queue.of_list [ "Keep planning"; "Start working" ] in
+  Agent.subscribe agent ~f:(function
+    | Loop (Ask_user { call_id; questions; _ }) ->
+      List.iter questions ~f:(fun q ->
+        printf
+          "ask_user [%s]: %s\n"
+          (Option.value q.header ~default:"")
+          q.question);
+      Or_error.ok_exn
+        (Agent.answer_question
+           agent
+           ~call_id
+           (Answered [ [ Queue.dequeue_exn answers ] ]))
+    | _ -> ());
+  Agent.set_mode agent ~plan:true;
+  prompt agent "plan it";
+  [%expect
+    {|
+    spawn #1: grok agent stdio
+    agent got initialize
+    agent got session/new session=- mcp=[]
+    agent got session/set_mode plan
+    agent got session/prompt "plan it"
+    ask_user [Plan]: Grok Build's plan:
+
+    1. Fix
+    2. Test
+    agent got answer {"outcome":"request_changes","feedback":"The user wants to keep planning: stay in plan mode and wait for what they want changed."}
+    ask_user [Plan]: Grok Build's plan:
+
+    1. Fix
+    2. Test
+    3. Document
+    agent got answer {"outcome":"approved"}
+    assistant (acp:grok/default, End_turn): "Changed it.Done."
+    |}]
+;;

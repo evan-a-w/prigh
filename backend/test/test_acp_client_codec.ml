@@ -749,16 +749,22 @@ let%expect_test "Grok: interjecting, its questions, its plan, background tasks" 
     < {"jsonrpc":"2.0","method":"x.ai/task_backgrounded","params":{"sessionId":"ses_1","update":{"task_id":"t1","task_snapshot":{"kind":"bash","command":"make watch"}}}}
     (Notice "the agent runs a background task (make watch)")
     < {"jsonrpc":"2.0","id":"p1","method":"x.ai/exit_plan_mode","params":{"method":"x.ai/exit_plan_mode","params":{"sessionId":"ses_1","toolCallId":"tc2","planContent":"1. Fix\n2. Test"}}}
-    (Notice  "Plan:\
-            \n1. Fix\
-            \n2. Test")
-      > {"jsonrpc":"2.0","id":"p1","result":{"outcome":"abandoned","feedback":"The client captured your proposed plan. Stop here and wait for the user's feedback or implementation request in a later turn."}}
+    (Approval_request (request_id p1) (tool_id (tc2)) (kind (Other ExitPlanMode))
+     (summary  "1. Fix\
+              \n2. Test")
+     (input
+      (Object
+       ((sessionId (String ses_1)) (toolCallId (String tc2))
+        (planContent (String  "1. Fix\
+                             \n2. Test")))))
+     (offers_always false))
     < {"jsonrpc":"2.0","id":"u1","method":"x.ai/something_new","params":{}}
       > {"jsonrpc":"2.0","id":"u1","error":{"code":-32601,"message":"method not found: x.ai/something_new"}}
     < {"jsonrpc":"2.0","id":"q2","method":"x.ai/ask_user_question","params":{"sessionId":"ses_1","toolCallId":"tc3","mode":"default","questions":[{"question":"Sure?","options":[]}]}}
     (User_question (request_id q2)
      (questions (((question Sure?) (header ()) (choices ()) (multiple false)))))
     < {"jsonrpc":"2.0","id":2,"result":{"stopReason":"end_turn"}}
+    (Request_withdrawn (request_id p1))
       > {"jsonrpc":"2.0","id":"q2","result":{"outcome":"cancelled"}}
     (Request_withdrawn (request_id q2))
     (Turn_end (turn_id (turn-1)) (stop Done))

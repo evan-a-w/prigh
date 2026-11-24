@@ -281,8 +281,9 @@ The composer (`composer/`), from the bottom up:
 - **`Composer_runner`** is the composer's `Runner`: it starts the CLI on
   the first turn and keeps it between turns, restarting it and resuming the
   recorded thread (a `Thread` entry per adapter and host) when it exited or
-  its host went; routes approval requests through `Services.approve` and
-  questions through `ask_user`; steers mid-turn where the CLI can (Codex;
+  its host went; routes approval requests through `Services.approve`,
+  questions and the plan a CLI proposes on leaving plan mode (Claude Code's
+  `ExitPlanMode`, Grok's `x.ai/exit_plan_mode`) through `ask_user`; steers mid-turn where the CLI can (Codex;
   Antigravity with another `session/prompt`, Grok with `_x.ai/interject`,
   per `Acp_agent.Quirks`), between turns otherwise; and records the cost the CLI reports as spend
   (`External_model` names its replies `codex/MODEL`, priced at zero).

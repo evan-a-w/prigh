@@ -259,9 +259,15 @@ module Tool = struct
 end
 
 module Permission = struct
+  module Kind = struct
+    type t =
+      | Options of (string * string) list (** option id, kind *)
+      | Plan (** Grok's [x.ai/exit_plan_mode] *)
+  end
+
   type t =
     { id : Json.t
-    ; options : (string * string) list (** option id, kind *)
+    ; kind : Kind.t
     }
 end
 
@@ -553,6 +559,16 @@ let cancelled_outcome =
   `Object [ "outcome", `Object [ "outcome", `String "cancelled" ] ]
 ;;
 
+let plan_abandoned =
+  `Object
+    [ "outcome", `String "abandoned"
+    ; ( "feedback"
+      , `String
+          "The user stopped before deciding on your plan. Stop here and wait \
+           for them." )
+    ]
+;;
+
 let withdraw_permissions t ~reply =
   let waiting = Hashtbl.to_alist t.permissions in
   Hashtbl.clear t.permissions;
@@ -560,7 +576,13 @@ let withdraw_permissions t ~reply =
     (List.sort waiting ~compare:(fun (a, _) (b, _) -> String.compare a b))
     ~f:(fun (request_id, (p : Permission.t)) ->
       (if reply
-       then [ Output.Send (result_line p.id cancelled_outcome) ]
+       then (
+         let outcome =
+           match p.kind with
+           | Options _ -> cancelled_outcome
+           | Plan -> plan_abandoned
+         in
+         [ Output.Send (result_line p.id outcome) ])
        else [])
       @ [ Event (Request_withdrawn { request_id }) ])
 ;;
@@ -666,9 +688,28 @@ let set_config_option t ~config_id value =
 let reply_approval t ~request_id (reply : Adapter_event.Approval_reply.t) =
   match Hashtbl.find_and_remove t.permissions request_id with
   | None -> None
-  | Some p ->
+  | Some { id; kind = Plan } ->
+    (* Grok's plan: carried out, changed as the user says, or dropped. *)
+    let outcome =
+      match reply with
+      | Allow | Allow_always -> `Object [ "outcome", `String "approved" ]
+      | Deny feedback ->
+        `Object
+          [ "outcome", `String "request_changes"
+          ; ( "feedback"
+            , `String
+                (Option.value
+                   feedback
+                   ~default:
+                     "The user wants to keep planning: stay in plan mode and \
+                      wait for what they want changed.") )
+          ]
+      | Cancel -> plan_abandoned
+    in
+    Some (result_line id outcome)
+  | Some { id; kind = Options options } ->
     let of_kind kind =
-      List.find_map p.options ~f:(fun (id, k) ->
+      List.find_map options ~f:(fun (id, k) ->
         Option.some_if (String.equal k kind) id)
     in
     (* A persistent option only when the user chose one: approving once
@@ -694,7 +735,7 @@ let reply_approval t ~request_id (reply : Adapter_event.Approval_reply.t) =
             )
           ]
     in
-    Some (result_line p.id outcome)
+    Some (result_line id outcome)
 ;;
 
 (* Parsing what the agent says. *)
@@ -1491,7 +1532,10 @@ let on_permission t ~id params =
        cancelled. *)
     [ Output.Send (result_line id cancelled_outcome) ]
   | _ ->
-    Hashtbl.set t.permissions ~key:request_id ~data:{ id; options };
+    Hashtbl.set
+      t.permissions
+      ~key:request_id
+      ~data:{ id; kind = Options options };
     let started, kind, tool_id =
       match tool_of_update t tool_call with
       | Some (tool_id, tool, started) -> started, tool.kind, Some tool_id
@@ -1548,8 +1592,8 @@ let xai_questions params =
 ;;
 
 (* Grok's requests and notifications beyond ACP ([x.ai/...]): its questions
-   go to the user; its plan, when it leaves plan mode, is shown and the
-   agent told to wait (prigh's plan mode carries on from there); its
+   go to the user; its plan, when it leaves plan mode, is put to the
+   user as Claude Code's is (start working or keep planning); its
    background tasks and subagents are noted. *)
 let on_xai t ~id name params =
   let params = xai_params params in
@@ -1565,19 +1609,22 @@ let on_xai t ~id name params =
       | Some plan when not (String.is_empty plan) -> plan
       | _ -> "(no plan written)"
     in
-    [ Output.Event (Notice ("Plan:\n" ^ plan))
-    ; Send
-        (result_line
-           id
-           (`Object
-               [ "outcome", `String "abandoned"
-               ; ( "feedback"
-                 , `String
-                     "The client captured your proposed plan. Stop here and \
-                      wait for the user's feedback or implementation request \
-                      in a later turn." )
-               ]))
-    ]
+    (match t.turn with
+     | Some { cancelled = true; _ } | None ->
+       [ Output.Send (result_line id plan_abandoned) ]
+     | Some _ ->
+       let request_id = request_id_string id in
+       Hashtbl.set t.permissions ~key:request_id ~data:{ id; kind = Plan };
+       [ Output.Event
+           (Approval_request
+              { request_id
+              ; tool_id = str "toolCallId" params
+              ; kind = Other "ExitPlanMode"
+              ; summary = plan
+              ; input = params
+              ; offers_always = false
+              })
+       ])
   | ("task_backgrounded" | "task_completed"), None ->
     let update = obj (field "update" params) in
     let snapshot = obj (field "task_snapshot" update) in
