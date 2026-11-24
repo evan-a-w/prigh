@@ -62,6 +62,8 @@ let%expect_test "/accounts picks a login, then what to do with it" =
   H.show h;
   [%expect
     {|
+    (Rpc (method_ auth_status) (params ()) (tag Auth_refresh))
+    (Rpc (method_ usage_limits) (params ()) (tag (Usage_limits (show false))))
     ▌ earlier question
       earlier answer
     Logins  (5)
@@ -485,5 +487,110 @@ let%expect_test "sharing a login, and one shared with the user" =
         (then_ (
           Notice_on_success
           "hid ChatGPT: Team (from dave): /accounts show ~dave/openai/team brings it back")))))
+    |}]
+;;
+
+let%expect_test "/accounts and /usage show each login's usage" =
+  let h = connected () in
+  let usage ~requests ~cost =
+    sprintf
+      {|{"requests":%d,"input":%d,"output":%d,"cache_read":0,"cost_usd":%.2f}|}
+      requests
+      (requests * 4000)
+      (requests * 300)
+      cost
+  in
+  let periods today week month =
+    sprintf
+      {|"usage":{"today":%s,"last_7_days":%s,"last_30_days":%s}|}
+      today
+      week
+      month
+  in
+  let with_usage =
+    String.substr_replace_first
+      logins_json
+      ~pattern:{|"default":true,"fallback":false}]}]|}
+      ~with_:
+        (sprintf
+           {|"default":true,"fallback":false,%s}]}]|}
+           (periods
+              (usage ~requests:3 ~cost:0.42)
+              (usage ~requests:10 ~cost:1.4)
+              (usage ~requests:25 ~cost:3.5)))
+    |> String.substr_replace_first
+         ~pattern:{|"default":false,"fallback":false}|}
+         ~with_:
+           (sprintf
+              {|"default":false,"fallback":false,%s}|}
+              (periods
+                 (usage ~requests:0 ~cost:0.)
+                 (usage ~requests:2 ~cost:0.)
+                 (usage ~requests:2 ~cost:0.)))
+  in
+  let limits =
+    {|{"fetched_at_ms":1700000000000,"providers":[{"provider":"openai","name":"ChatGPT","status":"limits","accounts":[{"ref":"openai/main","id":"main","label":"Personal","default":true,"status":"limits","plan":"pro","windows":[{"id":"primary","label":"5h","used_percent":42,"resets_at_ms":1700005400000},{"id":"secondary","label":"week","used_percent":91,"resets_at_ms":1700259200000}]},{"ref":"openai/work","id":"work","label":"Work","default":false,"status":"error","error":"sign in again with /login openai"}]},{"provider":"deepseek","name":"DeepSeek","status":"api_key"}]}|}
+  in
+  H.keys h "/accounts";
+  H.enter h;
+  H.reply ~quiet:true h Auth_refresh with_usage;
+  H.reply ~quiet:true h (Usage_limits { show = false }) limits;
+  H.show h;
+  [%expect
+    {|
+    (Rpc (method_ auth_status) (params ()) (tag Auth_refresh))
+    (Rpc (method_ usage_limits) (params ()) (tag (Usage_limits (show false))))
+    ▌ earlier question
+      earlier answer
+    Logins  (5)
+    / ▏
+    ▸* ChatGPT: Personal           5h 42%, resets in 1h 30m · subscription,…
+       ChatGPT: Work               30d 2 req 8.6k tok · subscription  opena…
+       DeepSeek: DeepSeek API key  today 3 req 13k tok $0.42 · API key, def…
+       Add a ChatGPT login         another account, under a label you choose
+       Add a DeepSeek login        another account, under a label you choose
+    ────────────────────────────────────────────────────────────────────────
+    >
+    gpt-5.5@Personal  think:off  ctx:0.1%/1.0M  Enter selects · Esc closes
+    |}];
+  H.esc h;
+  H.keys h "/usage";
+  H.enter h;
+  H.reply ~quiet:true h Auth_refresh with_usage;
+  H.reply ~quiet:true h (Usage_limits { show = true }) limits;
+  H.show h;
+  [%expect
+    {|
+    (Rpc (method_ auth_status) (params ()) (tag Auth_refresh))
+    (Rpc (method_ usage_limits) (params ()) (tag (Usage_limits (show true))))
+    ┌─ Usage ──────────────────────────────────────────────────────────────┐
+    │ ChatGPT: Personal  openai/main                                       │
+    │   5h 42%, resets in 1h 30m                                           │
+    │   week 91%, resets in 3d                                             │
+    │   nothing in the last 30 days                                        │
+    │ ChatGPT: Work  openai/work                                           │
+    │   limits unknown: sign in again with /login openai                   │
+    │   today    0 requests, 0 tokens                                      │
+    └─────────────────────── 1–7 of 16 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
+    ───────────────────────────────────────── reading the logins' usage… ───
+    > ▏
+    gpt-5.5@Personal  ↑↓ scroll · Esc closes · typing goes to the editor
+    |}];
+  H.key h (Prigh_ui.Key.plain Page_down);
+  H.show h;
+  [%expect
+    {|
+    ┌─ Usage ──────────────────────────────────────────────────────────────┐
+    │   7 days   2 requests, 8.6k tokens                                   │
+    │   30 days  2 requests, 8.6k tokens                                   │
+    │ DeepSeek: DeepSeek API key  deepseek/main                            │
+    │   today    3 requests, 13k tokens, $0.42                             │
+    │   7 days   10 requests, 43k tokens, $1.40                            │
+    │   30 days  25 requests, 108k tokens, $3.50                           │
+    │                                                                      │
+    └────────────────────── 8–14 of 16 · ↑↓ PgUp PgDn scroll · Esc closes ─┘
+    ────────────────────────────────────────────────────────────────────────
+    > ▏
+    gpt-5.5@Personal  ↑↓ scroll · Esc closes · typing goes to the editor
     |}]
 ;;

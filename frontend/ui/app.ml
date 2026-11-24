@@ -13,6 +13,8 @@ module Reply_tag = struct
     | Auth_login_picker
     | Auth_logout_picker
     | Share_targets of string (** the login's ref *)
+    | Usage_limits of { show : bool }
+    (** [usage_limits]: kept for [/accounts]; [show]: [/usage] shows them *)
     | Forge_refresh
     | Prs_picker of string option (** the state asked for *)
     | Pr_shown
@@ -300,6 +302,8 @@ module Model = struct
     { state : P.State.t option
     ; models : P.Model.t list
     ; auth : P.Auth_status.t list
+    ; usage_limits : P.Subscription_usage.t option
+      (** the last [usage_limits] answer: the logins' limits *)
     ; forge : P.Forge_account.t list
     ; transcript : Transcript.t
     ; agents : Agent_view.t list
@@ -687,6 +691,7 @@ let init =
   { state = None
   ; models = []
   ; auth = []
+  ; usage_limits = None
   ; forge = []
   ; transcript = Transcript.empty
   ; agents = []
@@ -1190,6 +1195,83 @@ let share_picker m ~ref_ users =
       (Provider_logins.share_rows_for l users)
 ;;
 
+let logins_picker_title = "Logins"
+
+(* An open [/accounts] picker shows the logins' latest usage. *)
+let logins_refreshed m =
+  match m.mode with
+  | Picker { kind = Commands; picker }
+    when String.equal (Picker.title picker) logins_picker_title ->
+    { m with
+      mode =
+        Picker
+          { kind = Commands
+          ; picker =
+              Picker.set_items
+                picker
+                (List.map
+                   (Provider_logins.rows
+                      ?usage:m.usage_limits
+                      m.auth
+                      ~session:m.state)
+                   ~f:(fun (r : Provider_logins.Row.t) ->
+                     Picker.Item.create
+                       ~id:r.id
+                       ~detail:r.detail
+                       ~marked:r.marked
+                       r.label))
+          }
+    }
+  | _ -> m
+;;
+
+(* [/usage]: each login's limits and what ran on it. *)
+let format_usage m (usage : P.Subscription_usage.t) : Content.t =
+  let now = usage.fetched_at in
+  let dim text = { Content.Span.text; style = Style.dim Style.plain } in
+  let logins = Provider_logins.all m.auth in
+  if List.is_empty logins
+  then [ [ dim "no logins yet: /login signs in to a provider" ] ]
+  else
+    List.concat_map logins ~f:(fun l ->
+      let windows =
+        match Login_usage_text.limits_of (Some usage) ~ref_:l.account.ref_ with
+        | Some (Limits { windows; _ }) ->
+          List.map windows ~f:(fun (w : P.Subscription_usage.Window.t) ->
+            let style =
+              if Float.( >= ) w.used_percent 90.
+              then Style.fg Red
+              else if Float.( >= ) w.used_percent 70.
+              then Style.fg Yellow
+              else Style.plain
+            in
+            [ { Content.Span.text = "  " ^ Login_usage_text.window ~now w
+              ; style
+              }
+            ])
+        | Some (Failed e) -> [ [ dim ("  limits unknown: " ^ e) ] ]
+        | Some (Not_signed_in | Api_key) | None -> []
+      in
+      ([ { Content.Span.text = Provider_logins.title l
+         ; style = Style.bold Style.plain
+         }
+       ; dim ("  " ^ l.account.ref_)
+       ]
+       :: windows)
+      @ List.map
+          (Login_usage_text.period_lines
+             ~cost:(Login_usage_text.billed l.account)
+             l.account.usage)
+          ~f:(fun line -> [ dim ("  " ^ line) ]))
+    @ [ []
+      ; [ dim
+            "Limits as the providers report them; requests and tokens per \
+             login (UTC days), with the cost of API keys. /accounts manages \
+             the logins."
+        ]
+      ]
+;;
+
 let accounts_command m (cmd : Commands.Parsed.t) =
   let command = "/accounts " ^ cmd.rest in
   match Provider_logins.Command.parse cmd.rest with
@@ -1205,9 +1287,11 @@ let accounts_command m (cmd : Commands.Parsed.t) =
       ( logins_picker
           m
           ~query
-          ~title:"Logins"
-          (Provider_logins.rows m.auth ~session:m.state)
-      , [] )
+          ~title:logins_picker_title
+          (Provider_logins.rows ?usage:m.usage_limits m.auth ~session:m.state)
+      , [ rpc "auth_status" ~tag:Auth_refresh
+        ; rpc "usage_limits" ~tag:(Usage_limits { show = false })
+        ] )
   | Menu arg ->
     (match Provider_logins.find m.auth arg with
      | Ok l ->
@@ -2660,6 +2744,7 @@ let reset_connection m =
     state = None
   ; models = []
   ; auth = []
+  ; usage_limits = None
   ; forge = []
   ; sessions = None
   ; known_sessions = Session_link.Known.empty
@@ -4830,6 +4915,12 @@ let run_command m (cmd : Commands.Parsed.t) =
      | Ok l -> confirm_logout m l, []
      | Error e -> error (restore_command m ("/logout " ^ cmd.rest)) e, [])
   | "accounts", _ -> accounts_command m cmd
+  | "usage", [] ->
+    ( notice m "reading the logins' usage…"
+    , [ rpc "auth_status" ~tag:Auth_refresh
+      ; rpc "usage_limits" ~tag:(Usage_limits { show = true })
+      ] )
+  | "usage", _ -> error m "usage: /usage", []
   | "account", _ -> account_command m cmd
   | "logout", provider :: _ ->
     (match Forge_accounts.logout_host m.forge provider with
@@ -7943,7 +8034,13 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
          (sessions_refreshed m)
      | Auth_refresh ->
        decode json ~f:(decode_list ~f:P.Auth_status.of_json) (fun auth ->
-         { m with auth }, [])
+         logins_refreshed { m with auth }, [])
+     | Usage_limits { show } ->
+       decode json ~f:P.Subscription_usage.of_json (fun usage ->
+         let m = logins_refreshed { m with usage_limits = Some usage } in
+         if show
+         then output m ~title:"Usage" (format_usage m usage), []
+         else m, [])
      | Auth_show ->
        decode json ~f:(decode_list ~f:P.Auth_status.of_json) (fun auth ->
          let m = { m with auth } in

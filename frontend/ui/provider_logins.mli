@@ -137,9 +137,14 @@ end
 
 val asks : string -> bool
 
-(** [/accounts]'s rows: every login, ids [/accounts menu REF]; and a row to
-    add one per signed-in provider. *)
-val rows : P.Auth_status.t list -> session:P.State.t option -> Row.t list
+(** [/accounts]'s rows: every login, ids [/accounts menu REF], with what it
+    has used ([usage]: the limits, as of when they were read); and a row
+    to add one per signed-in provider. *)
+val rows
+  :  ?usage:P.Subscription_usage.t
+  -> P.Auth_status.t list
+  -> session:P.State.t option
+  -> Row.t list
 
 (** A login's menu: use it here, make it the default, rename, fallback on
     or off, move up or down, share or stop sharing, log in again, log out;

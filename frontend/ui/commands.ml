@@ -108,6 +108,11 @@ let every =
       "the providers' logins: pick one to manage it; default, up, down, remove \
        LOGIN; rename LOGIN to LABEL; fallback LOGIN on|off"
   ; c
+      "usage"
+      ""
+      "each login's usage: its subscription's limits, and the requests and \
+       tokens (an API key's cost) of today and the last 7 and 30 days"
+  ; c
       "account"
       "[LOGIN|default]"
       "pick the login of the model's provider this session uses (or /model \

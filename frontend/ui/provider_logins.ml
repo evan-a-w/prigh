@@ -505,11 +505,25 @@ let add_rows (p : P.Auth_status.t) =
       })
 ;;
 
-let rows auth ~session =
+let rows ?usage auth ~session =
   List.map (all ~hidden:true auth) ~f:(fun l ->
+    let use =
+      Login_usage_text.brief
+        ~now:
+          (Option.value_map usage ~default:Time_ns.epoch ~f:(fun u ->
+             u.P.Subscription_usage.fetched_at))
+        ~limits:(Login_usage_text.limits_of usage ~ref_:l.account.ref_)
+        l.account
+    in
     { Row.id = "/accounts menu " ^ l.account.ref_
     ; label = title l
-    ; detail = detail l ^ "  " ^ l.account.ref_
+    ; detail =
+        (* What it used first: the rest of the line may be cut. *)
+        sprintf
+          "%s%s  %s"
+          (Option.value_map use ~default:"" ~f:(fun u -> u ^ " · "))
+          (detail l)
+          l.account.ref_
     ; marked = in_use session auth l
     })
   @ List.concat_map auth ~f:(fun (p : P.Auth_status.t) ->

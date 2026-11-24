@@ -10,7 +10,9 @@ module Totals = struct
     }
   [@@deriving sexp_of, equal]
 
-  let zero = { requests = 0; input = 0; output = 0; cache_read = 0; cost_usd = 0. }
+  let zero =
+    { requests = 0; input = 0; output = 0; cache_read = 0; cost_usd = 0. }
+  ;;
 
   let of_json j =
     let open Or_error.Let_syntax in

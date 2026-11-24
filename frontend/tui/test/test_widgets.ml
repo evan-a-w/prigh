@@ -376,7 +376,7 @@ let%expect_test "fuzzy ranking: command names" =
     {|
     "mo" -> mode model scoped-models generate-model approval-model memory import compaction permissions
     "lo" -> login logout clone default-host approval-model
-    "s"  -> state switch skills skill: signin setusr session snippet signout sessions scoped-models push jobs host todos resume agents hotkeys accounts verbosity user-info permissions default-host instructions downsize-images
+    "s"  -> state switch skills skill: signin setusr session snippet signout sessions scoped-models push jobs host usage todos resume agents hotkeys accounts verbosity user-info permissions default-host instructions downsize-images
     "sw" -> switch
     "xyz" ->
     |}]
@@ -704,6 +704,7 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     /login [provider] [method] [as LABEL]  log in to a provider (as LABEL: another login, or that one again), or a git host: github [HOST] [token], forgejo HOST [token], HOST [token]
     /logout [provider[@LOGIN]|HOST]        remove a provider's or a login's or a git host's stored credential
     /accounts [QUERY|SUBCOMMAND LOGIN]     the providers' logins: pick one to manage it; default, up, down, remove LOGIN; rename LOGIN to LABEL; fallback LOGIN on|off
+    /usage                                 each login's usage: its subscription's limits, and the requests and tokens (an API key's cost) of today and the last 7 and 30 days
     /account [LOGIN|default]               pick the login of the model's provider this session uses (or /model MODEL@LOGIN)
     /thinking [off|default|LEVEL]          pick or set the thinking level (the model's; default: the provider's)
     /verbosity [quiet|normal|verbose]      set the transcript verbosity

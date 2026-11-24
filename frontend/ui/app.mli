@@ -17,6 +17,8 @@ module Reply_tag : sig
     | Auth_login_picker
     | Auth_logout_picker
     | Share_targets of string (** the login's ref *)
+    | Usage_limits of { show : bool }
+    (** [usage_limits]: kept for [/accounts]; [show]: [/usage] shows them *)
     | Forge_refresh (** [forge_status]: the git hosts, and what lists them *)
     | Prs_picker of string option (** [/pr list]'s state *)
     | Pr_shown
@@ -324,6 +326,8 @@ module Model : sig
     { state : P.State.t option
     ; models : P.Model.t list
     ; auth : P.Auth_status.t list
+    ; usage_limits : P.Subscription_usage.t option
+      (** the last [usage_limits] answer: the logins' limits *)
     ; forge : P.Forge_account.t list (** the user's git hosts *)
     ; transcript : Transcript.t
     ; agents : Agent_view.t list
