@@ -16,6 +16,7 @@ module Reply_tag : sig
     | Auth_show
     | Auth_login_picker
     | Auth_logout_picker
+    | Share_targets of string (** the login's ref *)
     | Forge_refresh (** [forge_status]: the git hosts, and what lists them *)
     | Prs_picker of string option (** [/pr list]'s state *)
     | Pr_shown

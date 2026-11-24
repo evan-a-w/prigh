@@ -171,6 +171,7 @@ module Reply_tag = struct
         { command : string
         ; notice : string
         }
+    | Share_targets
     | Logins_changed of
         { command : string
         ; notice : string
@@ -760,6 +761,8 @@ module Model = struct
     ; sessions_asked : int
     ; models : Llm.t list
     ; auth : Auth_status.t list
+    ; share_targets : string list
+      (** the other users the user's logins can be shared with *)
     ; now : Time_ns.t option
     ; utc_offset : Time_ns.Span.t
     ; browser_time_zone : string option
@@ -871,6 +874,7 @@ module Model = struct
         ; drops
         ; hello
         ; saved_login
+        ; share_targets
         ; state
         ; chat
         ; sessions
@@ -980,6 +984,7 @@ module Model = struct
     && phys_equal drops b.drops
     && phys_equal hello b.hello
     && phys_equal saved_login b.saved_login
+    && phys_equal share_targets b.share_targets
     && phys_equal state b.state
     && (transcript || phys_equal chat b.chat)
     && phys_equal sessions b.sessions
@@ -1313,6 +1318,7 @@ let init =
   ; sessions_asked = 0
   ; models = []
   ; auth = []
+  ; share_targets = []
   ; now = None
   ; utc_offset = Time_ns.Span.zero
   ; browser_time_zone = None
@@ -7146,6 +7152,12 @@ let start_login_as (m : Model.t) ~provider ~method_ ~label =
 let accounts_command (m : Model.t) rest =
   let command = String.strip ("/accounts " ^ rest) in
   match Logins.Command.parse rest with
+  | Share { account; user = "" } ->
+    (match Logins.shareable m.auth account, m.share_targets with
+     | Error e, _ -> error m (String.capitalize e)
+     | Ok _, [] -> error m "No other users on this server to share with."
+     | Ok l, users ->
+       logins_picker m ~title:(Logins.share_title l) (Logins.share_rows_for l users))
   | Pick query ->
     if List.is_empty (Logins.all m.auth)
     then error m "No logins yet: /login signs in to a provider."
@@ -8974,6 +8986,7 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
   (* Subagents from before the backend restarted are gone: the report stays. *)
   | ( ( Ignore | Paths _
       | Auth_status Refresh
+      | Share_targets
       | Subagent _ | Subagents | Jobs | Config | Prompt_paths _
       | Users Probe )
     , Error _ ) -> m, []
@@ -9672,7 +9685,15 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
   | Auth_status purpose, Ok json ->
     decode m json (decode_list Auth_status.of_json) ~f:(fun auth ->
       let m = { m with auth } in
-      match purpose with
+      let targets =
+        if
+          List.exists auth ~f:(fun (p : Auth_status.t) ->
+            List.exists p.accounts ~f:(fun a -> a.shareable))
+        then [ rpc "account_share_targets" [] ~tag:Share_targets ]
+        else []
+      in
+      let m, cmds =
+        match purpose with
       | Refresh ->
         (match m.dialog with
          | Some (Auth _) -> { m with dialog = Some (Auth auth) }, []
@@ -9685,7 +9706,11 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
          | None ->
            toast
              m
-             "No provider or git host is logged in: /login logs in to one."))
+             "No provider or git host is logged in: /login logs in to one.")
+      in
+      m, cmds @ targets)
+  | Share_targets, Ok json ->
+    decode m json strings ~f:(fun share_targets -> { m with share_targets }, [])
   | Paths prefix, Ok json ->
     (match m.completion, strings json with
      | Some c, Ok paths ->

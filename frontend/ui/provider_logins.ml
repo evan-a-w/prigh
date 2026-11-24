@@ -11,12 +11,24 @@ end
 
 let str = P.Json.str
 
-let all (auth : P.Auth_status.t list) =
+let all ?(hidden = false) (auth : P.Auth_status.t list) =
   List.concat_map auth ~f:(fun provider ->
-    List.map provider.accounts ~f:(fun account -> { Login.provider; account }))
+    List.filter_map provider.accounts ~f:(fun account ->
+      Option.some_if (hidden || not account.hidden) { Login.provider; account }))
 ;;
 
-let title (l : Login.t) = sprintf "%s: %s" l.provider.name l.account.label
+let label (a : P.Auth_status.Account.t) =
+  match a.shared_by with
+  | None -> a.label
+  | Some owner -> sprintf "%s (from %s)" a.label owner
+;;
+
+let title (l : Login.t) = sprintf "%s: %s" l.provider.name (label l.account)
+let users = String.concat ~sep:", "
+
+let grantees (a : P.Auth_status.Account.t) =
+  List.map a.shared_with ~f:(fun g -> g.user)
+;;
 
 let kind (a : P.Auth_status.Account.t) =
   match a.method_ with
@@ -32,11 +44,20 @@ let detail (l : Login.t) =
        [ [ kind l.account ]
        ; (if l.account.default then [ "default" ] else [])
        ; (if l.account.fallback then [ "takes over at usage limits" ] else [])
+       ; Option.value_map l.account.shared_by ~default:[] ~f:(fun owner ->
+           [ "shared by " ^ owner ])
+       ; (match grantees l.account with
+          | [] -> []
+          | g -> [ "shared with " ^ users g ])
+       ; (if l.account.hidden then [ "hidden" ] else [])
        ])
 ;;
 
 let short (a : P.Auth_status.Account.t) =
-  if String.length a.label <= 16 then a.label else a.id
+  let s = if String.length a.label <= 16 then a.label else a.id in
+  match a.shared_by with
+  | None -> s
+  | Some owner -> sprintf "%s (%s)" s owner
 ;;
 
 let names (l : Login.t) =
@@ -47,7 +68,7 @@ let names (l : Login.t) =
 let find ?provider auth arg =
   let arg = String.strip arg in
   let logins =
-    List.filter (all auth) ~f:(fun l ->
+    List.filter (all ~hidden:true auth) ~f:(fun l ->
       Option.for_all provider ~f:(String.equal l.provider.provider))
   in
   let is s = String.Caseless.equal s arg in
@@ -112,7 +133,7 @@ let names_login arg = String.mem arg '@' || String.mem (String.strip arg) '/'
 
 let of_session auth (state : P.State.t) =
   let logins =
-    List.filter (all auth) ~f:(fun l ->
+    List.filter (all ~hidden:true auth) ~f:(fun l ->
       String.equal l.provider.provider state.model.provider)
   in
   match state.account with
@@ -140,8 +161,9 @@ let login_params auth ~provider ~method_ ~label =
   | None -> []
   | Some label ->
     (match find ~provider auth label with
-     | Ok l -> [ "account", str l.account.id ]
-     | Error _ -> [ "label", str label ])
+     | Ok l when Option.is_none l.account.shared_by ->
+       [ "account", str l.account.id ]
+     | Ok _ | Error _ -> [ "label", str label ])
 ;;
 
 module Request = struct
@@ -153,12 +175,29 @@ module Request = struct
   [@@deriving sexp_of]
 end
 
-let logout (l : Login.t) =
-  { Request.method_ = "logout"
-  ; params =
-      [ "provider", str l.provider.provider; "account", str l.account.id ]
-  ; done_ = sprintf "logged out of %s" (title l)
+let hide_request (l : Login.t) ~hidden =
+  { Request.method_ = "account_hide"
+  ; params = [ "ref", str l.account.ref_; "hidden", P.Json.bool hidden ]
+  ; done_ =
+      (if hidden
+       then
+         sprintf
+           "hid %s: /accounts show %s brings it back"
+           (title l)
+           l.account.ref_
+       else sprintf "%s is back in your logins" (title l))
   }
+;;
+
+let logout (l : Login.t) =
+  match l.account.shared_by with
+  | Some _ -> hide_request l ~hidden:true
+  | None ->
+    { Request.method_ = "logout"
+    ; params =
+        [ "provider", str l.provider.provider; "account", str l.account.id ]
+    ; done_ = sprintf "logged out of %s" (title l)
+    }
 ;;
 
 let set_model_params ~model_key login =
@@ -187,13 +226,26 @@ module Command = struct
     | Up of string
     | Down of string
     | Remove of string
+    | Share of
+        { account : string
+        ; user : string
+        }
+    | Unshare of
+        { account : string
+        ; user : string
+        }
+    | Hide of
+        { account : string
+        ; hidden : bool
+        }
     | Error of string
   [@@deriving sexp_of, equal]
 
   let usage =
     "/accounts [QUERY] picks a login; /accounts default|up|down|remove \
      ACCOUNT, /accounts rename ACCOUNT to LABEL, /accounts fallback ACCOUNT \
-     on|off"
+     on|off, /accounts share ACCOUNT with USER, /accounts unshare ACCOUNT from \
+     USER, /accounts hide|show ACCOUNT"
   ;;
 
   let parse rest =
@@ -215,6 +267,33 @@ module Command = struct
     | "up" -> needs (fun a -> Up a)
     | "down" -> needs (fun a -> Down a)
     | "remove" | "logout" -> needs (fun a -> Remove a)
+    | "hide" -> needs (fun a -> Hide { account = a; hidden = true })
+    | "show" -> needs (fun a -> Hide { account = a; hidden = false })
+    | ("share" | "unshare") as word ->
+      let sep = if String.equal word "share" then " with " else " from " in
+      needs (fun a ->
+        match String.substr_index_all a ~may_overlap:false ~pattern:sep with
+        | [] when String.equal word "share" ->
+          Share
+            { account =
+                String.strip
+                  (String.chop_suffix_if_exists a ~suffix:(String.rstrip sep))
+            ; user = ""
+            }
+        | [] ->
+          Error (sprintf "/accounts %s ACCOUNT%sUSER: name the user" word sep)
+        | is ->
+          let i = List.last_exn is in
+          let account = String.strip (String.prefix a i) in
+          let user =
+            String.strip (String.drop_prefix a (i + String.length sep))
+          in
+          if String.is_empty user && String.equal word "unshare"
+          then
+            Error (sprintf "/accounts %s ACCOUNT%sUSER: name the user" word sep)
+          else if String.equal word "share"
+          then Share { account; user }
+          else Unshare { account; user })
     | "fallback" ->
       needs (fun a ->
         match String.rsplit2 a ~on:' ' with
@@ -233,10 +312,40 @@ let update (l : Login.t) params ~done_ =
     }
 ;;
 
+let hide l ~hidden = Ok (hide_request l ~hidden)
+
+let can_share (l : Login.t) =
+  match l.account.shared_by with
+  | Some owner ->
+    Error (sprintf "%s is %s's: only they can share it" (title l) owner)
+  | None when not l.account.shareable ->
+    Error
+      (if Option.is_some l.provider.custom
+       then
+         sprintf
+           "%s is a custom provider: only the built-in providers' logins can \
+            be shared"
+           l.provider.name
+       else
+         "sharing needs other users on this server (prigh serve -tokens), \
+          signed in as yourself, with sharing on")
+  | None -> Ok ()
+;;
+
+let share (l : Login.t) users ~done_ =
+  Ok
+    { Request.method_ = "account_share"
+    ; params =
+        [ "ref", str l.account.ref_; "users", `Array (List.map users ~f:str) ]
+    ; done_
+    }
+;;
+
 let siblings auth (l : Login.t) =
   List.find auth ~f:(fun (p : P.Auth_status.t) ->
     String.equal p.provider l.provider.provider)
-  |> Option.value_map ~default:[] ~f:(fun (p : P.Auth_status.t) -> p.accounts)
+  |> Option.value_map ~default:[] ~f:(fun (p : P.Auth_status.t) ->
+    List.filter p.accounts ~f:(fun a -> Option.is_none a.shared_by))
 ;;
 
 let neighbour auth (l : Login.t) ~step =
@@ -315,6 +424,47 @@ let request auth (command : Command.t) =
   | Remove arg ->
     let* l = find auth arg in
     Ok (logout l)
+  | Hide { account; hidden } ->
+    let* l = find auth account in
+    (match l.account.shared_by with
+     | Some _ -> hide l ~hidden
+     | None ->
+       Error
+         (sprintf
+            "%s is your own login: /accounts remove %s logs out of it"
+            (title l)
+            l.account.ref_))
+  | Share { account; user = "" } ->
+    let* l = find auth account in
+    let* () = can_share l in
+    Error (sprintf "/accounts share %s with USER: name the user" l.account.ref_)
+  | Share { account; user } ->
+    let* l = find auth account in
+    let* () = can_share l in
+    if List.mem (grantees l.account) user ~equal:String.equal
+    then Error (sprintf "%s is shared with %s already" (title l) user)
+    else
+      share
+        l
+        (grantees l.account @ [ user ])
+        ~done_:(sprintf "shared %s with %s" (title l) user)
+  | Unshare { account; user } ->
+    let* l = find auth account in
+    let* () = can_share l in
+    (match grantees l.account with
+     | [] -> Error (sprintf "%s is not shared with anyone" (title l))
+     | g when not (List.mem g user ~equal:String.equal) ->
+       Error
+         (sprintf
+            "%s is not shared with %s: it is with %s"
+            (title l)
+            user
+            (users g))
+     | g ->
+       share
+         l
+         (List.filter g ~f:(Fn.non (String.equal user)))
+         ~done_:(sprintf "stopped sharing %s with %s" (title l) user))
 ;;
 
 module Row = struct
@@ -356,7 +506,7 @@ let add_rows (p : P.Auth_status.t) =
 ;;
 
 let rows auth ~session =
-  List.map (all auth) ~f:(fun l ->
+  List.map (all ~hidden:true auth) ~f:(fun l ->
     { Row.id = "/accounts menu " ^ l.account.ref_
     ; label = title l
     ; detail = detail l ^ "  " ^ l.account.ref_
@@ -366,6 +516,58 @@ let rows auth ~session =
     if Option.is_some p.custom || List.is_empty p.accounts
     then []
     else add_rows p)
+;;
+
+let share_rows (l : Login.t) =
+  let r = l.account.ref_ in
+  if not l.account.shareable
+  then []
+  else
+    { Row.id = "/accounts share " ^ r
+    ; label = "Share…"
+    ; detail = "another user of this server may use it; they never see its key"
+    ; marked = false
+    }
+    :: List.map (grantees l.account) ~f:(fun user ->
+      { Row.id = sprintf "/accounts unshare %s from %s" r user
+      ; label = sprintf "Stop sharing with %s" user
+      ; detail = "their sessions on it go back to their default login"
+      ; marked = false
+      })
+;;
+
+let shared_menu (l : Login.t) ~used ~same_provider =
+  let r = l.account.ref_ in
+  let row ?(detail = "") id label = { Row.id; label; detail; marked = false } in
+  let owner = Option.value l.account.shared_by ~default:"its owner" in
+  List.concat
+    [ (if same_provider && not used
+       then
+         [ row
+             ("/account " ^ l.account.id)
+             "Use in this session"
+             ~detail:(sprintf "on %s's login: they see what it costs" owner)
+         ]
+       else [])
+    ; [ (if l.account.fallback
+         then
+           row
+             (sprintf "/accounts fallback %s off" r)
+             "Stop taking over at usage limits"
+         else
+           row
+             (sprintf "/accounts fallback %s on" r)
+             "Take over at usage limits"
+             ~detail:"when your own login of the provider hits its limit")
+      ; (if l.account.hidden
+         then row ("/accounts show " ^ r) "Show" ~detail:"back in your pickers"
+         else
+           row
+             ("/accounts hide " ^ r)
+             "Hide"
+             ~detail:(sprintf "out of your pickers; %s still shares it" owner))
+      ]
+    ]
 ;;
 
 let menu (l : Login.t) ~session =
@@ -379,56 +581,70 @@ let menu (l : Login.t) ~session =
     Option.exists session ~f:(fun (s : P.State.t) ->
       Option.exists s.account ~f:(String.equal l.account.id))
   in
-  let accounts = l.provider.accounts in
-  let position =
-    List.findi accounts ~f:(fun _ a -> String.equal a.ref_ r)
-    |> Option.value_map ~default:0 ~f:fst
-  in
-  List.concat
-    [ (if same_provider && not used
-       then
-         [ row
-             ("/account " ^ r)
-             "Use in this session"
-             ~detail:"this session's requests go to this login"
-         ]
-       else [])
-    ; (if l.account.default
-       then []
-       else
-         [ row
-             ("/accounts default " ^ r)
-             "Make default"
-             ~detail:"sessions that pick no login use it"
-         ])
-    ; [ row (sprintf "/accounts rename %s to " r) "Rename…" ]
-    ; [ (if l.account.fallback
+  if Option.is_some l.account.shared_by
+  then shared_menu l ~used ~same_provider
+  else (
+    let accounts =
+      List.filter l.provider.accounts ~f:(fun a -> Option.is_none a.shared_by)
+    in
+    let position =
+      List.findi accounts ~f:(fun _ a -> String.equal a.ref_ r)
+      |> Option.value_map ~default:0 ~f:fst
+    in
+    List.concat
+      [ (if same_provider && not used
          then
-           row
-             (sprintf "/accounts fallback %s off" r)
-             "Stop taking over at usage limits"
+           [ row
+               ("/account " ^ r)
+               "Use in this session"
+               ~detail:"this session's requests go to this login"
+           ]
+         else [])
+      ; (if l.account.default
+         then []
          else
-           row
-             (sprintf "/accounts fallback %s on" r)
-             "Take over at usage limits"
-             ~detail:"when another login of the provider hits its limit")
-      ]
-    ; (if position > 0 then [ row ("/accounts up " ^ r) "Move up" ] else [])
-    ; (if position < List.length accounts - 1
-       then [ row ("/accounts down " ^ r) "Move down" ]
-       else [])
-    ; [ row
-          (sprintf "/login %s %s as %s" l.provider.provider l.account.method_ r)
-          "Log in again"
-      ; row
-          ("/logout " ^ r)
-          "Log out"
-          ~detail:
-            (if String.equal l.account.id "main" && List.length accounts > 1
-             then "pi uses this login: it loses it"
-             else "deletes the stored credential")
-      ]
-    ]
+           [ row
+               ("/accounts default " ^ r)
+               "Make default"
+               ~detail:"sessions that pick no login use it"
+           ])
+      ; [ row (sprintf "/accounts rename %s to " r) "Rename…" ]
+      ; [ (if l.account.fallback
+           then
+             row
+               (sprintf "/accounts fallback %s off" r)
+               "Stop taking over at usage limits"
+           else
+             row
+               (sprintf "/accounts fallback %s on" r)
+               "Take over at usage limits"
+               ~detail:"when another login of the provider hits its limit")
+        ]
+      ; (if position > 0 then [ row ("/accounts up " ^ r) "Move up" ] else [])
+      ; (if position < List.length accounts - 1
+         then [ row ("/accounts down " ^ r) "Move down" ]
+         else [])
+      ; share_rows l
+      ; [ row
+            (sprintf
+               "/login %s %s as %s"
+               l.provider.provider
+               l.account.method_
+               r)
+            "Log in again"
+        ; row
+            ("/logout " ^ r)
+            "Log out"
+            ~detail:
+              (if String.equal l.account.id "main" && List.length accounts > 1
+               then
+                 sprintf
+                   "deletes it; pi, which reads only this one, is logged out \
+                    of %s (your other logins stay)"
+                   l.provider.name
+               else "deletes the stored credential")
+        ]
+      ])
 ;;
 
 let provider_name auth provider =
@@ -464,7 +680,7 @@ let session_rows auth (state : P.State.t) =
   in
   List.map logins ~f:(fun l ->
     { Row.id = "/account " ^ l.account.ref_
-    ; label = l.account.label
+    ; label = label l.account
     ; detail = detail l
     ; marked = Option.exists state.account ~f:(String.equal l.account.id)
     })
@@ -491,4 +707,31 @@ let no_choice auth (state : P.State.t) =
          (provider_name auth provider)
          (if n = 0 then "no stored" else "one")
          provider)
+;;
+
+let shareable auth account =
+  let open Result.Let_syntax in
+  let%bind l = find auth account in
+  let%map () = can_share l in
+  l
+;;
+
+let share_title (l : Login.t) = sprintf "Share %s with" (title l)
+
+let share_rows_for (l : Login.t) users =
+  let r = l.account.ref_ in
+  List.map users ~f:(fun user ->
+    if List.mem (grantees l.account) user ~equal:String.equal
+    then
+      { Row.id = sprintf "/accounts unshare %s from %s" r user
+      ; label = user
+      ; detail = "shared with them: pick to stop sharing"
+      ; marked = true
+      }
+    else
+      { Row.id = sprintf "/accounts share %s with %s" r user
+      ; label = user
+      ; detail = "pick to share: they never see its key"
+      ; marked = false
+      })
 ;;

@@ -12,6 +12,7 @@ module Reply_tag = struct
     | Auth_show
     | Auth_login_picker
     | Auth_logout_picker
+    | Share_targets of string (** the login's ref *)
     | Forge_refresh
     | Prs_picker of string option (** the state asked for *)
     | Pr_shown
@@ -1178,9 +1179,29 @@ let confirm_logout m (l : Provider_logins.Login.t) =
   }
 ;;
 
+let share_picker m ~ref_ users =
+  match Provider_logins.find m.auth ref_, users with
+  | Error e, _ -> error m e
+  | Ok _, [] -> notice m "no other users on this server to share with"
+  | Ok l, users ->
+    logins_picker
+      m
+      ~title:(Provider_logins.share_title l)
+      (Provider_logins.share_rows_for l users)
+;;
+
 let accounts_command m (cmd : Commands.Parsed.t) =
   let command = "/accounts " ^ cmd.rest in
   match Provider_logins.Command.parse cmd.rest with
+  | Share { account; user = "" } ->
+    (match Provider_logins.shareable m.auth account with
+     | Ok l ->
+       ( m
+       , [ rpc
+             "account_share_targets"
+             ~tag:(Share_targets l.account.ref_)
+         ] )
+     | Error e -> error (restore_command m command) e, [])
   | Pick query ->
     if List.is_empty (Provider_logins.all m.auth)
     then notice m "no logins yet: /login signs in to a provider", []
@@ -1202,7 +1223,11 @@ let accounts_command m (cmd : Commands.Parsed.t) =
      | Error e -> error (restore_command m command) e, [])
   | Remove arg ->
     (match Provider_logins.find m.auth arg with
-     | Ok l -> confirm_logout m l, []
+     | Ok l when Option.is_none l.account.shared_by -> confirm_logout m l, []
+     | Ok _ ->
+       (match Provider_logins.request m.auth (Remove arg) with
+        | Ok r -> logins_request m command r
+        | Error e -> error (restore_command m command) e, [])
      | Error e -> error (restore_command m command) e, [])
   | c ->
     (match Provider_logins.request m.auth c with
@@ -2475,7 +2500,7 @@ let format_auth m : Content.t =
        List.map s.accounts ~f:(fun account ->
          let l = { Provider_logins.Login.provider = s; account } in
          [ { Content.Span.text =
-               String.make (width + 2) ' ' ^ "@ " ^ account.label
+               String.make (width + 2) ' ' ^ "@ " ^ Provider_logins.label account
            ; style = Style.plain
            }
          ; { text = sprintf "  %s  %s" (Provider_logins.detail l) account.ref_
@@ -4802,6 +4827,8 @@ let run_command m (cmd : Commands.Parsed.t) =
       ] )
   | "logout", _ :: _ when Provider_logins.names_login cmd.rest ->
     (match Provider_logins.find m.auth cmd.rest with
+     | Ok l when Option.is_some l.account.shared_by ->
+       logins_request m ("/logout " ^ cmd.rest) (Provider_logins.logout l)
      | Ok l -> confirm_logout m l, []
      | Error e -> error (restore_command m ("/logout " ^ cmd.rest)) e, [])
   | "accounts", _ -> accounts_command m cmd
@@ -7929,6 +7956,8 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
      | Auth_logout_picker ->
        decode json ~f:(decode_list ~f:P.Auth_status.of_json) (fun auth ->
          logout_picker { m with auth }, [])
+     | Share_targets ref_ ->
+       decode json ~f:strings (fun users -> share_picker m ~ref_ users, [])
      | Forge_refresh ->
        decode json ~f:P.Forge_account.list_of_json (fun forge ->
          forge_refreshed m forge, [])

@@ -15,16 +15,22 @@ module Login : sig
 end
 
 (** Every provider's, in [auth_status]'s order (each provider's in fallback
-    order). *)
-val all : P.Auth_status.t list -> Login.t list
+    order, then those shared with the user); [hidden] shared ones only with
+    [~hidden:true]. *)
+val all : ?hidden:bool -> P.Auth_status.t list -> Login.t list
+
+(** The label, and its owner when another user shares it: ["Work (from
+    alice)"]. *)
+val label : P.Auth_status.Account.t -> string
 
 (** ["ChatGPT: Work"]. *)
 val title : Login.t -> string
 
-(** ["subscription, default, takes over at usage limits"]. *)
+(** ["subscription, default, takes over at usage limits, shared with bob"]. *)
 val detail : Login.t -> string
 
-(** The label, or the id when the label is long: beside a model name. *)
+(** The label, or the id when the label is long, and the owner of a shared
+    one: beside a model name. *)
 val short : P.Auth_status.Account.t -> string
 
 (** The login named by [arg]: its ref ([provider/id]), [provider@label],
@@ -66,7 +72,7 @@ module Request : sig
   [@@deriving sexp_of]
 end
 
-(** [logout]'s request for a login. *)
+(** [logout]'s request for a login; for one shared with the user, hiding it. *)
 val logout : Login.t -> Request.t
 
 (** [set_model]'s parameters for [model_key] on [login] ([None]: the
@@ -92,7 +98,19 @@ module Command : sig
         }
     | Up of string
     | Down of string
-    | Remove of string
+    | Remove of string (** a shared login: hides it *)
+    | Share of
+        { account : string
+        ; user : string
+        } (** [ACCOUNT with USER]; [ACCOUNT] alone (user [""]): pick the user *)
+    | Unshare of
+        { account : string
+        ; user : string
+        } (** [ACCOUNT from USER] *)
+    | Hide of
+        { account : string
+        ; hidden : bool
+        } (** [hide|show ACCOUNT]: a shared login *)
     | Error of string (** what was wrong, with the usage *)
   [@@deriving sexp_of, equal]
 
@@ -124,7 +142,8 @@ val asks : string -> bool
 val rows : P.Auth_status.t list -> session:P.State.t option -> Row.t list
 
 (** A login's menu: use it here, make it the default, rename, fallback on
-    or off, move up or down, log in again, log out. *)
+    or off, move up or down, share or stop sharing, log in again, log out;
+    for one shared with the user: use it here, fallback, hide or show. *)
 val menu : Login.t -> session:P.State.t option -> Row.t list
 
 (** A provider's name ("ChatGPT"), by its id. *)
@@ -144,3 +163,13 @@ val session_rows : P.Auth_status.t list -> P.State.t -> Row.t list
 (** Why [/account] has nothing to pick: the session's provider has fewer than
     two logins (and none is pinned). *)
 val no_choice : P.Auth_status.t list -> P.State.t -> string option
+
+(** The own login [account] names, if it can be shared; else what to do. *)
+val shareable : P.Auth_status.t list -> string -> (Login.t, string) Result.t
+
+(** Sharing a login: ["Share ChatGPT: Work with"], and a row per user
+    ([account_share_targets]): those it is shared with are marked and stop
+    sharing when picked, the others share it. *)
+val share_title : Login.t -> string
+
+val share_rows_for : Login.t -> string list -> Row.t list

@@ -195,6 +195,7 @@ module Reply_tag : sig
         { command : string (** back into the editor if refused *)
         ; notice : string (** shown on success *)
         }
+    | Share_targets
     | Logins_changed of
         { command : string (** back into the editor if refused *)
         ; notice : string (** shown on success *)
@@ -971,6 +972,8 @@ module Model : sig
           to it is stale if a change came after *)
     ; models : Llm.t list
     ; auth : Auth_status.t list
+    ; share_targets : string list
+      (** the other users the user's logins can be shared with *)
     ; now : Time_ns.t option
     ; utc_offset : Time_ns.Span.t (** local time minus UTC *)
     ; browser_time_zone : string option (** IANA, once the page said *)

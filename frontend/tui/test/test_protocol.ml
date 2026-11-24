@@ -713,7 +713,7 @@ let%expect_test "accounts: auth events, status and usage" =
   in
   show
     (fun j -> Or_error.map (Auth_status.of_json j) ~f:Auth_status.sexp_of_t)
-    {|{"provider":"openai-codex","name":"OpenAI Codex (ChatGPT)","methods":[{"method":"oauth","label":"OpenAI (ChatGPT Plus/Pro)"}],"configured":{"method":"oauth","source":"oauth"},"expires_ms":1700000000000,"accounts":[{"ref":"openai-codex/main","id":"main","label":"Personal","method":"oauth","source":"oauth","expires_ms":1700000000000,"default":true,"fallback":true},{"ref":"openai-codex/work","id":"work","label":"Work","method":"oauth","source":"oauth","default":false,"fallback":false}]}|};
+    {|{"provider":"openai-codex","name":"OpenAI Codex (ChatGPT)","methods":[{"method":"oauth","label":"OpenAI (ChatGPT Plus/Pro)"}],"configured":{"method":"oauth","source":"oauth"},"expires_ms":1700000000000,"accounts":[{"ref":"openai-codex/main","id":"main","label":"Personal","method":"oauth","source":"oauth","expires_ms":1700000000000,"default":true,"fallback":true,"shareable":true,"shared_with":[{"user":"bob","since_ms":1700000000000}]},{"ref":"~alice/openai-codex/work","id":"~alice/work","label":"Work","method":"oauth","source":"shared by alice","default":false,"fallback":false,"shared_by":"alice","hidden":true}]}|};
   show
     (fun j ->
        Or_error.map
@@ -739,16 +739,26 @@ let%expect_test "accounts: auth events, status and usage" =
         (method_ oauth)
         (source  oauth)
         (expires_ms (1700000000000))
-        (default  true)
-        (fallback true))
-       ((ref_    openai-codex/work)
-        (id      work)
+        (default   true)
+        (fallback  true)
+        (shareable true)
+        (shared_with ((
+          (user     bob)
+          (since_ms 1700000000000))))
+        (shared_by ())
+        (hidden false))
+       ((ref_    ~alice/openai-codex/work)
+        (id      ~alice/work)
         (label   Work)
         (method_ oauth)
-        (source  oauth)
+        (source  "shared by alice")
         (expires_ms ())
-        (default  false)
-        (fallback false)))))
+        (default   false)
+        (fallback  false)
+        (shareable false)
+        (shared_with ())
+        (shared_by (alice))
+        (hidden true)))))
     ((fetched_at (2023-11-14 22:13:20.000000000Z))
      (providers ((
        (provider openai-codex)

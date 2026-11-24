@@ -47,6 +47,21 @@ module Custom = struct
   ;;
 end
 
+module Grant = struct
+  type t =
+    { user : string
+    ; since_ms : Int64.t
+    }
+  [@@deriving sexp_of, equal]
+
+  let of_json j =
+    let open Or_error.Let_syntax in
+    let%bind user = Json.string_field j "user" in
+    let%map since_ms = Json.int64_field j "since_ms" in
+    { user; since_ms }
+  ;;
+end
+
 module Account = struct
   type t =
     { ref_ : string
@@ -57,6 +72,10 @@ module Account = struct
     ; expires_ms : Int64.t option
     ; default : bool
     ; fallback : bool
+    ; shareable : bool
+    ; shared_with : Grant.t list
+    ; shared_by : string option
+    ; hidden : bool
     }
   [@@deriving sexp_of, equal]
 
@@ -73,8 +92,26 @@ module Account = struct
       | Some _ -> Json.int64_field j "expires_ms" >>| Option.some
     in
     let%bind default = Json.bool_default_field j "default" ~default:false in
-    let%map fallback = Json.bool_default_field j "fallback" ~default:false in
-    { ref_; id; label; method_; source; expires_ms; default; fallback }
+    let%bind fallback = Json.bool_default_field j "fallback" ~default:false in
+    let%bind shareable = Json.bool_default_field j "shareable" ~default:false in
+    let%bind shared_with =
+      Json.optional_list_field j "shared_with" ~f:Grant.of_json
+    in
+    let%bind shared_by = Json.string_opt_field j "shared_by" in
+    let%map hidden = Json.bool_default_field j "hidden" ~default:false in
+    { ref_
+    ; id
+    ; label
+    ; method_
+    ; source
+    ; expires_ms
+    ; default
+    ; fallback
+    ; shareable
+    ; shared_with
+    ; shared_by
+    ; hidden
+    }
   ;;
 end
 

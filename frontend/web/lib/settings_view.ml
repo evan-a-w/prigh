@@ -340,7 +340,8 @@ let providers (m : App.Model.t) ~inject =
 ;;
 
 (* Each provider's logins, once it has one: open a login's menu (use it,
-   make it the default, rename, log out...), or add another. *)
+   make it the default, rename, log out...), share it, hide one shared with
+   the user, or add another. *)
 let logins (m : App.Model.t) ~inject =
   let module Logins = Prigh_ui.Provider_logins in
   let run command = inject (Action.Run command) in
@@ -355,13 +356,37 @@ let logins (m : App.Model.t) ~inject =
           ~cls:"provider-login"
           ~name:(Logins.title l)
           ~about:(String.capitalize (Logins.detail l) ^ ".")
-          [ button
-              ~cls:"small"
-              ~title:menu
-              ~label:("Manage " ^ Logins.title l)
-              ~on_click:(run menu)
-              [ Node.text "Manage" ]
-          ])
+          ((match account.shared_by with
+            | Some _ ->
+              let verb, command =
+                if account.hidden
+                then "Show", "/accounts show " ^ account.ref_
+                else "Hide", "/accounts hide " ^ account.ref_
+              in
+              [ button
+                  ~cls:"small"
+                  ~title:command
+                  ~label:(verb ^ " " ^ Logins.title l)
+                  ~on_click:(run command)
+                  [ Node.text verb ]
+              ]
+            | None when account.shareable ->
+              let command = "/accounts share " ^ account.ref_ in
+              [ button
+                  ~cls:"small"
+                  ~title:command
+                  ~label:("Share " ^ Logins.title l)
+                  ~on_click:(run command)
+                  [ Node.text "Share…" ]
+              ]
+            | None -> [])
+           @ [ button
+                 ~cls:"small"
+                 ~title:menu
+                 ~label:("Manage " ^ Logins.title l)
+                 ~on_click:(run menu)
+                 [ Node.text "Manage" ]
+             ]))
       @ [ row
             ~cls:"provider-login-add"
             ~name:(sprintf "Another %s login" p.name)
