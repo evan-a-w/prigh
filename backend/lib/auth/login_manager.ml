@@ -173,16 +173,23 @@ let start t (provider : Provider_id.t) method_ =
     | Anthropic | Openai | Openai_codex | Deepseek ->
       run_flow
         t
-        ~run:(Provider_auth.login ~env:t.env t.store provider method_)
+        ~run:(fun interaction ->
+          Or_error.ignore_m
+            (Provider_auth.login
+               ~env:t.env
+               t.store
+               provider
+               method_
+               interaction))
         ~finish:(function
-        | Ok () -> emit t (Done { provider; method_ })
-        | Error e ->
-          emit
-            t
-            (Failed
-               { provider = Provider_id.to_string provider
-               ; error = Error.to_string_hum e
-               })))
+          | Ok () -> emit t (Done { provider; method_ })
+          | Error e ->
+            emit
+              t
+              (Failed
+                 { provider = Provider_id.to_string provider
+                 ; error = Error.to_string_hum e
+                 })))
 ;;
 
 let respond t ~id value =

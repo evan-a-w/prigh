@@ -2050,7 +2050,7 @@ let login_command =
             (match
                Provider_auth.login ~env store provider method_ interaction
              with
-             | Ok () ->
+             | Ok (_ : Account_id.t) ->
                eprintf
                  "Logged in to %s (%s); saved to %s\n"
                  (Provider_id.display_name provider)

@@ -177,3 +177,18 @@ let set t provider credential =
 let remove t provider =
   Or_error.ignore_m (modify t provider ~f:(fun _ -> Ok None))
 ;;
+
+let modify_all t ~f =
+  with_lock t ~f:(fun () ->
+    let open Or_error.Let_syntax in
+    let%bind fields = load t in
+    let%map next = f fields in
+    if
+      not
+        (List.equal
+           (fun (k1, v1) (k2, v2) ->
+              String.equal k1 k2 && Json.exactly_equal v1 v2)
+           fields
+           next)
+    then save t next)
+;;

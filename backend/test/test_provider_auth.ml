@@ -191,7 +191,7 @@ let%expect_test "login with an api key prompt; logout" =
            provider
            method_
            (Auth_interaction.scripted answers)
-         : unit Or_error.t)]
+         : Account_id.t Or_error.t)]
   in
   login Deepseek Api_key [ "  sk-typed  " ];
   print_s
@@ -205,7 +205,7 @@ let%expect_test "login with an api key prompt; logout" =
     [%sexp (Auth_store.read store Deepseek : Credential.t option Or_error.t)];
   [%expect
     {|
-    (Ok ())
+    (Ok main)
     (Ok ((Api_key sk-typed)))
     (Error "empty API key")
     (Error "login cancelled")
