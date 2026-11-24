@@ -26,7 +26,7 @@ let write (p : Line_transport.Peer.t) j =
 ;;
 
 (* Codex logged in to ChatGPT: two models, its rate limits. *)
-let fake_codex (p : Line_transport.Peer.t) =
+let fake_codex ~logged_in (p : Line_transport.Peer.t) =
   let reply j result =
     write
       p
@@ -65,6 +65,20 @@ let fake_codex (p : Line_transport.Peer.t) =
                          ]
                      ] )
                ; "nextCursor", `Null
+               ])
+       | "account/rateLimits/read" when not logged_in ->
+         write
+           p
+           (`Object
+               [ "id", Option.value_exn (Json.member "id" j)
+               ; ( "error"
+                 , `Object
+                     [ "code", `Number "-32600"
+                     ; ( "message"
+                       , `String
+                           "codex account authentication required to read rate \
+                            limits" )
+                     ] )
                ])
        | "account/rateLimits/read" ->
          reply
@@ -163,7 +177,7 @@ let composer =
        ())
 ;;
 
-let with_server f =
+let with_server ?(logged_in = true) f =
   with_sandbox
   @@ fun t ->
   Eio.Switch.run
@@ -194,7 +208,7 @@ let with_server f =
       (Line_transport.Peer.spawn
          ~sw
          (match launch.argv with
-          | "codex" :: _ -> fake_codex
+          | "codex" :: _ -> fake_codex ~logged_in
           | _ -> fake_claude))
   in
   let server =
@@ -351,5 +365,23 @@ let%expect_test "claude: its models and plan limits from its own login" =
       claude/default "Default (Opus 5.5)" thinking=[off default low medium high max]
       claude/sonnet "Sonnet 5.5" thinking=[off default low medium high max]
     chip: claude/default (Default (Opus 5.5))
+    |}]
+;;
+
+let%expect_test
+    "codex logged out: its models still, and what it said of its limits"
+  =
+  with_server ~logged_in:false
+  @@ fun ~call ~models:_ ~chip:_ ~usage ~changed:_ ->
+  ignore (call ~params:{|{"adapter": "codex"}|} "new_session" : Json.t);
+  usage ();
+  [%expect
+    {|
+    spawn codex
+    codex got initialize
+    codex got model/list
+    codex got account/rateLimits/read
+    event: models_changed
+    usage codex "Codex" error "Codex: codex account authentication required to read rate limits (codex login, on the session's tool host)"
     |}]
 ;;

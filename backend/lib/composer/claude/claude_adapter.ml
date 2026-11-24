@@ -287,6 +287,12 @@ let read_limits t =
       | _ -> false)
   with
   | Ok (Usage status) -> Some status
+  | Ok (Failed { message; _ }) ->
+    Some
+      (Failed
+         (sprintf
+            "Claude Code: %s (claude /login, on the session's tool host)"
+            message))
   | Ok _ | Error _ -> None
 ;;
 

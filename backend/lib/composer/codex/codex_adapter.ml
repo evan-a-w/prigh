@@ -232,6 +232,10 @@ let read_limits t =
       | _ -> false)
   with
   | Ok (Rate_limits status) -> Some status
+  | Ok (Failed { message; _ }) ->
+    Some
+      (Failed
+         (sprintf "Codex: %s (codex login, on the session's tool host)" message))
   | Ok _ | Error _ -> None
 ;;
 
