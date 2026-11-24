@@ -31,6 +31,7 @@ let call id ~name ~arguments =
     ; usage = Usage.zero
     ; stop_reason = Tool_use
     ; model = "m"
+    ; account = None
     }
 ;;
 

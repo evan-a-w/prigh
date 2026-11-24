@@ -11,6 +11,7 @@ let assistant ids =
     ; stop_reason = Tool_use
     ; usage = Usage.zero
     ; model = "m"
+    ; account = None
     }
 ;;
 
@@ -108,6 +109,7 @@ let%expect_test "the Anthropic request is repaired" =
       ; thinking = Off
       ; max_tokens = Some 100
       ; cache_key = None
+      ; account = None
       }
   in
   print_endline
@@ -175,6 +177,7 @@ let%expect_test
         ; thinking = Off
         ; max_tokens = Some 100
         ; cache_key = None
+        ; account = None
         }
     in
     List.iter

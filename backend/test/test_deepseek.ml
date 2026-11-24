@@ -15,6 +15,7 @@ let request ?(thinking = Thinking.Off) ?(tools = []) ?system messages =
   ; thinking
   ; max_tokens = None
   ; cache_key = None
+  ; account = None
   }
 ;;
 
@@ -34,6 +35,7 @@ let%expect_test
         ; stop_reason = Tool_use
         ; usage = Usage.zero
         ; model = model.id
+        ; account = None
         }
     ; Tool_result
         { tool_call_id = "call_1"

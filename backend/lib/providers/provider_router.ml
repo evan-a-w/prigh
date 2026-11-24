@@ -101,7 +101,24 @@ let create ~env ?timeout ?getenv ?(models = Model_registry.builtin ()) ~store ()
     in
     let provider = request.model.provider in
     let resolve () =
-      Provider_auth.resolve ~env ~cancel ?getenv store provider
+      Provider_auth.resolve
+        ~env
+        ~cancel
+        ?getenv
+        ?account:request.account
+        store
+        provider
+    in
+    let stream_as (p : Provider.t) (auth : Provider_auth.Resolved.t option) =
+      let account = Option.bind auth ~f:(fun a -> a.account) in
+      let message = p.stream { request with account } ~cancel ~on_event in
+      { message with
+        account =
+          Option.bind account ~f:(fun id ->
+            Option.some_if
+              (not (Account_id.is_main id))
+              (Account_id.to_string id))
+      }
     in
     match provider with
     | Custom name ->
@@ -121,10 +138,7 @@ let create ~env ?timeout ?getenv ?(models = Model_registry.builtin ()) ~store ()
               Option.map auth ~f:(fun (r : Provider_auth.Resolved.t) -> r.token)
             in
             let message =
-              (custom_provider ~env ?timeout p ~key).stream
-                request
-                ~cancel
-                ~on_event
+              stream_as (custom_provider ~env ?timeout p ~key) auth
             in
             (match message.stop_reason with
              | Error e
@@ -152,7 +166,7 @@ let create ~env ?timeout ?getenv ?(models = Model_registry.builtin ()) ~store ()
        | Ok (Some auth) ->
          (match builtin_provider ~env ?timeout provider auth with
           | Error e -> fail (Error.to_string_hum e)
-          | Ok p -> p.stream request ~cancel ~on_event))
+          | Ok p -> stream_as p (Some auth)))
   in
   { Provider.name = "router"; stream }
 ;;

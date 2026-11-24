@@ -592,6 +592,7 @@ let%expect_test "pruning keeps every request's prefix until the next cut" =
         ; stop_reason = Tool_use
         ; usage = Usage.zero
         ; model = "anthropic/claude-opus-5-5"
+        ; account = None
         }
     ; Tool_result
         { tool_call_id = id
@@ -635,6 +636,7 @@ let%expect_test "pruning keeps every request's prefix until the next cut" =
     ; thinking = Thinking.On (Some High)
     ; max_tokens = None
     ; cache_key = None
+    ; account = None
     }
   in
   let messages = ref [ Message.user "go" ] in

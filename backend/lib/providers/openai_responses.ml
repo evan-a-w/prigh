@@ -69,8 +69,8 @@ let reasoning_fields (model : Model.t) : Thinking.t -> (string * Json.t) list
     ]
 ;;
 
-let same_provider ~provider (a : Message.Assistant.t) =
-  Model.written_by a.model provider
+let same_provider ~provider ~account (a : Message.Assistant.t) =
+  Model.written_by a.model provider && Account_id.same a.account account
 ;;
 
 let input_text text =
@@ -207,7 +207,13 @@ let computer_outputs (messages : Message.t list) (r : Message.Tool_result.t) =
       ]
 ;;
 
-let input_items ~provider ~freeform ~computer (messages : Message.t list) =
+let input_items
+      ~provider
+      ~account
+      ~freeform
+      ~computer
+      (messages : Message.t list)
+  =
   List.concat_mapi messages ~f:(fun message_index m ->
     match m with
     | Tool_result r when computer && is_computer r.tool_name ->
@@ -243,7 +249,7 @@ let input_items ~provider ~freeform ~computer (messages : Message.t list) =
           ]
       ]
     | Assistant a ->
-      let replay_reasoning = same_provider ~provider a in
+      let replay_reasoning = same_provider ~provider ~account a in
       let text_index = ref 0 in
       List.filter_map a.content ~f:(function
         | Content.Text "" -> None
@@ -383,7 +389,13 @@ let request_body ~(endpoint : Endpoint.t) (r : Provider.Request.t) : Json.t =
            , `String
                (Option.value r.system ~default:"You are a helpful assistant.") )
          ; ( "input"
-           , `Array (input_items ~provider ~freeform ~computer r.messages) )
+           , `Array
+               (input_items
+                  ~provider
+                  ~account:r.account
+                  ~freeform
+                  ~computer
+                  r.messages) )
          ; ( "include"
            , `Array
                (`String "reasoning.encrypted_content"

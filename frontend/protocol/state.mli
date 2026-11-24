@@ -85,6 +85,10 @@ type t =
   ; temporary : bool
     (** not saved or listed, deleted when left: [new_session] with
         [temporary] made it, and only its [temporary_key] reaches it *)
+  ; account : string option
+    (** the login of [model]'s provider the session chose ([set_model]
+        with [account], or [model@account]); [None]: the provider's
+        default *)
   }
 [@@deriving sexp_of, equal]
 

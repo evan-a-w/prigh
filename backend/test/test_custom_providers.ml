@@ -1040,6 +1040,7 @@ let conversation =
       ; stop_reason = Tool_use
       ; usage = Usage.zero
       ; model = "aiproxy/m"
+      ; account = None
       }
   ; Tool_result
       { tool_call_id = "call_1"
@@ -1067,6 +1068,7 @@ let request ?(thinking = Thinking.On (Some High)) model =
   ; thinking
   ; max_tokens = None
   ; cache_key = None
+  ; account = None
   }
 ;;
 
@@ -1411,6 +1413,7 @@ let%expect_test "router: keyless servers, other API styles, unknown providers" =
           ; thinking = Off
           ; max_tokens = None
           ; cache_key = None
+          ; account = None
           }
           ~cancel:Cancellation.never
           ~on_event:ignore
@@ -1437,6 +1440,7 @@ let%expect_test "router: keyless servers, other API styles, unknown providers" =
           ; thinking = Off
           ; max_tokens = None
           ; cache_key = None
+          ; account = None
           }
           ~cancel:Cancellation.never
           ~on_event:ignore)
@@ -1458,6 +1462,49 @@ let%expect_test "router: keyless servers, other API styles, unknown providers" =
     POST /v2/chat/completions HTTP/1.1 authorization=- x-api-key=-
     (Error
      "custom provider ghost is not configured: add it with /login custom (or check providers.ghost in config.json)")
+    |}];
+  let other =
+    ok_exn
+      (Provider_accounts.save_login
+         ~label:"Other"
+         (store t)
+         (Custom "gw")
+         (Api_key "sk-other"))
+  in
+  let gw ?account () =
+    let message =
+      provider.stream
+        { model = Option.value_exn (Model_registry.find models "gw/claude-x")
+        ; system = None
+        ; messages = [ Message.user "hi" ]
+        ; tools = []
+        ; thinking = Off
+        ; max_tokens = None
+        ; cache_key = None
+        ; account
+        }
+        ~cancel:Cancellation.never
+        ~on_event:ignore
+    in
+    let key =
+      Option.bind
+        (List.last (Server.requests server))
+        ~f:(fun r -> Server.Request.header r "x-api-key")
+    in
+    print_s
+      [%sexp
+        (message.account : string option)
+      , (key : string option)
+      , (message.stop_reason : Stop_reason.t)]
+  in
+  gw ();
+  gw ~account:other ();
+  gw ~account:Account_id.main ();
+  [%expect
+    {|
+    (() (sk-gw) (Error "HTTP 418: just checking"))
+    ((other) (sk-other) (Error "HTTP 418: just checking"))
+    (() (sk-gw) (Error "HTTP 418: just checking"))
     |}]
 ;;
 

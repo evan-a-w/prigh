@@ -94,6 +94,7 @@ module State = struct
     ; cwd : string
     ; git_branch : string option
     ; model : Model.t
+    ; account : Account_id.t option
     ; thinking : Thinking.t
     ; running : bool
     ; message_count : int
@@ -208,6 +209,9 @@ type t =
   { env : Env.t
   ; sw : Switch.t
   ; provider : Provider.t
+  ; accounts : Provider_id.t -> Provider_accounts.Account.t list
+  ; mutable login : Account_id.t option
+    (** the account of [model]'s provider to use ([None]: its default) *)
   ; tools : Tool.t list
   ; offered : Tool.t -> bool
   ; user_info : User_info.t option
@@ -367,8 +371,11 @@ let restore_settings t =
    | Some (model_id, thinking) ->
      Option.iter (Model_registry.find t.models model_id) ~f:(fun m ->
        t.model <- m);
-     t.thinking <- settle_thinking t.model thinking
-   | None -> ());
+     t.thinking <- settle_thinking t.model thinking;
+     t.login
+     <- Option.bind (Session.account t.session) ~f:(fun id ->
+          Result.ok (Account_id.of_string id))
+   | None -> t.login <- None);
   restore_approvals t
 ;;
 
@@ -620,6 +627,7 @@ let state t =
   ; cwd = t.cwd
   ; git_branch = t.git_branch
   ; model = t.model
+  ; account = t.login
   ; thinking = t.thinking
   ; running = is_running t
   ; message_count = List.length messages
@@ -3134,8 +3142,9 @@ let deliveries t =
 ;;
 
 (* The system prompt names the tools of the model it was built for. *)
-let set_model t model =
+let set_model ?account t model =
   t.model <- model;
+  t.login <- account;
   let thinking = settle_thinking model t.thinking in
   if not (Thinking.equal thinking t.thinking)
   then (
@@ -3155,9 +3164,49 @@ let set_model t model =
     t.thinking <- thinking);
   environment_changed t;
   ignore
-    (Session.set_model t.session ~model:(Model.key model) ~thinking:t.thinking
+    (Session.set_model
+       ?account:(Option.map account ~f:Account_id.to_string)
+       t.session
+       ~model:(Model.key model)
+       ~thinking:t.thinking
      : Session.Entry.t);
   state_changed t
+;;
+
+let model_ref t =
+  match t.login with
+  | None -> Model.key t.model
+  | Some id -> Model.key t.model ^ "@" ^ Account_id.to_string id
+;;
+
+(* The account the current model's requests use: the pinned one, else the
+   provider's default. *)
+let current_account t =
+  match t.login with
+  | Some id -> Some id
+  | None ->
+    List.find_map (t.accounts t.model.provider) ~f:(fun a ->
+      Option.some_if a.default a.id)
+;;
+
+(* Before handing over to another model, another login of the same
+   provider: the next account after the current one (in the user's order)
+   that may be fallen over to and that this chain has not tried. *)
+let next_account t ~tried =
+  let accounts = t.accounts t.model.provider in
+  match current_account t with
+  | None -> None
+  | Some current ->
+    let after =
+      match
+        List.findi accounts ~f:(fun _ a -> Account_id.equal a.id current)
+      with
+      | Some (i, _) -> List.drop accounts (i + 1) @ List.take accounts i
+      | None -> accounts
+    in
+    List.find_map after ~f:(fun (a : Provider_accounts.Account.t) ->
+      let key = Model.key t.model ^ "@" ^ Account_id.to_string a.id in
+      Option.some_if (a.fallback && not (Set.mem tried key)) a)
 ;;
 
 (* The model to continue with when [model] cannot be used: the next one in
@@ -3545,7 +3594,13 @@ let rec start_run
        in
        Option.iter !halted ~f:(fun reason -> broadcast t (Notice reason));
        sweep_orphans t ~main_running:false;
-       let tried = Set.add tried (Model.key t.model) in
+       let tried =
+         let tried = Set.add tried (Model.key t.model) in
+         match current_account t with
+         | None -> tried
+         | Some id ->
+           Set.add tried (Model.key t.model ^ "@" ^ Account_id.to_string id)
+       in
        let cancelled = Cancellation.is_cancelled cancel in
        let current = phys_equal session t.session in
        let unavailable =
@@ -3553,8 +3608,21 @@ let rec start_run
        in
        let handover =
          Option.bind unavailable ~f:(fun error ->
-           match next_model t ~tried with
-           | None ->
+           match next_account t ~tried, next_model t ~tried with
+           | Some (account : Provider_accounts.Account.t), _ ->
+             let from = model_ref t in
+             broadcast
+               t
+               (Notice
+                  (sprintf
+                     "%s: %s; carrying on with the %s login (%s)"
+                     from
+                     error
+                     account.label
+                     (Account_id.to_string account.id)));
+             set_model ~account:account.id t t.model;
+             Some []
+           | None, None ->
              if not (List.is_empty t.config.fallback_models)
              then
                broadcast
@@ -3565,8 +3633,8 @@ let rec start_run
                         left to hand over to; /model picks another"
                        (Model.key t.model)));
              None
-           | Some next ->
-             let from = Model.key t.model in
+           | None, Some next ->
+             let from = model_ref t in
              broadcast
                t
                (Notice
@@ -3961,6 +4029,7 @@ let create
       ~env
       ~sw
       ~provider
+      ?(accounts = fun (_ : Provider_id.t) -> [])
       ~tools
       ~sessions_dir
       ~home
@@ -4025,10 +4094,28 @@ let create
       Session.create ~dir:sessions_dir ~cwd ()
   in
   let cwd = Session.cwd session in
+  let pinned = ref (fun () -> None) in
+  let provider : Provider.t =
+    let (provider : Provider.t) = provider in
+    { name = provider.name
+    ; stream =
+        (fun request ->
+          let request =
+            match (request : Provider.Request.t).account, !pinned () with
+            | None, Some (p, account)
+              when Provider_id.equal p request.model.provider ->
+              { request with account = Some account }
+            | _ -> request
+          in
+          provider.stream request)
+    }
+  in
   let t =
     { env
     ; sw
     ; provider
+    ; accounts
+    ; login = None
     ; tools
     ; offered
     ; user_info
@@ -4119,6 +4206,7 @@ let create
     ; on_noted = ignore
     }
   in
+  (pinned := fun () -> Option.map t.login ~f:(fun a -> t.model.provider, a));
   restore_settings t;
   restore_host t;
   restore_told t;
@@ -5004,6 +5092,7 @@ let complete t ~model ~system ~user ~max_tokens ~cancel ~on_delta =
     ; thinking = Off
     ; max_tokens = Some max_tokens
     ; cache_key = None
+    ; account = None
     }
   in
   let reply =

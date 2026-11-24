@@ -12,6 +12,7 @@ let assistant text =
     ; stop_reason = End_turn
     ; usage = Usage.zero
     ; model = "m"
+    ; account = None
     }
 ;;
 

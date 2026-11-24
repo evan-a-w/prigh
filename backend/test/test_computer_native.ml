@@ -38,6 +38,7 @@ let request
   ; thinking
   ; max_tokens = None
   ; cache_key = None
+  ; account = None
   }
 ;;
 
@@ -385,6 +386,7 @@ let computer_turn ~args =
       ; model = "anthropic/claude-opus-5-5"
       ; usage = Usage.zero
       ; stop_reason = Tool_use
+      ; account = None
       }
   ; Tool_result
       { tool_call_id = "t1"
@@ -531,6 +533,7 @@ let%expect_test
             ; model = "anthropic/claude-opus-5-5"
             ; usage = Usage.zero
             ; stop_reason = End_turn
+            ; account = None
             }
         ; Message.user "again"
         ]
@@ -672,6 +675,7 @@ let%expect_test
          ; model = "openai/gpt-6.1-sol"
          ; usage = Usage.zero
          ; stop_reason = Tool_use
+         ; account = None
          }
     :: results
   in

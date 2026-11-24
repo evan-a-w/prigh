@@ -4,7 +4,9 @@ open! Import
 (** A provider that picks the backend from [request.model.provider] and
     resolves credentials (refreshing OAuth tokens as needed) on every request,
     so logging in or out takes effect immediately. Missing credentials are
-    reported as an [Error] stop reason naming the [/login] command. Custom
+    reported as an [Error] stop reason naming the [/login] command. A
+    request's [account] picks the login (default: the provider's default);
+    the reply records the one that wrote it. Custom
     providers are looked up in [models] on every request; one without a key
     is called without authorisation (local servers). *)
 

@@ -330,6 +330,14 @@ The file has the same shape as pi's `auth.json`. To share pi's logins,
 symlink it (`ln -s ~/.pi/agent/auth.json ~/.config/prigh/auth.json`)
 rather than copying it, because Anthropic rotates refresh tokens.
 
+A provider can have several logins (accounts): log in again with a label
+(the `login` RPC's `label`) to add one. The first stays under pi's key;
+the others are `account:PROVIDER:ID`, with labels, order and the default
+in `"prigh:accounts"`. `/model openai-codex/gpt-6-sol@work` pins a login
+for the session. When a usage limit stops a run, prigh carries on with the
+provider's next login that allows fallback (OAuth ones by default, API
+keys only if you turn it on) before handing over to `fallback_models`.
+
 ### Custom OpenAI-compatible providers
 
 Any server that speaks OpenAI chat completions, the Responses API or

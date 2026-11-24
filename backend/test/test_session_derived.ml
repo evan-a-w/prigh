@@ -41,6 +41,7 @@ let assistant ?(calls = []) ?(model = "m") ~input text : Message.t =
     ; stop_reason = (if List.is_empty calls then End_turn else Tool_use)
     ; usage = { input; output = 10; cache_read = 0 }
     ; model
+    ; account = None
     }
 ;;
 

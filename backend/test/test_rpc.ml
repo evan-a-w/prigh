@@ -754,7 +754,7 @@ let%expect_test "auth: status, login via prompt, logout" =
 
 let%expect_test "auth: accounts (add by label, update, logout one)" =
   with_agent []
-  @@ fun t _agent h ->
+  @@ fun t agent h ->
   Login_manager.subscribe h.login ~f:(fun e ->
     print_endline (Json.to_string (Rpc_json.login_event e)));
   let accounts () =
@@ -838,6 +838,39 @@ let%expect_test "auth: accounts (add by label, update, logout one)" =
     {"type":"event","event":"auth","kind":"logged_out","provider":"deepseek","account":"work"}
     {"type":"response","id":"r1","ok":true,"result":{}}
     {"ref":"deepseek/main","id":"main","label":"DeepSeek API key","method":"api_key","source":"stored api key","default":true,"fallback":false}
+    |}];
+  let model () =
+    let s = Agent.state agent in
+    print_s
+      [%sexp (Model.key s.model : string), (s.account : Account_id.t option)]
+  in
+  call t h ~params:{|{"provider": "deepseek", "label": "Spare"}|} "login";
+  call t h ~params:{|{"id": "p3", "value": "sk-three"}|} "auth_respond";
+  Login_manager.wait h.login;
+  call t h ~params:{|{"model": "deepseek/deepseek-flash@Spare"}|} "set_model";
+  model ();
+  call
+    t
+    h
+    ~params:{|{"model": "deepseek/deepseek-flash", "account": "main"}|}
+    "set_model";
+  model ();
+  call t h ~params:{|{"model": "deepseek-flash@nobody"}|} "set_model";
+  call t h ~params:{|{"model": "deepseek-flash"}|} "set_model";
+  model ();
+  [%expect
+    {|
+    {"type":"event","event":"auth","kind":"prompt","id":"p3","prompt":"secret","message":"Enter DeepSeek API key"}
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    {"type":"event","event":"auth","kind":"done","provider":"deepseek","method":"api_key","account":"spare"}
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    (deepseek/deepseek-flash (spare))
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    (deepseek/deepseek-flash (main))
+    {"type":"response","id":"r1","ok":false,"error":"DeepSeek has no account \"nobody\": it has DeepSeek API key (main), Spare (spare)"}
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    (deepseek/deepseek-flash ())
     |}]
 ;;
 

@@ -52,5 +52,6 @@ let request ?cache_key ~model ~system ~messages ~question () =
   ; thinking = Off
   ; max_tokens = None
   ; cache_key
+  ; account = None
   }
 ;;

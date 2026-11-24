@@ -120,6 +120,7 @@ let%expect_test "which messages a compaction keeps" =
       ; usage = Usage.zero
       ; stop_reason = Tool_use
       ; model = "m"
+      ; account = None
       }
   in
   let r id text =
@@ -399,6 +400,7 @@ let assistant_calls calls =
     ; usage = Usage.zero
     ; stop_reason = Tool_use
     ; model = "m"
+    ; account = None
     }
 ;;
 

@@ -283,6 +283,10 @@ let common_params =
           ~env
           ~sw
           ~provider
+          ~accounts:(fun provider ->
+            Provider_accounts.list store provider
+            |> Result.ok
+            |> Option.value ~default:[])
           ~tools:
             (if no_tools
              then []

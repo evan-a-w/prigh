@@ -371,10 +371,11 @@ let state (s : Agent.State.t) =
      ; "plan", Option.value_map s.plan ~default:`Null ~f:Plan.to_json
      ; "session_rules", `Array (List.map s.session_rules ~f:str)
      ]
-     @
-     if List.is_empty s.allowed_calls
-     then []
-     else [ "allowed_calls", `Array (List.map s.allowed_calls ~f:str) ])
+     @ (if List.is_empty s.allowed_calls
+        then []
+        else [ "allowed_calls", `Array (List.map s.allowed_calls ~f:str) ])
+     @ Option.value_map s.account ~default:[] ~f:(fun id ->
+       [ "account", str (Account_id.to_string id) ]))
 ;;
 
 let job ~now task =
@@ -557,7 +558,7 @@ let entry (e : Session.Entry.t) =
   let payload =
     match e.payload with
     | Message m -> [ "kind", str "message"; "message", message m ]
-    | Model { model; thinking = t } ->
+    | Model { model; thinking = t; account = _ } ->
       [ "kind", str "model"; "model", str model; "thinking", thinking t ]
     | Compaction { summary; kept_from; pinned } ->
       [ "kind", str "compaction"

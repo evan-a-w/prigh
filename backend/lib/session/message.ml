@@ -23,6 +23,7 @@ module Assistant = struct
     ; stop_reason : Stop_reason.t
     ; usage : Usage.t
     ; model : string
+    ; account : string option [@sexp.option] [@jsonaf.option]
     }
   [@@deriving sexp, jsonaf, equal]
 

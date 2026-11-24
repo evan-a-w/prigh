@@ -16,6 +16,7 @@ let assistant ?(text = "") calls =
     ; stop_reason = Tool_use
     ; usage = Usage.zero
     ; model = "m"
+    ; account = None
     }
 ;;
 

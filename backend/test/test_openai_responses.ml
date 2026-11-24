@@ -33,6 +33,7 @@ let request
       ?system
       ?max_tokens
       ?cache_key
+      ?account
       messages
   =
   { Provider.Request.model
@@ -42,6 +43,7 @@ let request
   ; thinking
   ; max_tokens
   ; cache_key
+  ; account
   }
 ;;
 
@@ -61,6 +63,7 @@ let conversation =
       ; stop_reason = Tool_use
       ; usage = Usage.zero
       ; model = Model.key codex_model
+      ; account = None
       }
   ; Tool_result
       { tool_call_id = "call_1"
@@ -79,6 +82,7 @@ let conversation =
       ; stop_reason = End_turn
       ; usage = Usage.zero
       ; model = "anthropic/claude-opus-4-6"
+      ; account = None
       }
   ]
 ;;
@@ -519,6 +523,7 @@ let%expect_test
         ; stop_reason = Tool_use
         ; usage = Usage.zero
         ; model = Model.key codex_model
+        ; account = None
         }
     ; Tool_result
         { tool_call_id = "call_1"
@@ -694,4 +699,33 @@ let%expect_test
       xhigh    reasoning={"effort":"xhigh","summary":"auto"}
       max      reasoning={"effort":"max","summary":"auto"}
     |}]
+;;
+
+let%expect_test "reasoning is replayed only to the account that wrote it" =
+  let id s = Or_error.ok_exn (Account_id.of_string s) in
+  let replayed ~written ~to_ =
+    let conversation =
+      List.map conversation ~f:(function
+        | Message.Assistant a when String.equal a.model (Model.key codex_model)
+          -> Message.Assistant { a with account = written }
+        | m -> m)
+    in
+    let body =
+      T.request_body
+        ~endpoint:(Codex { access_token = "t"; account_id = "acct" })
+        (request ?account:to_ conversation)
+    in
+    String.is_substring (Json.to_string body) ~substring:"ENC"
+  in
+  print_s
+    [%sexp
+      ([ replayed ~written:None ~to_:None
+       ; replayed ~written:None ~to_:(Some Account_id.main)
+       ; replayed ~written:(Some "work") ~to_:(Some (id "work"))
+       ; replayed ~written:(Some "work") ~to_:None
+       ; replayed ~written:None ~to_:(Some (id "work"))
+       ; replayed ~written:(Some "work") ~to_:(Some (id "home"))
+       ]
+       : bool list)];
+  [%expect {| (true true true false false false) |}]
 ;;

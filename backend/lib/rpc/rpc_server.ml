@@ -323,6 +323,34 @@ let optional_account_param login params =
   | _ -> Or_error.map (account_param login params) ~f:(fun (_, id) -> Some id)
 ;;
 
+(* A model key, or [key@account] (an account's id or label); [account]
+   instead of the suffix. A key with an [@] of its own still resolves. *)
+let model_with_account login key ~account =
+  let open Or_error.Let_syntax in
+  let models = Login_manager.models login in
+  let%bind model, account =
+    match Model_registry.resolve models key, account with
+    | Ok model, _ -> Ok (model, account)
+    | (Error _ as error), Some _ -> Or_error.map error ~f:(fun m -> m, account)
+    | (Error _ as error), None ->
+      (match String.rsplit2 key ~on:'@' with
+       | Some (key, account) when not (String.is_empty account) ->
+         let%map model = Model_registry.resolve models key in
+         model, Some account
+       | Some _ | None -> Or_error.map error ~f:(fun m -> m, None))
+  in
+  match account with
+  | None -> Ok (model, None)
+  | Some account ->
+    let%map found =
+      Provider_accounts.find
+        (Login_manager.store login)
+        (model : Model.t).provider
+        account
+    in
+    model, Some found.id
+;;
+
 (* Confirmations and questions waiting for the user. *)
 let waiting agent =
   List.length (Agent.pending_confirms agent)
@@ -3704,12 +3732,12 @@ let dispatch agent login ~(client : Client.t) ~meth ~params : Json.t Or_error.t 
           ; "entries", `Array (List.map entries ~f:Rpc_json.entry)
           ])
   | "set_model" ->
-    Or_error.bind (string_param params "model") ~f:(fun id ->
-      Or_error.map
-        (Model_registry.resolve (Login_manager.models login) id)
-        ~f:(fun model ->
-          Agent.set_model agent model;
-          `Object []))
+    let open Or_error.Let_syntax in
+    let%bind id = string_param params "model" in
+    let%bind account = string_param_opt params "account" in
+    let%map model, account = model_with_account login id ~account in
+    Agent.set_model ?account agent model;
+    `Object []
   | "set_thinking" ->
     Or_error.bind (string_param params "thinking") ~f:(fun s ->
       Or_error.bind (Rpc_json.thinking_of_string s) ~f:(fun thinking ->

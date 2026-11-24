@@ -281,6 +281,7 @@ let%expect_test "a fork in a worktree is told its paths moved" =
             ; stop_reason = Tool_use
             ; usage = Usage.zero
             ; model = Model.default.id
+            ; account = None
             }
         ]
     }
