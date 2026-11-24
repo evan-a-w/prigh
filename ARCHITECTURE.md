@@ -264,7 +264,8 @@ and budgets, delivery of background work's reports, and eviction.
   Grants live in the owner's `Account_meta`; a recipient's request names
   `Account_ref.Shared` (`~OWNER/ID`), and the router resolves (and
   refreshes) it on the owner's store in-process, so no client sees the
-  secret. `Account_ledger` keeps per-recipient usage for the owner;
+  secret. `Account_ledger` keeps each login's usage per user and day (the
+  owner's own and recipients'; `auth_status`, `account_usage`);
   `Login_choice` lists a user's own and shared logins for pinning and
   fallback. Revoking pushes `accounts_changed` and unpins recipients.
 - `Provider_auth`: which methods each provider supports, environment

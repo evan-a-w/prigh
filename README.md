@@ -459,7 +459,7 @@ These are the main ones. `/help` lists them all, with their arguments.
 | Credentials | `/login`, `/logout`, `/auth`, `/accounts`, `/account` |
 | Sessions | `/new`, `/sessions`, `/switch`, `/name`, `/fork`, `/rewind`, `/tree`, `/clone`, `/pin`, `/archive`, `/delete`, `/export`, `/import`, `/temporary` (web) |
 | Context | `/compact`, `/trim`, `/delete`, `/compaction`, `/session`, `/trace` |
-| Long runs | `/goal`, `/budget`, `/remind`, `/resume`, `/usage` (web) |
+| Long runs | `/goal`, `/budget`, `/remind`, `/resume`, `/usage` |
 | Modes | `/mode`, `/plan`, `/chat`, `/confirm`, `/permissions`, `/todos` |
 | Agents | `/agents`, `/jobs`, `/queue`, `/btw`, `/abort` |
 | Where | `/host`, `/cd`, `/mkdir`, `/terminal` and `/files` (web), `/default-dir`, `/default-host` |
