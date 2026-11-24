@@ -110,7 +110,10 @@ let with_temp_index f =
 ;;
 
 (* A temporary index with the repository's as its start: its stat cache
-   spares [git add] re-reading every file. *)
+   spares [git add] re-reading every file. The copy keeps the original's
+   times: git takes an entry modified no earlier than its index file as
+   possibly stale and re-reads it, so a copy stamped now would pass a file
+   changed in the same tick as unchanged. *)
 let seed_index ~env ~cancel ~root ~index =
   match git ~env ~cancel ~dir:root [ "rev-parse"; "--git-path"; "index" ] with
   | Error _ -> ()
@@ -119,7 +122,9 @@ let seed_index ~env ~cancel ~root ~index =
     let p = if Filename.is_relative p then root ^/ p else p in
     (try
        let data = In_channel.read_all p in
-       Out_channel.write_all index ~data
+       let stats = Core_unix.stat p in
+       Out_channel.write_all index ~data;
+       Core_unix.utimes index ~access:stats.st_atime ~modif:stats.st_mtime
      with
      | _ -> ())
 ;;

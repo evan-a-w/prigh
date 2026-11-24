@@ -94,3 +94,32 @@ let%expect_test "Claude's stream-json: control requests by subtype" =
     < {"type":"result","subtype":"success"}
     |}]
 ;;
+
+let%expect_test "after its script, a request it has no answer for ends it" =
+  let s =
+    script
+      [ {|{"type":"default_reply","method":"model/list","result":{"data":[]}}|}
+      ; {|{"type":"expect_outbound","frame":{"id":1,"method":"initialize"}}|}
+      ; {|{"type":"emit_inbound","frame":{"id":1,"result":{}}}|}
+      ]
+  in
+  let t = Fake_cli.create s in
+  feed t {|{"id":7,"method":"initialize","params":{}}|};
+  feed t {|{"id":8,"method":"model/list","params":{}}|};
+  feed t {|{"method":"initialized"}|};
+  feed t {|{"id":9,"method":"thread/compact/start","params":{}}|};
+  print_s [%sexp (Fake_cli.exit_requested t : (int * string) option)];
+  [%expect
+    {|
+    > {"id":7,"method":"initialize","params":{}}
+    < {"id":7,"result":{}}
+    > {"id":8,"method":"model/list","params":{}}
+    < {"id":8,"result":{"data":[]}}
+    > {"method":"initialized"}
+    > {"id":9,"method":"thread/compact/start","params":{}}
+    ((3
+       "prigh fake-cli: the script has ended, but prigh sent a request it does not answer: {\"id\":9,\"method\":\"thread/compact/start\",\"params\":{}}\
+      \nadd it to the script (or a default_reply)\
+      \n"))
+    |}]
+;;

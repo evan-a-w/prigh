@@ -33,9 +33,91 @@ let obj fields : Json.t = `Object (List.filter_opt fields)
 let str s = `String s
 let path_names = [ "file_path"; "path"; "notebook_path" ]
 
+let shells =
+  [ "bash"
+  ; "sh"
+  ; "zsh"
+  ; "/bin/bash"
+  ; "/bin/sh"
+  ; "/bin/zsh"
+  ; "/usr/bin/bash"
+  ; "/usr/bin/zsh"
+  ]
+;;
+
+(* [s] as one shell word (bare, single- or double-quoted, in pieces), if it
+   is exactly one: else [None]. *)
+let one_word s =
+  let b = Buffer.create (String.length s) in
+  let n = String.length s in
+  let rec go i =
+    if i >= n
+    then Some (Buffer.contents b)
+    else (
+      match s.[i] with
+      | '\'' ->
+        (match String.index_from s (i + 1) '\'' with
+         | Some j ->
+           Buffer.add_string b (String.sub s ~pos:(i + 1) ~len:(j - i - 1));
+           go (j + 1)
+         | None -> None)
+      | '"' ->
+        let rec dq j =
+          if j >= n
+          then None
+          else (
+            match s.[j] with
+            | '"' -> go (j + 1)
+            | '\\' when j + 1 < n && String.mem "\"\\$`" s.[j + 1] ->
+              Buffer.add_char b s.[j + 1];
+              dq (j + 2)
+            | '$' | '`' -> None
+            | c ->
+              Buffer.add_char b c;
+              dq (j + 1))
+        in
+        dq (i + 1)
+      | '\\' when i + 1 < n ->
+        Buffer.add_char b s.[i + 1];
+        go (i + 2)
+      | ' '
+      | '\t'
+      | '\n'
+      | ';'
+      | '&'
+      | '|'
+      | '<'
+      | '>'
+      | '('
+      | ')'
+      | '$'
+      | '`'
+      | '*'
+      | '?'
+      | '['
+      | '#'
+      | '~' -> None
+      | c ->
+        Buffer.add_char b c;
+        go (i + 1))
+  in
+  if String.is_empty s then None else go 0
+;;
+
+(* [bash -lc 'script'] (as Codex wraps a command) is [script]. *)
+let unwrap_shell s =
+  match String.lsplit2 (String.strip s) ~on:' ' with
+  | Some (shell, rest) when List.mem shells shell ~equal:String.equal ->
+    (match String.lsplit2 (String.lstrip rest) ~on:' ' with
+     | Some (("-c" | "-lc"), script) ->
+       Option.value (one_word (String.strip script)) ~default:s
+     | _ -> s)
+  | _ -> s
+;;
+
 let command input =
   match field input "command" with
-  | Some (`String s) -> Some s
+  | Some (`String s) -> Some (unwrap_shell s)
   | Some (`Array parts) ->
     let parts =
       List.filter_map parts ~f:(function
@@ -44,10 +126,7 @@ let command input =
     in
     (match parts with
      | [ shell; ("-c" | "-lc"); script ]
-       when List.mem
-              [ "bash"; "sh"; "zsh"; "/bin/bash"; "/bin/sh" ]
-              shell
-              ~equal:String.equal -> Some script
+       when List.mem shells shell ~equal:String.equal -> Some script
      | parts -> Some (String.concat ~sep:" " parts))
   | _ -> None
 ;;

@@ -280,6 +280,10 @@ let%expect_test "canonical tools" =
   in
   show Command "Bash" {|{"command":"ls -la","description":"list"}|};
   show Command "commandExecution" {|{"command":["bash","-lc","ls"]}|};
+  show Command "commandExecution" {|{"command":"/bin/bash -lc 'ls -la'"}|};
+  show Command "commandExecution" {|{"command":"bash -c 'echo '\\''hi'\\'''"}|};
+  show Command "commandExecution" {|{"command":"/bin/bash -lc 'ls'; rm x"}|};
+  show Command "commandExecution" {|{"command":"bash -lc \"echo $HOME\""}|};
   show Read "Read" {|{"file_path":"/a/b.ml","offset":3,"limit":10}|};
   show Search "Grep" {|{"pattern":"foo","path":"src"}|};
   show Search "Glob" {|{"pattern":"**/*.ml"}|};
@@ -297,6 +301,10 @@ let%expect_test "canonical tools" =
     {|
     Bash             -> bash {"command":"ls -la"}
     commandExecution -> bash {"command":"ls"}
+    commandExecution -> bash {"command":"ls -la"}
+    commandExecution -> bash {"command":"echo 'hi'"}
+    commandExecution -> bash {"command":"/bin/bash -lc 'ls'; rm x"}
+    commandExecution -> bash {"command":"bash -lc \"echo $HOME\""}
     Read             -> read {"path":"/a/b.ml","offset":3,"limit":10}
     Grep             -> grep {"pattern":"foo","path":"src"}
     Glob             -> find {"pattern":"**/*.ml"}
