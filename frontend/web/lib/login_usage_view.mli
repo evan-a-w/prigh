@@ -7,8 +7,19 @@ open! Import
     over 7 and 30 days (an API key's cost too), and for a login the user
     shares, each user's part ([account_usage]). *)
 
-(** Under a login's row in Settings. *)
-val details : App.Model.t -> Prigh_ui.Provider_logins.Login.t -> Vdom.Node.t
+(** A login's row, as Settings → Models → Providers and Settings → Usage
+    list them: its title (["ChatGPT: Team (from dave)"]), what it is and its
+    plan, Share… (Hide or Show for one shared with the user) and Manage,
+    and under them its usage. *)
+val row
+  :  App.Model.t
+  -> inject:(App.Action.t -> unit Vdom.Effect.t)
+  -> Prigh_ui.Provider_logins.Login.t
+  -> Vdom.Node.t
+
+(** Whether the login has usage to show: limits (or why they are unknown),
+    requests in 30 days, or users. *)
+val shown : App.Model.t -> Prigh_ui.Provider_logins.Login.t -> bool
 
 (** The context card's lines on the session's login (the pinned one, else
     its provider's default); none without a stored login. *)

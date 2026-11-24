@@ -4137,14 +4137,16 @@ back: Memory | What you asked the model to remember, for later sessions. Kept on
 (none)
 === webkit: usage: opened ===
 Usage
-How much of your Claude and ChatGPT subscriptions' usage limits you have used, as the providers report it (read when you open this page), and whether a run stopped by one carries on when it resets.
+Each login's usage: how much of its subscription's limits it has used, as the provider reports it (read when you open this page), and what ran on it. And whether a run stopped by a limit carries on when it resets.
 At a limit
 Resume after a usage limit
 A run stopped by a provider's usage limit carries on by itself when the limit resets, if the provider says when. Off: it stays stopped until you send a message.
 Subscription limits
 Read TIME (just now). Updated when you open this page or press Refresh.
 Refresh
-Claude
+Anthropic: Anthropic (Claude Pro/Max)
+Subscription, default, takes over at usage limits.
+Manage
 5-hour session
 Resets in 2h 15m · TIME
 33% used
@@ -4154,8 +4156,9 @@ Resets in 3d 4h · TIME
 Weekly · Opus
 Reset time not reported
 4% used
-ChatGPT
-Plus
+OpenAI Codex (ChatGPT): OpenAI (ChatGPT Plus/Pro)
+Subscription, default, takes over at usage limits. Plus plan.
+Manage
 5-hour session
 Resets in 43m · TIME
 72% used
@@ -4168,18 +4171,20 @@ asked: Claude 1, ChatGPT 1
 asked: Claude 2, ChatGPT 2; ChatGPT's session: 75% used
 === webkit: usage: Claude rate limited ===
 Usage
-How much of your Claude and ChatGPT subscriptions' usage limits you have used, as the providers report it (read when you open this page), and whether a run stopped by one carries on when it resets.
+Each login's usage: how much of its subscription's limits it has used, as the provider reports it (read when you open this page), and what ran on it. And whether a run stopped by a limit carries on when it resets.
 At a limit
 Resume after a usage limit
 A run stopped by a provider's usage limit carries on by itself when the limit resets, if the provider says when. Off: it stays stopped until you send a message.
 Subscription limits
 Read TIME (just now). Updated when you open this page or press Refresh.
 Refresh
-Claude
-Could not read the limits
-Claude is limiting how often usage is read (HTTP 429): Refresh in a minute
-ChatGPT
-Plus
+Anthropic: Anthropic (Claude Pro/Max)
+Subscription, default, takes over at usage limits.
+Manage
+Limits unknown: Claude is limiting how often usage is read (HTTP 429): Refresh in a minute
+OpenAI Codex (ChatGPT): OpenAI (ChatGPT Plus/Pro)
+Subscription, default, takes over at usage limits. Plus plan.
+Manage
 5-hour session
 Resets in 43m · TIME
 75% used
@@ -4191,10 +4196,10 @@ bars: 5-hour session used=75, Weekly used=12
 asked again: 2
 === webkit: usage: phone 390x844 ===
 fits: yes; targets: all ok
-back: Usage | How much of your Claude and ChatGPT subscriptions' usage limits you have used, as the providers report it (read when you open this page), and whether a run stopped by one carries on when it resets.
+back: Usage | Each login's usage: how much of its subscription's limits it has used, as the provider reports it (read when you open this page), and what ran on it. And whether a run stopped by a limit carries on when it resets.
 === webkit: usage: phone 320x640 ===
 fits: yes; targets: all ok
-back: Usage | How much of your Claude and ChatGPT subscriptions' usage limits you have used, as the providers report it (read when you open this page), and whether a run stopped by one carries on when it resets.
+back: Usage | Each login's usage: how much of its subscription's limits it has used, as the provider reports it (read when you open this page), and what ran on it. And whether a run stopped by a limit carries on when it resets.
 === webkit: usage: errors ===
 (none)
 === webkit: user info: moved from user_info.md ===

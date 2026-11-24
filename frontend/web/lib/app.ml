@@ -2306,10 +2306,11 @@ let fetch_usage (m : Model.t) =
   , [ call Usage_limits ~tag:Usage_loaded ] )
 ;;
 
-(* Settings → Models: each login's limits, and who used the logins the user
-   shares. *)
+(* Settings → Models and Usage: each login's limits and what ran on it, and
+   who used the logins the user shares. *)
 let fetch_logins_usage (m : Model.t) =
   let m, limits = fetch_usage m in
+  let limits = rpc "auth_status" [] ~tag:(Auth_status Refresh) :: limits in
   let shared =
     List.concat_map m.auth ~f:(fun (p : Auth_status.t) ->
       List.filter_map p.accounts ~f:(fun a ->
@@ -2377,8 +2378,7 @@ let fetch_section (m : Model.t) : Settings_section.t -> _ = function
   | About_you -> fetch_about_you m
   | Mcp -> fetch_mcp m
   | Custom_instructions -> fetch_instructions m
-  | Usage -> fetch_usage m
-  | Models -> fetch_logins_usage m
+  | Usage | Models -> fetch_logins_usage m
   | Appearance
   | Sessions
   | New_sessions
@@ -12075,7 +12075,7 @@ let update_connected (m : Model.t) (action : Action.t) =
   | Open_snippets cursor -> open_snippets m ~cursor
   | Open_help -> open_dialog m Help
   | Open_settings -> open_settings m
-  | Usage_refresh -> fetch_usage m
+  | Usage_refresh -> fetch_logins_usage m
   | Settings_section section ->
     (match m.dialog with
      | Some Settings ->

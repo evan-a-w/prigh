@@ -8,7 +8,7 @@ let limits (m : App.Model.t) (l : Logins.Login.t) =
   match m.usage.usage with
   | Some (Ok u) ->
     Option.map (Text.limits_of (Some u) ~ref_:l.account.ref_) ~f:(fun s ->
-      s, Usage_view.now m u)
+      s, Usage_meter.now m u)
   | Some (Error _) | None -> None
 ;;
 
@@ -20,9 +20,9 @@ let window m ~now (w : Subscription_usage.Window.t) =
           "flex flex-wrap items-baseline justify-between gap-x-3 text-xs \
            text-muted-foreground"
         [ span ~cls:"font-medium text-foreground" w.label
-        ; span ~cls:"login-usage-resets" (Usage_view.resets m ~now w)
+        ; span ~cls:"login-usage-resets" (Usage_meter.resets m ~now w)
         ]
-    ; Usage_view.meter w
+    ; Usage_meter.meter w
     ]
 ;;
 
@@ -80,7 +80,7 @@ let users (m : App.Model.t) (l : Logins.Login.t) =
               ]))
 ;;
 
-let details m (l : Logins.Login.t) =
+let parts m (l : Logins.Login.t) =
   let windows =
     match limits m l with
     | Some (Limits { windows; _ }, now) -> List.map windows ~f:(window m ~now)
@@ -91,12 +91,57 @@ let details m (l : Logins.Login.t) =
       ]
     | Some ((Not_signed_in | Api_key), _) | None -> []
   in
-  match windows, periods l, users m l with
-  | [], None, None -> Node.none
-  | windows, periods, users ->
-    div
-      ~cls:"login-usage col-span-full flex min-w-0 flex-col gap-2"
-      (windows @ List.filter_opt [ periods; users ])
+  windows @ List.filter_opt [ periods l; users m l ]
+;;
+
+let shown m l = not (List.is_empty (parts m l))
+
+let details m l =
+  match parts m l with
+  | [] -> Node.none
+  | parts ->
+    div ~cls:"login-usage col-span-full flex min-w-0 flex-col gap-2" parts
+;;
+
+let plan m l =
+  match limits m l with
+  | Some (Limits { plan = Some plan; _ }, _) ->
+    sprintf " %s plan." (String.capitalize plan)
+  | _ -> ""
+;;
+
+let row m ~inject (l : Logins.Login.t) =
+  let open Settings_row in
+  let run command = inject (App.Action.Run command) in
+  let ref_ = l.account.ref_ in
+  let menu = "/accounts menu " ^ ref_ in
+  let title = Logins.title l in
+  let action ~verb ~command ~text =
+    button
+      ~cls:"small"
+      ~title:command
+      ~label:(verb ^ " " ^ title)
+      ~on_click:(run command)
+      [ Node.text text ]
+  in
+  row
+    ~cls:"provider-login"
+    ~name:title
+    ~about:(String.capitalize (Logins.detail l) ^ "." ^ plan m l)
+    ~below:(details m l)
+    ((match l.account.shared_by with
+      | Some _ when l.account.hidden ->
+        [ action ~verb:"Show" ~command:("/accounts show " ^ ref_) ~text:"Show" ]
+      | Some _ ->
+        [ action ~verb:"Hide" ~command:("/accounts hide " ^ ref_) ~text:"Hide" ]
+      | None when l.account.shareable ->
+        [ action
+            ~verb:"Share"
+            ~command:("/accounts share " ^ ref_)
+            ~text:"Share…"
+        ]
+      | None -> [])
+     @ [ action ~verb:"Manage" ~command:menu ~text:"Manage" ])
 ;;
 
 let session_login (m : App.Model.t) (state : State.t) =

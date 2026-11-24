@@ -310,11 +310,12 @@ let%expect_test "settings and the context card show each login's usage" =
   [%expect
     {|
     (Focus dialog)
+    (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
     (Rpc (method_ usage_limits) (params ()) (tag Usage_loaded))
     (Rpc (method_ account_usage) (params ((ref openai/work)))
      (tag (Login_users openai/work)))
     ChatGPT: Personal
-    Subscription, default, takes over at usage limits.
+    Subscription, default, takes over at usage limits. Pro plan.
     (Share…) (Manage)
     5-hour session Resets in 1h 30m · 11:30
     42% used

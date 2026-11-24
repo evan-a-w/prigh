@@ -350,44 +350,7 @@ let logins (m : App.Model.t) ~inject =
     then []
     else
       List.map p.accounts ~f:(fun account ->
-        let l = { Logins.Login.provider = p; account } in
-        let menu = "/accounts menu " ^ account.ref_ in
-        row
-          ~cls:"provider-login"
-          ~name:(Logins.title l)
-          ~about:(String.capitalize (Logins.detail l) ^ ".")
-          ~below:(Login_usage_view.details m l)
-          ((match account.shared_by with
-            | Some _ ->
-              let verb, command =
-                if account.hidden
-                then "Show", "/accounts show " ^ account.ref_
-                else "Hide", "/accounts hide " ^ account.ref_
-              in
-              [ button
-                  ~cls:"small"
-                  ~title:command
-                  ~label:(verb ^ " " ^ Logins.title l)
-                  ~on_click:(run command)
-                  [ Node.text verb ]
-              ]
-            | None when account.shareable ->
-              let command = "/accounts share " ^ account.ref_ in
-              [ button
-                  ~cls:"small"
-                  ~title:command
-                  ~label:("Share " ^ Logins.title l)
-                  ~on_click:(run command)
-                  [ Node.text "Share…" ]
-              ]
-            | None -> [])
-           @ [ button
-                 ~cls:"small"
-                 ~title:menu
-                 ~label:("Manage " ^ Logins.title l)
-                 ~on_click:(run menu)
-                 [ Node.text "Manage" ]
-             ]))
+        Login_usage_view.row m ~inject { Logins.Login.provider = p; account })
       @ [ row
             ~cls:"provider-login-add"
             ~name:(sprintf "Another %s login" p.name)

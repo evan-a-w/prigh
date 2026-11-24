@@ -4,86 +4,16 @@ open Html
 open Settings_row
 module Action = App.Action
 module U = Subscription_usage
-
-let until span =
-  let minutes = Float.iround_up_exn (Time_ns.Span.to_min span) in
-  let days = minutes / (24 * 60)
-  and hours = minutes / 60 % 24
-  and mins = minutes % 60 in
-  if minutes <= 0
-  then "under a minute"
-  else if days > 0
-  then if hours = 0 then sprintf "%dd" days else sprintf "%dd %dh" days hours
-  else if hours > 0
-  then if mins = 0 then sprintf "%dh" hours else sprintf "%dh %dm" hours mins
-  else sprintf "%dm" mins
-;;
-
-(* The clock moves on while the page is open; never before the answer. *)
-let now (m : App.Model.t) (usage : U.t) =
-  match m.now with
-  | Some now when Time_ns.( > ) now usage.fetched_at -> now
-  | _ -> usage.fetched_at
-;;
-
-let resets (m : App.Model.t) ~now (w : U.Window.t) =
-  match w.resets_at with
-  | None -> "Reset time not reported"
-  | Some at when Time_ns.( <= ) at now -> "Has reset: Refresh to see it"
-  | Some at ->
-    sprintf
-      "Resets in %s · %s"
-      (until (Time_ns.diff at now))
-      (Message_time.short (App.Model.message_time m) at)
-;;
-
-let percent p =
-  if Float.( < ) p 10. && not (Float.is_integer p)
-  then sprintf "%.1f%%" p
-  else sprintf "%.0f%%" p
-;;
-
-(* loon's Progress: the bar is the muted text's colour until 70% used,
-   then the accent, then from 90% the destructive colour. *)
-let meter (w : U.Window.t) =
-  let used = Float.clamp_exn w.used_percent ~min:0. ~max:100. in
-  let level, bar =
-    if Float.( >= ) used 90.
-    then "full", "[&>[data-slot=progress-indicator]]:bg-destructive"
-    else if Float.( >= ) used 70.
-    then "high", "[&>[data-slot=progress-indicator]]:bg-primary"
-    else "ok", "[&>[data-slot=progress-indicator]]:bg-muted-foreground"
-  in
-  div
-    ~cls:("usage-meter flex w-full items-center gap-3 " ^ level)
-    [ Loon.Progress.view
-        ~class_:
-          ("usage-track h-1.5 flex-1 \
-            [&>[data-slot=progress-indicator]]:motion-reduce:transition-none "
-           ^ bar)
-        ~attrs:[ Attr.create "aria-label" (w.label ^ " used") ]
-        ~value:used
-        ()
-    ; span
-        ~cls:
-          (if String.equal level "full"
-           then
-             "usage-percent min-w-[8ch] text-right text-[13px] tabular-nums \
-              text-destructive"
-           else
-             "usage-percent min-w-[8ch] text-right text-[13px] tabular-nums \
-              text-muted-foreground")
-        (percent w.used_percent ^ " used")
-    ]
-;;
+module Logins = Prigh_ui.Provider_logins
+module Text = Prigh_ui.Login_usage_text
 
 let window m ~now (w : U.Window.t) =
   row
     ~cls:"usage-window gap-2"
     ~wide:true
     ~name:w.label
-    ~about:(resets m ~now w)
-    [ meter w ]
+    ~about:(Usage_meter.resets m ~now w)
+    [ Usage_meter.meter w ]
 ;;
 
 let sign_in ~inject (p : U.Provider_usage.t) ~about =
@@ -158,11 +88,11 @@ let refresh_row (m : App.Model.t) ~inject =
     match page.usage, page.loading with
     | None, _ -> "Reading your usage from the providers…"
     | Some (Ok u), _ ->
-      let now = now m u in
+      let now = Usage_meter.now m u in
       sprintf
         "Read %s (%s ago). Updated when you open this page or press Refresh."
         (Message_time.short (App.Model.message_time m) u.fetched_at)
-        (until (Time_ns.diff now u.fetched_at))
+        (Text.until (Time_ns.diff now u.fetched_at))
       |> String.substr_replace_all
            ~pattern:"(under a minute ago)"
            ~with_:"(just now)"
@@ -195,12 +125,44 @@ let refresh_row (m : App.Model.t) ~inject =
     ]
 ;;
 
+(* A card per login with usage to show (its title names the provider); a
+   provider with none says why (not signed in, an API key, an error). *)
+let provider_cards (m : App.Model.t) ~inject ~limits (id : string) =
+  let logins =
+    List.filter
+      (Logins.all
+         (List.filter m.auth ~f:(fun (p : Auth_status.t) ->
+            String.equal p.provider id && Option.is_none p.custom)))
+      ~f:(Login_usage_view.shown m)
+  in
+  match logins, limits with
+  | [], Some (u, p) -> [ provider m ~inject ~now:(Usage_meter.now m u) p ]
+  | [], None -> []
+  | logins, _ ->
+    List.map logins ~f:(fun l -> group [ Login_usage_view.row m ~inject l ])
+;;
+
 let groups (m : App.Model.t) ~inject =
+  let usage =
+    match m.usage.usage with
+    | Some (Ok u) -> Some u
+    | Some (Error _) | None -> None
+  in
+  let limits id =
+    Option.bind usage ~f:(fun u ->
+      List.find_map u.providers ~f:(fun (p : U.Provider_usage.t) ->
+        Option.some_if (String.equal p.provider id) (u, p)))
+  in
+  (* The providers with limits first, as the backend lists them. *)
+  let ids =
+    Option.value_map usage ~default:[] ~f:(fun u ->
+      List.map u.providers ~f:(fun p -> p.provider))
+    @ List.map m.auth ~f:(fun p -> p.provider)
+    |> List.fold ~init:[] ~f:(fun seen id ->
+      if List.mem seen id ~equal:String.equal then seen else id :: seen)
+    |> List.rev
+  in
   group [ refresh_row m ~inject ]
-  ::
-  (match m.usage.usage with
-   | Some (Ok u) ->
-     let now = now m u in
-     List.map u.providers ~f:(provider m ~inject ~now)
-   | Some (Error _) | None -> [])
+  :: List.concat_map ids ~f:(fun id ->
+    provider_cards m ~inject ~limits:(limits id) id)
 ;;
