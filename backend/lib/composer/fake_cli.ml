@@ -252,37 +252,58 @@ let advance t =
 let start t = advance t
 
 let default_answer t json =
+  let ended = List.is_empty t.items in
+  let fallback found =
+    match found with
+    | Some r -> Some r
+    | None -> if ended then None else Some (`Object [])
+  in
+  let unexpected () =
+    t.exit
+    <- Some
+         ( 3
+         , sprintf
+             "prigh fake-cli: the script has ended, but prigh sent a request \
+              it does not answer: %s\n\
+              add it to the script (or a default_reply)\n"
+             (String.prefix (Json.to_string json) 500) );
+    []
+  in
   match field "method" json, Json.member "id" json with
   | Some meth, Some id ->
-    let result =
-      List.find_map t.script.defaults ~f:(function
-        | Method (m, r) when String.equal m meth -> Some r
-        | _ -> None)
-      |> Option.value ~default:(`Object [])
-    in
-    [ Json.to_string (`Object [ "id", id; "result", result ]) ]
+    (match
+       List.find_map t.script.defaults ~f:(function
+         | Method (m, r) when String.equal m meth -> Some r
+         | _ -> None)
+       |> fallback
+     with
+     | Some result ->
+       [ Json.to_string (`Object [ "id", id; "result", result ]) ]
+     | None -> unexpected ())
   | _ ->
     (match field "type" json, Json.member "request_id" json with
      | Some "control_request", Some request_id ->
        let subtype = path_string [ "request"; "subtype" ] json in
-       let response =
-         List.find_map t.script.defaults ~f:(function
-           | Subtype (s, r) when Option.equal String.equal (Some s) subtype ->
-             Some r
-           | _ -> None)
-         |> Option.value ~default:(`Object [])
-       in
-       [ Json.to_string
-           (`Object
-               [ "type", `String "control_response"
-               ; ( "response"
-                 , `Object
-                     [ "subtype", `String "success"
-                     ; "request_id", request_id
-                     ; "response", response
-                     ] )
-               ])
-       ]
+       (match
+          List.find_map t.script.defaults ~f:(function
+            | Subtype (s, r) when Option.equal String.equal (Some s) subtype ->
+              Some r
+            | _ -> None)
+          |> fallback
+        with
+        | None -> unexpected ()
+        | Some response ->
+          [ Json.to_string
+              (`Object
+                  [ "type", `String "control_response"
+                  ; ( "response"
+                    , `Object
+                        [ "subtype", `String "success"
+                        ; "request_id", request_id
+                        ; "response", response
+                        ] )
+                  ])
+          ])
      | _ -> [])
 ;;
 

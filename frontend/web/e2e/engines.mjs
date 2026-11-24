@@ -5,7 +5,7 @@
 // picker, a session on Codex (the CLI started on the backend's own tool
 // host), a turn streaming text, the model chip naming the harness and its
 // model, a command Codex asks to run answered in the approval dialog, a
-// control Codex sessions do not have (/compact) refused with the reason, and
+// control Codex sessions do not have (/btw) refused with the reason, and
 // Settings → Engines: each CLI's state on the host, with what to do. On a
 // desktop and two phones (390x844, 320x640, touch, the larger as an
 // installed PWA with the safe area's insets), the phones checked as
@@ -234,8 +234,8 @@ try {
   await screenshot("after the command");
 
   // 4. What Codex sessions cannot do is refused, saying why.
-  await send("/compact");
-  const refused = toast("compact");
+  await send("/btw what changed?");
+  const refused = toast("side questions");
   await refused.waitFor();
   section("a control Codex sessions do not have");
   console.log(flat(await refused.innerText()));

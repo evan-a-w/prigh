@@ -664,19 +664,28 @@ let runner_capabilities t =
 ;;
 
 (* A composer session's model is its harness's: the one picked (an
-   {!External_model}), else the one that wrote its latest reply
-   ([codex/gpt-5] shows as [gpt-5]), else the harness's default. *)
+   {!External_model}), else (the harness's default picked, or none) the one
+   that wrote its latest reply ([codex/gpt-5] shows as [gpt-5]), else the
+   harness's default. *)
 let shown_model t =
   match engine_choice t with
-  | _ when is_external t.model -> t.model
+  | _
+    when is_external t.model
+         && Option.is_some (External_model.native_id t.model) -> t.model
   | { engine = Composer; adapter = Some adapter } ->
     let prefix = Adapter_id.to_string adapter ^ "/" in
-    let name =
-      List.rev (Session.replies t.session)
-      |> List.find_map ~f:(fun (name, _) -> String.chop_prefix name ~prefix)
-      |> Option.value ~default:"default"
-    in
-    { t.model with id = name; name }
+    (match
+       List.rev (Session.replies t.session)
+       |> List.find_map ~f:(fun (name, _) -> String.chop_prefix name ~prefix)
+     with
+     | Some name when not (String.equal name External_model.default_id) ->
+       { t.model with id = name; name }
+     | _ ->
+       if is_external t.model
+       then t.model
+       else (
+         let name = External_model.default_id in
+         { t.model with id = name; name }))
   | _ -> t.model
 ;;
 
@@ -5410,12 +5419,12 @@ let rewind t ~to_ =
   let%bind.Or_error () = require t Rewind in
   if is_running t
   then Or_error.error_string "cannot rewind while a run is in progress"
-  else
+  else (
     let%bind.Or_error () = Runner.rewind (runner t) t.session ~to_ in
     Or_error.map (Session.rewind t.session ~to_) ~f:(fun () ->
       t.plan <- Plan.latest (path_messages t.session);
       restore_told t;
-      state_changed t)
+      state_changed t))
 ;;
 
 let set_session_name t name =

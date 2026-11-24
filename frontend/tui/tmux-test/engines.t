@@ -12,22 +12,34 @@ prints the captured panes.
     Hello from Codex.
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
-  $TMP/cwd  Codex · gpt-5.2-codex  think:default  mode:auto  ctx:0.0%/1.0M  $0.00
+  Codex · gpt-5.2-codex  think:default  mode:auto  view:normal  ctx:0.0%/200k  subscription
+  === /compact, by Codex itself
+    prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
+  
+  ▢ Using prigh-tui
+  ▌ hello
+    Hello from Codex.
+    Codex compacted its context
+  ────────────────────────────────────────────────────────────────────────────── context compacted ───
+  >
+  Codex · gpt-5.2-codex  think:default  mode:auto  view:normal  ctx:0.0%/200k  subscription
   === a control Codex sessions do not have
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
   ▢ Using prigh-tui
   ▌ hello
     Hello from Codex.
-  ─────────────────── Codex compacts its context by itself when it fills: /compact isn't available ───
+    Codex compacted its context
+  ─────────────────────── Codex sessions have no side questions (/btw): ask in the session instead ───
   >
-  $TMP/cwd  Codex · gpt-5.2-codex  think:default  mode:auto  ctx:0.0%/1.0M  $0.00
+  Codex · gpt-5.2-codex  think:default  mode:auto  view:normal  ctx:0.0%/200k  subscription
   === /adapters
     prigh in $TMP/cwd · /help · Esc aborts · Ctrl+C twice quits
   
   ▢ Using prigh-tui
   ▌ hello
     Hello from Codex.
+    Codex compacted its context
   ┌─ Agent CLIs ─────────────────────────────────────────────────────────────────────────────────────┐
   │ laptop:                                                                                          │
   │   ✓ Codex  0.166.0 · logged in (ChatGPT)                                                         │
@@ -38,4 +50,4 @@ prints the captured panes.
   └───────────────────────────────────────────────────────────────────────────────────── Esc closes ─┘
   ────────────────────────────────────────────────────────────────────────────────────────────────────
   >
-  Codex · gpt-5.2-codex  mode:auto  ctx:0.0%/1.0M  ↑↓ scroll · Esc closes · typing goes to the editor
+  Codex · gpt-5.2-codex  mode:auto  ctx:0.0%/200k  ↑↓ scroll · Esc closes · typing goes to the editor

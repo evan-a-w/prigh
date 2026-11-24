@@ -88,14 +88,21 @@ wait_for() {
 	return 1
 }
 
-# Waits until the pane has been stable for 0.3s.
+# Waits until the pane has been stable for 0.3s, for up to 10s: a pane that
+# never settles (a spinner of a run that never ends) is reported, not waited
+# on for ever.
 settle() {
 	local prev cur
+	local deadline=$((${EPOCHREALTIME//[.,]/} + 10000000))
 	prev="$(tmux capture-pane -p -t "$session")"
 	while :; do
 		sleep 0.3
 		cur="$(tmux capture-pane -p -t "$session")"
 		[ "$cur" = "$prev" ] && break
+		if [ "${EPOCHREALTIME//[.,]/}" -ge "$deadline" ]; then
+			echo "  the pane never settled"
+			break
+		fi
 		prev="$cur"
 	done
 }
@@ -850,7 +857,7 @@ scenario_detached() {
 }
 
 # The composer engine: a backend running Codex and Claude Code sessions, with
-# `prigh fake-cli` standing in for a logged-in `codex` (one turn of `codex
+# `prigh fake-cli` standing in for a logged-in `codex` (a turn and a compaction of `codex
 # app-server`) and no `claude` on the PATH.
 setup_engines() {
 	extra_args="-- -engines harness,composer -adapters codex,claude"
@@ -864,6 +871,8 @@ setup_engines() {
 	extra_env=("PATH=$path" "PRIGH_HOST_NAME=laptop")
 	local t='"threadId":"thr_t","turnId":"turn_1"'
 	local turn='{"id":"turn_1","items":[],"status":"%s","error":null}'
+	local t2='"threadId":"thr_t","turnId":"turn_2"'
+	local turn2='{"id":"turn_2","items":[],"status":"%s","error":null}'
 	cat >"$tmp/codex.jsonl" <<JSONL
 {"type":"command","args":["--version"],"stdout":"codex-cli 0.166.0\n"}
 {"type":"command","args":["login","status"],"stdout":"Logged in using ChatGPT\n"}
@@ -879,6 +888,11 @@ setup_engines() {
 {"type":"emit_inbound","frame":{"method":"item/agentMessage/delta","params":{$t,"itemId":"m1","delta":"Hello from Codex."}}}
 {"type":"emit_inbound","frame":{"method":"item/completed","params":{$t,"item":{"type":"agentMessage","id":"m1","text":"Hello from Codex.","phase":"final_answer"}}}}
 {"type":"emit_inbound","frame":{"method":"turn/completed","params":{"threadId":"thr_t","turn":$(printf "$turn" completed)}}}
+{"type":"expect_outbound","frame":{"id":4,"method":"thread/compact/start"}}
+{"type":"emit_inbound","frame":{"id":4,"result":{}}}
+{"type":"emit_inbound","frame":{"method":"turn/started","params":{"threadId":"thr_t","turn":$(printf "$turn2" inProgress)}}}
+{"type":"emit_inbound","frame":{"method":"item/completed","params":{$t2,"item":{"type":"contextCompaction","id":"k1"}}}}
+{"type":"emit_inbound","frame":{"method":"turn/completed","params":{"threadId":"thr_t","turn":$(printf "$turn2" completed)}}}
 JSONL
 	printf '#!/bin/sh\nexec %q fake-cli codex --script %q -- "$@"\n' "$backend" "$tmp/codex.jsonl" >"$tmp/bin/codex"
 	chmod +x "$tmp/bin/codex"
@@ -896,7 +910,12 @@ scenario_engines() {
 	capture engines "a Codex session's turn"
 	type_text "/compact"
 	keys Enter
-	wait_for "compacts its context"
+	wait_for "compacted its context"
+	settle
+	capture engines "/compact, by Codex itself"
+	type_text "/btw what changed?"
+	keys Enter
+	wait_for "side questions"
 	settle
 	capture engines "a control Codex sessions do not have"
 	type_text "/adapters"

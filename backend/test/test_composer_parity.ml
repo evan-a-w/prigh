@@ -390,7 +390,7 @@ let%expect_test "codex: its models, picked and thought about per turn" =
     {|
     codex got turn/start model=- effort=-
     assistant (codex/gpt-5, End_turn): "done"
-    model codex/default (default (GPT-5)), thinking default, context 3020 of 400000
+    model codex/gpt-5 (gpt-5), thinking default, context 3020 of 400000
       codex/default "default (GPT-5)" thinking=[default minimal low medium high]
       codex/gpt-5 "GPT-5" thinking=[default minimal low medium high]
       codex/gpt-5-codex "GPT-5 Codex" thinking=[default low medium high]
@@ -442,7 +442,7 @@ let%expect_test "claude: models from its handshake; switching them mid-session" 
     {|
     claude got user "hi"
     assistant (claude/claude-sonnet-4-6, End_turn): "done"
-    model claude/default (Default (Sonnet)), thinking default, context 7 of 200000
+    model claude/claude-sonnet-4-6 (claude-sonnet-4-6), thinking default, context 7 of 200000
       claude/default "Default (Sonnet)" thinking=[off default low medium high max]
       claude/opus "Opus" thinking=[off default low medium high max]
       claude/haiku "Haiku" thinking=[off default low medium high max]

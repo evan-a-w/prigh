@@ -5150,7 +5150,7 @@ Confirm Run bash: ls? y Allow once a Always allow bash(ls:*) this session n Deny
 card: bash ls
 Two entries: README.md and src. <TIME>
 === webkit: engines (desktop): a control Codex sessions do not have ===
-Codex compacts its context by itself when it fills: /compact isn't available
+Codex sessions have no side questions (/btw): ask in the session instead
 === webkit: engines (desktop): Settings → Engines ===
 Agent CLIs Checked on each connected tool host when you open this page, when a host connects, and on Refresh. prigh never installs a CLI or logs in: do that on the host. Refresh
 Codex 0.166.0 · <BIN>/codex Logged in · ChatGPT
@@ -5179,7 +5179,7 @@ phone: ok
 card: bash ls
 Two entries: README.md and src. <TIME>
 === webkit: engines (phone): a control Codex sessions do not have ===
-Codex compacts its context by itself when it fills: /compact isn't available
+Codex sessions have no side questions (/btw): ask in the session instead
 === webkit: engines (phone): Settings → Engines ===
 Agent CLIs Checked on each connected tool host when you open this page, when a host connects, and on Refresh. prigh never installs a CLI or logs in: do that on the host. Refresh
 Codex 0.166.0 · <BIN>/codex Logged in · ChatGPT
@@ -5209,7 +5209,7 @@ phone: ok
 card: bash ls
 Two entries: README.md and src. <TIME>
 === webkit: engines (small): a control Codex sessions do not have ===
-Codex compacts its context by itself when it fills: /compact isn't available
+Codex sessions have no side questions (/btw): ask in the session instead
 === webkit: engines (small): Settings → Engines ===
 Agent CLIs Checked on each connected tool host when you open this page, when a host connects, and on Refresh. prigh never installs a CLI or logs in: do that on the host. Refresh
 Codex 0.166.0 · <BIN>/codex Logged in · ChatGPT

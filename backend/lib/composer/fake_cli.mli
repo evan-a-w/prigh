@@ -25,9 +25,11 @@ open! Import
       the script does not expect at that point; without one, an empty
       object.
 
-    Lines that match nothing expected are answered (requests) or ignored;
-    after the script's end every request is answered so. Other types (the
-    fixtures' [runtime_exit]) are skipped. *)
+    Lines that match nothing expected are answered (requests) or ignored.
+    After the script's end, a request with no [default_reply] ends the CLI
+    (exit 3) with a message naming it, so a test whose script has drifted
+    from what prigh sends fails at once rather than waiting for a reply.
+    Other types (the fixtures' [runtime_exit]) are skipped. *)
 
 module Script : sig
   type t
