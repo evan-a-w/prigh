@@ -330,8 +330,10 @@ The file has the same shape as pi's `auth.json`. To share pi's logins,
 symlink it (`ln -s ~/.pi/agent/auth.json ~/.config/prigh/auth.json`)
 rather than copying it, because Anthropic rotates refresh tokens.
 
-A provider can have several logins (accounts): log in again with a label
-(the `login` RPC's `label`) to add one. The first stays under pi's key;
+A provider can have several logins (accounts): `/login PROVIDER as LABEL`
+adds one (prigh-web: Settings → Models, Add login). `/accounts` lists them
+to use, rename, make the default, reorder or log out of (prigh-web: each
+login's Manage), and `/account` picks the session's. The first stays under pi's key;
 the others are `account:PROVIDER:ID`, with labels, order and the default
 in `"prigh:accounts"`. `/model openai-codex/gpt-6-sol@work` pins a login
 for the session. When a usage limit stops a run, prigh carries on with the
@@ -444,7 +446,7 @@ These are the main ones. `/help` lists them all, with their arguments.
 | Area | Commands |
 |---|---|
 | Model | `/model`, `/thinking`, `/scoped-models`, `/change_default`, `/fallback` |
-| Credentials | `/login`, `/logout`, `/auth` |
+| Credentials | `/login`, `/logout`, `/auth`, `/accounts`, `/account` |
 | Sessions | `/new`, `/sessions`, `/switch`, `/name`, `/fork`, `/rewind`, `/tree`, `/clone`, `/pin`, `/archive`, `/delete`, `/export`, `/import`, `/temporary` (web) |
 | Context | `/compact`, `/trim`, `/delete`, `/compaction`, `/session`, `/trace` |
 | Long runs | `/goal`, `/budget`, `/remind`, `/resume`, `/usage` (web) |
