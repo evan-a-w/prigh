@@ -285,6 +285,14 @@ The composer (`composer/`), from the bottom up:
   questions through `ask_user`; steers mid-turn where the CLI can (Codex),
   between turns otherwise; and records the cost the CLI reports as spend
   (`External_model` names its replies `codex/MODEL`, priced at zero).
+- **`Adapter_catalog`** holds, per host and adapter, the models and usage
+  limits the CLI's own login offers (Codex's `model/list` and
+  `account/rateLimits/read`, Claude Code's `initialize` and `get_usage`),
+  read by running the CLI briefly (the adapter's `catalog`) when
+  `list_models` or `usage_limits` is asked before a session's first turn;
+  the live process's `account/rateLimits/updated` or `rate_limit_event`
+  then keep them current. Never prigh's own provider logins: a change goes
+  to the session's clients as `models_changed`, and they ask again.
 - **`Composer_recorder`** turns the events into the `Agent_event`s and
   messages a harness run makes, each external tool under prigh's name for
   it (`Canonical_tool`: `Bash` and `commandExecution` are `bash`,
