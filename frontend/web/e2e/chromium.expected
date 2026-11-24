@@ -1039,6 +1039,35 @@ A
 alice
 === chromium: accounts: errors ===
 none
+=== chromium: sharing: bob's logins before ===
+0
+=== chromium: sharing: 390x844: alice's logins ===
+ok
+DeepSeek: DeepSeek API key
+API key, default.
+Share…
+Manage
+=== chromium: sharing: 390x844: share with ===
+ok
+bob
+pick to share: they never see its key
+=== chromium: sharing: bob's logins after ===
+DeepSeek: DeepSeek API key (from alice)
+API key, default, shared by alice.
+Hide
+Manage
+=== chromium: sharing: 320x640: alice's logins ===
+ok
+DeepSeek: DeepSeek API key
+API key, default, shared with bob.
+Share…
+Manage
+=== chromium: sharing: 320x640: share with ===
+ok
+bob
+shared with them: pick to stop sharing
+=== chromium: sharing: bob's logins once revoked ===
+0
 === chromium: reconnect: a long session, halfway up ===
 scrolled: true
 draft: half-written thought

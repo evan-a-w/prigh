@@ -1039,6 +1039,35 @@ A
 alice
 === firefox: accounts: errors ===
 none
+=== firefox: sharing: bob's logins before ===
+0
+=== firefox: sharing: 390x844: alice's logins ===
+ok
+DeepSeek: DeepSeek API key
+API key, default.
+Share…
+Manage
+=== firefox: sharing: 390x844: share with ===
+ok
+bob
+pick to share: they never see its key
+=== firefox: sharing: bob's logins after ===
+DeepSeek: DeepSeek API key (from alice)
+API key, default, shared by alice.
+Hide
+Manage
+=== firefox: sharing: 320x640: alice's logins ===
+ok
+DeepSeek: DeepSeek API key
+API key, default, shared with bob.
+Share…
+Manage
+=== firefox: sharing: 320x640: share with ===
+ok
+bob
+shared with them: pick to stop sharing
+=== firefox: sharing: bob's logins once revoked ===
+0
 === firefox: reconnect: a long session, halfway up ===
 scrolled: true
 draft: half-written thought
