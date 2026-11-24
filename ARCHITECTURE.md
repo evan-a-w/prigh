@@ -260,6 +260,13 @@ and budgets, delivery of background work's reports, and eviction.
   pinned per session by the agent); replies record it so encrypted
   reasoning is only replayed to the account that wrote it. The agent tries
   the provider's other fallback accounts before `fallback_models`.
+- `Account_shares` (`-tokens`): the logins users share with each other.
+  Grants live in the owner's `Account_meta`; a recipient's request names
+  `Account_ref.Shared` (`~OWNER/ID`), and the router resolves (and
+  refreshes) it on the owner's store in-process, so no client sees the
+  secret. `Account_ledger` keeps per-recipient usage for the owner;
+  `Login_choice` lists a user's own and shared logins for pinning and
+  fallback. Revoking pushes `accounts_changed` and unpins recipients.
 - `Provider_auth`: which methods each provider supports, environment
   fallbacks, `resolve` (refreshing OAuth under the lock).
 - `Login_manager`: runs one login flow at a time and turns its prompts into

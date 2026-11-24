@@ -340,6 +340,16 @@ for the session. When a usage limit stops a run, prigh carries on with the
 provider's next login that allows fallback (OAuth ones by default, API
 keys only if you turn it on) before handing over to `fallback_models`.
 
+With `prigh serve -tokens`, a user can share one of their built-in
+providers' logins with other users: `/accounts share LOGIN [with USER]`
+(prigh-web: the login's Share…, a picker of the other users) and
+`/accounts unshare LOGIN from USER`. The others see it as "LABEL (from
+OWNER)" to pick or pin (`/account`, the model chip), or hide; they never
+get its key, and what they spend on it is theirs, though its owner sees it
+per user. Revoking moves their sessions back to their default login.
+Host-token connections cannot manage logins, and `-no-sharing` (or
+`PRIGH_SHARING=off`) turns sharing off.
+
 ### Custom OpenAI-compatible providers
 
 Any server that speaks OpenAI chat completions, the Responses API or
