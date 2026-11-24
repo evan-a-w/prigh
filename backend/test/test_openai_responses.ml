@@ -702,7 +702,7 @@ let%expect_test
 ;;
 
 let%expect_test "reasoning is replayed only to the account that wrote it" =
-  let id s = Or_error.ok_exn (Account_id.of_string s) in
+  let id s = Or_error.ok_exn (Account_ref.of_string s) in
   let replayed ~written ~to_ =
     let conversation =
       List.map conversation ~f:(function
@@ -720,7 +720,7 @@ let%expect_test "reasoning is replayed only to the account that wrote it" =
   print_s
     [%sexp
       ([ replayed ~written:None ~to_:None
-       ; replayed ~written:None ~to_:(Some Account_id.main)
+       ; replayed ~written:None ~to_:(Some Account_ref.main)
        ; replayed ~written:(Some "work") ~to_:(Some (id "work"))
        ; replayed ~written:(Some "work") ~to_:None
        ; replayed ~written:None ~to_:(Some (id "work"))

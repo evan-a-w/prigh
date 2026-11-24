@@ -70,7 +70,7 @@ let reasoning_fields (model : Model.t) : Thinking.t -> (string * Json.t) list
 ;;
 
 let same_provider ~provider ~account (a : Message.Assistant.t) =
-  Model.written_by a.model provider && Account_id.same a.account account
+  Model.written_by a.model provider && Account_ref.same a.account account
 ;;
 
 let input_text text =

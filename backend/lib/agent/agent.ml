@@ -94,7 +94,7 @@ module State = struct
     ; cwd : string
     ; git_branch : string option
     ; model : Model.t
-    ; account : Account_id.t option
+    ; account : Account_ref.t option
     ; thinking : Thinking.t
     ; running : bool
     ; message_count : int
@@ -209,8 +209,8 @@ type t =
   { env : Env.t
   ; sw : Switch.t
   ; provider : Provider.t
-  ; accounts : Provider_id.t -> Provider_accounts.Account.t list
-  ; mutable login : Account_id.t option
+  ; accounts : Provider_id.t -> Login_choice.t list
+  ; mutable login : Account_ref.t option
     (** the account of [model]'s provider to use ([None]: its default) *)
   ; tools : Tool.t list
   ; offered : Tool.t -> bool
@@ -374,7 +374,7 @@ let restore_settings t =
      t.thinking <- settle_thinking t.model thinking;
      t.login
      <- Option.bind (Session.account t.session) ~f:(fun id ->
-          Result.ok (Account_id.of_string id))
+          Result.ok (Account_ref.of_string id))
    | None -> t.login <- None);
   restore_approvals t
 ;;
@@ -3165,7 +3165,7 @@ let set_model ?account t model =
   environment_changed t;
   ignore
     (Session.set_model
-       ?account:(Option.map account ~f:Account_id.to_string)
+       ?account:(Option.map account ~f:Account_ref.to_string)
        t.session
        ~model:(Model.key model)
        ~thinking:t.thinking
@@ -3173,10 +3173,12 @@ let set_model ?account t model =
   state_changed t
 ;;
 
+let notice t text = broadcast t (Notice text)
+
 let model_ref t =
   match t.login with
   | None -> Model.key t.model
-  | Some id -> Model.key t.model ^ "@" ^ Account_id.to_string id
+  | Some id -> Model.key t.model ^ "@" ^ Account_ref.to_string id
 ;;
 
 (* The account the current model's requests use: the pinned one, else the
@@ -3186,7 +3188,7 @@ let current_account t =
   | Some id -> Some id
   | None ->
     List.find_map (t.accounts t.model.provider) ~f:(fun a ->
-      Option.some_if a.default a.id)
+      Option.some_if a.default a.ref_)
 ;;
 
 (* Before handing over to another model, another login of the same
@@ -3199,13 +3201,13 @@ let next_account t ~tried =
   | Some current ->
     let after =
       match
-        List.findi accounts ~f:(fun _ a -> Account_id.equal a.id current)
+        List.findi accounts ~f:(fun _ a -> Account_ref.equal a.ref_ current)
       with
       | Some (i, _) -> List.drop accounts (i + 1) @ List.take accounts i
       | None -> accounts
     in
-    List.find_map after ~f:(fun (a : Provider_accounts.Account.t) ->
-      let key = Model.key t.model ^ "@" ^ Account_id.to_string a.id in
+    List.find_map after ~f:(fun (a : Login_choice.t) ->
+      let key = Model.key t.model ^ "@" ^ Account_ref.to_string a.ref_ in
       Option.some_if (a.fallback && not (Set.mem tried key)) a)
 ;;
 
@@ -3604,12 +3606,12 @@ let rec start_run
          match Option.bind unavailable ~f:(fun _ -> current_account t) with
          | None -> tried
          | Some id ->
-           Set.add tried (Model.key t.model ^ "@" ^ Account_id.to_string id)
+           Set.add tried (Model.key t.model ^ "@" ^ Account_ref.to_string id)
        in
        let handover =
          Option.bind unavailable ~f:(fun error ->
            match next_account t ~tried, next_model t ~tried with
-           | Some (account : Provider_accounts.Account.t), _ ->
+           | Some (account : Login_choice.t), _ ->
              let from = model_ref t in
              broadcast
                t
@@ -3619,8 +3621,8 @@ let rec start_run
                      from
                      error
                      account.label
-                     (Account_id.to_string account.id)));
-             set_model ~account:account.id t t.model;
+                     (Account_ref.to_string account.ref_)));
+             set_model ~account:account.ref_ t t.model;
              Some []
            | None, None ->
              if not (List.is_empty t.config.fallback_models)

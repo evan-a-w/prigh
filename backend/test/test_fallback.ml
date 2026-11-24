@@ -20,7 +20,7 @@ let with_agent ?(config = []) ?(cwd = fun dir -> dir) ?logins replies f =
     Option.map logins ~f:(fun logins ->
       let store = Auth_store.create ~path:(Filename.concat t.dir "auth.json") in
       logins store;
-      fun provider -> Or_error.ok_exn (Provider_accounts.list store provider))
+      fun provider -> Or_error.ok_exn (Login_choice.list store provider))
   in
   let provider =
     Faux_provider.create
@@ -36,7 +36,7 @@ let with_agent ?(config = []) ?(cwd = fun dir -> dir) ?logins replies f =
           "request to %s%s, last %s\n"
           (Model.key r.model)
           (Option.value_map r.account ~default:"" ~f:(fun a ->
-             "@" ^ Account_id.to_string a))
+             "@" ^ Account_ref.to_string a))
           last)
       replies
   in
@@ -50,8 +50,8 @@ let with_agent ?(config = []) ?(cwd = fun dir -> dir) ?logins replies f =
             account =
               Option.bind r.account ~f:(fun a ->
                 Option.some_if
-                  (not (Account_id.is_main a))
-                  (Account_id.to_string a))
+                  (not (Account_ref.equal a Account_ref.main))
+                  (Account_ref.to_string a))
           })
     }
   in
@@ -396,7 +396,7 @@ let%expect_test
   print_s
     [%sexp
       (Model.key (Agent.state agent).model : string)
-    , ((Agent.state agent).account : Account_id.t option)];
+    , ((Agent.state agent).account : Account_ref.t option)];
   [%expect {| (anthropic/claude-opus-5-5 ()) |}]
 ;;
 
@@ -414,7 +414,7 @@ let%expect_test "a pinned login is used, kept with the session, and tried first"
            { Provider_accounts.Update.empty with fallback = Some true }))
     [ Reply.text "hello"; exhausted; exhausted; Reply.text "done it" ]
   @@ fun _t agent ->
-  let work = Or_error.ok_exn (Account_id.of_string "work") in
+  let work = Account_ref.Own (Or_error.ok_exn (Account_id.of_string "work")) in
   Agent.set_model ~account:work agent (Agent.state agent).model;
   Or_error.ok_exn (Agent.prompt agent "hi");
   Agent.wait_idle agent;
@@ -428,8 +428,8 @@ let%expect_test "a pinned login is used, kept with the session, and tried first"
   print_s
     [%sexp
       (Session.account (Agent.session agent) : string option)
-    , ((Agent.state agent).account : Account_id.t option)];
-  [%expect {| ((work) (work)) |}];
+    , ((Agent.state agent).account : Account_ref.t option)];
+  [%expect {| ((work) ((Own work))) |}];
   Or_error.ok_exn (Agent.prompt agent "again");
   Agent.wait_idle agent;
   [%expect
@@ -483,7 +483,7 @@ let%expect_test "subagents' requests use the session's pinned login" =
   in
   send "openai-codex/gpt-6-sol";
   Agent.set_model
-    ~account:(Or_error.ok_exn (Account_id.of_string "work"))
+    ~account:(Account_ref.Own (Or_error.ok_exn (Account_id.of_string "work")))
     agent
     (model "openai-codex/gpt-6-sol");
   send "openai-codex/gpt-6-sol";
@@ -491,6 +491,6 @@ let%expect_test "subagents' requests use the session's pinned login" =
   send "openai-codex/gpt-6-luna";
   (* Another provider's model keeps its own default. *)
   send "anthropic/claude-opus-5-5";
-  print_s [%sexp (List.rev !seen : Account_id.t option list)];
-  [%expect {| (() (work) (work) ()) |}]
+  print_s [%sexp (List.rev !seen : Account_ref.t option list)];
+  [%expect {| (() ((Own work)) ((Own work)) ()) |}]
 ;;

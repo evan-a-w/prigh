@@ -29,6 +29,7 @@ module Account_status : sig
     ; expires_ms : int option
     ; default : bool
     ; fallback : bool
+    ; shared_with : Account_meta.Grant.t list
     }
   [@@deriving sexp_of]
 end

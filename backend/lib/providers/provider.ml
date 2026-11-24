@@ -12,7 +12,7 @@ module Request = struct
     ; cache_key : string option
       (** groups requests that share a prompt prefix (a session, a
           subagent), for providers that route caching by key *)
-    ; account : Account_id.t option
+    ; account : Account_ref.t option
       (** the provider's login to use ([None]: its default); the router
           sets the one it resolved before calling the provider *)
     }

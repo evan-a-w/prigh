@@ -855,7 +855,7 @@ let%expect_test "an unresolved server_tool_use in history is dropped, not text" 
 ;;
 
 let%expect_test "thinking is replayed only to the account that wrote it" =
-  let id s = Or_error.ok_exn (Account_id.of_string s) in
+  let id s = Or_error.ok_exn (Account_ref.of_string s) in
   let replayed ~written ~to_ =
     let conversation =
       List.map conversation ~f:(function

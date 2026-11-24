@@ -8,6 +8,7 @@ module Account = struct
     ; credential : Credential.t
     ; default : bool
     ; fallback : bool
+    ; shared_with : Account_meta.Grant.t list
     }
   [@@deriving sexp_of]
 end
@@ -112,6 +113,8 @@ let view ~file provider fields =
             (match described with
              | Some d -> d.fallback
              | None -> default_fallback credential)
+        ; shared_with =
+            Option.value_map described ~default:[] ~f:(fun d -> d.shared_with)
         })
   in
   meta, provider_meta, accounts
@@ -199,6 +202,7 @@ let materialise ?provider_meta (accounts : Account.t list) =
         ; label = a.label
         ; fallback = a.fallback
         ; created_ms = created a.id
+        ; shared_with = a.shared_with
         })
   }
 ;;
@@ -310,6 +314,7 @@ let save_login ?account ?label store provider credential =
                       ; label
                       ; fallback = default_fallback credential
                       ; created_ms = Some (Credential.now_ms ())
+                      ; shared_with = []
                       }
                     ]
               }
@@ -407,4 +412,63 @@ let update store provider id (u : Update.t) =
       else accounts
     in
     [], Some (materialise ?provider_meta accounts), ())
+;;
+
+let share store provider id ~users =
+  rewrite store provider ~f:(fun ~provider_meta accounts ->
+    let open Or_error.Let_syntax in
+    let%map account = find_in provider accounts (Account_id.to_string id) in
+    let users = List.dedup_and_sort users ~compare:String.compare in
+    let grants =
+      List.map users ~f:(fun user ->
+        match
+          List.find account.shared_with ~f:(fun g -> String.equal g.user user)
+        with
+        | Some g -> g
+        | None -> { Account_meta.Grant.user; since_ms = Credential.now_ms () })
+    in
+    let accounts =
+      List.map accounts ~f:(fun a ->
+        if Account_id.equal a.id id then { a with shared_with = grants } else a)
+    in
+    [], Some (materialise ?provider_meta accounts), grants)
+;;
+
+let meta store =
+  Or_error.bind (Auth_store.read_entry store Account_meta.key) ~f:(function
+    | None -> Ok Account_meta.empty
+    | Some json -> Account_meta.of_json json)
+;;
+
+let shared_pref store ref_ =
+  Or_error.map (meta store) ~f:(fun meta -> Account_meta.shared_pref meta ref_)
+;;
+
+let set_shared_pref store ref_ ~f =
+  Or_error.ignore_m
+    (Auth_store.modify_entry store Account_meta.key ~f:(fun json ->
+       let open Or_error.Let_syntax in
+       let%map meta =
+         match json with
+         | None -> Ok Account_meta.empty
+         | Some json -> Account_meta.of_json json
+       in
+       let meta =
+         Account_meta.set_shared_pref
+           meta
+           ref_
+           (f (Account_meta.shared_pref meta ref_))
+       in
+       if Account_meta.is_empty meta
+       then None
+       else Some (Account_meta.to_json meta)))
+;;
+
+let list_all store =
+  Or_error.bind (Auth_store.entries store ~prefix:"") ~f:(fun fields ->
+    Or_error.all
+      (List.map Provider_id.builtins ~f:(fun provider ->
+         Or_error.map
+           (view ~file:(Auth_store.path store) provider fields)
+           ~f:(fun (_, _, accounts) -> provider, accounts))))
 ;;

@@ -43,7 +43,7 @@ module State : sig
     ; cwd : string
     ; git_branch : string option
     ; model : Model.t
-    ; account : Account_id.t option
+    ; account : Account_ref.t option
       (** the login of [model]'s provider the session chose; [None]: the
           provider's default *)
     ; thinking : Thinking.t
@@ -234,7 +234,7 @@ val create
   :  env:Env.t
   -> sw:Switch.t
   -> provider:Provider.t
-  -> ?accounts:(Provider_id.t -> Provider_accounts.Account.t list)
+  -> ?accounts:(Provider_id.t -> Login_choice.t list)
        (** a provider's logins, in the user's order: a session that hits
            a usage limit carries on with the next one that allows
            fallback before handing over to [fallback_models] (default:
@@ -540,7 +540,10 @@ val start_job : t -> command:string -> string
     the closest one it does ({!Model.clamp_thinking}), with a notice. [account]
     pins one of the provider's logins (default: whichever is its default
     when a request is made). *)
-val set_model : ?account:Account_id.t -> t -> Model.t -> unit
+val set_model : ?account:Account_ref.t -> t -> Model.t -> unit
+
+(** Tells the session's clients (a [Notice]). *)
+val notice : t -> string -> unit
 
 (** [provider] sending a request that names no account with [agent ()]'s
     pinned login when the request's model is of the same provider: what the

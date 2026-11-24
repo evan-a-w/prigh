@@ -1498,8 +1498,8 @@ let%expect_test "router: keyless servers, other API styles, unknown providers" =
       , (message.stop_reason : Stop_reason.t)]
   in
   gw ();
-  gw ~account:other ();
-  gw ~account:Account_id.main ();
+  gw ~account:(Own other) ();
+  gw ~account:Account_ref.main ();
   [%expect
     {|
     (() (sk-gw) (Error "HTTP 418: just checking"))

@@ -30,6 +30,9 @@ module Signed_in : sig
     { access : access
     ; user : string
     ; superuser : bool
+    ; via_host_token : bool
+      (** signed in with a host token: may not manage the user's model
+          logins (log in or out, share) *)
     }
 
   (** The user [as_user] may act as: anyone for a superuser, else only

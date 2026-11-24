@@ -19,8 +19,3 @@ val of_string : string -> t Or_error.t
     [-2], [-3], ... suffix; [account] when the label has no letter or
     digit. Never [main]. *)
 val of_label : string -> taken:t list -> t
-
-(** Whether a reply written on account [written] (as {!Message.Assistant}
-    records it: [None] for [main]) was written on [account] ([None]: also
-    [main]). *)
-val same : string option -> t option -> bool

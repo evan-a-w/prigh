@@ -37,6 +37,7 @@ module Account_status = struct
     ; expires_ms : int option
     ; default : bool
     ; fallback : bool
+    ; shared_with : Account_meta.Grant.t list
     }
   [@@deriving sexp_of]
 end
@@ -181,6 +182,7 @@ let account_status ~oauth_source (a : Provider_accounts.Account.t) =
        | Api_key _ -> None)
   ; default = a.default
   ; fallback = a.fallback
+  ; shared_with = a.shared_with
   }
 ;;
 

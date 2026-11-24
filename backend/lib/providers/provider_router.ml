@@ -90,7 +90,14 @@ let builtin_provider
   | Custom _ -> assert false
 ;;
 
-let create ~env ?timeout ?getenv ?(models = Model_registry.builtin ()) ~store ()
+let create
+      ~env
+      ?timeout
+      ?getenv
+      ?(models = Model_registry.builtin ())
+      ?member
+      ~store
+      ()
   =
   let stream (request : Provider.Request.t) ~cancel ~on_event =
     let fail message =
@@ -100,24 +107,78 @@ let create ~env ?timeout ?getenv ?(models = Model_registry.builtin ()) ~store ()
         ~usage:Usage.zero
     in
     let provider = request.model.provider in
-    let resolve () =
-      Provider_auth.resolve
-        ~env
-        ~cancel
-        ?getenv
-        ?account:request.account
-        store
-        provider
+    let shared ~owner id =
+      match member with
+      | None ->
+        Or_error.errorf
+          "%s's login %S is shared, and this server has no users to share \
+           with: /accounts picks another"
+          owner
+          (Account_id.to_string id)
+      | Some { Account_shares.Member.shares; user } ->
+        Or_error.map
+          (Account_shares.resolve
+             shares
+             ~env
+             ~cancel
+             ~recipient:user
+             provider
+             ~owner
+             id)
+          ~f:(fun r -> Some (r, Some (Account_ref.Shared { owner; id })))
     in
-    let stream_as (p : Provider.t) (auth : Provider_auth.Resolved.t option) =
-      let account = Option.bind auth ~f:(fun a -> a.account) in
+    let own account =
+      Or_error.map
+        (Provider_auth.resolve ~env ~cancel ?getenv ?account store provider)
+        ~f:
+          (Option.map ~f:(fun (r : Provider_auth.Resolved.t) ->
+             r, Option.map r.account ~f:(fun id -> Account_ref.Own id)))
+    in
+    let resolve () =
+      match request.account with
+      | Some (Own id) -> own (Some id)
+      | Some (Shared { owner; id }) -> shared ~owner id
+      | None ->
+        (match own None with
+         | Ok None when not (Provider_id.is_custom provider) ->
+           (* No login of their own: the first one shared with them. *)
+           (match
+              Option.bind member ~f:(fun member ->
+                List.find_map
+                  (Result.ok (Login_choice.list ~member store provider)
+                   |> Option.value ~default:[])
+                  ~f:(fun c ->
+                    match c.ref_ with
+                    | Shared { owner; id } when c.default -> Some (owner, id)
+                    | _ -> None))
+            with
+            | Some (owner, id) -> shared ~owner id
+            | None -> Ok None)
+         | result -> result)
+    in
+    let stream_as (p : Provider.t) auth =
+      let account =
+        Option.bind auth ~f:(fun (_, (account : Account_ref.t option)) ->
+          account)
+      in
       let message = p.stream { request with account } ~cancel ~on_event in
+      (match account, member with
+       | Some (Shared { owner; id }), Some { shares; user } ->
+         Account_shares.record
+           shares
+           ~recipient:user
+           provider
+           ~owner
+           id
+           message.usage
+           ~cost_usd:(Model.cost_usd request.model message.usage)
+       | _ -> ());
       { message with
         account =
-          Option.bind account ~f:(fun id ->
+          Option.bind account ~f:(fun account ->
             Option.some_if
-              (not (Account_id.is_main id))
-              (Account_id.to_string id))
+              (not (Account_ref.equal account Account_ref.main))
+              (Account_ref.to_string account))
       }
     in
     match provider with
@@ -135,7 +196,8 @@ let create ~env ?timeout ?getenv ?(models = Model_registry.builtin ()) ~store ()
           | Error e -> fail ("auth: " ^ Error.to_string_hum e)
           | Ok auth ->
             let key =
-              Option.map auth ~f:(fun (r : Provider_auth.Resolved.t) -> r.token)
+              Option.map auth ~f:(fun ((r : Provider_auth.Resolved.t), _) ->
+                r.token)
             in
             let message =
               stream_as (custom_provider ~env ?timeout p ~key) auth
@@ -163,8 +225,8 @@ let create ~env ?timeout ?getenv ?(models = Model_registry.builtin ()) ~store ()
       (match resolve () with
        | Error e -> fail ("auth: " ^ Error.to_string_hum e)
        | Ok None -> fail (not_configured_message provider)
-       | Ok (Some auth) ->
-         (match builtin_provider ~env ?timeout provider auth with
+       | Ok (Some ((resolved, _) as auth)) ->
+         (match builtin_provider ~env ?timeout provider resolved with
           | Error e -> fail (Error.to_string_hum e)
           | Ok p -> stream_as p (Some auth)))
   in

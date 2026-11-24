@@ -83,14 +83,18 @@ let%expect_test "account ids" =
     |}];
   print_s
     [%sexp
-      ([ Account_id.same None None
-       ; Account_id.same None (Some Account_id.main)
-       ; Account_id.same (Some "work") (Some (id "work"))
-       ; Account_id.same (Some "work") None
-       ; Account_id.same None (Some (id "work"))
+      ([ Account_ref.same None None
+       ; Account_ref.same None (Some Account_ref.main)
+       ; Account_ref.same (Some "work") (Some (Own (id "work")))
+       ; Account_ref.same (Some "work") None
+       ; Account_ref.same None (Some (Own (id "work")))
+       ; Account_ref.same
+           (Some "~alice/work")
+           (Some (Shared { owner = "alice"; id = id "work" }))
+       ; Account_ref.same (Some "~alice/work") (Some (Own (id "work")))
        ]
        : bool list)];
-  [%expect {| (true true true false false) |}]
+  [%expect {| (true true true false false true false) |}]
 ;;
 
 let%expect_test
@@ -413,9 +417,9 @@ let%expect_test "resolve, login and logout by account" =
       (accounts
        (((id main) (label "Anthropic (Claude Pro/Max)") (method_ Oauth)
          (source oauth) (expires_ms (4611686018427387903)) (default false)
-         (fallback true))
+         (fallback true) (shared_with ()))
         ((id work) (label Work) (method_ Api_key) (source "stored api key")
-         (expires_ms ()) (default true) (fallback false))))))
+         (expires_ms ()) (default true) (fallback false) (shared_with ()))))))
     |}];
   print_s
     [%sexp

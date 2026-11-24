@@ -51,6 +51,7 @@ module Signed_in = struct
     { access : access
     ; user : string
     ; superuser : bool
+    ; via_host_token : bool
     }
 
   let switch t as_user =
@@ -83,9 +84,15 @@ let authenticate t ?user ?as_user token =
         { Signed_in.access = t
         ; user = n.name
         ; superuser = Set.mem t.superusers n.name
+        ; via_host_token = false
         }
     | None, Some n ->
-      Ok { Signed_in.access = t; user = n.name; superuser = false }
+      Ok
+        { Signed_in.access = t
+        ; user = n.name
+        ; superuser = false
+        ; via_host_token = true
+        }
     | None, None -> Or_error.error_string unauthorised
   in
   Or_error.bind signed_in ~f:(fun signed_in ->

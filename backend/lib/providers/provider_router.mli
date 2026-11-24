@@ -15,6 +15,11 @@ val create
   -> ?timeout:Time_ns.Span.t
   -> ?getenv:(string -> string option)
   -> ?models:Model_registry.t
+  -> ?member:Account_shares.Member.t
+       (** the user of [prigh serve -tokens] whose requests these are: a
+           request may name a login another user shares with them, and one
+           naming none uses the first shared one when they have none of
+           their own *)
   -> store:Auth_store.t
   -> unit
   -> Provider.t

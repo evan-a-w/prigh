@@ -842,7 +842,7 @@ let%expect_test "auth: accounts (add by label, update, logout one)" =
   let model () =
     let s = Agent.state agent in
     print_s
-      [%sexp (Model.key s.model : string), (s.account : Account_id.t option)]
+      [%sexp (Model.key s.model : string), (s.account : Account_ref.t option)]
   in
   call t h ~params:{|{"provider": "deepseek", "label": "Spare"}|} "login";
   call t h ~params:{|{"id": "p3", "value": "sk-three"}|} "auth_respond";
@@ -865,9 +865,9 @@ let%expect_test "auth: accounts (add by label, update, logout one)" =
     {"type":"response","id":"r1","ok":true,"result":{}}
     {"type":"event","event":"auth","kind":"done","provider":"deepseek","method":"api_key","account":"spare"}
     {"type":"response","id":"r1","ok":true,"result":{}}
-    (deepseek/deepseek-flash (spare))
+    (deepseek/deepseek-flash ((Own spare)))
     {"type":"response","id":"r1","ok":true,"result":{}}
-    (deepseek/deepseek-flash (main))
+    (deepseek/deepseek-flash ((Own main)))
     {"type":"response","id":"r1","ok":false,"error":"DeepSeek has no account \"nobody\": it has DeepSeek API key (main), Spare (spare)"}
     {"type":"response","id":"r1","ok":true,"result":{}}
     (deepseek/deepseek-flash ())

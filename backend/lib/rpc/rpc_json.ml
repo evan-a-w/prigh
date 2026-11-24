@@ -375,7 +375,7 @@ let state (s : Agent.State.t) =
         then []
         else [ "allowed_calls", `Array (List.map s.allowed_calls ~f:str) ])
      @ Option.value_map s.account ~default:[] ~f:(fun id ->
-       [ "account", str (Account_id.to_string id) ]))
+       [ "account", str (Account_ref.to_string id) ]))
 ;;
 
 let job ~now task =
@@ -648,7 +648,11 @@ let account_ref provider account =
     (Account_id.to_string account)
 ;;
 
-let auth_account provider (a : Provider_auth.Account_status.t) =
+let grant (g : Account_meta.Grant.t) =
+  `Object [ "user", str g.user; "since_ms", int g.since_ms ]
+;;
+
+let auth_account ~shareable provider (a : Provider_auth.Account_status.t) =
   `Object
     ([ "ref", str (account_ref provider a.id)
      ; "id", str (Account_id.to_string a.id)
@@ -659,10 +663,46 @@ let auth_account provider (a : Provider_auth.Account_status.t) =
      ; "fallback", bool a.fallback
      ]
      @ Option.value_map a.expires_ms ~default:[] ~f:(fun e ->
-       [ "expires_ms", int e ]))
+       [ "expires_ms", int e ])
+     @ (if shareable && not (Provider_id.is_custom provider)
+        then [ "shareable", bool true ]
+        else [])
+     @
+     match a.shared_with with
+     | [] -> []
+     | grants -> [ "shared_with", `Array (List.map grants ~f:grant) ])
 ;;
 
-let auth_status (s : Provider_auth.Status.t) =
+let shared_account ~default (s : Account_shares.Shared.t) =
+  `Object
+    ([ "ref", str (Account_shares.Shared.key s)
+     ; "id", str (Account_ref.to_string (Account_shares.Shared.ref_ s))
+     ; "label", str s.label
+     ; "method", str (Provider_auth.Method.to_string s.method_)
+     ; "source", str ("shared by " ^ s.owner)
+     ; "default", bool default
+     ; "fallback", bool s.pref.fallback
+     ; "shared_by", str s.owner
+     ]
+     @ if s.pref.hidden then [ "hidden", bool true ] else [])
+;;
+
+let auth_status ?(shared = []) ?(shareable = false) (s : Provider_auth.Status.t)
+  =
+  let shared =
+    List.filter shared ~f:(fun (sh : Account_shares.Shared.t) ->
+      Provider_id.equal sh.provider s.provider)
+  in
+  let shared_default =
+    if List.is_empty s.accounts
+    then List.find shared ~f:(fun sh -> not sh.pref.hidden)
+    else None
+  in
+  let configured =
+    match s.configured, shared_default with
+    | None, Some sh -> Some (sh.method_, "shared by " ^ sh.owner)
+    | configured, _ -> configured
+  in
   `Object
     ([ "provider", str (Provider_id.to_string s.provider)
      ; "name", str (Provider_id.display_name s.provider)
@@ -674,7 +714,7 @@ let auth_status (s : Provider_auth.Status.t) =
                 ; "label", str (Provider_auth.Method.label s.provider m)
                 ])) )
      ; ( "configured"
-       , match s.configured with
+       , match configured with
          | None -> `Null
          | Some (m, source) ->
            `Object
@@ -682,7 +722,14 @@ let auth_status (s : Provider_auth.Status.t) =
              ; "source", str source
              ] )
      ; "expires_ms", Option.value_map s.expires_ms ~default:`Null ~f:int
-     ; "accounts", `Array (List.map s.accounts ~f:(auth_account s.provider))
+     ; ( "accounts"
+       , `Array
+           (List.map s.accounts ~f:(auth_account ~shareable s.provider)
+            @ List.map shared ~f:(fun sh ->
+              shared_account
+                ~default:
+                  (Option.exists shared_default ~f:(fun d -> phys_equal d sh))
+                sh)) )
      ]
      @
      match s.custom with

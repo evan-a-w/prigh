@@ -49,9 +49,3 @@ let of_label label ~taken =
          ~f:(fun n -> sprintf "%s-%d" base n))
       ~f:free
 ;;
-
-let same written account =
-  String.equal
-    (Option.value written ~default:main)
-    (Option.value account ~default:main)
-;;

@@ -19,6 +19,7 @@ module Account : sig
       (** may take over when another account hits its usage limit (by default
         for subscriptions, never for API keys: no spend the user did not
         choose) *)
+    ; shared_with : Account_meta.Grant.t list
     }
   [@@deriving sexp_of]
 end
@@ -28,6 +29,9 @@ val entry_key : Provider_id.t -> Account_id.t -> string
 
 (** In order (the fallback order). *)
 val list : Auth_store.t -> Provider_id.t -> Account.t list Or_error.t
+
+(** The built-in providers' (one read). *)
+val list_all : Auth_store.t -> (Provider_id.t * Account.t list) list Or_error.t
 
 val default : Auth_store.t -> Provider_id.t -> Account.t option Or_error.t
 
@@ -78,4 +82,26 @@ val update
   -> Provider_id.t
   -> Account_id.t
   -> Update.t
+  -> unit Or_error.t
+
+(** Sets the other users who may use the account ([users], deduplicated);
+    those already granted keep their [since_ms]. Returns the grants. *)
+val share
+  :  Auth_store.t
+  -> Provider_id.t
+  -> Account_id.t
+  -> users:string list
+  -> Account_meta.Grant.t list Or_error.t
+
+(** What the store's user chose about a login shared with them, by its ref
+    (["~alice/openai-codex/work"]). *)
+val shared_pref
+  :  Auth_store.t
+  -> string
+  -> Account_meta.Shared_pref.t Or_error.t
+
+val set_shared_pref
+  :  Auth_store.t
+  -> string
+  -> f:(Account_meta.Shared_pref.t -> Account_meta.Shared_pref.t)
   -> unit Or_error.t

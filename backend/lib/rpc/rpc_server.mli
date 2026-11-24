@@ -63,6 +63,12 @@ val create
   -> ?heartbeat_clock:float Eio.Time.clock_ty Eio.Resource.t
        (** what [host_timeout] is measured by (default: [env]'s clock) *)
   -> ?namespace:string
+  -> ?member:Account_shares.Member.t
+       (** the user, and the logins users share ([-tokens]): [auth_status]
+           lists those shared with them, [account_share] shares theirs, and
+           every client hears [accounts_changed] when one shared with them
+           changes; a session pinned to one no longer shared goes back to
+           the default login, with a notice *)
   -> ?backend_host:bool
        (** whether [new_agent] makes the backend a tool host (default: true) *)
   -> ?home:string
