@@ -254,7 +254,10 @@ let model_chip (m : App.Model.t) (state : State.t) ~inject =
            (Option.value_map level ~default:"" ~f:(fun l -> ", " ^ l)))
       ~attrs:(menu_attrs m Model)
       ~on_click:(inject (Action.Open_chip Model))
-      [ Provider_mark.view state.model.provider
+      [ Provider_mark.view
+          (Provider_mark.of_model
+             ~provider:state.model.provider
+             ~name:state.model.name)
       ; (if Session_engine.is_harness state.engine
          then span ~cls:"chip-label" (Model_menu.short_name state.model.name)
          else

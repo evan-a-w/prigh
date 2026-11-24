@@ -2082,6 +2082,19 @@ let set_state (m : Model.t) (state : State.t) =
       not (String.equal old.session_id state.session_id))
   in
   let m, cmds = set_state_without_files m state in
+  (* Another engine, adapter or host lists other models: none of the old
+     ones are shown meanwhile. *)
+  let m, models =
+    match old_state with
+    | Some old
+      when not
+             (String.equal old.engine.engine state.engine.engine
+              && [%equal: string option] old.engine.adapter state.engine.adapter
+              && (Session_engine.is_harness state.engine
+                  || String.equal old.active_host state.active_host)) ->
+      { m with models = [] }, [ rpc "list_models" [] ~tag:Models ]
+    | Some _ | None -> m, []
+  in
   let m = if hosts_changed then refresh_hosts m else m in
   let m, more = with_files m (Files.set_where m.files (files_where m)) in
   let m =
@@ -2104,7 +2117,7 @@ let set_state (m : Model.t) (state : State.t) =
          (Some state.session_id)
          ~watching:m.files.open_)
   in
-  m, cmds @ more @ review
+  m, cmds @ models @ more @ review
 ;;
 
 (* A provider prigh has no login for is a CLI's (Codex, Claude Code), which

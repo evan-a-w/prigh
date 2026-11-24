@@ -359,3 +359,138 @@ let%expect_test "picking a CLI's model asks for no prigh login" =
      (tag Model_set))
     |}]
 ;;
+
+let%expect_test
+    "the picker follows the engine: Antigravity's models, then Codex's"
+  =
+  let agy_fields =
+    [ "engine", `String "composer"
+    ; "adapter", `String "acp:antigravity"
+    ; "capabilities", codex_capabilities
+    ; "message_count", `Number "0"
+    ; ( "model"
+      , Jsonaf.of_string
+          (H.model_json
+             ~thinking:false
+             ~provider:"acp:antigravity"
+             ~id:"default"
+             ~name:"Gemini 3.8 Flash"
+             ()) )
+    ]
+  in
+  let h = H.create ~state:(H.state_json ~fields:agy_fields ()) () in
+  H.quiet h (fun () ->
+    hello
+      ~deployed:
+        { engines = [ "harness"; "composer" ]
+        ; adapters = [ "acp:antigravity"; "codex" ]
+        }
+      h;
+    H.event h {|{"type":"event","event":"models_changed"}|};
+    H.reply
+      h
+      "list_models"
+      (sprintf
+         "[%s,%s,%s]"
+         (H.model_json
+            ~thinking:false
+            ~provider:"acp:antigravity"
+            ~id:"default"
+            ~name:"Gemini 3.8 Flash"
+            ())
+         (H.model_json
+            ~thinking:false
+            ~provider:"acp:antigravity"
+            ~id:"gpt-oss"
+            ~name:"GPT-OSS 120B (Medium)"
+            ())
+         (H.model_json
+            ~thinking:false
+            ~provider:"acp:antigravity"
+            ~id:"sonnet"
+            ~name:"Claude Sonnet 4.6 (Thinking)"
+            ())));
+  let picker () =
+    H.quiet h (fun () -> H.key h "l" ~ctrl:true);
+    H.names h ~selector:".model-rail-tab";
+    H.text h ~selector:".model-list";
+    H.text h ~selector:".model-reasoning";
+    H.quiet h (fun () -> H.key h "Escape")
+  in
+  picker ();
+  [%expect
+    {|
+    (Open_chip Model)
+    [tab] button "Favourites"
+    [tab] button "Antigravity"
+    Gemini 3.8 Flash Alt+1 (Star: into the favourites (Alt+F)) ✓
+    GPT-OSS 120B (Medium) Alt+2 (Star: into the favourites (Alt+F))
+    Claude Sonnet 4.6 (Thinking) Alt+3 (Star: into the favourites (Alt+F))
+    Reasoning 3.8 Flash
+    Antigravity chooses how much it reasons.
+    Close_dialog
+    |}];
+  (* The engine chip starts a new session on Codex: none of Antigravity's
+     models are offered meanwhile, and Codex's are asked. *)
+  H.quiet h (fun () ->
+    H.click h ~selector:".tray-engine";
+    H.act h (Picker_query "codex");
+    H.act h Dialog_accept);
+  H.reply
+    h
+    "new_session"
+    (sprintf
+       {|{"state":%s}|}
+       (H.state_json
+          ~fields:
+            (codex_fields ()
+             @ [ "session_id", `String "s2"
+               ; "message_count", `Number "0"
+               ; ( "model"
+                 , Jsonaf.of_string
+                     (H.model_json
+                        ~provider:"codex"
+                        ~id:"default"
+                        ~name:"GPT-6.2-Sol"
+                        ()) )
+               ])
+          ()));
+  picker ();
+  H.reply
+    h
+    "list_models"
+    (sprintf
+       "[%s]"
+       (H.model_json ~provider:"codex" ~id:"default" ~name:"GPT-6.2-Sol" ()));
+  picker ();
+  [%expect
+    {|
+    Pick_engine
+    (Set_url_session s2)
+    (Rpc (method_ get_messages_page)
+     (params ((session /sessions/s2.jsonl) (limit 60)))
+     (tag (Page (path /sessions/s2.jsonl) (before ()))))
+    (Rpc (method_ get_pending) (params ()) (tag Pending))
+    (Rpc (method_ list_sessions) (params ()) (tag Sessions))
+    (Rpc (method_ list_subagents) (params ()) (tag Subagents))
+    (Rpc (method_ list_jobs) (params ()) (tag Jobs))
+    (Rpc (method_ list_models) (params ()) (tag Models))
+    (Rpc (method_ get_review) (params ()) (tag (Review Review)))
+    (Rpc (method_ list_worktrees) (params ())
+     (tag (Worktrees (place  "s2\
+                            \nbackend\
+                            \n/work") (purpose (Sidebar 2)))))
+    (Open_chip Model)
+    [tab] button "Favourites"
+    Reasoning GPT-6.2-Sol
+    (Off) (Default Default ✓) (Minimal) (Low) (Medium) (High) (Extra High) (Max)
+    Close_dialog
+    (Open_chip Model)
+    [tab] button "Favourites"
+    [tab] button "Codex"
+    GPT-6.2-Sol Alt+1 (Star: into the favourites (Alt+F)) ✓
+    Reasoning GPT-6.2-Sol
+    (Off) (Default Default ✓) (Minimal) (Low) (Medium) (High) (Extra High) (Max)
+    Close_dialog
+    |}]
+;;

@@ -54,8 +54,15 @@ let version name =
 ;;
 
 let newest_first models =
+  (* A CLI's (it has a [default]) stay in its order: its default first. *)
+  let cli =
+    List.filter_map models ~f:(fun (m : Llm.t) ->
+      Option.some_if (String.equal m.id "default") m.provider)
+  in
+  let is_cli (m : Llm.t) = List.mem cli m.provider ~equal:String.equal in
   List.stable_sort models ~compare:(fun (a : Llm.t) (b : Llm.t) ->
     match version a.name, version b.name with
+    | _ when is_cli a && is_cli b -> 0
     | Some a, Some b -> List.compare Int.compare b a
     | Some _, None -> -1
     | None, Some _ -> 1

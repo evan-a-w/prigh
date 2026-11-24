@@ -97,7 +97,9 @@ let row (m : App.Model.t) ~searching ~selected ~inject i (item : Picker.Item.t) 
         ; Attr.on_click (fun _ -> inject (Action.Picker_choose item.id))
         ]
       [ (match model with
-         | Some l -> Provider_mark.view l.provider
+         | Some l ->
+           Provider_mark.view
+             (Provider_mark.of_model ~provider:l.provider ~name:l.name)
          | None -> Node.none)
       ; Node.span
           ~attrs:[ Attr.class_ "model-name" ]
@@ -204,7 +206,14 @@ let reasoning (m : App.Model.t) ~inject =
           ]
       ; div
           ~cls:"model-reasoning-note"
-          [ Node.text "This model does not reason." ]
+          [ Node.text
+              (if String.is_prefix model.provider ~prefix:"acp:"
+               then
+                 sprintf
+                   "%s chooses how much it reasons."
+                   (Session_engine.adapter_label model.provider)
+               else "This model does not reason.")
+          ]
       ]
   | _ -> Node.none
 ;;

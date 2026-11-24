@@ -35,7 +35,8 @@ val offered
   -> Llm.t list
 
 (** Newest first: by the version in the name ("GPT-6.2 Sol": 6.2), those
-    without one last; equal versions keep their order. *)
+    without one last; equal versions keep their order. A CLI's models (its
+    provider has a [default]) keep the order it gave. *)
 val newest_first : Llm.t list -> Llm.t list
 
 (** The rail: the favourites, then each provider with a model on offer, in

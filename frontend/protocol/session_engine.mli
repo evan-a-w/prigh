@@ -76,7 +76,8 @@ val is_harness : t -> bool
 val of_state_json : Json.t -> t Or_error.t
 
 (** How sessions of an adapter are named: [codex] is "Codex", [claude]
-    "Claude Code", [acp:NAME] "NAME (ACP)". *)
+    "Claude Code", [acp:NAME] the agent's name for those prigh knows
+    (the backend's [Acp_agent.known]: "Antigravity"), else "NAME (ACP)". *)
 val adapter_label : string -> string
 
 (** "Harness", "Composer". *)

@@ -199,6 +199,11 @@ let adapter_label = function
   | "prigh" -> "prigh"
   | adapter ->
     (match String.chop_prefix adapter ~prefix:"acp:" with
+     | Some "opencode" -> "OpenCode"
+     | Some "gemini" -> "Gemini CLI"
+     | Some "antigravity" -> "Antigravity"
+     | Some "grok" -> "Grok Build"
+     | Some "goose" -> "Goose"
      | Some name -> name ^ " (ACP)"
      | None -> adapter)
 ;;
