@@ -444,3 +444,53 @@ let%expect_test "a pinned login is used, kept with the session, and tried first"
     assistant (gpt-6-sol): done it End_turn
     |}]
 ;;
+
+let%expect_test "subagents' requests use the session's pinned login" =
+  with_agent ~logins:codex_logins []
+  @@ fun _t agent ->
+  let seen = ref [] in
+  let recording : Provider.t =
+    { name = "recording"
+    ; stream =
+        (fun r ~cancel:_ ~on_event:_ ->
+          seen := r.account :: !seen;
+          raise_s [%message "not sent"])
+    }
+  in
+  let subagents = Agent.following_account (fun () -> Some agent) recording in
+  let model key =
+    Option.value_exn (Model_registry.find (Model_registry.builtin ()) key)
+  in
+  let send key =
+    let model = model key in
+    try
+      ignore
+        (subagents.stream
+           { Provider.Request.model
+           ; system = None
+           ; messages = []
+           ; tools = []
+           ; thinking = Off
+           ; max_tokens = None
+           ; cache_key = None
+           ; account = None
+           }
+           ~cancel:(Cancellation.create ())
+           ~on_event:ignore
+         : Message.Assistant.t)
+    with
+    | _ -> ()
+  in
+  send "openai-codex/gpt-6-sol";
+  Agent.set_model
+    ~account:(Or_error.ok_exn (Account_id.of_string "work"))
+    agent
+    (model "openai-codex/gpt-6-sol");
+  send "openai-codex/gpt-6-sol";
+  (* Another model of the provider (a subagent's own choice) too. *)
+  send "openai-codex/gpt-6-luna";
+  (* Another provider's model keeps its own default. *)
+  send "anthropic/claude-opus-5-5";
+  print_s [%sexp (List.rev !seen : Account_id.t option list)];
+  [%expect {| (() (work) (work) ()) |}]
+;;

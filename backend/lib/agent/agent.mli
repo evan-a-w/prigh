@@ -542,6 +542,11 @@ val start_job : t -> command:string -> string
     when a request is made). *)
 val set_model : ?account:Account_id.t -> t -> Model.t -> unit
 
+(** [provider] sending a request that names no account with [agent ()]'s
+    pinned login when the request's model is of the same provider: what the
+    session's subagents use, so that they run on the account it chose. *)
+val following_account : (unit -> t option) -> Provider.t -> Provider.t
+
 (** Fails, listing the model's options, when the model does not take it. *)
 val set_thinking : t -> Thinking.t -> unit Or_error.t
 

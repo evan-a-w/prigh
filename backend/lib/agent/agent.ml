@@ -4025,6 +4025,30 @@ let restore_resume t =
     else Session.set_resume_at t.session None
 ;;
 
+(* [provider] with requests that name no account sent with [pinned]'s, when
+   [pinned] names one of the request model's provider. *)
+let with_pinned ~pinned (provider : Provider.t) : Provider.t =
+  { name = provider.name
+  ; stream =
+      (fun request ->
+        let request =
+          match (request : Provider.Request.t).account, pinned () with
+          | None, Some (p, account)
+            when Provider_id.equal p request.model.provider ->
+            { request with account = Some account }
+          | _ -> request
+        in
+        provider.stream request)
+  }
+;;
+
+let pinned_account t = Option.map t.login ~f:(fun a -> t.model.provider, a)
+
+let following_account agent provider =
+  with_pinned provider ~pinned:(fun () ->
+    Option.bind (agent ()) ~f:pinned_account)
+;;
+
 let create
       ~env
       ~sw
@@ -4095,21 +4119,7 @@ let create
   in
   let cwd = Session.cwd session in
   let pinned = ref (fun () -> None) in
-  let provider : Provider.t =
-    let (provider : Provider.t) = provider in
-    { name = provider.name
-    ; stream =
-        (fun request ->
-          let request =
-            match (request : Provider.Request.t).account, !pinned () with
-            | None, Some (p, account)
-              when Provider_id.equal p request.model.provider ->
-              { request with account = Some account }
-            | _ -> request
-          in
-          provider.stream request)
-    }
-  in
+  let provider = with_pinned provider ~pinned:(fun () -> !pinned ()) in
   let t =
     { env
     ; sw
@@ -4206,7 +4216,7 @@ let create
     ; on_noted = ignore
     }
   in
-  (pinned := fun () -> Option.map t.login ~f:(fun a -> t.model.provider, a));
+  (pinned := fun () -> pinned_account t);
   restore_settings t;
   restore_host t;
   restore_told t;

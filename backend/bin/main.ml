@@ -272,7 +272,7 @@ let common_params =
           ~user_info:(fun () -> User_info.text user_info)
           ~custom_instructions:(fun () ->
             Custom_instructions.for_model custom_instructions)
-          ~provider
+          ~provider:(Agent.following_account (fun () -> !agent_ref) provider)
           ~current_model:(current (fun s -> s.model) Model.default)
           ~current_thinking:(current (fun s -> s.thinking) Thinking.default)
           ~home
