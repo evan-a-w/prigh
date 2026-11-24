@@ -141,6 +141,17 @@ try {
   await idle();
   // It finished: folded into the card's one row of those that ended.
   await page.locator(".session-card-ended").waitFor();
+  // Two background jobs: one that keeps running (its last line shows once
+  // the jobs are polled), one that fails at once, folded into the jobs'
+  // row of those that ended. Its report starts a turn: waited for.
+  await editor().fill("!&echo started; sleep 600");
+  await editor().press("Enter");
+  await page.locator(".session-card-job.running", { hasText: "started" }).waitFor();
+  await editor().fill("!&echo oops; exit 3");
+  await editor().press("Enter");
+  await page.locator(".session-card-jobs-ended").waitFor();
+  await page.locator(".chat", { hasText: "[job j2 exited 3]" }).first().waitFor().catch(() => {});
+  await idle();
   // Into the repository's other worktree: the session's own, so the card
   // lists it.
   await editor().fill("/worktree open feat/ui");
@@ -156,6 +167,30 @@ try {
     rows.map(r => `${r.innerText.replace(/\n/g, " ")}${r.getAttribute("aria-current") ? " (here)" : ""}`).join("\n")));
 
   for (const width of [1600, 1440, 1100, 900]) await layout("beside the chat", width);
+
+  // The jobs that ended, unfolded: how each ended. The running one's
+  // button kills it, and it joins them.
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.locator(".session-card-jobs-ended").click();
+  await page.waitForFunction(() => document.querySelectorAll(".session-card-job").length === 2);
+  section("the jobs that ended unfolded");
+  const jobRows = () => page.locator(".session-card-job").evaluateAll(rows =>
+    rows.map(r => `${r.getAttribute("data-job")}: ${r.innerText.replace(/\n/g, " | ")}` +
+      `${r.classList.contains("running") ? " (running)" : ""}`).join("\n"));
+  console.log(clean(await jobRows()).replace(/\b\d+(m \d\d)?s\b/g, "<T>"));
+  await screenshot("jobs");
+  await page.locator(".session-card-kill").click();
+  await page.waitForSelector(".session-card-job.running", { state: "detached" });
+  await idle();
+  section("the running job killed");
+  console.log(clean(await page.locator(".session-card-jobs-ended").innerText()));
+  console.log(clean(await jobRows()).replace(/\b\d+(m \d\d)?s\b/g, "<T>"));
+  await page.locator(".session-card-jobs-ended").click();
+  await page.waitForSelector(".session-card-job", { state: "detached" });
+  // Another running for the phones' sheets.
+  await editor().fill("!&echo again; sleep 600");
+  await editor().press("Enter");
+  await page.locator(".session-card-job.running", { hasText: "again" }).waitFor();
 
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.locator(".session-card-toggle").click();

@@ -35,9 +35,17 @@ let worktrees (m : Model.t) =
        List.map (Session_worktree_nodes.of_session m s) ~f:(fun n -> s, n))
 ;;
 
+(* The session's background jobs: the main agent's, not a subagent's. *)
+let jobs (m : Model.t) =
+  if Option.is_some m.subagent_chat then [] else m.agents.jobs
+;;
+
 let something (m : Model.t) =
   Option.is_some m.subagent_chat
-  || not (List.is_empty (agents m) && List.is_empty (worktrees m))
+  || not
+       (List.is_empty (agents m)
+        && List.is_empty (jobs m)
+        && List.is_empty (worktrees m))
 ;;
 
 let inline (m : Model.t) = m.session_card_open && (not m.narrow) && something m
@@ -81,6 +89,8 @@ let section
     | Parents -> "session-card-parents"
     | Subagents -> "session-card-subagents"
     | Ended -> "session-card-ended"
+    | Jobs -> "session-card-jobs"
+    | Ended_jobs -> "session-card-jobs-ended"
     | Worktrees -> "session-card-worktrees"
   in
   Loon.Collapsible.view
@@ -166,36 +176,36 @@ let subagent_row (m : Model.t) ~inject ((a : Agents.Agent.t), depth) =
     ]
 ;;
 
-(* The subagents that ended, folded into one row by default: "24 finished
-   · 3 failed"; unfolded, they follow it, the latest first. *)
-let ended_row (m : Model.t) ~inject ended =
-  let failed =
-    List.count ended ~f:(fun ((a : Agents.Agent.t), _) ->
-      Agents.Status.equal a.status Failed)
-  in
-  let finished = List.length ended - failed in
-  let open_ = Session_card.is_open m.session_card Ended in
-  let part n what cls =
-    Node.span ~attrs:[ Attr.class_ cls ] [ Node.text (sprintf "%d %s" n what) ]
-  in
+(* What ended, folded into one row by default: "24 finished · 3 failed";
+   unfolded, they follow it, the latest first. [counts] are (how many, what,
+   its class), those of none left out. *)
+let ended_row
+      (m : Model.t)
+      ~inject
+      ~(which : Session_card.Section.t)
+      ~cls
+      counts
+  =
+  let open_ = Session_card.is_open m.session_card which in
   let parts =
-    List.filter_opt
-      [ (if finished > 0 then Some (part finished "finished" "") else None)
-      ; (if failed > 0
-         then Some (part failed "failed" "text-destructive")
-         else None)
-      ]
+    List.filter_map counts ~f:(fun (n, what, cls) ->
+      Option.some_if
+        (n > 0)
+        (Node.span
+           ~attrs:[ Attr.class_ cls ]
+           [ Node.text (sprintf "%d %s" n what) ]))
     |> List.intersperse ~sep:(Node.span [ Node.text " · " ])
   in
   Node.button
     ~attrs:
       [ Attr.type_ "button"
       ; Attr.class_
-          "session-card-ended flex h-7 w-full items-center gap-1.5 rounded-md \
-           px-2 text-left text-[12px] text-muted-foreground hover:bg-accent \
-           hover:text-foreground narrow:h-11"
+          (cls
+           ^ " flex h-7 w-full items-center gap-1.5 rounded-md px-2 text-left \
+              text-[12px] text-muted-foreground hover:bg-accent \
+              hover:text-foreground narrow:h-11")
       ; Attr.create "aria-expanded" (Bool.to_string open_)
-      ; Attr.on_click (fun _ -> inject (Action.Session_card (Fold Ended)))
+      ; Attr.on_click (fun _ -> inject (Action.Session_card (Fold which)))
       ]
     [ Node.span ~attrs:[ Attr.class_ "min-w-0 truncate" ] parts
     ; Icon.view
@@ -225,10 +235,153 @@ let subagent_rows (m : Model.t) ~inject agents =
   match ended with
   | [] -> []
   | ended ->
-    ended_row m ~inject ended
+    let failed =
+      List.count ended ~f:(fun ((a : Agents.Agent.t), _) ->
+        Agents.Status.equal a.status Failed)
+    in
+    ended_row
+      m
+      ~inject
+      ~which:Ended
+      ~cls:"session-card-ended"
+      [ List.length ended - failed, "finished", ""
+      ; failed, "failed", "text-destructive"
+      ]
     ::
     (if Session_card.is_open m.session_card Ended
      then List.map ended ~f:(subagent_row m ~inject)
+     else [])
+;;
+
+(* A job: its command, then its id and last line of output, with how it
+   stands; a running one has a button that kills it. *)
+let job_row (m : Model.t) ~inject (j : Agents.Job.t) =
+  let now = Option.value m.now ~default:Time_ns.epoch in
+  let state = Session_card.Job_state.of_job j in
+  let elapsed = Agents.job_elapsed j ~now in
+  let id = j.info.id in
+  let last_line = Option.value j.info.last_line ~default:"" in
+  let state_cls =
+    match state with
+    | Failed _ -> "ml-auto shrink-0 tabular-nums text-destructive"
+    | Running | Done | Killed -> "ml-auto shrink-0 tabular-nums"
+  in
+  let kill =
+    match state with
+    | Done | Killed | Failed _ -> Node.none
+    | Running ->
+      let stopping = Set.mem m.agents.stopping (Job id) in
+      Loon.Button.view
+        ~variant:Ghost
+        ~size:Icon_xs
+        ~class_:
+          "session-card-kill shrink-0 text-muted-foreground \
+           hover:text-destructive narrow:size-11"
+        ~disabled:stopping
+        ~attrs:
+          [ Attr.title
+              (if stopping
+               then sprintf "Killing %s…" id
+               else sprintf "Kill %s (/jobs kill %s)" id id)
+          ; Attr.create "aria-label" (sprintf "Kill %s" id)
+          ]
+        ~on_click:
+          (if stopping then Effect.Ignore else inject (Action.Kill_job id))
+        [ Icon.view (if stopping then Loader_circle else Square) ]
+  in
+  Node.div
+    ~attrs:
+      [ Attr.classes
+          ([ "session-card-job"
+           ; "flex w-full items-center gap-1 rounded-md py-1 pr-1 pl-2 \
+              text-[12px] hover:bg-accent narrow:min-h-11"
+           ]
+           @
+           match state with
+           | Running -> [ "running" ]
+           | Done | Killed | Failed _ -> [])
+      ; Attr.title
+          (String.concat
+             ~sep:"\n"
+             (List.filter_opt
+                [ Some (String.strip j.info.command)
+                ; Option.some_if (not (String.is_empty last_line)) last_line
+                ]))
+      ; Attr.create "data-job" id
+      ]
+    [ Node.div
+        ~attrs:[ Attr.class_ "flex min-w-0 flex-1 flex-col" ]
+        [ Node.span
+            ~attrs:
+              [ Attr.class_ "min-w-0 truncate font-mono text-foreground/85" ]
+            [ Node.text (Chat_html.first_line j.info.command) ]
+        ; Node.span
+            ~attrs:
+              [ Attr.class_
+                  "flex min-w-0 items-center gap-1.5 text-[11px] \
+                   text-muted-foreground"
+              ]
+            [ Node.span
+                ~attrs:[ Attr.class_ "shrink-0 tabular-nums" ]
+                [ Node.text id ]
+            ; Node.span
+                ~attrs:[ Attr.class_ "min-w-0 truncate font-mono" ]
+                [ Node.text last_line ]
+            ; Node.span
+                ~attrs:[ Attr.class_ state_cls ]
+                [ (match state with
+                   | Running ->
+                     Node.span
+                       ~attrs:[ Attr.class_ "sr-only" ]
+                       [ Node.text "running " ]
+                   | Done | Killed | Failed _ -> Node.none)
+                ; Node.text (Session_card.Job_state.to_string state ~elapsed)
+                ]
+            ]
+        ]
+    ; kill
+    ]
+;;
+
+(* Running jobs, then those that ended: one row, unfolding to them, the
+   latest first. *)
+let job_rows (m : Model.t) ~inject jobs =
+  let running, ended =
+    List.partition_tf jobs ~f:(fun (j : Agents.Job.t) -> j.info.running)
+  in
+  let ended = List.rev ended in
+  let count f =
+    List.count ended ~f:(fun j -> f (Session_card.Job_state.of_job j))
+  in
+  List.map running ~f:(job_row m ~inject)
+  @
+  match ended with
+  | [] -> []
+  | ended ->
+    ended_row
+      m
+      ~inject
+      ~which:Ended_jobs
+      ~cls:"session-card-jobs-ended"
+      [ ( count (function
+            | Done -> true
+            | _ -> false)
+        , "finished"
+        , "" )
+      ; ( count (function
+            | Killed -> true
+            | _ -> false)
+        , "killed"
+        , "" )
+      ; ( count (function
+            | Failed _ -> true
+            | _ -> false)
+        , "failed"
+        , "text-destructive" )
+      ]
+    ::
+    (if Session_card.is_open m.session_card Ended_jobs
+     then List.map ended ~f:(job_row m ~inject)
      else [])
 ;;
 
@@ -326,6 +479,7 @@ let worktree_row
 
 let sections (m : Model.t) ~inject =
   let agents = agents m in
+  let jobs = jobs m in
   let worktrees = worktrees m in
   let in_subagent = Option.is_some m.subagent_chat in
   let session =
@@ -361,6 +515,17 @@ let sections (m : Model.t) ~inject =
          ~name:"Subagents"
          ~count:(List.length agents)
          (subagent_rows m ~inject agents))
+  ; (if List.is_empty jobs
+     then Node.none
+     else
+       section
+         m
+         ~inject
+         ~which:Jobs
+         ~glyph:Square_terminal
+         ~name:"Jobs"
+         ~count:(List.length jobs)
+         (job_rows m ~inject jobs))
   ; (if List.is_empty worktrees || in_subagent
      then Node.none
      else
