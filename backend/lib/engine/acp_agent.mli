@@ -18,6 +18,9 @@ module Quirks : sig
   module Steer : sig
     type t =
       | Between_turns (** it waits for the turn to end *)
+      | Prompt
+      (** Antigravity's: another [session/prompt] while one runs; the
+          running one ends [end_turn] and the new one carries the turn on *)
       | Xai_interject
       (** Grok's [_x.ai/interject]: the model reads it at its next step,
           the running tool finishing first *)

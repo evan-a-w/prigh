@@ -760,7 +760,7 @@ let%expect_test "versions and quirks of the known agents" =
       (steer Between_turns) (xai_extensions false)))
     (antigravity
      ((login ("agy acp --login")) (min_version (1.5.0)) (prompt_usage Gemini)
-      (steer Between_turns) (xai_extensions false)))
+      (steer Prompt) (xai_extensions false)))
     (grok
      ((login ("grok login")) (min_version ()) (prompt_usage Ignored)
       (steer Xai_interject) (xai_extensions true)))

@@ -3,6 +3,7 @@ open! Import
 module Codec = Acp_client_codec
 
 let capabilities_of
+      ?(quirks = Acp_agent.Quirks.none)
       (caps : Codec.Agent_capabilities.t option)
       (config : Codec.Session_config.t)
   : Capabilities.t
@@ -11,7 +12,10 @@ let capabilities_of
   ; rewind = Unsupported
   ; context_edit = false
   ; compact = Unsupported
-  ; steer = Between_turns
+  ; steer =
+      (match quirks.steer with
+       | Between_turns -> Between_turns
+       | Prompt | Xai_interject -> In_run)
   ; plan_mode =
       List.exists config.modes ~f:(fun (m : Codec.Mode.t) ->
         String.Caseless.equal m.id "plan")
@@ -144,15 +148,19 @@ let create
 
     let id = "acp:" ^ agent.name
     let display_name = agent.display_name
-    let capabilities = capabilities_of None Codec.Session_config.empty
+
+    let capabilities =
+      capabilities_of ~quirks:agent.quirks None Codec.Session_config.empty
+    ;;
 
     let current_capabilities t =
       capabilities_of
+        ~quirks:agent.quirks
         (Codec.agent_capabilities t.codec)
         (Codec.session_config t.codec)
     ;;
 
-    let native_questions = false
+    let native_questions = agent.quirks.xai_extensions
 
     let launch (start : Adapter.Start.t) : Adapter.Launch.t =
       { argv = agent.command
@@ -229,7 +237,9 @@ let create
           transport
           (start : Adapter.Start.t)
       =
-      let codec = Codec.create ?cost_total:start.cost_total () in
+      let codec =
+        Codec.create ~quirks:agent.quirks ?cost_total:start.cost_total ()
+      in
       let driver =
         Adapter.Driver.create
           ~sw
@@ -436,6 +446,13 @@ let create
       | _ -> Ok ()
     ;;
 
+    let inputs_of (input : Adapter.Input.t) =
+      (if String.is_empty input.text
+       then []
+       else [ Codec.Input.Text input.text ])
+      @ List.map input.images ~f:(fun i -> Codec.Input.Image i)
+    ;;
+
     let send t settings (input : Adapter.Input.t) =
       if not (Adapter.Driver.alive t.driver)
       then Or_error.errorf "%s is not running" agent.display_name
@@ -444,13 +461,7 @@ let create
       else
         let open Or_error.Let_syntax in
         let%bind () = apply t settings in
-        let inputs =
-          (if String.is_empty input.text
-           then []
-           else [ Codec.Input.Text input.text ])
-          @ List.map input.images ~f:(fun i -> Codec.Input.Image i)
-        in
-        let%map outputs = Codec.prompt t.codec inputs in
+        let%map outputs = Codec.prompt t.codec (inputs_of input) in
         Adapter.Driver.begin_turn t.driver;
         List.iter outputs ~f:(dispatch t)
     ;;
@@ -511,8 +522,15 @@ let create
       Or_error.errorf "%s does not compact on request" display_name
     ;;
 
-    let steer _ (_ : Adapter.Input.t) =
-      Or_error.errorf "%s takes new messages between turns" agent.display_name
+    let steer t (input : Adapter.Input.t) =
+      if not (Adapter.Driver.in_turn t.driver)
+      then Or_error.errorf "no %s turn is running" agent.display_name
+      else
+        Codec.steer t.codec (inputs_of input)
+        |> Result.map ~f:(List.iter ~f:(dispatch t))
+        |> Result.map_error ~f:(fun e ->
+          Error.of_string
+            (sprintf "%s: %s" agent.display_name (Error.to_string_hum e)))
     ;;
 
     let interrupt t =
@@ -528,8 +546,14 @@ let create
         ~f:(Adapter.Driver.write t.driver)
     ;;
 
-    (* ACP agents ask the user through prigh's [ask_user] tool. *)
-    let answer _ ~request_id:_ (_ : User_question.Reply.t) = ()
+    (* Most ACP agents ask the user through prigh's [ask_user] tool; Grok
+       asks its own way. *)
+    let answer t ~request_id (reply : User_question.Reply.t) =
+      Option.iter
+        (Codec.answer t.codec ~request_id reply)
+        ~f:(Adapter.Driver.write t.driver)
+    ;;
+
     let rollback = Adapter.Rollback.Unsupported
     let fork_native = false
 

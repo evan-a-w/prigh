@@ -12,6 +12,7 @@ module Quirks = struct
   module Steer = struct
     type t =
       | Between_turns
+      | Prompt
       | Xai_interject
     [@@deriving sexp_of, equal]
   end
@@ -62,6 +63,7 @@ let known =
           login = Some "agy acp --login"
         ; min_version = Some "1.5.0"
         ; prompt_usage = Gemini
+        ; steer = Prompt
         }
     }
   ; { name = "grok"

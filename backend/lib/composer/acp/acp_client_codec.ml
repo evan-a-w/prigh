@@ -231,6 +231,7 @@ module Pending = struct
     | Load_session of string
     | Resume_session of string
     | Prompt
+    | Steer (* a message for the running turn *)
     | Set_mode of string
     | Set_config_option
     | Set_model of string
@@ -240,7 +241,7 @@ module Pending = struct
     | New_session -> New_session
     | Load_session _ -> Load_session
     | Resume_session _ -> Resume_session
-    | Prompt -> Prompt
+    | Prompt | Steer -> Prompt
     | Set_mode _ -> Set_mode
     | Set_config_option | Set_model _ -> Set_config_option
   ;;
@@ -279,6 +280,7 @@ module Turn = struct
     ; mutable text : Open_item.t option
     ; mutable thought : Open_item.t option
     ; mutable items : int
+    ; mutable prompts : int (* session/prompt requests unanswered *)
     }
 end
 
@@ -297,10 +299,14 @@ type t =
   ; tools : Tool.t String.Table.t
   ; mutable cost : float option
   ; compacted : String.Hash_set.t (* compactionIds already reported *)
+  ; quirks : Acp_agent.Quirks.t
+  ; questions : (Json.t * User_question.t list) String.Table.t
+    (* Grok's [x.ai/ask_user_question]s waiting for the user: their ids *)
   }
 
-let create ?cost_total () =
+let create ?(quirks = Acp_agent.Quirks.none) ?cost_total () =
   { next_id = 0
+  ; quirks
   ; pending = Int.Table.create ()
   ; capabilities = None
   ; session_id = None
@@ -313,6 +319,7 @@ let create ?cost_total () =
   ; tools = String.Table.create ()
   ; cost = cost_total
   ; compacted = String.Hash_set.create ()
+  ; questions = String.Table.create ()
   }
 ;;
 
@@ -452,6 +459,7 @@ let prompt t inputs =
         ; text = None
         ; thought = None
         ; items = 0
+        ; prompts = 1
         }
       in
       t.turn <- Some turn;
@@ -466,6 +474,79 @@ let prompt t inputs =
               ])
       in
       Ok [ Output.Send line; Event (Turn_started { turn_id = turn.id }) ])
+;;
+
+let steer t inputs =
+  match t.session_id, t.turn, t.quirks.steer with
+  | _, _, Between_turns ->
+    Or_error.error_string "this agent takes new messages between turns"
+  | None, _, _ | _, None, _ -> Or_error.error_string "no turn is running"
+  | Some _, Some { cancelled = true; _ }, _ ->
+    Or_error.error_string "the turn is being stopped"
+  | Some session_id, Some turn, Prompt ->
+    turn.prompts <- turn.prompts + 1;
+    Ok
+      [ Output.Send
+          (request
+             t
+             Prompt
+             "session/prompt"
+             (`Object
+                 [ "sessionId", `String session_id
+                 ; "prompt", `Array (List.map inputs ~f:content_block)
+                 ]))
+      ]
+  | Some session_id, Some _, Xai_interject ->
+    let text =
+      List.filter_map inputs ~f:(function
+        | Input.Text text -> Some text
+        | Image _ -> None)
+      |> String.concat ~sep:"\n\n"
+    in
+    let images =
+      List.filter inputs ~f:(function
+        | Input.Image _ -> true
+        | Text _ -> false)
+    in
+    Ok
+      [ Output.Send
+          (request
+             t
+             Steer
+             "_x.ai/interject"
+             (`Object
+                 ([ "sessionId", `String session_id; "text", `String text ]
+                  @
+                  if List.is_empty images
+                  then []
+                  else [ "content", `Array (List.map images ~f:content_block) ]
+                 )))
+      ]
+;;
+
+(* A [session/prompt] answer's [usage], for an agent whose counts are known:
+   Antigravity's [inputTokens] leaves out [cachedReadTokens] and its
+   [outputTokens] already counts [thoughtTokens]. *)
+let prompt_usage t result =
+  match t.quirks.prompt_usage, field "usage" result with
+  | Gemini, Some (`Object _ as usage) ->
+    let int name =
+      Option.value (Option.bind (field name usage) ~f:Json.int) ~default:0
+    in
+    let cache_read = int "cachedReadTokens" in
+    [ Output.Event
+        (Usage
+           { usage =
+               { input = int "inputTokens" + cache_read
+               ; output = int "outputTokens"
+               ; cache_read
+               }
+           ; cost_usd = None
+           ; context_tokens = None
+           ; context_window = None
+           })
+    ]
+  | (Ignored | Gemini), _ -> []
 ;;
 
 let cancelled_outcome =
@@ -1209,10 +1290,22 @@ let end_turn t (stop : Adapter_event.Stop.t) =
     let closed = close_items t in
     let settled = settle_tools t in
     let withdrawn = withdraw_permissions t ~reply:false in
+    let unasked =
+      Hashtbl.fold
+        t.questions
+        ~init:[]
+        ~f:(fun ~key:request_id ~data:(id, _) acc ->
+          Output.Send
+            (result_line id (`Object [ "outcome", `String "cancelled" ]))
+          :: Event (Request_withdrawn { request_id })
+          :: acc)
+    in
+    Hashtbl.clear t.questions;
     t.turn <- None;
     closed
     @ settled
     @ withdrawn
+    @ unasked
     @ [ Output.Event (Turn_end { turn_id = Some turn.id; stop }) ]
 ;;
 
@@ -1248,6 +1341,16 @@ let stop_of_reason ~cancelled reason : Adapter_event.Stop.t =
       }
 ;;
 
+(* A [session/prompt] answered while a later one, steering the turn, is still
+   open: the turn goes on under the later one. *)
+let steered t =
+  match t.turn with
+  | Some turn when turn.prompts > 1 ->
+    turn.prompts <- turn.prompts - 1;
+    true
+  | _ -> false
+;;
+
 let on_response t ~id ~result ~error =
   match Hashtbl.find_and_remove t.pending id with
   | None -> []
@@ -1260,6 +1363,14 @@ let on_response t ~id ~result ~error =
         | Load_session _ -> t.loading <- false
         | _ -> ());
        (match pending with
+        | Prompt when steered t ->
+          [ Output.Event
+              (Notice (sprintf "the agent did not take the message: %s" message))
+          ]
+        | Steer ->
+          [ Output.Event
+              (Notice (sprintf "the agent did not take the message: %s" message))
+          ]
         | Prompt ->
           let cancelled =
             Option.value_map t.turn ~default:false ~f:(fun turn ->
@@ -1321,7 +1432,10 @@ let on_response t ~id ~result ~error =
              let config = parse_session_config t result in
              t.config <- config;
              [ Output.Response (Session_opened { kind; session_id; config }) ])
+        | Steer -> []
+        | Prompt when steered t -> prompt_usage t result
         | Prompt ->
+          let usage = prompt_usage t result in
           let cancelled =
             Option.value_map t.turn ~default:false ~f:(fun turn ->
               turn.cancelled)
@@ -1340,7 +1454,7 @@ let on_response t ~id ~result ~error =
               ]
             | _ -> []
           in
-          unknown @ end_turn t (stop_of_reason ~cancelled reason)
+          usage @ unknown @ end_turn t (stop_of_reason ~cancelled reason)
         | Set_mode mode_id ->
           t.config <- { t.config with current_mode = Some mode_id };
           [ Output.Response (Mode_set mode_id); Config_changed t.config ]
@@ -1406,6 +1520,118 @@ let of_our_session t params =
   | Some _, None -> false
 ;;
 
+let xai_method method_ =
+  Option.map
+    (List.find [ "_x.ai/"; "x.ai/" ] ~f:(fun prefix ->
+       String.is_prefix method_ ~prefix))
+    ~f:(fun prefix -> String.drop_prefix method_ (String.length prefix))
+;;
+
+(* Grok wraps some requests' params as [{method, params}]. *)
+let xai_params params =
+  match field "params" params with
+  | Some (`Object _ as inner) when Option.is_some (field "method" params) ->
+    inner
+  | _ -> params
+;;
+
+let xai_questions params =
+  List.map (items "questions" params) ~f:(fun q ->
+    { User_question.question = Option.value (str "question" q) ~default:""
+    ; header = None
+    ; choices =
+        List.filter_map (items "options" q) ~f:(fun o ->
+          Option.map (str "label" o) ~f:(fun label ->
+            { User_question.Choice.label; description = str "description" o }))
+    ; multiple = flag "multiSelect" q
+    })
+;;
+
+(* Grok's requests and notifications beyond ACP ([x.ai/...]): its questions
+   go to the user; its plan, when it leaves plan mode, is shown and the
+   agent told to wait (prigh's plan mode carries on from there); its
+   background tasks and subagents are noted. *)
+let on_xai t ~id name params =
+  let params = xai_params params in
+  match name, id with
+  | "ask_user_question", Some id ->
+    let request_id = request_id_string id in
+    let questions = xai_questions params in
+    Hashtbl.set t.questions ~key:request_id ~data:(id, questions);
+    [ Output.Event (User_question { request_id; questions }) ]
+  | "exit_plan_mode", Some id ->
+    let plan =
+      match Option.map (str "planContent" params) ~f:String.strip with
+      | Some plan when not (String.is_empty plan) -> plan
+      | _ -> "(no plan written)"
+    in
+    [ Output.Event (Notice ("Plan:\n" ^ plan))
+    ; Send
+        (result_line
+           id
+           (`Object
+               [ "outcome", `String "abandoned"
+               ; ( "feedback"
+                 , `String
+                     "The client captured your proposed plan. Stop here and \
+                      wait for the user's feedback or implementation request \
+                      in a later turn." )
+               ]))
+    ]
+  | ("task_backgrounded" | "task_completed"), None ->
+    let update = obj (field "update" params) in
+    let snapshot = obj (field "task_snapshot" update) in
+    let label =
+      List.find_map
+        [ "description", update
+        ; "description", snapshot
+        ; "display_command", snapshot
+        ; "command", snapshot
+        ; "command", update
+        ]
+        ~f:(fun (key, json) -> str key json)
+    in
+    let what =
+      match label with
+      | Some label -> sprintf "a background task (%s)" label
+      | None -> "a background task"
+    in
+    [ Output.Event
+        (Notice
+           (if String.equal name "task_backgrounded"
+            then sprintf "the agent runs %s" what
+            else sprintf "%s ended" (String.capitalize what)))
+    ]
+  | _, Some id ->
+    [ Output.Send
+        (error_line
+           id
+           ~code:(-32601)
+           ~message:(sprintf "method not found: x.ai/%s" name))
+    ]
+  | _, None -> []
+;;
+
+let answer t ~request_id (reply : User_question.Reply.t) =
+  match Hashtbl.find_and_remove t.questions request_id with
+  | None -> None
+  | Some (id, questions) ->
+    let result =
+      match reply with
+      | Answered answers ->
+        let answers =
+          List.zip_with_remainder questions answers
+          |> fst
+          |> List.map ~f:(fun ((q : User_question.t), picks) ->
+            q.question, `Array (List.map picks ~f:(fun p -> `String p)))
+        in
+        `Object [ "outcome", `String "accepted"; "answers", `Object answers ]
+      | Declined | Cancelled | Timed_out _ | Unavailable _ ->
+        `Object [ "outcome", `String "cancelled" ]
+    in
+    Some (result_line id result)
+;;
+
 let handle_line t raw =
   if String.is_empty (String.strip raw)
   then []
@@ -1429,6 +1655,9 @@ let handle_line t raw =
            [ Output.Send
                (error_line id ~code:(-32602) ~message:"unknown session")
            ]
+       | Some method_, id
+         when t.quirks.xai_extensions && Option.is_some (xai_method method_) ->
+         on_xai t ~id (Option.value_exn (xai_method method_)) params
        | Some method_, Some id ->
          [ Output.Send
              (error_line

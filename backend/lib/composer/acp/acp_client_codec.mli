@@ -202,7 +202,7 @@ type t
 (** [cost_total]: the running cost total ([usage_update.cost]) the session
     to resume reported last: the first live update counts only what came
     after it. *)
-val create : ?cost_total:float -> unit -> t
+val create : ?quirks:Acp_agent.Quirks.t -> ?cost_total:float -> unit -> t
 
 (** The session's running cost total, as the agent reported it last. *)
 val cost_total : t -> float option
@@ -234,6 +234,12 @@ val resume_session
     session, while a turn runs, or with images the agent does not take. *)
 val prompt : t -> Input.t list -> Output.t list Or_error.t
 
+(** A message for the running turn, the agent's way ({!Acp_agent.Quirks.Steer}):
+    another [session/prompt] (the earlier one's answer then leaves the turn
+    running) or Grok's [_x.ai/interject]. Errors for an agent that takes
+    messages between turns, or without a running turn. *)
+val steer : t -> Input.t list -> Output.t list Or_error.t
+
 (** [session/cancel] for the running turn, and [cancelled] answers to the
     permission requests it waits on (as the spec asks); the turn ends with
     its prompt's response ([Turn_end] [Interrupted]). Nothing when idle. *)
@@ -259,6 +265,11 @@ val reply_approval
   -> request_id:string
   -> Adapter_event.Approval_reply.t
   -> string option
+
+(** The answer to one of Grok's [x.ai/ask_user_question]s (an agent with
+    [xai_extensions]): the labels picked, by question, or [cancelled].
+    [None] when no such question is waiting. *)
+val answer : t -> request_id:string -> User_question.Reply.t -> string option
 
 val handle_line : t -> string -> Output.t list
 

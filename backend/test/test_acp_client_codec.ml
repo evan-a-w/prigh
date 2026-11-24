@@ -40,8 +40,8 @@ let new_session_response =
   {|{"jsonrpc":"2.0","id":1,"result":{"sessionId":"ses_1","modes":{"currentModeId":"build","availableModes":[{"id":"build","name":"Build"},{"id":"plan","name":"Plan","description":"Read only"}]},"configOptions":[{"id":"model","name":"Model","category":"model","type":"select","currentValue":"sonnet","options":[{"value":"sonnet","name":"Sonnet"},{"name":"OpenAI","options":[{"value":"gpt-5","name":"GPT-5"}]}]},{"id":"fast","name":"Fast","type":"boolean","currentValue":false}]}}|}
 ;;
 
-let started () =
-  let t = C.create () in
+let started ?quirks () =
+  let t = C.create ?quirks () in
   send (C.initialize t ~client_name:"prigh" ~client_version:"0.1");
   recv t init_response;
   send (C.new_session t ~cwd:"/work" ~mcp_servers:[]);
@@ -646,5 +646,134 @@ let%expect_test
      (Failed (kind Set_mode) (code -32603)
       (message "the ACP agent exited (code 1)")))
     false
+    |}]
+;;
+
+let quirks name = (Option.value_exn (Acp_agent.find_known name)).quirks
+
+let%expect_test "Antigravity: steering with another prompt, and its usage" =
+  let t = started ~quirks:(quirks "antigravity") () in
+  ignore ([%expect.output] : string);
+  ok (C.prompt t [ Text "build it" ]);
+  ok (C.steer t [ Text "use tabs" ]);
+  (* the first prompt ends [end_turn]: the turn goes on under the second *)
+  recv
+    t
+    {|{"jsonrpc":"2.0","id":2,"result":{"stopReason":"end_turn","usage":{"inputTokens":100,"cachedReadTokens":900,"outputTokens":50,"thoughtTokens":20,"totalTokens":1050}}}|};
+  recv
+    t
+    {|{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"ses_1","update":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"Tabs it is."}}}}|};
+  recv
+    t
+    {|{"jsonrpc":"2.0","id":3,"result":{"stopReason":"end_turn","usage":{"inputTokens":10,"cachedReadTokens":1000,"outputTokens":5}}}|};
+  ok (C.steer t [ Text "too late" ]);
+  [%expect
+    {|
+      > {"jsonrpc":"2.0","id":2,"method":"session/prompt","params":{"sessionId":"ses_1","prompt":[{"type":"text","text":"build it"}]}}
+    (Turn_started (turn_id turn-1))
+      > {"jsonrpc":"2.0","id":3,"method":"session/prompt","params":{"sessionId":"ses_1","prompt":[{"type":"text","text":"use tabs"}]}}
+    < {"jsonrpc":"2.0","id":2,"result":{"stopReason":"end_turn","usage":{"inputTokens":100,"cachedReadTokens":900,"outputTokens":50,"thoughtTokens":20,"totalTokens":1050}}}
+    (Usage
+     ((usage ((input 1000) (output 50) (cache_read 900))) (cost_usd ())
+      (context_tokens ()) (context_window ())))
+    < {"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"ses_1","update":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"Tabs it is."}}}}
+    (Text_delta (item turn-1-m1) (text "Tabs it is."))
+    < {"jsonrpc":"2.0","id":3,"result":{"stopReason":"end_turn","usage":{"inputTokens":10,"cachedReadTokens":1000,"outputTokens":5}}}
+    (Usage
+     ((usage ((input 1010) (output 5) (cache_read 1000))) (cost_usd ())
+      (context_tokens ()) (context_window ())))
+    (Text_done (item turn-1-m1) (text "Tabs it is."))
+    (Turn_end (turn_id (turn-1)) (stop Done))
+    (Error "no turn is running")
+    |}]
+;;
+
+let%expect_test "an agent without steering, and prompt usage it does not read" =
+  let t = started () in
+  ignore ([%expect.output] : string);
+  ok (C.prompt t [ Text "hi" ]);
+  ok (C.steer t [ Text "more" ]);
+  recv
+    t
+    {|{"jsonrpc":"2.0","id":2,"result":{"stopReason":"end_turn","usage":{"inputTokens":100,"outputTokens":50}}}|};
+  [%expect
+    {|
+      > {"jsonrpc":"2.0","id":2,"method":"session/prompt","params":{"sessionId":"ses_1","prompt":[{"type":"text","text":"hi"}]}}
+    (Turn_started (turn_id turn-1))
+    (Error "this agent takes new messages between turns")
+    < {"jsonrpc":"2.0","id":2,"result":{"stopReason":"end_turn","usage":{"inputTokens":100,"outputTokens":50}}}
+    (Turn_end (turn_id (turn-1)) (stop Done))
+    |}]
+;;
+
+let%expect_test "Grok: interjecting, its questions, its plan, background tasks" =
+  let t = started ~quirks:(quirks "grok") () in
+  ignore ([%expect.output] : string);
+  ok (C.prompt t [ Text "fix it" ]);
+  ok (C.steer t [ Text "and the docs" ]);
+  recv t {|{"jsonrpc":"2.0","id":3,"result":{"status":"queued"}}|};
+  recv
+    t
+    {|{"jsonrpc":"2.0","id":"q1","method":"_x.ai/ask_user_question","params":{"sessionId":"ses_1","toolCallId":"tc1","mode":"default","questions":[{"question":"Which file?","options":[{"label":"a.ml"},{"label":"b.ml","description":"the other"}],"multiSelect":false}]}}|};
+  print_s
+    [%sexp
+      (C.answer t ~request_id:"q1" (Answered [ [ "b.ml" ] ]) : string option)];
+  recv
+    t
+    {|{"jsonrpc":"2.0","method":"x.ai/task_backgrounded","params":{"sessionId":"ses_1","update":{"task_id":"t1","task_snapshot":{"kind":"bash","command":"make watch"}}}}|};
+  recv
+    t
+    {|{"jsonrpc":"2.0","id":"p1","method":"x.ai/exit_plan_mode","params":{"method":"x.ai/exit_plan_mode","params":{"sessionId":"ses_1","toolCallId":"tc2","planContent":"1. Fix\n2. Test"}}}|};
+  recv
+    t
+    {|{"jsonrpc":"2.0","id":"u1","method":"x.ai/something_new","params":{}}|};
+  recv
+    t
+    {|{"jsonrpc":"2.0","id":"q2","method":"x.ai/ask_user_question","params":{"sessionId":"ses_1","toolCallId":"tc3","mode":"default","questions":[{"question":"Sure?","options":[]}]}}|};
+  recv t {|{"jsonrpc":"2.0","id":2,"result":{"stopReason":"end_turn"}}|};
+  [%expect
+    {|
+      > {"jsonrpc":"2.0","id":2,"method":"session/prompt","params":{"sessionId":"ses_1","prompt":[{"type":"text","text":"fix it"}]}}
+    (Turn_started (turn_id turn-1))
+      > {"jsonrpc":"2.0","id":3,"method":"_x.ai/interject","params":{"sessionId":"ses_1","text":"and the docs"}}
+    < {"jsonrpc":"2.0","id":3,"result":{"status":"queued"}}
+    < {"jsonrpc":"2.0","id":"q1","method":"_x.ai/ask_user_question","params":{"sessionId":"ses_1","toolCallId":"tc1","mode":"default","questions":[{"question":"Which file?","options":[{"label":"a.ml"},{"label":"b.ml","description":"the other"}],"multiSelect":false}]}}
+    (User_question (request_id q1)
+     (questions
+      (((question "Which file?") (header ())
+        (choices
+         (((label a.ml) (description ()))
+          ((label b.ml) (description ("the other")))))
+        (multiple false)))))
+    ("{\"jsonrpc\":\"2.0\",\"id\":\"q1\",\"result\":{\"outcome\":\"accepted\",\"answers\":{\"Which file?\":[\"b.ml\"]}}}")
+    < {"jsonrpc":"2.0","method":"x.ai/task_backgrounded","params":{"sessionId":"ses_1","update":{"task_id":"t1","task_snapshot":{"kind":"bash","command":"make watch"}}}}
+    (Notice "the agent runs a background task (make watch)")
+    < {"jsonrpc":"2.0","id":"p1","method":"x.ai/exit_plan_mode","params":{"method":"x.ai/exit_plan_mode","params":{"sessionId":"ses_1","toolCallId":"tc2","planContent":"1. Fix\n2. Test"}}}
+    (Notice  "Plan:\
+            \n1. Fix\
+            \n2. Test")
+      > {"jsonrpc":"2.0","id":"p1","result":{"outcome":"abandoned","feedback":"The client captured your proposed plan. Stop here and wait for the user's feedback or implementation request in a later turn."}}
+    < {"jsonrpc":"2.0","id":"u1","method":"x.ai/something_new","params":{}}
+      > {"jsonrpc":"2.0","id":"u1","error":{"code":-32601,"message":"method not found: x.ai/something_new"}}
+    < {"jsonrpc":"2.0","id":"q2","method":"x.ai/ask_user_question","params":{"sessionId":"ses_1","toolCallId":"tc3","mode":"default","questions":[{"question":"Sure?","options":[]}]}}
+    (User_question (request_id q2)
+     (questions (((question Sure?) (header ()) (choices ()) (multiple false)))))
+    < {"jsonrpc":"2.0","id":2,"result":{"stopReason":"end_turn"}}
+      > {"jsonrpc":"2.0","id":"q2","result":{"outcome":"cancelled"}}
+    (Request_withdrawn (request_id q2))
+    (Turn_end (turn_id (turn-1)) (stop Done))
+    |}]
+;;
+
+let%expect_test "x.ai methods are only Grok's" =
+  let t = started () in
+  ignore ([%expect.output] : string);
+  recv
+    t
+    {|{"jsonrpc":"2.0","id":"q1","method":"x.ai/ask_user_question","params":{"sessionId":"ses_1","questions":[]}}|};
+  [%expect
+    {|
+    < {"jsonrpc":"2.0","id":"q1","method":"x.ai/ask_user_question","params":{"sessionId":"ses_1","questions":[]}}
+      > {"jsonrpc":"2.0","id":"q1","error":{"code":-32601,"message":"method not found: x.ai/ask_user_question (this client does not offer it)"}}
     |}]
 ;;

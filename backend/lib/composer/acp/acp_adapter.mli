@@ -26,6 +26,7 @@ val create
     edits or compaction on request; plan mode when it has a [plan] mode;
     images when it takes them. *)
 val capabilities_of
-  :  Acp_client_codec.Agent_capabilities.t option
+  :  ?quirks:Acp_agent.Quirks.t (** steering mid-turn, for an agent that can *)
+  -> Acp_client_codec.Agent_capabilities.t option
   -> Acp_client_codec.Session_config.t
   -> Capabilities.t
