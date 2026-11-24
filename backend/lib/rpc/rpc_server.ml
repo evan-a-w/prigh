@@ -4208,7 +4208,11 @@ let dispatch ?member agent login ~(client : Client.t) ~meth ~params
       | None -> [], false
       | Some { shares; user } ->
         ( Account_shares.shared_with shares ~user
-        , Account_shares.enabled shares && not (via_host_token client) )
+        , (not (via_host_token client))
+          &&
+            (match Account_shares.targets shares ~user with
+            | Ok (_ :: _) -> true
+            | Ok [] | Error _ -> false) )
     in
     Or_error.map (Login_manager.status login) ~f:(fun statuses ->
       `Array (List.map statuses ~f:(Rpc_json.auth_status ~shared ~shareable)))
