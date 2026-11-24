@@ -12,6 +12,7 @@
 import { execFileSync, spawn } from "node:child_process";
 import { mkdirSync, realpathSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { animationsOver } from "./animations.mjs";
 import { end } from "./end.mjs";
 import { normalVerbosity } from "./verbose_prefs.mjs";
 
@@ -258,10 +259,7 @@ try {
     const sheet = p.locator(".session-card.sheet");
     await sheet.waitFor();
     // It slides in: measured once its animations (and its parent's) are done.
-    await p.waitForFunction(() => {
-      const s = document.querySelector(".session-card.sheet");
-      return s && document.getAnimations().every(a => a.playState !== "running");
-    });
+    await animationsOver(p);
     console.log(clean(await sheet.innerText()));
     console.log(await p.evaluate(() => {
       const s = document.querySelector(".session-card.sheet").getBoundingClientRect();

@@ -14,6 +14,7 @@
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { animationsOver } from "./animations.mjs";
 import { end } from "./end.mjs";
 import { normalVerbosity } from "./verbose_prefs.mjs";
 
@@ -82,14 +83,17 @@ let page;
 let tag;
 const shoot = async label => {
   if (!process.env.SHOTS) return;
-  await page.waitForFunction(() => document.getAnimations().every(a => a.playState !== "running" || a.effect?.getComputedTiming().iterations === Infinity));
+  await animationsOver(page);
   await page.screenshot({ path: join(process.env.SHOTS, `temporary-${engineName}-${tag}-${label.replace(/\W+/g, "-")}.png`) });
 };
 const say = (...parts) => console.log(parts.join(" "));
 const text = sel => page.evaluate(sel => document.querySelector(sel)?.innerText.trim().replace(/\s*\n+\s*/g, " | ") ?? "none", sel);
 // Every control of the screen is in it, whole, and not under another.
-const reachable = sel => page.evaluate(async sel => {
-  await Promise.all(document.getAnimations().filter(a => a.effect?.getComputedTiming().iterations !== Infinity).map(a => a.finished.catch(() => {})));
+const reachable = async sel => {
+  await animationsOver(page);
+  return page.evaluate(unreachable, sel);
+};
+const unreachable = sel => {
   const bad = [];
   for (const el of document.querySelectorAll(sel)) {
     const r = el.getBoundingClientRect();
@@ -100,7 +104,7 @@ const reachable = sel => page.evaluate(async sel => {
   }
   if (document.documentElement.scrollWidth > innerWidth + 1) bad.push("the page overflows sideways");
   return bad.length ? bad.join("; ") : "all in view";
-}, sel);
+};
 const tap = async sel => (tag === "desktop" ? page.locator(sel).first().click() : page.locator(sel).first().tap());
 const send = async message => {
   const editor = page.locator(".composer textarea");
@@ -182,13 +186,12 @@ const screen = async (w, h, label) => {
   }, sel);
   // Clicks the menu's item called name, or else the first unmarked one in
   // view; says what is under the pointer there, and which was marked.
-  const settled = () => page.waitForFunction(() => document.getAnimations().every(a => a.playState !== "running" || a.effect?.getComputedTiming().iterations === Infinity));
   const choose = async name => {
-    await settled();
+    await animationsOver(page);
     const at = await middle(chip);
     await page.mouse.click(at.x, at.y);
     await page.locator("#chip-popover").waitFor();
-    await settled();
+    await animationsOver(page);
     const item = await page.evaluate(name => {
       // A model, or else (one model signed in) a reasoning level.
       const list = document.querySelector("#chip-popover").getBoundingClientRect();
@@ -266,8 +269,8 @@ const screen = async (w, h, label) => {
   await tap(".temporary-pill");
   await page.locator(".temporary-menu").waitFor();
   say("menu:", await text(".temporary-menu .modal-body"));
-  say("menu:", await page.evaluate(async phone => {
-    await Promise.all(document.getAnimations().filter(a => a.effect?.getComputedTiming().iterations !== Infinity).map(a => a.finished.catch(() => {})));
+  await animationsOver(page);
+  say("menu:", await page.evaluate(phone => {
     const m = document.querySelector(".temporary-menu").getBoundingClientRect();
     if (phone) return `a sheet across the bottom: ${m.left <= 1 && m.right >= innerWidth - 1 && Math.abs(m.bottom - innerHeight) <= 1}`;
     const p = document.querySelector(".temporary-pill").getBoundingClientRect();

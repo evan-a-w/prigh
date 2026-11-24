@@ -12,6 +12,7 @@
 import { spawn } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { animationsOver } from "./animations.mjs";
 import { end } from "./end.mjs";
 import { png } from "./png.mjs";
 import { answer, charts, dashboard, learn } from "./ui_specs.mjs";
@@ -80,7 +81,7 @@ const screenshot = async (label, selector) => {
   if (!process.env.SHOTS) return;
   shot++;
   const path = join(process.env.SHOTS, `${engineName}-ui-${String(shot).padStart(2, "0")}-${label.replace(/\W+/g, "-")}.png`);
-  await page.waitForFunction(() => document.getAnimations().every(a => a.playState !== "running"));
+  await animationsOver(page);
   if (selector) {
     // The chat scrolls inside the page: a component taller than the space
     // above the composer gets a viewport tall enough for all of it, and

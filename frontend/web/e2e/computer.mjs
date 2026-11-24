@@ -20,6 +20,7 @@
 import { spawn } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { animationsOver } from "./animations.mjs";
 import { end } from "./end.mjs";
 import { png } from "./png.mjs";
 import { holdGates, waitFor } from "./gates.mjs";
@@ -261,7 +262,7 @@ try {
   // Each answer: whole on the screen, uncovered, and how tall.
   const answers = async () => {
     // The sheet's entrance done.
-    await page.waitForFunction(() => document.querySelector(".computer-consent").getAnimations().every(a => a.playState !== "running"));
+    await animationsOver(page, ".computer-consent");
     for (const cls of ["allow", "deny", "reason"]) {
       const sel = `.computer-consent .confirm-answer.${cls}`;
       console.log(`${cls}: ${await inView(sel)}, ${Math.round((await page.locator(sel).boundingBox()).height) >= (touch ? 44 : 28) ? "tall enough" : "too small"}`);

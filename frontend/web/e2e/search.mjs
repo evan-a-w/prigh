@@ -12,6 +12,7 @@
 import { spawn } from "node:child_process";
 import { mkdirSync, utimesSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { animationsOver } from "./animations.mjs";
 import { end } from "./end.mjs";
 import { normalVerbosity } from "./verbose_prefs.mjs";
 import { hostName } from "./host_name.mjs";
@@ -123,7 +124,7 @@ let shot = 0;
 const screenshot = async label => {
   if (!process.env.SHOTS) return;
   shot++;
-  await page.waitForFunction(() => document.getAnimations().every(a => a.playState !== "running"));
+  await animationsOver(page);
   await page.screenshot({
     path: join(process.env.SHOTS, `${engineName}-search-${String(shot).padStart(2, "0")}-${label.replace(/\W+/g, "-")}.png`),
   });
@@ -165,9 +166,12 @@ const configurableTwice = (options = {}) =>
     null,
     options,
   );
-const fits = () => page.evaluate(async () => {
+const fits = async () => {
   // Measured where it comes to rest, not while it slides in.
-  await Promise.all(document.querySelector("#control-centre").getAnimations().map(a => a.finished));
+  await animationsOver(page, "#control-centre");
+  return page.evaluate(measure);
+};
+const measure = () => {
   const doc = document.documentElement;
   const box = document.querySelector("#control-centre").getBoundingClientRect();
   const input = document.querySelector("#control-input");
@@ -177,7 +181,7 @@ const fits = () => page.evaluate(async () => {
     `its input's font: ${getComputedStyle(input).fontSize}`,
     `rows at least 44px: ${[...document.querySelectorAll(".control-row")].every(r => r.getBoundingClientRect().height >= 44)}`,
   ].join("\n");
-});
+};
 const query = "configurable port";
 
 try {
