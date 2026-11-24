@@ -682,3 +682,26 @@ let%expect_test "an ACP agent's catalog: a session opened to read its models" =
     acp:opencode/sonnet "Claude Sonnet 4.6 (Thinking)"
     |}]
 ;;
+
+(* The frontends name the known agents themselves
+   ([Session_engine.adapter_label]): their names must agree. Silent where
+   the frontend's source is not there (the backend built alone). *)
+let%expect_test "the frontends name the known ACP agents as prigh does" =
+  let rec find dir n =
+    let path = Filename.concat dir "frontend/protocol/session_engine.ml" in
+    if Sys_unix.file_exists_exn path
+    then Some path
+    else if n = 0
+    then None
+    else find (Filename.dirname dir) (n - 1)
+  in
+  Option.iter
+    (find (Sys_unix.getcwd ()) 8)
+    ~f:(fun path ->
+      let source = In_channel.read_all path in
+      List.iter Acp_agent.known ~f:(fun (agent : Acp_agent.t) ->
+        let line = sprintf "Some %S -> %S" agent.name agent.display_name in
+        if not (String.is_substring source ~substring:line)
+        then printf "%s does not say: | %s\n" path line));
+  [%expect {| |}]
+;;

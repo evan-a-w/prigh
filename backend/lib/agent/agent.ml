@@ -696,7 +696,29 @@ let shown_model t =
        |> List.find_map ~f:(fun (name, _) -> String.chop_prefix name ~prefix)
      with
      | Some name when not (String.equal name External_model.default_id) ->
-       { t.model with id = name; name }
+       (* The harness's default is listed once, under its own name: a reply
+          from it shows as that row. *)
+       let models =
+         Option.value (Option.bind t.runner ~f:Runner.models) ~default:[]
+       in
+       let slug s =
+         String.lowercase s
+         |> String.map ~f:(fun c ->
+           if Char.is_alphanum c || Char.equal c '.' then c else '-')
+       in
+       (match
+          List.find models ~f:(fun (m : Model.t) -> String.equal m.id name)
+        with
+        | Some m -> listed t { t.model with id = m.id; provider = m.provider }
+        | None ->
+          (match
+             List.find models ~f:(fun (m : Model.t) ->
+               String.equal m.id External_model.default_id
+               && String.equal (slug m.name) (slug name))
+           with
+           | Some m ->
+             listed t { t.model with id = m.id; provider = m.provider }
+           | None -> { t.model with id = name; name }))
      | _ ->
        if is_external t.model
        then listed t t.model
