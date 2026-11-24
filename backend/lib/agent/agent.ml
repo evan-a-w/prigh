@@ -3594,17 +3594,17 @@ let rec start_run
        in
        Option.iter !halted ~f:(fun reason -> broadcast t (Notice reason));
        sweep_orphans t ~main_running:false;
-       let tried =
-         let tried = Set.add tried (Model.key t.model) in
-         match current_account t with
-         | None -> tried
-         | Some id ->
-           Set.add tried (Model.key t.model ^ "@" ^ Account_id.to_string id)
-       in
        let cancelled = Cancellation.is_cancelled cancel in
        let current = phys_equal session t.session in
        let unavailable =
          if cancelled || not current then None else unavailable_error added
+       in
+       let tried =
+         let tried = Set.add tried (Model.key t.model) in
+         match Option.bind unavailable ~f:(fun _ -> current_account t) with
+         | None -> tried
+         | Some id ->
+           Set.add tried (Model.key t.model ^ "@" ^ Account_id.to_string id)
        in
        let handover =
          Option.bind unavailable ~f:(fun error ->
