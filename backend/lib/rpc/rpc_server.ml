@@ -3595,9 +3595,7 @@ let list_adapters t (client : Client.t) params =
          else (
            let statuses =
              Adapter_health.probe
-               ~acp:(fun name ->
-                 Option.map (Engines.acp_agent t.engines name) ~f:(fun agent ->
-                   List.hd_exn agent.command))
+               ~acp:(Engines.acp_agent t.engines)
                ~exec:(fun ~name arguments ->
                  Agent.host_call_on
                    client.agent

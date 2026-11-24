@@ -24,7 +24,10 @@ let show statuses =
             [%sexp
               (s.install : Adapter_health.Install.t)
             , (s.auth : Adapter_health.Auth.t)])
-      (Option.value (Adapter_health.Status.problem s) ~default:"(ready)"))
+      (match Adapter_health.Status.problem s, Adapter_health.Status.hint s with
+       | Some problem, _ -> problem
+       | None, Some hint -> "(ready) " ^ hint
+       | None, None -> "(ready)"))
 ;;
 
 let of_text ?(is_error = false) text =
@@ -76,7 +79,7 @@ let%expect_test "installed and logged in" =
      (Logged_in (account (lloyd@example.com))))
       (ready)
     acp:gemini: ((Installed (version (0.9.1)) (path /usr/bin/gemini)) Unknown)
-      (ready)
+      (ready) prigh can't tell whether Gemini CLI is logged in on laptop: if it asks, run `gemini` there
     prigh: ((Installed (version (<version>)) (path prigh)) Not_needed)
       (ready)
     |}]
@@ -126,7 +129,52 @@ let%expect_test "not installed (one only in a login shell), logged out" =
     codex: ((Installed (version (0.166.0)) (path /usr/bin/codex)) Logged_out)
       Codex on laptop is not logged in: run `codex login` there
     claude: ((Installed (version (2.1.330)) (path /usr/bin/claude)) Unknown)
-      (ready)
+      (ready) prigh can't tell whether Claude Code is logged in on laptop: if it asks, run `claude auth login` there
+    |}]
+;;
+
+let%expect_test
+    "ACP agents: their login commands and the oldest version that speaks ACP"
+  =
+  let adapters : Adapter_id.t list =
+    [ Acp "antigravity"; Acp "grok"; Acp "opencode" ]
+  in
+  let probe ~agy =
+    show
+      (Adapter_health.of_result
+         adapters
+         ~host:"h1"
+         ~host_name:"laptop"
+         ~checked_at:0.
+         { Tool.Result.text =
+             sprintf
+               {|{"programs":[
+                   {"name":"agy","path":"/usr/bin/agy","login_shell_path":null,"version":%s,"status":null},
+                   {"name":"grok","path":"/usr/bin/grok","login_shell_path":null,"version":%s,"status":null},
+                   {"name":"opencode","path":null,"login_shell_path":null,"version":null,"status":null}],
+                 "paths":[],"env":{}}|}
+               (out 0 agy)
+               (out 0 "grok 1.0.41\n")
+         ; is_error = false
+         ; images = []
+         })
+  in
+  probe ~agy:"1.4.12\n";
+  probe ~agy:"agy 1.5.13\n";
+  [%expect
+    {|
+    acp:antigravity: ((Installed (version (1.4.12)) (path /usr/bin/agy)) Unknown)
+      Antigravity 1.4.12 on laptop is too old to drive: update it to 1.5.0 or later there
+    acp:grok: ((Installed (version (1.0.41)) (path /usr/bin/grok)) Unknown)
+      (ready) prigh can't tell whether Grok Build is logged in on laptop: if it asks, run `grok login` there
+    acp:opencode: ((Not_installed (login_shell_path ())) Unknown)
+      OpenCode is not installed on laptop, please install it
+    acp:antigravity: ((Installed (version (1.5.13)) (path /usr/bin/agy)) Unknown)
+      (ready) prigh can't tell whether Antigravity is logged in on laptop: if it asks, run `agy acp --login` there
+    acp:grok: ((Installed (version (1.0.41)) (path /usr/bin/grok)) Unknown)
+      (ready) prigh can't tell whether Grok Build is logged in on laptop: if it asks, run `grok login` there
+    acp:opencode: ((Not_installed (login_shell_path ())) Unknown)
+      OpenCode is not installed on laptop, please install it
     |}]
 ;;
 
@@ -194,6 +242,7 @@ let%expect_test "the cache" =
     ; install = Not_installed { login_shell_path = None }
     ; auth = Unknown
     ; checked_at
+    ; quirks = Acp_agent.Quirks.none
     }
   in
   Adapter_health.Cache.set

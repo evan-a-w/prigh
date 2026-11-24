@@ -37,6 +37,7 @@ type t =
   ; problem : string option
     (** what stops it and what to run, e.g. ["Codex is not installed on
         laptop, please install it"] *)
+  ; hint : string option (** advice short of a problem: how to log in *)
   ; checked_at : float (** Unix seconds *)
   }
 [@@deriving sexp_of, equal]

@@ -24,6 +24,7 @@ let status
       ?version
       ?account
       ?problem
+      ?hint
       ?(auth = "unknown")
       ~installed
       adapter
@@ -50,7 +51,8 @@ let status
        @ opt "version" version
        @ opt "path" (Option.map version ~f:(fun _ -> "/usr/bin/" ^ adapter))
        @ opt "account" account
-       @ opt "problem" problem)
+       @ opt "problem" problem
+       @ opt "hint" hint)
   ^ "}"
 ;;
 
@@ -88,6 +90,14 @@ let statuses =
            ~host:"h2"
            ~host_name:"server"
            ~installed:"null"
+       ; status
+           "acp:antigravity"
+           "Antigravity"
+           ~installed:"true"
+           ~version:"1.5.13"
+           ~hint:
+             "prigh can't tell whether Antigravity is logged in on laptop: if \
+              it asks, run `agy acp --login` there"
        ])
 ;;
 
@@ -176,6 +186,9 @@ let%expect_test
     Codex Not on the tool host's PATH Not installed Codex is not installed on server, please install it
     (Copy)
     Claude Code Could not tell whether it is installed Unknown
+    laptop
+    Antigravity 1.5.13 · /usr/bin/acp:antigravity Installed prigh can't tell whether Antigravity is logged in on laptop: if it asks, run `agy acp --login` there
+    (Copy)
     (Copy_text (text "claude auth login")
      (copied "Copied the command to the clipboard"))
     (Copy (text "claude auth login")

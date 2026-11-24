@@ -37,6 +37,8 @@ module Status : sig
     ; install : Install.t
     ; auth : Auth.t
     ; checked_at : float (** Unix seconds *)
+    ; quirks : Acp_agent.Quirks.t
+      (** an ACP agent's: its login command and minimum version *)
     }
   [@@deriving sexp_of, equal]
 
@@ -45,20 +47,28 @@ module Status : sig
       nothing we know of does. *)
   val problem : t -> string option
 
+  (** Advice short of a problem: how to log in to an agent that cannot say
+      whether it is logged in. *)
+  val hint : t -> string option
+
   (** [{adapter, label, host, host_name, installed, version?, path?,
       login_shell_path?, auth ("logged_in" | "logged_out" | "not_needed" |
-      "unknown"), account?, problem?, checked_at}] *)
+      "unknown"), account?, problem?, hint?, checked_at}] *)
   val to_json : t -> Json.t
 end
 
 (** The program an adapter runs ([codex], [claude], an ACP agent's
     command); [None] for [Prigh], which needs none. *)
-val program : ?acp:(string -> string option) -> Adapter_id.t -> string option
+val program
+  :  ?acp:(string -> Acp_agent.t option)
+  -> Adapter_id.t
+  -> string option
 
 (** The [$probe_programs] request for [adapters] (one call per host).
-    [acp]: the program an ACP agent runs (default: its name). *)
+    [acp]: the ACP agent of a name (default: {!Acp_agent.find_known}; an
+    unknown one runs the program of its name). *)
 val request
-  :  ?acp:(string -> string option)
+  :  ?acp:(string -> Acp_agent.t option)
   -> Adapter_id.t list
   -> Host_probe.Request.t
 
@@ -66,7 +76,7 @@ val request
     [host_name]): one per adapter, [Unknown] for them all when the host
     could not run it (an older prigh, gone). *)
 val of_result
-  :  ?acp:(string -> string option)
+  :  ?acp:(string -> Acp_agent.t option)
   -> Adapter_id.t list
   -> host:string
   -> host_name:string
@@ -76,7 +86,7 @@ val of_result
 
 (** Probes [adapters] on one host: [exec] runs a host operation there. *)
 val probe
-  :  ?acp:(string -> string option)
+  :  ?acp:(string -> Acp_agent.t option)
   -> exec:(name:string -> Json.t -> Tool.Result.t)
   -> Adapter_id.t list
   -> host:string

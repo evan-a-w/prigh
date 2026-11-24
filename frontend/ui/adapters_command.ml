@@ -29,6 +29,8 @@ let lines (statuses : P.Adapter_status.t list) =
       :: List.concat_map here ~f:(fun (s : P.Adapter_status.t) ->
         let mark = if Option.is_some s.problem then "✗" else "✓" in
         sprintf "  %s %s  %s" mark s.label (P.Adapter_status.summary s)
-        :: List.map (Option.to_list s.problem) ~f:(fun p -> "      " ^ p)))
+        :: List.map
+             (Option.to_list (Option.first_some s.problem s.hint))
+             ~f:(fun p -> "      " ^ p)))
     @ [ ""; "prigh never installs them or logs in: run that on the host" ]
 ;;

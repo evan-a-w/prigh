@@ -21,17 +21,33 @@ module Auth = struct
   [@@deriving sexp_of, equal]
 end
 
-let program ?(acp = Option.some) : Adapter_id.t -> string option = function
+let acp_agent ?(acp = Acp_agent.find_known) name = acp name
+
+let quirks ?acp : Adapter_id.t -> Acp_agent.Quirks.t = function
+  | Acp name ->
+    Option.value_map
+      (acp_agent ?acp name)
+      ~default:Acp_agent.Quirks.none
+      ~f:(fun a -> a.quirks)
+  | Codex | Claude | Prigh -> Acp_agent.Quirks.none
+;;
+
+let program ?acp : Adapter_id.t -> string option = function
   | Codex -> Some "codex"
   | Claude -> Some "claude"
-  | Acp name -> acp name
+  | Acp name ->
+    (match acp_agent ?acp name with
+     | Some agent -> List.hd agent.command
+     | None -> Some name)
   | Prigh -> None
 ;;
 
-let login_command : Adapter_id.t -> string option = function
+let login_command (quirks : Acp_agent.Quirks.t) : Adapter_id.t -> string option
+  = function
   | Codex -> Some "codex login"
   | Claude -> Some "claude auth login"
-  | Acp _ | Prigh -> None
+  | Acp _ -> quirks.login
+  | Prigh -> None
 ;;
 
 module Status = struct
@@ -42,8 +58,29 @@ module Status = struct
     ; install : Install.t
     ; auth : Auth.t
     ; checked_at : float
+    ; quirks : Acp_agent.Quirks.t
     }
   [@@deriving sexp_of, equal]
+
+  let too_old t =
+    match t.install, t.quirks.min_version with
+    | Installed { version = Some version; _ }, Some minimum
+      when Acp_agent.older version ~than:minimum -> Some (version, minimum)
+    | _ -> None
+  ;;
+
+  let hint t =
+    match t.install, t.auth, login_command t.quirks t.adapter with
+    | Installed _, Unknown, Some command ->
+      Some
+        (sprintf
+           "prigh can't tell whether %s is logged in on %s: if it asks, run \
+            `%s` there"
+           (Adapter_id.label t.adapter)
+           t.host_name
+           command)
+    | _ -> None
+  ;;
 
   let problem t =
     let label = Adapter_id.label t.adapter in
@@ -72,7 +109,7 @@ module Status = struct
            why)
     | Installed _, Logged_out ->
       Some
-        (match login_command t.adapter with
+        (match login_command t.quirks t.adapter with
          | Some command ->
            sprintf
              "%s on %s is not logged in: run `%s` there"
@@ -84,7 +121,14 @@ module Status = struct
              "%s on %s is not logged in: log in with its own command there"
              label
              t.host_name)
-    | Installed _, (Logged_in _ | Not_needed | Unknown) -> None
+    | Installed _, (Logged_in _ | Not_needed | Unknown) ->
+      Option.map (too_old t) ~f:(fun (version, minimum) ->
+        sprintf
+          "%s %s on %s is too old to drive: update it to %s or later there"
+          label
+          version
+          t.host_name
+          minimum)
   ;;
 
   let to_json t =
@@ -115,6 +159,7 @@ module Status = struct
        @ [ "auth", str auth ]
        @ opt "account" account
        @ opt "problem" (problem t)
+       @ opt "hint" (hint t)
        @ [ ( "checked_at"
            , `Number (Int.to_string (Float.iround_down_exn t.checked_at)) )
          ])
@@ -200,7 +245,13 @@ let auth adapter (found : Host_probe.Found.t) : Auth.t =
   | Acp _, Some _ -> Unknown
 ;;
 
-let of_found adapter ~host ~host_name ~checked_at (found : Host_probe.Found.t)
+let of_found
+      ?acp
+      adapter
+      ~host
+      ~host_name
+      ~checked_at
+      (found : Host_probe.Found.t)
   : Status.t
   =
   match found.path with
@@ -211,6 +262,7 @@ let of_found adapter ~host ~host_name ~checked_at (found : Host_probe.Found.t)
     ; install = Not_installed { login_shell_path = found.login_shell_path }
     ; auth = Unknown
     ; checked_at
+    ; quirks = quirks ?acp adapter
     }
   | Some path ->
     let version =
@@ -223,6 +275,7 @@ let of_found adapter ~host ~host_name ~checked_at (found : Host_probe.Found.t)
     ; install = Installed { version; path }
     ; auth = auth adapter found
     ; checked_at
+    ; quirks = quirks ?acp adapter
     }
 ;;
 
@@ -233,10 +286,11 @@ let prigh_status ~host ~host_name ~checked_at : Status.t =
   ; install = Installed { version = Some Version.to_string; path = "prigh" }
   ; auth = Not_needed
   ; checked_at
+  ; quirks = Acp_agent.Quirks.none
   }
 ;;
 
-let unknown adapters ~host ~host_name ~checked_at why =
+let unknown ?acp adapters ~host ~host_name ~checked_at why =
   List.map adapters ~f:(fun (adapter : Adapter_id.t) ->
     match adapter with
     | Prigh -> prigh_status ~host ~host_name ~checked_at
@@ -247,6 +301,7 @@ let unknown adapters ~host ~host_name ~checked_at why =
       ; install = Unknown why
       ; auth = Unknown
       ; checked_at
+      ; quirks = quirks ?acp adapter
       })
 ;;
 
@@ -266,6 +321,7 @@ let of_result
   if old_host
   then
     unknown
+      ?acp
       adapters
       ~host
       ~host_name
@@ -273,11 +329,18 @@ let of_result
       "its prigh is too old to check: update prigh there and restart its TUI \
        or tool-host"
   else if result.is_error
-  then unknown adapters ~host ~host_name ~checked_at (String.strip result.text)
+  then
+    unknown
+      ?acp
+      adapters
+      ~host
+      ~host_name
+      ~checked_at
+      (String.strip result.text)
   else (
     match Host_probe.Reply.of_result result with
     | Error e ->
-      unknown adapters ~host ~host_name ~checked_at (Error.to_string_hum e)
+      unknown ?acp adapters ~host ~host_name ~checked_at (Error.to_string_hum e)
     | Ok reply ->
       List.map adapters ~f:(fun adapter ->
         match program ?acp adapter with
@@ -287,7 +350,8 @@ let of_result
              List.find reply.programs ~f:(fun (f : Host_probe.Found.t) ->
                String.equal f.name name)
            with
-           | Some found -> of_found adapter ~host ~host_name ~checked_at found
+           | Some found ->
+             of_found ?acp adapter ~host ~host_name ~checked_at found
            | None ->
              { Status.adapter
              ; host
@@ -295,6 +359,7 @@ let of_result
              ; install = Unknown "the host did not report it"
              ; auth = Unknown
              ; checked_at
+             ; quirks = quirks ?acp adapter
              })))
 ;;
 

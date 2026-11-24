@@ -29,6 +29,7 @@ type t =
   ; auth : Auth.t
   ; account : string option
   ; problem : string option
+  ; hint : string option
   ; checked_at : float
   }
 [@@deriving sexp_of, equal]
@@ -59,6 +60,7 @@ let of_json j =
   in
   let%bind account = Json.string_opt_field j "account" in
   let%bind problem = Json.string_opt_field j "problem" in
+  let%bind hint = Json.string_opt_field j "hint" in
   let checked_at =
     Or_error.ok (Json.float_field j "checked_at") |> Option.value ~default:0.
   in
@@ -74,6 +76,7 @@ let of_json j =
     ; auth
     ; account
     ; problem
+    ; hint
     ; checked_at
     }
 ;;

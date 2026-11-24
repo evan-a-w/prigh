@@ -36,7 +36,7 @@ let adapter ~inject (s : S.t) =
     | Unknown why, _ -> String.capitalize why
   in
   let copy =
-    Option.map s.problem ~f:(fun problem ->
+    Option.map (Option.first_some s.problem s.hint) ~f:(fun problem ->
       let text, what =
         match command_in problem with
         | Some command -> command, "the command"
@@ -58,7 +58,11 @@ let adapter ~inject (s : S.t) =
     [ Settings_row.text
         ([ name s.label; Settings_row.about detail; note (level, label) ]
          @ Option.value_map s.problem ~default:[] ~f:(fun p ->
-           [ note ~cls:"adapter-problem select-text" ("warm", p) ]))
+           [ note ~cls:"adapter-problem select-text" ("warm", p) ])
+         @
+         match s.problem, s.hint with
+         | None, Some h -> [ note ~cls:"adapter-hint select-text" ("muted", h) ]
+         | _ -> [])
     ; control (Option.to_list copy)
     ]
 ;;
