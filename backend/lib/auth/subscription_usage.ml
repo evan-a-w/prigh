@@ -70,12 +70,24 @@ let status_fields : Status.t -> (string * Json.t) list = function
   | Failed error -> [ "status", `String "error"; "error", `String error ]
 ;;
 
-let to_json t =
+module Harness_usage = struct
+  type t =
+    { adapter : string
+    ; name : string
+    ; status : Status.t
+    }
+end
+
+let to_json ?(harnesses = []) t =
   `Object
     [ "fetched_at_ms", ms t.fetched_at
     ; ( "providers"
       , `Array
-          (List.map t.providers ~f:(fun (p : Provider_usage.t) ->
+          (List.map harnesses ~f:(fun (h : Harness_usage.t) ->
+             `Object
+               ([ "provider", `String h.adapter; "name", `String h.name ]
+                @ status_fields h.status))
+           @ List.map t.providers ~f:(fun (p : Provider_usage.t) ->
              `Object
                ([ "provider", `String (Provider_id.to_string p.provider)
                 ; "name", `String (name p.provider)
@@ -484,16 +496,4 @@ let fetch ~env ?getenv ?refresh ~http ~now store =
       providers
   in
   { fetched_at = now (); providers }
-;;
-
-let harness_json ~fetched_at ~adapter ~name status =
-  `Object
-    [ "fetched_at_ms", ms fetched_at
-    ; ( "providers"
-      , `Array
-          [ `Object
-              ([ "provider", `String adapter; "name", `String name ]
-               @ status_fields status)
-          ] )
-    ]
 ;;

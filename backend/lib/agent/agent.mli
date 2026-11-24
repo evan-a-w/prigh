@@ -314,6 +314,10 @@ val set_runner : t -> Runner.t option -> unit
     (its, {!External_model}); [None]: prigh's ({!Model_registry}). *)
 val external_models : t -> Model.t list option
 
+(** How much of the external harness's login's usage limits it said were
+    used ([None] for the harness engine, or before it said). *)
+val external_limits : t -> Subscription_usage.Status.t option
+
 (** Stops the external harness's process, if one runs: a later run starts
     it again. *)
 val stop_engine : t -> unit

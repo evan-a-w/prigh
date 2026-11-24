@@ -322,13 +322,18 @@ let set_max_thinking_tokens t tokens =
     ]
 ;;
 
-let get_usage t = control_request t Get_usage "get_usage" []
+let get_usage t =
+  control_request t Get_usage "get_usage" [ "skip_behaviors", `True ]
+;;
+
 let limits t = t.limits
 
 (* [get_usage]'s answer: [rate_limits] has the usage endpoint's shape
    ([five_hour], [seven_day], ...: [{utilization, resets_at}], 0 to 100). *)
 let usage_status response : Subscription_usage.Status.t =
-  match member "rate_limits_available" response, member "rate_limits" response with
+  match
+    member "rate_limits_available" response, member "rate_limits" response
+  with
   | Some `True, Some (`Object _ as limits) ->
     (match Subscription_usage.parse_anthropic (Json.to_string limits) with
      | Limits { plan = _; windows } ->
@@ -347,10 +352,16 @@ let note_limit t info =
         [ ( kind
           , `Object
               (( "utilization"
-               , `Number (Float.to_string_hum ~strip_zero:true (utilization *. 100.)) )
-               :: Option.value_map (num info "resetsAt") ~default:[] ~f:(fun at ->
-                 [ "resets_at", `Number (Float.to_string_hum ~strip_zero:true at) ]))
-          )
+               , `Number
+                   (Float.to_string_hum ~strip_zero:true (utilization *. 100.))
+               )
+               :: Option.value_map
+                    (num info "resetsAt")
+                    ~default:[]
+                    ~f:(fun at ->
+                      [ ( "resets_at"
+                        , `Number (Float.to_string_hum ~strip_zero:true at) )
+                      ])) )
         ]
     in
     (match Subscription_usage.parse_anthropic (Json.to_string window) with
@@ -361,8 +372,9 @@ let note_limit t info =
          | _ -> None, []
        in
        let windows =
-         if List.exists windows ~f:(fun (o : Subscription_usage.Window.t) ->
-              String.equal o.id w.id)
+         if
+           List.exists windows ~f:(fun (o : Subscription_usage.Window.t) ->
+             String.equal o.id w.id)
          then
            List.map windows ~f:(fun (o : Subscription_usage.Window.t) ->
              if String.equal o.id w.id then w else o)
@@ -938,7 +950,9 @@ let handle_control_response t json =
             | Get_usage ->
               let status =
                 usage_status
-                  (Option.value (member "response" response) ~default:(`Object []))
+                  (Option.value
+                     (member "response" response)
+                     ~default:(`Object []))
               in
               t.limits <- Some status;
               Usage status

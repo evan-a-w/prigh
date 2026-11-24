@@ -539,7 +539,10 @@ let read_account t =
   request t Account_read "account/read" (`Object [ "refreshToken", `False ])
 ;;
 
-let read_rate_limits t = request t Rate_limits_read "account/rateLimits/read" `Null
+let read_rate_limits t =
+  request t Rate_limits_read "account/rateLimits/read" `Null
+;;
+
 let limits t = t.limits
 
 let request_key : Json.t -> string = function
@@ -819,7 +822,7 @@ let limits_of_snapshot snapshot =
           match v with
           | `Number s ->
             (match Float.of_string_opt s with
-             | Some x -> `Number (Float.to_string_hum ~strip_zero:true (f x))
+             | Some x -> `Number (sprintf "%.17g" (f x))
              | None -> v)
           | v -> v)
       in
@@ -838,10 +841,12 @@ let limits_of_snapshot snapshot =
   let rate_limit =
     `Object
       (List.filter_opt
-         [ Option.map (window (field "primary" snapshot)) ~f:(fun w ->
-             "primary_window", w)
-         ; Option.map (window (field "secondary" snapshot)) ~f:(fun w ->
-             "secondary_window", w)
+         [ Option.map
+             (window (field "primary" snapshot))
+             ~f:(fun w -> "primary_window", w)
+         ; Option.map
+             (window (field "secondary" snapshot))
+             ~f:(fun w -> "secondary_window", w)
          ])
   in
   let plan =
@@ -1651,7 +1656,8 @@ let model_info json =
         ~f:(str "reasoningEffort")
   ; default_effort = str "defaultReasoningEffort" json
   ; images =
-      List.exists (list "inputModalities" json) ~f:(fun m ->
+      Option.is_none (field "inputModalities" json)
+      || List.exists (list "inputModalities" json) ~f:(fun m ->
         Option.equal String.equal (Json.string m) (Some "image"))
   }
 ;;

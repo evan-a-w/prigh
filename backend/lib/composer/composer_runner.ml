@@ -32,6 +32,8 @@ type t =
   ; mutable run_cancel : Cancellation.t (* the run [cancel] is part of *)
   ; mutable models : Model.t list (* the harness's, as it last said *)
   ; mutable context : int option * int option
+  ; catalog : unit -> Adapter.Catalog.t option
+  ; on_change : unit -> unit
   }
 
 let create
@@ -46,6 +48,8 @@ let create
       ?(host = fun () -> "local")
       ?handoff_from
       ?checkpoint
+      ?(catalog = fun () -> None)
+      ?(on_change = ignore)
       ()
   =
   { sw
@@ -75,6 +79,8 @@ let create
   ; run_cancel = Cancellation.never
   ; models = []
   ; context = None, None
+  ; catalog
+  ; on_change
   }
 ;;
 
@@ -376,8 +382,14 @@ let live t (s : Engine_intf.Services.t) (input : Engine_intf.Turn.Input.t) =
       | started, _ -> started
     in
     (match started with
-     | Ok live ->
+     | Ok (Live ((module L), a) as live) ->
+       L.on_change a (fun () ->
+         (match L.models a with
+          | [] -> ()
+          | models -> t.models <- models);
+         t.on_change ());
        t.live <- Some live;
+       t.on_change ();
        t.live_host <- Some host;
        Ok live
      | Error (`Spawn e | `Start e) -> Error e)
@@ -976,14 +988,35 @@ module R = struct
      | None -> ());
     Some
       (match t.models with
-       | [] -> [ External_model.default ~adapter:A.id ]
-       | models -> models)
+       | _ :: _ as models -> models
+       | [] ->
+         (match t.catalog () with
+          | Some { models = _ :: _ as models; _ } -> models
+          | Some _ | None -> [ External_model.default ~adapter:A.id ]))
   ;;
 
   let context t = t.context
   let run_turn = run_turn
 end
 
+(* The login's limits as the running harness said last, else as its
+   catalog did. *)
+let limits t =
+  let live =
+    match t.live with
+    | Some (Live ((module L), a)) -> L.limits a
+    | None -> None
+  in
+  match live with
+  | Some _ -> live
+  | None -> Option.bind (t.catalog ()) ~f:(fun c -> c.limits)
+;;
+
 let runner t =
-  Runner.create ~close:(fun () -> close t) ~rewind:(rewind t) (module R) t
+  Runner.create
+    ~close:(fun () -> close t)
+    ~rewind:(rewind t)
+    ~limits:(fun () -> limits t)
+    (module R)
+    t
 ;;

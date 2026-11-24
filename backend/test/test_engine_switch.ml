@@ -673,6 +673,7 @@ let%expect_test "back to the harness engine and out again; models follow" =
 
     first
     codex/gpt-5
+    spawn codex app-server
     models: codex/default
     error: "Codex has no model \"nope\": pick one of default (/model lists them)"
     |}];

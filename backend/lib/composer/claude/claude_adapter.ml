@@ -9,6 +9,7 @@ type t =
   ; mutable settings : Adapter.Settings.t (* what the process runs with *)
   ; mutable models : Model.t list
   ; mcp_calls : unit Promise.u String.Table.t (* by request id: abandons it *)
+  ; mutable on_change : unit -> unit
   }
 
 let id = "claude"
@@ -201,7 +202,8 @@ let refuse_orphan t (event : Adapter_event.t) =
   | _ -> ()
 ;;
 
-let start
+(* The process's driver, reading its lines, and the handshake. *)
+let open_process
       ~sw
       ?interrupt_grace
       ?request_timeout
@@ -226,13 +228,22 @@ let start
     ; settings = Adapter.Settings.of_start start
     ; models = []
     ; mcp_calls = String.Table.create ()
+    ; on_change = Fn.id
     }
   in
   Adapter.Driver.on_orphan_request driver (refuse_orphan t);
   Adapter.Driver.run
     driver
     ~handle_line:(fun line ->
-      List.iter (Claude_codec.handle_line codec line) ~f:(dispatch t))
+      let limits = Claude_codec.limits codec in
+      List.iter (Claude_codec.handle_line codec line) ~f:(dispatch t);
+      if
+        not
+          (Option.equal
+             Subscription_usage.Status.equal
+             limits
+             (Claude_codec.limits codec))
+      then t.on_change ())
     ~on_exit:(fun exit ->
       List.iter
         (Claude_codec.process_exited
@@ -253,7 +264,7 @@ let start
          ())
       ~matches:(function
       | Initialized _ | Failed { command = Initialize; _ } -> true
-      | Done _ | Failed _ -> false)
+      | _ -> false)
     |> Result.map_error ~f:(Error.tag ~tag:"Claude Code did not start")
   in
   match init with
@@ -262,7 +273,30 @@ let start
   | Initialized info ->
     t.models <- models_of info.models;
     Ok t
-  | Done _ -> Ok t
+  | _ -> Ok t
+;;
+
+(* The login's plan limits, asked: none for an API key's login. *)
+let read_limits t =
+  match
+    Adapter.Driver.request
+      t.driver
+      (Claude_codec.get_usage t.codec)
+      ~matches:(function
+      | Usage _ | Failed { command = Get_usage; _ } -> true
+      | _ -> false)
+  with
+  | Ok (Usage status) -> Some status
+  | Ok _ | Error _ -> None
+;;
+
+let catalog ~sw ?request_timeout transport start =
+  let%map.Or_error t = open_process ~sw ?request_timeout transport start in
+  { Adapter.Catalog.models = t.models; limits = read_limits t }
+;;
+
+let start ~sw ?interrupt_grace ?request_timeout ?injected transport start =
+  open_process ~sw ?interrupt_grace ?request_timeout ?injected transport start
 ;;
 
 let next_event t = Adapter.Driver.next_event t.driver
@@ -350,6 +384,8 @@ let in_turn t = Adapter.Driver.in_turn t.driver
 let alive t = Adapter.Driver.alive t.driver
 let stop t = Adapter.Driver.stop t.driver
 let models t = t.models
+let limits t = Claude_codec.limits t.codec
+let on_change t f = t.on_change <- f
 
 let compact t settings ~instructions =
   Adapter.Driver.await_idle t.driver;

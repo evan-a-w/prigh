@@ -6,6 +6,7 @@ type t =
   ; driver : Codex_codec.Response.t Adapter.Driver.t
   ; cwd : string
   ; mutable models : Model.t list
+  ; mutable on_change : unit -> unit
   }
 
 let id = "codex"
@@ -138,7 +139,7 @@ let list_models driver codec =
       | Some m ->
         { (model_of m ~id) with
           id = External_model.default_id
-        ; name = sprintf "default (%s)" m.display_name
+        ; name = sprintf "Default (%s)" m.display_name
         }
       | None -> External_model.default ~adapter:id
     in
@@ -159,14 +160,8 @@ let refuse_orphan t (event : Adapter_event.t) =
   | _ -> ()
 ;;
 
-let start
-      ~sw
-      ?interrupt_grace
-      ?request_timeout
-      ?injected:_
-      transport
-      (start : Adapter.Start.t)
-  =
+(* The process's driver, reading its lines, and the handshake. *)
+let open_process ~sw ?interrupt_grace ?request_timeout transport ~cwd =
   let codec = Codex_codec.create () in
   let driver =
     Adapter.Driver.create
@@ -176,12 +171,20 @@ let start
       ?request_timeout
       transport
   in
-  let t = { codec; driver; cwd = start.cwd; models = [] } in
+  let t = { codec; driver; cwd; models = []; on_change = Fn.id } in
   Adapter.Driver.on_orphan_request driver (refuse_orphan t);
   Adapter.Driver.run
     driver
     ~handle_line:(fun line ->
-      List.iter (Codex_codec.handle_line codec line) ~f:(dispatch t))
+      let limits = Codex_codec.limits codec in
+      List.iter (Codex_codec.handle_line codec line) ~f:(dispatch t);
+      if
+        not
+          (Option.equal
+             Subscription_usage.Status.equal
+             limits
+             (Codex_codec.limits codec))
+      then t.on_change ())
     ~on_exit:(fun exit ->
       if Adapter.Driver.in_turn driver
       then
@@ -213,7 +216,48 @@ let start
       | _ -> false)
     |> Result.map_error ~f:fail_with_exit
   in
-  let%bind () = failed init ~what:"initialize" in
+  let%map () = failed init ~what:"initialize" in
+  t
+;;
+
+(* The login's limits, asked: none for a login without them (an API key's
+   answer is an error). *)
+let read_limits t =
+  match
+    Adapter.Driver.request
+      t.driver
+      (Codex_codec.read_rate_limits t.codec)
+      ~matches:(function
+      | Rate_limits _ | Failed { kind = Rate_limits_read; _ } -> true
+      | _ -> false)
+  with
+  | Ok (Rate_limits status) -> Some status
+  | Ok _ | Error _ -> None
+;;
+
+let catalog ~sw ?request_timeout transport (start : Adapter.Start.t) =
+  let%map.Or_error t =
+    open_process ~sw ?request_timeout transport ~cwd:start.cwd
+  in
+  let models = list_models t.driver t.codec in
+  let limits = read_limits t in
+  { Adapter.Catalog.models; limits }
+;;
+
+let start
+      ~sw
+      ?interrupt_grace
+      ?request_timeout
+      ?injected:_
+      transport
+      (start : Adapter.Start.t)
+  =
+  let open Or_error.Let_syntax in
+  let%bind t =
+    open_process ~sw ?interrupt_grace ?request_timeout transport ~cwd:start.cwd
+  in
+  let codec = t.codec
+  and driver = t.driver in
   let s =
     settings ~cwd:start.cwd ~models:[] (Adapter.Settings.of_start start)
   in
@@ -245,6 +289,7 @@ let start
   (* Not waited for: a turn need not wait for the list. *)
   Fiber.fork_daemon ~sw (fun () ->
     t.models <- list_models driver codec;
+    t.on_change ();
     `Stop_daemon);
   t
 ;;
@@ -320,6 +365,8 @@ let in_turn t = Adapter.Driver.in_turn t.driver
 let alive t = Adapter.Driver.alive t.driver
 let stop t = Adapter.Driver.stop t.driver
 let models t = t.models
+let limits t = Codex_codec.limits t.codec
+let on_change t f = t.on_change <- f
 
 let compact t settings ~instructions:_ =
   Adapter.Driver.await_idle t.driver;

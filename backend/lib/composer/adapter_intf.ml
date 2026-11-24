@@ -84,6 +84,17 @@ module Input = struct
   [@@deriving sexp_of]
 end
 
+(** What a harness says of its login without a thread: its models (its
+    default first, as {!External_model.default_id}) and, for a subscription
+    login, how much of its usage limits it has used. *)
+module Catalog = struct
+  type t =
+    { models : Model.t list
+    ; limits : Subscription_usage.Status.t option
+    }
+  [@@deriving sexp_of]
+end
+
 (** How a harness takes its conversation back to an earlier turn. *)
 module Rollback = struct
   type t =
@@ -147,6 +158,24 @@ module type S = sig
   (** The models the running harness offers, once it said ([] before):
       its default first, as {!External_model.default_id}. *)
   val models : t -> Model.t list
+
+  (** How much of its login's usage limits it said were used, last ([None]
+      before it said, or for a login without limits). *)
+  val limits : t -> Subscription_usage.Status.t option
+
+  (** [f] is called whenever {!models} or {!limits} change. *)
+  val on_change : t -> (unit -> unit) -> unit
+
+  (** Runs the process [transport] runs only to ask its {!Catalog}: the
+      handshake, its models and its login's limits, opening no thread
+      (nothing is recorded with the harness); the caller stops the
+      process. Fails for a harness that cannot say without a thread. *)
+  val catalog
+    :  sw:Switch.t
+    -> ?request_timeout:Time_float.Span.t
+    -> Line_transport.t
+    -> Start.t
+    -> Catalog.t Or_error.t
 
   (** Compacts the thread's context ([/compact]): runs as a turn, ending
       with [Turn_end]. *)

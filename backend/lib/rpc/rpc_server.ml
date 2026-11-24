@@ -422,6 +422,8 @@ type t =
   ; engines : Engines.t (** what this backend deploys *)
   ; adapter_health : Adapter_health.Cache.t
     (** whether the composer's CLIs are installed and logged in, by host *)
+  ; catalogs : Adapter_catalog.t
+    (** the composer's CLIs' models and usage limits, by host *)
   ; spawn_external :
       (Agent.t -> Adapter.Launch.t -> Line_transport.t Or_error.t) option
   ; agents : Agent.t String.Table.t (** live sessions by session id *)
@@ -1095,6 +1097,95 @@ let recheck_adapter t agent adapter =
     adapters_changed t ~hosts:(Agent.state agent).hosts)
 ;;
 
+(* The session's model list changed: its clients ask for it again. *)
+let models_changed t agent =
+  let json =
+    `Object [ "type", `String "event"; "event", `String "models_changed" ]
+  in
+  List.iter (clients_of t agent) ~f:(fun (c : Client.t) -> c.send json)
+;;
+
+(* The harness [adapter] said its catalog on [host]: the sessions it runs
+   there show its models. *)
+let catalog_changed t ~host adapter =
+  Hashtbl.iter t.agents ~f:(fun agent ->
+    match Agent.engine_choice agent with
+    | { engine = Composer; adapter = Some a }
+      when String.equal (Adapter_id.to_string a) adapter
+           && String.equal (Agent.active_host agent) host ->
+      models_changed t agent
+    | _ -> ())
+;;
+
+(* Runs [adapter]'s harness on the session's tool host only to ask its
+   catalog ({!Adapter.S.catalog}). *)
+let fetch_catalog t agent (module A : Adapter.S) () =
+  let start = Adapter.Start.default ~cwd:(Session.cwd (Agent.session agent)) in
+  let launch = A.launch start in
+  let%bind.Or_error transport =
+    match t.spawn_external with
+    | Some spawn -> spawn agent launch
+    | None -> host_spawn t agent launch
+  in
+  Switch.run (fun sw ->
+    Exn.protect
+      ~finally:(fun () -> Line_transport.stop transport)
+      ~f:(fun () ->
+        A.catalog
+          ~sw
+          ~request_timeout:(Time_float.Span.of_sec 30.)
+          transport
+          start))
+;;
+
+(* Asks, in the background, the catalog of a Codex or Claude Code
+   session's harness on its tool host, unless one younger than [max_age]
+   seconds is kept. *)
+let ensure_catalog ?(max_age = 1800.) t agent =
+  match Agent.engine_choice agent with
+  | { engine = Composer; adapter = Some ((Codex | Claude) as adapter_id) } ->
+    (match Composer_adapters.find t.engines adapter_id with
+     | Error _ -> ()
+     | Ok adapter ->
+       let host = Agent.active_host agent in
+       let name = Adapter_id.to_string adapter_id in
+       Adapter_catalog.refresh
+         t.catalogs
+         ~sw:t.sw
+         ~host
+         name
+         ~max_age
+         ~fetch:(fetch_catalog t agent adapter)
+         ~on_done:(fun () -> catalog_changed t ~host name))
+  | _ -> ()
+;;
+
+(* A composer session's harness login's usage, as the harness says (asked
+   when it has not said lately). *)
+let harness_usage t agent : Subscription_usage.Harness_usage.t list =
+  match Agent.engine_choice agent with
+  | { engine = Composer; adapter = Some ((Codex | Claude) as adapter_id) } ->
+    let host = Agent.active_host agent in
+    let name = Adapter_id.to_string adapter_id in
+    ensure_catalog ~max_age:60. t agent;
+    if Option.is_none (Agent.external_limits agent)
+    then Adapter_catalog.await t.catalogs ~host name;
+    let label = Adapter_id.label adapter_id in
+    let status : Subscription_usage.Status.t =
+      match Agent.external_limits agent with
+      | Some status -> status
+      | None ->
+        Failed
+          (sprintf
+             "%s on %s did not say: check that it is installed and logged in \
+              there (Settings → Engines)"
+             label
+             (active_host_label agent))
+    in
+    [ { adapter = name; name = label; status } ]
+  | _ -> []
+;;
+
 (* A composer session's runner, driving its adapter's harness on the
    session's tool host and continuing the thread the session recorded there
    (each process records the threads it starts). *)
@@ -1164,6 +1255,12 @@ let composer_runner ?handoff_from t agent (adapter_id : Adapter_id.t) =
            Agent.host_call agent ~name:Checkpoint.op args)
          ~host:(fun () -> Agent.active_host agent)
          ?handoff_from
+         ~catalog:(fun () ->
+           Adapter_catalog.find
+             t.catalogs
+             ~host:(Agent.active_host agent)
+             adapter_name)
+         ~on_change:(fun () -> models_changed t agent)
          ())
 ;;
 
@@ -1360,6 +1457,10 @@ let create
     ; default_agent
     ; engines
     ; adapter_health = Adapter_health.Cache.create ~ttl:60.
+    ; catalogs =
+        Adapter_catalog.create
+          ~now:(fun () -> Eio.Time.now (Eio.Stdenv.clock env))
+          ()
     ; spawn_external
     ; agents = String.Table.create ()
     ; clients = String.Table.create ()
@@ -2377,6 +2478,7 @@ let set_adapter t (client : Client.t) params =
       Agent.set_engine agent choice;
       Agent.set_unavailable agent None;
       Agent.set_runner agent None;
+      models_changed t agent;
       Ok (attached_state client)
     | { engine = Composer; _ } ->
       let%bind adapter =
@@ -2388,6 +2490,7 @@ let set_adapter t (client : Client.t) params =
       Agent.set_engine agent choice;
       Agent.set_unavailable agent None;
       Agent.set_runner agent (Some runner);
+      models_changed t agent;
       attached_state client)
 ;;
 
@@ -3725,15 +3828,29 @@ let dispatch_server t (client : Client.t) ~meth ~params
       then t.login_owner <- previous;
       unit_result result)
   | "usage_limits" ->
-    Some
-      (ok
-         (Subscription_usage.to_json
-            (Subscription_usage.fetch
-               ~env:(Agent.env agent)
-               ~getenv:(Login_manager.getenv t.login)
-               ~http:t.usage_http
-               ~now:t.now
-               (Login_manager.store t.login))))
+    let harnesses = harness_usage t agent in
+    let usage =
+      Subscription_usage.fetch
+        ~env:(Agent.env agent)
+        ~getenv:(Login_manager.getenv t.login)
+        ~http:t.usage_http
+        ~now:t.now
+        (Login_manager.store t.login)
+    in
+    (* With a harness's own login shown, prigh's logins it lacks are noise. *)
+    let usage =
+      if List.is_empty harnesses
+      then usage
+      else
+        { usage with
+          providers =
+            List.filter
+              usage.providers
+              ~f:(fun (p : Subscription_usage.Provider_usage.t) ->
+                not (Subscription_usage.Status.equal p.status Not_signed_in))
+        }
+    in
+    Some (ok (Subscription_usage.to_json ~harnesses usage))
   | "forge_status" ->
     Some
       (Or_error.map (Forges.accounts t.forges) ~f:(fun accounts ->
@@ -3780,7 +3897,10 @@ let dispatch_server t (client : Client.t) ~meth ~params
     Some (pull_requests t client ~meth ~params)
   | "list_models" ->
     (match Agent.external_models client.agent with
-     | Some models -> Some (ok (`Array (List.map models ~f:Rpc_json.model)))
+     | Some models ->
+       (* Only the harness's default until it says its models: asked now. *)
+       if List.length models <= 1 then ensure_catalog t client.agent;
+       Some (ok (`Array (List.map models ~f:Rpc_json.model)))
      | None ->
        let models = Login_manager.models t.login in
        Model_registry.reload models;

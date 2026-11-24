@@ -29,7 +29,9 @@ type t
     {!Checkpoint.op} on the session's tool host: with it, the files are
     checkpointed around each run (in a git repository), which lets the
     session rewind them with the harness's conversation; without it the
-    session cannot rewind.
+    session cannot rewind. [catalog]: what the harness said of its login
+    without a thread ({!Adapter_catalog}), for its models and limits before
+    its process runs. [on_change]: the harness's models or limits changed.
 
     A turn ends when the user aborts it (Esc), also while the process
     starts, and when the process exits or stops; then whatever it was
@@ -54,6 +56,8 @@ val create
   -> ?host:(unit -> string)
   -> ?handoff_from:Engine_choice.t
   -> ?checkpoint:(Json.t -> Tool.Result.t)
+  -> ?catalog:(unit -> Adapter.Catalog.t option)
+  -> ?on_change:(unit -> unit)
   -> unit
   -> t
 

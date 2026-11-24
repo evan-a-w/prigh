@@ -374,6 +374,15 @@ let create
         List.iter outputs ~f:(dispatch t)
     ;;
 
+    let limits _ = None
+
+    (* Its models come with a session. *)
+    let on_change _ _ = ()
+
+    let catalog ~sw:_ ?request_timeout:_ _ _ =
+      Or_error.errorf "%s lists its models only in a session" display_name
+    ;;
+
     (* The choices of its [model] option; the current one is its default. *)
     let models t =
       match
@@ -393,7 +402,7 @@ let create
           | Some c ->
             { (model c) with
               id = External_model.default_id
-            ; name = sprintf "default (%s)" c.name
+            ; name = sprintf "Default (%s)" c.name
             }
           | None -> External_model.default ~adapter:id
         in

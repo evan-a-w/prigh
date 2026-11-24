@@ -92,10 +92,12 @@ module type Runner_api = sig
       external harness's process). [rewind]: what the engine must undo outside the session (an external
       harness's conversation and the files it changed) before the session
       is rewound to the entry [to_]; an error leaves both as they were.
-      Without it, rewinding is the session's alone. *)
+      Without it, rewinding is the session's alone. [limits]: how much of
+      its login's usage limits an external harness said were used. *)
   val create
     :  ?close:(unit -> unit)
     -> ?rewind:(Session.t -> to_:string -> unit Or_error.t)
+    -> ?limits:(unit -> Subscription_usage.Status.t option)
     -> (module S with type t = 'a)
     -> 'a
     -> t
@@ -110,6 +112,9 @@ module type Runner_api = sig
   val capabilities : t -> Capabilities.t
   val models : t -> Model.t list option
   val context : t -> int option * int option
+
+  (** See [create]: [None] for the harness. *)
+  val limits : t -> Subscription_usage.Status.t option
 
   val run_turn
     :  t

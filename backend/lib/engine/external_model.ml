@@ -38,7 +38,7 @@ let model
   ; name =
       Option.value
         name
-        ~default:(if String.equal id default_id then "default" else id)
+        ~default:(if String.equal id default_id then "Default" else id)
   ; context_window
   ; max_output = 0
   ; thinking_levels

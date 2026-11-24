@@ -663,6 +663,22 @@ let runner_capabilities t =
   | None, None -> Capabilities.harness
 ;;
 
+(* The harness's own description of [m] (its name, levels), once it listed
+   its models. *)
+let listed t (m : Model.t) =
+  Option.bind t.runner ~f:Runner.models
+  |> Option.bind
+       ~f:
+         (List.find ~f:(fun (l : Model.t) ->
+            Provider_id.equal l.provider m.provider && String.equal l.id m.id))
+  |> Option.value_map ~default:m ~f:(fun (l : Model.t) ->
+    { m with
+      name = l.name
+    ; thinking_levels = l.thinking_levels
+    ; can_disable_thinking = l.can_disable_thinking
+    })
+;;
+
 (* A composer session's model is its harness's: the one picked (an
    {!External_model}), else (the harness's default picked, or none) the one
    that wrote its latest reply ([codex/gpt-5] shows as [gpt-5]), else the
@@ -671,7 +687,8 @@ let shown_model t =
   match engine_choice t with
   | _
     when is_external t.model
-         && Option.is_some (External_model.native_id t.model) -> t.model
+         && Option.is_some (External_model.native_id t.model) ->
+    listed t t.model
   | { engine = Composer; adapter = Some adapter } ->
     let prefix = Adapter_id.to_string adapter ^ "/" in
     (match
@@ -682,10 +699,11 @@ let shown_model t =
        { t.model with id = name; name }
      | _ ->
        if is_external t.model
-       then t.model
-       else (
-         let name = External_model.default_id in
-         { t.model with id = name; name }))
+       then listed t t.model
+       else
+         listed
+           t
+           (External_model.default ~adapter:(Adapter_id.to_string adapter)))
   | _ -> t.model
 ;;
 
@@ -3137,6 +3155,7 @@ let set_runner t runner =
 (* The models the session can switch to when they are its external
    harness's, not prigh's. *)
 let external_models t = Option.bind t.runner ~f:Runner.models
+let external_limits t = Option.bind t.runner ~f:Runner.limits
 let stop_engine t = Option.iter t.runner ~f:Runner.close
 let capabilities t = runner_capabilities t
 

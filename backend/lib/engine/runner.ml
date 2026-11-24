@@ -9,11 +9,18 @@ type t =
       ; value : 'a
       ; close : unit -> unit
       ; rewind : Session.t -> to_:string -> unit Or_error.t
+      ; limits : unit -> Subscription_usage.Status.t option
       }
       -> t
 
-let create ?(close = ignore) ?(rewind = fun _ ~to_:_ -> Ok ()) runner value =
-  T { runner; value; close; rewind }
+let create
+      ?(close = ignore)
+      ?(rewind = fun _ ~to_:_ -> Ok ())
+      ?(limits = fun () -> None)
+      runner
+      value
+  =
+  T { runner; value; close; rewind; limits }
 ;;
 
 let close (T { close; _ }) = close ()
@@ -27,3 +34,4 @@ let run_turn (T { runner = (module R); value; _ }) services ~cancel input =
 
 let models (T { runner = (module R); value; _ }) = R.models value
 let context (T { runner = (module R); value; _ }) = R.context value
+let limits (T { limits; _ }) = limits ()
