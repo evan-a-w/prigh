@@ -769,3 +769,131 @@ let%expect_test "versions and quirks of the known agents" =
       (steer Between_turns) (xai_extensions false)))
     |}]
 ;;
+
+let known name = Option.value_exn (Acp_agent.find_known name)
+
+(* Starts [go], steers with [also this] once the agent is writing, and
+   prints the session's log after. *)
+let steer_mid_run agent =
+  let started, resolve = Eio.Promise.create () in
+  Agent.subscribe agent ~f:(function
+    | Loop (Message_update _) ->
+      if not (Eio.Promise.is_resolved started)
+      then Eio.Promise.resolve resolve ()
+    | _ -> ());
+  Or_error.ok_exn (Agent.prompt agent "go");
+  Eio.Promise.await started;
+  Or_error.ok_exn (Agent.steer agent "also this");
+  Agent.wait_idle agent;
+  print_endline "--- log";
+  List.iter (Agent.messages agent) ~f:(fun m ->
+    print_endline (Test_background_subagents.message_line m))
+;;
+
+let%expect_test "Antigravity: a message mid-run steers with another prompt" =
+  with_acp ~agent:(known "antigravity") ~peer:(fun _ p ->
+    P.initialize p;
+    P.new_session p "ses_1";
+    let first = P.expect p "session/prompt" in
+    P.text p "ses_1" "Working";
+    let second = P.expect p "session/prompt" in
+    (* The running prompt ends; the turn goes on under the steer. *)
+    P.result p first {|{"stopReason":"end_turn"}|};
+    P.text p "ses_1" " and that too.";
+    P.result p second {|{"stopReason":"end_turn"}|})
+  @@ fun agent _ ->
+  steer_mid_run agent;
+  [%expect
+    {|
+    spawn #1: agy acp
+    agent got initialize
+    agent got session/new session=- mcp=[]
+    agent got session/prompt "go"
+    assistant (acp:antigravity/default, End_turn): "Working"
+    agent got session/prompt "also this"
+    assistant (acp:antigravity/default, End_turn): " and that too."
+    --- log
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
+    assistant: Working
+    user: also this
+    assistant: and that too.
+    |}]
+;;
+
+let%expect_test "Grok: a message mid-run interjects" =
+  with_acp ~agent:(known "grok") ~peer:(fun _ p ->
+    P.initialize p;
+    P.new_session p "ses_1";
+    let prompt = P.expect p "session/prompt" in
+    P.text p "ses_1" "Working";
+    let interject = P.expect p "_x.ai/interject" in
+    printf
+      "interjected: %s\n"
+      (Json.to_string
+         (Option.value (Json.member "params" interject) ~default:`Null));
+    P.result p interject "{}";
+    P.text p "ses_1" " and that too.";
+    P.result p prompt {|{"stopReason":"end_turn"}|})
+  @@ fun agent _ ->
+  steer_mid_run agent;
+  [%expect
+    {|
+    spawn #1: grok agent stdio
+    agent got initialize
+    agent got session/new session=- mcp=[]
+    agent got session/prompt "go"
+    assistant (acp:grok/default, End_turn): "Working"
+    agent got _x.ai/interject
+    interjected: {"sessionId":"ses_1","text":"also this"}
+    assistant (acp:grok/default, End_turn): " and that too."
+    --- log
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
+    assistant: Working
+    user: also this
+    assistant: and that too.
+    |}]
+;;
+
+let%expect_test "Antigravity: stopping a steered turn" =
+  let steered, steered_resolve = Eio.Promise.create () in
+  with_acp ~agent:(known "antigravity") ~peer:(fun _ p ->
+    P.initialize p;
+    P.new_session p "ses_1";
+    let first = P.expect p "session/prompt" in
+    P.text p "ses_1" "Working";
+    let second = P.expect p "session/prompt" in
+    P.result p first {|{"stopReason":"end_turn"}|};
+    Eio.Promise.resolve steered_resolve ();
+    ignore (P.expect p "session/cancel" : Json.t);
+    P.result p second {|{"stopReason":"cancelled"}|})
+  @@ fun agent _ ->
+  let started, resolve = Eio.Promise.create () in
+  Agent.subscribe agent ~f:(function
+    | Loop (Message_update _) ->
+      if not (Eio.Promise.is_resolved started)
+      then Eio.Promise.resolve resolve ()
+    | _ -> ());
+  Or_error.ok_exn (Agent.prompt agent "go");
+  Eio.Promise.await started;
+  Or_error.ok_exn (Agent.steer agent "also this");
+  Eio.Promise.await steered;
+  ignore (Agent.abort agent : string list);
+  Agent.wait_idle agent;
+  print_endline "--- log";
+  List.iter (Agent.messages agent) ~f:(fun m ->
+    print_endline (Test_background_subagents.message_line m));
+  [%expect
+    {|
+    spawn #1: agy acp
+    agent got initialize
+    agent got session/new session=- mcp=[]
+    agent got session/prompt "go"
+    assistant (acp:antigravity/default, End_turn): "Working"
+    agent got session/prompt "also this"
+    agent got session/cancel
+    --- log
+    user: [Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).] |  | go
+    assistant: Working
+    user: also this
+    |}]
+;;
