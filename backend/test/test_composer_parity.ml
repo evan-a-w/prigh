@@ -505,3 +505,25 @@ let%expect_test "back to the harness engine: prigh's model again" =
     (("Agent.engine agent" Harness) (models false))
     |}]
 ;;
+
+let%expect_test "a default row's name and the id a reply came under" =
+  List.iter
+    [ "GPT-6.2-Sol", "gpt-6.2-sol"
+    ; "Opus 5", "claude-opus-5-20260101"
+    ; "Opus 5", "opus-5 (1M context)"
+    ; "Sonnet 4", "claude-sonnet-4-5-20250929"
+    ; "opus-4", "opus-4-1"
+    ; "Haiku 4.5", "claude-haiku-4.5"
+    ]
+    ~f:(fun (name, id) ->
+      printf "%s ~ %s: %b\n" name id (External_model.same_model name id));
+  [%expect
+    {|
+    GPT-6.2-Sol ~ gpt-6.2-sol: true
+    Opus 5 ~ claude-opus-5-20260101: true
+    Opus 5 ~ opus-5 (1M context): true
+    Sonnet 4 ~ claude-sonnet-4-5-20250929: false
+    opus-4 ~ opus-4-1: false
+    Haiku 4.5 ~ claude-haiku-4.5: true
+    |}]
+;;

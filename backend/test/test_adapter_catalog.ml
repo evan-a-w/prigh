@@ -241,7 +241,7 @@ let composer =
   Or_error.ok_exn
     (Engines.create
        ~engines:[ Harness; Composer ]
-       ~adapters:[ Codex; Claude; Acp "antigravity" ]
+       ~adapters:[ Codex; Claude; Acp "antigravity"; Acp "grok" ]
        ())
 ;;
 
@@ -272,13 +272,16 @@ let with_server ?(logged_in = true) f =
   in
   let spawn_external _agent (launch : Adapter.Launch.t) =
     printf "spawn %s\n" (List.hd_exn launch.argv);
-    Ok
-      (Line_transport.Peer.spawn
-         ~sw
-         (match launch.argv with
-          | "codex" :: _ -> fake_codex ~logged_in
-          | "agy" :: _ -> fake_agy
-          | _ -> fake_claude))
+    match launch.argv with
+    | "grok" :: _ -> Or_error.error_string "grok: command not found"
+    | argv ->
+      Ok
+        (Line_transport.Peer.spawn
+           ~sw
+           (match argv with
+            | "codex" :: _ -> fake_codex ~logged_in
+            | "agy" :: _ -> fake_agy
+            | _ -> fake_claude))
   in
   let server =
     Rpc_server.create
@@ -308,6 +311,8 @@ let with_server ?(logged_in = true) f =
   let client =
     Rpc_server.connect server ~send:(fun json ->
       match string_at [ "event" ] json with
+      | Some "notice" ->
+        printf "notice: %s\n" (Option.value_exn (string_at [ "text" ] json))
       | Some "models_changed" ->
         print_endline "event: models_changed";
         Option.iter !note_changed ~f:(fun u ->
@@ -554,5 +559,26 @@ let%expect_test
     {|
     event: models_changed
     acp:antigravity: chip: acp:antigravity/gpt-oss (GPT-OSS 120B (Medium))
+    |}]
+;;
+
+let%expect_test
+    "a harness that cannot list its models: only its default, and why, once"
+  =
+  with_server
+  @@ fun ~call ~models ~chip:_ ~usage:_ ~changed:_ ~next_change:_ ->
+  ignore (call ~params:{|{"adapter": "acp:grok"}|} "new_session" : Json.t);
+  models ();
+  (* The fetch failed at once: asked again, the picker says why, once. *)
+  models ();
+  models ();
+  [%expect
+    {|
+    spawn grok
+    event: models_changed
+    notice: Grok Build on backend did not list its models, so the picker shows only its default: grok: command not found. Check that it is installed and logged in there (Settings → Engines).
+      acp:grok/default "Default" thinking=[off]
+      acp:grok/default "Default" thinking=[off]
+      acp:grok/default "Default" thinking=[off]
     |}]
 ;;

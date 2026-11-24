@@ -93,11 +93,13 @@ module type Runner_api = sig
       harness's conversation and the files it changed) before the session
       is rewound to the entry [to_]; an error leaves both as they were.
       Without it, rewinding is the session's alone. [limits]: how much of
-      its login's usage limits an external harness said were used. *)
+      its login's usage limits an external harness said were used. [live]:
+      whether an external harness's process is up for the session. *)
   val create
     :  ?close:(unit -> unit)
     -> ?rewind:(Session.t -> to_:string -> unit Or_error.t)
     -> ?limits:(unit -> Subscription_usage.Status.t option)
+    -> ?live:(unit -> bool)
     -> (module S with type t = 'a)
     -> 'a
     -> t
@@ -115,6 +117,9 @@ module type Runner_api = sig
 
   (** See [create]: [None] for the harness. *)
   val limits : t -> Subscription_usage.Status.t option
+
+  (** See [create]: [false] for the harness. *)
+  val live : t -> bool
 
   val run_turn
     :  t

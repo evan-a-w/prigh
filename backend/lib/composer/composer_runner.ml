@@ -1020,6 +1020,10 @@ let runner t =
     ~close:(fun () -> close t)
     ~rewind:(rewind t)
     ~limits:(fun () -> limits t)
+    ~live:(fun () ->
+      match t.live with
+      | Some (Live ((module L), a)) -> L.alive a
+      | None -> false)
     (module R)
     t
 ;;

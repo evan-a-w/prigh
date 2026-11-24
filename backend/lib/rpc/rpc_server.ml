@@ -1181,6 +1181,22 @@ let catalog_failure t agent =
   | _ -> None
 ;;
 
+(* The session's harness listed no models when asked last (Goose): it has
+   only its default, and is not asked again. *)
+let lists_no_models t agent =
+  match Agent.engine_choice agent with
+  | { engine = Composer; adapter = Some a } ->
+    (match
+       Adapter_catalog.find
+         t.catalogs
+         ~host:(Agent.active_host agent)
+         (Adapter_id.to_string a)
+     with
+     | Some { models = []; _ } -> true
+     | Some _ | None -> false)
+  | _ -> false
+;;
+
 (* The models of a session an external harness runs: its own, never
    prigh's, even before it runs here. *)
 let external_models t agent =
@@ -3935,8 +3951,13 @@ let dispatch_server t (client : Client.t) ~meth ~params
     let agent = client.agent in
     (match external_models t agent with
      | Some models ->
-       (* Only the harness's default until it says its models: asked now. *)
-       if List.length models <= 1
+       (* Only the harness's default until it says its models: asked now,
+          unless its process is up (its session says them) or it listed
+          none before. *)
+       if
+         List.length models <= 1
+         && (not (Agent.external_live agent))
+         && not (lists_no_models t agent)
        then (
          ensure_catalog t agent;
          Option.iter (catalog_failure t agent) ~f:(fun why ->

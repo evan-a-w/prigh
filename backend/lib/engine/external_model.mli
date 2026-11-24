@@ -41,3 +41,9 @@ val native_id : Model.t -> string option
 (** The model the session recorded as [key] ([ADAPTER/ID]) among
     [models], else made from the key; [None] when [key] is not [adapter]'s. *)
 val restore : adapter:string -> models:Model.t list -> string -> Model.t option
+
+(** Whether a model's name ([Opus 5 (1M context)]) and an id a harness
+    replied under ([claude-opus-5-20260101]) are the same model: equal once
+    lowercased with [claude-] dropped, or one is the other with a date or a
+    bracketed note added ([sonnet-4] is not [sonnet-4-5]). *)
+val same_model : string -> string -> bool

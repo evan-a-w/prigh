@@ -701,19 +701,6 @@ let shown_model t =
        let models =
          Option.value (Option.bind t.runner ~f:Runner.models) ~default:[]
        in
-       let slug s =
-         String.lowercase s
-         |> String.map ~f:(fun c ->
-           if Char.is_alphanum c || Char.equal c '.' then c else '-')
-         |> fun s ->
-         Option.value (String.chop_prefix s ~prefix:"claude-") ~default:s
-       in
-       (* The same model, maybe with more said: [opus-5] and
-          [opus-5--1m-context-], [sonnet-5] and [sonnet-5-20260101]. *)
-       let same a b =
-         let longer_by a b = String.is_prefix b ~prefix:(a ^ "-") in
-         String.equal a b || longer_by a b || longer_by b a
-       in
        (match
           List.find models ~f:(fun (m : Model.t) -> String.equal m.id name)
         with
@@ -722,7 +709,7 @@ let shown_model t =
           (match
              List.find models ~f:(fun (m : Model.t) ->
                String.equal m.id External_model.default_id
-               && same (slug m.name) (slug name))
+               && External_model.same_model m.name name)
            with
            | Some m ->
              listed t { t.model with id = m.id; provider = m.provider }
@@ -3197,6 +3184,7 @@ let set_runner t runner =
    harness's, not prigh's. *)
 let external_models t = Option.bind t.runner ~f:Runner.models
 let external_limits t = Option.bind t.runner ~f:Runner.limits
+let external_live t = Option.exists t.runner ~f:Runner.live
 let stop_engine t = Option.iter t.runner ~f:Runner.close
 let capabilities t = runner_capabilities t
 

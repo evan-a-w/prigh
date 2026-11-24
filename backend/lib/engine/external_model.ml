@@ -87,3 +87,22 @@ let restore ~adapter ~models key =
      | Some m -> Some m
      | None -> Some (model ~adapter id))
 ;;
+
+let same_model a b =
+  let slug s =
+    String.lowercase s
+    |> String.map ~f:(fun c ->
+      if Char.is_alphanum c || Char.equal c '.' then c else '-')
+    |> fun s -> Option.value (String.chop_prefix s ~prefix:"claude-") ~default:s
+  in
+  let longer_by a b =
+    match String.chop_prefix b ~prefix:(a ^ "-") with
+    | None -> false
+    | Some rest ->
+      String.is_prefix rest ~prefix:"-"
+      || (String.length rest = 8 && String.for_all rest ~f:Char.is_digit)
+  in
+  let a = slug a
+  and b = slug b in
+  String.equal a b || longer_by a b || longer_by b a
+;;

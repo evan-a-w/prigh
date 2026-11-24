@@ -415,7 +415,8 @@ val identified_messages : t -> (string option * Timed_message.t) list
 
 val model : t -> (string * Thinking.t) option
 
-(** The latest model the session switched to of those [f] accepts (by key). *)
+(** The latest model the session switched to, on its active path, of those
+    [f] accepts (by key). *)
 val last_model : t -> f:(string -> bool) -> (string * Thinking.t) option
 
 (** {2 Engines}
