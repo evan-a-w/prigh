@@ -103,7 +103,7 @@ let%expect_test "choosing a new session's engine" =
   [%expect
     {|
     (Error
-     "this backend's composer does not drive gemini (ACP) (it drives Codex, Claude Code)")
+     "this backend's composer does not drive Gemini CLI (it drives Codex, Claude Code)")
     |}];
   choose ~t:Engines.default ~engine:"composer" ();
   [%expect
@@ -129,7 +129,7 @@ let%expect_test "a session the backend cannot run" =
     composer_deployed
     { engine = Composer; adapter = Some (Acp "gemini") };
   [%expect
-    {| ("this session drives gemini (ACP), which this backend's composer does not (it drives Codex, Claude Code): add it with -adapters codex,claude,acp:gemini") |}]
+    {| ("this session drives Gemini CLI, which this backend's composer does not (it drives Codex, Claude Code): add it with -adapters codex,claude,acp:gemini") |}]
 ;;
 
 let with_dir f = f (Filename_unix.temp_dir "prigh-engines" "")
@@ -411,7 +411,7 @@ let%expect_test "hello, new_session and state with the composer deployed" =
     ~f:(fun params -> print_fields (call ~params "new_session") [ [ "error" ] ]);
   [%expect
     {|
-    error: "this backend's composer does not drive gemini (ACP) (it drives Codex, Claude Code)"
+    error: "this backend's composer does not drive Gemini CLI (it drives Codex, Claude Code)"
     error: "unknown engine \"warp\": expected harness or composer"
     error: "param \"engine\" must be a string"
     |}]

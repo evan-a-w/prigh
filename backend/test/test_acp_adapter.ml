@@ -54,6 +54,13 @@ module P = struct
               | _ -> "")
            | "session/set_mode" ->
              " " ^ Option.value (str "modeId" params) ~default:""
+           | "session/set_model" ->
+             " " ^ Option.value (str "modelId" params) ~default:""
+           | "session/set_config_option" ->
+             sprintf
+               " %s=%s"
+               (Option.value (str "configId" params) ~default:"")
+               (Option.value (str "value" params) ~default:"")
            | _ -> ""
          in
          printf "agent got %s%s\n" m detail;
@@ -565,5 +572,113 @@ let%expect_test "-adapters: ACP agents and prigh, and new sessions on them" =
      (find
       (Error
        "prigh does not know how to start the ACP agent mine: give its command with -adapters acp:mine=<command and args> (it knows opencode, gemini, antigravity, grok, goose)")))
+    |}]
+;;
+
+(* Antigravity's and Grok's shape: the session model API, and a thought
+   level option. *)
+let session_with_models p session =
+  let j = P.expect p "session/new" in
+  P.result
+    p
+    j
+    (sprintf
+       {|{"sessionId":%S,
+          "models":{"currentModelId":"gemini-flash","availableModels":[
+            {"modelId":"gpt-oss","name":"GPT-OSS 120B (Medium)"},
+            {"modelId":"gemini-flash","name":"Gemini 3.8 Flash"},
+            {"modelId":"sonnet","name":"Claude Sonnet 4.6 (Thinking)"}]},
+          "configOptions":[{"id":"effort","name":"Effort","category":"thought_level",
+            "type":"select","currentValue":"medium","options":[
+              {"value":"low","name":"Low"},{"value":"medium","name":"Medium"},
+              {"value":"high","name":"High"}]}]}|}
+       session)
+;;
+
+let print_models agent =
+  List.iter
+    (Option.value (Agent.external_models agent) ~default:[])
+    ~f:(fun (m : Model.t) ->
+      printf
+        "  %s %S thinking=[%s]\n"
+        (Model.key m)
+        m.name
+        (String.concat
+           ~sep:","
+           (List.map m.thinking_levels ~f:Thinking.Level.to_string)))
+;;
+
+let%expect_test
+    "models from the session model API: the default first, set with \
+     session/set_model"
+  =
+  with_acp ~peer:(fun _ p ->
+    P.initialize p;
+    session_with_models p "ses_1";
+    let prompt = P.expect p "session/prompt" in
+    P.result p prompt {|{"stopReason":"end_turn"}|};
+    let j = P.expect p "session/set_model" in
+    P.result p j "{}";
+    let j = P.expect p "session/set_config_option" in
+    P.result p j "{}";
+    let prompt = P.expect p "session/prompt" in
+    P.result p prompt {|{"stopReason":"end_turn"}|};
+    let j = P.expect p "session/set_model" in
+    P.result p j "{}";
+    let prompt = P.expect p "session/prompt" in
+    P.result p prompt {|{"stopReason":"end_turn"}|})
+  @@ fun agent _ ->
+  prompt agent "one";
+  print_models agent;
+  let models = Option.value_exn (Agent.external_models agent) in
+  Agent.set_model
+    agent
+    (List.find_exn models ~f:(fun m -> String.equal m.id "sonnet"));
+  Or_error.ok_exn (Agent.set_thinking agent (On (Some High)));
+  prompt agent "two";
+  print_s [%sexp (Model.key (Agent.state agent).model : string)];
+  Agent.set_model agent (List.hd_exn models);
+  prompt agent "three";
+  [%expect
+    {|
+    spawn #1: opencode acp
+    agent got initialize
+    agent got session/new session=- mcp=[]
+    agent got session/prompt "one"
+      acp:opencode/default "Gemini 3.8 Flash" thinking=[low,medium,high]
+      acp:opencode/gpt-oss "GPT-OSS 120B (Medium)" thinking=[low,medium,high]
+      acp:opencode/sonnet "Claude Sonnet 4.6 (Thinking)" thinking=[low,medium,high]
+    agent got session/set_model sonnet
+    agent got session/set_config_option effort=high
+    agent got session/prompt "two"
+    acp:opencode/sonnet
+    agent got session/set_model gemini-flash
+    agent got session/prompt "three"
+    |}]
+;;
+
+let%expect_test "an ACP agent's catalog: a session opened to read its models" =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let (module A : Adapter.S) = Acp_adapter.create opencode in
+  let transport =
+    Line_transport.Peer.spawn ~sw (fun p ->
+      P.initialize p;
+      session_with_models p "ses_1")
+  in
+  (match A.catalog ~sw transport (Adapter.Start.default ~cwd:t.dir) with
+   | Error e -> print_s [%sexp (e : Error.t)]
+   | Ok { models; _ } ->
+     List.iter models ~f:(fun (m : Model.t) ->
+       printf "%s %S\n" (Model.key m) m.name));
+  [%expect
+    {|
+    agent got initialize
+    agent got session/new session=- mcp=[]
+    acp:opencode/default "Gemini 3.8 Flash"
+    acp:opencode/gpt-oss "GPT-OSS 120B (Medium)"
+    acp:opencode/sonnet "Claude Sonnet 4.6 (Thinking)"
     |}]
 ;;

@@ -11,7 +11,8 @@ type t =
 [@@deriving sexp_of, equal]
 
 (** The agents prigh knows how to start: [opencode] ([opencode acp]),
-    [gemini] ([gemini --experimental-acp]) and [goose] ([goose acp]). *)
+    [antigravity] ([agy acp]), [grok] ([grok agent stdio]), [gemini]
+    ([gemini --experimental-acp]) and [goose] ([goose acp]). *)
 val known : t list
 
 val find_known : string -> t option

@@ -132,18 +132,16 @@ let list_models driver codec =
   match infos with
   | [] -> []
   | _ ->
-    let default =
-      match
-        List.find infos ~f:(fun (m : Codex_codec.Model_info.t) -> m.is_default)
-      with
-      | Some m ->
-        { (model_of m ~id) with
-          id = External_model.default_id
-        ; name = sprintf "Default (%s)" m.display_name
-        }
-      | None -> External_model.default ~adapter:id
-    in
-    default :: List.map infos ~f:(model_of ~id)
+    (* Its default stands for the model it names: listed once. *)
+    (match
+       List.partition_tf infos ~f:(fun (m : Codex_codec.Model_info.t) ->
+         m.is_default)
+     with
+     | m :: _, others ->
+       { (model_of m ~id) with id = External_model.default_id }
+       :: List.map others ~f:(model_of ~id)
+     | [], _ ->
+       External_model.default ~adapter:id :: List.map infos ~f:(model_of ~id))
 ;;
 
 (* Codex asks in a turn of its own, which no prigh turn is there to answer. *)

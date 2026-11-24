@@ -16,7 +16,7 @@ type t =
   { now : unit -> float
   ; entries : (Key.t, Entry.t) Hashtbl.t
   ; asking : (Key.t, unit Promise.t) Hashtbl.t
-  ; failed : (Key.t, float) Hashtbl.t
+  ; failed : (Key.t, float * Error.t) Hashtbl.t
   }
 
 let create ~now () =
@@ -45,7 +45,7 @@ let refresh t ~sw ~host adapter ~max_age ~fetch ~on_done =
     Option.exists (age t ~host adapter) ~f:(fun age -> Float.( < ) age max_age)
   in
   let failed_lately =
-    Option.exists (Hashtbl.find t.failed key) ~f:(fun at ->
+    Option.exists (Hashtbl.find t.failed key) ~f:(fun (at, _) ->
       Float.( < ) (t.now () -. at) retry_after)
   in
   if not (fresh || failed_lately || Hashtbl.mem t.asking key)
@@ -71,9 +71,14 @@ let refresh t ~sw ~host adapter ~max_age ~fetch ~on_done =
         Hashtbl.set t.entries ~key ~data:{ catalog; at = t.now () };
         Promise.resolve resolve ();
         on_done ()
-      | Error _ ->
-        Hashtbl.set t.failed ~key ~data:(t.now ());
-        Promise.resolve resolve ()))
+      | Error e ->
+        Hashtbl.set t.failed ~key ~data:(t.now (), e);
+        Promise.resolve resolve ();
+        on_done ()))
+;;
+
+let failure t ~host adapter =
+  Option.map (Hashtbl.find t.failed (host, adapter)) ~f:snd
 ;;
 
 let await t ~host adapter =

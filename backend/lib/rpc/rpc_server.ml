@@ -1138,12 +1138,14 @@ let fetch_catalog t agent (module A : Adapter.S) () =
           start))
 ;;
 
-(* Asks, in the background, the catalog of a Codex or Claude Code
+(* Asks, in the background, the catalog of a Codex, Claude Code or ACP
    session's harness on its tool host, unless one younger than [max_age]
    seconds is kept. *)
 let ensure_catalog ?(max_age = 1800.) t agent =
   match Agent.engine_choice agent with
-  | { engine = Composer; adapter = Some ((Codex | Claude) as adapter_id) } ->
+  | { engine = Composer
+    ; adapter = Some ((Codex | Claude | Acp _) as adapter_id)
+    } ->
     (match Composer_adapters.find t.engines adapter_id with
      | Error _ -> ()
      | Ok adapter ->
@@ -1158,6 +1160,42 @@ let ensure_catalog ?(max_age = 1800.) t agent =
          ~fetch:(fetch_catalog t agent adapter)
          ~on_done:(fun () -> catalog_changed t ~host name))
   | _ -> ()
+;;
+
+(* Why a composer session's harness could not say its models, and what to
+   do. *)
+let catalog_failure t agent =
+  match Agent.engine_choice agent with
+  | { engine = Composer; adapter = Some ((Codex | Claude | Acp _) as a) } ->
+    let host = Agent.active_host agent in
+    Option.map
+      (Adapter_catalog.failure t.catalogs ~host (Adapter_id.to_string a))
+      ~f:(fun e ->
+        sprintf
+          "%s on %s did not list its models, so the picker shows only its \
+           default: %s. Check that it is installed and logged in there \
+           (Settings → Engines)."
+          (Adapter_id.label a)
+          host
+          (Error.to_string_hum e))
+  | _ -> None
+;;
+
+(* The models of a session an external harness runs: its own, never
+   prigh's, even before it runs here. *)
+let external_models t agent =
+  match Agent.external_models agent, Agent.engine_choice agent with
+  | Some models, _ -> Some models
+  | None, { engine = Composer; adapter = Some ((Codex | Claude | Acp _) as a) }
+    ->
+    let adapter = Adapter_id.to_string a in
+    Some
+      (match
+         Adapter_catalog.find t.catalogs ~host:(Agent.active_host agent) adapter
+       with
+       | Some { models = _ :: _ as models; _ } -> models
+       | Some _ | None -> [ External_model.default ~adapter ])
+  | None, _ -> None
 ;;
 
 (* A composer session's harness login's usage, as the harness says (asked
@@ -3896,10 +3934,15 @@ let dispatch_server t (client : Client.t) ~meth ~params
   | "pr_list" | "pr_view" | "pr_defaults" | "pr_create" ->
     Some (pull_requests t client ~meth ~params)
   | "list_models" ->
-    (match Agent.external_models client.agent with
+    let agent = client.agent in
+    (match external_models t agent with
      | Some models ->
        (* Only the harness's default until it says its models: asked now. *)
-       if List.length models <= 1 then ensure_catalog t client.agent;
+       if List.length models <= 1
+       then (
+         ensure_catalog t agent;
+         Option.iter (catalog_failure t agent) ~f:(fun why ->
+           tell_problems client [ why ]));
        Some (ok (`Array (List.map models ~f:Rpc_json.model)))
      | None ->
        let models = Login_manager.models t.login in
@@ -3946,7 +3989,9 @@ let resolve_external (models : Model.t list) query ~who =
       (String.concat ~sep:", " (List.map models ~f:(fun m -> m.id)))
 ;;
 
-let dispatch agent login ~(client : Client.t) ~meth ~params : Json.t Or_error.t =
+let dispatch agent login ~external_models ~(client : Client.t) ~meth ~params
+  : Json.t Or_error.t
+  =
   match meth with
   | "ping" -> ok (`String "pong")
   | "resync" ->
@@ -4158,7 +4203,7 @@ let dispatch agent login ~(client : Client.t) ~meth ~params : Json.t Or_error.t 
   | "set_model" ->
     Or_error.bind (string_param params "model") ~f:(fun id ->
       Or_error.map
-        (match Agent.external_models agent with
+        (match external_models () with
          | Some models ->
            resolve_external models id ~who:(Agent.engine_label agent)
          | None -> Model_registry.resolve (Login_manager.models login) id)
@@ -4472,7 +4517,14 @@ let handle t client (request : Json.t) : Json.t =
                       (Git_rpc.dispatch agent ~meth ~params))
                with
                | Some result -> result
-               | None -> dispatch agent t.login ~client ~meth ~params))
+               | None ->
+                 dispatch
+                   agent
+                   t.login
+                   ~external_models:(fun () -> external_models t agent)
+                   ~client
+                   ~meth
+                   ~params))
         with
         | result -> result
         | exception exn ->

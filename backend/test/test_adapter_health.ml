@@ -102,7 +102,7 @@ let%expect_test "not installed (one only in a login shell), logged out" =
     claude: ((Installed (version (2.1.330)) (path /usr/bin/claude)) Logged_out)
       Claude Code on laptop is not logged in: run `claude auth login` there
     acp:gemini: ((Not_installed (login_shell_path (/home/u/.npm/bin/gemini))) Unknown)
-      gemini (ACP) is installed on laptop at /home/u/.npm/bin/gemini, but not on the PATH of prigh's tool host there: add /home/u/.npm/bin to that PATH and restart the tool host
+      Gemini CLI is installed on laptop at /home/u/.npm/bin/gemini, but not on the PATH of prigh's tool host there: add /home/u/.npm/bin to that PATH and restart the tool host
     prigh: ((Installed (version (<version>)) (path prigh)) Not_needed)
       (ready)
     |}];
@@ -180,7 +180,7 @@ let%expect_test "JSON" =
     {|
     {"adapter":"codex","label":"Codex","host":"h1","host_name":"laptop","installed":true,"version":"0.166.0","path":"/usr/bin/codex","auth":"logged_in","account":"API key","checked_at":0}
     {"adapter":"claude","label":"Claude Code","host":"h1","host_name":"laptop","installed":false,"auth":"unknown","problem":"Claude Code is not installed on laptop, please install it","checked_at":0}
-    {"adapter":"acp:gemini","label":"gemini (ACP)","host":"h1","host_name":"laptop","installed":null,"unknown":"the host did not report it","auth":"unknown","problem":"can't tell whether gemini (ACP) is installed on laptop: the host did not report it","checked_at":0}
+    {"adapter":"acp:gemini","label":"Gemini CLI","host":"h1","host_name":"laptop","installed":null,"unknown":"the host did not report it","auth":"unknown","problem":"can't tell whether Gemini CLI is installed on laptop: the host did not report it","checked_at":0}
     {"adapter":"prigh","label":"prigh","host":"h1","host_name":"laptop","installed":true,"version":"<version>","path":"prigh","auth":"not_needed","checked_at":0}
     |}]
 ;;

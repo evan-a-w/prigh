@@ -32,6 +32,9 @@ let of_string s =
 let label = function
   | Codex -> "Codex"
   | Claude -> "Claude Code"
-  | Acp name -> name ^ " (ACP)"
+  | Acp name ->
+    (match Acp_agent.find_known name with
+     | Some agent -> agent.display_name
+     | None -> name ^ " (ACP)")
   | Prigh -> "prigh"
 ;;

@@ -113,6 +113,12 @@ module Session_config : sig
   val option : t -> category:string -> Config_option.t option
 end
 
+(** The id of the [model] option that stands for the session model state
+    of ACP's unstable API ([models] in the session's setup,
+    [current_model_update]), when the agent has no [model] option of its
+    own: {!set_config_option} on it sends [session/set_model]. *)
+val session_model_option : string
+
 module Command : sig
   type t =
     { name : string

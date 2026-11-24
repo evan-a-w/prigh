@@ -391,8 +391,7 @@ let%expect_test "codex: its models, picked and thought about per turn" =
     codex got turn/start model=- effort=-
     assistant (codex/gpt-5, End_turn): "done"
     model codex/gpt-5 (gpt-5), thinking default, context 3020 of 400000
-      codex/default "Default (GPT-5)" thinking=[default minimal low medium high]
-      codex/gpt-5 "GPT-5" thinking=[default minimal low medium high]
+      codex/default "GPT-5" thinking=[default minimal low medium high]
       codex/gpt-5-codex "GPT-5 Codex" thinking=[default low medium high]
     |}];
   let models = Option.value_exn (Agent.external_models agent) in

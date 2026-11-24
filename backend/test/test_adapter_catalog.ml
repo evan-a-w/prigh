@@ -169,11 +169,43 @@ let fake_claude (p : Line_transport.Peer.t) =
   loop ()
 ;;
 
+(* Antigravity: its models through the session model API. *)
+let fake_agy (p : Line_transport.Peer.t) =
+  let reply j result =
+    write
+      p
+      (`Object
+          [ "jsonrpc", `String "2.0"
+          ; "id", Option.value_exn (Json.member "id" j)
+          ; "result", Json.parse result |> Or_error.ok_exn
+          ])
+  in
+  let rec loop () =
+    match read p with
+    | None -> ()
+    | Some j ->
+      let meth = Option.value (string_at [ "method" ] j) ~default:"-" in
+      printf "agy got %s\n" meth;
+      (match meth with
+       | "initialize" ->
+         reply j {|{"protocolVersion":1,"agentCapabilities":{}}|}
+       | "session/new" ->
+         reply
+           j
+           {|{"sessionId":"s1","models":{"currentModelId":"flash","availableModels":[
+               {"modelId":"gpt-oss","name":"GPT-OSS 120B (Medium)"},
+               {"modelId":"flash","name":"Gemini 3.8 Flash"}]}}|}
+       | _ -> ());
+      loop ()
+  in
+  loop ()
+;;
+
 let composer =
   Or_error.ok_exn
     (Engines.create
        ~engines:[ Harness; Composer ]
-       ~adapters:[ Codex; Claude ]
+       ~adapters:[ Codex; Claude; Acp "antigravity" ]
        ())
 ;;
 
@@ -209,6 +241,7 @@ let with_server ?(logged_in = true) f =
          ~sw
          (match launch.argv with
           | "codex" :: _ -> fake_codex ~logged_in
+          | "agy" :: _ -> fake_agy
           | _ -> fake_claude))
   in
   let server =
@@ -229,8 +262,13 @@ let with_server ?(logged_in = true) f =
       ~new_agent
       ()
   in
-  let changed, note_changed = Eio.Promise.create () in
-  let note_changed = ref (Some note_changed) in
+  let note_changed = ref None in
+  let next_change () =
+    let changed, note = Eio.Promise.create () in
+    note_changed := Some note;
+    changed
+  in
+  let changed = next_change () in
   let client =
     Rpc_server.connect server ~send:(fun json ->
       match string_at [ "event" ] json with
@@ -305,13 +343,13 @@ let with_server ?(logged_in = true) f =
                ~f:(sprintf " %S")))
     | _ -> print_endline "usage: ?"
   in
-  f ~call ~models ~chip ~usage ~changed;
+  f ~call ~models ~chip ~usage ~changed ~next_change;
   Rpc_server.shutdown server
 ;;
 
 let%expect_test "codex: the picker lists Codex's models before the first turn" =
   with_server
-  @@ fun ~call ~models ~chip ~usage ~changed ->
+  @@ fun ~call ~models ~chip ~usage ~changed ~next_change:_ ->
   ignore (call ~params:{|{"adapter": "codex"}|} "new_session" : Json.t);
   chip ();
   print_endline "list_models, before Codex said:";
@@ -331,10 +369,9 @@ let%expect_test "codex: the picker lists Codex's models before the first turn" =
     codex got account/rateLimits/read
     event: models_changed
     list_models, after:
-      codex/default "Default (GPT-6.2-Sol)" thinking=[default low medium high]
-      codex/gpt-6.2-sol "GPT-6.2-Sol" thinking=[default low medium high]
+      codex/default "GPT-6.2-Sol" thinking=[default low medium high]
       codex/gpt-6.2-mini "GPT-6.2-Mini" thinking=[default low xhigh]
-    chip: codex/default (Default (GPT-6.2-Sol))
+    chip: codex/default (GPT-6.2-Sol)
     |}];
   ignore (call ~params:{|{"model": "gpt-6.2-mini"}|} "set_model" : Json.t);
   chip ();
@@ -349,7 +386,7 @@ let%expect_test "codex: the picker lists Codex's models before the first turn" =
 
 let%expect_test "claude: its models and plan limits from its own login" =
   with_server
-  @@ fun ~call ~models ~chip ~usage ~changed ->
+  @@ fun ~call ~models ~chip ~usage ~changed ~next_change:_ ->
   ignore (call ~params:{|{"adapter": "claude"}|} "new_session" : Json.t);
   usage ();
   Eio.Promise.await changed;
@@ -372,7 +409,7 @@ let%expect_test
     "codex logged out: its models still, and what it said of its limits"
   =
   with_server ~logged_in:false
-  @@ fun ~call ~models:_ ~chip:_ ~usage ~changed:_ ->
+  @@ fun ~call ~models:_ ~chip:_ ~usage ~changed:_ ~next_change:_ ->
   ignore (call ~params:{|{"adapter": "codex"}|} "new_session" : Json.t);
   usage ();
   [%expect
@@ -383,5 +420,57 @@ let%expect_test
     codex got account/rateLimits/read
     event: models_changed
     usage codex "Codex" error "Codex: codex account authentication required to read rate limits (codex login, on the session's tool host)"
+    |}]
+;;
+
+let%expect_test
+    "an ACP agent's models before its first turn; switching to Codex lists \
+     Codex's"
+  =
+  with_server
+  @@ fun ~call ~models ~chip ~usage:_ ~changed ~next_change ->
+  ignore
+    (call ~params:{|{"adapter": "acp:antigravity"}|} "new_session" : Json.t);
+  print_endline "list_models, before Antigravity said:";
+  models ();
+  Eio.Promise.await changed;
+  print_endline "list_models, after:";
+  models ();
+  chip ();
+  [%expect
+    {|
+    list_models, before Antigravity said:
+    spawn agy
+      acp:antigravity/default "Default" thinking=[off]
+    agy got initialize
+    agy got session/new
+    event: models_changed
+    list_models, after:
+      acp:antigravity/default "Gemini 3.8 Flash" thinking=[off]
+      acp:antigravity/gpt-oss "GPT-OSS 120B (Medium)" thinking=[off]
+    chip: acp:antigravity/default (Gemini 3.8 Flash)
+    |}];
+  let changed = next_change () in
+  ignore (call ~params:{|{"adapter": "codex"}|} "set_adapter" : Json.t);
+  print_endline "list_models, on Codex:";
+  models ();
+  Eio.Promise.await changed;
+  let changed = next_change () in
+  Eio.Promise.await changed;
+  models ();
+  chip ();
+  [%expect
+    {|
+    event: models_changed
+    list_models, on Codex:
+    spawn codex
+      codex/default "Default" thinking=[default low medium high]
+    codex got initialize
+    codex got model/list
+    codex got account/rateLimits/read
+    event: models_changed
+      codex/default "GPT-6.2-Sol" thinking=[default low medium high]
+      codex/gpt-6.2-mini "GPT-6.2-Mini" thinking=[default low xhigh]
+    chip: codex/default (GPT-6.2-Sol)
     |}]
 ;;

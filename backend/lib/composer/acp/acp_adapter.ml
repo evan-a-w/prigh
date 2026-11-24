@@ -31,6 +31,8 @@ type t =
   ; mutable last_line : Time_float.t
   ; mutable before_plan : string option (* the mode plan mode replaced *)
   ; mutable model : string option (* the model last set *)
+  ; mutable agent_default : string option (* its model before we set one *)
+  ; mutable thought : string option (* the thought level last set *)
   }
 
 let mcp_server (name, json) : Codec.Mcp_server.t option =
@@ -64,6 +66,55 @@ let dispatch t (output : Codec.Output.t) =
   | Response r -> Adapter.Driver.answer t.driver r
   | Config_changed _ | Commands _ | Title _ -> ()
 ;;
+
+(* The agent's [thought_level] option, as prigh's thinking levels. *)
+module Thought = struct
+  let level (c : Codec.Config_option.Choice.t) =
+    match String.lowercase c.value with
+    | "xhigh" | "extra_high" | "x-high" -> Some Thinking.Level.Xhigh
+    | v -> Thinking.Level.of_string v
+  ;;
+
+  let is_off (c : Codec.Config_option.Choice.t) =
+    List.mem
+      [ "off"; "none"; "disabled" ]
+      (String.lowercase c.value)
+      ~equal:String.equal
+  ;;
+
+  let option config =
+    match Codec.Session_config.option config ~category:"thought_level" with
+    | Some ({ value = Select { choices; current }; _ } as o) ->
+      Some (o, current, choices)
+    | Some _ | None -> None
+  ;;
+
+  (* Its levels, and whether it can be off. *)
+  let levels config =
+    match option config with
+    | None -> [], false
+    | Some (_, _, choices) ->
+      ( List.filter_map choices ~f:level
+        |> List.dedup_and_sort ~compare:Thinking.Level.compare
+      , List.exists choices ~f:is_off )
+  ;;
+
+  (* The choice for [thinking], when the agent has one ([On None] leaves it
+     as it is). *)
+  let choice config (thinking : Thinking.t) =
+    Option.bind (option config) ~f:(fun (o, current, choices) ->
+      let wanted =
+        match thinking with
+        | On None -> None
+        | Off -> List.find choices ~f:is_off
+        | On (Some l) ->
+          List.find choices ~f:(fun c ->
+            Option.equal Thinking.Level.equal (level c) (Some l))
+      in
+      Option.bind wanted ~f:(fun (c : Codec.Config_option.Choice.t) ->
+        Option.some_if (not (String.equal c.value current)) (o, c.value)))
+  ;;
+end
 
 let not_logged_in (agent : Acp_agent.t) methods =
   let how =
@@ -192,6 +243,8 @@ let create
         ; last_line = Time_float.now ()
         ; before_plan = None
         ; model = None
+        ; agent_default = None
+        ; thought = None
         }
       in
       Adapter.Driver.run
@@ -283,6 +336,14 @@ let create
           Or_error.error_string (not_logged_in agent auth_methods)
         | r -> refused "to open a session" r
       in
+      t.agent_default
+      <- (match
+            Codec.Session_config.option
+              (Codec.session_config codec)
+              ~category:"model"
+          with
+          | Some { value = Select { current; _ }; _ } -> Some current
+          | Some _ | None -> None);
       t
     ;;
 
@@ -332,26 +393,42 @@ let create
            | None -> Ok ())
         | _ -> Ok ()
       in
-      match s.model, Codec.Session_config.option config ~category:"model" with
-      | Some model, Some ({ value = Select { current; choices }; _ } as option)
-        when (not (String.equal current model))
-             && (not (Option.equal String.equal t.model (Some model)))
-             && List.exists
-                  choices
-                  ~f:(fun (c : Codec.Config_option.Choice.t) ->
-                    String.equal c.value model) ->
-        t.model <- Some model;
-        (match
-           Codec.set_config_option t.codec ~config_id:option.id (`Id model)
-         with
-         | Error _ as e -> e
-         | Ok line ->
-           let%bind r =
-             Adapter.Driver.request t.driver line ~matches:(function
-               | Config_set _ | Failed { kind = Set_config_option; _ } -> true
-               | _ -> false)
-           in
-           refused "the model" r)
+      let set_option ~what (option : Codec.Config_option.t) value =
+        match
+          Codec.set_config_option t.codec ~config_id:option.id (`Id value)
+        with
+        | Error _ as e -> e
+        | Ok line ->
+          let%bind r =
+            Adapter.Driver.request t.driver line ~matches:(function
+              | Config_set _ | Failed { kind = Set_config_option; _ } -> true
+              | _ -> false)
+          in
+          refused what r
+      in
+      (* Its default (no model chosen) is the model it started with. *)
+      let%bind () =
+        match
+          ( Option.first_some s.model t.agent_default
+          , Codec.Session_config.option config ~category:"model" )
+        with
+        | ( Some model
+          , Some ({ value = Select { current; choices }; _ } as option) )
+          when (not (String.equal current model))
+               && (not (Option.equal String.equal t.model (Some model)))
+               && List.exists
+                    choices
+                    ~f:(fun (c : Codec.Config_option.Choice.t) ->
+                      String.equal c.value model) ->
+          t.model <- Some model;
+          set_option ~what:"the model" option model
+        | _ -> Ok ()
+      in
+      match Thought.choice (Codec.session_config t.codec) s.thinking with
+      | Some (option, value)
+        when not (Option.equal String.equal t.thought (Some value)) ->
+        t.thought <- Some value;
+        set_option ~what:"the thinking level" option value
       | _ -> Ok ()
     ;;
 
@@ -379,35 +456,51 @@ let create
     (* Its models come with a session. *)
     let on_change _ _ = ()
 
-    let catalog ~sw:_ ?request_timeout:_ _ _ =
-      Or_error.errorf "%s lists its models only in a session" display_name
+    (* The choices of its [model] option, in its order, the one it started
+       with first as [default] (named as that model). *)
+    let models_of ~agent_default config =
+      match Codec.Session_config.option config ~category:"model" with
+      | Some { value = Select { current; choices }; _ } ->
+        let thinking_levels, can_disable_thinking = Thought.levels config in
+        let model (c : Codec.Config_option.Choice.t) =
+          External_model.model
+            ~adapter:id
+            ~name:c.name
+            ~thinking_levels
+            ~can_disable_thinking
+            c.value
+        in
+        let default = Option.value agent_default ~default:current in
+        (match
+           List.partition_tf
+             choices
+             ~f:(fun (c : Codec.Config_option.Choice.t) ->
+               String.equal c.value default)
+         with
+         | c :: _, rest ->
+           { (model c) with id = External_model.default_id }
+           :: List.map rest ~f:model
+         | [], _ ->
+           External_model.default ~adapter:id :: List.map choices ~f:model)
+      | Some _ | None -> []
     ;;
 
-    (* The choices of its [model] option; the current one is its default. *)
     let models t =
-      match
-        Codec.Session_config.option
-          (Codec.session_config t.codec)
-          ~category:"model"
-      with
-      | Some { value = Select { current; choices }; _ } ->
-        let model (c : Codec.Config_option.Choice.t) =
-          External_model.model ~adapter:id ~name:c.name c.value
-        in
-        let default =
-          match
-            List.find choices ~f:(fun (c : Codec.Config_option.Choice.t) ->
-              String.equal c.value current)
-          with
-          | Some c ->
-            { (model c) with
-              id = External_model.default_id
-            ; name = sprintf "Default (%s)" c.name
-            }
-          | None -> External_model.default ~adapter:id
-        in
-        default :: List.map choices ~f:model
-      | Some _ | None -> []
+      models_of ~agent_default:t.agent_default (Codec.session_config t.codec)
+    ;;
+
+    (* A session opened only to read its models. *)
+    let catalog ~sw ?request_timeout transport (s : Adapter.Start.t) =
+      let%map.Or_error t =
+        start
+          ~sw
+          ?request_timeout
+          transport
+          { s with resume = None; mcp_servers = [] }
+      in
+      let models = models t in
+      Adapter.Driver.stop t.driver;
+      { Adapter.Catalog.models; limits = None }
     ;;
 
     let compact _ _ ~instructions:_ =

@@ -90,6 +90,8 @@ module Session_config = struct
   ;;
 end
 
+let session_model_option = "prigh:session-model"
+
 module Command = struct
   type t =
     { name : string
@@ -231,6 +233,7 @@ module Pending = struct
     | Prompt
     | Set_mode of string
     | Set_config_option
+    | Set_model of string
 
   let kind : t -> Request_kind.t = function
     | Initialize -> Initialize
@@ -239,7 +242,7 @@ module Pending = struct
     | Resume_session _ -> Resume_session
     | Prompt -> Prompt
     | Set_mode _ -> Set_mode
-    | Set_config_option -> Set_config_option
+    | Set_config_option | Set_model _ -> Set_config_option
   ;;
 end
 
@@ -286,6 +289,8 @@ type t =
   ; mutable session_id : string option
   ; mutable loading : bool
   ; mutable config : Session_config.t
+  ; mutable models : Config_option.t option
+    (* the session model state of the unstable API, as an option *)
   ; mutable turn : Turn.t option
   ; mutable turns : int
   ; permissions : Permission.t String.Table.t
@@ -301,6 +306,7 @@ let create ?cost_total () =
   ; session_id = None
   ; loading = false
   ; config = Session_config.empty
+  ; models = None
   ; turn = None
   ; turns = 0
   ; permissions = String.Table.create ()
@@ -515,48 +521,65 @@ let set_config_option t ~config_id value =
   match t.session_id with
   | None -> Or_error.error_string "no ACP session yet"
   | Some session_id ->
-    (match
-       List.find t.config.config_options ~f:(fun (o : Config_option.t) ->
-         String.equal o.id config_id)
-     with
-     | None ->
-       Or_error.error_s [%message "the agent offers no such option" config_id]
-     | Some option ->
-       let value_fields =
-         match option.value, value with
-         | Boolean _, `Bool b ->
-           Ok
-             [ "type", `String "boolean"
-             ; ("value", if b then `True else `False)
-             ]
-         | Select { choices; _ }, `Id id ->
-           if List.exists choices ~f:(fun c -> String.equal c.value id)
-           then Ok [ "value", `String id ]
-           else
-             Or_error.error_s
-               [%message
-                 "not one of the option's choices"
-                   config_id
-                   id
-                   ~choices:
-                     (List.map choices ~f:(fun c -> c.value) : string list)]
-         | Boolean _, `Id _ ->
-           Or_error.error_s
-             [%message "the option takes true or false" config_id]
-         | Select _, `Bool _ ->
-           Or_error.error_s
-             [%message "the option takes one of its choices" config_id]
-       in
-       Or_error.map value_fields ~f:(fun value_fields ->
-         request
-           t
-           Set_config_option
-           "session/set_config_option"
-           (`Object
-               ([ "sessionId", `String session_id
-                ; "configId", `String config_id
-                ]
-                @ value_fields))))
+    if String.equal config_id session_model_option
+    then (
+      match value, t.models with
+      | `Id id, Some { value = Select { choices; _ }; _ }
+        when List.exists choices ~f:(fun c -> String.equal c.value id) ->
+        Ok
+          (request
+             t
+             (Set_model id)
+             "session/set_model"
+             (`Object [ "sessionId", `String session_id; "modelId", `String id ]))
+      | _ ->
+        Or_error.error_s
+          [%message
+            "the agent offers no such model"
+              ~model:(value : [ `Id of string | `Bool of bool ])])
+    else (
+      match
+        List.find t.config.config_options ~f:(fun (o : Config_option.t) ->
+          String.equal o.id config_id)
+      with
+      | None ->
+        Or_error.error_s [%message "the agent offers no such option" config_id]
+      | Some option ->
+        let value_fields =
+          match option.value, value with
+          | Boolean _, `Bool b ->
+            Ok
+              [ "type", `String "boolean"
+              ; ("value", if b then `True else `False)
+              ]
+          | Select { choices; _ }, `Id id ->
+            if List.exists choices ~f:(fun c -> String.equal c.value id)
+            then Ok [ "value", `String id ]
+            else
+              Or_error.error_s
+                [%message
+                  "not one of the option's choices"
+                    config_id
+                    id
+                    ~choices:
+                      (List.map choices ~f:(fun c -> c.value) : string list)]
+          | Boolean _, `Id _ ->
+            Or_error.error_s
+              [%message "the option takes true or false" config_id]
+          | Select _, `Bool _ ->
+            Or_error.error_s
+              [%message "the option takes one of its choices" config_id]
+        in
+        Or_error.map value_fields ~f:(fun value_fields ->
+          request
+            t
+            Set_config_option
+            "session/set_config_option"
+            (`Object
+                ([ "sessionId", `String session_id
+                 ; "configId", `String config_id
+                 ]
+                 @ value_fields))))
 ;;
 
 let reply_approval t ~request_id (reply : Adapter_event.Approval_reply.t) =
@@ -687,12 +710,63 @@ let parse_config_option o : Config_option.t option =
 
 let parse_config_options l = List.filter_map l ~f:parse_config_option
 
-let parse_session_config json : Session_config.t =
+(* The [models] state of ACP's unstable session model API, as a [model]
+   option. *)
+let parse_models json : Config_option.t option =
+  let open Option.Let_syntax in
+  let%bind models = field "models" json in
+  let%map current = str "currentModelId" models in
+  let choices =
+    List.filter_map (items "availableModels" models) ~f:(fun m ->
+      Option.map (str "modelId" m) ~f:(fun value ->
+        { Config_option.Choice.value
+        ; name = Option.value (str "name" m) ~default:value
+        ; description = str "description" m
+        ; group = None
+        }))
+  in
+  { Config_option.id = session_model_option
+  ; name = "Model"
+  ; description = None
+  ; category = Some "model"
+  ; value = Select { current; choices }
+  }
+;;
+
+(* The agent's options, with its session model state when no option is its
+   model. *)
+let with_models t options =
+  if
+    List.exists options ~f:(fun (o : Config_option.t) ->
+      Option.equal String.equal o.category (Some "model"))
+  then options
+  else options @ Option.to_list t.models
+;;
+
+let parse_session_config t json : Session_config.t =
   let current_mode, modes = parse_modes json in
+  Option.iter (parse_models json) ~f:(fun m -> t.models <- Some m);
   { current_mode
   ; modes
-  ; config_options = parse_config_options (items "configOptions" json)
+  ; config_options =
+      with_models t (parse_config_options (items "configOptions" json))
   }
+;;
+
+let set_current_model t id =
+  t.models
+  <- Option.map t.models ~f:(fun (o : Config_option.t) ->
+       match o.value with
+       | Select s -> { o with value = Select { s with current = id } }
+       | Boolean _ -> o);
+  t.config
+  <- { t.config with
+       config_options =
+         List.map t.config.config_options ~f:(fun (o : Config_option.t) ->
+           if String.equal o.id session_model_option
+           then Option.value t.models ~default:o
+           else o)
+     }
 ;;
 
 let error_of json =
@@ -1023,11 +1097,18 @@ let on_update t params =
     on_config_change
       t
       { t.config with current_mode = str "currentModeId" update }
+  | Some "current_model_update" ->
+    (match str "currentModelId" update with
+     | Some id ->
+       set_current_model t id;
+       [ Output.Config_changed t.config ]
+     | None -> [])
   | Some "config_option_update" ->
     on_config_change
       t
       { t.config with
-        config_options = parse_config_options (items "configOptions" update)
+        config_options =
+          with_models t (parse_config_options (items "configOptions" update))
       }
   | Some "available_commands_update" ->
     [ Output.Commands
@@ -1237,7 +1318,7 @@ let on_response t ~id ~result ~error =
               | New_session -> t.cost <- None
               | _ -> ());
              t.session_id <- Some session_id;
-             let config = parse_session_config result in
+             let config = parse_session_config t result in
              t.config <- config;
              [ Output.Response (Session_opened { kind; session_id; config }) ])
         | Prompt ->
@@ -1266,8 +1347,14 @@ let on_response t ~id ~result ~error =
         | Set_config_option ->
           let options = parse_config_options (items "configOptions" result) in
           if not (List.is_empty options)
-          then t.config <- { t.config with config_options = options };
-          [ Output.Response (Config_set options); Config_changed t.config ]))
+          then
+            t.config <- { t.config with config_options = with_models t options };
+          [ Output.Response (Config_set options); Config_changed t.config ]
+        | Set_model id ->
+          set_current_model t id;
+          [ Output.Response (Config_set (Option.to_list t.models))
+          ; Config_changed t.config
+          ]))
 ;;
 
 let request_id_string = function
