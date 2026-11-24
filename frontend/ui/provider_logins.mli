@@ -140,3 +140,7 @@ val session_request
 
 (** [/account]'s rows: the session's provider's logins and its default. *)
 val session_rows : P.Auth_status.t list -> P.State.t -> Row.t list
+
+(** Why [/account] has nothing to pick: the session's provider has fewer than
+    two logins (and none is pinned). *)
+val no_choice : P.Auth_status.t list -> P.State.t -> string option

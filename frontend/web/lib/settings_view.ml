@@ -339,6 +339,45 @@ let providers (m : App.Model.t) ~inject =
     ]
 ;;
 
+(* Each provider's logins, once it has one: open a login's menu (use it,
+   make it the default, rename, log out...), or add another. *)
+let logins (m : App.Model.t) ~inject =
+  let module Logins = Prigh_ui.Provider_logins in
+  let run command = inject (Action.Run command) in
+  List.concat_map m.auth ~f:(fun (p : Auth_status.t) ->
+    if Option.is_some p.custom || List.is_empty p.accounts
+    then []
+    else
+      List.map p.accounts ~f:(fun account ->
+        let l = { Logins.Login.provider = p; account } in
+        let menu = "/accounts menu " ^ account.ref_ in
+        row
+          ~cls:"provider-login"
+          ~name:(Logins.title l)
+          ~about:(String.capitalize (Logins.detail l) ^ ".")
+          [ button
+              ~cls:"small"
+              ~title:menu
+              ~label:("Manage " ^ Logins.title l)
+              ~on_click:(run menu)
+              [ Node.text "Manage" ]
+          ])
+      @ [ row
+            ~cls:"provider-login-add"
+            ~name:(sprintf "Another %s login" p.name)
+            ~about:
+              "Another account, under a label: pin a session to it with /model \
+               MODEL@LABEL."
+            [ button
+                ~cls:"small"
+                ~title:(sprintf "/login %s as LABEL" p.provider)
+                ~label:(sprintf "Add a %s login" p.name)
+                ~on_click:(run (sprintf "/login %s as" p.provider))
+                [ Node.text "Add login" ]
+            ]
+        ])
+;;
+
 let git_host (m : App.Model.t) (a : Forge_account.t) ~inject =
   let run command = inject (Action.Run command) in
   let login = "/login " ^ Forge_account.login_arg a in
@@ -1320,7 +1359,7 @@ let content (m : App.Model.t) (section : Section.t) ~inject =
     ]
   | New_sessions -> New_sessions_view.groups m ~inject
   | Models ->
-    [ group ~title:"Providers" [ providers m ~inject ]
+    [ group ~title:"Providers" (providers m ~inject :: logins m ~inject)
     ; group
         ~title:"Models prigh uses"
         ~note:"Besides the conversation's"

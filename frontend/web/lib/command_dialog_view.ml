@@ -952,6 +952,7 @@ let view (m : App.Model.t) (dialog : Dialog.t) ~inject =
   | Login _
   | Auth _
   | Forge_host _
+  | Login_label _
   | Pulls _
   | Pull _
   | Pr_create _

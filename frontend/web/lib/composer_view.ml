@@ -239,23 +239,36 @@ let model_chip (m : App.Model.t) (state : State.t) ~inject =
   | None ->
     let thinking = Option.value m.pending.thinking ~default:state.thinking in
     let level = Reasoning.chip_label state.model ~current:thinking in
+    (* The login, when the provider has several: model@login. *)
+    let login =
+      Prigh_ui.Provider_logins.of_session m.auth state
+      |> Option.map ~f:(fun l -> Prigh_ui.Provider_logins.short l.account)
+    in
+    let at = Option.value_map login ~default:"" ~f:(fun l -> "@" ^ l) in
     button
       ~cls:"chip-button model-chip"
       ~title:
         (sprintf
-           "%s%s: models, reasoning and access (Ctrl+L)"
+           "%s%s%s: models, reasoning and access (Ctrl+L)"
            state.model.name
+           at
            (Option.value_map level ~default:"" ~f:(fun l -> ", reasoning " ^ l)))
       ~label:
         (sprintf
-           "Model: %s%s"
+           "Model: %s%s%s"
            state.model.name
+           at
            (Option.value_map level ~default:"" ~f:(fun l -> ", " ^ l)))
       ~attrs:(menu_attrs m Model)
       ~on_click:(inject (Action.Open_chip Model))
-      [ Provider_mark.view state.model.provider
-      ; span ~cls:"chip-label" (Model_menu.short_name state.model.name)
-      ]
+      ([ Provider_mark.view state.model.provider
+       ; span ~cls:"chip-label" (Model_menu.short_name state.model.name)
+       ]
+       @ Option.value_map login ~default:[] ~f:(fun l ->
+         [ span
+             ~cls:"chip-login max-w-[9ch] truncate text-muted-foreground"
+             ("@" ^ l)
+         ]))
 ;;
 
 (* Where tools run, always named, also while that host is disconnected (its

@@ -475,3 +475,20 @@ let session_rows auth (state : P.State.t) =
       }
     ]
 ;;
+
+let no_choice auth (state : P.State.t) =
+  let provider = state.model.provider in
+  let n =
+    List.count (all auth) ~f:(fun l ->
+      String.equal l.provider.provider provider)
+  in
+  if n >= 2 || Option.is_some state.account
+  then None
+  else
+    Some
+      (sprintf
+         "%s has %s login: /login %s as LABEL adds another"
+         (provider_name auth provider)
+         (if n = 0 then "no stored" else "one")
+         provider)
+;;

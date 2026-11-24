@@ -1213,6 +1213,10 @@ let accounts_command m (cmd : Commands.Parsed.t) =
 let account_command m (cmd : Commands.Parsed.t) =
   match m.state with
   | None -> notice m "not connected", []
+  | Some state
+    when String.is_empty cmd.rest
+         && Option.is_some (Provider_logins.no_choice m.auth state) ->
+    notice m (Option.value_exn (Provider_logins.no_choice m.auth state)), []
   | Some state when String.is_empty cmd.rest ->
     ( logins_picker
         m

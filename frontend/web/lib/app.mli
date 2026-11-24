@@ -195,6 +195,10 @@ module Reply_tag : sig
         { command : string (** back into the editor if refused *)
         ; notice : string (** shown on success *)
         }
+    | Logins_changed of
+        { command : string (** back into the editor if refused *)
+        ; notice : string (** shown on success *)
+        } (** a change to a provider's logins ([/accounts], [/account]) *)
     | Mcp_settings_loaded (** [get_mcp_settings] *)
     | Mcp_host_listed
     (** [list_mcp], [mcp_approve] or [mcp_signout], for the settings *)

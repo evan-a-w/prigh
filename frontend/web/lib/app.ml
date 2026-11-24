@@ -171,6 +171,10 @@ module Reply_tag = struct
         { command : string
         ; notice : string
         }
+    | Logins_changed of
+        { command : string
+        ; notice : string
+        }
     | Mcp_settings_loaded
     | Mcp_host_listed
     | Mcp_sign_in_url of
@@ -1528,13 +1532,14 @@ let close_dialog (m : Model.t) =
   match m.return_to_settings, m.dialog with
   | ( true
     , Some
-        ( Login _ | Forge_host _ | Nix_gc_confirm _
+        ( Login _ | Forge_host _ | Nix_gc_confirm _ | Login_label _
         | Picker
             { kind =
                 ( Compaction_models
                 | Generate_models
                 | Approval_models
                 | Naming_models
+                | Logins
                 | Defaults _ )
             ; _
             } ) ) ->
@@ -2630,8 +2635,24 @@ let set_thinking (m : Model.t) level =
     , [ rpc "set_thinking" [ "thinking", str level ] ~tag:Thinking_set ] )
 ;;
 
-let set_model (m : Model.t) key =
-  let set = rpc "set_model" [ "model", str key ] ~tag:Model_set in
+(* [login]: on that login ([Some None]: the provider's default); else a
+   pinned login carries over to a model of its provider. *)
+let set_model ?login (m : Model.t) key =
+  let params =
+    match login with
+    | Some login ->
+      Prigh_ui.Provider_logins.set_model_params ~model_key:key login
+    | None ->
+      ("model", str key)
+      ::
+      (match
+         List.find m.models ~f:(fun model -> String.equal model.key key)
+       with
+       | Some model ->
+         Prigh_ui.Provider_logins.keep_pin m.state ~provider:model.provider
+       | None -> [])
+  in
+  let set = rpc "set_model" params ~tag:Model_set in
   let m =
     match m.state with
     | Some state when String.equal state.model.key key -> m
@@ -3671,7 +3692,15 @@ let cycle_model (m : Model.t) step =
         toast m ~replaces:[ "Model: " ] (sprintf "Model: %s" next.name)
       in
       ( { m with pending = { m.pending with model = Some next.key } }
-      , cmds @ [ rpc "set_model" [ "model", str next.key ] ~tag:Model_set ] ))
+      , cmds
+        @ [ rpc
+              "set_model"
+              (("model", str next.key)
+               :: Prigh_ui.Provider_logins.keep_pin
+                    (Some state)
+                    ~provider:next.provider)
+              ~tag:Model_set
+          ] ))
 ;;
 
 let cycle_thinking (m : Model.t) =
@@ -7061,6 +7090,114 @@ let hidden_messages (m : Model.t) ~path ~entry result =
   | _ -> m, []
 ;;
 
+(* ---- a provider's logins ------------------------------------------------ *)
+
+module Logins = Prigh_ui.Provider_logins
+
+let logins_picker (m : Model.t) ?(query = "") ~title rows =
+  let items =
+    List.map rows ~f:(fun (r : Logins.Row.t) ->
+      Picker.Item.create ~id:r.id ~detail:r.detail ~marked:r.marked r.label)
+  in
+  open_picker
+    m
+    (Picker { kind = Logins; picker = Picker.create ~query ~title items })
+;;
+
+let logins_request (m : Model.t) ~command (r : Logins.Request.t) =
+  ( m
+  , [ rpc r.method_ r.params ~tag:(Logins_changed { command; notice = r.done_ })
+    ] )
+;;
+
+(* What a login's picker or label dialog led to: from the settings page,
+   back there once done. *)
+let back_to_settings ~back ((m : Model.t), cmds) =
+  if not back
+  then m, cmds
+  else (
+    match m.dialog with
+    | None ->
+      ( { m with dialog = Some Settings; return_to_settings = false }
+      , cmds @ [ Command.Focus "dialog" ] )
+    | Some (Login _ | Login_label _ | Picker { kind = Logins; _ }) ->
+      { m with return_to_settings = true }, cmds
+    | Some _ -> m, cmds)
+;;
+
+let login_label (m : Model.t) ~title ~command =
+  open_dialog
+    m
+    ~focus:"dialog-input"
+    (Login_label { title; command; input = ""; error = None })
+;;
+
+let start_login_as (m : Model.t) ~provider ~method_ ~label =
+  let m, cmds = open_dialog m (Login (Login_flow.start provider)) in
+  ( m
+  , cmds
+    @ [ rpc
+          "login"
+          (Logins.login_params m.auth ~provider ~method_ ~label:(Some label))
+          ~tag:Login_started
+      ] )
+;;
+
+let accounts_command (m : Model.t) rest =
+  let command = String.strip ("/accounts " ^ rest) in
+  match Logins.Command.parse rest with
+  | Pick query ->
+    if List.is_empty (Logins.all m.auth)
+    then error m "No logins yet: /login signs in to a provider."
+    else
+      logins_picker
+        m
+        ~query
+        ~title:"Logins"
+        (Logins.rows m.auth ~session:m.state)
+  | Menu arg ->
+    (match Logins.find m.auth arg with
+     | Ok l ->
+       logins_picker m ~title:(Logins.title l) (Logins.menu l ~session:m.state)
+     | Error e -> error m (String.capitalize e))
+  | Remove arg ->
+    (match Logins.find m.auth arg with
+     | Ok l -> logins_request m ~command (Logins.logout l)
+     | Error e -> error m (String.capitalize e))
+  | Rename arg when not (String.is_substring arg ~substring:" to ") ->
+    (match Logins.find m.auth (String.strip arg) with
+     | Ok l ->
+       login_label
+         m
+         ~title:(sprintf "Rename %s" (Logins.title l))
+         ~command:(sprintf "/accounts rename %s to " l.account.ref_)
+     | Error e -> error m (String.capitalize e))
+  | c ->
+    (match Logins.request m.auth c with
+     | Ok r -> logins_request m ~command r
+     | Error e -> error m (String.capitalize e))
+;;
+
+let account_command (m : Model.t) rest =
+  current_state m ~f:(fun state ->
+    match Logins.no_choice m.auth state with
+    | Some why when String.is_empty rest -> error m (String.capitalize why ^ ".")
+    | _ ->
+      if String.is_empty rest
+      then
+        logins_picker
+          m
+          ~title:
+            (sprintf
+               "%s login for this session"
+               (Logins.provider_name m.auth state.model.provider))
+          (Logins.session_rows m.auth state)
+      else (
+        match Logins.session_request m.auth state rest with
+        | Ok r -> logins_request m ~command:("/account " ^ rest) r
+        | Error e -> error m (String.capitalize e)))
+;;
+
 let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
   let none = "" in
   let words =
@@ -7106,8 +7243,15 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
   | "temporary", _ -> new_temporary_session m ~temporary:true
   | "model", "" -> open_picker m (model_picker m)
   | "model", query ->
+    let query, login = Prigh_ui.Model_match.split_account m.models query in
     (match Prigh_ui.Model_match.resolve m.models query with
-     | Found model -> set_model m model.key
+     | Found model ->
+       (match login with
+        | None -> set_model m model.key
+        | Some login ->
+          (match Logins.find ~provider:model.provider m.auth login with
+           | Ok l -> set_model ~login:(Some l) m model.key
+           | Error e -> error m (String.capitalize e)))
      | Ambiguous _ -> open_picker m (model_picker ~query m)
      | Not_found suggestions ->
        error
@@ -7452,6 +7596,20 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
      | _ -> error m "Usage: /jobs [kill <id>] (/jobs shows them)")
   | "login", "" ->
     loading m "Log in" [ rpc "auth_status" [] ~tag:(Auth_status Login_picker) ]
+  | "login", _ when List.mem words "as" ~equal:String.equal ->
+    (match Logins.split_as words with
+     | provider :: rest, Some label ->
+       start_login_as m ~provider ~method_:(List.hd rest) ~label
+     | provider :: _, None when String.equal (List.last_exn words) "as" ->
+       login_label
+         m
+         ~title:
+           (sprintf "Add a %s login" (Logins.provider_name m.auth provider))
+         ~command:(String.strip ("/login " ^ rest) ^ " ")
+     | _ ->
+       error
+         m
+         "/login PROVIDER [METHOD] as LABEL: type the login's label after as.")
   | "login", _ ->
     (match Forges.parse_login m.forges words with
      | Provider { provider; method_ } -> start_login m ~provider ~method_
@@ -7464,6 +7622,12 @@ let run_command (m : Model.t) ({ name; rest } : Slash.Parsed.t) =
       m
       "Log out"
       [ rpc "auth_status" [] ~tag:(Auth_status Logout_picker) ]
+  | "logout", arg when Logins.names_login arg ->
+    (match Logins.find m.auth arg with
+     | Ok l -> logins_request m ~command:("/logout " ^ arg) (Logins.logout l)
+     | Error e -> error m (String.capitalize e))
+  | "accounts", _ -> accounts_command m rest
+  | "account", _ -> account_command m rest
   | "logout", arg ->
     (match Forges.logout_host m.forges arg with
      | Some host -> forge_logout m host
@@ -8974,6 +9138,14 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
         (sprintf "%s. %s is back in the editor." (String.capitalize e) command)
     else error m (String.capitalize e)
   | Mcp_command { notice; _ }, Ok _ -> toast m (String.capitalize notice)
+  | Logins_changed { command; _ }, Error e ->
+    if String.is_empty m.draft && List.is_empty m.images
+    then
+      error
+        (set_draft m command)
+        (sprintf "%s. %s is back in the editor." (String.capitalize e) command)
+    else error m (String.capitalize e)
+  | Logins_changed { notice; _ }, Ok _ -> toast m (String.capitalize notice)
   | Mcp_settings_loaded, result ->
     let result =
       Result.bind result ~f:(fun json ->
@@ -10898,6 +11070,20 @@ let picker_accepted (m : Model.t) ~kind (item : Picker.Item.t) =
        with
        | Some w -> open_worktree m w ~new_session:false
        | None -> m, [])
+    | Logins ->
+      back_to_settings
+        ~back:m.return_to_settings
+        (match String.chop_suffix item.id ~suffix:" to " with
+         | Some rename ->
+           accounts_command
+             m
+             (String.chop_prefix_if_exists rename ~prefix:"/accounts ")
+         | None when Logins.asks item.id ->
+           login_label m ~title:item.label ~command:item.id
+         | None ->
+           (match Slash.parse item.id with
+            | Some parsed -> run_command m parsed
+            | None -> m, []))
     | Menu menu -> menu_chosen m menu item.id
   in
   let refocus =
@@ -11464,6 +11650,24 @@ let dialog_accept (m : Model.t) =
            ~again:("forgejo " ^ host)
        in
        { m with return_to_settings = back }, cmds)
+  | Some (Login_label ({ command; input; _ } as l)) ->
+    (match String.strip input with
+     | "" ->
+       ( { m with
+           dialog =
+             Some
+               (Login_label
+                  { l with
+                    error = Some "Type a label, e.g. Work (Esc cancels)."
+                  })
+         }
+       , [] )
+     | label ->
+       let back = m.return_to_settings in
+       let m = { m with dialog = None; return_to_settings = false } in
+       (match Slash.parse (command ^ label) with
+        | Some parsed -> back_to_settings ~back (run_command m parsed)
+        | None -> m, []))
   | Some (Annotate a) ->
     if a.strokes > 0 then m, [ Command.Annotate_export ] else m, []
 ;;
@@ -11970,6 +12174,11 @@ let update_connected (m : Model.t) (action : Action.t) =
      | Some (Prompt prompt) -> prompt_input m (Prompt.set_input prompt text)
      | Some (Forge_host _) ->
        { m with dialog = Some (Forge_host { input = text; error = None }) }, []
+     | Some (Login_label l) ->
+       ( { m with
+           dialog = Some (Login_label { l with input = text; error = None })
+         }
+       , [] )
      | Some (Pulls _) -> with_picker m ~f:(fun p -> Picker.set_query p text)
      | Some (Review_pick p) ->
        ( { m with dialog = Some (Review_pick (Review_picker.set_query p text)) }
@@ -12297,13 +12506,14 @@ let update_connected (m : Model.t) (action : Action.t) =
         | Some (Settings | Auth _), None -> { m' with dialog = m.dialog }, cmds
         | ( Some Settings
           , Some
-              ( Login _ | Forge_host _ | Nix_gc_confirm _
+              ( Login _ | Forge_host _ | Nix_gc_confirm _ | Login_label _
               | Picker
                   { kind =
                       ( Compaction_models
                       | Generate_models
                       | Approval_models
                       | Naming_models
+                      | Logins
                       | Defaults _ )
                   ; _
                   } ) ) -> { m' with return_to_settings = true }, cmds

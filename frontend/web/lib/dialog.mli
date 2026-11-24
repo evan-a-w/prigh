@@ -19,6 +19,9 @@ module Picker_kind : sig
     | Hosts (** item ids are host ids *)
     | Users (** act as one ([/setusr]) *)
     | Accounts (** the account menu: see [App] for the item ids *)
+    | Logins
+    (** a provider's logins ([/accounts]): item ids are slash commands, run
+        when picked; one ending in a space asks for a label ([Login_label]) *)
     | Skills (** item ids are skill names *)
     | Snippets (** item ids are snippet names *)
     | Reminders (** the session's ([/remind]); item ids are their names *)
@@ -153,6 +156,12 @@ type t =
       { input : string
       ; error : string option
       } (** [/login forgejo]: which host? *)
+  | Login_label of
+      { title : string
+      ; command : string (** the label typed is appended and it is run *)
+      ; input : string
+      ; error : string option
+      } (** a login's label: adding one, or renaming it *)
   | New_worktree of New_worktree.t
   | Remove_worktree of
       { worktree : Worktree.t

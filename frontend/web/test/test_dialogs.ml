@@ -466,10 +466,14 @@ let%expect_test "help lists every key and command" =
     open a subagent's chat (none: the session card), cancel one, or send a running subagent a message (steer: at its next step; follow-up: when it ends its turn)
     /jobs [kill <id>]
     background jobs: the session card, or kill one
-    /login [provider|github [HOST]|forgejo HOST|HOST] [token]
-    log in to a model provider (or /login custom), or sign in to GitHub or a Forgejo or Gitea host (token: paste one instead of OAuth)
-    /logout [provider|HOST]
-    remove a provider's login, or sign out of a git host (github: github.com)
+    /login [provider [as LABEL]|github [HOST]|forgejo HOST|HOST] [token]
+    log in to a model provider (or /login custom; as LABEL: another login of it), or sign in to GitHub or a Forgejo or Gitea host (token: paste one instead of OAuth)
+    /logout [provider[@LOGIN]|HOST]
+    remove a provider's login (@LOGIN: one of several), or sign out of a git host (github: github.com)
+    /accounts [QUERY|default|rename|fallback|up|down|remove LOGIN]
+    a provider's logins: pick one to use, rename, make the default or log out of
+    /account [LOGIN|default]
+    the login of the model's provider this session uses (or /model MODEL@LOGIN)
     /auth
     show which providers and git hosts are logged in
     /pr [list [open|closed|all]|view N|new [title]|checkout N]

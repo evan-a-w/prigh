@@ -16,6 +16,7 @@ module Picker_kind = struct
     | Hosts
     | Users
     | Accounts
+    | Logins
     | Skills
     | Snippets
     | Reminders
@@ -126,6 +127,12 @@ type t =
       { input : string
       ; error : string option
       }
+  | Login_label of
+      { title : string
+      ; command : string
+      ; input : string
+      ; error : string option
+      }
   | New_worktree of New_worktree.t
   | Remove_worktree of
       { worktree : Worktree.t
@@ -196,6 +203,7 @@ let per_session = function
           | Confirm_tools
           | Users
           | Accounts
+          | Logins
           | Themes
           | Accents
           | Compaction_models
@@ -214,5 +222,6 @@ let per_session = function
   | Login _
   | Auth _
   | Forge_host _
+  | Login_label _
   | Nix_gc_confirm _ -> false
 ;;
