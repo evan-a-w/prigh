@@ -282,8 +282,9 @@ The composer (`composer/`), from the bottom up:
   the first turn and keeps it between turns, restarting it and resuming the
   recorded thread (a `Thread` entry per adapter and host) when it exited or
   its host went; routes approval requests through `Services.approve` and
-  questions through `ask_user`; steers mid-turn where the CLI can (Codex),
-  between turns otherwise; and records the cost the CLI reports as spend
+  questions through `ask_user`; steers mid-turn where the CLI can (Codex;
+  Antigravity with another `session/prompt`, Grok with `_x.ai/interject`,
+  per `Acp_agent.Quirks`), between turns otherwise; and records the cost the CLI reports as spend
   (`External_model` names its replies `codex/MODEL`, priced at zero).
 - **`Adapter_catalog`** holds, per host and adapter, the models and usage
   limits the CLI's own login offers (Codex's `model/list` and
