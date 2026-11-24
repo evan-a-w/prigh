@@ -47,6 +47,7 @@ end
 module Account_usage : sig
   type t =
     { id : Account_id.t
+    ; shared_by : string option (** another user's, shared with this one *)
     ; label : string
     ; default : bool
     ; status : Status.t
@@ -70,7 +71,7 @@ type t =
 [@@deriving sexp_of, equal]
 
 (** [{fetched_at_ms, providers: [{provider, name, status, plan?, windows?,
-    error?, accounts: [{ref, id, label, default, status, ...}]}]}], [status] one of [not_signed_in], [api_key], [limits] and
+    error?, accounts: [{ref, id, label, default, shared_by?, status, ...}]}]}], [status] one of [not_signed_in], [api_key], [limits] and
     [error]; a window is [{id, label, used_percent, resets_at_ms}]. *)
 val to_json : t -> Json.t
 
@@ -99,6 +100,18 @@ val parse_anthropic : string -> Status.t
 
 val parse_codex : now:float -> string -> Status.t
 
+(** A login another user shares with this one: its usage is asked for with
+    the owner's credential ([resolve]), never shown. *)
+module Shared : sig
+  type t =
+    { owner : string
+    ; provider : Provider_id.t
+    ; id : Account_id.t
+    ; label : string
+    ; resolve : unit -> Provider_auth.Resolved.t option Or_error.t
+    }
+end
+
 (** The signed-in providers' usage, asked for at once. [PRIGH_USAGE_ORIGIN]
     (from [getenv]) replaces both providers' origins, for prigh-web's e2e. *)
 val fetch
@@ -106,6 +119,7 @@ val fetch
   -> ?getenv:(string -> string option)
   -> ?refresh:
        (Provider_id.t -> refresh_token:string -> Credential.Oauth.t Or_error.t)
+  -> ?shared:Shared.t list (** after the user's own *)
   -> http:Http.t
   -> now:(unit -> float)
   -> Auth_store.t

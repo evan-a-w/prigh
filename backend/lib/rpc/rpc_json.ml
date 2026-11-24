@@ -652,7 +652,18 @@ let grant (g : Account_meta.Grant.t) =
   `Object [ "user", str g.user; "since_ms", int g.since_ms ]
 ;;
 
-let auth_account ~shareable provider (a : Provider_auth.Account_status.t) =
+let usage_fields ~usage provider ref_ =
+  match usage with
+  | None -> []
+  | Some usage ->
+    let (u : Account_ledger.Periods.t) = usage provider ref_ in
+    if u.last_30_days.requests = 0
+    then []
+    else [ "usage", Account_ledger.Periods.to_json u ]
+;;
+
+let auth_account ~shareable ~usage provider (a : Provider_auth.Account_status.t)
+  =
   `Object
     ([ "ref", str (account_ref provider a.id)
      ; "id", str (Account_id.to_string a.id)
@@ -667,13 +678,14 @@ let auth_account ~shareable provider (a : Provider_auth.Account_status.t) =
      @ (if shareable && not (Provider_id.is_custom provider)
         then [ "shareable", bool true ]
         else [])
+     @ usage_fields ~usage provider (Account_ref.Own a.id)
      @
      match a.shared_with with
      | [] -> []
      | grants -> [ "shared_with", `Array (List.map grants ~f:grant) ])
 ;;
 
-let shared_account ~default (s : Account_shares.Shared.t) =
+let shared_account ~usage ~default (s : Account_shares.Shared.t) =
   `Object
     ([ "ref", str (Account_shares.Shared.key s)
      ; "id", str (Account_ref.to_string (Account_shares.Shared.ref_ s))
@@ -684,10 +696,15 @@ let shared_account ~default (s : Account_shares.Shared.t) =
      ; "fallback", bool s.pref.fallback
      ; "shared_by", str s.owner
      ]
+     @ usage_fields ~usage s.provider (Account_shares.Shared.ref_ s)
      @ if s.pref.hidden then [ "hidden", bool true ] else [])
 ;;
 
-let auth_status ?(shared = []) ?(shareable = false) (s : Provider_auth.Status.t)
+let auth_status
+      ?(shared = [])
+      ?(shareable = false)
+      ?usage
+      (s : Provider_auth.Status.t)
   =
   let shared =
     List.filter shared ~f:(fun (sh : Account_shares.Shared.t) ->
@@ -724,9 +741,10 @@ let auth_status ?(shared = []) ?(shareable = false) (s : Provider_auth.Status.t)
      ; "expires_ms", Option.value_map s.expires_ms ~default:`Null ~f:int
      ; ( "accounts"
        , `Array
-           (List.map s.accounts ~f:(auth_account ~shareable s.provider)
+           (List.map s.accounts ~f:(auth_account ~shareable ~usage s.provider)
             @ List.map shared ~f:(fun sh ->
               shared_account
+                ~usage
                 ~default:
                   (Option.exists shared_default ~f:(fun d -> phys_equal d sh))
                 sh)) )

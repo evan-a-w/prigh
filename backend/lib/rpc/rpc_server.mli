@@ -69,6 +69,9 @@ val create
            every client hears [accounts_changed] when one shared with them
            changes; a session pinned to one no longer shared goes back to
            the default login, with a notice *)
+  -> ?ledger:Account_ledger.t
+       (** what ran on the user's logins: [auth_status] gives each login's
+           usage, [account_usage] the users' (default: none recorded) *)
   -> ?backend_host:bool
        (** whether [new_agent] makes the backend a tool host (default: true) *)
   -> ?home:string

@@ -212,20 +212,29 @@ let%expect_test "sharing: grant, list, resolve through the owner, hide, revoke" 
   [%expect
     {|
     (((user bob)
-      (today
-       ((requests 2) (input 200) (output 20) (cache_read 100) (cost_usd 0.5)))
-      (last_30_days
-       ((requests 2) (input 200) (output 20) (cache_read 100) (cost_usd 0.5))))
+      (usage
+       ((today
+         ((requests 2) (input 200) (output 20) (cache_read 100) (cost_usd 0.5)))
+        (last_7_days
+         ((requests 2) (input 200) (output 20) (cache_read 100) (cost_usd 0.5)))
+        (last_30_days
+         ((requests 2) (input 200) (output 20) (cache_read 100) (cost_usd 0.5))))))
      ((user carol)
-      (today
-       ((requests 1) (input 100) (output 10) (cache_read 50) (cost_usd 0.25)))
-      (last_30_days
-       ((requests 1) (input 100) (output 10) (cache_read 50) (cost_usd 0.25)))))
+      (usage
+       ((today
+         ((requests 1) (input 100) (output 10) (cache_read 50) (cost_usd 0.25)))
+        (last_7_days
+         ((requests 1) (input 100) (output 10) (cache_read 50) (cost_usd 0.25)))
+        (last_30_days
+         ((requests 1) (input 100) (output 10) (cache_read 50) (cost_usd 0.25)))))))
     (((user bob)
-      (today
-       ((requests 2) (input 200) (output 20) (cache_read 100) (cost_usd 0.5)))
-      (last_30_days
-       ((requests 2) (input 200) (output 20) (cache_read 100) (cost_usd 0.5)))))
+      (usage
+       ((today
+         ((requests 2) (input 200) (output 20) (cache_read 100) (cost_usd 0.5)))
+        (last_7_days
+         ((requests 2) (input 200) (output 20) (cache_read 100) (cost_usd 0.5)))
+        (last_30_days
+         ((requests 2) (input 200) (output 20) (cache_read 100) (cost_usd 0.5)))))))
     |}];
   (* Revoked: bob's next request fails, and the login is gone from his list. *)
   share [];
@@ -325,17 +334,14 @@ let make_router t ~sw ~shares ~requests =
             stream =
               (fun r ~cancel ~on_event ->
                 let reply = provider.stream r ~cancel ~on_event in
-                (match r.account with
-                 | Some (Shared { owner; id }) ->
-                   Account_shares.record
-                     shares
-                     ~recipient:user
-                     r.model.provider
-                     ~owner
-                     id
-                     reply.usage
-                     ~cost_usd:0.
-                 | _ -> ());
+                Option.iter r.account ~f:(fun account ->
+                  Account_shares.record_request
+                    ~member
+                    ~ledger:(Account_ledger.create ~home:world.home)
+                    r.model.provider
+                    account
+                    reply.usage
+                    ~cost_usd:0.);
                 reply)
           }
         in
@@ -519,7 +525,7 @@ let%expect_test "sharing over RPC: share, use, revoke mid-session, host tokens" 
     "this connection signed in with a host token, which cannot change model logins: sign in as the user (prigh-web, or the user's own token)"
     "this connection signed in with a host token, which cannot change model logins: sign in as the user (prigh-web, or the user's own token)"
     {"method":"oauth","source":"shared by alice"}
-    {"ref":"~alice/openai-codex/work","id":"~alice/work","label":"Work","method":"oauth","source":"shared by alice","default":true,"fallback":false,"shared_by":"alice"}
+    {"ref":"~alice/openai-codex/work","id":"~alice/work","label":"Work","method":"oauth","source":"shared by alice","default":true,"fallback":false,"shared_by":"alice","usage":{"today":{"requests":1,"input":10,"output":5,"cache_read":0,"cost_usd":0},"last_7_days":{"requests":1,"input":10,"output":5,"cache_read":0,"cost_usd":0},"last_30_days":{"requests":1,"input":10,"output":5,"cache_read":0,"cost_usd":0}}}
     |}];
   (* A recipient may not rename the shared login; alice sees his use. *)
   call
@@ -531,7 +537,7 @@ let%expect_test "sharing over RPC: share, use, revoke mid-session, host tokens" 
   [%expect
     {|
     "alice shares this login with you: you can hide it or let it take over at usage limits (fallback), not rename, reorder or make it the default"
-    [{"user":"bob","today":{"requests":1,"input":10,"output":5,"cache_read":0,"cost_usd":0.000000},"last_30_days":{"requests":1,"input":10,"output":5,"cache_read":0,"cost_usd":0.000000}}]
+    [{"user":"bob","today":{"requests":1,"input":10,"output":5,"cache_read":0,"cost_usd":0},"last_7_days":{"requests":1,"input":10,"output":5,"cache_read":0,"cost_usd":0},"last_30_days":{"requests":1,"input":10,"output":5,"cache_read":0,"cost_usd":0}}]
     |}];
   (* Alice stops sharing it mid-session: bob's session goes back to his
      default login, with a notice. *)
@@ -561,4 +567,163 @@ let%expect_test "sharing over RPC: share, use, revoke mid-session, host tokens" 
        : bool)];
   [%expect {| false |}];
   Rpc_router.shutdown router
+;;
+
+let%expect_test "usage per login and per user, over the periods" =
+  with_sandbox
+  @@ fun t ->
+  let shares, _ = setup t in
+  let ledger = Account_ledger.create ~home:(t.dir ^/ "alice") in
+  let now = Time_ns.of_string_with_utc_offset "2026-11-24 10:00:00Z" in
+  let days_ago n = Time_ns.sub now (Time_ns.Span.of_day (Float.of_int n)) in
+  let alice = { Account_shares.Member.shares; user = "alice" } in
+  let bob = { Account_shares.Member.shares; user = "bob" } in
+  let run ?member ~at account cost =
+    Account_shares.record_request
+      ~now:(days_ago at)
+      ?member
+      ~ledger
+      codex
+      account
+      { input = 1000; output = 100; cache_read = 0 }
+      ~cost_usd:cost
+  in
+  (* Alice on her own logins, today, 3, 20 and 40 days ago; bob on her
+     shared one today; a single-user server's request (no users). *)
+  run ~member:alice ~at:0 (Own work) 0.5;
+  run ~member:alice ~at:3 (Own work) 1.;
+  run ~member:alice ~at:20 (Own work) 2.;
+  run ~member:alice ~at:40 (Own work) 4.;
+  run ~member:alice ~at:0 Account_ref.main 0.1;
+  run ~member:bob ~at:0 (Shared { owner = "alice"; id = work }) 0.25;
+  run ~at:0 (Own work) 0.01;
+  let totals (p : Account_ledger.Totals.t) =
+    sprintf "%d req %d in $%.2f" p.requests p.input p.cost_usd
+  in
+  let periods (u : Account_ledger.Periods.t) =
+    sprintf
+      "today %s | 7d %s | 30d %s"
+      (totals u.today)
+      (totals u.last_7_days)
+      (totals u.last_30_days)
+  in
+  List.iter [ "openai-codex/work"; "openai-codex/main" ] ~f:(fun login ->
+    printf "%s: %s\n" login (periods (Account_ledger.usage ~now ledger ~login));
+    List.iter (Account_ledger.rows ~now ledger ~login) ~f:(fun r ->
+      printf "  %s: %s\n" r.user (periods r.usage)));
+  (* The other process's (or server's) writes are seen. *)
+  let other = Account_ledger.create ~home:(t.dir ^/ "alice") in
+  Account_ledger.record
+    ~now
+    other
+    ~login:"openai-codex/main"
+    ~user:"alice"
+    { input = 1; output = 1; cache_read = 0 }
+    ~cost_usd:0.;
+  printf
+    "main after another writer: %s\n"
+    (periods (Account_ledger.usage ~now ledger ~login:"openai-codex/main"));
+  (* Bob sees only his own use of alice's login. *)
+  (match
+     Account_shares.usage ~now shares ~user:"bob" codex ~owner:"alice" work
+   with
+   | Ok rows ->
+     List.iter rows ~f:(fun r ->
+       printf "bob sees %s: %s\n" r.user (periods r.usage))
+   | Error e -> print_endline (Error.to_string_hum e));
+  [%expect
+    {|
+    openai-codex/work: today 3 req 3000 in $0.76 | 7d 4 req 4000 in $1.76 | 30d 5 req 5000 in $3.76
+      alice: today 1 req 1000 in $0.50 | 7d 2 req 2000 in $1.50 | 30d 3 req 3000 in $3.50
+      bob: today 1 req 1000 in $0.25 | 7d 1 req 1000 in $0.25 | 30d 1 req 1000 in $0.25
+      default: today 1 req 1000 in $0.01 | 7d 1 req 1000 in $0.01 | 30d 1 req 1000 in $0.01
+    openai-codex/main: today 1 req 1000 in $0.10 | 7d 1 req 1000 in $0.10 | 30d 1 req 1000 in $0.10
+      alice: today 1 req 1000 in $0.10 | 7d 1 req 1000 in $0.10 | 30d 1 req 1000 in $0.10
+    main after another writer: today 2 req 1001 in $0.10 | 7d 2 req 1001 in $0.10 | 30d 2 req 1001 in $0.10
+    bob sees bob: today 1 req 1000 in $0.25 | 7d 1 req 1000 in $0.25 | 30d 1 req 1000 in $0.25
+    |}]
+;;
+
+(* Without [-tokens]: the user's own logins' usage, in [auth_status] and
+   [account_usage]. *)
+let%expect_test "usage over RPC without users" =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let store = store t "solo" in
+  alice_logins store;
+  let ledger = Account_ledger.create ~home:(t.dir ^/ "solo") in
+  let now = Time_ns.now () in
+  Account_shares.record_request
+    ~now
+    ~ledger
+    codex
+    (Own work)
+    { input = 2000; output = 300; cache_read = 500 }
+    ~cost_usd:0.75;
+  let new_agent ?session ~cwd () =
+    Agent.create
+      ~env:t.env
+      ~sw
+      ~provider:(Faux_provider.create [])
+      ~tools:[]
+      ~sessions_dir:(t.dir ^/ "sessions")
+      ~home:t.dir
+      ?session
+      ~cwd
+      ()
+  in
+  let server =
+    Rpc_server.create
+      ~env:t.env
+      ~sw
+      ~ledger
+      ~login:
+        (Login_manager.create ~env:t.env ~sw ~getenv:(fun _ -> None) ~store ())
+      ~sessions_dir:(t.dir ^/ "sessions")
+      ~cwd:t.dir
+      ~new_agent
+      ()
+  in
+  let client = Rpc_server.connect server ~send:ignore in
+  let call meth params =
+    let response =
+      Rpc_server.handle
+        server
+        client
+        (Json.of_string
+           (sprintf {|{"id": "r", "method": "%s", "params": %s}|} meth params))
+    in
+    match Json.member "result" response with
+    | Some r -> r
+    | None -> Option.value_exn (Json.member "error" response)
+  in
+  (match call "auth_status" "{}" with
+   | `Array providers ->
+     List.iter providers ~f:(fun p ->
+       match Json.member "accounts" p with
+       | Some (`Array accounts) ->
+         List.iter accounts ~f:(fun a ->
+           printf
+             "%s: %s\n"
+             (Json.to_string (Option.value_exn (Json.member "ref" a)))
+             (Option.value_map
+                (Json.member "usage" a)
+                ~default:"no usage"
+                ~f:Json.to_string))
+       | _ -> ())
+   | json -> print_endline (Json.to_string json));
+  print_endline
+    (Json.to_string (call "account_usage" {|{"ref": "openai-codex/work"}|}));
+  print_endline
+    (Json.to_string
+       (call "account_usage" {|{"ref": "~alice/openai-codex/work"}|}));
+  [%expect
+    {|
+    "openai-codex/main": no usage
+    "openai-codex/work": {"today":{"requests":1,"input":2000,"output":300,"cache_read":500,"cost_usd":0.75},"last_7_days":{"requests":1,"input":2000,"output":300,"cache_read":500,"cost_usd":0.75},"last_30_days":{"requests":1,"input":2000,"output":300,"cache_read":500,"cost_usd":0.75}}
+    [{"user":"default","you":true,"today":{"requests":1,"input":2000,"output":300,"cache_read":500,"cost_usd":0.75},"last_7_days":{"requests":1,"input":2000,"output":300,"cache_read":500,"cost_usd":0.75},"last_30_days":{"requests":1,"input":2000,"output":300,"cache_read":500,"cost_usd":0.75}}]
+    "sharing logins needs users (prigh serve -tokens): this server has one"
+    |}]
 ;;

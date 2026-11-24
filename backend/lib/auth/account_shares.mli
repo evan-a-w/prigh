@@ -124,6 +124,19 @@ val record
   -> cost_usd:float
   -> unit
 
+(** Adds a finished request on [account] to its owner's ledger: [ledger],
+    the user's own (none: not recorded), for their own logins (under [member]'s name, else
+    {!Account_ledger.single_user}); the owner's for a shared one. *)
+val record_request
+  :  ?now:Time_ns.t
+  -> ?member:Member.t
+  -> ?ledger:Account_ledger.t
+  -> Provider_id.t
+  -> Account_ref.t
+  -> Usage.t
+  -> cost_usd:float
+  -> unit
+
 (** Who used [owner]'s login: everyone for the owner, only themselves for
     another user. *)
 val usage

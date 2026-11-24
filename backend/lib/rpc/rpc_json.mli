@@ -71,6 +71,9 @@ val thinking_of_string : string -> Thinking.t Or_error.t
 val auth_status
   :  ?shared:Account_shares.Shared.t list
   -> ?shareable:bool
+  -> ?usage:(Provider_id.t -> Account_ref.t -> Account_ledger.Periods.t)
+       (** what ran on a login (for a shared one, the user's own use), as
+           each account's [usage] when anything did in the last 30 days *)
   -> Provider_auth.Status.t
   -> Json.t
 

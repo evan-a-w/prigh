@@ -243,9 +243,7 @@ let set_pref t ~user provider ~owner id ~f =
   Provider_accounts.set_shared_pref u.store (key provider ~owner id) ~f
 ;;
 
-let login_key provider id =
-  sprintf "%s/%s" (Provider_id.to_string provider) (Account_id.to_string id)
-;;
+let login_key = Account_ledger.login
 
 let record ?now t ~recipient provider ~owner id usage ~cost_usd =
   Option.iter (Hashtbl.find t.users owner) ~f:(fun (u : User.t) ->
@@ -256,6 +254,34 @@ let record ?now t ~recipient provider ~owner id usage ~cost_usd =
       ~user:recipient
       usage
       ~cost_usd)
+;;
+
+let record_request
+      ?now
+      ?member
+      ?ledger
+      provider
+      (account : Account_ref.t)
+      usage
+      ~cost_usd
+  =
+  match account, member, ledger with
+  | Own _, _, None -> ()
+  | Own id, _, Some ledger ->
+    Account_ledger.record
+      ?now
+      ledger
+      ~login:(login_key provider id)
+      ~user:
+        (Option.value_map
+           member
+           ~default:Account_ledger.single_user
+           ~f:(fun m -> m.Member.user))
+      usage
+      ~cost_usd
+  | Shared { owner; id }, Some { Member.shares; user }, _ ->
+    record ?now shares ~recipient:user provider ~owner id usage ~cost_usd
+  | Shared _, None, _ -> ()
 ;;
 
 let usage ?now t ~user provider ~owner id =

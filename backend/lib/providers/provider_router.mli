@@ -20,6 +20,9 @@ val create
            request may name a login another user shares with them, and one
            naming none uses the first shared one when they have none of
            their own *)
+  -> ?ledger:Account_ledger.t
+       (** where each request on a login is recorded
+           ({!Account_shares.record_request}; default: nowhere) *)
   -> store:Auth_store.t
   -> unit
   -> Provider.t

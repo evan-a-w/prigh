@@ -181,7 +181,15 @@ let common_params =
         then
           Faux_provider.create
             (List.init 1000 ~f:(fun _ -> Faux_provider.Reply.text "faux reply"))
-        else Provider_router.create ~env ~getenv ~models ?member ~store ()
+        else
+          Provider_router.create
+            ~env
+            ~getenv
+            ~models
+            ?member
+            ~ledger:(Account_ledger.create ~home)
+            ~store
+            ()
     in
     let session =
       Option.map session ~f:(fun key ->
@@ -859,6 +867,7 @@ let serve_command =
              ?token
              ?namespace
              ?member
+             ~ledger:(Account_ledger.create ~home:world.home)
              ~backend_host
              ~home:world.home
              ~nix_store
@@ -2659,7 +2668,13 @@ let compaction_eval_command =
              Model_registry.create ~env ~sw ~home ~store ~getenv ()
            in
            let provider =
-             Provider_router.create ~env ~getenv ~models ~store ()
+             Provider_router.create
+               ~env
+               ~getenv
+               ~models
+               ~ledger:(Account_ledger.create ~home)
+               ~store
+               ()
            in
            let resolve id =
              match Model_registry.resolve models id with

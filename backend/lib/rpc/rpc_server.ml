@@ -478,6 +478,7 @@ type t =
   { login : Login_manager.t
   ; member : Account_shares.Member.t option
     (** the user and the logins shared among users ([-tokens]) *)
+  ; ledger : Account_ledger.t option (** what ran on the user's logins *)
   ; forges : Forges.t
   ; token : string option (** required in [hello] before anything else *)
   ; namespace : string option
@@ -1239,6 +1240,7 @@ let create
       ?heartbeat_clock
       ?namespace
       ?member
+      ?ledger
       ?(backend_host = true)
       ?home
       ?forges
@@ -1271,6 +1273,7 @@ let create
   let t =
     { login
     ; member
+    ; ledger
     ; forges
     ; token
     ; namespace
@@ -3263,16 +3266,6 @@ let set_shared_pref t ~provider ~owner id ~f =
   send_accounts_changed t
 ;;
 
-let totals_json (t : Account_ledger.Totals.t) =
-  `Object
-    [ "requests", `Number (Int.to_string t.requests)
-    ; "input", `Number (Int.to_string t.input)
-    ; "output", `Number (Int.to_string t.output)
-    ; "cache_read", `Number (Int.to_string t.cache_read)
-    ; "cost_usd", `Number (sprintf "%.6f" t.cost_usd)
-    ]
-;;
-
 let account_methods t (client : Client.t) ~meth ~params =
   let open Or_error.Let_syntax in
   match meth with
@@ -3327,22 +3320,40 @@ let account_methods t (client : Client.t) ~meth ~params =
          `Object [])
   | "account_usage" ->
     Some
-      (let%bind { Account_shares.Member.shares; user } = member_of t in
-       let%bind provider, owner, id =
+      (let self =
+         Option.value_map
+           t.member
+           ~default:Account_ledger.single_user
+           ~f:(fun m -> m.user)
+       in
+       let%map rows =
          match%bind shared_ref_param t.login params with
-         | Some r -> Ok r
+         | Some (provider, owner, id) ->
+           let%bind { Account_shares.Member.shares; user } = member_of t in
+           Account_shares.usage shares ~user provider ~owner id
          | None ->
            let%map provider, id = account_param t.login params in
-           provider, user, id
+           (match t.member, t.ledger with
+            | Some { shares; user }, _ ->
+              Account_shares.usage shares ~user provider ~owner:user id
+              |> Result.ok
+              |> Option.value ~default:[]
+            | None, Some ledger ->
+              Account_ledger.rows
+                ledger
+                ~login:(Account_ledger.login provider id)
+            | None, None -> [])
        in
-       let%map rows = Account_shares.usage shares ~user provider ~owner id in
        `Array
          (List.map rows ~f:(fun (r : Account_ledger.Row.t) ->
-            `Object
-              [ "user", `String r.user
-              ; "today", totals_json r.today
-              ; "last_30_days", totals_json r.last_30_days
-              ])))
+            match Account_ledger.Periods.to_json r.usage with
+            | `Object periods ->
+              `Object
+                ((("user", `String r.user)
+                  :: (if String.equal r.user self then [ "you", `True ] else [])
+                 )
+                 @ periods)
+            | json -> json)))
   | _ -> None
 ;;
 
@@ -3657,11 +3668,38 @@ let dispatch_server t (client : Client.t) ~meth ~params
            { label; make_default; fallback; move_before }
          |> unit_result)
   | "usage_limits" ->
+    let env = Agent.env agent in
+    let shared =
+      match t.member with
+      | None -> []
+      | Some { shares; user } ->
+        Account_shares.shared_with shares ~user
+        |> List.filter ~f:(fun (s : Account_shares.Shared.t) ->
+          not s.pref.hidden)
+        |> List.map ~f:(fun (s : Account_shares.Shared.t) ->
+          { Subscription_usage.Shared.owner = s.owner
+          ; provider = s.provider
+          ; id = s.id
+          ; label = s.label
+          ; resolve =
+              (fun () ->
+                Or_error.map
+                  (Account_shares.resolve
+                     shares
+                     ~env
+                     ~recipient:user
+                     s.provider
+                     ~owner:s.owner
+                     s.id)
+                  ~f:Option.some)
+          })
+    in
     Some
       (ok
          (Subscription_usage.to_json
             (Subscription_usage.fetch
-               ~env:(Agent.env agent)
+               ~env
+               ~shared
                ~getenv:(Login_manager.getenv t.login)
                ~http:t.usage_http
                ~now:t.now
@@ -3735,7 +3773,7 @@ let ui_action_param params ~meth =
           "a prompt with ui_action takes no text: send text \"\"")
 ;;
 
-let dispatch ?member agent login ~(client : Client.t) ~meth ~params
+let dispatch ?member ?ledger agent login ~(client : Client.t) ~meth ~params
   : Json.t Or_error.t
   =
   match meth with
@@ -4214,8 +4252,21 @@ let dispatch ?member agent login ~(client : Client.t) ~meth ~params
             | Ok (_ :: _) -> true
             | Ok [] | Error _ -> false) )
     in
+    let usage provider (ref_ : Account_ref.t) =
+      match ref_, ledger, member with
+      | Own id, Some ledger, _ ->
+        Account_ledger.usage ledger ~login:(Account_ledger.login provider id)
+      | Shared { owner; id }, _, Some { shares; user } ->
+        (match Account_shares.usage shares ~user provider ~owner id with
+         | Ok rows ->
+           List.fold rows ~init:Account_ledger.Periods.zero ~f:(fun acc r ->
+             Account_ledger.Periods.add acc r.usage)
+         | Error _ -> Account_ledger.Periods.zero)
+      | _ -> Account_ledger.Periods.zero
+    in
     Or_error.map (Login_manager.status login) ~f:(fun statuses ->
-      `Array (List.map statuses ~f:(Rpc_json.auth_status ~shared ~shareable)))
+      `Array
+        (List.map statuses ~f:(Rpc_json.auth_status ~shared ~shareable ~usage)))
   | "auth_respond" ->
     Or_error.bind (string_param params "id") ~f:(fun id ->
       Or_error.bind (string_param params "value") ~f:(fun value ->
@@ -4267,7 +4318,14 @@ let handle t client (request : Json.t) : Json.t =
                with
                | Some result -> result
                | None ->
-                 dispatch ?member:t.member agent t.login ~client ~meth ~params))
+                 dispatch
+                   ?member:t.member
+                   ?ledger:t.ledger
+                   agent
+                   t.login
+                   ~client
+                   ~meth
+                   ~params))
         with
         | result -> result
         | exception exn ->

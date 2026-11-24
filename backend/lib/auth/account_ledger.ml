@@ -55,11 +55,41 @@ module Totals = struct
   ;;
 end
 
+module Periods = struct
+  type t =
+    { today : Totals.t
+    ; last_7_days : Totals.t
+    ; last_30_days : Totals.t
+    }
+  [@@deriving sexp_of, equal]
+
+  let zero =
+    { today = Totals.zero
+    ; last_7_days = Totals.zero
+    ; last_30_days = Totals.zero
+    }
+  ;;
+
+  let add a b =
+    { today = Totals.add a.today b.today
+    ; last_7_days = Totals.add a.last_7_days b.last_7_days
+    ; last_30_days = Totals.add a.last_30_days b.last_30_days
+    }
+  ;;
+
+  let to_json t =
+    `Object
+      [ "today", Totals.to_json t.today
+      ; "last_7_days", Totals.to_json t.last_7_days
+      ; "last_30_days", Totals.to_json t.last_30_days
+      ]
+  ;;
+end
+
 module Row = struct
   type t =
     { user : string
-    ; today : Totals.t
-    ; last_30_days : Totals.t
+    ; usage : Periods.t
     }
   [@@deriving sexp_of]
 end
@@ -67,13 +97,21 @@ end
 (* login -> user -> day ("2026-11-24") -> totals *)
 type data = Totals.t String.Map.t String.Map.t String.Map.t
 
+(* Another process (or another server of this one) may write the file too:
+   what was read stays good while the file is unchanged. *)
 type t =
   { path : string
-  ; mutable data : data option
+  ; mutable data : (float * data) option (** the file's mtime, and it *)
   }
 
 let create ~home =
   { path = Filename.concat home ".prigh/account-usage.json"; data = None }
+;;
+
+let mtime t =
+  match Core_unix.stat t.path with
+  | exception _ -> None
+  | st -> Some st.st_mtime
 ;;
 
 let keep_days = 90
@@ -89,9 +127,10 @@ let map_of_json json ~f =
 ;;
 
 let load t =
-  match t.data with
-  | Some data -> data
-  | None ->
+  let mtime = mtime t in
+  match t.data, mtime with
+  | Some (at, data), Some m when Float.equal at m -> data
+  | _ ->
     let data =
       match In_channel.read_all t.path with
       | exception _ -> String.Map.empty
@@ -101,12 +140,11 @@ let load t =
            map_of_json json ~f:(map_of_json ~f:(map_of_json ~f:Totals.of_json))
          | Error _ -> String.Map.empty)
     in
-    t.data <- Some data;
+    t.data <- Option.map mtime ~f:(fun m -> m, data);
     data
 ;;
 
 let save t (data : data) =
-  t.data <- Some data;
   let json =
     `Object
       (Map.to_alist data
@@ -126,9 +164,10 @@ let save t (data : data) =
     let tmp = t.path ^ ".tmp" in
     Out_channel.with_file tmp ~perm:0o600 ~f:(fun oc ->
       Out_channel.output_string oc (Json.to_string json));
-    Core_unix.rename ~src:tmp ~dst:t.path
+    Core_unix.rename ~src:tmp ~dst:t.path;
+    t.data <- Option.map (mtime t) ~f:(fun m -> m, data)
   with
-  | _ -> ()
+  | _ -> t.data <- None
 ;;
 
 let record ?(now = Time_ns.now ()) t ~login ~user (usage : Usage.t) ~cost_usd =
@@ -163,7 +202,11 @@ let record ?(now = Time_ns.now ()) t ~login ~user (usage : Usage.t) ~cost_usd =
 
 let rows ?(now = Time_ns.now ()) ?user t ~login =
   let today = day now in
-  let since = day (Time_ns.sub now (Time_ns.Span.of_day 29.)) in
+  let since days =
+    day (Time_ns.sub now (Time_ns.Span.of_day (Float.of_int (days - 1))))
+  in
+  let week = since 7
+  and month = since 30 in
   Map.find (load t) login
   |> Option.value ~default:String.Map.empty
   |> Map.to_alist
@@ -174,12 +217,26 @@ let rows ?(now = Time_ns.now ()) ?user t ~login =
         if keep key then Totals.add acc data else acc)
     in
     { Row.user
-    ; today = sum (String.equal today)
-    ; last_30_days = sum (fun d -> String.( >= ) d since)
+    ; usage =
+        { today = sum (String.equal today)
+        ; last_7_days = sum (fun d -> String.( >= ) d week)
+        ; last_30_days = sum (fun d -> String.( >= ) d month)
+        }
     })
+;;
+
+let usage ?now ?user t ~login =
+  List.fold (rows ?now ?user t ~login) ~init:Periods.zero ~f:(fun acc r ->
+    Periods.add acc r.usage)
 ;;
 
 let forget t ~login =
   let data = load t in
   if Map.mem data login then save t (Map.remove data login)
+;;
+
+let single_user = "default"
+
+let login provider id =
+  sprintf "%s/%s" (Provider_id.to_string provider) (Account_id.to_string id)
 ;;

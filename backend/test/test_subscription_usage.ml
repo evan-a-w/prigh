@@ -577,3 +577,91 @@ let%expect_test "each account's usage; the provider's is the default's" =
       account no-id (No id): error: The ChatGPT sign-in has no account id: sign in again with /login openai-codex
     |}]
 ;;
+
+let%expect_test "logins shared with the user: asked with the owner's token" =
+  with_sandbox
+  @@ fun t ->
+  let store = Auth_store.create ~path:(Filename.concat t.dir "auth.json") in
+  let http, print_requests = fake_http [ codex_url, Ok (200, [], codex) ] in
+  let shared ~owner resolve =
+    { Subscription_usage.Shared.owner
+    ; provider = Openai_codex
+    ; id = Or_error.ok_exn (Account_id.of_string "work")
+    ; label = "Work"
+    ; resolve
+    }
+  in
+  let usage =
+    Subscription_usage.fetch
+      ~env:t.env
+      ~getenv:(fun _ -> None)
+      ~shared:
+        [ shared ~owner:"alice" (fun () ->
+            Ok
+              (Some
+                 { Provider_auth.Resolved.token = "alice-token"
+                 ; method_ = Oauth
+                 ; account_id = Some "acct-alice"
+                 ; source = "oauth"
+                 ; account = None
+                 }))
+        ; shared ~owner:"carol" (fun () ->
+            Or_error.error_string
+              "carol does not share the login with you (any more)")
+        ]
+      ~http
+      ~now:(fun () -> now)
+      store
+  in
+  print_requests ();
+  List.iter usage.providers ~f:(fun p ->
+    printf "%s: " (Subscription_usage.name p.provider);
+    print_status p.status;
+    List.iter p.accounts ~f:(fun a ->
+      printf
+        "  %s's %s%s: "
+        (Option.value a.shared_by ~default:"own")
+        a.label
+        (if a.default then "*" else "");
+      print_status a.status));
+  (match Subscription_usage.to_json usage with
+   | `Object fields ->
+     (match List.Assoc.find fields ~equal:String.equal "providers" with
+      | Some (`Array [ _; `Object codex ]) ->
+        (match List.Assoc.find codex ~equal:String.equal "accounts" with
+         | Some (`Array (`Object first :: _)) ->
+           List.iter [ "ref"; "id"; "shared_by" ] ~f:(fun k ->
+             printf
+               "%s: %s\n"
+               k
+               (Json.to_string
+                  (List.Assoc.find_exn first ~equal:String.equal k)))
+         | _ -> print_endline "?")
+      | _ -> print_endline "?")
+   | _ -> print_endline "?");
+  [%expect
+    {|
+    GET https://chatgpt.com/backend-api/wham/usage
+      Authorization: Bearer alice-token
+      chatgpt-account-id: acct-alice
+      originator: prigh
+      User-Agent: prigh/0.1.0
+    Claude: not signed in
+    ChatGPT: plan: pro
+      5-hour session               [primary]                           42.0%  resets 2026-11-26T09:00:00.000000Z
+      Weekly                       [secondary]                         84.0%  resets 2026-11-28T12:46:40.000000Z
+      GPT-5.3-Codex-Spark · 5-hour session [GPT-5.3-Codex-Spark.primary]       70.0%  resets 2026-11-26T08:00:00.000000Z
+      Codex other · 15-minute window [codex_other.primary]                3.0%  resets 2026-11-26T08:01:00.000000Z
+      Codex other · Long window   [codex_other.secondary]              1.5%  resets 2026-11-26T05:14:20.000000Z
+      alice's Work*: plan: pro
+      5-hour session               [primary]                           42.0%  resets 2026-11-26T09:00:00.000000Z
+      Weekly                       [secondary]                         84.0%  resets 2026-11-28T12:46:40.000000Z
+      GPT-5.3-Codex-Spark · 5-hour session [GPT-5.3-Codex-Spark.primary]       70.0%  resets 2026-11-26T08:00:00.000000Z
+      Codex other · 15-minute window [codex_other.primary]                3.0%  resets 2026-11-26T08:01:00.000000Z
+      Codex other · Long window   [codex_other.secondary]              1.5%  resets 2026-11-26T05:14:20.000000Z
+      carol's Work: error: carol does not share the login with you (any more)
+    ref: "~alice/openai-codex/work"
+    id: "~alice/work"
+    shared_by: "alice"
+    |}]
+;;

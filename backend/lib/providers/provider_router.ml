@@ -96,6 +96,7 @@ let create
       ?getenv
       ?(models = Model_registry.builtin ())
       ?member
+      ?ledger
       ~store
       ()
   =
@@ -162,14 +163,13 @@ let create
           account)
       in
       let message = p.stream { request with account } ~cancel ~on_event in
-      (match account, member with
-       | Some (Shared { owner; id }), Some { shares; user } ->
-         Account_shares.record
-           shares
-           ~recipient:user
+      (match account with
+       | Some account ->
+         Account_shares.record_request
+           ?member
+           ?ledger
            provider
-           ~owner
-           id
+           account
            message.usage
            ~cost_usd:(Model.cost_usd request.model message.usage)
        | _ -> ());
