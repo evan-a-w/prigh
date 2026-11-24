@@ -5385,9 +5385,10 @@ let accept_autocomplete m ~submit_now =
          | Autocomplete.Source.Snippet, _ -> m, []
          | Autocomplete.Source.Command, true ->
            (match Commands.find ~superuser:m.superuser item.id with
-            (* [/review] and [/agents] alone are the common case: they run
-               at once. *)
-            | Some { argument = Some (Review | Agents); _ } -> submit m
+            (* [/review] and [/agents] alone are the common case, and [/new]
+               and [/engine] alone open their picker: they run at once. *)
+            | Some { argument = Some (Review | Agents | Engine | Adapter); _ }
+              -> submit m
             | Some spec when Option.is_some spec.argument ->
               refresh_autocomplete m
             | _ -> submit m)
