@@ -168,6 +168,7 @@ let%expect_test
   [%expect
     {|
     Toggle_context_card
+    (Rpc (method_ usage_limits) (params ()) (tag Usage_loaded))
     <div class="context-ring-anchor flex open relative shrink-0 z-(--z-menu-anchor)">
     Toggle_context_card
     (Run /session)

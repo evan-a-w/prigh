@@ -356,6 +356,7 @@ let logins (m : App.Model.t) ~inject =
           ~cls:"provider-login"
           ~name:(Logins.title l)
           ~about:(String.capitalize (Logins.detail l) ^ ".")
+          ~below:(Login_usage_view.details m l)
           ((match account.shared_by with
             | Some _ ->
               let verb, command =

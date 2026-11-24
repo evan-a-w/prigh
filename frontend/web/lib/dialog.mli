@@ -19,7 +19,7 @@ module Picker_kind : sig
     | Hosts (** item ids are host ids *)
     | Users (** act as one ([/setusr]) *)
     | Accounts (** the account menu: see [App] for the item ids *)
-    | Logins
+    | Logins of { noun : string } (** what its rows are, for its filter *)
     (** a provider's logins ([/accounts]): item ids are slash commands, run
         when picked; one ending in a space asks for a label ([Login_label]) *)
     | Skills (** item ids are skill names *)

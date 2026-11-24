@@ -35,10 +35,8 @@ val limits
     key's, billed per token). *)
 val totals : cost:bool -> P.Login_usage.Totals.t -> string
 
-(** ["today 3 requests, 12k tokens · 30 days 41 requests, 1.2M tokens"];
-    [all] adds the last 7 days. ["nothing in the last 30 days"] when
-    nothing ran. *)
-val periods : ?all:bool -> cost:bool -> P.Login_usage.t option -> string
+(** ["3 req 12k tok $0.40"]: [totals], shorter. *)
+val compact : cost:bool -> P.Login_usage.Totals.t -> string
 
 (** A login row's few words: its first limit window when the provider
     reported it, else what ran on it today or else in 30 days (["today 3 req
@@ -54,7 +52,3 @@ val period_lines : cost:bool -> P.Login_usage.t option -> string list
 
 (** Whether a login is billed per token: what ran on it shows its cost. *)
 val billed : P.Auth_status.Account.t -> bool
-
-(** [account_usage]'s rows: ["bob: today 1 request, 1k tokens · 30 days
-    ..."], the asking user's as ["you"]. *)
-val user : cost:bool -> P.Login_usage.User.t -> string

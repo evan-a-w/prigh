@@ -196,6 +196,14 @@ let%expect_test
     carol pick to share: they never see its key
     ↑↓ to move, Enter to choose, Esc to close
     |}];
+  List.iter (H.node h ~selector:".modal input" ()) ~f:(function
+    | Element { attributes; _ } ->
+      print_s
+        [%sexp
+          (List.Assoc.find attributes "placeholder" ~equal:String.equal
+           : string option)]
+    | _ -> ());
+  [%expect {| ("Filter users\226\128\166") |}];
   H.act h (Picker_query "car");
   H.key h "Enter" ~target:Field;
   [%expect
@@ -250,5 +258,86 @@ let%expect_test
     Place_popover
     Login ChatGPT
     (Personal) (Work) (Team (from dave)) (The provider's default ✓)
+    |}]
+;;
+
+(* Each login's usage: Personal's limits, Work's requests (shared with bob:
+   who used it), and the context card's line on the session's login. *)
+let usage_json =
+  let totals r =
+    sprintf
+      {|{"requests":%d,"input":%d,"output":%d,"cache_read":0,"cost_usd":0}|}
+      r
+      (r * 4000)
+      (r * 300)
+  in
+  let periods a b c =
+    sprintf
+      {|"usage":{"today":%s,"last_7_days":%s,"last_30_days":%s}|}
+      (totals a)
+      (totals b)
+      (totals c)
+  in
+  String.substr_replace_first
+    sharing_json
+    ~pattern:{|"shared_with":[{"user":"bob","since_ms":1700000000000}]|}
+    ~with_:
+      ({|"shared_with":[{"user":"bob","since_ms":1700000000000}],|}
+       ^ periods 3 10 25)
+;;
+
+let limits_json =
+  (* [H.now] is 1791194400000. *)
+  {|{"fetched_at_ms":1791194400000,"providers":[{"provider":"openai","name":"ChatGPT","status":"limits","accounts":[
+      {"ref":"openai/main","id":"main","label":"Personal","default":true,"status":"limits","plan":"pro","windows":[{"id":"primary","label":"5-hour session","used_percent":42,"resets_at_ms":1791199800000}]},
+      {"ref":"openai/work","id":"work","label":"Work","default":false,"status":"error","error":"sign in again: /login openai as Work"}]}]}|}
+;;
+
+let%expect_test "settings and the context card show each login's usage" =
+  let h = create () in
+  H.quiet h (fun () ->
+    H.act h (Clock H.now);
+    H.act h (Reply (Auth_status Refresh, Ok (Jsonaf.of_string usage_json)));
+    H.act h (Reply (Share_targets, Ok (Jsonaf.of_string {|["bob"]|}))));
+  H.act h (Settings_section Models);
+  H.reply h "usage_limits" limits_json;
+  H.reply
+    h
+    "account_usage"
+    {|[{"user":"alice","you":true,"today":{"requests":1,"input":4000,"output":300,"cache_read":0,"cost_usd":0},"last_7_days":{"requests":4,"input":16000,"output":1200,"cache_read":0,"cost_usd":0},"last_30_days":{"requests":5,"input":20000,"output":1500,"cache_read":0,"cost_usd":0}},
+       {"user":"bob","today":{"requests":2,"input":8000,"output":600,"cache_read":0,"cost_usd":0},"last_7_days":{"requests":6,"input":24000,"output":1800,"cache_read":0,"cost_usd":0},"last_30_days":{"requests":20,"input":80000,"output":6000,"cache_read":0,"cost_usd":0}}]|};
+  H.text h ~selector:".provider-login";
+  [%expect
+    {|
+    (Focus dialog)
+    (Rpc (method_ usage_limits) (params ()) (tag Usage_loaded))
+    (Rpc (method_ account_usage) (params ((ref openai/work)))
+     (tag (Login_users openai/work)))
+    ChatGPT: Personal
+    Subscription, default, takes over at usage limits.
+    (Share…) (Manage)
+    5-hour session Resets in 1h 30m · 11:30
+    42% used
+    ChatGPT: Work
+    Subscription, shared with bob.
+    (Share…) (Manage)
+    Limits unknown: sign in again: /login openai as Work
+    Today 3 req 13k tok
+    7 days 10 req 43k tok
+    30 days 25 req 108k tok
+    You today 1 req 4.3k tok · 30 days 5 req 22k tok
+    bob today 2 req 8.6k tok · 30 days 20 req 86k tok
+    ChatGPT: Team (from dave)
+    Subscription, shared by dave.
+    (Hide) (Manage)
+    |}];
+  H.quiet h (fun () -> H.act h Close_dialog);
+  H.act h Toggle_context_card;
+  H.text h ~selector:".context-card .login-line";
+  H.text h ~selector:".context-card .login-limit";
+  [%expect
+    {|
+    Login Personal
+    5-hour session 42% · 1h 30m
     |}]
 ;;

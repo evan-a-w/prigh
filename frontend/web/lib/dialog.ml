@@ -16,7 +16,7 @@ module Picker_kind = struct
     | Hosts
     | Users
     | Accounts
-    | Logins
+    | Logins of { noun : string } (** what its rows are, for its filter *)
     | Skills
     | Snippets
     | Reminders
@@ -203,7 +203,7 @@ let per_session = function
           | Confirm_tools
           | Users
           | Accounts
-          | Logins
+          | Logins _
           | Themes
           | Accents
           | Compaction_models

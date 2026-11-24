@@ -172,6 +172,7 @@ module Reply_tag = struct
         ; notice : string
         }
     | Share_targets
+    | Login_users of string (** [account_usage] of the login with this ref *)
     | Logins_changed of
         { command : string
         ; notice : string
@@ -763,6 +764,8 @@ module Model = struct
     ; auth : Auth_status.t list
     ; share_targets : string list
       (** the other users the user's logins can be shared with *)
+    ; login_users : Login_usage.User.t list String.Map.t
+      (** by login ref: who used the logins the user shares ([account_usage]) *)
     ; now : Time_ns.t option
     ; utc_offset : Time_ns.Span.t
     ; browser_time_zone : string option
@@ -875,6 +878,7 @@ module Model = struct
         ; hello
         ; saved_login
         ; share_targets
+        ; login_users
         ; state
         ; chat
         ; sessions
@@ -985,6 +989,7 @@ module Model = struct
     && phys_equal hello b.hello
     && phys_equal saved_login b.saved_login
     && phys_equal share_targets b.share_targets
+    && phys_equal login_users b.login_users
     && phys_equal state b.state
     && (transcript || phys_equal chat b.chat)
     && phys_equal sessions b.sessions
@@ -1319,6 +1324,7 @@ let init =
   ; models = []
   ; auth = []
   ; share_targets = []
+  ; login_users = String.Map.empty
   ; now = None
   ; utc_offset = Time_ns.Span.zero
   ; browser_time_zone = None
@@ -1545,7 +1551,7 @@ let close_dialog (m : Model.t) =
                 | Generate_models
                 | Approval_models
                 | Naming_models
-                | Logins
+                | Logins _
                 | Defaults _ )
             ; _
             } ) ) ->
@@ -2300,6 +2306,20 @@ let fetch_usage (m : Model.t) =
   , [ call Usage_limits ~tag:Usage_loaded ] )
 ;;
 
+(* Settings → Models: each login's limits, and who used the logins the user
+   shares. *)
+let fetch_logins_usage (m : Model.t) =
+  let m, limits = fetch_usage m in
+  let shared =
+    List.concat_map m.auth ~f:(fun (p : Auth_status.t) ->
+      List.filter_map p.accounts ~f:(fun a ->
+        Option.some_if
+          (Option.is_none a.shared_by && not (List.is_empty a.shared_with))
+          (rpc "account_usage" [ "ref", str a.ref_ ] ~tag:(Login_users a.ref_))))
+  in
+  m, limits @ shared
+;;
+
 let fetch_memory (m : Model.t) =
   ( { m with memory = Memory_notes.loading m.memory }
   , [ call Get_memory ~tag:Memory_loaded ] )
@@ -2358,10 +2378,10 @@ let fetch_section (m : Model.t) : Settings_section.t -> _ = function
   | Mcp -> fetch_mcp m
   | Custom_instructions -> fetch_instructions m
   | Usage -> fetch_usage m
+  | Models -> fetch_logins_usage m
   | Appearance
   | Sessions
   | New_sessions
-  | Models
   | Git_hosting
   | Nix_store
   | Account -> m, []
@@ -5386,6 +5406,7 @@ let user_switched (m : Model.t) (hello : Hello_reply.t) =
   let m =
     { m with
       hello = Some hello
+    ; login_users = String.Map.empty
     ; state = None
     ; chat = Chat.empty
     ; paging = Paging.all
@@ -7100,14 +7121,14 @@ let hidden_messages (m : Model.t) ~path ~entry result =
 
 module Logins = Prigh_ui.Provider_logins
 
-let logins_picker (m : Model.t) ?(query = "") ~title rows =
+let logins_picker (m : Model.t) ?(query = "") ?(noun = "logins") ~title rows =
   let items =
     List.map rows ~f:(fun (r : Logins.Row.t) ->
       Picker.Item.create ~id:r.id ~detail:r.detail ~marked:r.marked r.label)
   in
   open_picker
     m
-    (Picker { kind = Logins; picker = Picker.create ~query ~title items })
+    (Picker { kind = Logins { noun }; picker = Picker.create ~query ~title items })
 ;;
 
 let logins_request (m : Model.t) ~command (r : Logins.Request.t) =
@@ -7126,7 +7147,7 @@ let back_to_settings ~back ((m : Model.t), cmds) =
     | None ->
       ( { m with dialog = Some Settings; return_to_settings = false }
       , cmds @ [ Command.Focus "dialog" ] )
-    | Some (Login _ | Login_label _ | Picker { kind = Logins; _ }) ->
+    | Some (Login _ | Login_label _ | Picker { kind = Logins _; _ }) ->
       { m with return_to_settings = true }, cmds
     | Some _ -> m, cmds)
 ;;
@@ -7159,6 +7180,7 @@ let accounts_command (m : Model.t) rest =
      | Ok l, users ->
        logins_picker
          m
+         ~noun:"users"
          ~title:(Logins.share_title l)
          (Logins.share_rows_for l users))
   | Pick query ->
@@ -7169,11 +7191,18 @@ let accounts_command (m : Model.t) rest =
         m
         ~query
         ~title:"Logins"
-        (Logins.rows m.auth ~session:m.state)
+        (Logins.rows
+           ?usage:(Option.bind m.usage.usage ~f:Result.ok)
+           m.auth
+           ~session:m.state)
   | Menu arg ->
     (match Logins.find m.auth arg with
      | Ok l ->
-       logins_picker m ~title:(Logins.title l) (Logins.menu l ~session:m.state)
+       logins_picker
+         m
+         ~noun:"actions"
+         ~title:(Logins.title l)
+         (Logins.menu l ~session:m.state)
      | Error e -> error m (String.capitalize e))
   | Remove arg ->
     (match Logins.find m.auth arg with
@@ -8989,7 +9018,7 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
   (* Subagents from before the backend restarted are gone: the report stays. *)
   | ( ( Ignore | Paths _
       | Auth_status Refresh
-      | Share_targets | Subagent _ | Subagents | Jobs | Config | Prompt_paths _
+      | Share_targets | Login_users _ | Subagent _ | Subagents | Jobs | Config | Prompt_paths _
       | Users Probe )
     , Error _ ) -> m, []
   | Btw id, Error e -> update_btw m id ~f:(fun b -> Btw.fail b e), []
@@ -9711,6 +9740,9 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
                "No provider or git host is logged in: /login logs in to one.")
       in
       m, cmds @ targets)
+  | Login_users ref_, Ok json ->
+    decode m json Login_usage.User.list_of_json ~f:(fun users ->
+      { m with login_users = Map.set m.login_users ~key:ref_ ~data:users }, [])
   | Share_targets, Ok json ->
     decode m json strings ~f:(fun share_targets -> { m with share_targets }, [])
   | Paths prefix, Ok json ->
@@ -11097,7 +11129,7 @@ let picker_accepted (m : Model.t) ~kind (item : Picker.Item.t) =
        with
        | Some w -> open_worktree m w ~new_session:false
        | None -> m, [])
-    | Logins ->
+    | Logins _ ->
       back_to_settings
         ~back:m.return_to_settings
         (match String.chop_suffix item.id ~suffix:" to " with
@@ -12365,7 +12397,12 @@ let update_connected (m : Model.t) (action : Action.t) =
     { m with review_drawer = not m.review_drawer }, []
   | Toggle_sidebar -> { m with sidebar_open = not m.sidebar_open }, []
   | Toggle_status_tray -> { m with status_tray = not m.status_tray }, []
-  | Toggle_context_card -> { m with context_card = not m.context_card }, []
+  | Toggle_context_card ->
+    let m = { m with context_card = not m.context_card } in
+    (* The card shows the session's login's limits. *)
+    if m.context_card && Option.is_none m.usage.usage && not m.usage.loading
+    then fetch_usage m
+    else m, []
   | Toggle_session_card -> toggle_session_card m
   | Session_card action ->
     { m with session_card = Session_card.apply m.session_card action }, []
@@ -12540,7 +12577,7 @@ let update_connected (m : Model.t) (action : Action.t) =
                       | Generate_models
                       | Approval_models
                       | Naming_models
-                      | Logins
+                      | Logins _
                       | Defaults _ )
                   ; _
                   } ) ) -> { m' with return_to_settings = true }, cmds

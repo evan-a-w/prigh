@@ -252,6 +252,7 @@ let%expect_test "transcript detail, default mode, providers, shortcuts" =
   [%expect
     {|
     (Settings_section Models)
+    (Rpc (method_ usage_limits) (params ()) (tag Usage_loaded))
     Model providers
     Logged in to Anthropic.
     (Manage providers)
@@ -684,6 +685,7 @@ let%expect_test
     (MCP servers Tools the model can use from MCP servers. The servers here are kept on the backend for your account and run on every host your sessions use; a host's ~/.prigh/mcp.json and a project's .mcp.json add their own.) (Git hosting The hosts agents push branches to and open pull requests on.)
     (Account Who you are on this backend.)
     (Settings_section Models)
+    (Rpc (method_ usage_limits) (params ()) (tag Usage_loaded))
     <button class="btn ghost modal-back">
     <h2 class="">
     <button class="btn ghost icon">

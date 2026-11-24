@@ -73,19 +73,6 @@ let totals ~cost (t : P.Login_usage.Totals.t) =
      @ if cost then [ sprintf "$%.2f" t.cost_usd ] else [])
 ;;
 
-let periods ?(all = false) ~cost (usage : P.Login_usage.t option) =
-  match usage with
-  | None -> "nothing in the last 30 days"
-  | Some u when u.last_30_days.requests = 0 -> "nothing in the last 30 days"
-  | Some u ->
-    List.filter_opt
-      [ Some ("today " ^ totals ~cost u.today)
-      ; Option.some_if all ("7 days " ^ totals ~cost u.last_7_days)
-      ; Some ("30 days " ^ totals ~cost u.last_30_days)
-      ]
-    |> String.concat ~sep:" · "
-;;
-
 let period_lines ~cost (usage : P.Login_usage.t option) =
   match usage with
   | Some u when u.last_30_days.requests > 0 ->
@@ -118,11 +105,4 @@ let brief ~now ~limits:status (a : P.Auth_status.Account.t) =
   | None, Some u when u.last_30_days.requests > 0 ->
     Some ("30d " ^ compact ~cost:(billed a) u.last_30_days)
   | None, _ -> None
-;;
-
-let user ~cost (u : P.Login_usage.User.t) =
-  sprintf
-    "%s: %s"
-    (if u.you then "you" else u.user)
-    (periods ~cost (Some u.usage))
 ;;

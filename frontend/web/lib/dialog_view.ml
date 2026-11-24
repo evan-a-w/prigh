@@ -18,7 +18,7 @@ let picker_title : Dialog.Picker_kind.t -> string = function
   | Hosts -> "Hosts"
   | Users -> "Users"
   | Accounts -> "Accounts"
-  | Logins -> "Logins"
+  | Logins _ -> "Logins"
   | Menu _ -> "Menu"
   | Skills -> "Skills"
   | Snippets -> "Snippets"
@@ -93,7 +93,10 @@ let picker ?(trimmable = String.Set.empty) ~kind (p : Picker.t) ~inject =
       ]
     (Picker_view.view
        p
-       ~noun:(String.lowercase (picker_title kind))
+       ~noun:
+         (match kind with
+          | Logins { noun } -> noun
+          | _ -> String.lowercase (picker_title kind))
        ?empty:
          (match kind with
           | Mcp { servers = []; _ } -> Some (Node.text Mcp_servers.none)

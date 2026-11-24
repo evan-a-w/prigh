@@ -1165,6 +1165,7 @@ let%expect_test "the context ring: idle, running, and what applies" =
   [%expect
     {|
     Toggle_context_card
+    (Rpc (method_ usage_limits) (params ()) (tag Usage_loaded))
     Context 180k / 200k
     90% used · compacts at 160k (80%)
     This session $0.00

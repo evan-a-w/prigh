@@ -196,6 +196,7 @@ module Reply_tag : sig
         ; notice : string (** shown on success *)
         }
     | Share_targets
+    | Login_users of string (** [account_usage] of the login with this ref *)
     | Logins_changed of
         { command : string (** back into the editor if refused *)
         ; notice : string (** shown on success *)
@@ -974,6 +975,8 @@ module Model : sig
     ; auth : Auth_status.t list
     ; share_targets : string list
       (** the other users the user's logins can be shared with *)
+    ; login_users : Login_usage.User.t list String.Map.t
+      (** by login ref: who used the logins the user shares ([account_usage]) *)
     ; now : Time_ns.t option
     ; utc_offset : Time_ns.Span.t (** local time minus UTC *)
     ; browser_time_zone : string option (** IANA, once the page said *)
