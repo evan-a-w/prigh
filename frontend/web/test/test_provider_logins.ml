@@ -153,3 +153,102 @@ let%expect_test "/model MODEL@LABEL pins the login; the chip and menu show it" =
        (notice "this session uses ChatGPT: Personal"))))
     |}]
 ;;
+
+(* Alice may share Work (bob has it); dave shares his "Team" with her. *)
+let sharing_json =
+  {|[{"provider":"openai","name":"ChatGPT","methods":[{"method":"oauth","label":"ChatGPT Plus/Pro"}],"configured":{"method":"oauth","source":"oauth"},"expires_ms":null,"accounts":[{"ref":"openai/main","id":"main","label":"Personal","method":"oauth","source":"oauth","default":true,"fallback":true,"shareable":true},{"ref":"openai/work","id":"work","label":"Work","method":"oauth","source":"oauth","default":false,"fallback":false,"shareable":true,"shared_with":[{"user":"bob","since_ms":1700000000000}]},{"ref":"~dave/openai/team","id":"~dave/team","label":"Team","method":"oauth","source":"shared by dave","default":false,"fallback":false,"shared_by":"dave"}]}]|}
+;;
+
+let%expect_test
+    "sharing: Share… picks a user, grants show, revoking, a shared login"
+  =
+  let h = create () in
+  (* Granted or revoked by its owner: the recipient's UI asks again. *)
+  H.event h {|{"type":"event","event":"accounts_changed"}|};
+  H.reply h "auth_status" sharing_json;
+  H.reply h "account_share_targets" {|["bob","carol"]|};
+  H.quiet h (fun () -> H.act h (Settings_section Models));
+  H.text h ~selector:".provider-login";
+  [%expect
+    {|
+    (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
+    (Rpc (method_ account_share_targets) (params ()) (tag Share_targets))
+    ChatGPT: Personal
+    Subscription, default, takes over at usage limits.
+    (Share…) (Manage)
+    ChatGPT: Work
+    Subscription, shared with bob.
+    (Share…) (Manage)
+    ChatGPT: Team (from dave)
+    Subscription, shared by dave.
+    (Hide) (Manage)
+    |}];
+  H.click h ~nth:2 ~selector:".provider-login button";
+  H.text h ~selector:".modal";
+  [%expect
+    {|
+    (Run "/accounts share openai/work")
+    (Focus picker-input)
+    Share ChatGPT: Work with
+    (Close (Esc))
+    []
+    bob shared with them: pick to stop sharing ✓
+    carol pick to share: they never see its key
+    ↑↓ to move, Enter to choose, Esc to close
+    |}];
+  H.act h (Picker_query "car");
+  H.key h "Enter" ~target:Field;
+  [%expect
+    {|
+    Dialog_accept
+    (Rpc (method_ account_share) (params ((ref openai/work) (users (bob carol))))
+     (tag
+      (Logins_changed (command "/accounts share openai/work with carol")
+       (notice "shared ChatGPT: Work with carol"))))
+    (Focus dialog)
+    |}];
+  H.act h (Run "/accounts menu openai/work");
+  H.text h ~selector:".picker-items";
+  [%expect
+    {|
+    (Focus picker-input)
+    Use in this session this session's requests go to this login
+    Make default sessions that pick no login use it
+    Rename…
+    Take over at usage limits when another login of the provider hits its limit
+    Move up
+    Share… another user of this server may use it; they never see its key
+    Stop sharing with bob their sessions on it go back to their default login
+    Log in again
+    Log out deletes the stored credential
+    |}];
+  H.act h (Picker_query "stop sharing");
+  H.key h "Enter" ~target:Field;
+  [%expect
+    {|
+    Dialog_accept
+    (Rpc (method_ account_share) (params ((ref openai/work) (users ())))
+     (tag
+      (Logins_changed (command "/accounts unshare openai/work from bob")
+       (notice "stopped sharing ChatGPT: Work with bob"))))
+    (Focus dialog)
+    |}];
+  H.act h (Run "/accounts hide team");
+  [%expect
+    {|
+    (Rpc (method_ account_hide) (params ((ref ~dave/openai/team) (hidden true)))
+     (tag
+      (Logins_changed (command "/accounts hide team")
+       (notice
+        "hid ChatGPT: Team (from dave): /accounts show ~dave/openai/team brings it back"))))
+    |}];
+  H.act h (Open_chip Model);
+  H.text h ~selector:".model-logins";
+  [%expect
+    {|
+    (Focus popover-filter)
+    Place_popover
+    Login ChatGPT
+    (Personal) (Work) (Team (from dave)) (The provider's default ✓)
+    |}]
+;;

@@ -347,3 +347,143 @@ let%expect_test "a pinned login carries over to the provider's other models" =
         (then_ (Notice_on_success "this session uses ChatGPT's default login")))))
     |}]
 ;;
+
+(* Alice may share Work with bob or carol (bob has it); dave shares his
+   "Team" ChatGPT login with her. *)
+let sharing_json =
+  {|[{"provider":"openai","name":"ChatGPT","methods":[{"method":"oauth","label":"ChatGPT Plus/Pro"}],"configured":{"method":"oauth","source":"oauth"},"expires_ms":null,"accounts":[{"ref":"openai/main","id":"main","label":"Personal","method":"oauth","source":"oauth","default":true,"fallback":true,"shareable":true},{"ref":"openai/work","id":"work","label":"Work","method":"oauth","source":"oauth","default":false,"fallback":false,"shareable":true,"shared_with":[{"user":"bob","since_ms":1700000000000}]},{"ref":"~dave/openai/team","id":"~dave/team","label":"Team","method":"oauth","source":"shared by dave","default":false,"fallback":false,"shared_by":"dave"}]}]|}
+;;
+
+let%expect_test "sharing a login, and one shared with the user" =
+  let h = connected () in
+  H.reply ~quiet:true h Auth_refresh sharing_json;
+  let run text =
+    H.keys h text;
+    H.enter h
+  in
+  run "/accounts menu work";
+  H.show h;
+  [%expect
+    {|
+    ChatGPT: Work  (1–7 of 9)
+    / ▏
+    ▸  Use in this session        this session's requests go to this login
+       Make default               sessions that pick no login use it
+       Rename…
+       Take over at usage limits  when another login of the provider hits i…
+       Move up
+       Share…                     another user of this server may use it; t…
+       Stop sharing with bob      their sessions on it go back to their def…
+    ────────────────────────────────────────────────────────────────────────
+    >
+    gpt-5.5@Personal  think:off  ctx:0.1%/1.0M  Enter selects · Esc closes
+    |}];
+  H.keys h "Share";
+  H.enter h;
+  [%expect
+    {|
+    (Rpc
+      (method_ account_share_targets)
+      (params ())
+      (tag (Share_targets openai/work)))
+    |}];
+  H.reply h (Share_targets "openai/work") {|["bob","carol"]|};
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    Share ChatGPT: Work with  (2)
+    / ▏
+    ▸* bob    shared with them: pick to stop sharing
+       carol  pick to share: they never see its key
+    ────────────────────────────────────────────────────────────────────────
+    >
+    gpt-5.5@Personal  think:off  ctx:0.1%/1.0M  Enter selects · Esc closes
+    |}];
+  H.keys h "car";
+  H.enter h;
+  run "/accounts unshare work from bob";
+  run "/accounts unshare work from carol";
+  [%expect
+    {|
+    (Rpc
+      (method_ account_share)
+      (params ((ref openai/work) (users (bob carol))))
+      (tag (
+        Retry_in_editor
+        (command "/accounts share openai/work with carol")
+        (hint    "")
+        (then_ (Notice_on_success "shared ChatGPT: Work with carol")))))
+    (Rpc
+      (method_ account_share)
+      (params ((ref openai/work) (users ())))
+      (tag (
+        Retry_in_editor
+        (command "/accounts unshare work from bob")
+        (hint    "")
+        (then_ (Notice_on_success "stopped sharing ChatGPT: Work with bob")))))
+    |}];
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ───────────── ChatGPT: Work is not shared with carol: it is with bob ───
+    > /accounts unshare work from carol▏
+    /work  gpt-5.5@Personal  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    |}];
+  H.key h (Prigh_ui.Key.ctrl 'c');
+  (* Dave's: use it, take over at limits, hide; not share or rename. *)
+  run "/accounts menu team";
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ChatGPT: Team (from dave)  (3)
+    / ▏
+    ▸  Use in this session        on dave's login: they see what it costs
+       Take over at usage limits  when your own login of the provider hits …
+       Hide                       out of your pickers; dave still shares it
+    ────────────────────────────────────────────────────────────────────────
+    >
+    gpt-5.5@Personal  think:off  ctx:0.1%/1.0M  Enter selects · Esc closes
+    |}];
+  H.key h (Prigh_ui.Key.plain Escape);
+  run "/accounts share team with bob";
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ──────── ChatGPT: Team (from dave) is dave's: only they can share it ───
+    > /accounts share team with bob▏
+    /work  gpt-5.5@Personal  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
+    |}];
+  H.key h (Prigh_ui.Key.ctrl 'c');
+  run "/logout openai@Team";
+  [%expect
+    {|
+    (Rpc
+      (method_ account_hide)
+      (params (
+        (ref    ~dave/openai/team)
+        (hidden true)))
+      (tag (
+        Retry_in_editor
+        (command "/logout openai@Team")
+        (hint    "")
+        (then_ (
+          Notice_on_success
+          "hid ChatGPT: Team (from dave): /accounts show ~dave/openai/team brings it back")))))
+    |}]
+;;
