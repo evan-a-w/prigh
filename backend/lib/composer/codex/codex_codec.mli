@@ -104,6 +104,7 @@ module Request_kind : sig
     | Revert
     | Model_list
     | Account_read
+    | Rate_limits_read
   [@@deriving sexp_of, equal]
 end
 
@@ -125,6 +126,8 @@ module Response : sig
         ; next_cursor : string option
         }
     | Account of Account.t
+    | Rate_limits of Subscription_usage.Status.t
+    (** [account/rateLimits/read]: the login's usage limits *)
     | Done of Request_kind.t
     (** interrupt, compact, revert: nothing more to say *)
     | Failed of
@@ -211,6 +214,13 @@ val list_models : t -> cursor:string option -> string
 
 (** [account/read] without refreshing the token: passive. *)
 val read_account : t -> string
+
+(** [account/rateLimits/read]: the ChatGPT login's usage limits. *)
+val read_rate_limits : t -> string
+
+(** The login's usage limits as Codex last said ([account/rateLimits/read]
+    or [account/rateLimits/updated]). *)
+val limits : t -> Subscription_usage.Status.t option
 
 (** [None] when no such request is waiting (answered, or withdrawn). *)
 val reply_approval

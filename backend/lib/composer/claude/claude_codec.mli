@@ -91,11 +91,14 @@ module Response : sig
       | Set_permission_mode
       | Set_model
       | Set_max_thinking_tokens
+      | Get_usage
     [@@deriving sexp_of, equal]
   end
 
   type t =
     | Initialized of Init_info.t
+    | Usage of Subscription_usage.Status.t
+    (** [get_usage]: the login's plan limits *)
     | Done of Command.t
     | Failed of
         { command : Command.t
@@ -169,6 +172,14 @@ val set_model : t -> string option -> string
 
 (** [None]: thinking off. *)
 val set_max_thinking_tokens : t -> int option -> string
+
+(** [get_usage]: the Claude.ai login's plan limits (answered with
+    [Usage]). *)
+val get_usage : t -> string
+
+(** The login's plan limits as Claude Code last said ([get_usage], then
+    each [rate_limit_event]). *)
+val limits : t -> Subscription_usage.Status.t option
 
 (** {2 Answers to Claude Code's requests} *)
 

@@ -85,6 +85,7 @@ module Request_kind = struct
     | Revert
     | Model_list
     | Account_read
+    | Rate_limits_read
   [@@deriving sexp_of, equal]
 end
 
@@ -106,6 +107,7 @@ module Response = struct
         ; next_cursor : string option
         }
     | Account of Account.t
+    | Rate_limits of Subscription_usage.Status.t
     | Done of Request_kind.t
     | Failed of
         { kind : Request_kind.t
@@ -191,6 +193,7 @@ type t =
   ; mutable last_total : Usage.t option
   ; mutable turn_error : (Adapter_event.Error_kind.t * string) option
   ; mutable resets_at : float option
+  ; mutable limits : Subscription_usage.Status.t option
   }
 
 let create () =
@@ -207,6 +210,7 @@ let create () =
   ; last_total = None
   ; turn_error = None
   ; resets_at = None
+  ; limits = None
   }
 ;;
 
@@ -535,6 +539,9 @@ let read_account t =
   request t Account_read "account/read" (`Object [ "refreshToken", `False ])
 ;;
 
+let read_rate_limits t = request t Rate_limits_read "account/rateLimits/read" `Null
+let limits t = t.limits
+
 let request_key : Json.t -> string = function
   | `String s -> s
   | `Number n -> n
@@ -800,8 +807,62 @@ let token_usage t params =
       ]
 ;;
 
+(* A [RateLimitSnapshot] ([primary]/[secondary]: [{usedPercent,
+   windowDurationMins, resetsAt}], [planType]) in the shape of ChatGPT's
+   usage endpoint, which {!Subscription_usage.parse_codex} reads. *)
+let limits_of_snapshot snapshot =
+  let window w =
+    match w with
+    | Some (`Object _ as w) ->
+      let n key ~f =
+        Option.map (field key w) ~f:(fun v ->
+          match v with
+          | `Number s ->
+            (match Float.of_string_opt s with
+             | Some x -> `Number (Float.to_string_hum ~strip_zero:true (f x))
+             | None -> v)
+          | v -> v)
+      in
+      Some
+        (`Object
+            (List.filter_opt
+               [ Option.map (n "usedPercent" ~f:Fn.id) ~f:(fun v ->
+                   "used_percent", v)
+               ; Option.map
+                   (n "windowDurationMins" ~f:(fun m -> m *. 60.))
+                   ~f:(fun v -> "limit_window_seconds", v)
+               ; Option.map (n "resetsAt" ~f:Fn.id) ~f:(fun v -> "reset_at", v)
+               ]))
+    | _ -> None
+  in
+  let rate_limit =
+    `Object
+      (List.filter_opt
+         [ Option.map (window (field "primary" snapshot)) ~f:(fun w ->
+             "primary_window", w)
+         ; Option.map (window (field "secondary" snapshot)) ~f:(fun w ->
+             "secondary_window", w)
+         ])
+  in
+  let plan =
+    match str "planType" snapshot with
+    | Some "unknown" | None -> `Null
+    | Some p -> `String p
+  in
+  Subscription_usage.parse_codex
+    ~now:0.
+    (Json.to_string (`Object [ "plan_type", plan; "rate_limit", rate_limit ]))
+;;
+
 let rate_limits t params =
   let snapshot = Option.value (field "rateLimits" params) ~default:`Null in
+  (* A snapshot without windows (some limits have none) keeps what an
+     earlier one said. *)
+  (match snapshot, limits_of_snapshot snapshot with
+   | `Object _, (Limits { windows = _ :: _; _ } as status) ->
+     t.limits <- Some status
+   | `Object _, status when Option.is_none t.limits -> t.limits <- Some status
+   | _ -> ());
   let windows =
     List.filter_map [ "primary"; "secondary" ] ~f:(fun name ->
       match field name snapshot with
@@ -1682,6 +1743,11 @@ let response t (kind : Request_kind.t) json =
               })
        ]
      | Account_read -> [ Output.Response (Account (account result)) ]
+     | Rate_limits_read ->
+       let snapshot = Option.value (field "rateLimits" result) ~default:`Null in
+       let status = limits_of_snapshot snapshot in
+       t.limits <- Some status;
+       [ Output.Response (Rate_limits status) ]
      | Turn_interrupt | Compact | Revert -> [ Output.Response (Done kind) ])
 ;;
 

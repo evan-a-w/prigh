@@ -485,3 +485,15 @@ let fetch ~env ?getenv ?refresh ~http ~now store =
   in
   { fetched_at = now (); providers }
 ;;
+
+let harness_json ~fetched_at ~adapter ~name status =
+  `Object
+    [ "fetched_at_ms", ms fetched_at
+    ; ( "providers"
+      , `Array
+          [ `Object
+              ([ "provider", `String adapter; "name", `String name ]
+               @ status_fields status)
+          ] )
+    ]
+;;

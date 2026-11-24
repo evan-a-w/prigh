@@ -63,11 +63,13 @@ module Response = struct
       | Set_permission_mode
       | Set_model
       | Set_max_thinking_tokens
+      | Get_usage
     [@@deriving sexp_of, equal]
   end
 
   type t =
     | Initialized of Init_info.t
+    | Usage of Subscription_usage.Status.t
     | Done of Command.t
     | Failed of
         { command : Command.t
@@ -136,6 +138,7 @@ type t =
   ; mutable last_assistant :
       string option (* the uuid of the latest top-level one *)
   ; warned : String.Hash_set.t
+  ; mutable limits : Subscription_usage.Status.t option
   }
 
 let create ?cost_total () =
@@ -159,6 +162,7 @@ let create ?cost_total () =
   ; streaming = None
   ; last_assistant = None
   ; warned = String.Hash_set.create ()
+  ; limits = None
   }
 ;;
 
@@ -316,6 +320,57 @@ let set_max_thinking_tokens t tokens =
         | Some n -> json_int n
         | None -> `Null )
     ]
+;;
+
+let get_usage t = control_request t Get_usage "get_usage" []
+let limits t = t.limits
+
+(* [get_usage]'s answer: [rate_limits] has the usage endpoint's shape
+   ([five_hour], [seven_day], ...: [{utilization, resets_at}], 0 to 100). *)
+let usage_status response : Subscription_usage.Status.t =
+  match member "rate_limits_available" response, member "rate_limits" response with
+  | Some `True, Some (`Object _ as limits) ->
+    (match Subscription_usage.parse_anthropic (Json.to_string limits) with
+     | Limits { plan = _; windows } ->
+       Limits { plan = str response "subscription_type"; windows }
+     | status -> status)
+  | _ -> Api_key
+;;
+
+(* A [rate_limit_event]'s window ([utilization] 0 to 1) replaces the one
+   of the same name. *)
+let note_limit t info =
+  match str info "rateLimitType", num info "utilization" with
+  | Some kind, Some utilization ->
+    let window =
+      `Object
+        [ ( kind
+          , `Object
+              (( "utilization"
+               , `Number (Float.to_string_hum ~strip_zero:true (utilization *. 100.)) )
+               :: Option.value_map (num info "resetsAt") ~default:[] ~f:(fun at ->
+                 [ "resets_at", `Number (Float.to_string_hum ~strip_zero:true at) ]))
+          )
+        ]
+    in
+    (match Subscription_usage.parse_anthropic (Json.to_string window) with
+     | Limits { windows = [ w ]; _ } ->
+       let plan, windows =
+         match t.limits with
+         | Some (Limits { plan; windows }) -> plan, windows
+         | _ -> None, []
+       in
+       let windows =
+         if List.exists windows ~f:(fun (o : Subscription_usage.Window.t) ->
+              String.equal o.id w.id)
+         then
+           List.map windows ~f:(fun (o : Subscription_usage.Window.t) ->
+             if String.equal o.id w.id then w else o)
+         else windows @ [ w ]
+       in
+       t.limits <- Some (Limits { plan; windows })
+     | _ -> ())
+  | _ -> ()
 ;;
 
 let mcp_reply ~request_id response =
@@ -735,6 +790,7 @@ let handle_result t json =
 
 let handle_rate_limit t json =
   let info = Option.value (member "rate_limit_info" json) ~default:`Null in
+  note_limit t info;
   let resets_at = num info "resetsAt" in
   let kind = Option.value (str info "rateLimitType") ~default:"usage" in
   match str info "status" with
@@ -879,6 +935,13 @@ let handle_control_response t json =
                    (Option.value
                       (member "response" response)
                       ~default:(`Object [])))
+            | Get_usage ->
+              let status =
+                usage_status
+                  (Option.value (member "response" response) ~default:(`Object []))
+              in
+              t.limits <- Some status;
+              Usage status
             | command -> Done command)
          | Some _ | None ->
            Failed

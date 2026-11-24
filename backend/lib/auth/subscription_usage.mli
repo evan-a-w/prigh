@@ -63,6 +63,14 @@ type t =
     [error]; a window is [{id, label, used_percent, resets_at_ms}]. *)
 val to_json : t -> Json.t
 
+(** [usage_limits] for a composer session: the one external harness's limits ([adapter] [codex], named ["Codex"]), in {!to_json}'s shape. *)
+val harness_json
+  :  fetched_at:float
+  -> adapter:string
+  -> name:string
+  -> Status.t
+  -> Json.t
+
 (** The providers with subscription limits: [anthropic], [openai-codex]. *)
 val providers : Provider_id.t list
 
