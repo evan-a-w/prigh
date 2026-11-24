@@ -152,8 +152,8 @@ let%expect_test
             data-slot="button"
             data-variant="ghost"
             data-size="icon-sm"
-            title="Subagents and worktrees"
-            aria-label="Subagents and worktrees"
+            title="Subagents, jobs and worktrees"
+            aria-label="Subagents, jobs and worktrees"
             aria-pressed="false"
             class="[&_svg:not([class*='size-'])]:size-4 [&_svg]:pointer-events-none [&_svg]:shrink-0 active:not-aria-[haspopup]:translate-y-px aria-expanded:bg-muted aria-expanded:text-foreground aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-clip-padding border border-transparent dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:hover:bg-muted/50 disabled:opacity-50 disabled:pointer-events-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 font-medium group/button hover:bg-muted hover:text-foreground in-data-[slot=button-group]:rounded-lg inline-flex items-center justify-center outline-none rounded-[min(var(--radius-md),12px)] rounded-lg select-none session-card-toggle shrink-0 size-7 text-muted-foreground text-sm transition-all whitespace-nowrap"
             @on_click>
@@ -353,7 +353,162 @@ let%expect_test
     (Subagents 2)
     (1 finished · 1 failed)
     (Session_card (Fold Ended))
-    ((subagents_open true) (ended_open false) (worktrees_open false)
-     (sheet false))
+    ((subagents_open true) (ended_open false) (jobs_open true)
+     (ended_jobs_open false) (worktrees_open false) (sheet false))
+    |}]
+;;
+
+(* The session's background jobs ([list_jobs]): j1 runs; j2 exited 0, j3
+   was killed, j4 exited 2. *)
+let jobs =
+  {|[{"id":"j1","command":"npm run dev\n--port 3000","running":true,"exit":null,"delivered":false,"elapsed":75.0,"bytes":2048,"last_line":"ready on :3000"},
+     {"id":"j2","command":"dune build","running":false,"exit":"exited 0","delivered":true,"elapsed":3.2,"bytes":0,"last_line":null},
+     {"id":"j3","command":"sleep 600","running":false,"exit":"killed","delivered":true,"elapsed":0.4,"bytes":0,"last_line":null},
+     {"id":"j4","command":"cat missing.txt","running":false,"exit":"exited 2","delivered":false,"elapsed":12.0,"bytes":40,"last_line":"cat: missing.txt: No such file or directory"}]|}
+;;
+
+let%expect_test
+    "jobs: below the subagents, above the worktrees; the running listed, those \
+     that ended folded into one row"
+  =
+  let h = with_worktrees () in
+  two_agents h;
+  H.reply h "list_worktrees" worktrees;
+  H.reply h "list_jobs" jobs;
+  H.text h ~selector:".session-card";
+  [%expect
+    {|
+    (Subagents 2)
+    (Fix the touch targets working…) (Review the phone layout thinking…)
+    (Jobs 4)
+    npm run dev j1 ready on :3000 running 1m 15s
+    (Kill j1 (/jobs kill j1))
+    (1 finished · 1 killed · 1 failed)
+    (Worktrees 2)
+    |}];
+  (* Its elapsed time goes on with the clock. *)
+  H.quiet h (fun () ->
+    H.act h (Tick (Time_ns.add H.now (Time_ns.Span.of_sec 10.))));
+  H.texts h ~selector:".session-card-job" |> List.iter ~f:print_endline;
+  [%expect {| npm run dev j1 ready on :3000 running 1m 25s |}];
+  (* Unfolded, the latest first: how each ended, and for how long it ran
+     (not under a second); a failure in the destructive colour. *)
+  H.click h ~selector:".session-card-jobs-ended";
+  H.texts h ~selector:".session-card-job" |> List.iter ~f:print_endline;
+  H.elements h ~selector:".session-card-job .text-destructive";
+  [%expect
+    {|
+    (Session_card (Fold Ended_jobs))
+    npm run dev j1 ready on :3000 running 1m 25s
+    cat missing.txt j4 cat: missing.txt: No such file or directory exit 2 12s
+    sleep 600 j3 killed
+    dune build j2 done 3s
+    <span class="ml-auto shrink-0 tabular-nums text-destructive">
+    |}];
+  H.names h ~selector:".session-card-job";
+  [%expect
+    {|
+    div "npm run dev j1 ready on :3000 running 1m 25s" -- npm run dev
+    --port 3000
+    ready on :3000
+    div "cat missing.txt j4 cat: missing.txt: No such file or directory exit 2 12s" -- cat missing.txt
+    cat: missing.txt: No such file or directory
+    div "sleep 600 j3 killed" -- sleep 600
+    div "dune build j2 done 3s" -- dune build
+    |}];
+  (* Folding the section away. *)
+  H.click h ~selector:"[aria-controls=session-card-jobs-content]";
+  H.text h ~selector:".session-card";
+  [%expect
+    {|
+    (Session_card (Fold Jobs))
+    (Subagents 2)
+    (Fix the touch targets working…) (Review the phone layout thinking…)
+    (Jobs 4)
+    (Worktrees 2)
+    |}]
+;;
+
+let%expect_test "a running job's button kills it: acknowledged at once" =
+  let h = H.create () in
+  H.reply h "list_jobs" jobs;
+  H.names h ~selector:".session-card-kill";
+  H.click h ~selector:".session-card-kill";
+  H.names h ~selector:".session-card-kill";
+  H.elements h ~selector:".session-card-kill[disabled]";
+  (* It is killed: the next poll of the jobs has it among those that ended. *)
+  H.act h (Clock (Time_ns.add H.now (Time_ns.Span.of_sec 3.)));
+  H.reply
+    h
+    "list_jobs"
+    {|[{"id":"j1","command":"npm run dev","running":false,"exit":"killed","delivered":false,"elapsed":80.0,"bytes":2048,"last_line":"ready on :3000"}]|};
+  H.text h ~selector:".session-card";
+  [%expect
+    {|
+    button "Kill j1" -- Kill j1 (/jobs kill j1)
+    (Kill_job j1)
+    (Rpc (method_ kill_job) (params ((job_id j1))) (tag Show_error))
+    button "Kill j1" -- Killing j1…
+    <button class="[&_svg:not([class*='size-'])]:size-3 [&_svg]:pointer-events-none [&_svg]:shrink-0 active:not-aria-[haspopup]:translate-y-px aria-expanded:bg-muted aria-expanded:text-foreground aria-invalid:border-destructive aria-invalid:ring-3 aria-invalid:ring-destructive/20 bg-clip-padding border border-transparent dark:aria-invalid:border-destructive/50 dark:aria-invalid:ring-destructive/40 dark:hover:bg-muted/50 disabled:opacity-50 disabled:pointer-events-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 font-medium group/button hover:bg-muted hover:text-destructive in-data-[slot=button-group]:rounded-lg inline-flex items-center justify-center narrow:size-11 outline-none rounded-[min(var(--radius-md),10px)] rounded-lg select-none session-card-kill shrink-0 size-6 text-muted-foreground text-sm transition-all whitespace-nowrap">
+    (Rpc (method_ list_jobs) (params ()) (tag Jobs))
+    (Jobs 1)
+    (1 killed)
+    |}]
+;;
+
+let%expect_test
+    "jobs are the session's: not in a subagent's chat; the ended ones fold \
+     again for another session"
+  =
+  let h = H.create () in
+  two_agents h;
+  H.reply h "list_jobs" jobs;
+  H.quiet h (fun () -> H.click h ~selector:".session-card-jobs-ended");
+  H.quiet h (fun () -> H.act h (Open_subagent_chat "a1"));
+  H.elements h ~selector:".session-card-job";
+  H.text h ~selector:".session-card";
+  H.quiet h (fun () -> H.act h Subagent_back);
+  H.elements h ~selector:".session-card-job";
+  H.quiet h (fun () ->
+    H.event
+      h
+      (sprintf
+         {|{"event":"state","state":%s}|}
+         (H.state_json ~fields:[ "session_id", `String "s2" ] ())));
+  print_s [%sexp ((H.model h).session_card : Prigh_web.Session_card.t)];
+  [%expect
+    {|
+    (Session_card (Fold Ended_jobs))
+    (Parents 1)
+    (Root)
+    <div class="flex gap-1 hover:bg-accent items-center narrow:min-h-11 pl-2 pr-1 py-1 rounded-md running session-card-job text-[12px] w-full">
+    <div class="flex gap-1 hover:bg-accent items-center narrow:min-h-11 pl-2 pr-1 py-1 rounded-md session-card-job text-[12px] w-full">
+    <div class="flex gap-1 hover:bg-accent items-center narrow:min-h-11 pl-2 pr-1 py-1 rounded-md session-card-job text-[12px] w-full">
+    <div class="flex gap-1 hover:bg-accent items-center narrow:min-h-11 pl-2 pr-1 py-1 rounded-md session-card-job text-[12px] w-full">
+    ((subagents_open true) (ended_open false) (jobs_open true)
+     (ended_jobs_open false) (worktrees_open false) (sheet false))
+    |}]
+;;
+
+let%expect_test "only jobs: the card shows, and on a phone its sheet lists them"
+  =
+  let h = H.create () in
+  H.elements h ~selector:".session-card-toggle";
+  H.reply h "list_jobs" jobs;
+  H.names h ~selector:".session-card-toggle";
+  H.quiet h (fun () -> H.act h (Set_narrow true));
+  H.quiet h (fun () -> H.act h Toggle_status_tray);
+  H.click h ~selector:".session-card-row";
+  H.text h ~selector:".session-card";
+  [%expect
+    {|
+    button "Subagents, jobs and worktrees"
+    Toggle_status_tray
+    Toggle_session_card
+    This session
+    (Jobs 4)
+    npm run dev j1 ready on :3000 running 1m 15s
+    (Kill j1 (/jobs kill j1))
+    (1 finished · 1 killed · 1 failed)
     |}]
 ;;

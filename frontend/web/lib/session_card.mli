@@ -11,6 +11,8 @@ module Section : sig
     | Parents
     | Subagents
     | Ended (** the finished and failed subagents, in one row *)
+    | Jobs
+    | Ended_jobs (** the jobs that exited or were killed, in one row *)
     | Worktrees
   [@@deriving sexp_of, equal]
 end
@@ -25,16 +27,19 @@ end
 type t =
   { subagents_open : bool
   ; ended_open : bool
+  ; jobs_open : bool
+  ; ended_jobs_open : bool
   ; worktrees_open : bool
   ; sheet : bool
   }
 [@@deriving sexp_of, equal]
 
-(** The subagents unfolded (the running ones; those that ended in one folded
-    row), the worktrees folded, the sheet closed. *)
+(** The subagents and jobs unfolded (the running ones; those that ended in
+    one folded row each), the worktrees folded, the sheet closed. *)
 val default : t
 
-(** Another session's: the ended subagents folded again, the sheet closed. *)
+(** Another session's: the ended subagents and jobs folded again, the sheet
+    closed. *)
 val for_session : t -> t
 
 val is_open : t -> Section.t -> bool
@@ -56,4 +61,21 @@ module Activity : sig
   val of_agent : Agents.Agent.t -> now:Time_ns.t -> t
   val to_string : t -> string
   val running : t -> bool
+end
+
+(** How a background job stands, as its row says it. *)
+module Job_state : sig
+  type t =
+    | Running
+    | Done (** exited 0 *)
+    | Killed
+    | Failed of string (** ["exit 2"], or ["failed"] when it did not run *)
+  [@@deriving sexp_of, equal]
+
+  val of_job : Agents.Job.t -> t
+
+  (** With how long it ran (its elapsed time), unless it ended within a
+      second: ["12s"] while it runs, ["done 3s"], ["exit 2 3s"],
+      ["killed"]. *)
+  val to_string : t -> elapsed:Time_ns.Span.t -> string
 end

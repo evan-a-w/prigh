@@ -65,7 +65,7 @@ let sheet (m : App.Model.t) ~inject =
         then
           [ sheet_row
               ~cls:"session-card-row session-card-toggle"
-              ~name:"Subagents and worktrees"
+              ~name:"Subagents, jobs and worktrees"
               ~on:m.session_card.sheet
               ~glyph:Panel_right
               ~on_click:(go Action.Toggle_session_card)
@@ -175,8 +175,8 @@ let toggles (m : App.Model.t) ~inject =
        then
          toggle
            ~cls:"session-card-toggle"
-           ~title:"Subagents and worktrees"
-           ~label:"Subagents and worktrees"
+           ~title:"Subagents, jobs and worktrees"
+           ~label:"Subagents, jobs and worktrees"
            ~panel:false
            ~on:(if m.narrow then m.session_card.sheet else m.session_card_open)
            ~on_click:(inject Action.Toggle_session_card)

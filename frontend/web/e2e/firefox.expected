@@ -216,6 +216,9 @@ back again
 Subagents
 1
 1 finished
+Jobs
+1
+1 finished
 === firefox: its line opens its chat ===
 on show: a1
 Survey the project
@@ -1548,12 +1551,28 @@ none
 Subagents
 1
 1 finished
+Jobs
+2
+echo started; sleep 600
+j1
+started
+running
+<age>
+1 failed
 Worktrees
 1
 === firefox: session card: the worktrees unfolded ===
 Subagents
 1
 1 finished
+Jobs
+2
+echo started; sleep 600
+j1
+started
+running
+<age>
+1 failed
 Worktrees
 1
 feat/ui
@@ -1583,11 +1602,18 @@ card 208px wide, 12px from the pane's edge
 the card covers the column's corner
 the composer's left edge lines up with the column's: true
 the column keeps its left margin
+=== firefox: session card: the jobs that ended unfolded ===
+j1: echo started; sleep 600 | j1 | started | running | <T> (running)
+j2: echo oops; exit 3 | j2 | oops | exit 3
+=== firefox: session card: the running job killed ===
+1 killed · 1 failed
+j2: echo oops; exit 3 | j2 | oops | exit 3
+j1: echo started; sleep 600 | j1 | started | killed <age>
 === firefox: session card: hidden from the chrome, 1440px wide ===
 pane 1160px, the column centred
 no card
 === firefox: session card: the ended subagents unfolded ===
-Subagents | 1 | 1 finished | Count the modules | <age> | Worktrees | 1 | feat/ui | 1 changed
+Subagents | 1 | 1 finished | Count the modules | <age> | Jobs | 3 | echo again; sleep 600 | j3 | again | running | <age> | 1 killed · 1 failed | Worktrees | 1 | feat/ui | 1 changed
 === firefox: session card: a subagent's chat ===
 Count the modules
 <time>
@@ -1606,9 +1632,17 @@ This session
 Subagents
 1
 1 finished
+Jobs
+3
+echo again; sleep 600
+j3
+again
+running
+<age>
+1 killed · 1 failed
 Worktrees
 1
-inside the screen: true; rows 44px or more: true (3)
+inside the screen: true; rows 44px or more: true (6)
 Esc closes it
 === firefox: session card: a phone, 320x640 ===
 card beside the chat: 0
@@ -1616,9 +1650,17 @@ This session
 Subagents
 1
 1 finished
+Jobs
+3
+echo again; sleep 600
+j3
+again
+running
+<age>
+1 killed · 1 failed
 Worktrees
 1
-inside the screen: true; rows 44px or more: true (3)
+inside the screen: true; rows 44px or more: true (6)
 Esc closes it
 === firefox: session card: errors ===
 none
