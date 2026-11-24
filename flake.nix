@@ -478,6 +478,27 @@
             failing = c: lib.concatMapStrings (a: a.message) (lib.filter (a: !a.assertion) c.assertions);
             off = eval { };
             cli = eval { programs.prigh.enable = true; };
+            agentNames = lib.concatStringsSep " " (
+              [ pkgs.codex.name ] ++ lib.optional pkgs.stdenv.hostPlatform.isLinux pkgs.bubblewrap.name
+            );
+            bare = eval {
+              programs.prigh = {
+                enable = true;
+                agents = {
+                  codex = false;
+                  bubblewrap = false;
+                };
+              };
+            };
+            withClaude = eval {
+              programs.prigh = {
+                enable = true;
+                agents = {
+                  claudeCode = true;
+                  extraPackages = [ (pkgs.writeShellScriptBin "my-agent" "") ];
+                };
+              };
+            };
             desktop = eval {
               programs.prigh = {
                 enable = true;
@@ -528,8 +549,11 @@
           in
           pkgs.runCommand "prigh-home-manager-module" { } ''
             test "${names off}" = ""
-            test "${names cli}" = "prigh"
-            test "${names desktop}" = "prigh prigh-desktop-${desktopVersion}"
+            test "${names bare}" = "prigh"
+            test "${names cli}" = "prigh ${agentNames}"
+            test "${names desktop}" = "prigh ${agentNames} prigh-desktop-${desktopVersion}"
+            # Claude Code is unfree: only when asked for (or unfree is allowed)
+            test "${lib.concatMapStringsSep " " (p: p.pname or p.name) withClaude.home.packages}" = "prigh codex claude-code${lib.optionalString pkgs.stdenv.hostPlatform.isLinux " bubblewrap"} my-agent"
             test -z ${lib.escapeShellArg (failing desktop)}
             echo ${lib.escapeShellArg (failing secret)} | grep -q 'programs.prigh.desktop.extraArgs has -token=sekrit:'
             # the desktop app was given the options

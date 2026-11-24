@@ -5,6 +5,7 @@
 #   programs.prigh.desktop.enable = true;  # and the desktop app in the menus
 #   programs.prigh.desktop.ui = "local";   # prigh-web from this prigh (default: the backend's)
 #   programs.prigh.desktop.computerUse = true;  # the agent may drive this desktop
+#   programs.prigh.agents.claudeCode = true;    # Claude Code for the composer (unfree)
 self:
 {
   config,
@@ -60,6 +61,50 @@ in
       default = self.packages.${system}.default;
       defaultText = lib.literalExpression "prigh.packages.\${system}.default";
       description = "The prigh to install; the desktop app runs this one's `prigh desktop`.";
+    };
+
+    agents = {
+      codex = mkOption {
+        type = types.bool;
+        default = true;
+        description = ''
+          Install the Codex CLI (`codex`), which the composer engine drives
+          (`prigh serve -engines harness,composer -adapters codex`). Log in
+          with `codex login`.
+        '';
+      };
+
+      claudeCode = mkOption {
+        type = types.bool;
+        default = pkgs.config.allowUnfree or false;
+        defaultText = lib.literalExpression "pkgs.config.allowUnfree or false";
+        description = ''
+          Install Claude Code (`claude`), which the composer engine drives
+          (`-adapters claude`). It is unfree: on by default only when
+          nixpkgs allows unfree packages. Log in with `claude auth login`.
+        '';
+      };
+
+      bubblewrap = mkOption {
+        type = types.bool;
+        default = pkgs.stdenv.hostPlatform.isLinux;
+        defaultText = lib.literalExpression "pkgs.stdenv.hostPlatform.isLinux";
+        description = ''
+          Install bubblewrap (`bwrap`), the sandbox Codex runs commands in on
+          Linux (without it on the PATH, Codex warns and uses a copy of its
+          own).
+        '';
+      };
+
+      extraPackages = mkOption {
+        type = types.listOf types.package;
+        default = [ ];
+        example = lib.literalExpression "[ pkgs.opencode pkgs.gemini-cli ]";
+        description = ''
+          Other agent CLIs for the composer, e.g. ACP agents
+          (`-adapters acp:opencode`).
+        '';
+      };
     };
 
     desktop = {
@@ -205,6 +250,12 @@ in
         '';
       }
     ];
-    home.packages = [ cfg.package ] ++ lib.optional cfg.desktop.enable desktopPackage;
+    home.packages =
+      [ cfg.package ]
+      ++ lib.optional cfg.agents.codex pkgs.codex
+      ++ lib.optional cfg.agents.claudeCode pkgs.claude-code
+      ++ lib.optional cfg.agents.bubblewrap pkgs.bubblewrap
+      ++ cfg.agents.extraPackages
+      ++ lib.optional cfg.desktop.enable desktopPackage;
   };
 }
