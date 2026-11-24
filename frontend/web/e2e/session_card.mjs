@@ -77,9 +77,13 @@ const context = await browser.newContext({ viewport: { width: 1440, height: 900 
 const page = await context.newPage();
 watch(page);
 
-const clean = text => text
+// A running job's state is "running" for screen readers (sr-only, so a
+// block of its own in Chromium's and Firefox's innerText) then its age:
+// WebKit's innerText runs the two together.
+const srRunning = text => text.replace(/^running ?(?=\d|now\b)/gm, "running\n");
+const clean = text => srRunning(text)
   .split(dir).join("<DIR>")
-  .replace(/\b(now|\d+[smhd])$/gm, "<age>")
+  .replace(/\b(now|(\d+m )?\d+[smhd])$/gm, "<age>")
   .replace(/^\d\d?:\d\d$/gm, "<time>")
   .split("\n")
   .map(line => line.trim())
@@ -174,9 +178,10 @@ try {
   await page.locator(".session-card-jobs-ended").click();
   await page.waitForFunction(() => document.querySelectorAll(".session-card-job").length === 2);
   section("the jobs that ended unfolded");
-  const jobRows = () => page.locator(".session-card-job").evaluateAll(rows =>
-    rows.map(r => `${r.getAttribute("data-job")}: ${r.innerText.replace(/\n/g, " | ")}` +
-      `${r.classList.contains("running") ? " (running)" : ""}`).join("\n"));
+  const jobRows = async () => (await page.locator(".session-card-job").evaluateAll(rows =>
+    rows.map(r => [r.getAttribute("data-job"), r.innerText, r.classList.contains("running")])))
+    .map(([id, text, running]) => `${id}: ${srRunning(text).replace(/\n/g, " | ")}${running ? " (running)" : ""}`)
+    .join("\n");
   console.log(clean(await jobRows()).replace(/\b\d+(m \d\d)?s\b/g, "<T>"));
   await screenshot("jobs");
   await page.locator(".session-card-kill").click();

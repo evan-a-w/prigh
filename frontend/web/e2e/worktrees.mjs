@@ -457,8 +457,16 @@ try {
     }
     return out.length ? out.join("\n") : "ok";
   }, scope);
+  // A finished animation that fills nothing still listed is one WebKit has
+  // not yet taken out of the style: under load, a frame or more after it
+  // finished, the sheet still has the last of its slide up.
   const settled = target => target.waitForFunction(() =>
-    document.getAnimations().every(a => a.playState !== "running" || a.effect?.getComputedTiming().iterations === Infinity));
+    document.getAnimations().every(a => {
+      const timing = a.effect?.getComputedTiming();
+      if (timing?.iterations === Infinity) return true;
+      if (a.playState === "finished") return timing?.fill === "forwards" || timing?.fill === "both";
+      return a.playState !== "running";
+    }));
   const deleteOnPhone = async (from, w, h, { pwa = false } = {}) => {
     const tag = `${w}x${h}${pwa ? " PWA" : ""}`;
     const context = await browser.newContext({

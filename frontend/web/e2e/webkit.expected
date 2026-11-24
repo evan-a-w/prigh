@@ -933,6 +933,7 @@ to the prigh backend at ws://127.0.0.1:<PORT>/ws
 Saved accounts
 A
 alice
+127.0.0.1:<PORT>
 ×
 or sign in
 User name
@@ -1025,6 +1026,7 @@ Signed out.
 Continue as
 A
 alice
+127.0.0.1:<PORT>
 ×
 or sign in
 User name
