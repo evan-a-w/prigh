@@ -85,6 +85,14 @@ in
         '';
       };
 
+      opencode = mkOption {
+        type = types.bool;
+        default = true;
+        description = ''
+          Install OpenCode (`opencode`), an ACP agent the composer drives
+          (`-adapters acp:opencode`). Log in with `opencode auth login`.
+        '';
+      };
       bubblewrap = mkOption {
         type = types.bool;
         default = pkgs.stdenv.hostPlatform.isLinux;
@@ -254,6 +262,7 @@ in
       [ cfg.package ]
       ++ lib.optional cfg.agents.codex pkgs.codex
       ++ lib.optional cfg.agents.claudeCode pkgs.claude-code
+      ++ lib.optional cfg.agents.opencode pkgs.opencode
       ++ lib.optional cfg.agents.bubblewrap pkgs.bubblewrap
       ++ cfg.agents.extraPackages
       ++ lib.optional cfg.desktop.enable desktopPackage;

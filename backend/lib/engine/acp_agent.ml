@@ -17,6 +17,14 @@ let known =
     ; display_name = "Gemini CLI"
     ; command = [ "gemini"; "--experimental-acp" ]
     }
+  ; { name = "antigravity"
+    ; display_name = "Antigravity"
+    ; command = [ "agy"; "acp" ]
+    }
+  ; { name = "grok"
+    ; display_name = "Grok Build"
+    ; command = [ "grok"; "agent"; "stdio" ]
+    }
   ; { name = "goose"; display_name = "Goose"; command = [ "goose"; "acp" ] }
   ]
 ;;

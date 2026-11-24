@@ -186,7 +186,7 @@ machine's tool host, so sessions run their tools here, as with a TUI.
 ```nix
 # Home Manager (flake input `prigh`):
 imports = [ prigh.homeManagerModules.default ];
-programs.prigh.enable = true;          # prigh, codex and bwrap on the PATH (agents.*: claudeCode,
+programs.prigh.enable = true;          # prigh, codex, opencode, bwrap on PATH (agents.*: claudeCode,
                                        # on when unfree is allowed; extraPackages)
 programs.prigh.desktop.enable = true;  # "prigh" in the application menu
 # also desktop.ui, .window, .browser (table below), .extraArgs,
@@ -290,9 +290,9 @@ A backend runs sessions on the **harness**, prigh's own agent loop calling
 the model's API (the default), and, when you deploy it, the **composer**,
 which hands the work to a coding agent installed and signed in on the
 session's tool host: the Codex CLI (`codex app-server`), Claude Code
-(`claude`, stream-json), any ACP agent (`acp:opencode`, `acp:gemini` and
-`acp:goose` are known; give others their command, `-adapters
-acp:mine=my-agent --acp`) or `prigh`, prigh's own harness as an adapter.
+(`claude`, stream-json), an ACP agent (`acp:opencode`, `acp:antigravity`
+(`agy acp`), `acp:grok` (Grok Build), `acp:gemini`, `acp:goose`, or
+`acp:mine=my-agent --acp`) or `prigh`, prigh's own harness as an adapter.
 prigh keeps the session: its log (messages, tool calls, models, usage and
 the cost the agent reports), naming, search, worktrees, approvals and the
 UI, so a Codex or Claude Code session looks and works like any other. Their
