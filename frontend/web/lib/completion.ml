@@ -44,8 +44,12 @@ let command_items ~superuser ~prefix =
 ;;
 
 let logged_in (auth : Auth_status.t list) provider =
-  List.exists auth ~f:(fun s ->
-    String.equal s.provider provider && Option.is_some s.configured)
+  match
+    List.find auth ~f:(fun (s : Auth_status.t) ->
+      String.equal s.provider provider)
+  with
+  | None -> true
+  | Some s -> Option.is_some s.configured
 ;;
 
 let skill_items skills =

@@ -338,3 +338,24 @@ let%expect_test "the picker lists what the CLI's login offers, when it says" =
     GPT-6.2-Mini Alt+3 (Star: into the favourites (Alt+F))
     |}]
 ;;
+
+let%expect_test "picking a CLI's model asks for no prigh login" =
+  let h = session () in
+  H.quiet h (fun () ->
+    H.event h {|{"type":"event","event":"models_changed"}|};
+    H.reply
+      h
+      "list_models"
+      (H.model_json ~provider:"codex" ~id:"gpt-6.2-sol" ~name:"GPT-6.2-Sol" ()
+       |> sprintf "[%s]"));
+  H.act h (Run "/model");
+  H.act h (Picker_choose "codex/gpt-6.2-sol");
+  H.text h ~selector:".toast";
+  [%expect
+    {|
+    (Focus picker-input)
+    (Focus editor)
+    (Rpc (method_ set_model) (params ((model codex/gpt-6.2-sol)))
+     (tag Model_set))
+    |}]
+;;

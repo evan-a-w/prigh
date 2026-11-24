@@ -2107,10 +2107,9 @@ let set_state (m : Model.t) (state : State.t) =
   m, cmds @ more @ review
 ;;
 
-let logged_in (m : Model.t) provider =
-  List.exists m.auth ~f:(fun s ->
-    String.equal s.provider provider && Option.is_some s.configured)
-;;
+(* A provider prigh has no login for is a CLI's (Codex, Claude Code), which
+   lists only what its own login offers. *)
+let logged_in (m : Model.t) provider = Completion.logged_in m.auth provider
 
 let compact_tokens n =
   if n >= 1_000_000
