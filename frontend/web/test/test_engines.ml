@@ -623,3 +623,19 @@ let%expect_test "mid-run the engine waits for the turn" =
     Switch after this turn (Esc stops it)
     |}]
 ;;
+
+let%expect_test "Alt+E with one engine says how to have more" =
+  let h = H.create () in
+  H.quiet h (fun () ->
+    hello ~deployed:Prigh_protocol.Deployed_engines.harness_only h;
+    H.key h "l" ~ctrl:true);
+  H.key h "e" ~alt:true;
+  toasts h;
+  [%expect
+    {|
+    (Open_chip Model)
+    Model_menu_engine_picker
+    (Expire_toast (id 0) (after_ms 6000))
+    This backend runs one engine: start it with more (-engines, -adapters) to switch here; Settings → Engines shows them
+    |}]
+;;

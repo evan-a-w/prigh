@@ -46,6 +46,9 @@ let of_model ~provider ~name =
 ;;
 
 let letter provider =
+  let provider =
+    Option.value (String.chop_prefix provider ~prefix:"acp:") ~default:provider
+  in
   match String.find provider ~f:Char.is_alphanum with
   | Some c -> String.of_char (Char.uppercase c)
   | None -> "?"

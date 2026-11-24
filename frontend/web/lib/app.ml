@@ -6668,7 +6668,11 @@ let model_menu_engine_pick (m : Model.t) key =
 let model_menu_engine_picker (m : Model.t) =
   let m = close_engine_menu m in
   if List.is_empty (engine_options m)
-  then m, []
+  then
+    toast
+      m
+      "This backend runs one engine: start it with more (-engines, \
+       -adapters) to switch here; Settings → Engines shows them"
   else if Model.running m
   then toast m engine_busy
   else open_picker m (engine_picker m ~switch:(not (fresh m)))

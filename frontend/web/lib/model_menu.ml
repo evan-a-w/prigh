@@ -64,13 +64,20 @@ let newest_first models =
       Option.some_if (String.equal m.id "default") m.provider)
   in
   let is_cli (m : Llm.t) = List.mem cli m.provider ~equal:String.equal in
-  List.stable_sort models ~compare:(fun (a : Llm.t) (b : Llm.t) ->
-    match version a.name, version b.name with
-    | _ when is_cli a && is_cli b -> 0
-    | Some a, Some b -> List.compare Int.compare b a
-    | Some _, None -> -1
-    | None, Some _ -> 1
-    | None, None -> 0)
+  (* The others are sorted among themselves, in the places they held. *)
+  let sorted =
+    List.filter models ~f:(Fn.non is_cli)
+    |> List.stable_sort ~compare:(fun (a : Llm.t) (b : Llm.t) ->
+      match version a.name, version b.name with
+      | Some a, Some b -> List.compare Int.compare b a
+      | Some _, None -> -1
+      | None, Some _ -> 1
+      | None, None -> 0)
+  in
+  List.folding_map models ~init:sorted ~f:(fun sorted m ->
+    match sorted with
+    | next :: rest when not (is_cli m) -> rest, next
+    | _ -> sorted, m)
 ;;
 
 let providers (models : Llm.t list) =

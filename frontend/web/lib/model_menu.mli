@@ -3,8 +3,8 @@ open! Import
 
 (** The model chip's menu beyond its list ([Dialog.Popover] holds the list's
     filter and highlight): which provider's models it shows (or the
-    favourites), whether all of them, and whether the access or engine menu in its
-    foot is open. Also what the menu offers, and in which order. *)
+    favourites), whether all of them, and whether the access or engine menu
+    in its foot is open. Also what the menu offers, and in which order. *)
 
 module Tab : sig
   type t =

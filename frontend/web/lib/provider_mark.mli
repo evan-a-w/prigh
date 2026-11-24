@@ -12,5 +12,9 @@ val icon : string -> Html.Icon.t option
     Sonnet 4.6", "GPT-OSS 120B"), else by the agent. *)
 val of_model : provider:string -> name:string -> string
 
+(** The first letter of a provider's name, an ACP agent's ([acp:NAME])
+    being its NAME's. *)
+val letter : string -> string
+
 (** The logo, or the name's first letter for a provider without one. *)
 val view : ?cls:string -> string -> Node.t
