@@ -53,6 +53,7 @@ module Account_usage = struct
     ; id : string
     ; label : string
     ; default : bool
+    ; shared_by : string option
     ; status : Status.t
     }
   [@@deriving sexp_of, equal]
@@ -63,8 +64,9 @@ module Account_usage = struct
     let%bind id = Json.string_field j "id" in
     let%bind label = Json.string_field j "label" in
     let%bind default = Json.bool_default_field j "default" ~default:false in
+    let%bind shared_by = Json.string_opt_field j "shared_by" in
     let%map status = Status.of_json j in
-    { ref_; id; label; default; status }
+    { ref_; id; label; default; shared_by; status }
   ;;
 end
 

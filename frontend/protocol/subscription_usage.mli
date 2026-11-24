@@ -32,6 +32,7 @@ module Account_usage : sig
     ; id : string
     ; label : string
     ; default : bool
+    ; shared_by : string option (** another user's, shared with this one *)
     ; status : Status.t
     }
   [@@deriving sexp_of, equal]

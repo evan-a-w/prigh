@@ -76,6 +76,7 @@ module Account = struct
     ; shared_with : Grant.t list
     ; shared_by : string option
     ; hidden : bool
+    ; usage : Login_usage.t option
     }
   [@@deriving sexp_of, equal]
 
@@ -98,7 +99,12 @@ module Account = struct
       Json.optional_list_field j "shared_with" ~f:Grant.of_json
     in
     let%bind shared_by = Json.string_opt_field j "shared_by" in
-    let%map hidden = Json.bool_default_field j "hidden" ~default:false in
+    let%bind hidden = Json.bool_default_field j "hidden" ~default:false in
+    let%map usage =
+      match Json.field j "usage" with
+      | None | Some `Null -> Ok None
+      | Some u -> Login_usage.of_json u >>| Option.some
+    in
     { ref_
     ; id
     ; label
@@ -111,6 +117,7 @@ module Account = struct
     ; shared_with
     ; shared_by
     ; hidden
+    ; usage
     }
   ;;
 end

@@ -59,6 +59,9 @@ module Account : sig
       (** the user sharing it with this one: its ref is
           [~OWNER/PROVIDER/ID], its id [~OWNER/ID] *)
     ; hidden : bool (** a shared login the user hid *)
+    ; usage : Login_usage.t option
+      (** what ran on it lately ([None]: nothing in 30 days, or an older
+          backend); on a shared one, the user's own use *)
     }
   [@@deriving sexp_of, equal]
 end
