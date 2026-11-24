@@ -68,11 +68,11 @@ let%expect_test "/accounts picks a login, then what to do with it" =
       earlier answer
     Logins  (5)
     / ▏
-    ▸* ChatGPT: Personal           subscription, default, takes over at usa…
-       ChatGPT: Work               subscription  openai/work
-       DeepSeek: DeepSeek API key  API key, default  deepseek/main
-       Add a ChatGPT login         another account, under a label you choose
-       Add a DeepSeek login        another account, under a label you choose
+    ▸* ChatGPT: Personal     subscription, default, takes over at usage lim…
+       ChatGPT: Work         subscription  openai/work
+       DeepSeek: API key     API key, default  deepseek/main
+       Add a ChatGPT login   another account, under a label you choose
+       Add a DeepSeek login  another account, under a label you choose
     ────────────────────────────────────────────────────────────────────────
     >
     gpt-5.5@Personal  think:off  ctx:0.1%/1.0M  Enter selects · Esc closes
@@ -544,11 +544,11 @@ let%expect_test "/accounts and /usage show each login's usage" =
       earlier answer
     Logins  (5)
     / ▏
-    ▸* ChatGPT: Personal           5h 42%, resets in 1h 30m · subscription,…
-       ChatGPT: Work               30d 2 req 8.6k tok · subscription  opena…
-       DeepSeek: DeepSeek API key  today 3 req 13k tok $0.42 · API key, def…
-       Add a ChatGPT login         another account, under a label you choose
-       Add a DeepSeek login        another account, under a label you choose
+    ▸* ChatGPT: Personal     5h 42%, resets in 1h 30m · subscription, defau…
+       ChatGPT: Work         30d 2 req 8.6k tok · subscription  openai/work
+       DeepSeek: API key     today 3 req 13k tok $0.42 · API key, default  …
+       Add a ChatGPT login   another account, under a label you choose
+       Add a DeepSeek login  another account, under a label you choose
     ────────────────────────────────────────────────────────────────────────
     >
     gpt-5.5@Personal  think:off  ctx:0.1%/1.0M  Enter selects · Esc closes
@@ -583,7 +583,7 @@ let%expect_test "/accounts and /usage show each login's usage" =
     ┌─ Usage ──────────────────────────────────────────────────────────────┐
     │   7 days   2 requests, 8.6k tokens                                   │
     │   30 days  2 requests, 8.6k tokens                                   │
-    │ DeepSeek: DeepSeek API key  deepseek/main                            │
+    │ DeepSeek: API key  deepseek/main                                     │
     │   today    3 requests, 13k tokens, $0.42                             │
     │   7 days   10 requests, 43k tokens, $1.40                            │
     │   30 days  25 requests, 108k tokens, $3.50                           │

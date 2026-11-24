@@ -346,7 +346,8 @@ let%expect_test "a card per login, by provider; shared ones from their owner" =
     Subscription limits
     Read 10:00 (just now). Updated when you open this page or press Refresh.
     (Refresh)
-    Claude: Personal
+    Claude
+    Personal
     Subscription, default, takes over at usage limits. Max plan.
     (Share…) (Manage)
     5-hour session Resets in 1h 30m · 11:30
@@ -355,7 +356,8 @@ let%expect_test "a card per login, by provider; shared ones from their owner" =
     Not signed in
     Sign in with your ChatGPT subscription to see its limits: /login openai-codex.
     (Sign in)
-    DeepSeek: DeepSeek API key
+    DeepSeek
+    API key
     API key, default, takes over at usage limits, shared with bob.
     (Share…) (Manage)
     Today 2 req 8.6k tok $2.00
@@ -363,7 +365,7 @@ let%expect_test "a card per login, by provider; shared ones from their owner" =
     30 days 5 req 22k tok $5.00
     You today 1 req 4.3k tok $1.00 · 30 days 3 req 13k tok $3.00
     bob today 1 req 4.3k tok $1.00 · 30 days 2 req 8.6k tok $2.00
-    DeepSeek: Team (from carol)
+    Team (from carol)
     API key, shared by carol.
     (Hide) (Manage)
     Today 0 req 0 tok $0.00

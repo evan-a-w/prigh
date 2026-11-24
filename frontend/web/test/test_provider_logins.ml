@@ -34,13 +34,13 @@ let%expect_test "settings: each login, its menu, renaming one, adding one" =
   H.text h ~selector:".provider-login-add";
   [%expect
     {|
-    ChatGPT: Personal
+    Personal
     Subscription, default, takes over at usage limits.
     (Manage)
-    ChatGPT: Work
+    Work
     Subscription.
     (Manage)
-    Another ChatGPT login
+    Another login
     Another account, under a label: pin a session to it with /model MODEL@LABEL.
     (Add login)
     |}];
@@ -173,13 +173,13 @@ let%expect_test
     {|
     (Rpc (method_ auth_status) (params ()) (tag (Auth_status Refresh)))
     (Rpc (method_ account_share_targets) (params ()) (tag Share_targets))
-    ChatGPT: Personal
+    Personal
     Subscription, default, takes over at usage limits.
     (Share…) (Manage)
-    ChatGPT: Work
+    Work
     Subscription, shared with bob.
     (Share…) (Manage)
-    ChatGPT: Team (from dave)
+    Team (from dave)
     Subscription, shared by dave.
     (Hide) (Manage)
     |}];
@@ -314,12 +314,12 @@ let%expect_test "settings and the context card show each login's usage" =
     (Rpc (method_ usage_limits) (params ()) (tag Usage_loaded))
     (Rpc (method_ account_usage) (params ((ref openai/work)))
      (tag (Login_users openai/work)))
-    ChatGPT: Personal
+    Personal
     Subscription, default, takes over at usage limits. Pro plan.
     (Share…) (Manage)
     5-hour session Resets in 1h 30m · 11:30
     42% used
-    ChatGPT: Work
+    Work
     Subscription, shared with bob.
     (Share…) (Manage)
     Limits unknown: sign in again: /login openai as Work
@@ -328,7 +328,7 @@ let%expect_test "settings and the context card show each login's usage" =
     30 days 25 req 108k tok
     You today 1 req 4.3k tok · 30 days 5 req 22k tok
     bob today 2 req 8.6k tok · 30 days 20 req 86k tok
-    ChatGPT: Team (from dave)
+    Team (from dave)
     Subscription, shared by dave.
     (Hide) (Manage)
     |}];
@@ -340,5 +340,47 @@ let%expect_test "settings and the context card show each login's usage" =
     {|
     Login Personal
     5-hour session 42% · 1h 30m
+    |}]
+;;
+
+let%expect_test "a login's name drops the provider's name its label repeats" =
+  let login ~provider label shared_by =
+    {|{"provider":"p","name":"|}
+    ^ provider
+    ^ {|","methods":[],"configured":null,"accounts":[{"ref":"p/a","id":"a","label":"|}
+    ^ label
+    ^ {|","method":"oauth","source":"oauth","default":true,"fallback":false|}
+    ^ Option.value_map shared_by ~default:"" ~f:(sprintf {|,"shared_by":"%s"|})
+    ^ "}]}"
+    |> Jsonaf.of_string
+    |> Prigh_protocol.Auth_status.of_json
+    |> Or_error.ok_exn
+    |> List.return
+    |> Prigh_ui.Provider_logins.all
+    |> List.hd_exn
+  in
+  List.iter
+    [ "Anthropic", "Anthropic (Claude Pro/Max)", None
+    ; "OpenAI Codex (ChatGPT)", "OpenAI (ChatGPT Plus/Pro)", None
+    ; "OpenAI Codex (ChatGPT)", "OpenAI Codex API key", None
+    ; "DeepSeek", "DeepSeek API key", Some "carol"
+    ; "Anthropic", "Anthropic", None
+    ; "Anthropic", "work", None
+    ]
+    ~f:(fun (provider, label, shared_by) ->
+      let l = login ~provider label shared_by in
+      printf
+        "%-28s %-30s | %s\n"
+        label
+        (Prigh_ui.Provider_logins.name l)
+        (Prigh_ui.Provider_logins.title l));
+  [%expect
+    {|
+    Anthropic (Claude Pro/Max)   Claude Pro/Max                 | Anthropic: Claude Pro/Max
+    OpenAI (ChatGPT Plus/Pro)    ChatGPT Plus/Pro               | OpenAI Codex (ChatGPT): ChatGPT Plus/Pro
+    OpenAI Codex API key         API key                        | OpenAI Codex (ChatGPT): API key
+    DeepSeek API key             API key (from carol)           | DeepSeek: API key (from carol)
+    Anthropic                    Anthropic                      | Anthropic: Anthropic
+    work                         work                           | Anthropic: work
     |}]
 ;;

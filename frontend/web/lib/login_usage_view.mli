@@ -8,7 +8,8 @@ open! Import
     shares, each user's part ([account_usage]). *)
 
 (** A login's row, as Settings → Models → Providers and Settings → Usage
-    list them: its title (["ChatGPT: Team (from dave)"]), what it is and its
+    list them under its provider's name: its label ("Team (from dave)",
+    "Claude Pro/Max" for "Anthropic (Claude Pro/Max)"), what it is and its
     plan, Share… (Hide or Show for one shared with the user) and Manage,
     and under them its usage. *)
 val row

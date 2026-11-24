@@ -23,7 +23,39 @@ let label (a : P.Auth_status.Account.t) =
   | Some owner -> sprintf "%s (from %s)" a.label owner
 ;;
 
-let title (l : Login.t) = sprintf "%s: %s" l.provider.name (label l.account)
+(* The longest run of the provider's leading words the label starts with
+   goes, and parentheses around what is left: "Anthropic (Claude Pro/Max)"
+   under Anthropic is "Claude Pro/Max", "OpenAI Codex API key" under
+   "OpenAI Codex (ChatGPT)" is "API key". *)
+let own_label ~provider label =
+  let words = String.split provider ~on:' ' in
+  let rest =
+    List.init (List.length words) ~f:(fun i -> List.take words (i + 1))
+    |> List.rev
+    |> List.find_map ~f:(fun prefix ->
+      let prefix = String.concat ~sep:" " prefix ^ " " in
+      Option.some_if
+        (String.Caseless.is_prefix label ~prefix)
+        (String.strip (String.drop_prefix label (String.length prefix))))
+  in
+  match rest with
+  | None | Some "" -> label
+  | Some rest ->
+    (match String.chop_prefix rest ~prefix:"(" with
+     | Some inner
+       when String.length inner > 1 && String.is_suffix inner ~suffix:")" ->
+       String.drop_suffix inner 1
+     | _ -> rest)
+;;
+
+let name (l : Login.t) =
+  label
+    { l.account with
+      label = own_label ~provider:l.provider.name l.account.label
+    }
+;;
+
+let title (l : Login.t) = sprintf "%s: %s" l.provider.name (name l)
 let users = String.concat ~sep:", "
 
 let grantees (a : P.Auth_status.Account.t) =

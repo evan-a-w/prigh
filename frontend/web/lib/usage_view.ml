@@ -125,7 +125,7 @@ let refresh_row (m : App.Model.t) ~inject =
     ]
 ;;
 
-(* A card per login with usage to show (its title names the provider); a
+(* The provider's logins with usage to show, in a card under its name; a
    provider with none says why (not signed in, an API key, an error). *)
 let provider_cards (m : App.Model.t) ~inject ~limits (id : string) =
   let logins =
@@ -138,8 +138,11 @@ let provider_cards (m : App.Model.t) ~inject ~limits (id : string) =
   match logins, limits with
   | [], Some (u, p) -> [ provider m ~inject ~now:(Usage_meter.now m u) p ]
   | [], None -> []
-  | logins, _ ->
-    List.map logins ~f:(fun l -> group [ Login_usage_view.row m ~inject l ])
+  | (l :: _ as logins), _ ->
+    [ group
+        ~title:l.provider.name
+        (List.map logins ~f:(Login_usage_view.row m ~inject))
+    ]
 ;;
 
 let groups (m : App.Model.t) ~inject =

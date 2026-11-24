@@ -1043,7 +1043,7 @@ none
 0
 === chromium: sharing: 390x844: alice's logins ===
 ok
-DeepSeek: DeepSeek API key
+API key
 API key, default.
 Share…
 Manage
@@ -1058,7 +1058,7 @@ ok
 bob
 pick to share: they never see its key
 === chromium: sharing: bob's logins after ===
-DeepSeek: DeepSeek API key (from alice)
+API key (from alice)
 API key, default, shared by alice.
 Hide
 Manage
@@ -1070,7 +1070,7 @@ TODAY
 2 req 8.6k tok $0.25
 === chromium: sharing: 320x640: alice's logins ===
 ok
-DeepSeek: DeepSeek API key
+API key
 API key, default, shared with bob.
 Share…
 Manage
@@ -4284,7 +4284,8 @@ A run stopped by a provider's usage limit carries on by itself when the limit re
 Subscription limits
 Read TIME (just now). Updated when you open this page or press Refresh.
 Refresh
-Anthropic: Anthropic (Claude Pro/Max)
+Anthropic
+Claude Pro/Max
 Subscription, default, takes over at usage limits.
 Manage
 5-hour session
@@ -4296,7 +4297,8 @@ Resets in 3d 4h · TIME
 Weekly · Opus
 Reset time not reported
 4% used
-OpenAI Codex (ChatGPT): OpenAI (ChatGPT Plus/Pro)
+OpenAI Codex (ChatGPT)
+ChatGPT Plus/Pro
 Subscription, default, takes over at usage limits. Plus plan.
 Manage
 5-hour session
@@ -4318,11 +4320,13 @@ A run stopped by a provider's usage limit carries on by itself when the limit re
 Subscription limits
 Read TIME (just now). Updated when you open this page or press Refresh.
 Refresh
-Anthropic: Anthropic (Claude Pro/Max)
+Anthropic
+Claude Pro/Max
 Subscription, default, takes over at usage limits.
 Manage
 Limits unknown: Claude is limiting how often usage is read (HTTP 429): Refresh in a minute
-OpenAI Codex (ChatGPT): OpenAI (ChatGPT Plus/Pro)
+OpenAI Codex (ChatGPT)
+ChatGPT Plus/Pro
 Subscription, default, takes over at usage limits. Plus plan.
 Manage
 5-hour session

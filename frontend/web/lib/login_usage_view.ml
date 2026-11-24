@@ -126,7 +126,7 @@ let row m ~inject (l : Logins.Login.t) =
   in
   row
     ~cls:"provider-login"
-    ~name:title
+    ~name:(Logins.name l)
     ~about:(String.capitalize (Logins.detail l) ^ "." ^ plan m l)
     ~below:(details m l)
     ((match l.account.shared_by with

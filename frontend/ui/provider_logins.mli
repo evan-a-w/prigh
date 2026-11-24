@@ -23,7 +23,13 @@ val all : ?hidden:bool -> P.Auth_status.t list -> Login.t list
     alice)"]. *)
 val label : P.Auth_status.Account.t -> string
 
-(** ["ChatGPT: Work"]. *)
+(** The label under a heading naming its provider: without the provider's
+    name it starts with ("Claude Pro/Max" for "Anthropic (Claude
+    Pro/Max)"), and its owner when another user shares it. *)
+val name : Login.t -> string
+
+(** Where nothing names the provider: ["ChatGPT: Work"], ["Anthropic: Claude
+    Pro/Max"]. *)
 val title : Login.t -> string
 
 (** ["subscription, default, takes over at usage limits, shared with bob"]. *)
