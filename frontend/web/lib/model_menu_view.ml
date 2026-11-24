@@ -291,6 +291,92 @@ let access (m : App.Model.t) ~inject =
       ]
 ;;
 
+(* The session's engine, beside the access mode: switching it takes this
+   session to another agent (a fresh one: a new session on it). *)
+let engine (m : App.Model.t) ~inject =
+  match App.engine_options m with
+  | [] -> Node.none
+  | options ->
+    let mark (c : Deployed_engines.Choice.t) =
+      match c.adapter with
+      | None | Some "prigh" -> icon Bot
+      | Some _ -> Provider_mark.view (Deployed_engines.Choice.label c)
+    in
+    let current =
+      List.find options ~f:(fun (o : App.Engine_option.t) -> o.current)
+    in
+    let label =
+      match current with
+      | Some o -> Deployed_engines.Choice.label o.choice
+      | None -> "Engine"
+    in
+    let busy = App.Model.running m in
+    let open_ = m.model_menu.engine_open in
+    Node.div
+      ~attrs:[ classes [ "model-access"; "model-engine" ] [ "open", open_ ] ]
+      [ (if open_
+         then
+           Node.div
+             ~attrs:
+               [ Attr.class_ "model-access-menu menu-surface"
+               ; Attr.role "menu"
+               ; Attr.create "aria-label" "Engine"
+               ]
+             ((if busy
+               then
+                 [ div ~cls:"model-engine-busy" [ Node.text App.engine_busy ] ]
+               else [])
+              @ List.map options ~f:(fun (o : App.Engine_option.t) ->
+                Node.button
+                  ~attrs:
+                    [ classes
+                        [ "model-access-item" ]
+                        [ "on", o.current; "trouble", o.trouble ]
+                    ; Attr.type_ "button"
+                    ; Attr.role "menuitemradio"
+                    ; Attr.create "aria-checked" (Bool.to_string o.current)
+                    ; Attr.title o.hint
+                    ; (if busy then Attr.disabled else Attr.empty)
+                    ; Attr.on_click (fun _ ->
+                        inject
+                          (Action.Model_menu_engine_pick
+                             (Deployed_engines.Choice.key o.choice)))
+                    ]
+                  [ mark o.choice
+                  ; Node.span
+                      ~attrs:[ Attr.class_ "menu-text" ]
+                      [ span
+                          ~cls:"menu-label"
+                          (Deployed_engines.Choice.label o.choice)
+                      ; span ~cls:"menu-detail" o.hint
+                      ]
+                  ; (if o.current
+                     then Html.mark ~cls:"model-check" Check
+                     else Node.span ~attrs:[ Attr.class_ "model-check" ] [])
+                  ]))
+         else Node.none)
+      ; Node.button
+          ~attrs:
+            [ Attr.class_ "model-access-button"
+            ; Attr.type_ "button"
+            ; Attr.title
+                (if busy
+                 then App.engine_busy
+                 else sprintf "Runs on %s: switch the engine (Alt+E)" label)
+            ; Attr.create "aria-label" (sprintf "Engine: %s" label)
+            ; Attr.create "aria-haspopup" "menu"
+            ; Attr.create "aria-expanded" (Bool.to_string open_)
+            ; Attr.on_click (fun _ -> inject Action.Model_menu_engine)
+            ]
+          [ (match current with
+             | Some o -> mark o.choice
+             | None -> icon Bot)
+          ; span ~cls:"chip-label" label
+          ; icon ~cls:"chevron" Chevron
+          ]
+      ]
+;;
+
 let view (m : App.Model.t) (p : Picker.t) ~inject =
   let offered = App.offered_models m in
   let visible = Picker.visible p in
@@ -392,7 +478,7 @@ let view (m : App.Model.t) (p : Picker.t) ~inject =
         [ span
             ~cls:"menu-keys"
             "↑ ↓ models · ← → providers · Enter switches · Esc closes"
-        ; access m ~inject
+        ; div ~cls:"model-foot-controls" [ access m ~inject; engine m ~inject ]
         ]
     ]
 ;;

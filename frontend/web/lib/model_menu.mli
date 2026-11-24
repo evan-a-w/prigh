@@ -3,7 +3,7 @@ open! Import
 
 (** The model chip's menu beyond its list ([Dialog.Popover] holds the list's
     filter and highlight): which provider's models it shows (or the
-    favourites), whether all of them, and whether the access menu in its
+    favourites), whether all of them, and whether the access or engine menu in its
     foot is open. Also what the menu offers, and in which order. *)
 
 module Tab : sig
@@ -17,6 +17,7 @@ type t =
   { tab : Tab.t
   ; more : bool (** the provider's older models too ("Show more") *)
   ; access_open : bool (** the foot's menu of modes *)
+  ; engine_open : bool (** the foot's menu of engines *)
   }
 [@@deriving sexp_of, equal]
 

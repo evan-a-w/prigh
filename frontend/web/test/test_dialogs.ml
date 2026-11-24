@@ -161,6 +161,8 @@ let%expect_test "help lists every key and command" =
     switch to the list's Nth model
     Alt+F (in the model menu)
     star or unstar the highlighted model
+    Alt+E (in the model menu)
+    pick the session's engine (Codex, Claude Code, …), as its foot's engine menu does
     ↑ ↓ or Enter or Esc (a chip's menu)
     move / choose / close it; type to filter the models or hosts
     Tab (a chip's menu; ← → in the host's)

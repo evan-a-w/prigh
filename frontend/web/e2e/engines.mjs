@@ -212,6 +212,29 @@ try {
   await phoneAudit();
   await screenshot("first turn");
 
+  // The model menu's foot: the engine beside the access mode, with each
+  // adapter's health (Claude Code is not installed here).
+  await tap(model);
+  const engineButton = page.locator(".model-engine .model-access-button");
+  await tap(engineButton);
+  const engineMenu = page.locator(".model-engine .model-access-menu");
+  await engineMenu.locator(".model-access-item.trouble").waitFor();
+  await settled(page.locator("#chip-popover"));
+  section("the model menu's engine");
+  console.log(`button: ${await engineButton.getAttribute("aria-label")}`);
+  console.log((await engineMenu.locator(".model-access-item").evaluateAll(items => items.map(i => i.innerText))).map(clean).join("\n"));
+  // The open menu covers the list by design: only its targets are checked.
+  if (touch) {
+    const small = await page.locator(".model-engine .model-access-button, .model-engine .model-access-item")
+      .evaluateAll(els => els.filter(e => e.getBoundingClientRect().height < 44).length);
+    console.log(`phone: ${small} targets under 44px`);
+  }
+  await screenshot("model menu engine");
+  await page.keyboard.press("Escape");
+  await engineMenu.waitFor({ state: "detached" });
+  await page.keyboard.press("Escape");
+  await page.locator("#chip-popover").waitFor({ state: "detached" });
+
   // 3. Ask mode: the command Codex asks to run goes to the approval dialog.
   await send("/mode ask");
   await toast("Ask").waitFor();

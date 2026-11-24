@@ -5362,6 +5362,11 @@ chip: Codex
 Hello from Codex: ask me to look at the project. codex/gpt-5.2-codex 2.3k in 100 out <TIME>
 model chip: Codex · gpt-5.2-codex
 sidebar: 1 session, "Hello"
+=== chromium: engines (desktop): the model menu's engine ===
+button: Engine: Codex
+Codex 0.166.0 · logged in (ChatGPT)
+prigh harness prigh's own agent, calling the model directly
+Claude Code Claude Code is not installed on server-laptop, please install it
 === chromium: engines (desktop): Codex asks to run a command ===
 Confirm Run bash: ls? y Allow once a Always allow bash(ls:*) this session n Deny r Deny, saying why
 === chromium: engines (desktop): the command ran ===
@@ -5390,6 +5395,12 @@ Hello from Codex: ask me to look at the project. codex/gpt-5.2-codex 2.3k in 100
 model chip: Codex · gpt-5.2-codex
 sidebar: 1 session, "Hello"
 phone: ok
+=== chromium: engines (phone): the model menu's engine ===
+button: Engine: Codex
+Codex 0.166.0 · logged in (ChatGPT)
+prigh harness prigh's own agent, calling the model directly
+Claude Code Claude Code is not installed on server-laptop, please install it
+phone: 0 targets under 44px
 === chromium: engines (phone): Codex asks to run a command ===
 Confirm Run bash: ls? y Allow once a Always allow bash(ls:*) this session n Deny r Deny, saying why
 phone: ok
@@ -5420,6 +5431,12 @@ Hello from Codex: ask me to look at the project. codex/gpt-5.2-codex 2.3k in 100
 model chip: gpt-5.2-codex
 sidebar: 1 session, "Hello"
 phone: ok
+=== chromium: engines (small): the model menu's engine ===
+button: Engine: Codex
+Codex 0.166.0 · logged in (ChatGPT)
+prigh harness prigh's own agent, calling the model directly
+Claude Code Claude Code is not installed on server-laptop, please install it
+phone: 0 targets under 44px
 === chromium: engines (small): Codex asks to run a command ===
 Confirm Run bash: ls? y Allow once a Always allow bash(ls:*) this session n Deny r Deny, saying why
 phone: ok

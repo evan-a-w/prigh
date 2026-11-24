@@ -1366,7 +1366,15 @@ kbd {
   border-top: 1px solid var(--border);
 }
 .model-menu-foot > .menu-keys { padding: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.model-foot-controls { display: flex; align-items: center; gap: 2px; flex: none; min-width: 0; }
 .model-access { position: relative; flex: none; }
+.model-engine .model-access-button .chip-label { max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.model-engine .model-access-button .provider-mark, .model-engine .model-access-item .provider-mark { width: 14px; height: 14px; flex: none; }
+.model-engine .model-access-menu { width: 300px; }
+.model-engine .model-access-item .menu-detail { white-space: normal; }
+.model-engine .model-access-item.trouble .menu-detail { color: var(--destructive); }
+.model-engine .model-access-item:disabled { opacity: 0.55; cursor: default; }
+.model-engine-busy { padding: 6px 8px; color: var(--muted-foreground); font-size: 12px; }
 .model-access-button {
   display: inline-flex;
   align-items: center;

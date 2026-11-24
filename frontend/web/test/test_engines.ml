@@ -494,3 +494,132 @@ let%expect_test
     Close_dialog
     |}]
 ;;
+
+let%expect_test "the model menu's foot switches the engine" =
+  let deployed : Prigh_protocol.Deployed_engines.t =
+    { engines = [ "harness"; "composer" ]
+    ; adapters = [ "codex"; "acp:antigravity" ]
+    }
+  in
+  let h = session ~deployed ~fields:[ "message_count", `Number "4" ] () in
+  H.quiet h (fun () -> H.key h "l" ~ctrl:true);
+  H.text h ~selector:".model-menu-foot";
+  H.names h ~selector:".model-engine";
+  [%expect
+    {|
+    (Open_chip Model)
+    ↑ ↓ models · ← → providers · Enter switches · Esc closes
+    (Full access)
+    (Codex)
+    div "Codex"
+    |}];
+  (* Opened, it asks the adapters' health, shown on each. *)
+  H.click h ~selector:".model-engine .model-access-button";
+  H.quiet h (fun () ->
+    H.reply
+      h
+      "list_adapters"
+      {|{"adapters":[
+        {"adapter":"codex","label":"Codex","host":"backend","host_name":"desktop","installed":true,"auth":"logged_in","account":"ChatGPT","version":"0.166.0","checked_at":1791194400},
+        {"adapter":"acp:antigravity","label":"Antigravity","host":"backend","host_name":"desktop","installed":true,"auth":"unknown","version":"1.5.13","checked_at":1791194400}]}|});
+  H.text h ~selector:".model-engine .model-access-menu";
+  [%expect
+    {|
+    Model_menu_engine
+    (Rpc (method_ list_adapters) (params ()) (tag Adapters_loaded))
+    (Codex 0.166.0 · logged in (ChatGPT) ✓) (prigh harness prigh's own agent, calling the model directly) (A Antigravity 1.5.13)
+    |}];
+  (* Choosing one switches the session; the picker stays, and lists the new
+     adapter's models once the backend says they changed. *)
+  H.click h ~nth:2 ~selector:".model-engine .model-access-item";
+  H.names h ~selector:".model-engine .model-access-menu";
+  H.quiet h (fun () ->
+    H.event
+      h
+      (sprintf
+         {|{"event":"state","state":%s}|}
+         (H.state_json
+            ~fields:
+              [ "engine", `String "composer"
+              ; "adapter", `String "acp:antigravity"
+              ; "capabilities", codex_capabilities
+              ; "message_count", `Number "4"
+              ]
+            ())));
+  H.event h {|{"type":"event","event":"models_changed"}|};
+  H.reply
+    h
+    "list_models"
+    (sprintf
+       "[%s]"
+       (H.model_json
+          ~thinking:false
+          ~provider:"acp:antigravity"
+          ~id:"default"
+          ~name:"Gemini 3.8 Flash"
+          ()));
+  H.text h ~selector:".model-menu-main";
+  H.names h ~selector:".model-engine .model-access-button";
+  [%expect
+    {|
+    (Model_menu_engine_pick acp:antigravity)
+    (Rpc (method_ set_adapter) (params ((adapter acp:antigravity)))
+     (tag Show_error))
+    (Expire_toast (id 0) (after_ms 2580))
+    (Rpc (method_ list_models) (params ()) (tag Models))
+    []
+    Antigravity
+    Gemini 3.8 Flash Alt+1 (Star: into the favourites (Alt+F))
+    button "Engine: Antigravity" -- Runs on Antigravity: switch the engine (Alt+E)
+    |}];
+  (* Esc closes its menu first; Alt+E is the keyboard's picker. *)
+  H.quiet h (fun () -> H.click h ~selector:".model-engine .model-access-button");
+  H.key h "Escape";
+  H.elements h ~selector:".model-engine .model-access-menu";
+  H.names h ~selector:"#chip-popover";
+  H.key h "e" ~alt:true;
+  H.text h ~selector:".modal";
+  [%expect
+    {|
+    Model_menu_engine
+    Close_dialog
+    [dialog] div "Model"
+    Model_menu_engine_picker
+    (Focus picker-input)
+    Switch this session to
+    (Close (Esc))
+    []
+    Antigravity an ACP agent on the session's tool host ✓
+    prigh harness prigh's own agent, calling the model directly
+    Codex OpenAI's Codex CLI on the session's tool host
+    ↑↓ to move, Enter to choose, Esc to close
+    |}]
+;;
+
+let%expect_test "mid-run the engine waits for the turn" =
+  let h =
+    session ~fields:[ "message_count", `Number "4"; "running", `True ] ()
+  in
+  H.quiet h (fun () -> H.key h "l" ~ctrl:true);
+  H.names h ~selector:".model-engine .model-access-button";
+  H.click h ~selector:".model-engine .model-access-button";
+  H.text h ~selector:".model-engine .model-access-menu";
+  H.elements h ~selector:".model-engine .model-access-item[disabled]";
+  H.key h "e" ~alt:true;
+  toasts h;
+  [%expect
+    {|
+    (Open_chip Model)
+    button "Engine: Codex" -- Switch after this turn (Esc stops it)
+    Model_menu_engine
+    (Rpc (method_ list_adapters) (params ()) (tag Adapters_loaded))
+    Switch after this turn (Esc stops it)
+    (Codex OpenAI's Codex CLI on the session's tool host ✓) (prigh harness prigh's own agent, calling the model directly) (Claude Code Anthropic's Claude Code CLI on the session's tool host)
+    <button class="model-access-item on">
+    <button class="model-access-item">
+    <button class="model-access-item">
+    Model_menu_engine_picker
+    (Expire_toast (id 0) (after_ms 2980))
+    Switch after this turn (Esc stops it)
+    |}]
+;;

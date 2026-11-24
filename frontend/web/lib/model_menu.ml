@@ -12,10 +12,14 @@ type t =
   { tab : Tab.t
   ; more : bool
   ; access_open : bool
+  ; engine_open : bool
   }
 [@@deriving sexp_of, equal]
 
-let init = { tab = Favourites; more = false; access_open = false }
+let init =
+  { tab = Favourites; more = false; access_open = false; engine_open = false }
+;;
+
 let shown = 6
 
 let offered (models : Llm.t list) ~(auth : Auth_status.t list) ~current =

@@ -505,6 +505,13 @@ module Action = struct
     | Model_menu_step of int (** the next provider along the rail (← →) *)
     | Model_menu_more (** "Show more": the provider's older models *)
     | Model_menu_access (** opens or closes the access menu in its foot *)
+    | Model_menu_engine
+    (** opens or closes the engine menu in its foot (asking the adapters'
+        health the first time) *)
+    | Model_menu_engine_pick of string
+    (** a choice of the engine menu, by key: switches this session (a fresh
+        one gives way to a new session on it, as the engine chip) *)
+    | Model_menu_engine_picker (** Alt+E: the engine picker, by keyboard *)
     | Model_menu_nth of int (** Alt+1…9: the list's Nth model *)
     | Toggle_favourite of string option
     (** stars or unstars the model ([None]: the highlighted one) *)
@@ -6581,6 +6588,88 @@ let engine_command (m : Model.t) ~switch arg =
   | arg -> engine_chosen m ~switch arg
 ;;
 
+(* ---- the model menu's engine ------------------------------------------- *)
+
+module Engine_option = struct
+  type t =
+    { choice : Deployed_engines.Choice.t
+    ; hint : string
+    ; trouble : bool
+    ; current : bool
+    }
+end
+
+let engine_busy = "Switch after this turn (Esc stops it)"
+
+(* The model menu's foot switches this session; a fresh one gives way to a
+   new session, as the new-session screen's engine chip. *)
+let engine_options (m : Model.t) =
+  let switch = not (fresh m) in
+  let choices = engine_choices m ~switch in
+  if List.length choices < 2
+  then []
+  else (
+    let current = current_choice m in
+    let host = Option.map m.state ~f:(fun (s : State.t) -> s.active_host) in
+    let status adapter =
+      match m.adapters.statuses with
+      | Some (Ok statuses) ->
+        List.find statuses ~f:(fun (s : Adapter_status.t) ->
+          String.equal s.adapter adapter
+          && Option.equal String.equal (Some s.host) host)
+      | Some (Error _) | None -> None
+    in
+    List.map choices ~f:(fun (c : Deployed_engines.Choice.t) ->
+      let hint, trouble =
+        match Option.bind c.adapter ~f:status with
+        | Some { problem = Some problem; _ } -> problem, true
+        | Some s -> Adapter_status.summary s, false
+        | None -> Deployed_engines.Choice.describe c, false
+      in
+      { Engine_option.choice = c
+      ; hint
+      ; trouble
+      ; current = Option.equal Deployed_engines.Choice.equal current (Some c)
+      }))
+;;
+
+let close_engine_menu (m : Model.t) =
+  { m with model_menu = { m.model_menu with engine_open = false } }
+;;
+
+let model_menu_engine (m : Model.t) =
+  let opening = not m.model_menu.engine_open in
+  let m =
+    { m with
+      model_menu =
+        { m.model_menu with engine_open = opening; access_open = false }
+    }
+  in
+  if
+    opening
+    && composer_engine m
+    && Option.is_none m.adapters.statuses
+    && not m.adapters.loading
+  then fetch_adapters m
+  else m, []
+;;
+
+let model_menu_engine_pick (m : Model.t) key =
+  let m = close_engine_menu m in
+  if Model.running m
+  then toast m engine_busy
+  else engine_chosen m ~switch:(not (fresh m)) key
+;;
+
+let model_menu_engine_picker (m : Model.t) =
+  let m = close_engine_menu m in
+  if List.is_empty (engine_options m)
+  then m, []
+  else if Model.running m
+  then toast m engine_busy
+  else open_picker m (engine_picker m ~switch:(not (fresh m)))
+;;
+
 let keep_session (m : Model.t) =
   if not (temporary m)
   then m, []
@@ -9721,7 +9810,23 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
   | Models, Ok json ->
     decode m json (decode_list Llm.of_json) ~f:(fun models ->
       let m = { m with models } in
-      with_model_menu m m.model_menu)
+      (* Another engine's models: the menu opens on the new current one's
+         provider rather than on one that offers nothing now. *)
+      let offered = offered_models m in
+      let model_menu =
+        if
+          List.mem
+            (Model_menu.tabs offered)
+            m.model_menu.tab
+            ~equal:Model_menu.Tab.equal
+        then m.model_menu
+        else
+          { (Model_menu.opening offered ~current:(menu_model_key m)) with
+            access_open = m.model_menu.access_open
+          ; engine_open = m.model_menu.engine_open
+          }
+      in
+      with_model_menu m model_menu)
   | Auth_status purpose, Ok json ->
     decode m json (decode_list Auth_status.of_json) ~f:(fun auth ->
       let m = { m with auth } in
@@ -12025,9 +12130,15 @@ let update_connected (m : Model.t) (action : Action.t) =
   | Model_menu_access ->
     ( { m with
         model_menu =
-          { m.model_menu with access_open = not m.model_menu.access_open }
+          { m.model_menu with
+            access_open = not m.model_menu.access_open
+          ; engine_open = false
+          }
       }
     , [] )
+  | Model_menu_engine -> model_menu_engine m
+  | Model_menu_engine_pick key -> model_menu_engine_pick m key
+  | Model_menu_engine_picker -> model_menu_engine_picker m
   | Model_menu_nth n -> model_menu_nth m n
   | Toggle_favourite key ->
     let key =
@@ -12249,6 +12360,8 @@ let update_connected (m : Model.t) (action : Action.t) =
        { m with mcp = Option.value_exn (Mcp_page.escape m.mcp) }, []
      | Some (Popover { chip = Model; _ }), _ when m.model_menu.access_open ->
        { m with model_menu = { m.model_menu with access_open = false } }, []
+     | Some (Popover { chip = Model; _ }), _ when m.model_menu.engine_open ->
+       close_engine_menu m, []
      | _ ->
        (match m.dialog with
         | Some (Login { failed = None; provider; _ }) ->

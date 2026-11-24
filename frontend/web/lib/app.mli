@@ -630,6 +630,13 @@ module Action : sig
     | Model_menu_step of int (** the next provider along the rail (← →) *)
     | Model_menu_more (** "Show more": the provider's older models *)
     | Model_menu_access (** opens or closes the access menu in its foot *)
+    | Model_menu_engine
+    (** opens or closes the engine menu in its foot (asking the adapters'
+        health the first time) *)
+    | Model_menu_engine_pick of string
+    (** a choice of the engine menu, by key: switches this session (a fresh
+        one gives way to a new session on it, as the engine chip) *)
+    | Model_menu_engine_picker (** Alt+E: the engine picker, by keyboard *)
     | Model_menu_nth of int (** Alt+1…9: the list's Nth model *)
     | Toggle_favourite of string option
     (** stars or unstars the model ([None]: the highlighted one) *)
@@ -1248,6 +1255,26 @@ val deployed : Model.t -> Deployed_engines.t
 
 (** The session's engine and adapter, as a choice of [/new]. *)
 val current_choice : Model.t -> Deployed_engines.Choice.t option
+
+(** A choice of the model menu's engine menu: [hint] is its health on the
+    session's host (from Settings → Engines' [list_adapters]) or what it is;
+    [trouble] when that says it cannot run. *)
+module Engine_option : sig
+  type t =
+    { choice : Deployed_engines.Choice.t
+    ; hint : string
+    ; trouble : bool
+    ; current : bool
+    }
+end
+
+(** The model menu's engine menu: what this session can switch to (a fresh
+    one: what a new session can run on), this one's first; none when there
+    is nothing else. *)
+val engine_options : Model.t -> Engine_option.t list
+
+(** Why the engine cannot change while a run goes on. *)
+val engine_busy : string
 
 (** What the Temporary chip shows: the session's kind, or the one asked
     for. *)
