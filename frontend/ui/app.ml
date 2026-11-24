@@ -1142,6 +1142,93 @@ let restore_command m command =
   else m
 ;;
 
+(* ---- provider logins -------------------------------------------------- *)
+
+let logins_picker ?(query = "") m ~title rows =
+  let items =
+    List.map rows ~f:(fun (r : Provider_logins.Row.t) ->
+      Picker.Item.create ~id:r.id ~detail:r.detail ~marked:r.marked r.label)
+  in
+  open_picker m Commands (Picker.create ~query ~title items)
+;;
+
+let logins_request m command (r : Provider_logins.Request.t) =
+  ( m
+  , [ rpc
+        r.method_
+        ~params:r.params
+        ~tag:
+          (Retry_in_editor
+             { command; hint = ""; then_ = Notice_on_success r.done_ })
+    ] )
+;;
+
+let confirm_logout m (l : Provider_logins.Login.t) =
+  { m with
+    mode =
+      Confirm
+        { question =
+            sprintf
+              "Log out of %s and delete its credential? (y/n)"
+              (Provider_logins.title l)
+        ; action =
+            Logout_login
+              { provider = l.provider.provider; account = l.account.id }
+        }
+  }
+;;
+
+let accounts_command m (cmd : Commands.Parsed.t) =
+  let command = "/accounts " ^ cmd.rest in
+  match Provider_logins.Command.parse cmd.rest with
+  | Pick query ->
+    if List.is_empty (Provider_logins.all m.auth)
+    then notice m "no logins yet: /login signs in to a provider", []
+    else
+      ( logins_picker
+          m
+          ~query
+          ~title:"Logins"
+          (Provider_logins.rows m.auth ~session:m.state)
+      , [] )
+  | Menu arg ->
+    (match Provider_logins.find m.auth arg with
+     | Ok l ->
+       ( logins_picker
+           m
+           ~title:(Provider_logins.title l)
+           (Provider_logins.menu l ~session:m.state)
+       , [] )
+     | Error e -> error (restore_command m command) e, [])
+  | Remove arg ->
+    (match Provider_logins.find m.auth arg with
+     | Ok l -> confirm_logout m l, []
+     | Error e -> error (restore_command m command) e, [])
+  | c ->
+    (match Provider_logins.request m.auth c with
+     | Ok r -> logins_request m command r
+     | Error e -> error (restore_command m command) e, [])
+;;
+
+let account_command m (cmd : Commands.Parsed.t) =
+  match m.state with
+  | None -> notice m "not connected", []
+  | Some state when String.is_empty cmd.rest ->
+    ( logins_picker
+        m
+        ~title:
+          (sprintf
+             "%s login for this session"
+             (Provider_logins.provider_name m.auth state.model.provider))
+        (Provider_logins.session_rows m.auth state)
+    , [] )
+  | Some state ->
+    let command = "/account " ^ cmd.rest in
+    (match Provider_logins.session_request m.auth state cmd.rest with
+     | Ok r -> logins_request m command r
+     | Error e -> error (restore_command m command) e, [])
+;;
+
 (* ---- git hosting ------------------------------------------------------ *)
 
 let forge_login m (login : Forge_accounts.Login.t) =
@@ -2339,7 +2426,7 @@ let format_auth m : Content.t =
     List.fold statuses ~init:0 ~f:(fun acc s ->
       Int.max acc (String.length s.provider))
   in
-  List.map statuses ~f:(fun (s : P.Auth_status.t) ->
+  List.concat_map statuses ~f:(fun (s : P.Auth_status.t) ->
     let methods =
       String.concat
         ~sep:", "
@@ -2365,15 +2452,40 @@ let format_auth m : Content.t =
         ]
       | None, None -> [ { text = "not configured"; style = Style.fg Gray } ]
     in
-    [ { Content.Span.text = Text_width.pad_right s.provider ~width ^ "  "
-      ; style = Style.bold Style.plain
-      }
-    ]
-    @ state
-    @
-    if Option.is_some s.custom
-    then []
-    else [ { text = "  [" ^ methods ^ "]"; style = Style.dim Style.plain } ])
+    let line : Content.Line.t =
+      [ { Content.Span.text = Text_width.pad_right s.provider ~width ^ "  "
+        ; style = Style.bold Style.plain
+        }
+      ]
+      @ state
+      @
+      if Option.is_some s.custom
+      then []
+      else [ { text = "  [" ^ methods ^ "]"; style = Style.dim Style.plain } ]
+    in
+    line
+    ::
+    (if Option.is_some s.custom || List.length s.accounts < 2
+     then []
+     else
+       List.map s.accounts ~f:(fun account ->
+         let l = { Provider_logins.Login.provider = s; account } in
+         [ { Content.Span.text =
+               String.make (width + 2) ' ' ^ "@ " ^ account.label
+           ; style = Style.plain
+           }
+         ; { text = sprintf "  %s  %s" (Provider_logins.detail l) account.ref_
+           ; style = Style.dim Style.plain
+           }
+         ])))
+  @ (if List.is_empty (Provider_logins.all statuses)
+     then []
+     else
+       [ [ { Content.Span.text = "/accounts manages a provider's logins"
+           ; style = Style.dim Style.plain
+           }
+         ]
+       ])
   @ [ [ { Content.Span.text = "/login custom adds an OpenAI-compatible endpoint"
         ; style = Style.dim Style.plain
         }
@@ -2906,8 +3018,24 @@ let reconnect_reply m ~generation result =
 
 (* ---- slash commands --------------------------------------------------- *)
 
-let set_model_command key =
-  rpc "set_model" ~params:[ "model", str key ] ~tag:(Set_model_done key)
+(* A login pinned for the session carries over to a model of its provider. *)
+let set_model_command ?(account = []) key =
+  rpc
+    "set_model"
+    ~params:(("model", str key) :: account)
+    ~tag:(Set_model_done key)
+;;
+
+let set_model_keeping m key =
+  let account =
+    match
+      List.find m.models ~f:(fun (model : P.Model.t) ->
+        String.equal model.key key)
+    with
+    | Some model -> Provider_logins.keep_pin m.state ~provider:model.provider
+    | None -> []
+  in
+  set_model_command ~account key
 ;;
 
 let export_command path =
@@ -2921,8 +3049,21 @@ let export_command path =
 ;;
 
 let switch_model m arg =
+  let arg, login = Model_match.split_account m.models arg in
   match Model_match.resolve m.models arg with
-  | Found model -> m, [ set_model_command model.key ]
+  | Found model ->
+    (match login with
+     | None -> m, [ set_model_keeping m model.key ]
+     | Some login ->
+       (match Provider_logins.find ~provider:model.provider m.auth login with
+        | Ok l ->
+          ( m
+          , [ set_model_command
+                ~account:[ "account", str l.account.id ]
+                model.key
+            ] )
+        | Error e ->
+          error (restore_command m ("/model " ^ arg ^ "@" ^ login)) e, []))
   | Ambiguous _ ->
     ( model_picker (notice m (sprintf "several models match %S" arg)) ~query:arg
     , [] )
@@ -2957,12 +3098,13 @@ let cycle_model m ~step =
           ~f:fst
     in
     let next = List.nth_exn models ((index + step + n) mod n) in
+    let set = set_model_keeping m next.key in
     let m =
       match m.state with
       | Some s -> { m with state = Some { s with model = next } }
       | None -> m
     in
-    m, [ set_model_command next.key ]
+    m, [ set ]
 ;;
 
 let cycle_thinking m =
@@ -4620,6 +4762,24 @@ let run_command m (cmd : Commands.Parsed.t) =
     , [ rpc "auth_status" ~tag:Auth_login_picker
       ; call Forge_status ~tag:Forge_refresh
       ] )
+  | "login", _ :: _ when List.mem cmd.args "as" ~equal:String.equal ->
+    (match Provider_logins.split_as cmd.args with
+     | provider :: rest, Some label ->
+       ( m
+       , [ rpc
+             "login"
+             ~params:
+               (Provider_logins.login_params
+                  m.auth
+                  ~provider
+                  ~method_:(List.hd rest)
+                  ~label:(Some label))
+         ] )
+     | _ ->
+       ( error
+           (restore_command m ("/login " ^ cmd.rest))
+           "/login PROVIDER [METHOD] as LABEL: type the login's label after as"
+       , [] ))
   | "login", provider :: rest ->
     (match Forge_accounts.Login.parse m.forge cmd.args with
      | Some (Ok login) -> forge_login m login
@@ -4636,6 +4796,12 @@ let run_command m (cmd : Commands.Parsed.t) =
     , [ rpc "auth_status" ~tag:Auth_logout_picker
       ; call Forge_status ~tag:Forge_refresh
       ] )
+  | "logout", _ :: _ when Provider_logins.names_login cmd.rest ->
+    (match Provider_logins.find m.auth cmd.rest with
+     | Ok l -> confirm_logout m l, []
+     | Error e -> error (restore_command m ("/logout " ^ cmd.rest)) e, [])
+  | "accounts", _ -> accounts_command m cmd
+  | "account", _ -> account_command m cmd
   | "logout", provider :: _ ->
     (match Forge_accounts.logout_host m.forge provider with
      | Some host -> forge_logout m host
@@ -5583,7 +5749,7 @@ let rec editing m (intent : Intent.t) =
 let picker_selected m (kind : Mode.Picker_kind.t) (item : Picker.Item.t) =
   let m = { m with mode = Editing } in
   match kind with
-  | Models _ -> m, [ set_model_command item.id ]
+  | Models _ -> m, [ set_model_keeping m item.id ]
   | Scoped_models | Transcript_filter -> m, []
   | Thinking -> m, [ rpc "set_thinking" ~params:[ "thinking", str item.id ] ]
   | Modes -> mode_by_name m item.id
@@ -5611,6 +5777,13 @@ let picker_selected m (kind : Mode.Picker_kind.t) (item : Picker.Item.t) =
      | Some host -> forge_logout m host
      | None -> logout m item.id)
   | Pull_requests -> pr_command m item.id
+  | Commands ->
+    if Provider_logins.asks item.id
+    then { m with editor = Editor.set_text m.editor item.id }, []
+    else (
+      match Commands.parse item.id with
+      | Some cmd -> run_command m cmd
+      | None -> m, [])
   | Sessions _ ->
     ( m
     , [ rpc
@@ -6429,6 +6602,12 @@ let confirm m ~(action : Mode.Confirm_action.t) (intent : Intent.t) =
     match action with
     | Logout provider ->
       m, [ rpc "logout" ~params:[ "provider", str provider ] ]
+    | Logout_login { provider; account } ->
+      ( m
+      , [ rpc
+            "logout"
+            ~params:[ "provider", str provider; "account", str account ]
+        ] )
     | Forge_logout host -> m, [ call (Forge_logout host) ]
     | Cd_to_checkout path ->
       m, [ call (Enter_worktree path) ~tag:(Dir_changed Cwd) ]
@@ -6513,6 +6692,7 @@ let confirm m ~(action : Mode.Confirm_action.t) (intent : Intent.t) =
            and /terminal from the proxy (see DOCKER.md)"
       , [] )
     | Logout _
+    | Logout_login _
     | Forge_logout _
     | Rewind _
     | Trim _

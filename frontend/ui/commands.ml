@@ -94,14 +94,24 @@ let every =
   ; c
       ~argument:Argument.Login
       "login"
-      "[provider] [api_key|oauth]"
-      "log in to a provider, or a git host: github [HOST] [token], forgejo \
-       HOST [token], HOST [token]"
+      "[provider] [method] [as LABEL]"
+      "log in to a provider (as LABEL: another login, or that one again), or a \
+       git host: github [HOST] [token], forgejo HOST [token], HOST [token]"
   ; c
       ~argument:Argument.Logout
       "logout"
-      "[provider|HOST]"
-      "remove a provider's or a git host's stored credential"
+      "[provider[@LOGIN]|HOST]"
+      "remove a provider's or a login's or a git host's stored credential"
+  ; c
+      "accounts"
+      "[QUERY|SUBCOMMAND LOGIN]"
+      "the providers' logins: pick one to manage it; default, up, down, remove \
+       LOGIN; rename LOGIN to LABEL; fallback LOGIN on|off"
+  ; c
+      "account"
+      "[LOGIN|default]"
+      "pick the login of the model's provider this session uses (or /model \
+       MODEL@LOGIN)"
   ; c
       ~argument:Argument.Thinking
       "thinking"

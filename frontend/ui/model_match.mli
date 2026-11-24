@@ -12,3 +12,7 @@ type t =
 [@@deriving sexp_of]
 
 val resolve : Model.t list -> string -> t
+
+(** [MODEL@ACCOUNT] (a login's label or id): the model part and the login,
+    unless the whole names a model. *)
+val split_account : Model.t list -> string -> string * string option

@@ -376,7 +376,7 @@ let%expect_test "fuzzy ranking: command names" =
     {|
     "mo" -> mode model scoped-models generate-model approval-model memory import compaction permissions
     "lo" -> login logout clone default-host approval-model
-    "s"  -> state switch skills skill: signin setusr session snippet signout sessions scoped-models push jobs host todos resume agents hotkeys verbosity user-info permissions default-host instructions downsize-images
+    "s"  -> state switch skills skill: signin setusr session snippet signout sessions scoped-models push jobs host todos resume agents hotkeys accounts verbosity user-info permissions default-host instructions downsize-images
     "sw" -> switch
     "xyz" ->
     |}]
@@ -692,89 +692,91 @@ let%expect_test "keymap: every binding resolves to its intent and is documented"
     Alt+1                   focus agent N (Alt+1…9)
     Ctrl+C                  clear the editor or abort the turn, then (again) quit
     Ctrl+D                  quit
-    /help                              show commands and keys
-    /hotkeys                           show keyboard shortcuts
-    /model [name|id|provider/id]       pick or switch the model
-    /scoped-models                     pick the models Ctrl+P cycles through
-    /change_default                    save the current model and thinking level as the default for new sessions
-    /fallback [off|model...]           show or set the models that take over, in order, when a model's usage runs out
-    /default-dir [off|path]            show or set the directory new sessions start in (on the default host)
-    /default-host [off|name]           show or set the tool host prigh-web's new sessions start on (a terminal's start on its machine)
-    /default-budget [off|dollars]      show or set the cost budget of sessions that set none with /budget
-    /login [provider] [api_key|oauth]  log in to a provider, or a git host: github [HOST] [token], forgejo HOST [token], HOST [token]
-    /logout [provider|HOST]            remove a provider's or a git host's stored credential
-    /thinking [off|default|LEVEL]      pick or set the thinking level (the model's; default: the provider's)
-    /verbosity [quiet|normal|verbose]  set the transcript verbosity
-    /filter [all|KIND...|-KIND|+KIND]  show only some kinds of the transcript (user, assistant, thinking, tools, subagents, notes); the model's context is unchanged
-    /confirm [on|off|mode]             the mode new sessions (and this one) start in: on (ask), off (auto), ask, auto-edit, smart, auto, or chat (over the approval mode, which leaving it returns to)
-    /mode [mode]                       pick or set the mode, in Alt+M's order: ask, auto-edit, smart or auto (what asks first), plan (read-only planning) or chat (without the tool host)
-    /plan [on|off]                     toggle plan mode: the model investigates and plans, changing no files, until you turn it off
-    /chat [on|off]                     toggle chat mode: talk without the tool host (no files, commands or project; the web and other host-free tools), until you turn it off
-    /todos                             show the model's plan (its update_plan steps)
-    /permissions [forget N|all]        show the mode, the allow/ask/deny rules and the calls smart mode remembered; forget N or all: judge them again (and ask again on the hosts they let the agent work on)
-    /notify [off|bell|desktop]         how to tell you that a turn ended or something waits for you while the terminal is not focused
-    /auth                              show which providers and git hosts are configured
-    /budget [dollars|off]              show or set the session's cost budget: no turn starts once it is spent
-    /goal [text|off|resume]            set a goal the agent keeps working toward until it is met; show, clear or resume it
-    /remind [stop|every|rm|off ...]    stop [N] TEXT: remind the agent when it ends its turn (at most N times in a row, default 3); every N TEXT: every N turns; rm NAME, off: remove one or all; none: list the session's (Ctrl+D removes one)
-    /memory [on|off]                   the notes the model saved when you asked it to remember something (Ctrl+D forgets one); on or off gives the model the memory tool or takes it away
-    /instructions [add TEXT|on|off]    your custom instructions, in the context of every session (Enter shows one, Ctrl+D removes it): add TEXT adds one; on or off lets the model add, edit and remove them or not; prigh-web's Settings edits them
-    /user-info [FIELD VALUE|clear]     what you set about yourself for the model (name, country, time zone, units...), in the context of every session (unlike memory, which it looks up): show it, set a field (an empty VALUE clears it), or clear them all
-    /resume [now|cancel|on|off]        show, run now or cancel the automatic resume after a usage limit, or turn it on or off
-    /downsize-images                   send the conversation's images smaller (after the model refused one as too large) and retry a failed reply
-    /compact [instructions]            summarise older messages to free context
-    /compaction [at|model|mask ...]    show when conversations are compacted and what summarises them; at TOKENS|off: also once the context exceeds TOKENS, not only at 80% of the window; model MODEL|off: the model that writes the summaries (off: the session's); mask on|off: replace old tool outputs with placeholders first
-    /generate-model [MODEL|off]        show which model drafts commit messages, pull requests and branch names (✦ Generate); MODEL|off: draft them with MODEL (off: the session's)
-    /approval-model [MODEL|off]        show which model judges tool calls in smart mode (Alt+M, /mode smart); MODEL|off: judge them with MODEL (off: the session's)
-    /naming [model MODEL|off]          show which model names sessions and subagents; model MODEL|off: name them with MODEL (off: the drafting model, else the session's)
-    /trim [after|undo|show|hide]       drop everything before a message from the model's context: pick the message (newest first, with what it frees), confirm; after: everything after a message instead (what you send later stays); undo brings the latest trim back, show/hide unfolds the trimmed messages
-    /delete [undo|session...]          drop a message from the transcript and the model's context (a reply with its tool results): pick it, newest first; undo brings the latest deletion back; with sessions: delete them, after a confirmation
-    /diff [path]                       show the uncommitted changes where the tools run (git diff, untracked files too)
-    /pr [list|view N|new|checkout N]   pull requests of the repository where the tools run: list [open|closed|all] picks one (Enter shows it, its checks and diff), view N shows one, new [--generate] [title] creates one from the current branch (--generate, or Ctrl+G in the form: the model drafts the title and body), checkout N checks one out in a git worktree
-    /commit [-a] [-m MSG|--generate]   commit the staged changes of the session's worktree (-a: every change to tracked files first; MSG: the rest of the line, or quoted); --generate has the model draft the message into the editor to edit and send (Esc stops it); --amend [-m MSG] replaces the last commit, keeping its message without -m
-    /push                              push the session's worktree's branch to its upstream (set to the remote's branch of the same name when there is none)
-    /review [target] [--base REV ...]  the changed files' approvals and review comments (prigh-web: the review page) of the session's worktree or another (its branch, path or name), or of a branch not checked out (read-only), against its base or REV since their merge base (--direct: against REV itself); /review BASE [instructions] (HEAD: the uncommitted changes) has the model review the changes for prioritised findings
-    /init                              write or improve the project's AGENTS.md
-    /new                               start a new session
-    /name [text]                       set the session name
-    /session                           show session statistics
-    /trace                             where the session's time went: model, tools, waiting on you, the slowest steps (prigh trace SESSION -perfetto FILE exports a timeline)
-    /sessions                          pick a saved session (Tab marks, Ctrl+D deletes, Alt+A archives, Alt+T pins, Alt+D deletes all archived, Ctrl+N named)
-    /archive [session]                 archive a session (the current one without an argument)
-    /unarchive [session]               unarchive a session (the current one without an argument)
-    /pin [session]                     pin a session to the top of /sessions, where it is never archived for being idle (the current one without an argument)
-    /unpin [session]                   unpin a session (the current one without an argument)
-    /delete-archived                   delete every archived session, after a confirmation
-    /auto-archive [DAYS|off]           show how long a session goes without activity before it is archived; DAYS|off: archive after DAYS days (off: never, only by hand)
-    /agents [steer|cancel ...]         focus a subagent (Ctrl+D cancels one); steer N TEXT: tell subagent N (its number or id) at its next step, follow-up N TEXT: before it reports; cancel N
-    /jobs [id|kill <id>]               list background jobs (Enter shows output, Ctrl+D kills), or show/kill one
-    /queue                             the queued steers and follow-ups (Enter edits one, Ctrl+D removes it)
-    /host [name|backend]               pick where tools run (this frontend, another one, or the backend) and the directory there
-    /switch [path]                     switch to a saved session
-    /cd [path]                         change the working directory (asks to create a missing one)
-    /mkdir [path]                      create a directory (and its parents) and change to it
-    /worktree [list|new|open|back|rm]  pick a git worktree of the repository to work in (Ctrl+N: in a new session, Ctrl+D removes it); new BRANCH [BASE] creates one and works there; open [-n] TARGET (-n: in a new session); back [main]: back where the session switched into worktrees from; rm [-f] TARGET (-f: with uncommitted changes)
-    /fork                              fork at a previous user message
-    /rewind                            rewind the head to a previous user message
-    /tree                              show the session tree and switch head
-    /clone                             clone the current session
-    /export [path]                     export the transcript (markdown or .jsonl)
-    /import [path]                     import a session from a JSONL file
-    /abort                             abort the current run
-    /btw <question>                    ask a side question without interrupting the turn (not added to the conversation)
-    /skills                            pick a skill to run (Enter puts /skill:NAME in the editor)
-    /skill:NAME [args]                 run a skill, with what follows as its arguments
-    /snippet [NAME|add|rm]             insert a saved text at the cursor (none: pick one, Alt+N); add NAME [TEXT] saves one (no TEXT: your last prompt), rm NAME deletes it
-    /mcp [reconnect|add|remove ...]    list MCP servers (Enter approves one, signs in to one or lists its tools); reconnect restarts failed ones; add NAME URL|COMMAND [ARGS...] (or add {mcpServers JSON}), remove, enable or disable NAME change the servers in your settings, which run on every host; signin NAME opens a remote server's OAuth sign-in in the browser, signout NAME forgets it
-    /retry-backend-connection          reconnect to the backend now instead of waiting for the next retry
-    /state                             show session state
-    /clear                             clear the transcript
-    /connect [HOST:PORT|URL|local]     switch to the backend at HOST:PORT or a prigh-web URL (wss://host/ws, through an HTTPS proxy; saved for next time) or to a local one; none: asks, with the current address
-    /signin [user]                     sign in to the server, as another user or again
-    /signout                           sign out of the server (forgets the saved token), then sign in again
-    /setusr [user]                     act as another user (superusers only); without a user, list them
-    /nix-gc [run [DAYS|all]]           show the Nix store's size and free space; run collects garbage, first deleting every user's profile generations older than DAYS days (all: all but the current ones)
-    /quit                              exit
+    /help                                  show commands and keys
+    /hotkeys                               show keyboard shortcuts
+    /model [name|id|provider/id]           pick or switch the model
+    /scoped-models                         pick the models Ctrl+P cycles through
+    /change_default                        save the current model and thinking level as the default for new sessions
+    /fallback [off|model...]               show or set the models that take over, in order, when a model's usage runs out
+    /default-dir [off|path]                show or set the directory new sessions start in (on the default host)
+    /default-host [off|name]               show or set the tool host prigh-web's new sessions start on (a terminal's start on its machine)
+    /default-budget [off|dollars]          show or set the cost budget of sessions that set none with /budget
+    /login [provider] [method] [as LABEL]  log in to a provider (as LABEL: another login, or that one again), or a git host: github [HOST] [token], forgejo HOST [token], HOST [token]
+    /logout [provider[@LOGIN]|HOST]        remove a provider's or a login's or a git host's stored credential
+    /accounts [QUERY|SUBCOMMAND LOGIN]     the providers' logins: pick one to manage it; default, up, down, remove LOGIN; rename LOGIN to LABEL; fallback LOGIN on|off
+    /account [LOGIN|default]               pick the login of the model's provider this session uses (or /model MODEL@LOGIN)
+    /thinking [off|default|LEVEL]          pick or set the thinking level (the model's; default: the provider's)
+    /verbosity [quiet|normal|verbose]      set the transcript verbosity
+    /filter [all|KIND...|-KIND|+KIND]      show only some kinds of the transcript (user, assistant, thinking, tools, subagents, notes); the model's context is unchanged
+    /confirm [on|off|mode]                 the mode new sessions (and this one) start in: on (ask), off (auto), ask, auto-edit, smart, auto, or chat (over the approval mode, which leaving it returns to)
+    /mode [mode]                           pick or set the mode, in Alt+M's order: ask, auto-edit, smart or auto (what asks first), plan (read-only planning) or chat (without the tool host)
+    /plan [on|off]                         toggle plan mode: the model investigates and plans, changing no files, until you turn it off
+    /chat [on|off]                         toggle chat mode: talk without the tool host (no files, commands or project; the web and other host-free tools), until you turn it off
+    /todos                                 show the model's plan (its update_plan steps)
+    /permissions [forget N|all]            show the mode, the allow/ask/deny rules and the calls smart mode remembered; forget N or all: judge them again (and ask again on the hosts they let the agent work on)
+    /notify [off|bell|desktop]             how to tell you that a turn ended or something waits for you while the terminal is not focused
+    /auth                                  show which providers and git hosts are configured
+    /budget [dollars|off]                  show or set the session's cost budget: no turn starts once it is spent
+    /goal [text|off|resume]                set a goal the agent keeps working toward until it is met; show, clear or resume it
+    /remind [stop|every|rm|off ...]        stop [N] TEXT: remind the agent when it ends its turn (at most N times in a row, default 3); every N TEXT: every N turns; rm NAME, off: remove one or all; none: list the session's (Ctrl+D removes one)
+    /memory [on|off]                       the notes the model saved when you asked it to remember something (Ctrl+D forgets one); on or off gives the model the memory tool or takes it away
+    /instructions [add TEXT|on|off]        your custom instructions, in the context of every session (Enter shows one, Ctrl+D removes it): add TEXT adds one; on or off lets the model add, edit and remove them or not; prigh-web's Settings edits them
+    /user-info [FIELD VALUE|clear]         what you set about yourself for the model (name, country, time zone, units...), in the context of every session (unlike memory, which it looks up): show it, set a field (an empty VALUE clears it), or clear them all
+    /resume [now|cancel|on|off]            show, run now or cancel the automatic resume after a usage limit, or turn it on or off
+    /downsize-images                       send the conversation's images smaller (after the model refused one as too large) and retry a failed reply
+    /compact [instructions]                summarise older messages to free context
+    /compaction [at|model|mask ...]        show when conversations are compacted and what summarises them; at TOKENS|off: also once the context exceeds TOKENS, not only at 80% of the window; model MODEL|off: the model that writes the summaries (off: the session's); mask on|off: replace old tool outputs with placeholders first
+    /generate-model [MODEL|off]            show which model drafts commit messages, pull requests and branch names (✦ Generate); MODEL|off: draft them with MODEL (off: the session's)
+    /approval-model [MODEL|off]            show which model judges tool calls in smart mode (Alt+M, /mode smart); MODEL|off: judge them with MODEL (off: the session's)
+    /naming [model MODEL|off]              show which model names sessions and subagents; model MODEL|off: name them with MODEL (off: the drafting model, else the session's)
+    /trim [after|undo|show|hide]           drop everything before a message from the model's context: pick the message (newest first, with what it frees), confirm; after: everything after a message instead (what you send later stays); undo brings the latest trim back, show/hide unfolds the trimmed messages
+    /delete [undo|session...]              drop a message from the transcript and the model's context (a reply with its tool results): pick it, newest first; undo brings the latest deletion back; with sessions: delete them, after a confirmation
+    /diff [path]                           show the uncommitted changes where the tools run (git diff, untracked files too)
+    /pr [list|view N|new|checkout N]       pull requests of the repository where the tools run: list [open|closed|all] picks one (Enter shows it, its checks and diff), view N shows one, new [--generate] [title] creates one from the current branch (--generate, or Ctrl+G in the form: the model drafts the title and body), checkout N checks one out in a git worktree
+    /commit [-a] [-m MSG|--generate]       commit the staged changes of the session's worktree (-a: every change to tracked files first; MSG: the rest of the line, or quoted); --generate has the model draft the message into the editor to edit and send (Esc stops it); --amend [-m MSG] replaces the last commit, keeping its message without -m
+    /push                                  push the session's worktree's branch to its upstream (set to the remote's branch of the same name when there is none)
+    /review [target] [--base REV ...]      the changed files' approvals and review comments (prigh-web: the review page) of the session's worktree or another (its branch, path or name), or of a branch not checked out (read-only), against its base or REV since their merge base (--direct: against REV itself); /review BASE [instructions] (HEAD: the uncommitted changes) has the model review the changes for prioritised findings
+    /init                                  write or improve the project's AGENTS.md
+    /new                                   start a new session
+    /name [text]                           set the session name
+    /session                               show session statistics
+    /trace                                 where the session's time went: model, tools, waiting on you, the slowest steps (prigh trace SESSION -perfetto FILE exports a timeline)
+    /sessions                              pick a saved session (Tab marks, Ctrl+D deletes, Alt+A archives, Alt+T pins, Alt+D deletes all archived, Ctrl+N named)
+    /archive [session]                     archive a session (the current one without an argument)
+    /unarchive [session]                   unarchive a session (the current one without an argument)
+    /pin [session]                         pin a session to the top of /sessions, where it is never archived for being idle (the current one without an argument)
+    /unpin [session]                       unpin a session (the current one without an argument)
+    /delete-archived                       delete every archived session, after a confirmation
+    /auto-archive [DAYS|off]               show how long a session goes without activity before it is archived; DAYS|off: archive after DAYS days (off: never, only by hand)
+    /agents [steer|cancel ...]             focus a subagent (Ctrl+D cancels one); steer N TEXT: tell subagent N (its number or id) at its next step, follow-up N TEXT: before it reports; cancel N
+    /jobs [id|kill <id>]                   list background jobs (Enter shows output, Ctrl+D kills), or show/kill one
+    /queue                                 the queued steers and follow-ups (Enter edits one, Ctrl+D removes it)
+    /host [name|backend]                   pick where tools run (this frontend, another one, or the backend) and the directory there
+    /switch [path]                         switch to a saved session
+    /cd [path]                             change the working directory (asks to create a missing one)
+    /mkdir [path]                          create a directory (and its parents) and change to it
+    /worktree [list|new|open|back|rm]      pick a git worktree of the repository to work in (Ctrl+N: in a new session, Ctrl+D removes it); new BRANCH [BASE] creates one and works there; open [-n] TARGET (-n: in a new session); back [main]: back where the session switched into worktrees from; rm [-f] TARGET (-f: with uncommitted changes)
+    /fork                                  fork at a previous user message
+    /rewind                                rewind the head to a previous user message
+    /tree                                  show the session tree and switch head
+    /clone                                 clone the current session
+    /export [path]                         export the transcript (markdown or .jsonl)
+    /import [path]                         import a session from a JSONL file
+    /abort                                 abort the current run
+    /btw <question>                        ask a side question without interrupting the turn (not added to the conversation)
+    /skills                                pick a skill to run (Enter puts /skill:NAME in the editor)
+    /skill:NAME [args]                     run a skill, with what follows as its arguments
+    /snippet [NAME|add|rm]                 insert a saved text at the cursor (none: pick one, Alt+N); add NAME [TEXT] saves one (no TEXT: your last prompt), rm NAME deletes it
+    /mcp [reconnect|add|remove ...]        list MCP servers (Enter approves one, signs in to one or lists its tools); reconnect restarts failed ones; add NAME URL|COMMAND [ARGS...] (or add {mcpServers JSON}), remove, enable or disable NAME change the servers in your settings, which run on every host; signin NAME opens a remote server's OAuth sign-in in the browser, signout NAME forgets it
+    /retry-backend-connection              reconnect to the backend now instead of waiting for the next retry
+    /state                                 show session state
+    /clear                                 clear the transcript
+    /connect [HOST:PORT|URL|local]         switch to the backend at HOST:PORT or a prigh-web URL (wss://host/ws, through an HTTPS proxy; saved for next time) or to a local one; none: asks, with the current address
+    /signin [user]                         sign in to the server, as another user or again
+    /signout                               sign out of the server (forgets the saved token), then sign in again
+    /setusr [user]                         act as another user (superusers only); without a user, list them
+    /nix-gc [run [DAYS|all]]               show the Nix store's size and free space; run collects garbage, first deleting every user's profile generations older than DAYS days (all: all but the current ones)
+    /quit                                  exit
     !command   run a shell command; its output joins the context
     !!command  run a shell command without adding it to the context
     !&command  run a shell command as a background job (/jobs)

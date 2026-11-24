@@ -31,6 +31,7 @@ module Picker_kind = struct
     | Mcp of Mcp_list.t
     | Pull_requests (** [/pr]: Enter shows one *)
     | Auth_select of string
+    | Commands
   [@@deriving sexp_of, equal]
 end
 
@@ -66,6 +67,10 @@ end
 module Confirm_action = struct
   type t =
     | Logout of string
+    | Logout_login of
+        { provider : string
+        ; account : string
+        }
     | Forge_logout of string (** the host *)
     | Rewind of string
     | Trim of string

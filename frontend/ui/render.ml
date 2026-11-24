@@ -986,7 +986,14 @@ let status (m : App.Model.t) : Content.Line.t =
     let cwd =
       if s.chat_mode then [] else [ span ~style:base (format_cwd m s) ]
     in
-    let model = [ span ~style:base s.model.id ] in
+    let model =
+      [ span
+          ~style:base
+          (match Provider_logins.of_session m.auth s with
+           | Some l -> s.model.id ^ "@" ^ Provider_logins.short l.account
+           | None -> s.model.id)
+      ]
+    in
     let after_model =
       [ ( 4
         , [ span
