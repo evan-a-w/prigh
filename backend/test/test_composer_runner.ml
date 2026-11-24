@@ -520,6 +520,6 @@ let%expect_test "spawn failing: the run says why" =
   [%expect
     {|
     user: "[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\nhi"
-    assistant (codex/default, (Error"Codex could not start: Codex is not installed on laptop: install it (npm i -g @openai/codex), then try again")): ""
+    assistant (codex/default, (Error"Codex is not installed on laptop: install it (npm i -g @openai/codex), then try again")): ""
     |}]
 ;;

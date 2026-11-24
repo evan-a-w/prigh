@@ -30,6 +30,7 @@ module Driver = struct
     ; mutable orphan : Orphan.t option
     ; idle : Eio.Condition.t (* the orphan turn ended, or the process *)
     ; mutable on_orphan_request : Adapter_event.t -> unit
+    ; mutable exit : Line_transport.Exit.t option
     }
 
   let create
@@ -53,6 +54,7 @@ module Driver = struct
     ; orphan = None
     ; idle = Eio.Condition.create ()
     ; on_orphan_request = ignore
+    ; exit = None
     }
   ;;
 
@@ -148,6 +150,36 @@ module Driver = struct
     | tail -> sprintf "%s: %s" how tail
   ;;
 
+  let first_lines ?(max = 4) text =
+    String.split_lines text
+    |> List.map ~f:String.strip
+    |> List.filter ~f:(Fn.non String.is_empty)
+    |> Fn.flip List.take max
+    |> String.concat ~sep:"\n"
+  ;;
+
+  let start_failed ?(hint = fun (_ : Line_transport.Exit.t) -> None) t e =
+    let check = sprintf "Check %s in Settings → Engines (/adapters)." t.name in
+    match t.exit with
+    | Some exit ->
+      let how =
+        match exit.code with
+        | Some code -> sprintf "%s exited before starting (code %d)" t.name code
+        | None -> sprintf "%s stopped before starting" t.name
+      in
+      let what = Option.value (hint exit) ~default:check in
+      (match first_lines exit.stderr_tail with
+       | "" -> Error.of_string (sprintf "%s. %s" how what)
+       | said -> Error.of_string (sprintf "%s:\n%s\n%s" how said what))
+    | None ->
+      Error.of_string
+        (sprintf
+           "%s did not start: %s. %s"
+           t.name
+           (Error.to_string_hum e)
+           check)
+  ;;
+
   let request ?timeout t line ~matches =
     if not (alive t)
     then Or_error.error_string "the process exited"
@@ -236,6 +268,7 @@ module Driver = struct
       in
       loop ();
       let exit = Line_transport.ended t.transport in
+      t.exit <- Some exit;
       t.alive <- false;
       t.orphan <- None;
       Eio.Condition.broadcast t.idle;

@@ -318,7 +318,7 @@ let open_process
       ~matches:(function
       | Initialized _ | Failed { command = Initialize; _ } -> true
       | _ -> false)
-    |> Result.map_error ~f:(Error.tag ~tag:"Claude Code did not start")
+    |> Result.map_error ~f:(Adapter.Driver.start_failed driver)
   in
   match init with
   | Failed { message; _ } ->

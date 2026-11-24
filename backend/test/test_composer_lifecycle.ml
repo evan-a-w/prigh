@@ -284,7 +284,7 @@ let%expect_test "a harness that does not answer its start fails the turn" =
   [%expect
     {|
     spawn #1
-    assistant: (Error"Codex could not start: (\"Codex did not start\" \"no answer within 1ms\")") ""
+    assistant: (Error"Codex did not start: no answer within 1ms. Check Codex in Settings \226\134\146 Engines (/adapters).") ""
     |}]
 ;;
 

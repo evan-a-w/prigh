@@ -94,6 +94,16 @@ module Driver : sig
   (** Stops the process: a turn it runs ends at once ([Crashed]). *)
   val stop : _ t -> unit
 
+  (** Why the harness did not start, saying what to do: when its process
+      exited, its exit code and the first lines of its stderr, then [hint]'s
+      advice for that exit, else to check it in Settings → Engines; [e] when
+      it runs but did not answer. *)
+  val start_failed
+    :  ?hint:(Line_transport.Exit.t -> string option)
+    -> _ t
+    -> Error.t
+    -> Error.t
+
   (** Why the process ended, for errors: its exit code and stderr. *)
   val exit_message
     :  ?tail:bool (** with the end of its stderr (default: true) *)

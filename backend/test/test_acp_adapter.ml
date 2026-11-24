@@ -156,12 +156,7 @@ module P = struct
   ;;
 end
 
-let opencode : Acp_agent.t =
-  { name = "opencode"
-  ; display_name = "OpenCode"
-  ; command = [ "opencode"; "acp" ]
-  }
-;;
+let opencode : Acp_agent.t = Option.value_exn (Acp_agent.find_known "opencode")
 
 let print_event (e : Agent.Event.t) =
   match e with
@@ -182,14 +177,14 @@ let print_event (e : Agent.Event.t) =
   | _ -> ()
 ;;
 
-let with_acp ?(approval : Approval_mode.t option) ~peer f =
+let with_acp ?(agent = opencode) ?(approval : Approval_mode.t option) ~peer f =
   with_sandbox
   @@ fun t ->
   Eio.Switch.run
   @@ fun sw ->
   let launches = ref 0 in
   let adapter =
-    Acp_adapter.create ~load_quiet:(Time_float.Span.of_sec 0.2) opencode
+    Acp_adapter.create ~load_quiet:(Time_float.Span.of_sec 0.2) agent
   in
   let composer =
     Composer_runner.create
@@ -202,6 +197,7 @@ let with_acp ?(approval : Approval_mode.t option) ~peer f =
       ~interrupt_grace:(Time_float.Span.of_sec 0.5)
       ()
   in
+  let acp = agent in
   let agent =
     Agent.create
       ~env:t.env
@@ -214,7 +210,7 @@ let with_acp ?(approval : Approval_mode.t option) ~peer f =
       ~cwd:t.dir
       ()
   in
-  Agent.set_engine agent { engine = Composer; adapter = Some (Acp "opencode") };
+  Agent.set_engine agent { engine = Composer; adapter = Some (Acp acp.name) };
   Option.iter approval ~f:(fun approval -> Agent.set_mode agent ~approval);
   Agent.subscribe agent ~f:print_event;
   f agent composer;
@@ -413,7 +409,7 @@ let%expect_test "not logged in" =
     spawn #1: opencode acp
     agent got initialize
     agent got session/new session=- mcp=[]
-    assistant (acp:opencode/default, (Error"OpenCode could not start: OpenCode is not logged in on this host: log in with opencode auth login (run `opencode` there)")): ""
+    assistant (acp:opencode/default, (Error"OpenCode is not logged in on this host: run `opencode auth login` there")): ""
     |}]
 ;;
 
@@ -427,7 +423,7 @@ let%expect_test "an agent on another ACP version is refused, saying why" =
     {|
     spawn #1: opencode acp
     agent got initialize
-    assistant (acp:opencode/default, (Error"OpenCode could not start: OpenCode speaks ACP version 2, and prigh speaks version 1: update prigh or OpenCode")): ""
+    assistant (acp:opencode/default, (Error"OpenCode speaks ACP version 2, and prigh speaks version 1: update prigh or OpenCode")): ""
     |}]
 ;;
 
@@ -522,7 +518,10 @@ let%expect_test "-adapters: ACP agents and prigh, and new sessions on them" =
     {|
     ((adapters (codex acp:opencode prigh)) (check (Ok ()))
      (opencode
-      (((name opencode) (display_name OpenCode) (command (opencode acp)))))
+      (((name opencode) (display_name OpenCode) (command (opencode acp))
+        (quirks
+         ((login ("opencode auth login")) (min_version ()) (prompt_usage Ignored)
+          (steer Between_turns) (xai_extensions false))))))
      (mine ()))
     |}];
   show "acp:mine=my-agent --acp --verbose,claude";
@@ -530,9 +529,15 @@ let%expect_test "-adapters: ACP agents and prigh, and new sessions on them" =
     {|
     ((adapters (acp:mine claude)) (check (Ok ()))
      (opencode
-      (((name opencode) (display_name OpenCode) (command (opencode acp)))))
+      (((name opencode) (display_name OpenCode) (command (opencode acp))
+        (quirks
+         ((login ("opencode auth login")) (min_version ()) (prompt_usage Ignored)
+          (steer Between_turns) (xai_extensions false))))))
      (mine
-      (((name mine) (display_name mine) (command (my-agent --acp --verbose))))))
+      (((name mine) (display_name mine) (command (my-agent --acp --verbose))
+        (quirks
+         ((login ()) (min_version ()) (prompt_usage Ignored)
+          (steer Between_turns) (xai_extensions false)))))))
     |}];
   show "acp:unheard-of";
   [%expect
@@ -542,7 +547,10 @@ let%expect_test "-adapters: ACP agents and prigh, and new sessions on them" =
       (Error
        "prigh does not know how to start the ACP agent unheard-of: give its command with -adapters acp:unheard-of=<command and args> (it knows opencode, gemini, antigravity, grok, goose)"))
      (opencode
-      (((name opencode) (display_name OpenCode) (command (opencode acp)))))
+      (((name opencode) (display_name OpenCode) (command (opencode acp))
+        (quirks
+         ((login ("opencode auth login")) (min_version ()) (prompt_usage Ignored)
+          (steer Between_turns) (xai_extensions false))))))
      (mine ()))
     |}];
   List.iter [ Adapter_id.Prigh; Acp "opencode"; Acp "mine" ] ~f:(fun id ->
@@ -704,4 +712,60 @@ let%expect_test "the frontends name the known ACP agents as prigh does" =
         if not (String.is_substring source ~substring:line)
         then printf "%s does not say: | %s\n" path line));
   [%expect {| |}]
+;;
+
+let%expect_test "an agent that exits before starting says why and what to do" =
+  let antigravity = Option.value_exn (Acp_agent.find_known "antigravity") in
+  let exits stderr =
+    with_acp ~agent:antigravity ~peer:(fun _ p ->
+      Line_transport.Peer.write_stderr p stderr;
+      Line_transport.Peer.exit p ~code:2)
+    @@ fun agent _ -> prompt agent "hi"
+  in
+  exits
+    "Error: unexpected argument \"acp\".\n\
+     Prompts are read only from -p/--print, -i/--prompt-interactive, or stdin, \
+     so this argument would have been ignored.\n";
+  [%expect
+    {|
+    spawn #1: agy acp
+    assistant (acp:antigravity/default, (Error"Antigravity exited before starting (code 2):\nError: unexpected argument \"acp\".\nPrompts are read only from -p/--print, -i/--prompt-interactive, or stdin, so this argument would have been ignored.\nUpdate Antigravity to 1.5.0 or later: older versions do not have `agy acp`.")): ""
+    |}];
+  exits "panic: no config\n";
+  [%expect
+    {|
+    spawn #1: agy acp
+    assistant (acp:antigravity/default, (Error"Antigravity exited before starting (code 2):\npanic: no config\nCheck Antigravity in Settings \226\134\146 Engines (/adapters).")): ""
+    |}]
+;;
+
+let%expect_test "versions and quirks of the known agents" =
+  List.iter
+    [ "1.4.12", "1.5.0"; "1.5.0", "1.5.0"; "v1.10.0", "1.5.0"; "dev", "1.5.0" ]
+    ~f:(fun (v, than) ->
+      printf "%s < %s: %b\n" v than (Acp_agent.older v ~than));
+  List.iter Acp_agent.known ~f:(fun (a : Acp_agent.t) ->
+    print_s [%sexp (a.name : string), (a.quirks : Acp_agent.Quirks.t)]);
+  [%expect
+    {|
+    1.4.12 < 1.5.0: true
+    1.5.0 < 1.5.0: false
+    v1.10.0 < 1.5.0: false
+    dev < 1.5.0: false
+    (opencode
+     ((login ("opencode auth login")) (min_version ()) (prompt_usage Ignored)
+      (steer Between_turns) (xai_extensions false)))
+    (gemini
+     ((login (gemini)) (min_version ()) (prompt_usage Ignored)
+      (steer Between_turns) (xai_extensions false)))
+    (antigravity
+     ((login ("agy acp --login")) (min_version (1.5.0)) (prompt_usage Gemini)
+      (steer Between_turns) (xai_extensions false)))
+    (grok
+     ((login ("grok login")) (min_version ()) (prompt_usage Ignored)
+      (steer Xai_interject) (xai_extensions true)))
+    (goose
+     ((login ("goose configure")) (min_version ()) (prompt_usage Ignored)
+      (steer Between_turns) (xai_extensions false)))
+    |}]
 ;;

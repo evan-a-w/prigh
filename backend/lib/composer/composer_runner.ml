@@ -635,8 +635,11 @@ and run_turn'
        recorder
        (Turn_end { turn_id = None; stop = Interrupted })
    | Some (Error e) ->
+     let why = Error.to_string_hum e in
      fail
-       (sprintf "%s could not start: %s" A.display_name (Error.to_string_hum e))
+       (if String.is_prefix why ~prefix:A.display_name
+        then why
+        else sprintf "%s could not start: %s" A.display_name why)
    | Some (Ok (Live ((module L), a))) ->
      (match input.kind with
       | Prompt -> before := capture t s ~which:"before"

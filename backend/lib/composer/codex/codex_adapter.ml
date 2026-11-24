@@ -200,7 +200,7 @@ let open_process ~sw ?interrupt_grace ?request_timeout transport ~cwd =
                          exit
                    }
              }));
-  let fail_with_exit e = Error.tag e ~tag:"Codex did not start" in
+  let fail_with_exit e = Adapter.Driver.start_failed driver e in
   let open Or_error.Let_syntax in
   let%bind init =
     Adapter.Driver.request

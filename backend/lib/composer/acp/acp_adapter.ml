@@ -118,9 +118,11 @@ end
 
 let not_logged_in (agent : Acp_agent.t) methods =
   let how =
-    match (methods : Codec.Auth_method.t list) with
-    | [] -> sprintf "run `%s` there and log in" (List.hd_exn agent.command)
-    | ms ->
+    match (methods : Codec.Auth_method.t list), agent.quirks.login with
+    | _, Some login -> sprintf "run `%s` there" login
+    | [], None ->
+      sprintf "run `%s` there and log in" (List.hd_exn agent.command)
+    | ms, None ->
       sprintf
         "log in with %s (run `%s` there)"
         (String.concat
@@ -273,7 +275,9 @@ let create
           | Initialized _ | Failed { kind = Initialize; _ } -> true
           | _ -> false)
         |> Result.map_error
-             ~f:(Error.tag ~tag:(agent.display_name ^ " did not start"))
+             ~f:
+               (Adapter.Driver.start_failed driver ~hint:(fun exit ->
+                  Acp_agent.start_hint agent ~stderr:exit.stderr_tail))
       in
       let%bind auth_methods =
         match init with
