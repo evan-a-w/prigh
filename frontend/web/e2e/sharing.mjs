@@ -30,6 +30,14 @@ const aliceConfig = join(home, ".prigh/namespaces/alice/.config/prigh");
 mkdirSync(aliceConfig, { recursive: true });
 const secret = "sk-alice-secret-key";
 writeFileSync(join(aliceConfig, "auth.json"), JSON.stringify({ deepseek: { type: "api_key", key: secret } }));
+// What ran on her key (today, UTC): hers and bob's, once she shares it.
+const today = new Date().toISOString().slice(0, 10);
+const ran = (requests, cost_usd) => ({ [today]: { requests, input: requests * 4000, output: requests * 300, cache_read: 0, cost_usd } });
+mkdirSync(join(home, ".prigh/namespaces/alice/.prigh"), { recursive: true });
+writeFileSync(
+  join(home, ".prigh/namespaces/alice/.prigh/account-usage.json"),
+  JSON.stringify({ "deepseek/main": { alice: ran(3, 0.42), bob: ran(2, 0.25) } }),
+);
 writeFileSync(join(dir, "script.json"), JSON.stringify([{ text: "noted" }]));
 
 const server = spawn(

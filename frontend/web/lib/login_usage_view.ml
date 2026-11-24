@@ -41,7 +41,7 @@ let periods (l : Logins.Login.t) =
       (div
          ~cls:
            "login-usage-periods grid grid-cols-3 gap-x-3 text-xs \
-            text-muted-foreground narrow:grid-cols-1 narrow:gap-y-1"
+            text-muted-foreground"
          [ cell "Today" u.today
          ; cell "7 days" u.last_7_days
          ; cell "30 days" u.last_30_days

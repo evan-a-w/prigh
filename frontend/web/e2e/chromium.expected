@@ -1047,6 +1047,12 @@ DeepSeek: DeepSeek API key
 API key, default.
 Share…
 Manage
+TODAY
+5 req 22k tok $0.67
+7 DAYS
+5 req 22k tok $0.67
+30 DAYS
+5 req 22k tok $0.67
 === chromium: sharing: 390x844: share with ===
 ok
 bob
@@ -1056,12 +1062,28 @@ DeepSeek: DeepSeek API key (from alice)
 API key, default, shared by alice.
 Hide
 Manage
+TODAY
+2 req 8.6k tok $0.25
+7 DAYS
+2 req 8.6k tok $0.25
+30 DAYS
+2 req 8.6k tok $0.25
 === chromium: sharing: 320x640: alice's logins ===
 ok
 DeepSeek: DeepSeek API key
 API key, default, shared with bob.
 Share…
 Manage
+TODAY
+5 req 22k tok $0.67
+7 DAYS
+5 req 22k tok $0.67
+30 DAYS
+5 req 22k tok $0.67
+You
+today 3 req 13k tok $0.42 · 30 days 3 req 13k tok $0.42
+bob
+today 2 req 8.6k tok $0.25 · 30 days 2 req 8.6k tok $0.25
 === chromium: sharing: 320x640: share with ===
 ok
 bob
