@@ -100,7 +100,7 @@ let opening (models : Llm.t list) ~current =
   { init with tab }
 ;;
 
-let rows t (models : Llm.t list) ~favourites =
+let rows ?current t (models : Llm.t list) ~favourites =
   match t.tab with
   | Favourites ->
     ( List.filter_map favourites ~f:(fun key ->
@@ -113,7 +113,21 @@ let rows t (models : Llm.t list) ~favourites =
     in
     if t.more
     then all, 0
-    else List.take all shown, Int.max 0 (List.length all - shown)
+    else (
+      let first = List.take all shown in
+      (* The session's model is in the list even when it is an old one. *)
+      let first =
+        match
+          List.find all ~f:(fun (l : Llm.t) ->
+            Option.equal String.equal current (Some l.key))
+        with
+        | Some l
+          when not
+                 (List.exists first ~f:(fun (f : Llm.t) ->
+                    String.equal f.key l.key)) -> first @ [ l ]
+        | _ -> first
+      in
+      first, Int.max 0 (List.length all - List.length first))
 ;;
 
 let set_tab t tab =
@@ -130,16 +144,29 @@ let step t models delta =
   set_tab t tabs.((i + delta) % n)
 ;;
 
+let makers = [ "claude"; "gpt"; "gemini"; "deepseek"; "grok" ]
+
 let short_name name =
+  let maker word =
+    List.mem makers (String.lowercase word) ~equal:String.equal
+  in
   match String.split name ~on:' ' with
-  | first :: (_ :: _ as rest) ->
+  | first :: (second :: _ as rest) ->
     (match String.lsplit2 first ~on:'-' with
-     | Some (_, suffix)
-       when (not (String.is_empty suffix)) && Char.is_digit suffix.[0] ->
+     | Some (family, suffix)
+       when maker family
+            && (not (String.is_empty suffix))
+            && Char.is_digit suffix.[0] ->
        String.concat ~sep:" " (suffix :: rest)
      | _ ->
-       (match rest with
-        | _ :: _ :: _ -> String.concat ~sep:" " rest
-        | _ -> name))
+       (* Only a maker's name goes, and only before a word: "Claude Opus
+          4.6" is "Opus 4.6", "Gemini 3.8 Flash" stays. *)
+       if
+         maker first
+         && List.length rest >= 2
+         && (not (String.is_empty second))
+         && Char.is_alpha second.[0]
+       then String.concat ~sep:" " rest
+       else name)
   | _ -> name
 ;;

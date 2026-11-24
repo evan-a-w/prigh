@@ -271,6 +271,8 @@ try {
   const claudeRow = settings.locator(".adapter-status.adapter-claude");
   await codexRow.waitFor();
   await claudeRow.waitFor();
+  // Done checking: the button says Refresh again.
+  await page.waitForFunction(() => !document.querySelector(".settings-dialog .adapters-refresh")?.innerText.includes("Checking"));
   await settled(settings);
   section("Settings → Engines");
   console.log(clean(await settings.locator(".adapters-refresh").innerText()));
@@ -278,6 +280,32 @@ try {
   console.log(`copy: ${await claudeRow.locator("button").getAttribute("title")}`);
   await phoneAudit();
   await screenshot("settings engines");
+
+  // 6. Switching engine from the model menu: it keeps its place and size,
+  // whatever the chip now says and however many models the engine has.
+  await page.keyboard.press("Escape");
+  await settings.waitFor({ state: "detached" });
+  await tap(model);
+  await page.locator(".model-list .model-row").first().waitFor();
+  await settled(page.locator("#chip-popover"));
+  const box = () => page.locator("#chip-popover").evaluate(e => {
+    const r = e.getBoundingClientRect();
+    return [r.left, r.top, r.width, r.height].map(Math.round).join(",");
+  });
+  const switchTo = async (name) => {
+    await tap(engineButton);
+    await tap(engineMenu.locator(".model-access-item", { hasText: name }));
+    await page.waitForFunction(n => document.querySelector(".model-engine .model-access-button")?.getAttribute("aria-label") === `Engine: ${n}`, name);
+    await page.locator(".model-list .model-row").first().waitFor();
+    await settled(page.locator("#chip-popover"));
+  };
+  const before = await box();
+  await switchTo("prigh harness");
+  section("the model menu on another engine");
+  console.log(`held: ${(await box()) === before}`);
+  await screenshot("model menu harness");
+  await switchTo("Codex");
+  console.log(`held, back on Codex: ${(await box()) === before}`);
 } catch (e) {
   console.log(`failed: ${e.message.split("\n")[0]}`);
   await screenshot("failed");

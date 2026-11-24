@@ -313,3 +313,66 @@ let%expect_test "the ring opens its card; Esc closes it" =
     <div class="context-ring-anchor flex relative shrink-0">
     |}]
 ;;
+
+let%expect_test "the session's model is listed even when it is an old one" =
+  let h = many () in
+  H.event
+    h
+    (sprintf
+       {|{"event":"state","state":%s}|}
+       (H.state_json
+          ~fields:
+            [ ( "model"
+              , Jsonaf.of_string
+                  (H.model_json
+                     ~provider:"anthropic"
+                     ~id:"claude-opus-4-1"
+                     ~name:"Claude Opus 4.1"
+                     ()) )
+            ]
+          ()));
+  H.key h "l" ~ctrl:true;
+  menu h;
+  [%expect
+    {|
+    (Open_chip Model)
+    (Focus popover-filter)
+    Place_popover
+    <button class="model-rail-tab on">
+    Claude Opus 5.5 Alt+1 (Star: into the favourites (Alt+F))
+    Claude Sonnet 5 Alt+2 (Star: into the favourites (Alt+F))
+    Claude Haiku 5 Alt+3 (Star: into the favourites (Alt+F))
+    Claude Opus 5 Alt+4 (Star: into the favourites (Alt+F))
+    Claude Sonnet 4.5 Alt+5 (Star: into the favourites (Alt+F))
+    Claude Haiku 4.5 Alt+6 (Star: into the favourites (Alt+F))
+    Claude Opus 4.1 Alt+7 (Star: into the favourites (Alt+F)) ✓
+    |}]
+;;
+
+let%expect_test "short names: only a maker's name goes" =
+  List.iter
+    [ "Claude Opus 4.6"
+    ; "Claude Opus 4.6 (Thinking)"
+    ; "GPT-6.2 Sol"
+    ; "GPT-6.2-Sol"
+    ; "GPT-OSS 120B (Medium)"
+    ; "Gemini 3.8 Flash"
+    ; "Opus 5.5 (1M context)"
+    ; "DeepSeek V4 Pro"
+    ; "Default"
+    ]
+    ~f:(fun name ->
+      printf "%s -> %s\n" name (Prigh_web.Model_menu.short_name name));
+  [%expect
+    {|
+    Claude Opus 4.6 -> Opus 4.6
+    Claude Opus 4.6 (Thinking) -> Opus 4.6 (Thinking)
+    GPT-6.2 Sol -> 6.2 Sol
+    GPT-6.2-Sol -> GPT-6.2-Sol
+    GPT-OSS 120B (Medium) -> GPT-OSS 120B (Medium)
+    Gemini 3.8 Flash -> Gemini 3.8 Flash
+    Opus 5.5 (1M context) -> Opus 5.5 (1M context)
+    DeepSeek V4 Pro -> V4 Pro
+    Default -> Default
+    |}]
+;;

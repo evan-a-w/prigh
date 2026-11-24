@@ -426,7 +426,7 @@ let%expect_test
     Gemini 3.8 Flash Alt+1 (Star: into the favourites (Alt+F)) ✓
     GPT-OSS 120B (Medium) Alt+2 (Star: into the favourites (Alt+F))
     Claude Sonnet 4.6 (Thinking) Alt+3 (Star: into the favourites (Alt+F))
-    Reasoning 3.8 Flash
+    Reasoning Gemini 3.8 Flash
     Antigravity chooses how much it reasons.
     Close_dialog
     |}];

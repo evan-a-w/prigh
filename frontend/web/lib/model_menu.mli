@@ -49,15 +49,20 @@ val opening : Llm.t list -> current:string option -> t
 
 (** The rows of the tab (favourites in the order they were starred, a
     provider's newest first, cut to {!shown} unless [more]), and how many
-    "Show more" adds. *)
-val rows : t -> Llm.t list -> favourites:string list -> Llm.t list * int
+    "Show more" adds; the [current] model is always among them. *)
+val rows
+  :  ?current:string
+  -> t
+  -> Llm.t list
+  -> favourites:string list
+  -> Llm.t list * int
 
 (** The next tab along the rail, wrapping. *)
 val step : t -> Llm.t list -> int -> t
 
 val set_tab : t -> Tab.t -> t
 
-(** Short for the composer's chip: the family goes ("GPT-6.2 Sol" is "6.2
-    Sol", "Claude Opus 5.5" "Opus 5.5"); names of two words or fewer stay
-    whole. *)
+(** Short for the composer's chip: a maker's name goes ("GPT-6.2 Sol" is
+    "6.2 Sol", "Claude Opus 5.5" "Opus 5.5"); others stay whole ("GPT-OSS
+    120B (Medium)", "Gemini 3.8 Flash"). *)
 val short_name : string -> string

@@ -5193,6 +5193,9 @@ Agent CLIs Checked on each connected tool host when you open this page, when a h
 Codex 0.166.0 · <BIN>/codex Logged in · ChatGPT
 Claude Code Not on the tool host's PATH Not installed Claude Code is not installed on server-laptop, please install it Copy
 copy: Copy what to do: Claude Code is not installed on server-laptop, please install it
+=== firefox: engines (desktop): the model menu on another engine ===
+held: true
+held, back on Codex: true
 === firefox: engines (desktop): errors ===
 none
 === firefox: engines (phone): the new-session engine chip ===
@@ -5229,6 +5232,9 @@ Codex 0.166.0 · <BIN>/codex Logged in · ChatGPT
 Claude Code Not on the tool host's PATH Not installed Claude Code is not installed on server-laptop, please install it Copy
 copy: Copy what to do: Claude Code is not installed on server-laptop, please install it
 phone: ok
+=== firefox: engines (phone): the model menu on another engine ===
+held: true
+held, back on Codex: true
 === firefox: engines (phone): errors ===
 none
 === firefox: engines (small): the new-session engine chip ===
@@ -5265,6 +5271,9 @@ Codex 0.166.0 · <BIN>/codex Logged in · ChatGPT
 Claude Code Not on the tool host's PATH Not installed Claude Code is not installed on server-laptop, please install it Copy
 copy: Copy what to do: Claude Code is not installed on server-laptop, please install it
 phone: ok
+=== firefox: engines (small): the model menu on another engine ===
+held: true
+held, back on Codex: true
 === firefox: engines (small): errors ===
 none
 === firefox: smoke: sign in ===

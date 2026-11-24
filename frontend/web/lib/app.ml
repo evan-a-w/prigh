@@ -4033,7 +4033,11 @@ let model_menu_picker ?(query = "") (m : Model.t) =
   if String.is_empty query
   then (
     let rows, more =
-      Model_menu.rows m.model_menu offered ~favourites:m.favourite_models
+      Model_menu.rows
+        ?current
+        m.model_menu
+        offered
+        ~favourites:m.favourite_models
     in
     Picker.create
       ~title:"Model"
