@@ -7157,7 +7157,10 @@ let accounts_command (m : Model.t) rest =
      | Error e, _ -> error m (String.capitalize e)
      | Ok _, [] -> error m "No other users on this server to share with."
      | Ok l, users ->
-       logins_picker m ~title:(Logins.share_title l) (Logins.share_rows_for l users))
+       logins_picker
+         m
+         ~title:(Logins.share_title l)
+         (Logins.share_rows_for l users))
   | Pick query ->
     if List.is_empty (Logins.all m.auth)
     then error m "No logins yet: /login signs in to a provider."
@@ -8986,8 +8989,7 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
   (* Subagents from before the backend restarted are gone: the report stays. *)
   | ( ( Ignore | Paths _
       | Auth_status Refresh
-      | Share_targets
-      | Subagent _ | Subagents | Jobs | Config | Prompt_paths _
+      | Share_targets | Subagent _ | Subagents | Jobs | Config | Prompt_paths _
       | Users Probe )
     , Error _ ) -> m, []
   | Btw id, Error e -> update_btw m id ~f:(fun b -> Btw.fail b e), []
@@ -9694,19 +9696,19 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
       in
       let m, cmds =
         match purpose with
-      | Refresh ->
-        (match m.dialog with
-         | Some (Auth _) -> { m with dialog = Some (Auth auth) }, []
-         | _ -> m, [])
-      | Show -> open_dialog m (Auth auth)
-      | Login_picker -> open_picker m (login_picker auth ~forges:m.forges)
-      | Logout_picker ->
-        (match logout_picker auth ~forges:m.forges with
-         | Some dialog -> open_picker m dialog
-         | None ->
-           toast
-             m
-             "No provider or git host is logged in: /login logs in to one.")
+        | Refresh ->
+          (match m.dialog with
+           | Some (Auth _) -> { m with dialog = Some (Auth auth) }, []
+           | _ -> m, [])
+        | Show -> open_dialog m (Auth auth)
+        | Login_picker -> open_picker m (login_picker auth ~forges:m.forges)
+        | Logout_picker ->
+          (match logout_picker auth ~forges:m.forges with
+           | Some dialog -> open_picker m dialog
+           | None ->
+             toast
+               m
+               "No provider or git host is logged in: /login logs in to one.")
       in
       m, cmds @ targets)
   | Share_targets, Ok json ->

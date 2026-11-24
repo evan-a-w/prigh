@@ -1196,11 +1196,7 @@ let accounts_command m (cmd : Commands.Parsed.t) =
   | Share { account; user = "" } ->
     (match Provider_logins.shareable m.auth account with
      | Ok l ->
-       ( m
-       , [ rpc
-             "account_share_targets"
-             ~tag:(Share_targets l.account.ref_)
-         ] )
+       m, [ rpc "account_share_targets" ~tag:(Share_targets l.account.ref_) ]
      | Error e -> error (restore_command m command) e, [])
   | Pick query ->
     if List.is_empty (Provider_logins.all m.auth)
@@ -2500,7 +2496,9 @@ let format_auth m : Content.t =
        List.map s.accounts ~f:(fun account ->
          let l = { Provider_logins.Login.provider = s; account } in
          [ { Content.Span.text =
-               String.make (width + 2) ' ' ^ "@ " ^ Provider_logins.label account
+               String.make (width + 2) ' '
+               ^ "@ "
+               ^ Provider_logins.label account
            ; style = Style.plain
            }
          ; { text = sprintf "  %s  %s" (Provider_logins.detail l) account.ref_
