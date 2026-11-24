@@ -926,8 +926,16 @@ let%expect_test
     P.text p "ses_1" "Changed it.";
     exit_plan p ~id:"p2" "1. Fix\n2. Test\n3. Document";
     P.answer p;
+    (* Approved, it leaves plan mode itself: prigh does not put it back. *)
+    P.update
+      p
+      "ses_1"
+      {|{"sessionUpdate":"current_mode_update","currentModeId":"build"}|};
     P.text p "ses_1" "Done.";
-    P.result p prompt {|{"stopReason":"end_turn"}|})
+    P.result p prompt {|{"stopReason":"end_turn"}|};
+    let again = P.expect p "session/prompt" in
+    P.text p "ses_1" "Built.";
+    P.result p again {|{"stopReason":"end_turn"}|})
   @@ fun agent _ ->
   let answers = Queue.of_list [ "Keep planning"; "Start working" ] in
   Agent.subscribe agent ~f:(function
@@ -945,6 +953,7 @@ let%expect_test
     | _ -> ());
   Agent.set_mode agent ~plan:true;
   prompt agent "plan it";
+  prompt agent "now build";
   [%expect
     {|
     spawn #1: grok agent stdio
@@ -964,5 +973,7 @@ let%expect_test
     3. Document
     agent got answer {"outcome":"approved"}
     assistant (acp:grok/default, End_turn): "Changed it.Done."
+    agent got session/prompt "now build"
+    assistant (acp:grok/default, End_turn): "Built."
     |}]
 ;;

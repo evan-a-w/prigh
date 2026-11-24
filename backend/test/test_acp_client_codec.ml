@@ -673,14 +673,11 @@ let%expect_test "Antigravity: steering with another prompt, and its usage" =
     (Turn_started (turn_id turn-1))
       > {"jsonrpc":"2.0","id":3,"method":"session/prompt","params":{"sessionId":"ses_1","prompt":[{"type":"text","text":"use tabs"}]}}
     < {"jsonrpc":"2.0","id":2,"result":{"stopReason":"end_turn","usage":{"inputTokens":100,"cachedReadTokens":900,"outputTokens":50,"thoughtTokens":20,"totalTokens":1050}}}
-    (Usage
-     ((usage ((input 1000) (output 50) (cache_read 900))) (cost_usd ())
-      (context_tokens ()) (context_window ())))
     < {"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"ses_1","update":{"sessionUpdate":"agent_message_chunk","content":{"type":"text","text":"Tabs it is."}}}}
     (Text_delta (item turn-1-m1) (text "Tabs it is."))
     < {"jsonrpc":"2.0","id":3,"result":{"stopReason":"end_turn","usage":{"inputTokens":10,"cachedReadTokens":1000,"outputTokens":5}}}
     (Usage
-     ((usage ((input 1010) (output 5) (cache_read 1000))) (cost_usd ())
+     ((usage ((input 1010) (output 50) (cache_read 1000))) (cost_usd ())
       (context_tokens ()) (context_window ())))
     (Text_done (item turn-1-m1) (text "Tabs it is."))
     (Turn_end (turn_id (turn-1)) (stop Done))
@@ -781,5 +778,124 @@ let%expect_test "x.ai methods are only Grok's" =
     {|
     < {"jsonrpc":"2.0","id":"q1","method":"x.ai/ask_user_question","params":{"sessionId":"ses_1","questions":[]}}
       > {"jsonrpc":"2.0","id":"q1","error":{"code":-32601,"message":"method not found: x.ai/ask_user_question (this client does not offer it)"}}
+    |}]
+;;
+
+let%expect_test "Grok: questions after a stop or outside a turn; typed answers" =
+  let t = started ~quirks:(quirks "grok") () in
+  ignore ([%expect.output] : string);
+  let ask id =
+    recv
+      t
+      (sprintf
+         {|{"jsonrpc":"2.0","id":"%s","method":"x.ai/ask_user_question","params":{"sessionId":"ses_1","questions":[{"question":"Which file?","options":[{"label":"a.ml"}]},{"question":"Why?","options":[]},{"question":"","options":[]}]}}|}
+         id)
+  in
+  (* outside a turn: cancelled at once *)
+  ask "q0";
+  ok (C.prompt t [ Text "fix it" ]);
+  ask "q1";
+  print_s
+    [%sexp
+      (C.answer
+         t
+         ~request_id:"q1"
+         (Answered [ [ "a.ml"; "and c.ml" ]; [ "because" ]; [ "x" ] ])
+       : string option)];
+  ask "q2";
+  (* stopping answers it, and one asked while stopping is cancelled *)
+  ok (Ok (C.cancel t));
+  ask "q3";
+  [%expect
+    {|
+    < {"jsonrpc":"2.0","id":"q0","method":"x.ai/ask_user_question","params":{"sessionId":"ses_1","questions":[{"question":"Which file?","options":[{"label":"a.ml"}]},{"question":"Why?","options":[]},{"question":"","options":[]}]}}
+      > {"jsonrpc":"2.0","id":"q0","result":{"outcome":"cancelled"}}
+      > {"jsonrpc":"2.0","id":2,"method":"session/prompt","params":{"sessionId":"ses_1","prompt":[{"type":"text","text":"fix it"}]}}
+    (Turn_started (turn_id turn-1))
+    < {"jsonrpc":"2.0","id":"q1","method":"x.ai/ask_user_question","params":{"sessionId":"ses_1","questions":[{"question":"Which file?","options":[{"label":"a.ml"}]},{"question":"Why?","options":[]},{"question":"","options":[]}]}}
+    (User_question (request_id q1)
+     (questions
+      (((question "Which file?") (header ())
+        (choices (((label a.ml) (description ())))) (multiple false))
+       ((question Why?) (header ()) (choices ()) (multiple false))
+       ((question "") (header ()) (choices ()) (multiple false)))))
+    ("{\"jsonrpc\":\"2.0\",\"id\":\"q1\",\"result\":{\"outcome\":\"accepted\",\"answers\":{\"Which file?\":[\"a.ml\"],\"Why?\":[\"Other\"]},\"annotations\":{\"Which file?\":{\"notes\":\"and c.ml\"},\"Why?\":{\"notes\":\"because\"}}}}")
+    < {"jsonrpc":"2.0","id":"q2","method":"x.ai/ask_user_question","params":{"sessionId":"ses_1","questions":[{"question":"Which file?","options":[{"label":"a.ml"}]},{"question":"Why?","options":[]},{"question":"","options":[]}]}}
+    (User_question (request_id q2)
+     (questions
+      (((question "Which file?") (header ())
+        (choices (((label a.ml) (description ())))) (multiple false))
+       ((question Why?) (header ()) (choices ()) (multiple false))
+       ((question "") (header ()) (choices ()) (multiple false)))))
+      > {"jsonrpc":"2.0","method":"session/cancel","params":{"sessionId":"ses_1"}}
+      > {"jsonrpc":"2.0","id":"q2","result":{"outcome":"cancelled"}}
+    (Request_withdrawn (request_id q2))
+    < {"jsonrpc":"2.0","id":"q3","method":"x.ai/ask_user_question","params":{"sessionId":"ses_1","questions":[{"question":"Which file?","options":[{"label":"a.ml"}]},{"question":"Why?","options":[]},{"question":"","options":[]}]}}
+      > {"jsonrpc":"2.0","id":"q3","result":{"outcome":"cancelled"}}
+    |}]
+;;
+
+let%expect_test "a message for the running turn that the agent refuses" =
+  let check name =
+    let t = started ~quirks:(quirks name) () in
+    ignore ([%expect.output] : string);
+    ok (C.prompt t [ Text "go" ]);
+    ok (C.steer t [ Text "also this" ]);
+    recv t {|{"jsonrpc":"2.0","id":3,"error":{"code":-32603,"message":"busy"}}|};
+    recv t {|{"jsonrpc":"2.0","id":2,"result":{"stopReason":"end_turn"}}|}
+  in
+  check "antigravity";
+  [%expect
+    {|
+      > {"jsonrpc":"2.0","id":2,"method":"session/prompt","params":{"sessionId":"ses_1","prompt":[{"type":"text","text":"go"}]}}
+    (Turn_started (turn_id turn-1))
+      > {"jsonrpc":"2.0","id":3,"method":"session/prompt","params":{"sessionId":"ses_1","prompt":[{"type":"text","text":"also this"}]}}
+    < {"jsonrpc":"2.0","id":3,"error":{"code":-32603,"message":"busy"}}
+    (Notice
+     "the agent did not take your message sent during its turn (busy): it never saw it, so send it again once this turn ends")
+    < {"jsonrpc":"2.0","id":2,"result":{"stopReason":"end_turn"}}
+    (Turn_end (turn_id (turn-1)) (stop Done))
+    |}];
+  check "grok";
+  [%expect
+    {|
+      > {"jsonrpc":"2.0","id":2,"method":"session/prompt","params":{"sessionId":"ses_1","prompt":[{"type":"text","text":"go"}]}}
+    (Turn_started (turn_id turn-1))
+      > {"jsonrpc":"2.0","id":3,"method":"_x.ai/interject","params":{"sessionId":"ses_1","text":"also this"}}
+    < {"jsonrpc":"2.0","id":3,"error":{"code":-32603,"message":"busy"}}
+    (Notice
+     "the agent did not take your message sent during its turn (busy): it never saw it, so send it again once this turn ends")
+    < {"jsonrpc":"2.0","id":2,"result":{"stopReason":"end_turn"}}
+    (Turn_end (turn_id (turn-1)) (stop Done))
+    |}]
+;;
+
+let%expect_test "the agent changes its model itself" =
+  let t = C.create () in
+  send (C.initialize t ~client_name:"prigh" ~client_version:"0.1");
+  recv t init_response;
+  send (C.new_session t ~cwd:"/work" ~mcp_servers:[]);
+  recv
+    t
+    {|{"jsonrpc":"2.0","id":1,"result":{"sessionId":"ses_1","models":{"currentModelId":"flash","availableModels":[{"modelId":"flash","name":"Flash"},{"modelId":"pro","name":"Pro"}]}}}|};
+  ignore ([%expect.output] : string);
+  recv
+    t
+    {|{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"ses_1","update":{"sessionUpdate":"current_model_update","currentModelId":"pro"}}}|};
+  ok_line (C.set_config_option t ~config_id:"prigh:session-model" (`Id "flash"));
+  [%expect
+    {|
+    < {"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"ses_1","update":{"sessionUpdate":"current_model_update","currentModelId":"pro"}}}
+    (Config_changed
+     ((current_mode ()) (modes ())
+      (config_options
+       (((id prigh:session-model) (name Model) (description ())
+         (category (model))
+         (value
+          (Select (current pro)
+           (choices
+            (((value flash) (name Flash) (description ()) (group ()))
+             ((value pro) (name Pro) (description ()) (group ())))))))))))
+    > {"jsonrpc":"2.0","id":2,"method":"session/set_model","params":{"sessionId":"ses_1","modelId":"flash"}}
     |}]
 ;;

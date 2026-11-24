@@ -36,7 +36,9 @@ type t =
   ; mutable before_plan : string option (* the mode plan mode replaced *)
   ; mutable model : string option (* the model last set *)
   ; mutable agent_default : string option (* its model before we set one *)
-  ; mutable thought : string option (* the thought level last set *)
+  ; mutable plan : bool option
+    (* prigh's plan mode as last applied: the agent may leave plan mode
+       itself (Grok, its plan approved) and is not put back *)
   }
 
 let mcp_server (name, json) : Codec.Mcp_server.t option =
@@ -256,7 +258,7 @@ let create
         ; before_plan = None
         ; model = None
         ; agent_default = None
-        ; thought = None
+        ; plan = None
         }
       in
       Adapter.Driver.run
@@ -274,6 +276,13 @@ let create
                ~stderr_tail:exit.stderr_tail)
             ~f:(dispatch t));
       let open Or_error.Let_syntax in
+      let starting r =
+        Result.map_error
+          r
+          ~f:
+            (Adapter.Driver.start_failed driver ~hint:(fun exit ->
+               Acp_agent.start_hint agent ~stderr:exit.stderr_tail))
+      in
       let%bind init =
         Adapter.Driver.request
           driver
@@ -284,10 +293,7 @@ let create
           ~matches:(function
           | Initialized _ | Failed { kind = Initialize; _ } -> true
           | _ -> false)
-        |> Result.map_error
-             ~f:
-               (Adapter.Driver.start_failed driver ~hint:(fun exit ->
-                  Acp_agent.start_hint agent ~stderr:exit.stderr_tail))
+        |> starting
       in
       let%bind auth_methods =
         match init with
@@ -320,29 +326,34 @@ let create
           | _ -> false)
       in
       let%bind opened =
-        match start.resume with
-        | Some session_id when (not start.fork) && can_resume ->
-          Adapter.Driver.request
-            driver
-            (Codec.resume_session codec ~session_id ~cwd:start.cwd ~mcp_servers)
-            ~matches:(function
-            | Session_opened { kind = Resume_session; _ }
-            | Failed { kind = Resume_session; _ } -> true
-            | _ -> false)
-        | Some session_id when (not start.fork) && can_load ->
-          load
-            t
-            (Codec.load_session codec ~session_id ~cwd:start.cwd ~mcp_servers)
-            ~session_id
-        | Some _ ->
-          Adapter.Driver.push
-            driver
-            (Notice
-               (sprintf
-                  "%s can't continue its earlier session: it starts a new one"
-                  agent.display_name));
-          fresh ()
-        | None -> fresh ()
+        (match start.resume with
+         | Some session_id when (not start.fork) && can_resume ->
+           Adapter.Driver.request
+             driver
+             (Codec.resume_session
+                codec
+                ~session_id
+                ~cwd:start.cwd
+                ~mcp_servers)
+             ~matches:(function
+             | Session_opened { kind = Resume_session; _ }
+             | Failed { kind = Resume_session; _ } -> true
+             | _ -> false)
+         | Some session_id when (not start.fork) && can_load ->
+           load
+             t
+             (Codec.load_session codec ~session_id ~cwd:start.cwd ~mcp_servers)
+             ~session_id
+         | Some _ ->
+           Adapter.Driver.push
+             driver
+             (Notice
+                (sprintf
+                   "%s can't continue its earlier session: it starts a new one"
+                   agent.display_name));
+           fresh ()
+         | None -> fresh ())
+        |> starting
       in
       let%map () =
         match opened with
@@ -389,8 +400,10 @@ let create
         | Some current, Some plan -> String.equal current plan
         | _ -> false
       in
+      let plan_changed = not (Option.equal Bool.equal t.plan (Some s.plan)) in
       let%bind () =
         match plan_id with
+        | _ when not plan_changed -> Ok ()
         | Some plan when s.plan && not in_plan ->
           t.before_plan <- config.current_mode;
           set_mode t plan
@@ -407,6 +420,7 @@ let create
            | None -> Ok ())
         | _ -> Ok ()
       in
+      t.plan <- Some s.plan;
       let set_option ~what (option : Codec.Config_option.t) value =
         match
           Codec.set_config_option t.codec ~config_id:option.id (`Id value)
@@ -434,14 +448,12 @@ let create
                     choices
                     ~f:(fun (c : Codec.Config_option.Choice.t) ->
                       String.equal c.value model) ->
-          t.model <- Some model;
-          set_option ~what:"the model" option model
+          let%map () = set_option ~what:"the model" option model in
+          t.model <- Some model
         | _ -> Ok ()
       in
       match Thought.choice (Codec.session_config t.codec) s.thinking with
-      | Some (option, value)
-        when not (Option.equal String.equal t.thought (Some value)) ->
-        t.thought <- Some value;
+      | Some (option, value) ->
         set_option ~what:"the thinking level" option value
       | _ -> Ok ()
     ;;

@@ -233,7 +233,9 @@ module Pending = struct
     | Prompt
     | Steer (* a message for the running turn *)
     | Set_mode of string
-    | Set_config_option
+    | Set_config_option of string * Config_option.Value.t
+      (* the option, the value asked for: an answer without the options
+         means it took it *)
     | Set_model of string
 
   let kind : t -> Request_kind.t = function
@@ -243,7 +245,7 @@ module Pending = struct
     | Resume_session _ -> Resume_session
     | Prompt | Steer -> Prompt
     | Set_mode _ -> Set_mode
-    | Set_config_option | Set_model _ -> Set_config_option
+    | Set_config_option _ | Set_model _ -> Set_config_option
   ;;
 end
 
@@ -287,6 +289,10 @@ module Turn = struct
     ; mutable thought : Open_item.t option
     ; mutable items : int
     ; mutable prompts : int (* session/prompt requests unanswered *)
+    ; mutable usage : Usage.t option
+      (* the counts its answers gave so far: whether an agent counts each
+         prompt or the whole turn is unknown, so the turn reports the most
+         of each *)
     }
 end
 
@@ -441,21 +447,20 @@ let content_block : Input.t -> Json.t = function
       ]
 ;;
 
+let refuses_images t inputs =
+  List.exists inputs ~f:(function
+    | Input.Image _ -> true
+    | Text _ -> false)
+  && not (Option.value_map t.capabilities ~default:false ~f:(fun c -> c.images))
+;;
+
 let prompt t inputs =
   match t.session_id, t.turn with
   | None, _ -> Or_error.error_string "no ACP session yet"
   | Some _, Some turn ->
     Or_error.error_s [%message "a turn is already running" ~turn:turn.id]
   | Some session_id, None ->
-    let has_image =
-      List.exists inputs ~f:(function
-        | Input.Image _ -> true
-        | Text _ -> false)
-    in
-    let images =
-      Option.value_map t.capabilities ~default:false ~f:(fun c -> c.images)
-    in
-    if has_image && not images
+    if refuses_images t inputs
     then Or_error.error_string "this agent does not take images"
     else (
       t.turns <- t.turns + 1;
@@ -466,6 +471,7 @@ let prompt t inputs =
         ; thought = None
         ; items = 0
         ; prompts = 1
+        ; usage = None
         }
       in
       t.turn <- Some turn;
@@ -489,6 +495,8 @@ let steer t inputs =
   | None, _, _ | _, None, _ -> Or_error.error_string "no turn is running"
   | Some _, Some { cancelled = true; _ }, _ ->
     Or_error.error_string "the turn is being stopped"
+  | Some _, Some _, _ when refuses_images t inputs ->
+    Or_error.error_string "this agent does not take images"
   | Some session_id, Some turn, Prompt ->
     turn.prompts <- turn.prompts + 1;
     Ok
@@ -540,19 +548,42 @@ let prompt_usage t result =
       Option.value (Option.bind (field name usage) ~f:Json.int) ~default:0
     in
     let cache_read = int "cachedReadTokens" in
+    Some
+      { Usage.input = int "inputTokens" + cache_read
+      ; output = int "outputTokens"
+      ; cache_read
+      }
+  | (Ignored | Gemini), _ -> None
+;;
+
+(* Keeps an answer's counts with its turn's. *)
+let note_usage t result =
+  match t.turn, prompt_usage t result with
+  | Some turn, Some (u : Usage.t) ->
+    turn.usage
+    <- Some
+         (match turn.usage with
+          | None -> u
+          | Some (o : Usage.t) ->
+            { input = Int.max o.input u.input
+            ; output = Int.max o.output u.output
+            ; cache_read = Int.max o.cache_read u.cache_read
+            })
+  | _ -> ()
+;;
+
+let turn_usage t =
+  match Option.bind t.turn ~f:(fun turn -> turn.usage) with
+  | Some usage ->
     [ Output.Event
         (Usage
-           { usage =
-               { input = int "inputTokens" + cache_read
-               ; output = int "outputTokens"
-               ; cache_read
-               }
+           { usage
            ; cost_usd = None
            ; context_tokens = None
            ; context_window = None
            })
     ]
-  | (Ignored | Gemini), _ -> []
+  | None -> []
 ;;
 
 let cancelled_outcome =
@@ -587,15 +618,30 @@ let withdraw_permissions t ~reply =
       @ [ Event (Request_withdrawn { request_id }) ])
 ;;
 
+let question_cancelled = `Object [ "outcome", `String "cancelled" ]
+
+(* Grok's questions still waiting, answered as cancelled. *)
+let withdraw_questions t =
+  let waiting = Hashtbl.to_alist t.questions in
+  Hashtbl.clear t.questions;
+  List.concat_map
+    (List.sort waiting ~compare:(fun (a, _) (b, _) -> String.compare a b))
+    ~f:(fun (request_id, (id, _)) ->
+      [ Output.Send (result_line id question_cancelled)
+      ; Event (Request_withdrawn { request_id })
+      ])
+;;
+
 let cancel t =
   match t.turn, t.session_id with
   | Some turn, Some session_id when not turn.cancelled ->
     turn.cancelled <- true;
-    Output.Send
-      (notification
-         "session/cancel"
-         (`Object [ "sessionId", `String session_id ]))
-    :: withdraw_permissions t ~reply:true
+    (Output.Send
+       (notification
+          "session/cancel"
+          (`Object [ "sessionId", `String session_id ]))
+     :: withdraw_permissions t ~reply:true)
+    @ withdraw_questions t
   | _ -> []
 ;;
 
@@ -652,12 +698,16 @@ let set_config_option t ~config_id value =
           match option.value, value with
           | Boolean _, `Bool b ->
             Ok
-              [ "type", `String "boolean"
-              ; ("value", if b then `True else `False)
-              ]
+              ( Config_option.Value.Boolean b
+              , [ "type", `String "boolean"
+                ; ("value", if b then `True else `False)
+                ] )
           | Select { choices; _ }, `Id id ->
             if List.exists choices ~f:(fun c -> String.equal c.value id)
-            then Ok [ "value", `String id ]
+            then
+              Ok
+                ( Config_option.Value.Select { current = id; choices }
+                , [ "value", `String id ] )
             else
               Or_error.error_s
                 [%message
@@ -673,10 +723,10 @@ let set_config_option t ~config_id value =
             Or_error.error_s
               [%message "the option takes one of its choices" config_id]
         in
-        Or_error.map value_fields ~f:(fun value_fields ->
+        Or_error.map value_fields ~f:(fun (asked, value_fields) ->
           request
             t
-            Set_config_option
+            (Set_config_option (config_id, asked))
             "session/set_config_option"
             (`Object
                 ([ "sessionId", `String session_id
@@ -1331,17 +1381,7 @@ let end_turn t (stop : Adapter_event.Stop.t) =
     let closed = close_items t in
     let settled = settle_tools t in
     let withdrawn = withdraw_permissions t ~reply:false in
-    let unasked =
-      Hashtbl.fold
-        t.questions
-        ~init:[]
-        ~f:(fun ~key:request_id ~data:(id, _) acc ->
-          Output.Send
-            (result_line id (`Object [ "outcome", `String "cancelled" ]))
-          :: Event (Request_withdrawn { request_id })
-          :: acc)
-    in
-    Hashtbl.clear t.questions;
+    let unasked = withdraw_questions t in
     t.turn <- None;
     closed
     @ settled
@@ -1403,15 +1443,19 @@ let on_response t ~id ~result ~error =
        (match pending with
         | Load_session _ -> t.loading <- false
         | _ -> ());
+       let not_taken () =
+         [ Output.Event
+             (Notice
+                (sprintf
+                   "the agent did not take your message sent during its turn \
+                    (%s): it never saw it, so send it again once this turn \
+                    ends"
+                   message))
+         ]
+       in
        (match pending with
-        | Prompt when steered t ->
-          [ Output.Event
-              (Notice (sprintf "the agent did not take the message: %s" message))
-          ]
-        | Steer ->
-          [ Output.Event
-              (Notice (sprintf "the agent did not take the message: %s" message))
-          ]
+        | Prompt when steered t -> not_taken ()
+        | Steer -> not_taken ()
         | Prompt ->
           let cancelled =
             Option.value_map t.turn ~default:false ~f:(fun turn ->
@@ -1474,9 +1518,12 @@ let on_response t ~id ~result ~error =
              t.config <- config;
              [ Output.Response (Session_opened { kind; session_id; config }) ])
         | Steer -> []
-        | Prompt when steered t -> prompt_usage t result
+        | Prompt when steered t ->
+          note_usage t result;
+          []
         | Prompt ->
-          let usage = prompt_usage t result in
+          note_usage t result;
+          let usage = turn_usage t in
           let cancelled =
             Option.value_map t.turn ~default:false ~f:(fun turn ->
               turn.cancelled)
@@ -1499,11 +1546,19 @@ let on_response t ~id ~result ~error =
         | Set_mode mode_id ->
           t.config <- { t.config with current_mode = Some mode_id };
           [ Output.Response (Mode_set mode_id); Config_changed t.config ]
-        | Set_config_option ->
+        | Set_config_option (config_id, asked) ->
           let options = parse_config_options (items "configOptions" result) in
-          if not (List.is_empty options)
-          then
-            t.config <- { t.config with config_options = with_models t options };
+          t.config
+          <- { t.config with
+               config_options =
+                 (if List.is_empty options
+                  then
+                    List.map t.config.config_options ~f:(fun o ->
+                      if String.equal o.id config_id
+                      then { o with value = asked }
+                      else o)
+                  else with_models t options)
+             };
           [ Output.Response (Config_set options); Config_changed t.config ]
         | Set_model id ->
           set_current_model t id;
@@ -1599,10 +1654,14 @@ let on_xai t ~id name params =
   let params = xai_params params in
   match name, id with
   | "ask_user_question", Some id ->
-    let request_id = request_id_string id in
-    let questions = xai_questions params in
-    Hashtbl.set t.questions ~key:request_id ~data:(id, questions);
-    [ Output.Event (User_question { request_id; questions }) ]
+    (match t.turn with
+     | Some { cancelled = true; _ } | None ->
+       [ Output.Send (result_line id question_cancelled) ]
+     | Some _ ->
+       let request_id = request_id_string id in
+       let questions = xai_questions params in
+       Hashtbl.set t.questions ~key:request_id ~data:(id, questions);
+       [ Output.Event (User_question { request_id; questions }) ])
   | "exit_plan_mode", Some id ->
     let plan =
       match Option.map (str "planContent" params) ~f:String.strip with
@@ -1666,15 +1725,52 @@ let answer t ~request_id (reply : User_question.Reply.t) =
     let result =
       match reply with
       | Answered answers ->
-        let answers =
+        (* Keyed by the question's text, as Grok asks; what the user typed
+           rather than picked goes as [Other] with a note, as T3 sends it. *)
+        let answered =
           List.zip_with_remainder questions answers
           |> fst
-          |> List.map ~f:(fun ((q : User_question.t), picks) ->
-            q.question, `Array (List.map picks ~f:(fun p -> `String p)))
+          |> List.filter_map ~f:(fun ((q : User_question.t), picks) ->
+            let picks =
+              List.filter_map picks ~f:(fun p ->
+                Option.some_if (not (String.is_empty (String.strip p))) p)
+            in
+            if String.is_empty q.question || List.is_empty picks
+            then None
+            else (
+              let labels, typed =
+                List.partition_tf picks ~f:(fun p ->
+                  List.exists q.choices ~f:(fun (c : User_question.Choice.t) ->
+                    String.equal c.label p))
+              in
+              Some
+                ( q.question
+                , (if List.is_empty labels then [ "Other" ] else labels)
+                , typed )))
         in
-        `Object [ "outcome", `String "accepted"; "answers", `Object answers ]
-      | Declined | Cancelled | Timed_out _ | Unavailable _ ->
-        `Object [ "outcome", `String "cancelled" ]
+        let annotations =
+          List.filter_map answered ~f:(fun (question, _, typed) ->
+            if List.is_empty typed
+            then None
+            else
+              Some
+                ( question
+                , `Object [ "notes", `String (String.concat ~sep:"\n" typed) ]
+                ))
+        in
+        `Object
+          ([ "outcome", `String "accepted"
+           ; ( "answers"
+             , `Object
+                 (List.map answered ~f:(fun (question, labels, _) ->
+                    question, `Array (List.map labels ~f:(fun l -> `String l))))
+             )
+           ]
+           @
+           if List.is_empty annotations
+           then []
+           else [ "annotations", `Object annotations ])
+      | Declined | Cancelled | Timed_out _ | Unavailable _ -> question_cancelled
     in
     Some (result_line id result)
 ;;
