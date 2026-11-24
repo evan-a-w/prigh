@@ -9875,7 +9875,7 @@ let reply (m : Model.t) (tag : Reply_tag.t) result =
 
 let auth_event (m : Model.t) (e : Auth_event.t) =
   match e, m.dialog with
-  | Done { provider; method_ }, dialog ->
+  | Done { provider; method_; account = _ }, dialog ->
     let custom =
       is_custom m.auth provider
       ||
@@ -9904,7 +9904,7 @@ let auth_event (m : Model.t) (e : Auth_event.t) =
       @ [ rpc "auth_status" [] ~tag:(Auth_status Refresh)
         ; rpc "list_models" [] ~tag:Models
         ] )
-  | Logged_out provider, dialog ->
+  | Logged_out { provider; account = _ }, dialog ->
     let m =
       match dialog with
       | Some (Login { purpose = Logout; _ }) -> { m with dialog = None }
@@ -10035,6 +10035,7 @@ let main_event (m : Model.t) (event : Event.t) =
   | Tool_end { call; _ } ->
     (* An older backend's way to say a confirmation is no longer waited for. *)
     remove_confirm m ~call_id:call.id ~agent_id:None
+  | Accounts_changed -> m, [ rpc "auth_status" [] ~tag:(Auth_status Refresh) ]
   | Sessions_changed None -> m, [ rpc "list_sessions" [] ~tag:Sessions ]
   | Sessions_changed (Some change) ->
     ( sessions_listed
@@ -11489,7 +11490,7 @@ let update_connected (m : Model.t) (action : Action.t) =
     when Option.is_some m.session_gone
          &&
          match e with
-         | Sessions_changed _ | Nix_gc_progress _ -> false
+         | Sessions_changed _ | Nix_gc_progress _ | Accounts_changed -> false
          | _ -> true -> m, []
   | Event e ->
     let m, cmds = event m e in

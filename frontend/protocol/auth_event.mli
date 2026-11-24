@@ -38,12 +38,16 @@ type t =
   | Done of
       { provider : string
       ; method_ : string
+      ; account : string option (** its id; [None] from an older backend *)
       }
   | Failed of
       { provider : string
       ; error : string
       }
-  | Logged_out of string
+  | Logged_out of
+      { provider : string
+      ; account : string option
+      }
   | Forge_done of
       { host : string
       ; user : string option

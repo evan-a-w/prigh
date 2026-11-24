@@ -151,6 +151,9 @@ type t =
       { gen_id : string
       ; delta : string
       } (** streamed text of our own [generate_text] request *)
+  | Accounts_changed
+  (** a provider's accounts were renamed, reordered or given a new default:
+      reread [auth_status] *)
   | Sessions_changed of Session_summary.Change.t option
   (** something [list_sessions] shows changed, in any session: what, or
       [None] to refetch it *)

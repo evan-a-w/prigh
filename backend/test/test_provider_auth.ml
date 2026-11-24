@@ -246,7 +246,7 @@ let%expect_test
     (Error "a login is already in progress")
     (Error "no pending login prompt \"nope\"")
     (Ok ())
-    {"type":"event","event":"auth","kind":"done","provider":"deepseek","method":"api_key"}
+    {"type":"event","event":"auth","kind":"done","provider":"deepseek","method":"api_key","account":"main"}
     |}];
   print_s [%sexp (Login_manager.start login Openai Api_key : unit Or_error.t)];
   Eio.Fiber.yield ();

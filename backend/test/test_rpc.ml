@@ -735,20 +735,109 @@ let%expect_test "auth: status, login via prompt, logout" =
   call t h ~params:{|{"provider": "deepseek"}|} "logout";
   [%expect
     {|
-    {"type":"response","id":"r1","ok":true,"result":[{"provider":"anthropic","name":"Anthropic","methods":[{"method":"oauth","label":"Anthropic (Claude Pro/Max)"},{"method":"api_key","label":"Anthropic API key"}],"configured":null,"expires_ms":null},{"provider":"openai","name":"OpenAI","methods":[{"method":"api_key","label":"OpenAI API key"}],"configured":null,"expires_ms":null},{"provider":"openai-codex","name":"OpenAI Codex (ChatGPT)","methods":[{"method":"oauth","label":"OpenAI (ChatGPT Plus/Pro)"}],"configured":null,"expires_ms":null},{"provider":"deepseek","name":"DeepSeek","methods":[{"method":"api_key","label":"DeepSeek API key"}],"configured":null,"expires_ms":null}]}
+    {"type":"response","id":"r1","ok":true,"result":[{"provider":"anthropic","name":"Anthropic","methods":[{"method":"oauth","label":"Anthropic (Claude Pro/Max)"},{"method":"api_key","label":"Anthropic API key"}],"configured":null,"expires_ms":null,"accounts":[]},{"provider":"openai","name":"OpenAI","methods":[{"method":"api_key","label":"OpenAI API key"}],"configured":null,"expires_ms":null,"accounts":[]},{"provider":"openai-codex","name":"OpenAI Codex (ChatGPT)","methods":[{"method":"oauth","label":"OpenAI (ChatGPT Plus/Pro)"}],"configured":null,"expires_ms":null,"accounts":[]},{"provider":"deepseek","name":"DeepSeek","methods":[{"method":"api_key","label":"DeepSeek API key"}],"configured":null,"expires_ms":null,"accounts":[]}]}
     {"type":"response","id":"r1","ok":false,"error":"unknown provider \"groq\" (one of: anthropic, openai, openai-codex, deepseek; or custom to add an OpenAI-compatible endpoint)"}
     {"type":"response","id":"r1","ok":false,"error":"(\"login method not supported by provider\" (provider Deepseek)\n (method_ Oauth))"}
     {"type":"event","event":"auth","kind":"prompt","id":"p1","prompt":"secret","message":"Enter DeepSeek API key"}
     {"type":"response","id":"r1","ok":true,"result":{}}
     {"type":"response","id":"r1","ok":true,"result":{}}
-    {"type":"event","event":"auth","kind":"done","provider":"deepseek","method":"api_key"}
-    {"type":"response","id":"r1","ok":true,"result":[{"provider":"anthropic","name":"Anthropic","methods":[{"method":"oauth","label":"Anthropic (Claude Pro/Max)"},{"method":"api_key","label":"Anthropic API key"}],"configured":null,"expires_ms":null},{"provider":"openai","name":"OpenAI","methods":[{"method":"api_key","label":"OpenAI API key"}],"configured":null,"expires_ms":null},{"provider":"openai-codex","name":"OpenAI Codex (ChatGPT)","methods":[{"method":"oauth","label":"OpenAI (ChatGPT Plus/Pro)"}],"configured":null,"expires_ms":null},{"provider":"deepseek","name":"DeepSeek","methods":[{"method":"api_key","label":"DeepSeek API key"}],"configured":{"method":"api_key","source":"stored api key"},"expires_ms":null}]}
+    {"type":"event","event":"auth","kind":"done","provider":"deepseek","method":"api_key","account":"main"}
+    {"type":"response","id":"r1","ok":true,"result":[{"provider":"anthropic","name":"Anthropic","methods":[{"method":"oauth","label":"Anthropic (Claude Pro/Max)"},{"method":"api_key","label":"Anthropic API key"}],"configured":null,"expires_ms":null,"accounts":[]},{"provider":"openai","name":"OpenAI","methods":[{"method":"api_key","label":"OpenAI API key"}],"configured":null,"expires_ms":null,"accounts":[]},{"provider":"openai-codex","name":"OpenAI Codex (ChatGPT)","methods":[{"method":"oauth","label":"OpenAI (ChatGPT Plus/Pro)"}],"configured":null,"expires_ms":null,"accounts":[]},{"provider":"deepseek","name":"DeepSeek","methods":[{"method":"api_key","label":"DeepSeek API key"}],"configured":{"method":"api_key","source":"stored api key"},"expires_ms":null,"accounts":[{"ref":"deepseek/main","id":"main","label":"DeepSeek API key","method":"api_key","source":"stored api key","default":true,"fallback":false}]}]}
     {"type":"event","event":"auth","kind":"prompt","id":"p2","prompt":"secret","message":"Enter Anthropic API key"}
     {"type":"response","id":"r1","ok":true,"result":{}}
     {"type":"response","id":"r1","ok":true,"result":{}}
     {"type":"event","event":"auth","kind":"failed","provider":"anthropic","error":"login cancelled"}
     {"type":"event","event":"auth","kind":"logged_out","provider":"deepseek"}
     {"type":"response","id":"r1","ok":true,"result":{}}
+    |}]
+;;
+
+let%expect_test "auth: accounts (add by label, update, logout one)" =
+  with_agent []
+  @@ fun t _agent h ->
+  Login_manager.subscribe h.login ~f:(fun e ->
+    print_endline (Json.to_string (Rpc_json.login_event e)));
+  let accounts () =
+    match
+      Rpc_server.handle
+        h.server
+        h.client
+        (Json.of_string {|{"id": "r1", "method": "auth_status"}|})
+    with
+    | `Object fields ->
+      (match List.Assoc.find fields ~equal:String.equal "result" with
+       | Some (`Array providers) ->
+         List.iter providers ~f:(function
+           | `Object p ->
+             (match List.Assoc.find p ~equal:String.equal "accounts" with
+              | Some (`Array (_ :: _ as accounts)) ->
+                List.iter accounts ~f:(fun a ->
+                  print_endline (Json.to_string a))
+              | _ -> ())
+           | _ -> ())
+       | _ -> ())
+    | _ -> ()
+  in
+  call t h ~params:{|{"provider": "deepseek"}|} "login";
+  call t h ~params:{|{"id": "p1", "value": "sk-one"}|} "auth_respond";
+  Login_manager.wait h.login;
+  call t h ~params:{|{"provider": "deepseek", "label": "Work"}|} "login";
+  call t h ~params:{|{"id": "p2", "value": "sk-two"}|} "auth_respond";
+  Login_manager.wait h.login;
+  call t h ~params:{|{"provider": "deepseek", "account": "Bad Id"}|} "login";
+  [%expect
+    {|
+    {"type":"event","event":"auth","kind":"prompt","id":"p1","prompt":"secret","message":"Enter DeepSeek API key"}
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    {"type":"event","event":"auth","kind":"done","provider":"deepseek","method":"api_key","account":"main"}
+    {"type":"event","event":"auth","kind":"prompt","id":"p2","prompt":"secret","message":"Enter DeepSeek API key"}
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    {"type":"event","event":"auth","kind":"done","provider":"deepseek","method":"api_key","account":"work"}
+    {"type":"response","id":"r1","ok":false,"error":"\"Bad Id\" is not an account id: use 1 to 32 lowercase letters, digits and -"}
+    |}];
+  accounts ();
+  [%expect
+    {|
+    {"ref":"deepseek/main","id":"main","label":"DeepSeek API key","method":"api_key","source":"stored api key","default":true,"fallback":false}
+    {"ref":"deepseek/work","id":"work","label":"Work","method":"api_key","source":"stored api key","default":false,"fallback":false}
+    |}];
+  call
+    t
+    h
+    ~params:
+      {|{"ref": "deepseek/work", "label": "Job", "default": true, "fallback": true, "before": "deepseek/main"}|}
+    "account_update";
+  call
+    t
+    h
+    ~params:{|{"ref": "deepseek/nope", "default": true}|}
+    "account_update";
+  call t h ~params:{|{"ref": "deepseek", "default": true}|} "account_update";
+  call
+    t
+    h
+    ~params:{|{"ref": "deepseek/job", "before": "anthropic/main"}|}
+    "account_update";
+  accounts ();
+  [%expect
+    {|
+    {"type":"event","event":"accounts_changed"}
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    {"type":"response","id":"r1","ok":false,"error":"DeepSeek has no account \"nope\": it has Job (work), DeepSeek API key (main)"}
+    {"type":"response","id":"r1","ok":false,"error":"account ref \"deepseek\" is not <provider>/<account> (as auth_status lists it)"}
+    {"type":"response","id":"r1","ok":false,"error":"Anthropic has no account \"main\": it has none"}
+    {"ref":"deepseek/work","id":"work","label":"Job","method":"api_key","source":"stored api key","default":true,"fallback":true}
+    {"ref":"deepseek/main","id":"main","label":"DeepSeek API key","method":"api_key","source":"stored api key","default":false,"fallback":false}
+    |}];
+  call t h ~params:{|{"provider": "deepseek", "account": "job"}|} "logout";
+  accounts ();
+  [%expect
+    {|
+    {"type":"event","event":"auth","kind":"logged_out","provider":"deepseek","account":"work"}
+    {"type":"response","id":"r1","ok":true,"result":{}}
+    {"ref":"deepseek/main","id":"main","label":"DeepSeek API key","method":"api_key","source":"stored api key","default":true,"fallback":false}
     |}]
 ;;
 
@@ -1641,8 +1730,8 @@ let%expect_test
     starter: {"type":"event","event":"auth","kind":"prompt","id":"p1","prompt":"secret","message":"Enter DeepSeek API key"}
     {"type":"response","id":"o1","ok":false,"error":"a login is already in progress"}
     {"type":"response","id":"r1","ok":true,"result":{}}
-    starter: {"type":"event","event":"auth","kind":"done","provider":"deepseek","method":"api_key"}
-    other: {"type":"event","event":"auth","kind":"done","provider":"deepseek","method":"api_key"}
+    starter: {"type":"event","event":"auth","kind":"done","provider":"deepseek","method":"api_key","account":"main"}
+    other: {"type":"event","event":"auth","kind":"done","provider":"deepseek","method":"api_key","account":"main"}
     |}]
 ;;
 

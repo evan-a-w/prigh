@@ -532,12 +532,12 @@ let%expect_test "auth: stored key, environment, keyless; status" =
     (Error
      "auth.json's \"aiproxy\" entry is an OAuth login, not an API key (another tool may use that name): /logout aiproxy, then /login aiproxy")
     (() ())
-    {"provider":"anthropic","name":"Anthropic","methods":[{"method":"oauth","label":"Anthropic (Claude Pro/Max)"},{"method":"api_key","label":"Anthropic API key"}],"configured":null,"expires_ms":null}
-    {"provider":"openai","name":"OpenAI","methods":[{"method":"api_key","label":"OpenAI API key"}],"configured":null,"expires_ms":null}
-    {"provider":"openai-codex","name":"OpenAI Codex (ChatGPT)","methods":[{"method":"oauth","label":"OpenAI (ChatGPT Plus/Pro)"}],"configured":null,"expires_ms":null}
-    {"provider":"deepseek","name":"DeepSeek","methods":[{"method":"api_key","label":"DeepSeek API key"}],"configured":null,"expires_ms":null}
-    {"provider":"aiproxy","name":"aiproxy","methods":[{"method":"api_key","label":"aiproxy API key"}],"configured":{"method":"api_key","source":"stored api key"},"expires_ms":null,"custom":{"base_url":"http://localhost:3000/v1","api":"chat","api_label":"OpenAI chat completions (/chat/completions)"}}
-    {"provider":"ollama","name":"ollama","methods":[{"method":"api_key","label":"ollama API key"}],"configured":{"method":"api_key","source":"no key"},"expires_ms":null,"custom":{"base_url":"http://localhost:11434/v1","api":"chat","api_label":"OpenAI chat completions (/chat/completions)"}}
+    {"provider":"anthropic","name":"Anthropic","methods":[{"method":"oauth","label":"Anthropic (Claude Pro/Max)"},{"method":"api_key","label":"Anthropic API key"}],"configured":null,"expires_ms":null,"accounts":[]}
+    {"provider":"openai","name":"OpenAI","methods":[{"method":"api_key","label":"OpenAI API key"}],"configured":null,"expires_ms":null,"accounts":[]}
+    {"provider":"openai-codex","name":"OpenAI Codex (ChatGPT)","methods":[{"method":"oauth","label":"OpenAI (ChatGPT Plus/Pro)"}],"configured":null,"expires_ms":null,"accounts":[]}
+    {"provider":"deepseek","name":"DeepSeek","methods":[{"method":"api_key","label":"DeepSeek API key"}],"configured":null,"expires_ms":null,"accounts":[]}
+    {"provider":"aiproxy","name":"aiproxy","methods":[{"method":"api_key","label":"aiproxy API key"}],"configured":{"method":"api_key","source":"stored api key"},"expires_ms":null,"accounts":[{"ref":"aiproxy/main","id":"main","label":"aiproxy API key","method":"api_key","source":"stored api key","default":true,"fallback":false}],"custom":{"base_url":"http://localhost:3000/v1","api":"chat","api_label":"OpenAI chat completions (/chat/completions)"}}
+    {"provider":"ollama","name":"ollama","methods":[{"method":"api_key","label":"ollama API key"}],"configured":{"method":"api_key","source":"no key"},"expires_ms":null,"accounts":[],"custom":{"base_url":"http://localhost:11434/v1","api":"chat","api_label":"OpenAI chat completions (/chat/completions)"}}
     |}]
 ;;
 
@@ -590,13 +590,15 @@ let follow t login =
     | Progress m -> printf "%s\n" (mask t m)
     | Prompt_cancelled _ -> ()
     | Auth_url _ -> print_endline "auth url?!"
-    | Done { provider; method_ } ->
+    | Done { provider; method_; account = _ } ->
       print_s
         [%message
           "done" (provider : Provider_id.t) (method_ : Provider_auth.Method.t)]
     | Failed { provider; error } ->
       print_s [%message "failed" provider (mask t error)]
-    | Logged_out p -> print_s [%message "logged out" (p : Provider_id.t)]
+    | Logged_out { provider = p; account = _ } ->
+      print_s [%message "logged out" (p : Provider_id.t)]
+    | Accounts_changed -> ()
     | Forge_done _ | Forge_logged_out _ -> print_endline "forge?!")
 ;;
 
@@ -1541,7 +1543,7 @@ let%expect_test
     {"type":"event","event":"auth","kind":"progress","message":"Checking http://127.0.0.1:PORT/v1/models ..."}
     {"type":"response","id":"r1","ok":true,"result":{}}
     {"type":"event","event":"auth","kind":"progress","message":"Found 2 models: gpt-4o, openai/gpt-4o-mini"}
-    {"type":"event","event":"auth","kind":"done","provider":"aiproxy","method":"api_key"}
+    {"type":"event","event":"auth","kind":"done","provider":"aiproxy","method":"api_key","account":"main"}
     |}];
   custom_keys ();
   let call_quiet ?(params = "{}") meth =
@@ -1590,7 +1592,7 @@ let%expect_test
     {"type":"response","id":"r1","ok":true,"result":{}}
     {"type":"response","id":"r1","ok":false,"error":"unknown model \"aiproxy/gpt-5\"; did you mean: aiproxy/gpt-4o (gpt-4o)"}
     ("\"aiproxy/openai/gpt-4o-mini\"")
-    {"provider":"aiproxy","name":"aiproxy","methods":[{"method":"api_key","label":"aiproxy API key"}],"configured":{"method":"api_key","source":"no key"},"expires_ms":null,"custom":{"base_url":"http://127.0.0.1:PORT/v1","api":"chat","api_label":"OpenAI chat completions (/chat/completions)"}}
+    {"provider":"aiproxy","name":"aiproxy","methods":[{"method":"api_key","label":"aiproxy API key"}],"configured":{"method":"api_key","source":"no key"},"expires_ms":null,"accounts":[],"custom":{"base_url":"http://127.0.0.1:PORT/v1","api":"chat","api_label":"OpenAI chat completions (/chat/completions)"}}
     |}];
   (* Logging out asks the caller which to remove. *)
   call ~params:{|{"provider": "aiproxy"}|} "logout";

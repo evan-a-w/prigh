@@ -575,7 +575,9 @@ let%expect_test
   H.mode h;
   [%expect {| editing |}];
   H.event h (Auth (Progress "exchanging code"));
-  H.event h (Auth (Done { provider = "anthropic"; method_ = "api_key" }));
+  H.event
+    h
+    (Auth (Done { provider = "anthropic"; method_ = "api_key"; account = None }));
   [%expect
     {|
     (Rpc (method_ auth_status) (params ()) (tag Auth_refresh))
@@ -1324,7 +1326,7 @@ let%expect_test "/sessions picker switches and reloads; /logout confirms" =
   H.keys h "y";
   [%expect
     {| (Rpc (method_ logout) (params ((provider deepseek))) (tag Show_error)) |}];
-  H.event h (Auth (Logged_out "deepseek"));
+  H.event h (Auth (Logged_out { provider = "deepseek"; account = None }));
   [%expect {| (Rpc (method_ auth_status) (params ()) (tag Auth_refresh)) |}]
 ;;
 
@@ -6980,7 +6982,9 @@ let%expect_test "login end to end includes a prompt_cancelled" =
     deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01
     |}];
   H.event h (Auth (Progress "exchanging code"));
-  H.event h (Auth (Done { provider = "anthropic"; method_ = "api_key" }));
+  H.event
+    h
+    (Auth (Done { provider = "anthropic"; method_ = "api_key"; account = None }));
   [%expect
     {|
     (Rpc (method_ auth_status) (params ()) (tag Auth_refresh))
@@ -9740,7 +9744,9 @@ let%expect_test
       (tag Show_error))
     |}];
   H.event h (Auth (Progress "Found 1 models: gpt-4o"));
-  H.event h (Auth (Done { provider = "aiproxy"; method_ = "api_key" }));
+  H.event
+    h
+    (Auth (Done { provider = "aiproxy"; method_ = "api_key"; account = None }));
   H.reply
     ~quiet:true
     h
@@ -9825,7 +9831,7 @@ let%expect_test
                 }
           }));
   H.enter h;
-  H.event h (Auth (Logged_out "ollama"));
+  H.event h (Auth (Logged_out { provider = "ollama"; account = None }));
   [%expect
     {|
     (Rpc

@@ -640,6 +640,27 @@ let entry (e : Session.Entry.t) =
      @ payload)
 ;;
 
+let account_ref provider account =
+  sprintf
+    "%s/%s"
+    (Provider_id.to_string provider)
+    (Account_id.to_string account)
+;;
+
+let auth_account provider (a : Provider_auth.Account_status.t) =
+  `Object
+    ([ "ref", str (account_ref provider a.id)
+     ; "id", str (Account_id.to_string a.id)
+     ; "label", str a.label
+     ; "method", str (Provider_auth.Method.to_string a.method_)
+     ; "source", str a.source
+     ; "default", bool a.default
+     ; "fallback", bool a.fallback
+     ]
+     @ Option.value_map a.expires_ms ~default:[] ~f:(fun e ->
+       [ "expires_ms", int e ]))
+;;
+
 let auth_status (s : Provider_auth.Status.t) =
   `Object
     ([ "provider", str (Provider_id.to_string s.provider)
@@ -660,6 +681,7 @@ let auth_status (s : Provider_auth.Status.t) =
              ; "source", str source
              ] )
      ; "expires_ms", Option.value_map s.expires_ms ~default:`Null ~f:int
+     ; "accounts", `Array (List.map s.accounts ~f:(auth_account s.provider))
      ]
      @
      match s.custom with
@@ -713,17 +735,21 @@ let login_event (e : Login_manager.Event.t) =
     | Prompt_cancelled { id } ->
       [ "kind", str "prompt_cancelled"; "id", str id ]
     | Progress message -> [ "kind", str "progress"; "message", str message ]
-    | Done { provider; method_ } ->
+    | Done { provider; method_; account } ->
       [ "kind", str "done"
       ; "provider", str (Provider_id.to_string provider)
       ; "method", str (Provider_auth.Method.to_string method_)
+      ; "account", str (Account_id.to_string account)
       ]
     | Failed { provider; error } ->
       [ "kind", str "failed"; "provider", str provider; "error", str error ]
-    | Logged_out provider ->
+    | Logged_out { provider; account } ->
       [ "kind", str "logged_out"
       ; "provider", str (Provider_id.to_string provider)
       ]
+      @ Option.value_map account ~default:[] ~f:(fun a ->
+        [ "account", str (Account_id.to_string a) ])
+    | Accounts_changed -> []
     | Forge_done { host; user; method_ } ->
       [ "kind", str "forge_done"
       ; "host", str host
@@ -733,7 +759,10 @@ let login_event (e : Login_manager.Event.t) =
     | Forge_logged_out host ->
       [ "kind", str "forge_logged_out"; "host", str host ]
   in
-  `Object ([ "type", str "event"; "event", str "auth" ] @ fields)
+  match e with
+  | Accounts_changed ->
+    `Object [ "type", str "event"; "event", str "accounts_changed" ]
+  | _ -> `Object ([ "type", str "event"; "event", str "auth" ] @ fields)
 ;;
 
 let agent_queues agents =

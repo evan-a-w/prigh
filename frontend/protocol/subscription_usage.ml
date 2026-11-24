@@ -47,11 +47,33 @@ module Status = struct
   ;;
 end
 
+module Account_usage = struct
+  type t =
+    { ref_ : string
+    ; id : string
+    ; label : string
+    ; default : bool
+    ; status : Status.t
+    }
+  [@@deriving sexp_of, equal]
+
+  let of_json j =
+    let open Or_error.Let_syntax in
+    let%bind ref_ = Json.string_field j "ref" in
+    let%bind id = Json.string_field j "id" in
+    let%bind label = Json.string_field j "label" in
+    let%bind default = Json.bool_default_field j "default" ~default:false in
+    let%map status = Status.of_json j in
+    { ref_; id; label; default; status }
+  ;;
+end
+
 module Provider_usage = struct
   type t =
     { provider : string
     ; name : string
     ; status : Status.t
+    ; accounts : Account_usage.t list
     }
   [@@deriving sexp_of, equal]
 
@@ -59,8 +81,11 @@ module Provider_usage = struct
     let open Or_error.Let_syntax in
     let%bind provider = Json.string_field j "provider" in
     let%bind name = Json.string_field j "name" in
-    let%map status = Status.of_json j in
-    { provider; name; status }
+    let%bind status = Status.of_json j in
+    let%map accounts =
+      Json.optional_list_field j "accounts" ~f:Account_usage.of_json
+    in
+    { provider; name; status; accounts }
   ;;
 end
 

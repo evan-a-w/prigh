@@ -44,10 +44,21 @@ module Status : sig
   [@@deriving sexp_of, equal]
 end
 
+module Account_usage : sig
+  type t =
+    { id : Account_id.t
+    ; label : string
+    ; default : bool
+    ; status : Status.t
+    }
+  [@@deriving sexp_of, equal]
+end
+
 module Provider_usage : sig
   type t =
     { provider : Provider_id.t
-    ; status : Status.t
+    ; status : Status.t (** the default account's *)
+    ; accounts : Account_usage.t list (** each stored login's, in order *)
     }
   [@@deriving sexp_of, equal]
 end
@@ -59,7 +70,7 @@ type t =
 [@@deriving sexp_of, equal]
 
 (** [{fetched_at_ms, providers: [{provider, name, status, plan?, windows?,
-    error?}]}], [status] one of [not_signed_in], [api_key], [limits] and
+    error?, accounts: [{ref, id, label, default, status, ...}]}]}], [status] one of [not_signed_in], [api_key], [limits] and
     [error]; a window is [{id, label, used_percent, resets_at_ms}]. *)
 val to_json : t -> Json.t
 

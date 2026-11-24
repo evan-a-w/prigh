@@ -675,13 +675,96 @@ let%expect_test "auth events" =
       Auth (
         Done
         (provider anthropic)
-        (method_  oauth))))
+        (method_  oauth)
+        (account ()))))
     (Event (
       Auth (
         Failed
         (provider openai)
         (error    nope))))
-    (Event (Auth (Logged_out deepseek)))
+    (Event (Auth (Logged_out (provider deepseek) (account ()))))
+    |}]
+;;
+
+let%expect_test "accounts: auth events, status and usage" =
+  decode
+    {|{"type":"event","event":"auth","kind":"done","provider":"openai-codex","method":"oauth","account":"work"}|};
+  decode
+    {|{"type":"event","event":"auth","kind":"logged_out","provider":"openai-codex","account":"work"}|};
+  decode {|{"type":"event","event":"accounts_changed"}|};
+  [%expect
+    {|
+    (Event (
+      Auth (
+        Done
+        (provider openai-codex)
+        (method_  oauth)
+        (account (work)))))
+    (Event (Auth (Logged_out (provider openai-codex) (account (work)))))
+    (Event Accounts_changed)
+    |}];
+  let show f json =
+    match Json.parse json with
+    | Error e -> print_s [%message "parse" (e : Error.t)]
+    | Ok j ->
+      (match f j with
+       | Ok s -> print_s s
+       | Error e -> print_s [%message "decode" (e : Error.t)])
+  in
+  show
+    (fun j -> Or_error.map (Auth_status.of_json j) ~f:Auth_status.sexp_of_t)
+    {|{"provider":"openai-codex","name":"OpenAI Codex (ChatGPT)","methods":[{"method":"oauth","label":"OpenAI (ChatGPT Plus/Pro)"}],"configured":{"method":"oauth","source":"oauth"},"expires_ms":1700000000000,"accounts":[{"ref":"openai-codex/main","id":"main","label":"Personal","method":"oauth","source":"oauth","expires_ms":1700000000000,"default":true,"fallback":true},{"ref":"openai-codex/work","id":"work","label":"Work","method":"oauth","source":"oauth","default":false,"fallback":false}]}|};
+  show
+    (fun j ->
+       Or_error.map
+         (Subscription_usage.of_json j)
+         ~f:Subscription_usage.sexp_of_t)
+    {|{"fetched_at_ms":1700000000000,"providers":[{"provider":"openai-codex","name":"ChatGPT","status":"api_key","accounts":[{"ref":"openai-codex/main","id":"main","label":"Personal","default":true,"status":"api_key"},{"ref":"openai-codex/work","id":"work","label":"Work","default":false,"status":"error","error":"sign in again"}]}]}|};
+  [%expect
+    {|
+    ((provider openai-codex)
+     (name     "OpenAI Codex (ChatGPT)")
+     (methods ((
+       (method_ oauth)
+       (label   "OpenAI (ChatGPT Plus/Pro)"))))
+     (configured ((
+       (method_ oauth)
+       (source  oauth))))
+     (expires_ms (1700000000000))
+     (custom ())
+     (accounts (
+       ((ref_    openai-codex/main)
+        (id      main)
+        (label   Personal)
+        (method_ oauth)
+        (source  oauth)
+        (expires_ms (1700000000000))
+        (default  true)
+        (fallback true))
+       ((ref_    openai-codex/work)
+        (id      work)
+        (label   Work)
+        (method_ oauth)
+        (source  oauth)
+        (expires_ms ())
+        (default  false)
+        (fallback false)))))
+    ((fetched_at (2023-11-14 22:13:20.000000000Z))
+     (providers ((
+       (provider openai-codex)
+       (name     ChatGPT)
+       (status   Api_key)
+       (accounts (
+         ((ref_    openai-codex/main)
+          (id      main)
+          (label   Personal)
+          (default true)
+          (status  Api_key))
+         ((ref_    openai-codex/work)
+          (id      work)
+          (label   Work)
+          (default false)
+          (status (Failed "sign in again")))))))))
     |}]
 ;;
 
@@ -718,13 +801,15 @@ let%expect_test "auth status, models, sessions" =
        (method_ oauth)
        (source  auth.json))))
      (expires_ms (1700000000000))
-     (custom ()))
+     (custom   ())
+     (accounts ()))
     ((provider openai)
      (name     OpenAI)
      (methods    ())
      (configured ())
      (expires_ms ())
-     (custom     ()))
+     (custom     ())
+     (accounts   ()))
     ((provider aiproxy)
      (name     aiproxy)
      (methods ((
@@ -737,7 +822,8 @@ let%expect_test "auth status, models, sessions" =
      (custom ((
        (base_url http://localhost:3000/v1)
        (api      chat)
-       (api_label "OpenAI chat completions (/chat/completions)")))))
+       (api_label "OpenAI chat completions (/chat/completions)"))))
+     (accounts ()))
     ((id   abc)
      (path /p)
      (name ("build fix"))
@@ -2402,7 +2488,8 @@ let%expect_test "MCP sign-ins: the listing, the event, an OAuth client" =
   in
   round_trip
     {|{"type":"http","url":"https://x.example/mcp","oauth":{"clientId":"app","clientSecret":"s3cret","scopes":["a","b"]}}|};
-  [%expect {|
+  [%expect
+    {|
     (Http
       (url https://x.example/mcp)
       (headers ())

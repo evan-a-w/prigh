@@ -6769,7 +6769,7 @@ let auth_event m (e : P.Auth_event.t) =
        { m with mode = Editing; login_lines = [] }, []
      | _ -> m, [])
   | Progress message -> { m with login_lines = m.login_lines @ [ message ] }, []
-  | Done { provider; method_ } ->
+  | Done { provider; method_; account = _ } ->
     let m =
       match m.mode with
       | Login_prompt _ -> { m with mode = Editing }
@@ -6795,7 +6795,7 @@ let auth_event m (e : P.Auth_event.t) =
     in
     let m = { m with login_lines = [] } in
     error m (sprintf "login to %s failed: %s" provider e), []
-  | Logged_out provider ->
+  | Logged_out { provider; account = _ } ->
     ( notice m (sprintf "logged out of %s" provider)
     , [ rpc "auth_status" ~tag:Auth_refresh ] )
   | Forge_done { host; user; method_ } ->
@@ -6955,6 +6955,7 @@ let apply_event m (e : P.Event.t) =
     (match m.nix_gc with
      | Some _ -> { m with nix_gc = Some progress }, []
      | None -> m, [])
+  | Accounts_changed -> m, [ rpc "auth_status" ~tag:Auth_refresh ]
   | Temporary_ended _ -> m, []
   | Sessions_changed change ->
     (match change, Option.first_some m.sessions (picker_sessions m) with

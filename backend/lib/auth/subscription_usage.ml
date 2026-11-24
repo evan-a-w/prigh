@@ -23,10 +23,21 @@ module Status = struct
   [@@deriving sexp_of, equal]
 end
 
+module Account_usage = struct
+  type t =
+    { id : Account_id.t
+    ; label : string
+    ; default : bool
+    ; status : Status.t
+    }
+  [@@deriving sexp_of, equal]
+end
+
 module Provider_usage = struct
   type t =
     { provider : Provider_id.t
     ; status : Status.t
+    ; accounts : Account_usage.t list
     }
   [@@deriving sexp_of, equal]
 end
@@ -80,7 +91,23 @@ let to_json t =
                ([ "provider", `String (Provider_id.to_string p.provider)
                 ; "name", `String (name p.provider)
                 ]
-                @ status_fields p.status))) )
+                @ status_fields p.status
+                @ [ ( "accounts"
+                    , `Array
+                        (List.map p.accounts ~f:(fun (a : Account_usage.t) ->
+                           `Object
+                             ([ ( "ref"
+                                , `String
+                                    (sprintf
+                                       "%s/%s"
+                                       (Provider_id.to_string p.provider)
+                                       (Account_id.to_string a.id)) )
+                              ; "id", `String (Account_id.to_string a.id)
+                              ; "label", `String a.label
+                              ; ("default", if a.default then `True else `False)
+                              ]
+                              @ status_fields a.status))) )
+                  ]))) )
     ]
 ;;
 
@@ -423,9 +450,18 @@ let answer provider ~parse result =
             detail))
 ;;
 
-let fetch_one ~env ?getenv ?refresh ~(http : Http.t) ~now store provider =
+let fetch_one
+      ~env
+      ?getenv
+      ?refresh
+      ?account
+      ~(http : Http.t)
+      ~now
+      store
+      provider
+  =
   let login = "/login " ^ Provider_id.to_string provider in
-  match Provider_auth.resolve ~env ?getenv ?refresh store provider with
+  match Provider_auth.resolve ~env ?getenv ?refresh ?account store provider with
   | Error e ->
     Status.Failed
       (sprintf "%s: sign in again with %s" (Error.to_string_hum e) login)
@@ -478,9 +514,29 @@ let fetch ~env ?getenv ?refresh ~http ~now store =
   let providers =
     Fiber.List.map
       (fun provider ->
-         { Provider_usage.provider
-         ; status = fetch_one ~env ?getenv ?refresh ~http ~now store provider
-         })
+         let fetch ?account () =
+           fetch_one ~env ?getenv ?refresh ?account ~http ~now store provider
+         in
+         match Provider_accounts.list store provider with
+         | Error _ | Ok [] ->
+           { Provider_usage.provider; status = fetch (); accounts = [] }
+         | Ok accounts ->
+           let accounts =
+             Fiber.List.map
+               (fun (a : Provider_accounts.Account.t) ->
+                  { Account_usage.id = a.id
+                  ; label = a.label
+                  ; default = a.default
+                  ; status = fetch ~account:a.id ()
+                  })
+               accounts
+           in
+           let status =
+             match List.find accounts ~f:(fun a -> a.default) with
+             | Some a -> a.status
+             | None -> fetch ()
+           in
+           { provider; status; accounts })
       providers
   in
   { fetched_at = now (); providers }

@@ -25,11 +25,24 @@ module Status : sig
   [@@deriving sexp_of, equal]
 end
 
+(** One stored login's. *)
+module Account_usage : sig
+  type t =
+    { ref_ : string
+    ; id : string
+    ; label : string
+    ; default : bool
+    ; status : Status.t
+    }
+  [@@deriving sexp_of, equal]
+end
+
 module Provider_usage : sig
   type t =
     { provider : string (** e.g. [anthropic], for [/login] *)
     ; name : string (** e.g. ["Claude"] *)
-    ; status : Status.t
+    ; status : Status.t (** the default account's *)
+    ; accounts : Account_usage.t list (** [[]] from an older backend *)
     }
   [@@deriving sexp_of, equal]
 end

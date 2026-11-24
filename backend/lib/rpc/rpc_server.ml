@@ -110,6 +110,7 @@ let methods =
   ; "auth_respond"
   ; "auth_cancel"
   ; "logout"
+  ; "account_update"
   ; "usage_limits"
   ; "forge_status"
   ; "forge_login"
@@ -287,6 +288,39 @@ let provider_of_string login s =
 
 let provider_param login params =
   Or_error.bind (string_param params "provider") ~f:(provider_of_string login)
+;;
+
+(* An account named by [ref] (["<provider>/<id>"], as [auth_status] lists
+   it) or by [provider] and [account] (an id or a label). *)
+let account_param login params =
+  let open Or_error.Let_syntax in
+  let%bind provider, account =
+    match%bind string_param_opt params "ref" with
+    | Some r ->
+      (match String.rsplit2 r ~on:'/' with
+       | Some (p, a) ->
+         let%map provider = provider_of_string login p in
+         provider, a
+       | None ->
+         Or_error.errorf
+           "account ref %S is not <provider>/<account> (as auth_status lists \
+            it)"
+           r)
+    | None ->
+      let%bind provider = provider_param login params in
+      let%map account = string_param params "account" in
+      provider, account
+  in
+  let%map account =
+    Provider_accounts.find (Login_manager.store login) provider account
+  in
+  provider, account.id
+;;
+
+let optional_account_param login params =
+  match param params "account", param params "ref" with
+  | (None | Some `Null), (None | Some `Null) -> Ok None
+  | _ -> Or_error.map (account_param login params) ~f:(fun (_, id) -> Some id)
 ;;
 
 (* Confirmations and questions waiting for the user. *)
@@ -1261,8 +1295,12 @@ let create
       Option.iter
         (Option.bind t.login_owner ~f:(Hashtbl.find t.clients))
         ~f:(fun c -> c.send json)
-    | Done _ | Failed _ | Logged_out _ | Forge_done _ | Forge_logged_out _ ->
-      Hashtbl.iter t.clients ~f:(fun c -> c.send json));
+    | Done _
+    | Failed _
+    | Logged_out _
+    | Accounts_changed
+    | Forge_done _
+    | Forge_logged_out _ -> Hashtbl.iter t.clients ~f:(fun c -> c.send json));
   Model_registry.subscribe (Login_manager.models login) ~f:(fun problem ->
     Hashtbl.iter t.clients ~f:(fun c -> tell_problems c [ problem ]));
   t
@@ -3315,18 +3353,68 @@ let dispatch_server t (client : Client.t) ~meth ~params
                | None -> Or_error.errorf "unknown login method %S" s)
             | _ -> Ok (List.hd_exn (Provider_auth.methods provider))
           in
-          Or_error.bind method_ ~f:(fun method_ ->
-            owned (fun () -> Login_manager.start t.login provider method_))))
+          let open Or_error.Let_syntax in
+          let%bind method_ = method_ in
+          let%bind account =
+            match%bind string_param_opt params "account" with
+            | None -> Ok None
+            | Some a -> Or_error.map (Account_id.of_string a) ~f:Option.some
+          in
+          let%bind label = string_param_opt params "label" in
+          owned (fun () ->
+            Login_manager.start t.login ?account ?label provider method_)))
   | "logout" ->
     (* A custom provider's logout asks the caller a question. *)
     Option.some
     @@ Or_error.bind (provider_param t.login params) ~f:(fun provider ->
       let previous = t.login_owner in
       t.login_owner <- Some client.id;
-      let result = Login_manager.logout t.login provider in
+      let result =
+        Or_error.bind (optional_account_param t.login params) ~f:(fun account ->
+          Login_manager.logout t.login ?account provider)
+      in
       if Result.is_error result || not (Login_manager.in_progress t.login)
       then t.login_owner <- previous;
       unit_result result)
+  | "account_update" ->
+    Some
+      (let open Or_error.Let_syntax in
+       let%bind provider, account = account_param t.login params in
+       let%bind label = string_param_opt params "label" in
+       let%bind make_default = bool_param params "default" ~default:false in
+       let%bind fallback =
+         match param params "fallback" with
+         | None | Some `Null -> Ok None
+         | Some _ ->
+           Or_error.map
+             (bool_param params "fallback" ~default:false)
+             ~f:Option.some
+       in
+       let%bind move_before =
+         match param params "before" with
+         | None -> Ok None
+         | Some `Null -> Ok (Some None)
+         | Some (`String r) ->
+           let%bind before_provider, before =
+             account_param t.login (`Object [ "ref", `String r ])
+           in
+           if Provider_id.equal before_provider provider
+           then Ok (Some (Some before))
+           else
+             Or_error.errorf
+               "%S is another provider's account: accounts move among their \
+                provider's"
+               r
+         | Some _ ->
+           Or_error.error_string
+             "param \"before\" must be an account ref or null"
+       in
+       Login_manager.update_account
+         t.login
+         provider
+         account
+         { label; make_default; fallback; move_before }
+       |> unit_result)
   | "usage_limits" ->
     Some
       (ok
