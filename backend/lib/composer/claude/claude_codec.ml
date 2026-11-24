@@ -33,6 +33,8 @@ module Model_info = struct
     { value : string
     ; display_name : string
     ; description : string option
+    ; resolved : string option
+    ; efforts : string list option
     }
   [@@deriving sexp_of]
 end
@@ -921,6 +923,11 @@ let init_info json : Init_info.t =
         { Model_info.value
         ; display_name = Option.value (str m "displayName") ~default:value
         ; description = str m "description"
+        ; resolved = str m "resolvedModel"
+        ; efforts =
+            Option.map
+              (Option.bind (member "supportedEffortLevels" m) ~f:Json.list)
+              ~f:(List.filter_map ~f:Json.string)
         })
   ; commands =
       List.filter_map (list json "commands") ~f:(fun c ->

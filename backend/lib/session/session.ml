@@ -1601,6 +1601,13 @@ let reminder_names t =
 let budget t = (derived t).state.budget
 let model t = (derived t).state.model
 
+let last_model t ~f =
+  List.find_map t.entries ~f:(fun (e : Entry.t) ->
+    match e.payload with
+    | Model { model; thinking } when f model -> Some (model, thinking)
+    | _ -> None)
+;;
+
 module Thread = struct
   type t =
     { adapter : string

@@ -65,16 +65,59 @@ let thinking_tokens : Thinking.t -> int option = function
 
 let thinking_levels = Thinking.Level.[ Low; Medium; High; Max ]
 
+(* What Claude Code calls a model: the head of its description ("Sonnet 5 ·
+   Efficient for…" is "Sonnet 5") when that names it, else its name. *)
+let name_of (m : Claude_codec.Model_info.t) =
+  let head =
+    Option.map m.description ~f:(fun d ->
+      match String.substr_index d ~pattern:" · " with
+      | Some i -> String.prefix d i
+      | None -> d)
+  in
+  let first_word s = List.hd (String.split s ~on:' ') in
+  match head with
+  | Some head
+    when Option.equal String.equal (first_word head) (first_word m.display_name)
+         && String.exists head ~f:Char.is_digit -> head
+  | _ -> m.display_name
+;;
+
 let model_of (m : Claude_codec.Model_info.t) =
+  let thinking_levels =
+    match m.efforts with
+    | Some (_ :: _ as efforts) ->
+      List.filter_map efforts ~f:Thinking.Level.of_string
+    | Some [] | None -> thinking_levels
+  in
   External_model.model
     ~adapter:id
-    ~name:m.display_name
+    ~name:(name_of m)
     ~thinking_levels
     ~can_disable_thinking:true
     m.value
 ;;
 
-(* Claude Code's models, its default first (as [default]). *)
+(* "Use the default model (currently Opus 5 (1M context)) · …": the model
+   in the brackets after "currently". *)
+let currently description =
+  let pattern = "currently " in
+  let%bind.Option i = String.substr_index description ~pattern in
+  let rest = String.drop_prefix description (i + String.length pattern) in
+  let rec close depth i =
+    if i >= String.length rest
+    then None
+    else (
+      match rest.[i] with
+      | '(' -> close (depth + 1) (i + 1)
+      | ')' when depth = 0 -> Some (String.prefix rest i)
+      | ')' -> close (depth - 1) (i + 1)
+      | _ -> close depth (i + 1))
+  in
+  close 0 0 |> Option.filter ~f:(fun s -> not (String.is_empty s))
+;;
+
+(* Claude Code's models, its default first (as [default]), listed once:
+   named as the model it stands for, whose own row goes. *)
 let models_of (infos : Claude_codec.Model_info.t list) =
   match infos with
   | [] -> []
@@ -83,17 +126,27 @@ let models_of (infos : Claude_codec.Model_info.t list) =
       List.partition_tf infos ~f:(fun (m : Claude_codec.Model_info.t) ->
         String.equal m.value External_model.default_id)
     in
-    let default =
-      match default with
-      | m :: _ -> { (model_of m) with name = m.display_name }
-      | [] ->
-        External_model.model
-          ~adapter:id
-          ~thinking_levels
-          ~can_disable_thinking:true
-          External_model.default_id
-    in
-    default :: List.map others ~f:model_of
+    (match default with
+     | [] ->
+       External_model.model
+         ~adapter:id
+         ~thinking_levels
+         ~can_disable_thinking:true
+         External_model.default_id
+       :: List.map others ~f:model_of
+     | d :: _ ->
+       let same, rest =
+         List.partition_tf others ~f:(fun (m : Claude_codec.Model_info.t) ->
+           Option.is_some d.resolved
+           && Option.equal String.equal m.resolved d.resolved)
+       in
+       let name =
+         match same, Option.bind d.description ~f:currently with
+         | _, Some current -> current
+         | m :: _, None -> name_of m
+         | [], None -> d.display_name
+       in
+       { (model_of d) with name } :: List.map rest ~f:model_of)
 ;;
 
 let mcp_config ~injected (start : Adapter.Start.t) =

@@ -705,6 +705,14 @@ let shown_model t =
          String.lowercase s
          |> String.map ~f:(fun c ->
            if Char.is_alphanum c || Char.equal c '.' then c else '-')
+         |> fun s ->
+         Option.value (String.chop_prefix s ~prefix:"claude-") ~default:s
+       in
+       (* The same model, maybe with more said: [opus-5] and
+          [opus-5--1m-context-], [sonnet-5] and [sonnet-5-20260101]. *)
+       let same a b =
+         let longer_by a b = String.is_prefix b ~prefix:(a ^ "-") in
+         String.equal a b || longer_by a b || longer_by b a
        in
        (match
           List.find models ~f:(fun (m : Model.t) -> String.equal m.id name)
@@ -714,7 +722,7 @@ let shown_model t =
           (match
              List.find models ~f:(fun (m : Model.t) ->
                String.equal m.id External_model.default_id
-               && String.equal (slug m.name) (slug name))
+               && same (slug m.name) (slug name))
            with
            | Some m ->
              listed t { t.model with id = m.id; provider = m.provider }
@@ -3129,6 +3137,18 @@ let runner t =
   | None -> harness_runner t
 ;;
 
+(* The session records the model it is on, unless it is [current]. *)
+let record_model t ~current =
+  if not (Option.equal String.equal current (Some (Model.key t.model)))
+  then
+    ignore
+      (Session.set_model
+         t.session
+         ~model:(Model.key t.model)
+         ~thinking:t.thinking
+       : Session.Entry.t)
+;;
+
 (* The session's model follows its runner: an external harness's (the one
    the session recorded, else the harness's default) or prigh's own. *)
 let settle_runner_model t =
@@ -3136,7 +3156,12 @@ let settle_runner_model t =
   match external_models, (engine_choice t).adapter with
   | Some models, Some adapter ->
     let adapter = Adapter_id.to_string adapter in
-    let recorded = Option.map (Session.model t.session) ~f:fst in
+    let current = Option.map (Session.model t.session) ~f:fst in
+    (* The model this harness ran last in the session, if it ran here. *)
+    let recorded =
+      Session.last_model t.session ~f:(String.is_prefix ~prefix:(adapter ^ "/"))
+      |> Option.map ~f:fst
+    in
     let model =
       if External_model.of_adapter ~adapter t.model
       then t.model
@@ -3152,19 +3177,13 @@ let settle_runner_model t =
     in
     t.model <- model;
     t.thinking <- settle_thinking model t.thinking;
-    if not (Option.equal String.equal recorded (Some (Model.key model)))
-    then
-      ignore
-        (Session.set_model
-           t.session
-           ~model:(Model.key model)
-           ~thinking:t.thinking
-         : Session.Entry.t)
+    record_model t ~current
   | _ ->
     if is_external t.model
     then (
       t.model <- t.harness_model;
-      t.thinking <- settle_thinking t.model t.thinking)
+      t.thinking <- settle_thinking t.model t.thinking;
+      record_model t ~current:(Option.map (Session.model t.session) ~f:fst))
 ;;
 
 let set_runner t runner =

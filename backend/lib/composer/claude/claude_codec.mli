@@ -60,6 +60,8 @@ module Model_info : sig
     { value : string (** what [--model] / [set_model] take *)
     ; display_name : string
     ; description : string option
+    ; resolved : string option (** the model it stands for ([claude-opus-5]) *)
+    ; efforts : string list option (** its [supportedEffortLevels] *)
     }
   [@@deriving sexp_of]
 end

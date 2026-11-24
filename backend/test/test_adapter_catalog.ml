@@ -123,15 +123,51 @@ let fake_claude (p : Line_transport.Peer.t) =
              `Object
                [ ( "models"
                  , `Array
-                     [ `Object
-                         [ "value", `String "default"
-                         ; "displayName", `String "Default (Opus 5.5)"
-                         ]
-                     ; `Object
-                         [ "value", `String "sonnet"
-                         ; "displayName", `String "Sonnet 5.5"
-                         ]
-                     ] )
+                     (* As Claude Code 2.1 says them. *)
+                     (let efforts =
+                        ( "supportedEffortLevels"
+                        , `Array
+                            (List.map
+                               [ "low"; "medium"; "high"; "xhigh"; "max" ]
+                               ~f:(fun s -> `String s)) )
+                      in
+                      [ `Object
+                          [ "value", `String "default"
+                          ; "resolvedModel", `String "claude-opus-5-5[1m]"
+                          ; "displayName", `String "Default (recommended)"
+                          ; ( "description"
+                            , `String
+                                "Use the default model (currently Opus 5.5 (1M \
+                                 context)) · $5/$25 per Mtok" )
+                          ; efforts
+                          ]
+                      ; `Object
+                          [ "value", `String "opus[1m]"
+                          ; "resolvedModel", `String "claude-opus-5-5[1m]"
+                          ; "displayName", `String "Opus (1M context)"
+                          ; ( "description"
+                            , `String
+                                "Opus 5.5 with 1M context · Best for everyday, \
+                                 complex tasks" )
+                          ; efforts
+                          ]
+                      ; `Object
+                          [ "value", `String "sonnet"
+                          ; "resolvedModel", `String "claude-sonnet-5-5"
+                          ; "displayName", `String "Sonnet"
+                          ; ( "description"
+                            , `String "Sonnet 5.5 · Efficient for routine tasks"
+                            )
+                          ; efforts
+                          ]
+                      ; `Object
+                          [ "value", `String "haiku"
+                          ; "resolvedModel", `String "claude-haiku-4-5"
+                          ; "displayName", `String "Haiku"
+                          ; ( "description"
+                            , `String "Haiku 4.5 · Fastest for quick answers" )
+                          ]
+                      ]) )
                ]
            | "get_usage" ->
              `Object
@@ -399,9 +435,10 @@ let%expect_test "claude: its models and plan limits from its own login" =
     claude got get_usage
     event: models_changed
     usage claude "Claude Code" limits five_hour=12%
-      claude/default "Default (Opus 5.5)" thinking=[off default low medium high max]
-      claude/sonnet "Sonnet 5.5" thinking=[off default low medium high max]
-    chip: claude/default (Default (Opus 5.5))
+      claude/default "Opus 5.5 (1M context)" thinking=[off default low medium high xhigh max]
+      claude/sonnet "Sonnet 5.5" thinking=[off default low medium high xhigh max]
+      claude/haiku "Haiku 4.5" thinking=[off default low medium high max]
+    chip: claude/default (Opus 5.5 (1M context))
     |}]
 ;;
 
@@ -472,5 +509,50 @@ let%expect_test
       codex/default "GPT-6.2-Sol" thinking=[default low medium high]
       codex/gpt-6.2-mini "GPT-6.2-Mini" thinking=[default low xhigh]
     chip: codex/default (GPT-6.2-Sol)
+    |}]
+;;
+
+let%expect_test
+    "switching engine: the session's model is one the new engine has, the one \
+     it last ran with there"
+  =
+  with_server
+  @@ fun ~call ~models:_ ~chip ~usage:_ ~changed ~next_change ->
+  ignore
+    (call ~params:{|{"adapter": "acp:antigravity"}|} "new_session" : Json.t);
+  (* Asking its models has prigh ask Antigravity. *)
+  ignore (call "list_models" : Json.t);
+  Eio.Promise.await changed;
+  ignore
+    (call ~params:{|{"model": "acp:antigravity/gpt-oss"}|} "set_model" : Json.t);
+  chip ();
+  let switch adapter =
+    let changed = next_change () in
+    ignore
+      (call ~params:(sprintf {|{"adapter": "%s"}|} adapter) "set_adapter"
+       : Json.t);
+    Eio.Promise.await changed;
+    printf "%s: " adapter;
+    chip ()
+  in
+  [%expect
+    {|
+    spawn agy
+    agy got initialize
+    agy got session/new
+    event: models_changed
+    chip: acp:antigravity/gpt-oss (GPT-OSS 120B (Medium))
+    |}];
+  switch "harness";
+  [%expect
+    {|
+    event: models_changed
+    harness: chip: deepseek/deepseek-flash (DeepSeek V4.1 Flash)
+    |}];
+  switch "acp:antigravity";
+  [%expect
+    {|
+    event: models_changed
+    acp:antigravity: chip: acp:antigravity/gpt-oss (GPT-OSS 120B (Medium))
     |}]
 ;;

@@ -296,8 +296,9 @@ let%expect_test "our requests and the answers to them" =
           (token_source (claude.ai)) (api_key_source ()) (api_provider ()))))
        (models
         (((value default) (display_name "Default (recommended)")
-          (description ("Opus 4.7")))
-         ((value haiku) (display_name Haiku) (description ()))))
+          (description ("Opus 4.7")) (resolved ()) (efforts ()))
+         ((value haiku) (display_name Haiku) (description ()) (resolved ())
+          (efforts ()))))
        (commands
         (((name compact) (description ("Clear history but keep a summary"))))))))
     (Response (Done Set_model))
