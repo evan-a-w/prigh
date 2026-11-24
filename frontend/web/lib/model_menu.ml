@@ -19,10 +19,15 @@ let init = { tab = Favourites; more = false; access_open = false }
 let shown = 6
 
 let offered (models : Llm.t list) ~(auth : Auth_status.t list) ~current =
+  (* A provider prigh has no login for is a CLI's (Codex, Claude Code), which
+     lists only what its own login offers. *)
   let signed_in provider =
-    List.is_empty auth
-    || List.exists auth ~f:(fun s ->
-      String.equal s.provider provider && Option.is_some s.configured)
+    match
+      List.find auth ~f:(fun (s : Auth_status.t) ->
+        String.equal s.provider provider)
+    with
+    | None -> true
+    | Some s -> Option.is_some s.configured
   in
   List.filter models ~f:(fun model ->
     Option.equal String.equal current (Some model.key)
@@ -32,7 +37,8 @@ let offered (models : Llm.t list) ~(auth : Auth_status.t list) ~current =
 (* The first run of digits and dots: "GPT-6.2 Sol" is [6; 2]. *)
 let version name =
   let start =
-    String.lfindi name ~f:(fun _ c -> Char.is_digit c) |> Option.value ~default:(-1)
+    String.lfindi name ~f:(fun _ c -> Char.is_digit c)
+    |> Option.value ~default:(-1)
   in
   if start < 0
   then None

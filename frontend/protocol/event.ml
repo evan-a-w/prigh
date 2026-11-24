@@ -163,6 +163,7 @@ type t =
       }
   | Prefs_changed of Prefs.Change.t list
   | Adapters_changed of Adapter_status.t list
+  | Models_changed
   | Memory_changed of Memory.t
   | Custom_instructions_changed of Custom_instructions.t
   | User_info_changed of User_info.t
@@ -258,6 +259,7 @@ let rec of_json j =
   | "user_info_changed" ->
     User_info.of_json j >>| fun info -> User_info_changed info
   | "mcp_auth_changed" -> Ok Mcp_auth_changed
+  | "models_changed" -> Ok Models_changed
   | "mcp_settings_changed" ->
     Mcp_settings.of_json j >>| fun servers -> Mcp_settings_changed servers
   | "prefs_changed" ->

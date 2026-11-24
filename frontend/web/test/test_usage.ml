@@ -268,3 +268,42 @@ let%expect_test "until" =
     2d
     |}]
 ;;
+
+let%expect_test
+    "a Codex or Claude Code session's CLI reports its own login's limits"
+  =
+  let h = opened () in
+  H.quiet h (fun () ->
+    H.reply
+      h
+      "usage_limits"
+      {|{"fetched_at_ms":1791194400000,"providers":[
+          {"provider":"codex","name":"Codex","status":"limits","plan":"pro",
+           "windows":[
+             {"id":"primary","label":"5-hour session","used_percent":42,
+              "resets_at_ms":1791196920000}]},
+          {"provider":"claude","name":"Claude Code","status":"error",
+           "error":"Claude Code on backend did not say: check that it is installed and logged in there (Settings → Engines)"}]}|});
+  section h;
+  [%expect
+    {|
+    (Focus dialog)
+    (Rpc (method_ usage_limits) (params ()) (tag Usage_loaded))
+    Usage
+    How much of your Claude and ChatGPT subscriptions' usage limits you have used, as the providers report it (read when you open this page), and whether a run stopped by one carries on when it resets.
+    At a limit
+    Resume after a usage limit
+    A run stopped by a provider's usage limit carries on by itself when the limit resets, if the provider says when. Off: it stays stopped until you send a message.
+    (Stay stopped at a usage limit (/resume off))
+    Subscription limits
+    Read 10:00 (just now). Updated when you open this page or press Refresh.
+    (Refresh)
+    Codex Pro
+    5-hour session
+    Resets in 42m · 10:42
+    42% used
+    Claude Code
+    Could not read the limits
+    Claude Code on backend did not say: check that it is installed and logged in there (Settings → Engines)
+    |}]
+;;

@@ -884,9 +884,15 @@ let restore_pasted editor (text, pasted) =
          ~f:(Fn.non String.is_empty)) )
 ;;
 
+(* A provider prigh has no login for is a CLI's (Codex, Claude Code), which
+   lists only what its own login offers. *)
 let logged_in m provider =
-  List.exists m.auth ~f:(fun a ->
-    String.equal a.provider provider && Option.is_some a.configured)
+  match
+    List.find m.auth ~f:(fun (a : P.Auth_status.t) ->
+      String.equal a.provider provider)
+  with
+  | None -> not (List.is_empty m.auth)
+  | Some a -> Option.is_some a.configured
 ;;
 
 (** Models Ctrl+P / Ctrl+T / [/scoped-models] operate on, in catalog order. *)
@@ -938,7 +944,7 @@ let format_tokens n =
   else sprintf "%dM" (Int.of_float (Float.round (Float.of_int n /. 1e6)))
 ;;
 
-let model_picker_value m ~logged_in_only ~query =
+let model_items m ~logged_in_only =
   let current = Option.map m.state ~f:(fun s -> s.model.key) in
   let scoped = scoped_keys m in
   let models =
@@ -946,28 +952,29 @@ let model_picker_value m ~logged_in_only ~query =
     then List.filter m.models ~f:(fun model -> logged_in m model.provider)
     else m.models
   in
-  let items =
-    List.map models ~f:(fun (model : P.Model.t) ->
-      let logged = logged_in m model.provider in
-      let scoped_mark = if Set.mem scoped model.key then " ◆" else "" in
-      Picker.Item.create
-        ~id:model.key
-        ~detail:
-          (String.concat
-             ~sep:"  "
-             ([ model.key ^ scoped_mark
-              ; "ctx " ^ format_tokens model.context_window
-              ; format_price model.cost
-              ]
-              @ if logged then [] else [ "not logged in" ]))
-        ~search:(model.name ^ " " ^ model.key)
-        ~marked:
-          (Option.value_map current ~default:false ~f:(String.equal model.key))
-        ~dimmed:(not logged)
-        model.name)
-  in
+  List.map models ~f:(fun (model : P.Model.t) ->
+    let logged = logged_in m model.provider in
+    let scoped_mark = if Set.mem scoped model.key then " ◆" else "" in
+    Picker.Item.create
+      ~id:model.key
+      ~detail:
+        (String.concat
+           ~sep:"  "
+           ([ model.key ^ scoped_mark
+            ; "ctx " ^ format_tokens model.context_window
+            ; format_price model.cost
+            ]
+            @ if logged then [] else [ "not logged in" ]))
+      ~search:(model.name ^ " " ^ model.key)
+      ~marked:
+        (Option.value_map current ~default:false ~f:(String.equal model.key))
+      ~dimmed:(not logged)
+      model.name)
+;;
+
+let model_picker_value m ~logged_in_only ~query =
   let title = if logged_in_only then "Model (logged in)" else "Model" in
-  Picker.create ~query ~title items
+  Picker.create ~query ~title (model_items m ~logged_in_only)
 ;;
 
 let model_picker ?(logged_in_only = false) m ~query =
@@ -7111,6 +7118,7 @@ let apply_event m (e : P.Event.t) =
   | Memory_changed memory -> memory_changed m memory, []
   | Custom_instructions_changed ci -> instructions_changed m ci, []
   | User_info_changed _ | Mcp_settings_changed _ | Adapters_changed _ -> m, []
+  | Models_changed -> m, [ rpc "list_models" ~tag:Models_catalog ]
   | Mcp_auth_changed ->
     m, [ call (List_mcp { reconnect = false }) ~tag:Mcp_auth_refreshed ]
   | Prefs_changed changes ->
@@ -8061,7 +8069,14 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
          , [] ))
      | Models_catalog ->
        decode json ~f:(decode_list ~f:P.Model.of_json) (fun models ->
-         { m with models }, [])
+         let m = { m with models } in
+         match m.mode with
+         | Picker { kind = Models { logged_in_only } as kind; picker } ->
+           let picker =
+             Picker.set_items picker (model_items m ~logged_in_only)
+           in
+           { m with mode = Picker { kind; picker } }, []
+         | _ -> m, [])
      | Models_for_scoped ->
        decode json ~f:(decode_list ~f:P.Model.of_json) (fun models ->
          scoped_models_picker { m with models }, [])

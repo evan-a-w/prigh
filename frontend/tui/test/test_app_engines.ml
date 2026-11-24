@@ -239,3 +239,60 @@ let%expect_test "a Codex session that reported no cost runs on a subscription" =
     /work  Codex · deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.50
     |}]
 ;;
+
+let%expect_test
+    "the model picker lists what the CLI's login offers, when it says"
+  =
+  let h = connected ~extra:codex_engine () in
+  let codex id name =
+    model_json ~provider:"codex" ~context_window:200000 id name
+  in
+  H.reply
+    ~quiet:true
+    h
+    Models_catalog
+    (sprintf "[%s]" (codex "default" "Default"));
+  H.step h (Intent Model_picker);
+  H.show h;
+  (* Codex listed its models (prigh has no OpenAI login): asked again, the
+     open picker shows them, none "not logged in". *)
+  H.event h Models_changed;
+  H.reply
+    h
+    Models_catalog
+    (sprintf
+       "[%s,%s,%s]"
+       (codex "default" "Default (GPT-6.2-Sol)")
+       (codex "gpt-6.2-sol" "GPT-6.2-Sol")
+       (codex "gpt-6.2-mini" "GPT-6.2-Mini"));
+  H.show h;
+  [%expect
+    {|
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    Model  (1)
+    / ▏
+    ▸  Default  codex/default  ctx 200k  $10/$50 per M
+    ────────────────────────────────────────────────────────────────────────────────
+    >
+    Codex · deepseek-flash  Enter selects · Esc closes · Ctrl+N logged-in only
+    (Rpc (method_ list_models) (params ()) (tag Models_catalog))
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+    Model  (3)
+    / ▏
+    ▸  Default (GPT-6.2-Sol)  codex/default  ctx 200k  $10/$50 per M
+       GPT-6.2-Sol            codex/gpt-6.2-sol  ctx 200k  $10/$50 per M
+       GPT-6.2-Mini           codex/gpt-6.2-mini  ctx 200k  $10/$50 per M
+    ────────────────────────────────────────────────────────────────────────────────
+    >
+    Codex · deepseek-flash  Enter selects · Esc closes · Ctrl+N logged-in only
+    |}]
+;;

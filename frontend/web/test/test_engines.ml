@@ -295,3 +295,46 @@ let%expect_test "a Codex session that reported no cost runs on a subscription" =
     button "Context 0% full, $0.00: details"
     |}]
 ;;
+
+let%expect_test "the picker lists what the CLI's login offers, when it says" =
+  let h = session () in
+  let codex ~id ~name = H.model_json ~provider:"codex" ~id ~name () in
+  (* Before Codex has said: only its default. *)
+  H.quiet h (fun () ->
+    H.event h {|{"type":"event","event":"models_changed"}|};
+    H.reply
+      h
+      "list_models"
+      (sprintf "[%s]" (codex ~id:"default" ~name:"Default")));
+  H.key h "l" ~ctrl:true;
+  H.names h ~selector:".model-rail-tab";
+  H.text h ~selector:".model-list";
+  [%expect
+    {|
+    (Open_chip Model)
+    (Focus popover-filter)
+    Place_popover
+    [tab] button "Favourites"
+    [tab] button "Codex"
+    Default Alt+1 (Star: into the favourites (Alt+F))
+    |}];
+  (* Codex listed its models (prigh has no OpenAI login): asked again, the
+     open menu shows them. *)
+  H.event h {|{"type":"event","event":"models_changed"}|};
+  H.reply
+    h
+    "list_models"
+    (sprintf
+       "[%s,%s,%s]"
+       (codex ~id:"default" ~name:"Default (GPT-6.2-Sol)")
+       (codex ~id:"gpt-6.2-sol" ~name:"GPT-6.2-Sol")
+       (codex ~id:"gpt-6.2-mini" ~name:"GPT-6.2-Mini"));
+  H.text h ~selector:".model-list";
+  [%expect
+    {|
+    (Rpc (method_ list_models) (params ()) (tag Models))
+    Default (GPT-6.2-Sol) Alt+1 (Star: into the favourites (Alt+F))
+    GPT-6.2-Sol Alt+2 (Star: into the favourites (Alt+F))
+    GPT-6.2-Mini Alt+3 (Star: into the favourites (Alt+F))
+    |}]
+;;

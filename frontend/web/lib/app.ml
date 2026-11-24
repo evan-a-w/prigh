@@ -9708,7 +9708,8 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
   | Refresh_sessions, Ok _ -> m, [ rpc "list_sessions" [] ~tag:Sessions ]
   | Models, Ok json ->
     decode m json (decode_list Llm.of_json) ~f:(fun models ->
-      { m with models }, [])
+      let m = { m with models } in
+      with_model_menu m m.model_menu)
   | Auth_status purpose, Ok json ->
     decode m json (decode_list Auth_status.of_json) ~f:(fun auth ->
       let m = { m with auth } in
@@ -10274,6 +10275,7 @@ let main_event (m : Model.t) (event : Event.t) =
     { m with instructions = Instruction_notes.changed m.instructions ci }, []
   | Adapters_changed statuses ->
     { m with adapters = Adapters_page.changed m.adapters statuses }, []
+  | Models_changed -> m, [ rpc "list_models" [] ~tag:Models ]
   | Memory_changed memory ->
     { m with memory = Memory_notes.changed m.memory memory }, []
   | User_info_changed info ->

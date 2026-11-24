@@ -7,7 +7,8 @@ let option_id i = sprintf "popover-option-%d" i
 
 let provider_name (m : App.Model.t) id =
   List.find m.auth ~f:(fun (s : Auth_status.t) -> String.equal s.provider id)
-  |> Option.value_map ~default:id ~f:(fun s -> s.name)
+  |> Option.value_map ~default:(Session_engine.adapter_label id) ~f:(fun s ->
+    s.name)
 ;;
 
 let access_label (mode : Session_mode.t) =
