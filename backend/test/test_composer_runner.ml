@@ -153,6 +153,7 @@ let with_composer
       ?(approval : Approval_mode.t option)
       ?(on_launch = ignore)
       ?start
+      ?transport_notice
       ~adapter
       ~peer
       f
@@ -173,7 +174,19 @@ let with_composer
           !launches
           (String.concat ~sep:" " (List.take launch.argv 2));
         on_launch launch;
-        Ok (Line_transport.Peer.spawn ~sw (peer !launches)))
+        let p = Line_transport.Peer.spawn ~sw (peer !launches) in
+        match transport_notice with
+        | None -> Ok p
+        | Some notice ->
+          Ok
+            (Line_transport.create
+               ~read_line:(fun () -> Line_transport.read_line p)
+               ~write_line:(Line_transport.write_line p)
+               ~stop:(fun () -> Line_transport.stop p)
+               ~ended:(fun () -> Line_transport.ended p)
+               ~is_ended:(fun () -> Line_transport.is_ended p)
+               ~notice
+               ()))
       ?start
       ~interrupt_grace:(Time_float.Span.of_sec 0.5)
       ()
@@ -785,8 +798,10 @@ let print_launch (launch : Adapter.Launch.t) =
       || String.equal k "CLAUDE_CODE_OAUTH_TOKEN")
   in
   printf
-    "  env %s, unset %s%s\n"
+    "  env %s,%s unset %s%s\n"
     (Sexp.to_string [%sexp (auth : (string * string) list)])
+    (Option.value_map launch.secret ~default:"" ~f:(fun s ->
+       sprintf " %s on %s (else %s)," s.value s.fd_env s.env))
     (String.concat ~sep:" " launch.env_unset)
     (Option.value_map
        (List.find launch.argv ~f:(String.is_prefix ~prefix:"--resume="))
@@ -794,7 +809,7 @@ let print_launch (launch : Adapter.Launch.t) =
        ~f:(fun r -> ", " ^ r))
 ;;
 
-let%expect_test "claude on prigh's login: in its env, renewed, refused" =
+let%expect_test "claude on prigh's login: on a descriptor, renewed, refused" =
   let credential = claude_login ~expires_min:[ 30; 120; 120 ] () in
   with_composer
     ~adapter:(module Claude_adapter)
@@ -809,7 +824,7 @@ let%expect_test "claude on prigh's login: in its env, renewed, refused" =
     user: "[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\nhi"
     prigh fetches a token
     spawn #1: claude --output-format
-      env ((CLAUDE_CODE_OAUTH_TOKEN tok-1)), unset CLAUDECODE ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN
+      env (), tok-1 on CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR (else CLAUDE_CODE_OAUTH_TOKEN), unset CLAUDECODE ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN CLAUDE_CODE_OAUTH_TOKEN
     recorded on max: ((input 3)(output 1)(cache_read 0)), $0.01
     assistant (claude/claude-sonnet-4-6, End_turn): "ok"
     |}];
@@ -820,7 +835,7 @@ let%expect_test "claude on prigh's login: in its env, renewed, refused" =
     user: "again"
     prigh fetches a token
     spawn #2: claude --output-format
-      env ((CLAUDE_CODE_OAUTH_TOKEN tok-2)), unset CLAUDECODE ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN, --resume=s1
+      env (), tok-2 on CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR (else CLAUDE_CODE_OAUTH_TOKEN), unset CLAUDECODE ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN CLAUDE_CODE_OAUTH_TOKEN, --resume=s1
     assistant (claude/claude-sonnet-4-6, (Error"OAuth token has expired: Anthropic refused prigh's login \"max\": prigh refreshes it and restarts Claude Code on your next message (/login anthropic if it is refused again)")): ""
     |}];
   (* Refused: a newer token; refused again: Claude Code's own login. *)
@@ -830,7 +845,7 @@ let%expect_test "claude on prigh's login: in its env, renewed, refused" =
     user: "and again"
     prigh fetches a token, refused tok-2
     spawn #3: claude --output-format
-      env ((CLAUDE_CODE_OAUTH_TOKEN tok-3)), unset CLAUDECODE ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN, --resume=s1
+      env (), tok-3 on CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR (else CLAUDE_CODE_OAUTH_TOKEN), unset CLAUDECODE ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN CLAUDE_CODE_OAUTH_TOKEN, --resume=s1
     assistant (claude/claude-sonnet-4-6, (Error"OAuth token has expired: Anthropic refused prigh's login \"max\": prigh refreshes it and restarts Claude Code on your next message (/login anthropic if it is refused again)")): ""
     |}];
   prompt agent "once more";
@@ -840,6 +855,34 @@ let%expect_test "claude on prigh's login: in its env, renewed, refused" =
     notice: Claude Code was refused prigh's Anthropic login "max" again, after a refresh: this session runs on Claude Code's own login on its tool host from now on (/login anthropic logs in again, for new sessions).
     spawn #4: claude --output-format
       env (), unset CLAUDECODE, --resume=s1
+    assistant (claude/claude-sonnet-4-6, End_turn): "ok"
+    |}]
+;;
+
+let%expect_test "claude on an old tool host: the token in its env, said once" =
+  with_composer
+    ~adapter:(module Claude_adapter)
+    ~transport_notice:"laptop's prigh is too old (the token is in its env)"
+    ~start:(fun ~cwd ->
+      { (Adapter.Start.default ~cwd) with
+        login = Some (claude_login ~expires_min:[ 30; 120 ] ())
+      })
+    ~peer:(fun _ -> claude_on_login ~refuse:false ())
+  @@ fun _ agent _ ->
+  prompt agent "hi";
+  prompt agent "again";
+  [%expect
+    {|
+    user: "[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\nhi"
+    prigh fetches a token
+    spawn #1: claude --output-format
+    notice: laptop's prigh is too old (the token is in its env)
+    recorded on max: ((input 3)(output 1)(cache_read 0)), $0.01
+    assistant (claude/claude-sonnet-4-6, End_turn): "ok"
+    user: "again"
+    prigh fetches a token
+    spawn #2: claude --output-format
+    recorded on max: ((input 3)(output 1)(cache_read 0)), $0.00
     assistant (claude/claude-sonnet-4-6, End_turn): "ok"
     |}]
 ;;
@@ -881,7 +924,7 @@ let%expect_test "claude: no token, or an apiKeyHelper: its own login, saying so"
     user: "[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\nhi"
     prigh fetches a token
     spawn #1: claude --output-format
-      env ((CLAUDE_CODE_OAUTH_TOKEN tok-1)), unset CLAUDECODE ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN
+      env (), tok-1 on CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR (else CLAUDE_CODE_OAUTH_TOKEN), unset CLAUDECODE ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN CLAUDE_CODE_OAUTH_TOKEN
     notice: Claude Code uses its apiKeyHelper instead of prigh's Anthropic login "max", which it prefers to a token handed to it: remove apiKeyHelper from its settings (~/.claude/settings.json on its tool host), or choose Claude Code's own login in Settings → Engines.
     assistant (claude/claude-sonnet-4-6, End_turn): "ok"
     |}]

@@ -193,16 +193,17 @@ let launch_config ~injected (start : Adapter.Start.t) : Claude_launch.t =
 ;;
 
 let launch (start : Adapter.Start.t) : Adapter.Launch.t =
-  let set, unset =
+  let login : Claude_login.Env.t =
     match start.login with
-    | None -> [], []
+    | None -> { set = []; unset = []; secret = None }
     | Some login -> Claude_login.env login ~refused:start.login_refused
   in
   { argv = Claude_launch.argv (launch_config ~injected:true start)
-  ; env_set = Claude_launch.env_set @ set
-  ; env_unset = Claude_launch.env_unset @ unset
+  ; env_set = Claude_launch.env_set @ login.set
+  ; env_unset = Claude_launch.env_unset @ login.unset
   ; mcp = false
   ; cwd = start.cwd
+  ; secret = login.secret
   }
 ;;
 

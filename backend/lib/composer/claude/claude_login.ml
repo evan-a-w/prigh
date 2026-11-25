@@ -20,9 +20,18 @@ let competing =
   [ "ANTHROPIC_API_KEY"; "ANTHROPIC_AUTH_TOKEN"; "CLAUDE_CODE_OAUTH_TOKEN" ]
 ;;
 
-let variable : Login_method.t -> string = function
-  | Oauth -> "CLAUDE_CODE_OAUTH_TOKEN"
-  | Api_key -> "ANTHROPIC_API_KEY"
+module Env = struct
+  type t =
+    { set : (string * string) list
+    ; unset : string list
+    ; secret : Adapter.Launch.Secret.t option
+    }
+
+  let none = { set = []; unset = []; secret = None }
+end
+
+let unset_but name =
+  List.filter competing ~f:(fun v -> not (String.equal v name))
 ;;
 
 let usable ~refused (resolved : Provider_auth.Resolved.t) =
@@ -39,11 +48,25 @@ let env credential ~refused =
        |> Result.map_error ~f:Error.to_string_hum)
       ~f:(usable ~refused)
   with
-  | Error _ -> [], []
+  | Error _ -> Env.none
   | Ok resolved ->
-    let name = variable resolved.method_ in
-    ( [ name, resolved.token ]
-    , List.filter competing ~f:(fun v -> not (String.equal v name)) )
+    (match resolved.method_ with
+     | Oauth ->
+       let name = "CLAUDE_CODE_OAUTH_TOKEN" in
+       { set = []
+       ; unset = competing
+       ; secret =
+           Some
+             { fd_env = "CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR"
+             ; env = name
+             ; value = resolved.token
+             }
+       }
+     | Api_key ->
+       (* Its [CLAUDE_CODE_API_KEY_FILE_DESCRIPTOR] is read only in Anthropic's
+          remote sessions. *)
+       let name = "ANTHROPIC_API_KEY" in
+       { set = [ name, resolved.token ]; unset = unset_but name; secret = None })
 ;;
 
 let own =

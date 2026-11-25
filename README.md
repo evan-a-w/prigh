@@ -391,6 +391,11 @@ login codex [LOGIN|own]` in the TUI. prigh hands Codex short-lived access
 tokens over its stdin (never a file on the host), refreshes them, and
 counts the usage on that login; the status line reads `Codex · MODEL@LOGIN`.
 A Codex too old for that runs on its own login, with a notice to update it.
+Claude Code can run on one of your Anthropic logins likewise: it gets the
+access token on a private descriptor (`CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR`),
+not in its environment, so the commands it runs never see it; a tool host
+whose prigh predates that gets it in `CLAUDE_CODE_OAUTH_TOKEN`, with a notice
+to update prigh there. An API key goes in `ANTHROPIC_API_KEY`.
 
 With `prigh serve -tokens`, a user can share one of their built-in
 providers' logins with other users: `/accounts share LOGIN [with USER]`

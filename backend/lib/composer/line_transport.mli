@@ -46,6 +46,11 @@ end
 (** Its MCP side channel, if it was started with one. *)
 val mcp : t -> Mcp.t option
 
+(** What the user should know of how the process was started (once a
+    session), e.g. that a secret meant for a descriptor is in its
+    environment. *)
+val notice : t -> string option
+
 (** A transport from its operations, for [Host_stream] and other
     implementations. [ended] blocks until the process exited. *)
 val create
@@ -55,6 +60,7 @@ val create
   -> ended:(unit -> Exit.t)
   -> is_ended:(unit -> bool)
   -> ?mcp:Mcp.t
+  -> ?notice:string
   -> unit
   -> t
 

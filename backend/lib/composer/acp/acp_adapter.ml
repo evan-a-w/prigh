@@ -170,6 +170,7 @@ let create
       ; env_unset = []
       ; cwd = start.cwd
       ; mcp = true
+      ; secret = None
       }
     ;;
 

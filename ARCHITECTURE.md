@@ -149,7 +149,11 @@ switches the cwd, and `~` means the host's home.
   connection to a Unix socket in a private directory that first presents
   the token reported in `started`: a `prigh mcp-bridge` the program runs as
   an MCP server, given socket and token only in its MCP config (`{{prigh}}`
-  and `{{mcp_socket}}` in the arguments name them). `Host_stream` is the
+  and `{{mcp_socket}}` in the arguments name them). With `secret`, the program
+  gets it as one line on a socket at fd 3 (named by a variable the caller
+  chose), never in its environment; `started` says so. An older host
+  ignores it: `Host_transport` restarts the program with it in the
+  environment and a notice. `Host_stream` is the
   backend's end: lines in and out (at most 12 MiB each), `stop`,
   `interrupt` and an `ended` saying why (exited, not installed or only on a
   login shell's `PATH`, an older host, the host gone). `$probe_programs`

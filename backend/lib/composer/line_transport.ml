@@ -23,13 +23,15 @@ type t =
   ; ended : unit -> Exit.t
   ; is_ended : unit -> bool
   ; mcp : Mcp.t option
+  ; notice : string option
   }
 
-let create ~read_line ~write_line ~stop ~ended ~is_ended ?mcp () =
-  { read_line; write_line; stop; ended; is_ended; mcp }
+let create ~read_line ~write_line ~stop ~ended ~is_ended ?mcp ?notice () =
+  { read_line; write_line; stop; ended; is_ended; mcp; notice }
 ;;
 
 let mcp t = t.mcp
+let notice t = t.notice
 let read_line t = t.read_line ()
 let write_line t line = t.write_line line
 let stop t = t.stop ()
@@ -113,6 +115,7 @@ module Peer = struct
     ; ended = (fun () -> Promise.await exited)
     ; is_ended = (fun () -> Promise.is_resolved exited)
     ; mcp = None
+    ; notice = None
     }
   ;;
 end

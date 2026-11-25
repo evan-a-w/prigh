@@ -58,22 +58,9 @@ module Mcp_side = struct
   ;;
 end
 
-let spawn ~sw ~exec ~host ?on_stderr (launch : Adapter.Launch.t) =
-  let arguments =
-    { (Host_process.Arguments.create ~argv:launch.argv) with
-      env = launch.env_set
-    ; env_unset = launch.env_unset
-    ; mcp = launch.mcp
-    }
-  in
-  (* Its tail comes with the exit: what it writes before is only worth
-     sending when someone reads it. *)
-  let arguments =
-    if Option.is_none on_stderr
-    then { arguments with stderr_rate = 0 }
-    else arguments
-  in
-  let side = Option.some_if launch.mcp (Mcp_side.create ()) in
+(* Starts [arguments] and waits until it started. *)
+let start ~sw ~exec ~host ?on_stderr (arguments : Host_process.Arguments.t) =
+  let side = Option.some_if arguments.mcp (Mcp_side.create ()) in
   let s =
     Host_stream.start
       ~sw
@@ -89,7 +76,63 @@ let spawn ~sw ~exec ~host ?on_stderr (launch : Adapter.Launch.t) =
     Host_stream.stop s;
     raise exn
   | Error ended -> Error (Error.of_string (Host_stream.Ended.to_message ended))
-  | Ok started ->
+  | Ok started -> Ok (side, s, started)
+;;
+
+let secret_notice ~host ~program ~env =
+  sprintf
+    "%s's prigh cannot hand %s prigh's login privately, so it has it in %s, \
+     which every command it runs inherits: update prigh on %s to keep it out."
+    host
+    program
+    env
+    host
+;;
+
+let spawn ~sw ~exec ~host ?on_stderr (launch : Adapter.Launch.t) =
+  let arguments =
+    { (Host_process.Arguments.create ~argv:launch.argv) with
+      env = launch.env_set
+    ; env_unset = launch.env_unset
+    ; mcp = launch.mcp
+    ; secret =
+        Option.map launch.secret ~f:(fun { fd_env; value; env = _ } ->
+          { Host_process.Secret.fd_env; value })
+    }
+  in
+  (* Its tail comes with the exit: what it writes before is only worth
+     sending when someone reads it. *)
+  let arguments =
+    if Option.is_none on_stderr
+    then { arguments with stderr_rate = 0 }
+    else arguments
+  in
+  let start = start ~sw ~exec ~host ?on_stderr in
+  let started =
+    match start arguments, launch.secret with
+    | Ok (_, s, started), Some { env; value; fd_env = _ }
+      when not started.secret ->
+      (* A host too old to hand it on a descriptor started the program
+         without it: again, with it in the environment. *)
+      Host_stream.stop s;
+      Or_error.map
+        (start
+           { arguments with
+             secret = None
+           ; env = arguments.env @ [ env, value ]
+           })
+        ~f:(fun started ->
+          ( started
+          , Some
+              (secret_notice
+                 ~host
+                 ~program:(Filename.basename (List.hd_exn launch.argv))
+                 ~env) ))
+    | started, _ -> Or_error.map started ~f:(fun started -> started, None)
+  in
+  match started with
+  | Error _ as e -> e
+  | Ok ((side, s, started), notice) ->
     let mcp =
       match side, started.mcp_socket, started.mcp_token with
       | Some side, Some socket, Some token ->
@@ -113,5 +156,6 @@ let spawn ~sw ~exec ~host ?on_stderr (launch : Adapter.Launch.t) =
          ~ended:(fun () -> exit_of (Promise.await (Host_stream.ended s)))
          ~is_ended:(fun () -> Promise.is_resolved (Host_stream.ended s))
          ?mcp
+         ?notice
          ())
 ;;

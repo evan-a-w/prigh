@@ -32,6 +32,7 @@ type t =
   ; mutable not_git : (string * string) option
     (* a cwd whose files have no checkpoints, and why *)
   ; mutable checkpoint_noted : bool
+  ; mutable transport_noted : bool (* [Line_transport.notice] was shown *)
   ; mutable forking : string option (* the thread a new one forks *)
   ; mutable services : Engine_intf.Services.t option (* the running turn's *)
   ; mutable cancel : Cancellation.t
@@ -82,6 +83,7 @@ let create
   ; checkpoint
   ; not_git = None
   ; checkpoint_noted = false
+  ; transport_noted = false
   ; forking = None
   ; services = None
   ; cancel = Cancellation.never
@@ -201,6 +203,11 @@ let start_process t (s : Engine_intf.Services.t) (start : Adapter.Start.t) =
   match t.spawn (A.launch start) with
   | Error e -> Error (`Spawn e)
   | Ok transport ->
+    Option.iter (Line_transport.notice transport) ~f:(fun notice ->
+      if not t.transport_noted
+      then (
+        t.transport_noted <- true;
+        s.notice notice));
     let injected = injected t s in
     (* A harness with no MCP in its protocol reaches prigh's tools through
        the bridge on its host. *)

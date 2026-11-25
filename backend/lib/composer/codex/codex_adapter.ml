@@ -41,6 +41,7 @@ let launch (start : Adapter.Start.t) : Adapter.Launch.t =
   ; env_unset = []
   ; cwd = start.cwd
   ; mcp = true
+  ; secret = None
   }
 ;;
 

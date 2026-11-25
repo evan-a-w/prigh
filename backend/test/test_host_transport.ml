@@ -17,12 +17,13 @@ let exec (t : Tool_test_helpers.t) : Host_stream.Exec.t =
     ()
 ;;
 
-let launch ?(mcp = false) argv : Adapter.Launch.t =
+let launch ?(mcp = false) ?secret argv : Adapter.Launch.t =
   { argv
   ; env_set = [ "GREETING", "hello" ]
   ; env_unset = [ "HOME" ]
   ; cwd = "."
   ; mcp
+  ; secret
   }
 ;;
 
@@ -142,5 +143,66 @@ let%expect_test
     {"jsonrpc":"2.0","id":1,"result":{"tools":[{"name":"render_ui","description":"Shows rich components inline in the user's
     done
     ((code (0)) (stderr_tail ""))
+    |}]
+;;
+
+let%expect_test "a secret: on a descriptor, or in an old host's environment" =
+  with_sandbox
+  @@ fun t ->
+  Eio.Switch.run
+  @@ fun sw ->
+  let script =
+    {|echo "fd ${SECRET_FD-unset}, env ${SECRET-unset}"
+if read -r s <&3 2>/dev/null; then echo "read $s"; else echo "no fd 3"; fi
+env | grep -c hunter2|}
+  in
+  let secret =
+    { Adapter.Launch.Secret.fd_env = "SECRET_FD"
+    ; env = "SECRET"
+    ; value = "hunter2"
+    }
+  in
+  (* A host predating [secret] ignores it. *)
+  let old_host ~stdin ~cancel ~on_output ~name = function
+    | `Object fields ->
+      exec
+        t
+        ~stdin
+        ~cancel
+        ~on_output
+        ~name
+        (`Object (List.Assoc.remove fields ~equal:String.equal "secret"))
+    | arguments -> exec t ~stdin ~cancel ~on_output ~name arguments
+  in
+  List.iter
+    [ "new", exec t; "old", old_host ]
+    ~f:(fun (which, exec) ->
+      let transport =
+        Host_transport.spawn
+          ~sw
+          ~exec
+          ~host:"laptop"
+          (launch ~secret [ "sh"; "-c"; script ])
+        |> Or_error.ok_exn
+      in
+      printf "%s host\n" which;
+      Option.iter (Line_transport.notice transport) ~f:(printf "notice: %s\n");
+      let rec lines () =
+        Option.iter (Line_transport.read_line transport) ~f:(fun line ->
+          print_endline line;
+          lines ())
+      in
+      lines ());
+  [%expect
+    {|
+    new host
+    fd 3, env unset
+    read hunter2
+    0
+    old host
+    notice: laptop's prigh cannot hand sh prigh's login privately, so it has it in SECRET, which every command it runs inherits: update prigh on laptop to keep it out.
+    fd unset, env hunter2
+    no fd 3
+    1
     |}]
 ;;

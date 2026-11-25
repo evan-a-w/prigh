@@ -72,6 +72,19 @@ end
 
 (** The process to run, on the session's tool host. *)
 module Launch = struct
+  (** A secret for the process, kept out of its environment where its host
+      can: there the commands it runs would inherit it. *)
+  module Secret = struct
+    type t =
+      { fd_env : string
+        (** the variable naming the descriptor it is read from, on a host
+            that can hand it so ({!Host_process}'s [secret]) *)
+      ; env : string (** the variable carrying it, on another host *)
+      ; value : string [@sexp.opaque]
+      }
+    [@@deriving sexp_of]
+  end
+
   type t =
     { argv : string list
     ; env_set : (string * string) list
@@ -80,6 +93,7 @@ module Launch = struct
     ; mcp : bool
       (** with an MCP side channel, through which prigh's tools reach a
           harness that has no MCP of its own in its protocol *)
+    ; secret : Secret.t option
     }
   [@@deriving sexp_of]
 end

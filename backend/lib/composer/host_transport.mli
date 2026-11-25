@@ -9,7 +9,11 @@ open! Import
 
     Waits until the process started: fails, saying what to do, when the
     program is not installed there, the host's prigh is too old to run it
-    or the host went away. [host]: the host's name, for messages. *)
+    or the host went away. [host]: the host's name, for messages.
+
+    [launch.secret] goes on a descriptor; a host that did not hand it so (its
+    prigh predates that) has the program started again with it in the
+    environment, and a {!Line_transport.notice} saying so. *)
 val spawn
   :  sw:Switch.t
   -> exec:Host_stream.Exec.t
