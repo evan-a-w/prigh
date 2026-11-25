@@ -195,7 +195,18 @@ let granted t ~recipient provider ~owner id =
   | Ok (_, None) | Error _ -> false
 ;;
 
-let resolve t ~env ?cancel ?refresh ~recipient provider ~owner id =
+let resolve
+      t
+      ~env
+      ?cancel
+      ?refresh
+      ?refused
+      ?valid_for_ms
+      ~recipient
+      provider
+      ~owner
+      id
+  =
   let open Or_error.Let_syntax in
   let%bind () = check_enabled t in
   let%bind owner_user, account = find_account t provider ~owner id in
@@ -224,6 +235,8 @@ let resolve t ~env ?cancel ?refresh ~recipient provider ~owner id =
          ?cancel
          ~getenv:(fun _ -> None)
          ?refresh
+         ?refused
+         ?valid_for_ms
          ~account:id
          owner_user.store
          provider

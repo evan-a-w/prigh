@@ -604,6 +604,7 @@ let%expect_test "logins shared with the user: asked with the owner's token" =
                  ; account_id = Some "acct-alice"
                  ; source = "oauth"
                  ; account = None
+                 ; expires_ms = None
                  }))
         ; shared ~owner:"carol" (fun () ->
             Or_error.error_string

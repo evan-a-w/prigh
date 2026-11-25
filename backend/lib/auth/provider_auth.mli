@@ -15,6 +15,7 @@ module Resolved : sig
     ; account_id : string option
     ; source : string
     ; account : Account_id.t option (** [None]: from the environment *)
+    ; expires_ms : int option (** an OAuth token's expiry, Unix ms *)
     }
   [@@deriving sexp_of]
 end
@@ -52,13 +53,18 @@ val env_vars : Provider_id.t -> string list
 
 (** Refreshes OAuth tokens that expire within five minutes, persisting the
     rotated credential under the store lock. [None] means not configured.
-    [account] (default: the provider's default one) must be logged in. *)
+    [account] (default: the provider's default one) must be logged in.
+    [refused]: an access token a client was refused with (an agent CLI
+    got a 401): refreshed if it is still the stored one. [valid_for_ms]:
+    refresh one that expires within that long. *)
 val resolve
   :  env:Env.t
   -> ?cancel:Cancellation.t
   -> ?getenv:(string -> string option)
   -> ?refresh:
        (Provider_id.t -> refresh_token:string -> Credential.Oauth.t Or_error.t)
+  -> ?refused:string
+  -> ?valid_for_ms:int
   -> ?account:Account_id.t
   -> Auth_store.t
   -> Provider_id.t

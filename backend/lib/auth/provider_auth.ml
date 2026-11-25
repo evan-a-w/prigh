@@ -24,6 +24,7 @@ module Resolved = struct
     ; account_id : string option
     ; source : string
     ; account : Account_id.t option
+    ; expires_ms : int option
     }
   [@@deriving sexp_of]
 end
@@ -73,13 +74,19 @@ let refresh_oauth ~env ~cancel provider ~refresh_token =
 (* Double-checked: the cheap read decides whether to take the lock; the
    authoritative expiry check runs under it, so a concurrent refresh (this
    process or another) is observed instead of repeated. *)
-let fresh_oauth ~refresh store provider id (stored : Credential.Oauth.t) =
-  if not (Credential.oauth_needs_refresh stored)
+let fresh_oauth ?refused ?valid_for_ms ~refresh store provider id stored =
+  let needs (o : Credential.Oauth.t) =
+    Option.exists refused ~f:(String.equal o.access)
+    || Credential.oauth_needs_refresh o
+    || Option.exists valid_for_ms ~f:(fun ms ->
+      Credential.now_ms () + ms >= o.expires_ms)
+  in
+  if not (needs stored)
   then Ok stored
   else
     Or_error.bind
       (Provider_accounts.modify store provider id ~f:(function
-         | Some (Oauth current) when Credential.oauth_needs_refresh current ->
+         | Some (Oauth current) when needs current ->
            Or_error.map
              (refresh provider ~refresh_token:current.refresh)
              ~f:(fun c -> Some (Credential.Oauth c))
@@ -114,6 +121,8 @@ let resolve
       ?(cancel = Cancellation.never)
       ?(getenv = Sys.getenv)
       ?(refresh = refresh_oauth ~env ~cancel)
+      ?refused
+      ?valid_for_ms
       ?account
       store
       provider
@@ -140,6 +149,7 @@ let resolve
          ; account_id = None
          ; source = "stored api key"
          ; account = Some id
+         ; expires_ms = None
          })
   | Some { credential = Oauth _; _ } when Provider_id.is_custom provider ->
     Or_error.errorf
@@ -149,13 +159,16 @@ let resolve
       (Provider_id.to_string provider)
       (Provider_id.to_string provider)
   | Some { credential = Oauth stored; id; _ } ->
-    let%map c = fresh_oauth ~refresh store provider id stored in
+    let%map c =
+      fresh_oauth ?refused ?valid_for_ms ~refresh store provider id stored
+    in
     Some
       { Resolved.token = c.access
       ; method_ = Oauth
       ; account_id = c.account_id
       ; source = "oauth"
       ; account = Some id
+      ; expires_ms = Some c.expires_ms
       }
   | None ->
     Ok
@@ -165,6 +178,7 @@ let resolve
          ; account_id = None
          ; source = name
          ; account = None
+         ; expires_ms = None
          }))
 ;;
 

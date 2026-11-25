@@ -505,6 +505,7 @@ let load ~home =
 let known_fields =
   "providers"
   :: "forges"
+  :: "adapters"
   :: "confirm_tools"
   ::
   (match to_json default with

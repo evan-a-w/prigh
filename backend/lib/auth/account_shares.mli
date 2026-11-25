@@ -95,6 +95,8 @@ val resolve
   -> ?cancel:Cancellation.t
   -> ?refresh:
        (Provider_id.t -> refresh_token:string -> Credential.Oauth.t Or_error.t)
+  -> ?refused:string
+  -> ?valid_for_ms:int (** as for {!Provider_auth.resolve} *)
   -> recipient:string
   -> Provider_id.t
   -> owner:string

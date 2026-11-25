@@ -36,6 +36,9 @@ val refresh
   -> unit
   -> Credential.Oauth.t Or_error.t
 
+(** The ChatGPT plan (["plus"], ["pro"]) an access token's claims name. *)
+val plan_of_token : string -> string option
+
 module For_testing : sig
   val authorize_url : Config.t -> Pkce.Pair.t -> state:string -> string
   val account_id_of_token : string -> string option
