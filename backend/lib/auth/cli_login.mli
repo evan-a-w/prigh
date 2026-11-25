@@ -13,7 +13,7 @@ type t =
 [@@deriving sexp_of, equal]
 
 (** The provider whose logins an adapter can run on: [codex] runs on
-    [openai-codex] (ChatGPT); [None]: only on its own. *)
+    [openai-codex] (ChatGPT), [claude] on [anthropic] (Claude Pro/Max or an API key); [None]: only on its own. *)
 val provider : adapter:string -> Provider_id.t option
 
 (** The adapters that can run on one of prigh's logins. *)

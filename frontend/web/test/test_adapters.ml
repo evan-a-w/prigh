@@ -304,3 +304,39 @@ let%expect_test "a Codex session on prigh's login: Codex · MODEL@LOGIN" =
   H.text h ~selector:".model-chip";
   [%expect {| (Codex · Opus 5.5 @Work) |}]
 ;;
+
+let%expect_test "Engines: Claude Code's login warns of Anthropic's terms" =
+  let h = H.create () in
+  H.quiet h (fun () -> H.act h (hello ~features:[ "engines" ]));
+  H.quiet h (fun () -> H.act h (Settings_section Engines));
+  H.reply
+    h
+    "list_adapters"
+    {|{"adapters":[],"adapter_logins":[{"adapter":"claude","provider":"anthropic","login":"max","label":"Max","choices":[{"ref":"max","label":"Max"}]}]}|};
+  H.text h ~selector:".adapter-login";
+  [%expect
+    {|
+    Claude Code login
+    Your Claude Code sessions run on Claude Code's own login on their tool host, or on one of your Claude Pro/Max logins in prigh (yours or shared with you): prigh hands the host short-lived tokens and counts the usage on that login. Anthropic's terms keep Claude Pro/Max logins to Claude's own apps: prigh holding one for Claude Code may breach them
+    (Max)
+    |}]
+;;
+
+let%expect_test
+    "a Claude Code session on prigh's login: Claude Code · MODEL@LOGIN"
+  =
+  let h =
+    H.create
+      ~state:
+        (H.state_json
+           ~fields:
+             [ "engine", `String "composer"
+             ; "adapter", `String "claude"
+             ; "adapter_login", `String "Max"
+             ]
+           ())
+      ()
+  in
+  H.text h ~selector:".model-chip";
+  [%expect {| (Claude Code · Opus 5.5 @Max) |}]
+;;

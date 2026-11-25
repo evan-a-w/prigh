@@ -149,7 +149,14 @@ let print_event t (e : Agent.Event.t) =
   | _ -> ()
 ;;
 
-let with_composer ?(approval : Approval_mode.t option) ?start ~adapter ~peer f =
+let with_composer
+      ?(approval : Approval_mode.t option)
+      ?(on_launch = ignore)
+      ?start
+      ~adapter
+      ~peer
+      f
+  =
   with_sandbox
   @@ fun t ->
   Eio.Switch.run
@@ -165,6 +172,7 @@ let with_composer ?(approval : Approval_mode.t option) ?start ~adapter ~peer f =
           "spawn #%d: %s\n"
           !launches
           (String.concat ~sep:" " (List.take launch.argv 2));
+        on_launch launch;
         Ok (Line_transport.Peer.spawn ~sw (peer !launches)))
       ?start
       ~interrupt_grace:(Time_float.Span.of_sec 0.5)
@@ -686,5 +694,195 @@ let%expect_test "codex without the mode, or no token: its own login, saying so" 
     notice: prigh's ChatGPT login "work" has no token for Codex (refreshing failed: /login openai-codex): this session runs on Codex's own login on its tool host (codex login there).
     codex refreshed: {"id":0,"error":{"code":-32603,"message":"prigh handed this Codex no login: it runs on its own"}}
     assistant (codex/gpt-5, End_turn): "ok"
+    |}]
+;;
+
+(* Claude Code on prigh's login: it answers [initialize] saying which
+   [apiKeySource] it uses, then each prompt with "ok", or a 401 when
+   [refuse]. *)
+let claude_on_login
+      ?(api_key_source = "none")
+      ~refuse
+      ()
+      (p : Line_transport.Peer.t)
+  =
+  let read () =
+    Option.map (Line_transport.Peer.read_line p) ~f:(fun line ->
+      Json.parse line |> Or_error.ok_exn)
+  in
+  let write = Line_transport.Peer.write_line p in
+  let request_id j = Option.bind (Json.member "request_id" j) ~f:Json.string in
+  (match read () with
+   | Some init ->
+     write
+       (sprintf
+          {|{"type":"control_response","response":{"subtype":"success","request_id":"%s","response":{"claude_code_version":"2.1.330","models":[],"commands":[],"account":{"tokenSource":"CLAUDE_CODE_OAUTH_TOKEN","apiKeySource":"%s"}}}}|}
+          (Option.value (request_id init) ~default:"")
+          api_key_source)
+   | None -> ());
+  let rec turns () =
+    match read () with
+    | None -> ()
+    | Some j ->
+      (match Option.bind (Json.member "type" j) ~f:Json.string with
+       | Some "user" ->
+         write
+           {|{"type":"system","subtype":"init","apiKeySource":"none","model":"claude-sonnet-4-6","session_id":"s1"}|};
+         if refuse
+         then
+           write
+             {|{"type":"result","subtype":"success","is_error":true,"api_error_status":401,"result":"OAuth token has expired","session_id":"s1","usage":{"input_tokens":0,"output_tokens":0}}|}
+         else (
+           write
+             {|{"type":"assistant","message":{"model":"claude-sonnet-4-6","id":"m1","type":"message","role":"assistant","content":[{"type":"text","text":"ok"}],"usage":{"input_tokens":3,"output_tokens":1}},"session_id":"s1","uuid":"u1"}|};
+           write
+             {|{"type":"result","subtype":"success","is_error":false,"result":"ok","session_id":"s1","total_cost_usd":0.01,"usage":{"input_tokens":3,"output_tokens":1}}|})
+       | _ -> ());
+      turns ()
+  in
+  turns ()
+;;
+
+(* prigh's Claude login [max]: [tok-N], expiring in [expires_min.(N-1)]
+   minutes. *)
+let claude_login ?(fail = false) ~expires_min () =
+  let n = ref 0 in
+  Cli_credential.create
+    ~provider:Anthropic
+    ~account:(Own (Account_id.of_string "max" |> Or_error.ok_exn))
+    ~label:"max"
+    ~fetch:(fun ?refused ?valid_for_ms:_ () ->
+      incr n;
+      printf
+        "prigh fetches a token%s\n"
+        (Option.value_map refused ~default:"" ~f:(sprintf ", refused %s"));
+      if fail
+      then Or_error.error_string "refreshing failed: /login anthropic"
+      else
+        Ok
+          { Provider_auth.Resolved.token = sprintf "tok-%d" !n
+          ; method_ = Oauth
+          ; account_id = None
+          ; source = "oauth"
+          ; account = None
+          ; expires_ms =
+              Some
+                (Credential.now_ms ()
+                 + (60_000 * List.nth_exn expires_min (!n - 1)))
+          })
+    ~record:(fun usage ~cost_usd ->
+      printf
+        "recorded on max: %s, $%.2f\n"
+        (Sexp.to_string [%sexp (usage : Usage.t)])
+        cost_usd)
+    ()
+;;
+
+let print_launch (launch : Adapter.Launch.t) =
+  let auth =
+    List.filter launch.env_set ~f:(fun (k, _) ->
+      String.is_prefix k ~prefix:"ANTHROPIC"
+      || String.equal k "CLAUDE_CODE_OAUTH_TOKEN")
+  in
+  printf
+    "  env %s, unset %s%s\n"
+    (Sexp.to_string [%sexp (auth : (string * string) list)])
+    (String.concat ~sep:" " launch.env_unset)
+    (Option.value_map
+       (List.find launch.argv ~f:(String.is_prefix ~prefix:"--resume="))
+       ~default:""
+       ~f:(fun r -> ", " ^ r))
+;;
+
+let%expect_test "claude on prigh's login: in its env, renewed, refused" =
+  let credential = claude_login ~expires_min:[ 30; 120; 120 ] () in
+  with_composer
+    ~adapter:(module Claude_adapter)
+    ~on_launch:print_launch
+    ~start:(fun ~cwd ->
+      { (Adapter.Start.default ~cwd) with login = Some credential })
+    ~peer:(fun n -> claude_on_login ~refuse:(n = 2 || n = 3) ())
+  @@ fun _ agent _ ->
+  prompt agent "hi";
+  [%expect
+    {|
+    user: "[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\nhi"
+    prigh fetches a token
+    spawn #1: claude --output-format
+      env ((CLAUDE_CODE_OAUTH_TOKEN tok-1)), unset CLAUDECODE ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN
+    recorded on max: ((input 3)(output 1)(cache_read 0)), $0.01
+    assistant (claude/claude-sonnet-4-6, End_turn): "ok"
+    |}];
+  (* The token expires within the hour: a new process, on the thread. *)
+  prompt agent "again";
+  [%expect
+    {|
+    user: "again"
+    prigh fetches a token
+    spawn #2: claude --output-format
+      env ((CLAUDE_CODE_OAUTH_TOKEN tok-2)), unset CLAUDECODE ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN, --resume=s1
+    assistant (claude/claude-sonnet-4-6, (Error"OAuth token has expired: Anthropic refused prigh's login \"max\": prigh refreshes it and restarts Claude Code on your next message (/login anthropic if it is refused again)")): ""
+    |}];
+  (* Refused: a newer token; refused again: Claude Code's own login. *)
+  prompt agent "and again";
+  [%expect
+    {|
+    user: "and again"
+    prigh fetches a token, refused tok-2
+    spawn #3: claude --output-format
+      env ((CLAUDE_CODE_OAUTH_TOKEN tok-3)), unset CLAUDECODE ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN, --resume=s1
+    assistant (claude/claude-sonnet-4-6, (Error"OAuth token has expired: Anthropic refused prigh's login \"max\": prigh refreshes it and restarts Claude Code on your next message (/login anthropic if it is refused again)")): ""
+    |}];
+  prompt agent "once more";
+  [%expect
+    {|
+    user: "once more"
+    notice: Claude Code was refused prigh's Anthropic login "max" again, after a refresh: this session runs on Claude Code's own login on its tool host from now on (/login anthropic logs in again, for new sessions).
+    spawn #4: claude --output-format
+      env (), unset CLAUDECODE, --resume=s1
+    assistant (claude/claude-sonnet-4-6, End_turn): "ok"
+    |}]
+;;
+
+let%expect_test "claude: no token, or an apiKeyHelper: its own login, saying so"
+  =
+  with_composer
+    ~adapter:(module Claude_adapter)
+    ~on_launch:print_launch
+    ~start:(fun ~cwd ->
+      { (Adapter.Start.default ~cwd) with
+        login = Some (claude_login ~fail:true ~expires_min:[] ())
+      })
+    ~peer:(fun _ -> claude_on_login ~refuse:false ())
+  @@ fun _ agent _ ->
+  prompt agent "hi";
+  [%expect
+    {|
+    user: "[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\nhi"
+    prigh fetches a token
+    spawn #1: claude --output-format
+      env (), unset CLAUDECODE
+    notice: prigh's Anthropic login "max" has no token for Claude Code (refreshing failed: /login anthropic): this session runs on Claude Code's own login on its tool host (claude /login there).
+    assistant (claude/claude-sonnet-4-6, End_turn): "ok"
+    |}];
+  with_composer
+    ~adapter:(module Claude_adapter)
+    ~on_launch:print_launch
+    ~start:(fun ~cwd ->
+      { (Adapter.Start.default ~cwd) with
+        login = Some (claude_login ~expires_min:[ 120 ] ())
+      })
+    ~peer:(fun _ ->
+      claude_on_login ~api_key_source:"apiKeyHelper" ~refuse:false ())
+  @@ fun _ agent _ ->
+  prompt agent "hi";
+  [%expect
+    {|
+    user: "[Client: the user is on another client, which cannot display components: do not call render_ui; answer in text (markdown is fine).]\n\nhi"
+    prigh fetches a token
+    spawn #1: claude --output-format
+      env ((CLAUDE_CODE_OAUTH_TOKEN tok-1)), unset CLAUDECODE ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN
+    notice: Claude Code uses its apiKeyHelper instead of prigh's Anthropic login "max", which it prefers to a token handed to it: remove apiKeyHelper from its settings (~/.claude/settings.json on its tool host), or choose Claude Code's own login in Settings → Engines.
+    assistant (claude/claude-sonnet-4-6, End_turn): "ok"
     |}]
 ;;

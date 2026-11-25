@@ -570,7 +570,7 @@ let%expect_test "Codex on one of prigh's ChatGPT logins: chosen, listed, shown" 
     logins
       (call ~params:{|{"adapter":"codex","login":"home"}|} "set_adapter_login");
     logins
-      (call ~params:{|{"adapter":"claude","login":"work"}|} "set_adapter_login");
+      (call ~params:{|{"adapter":"gemini","login":"work"}|} "set_adapter_login");
     logins
       (call ~params:{|{"adapter":"codex","login":"own"}|} "set_adapter_login");
     state_login ();
@@ -578,8 +578,8 @@ let%expect_test "Codex on one of prigh's ChatGPT logins: chosen, listed, shown" 
       (In_channel.read_all (Filename.concat t.dir ".prigh/config.json")));
   [%expect
     {|
-    [{"adapter":"codex","provider":"openai-codex","login":null,"label":null,"choices":[{"ref":"main","label":"Work"}]}]
-    [{"adapter":"codex","provider":"openai-codex","login":"main","label":"Work","choices":[{"ref":"main","label":"Work"}]}]
+    [{"adapter":"codex","provider":"openai-codex","login":null,"label":null,"choices":[{"ref":"main","label":"Work"}]},{"adapter":"claude","provider":"anthropic","login":null,"label":null,"choices":[]}]
+    [{"adapter":"codex","provider":"openai-codex","login":"main","label":"Work","choices":[{"ref":"main","label":"Work"}]},{"adapter":"claude","provider":"anthropic","login":null,"label":null,"choices":[]}]
     {
       "adapters": {
         "codex": {
@@ -590,8 +590,8 @@ let%expect_test "Codex on one of prigh's ChatGPT logins: chosen, listed, shown" 
     (adapter_login ())
     (adapter_login ("\"Work\""))
     {"type":"response","id":"r","ok":false,"error":"ChatGPT has no account \"home\": it has Work (main)"}
-    {"type":"response","id":"r","ok":false,"error":"claude runs only on its own login (prigh can hand one of its logins to: codex)"}
-    [{"adapter":"codex","provider":"openai-codex","login":null,"label":null,"choices":[{"ref":"main","label":"Work"}]}]
+    {"type":"response","id":"r","ok":false,"error":"gemini runs only on its own login (prigh can hand one of its logins to: codex, claude)"}
+    [{"adapter":"codex","provider":"openai-codex","login":null,"label":null,"choices":[{"ref":"main","label":"Work"}]},{"adapter":"claude","provider":"anthropic","login":null,"label":null,"choices":[]}]
     (adapter_login ())
     {}
     |}]

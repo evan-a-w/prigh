@@ -25,6 +25,13 @@ type t =
 (** From a reply's [adapter_logins] ([\[\]] when absent: an older backend). *)
 val list_of_json : Json.t -> t list Or_error.t
 
+(** For a provider whose terms frown on prigh handing its logins to the CLI
+    (Anthropic): a line to show where the user chooses one. *)
+val warning : t -> string option
+
+(** ["ChatGPT"], ["Claude Pro/Max"]: whose logins it takes. *)
+val provider_name : t -> string
+
 (** ["Codex's own login"], ["ChatGPT (prigh) · Work"]. *)
 val describe : t -> string
 

@@ -26,6 +26,9 @@ module Start = struct
     ; login : Cli_credential.t option
       (** one of prigh's logins to run on, for a harness that can take one
           ({!Cli_login}); [None]: its own *)
+    ; login_refused : (string option[@sexp.opaque])
+      (** the token of [login] the previous process was refused with: this
+          one wants a newer one ({!S.renewal}) *)
     }
   [@@deriving sexp_of]
 
@@ -42,6 +45,7 @@ module Start = struct
     ; developer_instructions = None
     ; mcp_servers = []
     ; login = None
+    ; login_refused = None
     }
   ;;
 end
@@ -97,6 +101,16 @@ module Catalog = struct
     ; limits : Subscription_usage.Status.t option
     }
   [@@deriving sexp_of]
+end
+
+(** Why a harness on one of prigh's logins wants its process replaced
+    before the next turn, its thread continued ({!S.renewal}): for a harness
+    that takes the login only when it starts (Claude Code). *)
+module Login_renewal = struct
+  type t =
+    | Expiring (** the token it was given expires soon *)
+    | Refused of string (** it was refused with this token *)
+  [@@deriving sexp_of, equal]
 end
 
 (** How a harness takes its conversation back to an earlier turn. *)
@@ -228,6 +242,10 @@ module type S = sig
   (** The login of prigh's its process runs on ([Start.login], unless it
       could not take it); [None]: its own. *)
   val login : t -> Cli_credential.t option
+
+  (** Whether its process should be replaced before the next turn: see
+      {!Login_renewal}. A harness that renews its login itself: [None]. *)
+  val renewal : t -> Login_renewal.t option
 
   (** Stops the process. *)
   val stop : t -> unit

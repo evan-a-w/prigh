@@ -10,6 +10,9 @@ type t =
   ; mutable models : Model.t list
   ; mcp_calls : unit Promise.u String.Table.t (* by request id: abandons it *)
   ; mutable on_change : unit -> unit
+  ; mutable login : Claude_login.t option
+    (** prigh's login, when the process runs on it *)
+  ; mutable refused : bool (** a turn was refused with its token *)
   }
 
 let id = "claude"
@@ -190,9 +193,14 @@ let launch_config ~injected (start : Adapter.Start.t) : Claude_launch.t =
 ;;
 
 let launch (start : Adapter.Start.t) : Adapter.Launch.t =
+  let set, unset =
+    match start.login with
+    | None -> [], []
+    | Some login -> Claude_login.env login ~refused:start.login_refused
+  in
   { argv = Claude_launch.argv (launch_config ~injected:true start)
-  ; env_set = Claude_launch.env_set
-  ; env_unset = Claude_launch.env_unset
+  ; env_set = Claude_launch.env_set @ set
+  ; env_unset = Claude_launch.env_unset @ unset
   ; mcp = false
   ; cwd = start.cwd
   }
@@ -255,6 +263,24 @@ let refuse_orphan t (event : Adapter_event.t) =
   | _ -> ()
 ;;
 
+(* Whether the process runs on the login of prigh's it was launched with
+   ([launch]), saying so when it does not. *)
+let take_login t (start : Adapter.Start.t) (info : Claude_codec.Init_info.t) =
+  let notice message = Adapter.Driver.push t.driver (Notice message) in
+  Option.iter start.login ~f:(fun credential ->
+    match Claude_login.of_launch credential ~refused:start.login_refused with
+    | Error why -> notice why
+    | Ok login ->
+      (match
+         Claude_login.overridden
+           login
+           ~api_key_source:
+             (Option.bind info.account ~f:(fun a -> a.api_key_source))
+       with
+       | Some why -> notice why
+       | None -> t.login <- Some login))
+;;
+
 (* The process's driver, reading its lines, and the handshake. *)
 let open_process
       ~sw
@@ -282,6 +308,8 @@ let open_process
     ; models = []
     ; mcp_calls = String.Table.create ()
     ; on_change = Fn.id
+    ; login = None
+    ; refused = false
     }
   in
   Adapter.Driver.on_orphan_request driver (refuse_orphan t);
@@ -325,6 +353,7 @@ let open_process
     Or_error.errorf "Claude Code refused to start: %s" message
   | Initialized info ->
     t.models <- models_of info.models;
+    take_login t start info;
     Ok t
   | _ -> Ok t
 ;;
@@ -358,7 +387,22 @@ let start ~sw ?interrupt_grace ?request_timeout ?injected transport start =
   open_process ~sw ?interrupt_grace ?request_timeout ?injected transport start
 ;;
 
-let next_event t = Adapter.Driver.next_event t.driver
+(* A turn refused with prigh's token: the next one gets a newer one. *)
+let next_event t : Adapter_event.t =
+  match Adapter.Driver.next_event t.driver, t.login with
+  | ( Turn_end { turn_id; stop = Failed { kind = Auth_required _; message } }
+    , Some login ) ->
+    t.refused <- true;
+    Turn_end
+      { turn_id
+      ; stop =
+          Failed
+            { kind = Auth_required { hint = Claude_login.refused_hint login }
+            ; message
+            }
+      }
+  | event, _ -> event
+;;
 
 (* Brings the process's settings up to [s]: model, permission mode and
    thinking change without a restart. *)
@@ -441,7 +485,18 @@ let thread_id t = Claude_codec.session_id t.codec
 let cost_total t = Claude_codec.cost_total t.codec
 let in_turn t = Adapter.Driver.in_turn t.driver
 let alive t = Adapter.Driver.alive t.driver
-let login _ = None
+let login t = Option.map t.login ~f:Claude_login.credential
+
+let renewal t : Adapter.Login_renewal.t option =
+  match t.login with
+  | None -> None
+  | Some login when t.refused -> Some (Refused (Claude_login.token login))
+  | Some login ->
+    Option.some_if
+      (Claude_login.expiring login ~now_ms:(Credential.now_ms ()))
+      Adapter.Login_renewal.Expiring
+;;
+
 let stop t = Adapter.Driver.stop t.driver
 let models t = t.models
 let limits t = Claude_codec.limits t.codec

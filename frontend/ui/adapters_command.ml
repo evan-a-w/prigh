@@ -97,7 +97,10 @@ let find_login (logins : P.Adapter_login.t list) ~adapter =
 
 let changed (l : P.Adapter_login.t) =
   sprintf
-    "%s runs on %s from its next turn"
+    "%s runs on %s from its next turn%s"
     (P.Session_engine.adapter_label l.adapter)
     (P.Adapter_login.describe l)
+    (match l.login, P.Adapter_login.warning l with
+     | Some _, Some warning -> " (" ^ warning ^ ")"
+     | _ -> "")
 ;;

@@ -262,3 +262,78 @@ let%expect_test "a Codex session on prigh's login says so" =
     /work  Codex · gpt-5.5@Work  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
     |}]
 ;;
+
+let claude_logins ~login =
+  sprintf
+    {|{"adapter_logins":[
+       {"adapter":"claude","provider":"anthropic","login":%s,"label":%s,
+        "choices":[{"ref":"max","label":"Max"}]}]}|}
+    (if login then {|"max"|} else "null")
+    (if login then {|"Max"|} else "null")
+;;
+
+let%expect_test
+    "/adapters login claude: prigh's Claude logins, with Anthropic's terms"
+  =
+  let h = connected () in
+  run h "/adapters login claude";
+  H.reply h (Adapter_login_picker (Some "claude")) (claude_logins ~login:false);
+  H.show h;
+  H.key h (Key.plain Escape);
+  run h "/adapters login claude max";
+  H.reply h (Adapter_login_set "claude") (claude_logins ~login:true);
+  H.show h;
+  [%expect
+    {|
+    (Rpc
+      (method_ list_adapters)
+      (params ())
+      (tag (Adapter_login_picker (claude))))
+
+
+
+
+
+
+
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    Claude Code runs on  (2)
+    / ▏
+    ▸* Claude Code's own login  on the session's tool host (log in there)
+      ── Anthropic's terms keep Claude Pro/Max logins to Claude's own apps: prigh holding one…
+       Max                      max, prigh hands it short-lived tokens
+    ──────────────────────────────────────────────────────────────────────────────────────────
+    >
+    deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  Enter selects · Esc closes
+    (Rpc
+      (method_ set_adapter_login)
+      (params (
+        (adapter claude)
+        (login   max)))
+      (tag (Adapter_login_set claude)))
+
+
+
+
+
+
+
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ┌─ Notice ───────────────────────────────────────────────────────────────────────────────┐
+    │ Claude Code runs on Claude Pro/Max (prigh) · Max from its next turn (Anthropic's terms │
+    │ keep Claude Pro/Max logins to Claude's own apps: prigh holding one for Claude Code may │
+    │ breach them)                                                                           │
+    └──────────────────────────────────────────────────────────────────────── Esc dismisses ─┘
+    ──────────────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
+    |}]
+;;

@@ -579,6 +579,7 @@ let create
     let in_turn t = Adapter.Driver.in_turn t.driver
     let alive t = Adapter.Driver.alive t.driver
     let login _ = None
+    let renewal _ = None
     let stop t = Adapter.Driver.stop t.driver
   end)
 ;;

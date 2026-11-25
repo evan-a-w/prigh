@@ -52,5 +52,8 @@ val fetch
   -> unit
   -> Provider_auth.Resolved.t Or_error.t
 
+(** What {!fetch} answered last ([None]: never asked). *)
+val last : t -> Provider_auth.Resolved.t Or_error.t option
+
 (** Adds a turn run on the login to its owner's ledger. *)
 val record : t -> Usage.t -> cost_usd:float -> unit

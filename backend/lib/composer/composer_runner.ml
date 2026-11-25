@@ -16,6 +16,10 @@ type t =
   ; mutable live_host : string option
   ; mutable live_login : Account_ref.t option
     (** the login of prigh's the live process was given ([Start.login]) *)
+  ; mutable login_refused : string option
+    (** the token the last process was refused with ({!Adapter.Login_renewal}) *)
+  ; mutable login_dropped : Account_ref.t option
+    (** a login of prigh's refused even after a refresh: not handed again *)
   ; mutable thread_id : string option
   ; mutable resumed : string option
   ; mutable fresh : bool
@@ -65,6 +69,8 @@ let create
   ; live = None
   ; live_host = None
   ; live_login = None
+  ; login_refused = None
+  ; login_dropped = None
   ; thread_id = None
   ; resumed = None
   ; fresh = false
@@ -290,6 +296,37 @@ let cost_total_of session thread =
     if String.equal turn.thread_id thread then turn.cost_total else None)
 ;;
 
+(* A harness that takes prigh's login only when it starts gets a new process
+   (on the same thread) when its token is about to expire or was refused;
+   refused again after a refresh, the login is not handed again. *)
+let renew_login t (s : Engine_intf.Services.t) ~login =
+  match t.live with
+  | Some (Live ((module A), a)) when A.alive a ->
+    (match A.renewal a with
+     | None -> t.login_refused <- None
+     | Some renewal ->
+       A.stop a;
+       t.live <- None;
+       (match renewal, login with
+        | Expiring, _ -> t.login_refused <- None
+        | Refused _, Some login when Option.is_some t.login_refused ->
+          t.login_refused <- None;
+          t.login_dropped <- Some (Cli_credential.account login);
+          let provider = Cli_credential.provider login in
+          s.notice
+            (sprintf
+               "%s was refused prigh's %s login %S again, after a refresh: \
+                this session runs on %s's own login on its tool host from now \
+                on (/login %s logs in again, for new sessions)."
+               A.display_name
+               (Provider_id.display_name provider)
+               (Cli_credential.label login)
+               A.display_name
+               (Provider_id.to_string provider))
+        | Refused token, _ -> t.login_refused <- Some token))
+  | Some _ | None -> ()
+;;
+
 let live t (s : Engine_intf.Services.t) (input : Engine_intf.Turn.Input.t) =
   let host = t.host () in
   (* The session moved to another tool host: its harness runs there now,
@@ -302,6 +339,14 @@ let live t (s : Engine_intf.Services.t) (input : Engine_intf.Turn.Input.t) =
      t.thread_id <- None
    | Some _ | None -> ());
   let base = t.start ~cwd:s.cwd in
+  renew_login t s ~login:base.login;
+  let base =
+    match base.login, t.login_dropped with
+    | Some login, Some dropped
+      when Account_ref.equal (Cli_credential.account login) dropped ->
+      { base with login = None }
+    | _ -> base
+  in
   let login = Option.map base.login ~f:Cli_credential.account in
   (* The user chose another login for the harness: a process on it, on the
      same thread. *)
@@ -342,6 +387,7 @@ let live t (s : Engine_intf.Services.t) (input : Engine_intf.Turn.Input.t) =
       ; resume
       ; fork = fork && Option.is_some resume
       ; at
+      ; login_refused = t.login_refused
       }
     in
     let started =

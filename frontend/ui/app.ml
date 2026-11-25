@@ -7819,6 +7819,7 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
                (P.Session_engine.adapter_label l.adapter ^ "'s own login")
              :: List.map l.choices ~f:(fun (c : P.Adapter_login.Choice.t) ->
                Picker.Item.create
+                 ?section:(P.Adapter_login.warning l)
                  ~id:c.ref_
                  ~detail:(c.ref_ ^ ", prigh hands it short-lived tokens")
                  ~marked:(current (Some c.ref_))

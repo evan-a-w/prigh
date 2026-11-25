@@ -453,6 +453,7 @@ let cost_total _ = None
 let in_turn t = Adapter.Driver.in_turn t.driver
 let alive t = Adapter.Driver.alive t.driver
 let login t = Option.map t.login ~f:Codex_login.credential
+let renewal _ = None
 let stop t = Adapter.Driver.stop t.driver
 let models t = t.models
 let limits t = Codex_codec.limits t.codec

@@ -11,6 +11,7 @@ type t =
       -> unit
       -> Provider_auth.Resolved.t Or_error.t
   ; record : Usage.t -> cost_usd:float -> unit
+  ; mutable last : Provider_auth.Resolved.t Or_error.t option
   }
 
 let sexp_of_t t =
@@ -29,7 +30,7 @@ let create
       ?(record = fun _ ~cost_usd:_ -> ())
       ()
   =
-  { provider; account; label; fetch; record }
+  { provider; account; label; fetch; record; last = None }
 ;;
 
 let of_store ~env ?member ?ledger store provider account =
@@ -84,11 +85,25 @@ let of_store ~env ?member ?ledger store provider account =
       usage
       ~cost_usd
   in
-  Ok { provider; account = choice.ref_; label = choice.label; fetch; record }
+  Ok
+    { provider
+    ; account = choice.ref_
+    ; label = choice.label
+    ; fetch
+    ; record
+    ; last = None
+    }
 ;;
 
 let provider t = t.provider
 let account t = t.account
 let label t = t.label
-let fetch t ?refused ?valid_for_ms () = t.fetch ?refused ?valid_for_ms ()
+
+let fetch t ?refused ?valid_for_ms () =
+  let result = t.fetch ?refused ?valid_for_ms () in
+  t.last <- Some result;
+  result
+;;
+
+let last t = t.last
 let record t usage ~cost_usd = t.record usage ~cost_usd

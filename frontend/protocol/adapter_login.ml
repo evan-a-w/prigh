@@ -49,6 +49,15 @@ let provider_name t =
   | p -> p
 ;;
 
+let warning t =
+  match t.provider with
+  | "anthropic" ->
+    Some
+      "Anthropic's terms keep Claude Pro/Max logins to Claude's own apps: \
+       prigh holding one for Claude Code may breach them"
+  | _ -> None
+;;
+
 let describe t =
   match t.login with
   | None -> own t

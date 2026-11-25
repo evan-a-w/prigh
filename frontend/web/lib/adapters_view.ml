@@ -115,6 +115,7 @@ let login_row ~inject (l : Adapter_login.t) =
   row
     ~cls:("adapter-login adapter-login-" ^ l.adapter)
     ~name:(who ^ " login")
+    ?note:(Option.map (Adapter_login.warning l) ~f:(fun w -> "warm", w))
     ~about:
       (sprintf
          "Your %s sessions run on %s's own login on their tool host, or on one \
@@ -122,9 +123,7 @@ let login_row ~inject (l : Adapter_login.t) =
           the host short-lived tokens and counts the usage on that login."
          who
          who
-         (match l.provider with
-          | "openai-codex" -> "ChatGPT"
-          | p -> p))
+         (Adapter_login.provider_name l))
     [ select
         ~cls:"adapter-login-choice"
         ~title:(sprintf "Choose %s's login (/adapters login %s)" who l.adapter)

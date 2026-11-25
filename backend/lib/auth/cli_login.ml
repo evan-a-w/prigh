@@ -9,10 +9,11 @@ type t =
 let provider ~adapter : Provider_id.t option =
   match adapter with
   | "codex" -> Some Openai_codex
+  | "claude" -> Some Anthropic
   | _ -> None
 ;;
 
-let adapters = [ "codex" ]
+let adapters = [ "codex"; "claude" ]
 
 let to_json = function
   | Own -> `Null
