@@ -439,7 +439,7 @@ let%expect_test "a pinned login is used, kept with the session, and tried first"
     notice: openai-codex/gpt-6-sol@work: HTTP 429: The usage limit has been reached (usage limit reached); carrying on with the Key login (key)
     request to openai-codex/gpt-6-sol@key, last assistant
     assistant (gpt-6-sol@key):  (Error"HTTP 429: The usage limit has been reached (usage limit reached)")
-    notice: openai-codex/gpt-6-sol@key: HTTP 429: The usage limit has been reached (usage limit reached); carrying on with the OpenAI (ChatGPT Plus/Pro) login (main)
+    notice: openai-codex/gpt-6-sol@key: HTTP 429: The usage limit has been reached (usage limit reached); carrying on with the ChatGPT Plus/Pro login (main)
     request to openai-codex/gpt-6-sol@main, last assistant
     assistant (gpt-6-sol): done it End_turn
     |}]

@@ -713,7 +713,7 @@ let%expect_test "accounts: auth events, status and usage" =
   in
   show
     (fun j -> Or_error.map (Auth_status.of_json j) ~f:Auth_status.sexp_of_t)
-    {|{"provider":"openai-codex","name":"OpenAI Codex (ChatGPT)","methods":[{"method":"oauth","label":"OpenAI (ChatGPT Plus/Pro)"}],"configured":{"method":"oauth","source":"oauth"},"expires_ms":1700000000000,"accounts":[{"ref":"openai-codex/main","id":"main","label":"Personal","method":"oauth","source":"oauth","expires_ms":1700000000000,"default":true,"fallback":true,"shareable":true,"shared_with":[{"user":"bob","since_ms":1700000000000}],"usage":{"today":{"requests":2,"input":3000,"output":200,"cache_read":1000,"cost_usd":0.42},"last_30_days":{"requests":9,"input":12000,"output":900,"cache_read":4000,"cost_usd":1.5}}},{"ref":"~alice/openai-codex/work","id":"~alice/work","label":"Work","method":"oauth","source":"shared by alice","default":false,"fallback":false,"shared_by":"alice","hidden":true}]}|};
+    {|{"provider":"openai-codex","name":"ChatGPT","methods":[{"method":"oauth","label":"ChatGPT Plus/Pro"}],"configured":{"method":"oauth","source":"oauth"},"expires_ms":1700000000000,"accounts":[{"ref":"openai-codex/main","id":"main","label":"Personal","method":"oauth","source":"oauth","expires_ms":1700000000000,"default":true,"fallback":true,"shareable":true,"shared_with":[{"user":"bob","since_ms":1700000000000}],"usage":{"today":{"requests":2,"input":3000,"output":200,"cache_read":1000,"cost_usd":0.42},"last_30_days":{"requests":9,"input":12000,"output":900,"cache_read":4000,"cost_usd":1.5}}},{"ref":"~alice/openai-codex/work","id":"~alice/work","label":"Work","method":"oauth","source":"shared by alice","default":false,"fallback":false,"shared_by":"alice","hidden":true}]}|};
   show
     (fun j ->
        Or_error.map
@@ -729,10 +729,10 @@ let%expect_test "accounts: auth events, status and usage" =
   [%expect
     {|
     ((provider openai-codex)
-     (name     "OpenAI Codex (ChatGPT)")
+     (name     ChatGPT)
      (methods ((
        (method_ oauth)
-       (label   "OpenAI (ChatGPT Plus/Pro)"))))
+       (label   "ChatGPT Plus/Pro"))))
      (configured ((
        (method_ oauth)
        (source  oauth))))

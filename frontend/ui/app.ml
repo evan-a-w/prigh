@@ -1179,7 +1179,11 @@ let login_items m =
       | None ->
         Picker.Item.create
           ~id:(s.provider ^ " " ^ meth.method_)
-          ~detail:(String.strip (meth.label ^ "  " ^ configured))
+          ~detail:
+            (String.strip
+               (Provider_logins.own_label ~provider:s.name meth.label
+                ^ "  "
+                ^ configured))
           ~marked:(not (String.is_empty configured))
           (s.name ^ " (" ^ meth.method_ ^ ")")))
   @ [ Picker.Item.create

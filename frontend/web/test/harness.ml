@@ -203,7 +203,7 @@ let forges_json =
 
 let auth_json =
   {|[{"provider":"anthropic","name":"Anthropic","methods":[{"method":"oauth","label":"Claude subscription"},{"method":"api_key","label":"API key"}],"configured":{"method":"oauth","source":"auth.json"}},
-     {"provider":"openai","name":"OpenAI","methods":[{"method":"api_key","label":"API key"}],"configured":null},
+     {"provider":"openai","name":"OpenAI API","methods":[{"method":"api_key","label":"OpenAI API key"}],"configured":null},
      {"provider":"deepseek","name":"DeepSeek","methods":[{"method":"api_key","label":"API key"}],"configured":null}]|}
 ;;
 

@@ -23,6 +23,11 @@ val all : ?hidden:bool -> P.Auth_status.t list -> Login.t list
     alice)"]. *)
 val label : P.Auth_status.Account.t -> string
 
+(** [label] without the provider's name it starts with: "Plus/Pro" for
+    "ChatGPT Plus/Pro" under ChatGPT, "API key" for "OpenAI API key" under
+    "OpenAI API". *)
+val own_label : provider:string -> string -> string
+
 (** The label under a heading naming its provider: without the provider's
     name it starts with ("Claude Pro/Max" for "Anthropic (Claude
     Pro/Max)"), and its owner when another user shares it. *)

@@ -160,7 +160,7 @@ let%expect_test "add, relabel, reorder, default, fallback, remove" =
   show_file t;
   [%expect
     {|
-    *main       "OpenAI (ChatGPT Plus/Pro)"    oauth:p1 fallback=true
+    *main       "ChatGPT Plus/Pro"             oauth:p1 fallback=true
      work       "Work"                         oauth:w1 fallback=true
      work-two   "Work Two"                     oauth:w2 fallback=true
     {
@@ -186,7 +186,7 @@ let%expect_test "add, relabel, reorder, default, fallback, remove" =
             "accounts": [
               {
                 "id": "main",
-                "label": "OpenAI (ChatGPT Plus/Pro)",
+                "label": "ChatGPT Plus/Pro",
                 "fallback": true
               },
               {
@@ -229,9 +229,9 @@ let%expect_test "add, relabel, reorder, default, fallback, remove" =
     (Ok work-two)
     (Ok main)
     (Error
-     "OpenAI Codex (ChatGPT) has no account \"nope\": it has OpenAI (ChatGPT Plus/Pro) (main), Work (work), Work Two (work-two)")
+     "ChatGPT has no account \"nope\": it has ChatGPT Plus/Pro (main), Work (work), Work Two (work-two)")
     (Ok main)
-    *main       "OpenAI (ChatGPT Plus/Pro)"    oauth:p1c fallback=true
+    *main       "ChatGPT Plus/Pro"             oauth:p1c fallback=true
      work       "Work"                         oauth:w1b fallback=true
      work-two   "Work Two"                     oauth:w2b fallback=true
     |}];
@@ -262,12 +262,11 @@ let%expect_test "add, relabel, reorder, default, fallback, remove" =
     (Ok ())
     (Ok ())
     (Error
-     "OpenAI Codex (ChatGPT) has no account \"nope\": it has Work Two (work-two), Job (work), OpenAI (ChatGPT Plus/Pro) (main)")
-    (Error
-     "OpenAI Codex (ChatGPT) already has an account labelled \"job\": pick another label")
+     "ChatGPT has no account \"nope\": it has Work Two (work-two), Job (work), ChatGPT Plus/Pro (main)")
+    (Error "ChatGPT already has an account labelled \"job\": pick another label")
      work-two   "Work Two"                     oauth:w2b fallback=false
     *work       "Job"                          oauth:w1b fallback=true
-     main       "OpenAI (ChatGPT Plus/Pro)"    oauth:p1c fallback=true
+     main       "ChatGPT Plus/Pro"             oauth:p1c fallback=true
     |}];
   print_s
     [%sexp
@@ -288,7 +287,7 @@ let%expect_test "add, relabel, reorder, default, fallback, remove" =
     {|
     (Ok ())
     *work-two   "Work Two"                     oauth:w2b fallback=false
-     main       "OpenAI (ChatGPT Plus/Pro)"    oauth:p1c fallback=true
+     main       "ChatGPT Plus/Pro"             oauth:p1c fallback=true
     (Ok ())
     (Ok ())
     {}

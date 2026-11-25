@@ -529,7 +529,7 @@ let%expect_test "logging in: pick a provider, open the URL, answer the prompts" 
     (Focus picker-input)
     Anthropic Claude subscription, logged in via auth.json ✓
     Anthropic API key
-    OpenAI API key
+    OpenAI API API key
     DeepSeek API key
     Custom provider add an OpenAI-compatible endpoint (aiproxy, LiteLLM, OpenRouter, vLLM, Ollama…)
     GitHub (github.com) not signed in
@@ -548,7 +548,7 @@ let%expect_test "logging in: pick a provider, open the URL, answer the prompts" 
   H.text h ~selector:".modal";
   [%expect
     {|
-    Log in to OpenAI
+    Log in to OpenAI API
     (Close (Esc))
     Waiting for the provider…
     (Cancel)
@@ -567,7 +567,7 @@ let%expect_test "logging in: pick a provider, open the URL, answer the prompts" 
   [%expect
     {|
     (Focus dialog-input)
-    Log in to OpenAI
+    Log in to OpenAI API
     (Close (Esc))
     Sign in, then paste the code.
     (Open the login page)
@@ -683,7 +683,7 @@ let%expect_test "/auth shows the providers; /logout picks a logged-in one" =
     (Focus dialog)
     Anthropic logged in with oauth (auth.json)
     (Log out)
-    OpenAI not logged in
+    OpenAI API not logged in
     (Log in)
     DeepSeek not logged in
     (Log in)

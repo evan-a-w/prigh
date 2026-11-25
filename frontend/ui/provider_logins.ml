@@ -25,18 +25,28 @@ let label (a : P.Auth_status.Account.t) =
 
 (* The longest run of the provider's leading words the label starts with
    goes, and parentheses around what is left: "Anthropic (Claude Pro/Max)"
-   under Anthropic is "Claude Pro/Max", "OpenAI Codex API key" under
-   "OpenAI Codex (ChatGPT)" is "API key". *)
+   under Anthropic is "Claude Pro/Max", "ChatGPT Plus/Pro" under ChatGPT is
+   "Plus/Pro". A key stays whole: "OpenAI API key" under "OpenAI API" is
+   "API key". *)
 let own_label ~provider label =
   let words = String.split provider ~on:' ' in
-  let rest =
-    List.init (List.length words) ~f:(fun i -> List.take words (i + 1))
+  let prefixes =
+    List.init (List.length words) ~f:(fun i ->
+      String.concat ~sep:" " (List.take words (i + 1)))
     |> List.rev
-    |> List.find_map ~f:(fun prefix ->
-      let prefix = String.concat ~sep:" " prefix ^ " " in
-      Option.some_if
-        (String.Caseless.is_prefix label ~prefix)
-        (String.strip (String.drop_prefix label (String.length prefix))))
+  in
+  let api_key = "API key" in
+  let rest =
+    if
+      List.exists prefixes ~f:(fun prefix ->
+        String.Caseless.equal label (prefix ^ " " ^ api_key))
+    then Some api_key
+    else
+      List.find_map prefixes ~f:(fun prefix ->
+        let prefix = prefix ^ " " in
+        Option.some_if
+          (String.Caseless.is_prefix label ~prefix)
+          (String.strip (String.drop_prefix label (String.length prefix))))
   in
   match rest with
   | None | Some "" -> label

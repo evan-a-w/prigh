@@ -361,8 +361,10 @@ let%expect_test "a login's name drops the provider's name its label repeats" =
   in
   List.iter
     [ "Anthropic", "Anthropic (Claude Pro/Max)", None
-    ; "OpenAI Codex (ChatGPT)", "OpenAI (ChatGPT Plus/Pro)", None
-    ; "OpenAI Codex (ChatGPT)", "OpenAI Codex API key", None
+    ; "ChatGPT", "ChatGPT Plus/Pro", None
+    ; "ChatGPT", "ChatGPT API key", None
+    ; "OpenAI API", "OpenAI API key", None
+    ; "OpenAI API", "OpenAI OAuth", None
     ; "DeepSeek", "DeepSeek API key", Some "carol"
     ; "Anthropic", "Anthropic", None
     ; "Anthropic", "work", None
@@ -377,10 +379,69 @@ let%expect_test "a login's name drops the provider's name its label repeats" =
   [%expect
     {|
     Anthropic (Claude Pro/Max)   Claude Pro/Max                 | Anthropic: Claude Pro/Max
-    OpenAI (ChatGPT Plus/Pro)    ChatGPT Plus/Pro               | OpenAI Codex (ChatGPT): ChatGPT Plus/Pro
-    OpenAI Codex API key         API key                        | OpenAI Codex (ChatGPT): API key
+    ChatGPT Plus/Pro             Plus/Pro                       | ChatGPT: Plus/Pro
+    ChatGPT API key              API key                        | ChatGPT: API key
+    OpenAI API key               API key                        | OpenAI API: API key
+    OpenAI OAuth                 OAuth                          | OpenAI API: OAuth
     DeepSeek API key             API key (from carol)           | DeepSeek: API key (from carol)
     Anthropic                    Anthropic                      | Anthropic: Anthropic
     work                         work                           | Anthropic: work
+    |}]
+;;
+
+(* The backend's names: ChatGPT (the subscription) and OpenAI API (a key);
+   a provider with only someone else's login hides it rather than log out. *)
+let%expect_test "ChatGPT, OpenAI API and a login shared with the user" =
+  let h = H.create () in
+  H.quiet h (fun () ->
+    H.type_ h "/auth";
+    H.act h Send;
+    H.reply
+      h
+      "auth_status"
+      {|[{"provider":"anthropic","name":"Anthropic","methods":[{"method":"oauth","label":"Anthropic (Claude Pro/Max)"}],"configured":{"method":"oauth","source":"shared by lloyd"},"expires_ms":null,"accounts":[{"ref":"~lloyd/anthropic/main","id":"~lloyd/main","label":"Max","method":"oauth","source":"shared by lloyd","default":true,"fallback":false,"shared_by":"lloyd"}]},
+         {"provider":"openai","name":"OpenAI API","methods":[{"method":"api_key","label":"OpenAI API key"}],"configured":{"method":"api_key","source":"stored api key"},"expires_ms":null,"accounts":[{"ref":"openai/main","id":"main","label":"OpenAI API key","method":"api_key","source":"stored api key","default":true,"fallback":false}]},
+         {"provider":"openai-codex","name":"ChatGPT","methods":[{"method":"oauth","label":"ChatGPT Plus/Pro"}],"configured":{"method":"oauth","source":"oauth"},"expires_ms":null,"accounts":[{"ref":"openai-codex/main","id":"main","label":"ChatGPT Plus/Pro","method":"oauth","source":"oauth","default":true,"fallback":false}]}]|});
+  H.text h ~selector:".auth-row";
+  [%expect
+    {|
+    Anthropic logged in with oauth (shared by lloyd)
+    (Hide)
+    OpenAI API logged in with api_key (stored api key)
+    (Log out)
+    ChatGPT logged in with oauth (oauth)
+    (Log out)
+    |}];
+  H.click h ~selector:".auth-row button";
+  [%expect
+    {|
+    (Run "/accounts hide ~lloyd/anthropic/main")
+    (Rpc (method_ account_hide)
+     (params ((ref ~lloyd/anthropic/main) (hidden true)))
+     (tag
+      (Logins_changed (command "/accounts hide ~lloyd/anthropic/main")
+       (notice
+        "hid Anthropic: Max (from lloyd): /accounts show ~lloyd/anthropic/main brings it back"))))
+    |}];
+  H.quiet h (fun () -> H.act h (Settings_section Models));
+  H.text h ~selector:".settings-group-head";
+  H.text h ~selector:".provider-login";
+  [%expect
+    {|
+    Providers
+    Anthropic
+    OpenAI API
+    ChatGPT
+    Models prigh uses Besides the conversation's
+    Compaction
+    Max (from lloyd)
+    Subscription, default, shared by lloyd.
+    (Hide) (Manage)
+    API key
+    API key, default.
+    (Manage)
+    Plus/Pro
+    Subscription, default.
+    (Manage)
     |}]
 ;;

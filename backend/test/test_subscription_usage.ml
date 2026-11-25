@@ -562,7 +562,7 @@ let%expect_test "each account's usage; the provider's is the default's" =
       GPT-5.3-Codex-Spark · 5-hour session [GPT-5.3-Codex-Spark.primary]       70.0%  resets 2026-11-26T08:00:00.000000Z
       Codex other · 15-minute window [codex_other.primary]                3.0%  resets 2026-11-26T08:01:00.000000Z
       Codex other · Long window   [codex_other.secondary]              1.5%  resets 2026-11-26T05:14:20.000000Z
-      account main* (OpenAI (ChatGPT Plus/Pro)): plan: pro
+      account main* (ChatGPT Plus/Pro): plan: pro
       5-hour session               [primary]                           42.0%  resets 2026-11-26T09:00:00.000000Z
       Weekly                       [secondary]                         84.0%  resets 2026-11-28T12:46:40.000000Z
       GPT-5.3-Codex-Spark · 5-hour session [GPT-5.3-Codex-Spark.primary]       70.0%  resets 2026-11-26T08:00:00.000000Z

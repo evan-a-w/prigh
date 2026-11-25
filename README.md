@@ -1,7 +1,7 @@
 # prigh
 
 A coding agent. The backend is OCaml (OxCaml, Eio) and talks to Anthropic,
-OpenAI, OpenAI Codex (ChatGPT), DeepSeek and any OpenAI- or
+the OpenAI API, ChatGPT (a Plus/Pro subscription), DeepSeek and any OpenAI- or
 Anthropic-compatible endpoint. You drive it from a terminal UI, from
 prigh-web in a browser (installable as an app, phone included), from a
 desktop app, or from an editor over ACP. There are no plugins: tools,

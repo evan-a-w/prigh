@@ -35,7 +35,7 @@ let%expect_test "methods, env vars and labels per provider" =
     {|
     anthropic     methods=oauth(Anthropic (Claude Pro/Max)),api_key(Anthropic API key) env=ANTHROPIC_OAUTH_TOKEN,ANTHROPIC_API_KEY
     openai        methods=api_key(OpenAI API key) env=OPENAI_API_KEY
-    openai-codex  methods=oauth(OpenAI (ChatGPT Plus/Pro)) env=
+    openai-codex  methods=oauth(ChatGPT Plus/Pro) env=
     deepseek      methods=api_key(DeepSeek API key) env=DEEPSEEK_API_KEY
     |}]
 ;;
@@ -305,8 +305,9 @@ let%expect_test "provider router: unauthenticated request fails with a hint" =
     {|
     (Error
      "not logged in to Anthropic: use /login anthropic or set ANTHROPIC_OAUTH_TOKEN/ANTHROPIC_API_KEY")
-    (Error "not logged in to OpenAI: use /login openai or set OPENAI_API_KEY")
-    (Error "not logged in to OpenAI Codex (ChatGPT): use /login openai-codex")
+    (Error
+     "not logged in to OpenAI API: use /login openai or set OPENAI_API_KEY")
+    (Error "not logged in to ChatGPT: use /login openai-codex")
     (Error
      "not logged in to DeepSeek: use /login deepseek or set DEEPSEEK_API_KEY")
     |}]

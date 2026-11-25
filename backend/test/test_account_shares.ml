@@ -94,7 +94,7 @@ let%expect_test "sharing: grant, list, resolve through the owner, hide, revoke" 
     error: alice is you: share with bob, carol
     error: no user "dave": share with bob, carol
     error: gw is a custom provider: only the built-in providers' logins can be shared
-    error: OpenAI Codex (ChatGPT) has no account "nope": it has Personal (main), Work (work)
+    error: ChatGPT has no account "nope": it has Personal (main), Work (work)
     (bob)
     (Ok (alice carol))
     |}];
@@ -159,7 +159,7 @@ let%expect_test "sharing: grant, list, resolve through the owner, hide, revoke" 
     refreshing with alice-refresh-1
     alice-access-2
     alice-access-2
-    error: alice does not share the OpenAI Codex (ChatGPT) login "Work" with you (any more): /accounts picks another
+    error: alice does not share the ChatGPT login "Work" with you (any more): /accounts picks another
     1
     (true false)
     |}];
@@ -247,7 +247,7 @@ let%expect_test "sharing: grant, list, resolve through the owner, hide, revoke" 
   [%expect
     {|
     ()
-    error: alice does not share the OpenAI Codex (ChatGPT) login "Work" with you (any more): /accounts picks another
+    error: alice does not share the ChatGPT login "Work" with you (any more): /accounts picks another
     ()
     ()
     false
@@ -550,7 +550,7 @@ let%expect_test "sharing over RPC: share, use, revoke mid-session, host tokens" 
     {|
     {"shared_with":[]}
     {"type":"event","event":"accounts_changed"}
-    {"type":"event","event":"notice","text":"alice stopped sharing the OpenAI Codex (ChatGPT) login ~alice/work with you: carrying on with your default login (/account picks another)"}
+    {"type":"event","event":"notice","text":"alice stopped sharing the ChatGPT login ~alice/work with you: carrying on with your default login (/account picks another)"}
     ()
     null
     |}];

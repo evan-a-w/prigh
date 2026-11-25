@@ -2291,7 +2291,9 @@ let login_picker (statuses : Auth_status.t list) ~forges =
           in
           Picker.Item.create
             ~id:(s.provider ^ " " ^ meth.method_)
-            ~detail:(meth.label ^ configured)
+            ~detail:
+              (Prigh_ui.Provider_logins.own_label ~provider:s.name meth.label
+               ^ configured)
             ~search:
               (String.concat
                  ~sep:" "

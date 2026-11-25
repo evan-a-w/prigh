@@ -97,7 +97,7 @@ let exchange ~env ~cancel (config : Config.t) ~code ~verifier =
          ; "code_verifier", verifier
          ; "redirect_uri", Config.redirect_uri config
          ]
-       ~what:"OpenAI Codex token exchange")
+       ~what:"ChatGPT token exchange")
     ~f:credential_of_body
 ;;
 
@@ -118,7 +118,7 @@ let refresh
          ; "refresh_token", refresh_token
          ; "client_id", config.client_id
          ]
-       ~what:"OpenAI Codex token refresh")
+       ~what:"ChatGPT token refresh")
     ~f:credential_of_body
 ;;
 

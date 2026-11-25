@@ -624,6 +624,15 @@ let login_label ~title ~input ~error ~inject =
     ]
 ;;
 
+(* The shared login a provider the user has none of their own for uses. *)
+let shared_in_use (s : Auth_status.t) =
+  if List.exists s.accounts ~f:(fun a -> Option.is_none a.shared_by)
+  then None
+  else
+    List.find_map s.accounts ~f:(fun a ->
+      Option.some_if (Option.is_some a.shared_by && not a.hidden) a.ref_)
+;;
+
 let auth (m : App.Model.t) (statuses : Auth_status.t list) ~inject =
   Modal.view
     ~cls:"auth-dialog"
@@ -683,10 +692,19 @@ let auth (m : App.Model.t) (statuses : Auth_status.t list) ~inject =
                            [ Node.text "Remove" ]
                        ]
                    | None, Some _ ->
-                     button
-                       ~cls:"small"
-                       ~on_click:(inject (Action.Logout s.provider))
-                       [ Node.text "Log out" ]
+                     (match shared_in_use s with
+                      | Some ref_ ->
+                        (* Someone else's login: hidden here, not logged out. *)
+                        button
+                          ~cls:"small"
+                          ~on_click:
+                            (inject (Action.Run ("/accounts hide " ^ ref_)))
+                          [ Node.text "Hide" ]
+                      | None ->
+                        button
+                          ~cls:"small"
+                          ~on_click:(inject (Action.Logout s.provider))
+                          [ Node.text "Log out" ])
                    | None, None ->
                      button
                        ~cls:"small primary"

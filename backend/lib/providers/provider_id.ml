@@ -25,8 +25,8 @@ let of_builtin_string s =
 
 let display_name = function
   | Anthropic -> "Anthropic"
-  | Openai -> "OpenAI"
-  | Openai_codex -> "OpenAI Codex (ChatGPT)"
+  | Openai -> "OpenAI API"
+  | Openai_codex -> "ChatGPT"
   | Deepseek -> "DeepSeek"
   | Custom name -> name
 ;;

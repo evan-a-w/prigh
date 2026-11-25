@@ -96,7 +96,7 @@ let%expect_test "the model menu: the rail, Alt+N labels, Show more, ← →" =
     Place_popover
     [tab] button "Favourites"
     [tab] button "Anthropic"
-    [tab] button "OpenAI"
+    [tab] button "OpenAI API"
     <button class="model-rail-tab on">
     Claude Opus 5.5 Alt+1 (Star: into the favourites (Alt+F)) ✓
     Claude Sonnet 5 Alt+2 (Star: into the favourites (Alt+F))
@@ -219,7 +219,7 @@ let%expect_test "searching finds models across the providers" =
     (Focus popover-filter)
     Place_popover
     (Picker_query 6)
-    GPT-6 OpenAI Alt+1 (Star: into the favourites (Alt+F))
+    GPT-6 OpenAI API Alt+1 (Star: into the favourites (Alt+F))
     |}];
   H.input h ~selector:"#popover-filter" "zzzz";
   H.text h ~selector:"#chip-popover .model-menu-main";

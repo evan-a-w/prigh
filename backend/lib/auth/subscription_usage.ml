@@ -53,7 +53,6 @@ let providers : Provider_id.t list = [ Anthropic; Openai_codex ]
 
 let name : Provider_id.t -> string = function
   | Anthropic -> "Claude"
-  | Openai_codex -> "ChatGPT"
   | p -> Provider_id.display_name p
 ;;
 

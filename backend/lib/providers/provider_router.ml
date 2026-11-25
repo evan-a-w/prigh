@@ -79,7 +79,7 @@ let builtin_provider
     (match auth.account_id with
      | None ->
        Or_error.error_string
-         "OpenAI Codex credential has no account id; log in again"
+         "ChatGPT credential has no account id; log in again"
      | Some account_id ->
        Ok
          (Openai_responses.create

@@ -533,8 +533,8 @@ let%expect_test "auth: stored key, environment, keyless; status" =
      "auth.json's \"aiproxy\" entry is an OAuth login, not an API key (another tool may use that name): /logout aiproxy, then /login aiproxy")
     (() ())
     {"provider":"anthropic","name":"Anthropic","methods":[{"method":"oauth","label":"Anthropic (Claude Pro/Max)"},{"method":"api_key","label":"Anthropic API key"}],"configured":null,"expires_ms":null,"accounts":[]}
-    {"provider":"openai","name":"OpenAI","methods":[{"method":"api_key","label":"OpenAI API key"}],"configured":null,"expires_ms":null,"accounts":[]}
-    {"provider":"openai-codex","name":"OpenAI Codex (ChatGPT)","methods":[{"method":"oauth","label":"OpenAI (ChatGPT Plus/Pro)"}],"configured":null,"expires_ms":null,"accounts":[]}
+    {"provider":"openai","name":"OpenAI API","methods":[{"method":"api_key","label":"OpenAI API key"}],"configured":null,"expires_ms":null,"accounts":[]}
+    {"provider":"openai-codex","name":"ChatGPT","methods":[{"method":"oauth","label":"ChatGPT Plus/Pro"}],"configured":null,"expires_ms":null,"accounts":[]}
     {"provider":"deepseek","name":"DeepSeek","methods":[{"method":"api_key","label":"DeepSeek API key"}],"configured":null,"expires_ms":null,"accounts":[]}
     {"provider":"aiproxy","name":"aiproxy","methods":[{"method":"api_key","label":"aiproxy API key"}],"configured":{"method":"api_key","source":"stored api key"},"expires_ms":null,"accounts":[{"ref":"aiproxy/main","id":"main","label":"aiproxy API key","method":"api_key","source":"stored api key","default":true,"fallback":false}],"custom":{"base_url":"http://localhost:3000/v1","api":"chat","api_label":"OpenAI chat completions (/chat/completions)"}}
     {"provider":"ollama","name":"ollama","methods":[{"method":"api_key","label":"ollama API key"}],"configured":{"method":"api_key","source":"no key"},"expires_ms":null,"accounts":[],"custom":{"base_url":"http://localhost:11434/v1","api":"chat","api_label":"OpenAI chat completions (/chat/completions)"}}

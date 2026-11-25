@@ -332,7 +332,7 @@ let%expect_test "custom providers in /auth, /login and /logout: edit and remove"
     (Close (Esc))
     Anthropic logged in with oauth (auth.json)
     (Log out)
-    OpenAI not logged in
+    OpenAI API not logged in
     (Log in)
     DeepSeek not logged in
     (Log in)
@@ -403,7 +403,7 @@ let%expect_test "custom providers in /auth, /login and /logout: edit and remove"
     (Focus picker-input)
     Anthropic Claude subscription, logged in via auth.json ✓
     Anthropic API key
-    OpenAI API key
+    OpenAI API API key
     DeepSeek API key
     aiproxy custom, http://localhost:3000/v1, OpenAI chat completions (/chat/completions), edit
     Custom provider add an OpenAI-compatible endpoint (aiproxy, LiteLLM, OpenRouter, vLLM, Ollama…)
@@ -419,7 +419,7 @@ let%expect_test "custom providers in /auth, /login and /logout: edit and remove"
     (Focus editor)
     Providers ↑↓ Tab Enter Esc   Ctrl+Enter as typed
     Anthropic logged in
-    OpenAI
+    OpenAI API
     DeepSeek
     aiproxy custom, http://localhost:3000/v1
     custom add an OpenAI-compatible endpoint
