@@ -578,6 +578,7 @@ let create
     let cost_total t = Codec.cost_total t.codec
     let in_turn t = Adapter.Driver.in_turn t.driver
     let alive t = Adapter.Driver.alive t.driver
+    let login _ = None
     let stop t = Adapter.Driver.stop t.driver
   end)
 ;;

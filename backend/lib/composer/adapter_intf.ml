@@ -23,6 +23,9 @@ module Start = struct
       (** appended to the harness's own system prompt *)
     ; mcp_servers : (string * Json.t) list
       (** stdio MCP servers to give it: name and [{command, args, env}] *)
+    ; login : Cli_credential.t option
+      (** one of prigh's logins to run on, for a harness that can take one
+          ({!Cli_login}); [None]: its own *)
     }
   [@@deriving sexp_of]
 
@@ -38,6 +41,7 @@ module Start = struct
     ; cost_total = None
     ; developer_instructions = None
     ; mcp_servers = []
+    ; login = None
     }
   ;;
 end
@@ -220,6 +224,10 @@ module type S = sig
 
   (** Whether its process still runs. *)
   val alive : t -> bool
+
+  (** The login of prigh's its process runs on ([Start.login], unless it
+      could not take it); [None]: its own. *)
+  val login : t -> Cli_credential.t option
 
   (** Stops the process. *)
   val stop : t -> unit

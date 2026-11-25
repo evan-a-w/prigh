@@ -58,6 +58,32 @@ module Account = struct
   [@@deriving sexp_of, equal]
 end
 
+module Chatgpt_tokens = struct
+  type t =
+    { access_token : string
+    ; account_id : string
+    ; plan : string option
+    }
+
+  let sexp_of_t t =
+    [%sexp
+      { access_token = "<redacted>"
+      ; account_id : string = t.account_id
+      ; plan : string option = t.plan
+      }]
+  ;;
+
+  let fields t =
+    [ "accessToken", `String t.access_token
+    ; "chatgptAccountId", `String t.account_id
+    ; ( "chatgptPlanType"
+      , match t.plan with
+        | Some p -> `String p
+        | None -> `Null )
+    ]
+  ;;
+end
+
 module Model_info = struct
   type t =
     { id : string
@@ -86,6 +112,7 @@ module Request_kind = struct
     | Model_list
     | Account_read
     | Rate_limits_read
+    | Login
   [@@deriving sexp_of, equal]
 end
 
@@ -108,6 +135,7 @@ module Response = struct
         }
     | Account of Account.t
     | Rate_limits of Subscription_usage.Status.t
+    | Logged_in
     | Done of Request_kind.t
     | Failed of
         { kind : Request_kind.t
@@ -133,6 +161,10 @@ module Output = struct
     | Send of string
     | Response of Response.t
     | Tool_call of Tool_call.t
+    | Token_refresh of
+        { request_id : string
+        ; previous_account_id : string option
+        }
   [@@deriving sexp_of]
 end
 
@@ -145,6 +177,7 @@ module Server_request = struct
     | Mcp_tool_approval of { schema : Json.t option }
     | Question of { question_ids : string list }
     | Tool
+    | Token_refresh
 end
 
 (* A request of Codex's waiting for our answer, with its JSON-RPC id. *)
@@ -543,6 +576,15 @@ let read_rate_limits t =
   request t Rate_limits_read "account/rateLimits/read" `Null
 ;;
 
+let login_tokens t tokens =
+  request
+    t
+    Login
+    "account/login/start"
+    (`Object
+        (("type", `String "chatgptAuthTokens") :: Chatgpt_tokens.fields tokens))
+;;
+
 let limits t = t.limits
 
 let request_key : Json.t -> string = function
@@ -647,13 +689,13 @@ let mcp_accept ~schema ~always =
 let reply_approval t ~request_id (answer : Adapter_event.Approval_reply.t) =
   match Hashtbl.find t.server_requests request_id with
   | None -> None
-  | Some { request = Question _ | Tool; _ } -> None
+  | Some { request = Question _ | Tool | Token_refresh; _ } -> None
   | Some { Pending.id; request } ->
     Hashtbl.remove t.server_requests request_id;
     let decision name = `Object [ "decision", `String name ] in
     let result =
       match request, answer with
-      | (Question _ | Tool), _ -> assert false
+      | (Question _ | Tool | Token_refresh), _ -> assert false
       | Command_approval _, Allow | File_approval, Allow -> decision "accept"
       | Command_approval { decisions }, Allow_always ->
         if offered decisions "acceptForSession"
@@ -1634,10 +1676,28 @@ let server_request t ~id method_ params =
                "Codex's %{server} asked for input, which prigh cannot show \
                 yet: cancelled"])
       ]
+  | "account/chatgptAuthTokens/refresh" ->
+    register Token_refresh;
+    [ Output.Token_refresh
+        { request_id = key
+        ; previous_account_id = str "previousAccountId" params
+        }
+    ]
   | _ ->
     [ Output.Send
         (reply_error id ~code:(-32601) ("prigh does not handle " ^ method_))
     ]
+;;
+
+let reply_token_refresh t ~request_id tokens =
+  match Hashtbl.find t.server_requests request_id with
+  | Some { Pending.id; request = Token_refresh } ->
+    Hashtbl.remove t.server_requests request_id;
+    Some
+      (match tokens with
+       | Ok tokens -> reply id (`Object (Chatgpt_tokens.fields tokens))
+       | Error e -> reply_error id ~code:(-32603) (Error.to_string_hum e))
+  | Some _ | None -> None
 ;;
 
 let model_info json =
@@ -1754,6 +1814,7 @@ let response t (kind : Request_kind.t) json =
        let status = limits_of_snapshot snapshot in
        t.limits <- Some status;
        [ Output.Response (Rate_limits status) ]
+     | Login -> [ Output.Response Logged_in ]
      | Turn_interrupt | Compact | Revert -> [ Output.Response (Done kind) ])
 ;;
 

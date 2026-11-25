@@ -4,9 +4,13 @@ open! Import
 type t =
   { codec : Codex_codec.t
   ; driver : Codex_codec.Response.t Adapter.Driver.t
+  ; sw : Switch.t
   ; cwd : string
   ; mutable models : Model.t list
   ; mutable on_change : unit -> unit
+  ; mutable version : string option
+  ; mutable login : Codex_login.t option
+    (** prigh's login, once Codex took it *)
   }
 
 let id = "codex"
@@ -71,6 +75,19 @@ let dispatch t (output : Codex_codec.Output.t) =
   | Event e -> Adapter.Driver.push t.driver e
   | Send line -> Adapter.Driver.write t.driver line
   | Response r -> Adapter.Driver.answer t.driver r
+  | Token_refresh { request_id; previous_account_id = _ } ->
+    (* Fetching may refresh over the network: not on the reader's fiber. *)
+    Fiber.fork ~sw:t.sw (fun () ->
+      let tokens =
+        match t.login with
+        | Some login -> Codex_login.tokens login ~refused:true
+        | None ->
+          Or_error.error_string
+            "prigh handed this Codex no login: it runs on its own"
+      in
+      Option.iter
+        (Codex_codec.reply_token_refresh t.codec ~request_id tokens)
+        ~f:(Adapter.Driver.write t.driver))
   | Tool_call { request_id; tool; _ } ->
     (* No dynamic tools are offered: prigh's come over MCP. *)
     Option.iter
@@ -169,7 +186,17 @@ let open_process ~sw ?interrupt_grace ?request_timeout transport ~cwd =
       ?request_timeout
       transport
   in
-  let t = { codec; driver; cwd; models = []; on_change = Fn.id } in
+  let t =
+    { codec
+    ; driver
+    ; sw
+    ; cwd
+    ; models = []
+    ; on_change = Fn.id
+    ; version = None
+    ; login = None
+    }
+  in
   Adapter.Driver.on_orphan_request driver (refuse_orphan t);
   Adapter.Driver.run
     driver
@@ -215,7 +242,64 @@ let open_process ~sw ?interrupt_grace ?request_timeout transport ~cwd =
     |> Result.map_error ~f:fail_with_exit
   in
   let%map () = failed init ~what:"initialize" in
+  (match init with
+   | Initialized { version; _ } -> t.version <- version
+   | _ -> ());
   t
+;;
+
+let notice t message = Adapter.Driver.push t.driver (Notice message)
+
+let login_request t tokens =
+  Adapter.Driver.request
+    t.driver
+    (Codex_codec.login_tokens t.codec tokens)
+    ~matches:(function
+    | Logged_in | Failed { kind = Login; _ } -> true
+    | _ -> false)
+;;
+
+(* Hands Codex prigh's login; when it cannot take it, it runs on its own,
+   saying so. *)
+let hand_login t login =
+  let fallback why =
+    notice t (Codex_login.fallback_notice login ~version:t.version why)
+  in
+  match Codex_login.tokens login ~refused:false with
+  | Error e -> fallback (`No_token e)
+  | Ok tokens ->
+    (match login_request t tokens with
+     | Ok Logged_in -> t.login <- Some login
+     | Ok (Failed { message; _ }) -> fallback (`Refused message)
+     | Ok _ -> ()
+     | Error e -> fallback (`Refused (Error.to_string_hum e)))
+;;
+
+(* Codex does not refresh a token it was handed before it expires, only
+   once refused: a turn starts with one that lasts. *)
+let renew_login t =
+  match t.login with
+  | Some login when Codex_login.expiring login ~now_ms:(Credential.now_ms ()) ->
+    let label = Cli_credential.label (Codex_login.credential login) in
+    (match Codex_login.tokens login ~refused:false with
+     | Error e ->
+       notice
+         t
+         (sprintf
+            "prigh could not refresh ChatGPT login %S for Codex: %s"
+            label
+            (Error.to_string_hum e))
+     | Ok tokens ->
+       (match login_request t tokens with
+        | Ok Logged_in | Ok _ -> ()
+        | Error e ->
+          notice
+            t
+            (sprintf
+               "Codex did not take a fresh token of ChatGPT login %S: %s"
+               label
+               (Error.to_string_hum e))))
+  | Some _ | None -> ()
 ;;
 
 (* The login's limits, asked: none for a login without them (an API key's
@@ -258,6 +342,8 @@ let start
   let%bind t =
     open_process ~sw ?interrupt_grace ?request_timeout transport ~cwd:start.cwd
   in
+  Option.iter start.login ~f:(fun login ->
+    hand_login t (Codex_login.create login));
   let codec = t.codec
   and driver = t.driver in
   let s =
@@ -304,6 +390,7 @@ let send t settings input =
   if not (Adapter.Driver.alive t.driver)
   then Or_error.error_string "Codex is not running"
   else (
+    renew_login t;
     let%map.Or_error line =
       Codex_codec.start_turn t.codec (settings_of t settings) (inputs input)
     in
@@ -365,6 +452,7 @@ let thread_id t = Codex_codec.thread_id t.codec
 let cost_total _ = None
 let in_turn t = Adapter.Driver.in_turn t.driver
 let alive t = Adapter.Driver.alive t.driver
+let login t = Option.map t.login ~f:Codex_login.credential
 let stop t = Adapter.Driver.stop t.driver
 let models t = t.models
 let limits t = Codex_codec.limits t.codec
@@ -375,6 +463,7 @@ let compact t settings ~instructions:_ =
   if not (Adapter.Driver.alive t.driver)
   then Or_error.error_string "Codex is not running"
   else (
+    renew_login t;
     ignore (settings : Adapter.Settings.t);
     let%map.Or_error line = Codex_codec.compact t.codec in
     Adapter.Driver.begin_turn t.driver;

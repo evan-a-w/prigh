@@ -441,6 +441,7 @@ let thread_id t = Claude_codec.session_id t.codec
 let cost_total t = Claude_codec.cost_total t.codec
 let in_turn t = Adapter.Driver.in_turn t.driver
 let alive t = Adapter.Driver.alive t.driver
+let login _ = None
 let stop t = Adapter.Driver.stop t.driver
 let models t = t.models
 let limits t = Claude_codec.limits t.codec

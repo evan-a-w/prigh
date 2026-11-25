@@ -92,6 +92,13 @@ module Printer = struct
     | Tool_call call ->
       flush t;
       print_s [%message "tool call" (call : C.Tool_call.t)]
+    | Token_refresh { request_id; previous_account_id } ->
+      flush t;
+      print_s
+        [%message
+          "token refresh"
+            (request_id : string)
+            (previous_account_id : string option)]
   ;;
 end
 
@@ -1845,6 +1852,57 @@ let%expect_test "models and the account" =
      (response (Account (Chatgpt (email (l@example.com)) (plan (pro))))))
     (response (response (Account Api_key)))
     (response (response (Account Not_needed)))
+    |}]
+;;
+
+let%expect_test "prigh's ChatGPT login: handed, refused, refreshed" =
+  let codec = C.create () in
+  let tokens access : C.Chatgpt_tokens.t =
+    { access_token = access; account_id = "acct-1"; plan = Some "plus" }
+  in
+  print_line (C.login_tokens codec (tokens "tok-1"));
+  print_line (C.login_tokens codec { (tokens "tok-2") with plan = None });
+  print_s [%sexp (tokens "secret" : C.Chatgpt_tokens.t)];
+  feed
+    codec
+    [ {|{"id":0,"result":{"type":"chatgptAuthTokens"}}|}
+    ; {|{"id":1,"error":{"code":-32600,"message":"external auth is not supported"}}|}
+    ; {|{"method":"account/chatgptAuthTokens/refresh","id":0,"params":{"reason":"unauthorized","previousAccountId":"acct-1"}}|}
+    ; {|{"method":"account/chatgptAuthTokens/refresh","id":1,"params":{"reason":"unauthorized"}}|}
+    ];
+  print_s
+    [%sexp
+      (C.reply_token_refresh codec ~request_id:"0" (Ok (tokens "tok-3"))
+       : string option)];
+  print_s
+    [%sexp
+      (C.reply_token_refresh
+         codec
+         ~request_id:"1"
+         (Or_error.error_string "login gone")
+       : string option)];
+  (* Answered once; not an approval. *)
+  print_s
+    [%sexp
+      (C.reply_token_refresh codec ~request_id:"0" (Ok (tokens "tok-4"))
+       : string option)];
+  print_s [%sexp (C.reply_approval codec ~request_id:"0" Allow : string option)];
+  [%expect
+    {|
+    -> {"id":0,"method":"account/login/start","params":{"type":"chatgptAuthTokens","accessToken":"tok-1","chatgptAccountId":"acct-1","chatgptPlanType":"plus"}}
+    -> {"id":1,"method":"account/login/start","params":{"type":"chatgptAuthTokens","accessToken":"tok-2","chatgptAccountId":"acct-1","chatgptPlanType":null}}
+    ((access_token <redacted>) (account_id acct-1) (plan (plus)))
+    (response (response Logged_in))
+    (response
+     (response
+      (Failed (kind Login) (code -32600)
+       (message "external auth is not supported"))))
+    ("token refresh" (request_id 0) (previous_account_id (acct-1)))
+    ("token refresh" (request_id 1) (previous_account_id ()))
+    ("{\"id\":0,\"result\":{\"accessToken\":\"tok-3\",\"chatgptAccountId\":\"acct-1\",\"chatgptPlanType\":\"plus\"}}")
+    ("{\"id\":1,\"error\":{\"code\":-32603,\"message\":\"login gone\"}}")
+    ()
+    ()
     |}]
 ;;
 

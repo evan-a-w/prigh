@@ -76,6 +76,19 @@ module Account : sig
   [@@deriving sexp_of, equal]
 end
 
+(** A ChatGPT login's access token, handed to Codex for the process
+    ([account/login/start {type: "chatgptAuthTokens"}]): Codex keeps it in
+    memory and asks for a new one when refused ({!Output.Token_refresh}).
+    Printed without the token. *)
+module Chatgpt_tokens : sig
+  type t =
+    { access_token : string
+    ; account_id : string (** [chatgpt_account_id] *)
+    ; plan : string option (** [None]: Codex reads it from the token *)
+    }
+  [@@deriving sexp_of]
+end
+
 module Model_info : sig
   type t =
     { id : string
@@ -105,6 +118,7 @@ module Request_kind : sig
     | Model_list
     | Account_read
     | Rate_limits_read
+    | Login
   [@@deriving sexp_of, equal]
 end
 
@@ -128,6 +142,7 @@ module Response : sig
     | Account of Account.t
     | Rate_limits of Subscription_usage.Status.t
     (** [account/rateLimits/read]: the login's usage limits *)
+    | Logged_in (** Codex took the tokens of {!login_tokens} *)
     | Done of Request_kind.t
     (** interrupt, compact, revert: nothing more to say *)
     | Failed of
@@ -156,6 +171,12 @@ module Output : sig
     | Send of string (** a line for Codex's stdin *)
     | Response of Response.t
     | Tool_call of Tool_call.t
+    | Token_refresh of
+        { request_id : string
+        ; previous_account_id : string option
+        }
+    (** Codex was refused with the tokens it has (a 401) and waits, 10s at
+        most, for new ones: answer with {!reply_token_refresh} *)
   [@@deriving sexp_of]
 end
 
@@ -215,6 +236,12 @@ val list_models : t -> cursor:string option -> string
 (** [account/read] without refreshing the token: passive. *)
 val read_account : t -> string
 
+(** [account/login/start {type: "chatgptAuthTokens"}]: the process runs on
+    these tokens (in memory: Codex writes no [auth.json]) until it is given
+    others; answered [Logged_in], or [Failed] by a Codex without the mode
+    (it is experimental) or one that forces another login. *)
+val login_tokens : t -> Chatgpt_tokens.t -> string
+
 (** [account/rateLimits/read]: the ChatGPT login's usage limits. *)
 val read_rate_limits : t -> string
 
@@ -240,6 +267,14 @@ val reply_tool_call
   -> request_id:string
   -> output:string
   -> success:bool
+  -> string option
+
+(** Answers a {!Output.Token_refresh}; [Error] tells Codex why there are
+    none. [None] when no such request is waiting. *)
+val reply_token_refresh
+  :  t
+  -> request_id:string
+  -> Chatgpt_tokens.t Or_error.t
   -> string option
 
 val handle_line : t -> string -> Output.t list
