@@ -120,7 +120,8 @@ let login_row ~inject (l : Adapter_login.t) =
       (sprintf
          "Your %s sessions run on %s's own login on their tool host, or on one \
           of your %s logins in prigh (yours or shared with you): prigh hands \
-          the host short-lived tokens and counts the usage on that login."
+          the host short-lived tokens and counts the usage on that login. \
+          Import moves the tool host's own login into prigh."
          who
          who
          (Adapter_login.provider_name l))
@@ -139,7 +140,7 @@ let login_row ~inject (l : Adapter_login.t) =
              who
              l.adapter)
         ~on_click:(inject (Action.Run ("/adapters import " ^ l.adapter)))
-        [ Node.text "Import this host's login" ]
+        [ Node.text "Import" ]
     ]
 ;;
 

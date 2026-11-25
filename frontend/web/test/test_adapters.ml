@@ -266,8 +266,8 @@ let%expect_test "Engines: Codex's login, own or one of prigh's ChatGPT logins" =
   [%expect
     {|
     Codex login
-    Your Codex sessions run on Codex's own login on their tool host, or on one of your ChatGPT logins in prigh (yours or shared with you): prigh hands the host short-lived tokens and counts the usage on that login.
-    (Codex's own) (Import this host's login)
+    Your Codex sessions run on Codex's own login on their tool host, or on one of your ChatGPT logins in prigh (yours or shared with you): prigh hands the host short-lived tokens and counts the usage on that login. Import moves the tool host's own login into prigh.
+    (Codex's own) (Import)
     (Run "/adapters login codex")
     (Focus picker-input)
     Codex runs on
@@ -283,8 +283,8 @@ let%expect_test "Engines: Codex's login, own or one of prigh's ChatGPT logins" =
     (Focus dialog)
     (Expire_toast (id 0) (after_ms 3740))
     Codex login
-    Your Codex sessions run on Codex's own login on their tool host, or on one of your ChatGPT logins in prigh (yours or shared with you): prigh hands the host short-lived tokens and counts the usage on that login.
-    (Work) (Import this host's login)
+    Your Codex sessions run on Codex's own login on their tool host, or on one of your ChatGPT logins in prigh (yours or shared with you): prigh hands the host short-lived tokens and counts the usage on that login. Import moves the tool host's own login into prigh.
+    (Work) (Import)
     |}]
 ;;
 
@@ -317,8 +317,8 @@ let%expect_test "Engines: Claude Code's login warns of Anthropic's terms" =
   [%expect
     {|
     Claude Code login
-    Your Claude Code sessions run on Claude Code's own login on their tool host, or on one of your Claude Pro/Max logins in prigh (yours or shared with you): prigh hands the host short-lived tokens and counts the usage on that login. Anthropic's terms keep Claude Pro/Max logins to Claude's own apps: prigh holding one for Claude Code may breach them
-    (Max) (Import this host's login)
+    Your Claude Code sessions run on Claude Code's own login on their tool host, or on one of your Claude Pro/Max logins in prigh (yours or shared with you): prigh hands the host short-lived tokens and counts the usage on that login. Import moves the tool host's own login into prigh. Anthropic's terms keep Claude Pro/Max logins to Claude's own apps: prigh holding one for Claude Code may breach them
+    (Max) (Import)
     |}]
 ;;
 
@@ -393,8 +393,8 @@ let%expect_test "Engines: importing the host's Codex login asks first" =
     (Focus dialog)
     (Expire_toast (id 0) (after_ms 6000))
     Codex login
-    Your Codex sessions run on Codex's own login on their tool host, or on one of your ChatGPT logins in prigh (yours or shared with you): prigh hands the host short-lived tokens and counts the usage on that login.
-    (imported from laptop) (Import this host's login)
+    Your Codex sessions run on Codex's own login on their tool host, or on one of your ChatGPT logins in prigh (yours or shared with you): prigh hands the host short-lived tokens and counts the usage on that login. Import moves the tool host's own login into prigh.
+    (imported from laptop) (Import)
     Codex runs on "imported from laptop" from its next turn: laptop's file is now /home/u/.codex/auth.json.moved-to-prigh
     |}]
 ;;
