@@ -145,6 +145,11 @@ type t =
       ; error : string option
       }
   | Nix_gc_confirm of Nix_generations.t
+  | Import_login_confirm of
+      { import : Adapter_login.Import.t
+      ; busy : bool
+      ; error : string option
+      }
   | Annotate of Annotate.t
   | Temporary_menu
   | Leave_temporary
@@ -228,4 +233,5 @@ let per_session = function
   | Forge_host _
   | Login_label _
   | Nix_gc_confirm _ -> false
+  | Import_login_confirm _ -> false
 ;;

@@ -140,6 +140,8 @@ module Reply_tag = struct
     | Adapters_shown (** [/adapters] *)
     | Adapter_login_picker of string option (** the adapter named *)
     | Adapter_login_set of string (** the adapter *)
+    | Adapter_import_found (** [/adapters import]: for the user to consent *)
+    | Adapter_imported
     | Nix_store_shown (** [/nix-gc] *)
     | Nix_gc_done (** [/nix-gc run] *)
     | User_switched
@@ -4316,6 +4318,17 @@ let adapters_command m rest =
              })
           ~tag:(Adapter_login_set adapter)
       ] )
+  | Ok (Import { adapter; host }) ->
+    ( notice
+        m
+        (sprintf
+           "looking for %s's login on %s…"
+           (P.Session_engine.adapter_label adapter)
+           (Option.value host ~default:"the session's tool host"))
+    , [ call
+          (Import_adapter_login { adapter; host; confirm = false })
+          ~tag:Adapter_import_found
+      ] )
 ;;
 
 let nix_gc_command m rest =
@@ -6967,6 +6980,12 @@ let confirm m ~(action : Mode.Confirm_action.t) (intent : Intent.t) =
       , [ call (Delete_sessions { paths; switch_to }) ~tag:Sessions_deleted ] )
     | Tool_confirm c -> answer_confirm m c Allow
     | Nix_gc generations -> start_nix_gc m (Some generations)
+    | Import_adapter_login { adapter; host } ->
+      ( notice m "moving the login into prigh…"
+      , [ call
+            (Import_adapter_login { adapter; host = Some host; confirm = true })
+            ~tag:Adapter_imported
+        ] )
     | Browser_signin ->
       relink
         m
@@ -7043,7 +7062,8 @@ let confirm m ~(action : Mode.Confirm_action.t) (intent : Intent.t) =
     | Trim_after _
     | Delete_sessions _
     | Remove_worktree _
-    | Nix_gc _ -> notice m "cancelled", []
+    | Nix_gc _
+    | Import_adapter_login _ -> notice m "cancelled", []
   in
   match intent, action with
   | (Insert ("y" | "Y") | Submit), _ -> yes { m with mode = Editing }
@@ -7840,6 +7860,22 @@ let rec reply m (tag : Reply_tag.t) (result : (P.Json.t, string) Result.t) =
          with
          | None -> notice m "changed", []
          | Some l -> notice m (Adapters_command.changed l), [])
+     | Adapter_import_found ->
+       decode json ~f:P.Adapter_login.Import.of_json (fun i ->
+         ( { m with
+             notice = None
+           ; mode =
+               Confirm
+                 { question = P.Adapter_login.Import.question i
+                 ; action =
+                     Import_adapter_login { adapter = i.adapter; host = i.host }
+                 }
+           ; autocomplete = None
+           }
+         , [] ))
+     | Adapter_imported ->
+       decode json ~f:P.Adapter_login.Import.of_json (fun i ->
+         notice m (P.Adapter_login.Import.done_ i), [])
      | Nix_store_shown ->
        decode json ~f:P.Nix_store_status.of_json (fun status ->
          ( output

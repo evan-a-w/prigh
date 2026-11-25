@@ -130,6 +130,16 @@ let login_row ~inject (l : Adapter_login.t) =
         ~label:(sprintf "%s login: %s" who current)
         ~on_click:(inject (Action.Run ("/adapters login " ^ l.adapter)))
         current
+    ; button
+        ~cls:"small adapter-login-import"
+        ~title:
+          (sprintf
+             "Move %s's own login on the session's tool host into prigh \
+              (/adapters import %s)"
+             who
+             l.adapter)
+        ~on_click:(inject (Action.Run ("/adapters import " ^ l.adapter)))
+        [ Node.text "Import this host's login" ]
     ]
 ;;
 

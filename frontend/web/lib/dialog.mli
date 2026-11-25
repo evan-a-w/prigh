@@ -178,6 +178,11 @@ type t =
       } (** asked before removing it *)
   | Nix_gc_confirm of Nix_generations.t
   (** [/nix-gc run DAYS|all]: delete profile generations, then collect? *)
+  | Import_login_confirm of
+      { import : Adapter_login.Import.t
+      ; busy : bool (** moving it: waiting for the backend *)
+      ; error : string option
+      } (** [/adapters import]: move the host's own CLI login into prigh? *)
   | Annotate of Annotate.t (** drawing on an image *)
   | Temporary_menu (** a temporary session's: keep it, or delete it *)
   | Leave_temporary

@@ -226,6 +226,13 @@ module Method : sig
         }
     (** {!Adapter_login.list_of_json}: the CLI runs the user's composer
         sessions on that login from their next turn *)
+    | Import_adapter_login of
+        { adapter : string
+        ; host : string option (** id or name; [None]: the session's *)
+        ; confirm : bool
+        }
+    (** {!Adapter_login.Import}: moves the host's own CLI login into
+        prigh; without [confirm] only finds it, for the user to consent *)
     (** moves the attached session to [adapter] (or ["harness"]), with a
         handoff; replies with its {!State} *)
     | Nix_store_status (** superusers: {!Nix_store_status} *)

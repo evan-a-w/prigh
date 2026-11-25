@@ -8,7 +8,11 @@ open! Import
 
     [/adapters login ADAPTER [LOGIN|own]]: which login the CLI runs the
     user's sessions on, its own or one of prigh's ({!P.Adapter_login});
-    without [LOGIN], a picker. *)
+    without [LOGIN], a picker.
+
+    [/adapters import ADAPTER [HOST]]: moves the CLI's own login on [HOST]
+    (default: the session's tool host) into prigh, after the user consents
+    ({!P.Adapter_login.Import}). *)
 
 val usage : string
 
@@ -18,6 +22,10 @@ module Action : sig
     | Login of
         { adapter : string option (** [None]: the only one there is *)
         ; login : string option (** [None]: pick; ["own"]: its own *)
+        }
+    | Import of
+        { adapter : string
+        ; host : string option (** [None]: the session's *)
         }
   [@@deriving sexp_of, equal]
 end

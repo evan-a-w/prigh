@@ -339,6 +339,8 @@ module Reply_tag : sig
     | Adapter_logins_loaded of string option
     (** [list_adapters] for [/adapters login]: the adapter whose picker opens *)
     | Adapter_login_saved of string (** [set_adapter_login]: the adapter *)
+    | Adapter_import_found (** [import_adapter_login] without [confirm] *)
+    | Adapter_imported
     | Instructions_loaded (** [get_custom_instructions] *)
     | Instruction_saved
     (** [save_custom_instruction]: the draft closes, or says why not *)

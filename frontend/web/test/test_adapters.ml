@@ -267,7 +267,7 @@ let%expect_test "Engines: Codex's login, own or one of prigh's ChatGPT logins" =
     {|
     Codex login
     Your Codex sessions run on Codex's own login on their tool host, or on one of your ChatGPT logins in prigh (yours or shared with you): prigh hands the host short-lived tokens and counts the usage on that login.
-    (Codex's own)
+    (Codex's own) (Import this host's login)
     (Run "/adapters login codex")
     (Focus picker-input)
     Codex runs on
@@ -284,7 +284,7 @@ let%expect_test "Engines: Codex's login, own or one of prigh's ChatGPT logins" =
     (Expire_toast (id 0) (after_ms 3740))
     Codex login
     Your Codex sessions run on Codex's own login on their tool host, or on one of your ChatGPT logins in prigh (yours or shared with you): prigh hands the host short-lived tokens and counts the usage on that login.
-    (Work)
+    (Work) (Import this host's login)
     |}]
 ;;
 
@@ -318,7 +318,7 @@ let%expect_test "Engines: Claude Code's login warns of Anthropic's terms" =
     {|
     Claude Code login
     Your Claude Code sessions run on Claude Code's own login on their tool host, or on one of your Claude Pro/Max logins in prigh (yours or shared with you): prigh hands the host short-lived tokens and counts the usage on that login. Anthropic's terms keep Claude Pro/Max logins to Claude's own apps: prigh holding one for Claude Code may breach them
-    (Max)
+    (Max) (Import this host's login)
     |}]
 ;;
 
@@ -339,4 +339,62 @@ let%expect_test
   in
   H.text h ~selector:".model-chip";
   [%expect {| (Claude Code · Opus 5.5 @Max) |}]
+;;
+
+let import_reply ~confirmed =
+  sprintf
+    {|{"confirmed":%b,"adapter":"codex","provider":"openai-codex","host":"laptop","path":"/home/u/.codex/auth.json","label":"imported from laptop","warning":"Codex on laptop will stop being logged in.",%s}|}
+    confirmed
+    (if confirmed
+     then
+       {|"adapter_logins":[{"adapter":"codex","provider":"openai-codex","login":"imported-from-laptop","label":"imported from laptop","choices":[{"ref":"imported-from-laptop","label":"imported from laptop"}]}]|}
+     else {|"note":null|})
+;;
+
+let%expect_test "Engines: importing the host's Codex login asks first" =
+  let h = H.create () in
+  H.quiet h (fun () -> H.act h (hello ~features:[ "engines" ]));
+  H.quiet h (fun () -> H.act h (Settings_section Engines));
+  H.reply
+    h
+    "list_adapters"
+    (sprintf {|{"adapters":[],%s}|} (logins ~login:false));
+  H.click h ~selector:".adapter-login-import";
+  H.reply h "import_adapter_login" (import_reply ~confirmed:false);
+  H.text h ~selector:".import-login-confirm";
+  (* Refused: the dialog says why and stays. *)
+  H.click h ~selector:".import-login-confirm .danger";
+  H.fail h "import_adapter_login" "laptop went away";
+  H.text h ~selector:".import-login-confirm .dialog-error";
+  H.click h ~selector:".import-login-confirm .danger";
+  H.reply h "import_adapter_login" (import_reply ~confirmed:true);
+  H.text h ~selector:".adapter-login";
+  H.text h ~selector:".toast";
+  [%expect
+    {|
+    (Run "/adapters import codex")
+    (Rpc (method_ import_adapter_login) (params ((adapter codex)))
+     (tag Adapter_import_found))
+    (Focus dialog)
+    Move Codex's login from laptop into prigh?
+    (Close (Esc))
+    Codex on laptop will stop being logged in.
+    prigh keeps it as "imported from laptop", refreshing it for every tool host that runs Codex on it.
+    Enter moves it, Esc cancels (Cancel) (Move it)
+    Dialog_accept
+    (Rpc (method_ import_adapter_login)
+     (params ((adapter codex) (host laptop) (confirm true)))
+     (tag Adapter_imported))
+    laptop went away
+    Dialog_accept
+    (Rpc (method_ import_adapter_login)
+     (params ((adapter codex) (host laptop) (confirm true)))
+     (tag Adapter_imported))
+    (Focus dialog)
+    (Expire_toast (id 0) (after_ms 6000))
+    Codex login
+    Your Codex sessions run on Codex's own login on their tool host, or on one of your ChatGPT logins in prigh (yours or shared with you): prigh hands the host short-lived tokens and counts the usage on that login.
+    (imported from laptop) (Import this host's login)
+    Codex runs on "imported from laptop" from its next turn: laptop's file is now /home/u/.codex/auth.json.moved-to-prigh
+    |}]
 ;;

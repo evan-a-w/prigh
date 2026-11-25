@@ -154,6 +154,8 @@ module Reply_tag : sig
     | Adapters_shown (** [/adapters] *)
     | Adapter_login_picker of string option (** the adapter named *)
     | Adapter_login_set of string (** the adapter *)
+    | Adapter_import_found (** [/adapters import]: for the user to consent *)
+    | Adapter_imported
     | Nix_store_shown (** [/nix-gc] *)
     | Nix_gc_done (** [/nix-gc run] *)
     | User_switched

@@ -23,6 +23,8 @@ type t =
   }
 [@@deriving sexp_of, equal]
 
+type adapter_login = t [@@deriving sexp_of, equal]
+
 let of_json j =
   let open Or_error.Let_syntax in
   let%bind adapter = Json.string_field j "adapter" in
@@ -85,3 +87,53 @@ let parse_choice t arg =
               then ", " ^ c.ref_
               else sprintf ", %s (%s)" c.label c.ref_))))
 ;;
+
+module Import = struct
+  type t =
+    { adapter : string
+    ; host : string
+    ; path : string
+    ; label : string
+    ; warning : string
+    ; confirmed : bool
+    ; note : string option
+    ; logins : adapter_login list
+    }
+  [@@deriving sexp_of, equal]
+
+  let of_json j =
+    let open Or_error.Let_syntax in
+    let%bind adapter = Json.string_field j "adapter" in
+    let%bind host = Json.string_field j "host" in
+    let%bind path = Json.string_field j "path" in
+    let%bind label = Json.string_field j "label" in
+    let%bind warning = Json.string_field j "warning" in
+    let%bind note = Json.string_opt_field j "note" in
+    let%bind confirmed = Json.bool_default_field j "confirmed" ~default:false in
+    let%map logins = list_of_json j in
+    { adapter; host; path; label; warning; confirmed; note; logins }
+  ;;
+
+  let question t =
+    let cli = Session_engine.adapter_label t.adapter in
+    String.concat
+      ~sep:" "
+      ([ sprintf "Import %s's login from %s?" cli t.host; t.warning ]
+       @
+       match t.adapter with
+       | "claude" ->
+         [ "Anthropic's terms keep Claude Pro/Max logins to Claude's own apps."
+         ]
+       | _ -> [])
+  ;;
+
+  let done_ t =
+    sprintf
+      "%s runs on %S from its next turn: %s's file is now %s.moved-to-prigh%s"
+      (Session_engine.adapter_label t.adapter)
+      t.label
+      t.host
+      t.path
+      (Option.value_map t.note ~default:"" ~f:(fun n -> " (" ^ n ^ ")"))
+  ;;
+end

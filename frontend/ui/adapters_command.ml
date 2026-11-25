@@ -1,7 +1,10 @@
 open! Core
 open! Import
 
-let usage = "/adapters [refresh] | /adapters login [ADAPTER] [LOGIN|own]"
+let usage =
+  "/adapters [refresh] | /adapters login [ADAPTER] [LOGIN|own] | /adapters \
+   import ADAPTER [HOST]"
+;;
 
 module Action = struct
   type t =
@@ -9,6 +12,10 @@ module Action = struct
     | Login of
         { adapter : string option
         ; login : string option
+        }
+    | Import of
+        { adapter : string
+        ; host : string option
         }
   [@@deriving sexp_of, equal]
 end
@@ -22,6 +29,13 @@ let parse rest =
   | [ "refresh" ] -> Ok (List { refresh = true })
   | [ "login" ] -> Ok (Login { adapter = None; login = None })
   | [ "login"; adapter ] -> Ok (Login { adapter = Some adapter; login = None })
+  | [ "import" ] ->
+    Or_error.error_string
+      "which CLI? /adapters import codex|claude [HOST] moves that host's login \
+       into prigh"
+  | [ "import"; adapter ] -> Ok (Import { adapter; host = None })
+  | "import" :: adapter :: host ->
+    Ok (Import { adapter; host = Some (String.concat ~sep:" " host) })
   | "login" :: adapter :: login ->
     Ok
       (Login
@@ -37,9 +51,10 @@ let login_lines (logins : P.Adapter_login.t list) =
     :: "Logins:"
     :: List.map logins ~f:(fun (l : P.Adapter_login.t) ->
       sprintf
-        "  %s runs on %s  (/adapters login %s [LOGIN|own])"
+        "  %s runs on %s  (/adapters login %s [LOGIN|own], /adapters import %s)"
         (P.Session_engine.adapter_label l.adapter)
         (P.Adapter_login.describe l)
+        l.adapter
         l.adapter)
 ;;
 

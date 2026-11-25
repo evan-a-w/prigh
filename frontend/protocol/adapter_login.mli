@@ -39,3 +39,29 @@ val describe : t -> string
     (case-insensitive), or ["own"]. [Ok None]: the CLI's own. The error
     lists the choices. *)
 val parse_choice : t -> string -> Choice.t option Or_error.t
+
+(** [import_adapter_login]'s answer: a tool host's own CLI login found
+    ([confirmed] false: for the user to consent to) or moved into prigh. *)
+module Import : sig
+  type adapter_login := t
+
+  type t =
+    { adapter : string
+    ; host : string (** the host's name *)
+    ; path : string (** the CLI's credentials file there *)
+    ; label : string (** the login's in prigh, ["imported from HOST"] *)
+    ; warning : string (** what moving it does *)
+    ; confirmed : bool
+    ; note : string option (** moved, but the file could not be renamed *)
+    ; logins : adapter_login list
+    }
+  [@@deriving sexp_of, equal]
+
+  val of_json : Json.t -> t Or_error.t
+
+  (** The consent dialog's question (with Anthropic's terms for Claude). *)
+  val question : t -> string
+
+  (** What the user is told once it moved. *)
+  val done_ : t -> string
+end

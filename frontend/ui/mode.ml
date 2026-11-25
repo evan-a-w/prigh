@@ -105,7 +105,10 @@ module Confirm_action = struct
     | Clear_user_info
     | Chat_without_host of string
     | Nix_gc of Nix_generations.t
-    (** [/nix-gc run DAYS|all]: deleting profile generations *)
+    | Import_adapter_login of
+        { adapter : string
+        ; host : string
+        } (** [/nix-gc run DAYS|all]: deleting profile generations *)
     | Browser_signin
     (** a sign-in proxy guards the backend: sign in to it through the
         browser *)

@@ -292,6 +292,8 @@ module Reply_tag = struct
     | Adapter_logins_loaded of string option
     (** the picker to open, for an adapter *)
     | Adapter_login_saved of string
+    | Adapter_import_found
+    | Adapter_imported
     | Instructions_loaded
     | Instruction_saved
     | Instruction_removed
@@ -1583,7 +1585,11 @@ let close_dialog (m : Model.t) =
   match m.return_to_settings, m.dialog with
   | ( true
     , Some
-        ( Login _ | Forge_host _ | Nix_gc_confirm _ | Login_label _
+        ( Login _
+        | Forge_host _
+        | Nix_gc_confirm _
+        | Import_login_confirm _
+        | Login_label _
         | Picker
             { kind =
                 ( Compaction_models
@@ -4878,6 +4884,12 @@ let adapters_command (m : Model.t) rest =
       let m, more = fetch_adapters ~refresh m in
       m, cmds @ more)
     else m, cmds
+  | Ok (Import { adapter; host }) ->
+    ( m
+    , [ call
+          (Import_adapter_login { adapter; host; confirm = false })
+          ~tag:Adapter_import_found
+      ] )
   | Ok (Login { adapter; login = Some login }) ->
     set_adapter_login m ~adapter:(Option.value adapter ~default:"codex") login
   | Ok (Login { adapter; login = None }) ->
@@ -9891,8 +9903,44 @@ let rec reply_to (m : Model.t) (tag : Reply_tag.t) result =
       with
       | Some l -> toast m (Prigh_ui.Adapters_command.changed l)
       | None -> m, [])
-  | (Adapter_logins_loaded _ | Adapter_login_saved _), Error e ->
-    error m (String.capitalize e)
+  | Adapter_import_found, Ok json ->
+    decode m json Adapter_login.Import.of_json ~f:(fun import ->
+      let back =
+        match m.dialog with
+        | Some Settings -> true
+        | _ -> m.return_to_settings
+      in
+      let m, cmds =
+        open_dialog
+          m
+          (Import_login_confirm { import; busy = false; error = None })
+      in
+      { m with return_to_settings = back }, cmds)
+  | Adapter_imported, Ok json ->
+    decode m json Adapter_login.Import.of_json ~f:(fun import ->
+      let m =
+        { m with
+          adapters = Adapters_page.logins_changed m.adapters import.logins
+        }
+      in
+      let m, closed =
+        match m.dialog with
+        | Some (Import_login_confirm _) -> close_dialog m
+        | _ -> m, []
+      in
+      let m, cmds = toast m (Adapter_login.Import.done_ import) in
+      m, closed @ cmds)
+  | Adapter_imported, Error e ->
+    (match m.dialog with
+     | Some (Import_login_confirm d) ->
+       ( { m with
+           dialog =
+             Some (Import_login_confirm { d with busy = false; error = Some e })
+         }
+       , [] )
+     | _ -> error m (String.capitalize e))
+  | ( (Adapter_logins_loaded _ | Adapter_login_saved _ | Adapter_import_found)
+    , Error e ) -> error m (String.capitalize e)
   | Usage_loaded, result ->
     let result =
       Result.bind result ~f:(fun json ->
@@ -12114,6 +12162,20 @@ let dialog_accept (m : Model.t) =
     , [ change_dir ~if_missing:Create ~target path ] )
   | Some (New_worktree d) -> create_worktree m d
   | Some (Remove_worktree _) -> remove_worktree m ~force:false
+  | Some (Import_login_confirm { busy = true; _ }) -> m, []
+  | Some (Import_login_confirm ({ import; _ } as d)) ->
+    ( { m with
+        dialog =
+          Some (Import_login_confirm { d with busy = true; error = None })
+      }
+    , [ call
+          (Import_adapter_login
+             { adapter = import.adapter
+             ; host = Some import.host
+             ; confirm = true
+             })
+          ~tag:Adapter_imported
+      ] )
   | Some (Nix_gc_confirm generations) ->
     let m, cmds = close_dialog m in
     let m, start = start_nix_gc m (Some generations) in
@@ -13044,7 +13106,11 @@ let update_connected (m : Model.t) (action : Action.t) =
         | Some (Settings | Auth _), None -> { m' with dialog = m.dialog }, cmds
         | ( Some Settings
           , Some
-              ( Login _ | Forge_host _ | Nix_gc_confirm _ | Login_label _
+              ( Login _
+              | Forge_host _
+              | Nix_gc_confirm _
+              | Import_login_confirm _
+              | Login_label _
               | Picker
                   { kind =
                       ( Compaction_models

@@ -46,7 +46,6 @@ let%expect_test "/adapters lists each host's CLIs and what to run" =
   [%expect
     {|
     (Rpc (method_ list_adapters) (params ()) (tag Adapters_shown))
-
     ▌ earlier question
       earlier answer
     ┌─ Agent CLIs ───────────────────────────────────────────────────────────────────────────┐
@@ -61,7 +60,8 @@ let%expect_test "/adapters lists each host's CLIs and what to run" =
     │ prigh never installs them or logs in: run that on the host                             │
     │                                                                                        │
     │ Logins:                                                                                │
-    │   Codex runs on ChatGPT (prigh) · Work  (/adapters login codex [LOGIN|own])            │
+    │   Codex runs on ChatGPT (prigh) · Work  (/adapters login codex [LOGIN|own], /adapters  │
+    │ import codex)                                                                          │
     └─────────────────────────────────────────────────────────────────────────── Esc closes ─┘
     ──────────────────────────────────────────────────────────────────────────────────────────
     > ▏
@@ -76,15 +76,15 @@ let%expect_test "/adapters lists each host's CLIs and what to run" =
 
 
 
-
-
-
-
       prigh in /work · /help · Esc aborts · Ctrl+C twice quits
 
     ▌ earlier question
       earlier answer
-    ── unknown argument "now": /adapters [refresh] | /adapters login [ADAPTER] [LOGIN|own] ───
+    ┌─ Error ────────────────────────────────────────────────────────────────────────────────┐
+    │ unknown argument "now": /adapters [refresh] | /adapters login [ADAPTER] [LOGIN|own] |  │
+    │ /adapters import ADAPTER [HOST]                                                        │
+    └──────────────────────────────────────────────────────────────────────── Esc dismisses ─┘
+    ──────────────────────────────────────────────────────────────────────────────────────────
     > /adapters now▏
     /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
     |}]
@@ -334,6 +334,100 @@ let%expect_test
     └──────────────────────────────────────────────────────────────────────── Esc dismisses ─┘
     ──────────────────────────────────────────────────────────────────────────────────────────
     > ▏
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
+    |}]
+;;
+
+let import_reply ~confirmed =
+  sprintf
+    {|{"confirmed":%b,"adapter":"claude","provider":"anthropic","host":"laptop","path":"/home/u/.claude/.credentials.json","label":"imported from laptop","warning":"Claude Code on laptop will stop being logged in.","note":null,"adapter_logins":[]}|}
+    confirmed
+;;
+
+let%expect_test "/adapters import claude laptop: asks first, then moves it" =
+  let h = connected () in
+  run h "/adapters import claude laptop";
+  H.reply h Adapter_import_found (import_reply ~confirmed:false);
+  H.show h;
+  H.enter h;
+  H.reply h Adapter_imported (import_reply ~confirmed:true);
+  H.show h;
+  run h "/adapters import";
+  H.show h;
+  [%expect
+    {|
+    (Rpc
+      (method_ import_adapter_login)
+      (params (
+        (adapter claude)
+        (host    laptop)))
+      (tag Adapter_import_found))
+
+
+
+
+
+
+
+
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ┌─ Confirm ──────────────────────────────────────────────────────────────────────────────┐
+    │ Import Claude Code's login from laptop? Claude Code on laptop will stop being logged   │
+    │ in. Anthropic's terms keep Claude Pro/Max logins to Claude's own apps.                 │
+    └────────────────────────────────────────────────────────────────────────────────────────┘
+    ──────────────────────────────────────────────────────────────────────────────────────────
+    ? ▏
+    /work  deepseek-flash  think:off  mode:auto  ctx:0.1%/1.0M  $0.01  confirm: y / n
+    (Rpc
+      (method_ import_adapter_login)
+      (params (
+        (adapter claude)
+        (host    laptop)
+        (confirm true)))
+      (tag Adapter_imported))
+
+
+
+
+
+
+
+
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ┌─ Notice ───────────────────────────────────────────────────────────────────────────────┐
+    │ Claude Code runs on "imported from laptop" from its next turn: laptop's file is now    │
+    │ /home/u/.claude/.credentials.json.moved-to-prigh                                       │
+    └──────────────────────────────────────────────────────────────────────── Esc dismisses ─┘
+    ──────────────────────────────────────────────────────────────────────────────────────────
+    > ▏
+    /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
+
+
+
+
+
+
+
+
+
+
+
+
+
+      prigh in /work · /help · Esc aborts · Ctrl+C twice quits
+
+    ▌ earlier question
+      earlier answer
+    ─── which CLI? /adapters import codex|claude [HOST] moves that host's login into prigh ───
+    > /adapters import▏
     /work  deepseek-flash  think:off  mode:auto  view:normal  ctx:0.1%/1.0M  $0.01
     |}]
 ;;

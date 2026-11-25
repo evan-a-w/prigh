@@ -177,6 +177,11 @@ module Method = struct
         { adapter : string
         ; login : string option
         }
+    | Import_adapter_login of
+        { adapter : string
+        ; host : string option
+        ; confirm : bool
+        }
     | Nix_store_status
     | Nix_store_gc of { delete_generations : Nix_generations.t option }
     | Get_memory
@@ -279,6 +284,7 @@ module Method = struct
     | List_adapters _ -> "list_adapters"
     | Set_adapter _ -> "set_adapter"
     | Set_adapter_login _ -> "set_adapter_login"
+    | Import_adapter_login _ -> "import_adapter_login"
     | Nix_store_status -> "nix_store_status"
     | Nix_store_gc _ -> "nix_store_gc"
     | Get_memory -> "get_memory"
@@ -340,6 +346,10 @@ module Method = struct
       [ "adapter", Json.str adapter
       ; "login", Option.value_map login ~default:`Null ~f:Json.str
       ]
+    | Import_adapter_login { adapter; host; confirm } ->
+      [ "adapter", Json.str adapter ]
+      @ Option.value_map host ~default:[] ~f:(fun h -> [ "host", Json.str h ])
+      @ if confirm then [ "confirm", Json.bool true ] else []
     | Save_memory { id; title; text } -> Memory.save_params ?id ?title text
     | Forget_memory { id } -> Memory.forget_params ~id
     | Forget_allowed_call { call = Some call } -> [ "call", Json.str call ]
